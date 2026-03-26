@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.6.1
+
+- Fixed the yank files dialog so pressing `space` can toggle selected files off again
+- Added regression coverage for the checklist space-toggle behavior
+
 ## v0.6.0
 
 - Migrated the TUI stack to Bubble Tea v2, Bubbles v2, and Lip Gloss v2
