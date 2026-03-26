@@ -42,7 +42,7 @@ func (c Checklist) Update(key string) Checklist {
 		if c.Cursor > 0 {
 			c.Cursor--
 		}
-	case " ":
+	case " ", "space":
 		if len(c.Items) > 0 {
 			items := make([]Item, len(c.Items))
 			copy(items, c.Items)
