@@ -193,6 +193,25 @@ func TestExecute_RunsPush(t *testing.T) {
 	}
 }
 
+func TestExecute_RunsStage(t *testing.T) {
+	called := 0
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+		runStage: func() error {
+			called++
+			return nil
+		},
+	}
+
+	if err := execute([]string{"stage"}, d); err != nil {
+		t.Fatalf("execute stage: %v", err)
+	}
+	if called != 1 {
+		t.Fatalf("runStage called %d times, want 1", called)
+	}
+}
+
 func TestExecute_PushAllowedInRegularRepo(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	d := deps{

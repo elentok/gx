@@ -11,6 +11,7 @@ import (
 	"gx/config"
 	"gx/git"
 	"gx/ui/confirm"
+	"gx/ui/stage"
 	"gx/ui/worktrees"
 
 	tea "charm.land/bubbletea/v2"
@@ -22,6 +23,7 @@ type deps struct {
 	stderr       io.Writer
 	getwd        func() (string, error)
 	runWorktrees func(string) error
+	runStage     func() error
 	confirmForce func(string) (bool, error)
 	initConfig   func() (string, error)
 	getenv       func(string) string
@@ -35,6 +37,7 @@ func defaultDeps() deps {
 		stderr:       os.Stderr,
 		getwd:        os.Getwd,
 		runWorktrees: runWorktrees,
+		runStage:     runStage,
 		confirmForce: confirm.Run,
 		initConfig:   config.Init,
 		getenv:       os.Getenv,
@@ -57,6 +60,8 @@ func execute(args []string, d deps) error {
 		return runWorktreeCmd(args[1:], d)
 	case "push":
 		return runPush(d)
+	case "stage":
+		return d.runStage()
 	case "init":
 		return runInit(d)
 	case "edit-config":
@@ -85,6 +90,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  gx wt abs-path <name>        print absolute path of a worktree")
 	fmt.Fprintln(w, "  gx wt clone <url> [dir]      clone using the .bare trick")
 	fmt.Fprintln(w, "  gx push")
+	fmt.Fprintln(w, "  gx stage")
 	fmt.Fprintln(w, "  gx init")
 	fmt.Fprintln(w, "  gx edit-config")
 	fmt.Fprintln(w, "  gx bump [major|minor|patch]  create a version tag and optionally push")
@@ -154,6 +160,31 @@ func runWorktrees(_ string) error {
 		UseNerdFontIcons: cfg.UseNerdFontIcons,
 	}
 	m := worktrees.NewWithSettings(*repo, activeWorktreePath, settings)
+	p := tea.NewProgram(m)
+	_, err = p.Run()
+	return err
+}
+
+func runStage() error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	info, err := git.IdentifyDir(cwd)
+	if err != nil {
+		return err
+	}
+	if info.Repo.IsBare && info.WorktreeRoot == "" {
+		return fmt.Errorf("gx stage must be run from a regular repo or linked worktree")
+	}
+
+	root, err := git.WorktreeRoot(cwd)
+	if err != nil {
+		return err
+	}
+
+	m := stage.New(root)
 	p := tea.NewProgram(m)
 	_, err = p.Run()
 	return err
