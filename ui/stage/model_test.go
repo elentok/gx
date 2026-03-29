@@ -200,3 +200,29 @@ func TestApplySelection_DoesNotSwitchSectionWhenHunksRemain(t *testing.T) {
 		t.Fatalf("expected unstaged hunks to remain after staging first hunk")
 	}
 }
+
+func TestCCTriggersCommitCommand(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "README.md", "changed\n")
+
+	m := New(repo)
+	m.ready = true
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+	if cmd != nil {
+		t.Fatalf("first c should not launch command")
+	}
+	m = updated.(Model)
+	if m.keyPrefix != "c" {
+		t.Fatalf("expected keyPrefix=c after first c, got %q", m.keyPrefix)
+	}
+
+	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+	if cmd == nil {
+		t.Fatalf("second c should launch commit command")
+	}
+	m = updated.(Model)
+	if m.keyPrefix != "" {
+		t.Fatalf("expected keyPrefix reset after cc, got %q", m.keyPrefix)
+	}
+}

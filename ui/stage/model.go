@@ -2,6 +2,8 @@ package stage
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"time"
@@ -70,6 +72,7 @@ type Model struct {
 	statusMsg string
 	err       error
 	flash     flashState
+	keyPrefix string
 }
 
 type Settings struct {
@@ -90,6 +93,11 @@ type flashState struct {
 }
 
 type flashTickMsg struct{}
+
+type commitFinishedMsg struct {
+	err       error
+	tmuxSplit bool
+}
 
 var (
 	catBase0   = lipgloss.Color("#1e1e2e")
@@ -161,6 +169,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
+		if handledModel, cmd, handled := m.handleChordKey(msg); handled {
+			return handledModel, cmd
+		}
 		if m.focus == focusStatus {
 			return m.handleStatusKey(msg)
 		}
@@ -174,8 +185,42 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nextFlashCmd()
 		}
+	case commitFinishedMsg:
+		if msg.err != nil {
+			m.statusMsg = "commit failed: " + msg.err.Error()
+			return m, nil
+		}
+		if msg.tmuxSplit {
+			m.statusMsg = "opened tmux split: git commit"
+			return m, nil
+		}
+		m.statusMsg = "git commit finished"
+		m.refresh()
+		return m, nil
 	}
 	return m, nil
+}
+
+func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
+	key := msg.String()
+	if m.keyPrefix == "c" {
+		m.keyPrefix = ""
+		if key == "c" {
+			m.statusMsg = "opening git commit..."
+			return m, cmdGitCommit(m.worktreeRoot), true
+		}
+		if key == "esc" {
+			m.statusMsg = ""
+			return m, nil, true
+		}
+	}
+	if key == "c" {
+		m.keyPrefix = "c"
+		m.statusMsg = "cc: git commit"
+		return m, nil, true
+	}
+	m.keyPrefix = ""
+	return m, nil, false
 }
 
 func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -953,6 +998,20 @@ func nextFlashCmd() tea.Cmd {
 	})
 }
 
+func cmdGitCommit(worktreeRoot string) tea.Cmd {
+	if os.Getenv("TMUX") != "" {
+		return func() tea.Msg {
+			err := exec.Command("tmux", "split-window", "-v", "-c", worktreeRoot, "git commit").Run()
+			return commitFinishedMsg{err: err, tmuxSplit: true}
+		}
+	}
+	c := exec.Command("git", "commit")
+	c.Dir = worktreeRoot
+	return tea.ExecProcess(c, func(err error) tea.Msg {
+		return commitFinishedMsg{err: err}
+	})
+}
+
 func (m Model) selectedStatusEntry() (statusEntry, bool) {
 	if m.selected < 0 || m.selected >= len(m.statusEntries) {
 		return statusEntry{}, false
@@ -1089,19 +1148,21 @@ func (m *Model) focusMovedTarget(sig movedTarget) {
 
 func (m Model) helpLine() string {
 	if m.focus == focusStatus {
+		hint := "status: j/k move · h/l collapse-expand · space toggle file/dir · enter diff · cc commit · r refresh · q quit"
 		if m.statusMsg != "" {
-			return "  " + m.statusMsg
+			return "  " + m.statusMsg + "  ·  " + lipgloss.NewStyle().Foreground(catSubtle).Render(hint)
 		}
-		return lipgloss.NewStyle().Foreground(catSubtle).Render("  status: j/k move · h/l collapse-expand · space toggle file/dir · enter diff · r refresh · q quit")
-	}
-	if m.statusMsg != "" {
-		return "  " + m.statusMsg
+		return lipgloss.NewStyle().Foreground(catSubtle).Render("  " + hint)
 	}
 	modeLabel := "hunk"
 	if m.navMode == navLine {
 		modeLabel = "line"
 	}
-	return lipgloss.NewStyle().Foreground(catSubtle).Render("  diff: mode:" + modeLabel + " · tab section · f fullscreen · j/k move · J/K scroll(3) · space stage/unstage · r refresh · esc/q back")
+	hint := "diff: mode:" + modeLabel + " · tab section · f fullscreen · j/k move · J/K scroll(3) · space stage/unstage · cc commit · r refresh · esc/q back"
+	if m.statusMsg != "" {
+		return "  " + m.statusMsg + "  ·  " + lipgloss.NewStyle().Foreground(catSubtle).Render(hint)
+	}
+	return lipgloss.NewStyle().Foreground(catSubtle).Render("  " + hint)
 }
 
 func (m Model) panelStyle(active bool) lipgloss.Style {
