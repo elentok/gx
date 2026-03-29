@@ -174,6 +174,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ready = true
 		m.syncDiffViewports()
 		return m, nil
+	case tea.FocusMsg:
+		m.refresh()
+		return m, nil
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
@@ -763,6 +766,7 @@ func (m Model) View() tea.View {
 	}
 	v := tea.NewView(out)
 	v.AltScreen = true
+	v.ReportFocus = true
 	return v
 }
 

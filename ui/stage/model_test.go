@@ -79,6 +79,33 @@ func TestHelpOverlayToggleAndCompactStatusBar(t *testing.T) {
 	}
 }
 
+func TestRefreshesOnFocusMsg(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+
+	m := New(repo)
+	m.ready = true
+
+	countBefore := len(m.statusEntries)
+	testutil.WriteFile(t, repo, "b.txt", "two\n")
+
+	updated, _ := m.Update(tea.FocusMsg{})
+	m = updated.(Model)
+
+	if len(m.statusEntries) <= countBefore {
+		t.Fatalf("expected refresh on focus to include new file; before=%d after=%d", countBefore, len(m.statusEntries))
+	}
+}
+
+func TestViewEnablesReportFocus(t *testing.T) {
+	m := New(testutil.TempRepo(t))
+	m.ready = true
+	v := m.View()
+	if !v.ReportFocus {
+		t.Fatalf("expected ReportFocus enabled on stage view")
+	}
+}
+
 func TestSpaceStagesSingleLineInLineMode(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "line.txt", "line-1\nline-2\n")
