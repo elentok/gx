@@ -38,14 +38,16 @@ const (
 )
 
 type sectionState struct {
-	rawLines     []string
-	viewLines    []string
-	displayToRaw []int
-	rawToDisplay []int
-	parsed       parsedDiff
-	activeHunk   int
-	activeLine   int
-	viewport     viewport.Model
+	rawLines         []string
+	baseLines        []string
+	baseDisplayToRaw []int
+	viewLines        []string
+	displayToRaw     []int
+	rawToDisplay     []int
+	parsed           parsedDiff
+	activeHunk       int
+	activeLine       int
+	viewport         viewport.Model
 }
 
 type Model struct {
@@ -60,6 +62,7 @@ type Model struct {
 	section        diffSection
 	navMode        navMode
 	diffFullscreen bool
+	wrapSoft       bool
 
 	files         []git.StageFileStatus
 	statusEntries []statusEntry
@@ -135,6 +138,7 @@ func NewWithSettings(worktreeRoot string, settings Settings) Model {
 		focus:         focusStatus,
 		section:       sectionUnstaged,
 		navMode:       navHunk,
+		wrapSoft:      true,
 		collapsedDirs: map[string]bool{},
 		selected:      0,
 		unstaged:      newSectionState(),
@@ -288,6 +292,10 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.diffFullscreen = !m.diffFullscreen
 		m.syncDiffViewports()
 		m.ensureActiveVisible(m.currentSection())
+	case "w":
+		m.wrapSoft = !m.wrapSoft
+		m.syncDiffViewports()
+		m.ensureActiveVisible(m.currentSection())
 	case "r":
 		m.refresh()
 	case "j", "down":
@@ -424,8 +432,8 @@ func (m *Model) reload(preservePath string) {
 		m.err = err
 		m.files = nil
 		m.statusEntries = nil
-		m.unstaged = sectionState{activeHunk: -1, activeLine: -1}
-		m.staged = sectionState{activeHunk: -1, activeLine: -1}
+		m.unstaged = newSectionState()
+		m.staged = newSectionState()
 		return
 	}
 	m.err = nil
@@ -517,6 +525,8 @@ func buildSectionState(raw, color string, prev sectionState) sectionState {
 	if raw == "" {
 		state.activeHunk = -1
 		state.activeLine = -1
+		state.baseLines = nil
+		state.baseDisplayToRaw = nil
 		state.viewLines = nil
 		state.displayToRaw = nil
 		state.rawToDisplay = nil
@@ -532,7 +542,10 @@ func buildSectionState(raw, color string, prev sectionState) sectionState {
 	if len(colorLines) != len(state.rawLines) {
 		colorLines = append([]string{}, state.rawLines...)
 	}
-	state.viewLines, state.displayToRaw, state.rawToDisplay = buildDisplayLines(state.parsed, colorLines)
+	state.baseLines, state.baseDisplayToRaw = buildDisplayBaseLines(state.parsed, colorLines)
+	state.viewLines = append([]string{}, state.baseLines...)
+	state.displayToRaw = append([]int{}, state.baseDisplayToRaw...)
+	state.rawToDisplay = buildRawToDisplayMap(state.parsed, state.displayToRaw)
 	prevOffset := state.viewport.YOffset()
 	state.viewport.SetContentLines(state.viewLines)
 	state.viewport.SetYOffset(prevOffset)
@@ -562,13 +575,9 @@ func buildSectionState(raw, color string, prev sectionState) sectionState {
 	return state
 }
 
-func buildDisplayLines(parsed parsedDiff, colorLines []string) (lines []string, displayToRaw []int, rawToDisplay []int) {
+func buildDisplayBaseLines(parsed parsedDiff, colorLines []string) (lines []string, displayToRaw []int) {
 	if len(parsed.Lines) == 0 {
-		return nil, nil, nil
-	}
-	rawToDisplay = make([]int, len(parsed.Lines))
-	for i := range rawToDisplay {
-		rawToDisplay[i] = -1
+		return nil, nil
 	}
 
 	hdrStyle := lipgloss.NewStyle().Background(catSurface).Foreground(catText).Bold(true)
@@ -579,23 +588,32 @@ func buildDisplayLines(parsed parsedDiff, colorLines []string) (lines []string, 
 		}
 
 		header := cleanHunkHeader(parsed.Lines[h.StartLine])
-		displayIdx := len(lines)
 		lines = append(lines, hdrStyle.Render(" "+header+" "))
 		displayToRaw = append(displayToRaw, h.StartLine)
-		rawToDisplay[h.StartLine] = displayIdx
 
 		for rawIdx := h.StartLine + 1; rawIdx <= h.EndLine && rawIdx < len(parsed.Lines); rawIdx++ {
 			line := parsed.Lines[rawIdx]
 			if rawIdx < len(colorLines) {
 				line = sanitizeANSIInline(colorLines[rawIdx])
 			}
-			displayIdx = len(lines)
 			lines = append(lines, line)
 			displayToRaw = append(displayToRaw, rawIdx)
-			rawToDisplay[rawIdx] = displayIdx
 		}
 	}
-	return lines, displayToRaw, rawToDisplay
+	return lines, displayToRaw
+}
+
+func buildRawToDisplayMap(parsed parsedDiff, displayToRaw []int) []int {
+	rawToDisplay := make([]int, len(parsed.Lines))
+	for i := range rawToDisplay {
+		rawToDisplay[i] = -1
+	}
+	for i, rawIdx := range displayToRaw {
+		if rawIdx >= 0 && rawIdx < len(rawToDisplay) && rawToDisplay[rawIdx] < 0 {
+			rawToDisplay[rawIdx] = i
+		}
+	}
+	return rawToDisplay
 }
 
 func sanitizeANSIInline(s string) string {
@@ -928,6 +946,9 @@ func (m *Model) syncDiffViewports() {
 	_, diffW := m.splitWidth()
 	_, diffH := m.splitHeight(mainH)
 	vpW := maxInt(1, diffW-4)
+	wrapWidth := maxInt(1, vpW-2)
+	reflowSectionLines(&m.unstaged, wrapWidth, m.wrapSoft)
+	reflowSectionLines(&m.staged, wrapWidth, m.wrapSoft)
 
 	hasUnstaged := len(m.unstaged.viewLines) > 0
 	hasStaged := len(m.staged.viewLines) > 0
@@ -979,6 +1000,70 @@ func (m *Model) syncDiffViewports() {
 	// Ensure content is set and clamped.
 	m.unstaged.viewport.SetContentLines(m.unstaged.viewLines)
 	m.staged.viewport.SetContentLines(m.staged.viewLines)
+}
+
+func reflowSectionLines(sec *sectionState, wrapWidth int, wrapSoft bool) {
+	if len(sec.baseLines) == 0 {
+		sec.viewLines = nil
+		sec.displayToRaw = nil
+		sec.rawToDisplay = buildRawToDisplayMap(sec.parsed, nil)
+		sec.viewport.SetContent("")
+		sec.viewport.SetYOffset(0)
+		return
+	}
+
+	prevOffset := sec.viewport.YOffset()
+	view := make([]string, 0, len(sec.baseLines))
+	mapRaw := make([]int, 0, len(sec.baseDisplayToRaw))
+
+	for i, line := range sec.baseLines {
+		rawIdx := -1
+		if i < len(sec.baseDisplayToRaw) {
+			rawIdx = sec.baseDisplayToRaw[i]
+		}
+		if !wrapSoft || rawIdx < 0 {
+			view = append(view, line)
+			mapRaw = append(mapRaw, rawIdx)
+			continue
+		}
+		parts := wrapANSI(line, wrapWidth)
+		for _, p := range parts {
+			view = append(view, p)
+			mapRaw = append(mapRaw, rawIdx)
+		}
+	}
+
+	sec.viewLines = view
+	sec.displayToRaw = mapRaw
+	sec.rawToDisplay = buildRawToDisplayMap(sec.parsed, sec.displayToRaw)
+	sec.viewport.SetContentLines(sec.viewLines)
+	sec.viewport.SetYOffset(prevOffset)
+}
+
+func wrapANSI(s string, width int) []string {
+	if width <= 0 {
+		return []string{s}
+	}
+	total := ansi.StringWidth(s)
+	if total <= width {
+		return []string{s}
+	}
+	out := make([]string, 0, total/width+1)
+	for start := 0; start < total; start += width {
+		end := start + width
+		if end > total {
+			end = total
+		}
+		part := ansi.Cut(s, start, end)
+		if part == "" {
+			break
+		}
+		out = append(out, part)
+	}
+	if len(out) == 0 {
+		return []string{s}
+	}
+	return out
 }
 
 func (m *Model) ensureActiveVisible(sec *sectionState) {
@@ -1158,7 +1243,11 @@ func (m Model) helpLine() string {
 	if m.navMode == navLine {
 		modeLabel = "line"
 	}
-	hint := "diff: mode:" + modeLabel + " · tab section · f fullscreen · j/k move · J/K scroll(3) · space stage/unstage · cc commit · r refresh · esc/q back"
+	wrapLabel := "off"
+	if m.wrapSoft {
+		wrapLabel = "on"
+	}
+	hint := "diff: mode:" + modeLabel + " · wrap:" + wrapLabel + " · tab section · f fullscreen · w wrap · j/k move · J/K scroll(3) · space stage/unstage · cc commit · r refresh · esc/q back"
 	if m.statusMsg != "" {
 		return "  " + m.statusMsg + "  ·  " + lipgloss.NewStyle().Foreground(catSubtle).Render(hint)
 	}

@@ -226,3 +226,37 @@ func TestCCTriggersCommitCommand(t *testing.T) {
 		t.Fatalf("expected keyPrefix reset after cc, got %q", m.keyPrefix)
 	}
 }
+
+func TestWToggleSoftWrap(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "README.md", "this is a very long line that should wrap in narrow diff panes\n")
+
+	m := New(repo)
+	m.ready = true
+	m.width = 80
+	m.height = 20
+	m.focus = focusDiff
+	m.section = sectionUnstaged
+	m.syncDiffViewports()
+
+	wrappedCount := len(m.unstaged.viewLines)
+	if !m.wrapSoft {
+		t.Fatal("expected wrapSoft enabled by default")
+	}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'w', Text: "w"})
+	m = updated.(Model)
+	if m.wrapSoft {
+		t.Fatal("expected wrapSoft disabled after w")
+	}
+	unwrappedCount := len(m.unstaged.viewLines)
+	if unwrappedCount > wrappedCount {
+		t.Fatalf("expected unwrapped lines <= wrapped lines, got wrapped=%d unwrapped=%d", wrappedCount, unwrappedCount)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'w', Text: "w"})
+	m = updated.(Model)
+	if !m.wrapSoft {
+		t.Fatal("expected wrapSoft enabled after second w")
+	}
+}
