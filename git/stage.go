@@ -146,13 +146,10 @@ func DiffPathWithDelta(worktreeRoot, path string, cached bool, contextLines int)
 // Plain output is returned when color is false; otherwise output is rendered by
 // git diff with delta as pager where possible.
 func DiffUntrackedPath(worktreeRoot, path string, color bool, contextLines int) (string, error) {
-	absPath := path
-	if !filepath.IsAbs(path) {
-		absPath = filepath.Join(worktreeRoot, path)
-	}
+	diffPath := path
 
 	if !color {
-		return runGitAllowExitCodes(worktreeRoot, nil, map[int]bool{0: true, 1: true}, "diff", "--no-index", "--no-color", diffContextArg(contextLines), "--", "/dev/null", absPath)
+		return runGitAllowExitCodes(worktreeRoot, nil, map[int]bool{0: true, 1: true}, "diff", "--no-index", "--no-color", diffContextArg(contextLines), "--", "/dev/null", diffPath)
 	}
 
 	raw, err := runGitAllowExitCodes(worktreeRoot, nil, map[int]bool{0: true, 1: true},
@@ -162,7 +159,7 @@ func DiffUntrackedPath(worktreeRoot, path string, color bool, contextLines int) 
 		diffContextArg(contextLines),
 		"--",
 		"/dev/null",
-		absPath,
+		diffPath,
 	)
 	if err != nil {
 		return "", err
@@ -181,7 +178,7 @@ func DiffUntrackedPath(worktreeRoot, path string, color bool, contextLines int) 
 		diffContextArg(contextLines),
 		"--",
 		"/dev/null",
-		absPath,
+		diffPath,
 	)
 }
 
@@ -281,12 +278,26 @@ func ApplyPatchToIndex(worktreeRoot, patch string, reverse bool, unidiffZero boo
 		args = append(args, "--unidiff-zero")
 	}
 	_, err := runGitAllowExitCodes(worktreeRoot, []byte(patch), map[int]bool{0: true}, args...)
+	if err == nil {
+		return nil
+	}
+	if runErr, ok := err.(*RunError); ok {
+		if strings.TrimSpace(runErr.Stdout) == "" && strings.TrimSpace(runErr.Stderr) == "" {
+			return fmt.Errorf("%w\npatch:\n%s", err, patch)
+		}
+	}
 	return err
 }
 
 // StagePath stages a full path (used for untracked files).
 func StagePath(worktreeRoot, path string) error {
 	_, _, err := run(worktreeRoot, []string{"add", "--", path})
+	return err
+}
+
+// StageIntentPath records an intent-to-add entry without adding content.
+func StageIntentPath(worktreeRoot, path string) error {
+	_, _, err := run(worktreeRoot, []string{"add", "-N", "--", path})
 	return err
 }
 

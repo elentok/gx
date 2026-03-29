@@ -74,6 +74,8 @@ type Model struct {
 
 	statusMsg string
 	err       error
+	errorOpen bool
+	errorVP   viewport.Model
 	flash     flashState
 	keyPrefix string
 }
@@ -174,6 +176,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
+		if m.errorOpen {
+			return m.handleErrorKey(msg)
+		}
 		if handledModel, cmd, handled := m.handleChordKey(msg); handled {
 			return handledModel, cmd
 		}
@@ -204,6 +209,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	return m, nil
+}
+
+func (m Model) handleErrorKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "enter", "q":
+		m.errorOpen = false
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.errorVP, cmd = m.errorVP.Update(msg)
+	return m, cmd
 }
 
 func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
@@ -248,7 +264,7 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.reloadDiffsForSelection()
 	case "r":
 		m.refresh()
-	case "space":
+	case "space", " ":
 		m.toggleStageStatusEntry()
 		m.reloadDiffsForSelection()
 	case "enter":
@@ -309,7 +325,7 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "K":
 		sec := m.currentSection()
 		sec.viewport.ScrollUp(3)
-	case "space":
+	case "space", " ":
 		cmd := m.applySelection()
 		return m, cmd
 	}
@@ -357,18 +373,14 @@ func (m *Model) applySelection() tea.Cmd {
 		return nil
 	}
 
-	if file.IsUntracked() && m.section == sectionUnstaged {
-		if err := git.StagePath(m.worktreeRoot, file.Path); err != nil {
-			m.statusMsg = err.Error()
-			return nil
-		}
-		m.statusMsg = "staged " + file.Path
-		m.reload(file.Path)
-		return nil
-	}
-
 	sec := m.currentSection()
 	sig := movedTarget{fromSection: m.section, navMode: m.navMode}
+	if file.IsUntracked() && m.section == sectionUnstaged {
+		if err := git.StageIntentPath(m.worktreeRoot, file.Path); err != nil {
+			m.showGitError(err)
+			return nil
+		}
+	}
 
 	if m.navMode == navHunk {
 		if sec.activeHunk < 0 || sec.activeHunk >= len(sec.parsed.Hunks) {
@@ -382,7 +394,7 @@ func (m *Model) applySelection() tea.Cmd {
 		}
 		reverse := m.section == sectionStaged
 		if err := git.ApplyPatchToIndex(m.worktreeRoot, patch, reverse, false); err != nil {
-			m.statusMsg = err.Error()
+			m.showGitError(err)
 			return nil
 		}
 	} else {
@@ -397,7 +409,7 @@ func (m *Model) applySelection() tea.Cmd {
 		}
 		reverse := m.section == sectionStaged
 		if err := git.ApplyPatchToIndex(m.worktreeRoot, patch, reverse, true); err != nil {
-			m.statusMsg = err.Error()
+			m.showGitError(err)
 			return nil
 		}
 	}
@@ -480,7 +492,7 @@ func (m *Model) reloadDiffsForSelection() {
 	if file.IsUntracked() {
 		raw, err := git.DiffUntrackedPath(m.worktreeRoot, file.Path, false, m.settings.DiffContextLines)
 		if err != nil {
-			m.statusMsg = err.Error()
+			m.showGitError(err)
 			raw = ""
 		}
 		col, err := git.DiffUntrackedPath(m.worktreeRoot, file.Path, true, m.settings.DiffContextLines)
@@ -496,7 +508,7 @@ func (m *Model) reloadDiffsForSelection() {
 
 	unstagedRaw, err := git.DiffPath(m.worktreeRoot, file.Path, false, m.settings.DiffContextLines)
 	if err != nil {
-		m.statusMsg = err.Error()
+		m.showGitError(err)
 		unstagedRaw = ""
 	}
 	unstagedColor, err := git.DiffPathWithDelta(m.worktreeRoot, file.Path, false, m.settings.DiffContextLines)
@@ -506,7 +518,7 @@ func (m *Model) reloadDiffsForSelection() {
 
 	stagedRaw, err := git.DiffPath(m.worktreeRoot, file.Path, true, m.settings.DiffContextLines)
 	if err != nil {
-		m.statusMsg = err.Error()
+		m.showGitError(err)
 		stagedRaw = ""
 	}
 	stagedColor, err := git.DiffPathWithDelta(m.worktreeRoot, file.Path, true, m.settings.DiffContextLines)
@@ -540,8 +552,12 @@ func buildSectionState(raw, color string, prev sectionState) sectionState {
 	state.rawLines = append([]string{}, state.parsed.Lines...)
 
 	colorLines := splitLines(color)
-	if len(colorLines) != len(state.rawLines) {
+	if len(colorLines) == 0 {
 		colorLines = append([]string{}, state.rawLines...)
+	} else if len(colorLines) < len(state.rawLines) {
+		colorLines = append(colorLines, state.rawLines[len(colorLines):]...)
+	} else if len(colorLines) > len(state.rawLines) {
+		colorLines = colorLines[:len(state.rawLines)]
 	}
 	state.baseLines, state.baseDisplayToRaw = buildDisplayBaseLines(state.parsed, colorLines)
 	state.viewLines = append([]string{}, state.baseLines...)
@@ -720,9 +736,34 @@ func (m Model) View() tea.View {
 
 	footer := m.helpLine()
 	out := lipgloss.JoinVertical(lipgloss.Left, body, footer)
+	if m.errorOpen {
+		out = overlayModal(out, m.errorModalView(), m.width, m.height)
+	}
 	v := tea.NewView(out)
 	v.AltScreen = true
 	return v
+}
+
+func (m *Model) showGitError(err error) {
+	if err == nil {
+		return
+	}
+	m.statusMsg = "git command failed"
+	vpW := m.width * 2 / 3
+	if vpW < 44 {
+		vpW = 44
+	}
+	if vpW > 96 {
+		vpW = 96
+	}
+	vpH := m.height/2 - 6
+	if vpH < 4 {
+		vpH = 4
+	}
+	vp := viewport.New(viewport.WithWidth(vpW-2), viewport.WithHeight(vpH))
+	vp.SetContent(err.Error())
+	m.errorVP = vp
+	m.errorOpen = true
 }
 
 func (m Model) splitWidth() (statusW, diffW int) {
@@ -1182,7 +1223,7 @@ func (m *Model) toggleStageStatusEntry() {
 		return
 	}
 	if err != nil {
-		m.statusMsg = err.Error()
+		m.showGitError(err)
 		return
 	}
 	if stageAll {
@@ -1259,6 +1300,62 @@ func (m Model) helpLine() string {
 		return "  " + m.statusMsg + "  ·  " + lipgloss.NewStyle().Foreground(catSubtle).Render(hint)
 	}
 	return lipgloss.NewStyle().Foreground(catSubtle).Render("  " + hint)
+}
+
+func (m Model) errorModalView() string {
+	titleStyle := lipgloss.NewStyle().Foreground(catRed).Bold(true)
+	borderStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(catRed).
+		Padding(0, 1).
+		Width(m.errorVP.Width())
+
+	hint := lipgloss.NewStyle().Foreground(catSubtle).Render("esc / enter / q dismiss · j/k scroll")
+	inner := lipgloss.JoinVertical(lipgloss.Left,
+		titleStyle.Render("Error"),
+		"",
+		m.errorVP.View(),
+		"",
+		hint,
+	)
+	return borderStyle.Render(inner)
+}
+
+func overlayModal(bg, modal string, screenW, screenH int) string {
+	modalW := lipgloss.Width(modal)
+	modalH := lipgloss.Height(modal)
+	x := (screenW - modalW) / 2
+	y := (screenH - modalH) / 2
+	if x < 0 {
+		x = 0
+	}
+	if y < 0 {
+		y = 0
+	}
+	return placeOverlay(bg, modal, x, y)
+}
+
+func placeOverlay(bg, fg string, x, y int) string {
+	bgLines := strings.Split(bg, "\n")
+	fgLines := strings.Split(fg, "\n")
+
+	for i, fgLine := range fgLines {
+		bgY := y + i
+		if bgY < 0 || bgY >= len(bgLines) {
+			continue
+		}
+		bgLine := bgLines[bgY]
+		fgW := ansi.StringWidth(fgLine)
+
+		left := ansi.Truncate(bgLine, x, "")
+		if leftW := ansi.StringWidth(left); leftW < x {
+			left += strings.Repeat(" ", x-leftW)
+		}
+		right := ansi.TruncateLeft(bgLine, x+fgW, "")
+		bgLines[bgY] = left + fgLine + right
+	}
+
+	return strings.Join(bgLines, "\n")
 }
 
 func (m Model) panelStyle(active bool) lipgloss.Style {

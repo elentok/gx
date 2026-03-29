@@ -149,8 +149,13 @@ func buildHunkPatch(parsed parsedDiff, hunkIndex int) (string, error) {
 		return "", fmt.Errorf("invalid hunk bounds")
 	}
 
+	header := patchFileHeader(parsed.FileHeader)
+	if len(header) == 0 {
+		return "", fmt.Errorf("diff file header missing")
+	}
+
 	var lines []string
-	lines = append(lines, parsed.FileHeader...)
+	lines = append(lines, header...)
 	lines = append(lines, parsed.Lines[h.StartLine:h.EndLine+1]...)
 	return strings.Join(lines, "\n") + "\n", nil
 }
@@ -165,14 +170,14 @@ func buildSingleLinePatch(parsed parsedDiff, changedIndex int) (string, error) {
 	}
 	h := parsed.Hunks[cl.HunkIndex]
 
-	var header []string
-	for _, line := range parsed.FileHeader {
-		if strings.HasPrefix(line, "diff --git ") || strings.HasPrefix(line, "index ") || strings.HasPrefix(line, "--- ") || strings.HasPrefix(line, "+++ ") || strings.HasPrefix(line, "new file mode ") || strings.HasPrefix(line, "deleted file mode ") {
-			header = append(header, line)
-		}
-	}
+	header := patchFileHeader(parsed.FileHeader)
 	if len(header) == 0 {
 		return "", fmt.Errorf("diff file header missing")
+	}
+
+	segmentStart, segmentEnd, err := singleLineSegment(parsed, h, cl.LineIndex)
+	if err != nil {
+		return "", err
 	}
 
 	oldLine := h.OldStart
@@ -190,14 +195,9 @@ func buildSingleLinePatch(parsed parsedDiff, changedIndex int) (string, error) {
 		}
 
 		prefix := line[0]
-		keep := false
-		switch prefix {
-		case ' ':
-			keep = true
-		case '-', '+':
-			keep = lineIdx == cl.LineIndex
-		case '\\':
-			keep = len(kept) > 0
+		keep := lineIdx >= segmentStart && lineIdx <= segmentEnd
+		if prefix == '\\' {
+			keep = keep && len(kept) > 0
 		}
 
 		if keep {
@@ -245,4 +245,60 @@ func buildSingleLinePatch(parsed parsedDiff, changedIndex int) (string, error) {
 	lines = append(lines, hunkHeader)
 	lines = append(lines, kept...)
 	return strings.Join(lines, "\n") + "\n", nil
+}
+
+func singleLineSegment(parsed parsedDiff, h parsedHunk, selectedLine int) (start int, end int, err error) {
+	if selectedLine < h.StartLine || selectedLine > h.EndLine {
+		return 0, 0, fmt.Errorf("selected line out of hunk")
+	}
+
+	start = selectedLine
+	for i := selectedLine - 1; i > h.StartLine; i-- {
+		line := parsed.Lines[i]
+		if line == "" {
+			continue
+		}
+		if line[0] != ' ' {
+			break
+		}
+		start = i
+	}
+
+	end = selectedLine
+	for i := selectedLine + 1; i <= h.EndLine && i < len(parsed.Lines); i++ {
+		line := parsed.Lines[i]
+		if line == "" {
+			continue
+		}
+		if line[0] != ' ' {
+			break
+		}
+		end = i
+	}
+
+	return start, end, nil
+}
+
+func patchFileHeader(fileHeader []string) []string {
+	plusPath := ""
+	for _, line := range fileHeader {
+		if strings.HasPrefix(line, "+++ b/") {
+			plusPath = strings.TrimPrefix(line, "+++ b/")
+			break
+		}
+	}
+
+	header := make([]string, 0, len(fileHeader))
+	for _, line := range fileHeader {
+		if strings.HasPrefix(line, "new file mode ") || strings.HasPrefix(line, "deleted file mode ") {
+			continue
+		}
+		if line == "--- /dev/null" && plusPath != "" {
+			line = "--- a/" + plusPath
+		}
+		if strings.HasPrefix(line, "diff --git ") || strings.HasPrefix(line, "--- ") || strings.HasPrefix(line, "+++ ") {
+			header = append(header, line)
+		}
+	}
+	return header
 }

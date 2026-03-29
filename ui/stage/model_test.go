@@ -1,6 +1,7 @@
 package stage
 
 import (
+	"strings"
 	"testing"
 
 	"gx/git"
@@ -46,7 +47,7 @@ func TestQAndEscFocusBehavior(t *testing.T) {
 
 func TestSpaceStagesSingleLineInLineMode(t *testing.T) {
 	repo := testutil.TempRepo(t)
-	testutil.WriteFile(t, repo, "README.md", "# test\nadded\n")
+	testutil.WriteFile(t, repo, "line.txt", "line-1\nline-2\n")
 
 	m := New(repo)
 	m.ready = true
@@ -56,7 +57,7 @@ func TestSpaceStagesSingleLineInLineMode(t *testing.T) {
 
 	m.applySelection()
 
-	staged, err := git.DiffPath(repo, "README.md", true, 1)
+	staged, err := git.DiffPath(repo, "line.txt", true, 1)
 	if err != nil {
 		t.Fatalf("DiffPath cached: %v", err)
 	}
@@ -310,5 +311,181 @@ func TestStatusFileIcon(t *testing.T) {
 	}
 	if got := statusFileIcon(git.StageFileStatus{IndexStatus: ' ', WorktreeCode: 'M'}, icons); got != "" {
 		t.Fatalf("modified icon = %q, want modified file icon", got)
+	}
+}
+
+func TestLineModeCanUnstageSingleModifiedLine(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "README.md", "old-1\nold-2\nold-3\n")
+	testutil.MustGitExported(t, repo, "add", "README.md")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+	testutil.WriteFile(t, repo, "README.md", "new-1\nnew-2\nnew-3\n")
+
+	m := New(repo)
+	m.ready = true
+
+	// Stage everything first.
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
+	m = updated.(Model)
+
+	// Enter diff view and switch to line mode.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	m = updated.(Model)
+
+	// Move to second changed line and unstage it.
+	for range 4 {
+		updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+		m = updated.(Model)
+	}
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
+	m = updated.(Model)
+
+	staged, err := git.DiffPath(repo, "README.md", true, 1)
+	if err != nil {
+		t.Fatalf("staged diff: %v", err)
+	}
+	unstaged, err := git.DiffPath(repo, "README.md", false, 1)
+	if err != nil {
+		t.Fatalf("unstaged diff: %v", err)
+	}
+
+	if !strings.Contains(staged, "+new-1") || strings.Contains(staged, "+new-2") || !strings.Contains(unstaged, "+new-2") {
+		t.Fatalf("unexpected diffs after unstage line; status=%q\nSTAGED:\n%s\nUNSTAGED:\n%s", m.statusMsg, staged, unstaged)
+	}
+}
+
+func TestLineModeStagesSingleLineInUntrackedFile(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "new.txt", "line-1\nline-2\nline-3\n")
+
+	m := New(repo)
+	m.ready = true
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
+	m = updated.(Model)
+
+	staged, err := git.DiffPath(repo, "new.txt", true, 1)
+	if err != nil {
+		t.Fatalf("staged diff: %v", err)
+	}
+	if strings.Contains(staged, "+line-1") || !strings.Contains(staged, "+line-2") || strings.Contains(staged, "+line-3") {
+		t.Fatalf("expected single line staged for untracked file; status=%q\nSTAGED:\n%s", m.statusMsg, staged)
+	}
+}
+
+func TestLineModeUnstageOneOfAdjacentDeletedLinesDoesNotDuplicate(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	base := strings.Join([]string{
+		"func f() {",
+		"    if cond {",
+		"        x()",
+		"    }",
+		"    y()",
+		"}",
+	}, "\n") + "\n"
+	testutil.WriteFile(t, repo, "f.go", base)
+	testutil.MustGitExported(t, repo, "add", "f.go")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+
+	updated := strings.Join([]string{
+		"func f() {",
+		"    if cond {",
+		"    y()",
+		"}",
+	}, "\n") + "\n"
+	testutil.WriteFile(t, repo, "f.go", updated)
+
+	m := New(repo)
+	m.ready = true
+
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
+	m = updatedModel.(Model)
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updatedModel.(Model)
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	m = updatedModel.(Model)
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updatedModel.(Model)
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
+	m = updatedModel.(Model)
+
+	staged, err := git.DiffPath(repo, "f.go", true, 1)
+	if err != nil {
+		t.Fatalf("staged diff: %v", err)
+	}
+	if strings.Contains(staged, "+    }") {
+		t.Fatalf("unexpected duplicated closing brace in staged diff:\n%s", staged)
+	}
+}
+
+func TestLineModeUnstageBraceFromFirstHunkBlock(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	base := strings.Join([]string{
+		"package git",
+		"",
+		"func DiffUntrackedPath(worktreeRoot, path string, color bool, contextLines int) (string, error) {",
+		"    diffPath := path",
+		"    absPath := path",
+		"    if !filepath.IsAbs(path) {",
+		"        absPath = filepath.Join(worktreeRoot, path)",
+		"    }",
+		"",
+		"    if !color {",
+		"        return \"\", nil",
+		"    }",
+		"    _ = absPath",
+		"    return \"\", nil",
+		"}",
+	}, "\n") + "\n"
+	testutil.WriteFile(t, repo, "stage.go", base)
+	testutil.MustGitExported(t, repo, "add", "stage.go")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+
+	updated := strings.Join([]string{
+		"package git",
+		"",
+		"func DiffUntrackedPath(worktreeRoot, path string, color bool, contextLines int) (string, error) {",
+		"    diffPath := path",
+		"",
+		"    if !color {",
+		"        return \"\", nil",
+		"    }",
+		"    return \"\", nil",
+		"}",
+	}, "\n") + "\n"
+	testutil.WriteFile(t, repo, "stage.go", updated)
+
+	m := New(repo)
+	m.ready = true
+
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
+	m = updatedModel.(Model)
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updatedModel.(Model)
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	m = updatedModel.(Model)
+
+	// Move to the deletion of the closing brace line.
+	for i := 0; i < 3; i++ {
+		updatedModel, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+		m = updatedModel.(Model)
+	}
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
+	m = updatedModel.(Model)
+
+	staged, err := git.DiffPath(repo, "stage.go", true, 1)
+	if err != nil {
+		t.Fatalf("staged diff: %v", err)
+	}
+	if strings.Contains(staged, "+    }") {
+		t.Fatalf("unexpected duplicated brace in staged diff:\n%s", staged)
 	}
 }
