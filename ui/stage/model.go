@@ -894,9 +894,13 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 	sec.viewport.SetWidth(innerW)
 
 	titleText := title
+	if m.diffFullscreen {
+		titleText += " [fullscreen]"
+	}
+	rightTitleText := ""
 	if sec.viewport.TotalLineCount() > sec.viewport.VisibleLineCount() && sec.viewport.VisibleLineCount() > 0 {
 		pct := int(sec.viewport.ScrollPercent()*100 + 0.5)
-		titleText += fmt.Sprintf(" %d%%", pct)
+		rightTitleText = fmt.Sprintf("%d%%", pct)
 	}
 
 	lines := make([]string, 0, bodyH)
@@ -925,7 +929,7 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 		line := mark + sec.viewLines[displayIdx]
 		lines = append(lines, ansi.Truncate(line, innerW, ""))
 	}
-	return m.renderPanelWithBorderTitle(width, height, titleText, lines, activeSection)
+	return m.renderPanelWithBorderTitle(width, height, titleText, rightTitleText, lines, activeSection)
 }
 
 func (m Model) activeRawLineIndex(sec sectionState) int {
@@ -1268,7 +1272,7 @@ func (m Model) panelStyle(active bool) lipgloss.Style {
 		Background(catBase0)
 }
 
-func (m Model) renderPanelWithBorderTitle(width, height int, title string, lines []string, active bool) string {
+func (m Model) renderPanelWithBorderTitle(width, height int, title, rightTitle string, lines []string, active bool) string {
 	if width < 2 || height < 2 {
 		return ""
 	}
@@ -1284,16 +1288,27 @@ func (m Model) renderPanelWithBorderTitle(width, height int, title string, lines
 	border := lipgloss.NewStyle().Foreground(borderColor)
 
 	titleSeg := titleStyle.Render(" " + title + " ")
+	rightSeg := ""
+	if rightTitle != "" {
+		rightSeg = titleStyle.Render(" " + rightTitle + " ")
+	}
 	titleW := ansi.StringWidth(titleSeg)
+	rightW := ansi.StringWidth(rightSeg)
 	topInner := ""
-	if titleW >= innerW {
+	if rightW >= innerW {
+		topInner = ansi.Truncate(rightSeg, innerW, "")
+	} else if titleW+rightW >= innerW {
+		titleSeg = ansi.Truncate(titleSeg, innerW-rightW, "")
+		titleW = ansi.StringWidth(titleSeg)
+		topInner = titleSeg + rightSeg
+	} else if titleW >= innerW {
 		topInner = ansi.Truncate(titleSeg, innerW, "")
 		titleW = ansi.StringWidth(topInner)
 	} else {
-		topInner = titleSeg + border.Render(strings.Repeat("─", innerW-titleW))
+		topInner = titleSeg + border.Render(strings.Repeat("─", innerW-titleW-rightW)) + rightSeg
 	}
-	if titleW < innerW && !strings.Contains(topInner, "─") {
-		topInner += border.Render(strings.Repeat("─", innerW-titleW))
+	if titleW+rightW < innerW && !strings.Contains(topInner, "─") {
+		topInner += border.Render(strings.Repeat("─", innerW-titleW-rightW))
 	}
 
 	if len(lines) > innerH {
