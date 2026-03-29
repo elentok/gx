@@ -184,7 +184,11 @@ func runStage() error {
 		return err
 	}
 
-	m := stage.New(root)
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	m := stage.NewWithSettings(root, stage.Settings{DiffContextLines: cfg.StageDiffContextLines})
 	p := tea.NewProgram(m)
 	_, err = p.Run()
 	return err

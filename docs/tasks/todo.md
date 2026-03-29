@@ -1,5 +1,21 @@
 # BubbleTea v2 Migration Plan
 
+## Current Task: Yank Dialog Space Toggle Regression
+
+- [x] Reproduce the yank dialog checkbox toggle path and identify why pressing space does not uncheck the current item.
+- [x] Fix the checklist key handling with the smallest compatible change.
+- [x] Add regression coverage for the space-toggle behavior.
+- [x] Run targeted tests and record the result.
+
+## Review
+
+- Root cause: `ui/components/checklist.go` only toggled on the literal `" "` key string, while Bubble Tea v2 key handling for the space bar in this path now arrives as `"space"`.
+- Fix: accept both `" "` and `"space"` in `Checklist.Update(...)` so the yank dialog can toggle items off again without risking compatibility with any older callers.
+- Regression coverage: added `TestChecklistUpdate_TogglesCurrentItemOnSpace` in `ui/components/checklist_test.go`.
+- Verification:
+  - `go test ./ui/components -count=1`
+  - `go test ./ui/worktrees -run 'TestYankModalAppearsAndCancels|TestYankAndPaste' -count=1`
+
 ## Goal
 
 Upgrade the repo from Bubble Tea v1 to the Bubble Tea v2 stack described in the upstream guide, while keeping the existing CLI and TUI behavior intact.

@@ -49,7 +49,7 @@ func TestDiffUntrackedPath(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "new.txt", "hello\n")
 
-	raw, err := DiffUntrackedPath(repo, "new.txt", false)
+	raw, err := DiffUntrackedPath(repo, "new.txt", false, 1)
 	if err != nil {
 		t.Fatalf("DiffUntrackedPath raw: %v", err)
 	}
@@ -57,7 +57,7 @@ func TestDiffUntrackedPath(t *testing.T) {
 		t.Fatalf("unexpected untracked diff:\n%s", raw)
 	}
 
-	color, err := DiffUntrackedPath(repo, "new.txt", true)
+	color, err := DiffUntrackedPath(repo, "new.txt", true, 1)
 	if err != nil {
 		t.Fatalf("DiffUntrackedPath color: %v", err)
 	}
@@ -86,5 +86,29 @@ func TestListStageFiles_UntrackedDirectoryListsFiles(t *testing.T) {
 	}
 	if seen["newdir/"] {
 		t.Fatalf("unexpected aggregated dir entry: %#v", files)
+	}
+}
+
+func TestDiffPath_ContextLinesAffectHunkGrouping(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "README.md", "l1\nl2\nl3\nl4\nl5\nl6\nl7\nl8\n")
+	testutil.MustGitExported(t, repo, "add", "README.md")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+
+	testutil.WriteFile(t, repo, "README.md", "L1\nl2\nl3\nl4\nl5\nl6\nl7\nL8\n")
+
+	compact, err := DiffPath(repo, "README.md", false, 0)
+	if err != nil {
+		t.Fatalf("DiffPath compact: %v", err)
+	}
+	wider, err := DiffPath(repo, "README.md", false, 5)
+	if err != nil {
+		t.Fatalf("DiffPath wider: %v", err)
+	}
+
+	compactHunks := strings.Count(compact, "@@ ")
+	widerHunks := strings.Count(wider, "@@ ")
+	if compactHunks <= widerHunks {
+		t.Fatalf("expected fewer hunks with larger context, compact=%d wider=%d", compactHunks, widerHunks)
 	}
 }

@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"gx/git"
-	"gx/ui"
 
+	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -40,11 +40,12 @@ type sectionState struct {
 	parsed     parsedDiff
 	activeHunk int
 	activeLine int
-	scroll     int
+	viewport   viewport.Model
 }
 
 type Model struct {
 	worktreeRoot string
+	settings     Settings
 
 	width  int
 	height int
@@ -65,6 +66,14 @@ type Model struct {
 	statusMsg string
 	err       error
 	flash     flashState
+}
+
+type Settings struct {
+	DiffContextLines int
+}
+
+func DefaultSettings() Settings {
+	return Settings{DiffContextLines: 1}
 }
 
 type flashState struct {
@@ -90,24 +99,38 @@ var (
 )
 
 func New(worktreeRoot string) Model {
+	return NewWithSettings(worktreeRoot, DefaultSettings())
+}
+
+func NewWithSettings(worktreeRoot string, settings Settings) Model {
+	if settings.DiffContextLines < 0 {
+		settings.DiffContextLines = 0
+	}
+	if settings.DiffContextLines > 20 {
+		settings.DiffContextLines = 20
+	}
 	m := Model{
 		worktreeRoot:  worktreeRoot,
+		settings:      settings,
 		focus:         focusStatus,
 		section:       sectionUnstaged,
 		navMode:       navHunk,
 		collapsedDirs: map[string]bool{},
 		selected:      0,
-		unstaged: sectionState{
-			activeHunk: -1,
-			activeLine: -1,
-		},
-		staged: sectionState{
-			activeHunk: -1,
-			activeLine: -1,
-		},
+		unstaged:      newSectionState(),
+		staged:        newSectionState(),
 	}
 	m.reload("")
 	return m
+}
+
+func newSectionState() sectionState {
+	vp := viewport.New()
+	return sectionState{
+		activeHunk: -1,
+		activeLine: -1,
+		viewport:   vp,
+	}
 }
 
 func (m Model) Init() tea.Cmd {
@@ -120,6 +143,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.ready = true
+		m.syncDiffViewports()
 		return m, nil
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
@@ -188,6 +212,7 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			} else {
 				m.section = sectionUnstaged
 			}
+			m.ensureActiveVisible(m.currentSection())
 		}
 	case "a":
 		if m.navMode == navHunk {
@@ -195,23 +220,17 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.navMode = navHunk
 		}
+		m.ensureActiveVisible(m.currentSection())
 	case "j", "down":
 		m.moveActive(1)
 	case "k", "up":
 		m.moveActive(-1)
 	case "J":
 		sec := m.currentSection()
-		sec.scroll++
-		maxScroll := len(sec.viewLines) - 1
-		if sec.scroll > maxScroll {
-			sec.scroll = maxScroll
-		}
+		sec.viewport.ScrollDown(3)
 	case "K":
 		sec := m.currentSection()
-		sec.scroll--
-		if sec.scroll < 0 {
-			sec.scroll = 0
-		}
+		sec.viewport.ScrollUp(3)
 	case "space":
 		cmd := m.applySelection()
 		return m, cmd
@@ -244,6 +263,7 @@ func (m *Model) moveActive(delta int) {
 			sec.activeLine = len(sec.parsed.Changed) - 1
 		}
 	}
+	m.ensureActiveVisible(sec)
 }
 
 type movedTarget struct {
@@ -305,12 +325,28 @@ func (m *Model) applySelection() tea.Cmd {
 	}
 
 	m.statusMsg = "updated " + file.Path
+	from := m.section
 	m.reload(file.Path)
-	m.focusMovedTarget(sig)
-	if m.flash.active {
-		return nextFlashCmd()
+	if m.shouldSwitchAfterApply(from) {
+		m.focusMovedTarget(sig)
+		if m.flash.active {
+			return nextFlashCmd()
+		}
+	} else {
+		m.section = from
+		m.ensureActiveVisible(m.currentSection())
 	}
 	return nil
+}
+
+func (m *Model) shouldSwitchAfterApply(from diffSection) bool {
+	var sec sectionState
+	if from == sectionStaged {
+		sec = m.staged
+	} else {
+		sec = m.unstaged
+	}
+	return len(sec.parsed.Hunks) == 0
 }
 
 func (m *Model) reload(preservePath string) {
@@ -329,8 +365,8 @@ func (m *Model) reload(preservePath string) {
 
 	if len(m.statusEntries) == 0 {
 		m.selected = 0
-		m.unstaged = sectionState{activeHunk: -1, activeLine: -1}
-		m.staged = sectionState{activeHunk: -1, activeLine: -1}
+		m.unstaged = newSectionState()
+		m.staged = newSectionState()
 		m.focus = focusStatus
 		return
 	}
@@ -356,44 +392,46 @@ func (m *Model) reload(preservePath string) {
 func (m *Model) reloadDiffsForSelection() {
 	entry, ok := m.selectedStatusEntry()
 	if !ok || entry.Kind == statusEntryDir {
-		m.unstaged = sectionState{activeHunk: -1, activeLine: -1}
-		m.staged = sectionState{activeHunk: -1, activeLine: -1}
+		m.unstaged = newSectionState()
+		m.staged = newSectionState()
+		m.syncDiffViewports()
 		return
 	}
 
 	file := entry.File
 	if file.IsUntracked() {
-		raw, err := git.DiffUntrackedPath(m.worktreeRoot, file.Path, false)
+		raw, err := git.DiffUntrackedPath(m.worktreeRoot, file.Path, false, m.settings.DiffContextLines)
 		if err != nil {
 			m.statusMsg = err.Error()
 			raw = ""
 		}
-		col, err := git.DiffUntrackedPath(m.worktreeRoot, file.Path, true)
+		col, err := git.DiffUntrackedPath(m.worktreeRoot, file.Path, true, m.settings.DiffContextLines)
 		if err != nil {
 			col = raw
 		}
 		m.unstaged = buildSectionState(raw, col, m.unstaged)
-		m.staged = sectionState{activeHunk: -1, activeLine: -1}
+		m.staged = newSectionState()
 		m.section = sectionUnstaged
+		m.syncDiffViewports()
 		return
 	}
 
-	unstagedRaw, err := git.DiffPath(m.worktreeRoot, file.Path, false)
+	unstagedRaw, err := git.DiffPath(m.worktreeRoot, file.Path, false, m.settings.DiffContextLines)
 	if err != nil {
 		m.statusMsg = err.Error()
 		unstagedRaw = ""
 	}
-	unstagedColor, err := git.DiffPathWithDelta(m.worktreeRoot, file.Path, false)
+	unstagedColor, err := git.DiffPathWithDelta(m.worktreeRoot, file.Path, false, m.settings.DiffContextLines)
 	if err != nil {
 		unstagedColor = unstagedRaw
 	}
 
-	stagedRaw, err := git.DiffPath(m.worktreeRoot, file.Path, true)
+	stagedRaw, err := git.DiffPath(m.worktreeRoot, file.Path, true, m.settings.DiffContextLines)
 	if err != nil {
 		m.statusMsg = err.Error()
 		stagedRaw = ""
 	}
-	stagedColor, err := git.DiffPathWithDelta(m.worktreeRoot, file.Path, true)
+	stagedColor, err := git.DiffPathWithDelta(m.worktreeRoot, file.Path, true, m.settings.DiffContextLines)
 	if err != nil {
 		stagedColor = stagedRaw
 	}
@@ -401,15 +439,17 @@ func (m *Model) reloadDiffsForSelection() {
 	m.unstaged = buildSectionState(unstagedRaw, unstagedColor, m.unstaged)
 	m.staged = buildSectionState(stagedRaw, stagedColor, m.staged)
 	m.pickAvailableSection()
+	m.syncDiffViewports()
 }
 
 func buildSectionState(raw, color string, prev sectionState) sectionState {
-	state := sectionState{activeHunk: prev.activeHunk, activeLine: prev.activeLine, scroll: prev.scroll}
+	state := sectionState{activeHunk: prev.activeHunk, activeLine: prev.activeLine, viewport: prev.viewport}
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		state.activeHunk = -1
 		state.activeLine = -1
-		state.scroll = 0
+		state.viewport.SetContent("")
+		state.viewport.SetYOffset(0)
 		return state
 	}
 
@@ -421,6 +461,9 @@ func buildSectionState(raw, color string, prev sectionState) sectionState {
 		colorLines = append([]string{}, state.rawLines...)
 	}
 	state.viewLines = colorLines
+	prevOffset := state.viewport.YOffset()
+	state.viewport.SetContentLines(state.viewLines)
+	state.viewport.SetYOffset(prevOffset)
 
 	if len(state.parsed.Hunks) == 0 {
 		state.activeHunk = -1
@@ -444,13 +487,6 @@ func buildSectionState(raw, color string, prev sectionState) sectionState {
 		}
 	}
 
-	maxScroll := len(state.viewLines) - 1
-	if state.scroll < 0 {
-		state.scroll = 0
-	}
-	if state.scroll > maxScroll {
-		state.scroll = maxScroll
-	}
 	return state
 }
 
@@ -667,20 +703,9 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 	innerW := maxInt(1, width-2)
 	innerH := maxInt(1, height-2)
 
-	titleLine := lipgloss.NewStyle().Foreground(catBlue).Bold(true).Render(title)
-	if m.focus == focusDiff && m.section == section {
-		titleLine = lipgloss.NewStyle().Foreground(catOrange).Bold(true).Render(title + " *")
-	}
-	titleLine += lipgloss.NewStyle().Foreground(catSubtle).Render(fmt.Sprintf("  (%d hunks, %d lines)", len(sec.parsed.Hunks), len(sec.parsed.Changed)))
+	activeSection := m.focus == focusDiff && m.section == section
 
-	modeLabel := "hunk"
-	if m.navMode == navLine {
-		modeLabel = "line"
-	}
-	titleLine += lipgloss.NewStyle().Foreground(catSubtle).Render("  mode:" + modeLabel)
-
-	lines := []string{ansi.Truncate(titleLine, innerW, "")}
-	bodyH := innerH - 1
+	bodyH := innerH
 	if bodyH < 0 {
 		bodyH = 0
 	}
@@ -691,22 +716,29 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 		hunkStart = sec.parsed.Hunks[sec.activeHunk].StartLine
 		hunkEnd = sec.parsed.Hunks[sec.activeHunk].EndLine
 	}
-	if m.focus == focusDiff && m.section == section {
-		sec.scroll = ensureVisible(sec.scroll, active, bodyH)
+	sec.viewport.SetHeight(maxInt(0, bodyH))
+	sec.viewport.SetWidth(innerW)
+
+	titleText := title
+	if sec.viewport.TotalLineCount() > sec.viewport.VisibleLineCount() && sec.viewport.VisibleLineCount() > 0 {
+		pct := int(sec.viewport.ScrollPercent()*100 + 0.5)
+		titleText += fmt.Sprintf(" %d%%", pct)
 	}
 
+	lines := make([]string, 0, bodyH)
+
 	for i := 0; i < bodyH; i++ {
-		rawIdx := sec.scroll + i
+		rawIdx := sec.viewport.YOffset() + i
 		if rawIdx >= len(sec.viewLines) {
 			lines = append(lines, "")
 			continue
 		}
 		mark := "  "
 		inActiveHunk := m.navMode == navHunk && rawIdx >= hunkStart && rawIdx <= hunkEnd
-		if inActiveHunk && m.focus == focusDiff && m.section == section {
+		if inActiveHunk && activeSection {
 			mark = lipgloss.NewStyle().Foreground(catOrange).Render("▌ ")
 		}
-		if rawIdx == active && m.focus == focusDiff && m.section == section {
+		if rawIdx == active && activeSection {
 			mark = lipgloss.NewStyle().Foreground(catOrange).Bold(true).Render("▌ ")
 		}
 		if m.flashMarker(section, rawIdx, sec) {
@@ -715,12 +747,7 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 		line := mark + sec.viewLines[rawIdx]
 		lines = append(lines, ansi.Truncate(line, innerW, ""))
 	}
-
-	content := strings.Join(lines, "\n")
-	return m.panelStyle(m.focus == focusDiff && m.section == section).
-		Width(width).
-		Height(height).
-		Render(content)
+	return m.renderPanelWithBorderTitle(width, height, titleText, lines, activeSection)
 }
 
 func (m Model) activeRawLineIndex(sec sectionState) int {
@@ -736,23 +763,58 @@ func (m Model) activeRawLineIndex(sec sectionState) int {
 	return -1
 }
 
-func ensureVisible(scroll, active, height int) int {
-	if height <= 0 || active < 0 {
-		if scroll < 0 {
-			return 0
+func (m *Model) syncDiffViewports() {
+	mainH := m.height - 1
+	if mainH < 4 {
+		mainH = 4
+	}
+	_, diffW := m.splitWidth()
+	_, diffH := m.splitHeight(mainH)
+	vpW := maxInt(1, diffW-4)
+
+	hasUnstaged := len(m.unstaged.viewLines) > 0
+	hasStaged := len(m.staged.viewLines) > 0
+
+	if hasUnstaged && hasStaged {
+		topH := diffH / 2
+		if topH < 5 {
+			topH = 5
 		}
-		return scroll
+		bottomH := diffH - topH
+		if bottomH < 5 {
+			bottomH = 5
+			topH = diffH - bottomH
+		}
+		m.unstaged.viewport.SetHeight(maxInt(0, topH-3))
+		m.staged.viewport.SetHeight(maxInt(0, bottomH-3))
+		m.unstaged.viewport.SetWidth(vpW)
+		m.staged.viewport.SetWidth(vpW)
+	} else if hasUnstaged {
+		m.unstaged.viewport.SetHeight(maxInt(0, diffH-3))
+		m.unstaged.viewport.SetWidth(vpW)
+		m.staged.viewport.SetHeight(0)
+		m.staged.viewport.SetWidth(vpW)
+	} else if hasStaged {
+		m.staged.viewport.SetHeight(maxInt(0, diffH-3))
+		m.staged.viewport.SetWidth(vpW)
+		m.unstaged.viewport.SetHeight(0)
+		m.unstaged.viewport.SetWidth(vpW)
+	} else {
+		m.unstaged.viewport.SetHeight(0)
+		m.staged.viewport.SetHeight(0)
+		m.unstaged.viewport.SetWidth(vpW)
+		m.staged.viewport.SetWidth(vpW)
 	}
-	if active < scroll {
-		scroll = active
+	// Ensure content is set and clamped.
+	m.unstaged.viewport.SetContentLines(m.unstaged.viewLines)
+	m.staged.viewport.SetContentLines(m.staged.viewLines)
+}
+
+func (m *Model) ensureActiveVisible(sec *sectionState) {
+	active := m.activeRawLineIndex(*sec)
+	if active >= 0 {
+		sec.viewport.EnsureVisible(active, 0, 0)
 	}
-	if active >= scroll+height {
-		scroll = active - height + 1
-	}
-	if scroll < 0 {
-		scroll = 0
-	}
-	return scroll
 }
 
 func nextFlashCmd() tea.Cmd {
@@ -855,12 +917,14 @@ func (m *Model) focusMovedTarget(sig movedTarget) {
 		for i := range sec.parsed.Hunks {
 			if sec.parsed.Hunks[i].Header == sig.hunkHeader {
 				sec.activeHunk = i
+				m.ensureActiveVisible(sec)
 				m.flash = flashState{active: true, section: m.section, navMode: navHunk, hunk: i, frames: 4}
 				return
 			}
 		}
 		if len(sec.parsed.Hunks) > 0 {
 			sec.activeHunk = 0
+			m.ensureActiveVisible(sec)
 			m.flash = flashState{active: true, section: m.section, navMode: navHunk, hunk: 0, frames: 4}
 		}
 		return
@@ -869,12 +933,14 @@ func (m *Model) focusMovedTarget(sig movedTarget) {
 	for i := range sec.parsed.Changed {
 		if sec.parsed.Changed[i].Text == sig.lineText {
 			sec.activeLine = i
+			m.ensureActiveVisible(sec)
 			m.flash = flashState{active: true, section: m.section, navMode: navLine, line: i, frames: 4}
 			return
 		}
 	}
 	if len(sec.parsed.Changed) > 0 {
 		sec.activeLine = 0
+		m.ensureActiveVisible(sec)
 		m.flash = flashState{active: true, section: m.section, navMode: navLine, line: 0, frames: 4}
 	}
 }
@@ -889,11 +955,15 @@ func (m Model) helpLine() string {
 	if m.statusMsg != "" {
 		return "  " + m.statusMsg
 	}
-	return lipgloss.NewStyle().Foreground(catSubtle).Render("  diff: tab section · a mode · j/k move · J/K scroll · space stage/unstage · esc/q back")
+	modeLabel := "hunk"
+	if m.navMode == navLine {
+		modeLabel = "line"
+	}
+	return lipgloss.NewStyle().Foreground(catSubtle).Render("  diff: mode:" + modeLabel + " · tab section · j/k move · J/K scroll(3) · space stage/unstage · esc/q back")
 }
 
 func (m Model) panelStyle(active bool) lipgloss.Style {
-	borderColor := ui.ColorBorder
+	borderColor := catSubtle
 	if active {
 		borderColor = catOrange
 	}
@@ -901,6 +971,52 @@ func (m Model) panelStyle(active bool) lipgloss.Style {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(borderColor).
 		Background(catBase0)
+}
+
+func (m Model) renderPanelWithBorderTitle(width, height int, title string, lines []string, active bool) string {
+	if width < 2 || height < 2 {
+		return ""
+	}
+	innerW := width - 2
+	innerH := height - 2
+
+	borderColor := catSubtle
+	titleStyle := lipgloss.NewStyle().Foreground(catBlue)
+	if active {
+		borderColor = catOrange
+		titleStyle = lipgloss.NewStyle().Foreground(catOrange).Bold(true)
+	}
+	border := lipgloss.NewStyle().Foreground(borderColor)
+
+	titleSeg := titleStyle.Render(" " + title + " ")
+	titleW := ansi.StringWidth(titleSeg)
+	topInner := ""
+	if titleW >= innerW {
+		topInner = ansi.Truncate(titleSeg, innerW, "")
+		titleW = ansi.StringWidth(topInner)
+	} else {
+		topInner = titleSeg + border.Render(strings.Repeat("─", innerW-titleW))
+	}
+	if titleW < innerW && !strings.Contains(topInner, "─") {
+		topInner += border.Render(strings.Repeat("─", innerW-titleW))
+	}
+
+	if len(lines) > innerH {
+		lines = lines[:innerH]
+	}
+	body := make([]string, 0, innerH)
+	for i := 0; i < innerH; i++ {
+		line := ""
+		if i < len(lines) {
+			line = ansi.Truncate(lines[i], innerW, "")
+		}
+		line = line + strings.Repeat(" ", maxInt(0, innerW-ansi.StringWidth(line)))
+		body = append(body, border.Render("│")+line+border.Render("│"))
+	}
+
+	bottom := border.Render("╰" + strings.Repeat("─", innerW) + "╯")
+	top := border.Render("╭") + topInner + border.Render("╮")
+	return strings.Join(append([]string{top}, append(body, bottom)...), "\n")
 }
 
 func statusEntryMeta(entry statusEntry) string {

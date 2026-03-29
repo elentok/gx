@@ -11,13 +11,15 @@ var userConfigDirFn = os.UserConfigDir
 
 // Config is gx's user configuration.
 type Config struct {
-	UseNerdFontIcons bool `json:"use-nerdfont-icons"`
+	UseNerdFontIcons      bool `json:"use-nerdfont-icons"`
+	StageDiffContextLines int  `json:"stage-diff-context-lines"`
 }
 
 // Default returns the default configuration.
 func Default() Config {
 	return Config{
-		UseNerdFontIcons: false,
+		UseNerdFontIcons:      false,
+		StageDiffContextLines: 1,
 	}
 }
 
@@ -48,8 +50,10 @@ func Load() (Config, error) {
 
 	// Support both kebab-case and snake_case key variants.
 	var raw struct {
-		UseNerdFontIconsKebab *bool `json:"use-nerdfont-icons"`
-		UseNerdFontIconsSnake *bool `json:"use_nerdfont_icons"`
+		UseNerdFontIconsKebab      *bool `json:"use-nerdfont-icons"`
+		UseNerdFontIconsSnake      *bool `json:"use_nerdfont_icons"`
+		StageDiffContextLinesKebab *int  `json:"stage-diff-context-lines"`
+		StageDiffContextLinesSnake *int  `json:"stage_diff_context_lines"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return cfg, fmt.Errorf("parse config %s: %w", path, err)
@@ -60,7 +64,23 @@ func Load() (Config, error) {
 		cfg.UseNerdFontIcons = *raw.UseNerdFontIconsSnake
 	}
 
+	if raw.StageDiffContextLinesKebab != nil {
+		cfg.StageDiffContextLines = clampStageDiffContext(*raw.StageDiffContextLinesKebab)
+	} else if raw.StageDiffContextLinesSnake != nil {
+		cfg.StageDiffContextLines = clampStageDiffContext(*raw.StageDiffContextLinesSnake)
+	}
+
 	return cfg, nil
+}
+
+func clampStageDiffContext(n int) int {
+	if n < 0 {
+		return 0
+	}
+	if n > 20 {
+		return 20
+	}
+	return n
 }
 
 // Init writes the default config file and returns its path.

@@ -98,8 +98,8 @@ func UnstagePath(worktreeRoot, path string) error {
 
 // DiffPath returns a unified diff for path. When cached is true, it reads index
 // vs HEAD. Output is plain (no ANSI colors).
-func DiffPath(worktreeRoot, path string, cached bool) (string, error) {
-	args := []string{"diff", "--no-color"}
+func DiffPath(worktreeRoot, path string, cached bool, contextLines int) (string, error) {
+	args := []string{"diff", "--no-color", diffContextArg(contextLines)}
 	if cached {
 		args = append(args, "--cached")
 	}
@@ -113,8 +113,8 @@ func DiffPath(worktreeRoot, path string, cached bool) (string, error) {
 
 // DiffPathWithDelta returns a unified diff rendered by git diff with delta as
 // pager. If delta is unavailable, it falls back to git's own color output.
-func DiffPathWithDelta(worktreeRoot, path string, cached bool) (string, error) {
-	rawArgs := []string{"diff", "--no-color"}
+func DiffPathWithDelta(worktreeRoot, path string, cached bool, contextLines int) (string, error) {
+	rawArgs := []string{"diff", "--no-color", diffContextArg(contextLines)}
 	if cached {
 		rawArgs = append(rawArgs, "--cached")
 	}
@@ -130,7 +130,7 @@ func DiffPathWithDelta(worktreeRoot, path string, cached bool) (string, error) {
 		return out, nil
 	}
 
-	fallbackArgs := []string{"diff", "--color=always"}
+	fallbackArgs := []string{"diff", "--color=always", diffContextArg(contextLines)}
 	if cached {
 		fallbackArgs = append(fallbackArgs, "--cached")
 	}
@@ -145,20 +145,21 @@ func DiffPathWithDelta(worktreeRoot, path string, cached bool) (string, error) {
 // DiffUntrackedPath returns a /dev/null -> file patch for an untracked path.
 // Plain output is returned when color is false; otherwise output is rendered by
 // git diff with delta as pager where possible.
-func DiffUntrackedPath(worktreeRoot, path string, color bool) (string, error) {
+func DiffUntrackedPath(worktreeRoot, path string, color bool, contextLines int) (string, error) {
 	absPath := path
 	if !filepath.IsAbs(path) {
 		absPath = filepath.Join(worktreeRoot, path)
 	}
 
 	if !color {
-		return runGitAllowExitCodes(worktreeRoot, nil, map[int]bool{0: true, 1: true}, "diff", "--no-index", "--no-color", "--", "/dev/null", absPath)
+		return runGitAllowExitCodes(worktreeRoot, nil, map[int]bool{0: true, 1: true}, "diff", "--no-index", "--no-color", diffContextArg(contextLines), "--", "/dev/null", absPath)
 	}
 
 	raw, err := runGitAllowExitCodes(worktreeRoot, nil, map[int]bool{0: true, 1: true},
 		"diff",
 		"--no-index",
 		"--no-color",
+		diffContextArg(contextLines),
 		"--",
 		"/dev/null",
 		absPath,
@@ -177,10 +178,21 @@ func DiffUntrackedPath(worktreeRoot, path string, color bool) (string, error) {
 		"diff",
 		"--no-index",
 		"--color=always",
+		diffContextArg(contextLines),
 		"--",
 		"/dev/null",
 		absPath,
 	)
+}
+
+func diffContextArg(contextLines int) string {
+	if contextLines < 0 {
+		contextLines = 0
+	}
+	if contextLines > 20 {
+		contextLines = 20
+	}
+	return fmt.Sprintf("-U%d", contextLines)
 }
 
 func colorizeWithDelta(worktreeRoot, raw string) (string, error) {
