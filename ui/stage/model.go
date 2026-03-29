@@ -247,6 +247,9 @@ func (m Model) handleHelpKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	key := msg.String()
+	shiftG := (msg.Mod&tea.ModShift) != 0 && (msg.Code == 'g' || msg.Code == 'G' || msg.Text == "g" || msg.Text == "G")
+	isUpperG := key == "G" || key == "shift+g" || msg.Text == "G" || msg.ShiftedCode == 'G' || shiftG
+	isLowerG := key == "g" && !isUpperG && (msg.Mod&tea.ModShift) == 0
 	if m.keyPrefix == "c" {
 		m.keyPrefix = ""
 		if key == "c" {
@@ -258,9 +261,34 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 			return m, nil, true
 		}
 	}
+	if m.keyPrefix == "g" {
+		m.keyPrefix = ""
+		if isLowerG {
+			m.jumpToTop()
+			return m, nil, true
+		}
+		if isUpperG {
+			m.jumpToBottom()
+			return m, nil, true
+		}
+		if key == "esc" {
+			m.statusMsg = ""
+			return m, nil, true
+		}
+	}
 	if key == "c" {
 		m.keyPrefix = "c"
 		m.statusMsg = "cc: git commit"
+		return m, nil, true
+	}
+	if isLowerG {
+		m.keyPrefix = "g"
+		m.statusMsg = "gg: jump to top"
+		return m, nil, true
+	}
+	if isUpperG {
+		m.keyPrefix = ""
+		m.jumpToBottom()
 		return m, nil, true
 	}
 	m.keyPrefix = ""
@@ -292,6 +320,10 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.reloadDiffsForSelection()
 	case "r":
 		m.refresh()
+	case "ctrl+d":
+		m.scrollStatusPage(1)
+	case "ctrl+u":
+		m.scrollStatusPage(-1)
 	case "space", " ":
 		m.toggleStageStatusEntry()
 		m.reloadDiffsForSelection()
@@ -352,6 +384,10 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "K":
 		sec := m.currentSection()
 		sec.viewport.ScrollUp(3)
+	case "ctrl+d":
+		m.scrollDiffPage(1)
+	case "ctrl+u":
+		m.scrollDiffPage(-1)
 	case "space", " ":
 		cmd := m.applySelection()
 		return m, cmd
@@ -367,12 +403,33 @@ func (m *Model) moveActive(delta int) {
 		if len(sec.parsed.Hunks) == 0 {
 			return
 		}
+		old := sec.activeHunk
+		if sec.activeHunk >= 0 && sec.activeHunk < len(sec.parsed.Hunks) {
+			if start, end, ok := hunkDisplayBounds(*sec, sec.activeHunk); ok {
+				visible := sec.viewport.VisibleLineCount()
+				y := sec.viewport.YOffset()
+				if visible > 0 {
+					last := y + visible - 1
+					if delta > 0 && end > last {
+						sec.viewport.ScrollDown(1)
+						return
+					}
+					if delta < 0 && start < y {
+						sec.viewport.ScrollUp(1)
+						return
+					}
+				}
+			}
+		}
 		sec.activeHunk += delta
 		if sec.activeHunk < 0 {
 			sec.activeHunk = 0
 		}
 		if sec.activeHunk >= len(sec.parsed.Hunks) {
 			sec.activeHunk = len(sec.parsed.Hunks) - 1
+		}
+		if sec.activeHunk == old {
+			return
 		}
 	} else {
 		if len(sec.parsed.Changed) == 0 {
@@ -387,6 +444,118 @@ func (m *Model) moveActive(delta int) {
 		}
 	}
 	m.ensureActiveVisible(sec)
+}
+
+func (m *Model) scrollStatusPage(direction int) {
+	if len(m.statusEntries) == 0 {
+		return
+	}
+	mainH := m.height - 1
+	if mainH < 4 {
+		mainH = 4
+	}
+	statusH, _ := m.splitHeight(mainH)
+	visible := maxInt(1, (statusH-2)/2)
+	if direction > 0 {
+		m.selected += visible
+	} else {
+		m.selected -= visible
+	}
+	if m.selected < 0 {
+		m.selected = 0
+	}
+	if m.selected >= len(m.statusEntries) {
+		m.selected = len(m.statusEntries) - 1
+	}
+	m.reloadDiffsForSelection()
+}
+
+func (m *Model) scrollDiffPage(direction int) {
+	sec := m.currentSection()
+	visible := sec.viewport.VisibleLineCount()
+	if visible <= 0 {
+		return
+	}
+	step := maxInt(1, visible/2)
+	if direction > 0 {
+		sec.viewport.ScrollDown(step)
+	} else {
+		sec.viewport.ScrollUp(step)
+	}
+}
+
+func (m *Model) jumpToTop() {
+	if m.focus == focusStatus {
+		if len(m.statusEntries) == 0 {
+			return
+		}
+		m.selected = 0
+		m.reloadDiffsForSelection()
+		return
+	}
+	sec := m.currentSection()
+	sec.viewport.SetYOffset(0)
+	if m.navMode == navHunk {
+		if len(sec.parsed.Hunks) == 0 {
+			return
+		}
+		sec.activeHunk = 0
+	} else {
+		if len(sec.parsed.Changed) == 0 {
+			return
+		}
+		sec.activeLine = 0
+	}
+}
+
+func (m *Model) jumpToBottom() {
+	if m.focus == focusStatus {
+		if len(m.statusEntries) == 0 {
+			return
+		}
+		m.selected = len(m.statusEntries) - 1
+		m.reloadDiffsForSelection()
+		return
+	}
+	sec := m.currentSection()
+	maxOffset := sec.viewport.TotalLineCount() - sec.viewport.VisibleLineCount()
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	sec.viewport.SetYOffset(maxOffset)
+	if m.navMode == navHunk {
+		if len(sec.parsed.Hunks) == 0 {
+			return
+		}
+		sec.activeHunk = len(sec.parsed.Hunks) - 1
+	} else {
+		if len(sec.parsed.Changed) == 0 {
+			return
+		}
+		sec.activeLine = len(sec.parsed.Changed) - 1
+	}
+}
+
+func hunkDisplayBounds(sec sectionState, hunkIdx int) (start int, end int, ok bool) {
+	if hunkIdx < 0 || hunkIdx >= len(sec.parsed.Hunks) {
+		return 0, 0, false
+	}
+	h := sec.parsed.Hunks[hunkIdx]
+	start = -1
+	end = -1
+	for displayIdx, rawIdx := range sec.displayToRaw {
+		if rawIdx < h.StartLine || rawIdx > h.EndLine {
+			continue
+		}
+		if start < 0 {
+			start = displayIdx
+		}
+		end = displayIdx
+	}
+	if start < 0 || end < 0 {
+		return 0, 0, false
+	}
+	return start, end, true
 }
 
 type movedTarget struct {
@@ -993,6 +1162,22 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 		rightTitleText = fmt.Sprintf("%d%%", pct)
 	}
 
+	overflowTopDisplay := -1
+	overflowBottomDisplay := -1
+	if m.navMode == navHunk && activeSection && sec.activeHunk >= 0 {
+		if start, end, ok := hunkDisplayBounds(*sec, sec.activeHunk); ok && sec.viewport.VisibleLineCount() > 0 {
+			vpTop := sec.viewport.YOffset()
+			vpBottom := vpTop + sec.viewport.VisibleLineCount() - 1
+			if start < vpTop {
+				overflowTopDisplay = vpTop
+			}
+			if end > vpBottom {
+				overflowBottomDisplay = vpBottom
+			}
+		}
+	}
+	overflowTopMark, overflowBottomMark, overflowBothMark := m.hunkOverflowMarkers()
+
 	lines := make([]string, 0, bodyH)
 
 	for i := 0; i < bodyH; i++ {
@@ -1013,6 +1198,15 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 		if rawIdx >= 0 && rawIdx == active && activeSection {
 			mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render("▌ ")
 		}
+		if inActiveHunk {
+			if displayIdx == overflowTopDisplay && displayIdx == overflowBottomDisplay {
+				mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render(overflowBothMark)
+			} else if displayIdx == overflowTopDisplay {
+				mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render(overflowTopMark)
+			} else if displayIdx == overflowBottomDisplay {
+				mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render(overflowBottomMark)
+			}
+		}
 		if rawIdx >= 0 && m.flashMarker(section, rawIdx, sec) {
 			mark = lipgloss.NewStyle().Foreground(catGreen).Bold(true).Render("◆ ")
 		}
@@ -1020,6 +1214,13 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 		lines = append(lines, ansi.Truncate(line, innerW, ""))
 	}
 	return m.renderPanelWithBorderTitle(width, height, titleText, rightTitleText, lines, activeSection, section)
+}
+
+func (m Model) hunkOverflowMarkers() (top, bottom, both string) {
+	if m.settings.UseNerdFontIcons {
+		return " ", " ", "↕ "
+	}
+	return "↑ ", "↓ ", "↕ "
 }
 
 func (m Model) activeRawLineIndex(sec sectionState) int {
@@ -1378,6 +1579,8 @@ func stageHelpText() string {
 		"",
 		"Status Focus",
 		"  j / k   move selection",
+		"  gg / G  jump top / bottom",
+		"  ctrl+u/d scroll half page",
 		"  h       collapse open directory",
 		"  l       expand directory / open diff on file",
 		"  space   stage/unstage file",
@@ -1386,6 +1589,8 @@ func stageHelpText() string {
 		"",
 		"Diff Focus",
 		"  esc/h   return to status",
+		"  gg / G  jump top / bottom",
+		"  ctrl+u/d scroll half page",
 		"  tab     switch unstaged/staged section",
 		"  a       toggle hunk/line mode",
 		"  j / k   move active hunk/line",

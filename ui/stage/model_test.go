@@ -1,6 +1,7 @@
 package stage
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -263,6 +264,267 @@ func TestDiffJKScrollsWithoutMovingCursor(t *testing.T) {
 		if got := m.unstaged.viewport.YOffset(); got >= beforeOffset+expectedDelta {
 			t.Fatalf("K should scroll up on first press: offset after K=%d", got)
 		}
+	}
+}
+
+func TestHunkModeJKScrollsLargeHunkBeforeSwitching(t *testing.T) {
+	repo := testutil.TempRepo(t)
+
+	base := make([]string, 0, 48)
+	for i := 1; i <= 48; i++ {
+		base = append(base, fmt.Sprintf("line-%02d", i))
+	}
+	testutil.WriteFile(t, repo, "big.txt", strings.Join(base, "\n")+"\n")
+	testutil.MustGitExported(t, repo, "add", "big.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+
+	updated := append([]string{}, base...)
+	for i := 0; i < 20; i++ {
+		updated[i] = "new-" + updated[i]
+	}
+	for i := 34; i < 38; i++ {
+		updated[i] = "new-" + updated[i]
+	}
+	testutil.WriteFile(t, repo, "big.txt", strings.Join(updated, "\n")+"\n")
+
+	m := New(repo)
+	m.ready = true
+	m.width = 100
+	m.height = 16
+	m.focus = focusDiff
+	m.section = sectionUnstaged
+	m.navMode = navHunk
+	m.syncDiffViewports()
+
+	if m.unstaged.activeHunk != 0 {
+		t.Fatalf("expected first hunk active initially, got %d", m.unstaged.activeHunk)
+	}
+	beforeOffset := m.unstaged.viewport.YOffset()
+
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updatedModel.(Model)
+	if m.unstaged.activeHunk != 0 {
+		t.Fatalf("expected j to scroll large hunk before switching, activeHunk=%d", m.unstaged.activeHunk)
+	}
+	if m.unstaged.viewport.YOffset() <= beforeOffset {
+		t.Fatalf("expected j to scroll down within large hunk")
+	}
+
+	midOffset := m.unstaged.viewport.YOffset()
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
+	m = updatedModel.(Model)
+	if m.unstaged.activeHunk != 0 {
+		t.Fatalf("expected k to scroll large hunk before switching, activeHunk=%d", m.unstaged.activeHunk)
+	}
+	if m.unstaged.viewport.YOffset() >= midOffset {
+		t.Fatalf("expected k to scroll up within large hunk")
+	}
+}
+
+func TestHunkOverflowViewportMarkers(t *testing.T) {
+	repo := testutil.TempRepo(t)
+
+	base := make([]string, 0, 40)
+	for i := 1; i <= 40; i++ {
+		base = append(base, fmt.Sprintf("line-%02d", i))
+	}
+	testutil.WriteFile(t, repo, "big.txt", strings.Join(base, "\n")+"\n")
+	testutil.MustGitExported(t, repo, "add", "big.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+
+	updated := append([]string{}, base...)
+	for i := 0; i < 24; i++ {
+		updated[i] = "new-" + updated[i]
+	}
+	testutil.WriteFile(t, repo, "big.txt", strings.Join(updated, "\n")+"\n")
+
+	assertMarkers := func(useNerd bool, up, down string) {
+		t.Helper()
+		m := NewWithSettings(repo, Settings{DiffContextLines: 1, UseNerdFontIcons: useNerd})
+		m.ready = true
+		m.width = 100
+		m.height = 16
+		m.focus = focusDiff
+		m.section = sectionUnstaged
+		m.navMode = navHunk
+		m.syncDiffViewports()
+
+		m.unstaged.viewport.SetYOffset(3)
+		pane := m.renderSectionPane(80, 10, "Unstaged", &m.unstaged, sectionUnstaged)
+
+		if strings.Contains(pane, "hunk>view") {
+			t.Fatalf("unexpected legacy hunk>view indicator in pane:\n%s", pane)
+		}
+		if !strings.Contains(pane, up) || !strings.Contains(pane, down) {
+			t.Fatalf("expected overflow markers %q and %q in pane:\n%s", up, down, pane)
+		}
+	}
+
+	assertMarkers(true, "", "")
+	assertMarkers(false, "↑", "↓")
+}
+
+func TestGGAndGInStatusAndDiff(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.WriteFile(t, repo, "b.txt", "two\n")
+	testutil.WriteFile(t, repo, "c.txt", "three\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusStatus
+	m.selected = 1
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	m = updated.(Model)
+	if m.selected != 0 {
+		t.Fatalf("expected gg to jump status selection to top, got %d", m.selected)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'G', Text: "G"})
+	m = updated.(Model)
+	if m.selected != len(m.statusEntries)-1 {
+		t.Fatalf("expected G to jump status selection to bottom, got %d", m.selected)
+	}
+
+	m.focus = focusDiff
+	m.section = sectionUnstaged
+	m.navMode = navLine
+	if len(m.unstaged.parsed.Changed) == 0 {
+		t.Fatalf("expected unstaged changes in diff view")
+	}
+	m.unstaged.activeLine = len(m.unstaged.parsed.Changed) - 1
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	m = updated.(Model)
+	if m.unstaged.activeLine != 0 {
+		t.Fatalf("expected gg to jump active diff line to top, got %d", m.unstaged.activeLine)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'G', Text: "G"})
+	m = updated.(Model)
+	if m.unstaged.activeLine != len(m.unstaged.parsed.Changed)-1 {
+		t.Fatalf("expected G to jump active diff line to bottom, got %d", m.unstaged.activeLine)
+	}
+}
+
+func TestUppercaseGUsingShiftedCodeJumpsBottom(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.WriteFile(t, repo, "b.txt", "two\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusStatus
+	m.selected = 0
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "G", ShiftedCode: 'G'})
+	m = updated.(Model)
+	if m.selected != len(m.statusEntries)-1 {
+		t.Fatalf("expected shifted G to jump to bottom, got %d", m.selected)
+	}
+}
+
+func TestUppercaseGUsingShiftModifierJumpsBottom(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.WriteFile(t, repo, "b.txt", "two\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusStatus
+	m.selected = 0
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g", Mod: tea.ModShift})
+	m = updated.(Model)
+	if m.selected != len(m.statusEntries)-1 {
+		t.Fatalf("expected shifted modifier G to jump to bottom, got %d", m.selected)
+	}
+}
+
+func TestGInDiffHunkModeJumpsViewportToBottom(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	base := make([]string, 0, 40)
+	for i := 1; i <= 40; i++ {
+		base = append(base, fmt.Sprintf("line-%02d", i))
+	}
+	testutil.WriteFile(t, repo, "big.txt", strings.Join(base, "\n")+"\n")
+	testutil.MustGitExported(t, repo, "add", "big.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+
+	updated := append([]string{}, base...)
+	for i := 0; i < 28; i++ {
+		updated[i] = "new-" + updated[i]
+	}
+	testutil.WriteFile(t, repo, "big.txt", strings.Join(updated, "\n")+"\n")
+
+	m := New(repo)
+	m.ready = true
+	m.width = 100
+	m.height = 16
+	m.focus = focusDiff
+	m.section = sectionUnstaged
+	m.navMode = navHunk
+	m.syncDiffViewports()
+
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "G", ShiftedCode: 'G'})
+	m = updatedModel.(Model)
+
+	maxOffset := m.unstaged.viewport.TotalLineCount() - m.unstaged.viewport.VisibleLineCount()
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if got := m.unstaged.viewport.YOffset(); got != maxOffset {
+		t.Fatalf("expected G to jump diff viewport to bottom, got %d want %d", got, maxOffset)
+	}
+}
+
+func TestCtrlDAndCtrlUScrollStatusAndDiff(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	for i := 0; i < 16; i++ {
+		testutil.WriteFile(t, repo, fmt.Sprintf("f%02d.txt", i), "x\n")
+	}
+
+	m := New(repo)
+	m.ready = true
+	m.width = 120
+	m.height = 24
+	m.focus = focusStatus
+	beforeSel := m.selected
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
+	m = updated.(Model)
+	if m.selected <= beforeSel {
+		t.Fatalf("expected ctrl+d to move status selection down")
+	}
+
+	midSel := m.selected
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
+	m = updated.(Model)
+	if m.selected >= midSel {
+		t.Fatalf("expected ctrl+u to move status selection up")
+	}
+
+	m.focus = focusDiff
+	m.section = sectionUnstaged
+	m.navMode = navHunk
+	m.syncDiffViewports()
+	beforeOffset := m.unstaged.viewport.YOffset()
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
+	m = updated.(Model)
+	if m.unstaged.viewport.YOffset() < beforeOffset {
+		t.Fatalf("expected ctrl+d to scroll diff down")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
+	m = updated.(Model)
+	if m.unstaged.viewport.YOffset() > beforeOffset {
+		t.Fatalf("expected ctrl+u to scroll diff up")
 	}
 }
 

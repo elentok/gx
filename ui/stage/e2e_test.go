@@ -2,6 +2,7 @@ package stage_test
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -145,6 +146,23 @@ func setupModifiedFileThreeLineChanges(t *testing.T, repoDir, path string) {
 	testutil.MustGitExported(t, repoDir, "commit", "-m", "add "+path)
 	updated := strings.Join([]string{"new-1", "new-2", "new-3", "keep-4", "keep-5"}, "\n") + "\n"
 	testutil.WriteFile(t, repoDir, path, updated)
+}
+
+func setupModifiedFileLargeSingleHunk(t *testing.T, repoDir, path string) {
+	t.Helper()
+	base := make([]string, 0, 40)
+	for i := 1; i <= 40; i++ {
+		base = append(base, fmt.Sprintf("line-%02d", i))
+	}
+	testutil.WriteFile(t, repoDir, path, strings.Join(base, "\n")+"\n")
+	testutil.MustGitExported(t, repoDir, "add", path)
+	testutil.MustGitExported(t, repoDir, "commit", "-m", "add "+path)
+
+	updated := append([]string{}, base...)
+	for i := 0; i < 28; i++ {
+		updated[i] = "new-" + updated[i]
+	}
+	testutil.WriteFile(t, repoDir, path, strings.Join(updated, "\n")+"\n")
 }
 
 func TestStageE2E_StageFullNewFileFromSidebar(t *testing.T) {
@@ -374,6 +392,28 @@ func TestStageE2E_UnstageOneLineAfterStagingAll_LineMode(t *testing.T) {
 	if !hasAddedLine(staged, "new-1") || hasAddedLine(staged, "new-2") || !hasAddedLine(staged, "new-3") || !hasAddedLine(unstaged, "new-2") {
 		t.Fatalf("unexpected line unstage result\nSTAGED:\n%s\nUNSTAGED:\n%s", staged, unstaged)
 	}
+
+	quitStage(t, tm)
+}
+
+func TestStageE2E_HunkModeBottomJDoesNotJumpToTop(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	path := "large-hunk-no-jump.txt"
+	setupModifiedFileLargeSingleHunk(t, repoDir, path)
+
+	tm := startStageTUI(t, repoDir)
+	waitForStageText(t, tm, path, stageLoadWait)
+
+	tm.Send(keySpecial(tea.KeyEnter))
+
+	for i := 0; i < 220; i++ {
+		tm.Send(keyRune('j'))
+	}
+	waitForStageText(t, tm, "100%", stageActionWait)
+
+	// Extra j at bottom should not jump viewport back to top.
+	tm.Send(keyRune('j'))
+	waitForStageText(t, tm, "100%", stageActionWait)
 
 	quitStage(t, tm)
 }
