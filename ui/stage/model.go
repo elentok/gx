@@ -76,6 +76,8 @@ type Model struct {
 	err       error
 	errorOpen bool
 	errorVP   viewport.Model
+	helpOpen  bool
+	helpVP    viewport.Model
 	flash     flashState
 	keyPrefix string
 }
@@ -179,6 +181,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.errorOpen {
 			return m.handleErrorKey(msg)
 		}
+		if m.helpOpen {
+			return m.handleHelpKey(msg)
+		}
 		if handledModel, cmd, handled := m.handleChordKey(msg); handled {
 			return handledModel, cmd
 		}
@@ -219,6 +224,17 @@ func (m Model) handleErrorKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	var cmd tea.Cmd
 	m.errorVP, cmd = m.errorVP.Update(msg)
+	return m, cmd
+}
+
+func (m Model) handleHelpKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "?", "esc", "enter", "q":
+		m.helpOpen = false
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.helpVP, cmd = m.helpVP.Update(msg)
 	return m, cmd
 }
 
@@ -279,6 +295,8 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.ensureActiveVisible(m.currentSection())
 	case "q":
 		return m, tea.Quit
+	case "?":
+		m.showHelpOverlay()
 	}
 	return m, nil
 }
@@ -328,6 +346,8 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "space", " ":
 		cmd := m.applySelection()
 		return m, cmd
+	case "?":
+		m.showHelpOverlay()
 	}
 	return m, nil
 }
@@ -738,6 +758,8 @@ func (m Model) View() tea.View {
 	out := lipgloss.JoinVertical(lipgloss.Left, body, footer)
 	if m.errorOpen {
 		out = overlayModal(out, m.errorModalView(), m.width, m.height)
+	} else if m.helpOpen {
+		out = overlayModal(out, m.helpModalView(), m.width, m.height)
 	}
 	v := tea.NewView(out)
 	v.AltScreen = true
@@ -1281,7 +1303,7 @@ func (m *Model) focusMovedTarget(sig movedTarget) {
 
 func (m Model) helpLine() string {
 	if m.focus == focusStatus {
-		hint := "status: j/k move · h/l collapse-expand · space toggle file/dir · enter diff · cc commit · r refresh · q quit"
+		hint := "status · ? help"
 		if m.statusMsg != "" {
 			return "  " + m.statusMsg + "  ·  " + lipgloss.NewStyle().Foreground(catSubtle).Render(hint)
 		}
@@ -1295,11 +1317,56 @@ func (m Model) helpLine() string {
 	if m.wrapSoft {
 		wrapLabel = "on"
 	}
-	hint := "diff: mode:" + modeLabel + " · wrap:" + wrapLabel + " · tab section · f fullscreen · w wrap · j/k move · J/K scroll(3) · space stage/unstage · cc commit · r refresh · esc/q back"
+	hint := "diff: mode:" + modeLabel + " · wrap:" + wrapLabel + " · ? help"
 	if m.statusMsg != "" {
 		return "  " + m.statusMsg + "  ·  " + lipgloss.NewStyle().Foreground(catSubtle).Render(hint)
 	}
 	return lipgloss.NewStyle().Foreground(catSubtle).Render("  " + hint)
+}
+
+func (m *Model) showHelpOverlay() {
+	vpW := m.width * 2 / 3
+	if vpW < 56 {
+		vpW = 56
+	}
+	if vpW > 104 {
+		vpW = 104
+	}
+	vpH := m.height/2 - 4
+	if vpH < 8 {
+		vpH = 8
+	}
+	vp := viewport.New(viewport.WithWidth(vpW-2), viewport.WithHeight(vpH))
+	vp.SetContent(stageHelpText())
+	m.helpVP = vp
+	m.helpOpen = true
+}
+
+func stageHelpText() string {
+	return strings.Join([]string{
+		"Global",
+		"  ?       toggle this help",
+		"  cc      open git commit",
+		"",
+		"Status Focus",
+		"  j / k   move selection",
+		"  h / l   collapse or expand directory",
+		"  space   stage/unstage file",
+		"  enter   open diff view",
+		"  r       refresh",
+		"  q       quit",
+		"",
+		"Diff Focus",
+		"  esc/q   return to status",
+		"  tab     switch unstaged/staged section",
+		"  a       toggle hunk/line mode",
+		"  j / k   move active hunk/line",
+		"  J / K   scroll diff viewport",
+		"  space   stage/unstage active hunk/line",
+		"  f       toggle fullscreen diff",
+		"  w       toggle soft wrap",
+		"  r       refresh",
+	}, "\n")
 }
 
 func (m Model) errorModalView() string {
@@ -1315,6 +1382,25 @@ func (m Model) errorModalView() string {
 		titleStyle.Render("Error"),
 		"",
 		m.errorVP.View(),
+		"",
+		hint,
+	)
+	return borderStyle.Render(inner)
+}
+
+func (m Model) helpModalView() string {
+	titleStyle := lipgloss.NewStyle().Foreground(catBlue).Bold(true)
+	borderStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(catBlue).
+		Padding(0, 1).
+		Width(m.helpVP.Width())
+
+	hint := lipgloss.NewStyle().Foreground(catSubtle).Render("? / esc / enter / q dismiss · j/k scroll")
+	inner := lipgloss.JoinVertical(lipgloss.Left,
+		titleStyle.Render("Keyboard Help"),
+		"",
+		m.helpVP.View(),
 		"",
 		hint,
 	)

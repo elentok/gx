@@ -45,6 +45,40 @@ func TestQAndEscFocusBehavior(t *testing.T) {
 	}
 }
 
+func TestHelpOverlayToggleAndCompactStatusBar(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "README.md", "changed\n")
+
+	m := New(repo)
+	m.ready = true
+	m.width = 120
+	m.height = 40
+	m.focus = focusStatus
+
+	line := m.helpLine()
+	if !strings.Contains(line, "? help") || strings.Contains(line, "j/k") {
+		t.Fatalf("expected compact status help line, got %q", line)
+	}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '?', Text: "?"})
+	m = updated.(Model)
+	if !m.helpOpen {
+		t.Fatalf("expected help overlay to open")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	if !m.helpOpen {
+		t.Fatalf("expected help overlay to stay open while scrolling")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	m = updated.(Model)
+	if m.helpOpen {
+		t.Fatalf("expected help overlay to close on esc")
+	}
+}
+
 func TestSpaceStagesSingleLineInLineMode(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "line.txt", "line-1\nline-2\n")
