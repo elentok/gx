@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"gx/git"
 	"gx/testutil"
@@ -549,6 +550,19 @@ func TestStatusEntryColorDeletedFileIsDim(t *testing.T) {
 	}
 	if got := statusEntryColor(entry); got != "#a6adc8" {
 		t.Fatalf("expected dim deleted color, got %q", got)
+	}
+}
+
+func TestStatusMessageClearsAfterTimeoutTick(t *testing.T) {
+	m := New(testutil.TempRepo(t))
+	m.ready = true
+	m.statusMsg = "temporary"
+	m.statusUntil = time.Now().Add(-time.Second)
+
+	updated, _ := m.Update(statusTickMsg{})
+	m = updated.(Model)
+	if m.statusMsg != "" {
+		t.Fatalf("expected status message to clear after timeout tick")
 	}
 }
 

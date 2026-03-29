@@ -73,6 +73,7 @@ type Model struct {
 	staged   sectionState
 
 	statusMsg      string
+	statusUntil    time.Time
 	err            error
 	errorOpen      bool
 	errorVP        viewport.Model
@@ -102,6 +103,7 @@ type flashState struct {
 }
 
 type flashTickMsg struct{}
+type statusTickMsg struct{}
 
 type commitFinishedMsg struct {
 	err       error
@@ -121,6 +123,8 @@ var (
 )
 
 const ansiReset = "\x1b[0m"
+
+const statusMessageTTL = 5 * time.Second
 
 var (
 	ansiCSIRe = regexp.MustCompile(`\x1b\[[0-9:;<=>?]*[ -/]*[@-~]`)
@@ -164,7 +168,7 @@ func newSectionState() sectionState {
 }
 
 func (m Model) Init() tea.Cmd {
-	return nil
+	return statusTickCmd()
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -178,6 +182,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.FocusMsg:
 		m.refresh()
 		return m, nil
+	case statusTickMsg:
+		if m.statusMsg != "" && !m.statusUntil.IsZero() && time.Now().After(m.statusUntil) {
+			m.clearStatus()
+		}
+		return m, statusTickCmd()
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
@@ -209,14 +218,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case commitFinishedMsg:
 		if msg.err != nil {
-			m.statusMsg = "commit failed: " + msg.err.Error()
+			m.setStatus("commit failed: " + msg.err.Error())
 			return m, nil
 		}
 		if msg.tmuxSplit {
-			m.statusMsg = "opened tmux split: git commit"
+			m.setStatus("opened tmux split: git commit")
 			return m, nil
 		}
-		m.statusMsg = "git commit finished"
+		m.setStatus("git commit finished")
 		m.refresh()
 		return m, nil
 	}
@@ -253,11 +262,11 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	if m.keyPrefix == "c" {
 		m.keyPrefix = ""
 		if key == "c" {
-			m.statusMsg = "opening git commit..."
+			m.setStatus("opening git commit...")
 			return m, cmdGitCommit(m.worktreeRoot), true
 		}
 		if key == "esc" {
-			m.statusMsg = ""
+			m.clearStatus()
 			return m, nil, true
 		}
 	}
@@ -272,18 +281,18 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 			return m, nil, true
 		}
 		if key == "esc" {
-			m.statusMsg = ""
+			m.clearStatus()
 			return m, nil, true
 		}
 	}
 	if key == "c" {
 		m.keyPrefix = "c"
-		m.statusMsg = "cc: git commit"
+		m.setStatus("cc: git commit")
 		return m, nil, true
 	}
 	if isLowerG {
 		m.keyPrefix = "g"
-		m.statusMsg = "gg: jump to top"
+		m.setStatus("gg: jump to top")
 		return m, nil, true
 	}
 	if isUpperG {
@@ -587,7 +596,7 @@ func (m *Model) applySelection() tea.Cmd {
 		sig.hunkHeader = sec.parsed.Hunks[sec.activeHunk].Header
 		patch, err := buildHunkPatch(sec.parsed, sec.activeHunk)
 		if err != nil {
-			m.statusMsg = err.Error()
+			m.setStatus(err.Error())
 			return nil
 		}
 		reverse := m.section == sectionStaged
@@ -602,7 +611,7 @@ func (m *Model) applySelection() tea.Cmd {
 		sig.lineText = sec.parsed.Changed[sec.activeLine].Text
 		patch, err := buildSingleLinePatch(sec.parsed, sec.activeLine)
 		if err != nil {
-			m.statusMsg = err.Error()
+			m.setStatus(err.Error())
 			return nil
 		}
 		reverse := m.section == sectionStaged
@@ -612,7 +621,7 @@ func (m *Model) applySelection() tea.Cmd {
 		}
 	}
 
-	m.statusMsg = "updated " + file.Path
+	m.setStatus("updated " + file.Path)
 	from := m.section
 	m.reload(file.Path)
 	if m.shouldSwitchAfterApply(from) {
@@ -967,7 +976,7 @@ func (m *Model) showGitError(err error) {
 	if err == nil {
 		return
 	}
-	m.statusMsg = "git command failed"
+	m.setStatus("git command failed")
 	vpW := m.width * 2 / 3
 	if vpW < 44 {
 		vpW = 44
@@ -1486,11 +1495,31 @@ func (m *Model) toggleStageStatusEntry() {
 		return
 	}
 	if stageAll {
-		m.statusMsg = "staged " + path
+		m.setStatus("staged " + path)
 	} else {
-		m.statusMsg = "unstaged " + path
+		m.setStatus("unstaged " + path)
 	}
 	m.reload(path)
+}
+
+func (m *Model) setStatus(msg string) {
+	m.statusMsg = msg
+	if msg == "" {
+		m.statusUntil = time.Time{}
+		return
+	}
+	m.statusUntil = time.Now().Add(statusMessageTTL)
+}
+
+func (m *Model) clearStatus() {
+	m.statusMsg = ""
+	m.statusUntil = time.Time{}
+}
+
+func statusTickCmd() tea.Cmd {
+	return tea.Tick(time.Second, func(time.Time) tea.Msg {
+		return statusTickMsg{}
+	})
 }
 
 func (m *Model) focusMovedTarget(sig movedTarget) {
