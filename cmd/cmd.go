@@ -188,7 +188,7 @@ func runStage() error {
 	if err != nil {
 		return err
 	}
-	m := stage.NewWithSettings(root, stage.Settings{DiffContextLines: cfg.StageDiffContextLines})
+	m := stage.NewWithSettings(root, stage.Settings{DiffContextLines: cfg.StageDiffContextLines, UseNerdFontIcons: cfg.UseNerdFontIcons})
 	p := tea.NewProgram(m)
 	_, err = p.Run()
 	return err

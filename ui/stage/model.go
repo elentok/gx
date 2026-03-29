@@ -80,10 +80,11 @@ type Model struct {
 
 type Settings struct {
 	DiffContextLines int
+	UseNerdFontIcons bool
 }
 
 func DefaultSettings() Settings {
-	return Settings{DiffContextLines: 1}
+	return Settings{DiffContextLines: 1, UseNerdFontIcons: true}
 }
 
 type flashState struct {
@@ -778,6 +779,7 @@ func (m Model) renderStatusPane(width, height int) string {
 	if len(m.statusEntries) == 0 {
 		lines = append(lines, lipgloss.NewStyle().Foreground(catSubtle).Render("clean working tree"))
 	} else {
+		icons := statusPaneIconsFor(m.settings.UseNerdFontIcons)
 		start := m.selected - bodyH/2
 		if start < 0 {
 			start = 0
@@ -799,21 +801,22 @@ func (m Model) renderStatusPane(width, height int) string {
 				mark = lipgloss.NewStyle().Foreground(catOrange).Render("▌ ")
 			}
 			indent := strings.Repeat("  ", entry.Depth)
-			meta := statusEntryMeta(entry)
+			statusColor := statusEntryColor(entry)
+			meta := lipgloss.NewStyle().Foreground(lipgloss.Color(statusColor)).Render(statusEntryMeta(entry, m.settings.UseNerdFontIcons, icons))
 			name := entry.DisplayName
 			if entry.Kind == statusEntryDir {
-				symbol := "▾"
+				symbol := icons.folderOpen
 				if !entry.Expanded {
-					symbol = "▸"
+					symbol = icons.folderClosed
 				}
 				name = symbol + " " + name + "/"
-				name = lipgloss.NewStyle().Foreground(catBlue).Bold(true).Render(name)
-			} else if entry.HasOnlyUntracked {
-				name = lipgloss.NewStyle().Foreground(catGreen).Render(name)
+			} else {
+				name = statusFileIcon(entry.File, icons) + " " + name
 			}
+			name = lipgloss.NewStyle().Foreground(lipgloss.Color(statusColor)).Render(name)
 			line := fmt.Sprintf("%s%s%s %s", mark, indent, meta, name)
 			if i == m.selected {
-				line = lipgloss.NewStyle().Bold(true).Foreground(catText).Render(line)
+				line = lipgloss.NewStyle().Bold(true).Render(line)
 			}
 			lines = append(lines, ansi.Truncate(line, innerW, ""))
 		}
@@ -1311,37 +1314,67 @@ func (m Model) renderPanelWithBorderTitle(width, height int, title string, lines
 	return strings.Join(append([]string{top}, append(body, bottom)...), "\n")
 }
 
-func statusEntryMeta(entry statusEntry) string {
-	if entry.Kind == statusEntryDir {
-		switch {
-		case entry.HasStaged && entry.HasUnstaged:
-			return lipgloss.NewStyle().Foreground(catYellow).Render("M+")
-		case entry.HasUnstaged:
-			if entry.HasOnlyUntracked {
-				return lipgloss.NewStyle().Foreground(catGreen).Render("??")
-			}
-			return lipgloss.NewStyle().Foreground(catYellow).Render(" M")
-		case entry.HasStaged:
-			return lipgloss.NewStyle().Foreground(catBlue).Render("M ")
-		default:
-			return lipgloss.NewStyle().Foreground(catSubtle).Render("--")
+type statusPaneIcons struct {
+	folderClosed string
+	folderOpen   string
+	fileModified string
+	fileNew      string
+	partial      string
+	staged       string
+}
+
+func statusPaneIconsFor(useNerdFontIcons bool) statusPaneIcons {
+	if !useNerdFontIcons {
+		return statusPaneIcons{
+			folderClosed: "▸",
+			folderOpen:   "▾",
+			fileModified: "M",
+			fileNew:      "N",
+			partial:      "+",
+			staged:       "✓",
 		}
 	}
+	return statusPaneIcons{
+		folderClosed: "",
+		folderOpen:   "",
+		fileModified: "",
+		fileNew:      "",
+		partial:      "",
+		staged:       "",
+	}
+}
 
-	xy := entry.File.XY()
-	if entry.File.IsUntracked() {
-		return lipgloss.NewStyle().Foreground(catGreen).Render(xy)
+func statusEntryColor(entry statusEntry) string {
+	if entry.HasStaged && entry.HasUnstaged {
+		return "#fab387"
 	}
-	if entry.File.HasStagedChanges() && entry.File.HasUnstagedChanges() {
-		return lipgloss.NewStyle().Foreground(catYellow).Render(xy)
+	if entry.HasStaged {
+		return "#a6e3a1"
 	}
-	if entry.File.HasStagedChanges() {
-		return lipgloss.NewStyle().Foreground(catBlue).Render(xy)
+	return "#cdd6f4"
+}
+
+func statusEntryMeta(entry statusEntry, useNerdFontIcons bool, icons statusPaneIcons) string {
+	if entry.HasStaged && entry.HasUnstaged {
+		return icons.partial
 	}
-	if entry.File.HasUnstagedChanges() {
-		return lipgloss.NewStyle().Foreground(catYellow).Render(xy)
+	if entry.HasStaged {
+		return icons.staged
 	}
-	return lipgloss.NewStyle().Foreground(catSubtle).Render(xy)
+	if useNerdFontIcons {
+		return " "
+	}
+	if entry.Kind == statusEntryDir {
+		return "-"
+	}
+	return entry.File.XY()
+}
+
+func statusFileIcon(file git.StageFileStatus, icons statusPaneIcons) string {
+	if file.IsUntracked() || file.IndexStatus == 'A' {
+		return icons.fileNew
+	}
+	return icons.fileModified
 }
 
 func (m Model) flashMarker(section diffSection, rawIdx int, sec *sectionState) bool {

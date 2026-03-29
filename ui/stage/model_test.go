@@ -260,3 +260,55 @@ func TestWToggleSoftWrap(t *testing.T) {
 		t.Fatal("expected wrapSoft enabled after second w")
 	}
 }
+
+func TestDefaultSettingsEnableNerdFontIcons(t *testing.T) {
+	settings := DefaultSettings()
+	if !settings.UseNerdFontIcons {
+		t.Fatal("UseNerdFontIcons = false, want true")
+	}
+}
+
+func TestStatusEntryColor(t *testing.T) {
+	tests := []struct {
+		name  string
+		entry statusEntry
+		want  string
+	}{
+		{name: "unstaged", entry: statusEntry{HasUnstaged: true}, want: "#cdd6f4"},
+		{name: "partial", entry: statusEntry{HasStaged: true, HasUnstaged: true}, want: "#fab387"},
+		{name: "staged", entry: statusEntry{HasStaged: true}, want: "#a6e3a1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := statusEntryColor(tt.entry); got != tt.want {
+				t.Fatalf("statusEntryColor() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestStatusEntryMeta_NerdFont(t *testing.T) {
+	icons := statusPaneIconsFor(true)
+
+	if got := statusEntryMeta(statusEntry{HasStaged: true, HasUnstaged: true}, true, icons); got != "" {
+		t.Fatalf("partial nerd icon = %q", got)
+	}
+	if got := statusEntryMeta(statusEntry{HasStaged: true}, true, icons); got != "" {
+		t.Fatalf("staged nerd icon = %q", got)
+	}
+}
+
+func TestStatusFileIcon(t *testing.T) {
+	icons := statusPaneIconsFor(true)
+
+	if got := statusFileIcon(git.StageFileStatus{IndexStatus: '?', WorktreeCode: '?'}, icons); got != "" {
+		t.Fatalf("untracked icon = %q, want new file icon", got)
+	}
+	if got := statusFileIcon(git.StageFileStatus{IndexStatus: 'A', WorktreeCode: ' '}, icons); got != "" {
+		t.Fatalf("added icon = %q, want new file icon", got)
+	}
+	if got := statusFileIcon(git.StageFileStatus{IndexStatus: ' ', WorktreeCode: 'M'}, icons); got != "" {
+		t.Fatalf("modified icon = %q, want modified file icon", got)
+	}
+}

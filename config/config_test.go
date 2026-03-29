@@ -16,8 +16,8 @@ func TestLoadMissingUsesDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.UseNerdFontIcons {
-		t.Fatal("UseNerdFontIcons = true, want false")
+	if !cfg.UseNerdFontIcons {
+		t.Fatal("UseNerdFontIcons = false, want true")
 	}
 	if cfg.StageDiffContextLines != 1 {
 		t.Fatalf("StageDiffContextLines = %d, want 1", cfg.StageDiffContextLines)
@@ -118,8 +118,8 @@ func TestInitCreatesDefaultConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.UseNerdFontIcons {
-		t.Fatal("UseNerdFontIcons = true, want false by default")
+	if !cfg.UseNerdFontIcons {
+		t.Fatal("UseNerdFontIcons = false, want true by default")
 	}
 	if cfg.StageDiffContextLines != 1 {
 		t.Fatalf("StageDiffContextLines = %d, want 1 by default", cfg.StageDiffContextLines)

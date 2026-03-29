@@ -18,7 +18,7 @@ type Config struct {
 // Default returns the default configuration.
 func Default() Config {
 	return Config{
-		UseNerdFontIcons:      false,
+		UseNerdFontIcons:      true,
 		StageDiffContextLines: 1,
 	}
 }
