@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.7.0
+
+- Added a dedicated `gx stage` TUI for file, hunk, and line staging/unstaging with split unstaged/staged diff panes
+
 ## v0.6.1
 
 - Fixed the yank files dialog so pressing `space` can toggle selected files off again
