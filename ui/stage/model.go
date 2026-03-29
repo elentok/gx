@@ -1569,11 +1569,7 @@ func (m *Model) focusMovedTarget(sig movedTarget) {
 
 func (m Model) helpLine() string {
 	if m.focus == focusStatus {
-		hint := "status · ? help"
-		if m.statusMsg != "" {
-			return "  " + m.statusMsg + "  ·  " + lipgloss.NewStyle().Foreground(catSubtle).Render(hint)
-		}
-		return lipgloss.NewStyle().Foreground(catSubtle).Render("  " + hint)
+		return m.renderFooterLine("status · ? help")
 	}
 	modeLabel := "hunk"
 	if m.navMode == navLine {
@@ -1583,11 +1579,45 @@ func (m Model) helpLine() string {
 	if m.wrapSoft {
 		wrapLabel = "on"
 	}
-	hint := "diff: mode:" + modeLabel + " · wrap:" + wrapLabel + " · ? help"
-	if m.statusMsg != "" {
-		return "  " + m.statusMsg + "  ·  " + lipgloss.NewStyle().Foreground(catSubtle).Render(hint)
+	return m.renderFooterLine("diff: mode:" + modeLabel + " · wrap:" + wrapLabel + " · ? help")
+}
+
+func (m Model) renderFooterLine(hint string) string {
+	hintText := "· " + hint
+	hintStyled := lipgloss.NewStyle().Foreground(catSubtle).Render(hintText)
+	lineW := m.width
+	if lineW <= 0 {
+		if m.statusMsg == "" {
+			return hintStyled
+		}
+		return m.statusMsg + "  " + hintStyled
 	}
-	return lipgloss.NewStyle().Foreground(catSubtle).Render("  " + hint)
+
+	hintW := ansi.StringWidth(hintText)
+	if m.statusMsg == "" {
+		if hintW >= lineW {
+			return ansi.Truncate(hintStyled, lineW, "")
+		}
+		return strings.Repeat(" ", lineW-hintW) + hintStyled
+	}
+
+	sep := "  "
+	sepW := ansi.StringWidth(sep)
+	statusMax := lineW - hintW - sepW
+	if statusMax <= 0 {
+		if hintW >= lineW {
+			return ansi.Truncate(hintStyled, lineW, "")
+		}
+		return strings.Repeat(" ", lineW-hintW) + hintStyled
+	}
+
+	status := ansi.Truncate(m.statusMsg, statusMax, "...")
+	left := status + sep
+	leftW := ansi.StringWidth(left)
+	if leftW+hintW >= lineW {
+		return left + hintStyled
+	}
+	return left + strings.Repeat(" ", lineW-leftW-hintW) + hintStyled
 }
 
 func (m *Model) showHelpOverlay() {

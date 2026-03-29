@@ -10,6 +10,7 @@ import (
 	"gx/testutil"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestUseStackedLayoutThreshold(t *testing.T) {
@@ -138,6 +139,27 @@ func TestHelpOverlayToggleAndCompactStatusBar(t *testing.T) {
 	m = updated.(Model)
 	if m.helpOpen {
 		t.Fatalf("expected help overlay to close on esc")
+	}
+}
+
+func TestHelpLineRightAlignsHintAndTruncatesStatus(t *testing.T) {
+	m := New(testutil.TempRepo(t))
+	m.ready = true
+	m.width = 48
+	m.focus = focusStatus
+	m.statusMsg = "this is a very long status message that should truncate"
+
+	line := m.helpLine()
+	plain := ansi.Strip(line)
+
+	if ansi.StringWidth(plain) != m.width {
+		t.Fatalf("expected footer width %d, got %d (%q)", m.width, ansi.StringWidth(plain), plain)
+	}
+	if !strings.Contains(plain, "...") {
+		t.Fatalf("expected truncated status with ellipsis, got %q", plain)
+	}
+	if !strings.HasSuffix(plain, "· status · ? help") {
+		t.Fatalf("expected hint right-aligned at end, got %q", plain)
 	}
 }
 
