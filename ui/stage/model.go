@@ -2,6 +2,7 @@ package stage
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -103,6 +104,11 @@ var (
 )
 
 const ansiReset = "\x1b[0m"
+
+var (
+	ansiCSIRe = regexp.MustCompile(`\x1b\[[0-9:;<=>?]*[ -/]*[@-~]`)
+	ansiOSCRe = regexp.MustCompile(`\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)`) // OSC ... BEL/ST
+)
 
 func New(worktreeRoot string) Model {
 	return NewWithSettings(worktreeRoot, DefaultSettings())
@@ -536,7 +542,7 @@ func buildDisplayLines(parsed parsedDiff, colorLines []string) (lines []string, 
 		for rawIdx := h.StartLine + 1; rawIdx <= h.EndLine && rawIdx < len(parsed.Lines); rawIdx++ {
 			line := parsed.Lines[rawIdx]
 			if rawIdx < len(colorLines) {
-				line = colorLines[rawIdx]
+				line = sanitizeANSIInline(colorLines[rawIdx])
 			}
 			displayIdx = len(lines)
 			lines = append(lines, line)
@@ -545,6 +551,28 @@ func buildDisplayLines(parsed parsedDiff, colorLines []string) (lines []string, 
 		}
 	}
 	return lines, displayToRaw, rawToDisplay
+}
+
+func sanitizeANSIInline(s string) string {
+	s = ansiOSCRe.ReplaceAllString(s, "")
+	s = ansiCSIRe.ReplaceAllStringFunc(s, func(seq string) string {
+		if strings.HasSuffix(seq, "m") {
+			return seq
+		}
+		return ""
+	})
+	// Tabs can visually overflow panel width depending on terminal tab stops,
+	// causing border glyphs to appear missing. Normalize to spaces.
+	s = strings.ReplaceAll(s, "\t", "    ")
+	// Drop residual C0 control chars that can affect cursor position/erase.
+	b := make([]rune, 0, len(s))
+	for _, r := range s {
+		if (r < 0x20 && r != 0x1b) || r == 0x7f {
+			continue
+		}
+		b = append(b, r)
+	}
+	return string(b)
 }
 
 func cleanHunkHeader(line string) string {
