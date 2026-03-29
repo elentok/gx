@@ -1056,8 +1056,13 @@ func (m Model) renderStatusPane(width, height int) string {
 			}
 			indent := strings.Repeat("  ", entry.Depth)
 			statusColor := statusEntryColor(entry)
+			deleted := entry.Kind == statusEntryFile && isDeletedFileStatus(entry.File)
 			metaRaw := statusEntryMeta(entry, m.settings.UseNerdFontIcons, icons)
-			meta := lipgloss.NewStyle().Foreground(lipgloss.Color(statusColor)).Render(metaRaw)
+			metaStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(statusColor))
+			if deleted {
+				metaStyle = metaStyle.Faint(true)
+			}
+			meta := metaStyle.Render(metaRaw)
 			name := entry.DisplayName
 			if entry.Kind == statusEntryDir {
 				symbol := icons.folderOpen
@@ -1068,13 +1073,17 @@ func (m Model) renderStatusPane(width, height int) string {
 			} else {
 				name = statusFileIcon(entry.File, icons) + " " + name
 			}
-			name = lipgloss.NewStyle().Foreground(lipgloss.Color(statusColor)).Render(name)
+			nameStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(statusColor))
+			if deleted {
+				nameStyle = nameStyle.Faint(true)
+			}
+			name = nameStyle.Render(name)
 			sep := " "
 			if strings.TrimSpace(metaRaw) == "" {
 				sep = ""
 			}
 			line := fmt.Sprintf("%s%s%s%s%s", mark, indent, meta, sep, name)
-			if i == m.selected {
+			if i == m.selected && !deleted {
 				line = lipgloss.NewStyle().Bold(true).Render(line)
 			}
 			lines = append(lines, line)
@@ -1756,6 +1765,7 @@ type statusPaneIcons struct {
 	folderOpen   string
 	fileModified string
 	fileNew      string
+	fileDeleted  string
 	partial      string
 	staged       string
 }
@@ -1767,6 +1777,7 @@ func statusPaneIconsFor(useNerdFontIcons bool) statusPaneIcons {
 			folderOpen:   "▾",
 			fileModified: "M",
 			fileNew:      "N",
+			fileDeleted:  "D",
 			partial:      "+",
 			staged:       "✓",
 		}
@@ -1776,12 +1787,16 @@ func statusPaneIconsFor(useNerdFontIcons bool) statusPaneIcons {
 		folderOpen:   "",
 		fileModified: "",
 		fileNew:      "",
+		fileDeleted:  "",
 		partial:      "",
 		staged:       "",
 	}
 }
 
 func statusEntryColor(entry statusEntry) string {
+	if entry.Kind == statusEntryFile && isDeletedFileStatus(entry.File) {
+		return "#a6adc8"
+	}
 	if entry.HasStaged && entry.HasUnstaged {
 		return "#fab387"
 	}
@@ -1808,10 +1823,17 @@ func statusEntryMeta(entry statusEntry, useNerdFontIcons bool, icons statusPaneI
 }
 
 func statusFileIcon(file git.StageFileStatus, icons statusPaneIcons) string {
+	if isDeletedFileStatus(file) {
+		return icons.fileDeleted
+	}
 	if file.IsUntracked() || file.IndexStatus == 'A' {
 		return icons.fileNew
 	}
 	return icons.fileModified
+}
+
+func isDeletedFileStatus(file git.StageFileStatus) bool {
+	return file.IndexStatus == 'D' || file.WorktreeCode == 'D'
 }
 
 func (m Model) flashMarker(section diffSection, rawIdx int, sec *sectionState) bool {

@@ -528,6 +528,30 @@ func TestCtrlDAndCtrlUScrollStatusAndDiff(t *testing.T) {
 	}
 }
 
+func TestStatusFileIconDeletedAndFallback(t *testing.T) {
+	deleted := git.StageFileStatus{Path: "gone.txt", WorktreeCode: 'D'}
+
+	nerd := statusPaneIconsFor(true)
+	if got := statusFileIcon(deleted, nerd); got != "" {
+		t.Fatalf("expected deleted nerd icon, got %q", got)
+	}
+
+	plain := statusPaneIconsFor(false)
+	if got := statusFileIcon(deleted, plain); got != "D" {
+		t.Fatalf("expected deleted fallback icon, got %q", got)
+	}
+}
+
+func TestStatusEntryColorDeletedFileIsDim(t *testing.T) {
+	entry := statusEntry{
+		Kind: statusEntryFile,
+		File: git.StageFileStatus{Path: "gone.txt", WorktreeCode: 'D'},
+	}
+	if got := statusEntryColor(entry); got != "#a6adc8" {
+		t.Fatalf("expected dim deleted color, got %q", got)
+	}
+}
+
 func TestDiffJDoesNotOverscrollPastContent(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "# test\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n")
