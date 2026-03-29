@@ -1,1 +1,1 @@
-CLAUDE.md
+See ./ai/index.md
