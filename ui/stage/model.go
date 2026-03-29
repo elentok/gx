@@ -72,14 +72,15 @@ type Model struct {
 	unstaged sectionState
 	staged   sectionState
 
-	statusMsg string
-	err       error
-	errorOpen bool
-	errorVP   viewport.Model
-	helpOpen  bool
-	helpVP    viewport.Model
-	flash     flashState
-	keyPrefix string
+	statusMsg      string
+	err            error
+	errorOpen      bool
+	errorVP        viewport.Model
+	helpOpen       bool
+	helpVP         viewport.Model
+	activeFilePath string
+	flash          flashState
+	keyPrefix      string
 }
 
 type Settings struct {
@@ -181,6 +182,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
+		if msg.String() == "q" {
+			return m, tea.Quit
+		}
 		if m.errorOpen {
 			return m.handleErrorKey(msg)
 		}
@@ -221,7 +225,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleErrorKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "esc", "enter", "q":
+	case "esc", "enter":
 		m.errorOpen = false
 		return m, nil
 	}
@@ -232,7 +236,7 @@ func (m Model) handleErrorKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleHelpKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "?", "esc", "enter", "q":
+	case "?", "esc", "enter":
 		m.helpOpen = false
 		return m, nil
 	}
@@ -279,6 +283,11 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.collapseSelectedDir()
 		m.reloadDiffsForSelection()
 	case "l", "right":
+		entry, ok := m.selectedStatusEntry()
+		if ok && entry.Kind == statusEntryFile {
+			m.enterDiffFromStatus(false)
+			return m, nil
+		}
 		m.expandSelectedDir()
 		m.reloadDiffsForSelection()
 	case "r":
@@ -291,13 +300,7 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.reloadDiffsForSelection()
 			return m, nil
 		}
-		m.focus = focusDiff
-		m.section = sectionUnstaged
-		m.pickAvailableSection()
-		m.syncDiffViewports()
-		m.ensureActiveVisible(m.currentSection())
-	case "q":
-		return m, tea.Quit
+		m.enterDiffFromStatus(false)
 	case "?":
 		m.showHelpOverlay()
 	}
@@ -307,6 +310,9 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "q":
+		m.focus = focusStatus
+		return m, nil
+	case "h", "left":
 		m.focus = focusStatus
 		return m, nil
 	case "tab":
@@ -505,6 +511,7 @@ func (m *Model) reload(preservePath string) {
 func (m *Model) reloadDiffsForSelection() {
 	entry, ok := m.selectedStatusEntry()
 	if !ok || entry.Kind == statusEntryDir {
+		m.activeFilePath = ""
 		m.unstaged = newSectionState()
 		m.staged = newSectionState()
 		m.syncDiffViewports()
@@ -512,6 +519,10 @@ func (m *Model) reloadDiffsForSelection() {
 	}
 
 	file := entry.File
+	if file.Path != m.activeFilePath {
+		m.section = sectionUnstaged
+		m.activeFilePath = file.Path
+	}
 	if file.IsUntracked() {
 		raw, err := git.DiffUntrackedPath(m.worktreeRoot, file.Path, false, m.settings.DiffContextLines)
 		if err != nil {
@@ -553,6 +564,19 @@ func (m *Model) reloadDiffsForSelection() {
 	m.staged = buildSectionState(stagedRaw, stagedColor, m.staged)
 	m.pickAvailableSection()
 	m.syncDiffViewports()
+}
+
+func (m *Model) enterDiffFromStatus(resetSection bool) {
+	if _, ok := m.selectedFile(); !ok {
+		return
+	}
+	m.focus = focusDiff
+	if resetSection {
+		m.section = sectionUnstaged
+	}
+	m.pickAvailableSection()
+	m.syncDiffViewports()
+	m.ensureActiveVisible(m.currentSection())
 }
 
 func buildSectionState(raw, color string, prev sectionState) sectionState {
@@ -829,16 +853,10 @@ func (m Model) useStackedLayout() bool {
 }
 
 func (m Model) renderStatusPane(width, height int) string {
-	innerW := maxInt(1, width-2)
 	innerH := maxInt(1, height-2)
 	lines := make([]string, 0, innerH)
-	title := lipgloss.NewStyle().Foreground(catBlue).Bold(true).Render(" Status")
-	if m.focus == focusStatus {
-		title = lipgloss.NewStyle().Foreground(catOrange).Bold(true).Render(" Status *")
-	}
-	lines = append(lines, ansi.Truncate(title, innerW, ""))
 
-	bodyH := innerH - 1
+	bodyH := innerH
 	if bodyH < 0 {
 		bodyH = 0
 	}
@@ -863,13 +881,14 @@ func (m Model) renderStatusPane(width, height int) string {
 		}
 		for i := start; i < end; i++ {
 			entry := m.statusEntries[i]
-			mark := "  "
+			mark := " "
 			if i == m.selected {
-				mark = lipgloss.NewStyle().Foreground(catOrange).Render("▌ ")
+				mark = lipgloss.NewStyle().Foreground(catOrange).Render("▌")
 			}
 			indent := strings.Repeat("  ", entry.Depth)
 			statusColor := statusEntryColor(entry)
-			meta := lipgloss.NewStyle().Foreground(lipgloss.Color(statusColor)).Render(statusEntryMeta(entry, m.settings.UseNerdFontIcons, icons))
+			metaRaw := statusEntryMeta(entry, m.settings.UseNerdFontIcons, icons)
+			meta := lipgloss.NewStyle().Foreground(lipgloss.Color(statusColor)).Render(metaRaw)
 			name := entry.DisplayName
 			if entry.Kind == statusEntryDir {
 				symbol := icons.folderOpen
@@ -881,11 +900,15 @@ func (m Model) renderStatusPane(width, height int) string {
 				name = statusFileIcon(entry.File, icons) + " " + name
 			}
 			name = lipgloss.NewStyle().Foreground(lipgloss.Color(statusColor)).Render(name)
-			line := fmt.Sprintf("%s%s%s %s", mark, indent, meta, name)
+			sep := " "
+			if strings.TrimSpace(metaRaw) == "" {
+				sep = ""
+			}
+			line := fmt.Sprintf("%s%s%s%s%s", mark, indent, meta, sep, name)
 			if i == m.selected {
 				line = lipgloss.NewStyle().Bold(true).Render(line)
 			}
-			lines = append(lines, ansi.Truncate(line, innerW, ""))
+			lines = append(lines, line)
 		}
 	}
 
@@ -893,11 +916,7 @@ func (m Model) renderStatusPane(width, height int) string {
 		lines = append(lines, "")
 	}
 
-	content := strings.Join(lines, "\n")
-	return m.panelStyle(m.focus == focusStatus).
-		Width(width).
-		Height(height).
-		Render(content)
+	return m.renderPanelWithBorderTitle(width, height, "Status", "", lines, m.focus == focusStatus, sectionUnstaged)
 }
 
 func (m *Model) renderDiffPane(width, height int) string {
@@ -1354,18 +1373,19 @@ func stageHelpText() string {
 	return strings.Join([]string{
 		"Global",
 		"  ?       toggle this help",
+		"  q       quit",
 		"  cc      open git commit",
 		"",
 		"Status Focus",
 		"  j / k   move selection",
-		"  h / l   collapse or expand directory",
+		"  h       collapse open directory",
+		"  l       expand directory / open diff on file",
 		"  space   stage/unstage file",
 		"  enter   open diff view",
 		"  r       refresh",
-		"  q       quit",
 		"",
 		"Diff Focus",
-		"  esc/q   return to status",
+		"  esc/h   return to status",
 		"  tab     switch unstaged/staged section",
 		"  a       toggle hunk/line mode",
 		"  j / k   move active hunk/line",
@@ -1385,7 +1405,7 @@ func (m Model) errorModalView() string {
 		Padding(0, 1).
 		Width(m.errorVP.Width())
 
-	hint := lipgloss.NewStyle().Foreground(catSubtle).Render("esc / enter / q dismiss · j/k scroll")
+	hint := lipgloss.NewStyle().Foreground(catSubtle).Render("esc / enter dismiss · j/k scroll")
 	inner := lipgloss.JoinVertical(lipgloss.Left,
 		titleStyle.Render("Error"),
 		"",
@@ -1404,7 +1424,7 @@ func (m Model) helpModalView() string {
 		Padding(0, 1).
 		Width(m.helpVP.Width())
 
-	hint := lipgloss.NewStyle().Foreground(catSubtle).Render("? / esc / enter / q dismiss · j/k scroll")
+	hint := lipgloss.NewStyle().Foreground(catSubtle).Render("? / esc / enter dismiss · j/k scroll")
 	inner := lipgloss.JoinVertical(lipgloss.Left,
 		titleStyle.Render("Keyboard Help"),
 		"",
@@ -1574,7 +1594,7 @@ func statusEntryMeta(entry statusEntry, useNerdFontIcons bool, icons statusPaneI
 		return icons.staged
 	}
 	if useNerdFontIcons {
-		return " "
+		return "  "
 	}
 	if entry.Kind == statusEntryDir {
 		return "-"

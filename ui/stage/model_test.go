@@ -45,6 +45,66 @@ func TestQAndEscFocusBehavior(t *testing.T) {
 	}
 }
 
+func TestQAlwaysQuitsFromDiffFocus(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "README.md", "changed\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusDiff
+
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
+	if cmd == nil {
+		t.Fatalf("expected q to quit from diff focus")
+	}
+}
+
+func TestStatusLOnFileEntersDiffAndResetsSectionOnFileChange(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\ntwo\n")
+	testutil.WriteFile(t, repo, "b.txt", "one\ntwo\n")
+	testutil.MustGitExported(t, repo, "add", "a.txt", "b.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+
+	// File a has both staged and unstaged changes.
+	testutil.WriteFile(t, repo, "a.txt", "ONE\ntwo\n")
+	testutil.MustGitExported(t, repo, "add", "a.txt")
+	testutil.WriteFile(t, repo, "a.txt", "ONE-again\ntwo\n")
+
+	// File b is only unstaged.
+	testutil.WriteFile(t, repo, "b.txt", "ONE\ntwo\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusStatus
+	m.section = sectionStaged
+
+	if len(m.statusEntries) < 2 {
+		t.Fatalf("expected two status entries, got %d", len(m.statusEntries))
+	}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+	m = updated.(Model)
+	if m.focus != focusDiff {
+		t.Fatalf("expected l on file to enter diff")
+	}
+	if m.section != sectionStaged {
+		t.Fatalf("expected section to remain staged for same file")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
+	m = updated.(Model)
+	if m.focus != focusStatus {
+		t.Fatalf("expected h in diff to return to status")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	if m.section != sectionUnstaged {
+		t.Fatalf("expected section reset to unstaged after active file change")
+	}
+}
+
 func TestHelpOverlayToggleAndCompactStatusBar(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "changed\n")
