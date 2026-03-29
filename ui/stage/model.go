@@ -952,6 +952,10 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 	}
 
 	active := m.activeRawLineIndex(*sec)
+	accent := catOrange
+	if section == sectionStaged {
+		accent = catGreen
+	}
 	hunkStart, hunkEnd := -1, -1
 	if m.navMode == navHunk && sec.activeHunk >= 0 && sec.activeHunk < len(sec.parsed.Hunks) {
 		hunkStart = sec.parsed.Hunks[sec.activeHunk].StartLine
@@ -985,10 +989,10 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 		mark := "  "
 		inActiveHunk := rawIdx >= 0 && m.navMode == navHunk && rawIdx >= hunkStart && rawIdx <= hunkEnd
 		if inActiveHunk && activeSection {
-			mark = lipgloss.NewStyle().Foreground(catOrange).Render("▌ ")
+			mark = lipgloss.NewStyle().Foreground(accent).Render("▌ ")
 		}
 		if rawIdx >= 0 && rawIdx == active && activeSection {
-			mark = lipgloss.NewStyle().Foreground(catOrange).Bold(true).Render("▌ ")
+			mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render("▌ ")
 		}
 		if rawIdx >= 0 && m.flashMarker(section, rawIdx, sec) {
 			mark = lipgloss.NewStyle().Foreground(catGreen).Bold(true).Render("◆ ")
@@ -996,7 +1000,7 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 		line := mark + sec.viewLines[displayIdx]
 		lines = append(lines, ansi.Truncate(line, innerW, ""))
 	}
-	return m.renderPanelWithBorderTitle(width, height, titleText, rightTitleText, lines, activeSection)
+	return m.renderPanelWithBorderTitle(width, height, titleText, rightTitleText, lines, activeSection, section)
 }
 
 func (m Model) activeRawLineIndex(sec sectionState) int {
@@ -1459,7 +1463,7 @@ func (m Model) panelStyle(active bool) lipgloss.Style {
 		Background(catBase0)
 }
 
-func (m Model) renderPanelWithBorderTitle(width, height int, title, rightTitle string, lines []string, active bool) string {
+func (m Model) renderPanelWithBorderTitle(width, height int, title, rightTitle string, lines []string, active bool, section diffSection) string {
 	if width < 2 || height < 2 {
 		return ""
 	}
@@ -1468,7 +1472,13 @@ func (m Model) renderPanelWithBorderTitle(width, height int, title, rightTitle s
 
 	borderColor := catSubtle
 	titleStyle := lipgloss.NewStyle().Foreground(catBlue)
-	if active {
+	if section == sectionStaged {
+		borderColor = catGreen
+		titleStyle = lipgloss.NewStyle().Foreground(catGreen)
+		if active {
+			titleStyle = titleStyle.Bold(true)
+		}
+	} else if active {
 		borderColor = catOrange
 		titleStyle = lipgloss.NewStyle().Foreground(catOrange).Bold(true)
 	}
