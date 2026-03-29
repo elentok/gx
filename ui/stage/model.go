@@ -35,12 +35,14 @@ const (
 )
 
 type sectionState struct {
-	rawLines   []string
-	viewLines  []string
-	parsed     parsedDiff
-	activeHunk int
-	activeLine int
-	viewport   viewport.Model
+	rawLines     []string
+	viewLines    []string
+	displayToRaw []int
+	rawToDisplay []int
+	parsed       parsedDiff
+	activeHunk   int
+	activeLine   int
+	viewport     viewport.Model
 }
 
 type Model struct {
@@ -51,9 +53,10 @@ type Model struct {
 	height int
 	ready  bool
 
-	focus   focusPane
-	section diffSection
-	navMode navMode
+	focus          focusPane
+	section        diffSection
+	navMode        navMode
+	diffFullscreen bool
 
 	files         []git.StageFileStatus
 	statusEntries []statusEntry
@@ -88,15 +91,18 @@ type flashState struct {
 type flashTickMsg struct{}
 
 var (
-	catBase0  = lipgloss.Color("#1e1e2e")
-	catText   = lipgloss.Color("#cdd6f4")
-	catSubtle = lipgloss.Color("#a6adc8")
-	catBlue   = lipgloss.Color("#89b4fa")
-	catGreen  = lipgloss.Color("#a6e3a1")
-	catYellow = lipgloss.Color("#f9e2af")
-	catRed    = lipgloss.Color("#f38ba8")
-	catOrange = lipgloss.Color("#fab387")
+	catBase0   = lipgloss.Color("#1e1e2e")
+	catText    = lipgloss.Color("#cdd6f4")
+	catSubtle  = lipgloss.Color("#a6adc8")
+	catBlue    = lipgloss.Color("#89b4fa")
+	catGreen   = lipgloss.Color("#a6e3a1")
+	catYellow  = lipgloss.Color("#f9e2af")
+	catRed     = lipgloss.Color("#f38ba8")
+	catOrange  = lipgloss.Color("#fab387")
+	catSurface = lipgloss.Color("#313244")
 )
+
+const ansiReset = "\x1b[0m"
 
 func New(worktreeRoot string) Model {
 	return NewWithSettings(worktreeRoot, DefaultSettings())
@@ -184,6 +190,8 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "l", "right":
 		m.expandSelectedDir()
 		m.reloadDiffsForSelection()
+	case "r":
+		m.refresh()
 	case "space":
 		m.toggleStageStatusEntry()
 		m.reloadDiffsForSelection()
@@ -193,7 +201,10 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.focus = focusDiff
+		m.section = sectionUnstaged
 		m.pickAvailableSection()
+		m.syncDiffViewports()
+		m.ensureActiveVisible(m.currentSection())
 	case "q":
 		return m, tea.Quit
 	}
@@ -212,6 +223,7 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			} else {
 				m.section = sectionUnstaged
 			}
+			m.syncDiffViewports()
 			m.ensureActiveVisible(m.currentSection())
 		}
 	case "a":
@@ -221,6 +233,12 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.navMode = navHunk
 		}
 		m.ensureActiveVisible(m.currentSection())
+	case "f":
+		m.diffFullscreen = !m.diffFullscreen
+		m.syncDiffViewports()
+		m.ensureActiveVisible(m.currentSection())
+	case "r":
+		m.refresh()
 	case "j", "down":
 		m.moveActive(1)
 	case "k", "up":
@@ -448,6 +466,9 @@ func buildSectionState(raw, color string, prev sectionState) sectionState {
 	if raw == "" {
 		state.activeHunk = -1
 		state.activeLine = -1
+		state.viewLines = nil
+		state.displayToRaw = nil
+		state.rawToDisplay = nil
 		state.viewport.SetContent("")
 		state.viewport.SetYOffset(0)
 		return state
@@ -460,7 +481,7 @@ func buildSectionState(raw, color string, prev sectionState) sectionState {
 	if len(colorLines) != len(state.rawLines) {
 		colorLines = append([]string{}, state.rawLines...)
 	}
-	state.viewLines = colorLines
+	state.viewLines, state.displayToRaw, state.rawToDisplay = buildDisplayLines(state.parsed, colorLines)
 	prevOffset := state.viewport.YOffset()
 	state.viewport.SetContentLines(state.viewLines)
 	state.viewport.SetYOffset(prevOffset)
@@ -488,6 +509,59 @@ func buildSectionState(raw, color string, prev sectionState) sectionState {
 	}
 
 	return state
+}
+
+func buildDisplayLines(parsed parsedDiff, colorLines []string) (lines []string, displayToRaw []int, rawToDisplay []int) {
+	if len(parsed.Lines) == 0 {
+		return nil, nil, nil
+	}
+	rawToDisplay = make([]int, len(parsed.Lines))
+	for i := range rawToDisplay {
+		rawToDisplay[i] = -1
+	}
+
+	hdrStyle := lipgloss.NewStyle().Background(catSurface).Foreground(catText).Bold(true)
+	for hi, h := range parsed.Hunks {
+		if hi > 0 {
+			lines = append(lines, "")
+			displayToRaw = append(displayToRaw, -1)
+		}
+
+		header := cleanHunkHeader(parsed.Lines[h.StartLine])
+		displayIdx := len(lines)
+		lines = append(lines, hdrStyle.Render(" "+header+" "))
+		displayToRaw = append(displayToRaw, h.StartLine)
+		rawToDisplay[h.StartLine] = displayIdx
+
+		for rawIdx := h.StartLine + 1; rawIdx <= h.EndLine && rawIdx < len(parsed.Lines); rawIdx++ {
+			line := parsed.Lines[rawIdx]
+			if rawIdx < len(colorLines) {
+				line = colorLines[rawIdx]
+			}
+			displayIdx = len(lines)
+			lines = append(lines, line)
+			displayToRaw = append(displayToRaw, rawIdx)
+			rawToDisplay[rawIdx] = displayIdx
+		}
+	}
+	return lines, displayToRaw, rawToDisplay
+}
+
+func cleanHunkHeader(line string) string {
+	first := strings.Index(line, "@@")
+	if first == -1 {
+		return strings.TrimSpace(line)
+	}
+	second := strings.Index(line[first+2:], "@@")
+	if second == -1 {
+		return strings.TrimSpace(line)
+	}
+	second = first + 2 + second
+	tail := strings.TrimSpace(line[second+2:])
+	if tail == "" {
+		return "hunk"
+	}
+	return tail
 }
 
 func splitLines(s string) []string {
@@ -683,6 +757,12 @@ func (m *Model) renderDiffPane(width, height int) string {
 	if hasStaged && !hasUnstaged {
 		return m.renderSectionPane(width, height, "Staged", &m.staged, sectionStaged)
 	}
+	if m.diffFullscreen {
+		if m.section == sectionStaged {
+			return m.renderSectionPane(width, height, "Staged", &m.staged, sectionStaged)
+		}
+		return m.renderSectionPane(width, height, "Unstaged", &m.unstaged, sectionUnstaged)
+	}
 
 	topH := height / 2
 	if topH < 5 {
@@ -728,23 +808,27 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 	lines := make([]string, 0, bodyH)
 
 	for i := 0; i < bodyH; i++ {
-		rawIdx := sec.viewport.YOffset() + i
-		if rawIdx >= len(sec.viewLines) {
+		displayIdx := sec.viewport.YOffset() + i
+		if displayIdx >= len(sec.viewLines) {
 			lines = append(lines, "")
 			continue
 		}
+		rawIdx := -1
+		if displayIdx >= 0 && displayIdx < len(sec.displayToRaw) {
+			rawIdx = sec.displayToRaw[displayIdx]
+		}
 		mark := "  "
-		inActiveHunk := m.navMode == navHunk && rawIdx >= hunkStart && rawIdx <= hunkEnd
+		inActiveHunk := rawIdx >= 0 && m.navMode == navHunk && rawIdx >= hunkStart && rawIdx <= hunkEnd
 		if inActiveHunk && activeSection {
 			mark = lipgloss.NewStyle().Foreground(catOrange).Render("▌ ")
 		}
-		if rawIdx == active && activeSection {
+		if rawIdx >= 0 && rawIdx == active && activeSection {
 			mark = lipgloss.NewStyle().Foreground(catOrange).Bold(true).Render("▌ ")
 		}
-		if m.flashMarker(section, rawIdx, sec) {
+		if rawIdx >= 0 && m.flashMarker(section, rawIdx, sec) {
 			mark = lipgloss.NewStyle().Foreground(catGreen).Bold(true).Render("◆ ")
 		}
-		line := mark + sec.viewLines[rawIdx]
+		line := mark + sec.viewLines[displayIdx]
 		lines = append(lines, ansi.Truncate(line, innerW, ""))
 	}
 	return m.renderPanelWithBorderTitle(width, height, titleText, lines, activeSection)
@@ -774,6 +858,20 @@ func (m *Model) syncDiffViewports() {
 
 	hasUnstaged := len(m.unstaged.viewLines) > 0
 	hasStaged := len(m.staged.viewLines) > 0
+	if m.diffFullscreen {
+		if m.section == sectionUnstaged {
+			m.unstaged.viewport.SetHeight(maxInt(0, diffH-3))
+			m.staged.viewport.SetHeight(0)
+		} else {
+			m.staged.viewport.SetHeight(maxInt(0, diffH-3))
+			m.unstaged.viewport.SetHeight(0)
+		}
+		m.unstaged.viewport.SetWidth(vpW)
+		m.staged.viewport.SetWidth(vpW)
+		m.unstaged.viewport.SetContentLines(m.unstaged.viewLines)
+		m.staged.viewport.SetContentLines(m.staged.viewLines)
+		return
+	}
 
 	if hasUnstaged && hasStaged {
 		topH := diffH / 2
@@ -813,7 +911,11 @@ func (m *Model) syncDiffViewports() {
 func (m *Model) ensureActiveVisible(sec *sectionState) {
 	active := m.activeRawLineIndex(*sec)
 	if active >= 0 {
-		sec.viewport.EnsureVisible(active, 0, 0)
+		display := active
+		if active < len(sec.rawToDisplay) && sec.rawToDisplay[active] >= 0 {
+			display = sec.rawToDisplay[active]
+		}
+		sec.viewport.EnsureVisible(display, 0, 0)
 	}
 }
 
@@ -828,6 +930,18 @@ func (m Model) selectedStatusEntry() (statusEntry, bool) {
 		return statusEntry{}, false
 	}
 	return m.statusEntries[m.selected], true
+}
+
+func (m *Model) refresh() {
+	preserve := ""
+	if entry, ok := m.selectedStatusEntry(); ok {
+		preserve = entry.Path
+	}
+	m.reload(preserve)
+	m.syncDiffViewports()
+	if m.focus == focusDiff {
+		m.ensureActiveVisible(m.currentSection())
+	}
 }
 
 func (m Model) selectedFile() (git.StageFileStatus, bool) {
@@ -950,7 +1064,7 @@ func (m Model) helpLine() string {
 		if m.statusMsg != "" {
 			return "  " + m.statusMsg
 		}
-		return lipgloss.NewStyle().Foreground(catSubtle).Render("  status: j/k move · h/l collapse-expand · space toggle file/dir · enter diff · q quit")
+		return lipgloss.NewStyle().Foreground(catSubtle).Render("  status: j/k move · h/l collapse-expand · space toggle file/dir · enter diff · r refresh · q quit")
 	}
 	if m.statusMsg != "" {
 		return "  " + m.statusMsg
@@ -959,7 +1073,7 @@ func (m Model) helpLine() string {
 	if m.navMode == navLine {
 		modeLabel = "line"
 	}
-	return lipgloss.NewStyle().Foreground(catSubtle).Render("  diff: mode:" + modeLabel + " · tab section · j/k move · J/K scroll(3) · space stage/unstage · esc/q back")
+	return lipgloss.NewStyle().Foreground(catSubtle).Render("  diff: mode:" + modeLabel + " · tab section · f fullscreen · j/k move · J/K scroll(3) · space stage/unstage · r refresh · esc/q back")
 }
 
 func (m Model) panelStyle(active bool) lipgloss.Style {
@@ -1011,7 +1125,7 @@ func (m Model) renderPanelWithBorderTitle(width, height int, title string, lines
 			line = ansi.Truncate(lines[i], innerW, "")
 		}
 		line = line + strings.Repeat(" ", maxInt(0, innerW-ansi.StringWidth(line)))
-		body = append(body, border.Render("│")+line+border.Render("│"))
+		body = append(body, border.Render("│")+line+ansiReset+border.Render("│"))
 	}
 
 	bottom := border.Render("╰" + strings.Repeat("─", innerW) + "╯")

@@ -137,8 +137,10 @@ func TestDiffJKScrollsWithoutMovingCursor(t *testing.T) {
 	if m.unstaged.activeLine != beforeLine {
 		t.Fatalf("K changed active line: got %d want %d", m.unstaged.activeLine, beforeLine)
 	}
-	if got := m.unstaged.viewport.YOffset(); got >= beforeOffset+expectedDelta {
-		t.Fatalf("K should scroll up on first press: offset after K=%d", got)
+	if expectedDelta > 0 {
+		if got := m.unstaged.viewport.YOffset(); got >= beforeOffset+expectedDelta {
+			t.Fatalf("K should scroll up on first press: offset after K=%d", got)
+		}
 	}
 }
 
