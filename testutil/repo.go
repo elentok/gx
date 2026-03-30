@@ -140,6 +140,16 @@ func TempDotBareRepoWithWorktrees(t *testing.T, names ...string) string {
 	t.Helper()
 	src := TempRepo(t)
 	outer := evalDir(t, t.TempDir())
+	// Remove the outer repo before t.TempDir cleanup (LIFO) and retry to absorb
+	// transient macOS/APFS ENOTEMPTY races from lingering git filesystem activity.
+	t.Cleanup(func() {
+		for range 10 {
+			if os.RemoveAll(outer) == nil {
+				return
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+	})
 
 	bareDir := filepath.Join(outer, ".bare")
 	mustRun(t, ".", "git", "clone", "--bare", src, bareDir)
