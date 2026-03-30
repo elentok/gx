@@ -81,6 +81,7 @@ type Model struct {
 	helpOpen       bool
 	helpVP         viewport.Model
 	activeFilePath string
+	diffReloadSeq  int
 	confirmOpen    bool
 	confirmTitle   string
 	confirmLines   []string
@@ -119,6 +120,7 @@ type flashState struct {
 type flashTickMsg struct{}
 type statusTickMsg struct{}
 type actionPollMsg struct{}
+type diffReloadMsg struct{ seq int }
 
 type commitFinishedMsg struct {
 	err       error
@@ -140,6 +142,7 @@ var (
 const ansiReset = "\x1b[0m"
 
 const statusMessageTTL = 5 * time.Second
+const statusDiffReloadDebounce = 100 * time.Millisecond
 
 var (
 	ansiCSIRe = regexp.MustCompile(`\x1b\[[0-9:;<=>?]*[ -/]*[@-~]`)
@@ -216,6 +219,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.runningOpen && !m.runningDone {
 			return m, actionPollCmd()
+		}
+		return m, nil
+	case diffReloadMsg:
+		if msg.seq == m.diffReloadSeq && m.focus == focusStatus {
+			m.reloadDiffsForSelection()
 		}
 		return m, nil
 	case tea.KeyPressMsg:
@@ -316,10 +324,16 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		m.keyPrefix = ""
 		if isLowerG {
 			m.jumpToTop()
+			if m.focus == focusStatus {
+				return m, m.scheduleDiffReload(), true
+			}
 			return m, nil, true
 		}
 		if isUpperG {
 			m.jumpToBottom()
+			if m.focus == focusStatus {
+				return m, m.scheduleDiffReload(), true
+			}
 			return m, nil, true
 		}
 		if key == "esc" {
@@ -340,6 +354,9 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	if isUpperG {
 		m.keyPrefix = ""
 		m.jumpToBottom()
+		if m.focus == focusStatus {
+			return m, m.scheduleDiffReload(), true
+		}
 		return m, nil, true
 	}
 	m.keyPrefix = ""
@@ -351,12 +368,14 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "j", "down":
 		if m.selected < len(m.statusEntries)-1 {
 			m.selected++
-			m.reloadDiffsForSelection()
+			m.onStatusSelectionChanged()
+			return m, m.scheduleDiffReload()
 		}
 	case "k", "up":
 		if m.selected > 0 {
 			m.selected--
-			m.reloadDiffsForSelection()
+			m.onStatusSelectionChanged()
+			return m, m.scheduleDiffReload()
 		}
 	case "h", "left":
 		m.collapseSelectedDir()
@@ -391,9 +410,13 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.showGitError(err)
 		}
 	case "ctrl+d":
-		m.scrollStatusPage(1)
+		if m.scrollStatusPage(1) {
+			return m, m.scheduleDiffReload()
+		}
 	case "ctrl+u":
-		m.scrollStatusPage(-1)
+		if m.scrollStatusPage(-1) {
+			return m, m.scheduleDiffReload()
+		}
 	case "space", " ":
 		m.toggleStageStatusEntry()
 		m.reloadDiffsForSelection()
@@ -535,10 +558,11 @@ func (m *Model) moveActive(delta int) {
 	m.ensureActiveVisible(sec)
 }
 
-func (m *Model) scrollStatusPage(direction int) {
+func (m *Model) scrollStatusPage(direction int) bool {
 	if len(m.statusEntries) == 0 {
-		return
+		return false
 	}
+	old := m.selected
 	mainH := m.height - 1
 	if mainH < 4 {
 		mainH = 4
@@ -556,7 +580,11 @@ func (m *Model) scrollStatusPage(direction int) {
 	if m.selected >= len(m.statusEntries) {
 		m.selected = len(m.statusEntries) - 1
 	}
-	m.reloadDiffsForSelection()
+	if m.selected == old {
+		return false
+	}
+	m.onStatusSelectionChanged()
+	return true
 }
 
 func (m *Model) scrollDiffPage(direction int) {
@@ -578,8 +606,11 @@ func (m *Model) jumpToTop() {
 		if len(m.statusEntries) == 0 {
 			return
 		}
+		if m.selected == 0 {
+			return
+		}
 		m.selected = 0
-		m.reloadDiffsForSelection()
+		m.onStatusSelectionChanged()
 		return
 	}
 	sec := m.currentSection()
@@ -602,8 +633,11 @@ func (m *Model) jumpToBottom() {
 		if len(m.statusEntries) == 0 {
 			return
 		}
+		if m.selected == len(m.statusEntries)-1 {
+			return
+		}
 		m.selected = len(m.statusEntries) - 1
-		m.reloadDiffsForSelection()
+		m.onStatusSelectionChanged()
 		return
 	}
 	sec := m.currentSection()
@@ -622,6 +656,25 @@ func (m *Model) jumpToBottom() {
 			return
 		}
 		sec.activeLine = len(sec.parsed.Changed) - 1
+	}
+}
+
+func (m *Model) scheduleDiffReload() tea.Cmd {
+	m.diffReloadSeq++
+	seq := m.diffReloadSeq
+	return tea.Tick(statusDiffReloadDebounce, func(time.Time) tea.Msg {
+		return diffReloadMsg{seq: seq}
+	})
+}
+
+func (m *Model) onStatusSelectionChanged() {
+	entry, ok := m.selectedStatusEntry()
+	if !ok || entry.Kind == statusEntryDir {
+		m.section = sectionUnstaged
+		return
+	}
+	if entry.File.Path != m.activeFilePath {
+		m.section = sectionUnstaged
 	}
 }
 
@@ -828,6 +881,8 @@ func (m *Model) enterDiffFromStatus(resetSection bool) {
 	if _, ok := m.selectedFile(); !ok {
 		return
 	}
+	m.diffReloadSeq++
+	m.reloadDiffsForSelection()
 	m.focus = focusDiff
 	if resetSection {
 		m.section = sectionUnstaged

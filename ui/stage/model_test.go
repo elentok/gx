@@ -588,6 +588,32 @@ func TestStatusMessageClearsAfterTimeoutTick(t *testing.T) {
 	}
 }
 
+func TestStatusSelectionDebouncesDiffReload(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.WriteFile(t, repo, "b.txt", "two\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusStatus
+
+	before := m.activeFilePath
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	if cmd == nil {
+		t.Fatalf("expected j in status to schedule debounced reload")
+	}
+	if m.activeFilePath != before {
+		t.Fatalf("expected active file to remain unchanged before debounce fires")
+	}
+
+	updated, _ = m.Update(diffReloadMsg{seq: m.diffReloadSeq})
+	m = updated.(Model)
+	if m.activeFilePath == before {
+		t.Fatalf("expected active file to update after debounce message")
+	}
+}
+
 func TestDiffJDoesNotOverscrollPastContent(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "# test\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n")
