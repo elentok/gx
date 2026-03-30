@@ -37,6 +37,18 @@ func waitForStageText(t *testing.T, tm *teatest.TestModel, text string, timeout 
 	}, teatest.WithDuration(timeout))
 }
 
+func waitForStageAnyText(t *testing.T, tm *teatest.TestModel, timeout time.Duration, texts ...string) {
+	t.Helper()
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		for _, text := range texts {
+			if bytes.Contains(bts, []byte(text)) {
+				return true
+			}
+		}
+		return false
+	}, teatest.WithDuration(timeout))
+}
+
 func waitForGitState(t *testing.T, tm *teatest.TestModel, timeout time.Duration, cond func() bool) {
 	t.Helper()
 	teatest.WaitFor(t, tm.Output(), func(_ []byte) bool { return cond() }, teatest.WithDuration(timeout))
@@ -359,6 +371,37 @@ func TestStageE2E_StageVisualRangeInNewFileFromDiffView(t *testing.T) {
 		staged, unstaged := stagedAndUnstagedDiff(t, repoDir, path)
 		return strings.Contains(staged, "+new-1") && strings.Contains(staged, "+new-2") && strings.Contains(unstaged, "+new-3")
 	})
+
+	quitStage(t, tm)
+}
+
+func TestStageE2E_YankFilenameFromStatus(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	path := "yank-status.txt"
+	testutil.WriteFile(t, repoDir, path, "one\n")
+
+	tm := startStageTUI(t, repoDir)
+	waitForStageText(t, tm, path, stageLoadWait)
+
+	tm.Send(keyRune('y'))
+	tm.Send(keyRune('f'))
+	waitForStageAnyText(t, tm, stageActionWait, "yanked filename", "clipboard copy failed")
+
+	quitStage(t, tm)
+}
+
+func TestStageE2E_YankContextFromDiff(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	path := "yank-diff.txt"
+	setupModifiedFileThreeLineChanges(t, repoDir, path)
+
+	tm := startStageTUI(t, repoDir)
+	waitForStageText(t, tm, path, stageLoadWait)
+
+	tm.Send(keySpecial(tea.KeyEnter))
+	tm.Send(keyRune('y'))
+	tm.Send(keyRune('c'))
+	waitForStageAnyText(t, tm, stageActionWait, "yanked context", "clipboard copy failed")
 
 	quitStage(t, tm)
 }

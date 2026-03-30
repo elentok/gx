@@ -384,6 +384,94 @@ func TestDiffStagedDUnstagesSelectionWithoutConfirm(t *testing.T) {
 	}
 }
 
+func TestYankFilenameWithYFInStatusView(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+
+	var got string
+	prev := stageClipboardWrite
+	stageClipboardWrite = func(s string) error {
+		got = s
+		return nil
+	}
+	t.Cleanup(func() { stageClipboardWrite = prev })
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusStatus
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
+	m = updated.(Model)
+
+	if got != "a.txt" {
+		t.Fatalf("expected yanked filename, got %q", got)
+	}
+}
+
+func TestYankContextWithYCInStatusViewYanksFilenameOnly(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "b.txt", "one\n")
+
+	var got string
+	prev := stageClipboardWrite
+	stageClipboardWrite = func(s string) error {
+		got = s
+		return nil
+	}
+	t.Cleanup(func() { stageClipboardWrite = prev })
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusStatus
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+	m = updated.(Model)
+
+	if got != "@b.txt" {
+		t.Fatalf("expected yc in status to yank filename only, got %q", got)
+	}
+}
+
+func TestYankContextWithYCInDiffViewIncludesLocationAndHunk(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "c.txt", "old-1\nold-2\n")
+	testutil.MustGitExported(t, repo, "add", "c.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+	testutil.WriteFile(t, repo, "c.txt", "new-1\nnew-2\n")
+
+	var got string
+	prev := stageClipboardWrite
+	stageClipboardWrite = func(s string) error {
+		got = s
+		return nil
+	}
+	t.Cleanup(func() { stageClipboardWrite = prev })
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusDiff
+	m.section = sectionUnstaged
+	m.navMode = navLine
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+	m = updated.(Model)
+
+	if !strings.Contains(got, "@c.txt L") {
+		t.Fatalf("expected yc output to include file and line, got %q", got)
+	}
+	if !strings.Contains(got, "+new-1") || !strings.Contains(got, "-old-1") {
+		t.Fatalf("expected yc output to include raw hunk content, got %q", got)
+	}
+}
+
 func TestDiffJKScrollsWithoutMovingCursor(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "# test\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n")

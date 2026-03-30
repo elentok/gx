@@ -294,6 +294,52 @@ func ApplyPatchToIndex(worktreeRoot, patch string, reverse bool, unidiffZero boo
 	return err
 }
 
+// ApplyPatchToWorktree applies patch to the worktree in worktreeRoot.
+func ApplyPatchToWorktree(worktreeRoot, patch string, reverse bool, unidiffZero bool) error {
+	args := []string{"apply", "--whitespace=nowarn"}
+	if reverse {
+		args = append(args, "-R")
+	}
+	if unidiffZero {
+		args = append(args, "--unidiff-zero")
+	}
+	_, err := runGitAllowExitCodes(worktreeRoot, []byte(patch), map[int]bool{0: true}, args...)
+	if err == nil {
+		return nil
+	}
+	if runErr, ok := err.(*RunError); ok {
+		if strings.TrimSpace(runErr.Stdout) == "" && strings.TrimSpace(runErr.Stderr) == "" {
+			return fmt.Errorf("%w\npatch:\n%s", err, patch)
+		}
+	}
+	return err
+}
+
+// RestorePaths restores the given paths in both index and worktree from HEAD.
+func RestorePaths(worktreeRoot string, paths []string) error {
+	if len(paths) == 0 {
+		return nil
+	}
+	args := []string{"restore", "--source=HEAD", "--staged", "--worktree", "--"}
+	args = append(args, paths...)
+	_, _, err := run(worktreeRoot, args)
+	return err
+}
+
+// DiscardUntrackedPath removes an untracked path from the working tree.
+func DiscardUntrackedPath(worktreeRoot, relPath string) error {
+	root := filepath.Clean(worktreeRoot)
+	target := filepath.Clean(filepath.Join(root, relPath))
+	if target == root {
+		return fmt.Errorf("refusing to remove worktree root")
+	}
+	prefix := root + string(filepath.Separator)
+	if !strings.HasPrefix(target, prefix) {
+		return fmt.Errorf("path escapes worktree root: %s", relPath)
+	}
+	return os.RemoveAll(target)
+}
+
 // StagePath stages a full path (used for untracked files).
 func StagePath(worktreeRoot, path string) error {
 	_, _, err := run(worktreeRoot, []string{"add", "--", path})

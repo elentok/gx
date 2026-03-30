@@ -366,9 +366,28 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 			return m, nil, true
 		}
 	}
+	if m.keyPrefix == "y" {
+		m.keyPrefix = ""
+		switch key {
+		case "c":
+			m.yankContextForAI()
+			return m, nil, true
+		case "f":
+			m.yankFilename()
+			return m, nil, true
+		case "esc":
+			m.clearStatus()
+			return m, nil, true
+		}
+	}
 	if key == "c" {
 		m.keyPrefix = "c"
 		m.setStatus("cc: git commit")
+		return m, nil, true
+	}
+	if key == "y" {
+		m.keyPrefix = "y"
+		m.setStatus("yc: yank AI context · yf: yank filename")
 		return m, nil, true
 	}
 	if isLowerG {
@@ -2133,6 +2152,7 @@ func stageHelpText() string {
 		"  ?       toggle this help",
 		"  q       quit",
 		"  cc      open git commit",
+		"  yc/yf   yank context / filename",
 		"  p/P     pull / push",
 		"  b       rebase on origin/master",
 		"  A       amend last commit (confirm)",
