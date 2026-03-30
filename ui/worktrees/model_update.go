@@ -397,8 +397,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loading = true
 		return m, cmdLoadWorktrees(m.repo)
 
-	case urlOpenedMsg:
-
 	case forcePushResultMsg:
 		m.spinnerActive = false
 		m.lastJobLog = msg.log

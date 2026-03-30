@@ -374,17 +374,17 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.startPullAction()
 		return m, actionPollCmd()
 	case "P":
-		if err := m.startPushAction(); err != nil {
+		if err := m.preparePushConfirm(); err != nil {
 			m.showGitError(err)
 			return m, nil
 		}
-		return m, actionPollCmd()
+		return m, nil
 	case "b":
-		if err := m.startRebaseAction(); err != nil {
+		if err := m.prepareRebaseConfirm(); err != nil {
 			m.showGitError(err)
 			return m, nil
 		}
-		return m, actionPollCmd()
+		return m, nil
 	case "A":
 		if err := m.openAmendConfirm(); err != nil {
 			m.showGitError(err)
@@ -447,17 +447,17 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.startPullAction()
 		return m, actionPollCmd()
 	case "P":
-		if err := m.startPushAction(); err != nil {
+		if err := m.preparePushConfirm(); err != nil {
 			m.showGitError(err)
 			return m, nil
 		}
-		return m, actionPollCmd()
+		return m, nil
 	case "b":
-		if err := m.startRebaseAction(); err != nil {
+		if err := m.prepareRebaseConfirm(); err != nil {
 			m.showGitError(err)
 			return m, nil
 		}
-		return m, actionPollCmd()
+		return m, nil
 	case "A":
 		if err := m.openAmendConfirm(); err != nil {
 			m.showGitError(err)

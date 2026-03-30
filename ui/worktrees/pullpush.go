@@ -2,10 +2,9 @@ package worktrees
 
 import (
 	"fmt"
-	"os/exec"
-	"runtime"
 
 	"gx/git"
+	"gx/ui"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -23,7 +22,6 @@ type forcePushResultMsg struct {
 	err error
 	log string
 }
-type urlOpenedMsg struct{}
 
 type stashPullResultMsg struct {
 	err     error
@@ -73,17 +71,7 @@ func cmdForcePush(repo git.Repo, wt git.Worktree) tea.Cmd {
 }
 
 func cmdOpenURL(url string) tea.Cmd {
-	return func() tea.Msg {
-		var cmd *exec.Cmd
-		switch runtime.GOOS {
-		case "darwin":
-			cmd = exec.Command("open", url)
-		default:
-			cmd = exec.Command("xdg-open", url)
-		}
-		_ = cmd.Start()
-		return urlOpenedMsg{}
-	}
+	return ui.CmdOpenURL(url)
 }
 
 func cmdStashPull(wt git.Worktree) tea.Cmd {

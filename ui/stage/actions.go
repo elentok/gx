@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"gx/git"
+	"gx/ui"
 
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
@@ -20,10 +21,13 @@ type stageConfirmAction int
 
 const (
 	confirmNone stageConfirmAction = iota
+	confirmPush
+	confirmRebase
 	confirmForcePush
 	confirmPullPopStash
 	confirmRebasePopStash
 	confirmAmend
+	confirmOpenPR
 )
 
 type stageActionKind int
@@ -46,6 +50,7 @@ type stageActionResult struct {
 	promptPopStash bool
 	remote         string
 	branch         string
+	prURL          string
 }
 
 type stageActionRunner struct {
@@ -133,6 +138,10 @@ func (r *stageActionRunner) run() stageActionResult {
 				res.promptForce = true
 				res.err = nil
 			}
+		} else {
+			r.mu.Lock()
+			res.prURL = git.ExtractPRURL(r.output.String())
+			r.mu.Unlock()
 		}
 		return res
 	case actionForcePush:
@@ -312,6 +321,16 @@ func (m *Model) handleActionResult(res stageActionResult) {
 		m.setStatus("pull complete")
 	case actionPush:
 		m.setStatus("push complete")
+		if res.prURL != "" {
+			m.openConfirm(
+				fmt.Sprintf("Open pull request page?\n\n%s", res.prURL),
+				nil,
+				confirmOpenPR,
+				res.prURL,
+				"",
+			)
+			m.confirmYes = true
+		}
 	case actionForcePush:
 		m.setStatus("force push complete")
 	case actionRebase:
@@ -374,6 +393,14 @@ func (m Model) confirmAccept() (tea.Model, tea.Cmd) {
 	m.confirmAction = confirmNone
 
 	switch a {
+	case confirmPush:
+		runner := newStageActionRunner(actionPush, m.worktreeRoot, m.confirmRemote, m.confirmBranch)
+		m.openRunning("Push", runner)
+		return m, actionPollCmd()
+	case confirmRebase:
+		runner := newStageActionRunner(actionRebase, m.worktreeRoot, "", m.confirmBranch)
+		m.openRunning("Rebase on origin/master", runner)
+		return m, actionPollCmd()
 	case confirmForcePush:
 		runner := newStageActionRunner(actionForcePush, m.worktreeRoot, m.confirmRemote, m.confirmBranch)
 		m.openRunning("Force push", runner)
@@ -390,6 +417,9 @@ func (m Model) confirmAccept() (tea.Model, tea.Cmd) {
 		runner := newStageActionRunner(actionAmend, m.worktreeRoot, "", "")
 		m.openRunning("Amend commit", runner)
 		return m, actionPollCmd()
+	case confirmOpenPR:
+		m.setStatus("opening PR URL")
+		return m, ui.CmdOpenURL(m.confirmRemote)
 	}
 	return m, nil
 }
@@ -431,7 +461,7 @@ func (m *Model) startPullAction() {
 	m.openRunning("Pull", newStageActionRunner(actionPull, m.worktreeRoot, "", ""))
 }
 
-func (m *Model) startPushAction() error {
+func (m *Model) preparePushConfirm() error {
 	branch, err := git.CurrentBranch(m.worktreeRoot)
 	if err != nil {
 		return err
@@ -440,11 +470,17 @@ func (m *Model) startPushAction() error {
 		return fmt.Errorf("cannot push: detached HEAD")
 	}
 	remote := git.BranchRemote(git.Repo{Root: m.worktreeRoot}, branch)
-	m.openRunning("Push", newStageActionRunner(actionPush, m.worktreeRoot, remote, branch))
+	m.openConfirm(
+		fmt.Sprintf("Push branch %s to %s?", branch, remote),
+		nil,
+		confirmPush,
+		remote,
+		branch,
+	)
 	return nil
 }
 
-func (m *Model) startRebaseAction() error {
+func (m *Model) prepareRebaseConfirm() error {
 	branch, err := git.CurrentBranch(m.worktreeRoot)
 	if err != nil {
 		return err
@@ -452,7 +488,13 @@ func (m *Model) startRebaseAction() error {
 	if branch == "" || branch == "HEAD" {
 		return fmt.Errorf("cannot rebase: detached HEAD")
 	}
-	m.openRunning("Rebase on origin/master", newStageActionRunner(actionRebase, m.worktreeRoot, "", ""))
+	m.openConfirm(
+		fmt.Sprintf("Rebase branch %s on origin/master?", branch),
+		nil,
+		confirmRebase,
+		"",
+		branch,
+	)
 	return nil
 }
 
