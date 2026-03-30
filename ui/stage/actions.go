@@ -3,14 +3,13 @@ package stage
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"os/exec"
 	"strings"
-	"sync"
 	"time"
 
 	"gx/git"
 	"gx/ui"
+	"gx/ui/components"
 
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
@@ -60,14 +59,10 @@ type stageActionRunner struct {
 	remote string
 	branch string
 
-	mu      sync.Mutex
-	output  bytes.Buffer
-	readPos int
-
-	cmd  *exec.Cmd
-	done chan stageActionResult
-	res  stageActionResult
-	ok   bool
+	runner *components.CommandRunner
+	done   chan stageActionResult
+	res    stageActionResult
+	ok     bool
 }
 
 func newStageActionRunner(kind stageActionKind, root, remote, branch string) *stageActionRunner {
@@ -76,6 +71,7 @@ func newStageActionRunner(kind stageActionKind, root, remote, branch string) *st
 		root:   root,
 		remote: remote,
 		branch: branch,
+		runner: components.NewCommandRunner(root, "git"),
 		done:   make(chan stageActionResult, 1),
 	}
 }
@@ -83,31 +79,17 @@ func newStageActionRunner(kind stageActionKind, root, remote, branch string) *st
 func (r *stageActionRunner) Start() {
 	go func() {
 		res := r.run()
-		r.mu.Lock()
-		res.output = r.output.String()
-		r.mu.Unlock()
+		res.output = r.runner.Output()
 		r.done <- res
 	}()
 }
 
 func (r *stageActionRunner) Cancel() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.cmd != nil && r.cmd.Process != nil {
-		_ = r.cmd.Process.Kill()
-	}
+	r.runner.Cancel()
 }
 
 func (r *stageActionRunner) Consume() string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	s := r.output.String()
-	if r.readPos >= len(s) {
-		return ""
-	}
-	chunk := s[r.readPos:]
-	r.readPos = len(s)
-	return chunk
+	return r.runner.Consume()
 }
 
 func (r *stageActionRunner) Result() (stageActionResult, bool) {
@@ -139,9 +121,7 @@ func (r *stageActionRunner) run() stageActionResult {
 				res.err = nil
 			}
 		} else {
-			r.mu.Lock()
-			res.prURL = git.ExtractPRURL(r.output.String())
-			r.mu.Unlock()
+			res.prURL = git.ExtractPRURL(r.runner.Output())
 		}
 		return res
 	case actionForcePush:
@@ -215,66 +195,16 @@ func (r *stageActionRunner) runPullLike(kind stageActionKind) stageActionResult 
 }
 
 func (r *stageActionRunner) execGit(args ...string) error {
-	cmd := exec.Command("git", args...)
-	cmd.Dir = r.root
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return err
-	}
-
-	r.mu.Lock()
-	r.cmd = cmd
-	r.mu.Unlock()
-
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		r.copyOutput(stdout)
-	}()
-	go func() {
-		defer wg.Done()
-		r.copyOutput(stderr)
-	}()
-
-	err = cmd.Wait()
-	wg.Wait()
-
-	r.mu.Lock()
-	r.cmd = nil
-	r.mu.Unlock()
-
+	r.runner = components.NewCommandRunner(r.root, "git", args...)
+	r.runner.Start()
+	err := r.runner.Wait()
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
-			return &git.RunError{Args: args, Dir: r.root, Stdout: "", Stderr: strings.TrimSpace(ee.Error()), Code: ee.ExitCode()}
+			return &git.RunError{Args: args, Dir: r.root, Stdout: strings.TrimSpace(r.runner.Output()), Stderr: strings.TrimSpace(ee.Error()), Code: ee.ExitCode()}
 		}
 		return err
 	}
 	return nil
-}
-
-func (r *stageActionRunner) copyOutput(src io.Reader) {
-	buf := make([]byte, 2048)
-	for {
-		n, err := src.Read(buf)
-		if n > 0 {
-			r.mu.Lock()
-			r.output.Write(buf[:n])
-			r.mu.Unlock()
-		}
-		if err != nil {
-			return
-		}
-	}
 }
 
 func actionPollCmd() tea.Cmd {
