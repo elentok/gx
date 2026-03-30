@@ -82,6 +82,10 @@ Stage UI highlights:
 
 - Status tree + split Unstaged/Staged diff panes
 - Stage or unstage at file, hunk, or line level
+- Visual line-range mode (`v`) to stage/unstage selected blocks with `space`
+- Discard changes with confirmation (`d`) in status and diff views
+- Yank AI context (`yc`) and filename-only (`yf`)
+- Live search in status/diff with highlights and `n` / `N` navigation
 - Vim-like navigation (`j`/`k`, `gg`/`G`, `ctrl+u`/`ctrl+d`)
 - Pull/push/rebase/amend actions directly in stage (`p`/`P`/`b`/`A`) with confirmations
 - Push in stage detects GitHub PR URLs and asks whether to open them

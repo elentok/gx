@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.8.0
+
+- `gx stage`:
+  - Added visual line-range mode (`v`) so you can select multi-line blocks and stage/unstage them with `space`
+  - Added discard flows via `d` with mandatory confirmation prompts (status-file discard semantics, unstaged line/hunk/range discard, staged `d` as unstage)
+  - Added stage yank mappings: `yc` for AI-friendly diff context and `yf` for filename-only yank
+  - Improved test coverage with additional unit and E2E tests for visual mode, discard, and yank flows
+  - Refactored internals by splitting the large monolithic model/view files into focused modules for update, key handling, navigation, runtime state, and rendering
+
 ## v0.7.2
 
 - Expanded `gx stage` with action keys: pull (`p`), push (`P`), rebase (`b`), and amend (`A`) with confirmations
