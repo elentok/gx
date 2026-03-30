@@ -607,6 +607,30 @@ func TestStatusEntryColorDeletedFileIsDim(t *testing.T) {
 	}
 }
 
+func TestStatusFileIconRenamedAndFallback(t *testing.T) {
+	renamed := git.StageFileStatus{Path: "new.txt", RenameFrom: "old.txt", IndexStatus: 'R'}
+
+	nerd := statusPaneIconsFor(true)
+	if got := statusFileIcon(renamed, nerd); got != "󰁔" {
+		t.Fatalf("expected renamed nerd icon, got %q", got)
+	}
+
+	plain := statusPaneIconsFor(false)
+	if got := statusFileIcon(renamed, plain); got != "R" {
+		t.Fatalf("expected renamed fallback icon, got %q", got)
+	}
+}
+
+func TestStatusEntryColorRenamedFileIsBlue(t *testing.T) {
+	entry := statusEntry{
+		Kind: statusEntryFile,
+		File: git.StageFileStatus{Path: "new.txt", RenameFrom: "old.txt", IndexStatus: 'R'},
+	}
+	if got := statusEntryColor(entry); got != "#89b4fa" {
+		t.Fatalf("expected renamed color, got %q", got)
+	}
+}
+
 func TestStatusMessageClearsAfterTimeoutTick(t *testing.T) {
 	m := New(testutil.TempRepo(t))
 	m.ready = true

@@ -112,3 +112,30 @@ func TestDiffPath_ContextLinesAffectHunkGrouping(t *testing.T) {
 		t.Fatalf("expected fewer hunks with larger context, compact=%d wider=%d", compactHunks, widerHunks)
 	}
 }
+
+func TestListStageFiles_RenameTracksSourceAndDestination(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "old.txt", "one\n")
+	testutil.MustGitExported(t, repo, "add", "old.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "add old")
+	testutil.MustGitExported(t, repo, "mv", "old.txt", "new.txt")
+
+	files, err := ListStageFiles(repo)
+	if err != nil {
+		t.Fatalf("ListStageFiles: %v", err)
+	}
+
+	var renamed *StageFileStatus
+	for i := range files {
+		if files[i].Path == "new.txt" {
+			renamed = &files[i]
+			break
+		}
+	}
+	if renamed == nil {
+		t.Fatalf("expected renamed destination entry new.txt, got %+v", files)
+	}
+	if renamed.RenameFrom != "old.txt" {
+		t.Fatalf("expected rename source old.txt, got %q", renamed.RenameFrom)
+	}
+}

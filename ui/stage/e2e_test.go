@@ -547,3 +547,22 @@ func TestStageE2E_RebaseActionWithConfirm(t *testing.T) {
 
 	quitStage(t, tm)
 }
+
+func TestStageE2E_RenamedFileShownInStatusAndDiffHeader(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	oldPath := "old-name.txt"
+	newPath := "new-name.txt"
+
+	testutil.WriteFile(t, repoDir, oldPath, "one\n")
+	mustRunGit(t, repoDir, "add", oldPath)
+	mustRunGit(t, repoDir, "commit", "-m", "add old file")
+	mustRunGit(t, repoDir, "mv", oldPath, newPath)
+
+	tm := startStageTUI(t, repoDir)
+	waitForStageText(t, tm, "old-name.txt -> new-name.txt", stageLoadWait)
+
+	tm.Send(keySpecial(tea.KeyEnter))
+	waitForStageText(t, tm, "[moved: old-name.txt -> new-name.txt]", stageActionWait)
+
+	quitStage(t, tm)
+}

@@ -13,6 +13,7 @@ import (
 // StageFileStatus represents one file entry from git status porcelain output.
 type StageFileStatus struct {
 	Path         string
+	RenameFrom   string
 	IndexStatus  byte
 	WorktreeCode byte
 }
@@ -30,6 +31,10 @@ func (s StageFileStatus) HasUnstagedChanges() bool {
 		return true
 	}
 	return s.WorktreeCode != ' ' && s.WorktreeCode != '?'
+}
+
+func (s StageFileStatus) IsRenamed() bool {
+	return s.IndexStatus == 'R' || s.WorktreeCode == 'R'
 }
 
 // XY returns the two-character porcelain status code.
@@ -76,7 +81,7 @@ func ListStageFiles(worktreeRoot string) ([]StageFileStatus, error) {
 		// In porcelain v1 -z format, renames/copies include an extra NUL path.
 		if entry.IndexStatus == 'R' || entry.IndexStatus == 'C' || entry.WorktreeCode == 'R' || entry.WorktreeCode == 'C' {
 			if i+1 < len(parts) && parts[i+1] != "" {
-				entry.Path = parts[i+1]
+				entry.RenameFrom = parts[i+1]
 				i++
 			}
 		}

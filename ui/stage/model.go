@@ -1223,6 +1223,9 @@ func (m Model) renderStatusPane(width, height int) string {
 				}
 				name = symbol + " " + name + "/"
 			} else {
+				if entry.File.IsRenamed() && entry.File.RenameFrom != "" {
+					name = entry.File.RenameFrom + " -> " + entry.File.Path
+				}
 				name = statusFileIcon(entry.File, icons) + " " + name
 			}
 			nameStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(statusColor))
@@ -1314,6 +1317,9 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 	sec.viewport.SetWidth(innerW)
 
 	titleText := title
+	if file, ok := m.selectedFile(); ok && file.IsRenamed() && file.RenameFrom != "" {
+		titleText += " [moved: " + file.RenameFrom + " -> " + file.Path + "]"
+	}
 	if m.diffFullscreen {
 		titleText += " [fullscreen]"
 	}
@@ -1986,6 +1992,7 @@ type statusPaneIcons struct {
 	fileModified string
 	fileNew      string
 	fileDeleted  string
+	fileRenamed  string
 	partial      string
 	staged       string
 }
@@ -1998,6 +2005,7 @@ func statusPaneIconsFor(useNerdFontIcons bool) statusPaneIcons {
 			fileModified: "M",
 			fileNew:      "N",
 			fileDeleted:  "D",
+			fileRenamed:  "R",
 			partial:      "+",
 			staged:       "✓",
 		}
@@ -2008,6 +2016,7 @@ func statusPaneIconsFor(useNerdFontIcons bool) statusPaneIcons {
 		fileModified: "",
 		fileNew:      "",
 		fileDeleted:  "",
+		fileRenamed:  "󰁔",
 		partial:      "",
 		staged:       "",
 	}
@@ -2016,6 +2025,9 @@ func statusPaneIconsFor(useNerdFontIcons bool) statusPaneIcons {
 func statusEntryColor(entry statusEntry) string {
 	if entry.Kind == statusEntryFile && isDeletedFileStatus(entry.File) {
 		return "#a6adc8"
+	}
+	if entry.Kind == statusEntryFile && entry.File.IsRenamed() {
+		return "#89b4fa"
 	}
 	if entry.HasStaged && entry.HasUnstaged {
 		return "#fab387"
@@ -2045,6 +2057,9 @@ func statusEntryMeta(entry statusEntry, useNerdFontIcons bool, icons statusPaneI
 func statusFileIcon(file git.StageFileStatus, icons statusPaneIcons) string {
 	if isDeletedFileStatus(file) {
 		return icons.fileDeleted
+	}
+	if file.IsRenamed() {
+		return icons.fileRenamed
 	}
 	if file.IsUntracked() || file.IndexStatus == 'A' {
 		return icons.fileNew
