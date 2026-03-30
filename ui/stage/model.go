@@ -12,6 +12,7 @@ import (
 	"gx/git"
 	"gx/ui/components"
 
+	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -83,6 +84,12 @@ type Model struct {
 	helpVP         viewport.Model
 	activeFilePath string
 	diffReloadSeq  int
+	searchMode     stageSearchMode
+	searchScope    stageSearchScope
+	searchQuery    string
+	searchMatches  []stageSearchMatch
+	searchCursor   int
+	searchInput    textinput.Model
 	confirmOpen    bool
 	confirmTitle   string
 	confirmLines   []string
@@ -250,6 +257,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.helpOpen {
 			return m.handleHelpKey(msg)
+		}
+		if m.searchMode != searchModeNone {
+			return m.handleSearchKey(msg)
+		}
+		if cmd, handled := m.handleSearchNavigateKey(msg); handled {
+			return m, cmd
+		}
+		if msg.String() == "/" {
+			m.enterSearchMode()
+			return m, nil
 		}
 		if handledModel, cmd, handled := m.handleChordKey(msg); handled {
 			return handledModel, cmd
@@ -559,6 +576,7 @@ func (m *Model) moveActive(delta int) {
 			sec.activeLine = len(sec.parsed.Changed) - 1
 		}
 	}
+	m.syncSearchCursorFromDiffFocus()
 	m.ensureActiveVisible(sec)
 }
 
@@ -630,6 +648,7 @@ func (m *Model) jumpToTop() {
 		}
 		sec.activeLine = 0
 	}
+	m.syncSearchCursorFromDiffFocus()
 }
 
 func (m *Model) jumpToBottom() {
@@ -661,6 +680,7 @@ func (m *Model) jumpToBottom() {
 		}
 		sec.activeLine = len(sec.parsed.Changed) - 1
 	}
+	m.syncSearchCursorFromDiffFocus()
 }
 
 func (m *Model) scheduleDiffReload() tea.Cmd {
@@ -796,6 +816,9 @@ func (m *Model) reload(preservePath string) {
 	m.err = nil
 	m.files = files
 	m.statusEntries = buildStatusEntries(m.files, m.collapsedDirs)
+	if strings.TrimSpace(m.searchQuery) != "" && m.searchScope == searchScopeStatus {
+		m.recomputeSearchMatches()
+	}
 
 	if len(m.statusEntries) == 0 {
 		m.selected = 0
@@ -830,6 +853,9 @@ func (m *Model) reloadDiffsForSelection() {
 		m.unstaged = newSectionState()
 		m.staged = newSectionState()
 		m.syncDiffViewports()
+		if strings.TrimSpace(m.searchQuery) != "" && (m.searchScope == searchScopeUnstaged || m.searchScope == searchScopeStaged) {
+			m.recomputeSearchMatches()
+		}
 		return
 	}
 
@@ -879,6 +905,9 @@ func (m *Model) reloadDiffsForSelection() {
 	m.staged = buildSectionState(stagedRaw, stagedColor, m.staged)
 	m.pickAvailableSection()
 	m.syncDiffViewports()
+	if strings.TrimSpace(m.searchQuery) != "" && (m.searchScope == searchScopeUnstaged || m.searchScope == searchScopeStaged) {
+		m.recomputeSearchMatches()
+	}
 }
 
 func (m *Model) enterDiffFromStatus(resetSection bool) {
@@ -1228,6 +1257,9 @@ func (m Model) renderStatusPane(width, height int) string {
 				}
 				name = statusFileIcon(entry.File, icons) + " " + name
 			}
+			if m.searchMatchStatusIndex(i) {
+				name = highlightMatchText(name, m.searchQuery)
+			}
 			nameStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(statusColor))
 			if deleted {
 				nameStyle = nameStyle.Faint(true)
@@ -1377,8 +1409,29 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 		if rawIdx >= 0 && m.flashMarker(section, rawIdx, sec) {
 			mark = lipgloss.NewStyle().Foreground(catGreen).Bold(true).Render("◆ ")
 		}
-		line := mark + sec.viewLines[displayIdx]
-		lines = append(lines, ansi.Truncate(line, innerW, ""))
+
+		indicator := "  "
+		if matched, current := m.searchMatchDiffDisplay(section, displayIdx); matched {
+			icon := "* "
+			if m.settings.UseNerdFontIcons {
+				icon = "󰍉 "
+			}
+			style := lipgloss.NewStyle().Foreground(catYellow).Bold(true)
+			if current {
+				style = style.Foreground(catGreen)
+			}
+			indicator = style.Render(icon)
+		}
+
+		markW := ansi.StringWidth(mark)
+		indicatorW := ansi.StringWidth(indicator)
+		bodyW := innerW - markW - indicatorW
+		if bodyW < 0 {
+			bodyW = 0
+		}
+		body := ansi.Truncate(sec.viewLines[displayIdx], bodyW, "")
+		body += strings.Repeat(" ", maxInt(0, bodyW-ansi.StringWidth(body)))
+		lines = append(lines, mark+body+indicator)
 	}
 	return m.renderPanelWithBorderTitle(width, height, titleText, rightTitleText, lines, activeSection, section)
 }
@@ -1739,8 +1792,19 @@ func (m *Model) focusMovedTarget(sig movedTarget) {
 }
 
 func (m Model) helpLine() string {
+	if m.searchMode != searchModeNone {
+		line := lipgloss.NewStyle().Foreground(catSubtle).Render("  " + m.searchFooterText())
+		if m.width > 0 {
+			line = ansi.Truncate(line, m.width, "")
+		}
+		return line
+	}
 	if m.focus == focusStatus {
-		return m.renderFooterLine("status · ? help")
+		hint := "status · ? help"
+		if s := m.searchCounterLabel(); s != "" {
+			hint = s + " · " + hint
+		}
+		return m.renderFooterLine(hint)
 	}
 	modeLabel := "hunk"
 	if m.navMode == navLine {
@@ -1750,7 +1814,29 @@ func (m Model) helpLine() string {
 	if m.wrapSoft {
 		wrapLabel = "on"
 	}
-	return m.renderFooterLine("diff: mode:" + modeLabel + " · wrap:" + wrapLabel + " · ? help")
+	hint := "diff: mode:" + modeLabel + " · wrap:" + wrapLabel + " · ? help"
+	if s := m.searchCounterLabel(); s != "" {
+		hint = s + " · " + hint
+	}
+	return m.renderFooterLine(hint)
+}
+
+func (m Model) searchCounterLabel() string {
+	if strings.TrimSpace(m.searchQuery) == "" || len(m.searchMatches) == 0 {
+		return ""
+	}
+	idx := m.searchCursor + 1
+	if idx < 1 {
+		idx = 1
+	}
+	if idx > len(m.searchMatches) {
+		idx = len(m.searchMatches)
+	}
+	icon := "*"
+	if m.settings.UseNerdFontIcons {
+		icon = "󰍉"
+	}
+	return fmt.Sprintf("%s %d/%d", icon, idx, len(m.searchMatches))
 }
 
 func (m Model) renderFooterLine(hint string) string {

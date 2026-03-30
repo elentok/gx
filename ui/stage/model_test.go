@@ -228,6 +228,9 @@ func TestSpaceStagesSingleLineInLineMode(t *testing.T) {
 
 	m := New(repo)
 	m.ready = true
+	m.width = 100
+	m.height = 20
+	m.syncDiffViewports()
 	m.focus = focusDiff
 	m.section = sectionUnstaged
 	m.navMode = navLine
@@ -667,6 +670,163 @@ func TestStatusSelectionDebouncesDiffReload(t *testing.T) {
 	m = updated.(Model)
 	if m.activeFilePath == before {
 		t.Fatalf("expected active file to update after debounce message")
+	}
+}
+
+func TestStageSearchStatusModeAndNavigation(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "apple.txt", "one\n")
+	testutil.WriteFile(t, repo, "apricot.txt", "two\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusStatus
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	m = updated.(Model)
+	if m.searchMode != searchModeInput {
+		t.Fatalf("expected search input mode after /")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'p', Text: "p"})
+	m = updated.(Model)
+	if len(m.searchMatches) < 2 {
+		t.Fatalf("expected multiple status search matches, got %d", len(m.searchMatches))
+	}
+
+	first := m.selected
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	if m.searchMode != searchModeNone || m.searchQuery == "" || len(m.searchMatches) == 0 {
+		t.Fatalf("expected enter to return to normal mode while keeping search highlights")
+	}
+	if line := ansi.Strip(m.helpLine()); !strings.Contains(line, "1/2") {
+		t.Fatalf("expected persistent search counter in footer, got %q", line)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
+	m = updated.(Model)
+	if m.selected == first {
+		t.Fatalf("expected n to move to next search result")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	m = updated.(Model)
+	if m.searchMode != searchModeNone || m.searchQuery != "" || len(m.searchMatches) != 0 {
+		t.Fatalf("expected esc to clear search state")
+	}
+}
+
+func TestStageSearchModeFooterIsLeftAligned(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "apple.txt", "one\n")
+
+	m := New(repo)
+	m.ready = true
+	m.width = 60
+	m.focus = focusStatus
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	m = updated.(Model)
+
+	line := ansi.Strip(m.helpLine())
+	if !strings.HasPrefix(line, "  search:") {
+		t.Fatalf("expected left-aligned search footer, got %q", line)
+	}
+}
+
+func TestStageSearchDiffModeAndPrevNextKeys(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "README.md", "needle-one\nline\nneedle-two\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusDiff
+	m.section = sectionUnstaged
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	m = updated.(Model)
+	if m.searchMode != searchModeInput {
+		t.Fatalf("expected diff search input mode after /")
+	}
+
+	for _, r := range []rune{'n', 'e', 'e', 'd', 'l', 'e'} {
+		updated, _ = m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
+		m = updated.(Model)
+	}
+	if len(m.searchMatches) < 2 {
+		t.Logf("searchQuery=%q scope=%v", m.searchQuery, m.searchScope)
+		for i := 0; i < len(m.unstaged.viewLines) && i < 8; i++ {
+			t.Logf("line[%d]=%q", i, ansi.Strip(m.unstaged.viewLines[i]))
+		}
+		t.Fatalf("expected multiple diff search matches, got %d", len(m.searchMatches))
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	if m.searchMode != searchModeNone || m.searchQuery == "" || len(m.searchMatches) == 0 {
+		t.Fatalf("expected enter to return to normal mode while keeping search highlights")
+	}
+	if m.navMode != navLine {
+		t.Fatalf("expected enter after diff search to switch to line mode")
+	}
+	first := m.searchCursor
+	firstLine := m.unstaged.activeLine
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
+	m = updated.(Model)
+	if m.searchCursor == first {
+		t.Fatalf("expected n to move to next diff result")
+	}
+	if m.unstaged.activeLine == firstLine {
+		t.Fatalf("expected n to move active diff line to next match")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'N', Text: "N", ShiftedCode: 'N'})
+	m = updated.(Model)
+	if m.searchCursor != first {
+		t.Fatalf("expected N to move back to previous diff result")
+	}
+
+	// Moving cursor to a matched line should update the search counter cursor.
+	startCursor := m.searchCursor
+	for i := 0; i < 5; i++ {
+		updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+		m = updated.(Model)
+		if m.searchCursor != startCursor {
+			break
+		}
+	}
+	if m.searchCursor == startCursor {
+		t.Fatalf("expected diff cursor movement to sync search cursor when reaching a match")
+	}
+}
+
+func TestStageSearchDiffUsesRightEdgeIndicatorInHunkMode(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "README.md", "needle-one\nline\nneedle-two\n")
+
+	m := New(repo)
+	m.ready = true
+	m.width = 100
+	m.height = 20
+	m.syncDiffViewports()
+	m.focus = focusDiff
+	m.section = sectionUnstaged
+	m.navMode = navHunk
+	m.searchQuery = "needle"
+	m.searchScope = searchScopeUnstaged
+	m.recomputeSearchMatches()
+
+	pane := m.renderSectionPane(80, 12, "Unstaged", &m.unstaged, sectionUnstaged)
+	if !strings.Contains(ansi.Strip(pane), "󰍉") {
+		t.Fatalf("expected right-edge nerd search indicator in diff pane")
 	}
 }
 

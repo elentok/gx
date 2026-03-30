@@ -566,3 +566,24 @@ func TestStageE2E_RenamedFileShownInStatusAndDiffHeader(t *testing.T) {
 
 	quitStage(t, tm)
 }
+
+func TestStageE2E_StatusSearchKeepsHighlightsAfterEnter(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	testutil.WriteFile(t, repoDir, "apple.txt", "one\n")
+	testutil.WriteFile(t, repoDir, "apricot.txt", "two\n")
+
+	tm := startStageTUI(t, repoDir)
+	waitForStageText(t, tm, "apple.txt", stageLoadWait)
+
+	tm.Send(keyRune('/'))
+	tm.Send(keyRune('a'))
+	tm.Send(keyRune('p'))
+	waitForStageText(t, tm, "search:", stageActionWait)
+	tm.Send(keySpecial(tea.KeyEnter))
+	waitForStageText(t, tm, "status · ? help", stageActionWait)
+	tm.Send(keyRune('n'))
+	tm.Send(keyRune('/'))
+	tm.Send(keySpecial(tea.KeyEsc))
+
+	quitStage(t, tm)
+}
