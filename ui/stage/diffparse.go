@@ -149,7 +149,7 @@ func buildHunkPatch(parsed parsedDiff, hunkIndex int) (string, error) {
 		return "", fmt.Errorf("invalid hunk bounds")
 	}
 
-	header := patchFileHeader(parsed.FileHeader)
+	header := patchFileHeaderFull(parsed.FileHeader)
 	if len(header) == 0 {
 		return "", fmt.Errorf("diff file header missing")
 	}
@@ -299,6 +299,17 @@ func patchFileHeader(fileHeader []string) []string {
 		if strings.HasPrefix(line, "diff --git ") || strings.HasPrefix(line, "--- ") || strings.HasPrefix(line, "+++ ") {
 			header = append(header, line)
 		}
+	}
+	return header
+}
+
+func patchFileHeaderFull(fileHeader []string) []string {
+	if len(fileHeader) == 0 {
+		return nil
+	}
+	header := make([]string, 0, len(fileHeader))
+	for _, line := range fileHeader {
+		header = append(header, line)
 	}
 	return header
 }

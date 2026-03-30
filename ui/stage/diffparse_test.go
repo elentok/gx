@@ -82,3 +82,25 @@ func TestBuildSingleLinePatch_DoesNotIncludeNonContiguousContext(t *testing.T) {
 		t.Fatalf("patch missing selected line:\n%s", patch)
 	}
 }
+
+func TestBuildHunkPatch_PreservesFullFileHeader(t *testing.T) {
+	raw := strings.Join([]string{
+		"diff --git a/a.txt b/a.txt",
+		"new file mode 100644",
+		"index 0000000..1111111",
+		"--- /dev/null",
+		"+++ b/a.txt",
+		"@@ -0,0 +1,2 @@",
+		"+one",
+		"+two",
+	}, "\n") + "\n"
+	p := parseUnifiedDiff(raw)
+
+	patch, err := buildHunkPatch(p, 0)
+	if err != nil {
+		t.Fatalf("buildHunkPatch: %v", err)
+	}
+	if !strings.Contains(patch, "new file mode 100644") || !strings.Contains(patch, "index 0000000..1111111") || !strings.Contains(patch, "--- /dev/null") {
+		t.Fatalf("expected patch to preserve file header metadata:\n%s", patch)
+	}
+}
