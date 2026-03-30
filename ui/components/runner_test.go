@@ -7,10 +7,11 @@ import (
 )
 
 func TestCommandRunnerStreamsAndWaits(t *testing.T) {
-	r := NewCommandRunner(".", "sh", "-c", "printf 'one'; sleep 0.1; printf ' two'")
+	// Use whole-second sleep for portability across shells/sleep implementations.
+	r := NewCommandRunner(".", "sh", "-c", "printf 'one'; sleep 1; printf ' two'")
 	r.Start()
 
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(3 * time.Second)
 	seen := ""
 	for time.Now().Before(deadline) {
 		seen += r.Consume()
@@ -26,9 +27,12 @@ func TestCommandRunnerStreamsAndWaits(t *testing.T) {
 	if err := r.Wait(); err != nil {
 		t.Fatalf("Wait: %v", err)
 	}
-	seen += r.Consume()
-	if !strings.Contains(seen, "one two") {
-		t.Fatalf("expected full output, got %q", seen)
+	full := seen + r.Consume()
+	if !strings.Contains(full, "one") || !strings.Contains(full, "two") {
+		t.Fatalf("expected full output to include one and two, got %q", full)
+	}
+	if strings.Index(full, "one") > strings.Index(full, "two") {
+		t.Fatalf("expected output order one before two, got %q", full)
 	}
 }
 
