@@ -2,6 +2,7 @@ package stage
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -293,6 +294,93 @@ func TestStatusSpaceTogglesWholeFile(t *testing.T) {
 	}
 	if staged != "" {
 		t.Fatalf("expected file to be unstaged by second status space")
+	}
+}
+
+func TestStatusDDiscardsUntrackedFileAfterConfirm(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "new.txt", "new\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusStatus
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
+	m = updated.(Model)
+	if !m.confirmOpen {
+		t.Fatalf("expected discard confirmation to open")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	m = updated.(Model)
+
+	if _, err := os.Stat(repo + "/new.txt"); err == nil {
+		t.Fatalf("expected untracked file to be deleted after discard confirm")
+	}
+	if len(m.statusEntries) != 0 {
+		t.Fatalf("expected no status entries after discard, got %d", len(m.statusEntries))
+	}
+}
+
+func TestDiffUnstagedDDiscardsLineAfterConfirm(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "line.txt", "one\ntwo\n")
+	testutil.MustGitExported(t, repo, "add", "line.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+	testutil.WriteFile(t, repo, "line.txt", "ONE\ntwo\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusDiff
+	m.section = sectionUnstaged
+	m.navMode = navLine
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
+	m = updated.(Model)
+	if !m.confirmOpen {
+		t.Fatalf("expected discard confirmation in unstaged diff")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	m = updated.(Model)
+
+	unstaged, err := git.DiffPath(repo, "line.txt", false, 1)
+	if err != nil {
+		t.Fatalf("DiffPath unstaged: %v", err)
+	}
+	if strings.Contains(unstaged, "+ONE") || !strings.Contains(unstaged, "-one") {
+		t.Fatalf("expected selected +line to be discarded from worktree, got:\n%s", unstaged)
+	}
+}
+
+func TestDiffStagedDUnstagesSelectionWithoutConfirm(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "line.txt", "one\ntwo\n")
+
+	m := New(repo)
+	m.ready = true
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
+	m = updated.(Model)
+	m.focus = focusDiff
+	m.section = sectionStaged
+	m.navMode = navLine
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
+	m = updated.(Model)
+
+	if m.confirmOpen {
+		t.Fatalf("did not expect discard confirm in staged diff; d should unstage")
+	}
+	unstaged, err := git.DiffPath(repo, "line.txt", false, 1)
+	if err != nil {
+		t.Fatalf("DiffPath unstaged: %v", err)
+	}
+	if strings.TrimSpace(unstaged) == "" {
+		t.Fatalf("expected unstaged diff after using d in staged view")
 	}
 }
 

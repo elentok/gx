@@ -26,6 +26,8 @@ const (
 	confirmRebasePopStash
 	confirmAmend
 	confirmOpenPR
+	confirmDiscardStatus
+	confirmDiscardUnstaged
 )
 
 type stageActionKind int
@@ -342,6 +344,36 @@ func (m Model) confirmAccept() (tea.Model, tea.Cmd) {
 	case confirmOpenPR:
 		m.setStatus("opening PR URL")
 		return m, ui.CmdOpenURL(m.confirmRemote)
+	case confirmDiscardStatus:
+		if m.confirmDiscardUntracked {
+			if err := git.DiscardUntrackedPath(m.worktreeRoot, m.confirmPaths[0]); err != nil {
+				m.showGitError(err)
+				return m, nil
+			}
+		} else {
+			if err := git.RestorePaths(m.worktreeRoot, m.confirmPaths); err != nil {
+				m.showGitError(err)
+				return m, nil
+			}
+		}
+		m.setStatus("discarded " + m.confirmPaths[0])
+		m.reload(m.confirmPaths[0])
+		return m, nil
+	case confirmDiscardUnstaged:
+		if err := git.ApplyPatchToWorktree(m.worktreeRoot, m.confirmPatch, true, m.confirmPatchUnidiffZero); err != nil {
+			m.showGitError(err)
+			return m, nil
+		}
+		if m.section == sectionUnstaged {
+			m.unstaged.visualActive = false
+			m.unstaged.visualAnchor = m.unstaged.activeLine
+		}
+		m.setStatus("discarded " + m.confirmPaths[0])
+		m.reload(m.confirmPaths[0])
+		if m.focus == focusDiff {
+			m.ensureActiveVisible(m.currentSection())
+		}
+		return m, nil
 	}
 	return m, nil
 }
@@ -376,6 +408,10 @@ func (m *Model) openConfirm(title string, lines []string, action stageConfirmAct
 	m.confirmAction = action
 	m.confirmRemote = remote
 	m.confirmBranch = branch
+	m.confirmPaths = nil
+	m.confirmPatch = ""
+	m.confirmPatchUnidiffZero = false
+	m.confirmDiscardUntracked = false
 	m.confirmYes = true
 }
 

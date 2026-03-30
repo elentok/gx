@@ -77,36 +77,40 @@ type Model struct {
 	unstaged sectionState
 	staged   sectionState
 
-	statusMsg      string
-	statusUntil    time.Time
-	err            error
-	errorOpen      bool
-	errorVP        viewport.Model
-	helpOpen       bool
-	helpVP         viewport.Model
-	activeFilePath string
-	diffReloadSeq  int
-	searchMode     stageSearchMode
-	searchScope    stageSearchScope
-	searchQuery    string
-	searchMatches  []stageSearchMatch
-	searchCursor   int
-	searchInput    textinput.Model
-	confirmOpen    bool
-	confirmTitle   string
-	confirmLines   []string
-	confirmYes     bool
-	confirmAction  stageConfirmAction
-	confirmRemote  string
-	confirmBranch  string
-	runningOpen    bool
-	runningTitle   string
-	runningVP      viewport.Model
-	runningContent string
-	runningRunner  *stageActionRunner
-	runningDone    bool
-	flash          flashState
-	keyPrefix      string
+	statusMsg               string
+	statusUntil             time.Time
+	err                     error
+	errorOpen               bool
+	errorVP                 viewport.Model
+	helpOpen                bool
+	helpVP                  viewport.Model
+	activeFilePath          string
+	diffReloadSeq           int
+	searchMode              stageSearchMode
+	searchScope             stageSearchScope
+	searchQuery             string
+	searchMatches           []stageSearchMatch
+	searchCursor            int
+	searchInput             textinput.Model
+	confirmOpen             bool
+	confirmTitle            string
+	confirmLines            []string
+	confirmYes              bool
+	confirmAction           stageConfirmAction
+	confirmRemote           string
+	confirmBranch           string
+	confirmPaths            []string
+	confirmPatch            string
+	confirmPatchUnidiffZero bool
+	confirmDiscardUntracked bool
+	runningOpen             bool
+	runningTitle            string
+	runningVP               viewport.Model
+	runningContent          string
+	runningRunner           *stageActionRunner
+	runningDone             bool
+	flash                   flashState
+	keyPrefix               string
 }
 
 type Settings struct {
@@ -452,6 +456,8 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.enterDiffFromStatus(false)
 	case "?":
 		m.showHelpOverlay()
+	case "d":
+		m.openDiscardStatusConfirm()
 	}
 	return m, nil
 }
@@ -551,6 +557,13 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "space", " ":
 		cmd := m.applySelection()
 		return m, cmd
+	case "d":
+		if m.section == sectionStaged {
+			cmd := m.applySelection()
+			return m, cmd
+		}
+		m.openDiscardDiffConfirm()
+		return m, nil
 	case "?":
 		m.showHelpOverlay()
 	}
@@ -1822,6 +1835,108 @@ func (m *Model) toggleStageStatusEntry() {
 	m.reload(path)
 }
 
+func (m *Model) openDiscardStatusConfirm() {
+	entry, ok := m.selectedStatusEntry()
+	if !ok || entry.Kind != statusEntryFile {
+		return
+	}
+
+	title := fmt.Sprintf("Discard changes in %s?", entry.Path)
+	paths := []string{entry.Path}
+	lines := []string{}
+
+	switch {
+	case entry.File.IsUntracked():
+		lines = append(lines, "This will delete the untracked file.")
+	case entry.File.IsRenamed() && entry.File.RenameFrom != "":
+		lines = append(lines,
+			"This will undo the rename.",
+			entry.File.RenameFrom+" -> "+entry.File.Path,
+		)
+		paths = []string{entry.File.RenameFrom, entry.File.Path}
+	case entry.File.IndexStatus == 'A' || entry.File.WorktreeCode == 'A':
+		lines = append(lines, "This will delete the new file.")
+	case entry.File.IndexStatus == 'D' || entry.File.WorktreeCode == 'D':
+		lines = append(lines, "This will restore the deleted file from HEAD.")
+	default:
+		lines = append(lines, "This will undo all changes in this file.")
+	}
+
+	m.openConfirm(title, lines, confirmDiscardStatus, "", "")
+	m.confirmDiscardUntracked = entry.File.IsUntracked()
+	m.confirmPaths = uniqueNonEmpty(paths)
+}
+
+func (m *Model) openDiscardDiffConfirm() {
+	if m.section != sectionUnstaged {
+		return
+	}
+	file, ok := m.selectedFile()
+	if !ok {
+		return
+	}
+	sec := m.currentSection()
+
+	var (
+		title       string
+		lines       []string
+		patch       string
+		unidiffZero bool
+		err         error
+	)
+
+	if m.navMode == navHunk {
+		if sec.activeHunk < 0 || sec.activeHunk >= len(sec.parsed.Hunks) {
+			return
+		}
+		patch, err = buildHunkPatch(sec.parsed, sec.activeHunk)
+		title = "Discard selected hunk?"
+		lines = []string{"This will discard the selected hunk from your working tree."}
+	} else {
+		if sec.activeLine < 0 || sec.activeLine >= len(sec.parsed.Changed) {
+			return
+		}
+		startLine, endLine := sec.activeLine, sec.activeLine
+		if sec.visualActive {
+			startLine, endLine = visualLineBounds(*sec)
+		}
+		if sec.visualActive && endLine > startLine {
+			patch, err = buildLineRangePatch(sec.parsed, startLine, endLine)
+			title = "Discard selected lines?"
+			lines = []string{"This will discard the selected lines from your working tree."}
+		} else {
+			patch, err = buildSingleLinePatch(sec.parsed, sec.activeLine)
+			title = "Discard selected line?"
+			lines = []string{"This will discard the selected line from your working tree."}
+		}
+		unidiffZero = true
+	}
+
+	if err != nil {
+		m.setStatus(err.Error())
+		return
+	}
+
+	m.openConfirm(title, lines, confirmDiscardUnstaged, "", "")
+	m.confirmPaths = []string{file.Path}
+	m.confirmPatch = patch
+	m.confirmPatchUnidiffZero = unidiffZero
+}
+
+func uniqueNonEmpty(paths []string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(paths))
+	for _, p := range paths {
+		p = strings.TrimSpace(p)
+		if p == "" || seen[p] {
+			continue
+		}
+		seen[p] = true
+		out = append(out, p)
+	}
+	return out
+}
+
 func (m *Model) setStatus(msg string) {
 	m.statusMsg = msg
 	if msg == "" {
@@ -2029,6 +2144,7 @@ func stageHelpText() string {
 		"  h       collapse open directory",
 		"  l       expand directory / open diff on file",
 		"  space   stage/unstage file",
+		"  d       discard file change (confirm)",
 		"  enter   open diff view",
 		"  r       refresh",
 		"",
@@ -2042,6 +2158,7 @@ func stageHelpText() string {
 		"  j / k   move active hunk/line",
 		"  J / K   scroll diff viewport",
 		"  space   stage/unstage active hunk/line",
+		"  d       discard (unstaged) / unstage (staged)",
 		"  f       toggle fullscreen diff",
 		"  w       toggle soft wrap",
 		"  r       refresh",
