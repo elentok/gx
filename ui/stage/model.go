@@ -80,6 +80,19 @@ type Model struct {
 	helpOpen       bool
 	helpVP         viewport.Model
 	activeFilePath string
+	confirmOpen    bool
+	confirmTitle   string
+	confirmLines   []string
+	confirmYes     bool
+	confirmAction  stageConfirmAction
+	confirmRemote  string
+	confirmBranch  string
+	runningOpen    bool
+	runningTitle   string
+	runningVP      viewport.Model
+	runningContent string
+	runningRunner  *stageActionRunner
+	runningDone    bool
 	flash          flashState
 	keyPrefix      string
 }
@@ -104,6 +117,7 @@ type flashState struct {
 
 type flashTickMsg struct{}
 type statusTickMsg struct{}
+type actionPollMsg struct{}
 
 type commitFinishedMsg struct {
 	err       error
@@ -187,12 +201,39 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.clearStatus()
 		}
 		return m, statusTickCmd()
+	case actionPollMsg:
+		if m.runningRunner != nil {
+			if chunk := m.runningRunner.Consume(); chunk != "" {
+				m.appendRunningOutput(chunk)
+			}
+			if !m.runningDone {
+				if res, done := m.runningRunner.Result(); done {
+					m.runningDone = true
+					m.handleActionResult(res)
+				}
+			}
+		}
+		if m.runningOpen && !m.runningDone {
+			return m, actionPollCmd()
+		}
+		return m, nil
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
+			if m.runningOpen && !m.runningDone && m.runningRunner != nil {
+				m.runningRunner.Cancel()
+				m.setStatus("cancel requested")
+				return m, nil
+			}
 			return m, tea.Quit
 		}
 		if msg.String() == "q" {
 			return m, tea.Quit
+		}
+		if m.runningOpen {
+			return m.handleRunningKey(msg)
+		}
+		if m.confirmOpen {
+			return m.handleConfirmKey(msg)
 		}
 		if m.errorOpen {
 			return m.handleErrorKey(msg)
@@ -329,6 +370,25 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.reloadDiffsForSelection()
 	case "r":
 		m.refresh()
+	case "p":
+		m.startPullAction()
+		return m, actionPollCmd()
+	case "P":
+		if err := m.startPushAction(); err != nil {
+			m.showGitError(err)
+			return m, nil
+		}
+		return m, actionPollCmd()
+	case "b":
+		if err := m.startRebaseAction(); err != nil {
+			m.showGitError(err)
+			return m, nil
+		}
+		return m, actionPollCmd()
+	case "A":
+		if err := m.openAmendConfirm(); err != nil {
+			m.showGitError(err)
+		}
 	case "ctrl+d":
 		m.scrollStatusPage(1)
 	case "ctrl+u":
@@ -383,6 +443,25 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.ensureActiveVisible(m.currentSection())
 	case "r":
 		m.refresh()
+	case "p":
+		m.startPullAction()
+		return m, actionPollCmd()
+	case "P":
+		if err := m.startPushAction(); err != nil {
+			m.showGitError(err)
+			return m, nil
+		}
+		return m, actionPollCmd()
+	case "b":
+		if err := m.startRebaseAction(); err != nil {
+			m.showGitError(err)
+			return m, nil
+		}
+		return m, actionPollCmd()
+	case "A":
+		if err := m.openAmendConfirm(); err != nil {
+			m.showGitError(err)
+		}
 	case "j", "down":
 		m.moveActive(1)
 	case "k", "up":
@@ -961,7 +1040,11 @@ func (m Model) View() tea.View {
 
 	footer := m.helpLine()
 	out := lipgloss.JoinVertical(lipgloss.Left, body, footer)
-	if m.errorOpen {
+	if m.runningOpen {
+		out = overlayModal(out, m.runningModalView(), m.width, m.height)
+	} else if m.confirmOpen {
+		out = overlayModal(out, m.confirmModalView(), m.width, m.height)
+	} else if m.errorOpen {
 		out = overlayModal(out, m.errorModalView(), m.width, m.height)
 	} else if m.helpOpen {
 		out = overlayModal(out, m.helpModalView(), m.width, m.height)
@@ -1644,6 +1727,9 @@ func stageHelpText() string {
 		"  ?       toggle this help",
 		"  q       quit",
 		"  cc      open git commit",
+		"  p/P     pull / push",
+		"  b       rebase on origin/master",
+		"  A       amend last commit (confirm)",
 		"",
 		"Status Focus",
 		"  j / k   move selection",
