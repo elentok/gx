@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"regexp"
 	"strings"
 	"time"
@@ -378,6 +379,9 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, m.scheduleDiffReload()
 		}
 	case "h", "left":
+		if m.focusParentInStatus() {
+			return m, m.scheduleDiffReload()
+		}
 		m.collapseSelectedDir()
 		m.reloadDiffsForSelection()
 	case "l", "right":
@@ -1602,6 +1606,28 @@ func (m *Model) collapseSelectedDir() {
 	if m.selected >= len(m.statusEntries) {
 		m.selected = len(m.statusEntries) - 1
 	}
+}
+
+func (m *Model) focusParentInStatus() bool {
+	entry, ok := m.selectedStatusEntry()
+	if !ok {
+		return false
+	}
+	parent := path.Dir(entry.Path)
+	if parent == "." || parent == "" || parent == entry.Path {
+		return false
+	}
+	for i, candidate := range m.statusEntries {
+		if candidate.Kind == statusEntryDir && candidate.Path == parent {
+			if m.selected == i {
+				return false
+			}
+			m.selected = i
+			m.onStatusSelectionChanged()
+			return true
+		}
+	}
+	return false
 }
 
 func (m *Model) expandSelectedDir() {

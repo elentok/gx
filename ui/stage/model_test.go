@@ -108,6 +108,38 @@ func TestStatusLOnFileEntersDiffAndResetsSectionOnFileChange(t *testing.T) {
 	}
 }
 
+func TestStatusHFocusesParentFolder(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.Mkdir(t, repo+"/ui/stage")
+	testutil.WriteFile(t, repo, "ui/stage/model.go", "package stage\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusStatus
+
+	fileIdx := -1
+	for i, entry := range m.statusEntries {
+		if entry.Kind == statusEntryFile && entry.Path == "ui/stage/model.go" {
+			fileIdx = i
+			break
+		}
+	}
+	if fileIdx < 0 {
+		t.Fatalf("expected ui/stage/model.go entry in status tree")
+	}
+	m.selected = fileIdx
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
+	m = updated.(Model)
+	if cmd == nil {
+		t.Fatalf("expected h to schedule diff reload after focusing parent")
+	}
+	entry, ok := m.selectedStatusEntry()
+	if !ok || entry.Kind != statusEntryDir || entry.Path != "ui/stage" {
+		t.Fatalf("expected selection to move to parent dir ui/stage, got %+v", entry)
+	}
+}
+
 func TestHelpOverlayToggleAndCompactStatusBar(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "changed\n")
