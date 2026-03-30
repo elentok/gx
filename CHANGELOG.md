@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.7.1
+
+- Expanded `gx stage` with action keys: pull (`p`), push (`P`), rebase (`b`), and amend (`A`) with confirmations
+- Push in stage now matches worktrees behavior: detects GitHub PR URLs and asks whether to open them
+- Added live, cancellable action output overlays in stage (`ctrl+c` cancels running git command)
+- Improved stage navigation and UX: debounced status diff loading while scrolling, parent-folder focus on `h`, and additional regression/E2E coverage for push/pull/rebase flows
+- Refactored shared UI/runtime pieces used by both stage and worktrees (URL opener, confirm/output modal primitives, cancellable command runner)
+
 ## v0.7.0
 
 - Added a dedicated `gx stage` TUI for file, hunk, and line staging/unstaging with split unstaged/staged diff panes

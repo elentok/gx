@@ -83,7 +83,10 @@ Stage UI highlights:
 - Status tree + split Unstaged/Staged diff panes
 - Stage or unstage at file, hunk, or line level
 - Vim-like navigation (`j`/`k`, `gg`/`G`, `ctrl+u`/`ctrl+d`)
+- Pull/push/rebase/amend actions directly in stage (`p`/`P`/`b`/`A`) with confirmations
+- Push in stage detects GitHub PR URLs and asks whether to open them
 - Keyboard help overlay (`?`) and full git-error overlay
+- Live action output overlay with cancellation (`ctrl+c`)
 
 Clone using the `.bare` directory trick and bootstrap the initial worktree:
 
