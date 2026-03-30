@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.7.1
+## v0.7.2
 
 - Expanded `gx stage` with action keys: pull (`p`), push (`P`), rebase (`b`), and amend (`A`) with confirmations
 - Push in stage now matches worktrees behavior: detects GitHub PR URLs and asks whether to open them
