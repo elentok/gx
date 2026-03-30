@@ -2,10 +2,9 @@ package worktrees
 
 import (
 	"gx/ui"
+	"gx/ui/components"
 
-	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 )
 
 // enterConfirm switches to confirm mode with the given prompt and the command
@@ -29,37 +28,22 @@ func (m Model) enterConfirmWithCancel(prompt string, cmd tea.Cmd, spinnerLabel, 
 }
 
 func (m Model) handleConfirmKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	toggleLeft := key.NewBinding(key.WithKeys("left", "h"))
-	toggleRight := key.NewBinding(key.WithKeys("right", "l"))
-	yes := key.NewBinding(key.WithKeys("y"))
-	no := key.NewBinding(key.WithKeys("n"))
-	cancel := key.NewBinding(key.WithKeys("esc", "q"))
-	submit := key.NewBinding(key.WithKeys("enter"))
-
-	switch {
-	case key.Matches(msg, toggleLeft):
-		m.confirmYes = true
-	case key.Matches(msg, toggleRight):
-		m.confirmYes = false
-	case key.Matches(msg, yes):
+	nextYes, decided, accepted, handled := components.UpdateConfirm(msg, m.confirmYes)
+	if !handled {
+		return m, nil
+	}
+	m.confirmYes = nextYes
+	if !decided {
+		return m, nil
+	}
+	if accepted {
 		return m.runConfirmed()
-	case key.Matches(msg, no), key.Matches(msg, cancel):
-		m.mode = modeNormal
-		if m.confirmCancelMsg != "" {
-			m.statusGen++
-			m.statusMsg = m.confirmCancelMsg
-			return m, cmdClearStatus(m.statusGen)
-		}
-	case key.Matches(msg, submit):
-		if m.confirmYes {
-			return m.runConfirmed()
-		}
-		m.mode = modeNormal
-		if m.confirmCancelMsg != "" {
-			m.statusGen++
-			m.statusMsg = m.confirmCancelMsg
-			return m, cmdClearStatus(m.statusGen)
-		}
+	}
+	m.mode = modeNormal
+	if m.confirmCancelMsg != "" {
+		m.statusGen++
+		m.statusMsg = m.confirmCancelMsg
+		return m, cmdClearStatus(m.statusGen)
 	}
 	return m, nil
 }
@@ -75,29 +59,13 @@ func (m Model) runConfirmed() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) confirmModalView() string {
-	borderStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(ui.ColorBorder).
-		Padding(1, 2)
-
-	yesLabel := confirmButton("Yes", m.confirmYes)
-	noLabel := confirmButton("No", !m.confirmYes)
-	hint := ui.StyleDim.Render("←/→ or h/l: choose  y/n: quick select  enter: confirm")
-
-	inner := lipgloss.JoinVertical(lipgloss.Left,
+	return components.RenderConfirmModal(
 		m.confirmPrompt,
-		"",
-		"  "+yesLabel+"   "+noLabel,
-		"",
-		hint,
+		m.confirmYes,
+		ui.ColorBorder,
+		ui.ColorGreen,
+		ui.ColorRed,
+		ui.ColorGray,
+		0,
 	)
-	return borderStyle.Render(inner)
-}
-
-func confirmButton(label string, selected bool) string {
-	s := lipgloss.NewStyle().Padding(0, 1)
-	if selected {
-		return s.Foreground(ui.ColorGreen).Bold(true).Render("> " + label + " <")
-	}
-	return s.Foreground(ui.ColorGray).Render("  " + label + "  ")
 }

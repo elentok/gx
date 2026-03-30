@@ -13,7 +13,6 @@ import (
 
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 )
 
 type stageConfirmAction int
@@ -289,26 +288,19 @@ func (m *Model) handleRunningKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleConfirmKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc":
-		m.confirmOpen = false
-		m.confirmAction = confirmNone
+	nextYes, decided, accepted, handled := components.UpdateConfirm(msg, m.confirmYes)
+	if !handled {
 		return m, nil
-	case "left", "h":
-		m.confirmYes = true
-	case "right", "l":
-		m.confirmYes = false
-	case "y":
-		m.confirmYes = true
-		return m.confirmAccept()
-	case "n":
-		m.confirmYes = false
-		m.confirmOpen = false
-		m.confirmAction = confirmNone
+	}
+	m.confirmYes = nextYes
+	if !decided {
 		return m, nil
-	case "enter":
+	}
+	if accepted {
 		return m.confirmAccept()
 	}
+	m.confirmOpen = false
+	m.confirmAction = confirmNone
 	return m, nil
 }
 
@@ -490,50 +482,33 @@ func (m Model) runningModalView() string {
 	if title == "" {
 		title = "Running"
 	}
-	titleStyle := lipgloss.NewStyle().Foreground(catYellow).Bold(true)
-	borderStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(catYellow).
-		Padding(0, 1).
-		Width(m.runningVP.Width())
 	hint := "ctrl+c cancel · j/k scroll"
 	if m.runningDone {
 		hint = "esc / enter dismiss · j/k scroll"
 	}
-	inner := lipgloss.JoinVertical(lipgloss.Left,
-		titleStyle.Render(title),
-		"",
+	return components.RenderOutputModal(
+		title,
 		m.runningVP.View(),
-		"",
-		lipgloss.NewStyle().Foreground(catSubtle).Render(hint),
+		hint,
+		catYellow,
+		catYellow,
+		catSubtle,
+		m.runningVP.Width(),
 	)
-	return borderStyle.Render(inner)
 }
 
 func (m Model) confirmModalView() string {
-	titleStyle := lipgloss.NewStyle().Foreground(catYellow).Bold(true)
-	borderStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(catYellow).
-		Padding(0, 1).
-		Width(maxInt(56, m.width/2))
-	yes := " Yes "
-	no := " No "
-	if m.confirmYes {
-		yes = lipgloss.NewStyle().Foreground(catGreen).Bold(true).Render("[Yes]")
-		no = lipgloss.NewStyle().Foreground(catSubtle).Render(" No ")
-	} else {
-		yes = lipgloss.NewStyle().Foreground(catSubtle).Render(" Yes ")
-		no = lipgloss.NewStyle().Foreground(catRed).Bold(true).Render("[No]")
+	prompt := m.confirmTitle
+	if len(m.confirmLines) > 0 {
+		prompt = prompt + "\n\n" + strings.Join(m.confirmLines, "\n")
 	}
-	body := strings.Join(m.confirmLines, "\n")
-	inner := lipgloss.JoinVertical(lipgloss.Left,
-		titleStyle.Render(m.confirmTitle),
-		"",
-		body,
-		"",
-		yes+"  "+no,
-		lipgloss.NewStyle().Foreground(catSubtle).Render("h/l or y/n, enter confirm, esc cancel"),
+	return components.RenderConfirmModal(
+		prompt,
+		m.confirmYes,
+		catYellow,
+		catGreen,
+		catRed,
+		catSubtle,
+		maxInt(56, m.width/2),
 	)
-	return borderStyle.Render(inner)
 }

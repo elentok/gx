@@ -2,10 +2,10 @@ package worktrees
 
 import (
 	"gx/ui"
+	"gx/ui/components"
 
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 )
 
 // enterLogsMode switches the model into logs mode to display the last job output.
@@ -42,26 +42,18 @@ func (m Model) handleLogsKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 // logsModalView renders a centred modal with the last job's output.
 func (m Model) logsModalView() string {
-	titleStyle := lipgloss.NewStyle().Bold(true)
-	hintStyle := ui.StyleDim
-	borderStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(ui.ColorBorder).
-		Padding(0, 1).
-		Width(m.logsViewport.Width())
-
 	content := m.lastJobLog
 	if content == "" {
 		content = ui.StyleDim.Render("(no output)")
 	}
 	m.logsViewport.SetContent(content)
-
-	inner := lipgloss.JoinVertical(lipgloss.Left,
-		titleStyle.Render(m.lastJobLabel),
-		"",
+	return components.RenderOutputModal(
+		m.lastJobLabel,
 		m.logsViewport.View(),
-		"",
-		hintStyle.Render("esc / enter / q  to dismiss"),
+		"esc / enter / q  to dismiss",
+		ui.ColorBorder,
+		ui.ColorGreen,
+		ui.ColorGray,
+		m.logsViewport.Width(),
 	)
-	return borderStyle.Render(inner)
 }

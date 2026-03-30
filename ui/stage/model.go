@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"gx/git"
+	"gx/ui/components"
 
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
@@ -1757,22 +1758,15 @@ func stageHelpText() string {
 }
 
 func (m Model) errorModalView() string {
-	titleStyle := lipgloss.NewStyle().Foreground(catRed).Bold(true)
-	borderStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(catRed).
-		Padding(0, 1).
-		Width(m.errorVP.Width())
-
-	hint := lipgloss.NewStyle().Foreground(catSubtle).Render("esc / enter dismiss · j/k scroll")
-	inner := lipgloss.JoinVertical(lipgloss.Left,
-		titleStyle.Render("Error"),
-		"",
+	return components.RenderOutputModal(
+		"Error",
 		m.errorVP.View(),
-		"",
-		hint,
+		"esc / enter dismiss · j/k scroll",
+		catRed,
+		catRed,
+		catSubtle,
+		m.errorVP.Width(),
 	)
-	return borderStyle.Render(inner)
 }
 
 func (m Model) helpModalView() string {

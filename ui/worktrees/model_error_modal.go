@@ -2,10 +2,11 @@ package worktrees
 
 import (
 	"gx/ui"
+	"gx/ui/components"
 
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // showError switches the model into error mode with a scrollable viewport.
@@ -54,19 +55,13 @@ func (m Model) errorHint() string {
 
 // errorModalView renders a centred modal with the error text.
 func (m Model) errorModalView() string {
-	titleStyle := lipgloss.NewStyle().Foreground(ui.ColorRed).Bold(true)
-	borderStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(ui.ColorRed).
-		Padding(0, 1).
-		Width(m.errorViewport.Width())
-
-	inner := lipgloss.JoinVertical(lipgloss.Left,
-		titleStyle.Render("Error"),
-		"",
+	return components.RenderOutputModal(
+		"Error",
 		m.errorViewport.View(),
-		"",
-		m.errorHint(),
+		ansi.Strip(m.errorHint()),
+		ui.ColorRed,
+		ui.ColorRed,
+		ui.ColorGray,
+		m.errorViewport.Width(),
 	)
-	return borderStyle.Render(inner)
 }
