@@ -357,7 +357,7 @@ func TestStageE2E_StageVisualRangeInNewFileFromDiffView(t *testing.T) {
 
 	waitForGitState(t, tm, stageActionWait, func() bool {
 		staged, unstaged := stagedAndUnstagedDiff(t, repoDir, path)
-		return strings.Contains(staged, "+line-1-new") && strings.Contains(staged, "+line-2-new") && strings.Contains(unstaged, "+line-3-new")
+		return strings.Contains(staged, "+new-1") && strings.Contains(staged, "+new-2") && strings.Contains(unstaged, "+new-3")
 	})
 
 	quitStage(t, tm)
