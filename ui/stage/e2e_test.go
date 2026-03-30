@@ -338,6 +338,31 @@ func TestStageE2E_StageOneLineInModifiedFileFromDiffView_LineMode(t *testing.T) 
 	quitStage(t, tm)
 }
 
+func TestStageE2E_StageVisualRangeInNewFileFromDiffView(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	path := "range-new-file.txt"
+	setupAddedFileThreeLineChanges(t, repoDir, path)
+
+	tm := startStageTUI(t, repoDir)
+	waitForStageText(t, tm, path, stageLoadWait)
+
+	tm.Send(keySpecial(tea.KeyEnter))
+	tm.Send(keyRune('a'))
+	tm.Send(keyRune('j'))
+	tm.Send(keyRune('j'))
+	tm.Send(keyRune('j'))
+	tm.Send(keyRune('v'))
+	tm.Send(keyRune('j'))
+	tm.Send(keyRune(' '))
+
+	waitForGitState(t, tm, stageActionWait, func() bool {
+		staged, unstaged := stagedAndUnstagedDiff(t, repoDir, path)
+		return strings.Contains(staged, "+line-1-new") && strings.Contains(staged, "+line-2-new") && strings.Contains(unstaged, "+line-3-new")
+	})
+
+	quitStage(t, tm)
+}
+
 func TestStageE2E_StageThirdLineInNewFileFromDiffView_LineMode(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	path := "new-line-3.txt"

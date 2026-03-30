@@ -50,6 +50,8 @@ type sectionState struct {
 	parsed           parsedDiff
 	activeHunk       int
 	activeLine       int
+	visualActive     bool
+	visualAnchor     int
 	viewport         viewport.Model
 }
 
@@ -187,9 +189,10 @@ func NewWithSettings(worktreeRoot string, settings Settings) Model {
 func newSectionState() sectionState {
 	vp := viewport.New()
 	return sectionState{
-		activeHunk: -1,
-		activeLine: -1,
-		viewport:   vp,
+		activeHunk:   -1,
+		activeLine:   -1,
+		visualAnchor: -1,
+		viewport:     vp,
 	}
 }
 
@@ -456,6 +459,12 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "q":
+		sec := m.currentSection()
+		if sec.visualActive {
+			sec.visualActive = false
+			sec.visualAnchor = sec.activeLine
+			return m, nil
+		}
 		m.focus = focusStatus
 		return m, nil
 	case "h", "left":
@@ -472,12 +481,30 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.ensureActiveVisible(m.currentSection())
 		}
 	case "a":
+		sec := m.currentSection()
+		sec.visualActive = false
 		if m.navMode == navHunk {
 			m.navMode = navLine
 		} else {
 			m.navMode = navHunk
 		}
 		m.ensureActiveVisible(m.currentSection())
+	case "v":
+		sec := m.currentSection()
+		if m.navMode == navHunk {
+			m.navMode = navLine
+		}
+		if len(sec.parsed.Changed) == 0 {
+			return m, nil
+		}
+		if !sec.visualActive {
+			sec.visualActive = true
+			sec.visualAnchor = sec.activeLine
+		} else {
+			sec.visualActive = false
+			sec.visualAnchor = sec.activeLine
+		}
+		m.ensureActiveVisible(sec)
 	case "f":
 		m.diffFullscreen = !m.diffFullscreen
 		m.syncDiffViewports()
@@ -724,6 +751,30 @@ func hunkDisplayBounds(sec sectionState, hunkIdx int) (start int, end int, ok bo
 	return start, end, true
 }
 
+func visualLineBounds(sec sectionState) (start, end int) {
+	start = sec.visualAnchor
+	end = sec.activeLine
+	if start > end {
+		start, end = end, start
+	}
+	if start < 0 {
+		start = 0
+	}
+	if end < 0 {
+		end = 0
+	}
+	if end >= len(sec.parsed.Changed) {
+		end = len(sec.parsed.Changed) - 1
+	}
+	if start >= len(sec.parsed.Changed) {
+		start = len(sec.parsed.Changed) - 1
+	}
+	if start < 0 {
+		start = 0
+	}
+	return start, end
+}
+
 type movedTarget struct {
 	fromSection diffSection
 	navMode     navMode
@@ -765,8 +816,21 @@ func (m *Model) applySelection() tea.Cmd {
 		if sec.activeLine < 0 || sec.activeLine >= len(sec.parsed.Changed) {
 			return nil
 		}
-		sig.lineText = sec.parsed.Changed[sec.activeLine].Text
-		patch, err := buildSingleLinePatch(sec.parsed, sec.activeLine)
+		startLine, endLine := sec.activeLine, sec.activeLine
+		if sec.visualActive {
+			startLine, endLine = visualLineBounds(*sec)
+		}
+		sig.lineText = sec.parsed.Changed[endLine].Text
+
+		var (
+			patch string
+			err   error
+		)
+		if sec.visualActive && endLine > startLine {
+			patch, err = buildLineRangePatch(sec.parsed, startLine, endLine)
+		} else {
+			patch, err = buildSingleLinePatch(sec.parsed, sec.activeLine)
+		}
 		if err != nil {
 			m.setStatus(err.Error())
 			return nil
@@ -778,6 +842,8 @@ func (m *Model) applySelection() tea.Cmd {
 		}
 	}
 
+	sec.visualActive = false
+	sec.visualAnchor = sec.activeLine
 	m.setStatus("updated " + file.Path)
 	from := m.section
 	m.reload(file.Path)
@@ -926,7 +992,7 @@ func (m *Model) enterDiffFromStatus(resetSection bool) {
 }
 
 func buildSectionState(raw, color string, prev sectionState) sectionState {
-	state := sectionState{activeHunk: prev.activeHunk, activeLine: prev.activeLine, viewport: prev.viewport}
+	state := sectionState{activeHunk: prev.activeHunk, activeLine: prev.activeLine, visualActive: prev.visualActive, visualAnchor: prev.visualAnchor, viewport: prev.viewport}
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		state.activeHunk = -1
@@ -936,6 +1002,8 @@ func buildSectionState(raw, color string, prev sectionState) sectionState {
 		state.viewLines = nil
 		state.displayToRaw = nil
 		state.rawToDisplay = nil
+		state.visualActive = false
+		state.visualAnchor = -1
 		state.viewport.SetContent("")
 		state.viewport.SetYOffset(0)
 		return state
@@ -973,12 +1041,17 @@ func buildSectionState(raw, color string, prev sectionState) sectionState {
 
 	if len(state.parsed.Changed) == 0 {
 		state.activeLine = -1
+		state.visualActive = false
+		state.visualAnchor = -1
 	} else {
 		if state.activeLine < 0 {
 			state.activeLine = 0
 		}
 		if state.activeLine >= len(state.parsed.Changed) {
 			state.activeLine = len(state.parsed.Changed) - 1
+		}
+		if state.visualAnchor < 0 || state.visualAnchor >= len(state.parsed.Changed) {
+			state.visualAnchor = state.activeLine
 		}
 	}
 
@@ -1390,6 +1463,9 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 			rawIdx = sec.displayToRaw[displayIdx]
 		}
 		mark := "  "
+		if m.navMode == navLine && sec.visualActive && m.visualMatchDiffDisplay(*sec, displayIdx) {
+			mark = lipgloss.NewStyle().Foreground(accent).Render("▎ ")
+		}
 		inActiveHunk := rawIdx >= 0 && m.navMode == navHunk && rawIdx >= hunkStart && rawIdx <= hunkEnd
 		if inActiveHunk && activeSection {
 			mark = lipgloss.NewStyle().Foreground(accent).Render("▌ ")
@@ -1441,6 +1517,26 @@ func (m Model) hunkOverflowMarkers() (top, bottom, both string) {
 		return " ", " ", "↕ "
 	}
 	return "↑ ", "↓ ", "↕ "
+}
+
+func (m Model) visualMatchDiffDisplay(sec sectionState, displayIdx int) bool {
+	if !sec.visualActive || m.navMode != navLine {
+		return false
+	}
+	if displayIdx < 0 || displayIdx >= len(sec.displayToRaw) {
+		return false
+	}
+	rawIdx := sec.displayToRaw[displayIdx]
+	if rawIdx < 0 {
+		return false
+	}
+	start, end := visualLineBounds(sec)
+	for i := start; i <= end && i < len(sec.parsed.Changed); i++ {
+		if i >= 0 && sec.parsed.Changed[i].LineIndex == rawIdx {
+			return true
+		}
+	}
+	return false
 }
 
 func (m Model) activeRawLineIndex(sec sectionState) int {
@@ -1793,7 +1889,11 @@ func (m *Model) focusMovedTarget(sig movedTarget) {
 
 func (m Model) helpLine() string {
 	if m.searchMode != searchModeNone {
-		line := lipgloss.NewStyle().Foreground(catSubtle).Render("  " + m.searchFooterText())
+		prefix := ""
+		if m.focus == focusDiff && m.currentSection().visualActive {
+			prefix = "VISUAL · "
+		}
+		line := lipgloss.NewStyle().Foreground(catSubtle).Render("  " + prefix + m.searchFooterText())
 		if m.width > 0 {
 			line = ansi.Truncate(line, m.width, "")
 		}
@@ -1818,6 +1918,9 @@ func (m Model) helpLine() string {
 	if s := m.searchCounterLabel(); s != "" {
 		hint = s + " · " + hint
 	}
+	if m.currentSection().visualActive {
+		return m.renderFooterLineWithPrefix("VISUAL", hint)
+	}
 	return m.renderFooterLine(hint)
 }
 
@@ -1840,18 +1943,32 @@ func (m Model) searchCounterLabel() string {
 }
 
 func (m Model) renderFooterLine(hint string) string {
+	return m.renderFooterLineWithPrefix("", hint)
+}
+
+func (m Model) renderFooterLineWithPrefix(prefix, hint string) string {
 	hintText := "· " + hint
 	hintStyled := lipgloss.NewStyle().Foreground(catSubtle).Render(hintText)
+	leftText := ""
+	if prefix != "" {
+		leftText = prefix
+	}
+	if m.statusMsg != "" {
+		if leftText != "" {
+			leftText += " · "
+		}
+		leftText += m.statusMsg
+	}
 	lineW := m.width
 	if lineW <= 0 {
-		if m.statusMsg == "" {
+		if leftText == "" {
 			return hintStyled
 		}
-		return m.statusMsg + "  " + hintStyled
+		return leftText + "  " + hintStyled
 	}
 
 	hintW := ansi.StringWidth(hintText)
-	if m.statusMsg == "" {
+	if leftText == "" {
 		if hintW >= lineW {
 			return ansi.Truncate(hintStyled, lineW, "")
 		}
@@ -1868,7 +1985,7 @@ func (m Model) renderFooterLine(hint string) string {
 		return strings.Repeat(" ", lineW-hintW) + hintStyled
 	}
 
-	status := ansi.Truncate(m.statusMsg, statusMax, "...")
+	status := ansi.Truncate(leftText, statusMax, "...")
 	left := status + sep
 	leftW := ansi.StringWidth(left)
 	if leftW+hintW >= lineW {
@@ -1921,6 +2038,7 @@ func stageHelpText() string {
 		"  ctrl+u/d scroll half page",
 		"  tab     switch unstaged/staged section",
 		"  a       toggle hunk/line mode",
+		"  v       toggle visual line-range mode",
 		"  j / k   move active hunk/line",
 		"  J / K   scroll diff viewport",
 		"  space   stage/unstage active hunk/line",

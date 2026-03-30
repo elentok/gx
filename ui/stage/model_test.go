@@ -195,6 +195,25 @@ func TestHelpLineRightAlignsHintAndTruncatesStatus(t *testing.T) {
 	}
 }
 
+func TestHelpLineShowsVisualAtLeftInDiffFocus(t *testing.T) {
+	m := New(testutil.TempRepo(t))
+	m.ready = true
+	m.width = 64
+	m.focus = focusDiff
+	m.navMode = navLine
+	m.unstaged.visualActive = true
+
+	line := m.helpLine()
+	plain := ansi.Strip(line)
+
+	if !strings.HasPrefix(plain, "VISUAL") {
+		t.Fatalf("expected VISUAL indicator at start of footer, got %q", plain)
+	}
+	if !strings.HasSuffix(plain, "· diff: mode:line · wrap:on · ? help") {
+		t.Fatalf("expected diff hint at end of footer, got %q", plain)
+	}
+}
+
 func TestRefreshesOnFocusMsg(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
@@ -747,6 +766,9 @@ func TestStageSearchDiffModeAndPrevNextKeys(t *testing.T) {
 
 	m := New(repo)
 	m.ready = true
+	m.width = 100
+	m.height = 20
+	m.syncDiffViewports()
 	m.focus = focusDiff
 	m.section = sectionUnstaged
 
@@ -761,10 +783,6 @@ func TestStageSearchDiffModeAndPrevNextKeys(t *testing.T) {
 		m = updated.(Model)
 	}
 	if len(m.searchMatches) < 2 {
-		t.Logf("searchQuery=%q scope=%v", m.searchQuery, m.searchScope)
-		for i := 0; i < len(m.unstaged.viewLines) && i < 8; i++ {
-			t.Logf("line[%d]=%q", i, ansi.Strip(m.unstaged.viewLines[i]))
-		}
 		t.Fatalf("expected multiple diff search matches, got %d", len(m.searchMatches))
 	}
 
@@ -1172,5 +1190,102 @@ func TestLineModeUnstageBraceFromFirstHunkBlock(t *testing.T) {
 	}
 	if strings.Contains(staged, "+    }") {
 		t.Fatalf("unexpected duplicated brace in staged diff:\n%s", staged)
+	}
+}
+
+func TestVisualModeStagesLineRange(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "range.txt", "one\ntwo\nthree\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusDiff
+	m.section = sectionUnstaged
+	m.navMode = navLine
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
+	m = updated.(Model)
+	if !m.unstaged.visualActive {
+		t.Fatalf("expected visual mode active after v")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
+	m = updated.(Model)
+
+	staged, err := git.DiffPath(repo, "range.txt", true, 1)
+	if err != nil {
+		t.Fatalf("DiffPath cached: %v", err)
+	}
+	if !strings.Contains(staged, "+one") || !strings.Contains(staged, "+two") {
+		t.Fatalf("expected staged diff to include selected visual range:\n%s", staged)
+	}
+	if m.unstaged.visualActive {
+		t.Fatalf("expected visual mode to exit after applying selection")
+	}
+}
+
+func TestEscExitsVisualModeAndKeepsDiffFocus(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "range.txt", "one\ntwo\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusDiff
+	m.section = sectionUnstaged
+	m.navMode = navLine
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
+	m = updated.(Model)
+	if !m.unstaged.visualActive {
+		t.Fatalf("expected visual mode active after v")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	m = updated.(Model)
+
+	if m.focus != focusDiff {
+		t.Fatalf("expected esc in visual mode to keep diff focus")
+	}
+	if m.unstaged.visualActive {
+		t.Fatalf("expected esc to exit visual mode")
+	}
+}
+
+func TestVisualModeUnstagesLineRange(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "range.txt", "one\ntwo\nthree\n")
+
+	m := New(repo)
+	m.ready = true
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
+	m = updated.(Model)
+	m.focus = focusDiff
+	m.section = sectionStaged
+	m.navMode = navLine
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
+	m = updated.(Model)
+
+	staged, err := git.DiffPath(repo, "range.txt", true, 1)
+	if err != nil {
+		t.Fatalf("DiffPath(staged): %v", err)
+	}
+	unstaged, err := git.DiffPath(repo, "range.txt", false, 1)
+	if err != nil {
+		t.Fatalf("DiffPath(unstaged): %v", err)
+	}
+
+	if strings.Contains(staged, "+one") || strings.Contains(staged, "+two") || !strings.Contains(staged, "+three") {
+		t.Fatalf("expected staged diff to keep only third line:\n%s", staged)
+	}
+	if !strings.Contains(unstaged, "+one") || !strings.Contains(unstaged, "+two") {
+		t.Fatalf("expected unstaged diff to include selected visual range:\n%s", unstaged)
 	}
 }

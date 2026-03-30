@@ -104,3 +104,29 @@ func TestBuildHunkPatch_PreservesFullFileHeader(t *testing.T) {
 		t.Fatalf("expected patch to preserve file header metadata:\n%s", patch)
 	}
 }
+
+func TestBuildLineRangePatch_IncludesSelectedRange(t *testing.T) {
+	raw := strings.Join([]string{
+		"diff --git a/a.txt b/a.txt",
+		"index 1111111..2222222 100644",
+		"--- a/a.txt",
+		"+++ b/a.txt",
+		"@@ -1,6 +1,6 @@",
+		" keep-1",
+		"-old-2",
+		"+new-2",
+		" keep-3",
+		"-old-4",
+		"+new-4",
+		" keep-5",
+	}, "\n") + "\n"
+	p := parseUnifiedDiff(raw)
+
+	patch, err := buildLineRangePatch(p, 1, 3)
+	if err != nil {
+		t.Fatalf("buildLineRangePatch: %v", err)
+	}
+	if !strings.Contains(patch, "+new-2") || !strings.Contains(patch, "+new-4") {
+		t.Fatalf("expected both selected lines in patch:\n%s", patch)
+	}
+}
