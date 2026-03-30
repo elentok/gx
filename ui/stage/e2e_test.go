@@ -3,6 +3,8 @@ package stage_test
 import (
 	"bytes"
 	"fmt"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -53,6 +55,57 @@ func keyRune(r rune) tea.KeyPressMsg {
 
 func keySpecial(code rune) tea.KeyPressMsg {
 	return tea.KeyPressMsg{Code: code}
+}
+
+func mustRunGit(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v in %s failed: %v\n%s", args, dir, err, out)
+	}
+}
+
+func gitOutput(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v in %s failed: %v\n%s", args, dir, err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func gitOutputAllowFail(dir string, args ...string) (string, bool) {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return strings.TrimSpace(string(out)), false
+	}
+	return strings.TrimSpace(string(out)), true
+}
+
+func setupRemoteAndClone(t *testing.T, initialBranch string) (remoteBare, cloneDir string) {
+	t.Helper()
+	src := filepath.Join(t.TempDir(), "src")
+	mustRunGit(t, ".", "init", "--initial-branch="+initialBranch, src)
+	mustRunGit(t, src, "config", "user.email", "test@test.com")
+	mustRunGit(t, src, "config", "user.name", "Test")
+	testutil.WriteFile(t, src, "README.md", "base\n")
+	mustRunGit(t, src, "add", ".")
+	mustRunGit(t, src, "commit", "-m", "initial")
+
+	remoteBare = filepath.Join(t.TempDir(), "origin.git")
+	mustRunGit(t, ".", "clone", "--bare", src, remoteBare)
+
+	cloneDir = filepath.Join(t.TempDir(), "clone")
+	mustRunGit(t, ".", "clone", remoteBare, cloneDir)
+	mustRunGit(t, cloneDir, "config", "user.email", "test@test.com")
+	mustRunGit(t, cloneDir, "config", "user.name", "Test")
+	return remoteBare, cloneDir
 }
 
 func stagedAndUnstagedDiff(t *testing.T, repoDir, path string) (string, string) {
@@ -414,6 +467,83 @@ func TestStageE2E_HunkModeBottomJDoesNotJumpToTop(t *testing.T) {
 	// Extra j at bottom should not jump viewport back to top.
 	tm.Send(keyRune('j'))
 	waitForStageText(t, tm, "100%", stageActionWait)
+
+	quitStage(t, tm)
+}
+
+func TestStageE2E_PushActionWithConfirm(t *testing.T) {
+	_, repoDir := setupRemoteAndClone(t, "main")
+	mustRunGit(t, repoDir, "checkout", "-b", "feature/push")
+	testutil.WriteFile(t, repoDir, "push.txt", "push\n")
+	mustRunGit(t, repoDir, "add", "push.txt")
+	mustRunGit(t, repoDir, "commit", "-m", "push commit")
+
+	tm := startStageTUI(t, repoDir)
+	waitForStageText(t, tm, "Status", stageLoadWait)
+
+	tm.Send(keyRune('P'))
+	waitForStageText(t, tm, "Push branch feature/push to origin?", stageActionWait)
+	tm.Send(keyRune('y'))
+
+	waitForGitState(t, tm, stageLoadWait, func() bool {
+		out, ok := gitOutputAllowFail(repoDir, "rev-parse", "--verify", "refs/remotes/origin/feature/push")
+		return ok && out != ""
+	})
+
+	quitStage(t, tm)
+}
+
+func TestStageE2E_PullActionUpdatesWorktree(t *testing.T) {
+	remote, repoDir := setupRemoteAndClone(t, "main")
+	other := filepath.Join(t.TempDir(), "other")
+	mustRunGit(t, ".", "clone", remote, other)
+	mustRunGit(t, other, "config", "user.email", "test@test.com")
+	mustRunGit(t, other, "config", "user.name", "Test")
+
+	testutil.WriteFile(t, other, "pull.txt", "from remote\n")
+	mustRunGit(t, other, "add", "pull.txt")
+	mustRunGit(t, other, "commit", "-m", "remote update")
+	mustRunGit(t, other, "push", "origin", "main")
+
+	tm := startStageTUI(t, repoDir)
+	waitForStageText(t, tm, "Status", stageLoadWait)
+	tm.Send(keyRune('p'))
+
+	waitForGitState(t, tm, stageLoadWait, func() bool {
+		log := gitOutput(t, repoDir, "log", "--oneline", "-1")
+		return strings.Contains(log, "remote update")
+	})
+
+	quitStage(t, tm)
+}
+
+func TestStageE2E_RebaseActionWithConfirm(t *testing.T) {
+	remote, repoDir := setupRemoteAndClone(t, "master")
+	mustRunGit(t, repoDir, "checkout", "-b", "feature/rebase")
+	testutil.WriteFile(t, repoDir, "feature.txt", "feature\n")
+	mustRunGit(t, repoDir, "add", "feature.txt")
+	mustRunGit(t, repoDir, "commit", "-m", "feature work")
+
+	other := filepath.Join(t.TempDir(), "other")
+	mustRunGit(t, ".", "clone", remote, other)
+	mustRunGit(t, other, "config", "user.email", "test@test.com")
+	mustRunGit(t, other, "config", "user.name", "Test")
+	testutil.WriteFile(t, other, "master.txt", "master update\n")
+	mustRunGit(t, other, "add", "master.txt")
+	mustRunGit(t, other, "commit", "-m", "master update")
+	mustRunGit(t, other, "push", "origin", "master")
+
+	tm := startStageTUI(t, repoDir)
+	waitForStageText(t, tm, "Status", stageLoadWait)
+	tm.Send(keyRune('b'))
+	waitForStageText(t, tm, "Rebase branch feature/rebase on origin/master?", stageActionWait)
+	tm.Send(keyRune('y'))
+
+	waitForGitState(t, tm, stageLoadWait, func() bool {
+		base := gitOutput(t, repoDir, "merge-base", "HEAD", "origin/master")
+		head := gitOutput(t, repoDir, "rev-parse", "origin/master")
+		return base == head
+	})
 
 	quitStage(t, tm)
 }
