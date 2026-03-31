@@ -345,13 +345,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch))
 			}
 		}
-		if msg.opLabel == "rebase" {
+		switch msg.opLabel {
+		case "rebase":
 			for _, w := range m.worktrees {
 				if w.Branch != "" {
 					cmds = append(cmds, cmdLoadBaseStatus(m.repo, w.Branch))
 				}
 			}
-		} else if msg.opLabel == "pull" {
+		case "pull":
 			if wt := m.selectedWorktree(); wt != nil && wt.Branch == m.repo.MainBranch {
 				for _, w := range m.worktrees {
 					if w.Branch != "" {
