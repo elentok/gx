@@ -20,7 +20,12 @@ func TestPushKeyOpensSpecificConfirm(t *testing.T) {
 	m.ready = true
 	m.focus = focusStatus
 
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'P', Text: "P", ShiftedCode: 'P'})
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'P', Text: "P", ShiftedCode: 'P'})
+	m = updated.(Model)
+	if cmd == nil {
+		t.Fatalf("expected push preflight command")
+	}
+	updated, _ = m.Update(cmd())
 	m = updated.(Model)
 
 	if !m.confirmOpen {

@@ -129,6 +129,12 @@ type flashTickMsg struct{}
 type statusTickMsg struct{}
 type actionPollMsg struct{}
 type diffReloadMsg struct{ seq int }
+type pushPreflightMsg struct {
+	err        error
+	branch     string
+	remote     string
+	divergence *git.PushDivergence
+}
 
 type commitFinishedMsg struct {
 	err       error

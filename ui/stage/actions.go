@@ -224,6 +224,46 @@ func actionPollCmd() tea.Cmd {
 	})
 }
 
+func cmdPushPreflight(root string) tea.Cmd {
+	return func() tea.Msg {
+		branch, err := git.CurrentBranch(root)
+		if err != nil {
+			return pushPreflightMsg{err: err}
+		}
+		if branch == "" || branch == "HEAD" {
+			return pushPreflightMsg{err: fmt.Errorf("cannot push: detached HEAD")}
+		}
+		remote := git.BranchRemote(git.Repo{Root: root}, branch)
+		div, err := git.DetectPushDivergence(root, branch)
+		if err != nil {
+			return pushPreflightMsg{err: err}
+		}
+		return pushPreflightMsg{branch: branch, remote: remote, divergence: div}
+	}
+}
+
+func (m *Model) openCheckingDivergence() {
+	vpW := m.width * 2 / 3
+	if vpW < 56 {
+		vpW = 56
+	}
+	if vpW > 110 {
+		vpW = 110
+	}
+	vpH := m.height/2 - 4
+	if vpH < 8 {
+		vpH = 8
+	}
+	vp := viewport.New(viewport.WithWidth(vpW-2), viewport.WithHeight(vpH))
+	vp.SetContent("Fetching remote and checking branch divergence…")
+	m.runningVP = vp
+	m.runningContent = "Fetching remote and checking branch divergence…\n"
+	m.runningOpen = true
+	m.runningDone = false
+	m.runningTitle = "Checking push status"
+	m.runningRunner = nil
+}
+
 func (m *Model) appendRunningOutput(chunk string) {
 	if chunk == "" {
 		return

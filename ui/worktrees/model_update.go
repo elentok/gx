@@ -111,7 +111,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m.showError("cannot push: worktree is in detached HEAD state"), nil
 				}
 				prompt := fmt.Sprintf("Push %s?", wt.Branch)
-				return m.enterConfirm(prompt, cmdPush(m.repo, *wt), "Pushing "+wt.Name+"…"), nil
+				return m.enterConfirm(prompt, cmdPush(m.repo, *wt), "Checking remote divergence…"), nil
 			}
 		case key.Matches(msg, keys.Rebase) && len(m.worktrees) > 0 && !m.spinnerActive:
 			wt := m.selectedWorktree()

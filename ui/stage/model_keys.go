@@ -114,11 +114,8 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.startPullAction()
 		return m, actionPollCmd()
 	case "P":
-		if err := m.preparePushConfirm(); err != nil {
-			m.showGitError(err)
-			return m, nil
-		}
-		return m, nil
+		m.openCheckingDivergence()
+		return m, cmdPushPreflight(m.worktreeRoot)
 	case "b":
 		if err := m.prepareRebaseConfirm(); err != nil {
 			m.showGitError(err)
@@ -217,11 +214,8 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.startPullAction()
 		return m, actionPollCmd()
 	case "P":
-		if err := m.preparePushConfirm(); err != nil {
-			m.showGitError(err)
-			return m, nil
-		}
-		return m, nil
+		m.openCheckingDivergence()
+		return m, cmdPushPreflight(m.worktreeRoot)
 	case "b":
 		if err := m.prepareRebaseConfirm(); err != nil {
 			m.showGitError(err)

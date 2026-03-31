@@ -1,7 +1,10 @@
 package stage
 
 import (
+	"fmt"
 	"time"
+
+	"gx/ui/components"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -46,6 +49,44 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.seq == m.diffReloadSeq && m.focus == focusStatus {
 			m.reloadDiffsForSelection()
 		}
+		return m, nil
+	case pushPreflightMsg:
+		m.runningOpen = false
+		m.runningDone = false
+		m.runningRunner = nil
+		if msg.err != nil {
+			m.showGitError(msg.err)
+			return m, nil
+		}
+		if msg.divergence != nil {
+			div := msg.divergence
+			m.openConfirm(
+				fmt.Sprintf("Branch %s has diverged from the remote branch:", div.Branch),
+				[]string{
+					"",
+					fmt.Sprintf("Last local commit: %s", humanizeOrUnknown(div.Local.Date)),
+					fmt.Sprintf("  %s %s", div.Local.Hash, div.Local.Message),
+					"",
+					fmt.Sprintf("Last remote commit: %s", humanizeOrUnknown(div.RemoteHead.Date)),
+					fmt.Sprintf("  %s %s", div.RemoteHead.Hash, div.RemoteHead.Message),
+				},
+				confirmPushDiverged,
+				div.Upstream,
+				msg.branch,
+			)
+			m.confirmMenu = components.MenuState{
+				Items:  []components.MenuItem{{Label: "Rebase", Value: "rebase"}, {Label: "Push --force", Value: "force"}, {Label: "Abort", Value: "abort"}},
+				Cursor: 0,
+			}
+			return m, nil
+		}
+		m.openConfirm(
+			fmt.Sprintf("Push branch %s to %s?", msg.branch, msg.remote),
+			nil,
+			confirmPush,
+			msg.remote,
+			msg.branch,
+		)
 		return m, nil
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {

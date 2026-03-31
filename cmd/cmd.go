@@ -308,9 +308,16 @@ func runPush(d deps) error {
 	}
 
 	remote := git.BranchRemote(info.Repo, branch)
-	if div, err := git.DetectPushDivergence(pushDir, branch); err != nil {
+	var div *git.PushDivergence
+	checkLabel := fmt.Sprintf("Checking remote divergence for %s...", branch)
+	if err := runWithSpinner(d.stdin, d.stderr, checkLabel, func() error {
+		var detectErr error
+		div, detectErr = git.DetectPushDivergence(pushDir, branch)
+		return detectErr
+	}); err != nil {
 		return err
-	} else if div != nil {
+	}
+	if div != nil {
 		chooser := d.choosePushDivergence
 		if chooser == nil {
 			chooser = choosePushDivergence
