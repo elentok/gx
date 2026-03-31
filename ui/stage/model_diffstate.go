@@ -43,8 +43,26 @@ func (m *Model) applySelection() tea.Cmd {
 		}
 		reverse := m.section == sectionStaged
 		if err := git.ApplyPatchToIndex(m.worktreeRoot, patch, reverse, false); err != nil {
-			m.showGitError(err)
-			return nil
+			if !isCorruptPatchErr(err) {
+				m.showGitError(err)
+				return nil
+			}
+			h := sec.parsed.Hunks[sec.activeHunk]
+			if len(h.ChangedLineOffset) == 0 {
+				m.showGitError(err)
+				return nil
+			}
+			startChanged := h.ChangedLineOffset[0]
+			endChanged := h.ChangedLineOffset[len(h.ChangedLineOffset)-1]
+			fallbackPatch, fallbackErr := buildLineRangePatch(sec.parsed, startChanged, endChanged)
+			if fallbackErr != nil {
+				m.showGitError(err)
+				return nil
+			}
+			if fallbackApplyErr := git.ApplyPatchToIndex(m.worktreeRoot, fallbackPatch, reverse, true); fallbackApplyErr != nil {
+				m.showGitError(err)
+				return nil
+			}
 		}
 	} else {
 		if sec.activeLine < 0 || sec.activeLine >= len(sec.parsed.Changed) {
@@ -91,6 +109,14 @@ func (m *Model) applySelection() tea.Cmd {
 		m.ensureActiveVisible(m.currentSection())
 	}
 	return nil
+}
+
+func isCorruptPatchErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := strings.ToLower(err.Error())
+	return strings.Contains(s, "corrupt patch")
 }
 
 func (m *Model) shouldSwitchAfterApply(from diffSection) bool {

@@ -3,6 +3,9 @@ package stage
 import (
 	"strings"
 	"testing"
+
+	"gx/git"
+	"gx/testutil"
 )
 
 func TestParseUnifiedDiff_TracksHunksAndChangedLines(t *testing.T) {
@@ -128,5 +131,51 @@ func TestBuildLineRangePatch_IncludesSelectedRange(t *testing.T) {
 	}
 	if !strings.Contains(patch, "+new-2") || !strings.Contains(patch, "+new-4") {
 		t.Fatalf("expected both selected lines in patch:\n%s", patch)
+	}
+}
+
+func TestBuildHunkPatch_ApplyToIndex_WithIndentedGoLines(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	content := strings.Join([]string{
+		"package p",
+		"",
+		"func f() {",
+		"\ttm.Send(keyRune('y'))",
+		"\twaitForText(t, tm, \"Force push?\", loadWait)",
+		"",
+		"\t// Confirm force push with 'y'.",
+		"\ttm.Send(keyRune('y'))",
+		"}",
+	}, "\n") + "\n"
+	testutil.WriteFile(t, repo, "a.go", content)
+	testutil.CommitAll(t, repo, "baseline")
+
+	updated := strings.Join([]string{
+		"package p",
+		"",
+		"func f() {",
+		"\ttm.Send(keyRune('y'))",
+		"\twaitForText(t, tm, \"has diverged from the remote branch\", loadWait)",
+		"",
+		"\t// Choose force push.",
+		"\ttm.Send(keyRune('2'))",
+		"}",
+	}, "\n") + "\n"
+	testutil.WriteFile(t, repo, "a.go", updated)
+
+	raw, err := git.DiffPath(repo, "a.go", false, 1)
+	if err != nil {
+		t.Fatalf("DiffPath: %v", err)
+	}
+	p := parseUnifiedDiff(raw)
+	if len(p.Hunks) != 1 {
+		t.Fatalf("expected one hunk, got %d", len(p.Hunks))
+	}
+	patch, err := buildHunkPatch(p, 0)
+	if err != nil {
+		t.Fatalf("buildHunkPatch: %v", err)
+	}
+	if err := git.ApplyPatchToIndex(repo, patch, false, false); err != nil {
+		t.Fatalf("ApplyPatchToIndex failed: %v\npatch:\n%s", err, patch)
 	}
 }
