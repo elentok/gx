@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.9.1
+
+- Fixed diverged push force-push target in `gx stage`: force push now correctly uses the remote name (`origin`) instead of the upstream ref (`origin/<branch>`)
+
 ## v0.9.0
 
 - Divergence detection: before pushing gx will detect if he branch has diverged and will offer the user to rebase, force push or abort
