@@ -155,6 +155,28 @@ func (m *Model) expandSelectedDir() {
 	m.statusEntries = buildStatusEntries(m.files, m.collapsedDirs)
 }
 
+func (m *Model) moveToAdjacentFile(delta int) bool {
+	if delta == 0 || len(m.statusEntries) == 0 {
+		return false
+	}
+	idx := m.selected
+	for {
+		idx += delta
+		if idx < 0 || idx >= len(m.statusEntries) {
+			return false
+		}
+		if m.statusEntries[idx].Kind == statusEntryFile {
+			m.selected = idx
+			m.onStatusSelectionChanged()
+			m.reloadDiffsForSelection()
+			if m.focus == focusDiff {
+				m.ensureActiveVisible(m.currentSection())
+			}
+			return true
+		}
+	}
+}
+
 func (m *Model) toggleStageStatusEntry() {
 	entry, ok := m.selectedStatusEntry()
 	if !ok {

@@ -1429,6 +1429,66 @@ func TestEscExitsVisualModeAndKeepsDiffFocus(t *testing.T) {
 	}
 }
 
+func TestDiffDotMovesToNextFile(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.WriteFile(t, repo, "b.txt", "two\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusDiff
+	m.section = sectionUnstaged
+
+	before, ok := m.selectedFile()
+	if !ok {
+		t.Fatalf("expected selected file before navigation")
+	}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '.', Text: "."})
+	m = updated.(Model)
+
+	after, ok := m.selectedFile()
+	if !ok {
+		t.Fatalf("expected selected file after navigation")
+	}
+	if after.Path == before.Path {
+		t.Fatalf("expected '.' to move to next file, stayed on %q", after.Path)
+	}
+	if m.focus != focusDiff {
+		t.Fatalf("expected to remain in diff focus, got %v", m.focus)
+	}
+}
+
+func TestDiffCommaMovesToPreviousFile(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.WriteFile(t, repo, "b.txt", "two\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusDiff
+	m.section = sectionUnstaged
+
+	first, ok := m.selectedFile()
+	if !ok {
+		t.Fatalf("expected selected file")
+	}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '.', Text: "."})
+	m = updated.(Model)
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: ',', Text: ","})
+	m = updated.(Model)
+
+	back, ok := m.selectedFile()
+	if !ok {
+		t.Fatalf("expected selected file after ','")
+	}
+	if back.Path != first.Path {
+		t.Fatalf("expected ',' to return to previous file %q, got %q", first.Path, back.Path)
+	}
+}
+
 func TestVisualModeUnstagesLineRange(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "range.txt", "one\ntwo\nthree\n")

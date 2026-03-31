@@ -252,6 +252,14 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "?":
 		m.showHelpOverlay()
+	case ".":
+		if m.moveToAdjacentFile(1) {
+			return m, nil
+		}
+	case ",":
+		if m.moveToAdjacentFile(-1) {
+			return m, nil
+		}
 	}
 	return m, nil
 }

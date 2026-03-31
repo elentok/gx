@@ -164,6 +164,7 @@ func stageHelpText() string {
 		"  a       toggle hunk/line mode",
 		"  v       toggle visual line-range mode",
 		"  j / k   move active hunk/line",
+		"  , / .   previous/next file",
 		"  J / K   scroll diff viewport",
 		"  space   stage/unstage active hunk/line",
 		"  d       discard (unstaged) / unstage (staged)",
