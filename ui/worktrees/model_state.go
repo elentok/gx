@@ -79,6 +79,7 @@ type Model struct {
 
 	pushDivergence   *git.PushDivergence
 	pushDivergenceWT *git.Worktree
+	pushMenu         components.MenuState
 
 	yankLoading   bool
 	yankSource    git.Worktree

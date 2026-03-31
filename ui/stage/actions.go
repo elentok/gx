@@ -300,25 +300,41 @@ func (m *Model) handleRunningKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleConfirmKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.confirmAction == confirmPushDiverged {
-		switch msg.String() {
-		case "1":
+		next, decided, accepted, handled := components.UpdateMenu(msg, m.confirmMenu)
+		if !handled {
+			return m, nil
+		}
+		m.confirmMenu = next
+		if !decided {
+			return m, nil
+		}
+		if !accepted {
+			m.confirmOpen = false
+			m.confirmAction = confirmNone
+			m.setStatus("push aborted")
+			return m, nil
+		}
+		choice := "abort"
+		if len(m.confirmMenu.Items) > 0 && m.confirmMenu.Cursor >= 0 && m.confirmMenu.Cursor < len(m.confirmMenu.Items) {
+			choice = m.confirmMenu.Items[m.confirmMenu.Cursor].Value
+		}
+		switch choice {
+		case "rebase":
 			m.confirmOpen = false
 			m.confirmAction = confirmNone
 			runner := newStageActionRunner(actionRebase, m.worktreeRoot, m.confirmRemote, m.confirmBranch)
 			m.openRunning("Rebase on "+m.confirmRemote, runner)
 			return m, actionPollCmd()
-		case "2":
+		case "force":
 			m.confirmOpen = false
 			m.confirmAction = confirmNone
 			runner := newStageActionRunner(actionForcePush, m.worktreeRoot, m.confirmRemote, m.confirmBranch)
 			m.openRunning("Force push", runner)
 			return m, actionPollCmd()
-		case "3", "esc", "enter":
+		default:
 			m.confirmOpen = false
 			m.confirmAction = confirmNone
 			m.setStatus("push aborted")
-			return m, nil
-		default:
 			return m, nil
 		}
 	}
@@ -449,6 +465,7 @@ func (m *Model) openConfirm(title string, lines []string, action stageConfirmAct
 	m.confirmPatch = ""
 	m.confirmPatchUnidiffZero = false
 	m.confirmDiscardUntracked = false
+	m.confirmMenu = components.MenuState{}
 	m.confirmYes = true
 }
 
@@ -474,17 +491,19 @@ func (m *Model) preparePushConfirm() error {
 				"",
 				fmt.Sprintf("  Last local commit: %s %s", div.Local.Hash, div.Local.Message),
 				fmt.Sprintf("  Last remote commit: %s %s", div.RemoteHead.Hash, div.RemoteHead.Message),
-				"",
-				"1. Rebase",
-				"2. Push --force",
-				"3. Abort",
-				"",
-				"Press 1, 2, or 3",
 			},
 			confirmPushDiverged,
 			div.Upstream,
 			branch,
 		)
+		m.confirmMenu = components.MenuState{
+			Items: []components.MenuItem{
+				{Label: "Rebase", Value: "rebase"},
+				{Label: "Push --force", Value: "force"},
+				{Label: "Abort", Value: "abort"},
+			},
+			Cursor: 0,
+		}
 		return nil
 	}
 	m.openConfirm(
@@ -611,13 +630,15 @@ func (m Model) confirmModalView() string {
 		prompt = prompt + "\n\n" + strings.Join(m.confirmLines, "\n")
 	}
 	if m.confirmAction == confirmPushDiverged {
-		return components.RenderOutputModal(
+		return components.RenderMenuModal(
 			"Push Diverged",
 			prompt,
-			"1 rebase · 2 force push · 3 abort",
+			m.confirmMenu,
+			"j/k or ↑/↓ navigate · enter select · esc cancel",
 			catYellow,
 			catYellow,
 			catSubtle,
+			catGreen,
 			maxInt(56, m.width/2),
 		)
 	}

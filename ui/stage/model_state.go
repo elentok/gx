@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"gx/git"
+	"gx/ui/components"
 
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
@@ -95,6 +96,7 @@ type Model struct {
 	confirmPatch            string
 	confirmPatchUnidiffZero bool
 	confirmDiscardUntracked bool
+	confirmMenu             components.MenuState
 	runningOpen             bool
 	runningTitle            string
 	runningVP               viewport.Model

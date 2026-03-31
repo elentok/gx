@@ -334,16 +334,16 @@ func TestPushRejectedShowsForcePushPrompt(t *testing.T) {
 	waitForText(t, tm, "Push feature-a?", actionWait)
 	tm.Send(keyRune('y'))
 
-	// The model should detect divergence before push and show a 3-option modal.
+	// The model should detect divergence before push and show a menu modal.
 	waitForTexts(t, tm, loadWait,
 		"has diverged from the remote branch",
-		"1. Rebase",
-		"2. Push --force",
-		"3. Abort",
+		"Rebase",
+		"Push --force",
+		"Abort",
 	)
 
-	// Abort.
-	tm.Send(keyRune('3'))
+	// Abort with Esc.
+	tm.Send(keySpecial(tea.KeyEsc))
 	quit(t, tm)
 }
 
@@ -363,8 +363,9 @@ func TestPushRejectedForcePushConfirmed(t *testing.T) {
 	tm.Send(keyRune('y'))
 	waitForText(t, tm, "has diverged from the remote branch", loadWait)
 
-	// Choose force push.
-	tm.Send(keyRune('2'))
+	// Choose force push (default is rebase, so move down once).
+	tm.Send(keyRune('j'))
+	tm.Send(keySpecial(tea.KeyEnter))
 
 	waitForText(t, tm, "Force-pushed", loadWait)
 
