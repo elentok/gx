@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.9.0
+
+- Divergence detection: before pushing gx will detect if he branch has diverged and will offer the user to rebase, force push or abort
+  (across `gx push`, `gx wt`, and `gx stage`)
+- `gx stage` UX updates:
+  - `.` / `,` jump to next/previous file from diff view
+  - fullscreen diff now hides the status pane
+  - `ol` opens `lazygit log`
+  - `e` opens the currently selected file in `$EDITOR` from both status and diff views
+- Improved stage patch robustness by falling back to line-range patch application when hunk apply reports a corrupt patch
+
 ## v0.8.0
 
 - `gx stage`:

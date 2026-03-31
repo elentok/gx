@@ -87,10 +87,15 @@ Stage UI highlights:
 - Yank AI context (`yc`) and filename-only (`yf`)
 - Live search in status/diff with highlights and `n` / `N` navigation
 - Vim-like navigation (`j`/`k`, `gg`/`G`, `ctrl+u`/`ctrl+d`)
+- File-to-file diff jumps with `,` / `.`
+- Edit selected file in `$EDITOR` with `e` (status and diff views)
+- Open lazygit log with `ol`
 - Pull/push/rebase/amend actions directly in stage (`p`/`P`/`b`/`A`) with confirmations
+- Push divergence flow uses a menu (`j`/`k` + `enter`) with relative commit times
 - Push in stage detects GitHub PR URLs and asks whether to open them
 - Keyboard help overlay (`?`) and full git-error overlay
 - Live action output overlay with cancellation (`ctrl+c`)
+- Fullscreen diff hides the status pane
 
 Clone using the `.bare` directory trick and bootstrap the initial worktree:
 
@@ -114,7 +119,7 @@ gx wt list
 gx wt abs-path <name>
 ```
 
-Push current worktree branch, with styled force-with-lease confirmation on rejection:
+Push current worktree branch, with proactive divergence detection and visible preflight progress:
 
 ```sh
 gx push
