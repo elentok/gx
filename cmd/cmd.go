@@ -26,7 +26,7 @@ type deps struct {
 	stderr               io.Writer
 	getwd                func() (string, error)
 	runWorktrees         func(string) error
-	runStage             func() error
+	runStatus            func() error
 	confirmForce         func(string) (bool, error)
 	choosePushDivergence func(io.Reader, io.Writer, *git.PushDivergence) (int, error)
 	initConfig           func() (string, error)
@@ -41,7 +41,7 @@ func defaultDeps() deps {
 		stderr:               os.Stderr,
 		getwd:                os.Getwd,
 		runWorktrees:         runWorktrees,
-		runStage:             runStage,
+		runStatus:            runStatus,
 		confirmForce:         confirm.Run,
 		choosePushDivergence: choosePushDivergence,
 		initConfig:           config.Init,
@@ -65,8 +65,8 @@ func execute(args []string, d deps) error {
 		return runWorktreeCmd(args[1:], d)
 	case "push":
 		return runPush(d)
-	case "stage":
-		return d.runStage()
+	case "status":
+		return d.runStatus()
 	case "init":
 		return runInit(d)
 	case "edit-config":
@@ -95,7 +95,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  gx wt abs-path <name>        print absolute path of a worktree")
 	fmt.Fprintln(w, "  gx wt clone <url> [dir]      clone using the .bare trick")
 	fmt.Fprintln(w, "  gx push")
-	fmt.Fprintln(w, "  gx stage")
+	fmt.Fprintln(w, "  gx status")
 	fmt.Fprintln(w, "  gx init")
 	fmt.Fprintln(w, "  gx edit-config")
 	fmt.Fprintln(w, "  gx bump [major|minor|patch]  create a version tag and optionally push")
@@ -170,7 +170,7 @@ func runWorktrees(_ string) error {
 	return err
 }
 
-func runStage() error {
+func runStatus() error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -181,7 +181,7 @@ func runStage() error {
 		return err
 	}
 	if info.Repo.IsBare && info.WorktreeRoot == "" {
-		return fmt.Errorf("gx stage must be run from a regular repo or linked worktree")
+		return fmt.Errorf("gx status must be run from a regular repo or linked worktree")
 	}
 
 	root, err := git.WorktreeRoot(cwd)

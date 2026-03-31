@@ -193,22 +193,22 @@ func TestExecute_RunsPush(t *testing.T) {
 	}
 }
 
-func TestExecute_RunsStage(t *testing.T) {
+func TestExecute_RunsStatus(t *testing.T) {
 	called := 0
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
-		runStage: func() error {
+		runStatus: func() error {
 			called++
 			return nil
 		},
 	}
 
-	if err := execute([]string{"stage"}, d); err != nil {
-		t.Fatalf("execute stage: %v", err)
+	if err := execute([]string{"status"}, d); err != nil {
+		t.Fatalf("execute status: %v", err)
 	}
 	if called != 1 {
-		t.Fatalf("runStage called %d times, want 1", called)
+		t.Fatalf("runStatus called %d times, want 1", called)
 	}
 }
 

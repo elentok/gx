@@ -8,7 +8,7 @@ import (
 
 func (m Model) View() tea.View {
 	if !m.ready {
-		v := tea.NewView("\n  Loading stage UI…")
+		v := tea.NewView("\n  Loading status UI…")
 		v.AltScreen = true
 		return v
 	}

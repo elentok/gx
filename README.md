@@ -19,7 +19,7 @@ and [go-migration-plan.md](/docs/go-migration-plan.md)).
 - Rebase the selected worktree on main (`b`), with optional stash-and-restore for dirty worktrees
 - `gx wt clone` clones using the `.bare` directory trick for a clean layout
 - `gx wt list` and `gx wt abs-path` for scripting and shell integration
-- `gx stage` interactive staging UI with file/hunk/line stage + unstage flows
+- `gx status` interactive staging UI with file/hunk/line stage + unstage flows
 - Press `/` to search and highlight matching worktrees by name or branch
 - Press `l` to open the selected worktree in lazygit
 - `gx bump` creates an annotated version tag with an interactive picker (or pass `major`/`minor`/`patch` directly) and optionally pushes
@@ -75,7 +75,7 @@ gx wt
 Open the interactive staging UI:
 
 ```sh
-gx stage
+gx status
 ```
 
 Stage UI highlights:
