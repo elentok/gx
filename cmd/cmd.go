@@ -63,9 +63,9 @@ func execute(args []string, d deps) error {
 	switch args[0] {
 	case "worktrees", "wt":
 		return runWorktreeCmd(args[1:], d)
-	case "push":
+	case "push", "ps":
 		return runPush(d)
-	case "status":
+	case "status", "s":
 		return d.runStatus()
 	case "init":
 		return runInit(d)
@@ -94,8 +94,8 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  gx wt list                   list worktree names")
 	fmt.Fprintln(w, "  gx wt abs-path <name>        print absolute path of a worktree")
 	fmt.Fprintln(w, "  gx wt clone <url> [dir]      clone using the .bare trick")
-	fmt.Fprintln(w, "  gx push")
-	fmt.Fprintln(w, "  gx status")
+	fmt.Fprintln(w, "  gx push|ps")
+	fmt.Fprintln(w, "  gx status|s")
 	fmt.Fprintln(w, "  gx init")
 	fmt.Fprintln(w, "  gx edit-config")
 	fmt.Fprintln(w, "  gx bump [major|minor|patch]  create a version tag and optionally push")

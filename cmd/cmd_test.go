@@ -181,34 +181,42 @@ func TestExecute_UnknownCommand(t *testing.T) {
 }
 
 func TestExecute_RunsPush(t *testing.T) {
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		getwd: func() (string, error) {
-			return "/tmp", errors.New("boom")
-		},
-	}
-	if err := execute([]string{"push"}, d); err == nil {
-		t.Fatal("expected propagated error")
+	for _, name := range []string{"push", "ps"} {
+		t.Run(name, func(t *testing.T) {
+			d := deps{
+				stdout: bytes.NewBuffer(nil),
+				stderr: bytes.NewBuffer(nil),
+				getwd: func() (string, error) {
+					return "/tmp", errors.New("boom")
+				},
+			}
+			if err := execute([]string{name}, d); err == nil {
+				t.Fatal("expected propagated error")
+			}
+		})
 	}
 }
 
 func TestExecute_RunsStatus(t *testing.T) {
-	called := 0
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		runStatus: func() error {
-			called++
-			return nil
-		},
-	}
+	for _, name := range []string{"status", "s"} {
+		t.Run(name, func(t *testing.T) {
+			called := 0
+			d := deps{
+				stdout: bytes.NewBuffer(nil),
+				stderr: bytes.NewBuffer(nil),
+				runStatus: func() error {
+					called++
+					return nil
+				},
+			}
 
-	if err := execute([]string{"status"}, d); err != nil {
-		t.Fatalf("execute status: %v", err)
-	}
-	if called != 1 {
-		t.Fatalf("runStatus called %d times, want 1", called)
+			if err := execute([]string{name}, d); err != nil {
+				t.Fatalf("execute %s: %v", name, err)
+			}
+			if called != 1 {
+				t.Fatalf("runStatus called %d times, want 1", called)
+			}
+		})
 	}
 }
 
