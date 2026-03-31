@@ -2,12 +2,14 @@ package worktrees
 
 import (
 	"fmt"
+	"time"
 
 	"gx/git"
 	"gx/ui"
 	"gx/ui/components"
 
 	tea "charm.land/bubbletea/v2"
+	humanize "github.com/dustin/go-humanize"
 )
 
 func (m Model) enterPushDivergedMode(wt git.Worktree, div *git.PushDivergence) Model {
@@ -75,10 +77,12 @@ func (m Model) pushDivergedModalView() string {
 	}
 	d := m.pushDivergence
 	prompt := fmt.Sprintf(
-		"Branch %s has diverged from the remote branch:\n\n  Last local commit: %s %s\n  Last remote commit: %s %s",
+		"Branch %s has diverged from the remote branch:\n\nLast local commit: %s\n  %s %s\n\nLast remote commit: %s\n  %s %s",
 		d.Branch,
+		humanizeOrUnknownTime(d.Local.Date),
 		d.Local.Hash,
 		d.Local.Message,
+		humanizeOrUnknownTime(d.RemoteHead.Date),
 		d.RemoteHead.Hash,
 		d.RemoteHead.Message,
 	)
@@ -93,4 +97,11 @@ func (m Model) pushDivergedModalView() string {
 		ui.ColorGreen,
 		0,
 	)
+}
+
+func humanizeOrUnknownTime(t time.Time) string {
+	if t.IsZero() {
+		return "unknown time"
+	}
+	return humanize.Time(t)
 }

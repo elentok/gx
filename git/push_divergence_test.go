@@ -41,4 +41,7 @@ func TestDetectPushDivergence_Diverged(t *testing.T) {
 	if div.Local.Hash == "" || div.RemoteHead.Hash == "" {
 		t.Fatalf("expected commit hashes, got local=%q remote=%q", div.Local.Hash, div.RemoteHead.Hash)
 	}
+	if div.Local.Date.IsZero() || div.RemoteHead.Date.IsZero() {
+		t.Fatalf("expected non-zero commit dates, got local=%v remote=%v", div.Local.Date, div.RemoteHead.Date)
+	}
 }

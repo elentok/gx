@@ -13,6 +13,7 @@ import (
 
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
+	humanize "github.com/dustin/go-humanize"
 )
 
 type stageConfirmAction int
@@ -489,8 +490,11 @@ func (m *Model) preparePushConfirm() error {
 			fmt.Sprintf("Branch %s has diverged from the remote branch:", div.Branch),
 			[]string{
 				"",
-				fmt.Sprintf("  Last local commit: %s %s", div.Local.Hash, div.Local.Message),
-				fmt.Sprintf("  Last remote commit: %s %s", div.RemoteHead.Hash, div.RemoteHead.Message),
+				fmt.Sprintf("Last local commit: %s", humanizeOrUnknown(div.Local.Date)),
+				fmt.Sprintf("  %s %s", div.Local.Hash, div.Local.Message),
+				"",
+				fmt.Sprintf("Last remote commit: %s", humanizeOrUnknown(div.RemoteHead.Date)),
+				fmt.Sprintf("  %s %s", div.RemoteHead.Hash, div.RemoteHead.Message),
 			},
 			confirmPushDiverged,
 			div.Upstream,
@@ -514,6 +518,13 @@ func (m *Model) preparePushConfirm() error {
 		branch,
 	)
 	return nil
+}
+
+func humanizeOrUnknown(t time.Time) string {
+	if t.IsZero() {
+		return "unknown time"
+	}
+	return humanize.Time(t)
 }
 
 func (m *Model) prepareRebaseConfirm() error {

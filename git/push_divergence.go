@@ -3,11 +3,13 @@ package git
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 type CommitInfo struct {
 	Hash    string
 	Message string
+	Date    time.Time
 }
 
 type PushDivergence struct {
@@ -54,17 +56,21 @@ func DetectPushDivergence(worktreePath, branch string) (*PushDivergence, error) 
 }
 
 func commitInfo(repoRoot, ref string) (CommitInfo, error) {
-	out, _, err := run(repoRoot, []string{"log", "-1", "--pretty=format:%h\t%s", ref})
+	out, _, err := run(repoRoot, []string{"log", "-1", "--pretty=format:%h\t%ci\t%s", ref})
 	if err != nil {
 		return CommitInfo{}, err
 	}
-	parts := strings.SplitN(out, "\t", 2)
+	parts := strings.SplitN(out, "\t", 3)
 	if len(parts) == 0 || strings.TrimSpace(parts[0]) == "" {
 		return CommitInfo{}, fmt.Errorf("unable to parse commit info for %s", ref)
 	}
-	msg := ""
+	var date time.Time
 	if len(parts) > 1 {
-		msg = strings.TrimSpace(parts[1])
+		date, _ = time.Parse("2006-01-02 15:04:05 -0700", strings.TrimSpace(parts[1]))
 	}
-	return CommitInfo{Hash: strings.TrimSpace(parts[0]), Message: msg}, nil
+	msg := ""
+	if len(parts) > 2 {
+		msg = strings.TrimSpace(parts[2])
+	}
+	return CommitInfo{Hash: strings.TrimSpace(parts[0]), Message: msg, Date: date}, nil
 }

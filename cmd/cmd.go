@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"gx/config"
 	"gx/git"
@@ -16,6 +17,7 @@ import (
 	"gx/ui/worktrees"
 
 	tea "charm.land/bubbletea/v2"
+	humanize "github.com/dustin/go-humanize"
 )
 
 type deps struct {
@@ -395,8 +397,10 @@ func choosePushDivergence(in io.Reader, out io.Writer, div *git.PushDivergence) 
 		return 3, nil
 	}
 	fmt.Fprintf(out, "Branch %s has diverged from the remote branch:\n\n", div.Branch)
-	fmt.Fprintf(out, "  Last local commit: %s %s\n", div.Local.Hash, div.Local.Message)
-	fmt.Fprintf(out, "  Last remote commit: %s %s\n\n", div.RemoteHead.Hash, div.RemoteHead.Message)
+	fmt.Fprintf(out, "Last local commit: %s\n", relativeDate(div.Local.Date))
+	fmt.Fprintf(out, "  %s %s\n\n", div.Local.Hash, div.Local.Message)
+	fmt.Fprintf(out, "Last remote commit: %s\n", relativeDate(div.RemoteHead.Date))
+	fmt.Fprintf(out, "  %s %s\n\n", div.RemoteHead.Hash, div.RemoteHead.Message)
 	fmt.Fprintln(out, "Choose an option:")
 	fmt.Fprintln(out, "1. Rebase")
 	fmt.Fprintln(out, "2. Push --force")
@@ -417,6 +421,13 @@ func choosePushDivergence(in io.Reader, out io.Writer, div *git.PushDivergence) 
 	default:
 		return 3, nil
 	}
+}
+
+func relativeDate(t time.Time) string {
+	if t.IsZero() {
+		return "unknown time"
+	}
+	return humanize.Time(t)
 }
 
 func runInit(d deps) error {
