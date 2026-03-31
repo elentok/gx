@@ -91,6 +91,7 @@ type Model struct {
 	confirmYes              bool
 	confirmAction           stageConfirmAction
 	confirmRemote           string
+	confirmUpstream         string
 	confirmBranch           string
 	confirmPaths            []string
 	confirmPatch            string

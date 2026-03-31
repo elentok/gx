@@ -74,3 +74,34 @@ func TestPushResultWithPRURLOpensConfirm(t *testing.T) {
 		t.Fatalf("expected PR confirm to default to yes")
 	}
 }
+
+func TestPreparePushConfirm_DivergedUsesRemoteAndUpstreamSeparately(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	remote := t.TempDir() + "/remote.git"
+	testutil.MustGitExported(t, ".", "clone", "--bare", repo, remote)
+	testutil.MustGitExported(t, repo, "remote", "add", "origin", remote)
+	testutil.MustGitExported(t, repo, "checkout", "-b", "feature/push")
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.MustGitExported(t, repo, "add", "a.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "feature")
+	testutil.PushBranchWithUpstream(t, repo, "origin", "feature/push")
+
+	// Diverge local from remote head.
+	testutil.AmendLastCommit(t, repo)
+
+	m := New(repo)
+	m.ready = true
+
+	if err := m.preparePushConfirm(); err != nil {
+		t.Fatalf("preparePushConfirm: %v", err)
+	}
+	if !m.confirmOpen || m.confirmAction != confirmPushDiverged {
+		t.Fatalf("expected diverged push confirm modal")
+	}
+	if m.confirmRemote != "origin" {
+		t.Fatalf("expected force-push remote name, got %q", m.confirmRemote)
+	}
+	if !strings.HasPrefix(m.confirmUpstream, "origin/") {
+		t.Fatalf("expected upstream ref like origin/<branch>, got %q", m.confirmUpstream)
+	}
+}

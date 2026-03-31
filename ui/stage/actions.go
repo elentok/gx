@@ -363,8 +363,12 @@ func (m *Model) handleConfirmKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case "rebase":
 			m.confirmOpen = false
 			m.confirmAction = confirmNone
-			runner := newStageActionRunner(actionRebase, m.worktreeRoot, m.confirmRemote, m.confirmBranch)
-			m.openRunning("Rebase on "+m.confirmRemote, runner)
+			target := strings.TrimSpace(m.confirmUpstream)
+			if target == "" {
+				target = strings.TrimSpace(m.confirmRemote)
+			}
+			runner := newStageActionRunner(actionRebase, m.worktreeRoot, target, m.confirmBranch)
+			m.openRunning("Rebase on "+target, runner)
 			return m, actionPollCmd()
 		case "force":
 			m.confirmOpen = false
@@ -501,6 +505,7 @@ func (m *Model) openConfirm(title string, lines []string, action stageConfirmAct
 	m.confirmLines = append([]string{}, lines...)
 	m.confirmAction = action
 	m.confirmRemote = remote
+	m.confirmUpstream = ""
 	m.confirmBranch = branch
 	m.confirmPaths = nil
 	m.confirmPatch = ""
@@ -537,9 +542,10 @@ func (m *Model) preparePushConfirm() error {
 				fmt.Sprintf("  %s %s", div.RemoteHead.Hash, div.RemoteHead.Message),
 			},
 			confirmPushDiverged,
-			div.Upstream,
+			div.Remote,
 			branch,
 		)
+		m.confirmUpstream = div.Upstream
 		m.confirmMenu = components.MenuState{
 			Items: []components.MenuItem{
 				{Label: "Rebase", Value: "rebase"},

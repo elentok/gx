@@ -71,9 +71,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					fmt.Sprintf("  %s %s", div.RemoteHead.Hash, div.RemoteHead.Message),
 				},
 				confirmPushDiverged,
-				div.Upstream,
+				div.Remote,
 				msg.branch,
 			)
+			m.confirmUpstream = div.Upstream
 			m.confirmMenu = components.MenuState{
 				Items:  []components.MenuItem{{Label: "Rebase", Value: "rebase"}, {Label: "Push --force", Value: "force"}, {Label: "Abort", Value: "abort"}},
 				Cursor: 0,
