@@ -14,9 +14,10 @@ type pullResultMsg struct {
 	log string
 }
 type pushResultMsg struct {
-	err   error
-	prURL string
-	log   string
+	err        error
+	prURL      string
+	log        string
+	divergence *git.PushDivergence
 }
 type forcePushResultMsg struct {
 	err error
@@ -56,6 +57,13 @@ func cmdPull(wt git.Worktree) tea.Cmd {
 
 func cmdPush(repo git.Repo, wt git.Worktree) tea.Cmd {
 	return func() tea.Msg {
+		div, err := git.DetectPushDivergence(wt.Path, wt.Branch)
+		if err != nil {
+			return pushResultMsg{err: err}
+		}
+		if div != nil {
+			return pushResultMsg{divergence: div}
+		}
 		remote := git.BranchRemote(repo, wt.Branch)
 		prURL, out, err := git.PushBranch(wt.Path, remote, wt.Branch)
 		return pushResultMsg{err: err, prURL: prURL, log: out}
@@ -101,6 +109,13 @@ func cmdRebase(repo git.Repo, wt git.Worktree, stash bool) tea.Cmd {
 		}
 		out, err := git.Rebase(wt.Path, repo.MainBranch)
 		return rebaseResultMsg{err: err, log: out, stashed: stashed, wtPath: wt.Path}
+	}
+}
+
+func cmdRebaseRef(wt git.Worktree, ref string) tea.Cmd {
+	return func() tea.Msg {
+		out, err := git.Rebase(wt.Path, ref)
+		return rebaseResultMsg{err: err, log: out, stashed: false, wtPath: wt.Path}
 	}
 }
 

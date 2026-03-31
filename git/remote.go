@@ -56,6 +56,12 @@ func FixFetchConfig(repoRoot string) error {
 	return err
 }
 
+// Fetch runs `git fetch <remote>` in repoRoot.
+func Fetch(repoRoot, remote string) error {
+	_, _, err := run(repoRoot, []string{"fetch", remote})
+	return err
+}
+
 // ListRemotes returns the names of all configured remotes.
 func ListRemotes(repo Repo) ([]string, error) {
 	out, _, err := run(repo.Root, []string{"remote"})
@@ -131,7 +137,6 @@ func ExtractPRURL(output string) string {
 	}
 	return ""
 }
-
 
 // PushBranchForceWithLease force-pushes branch using --force-with-lease.
 func PushBranchForceWithLease(worktreePath, remote, branch string) error {

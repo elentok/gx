@@ -27,6 +27,7 @@ const (
 	modeSearch
 	modeError
 	modeLogs
+	modePushDiverged
 )
 
 type dirtyState struct {
@@ -45,9 +46,9 @@ type Model struct {
 	activeWorktreePath string // path of the worktree the user launched from
 	settings           Settings
 
-	worktrees   []git.Worktree
-	statuses    map[string]git.SyncStatus
-	dirties     map[string]dirtyState
+	worktrees  []git.Worktree
+	statuses   map[string]git.SyncStatus
+	dirties    map[string]dirtyState
 	baseStatus map[string]*bool // keyed by branch; nil=loading, &true=rebased, &false=needs rebase
 
 	table    table.Model
@@ -75,6 +76,9 @@ type Model struct {
 	confirmCmd          tea.Cmd // executed when the user confirms
 	confirmSpinnerLabel string  // if non-empty, spinner is started on confirm
 	confirmCancelMsg    string  // if non-empty, shown as statusMsg when user cancels
+
+	pushDivergence   *git.PushDivergence
+	pushDivergenceWT *git.Worktree
 
 	yankLoading   bool
 	yankSource    git.Worktree

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -18,30 +19,32 @@ import (
 )
 
 type deps struct {
-	stdin        io.Reader
-	stdout       io.Writer
-	stderr       io.Writer
-	getwd        func() (string, error)
-	runWorktrees func(string) error
-	runStage     func() error
-	confirmForce func(string) (bool, error)
-	initConfig   func() (string, error)
-	getenv       func(string) string
-	runEditor    func(editor, path string, in io.Reader, out, err io.Writer) error
+	stdin                io.Reader
+	stdout               io.Writer
+	stderr               io.Writer
+	getwd                func() (string, error)
+	runWorktrees         func(string) error
+	runStage             func() error
+	confirmForce         func(string) (bool, error)
+	choosePushDivergence func(io.Reader, io.Writer, *git.PushDivergence) (int, error)
+	initConfig           func() (string, error)
+	getenv               func(string) string
+	runEditor            func(editor, path string, in io.Reader, out, err io.Writer) error
 }
 
 func defaultDeps() deps {
 	return deps{
-		stdin:        os.Stdin,
-		stdout:       os.Stdout,
-		stderr:       os.Stderr,
-		getwd:        os.Getwd,
-		runWorktrees: runWorktrees,
-		runStage:     runStage,
-		confirmForce: confirm.Run,
-		initConfig:   config.Init,
-		getenv:       os.Getenv,
-		runEditor:    runEditorCommand,
+		stdin:                os.Stdin,
+		stdout:               os.Stdout,
+		stderr:               os.Stderr,
+		getwd:                os.Getwd,
+		runWorktrees:         runWorktrees,
+		runStage:             runStage,
+		confirmForce:         confirm.Run,
+		choosePushDivergence: choosePushDivergence,
+		initConfig:           config.Init,
+		getenv:               os.Getenv,
+		runEditor:            runEditorCommand,
 	}
 }
 
@@ -303,6 +306,43 @@ func runPush(d deps) error {
 	}
 
 	remote := git.BranchRemote(info.Repo, branch)
+	if div, err := git.DetectPushDivergence(pushDir, branch); err != nil {
+		return err
+	} else if div != nil {
+		chooser := d.choosePushDivergence
+		if chooser == nil {
+			chooser = choosePushDivergence
+		}
+		choice, err := chooser(d.stdin, d.stdout, div)
+		if err != nil {
+			return err
+		}
+		switch choice {
+		case 1:
+			rebaseLabel := fmt.Sprintf("Rebasing %s on %s...", branch, div.Upstream)
+			if err := runWithSpinner(d.stdin, d.stderr, rebaseLabel, func() error {
+				_, err := git.Rebase(pushDir, div.Upstream)
+				return err
+			}); err != nil {
+				return err
+			}
+			fmt.Fprintf(d.stdout, "Rebased %s on %s\n", branch, div.Upstream)
+			return nil
+		case 2:
+			forceLabel := fmt.Sprintf("Force-pushing %s to %s...", branch, remote)
+			if err := runWithSpinner(d.stdin, d.stderr, forceLabel, func() error {
+				_, err := git.PushBranchForce(pushDir, remote, branch)
+				return err
+			}); err != nil {
+				return err
+			}
+			fmt.Fprintf(d.stdout, "Force-pushed %s to %s with --force\n", branch, remote)
+			return nil
+		default:
+			return fmt.Errorf("push aborted")
+		}
+	}
+
 	pushLabel := fmt.Sprintf("Pushing %s to %s...", branch, remote)
 	if err := runWithSpinner(d.stdin, d.stderr, pushLabel, func() error {
 		_, _, err := git.PushBranch(pushDir, remote, branch)
@@ -348,6 +388,35 @@ func runPush(d deps) error {
 
 	fmt.Fprintf(d.stdout, "Pushed %s to %s\n", branch, remote)
 	return nil
+}
+
+func choosePushDivergence(in io.Reader, out io.Writer, div *git.PushDivergence) (int, error) {
+	if div == nil {
+		return 3, nil
+	}
+	fmt.Fprintf(out, "Branch %s has diverged from the remote branch:\n\n", div.Branch)
+	fmt.Fprintf(out, "  Last local commit: %s %s\n", div.Local.Hash, div.Local.Message)
+	fmt.Fprintf(out, "  Last remote commit: %s %s\n\n", div.RemoteHead.Hash, div.RemoteHead.Message)
+	fmt.Fprintln(out, "Choose an option:")
+	fmt.Fprintln(out, "1. Rebase")
+	fmt.Fprintln(out, "2. Push --force")
+	fmt.Fprintln(out, "3. Abort")
+	fmt.Fprint(out, "> ")
+
+	r := bufio.NewReader(in)
+	line, err := r.ReadString('\n')
+	if err != nil && len(line) == 0 {
+		return 3, err
+	}
+	line = strings.TrimSpace(line)
+	switch line {
+	case "1":
+		return 1, nil
+	case "2":
+		return 2, nil
+	default:
+		return 3, nil
+	}
 }
 
 func runInit(d deps) error {

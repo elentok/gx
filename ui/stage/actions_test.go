@@ -48,7 +48,7 @@ func TestRebaseKeyOpensSpecificConfirm(t *testing.T) {
 	if !m.confirmOpen {
 		t.Fatalf("expected rebase key to open confirmation")
 	}
-	if !strings.Contains(m.confirmTitle, "Rebase branch feature/test on origin/master?") {
+	if !strings.Contains(m.confirmTitle, "Rebase branch feature/test on origin/main?") {
 		t.Fatalf("unexpected rebase confirm title: %q", m.confirmTitle)
 	}
 }

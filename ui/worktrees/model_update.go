@@ -49,6 +49,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleSearchKey(msg)
 		case modeLogs:
 			return m.handleLogsKey(msg)
+		case modePushDiverged:
+			return m.handlePushDivergedKey(msg)
 		}
 		switch {
 		case key.Matches(msg, keys.Logs) && m.lastJobLog != "":
@@ -367,6 +369,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spinnerActive = false
 		m.lastJobLog = msg.log
 		m.lastJobLabel = "Push output"
+		if msg.divergence != nil {
+			wt := m.selectedWorktree()
+			if wt != nil {
+				return m.enterPushDivergedMode(*wt, msg.divergence), nil
+			}
+			return m.showError("cannot resolve selected worktree for diverged push"), nil
+		}
 		if msg.err != nil {
 			wt := m.selectedWorktree()
 			if wt != nil && git.IsNonFastForwardPushError(msg.err) {

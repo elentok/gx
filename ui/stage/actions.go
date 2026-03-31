@@ -28,6 +28,7 @@ const (
 	confirmOpenPR
 	confirmDiscardStatus
 	confirmDiscardUnstaged
+	confirmPushDiverged
 )
 
 type stageActionKind int
@@ -162,14 +163,22 @@ func (r *stageActionRunner) runPullLike(kind stageActionKind) stageActionResult 
 	}
 
 	if kind == actionRebase {
-		if err := r.execGit("fetch", "origin"); err != nil {
+		target := strings.TrimSpace(r.remote)
+		if target == "" {
+			target = detectRebaseTarget(r.root)
+		}
+		fetchRemote := "origin"
+		if i := strings.Index(target, "/"); i > 0 {
+			fetchRemote = strings.TrimSpace(target[:i])
+		}
+		if err := r.execGit("fetch", fetchRemote); err != nil {
 			res.err = err
 			if stashed {
 				res.promptPopStash = true
 			}
 			return res
 		}
-		if err := r.execGit("rebase", "origin/master"); err != nil {
+		if err := r.execGit("rebase", target); err != nil {
 			res.err = err
 			if stashed {
 				res.promptPopStash = true
@@ -290,6 +299,30 @@ func (m *Model) handleRunningKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleConfirmKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.confirmAction == confirmPushDiverged {
+		switch msg.String() {
+		case "1":
+			m.confirmOpen = false
+			m.confirmAction = confirmNone
+			runner := newStageActionRunner(actionRebase, m.worktreeRoot, m.confirmRemote, m.confirmBranch)
+			m.openRunning("Rebase on "+m.confirmRemote, runner)
+			return m, actionPollCmd()
+		case "2":
+			m.confirmOpen = false
+			m.confirmAction = confirmNone
+			runner := newStageActionRunner(actionForcePush, m.worktreeRoot, m.confirmRemote, m.confirmBranch)
+			m.openRunning("Force push", runner)
+			return m, actionPollCmd()
+		case "3", "esc", "enter":
+			m.confirmOpen = false
+			m.confirmAction = confirmNone
+			m.setStatus("push aborted")
+			return m, nil
+		default:
+			return m, nil
+		}
+	}
+
 	nextYes, decided, accepted, handled := components.UpdateConfirm(msg, m.confirmYes)
 	if !handled {
 		return m, nil
@@ -322,8 +355,12 @@ func (m Model) confirmAccept() (tea.Model, tea.Cmd) {
 		m.openRunning("Push", runner)
 		return m, actionPollCmd()
 	case confirmRebase:
-		runner := newStageActionRunner(actionRebase, m.worktreeRoot, "", m.confirmBranch)
-		m.openRunning("Rebase on origin/master", runner)
+		runner := newStageActionRunner(actionRebase, m.worktreeRoot, m.confirmRemote, m.confirmBranch)
+		titleTarget := strings.TrimSpace(m.confirmRemote)
+		if titleTarget == "" {
+			titleTarget = detectRebaseTarget(m.worktreeRoot)
+		}
+		m.openRunning("Rebase on "+titleTarget, runner)
 		return m, actionPollCmd()
 	case confirmForcePush:
 		runner := newStageActionRunner(actionForcePush, m.worktreeRoot, m.confirmRemote, m.confirmBranch)
@@ -428,6 +465,28 @@ func (m *Model) preparePushConfirm() error {
 		return fmt.Errorf("cannot push: detached HEAD")
 	}
 	remote := git.BranchRemote(git.Repo{Root: m.worktreeRoot}, branch)
+	if div, err := git.DetectPushDivergence(m.worktreeRoot, branch); err != nil {
+		return err
+	} else if div != nil {
+		m.openConfirm(
+			fmt.Sprintf("Branch %s has diverged from the remote branch:", div.Branch),
+			[]string{
+				"",
+				fmt.Sprintf("  Last local commit: %s %s", div.Local.Hash, div.Local.Message),
+				fmt.Sprintf("  Last remote commit: %s %s", div.RemoteHead.Hash, div.RemoteHead.Message),
+				"",
+				"1. Rebase",
+				"2. Push --force",
+				"3. Abort",
+				"",
+				"Press 1, 2, or 3",
+			},
+			confirmPushDiverged,
+			div.Upstream,
+			branch,
+		)
+		return nil
+	}
 	m.openConfirm(
 		fmt.Sprintf("Push branch %s to %s?", branch, remote),
 		nil,
@@ -446,14 +505,27 @@ func (m *Model) prepareRebaseConfirm() error {
 	if branch == "" || branch == "HEAD" {
 		return fmt.Errorf("cannot rebase: detached HEAD")
 	}
+	target := detectRebaseTarget(m.worktreeRoot)
 	m.openConfirm(
-		fmt.Sprintf("Rebase branch %s on origin/master?", branch),
+		fmt.Sprintf("Rebase branch %s on %s?", branch, target),
 		nil,
 		confirmRebase,
-		"",
+		target,
 		branch,
 	)
 	return nil
+}
+
+func detectRebaseTarget(root string) string {
+	repo, err := git.FindRepo(root)
+	if err != nil {
+		return "origin/main"
+	}
+	main := strings.TrimSpace(repo.MainBranch)
+	if main == "" {
+		main = "main"
+	}
+	return "origin/" + main
 }
 
 func (m *Model) openAmendConfirm() error {
@@ -537,6 +609,17 @@ func (m Model) confirmModalView() string {
 	prompt := m.confirmTitle
 	if len(m.confirmLines) > 0 {
 		prompt = prompt + "\n\n" + strings.Join(m.confirmLines, "\n")
+	}
+	if m.confirmAction == confirmPushDiverged {
+		return components.RenderOutputModal(
+			"Push Diverged",
+			prompt,
+			"1 rebase · 2 force push · 3 abort",
+			catYellow,
+			catYellow,
+			catSubtle,
+			maxInt(56, m.width/2),
+		)
 	}
 	return components.RenderConfirmModal(
 		prompt,

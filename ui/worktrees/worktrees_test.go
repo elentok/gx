@@ -334,11 +334,16 @@ func TestPushRejectedShowsForcePushPrompt(t *testing.T) {
 	waitForText(t, tm, "Push feature-a?", actionWait)
 	tm.Send(keyRune('y'))
 
-	// The model should detect the non-fast-forward error and show the confirm modal.
-	waitForText(t, tm, "Force push?", loadWait)
+	// The model should detect divergence before push and show a 3-option modal.
+	waitForTexts(t, tm, loadWait,
+		"has diverged from the remote branch",
+		"1. Rebase",
+		"2. Push --force",
+		"3. Abort",
+	)
 
-	// 'q' in confirm mode cancels the modal; send it to return to normal, then quit.
-	tm.Send(keyRune('n'))
+	// Abort.
+	tm.Send(keyRune('3'))
 	quit(t, tm)
 }
 
@@ -356,10 +361,10 @@ func TestPushRejectedForcePushConfirmed(t *testing.T) {
 	tm.Send(keyRune('P'))
 	waitForText(t, tm, "Push feature-a?", actionWait)
 	tm.Send(keyRune('y'))
-	waitForText(t, tm, "Force push?", loadWait)
+	waitForText(t, tm, "has diverged from the remote branch", loadWait)
 
-	// Confirm force push with 'y'.
-	tm.Send(keyRune('y'))
+	// Choose force push.
+	tm.Send(keyRune('2'))
 
 	waitForText(t, tm, "Force-pushed", loadWait)
 
