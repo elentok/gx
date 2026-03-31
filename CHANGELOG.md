@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.10.0
+
+- Renamed the `gx stage` command to `gx status`
+- Updated command routing, usage/help text, and tests to use `gx status`
+- Updated docs and prompts to reflect the new command name
+
 ## v0.9.1
 
 - Fixed diverged push force-push target in `gx stage`: force push now correctly uses the remote name (`origin`) instead of the upstream ref (`origin/<branch>`)
