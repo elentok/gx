@@ -27,14 +27,17 @@ func (m Model) View() tea.View {
 	statusW, diffW := m.splitWidth()
 	statusH, diffH := m.splitHeight(mainH)
 
-	statusPanel := m.renderStatusPane(statusW, statusH)
-	diffPanel := m.renderDiffPane(diffW, diffH)
-
 	var body string
-	if m.useStackedLayout() {
-		body = lipgloss.JoinVertical(lipgloss.Left, statusPanel, diffPanel)
+	if m.diffFullscreen && m.focus == focusDiff {
+		body = m.renderDiffPane(m.width, mainH)
 	} else {
-		body = lipgloss.JoinHorizontal(lipgloss.Top, statusPanel, diffPanel)
+		statusPanel := m.renderStatusPane(statusW, statusH)
+		diffPanel := m.renderDiffPane(diffW, diffH)
+		if m.useStackedLayout() {
+			body = lipgloss.JoinVertical(lipgloss.Left, statusPanel, diffPanel)
+		} else {
+			body = lipgloss.JoinHorizontal(lipgloss.Top, statusPanel, diffPanel)
+		}
 	}
 
 	footer := m.helpLine()

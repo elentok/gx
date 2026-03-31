@@ -242,6 +242,24 @@ func TestViewEnablesReportFocus(t *testing.T) {
 	}
 }
 
+func TestFullscreenDiffHidesStatusPane(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+
+	m := New(repo)
+	m.ready = true
+	m.width = 120
+	m.height = 30
+	m.focus = focusDiff
+	m.diffFullscreen = true
+
+	v := m.View()
+	plain := ansi.Strip(v.Content)
+	if strings.Contains(plain, "Status") {
+		t.Fatalf("expected status pane hidden in fullscreen diff view")
+	}
+}
+
 func TestSpaceStagesSingleLineInLineMode(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "line.txt", "line-1\nline-2\n")
