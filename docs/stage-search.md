@@ -2,7 +2,7 @@
 
 ## Goal
 
-Add vim-like search in `gx stage` for both status and diff views with two explicit modes:
+Add vim-like search in `gx status` for both status and diff views with two explicit modes:
 
 - search-input mode
 - search-results mode

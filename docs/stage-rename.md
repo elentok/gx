@@ -2,7 +2,7 @@
 
 ## Goal
 
-Add first-class rename/move support to `gx stage` so moved files are easy to spot and understand in both the status tree and diff panes.
+Add first-class rename/move support to `gx status` so moved files are easy to spot and understand in both the status tree and diff panes.
 
 ## Status/Icon Mapping
 

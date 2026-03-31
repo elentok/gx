@@ -1,8 +1,8 @@
-# `gx stage` Implementation Plan
+# `gx status` Implementation Plan
 
 ## Goal
 
-Add a new `gx stage` command that opens an interactive two-pane staging UI inspired by Lazygit, with syntax-highlighted diffs via `git diff` + `delta`, and supports hunk/line stage and unstage flows.
+Add a new `gx status` command that opens an interactive two-pane status UI inspired by Lazygit, with syntax-highlighted diffs via `git diff` + `delta`, and supports hunk/line stage and unstage flows.
 
 ## Confirmed product decisions
 
@@ -11,12 +11,12 @@ Add a new `gx stage` command that opens an interactive two-pane staging UI inspi
 - In diff **hunk mode**, `<space>` applies to the selected hunk.
 - `enter` moves focus from status pane to diff pane.
 - `esc` and `q` move focus from diff pane back to status pane.
-- `q` while focused on status exits the stage UI.
+- `q` while focused on status exits the status UI.
 - Untracked files are listed and can be staged from the UI.
 
 ## Scope
 
-- Add a new CLI command entrypoint: `gx stage`.
+- Add a new CLI command entrypoint: `gx status`.
 - Build a dedicated Bubble Tea model for staging UI (not mixed into worktrees UI).
 - Add git plumbing for status/diff parsing and patch apply operations.
 - Add tests for command wiring, layout behavior, navigation/focus, and stage/unstage actions.
@@ -26,8 +26,8 @@ Add a new `gx stage` command that opens an interactive two-pane staging UI inspi
 ### 1) Command integration
 
 - Update `cmd/cmd.go`:
-  - Add `stage` command in `execute(...)` switch.
-  - Include usage help line for `gx stage`.
+  - Add `status` command in `execute(...)` switch.
+  - Include usage help line for `gx status`.
   - Implement `runStage(d deps) error` similar to existing TUI commands (resolve repo from cwd, then launch Bubble Tea program).
 
 ### 2) New stage domain package(s)
@@ -100,7 +100,7 @@ Add a new `gx stage` command that opens an interactive two-pane staging UI inspi
 ## Implementation phases
 
 - [x] Phase 1: Command wiring and basic model skeleton
-  - Add `gx stage` command routing and usage text.
+  - Add `gx status` command routing and usage text.
   - Add initial `ui/stage` model with startup, size handling, focus state, and quit behavior.
 
 - [x] Phase 2: Status pane
@@ -125,7 +125,7 @@ Add a new `gx stage` command that opens an interactive two-pane staging UI inspi
   - Refresh data model after each action and maintain stable selection.
 
 - [x] Phase 6: Tests and verification
-  - Add/extend command tests in `cmd` for `gx stage` dispatch/help.
+  - Add/extend command tests in `cmd` for `gx status` dispatch/help.
   - Add focused unit tests for diff parser + navigation target rules.
   - Add model tests for layout threshold behavior (`100` boundary), focus rules, and section collapsing.
   - Add tests for stage/unstage patch generation and git helper behavior (with temp repos).
@@ -133,7 +133,7 @@ Add a new `gx stage` command that opens an interactive two-pane staging UI inspi
 
 ## Verification checklist
 
-- `gx stage` launches from a repo and exits cleanly.
+- `gx status` launches from a repo and exits cleanly.
 - Status pane shows expected files and supports `j/k` and arrows.
 - Layout switches exactly at width `100`.
 - Diff pane shows staged/unstaged sections and collapses empty section.
@@ -156,7 +156,7 @@ Add a new `gx stage` command that opens an interactive two-pane staging UI inspi
 ## Review
 
 - What changed:
-  - Added `gx stage` command wiring in `cmd/cmd.go` with a dedicated stage runner and usage entry.
+  - Added `gx status` command wiring in `cmd/cmd.go` with a dedicated status runner and usage entry.
   - Added stage git plumbing in `git/stage.go`:
     - porcelain status parsing (`ListStageFiles`)
     - staged/unstaged and untracked diff retrieval (plain + delta-rendered)
@@ -181,7 +181,7 @@ Add a new `gx stage` command that opens an interactive two-pane staging UI inspi
 
 ## Part 2 plan
 
-- [x] Add active-pane border highlighting in orange and apply catppuccin-themed accents in stage UI.
+- [x] Add active-pane border highlighting in orange and apply catppuccin-themed accents in status UI.
 - [x] Add status-pane `<space>` toggle for whole-file stage/unstage.
 - [x] Switch status collection to list untracked files individually, and build a collapsible directory tree for nested paths.
 - [x] Add directory-row actions: collapse/expand with left/right (and h/l), `<space>` stages/unstages all descendants.

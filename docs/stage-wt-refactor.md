@@ -2,7 +2,7 @@
 
 ## Goal
 
-Unify duplicated modal/action plumbing between `gx stage` and `gx wt` so both screens share:
+Unify duplicated modal/action plumbing between `gx status` and `gx wt` so both screens share:
 
 - confirm modal behavior
 - output/error modal behavior
@@ -93,7 +93,7 @@ Both stage and worktrees use this helper.
 
 ## Behavior parity requirements
 
-### Stage (`gx stage`)
+### Stage (`gx status`)
 
 #### Push (`P`)
 
@@ -191,7 +191,7 @@ Both stage and worktrees use this helper.
 - Full workflow E2Es for stage push/pull/rebase actions:
   - create dummy repos and remotes
   - perform stage + commit in test setup
-  - run pull/push/rebase through `gx stage`
+  - run pull/push/rebase through `gx status`
   - fake editor in tests (for example with `GIT_EDITOR` script)
   - disable tmux behavior in tests where needed (for example unsetting `TMUX`)
 
