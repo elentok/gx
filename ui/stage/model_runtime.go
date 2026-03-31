@@ -72,6 +72,13 @@ func cmdGitCommit(worktreeRoot string) tea.Cmd {
 	})
 }
 
+func cmdLazygitLog(worktreeRoot string) tea.Cmd {
+	c := exec.Command("lazygit", "-p", worktreeRoot, "log")
+	return tea.ExecProcess(c, func(err error) tea.Msg {
+		return lazygitLogFinishedMsg{err: err}
+	})
+}
+
 func (m Model) selectedStatusEntry() (statusEntry, bool) {
 	if m.selected < 0 || m.selected >= len(m.statusEntries) {
 		return statusEntry{}, false

@@ -1125,6 +1125,31 @@ func TestCCTriggersCommitCommand(t *testing.T) {
 	}
 }
 
+func TestOLTriggersLazygitLogCommand(t *testing.T) {
+	repo := testutil.TempRepo(t)
+
+	m := New(repo)
+	m.ready = true
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	if cmd != nil {
+		t.Fatalf("first o should not launch command")
+	}
+	m = updated.(Model)
+	if m.keyPrefix != "o" {
+		t.Fatalf("expected keyPrefix=o after first o, got %q", m.keyPrefix)
+	}
+
+	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+	if cmd == nil {
+		t.Fatalf("second key should launch lazygit log command")
+	}
+	m = updated.(Model)
+	if m.keyPrefix != "" {
+		t.Fatalf("expected keyPrefix reset after ol, got %q", m.keyPrefix)
+	}
+}
+
 func TestWToggleSoftWrap(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "this is a very long line that should wrap in narrow diff panes\n")

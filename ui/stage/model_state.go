@@ -141,6 +141,8 @@ type commitFinishedMsg struct {
 	tmuxSplit bool
 }
 
+type lazygitLogFinishedMsg struct{ err error }
+
 var (
 	catBase0   = lipgloss.Color("#1e1e2e")
 	catText    = lipgloss.Color("#cdd6f4")

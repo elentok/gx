@@ -140,6 +140,7 @@ func stageHelpText() string {
 		"  ?       toggle this help",
 		"  q       quit",
 		"  cc      open git commit",
+		"  ol      open lazygit log",
 		"  yc/yf   yank context / filename",
 		"  p/P     pull / push",
 		"  b       rebase on origin/master",

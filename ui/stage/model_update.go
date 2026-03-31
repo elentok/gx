@@ -150,6 +150,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.setStatus("git commit finished")
 		m.refresh()
 		return m, nil
+	case lazygitLogFinishedMsg:
+		if msg.err != nil {
+			m.setStatus("lazygit log failed: " + msg.err.Error())
+			return m, nil
+		}
+		m.setStatus("lazygit log closed")
+		m.refresh()
+		return m, nil
 	}
 	return m, nil
 }

@@ -53,6 +53,17 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 			return m, nil, true
 		}
 	}
+	if m.keyPrefix == "o" {
+		m.keyPrefix = ""
+		if key == "l" {
+			m.setStatus("opening lazygit log...")
+			return m, cmdLazygitLog(m.worktreeRoot), true
+		}
+		if key == "esc" {
+			m.clearStatus()
+			return m, nil, true
+		}
+	}
 	if key == "c" {
 		m.keyPrefix = "c"
 		m.setStatus("cc: git commit")
@@ -61,6 +72,11 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	if key == "y" {
 		m.keyPrefix = "y"
 		m.setStatus("yc: yank AI context · yf: yank filename")
+		return m, nil, true
+	}
+	if key == "o" {
+		m.keyPrefix = "o"
+		m.setStatus("ol: open lazygit log")
 		return m, nil, true
 	}
 	if isLowerG {
