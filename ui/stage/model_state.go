@@ -142,6 +142,7 @@ type commitFinishedMsg struct {
 }
 
 type lazygitLogFinishedMsg struct{ err error }
+type editFileFinishedMsg struct{ err error }
 
 var (
 	catBase0   = lipgloss.Color("#1e1e2e")

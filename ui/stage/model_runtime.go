@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -76,6 +77,31 @@ func cmdLazygitLog(worktreeRoot string) tea.Cmd {
 	c := exec.Command("lazygit", "-p", worktreeRoot, "log")
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		return lazygitLogFinishedMsg{err: err}
+	})
+}
+
+func (m *Model) cmdEditSelectedFile() tea.Cmd {
+	file, ok := m.selectedFile()
+	if !ok {
+		m.setStatus("no file selected")
+		return nil
+	}
+	editor := strings.TrimSpace(os.Getenv("EDITOR"))
+	if editor == "" {
+		m.setStatus("$EDITOR is not set")
+		return nil
+	}
+	parts := strings.Fields(editor)
+	if len(parts) == 0 {
+		m.setStatus("$EDITOR is empty")
+		return nil
+	}
+	target := filepath.Join(m.worktreeRoot, file.Path)
+	args := append(parts[1:], target)
+	c := exec.Command(parts[0], args...)
+	m.setStatus("opening editor...")
+	return tea.ExecProcess(c, func(err error) tea.Msg {
+		return editFileFinishedMsg{err: err}
 	})
 }
 

@@ -163,6 +163,8 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.showHelpOverlay()
 	case "d":
 		m.openDiscardStatusConfirm()
+	case "e":
+		return m, m.cmdEditSelectedFile()
 	}
 	return m, nil
 }
@@ -276,6 +278,8 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.moveToAdjacentFile(-1) {
 			return m, nil
 		}
+	case "e":
+		return m, m.cmdEditSelectedFile()
 	}
 	return m, nil
 }

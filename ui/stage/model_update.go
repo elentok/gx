@@ -158,6 +158,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.setStatus("lazygit log closed")
 		m.refresh()
 		return m, nil
+	case editFileFinishedMsg:
+		if msg.err != nil {
+			m.setStatus("edit failed: " + msg.err.Error())
+			return m, nil
+		}
+		m.setStatus("editor closed")
+		m.refresh()
+		return m, nil
 	}
 	return m, nil
 }

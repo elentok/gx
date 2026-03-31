@@ -1150,6 +1150,29 @@ func TestOLTriggersLazygitLogCommand(t *testing.T) {
 	}
 }
 
+func TestEOpensEditorFromStatusAndDiff(t *testing.T) {
+	t.Setenv("EDITOR", "true")
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "edit.txt", "one\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusStatus
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})
+	m = updated.(Model)
+	if cmd == nil {
+		t.Fatalf("expected e in status view to launch editor command")
+	}
+
+	m.focus = focusDiff
+	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})
+	m = updated.(Model)
+	if cmd == nil {
+		t.Fatalf("expected e in diff view to launch editor command")
+	}
+}
+
 func TestWToggleSoftWrap(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "this is a very long line that should wrap in narrow diff panes\n")
