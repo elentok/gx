@@ -1363,6 +1363,63 @@ func TestEditorLineForCurrentSelectionInDiffMode(t *testing.T) {
 	}
 }
 
+func TestMouseWheelScrollsUnstagedDiffViewport(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	before := make([]string, 0, 80)
+	after := make([]string, 0, 80)
+	for i := 1; i <= 80; i++ {
+		before = append(before, fmt.Sprintf("old-%03d", i))
+		after = append(after, fmt.Sprintf("new-%03d", i))
+	}
+	testutil.WriteFile(t, repo, "scroll.txt", strings.Join(before, "\n")+"\n")
+	testutil.MustGitExported(t, repo, "add", "scroll.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+	testutil.WriteFile(t, repo, "scroll.txt", strings.Join(after, "\n")+"\n")
+
+	m := New(repo)
+	m.ready = true
+	m.width = 120
+	m.height = 26
+	m.syncDiffViewports()
+	m.focus = focusDiff
+
+	beforeOffset := m.unstaged.viewport.YOffset()
+	updated, _ := m.Update(tea.MouseWheelMsg{X: 50, Y: 6, Button: tea.MouseWheelDown})
+	m = updated.(Model)
+	if m.unstaged.viewport.YOffset() <= beforeOffset {
+		t.Fatalf("expected unstaged viewport to scroll down, before=%d after=%d", beforeOffset, m.unstaged.viewport.YOffset())
+	}
+}
+
+func TestMouseWheelScrollsStagedDiffViewport(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	before := make([]string, 0, 80)
+	after := make([]string, 0, 80)
+	for i := 1; i <= 80; i++ {
+		before = append(before, fmt.Sprintf("old-%03d", i))
+		after = append(after, fmt.Sprintf("new-%03d", i))
+	}
+	testutil.WriteFile(t, repo, "staged-scroll.txt", strings.Join(before, "\n")+"\n")
+	testutil.MustGitExported(t, repo, "add", "staged-scroll.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+	testutil.WriteFile(t, repo, "staged-scroll.txt", strings.Join(after, "\n")+"\n")
+	testutil.MustGitExported(t, repo, "add", "staged-scroll.txt")
+
+	m := New(repo)
+	m.ready = true
+	m.width = 120
+	m.height = 26
+	m.syncDiffViewports()
+	m.focus = focusDiff
+
+	beforeOffset := m.staged.viewport.YOffset()
+	updated, _ := m.Update(tea.MouseWheelMsg{X: 50, Y: 6, Button: tea.MouseWheelDown})
+	m = updated.(Model)
+	if m.staged.viewport.YOffset() <= beforeOffset {
+		t.Fatalf("expected staged viewport to scroll down, before=%d after=%d", beforeOffset, m.staged.viewport.YOffset())
+	}
+}
+
 func TestWToggleSoftWrap(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "this is a very long line that should wrap in narrow diff panes\n")

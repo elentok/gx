@@ -89,6 +89,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			msg.branch,
 		)
 		return m, nil
+	case tea.MouseWheelMsg:
+		if m.handleMouseWheel(msg) {
+			return m, nil
+		}
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
 			if m.runningOpen && !m.runningDone && m.runningRunner != nil {
