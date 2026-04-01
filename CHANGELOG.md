@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.10.2
+
+- Fixed intermittent CI/status lock contention by running read-only status probes with `git --no-optional-locks`
+- Applied the lock-avoidance path to stage file listing and uncommitted-change collection
+
 ## v0.10.1
 
 - Updated status yank mappings to a clearer set: `yy` (content), `yl` (location), `ya` (all context), and `yf` (filename)
