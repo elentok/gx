@@ -118,7 +118,7 @@ func revCount(repoRoot, fromRef, toRef string) (int, error) {
 // UncommittedChanges returns modified, added, deleted, and untracked files in
 // the worktree at the given path.
 func UncommittedChanges(worktreePath string) ([]Change, error) {
-	out, _, err := run(worktreePath, []string{"status", "--porcelain=v1"})
+	out, _, err := runNoOptionalLocks(worktreePath, []string{"status", "--porcelain=v1"})
 	if err != nil {
 		return nil, err
 	}

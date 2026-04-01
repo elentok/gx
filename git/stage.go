@@ -53,7 +53,7 @@ func WorktreeRoot(dir string) (string, error) {
 
 // ListStageFiles returns status entries suitable for an interactive staging UI.
 func ListStageFiles(worktreeRoot string) ([]StageFileStatus, error) {
-	out, _, err := run(worktreeRoot, []string{"status", "--porcelain=v1", "--untracked-files=all", "-z"})
+	out, _, err := runNoOptionalLocks(worktreeRoot, []string{"status", "--porcelain=v1", "--untracked-files=all", "-z"})
 	if err != nil {
 		return nil, err
 	}

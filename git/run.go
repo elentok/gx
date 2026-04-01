@@ -47,6 +47,13 @@ func run(dir string, args []string) (stdout, stderr string, err error) {
 	return stdout, stderr, nil
 }
 
+// runNoOptionalLocks executes a git command with optional index-refresh locks disabled.
+// This is useful for read-only UI probes like `git status`, which can otherwise race with
+// write operations such as stash/reset/rebase on macOS.
+func runNoOptionalLocks(dir string, args []string) (stdout, stderr string, err error) {
+	return run(dir, append([]string{"--no-optional-locks"}, args...))
+}
+
 // runAllowFail runs a git command and returns stdout, or "" if it fails.
 func runAllowFail(dir string, args []string) string {
 	out, _, _ := run(dir, args)
