@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -185,6 +186,39 @@ func DiffUntrackedPath(worktreeRoot, path string, color bool, contextLines int) 
 		"/dev/null",
 		diffPath,
 	)
+}
+
+// BinaryFileSizes returns previous and new file sizes for binary diff summaries.
+// prevSize is read from HEAD (or rename source when available).
+// newSize is read from the worktree path, falling back to the index blob.
+func BinaryFileSizes(worktreeRoot string, file StageFileStatus) (prevSize, newSize int64, prevOK, newOK bool) {
+	prevPath := file.Path
+	if file.RenameFrom != "" {
+		prevPath = file.RenameFrom
+	}
+	prevSize, prevOK = gitObjectSize(worktreeRoot, "HEAD:"+prevPath)
+
+	if info, err := os.Stat(filepath.Join(worktreeRoot, filepath.FromSlash(file.Path))); err == nil && info.Mode().IsRegular() {
+		newSize = info.Size()
+		newOK = true
+	}
+	if !newOK {
+		newSize, newOK = gitObjectSize(worktreeRoot, ":"+file.Path)
+	}
+
+	return prevSize, newSize, prevOK, newOK
+}
+
+func gitObjectSize(worktreeRoot, object string) (int64, bool) {
+	out := strings.TrimSpace(runAllowFail(worktreeRoot, []string{"cat-file", "-s", object}))
+	if out == "" {
+		return 0, false
+	}
+	size, err := strconv.ParseInt(out, 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	return size, true
 }
 
 func diffContextArg(contextLines int) string {
