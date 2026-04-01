@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.10.3
+
+- Updated `gx status` docs and UX highlights, including clearer yank shortcuts (`yy` / `yl` / `ya` / `yf`)
+- Added branch sync summary to the status pane header (synced/ahead/behind/diverged)
+- Added mouse-wheel scrolling in status diff panes (unstaged/staged and fullscreen)
+- Updated `e` in diff view to open `$EDITOR` at the selected hunk/line when supported by the editor
+
 ## v0.10.2
 
 - Fixed intermittent CI/status lock contention by running read-only status probes with `git --no-optional-locks`

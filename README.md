@@ -85,14 +85,16 @@ Status UI highlights:
 - Visual line-range mode (`v`) to stage/unstage selected blocks with `space`
 - Discard changes with confirmation (`d`) in status and diff views
 - Yank content/location/all/filename with `yy` / `yl` / `ya` / `yf`
+- Status header shows branch sync at a glance (`✓`, `↑N`, `↓N`, `↑N ↓N`)
 - Live search in status/diff with highlights and `n` / `N` navigation
 - Vim-like navigation (`j`/`k`, `gg`/`G`, `ctrl+u`/`ctrl+d`)
+- Mouse wheel scrolling in diff panes (unstaged/staged, including fullscreen)
 - File-to-file diff jumps with `,` / `.`
-- Edit selected file in `$EDITOR` with `e` (status and diff views)
+- Edit selected file in `$EDITOR` with `e` (opens at selected line/hunk in diff view)
 - Open lazygit log with `ol`
-- Pull/push/rebase/amend actions directly in stage (`p`/`P`/`b`/`A`) with confirmations
+- Pull/push/rebase/amend actions directly in status (`p`/`P`/`b`/`A`) with confirmations
 - Push divergence flow uses a menu (`j`/`k` + `enter`) with relative commit times
-- Push in stage detects GitHub PR URLs and asks whether to open them
+- Push in status detects GitHub PR URLs and asks whether to open them
 - Keyboard help overlay (`?`) and full git-error overlay
 - Live action output overlay with cancellation (`ctrl+c`)
 - Fullscreen diff hides the status pane
