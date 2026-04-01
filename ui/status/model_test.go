@@ -1315,6 +1315,54 @@ func TestEOpensEditorFromStatusAndDiff(t *testing.T) {
 	}
 }
 
+func TestEditorLaunchArgsUsesGotoForKnownEditors(t *testing.T) {
+	tests := []struct {
+		name   string
+		editor string
+		want   string
+	}{
+		{name: "code", editor: "code", want: "--goto /tmp/x.go:12"},
+		{name: "vim", editor: "nvim", want: "+12 /tmp/x.go"},
+		{name: "sublime", editor: "subl", want: "/tmp/x.go:12"},
+		{name: "fallback", editor: "emacs", want: "/tmp/x.go"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := strings.Join(editorLaunchArgs(tt.editor, nil, "/tmp/x.go", 12), " ")
+			if !strings.Contains(got, tt.want) {
+				t.Fatalf("editorLaunchArgs(%q)=%q, want to contain %q", tt.editor, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEditorLineForCurrentSelectionInDiffMode(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "line.txt", "old-1\nold-2\nold-3\n")
+	testutil.MustGitExported(t, repo, "add", "line.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+	testutil.WriteFile(t, repo, "line.txt", "new-1\nnew-2\nnew-3\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusDiff
+	m.section = sectionUnstaged
+	m.navMode = navLine
+
+	for i, cl := range m.unstaged.parsed.Changed {
+		if cl.NewLine == 2 {
+			m.unstaged.activeLine = i
+			break
+		}
+	}
+
+	line := m.editorLineForCurrentSelection()
+	if line != 2 {
+		t.Fatalf("editorLineForCurrentSelection()=%d, want 2", line)
+	}
+}
+
 func TestWToggleSoftWrap(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "this is a very long line that should wrap in narrow diff panes\n")

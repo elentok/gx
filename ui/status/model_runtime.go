@@ -97,12 +97,38 @@ func (m *Model) cmdEditSelectedFile() tea.Cmd {
 		return nil
 	}
 	target := filepath.Join(m.worktreeRoot, file.Path)
-	args := append(parts[1:], target)
+	line := m.editorLineForCurrentSelection()
+	args := editorLaunchArgs(parts[0], parts[1:], target, line)
 	c := exec.Command(parts[0], args...)
 	m.setStatus("opening editor...")
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		return editFileFinishedMsg{err: err}
 	})
+}
+
+func (m Model) editorLineForCurrentSelection() int {
+	if m.focus != focusDiff {
+		return 0
+	}
+	sec := m.currentSection()
+	if m.navMode == navLine {
+		if sec.activeLine < 0 || sec.activeLine >= len(sec.parsed.Changed) {
+			return 0
+		}
+		cl := sec.parsed.Changed[sec.activeLine]
+		if cl.NewLine > 0 {
+			return cl.NewLine
+		}
+		return cl.OldLine
+	}
+	if sec.activeHunk < 0 || sec.activeHunk >= len(sec.parsed.Hunks) {
+		return 0
+	}
+	h := sec.parsed.Hunks[sec.activeHunk]
+	if h.NewStart > 0 {
+		return h.NewStart
+	}
+	return h.OldStart
 }
 
 func (m Model) selectedStatusEntry() (statusEntry, bool) {
