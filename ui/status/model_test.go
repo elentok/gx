@@ -196,6 +196,42 @@ func TestHelpLineRightAlignsHintAndTruncatesStatus(t *testing.T) {
 	}
 }
 
+func TestStatusPaneShowsBranchSummaryInTitle(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	m := New(repo)
+	m.ready = true
+	m.width = 100
+	m.height = 20
+	m.branchName = "feature/test"
+	m.branchBaseRef = "origin/main"
+	m.branchSync = git.SyncStatus{Name: git.StatusAhead, Ahead: 2}
+
+	pane := ansi.Strip(m.renderStatusPane(72, 10))
+	if !strings.Contains(pane, "Status (") {
+		t.Fatalf("expected branch summary in status title, got:\n%s", pane)
+	}
+	if !strings.Contains(pane, "feature/test") {
+		t.Fatalf("expected branch summary to include branch name, got:\n%s", pane)
+	}
+	if !strings.Contains(pane, "↑2") {
+		t.Fatalf("expected branch summary to include ahead state, got:\n%s", pane)
+	}
+	if strings.Contains(pane, "vs origin/main") {
+		t.Fatalf("expected default base ref to stay hidden, got:\n%s", pane)
+	}
+}
+
+func TestBranchSummaryTitleShowsBaseOnlyWhenNonDefault(t *testing.T) {
+	m := Model{settings: Settings{UseNerdFontIcons: true}, branchName: "feature/x", branchBaseRef: "origin/release", branchSync: git.SyncStatus{Name: git.StatusBehind, Behind: 1}}
+	line := m.branchSummaryTitleSuffix()
+	if !strings.Contains(line, " feature/x ↓1") {
+		t.Fatalf("unexpected title suffix: %q", line)
+	}
+	if !strings.Contains(line, "vs origin/release") {
+		t.Fatalf("expected non-default base ref in title suffix: %q", line)
+	}
+}
+
 func TestHelpLineShowsVisualAtLeftInDiffFocus(t *testing.T) {
 	m := New(testutil.TempRepo(t))
 	m.ready = true

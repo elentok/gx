@@ -68,6 +68,34 @@ func WorktreeSyncStatus(repo Repo, branch string) (SyncStatus, error) {
 	return syncBetween(repo.Root, branch, upstream)
 }
 
+// BranchSyncStatusAgainstRef compares a local branch/ref against an explicit
+// remote reference (for example: branch vs origin/main).
+func BranchSyncStatusAgainstRef(repoRoot, localRef, remoteRef string) (SyncStatus, error) {
+	if strings.TrimSpace(localRef) == "" || strings.TrimSpace(remoteRef) == "" {
+		return SyncStatus{Name: StatusUnknown}, nil
+	}
+	return syncBetween(repoRoot, localRef, remoteRef)
+}
+
+// DefaultMainRemoteRef returns the best remote mainline ref for repoRoot.
+// It prefers origin/<default-branch>, then falls back to origin/main/master if present.
+func DefaultMainRemoteRef(repoRoot string) string {
+	defaultBranch := RemoteDefaultBranch(repoRoot)
+	candidates := []string{defaultBranch, "main", "master"}
+	seen := map[string]bool{}
+	for _, branch := range candidates {
+		branch = strings.TrimSpace(branch)
+		if branch == "" || seen[branch] {
+			continue
+		}
+		seen[branch] = true
+		if runAllowFail(repoRoot, []string{"rev-parse", "--verify", "refs/remotes/origin/" + branch}) != "" {
+			return "origin/" + branch
+		}
+	}
+	return ""
+}
+
 func syncBetween(repoRoot, localRef, remoteRef string) (SyncStatus, error) {
 	localHash := runAllowFail(repoRoot, []string{"rev-parse", "--verify", localRef})
 	remoteHash := runAllowFail(repoRoot, []string{"rev-parse", "--verify", remoteRef})

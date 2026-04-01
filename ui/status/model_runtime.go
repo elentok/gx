@@ -124,6 +124,27 @@ func (m *Model) refresh() {
 	}
 }
 
+func (m *Model) reloadBranchState() {
+	m.branchName = ""
+	m.branchBaseRef = ""
+	m.branchSync = git.SyncStatus{Name: git.StatusUnknown}
+
+	branch, err := git.CurrentBranch(m.worktreeRoot)
+	if err != nil || strings.TrimSpace(branch) == "" || strings.TrimSpace(branch) == "HEAD" {
+		return
+	}
+	m.branchName = strings.TrimSpace(branch)
+	m.branchBaseRef = git.DefaultMainRemoteRef(m.worktreeRoot)
+	if m.branchBaseRef == "" {
+		return
+	}
+	sync, err := git.BranchSyncStatusAgainstRef(m.worktreeRoot, m.branchName, m.branchBaseRef)
+	if err != nil {
+		return
+	}
+	m.branchSync = sync
+}
+
 func (m Model) selectedFile() (git.StageFileStatus, bool) {
 	entry, ok := m.selectedStatusEntry()
 	if !ok || entry.Kind != statusEntryFile {

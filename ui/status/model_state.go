@@ -63,6 +63,9 @@ type Model struct {
 	wrapSoft       bool
 
 	files         []git.StageFileStatus
+	branchName    string
+	branchBaseRef string
+	branchSync    git.SyncStatus
 	statusEntries []statusEntry
 	collapsedDirs map[string]bool
 	selected      int

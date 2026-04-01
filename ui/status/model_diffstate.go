@@ -130,6 +130,7 @@ func (m *Model) shouldSwitchAfterApply(from diffSection) bool {
 }
 
 func (m *Model) reload(preservePath string) {
+	m.reloadBranchState()
 	files, err := git.ListStageFiles(m.worktreeRoot)
 	if err != nil {
 		m.err = err

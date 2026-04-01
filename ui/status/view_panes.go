@@ -125,7 +125,49 @@ func (m Model) renderStatusPane(width, height int) string {
 		lines = append(lines, "")
 	}
 
-	return m.renderPanelWithBorderTitle(width, height, "Status", "", lines, m.focus == focusStatus, sectionUnstaged)
+	title := "Status"
+	if summary := m.branchSummaryTitleSuffix(); summary != "" {
+		title += " (" + summary + ")"
+	}
+	return m.renderPanelWithBorderTitle(width, height, title, "", lines, m.focus == focusStatus, sectionUnstaged)
+}
+
+func (m Model) branchSummaryTitleSuffix() string {
+	if strings.TrimSpace(m.branchName) == "" {
+		return ""
+	}
+	branchLabel := "branch"
+	if m.settings.UseNerdFontIcons {
+		branchLabel = ""
+	}
+	out := branchLabel + " " + m.branchName + " " + m.branchSyncToken()
+	base := strings.TrimSpace(m.branchBaseRef)
+	if shouldShowBranchBaseRef(base) {
+		out += " · vs " + base
+	}
+	return out
+}
+
+func (m Model) branchSyncToken() string {
+	switch m.branchSync.Name {
+	case git.StatusSame:
+		return "✓"
+	case git.StatusAhead:
+		return fmt.Sprintf("↑%d", m.branchSync.Ahead)
+	case git.StatusBehind:
+		return fmt.Sprintf("↓%d", m.branchSync.Behind)
+	case git.StatusDiverged:
+		return fmt.Sprintf("↑%d ↓%d", m.branchSync.Ahead, m.branchSync.Behind)
+	}
+	return "?"
+}
+
+func shouldShowBranchBaseRef(base string) bool {
+	base = strings.TrimSpace(base)
+	if base == "" {
+		return false
+	}
+	return base != "origin/main" && base != "origin/master"
 }
 
 func (m *Model) renderDiffPane(width, height int) string {
