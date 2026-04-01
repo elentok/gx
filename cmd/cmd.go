@@ -13,7 +13,7 @@ import (
 	"gx/config"
 	"gx/git"
 	"gx/ui/confirm"
-	"gx/ui/stage"
+	"gx/ui/status"
 	"gx/ui/worktrees"
 
 	tea "charm.land/bubbletea/v2"

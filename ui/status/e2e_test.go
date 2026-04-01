@@ -12,7 +12,7 @@ import (
 	"gx/git"
 	"gx/testutil"
 	teatest "gx/testutil/teatestv2"
-	"gx/ui/stage"
+	"gx/ui/status"
 
 	tea "charm.land/bubbletea/v2"
 )

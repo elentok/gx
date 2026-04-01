@@ -111,8 +111,8 @@ func TestStatusLOnFileEntersDiffAndResetsSectionOnFileChange(t *testing.T) {
 
 func TestStatusHFocusesParentFolder(t *testing.T) {
 	repo := testutil.TempRepo(t)
-	testutil.Mkdir(t, repo+"/ui/stage")
-	testutil.WriteFile(t, repo, "ui/stage/model.go", "package stage\n")
+	testutil.Mkdir(t, repo+"/ui/status")
+	testutil.WriteFile(t, repo, "ui/status/model.go", "package stage\n")
 
 	m := New(repo)
 	m.ready = true
@@ -120,13 +120,13 @@ func TestStatusHFocusesParentFolder(t *testing.T) {
 
 	fileIdx := -1
 	for i, entry := range m.statusEntries {
-		if entry.Kind == statusEntryFile && entry.Path == "ui/stage/model.go" {
+		if entry.Kind == statusEntryFile && entry.Path == "ui/status/model.go" {
 			fileIdx = i
 			break
 		}
 	}
 	if fileIdx < 0 {
-		t.Fatalf("expected ui/stage/model.go entry in status tree")
+		t.Fatalf("expected ui/status/model.go entry in status tree")
 	}
 	m.selected = fileIdx
 
@@ -136,8 +136,8 @@ func TestStatusHFocusesParentFolder(t *testing.T) {
 		t.Fatalf("expected h to schedule diff reload after focusing parent")
 	}
 	entry, ok := m.selectedStatusEntry()
-	if !ok || entry.Kind != statusEntryDir || entry.Path != "ui/stage" {
-		t.Fatalf("expected selection to move to parent dir ui/stage, got %+v", entry)
+	if !ok || entry.Kind != statusEntryDir || entry.Path != "ui/status" {
+		t.Fatalf("expected selection to move to parent dir ui/status, got %+v", entry)
 	}
 }
 
@@ -1310,6 +1310,33 @@ func TestWToggleSoftWrap(t *testing.T) {
 	m = updated.(Model)
 	if !m.wrapSoft {
 		t.Fatal("expected wrapSoft enabled after second w")
+	}
+}
+
+func TestBinaryFileShowsSizeSummaryInsteadOfNoFileSelected(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	path := repo + "/bin.dat"
+	if err := os.WriteFile(path, []byte{0x00, 0x01, 0x02, 0x03}, 0644); err != nil {
+		t.Fatalf("write baseline binary: %v", err)
+	}
+	testutil.MustGitExported(t, repo, "add", "bin.dat")
+	testutil.MustGitExported(t, repo, "commit", "-m", "add binary")
+	if err := os.WriteFile(path, []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06}, 0644); err != nil {
+		t.Fatalf("write modified binary: %v", err)
+	}
+
+	m := New(repo)
+	m.ready = true
+	m.width = 120
+	m.height = 24
+	m.syncDiffViewports()
+
+	view := ansi.Strip(m.renderDiffPane(80, 12))
+	if strings.Contains(view, "No file selected") {
+		t.Fatalf("expected binary summary instead of no-file message, got:\n%s", view)
+	}
+	if !strings.Contains(view, "binary file (prev size: 4 B, new size: 7 B)") {
+		t.Fatalf("expected binary size summary, got:\n%s", view)
 	}
 }
 

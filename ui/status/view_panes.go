@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"gx/git"
+
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -127,8 +129,8 @@ func (m Model) renderStatusPane(width, height int) string {
 }
 
 func (m *Model) renderDiffPane(width, height int) string {
-	hasUnstaged := len(m.unstaged.viewLines) > 0
-	hasStaged := len(m.staged.viewLines) > 0
+	hasUnstaged := len(m.unstaged.viewLines) > 0 || sectionHasBinaryDiff(m.unstaged)
+	hasStaged := len(m.staged.viewLines) > 0 || sectionHasBinaryDiff(m.staged)
 
 	if !hasUnstaged && !hasStaged {
 		content := lipgloss.NewStyle().Foreground(catSubtle).Render("No file selected")
@@ -220,63 +222,71 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 	overflowTopMark, overflowBottomMark, overflowBothMark := m.hunkOverflowMarkers()
 
 	lines := make([]string, 0, bodyH)
+	if len(sec.viewLines) == 0 && sectionHasBinaryDiff(*sec) {
+		lines = append(lines, lipgloss.NewStyle().Foreground(catSubtle).Render(m.binarySummaryLine()))
+	}
 
-	for i := 0; i < bodyH; i++ {
-		displayIdx := sec.viewport.YOffset() + i
-		if displayIdx >= len(sec.viewLines) {
-			lines = append(lines, "")
-			continue
-		}
-		rawIdx := -1
-		if displayIdx >= 0 && displayIdx < len(sec.displayToRaw) {
-			rawIdx = sec.displayToRaw[displayIdx]
-		}
-		mark := "  "
-		if m.navMode == navLine && sec.visualActive && m.visualMatchDiffDisplay(*sec, displayIdx) {
-			mark = lipgloss.NewStyle().Foreground(accent).Render("▎ ")
-		}
-		inActiveHunk := rawIdx >= 0 && m.navMode == navHunk && rawIdx >= hunkStart && rawIdx <= hunkEnd
-		if inActiveHunk && activeSection {
-			mark = lipgloss.NewStyle().Foreground(accent).Render("▌ ")
-		}
-		if rawIdx >= 0 && rawIdx == active && activeSection {
-			mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render("▌ ")
-		}
-		if inActiveHunk {
-			if displayIdx == overflowTopDisplay && displayIdx == overflowBottomDisplay {
-				mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render(overflowBothMark)
-			} else if displayIdx == overflowTopDisplay {
-				mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render(overflowTopMark)
-			} else if displayIdx == overflowBottomDisplay {
-				mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render(overflowBottomMark)
+	if len(lines) == 0 {
+		for i := 0; i < bodyH; i++ {
+			displayIdx := sec.viewport.YOffset() + i
+			if displayIdx >= len(sec.viewLines) {
+				lines = append(lines, "")
+				continue
 			}
-		}
-		if rawIdx >= 0 && m.flashMarker(section, rawIdx, sec) {
-			mark = lipgloss.NewStyle().Foreground(catGreen).Bold(true).Render("◆ ")
-		}
+			rawIdx := -1
+			if displayIdx >= 0 && displayIdx < len(sec.displayToRaw) {
+				rawIdx = sec.displayToRaw[displayIdx]
+			}
+			mark := "  "
+			if m.navMode == navLine && sec.visualActive && m.visualMatchDiffDisplay(*sec, displayIdx) {
+				mark = lipgloss.NewStyle().Foreground(accent).Render("▎ ")
+			}
+			inActiveHunk := rawIdx >= 0 && m.navMode == navHunk && rawIdx >= hunkStart && rawIdx <= hunkEnd
+			if inActiveHunk && activeSection {
+				mark = lipgloss.NewStyle().Foreground(accent).Render("▌ ")
+			}
+			if rawIdx >= 0 && rawIdx == active && activeSection {
+				mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render("▌ ")
+			}
+			if inActiveHunk {
+				if displayIdx == overflowTopDisplay && displayIdx == overflowBottomDisplay {
+					mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render(overflowBothMark)
+				} else if displayIdx == overflowTopDisplay {
+					mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render(overflowTopMark)
+				} else if displayIdx == overflowBottomDisplay {
+					mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render(overflowBottomMark)
+				}
+			}
+			if rawIdx >= 0 && m.flashMarker(section, rawIdx, sec) {
+				mark = lipgloss.NewStyle().Foreground(catGreen).Bold(true).Render("◆ ")
+			}
 
-		indicator := "  "
-		if matched, current := m.searchMatchDiffDisplay(section, displayIdx); matched {
-			icon := "* "
-			if m.settings.UseNerdFontIcons {
-				icon = "󰍉 "
+			indicator := "  "
+			if matched, current := m.searchMatchDiffDisplay(section, displayIdx); matched {
+				icon := "* "
+				if m.settings.UseNerdFontIcons {
+					icon = "󰍉 "
+				}
+				style := lipgloss.NewStyle().Foreground(catYellow).Bold(true)
+				if current {
+					style = style.Foreground(catGreen)
+				}
+				indicator = style.Render(icon)
 			}
-			style := lipgloss.NewStyle().Foreground(catYellow).Bold(true)
-			if current {
-				style = style.Foreground(catGreen)
-			}
-			indicator = style.Render(icon)
-		}
 
-		markW := ansi.StringWidth(mark)
-		indicatorW := ansi.StringWidth(indicator)
-		bodyW := innerW - markW - indicatorW
-		if bodyW < 0 {
-			bodyW = 0
+			markW := ansi.StringWidth(mark)
+			indicatorW := ansi.StringWidth(indicator)
+			bodyW := innerW - markW - indicatorW
+			if bodyW < 0 {
+				bodyW = 0
+			}
+			body := ansi.Truncate(sec.viewLines[displayIdx], bodyW, "")
+			body += strings.Repeat(" ", maxInt(0, bodyW-ansi.StringWidth(body)))
+			lines = append(lines, mark+body+indicator)
 		}
-		body := ansi.Truncate(sec.viewLines[displayIdx], bodyW, "")
-		body += strings.Repeat(" ", maxInt(0, bodyW-ansi.StringWidth(body)))
-		lines = append(lines, mark+body+indicator)
+	}
+	for len(lines) < bodyH {
+		lines = append(lines, "")
 	}
 	return m.renderPanelWithBorderTitle(width, height, titleText, rightTitleText, lines, activeSection, section)
 }
@@ -333,8 +343,8 @@ func (m *Model) syncDiffViewports() {
 	reflowSectionLines(&m.unstaged, wrapWidth, m.wrapSoft)
 	reflowSectionLines(&m.staged, wrapWidth, m.wrapSoft)
 
-	hasUnstaged := len(m.unstaged.viewLines) > 0
-	hasStaged := len(m.staged.viewLines) > 0
+	hasUnstaged := len(m.unstaged.viewLines) > 0 || sectionHasBinaryDiff(m.unstaged)
+	hasStaged := len(m.staged.viewLines) > 0 || sectionHasBinaryDiff(m.staged)
 	if m.diffFullscreen {
 		if m.section == sectionUnstaged {
 			m.unstaged.viewport.SetHeight(maxInt(0, diffH-3))
@@ -446,4 +456,48 @@ func wrapANSI(s string, width int) []string {
 		return []string{s}
 	}
 	return out
+}
+
+func sectionHasBinaryDiff(sec sectionState) bool {
+	for _, line := range sec.rawLines {
+		if strings.HasPrefix(line, "Binary files ") || strings.HasPrefix(line, "GIT binary patch") {
+			return true
+		}
+	}
+	return false
+}
+
+func (m Model) binarySummaryLine() string {
+	file, ok := m.selectedFile()
+	if !ok {
+		return "binary file"
+	}
+	prevSize, newSize, prevOK, newOK := git.BinaryFileSizes(m.worktreeRoot, file)
+	if !prevOK && !newOK {
+		return "binary file"
+	}
+	return fmt.Sprintf("binary file (prev size: %s, new size: %s)", formatSize(prevSize, prevOK), formatSize(newSize, newOK))
+}
+
+func formatSize(size int64, ok bool) string {
+	if !ok {
+		return "n/a"
+	}
+	if size < 0 {
+		size = 0
+	}
+	units := []string{"B", "KB", "MB", "GB", "TB"}
+	v := float64(size)
+	idx := 0
+	for v >= 1024 && idx < len(units)-1 {
+		v /= 1024
+		idx++
+	}
+	if idx == 0 {
+		return fmt.Sprintf("%d %s", size, units[idx])
+	}
+	if v >= 10 {
+		return fmt.Sprintf("%.0f %s", v, units[idx])
+	}
+	return fmt.Sprintf("%.1f %s", v, units[idx])
 }
