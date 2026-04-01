@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.10.1
+
+- Updated status yank mappings to a clearer set: `yy` (content), `yl` (location), `ya` (all context), and `yf` (filename)
+- In `gx status` diff view, yank actions now respect focus granularity (hunk, line, or visual selection)
+
 ## v0.10.0
 
 - Renamed the `gx stage` command to `gx status`
