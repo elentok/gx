@@ -141,7 +141,7 @@ func stageHelpText() string {
 		"  q       quit",
 		"  cc      open git commit",
 		"  ol      open lazygit log",
-		"  yc/yf   yank context / filename",
+		"  yy/yl/ya/yf yank content/location/all/filename",
 		"  p/P     pull / push",
 		"  b       rebase on origin/master",
 		"  A       amend last commit (confirm)",

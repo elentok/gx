@@ -400,8 +400,8 @@ func TestStageE2E_YankContextFromDiff(t *testing.T) {
 
 	tm.Send(keySpecial(tea.KeyEnter))
 	tm.Send(keyRune('y'))
-	tm.Send(keyRune('c'))
-	waitForStageAnyText(t, tm, stageActionWait, "yanked context", "clipboard copy failed")
+	tm.Send(keyRune('a'))
+	waitForStageAnyText(t, tm, stageActionWait, "yanked all context", "clipboard copy failed")
 
 	quitStage(t, tm)
 }

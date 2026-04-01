@@ -428,7 +428,7 @@ func TestYankFilenameWithYFInStatusView(t *testing.T) {
 	}
 }
 
-func TestYankContextWithYCInStatusViewYanksFilenameOnly(t *testing.T) {
+func TestYankLocationWithYLInStatusViewYanksFilenameOnly(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "b.txt", "one\n")
 
@@ -446,15 +446,15 @@ func TestYankContextWithYCInStatusViewYanksFilenameOnly(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
 	m = updated.(Model)
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	m = updated.(Model)
 
 	if got != "@b.txt" {
-		t.Fatalf("expected yc in status to yank filename only, got %q", got)
+		t.Fatalf("expected yl in status to yank filename only, got %q", got)
 	}
 }
 
-func TestYankContextWithYCInDiffViewIncludesLocationAndHunk(t *testing.T) {
+func TestYankAllContextWithYAInDiffLineModeIncludesLocationAndSelectedLine(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "c.txt", "old-1\nold-2\n")
 	testutil.MustGitExported(t, repo, "add", "c.txt")
@@ -479,14 +479,120 @@ func TestYankContextWithYCInDiffViewIncludesLocationAndHunk(t *testing.T) {
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
 	m = updated.(Model)
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	m = updated.(Model)
 
 	if !strings.Contains(got, "@c.txt L") {
-		t.Fatalf("expected yc output to include file and line, got %q", got)
+		t.Fatalf("expected ya output to include file and line, got %q", got)
 	}
-	if !strings.Contains(got, "+new-1") || !strings.Contains(got, "-old-1") {
-		t.Fatalf("expected yc output to include raw hunk content, got %q", got)
+	if !strings.Contains(got, "-old-2") {
+		t.Fatalf("expected ya output to include selected line content, got %q", got)
+	}
+	if strings.Contains(got, "-old-1") || strings.Contains(got, "+new") {
+		t.Fatalf("expected ya output to exclude non-selected line content, got %q", got)
+	}
+}
+
+func TestYankFilenameWithYFInDiffLineModeYanksFilenameOnly(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "d.txt", "old-1\nold-2\n")
+	testutil.MustGitExported(t, repo, "add", "d.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+	testutil.WriteFile(t, repo, "d.txt", "new-1\nnew-2\n")
+
+	var got string
+	prev := stageClipboardWrite
+	stageClipboardWrite = func(s string) error {
+		got = s
+		return nil
+	}
+	t.Cleanup(func() { stageClipboardWrite = prev })
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusDiff
+	m.section = sectionUnstaged
+	m.navMode = navLine
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
+	m = updated.(Model)
+
+	if got != "d.txt" {
+		t.Fatalf("expected yf output to be filename only, got %q", got)
+	}
+}
+
+func TestYankLocationOnlyWithYLInDiffVisualModeYanksOnlyLocation(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "e.txt", "old-1\nold-2\n")
+	testutil.MustGitExported(t, repo, "add", "e.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+	testutil.WriteFile(t, repo, "e.txt", "new-1\nnew-2\n")
+
+	var got string
+	prev := stageClipboardWrite
+	stageClipboardWrite = func(s string) error {
+		got = s
+		return nil
+	}
+	t.Cleanup(func() { stageClipboardWrite = prev })
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusDiff
+	m.section = sectionUnstaged
+	m.navMode = navLine
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+	m = updated.(Model)
+
+	if !strings.HasPrefix(got, "@e.txt L") {
+		t.Fatalf("expected yl output to include only file and line range, got %q", got)
+	}
+	if strings.Contains(got, "\n") || strings.Contains(got, "-old") || strings.Contains(got, "+new") {
+		t.Fatalf("expected yl output to exclude content lines, got %q", got)
+	}
+}
+
+func TestYankSelectionOnlyWithYYInDiffLineMode(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "f.txt", "old-1\nold-2\n")
+	testutil.MustGitExported(t, repo, "add", "f.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+	testutil.WriteFile(t, repo, "f.txt", "new-1\nnew-2\n")
+
+	var got string
+	prev := stageClipboardWrite
+	stageClipboardWrite = func(s string) error {
+		got = s
+		return nil
+	}
+	t.Cleanup(func() { stageClipboardWrite = prev })
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusDiff
+	m.section = sectionUnstaged
+	m.navMode = navLine
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	m = updated.(Model)
+
+	if strings.Contains(got, "@f.txt") {
+		t.Fatalf("expected yy output to be raw selection only, got %q", got)
+	}
+	if got != "-old-1" {
+		t.Fatalf("expected yy output to yank only active line, got %q", got)
 	}
 }
 

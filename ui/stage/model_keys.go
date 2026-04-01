@@ -42,11 +42,17 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	if m.keyPrefix == "y" {
 		m.keyPrefix = ""
 		switch key {
-		case "c":
-			m.yankContextForAI()
+		case "l":
+			m.yankLocationOnly()
+			return m, nil, true
+		case "a":
+			m.yankAllContext()
 			return m, nil, true
 		case "f":
 			m.yankFilename()
+			return m, nil, true
+		case "y":
+			m.yankContentOnly()
 			return m, nil, true
 		case "esc":
 			m.clearStatus()
@@ -71,7 +77,7 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	}
 	if key == "y" {
 		m.keyPrefix = "y"
-		m.setStatus("yc: yank AI context · yf: yank filename")
+		m.setStatus("yy: content · yl: location · ya: all · yf: filename")
 		return m, nil, true
 	}
 	if key == "o" {
