@@ -2,7 +2,6 @@ package components
 
 import (
 	"bytes"
-	"io"
 	"os/exec"
 	"sync"
 )
@@ -90,15 +89,8 @@ func (r *CommandRunner) Wait() error {
 func (r *CommandRunner) run() error {
 	cmd := exec.Command(r.cmdName, r.args...)
 	cmd.Dir = r.dir
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return err
-	}
+	cmd.Stdout = commandRunnerOutputWriter{runner: r}
+	cmd.Stderr = commandRunnerOutputWriter{runner: r}
 
 	r.mu.Lock()
 	r.cmd = cmd
@@ -107,20 +99,7 @@ func (r *CommandRunner) run() error {
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		r.copyOutput(stdout)
-	}()
-	go func() {
-		defer wg.Done()
-		r.copyOutput(stderr)
-	}()
-
-	err = cmd.Wait()
-	wg.Wait()
+	err := cmd.Wait()
 
 	r.mu.Lock()
 	r.cmd = nil
@@ -128,17 +107,12 @@ func (r *CommandRunner) run() error {
 	return err
 }
 
-func (r *CommandRunner) copyOutput(src io.Reader) {
-	buf := make([]byte, 2048)
-	for {
-		n, err := src.Read(buf)
-		if n > 0 {
-			r.mu.Lock()
-			r.output.Write(buf[:n])
-			r.mu.Unlock()
-		}
-		if err != nil {
-			return
-		}
-	}
+type commandRunnerOutputWriter struct {
+	runner *CommandRunner
+}
+
+func (w commandRunnerOutputWriter) Write(p []byte) (int, error) {
+	w.runner.mu.Lock()
+	defer w.runner.mu.Unlock()
+	return w.runner.output.Write(p)
 }
