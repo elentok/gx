@@ -308,6 +308,15 @@ func runPush(d deps) error {
 	}
 
 	remote := git.BranchRemote(info.Repo, branch)
+	prompt := fmt.Sprintf("Push branch %s to %s?", branch, remote)
+	confirmed, err := d.confirmForce(prompt)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		return fmt.Errorf("push aborted")
+	}
+
 	var div *git.PushDivergence
 	checkLabel := fmt.Sprintf("Checking remote divergence for %s...", branch)
 	if err := runWithSpinner(d.stdin, d.stderr, checkLabel, func() error {

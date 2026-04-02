@@ -84,14 +84,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
-		m.openConfirm(
-			fmt.Sprintf("Push branch %s to %s?", msg.branch, msg.remote),
-			nil,
-			confirmPush,
-			msg.remote,
-			msg.branch,
-		)
-		return m, nil
+		runner := newStageActionRunner(actionPush, m.worktreeRoot, msg.remote, msg.branch)
+		m.openRunning("Push", runner)
+		return m, actionPollCmd()
 	case tea.MouseWheelMsg:
 		if m.handleMouseWheel(msg) {
 			return m, nil

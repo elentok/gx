@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"gx/git"
 	"gx/testutil"
 )
 
@@ -257,6 +258,41 @@ func TestExecute_PushRejectedInBareRepo(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "must be run from a regular repo or linked worktree") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestExecute_PushConfirmsBeforeCheckingDivergence(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	remote := t.TempDir() + "/remote.git"
+	testutil.MustGitExported(t, ".", "clone", "--bare", repoDir, remote)
+	testutil.MustGitExported(t, repoDir, "remote", "add", "origin", remote)
+
+	prompts := []string{}
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+		getwd: func() (string, error) {
+			return repoDir, nil
+		},
+		confirmForce: func(prompt string) (bool, error) {
+			prompts = append(prompts, prompt)
+			return false, nil
+		},
+		choosePushDivergence: func(io.Reader, io.Writer, *git.PushDivergence) (int, error) {
+			t.Fatalf("divergence chooser should not run before push confirmation")
+			return 0, nil
+		},
+	}
+
+	err := execute([]string{"push"}, d)
+	if err == nil || err.Error() != "push aborted" {
+		t.Fatalf("expected push aborted, got %v", err)
+	}
+	if len(prompts) != 1 {
+		t.Fatalf("expected exactly one confirmation prompt, got %v", prompts)
+	}
+	if prompts[0] != "Push branch main to origin?" {
+		t.Fatalf("unexpected confirmation prompt: %q", prompts[0])
 	}
 }
 

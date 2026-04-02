@@ -22,11 +22,9 @@ func TestPushKeyOpensSpecificConfirm(t *testing.T) {
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'P', Text: "P", ShiftedCode: 'P'})
 	m = updated.(Model)
-	if cmd == nil {
-		t.Fatalf("expected push preflight command")
+	if cmd != nil {
+		t.Fatalf("expected no preflight command before confirmation")
 	}
-	updated, _ = m.Update(cmd())
-	m = updated.(Model)
 
 	if !m.confirmOpen {
 		t.Fatalf("expected push key to open confirmation")
@@ -95,8 +93,20 @@ func TestPreparePushConfirm_DivergedUsesRemoteAndUpstreamSeparately(t *testing.T
 	if err := m.preparePushConfirm(); err != nil {
 		t.Fatalf("preparePushConfirm: %v", err)
 	}
+	if !m.confirmOpen || m.confirmAction != confirmPush {
+		t.Fatalf("expected initial push confirmation")
+	}
+
+	updated, cmd := m.confirmAccept()
+	m = updated.(Model)
+	if cmd == nil {
+		t.Fatalf("expected push preflight command after confirming push")
+	}
+	updated, _ = m.Update(cmd())
+	m = updated.(Model)
+
 	if !m.confirmOpen || m.confirmAction != confirmPushDiverged {
-		t.Fatalf("expected diverged push confirm modal")
+		t.Fatalf("expected diverged push confirm modal after preflight")
 	}
 	if m.confirmRemote != "origin" {
 		t.Fatalf("expected force-push remote name, got %q", m.confirmRemote)

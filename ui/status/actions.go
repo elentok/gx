@@ -412,9 +412,8 @@ func (m Model) confirmAccept() (tea.Model, tea.Cmd) {
 
 	switch a {
 	case confirmPush:
-		runner := newStageActionRunner(actionPush, m.worktreeRoot, m.confirmRemote, m.confirmBranch)
-		m.openRunning("Push", runner)
-		return m, actionPollCmd()
+		m.openCheckingDivergence()
+		return m, cmdPushPreflight(m.worktreeRoot)
 	case confirmRebase:
 		runner := newStageActionRunner(actionRebase, m.worktreeRoot, m.confirmRemote, m.confirmBranch)
 		titleTarget := strings.TrimSpace(m.confirmRemote)
@@ -528,34 +527,6 @@ func (m *Model) preparePushConfirm() error {
 		return fmt.Errorf("cannot push: detached HEAD")
 	}
 	remote := git.BranchRemote(git.Repo{Root: m.worktreeRoot}, branch)
-	if div, err := git.DetectPushDivergence(m.worktreeRoot, branch); err != nil {
-		return err
-	} else if div != nil {
-		m.openConfirm(
-			fmt.Sprintf("Branch %s has diverged from the remote branch:", div.Branch),
-			[]string{
-				"",
-				fmt.Sprintf("Last local commit: %s", humanizeOrUnknown(div.Local.Date)),
-				fmt.Sprintf("  %s %s", div.Local.Hash, div.Local.Message),
-				"",
-				fmt.Sprintf("Last remote commit: %s", humanizeOrUnknown(div.RemoteHead.Date)),
-				fmt.Sprintf("  %s %s", div.RemoteHead.Hash, div.RemoteHead.Message),
-			},
-			confirmPushDiverged,
-			div.Remote,
-			branch,
-		)
-		m.confirmUpstream = div.Upstream
-		m.confirmMenu = components.MenuState{
-			Items: []components.MenuItem{
-				{Label: "Rebase", Value: "rebase"},
-				{Label: "Push --force", Value: "force"},
-				{Label: "Abort", Value: "abort"},
-			},
-			Cursor: 0,
-		}
-		return nil
-	}
 	m.openConfirm(
 		fmt.Sprintf("Push branch %s to %s?", branch, remote),
 		nil,
