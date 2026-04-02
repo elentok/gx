@@ -93,12 +93,11 @@ func colorizeWithDelta(worktreeRoot, raw string, sideBySide bool, renderWidth in
 		args = append(args, "--color-only")
 	}
 	if sideBySide {
-		args = append(args, "--side-by-side")
 		if renderWidth > 0 {
 			args = append(args, "--width", strconv.Itoa(renderWidth))
 		}
 	}
-	configPath, cleanup, err := tempDeltaConfig(worktreeRoot)
+	configPath, cleanup, err := tempDeltaConfig(worktreeRoot, sideBySide)
 	if err == nil && configPath != "" {
 		defer cleanup()
 		args = append(args, "--config", configPath)
@@ -129,20 +128,21 @@ type deltaConfigCacheEntry struct {
 
 var deltaConfigCache sync.Map
 
-func tempDeltaConfig(worktreeRoot string) (path string, cleanup func(), err error) {
+func tempDeltaConfig(worktreeRoot string, sideBySide bool) (path string, cleanup func(), err error) {
 	cacheKey := worktreeRoot
 	if cacheKey == "" {
 		cacheKey = "."
 	}
+	cacheKey = fmt.Sprintf("%s|sbs=%t", cacheKey, sideBySide)
 	entryAny, _ := deltaConfigCache.LoadOrStore(cacheKey, &deltaConfigCacheEntry{})
 	entry := entryAny.(*deltaConfigCacheEntry)
 	entry.once.Do(func() {
-		entry.path, entry.err = createTempDeltaConfig(worktreeRoot)
+		entry.path, entry.err = createTempDeltaConfig(worktreeRoot, sideBySide)
 	})
 	return entry.path, func() {}, entry.err
 }
 
-func createTempDeltaConfig(worktreeRoot string) (path string, err error) {
+func createTempDeltaConfig(worktreeRoot string, sideBySide bool) (path string, err error) {
 	includes := make([]string, 0, 2)
 
 	home, err := os.UserHomeDir()
@@ -180,7 +180,7 @@ func createTempDeltaConfig(worktreeRoot string) (path string, err error) {
 		b.WriteString("\n")
 	}
 	b.WriteString("[delta]\n")
-	b.WriteString("\tside-by-side = false\n")
+	fmt.Fprintf(&b, "\tside-by-side = %t\n", sideBySide)
 	b.WriteString("\thunk-header-decoration-style = ol\n")
 	b.WriteString("\thunk-header-style = file line-number syntax\n")
 	content := b.String()
