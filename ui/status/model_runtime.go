@@ -42,6 +42,10 @@ func (m *Model) ensureActiveVisible(sec *sectionState) {
 		sec.viewport.EnsureVisible(r[0], 0, 0)
 		return
 	}
+	if m.navMode == navLine && sec.activeLine >= 0 && sec.activeLine < len(sec.changedDisplay) && sec.changedDisplay[sec.activeLine] >= 0 {
+		sec.viewport.EnsureVisible(sec.changedDisplay[sec.activeLine], 0, 0)
+		return
+	}
 	active := m.activeRawLineIndex(*sec)
 	if active >= 0 {
 		display := active

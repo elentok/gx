@@ -268,7 +268,7 @@ func TestToggleSideBySideModeWithS(t *testing.T) {
 	if m.renderMode != renderSideBySide {
 		t.Fatalf("expected render mode side-by-side, got %v", m.renderMode)
 	}
-	if !strings.Contains(m.statusMsg, "hunk-only") {
+	if !strings.Contains(m.statusMsg, "side-by-side mode") {
 		t.Fatalf("expected side-by-side status message, got %q", m.statusMsg)
 	}
 	view := ansi.Strip(m.renderDiffPane(80, 16))
@@ -311,12 +311,9 @@ func TestSideBySideModeAllowsHunkStaging(t *testing.T) {
 	}
 }
 
-func TestSideBySideModeBlocksLineModeToggle(t *testing.T) {
+func TestSideBySideModeAllowsLineModeToggle(t *testing.T) {
 	repo := testutil.TempRepo(t)
-	testutil.WriteFile(t, repo, "c.txt", "one\n")
-	testutil.MustGitExported(t, repo, "add", "c.txt")
-	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
-	testutil.WriteFile(t, repo, "c.txt", "two\n")
+	testutil.WriteFile(t, repo, "c.txt", "one\ntwo\n")
 
 	m := New(repo)
 	m.ready = true
@@ -327,11 +324,46 @@ func TestSideBySideModeBlocksLineModeToggle(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	m = updated.(Model)
-	if m.navMode != navHunk {
-		t.Fatalf("expected nav mode to stay hunk in side-by-side, got %v", m.navMode)
+	if m.navMode != navLine {
+		t.Fatalf("expected nav mode to switch to line in side-by-side, got %v", m.navMode)
 	}
-	if !strings.Contains(m.statusMsg, "hunk mode only") {
-		t.Fatalf("expected hunk-mode guardrail status, got %q", m.statusMsg)
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
+	m = updated.(Model)
+	staged, err := git.DiffPath(repo, "c.txt", true, 1)
+	if err != nil {
+		t.Fatalf("staged diff: %v", err)
+	}
+	if !strings.Contains(staged, "+one") {
+		t.Fatalf("expected staged line diff in side-by-side line mode, got:\n%s", staged)
+	}
+}
+
+func TestSideBySideModeAllowsVisualLineRangeStaging(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "v.txt", "new-1\nnew-2\nnew-3\n")
+
+	m := New(repo)
+	m.ready = true
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
+	m = updated.(Model)
+
+	staged, err := git.DiffPath(repo, "v.txt", true, 1)
+	if err != nil {
+		t.Fatalf("staged diff: %v", err)
+	}
+	if !strings.Contains(staged, "+new-1") || !strings.Contains(staged, "+new-2") {
+		t.Fatalf("expected visual range lines staged in side-by-side mode, got:\n%s", staged)
 	}
 }
 

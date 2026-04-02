@@ -2,6 +2,7 @@ package stage
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 
 	"gx/git"
@@ -12,6 +13,7 @@ import (
 )
 
 var deltaHunkHeaderRe = regexp.MustCompile(`^\s*[•*]\s+.+:\d+:(?:\s.*)?$`)
+var deltaSideBySideLineRe = regexp.MustCompile(`^\s*│\s*([0-9]+)?\s*│.*│\s*([0-9]+)?\s*│`)
 
 type movedTarget struct {
 	fromSection diffSection
@@ -21,10 +23,6 @@ type movedTarget struct {
 }
 
 func (m *Model) applySelection() tea.Cmd {
-	if m.isSideBySideMode() && m.navMode != navHunk {
-		m.setStatus("side-by-side supports hunk mode only; press s for full interactive mode")
-		return nil
-	}
 	file, ok := m.selectedFile()
 	if !ok {
 		return nil
@@ -274,6 +272,7 @@ func buildSectionState(raw, color string, prev sectionState, sideBySide bool) se
 		state.displayToRaw = nil
 		state.rawToDisplay = nil
 		state.hunkDisplayRange = nil
+		state.changedDisplay = nil
 		state.visualActive = false
 		state.visualAnchor = -1
 		state.viewport.SetContent("")
@@ -301,6 +300,7 @@ func buildSectionState(raw, color string, prev sectionState, sideBySide bool) se
 	state.displayToRaw = append([]int{}, state.baseDisplayToRaw...)
 	state.rawToDisplay = buildRawToDisplayMap(state.parsed, state.displayToRaw)
 	state.hunkDisplayRange = nil
+	state.changedDisplay = nil
 	prevOffset := state.viewport.YOffset()
 	state.viewport.SetContentLines(state.viewLines)
 	state.viewport.SetYOffset(prevOffset)
@@ -346,7 +346,11 @@ func initSideBySideSectionState(state *sectionState, color string) {
 		state.baseDisplayToRaw[i] = -1
 	}
 	state.displayToRaw = append([]int{}, state.baseDisplayToRaw...)
-	state.rawToDisplay = buildRawToDisplayMap(state.parsed, nil)
+	state.changedDisplay = make([]int, len(state.parsed.Changed))
+	for i := range state.changedDisplay {
+		state.changedDisplay[i] = -1
+	}
+	mapSideBySideDisplayLinesToChanged(state)
 	state.hunkDisplayRange = sideBySideHunkDisplayRanges(state.viewLines, len(state.parsed.Hunks))
 	prevOffset := state.viewport.YOffset()
 	state.viewport.SetContentLines(state.viewLines)
@@ -378,6 +382,61 @@ func initSideBySideSectionState(state *sectionState, color string) {
 			state.visualAnchor = state.activeLine
 		}
 	}
+}
+
+func mapSideBySideDisplayLinesToChanged(state *sectionState) {
+	oldByLine := map[int][]int{}
+	newByLine := map[int][]int{}
+	for i, cl := range state.parsed.Changed {
+		if cl.Prefix == '-' {
+			oldByLine[cl.OldLine] = append(oldByLine[cl.OldLine], i)
+		}
+		if cl.Prefix == '+' {
+			newByLine[cl.NewLine] = append(newByLine[cl.NewLine], i)
+		}
+	}
+
+	for displayIdx, line := range state.viewLines {
+		plain := ansi.Strip(line)
+		m := deltaSideBySideLineRe.FindStringSubmatch(plain)
+		if m == nil {
+			continue
+		}
+		left := parseOptionalLineNumber(m[1])
+		right := parseOptionalLineNumber(m[2])
+
+		if left > 0 {
+			if queue := oldByLine[left]; len(queue) > 0 {
+				idx := queue[0]
+				oldByLine[left] = queue[1:]
+				state.changedDisplay[idx] = displayIdx
+				state.displayToRaw[displayIdx] = state.parsed.Changed[idx].LineIndex
+			}
+		}
+		if right > 0 {
+			if queue := newByLine[right]; len(queue) > 0 {
+				idx := queue[0]
+				newByLine[right] = queue[1:]
+				state.changedDisplay[idx] = displayIdx
+				if state.displayToRaw[displayIdx] < 0 {
+					state.displayToRaw[displayIdx] = state.parsed.Changed[idx].LineIndex
+				}
+			}
+		}
+	}
+	state.rawToDisplay = buildRawToDisplayMap(state.parsed, state.displayToRaw)
+}
+
+func parseOptionalLineNumber(s string) int {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 1 {
+		return 0
+	}
+	return n
 }
 
 func sideBySideHunkDisplayRanges(lines []string, hunkCount int) [][2]int {

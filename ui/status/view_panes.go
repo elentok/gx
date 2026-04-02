@@ -298,6 +298,9 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 			if rawIdx >= 0 && rawIdx == active && activeSection {
 				mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render("▌ ")
 			}
+			if rawIdx < 0 && m.navMode == navLine && activeSection && sec.activeLine >= 0 && sec.activeLine < len(sec.changedDisplay) && sec.changedDisplay[sec.activeLine] == displayIdx {
+				mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render("▌ ")
+			}
 			if inActiveHunk {
 				if displayIdx == overflowTopDisplay && displayIdx == overflowBottomDisplay {
 					mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render(overflowBothMark)
@@ -356,6 +359,15 @@ func (m Model) hunkOverflowMarkers() (top, bottom, both string) {
 
 func (m Model) visualMatchDiffDisplay(sec sectionState, displayIdx int) bool {
 	if !sec.visualActive || m.navMode != navLine {
+		return false
+	}
+	if len(sec.changedDisplay) > 0 {
+		start, end := visualLineBounds(sec)
+		for i := start; i <= end && i < len(sec.changedDisplay); i++ {
+			if i >= 0 && sec.changedDisplay[i] == displayIdx {
+				return true
+			}
+		}
 		return false
 	}
 	if displayIdx < 0 || displayIdx >= len(sec.displayToRaw) {
