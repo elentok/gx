@@ -331,6 +331,12 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 				bodyW = 0
 			}
 			body := ansi.Truncate(sec.viewLines[displayIdx], bodyW, "")
+			if m.renderMode == renderSideBySide {
+				plain := strings.TrimSpace(ansi.Strip(body))
+				if isDeltaSectionDivider(plain) {
+					body = lipgloss.NewStyle().Foreground(catDeepBg).Render(ansi.Strip(body))
+				}
+			}
 			body += strings.Repeat(" ", maxInt(0, bodyW-ansi.StringWidth(body)))
 			lines = append(lines, mark+body+indicator)
 		}

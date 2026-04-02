@@ -9,8 +9,10 @@ func (m Model) deltaRenderWidth() int {
 	if m.diffFullscreen && m.focus == focusDiff {
 		diffW = m.width
 	}
+	// Side-by-side rows are rendered with left marker + right indicator gutters
+	// in addition to panel borders; reserve 2 extra cells to avoid right-edge crop.
 	vpW := maxInt(1, diffW-4)
-	return vpW
+	return maxInt(1, vpW-2)
 }
 
 func (m *Model) toggleRenderMode() {

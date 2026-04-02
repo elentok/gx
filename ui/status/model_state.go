@@ -159,6 +159,7 @@ type editFileFinishedMsg struct{ err error }
 
 var (
 	catBase0   = lipgloss.Color("#1e1e2e")
+	catDeepBg  = lipgloss.Color("#11111a")
 	catText    = lipgloss.Color("#cdd6f4")
 	catSubtle  = lipgloss.Color("#a6adc8")
 	catBlue    = lipgloss.Color("#89b4fa")
