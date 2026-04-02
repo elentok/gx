@@ -25,6 +25,23 @@ func TestUseStackedLayoutThreshold(t *testing.T) {
 	}
 }
 
+func TestSplitWidthUsesNarrowStatusPaneOnWideScreens(t *testing.T) {
+	m := Model{width: 160}
+	statusW, diffW := m.splitWidth()
+	if statusW != 27 {
+		t.Fatalf("expected status width 27 (17%% of 160), got %d", statusW)
+	}
+	if diffW != 133 {
+		t.Fatalf("expected diff width 133, got %d", diffW)
+	}
+
+	m.width = 140
+	statusW, _ = m.splitWidth()
+	if statusW != 42 {
+		t.Fatalf("expected status width 42 (30%% of 140) at threshold, got %d", statusW)
+	}
+}
+
 func TestQAndEscFocusBehavior(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "changed\n")

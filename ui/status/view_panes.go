@@ -14,7 +14,11 @@ func (m Model) splitWidth() (statusW, diffW int) {
 	if m.useStackedLayout() {
 		return m.width, m.width
 	}
-	statusW = int(float64(m.width) * 0.30)
+	statusRatio := 0.30
+	if m.width > 140 {
+		statusRatio = 0.17
+	}
+	statusW = int(float64(m.width) * statusRatio)
 	if statusW < 20 {
 		statusW = 20
 	}
