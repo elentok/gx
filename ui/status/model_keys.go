@@ -132,6 +132,8 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.reloadDiffsForSelection()
 	case "r":
 		m.refresh()
+	case "s":
+		m.toggleRenderMode()
 	case "p":
 		m.startPullAction()
 		return m, actionPollCmd()

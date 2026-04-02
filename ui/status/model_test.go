@@ -286,6 +286,30 @@ func TestToggleSideBySideModeWithS(t *testing.T) {
 	}
 }
 
+func TestToggleSideBySideModeWithSFromStatusPane(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "status-s.txt", "one\n")
+	testutil.MustGitExported(t, repo, "add", "status-s.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+	testutil.WriteFile(t, repo, "status-s.txt", "two\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusStatus
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
+	m = updated.(Model)
+	if m.renderMode != renderSideBySide {
+		t.Fatalf("expected render mode side-by-side from status pane, got %v", m.renderMode)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
+	m = updated.(Model)
+	if m.renderMode != renderUnified {
+		t.Fatalf("expected render mode unified after second toggle, got %v", m.renderMode)
+	}
+}
+
 func TestSideBySideModeAllowsHunkStaging(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "b.txt", "one\n")
