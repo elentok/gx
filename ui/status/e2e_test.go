@@ -104,6 +104,8 @@ func setupRemoteAndClone(t *testing.T, initialBranch string) (remoteBare, cloneD
 	t.Helper()
 	src := filepath.Join(t.TempDir(), "src")
 	mustRunGit(t, ".", "init", "--initial-branch="+initialBranch, src)
+	mustRunGit(t, src, "config", "gc.auto", "0")
+	mustRunGit(t, src, "config", "gc.autoDetach", "false")
 	mustRunGit(t, src, "config", "user.email", "test@test.com")
 	mustRunGit(t, src, "config", "user.name", "Test")
 	testutil.WriteFile(t, src, "README.md", "base\n")
@@ -115,6 +117,8 @@ func setupRemoteAndClone(t *testing.T, initialBranch string) (remoteBare, cloneD
 
 	cloneDir = filepath.Join(t.TempDir(), "clone")
 	mustRunGit(t, ".", "clone", remoteBare, cloneDir)
+	mustRunGit(t, cloneDir, "config", "gc.auto", "0")
+	mustRunGit(t, cloneDir, "config", "gc.autoDetach", "false")
 	mustRunGit(t, cloneDir, "config", "user.email", "test@test.com")
 	mustRunGit(t, cloneDir, "config", "user.name", "Test")
 	return remoteBare, cloneDir
@@ -565,6 +569,8 @@ func TestStageE2E_PullActionUpdatesWorktree(t *testing.T) {
 	remote, repoDir := setupRemoteAndClone(t, "main")
 	other := filepath.Join(t.TempDir(), "other")
 	mustRunGit(t, ".", "clone", remote, other)
+	mustRunGit(t, other, "config", "gc.auto", "0")
+	mustRunGit(t, other, "config", "gc.autoDetach", "false")
 	mustRunGit(t, other, "config", "user.email", "test@test.com")
 	mustRunGit(t, other, "config", "user.name", "Test")
 
@@ -594,6 +600,8 @@ func TestStageE2E_RebaseActionWithConfirm(t *testing.T) {
 
 	other := filepath.Join(t.TempDir(), "other")
 	mustRunGit(t, ".", "clone", remote, other)
+	mustRunGit(t, other, "config", "gc.auto", "0")
+	mustRunGit(t, other, "config", "gc.autoDetach", "false")
 	mustRunGit(t, other, "config", "user.email", "test@test.com")
 	mustRunGit(t, other, "config", "user.name", "Test")
 	testutil.WriteFile(t, other, "master.txt", "master update\n")
