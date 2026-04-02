@@ -148,15 +148,44 @@ func (m Model) selectedStatusEntry() (statusEntry, bool) {
 }
 
 func (m *Model) refresh() {
+	m.refreshWithBehavior(false)
+}
+
+func (m *Model) refreshPreserveScroll() {
+	m.refreshWithBehavior(true)
+}
+
+func (m *Model) refreshWithBehavior(preserveScroll bool) {
 	preserve := ""
 	if entry, ok := m.selectedStatusEntry(); ok {
 		preserve = entry.Path
 	}
+	unstagedOffset := m.unstaged.viewport.YOffset()
+	stagedOffset := m.staged.viewport.YOffset()
 	m.reload(preserve)
 	m.syncDiffViewports()
+	if preserveScroll {
+		restoreViewportYOffset(&m.unstaged, unstagedOffset)
+		restoreViewportYOffset(&m.staged, stagedOffset)
+		return
+	}
 	if m.focus == focusDiff {
 		m.ensureActiveVisible(m.currentSection())
 	}
+}
+
+func restoreViewportYOffset(sec *sectionState, y int) {
+	if y < 0 {
+		y = 0
+	}
+	maxOffset := sec.viewport.TotalLineCount() - sec.viewport.VisibleLineCount()
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if y > maxOffset {
+		y = maxOffset
+	}
+	sec.viewport.SetYOffset(y)
 }
 
 func (m *Model) reloadBranchState() {

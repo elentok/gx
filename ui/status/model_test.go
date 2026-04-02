@@ -385,6 +385,35 @@ func TestRefreshesOnFocusMsg(t *testing.T) {
 	}
 }
 
+func TestFocusMsgRefreshPreservesDiffScrollOffset(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	base := make([]string, 0, 80)
+	updated := make([]string, 0, 80)
+	for i := 1; i <= 80; i++ {
+		base = append(base, fmt.Sprintf("old-%03d", i))
+		updated = append(updated, fmt.Sprintf("new-%03d", i))
+	}
+	testutil.WriteFile(t, repo, "scroll-focus.txt", strings.Join(base, "\n")+"\n")
+	testutil.MustGitExported(t, repo, "add", "scroll-focus.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+	testutil.WriteFile(t, repo, "scroll-focus.txt", strings.Join(updated, "\n")+"\n")
+
+	m := New(repo)
+	m.ready = true
+	m.width = 120
+	m.height = 28
+	m.focus = focusDiff
+	m.syncDiffViewports()
+	m.unstaged.viewport.SetYOffset(9)
+
+	updatedModel, _ := m.Update(tea.FocusMsg{})
+	m = updatedModel.(Model)
+
+	if got := m.unstaged.viewport.YOffset(); got != 9 {
+		t.Fatalf("expected focus refresh to preserve diff scroll offset, got %d", got)
+	}
+}
+
 func TestViewEnablesReportFocus(t *testing.T) {
 	m := New(testutil.TempRepo(t))
 	m.ready = true

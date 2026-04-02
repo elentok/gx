@@ -25,7 +25,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.syncDiffViewports()
 		return m, nil
 	case tea.FocusMsg:
-		m.refresh()
+		m.refreshPreserveScroll()
 		return m, nil
 	case statusTickMsg:
 		if m.statusMsg != "" && !m.statusUntil.IsZero() && time.Now().After(m.statusUntil) {
