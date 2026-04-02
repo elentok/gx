@@ -28,11 +28,6 @@ func TestCommandRunnerStreamsAndWaits(t *testing.T) {
 		t.Fatalf("Wait: %v", err)
 	}
 	full := seen + r.Consume()
-	postDeadline := time.Now().Add(500 * time.Millisecond)
-	for !strings.Contains(full, "two") && time.Now().Before(postDeadline) {
-		time.Sleep(10 * time.Millisecond)
-		full += r.Consume()
-	}
 	if !strings.Contains(full, "one") || !strings.Contains(full, "two") {
 		t.Fatalf("expected full output to include one and two, got %q", full)
 	}
