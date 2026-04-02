@@ -1,5 +1,7 @@
 package stage
 
+import "github.com/charmbracelet/x/ansi"
+
 func (m Model) deltaRenderWidth() int {
 	mainH := m.height - 1
 	if mainH < 4 {
@@ -9,10 +11,16 @@ func (m Model) deltaRenderWidth() int {
 	if m.diffFullscreen && m.focus == focusDiff {
 		diffW = m.width
 	}
-	// Side-by-side rows are rendered with left marker + right indicator gutters
-	// in addition to panel borders; reserve 2 extra cells to avoid right-edge crop.
-	vpW := maxInt(1, diffW-4)
-	return maxInt(1, vpW-2)
+	innerW := maxInt(1, diffW-2)
+
+	markW := ansi.StringWidth("▌ ")
+	indicator := "* "
+	if m.settings.UseNerdFontIcons {
+		indicator = "󰍉 "
+	}
+	indicatorW := ansi.StringWidth(indicator)
+
+	return maxInt(1, innerW-markW-indicatorW)
 }
 
 func (m *Model) toggleRenderMode() {
