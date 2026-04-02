@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // StageFileStatus represents one file entry from git status porcelain output.
@@ -265,7 +266,28 @@ func colorizeWithDelta(worktreeRoot, raw string, sideBySide bool, renderWidth in
 	return strings.TrimRight(outBuf.String(), "\r\n"), nil
 }
 
+type deltaConfigCacheEntry struct {
+	once sync.Once
+	path string
+	err  error
+}
+
+var deltaConfigCache sync.Map
+
 func tempDeltaConfig(worktreeRoot string) (path string, cleanup func(), err error) {
+	cacheKey := worktreeRoot
+	if cacheKey == "" {
+		cacheKey = "."
+	}
+	entryAny, _ := deltaConfigCache.LoadOrStore(cacheKey, &deltaConfigCacheEntry{})
+	entry := entryAny.(*deltaConfigCacheEntry)
+	entry.once.Do(func() {
+		entry.path, entry.err = createTempDeltaConfig(worktreeRoot)
+	})
+	return entry.path, func() {}, entry.err
+}
+
+func createTempDeltaConfig(worktreeRoot string) (path string, err error) {
 	includes := make([]string, 0, 2)
 
 	home, err := os.UserHomeDir()
@@ -288,12 +310,12 @@ func tempDeltaConfig(worktreeRoot string) (path string, cleanup func(), err erro
 	}
 
 	if len(includes) == 0 {
-		return "", func() {}, fmt.Errorf("no git config found for delta")
+		return "", fmt.Errorf("no git config found for delta")
 	}
 
 	f, err := os.CreateTemp("", "gx-delta-*.gitconfig")
 	if err != nil {
-		return "", func() {}, err
+		return "", err
 	}
 
 	var b strings.Builder
@@ -302,18 +324,18 @@ func tempDeltaConfig(worktreeRoot string) (path string, cleanup func(), err erro
 		b.WriteString(cfg)
 		b.WriteString("\n")
 	}
-	b.WriteString("[delta]\n\tside-by-side = false\n")
+	b.WriteString("[delta]\n\tside-by-side = false\n\thunk-header-decoration-style = ol\n")
 	content := b.String()
 	if _, err := f.WriteString(content); err != nil {
 		_ = f.Close()
 		_ = os.Remove(f.Name())
-		return "", func() {}, err
+		return "", err
 	}
 	if err := f.Close(); err != nil {
 		_ = os.Remove(f.Name())
-		return "", func() {}, err
+		return "", err
 	}
-	return f.Name(), func() { _ = os.Remove(f.Name()) }, nil
+	return f.Name(), nil
 }
 
 // ApplyPatchToIndex applies patch to the index in worktreeRoot.
