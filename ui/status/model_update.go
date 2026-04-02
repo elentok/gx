@@ -19,6 +19,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.ready = true
+		if m.renderMode == renderSideBySide {
+			m.reloadDiffsForSelection()
+		}
 		m.syncDiffViewports()
 		return m, nil
 	case tea.FocusMsg:

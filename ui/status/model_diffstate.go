@@ -17,6 +17,10 @@ type movedTarget struct {
 }
 
 func (m *Model) applySelection() tea.Cmd {
+	if m.isSideBySideReadOnly() {
+		m.setStatus("side-by-side is read-only; press s for interactive mode")
+		return nil
+	}
 	file, ok := m.selectedFile()
 	if !ok {
 		return nil
@@ -192,16 +196,17 @@ func (m *Model) reloadDiffsForSelection() {
 		m.activeFilePath = file.Path
 	}
 	if file.IsUntracked() {
-		raw, err := git.DiffUntrackedPath(m.worktreeRoot, file.Path, false, m.settings.DiffContextLines)
+		renderWidth := m.deltaRenderWidth()
+		raw, err := git.DiffUntrackedPath(m.worktreeRoot, file.Path, false, false, 0, m.settings.DiffContextLines)
 		if err != nil {
 			m.showGitError(err)
 			raw = ""
 		}
-		col, err := git.DiffUntrackedPath(m.worktreeRoot, file.Path, true, m.settings.DiffContextLines)
+		col, err := git.DiffUntrackedPath(m.worktreeRoot, file.Path, true, m.renderMode == renderSideBySide, renderWidth, m.settings.DiffContextLines)
 		if err != nil {
 			col = raw
 		}
-		m.unstaged = buildSectionState(raw, col, m.unstaged)
+		m.unstaged = buildSectionState(raw, col, m.unstaged, m.renderMode == renderSideBySide)
 		m.staged = newSectionState()
 		m.section = sectionUnstaged
 		m.syncDiffViewports()
@@ -213,7 +218,8 @@ func (m *Model) reloadDiffsForSelection() {
 		m.showGitError(err)
 		unstagedRaw = ""
 	}
-	unstagedColor, err := git.DiffPathWithDelta(m.worktreeRoot, file.Path, false, m.settings.DiffContextLines)
+	renderWidth := m.deltaRenderWidth()
+	unstagedColor, err := git.DiffPathWithDelta(m.worktreeRoot, file.Path, false, m.renderMode == renderSideBySide, renderWidth, m.settings.DiffContextLines)
 	if err != nil {
 		unstagedColor = unstagedRaw
 	}
@@ -223,13 +229,13 @@ func (m *Model) reloadDiffsForSelection() {
 		m.showGitError(err)
 		stagedRaw = ""
 	}
-	stagedColor, err := git.DiffPathWithDelta(m.worktreeRoot, file.Path, true, m.settings.DiffContextLines)
+	stagedColor, err := git.DiffPathWithDelta(m.worktreeRoot, file.Path, true, m.renderMode == renderSideBySide, renderWidth, m.settings.DiffContextLines)
 	if err != nil {
 		stagedColor = stagedRaw
 	}
 
-	m.unstaged = buildSectionState(unstagedRaw, unstagedColor, m.unstaged)
-	m.staged = buildSectionState(stagedRaw, stagedColor, m.staged)
+	m.unstaged = buildSectionState(unstagedRaw, unstagedColor, m.unstaged, m.renderMode == renderSideBySide)
+	m.staged = buildSectionState(stagedRaw, stagedColor, m.staged, m.renderMode == renderSideBySide)
 	m.pickAvailableSection()
 	m.syncDiffViewports()
 	if strings.TrimSpace(m.searchQuery) != "" && (m.searchScope == searchScopeUnstaged || m.searchScope == searchScopeStaged) {
@@ -252,7 +258,7 @@ func (m *Model) enterDiffFromStatus(resetSection bool) {
 	m.ensureActiveVisible(m.currentSection())
 }
 
-func buildSectionState(raw, color string, prev sectionState) sectionState {
+func buildSectionState(raw, color string, prev sectionState, sideBySide bool) sectionState {
 	state := sectionState{activeHunk: prev.activeHunk, activeLine: prev.activeLine, visualActive: prev.visualActive, visualAnchor: prev.visualAnchor, viewport: prev.viewport}
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -272,6 +278,10 @@ func buildSectionState(raw, color string, prev sectionState) sectionState {
 
 	state.parsed = parseUnifiedDiff(raw)
 	state.rawLines = append([]string{}, state.parsed.Lines...)
+	if sideBySide {
+		initSideBySideSectionState(&state, color)
+		return state
+	}
 
 	colorLines := splitLines(color)
 	if len(colorLines) == 0 {
@@ -317,6 +327,50 @@ func buildSectionState(raw, color string, prev sectionState) sectionState {
 	}
 
 	return state
+}
+
+func initSideBySideSectionState(state *sectionState, color string) {
+	state.viewLines = splitLines(color)
+	if len(state.viewLines) == 0 {
+		state.viewLines = append([]string{}, state.rawLines...)
+	}
+	state.baseLines = append([]string{}, state.viewLines...)
+	state.baseDisplayToRaw = make([]int, len(state.baseLines))
+	for i := range state.baseDisplayToRaw {
+		state.baseDisplayToRaw[i] = -1
+	}
+	state.displayToRaw = append([]int{}, state.baseDisplayToRaw...)
+	state.rawToDisplay = buildRawToDisplayMap(state.parsed, nil)
+	prevOffset := state.viewport.YOffset()
+	state.viewport.SetContentLines(state.viewLines)
+	state.viewport.SetYOffset(prevOffset)
+
+	if len(state.parsed.Hunks) == 0 {
+		state.activeHunk = -1
+	} else {
+		if state.activeHunk < 0 {
+			state.activeHunk = 0
+		}
+		if state.activeHunk >= len(state.parsed.Hunks) {
+			state.activeHunk = len(state.parsed.Hunks) - 1
+		}
+	}
+
+	if len(state.parsed.Changed) == 0 {
+		state.activeLine = -1
+		state.visualActive = false
+		state.visualAnchor = -1
+	} else {
+		if state.activeLine < 0 {
+			state.activeLine = 0
+		}
+		if state.activeLine >= len(state.parsed.Changed) {
+			state.activeLine = len(state.parsed.Changed) - 1
+		}
+		if state.visualAnchor < 0 || state.visualAnchor >= len(state.parsed.Changed) {
+			state.visualAnchor = state.activeLine
+		}
+	}
 }
 
 func buildDisplayBaseLines(parsed parsedDiff, colorLines []string) (lines []string, displayToRaw []int) {

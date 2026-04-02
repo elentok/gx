@@ -246,8 +246,68 @@ func TestHelpLineShowsVisualAtLeftInDiffFocus(t *testing.T) {
 	if !strings.HasPrefix(plain, "VISUAL") {
 		t.Fatalf("expected VISUAL indicator at start of footer, got %q", plain)
 	}
-	if !strings.HasSuffix(plain, "· diff: mode:line · wrap:on · ? help") {
+	if !strings.HasSuffix(plain, "· diff: mode:line · render:unified · wrap:on · ? help") {
 		t.Fatalf("expected diff hint at end of footer, got %q", plain)
+	}
+}
+
+func TestToggleSideBySideModeWithS(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.MustGitExported(t, repo, "add", "a.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+	testutil.WriteFile(t, repo, "a.txt", "two\n")
+
+	m := New(repo)
+	m.ready = true
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
+	m = updated.(Model)
+	if m.renderMode != renderSideBySide {
+		t.Fatalf("expected render mode side-by-side, got %v", m.renderMode)
+	}
+	if !strings.Contains(m.statusMsg, "read-only") {
+		t.Fatalf("expected side-by-side status message, got %q", m.statusMsg)
+	}
+	view := ansi.Strip(m.renderDiffPane(80, 16))
+	if strings.Contains(view, "No file selected") {
+		t.Fatalf("expected side-by-side diff content, got:\n%s", view)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
+	m = updated.(Model)
+	if m.renderMode != renderUnified {
+		t.Fatalf("expected render mode unified, got %v", m.renderMode)
+	}
+}
+
+func TestSideBySideModeBlocksStagingActions(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "b.txt", "one\n")
+	testutil.MustGitExported(t, repo, "add", "b.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+	testutil.WriteFile(t, repo, "b.txt", "two\n")
+
+	m := New(repo)
+	m.ready = true
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
+	m = updated.(Model)
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
+	m = updated.(Model)
+	if !strings.Contains(m.statusMsg, "read-only") {
+		t.Fatalf("expected read-only guardrail status, got %q", m.statusMsg)
+	}
+	staged, err := git.DiffPath(repo, "b.txt", true, 1)
+	if err != nil {
+		t.Fatalf("staged diff: %v", err)
+	}
+	if strings.TrimSpace(staged) != "" {
+		t.Fatalf("expected no staged diff in side-by-side read-only mode, got:\n%s", staged)
 	}
 }
 

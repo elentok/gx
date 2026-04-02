@@ -33,6 +33,13 @@ const (
 	navLine
 )
 
+type diffRenderMode int
+
+const (
+	renderUnified diffRenderMode = iota
+	renderSideBySide
+)
+
 type sectionState struct {
 	rawLines         []string
 	baseLines        []string
@@ -59,6 +66,7 @@ type Model struct {
 	focus          focusPane
 	section        diffSection
 	navMode        navMode
+	renderMode     diffRenderMode
 	diffFullscreen bool
 	wrapSoft       bool
 
@@ -187,6 +195,7 @@ func NewWithSettings(worktreeRoot string, settings Settings) Model {
 		focus:         focusStatus,
 		section:       sectionUnstaged,
 		navMode:       navHunk,
+		renderMode:    renderUnified,
 		wrapSoft:      true,
 		collapsedDirs: map[string]bool{},
 		selected:      0,

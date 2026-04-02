@@ -119,7 +119,7 @@ func DiffPath(worktreeRoot, path string, cached bool, contextLines int) (string,
 
 // DiffPathWithDelta returns a unified diff rendered by git diff with delta as
 // pager. If delta is unavailable, it falls back to git's own color output.
-func DiffPathWithDelta(worktreeRoot, path string, cached bool, contextLines int) (string, error) {
+func DiffPathWithDelta(worktreeRoot, path string, cached bool, sideBySide bool, renderWidth int, contextLines int) (string, error) {
 	rawArgs := []string{"diff", "--no-color", diffContextArg(contextLines)}
 	if cached {
 		rawArgs = append(rawArgs, "--cached")
@@ -132,7 +132,7 @@ func DiffPathWithDelta(worktreeRoot, path string, cached bool, contextLines int)
 	if strings.TrimSpace(raw) == "" {
 		return "", nil
 	}
-	if out, deltaErr := colorizeWithDelta(worktreeRoot, raw); deltaErr == nil {
+	if out, deltaErr := colorizeWithDelta(worktreeRoot, raw, sideBySide, renderWidth); deltaErr == nil {
 		return out, nil
 	}
 
@@ -151,7 +151,7 @@ func DiffPathWithDelta(worktreeRoot, path string, cached bool, contextLines int)
 // DiffUntrackedPath returns a /dev/null -> file patch for an untracked path.
 // Plain output is returned when color is false; otherwise output is rendered by
 // git diff with delta as pager where possible.
-func DiffUntrackedPath(worktreeRoot, path string, color bool, contextLines int) (string, error) {
+func DiffUntrackedPath(worktreeRoot, path string, color bool, sideBySide bool, renderWidth int, contextLines int) (string, error) {
 	diffPath := path
 
 	if !color {
@@ -173,7 +173,7 @@ func DiffUntrackedPath(worktreeRoot, path string, color bool, contextLines int) 
 	if strings.TrimSpace(raw) == "" {
 		return "", nil
 	}
-	if out, deltaErr := colorizeWithDelta(worktreeRoot, raw); deltaErr == nil {
+	if out, deltaErr := colorizeWithDelta(worktreeRoot, raw, sideBySide, renderWidth); deltaErr == nil {
 		return out, nil
 	}
 
@@ -231,8 +231,17 @@ func diffContextArg(contextLines int) string {
 	return fmt.Sprintf("-U%d", contextLines)
 }
 
-func colorizeWithDelta(worktreeRoot, raw string) (string, error) {
-	args := []string{"--paging=never", "--color-only"}
+func colorizeWithDelta(worktreeRoot, raw string, sideBySide bool, renderWidth int) (string, error) {
+	args := []string{"--paging=never"}
+	if !sideBySide {
+		args = append(args, "--color-only")
+	}
+	if sideBySide {
+		args = append(args, "--side-by-side")
+		if renderWidth > 0 {
+			args = append(args, "--width", strconv.Itoa(renderWidth))
+		}
+	}
 	configPath, cleanup, err := tempDeltaConfig(worktreeRoot)
 	if err == nil && configPath != "" {
 		defer cleanup()

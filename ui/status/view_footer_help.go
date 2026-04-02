@@ -36,7 +36,7 @@ func (m Model) helpLine() string {
 	if m.wrapSoft {
 		wrapLabel = "on"
 	}
-	hint := "diff: mode:" + modeLabel + " · wrap:" + wrapLabel + " · ? help"
+	hint := "diff: mode:" + modeLabel + " · render:" + m.renderModeLabel() + " · wrap:" + wrapLabel + " · ? help"
 	if s := m.searchCounterLabel(); s != "" {
 		hint = s + " · " + hint
 	}
@@ -168,6 +168,7 @@ func stageHelpText() string {
 		"  j / k   move active hunk/line",
 		"  , / .   previous/next file",
 		"  J / K   scroll diff viewport",
+		"  s       toggle unified/side-by-side (read-only)",
 		"  space   stage/unstage active hunk/line",
 		"  d       discard (unstaged) / unstage (staged)",
 		"  e       edit current file in $EDITOR",
