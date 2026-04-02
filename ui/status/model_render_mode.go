@@ -1,5 +1,6 @@
 package stage
 
+import "gx/git"
 import "github.com/charmbracelet/x/ansi"
 
 func (m Model) deltaRenderWidth() int {
@@ -25,6 +26,10 @@ func (m Model) deltaRenderWidth() int {
 
 func (m *Model) toggleRenderMode() {
 	if m.renderMode == renderUnified {
+		if !git.DeltaAvailable() {
+			m.setStatus("side-by-side requires delta; staying in unified mode")
+			return
+		}
 		m.renderMode = renderSideBySide
 		m.setStatus("side-by-side mode")
 	} else {
