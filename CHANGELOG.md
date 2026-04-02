@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.11.0
+
+- Added side-by-side diff render mode in `gx status` (`s`) with full interactive staging support across hunk, line, and visual selection flows
+- Added side-by-side hunk gutter indicators and improved side-by-side rendering fidelity (adaptive width, fullscreen width recalculation, dimmed section separators)
+- On very wide screens (`>140` cols), status pane now uses 17% width to prioritize diff space
+- Hardened status E2E reliability on CI by disabling repo auto-gc in remote/clone test setups
+
 ## v0.10.3
 
 - Updated `gx status` docs and UX highlights, including clearer yank shortcuts (`yy` / `yl` / `ya` / `yf`)

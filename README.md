@@ -89,6 +89,7 @@ Status UI highlights:
 - Live search in status/diff with highlights and `n` / `N` navigation
 - Vim-like navigation (`j`/`k`, `gg`/`G`, `ctrl+u`/`ctrl+d`)
 - Mouse wheel scrolling in diff panes (unstaged/staged, including fullscreen)
+- Toggle unified/side-by-side diff rendering with `s` (supports hunk, line, and visual actions)
 - File-to-file diff jumps with `,` / `.`
 - Edit selected file in `$EDITOR` with `e` (opens at selected line/hunk in diff view)
 - Open lazygit log with `ol`
@@ -98,6 +99,7 @@ Status UI highlights:
 - Keyboard help overlay (`?`) and full git-error overlay
 - Live action output overlay with cancellation (`ctrl+c`)
 - Fullscreen diff hides the status pane
+- Focus refresh keeps your diff scroll position
 
 Clone using the `.bare` directory trick and bootstrap the initial worktree:
 
