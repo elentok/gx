@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.11.1
+
+- `gx push` now asks for confirmation before checking remote divergence
+- Push actions in `gx status` and `gx wt` now consistently confirm first, then run divergence checks
+- Fixed side-by-side `delta` rendering so line-number colors match the configured theme instead of falling back to delta's default side-by-side colors
+- Added `make test-docker-ubuntu` plus a helper script to run the test suite in a CI-like Ubuntu container with `git-delta` installed
+
 ## v0.11.0
 
 - Added side-by-side diff render mode in `gx status` (`s`) with full interactive staging support across hunk, line, and visual selection flows

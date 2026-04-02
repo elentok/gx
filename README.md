@@ -101,7 +101,7 @@ Status UI highlights:
 - File-to-file diff jumps with `,` / `.`
 - Edit selected file in `$EDITOR` with `e` (opens at selected line/hunk in diff view)
 - Open lazygit log with `ol`
-- Pull/push/rebase/amend actions directly in status (`p`/`P`/`b`/`A`) with confirmations
+- Pull/push/rebase/amend actions directly in status (`p`/`P`/`b`/`A`) with confirmations; push confirms first, then checks divergence if needed
 - Push divergence flow uses a menu (`j`/`k` + `enter`) with relative commit times
 - Push in status detects GitHub PR URLs and asks whether to open them
 - Keyboard help overlay (`?`) and full git-error overlay
@@ -131,10 +131,16 @@ gx wt list
 gx wt abs-path <name>
 ```
 
-Push current worktree branch, with proactive divergence detection and visible preflight progress:
+Push current worktree branch; gx confirms first, then checks for divergence before pushing:
 
 ```sh
 gx push
+```
+
+Run the full test suite in a CI-like Ubuntu container:
+
+```sh
+make test-docker-ubuntu
 ```
 
 Stash uncommitted changes, run a command, then auto-pop the stash on success (prompts to pop on failure):
