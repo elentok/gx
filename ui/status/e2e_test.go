@@ -15,6 +15,7 @@ import (
 	"gx/ui/status"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 const (
@@ -46,6 +47,13 @@ func waitForStageAnyText(t *testing.T, tm *teatest.TestModel, timeout time.Durat
 			}
 		}
 		return false
+	}, teatest.WithDuration(timeout))
+}
+
+func waitForStageStrippedText(t *testing.T, tm *teatest.TestModel, text string, timeout time.Duration) {
+	t.Helper()
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(ansi.Strip(string(bts)), text)
 	}, teatest.WithDuration(timeout))
 }
 
@@ -639,6 +647,25 @@ func TestStageE2E_RenamedFileShownInStatusAndDiffHeader(t *testing.T) {
 
 	tm.Send(keySpecial(tea.KeyEnter))
 	waitForStageText(t, tm, "[moved: old-name.txt -> new-name.txt]", stageActionWait)
+
+	quitStage(t, tm)
+}
+
+func TestStageE2E_SideBySideShowsActiveHunkGutterIndicator(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	path := "sbs-hunks.txt"
+	setupModifiedFileTwoHunks(t, repoDir, path)
+
+	tm := startStageTUI(t, repoDir)
+	waitForStageText(t, tm, path, stageLoadWait)
+
+	tm.Send(keySpecial(tea.KeyEnter))
+	tm.Send(keyRune('s'))
+	tm.Send(keyRune('f'))
+
+	waitForStageStrippedText(t, tm, "render:side-by-side", stageActionWait)
+	waitForStageStrippedText(t, tm, "[fullscreen]", stageActionWait)
+	waitForStageStrippedText(t, tm, "▌", stageActionWait)
 
 	quitStage(t, tm)
 }

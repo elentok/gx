@@ -37,6 +37,11 @@ func (m *Model) currentSection() *sectionState {
 }
 
 func (m *Model) ensureActiveVisible(sec *sectionState) {
+	if m.navMode == navHunk && sec.activeHunk >= 0 && sec.activeHunk < len(sec.hunkDisplayRange) {
+		r := sec.hunkDisplayRange[sec.activeHunk]
+		sec.viewport.EnsureVisible(r[0], 0, 0)
+		return
+	}
 	active := m.activeRawLineIndex(*sec)
 	if active >= 0 {
 		display := active

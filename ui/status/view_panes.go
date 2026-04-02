@@ -283,7 +283,15 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 			if m.navMode == navLine && sec.visualActive && m.visualMatchDiffDisplay(*sec, displayIdx) {
 				mark = lipgloss.NewStyle().Foreground(accent).Render("▎ ")
 			}
-			inActiveHunk := rawIdx >= 0 && m.navMode == navHunk && rawIdx >= hunkStart && rawIdx <= hunkEnd
+			inActiveHunk := false
+			if m.navMode == navHunk {
+				if len(sec.hunkDisplayRange) > 0 && sec.activeHunk >= 0 && sec.activeHunk < len(sec.hunkDisplayRange) {
+					r := sec.hunkDisplayRange[sec.activeHunk]
+					inActiveHunk = displayIdx >= r[0] && displayIdx <= r[1]
+				} else {
+					inActiveHunk = rawIdx >= 0 && rawIdx >= hunkStart && rawIdx <= hunkEnd
+				}
+			}
 			if inActiveHunk && activeSection {
 				mark = lipgloss.NewStyle().Foreground(accent).Render("▌ ")
 			}

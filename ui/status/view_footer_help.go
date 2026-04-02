@@ -168,7 +168,7 @@ func stageHelpText() string {
 		"  j / k   move active hunk/line",
 		"  , / .   previous/next file",
 		"  J / K   scroll diff viewport",
-		"  s       toggle unified/side-by-side (read-only)",
+		"  s       toggle unified/side-by-side (hunk-only)",
 		"  space   stage/unstage active hunk/line",
 		"  d       discard (unstaged) / unstage (staged)",
 		"  e       edit current file in $EDITOR",

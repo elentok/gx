@@ -47,6 +47,7 @@ type sectionState struct {
 	viewLines        []string
 	displayToRaw     []int
 	rawToDisplay     []int
+	hunkDisplayRange [][2]int
 	parsed           parsedDiff
 	activeHunk       int
 	activeLine       int

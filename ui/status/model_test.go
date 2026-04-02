@@ -268,12 +268,15 @@ func TestToggleSideBySideModeWithS(t *testing.T) {
 	if m.renderMode != renderSideBySide {
 		t.Fatalf("expected render mode side-by-side, got %v", m.renderMode)
 	}
-	if !strings.Contains(m.statusMsg, "read-only") {
+	if !strings.Contains(m.statusMsg, "hunk-only") {
 		t.Fatalf("expected side-by-side status message, got %q", m.statusMsg)
 	}
 	view := ansi.Strip(m.renderDiffPane(80, 16))
 	if strings.Contains(view, "No file selected") {
 		t.Fatalf("expected side-by-side diff content, got:\n%s", view)
+	}
+	if !strings.Contains(view, "▌ ") {
+		t.Fatalf("expected active hunk indicator in side-by-side view, got:\n%s", view)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
@@ -283,7 +286,7 @@ func TestToggleSideBySideModeWithS(t *testing.T) {
 	}
 }
 
-func TestSideBySideModeBlocksStagingActions(t *testing.T) {
+func TestSideBySideModeAllowsHunkStaging(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "b.txt", "one\n")
 	testutil.MustGitExported(t, repo, "add", "b.txt")
@@ -299,15 +302,36 @@ func TestSideBySideModeBlocksStagingActions(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	m = updated.(Model)
-	if !strings.Contains(m.statusMsg, "read-only") {
-		t.Fatalf("expected read-only guardrail status, got %q", m.statusMsg)
-	}
 	staged, err := git.DiffPath(repo, "b.txt", true, 1)
 	if err != nil {
 		t.Fatalf("staged diff: %v", err)
 	}
-	if strings.TrimSpace(staged) != "" {
-		t.Fatalf("expected no staged diff in side-by-side read-only mode, got:\n%s", staged)
+	if !strings.Contains(staged, "+two") {
+		t.Fatalf("expected staged diff in side-by-side hunk mode, got:\n%s", staged)
+	}
+}
+
+func TestSideBySideModeBlocksLineModeToggle(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "c.txt", "one\n")
+	testutil.MustGitExported(t, repo, "add", "c.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+	testutil.WriteFile(t, repo, "c.txt", "two\n")
+
+	m := New(repo)
+	m.ready = true
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
+	m = updated.(Model)
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	m = updated.(Model)
+	if m.navMode != navHunk {
+		t.Fatalf("expected nav mode to stay hunk in side-by-side, got %v", m.navMode)
+	}
+	if !strings.Contains(m.statusMsg, "hunk mode only") {
+		t.Fatalf("expected hunk-mode guardrail status, got %q", m.statusMsg)
 	}
 }
 

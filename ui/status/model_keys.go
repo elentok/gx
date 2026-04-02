@@ -43,13 +43,13 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		m.keyPrefix = ""
 		switch key {
 		case "l":
-			if m.focus == focusDiff && m.blockIfSideBySideReadOnly() {
+			if m.focus == focusDiff && m.isSideBySideMode() && m.navMode != navHunk && m.blockIfSideBySideLineAction() {
 				return m, nil, true
 			}
 			m.yankLocationOnly()
 			return m, nil, true
 		case "a":
-			if m.focus == focusDiff && m.blockIfSideBySideReadOnly() {
+			if m.focus == focusDiff && m.isSideBySideMode() && m.navMode != navHunk && m.blockIfSideBySideLineAction() {
 				return m, nil, true
 			}
 			m.yankAllContext()
@@ -58,7 +58,7 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 			m.yankFilename()
 			return m, nil, true
 		case "y":
-			if m.focus == focusDiff && m.blockIfSideBySideReadOnly() {
+			if m.focus == focusDiff && m.isSideBySideMode() && m.navMode != navHunk && m.blockIfSideBySideLineAction() {
 				return m, nil, true
 			}
 			m.yankContentOnly()
@@ -209,7 +209,7 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.ensureActiveVisible(m.currentSection())
 		}
 	case "a":
-		if m.blockIfSideBySideReadOnly() {
+		if m.isSideBySideMode() && m.blockIfSideBySideLineAction() {
 			return m, nil
 		}
 		sec := m.currentSection()
@@ -221,7 +221,7 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		m.ensureActiveVisible(m.currentSection())
 	case "v":
-		if m.blockIfSideBySideReadOnly() {
+		if m.isSideBySideMode() && m.blockIfSideBySideLineAction() {
 			return m, nil
 		}
 		sec := m.currentSection()
@@ -285,13 +285,13 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+u":
 		m.scrollDiffPage(-1)
 	case "space", " ":
-		if m.blockIfSideBySideReadOnly() {
+		if m.isSideBySideMode() && m.navMode != navHunk && m.blockIfSideBySideLineAction() {
 			return m, nil
 		}
 		cmd := m.applySelection()
 		return m, cmd
 	case "d":
-		if m.blockIfSideBySideReadOnly() {
+		if m.isSideBySideMode() && m.navMode != navHunk && m.blockIfSideBySideLineAction() {
 			return m, nil
 		}
 		if m.section == sectionStaged {

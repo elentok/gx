@@ -1,13 +1,17 @@
 package stage
 
 import (
+	"regexp"
 	"strings"
 
 	"gx/git"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
+
+var deltaHunkHeaderRe = regexp.MustCompile(`^\s*[•*]\s+.+:\d+:(?:\s.*)?$`)
 
 type movedTarget struct {
 	fromSection diffSection
@@ -17,8 +21,8 @@ type movedTarget struct {
 }
 
 func (m *Model) applySelection() tea.Cmd {
-	if m.isSideBySideReadOnly() {
-		m.setStatus("side-by-side is read-only; press s for interactive mode")
+	if m.isSideBySideMode() && m.navMode != navHunk {
+		m.setStatus("side-by-side supports hunk mode only; press s for full interactive mode")
 		return nil
 	}
 	file, ok := m.selectedFile()
@@ -269,6 +273,7 @@ func buildSectionState(raw, color string, prev sectionState, sideBySide bool) se
 		state.viewLines = nil
 		state.displayToRaw = nil
 		state.rawToDisplay = nil
+		state.hunkDisplayRange = nil
 		state.visualActive = false
 		state.visualAnchor = -1
 		state.viewport.SetContent("")
@@ -295,6 +300,7 @@ func buildSectionState(raw, color string, prev sectionState, sideBySide bool) se
 	state.viewLines = append([]string{}, state.baseLines...)
 	state.displayToRaw = append([]int{}, state.baseDisplayToRaw...)
 	state.rawToDisplay = buildRawToDisplayMap(state.parsed, state.displayToRaw)
+	state.hunkDisplayRange = nil
 	prevOffset := state.viewport.YOffset()
 	state.viewport.SetContentLines(state.viewLines)
 	state.viewport.SetYOffset(prevOffset)
@@ -341,6 +347,7 @@ func initSideBySideSectionState(state *sectionState, color string) {
 	}
 	state.displayToRaw = append([]int{}, state.baseDisplayToRaw...)
 	state.rawToDisplay = buildRawToDisplayMap(state.parsed, nil)
+	state.hunkDisplayRange = sideBySideHunkDisplayRanges(state.viewLines, len(state.parsed.Hunks))
 	prevOffset := state.viewport.YOffset()
 	state.viewport.SetContentLines(state.viewLines)
 	state.viewport.SetYOffset(prevOffset)
@@ -371,6 +378,62 @@ func initSideBySideSectionState(state *sectionState, color string) {
 			state.visualAnchor = state.activeLine
 		}
 	}
+}
+
+func sideBySideHunkDisplayRanges(lines []string, hunkCount int) [][2]int {
+	if hunkCount <= 0 || len(lines) == 0 {
+		return nil
+	}
+	headers := make([]int, 0, hunkCount)
+	for i, line := range lines {
+		plain := strings.TrimSpace(ansi.Strip(line))
+		if deltaHunkHeaderRe.MatchString(plain) {
+			headers = append(headers, i)
+		}
+	}
+	if len(headers) != hunkCount {
+		return nil
+	}
+	ranges := make([][2]int, 0, hunkCount)
+	for i, start := range headers {
+		end := len(lines) - 1
+		if i+1 < len(headers) {
+			end = headers[i+1] - 1
+		}
+		for end >= start {
+			plain := strings.TrimSpace(ansi.Strip(lines[end]))
+			if plain == "" || isDeltaSectionDivider(plain) {
+				end--
+				continue
+			}
+			break
+		}
+		for start <= end {
+			plain := strings.TrimSpace(ansi.Strip(lines[start]))
+			if isDeltaSectionDivider(plain) {
+				start++
+				continue
+			}
+			break
+		}
+		if end < start {
+			end = start
+		}
+		ranges = append(ranges, [2]int{start, end})
+	}
+	return ranges
+}
+
+func isDeltaSectionDivider(plain string) bool {
+	if plain == "" {
+		return false
+	}
+	for _, r := range plain {
+		if r != '─' && r != '-' {
+			return false
+		}
+	}
+	return true
 }
 
 func buildDisplayBaseLines(parsed parsedDiff, colorLines []string) (lines []string, displayToRaw []int) {

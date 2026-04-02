@@ -179,6 +179,12 @@ func (m *Model) onStatusSelectionChanged() {
 }
 
 func hunkDisplayBounds(sec sectionState, hunkIdx int) (start int, end int, ok bool) {
+	if hunkIdx >= 0 && hunkIdx < len(sec.hunkDisplayRange) {
+		r := sec.hunkDisplayRange[hunkIdx]
+		if r[0] >= 0 && r[1] >= r[0] {
+			return r[0], r[1], true
+		}
+	}
 	if hunkIdx < 0 || hunkIdx >= len(sec.parsed.Hunks) {
 		return 0, 0, false
 	}

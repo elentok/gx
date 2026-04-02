@@ -16,7 +16,11 @@ func (m Model) deltaRenderWidth() int {
 func (m *Model) toggleRenderMode() {
 	if m.renderMode == renderUnified {
 		m.renderMode = renderSideBySide
-		m.setStatus("side-by-side mode (read-only)")
+		m.navMode = navHunk
+		sec := m.currentSection()
+		sec.visualActive = false
+		sec.visualAnchor = sec.activeLine
+		m.setStatus("side-by-side mode (hunk-only)")
 	} else {
 		m.renderMode = renderUnified
 		m.setStatus("unified mode")
@@ -26,15 +30,15 @@ func (m *Model) toggleRenderMode() {
 	m.ensureActiveVisible(m.currentSection())
 }
 
-func (m Model) isSideBySideReadOnly() bool {
+func (m Model) isSideBySideMode() bool {
 	return m.renderMode == renderSideBySide
 }
 
-func (m *Model) blockIfSideBySideReadOnly() bool {
-	if !m.isSideBySideReadOnly() {
+func (m *Model) blockIfSideBySideLineAction() bool {
+	if !m.isSideBySideMode() {
 		return false
 	}
-	m.setStatus("side-by-side is read-only; press s for interactive mode")
+	m.setStatus("side-by-side supports hunk mode only; press s for full interactive mode")
 	return true
 }
 
