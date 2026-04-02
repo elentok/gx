@@ -28,7 +28,15 @@ and [go-migration-plan.md](/docs/go-migration-plan.md)).
 - Scrollable error modal for any git failures
 - See [Changelog](./CHANGELOG.md)
 
-![screenshot](./docs/screenshot.png)
+## Screenshots
+
+`gx status`
+
+![screenshot-status](./docs/screenshot-status.png)
+
+`gx wt` (worktrees)
+
+![screenshot-wt](./docs/screenshot-wt.png)
 
 ## Requirements
 
