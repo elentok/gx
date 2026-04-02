@@ -6,6 +6,9 @@
 - Added side-by-side hunk gutter indicators and improved side-by-side rendering fidelity (adaptive width, fullscreen width recalculation, dimmed section separators)
 - On very wide screens (`>140` cols), status pane now uses 17% width to prioritize diff space
 - Hardened status E2E reliability on CI by disabling repo auto-gc in remote/clone test setups
+- Side-by-side mode now explicitly requires `delta`; CI installs `delta` so side-by-side coverage runs there too
+- Made `delta` rendering more consistent across environments by generating a temp config with the expected side-by-side hunk-header settings
+- Reuse the generated temp `delta` config for the process lifetime instead of recreating it on every render
 
 ## v0.10.3
 
