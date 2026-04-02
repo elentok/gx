@@ -12,7 +12,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-var deltaHunkHeaderRe = regexp.MustCompile(`^\s*[•*]\s+.+:\d+:(?:\s.*)?$`)
+var deltaHunkHeaderRe = regexp.MustCompile(`^\s*(?:[•*]\s+)?[^:]+:\d+:(?:\s.*)?$`)
 var deltaSideBySideLineRe = regexp.MustCompile(`^\s*│\s*([0-9]+)?\s*│.*│\s*([0-9]+)?\s*│`)
 
 type movedTarget struct {

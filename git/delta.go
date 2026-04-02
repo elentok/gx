@@ -179,7 +179,10 @@ func createTempDeltaConfig(worktreeRoot string) (path string, err error) {
 		b.WriteString(cfg)
 		b.WriteString("\n")
 	}
-	b.WriteString("[delta]\n\tside-by-side = false\n\thunk-header-decoration-style = ol\n")
+	b.WriteString("[delta]\n")
+	b.WriteString("\tside-by-side = false\n")
+	b.WriteString("\thunk-header-decoration-style = ol\n")
+	b.WriteString("\thunk-header-style = file line-number syntax\n")
 	content := b.String()
 	if _, err := f.WriteString(content); err != nil {
 		_ = f.Close()
