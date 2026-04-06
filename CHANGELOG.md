@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.11.2
+
+- Added session-scoped diff context controls in `gx status` with `[` / `]`, clamped to a minimum of `-U1`
+- Show the current diff context in the status footer and added help/docs for the new context controls
+
 ## v0.11.1
 
 - `gx push` now asks for confirmation before checking remote divergence
