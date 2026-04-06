@@ -98,6 +98,7 @@ Status UI highlights:
 - Vim-like navigation (`j`/`k`, `gg`/`G`, `ctrl+u`/`ctrl+d`)
 - Mouse wheel scrolling in diff panes (unstaged/staged, including fullscreen)
 - Toggle unified/side-by-side diff rendering with `s` (supports hunk, line, and visual actions)
+- Adjust diff context for the current session with `[` / `]`
 - File-to-file diff jumps with `,` / `.`
 - Edit selected file in `$EDITOR` with `e` (opens at selected line/hunk in diff view)
 - Open lazygit log with `ol`

@@ -22,7 +22,7 @@ func (m Model) helpLine() string {
 		return line
 	}
 	if m.focus == focusStatus {
-		hint := "status · ? help"
+		hint := m.diffContextLabel() + " · status · ? help"
 		if s := m.searchCounterLabel(); s != "" {
 			hint = s + " · " + hint
 		}
@@ -36,7 +36,7 @@ func (m Model) helpLine() string {
 	if m.wrapSoft {
 		wrapLabel = "on"
 	}
-	hint := "diff: mode:" + modeLabel + " · render:" + m.renderModeLabel() + " · wrap:" + wrapLabel + " · ? help"
+	hint := m.diffContextLabel() + " · diff: mode:" + modeLabel + " · render:" + m.renderModeLabel() + " · wrap:" + wrapLabel + " · ? help"
 	if s := m.searchCounterLabel(); s != "" {
 		hint = s + " · " + hint
 	}
@@ -62,6 +62,13 @@ func (m Model) searchCounterLabel() string {
 		icon = "󰍉"
 	}
 	return fmt.Sprintf("%s %d/%d", icon, idx, len(m.searchMatches))
+}
+
+func (m Model) diffContextLabel() string {
+	if m.settings.UseNerdFontIcons {
+		return fmt.Sprintf("󰉸 context: %d", m.currentDiffContextLines())
+	}
+	return fmt.Sprintf("context: %d", m.currentDiffContextLines())
 }
 
 func (m Model) renderFooterLine(hint string) string {
@@ -101,6 +108,14 @@ func (m Model) renderFooterLineWithPrefix(prefix, hint string) string {
 	sepW := ansi.StringWidth(sep)
 	statusMax := lineW - hintW - sepW
 	if statusMax <= 0 {
+		if leftText != "" {
+			left := leftText + sep
+			leftW := ansi.StringWidth(left)
+			if leftW >= lineW {
+				return ansi.Truncate(leftText, lineW, "")
+			}
+			return left + ansi.Truncate(hintStyled, lineW-leftW, "")
+		}
 		if hintW >= lineW {
 			return ansi.Truncate(hintStyled, lineW, "")
 		}
@@ -156,6 +171,7 @@ func stageHelpText() string {
 		"  d       discard file change (confirm)",
 		"  e       edit current file in $EDITOR",
 		"  enter   open diff view",
+		"  [ / ]   decrease/increase diff context",
 		"  r       refresh",
 		"",
 		"Diff Focus",
@@ -169,6 +185,7 @@ func stageHelpText() string {
 		"  , / .   previous/next file",
 		"  J / K   scroll diff viewport",
 		"  s       toggle unified/side-by-side",
+		"  [ / ]   decrease/increase diff context",
 		"  space   stage/unstage active hunk/line",
 		"  d       discard (unstaged) / unstage (staged)",
 		"  e       edit current file in $EDITOR",

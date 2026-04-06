@@ -104,6 +104,12 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 
 func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "[":
+		m.adjustDiffContextLines(-1)
+		return m, nil
+	case "]":
+		m.adjustDiffContextLines(1)
+		return m, nil
 	case "j", "down":
 		if m.selected < len(m.statusEntries)-1 {
 			m.selected++
@@ -182,6 +188,12 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "[":
+		m.adjustDiffContextLines(-1)
+		return m, nil
+	case "]":
+		m.adjustDiffContextLines(1)
+		return m, nil
 	case "esc", "q":
 		sec := m.currentSection()
 		if sec.visualActive {

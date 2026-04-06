@@ -208,7 +208,7 @@ func TestHelpLineRightAlignsHintAndTruncatesStatus(t *testing.T) {
 	if !strings.Contains(plain, "...") {
 		t.Fatalf("expected truncated status with ellipsis, got %q", plain)
 	}
-	if !strings.HasSuffix(plain, "· status · ? help") {
+	if !strings.HasSuffix(plain, "· 󰉸 context: 1 · status · ? help") {
 		t.Fatalf("expected hint right-aligned at end, got %q", plain)
 	}
 }
@@ -252,7 +252,7 @@ func TestBranchSummaryTitleShowsBaseOnlyWhenNonDefault(t *testing.T) {
 func TestHelpLineShowsVisualAtLeftInDiffFocus(t *testing.T) {
 	m := New(testutil.TempRepo(t))
 	m.ready = true
-	m.width = 64
+	m.width = 96
 	m.focus = focusDiff
 	m.navMode = navLine
 	m.unstaged.visualActive = true
@@ -263,7 +263,7 @@ func TestHelpLineShowsVisualAtLeftInDiffFocus(t *testing.T) {
 	if !strings.HasPrefix(plain, "VISUAL") {
 		t.Fatalf("expected VISUAL indicator at start of footer, got %q", plain)
 	}
-	if !strings.HasSuffix(plain, "· diff: mode:line · render:unified · wrap:on · ? help") {
+	if !strings.HasSuffix(plain, "· 󰉸 context: 1 · diff: mode:line · render:unified · wrap:on · ? help") {
 		t.Fatalf("expected diff hint at end of footer, got %q", plain)
 	}
 }
@@ -324,6 +324,65 @@ func TestToggleSideBySideModeWithSFromStatusPane(t *testing.T) {
 	m = updated.(Model)
 	if m.renderMode != renderUnified {
 		t.Fatalf("expected render mode unified after second toggle, got %v", m.renderMode)
+	}
+}
+
+func TestAdjustDiffContextLinesInDiffFocus(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "ctx.txt", "one\ntwo\nthree\n")
+	testutil.MustGitExported(t, repo, "add", "ctx.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+	testutil.WriteFile(t, repo, "ctx.txt", "zero\none\ntwo\nTHREE\n")
+
+	m := NewWithSettings(repo, Settings{DiffContextLines: 1, UseNerdFontIcons: true})
+	m.ready = true
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	if m.currentDiffContextLines() != 1 {
+		t.Fatalf("expected initial diff context 1, got %d", m.currentDiffContextLines())
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: ']', Text: "]"})
+	m = updated.(Model)
+	if m.currentDiffContextLines() != 2 {
+		t.Fatalf("expected diff context 2 after ], got %d", m.currentDiffContextLines())
+	}
+	if !strings.Contains(m.statusMsg, "diff context: 2") {
+		t.Fatalf("expected diff context status message, got %q", m.statusMsg)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '[', Text: "["})
+	m = updated.(Model)
+	if m.currentDiffContextLines() != 1 {
+		t.Fatalf("expected diff context 1 after [, got %d", m.currentDiffContextLines())
+	}
+}
+
+func TestAdjustDiffContextLinesIsSessionOnly(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "ctx-status.txt", "one\ntwo\n")
+	testutil.MustGitExported(t, repo, "add", "ctx-status.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+	testutil.WriteFile(t, repo, "ctx-status.txt", "ONE\ntwo\n")
+
+	m := NewWithSettings(repo, Settings{DiffContextLines: 3, UseNerdFontIcons: true})
+	m.ready = true
+	m.focus = focusStatus
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '[', Text: "["})
+	m = updated.(Model)
+	if m.currentDiffContextLines() != 2 {
+		t.Fatalf("expected session diff context 2 after [, got %d", m.currentDiffContextLines())
+	}
+	if m.settings.DiffContextLines != 3 {
+		t.Fatalf("expected settings diff context to remain 3, got %d", m.settings.DiffContextLines)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: ']', Text: "]"})
+	m = updated.(Model)
+	if m.currentDiffContextLines() != 3 {
+		t.Fatalf("expected session diff context 3 after ], got %d", m.currentDiffContextLines())
 	}
 }
 

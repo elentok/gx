@@ -199,12 +199,12 @@ func (m *Model) reloadDiffsForSelection() {
 	}
 	if file.IsUntracked() {
 		renderWidth := m.deltaRenderWidth()
-		raw, err := git.DiffUntrackedPath(m.worktreeRoot, file.Path, false, false, 0, m.settings.DiffContextLines)
+		raw, err := git.DiffUntrackedPath(m.worktreeRoot, file.Path, false, false, 0, m.currentDiffContextLines())
 		if err != nil {
 			m.showGitError(err)
 			raw = ""
 		}
-		col, err := git.DiffUntrackedPath(m.worktreeRoot, file.Path, true, m.renderMode == renderSideBySide, renderWidth, m.settings.DiffContextLines)
+		col, err := git.DiffUntrackedPath(m.worktreeRoot, file.Path, true, m.renderMode == renderSideBySide, renderWidth, m.currentDiffContextLines())
 		if err != nil {
 			col = raw
 		}
@@ -215,23 +215,23 @@ func (m *Model) reloadDiffsForSelection() {
 		return
 	}
 
-	unstagedRaw, err := git.DiffPath(m.worktreeRoot, file.Path, false, m.settings.DiffContextLines)
+	unstagedRaw, err := git.DiffPath(m.worktreeRoot, file.Path, false, m.currentDiffContextLines())
 	if err != nil {
 		m.showGitError(err)
 		unstagedRaw = ""
 	}
 	renderWidth := m.deltaRenderWidth()
-	unstagedColor, err := git.DiffPathWithDelta(m.worktreeRoot, file.Path, false, m.renderMode == renderSideBySide, renderWidth, m.settings.DiffContextLines)
+	unstagedColor, err := git.DiffPathWithDelta(m.worktreeRoot, file.Path, false, m.renderMode == renderSideBySide, renderWidth, m.currentDiffContextLines())
 	if err != nil {
 		unstagedColor = unstagedRaw
 	}
 
-	stagedRaw, err := git.DiffPath(m.worktreeRoot, file.Path, true, m.settings.DiffContextLines)
+	stagedRaw, err := git.DiffPath(m.worktreeRoot, file.Path, true, m.currentDiffContextLines())
 	if err != nil {
 		m.showGitError(err)
 		stagedRaw = ""
 	}
-	stagedColor, err := git.DiffPathWithDelta(m.worktreeRoot, file.Path, true, m.renderMode == renderSideBySide, renderWidth, m.settings.DiffContextLines)
+	stagedColor, err := git.DiffPathWithDelta(m.worktreeRoot, file.Path, true, m.renderMode == renderSideBySide, renderWidth, m.currentDiffContextLines())
 	if err != nil {
 		stagedColor = stagedRaw
 	}

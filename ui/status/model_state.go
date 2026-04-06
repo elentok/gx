@@ -65,12 +65,13 @@ type Model struct {
 	height int
 	ready  bool
 
-	focus          focusPane
-	section        diffSection
-	navMode        navMode
-	renderMode     diffRenderMode
-	diffFullscreen bool
-	wrapSoft       bool
+	focus            focusPane
+	section          diffSection
+	navMode          navMode
+	renderMode       diffRenderMode
+	diffFullscreen   bool
+	diffContextLines int
+	wrapSoft         bool
 
 	files         []git.StageFileStatus
 	branchName    string
@@ -193,17 +194,18 @@ func NewWithSettings(worktreeRoot string, settings Settings) Model {
 		settings.DiffContextLines = 20
 	}
 	m := Model{
-		worktreeRoot:  worktreeRoot,
-		settings:      settings,
-		focus:         focusStatus,
-		section:       sectionUnstaged,
-		navMode:       navHunk,
-		renderMode:    renderUnified,
-		wrapSoft:      true,
-		collapsedDirs: map[string]bool{},
-		selected:      0,
-		unstaged:      newSectionState(),
-		staged:        newSectionState(),
+		worktreeRoot:     worktreeRoot,
+		settings:         settings,
+		focus:            focusStatus,
+		section:          sectionUnstaged,
+		navMode:          navHunk,
+		renderMode:       renderUnified,
+		diffContextLines: settings.DiffContextLines,
+		wrapSoft:         true,
+		collapsedDirs:    map[string]bool{},
+		selected:         0,
+		unstaged:         newSectionState(),
+		staged:           newSectionState(),
 	}
 	m.reload("")
 	return m
