@@ -21,7 +21,7 @@ and [go-migration-plan.md](/docs/go-migration-plan.md)).
 - `gx wt list` and `gx wt abs-path` for scripting and shell integration
 - `gx status` interactive status UI with file/hunk/line stage + unstage flows
 - Press `/` to search and highlight matching worktrees by name or branch
-- Press `l` to open the selected worktree in lazygit
+- Press `g` to open the selected worktree in lazygit
 - `gx bump` creates an annotated version tag with an interactive picker (or pass `major`/`minor`/`patch` directly) and optionally pushes
 - `gx doctor` checks for and optionally fixes common configuration issues
 - Startup check for misconfigured fetch refspec with an option to fix automatically
@@ -95,13 +95,14 @@ Status UI highlights:
 - Yank content/location/all/filename with `yy` / `yl` / `ya` / `yf`
 - Status header shows branch sync at a glance (`✓`, `↑N`, `↓N`, `↑N ↓N`)
 - Live search in status/diff with highlights and `n` / `N` navigation
-- Vim-like navigation (`j`/`k`, `gg`/`G`, `ctrl+u`/`ctrl+d`)
+- Vim-like navigation (`j`/`k`, `G`, `ctrl+u`/`ctrl+d`)
 - Mouse wheel scrolling in diff panes (unstaged/staged, including fullscreen)
 - Toggle unified/side-by-side diff rendering with `s` (supports hunk, line, and visual actions)
 - Adjust diff context for the current session with `[` / `]`
 - File-to-file diff jumps with `,` / `.`
 - Edit selected file in `$EDITOR` with `e` (opens at selected line/hunk in diff view)
-- Open lazygit log with `ol`
+- Open lazygit log with `g`
+- View the last command output with `o`
 - Pull/push/rebase/amend actions directly in status (`p`/`P`/`b`/`A`) with confirmations; push confirms first, then checks divergence if needed
 - Push divergence flow uses a menu (`j`/`k` + `enter`) with relative commit times
 - Push in status detects GitHub PR URLs and asks whether to open them
@@ -214,7 +215,7 @@ Example:
 | `p`            | Pull selected worktree's branch (stash prompt if dirty)   |
 | `P`            | Push selected worktree's branch (confirms before pushing) |
 | `b`            | Rebase selected worktree on main (stash prompt if dirty)  |
-| `l`            | Open selected worktree in lazygit                         |
+| `g`            | Open selected worktree in lazygit                         |
 | `o`            | View output log of last pull/push job                     |
 | `/`            | Search worktrees by name or branch                        |
 | `t`            | Track remote branch (set upstream)                        |

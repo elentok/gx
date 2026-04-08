@@ -318,10 +318,15 @@ func runPush(d deps) error {
 	}
 
 	var div *git.PushDivergence
+	fetchLabel := fmt.Sprintf("Fetching %s before checking divergence...", remote)
+	fmt.Fprintln(d.stderr, fetchLabel)
+	if err := runGitInteractive(pushDir, d.stdin, d.stdout, d.stderr, "fetch", remote); err != nil {
+		return err
+	}
 	checkLabel := fmt.Sprintf("Checking remote divergence for %s...", branch)
 	if err := runWithSpinner(d.stdin, d.stderr, checkLabel, func() error {
 		var detectErr error
-		div, detectErr = git.DetectPushDivergence(pushDir, branch)
+		div, detectErr = git.DetectPushDivergenceAfterFetch(pushDir, branch)
 		return detectErr
 	}); err != nil {
 		return err
@@ -348,10 +353,8 @@ func runPush(d deps) error {
 			return nil
 		case 2:
 			forceLabel := fmt.Sprintf("Force-pushing %s to %s...", branch, remote)
-			if err := runWithSpinner(d.stdin, d.stderr, forceLabel, func() error {
-				_, err := git.PushBranchForce(pushDir, remote, branch)
-				return err
-			}); err != nil {
+			fmt.Fprintln(d.stderr, forceLabel)
+			if err := runGitInteractive(pushDir, d.stdin, d.stdout, d.stderr, "push", "--force", remote, branch); err != nil {
 				return err
 			}
 			fmt.Fprintf(d.stdout, "Force-pushed %s to %s with --force\n", branch, remote)
@@ -362,10 +365,8 @@ func runPush(d deps) error {
 	}
 
 	pushLabel := fmt.Sprintf("Pushing %s to %s...", branch, remote)
-	if err := runWithSpinner(d.stdin, d.stderr, pushLabel, func() error {
-		_, _, err := git.PushBranch(pushDir, remote, branch)
-		return err
-	}); err != nil {
+	fmt.Fprintln(d.stderr, pushLabel)
+	if err := runGitInteractive(pushDir, d.stdin, d.stdout, d.stderr, "push", remote, branch); err != nil {
 		if !git.IsNonFastForwardPushError(err) {
 			return err
 		}
@@ -379,9 +380,8 @@ func runPush(d deps) error {
 			return fmt.Errorf("push aborted")
 		}
 		forceLabel := fmt.Sprintf("Force-pushing %s to %s with lease...", branch, remote)
-		if forceErr := runWithSpinner(d.stdin, d.stderr, forceLabel, func() error {
-			return git.PushBranchForceWithLease(pushDir, remote, branch)
-		}); forceErr != nil {
+		fmt.Fprintln(d.stderr, forceLabel)
+		if forceErr := runGitInteractive(pushDir, d.stdin, d.stdout, d.stderr, "push", "--force-with-lease", remote, branch); forceErr != nil {
 			prompt := fmt.Sprintf("--force-with-lease failed: %v\nRun plain --force for %s/%s?", forceErr, remote, branch)
 			confirmedForce, confirmErr := d.confirmForce(prompt)
 			if confirmErr != nil {
@@ -391,10 +391,8 @@ func runPush(d deps) error {
 				return fmt.Errorf("push aborted after --force-with-lease failure")
 			}
 			forceLabel = fmt.Sprintf("Force-pushing %s to %s...", branch, remote)
-			if err := runWithSpinner(d.stdin, d.stderr, forceLabel, func() error {
-				_, err := git.PushBranchForce(pushDir, remote, branch)
-				return err
-			}); err != nil {
+			fmt.Fprintln(d.stderr, forceLabel)
+			if err := runGitInteractive(pushDir, d.stdin, d.stdout, d.stderr, "push", "--force", remote, branch); err != nil {
 				return err
 			}
 			fmt.Fprintf(d.stdout, "Force-pushed %s to %s with --force\n", branch, remote)
@@ -437,6 +435,21 @@ func choosePushDivergence(in io.Reader, out io.Writer, div *git.PushDivergence) 
 	default:
 		return 3, nil
 	}
+}
+
+func runGitInteractive(dir string, in io.Reader, out, errOut io.Writer, args ...string) error {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	cmd.Stdin = in
+	cmd.Stdout = out
+	cmd.Stderr = errOut
+	if err := cmd.Run(); err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return &git.RunError{Args: args, Dir: dir, Code: exitErr.ExitCode()}
+		}
+		return fmt.Errorf("git %s: %w", strings.Join(args, " "), err)
+	}
+	return nil
 }
 
 func relativeDate(t time.Time) string {

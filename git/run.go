@@ -3,6 +3,7 @@ package git
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -26,6 +27,7 @@ func (e *RunError) Error() string {
 func run(dir string, args []string) (stdout, stderr string, err error) {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
+	cmd.Env = NonInteractiveEnv()
 	var outBuf, errBuf bytes.Buffer
 	cmd.Stdout = &outBuf
 	cmd.Stderr = &errBuf
@@ -71,4 +73,13 @@ func joinOutput(stdout, stderr string) string {
 		return stdout
 	}
 	return stdout + "\n" + stderr
+}
+
+func NonInteractiveEnv() []string {
+	env := append([]string{}, os.Environ()...)
+	env = append(env, "GIT_TERMINAL_PROMPT=0")
+	if os.Getenv("GIT_SSH_COMMAND") == "" {
+		env = append(env, "GIT_SSH_COMMAND=ssh -o BatchMode=yes")
+	}
+	return env
 }

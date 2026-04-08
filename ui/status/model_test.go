@@ -1022,7 +1022,7 @@ func TestHunkOverflowViewportMarkers(t *testing.T) {
 	assertMarkers(false, "↑", "↓")
 }
 
-func TestGGAndGInStatusAndDiff(t *testing.T) {
+func TestGInStatusAndDiffJumpsBottom(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 	testutil.WriteFile(t, repo, "b.txt", "two\n")
@@ -1031,17 +1031,9 @@ func TestGGAndGInStatusAndDiff(t *testing.T) {
 	m := New(repo)
 	m.ready = true
 	m.focus = focusStatus
-	m.selected = 1
+	m.selected = 0
 
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
-	m = updated.(Model)
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
-	m = updated.(Model)
-	if m.selected != 0 {
-		t.Fatalf("expected gg to jump status selection to top, got %d", m.selected)
-	}
-
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'G', Text: "G"})
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	m = updated.(Model)
 	if m.selected != len(m.statusEntries)-1 {
 		t.Fatalf("expected G to jump status selection to bottom, got %d", m.selected)
@@ -1053,15 +1045,7 @@ func TestGGAndGInStatusAndDiff(t *testing.T) {
 	if len(m.unstaged.parsed.Changed) == 0 {
 		t.Fatalf("expected unstaged changes in diff view")
 	}
-	m.unstaged.activeLine = len(m.unstaged.parsed.Changed) - 1
-
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
-	m = updated.(Model)
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
-	m = updated.(Model)
-	if m.unstaged.activeLine != 0 {
-		t.Fatalf("expected gg to jump active diff line to top, got %d", m.unstaged.activeLine)
-	}
+	m.unstaged.activeLine = 0
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	m = updated.(Model)
@@ -1512,28 +1496,19 @@ func TestCCTriggersCommitCommand(t *testing.T) {
 	}
 }
 
-func TestOLTriggersLazygitLogCommand(t *testing.T) {
+func TestGTriggersLazygitLogCommand(t *testing.T) {
 	repo := testutil.TempRepo(t)
 
 	m := New(repo)
 	m.ready = true
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
-	if cmd != nil {
-		t.Fatalf("first o should not launch command")
-	}
-	m = updated.(Model)
-	if m.keyPrefix != "o" {
-		t.Fatalf("expected keyPrefix=o after first o, got %q", m.keyPrefix)
-	}
-
-	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	if cmd == nil {
-		t.Fatalf("second key should launch lazygit log command")
+		t.Fatalf("g should launch lazygit log command")
 	}
 	m = updated.(Model)
 	if m.keyPrefix != "" {
-		t.Fatalf("expected keyPrefix reset after ol, got %q", m.keyPrefix)
+		t.Fatalf("expected keyPrefix empty after g, got %q", m.keyPrefix)
 	}
 }
 

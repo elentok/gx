@@ -27,10 +27,18 @@ func DetectPushDivergence(worktreePath, branch string) (*PushDivergence, error) 
 	if upstream == "" {
 		return nil, nil
 	}
-	remote := BranchRemote(Repo{Root: worktreePath}, branch)
 	if err := Fetch(worktreePath, "origin"); err != nil {
 		return nil, err
 	}
+	return DetectPushDivergenceAfterFetch(worktreePath, branch)
+}
+
+func DetectPushDivergenceAfterFetch(worktreePath, branch string) (*PushDivergence, error) {
+	upstream := UpstreamBranch(worktreePath, branch)
+	if upstream == "" {
+		return nil, nil
+	}
+	remote := BranchRemote(Repo{Root: worktreePath}, branch)
 	status, err := syncBetween(worktreePath, branch, upstream)
 	if err != nil {
 		return nil, err

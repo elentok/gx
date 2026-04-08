@@ -3,26 +3,26 @@ package worktrees
 import "charm.land/bubbles/v2/key"
 
 type keyMap struct {
-	Up              key.Binding
-	Down            key.Binding
-	New             key.Binding
-	NewTmuxSession  key.Binding
-	NewTmuxWindow   key.Binding
-	Delete          key.Binding
-	Rename          key.Binding
-	Clone           key.Binding
-	Yank            key.Binding
-	Pull            key.Binding
-	Push            key.Binding
-	Rebase          key.Binding
-	Lazygit         key.Binding
-	Search          key.Binding
-	Track           key.Binding
-	Refresh         key.Binding
-	RemoteUpdate    key.Binding
-	Logs            key.Binding
-	Help            key.Binding
-	Quit            key.Binding
+	Up             key.Binding
+	Down           key.Binding
+	New            key.Binding
+	NewTmuxSession key.Binding
+	NewTmuxWindow  key.Binding
+	Delete         key.Binding
+	Rename         key.Binding
+	Clone          key.Binding
+	Yank           key.Binding
+	Pull           key.Binding
+	Push           key.Binding
+	Rebase         key.Binding
+	Lazygit        key.Binding
+	Search         key.Binding
+	Track          key.Binding
+	Refresh        key.Binding
+	RemoteUpdate   key.Binding
+	Logs           key.Binding
+	Help           key.Binding
+	Quit           key.Binding
 }
 
 var keys = keyMap{
@@ -75,8 +75,8 @@ var keys = keyMap{
 		key.WithHelp("P", "push"),
 	),
 	Lazygit: key.NewBinding(
-		key.WithKeys("l"),
-		key.WithHelp("l", "lazygit"),
+		key.WithKeys("g"),
+		key.WithHelp("g", "lazygit"),
 	),
 	Search: key.NewBinding(
 		key.WithKeys("/"),

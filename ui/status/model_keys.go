@@ -6,33 +6,11 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	key := msg.String()
 	shiftG := (msg.Mod&tea.ModShift) != 0 && (msg.Code == 'g' || msg.Code == 'G' || msg.Text == "g" || msg.Text == "G")
 	isUpperG := key == "G" || key == "shift+g" || msg.Text == "G" || msg.ShiftedCode == 'G' || shiftG
-	isLowerG := key == "g" && !isUpperG && (msg.Mod&tea.ModShift) == 0
 	if m.keyPrefix == "c" {
 		m.keyPrefix = ""
 		if key == "c" {
 			m.setStatus("opening git commit...")
 			return m, cmdGitCommit(m.worktreeRoot), true
-		}
-		if key == "esc" {
-			m.clearStatus()
-			return m, nil, true
-		}
-	}
-	if m.keyPrefix == "g" {
-		m.keyPrefix = ""
-		if isLowerG {
-			m.jumpToTop()
-			if m.focus == focusStatus {
-				return m, m.scheduleDiffReload(), true
-			}
-			return m, nil, true
-		}
-		if isUpperG {
-			m.jumpToBottom()
-			if m.focus == focusStatus {
-				return m, m.scheduleDiffReload(), true
-			}
-			return m, nil, true
 		}
 		if key == "esc" {
 			m.clearStatus()
@@ -59,17 +37,6 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 			return m, nil, true
 		}
 	}
-	if m.keyPrefix == "o" {
-		m.keyPrefix = ""
-		if key == "l" {
-			m.setStatus("opening lazygit log...")
-			return m, cmdLazygitLog(m.worktreeRoot), true
-		}
-		if key == "esc" {
-			m.clearStatus()
-			return m, nil, true
-		}
-	}
 	if key == "c" {
 		m.keyPrefix = "c"
 		m.setStatus("cc: git commit")
@@ -80,14 +47,16 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		m.setStatus("yy: content · yl: location · ya: all · yf: filename")
 		return m, nil, true
 	}
-	if key == "o" {
-		m.keyPrefix = "o"
-		m.setStatus("ol: open lazygit log")
-		return m, nil, true
+	if key == "g" && !isUpperG {
+		m.setStatus("opening lazygit log...")
+		return m, cmdLazygitLog(m.worktreeRoot), true
 	}
-	if isLowerG {
-		m.keyPrefix = "g"
-		m.setStatus("gg: jump to top")
+	if key == "o" {
+		if m.outputContent == "" {
+			m.setStatus("no command output")
+			return m, nil, true
+		}
+		m.openOutputModal()
 		return m, nil, true
 	}
 	if isUpperG {
@@ -141,8 +110,7 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "s":
 		m.toggleRenderMode()
 	case "p":
-		m.startPullAction()
-		return m, actionPollCmd()
+		return m.startPullAction()
 	case "P":
 		if err := m.preparePushConfirm(); err != nil {
 			m.showGitError(err)

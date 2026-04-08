@@ -52,9 +52,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case modePushDiverged:
 			return m.handlePushDivergedKey(msg)
 		}
+		if handledModel, cmd, handled := m.handleOutputKey(msg); handled {
+			return handledModel, cmd
+		}
 		switch {
-		case key.Matches(msg, keys.Logs) && m.lastJobLog != "":
-			return m.enterLogsMode(), nil
 		case key.Matches(msg, keys.Search) && !m.spinnerActive:
 			m = m.enterSearchMode()
 			return m, nil
@@ -251,6 +252,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Batch(cmds...)
 
+	case stashPullStartedMsg:
+		m.spinnerActive = false
+		m.lastJobLog = msg.log
+		m.lastJobLabel = "Pull output"
+		if msg.err != nil {
+			return m.showError(msg.err.Error()), nil
+		}
+		m.spinnerActive = true
+		m.spinnerLabel = "Pulling " + msg.wt.Name + "…"
+		return m, tea.Batch(cmdPullAfterStash(msg.wt, msg.log), m.spinner.Tick)
+
 	case stashPullResultMsg:
 		m.spinnerActive = false
 		m.lastJobLog = msg.log
@@ -258,7 +270,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			if msg.stashed {
 				prompt := fmt.Sprintf("Pull failed: %s\n\nPop stash?", msg.err.Error())
-				m = m.enterConfirm(prompt, cmdStashPop(msg.wtPath, "pull"), "Popping stash…")
+				m = m.enterConfirm(prompt, cmdStashPop(msg.wtPath, "pull", msg.log), "Popping stash…")
 				m.confirmYes = true
 				return m, nil
 			}
@@ -267,7 +279,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.stashed {
 			m.spinnerActive = true
 			m.spinnerLabel = "Popping stash…"
-			return m, tea.Batch(cmdStashPop(msg.wtPath, "pull"), m.spinner.Tick)
+			return m, tea.Batch(cmdStashPop(msg.wtPath, "pull", msg.log), m.spinner.Tick)
 		}
 		// Should not reach here (stashPull always stashes), but handle gracefully
 		m.statusGen++
@@ -296,7 +308,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			if msg.stashed {
 				prompt := fmt.Sprintf("Rebase failed: %s\n\nPop stash?", msg.err.Error())
-				m = m.enterConfirm(prompt, cmdStashPop(msg.wtPath, "rebase"), "Popping stash…")
+				m = m.enterConfirm(prompt, cmdStashPop(msg.wtPath, "rebase", msg.log), "Popping stash…")
 				m.confirmYes = true
 				return m, nil
 			}
@@ -305,7 +317,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.stashed {
 			m.spinnerActive = true
 			m.spinnerLabel = "Popping stash…"
-			return m, tea.Batch(cmdStashPop(msg.wtPath, "rebase"), m.spinner.Tick)
+			return m, tea.Batch(cmdStashPop(msg.wtPath, "rebase", msg.log), m.spinner.Tick)
 		}
 		m.statusGen++
 		m.statusMsg = "Rebased"
@@ -325,6 +337,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case stashPopResultMsg:
 		m.spinnerActive = false
+		m.lastJobLog = msg.log
 		if msg.err != nil {
 			return m.showError(fmt.Sprintf("Stash pop failed: %s", msg.err.Error())), nil
 		}
@@ -379,7 +392,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			wt := m.selectedWorktree()
 			if wt != nil && git.IsNonFastForwardPushError(msg.err) {
-				return m.enterConfirm(forcePushPrompt(*wt), cmdForcePush(m.repo, *wt), "Force-pushing "+wt.Name+"…"), nil
+				return m.enterConfirm(forcePushPrompt(*wt), cmdForcePush(m.repo, *wt, msg.log), "Force-pushing "+wt.Name+"…"), nil
 			}
 			return m.showError(msg.err.Error()), nil
 		}
@@ -399,6 +412,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(cmds...)
 		}
 		return m, tea.Batch(cmds...)
+
+	case pushFetchResultMsg:
+		m.spinnerActive = false
+		if msg.log != "" {
+			m.lastJobLog = msg.log
+			m.lastJobLabel = "Fetch output"
+		}
+		if msg.err != nil {
+			return m.showError(msg.err.Error()), nil
+		}
+		div, err := git.DetectPushDivergenceAfterFetch(msg.wt.Path, msg.wt.Branch)
+		if err != nil {
+			return m.showError(err.Error()), nil
+		}
+		if div != nil {
+			return m.enterPushDivergedMode(msg.wt, div), nil
+		}
+		m.spinnerActive = true
+		m.spinnerLabel = "Pushing " + msg.wt.Name + "…"
+		return m, tea.Batch(cmdPushInteractive(m.repo, msg.wt, msg.log), m.spinner.Tick)
 
 	case lazygitFinishedMsg:
 		if msg.err != nil {

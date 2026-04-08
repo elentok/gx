@@ -44,6 +44,8 @@ func (m Model) View() tea.View {
 	out := lipgloss.JoinVertical(lipgloss.Left, body, footer)
 	if m.runningOpen {
 		out = overlayModal(out, m.runningModalView(), m.width, m.height)
+	} else if m.outputOpen {
+		out = overlayModal(out, m.outputModalView(), m.width, m.height)
 	} else if m.confirmOpen {
 		out = overlayModal(out, m.confirmModalView(), m.width, m.height)
 	} else if m.errorOpen {

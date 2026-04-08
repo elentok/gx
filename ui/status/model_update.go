@@ -53,11 +53,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.reloadDiffsForSelection()
 		}
 		return m, nil
+	case pushFetchFinishedMsg:
+		m.recordCommandOutput("Fetch output", msg.output)
+		m.pendingActionOutput = msg.output
+		if msg.err != nil {
+			m.pendingActionOutput = ""
+			m.showGitError(msg.err)
+			return m, nil
+		}
+		m.openCheckingDivergence()
+		return m, cmdPushPreflight(m.worktreeRoot)
 	case pushPreflightMsg:
 		m.runningOpen = false
 		m.runningDone = false
 		m.runningRunner = nil
 		if msg.err != nil {
+			m.pendingActionOutput = ""
 			m.showGitError(msg.err)
 			return m, nil
 		}
@@ -84,9 +95,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
+		initialOutput := m.pendingActionOutput
+		m.pendingActionOutput = ""
 		runner := newStageActionRunner(actionPush, m.worktreeRoot, msg.remote, msg.branch)
-		m.openRunning("Push", runner)
-		return m, actionPollCmd()
+		return m.startInteractiveGitActionWithOutput(actionPush, "Push", runner.remote, runner.branch, initialOutput, "push", runner.remote, runner.branch)
+	case interactiveGitActionFinishedMsg:
+		m.handleActionResult(msg.res)
+		return m, nil
 	case tea.MouseWheelMsg:
 		if m.handleMouseWheel(msg) {
 			return m, nil
@@ -105,6 +120,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.runningOpen {
 			return m.handleRunningKey(msg)
+		}
+		if m.outputOpen {
+			return m.handleOutputKey(msg)
 		}
 		if m.confirmOpen {
 			return m.handleConfirmKey(msg)

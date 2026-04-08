@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"os/exec"
 	"sync"
+
+	"gx/git"
 )
 
 // CommandRunner executes a command, streams combined output, and supports cancel.
@@ -89,6 +91,9 @@ func (r *CommandRunner) Wait() error {
 func (r *CommandRunner) run() error {
 	cmd := exec.Command(r.cmdName, r.args...)
 	cmd.Dir = r.dir
+	if r.cmdName == "git" {
+		cmd.Env = git.NonInteractiveEnv()
+	}
 	cmd.Stdout = commandRunnerOutputWriter{runner: r}
 	cmd.Stderr = commandRunnerOutputWriter{runner: r}
 

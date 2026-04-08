@@ -118,6 +118,11 @@ type Model struct {
 	runningContent          string
 	runningRunner           *stageActionRunner
 	runningDone             bool
+	outputOpen              bool
+	outputTitle             string
+	outputContent           string
+	outputViewport          viewport.Model
+	pendingActionOutput     string
 	flash                   flashState
 	keyPrefix               string
 }
@@ -149,6 +154,17 @@ type pushPreflightMsg struct {
 	branch     string
 	remote     string
 	divergence *git.PushDivergence
+}
+
+type pushFetchFinishedMsg struct {
+	err    error
+	branch string
+	remote string
+	output string
+}
+
+type interactiveGitActionFinishedMsg struct {
+	res stageActionResult
 }
 
 type commitFinishedMsg struct {

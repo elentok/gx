@@ -1,6 +1,7 @@
 package stage
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -73,6 +74,25 @@ func TestPushResultWithPRURLOpensConfirm(t *testing.T) {
 	}
 }
 
+func TestStageActionRunnerAccumulatesCompositePullOutput(t *testing.T) {
+	repo := testutil.TempBareRepoWithMainWorktreeAhead(t)
+	mainWt := filepath.Join(repo, "main")
+	testutil.WriteFile(t, mainWt, "README.md", "modified")
+
+	runner := newStageActionRunner(actionPull, mainWt, "", "")
+	res := runner.runPullLike(actionPull)
+	res.output = runner.log.String()
+
+	if res.err != nil {
+		t.Fatalf("run pull action: %v\n%s", res.err, res.output)
+	}
+	for _, want := range []string{"$ git stash push -u -m gx-stage-auto-stash", "$ git pull", "$ git stash pop"} {
+		if !strings.Contains(res.output, want) {
+			t.Fatalf("expected output to include %q, got:\n%s", want, res.output)
+		}
+	}
+}
+
 func TestPreparePushConfirm_DivergedUsesRemoteAndUpstreamSeparately(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	remote := t.TempDir() + "/remote.git"
@@ -101,6 +121,11 @@ func TestPreparePushConfirm_DivergedUsesRemoteAndUpstreamSeparately(t *testing.T
 	m = updated.(Model)
 	if cmd == nil {
 		t.Fatalf("expected push preflight command after confirming push")
+	}
+	updated, cmd = m.Update(pushFetchFinishedMsg{branch: m.confirmBranch, remote: m.confirmRemote})
+	m = updated.(Model)
+	if cmd == nil {
+		t.Fatalf("expected push preflight command after fetch")
 	}
 	updated, _ = m.Update(cmd())
 	m = updated.(Model)
