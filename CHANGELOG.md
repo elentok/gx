@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.11.3
+
+- User-initiated Git network actions now run interactively so SSH key passphrase prompts can be answered in `gx push`, `gx status`, and `gx wt`
+- Background Git commands still fail fast on credential prompts to avoid hanging the UI
+- Added `o` to view the latest command output in `gx status` and `gx wt`; composite actions now include labeled output for every step, such as stash, pull/rebase/push, and stash pop
+- Changed lazygit shortcuts to `g` in `gx status` and `gx wt`
+
 ## v0.11.2
 
 - Added session-scoped diff context controls in `gx status` with `[` / `]`, clamped to a minimum of `-U1`
