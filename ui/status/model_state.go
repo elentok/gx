@@ -118,6 +118,10 @@ type Model struct {
 	runningContent          string
 	runningRunner           *stageActionRunner
 	runningDone             bool
+	credentialOpen          bool
+	credentialPrompt        string
+	credentialInput         textinput.Model
+	credentialSecret        bool
 	outputOpen              bool
 	outputTitle             string
 	outputContent           string
@@ -149,23 +153,6 @@ type flashTickMsg struct{}
 type statusTickMsg struct{}
 type actionPollMsg struct{}
 type diffReloadMsg struct{ seq int }
-type pushPreflightMsg struct {
-	err        error
-	branch     string
-	remote     string
-	divergence *git.PushDivergence
-}
-
-type pushFetchFinishedMsg struct {
-	err    error
-	branch string
-	remote string
-	output string
-}
-
-type interactiveGitActionFinishedMsg struct {
-	res stageActionResult
-}
 
 type commitFinishedMsg struct {
 	err       error

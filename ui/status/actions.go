@@ -11,6 +11,7 @@ import (
 	"gx/ui"
 	"gx/ui/components"
 
+	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	humanize "github.com/dustin/go-humanize"
@@ -36,6 +37,7 @@ type stageActionKind int
 
 const (
 	actionPull stageActionKind = iota
+	actionPushFetch
 	actionPush
 	actionForcePush
 	actionRebase
@@ -70,13 +72,17 @@ type stageActionRunner struct {
 }
 
 func newStageActionRunner(kind stageActionKind, root, remote, branch string) *stageActionRunner {
+	return newStageActionRunnerWithOutput(kind, root, remote, branch, "")
+}
+
+func newStageActionRunnerWithOutput(kind stageActionKind, root, remote, branch, initialOutput string) *stageActionRunner {
 	return &stageActionRunner{
 		kind:   kind,
 		root:   root,
 		remote: remote,
 		branch: branch,
-		runner: components.NewCommandRunner(root, "git"),
-		log:    ui.NewCommandOutputLog(),
+		runner: components.NewCommandRunnerWithPolicy(root, "git", components.CredentialPolicyPrompt),
+		log:    ui.CommandOutputLogFrom(initialOutput),
 		done:   make(chan stageActionResult, 1),
 	}
 }
@@ -97,6 +103,14 @@ func (r *stageActionRunner) Consume() string {
 	return r.runner.Consume()
 }
 
+func (r *stageActionRunner) Prompt() (components.CredentialPrompt, bool) {
+	return r.runner.Prompt()
+}
+
+func (r *stageActionRunner) SubmitPromptInput(input string) error {
+	return r.runner.SubmitPromptInput(input)
+}
+
 func (r *stageActionRunner) Result() (stageActionResult, bool) {
 	if r.ok {
 		return r.res, true
@@ -115,6 +129,10 @@ func (r *stageActionRunner) run() stageActionResult {
 	switch r.kind {
 	case actionPull:
 		return r.runPullLike(actionPull)
+	case actionPushFetch:
+		res := stageActionResult{kind: r.kind, remote: r.remote, branch: r.branch}
+		res.err = r.execGit("fetch", r.remote)
+		return res
 	case actionRebase:
 		return r.runPullLike(actionRebase)
 	case actionPush:
@@ -208,7 +226,7 @@ func (r *stageActionRunner) runPullLike(kind stageActionKind) stageActionResult 
 }
 
 func (r *stageActionRunner) execGit(args ...string) error {
-	r.runner = components.NewCommandRunner(r.root, "git", args...)
+	r.runner = components.NewCommandRunnerWithPolicy(r.root, "git", components.CredentialPolicyPrompt, args...)
 	r.runner.Start()
 	err := r.runner.Wait()
 	out := r.runner.Output()
@@ -225,36 +243,6 @@ func (r *stageActionRunner) execGit(args ...string) error {
 func actionPollCmd() tea.Cmd {
 	return tea.Tick(120*time.Millisecond, func(time.Time) tea.Msg {
 		return actionPollMsg{}
-	})
-}
-
-func cmdPushPreflight(root string) tea.Cmd {
-	return func() tea.Msg {
-		branch, err := git.CurrentBranch(root)
-		if err != nil {
-			return pushPreflightMsg{err: err}
-		}
-		if branch == "" || branch == "HEAD" {
-			return pushPreflightMsg{err: fmt.Errorf("cannot push: detached HEAD")}
-		}
-		remote := git.BranchRemote(git.Repo{Root: root}, branch)
-		div, err := git.DetectPushDivergenceAfterFetch(root, branch)
-		if err != nil {
-			return pushPreflightMsg{err: err}
-		}
-		return pushPreflightMsg{branch: branch, remote: remote, divergence: div}
-	}
-}
-
-func cmdInteractivePushFetch(root, branch, remote string) tea.Cmd {
-	rec := ui.NewCommandOutputRecorder()
-	c := exec.Command("git", "fetch", remote)
-	c.Dir = root
-	rec.Attach(c)
-	return tea.ExecProcess(c, func(err error) tea.Msg {
-		log := ui.NewCommandOutputLog()
-		log.AppendCommand("git", []string{"fetch", remote}, rec.Output().String())
-		return pushFetchFinishedMsg{err: err, branch: branch, remote: remote, output: log.String()}
 	})
 }
 
@@ -292,6 +280,47 @@ func (m *Model) appendRunningOutput(chunk string) {
 func (m *Model) handleActionResult(res stageActionResult) {
 	if strings.TrimSpace(res.output) != "" {
 		m.recordCommandOutput(stageActionOutputTitle(res.kind), res.output)
+	}
+	if res.kind == actionPushFetch {
+		m.pendingActionOutput = ""
+		if res.err != nil {
+			m.showGitError(fmt.Errorf("%w\n%s", res.err, strings.TrimSpace(res.output)))
+			m.runningOpen = false
+			return
+		}
+		div, err := git.DetectPushDivergenceAfterFetch(m.worktreeRoot, res.branch)
+		if err != nil {
+			m.showGitError(err)
+			m.runningOpen = false
+			return
+		}
+		if div != nil {
+			m.pendingActionOutput = res.output
+			m.openConfirm(
+				fmt.Sprintf("Branch %s has diverged from the remote branch:", div.Branch),
+				[]string{
+					"",
+					fmt.Sprintf("Last local commit: %s", humanizeOrUnknown(div.Local.Date)),
+					fmt.Sprintf("  %s %s", div.Local.Hash, div.Local.Message),
+					"",
+					fmt.Sprintf("Last remote commit: %s", humanizeOrUnknown(div.RemoteHead.Date)),
+					fmt.Sprintf("  %s %s", div.RemoteHead.Hash, div.RemoteHead.Message),
+				},
+				confirmPushDiverged,
+				div.Remote,
+				res.branch,
+			)
+			m.confirmUpstream = div.Upstream
+			m.confirmMenu = components.MenuState{
+				Items:  []components.MenuItem{{Label: "Rebase", Value: "rebase"}, {Label: "Push --force", Value: "force"}, {Label: "Abort", Value: "abort"}},
+				Cursor: 0,
+			}
+			m.runningOpen = false
+			return
+		}
+		runner := newStageActionRunnerWithOutput(actionPush, m.worktreeRoot, res.remote, res.branch, res.output)
+		m.openRunning("Push", runner)
+		return
 	}
 	if res.promptForce {
 		m.openConfirm("Force push?", []string{"Push was rejected as non-fast-forward.", "Force push with --force?"}, confirmForcePush, res.remote, res.branch)
@@ -358,6 +387,45 @@ func (m *Model) handleRunningKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+func newCredentialInput(secret bool) textinput.Model {
+	ti := textinput.New()
+	ti.Focus()
+	if secret {
+		ti.EchoMode = textinput.EchoPassword
+		ti.EchoCharacter = '*'
+	}
+	return ti
+}
+
+func (m *Model) openCredentialPrompt(prompt components.CredentialPrompt) {
+	m.credentialPrompt = prompt.Text
+	m.credentialSecret = prompt.Kind == components.PromptKindSecret
+	m.credentialInput = newCredentialInput(m.credentialSecret)
+	m.credentialOpen = true
+}
+
+func (m *Model) handleCredentialKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		if m.runningRunner != nil {
+			m.runningRunner.Cancel()
+		}
+		m.credentialOpen = false
+		m.credentialPrompt = ""
+		return m, nil
+	case "enter":
+		if m.runningRunner != nil {
+			_ = m.runningRunner.SubmitPromptInput(m.credentialInput.Value())
+		}
+		m.credentialOpen = false
+		m.credentialPrompt = ""
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.credentialInput, cmd = m.credentialInput.Update(msg)
+	return m, cmd
+}
+
 func (m *Model) handleConfirmKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.confirmAction == confirmPushDiverged {
 		next, decided, accepted, handled := components.UpdateMenu(msg, m.confirmMenu)
@@ -388,13 +456,17 @@ func (m *Model) handleConfirmKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			if target == "" {
 				target = strings.TrimSpace(m.confirmRemote)
 			}
-			return m.startInteractiveGitActionWithOutput(actionRebase, "Rebase on "+target, target, m.confirmBranch, initialOutput, "rebase", target)
+			runner := newStageActionRunnerWithOutput(actionRebase, m.worktreeRoot, target, m.confirmBranch, initialOutput)
+			m.openRunning("Rebase on "+target, runner)
+			return m, actionPollCmd()
 		case "force":
 			m.confirmOpen = false
 			m.confirmAction = confirmNone
 			initialOutput := m.pendingActionOutput
 			m.pendingActionOutput = ""
-			return m.startInteractiveGitActionWithOutput(actionForcePush, "Force push", m.confirmRemote, m.confirmBranch, initialOutput, "push", "--force", m.confirmRemote, m.confirmBranch)
+			runner := newStageActionRunnerWithOutput(actionForcePush, m.worktreeRoot, m.confirmRemote, m.confirmBranch, initialOutput)
+			m.openRunning("Force push", runner)
+			return m, actionPollCmd()
 		default:
 			m.confirmOpen = false
 			m.confirmAction = confirmNone
@@ -432,16 +504,21 @@ func (m Model) confirmAccept() (tea.Model, tea.Cmd) {
 
 	switch a {
 	case confirmPush:
-		m.setStatus("fetching " + m.confirmRemote + "...")
-		return m, cmdInteractivePushFetch(m.worktreeRoot, m.confirmBranch, m.confirmRemote)
+		runner := newStageActionRunner(actionPushFetch, m.worktreeRoot, m.confirmRemote, m.confirmBranch)
+		m.openRunning("Checking push status", runner)
+		return m, actionPollCmd()
 	case confirmRebase:
 		titleTarget := strings.TrimSpace(m.confirmRemote)
 		if titleTarget == "" {
 			titleTarget = detectRebaseTarget(m.worktreeRoot)
 		}
-		return m.startInteractiveGitAction(actionRebase, "Rebase on "+titleTarget, titleTarget, m.confirmBranch, "rebase", titleTarget)
+		runner := newStageActionRunner(actionRebase, m.worktreeRoot, titleTarget, m.confirmBranch)
+		m.openRunning("Rebase on "+titleTarget, runner)
+		return m, actionPollCmd()
 	case confirmForcePush:
-		return m.startInteractiveGitAction(actionForcePush, "Force push", m.confirmRemote, m.confirmBranch, "push", "--force", m.confirmRemote, m.confirmBranch)
+		runner := newStageActionRunner(actionForcePush, m.worktreeRoot, m.confirmRemote, m.confirmBranch)
+		m.openRunning("Force push", runner)
+		return m, actionPollCmd()
 	case confirmPullPopStash:
 		runner := newStageActionRunner(actionPopStashPull, m.worktreeRoot, "", "")
 		m.openRunning("Pop stash", runner)
@@ -514,32 +591,12 @@ func (m *Model) openRunning(title string, runner *stageActionRunner) {
 	runner.Start()
 }
 
-func (m Model) startInteractiveGitAction(kind stageActionKind, title, remote, branch string, args ...string) (tea.Model, tea.Cmd) {
-	return m.startInteractiveGitActionWithOutput(kind, title, remote, branch, "", args...)
-}
-
-func (m Model) startInteractiveGitActionWithOutput(kind stageActionKind, title, remote, branch, initialOutput string, args ...string) (tea.Model, tea.Cmd) {
-	m.setStatus(strings.ToLower(title) + "...")
-	return m, cmdInteractiveGitAction(m.worktreeRoot, kind, remote, branch, initialOutput, args...)
-}
-
-func cmdInteractiveGitAction(root string, kind stageActionKind, remote, branch, initialOutput string, args ...string) tea.Cmd {
-	rec := ui.NewCommandOutputRecorder()
-	c := exec.Command("git", args...)
-	c.Dir = root
-	rec.Attach(c)
-	return tea.ExecProcess(c, func(err error) tea.Msg {
-		log := ui.CommandOutputLogFrom(initialOutput)
-		log.AppendCommand("git", args, rec.Output().String())
-		res := stageActionResult{kind: kind, err: err, remote: remote, branch: branch, output: log.String()}
-		return interactiveGitActionFinishedMsg{res: res}
-	})
-}
-
 func stageActionOutputTitle(kind stageActionKind) string {
 	switch kind {
 	case actionPull:
 		return "Pull output"
+	case actionPushFetch:
+		return "Fetch output"
 	case actionPush:
 		return "Push output"
 	case actionForcePush:
@@ -610,7 +667,9 @@ func (m *Model) openConfirm(title string, lines []string, action stageConfirmAct
 }
 
 func (m Model) startPullAction() (tea.Model, tea.Cmd) {
-	return m.startInteractiveGitAction(actionPull, "Pull", "", "", "pull")
+	runner := newStageActionRunner(actionPull, m.worktreeRoot, "", "")
+	m.openRunning("Pull", runner)
+	return m, actionPollCmd()
 }
 
 func (m *Model) preparePushConfirm() error {
@@ -760,6 +819,24 @@ func (m Model) outputModalView() string {
 		catYellow,
 		catSubtle,
 		m.outputViewport.Width(),
+	)
+}
+
+func (m Model) credentialModalView() string {
+	title := "Credential Required"
+	input := m.credentialInput.View()
+	if input == "" {
+		input = " "
+	}
+	return components.RenderInputModal(
+		title,
+		m.credentialPrompt,
+		input,
+		"enter submit · esc cancel",
+		catBlue,
+		catBlue,
+		catSubtle,
+		0,
 	)
 }
 

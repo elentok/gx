@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"gx/git"
+	"gx/ui"
 	"gx/ui/components"
 
 	"charm.land/bubbles/v2/key"
@@ -35,6 +36,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleErrorKey(msg)
 		case modeConfirm:
 			return m.handleConfirmKey(msg)
+		case modeCredentialPrompt:
+			return m.handleCredentialKey(msg)
 		case modeRename:
 			return m.handleRenameKey(msg)
 		case modeClone:
@@ -101,9 +104,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						"Pull aborted (dirty worktree)",
 					), nil
 				}
-				m.spinnerActive = true
-				m.spinnerLabel = "Pulling " + wt.Name + "…"
-				return m, tea.Batch(cmdPull(*wt), m.spinner.Tick)
+				return m, cmdStartPromptableJob(promptableJobPull, *wt, "", false)
 			}
 		case key.Matches(msg, keys.Push) && len(m.worktrees) > 0 && !m.spinnerActive:
 			wt := m.selectedWorktree()
@@ -112,7 +113,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m.showError("cannot push: worktree is in detached HEAD state"), nil
 				}
 				prompt := fmt.Sprintf("Push %s?", wt.Branch)
-				return m.enterConfirm(prompt, cmdPush(m.repo, *wt), "Checking remote divergence…"), nil
+				return m.enterConfirm(prompt, cmdStartPromptableJob(promptableJobPushFetch, *wt, "", false), "Checking remote divergence…"), nil
 			}
 		case key.Matches(msg, keys.Rebase) && len(m.worktrees) > 0 && !m.spinnerActive:
 			wt := m.selectedWorktree()
@@ -216,7 +217,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case promptableJobStartMsg:
+		args := promptableJobArgs(m.repo, msg.kind, msg.wt)
+		runner := components.NewCommandRunnerWithPolicy(msg.wt.Path, "git", components.CredentialPolicyPrompt, args...)
+		runner.Start()
+		log := ui.CommandOutputLogFrom(msg.initialLog)
+		w := msg.wt
+		m.jobRunner = runner
+		m.jobKind = msg.kind
+		m.jobWorktree = &w
+		m.jobLog = log
+		m.jobStashed = msg.stashed
+		m.spinnerActive = true
+		m.spinnerLabel = promptableJobLabel(msg.kind, msg.wt)
+		return m, m.spinner.Tick
+
 	case spinner.TickMsg:
+		if m.jobRunner != nil {
+			if prompt, ok := m.jobRunner.Prompt(); ok && m.mode != modeCredentialPrompt {
+				m = m.enterCredentialPrompt(prompt)
+			}
+			if err, done := m.jobRunner.Result(); done {
+				return m.finishPromptableJob(err)
+			}
+		}
 		if m.spinnerActive || m.sidebarLoading {
 			var cmd tea.Cmd
 			m.spinner, cmd = m.spinner.Update(msg)
@@ -260,8 +284,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.showError(msg.err.Error()), nil
 		}
 		m.spinnerActive = true
-		m.spinnerLabel = "Pulling " + msg.wt.Name + "…"
-		return m, tea.Batch(cmdPullAfterStash(msg.wt, msg.log), m.spinner.Tick)
+		m.spinnerLabel = promptableJobLabel(promptableJobPull, msg.wt)
+		return m, tea.Batch(cmdStartPromptableJob(promptableJobPull, msg.wt, msg.log, true), m.spinner.Tick)
 
 	case stashPullResultMsg:
 		m.spinnerActive = false
@@ -392,7 +416,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			wt := m.selectedWorktree()
 			if wt != nil && git.IsNonFastForwardPushError(msg.err) {
-				return m.enterConfirm(forcePushPrompt(*wt), cmdForcePush(m.repo, *wt, msg.log), "Force-pushing "+wt.Name+"…"), nil
+				return m.enterConfirm(forcePushPrompt(*wt), cmdStartPromptableJob(promptableJobForcePush, *wt, msg.log, false), "Force-pushing "+wt.Name+"…"), nil
 			}
 			return m.showError(msg.err.Error()), nil
 		}
@@ -430,8 +454,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.enterPushDivergedMode(msg.wt, div), nil
 		}
 		m.spinnerActive = true
-		m.spinnerLabel = "Pushing " + msg.wt.Name + "…"
-		return m, tea.Batch(cmdPushInteractive(m.repo, msg.wt, msg.log), m.spinner.Tick)
+		m.spinnerLabel = promptableJobLabel(promptableJobPush, msg.wt)
+		return m, tea.Batch(cmdStartPromptableJob(promptableJobPush, msg.wt, msg.log, false), m.spinner.Tick)
 
 	case lazygitFinishedMsg:
 		if msg.err != nil {

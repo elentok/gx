@@ -21,6 +21,8 @@ func (m Model) View() tea.View {
 		switch m.mode {
 		case modeConfirm:
 			content = overlayModal(bg, m.confirmModalView(), m.width, m.height)
+		case modeCredentialPrompt:
+			content = overlayModal(bg, m.credentialModalView(), m.width, m.height)
 		case modePushDiverged:
 			content = overlayModal(bg, m.pushDivergedModalView(), m.width, m.height)
 		case modeError:

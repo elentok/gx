@@ -119,16 +119,16 @@ func TestPreparePushConfirm_DivergedUsesRemoteAndUpstreamSeparately(t *testing.T
 
 	updated, cmd := m.confirmAccept()
 	m = updated.(Model)
-	if cmd == nil {
-		t.Fatalf("expected push preflight command after confirming push")
+	if cmd == nil || m.runningRunner == nil {
+		t.Fatalf("expected push fetch runner after confirming push")
 	}
-	updated, cmd = m.Update(pushFetchFinishedMsg{branch: m.confirmBranch, remote: m.confirmRemote})
-	m = updated.(Model)
-	if cmd == nil {
-		t.Fatalf("expected push preflight command after fetch")
-	}
-	updated, _ = m.Update(cmd())
-	m = updated.(Model)
+
+	m.handleActionResult(stageActionResult{
+		kind:   actionPushFetch,
+		branch: m.confirmBranch,
+		remote: m.confirmRemote,
+		output: "$ git fetch origin\n(no output)",
+	})
 
 	if !m.confirmOpen || m.confirmAction != confirmPushDiverged {
 		t.Fatalf("expected diverged push confirm modal after preflight")

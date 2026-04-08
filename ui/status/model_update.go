@@ -1,10 +1,7 @@
 package stage
 
 import (
-	"fmt"
 	"time"
-
-	"gx/ui/components"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -38,6 +35,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.appendRunningOutput(chunk)
 			}
 			if !m.runningDone {
+				if !m.credentialOpen {
+					if prompt, ok := m.runningRunner.Prompt(); ok {
+						m.openCredentialPrompt(prompt)
+					}
+				}
 				if res, done := m.runningRunner.Result(); done {
 					m.runningDone = true
 					m.handleActionResult(res)
@@ -52,55 +54,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.seq == m.diffReloadSeq && m.focus == focusStatus {
 			m.reloadDiffsForSelection()
 		}
-		return m, nil
-	case pushFetchFinishedMsg:
-		m.recordCommandOutput("Fetch output", msg.output)
-		m.pendingActionOutput = msg.output
-		if msg.err != nil {
-			m.pendingActionOutput = ""
-			m.showGitError(msg.err)
-			return m, nil
-		}
-		m.openCheckingDivergence()
-		return m, cmdPushPreflight(m.worktreeRoot)
-	case pushPreflightMsg:
-		m.runningOpen = false
-		m.runningDone = false
-		m.runningRunner = nil
-		if msg.err != nil {
-			m.pendingActionOutput = ""
-			m.showGitError(msg.err)
-			return m, nil
-		}
-		if msg.divergence != nil {
-			div := msg.divergence
-			m.openConfirm(
-				fmt.Sprintf("Branch %s has diverged from the remote branch:", div.Branch),
-				[]string{
-					"",
-					fmt.Sprintf("Last local commit: %s", humanizeOrUnknown(div.Local.Date)),
-					fmt.Sprintf("  %s %s", div.Local.Hash, div.Local.Message),
-					"",
-					fmt.Sprintf("Last remote commit: %s", humanizeOrUnknown(div.RemoteHead.Date)),
-					fmt.Sprintf("  %s %s", div.RemoteHead.Hash, div.RemoteHead.Message),
-				},
-				confirmPushDiverged,
-				div.Remote,
-				msg.branch,
-			)
-			m.confirmUpstream = div.Upstream
-			m.confirmMenu = components.MenuState{
-				Items:  []components.MenuItem{{Label: "Rebase", Value: "rebase"}, {Label: "Push --force", Value: "force"}, {Label: "Abort", Value: "abort"}},
-				Cursor: 0,
-			}
-			return m, nil
-		}
-		initialOutput := m.pendingActionOutput
-		m.pendingActionOutput = ""
-		runner := newStageActionRunner(actionPush, m.worktreeRoot, msg.remote, msg.branch)
-		return m.startInteractiveGitActionWithOutput(actionPush, "Push", runner.remote, runner.branch, initialOutput, "push", runner.remote, runner.branch)
-	case interactiveGitActionFinishedMsg:
-		m.handleActionResult(msg.res)
 		return m, nil
 	case tea.MouseWheelMsg:
 		if m.handleMouseWheel(msg) {
@@ -117,6 +70,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if msg.String() == "q" {
 			return m, tea.Quit
+		}
+		if m.credentialOpen {
+			return m.handleCredentialKey(msg)
 		}
 		if m.runningOpen {
 			return m.handleRunningKey(msg)

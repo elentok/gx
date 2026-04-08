@@ -2,6 +2,7 @@ package worktrees
 
 import (
 	"gx/git"
+	"gx/ui"
 	"gx/ui/components"
 
 	"charm.land/bubbles/v2/help"
@@ -28,6 +29,16 @@ const (
 	modeError
 	modeLogs
 	modePushDiverged
+	modeCredentialPrompt
+)
+
+type promptableJobKind int
+
+const (
+	promptableJobPull promptableJobKind = iota
+	promptableJobPushFetch
+	promptableJobPush
+	promptableJobForcePush
 )
 
 type dirtyState struct {
@@ -66,6 +77,11 @@ type Model struct {
 	statusMsg     string
 	statusGen     int // incremented each time statusMsg is set, used to expire old ticks
 	errorViewport viewport.Model
+	jobRunner     *components.CommandRunner
+	jobKind       promptableJobKind
+	jobWorktree   *git.Worktree
+	jobLog        *ui.CommandOutputLog
+	jobStashed    bool
 
 	lastJobLog   string
 	lastJobLabel string

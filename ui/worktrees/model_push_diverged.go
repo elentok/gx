@@ -60,9 +60,7 @@ func (m Model) handlePushDivergedKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(cmdRebaseRef(wt, div.Upstream, m.lastJobLog), m.spinner.Tick)
 	case "force":
 		m.mode = modeNormal
-		m.spinnerActive = true
-		m.spinnerLabel = "Force-pushing " + wt.Name + "..."
-		return m, tea.Batch(cmdForcePush(m.repo, wt, m.lastJobLog), m.spinner.Tick)
+		return m, cmdStartPromptableJob(promptableJobForcePush, wt, m.lastJobLog, false)
 	default:
 		m.mode = modeNormal
 		m.statusGen++

@@ -42,7 +42,9 @@ func (m Model) View() tea.View {
 
 	footer := m.helpLine()
 	out := lipgloss.JoinVertical(lipgloss.Left, body, footer)
-	if m.runningOpen {
+	if m.credentialOpen {
+		out = overlayModal(out, m.credentialModalView(), m.width, m.height)
+	} else if m.runningOpen {
 		out = overlayModal(out, m.runningModalView(), m.width, m.height)
 	} else if m.outputOpen {
 		out = overlayModal(out, m.outputModalView(), m.width, m.height)
