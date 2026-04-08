@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"gx/git"
 
@@ -52,9 +53,9 @@ type CommandRunner struct {
 	done          chan error
 	resErr        error
 	doneSet       bool
-	tail          string
 	prompt        *CredentialPrompt
 	lastPromptSeq int
+	detector      credentialPromptDetector
 }
 
 func NewCommandRunner(dir, cmdName string, args ...string) *CommandRunner {
@@ -144,7 +145,8 @@ func (r *CommandRunner) SubmitPromptInput(input string) error {
 		return nil
 	}
 	r.prompt = nil
-	_, err := io.WriteString(r.pty, input+"\n")
+	r.detector.Reset()
+	_, err := io.WriteString(r.pty, input+"\r")
 	return err
 }
 
@@ -188,6 +190,9 @@ func (r *CommandRunner) runPlain() error {
 func (r *CommandRunner) runPromptable() error {
 	cmd := exec.Command(r.cmdName, r.args...)
 	cmd.Dir = r.dir
+	if r.cmdName == "git" {
+		cmd.Env = append(os.Environ(), "LANG=C", "LC_ALL=C", "LC_MESSAGES=C")
+	}
 
 	ptmx, err := pty.Start(cmd)
 	if err != nil {
@@ -243,14 +248,11 @@ func (r *CommandRunner) appendOutput(chunk string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.output.WriteString(chunk)
-	r.tail += chunk
-	if len(r.tail) > 512 {
-		r.tail = r.tail[len(r.tail)-512:]
-	}
 	if r.prompt != nil {
+		r.detector.Feed(chunk)
 		return
 	}
-	if prompt, ok := detectCredentialPrompt(r.tail); ok {
+	if prompt, ok := r.detector.Feed(chunk); ok {
 		prompt.seq = r.lastPromptSeq + 1
 		r.prompt = &prompt
 	}
@@ -274,9 +276,6 @@ var (
 
 func detectCredentialPrompt(tail string) (CredentialPrompt, bool) {
 	plain := strings.ReplaceAll(tail, "\r", "")
-	if i := strings.LastIndexByte(plain, '\n'); i >= 0 {
-		plain = plain[i+1:]
-	}
 	switch {
 	case sshPassphrasePrompt.MatchString(plain):
 		return CredentialPrompt{Text: strings.TrimSpace(plain), Kind: PromptKindSecret}, true
@@ -289,4 +288,34 @@ func detectCredentialPrompt(tail string) (CredentialPrompt, bool) {
 	default:
 		return CredentialPrompt{}, false
 	}
+}
+
+type credentialPromptDetector struct {
+	buf strings.Builder
+}
+
+func (d *credentialPromptDetector) Reset() {
+	d.buf.Reset()
+}
+
+func (d *credentialPromptDetector) Feed(chunk string) (CredentialPrompt, bool) {
+	for len(chunk) > 0 {
+		r, size := utf8.DecodeRuneInString(chunk)
+		chunk = chunk[size:]
+		switch r {
+		case '\n':
+			d.buf.Reset()
+			continue
+		case utf8.RuneError:
+			if size == 0 {
+				continue
+			}
+		}
+		_, _ = d.buf.WriteRune(r)
+		if prompt, ok := detectCredentialPrompt(d.buf.String()); ok {
+			d.buf.Reset()
+			return prompt, true
+		}
+	}
+	return CredentialPrompt{}, false
 }
