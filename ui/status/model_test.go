@@ -3,6 +3,7 @@ package stage
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -246,6 +247,27 @@ func TestBranchSummaryTitleShowsBaseOnlyWhenNonDefault(t *testing.T) {
 	}
 	if !strings.Contains(line, "vs origin/release") {
 		t.Fatalf("expected non-default base ref in title suffix: %q", line)
+	}
+}
+
+func TestReloadBranchStateUsesBranchUpstream(t *testing.T) {
+	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
+	wtDir := filepath.Join(repoDir, "feature")
+	testutil.PushBranchWithUpstream(t, wtDir, "origin", "feature")
+	testutil.WriteFile(t, wtDir, "ahead.txt", "ahead")
+	testutil.CommitAll(t, wtDir, "ahead")
+
+	m := New(wtDir)
+	m.reloadBranchState()
+
+	if m.branchName != "feature" {
+		t.Fatalf("expected current branch feature, got %q", m.branchName)
+	}
+	if m.branchBaseRef != "origin/feature" {
+		t.Fatalf("expected upstream base ref origin/feature, got %q", m.branchBaseRef)
+	}
+	if m.branchSync.Name != git.StatusAhead || m.branchSync.Ahead != 1 {
+		t.Fatalf("expected branch sync ahead of origin/feature, got %+v", m.branchSync)
 	}
 }
 

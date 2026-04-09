@@ -198,7 +198,7 @@ func (m *Model) reloadBranchState() {
 		return
 	}
 	m.branchName = strings.TrimSpace(branch)
-	m.branchBaseRef = git.DefaultMainRemoteRef(m.worktreeRoot)
+	m.branchBaseRef = git.UpstreamBranch(m.worktreeRoot, m.branchName)
 	if m.branchBaseRef == "" {
 		return
 	}
