@@ -21,6 +21,13 @@ func (m Model) handleOutputKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 				return m, cmdLazygitLog(*wt), true
 			}
 			return m, nil, true
+		case "t":
+			wt := m.selectedWorktree()
+			if wt != nil {
+				m.statusMsg = "opening tmux session..."
+				return m, cmdTmuxNewSession(wt.Name, wt.Path), true
+			}
+			return m, nil, true
 		case "esc":
 			m.statusMsg = ""
 			return m, nil, true
@@ -39,7 +46,7 @@ func (m Model) handleOutputKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	}
 	if key == "o" {
 		m.keyPrefix = "o"
-		m.statusMsg = "oo: output · ol: lazygit log"
+		m.statusMsg = "oo: output · ol: lazygit log · ot: tmux session"
 		return m, nil, true
 	}
 	return m, nil, false

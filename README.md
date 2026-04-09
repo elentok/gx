@@ -219,6 +219,7 @@ Example:
 | `g`            | Jump to the top of the worktree list                      |
 | `oo`           | View output log of the last job                           |
 | `ol`           | Open lazygit log for the selected worktree                |
+| `ot`           | Open a tmux session in the selected worktree              |
 | `/`            | Search worktrees by name or branch                        |
 | `t`            | Track remote branch (set upstream)                        |
 | `R`            | Refresh worktree list and statuses                        |

@@ -22,6 +22,7 @@ type keyMap struct {
 	RemoteUpdate   key.Binding
 	Logs           key.Binding
 	Log            key.Binding
+	TmuxSession    key.Binding
 	Help           key.Binding
 	Quit           key.Binding
 }
@@ -103,6 +104,10 @@ var keys = keyMap{
 		key.WithKeys("ol"),
 		key.WithHelp("ol", "lazygit log"),
 	),
+	TmuxSession: key.NewBinding(
+		key.WithKeys("ot"),
+		key.WithHelp("ot", "tmux session"),
+	),
 	Help: key.NewBinding(
 		key.WithKeys("?"),
 		key.WithHelp("?", "toggle help"),
@@ -125,6 +130,6 @@ func (k keyMap) FullHelp() [][]key.Binding {
 		{k.Up, k.Down, k.Top},
 		{k.New, k.NewTmuxSession, k.NewTmuxWindow, k.Delete, k.Rename, k.Clone},
 		{k.Yank, k.Search},
-		{k.Pull, k.Push, k.Rebase, k.Track, k.Refresh, k.RemoteUpdate, k.Logs, k.Log, k.Help, k.Quit},
+		{k.Pull, k.Push, k.Rebase, k.Track, k.Refresh, k.RemoteUpdate, k.Logs, k.Log, k.TmuxSession, k.Help, k.Quit},
 	}
 }

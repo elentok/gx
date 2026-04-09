@@ -98,3 +98,35 @@ func TestOLTriggersLazygitLogCommand(t *testing.T) {
 		t.Fatalf("expected keyPrefix reset after ol, got %q", m.keyPrefix)
 	}
 }
+
+func TestOTTriggersTmuxSessionCommand(t *testing.T) {
+	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, "")
+	m.ready = true
+	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.MainBranch}}
+	resizeTable(&m.table, 100, 10)
+	m.table.SetRows(m.buildRows())
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	if cmd != nil {
+		t.Fatalf("first o should not launch command")
+	}
+	m = updated.(Model)
+	if m.keyPrefix != "o" {
+		t.Fatalf("expected keyPrefix=o after first o, got %q", m.keyPrefix)
+	}
+
+	updated, cmd = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+	if cmd == nil {
+		t.Fatalf("ot should launch tmux session command")
+	}
+	m = updated.(Model)
+	if m.keyPrefix != "" {
+		t.Fatalf("expected keyPrefix reset after ot, got %q", m.keyPrefix)
+	}
+}
