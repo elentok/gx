@@ -1,6 +1,8 @@
 # gx
 
-A collection of git helper (worktree management, etc...)
+[![CI](https://github.com/elentok/gx/actions/workflows/ci.yml/badge.svg)](https://github.com/elentok/gx/actions/workflows/ci.yml)
+
+A collection of git helpers (worktree management, staging, etc...)
 
 ## Disclaimer
 
