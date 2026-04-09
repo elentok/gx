@@ -211,8 +211,8 @@ func (r *CommandRunner) runPromptable() error {
 	}()
 
 	waitErr := cmd.Wait()
-	_ = ptmx.Close()
 	readErr := <-readDone
+	_ = ptmx.Close()
 
 	r.mu.Lock()
 	r.cmd = nil
