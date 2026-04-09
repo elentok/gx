@@ -2,10 +2,16 @@ package git
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
 
 const expectedFetchRefspec = "+refs/heads/*:refs/remotes/origin/*"
+
+var (
+	ansiCSIRe = regexp.MustCompile(`\x1b\[[0-9:;<=>?]*[ -/]*[@-~]`)
+	ansiOSCRe = regexp.MustCompile(`\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)`)
+)
 
 // FetchConfigProblem describes a misconfigured origin fetch setup and the
 // commands needed to fix it.
@@ -128,6 +134,8 @@ func PushBranch(worktreePath, remote, branch string) (prURL, output string, err 
 // ExtractPRURL scans git push output for a GitHub PR creation URL.
 // Git prefixes remote messages with "remote: ", so we strip that first.
 func ExtractPRURL(output string) string {
+	output = ansiOSCRe.ReplaceAllString(output, "")
+	output = ansiCSIRe.ReplaceAllString(output, "")
 	for _, line := range strings.Split(output, "\n") {
 		line = strings.TrimPrefix(strings.TrimSpace(line), "remote:")
 		line = strings.TrimSpace(line)

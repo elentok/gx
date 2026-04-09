@@ -22,6 +22,17 @@ remote:
 	}
 }
 
+func TestExtractPRURL_StripsTerminalEscapes(t *testing.T) {
+	const want = "https://github.com/elentok/gx/pull/new/my-branch"
+	output := "" +
+		"remote: Create a pull request for 'my-branch' on GitHub by visiting:\n" +
+		"remote: \x1b[32m\x1b]8;;" + want + "\x07" + want + "\x1b]8;;\x07\x1b[0m\n"
+
+	if got := ExtractPRURL(output); got != want {
+		t.Fatalf("ExtractPRURL() = %q, want %q", got, want)
+	}
+}
+
 func TestIsNonFastForwardPushError(t *testing.T) {
 	tests := []struct {
 		name string

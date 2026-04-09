@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.11.4
+
+- `gx status` and `gx wt` now keep SSH/HTTPS credential prompts inside the TUI by detecting Git/SSH input requests and opening an in-app input modal instead of suspending to the terminal
+- User-initiated TUI network actions now run through a PTY-backed Git runner so passphrases, usernames, and passwords can be submitted directly from the app
+- Fixed the PTY credential flow so handled passphrase prompts are not rediscovered and resubmitted incorrectly, which could cause repeated SSH key prompts and failed authentication
+
 ## v0.11.3
 
 - User-initiated Git network actions now run interactively so SSH key passphrase prompts can be answered in `gx push`, `gx status`, and `gx wt`
