@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"syscall"
 	"unicode/utf8"
 
 	"gx/git"
@@ -222,7 +223,7 @@ func (r *CommandRunner) runPromptable() error {
 	if waitErr != nil {
 		return waitErr
 	}
-	if readErr != nil && !errors.Is(readErr, os.ErrClosed) && !errors.Is(readErr, io.EOF) {
+	if readErr != nil && !isBenignPTYReadError(readErr) {
 		return readErr
 	}
 	return nil
@@ -288,6 +289,13 @@ func detectCredentialPrompt(tail string) (CredentialPrompt, bool) {
 	default:
 		return CredentialPrompt{}, false
 	}
+}
+
+func isBenignPTYReadError(err error) bool {
+	return err == nil ||
+		errors.Is(err, os.ErrClosed) ||
+		errors.Is(err, io.EOF) ||
+		errors.Is(err, syscall.EIO)
 }
 
 type credentialPromptDetector struct {
