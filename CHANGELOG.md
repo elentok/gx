@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.11.6
+
+- `gx status` now shows branch sync relative to the current branch's upstream ref instead of always comparing against the repo's default main remote branch
+- Restored `g` as jump-to-top in `gx status` and `gx wt`, and moved output/log actions to chords: `oo` for command output and `ol` for lazygit log
+- Added `ot` in `gx wt` to open a tmux session in the selected worktree directory
+
 ## v0.11.5
 
 - Fixed Ubuntu CI failures in the PTY-backed Git runner by treating Linux `/dev/ptmx` `EIO` shutdown reads as benign EOF-style conditions
