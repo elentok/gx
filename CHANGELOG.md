@@ -1,10 +1,15 @@
 # Changelog
 
+## v0.11.5
+
+- Fixed Ubuntu CI failures in the PTY-backed Git runner by treating Linux `/dev/ptmx` `EIO` shutdown reads as benign EOF-style conditions
+
 ## v0.11.4
 
 - `gx status` and `gx wt` now keep SSH/HTTPS credential prompts inside the TUI by detecting Git/SSH input requests and opening an in-app input modal instead of suspending to the terminal
 - User-initiated TUI network actions now run through a PTY-backed Git runner so passphrases, usernames, and passwords can be submitted directly from the app
 - Fixed the PTY credential flow so handled passphrase prompts are not rediscovered and resubmitted incorrectly, which could cause repeated SSH key prompts and failed authentication
+- Fixed GitHub PR URL detection after PTY-backed pushes by stripping terminal escape sequences before scanning push output
 
 ## v0.11.3
 
