@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+	"unicode"
 
 	"gx/git"
 	"gx/ui"
@@ -272,9 +273,25 @@ func (m *Model) appendRunningOutput(chunk string) {
 	if chunk == "" {
 		return
 	}
-	m.runningContent += chunk
+	m.runningContent += sanitizeTerminalOutputForViewport(chunk)
 	m.runningVP.SetContent(m.runningContent)
 	m.runningVP.GotoBottom()
+}
+
+func sanitizeTerminalOutputForViewport(s string) string {
+	s = ansiOSCRe.ReplaceAllString(s, "")
+	s = ansiCSIRe.ReplaceAllString(s, "")
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.ReplaceAll(s, "\r", "")
+
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		if r == '\n' || r == '\t' || !unicode.IsControl(r) {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 func (m *Model) handleActionResult(res stageActionResult) {
