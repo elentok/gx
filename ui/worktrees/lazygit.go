@@ -16,3 +16,10 @@ func cmdLazygit(wt git.Worktree) tea.Cmd {
 		return lazygitFinishedMsg{err: err}
 	})
 }
+
+func cmdLazygitLog(wt git.Worktree) tea.Cmd {
+	c := exec.Command("lazygit", "-p", wt.Path, "log")
+	return tea.ExecProcess(c, func(err error) tea.Msg {
+		return lazygitFinishedMsg{err: err}
+	})
+}

@@ -48,15 +48,34 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		return m, nil, true
 	}
 	if key == "g" && !isUpperG {
-		m.setStatus("opening lazygit log...")
-		return m, cmdLazygitLog(m.worktreeRoot), true
+		m.keyPrefix = ""
+		m.jumpToTop()
+		if m.focus == focusStatus {
+			return m, m.scheduleDiffReload(), true
+		}
+		return m, nil, true
 	}
-	if key == "o" {
-		if m.outputContent == "" {
-			m.setStatus("no command output")
+	if m.keyPrefix == "o" {
+		m.keyPrefix = ""
+		switch key {
+		case "o":
+			if m.outputContent == "" {
+				m.setStatus("no command output")
+				return m, nil, true
+			}
+			m.openOutputModal()
+			return m, nil, true
+		case "l":
+			m.setStatus("opening lazygit log...")
+			return m, cmdLazygitLog(m.worktreeRoot), true
+		case "esc":
+			m.clearStatus()
 			return m, nil, true
 		}
-		m.openOutputModal()
+	}
+	if key == "o" {
+		m.keyPrefix = "o"
+		m.setStatus("oo: output · ol: lazygit log")
 		return m, nil, true
 	}
 	if isUpperG {

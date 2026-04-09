@@ -105,6 +105,7 @@ type Model struct {
 	searchQuery   string
 	searchMatches []int
 	searchCursor  int
+	keyPrefix     string
 
 	help help.Model
 

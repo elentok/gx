@@ -1496,19 +1496,73 @@ func TestCCTriggersCommitCommand(t *testing.T) {
 	}
 }
 
-func TestGTriggersLazygitLogCommand(t *testing.T) {
+func TestGJumpsToTop(t *testing.T) {
+	repo := testutil.TempRepo(t)
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusStatus
+	m.statusEntries = []statusEntry{{Kind: statusEntryFile}, {Kind: statusEntryFile}, {Kind: statusEntryFile}}
+	m.selected = 2
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	if cmd == nil {
+		t.Fatalf("g should schedule a diff reload after jumping to top")
+	}
+	m = updated.(Model)
+	if m.selected != 0 {
+		t.Fatalf("expected g to jump to top, got selected=%d", m.selected)
+	}
+}
+
+func TestOLTriggersLazygitLogCommand(t *testing.T) {
 	repo := testutil.TempRepo(t)
 
 	m := New(repo)
 	m.ready = true
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	if cmd != nil {
+		t.Fatalf("first o should not launch command")
+	}
+	m = updated.(Model)
+	if m.keyPrefix != "o" {
+		t.Fatalf("expected keyPrefix=o after first o, got %q", m.keyPrefix)
+	}
+
+	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	if cmd == nil {
-		t.Fatalf("g should launch lazygit log command")
+		t.Fatalf("ol should launch lazygit log command")
 	}
 	m = updated.(Model)
 	if m.keyPrefix != "" {
-		t.Fatalf("expected keyPrefix empty after g, got %q", m.keyPrefix)
+		t.Fatalf("expected keyPrefix reset after ol, got %q", m.keyPrefix)
+	}
+}
+
+func TestOOOpensOutputModal(t *testing.T) {
+	repo := testutil.TempRepo(t)
+
+	m := New(repo)
+	m.ready = true
+	m.outputContent = "hello"
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	if cmd != nil {
+		t.Fatalf("first o should not launch command")
+	}
+	m = updated.(Model)
+	if m.keyPrefix != "o" {
+		t.Fatalf("expected keyPrefix=o after first o, got %q", m.keyPrefix)
+	}
+
+	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	if cmd != nil {
+		t.Fatalf("oo should not launch a command")
+	}
+	m = updated.(Model)
+	if !m.outputOpen {
+		t.Fatalf("expected oo to open output modal")
 	}
 }
 

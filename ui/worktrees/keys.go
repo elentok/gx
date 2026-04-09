@@ -5,6 +5,7 @@ import "charm.land/bubbles/v2/key"
 type keyMap struct {
 	Up             key.Binding
 	Down           key.Binding
+	Top            key.Binding
 	New            key.Binding
 	NewTmuxSession key.Binding
 	NewTmuxWindow  key.Binding
@@ -15,12 +16,12 @@ type keyMap struct {
 	Pull           key.Binding
 	Push           key.Binding
 	Rebase         key.Binding
-	Lazygit        key.Binding
 	Search         key.Binding
 	Track          key.Binding
 	Refresh        key.Binding
 	RemoteUpdate   key.Binding
 	Logs           key.Binding
+	Log            key.Binding
 	Help           key.Binding
 	Quit           key.Binding
 }
@@ -33,6 +34,10 @@ var keys = keyMap{
 	Down: key.NewBinding(
 		key.WithKeys("down", "j"),
 		key.WithHelp("↓/j", "down"),
+	),
+	Top: key.NewBinding(
+		key.WithKeys("g"),
+		key.WithHelp("g", "top"),
 	),
 	Delete: key.NewBinding(
 		key.WithKeys("d"),
@@ -74,10 +79,6 @@ var keys = keyMap{
 		key.WithKeys("P"),
 		key.WithHelp("P", "push"),
 	),
-	Lazygit: key.NewBinding(
-		key.WithKeys("g"),
-		key.WithHelp("g", "lazygit"),
-	),
 	Search: key.NewBinding(
 		key.WithKeys("/"),
 		key.WithHelp("/", "search"),
@@ -95,8 +96,12 @@ var keys = keyMap{
 		key.WithHelp("U", "remote update"),
 	),
 	Logs: key.NewBinding(
-		key.WithKeys("o"),
-		key.WithHelp("o", "view output"),
+		key.WithKeys("oo"),
+		key.WithHelp("oo", "view output"),
+	),
+	Log: key.NewBinding(
+		key.WithKeys("ol"),
+		key.WithHelp("ol", "lazygit log"),
 	),
 	Help: key.NewBinding(
 		key.WithKeys("?"),
@@ -112,14 +117,14 @@ var keys = keyMap{
 // bubbles/help in a later milestone.
 
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.New, k.NewTmuxSession, k.NewTmuxWindow, k.Delete, k.Rename, k.Clone, k.Yank, k.Pull, k.Push, k.Lazygit, k.Search, k.Track, k.Refresh, k.Quit, k.Help}
+	return []key.Binding{k.Up, k.Down, k.Top, k.New, k.NewTmuxSession, k.NewTmuxWindow, k.Delete, k.Rename, k.Clone, k.Yank, k.Pull, k.Push, k.Search, k.Track, k.Refresh, k.Quit, k.Help}
 }
 
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Up, k.Down},
+		{k.Up, k.Down, k.Top},
 		{k.New, k.NewTmuxSession, k.NewTmuxWindow, k.Delete, k.Rename, k.Clone},
 		{k.Yank, k.Search},
-		{k.Pull, k.Push, k.Rebase, k.Lazygit, k.Track, k.Refresh, k.RemoteUpdate, k.Logs, k.Help, k.Quit},
+		{k.Pull, k.Push, k.Rebase, k.Track, k.Refresh, k.RemoteUpdate, k.Logs, k.Log, k.Help, k.Quit},
 	}
 }

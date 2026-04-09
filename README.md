@@ -101,8 +101,9 @@ Status UI highlights:
 - Adjust diff context for the current session with `[` / `]`
 - File-to-file diff jumps with `,` / `.`
 - Edit selected file in `$EDITOR` with `e` (opens at selected line/hunk in diff view)
-- Open lazygit log with `g`
-- View the last command output with `o`
+- Jump to the top with `g`
+- Open lazygit log with `ol`
+- View the last command output with `oo`
 - Pull/push/rebase/amend actions directly in status (`p`/`P`/`b`/`A`) with confirmations; push confirms first, then checks divergence if needed
 - Push divergence flow uses a menu (`j`/`k` + `enter`) with relative commit times
 - Push in status detects GitHub PR URLs and asks whether to open them
@@ -215,8 +216,9 @@ Example:
 | `p`            | Pull selected worktree's branch (stash prompt if dirty)   |
 | `P`            | Push selected worktree's branch (confirms before pushing) |
 | `b`            | Rebase selected worktree on main (stash prompt if dirty)  |
-| `g`            | Open selected worktree in lazygit                         |
-| `o`            | View output log of last pull/push job                     |
+| `g`            | Jump to the top of the worktree list                      |
+| `oo`           | View output log of the last job                           |
+| `ol`           | Open lazygit log for the selected worktree                |
 | `/`            | Search worktrees by name or branch                        |
 | `t`            | Track remote branch (set upstream)                        |
 | `R`            | Refresh worktree list and statuses                        |
