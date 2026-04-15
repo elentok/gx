@@ -1196,12 +1196,12 @@ func TestStatusFileIconDeletedAndFallback(t *testing.T) {
 	deleted := git.StageFileStatus{Path: "gone.txt", WorktreeCode: 'D'}
 
 	nerd := statusPaneIconsFor(true)
-	if got := statusFileIcon(deleted, nerd); got != "" {
+	if got := statusFileIcon(deleted, false, nerd); got != "" {
 		t.Fatalf("expected deleted nerd icon, got %q", got)
 	}
 
 	plain := statusPaneIconsFor(false)
-	if got := statusFileIcon(deleted, plain); got != "D" {
+	if got := statusFileIcon(deleted, false, plain); got != "D" {
 		t.Fatalf("expected deleted fallback icon, got %q", got)
 	}
 }
@@ -1220,12 +1220,12 @@ func TestStatusFileIconRenamedAndFallback(t *testing.T) {
 	renamed := git.StageFileStatus{Path: "new.txt", RenameFrom: "old.txt", IndexStatus: 'R'}
 
 	nerd := statusPaneIconsFor(true)
-	if got := statusFileIcon(renamed, nerd); got != "󰁔" {
+	if got := statusFileIcon(renamed, false, nerd); got != "󰁔" {
 		t.Fatalf("expected renamed nerd icon, got %q", got)
 	}
 
 	plain := statusPaneIconsFor(false)
-	if got := statusFileIcon(renamed, plain); got != "R" {
+	if got := statusFileIcon(renamed, false, plain); got != "R" {
 		t.Fatalf("expected renamed fallback icon, got %q", got)
 	}
 }
@@ -1818,14 +1818,33 @@ func TestStatusEntryMeta_NerdFont(t *testing.T) {
 func TestStatusFileIcon(t *testing.T) {
 	icons := statusPaneIconsFor(true)
 
-	if got := statusFileIcon(git.StageFileStatus{IndexStatus: '?', WorktreeCode: '?'}, icons); got != "" {
+	if got := statusFileIcon(git.StageFileStatus{IndexStatus: '?', WorktreeCode: '?'}, false, icons); got != "" {
 		t.Fatalf("untracked icon = %q, want new file icon", got)
 	}
-	if got := statusFileIcon(git.StageFileStatus{IndexStatus: 'A', WorktreeCode: ' '}, icons); got != "" {
+	if got := statusFileIcon(git.StageFileStatus{IndexStatus: 'A', WorktreeCode: ' '}, false, icons); got != "" {
 		t.Fatalf("added icon = %q, want new file icon", got)
 	}
-	if got := statusFileIcon(git.StageFileStatus{IndexStatus: ' ', WorktreeCode: 'M'}, icons); got != "" {
+	if got := statusFileIcon(git.StageFileStatus{IndexStatus: ' ', WorktreeCode: 'M'}, false, icons); got != "" {
 		t.Fatalf("modified icon = %q, want modified file icon", got)
+	}
+}
+
+func TestStatusFileIconSymlink(t *testing.T) {
+	nerd := statusPaneIconsFor(true)
+	plain := statusPaneIconsFor(false)
+
+	modified := git.StageFileStatus{Path: "link", IndexStatus: ' ', WorktreeCode: 'M'}
+	if got := statusFileIcon(modified, true, nerd); got != "󰌷" {
+		t.Fatalf("symlink nerd icon = %q, want symlink icon", got)
+	}
+	if got := statusFileIcon(modified, true, plain); got != "L" {
+		t.Fatalf("symlink plain icon = %q, want L", got)
+	}
+
+	// Deleted symlink keeps the delete icon (deletion takes precedence).
+	deleted := git.StageFileStatus{Path: "link", IndexStatus: 'D'}
+	if got := statusFileIcon(deleted, true, nerd); got == "󰌷" {
+		t.Fatalf("deleted symlink should show delete icon, not symlink icon")
 	}
 }
 

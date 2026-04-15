@@ -159,6 +159,7 @@ type statusPaneIcons struct {
 	fileNew      string
 	fileDeleted  string
 	fileRenamed  string
+	fileSymlink  string
 	partial      string
 	staged       string
 }
@@ -172,6 +173,7 @@ func statusPaneIconsFor(useNerdFontIcons bool) statusPaneIcons {
 			fileNew:      "N",
 			fileDeleted:  "D",
 			fileRenamed:  "R",
+			fileSymlink:  "L",
 			partial:      "+",
 			staged:       "✓",
 		}
@@ -183,6 +185,7 @@ func statusPaneIconsFor(useNerdFontIcons bool) statusPaneIcons {
 		fileNew:      "",
 		fileDeleted:  "",
 		fileRenamed:  "󰁔",
+		fileSymlink:  "󰌷",
 		partial:      "",
 		staged:       "",
 	}
@@ -220,12 +223,15 @@ func statusEntryMeta(entry statusEntry, useNerdFontIcons bool, icons statusPaneI
 	return entry.File.XY()
 }
 
-func statusFileIcon(file git.StageFileStatus, icons statusPaneIcons) string {
+func statusFileIcon(file git.StageFileStatus, isSymlink bool, icons statusPaneIcons) string {
 	if isDeletedFileStatus(file) {
 		return icons.fileDeleted
 	}
 	if file.IsRenamed() {
 		return icons.fileRenamed
+	}
+	if isSymlink {
+		return icons.fileSymlink
 	}
 	if file.IsUntracked() || file.IndexStatus == 'A' {
 		return icons.fileNew

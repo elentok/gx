@@ -179,3 +179,189 @@ func TestBuildHunkPatch_ApplyToIndex_WithIndentedGoLines(t *testing.T) {
 		t.Fatalf("ApplyPatchToIndex failed: %v\npatch:\n%s", err, patch)
 	}
 }
+
+func TestParseSymlinkDiffInfo(t *testing.T) {
+	newSymlinkDiff := strings.Join([]string{
+		"diff --git a/link b/link",
+		"new file mode 120000",
+		"index 0000000..abc1234",
+		"--- /dev/null",
+		"+++ b/link",
+		"@@ -0,0 +1 @@",
+		"+target/path",
+		"\\ No newline at end of file",
+	}, "\n") + "\n"
+
+	modifiedSymlinkDiff := strings.Join([]string{
+		"diff --git a/link b/link",
+		"index abc1234..def5678 120000",
+		"--- a/link",
+		"+++ b/link",
+		"@@ -1 +1 @@",
+		"-old/target",
+		"\\ No newline at end of file",
+		"+new/target",
+		"\\ No newline at end of file",
+	}, "\n") + "\n"
+
+	deletedSymlinkDiff := strings.Join([]string{
+		"diff --git a/link b/link",
+		"deleted file mode 120000",
+		"index abc1234..0000000",
+		"--- a/link",
+		"+++ /dev/null",
+		"@@ -1 +0,0 @@",
+		"-target/path",
+		"\\ No newline at end of file",
+	}, "\n") + "\n"
+
+	regularToSymlinkDiff := strings.Join([]string{
+		"diff --git a/myfile b/myfile",
+		"deleted file mode 100644",
+		"index 00cb5bc..0000000",
+		"--- a/myfile",
+		"+++ /dev/null",
+		"@@ -1 +0,0 @@",
+		"-regular content",
+		"diff --git a/myfile b/myfile",
+		"new file mode 120000",
+		"index 0000000..0d607a7",
+		"--- /dev/null",
+		"+++ b/myfile",
+		"@@ -0,0 +1 @@",
+		"+some/target",
+		"\\ No newline at end of file",
+	}, "\n") + "\n"
+
+	symlinkToRegularDiff := strings.Join([]string{
+		"diff --git a/link b/link",
+		"deleted file mode 120000",
+		"index 0d607a7..0000000",
+		"--- a/link",
+		"+++ /dev/null",
+		"@@ -1 +0,0 @@",
+		"-some/target",
+		"\\ No newline at end of file",
+		"diff --git a/link b/link",
+		"new file mode 100644",
+		"index 0000000..b9a1f7f",
+		"--- /dev/null",
+		"+++ b/link",
+		"@@ -0,0 +1 @@",
+		"+now regular",
+	}, "\n") + "\n"
+
+	regularFileDiff := strings.Join([]string{
+		"diff --git a/a.txt b/a.txt",
+		"index 1111111..2222222 100644",
+		"--- a/a.txt",
+		"+++ b/a.txt",
+		"@@ -1 +1 @@",
+		"-old",
+		"+new",
+	}, "\n") + "\n"
+
+	tests := []struct {
+		name         string
+		raw          string
+		isSymlink    bool
+		wasSymlink   bool
+		isNowSymlink bool
+		oldTarget    string
+		newTarget    string
+		summary      string
+		titleLabel   string
+	}{
+		{
+			name:         "new symlink",
+			raw:          newSymlinkDiff,
+			isSymlink:    true,
+			wasSymlink:   false,
+			isNowSymlink: true,
+			oldTarget:    "",
+			newTarget:    "target/path",
+			summary:      "symlink -> target/path",
+			titleLabel:   "[symlink]",
+		},
+		{
+			name:         "modified symlink",
+			raw:          modifiedSymlinkDiff,
+			isSymlink:    true,
+			wasSymlink:   true,
+			isNowSymlink: true,
+			oldTarget:    "old/target",
+			newTarget:    "new/target",
+			summary:      "symlink: old/target -> new/target",
+			titleLabel:   "[symlink]",
+		},
+		{
+			name:         "deleted symlink",
+			raw:          deletedSymlinkDiff,
+			isSymlink:    true,
+			wasSymlink:   true,
+			isNowSymlink: false,
+			oldTarget:    "target/path",
+			newTarget:    "",
+			summary:      "symlink: target/path (removed)",
+			titleLabel:   "[symlink]",
+		},
+		{
+			name:         "regular file to symlink",
+			raw:          regularToSymlinkDiff,
+			isSymlink:    true,
+			wasSymlink:   false,
+			isNowSymlink: true,
+			oldTarget:    "",
+			newTarget:    "some/target",
+			summary:      "regular file -> symlink (some/target)",
+			titleLabel:   "[regular -> symlink]",
+		},
+		{
+			name:         "symlink to regular file",
+			raw:          symlinkToRegularDiff,
+			isSymlink:    true,
+			wasSymlink:   true,
+			isNowSymlink: false,
+			oldTarget:    "some/target",
+			newTarget:    "",
+			summary:      "symlink (some/target) -> regular file",
+			titleLabel:   "[symlink -> regular]",
+		},
+		{
+			name:      "regular file",
+			raw:       regularFileDiff,
+			isSymlink: false,
+			summary:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := parseUnifiedDiff(tt.raw)
+			si := parseSymlinkDiffInfo(p)
+			if si.IsSymlink != tt.isSymlink {
+				t.Errorf("IsSymlink = %v, want %v", si.IsSymlink, tt.isSymlink)
+			}
+			if tt.isSymlink {
+				if si.WasSymlink != tt.wasSymlink {
+					t.Errorf("WasSymlink = %v, want %v", si.WasSymlink, tt.wasSymlink)
+				}
+				if si.IsNowSymlink != tt.isNowSymlink {
+					t.Errorf("IsNowSymlink = %v, want %v", si.IsNowSymlink, tt.isNowSymlink)
+				}
+				if si.OldTarget != tt.oldTarget {
+					t.Errorf("OldTarget = %q, want %q", si.OldTarget, tt.oldTarget)
+				}
+				if si.NewTarget != tt.newTarget {
+					t.Errorf("NewTarget = %q, want %q", si.NewTarget, tt.newTarget)
+				}
+			}
+			if got := si.summary(); got != tt.summary {
+				t.Errorf("summary = %q, want %q", got, tt.summary)
+			}
+			if got := si.titleLabel(); got != tt.titleLabel {
+				t.Errorf("titleLabel = %q, want %q", got, tt.titleLabel)
+			}
+		})
+	}
+}

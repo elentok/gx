@@ -2,6 +2,8 @@ package stage
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"gx/git"
@@ -103,7 +105,7 @@ func (m Model) renderStatusPane(width, height int) string {
 				if entry.File.IsRenamed() && entry.File.RenameFrom != "" {
 					name = entry.File.RenameFrom + " -> " + entry.File.Path
 				}
-				name = statusFileIcon(entry.File, icons) + " " + name
+				name = statusFileIcon(entry.File, isWorktreeSymlink(m.worktreeRoot, entry.File.Path), icons) + " " + name
 			}
 			if m.searchMatchStatusIndex(i) {
 				name = highlightMatchText(name, m.searchQuery)
@@ -241,6 +243,11 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 	titleText := title
 	if file, ok := m.selectedFile(); ok && file.IsRenamed() && file.RenameFrom != "" {
 		titleText += " [moved: " + file.RenameFrom + " -> " + file.Path + "]"
+	}
+	if si := parseSymlinkDiffInfo(sec.parsed); si.IsSymlink {
+		if label := si.titleLabel(); label != "" {
+			titleText += " " + label
+		}
 	}
 	if m.diffFullscreen {
 		titleText += " [fullscreen]"
@@ -549,6 +556,17 @@ func (m Model) binarySummaryLine() string {
 		return "binary file"
 	}
 	return fmt.Sprintf("binary file (prev size: %s, new size: %s)", formatSize(prevSize, prevOK), formatSize(newSize, newOK))
+}
+
+// isWorktreeSymlink reports whether the file at relPath inside worktreeRoot is a
+// symlink in the working tree. Returns false if the file does not exist or any
+// error occurs (e.g. deleted files).
+func isWorktreeSymlink(worktreeRoot, relPath string) bool {
+	info, err := os.Lstat(filepath.Join(worktreeRoot, filepath.FromSlash(relPath)))
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeSymlink != 0
 }
 
 func formatSize(size int64, ok bool) string {

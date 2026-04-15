@@ -410,6 +410,155 @@ func singleLineSegment(parsed parsedDiff, h parsedHunk, selectedLine int) (start
 	return start, end, nil
 }
 
+// symlinkDiffInfo describes symlink involvement in a diff.
+// Type conversions (regular file ↔ symlink) appear as two diff blocks for the
+// same path, so all parsed lines are scanned rather than just the file header.
+type symlinkDiffInfo struct {
+	IsSymlink    bool   // diff involves a symlink at all
+	WasSymlink   bool   // old file was a symlink
+	IsNowSymlink bool   // new file is a symlink
+	TypeChange   bool   // file type changed (regular ↔ symlink)
+	OldTarget    string // symlink target before the change (if WasSymlink)
+	NewTarget    string // symlink target after the change (if IsNowSymlink)
+}
+
+// parseSymlinkDiffInfo extracts symlink information from a parsed diff.
+// It detects plain symlink additions/modifications/deletions and type changes
+// between regular files and symlinks.
+func parseSymlinkDiffInfo(parsed parsedDiff) symlinkDiffInfo {
+	var info symlinkDiffInfo
+	var hasNonSymlinkMode bool
+
+	// Scan all lines (not just FileHeader) because a type conversion produces two
+	// diff --git blocks: the second block's header falls inside the first hunk's
+	// line range rather than in FileHeader.
+	for _, line := range parsed.Lines {
+		switch {
+		case strings.HasPrefix(line, "new file mode "):
+			mode := strings.TrimSpace(strings.TrimPrefix(line, "new file mode "))
+			if mode == "120000" {
+				info.IsNowSymlink = true
+			} else {
+				hasNonSymlinkMode = true
+			}
+		case strings.HasPrefix(line, "deleted file mode "):
+			mode := strings.TrimSpace(strings.TrimPrefix(line, "deleted file mode "))
+			if mode == "120000" {
+				info.WasSymlink = true
+			} else {
+				hasNonSymlinkMode = true
+			}
+		case strings.HasPrefix(line, "old mode "):
+			mode := strings.TrimSpace(strings.TrimPrefix(line, "old mode "))
+			if mode == "120000" {
+				info.WasSymlink = true
+			} else {
+				hasNonSymlinkMode = true
+			}
+		case strings.HasPrefix(line, "new mode "):
+			mode := strings.TrimSpace(strings.TrimPrefix(line, "new mode "))
+			if mode == "120000" {
+				info.IsNowSymlink = true
+			} else {
+				hasNonSymlinkMode = true
+			}
+		case strings.HasPrefix(line, "index "):
+			// "index <hash>..<hash> 120000" indicates a same-type symlink change.
+			parts := strings.Fields(line)
+			if len(parts) == 3 && parts[2] == "120000" {
+				info.WasSymlink = true
+				info.IsNowSymlink = true
+			}
+		}
+	}
+	info.IsSymlink = info.WasSymlink || info.IsNowSymlink
+	if !info.IsSymlink {
+		return info
+	}
+	info.TypeChange = hasNonSymlinkMode
+
+	// Extract targets from changed lines. Only pull the target from the side that
+	// is actually a symlink; for type conversions the other side contains regular
+	// file content that should not be treated as a symlink target.
+	//
+	// In a two-block diff (type conversion), "--- a/file" and "+++ b/file" header
+	// lines from the second block land inside the first hunk's line range and are
+	// parsed as changed lines. Skip them: after stripping the prefix char they
+	// start with "-- " or "++ ".
+	for _, cl := range parsed.Changed {
+		if len(cl.Text) < 2 {
+			continue
+		}
+		target := strings.TrimSpace(cl.Text[1:])
+		if strings.HasPrefix(target, "-- ") || strings.HasPrefix(target, "++ ") {
+			continue
+		}
+		if cl.Prefix == '-' && info.WasSymlink && info.OldTarget == "" {
+			info.OldTarget = target
+		} else if cl.Prefix == '+' && info.IsNowSymlink && info.NewTarget == "" {
+			info.NewTarget = target
+		}
+	}
+	return info
+}
+
+// summary returns a short human-readable description of the symlink change.
+func (si symlinkDiffInfo) summary() string {
+	switch {
+	case si.WasSymlink && si.IsNowSymlink:
+		switch {
+		case si.OldTarget != "" && si.NewTarget != "":
+			return "symlink: " + si.OldTarget + " -> " + si.NewTarget
+		case si.NewTarget != "":
+			return "symlink -> " + si.NewTarget
+		case si.OldTarget != "":
+			return "symlink: " + si.OldTarget + " (removed)"
+		default:
+			return "symlink"
+		}
+	case !si.WasSymlink && si.IsNowSymlink && si.TypeChange:
+		if si.NewTarget != "" {
+			return "regular file -> symlink (" + si.NewTarget + ")"
+		}
+		return "regular file -> symlink"
+	case !si.WasSymlink && si.IsNowSymlink && !si.TypeChange:
+		if si.NewTarget != "" {
+			return "symlink -> " + si.NewTarget
+		}
+		return "symlink"
+	case si.WasSymlink && !si.IsNowSymlink && si.TypeChange:
+		if si.OldTarget != "" {
+			return "symlink (" + si.OldTarget + ") -> regular file"
+		}
+		return "symlink -> regular file"
+	case si.WasSymlink && !si.IsNowSymlink && !si.TypeChange:
+		if si.OldTarget != "" {
+			return "symlink: " + si.OldTarget + " (removed)"
+		}
+		return "symlink (removed)"
+	default:
+		return ""
+	}
+}
+
+// titleLabel returns a concise bracket label for use in a section pane title.
+func (si symlinkDiffInfo) titleLabel() string {
+	switch {
+	case si.WasSymlink && si.IsNowSymlink:
+		return "[symlink]"
+	case !si.WasSymlink && si.IsNowSymlink && si.TypeChange:
+		return "[regular -> symlink]"
+	case !si.WasSymlink && si.IsNowSymlink && !si.TypeChange:
+		return "[symlink]"
+	case si.WasSymlink && !si.IsNowSymlink && si.TypeChange:
+		return "[symlink -> regular]"
+	case si.WasSymlink && !si.IsNowSymlink && !si.TypeChange:
+		return "[symlink]"
+	default:
+		return ""
+	}
+}
+
 func patchFileHeader(fileHeader []string) []string {
 	plusPath := ""
 	for _, line := range fileHeader {

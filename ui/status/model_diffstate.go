@@ -500,6 +500,14 @@ func buildDisplayBaseLines(parsed parsedDiff, colorLines []string) (lines []stri
 		return nil, nil
 	}
 
+	if si := parseSymlinkDiffInfo(parsed); si.IsSymlink {
+		if summary := si.summary(); summary != "" {
+			symlinkStyle := lipgloss.NewStyle().Foreground(catBlue).Bold(true)
+			lines = append(lines, symlinkStyle.Render("  "+summary))
+			displayToRaw = append(displayToRaw, -1)
+		}
+	}
+
 	hdrStyle := lipgloss.NewStyle().Background(catSurface).Foreground(catText).Bold(true)
 	for hi, h := range parsed.Hunks {
 		if hi > 0 {
