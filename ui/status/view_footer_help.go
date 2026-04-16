@@ -24,11 +24,14 @@ func (m Model) helpLine() string {
 		return line
 	}
 	if m.focus == focusStatus {
-		hint := m.diffContextLabel() + " · status"
+		hint := m.diffContextLabel() + " · " + m.helpSectionLabel()
 		if t := m.terminalLabel(); t != "" {
 			hint += " · " + t
 		}
 		hint += " · ? help"
+		if hs := m.footerShortHelp(); hs != "" {
+			hint += " · " + hs
+		}
 		if s := m.searchCounterLabel(); s != "" {
 			hint = s + " · " + hint
 		}
@@ -47,6 +50,9 @@ func (m Model) helpLine() string {
 		hint += " · " + t
 	}
 	hint += " · ? help"
+	if hs := m.footerShortHelp(); hs != "" {
+		hint += " · " + hs
+	}
 	if s := m.searchCounterLabel(); s != "" {
 		hint = s + " · " + hint
 	}
@@ -122,7 +128,7 @@ func (m Model) renderFooterLineWithPrefix(prefix, hint string) string {
 			left := leftText + sep
 			leftW := ansi.StringWidth(left)
 			if leftW >= lineW {
-				return ansi.Truncate(leftText, lineW, "")
+				return ansi.Truncate(leftText, lineW, "...")
 			}
 			return left + ansi.Truncate(hintStyled, lineW-leftW, "")
 		}
@@ -158,55 +164,14 @@ func (m *Model) showHelpOverlay() {
 		vpH = 8
 	}
 	vp := viewport.New(viewport.WithWidth(vpW-2), viewport.WithHeight(vpH))
-	vp.SetContent(stageHelpText())
+	vp.SetContent(m.helpFullView(vpW - 2))
 	m.helpVP = vp
 	m.helpOpen = true
 }
 
-func stageHelpText() string {
-	return strings.Join([]string{
-		"Global",
-		"  ?       toggle this help",
-		"  q       quit",
-		"  cc      open git commit",
-		"  g       jump top",
-		"  oo      view last command output",
-		"  ol      open lazygit log",
-		"  yy/yl/ya/yf yank content/location/all/filename",
-		"  p/P     pull / push",
-		"  b       rebase on origin/master",
-		"  A       amend last commit (confirm)",
-		"",
-		"Status Focus",
-		"  j / k   move selection",
-		"  G       jump bottom",
-		"  ctrl+u/d scroll half page",
-		"  h       collapse open directory",
-		"  l       expand directory / open diff on file",
-		"  space   stage/unstage file",
-		"  d       discard file change (confirm)",
-		"  e       edit current file in $EDITOR",
-		"  enter   open diff view",
-		"  [ / ]   decrease/increase diff context",
-		"  r       refresh",
-		"",
-		"Diff Focus",
-		"  esc/h   return to status",
-		"  G       jump bottom",
-		"  ctrl+u/d scroll half page",
-		"  tab     switch unstaged/staged section",
-		"  a       toggle hunk/line mode",
-		"  v       toggle visual line-range mode",
-		"  j / k   move active hunk/line",
-		"  , / .   previous/next file",
-		"  J / K   scroll diff viewport",
-		"  s       toggle unified/side-by-side",
-		"  [ / ]   decrease/increase diff context",
-		"  space   stage/unstage active hunk/line",
-		"  d       discard (unstaged) / unstage (staged)",
-		"  e       edit current file in $EDITOR",
-		"  f       toggle fullscreen diff",
-		"  w       toggle soft wrap",
-		"  r       refresh",
-	}, "\n")
+func (m Model) footerShortHelp() string {
+	if m.statusMsg != "" || m.width < 110 {
+		return ""
+	}
+	return m.helpShortView()
 }

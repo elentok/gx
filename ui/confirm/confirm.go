@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"gx/ui"
+	"gx/ui/components"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -46,25 +47,14 @@ func (m model) Init() tea.Cmd { return nil }
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "left", "h":
-			m.choiceYes = true
-		case "right", "l":
-			m.choiceYes = false
-		case "y":
-			m.choiceYes = true
+		nextYes, decided, accepted, handled := components.UpdateConfirm(msg, m.choiceYes)
+		if !handled {
+			return m, nil
+		}
+		m.choiceYes = nextYes
+		if decided {
 			m.done = true
-			return m, tea.Quit
-		case "n":
-			m.choiceYes = false
-			m.done = true
-			return m, tea.Quit
-		case "enter":
-			m.done = true
-			return m, tea.Quit
-		case "ctrl+c", "esc", "q":
-			m.choiceYes = false
-			m.done = true
+			m.choiceYes = accepted
 			return m, tea.Quit
 		}
 	}

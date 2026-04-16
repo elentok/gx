@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"gx/ui"
+	"gx/ui/components"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -25,7 +26,7 @@ func Run(header string, items []Item) (int, error) {
 }
 
 func run(header string, items []Item, in io.Reader, out io.Writer) (int, error) {
-	m := model{header: header, items: items}
+	m := model{header: header, items: items, state: menuState(items)}
 	p := tea.NewProgram(m, tea.WithInput(in), tea.WithOutput(out))
 	finalModel, err := p.Run()
 	if err != nil {
@@ -35,13 +36,13 @@ func run(header string, items []Item, in io.Reader, out io.Writer) (int, error) 
 	if !fm.done || fm.aborted {
 		return -1, nil
 	}
-	return fm.cursor, nil
+	return fm.state.Cursor, nil
 }
 
 type model struct {
 	header  string
 	items   []Item
-	cursor  int
+	state   components.MenuState
 	done    bool
 	aborted bool
 }
@@ -51,18 +52,16 @@ func (m model) Init() tea.Cmd { return nil }
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
+		if state, decided, accepted, handled := components.UpdateMenu(msg, m.state); handled {
+			m.state = state
+			if decided {
+				m.done = true
+				m.aborted = !accepted
+				return m, tea.Quit
+			}
+			return m, nil
+		}
 		switch msg.String() {
-		case "j", "down":
-			if m.cursor < len(m.items)-1 {
-				m.cursor++
-			}
-		case "k", "up":
-			if m.cursor > 0 {
-				m.cursor--
-			}
-		case "enter":
-			m.done = true
-			return m, tea.Quit
 		case "ctrl+c", "esc", "q":
 			m.aborted = true
 			m.done = true
@@ -71,9 +70,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Number shortcuts: 1-based
 			key := msg.String()
 			if len(key) == 1 && key[0] >= '1' && key[0] <= '9' {
-				idx := int(key[0]-'1')
+				idx := int(key[0] - '1')
 				if idx < len(m.items) {
-					m.cursor = idx
+					m.state.Cursor = idx
 					m.done = true
 					return m, tea.Quit
 				}
@@ -97,7 +96,7 @@ func (m model) View() tea.View {
 
 	for i, item := range m.items {
 		num := fmt.Sprintf("%d", i+1)
-		if i == m.cursor {
+		if i == m.state.Cursor {
 			label := selectedStyle.Render("▸ " + num + ". " + item.Label)
 			if item.Detail != "" {
 				label += "  " + detailStyle.Render(item.Detail)
@@ -118,4 +117,15 @@ func (m model) View() tea.View {
 	sb.WriteString("\n")
 
 	return tea.NewView(sb.String())
+}
+
+func menuState(items []Item) components.MenuState {
+	menuItems := make([]components.MenuItem, len(items))
+	for i, item := range items {
+		menuItems[i] = components.MenuItem{
+			Label:  fmt.Sprintf("%d. %s", i+1, item.Label),
+			Detail: item.Detail,
+		}
+	}
+	return components.MenuState{Items: menuItems}
 }

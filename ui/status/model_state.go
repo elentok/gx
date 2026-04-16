@@ -8,6 +8,7 @@ import (
 	"gx/ui"
 	"gx/ui/components"
 
+	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
 	"charm.land/lipgloss/v2"
@@ -100,6 +101,7 @@ type Model struct {
 	searchMatches           []stageSearchMatch
 	searchCursor            int
 	searchInput             textinput.Model
+	help                    help.Model
 	confirmOpen             bool
 	confirmTitle            string
 	confirmLines            []string
@@ -211,6 +213,7 @@ func NewWithSettings(worktreeRoot string, settings Settings) Model {
 		selected:         0,
 		unstaged:         newSectionState(),
 		staged:           newSectionState(),
+		help:             newStageHelpModel(),
 	}
 	m.reload("")
 	return m
