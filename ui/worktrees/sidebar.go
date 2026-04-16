@@ -58,7 +58,7 @@ func renderSidebarContent(wt *git.Worktree, upstream string, headCommit git.Comm
 	b.WriteString("\n")
 	if upstream == "" {
 		b.WriteString(ui.StyleDim.Render("  no remote tracking branch") + "\n")
-		b.WriteString(ui.StyleDim.Render("  press t to track origin/<branch>") + "\n")
+		b.WriteString("  " + ui.RenderInlineBindings(keys.Track) + " " + ui.StyleDim.Render("origin/<branch>") + "\n")
 	} else {
 		b.WriteString(ui.StyleBold.Render(ic.aheadTitle))
 		b.WriteString("\n\n")

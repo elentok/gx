@@ -96,7 +96,7 @@ func (m Model) yankModalView() string {
 	return ui.RenderModalFrame(ui.ModalFrameOptions{
 		Title:       "Yank files from: " + m.yankSource.Name,
 		Body:        m.yankChecklist.View(modalW-4, listH),
-		Hint:        "space toggle · a all · enter confirm · esc cancel",
+		Hint:        ui.HintChecklistConfirm(),
 		Width:       modalW - 4,
 		BorderColor: ui.ColorBorder,
 		TitleColor:  ui.ColorBlue,

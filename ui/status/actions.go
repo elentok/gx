@@ -808,9 +808,9 @@ func (m Model) runningModalView() string {
 	if title == "" {
 		title = "Running"
 	}
-	hint := "ctrl+c cancel · j/k scroll"
+	hint := ui.HintCancelScroll()
 	if m.runningDone {
-		hint = "esc / enter dismiss · j/k scroll"
+		hint = ui.HintDismissScroll()
 	}
 	return components.RenderOutputModal(
 		title,
@@ -831,7 +831,7 @@ func (m Model) outputModalView() string {
 	return components.RenderOutputModal(
 		title,
 		m.outputViewport.View(),
-		"esc / enter / q dismiss · j/k scroll",
+		ui.HintDismissScroll(),
 		catYellow,
 		catYellow,
 		catSubtle,
@@ -849,7 +849,7 @@ func (m Model) credentialModalView() string {
 		title,
 		m.credentialPrompt,
 		input,
-		"enter submit · esc cancel",
+		ui.HintSubmitCancel(),
 		catBlue,
 		catBlue,
 		catSubtle,

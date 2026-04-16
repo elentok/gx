@@ -12,7 +12,7 @@ func (m Model) errorModalView() string {
 	return components.RenderOutputModal(
 		"Error",
 		m.errorVP.View(),
-		"esc / enter dismiss · j/k scroll",
+		ui.HintDismissScroll(),
 		catRed,
 		catRed,
 		catSubtle,
@@ -24,7 +24,7 @@ func (m Model) helpModalView() string {
 	return ui.RenderModalFrame(ui.ModalFrameOptions{
 		Title:       "Keyboard Help",
 		Body:        m.helpVP.View(),
-		Hint:        "? / esc / enter dismiss · j/k scroll",
+		Hint:        ui.JoinStatus(ui.RenderInlineBindings(stageKeyHelp), ui.HintDismissScroll()),
 		Width:       m.helpVP.Width(),
 		BorderColor: catBlue,
 		TitleColor:  catBlue,
@@ -79,19 +79,6 @@ type statusPaneIcons struct {
 
 func statusPaneIconsFor(useNerdFontIcons bool) statusPaneIcons {
 	shared := ui.Icons(useNerdFontIcons)
-	if !useNerdFontIcons {
-		return statusPaneIcons{
-			folderClosed: shared.FolderClosed,
-			folderOpen:   shared.FolderOpen,
-			fileModified: shared.FileModified,
-			fileNew:      shared.FileAdded,
-			fileDeleted:  shared.FileDeleted,
-			fileRenamed:  shared.FileRenamed,
-			fileSymlink:  shared.FileSymlink,
-			partial:      shared.Partial,
-			staged:       shared.Staged,
-		}
-	}
 	return statusPaneIcons{
 		folderClosed: shared.FolderClosed,
 		folderOpen:   shared.FolderOpen,

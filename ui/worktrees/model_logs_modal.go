@@ -44,13 +44,13 @@ func (m Model) handleLogsKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 func (m Model) logsModalView() string {
 	content := m.lastJobLog
 	if content == "" {
-		content = ui.StyleDim.Render("(no output)")
+		content = ui.StyleDim.Render("(" + ui.MessageNoOutput() + ")")
 	}
 	m.logsViewport.SetContent(content)
 	return components.RenderOutputModal(
 		m.lastJobLabel,
 		m.logsViewport.View(),
-		"esc / enter / q  to dismiss",
+		ui.HintDismiss(),
 		ui.ColorBorder,
 		ui.ColorGreen,
 		ui.ColorGray,

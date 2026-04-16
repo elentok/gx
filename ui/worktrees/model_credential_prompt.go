@@ -57,7 +57,7 @@ func (m Model) credentialModalView() string {
 		"Credential Required",
 		m.confirmPrompt,
 		input,
-		"enter submit · esc cancel",
+		ui.HintSubmitCancel(),
 		ui.ColorBorder,
 		ui.ColorGreen,
 		ui.ColorGray,

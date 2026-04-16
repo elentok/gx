@@ -45,3 +45,34 @@ func MessageOpening(target string) string {
 func MessageClosed(target string) string {
 	return strings.TrimSpace(target) + " closed"
 }
+
+func HintDismiss() string {
+	return RenderInlineBindings(key.NewBinding(key.WithHelp("esc/enter/q", "dismiss")))
+}
+
+func HintDismissScroll() string {
+	return JoinStatus(HintDismiss(), RenderInlineBindings(key.NewBinding(key.WithHelp("j/k", "scroll"))))
+}
+
+func HintSubmitCancel() string {
+	return RenderInlineBindings(
+		key.NewBinding(key.WithHelp("enter", "submit")),
+		key.NewBinding(key.WithHelp("esc", "cancel")),
+	)
+}
+
+func HintChecklistConfirm() string {
+	return RenderInlineBindings(
+		key.NewBinding(key.WithHelp("space", "toggle")),
+		key.NewBinding(key.WithHelp("a", "all")),
+		key.NewBinding(key.WithHelp("enter", "confirm")),
+		key.NewBinding(key.WithHelp("esc", "cancel")),
+	)
+}
+
+func HintCancelScroll() string {
+	return JoinStatus(
+		RenderInlineBindings(key.NewBinding(key.WithHelp("ctrl+c", "cancel"))),
+		RenderInlineBindings(key.NewBinding(key.WithHelp("j/k", "scroll"))),
+	)
+}

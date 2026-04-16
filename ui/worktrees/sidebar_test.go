@@ -32,6 +32,9 @@ func TestRenderSidebarContent_NoUpstream(t *testing.T) {
 	if !strings.Contains(out, "no remote tracking branch") {
 		t.Fatal("missing no-tracking note")
 	}
+	if !strings.Contains(out, "t") || !strings.Contains(out, "track") || !strings.Contains(out, "origin/<branch>") {
+		t.Fatal("missing tracking hint")
+	}
 	if strings.Contains(out, "Commits ahead") {
 		t.Fatal("should not show ahead section when no upstream")
 	}
