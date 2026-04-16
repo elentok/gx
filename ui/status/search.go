@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	"gx/ui"
+
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -246,7 +249,13 @@ func (m Model) searchFooterText() string {
 			base += fmt.Sprintf(" · %d/%d", idx, total)
 		}
 	}
-	base += " · enter keep highlights · esc clear"
+	base = ui.JoinStatus(
+		base,
+		ui.RenderInlineBindings(
+			key.NewBinding(key.WithHelp("enter", "keep highlights")),
+			key.NewBinding(key.WithHelp("esc", "clear")),
+		),
+	)
 	return base
 }
 

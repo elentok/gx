@@ -9,6 +9,7 @@ import (
 
 	"gx/ui"
 
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
@@ -185,7 +186,11 @@ func (m bumpPickerModel) View() tea.View {
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
-	b.WriteString(ui.StyleDim.Render("  ↑/↓ or j/k: choose  enter: confirm  q/esc: cancel"))
+	b.WriteString(ui.StyleDim.Render("  " + ui.RenderInlineBindings(
+		key.NewBinding(key.WithHelp("↑/↓ or j/k", "choose")),
+		key.NewBinding(key.WithHelp("enter", "confirm")),
+		key.NewBinding(key.WithHelp("q/esc", "cancel")),
+	)))
 	b.WriteString("\n")
 	return tea.NewView(b.String())
 }
