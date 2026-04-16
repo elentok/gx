@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.12.0
+
+- Added a shared UI design-system foundation across `gx status`, `gx wt`, and CLI flows: common theme colors, semantic icons, shared frame/overlay primitives, and reusable feedback/key-hint helpers
+- Standardized menus, confirms, keybinding hints, and status messaging so CLI and TUI interactions now feel much more consistent across screens
+- Migrated `gx status` onto structured `bubbles/help` and `key.Binding` driven help rendering
+- Tightened final polish across remaining surfaces, including shared modal hint language, cleaner search/footer hints, and a more consistent interactive `gx bump` picker
+- Added design-system research/spec docs under `docs/design-system/` and an AI-facing usage guide in `.ai/design-system.md` to keep future UI work aligned with the shared system
+
 ## v0.11.7
 
 - `gx status` diff view now identifies symlinks: shows the target in a summary line (`symlink -> target`, `symlink: old -> new`, `symlink (target) -> regular file`, etc.) and labels the section header with `[symlink]`, `[regular -> symlink]`, or `[symlink -> regular]`; sidebar uses a dedicated symlink icon
