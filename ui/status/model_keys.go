@@ -1,5 +1,7 @@
 package stage
 
+import "gx/ui"
+
 import tea "charm.land/bubbletea/v2"
 
 func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
@@ -9,7 +11,7 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	if m.keyPrefix == "c" {
 		m.keyPrefix = ""
 		if key == "c" {
-			m.setStatus("opening git commit...")
+			m.setStatus(ui.MessageOpening("git commit"))
 			return m, cmdGitCommit(m.worktreeRoot, m.settings.Terminal), true
 		}
 		if key == "esc" {
@@ -60,13 +62,13 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		switch key {
 		case "o":
 			if m.outputContent == "" {
-				m.setStatus("no command output")
+				m.setStatus(ui.MessageNoOutput())
 				return m, nil, true
 			}
 			m.openOutputModal()
 			return m, nil, true
 		case "l":
-			m.setStatus("opening lazygit log...")
+			m.setStatus(ui.MessageOpening("lazygit log"))
 			return m, cmdLazygitLog(m.worktreeRoot), true
 		case "esc":
 			m.clearStatus()

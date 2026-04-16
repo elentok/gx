@@ -124,7 +124,7 @@ func TestDeleteWorktree_ShowsToastAfterDeletion(t *testing.T) {
 
 	// The toast proves spinnerActive was cleared — if the spinner stays stuck
 	// the model never re-renders status messages and this will time out.
-	waitForText(t, tm, "feature-a deleted successfully", loadWait)
+	waitForText(t, tm, "deleted worktree feature-a", loadWait)
 
 	quit(t, tm)
 }
@@ -314,7 +314,7 @@ func TestPushWorktree(t *testing.T) {
 	waitForText(t, tm, "Push feature-a?", actionWait)
 	tm.Send(keyRune('y'))
 
-	waitForText(t, tm, "Pushed", loadWait)
+	waitForText(t, tm, "push complete", loadWait)
 
 	quit(t, tm)
 }
@@ -367,7 +367,7 @@ func TestPushRejectedForcePushConfirmed(t *testing.T) {
 	tm.Send(keyRune('j'))
 	tm.Send(keySpecial(tea.KeyEnter))
 
-	waitForText(t, tm, "Force-pushed", loadWait)
+	waitForText(t, tm, "force push complete", loadWait)
 
 	quit(t, tm)
 }
@@ -388,7 +388,7 @@ func TestPullMainRefreshesBaseStatus(t *testing.T) {
 
 	// Pull main (cursor is on main).
 	tm.Send(keyRune('p'))
-	waitForText(t, tm, "Pulled", loadWait)
+	waitForText(t, tm, "pull complete", loadWait)
 
 	// After pulling, main advances; feature-a is now behind main → ✗.
 	waitForText(t, tm, "✗", loadWait)
@@ -415,7 +415,7 @@ func TestStashPullMainRefreshesBaseStatus(t *testing.T) {
 	waitForText(t, tm, "Stash", actionWait)
 	tm.Send(keyRune('y'))
 
-	waitForText(t, tm, "Pulled (stash restored)", loadWait)
+	waitForText(t, tm, "pull complete (stash restored)", loadWait)
 
 	tm.Send(keyRune('o'))
 	tm.Send(keyRune('o'))

@@ -104,10 +104,7 @@ func (m Model) finishPromptableJob(err error) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(cmdStashPop(wt.Path, "pull", log), m.spinner.Tick)
 		}
 		m.statusGen++
-		m.statusMsg = "Pulled"
-		if log != "" {
-			m.statusMsg += "  ·  o  view output"
-		}
+		m.statusMsg = worktreeStatusMessage(ui.MessageComplete("pull"), log != "")
 		cmds := []tea.Cmd{cmdClearStatus(m.statusGen)}
 		if wt.Branch != "" {
 			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, wt))
@@ -140,10 +137,7 @@ func (m Model) finishPromptableJob(err error) (tea.Model, tea.Cmd) {
 			return m.showError(err.Error()), nil
 		}
 		m.statusGen++
-		m.statusMsg = "Pushed"
-		if log != "" {
-			m.statusMsg += "  ·  o  view output"
-		}
+		m.statusMsg = worktreeStatusMessage(ui.MessageComplete("push"), log != "")
 		cmds := []tea.Cmd{cmdClearStatus(m.statusGen)}
 		if wt.Branch != "" {
 			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, wt))
@@ -161,10 +155,7 @@ func (m Model) finishPromptableJob(err error) (tea.Model, tea.Cmd) {
 			return m.showError(err.Error()), nil
 		}
 		m.statusGen++
-		m.statusMsg = "Force-pushed"
-		if log != "" {
-			m.statusMsg += "  ·  o  view output"
-		}
+		m.statusMsg = worktreeStatusMessage(ui.MessageComplete("force push"), log != "")
 		cmds := []tea.Cmd{cmdClearStatus(m.statusGen)}
 		if wt.Branch != "" {
 			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, wt))

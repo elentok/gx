@@ -364,9 +364,9 @@ func (m *Model) handleActionResult(res stageActionResult) {
 
 	switch res.kind {
 	case actionPull:
-		m.setStatus("pull complete")
+		m.setStatus(ui.MessageComplete("pull"))
 	case actionPush:
-		m.setStatus("push complete")
+		m.setStatus(ui.MessageComplete("push"))
 		if res.prURL != "" {
 			m.openConfirm(
 				fmt.Sprintf("Open pull request page?\n\n%s", res.prURL),
@@ -378,9 +378,9 @@ func (m *Model) handleActionResult(res stageActionResult) {
 			m.confirmYes = true
 		}
 	case actionForcePush:
-		m.setStatus("force push complete")
+		m.setStatus(ui.MessageComplete("force push"))
 	case actionRebase:
-		m.setStatus("rebase complete")
+		m.setStatus(ui.MessageComplete("rebase"))
 	case actionPopStashPull, actionPopStashRebase:
 		m.setStatus("stash restored")
 	case actionAmend:
@@ -456,7 +456,7 @@ func (m *Model) handleConfirmKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if !accepted {
 			m.confirmOpen = false
 			m.confirmAction = confirmNone
-			m.setStatus("push aborted")
+			m.setStatus(ui.MessageAborted("push"))
 			return m, nil
 		}
 		choice := "abort"
@@ -488,7 +488,7 @@ func (m *Model) handleConfirmKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.confirmOpen = false
 			m.confirmAction = confirmNone
 			m.pendingActionOutput = ""
-			m.setStatus("push aborted")
+			m.setStatus(ui.MessageAborted("push"))
 			return m, nil
 		}
 	}
@@ -549,7 +549,7 @@ func (m Model) confirmAccept() (tea.Model, tea.Cmd) {
 		m.openRunning("Amend commit", runner)
 		return m, actionPollCmd()
 	case confirmOpenPR:
-		m.setStatus("opening PR URL")
+		m.setStatus(ui.MessageOpening("PR URL"))
 		return m, ui.CmdOpenURL(m.confirmRemote)
 	case confirmDiscardStatus:
 		if m.confirmDiscardUntracked {

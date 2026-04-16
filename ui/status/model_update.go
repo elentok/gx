@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"gx/ui"
+
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -126,7 +128,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.setStatus("opened " + msg.splitApp + " split: git commit")
 			return m, nil
 		}
-		m.setStatus("git commit finished")
+		m.setStatus(ui.MessageClosed("git commit"))
 		m.refresh()
 		return m, nil
 	case lazygitLogFinishedMsg:
@@ -134,7 +136,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.setStatus("lazygit log failed: " + msg.err.Error())
 			return m, nil
 		}
-		m.setStatus("lazygit log closed")
+		m.setStatus(ui.MessageClosed("lazygit log"))
 		m.refresh()
 		return m, nil
 	case editFileFinishedMsg:
@@ -142,7 +144,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.setStatus("edit failed: " + msg.err.Error())
 			return m, nil
 		}
-		m.setStatus("editor closed")
+		m.setStatus(ui.MessageClosed("editor"))
 		m.refresh()
 		return m, nil
 	}

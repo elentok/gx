@@ -12,21 +12,21 @@ func (m Model) handleOutputKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		case "o":
 			if m.lastJobLog == "" {
 				m.statusGen++
-				m.statusMsg = "no command output"
+				m.statusMsg = ui.MessageNoOutput()
 				return m, cmdClearStatus(m.statusGen), true
 			}
 			return m.enterLogsMode(), nil, true
 		case "l":
 			wt := m.selectedWorktree()
 			if wt != nil {
-				m.statusMsg = "opening lazygit log..."
+				m.statusMsg = ui.MessageOpening("lazygit log")
 				return m, cmdLazygitLog(*wt), true
 			}
 			return m, nil, true
 		case "t":
 			wt := m.selectedWorktree()
 			if wt != nil {
-				m.statusMsg = "opening tmux session..."
+				m.statusMsg = ui.MessageOpening("tmux session")
 				return m, cmdTmuxNewSession(wt.Name, wt.Path), true
 			}
 			return m, nil, true

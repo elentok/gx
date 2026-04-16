@@ -12,6 +12,13 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
+func worktreeStatusMessage(message string, hasOutput bool) string {
+	if !hasOutput {
+		return message
+	}
+	return ui.StatusWithHints(message, keys.Logs)
+}
+
 func (m Model) Init() tea.Cmd {
 	return cmdLoadWorktrees(m.repo)
 }
@@ -96,7 +103,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						"Stash changes before pulling "+wt.Name+"?",
 						cmdStashPull(*wt),
 						"Pulling "+wt.Name+"…",
-						"Pull aborted (dirty worktree)",
+						"pull aborted (dirty worktree)",
 					), nil
 				}
 				return m, cmdStartPromptableJob(promptableJobPull, *wt, "", false)
@@ -152,7 +159,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.showError(msg.err.Error()), nil
 		}
 		m.statusGen++
-		m.statusMsg = fmt.Sprintf("Worktree %s deleted successfully", msg.name)
+		m.statusMsg = fmt.Sprintf("deleted worktree %s", msg.name)
 		return m, tea.Batch(cmdLoadWorktrees(m.repo), cmdClearStatus(m.statusGen))
 
 	case renameResultMsg:
@@ -254,10 +261,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.showError(msg.err.Error()), nil
 		}
 		m.statusGen++
-		m.statusMsg = "Pulled"
-		if msg.log != "" {
-			m.statusMsg += "  ·  o  view output"
-		}
+		m.statusMsg = worktreeStatusMessage(ui.MessageComplete("pull"), msg.log != "")
 		cmds = append(cmds, cmdClearStatus(m.statusGen))
 		if wt := m.selectedWorktree(); wt != nil && wt.Branch != "" {
 			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, *wt))
@@ -302,10 +306,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Should not reach here (stashPull always stashes), but handle gracefully
 		m.statusGen++
-		m.statusMsg = "Pulled"
-		if msg.log != "" {
-			m.statusMsg += "  ·  o  view output"
-		}
+		m.statusMsg = worktreeStatusMessage(ui.MessageComplete("pull"), msg.log != "")
 		cmds = append(cmds, cmdClearStatus(m.statusGen))
 		if wt := m.selectedWorktree(); wt != nil && wt.Branch != "" {
 			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, *wt))
@@ -317,7 +318,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			fmt.Sprintf("Stash changes before rebasing %s?", msg.wt.Branch),
 			cmdRebase(msg.repo, msg.wt, true),
 			"Rebasing "+msg.wt.Name+"…",
-			"Rebase aborted (dirty worktree)",
+			"rebase aborted (dirty worktree)",
 		), nil
 
 	case rebaseResultMsg:
@@ -339,10 +340,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(cmdStashPop(msg.wtPath, "rebase", msg.log), m.spinner.Tick)
 		}
 		m.statusGen++
-		m.statusMsg = "Rebased"
-		if msg.log != "" {
-			m.statusMsg += "  ·  o  view output"
-		}
+		m.statusMsg = worktreeStatusMessage(ui.MessageComplete("rebase"), msg.log != "")
 		cmds = append(cmds, cmdClearStatus(m.statusGen))
 		for _, w := range m.worktrees {
 			if w.Branch != "" {
@@ -363,15 +361,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusGen++
 		switch msg.opLabel {
 		case "pull":
-			m.statusMsg = "Pulled (stash restored)"
+			m.statusMsg = "pull complete (stash restored)"
 		case "rebase":
-			m.statusMsg = "Rebased (stash restored)"
+			m.statusMsg = "rebase complete (stash restored)"
 		default:
-			m.statusMsg = "Stash restored"
+			m.statusMsg = "stash restored"
 		}
-		if m.lastJobLog != "" {
-			m.statusMsg += "  ·  o  view output"
-		}
+		m.statusMsg = worktreeStatusMessage(m.statusMsg, m.lastJobLog != "")
 		cmds = append(cmds, cmdClearStatus(m.statusGen))
 		if wt := m.selectedWorktree(); wt != nil {
 			cmds = append(cmds, cmdLoadDirtyStatus(*wt), cmdLoadSidebarData(m.repo, *wt))
@@ -416,10 +412,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.showError(msg.err.Error()), nil
 		}
 		m.statusGen++
-		m.statusMsg = "Pushed"
-		if msg.log != "" {
-			m.statusMsg += "  ·  o  view output"
-		}
+		m.statusMsg = worktreeStatusMessage(ui.MessageComplete("push"), msg.log != "")
 		cmds = append(cmds, cmdClearStatus(m.statusGen))
 		if wt := m.selectedWorktree(); wt != nil && wt.Branch != "" {
 			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, *wt))
@@ -467,10 +460,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.showError(msg.err.Error()), nil
 		}
 		m.statusGen++
-		m.statusMsg = "Force-pushed"
-		if msg.log != "" {
-			m.statusMsg += "  ·  o  view output"
-		}
+		m.statusMsg = worktreeStatusMessage(ui.MessageComplete("force push"), msg.log != "")
 		cmds = append(cmds, cmdClearStatus(m.statusGen))
 		if wt := m.selectedWorktree(); wt != nil && wt.Branch != "" {
 			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, *wt))
@@ -499,7 +489,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.showError(msg.err.Error()), nil
 		}
 		m.statusGen++
-		m.statusMsg = "Tracking remote branch"
+		m.statusMsg = "tracking remote branch"
 		cmds = append(cmds, cmdClearStatus(m.statusGen))
 		if wt := m.selectedWorktree(); wt != nil && wt.Branch != "" {
 			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, *wt))
@@ -512,7 +502,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.clipboard = nil
 		m.statusGen++
-		m.statusMsg = fmt.Sprintf("Pasted %d file(s)", msg.n)
+		m.statusMsg = fmt.Sprintf("pasted %d file(s)", msg.n)
 		clearCmd := cmdClearStatus(m.statusGen)
 		return m, tea.Batch(clearCmd, cmdLoadWorktrees(m.repo))
 

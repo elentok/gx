@@ -48,7 +48,7 @@ func (m Model) handlePushDivergedKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if !accepted {
 		m.mode = modeNormal
 		m.statusGen++
-		m.statusMsg = "Push aborted"
+		m.statusMsg = ui.MessageAborted("push")
 		return m, cmdClearStatus(m.statusGen)
 	}
 	choice := m.pushMenu.Items[m.pushMenu.Cursor].Value
@@ -64,7 +64,7 @@ func (m Model) handlePushDivergedKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	default:
 		m.mode = modeNormal
 		m.statusGen++
-		m.statusMsg = "Push aborted"
+		m.statusMsg = ui.MessageAborted("push")
 		return m, cmdClearStatus(m.statusGen)
 	}
 }

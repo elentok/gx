@@ -121,7 +121,7 @@ func (m *Model) cmdEditSelectedFile() tea.Cmd {
 	line := m.editorLineForCurrentSelection()
 	args := editorLaunchArgs(parts[0], parts[1:], target, line)
 	c := exec.Command(parts[0], args...)
-	m.setStatus("opening editor...")
+	m.setStatus(ui.MessageOpening("editor"))
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		return editFileFinishedMsg{err: err}
 	})
