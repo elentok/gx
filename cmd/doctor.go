@@ -1,16 +1,37 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
 	"gx/git"
+	"gx/ui"
 )
 
 func runDoctor(args []string, d deps) error {
-	fix := len(args) > 0 && args[0] == "--fix"
+	var fix bool
+	var pause bool
+	for _, arg := range args {
+		switch arg {
+		case "--fix":
+			fix = true
+		case "--pause":
+			pause = true
+		default:
+			return fmt.Errorf("unknown doctor flag %q", arg)
+		}
+	}
+	getenv := d.getenv
+	if getenv == nil {
+		getenv = os.Getenv
+	}
+	stdin := d.stdin
+	if stdin == nil {
+		stdin = os.Stdin
+	}
 
 	cwd, err := d.getwd()
 	if err != nil {
@@ -32,8 +53,13 @@ func runDoctor(args []string, d deps) error {
 		return err
 	}
 
+	printDoctorRuntime(d.stdout, getenv)
+
 	if len(issues) == 0 {
 		fmt.Fprintln(d.stdout, "No issues found.")
+		if pause {
+			pauseDoctor(d.stdout, stdin)
+		}
 		return nil
 	}
 
@@ -72,6 +98,10 @@ func runDoctor(args []string, d deps) error {
 		fmt.Fprintln(d.stdout, "Run 'gx doctor --fix' to apply fixes.")
 	}
 
+	if pause {
+		pauseDoctor(d.stdout, stdin)
+	}
+
 	return nil
 }
 
@@ -93,7 +123,26 @@ func findRepoWithFallback(dir string) (*git.Repo, error) {
 }
 
 func printDoctorUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: gx doctor [--fix]")
+	fmt.Fprintln(w, "Usage: gx doctor [--fix] [--pause]")
 	fmt.Fprintln(w, "  Checks the current repo for common configuration issues.")
-	fmt.Fprintln(w, "  --fix  Prompt to apply each fix interactively.")
+	fmt.Fprintln(w, "  --fix    Prompt to apply each fix interactively.")
+	fmt.Fprintln(w, "  --pause  Wait for Enter before exiting.")
+}
+
+func printDoctorRuntime(w io.Writer, getenv func(string) string) {
+	terminal := ui.DetectTerminalFrom(getenv)
+	label := terminal.String()
+	if label == "" {
+		label = "plain"
+	}
+	fmt.Fprintf(w, "Runtime:\n")
+	fmt.Fprintf(w, "  terminal: %s\n", label)
+	fmt.Fprintf(w, "  TMUX=%q\n", getenv("TMUX"))
+	fmt.Fprintf(w, "  KITTY_WINDOW_ID=%q\n", getenv("KITTY_WINDOW_ID"))
+	fmt.Fprintf(w, "  KITTY_LISTEN_ON=%q\n\n", getenv("KITTY_LISTEN_ON"))
+}
+
+func pauseDoctor(stdout io.Writer, stdin io.Reader) {
+	fmt.Fprint(stdout, "Press Enter to exit...")
+	_, _ = bufio.NewReader(stdin).ReadString('\n')
 }

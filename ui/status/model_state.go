@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"gx/git"
+	"gx/ui"
 	"gx/ui/components"
 
 	"charm.land/bubbles/v2/textinput"
@@ -134,10 +135,11 @@ type Model struct {
 type Settings struct {
 	DiffContextLines int
 	UseNerdFontIcons bool
+	Terminal         ui.Terminal
 }
 
 func DefaultSettings() Settings {
-	return Settings{DiffContextLines: 1, UseNerdFontIcons: true}
+	return Settings{DiffContextLines: 1, UseNerdFontIcons: true, Terminal: ui.TerminalPlain}
 }
 
 type flashState struct {

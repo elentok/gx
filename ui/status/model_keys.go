@@ -10,7 +10,7 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		m.keyPrefix = ""
 		if key == "c" {
 			m.setStatus("opening git commit...")
-			return m, cmdGitCommit(m.worktreeRoot), true
+			return m, cmdGitCommit(m.worktreeRoot, m.settings.Terminal), true
 		}
 		if key == "esc" {
 			m.clearStatus()

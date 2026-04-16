@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"gx/git"
+	"gx/ui"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -68,14 +69,14 @@ func statusTickCmd() tea.Cmd {
 	})
 }
 
-func cmdGitCommit(worktreeRoot string) tea.Cmd {
-	if os.Getenv("TMUX") != "" {
+func cmdGitCommit(worktreeRoot string, terminal ui.Terminal) tea.Cmd {
+	if terminal == ui.TerminalTmux {
 		return func() tea.Msg {
 			err := exec.Command("tmux", "split-window", "-v", "-c", worktreeRoot, "git commit").Run()
 			return commitFinishedMsg{err: err, splitApp: "tmux"}
 		}
 	}
-	if os.Getenv("KITTY_LISTEN_ON") != "" {
+	if terminal == ui.TerminalKittyRemote {
 		return func() tea.Msg {
 			args := []string{"@", "launch", "--copy-env", "--location=hsplit", "--cwd=" + worktreeRoot}
 			args = append(args, "git", "commit")

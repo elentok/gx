@@ -194,6 +194,8 @@ func TestHelpOverlayToggleAndCompactStatusBar(t *testing.T) {
 }
 
 func TestHelpLineRightAlignsHintAndTruncatesStatus(t *testing.T) {
+	t.Setenv("TMUX", "")
+	t.Setenv("KITTY_WINDOW_ID", "")
 	m := New(testutil.TempRepo(t))
 	m.ready = true
 	m.width = 48
@@ -272,6 +274,8 @@ func TestReloadBranchStateUsesBranchUpstream(t *testing.T) {
 }
 
 func TestHelpLineShowsVisualAtLeftInDiffFocus(t *testing.T) {
+	t.Setenv("TMUX", "")
+	t.Setenv("KITTY_WINDOW_ID", "")
 	m := New(testutil.TempRepo(t))
 	m.ready = true
 	m.width = 96

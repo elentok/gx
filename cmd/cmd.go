@@ -11,6 +11,7 @@ import (
 
 	"gx/config"
 	"gx/git"
+	"gx/ui"
 	"gx/ui/confirm"
 	"gx/ui/menu"
 	"gx/ui/status"
@@ -196,7 +197,11 @@ func runStatus() error {
 	if err != nil {
 		return err
 	}
-	m := stage.NewWithSettings(root, stage.Settings{DiffContextLines: cfg.StageDiffContextLines, UseNerdFontIcons: cfg.UseNerdFontIcons})
+	m := stage.NewWithSettings(root, stage.Settings{
+		DiffContextLines: cfg.StageDiffContextLines,
+		UseNerdFontIcons: cfg.UseNerdFontIcons,
+		Terminal:         ui.DetectTerminal(),
+	})
 	p := tea.NewProgram(m)
 	_, err = p.Run()
 	return err

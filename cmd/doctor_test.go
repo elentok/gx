@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -57,6 +58,76 @@ func TestDoctor_NoIssues(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "No issues found") {
 		t.Errorf("expected 'No issues found', got: %q", stdout.String())
+	}
+}
+
+func TestDoctor_PrintsRuntimeTerminalInfo(t *testing.T) {
+	outerDir := setupDotBareForCmd(t)
+
+	var stdout bytes.Buffer
+	d := deps{
+		stdout: &stdout,
+		stderr: bytes.NewBuffer(nil),
+		getwd:  func() (string, error) { return outerDir, nil },
+		getenv: func(key string) string {
+			switch key {
+			case "KITTY_LISTEN_ON":
+				return "unix:/tmp/mykitty-70704"
+			case "KITTY_WINDOW_ID":
+				return "12"
+			case "TMUX":
+				return "/tmp/tmux-1000/default,123,0"
+			default:
+				return ""
+			}
+		},
+	}
+
+	if err := execute([]string{"doctor"}, d); err != nil {
+		t.Fatalf("doctor: %v", err)
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "Runtime:") {
+		t.Fatalf("expected runtime section, got: %q", out)
+	}
+	if !strings.Contains(out, "terminal: kitty") {
+		t.Fatalf("expected detected kitty terminal, got: %q", out)
+	}
+	if !strings.Contains(out, `KITTY_LISTEN_ON="unix:/tmp/mykitty-70704"`) {
+		t.Fatalf("expected kitty env in output, got: %q", out)
+	}
+}
+
+func TestDoctor_PauseWaitsForEnter(t *testing.T) {
+	outerDir := setupDotBareForCmd(t)
+
+	var stdout bytes.Buffer
+	d := deps{
+		stdin:  strings.NewReader("\n"),
+		stdout: &stdout,
+		stderr: bytes.NewBuffer(nil),
+		getwd:  func() (string, error) { return outerDir, nil },
+	}
+
+	if err := execute([]string{"doctor", "--pause"}, d); err != nil {
+		t.Fatalf("doctor --pause: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "Press Enter to exit...") {
+		t.Fatalf("expected pause prompt, got: %q", stdout.String())
+	}
+}
+
+func TestDoctor_UnknownFlag(t *testing.T) {
+	d := deps{
+		getwd: func() (string, error) { return "", errors.New("should not be called") },
+	}
+
+	err := execute([]string{"doctor", "--wat"}, d)
+	if err == nil {
+		t.Fatal("expected error for unknown flag")
+	}
+	if !strings.Contains(err.Error(), `unknown doctor flag "--wat"`) {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

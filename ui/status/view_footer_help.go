@@ -22,7 +22,11 @@ func (m Model) helpLine() string {
 		return line
 	}
 	if m.focus == focusStatus {
-		hint := m.diffContextLabel() + " · status · ? help"
+		hint := m.diffContextLabel() + " · status"
+		if t := m.terminalLabel(); t != "" {
+			hint += " · " + t
+		}
+		hint += " · ? help"
 		if s := m.searchCounterLabel(); s != "" {
 			hint = s + " · " + hint
 		}
@@ -36,7 +40,11 @@ func (m Model) helpLine() string {
 	if m.wrapSoft {
 		wrapLabel = "on"
 	}
-	hint := m.diffContextLabel() + " · diff: mode:" + modeLabel + " · render:" + m.renderModeLabel() + " · wrap:" + wrapLabel + " · ? help"
+	hint := m.diffContextLabel() + " · diff: mode:" + modeLabel + " · render:" + m.renderModeLabel() + " · wrap:" + wrapLabel
+	if t := m.terminalLabel(); t != "" {
+		hint += " · " + t
+	}
+	hint += " · ? help"
 	if s := m.searchCounterLabel(); s != "" {
 		hint = s + " · " + hint
 	}
@@ -129,6 +137,10 @@ func (m Model) renderFooterLineWithPrefix(prefix, hint string) string {
 		return left + hintStyled
 	}
 	return left + strings.Repeat(" ", lineW-leftW-hintW) + hintStyled
+}
+
+func (m Model) terminalLabel() string {
+	return m.settings.Terminal.String()
 }
 
 func (m *Model) showHelpOverlay() {
