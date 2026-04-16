@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -13,6 +12,7 @@ import (
 	"gx/config"
 	"gx/git"
 	"gx/ui/confirm"
+	"gx/ui/menu"
 	"gx/ui/status"
 	"gx/ui/worktrees"
 
@@ -412,31 +412,32 @@ func runPush(d deps) error {
 	return nil
 }
 
-func choosePushDivergence(in io.Reader, out io.Writer, div *git.PushDivergence) (int, error) {
+func choosePushDivergence(_ io.Reader, _ io.Writer, div *git.PushDivergence) (int, error) {
 	if div == nil {
 		return 3, nil
 	}
-	fmt.Fprintf(out, "Branch %s has diverged from the remote branch:\n\n", div.Branch)
-	fmt.Fprintf(out, "Last local commit: %s\n", relativeDate(div.Local.Date))
-	fmt.Fprintf(out, "  %s %s\n\n", div.Local.Hash, div.Local.Message)
-	fmt.Fprintf(out, "Last remote commit: %s\n", relativeDate(div.RemoteHead.Date))
-	fmt.Fprintf(out, "  %s %s\n\n", div.RemoteHead.Hash, div.RemoteHead.Message)
-	fmt.Fprintln(out, "Choose an option:")
-	fmt.Fprintln(out, "1. Rebase")
-	fmt.Fprintln(out, "2. Push --force")
-	fmt.Fprintln(out, "3. Abort")
-	fmt.Fprint(out, "> ")
 
-	r := bufio.NewReader(in)
-	line, err := r.ReadString('\n')
-	if err != nil && len(line) == 0 {
+	header := fmt.Sprintf(
+		"Branch %s has diverged from the remote.\n\n  local   %s  %s %s\n  remote  %s  %s %s",
+		div.Branch,
+		relativeDate(div.Local.Date), div.Local.Hash, div.Local.Message,
+		relativeDate(div.RemoteHead.Date), div.RemoteHead.Hash, div.RemoteHead.Message,
+	)
+
+	items := []menu.Item{
+		{Label: "Rebase", Detail: fmt.Sprintf("rebase %s onto %s", div.Branch, div.Upstream)},
+		{Label: "Force push", Detail: "--force"},
+		{Label: "Abort"},
+	}
+
+	choice, err := menu.Run(header, items)
+	if err != nil {
 		return 3, err
 	}
-	line = strings.TrimSpace(line)
-	switch line {
-	case "1":
+	switch choice {
+	case 0:
 		return 1, nil
-	case "2":
+	case 1:
 		return 2, nil
 	default:
 		return 3, nil

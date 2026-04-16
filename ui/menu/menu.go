@@ -1,0 +1,121 @@
+package menu
+
+import (
+	"fmt"
+	"io"
+	"os"
+	"strings"
+
+	"gx/ui"
+
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+)
+
+// Item is a selectable menu entry.
+type Item struct {
+	Label  string
+	Detail string // optional dim annotation shown after the label
+}
+
+// Run renders an interactive menu and returns the 0-based index of the chosen
+// item, or -1 if the user aborted (esc/q/ctrl+c).
+func Run(header string, items []Item) (int, error) {
+	return run(header, items, os.Stdin, os.Stdout)
+}
+
+func run(header string, items []Item, in io.Reader, out io.Writer) (int, error) {
+	m := model{header: header, items: items}
+	p := tea.NewProgram(m, tea.WithInput(in), tea.WithOutput(out))
+	finalModel, err := p.Run()
+	if err != nil {
+		return -1, err
+	}
+	fm := finalModel.(model)
+	if !fm.done || fm.aborted {
+		return -1, nil
+	}
+	return fm.cursor, nil
+}
+
+type model struct {
+	header  string
+	items   []Item
+	cursor  int
+	done    bool
+	aborted bool
+}
+
+func (m model) Init() tea.Cmd { return nil }
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "j", "down":
+			if m.cursor < len(m.items)-1 {
+				m.cursor++
+			}
+		case "k", "up":
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		case "enter":
+			m.done = true
+			return m, tea.Quit
+		case "ctrl+c", "esc", "q":
+			m.aborted = true
+			m.done = true
+			return m, tea.Quit
+		default:
+			// Number shortcuts: 1-based
+			key := msg.String()
+			if len(key) == 1 && key[0] >= '1' && key[0] <= '9' {
+				idx := int(key[0]-'1')
+				if idx < len(m.items) {
+					m.cursor = idx
+					m.done = true
+					return m, tea.Quit
+				}
+			}
+		}
+	}
+	return m, nil
+}
+
+func (m model) View() tea.View {
+	var sb strings.Builder
+
+	if m.header != "" {
+		sb.WriteString(m.header)
+		sb.WriteString("\n\n")
+	}
+
+	selectedStyle := lipgloss.NewStyle().Foreground(ui.ColorGreen).Bold(true)
+	normalStyle := lipgloss.NewStyle().Foreground(ui.ColorGray)
+	detailStyle := lipgloss.NewStyle().Foreground(ui.ColorGray)
+
+	for i, item := range m.items {
+		num := fmt.Sprintf("%d", i+1)
+		if i == m.cursor {
+			label := selectedStyle.Render("▸ " + num + ". " + item.Label)
+			if item.Detail != "" {
+				label += "  " + detailStyle.Render(item.Detail)
+			}
+			sb.WriteString(label)
+		} else {
+			label := normalStyle.Render("  " + num + ". " + item.Label)
+			if item.Detail != "" {
+				label += "  " + detailStyle.Render(item.Detail)
+			}
+			sb.WriteString(label)
+		}
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("\n")
+	sb.WriteString(ui.StyleDim.Render("j/k: navigate  1-9: quick select  enter: confirm  esc: abort"))
+	sb.WriteString("\n")
+
+	return tea.NewView(sb.String())
+}
