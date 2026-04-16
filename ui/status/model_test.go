@@ -1511,6 +1511,9 @@ func TestCCTriggersCommitCommand(t *testing.T) {
 	if m.keyPrefix != "c" {
 		t.Fatalf("expected keyPrefix=c after first c, got %q", m.keyPrefix)
 	}
+	if hint := ansi.Strip(m.statusMsg); !strings.Contains(hint, "cc") || !strings.Contains(hint, "git commit") {
+		t.Fatalf("expected binding-driven commit hint, got %q", hint)
+	}
 
 	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
 	if cmd == nil {
@@ -1519,6 +1522,26 @@ func TestCCTriggersCommitCommand(t *testing.T) {
 	m = updated.(Model)
 	if m.keyPrefix != "" {
 		t.Fatalf("expected keyPrefix reset after cc, got %q", m.keyPrefix)
+	}
+}
+
+func TestYShowsBindingDrivenYankHint(t *testing.T) {
+	repo := testutil.TempRepo(t)
+
+	m := New(repo)
+	m.ready = true
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	if cmd != nil {
+		t.Fatalf("first y should not launch command")
+	}
+	m = updated.(Model)
+
+	hint := ansi.Strip(m.statusMsg)
+	for _, want := range []string{"yy", "content", "yl", "location", "ya", "all", "yf", "filename"} {
+		if !strings.Contains(hint, want) {
+			t.Fatalf("expected yank hint %q in %q", want, hint)
+		}
 	}
 }
 

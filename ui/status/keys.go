@@ -3,6 +3,8 @@ package stage
 import (
 	"fmt"
 
+	"gx/ui"
+
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
 )
@@ -25,6 +27,10 @@ var (
 	stageKeyOutput     = key.NewBinding(key.WithKeys("oo"), key.WithHelp("oo", "view output"))
 	stageKeyLog        = key.NewBinding(key.WithKeys("ol"), key.WithHelp("ol", "lazygit log"))
 	stageKeyYank       = key.NewBinding(key.WithKeys("yy", "yl", "ya", "yf"), key.WithHelp("yy/yl/ya/yf", "yank"))
+	stageKeyYankText   = key.NewBinding(key.WithKeys("yy"), key.WithHelp("yy", "content"))
+	stageKeyYankPath   = key.NewBinding(key.WithKeys("yl"), key.WithHelp("yl", "location"))
+	stageKeyYankAll    = key.NewBinding(key.WithKeys("ya"), key.WithHelp("ya", "all"))
+	stageKeyYankName   = key.NewBinding(key.WithKeys("yf"), key.WithHelp("yf", "filename"))
 	stageKeyPull       = key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "pull"))
 	stageKeyPush       = key.NewBinding(key.WithKeys("P"), key.WithHelp("P", "push"))
 	stageKeyRebase     = key.NewBinding(key.WithKeys("b"), key.WithHelp("b", "rebase"))
@@ -114,6 +120,10 @@ func (m Model) helpFullView(width int) string {
 		h.SetWidth(width)
 	}
 	return h.View(m.currentKeyMap())
+}
+
+func (m Model) inlineHints(bindings ...key.Binding) string {
+	return ui.RenderInlineBindings(bindings...)
 }
 
 func (m Model) helpSectionLabel() string {

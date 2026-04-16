@@ -2,12 +2,14 @@ package worktrees
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"gx/git"
 	"gx/testutil"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestGJumpsToTop(t *testing.T) {
@@ -64,6 +66,30 @@ func TestOOOpensLogsMode(t *testing.T) {
 	m = updated.(Model)
 	if m.mode != modeLogs {
 		t.Fatalf("expected oo to open logs mode, got mode=%v", m.mode)
+	}
+}
+
+func TestOShowsBindingDrivenOutputHint(t *testing.T) {
+	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, "")
+	m.ready = true
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	if cmd != nil {
+		t.Fatalf("first o should not launch command")
+	}
+	m = updated.(Model)
+
+	hint := ansi.Strip(m.statusMsg)
+	for _, want := range []string{"oo", "view output", "ol", "lazygit log", "ot", "tmux session"} {
+		if !strings.Contains(hint, want) {
+			t.Fatalf("expected output hint %q in %q", want, hint)
+		}
 	}
 }
 

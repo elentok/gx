@@ -39,12 +39,12 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	}
 	if key == "c" {
 		m.keyPrefix = "c"
-		m.setStatus("cc: git commit")
+		m.setStatus(m.inlineHints(stageKeyCommit))
 		return m, nil, true
 	}
 	if key == "y" {
 		m.keyPrefix = "y"
-		m.setStatus("yy: content · yl: location · ya: all · yf: filename")
+		m.setStatus(m.inlineHints(stageKeyYankText, stageKeyYankPath, stageKeyYankAll, stageKeyYankName))
 		return m, nil, true
 	}
 	if key == "g" && !isUpperG {
@@ -75,7 +75,7 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	}
 	if key == "o" {
 		m.keyPrefix = "o"
-		m.setStatus("oo: output · ol: lazygit log")
+		m.setStatus(m.inlineHints(stageKeyOutput, stageKeyLog))
 		return m, nil, true
 	}
 	if isUpperG {

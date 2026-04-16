@@ -19,17 +19,12 @@ type pasteResultMsg struct {
 // handlePasteModeKey handles key events in paste mode (clipboard active, waiting for destination).
 // Only navigation (j/k/arrows), paste (p), and cancel (esc) are active.
 func (m Model) handlePasteModeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	up := key.NewBinding(key.WithKeys("up", "k"))
-	down := key.NewBinding(key.WithKeys("down", "j"))
-	doPaste := key.NewBinding(key.WithKeys("p"))
-	cancel := key.NewBinding(key.WithKeys("esc", "q"))
-
 	switch {
-	case key.Matches(msg, cancel):
+	case key.Matches(msg, keys.PasteCancel):
 		m.clipboard = nil
 		m.mode = modeNormal
 		return m, nil
-	case key.Matches(msg, doPaste):
+	case key.Matches(msg, keys.PasteConfirm):
 		if m.clipboard != nil {
 			wt := m.selectedWorktree()
 			if wt != nil {
@@ -40,7 +35,7 @@ func (m Model) handlePasteModeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		m.mode = modeNormal
 		return m, nil
-	case key.Matches(msg, up), key.Matches(msg, down):
+	case key.Matches(msg, keys.Up), key.Matches(msg, keys.Down):
 		prevCursor := m.table.Cursor()
 		var tableCmd tea.Cmd
 		m.table, tableCmd = m.table.Update(msg)

@@ -23,6 +23,11 @@ type keyMap struct {
 	Logs           key.Binding
 	Log            key.Binding
 	TmuxSession    key.Binding
+	SearchNext     key.Binding
+	SearchPrev     key.Binding
+	SearchClose    key.Binding
+	PasteConfirm   key.Binding
+	PasteCancel    key.Binding
 	Help           key.Binding
 	Quit           key.Binding
 }
@@ -107,6 +112,26 @@ var keys = keyMap{
 	TmuxSession: key.NewBinding(
 		key.WithKeys("ot"),
 		key.WithHelp("ot", "tmux session"),
+	),
+	SearchNext: key.NewBinding(
+		key.WithKeys("ctrl+n"),
+		key.WithHelp("ctrl+n", "next"),
+	),
+	SearchPrev: key.NewBinding(
+		key.WithKeys("ctrl+p"),
+		key.WithHelp("ctrl+p", "prev"),
+	),
+	SearchClose: key.NewBinding(
+		key.WithKeys("esc", "enter"),
+		key.WithHelp("esc/enter", "close"),
+	),
+	PasteConfirm: key.NewBinding(
+		key.WithKeys("p"),
+		key.WithHelp("p", "paste"),
+	),
+	PasteCancel: key.NewBinding(
+		key.WithKeys("esc", "q"),
+		key.WithHelp("esc/q", "cancel"),
 	),
 	Help: key.NewBinding(
 		key.WithKeys("?"),

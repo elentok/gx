@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"gx/ui"
+
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
@@ -50,23 +52,19 @@ func (m Model) recomputeSearchMatches() Model {
 
 // handleSearchKey handles key events while in search mode.
 func (m Model) handleSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	nextMatch := key.NewBinding(key.WithKeys("ctrl+n"))
-	prevMatch := key.NewBinding(key.WithKeys("ctrl+p"))
-	exit := key.NewBinding(key.WithKeys("esc", "enter"))
-
 	switch {
-	case key.Matches(msg, exit):
+	case key.Matches(msg, keys.SearchClose):
 		m = m.exitSearchMode()
 		return m, nil
 
-	case key.Matches(msg, nextMatch):
+	case key.Matches(msg, keys.SearchNext):
 		if len(m.searchMatches) > 0 {
 			m.searchCursor = (m.searchCursor + 1) % len(m.searchMatches)
 			return m.jumpToSearchCursor()
 		}
 		return m, nil
 
-	case key.Matches(msg, prevMatch):
+	case key.Matches(msg, keys.SearchPrev):
 		if len(m.searchMatches) > 0 {
 			m.searchCursor = (m.searchCursor - 1 + len(m.searchMatches)) % len(m.searchMatches)
 			return m.jumpToSearchCursor()
@@ -98,11 +96,12 @@ func (m Model) jumpToSearchCursor() (Model, tea.Cmd) {
 // searchView returns the one-line status bar text for search mode.
 func (m Model) searchView() string {
 	query := m.textInput.View()
+	hints := ui.RenderInlineBindings(keys.SearchNext, keys.SearchPrev, keys.SearchClose)
 	if m.searchQuery != "" && len(m.searchMatches) == 0 {
-		return "  Search: " + query + "  no matches"
+		return "  Search: " + query + "  no matches  ·  " + hints
 	}
 	if len(m.searchMatches) > 0 {
-		return fmt.Sprintf("  Search: %s  %d/%d", query, m.searchCursor+1, len(m.searchMatches))
+		return fmt.Sprintf("  Search: %s  %d/%d  ·  %s", query, m.searchCursor+1, len(m.searchMatches), hints)
 	}
-	return "  Search: " + query
+	return "  Search: " + query + "  ·  " + hints
 }

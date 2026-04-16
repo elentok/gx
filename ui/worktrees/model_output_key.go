@@ -1,5 +1,7 @@
 package worktrees
 
+import "gx/ui"
+
 import tea "charm.land/bubbletea/v2"
 
 func (m Model) handleOutputKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
@@ -46,7 +48,7 @@ func (m Model) handleOutputKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	}
 	if key == "o" {
 		m.keyPrefix = "o"
-		m.statusMsg = "oo: output · ol: lazygit log · ot: tmux session"
+		m.statusMsg = ui.RenderInlineBindings(keys.Logs, keys.Log, keys.TmuxSession)
 		return m, nil, true
 	}
 	return m, nil, false
