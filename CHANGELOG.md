@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.11.7
+
+- `gx status` diff view now identifies symlinks: shows the target in a summary line (`symlink -> target`, `symlink: old -> new`, `symlink (target) -> regular file`, etc.) and labels the section header with `[symlink]`, `[regular -> symlink]`, or `[symlink -> regular]`; sidebar uses a dedicated symlink icon
+- `gx stashify` now prints styled blue badge labels with nerd font icons before each step; icons are gated on the `use-nerdfont-icons` config option
+
 ## v0.11.6
 
 - `gx status` now shows branch sync relative to the current branch's upstream ref instead of always comparing against the repo's default main remote branch
