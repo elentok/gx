@@ -77,14 +77,11 @@ func cmdGitCommit(worktreeRoot string) tea.Cmd {
 	}
 	if os.Getenv("KITTY_LISTEN_ON") != "" {
 		return func() tea.Msg {
-			args := []string{"@", "launch", "--location=hsplit", "--cwd=" + worktreeRoot}
-			for _, e := range os.Environ() {
-				args = append(args, "--env", e)
-			}
+			args := []string{"@", "launch", "--copy-env", "--location=hsplit", "--cwd=" + worktreeRoot}
 			args = append(args, "git", "commit")
 			out, err := exec.Command("kitty", args...).CombinedOutput()
 			if err != nil {
-				err = fmt.Errorf("$ kitty @ launch --location=hsplit --cwd=%s [env] git commit\n\n%w\n\n%s", worktreeRoot, err, strings.TrimSpace(string(out)))
+				err = fmt.Errorf("$ kitty %s\n\n%w\n\n%s", strings.Join(args, " "), err, strings.TrimSpace(string(out)))
 			}
 			return commitFinishedMsg{err: err, splitApp: "kitty"}
 		}
