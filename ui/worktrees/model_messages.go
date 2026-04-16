@@ -4,6 +4,8 @@ import "gx/git"
 
 type clearStatusMsg struct{ gen int }
 
+type pruneRemotesMsg struct{ err error }
+
 type worktreesLoadedMsg struct {
 	worktrees []git.Worktree
 	err       error

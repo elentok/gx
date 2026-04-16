@@ -21,6 +21,13 @@ func cmdLoadWorktrees(repo git.Repo) tea.Cmd {
 	}
 }
 
+func cmdPruneRemotes(repo git.Repo) tea.Cmd {
+	return func() tea.Msg {
+		err := git.PruneAllRemotes(repo)
+		return pruneRemotesMsg{err: err}
+	}
+}
+
 func cmdLoadSyncStatus(repo git.Repo, branch string) tea.Cmd {
 	return func() tea.Msg {
 		status, _ := git.WorktreeSyncStatus(repo, branch)

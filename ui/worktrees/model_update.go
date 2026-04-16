@@ -131,7 +131,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case key.Matches(msg, keys.Refresh) && !m.spinnerActive:
 			m.loading = true
-			return m, cmdLoadWorktrees(m.repo)
+			return m, tea.Batch(cmdLoadWorktrees(m.repo), cmdPruneRemotes(m.repo))
 		case key.Matches(msg, keys.RemoteUpdate) && !m.spinnerActive:
 			m.spinnerActive = true
 			m.spinnerLabel = "Fetching remotes…"
@@ -476,6 +476,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, *wt))
 		}
 		return m, tea.Batch(cmds...)
+
+	case pruneRemotesMsg:
+		if msg.err != nil {
+			return m.showError("remote prune failed: " + msg.err.Error()), nil
+		}
+		return m, nil
 
 	case remoteUpdateResultMsg:
 		m.spinnerActive = false
