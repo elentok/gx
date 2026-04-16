@@ -36,14 +36,14 @@ func DetectTerminal() Terminal {
 
 // DetectTerminalFrom detects the terminal environment using the provided getter.
 func DetectTerminalFrom(getenv func(string) string) Terminal {
-	if getenv("TMUX") != "" {
-		return TerminalTmux
-	}
 	if getenv("KITTY_LISTEN_ON") != "" {
 		return TerminalKittyRemote
 	}
 	if getenv("KITTY_WINDOW_ID") != "" {
 		return TerminalKitty
+	}
+	if getenv("TMUX") != "" {
+		return TerminalTmux
 	}
 	return TerminalPlain
 }

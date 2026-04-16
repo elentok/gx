@@ -2,23 +2,23 @@ package ui
 
 import "testing"
 
-func TestDetectTerminalPrefersTmuxOverKittyRemote(t *testing.T) {
+func TestDetectTerminalPrefersKittyRemoteOverTmux(t *testing.T) {
 	t.Setenv("TMUX", "/tmp/tmux-1000/default,123,0")
 	t.Setenv("KITTY_LISTEN_ON", "unix:/tmp/mykitty-70704")
 	t.Setenv("KITTY_WINDOW_ID", "12")
 
-	if got := DetectTerminal(); got != TerminalTmux {
-		t.Fatalf("DetectTerminal() = %v, want %v", got, TerminalTmux)
+	if got := DetectTerminal(); got != TerminalKittyRemote {
+		t.Fatalf("DetectTerminal() = %v, want %v", got, TerminalKittyRemote)
 	}
 }
 
-func TestDetectTerminalPrefersTmuxOverKittyWindow(t *testing.T) {
+func TestDetectTerminalPrefersKittyWindowOverTmux(t *testing.T) {
 	t.Setenv("TMUX", "/tmp/tmux-1000/default,123,0")
 	t.Setenv("KITTY_LISTEN_ON", "")
 	t.Setenv("KITTY_WINDOW_ID", "12")
 
-	if got := DetectTerminal(); got != TerminalTmux {
-		t.Fatalf("DetectTerminal() = %v, want %v", got, TerminalTmux)
+	if got := DetectTerminal(); got != TerminalKitty {
+		t.Fatalf("DetectTerminal() = %v, want %v", got, TerminalKitty)
 	}
 }
 
@@ -42,7 +42,7 @@ func TestDetectTerminalFrom(t *testing.T) {
 		return env[key]
 	}
 
-	if got := DetectTerminalFrom(getenv); got != TerminalTmux {
-		t.Fatalf("DetectTerminalFrom() = %v, want %v", got, TerminalTmux)
+	if got := DetectTerminalFrom(getenv); got != TerminalKittyRemote {
+		t.Fatalf("DetectTerminalFrom() = %v, want %v", got, TerminalKittyRemote)
 	}
 }
