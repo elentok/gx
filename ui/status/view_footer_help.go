@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"gx/ui"
+
 	"charm.land/bubbles/v2/viewport"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -67,7 +69,7 @@ func (m Model) searchCounterLabel() string {
 	}
 	icon := "*"
 	if m.settings.UseNerdFontIcons {
-		icon = "󰍉"
+		icon = ui.Icons(true).Search
 	}
 	return fmt.Sprintf("%s %d/%d", icon, idx, len(m.searchMatches))
 }

@@ -9,7 +9,6 @@ import (
 	"gx/ui/components"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 )
 
 // yankDataMsg is sent when the file list for yank mode has been loaded.
@@ -74,11 +73,11 @@ func (m Model) handleYankKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // yankModalView renders the centered yank checklist modal.
 func (m Model) yankModalView() string {
 	if m.yankLoading {
-		return lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(ui.ColorBorder).
-			Padding(0, 1).
-			Render("  Loading files…")
+		return ui.RenderModalFrame(ui.ModalFrameOptions{
+			Body:        "Loading files…",
+			BorderColor: ui.ColorBorder,
+			HintColor:   ui.ColorGray,
+		})
 	}
 
 	modalW := m.width * 2 / 3
@@ -94,19 +93,15 @@ func (m Model) yankModalView() string {
 		listH = 3
 	}
 
-	inner := lipgloss.JoinVertical(lipgloss.Left,
-		lipgloss.NewStyle().Bold(true).Render("Yank files from: "+m.yankSource.Name),
-		"",
-		m.yankChecklist.View(modalW-4, listH),
-		"",
-		ui.StyleDim.Render("space toggle · a all · enter confirm · esc cancel"),
-	)
-	return lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(ui.ColorBorder).
-		Padding(0, 1).
-		Width(modalW - 4).
-		Render(inner)
+	return ui.RenderModalFrame(ui.ModalFrameOptions{
+		Title:       "Yank files from: " + m.yankSource.Name,
+		Body:        m.yankChecklist.View(modalW-4, listH),
+		Hint:        "space toggle · a all · enter confirm · esc cancel",
+		Width:       modalW - 4,
+		BorderColor: ui.ColorBorder,
+		TitleColor:  ui.ColorBlue,
+		HintColor:   ui.ColorGray,
+	})
 }
 
 // changesToChecklistItems converts git changes into checklist items.

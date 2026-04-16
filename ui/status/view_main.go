@@ -1,6 +1,8 @@
 package stage
 
 import (
+	"gx/ui"
+
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -43,17 +45,17 @@ func (m Model) View() tea.View {
 	footer := m.helpLine()
 	out := lipgloss.JoinVertical(lipgloss.Left, body, footer)
 	if m.credentialOpen {
-		out = overlayModal(out, m.credentialModalView(), m.width, m.height)
+		out = ui.OverlayCenter(out, m.credentialModalView(), m.width, m.height)
 	} else if m.runningOpen {
-		out = overlayModal(out, m.runningModalView(), m.width, m.height)
+		out = ui.OverlayCenter(out, m.runningModalView(), m.width, m.height)
 	} else if m.outputOpen {
-		out = overlayModal(out, m.outputModalView(), m.width, m.height)
+		out = ui.OverlayCenter(out, m.outputModalView(), m.width, m.height)
 	} else if m.confirmOpen {
-		out = overlayModal(out, m.confirmModalView(), m.width, m.height)
+		out = ui.OverlayCenter(out, m.confirmModalView(), m.width, m.height)
 	} else if m.errorOpen {
-		out = overlayModal(out, m.errorModalView(), m.width, m.height)
+		out = ui.OverlayCenter(out, m.errorModalView(), m.width, m.height)
 	} else if m.helpOpen {
-		out = overlayModal(out, m.helpModalView(), m.width, m.height)
+		out = ui.OverlayCenter(out, m.helpModalView(), m.width, m.height)
 	}
 	v := tea.NewView(out)
 	v.AltScreen = true

@@ -18,7 +18,7 @@
 ### Scope
 
 - Use a top-level scope for primary area changes:
-  - `stage:` for `ui/stage`, staging UX, and stage command behavior.
+  - `status:` for `ui/status`, staging UX, and stage command behavior.
   - `worktrees:` for worktree UI and workflows.
   - `config:` for config defaults/parsing.
   - `git:` for git integration behavior.

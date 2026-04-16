@@ -4,6 +4,8 @@ import (
 	"image/color"
 	"strings"
 
+	"gx/ui"
+
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
@@ -51,15 +53,6 @@ func UpdateMenu(msg tea.KeyPressMsg, state MenuState) (MenuState, bool, bool, bo
 }
 
 func RenderMenuModal(title, prompt string, state MenuState, hint string, borderColor, titleColor, subtleColor, selectedColor color.Color, width int) string {
-	borderStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(borderColor).
-		Padding(0, 1)
-	if width > 0 {
-		borderStyle = borderStyle.Width(width)
-	}
-
-	head := lipgloss.NewStyle().Foreground(titleColor).Bold(true).Render(title)
 	selected := lipgloss.NewStyle().Foreground(selectedColor).Bold(true)
 	normal := lipgloss.NewStyle().Foreground(subtleColor)
 
@@ -81,14 +74,18 @@ func RenderMenuModal(title, prompt string, state MenuState, hint string, borderC
 	if hint == "" {
 		hint = "j/k or ↑/↓ navigate · enter select · esc cancel"
 	}
-	inner := lipgloss.JoinVertical(lipgloss.Left,
-		head,
-		"",
-		prompt,
-		"",
-		strings.Join(menuLines, "\n"),
-		"",
-		normal.Render(hint),
-	)
-	return borderStyle.Render(inner)
+	body := prompt
+	if body != "" {
+		body += "\n\n"
+	}
+	body += strings.Join(menuLines, "\n")
+	return ui.RenderModalFrame(ui.ModalFrameOptions{
+		Title:       title,
+		Body:        body,
+		Hint:        hint,
+		Width:       width,
+		BorderColor: borderColor,
+		TitleColor:  titleColor,
+		HintColor:   subtleColor,
+	})
 }

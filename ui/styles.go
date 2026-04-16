@@ -2,28 +2,53 @@ package ui
 
 import "charm.land/lipgloss/v2"
 
-// Colors
+// Base palette. This follows the Catppuccin-inspired colors already used by the
+// status UI so the rest of the app can share one visual language.
 var (
-	ColorGreen   = lipgloss.Color("2")
-	ColorYellow  = lipgloss.Color("3")
-	ColorCyan    = lipgloss.Color("6")
-	ColorMagenta = lipgloss.Color("5")
-	ColorRed     = lipgloss.Color("1")
-	ColorGray    = lipgloss.Color("8")
-	ColorBorder  = lipgloss.Color("240")
+	ColorBase    = lipgloss.Color("#1e1e2e")
+	ColorDeepBg  = lipgloss.Color("#11111a")
+	ColorText    = lipgloss.Color("#cdd6f4")
+	ColorSubtle  = lipgloss.Color("#a6adc8")
+	ColorBlue    = lipgloss.Color("#89b4fa")
+	ColorGreen   = lipgloss.Color("#a6e3a1")
+	ColorYellow  = lipgloss.Color("#f9e2af")
+	ColorRed     = lipgloss.Color("#f38ba8")
+	ColorOrange  = lipgloss.Color("#fab387")
+	ColorMauve   = lipgloss.Color("#cba6f7")
+	ColorTeal    = lipgloss.Color("#94e2d5")
+	ColorSurface = lipgloss.Color("#313244")
 )
 
-// Status styles
+// Backwards-compatible aliases still used by some call sites.
+var (
+	ColorGray    = ColorSubtle
+	ColorBorder  = ColorSubtle
+	ColorCyan    = ColorTeal
+	ColorMagenta = ColorMauve
+)
+
+// Semantic text and surface styles.
+var (
+	StyleTitle    = lipgloss.NewStyle().Foreground(ColorBlue).Bold(true)
+	StyleHeading  = lipgloss.NewStyle().Foreground(ColorText).Bold(true)
+	StyleStrong   = lipgloss.NewStyle().Foreground(ColorText).Bold(true)
+	StyleBody     = lipgloss.NewStyle().Foreground(ColorText)
+	StyleMuted    = lipgloss.NewStyle().Foreground(ColorSubtle)
+	StyleHint     = lipgloss.NewStyle().Foreground(ColorSubtle)
+	StyleCodeLike = lipgloss.NewStyle().Foreground(ColorTeal)
+)
+
+// Status styles.
 var (
 	StyleStatusSynced   = lipgloss.NewStyle().Foreground(ColorGreen)
-	StyleStatusAhead    = lipgloss.NewStyle().Foreground(ColorMagenta)
+	StyleStatusAhead    = lipgloss.NewStyle().Foreground(ColorMauve)
 	StyleStatusBehind   = lipgloss.NewStyle().Foreground(ColorYellow)
 	StyleStatusDiverged = lipgloss.NewStyle().Foreground(ColorRed)
-	StyleStatusUnknown  = lipgloss.NewStyle().Foreground(ColorGray)
+	StyleStatusUnknown  = lipgloss.NewStyle().Foreground(ColorSubtle)
 )
 
-// Text styles
+// Text styles.
 var (
 	StyleBold = lipgloss.NewStyle().Bold(true)
-	StyleDim  = lipgloss.NewStyle().Foreground(ColorGray)
+	StyleDim  = StyleMuted
 )

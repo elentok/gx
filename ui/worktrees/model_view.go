@@ -2,6 +2,7 @@ package worktrees
 
 import (
 	"fmt"
+	"strings"
 
 	"gx/ui"
 
@@ -20,17 +21,17 @@ func (m Model) View() tea.View {
 
 		switch m.mode {
 		case modeConfirm:
-			content = overlayModal(bg, m.confirmModalView(), m.width, m.height)
+			content = ui.OverlayCenter(bg, m.confirmModalView(), m.width, m.height)
 		case modeCredentialPrompt:
-			content = overlayModal(bg, m.credentialModalView(), m.width, m.height)
+			content = ui.OverlayCenter(bg, m.credentialModalView(), m.width, m.height)
 		case modePushDiverged:
-			content = overlayModal(bg, m.pushDivergedModalView(), m.width, m.height)
+			content = ui.OverlayCenter(bg, m.pushDivergedModalView(), m.width, m.height)
 		case modeError:
-			content = overlayModal(bg, m.errorModalView(), m.width, m.height)
+			content = ui.OverlayCenter(bg, m.errorModalView(), m.width, m.height)
 		case modeLogs:
-			content = overlayModal(bg, m.logsModalView(), m.width, m.height)
+			content = ui.OverlayCenter(bg, m.logsModalView(), m.width, m.height)
 		case modeYank:
-			content = overlayModal(bg, m.yankModalView(), m.width, m.height)
+			content = ui.OverlayCenter(bg, m.yankModalView(), m.width, m.height)
 		default:
 			content = bg
 		}
@@ -41,40 +42,31 @@ func (m Model) View() tea.View {
 	return v
 }
 
-// overlayModal centers modal over bg using placeOverlay.
-func overlayModal(bg, modal string, screenW, screenH int) string {
-	modalW := lipgloss.Width(modal)
-	modalH := lipgloss.Height(modal)
-	x := (screenW - modalW) / 2
-	y := (screenH - modalH) / 2
-	if x < 0 {
-		x = 0
-	}
-	if y < 0 {
-		y = 0
-	}
-	return placeOverlay(bg, modal, x, y)
-}
-
 // normalView renders the worktrees table, sidebar, and status bar.
 func (m Model) normalView() string {
 	h := m.contentHeight()
 	tableW, sidebarW := m.splitWidth()
 	tableH, sidebarH := m.splitHeight(h)
 
-	tableView := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(ui.ColorBorder).
-		Width(tableW).
-		Height(tableH).
-		Render(tableView(m.table))
+	tableView := ui.RenderPanelFrame(ui.PanelFrameOptions{
+		Width:       tableW,
+		Height:      tableH,
+		Title:       "Worktrees",
+		Lines:       strings.Split(tableView(m.table), "\n"),
+		BorderColor: ui.ColorBorder,
+		TitleColor:  ui.ColorBlue,
+		Background:  ui.ColorBase,
+	})
 
-	sidebarView := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(ui.ColorBorder).
-		Width(sidebarW).
-		Height(sidebarH).
-		Render(m.viewport.View())
+	sidebarView := ui.RenderPanelFrame(ui.PanelFrameOptions{
+		Width:       sidebarW,
+		Height:      sidebarH,
+		Title:       "Details",
+		Lines:       strings.Split(m.viewport.View(), "\n"),
+		BorderColor: ui.ColorBorder,
+		TitleColor:  ui.ColorBlue,
+		Background:  ui.ColorBase,
+	})
 
 	var content string
 	if m.useStackedLayout() {

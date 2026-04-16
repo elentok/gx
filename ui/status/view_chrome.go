@@ -1,13 +1,11 @@
 package stage
 
 import (
-	"strings"
-
 	"gx/git"
+	"gx/ui"
 	"gx/ui/components"
 
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/ansi"
 )
 
 func (m Model) errorModalView() string {
@@ -23,59 +21,15 @@ func (m Model) errorModalView() string {
 }
 
 func (m Model) helpModalView() string {
-	titleStyle := lipgloss.NewStyle().Foreground(catBlue).Bold(true)
-	borderStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(catBlue).
-		Padding(0, 1).
-		Width(m.helpVP.Width())
-
-	hint := lipgloss.NewStyle().Foreground(catSubtle).Render("? / esc / enter dismiss · j/k scroll")
-	inner := lipgloss.JoinVertical(lipgloss.Left,
-		titleStyle.Render("Keyboard Help"),
-		"",
-		m.helpVP.View(),
-		"",
-		hint,
-	)
-	return borderStyle.Render(inner)
-}
-
-func overlayModal(bg, modal string, screenW, screenH int) string {
-	modalW := lipgloss.Width(modal)
-	modalH := lipgloss.Height(modal)
-	x := (screenW - modalW) / 2
-	y := (screenH - modalH) / 2
-	if x < 0 {
-		x = 0
-	}
-	if y < 0 {
-		y = 0
-	}
-	return placeOverlay(bg, modal, x, y)
-}
-
-func placeOverlay(bg, fg string, x, y int) string {
-	bgLines := strings.Split(bg, "\n")
-	fgLines := strings.Split(fg, "\n")
-
-	for i, fgLine := range fgLines {
-		bgY := y + i
-		if bgY < 0 || bgY >= len(bgLines) {
-			continue
-		}
-		bgLine := bgLines[bgY]
-		fgW := ansi.StringWidth(fgLine)
-
-		left := ansi.Truncate(bgLine, x, "")
-		if leftW := ansi.StringWidth(left); leftW < x {
-			left += strings.Repeat(" ", x-leftW)
-		}
-		right := ansi.TruncateLeft(bgLine, x+fgW, "")
-		bgLines[bgY] = left + fgLine + right
-	}
-
-	return strings.Join(bgLines, "\n")
+	return ui.RenderModalFrame(ui.ModalFrameOptions{
+		Title:       "Keyboard Help",
+		Body:        m.helpVP.View(),
+		Hint:        "? / esc / enter dismiss · j/k scroll",
+		Width:       m.helpVP.Width(),
+		BorderColor: catBlue,
+		TitleColor:  catBlue,
+		HintColor:   catSubtle,
+	})
 }
 
 func (m Model) panelStyle(active bool) lipgloss.Style {
@@ -90,66 +44,25 @@ func (m Model) panelStyle(active bool) lipgloss.Style {
 }
 
 func (m Model) renderPanelWithBorderTitle(width, height int, title, rightTitle string, lines []string, active bool, section diffSection) string {
-	if width < 2 || height < 2 {
-		return ""
-	}
-	innerW := width - 2
-	innerH := height - 2
-
 	borderColor := catSubtle
-	titleStyle := lipgloss.NewStyle().Foreground(catBlue)
+	titleColor := catBlue
 	if section == sectionStaged {
 		borderColor = catGreen
-		titleStyle = lipgloss.NewStyle().Foreground(catGreen)
-		if active {
-			titleStyle = titleStyle.Bold(true)
-		}
+		titleColor = catGreen
 	} else if active {
 		borderColor = catOrange
-		titleStyle = lipgloss.NewStyle().Foreground(catOrange).Bold(true)
+		titleColor = catOrange
 	}
-	border := lipgloss.NewStyle().Foreground(borderColor)
-
-	titleSeg := titleStyle.Render(" " + title + " ")
-	rightSeg := ""
-	if rightTitle != "" {
-		rightSeg = titleStyle.Render(" " + rightTitle + " ")
-	}
-	titleW := ansi.StringWidth(titleSeg)
-	rightW := ansi.StringWidth(rightSeg)
-	topInner := ""
-	if rightW >= innerW {
-		topInner = ansi.Truncate(rightSeg, innerW, "")
-	} else if titleW+rightW >= innerW {
-		titleSeg = ansi.Truncate(titleSeg, innerW-rightW, "")
-		titleW = ansi.StringWidth(titleSeg)
-		topInner = titleSeg + rightSeg
-	} else if titleW >= innerW {
-		topInner = ansi.Truncate(titleSeg, innerW, "")
-		titleW = ansi.StringWidth(topInner)
-	} else {
-		topInner = titleSeg + border.Render(strings.Repeat("─", innerW-titleW-rightW)) + rightSeg
-	}
-	if titleW+rightW < innerW && !strings.Contains(topInner, "─") {
-		topInner += border.Render(strings.Repeat("─", innerW-titleW-rightW))
-	}
-
-	if len(lines) > innerH {
-		lines = lines[:innerH]
-	}
-	body := make([]string, 0, innerH)
-	for i := 0; i < innerH; i++ {
-		line := ""
-		if i < len(lines) {
-			line = ansi.Truncate(lines[i], innerW, "")
-		}
-		line = line + strings.Repeat(" ", maxInt(0, innerW-ansi.StringWidth(line)))
-		body = append(body, border.Render("│")+line+ansiReset+border.Render("│"))
-	}
-
-	bottom := border.Render("╰" + strings.Repeat("─", innerW) + "╯")
-	top := border.Render("╭") + topInner + border.Render("╮")
-	return strings.Join(append([]string{top}, append(body, bottom)...), "\n")
+	return ui.RenderPanelFrame(ui.PanelFrameOptions{
+		Width:       width,
+		Height:      height,
+		Title:       title,
+		RightTitle:  rightTitle,
+		Lines:       lines,
+		BorderColor: borderColor,
+		TitleColor:  titleColor,
+		Background:  catBase0,
+	})
 }
 
 type statusPaneIcons struct {
@@ -165,29 +78,30 @@ type statusPaneIcons struct {
 }
 
 func statusPaneIconsFor(useNerdFontIcons bool) statusPaneIcons {
+	shared := ui.Icons(useNerdFontIcons)
 	if !useNerdFontIcons {
 		return statusPaneIcons{
-			folderClosed: "▸",
-			folderOpen:   "▾",
-			fileModified: "M",
-			fileNew:      "N",
-			fileDeleted:  "D",
-			fileRenamed:  "R",
-			fileSymlink:  "L",
-			partial:      "+",
-			staged:       "✓",
+			folderClosed: shared.FolderClosed,
+			folderOpen:   shared.FolderOpen,
+			fileModified: shared.FileModified,
+			fileNew:      shared.FileAdded,
+			fileDeleted:  shared.FileDeleted,
+			fileRenamed:  shared.FileRenamed,
+			fileSymlink:  shared.FileSymlink,
+			partial:      shared.Partial,
+			staged:       shared.Staged,
 		}
 	}
 	return statusPaneIcons{
-		folderClosed: "",
-		folderOpen:   "",
-		fileModified: "",
-		fileNew:      "",
-		fileDeleted:  "",
-		fileRenamed:  "󰁔",
-		fileSymlink:  "󰌷",
-		partial:      "",
-		staged:       "",
+		folderClosed: shared.FolderClosed,
+		folderOpen:   shared.FolderOpen,
+		fileModified: shared.FileModified,
+		fileNew:      shared.FileAdded,
+		fileDeleted:  shared.FileDeleted,
+		fileRenamed:  shared.FileRenamed,
+		fileSymlink:  shared.FileSymlink,
+		partial:      shared.Partial,
+		staged:       shared.Staged,
 	}
 }
 

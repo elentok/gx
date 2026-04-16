@@ -1,5 +1,7 @@
 package worktrees
 
+import "gx/ui"
+
 type uiIcons struct {
 	worktreePrefix string
 	mainPrefix     string
@@ -17,31 +19,32 @@ type uiIcons struct {
 }
 
 func icons(useNerdFont bool) uiIcons {
+	shared := ui.Icons(useNerdFont)
 	if !useNerdFont {
 		return uiIcons{
-			worktreeTitle: "Worktree",
+			worktreeTitle: shared.Worktree,
 			aheadTitle:    "Commits ahead of remote",
 			behindTitle:   "Commits behind remote",
 			baseTitle:     "Base",
-			checkmark:     "✓",
-			x:             "✗",
+			checkmark:     shared.Check,
+			x:             shared.Close,
 			changesTitle:  "Changes",
-			dash:          "-",
+			dash:          shared.Dash,
 		}
 	}
 	return uiIcons{
 		worktreePrefix: "󰉖 ",
 		mainPrefix:     "󰋜 ",
-		branchPrefix:   " ",
-		worktreeTitle:  "󰙅 Worktree",
+		branchPrefix:   shared.Branch + " ",
+		worktreeTitle:  shared.Worktree + " Worktree",
 		aheadTitle:     " Commits ahead of remote",
 		behindTitle:    " Commits behind remote",
-		ahead:          "",
-		behind:         "",
+		ahead:          shared.Ahead,
+		behind:         shared.Behind,
 		baseTitle:      "󰋜 Base",
-		checkmark:      "",
-		x:              "󰅙", //
+		checkmark:      shared.Check,
+		x:              shared.Close,
 		changesTitle:   "󰈔 Changes",
-		dash:           "—",
+		dash:           shared.Dash,
 	}
 }
