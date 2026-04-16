@@ -2,14 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"os/exec"
 	"strings"
 
 	"gx/config"
 	"gx/git"
-
-	"charm.land/lipgloss/v2"
 )
 
 func runStashify(args []string, d deps) error {
@@ -32,16 +29,15 @@ func runStashify(args []string, d deps) error {
 
 	stashed := false
 	if len(changes) > 0 {
-		printStashifyBadge(d.stderr, nerd, " Stashing changes\u2026", "Stashing changes\u2026")
+		printBadge(d.stderr, nerd, " Stashing changes\u2026", "Stashing changes\u2026")
 		if _, err := git.Stash(cwd); err != nil {
 			return fmt.Errorf("stash failed: %w", err)
 		}
-		fmt.Fprintln(d.stderr)
 		stashed = true
 	}
 
 	runLabel := strings.Join(args, " ")
-	printStashifyBadge(d.stderr, nerd, "󱐋 Running "+runLabel+"\u2026", "Running "+runLabel+"\u2026")
+	printBadge(d.stderr, nerd, "󱐋 Running "+runLabel+"\u2026", "Running "+runLabel+"\u2026")
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Dir = cwd
 	cmd.Stdin = d.stdin
@@ -54,8 +50,7 @@ func runStashify(args []string, d deps) error {
 	}
 
 	if cmdErr == nil {
-		fmt.Fprintln(d.stderr)
-		printStashifyBadge(d.stderr, nerd, " Unstashing changes\u2026", "Unstashing changes\u2026")
+		printBadge(d.stderr, nerd, " Unstashing changes\u2026", "Unstashing changes\u2026")
 		if _, err := git.StashPop(cwd); err != nil {
 			return fmt.Errorf("stash pop failed: %w", err)
 		}
@@ -73,22 +68,4 @@ func runStashify(args []string, d deps) error {
 		}
 	}
 	return cmdErr
-}
-
-func printStashifyBadge(w io.Writer, nerd bool, nerdText, plainText string) {
-	text := plainText
-	if nerd {
-		text = nerdText
-	}
-	if isTerminalWriter(w) {
-		badge := lipgloss.NewStyle().
-			Background(lipgloss.Color("4")).
-			Foreground(lipgloss.Color("0")).
-			PaddingLeft(1).
-			PaddingRight(1).
-			Render(text)
-		fmt.Fprintln(w, badge)
-	} else {
-		fmt.Fprintln(w, text)
-	}
 }

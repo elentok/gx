@@ -8,7 +8,6 @@ import (
 	"gx/ui"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 )
 
 type doneMsg struct{}
@@ -17,15 +16,22 @@ type model struct {
 	prompt    string
 	choiceYes bool
 	done      bool
+	nerd      bool
 }
 
 // Run renders a small styled confirmation UI and returns true when accepted.
+// Yes is the default selection.
 func Run(prompt string) (bool, error) {
-	return run(prompt, os.Stdin, os.Stdout)
+	return run(prompt, false, os.Stdin, os.Stdout)
 }
 
-func run(prompt string, in io.Reader, out io.Writer) (bool, error) {
-	m := model{prompt: prompt}
+// RunWithNerd is like Run but uses nerd-font pill-shaped buttons when nerd is true.
+func RunWithNerd(prompt string, nerd bool) (bool, error) {
+	return run(prompt, nerd, os.Stdin, os.Stdout)
+}
+
+func run(prompt string, nerd bool, in io.Reader, out io.Writer) (bool, error) {
+	m := model{prompt: prompt, choiceYes: true, nerd: nerd}
 	p := tea.NewProgram(m, tea.WithInput(in), tea.WithOutput(out))
 	finalModel, err := p.Run()
 	if err != nil {
@@ -66,25 +72,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() tea.View {
-	body := lipgloss.NewStyle().Padding(1, 2).Render(m.prompt)
 	hint := ui.StyleDim.Render("left/right: choose  y/n: quick select  enter: confirm")
-	yes := optionLabel("Yes", m.choiceYes)
-	no := optionLabel("No", !m.choiceYes)
+	yes := ui.RenderButton("Yes", m.choiceYes, m.nerd)
+	no := ui.RenderButton("No", !m.choiceYes, m.nerd)
 	return tea.NewView(strings.Join([]string{
-		body,
+		m.prompt,
+		"",
 		"  " + yes + "   " + no,
 		"  " + hint,
 		"",
 	}, "\n"))
-}
-
-func optionLabel(label string, selected bool) string {
-	s := lipgloss.NewStyle().Padding(0, 1)
-	if selected {
-		s = s.Foreground(ui.ColorGreen).Bold(true)
-		return s.Render("> " + label + " <")
-	} else {
-		s = s.Foreground(ui.ColorGray)
-		return s.Render("  " + label + "  ")
-	}
 }

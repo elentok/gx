@@ -35,14 +35,17 @@ type deps struct {
 }
 
 func defaultDeps() deps {
+	cfg, _ := config.Load()
 	return deps{
-		stdin:                os.Stdin,
-		stdout:               os.Stdout,
-		stderr:               os.Stderr,
-		getwd:                os.Getwd,
+		stdin:  os.Stdin,
+		stdout: os.Stdout,
+		stderr: os.Stderr,
+		getwd:  os.Getwd,
+		confirmForce: func(prompt string) (bool, error) {
+			return confirm.RunWithNerd(prompt, cfg.UseNerdFontIcons)
+		},
 		runWorktrees:         runWorktrees,
 		runStatus:            runStatus,
-		confirmForce:         confirm.Run,
 		choosePushDivergence: choosePushDivergence,
 		initConfig:           config.Init,
 		getenv:               os.Getenv,
@@ -307,6 +310,9 @@ func runPush(d deps) error {
 		return fmt.Errorf("cannot push from detached HEAD")
 	}
 
+	cfg, _ := config.Load()
+	nerd := cfg.UseNerdFontIcons
+
 	remote := git.BranchRemote(info.Repo, branch)
 	prompt := fmt.Sprintf("Push branch %s to %s?", branch, remote)
 	confirmed, err := d.confirmForce(prompt)
@@ -319,7 +325,7 @@ func runPush(d deps) error {
 
 	var div *git.PushDivergence
 	fetchLabel := fmt.Sprintf("Fetching %s before checking divergence...", remote)
-	fmt.Fprintln(d.stderr, fetchLabel)
+	printBadge(d.stderr, nerd, fetchLabel, fetchLabel)
 	if err := runGitInteractive(pushDir, d.stdin, d.stdout, d.stderr, "fetch", remote); err != nil {
 		return err
 	}
@@ -349,15 +355,15 @@ func runPush(d deps) error {
 			}); err != nil {
 				return err
 			}
-			fmt.Fprintf(d.stdout, "Rebased %s on %s\n", branch, div.Upstream)
+			printSuccess(d.stderr, fmt.Sprintf("Rebased %s on %s", branch, div.Upstream))
 			return nil
 		case 2:
 			forceLabel := fmt.Sprintf("Force-pushing %s to %s...", branch, remote)
-			fmt.Fprintln(d.stderr, forceLabel)
+			printBadge(d.stderr, nerd, forceLabel, forceLabel)
 			if err := runGitInteractive(pushDir, d.stdin, d.stdout, d.stderr, "push", "--force", remote, branch); err != nil {
 				return err
 			}
-			fmt.Fprintf(d.stdout, "Force-pushed %s to %s with --force\n", branch, remote)
+			printSuccess(d.stderr, fmt.Sprintf("Force-pushed %s to %s with --force", branch, remote))
 			return nil
 		default:
 			return fmt.Errorf("push aborted")
@@ -365,7 +371,7 @@ func runPush(d deps) error {
 	}
 
 	pushLabel := fmt.Sprintf("Pushing %s to %s...", branch, remote)
-	fmt.Fprintln(d.stderr, pushLabel)
+	printBadge(d.stderr, nerd, pushLabel, pushLabel)
 	if err := runGitInteractive(pushDir, d.stdin, d.stdout, d.stderr, "push", remote, branch); err != nil {
 		if !git.IsNonFastForwardPushError(err) {
 			return err
@@ -379,8 +385,8 @@ func runPush(d deps) error {
 		if !confirmed {
 			return fmt.Errorf("push aborted")
 		}
-		forceLabel := fmt.Sprintf("Force-pushing %s to %s with lease...", branch, remote)
-		fmt.Fprintln(d.stderr, forceLabel)
+		forceLeaseLabel := fmt.Sprintf("Force-pushing %s to %s with lease...", branch, remote)
+		printBadge(d.stderr, nerd, forceLeaseLabel, forceLeaseLabel)
 		if forceErr := runGitInteractive(pushDir, d.stdin, d.stdout, d.stderr, "push", "--force-with-lease", remote, branch); forceErr != nil {
 			prompt := fmt.Sprintf("--force-with-lease failed: %v\nRun plain --force for %s/%s?", forceErr, remote, branch)
 			confirmedForce, confirmErr := d.confirmForce(prompt)
@@ -390,19 +396,19 @@ func runPush(d deps) error {
 			if !confirmedForce {
 				return fmt.Errorf("push aborted after --force-with-lease failure")
 			}
-			forceLabel = fmt.Sprintf("Force-pushing %s to %s...", branch, remote)
-			fmt.Fprintln(d.stderr, forceLabel)
+			forceLabel := fmt.Sprintf("Force-pushing %s to %s...", branch, remote)
+			printBadge(d.stderr, nerd, forceLabel, forceLabel)
 			if err := runGitInteractive(pushDir, d.stdin, d.stdout, d.stderr, "push", "--force", remote, branch); err != nil {
 				return err
 			}
-			fmt.Fprintf(d.stdout, "Force-pushed %s to %s with --force\n", branch, remote)
+			printSuccess(d.stderr, fmt.Sprintf("Force-pushed %s to %s with --force", branch, remote))
 			return nil
 		}
-		fmt.Fprintf(d.stdout, "Force-pushed %s to %s with --force-with-lease\n", branch, remote)
+		printSuccess(d.stderr, fmt.Sprintf("Force-pushed %s to %s with --force-with-lease", branch, remote))
 		return nil
 	}
 
-	fmt.Fprintf(d.stdout, "Pushed %s to %s\n", branch, remote)
+	printSuccess(d.stderr, fmt.Sprintf("Pushed %s to %s", branch, remote))
 	return nil
 }
 

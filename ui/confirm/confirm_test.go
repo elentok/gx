@@ -7,7 +7,7 @@ import (
 )
 
 func TestRunYes(t *testing.T) {
-	ok, err := run("Force push?", strings.NewReader("y"), bytes.NewBuffer(nil))
+	ok, err := run("Force push?", false, strings.NewReader("y"), bytes.NewBuffer(nil))
 	if err != nil {
 		t.Fatalf("run: %v", err)
 	}
@@ -17,11 +17,21 @@ func TestRunYes(t *testing.T) {
 }
 
 func TestRunNo(t *testing.T) {
-	ok, err := run("Force push?", strings.NewReader("n"), bytes.NewBuffer(nil))
+	ok, err := run("Force push?", false, strings.NewReader("n"), bytes.NewBuffer(nil))
 	if err != nil {
 		t.Fatalf("run: %v", err)
 	}
 	if ok {
 		t.Fatal("expected no")
+	}
+}
+
+func TestRunDefaultYes(t *testing.T) {
+	ok, err := run("Force push?", false, strings.NewReader("\r"), bytes.NewBuffer(nil))
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected yes as default")
 	}
 }
