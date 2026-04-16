@@ -32,7 +32,7 @@ func TestRenderMenuModalIncludesPromptAndItems(t *testing.T) {
 		"Title",
 		"Choose:",
 		MenuState{Items: []MenuItem{{Label: "One"}, {Label: "Two"}}, Cursor: 0},
-		"hint",
+		"",
 		lipgloss.Color("8"),
 		lipgloss.Color("7"),
 		lipgloss.Color("8"),
@@ -41,5 +41,19 @@ func TestRenderMenuModalIncludesPromptAndItems(t *testing.T) {
 	)
 	if !strings.Contains(r, "Choose:") || !strings.Contains(r, "One") || !strings.Contains(r, "Two") {
 		t.Fatalf("menu modal missing content: %q", r)
+	}
+	if !strings.Contains(r, "navigate") || !strings.Contains(r, "select") || !strings.Contains(r, "cancel") {
+		t.Fatalf("menu modal missing shared hint text: %q", r)
+	}
+}
+
+func TestRenderMenuListIncludesDetails(t *testing.T) {
+	r := RenderMenuList(
+		MenuState{Items: []MenuItem{{Label: "One", Detail: "first"}, {Label: "Two"}}, Cursor: 0},
+		lipgloss.Color("8"),
+		lipgloss.Color("10"),
+	)
+	if !strings.Contains(r, "One") || !strings.Contains(r, "first") || !strings.Contains(r, "Two") {
+		t.Fatalf("menu list missing content: %q", r)
 	}
 }

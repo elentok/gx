@@ -867,7 +867,7 @@ func (m Model) confirmModalView() string {
 			"Push Diverged",
 			prompt,
 			m.confirmMenu,
-			"j/k or ↑/↓ navigate · enter select · esc cancel",
+			"",
 			catYellow,
 			catYellow,
 			catSubtle,

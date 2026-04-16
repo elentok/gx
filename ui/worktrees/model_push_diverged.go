@@ -88,7 +88,7 @@ func (m Model) pushDivergedModalView() string {
 		"Push Diverged",
 		prompt,
 		m.pushMenu,
-		"j/k or ↑/↓ navigate · enter select · esc cancel",
+		"",
 		ui.ColorBorder,
 		ui.ColorBorder,
 		ui.ColorGray,

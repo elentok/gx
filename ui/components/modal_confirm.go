@@ -5,6 +5,7 @@ import (
 
 	"gx/ui"
 
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -27,20 +28,25 @@ func UpdateConfirm(msg tea.KeyPressMsg, yes bool) (bool, bool, bool, bool) {
 	}
 }
 
-func RenderConfirmModal(prompt string, yes bool, borderColor, yesColor, noColor, subtleColor color.Color, width int) string {
-	yesLabel := " Yes "
-	noLabel := " No "
-	if yes {
-		yesLabel = ui.StyleStrong.Foreground(yesColor).Render("[Yes]")
-		noLabel = ui.StyleMuted.Foreground(subtleColor).Render(" No ")
-	} else {
-		yesLabel = ui.StyleMuted.Foreground(subtleColor).Render(" Yes ")
-		noLabel = ui.StyleStrong.Foreground(noColor).Render("[No]")
-	}
+var ConfirmHint = ui.RenderInlineBindings(
+	key.NewBinding(key.WithHelp("h/l or ←/→", "choose")),
+	key.NewBinding(key.WithHelp("y/n", "quick select")),
+	key.NewBinding(key.WithHelp("enter", "confirm")),
+	key.NewBinding(key.WithHelp("esc", "cancel")),
+)
 
+func RenderConfirmChoices(yes bool, nerd bool) string {
+	return "  " + ui.RenderButton("Yes", yes, nerd) + "   " + ui.RenderButton("No", !yes, nerd)
+}
+
+func RenderConfirmContent(prompt string, yes bool, nerd bool) string {
+	return prompt + "\n\n" + RenderConfirmChoices(yes, nerd)
+}
+
+func RenderConfirmModal(prompt string, yes bool, borderColor, yesColor, noColor, subtleColor color.Color, width int) string {
 	return ui.RenderModalFrame(ui.ModalFrameOptions{
-		Body:        prompt + "\n\n" + yesLabel + "  " + noLabel,
-		Hint:        "h/l or y/n, enter confirm, esc cancel",
+		Body:        RenderConfirmContent(prompt, yes, false),
+		Hint:        ConfirmHint,
 		Width:       width,
 		BorderColor: borderColor,
 		HintColor:   subtleColor,

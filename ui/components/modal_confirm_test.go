@@ -1,7 +1,10 @@
 package components
 
 import (
+	"strings"
 	"testing"
+
+	"github.com/charmbracelet/x/ansi"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -45,5 +48,11 @@ func TestRenderConfirmModalIncludesPrompt(t *testing.T) {
 	)
 	if r == "" {
 		t.Fatalf("expected non-empty rendered modal")
+	}
+	plain := ansi.Strip(r)
+	for _, want := range []string{"Prompt?", "Yes", "No", "choose", "quick select"} {
+		if !strings.Contains(plain, want) {
+			t.Fatalf("expected %q in confirm modal: %q", want, plain)
+		}
 	}
 }

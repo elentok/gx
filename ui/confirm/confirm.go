@@ -62,13 +62,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() tea.View {
-	hint := ui.StyleDim.Render("left/right: choose  y/n: quick select  enter: confirm")
-	yes := ui.RenderButton("Yes", m.choiceYes, m.nerd)
-	no := ui.RenderButton("No", !m.choiceYes, m.nerd)
+	hint := ui.StyleDim.Render(components.ConfirmHint)
 	return tea.NewView(strings.Join([]string{
 		m.prompt,
 		"",
-		"  " + yes + "   " + no,
+		components.RenderConfirmChoices(m.choiceYes, m.nerd),
 		"  " + hint,
 		"",
 	}, "\n"))

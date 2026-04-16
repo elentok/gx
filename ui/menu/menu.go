@@ -10,7 +10,6 @@ import (
 	"gx/ui/components"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 )
 
 // Item is a selectable menu entry.
@@ -90,30 +89,11 @@ func (m model) View() tea.View {
 		sb.WriteString("\n\n")
 	}
 
-	selectedStyle := lipgloss.NewStyle().Foreground(ui.ColorGreen).Bold(true)
-	normalStyle := lipgloss.NewStyle().Foreground(ui.ColorGray)
-	detailStyle := lipgloss.NewStyle().Foreground(ui.ColorGray)
-
-	for i, item := range m.items {
-		num := fmt.Sprintf("%d", i+1)
-		if i == m.state.Cursor {
-			label := selectedStyle.Render("▸ " + num + ". " + item.Label)
-			if item.Detail != "" {
-				label += "  " + detailStyle.Render(item.Detail)
-			}
-			sb.WriteString(label)
-		} else {
-			label := normalStyle.Render("  " + num + ". " + item.Label)
-			if item.Detail != "" {
-				label += "  " + detailStyle.Render(item.Detail)
-			}
-			sb.WriteString(label)
-		}
-		sb.WriteString("\n")
-	}
+	sb.WriteString(components.RenderMenuList(m.state, ui.ColorGray, ui.ColorGreen))
+	sb.WriteString("\n")
 
 	sb.WriteString("\n")
-	sb.WriteString(ui.StyleDim.Render("j/k: navigate  1-9: quick select  enter: confirm  esc: abort"))
+	sb.WriteString(ui.StyleDim.Render(components.MenuHintNumber))
 	sb.WriteString("\n")
 
 	return tea.NewView(sb.String())
