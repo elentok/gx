@@ -72,7 +72,21 @@ func cmdGitCommit(worktreeRoot string) tea.Cmd {
 	if os.Getenv("TMUX") != "" {
 		return func() tea.Msg {
 			err := exec.Command("tmux", "split-window", "-v", "-c", worktreeRoot, "git commit").Run()
-			return commitFinishedMsg{err: err, tmuxSplit: true}
+			return commitFinishedMsg{err: err, splitApp: "tmux"}
+		}
+	}
+	if os.Getenv("KITTY_LISTEN_ON") != "" {
+		return func() tea.Msg {
+			args := []string{"@", "launch", "--location=hsplit", "--cwd=" + worktreeRoot}
+			for _, e := range os.Environ() {
+				args = append(args, "--env", e)
+			}
+			args = append(args, "git", "commit")
+			out, err := exec.Command("kitty", args...).CombinedOutput()
+			if err != nil {
+				err = fmt.Errorf("$ kitty @ launch --location=hsplit --cwd=%s [env] git commit\n\n%w\n\n%s", worktreeRoot, err, strings.TrimSpace(string(out)))
+			}
+			return commitFinishedMsg{err: err, splitApp: "kitty"}
 		}
 	}
 	c := exec.Command("git", "commit")

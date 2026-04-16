@@ -155,8 +155,8 @@ type actionPollMsg struct{}
 type diffReloadMsg struct{ seq int }
 
 type commitFinishedMsg struct {
-	err       error
-	tmuxSplit bool
+	err      error
+	splitApp string // "tmux", "kitty", or "" for foreground
 }
 
 type lazygitLogFinishedMsg struct{ err error }

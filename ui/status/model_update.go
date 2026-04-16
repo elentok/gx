@@ -1,6 +1,7 @@
 package stage
 
 import (
+	"fmt"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -117,11 +118,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case commitFinishedMsg:
 		if msg.err != nil {
-			m.setStatus("commit failed: " + msg.err.Error())
+			m.showGitError(fmt.Errorf("commit failed: %w", msg.err))
 			return m, nil
 		}
-		if msg.tmuxSplit {
-			m.setStatus("opened tmux split: git commit")
+		if msg.splitApp != "" {
+			m.setStatus("opened " + msg.splitApp + " split: git commit")
 			return m, nil
 		}
 		m.setStatus("git commit finished")
