@@ -44,6 +44,9 @@ func runStashify(args []string, d deps) error {
 	cmd.Stdout = d.stdout
 	cmd.Stderr = d.stderr
 	cmdErr := cmd.Run()
+	if exitErr, ok := cmdErr.(*exec.ExitError); ok {
+		cmdErr = &ExitError{Code: exitErr.ExitCode()}
+	}
 
 	if !stashed {
 		return cmdErr
