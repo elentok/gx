@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.12.2
+
+- `gx status` now compresses single-child directory chains in the sidebar, so paths like `keyboards/iris/keymaps/` render as a single directory row instead of three nested rows
+
 ## v0.12.1
 
 - Added an optional path argument to `gx status` / `gx s`; relative and absolute file paths now preselect the matching file in the status sidebar without jumping into diff focus
