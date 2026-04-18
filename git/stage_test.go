@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"gx/testutil"
+	"github.com/elentok/gx/testutil"
 )
 
 func TestListStageFiles(t *testing.T) {

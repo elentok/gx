@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"gx/git"
+	"github.com/elentok/gx/git"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"

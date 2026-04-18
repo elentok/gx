@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"gx/ui"
+	"github.com/elentok/gx/ui"
 
 	tea "charm.land/bubbletea/v2"
 )

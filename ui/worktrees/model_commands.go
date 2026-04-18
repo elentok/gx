@@ -3,7 +3,7 @@ package worktrees
 import (
 	"time"
 
-	"gx/git"
+	"github.com/elentok/gx/git"
 
 	tea "charm.land/bubbletea/v2"
 )

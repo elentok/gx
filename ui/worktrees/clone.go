@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gx/git"
+	"github.com/elentok/gx/git"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"

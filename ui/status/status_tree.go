@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"gx/git"
+	"github.com/elentok/gx/git"
 )
 
 type statusEntryKind int

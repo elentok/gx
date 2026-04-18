@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"gx/ui"
+	"github.com/elentok/gx/ui"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"

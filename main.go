@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"gx/cmd"
+	"github.com/elentok/gx/cmd"
 )
 
 func main() {

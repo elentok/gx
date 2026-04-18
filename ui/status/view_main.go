@@ -1,7 +1,7 @@
 package stage
 
 import (
-	"gx/ui"
+	"github.com/elentok/gx/ui"
 
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"

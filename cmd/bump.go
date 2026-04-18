@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"gx/ui"
+	"github.com/elentok/gx/ui"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"

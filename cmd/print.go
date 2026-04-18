@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"gx/ui"
+	"github.com/elentok/gx/ui"
 
 	"charm.land/lipgloss/v2"
 )

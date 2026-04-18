@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"gx/git"
-	"gx/testutil"
-	teatest "gx/testutil/teatestv2"
-	"gx/ui/status"
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/testutil"
+	teatest "github.com/elentok/gx/testutil/teatestv2"
+	"github.com/elentok/gx/ui/status"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"

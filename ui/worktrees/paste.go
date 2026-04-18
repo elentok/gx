@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"gx/git"
+	"github.com/elentok/gx/git"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"

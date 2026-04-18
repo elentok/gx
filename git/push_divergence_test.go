@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"gx/git"
-	"gx/testutil"
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/testutil"
 )
 
 func TestDetectPushDivergence_NoUpstream(t *testing.T) {

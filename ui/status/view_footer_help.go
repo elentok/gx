@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"gx/ui"
+	"github.com/elentok/gx/ui"
 
 	"charm.land/bubbles/v2/viewport"
 	"charm.land/lipgloss/v2"

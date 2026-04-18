@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"gx/git"
-	"gx/testutil"
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/testutil"
 )
 
 func TestExecute_ListWorktrees(t *testing.T) {

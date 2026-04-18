@@ -3,7 +3,7 @@ package worktrees
 import (
 	"strings"
 
-	"gx/git"
+	"github.com/elentok/gx/git"
 )
 
 func (m Model) splitWidth() (tableW, sidebarW int) {

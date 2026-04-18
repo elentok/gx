@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"gx/testutil"
+	"github.com/elentok/gx/testutil"
 
 	tea "charm.land/bubbletea/v2"
 )

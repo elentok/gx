@@ -5,8 +5,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"gx/config"
-	"gx/git"
+	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/git"
 )
 
 func runStashify(args []string, d deps) error {

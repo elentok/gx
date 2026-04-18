@@ -1,6 +1,6 @@
 package stage
 
-import "gx/git"
+import "github.com/elentok/gx/git"
 import "github.com/charmbracelet/x/ansi"
 
 func (m Model) deltaRenderWidth() int {

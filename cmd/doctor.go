@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"gx/git"
-	"gx/ui"
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui"
 )
 
 func runDoctor(args []string, d deps) error {

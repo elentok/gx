@@ -3,9 +3,9 @@ package worktrees
 import (
 	"fmt"
 
-	"gx/git"
-	"gx/ui"
-	"gx/ui/components"
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/components"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"

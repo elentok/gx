@@ -1,6 +1,6 @@
 package worktrees
 
-import "gx/ui"
+import "github.com/elentok/gx/ui"
 
 import tea "charm.land/bubbletea/v2"
 

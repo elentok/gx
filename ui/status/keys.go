@@ -3,7 +3,7 @@ package stage
 import (
 	"fmt"
 
-	"gx/ui"
+	"github.com/elentok/gx/ui"
 
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"

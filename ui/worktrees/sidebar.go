@@ -3,8 +3,8 @@ package worktrees
 import (
 	"strings"
 
-	"gx/git"
-	"gx/ui"
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui"
 
 	"charm.land/lipgloss/v2"
 	humanize "github.com/dustin/go-humanize"

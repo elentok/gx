@@ -3,8 +3,8 @@ package git_test
 import (
 	"testing"
 
-	"gx/git"
-	"gx/testutil"
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/testutil"
 )
 
 func TestListBranches(t *testing.T) {

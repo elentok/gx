@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"gx/ui"
-	"gx/ui/components"
+	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/components"
 
 	tea "charm.land/bubbletea/v2"
 )

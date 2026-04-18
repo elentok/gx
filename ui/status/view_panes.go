@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gx/git"
+	"github.com/elentok/gx/git"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"

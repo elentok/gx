@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"unicode/utf8"
 
-	"gx/git"
+	"github.com/elentok/gx/git"
 
 	"github.com/creack/pty"
 )

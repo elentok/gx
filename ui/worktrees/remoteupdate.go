@@ -1,7 +1,7 @@
 package worktrees
 
 import (
-	"gx/git"
+	"github.com/elentok/gx/git"
 
 	tea "charm.land/bubbletea/v2"
 )

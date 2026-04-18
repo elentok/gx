@@ -1,4 +1,4 @@
-module gx
+module github.com/elentok/gx
 
 go 1.25.0
 

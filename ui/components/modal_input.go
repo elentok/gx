@@ -3,7 +3,7 @@ package components
 import (
 	"image/color"
 
-	"gx/ui"
+	"github.com/elentok/gx/ui"
 )
 
 func RenderInputModal(title, prompt, input, hint string, borderColor, titleColor, subtleColor color.Color, width int) string {

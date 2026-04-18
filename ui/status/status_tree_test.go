@@ -3,7 +3,7 @@ package stage
 import (
 	"testing"
 
-	"gx/git"
+	"github.com/elentok/gx/git"
 )
 
 func TestBuildStatusEntries_CollapsibleDirectory(t *testing.T) {

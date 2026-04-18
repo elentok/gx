@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"gx/git"
-	"gx/testutil"
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/testutil"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"

@@ -1,8 +1,8 @@
 package worktrees
 
 import (
-	"gx/ui"
-	"gx/ui/components"
+	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/components"
 
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"

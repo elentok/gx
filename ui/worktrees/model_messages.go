@@ -1,6 +1,6 @@
 package worktrees
 
-import "gx/git"
+import "github.com/elentok/gx/git"
 
 type clearStatusMsg struct{ gen int }
 

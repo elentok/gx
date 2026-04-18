@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"gx/git"
-	"gx/testutil"
-	teatest "gx/testutil/teatestv2"
-	"gx/ui/worktrees"
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/testutil"
+	teatest "github.com/elentok/gx/testutil/teatestv2"
+	"github.com/elentok/gx/ui/worktrees"
 
 	tea "charm.land/bubbletea/v2"
 )

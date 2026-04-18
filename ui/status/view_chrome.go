@@ -1,9 +1,9 @@
 package stage
 
 import (
-	"gx/git"
-	"gx/ui"
-	"gx/ui/components"
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/components"
 
 	"charm.land/lipgloss/v2"
 )

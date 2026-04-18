@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"gx/git"
+	"github.com/elentok/gx/git"
 )
 
 func TestDirtyStateFromChanges(t *testing.T) {

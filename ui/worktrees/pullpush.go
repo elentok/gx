@@ -3,8 +3,8 @@ package worktrees
 import (
 	"fmt"
 
-	"gx/git"
-	"gx/ui"
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui"
 
 	tea "charm.land/bubbletea/v2"
 )

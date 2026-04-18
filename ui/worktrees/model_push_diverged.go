@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"gx/git"
-	"gx/ui"
-	"gx/ui/components"
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/components"
 
 	tea "charm.land/bubbletea/v2"
 	humanize "github.com/dustin/go-humanize"
