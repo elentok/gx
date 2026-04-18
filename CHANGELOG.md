@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.12.1
+
+- Added an optional path argument to `gx status` / `gx s`; relative and absolute file paths now preselect the matching file in the status sidebar without jumping into diff focus
+- Changed the Go module path to `github.com/elentok/gx` so `go install github.com/elentok/gx@latest` works correctly
+
 ## v0.12.0
 
 - Added a shared UI design-system foundation across `gx status`, `gx wt`, and CLI flows: common theme colors, semantic icons, shared frame/overlay primitives, and reusable feedback/key-hint helpers
