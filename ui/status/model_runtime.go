@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -259,8 +258,8 @@ func (m *Model) focusParentInStatus() bool {
 	if !ok {
 		return false
 	}
-	parent := path.Dir(entry.Path)
-	if parent == "." || parent == "" || parent == entry.Path {
+	parent := strings.TrimSpace(entry.ParentPath)
+	if parent == "" || parent == entry.Path {
 		return false
 	}
 	for i, candidate := range m.statusEntries {

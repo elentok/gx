@@ -73,6 +73,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		if msg.String() == "q" {
+			if m.runningRunner != nil && !m.runningDone {
+				m.runningRunner.Cancel()
+			}
 			return m, tea.Quit
 		}
 		if m.credentialOpen {

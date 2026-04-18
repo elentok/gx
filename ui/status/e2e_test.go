@@ -628,6 +628,7 @@ func TestStageE2E_RebaseActionWithConfirm(t *testing.T) {
 		head := gitOutput(t, repoDir, "rev-parse", "origin/master")
 		return base == head
 	})
+	waitForStageStrippedText(t, tm, "rebase complete", stageActionWait)
 
 	quitStage(t, tm)
 }

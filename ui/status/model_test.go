@@ -159,6 +159,31 @@ func TestStatusHFocusesParentFolder(t *testing.T) {
 	}
 }
 
+func TestStatusHOnCompressedDirDoesNotFocusHiddenParent(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.Mkdir(t, repo+"/keyboards/iris/keymaps")
+	testutil.WriteFile(t, repo, "keyboards/iris/keymaps/myfile.c", "changed\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusStatus
+
+	entry, ok := m.selectedStatusEntry()
+	if !ok || entry.Kind != statusEntryDir || entry.Path != "keyboards/iris/keymaps" {
+		t.Fatalf("expected compressed dir selected by default, got %+v", entry)
+	}
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
+	m = updated.(Model)
+	if cmd != nil {
+		t.Fatalf("expected no diff reload cmd when no visible parent exists")
+	}
+	entry, ok = m.selectedStatusEntry()
+	if !ok || entry.Kind != statusEntryDir || entry.Path != "keyboards/iris/keymaps" {
+		t.Fatalf("expected selection to stay on compressed dir, got %+v", entry)
+	}
+}
+
 func TestHelpOverlayToggleAndCompactStatusBar(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "changed\n")
