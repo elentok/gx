@@ -241,6 +241,33 @@ func TestStatusPaneShowsBranchSummaryInTitle(t *testing.T) {
 	}
 }
 
+func TestNewWithInitialPathSelectsFileAndKeepsStatusFocus(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.Mkdir(t, repo+"/dir")
+	testutil.WriteFile(t, repo, "dir/a.txt", "one\n")
+	testutil.WriteFile(t, repo, "dir/b.txt", "two\n")
+
+	m := NewWithSettings(repo, Settings{
+		DiffContextLines: 1,
+		UseNerdFontIcons: true,
+		InitialPath:      "dir/b.txt",
+	})
+
+	entry, ok := m.selectedStatusEntry()
+	if !ok {
+		t.Fatal("expected selected entry")
+	}
+	if entry.Kind != statusEntryFile || entry.Path != "dir/b.txt" {
+		t.Fatalf("selected entry = %+v, want file dir/b.txt", entry)
+	}
+	if m.focus != focusStatus {
+		t.Fatalf("focus = %v, want %v", m.focus, focusStatus)
+	}
+	if m.activeFilePath != "dir/b.txt" {
+		t.Fatalf("activeFilePath = %q, want %q", m.activeFilePath, "dir/b.txt")
+	}
+}
+
 func TestBranchSummaryTitleShowsBaseOnlyWhenNonDefault(t *testing.T) {
 	m := Model{settings: Settings{UseNerdFontIcons: true}, branchName: "feature/x", branchBaseRef: "origin/release", branchSync: git.SyncStatus{Name: git.StatusBehind, Behind: 1}}
 	line := m.branchSummaryTitleSuffix()

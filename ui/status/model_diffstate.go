@@ -161,9 +161,15 @@ func (m *Model) reload(preservePath string) {
 		return
 	}
 
-	if preservePath != "" {
+	targetPath := preservePath
+	if targetPath == "" && m.initialPath != "" {
+		targetPath = m.initialPath
+		m.initialPath = ""
+	}
+
+	if targetPath != "" {
 		for i, entry := range m.statusEntries {
-			if entry.Path == preservePath {
+			if entry.Path == targetPath {
 				m.selected = i
 				break
 			}

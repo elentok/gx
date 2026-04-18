@@ -62,6 +62,7 @@ type sectionState struct {
 type Model struct {
 	worktreeRoot string
 	settings     Settings
+	initialPath  string
 
 	width  int
 	height int
@@ -137,6 +138,7 @@ type Model struct {
 type Settings struct {
 	DiffContextLines int
 	UseNerdFontIcons bool
+	InitialPath      string
 	Terminal         ui.Terminal
 }
 
@@ -203,6 +205,7 @@ func NewWithSettings(worktreeRoot string, settings Settings) Model {
 	m := Model{
 		worktreeRoot:     worktreeRoot,
 		settings:         settings,
+		initialPath:      settings.InitialPath,
 		focus:            focusStatus,
 		section:          sectionUnstaged,
 		navMode:          navHunk,

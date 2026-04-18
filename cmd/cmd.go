@@ -27,7 +27,7 @@ type deps struct {
 	stderr               io.Writer
 	getwd                func() (string, error)
 	runWorktrees         func(string) error
-	runStatus            func() error
+	runStatus            func(string) error
 	confirmForce         func(string) (bool, error)
 	choosePushDivergence func(io.Reader, io.Writer, *git.PushDivergence) (int, error)
 	initConfig           func() (string, error)
@@ -70,7 +70,14 @@ func execute(args []string, d deps) error {
 	case "push", "ps":
 		return runPush(d)
 	case "status", "s":
-		return d.runStatus()
+		target := ""
+		if len(args) > 2 {
+			return fmt.Errorf("usage: gx status|s [path]")
+		}
+		if len(args) == 2 {
+			target = args[1]
+		}
+		return d.runStatus(target)
 	case "init":
 		return runInit(d)
 	case "edit-config":
@@ -174,7 +181,7 @@ func runWorktrees(_ string) error {
 	return err
 }
 
-func runStatus() error {
+func runStatus(target string) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -192,6 +199,13 @@ func runStatus() error {
 	if err != nil {
 		return err
 	}
+	initialPath := ""
+	if strings.TrimSpace(target) != "" {
+		initialPath, err = resolveStatusTargetPath(root, cwd, target)
+		if err != nil {
+			return err
+		}
+	}
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -200,11 +214,32 @@ func runStatus() error {
 	m := stage.NewWithSettings(root, stage.Settings{
 		DiffContextLines: cfg.StageDiffContextLines,
 		UseNerdFontIcons: cfg.UseNerdFontIcons,
+		InitialPath:      initialPath,
 		Terminal:         ui.DetectTerminal(),
 	})
 	p := tea.NewProgram(m)
 	_, err = p.Run()
 	return err
+}
+
+func resolveStatusTargetPath(worktreeRoot, cwd, target string) (string, error) {
+	path := filepath.Clean(target)
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(cwd, path)
+	}
+	path = filepath.Clean(path)
+	root := filepath.Clean(worktreeRoot)
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return "", err
+	}
+	if rel == "." {
+		return "", fmt.Errorf("status target must be a file inside %s", worktreeRoot)
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("status target %q is outside worktree root %s", target, worktreeRoot)
+	}
+	return filepath.ToSlash(rel), nil
 }
 
 func runCloneWT(args []string, d deps) error {
