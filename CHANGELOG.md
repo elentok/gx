@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.12.3
+
+- `gx wt` now opens keyboard help in a centered overlay like `gx status`, and both `gx wt` and `gx status` footers now show a compact `? help` prompt instead of inline keymaps
+- Restyled `gx wt` help to match the brighter `gx status` help colors
+
 ## v0.12.2
 
 - `gx status` now compresses single-child directory chains in the sidebar, so paths like `keyboards/iris/keymaps/` render as a single directory row instead of three nested rows
