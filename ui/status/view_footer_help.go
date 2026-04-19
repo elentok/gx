@@ -29,9 +29,6 @@ func (m Model) helpLine() string {
 			hint += " · " + t
 		}
 		hint += " · ? help"
-		if hs := m.footerShortHelp(); hs != "" {
-			hint += " · " + hs
-		}
 		if s := m.searchCounterLabel(); s != "" {
 			hint = s + " · " + hint
 		}
@@ -50,9 +47,6 @@ func (m Model) helpLine() string {
 		hint += " · " + t
 	}
 	hint += " · ? help"
-	if hs := m.footerShortHelp(); hs != "" {
-		hint += " · " + hs
-	}
 	if s := m.searchCounterLabel(); s != "" {
 		hint = s + " · " + hint
 	}
@@ -167,11 +161,4 @@ func (m *Model) showHelpOverlay() {
 	vp.SetContent(m.helpFullView(vpW - 2))
 	m.helpVP = vp
 	m.helpOpen = true
-}
-
-func (m Model) footerShortHelp() string {
-	if m.statusMsg != "" || m.width < 110 {
-		return ""
-	}
-	return m.helpShortView()
 }

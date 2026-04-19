@@ -1,6 +1,11 @@
 package worktrees
 
-import "charm.land/bubbles/v2/key"
+import (
+	"github.com/elentok/gx/ui"
+
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
+)
 
 type keyMap struct {
 	Up             key.Binding
@@ -135,16 +140,13 @@ var keys = keyMap{
 	),
 	Help: key.NewBinding(
 		key.WithKeys("?"),
-		key.WithHelp("?", "toggle help"),
+		key.WithHelp("?", "help"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),
 		key.WithHelp("q", "quit"),
 	),
 }
-
-// ShortHelp and FullHelp implement help.KeyMap so this can be wired to
-// bubbles/help in a later milestone.
 
 func (k keyMap) ShortHelp() []key.Binding {
 	return []key.Binding{k.Up, k.Down, k.Top, k.New, k.NewTmuxSession, k.NewTmuxWindow, k.Delete, k.Rename, k.Clone, k.Yank, k.Pull, k.Push, k.Search, k.Track, k.Refresh, k.Quit, k.Help}
@@ -157,4 +159,17 @@ func (k keyMap) FullHelp() [][]key.Binding {
 		{k.Yank, k.Search},
 		{k.Pull, k.Push, k.Rebase, k.Track, k.Refresh, k.RemoteUpdate, k.Logs, k.Log, k.TmuxSession, k.Help, k.Quit},
 	}
+}
+
+func newWorktreeHelpModel() help.Model {
+	h := help.New()
+	h.ShortSeparator = " · "
+	h.FullSeparator = "  "
+	h.Styles.ShortKey = h.Styles.ShortKey.Foreground(ui.ColorBlue).Bold(true)
+	h.Styles.ShortDesc = h.Styles.ShortDesc.Foreground(ui.ColorSubtle)
+	h.Styles.ShortSeparator = h.Styles.ShortSeparator.Foreground(ui.ColorSubtle)
+	h.Styles.FullKey = h.Styles.FullKey.Foreground(ui.ColorBlue).Bold(true)
+	h.Styles.FullDesc = h.Styles.FullDesc.Foreground(ui.ColorText)
+	h.Styles.FullSeparator = h.Styles.FullSeparator.Foreground(ui.ColorSubtle)
+	return h
 }

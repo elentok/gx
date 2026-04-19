@@ -41,6 +41,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.mode {
 		case modeError:
 			return m.handleErrorKey(msg)
+		case modeHelp:
+			return m.handleHelpKey(msg)
 		case modeConfirm:
 			return m.handleConfirmKey(msg)
 		case modeCredentialPrompt:
@@ -72,8 +74,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.Quit):
 			return m, tea.Quit
 		case key.Matches(msg, keys.Help):
-			m.help.ShowAll = !m.help.ShowAll
-			m = m.resized()
+			m = m.enterHelpMode()
 			return m, nil
 		case key.Matches(msg, keys.New) && !m.spinnerActive:
 			m = m.enterNewMode()

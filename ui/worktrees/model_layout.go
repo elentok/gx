@@ -1,10 +1,6 @@
 package worktrees
 
-import (
-	"strings"
-
-	"github.com/elentok/gx/git"
-)
+import "github.com/elentok/gx/git"
 
 func (m Model) splitWidth() (tableW, sidebarW int) {
 	if m.useStackedLayout() {
@@ -40,11 +36,7 @@ func (m Model) useStackedLayout() bool {
 }
 
 func (m Model) helpLineCount() int {
-	v := m.help.View(keys)
-	if v == "" {
-		return 1
-	}
-	return strings.Count(v, "\n") + 1
+	return 1
 }
 
 func (m Model) contentHeight() int {

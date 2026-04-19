@@ -30,6 +30,7 @@ const (
 	modeLogs
 	modePushDiverged
 	modeCredentialPrompt
+	modeHelp
 )
 
 type promptableJobKind int
@@ -77,6 +78,7 @@ type Model struct {
 	statusMsg     string
 	statusGen     int // incremented each time statusMsg is set, used to expire old ticks
 	errorViewport viewport.Model
+	helpViewport  viewport.Model
 	jobRunner     *components.CommandRunner
 	jobKind       promptableJobKind
 	jobWorktree   *git.Worktree
@@ -141,7 +143,7 @@ func NewWithSettings(repo git.Repo, activeWorktreePath string, settings Settings
 		baseStatus:         make(map[string]*bool),
 		table:              newTable(),
 		loading:            true,
-		help:               help.New(),
+		help:               newWorktreeHelpModel(),
 		spinner:            sp,
 	}
 }

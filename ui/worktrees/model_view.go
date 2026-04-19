@@ -30,6 +30,8 @@ func (m Model) View() tea.View {
 			content = ui.OverlayCenter(bg, m.errorModalView(), m.width, m.height)
 		case modeLogs:
 			content = ui.OverlayCenter(bg, m.logsModalView(), m.width, m.height)
+		case modeHelp:
+			content = ui.OverlayCenter(bg, m.helpModalView(), m.width, m.height)
 		case modeYank:
 			content = ui.OverlayCenter(bg, m.yankModalView(), m.width, m.height)
 		default:
@@ -101,6 +103,6 @@ func (m Model) statusBarView() string {
 		if m.statusMsg != "" {
 			return "  " + m.statusMsg
 		}
-		return m.help.View(keys)
+		return "  " + ui.StyleHint.Render("? help")
 	}
 }
