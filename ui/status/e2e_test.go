@@ -682,7 +682,7 @@ func TestStageE2E_StatusSearchKeepsHighlightsAfterEnter(t *testing.T) {
 	tm.Send(keyRune('/'))
 	tm.Send(keyRune('a'))
 	tm.Send(keyRune('p'))
-	waitForStageText(t, tm, "search:", stageActionWait)
+	waitForStageText(t, tm, "Search", stageActionWait)
 	tm.Send(keySpecial(tea.KeyEnter))
 	waitForStageText(t, tm, "status · ? help", stageActionWait)
 	tm.Send(keyRune('n'))

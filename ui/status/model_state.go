@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
@@ -140,6 +141,7 @@ type Settings struct {
 	UseNerdFontIcons bool
 	InitialPath      string
 	Terminal         ui.Terminal
+	InputModalBottom config.InputModalBottom
 }
 
 func DefaultSettings() Settings {

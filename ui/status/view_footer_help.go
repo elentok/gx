@@ -12,17 +12,6 @@ import (
 )
 
 func (m Model) helpLine() string {
-	if m.searchMode != searchModeNone {
-		prefix := ""
-		if m.focus == focusDiff && m.currentSection().visualActive {
-			prefix = "VISUAL · "
-		}
-		line := lipgloss.NewStyle().Foreground(catSubtle).Render("  " + prefix + m.searchFooterText())
-		if m.width > 0 {
-			line = ansi.Truncate(line, m.width, "")
-		}
-		return line
-	}
 	if m.focus == focusStatus {
 		hint := m.diffContextLabel() + " · " + m.helpSectionLabel()
 		if t := m.terminalLabel(); t != "" {

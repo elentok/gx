@@ -60,7 +60,7 @@ func (m Model) textInputOverlayWidth() int {
 
 // textInputOverlayView renders the framed input overlay for text-input modes.
 func (m Model) textInputOverlayView() string {
-	var title, body string
+	var title, rightTitle, body string
 	outerW := m.textInputOverlayWidth()
 	innerW := outerW - 2 - 2 // minus border and padding
 	ti := m.textInput
@@ -85,17 +85,17 @@ func (m Model) textInputOverlayView() string {
 		body = inputView
 	case modeSearch:
 		title = "Search"
+		body = inputView
 		if m.searchQuery != "" && len(m.searchMatches) == 0 {
-			body = inputView + "  no matches"
+			rightTitle = "no matches"
 		} else if len(m.searchMatches) > 0 {
-			body = fmt.Sprintf("%s  %d/%d", inputView, m.searchCursor+1, len(m.searchMatches))
-		} else {
-			body = inputView
+			rightTitle = fmt.Sprintf("%d/%d", m.searchCursor+1, len(m.searchMatches))
 		}
 	}
 
 	return ui.RenderModalFrame(ui.ModalFrameOptions{
 		Title:         title,
+		RightTitle:    rightTitle,
 		Body:          body,
 		Width:         outerW,
 		BorderColor:   ui.ColorBorder,

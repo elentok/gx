@@ -6,7 +6,6 @@ import (
 
 	"github.com/elentok/gx/ui"
 
-	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -232,31 +231,41 @@ func (m Model) statusEntrySearchText(entry statusEntry) string {
 	return name
 }
 
-func (m Model) searchFooterText() string {
-	if m.searchMode == searchModeNone {
-		return ""
+const searchOverlayDesiredWidth = 50
+
+func (m Model) searchOverlayWidth() int {
+	max := m.width * 80 / 100
+	if searchOverlayDesiredWidth < max {
+		return searchOverlayDesiredWidth
 	}
+	return max
+}
+
+func (m Model) searchInputOverlayView() string {
+	outerW := m.searchOverlayWidth()
+	innerW := outerW - 2 - 2 // minus border and padding
+	ti := m.searchInput
+	ti.SetWidth(innerW)
+
+	var rightTitle string
 	total := len(m.searchMatches)
-	idx := 0
-	if total > 0 {
-		idx = m.searchCursor + 1
-	}
-	base := fmt.Sprintf("search: %s", m.searchInput.View())
 	if strings.TrimSpace(m.searchQuery) != "" {
 		if total == 0 {
-			base += " · no matches"
+			rightTitle = "no matches"
 		} else {
-			base += fmt.Sprintf(" · %d/%d", idx, total)
+			rightTitle = fmt.Sprintf("%d/%d", m.searchCursor+1, total)
 		}
 	}
-	base = ui.JoinStatus(
-		base,
-		ui.RenderInlineBindings(
-			key.NewBinding(key.WithHelp("enter", "keep highlights")),
-			key.NewBinding(key.WithHelp("esc", "clear")),
-		),
-	)
-	return base
+
+	return ui.RenderModalFrame(ui.ModalFrameOptions{
+		Title:         "Search",
+		RightTitle:    rightTitle,
+		Body:          ti.View(),
+		Width:         outerW,
+		BorderColor:   ui.ColorBorder,
+		TitleColor:    ui.ColorBlue,
+		TitleInBorder: true,
+	})
 }
 
 func (m Model) searchMatchStatusIndex(idx int) bool {

@@ -12,11 +12,13 @@ const ansiReset = "\x1b[0m"
 
 type ModalFrameOptions struct {
 	Title         string
+	RightTitle    string
 	Body          string
 	Hint          string
 	Width         int
 	BorderColor   color.Color
 	TitleColor    color.Color
+	RightTitleColor color.Color
 	HintColor     color.Color
 	PaddingX      int
 	TitleInBorder bool
@@ -53,15 +55,19 @@ func RenderModalFrame(opts ModalFrameOptions) string {
 	}
 	rendered := borderStyle.Render(strings.Join(parts, "\n"))
 
-	if opts.TitleInBorder && strings.TrimSpace(opts.Title) != "" {
-		rendered = injectBorderTitle(rendered, opts.Title, opts.TitleColor, opts.BorderColor)
+	if opts.TitleInBorder && (strings.TrimSpace(opts.Title) != "" || strings.TrimSpace(opts.RightTitle) != "") {
+		rightColor := opts.RightTitleColor
+		if rightColor == nil {
+			rightColor = opts.TitleColor
+		}
+		rendered = injectBorderTitle(rendered, opts.Title, opts.RightTitle, opts.TitleColor, rightColor, opts.BorderColor)
 	}
 	return rendered
 }
 
 // injectBorderTitle replaces the top border line of a rendered frame with one
-// that embeds the title, producing  ╭─ Title ───╮  instead of  ╭───────────╮.
-func injectBorderTitle(frame, title string, titleColor, borderColor color.Color) string {
+// that embeds titles, e.g.  ╭─ Title ───── 2/5 ─╮.
+func injectBorderTitle(frame, title, rightTitle string, titleColor, rightTitleColor, borderColor color.Color) string {
 	lines := strings.Split(frame, "\n")
 	if len(lines) == 0 {
 		return frame
@@ -69,10 +75,21 @@ func injectBorderTitle(frame, title string, titleColor, borderColor color.Color)
 	frameW := ansi.StringWidth(lines[0])
 	borderS := lipgloss.NewStyle().Foreground(borderColor)
 	titleS := lipgloss.NewStyle().Foreground(titleColor).Bold(true)
-	titleStr := titleS.Render(" " + title + " ")
-	titleW := ansi.StringWidth(titleStr)
-	dashes := maxInt(0, frameW-2-titleW) // -2 for ╭ and ╮
-	lines[0] = borderS.Render("╭") + titleStr + borderS.Render(strings.Repeat("─", dashes)) + borderS.Render("╮")
+	rightS := lipgloss.NewStyle().Foreground(rightTitleColor)
+
+	leftStr := ""
+	if strings.TrimSpace(title) != "" {
+		leftStr = titleS.Render(" " + title + " ")
+	}
+	rightStr := ""
+	if strings.TrimSpace(rightTitle) != "" {
+		rightStr = rightS.Render(" " + rightTitle + " ")
+	}
+
+	leftW := ansi.StringWidth(leftStr)
+	rightW := ansi.StringWidth(rightStr)
+	dashes := maxInt(0, frameW-2-leftW-rightW) // -2 for ╭ and ╮
+	lines[0] = borderS.Render("╭") + leftStr + borderS.Render(strings.Repeat("─", dashes)) + rightStr + borderS.Render("╮")
 	return strings.Join(lines, "\n")
 }
 

@@ -217,6 +217,7 @@ func runStatus(target string) error {
 		UseNerdFontIcons: cfg.UseNerdFontIcons,
 		InitialPath:      initialPath,
 		Terminal:         ui.DetectTerminal(),
+		InputModalBottom: cfg.InputModalBottom,
 	})
 	p := tea.NewProgram(m)
 	_, err = p.Run()

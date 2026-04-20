@@ -44,6 +44,11 @@ func (m Model) View() tea.View {
 
 	footer := m.helpLine()
 	out := lipgloss.JoinVertical(lipgloss.Left, body, footer)
+	if m.searchMode == searchModeInput {
+		overlay := m.searchInputOverlayView()
+		y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
+		out = ui.OverlayBottomCenter(out, overlay, m.width, y)
+	}
 	if m.credentialOpen {
 		out = ui.OverlayCenter(out, m.credentialModalView(), m.width, m.height)
 	} else if m.runningOpen {

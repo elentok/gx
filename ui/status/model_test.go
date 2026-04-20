@@ -1383,13 +1383,14 @@ func TestStageSearchStatusModeAndNavigation(t *testing.T) {
 	}
 }
 
-func TestStageSearchModeFooterIsLeftAligned(t *testing.T) {
+func TestStageSearchModeShowsOverlay(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "apple.txt", "one\n")
 
 	m := New(repo)
 	m.ready = true
 	m.width = 60
+	m.height = 20
 	m.focus = focusStatus
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
@@ -1397,9 +1398,9 @@ func TestStageSearchModeFooterIsLeftAligned(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	m = updated.(Model)
 
-	line := ansi.Strip(m.helpLine())
-	if !strings.HasPrefix(line, "  search:") {
-		t.Fatalf("expected left-aligned search footer, got %q", line)
+	overlay := ansi.Strip(m.searchInputOverlayView())
+	if !strings.Contains(overlay, "Search") {
+		t.Fatalf("expected overlay to contain 'Search', got %q", overlay)
 	}
 }
 
