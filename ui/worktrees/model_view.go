@@ -35,7 +35,9 @@ func (m Model) View() tea.View {
 		case modeYank:
 			content = ui.OverlayCenter(bg, m.yankModalView(), m.width, m.height)
 		case modeRename, modeClone, modeNew, modeNewTmuxSession, modeNewTmuxWindow, modeSearch:
-			content = ui.OverlayBottomCenter(bg, m.textInputOverlayView(), m.width, m.height, 10)
+			overlay := m.textInputOverlayView()
+			y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
+			content = ui.OverlayBottomCenter(bg, overlay, m.width, y)
 		default:
 			content = bg
 		}
@@ -46,16 +48,23 @@ func (m Model) View() tea.View {
 	return v
 }
 
-const (
-	textInputOverlayWidth     = 42 // outer frame width
-	textInputOverlayInnerWidth = textInputOverlayWidth - 2 - 2 // minus border and padding
-)
+const textInputOverlayDesiredWidth = 50
+
+func (m Model) textInputOverlayWidth() int {
+	max := m.width * 80 / 100
+	if textInputOverlayDesiredWidth < max {
+		return textInputOverlayDesiredWidth
+	}
+	return max
+}
 
 // textInputOverlayView renders the framed input overlay for text-input modes.
 func (m Model) textInputOverlayView() string {
 	var title, body string
+	outerW := m.textInputOverlayWidth()
+	innerW := outerW - 2 - 2 // minus border and padding
 	ti := m.textInput
-	ti.SetWidth(textInputOverlayInnerWidth)
+	ti.SetWidth(innerW)
 	inputView := ti.View()
 
 	switch m.mode {
@@ -88,7 +97,7 @@ func (m Model) textInputOverlayView() string {
 	return ui.RenderModalFrame(ui.ModalFrameOptions{
 		Title:         title,
 		Body:          body,
-		Width:         textInputOverlayWidth,
+		Width:         outerW,
 		BorderColor:   ui.ColorBorder,
 		TitleColor:    ui.ColorBlue,
 		TitleInBorder: true,

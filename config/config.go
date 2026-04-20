@@ -9,10 +9,14 @@ import (
 
 var userConfigDirFn = os.UserConfigDir
 
+const SchemaURL = "https://raw.githubusercontent.com/elentok/gx/main/docs/config-schema.json"
+
 // Config is gx's user configuration.
 type Config struct {
-	UseNerdFontIcons      bool `json:"use-nerdfont-icons"`
-	StageDiffContextLines int  `json:"stage-diff-context-lines"`
+	Schema                string           `json:"$schema,omitempty"`
+	UseNerdFontIcons      bool             `json:"use-nerdfont-icons"`
+	StageDiffContextLines int              `json:"stage-diff-context-lines"`
+	InputModalBottom      InputModalBottom `json:"input-modal-bottom"`
 }
 
 // Default returns the default configuration.
@@ -20,6 +24,7 @@ func Default() Config {
 	return Config{
 		UseNerdFontIcons:      true,
 		StageDiffContextLines: 1,
+		InputModalBottom:      DefaultInputModalBottom(),
 	}
 }
 
@@ -48,26 +53,22 @@ func Load() (Config, error) {
 		return cfg, fmt.Errorf("read config %s: %w", path, err)
 	}
 
-	// Support both kebab-case and snake_case key variants.
 	var raw struct {
-		UseNerdFontIconsKebab      *bool `json:"use-nerdfont-icons"`
-		UseNerdFontIconsSnake      *bool `json:"use_nerdfont_icons"`
-		StageDiffContextLinesKebab *int  `json:"stage-diff-context-lines"`
-		StageDiffContextLinesSnake *int  `json:"stage_diff_context_lines"`
+		UseNerdFontIcons      *bool             `json:"use-nerdfont-icons"`
+		StageDiffContextLines *int              `json:"stage-diff-context-lines"`
+		InputModalBottom      *InputModalBottom `json:"input-modal-bottom"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return cfg, fmt.Errorf("parse config %s: %w", path, err)
 	}
-	if raw.UseNerdFontIconsKebab != nil {
-		cfg.UseNerdFontIcons = *raw.UseNerdFontIconsKebab
-	} else if raw.UseNerdFontIconsSnake != nil {
-		cfg.UseNerdFontIcons = *raw.UseNerdFontIconsSnake
+	if raw.UseNerdFontIcons != nil {
+		cfg.UseNerdFontIcons = *raw.UseNerdFontIcons
 	}
-
-	if raw.StageDiffContextLinesKebab != nil {
-		cfg.StageDiffContextLines = clampStageDiffContext(*raw.StageDiffContextLinesKebab)
-	} else if raw.StageDiffContextLinesSnake != nil {
-		cfg.StageDiffContextLines = clampStageDiffContext(*raw.StageDiffContextLinesSnake)
+	if raw.StageDiffContextLines != nil {
+		cfg.StageDiffContextLines = clampStageDiffContext(*raw.StageDiffContextLines)
+	}
+	if raw.InputModalBottom != nil {
+		cfg.InputModalBottom = *raw.InputModalBottom
 	}
 
 	return cfg, nil
@@ -101,7 +102,9 @@ func Init() (string, error) {
 		return "", fmt.Errorf("create config dir: %w", err)
 	}
 
-	b, err := json.MarshalIndent(Default(), "", "  ")
+	cfg := Default()
+	cfg.Schema = SchemaURL
+	b, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("encode default config: %w", err)
 	}

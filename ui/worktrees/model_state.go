@@ -1,6 +1,7 @@
 package worktrees
 
 import (
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
@@ -50,6 +51,7 @@ type dirtyState struct {
 // Settings controls optional rendering behavior for the worktrees UI.
 type Settings struct {
 	UseNerdFontIcons bool
+	InputModalBottom config.InputModalBottom
 }
 
 // Model is the BubbleTea model for the worktrees page.

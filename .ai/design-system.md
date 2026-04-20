@@ -41,7 +41,7 @@ Screen packages should compose these:
 
 - Use `ui.RenderModalFrame(...)` and `ui.RenderPanelFrame(...)`
 - Use `ui.OverlayCenter(...)` for centered modal overlays
-- Use `ui.OverlayBottomCenter(...)` + `ui.RenderModalFrame(TitleInBorder: true)` for text-input overlays (horizontally centered, near the bottom)
+- Use `ui.OverlayBottomCenter(bg, fg, screenW, y)` + `ui.RenderModalFrame(TitleInBorder: true)` for text-input overlays (horizontally centered, y from `settings.InputModalBottom.ResolveY`)
 - Do not hand-roll borders, padding, or hint rows in screen packages unless there is a strong screen-specific reason
 
 3. Reuse shared components for common interaction patterns
@@ -97,7 +97,7 @@ Not acceptable by default:
 
 ### Text-input overlays
 
-- Good: `ui.OverlayBottomCenter(bg, ui.RenderModalFrame(..., TitleInBorder: true), w, h, 10)`
+- Good: `ui.OverlayBottomCenter(bg, ui.RenderModalFrame(..., TitleInBorder: true), w, settings.InputModalBottom.ResolveY(h, fgH))`
 - Bad: rendering the text input in the status bar or hand-rolling a bordered input box
 
 ### Icons

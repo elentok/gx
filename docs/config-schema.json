@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/elentok/gx/main/docs/config-schema.json",
+  "title": "gx config",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "use-nerdfont-icons": {
+      "type": "boolean",
+      "description": "Enable Nerd Font icons in the UI. Default: true.",
+      "default": true
+    },
+    "stage-diff-context-lines": {
+      "type": "integer",
+      "description": "Number of context lines shown around each diff hunk in the staging view. Clamped to 0–20. Default: 1.",
+      "minimum": 0,
+      "maximum": 20,
+      "default": 1
+    },
+    "input-modal-bottom": {
+      "description": "Vertical position of the text-input overlay. An integer means fixed lines from the bottom, a percentage string (e.g. \"5%\") means a fraction of screen height from the bottom, and \"center\" places it in the middle of the screen. Default: \"5%\".",
+      "default": "5%",
+      "oneOf": [
+        {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Fixed number of lines from the bottom of the screen."
+        },
+        {
+          "type": "string",
+          "pattern": "^\\d+(\\.\\d+)?%$",
+          "description": "Percentage of screen height from the bottom (e.g. \"5%\")."
+        },
+        {
+          "type": "string",
+          "enum": ["center"],
+          "description": "Center the overlay vertically on the screen."
+        }
+      ]
+    }
+  }
+}
