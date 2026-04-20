@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.12.4
+
+- `gx wt` and `gx status` search now appears as a framed bottom-center overlay instead of replacing the footer line; match count (`2/5`) and `no matches` appear on the right side of the modal border
+- `gx wt` text-input overlays (rename, clone, new, search) are now wider (50 columns, capped at 80% of window width)
+- Added `input-modal-bottom` config option to control the vertical position of text-input overlays: accepts an integer (fixed lines from bottom), a percentage string like `"20%"`, or `"center"`; `gx init` now writes `$schema` pointing to the published JSON schema
+- Added `docs/config-schema.json` — reference it with `"$schema": "https://raw.githubusercontent.com/elentok/gx/main/docs/config-schema.json"` for editor autocompletion
+
 ## v0.12.3
 
 - `gx wt` now opens keyboard help in a centered overlay like `gx status`, and both `gx wt` and `gx status` footers now show a compact `? help` prompt instead of inline keymaps
