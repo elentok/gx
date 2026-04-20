@@ -11,14 +11,15 @@ import (
 const ansiReset = "\x1b[0m"
 
 type ModalFrameOptions struct {
-	Title       string
-	Body        string
-	Hint        string
-	Width       int
-	BorderColor color.Color
-	TitleColor  color.Color
-	HintColor   color.Color
-	PaddingX    int
+	Title         string
+	Body          string
+	Hint          string
+	Width         int
+	BorderColor   color.Color
+	TitleColor    color.Color
+	HintColor     color.Color
+	PaddingX      int
+	TitleInBorder bool
 }
 
 func RenderModalFrame(opts ModalFrameOptions) string {
@@ -35,7 +36,7 @@ func RenderModalFrame(opts ModalFrameOptions) string {
 	}
 
 	parts := make([]string, 0, 5)
-	if strings.TrimSpace(opts.Title) != "" {
+	if !opts.TitleInBorder && strings.TrimSpace(opts.Title) != "" {
 		parts = append(parts, lipgloss.NewStyle().Foreground(opts.TitleColor).Bold(true).Render(opts.Title))
 	}
 	if strings.TrimSpace(opts.Body) != "" {
@@ -50,7 +51,29 @@ func RenderModalFrame(opts ModalFrameOptions) string {
 		}
 		parts = append(parts, lipgloss.NewStyle().Foreground(opts.HintColor).Render(opts.Hint))
 	}
-	return borderStyle.Render(strings.Join(parts, "\n"))
+	rendered := borderStyle.Render(strings.Join(parts, "\n"))
+
+	if opts.TitleInBorder && strings.TrimSpace(opts.Title) != "" {
+		rendered = injectBorderTitle(rendered, opts.Title, opts.TitleColor, opts.BorderColor)
+	}
+	return rendered
+}
+
+// injectBorderTitle replaces the top border line of a rendered frame with one
+// that embeds the title, producing  ╭─ Title ───╮  instead of  ╭───────────╮.
+func injectBorderTitle(frame, title string, titleColor, borderColor color.Color) string {
+	lines := strings.Split(frame, "\n")
+	if len(lines) == 0 {
+		return frame
+	}
+	frameW := ansi.StringWidth(lines[0])
+	borderS := lipgloss.NewStyle().Foreground(borderColor)
+	titleS := lipgloss.NewStyle().Foreground(titleColor).Bold(true)
+	titleStr := titleS.Render(" " + title + " ")
+	titleW := ansi.StringWidth(titleStr)
+	dashes := maxInt(0, frameW-2-titleW) // -2 for ╭ and ╮
+	lines[0] = borderS.Render("╭") + titleStr + borderS.Render(strings.Repeat("─", dashes)) + borderS.Render("╮")
+	return strings.Join(lines, "\n")
 }
 
 type PanelFrameOptions struct {

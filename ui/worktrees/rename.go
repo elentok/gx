@@ -82,7 +82,3 @@ func (m Model) handleRenameKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, tiCmd
 }
 
-// renameView returns the one-line status bar text for rename mode.
-func (m Model) renameView() string {
-	return "  Rename to: " + m.textInput.View()
-}

@@ -104,13 +104,3 @@ func (m Model) handleNewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, tiCmd
 }
 
-func (m Model) newView() string {
-	label := "New worktree"
-	switch m.mode {
-	case modeNewTmuxSession:
-		label = "New worktree + tmux session"
-	case modeNewTmuxWindow:
-		label = "New worktree + tmux window"
-	}
-	return "  " + label + ": " + m.textInput.View()
-}

@@ -41,13 +41,14 @@ Screen packages should compose these:
 
 - Use `ui.RenderModalFrame(...)` and `ui.RenderPanelFrame(...)`
 - Use `ui.OverlayCenter(...)` for centered modal overlays
+- Use `ui.OverlayBottomCenter(...)` + `ui.RenderModalFrame(TitleInBorder: true)` for text-input overlays (horizontally centered, near the bottom)
 - Do not hand-roll borders, padding, or hint rows in screen packages unless there is a strong screen-specific reason
 
 3. Reuse shared components for common interaction patterns
 
 - confirm: `ui/components/modal_confirm.go`
 - menu: `ui/components/modal_menu.go`
-- input: `ui/components/modal_input.go`
+- input: `ui/components/modal_input.go` — for prompt-style inputs; for single-line text entry use `RenderModalFrame` with `TitleInBorder: true` and `OverlayBottomCenter`
 - output/log modal: `ui/components/modal_output.go`
 - checklist: `ui/components/checklist.go`
 
@@ -93,6 +94,11 @@ Not acceptable by default:
 
 - Good: call a shared component or `ui.RenderModalFrame(...)`
 - Bad: assembling bordered modal text inline in a screen package
+
+### Text-input overlays
+
+- Good: `ui.OverlayBottomCenter(bg, ui.RenderModalFrame(..., TitleInBorder: true), w, h, 10)`
+- Bad: rendering the text input in the status bar or hand-rolling a bordered input box
 
 ### Icons
 

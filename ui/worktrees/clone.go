@@ -101,10 +101,6 @@ func (m Model) handleCloneKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, tiCmd
 }
 
-// cloneView returns the one-line status bar text for clone mode.
-func (m Model) cloneView() string {
-	return "  Clone as: " + m.textInput.View()
-}
 
 // ── file copy helpers ─────────────────────────────────────────────────────────
 

@@ -34,6 +34,8 @@ func (m Model) View() tea.View {
 			content = ui.OverlayCenter(bg, m.helpModalView(), m.width, m.height)
 		case modeYank:
 			content = ui.OverlayCenter(bg, m.yankModalView(), m.width, m.height)
+		case modeRename, modeClone, modeNew, modeNewTmuxSession, modeNewTmuxWindow, modeSearch:
+			content = ui.OverlayBottomCenter(bg, m.textInputOverlayView(), m.width, m.height, 10)
 		default:
 			content = bg
 		}
@@ -42,6 +44,55 @@ func (m Model) View() tea.View {
 	v := tea.NewView(content)
 	v.AltScreen = true
 	return v
+}
+
+const (
+	textInputOverlayWidth     = 42 // outer frame width
+	textInputOverlayInnerWidth = textInputOverlayWidth - 2 - 2 // minus border and padding
+)
+
+// textInputOverlayView renders the framed input overlay for text-input modes.
+func (m Model) textInputOverlayView() string {
+	var title, body string
+	ti := m.textInput
+	ti.SetWidth(textInputOverlayInnerWidth)
+	inputView := ti.View()
+
+	switch m.mode {
+	case modeRename:
+		title = "Rename Worktree"
+		body = inputView
+	case modeClone:
+		title = "Clone Worktree"
+		body = inputView
+	case modeNew:
+		title = "New Worktree"
+		body = inputView
+	case modeNewTmuxSession:
+		title = "New Worktree + Tmux Session"
+		body = inputView
+	case modeNewTmuxWindow:
+		title = "New Worktree + Tmux Window"
+		body = inputView
+	case modeSearch:
+		title = "Search"
+		if m.searchQuery != "" && len(m.searchMatches) == 0 {
+			body = inputView + "  no matches"
+		} else if len(m.searchMatches) > 0 {
+			body = fmt.Sprintf("%s  %d/%d", inputView, m.searchCursor+1, len(m.searchMatches))
+		} else {
+			body = inputView
+		}
+	}
+
+	return ui.RenderModalFrame(ui.ModalFrameOptions{
+		Title:         title,
+		Body:          body,
+		Width:         textInputOverlayWidth,
+		BorderColor:   ui.ColorBorder,
+		TitleColor:    ui.ColorBlue,
+		TitleInBorder: true,
+	})
 }
 
 // normalView renders the worktrees table, sidebar, and status bar.
@@ -84,14 +135,6 @@ func (m Model) statusBarView() string {
 	switch m.mode {
 	case modeError:
 		return ""
-	case modeRename:
-		return m.renameView()
-	case modeClone:
-		return m.cloneView()
-	case modeNew, modeNewTmuxSession, modeNewTmuxWindow:
-		return m.newView()
-	case modeSearch:
-		return m.searchView()
 	default:
 		if m.mode == modePaste && m.clipboard != nil {
 			prefix := ui.StyleDim.Render(fmt.Sprintf("  %d file(s) from %s", len(m.clipboard.files), m.clipboard.srcName))

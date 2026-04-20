@@ -21,6 +21,22 @@ func OverlayCenter(bg, fg string, screenW, screenH int) string {
 	return PlaceOverlay(bg, fg, x, y)
 }
 
+// OverlayBottomCenter places fg horizontally centered and bottomPadding rows
+// above the bottom of the screen.
+func OverlayBottomCenter(bg, fg string, screenW, screenH, bottomPadding int) string {
+	fgW := lipgloss.Width(fg)
+	fgH := lipgloss.Height(fg)
+	x := (screenW - fgW) / 2
+	y := screenH - fgH - bottomPadding
+	if x < 0 {
+		x = 0
+	}
+	if y < 0 {
+		y = 0
+	}
+	return PlaceOverlay(bg, fg, x, y)
+}
+
 func PlaceOverlay(bg, fg string, x, y int) string {
 	bgLines := strings.Split(bg, "\n")
 	fgLines := strings.Split(fg, "\n")

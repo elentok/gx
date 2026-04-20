@@ -1,10 +1,7 @@
 package worktrees
 
 import (
-	"fmt"
 	"strings"
-
-	"github.com/elentok/gx/ui"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
@@ -93,15 +90,3 @@ func (m Model) jumpToSearchCursor() (Model, tea.Cmd) {
 	return m, cmdLoadSidebarData(m.repo, m.worktrees[idx])
 }
 
-// searchView returns the one-line status bar text for search mode.
-func (m Model) searchView() string {
-	query := m.textInput.View()
-	hints := ui.RenderInlineBindings(keys.SearchNext, keys.SearchPrev, keys.SearchClose)
-	if m.searchQuery != "" && len(m.searchMatches) == 0 {
-		return "  Search: " + query + "  no matches  ·  " + hints
-	}
-	if len(m.searchMatches) > 0 {
-		return fmt.Sprintf("  Search: %s  %d/%d  ·  %s", query, m.searchCursor+1, len(m.searchMatches), hints)
-	}
-	return "  Search: " + query + "  ·  " + hints
-}

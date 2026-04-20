@@ -215,7 +215,7 @@ func TestNewInputAppearsAndCancels(t *testing.T) {
 	waitForText(t, tm, "feature-a", loadWait)
 
 	tm.Send(keyRune('n'))
-	waitForText(t, tm, "New worktree", actionWait)
+	waitForText(t, tm, "New Worktree", actionWait)
 
 	tm.Send(keySpecial(tea.KeyEsc))
 	quit(t, tm)
@@ -228,7 +228,7 @@ func TestNewWorktree(t *testing.T) {
 	waitForText(t, tm, "feature-a", loadWait)
 
 	tm.Send(keyRune('n'))
-	waitForText(t, tm, "New worktree", actionWait)
+	waitForText(t, tm, "New Worktree", actionWait)
 	tm.Type("feature-new")
 	tm.Send(keySpecial(tea.KeyEnter))
 
@@ -521,7 +521,7 @@ func TestSearchModeAppearsAndCancels(t *testing.T) {
 	waitForText(t, tm, "feature-a", loadWait)
 
 	tm.Send(keyRune('/'))
-	waitForText(t, tm, "Search:", actionWait)
+	waitForText(t, tm, "Search", actionWait)
 
 	tm.Send(keySpecial(tea.KeyEsc))
 
@@ -536,7 +536,7 @@ func TestSearchHighlightsAndJumps(t *testing.T) {
 
 	// Enter search and type "fix"
 	tm.Send(keyRune('/'))
-	waitForText(t, tm, "Search:", actionWait)
+	waitForText(t, tm, "Search", actionWait)
 	tm.Type("fix")
 
 	// Should show "1/1" (one match)
@@ -556,7 +556,7 @@ func TestSearchCyclesMatches(t *testing.T) {
 
 	// Enter search and type "feature" — two matches
 	tm.Send(keyRune('/'))
-	waitForText(t, tm, "Search:", actionWait)
+	waitForText(t, tm, "Search", actionWait)
 	tm.Type("feature")
 	waitForText(t, tm, "1/2", actionWait)
 
