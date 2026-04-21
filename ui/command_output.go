@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"unicode"
 )
 
 type CommandOutput struct {
@@ -72,7 +73,7 @@ func NewCommandOutputLog() *CommandOutputLog {
 
 func CommandOutputLogFrom(output string) *CommandOutputLog {
 	log := NewCommandOutputLog()
-	log.b.WriteString(strings.TrimSpace(output))
+	log.b.WriteString(strings.TrimSpace(sanitizeCommandOutput(output)))
 	return log
 }
 
@@ -83,7 +84,7 @@ func (l *CommandOutputLog) AppendCommand(name string, args []string, output stri
 	l.b.WriteString("$ ")
 	l.b.WriteString(formatCommandForOutput(name, args))
 	l.b.WriteString("\n")
-	output = strings.TrimSpace(output)
+	output = strings.TrimSpace(sanitizeCommandOutput(output))
 	if output == "" {
 		l.b.WriteString("(no output)")
 		return
@@ -99,6 +100,26 @@ func (l *CommandOutputLog) String() string {
 }
 
 var safeCommandOutputArg = regexp.MustCompile(`^[A-Za-z0-9_./:=@%+,\-]+$`)
+var (
+	commandOutputANSICSIRe = regexp.MustCompile(`\x1b\[[0-9:;<=>?]*[ -/]*[@-~]`)
+	commandOutputANSIOSCRe = regexp.MustCompile(`\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)`)
+)
+
+func sanitizeCommandOutput(s string) string {
+	s = commandOutputANSIOSCRe.ReplaceAllString(s, "")
+	s = commandOutputANSICSIRe.ReplaceAllString(s, "")
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.ReplaceAll(s, "\r", "")
+
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		if r == '\n' || r == '\t' || !unicode.IsControl(r) {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
 
 func formatCommandForOutput(name string, args []string) string {
 	parts := make([]string, 0, len(args)+1)
