@@ -49,17 +49,15 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		m.setStatus(m.inlineHints(stageKeyYankText, stageKeyYankPath, stageKeyYankAll, stageKeyYankName))
 		return m, nil, true
 	}
-	if key == "g" && !isUpperG {
-		m.keyPrefix = ""
-		m.jumpToTop()
-		if m.focus == focusStatus {
-			return m, m.scheduleDiffReload(), true
-		}
-		return m, nil, true
-	}
-	if m.keyPrefix == "o" {
+	if m.keyPrefix == "g" {
 		m.keyPrefix = ""
 		switch key {
+		case "g":
+			m.jumpToTop()
+			if m.focus == focusStatus {
+				return m, m.scheduleDiffReload(), true
+			}
+			return m, nil, true
 		case "o":
 			if m.outputContent == "" {
 				m.setStatus(ui.MessageNoOutput())
@@ -73,11 +71,14 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		case "esc":
 			m.clearStatus()
 			return m, nil, true
+		default:
+			m.clearStatus()
+			return m, nil, true
 		}
 	}
-	if key == "o" {
-		m.keyPrefix = "o"
-		m.setStatus(m.inlineHints(stageKeyOutput, stageKeyLog))
+	if key == "g" && !isUpperG {
+		m.keyPrefix = "g"
+		m.setStatus(m.inlineHints(stageKeyTop, stageKeyOutput, stageKeyLog))
 		return m, nil, true
 	}
 	if isUpperG {

@@ -16,7 +16,7 @@ func worktreeStatusMessage(message string, hasOutput bool) string {
 	if !hasOutput {
 		return message
 	}
-	return ui.StatusWithHints(message, keys.Logs)
+	return ui.StatusWithHints(message, keys.GoOutput)
 }
 
 func (m Model) Init() tea.Cmd {
@@ -51,8 +51,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleRenameKey(msg)
 		case modeClone:
 			return m.handleCloneKey(msg)
-		case modeNew, modeNewTmuxSession, modeNewTmuxWindow:
+		case modeNew, modeNewAndOpen:
 			return m.handleNewKey(msg)
+		case modeTerminalMenu:
+			return m.handleTerminalMenuKey(msg)
 		case modeYank:
 			return m.handleYankKey(msg)
 		case modePaste:
@@ -64,7 +66,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case modePushDiverged:
 			return m.handlePushDivergedKey(msg)
 		}
-		if handledModel, cmd, handled := m.handleOutputKey(msg); handled {
+		if handledModel, cmd, handled := m.handleChordKey(msg); handled {
 			return handledModel, cmd
 		}
 		switch {
@@ -79,11 +81,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.New) && !m.spinnerActive:
 			m = m.enterNewMode()
 			return m, nil
-		case key.Matches(msg, keys.NewTmuxSession) && !m.spinnerActive:
-			m = m.enterNewTmuxSessionMode()
-			return m, nil
-		case key.Matches(msg, keys.NewTmuxWindow) && !m.spinnerActive:
-			m = m.enterNewTmuxWindowMode()
+		case key.Matches(msg, keys.NewAndOpen) && !m.spinnerActive:
+			m = m.enterNewAndOpenMode()
 			return m, nil
 		case key.Matches(msg, keys.Delete) && len(m.worktrees) > 0 && !m.spinnerActive:
 			return m.enterDeleteConfirm(), nil
@@ -184,20 +183,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusMsg = ""
 		return m, cmdLoadWorktrees(m.repo)
 
-	case newTmuxResultMsg:
+	case newOpenResultMsg:
 		if msg.err != nil {
 			return m.showError(msg.err.Error()), nil
 		}
 		m.statusMsg = ""
-		var tmuxCmd tea.Cmd
-		if msg.openMode == tmuxOpenWindow {
-			tmuxCmd = cmdTmuxNewWindow(msg.name, msg.path)
-		} else {
-			tmuxCmd = cmdTmuxNewSession(msg.name, msg.path)
-		}
-		return m, tea.Batch(cmdLoadWorktrees(m.repo), tmuxCmd)
+		m = m.enterTerminalMenuFor(msg.name, msg.path)
+		return m, cmdLoadWorktrees(m.repo)
 
-	case tmuxResultMsg:
+	case terminalResultMsg:
 		if msg.err != nil {
 			return m.showError(msg.err.Error()), nil
 		}

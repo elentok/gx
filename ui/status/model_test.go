@@ -1598,7 +1598,7 @@ func TestYShowsBindingDrivenYankHint(t *testing.T) {
 	}
 }
 
-func TestGJumpsToTop(t *testing.T) {
+func TestGGJumpsToTop(t *testing.T) {
 	repo := testutil.TempRepo(t)
 
 	m := New(repo)
@@ -1607,64 +1607,72 @@ func TestGJumpsToTop(t *testing.T) {
 	m.statusEntries = []statusEntry{{Kind: statusEntryFile}, {Kind: statusEntryFile}, {Kind: statusEntryFile}}
 	m.selected = 2
 
+	// First g sets keyPrefix
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	m = updated.(Model)
+	if m.keyPrefix != "g" {
+		t.Fatalf("expected keyPrefix=g after first g, got %q", m.keyPrefix)
+	}
+
+	// Second g jumps to top
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	if cmd == nil {
-		t.Fatalf("g should schedule a diff reload after jumping to top")
+		t.Fatalf("gg should schedule a diff reload after jumping to top")
 	}
 	m = updated.(Model)
 	if m.selected != 0 {
-		t.Fatalf("expected g to jump to top, got selected=%d", m.selected)
+		t.Fatalf("expected gg to jump to top, got selected=%d", m.selected)
 	}
 }
 
-func TestOLTriggersLazygitLogCommand(t *testing.T) {
+func TestGLTriggersLazygitLogCommand(t *testing.T) {
 	repo := testutil.TempRepo(t)
 
 	m := New(repo)
 	m.ready = true
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	if cmd != nil {
-		t.Fatalf("first o should not launch command")
+		t.Fatalf("first g should not launch command")
 	}
 	m = updated.(Model)
-	if m.keyPrefix != "o" {
-		t.Fatalf("expected keyPrefix=o after first o, got %q", m.keyPrefix)
+	if m.keyPrefix != "g" {
+		t.Fatalf("expected keyPrefix=g after first g, got %q", m.keyPrefix)
 	}
 
 	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	if cmd == nil {
-		t.Fatalf("ol should launch lazygit log command")
+		t.Fatalf("gl should launch lazygit log command")
 	}
 	m = updated.(Model)
 	if m.keyPrefix != "" {
-		t.Fatalf("expected keyPrefix reset after ol, got %q", m.keyPrefix)
+		t.Fatalf("expected keyPrefix reset after gl, got %q", m.keyPrefix)
 	}
 }
 
-func TestOOOpensOutputModal(t *testing.T) {
+func TestGOOpensOutputModal(t *testing.T) {
 	repo := testutil.TempRepo(t)
 
 	m := New(repo)
 	m.ready = true
 	m.outputContent = "hello"
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	if cmd != nil {
-		t.Fatalf("first o should not launch command")
+		t.Fatalf("first g should not launch command")
 	}
 	m = updated.(Model)
-	if m.keyPrefix != "o" {
-		t.Fatalf("expected keyPrefix=o after first o, got %q", m.keyPrefix)
+	if m.keyPrefix != "g" {
+		t.Fatalf("expected keyPrefix=g after first g, got %q", m.keyPrefix)
 	}
 
 	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
 	if cmd != nil {
-		t.Fatalf("oo should not launch a command")
+		t.Fatalf("go should not launch a command")
 	}
 	m = updated.(Model)
 	if !m.outputOpen {
-		t.Fatalf("expected oo to open output modal")
+		t.Fatalf("expected go to open output modal")
 	}
 }
 

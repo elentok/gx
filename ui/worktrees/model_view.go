@@ -34,7 +34,9 @@ func (m Model) View() tea.View {
 			content = ui.OverlayCenter(bg, m.helpModalView(), m.width, m.height)
 		case modeYank:
 			content = ui.OverlayCenter(bg, m.yankModalView(), m.width, m.height)
-		case modeRename, modeClone, modeNew, modeNewTmuxSession, modeNewTmuxWindow, modeSearch:
+		case modeTerminalMenu:
+			content = ui.OverlayCenter(bg, m.terminalMenuModalView(), m.width, m.height)
+		case modeRename, modeClone, modeNew, modeNewAndOpen, modeSearch:
 			overlay := m.textInputOverlayView()
 			y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
 			content = ui.OverlayBottomCenter(bg, overlay, m.width, y)
@@ -77,11 +79,8 @@ func (m Model) textInputOverlayView() string {
 	case modeNew:
 		title = "New Worktree"
 		body = inputView
-	case modeNewTmuxSession:
-		title = "New Worktree + Tmux Session"
-		body = inputView
-	case modeNewTmuxWindow:
-		title = "New Worktree + Tmux Window"
+	case modeNewAndOpen:
+		title = "New Worktree"
 		body = inputView
 	case modeSearch:
 		title = "Search"

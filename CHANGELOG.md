@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.12.5
+
+- `gx wt` now has a unified "open in terminal" menu (`o` for current worktree, `N` for new worktree + open); menu offers session, hsplit, vsplit, and tab — works with tmux and kitty remote control; kitty without remote shows an informative message
+- `gx wt` and `gx status` output/lazygit chords migrated to a `g`-prefix scheme: `gg` = top, `go` = view output, `gl` = lazygit log (consistent with nvim muscle memory); `o` is now free for the open menu in worktrees
+- Kitty session names use vowel-stripped `repo-worktree` form (e.g. `my-rp-ftr-a`) for brevity; session files are auto-created at `~/.local/share/kitty/sessions/`
+
 ## v0.12.4
 
 - `gx wt` and `gx status` search now appears as a framed bottom-center overlay instead of replacing the footer line; match count (`2/5`) and `no matches` appear on the right side of the modal border

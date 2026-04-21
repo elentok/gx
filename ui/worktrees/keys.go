@@ -8,33 +8,32 @@ import (
 )
 
 type keyMap struct {
-	Up             key.Binding
-	Down           key.Binding
-	Top            key.Binding
-	New            key.Binding
-	NewTmuxSession key.Binding
-	NewTmuxWindow  key.Binding
-	Delete         key.Binding
-	Rename         key.Binding
-	Clone          key.Binding
-	Yank           key.Binding
-	Pull           key.Binding
-	Push           key.Binding
-	Rebase         key.Binding
-	Search         key.Binding
-	Track          key.Binding
-	Refresh        key.Binding
-	RemoteUpdate   key.Binding
-	Logs           key.Binding
-	Log            key.Binding
-	TmuxSession    key.Binding
-	SearchNext     key.Binding
-	SearchPrev     key.Binding
-	SearchClose    key.Binding
-	PasteConfirm   key.Binding
-	PasteCancel    key.Binding
-	Help           key.Binding
-	Quit           key.Binding
+	Up           key.Binding
+	Down         key.Binding
+	Top          key.Binding
+	New          key.Binding
+	NewAndOpen   key.Binding
+	Delete       key.Binding
+	Rename       key.Binding
+	Clone        key.Binding
+	Yank         key.Binding
+	Pull         key.Binding
+	Push         key.Binding
+	Rebase       key.Binding
+	Search       key.Binding
+	Track        key.Binding
+	Refresh      key.Binding
+	RemoteUpdate key.Binding
+	GoOutput     key.Binding
+	GoLog        key.Binding
+	Open         key.Binding
+	SearchNext   key.Binding
+	SearchPrev   key.Binding
+	SearchClose  key.Binding
+	PasteConfirm key.Binding
+	PasteCancel  key.Binding
+	Help         key.Binding
+	Quit         key.Binding
 }
 
 var keys = keyMap{
@@ -47,8 +46,8 @@ var keys = keyMap{
 		key.WithHelp("↓/j", "down"),
 	),
 	Top: key.NewBinding(
-		key.WithKeys("g"),
-		key.WithHelp("g", "top"),
+		key.WithKeys("gg"),
+		key.WithHelp("gg", "top"),
 	),
 	Delete: key.NewBinding(
 		key.WithKeys("d"),
@@ -58,13 +57,13 @@ var keys = keyMap{
 		key.WithKeys("n"),
 		key.WithHelp("n", "new worktree"),
 	),
-	NewTmuxSession: key.NewBinding(
+	NewAndOpen: key.NewBinding(
 		key.WithKeys("N"),
-		key.WithHelp("N", "new worktree + tmux session"),
+		key.WithHelp("N", "new worktree + open"),
 	),
-	NewTmuxWindow: key.NewBinding(
-		key.WithKeys("T"),
-		key.WithHelp("T", "new worktree + tmux window"),
+	Open: key.NewBinding(
+		key.WithKeys("o"),
+		key.WithHelp("o", "open in terminal"),
 	),
 	Rename: key.NewBinding(
 		key.WithKeys("r"),
@@ -106,17 +105,13 @@ var keys = keyMap{
 		key.WithKeys("U"),
 		key.WithHelp("U", "remote update"),
 	),
-	Logs: key.NewBinding(
-		key.WithKeys("oo"),
-		key.WithHelp("oo", "view output"),
+	GoOutput: key.NewBinding(
+		key.WithKeys("go"),
+		key.WithHelp("go", "view output"),
 	),
-	Log: key.NewBinding(
-		key.WithKeys("ol"),
-		key.WithHelp("ol", "lazygit log"),
-	),
-	TmuxSession: key.NewBinding(
-		key.WithKeys("ot"),
-		key.WithHelp("ot", "tmux session"),
+	GoLog: key.NewBinding(
+		key.WithKeys("gl"),
+		key.WithHelp("gl", "lazygit log"),
 	),
 	SearchNext: key.NewBinding(
 		key.WithKeys("ctrl+n"),
@@ -149,15 +144,15 @@ var keys = keyMap{
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.Top, k.New, k.NewTmuxSession, k.NewTmuxWindow, k.Delete, k.Rename, k.Clone, k.Yank, k.Pull, k.Push, k.Search, k.Track, k.Refresh, k.Quit, k.Help}
+	return []key.Binding{k.Up, k.Down, k.Top, k.New, k.NewAndOpen, k.Open, k.Delete, k.Rename, k.Clone, k.Yank, k.Pull, k.Push, k.Search, k.Track, k.Refresh, k.Quit, k.Help}
 }
 
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Top},
-		{k.New, k.NewTmuxSession, k.NewTmuxWindow, k.Delete, k.Rename, k.Clone},
+		{k.New, k.NewAndOpen, k.Open, k.Delete, k.Rename, k.Clone},
 		{k.Yank, k.Search},
-		{k.Pull, k.Push, k.Rebase, k.Track, k.Refresh, k.RemoteUpdate, k.Logs, k.Log, k.TmuxSession, k.Help, k.Quit},
+		{k.Pull, k.Push, k.Rebase, k.Track, k.Refresh, k.RemoteUpdate, k.GoOutput, k.GoLog, k.Help, k.Quit},
 	}
 }
 

@@ -7,12 +7,13 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/ui"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 )
 
-func TestGJumpsToTop(t *testing.T) {
+func TestGGJumpsToTop(t *testing.T) {
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a", "feature-b")
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -29,17 +30,28 @@ func TestGJumpsToTop(t *testing.T) {
 	m.table.SetRows(m.buildRows())
 	m.table.SetCursor(1)
 
+	// First g sets keyPrefix
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	if cmd == nil {
-		t.Fatalf("g should load sidebar data after jumping to top")
+		// just set keyPrefix, no cmd yet
+	}
+	m = updated.(Model)
+	if m.keyPrefix != "g" {
+		t.Fatalf("expected keyPrefix=g after first g, got %q", m.keyPrefix)
+	}
+
+	// Second g jumps to top
+	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	if cmd == nil {
+		t.Fatalf("gg should load sidebar data after jumping to top")
 	}
 	m = updated.(Model)
 	if m.table.Cursor() != 0 {
-		t.Fatalf("expected g to jump to top, got cursor=%d", m.table.Cursor())
+		t.Fatalf("expected gg to jump to top, got cursor=%d", m.table.Cursor())
 	}
 }
 
-func TestOOOpensLogsMode(t *testing.T) {
+func TestGOOpensLogsMode(t *testing.T) {
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -50,26 +62,23 @@ func TestOOOpensLogsMode(t *testing.T) {
 	m.ready = true
 	m.lastJobLog = "hello"
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
-	if cmd != nil {
-		t.Fatalf("first o should not launch command")
-	}
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	m = updated.(Model)
-	if m.keyPrefix != "o" {
-		t.Fatalf("expected keyPrefix=o after first o, got %q", m.keyPrefix)
+	if m.keyPrefix != "g" {
+		t.Fatalf("expected keyPrefix=g after g, got %q", m.keyPrefix)
 	}
 
-	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
 	if cmd != nil {
-		t.Fatalf("oo should not launch command")
+		t.Fatalf("go should not launch command")
 	}
 	m = updated.(Model)
 	if m.mode != modeLogs {
-		t.Fatalf("expected oo to open logs mode, got mode=%v", m.mode)
+		t.Fatalf("expected go to open logs mode, got mode=%v", m.mode)
 	}
 }
 
-func TestOShowsBindingDrivenOutputHint(t *testing.T) {
+func TestGShowsChordHint(t *testing.T) {
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -79,21 +88,21 @@ func TestOShowsBindingDrivenOutputHint(t *testing.T) {
 	m := New(*repo, "")
 	m.ready = true
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	if cmd != nil {
-		t.Fatalf("first o should not launch command")
+		t.Fatalf("first g should not launch command")
 	}
 	m = updated.(Model)
 
 	hint := ansi.Strip(m.statusMsg)
-	for _, want := range []string{"oo", "view output", "ol", "lazygit log", "ot", "tmux session"} {
+	for _, want := range []string{"gg", "top", "go", "view output", "gl", "lazygit log"} {
 		if !strings.Contains(hint, want) {
-			t.Fatalf("expected output hint %q in %q", want, hint)
+			t.Fatalf("expected chord hint %q in %q", want, hint)
 		}
 	}
 }
 
-func TestOLTriggersLazygitLogCommand(t *testing.T) {
+func TestGLTriggersLazygitLogCommand(t *testing.T) {
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -106,33 +115,33 @@ func TestOLTriggersLazygitLogCommand(t *testing.T) {
 	resizeTable(&m.table, 100, 10)
 	m.table.SetRows(m.buildRows())
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	if cmd != nil {
-		t.Fatalf("first o should not launch command")
+		t.Fatalf("first g should not launch command")
 	}
 	m = updated.(Model)
-	if m.keyPrefix != "o" {
-		t.Fatalf("expected keyPrefix=o after first o, got %q", m.keyPrefix)
+	if m.keyPrefix != "g" {
+		t.Fatalf("expected keyPrefix=g after first g, got %q", m.keyPrefix)
 	}
 
 	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	if cmd == nil {
-		t.Fatalf("ol should launch lazygit log command")
+		t.Fatalf("gl should launch lazygit log command")
 	}
 	m = updated.(Model)
 	if m.keyPrefix != "" {
-		t.Fatalf("expected keyPrefix reset after ol, got %q", m.keyPrefix)
+		t.Fatalf("expected keyPrefix reset after gl, got %q", m.keyPrefix)
 	}
 }
 
-func TestOTTriggersTmuxSessionCommand(t *testing.T) {
+func TestOEntersTerminalMenuMode(t *testing.T) {
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
 		t.Fatalf("FindRepo: %v", err)
 	}
 
-	m := New(*repo, "")
+	m := NewWithSettings(*repo, "", Settings{Terminal: ui.TerminalTmux})
 	m.ready = true
 	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.MainBranch}}
 	resizeTable(&m.table, 100, 10)
@@ -140,19 +149,10 @@ func TestOTTriggersTmuxSessionCommand(t *testing.T) {
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
 	if cmd != nil {
-		t.Fatalf("first o should not launch command")
+		t.Fatalf("o should not launch command")
 	}
 	m = updated.(Model)
-	if m.keyPrefix != "o" {
-		t.Fatalf("expected keyPrefix=o after first o, got %q", m.keyPrefix)
-	}
-
-	updated, cmd = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
-	if cmd == nil {
-		t.Fatalf("ot should launch tmux session command")
-	}
-	m = updated.(Model)
-	if m.keyPrefix != "" {
-		t.Fatalf("expected keyPrefix reset after ot, got %q", m.keyPrefix)
+	if m.mode != modeTerminalMenu {
+		t.Fatalf("expected o to enter terminal menu mode, got mode=%v", m.mode)
 	}
 }

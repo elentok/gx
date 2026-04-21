@@ -11,20 +11,12 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-type tmuxOpenMode int
-
-const (
-	tmuxOpenSession tmuxOpenMode = iota
-	tmuxOpenWindow
-)
-
 type newResultMsg struct{ err error }
 
-type newTmuxResultMsg struct {
-	err      error
-	name     string
-	path     string
-	openMode tmuxOpenMode
+type newOpenResultMsg struct {
+	err  error
+	name string
+	path string
 }
 
 func cmdNewWorktree(repo git.Repo, newName string) tea.Cmd {
@@ -34,11 +26,11 @@ func cmdNewWorktree(repo git.Repo, newName string) tea.Cmd {
 	}
 }
 
-func cmdNewWorktreeAndTmux(repo git.Repo, newName string, openMode tmuxOpenMode) tea.Cmd {
+func cmdNewWorktreeAndOpen(repo git.Repo, newName string) tea.Cmd {
 	return func() tea.Msg {
 		newPath := filepath.Join(repo.LinkedWorktreeDir(), newName)
 		err := git.AddWorktree(repo, newName, newPath, repo.MainBranch)
-		return newTmuxResultMsg{err: err, name: newName, path: newPath, openMode: openMode}
+		return newOpenResultMsg{err: err, name: newName, path: newPath}
 	}
 }
 
@@ -56,15 +48,8 @@ func (m Model) enterNewMode() Model {
 	return m
 }
 
-func (m Model) enterNewTmuxSessionMode() Model {
-	m.mode = modeNewTmuxSession
-	m.textInput = newWorktreeInput()
-	m.statusMsg = ""
-	return m
-}
-
-func (m Model) enterNewTmuxWindowMode() Model {
-	m.mode = modeNewTmuxWindow
+func (m Model) enterNewAndOpenMode() Model {
+	m.mode = modeNewAndOpen
 	m.textInput = newWorktreeInput()
 	m.statusMsg = ""
 	return m
@@ -89,18 +74,13 @@ func (m Model) handleNewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		prevMode := m.mode
 		m.mode = modeNormal
 		m.statusMsg = "Creating…"
-		switch prevMode {
-		case modeNewTmuxSession:
-			return m, cmdNewWorktreeAndTmux(m.repo, newName, tmuxOpenSession)
-		case modeNewTmuxWindow:
-			return m, cmdNewWorktreeAndTmux(m.repo, newName, tmuxOpenWindow)
-		default:
-			return m, cmdNewWorktree(m.repo, newName)
+		if prevMode == modeNewAndOpen {
+			return m, cmdNewWorktreeAndOpen(m.repo, newName)
 		}
+		return m, cmdNewWorktree(m.repo, newName)
 	}
 
 	var tiCmd tea.Cmd
 	m.textInput, tiCmd = m.textInput.Update(msg)
 	return m, tiCmd
 }
-

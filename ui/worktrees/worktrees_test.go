@@ -417,7 +417,7 @@ func TestStashPullMainRefreshesBaseStatus(t *testing.T) {
 
 	waitForText(t, tm, "pull complete (stash restored)", loadWait)
 
-	tm.Send(keyRune('o'))
+	tm.Send(keyRune('g'))
 	tm.Send(keyRune('o'))
 	waitForTexts(t, tm, actionWait, "$ git stash", "$ git pull", "$ git stash pop")
 	tm.Send(keySpecial(tea.KeyEsc))

@@ -80,8 +80,8 @@ func (m Model) resized() Model {
 
 func (m Model) sidebarContent() string {
 	var wt *git.Worktree
-	if len(m.worktrees) > 0 {
-		w := m.worktrees[m.table.Cursor()]
+	if cursor := m.table.Cursor(); cursor >= 0 && cursor < len(m.worktrees) {
+		w := m.worktrees[cursor]
 		wt = &w
 	}
 	var rebasedOnMain *bool

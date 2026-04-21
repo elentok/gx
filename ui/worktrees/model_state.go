@@ -22,8 +22,7 @@ const (
 	modeRename
 	modeClone
 	modeNew
-	modeNewTmuxSession
-	modeNewTmuxWindow
+	modeNewAndOpen
 	modeYank
 	modePaste
 	modeSearch
@@ -32,6 +31,7 @@ const (
 	modePushDiverged
 	modeCredentialPrompt
 	modeHelp
+	modeTerminalMenu
 )
 
 type promptableJobKind int
@@ -52,6 +52,7 @@ type dirtyState struct {
 type Settings struct {
 	UseNerdFontIcons bool
 	InputModalBottom config.InputModalBottom
+	Terminal         ui.Terminal
 }
 
 // Model is the BubbleTea model for the worktrees page.
@@ -110,6 +111,10 @@ type Model struct {
 	searchMatches []int
 	searchCursor  int
 	keyPrefix     string
+
+	openTargetName string
+	openTargetPath string
+	terminalMenu   components.MenuState
 
 	help help.Model
 
