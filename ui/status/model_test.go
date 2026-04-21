@@ -304,6 +304,93 @@ func TestBranchSummaryTitleShowsBaseOnlyWhenNonDefault(t *testing.T) {
 	}
 }
 
+func TestLeftPaneHeightsHideCommitPaneOnlyWhenTooSmall(t *testing.T) {
+	m := Model{}
+	statusH, commitsH := m.leftPaneHeights(20)
+	if statusH <= 0 || commitsH <= 0 {
+		t.Fatalf("expected commit pane when height allows it, got status=%d commits=%d", statusH, commitsH)
+	}
+
+	statusH, commitsH = m.leftPaneHeights(12)
+	if statusH != 12 || commitsH != 0 {
+		t.Fatalf("expected no commit pane when total height too small, got status=%d commits=%d", statusH, commitsH)
+	}
+}
+
+func TestLeftPaneHeightsReserveSpaceForCommitPane(t *testing.T) {
+	m := Model{branchCommits: []branchCommitRow{{subject: "one"}}}
+	statusH, commitsH := m.leftPaneHeights(24)
+	if statusH <= 0 || commitsH <= 0 {
+		t.Fatalf("expected both panes to have height, got status=%d commits=%d", statusH, commitsH)
+	}
+	if statusH+commitsH != 24 {
+		t.Fatalf("expected heights to sum to total, got status=%d commits=%d", statusH, commitsH)
+	}
+}
+
+func TestRenderBranchCommitsPane_ShowsWrappedSubjectAndMetadata(t *testing.T) {
+	m := Model{
+		branchCommits: []branchCommitRow{{
+			subject: "this is a long commit subject that should wrap nicely",
+			hash:    "abc1234",
+			date:    time.Now().Add(-5 * time.Minute),
+			class:   git.BranchHistoryLocalOnly,
+		}},
+	}
+
+	pane := ansi.Strip(m.renderBranchCommitsPane(28, 8))
+	if !strings.Contains(pane, "Commits") {
+		t.Fatalf("expected commits title, got:\n%s", pane)
+	}
+	if !strings.Contains(pane, "abc1234") {
+		t.Fatalf("expected commit hash metadata, got:\n%s", pane)
+	}
+	if !strings.Contains(pane, "minutes ago") && !strings.Contains(pane, "minute ago") {
+		t.Fatalf("expected relative time metadata, got:\n%s", pane)
+	}
+	if !strings.Contains(pane, "this is a long commit") || !strings.Contains(pane, "subject that should") {
+		t.Fatalf("expected wrapped subject lines, got:\n%s", pane)
+	}
+}
+
+func TestReloadBranchCommitsIncludesDivergedRemoteCommits(t *testing.T) {
+	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
+	wtDir := filepath.Join(repoDir, "feature")
+
+	testutil.PushBranchWithUpstream(t, wtDir, "origin", "feature")
+	testutil.MustGitExported(t, wtDir, "reset", "--hard", "HEAD~1")
+	testutil.WriteFile(t, wtDir, "shared.txt", "shared\n")
+	testutil.CommitAll(t, wtDir, "shared commit")
+	testutil.MustGitExported(t, wtDir, "push", "--force-with-lease", "-u", "origin", "feature")
+
+	testutil.WriteFile(t, wtDir, "remote.txt", "remote\n")
+	testutil.CommitAll(t, wtDir, "remote only")
+	testutil.MustGitExported(t, wtDir, "push")
+
+	testutil.MustGitExported(t, wtDir, "reset", "--hard", "HEAD~1")
+	testutil.WriteFile(t, wtDir, "local.txt", "local\n")
+	testutil.CommitAll(t, wtDir, "local only")
+
+	m := New(wtDir)
+	if len(m.branchCommits) < 3 {
+		t.Fatalf("expected at least 3 branch commits, got %d", len(m.branchCommits))
+	}
+
+	got := map[string]git.BranchHistoryClass{}
+	for _, commit := range m.branchCommits {
+		got[commit.subject] = commit.class
+	}
+	if got["shared commit"] != git.BranchHistoryShared {
+		t.Fatalf("shared commit class = %q", got["shared commit"])
+	}
+	if got["remote only"] != git.BranchHistoryRemoteOnly {
+		t.Fatalf("remote only class = %q", got["remote only"])
+	}
+	if got["local only"] != git.BranchHistoryLocalOnly {
+		t.Fatalf("local only class = %q", got["local only"])
+	}
+}
+
 func TestReloadBranchStateUsesBranchUpstream(t *testing.T) {
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	wtDir := filepath.Join(repoDir, "feature")

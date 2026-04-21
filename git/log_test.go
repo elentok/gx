@@ -4,6 +4,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
@@ -25,6 +26,9 @@ func TestCommitsSinceMain_hasCommits(t *testing.T) {
 	}
 	if commits[0].Hash == "" {
 		t.Error("Hash is empty")
+	}
+	if commits[0].Date.IsZero() {
+		t.Error("Date is zero")
 	}
 }
 
@@ -80,6 +84,111 @@ func TestCommitsBehindMain(t *testing.T) {
 	}
 	if behind[0].Subject != "main commit" {
 		t.Fatalf("got behind subject %q, want %q", behind[0].Subject, "main commit")
+	}
+}
+
+func TestBranchHistorySinceMain_NoUpstreamMarksLocalCommits(t *testing.T) {
+	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
+	repo, _ := git.FindRepo(repoDir)
+
+	history, err := git.BranchHistorySinceMain(*repo, "feature", "")
+	if err != nil {
+		t.Fatalf("BranchHistorySinceMain: %v", err)
+	}
+	if len(history) != 1 {
+		t.Fatalf("got %d commits, want 1", len(history))
+	}
+	if history[0].Class != git.BranchHistoryLocalOnly {
+		t.Fatalf("got class %q, want %q", history[0].Class, git.BranchHistoryLocalOnly)
+	}
+	if history[0].Date.IsZero() {
+		t.Fatal("expected populated date")
+	}
+}
+
+func TestBranchHistorySinceMain_UsesRemoteMainNotLocalMain(t *testing.T) {
+	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
+	repo, _ := git.FindRepo(repoDir)
+	mainDir := filepath.Join(repoDir, "main")
+	mustGit(t, repoDir, "worktree", "add", mainDir, "main")
+	mustGit(t, mainDir, "config", "user.email", "test@test.com")
+	mustGit(t, mainDir, "config", "user.name", "Test")
+
+	testutil.WriteFile(t, mainDir, "local-main-only.txt", "not pushed\n")
+	testutil.CommitAll(t, mainDir, "local main only")
+
+	history, err := git.BranchHistorySinceMain(*repo, "feature", "")
+	if err != nil {
+		t.Fatalf("BranchHistorySinceMain: %v", err)
+	}
+	if len(history) != 1 {
+		t.Fatalf("got %d commits, want 1", len(history))
+	}
+	if history[0].Subject != "add feature" {
+		t.Fatalf("got subject %q, want %q", history[0].Subject, "add feature")
+	}
+}
+
+func TestBranchHistorySinceMain_DivergedIncludesRemoteOnly(t *testing.T) {
+	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
+	repo, _ := git.FindRepo(repoDir)
+	featureDir := filepath.Join(repoDir, "feature")
+
+	testutil.PushBranchWithUpstream(t, featureDir, "origin", "feature")
+	mustGit(t, featureDir, "reset", "--hard", "HEAD~1")
+	testutil.WriteFile(t, featureDir, "shared.txt", "shared\n")
+	testutil.CommitAll(t, featureDir, "shared commit")
+	testutil.WriteFile(t, featureDir, "local.txt", "local\n")
+	testutil.CommitAll(t, featureDir, "local only")
+	testutil.MustGitExported(t, featureDir, "push", "--force-with-lease", "-u", "origin", "feature")
+
+	testutil.WriteFile(t, featureDir, "remote.txt", "remote\n")
+	testutil.CommitAll(t, featureDir, "remote only")
+	testutil.MustGitExported(t, featureDir, "push")
+
+	mustGit(t, featureDir, "reset", "--hard", "HEAD~1")
+	testutil.WriteFile(t, featureDir, "local2.txt", "local again\n")
+	testutil.CommitAll(t, featureDir, "local again")
+
+	history, err := git.BranchHistorySinceMain(*repo, "feature", "origin/feature")
+	if err != nil {
+		t.Fatalf("BranchHistorySinceMain: %v", err)
+	}
+	if len(history) < 3 {
+		t.Fatalf("got %d commits, want at least 3", len(history))
+	}
+
+	got := map[string]git.BranchHistoryClass{}
+	for _, commit := range history {
+		got[commit.Subject] = commit.Class
+	}
+	if got["shared commit"] != git.BranchHistoryShared {
+		t.Fatalf("shared commit class = %q, want %q", got["shared commit"], git.BranchHistoryShared)
+	}
+	if got["remote only"] != git.BranchHistoryRemoteOnly {
+		t.Fatalf("remote only class = %q, want %q", got["remote only"], git.BranchHistoryRemoteOnly)
+	}
+	if got["local again"] != git.BranchHistoryLocalOnly {
+		t.Fatalf("local again class = %q, want %q", got["local again"], git.BranchHistoryLocalOnly)
+	}
+	for i := 1; i < len(history); i++ {
+		if history[i-1].Date.Before(history[i].Date) && !history[i-1].Date.Equal(history[i].Date) {
+			t.Fatalf("history not sorted newest-first: %v before %v", history[i-1].Date, history[i].Date)
+		}
+	}
+}
+
+func TestHeadCommit_PopulatesFullHashAndDate(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	head, err := git.HeadCommit(repoDir, "main")
+	if err != nil {
+		t.Fatalf("HeadCommit: %v", err)
+	}
+	if head.FullHash == "" || len(head.FullHash) < len(head.Hash) {
+		t.Fatalf("unexpected hashes: full=%q short=%q", head.FullHash, head.Hash)
+	}
+	if head.Date.IsZero() || time.Since(head.Date) < 0 {
+		t.Fatalf("unexpected date: %v", head.Date)
 	}
 }
 

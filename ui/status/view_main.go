@@ -33,7 +33,7 @@ func (m Model) View() tea.View {
 	if m.diffFullscreen && m.focus == focusDiff {
 		body = m.renderDiffPane(m.width, mainH)
 	} else {
-		statusPanel := m.renderStatusPane(statusW, statusH)
+		statusPanel := m.renderLeftPane(statusW, statusH)
 		diffPanel := m.renderDiffPane(diffW, diffH)
 		if m.useStackedLayout() {
 			body = lipgloss.JoinVertical(lipgloss.Left, statusPanel, diffPanel)

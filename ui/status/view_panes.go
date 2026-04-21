@@ -52,6 +52,37 @@ func (m Model) useStackedLayout() bool {
 	return m.width <= 100
 }
 
+func (m Model) renderLeftPane(width, height int) string {
+	statusH, commitsH := m.leftPaneHeights(height)
+	if commitsH == 0 {
+		return m.renderStatusPane(width, statusH)
+	}
+	return lipgloss.JoinVertical(
+		lipgloss.Left,
+		m.renderStatusPane(width, statusH),
+		m.renderBranchCommitsPane(width, commitsH),
+	)
+}
+
+func (m Model) leftPaneHeights(total int) (statusH, commitsH int) {
+	if total < 7 {
+		return total, 0
+	}
+
+	commitsH = total / 3
+	if commitsH < 7 {
+		commitsH = 7
+	}
+	if commitsH > 15 {
+		commitsH = 15
+	}
+	statusH = total - commitsH
+	if statusH < 7 {
+		return total, 0
+	}
+	return statusH, commitsH
+}
+
 func (m Model) renderStatusPane(width, height int) string {
 	innerH := maxInt(1, height-2)
 	lines := make([]string, 0, innerH)

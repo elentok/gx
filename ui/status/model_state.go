@@ -81,6 +81,7 @@ type Model struct {
 	branchName    string
 	branchBaseRef string
 	branchSync    git.SyncStatus
+	branchCommits []branchCommitRow
 	statusEntries []statusEntry
 	collapsedDirs map[string]bool
 	selected      int
@@ -169,6 +170,13 @@ type commitFinishedMsg struct {
 
 type lazygitLogFinishedMsg struct{ err error }
 type editFileFinishedMsg struct{ err error }
+
+type branchCommitRow struct {
+	subject string
+	hash    string
+	date    time.Time
+	class   git.BranchHistoryClass
+}
 
 var (
 	catBase0   = lipgloss.Color("#1e1e2e")

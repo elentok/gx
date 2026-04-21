@@ -2,9 +2,10 @@
 
 ## v0.12.5
 
-- `gx wt` now has a unified "open in terminal" menu (`o` for current worktree, `N` for new worktree + open); menu offers session, hsplit, vsplit, and tab — works with tmux and kitty remote control; kitty without remote shows an informative message
-- `gx wt` and `gx status` output/lazygit chords migrated to a `g`-prefix scheme: `gg` = top, `go` = view output, `gl` = lazygit log (consistent with nvim muscle memory); `o` is now free for the open menu in worktrees
-- Kitty session names use vowel-stripped `repo-worktree` form (e.g. `my-rp-ftr-a`) for brevity; session files are auto-created at `~/.local/share/kitty/sessions/`
+- `gx wt` now has a unified "open in terminal" menu: `o` opens the selected worktree and `N` creates a new worktree and opens it immediately; the menu offers session, hsplit, vsplit, and tab actions for tmux and kitty remote control, and shows a clear message when kitty remote control is unavailable
+- `gx wt` and `gx status` output/lazygit chords now use a `g` prefix: `gg` jumps to top, `go` shows command output, and `gl` opens the lazygit log; this frees `o` for the new worktree open flow
+- Kitty session names now use a vowel-stripped `repo-worktree` form for brevity, and session files are auto-created as `~/.local/share/kitty/sessions/<name>.kitty-session`
+- `gx status` now shows a read-only `Commits` frame under the status tree with the branch history since the remote mainline (`origin/<default>`, `origin/main`, or `origin/master`); commits show wrapped subjects plus relative time and short hash, and are color-coded for shared, local-only, and remote-only/diverged commits
 
 ## v0.12.4
 
