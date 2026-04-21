@@ -26,20 +26,77 @@ func TestUseStackedLayoutThreshold(t *testing.T) {
 	}
 }
 
-func TestSplitWidthUsesNarrowStatusPaneOnWideScreens(t *testing.T) {
+func TestSplitWidthUsesMinimumStatusPaneWidthForShortContent(t *testing.T) {
 	m := Model{width: 160}
 	statusW, diffW := m.splitWidth()
-	if statusW != 27 {
-		t.Fatalf("expected status width 27 (17%% of 160), got %d", statusW)
+	if statusW != minStatusPaneWidth {
+		t.Fatalf("expected minimum status width %d, got %d", minStatusPaneWidth, statusW)
 	}
-	if diffW != 133 {
-		t.Fatalf("expected diff width 133, got %d", diffW)
+	if diffW != 160-minStatusPaneWidth {
+		t.Fatalf("expected diff width %d, got %d", 160-minStatusPaneWidth, diffW)
+	}
+}
+
+func TestSplitWidthExpandsForLongVisibleStatusRows(t *testing.T) {
+	m := Model{
+		width: 180,
+		statusEntries: []statusEntry{{
+			Kind:        statusEntryFile,
+			DisplayName: "renamed.go",
+			File: git.StageFileStatus{
+				Path:         "new/path/renamed.go",
+				RenameFrom:   "old/path/original-name.go",
+				IndexStatus:  'R',
+				WorktreeCode: ' ',
+			},
+			HasStaged: true,
+		}},
 	}
 
-	m.width = 140
-	statusW, _ = m.splitWidth()
-	if statusW != 42 {
-		t.Fatalf("expected status width 42 (30%% of 140) at threshold, got %d", statusW)
+	statusW, diffW := m.splitWidth()
+	if statusW <= minStatusPaneWidth {
+		t.Fatalf("expected status pane to grow past minimum width, got %d", statusW)
+	}
+	if diffW >= 180-minStatusPaneWidth {
+		t.Fatalf("expected diff pane to shrink when status pane grows, got %d", diffW)
+	}
+	pane := ansi.Strip(m.renderStatusPane(statusW, 10))
+	if !strings.Contains(pane, "old/path/original-name.go -> new/path/renamed.go") {
+		t.Fatalf("expected full renamed path to fit without truncation, got:\n%s", pane)
+	}
+}
+
+func TestSplitWidthHonorsMaximumStatusPaneWidth(t *testing.T) {
+	m := Model{
+		width:         200,
+		branchName:    "feature/some-extremely-verbose-branch-name-that-keeps-going",
+		branchBaseRef: "origin/release/very-long-train-name",
+		branchSync:    git.SyncStatus{Name: git.StatusDiverged, Ahead: 12, Behind: 8},
+	}
+
+	statusW, diffW := m.splitWidth()
+	if statusW != maxStatusPaneWidth {
+		t.Fatalf("expected status pane max width %d, got %d", maxStatusPaneWidth, statusW)
+	}
+	if diffW != 200-maxStatusPaneWidth {
+		t.Fatalf("expected diff width %d, got %d", 200-maxStatusPaneWidth, diffW)
+	}
+}
+
+func TestSplitWidthPreservesMinimumDiffWidth(t *testing.T) {
+	m := Model{
+		width:         101,
+		branchName:    "feature/some-extremely-verbose-branch-name-that-keeps-going",
+		branchBaseRef: "origin/release/very-long-train-name",
+		branchSync:    git.SyncStatus{Name: git.StatusDiverged, Ahead: 12, Behind: 8},
+	}
+
+	statusW, diffW := m.splitWidth()
+	if diffW != minDiffPaneWidth {
+		t.Fatalf("expected minimum diff width %d, got %d", minDiffPaneWidth, diffW)
+	}
+	if statusW != 101-minDiffPaneWidth {
+		t.Fatalf("expected status width %d, got %d", 101-minDiffPaneWidth, statusW)
 	}
 }
 

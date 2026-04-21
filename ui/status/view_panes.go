@@ -12,21 +12,38 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
+const (
+	minStatusPaneWidth = 30
+	maxStatusPaneWidth = 72
+	minDiffPaneWidth   = 60
+)
+
 func (m Model) splitWidth() (statusW, diffW int) {
 	if m.useStackedLayout() {
 		return m.width, m.width
 	}
-	statusRatio := 0.30
-	if m.width > 140 {
-		statusRatio = 0.17
+
+	statusH, _ := m.leftPaneHeights(m.mainContentHeight())
+	statusW = m.requiredStatusPaneWidth(statusH)
+	statusMax := minInt(maxStatusPaneWidth, int(float64(m.width)*0.45))
+	if statusMax < minStatusPaneWidth {
+		statusMax = minStatusPaneWidth
 	}
-	statusW = int(float64(m.width) * statusRatio)
-	if statusW < 20 {
-		statusW = 20
+	if statusW < minStatusPaneWidth {
+		statusW = minStatusPaneWidth
+	}
+	if statusW > statusMax {
+		statusW = statusMax
+	}
+	if m.width-statusW < minDiffPaneWidth {
+		statusW = m.width - minDiffPaneWidth
+	}
+	if statusW < minStatusPaneWidth {
+		statusW = minStatusPaneWidth
 	}
 	diffW = m.width - statusW
-	if diffW < 20 {
-		diffW = 20
+	if diffW < minDiffPaneWidth {
+		diffW = minDiffPaneWidth
 		statusW = m.width - diffW
 	}
 	return statusW, diffW
@@ -50,6 +67,14 @@ func (m Model) splitHeight(total int) (statusH, diffH int) {
 
 func (m Model) useStackedLayout() bool {
 	return m.width <= 100
+}
+
+func (m Model) mainContentHeight() int {
+	mainH := m.height - 1
+	if mainH < 4 {
+		mainH = 4
+	}
+	return mainH
 }
 
 func (m Model) renderLeftPane(width, height int) string {
@@ -83,7 +108,15 @@ func (m Model) leftPaneHeights(total int) (statusH, commitsH int) {
 	return statusH, commitsH
 }
 
-func (m Model) renderStatusPane(width, height int) string {
+func (m Model) statusPaneTitle() string {
+	title := "Status"
+	if summary := m.branchSummaryTitleSuffix(); summary != "" {
+		title += " (" + summary + ")"
+	}
+	return title
+}
+
+func (m Model) visibleStatusLines(height int) []string {
 	innerH := maxInt(1, height-2)
 	lines := make([]string, 0, innerH)
 
@@ -161,12 +194,22 @@ func (m Model) renderStatusPane(width, height int) string {
 	for len(lines) < innerH {
 		lines = append(lines, "")
 	}
+	return lines
+}
 
-	title := "Status"
-	if summary := m.branchSummaryTitleSuffix(); summary != "" {
-		title += " (" + summary + ")"
+func (m Model) requiredStatusPaneWidth(height int) int {
+	required := ansi.StringWidth(" " + m.statusPaneTitle() + " ")
+	for _, line := range m.visibleStatusLines(height) {
+		if w := ansi.StringWidth(line); w > required {
+			required = w
+		}
 	}
-	return m.renderPanelWithBorderTitle(width, height, title, "", lines, m.focus == focusStatus, sectionUnstaged)
+	return required + 2
+}
+
+func (m Model) renderStatusPane(width, height int) string {
+	lines := m.visibleStatusLines(height)
+	return m.renderPanelWithBorderTitle(width, height, m.statusPaneTitle(), "", lines, m.focus == focusStatus, sectionUnstaged)
 }
 
 func (m Model) branchSummaryTitleSuffix() string {
@@ -205,6 +248,13 @@ func shouldShowBranchBaseRef(base string) bool {
 		return false
 	}
 	return base != "origin/main" && base != "origin/master"
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func (m *Model) renderDiffPane(width, height int) string {

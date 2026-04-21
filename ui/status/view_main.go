@@ -21,10 +21,7 @@ func (m Model) View() tea.View {
 		return v
 	}
 
-	mainH := m.height - 1
-	if mainH < 4 {
-		mainH = 4
-	}
+	mainH := m.mainContentHeight()
 
 	statusW, diffW := m.splitWidth()
 	statusH, diffH := m.splitHeight(mainH)
