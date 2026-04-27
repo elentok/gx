@@ -175,6 +175,7 @@ func runWorktrees(_ string) error {
 	settings := worktrees.Settings{
 		UseNerdFontIcons: cfg.UseNerdFontIcons,
 		InputModalBottom: cfg.InputModalBottom,
+		NameAliases:      cfg.NameAliases,
 		Terminal:         ui.DetectTerminal(),
 	}
 	m := worktrees.NewWithSettings(*repo, activeWorktreePath, settings)

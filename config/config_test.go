@@ -235,6 +235,29 @@ func TestLoadInputModalBottomInvalidFallsBackToDefault(t *testing.T) {
 	}
 }
 
+func TestLoadNameAliases(t *testing.T) {
+	tmp := t.TempDir()
+	prev := userConfigDirFn
+	userConfigDirFn = func() (string, error) { return tmp, nil }
+	t.Cleanup(func() { userConfigDirFn = prev })
+
+	dir := filepath.Join(tmp, "gx")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(`{"name-aliases":{"my-project-frontend":"project-fe"}}`), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got := cfg.NameAliases["my-project-frontend"]; got != "project-fe" {
+		t.Fatalf("NameAliases lookup = %q, want %q", got, "project-fe")
+	}
+}
+
 func TestInitFailsIfConfigExists(t *testing.T) {
 	tmp := t.TempDir()
 	prev := userConfigDirFn

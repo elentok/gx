@@ -17,6 +17,7 @@ type Config struct {
 	UseNerdFontIcons      bool             `json:"use-nerdfont-icons"`
 	StageDiffContextLines int              `json:"stage-diff-context-lines"`
 	InputModalBottom      InputModalBottom `json:"input-modal-bottom"`
+	NameAliases           map[string]string `json:"name-aliases,omitempty"`
 }
 
 // Default returns the default configuration.
@@ -57,6 +58,7 @@ func Load() (Config, error) {
 		UseNerdFontIcons      *bool             `json:"use-nerdfont-icons"`
 		StageDiffContextLines *int              `json:"stage-diff-context-lines"`
 		InputModalBottom      *InputModalBottom `json:"input-modal-bottom"`
+		NameAliases           map[string]string `json:"name-aliases"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return cfg, fmt.Errorf("parse config %s: %w", path, err)
@@ -69,6 +71,12 @@ func Load() (Config, error) {
 	}
 	if raw.InputModalBottom != nil {
 		cfg.InputModalBottom = *raw.InputModalBottom
+	}
+	if raw.NameAliases != nil {
+		cfg.NameAliases = make(map[string]string, len(raw.NameAliases))
+		for k, v := range raw.NameAliases {
+			cfg.NameAliases[k] = v
+		}
 	}
 
 	return cfg, nil

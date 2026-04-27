@@ -52,6 +52,7 @@ type dirtyState struct {
 type Settings struct {
 	UseNerdFontIcons bool
 	InputModalBottom config.InputModalBottom
+	NameAliases      map[string]string
 	Terminal         ui.Terminal
 }
 

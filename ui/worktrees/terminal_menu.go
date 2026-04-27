@@ -75,7 +75,7 @@ func (m Model) executeTerminalAction(action string) (Model, tea.Cmd) {
 		}
 	case ui.TerminalKittyRemote:
 		repoName := filepath.Base(m.repo.LinkedWorktreeDir())
-		sessName := sessionNameFor(repoName, name)
+		sessName := sessionNameFor(repoName, name, m.settings.NameAliases)
 		switch action {
 		case "session":
 			return m, cmdKittySession(sessName, path)

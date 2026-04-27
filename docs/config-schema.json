@@ -40,6 +40,14 @@
           "description": "Center the overlay vertically on the screen."
         }
       ]
+    },
+    "name-aliases": {
+      "type": "object",
+      "description": "Exact full-name aliases applied before kitty session-name compression. Alias values are then compressed with the normal dash-segment rules.",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "default": {}
     }
   }
 }

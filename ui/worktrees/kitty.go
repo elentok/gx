@@ -32,12 +32,19 @@ func compressSegment(s string) string {
 	return b.String()
 }
 
-func sessionNameFor(repoName, wtName string) string {
-	parts := strings.Split(repoName+"-"+wtName, "-")
+func shortenName(name string, aliases map[string]string) string {
+	if alias, ok := aliases[name]; ok {
+		name = alias
+	}
+	parts := strings.Split(name, "-")
 	for i, p := range parts {
 		parts[i] = compressSegment(p)
 	}
-	name := strings.Join(parts, "-")
+	return strings.TrimPrefix(strings.Join(parts, "-"), ".")
+}
+
+func sessionNameFor(repoName, wtName string, aliases map[string]string) string {
+	name := shortenName(repoName, aliases) + "-" + shortenName(wtName, aliases)
 	return strings.TrimPrefix(name, ".")
 }
 
