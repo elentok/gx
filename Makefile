@@ -3,7 +3,7 @@
 GO_VERSION := 1.25.0
 
 build:
-	go build -ldflags "-X gx/cmd.version=$(shell git describe --tags --always --dirty)" -o gx .
+	go build -ldflags "-X github.com/elentok/gx/cmd.version=$(shell git describe --tags --always --dirty)" -o gx .
 
 install:
 	go install .
