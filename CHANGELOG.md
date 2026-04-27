@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.12.8
+
+- `gx wt` text-input overlays now accept pasted text again for flows like new worktree, rename, clone, search, and credential prompts
+- Added `name-aliases` config for kitty session naming so exact repo and worktree names can be replaced before the usual dash-segment compression runs
+
 ## v0.12.7
 
 - Fixed release and local linker version stamping after the Go module path change so `gx version` now reports the injected tag/build version instead of falling back to Go's VCS build info and showing unexpected `+dirty` suffixes
