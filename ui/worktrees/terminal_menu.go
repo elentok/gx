@@ -74,7 +74,7 @@ func (m Model) executeTerminalAction(action string) (Model, tea.Cmd) {
 			return m, cmdTmuxNewWindow(name, path)
 		}
 	case ui.TerminalKittyRemote:
-		repoName := filepath.Base(m.repo.Root)
+		repoName := filepath.Base(m.repo.LinkedWorktreeDir())
 		sessName := sessionNameFor(repoName, name)
 		switch action {
 		case "session":
