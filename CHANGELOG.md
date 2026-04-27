@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.12.6
+
+- `gx status` now sizes the `Commits` pane from its rendered content instead of using a fixed split, while keeping both the status list and branch-commit history visible within min/max height bounds
+- Fixed kitty session naming for `.bare`-style repos so new sessions use the outer repo directory name instead of generating `bre-...` prefixes from `.bare`
+
 ## v0.12.5
 
 - `gx wt` now has a unified "open in terminal" menu: `o` opens the selected worktree and `N` creates a new worktree and opens it immediately; the menu offers session, hsplit, vsplit, and tab actions for tmux and kitty remote control, and shows a clear message when kitty remote control is unavailable
