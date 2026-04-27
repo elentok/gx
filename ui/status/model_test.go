@@ -363,25 +363,32 @@ func TestBranchSummaryTitleShowsBaseOnlyWhenNonDefault(t *testing.T) {
 
 func TestLeftPaneHeightsHideCommitPaneOnlyWhenTooSmall(t *testing.T) {
 	m := Model{}
-	statusH, commitsH := m.leftPaneHeights(20)
-	if statusH <= 0 || commitsH <= 0 {
-		t.Fatalf("expected commit pane when height allows it, got status=%d commits=%d", statusH, commitsH)
+	statusH, commitsH := m.leftPaneHeights(20, 40)
+	if commitsH != minCommitsPaneHeight {
+		t.Fatalf("expected minimum commit pane height %d, got %d", minCommitsPaneHeight, commitsH)
 	}
-
-	statusH, commitsH = m.leftPaneHeights(12)
-	if statusH != 12 || commitsH != 0 {
-		t.Fatalf("expected no commit pane when total height too small, got status=%d commits=%d", statusH, commitsH)
+	if statusH != 20-minCommitsPaneHeight {
+		t.Fatalf("expected status height %d, got %d", 20-minCommitsPaneHeight, statusH)
 	}
 }
 
-func TestLeftPaneHeightsReserveSpaceForCommitPane(t *testing.T) {
-	m := Model{branchCommits: []branchCommitRow{{subject: "one"}}}
-	statusH, commitsH := m.leftPaneHeights(24)
-	if statusH <= 0 || commitsH <= 0 {
-		t.Fatalf("expected both panes to have height, got status=%d commits=%d", statusH, commitsH)
+func TestLeftPaneHeightsFitCommitContentsWithMaximum(t *testing.T) {
+	m := Model{branchCommits: []branchCommitRow{
+		{subject: "one", hash: "a1", date: time.Now(), class: git.BranchHistoryLocalOnly},
+		{subject: "two", hash: "b2", date: time.Now(), class: git.BranchHistoryLocalOnly},
+		{subject: "three", hash: "c3", date: time.Now(), class: git.BranchHistoryLocalOnly},
+		{subject: "four", hash: "d4", date: time.Now(), class: git.BranchHistoryLocalOnly},
+		{subject: "five", hash: "e5", date: time.Now(), class: git.BranchHistoryLocalOnly},
+		{subject: "six", hash: "f6", date: time.Now(), class: git.BranchHistoryLocalOnly},
+		{subject: "seven", hash: "g7", date: time.Now(), class: git.BranchHistoryLocalOnly},
+		{subject: "eight", hash: "h8", date: time.Now(), class: git.BranchHistoryLocalOnly},
+	}}
+	statusH, commitsH := m.leftPaneHeights(40, 40)
+	if commitsH != maxCommitsPaneHeight {
+		t.Fatalf("expected max commit pane height %d, got %d", maxCommitsPaneHeight, commitsH)
 	}
-	if statusH+commitsH != 24 {
-		t.Fatalf("expected heights to sum to total, got status=%d commits=%d", statusH, commitsH)
+	if statusH != 40-maxCommitsPaneHeight {
+		t.Fatalf("expected status height %d, got %d", 40-maxCommitsPaneHeight, statusH)
 	}
 }
 
@@ -445,6 +452,25 @@ func TestReloadBranchCommitsIncludesDivergedRemoteCommits(t *testing.T) {
 	}
 	if got["local only"] != git.BranchHistoryLocalOnly {
 		t.Fatalf("local only class = %q", got["local only"])
+	}
+}
+
+func TestRefreshesBranchCommitsOnFocusMsg(t *testing.T) {
+	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
+	wtDir := filepath.Join(repoDir, "feature")
+
+	m := New(wtDir)
+	m.ready = true
+	countBefore := len(m.branchCommits)
+
+	testutil.WriteFile(t, wtDir, "later.txt", "later\n")
+	testutil.CommitAll(t, wtDir, "later commit")
+
+	updated, _ := m.Update(tea.FocusMsg{})
+	m = updated.(Model)
+
+	if len(m.branchCommits) <= countBefore {
+		t.Fatalf("expected focus refresh to reload branch commits; before=%d after=%d", countBefore, len(m.branchCommits))
 	}
 }
 

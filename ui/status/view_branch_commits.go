@@ -11,29 +11,40 @@ import (
 )
 
 func (m Model) renderBranchCommitsPane(width, height int) string {
-	innerW := maxInt(1, width-2)
 	innerH := maxInt(1, height-2)
-
-	lines := make([]string, 0, innerH)
-	if len(m.branchCommits) == 0 {
-		lines = append(lines, lipgloss.NewStyle().Foreground(catSubtle).Render("no commits since main"))
-	} else {
-		for i, commit := range m.branchCommits {
-			lines = append(lines, m.renderBranchCommitCard(commit, innerW)...)
-			if i < len(m.branchCommits)-1 {
-				lines = append(lines, "")
-			}
-			if len(lines) >= innerH {
-				break
-			}
-		}
-	}
+	lines := m.branchCommitPaneLines(width)
 
 	for len(lines) < innerH {
 		lines = append(lines, "")
 	}
 
 	return m.renderPanelWithBorderTitle(width, height, "Commits", "", lines[:innerH], false, sectionUnstaged)
+}
+
+func (m Model) branchCommitPaneLines(width int) []string {
+	innerW := maxInt(1, width-2)
+	lines := make([]string, 0, 8)
+	if len(m.branchCommits) == 0 {
+		return []string{lipgloss.NewStyle().Foreground(catSubtle).Render("no commits since remote main")}
+	}
+	for i, commit := range m.branchCommits {
+		lines = append(lines, m.renderBranchCommitCard(commit, innerW)...)
+		if i < len(m.branchCommits)-1 {
+			lines = append(lines, "")
+		}
+	}
+	return lines
+}
+
+func (m Model) requiredBranchCommitsPaneHeight(width int) int {
+	required := len(m.branchCommitPaneLines(width)) + 2
+	if required < minCommitsPaneHeight {
+		required = minCommitsPaneHeight
+	}
+	if required > maxCommitsPaneHeight {
+		required = maxCommitsPaneHeight
+	}
+	return required
 }
 
 func (m Model) renderBranchCommitCard(commit branchCommitRow, width int) []string {
