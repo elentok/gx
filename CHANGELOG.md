@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.12.7
+
+- Fixed release and local linker version stamping after the Go module path change so `gx version` now reports the injected tag/build version instead of falling back to Go's VCS build info and showing unexpected `+dirty` suffixes
+
 ## v0.12.6
 
 - `gx status` now sizes the `Commits` pane from its rendered content instead of using a fixed split, while keeping both the status list and branch-commit history visible within min/max height bounds
