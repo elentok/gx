@@ -34,6 +34,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m = m.resized()
 		return m, nil
 
+	case tea.PasteMsg:
+		switch m.mode {
+		case modeCredentialPrompt, modeRename, modeClone, modeNew, modeNewAndOpen:
+			var cmd tea.Cmd
+			m.textInput, cmd = m.textInput.Update(msg)
+			return m, cmd
+		case modeSearch:
+			var cmd tea.Cmd
+			m.textInput, cmd = m.textInput.Update(msg)
+			m.searchQuery = m.textInput.Value()
+			m = m.recomputeSearchMatches()
+			if len(m.searchMatches) > 0 {
+				m.searchCursor = 0
+				return m.jumpToSearchCursor()
+			}
+			m.table.SetRows(m.buildRows())
+			return m, cmd
+		}
+
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
