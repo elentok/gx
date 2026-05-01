@@ -1,4 +1,4 @@
-package stage_test
+package status_test
 
 import (
 	"bytes"
@@ -27,7 +27,7 @@ const (
 
 func startStageTUI(t *testing.T, repoDir string) *teatest.TestModel {
 	t.Helper()
-	m := stage.New(repoDir)
+	m := status.New(repoDir)
 	return teatest.NewTestModel(t, m, teatest.WithInitialTermSize(stageTermWidth, stageTermHeight))
 }
 

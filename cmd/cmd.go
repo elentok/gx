@@ -16,7 +16,7 @@ import (
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/menu"
 	"github.com/elentok/gx/ui/nav"
-	"github.com/elentok/gx/ui/status"
+	statusui "github.com/elentok/gx/ui/status"
 	"github.com/elentok/gx/ui/worktrees"
 
 	tea "charm.land/bubbletea/v2"
@@ -184,7 +184,7 @@ func runWorktrees(_ string) error {
 		InitialRoute:       nav.Route{Kind: nav.RouteWorktrees},
 		ActiveWorktreePath: activeWorktreePath,
 		Worktrees:          settings,
-		Status: stage.Settings{
+		Status: statusui.Settings{
 			DiffContextLines: cfg.StageDiffContextLines,
 			UseNerdFontIcons: cfg.UseNerdFontIcons,
 			Terminal:         ui.DetectTerminal(),
@@ -239,7 +239,7 @@ func runStatus(target string) error {
 			NameAliases:      cfg.NameAliases,
 			Terminal:         ui.DetectTerminal(),
 		},
-		Status: stage.Settings{
+		Status: statusui.Settings{
 			DiffContextLines: cfg.StageDiffContextLines,
 			UseNerdFontIcons: cfg.UseNerdFontIcons,
 			InitialPath:      initialPath,

@@ -1,4 +1,4 @@
-package stage
+package status
 
 import (
 	"github.com/elentok/gx/ui"

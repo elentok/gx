@@ -1,4 +1,4 @@
-package stage
+package status
 
 import (
 	"fmt"
@@ -188,7 +188,7 @@ func TestStatusLOnFileEntersDiffAndResetsSectionOnFileChange(t *testing.T) {
 func TestStatusHFocusesParentFolder(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.Mkdir(t, repo+"/ui/status")
-	testutil.WriteFile(t, repo, "ui/status/model.go", "package stage\n")
+	testutil.WriteFile(t, repo, "ui/status/model.go", "package status\n")
 
 	m := New(repo)
 	m.ready = true

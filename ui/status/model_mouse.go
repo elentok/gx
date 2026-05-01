@@ -1,4 +1,4 @@
-package stage
+package status
 
 import tea "charm.land/bubbletea/v2"
 

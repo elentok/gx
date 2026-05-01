@@ -1,4 +1,4 @@
-package stage
+package status
 
 import (
 	"image/color"

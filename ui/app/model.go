@@ -5,7 +5,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/nav"
-	stage "github.com/elentok/gx/ui/status"
+	statusui "github.com/elentok/gx/ui/status"
 	"github.com/elentok/gx/ui/worktrees"
 
 	tea "charm.land/bubbletea/v2"
@@ -16,7 +16,7 @@ type Settings struct {
 	InitialRoute       nav.Route
 	ActiveWorktreePath string
 	Worktrees          worktrees.Settings
-	Status             stage.Settings
+	Status             statusui.Settings
 }
 
 type pageState struct {
@@ -102,7 +102,7 @@ func (m Model) newPage(route nav.Route) pageState {
 		}
 		return pageState{
 			route: route,
-			model: stage.NewWithSettings(route.WorktreeRoot, settings),
+			model: statusui.NewWithSettings(route.WorktreeRoot, settings),
 		}
 	case nav.RouteLog:
 		return pageState{
