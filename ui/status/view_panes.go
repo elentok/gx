@@ -430,6 +430,10 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 			if bodyW < 0 {
 				bodyW = 0
 			}
+			rowKind := diffRowPlain
+			if displayIdx >= 0 && displayIdx < len(sec.viewLineKinds) {
+				rowKind = sec.viewLineKinds[displayIdx]
+			}
 			body := ansi.Truncate(sec.viewLines[displayIdx], bodyW, "")
 			if m.renderMode == renderSideBySide {
 				plain := strings.TrimSpace(ansi.Strip(body))
@@ -437,7 +441,7 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 					body = lipgloss.NewStyle().Foreground(catDeepBg).Render(ansi.Strip(body))
 				}
 			}
-			body += strings.Repeat(" ", maxInt(0, bodyW-ansi.StringWidth(body)))
+			body += m.diffBodyPadding(rowKind, maxInt(0, bodyW-ansi.StringWidth(body)))
 			lines = append(lines, mark+body+indicator)
 		}
 	}
@@ -562,6 +566,7 @@ func (m *Model) syncDiffViewports() {
 func reflowSectionLines(sec *sectionState, wrapWidth int, wrapSoft bool) {
 	if len(sec.baseLines) == 0 {
 		sec.viewLines = nil
+		sec.viewLineKinds = nil
 		sec.displayToRaw = nil
 		sec.rawToDisplay = buildRawToDisplayMap(sec.parsed, nil)
 		sec.viewport.SetContent("")
@@ -571,26 +576,34 @@ func reflowSectionLines(sec *sectionState, wrapWidth int, wrapSoft bool) {
 
 	prevOffset := sec.viewport.YOffset()
 	view := make([]string, 0, len(sec.baseLines))
+	kinds := make([]diffDisplayRowKind, 0, len(sec.baseLines))
 	mapRaw := make([]int, 0, len(sec.baseDisplayToRaw))
 
 	for i, line := range sec.baseLines {
 		rawIdx := -1
+		kind := diffRowPlain
 		if i < len(sec.baseDisplayToRaw) {
 			rawIdx = sec.baseDisplayToRaw[i]
 		}
+		if i < len(sec.baseLineKinds) {
+			kind = sec.baseLineKinds[i]
+		}
 		if !wrapSoft || rawIdx < 0 {
 			view = append(view, line)
+			kinds = append(kinds, kind)
 			mapRaw = append(mapRaw, rawIdx)
 			continue
 		}
 		parts := wrapANSI(line, wrapWidth)
 		for _, p := range parts {
 			view = append(view, p)
+			kinds = append(kinds, kind)
 			mapRaw = append(mapRaw, rawIdx)
 		}
 	}
 
 	sec.viewLines = view
+	sec.viewLineKinds = kinds
 	sec.displayToRaw = mapRaw
 	sec.rawToDisplay = buildRawToDisplayMap(sec.parsed, sec.displayToRaw)
 	sec.viewport.SetContentLines(sec.viewLines)
@@ -676,4 +689,19 @@ func formatSize(size int64, ok bool) string {
 		return fmt.Sprintf("%.0f %s", v, units[idx])
 	}
 	return fmt.Sprintf("%.1f %s", v, units[idx])
+}
+
+func (m Model) diffBodyPadding(kind diffDisplayRowKind, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	spaces := strings.Repeat(" ", width)
+	switch kind {
+	case diffRowAdded:
+		return lipgloss.NewStyle().Background(lipgloss.Color("#2c3239")).Render(spaces)
+	case diffRowRemoved:
+		return lipgloss.NewStyle().Background(lipgloss.Color("#34293a")).Render(spaces)
+	default:
+		return spaces
+	}
 }

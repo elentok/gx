@@ -300,8 +300,10 @@ func buildSectionState(raw, color string, prev sectionState, sideBySide bool) se
 		state.activeHunk = -1
 		state.activeLine = -1
 		state.baseLines = nil
+		state.baseLineKinds = nil
 		state.baseDisplayToRaw = nil
 		state.viewLines = nil
+		state.viewLineKinds = nil
 		state.displayToRaw = nil
 		state.rawToDisplay = nil
 		state.hunkDisplayRange = nil
@@ -328,8 +330,9 @@ func buildSectionState(raw, color string, prev sectionState, sideBySide bool) se
 	} else if len(colorLines) > len(state.rawLines) {
 		colorLines = colorLines[:len(state.rawLines)]
 	}
-	state.baseLines, state.baseDisplayToRaw = buildDisplayBaseLines(state.parsed, colorLines)
+	state.baseLines, state.baseLineKinds, state.baseDisplayToRaw = buildDisplayBaseLines(state.parsed, colorLines)
 	state.viewLines = append([]string{}, state.baseLines...)
+	state.viewLineKinds = append([]diffDisplayRowKind{}, state.baseLineKinds...)
 	state.displayToRaw = append([]int{}, state.baseDisplayToRaw...)
 	state.rawToDisplay = buildRawToDisplayMap(state.parsed, state.displayToRaw)
 	state.hunkDisplayRange = nil
@@ -374,10 +377,12 @@ func initSideBySideSectionState(state *sectionState, color string) {
 		state.viewLines = append([]string{}, state.rawLines...)
 	}
 	state.baseLines = append([]string{}, state.viewLines...)
+	state.baseLineKinds = make([]diffDisplayRowKind, len(state.baseLines))
 	state.baseDisplayToRaw = make([]int, len(state.baseLines))
 	for i := range state.baseDisplayToRaw {
 		state.baseDisplayToRaw[i] = -1
 	}
+	state.viewLineKinds = append([]diffDisplayRowKind{}, state.baseLineKinds...)
 	state.displayToRaw = append([]int{}, state.baseDisplayToRaw...)
 	state.changedDisplay = make([]int, len(state.parsed.Changed))
 	for i := range state.changedDisplay {
@@ -528,15 +533,16 @@ func isDeltaSectionDivider(plain string) bool {
 	return true
 }
 
-func buildDisplayBaseLines(parsed parsedDiff, colorLines []string) (lines []string, displayToRaw []int) {
+func buildDisplayBaseLines(parsed parsedDiff, colorLines []string) (lines []string, kinds []diffDisplayRowKind, displayToRaw []int) {
 	if len(parsed.Lines) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	if si := parseSymlinkDiffInfo(parsed); si.IsSymlink {
 		if summary := si.summary(); summary != "" {
 			symlinkStyle := lipgloss.NewStyle().Foreground(catBlue).Bold(true)
 			lines = append(lines, symlinkStyle.Render("  "+summary))
+			kinds = append(kinds, diffRowPlain)
 			displayToRaw = append(displayToRaw, -1)
 		}
 	}
@@ -545,11 +551,13 @@ func buildDisplayBaseLines(parsed parsedDiff, colorLines []string) (lines []stri
 	for hi, h := range parsed.Hunks {
 		if hi > 0 {
 			lines = append(lines, "")
+			kinds = append(kinds, diffRowPlain)
 			displayToRaw = append(displayToRaw, -1)
 		}
 
 		header := cleanHunkHeader(parsed.Lines[h.StartLine])
 		lines = append(lines, hdrStyle.Render(" "+header+" "))
+		kinds = append(kinds, diffRowHunkHeader)
 		displayToRaw = append(displayToRaw, h.StartLine)
 
 		for rawIdx := h.StartLine + 1; rawIdx <= h.EndLine && rawIdx < len(parsed.Lines); rawIdx++ {
@@ -557,11 +565,70 @@ func buildDisplayBaseLines(parsed parsedDiff, colorLines []string) (lines []stri
 			if rawIdx < len(colorLines) {
 				line = sanitizeANSIInline(colorLines[rawIdx])
 			}
+			kind := diffRowPlain
+			if len(parsed.Lines[rawIdx]) > 0 {
+				switch parsed.Lines[rawIdx][0] {
+				case '+':
+					kind = diffRowAdded
+					line = stripUnifiedVisibleMarker(line, '+')
+				case '-':
+					kind = diffRowRemoved
+					line = stripUnifiedVisibleMarker(line, '-')
+				}
+			}
 			lines = append(lines, line)
+			kinds = append(kinds, kind)
 			displayToRaw = append(displayToRaw, rawIdx)
 		}
 	}
-	return lines, displayToRaw
+	return lines, kinds, displayToRaw
+}
+
+func stripUnifiedVisibleMarker(line string, marker byte) string {
+	if line == "" {
+		return line
+	}
+	plain := ansi.Strip(line)
+	if plain == "" {
+		return line
+	}
+
+	visibleIdx := -1
+	if len(plain) > 0 && plain[0] == marker {
+		visibleIdx = 0
+	} else {
+		searchFrom := 0
+		for {
+			sep := strings.Index(plain[searchFrom:], "│")
+			if sep < 0 {
+				break
+			}
+			sep += searchFrom
+			start := sep + len("│")
+			for start < len(plain) && plain[start] == ' ' {
+				start++
+			}
+			if start < len(plain) && plain[start] == marker {
+				visibleIdx = ansi.StringWidth(plain[:start])
+				break
+			}
+			searchFrom = start
+			if searchFrom >= len(plain) {
+				break
+			}
+		}
+	}
+	if visibleIdx < 0 {
+		return line
+	}
+
+	total := ansi.StringWidth(line)
+	if visibleIdx >= total {
+		return line
+	}
+	before := ansi.Cut(line, 0, visibleIdx)
+	after := ansi.Cut(line, visibleIdx+1, total)
+	return before + " " + after
 }
 
 func buildRawToDisplayMap(parsed parsedDiff, displayToRaw []int) []int {

@@ -43,11 +43,22 @@ const (
 	renderSideBySide
 )
 
+type diffDisplayRowKind int
+
+const (
+	diffRowPlain diffDisplayRowKind = iota
+	diffRowAdded
+	diffRowRemoved
+	diffRowHunkHeader
+)
+
 type sectionState struct {
 	rawLines         []string
 	baseLines        []string
+	baseLineKinds    []diffDisplayRowKind
 	baseDisplayToRaw []int
 	viewLines        []string
+	viewLineKinds    []diffDisplayRowKind
 	displayToRaw     []int
 	rawToDisplay     []int
 	hunkDisplayRange [][2]int

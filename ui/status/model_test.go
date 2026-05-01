@@ -575,6 +575,29 @@ func TestToggleSideBySideModeWithSFromStatusPane(t *testing.T) {
 	}
 }
 
+func TestStripUnifiedVisibleMarkerRemovesChangedPrefix(t *testing.T) {
+	line := "  1 ⋮    │-old"
+	got := stripUnifiedVisibleMarker(line, '-')
+	if strings.Contains(got, "│-old") {
+		t.Fatalf("expected visible marker stripped, got %q", got)
+	}
+	if !strings.Contains(got, "│ old") {
+		t.Fatalf("expected content alignment preserved, got %q", got)
+	}
+
+	raw := "+new"
+	got = stripUnifiedVisibleMarker(raw, '+')
+	if got != " new" {
+		t.Fatalf("expected raw unified marker replaced with space, got %q", got)
+	}
+
+	line = "    ⋮ 579│+\tline := \"  1 ⋮    │-old\""
+	got = stripUnifiedVisibleMarker(line, '+')
+	if strings.Contains(got, "│+\tline") {
+		t.Fatalf("expected gutter marker stripped before source text, got %q", got)
+	}
+}
+
 func TestAdjustDiffContextLinesInDiffFocus(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "ctx.txt", "one\ntwo\nthree\n")
@@ -604,6 +627,65 @@ func TestAdjustDiffContextLinesInDiffFocus(t *testing.T) {
 	m = updated.(Model)
 	if m.currentDiffContextLines() != 1 {
 		t.Fatalf("expected diff context 1 after [, got %d", m.currentDiffContextLines())
+	}
+}
+
+func TestUnifiedDiffViewHidesVisibleChangeMarkers(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "clean.txt", "old-value\nkeep\n")
+	testutil.MustGitExported(t, repo, "add", "clean.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+	testutil.WriteFile(t, repo, "clean.txt", "new-value\nkeep\n")
+
+	m := New(repo)
+	m.ready = true
+	m.width = 120
+	m.height = 20
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+
+	view := ansi.Strip(m.renderDiffPane(100, 12))
+	if strings.Contains(view, "+new-value") || strings.Contains(view, "-old-value") {
+		t.Fatalf("expected unified view to hide visible +/- markers, got:\n%s", view)
+	}
+	if !strings.Contains(view, "new-value") || !strings.Contains(view, "old-value") {
+		t.Fatalf("expected unified view to keep changed content visible, got:\n%s", view)
+	}
+
+	stagedBefore, err := git.DiffPath(repo, "clean.txt", true, 1)
+	if err != nil {
+		t.Fatalf("staged diff before apply: %v", err)
+	}
+	if stagedBefore != "" {
+		t.Fatalf("expected no staged diff before apply, got:\n%s", stagedBefore)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
+	m = updated.(Model)
+
+	stagedAfter, err := git.DiffPath(repo, "clean.txt", true, 1)
+	if err != nil {
+		t.Fatalf("staged diff after apply: %v", err)
+	}
+	if !strings.Contains(stagedAfter, "old-value") && !strings.Contains(stagedAfter, "new-value") {
+		t.Fatalf("expected staging to keep using raw unified diff mappings, got:\n%s", stagedAfter)
+	}
+}
+
+func TestDiffBodyPaddingStylesChangedRows(t *testing.T) {
+	m := New(testutil.TempRepo(t))
+	added := m.diffBodyPadding(diffRowAdded, 3)
+	removed := m.diffBodyPadding(diffRowRemoved, 3)
+	plain := m.diffBodyPadding(diffRowPlain, 3)
+
+	if ansi.Strip(added) != "   " || ansi.Strip(removed) != "   " || plain != "   " {
+		t.Fatalf("expected padding width preserved")
+	}
+	if added == "   " || removed == "   " {
+		t.Fatalf("expected changed row padding to carry styling")
 	}
 }
 
