@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.12.9
+
+- Refined `gx status` unified diff rendering so changed rows no longer show literal `+` / `-` markers, making the interactive unified view read closer to the side-by-side mode while keeping hunk/line staging behavior intact
+- Extended added and removed row backgrounds to the full diff pane width for a cleaner, easier-to-scan unified diff
+
 ## v0.12.8
 
 - `gx wt` text-input overlays now accept pasted text again for flows like new worktree, rename, clone, search, and credential prompts
