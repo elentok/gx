@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/nav"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
@@ -92,7 +93,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.Search) && !m.spinnerActive:
 			m = m.enterSearchMode()
 			return m, nil
+		case msg.String() == "esc" && m.settings.EnableNavigation:
+			return m, nav.Back()
 		case key.Matches(msg, keys.Quit):
+			if m.settings.EnableNavigation {
+				return m, nav.Back()
+			}
 			return m, tea.Quit
 		case key.Matches(msg, keys.Help):
 			m = m.enterHelpMode()

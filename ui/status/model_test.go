@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/ui/nav"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -1877,24 +1878,41 @@ func TestGGJumpsToTop(t *testing.T) {
 	}
 }
 
-func TestGLTriggersLazygitLogCommand(t *testing.T) {
+func TestLTriggersLazygitLogCommand(t *testing.T) {
 	repo := testutil.TempRepo(t)
 
 	m := New(repo)
 	m.ready = true
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
-	if cmd != nil {
-		t.Fatalf("first g should not launch command")
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'L', Text: "L", ShiftedCode: 'L', Mod: tea.ModShift})
+	if cmd == nil {
+		t.Fatalf("L should launch lazygit log command")
 	}
 	m = updated.(Model)
-	if m.keyPrefix != "g" {
-		t.Fatalf("expected keyPrefix=g after first g, got %q", m.keyPrefix)
+	if m.statusMsg == "" {
+		t.Fatalf("expected status message after L")
 	}
+}
 
-	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+func TestGLNavigatesToLogWhenNavigationEnabled(t *testing.T) {
+	repo := testutil.TempRepo(t)
+
+	m := NewWithSettings(repo, Settings{EnableNavigation: true})
+	m.ready = true
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	m = updated.(Model)
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	if cmd == nil {
-		t.Fatalf("gl should launch lazygit log command")
+		t.Fatalf("gl should navigate to log when navigation is enabled")
+	}
+	route, ok := nav.IsPush(cmd())
+	if !ok {
+		t.Fatalf("expected nav push message")
+	}
+	if route.Kind != nav.RouteLog {
+		t.Fatalf("expected log route, got %q", route.Kind)
 	}
 	m = updated.(Model)
 	if m.keyPrefix != "" {

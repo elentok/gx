@@ -141,6 +141,9 @@ I do not recommend a flat `ui/root.go` / `ui/model.go` under `ui/`; that will bl
     - commit header metadata optional
     - allowed actions
   - Preserve existing status behavior unchanged while moving it onto the shared explorer core.
+  - Remove the temporary embedded-shell toggle (`EnableNavigation` or its equivalent) by separating:
+    - app-shell navigation ownership
+    - standalone page behavior/wrappers
   - This milestone is the real foundation for the commit page; do not skip it.
 
 - [ ] Milestone 4: Commit page backed by historical commit diffs
@@ -232,6 +235,8 @@ I do not recommend a flat `ui/root.go` / `ui/model.go` under `ui/`; that will bl
   - generic file-tree rendering
   - generic diff rendering/navigation
   - modal plumbing
+- The current `EnableNavigation` flag is intentional transition glue, not the target architecture.
+- By the end of this milestone, navigation mode should come from composition boundaries rather than a boolean living in page settings.
 - Separate these before adding commit support or the commit page will either duplicate a lot of code or wedge historical behavior into status-only assumptions.
 - Good extraction targets:
   - status tree building can be generalized from `git.StageFileStatus` to a smaller file-entry shape

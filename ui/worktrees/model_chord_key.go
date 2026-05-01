@@ -2,6 +2,7 @@ package worktrees
 
 import (
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/nav"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -28,10 +29,26 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 			}
 			return m.enterLogsMode(), nil, true
 		case "l":
-			wt := m.selectedWorktree()
-			if wt != nil {
-				m.statusMsg = ui.MessageOpening("lazygit log")
-				return m, cmdLazygitLog(*wt), true
+			if m.settings.EnableNavigation {
+				wt := m.selectedWorktree()
+				if wt != nil {
+					return m, nav.Push(nav.Route{Kind: nav.RouteLog, WorktreeRoot: wt.Path}), true
+				}
+				return m, nil, true
+			}
+			return m, nil, true
+		case "s":
+			if m.settings.EnableNavigation {
+				wt := m.selectedWorktree()
+				if wt != nil {
+					return m, nav.Push(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: wt.Path}), true
+				}
+				return m, nil, true
+			}
+			return m, nil, true
+		case "w":
+			if m.settings.EnableNavigation {
+				return m, nav.Push(nav.Route{Kind: nav.RouteWorktrees}), true
 			}
 			return m, nil, true
 		case "esc":
@@ -44,7 +61,15 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	}
 	if key == "g" {
 		m.keyPrefix = "g"
-		m.statusMsg = ui.RenderInlineBindings(keys.Top, keys.GoOutput, keys.GoLog)
+		m.statusMsg = ui.RenderInlineBindings(keys.Top, keys.GoOutput, keys.GoWorktrees, keys.GoLog, keys.GoStatus)
+		return m, nil, true
+	}
+	if key == "L" {
+		wt := m.selectedWorktree()
+		if wt != nil {
+			m.statusMsg = ui.MessageOpening("lazygit log")
+			return m, cmdLazygitLog(*wt), true
+		}
 		return m, nil, true
 	}
 	if key == "o" {

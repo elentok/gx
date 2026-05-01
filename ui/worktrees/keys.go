@@ -25,7 +25,10 @@ type keyMap struct {
 	Refresh      key.Binding
 	RemoteUpdate key.Binding
 	GoOutput     key.Binding
+	GoWorktrees  key.Binding
 	GoLog        key.Binding
+	GoStatus     key.Binding
+	LazygitLog   key.Binding
 	Open         key.Binding
 	SearchNext   key.Binding
 	SearchPrev   key.Binding
@@ -109,9 +112,21 @@ var keys = keyMap{
 		key.WithKeys("go"),
 		key.WithHelp("go", "view output"),
 	),
+	GoWorktrees: key.NewBinding(
+		key.WithKeys("gw"),
+		key.WithHelp("gw", "goto worktrees"),
+	),
 	GoLog: key.NewBinding(
 		key.WithKeys("gl"),
-		key.WithHelp("gl", "lazygit log"),
+		key.WithHelp("gl", "goto log"),
+	),
+	GoStatus: key.NewBinding(
+		key.WithKeys("gs"),
+		key.WithHelp("gs", "goto status"),
+	),
+	LazygitLog: key.NewBinding(
+		key.WithKeys("L"),
+		key.WithHelp("L", "lazygit log"),
 	),
 	SearchNext: key.NewBinding(
 		key.WithKeys("ctrl+n"),
@@ -152,7 +167,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 		{k.Up, k.Down, k.Top},
 		{k.New, k.NewAndOpen, k.Open, k.Delete, k.Rename, k.Clone},
 		{k.Yank, k.Search},
-		{k.Pull, k.Push, k.Rebase, k.Track, k.Refresh, k.RemoteUpdate, k.GoOutput, k.GoLog, k.Help, k.Quit},
+		{k.Pull, k.Push, k.Rebase, k.Track, k.Refresh, k.RemoteUpdate, k.GoWorktrees, k.GoLog, k.GoStatus, k.LazygitLog, k.Help, k.Quit},
 	}
 }
 

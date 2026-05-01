@@ -154,6 +154,7 @@ type Settings struct {
 	InitialPath      string
 	Terminal         ui.Terminal
 	InputModalBottom config.InputModalBottom
+	EnableNavigation bool
 }
 
 func DefaultSettings() Settings {

@@ -54,6 +54,7 @@ type Settings struct {
 	InputModalBottom config.InputModalBottom
 	NameAliases      map[string]string
 	Terminal         ui.Terminal
+	EnableNavigation bool
 }
 
 // Model is the BubbleTea model for the worktrees page.

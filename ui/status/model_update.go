@@ -72,7 +72,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, tea.Quit
 		}
-		if msg.String() == "q" {
+		if msg.String() == "q" && !m.settings.EnableNavigation {
 			if m.runningRunner != nil && !m.runningDone {
 				m.runningRunner.Cancel()
 			}

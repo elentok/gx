@@ -78,6 +78,12 @@ Not acceptable by default:
 - one-off success/error wording for common actions
 - duplicate keybinding copy
 
+7. Extract repeated Lip Gloss styles into named variables
+
+- If a style is reused or makes a render helper harder to read, extract it to a package-level variable with a semantic name
+- Prefer `activeTabStyle`, `inactiveTabStyle`, `errorTitleStyle`, etc. over rebuilding the same `lipgloss.NewStyle()` chain inline
+- Keep render helpers focused on structure and state decisions, not long styling chains
+
 ## Preferred Patterns
 
 ### Hints
@@ -104,6 +110,11 @@ Not acceptable by default:
 
 - Good: `ui.Icons(useNerd).Search`
 - Bad: embedding `"󰍉"` directly in screen code
+
+### Lip Gloss styles
+
+- Good: define a named style variable once, then call `style.Render(...)`
+- Bad: embedding long `lipgloss.NewStyle().Foreground(...).Background(...).Padding(...)` chains inline inside small render helpers
 
 ## If You Need Something New
 

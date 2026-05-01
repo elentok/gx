@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/nav"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -95,14 +96,14 @@ func TestGShowsChordHint(t *testing.T) {
 	m = updated.(Model)
 
 	hint := ansi.Strip(m.statusMsg)
-	for _, want := range []string{"gg", "top", "go", "view output", "gl", "lazygit log"} {
+	for _, want := range []string{"gg", "top", "go", "view output", "gw", "goto worktrees", "gl", "goto log", "gs", "goto status"} {
 		if !strings.Contains(hint, want) {
 			t.Fatalf("expected chord hint %q in %q", want, hint)
 		}
 	}
 }
 
-func TestGLTriggersLazygitLogCommand(t *testing.T) {
+func TestLTriggersLazygitLogCommand(t *testing.T) {
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -115,18 +116,42 @@ func TestGLTriggersLazygitLogCommand(t *testing.T) {
 	resizeTable(&m.table, 100, 10)
 	m.table.SetRows(m.buildRows())
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
-	if cmd != nil {
-		t.Fatalf("first g should not launch command")
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'L', Text: "L", ShiftedCode: 'L', Mod: tea.ModShift})
+	if cmd == nil {
+		t.Fatalf("L should launch lazygit log command")
 	}
 	m = updated.(Model)
-	if m.keyPrefix != "g" {
-		t.Fatalf("expected keyPrefix=g after first g, got %q", m.keyPrefix)
+	if m.statusMsg == "" {
+		t.Fatalf("expected status message after L")
+	}
+}
+
+func TestGLNavigatesToLogWhenNavigationEnabled(t *testing.T) {
+	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
 	}
 
-	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+	m := NewWithSettings(*repo, "", Settings{EnableNavigation: true})
+	m.ready = true
+	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.MainBranch}}
+	resizeTable(&m.table, 100, 10)
+	m.table.SetRows(m.buildRows())
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	m = updated.(Model)
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	if cmd == nil {
-		t.Fatalf("gl should launch lazygit log command")
+		t.Fatalf("gl should navigate to log when navigation is enabled")
+	}
+	route, ok := nav.IsPush(cmd())
+	if !ok {
+		t.Fatalf("expected nav push message")
+	}
+	if route.Kind != nav.RouteLog {
+		t.Fatalf("expected log route, got %q", route.Kind)
 	}
 	m = updated.(Model)
 	if m.keyPrefix != "" {

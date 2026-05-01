@@ -12,8 +12,10 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/app"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/menu"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/status"
 	"github.com/elentok/gx/ui/worktrees"
 
@@ -178,7 +180,17 @@ func runWorktrees(_ string) error {
 		NameAliases:      cfg.NameAliases,
 		Terminal:         ui.DetectTerminal(),
 	}
-	m := worktrees.NewWithSettings(*repo, activeWorktreePath, settings)
+	m := app.New(*repo, app.Settings{
+		InitialRoute:       nav.Route{Kind: nav.RouteWorktrees},
+		ActiveWorktreePath: activeWorktreePath,
+		Worktrees:          settings,
+		Status: stage.Settings{
+			DiffContextLines: cfg.StageDiffContextLines,
+			UseNerdFontIcons: cfg.UseNerdFontIcons,
+			Terminal:         ui.DetectTerminal(),
+			InputModalBottom: cfg.InputModalBottom,
+		},
+	})
 	p := tea.NewProgram(m)
 	_, err = p.Run()
 	return err
@@ -214,12 +226,26 @@ func runStatus(target string) error {
 	if err != nil {
 		return err
 	}
-	m := stage.NewWithSettings(root, stage.Settings{
-		DiffContextLines: cfg.StageDiffContextLines,
-		UseNerdFontIcons: cfg.UseNerdFontIcons,
-		InitialPath:      initialPath,
-		Terminal:         ui.DetectTerminal(),
-		InputModalBottom: cfg.InputModalBottom,
+	repo, err := git.FindRepo(root)
+	if err != nil {
+		return err
+	}
+	m := app.New(*repo, app.Settings{
+		InitialRoute:       nav.Route{Kind: nav.RouteStatus, WorktreeRoot: root, InitialPath: initialPath},
+		ActiveWorktreePath: root,
+		Worktrees: worktrees.Settings{
+			UseNerdFontIcons: cfg.UseNerdFontIcons,
+			InputModalBottom: cfg.InputModalBottom,
+			NameAliases:      cfg.NameAliases,
+			Terminal:         ui.DetectTerminal(),
+		},
+		Status: stage.Settings{
+			DiffContextLines: cfg.StageDiffContextLines,
+			UseNerdFontIcons: cfg.UseNerdFontIcons,
+			InitialPath:      initialPath,
+			Terminal:         ui.DetectTerminal(),
+			InputModalBottom: cfg.InputModalBottom,
+		},
 	})
 	p := tea.NewProgram(m)
 	_, err = p.Run()

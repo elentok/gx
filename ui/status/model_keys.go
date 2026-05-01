@@ -1,6 +1,9 @@
 package stage
 
-import "github.com/elentok/gx/ui"
+import (
+	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/nav"
+)
 
 import tea "charm.land/bubbletea/v2"
 
@@ -66,8 +69,20 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 			m.openOutputModal()
 			return m, nil, true
 		case "l":
-			m.setStatus(ui.MessageOpening("lazygit log"))
-			return m, cmdLazygitLog(m.worktreeRoot), true
+			if m.settings.EnableNavigation {
+				return m, nav.Push(nav.Route{Kind: nav.RouteLog, WorktreeRoot: m.worktreeRoot}), true
+			}
+			return m, nil, true
+		case "s":
+			if m.settings.EnableNavigation {
+				return m, nav.Push(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: m.worktreeRoot}), true
+			}
+			return m, nil, true
+		case "w":
+			if m.settings.EnableNavigation {
+				return m, nav.Push(nav.Route{Kind: nav.RouteWorktrees}), true
+			}
+			return m, nil, true
 		case "esc":
 			m.clearStatus()
 			return m, nil, true
@@ -78,8 +93,12 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	}
 	if key == "g" && !isUpperG {
 		m.keyPrefix = "g"
-		m.setStatus(m.inlineHints(stageKeyTop, stageKeyOutput, stageKeyLog))
+		m.setStatus(m.inlineHints(stageKeyTop, stageKeyOutput, stageKeyGoWorktree, stageKeyGoLog, stageKeyGoStatus))
 		return m, nil, true
+	}
+	if key == "L" {
+		m.setStatus(ui.MessageOpening("lazygit log"))
+		return m, cmdLazygitLog(m.worktreeRoot), true
 	}
 	if isUpperG {
 		m.keyPrefix = ""
@@ -95,6 +114,16 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 
 func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "q":
+		if m.settings.EnableNavigation {
+			return m, nav.Back()
+		}
+		return m, tea.Quit
+	case "esc":
+		if m.settings.EnableNavigation {
+			return m, nav.Back()
+		}
+		return m, nil
 	case "[":
 		m.adjustDiffContextLines(-1)
 		return m, nil

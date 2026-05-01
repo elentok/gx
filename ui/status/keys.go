@@ -25,7 +25,10 @@ var (
 	stageKeySearchPrev = key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "prev match"))
 	stageKeyCommit     = key.NewBinding(key.WithKeys("cc"), key.WithHelp("cc", "git commit"))
 	stageKeyOutput     = key.NewBinding(key.WithKeys("go"), key.WithHelp("go", "view output"))
-	stageKeyLog        = key.NewBinding(key.WithKeys("gl"), key.WithHelp("gl", "lazygit log"))
+	stageKeyGoWorktree = key.NewBinding(key.WithKeys("gw"), key.WithHelp("gw", "goto worktrees"))
+	stageKeyGoLog      = key.NewBinding(key.WithKeys("gl"), key.WithHelp("gl", "goto log"))
+	stageKeyGoStatus   = key.NewBinding(key.WithKeys("gs"), key.WithHelp("gs", "goto status"))
+	stageKeyLog        = key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "lazygit log"))
 	stageKeyYank       = key.NewBinding(key.WithKeys("yy", "yl", "ya", "yf"), key.WithHelp("yy/yl/ya/yf", "yank"))
 	stageKeyYankText   = key.NewBinding(key.WithKeys("yy"), key.WithHelp("yy", "content"))
 	stageKeyYankPath   = key.NewBinding(key.WithKeys("yl"), key.WithHelp("yl", "location"))
@@ -85,7 +88,7 @@ func (k stageKeyMap) ShortHelp() []key.Binding {
 
 func (k stageKeyMap) FullHelp() [][]key.Binding {
 	global := []key.Binding{
-		stageKeyHelp, stageKeyQuit, stageKeyCommit, stageKeyOutput, stageKeyLog,
+		stageKeyHelp, stageKeyQuit, stageKeyCommit, stageKeyOutput, stageKeyGoWorktree, stageKeyGoLog, stageKeyGoStatus, stageKeyLog,
 		stageKeyYank, stageKeyPull, stageKeyPush, stageKeyRebase, stageKeyAmend,
 	}
 	search := []key.Binding{stageKeySearch, stageKeySearchNext, stageKeySearchPrev}
