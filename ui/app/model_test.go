@@ -268,6 +268,27 @@ func TestViewMergesTabsIntoFooterLine(t *testing.T) {
 	}
 }
 
+func TestTabsUseBadgeCapsInFooter(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.Route{Kind: nav.RouteLog, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+	m.width = 80
+	m.height = 24
+
+	last := strings.Split(m.View().Content, "\n")
+	footer := last[len(last)-1]
+	if !strings.Contains(footer, "\uE0B6") || !strings.Contains(footer, "\uE0B4") {
+		t.Fatalf("expected pill badge caps in footer tabs")
+	}
+}
+
 func TestViewMatchesScreenHeight(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)

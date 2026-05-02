@@ -13,13 +13,10 @@ import (
 )
 
 var (
-	logSelectedStyle    = lipgloss.NewStyle().Foreground(ui.ColorDeepBg).Background(ui.ColorOrange)
-	logHashStyle        = lipgloss.NewStyle().Foreground(ui.ColorBlue)
-	logMetaStyle        = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
-	logPseudoStyle      = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true)
-	logTagBadgeStyle    = lipgloss.NewStyle().Foreground(ui.ColorDeepBg).Background(ui.ColorYellow).Padding(0, 1)
-	logLocalBadgeStyle  = lipgloss.NewStyle().Foreground(ui.ColorDeepBg).Background(ui.ColorGreen).Padding(0, 1)
-	logRemoteBadgeStyle = lipgloss.NewStyle().Foreground(ui.ColorDeepBg).Background(ui.ColorBlue).Padding(0, 1)
+	logSelectedStyle = lipgloss.NewStyle().Foreground(ui.ColorDeepBg).Background(ui.ColorOrange)
+	logHashStyle     = lipgloss.NewStyle().Foreground(ui.ColorBlue)
+	logMetaStyle     = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
+	logPseudoStyle   = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true)
 )
 
 func (m Model) View() tea.View {
@@ -126,16 +123,31 @@ func renderBadges(decorations []git.RefDecoration) string {
 	}
 	parts := make([]string, 0, len(decorations))
 	for _, decoration := range decorations {
-		switch decoration.Kind {
-		case git.RefDecorationTag:
-			parts = append(parts, logTagBadgeStyle.Render(decoration.Name))
-		case git.RefDecorationRemoteBranch:
-			parts = append(parts, logRemoteBadgeStyle.Render(decoration.Name))
-		default:
-			parts = append(parts, logLocalBadgeStyle.Render(decoration.Name))
-		}
+		parts = append(parts, ui.RenderBadge(decoration.Name, badgeVariantForDecoration(decoration), true))
 	}
 	return strings.Join(parts, " ")
+}
+
+func badgeVariantForDecoration(decoration git.RefDecoration) ui.BadgeVariant {
+	switch decoration.Kind {
+	case git.RefDecorationTag:
+		return ui.BadgeVariantBlue
+	case git.RefDecorationRemoteBranch, git.RefDecorationLocalBranch:
+		if isMainOrMasterRef(decoration.Name) {
+			return ui.BadgeVariantYellow
+		}
+		return ui.BadgeVariantMauve
+	default:
+		return ui.BadgeVariantSurface
+	}
+}
+
+func isMainOrMasterRef(name string) bool {
+	name = strings.TrimSpace(name)
+	if idx := strings.LastIndex(name, "/"); idx >= 0 {
+		name = name[idx+1:]
+	}
+	return name == "main" || name == "master"
 }
 
 func (m Model) footerView() string {

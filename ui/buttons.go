@@ -26,18 +26,5 @@ func RenderButton(label string, selected bool, nerd bool) string {
 		fgColor = lipgloss.Color("7")
 	}
 
-	bodyStyle := lipgloss.NewStyle().
-		Background(bgColor).
-		Foreground(fgColor)
-	if selected {
-		bodyStyle = bodyStyle.Bold(true)
-	}
-	body := bodyStyle.Render(" " + label + " ")
-
-	if !nerd {
-		return body
-	}
-
-	capStyle := lipgloss.NewStyle().Foreground(bgColor)
-	return capStyle.Render(capLeft) + body + capStyle.Render(capRight)
+	return renderPill(label, bgColor, fgColor, selected, nerd)
 }

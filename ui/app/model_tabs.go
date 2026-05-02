@@ -7,20 +7,7 @@ import (
 	"github.com/elentok/gx/ui/nav"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-)
-
-var (
-	activeTabStyle = lipgloss.NewStyle().
-			Foreground(ui.ColorDeepBg).
-			Background(ui.ColorOrange).
-			Bold(true).
-			Padding(0, 1)
-	inactiveTabStyle = lipgloss.NewStyle().
-				Foreground(ui.ColorSubtle).
-				Faint(true).
-				Padding(0, 1)
 )
 
 func (m *Model) ensureTabs() {
@@ -195,7 +182,7 @@ type tabSpec struct {
 
 func renderTab(tab tabSpec) string {
 	if tab.active {
-		return activeTabStyle.Render(tab.label)
+		return ui.RenderBadge(tab.label, ui.BadgeVariantOrange, true)
 	}
-	return inactiveTabStyle.Render(tab.label)
+	return ui.RenderBadge(tab.label, ui.BadgeVariantSurface, true)
 }

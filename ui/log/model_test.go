@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
 
 	tea "charm.land/bubbletea/v2"
@@ -100,5 +101,24 @@ func TestSelectedCommitRowFillsFullWidth(t *testing.T) {
 	line := m.renderRow(m.rows[0], true, 40)
 	if got := ansi.StringWidth(ansi.Strip(line)); got != 40 {
 		t.Fatalf("selected row width = %d, want 40", got)
+	}
+}
+
+func TestBadgeVariantForDecoration(t *testing.T) {
+	tests := []struct {
+		name string
+		dec  git.RefDecoration
+		want ui.BadgeVariant
+	}{
+		{name: "main local branch", dec: git.RefDecoration{Name: "main", Kind: git.RefDecorationLocalBranch}, want: ui.BadgeVariantYellow},
+		{name: "main remote branch", dec: git.RefDecoration{Name: "origin/main", Kind: git.RefDecorationRemoteBranch}, want: ui.BadgeVariantYellow},
+		{name: "feature branch", dec: git.RefDecoration{Name: "feature/x", Kind: git.RefDecorationLocalBranch}, want: ui.BadgeVariantMauve},
+		{name: "tag", dec: git.RefDecoration{Name: "v1.0.0", Kind: git.RefDecorationTag}, want: ui.BadgeVariantBlue},
+	}
+
+	for _, tt := range tests {
+		if got := badgeVariantForDecoration(tt.dec); got != tt.want {
+			t.Fatalf("%s: variant = %q, want %q", tt.name, got, tt.want)
+		}
 	}
 }
