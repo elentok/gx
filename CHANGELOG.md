@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.12.10
+
+- Added app-level tab navigation across `gx wt`, `gx log`, and `gx status`, including persistent tab state, `gw` / `gl` / `gs` routing, and proper push/replace back-stack behavior for drill-down screens
+- Added a new `gx log` view with commit history, ref badges, pseudo-row navigation into working-tree status, inline search with persistent highlights plus `n` / `N` result jumping, and support for `gx log <ref>` rooted at an explicit commitish
+- Unified selected-row highlighting across log and worktrees with a neutral surface background that preserves existing foreground colors and search/status styling
+
 ## v0.12.9
 
 - Refined `gx status` unified diff rendering so changed rows no longer show literal `+` / `-` markers, making the interactive unified view read closer to the side-by-side mode while keeping hunk/line staging behavior intact
