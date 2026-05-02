@@ -116,11 +116,11 @@ func TestDirtyCellSymbols(t *testing.T) {
 	}
 }
 
-func TestDirtyAndStatusCellSelectedArePlain(t *testing.T) {
-	if got := dirtyCell(dirtyState{hasModified: true, hasUntracked: true}, icons(false), true); got != "M?" {
-		t.Fatalf("dirtyCell(selected) = %q, want %q", got, "M?")
+func TestDirtyAndStatusCellSelectedKeepContent(t *testing.T) {
+	if got := dirtyCell(dirtyState{hasModified: true, hasUntracked: true}, icons(false), true); !strings.Contains(got, "M?") {
+		t.Fatalf("dirtyCell(selected) = %q, want symbol %q", got, "M?")
 	}
-	if got := statusCell(git.SyncStatus{Name: git.StatusSame}, icons(false), true, false); got != "synced" {
+	if got := statusCell(git.SyncStatus{Name: git.StatusSame}, icons(false), true, false); !strings.Contains(got, "synced") {
 		t.Fatalf("statusCell(selected) = %q, want %q", got, "synced")
 	}
 }

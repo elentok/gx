@@ -45,10 +45,7 @@ func newTable() table.Model {
 		BorderForeground(ui.ColorBorder).
 		BorderBottom(true).
 		Bold(true)
-	s.Selected = s.Selected.
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
+	s.Selected = ui.StyleRowHighlight
 	t.SetStyles(s)
 	tableStyles = s
 
@@ -156,7 +153,7 @@ func renderRow(row table.Row, cols []table.Column, selected bool) string {
 	}
 	rowStr := ui.RenderFixedColumns(renderCols)
 	if selected {
-		return tableStyles.Selected.Render(rowStr)
+		return ui.RenderRowHighlight(rowStr)
 	}
 	return rowStr
 }
@@ -198,7 +195,7 @@ func highlightMatch(text, query string) string {
 	return text[:idx] + styleSearchHighlight.Render(text[idx:idx+len(query)]) + text[idx+len(query):]
 }
 
-func worktreeCell(name, branch string, ic uiIcons, isMain, isSelected bool) string {
+func worktreeCell(name, branch string, ic uiIcons, isMain, _ bool) string {
 	prefix := ic.worktreePrefix
 	if isMain && ic.mainPrefix != "" {
 		prefix = ic.mainPrefix
@@ -207,9 +204,7 @@ func worktreeCell(name, branch string, ic uiIcons, isMain, isSelected bool) stri
 
 	if branch != "" && branch != name {
 		branchSuffix := "(" + ic.branchPrefix + branch + ")"
-		if isSelected {
-			text += " " + branchSuffix
-		} else if isMain {
+		if isMain {
 			return styleMainBranch.Render(text + " " + branchSuffix)
 		} else {
 			text += " " + ui.StyleDim.Render(branchSuffix)
@@ -217,13 +212,13 @@ func worktreeCell(name, branch string, ic uiIcons, isMain, isSelected bool) stri
 		return text
 	}
 
-	if isMain && !isSelected {
+	if isMain {
 		return styleMainBranch.Render(text)
 	}
 	return text
 }
 
-func dirtyCell(d dirtyState, ic uiIcons, selected bool) string {
+func dirtyCell(d dirtyState, ic uiIcons, _ bool) string {
 	switch {
 	case d.hasModified && d.hasUntracked:
 		return "M?"
@@ -232,35 +227,23 @@ func dirtyCell(d dirtyState, ic uiIcons, selected bool) string {
 	case d.hasUntracked:
 		return "?"
 	}
-	if selected {
-		return ic.dash
-	}
 	return ui.StyleDim.Render(ic.dash)
 }
 
-func baseCell(rebased *bool, ic uiIcons, isMainBranch bool, selected bool) string {
+func baseCell(rebased *bool, ic uiIcons, isMainBranch bool, _ bool) string {
 	if isMainBranch {
-		if selected {
-			return ic.dash
-		}
 		return ui.StyleDim.Render(ic.dash)
 	}
 	if rebased == nil {
 		return "" // not yet loaded
 	}
 	if *rebased {
-		if selected {
-			return ic.checkmark
-		}
 		return ui.StyleStatusSynced.Render(ic.checkmark)
-	}
-	if selected {
-		return ic.x
 	}
 	return ui.StyleStatusDiverged.Render(ic.x)
 }
 
-func statusCell(s git.SyncStatus, ic uiIcons, selected bool, useNerdFontIcons bool) string {
+func statusCell(s git.SyncStatus, ic uiIcons, _ bool, useNerdFontIcons bool) string {
 	label := ic.dash
 	switch s.Name {
 	case git.StatusSame:
@@ -271,9 +254,6 @@ func statusCell(s git.SyncStatus, ic uiIcons, selected bool, useNerdFontIcons bo
 	if useNerdFontIcons {
 		label = strings.ReplaceAll(label, "ahead", ic.ahead)
 		label = strings.ReplaceAll(label, "behind", ic.behind)
-	}
-	if selected {
-		return label
 	}
 	switch s.Name {
 	case git.StatusSame:

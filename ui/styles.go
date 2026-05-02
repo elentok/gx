@@ -1,6 +1,12 @@
 package ui
 
-import "charm.land/lipgloss/v2"
+import (
+	"fmt"
+	"image/color"
+	"strings"
+
+	"charm.land/lipgloss/v2"
+)
 
 // Base palette. This follows the Catppuccin-inspired colors already used by the
 // status UI so the rest of the app can share one visual language.
@@ -49,6 +55,22 @@ var (
 
 // Text styles.
 var (
-	StyleBold = lipgloss.NewStyle().Bold(true)
-	StyleDim  = StyleMuted
+	StyleBold         = lipgloss.NewStyle().Bold(true)
+	StyleDim          = StyleMuted
+	StyleRowHighlight = lipgloss.NewStyle().Background(ColorSurface)
 )
+
+// RenderRowHighlight applies the shared row highlight background and re-applies
+// it after nested ANSI resets so per-cell foreground colors stay visible across
+// the full row.
+func RenderRowHighlight(text string) string {
+	bg := backgroundANSI(ColorSurface)
+	text = strings.ReplaceAll(text, "\x1b[0m", "\x1b[0m"+bg)
+	text = strings.ReplaceAll(text, "\x1b[m", "\x1b[m"+bg)
+	return bg + text + "\x1b[0m"
+}
+
+func backgroundANSI(c color.Color) string {
+	nrgba := color.NRGBAModel.Convert(c).(color.NRGBA)
+	return fmt.Sprintf("\x1b[48;2;%d;%d;%dm", nrgba.R, nrgba.G, nrgba.B)
+}

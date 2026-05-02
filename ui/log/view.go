@@ -13,11 +13,10 @@ import (
 )
 
 var (
-	logSelectedStyle = lipgloss.NewStyle().Foreground(ui.ColorDeepBg).Background(ui.ColorOrange)
-	logHashStyle     = lipgloss.NewStyle().Foreground(ui.ColorBlue)
-	logMetaStyle     = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
-	logPseudoStyle   = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true)
-	logSearchStyle   = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true).Underline(true)
+	logHashStyle   = lipgloss.NewStyle().Foreground(ui.ColorBlue)
+	logMetaStyle   = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
+	logPseudoStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true)
+	logSearchStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true).Underline(true)
 )
 
 func (m Model) View() tea.View {
@@ -95,12 +94,11 @@ func (m Model) renderRow(row row, selected bool, width int) string {
 	}
 	line = ansi.Truncate(line, maxInt(1, width), "…")
 	if selected {
-		line = ansi.Strip(line)
 		lineW := ansi.StringWidth(line)
 		if lineW < width {
 			line += strings.Repeat(" ", width-lineW)
 		}
-		return logSelectedStyle.Render(line)
+		return ui.RenderRowHighlight(line)
 	}
 	return line
 }

@@ -103,6 +103,9 @@ func TestSelectedCommitRowFillsFullWidth(t *testing.T) {
 	if got := ansi.StringWidth(ansi.Strip(line)); got != 40 {
 		t.Fatalf("selected row width = %d, want 40", got)
 	}
+	if line == ansi.Strip(line) {
+		t.Fatalf("expected selected row to preserve nested ansi colors")
+	}
 }
 
 func TestBadgeVariantForDecoration(t *testing.T) {
