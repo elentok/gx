@@ -11,4 +11,6 @@ var (
 	logKeySearchNext  = key.NewBinding(key.WithKeys("ctrl+n"), key.WithHelp("ctrl+n", "next"))
 	logKeySearchPrev  = key.NewBinding(key.WithKeys("ctrl+p"), key.WithHelp("ctrl+p", "prev"))
 	logKeySearchClose = key.NewBinding(key.WithKeys("esc", "enter"), key.WithHelp("esc/enter", "close"))
+	logKeyResultNext  = key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next result"))
+	logKeyResultPrev  = key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "prev result"))
 )

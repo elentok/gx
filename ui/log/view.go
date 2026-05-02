@@ -17,6 +17,7 @@ var (
 	logHashStyle     = lipgloss.NewStyle().Foreground(ui.ColorBlue)
 	logMetaStyle     = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
 	logPseudoStyle   = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true)
+	logSearchStyle   = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true).Underline(true)
 )
 
 func (m Model) View() tea.View {
@@ -81,10 +82,14 @@ func (m Model) renderRow(row row, selected bool, width int) string {
 	line := ""
 	switch row.kind {
 	case rowPseudoStatus:
-		line = fmt.Sprintf("  %s  %s", logPseudoStyle.Render("working tree"), ui.StyleMuted.Render(row.detail))
+		line = fmt.Sprintf(
+			"  %s  %s",
+			logPseudoStyle.Render(m.highlightSearch("working tree")),
+			ui.StyleMuted.Render(m.highlightSearch(row.detail)),
+		)
 	default:
 		line = m.renderCommitRow(row)
-		if badges := renderBadges(row.commit.Decorations); badges != "" {
+		if badges := m.renderBadges(row.commit.Decorations); badges != "" {
 			line += "  " + badges
 		}
 	}
@@ -107,25 +112,53 @@ func (m Model) renderCommitRow(row row) string {
 	}
 	cols := []ui.FixedColumn{
 		{Text: graph, Width: 4},
-		{Text: row.commit.Hash, Width: 8, Style: logHashStyle},
+		{Text: m.highlightSearch(row.commit.Hash), Width: 8, Style: logHashStyle},
 		{Text: "", Width: 2},
 		{Text: ui.RelativeTimeCompact(row.commit.Date), Width: 10, Style: logMetaStyle},
 		{Text: "", Width: 1},
-		{Text: row.commit.AuthorShort, Width: 4, Style: logMetaStyle},
+		{Text: m.highlightSearch(row.commit.AuthorShort), Width: 4, Style: logMetaStyle},
 	}
 	meta := ui.RenderFixedColumns(cols)
-	return meta + "  " + row.commit.Subject
+	return meta + "  " + m.highlightSearch(row.commit.Subject)
 }
 
-func renderBadges(decorations []git.RefDecoration) string {
+func (m Model) renderBadges(decorations []git.RefDecoration) string {
 	if len(decorations) == 0 {
 		return ""
 	}
 	parts := make([]string, 0, len(decorations))
 	for _, decoration := range decorations {
-		parts = append(parts, ui.RenderBadge(decoration.Name, badgeVariantForDecoration(decoration), true))
+		parts = append(parts, ui.RenderBadge(m.highlightSearch(decoration.Name), badgeVariantForDecoration(decoration), true))
 	}
 	return strings.Join(parts, " ")
+}
+
+func (m Model) highlightSearch(text string) string {
+	query := strings.TrimSpace(m.searchQuery)
+	if query == "" {
+		return text
+	}
+	lowerText := strings.ToLower(text)
+	lowerQuery := strings.ToLower(query)
+	if !strings.Contains(lowerText, lowerQuery) {
+		return text
+	}
+
+	var out strings.Builder
+	start := 0
+	for start < len(text) {
+		idx := strings.Index(lowerText[start:], lowerQuery)
+		if idx < 0 {
+			out.WriteString(text[start:])
+			break
+		}
+		idx += start
+		out.WriteString(text[start:idx])
+		end := idx + len(query)
+		out.WriteString(logSearchStyle.Render(text[idx:end]))
+		start = end
+	}
+	return out.String()
 }
 
 func badgeVariantForDecoration(decoration git.RefDecoration) ui.BadgeVariant {

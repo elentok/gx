@@ -52,6 +52,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "/":
 			m.enterSearchMode()
+		case "n":
+			m.advanceSearch(1)
+		case "N":
+			m.advanceSearch(-1)
 		case "enter":
 			return m, m.openSelected()
 		case "L":

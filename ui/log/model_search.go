@@ -22,22 +22,13 @@ func (m *Model) enterSearchMode() {
 func (m Model) handleSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, logKeySearchClose):
-		m.searchMode = searchModeNone
-		m.searchQuery = ""
-		m.searchMatch = nil
-		m.searchCursor = 0
+		m.closeSearch()
 		return m, nil
 	case key.Matches(msg, logKeySearchNext):
-		if len(m.searchMatch) > 0 {
-			m.searchCursor = (m.searchCursor + 1) % len(m.searchMatch)
-			m.cursor = m.searchMatch[m.searchCursor]
-		}
+		m.advanceSearch(1)
 		return m, nil
 	case key.Matches(msg, logKeySearchPrev):
-		if len(m.searchMatch) > 0 {
-			m.searchCursor = (m.searchCursor - 1 + len(m.searchMatch)) % len(m.searchMatch)
-			m.cursor = m.searchMatch[m.searchCursor]
-		}
+		m.advanceSearch(-1)
 		return m, nil
 	}
 
@@ -50,6 +41,23 @@ func (m Model) handleSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.cursor = m.searchMatch[0]
 	}
 	return m, cmd
+}
+
+func (m *Model) closeSearch() {
+	m.searchMode = searchModeNone
+	if strings.TrimSpace(m.searchQuery) == "" || len(m.searchMatch) == 0 {
+		m.searchQuery = ""
+		m.searchMatch = nil
+		m.searchCursor = 0
+	}
+}
+
+func (m *Model) advanceSearch(delta int) {
+	if len(m.searchMatch) == 0 {
+		return
+	}
+	m.searchCursor = (m.searchCursor + delta + len(m.searchMatch)) % len(m.searchMatch)
+	m.cursor = m.searchMatch[m.searchCursor]
 }
 
 func (m *Model) recomputeSearchMatches() {
