@@ -179,7 +179,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case msg.String() == "enter" && len(m.worktrees) > 0 && m.settings.EnableNavigation:
 			wt := m.selectedWorktree()
 			if wt != nil {
-				return m, nav.Push(nav.Route{Kind: nav.RouteLog, WorktreeRoot: wt.Path})
+				return m, nav.Replace(nav.Route{Kind: nav.RouteLog, WorktreeRoot: wt.Path})
 			}
 		}
 

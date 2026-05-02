@@ -46,14 +46,14 @@ func (m placeholderModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.keyG = false
 			switch msg.String() {
 			case "w":
-				return m, nav.Push(nav.Route{Kind: nav.RouteWorktrees})
+				return m, nav.Replace(nav.Route{Kind: nav.RouteWorktrees})
 			case "s":
 				if strings.TrimSpace(m.route.WorktreeRoot) == "" {
 					return m, nil
 				}
-				return m, nav.Push(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: m.route.WorktreeRoot})
+				return m, nav.Replace(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: m.route.WorktreeRoot})
 			case "l":
-				return m, nav.Push(nav.Route{Kind: nav.RouteLog, WorktreeRoot: m.route.WorktreeRoot, Ref: m.route.Ref})
+				return m, nav.Replace(nav.Route{Kind: nav.RouteLog, WorktreeRoot: m.route.WorktreeRoot, Ref: m.route.Ref})
 			}
 			return m, nil
 		}

@@ -70,10 +70,10 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if route, ok := nav.IsReplace(msg); ok {
+		return m.switchTab(route)
+	}
 	if route, ok := nav.IsPush(msg); ok {
-		if tabForRoute(route.Kind) == route.Kind {
-			return m.switchTab(route)
-		}
 		next := m.newPage(route)
 		m.history = append(m.history, next)
 		return m, tea.Batch(tea.ClearScreen, next.model.Init(), m.resizeCurrentCmd())

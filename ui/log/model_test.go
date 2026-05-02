@@ -48,9 +48,9 @@ func TestGHResetsCustomRefToHead(t *testing.T) {
 	if cmd == nil {
 		t.Fatalf("expected nav command for gh")
 	}
-	route, ok := nav.IsPush(cmd())
+	route, ok := nav.IsReplace(cmd())
 	if !ok {
-		t.Fatalf("expected nav push")
+		t.Fatalf("expected nav replace")
 	}
 	if route.Kind != nav.RouteLog || route.Ref != "HEAD" {
 		t.Fatalf("expected log HEAD route, got kind=%q ref=%q", route.Kind, route.Ref)

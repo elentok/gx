@@ -12,7 +12,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-func TestTopLevelPushSwitchesTabWithoutHistory(t *testing.T) {
+func TestReplaceSwitchesTabWithoutHistory(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -24,7 +24,7 @@ func TestTopLevelPushSwitchesTabWithoutHistory(t *testing.T) {
 		ActiveWorktreePath: repoDir,
 	})
 
-	updated, cmd := m.Update(nav.Push(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: repoDir})())
+	updated, cmd := m.Update(nav.Replace(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: repoDir})())
 	if cmd == nil {
 		t.Fatalf("expected resize cmd when switching tabs")
 	}
@@ -33,11 +33,11 @@ func TestTopLevelPushSwitchesTabWithoutHistory(t *testing.T) {
 		t.Fatalf("expected active tab status, got %q", m.activeTab)
 	}
 	if len(m.history) != 0 {
-		t.Fatalf("expected empty history after top-level tab switch, got %d", len(m.history))
+		t.Fatalf("expected empty history after tab replace, got %d", len(m.history))
 	}
 }
 
-func TestShellChordSwitchesTopLevelTabWithoutHistory(t *testing.T) {
+func TestShellChordReplacesTabWithoutHistory(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -67,7 +67,7 @@ func TestShellChordSwitchesTopLevelTabWithoutHistory(t *testing.T) {
 	}
 }
 
-func TestSwitchToUninitializedTopLevelTabRunsInit(t *testing.T) {
+func TestSwitchToUninitializedTabRunsInit(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -96,7 +96,7 @@ func TestSwitchToUninitializedTopLevelTabRunsInit(t *testing.T) {
 	}
 }
 
-func TestPushDetailAndBackRestoresTopLevelPage(t *testing.T) {
+func TestPushCommitAndBackRestoresTab(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -110,7 +110,7 @@ func TestPushDetailAndBackRestoresTopLevelPage(t *testing.T) {
 
 	updated, cmd := m.Update(nav.Push(nav.Route{Kind: nav.RouteCommit, WorktreeRoot: repoDir, Ref: "HEAD"})())
 	if cmd == nil {
-		t.Fatalf("expected init/resize cmd when pushing detail route")
+		t.Fatalf("expected init/resize cmd when pushing commit route")
 	}
 	m = updated.(Model)
 	if len(m.history) != 1 {
@@ -130,7 +130,41 @@ func TestPushDetailAndBackRestoresTopLevelPage(t *testing.T) {
 	}
 }
 
-func TestTopLevelSwitchFromDetailClearsHistory(t *testing.T) {
+func TestPushStatusAndBackRestoresLogTab(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.Route{Kind: nav.RouteLog, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	updated, cmd := m.Update(nav.Push(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: repoDir})())
+	if cmd == nil {
+		t.Fatalf("expected init/resize cmd when pushing status route")
+	}
+	m = updated.(Model)
+	if len(m.history) != 1 {
+		t.Fatalf("expected history depth 1, got %d", len(m.history))
+	}
+	if got := m.activePage().route.Kind; got != nav.RouteStatus {
+		t.Fatalf("expected active page status, got %q", got)
+	}
+
+	updated, cmd = m.Update(nav.Back()())
+	m = updated.(Model)
+	if m.activeTab != nav.RouteLog {
+		t.Fatalf("expected active tab log after back, got %q", m.activeTab)
+	}
+	if len(m.history) != 0 {
+		t.Fatalf("expected empty history after back, got %d", len(m.history))
+	}
+}
+
+func TestReplaceClearsHistoryAfterPush(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -148,13 +182,13 @@ func TestTopLevelSwitchFromDetailClearsHistory(t *testing.T) {
 		t.Fatalf("expected history depth 1, got %d", len(m.history))
 	}
 
-	updated, _ = m.Update(nav.Push(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: repoDir})())
+	updated, _ = m.Update(nav.Replace(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: repoDir})())
 	m = updated.(Model)
 	if m.activeTab != nav.RouteStatus {
 		t.Fatalf("expected active tab status, got %q", m.activeTab)
 	}
 	if len(m.history) != 0 {
-		t.Fatalf("expected history cleared after top-level switch, got %d", len(m.history))
+		t.Fatalf("expected history cleared after tab replace, got %d", len(m.history))
 	}
 }
 

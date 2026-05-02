@@ -1907,9 +1907,9 @@ func TestGLNavigatesToLogWhenNavigationEnabled(t *testing.T) {
 	if cmd == nil {
 		t.Fatalf("gl should navigate to log when navigation is enabled")
 	}
-	route, ok := nav.IsPush(cmd())
+	route, ok := nav.IsReplace(cmd())
 	if !ok {
-		t.Fatalf("expected nav push message")
+		t.Fatalf("expected nav replace message")
 	}
 	if route.Kind != nav.RouteLog {
 		t.Fatalf("expected log route, got %q", route.Kind)

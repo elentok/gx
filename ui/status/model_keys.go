@@ -72,19 +72,19 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		case "l":
 			if m.settings.EnableNavigation {
 				m.clearStatus()
-				return m, nav.Push(nav.Route{Kind: nav.RouteLog, WorktreeRoot: m.worktreeRoot}), true
+				return m, nav.Replace(nav.Route{Kind: nav.RouteLog, WorktreeRoot: m.worktreeRoot}), true
 			}
 			return m, nil, true
 		case "s":
 			if m.settings.EnableNavigation {
 				m.clearStatus()
-				return m, nav.Push(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: m.worktreeRoot}), true
+				return m, nav.Replace(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: m.worktreeRoot}), true
 			}
 			return m, nil, true
 		case "w":
 			if m.settings.EnableNavigation {
 				m.clearStatus()
-				return m, nav.Push(nav.Route{Kind: nav.RouteWorktrees}), true
+				return m, nav.Replace(nav.Route{Kind: nav.RouteWorktrees}), true
 			}
 			return m, nil, true
 		case "esc":

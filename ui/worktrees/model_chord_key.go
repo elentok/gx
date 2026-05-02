@@ -33,7 +33,7 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 				wt := m.selectedWorktree()
 				if wt != nil {
 					m.statusMsg = ""
-					return m, nav.Push(nav.Route{Kind: nav.RouteLog, WorktreeRoot: wt.Path}), true
+					return m, nav.Replace(nav.Route{Kind: nav.RouteLog, WorktreeRoot: wt.Path}), true
 				}
 				return m, nil, true
 			}
@@ -43,7 +43,7 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 				wt := m.selectedWorktree()
 				if wt != nil {
 					m.statusMsg = ""
-					return m, nav.Push(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: wt.Path}), true
+					return m, nav.Replace(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: wt.Path}), true
 				}
 				return m, nil, true
 			}
@@ -51,7 +51,7 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		case "w":
 			if m.settings.EnableNavigation {
 				m.statusMsg = ""
-				return m, nav.Push(nav.Route{Kind: nav.RouteWorktrees}), true
+				return m, nav.Replace(nav.Route{Kind: nav.RouteWorktrees}), true
 			}
 			return m, nil, true
 		case "esc":

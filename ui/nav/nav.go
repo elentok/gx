@@ -22,11 +22,21 @@ type pushMsg struct {
 	Route Route
 }
 
+type replaceMsg struct {
+	Route Route
+}
+
 type backMsg struct{}
 
 func Push(route Route) tea.Cmd {
 	return func() tea.Msg {
 		return pushMsg{Route: route}
+	}
+}
+
+func Replace(route Route) tea.Cmd {
+	return func() tea.Msg {
+		return replaceMsg{Route: route}
 	}
 }
 
@@ -39,6 +49,11 @@ func Back() tea.Cmd {
 func IsPush(msg tea.Msg) (Route, bool) {
 	push, ok := msg.(pushMsg)
 	return push.Route, ok
+}
+
+func IsReplace(msg tea.Msg) (Route, bool) {
+	replace, ok := msg.(replaceMsg)
+	return replace.Route, ok
 }
 
 func IsBack(msg tea.Msg) bool {
