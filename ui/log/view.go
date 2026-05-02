@@ -1,0 +1,176 @@
+package log
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui"
+
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
+)
+
+var (
+	logSelectedStyle    = lipgloss.NewStyle().Foreground(ui.ColorDeepBg).Background(ui.ColorOrange)
+	logHashStyle        = lipgloss.NewStyle().Foreground(ui.ColorBlue)
+	logMetaStyle        = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
+	logPseudoStyle      = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true)
+	logTagBadgeStyle    = lipgloss.NewStyle().Foreground(ui.ColorDeepBg).Background(ui.ColorYellow).Padding(0, 1)
+	logLocalBadgeStyle  = lipgloss.NewStyle().Foreground(ui.ColorDeepBg).Background(ui.ColorGreen).Padding(0, 1)
+	logRemoteBadgeStyle = lipgloss.NewStyle().Foreground(ui.ColorDeepBg).Background(ui.ColorBlue).Padding(0, 1)
+)
+
+func (m Model) View() tea.View {
+	if !m.ready {
+		return tea.NewView("\n  Loading log…")
+	}
+	if m.err != nil {
+		return tea.NewView("\n  Error: " + m.err.Error())
+	}
+
+	body := ui.RenderPanelFrame(ui.PanelFrameOptions{
+		Width:       maxInt(20, m.width),
+		Height:      maxInt(4, m.height-1),
+		Title:       "Log",
+		RightTitle:  m.startRef,
+		Lines:       m.visibleLines(),
+		BorderColor: ui.ColorBorder,
+		TitleColor:  ui.ColorBlue,
+		Background:  ui.ColorBase,
+	})
+	footer := m.footerView()
+	out := lipgloss.JoinVertical(lipgloss.Left, body, footer)
+	if m.searchMode == searchModeInput {
+		overlay := m.searchOverlayView()
+		y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
+		out = ui.OverlayBottomCenter(out, overlay, m.width, y)
+	}
+	v := tea.NewView(out)
+	v.AltScreen = true
+	return v
+}
+
+func (m Model) visibleLines() []string {
+	if len(m.rows) == 0 {
+		return []string{ui.StyleMuted.Render("no commits")}
+	}
+
+	innerHeight := maxInt(1, m.height-3)
+	start := m.cursor - innerHeight/2
+	if start < 0 {
+		start = 0
+	}
+	if start > len(m.rows)-innerHeight {
+		start = len(m.rows) - innerHeight
+	}
+	if start < 0 {
+		start = 0
+	}
+	end := start + innerHeight
+	if end > len(m.rows) {
+		end = len(m.rows)
+	}
+
+	lines := make([]string, 0, end-start)
+	for i := start; i < end; i++ {
+		lines = append(lines, m.renderRow(m.rows[i], i == m.cursor, m.width-4))
+	}
+	return lines
+}
+
+func (m Model) renderRow(row row, selected bool, width int) string {
+	line := ""
+	switch row.kind {
+	case rowPseudoStatus:
+		line = fmt.Sprintf("  %s  %s", logPseudoStyle.Render("working tree"), ui.StyleMuted.Render(row.detail))
+	default:
+		graph := row.commit.Graph
+		if graph == "" {
+			graph = "*"
+		}
+		meta := fmt.Sprintf("%-8s  %-10s  %-4s", row.commit.Hash, relativeTime(row.commit.Date), row.commit.AuthorShort)
+		line = fmt.Sprintf("%-4s  %s  %s", graph, logHashStyle.Render(meta), row.commit.Subject)
+		if badges := renderBadges(row.commit.Decorations); badges != "" {
+			line += "  " + badges
+		}
+	}
+	line = ansi.Truncate(line, maxInt(1, width), "…")
+	if selected {
+		return logSelectedStyle.Render(line)
+	}
+	return line
+}
+
+func renderBadges(decorations []git.RefDecoration) string {
+	if len(decorations) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(decorations))
+	for _, decoration := range decorations {
+		switch decoration.Kind {
+		case git.RefDecorationTag:
+			parts = append(parts, logTagBadgeStyle.Render(decoration.Name))
+		case git.RefDecorationRemoteBranch:
+			parts = append(parts, logRemoteBadgeStyle.Render(decoration.Name))
+		default:
+			parts = append(parts, logLocalBadgeStyle.Render(decoration.Name))
+		}
+	}
+	return strings.Join(parts, " ")
+}
+
+func (m Model) footerView() string {
+	left := m.statusMsg
+	if left == "" && m.searchQuery != "" && len(m.searchMatch) > 0 {
+		left = fmt.Sprintf("%d/%d matches", m.searchCursor+1, len(m.searchMatch))
+	}
+	if left == "" {
+		left = "enter open commit"
+	}
+	right := ui.StyleHint.Render("/ search · q back · L lazygit log")
+	if m.width <= 0 {
+		return left + "  " + right
+	}
+	left = ansi.Truncate(left, m.width, "…")
+	leftW := ansi.StringWidth(left)
+	rightW := ansi.StringWidth(right)
+	if leftW+rightW+2 >= m.width {
+		return left + "  " + ansi.Truncate(right, maxInt(0, m.width-leftW-2), "")
+	}
+	return left + strings.Repeat(" ", m.width-leftW-rightW) + right
+}
+
+func (m Model) searchOverlayView() string {
+	outerW := m.width * 80 / 100
+	if outerW > 50 {
+		outerW = 50
+	}
+	if outerW < 20 {
+		outerW = 20
+	}
+	ti := m.searchInput
+	ti.SetWidth(outerW - 4)
+	rightTitle := ""
+	if m.searchQuery != "" && len(m.searchMatch) == 0 {
+		rightTitle = "no matches"
+	} else if len(m.searchMatch) > 0 {
+		rightTitle = fmt.Sprintf("%d/%d", m.searchCursor+1, len(m.searchMatch))
+	}
+	return ui.RenderModalFrame(ui.ModalFrameOptions{
+		Title:         "Search",
+		RightTitle:    rightTitle,
+		Body:          ti.View(),
+		Width:         outerW,
+		BorderColor:   ui.ColorBorder,
+		TitleColor:    ui.ColorBlue,
+		TitleInBorder: true,
+	})
+}
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}

@@ -57,6 +57,7 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		switch key {
 		case "g":
 			m.jumpToTop()
+			m.clearStatus()
 			if m.focus == focusStatus {
 				return m, m.scheduleDiffReload(), true
 			}
@@ -70,16 +71,19 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 			return m, nil, true
 		case "l":
 			if m.settings.EnableNavigation {
+				m.clearStatus()
 				return m, nav.Push(nav.Route{Kind: nav.RouteLog, WorktreeRoot: m.worktreeRoot}), true
 			}
 			return m, nil, true
 		case "s":
 			if m.settings.EnableNavigation {
+				m.clearStatus()
 				return m, nav.Push(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: m.worktreeRoot}), true
 			}
 			return m, nil, true
 		case "w":
 			if m.settings.EnableNavigation {
+				m.clearStatus()
 				return m, nav.Push(nav.Route{Kind: nav.RouteWorktrees}), true
 			}
 			return m, nil, true

@@ -4,17 +4,19 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
+	logui "github.com/elentok/gx/ui/log"
 	"github.com/elentok/gx/ui/nav"
 	statusui "github.com/elentok/gx/ui/status"
 	"github.com/elentok/gx/ui/worktrees"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 type Settings struct {
 	InitialRoute       nav.Route
 	ActiveWorktreePath string
+	Log                logui.Settings
 	Worktrees          worktrees.Settings
 	Status             statusui.Settings
 }
@@ -24,6 +26,15 @@ type pageState struct {
 	model tea.Model
 }
 
+type tabPageState struct {
+	kind         nav.RouteKind
+	worktreeRoot string
+	ref          string
+	initialPath  string
+	model        tea.Model
+	initialized  bool
+}
+
 type Model struct {
 	repo     git.Repo
 	settings Settings
@@ -31,37 +42,48 @@ type Model struct {
 	width  int
 	height int
 
-	current pageState
-	history []pageState
+	activeTab nav.RouteKind
+	tabs      map[nav.RouteKind]tabPageState
+	history   []pageState
+	keyPrefix string
 }
 
 func New(repo git.Repo, settings Settings) Model {
-	m := Model{repo: repo, settings: settings}
+	m := Model{
+		repo:     repo,
+		settings: settings,
+		tabs:     make(map[nav.RouteKind]tabPageState),
+	}
 	if m.settings.InitialRoute.Kind == "" {
 		m.settings.InitialRoute = nav.Route{Kind: nav.RouteWorktrees}
 	}
-	m.current = m.newPage(m.settings.InitialRoute)
+	m.activeTab = tabForRoute(m.settings.InitialRoute.Kind)
+	m.ensureTabs()
+	page := m.newTabPage(m.tabStateForRoute(m.settings.InitialRoute))
+	page.initialized = true
+	m.tabs[m.activeTab] = page
 	return m
 }
 
 func (m Model) Init() tea.Cmd {
-	return m.current.model.Init()
+	return m.activePage().model.Init()
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if route, ok := nav.IsPush(msg); ok {
+		if tabForRoute(route.Kind) == route.Kind {
+			return m.switchTab(route)
+		}
 		next := m.newPage(route)
-		m.history = append(m.history, m.current)
-		m.current = next
-		return m, tea.Batch(m.current.model.Init(), m.resizeCurrentCmd())
+		m.history = append(m.history, next)
+		return m, tea.Batch(tea.ClearScreen, next.model.Init(), m.resizeCurrentCmd())
 	}
 	if nav.IsBack(msg) {
 		if len(m.history) == 0 {
 			return m, tea.Quit
 		}
-		m.current = m.history[len(m.history)-1]
 		m.history = m.history[:len(m.history)-1]
-		return m, m.resizeCurrentCmd()
+		return m, tea.Batch(tea.ClearScreen, m.resizeCurrentCmd())
 	}
 
 	if size, ok := msg.(tea.WindowSizeMsg); ok {
@@ -69,19 +91,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = size.Height
 		msg = m.childWindowSizeMsg()
 	}
+	if key, ok := msg.(tea.KeyPressMsg); ok {
+		if handled, cmd := m.handleShellChordKey(key); handled {
+			return m, cmd
+		}
+	}
 
-	nextModel, cmd := m.current.model.Update(msg)
-	m.current.model = nextModel
+	current := m.activePage()
+	nextModel, cmd := current.model.Update(msg)
+	current.model = nextModel
+	m.setActivePage(current)
 	return m, cmd
 }
 
 func (m Model) View() tea.View {
-	child := m.current.model.View()
+	child := m.activePage().model.View()
 	content := child.Content
 	if strings.TrimSpace(content) == "" {
 		content = "\n"
 	}
-	content = lipgloss.JoinVertical(lipgloss.Left, content, m.tabsView())
+	content = normalizeFrameContent(content, m.width, m.height)
+	content = injectTabsIntoFooter(content, m.tabsView(), m.width)
 
 	v := tea.NewView(content)
 	v.AltScreen = true
@@ -90,6 +120,65 @@ func (m Model) View() tea.View {
 	v.Cursor = child.Cursor
 	v.OnMouse = child.OnMouse
 	return v
+}
+
+func (m Model) activePage() pageState {
+	if len(m.history) > 0 {
+		return m.history[len(m.history)-1]
+	}
+	tab := m.tabs[m.activeTab]
+	return pageState{
+		route: nav.Route{
+			Kind:         tab.kind,
+			WorktreeRoot: tab.worktreeRoot,
+			Ref:          tab.ref,
+			InitialPath:  tab.initialPath,
+		},
+		model: tab.model,
+	}
+}
+
+func (m *Model) setActivePage(page pageState) {
+	if len(m.history) > 0 {
+		m.history[len(m.history)-1] = page
+		return
+	}
+	tab := m.tabs[m.activeTab]
+	tab.model = page.model
+	m.tabs[m.activeTab] = tab
+}
+
+func normalizeFrameContent(content string, targetWidth, targetHeight int) string {
+	if targetWidth <= 0 && targetHeight <= 0 {
+		return content
+	}
+	lines := strings.Split(content, "\n")
+	for len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+	if targetWidth > 0 {
+		for i, line := range lines {
+			line = ansi.Truncate(line, targetWidth, "")
+			lineW := ansi.StringWidth(line)
+			if lineW < targetWidth {
+				line += strings.Repeat(" ", targetWidth-lineW)
+			}
+			lines[i] = line
+		}
+	}
+	if targetHeight > 0 {
+		if len(lines) > targetHeight {
+			lines = lines[:targetHeight]
+		}
+		padLine := ""
+		if targetWidth > 0 {
+			padLine = strings.Repeat(" ", targetWidth)
+		}
+		for len(lines) < targetHeight {
+			lines = append(lines, padLine)
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 func (m Model) newPage(route nav.Route) pageState {
@@ -105,9 +194,11 @@ func (m Model) newPage(route nav.Route) pageState {
 			model: statusui.NewWithSettings(route.WorktreeRoot, settings),
 		}
 	case nav.RouteLog:
+		settings := m.settings.Log
+		settings.EnableNavigation = true
 		return pageState{
 			route: route,
-			model: newPlaceholderModel("Log", "Log page not implemented yet.", route),
+			model: logui.NewWithSettings(route.WorktreeRoot, route.Ref, settings),
 		}
 	case nav.RouteCommit:
 		return pageState{
@@ -127,7 +218,7 @@ func (m Model) newPage(route nav.Route) pageState {
 }
 
 func (m Model) childWindowSizeMsg() tea.WindowSizeMsg {
-	height := m.height - 1
+	height := m.height
 	if height < 1 {
 		height = 1
 	}

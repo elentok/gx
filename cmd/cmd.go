@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/app"
 	"github.com/elentok/gx/ui/confirm"
+	logui "github.com/elentok/gx/ui/log"
 	"github.com/elentok/gx/ui/menu"
 	"github.com/elentok/gx/ui/nav"
 	statusui "github.com/elentok/gx/ui/status"
@@ -30,6 +31,7 @@ type deps struct {
 	getwd                func() (string, error)
 	runWorktrees         func(string) error
 	runStatus            func(string) error
+	runLog               func(string) error
 	confirmForce         func(string) (bool, error)
 	choosePushDivergence func(io.Reader, io.Writer, *git.PushDivergence) (int, error)
 	initConfig           func() (string, error)
@@ -49,6 +51,7 @@ func defaultDeps() deps {
 		},
 		runWorktrees:         runWorktrees,
 		runStatus:            runStatus,
+		runLog:               runLog,
 		choosePushDivergence: choosePushDivergence,
 		initConfig:           config.Init,
 		getenv:               os.Getenv,
@@ -80,6 +83,15 @@ func execute(args []string, d deps) error {
 			target = args[1]
 		}
 		return d.runStatus(target)
+	case "log":
+		ref := ""
+		if len(args) > 2 {
+			return fmt.Errorf("usage: gx log [hash-or-ref]")
+		}
+		if len(args) == 2 {
+			ref = args[1]
+		}
+		return d.runLog(ref)
 	case "init":
 		return runInit(d)
 	case "edit-config":
@@ -109,6 +121,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  gx wt clone <url> [dir]      clone using the .bare trick")
 	fmt.Fprintln(w, "  gx push|ps")
 	fmt.Fprintln(w, "  gx status|s")
+	fmt.Fprintln(w, "  gx log [hash-or-ref]")
 	fmt.Fprintln(w, "  gx init")
 	fmt.Fprintln(w, "  gx edit-config")
 	fmt.Fprintln(w, "  gx bump [major|minor|patch]  create a version tag and optionally push")
@@ -183,7 +196,12 @@ func runWorktrees(_ string) error {
 	m := app.New(*repo, app.Settings{
 		InitialRoute:       nav.Route{Kind: nav.RouteWorktrees},
 		ActiveWorktreePath: activeWorktreePath,
-		Worktrees:          settings,
+		Log: logui.Settings{
+			UseNerdFontIcons: cfg.UseNerdFontIcons,
+			InputModalBottom: cfg.InputModalBottom,
+			EnableNavigation: true,
+		},
+		Worktrees: settings,
 		Status: statusui.Settings{
 			DiffContextLines: cfg.StageDiffContextLines,
 			UseNerdFontIcons: cfg.UseNerdFontIcons,
@@ -233,6 +251,11 @@ func runStatus(target string) error {
 	m := app.New(*repo, app.Settings{
 		InitialRoute:       nav.Route{Kind: nav.RouteStatus, WorktreeRoot: root, InitialPath: initialPath},
 		ActiveWorktreePath: root,
+		Log: logui.Settings{
+			UseNerdFontIcons: cfg.UseNerdFontIcons,
+			InputModalBottom: cfg.InputModalBottom,
+			EnableNavigation: true,
+		},
 		Worktrees: worktrees.Settings{
 			UseNerdFontIcons: cfg.UseNerdFontIcons,
 			InputModalBottom: cfg.InputModalBottom,
@@ -245,6 +268,61 @@ func runStatus(target string) error {
 			InitialPath:      initialPath,
 			Terminal:         ui.DetectTerminal(),
 			InputModalBottom: cfg.InputModalBottom,
+		},
+	})
+	p := tea.NewProgram(m)
+	_, err = p.Run()
+	return err
+}
+
+func runLog(ref string) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	info, err := git.IdentifyDir(cwd)
+	if err != nil {
+		return err
+	}
+	if info.Repo.IsBare && info.WorktreeRoot == "" {
+		return fmt.Errorf("gx log must be run from a regular repo or linked worktree")
+	}
+
+	root, err := git.WorktreeRoot(cwd)
+	if err != nil {
+		return err
+	}
+	repo, err := git.FindRepo(root)
+	if err != nil {
+		return err
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	m := app.New(*repo, app.Settings{
+		InitialRoute:       nav.Route{Kind: nav.RouteLog, WorktreeRoot: root, Ref: ref},
+		ActiveWorktreePath: root,
+		Log: logui.Settings{
+			UseNerdFontIcons: cfg.UseNerdFontIcons,
+			InputModalBottom: cfg.InputModalBottom,
+			EnableNavigation: true,
+		},
+		Worktrees: worktrees.Settings{
+			UseNerdFontIcons: cfg.UseNerdFontIcons,
+			InputModalBottom: cfg.InputModalBottom,
+			NameAliases:      cfg.NameAliases,
+			Terminal:         ui.DetectTerminal(),
+			EnableNavigation: true,
+		},
+		Status: statusui.Settings{
+			DiffContextLines: cfg.StageDiffContextLines,
+			UseNerdFontIcons: cfg.UseNerdFontIcons,
+			Terminal:         ui.DetectTerminal(),
+			InputModalBottom: cfg.InputModalBottom,
+			EnableNavigation: true,
 		},
 	})
 	p := tea.NewProgram(m)

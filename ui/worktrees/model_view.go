@@ -8,6 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func (m Model) View() tea.View {
@@ -140,20 +141,28 @@ func (m Model) normalView() string {
 
 // statusBarView renders the 1-line bar at the bottom of the screen.
 func (m Model) statusBarView() string {
+	line := ""
 	switch m.mode {
 	case modeError:
-		return ""
+		line = ""
 	default:
 		if m.mode == modePaste && m.clipboard != nil {
 			prefix := ui.StyleDim.Render(fmt.Sprintf("  %d file(s) from %s", len(m.clipboard.files), m.clipboard.srcName))
-			return prefix + ui.StyleDim.Render("  ·  ") + ui.RenderInlineBindings(keys.Up, keys.Down, keys.PasteConfirm, keys.PasteCancel)
+			line = prefix + ui.StyleDim.Render("  ·  ") + ui.RenderInlineBindings(keys.Up, keys.Down, keys.PasteConfirm, keys.PasteCancel)
+			break
 		}
 		if m.spinnerActive {
-			return "  " + m.spinner.View() + " " + m.spinnerLabel
+			line = "  " + m.spinner.View() + " " + m.spinnerLabel
+			break
 		}
 		if m.statusMsg != "" {
-			return "  " + m.statusMsg
+			line = "  " + m.statusMsg
+			break
 		}
-		return "  " + ui.StyleHint.Render("? help")
+		line = "  " + ui.StyleHint.Render("? help")
 	}
+	if m.width > 0 {
+		return ansi.Truncate(line, m.width, "…")
+	}
+	return line
 }

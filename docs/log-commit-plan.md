@@ -82,7 +82,7 @@ I do not recommend a flat `ui/root.go` / `ui/model.go` under `ui/`; that will bl
 
 ## Proposed milestones
 
-- [ ] Milestone 1: App shell, routing, and shared chained menus
+- [x] Milestone 1: App shell, routing, and shared chained menus
   - Add a new root model under `ui/app/` that hosts child pages.
   - Move app launch in `cmd/cmd.go` to the root shell instead of directly launching worktrees/status models.
   - Define route/state concepts for:
@@ -102,7 +102,7 @@ I do not recommend a flat `ui/root.go` / `ui/model.go` under `ui/`; that will bl
   - Add bottom tab rendering and global `gw` / `gl` / `gs` handling.
   - Promote chained-key popup UX into a shared component/helper used by worktrees first.
 
-- [ ] Milestone 2: Git log data model and log page
+- [x] Milestone 2: Git log data model and log page
   - Extend git log plumbing with a richer row model, likely separate from the existing lightweight `git.Commit`:
     - full hash
     - short hash

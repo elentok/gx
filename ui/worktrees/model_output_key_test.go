@@ -159,6 +159,33 @@ func TestGLNavigatesToLogWhenNavigationEnabled(t *testing.T) {
 	}
 }
 
+func TestEnterNavigatesToLogWhenNavigationEnabled(t *testing.T) {
+	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := NewWithSettings(*repo, "", Settings{EnableNavigation: true})
+	m.ready = true
+	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.MainBranch}}
+	resizeTable(&m.table, 100, 10)
+	m.table.SetRows(m.buildRows())
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatalf("enter should navigate to log when navigation is enabled")
+	}
+	route, ok := nav.IsPush(cmd())
+	if !ok {
+		t.Fatalf("expected nav push message")
+	}
+	if route.Kind != nav.RouteLog {
+		t.Fatalf("expected log route, got %q", route.Kind)
+	}
+	_ = updated
+}
+
 func TestOEntersTerminalMenuMode(t *testing.T) {
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	repo, err := git.FindRepo(repoDir)

@@ -34,6 +34,25 @@ func TestExecute_ListWorktrees(t *testing.T) {
 	}
 }
 
+func TestExecute_LogDispatchesToRunLog(t *testing.T) {
+	called := ""
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+		runLog: func(ref string) error {
+			called = ref
+			return nil
+		},
+	}
+
+	if err := execute([]string{"log", "HEAD~2"}, d); err != nil {
+		t.Fatalf("execute log: %v", err)
+	}
+	if called != "HEAD~2" {
+		t.Fatalf("runLog called with %q, want %q", called, "HEAD~2")
+	}
+}
+
 func TestExecute_WorktreeAbsPath(t *testing.T) {
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	var stdout bytes.Buffer

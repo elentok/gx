@@ -176,6 +176,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m.enterTrackConfirm(), nil
 			}
+		case msg.String() == "enter" && len(m.worktrees) > 0 && m.settings.EnableNavigation:
+			wt := m.selectedWorktree()
+			if wt != nil {
+				return m, nav.Push(nav.Route{Kind: nav.RouteLog, WorktreeRoot: wt.Path})
+			}
 		}
 
 	case deleteResultMsg:
