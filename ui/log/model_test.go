@@ -2,11 +2,14 @@ package log
 
 import (
 	"testing"
+	"time"
 
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui/nav"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestEnterOnPseudoRowOpensStatus(t *testing.T) {
@@ -77,4 +80,25 @@ func TestEnterOnCommitRowOpensCommitRoute(t *testing.T) {
 		t.Fatalf("expected commit route, got %q", route.Kind)
 	}
 	_ = updated
+}
+
+func TestSelectedCommitRowFillsFullWidth(t *testing.T) {
+	m := Model{
+		width: 80,
+		rows: []row{{
+			kind: rowCommit,
+			commit: git.LogEntry{
+				Hash:        "12345678",
+				AuthorShort: "AB",
+				Subject:     "subject",
+				Date:        time.Now().Add(-2 * time.Hour),
+				Graph:       "*",
+				Decorations: []git.RefDecoration{{Name: "main", Kind: git.RefDecorationLocalBranch}},
+			},
+		}},
+	}
+	line := m.renderRow(m.rows[0], true, 40)
+	if got := ansi.StringWidth(ansi.Strip(line)); got != 40 {
+		t.Fatalf("selected row width = %d, want 40", got)
+	}
 }

@@ -8,7 +8,6 @@ import (
 
 	"charm.land/bubbles/v2/table"
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/ansi"
 )
 
 var styleMainBranch = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
@@ -100,16 +99,18 @@ func tableView(t table.Model) string {
 
 func headersView(t table.Model) string {
 	cols := t.Columns()
-	s := make([]string, 0, len(cols))
+	renderCols := make([]ui.FixedColumn, 0, len(cols))
 	for _, col := range cols {
 		if col.Width <= 0 {
 			continue
 		}
-		style := lipgloss.NewStyle().Width(col.Width).MaxWidth(col.Width).Inline(true)
-		cell := style.Render(ansi.Truncate(col.Title, col.Width, "…"))
-		s = append(s, tableStyles.Header.Render(cell))
+		renderCols = append(renderCols, ui.FixedColumn{
+			Text:  col.Title,
+			Width: col.Width,
+			Style: tableStyles.Header,
+		})
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, s...)
+	return ui.RenderFixedColumns(renderCols)
 }
 
 func rowsView(t table.Model) string {
@@ -138,7 +139,7 @@ func rowsView(t table.Model) string {
 }
 
 func renderRow(row table.Row, cols []table.Column, selected bool) string {
-	cells := make([]string, 0, len(cols))
+	renderCols := make([]ui.FixedColumn, 0, len(cols))
 	for i, col := range cols {
 		if col.Width <= 0 {
 			continue
@@ -147,11 +148,13 @@ func renderRow(row table.Row, cols []table.Column, selected bool) string {
 		if i < len(row) {
 			value = row[i]
 		}
-		style := lipgloss.NewStyle().Width(col.Width).MaxWidth(col.Width).Inline(true)
-		cell := tableStyles.Cell.Render(style.Render(ansi.Truncate(value, col.Width, "…")))
-		cells = append(cells, cell)
+		renderCols = append(renderCols, ui.FixedColumn{
+			Text:  value,
+			Width: col.Width,
+			Style: tableStyles.Cell,
+		})
 	}
-	rowStr := lipgloss.JoinHorizontal(lipgloss.Top, cells...)
+	rowStr := ui.RenderFixedColumns(renderCols)
 	if selected {
 		return tableStyles.Selected.Render(rowStr)
 	}

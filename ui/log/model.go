@@ -2,14 +2,12 @@ package log
 
 import (
 	"strings"
-	"time"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
-	humanize "github.com/dustin/go-humanize"
 )
 
 const maxLogEntries = 250
@@ -85,11 +83,4 @@ func normalizedRef(ref string) string {
 		return "HEAD"
 	}
 	return ref
-}
-
-func relativeTime(t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
-	return humanize.Time(t)
 }

@@ -86,21 +86,38 @@ func (m Model) renderRow(row row, selected bool, width int) string {
 	case rowPseudoStatus:
 		line = fmt.Sprintf("  %s  %s", logPseudoStyle.Render("working tree"), ui.StyleMuted.Render(row.detail))
 	default:
-		graph := row.commit.Graph
-		if graph == "" {
-			graph = "*"
-		}
-		meta := fmt.Sprintf("%-8s  %-10s  %-4s", row.commit.Hash, relativeTime(row.commit.Date), row.commit.AuthorShort)
-		line = fmt.Sprintf("%-4s  %s  %s", graph, logHashStyle.Render(meta), row.commit.Subject)
+		line = m.renderCommitRow(row)
 		if badges := renderBadges(row.commit.Decorations); badges != "" {
 			line += "  " + badges
 		}
 	}
 	line = ansi.Truncate(line, maxInt(1, width), "…")
 	if selected {
+		line = ansi.Strip(line)
+		lineW := ansi.StringWidth(line)
+		if lineW < width {
+			line += strings.Repeat(" ", width-lineW)
+		}
 		return logSelectedStyle.Render(line)
 	}
 	return line
+}
+
+func (m Model) renderCommitRow(row row) string {
+	graph := row.commit.Graph
+	if graph == "" {
+		graph = "*"
+	}
+	cols := []ui.FixedColumn{
+		{Text: graph, Width: 4},
+		{Text: row.commit.Hash, Width: 8, Style: logHashStyle},
+		{Text: "", Width: 2},
+		{Text: ui.RelativeTimeCompact(row.commit.Date), Width: 10, Style: logMetaStyle},
+		{Text: "", Width: 1},
+		{Text: row.commit.AuthorShort, Width: 4, Style: logMetaStyle},
+	}
+	meta := ui.RenderFixedColumns(cols)
+	return meta + "  " + row.commit.Subject
 }
 
 func renderBadges(decorations []git.RefDecoration) string {
@@ -168,6 +185,7 @@ func (m Model) searchOverlayView() string {
 		TitleInBorder: true,
 	})
 }
+
 func maxInt(a, b int) int {
 	if a > b {
 		return a
