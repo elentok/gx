@@ -218,6 +218,28 @@ I do not recommend a flat `ui/root.go` / `ui/model.go` under `ui/`; that will bl
   - log at `<ref>`
   - show commit at `<ref>`
   - status for current worktree
+- The first shell cut used route-push semantics for `gw` / `gl` / `gs`, but that caused repeated page re-creation and made terminal repaint glitches much harder to reason about.
+- The better model is persistent cached top-level tabs:
+  - `worktrees`
+  - `log`
+  - `status`
+  - with history reserved for deeper pages such as `commit`
+- Why we changed it:
+  - tab switches should preserve local page state
+  - tab switches should not pollute the back-stack
+  - recreating child models on every tab hop amplified repaint/layout bugs and made shell behavior harder to reason about
+- The shell now owns the `g{w,l,s}` tab chords before child pages see the leading `g`.
+- Why we changed that:
+  - letting children see the first `g` meant they could briefly enter their own chord-preview state before the shell switched tabs
+  - that led to stale footer/chord UI and was one cause of the “line jump” / broken worktrees state during tab switches
+- Footer tabs should be merged into the page footer/status line, not rendered as an extra line below it.
+- Why we changed that:
+  - a separate shell-owned tab row made child pages reserve one footer line while the shell also appended one, which created layout confusion
+  - visually, tabs belong to the same footer/status region as the page hints
+- Cached tabs should store explicit tab context rather than a full normalized `nav.Route`.
+- Why we changed that:
+  - storing full routes forced a `normalizeTopRoute` helper that was hard to explain and mixed route intent with cached tab state
+  - explicit tab context (`kind`, `worktreeRoot`, `ref`, `initialPath`) is easier to compare, initialize, and reason about
 
 ### Milestone 2 notes
 
@@ -227,6 +249,12 @@ I do not recommend a flat `ui/root.go` / `ui/model.go` under `ui/`; that will bl
 - The pseudo-commit row should be a UI model type, not a fake `git` commit object. Keep real commit data and synthetic navigation rows distinct.
 - Keep “current log root” as explicit route state so `gh` is just a route update back to `HEAD`, not a special-case mutation hidden inside the table model.
 - Log rows should carry typed badge decorations so UI can color branches, remotes, and tags differently rather than treating all decorations as plain strings.
+- The initial log row renderer used ad-hoc `fmt.Sprintf`-style fixed fields.
+- Next refactor should extract a small shared ANSI-aware fixed-column renderer from `ui/worktrees/table.go` and reuse it in log.
+- Why:
+  - log needs stable-width relative-time and initials columns
+  - selected-row highlighting should cover the full visible line, which is easier if we avoid nested style resets inside the selected row
+  - `worktrees` already solved the low-level “truncate/pad ANSI-safe cells to exact width” problem, but it is still trapped inside worktree-specific table rendering code
 
 ### Milestone 3 notes
 
