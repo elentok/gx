@@ -1,5 +1,18 @@
 package status
 
+import "github.com/elentok/gx/git"
+
+type explorerFileSelection struct {
+	path       string
+	renameFrom string
+	untracked  bool
+	stageFile  git.StageFileStatus
+}
+
+type explorerDiffSelection struct {
+	file explorerFileSelection
+}
+
 func (m Model) diffEmptyMessage() string {
 	return "No file selected"
 }
@@ -57,4 +70,25 @@ func (m Model) explorerCanEditSelection() bool {
 
 func (m Model) explorerCanRunBranchActions() bool {
 	return true
+}
+
+func (m Model) selectedExplorerFile() (explorerFileSelection, bool) {
+	file, ok := m.selectedFile()
+	if !ok {
+		return explorerFileSelection{}, false
+	}
+	return explorerFileSelection{
+		path:       file.Path,
+		renameFrom: file.RenameFrom,
+		untracked:  file.IsUntracked(),
+		stageFile:  file,
+	}, true
+}
+
+func (m Model) selectedExplorerDiff() (explorerDiffSelection, bool) {
+	file, ok := m.selectedExplorerFile()
+	if !ok {
+		return explorerDiffSelection{}, false
+	}
+	return explorerDiffSelection{file: file}, true
 }

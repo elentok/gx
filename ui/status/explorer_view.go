@@ -73,8 +73,8 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 	sec.viewport.SetWidth(innerW)
 
 	titleText := title
-	if file, ok := m.selectedFile(); ok && file.IsRenamed() && file.RenameFrom != "" {
-		titleText += " [moved: " + file.RenameFrom + " -> " + file.Path + "]"
+	if file, ok := m.selectedExplorerFile(); ok && file.renameFrom != "" {
+		titleText += " [moved: " + file.renameFrom + " -> " + file.path + "]"
 	}
 	if si := parseSymlinkDiffInfo(sec.parsed); si.IsSymlink {
 		if label := si.titleLabel(); label != "" {
@@ -392,11 +392,11 @@ func sectionHasBinaryDiff(sec sectionState) bool {
 }
 
 func (m Model) binarySummaryLine() string {
-	file, ok := m.selectedFile()
+	file, ok := m.selectedExplorerFile()
 	if !ok {
 		return "binary file"
 	}
-	prevSize, newSize, prevOK, newOK := git.BinaryFileSizes(m.worktreeRoot, file)
+	prevSize, newSize, prevOK, newOK := git.BinaryFileSizes(m.worktreeRoot, file.stageFile)
 	if !prevOK && !newOK {
 		return "binary file"
 	}
