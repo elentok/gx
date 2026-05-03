@@ -42,7 +42,7 @@ func (m *Model) applySelection() tea.Cmd {
 			return nil
 		}
 		sig.hunkHeader = sec.parsed.Hunks[sec.activeHunk].Header
-		patch, err := buildHunkPatch(sec.parsed, sec.activeHunk)
+		patch, err := diff.BuildHunkPatch(sec.parsed, sec.activeHunk)
 		if err != nil {
 			m.setStatus(err.Error())
 			return nil
@@ -60,7 +60,7 @@ func (m *Model) applySelection() tea.Cmd {
 			}
 			startChanged := h.ChangedLineOffset[0]
 			endChanged := h.ChangedLineOffset[len(h.ChangedLineOffset)-1]
-			fallbackPatch, fallbackErr := buildLineRangePatch(sec.parsed, startChanged, endChanged)
+			fallbackPatch, fallbackErr := diff.BuildLineRangePatch(sec.parsed, startChanged, endChanged)
 			if fallbackErr != nil {
 				m.showGitError(err)
 				return nil
@@ -85,9 +85,9 @@ func (m *Model) applySelection() tea.Cmd {
 			err   error
 		)
 		if sec.visualActive && endLine > startLine {
-			patch, err = buildLineRangePatch(sec.parsed, startLine, endLine)
+			patch, err = diff.BuildLineRangePatch(sec.parsed, startLine, endLine)
 		} else {
-			patch, err = buildSingleLinePatch(sec.parsed, sec.activeLine)
+			patch, err = diff.BuildSingleLinePatch(sec.parsed, sec.activeLine)
 		}
 		if err != nil {
 			m.setStatus(err.Error())
@@ -238,7 +238,7 @@ func (m *Model) openDiscardDiffConfirm() {
 		if sec.activeHunk < 0 || sec.activeHunk >= len(sec.parsed.Hunks) {
 			return
 		}
-		patch, err = buildHunkPatch(sec.parsed, sec.activeHunk)
+		patch, err = diff.BuildHunkPatch(sec.parsed, sec.activeHunk)
 		title = "Discard selected hunk?"
 		lines = []string{"This will discard the selected hunk from your working tree."}
 	} else {
@@ -250,11 +250,11 @@ func (m *Model) openDiscardDiffConfirm() {
 			startLine, endLine = visualLineBounds(*sec)
 		}
 		if sec.visualActive && endLine > startLine {
-			patch, err = buildLineRangePatch(sec.parsed, startLine, endLine)
+			patch, err = diff.BuildLineRangePatch(sec.parsed, startLine, endLine)
 			title = "Discard selected lines?"
 			lines = []string{"This will discard the selected lines from your working tree."}
 		} else {
-			patch, err = buildSingleLinePatch(sec.parsed, sec.activeLine)
+			patch, err = diff.BuildSingleLinePatch(sec.parsed, sec.activeLine)
 			title = "Discard selected line?"
 			lines = []string{"This will discard the selected line from your working tree."}
 		}

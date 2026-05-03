@@ -170,7 +170,7 @@ func BuildDisplayBaseLines(parsed ParsedDiff, colorLines []string) (lines []stri
 	}
 
 	if si := ParseSymlinkDiffInfo(parsed); si.IsSymlink {
-		if summary := si.summary(); summary != "" {
+		if summary := si.Summary(); summary != "" {
 			symlinkStyle := lipgloss.NewStyle().Foreground(ui.ColorBlue).Bold(true)
 			lines = append(lines, symlinkStyle.Render("  "+summary))
 			kinds = append(kinds, RowPlain)
@@ -244,32 +244,49 @@ func SectionHasBinaryDiff(parsed ParsedDiff) bool { return HasBinaryDiff(parsed)
 func (si SymlinkDiffInfo) TitleLabel() string {
 	switch {
 	case si.WasSymlink && si.IsNowSymlink:
+		return "[symlink]"
+	case !si.WasSymlink && si.IsNowSymlink && si.TypeChange:
+		return "[regular -> symlink]"
+	case !si.WasSymlink && si.IsNowSymlink && !si.TypeChange:
+		return "[symlink]"
+	case si.WasSymlink && !si.IsNowSymlink && si.TypeChange:
+		return "[symlink -> regular]"
+	case si.WasSymlink && !si.IsNowSymlink && !si.TypeChange:
+		return "[symlink]"
+	default:
+		return ""
+	}
+}
+
+func (si SymlinkDiffInfo) Summary() string {
+	switch {
+	case si.WasSymlink && si.IsNowSymlink:
 		switch {
 		case si.OldTarget != "" && si.NewTarget != "":
-			return "[symlink: " + si.OldTarget + " -> " + si.NewTarget + "]"
+			return "symlink: " + si.OldTarget + " -> " + si.NewTarget
 		case si.NewTarget != "":
-			return "[symlink -> " + si.NewTarget + "]"
+			return "symlink -> " + si.NewTarget
 		case si.OldTarget != "":
-			return "[symlink: " + si.OldTarget + " (removed)]"
+			return "symlink: " + si.OldTarget + " (removed)"
 		default:
-			return "[symlink]"
+			return "symlink"
 		}
 	case !si.WasSymlink && si.IsNowSymlink && si.TypeChange:
 		if si.NewTarget != "" {
-			return "[symlink -> " + si.NewTarget + "]"
+			return "regular file -> symlink (" + si.NewTarget + ")"
 		}
-		return "[symlink]"
+		return "regular file -> symlink"
 	case si.WasSymlink && !si.IsNowSymlink && si.TypeChange:
 		if si.OldTarget != "" {
-			return "[symlink: " + si.OldTarget + " (removed)]"
+			return "symlink (" + si.OldTarget + ") -> regular file"
 		}
-		return "[symlink removed]"
+		return "symlink -> regular file"
 	case si.IsNowSymlink && si.NewTarget != "":
-		return "[symlink -> " + si.NewTarget + "]"
+		return "symlink -> " + si.NewTarget
 	case si.WasSymlink && si.OldTarget != "":
-		return "[symlink: " + si.OldTarget + " (removed)]"
+		return "symlink: " + si.OldTarget + " (removed)"
 	default:
-		return "[symlink]"
+		return ""
 	}
 }
 
@@ -336,38 +353,6 @@ func ParseSymlinkDiffInfo(parsed ParsedDiff) SymlinkDiffInfo {
 		}
 	}
 	return info
-}
-
-func (si SymlinkDiffInfo) summary() string {
-	switch {
-	case si.WasSymlink && si.IsNowSymlink:
-		switch {
-		case si.OldTarget != "" && si.NewTarget != "":
-			return "symlink: " + si.OldTarget + " -> " + si.NewTarget
-		case si.NewTarget != "":
-			return "symlink -> " + si.NewTarget
-		case si.OldTarget != "":
-			return "symlink: " + si.OldTarget + " (removed)"
-		default:
-			return "symlink"
-		}
-	case !si.WasSymlink && si.IsNowSymlink && si.TypeChange:
-		if si.NewTarget != "" {
-			return "symlink -> " + si.NewTarget
-		}
-		return "symlink"
-	case si.WasSymlink && !si.IsNowSymlink && si.TypeChange:
-		if si.OldTarget != "" {
-			return "symlink: " + si.OldTarget + " (removed)"
-		}
-		return "symlink removed"
-	case si.IsNowSymlink && si.NewTarget != "":
-		return "symlink -> " + si.NewTarget
-	case si.WasSymlink && si.OldTarget != "":
-		return "symlink: " + si.OldTarget + " (removed)"
-	default:
-		return "symlink"
-	}
 }
 
 func cleanHunkHeader(line string) string {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/ui/diff"
 )
 
 func TestParseUnifiedDiff_TracksHunksAndChangedLines(t *testing.T) {
@@ -44,7 +45,7 @@ func TestBuildSingleLinePatch(t *testing.T) {
 		"+new",
 	}, "\n") + "\n"
 	p := parseUnifiedDiff(raw)
-	patch, err := buildSingleLinePatch(p, 1)
+	patch, err := diff.BuildSingleLinePatch(p, 1)
 	if err != nil {
 		t.Fatalf("buildSingleLinePatch: %v", err)
 	}
@@ -73,7 +74,7 @@ func TestBuildSingleLinePatch_DoesNotIncludeNonContiguousContext(t *testing.T) {
 	}, "\n") + "\n"
 	p := parseUnifiedDiff(raw)
 
-	patch, err := buildSingleLinePatch(p, 1) // +new-2
+	patch, err := diff.BuildSingleLinePatch(p, 1) // +new-2
 	if err != nil {
 		t.Fatalf("buildSingleLinePatch: %v", err)
 	}
@@ -99,7 +100,7 @@ func TestBuildHunkPatch_PreservesFullFileHeader(t *testing.T) {
 	}, "\n") + "\n"
 	p := parseUnifiedDiff(raw)
 
-	patch, err := buildHunkPatch(p, 0)
+	patch, err := diff.BuildHunkPatch(p, 0)
 	if err != nil {
 		t.Fatalf("buildHunkPatch: %v", err)
 	}
@@ -125,7 +126,7 @@ func TestBuildLineRangePatch_IncludesSelectedRange(t *testing.T) {
 	}, "\n") + "\n"
 	p := parseUnifiedDiff(raw)
 
-	patch, err := buildLineRangePatch(p, 1, 3)
+	patch, err := diff.BuildLineRangePatch(p, 1, 3)
 	if err != nil {
 		t.Fatalf("buildLineRangePatch: %v", err)
 	}
@@ -171,7 +172,7 @@ func TestBuildHunkPatch_ApplyToIndex_WithIndentedGoLines(t *testing.T) {
 	if len(p.Hunks) != 1 {
 		t.Fatalf("expected one hunk, got %d", len(p.Hunks))
 	}
-	patch, err := buildHunkPatch(p, 0)
+	patch, err := diff.BuildHunkPatch(p, 0)
 	if err != nil {
 		t.Fatalf("buildHunkPatch: %v", err)
 	}
@@ -338,7 +339,7 @@ func TestParseSymlinkDiffInfo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := parseUnifiedDiff(tt.raw)
-			si := parseSymlinkDiffInfo(p)
+			si := diff.ParseSymlinkDiffInfo(p)
 			if si.IsSymlink != tt.isSymlink {
 				t.Errorf("IsSymlink = %v, want %v", si.IsSymlink, tt.isSymlink)
 			}
@@ -356,10 +357,10 @@ func TestParseSymlinkDiffInfo(t *testing.T) {
 					t.Errorf("NewTarget = %q, want %q", si.NewTarget, tt.newTarget)
 				}
 			}
-			if got := si.summary(); got != tt.summary {
+			if got := si.Summary(); got != tt.summary {
 				t.Errorf("summary = %q, want %q", got, tt.summary)
 			}
-			if got := si.titleLabel(); got != tt.titleLabel {
+			if got := si.TitleLabel(); got != tt.titleLabel {
 				t.Errorf("titleLabel = %q, want %q", got, tt.titleLabel)
 			}
 		})
