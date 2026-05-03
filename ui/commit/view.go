@@ -153,7 +153,11 @@ func (m Model) renderDiffPane(width, height int) string {
 					mark = commitDiffMarkerActiveStyle.Render("▌ ")
 				}
 			}
-			lines = append(lines, mark+m.section.ViewLines[displayIdx])
+			body := m.section.ViewLines[displayIdx]
+			if matched, current := m.searchMatchDiffDisplay(displayIdx); matched {
+				body = highlightMatchText(body, m.searchQuery, current)
+			}
+			lines = append(lines, mark+body)
 		}
 	} else if len(m.section.Parsed.Lines) > 0 {
 		if diff.HasBinaryDiff(m.section.Parsed) {
@@ -218,9 +222,12 @@ func isMainOrMasterRef(name string) bool {
 }
 
 func (m Model) footerView() string {
+	if m.searchMode == searchModeInput {
+		return m.searchFooterText()
+	}
 	left := "j/k files  enter diff  b body"
 	if m.focusDiff {
-		left = "j/k move  a mode  w wrap  h back"
+		left = "j/k move  a mode  / search  w wrap"
 	}
 	right := ui.StyleHint.Render("gw worktrees · gl log · gs status · q back")
 	if m.width <= 0 {

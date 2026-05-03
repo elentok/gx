@@ -5,11 +5,11 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/explorer"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/ansi"
 )
 
 type stageSearchMode int
@@ -138,11 +138,12 @@ func (m *Model) recomputeSearchMatches() {
 		}
 	} else {
 		sec := m.searchScopeSection(scope)
-		for i := 0; i < len(sec.viewLines) && i < len(sec.displayToRaw); i++ {
-			line := strings.ToLower(ansi.Strip(sec.viewLines[i]))
-			if strings.Contains(line, q) {
-				m.searchMatches = append(m.searchMatches, stageSearchMatch{displayIndex: i, rawIndex: sec.displayToRaw[i], scope: scope})
-			}
+		for _, match := range explorer.ComputeDiffSearchMatches(sec.viewLines, sec.displayToRaw, q) {
+			m.searchMatches = append(m.searchMatches, stageSearchMatch{
+				displayIndex: match.DisplayIndex,
+				rawIndex:     match.RawIndex,
+				scope:        scope,
+			})
 		}
 	}
 }
@@ -162,30 +163,12 @@ func (m *Model) jumpToSearchCursor() tea.Cmd {
 	}
 
 	sec := m.searchScopeSection(match.scope)
-	if match.displayIndex >= 0 {
-		if match.displayIndex < sec.viewport.YOffset() {
-			sec.viewport.SetYOffset(match.displayIndex)
-		} else {
-			last := sec.viewport.YOffset() + sec.viewport.VisibleLineCount() - 1
-			if sec.viewport.VisibleLineCount() > 0 && match.displayIndex > last {
-				sec.viewport.SetYOffset(maxInt(0, match.displayIndex-sec.viewport.VisibleLineCount()+1))
-			}
-		}
-	}
-	if match.rawIndex >= 0 {
-		for i, ch := range sec.parsed.Changed {
-			if ch.LineIndex == match.rawIndex {
-				sec.activeLine = i
-				break
-			}
-		}
-		for i, h := range sec.parsed.Hunks {
-			if match.rawIndex >= h.StartLine && match.rawIndex <= h.EndLine {
-				sec.activeHunk = i
-				break
-			}
-		}
-	}
+	data := toExplorerSectionData(*sec)
+	explorer.ApplyDiffSearchMatch(&data, &sec.viewport, explorer.DiffSearchMatch{
+		DisplayIndex: match.displayIndex,
+		RawIndex:     match.rawIndex,
+	})
+	*sec = fromExplorerSectionData(data, sec.viewport)
 	return nil
 }
 
@@ -201,15 +184,30 @@ func (m *Model) syncSearchCursorFromDiffFocus() {
 		return
 	}
 	sec := m.searchScopeSection(expected)
-	if m.navMode != navLine || sec.activeLine < 0 || sec.activeLine >= len(sec.parsed.Changed) {
+	data := toExplorerSectionData(*sec)
+	diffMatches := make([]explorer.DiffSearchMatch, 0, len(m.searchMatches))
+	for _, match := range m.searchMatches {
+		if match.scope == expected {
+			diffMatches = append(diffMatches, explorer.DiffSearchMatch{
+				DisplayIndex: match.displayIndex,
+				RawIndex:     match.rawIndex,
+			})
+		}
+	}
+	idx := explorer.CurrentDiffSearchMatchIndex(data, diffMatches, explorer.NavLine)
+	if idx < 0 {
 		return
 	}
-	raw := sec.parsed.Changed[sec.activeLine].LineIndex
+	cursor := 0
 	for i, match := range m.searchMatches {
-		if match.scope == expected && match.rawIndex == raw {
+		if match.scope != expected {
+			continue
+		}
+		if cursor == idx {
 			m.searchCursor = i
 			return
 		}
+		cursor++
 	}
 }
 

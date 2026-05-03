@@ -7,8 +7,9 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/explorer"
 
-	tea "charm.land/bubbletea/v2"
+	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
 )
 
 type Settings struct {
@@ -22,20 +23,25 @@ type Model struct {
 	ref          string
 	settings     Settings
 
-	width        int
-	height       int
-	ready        bool
-	focusDiff    bool
-	diffNavMode  explorer.NavMode
-	wrapSoft     bool
-	keyPrefix    string
-	bodyExpanded bool
-	details      git.CommitDetails
-	files        []git.CommitFile
-	selected     int
-	section      explorer.SectionData
-	diffViewport viewport.Model
-	err          error
+	width         int
+	height        int
+	ready         bool
+	focusDiff     bool
+	diffNavMode   explorer.NavMode
+	wrapSoft      bool
+	keyPrefix     string
+	bodyExpanded  bool
+	details       git.CommitDetails
+	files         []git.CommitFile
+	selected      int
+	section       explorer.SectionData
+	diffViewport  viewport.Model
+	searchMode    commitSearchMode
+	searchQuery   string
+	searchMatches []explorer.DiffSearchMatch
+	searchCursor  int
+	searchInput   textinput.Model
+	err           error
 }
 
 func New(worktreeRoot, ref string) Model {

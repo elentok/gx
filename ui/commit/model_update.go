@@ -19,8 +19,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
+		if handled, cmd := m.handleSearchKey(msg); handled {
+			return m, cmd
+		}
 		if handled, cmd := m.handleChordKey(msg); handled {
 			return m, cmd
+		}
+		if m.handleSearchNavigateKey(msg) {
+			return m, nil
 		}
 		switch msg.String() {
 		case "q", "esc":
@@ -29,6 +35,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			return m, nav.Back()
+		case "/":
+			m.enterSearchMode()
+			return m, nil
 		case "b":
 			m.bodyExpanded = !m.bodyExpanded
 			m.syncDiffViewport()

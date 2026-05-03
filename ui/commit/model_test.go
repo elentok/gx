@@ -130,3 +130,57 @@ func TestEscLeavesDiffFocusBeforeBackingOut(t *testing.T) {
 		t.Fatalf("expected esc to leave diff focus")
 	}
 }
+
+func TestSearchMovesToMatchesAndNavigates(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\ntwo\nthree\nfour\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "a.txt", "alpha\nTWO\nalpha three\nfour\n")
+	testutil.CommitAll(t, repo, "change")
+
+	m := New(repo, "HEAD")
+	m.ready = true
+	m.width = 100
+	m.height = 24
+	m.syncDiffViewport()
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	m = updated.(Model)
+	if m.searchMode != searchModeInput {
+		t.Fatalf("expected / to enter search mode")
+	}
+
+	for _, r := range []rune("alpha") {
+		updated, _ = m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
+		m = updated.(Model)
+	}
+	if m.searchQuery != "alpha" {
+		t.Fatalf("searchQuery = %q, want alpha", m.searchQuery)
+	}
+	if len(m.searchMatches) < 2 {
+		t.Fatalf("expected multiple matches, got %d", len(m.searchMatches))
+	}
+	if !m.focusDiff || m.diffNavMode != explorer.NavLine {
+		t.Fatalf("expected search to focus diff in line mode")
+	}
+
+	first := m.section.ActiveLine
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	if m.searchMode != searchModeNone {
+		t.Fatalf("expected enter to leave search mode")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
+	m = updated.(Model)
+	if m.section.ActiveLine == first {
+		t.Fatalf("expected n to move to next match")
+	}
+
+	second := m.section.ActiveLine
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'N', Text: "N", ShiftedCode: 'N'})
+	m = updated.(Model)
+	if m.section.ActiveLine == second {
+		t.Fatalf("expected N to move to previous match")
+	}
+}

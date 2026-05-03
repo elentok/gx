@@ -1,6 +1,10 @@
 package commit
 
-import "github.com/elentok/gx/ui/explorer"
+import (
+	"strings"
+
+	"github.com/elentok/gx/ui/explorer"
+)
 
 func (m *Model) diffPaneSize() (int, int) {
 	headerH := maxInt(4, len(m.headerLines())+2)
@@ -25,6 +29,19 @@ func (m *Model) syncDiffViewport() {
 	bodyW := maxInt(1, diffW-4)
 	bodyH := maxInt(0, diffH-2)
 	explorer.ReflowSectionData(&m.section, bodyW, m.wrapSoft)
+	if strings.TrimSpace(m.searchQuery) != "" {
+		cursor := m.searchCursor
+		m.recomputeSearchMatches()
+		if len(m.searchMatches) > 0 {
+			if cursor >= len(m.searchMatches) {
+				cursor = len(m.searchMatches) - 1
+			}
+			if cursor < 0 {
+				cursor = 0
+			}
+			m.searchCursor = cursor
+		}
+	}
 	m.diffViewport.SetWidth(bodyW)
 	m.diffViewport.SetHeight(bodyH)
 	m.diffViewport.SetContentLines(m.section.ViewLines)
@@ -88,6 +105,7 @@ func (m *Model) moveDiffActive(delta int) {
 			m.section.ActiveLine = len(m.section.Parsed.Changed) - 1
 		}
 	}
+	m.syncSearchCursorFromDiffFocus()
 	m.ensureActiveVisible()
 }
 
@@ -117,6 +135,7 @@ func (m *Model) jumpDiffTop() {
 		return
 	}
 	m.section.ActiveLine = 0
+	m.syncSearchCursorFromDiffFocus()
 }
 
 func (m *Model) jumpDiffBottom() {
@@ -136,4 +155,14 @@ func (m *Model) jumpDiffBottom() {
 		return
 	}
 	m.section.ActiveLine = len(m.section.Parsed.Changed) - 1
+	m.syncSearchCursorFromDiffFocus()
+}
+
+func (m *Model) syncSearchCursorFromDiffFocus() {
+	if strings.TrimSpace(m.searchQuery) == "" || len(m.searchMatches) == 0 || !m.focusDiff {
+		return
+	}
+	if i := explorer.CurrentDiffSearchMatchIndex(m.section, m.searchMatches, m.diffNavMode); i >= 0 {
+		m.searchCursor = i
+	}
 }
