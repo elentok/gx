@@ -57,7 +57,7 @@ type sectionState struct {
 	rawToDisplay     []int
 	hunkDisplayRange [][2]int
 	changedDisplay   []int
-	parsed           parsedDiff
+	parsed           diff.ParsedDiff
 	activeHunk       int
 	activeLine       int
 	visualActive     bool

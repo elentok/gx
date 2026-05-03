@@ -1,4 +1,4 @@
-package status
+package diff
 
 import (
 	"strings"
@@ -6,7 +6,6 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/ui/diff"
 )
 
 func TestParseUnifiedDiff_TracksHunksAndChangedLines(t *testing.T) {
@@ -22,7 +21,7 @@ func TestParseUnifiedDiff_TracksHunksAndChangedLines(t *testing.T) {
 		" three",
 	}, "\n") + "\n"
 
-	p := parseUnifiedDiff(raw)
+	p := ParseUnifiedDiff(raw)
 	if len(p.Hunks) != 1 {
 		t.Fatalf("hunks = %d, want 1", len(p.Hunks))
 	}
@@ -44,10 +43,10 @@ func TestBuildSingleLinePatch(t *testing.T) {
 		"-old",
 		"+new",
 	}, "\n") + "\n"
-	p := parseUnifiedDiff(raw)
-	patch, err := diff.BuildSingleLinePatch(p, 1)
+	p := ParseUnifiedDiff(raw)
+	patch, err := BuildSingleLinePatch(p, 1)
 	if err != nil {
-		t.Fatalf("buildSingleLinePatch: %v", err)
+		t.Fatalf("BuildSingleLinePatch: %v", err)
 	}
 	if !strings.Contains(patch, "@@ -") {
 		t.Fatalf("unexpected hunk header in patch:\n%s", patch)
@@ -72,11 +71,11 @@ func TestBuildSingleLinePatch_DoesNotIncludeNonContiguousContext(t *testing.T) {
 		"+new-4",
 		" keep-5",
 	}, "\n") + "\n"
-	p := parseUnifiedDiff(raw)
+	p := ParseUnifiedDiff(raw)
 
-	patch, err := diff.BuildSingleLinePatch(p, 1) // +new-2
+	patch, err := BuildSingleLinePatch(p, 1) // +new-2
 	if err != nil {
-		t.Fatalf("buildSingleLinePatch: %v", err)
+		t.Fatalf("BuildSingleLinePatch: %v", err)
 	}
 
 	if strings.Contains(patch, "keep-5") || strings.Contains(patch, "old-4") || strings.Contains(patch, "new-4") {
@@ -98,11 +97,11 @@ func TestBuildHunkPatch_PreservesFullFileHeader(t *testing.T) {
 		"+one",
 		"+two",
 	}, "\n") + "\n"
-	p := parseUnifiedDiff(raw)
+	p := ParseUnifiedDiff(raw)
 
-	patch, err := diff.BuildHunkPatch(p, 0)
+	patch, err := BuildHunkPatch(p, 0)
 	if err != nil {
-		t.Fatalf("buildHunkPatch: %v", err)
+		t.Fatalf("BuildHunkPatch: %v", err)
 	}
 	if !strings.Contains(patch, "new file mode 100644") || !strings.Contains(patch, "index 0000000..1111111") || !strings.Contains(patch, "--- /dev/null") {
 		t.Fatalf("expected patch to preserve file header metadata:\n%s", patch)
@@ -124,11 +123,11 @@ func TestBuildLineRangePatch_IncludesSelectedRange(t *testing.T) {
 		"+new-4",
 		" keep-5",
 	}, "\n") + "\n"
-	p := parseUnifiedDiff(raw)
+	p := ParseUnifiedDiff(raw)
 
-	patch, err := diff.BuildLineRangePatch(p, 1, 3)
+	patch, err := BuildLineRangePatch(p, 1, 3)
 	if err != nil {
-		t.Fatalf("buildLineRangePatch: %v", err)
+		t.Fatalf("BuildLineRangePatch: %v", err)
 	}
 	if !strings.Contains(patch, "+new-2") || !strings.Contains(patch, "+new-4") {
 		t.Fatalf("expected both selected lines in patch:\n%s", patch)
@@ -168,13 +167,13 @@ func TestBuildHunkPatch_ApplyToIndex_WithIndentedGoLines(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DiffPath: %v", err)
 	}
-	p := parseUnifiedDiff(raw)
+	p := ParseUnifiedDiff(raw)
 	if len(p.Hunks) != 1 {
 		t.Fatalf("expected one hunk, got %d", len(p.Hunks))
 	}
-	patch, err := diff.BuildHunkPatch(p, 0)
+	patch, err := BuildHunkPatch(p, 0)
 	if err != nil {
-		t.Fatalf("buildHunkPatch: %v", err)
+		t.Fatalf("BuildHunkPatch: %v", err)
 	}
 	if err := git.ApplyPatchToIndex(repo, patch, false, false); err != nil {
 		t.Fatalf("ApplyPatchToIndex failed: %v\npatch:\n%s", err, patch)
@@ -338,8 +337,8 @@ func TestParseSymlinkDiffInfo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := parseUnifiedDiff(tt.raw)
-			si := diff.ParseSymlinkDiffInfo(p)
+			p := ParseUnifiedDiff(tt.raw)
+			si := ParseSymlinkDiffInfo(p)
 			if si.IsSymlink != tt.isSymlink {
 				t.Errorf("IsSymlink = %v, want %v", si.IsSymlink, tt.isSymlink)
 			}

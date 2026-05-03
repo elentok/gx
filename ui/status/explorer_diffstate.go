@@ -294,7 +294,7 @@ func buildSectionState(raw, color string, prev sectionState, sideBySide bool) se
 		return state
 	}
 
-	state.parsed = parseUnifiedDiff(raw)
+	state.parsed = diff.ParseUnifiedDiff(raw)
 	state.rawLines = append([]string{}, state.parsed.Lines...)
 	if sideBySide {
 		initSideBySideSectionState(&state, color)

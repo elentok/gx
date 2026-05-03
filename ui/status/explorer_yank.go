@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/atotto/clipboard"
+	"github.com/elentok/gx/ui/diff"
 )
 
 var stageClipboardWrite = clipboard.WriteAll
@@ -249,7 +250,7 @@ func (m Model) focusedLineSpanForYank(sec sectionState, hunkIdx int) (int, int) 
 	return lineStart, lineEnd
 }
 
-func changedLineNumberForYank(cl changedLine) int {
+func changedLineNumberForYank(cl diff.ChangedLine) int {
 	if cl.Prefix == '-' && cl.OldLine > 0 {
 		return cl.OldLine
 	}
