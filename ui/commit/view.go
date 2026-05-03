@@ -7,12 +7,15 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diff"
+	"github.com/elentok/gx/ui/explorer"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
 
 var commitMetaStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
+var commitDiffMarkerStyle = lipgloss.NewStyle().Foreground(ui.ColorOrange)
+var commitDiffMarkerActiveStyle = lipgloss.NewStyle().Foreground(ui.ColorOrange).Bold(true)
 
 func (m Model) View() tea.View {
 	if !m.ready {
@@ -130,7 +133,28 @@ func (m Model) renderFilesPane(width, height int) string {
 func (m Model) renderDiffPane(width, height int) string {
 	lines := []string{ui.StyleMuted.Render("no diff")}
 	if len(m.section.ViewLines) > 0 {
-		lines = m.section.ViewLines
+		lines = make([]string, 0, maxInt(1, m.diffViewport.VisibleLineCount()))
+		bodyH := maxInt(1, height-2)
+		for i := 0; i < bodyH; i++ {
+			displayIdx := m.diffViewport.YOffset() + i
+			if displayIdx >= len(m.section.ViewLines) {
+				lines = append(lines, "")
+				continue
+			}
+			mark := "  "
+			if m.focusDiff {
+				if m.diffNavMode == explorer.NavHunk && m.section.ActiveHunk >= 0 && m.section.ActiveHunk < len(m.section.HunkDisplayRange) {
+					r := m.section.HunkDisplayRange[m.section.ActiveHunk]
+					if displayIdx >= r[0] && displayIdx <= r[1] {
+						mark = commitDiffMarkerStyle.Render("▌ ")
+					}
+				}
+				if m.diffNavMode == explorer.NavLine && m.section.ActiveLine >= 0 && m.section.ActiveLine < len(m.section.ChangedDisplay) && m.section.ChangedDisplay[m.section.ActiveLine] == displayIdx {
+					mark = commitDiffMarkerActiveStyle.Render("▌ ")
+				}
+			}
+			lines = append(lines, mark+m.section.ViewLines[displayIdx])
+		}
 	} else if len(m.section.Parsed.Lines) > 0 {
 		if diff.HasBinaryDiff(m.section.Parsed) {
 			lines = []string{ui.StyleMuted.Render("binary file")}
@@ -142,11 +166,22 @@ func (m Model) renderDiffPane(width, height int) string {
 		Width:       width,
 		Height:      height,
 		Title:       "Diff",
+		RightTitle:  m.diffTitle(),
 		BorderColor: ui.ColorBorder,
 		TitleColor:  ui.ColorBlue,
 		Background:  ui.ColorBase,
 		Lines:       lines,
 	})
+}
+
+func (m Model) diffTitle() string {
+	if !m.focusDiff {
+		return ""
+	}
+	if m.diffNavMode == explorer.NavLine {
+		return "line"
+	}
+	return "hunk"
 }
 
 func renderBadges(decorations []git.RefDecoration) string {
@@ -183,7 +218,10 @@ func isMainOrMasterRef(name string) bool {
 }
 
 func (m Model) footerView() string {
-	left := "j/k move  b toggle body"
+	left := "j/k files  enter diff  b body"
+	if m.focusDiff {
+		left = "j/k move  a mode  w wrap  h back"
+	}
 	right := ui.StyleHint.Render("gw worktrees · gl log · gs status · q back")
 	if m.width <= 0 {
 		return left + "  " + right

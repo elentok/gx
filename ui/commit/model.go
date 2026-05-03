@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/ui/explorer"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/bubbles/v2/viewport"
 )
 
 type Settings struct {
@@ -25,12 +26,15 @@ type Model struct {
 	height       int
 	ready        bool
 	focusDiff    bool
+	diffNavMode  explorer.NavMode
+	wrapSoft     bool
 	keyPrefix    string
 	bodyExpanded bool
 	details      git.CommitDetails
 	files        []git.CommitFile
 	selected     int
 	section      explorer.SectionData
+	diffViewport viewport.Model
 	err          error
 }
 
@@ -44,6 +48,9 @@ func NewWithSettings(worktreeRoot, ref string, settings Settings) Model {
 		ref:          normalizedRef(ref),
 		settings:     settings,
 		bodyExpanded: true,
+		diffNavMode:  explorer.NavHunk,
+		wrapSoft:     true,
+		diffViewport: viewport.New(),
 	}
 	m.reload()
 	return m
@@ -93,4 +100,5 @@ func (m *Model) refreshDiff() {
 		return
 	}
 	m.section = explorer.BuildSectionData(rawDiff, rawDiff, m.section, false)
+	m.syncDiffViewport()
 }

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/ui/explorer"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -42,5 +43,90 @@ func TestBToggleBody(t *testing.T) {
 	m.height = 20
 	if !strings.Contains(m.View().Content, "body hidden") {
 		t.Fatalf("expected collapsed body hint")
+	}
+}
+
+func TestEnterFocusesDiffAndJKMoveInsideDiff(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\ntwo\nthree\nfour\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "a.txt", "one\nTWO\nTHREE\nfour\n")
+	testutil.CommitAll(t, repo, "change")
+
+	m := New(repo, "HEAD")
+	m.ready = true
+	m.width = 100
+	m.height = 24
+	m.syncDiffViewport()
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	if !m.focusDiff {
+		t.Fatalf("expected enter to focus diff")
+	}
+	if m.diffNavMode != explorer.NavHunk {
+		t.Fatalf("expected default nav mode hunk, got %v", m.diffNavMode)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	m = updated.(Model)
+	if m.diffNavMode != explorer.NavLine {
+		t.Fatalf("expected a to switch to line mode, got %v", m.diffNavMode)
+	}
+
+	before := m.section.ActiveLine
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	if m.section.ActiveLine <= before {
+		t.Fatalf("expected j to move active line, before=%d after=%d", before, m.section.ActiveLine)
+	}
+}
+
+func TestJKWithoutDiffFocusMoveFiles(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.WriteFile(t, repo, "b.txt", "one\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "a.txt", "A\n")
+	testutil.WriteFile(t, repo, "b.txt", "B\n")
+	testutil.CommitAll(t, repo, "change")
+
+	m := New(repo, "HEAD")
+	m.ready = true
+	if len(m.files) < 2 {
+		t.Fatalf("expected multiple files, got %d", len(m.files))
+	}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	if m.selected != 1 {
+		t.Fatalf("expected j to move selected file, got %d", m.selected)
+	}
+	if m.focusDiff {
+		t.Fatalf("expected file navigation not to force diff focus")
+	}
+}
+
+func TestEscLeavesDiffFocusBeforeBackingOut(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "a.txt", "two\n")
+	testutil.CommitAll(t, repo, "change")
+
+	m := New(repo, "HEAD")
+	m.ready = true
+	m.width = 100
+	m.height = 24
+	m.syncDiffViewport()
+	m.focusDiff = true
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	m = updated.(Model)
+	if cmd != nil {
+		t.Fatalf("expected esc in diff to only change focus")
+	}
+	if m.focusDiff {
+		t.Fatalf("expected esc to leave diff focus")
 	}
 }
