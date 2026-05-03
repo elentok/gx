@@ -23,9 +23,13 @@ type Model struct {
 	width        int
 	height       int
 	ready        bool
+	focusDiff    bool
 	keyPrefix    string
 	bodyExpanded bool
 	details      git.CommitDetails
+	files        []git.CommitFile
+	selected     int
+	diff         string
 	err          error
 }
 
@@ -56,4 +60,36 @@ func normalizedRef(ref string) string {
 
 func (m *Model) reload() {
 	m.details, m.err = git.CommitDetailsForRef(m.worktreeRoot, m.ref)
+	if m.err != nil {
+		m.files = nil
+		m.diff = ""
+		return
+	}
+	m.files, m.err = git.CommitFilesForRef(m.worktreeRoot, m.ref)
+	if m.err != nil {
+		m.diff = ""
+		return
+	}
+	if m.selected >= len(m.files) {
+		m.selected = len(m.files) - 1
+	}
+	if m.selected < 0 {
+		m.selected = 0
+	}
+	m.refreshDiff()
+}
+
+func (m *Model) refreshDiff() {
+	if len(m.files) == 0 {
+		m.diff = ""
+		return
+	}
+	file := m.files[m.selected]
+	diff, err := git.CommitFileDiffForRef(m.worktreeRoot, m.ref, file.Path)
+	if err != nil {
+		m.err = err
+		m.diff = ""
+		return
+	}
+	m.diff = diff
 }

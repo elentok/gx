@@ -22,9 +22,34 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		switch msg.String() {
 		case "q", "esc":
+			if m.focusDiff {
+				m.focusDiff = false
+				return m, nil
+			}
 			return m, nav.Back()
 		case "b":
 			m.bodyExpanded = !m.bodyExpanded
+			return m, nil
+		case "j", "down":
+			if len(m.files) > 0 {
+				if m.selected < len(m.files)-1 {
+					m.selected++
+					m.refreshDiff()
+				}
+				m.focusDiff = true
+			}
+			return m, nil
+		case "k", "up":
+			if len(m.files) > 0 {
+				if m.selected > 0 {
+					m.selected--
+					m.refreshDiff()
+				}
+				m.focusDiff = true
+			}
+			return m, nil
+		case "enter":
+			m.focusDiff = true
 			return m, nil
 		}
 	}

@@ -23,21 +23,22 @@ func (m Model) View() tea.View {
 
 	body := ui.RenderPanelFrame(ui.PanelFrameOptions{
 		Width:       maxInt(20, m.width),
-		Height:      maxInt(4, m.height-1),
+		Height:      maxInt(10, minInt(m.height-1, 12)),
 		Title:       "Commit",
 		RightTitle:  m.ref,
-		Lines:       m.visibleLines(),
+		Lines:       m.headerLines(),
 		BorderColor: ui.ColorBorder,
 		TitleColor:  ui.ColorBlue,
 		Background:  ui.ColorBase,
 	})
+	content := m.contentView()
 	footer := m.footerView()
-	v := tea.NewView(lipgloss.JoinVertical(lipgloss.Left, body, footer))
+	v := tea.NewView(lipgloss.JoinVertical(lipgloss.Left, body, content, footer))
 	v.AltScreen = true
 	return v
 }
 
-func (m Model) visibleLines() []string {
+func (m Model) headerLines() []string {
 	lines := []string{
 		ui.StyleHeading.Render(m.details.Subject),
 		"",
@@ -60,6 +61,85 @@ func (m Model) visibleLines() []string {
 		lines = append(lines, ui.StyleMuted.Render("(body hidden; press b to expand)"))
 	}
 	return lines
+}
+
+func (m Model) contentView() string {
+	headerH := maxInt(4, len(m.headerLines())+2)
+	contentH := maxInt(5, m.height-1-headerH-1)
+	if len(m.files) == 0 {
+		return ui.RenderPanelFrame(ui.PanelFrameOptions{
+			Width:       maxInt(20, m.width),
+			Height:      contentH,
+			Title:       "Changes",
+			BorderColor: ui.ColorBorder,
+			TitleColor:  ui.ColorBlue,
+			Background:  ui.ColorBase,
+			Lines:       []string{ui.StyleMuted.Render("no changed files")},
+		})
+	}
+
+	mainH := contentH
+	if m.width < 90 {
+		filesH := maxInt(5, mainH/3)
+		diffH := maxInt(5, mainH-filesH)
+		files := m.renderFilesPane(m.width, filesH)
+		diff := m.renderDiffPane(m.width, diffH)
+		return lipgloss.JoinVertical(lipgloss.Left, files, diff)
+	}
+	leftW := maxInt(24, m.width/4)
+	if leftW > m.width-40 {
+		leftW = m.width - 40
+	}
+	if leftW < 24 {
+		leftW = 24
+	}
+	rightW := m.width - leftW
+	left := m.renderFilesPane(leftW, mainH)
+	right := m.renderDiffPane(rightW, mainH)
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+}
+
+func (m Model) renderFilesPane(width, height int) string {
+	lines := make([]string, 0, maxInt(1, len(m.files)))
+	for i, file := range m.files {
+		name := file.Path
+		if file.RenameFrom != "" {
+			name = file.RenameFrom + " -> " + file.Path
+		}
+		line := fmt.Sprintf("%s %s", file.Status, name)
+		if i == m.selected {
+			line = ui.RenderRowHighlight(line)
+		}
+		lines = append(lines, line)
+	}
+	if len(lines) == 0 {
+		lines = append(lines, ui.StyleMuted.Render("no changed files"))
+	}
+	return ui.RenderPanelFrame(ui.PanelFrameOptions{
+		Width:       width,
+		Height:      height,
+		Title:       "Files",
+		BorderColor: ui.ColorBorder,
+		TitleColor:  ui.ColorBlue,
+		Background:  ui.ColorBase,
+		Lines:       lines,
+	})
+}
+
+func (m Model) renderDiffPane(width, height int) string {
+	lines := []string{ui.StyleMuted.Render("no diff")}
+	if strings.TrimSpace(m.diff) != "" {
+		lines = strings.Split(m.diff, "\n")
+	}
+	return ui.RenderPanelFrame(ui.PanelFrameOptions{
+		Width:       width,
+		Height:      height,
+		Title:       "Diff",
+		BorderColor: ui.ColorBorder,
+		TitleColor:  ui.ColorBlue,
+		Background:  ui.ColorBase,
+		Lines:       lines,
+	})
 }
 
 func renderBadges(decorations []git.RefDecoration) string {
@@ -96,7 +176,7 @@ func isMainOrMasterRef(name string) bool {
 }
 
 func (m Model) footerView() string {
-	left := "b toggle body"
+	left := "j/k move  b toggle body"
 	right := ui.StyleHint.Render("gw worktrees · gl log · gs status · q back")
 	if m.width <= 0 {
 		return left + "  " + right
@@ -111,6 +191,13 @@ func (m Model) footerView() string {
 
 func maxInt(a, b int) int {
 	if a > b {
+		return a
+	}
+	return b
+}
+
+func minInt(a, b int) int {
+	if a < b {
 		return a
 	}
 	return b
