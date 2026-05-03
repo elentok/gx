@@ -1,19 +1,14 @@
 package status
 
 import (
-	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/diff"
+	"github.com/elentok/gx/ui/explorer"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/charmbracelet/x/ansi"
 )
-
-var deltaHunkHeaderRe = regexp.MustCompile(`^\s*(?:[•*]\s+)?[^:]+:\d+:(?:\s.*)?$`)
-var deltaSideBySideLineRe = regexp.MustCompile(`^\s*│\s*([0-9]+)?\s*│.*│\s*([0-9]+)?\s*│`)
 
 type movedTarget struct {
 	fromSection diffSection
@@ -301,7 +296,7 @@ func buildSectionState(raw, color string, prev sectionState, sideBySide bool) se
 		return state
 	}
 
-	colorLines := splitLines(color)
+	colorLines := explorer.SplitLines(color)
 	if len(colorLines) == 0 {
 		colorLines = append([]string{}, state.rawLines...)
 	} else if len(colorLines) < len(state.rawLines) {
@@ -396,7 +391,7 @@ func (m *Model) focusMovedTarget(sig movedTarget) {
 }
 
 func initSideBySideSectionState(state *sectionState, color string) {
-	state.viewLines = splitLines(color)
+	state.viewLines = explorer.SplitLines(color)
 	if len(state.viewLines) == 0 {
 		state.viewLines = append([]string{}, state.rawLines...)
 	}
@@ -412,8 +407,11 @@ func initSideBySideSectionState(state *sectionState, color string) {
 	for i := range state.changedDisplay {
 		state.changedDisplay[i] = -1
 	}
-	mapSideBySideDisplayLinesToChanged(state)
-	state.hunkDisplayRange = sideBySideHunkDisplayRanges(state.viewLines, len(state.parsed.Hunks))
+	mapping := explorer.BuildSideBySideMapping(state.parsed, state.viewLines)
+	state.displayToRaw = mapping.DisplayToRaw
+	state.rawToDisplay = mapping.RawToDisplay
+	state.changedDisplay = mapping.ChangedDisplay
+	state.hunkDisplayRange = mapping.HunkDisplayRange
 	prevOffset := state.viewport.YOffset()
 	state.viewport.SetContentLines(state.viewLines)
 	state.viewport.SetYOffset(prevOffset)
@@ -446,122 +444,10 @@ func initSideBySideSectionState(state *sectionState, color string) {
 	}
 }
 
-func mapSideBySideDisplayLinesToChanged(state *sectionState) {
-	oldByLine := map[int][]int{}
-	newByLine := map[int][]int{}
-	for i, cl := range state.parsed.Changed {
-		if cl.Prefix == '-' {
-			oldByLine[cl.OldLine] = append(oldByLine[cl.OldLine], i)
-		}
-		if cl.Prefix == '+' {
-			newByLine[cl.NewLine] = append(newByLine[cl.NewLine], i)
-		}
-	}
-
-	for displayIdx, line := range state.viewLines {
-		plain := ansi.Strip(line)
-		m := deltaSideBySideLineRe.FindStringSubmatch(plain)
-		if m == nil {
-			continue
-		}
-		left := parseOptionalLineNumber(m[1])
-		right := parseOptionalLineNumber(m[2])
-
-		if left > 0 {
-			if queue := oldByLine[left]; len(queue) > 0 {
-				idx := queue[0]
-				oldByLine[left] = queue[1:]
-				state.changedDisplay[idx] = displayIdx
-				state.displayToRaw[displayIdx] = state.parsed.Changed[idx].LineIndex
-			}
-		}
-		if right > 0 {
-			if queue := newByLine[right]; len(queue) > 0 {
-				idx := queue[0]
-				newByLine[right] = queue[1:]
-				state.changedDisplay[idx] = displayIdx
-				if state.displayToRaw[displayIdx] < 0 {
-					state.displayToRaw[displayIdx] = state.parsed.Changed[idx].LineIndex
-				}
-			}
-		}
-	}
-	state.rawToDisplay = diff.BuildRawToDisplayMap(state.parsed, state.displayToRaw)
-}
-
-func parseOptionalLineNumber(s string) int {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return 0
-	}
-	n, err := strconv.Atoi(s)
-	if err != nil || n < 1 {
-		return 0
-	}
-	return n
-}
-
-func sideBySideHunkDisplayRanges(lines []string, hunkCount int) [][2]int {
-	if hunkCount <= 0 || len(lines) == 0 {
-		return nil
-	}
-	headers := make([]int, 0, hunkCount)
-	for i, line := range lines {
-		plain := strings.TrimSpace(ansi.Strip(line))
-		if deltaHunkHeaderRe.MatchString(plain) {
-			headers = append(headers, i)
-		}
-	}
-	if len(headers) != hunkCount {
-		return nil
-	}
-	ranges := make([][2]int, 0, hunkCount)
-	for i, start := range headers {
-		end := len(lines) - 1
-		if i+1 < len(headers) {
-			end = headers[i+1] - 1
-		}
-		for end >= start {
-			plain := strings.TrimSpace(ansi.Strip(lines[end]))
-			if plain == "" || isDeltaSectionDivider(plain) {
-				end--
-				continue
-			}
-			break
-		}
-		for start <= end {
-			plain := strings.TrimSpace(ansi.Strip(lines[start]))
-			if isDeltaSectionDivider(plain) {
-				start++
-				continue
-			}
-			break
-		}
-		if end < start {
-			end = start
-		}
-		ranges = append(ranges, [2]int{start, end})
-	}
-	return ranges
-}
-
 func isDeltaSectionDivider(plain string) bool {
-	if plain == "" {
-		return false
-	}
-	for _, r := range plain {
-		if r != '─' && r != '-' {
-			return false
-		}
-	}
-	return true
+	return explorer.IsDeltaSectionDivider(plain)
 }
 
 func splitLines(s string) []string {
-	s = strings.ReplaceAll(s, "\r\n", "\n")
-	s = strings.TrimSuffix(s, "\n")
-	if strings.TrimSpace(s) == "" {
-		return nil
-	}
-	return strings.Split(s, "\n")
+	return explorer.SplitLines(s)
 }
