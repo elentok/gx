@@ -5,7 +5,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui/diff"
+	"github.com/elentok/gx/ui/explorer"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -30,7 +30,7 @@ type Model struct {
 	details      git.CommitDetails
 	files        []git.CommitFile
 	selected     int
-	diff         diff.ParsedDiff
+	section      explorer.SectionData
 	err          error
 }
 
@@ -63,12 +63,12 @@ func (m *Model) reload() {
 	m.details, m.err = git.CommitDetailsForRef(m.worktreeRoot, m.ref)
 	if m.err != nil {
 		m.files = nil
-		m.diff = diff.ParsedDiff{}
+		m.section = explorer.NewSectionData()
 		return
 	}
 	m.files, m.err = git.CommitFilesForRef(m.worktreeRoot, m.ref)
 	if m.err != nil {
-		m.diff = diff.ParsedDiff{}
+		m.section = explorer.NewSectionData()
 		return
 	}
 	if m.selected >= len(m.files) {
@@ -82,15 +82,15 @@ func (m *Model) reload() {
 
 func (m *Model) refreshDiff() {
 	if len(m.files) == 0 {
-		m.diff = diff.ParsedDiff{}
+		m.section = explorer.NewSectionData()
 		return
 	}
 	file := m.files[m.selected]
 	rawDiff, err := git.CommitFileDiffForRef(m.worktreeRoot, m.ref, file.Path)
 	if err != nil {
 		m.err = err
-		m.diff = diff.ParsedDiff{}
+		m.section = explorer.NewSectionData()
 		return
 	}
-	m.diff = diff.ParseUnifiedDiff(rawDiff)
+	m.section = explorer.BuildSectionData(rawDiff, rawDiff, m.section, false)
 }

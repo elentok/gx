@@ -268,80 +268,17 @@ func (m *Model) openDiscardDiffConfirm() {
 }
 
 func buildSectionState(raw, color string, prev sectionState, sideBySide bool) sectionState {
-	state := sectionState{activeHunk: prev.activeHunk, activeLine: prev.activeLine, visualActive: prev.visualActive, visualAnchor: prev.visualAnchor, viewport: prev.viewport}
+	data := explorer.BuildSectionData(raw, color, toExplorerSectionData(prev), sideBySide)
+	state := fromExplorerSectionData(data, prev.viewport)
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		state.activeHunk = -1
-		state.activeLine = -1
-		state.baseLines = nil
-		state.baseLineKinds = nil
-		state.baseDisplayToRaw = nil
-		state.viewLines = nil
-		state.viewLineKinds = nil
-		state.displayToRaw = nil
-		state.rawToDisplay = nil
-		state.hunkDisplayRange = nil
-		state.changedDisplay = nil
-		state.visualActive = false
-		state.visualAnchor = -1
 		state.viewport.SetContent("")
 		state.viewport.SetYOffset(0)
 		return state
 	}
-
-	state.parsed = diff.ParseUnifiedDiff(raw)
-	state.rawLines = append([]string{}, state.parsed.Lines...)
-	if sideBySide {
-		initSideBySideSectionState(&state, color)
-		return state
-	}
-
-	colorLines := explorer.SplitLines(color)
-	if len(colorLines) == 0 {
-		colorLines = append([]string{}, state.rawLines...)
-	} else if len(colorLines) < len(state.rawLines) {
-		colorLines = append(colorLines, state.rawLines[len(colorLines):]...)
-	} else if len(colorLines) > len(state.rawLines) {
-		colorLines = colorLines[:len(state.rawLines)]
-	}
-	state.baseLines, state.baseLineKinds, state.baseDisplayToRaw = diff.BuildDisplayBaseLines(state.parsed, colorLines)
-	state.viewLines = append([]string{}, state.baseLines...)
-	state.viewLineKinds = append([]diffDisplayRowKind{}, state.baseLineKinds...)
-	state.displayToRaw = append([]int{}, state.baseDisplayToRaw...)
-	state.rawToDisplay = diff.BuildRawToDisplayMap(state.parsed, state.displayToRaw)
-	state.hunkDisplayRange = nil
-	state.changedDisplay = nil
 	prevOffset := state.viewport.YOffset()
 	state.viewport.SetContentLines(state.viewLines)
 	state.viewport.SetYOffset(prevOffset)
-
-	if len(state.parsed.Hunks) == 0 {
-		state.activeHunk = -1
-	} else {
-		if state.activeHunk < 0 {
-			state.activeHunk = 0
-		}
-		if state.activeHunk >= len(state.parsed.Hunks) {
-			state.activeHunk = len(state.parsed.Hunks) - 1
-		}
-	}
-
-	if len(state.parsed.Changed) == 0 {
-		state.activeLine = -1
-		state.visualActive = false
-		state.visualAnchor = -1
-	} else {
-		if state.activeLine < 0 {
-			state.activeLine = 0
-		}
-		if state.activeLine >= len(state.parsed.Changed) {
-			state.activeLine = len(state.parsed.Changed) - 1
-		}
-		if state.visualAnchor < 0 || state.visualAnchor >= len(state.parsed.Changed) {
-			state.visualAnchor = state.activeLine
-		}
-	}
-
 	return state
 }
 
@@ -387,60 +324,6 @@ func (m *Model) focusMovedTarget(sig movedTarget) {
 		sec.activeLine = 0
 		m.ensureActiveVisible(sec)
 		m.flash = flashState{active: true, section: m.section, navMode: navLine, line: 0, frames: 4}
-	}
-}
-
-func initSideBySideSectionState(state *sectionState, color string) {
-	state.viewLines = explorer.SplitLines(color)
-	if len(state.viewLines) == 0 {
-		state.viewLines = append([]string{}, state.rawLines...)
-	}
-	state.baseLines = append([]string{}, state.viewLines...)
-	state.baseLineKinds = make([]diffDisplayRowKind, len(state.baseLines))
-	state.baseDisplayToRaw = make([]int, len(state.baseLines))
-	for i := range state.baseDisplayToRaw {
-		state.baseDisplayToRaw[i] = -1
-	}
-	state.viewLineKinds = append([]diffDisplayRowKind{}, state.baseLineKinds...)
-	state.displayToRaw = append([]int{}, state.baseDisplayToRaw...)
-	state.changedDisplay = make([]int, len(state.parsed.Changed))
-	for i := range state.changedDisplay {
-		state.changedDisplay[i] = -1
-	}
-	mapping := explorer.BuildSideBySideMapping(state.parsed, state.viewLines)
-	state.displayToRaw = mapping.DisplayToRaw
-	state.rawToDisplay = mapping.RawToDisplay
-	state.changedDisplay = mapping.ChangedDisplay
-	state.hunkDisplayRange = mapping.HunkDisplayRange
-	prevOffset := state.viewport.YOffset()
-	state.viewport.SetContentLines(state.viewLines)
-	state.viewport.SetYOffset(prevOffset)
-
-	if len(state.parsed.Hunks) == 0 {
-		state.activeHunk = -1
-	} else {
-		if state.activeHunk < 0 {
-			state.activeHunk = 0
-		}
-		if state.activeHunk >= len(state.parsed.Hunks) {
-			state.activeHunk = len(state.parsed.Hunks) - 1
-		}
-	}
-
-	if len(state.parsed.Changed) == 0 {
-		state.activeLine = -1
-		state.visualActive = false
-		state.visualAnchor = -1
-	} else {
-		if state.activeLine < 0 {
-			state.activeLine = 0
-		}
-		if state.activeLine >= len(state.parsed.Changed) {
-			state.activeLine = len(state.parsed.Changed) - 1
-		}
-		if state.visualAnchor < 0 || state.visualAnchor >= len(state.parsed.Changed) {
-			state.visualAnchor = state.activeLine
-		}
 	}
 }
 

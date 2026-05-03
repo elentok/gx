@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/diff"
+	"github.com/elentok/gx/ui/explorer"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -311,48 +312,15 @@ func (m *Model) syncDiffViewports() {
 }
 
 func reflowSectionLines(sec *sectionState, wrapWidth int, wrapSoft bool) {
+	prevOffset := sec.viewport.YOffset()
+	data := toExplorerSectionData(*sec)
+	explorer.ReflowSectionData(&data, wrapWidth, wrapSoft)
+	*sec = fromExplorerSectionData(data, sec.viewport)
 	if len(sec.baseLines) == 0 {
-		sec.viewLines = nil
-		sec.viewLineKinds = nil
-		sec.displayToRaw = nil
-		sec.rawToDisplay = diff.BuildRawToDisplayMap(sec.parsed, nil)
 		sec.viewport.SetContent("")
 		sec.viewport.SetYOffset(0)
 		return
 	}
-
-	prevOffset := sec.viewport.YOffset()
-	view := make([]string, 0, len(sec.baseLines))
-	kinds := make([]diffDisplayRowKind, 0, len(sec.baseLines))
-	mapRaw := make([]int, 0, len(sec.baseDisplayToRaw))
-
-	for i, line := range sec.baseLines {
-		rawIdx := -1
-		kind := diffRowPlain
-		if i < len(sec.baseDisplayToRaw) {
-			rawIdx = sec.baseDisplayToRaw[i]
-		}
-		if i < len(sec.baseLineKinds) {
-			kind = sec.baseLineKinds[i]
-		}
-		if !wrapSoft || rawIdx < 0 {
-			view = append(view, line)
-			kinds = append(kinds, kind)
-			mapRaw = append(mapRaw, rawIdx)
-			continue
-		}
-		parts := diff.WrapANSI(line, wrapWidth)
-		for _, p := range parts {
-			view = append(view, p)
-			kinds = append(kinds, kind)
-			mapRaw = append(mapRaw, rawIdx)
-		}
-	}
-
-	sec.viewLines = view
-	sec.viewLineKinds = kinds
-	sec.displayToRaw = mapRaw
-	sec.rawToDisplay = diff.BuildRawToDisplayMap(sec.parsed, sec.displayToRaw)
 	sec.viewport.SetContentLines(sec.viewLines)
 	sec.viewport.SetYOffset(prevOffset)
 }

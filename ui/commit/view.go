@@ -129,14 +129,13 @@ func (m Model) renderFilesPane(width, height int) string {
 
 func (m Model) renderDiffPane(width, height int) string {
 	lines := []string{ui.StyleMuted.Render("no diff")}
-	if len(m.diff.Lines) > 0 {
-		lines, _, _ = diff.BuildDisplayBaseLines(m.diff, nil)
-		if len(lines) == 0 {
-			if diff.HasBinaryDiff(m.diff) {
-				lines = []string{ui.StyleMuted.Render("binary file")}
-			} else {
-				lines = []string{ui.StyleMuted.Render("no diff")}
-			}
+	if len(m.section.ViewLines) > 0 {
+		lines = m.section.ViewLines
+	} else if len(m.section.Parsed.Lines) > 0 {
+		if diff.HasBinaryDiff(m.section.Parsed) {
+			lines = []string{ui.StyleMuted.Render("binary file")}
+		} else {
+			lines = []string{ui.StyleMuted.Render("no diff")}
 		}
 	}
 	return ui.RenderPanelFrame(ui.PanelFrameOptions{
