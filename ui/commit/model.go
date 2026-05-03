@@ -41,6 +41,7 @@ type Model struct {
 	searchMatches []explorer.DiffSearchMatch
 	searchCursor  int
 	searchInput   textinput.Model
+	statusMsg     string
 	err           error
 }
 

@@ -184,3 +184,65 @@ func TestSearchMovesToMatchesAndNavigates(t *testing.T) {
 		t.Fatalf("expected N to move to previous match")
 	}
 }
+
+func TestYankFilenameWithYF(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.CommitAll(t, repo, "base")
+
+	var got string
+	prev := commitClipboardWrite
+	commitClipboardWrite = func(s string) error {
+		got = s
+		return nil
+	}
+	t.Cleanup(func() { commitClipboardWrite = prev })
+
+	m := New(repo, "HEAD")
+	m.ready = true
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
+	m = updated.(Model)
+
+	if got != "a.txt" {
+		t.Fatalf("expected yanked filename, got %q", got)
+	}
+}
+
+func TestYankAllContextWithYAInDiff(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "old-1\nold-2\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "a.txt", "new-1\nnew-2\n")
+	testutil.CommitAll(t, repo, "change")
+
+	var got string
+	prev := commitClipboardWrite
+	commitClipboardWrite = func(s string) error {
+		got = s
+		return nil
+	}
+	t.Cleanup(func() { commitClipboardWrite = prev })
+
+	m := New(repo, "HEAD")
+	m.ready = true
+	m.width = 100
+	m.height = 24
+	m.syncDiffViewport()
+	m.focusDiff = true
+	m.diffNavMode = explorer.NavLine
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	m = updated.(Model)
+
+	if !strings.Contains(got, "@a.txt L") {
+		t.Fatalf("expected ya output to include location, got %q", got)
+	}
+	if !strings.Contains(got, "-old-1") {
+		t.Fatalf("expected ya output to include selected diff line, got %q", got)
+	}
+}

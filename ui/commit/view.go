@@ -222,12 +222,15 @@ func isMainOrMasterRef(name string) bool {
 }
 
 func (m Model) footerView() string {
+	if m.statusMsg != "" {
+		return ui.StyleHint.Render(m.statusMsg)
+	}
 	if m.searchMode == searchModeInput {
 		return m.searchFooterText()
 	}
 	left := "j/k files  enter diff  b body"
 	if m.focusDiff {
-		left = "j/k move  a mode  / search  w wrap"
+		left = "j/k move  a mode  / search  y yank"
 	}
 	right := ui.StyleHint.Render("gw worktrees · gl log · gs status · q back")
 	if m.width <= 0 {

@@ -22,8 +22,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if handled, cmd := m.handleSearchKey(msg); handled {
 			return m, cmd
 		}
-		if handled, cmd := m.handleChordKey(msg); handled {
-			return m, cmd
+		if next, cmd, handled := m.handleChordKey(msg); handled {
+			return next, cmd
 		}
 		if m.handleSearchNavigateKey(msg) {
 			return m, nil
@@ -131,22 +131,48 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleChordKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
+func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
+	if m.keyPrefix == "y" {
+		m.keyPrefix = ""
+		switch msg.String() {
+		case "l":
+			m.yankLocationOnly()
+			return m, nil, true
+		case "a":
+			m.yankAllContext()
+			return m, nil, true
+		case "f":
+			m.yankFilename()
+			return m, nil, true
+		case "y":
+			m.yankContentOnly()
+			return m, nil, true
+		case "esc":
+			m.clearStatus()
+			return m, nil, true
+		}
+		return m, nil, true
+	}
 	if m.keyPrefix == "g" {
 		m.keyPrefix = ""
 		switch msg.String() {
 		case "w":
-			return true, nav.Replace(nav.Route{Kind: nav.RouteWorktrees})
+			return m, nav.Replace(nav.Route{Kind: nav.RouteWorktrees}), true
 		case "l":
-			return true, nav.Replace(nav.Route{Kind: nav.RouteLog, WorktreeRoot: m.worktreeRoot, Ref: m.ref})
+			return m, nav.Replace(nav.Route{Kind: nav.RouteLog, WorktreeRoot: m.worktreeRoot, Ref: m.ref}), true
 		case "s":
-			return true, nav.Replace(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: m.worktreeRoot})
+			return m, nav.Replace(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: m.worktreeRoot}), true
 		}
-		return true, nil
+		return m, nil, true
+	}
+	if msg.String() == "y" {
+		m.keyPrefix = "y"
+		m.setStatus("yy content · yl location · ya all · yf filename")
+		return m, nil, true
 	}
 	if msg.String() == "g" {
 		m.keyPrefix = "g"
-		return true, nil
+		return m, nil, true
 	}
-	return false, nil
+	return m, nil, false
 }

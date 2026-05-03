@@ -1,4 +1,4 @@
-package status
+package commit
 
 import (
 	"fmt"
@@ -8,16 +8,30 @@ import (
 	"github.com/elentok/gx/ui/explorer"
 )
 
-var stageClipboardWrite = clipboard.WriteAll
+var commitClipboardWrite = clipboard.WriteAll
+
+func (m *Model) setStatus(msg string) {
+	m.statusMsg = msg
+}
+
+func (m *Model) clearStatus() {
+	m.statusMsg = ""
+}
+
+func (m *Model) selectedFile() (path string, ok bool) {
+	if m.selected < 0 || m.selected >= len(m.files) {
+		return "", false
+	}
+	return m.files[m.selected].Path, true
+}
 
 func (m *Model) yankFilename() {
-	file, ok := m.selectedExplorerFile()
+	path, ok := m.selectedFile()
 	if !ok {
 		m.setStatus("no file selected")
 		return
 	}
-	text := file.Path
-	if err := stageClipboardWrite(text); err != nil {
+	if err := commitClipboardWrite(path); err != nil {
 		m.setStatus("clipboard copy failed: " + err.Error())
 		return
 	}
@@ -25,13 +39,13 @@ func (m *Model) yankFilename() {
 }
 
 func (m *Model) yankLocationOnly() {
-	file, ok := m.selectedExplorerFile()
+	path, ok := m.selectedFile()
 	if !ok {
 		m.setStatus("no file selected")
 		return
 	}
-	if m.focus == focusStatus {
-		if err := stageClipboardWrite("@" + file.Path); err != nil {
+	if !m.focusDiff {
+		if err := commitClipboardWrite("@" + path); err != nil {
 			m.setStatus("clipboard copy failed: " + err.Error())
 			return
 		}
@@ -42,7 +56,7 @@ func (m *Model) yankLocationOnly() {
 	if !ok {
 		return
 	}
-	if err := stageClipboardWrite("@" + file.Path + " " + loc); err != nil {
+	if err := commitClipboardWrite("@" + path + " " + loc); err != nil {
 		m.setStatus("clipboard copy failed: " + err.Error())
 		return
 	}
@@ -50,26 +64,25 @@ func (m *Model) yankLocationOnly() {
 }
 
 func (m *Model) yankAllContext() {
-	file, ok := m.selectedExplorerFile()
+	path, ok := m.selectedFile()
 	if !ok {
 		m.setStatus("no file selected")
 		return
 	}
-	if m.focus == focusStatus {
-		if err := stageClipboardWrite("@" + file.Path); err != nil {
+	if !m.focusDiff {
+		if err := commitClipboardWrite("@" + path); err != nil {
 			m.setStatus("clipboard copy failed: " + err.Error())
 			return
 		}
 		m.setStatus("yanked all context")
 		return
 	}
-
 	loc, body, ok := m.focusedLocationAndBody()
 	if !ok {
 		return
 	}
-	text := fmt.Sprintf("@%s %s\n\n%s", file.Path, loc, strings.Join(body, "\n"))
-	if err := stageClipboardWrite(text); err != nil {
+	text := fmt.Sprintf("@%s %s\n\n%s", path, loc, strings.Join(body, "\n"))
+	if err := commitClipboardWrite(text); err != nil {
 		m.setStatus("clipboard copy failed: " + err.Error())
 		return
 	}
@@ -77,21 +90,20 @@ func (m *Model) yankAllContext() {
 }
 
 func (m *Model) yankContentOnly() {
-	if m.focus == focusStatus {
+	if !m.focusDiff {
 		m.setStatus("no diff selection to yank")
 		return
 	}
-	sec := m.currentSection()
-	if explorer.ActiveHunkIndexForYank(toExplorerSectionData(*sec), m.navMode) < 0 {
+	if explorer.ActiveHunkIndexForYank(m.section, m.diffNavMode) < 0 {
 		m.setStatus("no hunk selected")
 		return
 	}
-	body := explorer.FocusedYankBody(toExplorerSectionData(*sec), m.navMode)
+	body := explorer.FocusedYankBody(m.section, m.diffNavMode)
 	if len(body) == 0 {
 		m.setStatus("no lines to yank")
 		return
 	}
-	if err := stageClipboardWrite(strings.Join(body, "\n")); err != nil {
+	if err := commitClipboardWrite(strings.Join(body, "\n")); err != nil {
 		m.setStatus("clipboard copy failed: " + err.Error())
 		return
 	}
@@ -99,18 +111,15 @@ func (m *Model) yankContentOnly() {
 }
 
 func (m *Model) focusedLocationAndBody() (string, []string, bool) {
-	sec := m.currentSection()
-	data := toExplorerSectionData(*sec)
-	hunkIdx := explorer.ActiveHunkIndexForYank(data, m.navMode)
-	if hunkIdx < 0 || hunkIdx >= len(sec.parsed.Hunks) {
+	if explorer.ActiveHunkIndexForYank(m.section, m.diffNavMode) < 0 {
 		m.setStatus("no hunk selected")
 		return "", nil, false
 	}
-	body := explorer.FocusedYankBody(data, m.navMode)
+	body := explorer.FocusedYankBody(m.section, m.diffNavMode)
 	if len(body) == 0 {
 		m.setStatus("no lines to yank")
 		return "", nil, false
 	}
-	loc := explorer.FocusedLocation(data, m.navMode)
+	loc := explorer.FocusedLocation(m.section, m.diffNavMode)
 	return loc, body, true
 }
