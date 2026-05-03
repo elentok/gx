@@ -74,8 +74,8 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 	sec.viewport.SetWidth(innerW)
 
 	titleText := title
-	if file, ok := m.selectedExplorerFile(); ok && file.renameFrom != "" {
-		titleText += " [moved: " + file.renameFrom + " -> " + file.path + "]"
+	if file, ok := m.selectedExplorerFile(); ok && file.RenameFrom != "" {
+		titleText += " [moved: " + file.RenameFrom + " -> " + file.Path + "]"
 	}
 	if si := diff.ParseSymlinkDiffInfo(sec.parsed); si.IsSymlink {
 		if label := si.TitleLabel(); label != "" {

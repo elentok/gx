@@ -6,37 +6,6 @@ import (
 	"github.com/elentok/gx/ui/diff"
 )
 
-// These types model the reusable diff explorer core that both live status and
-// historical commit review will eventually share.
-
-type focusPane int
-
-const (
-	focusStatus focusPane = iota
-	focusDiff
-)
-
-type diffSection int
-
-const (
-	sectionUnstaged diffSection = iota
-	sectionStaged
-)
-
-type navMode int
-
-const (
-	navHunk navMode = iota
-	navLine
-)
-
-type diffRenderMode int
-
-const (
-	renderUnified diffRenderMode = iota
-	renderSideBySide
-)
-
 type diffDisplayRowKind = diff.RowKind
 
 const (

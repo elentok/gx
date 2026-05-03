@@ -30,8 +30,8 @@ func (m *Model) applySelection() tea.Cmd {
 
 	sec := m.currentSection()
 	sig := movedTarget{fromSection: m.section, navMode: m.navMode}
-	if file.untracked && m.section == sectionUnstaged {
-		if err := git.StageIntentPath(m.worktreeRoot, file.path); err != nil {
+	if file.Untracked && m.section == sectionUnstaged {
+		if err := git.StageIntentPath(m.worktreeRoot, file.Path); err != nil {
 			m.showGitError(err)
 			return nil
 		}
@@ -102,9 +102,9 @@ func (m *Model) applySelection() tea.Cmd {
 
 	sec.visualActive = false
 	sec.visualAnchor = sec.activeLine
-	m.setStatus("updated " + file.path)
+	m.setStatus("updated " + file.Path)
 	from := m.section
-	m.reload(file.path)
+	m.reload(file.Path)
 	if m.shouldSwitchAfterApply(from) {
 		m.focusMovedTarget(sig)
 		if m.flash.active {
@@ -149,18 +149,18 @@ func (m *Model) reloadDiffsForSelection() {
 	}
 
 	file := sel.file
-	if file.path != m.activeFilePath {
+	if file.Path != m.activeFilePath {
 		m.section = sectionUnstaged
-		m.activeFilePath = file.path
+		m.activeFilePath = file.Path
 	}
-	if file.untracked {
+	if file.Untracked {
 		renderWidth := m.deltaRenderWidth()
-		raw, err := git.DiffUntrackedPath(m.worktreeRoot, file.path, false, false, 0, m.currentDiffContextLines())
+		raw, err := git.DiffUntrackedPath(m.worktreeRoot, file.Path, false, false, 0, m.currentDiffContextLines())
 		if err != nil {
 			m.showGitError(err)
 			raw = ""
 		}
-		col, err := git.DiffUntrackedPath(m.worktreeRoot, file.path, true, m.renderMode == renderSideBySide, renderWidth, m.currentDiffContextLines())
+		col, err := git.DiffUntrackedPath(m.worktreeRoot, file.Path, true, m.renderMode == renderSideBySide, renderWidth, m.currentDiffContextLines())
 		if err != nil {
 			col = raw
 		}
@@ -171,23 +171,23 @@ func (m *Model) reloadDiffsForSelection() {
 		return
 	}
 
-	unstagedRaw, err := git.DiffPath(m.worktreeRoot, file.path, false, m.currentDiffContextLines())
+	unstagedRaw, err := git.DiffPath(m.worktreeRoot, file.Path, false, m.currentDiffContextLines())
 	if err != nil {
 		m.showGitError(err)
 		unstagedRaw = ""
 	}
 	renderWidth := m.deltaRenderWidth()
-	unstagedColor, err := git.DiffPathWithDelta(m.worktreeRoot, file.path, false, m.renderMode == renderSideBySide, renderWidth, m.currentDiffContextLines())
+	unstagedColor, err := git.DiffPathWithDelta(m.worktreeRoot, file.Path, false, m.renderMode == renderSideBySide, renderWidth, m.currentDiffContextLines())
 	if err != nil {
 		unstagedColor = unstagedRaw
 	}
 
-	stagedRaw, err := git.DiffPath(m.worktreeRoot, file.path, true, m.currentDiffContextLines())
+	stagedRaw, err := git.DiffPath(m.worktreeRoot, file.Path, true, m.currentDiffContextLines())
 	if err != nil {
 		m.showGitError(err)
 		stagedRaw = ""
 	}
-	stagedColor, err := git.DiffPathWithDelta(m.worktreeRoot, file.path, true, m.renderMode == renderSideBySide, renderWidth, m.currentDiffContextLines())
+	stagedColor, err := git.DiffPathWithDelta(m.worktreeRoot, file.Path, true, m.renderMode == renderSideBySide, renderWidth, m.currentDiffContextLines())
 	if err != nil {
 		stagedColor = stagedRaw
 	}
@@ -267,7 +267,7 @@ func (m *Model) openDiscardDiffConfirm() {
 	}
 
 	m.openConfirm(title, lines, confirmDiscardUnstaged, "", "")
-	m.confirmPaths = []string{file.path}
+	m.confirmPaths = []string{file.Path}
 	m.confirmPatch = patch
 	m.confirmPatchUnidiffZero = unidiffZero
 }

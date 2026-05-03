@@ -16,7 +16,7 @@ func (m *Model) yankFilename() {
 		m.setStatus("no file selected")
 		return
 	}
-	text := file.path
+	text := file.Path
 	if err := stageClipboardWrite(text); err != nil {
 		m.setStatus("clipboard copy failed: " + err.Error())
 		return
@@ -31,7 +31,7 @@ func (m *Model) yankLocationOnly() {
 		return
 	}
 	if m.focus == focusStatus {
-		if err := stageClipboardWrite("@" + file.path); err != nil {
+		if err := stageClipboardWrite("@" + file.Path); err != nil {
 			m.setStatus("clipboard copy failed: " + err.Error())
 			return
 		}
@@ -42,7 +42,7 @@ func (m *Model) yankLocationOnly() {
 	if !ok {
 		return
 	}
-	if err := stageClipboardWrite("@" + file.path + " " + loc); err != nil {
+	if err := stageClipboardWrite("@" + file.Path + " " + loc); err != nil {
 		m.setStatus("clipboard copy failed: " + err.Error())
 		return
 	}
@@ -56,7 +56,7 @@ func (m *Model) yankAllContext() {
 		return
 	}
 	if m.focus == focusStatus {
-		if err := stageClipboardWrite("@" + file.path); err != nil {
+		if err := stageClipboardWrite("@" + file.Path); err != nil {
 			m.setStatus("clipboard copy failed: " + err.Error())
 			return
 		}
@@ -68,7 +68,7 @@ func (m *Model) yankAllContext() {
 	if !ok {
 		return
 	}
-	text := fmt.Sprintf("@%s %s\n\n%s", file.path, loc, strings.Join(body, "\n"))
+	text := fmt.Sprintf("@%s %s\n\n%s", file.Path, loc, strings.Join(body, "\n"))
 	if err := stageClipboardWrite(text); err != nil {
 		m.setStatus("clipboard copy failed: " + err.Error())
 		return

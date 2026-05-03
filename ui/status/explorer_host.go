@@ -3,17 +3,16 @@ package status
 import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/diff"
+	"github.com/elentok/gx/ui/explorer"
 )
 
-type explorerFileSelection struct {
-	path       string
-	renameFrom string
-	untracked  bool
-	stageFile  git.StageFileStatus
+type statusExplorerFileSelection struct {
+	explorer.FileSelection
+	stageFile git.StageFileStatus
 }
 
-type explorerDiffSelection struct {
-	file explorerFileSelection
+type statusExplorerDiffSelection struct {
+	file statusExplorerFileSelection
 }
 
 func (m Model) diffEmptyMessage() string {
@@ -75,23 +74,25 @@ func (m Model) explorerCanRunBranchActions() bool {
 	return true
 }
 
-func (m Model) selectedExplorerFile() (explorerFileSelection, bool) {
+func (m Model) selectedExplorerFile() (statusExplorerFileSelection, bool) {
 	file, ok := m.selectedFile()
 	if !ok {
-		return explorerFileSelection{}, false
+		return statusExplorerFileSelection{}, false
 	}
-	return explorerFileSelection{
-		path:       file.Path,
-		renameFrom: file.RenameFrom,
-		untracked:  file.IsUntracked(),
-		stageFile:  file,
+	return statusExplorerFileSelection{
+		FileSelection: explorer.FileSelection{
+			Path:       file.Path,
+			RenameFrom: file.RenameFrom,
+			Untracked:  file.IsUntracked(),
+		},
+		stageFile: file,
 	}, true
 }
 
-func (m Model) selectedExplorerDiff() (explorerDiffSelection, bool) {
+func (m Model) selectedExplorerDiff() (statusExplorerDiffSelection, bool) {
 	file, ok := m.selectedExplorerFile()
 	if !ok {
-		return explorerDiffSelection{}, false
+		return statusExplorerDiffSelection{}, false
 	}
-	return explorerDiffSelection{file: file}, true
+	return statusExplorerDiffSelection{file: file}, true
 }
