@@ -1,5 +1,7 @@
 package status
 
+import "github.com/elentok/gx/ui/explorer"
+
 func (m *Model) pickAvailableSection() {
 	sections := m.visibleDiffSections()
 	if len(sections) == 1 {
@@ -60,68 +62,10 @@ func (m Model) editorLineForCurrentSelection() int {
 	return h.OldStart
 }
 
-func restoreViewportYOffset(sec *sectionState, y int) {
-	if y < 0 {
-		y = 0
-	}
-	maxOffset := sec.viewport.TotalLineCount() - sec.viewport.VisibleLineCount()
-	if maxOffset < 0 {
-		maxOffset = 0
-	}
-	if y > maxOffset {
-		y = maxOffset
-	}
-	sec.viewport.SetYOffset(y)
-}
-
 func hunkDisplayBounds(sec sectionState, hunkIdx int) (start int, end int, ok bool) {
-	if hunkIdx >= 0 && hunkIdx < len(sec.hunkDisplayRange) {
-		r := sec.hunkDisplayRange[hunkIdx]
-		if r[0] >= 0 && r[1] >= r[0] {
-			return r[0], r[1], true
-		}
-	}
-	if hunkIdx < 0 || hunkIdx >= len(sec.parsed.Hunks) {
-		return 0, 0, false
-	}
-	h := sec.parsed.Hunks[hunkIdx]
-	start = -1
-	end = -1
-	for displayIdx, rawIdx := range sec.displayToRaw {
-		if rawIdx < h.StartLine || rawIdx > h.EndLine {
-			continue
-		}
-		if start < 0 {
-			start = displayIdx
-		}
-		end = displayIdx
-	}
-	if start < 0 || end < 0 {
-		return 0, 0, false
-	}
-	return start, end, true
+	return explorer.HunkDisplayBounds(sec.hunkDisplayRange, sec.parsed, sec.displayToRaw, hunkIdx)
 }
 
 func visualLineBounds(sec sectionState) (start, end int) {
-	start = sec.visualAnchor
-	end = sec.activeLine
-	if start > end {
-		start, end = end, start
-	}
-	if start < 0 {
-		start = 0
-	}
-	if end < 0 {
-		end = 0
-	}
-	if end >= len(sec.parsed.Changed) {
-		end = len(sec.parsed.Changed) - 1
-	}
-	if start >= len(sec.parsed.Changed) {
-		start = len(sec.parsed.Changed) - 1
-	}
-	if start < 0 {
-		start = 0
-	}
-	return start, end
+	return explorer.VisualLineBounds(sec.visualAnchor, sec.activeLine, len(sec.parsed.Changed))
 }

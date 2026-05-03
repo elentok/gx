@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/explorer"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -101,8 +102,8 @@ func (m *Model) refreshWithBehavior(preserveScroll bool) {
 	m.reload(preserve)
 	m.syncDiffViewports()
 	if preserveScroll {
-		restoreViewportYOffset(&m.unstaged, unstagedOffset)
-		restoreViewportYOffset(&m.staged, stagedOffset)
+		explorer.RestoreViewportYOffset(&m.unstaged.viewport, unstagedOffset)
+		explorer.RestoreViewportYOffset(&m.staged.viewport, stagedOffset)
 		return
 	}
 	if m.focus == focusDiff {
