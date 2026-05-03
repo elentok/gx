@@ -15,62 +15,6 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-type focusPane int
-
-const (
-	focusStatus focusPane = iota
-	focusDiff
-)
-
-type diffSection int
-
-const (
-	sectionUnstaged diffSection = iota
-	sectionStaged
-)
-
-type navMode int
-
-const (
-	navHunk navMode = iota
-	navLine
-)
-
-type diffRenderMode int
-
-const (
-	renderUnified diffRenderMode = iota
-	renderSideBySide
-)
-
-type diffDisplayRowKind int
-
-const (
-	diffRowPlain diffDisplayRowKind = iota
-	diffRowAdded
-	diffRowRemoved
-	diffRowHunkHeader
-)
-
-type sectionState struct {
-	rawLines         []string
-	baseLines        []string
-	baseLineKinds    []diffDisplayRowKind
-	baseDisplayToRaw []int
-	viewLines        []string
-	viewLineKinds    []diffDisplayRowKind
-	displayToRaw     []int
-	rawToDisplay     []int
-	hunkDisplayRange [][2]int
-	changedDisplay   []int
-	parsed           parsedDiff
-	activeHunk       int
-	activeLine       int
-	visualActive     bool
-	visualAnchor     int
-	viewport         viewport.Model
-}
-
 type Model struct {
 	worktreeRoot string
 	settings     Settings
@@ -161,15 +105,6 @@ func DefaultSettings() Settings {
 	return Settings{DiffContextLines: 1, UseNerdFontIcons: true, Terminal: ui.TerminalPlain}
 }
 
-type flashState struct {
-	active  bool
-	section diffSection
-	navMode navMode
-	hunk    int
-	line    int
-	frames  int
-}
-
 type flashTickMsg struct{}
 type statusTickMsg struct{}
 type actionPollMsg struct{}
@@ -242,14 +177,4 @@ func NewWithSettings(worktreeRoot string, settings Settings) Model {
 	}
 	m.reload("")
 	return m
-}
-
-func newSectionState() sectionState {
-	vp := viewport.New()
-	return sectionState{
-		activeHunk:   -1,
-		activeLine:   -1,
-		visualAnchor: -1,
-		viewport:     vp,
-	}
 }

@@ -14,48 +14,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-func (m *Model) pickAvailableSection() {
-	hasUnstaged := len(m.unstaged.viewLines) > 0
-	hasStaged := len(m.staged.viewLines) > 0
-	if hasUnstaged && !hasStaged {
-		m.section = sectionUnstaged
-	}
-	if hasStaged && !hasUnstaged {
-		m.section = sectionStaged
-	}
-}
-
-func (m Model) canSwitchSections() bool {
-	return len(m.unstaged.viewLines) > 0 && len(m.staged.viewLines) > 0
-}
-
-func (m *Model) currentSection() *sectionState {
-	if m.section == sectionStaged {
-		return &m.staged
-	}
-	return &m.unstaged
-}
-
-func (m *Model) ensureActiveVisible(sec *sectionState) {
-	if m.navMode == navHunk && sec.activeHunk >= 0 && sec.activeHunk < len(sec.hunkDisplayRange) {
-		r := sec.hunkDisplayRange[sec.activeHunk]
-		sec.viewport.EnsureVisible(r[0], 0, 0)
-		return
-	}
-	if m.navMode == navLine && sec.activeLine >= 0 && sec.activeLine < len(sec.changedDisplay) && sec.changedDisplay[sec.activeLine] >= 0 {
-		sec.viewport.EnsureVisible(sec.changedDisplay[sec.activeLine], 0, 0)
-		return
-	}
-	active := m.activeRawLineIndex(*sec)
-	if active >= 0 {
-		display := active
-		if active < len(sec.rawToDisplay) && sec.rawToDisplay[active] >= 0 {
-			display = sec.rawToDisplay[active]
-		}
-		sec.viewport.EnsureVisible(display, 0, 0)
-	}
-}
-
 func nextFlashCmd() tea.Cmd {
 	return tea.Tick(90*time.Millisecond, func(time.Time) tea.Msg {
 		return flashTickMsg{}
@@ -183,20 +141,6 @@ func (m *Model) refreshWithBehavior(preserveScroll bool) {
 	if m.focus == focusDiff {
 		m.ensureActiveVisible(m.currentSection())
 	}
-}
-
-func restoreViewportYOffset(sec *sectionState, y int) {
-	if y < 0 {
-		y = 0
-	}
-	maxOffset := sec.viewport.TotalLineCount() - sec.viewport.VisibleLineCount()
-	if maxOffset < 0 {
-		maxOffset = 0
-	}
-	if y > maxOffset {
-		y = maxOffset
-	}
-	sec.viewport.SetYOffset(y)
 }
 
 func (m *Model) reloadBranchState() {
