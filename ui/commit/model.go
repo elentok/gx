@@ -5,6 +5,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/diff"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -29,7 +30,7 @@ type Model struct {
 	details      git.CommitDetails
 	files        []git.CommitFile
 	selected     int
-	diff         string
+	diff         diff.ParsedDiff
 	err          error
 }
 
@@ -62,12 +63,12 @@ func (m *Model) reload() {
 	m.details, m.err = git.CommitDetailsForRef(m.worktreeRoot, m.ref)
 	if m.err != nil {
 		m.files = nil
-		m.diff = ""
+		m.diff = diff.ParsedDiff{}
 		return
 	}
 	m.files, m.err = git.CommitFilesForRef(m.worktreeRoot, m.ref)
 	if m.err != nil {
-		m.diff = ""
+		m.diff = diff.ParsedDiff{}
 		return
 	}
 	if m.selected >= len(m.files) {
@@ -81,15 +82,15 @@ func (m *Model) reload() {
 
 func (m *Model) refreshDiff() {
 	if len(m.files) == 0 {
-		m.diff = ""
+		m.diff = diff.ParsedDiff{}
 		return
 	}
 	file := m.files[m.selected]
-	diff, err := git.CommitFileDiffForRef(m.worktreeRoot, m.ref, file.Path)
+	rawDiff, err := git.CommitFileDiffForRef(m.worktreeRoot, m.ref, file.Path)
 	if err != nil {
 		m.err = err
-		m.diff = ""
+		m.diff = diff.ParsedDiff{}
 		return
 	}
-	m.diff = diff
+	m.diff = diff.ParseUnifiedDiff(rawDiff)
 }

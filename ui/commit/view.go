@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/diff"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -128,8 +129,15 @@ func (m Model) renderFilesPane(width, height int) string {
 
 func (m Model) renderDiffPane(width, height int) string {
 	lines := []string{ui.StyleMuted.Render("no diff")}
-	if strings.TrimSpace(m.diff) != "" {
-		lines = strings.Split(m.diff, "\n")
+	if len(m.diff.Lines) > 0 {
+		lines, _, _ = diff.BuildDisplayBaseLines(m.diff, nil)
+		if len(lines) == 0 {
+			if diff.HasBinaryDiff(m.diff) {
+				lines = []string{ui.StyleMuted.Render("binary file")}
+			} else {
+				lines = []string{ui.StyleMuted.Render("no diff")}
+			}
+		}
 	}
 	return ui.RenderPanelFrame(ui.PanelFrameOptions{
 		Width:       width,
