@@ -243,7 +243,7 @@ func (m Model) searchOverlayWidth() int {
 
 func (m Model) searchInputOverlayView() string {
 	outerW := m.searchOverlayWidth()
-	innerW := outerW - 2 - 2 // minus border and padding
+	innerW := outerW - 2 - 2
 	ti := m.searchInput
 	ti.SetWidth(innerW)
 
