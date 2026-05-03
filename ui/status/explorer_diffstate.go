@@ -135,83 +135,6 @@ func (m *Model) shouldSwitchAfterApply(from diffSection) bool {
 	return len(sec.parsed.Hunks) == 0
 }
 
-func (m *Model) reload(preservePath string) {
-	m.reloadBranchState()
-	m.reloadBranchCommits()
-	files, err := git.ListStageFiles(m.worktreeRoot)
-	if err != nil {
-		m.err = err
-		m.files = nil
-		m.branchCommits = nil
-		m.statusEntries = nil
-		m.unstaged = newSectionState()
-		m.staged = newSectionState()
-		return
-	}
-	m.err = nil
-	m.files = files
-	m.statusEntries = buildStatusEntries(m.files, m.collapsedDirs)
-	if strings.TrimSpace(m.searchQuery) != "" && m.searchScope == searchScopeStatus {
-		m.recomputeSearchMatches()
-	}
-
-	if len(m.statusEntries) == 0 {
-		m.selected = 0
-		m.unstaged = newSectionState()
-		m.staged = newSectionState()
-		m.focus = focusStatus
-		return
-	}
-
-	targetPath := preservePath
-	if targetPath == "" && m.initialPath != "" {
-		targetPath = m.initialPath
-		m.initialPath = ""
-	}
-
-	if targetPath != "" {
-		for i, entry := range m.statusEntries {
-			if entry.Path == targetPath {
-				m.selected = i
-				break
-			}
-		}
-	}
-	if m.selected >= len(m.statusEntries) {
-		m.selected = len(m.statusEntries) - 1
-	}
-	if m.selected < 0 {
-		m.selected = 0
-	}
-
-	m.reloadDiffsForSelection()
-}
-
-func (m *Model) reloadBranchCommits() {
-	m.branchCommits = nil
-	if strings.TrimSpace(m.branchName) == "" || strings.TrimSpace(m.branchName) == "HEAD" {
-		return
-	}
-	repo, err := git.FindRepo(m.worktreeRoot)
-	if err != nil {
-		return
-	}
-	history, err := git.BranchHistorySinceMain(*repo, m.branchName, m.branchBaseRef)
-	if err != nil {
-		return
-	}
-	rows := make([]branchCommitRow, 0, len(history))
-	for _, commit := range history {
-		rows = append(rows, branchCommitRow{
-			subject: commit.Subject,
-			hash:    commit.Hash,
-			date:    commit.Date,
-			class:   commit.Class,
-		})
-	}
-	m.branchCommits = rows
-}
-
 func (m *Model) reloadDiffsForSelection() {
 	entry, ok := m.selectedStatusEntry()
 	if !ok || entry.Kind == statusEntryDir {
@@ -293,6 +216,62 @@ func (m *Model) enterDiffFromStatus(resetSection bool) {
 	m.ensureActiveVisible(m.currentSection())
 }
 
+func (m *Model) openDiscardDiffConfirm() {
+	if m.section != sectionUnstaged {
+		return
+	}
+	file, ok := m.selectedFile()
+	if !ok {
+		return
+	}
+	sec := m.currentSection()
+
+	var (
+		title       string
+		lines       []string
+		patch       string
+		unidiffZero bool
+		err         error
+	)
+
+	if m.navMode == navHunk {
+		if sec.activeHunk < 0 || sec.activeHunk >= len(sec.parsed.Hunks) {
+			return
+		}
+		patch, err = buildHunkPatch(sec.parsed, sec.activeHunk)
+		title = "Discard selected hunk?"
+		lines = []string{"This will discard the selected hunk from your working tree."}
+	} else {
+		if sec.activeLine < 0 || sec.activeLine >= len(sec.parsed.Changed) {
+			return
+		}
+		startLine, endLine := sec.activeLine, sec.activeLine
+		if sec.visualActive {
+			startLine, endLine = visualLineBounds(*sec)
+		}
+		if sec.visualActive && endLine > startLine {
+			patch, err = buildLineRangePatch(sec.parsed, startLine, endLine)
+			title = "Discard selected lines?"
+			lines = []string{"This will discard the selected lines from your working tree."}
+		} else {
+			patch, err = buildSingleLinePatch(sec.parsed, sec.activeLine)
+			title = "Discard selected line?"
+			lines = []string{"This will discard the selected line from your working tree."}
+		}
+		unidiffZero = true
+	}
+
+	if err != nil {
+		m.setStatus(err.Error())
+		return
+	}
+
+	m.openConfirm(title, lines, confirmDiscardUnstaged, "", "")
+	m.confirmPaths = []string{file.Path}
+	m.confirmPatch = patch
+	m.confirmPatchUnidiffZero = unidiffZero
+}
+
 func buildSectionState(raw, color string, prev sectionState, sideBySide bool) sectionState {
 	state := sectionState{activeHunk: prev.activeHunk, activeLine: prev.activeLine, visualActive: prev.visualActive, visualAnchor: prev.visualAnchor, viewport: prev.viewport}
 	raw = strings.TrimSpace(raw)
@@ -369,6 +348,51 @@ func buildSectionState(raw, color string, prev sectionState, sideBySide bool) se
 	}
 
 	return state
+}
+
+func (m *Model) focusMovedTarget(sig movedTarget) {
+	if sig.fromSection == sectionUnstaged {
+		m.section = sectionStaged
+	} else {
+		m.section = sectionUnstaged
+	}
+	var sec *sectionState
+	if m.section == sectionStaged {
+		sec = &m.staged
+	} else {
+		sec = &m.unstaged
+	}
+
+	if sig.navMode == navHunk {
+		for i := range sec.parsed.Hunks {
+			if sec.parsed.Hunks[i].Header == sig.hunkHeader {
+				sec.activeHunk = i
+				m.ensureActiveVisible(sec)
+				m.flash = flashState{active: true, section: m.section, navMode: navHunk, hunk: i, frames: 4}
+				return
+			}
+		}
+		if len(sec.parsed.Hunks) > 0 {
+			sec.activeHunk = 0
+			m.ensureActiveVisible(sec)
+			m.flash = flashState{active: true, section: m.section, navMode: navHunk, hunk: 0, frames: 4}
+		}
+		return
+	}
+
+	for i := range sec.parsed.Changed {
+		if sec.parsed.Changed[i].Text == sig.lineText {
+			sec.activeLine = i
+			m.ensureActiveVisible(sec)
+			m.flash = flashState{active: true, section: m.section, navMode: navLine, line: i, frames: 4}
+			return
+		}
+	}
+	if len(sec.parsed.Changed) > 0 {
+		sec.activeLine = 0
+		m.ensureActiveVisible(sec)
+		m.flash = flashState{active: true, section: m.section, navMode: navLine, line: 0, frames: 4}
+	}
 }
 
 func initSideBySideSectionState(state *sectionState, color string) {

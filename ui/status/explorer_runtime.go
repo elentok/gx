@@ -42,6 +42,31 @@ func (m *Model) ensureActiveVisible(sec *sectionState) {
 	}
 }
 
+func (m Model) editorLineForCurrentSelection() int {
+	if m.focus != focusDiff {
+		return 0
+	}
+	sec := m.currentSection()
+	if m.navMode == navLine {
+		if sec.activeLine < 0 || sec.activeLine >= len(sec.parsed.Changed) {
+			return 0
+		}
+		cl := sec.parsed.Changed[sec.activeLine]
+		if cl.NewLine > 0 {
+			return cl.NewLine
+		}
+		return cl.OldLine
+	}
+	if sec.activeHunk < 0 || sec.activeHunk >= len(sec.parsed.Hunks) {
+		return 0
+	}
+	h := sec.parsed.Hunks[sec.activeHunk]
+	if h.NewStart > 0 {
+		return h.NewStart
+	}
+	return h.OldStart
+}
+
 func restoreViewportYOffset(sec *sectionState, y int) {
 	if y < 0 {
 		y = 0
