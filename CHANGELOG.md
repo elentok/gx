@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.12.11
+
+- Added a real `gx show [hash-or-ref]` entrypoint that opens a new commit view with commit metadata, ref badges, and body collapse/expand
+- Added commit-ref plumbing in the app shell so commit routes resolve directly instead of using a placeholder page
+- Continued extracting the shared diff-explorer core out of `gx status`, with host-style helpers and selection adapters to prepare for the future commit diff explorer
+
 ## v0.12.10
 
 - Added app-level tab navigation across `gx wt`, `gx log`, and `gx status`, including persistent tab state, `gw` / `gl` / `gs` routing, and proper push/replace back-stack behavior for drill-down screens
