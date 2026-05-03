@@ -18,23 +18,7 @@ func (m *Model) currentSection() *sectionState {
 }
 
 func (m *Model) ensureActiveVisible(sec *sectionState) {
-	if m.navMode == navHunk && sec.activeHunk >= 0 && sec.activeHunk < len(sec.hunkDisplayRange) {
-		r := sec.hunkDisplayRange[sec.activeHunk]
-		sec.viewport.EnsureVisible(r[0], 0, 0)
-		return
-	}
-	if m.navMode == navLine && sec.activeLine >= 0 && sec.activeLine < len(sec.changedDisplay) && sec.changedDisplay[sec.activeLine] >= 0 {
-		sec.viewport.EnsureVisible(sec.changedDisplay[sec.activeLine], 0, 0)
-		return
-	}
-	active := m.activeRawLineIndex(*sec)
-	if active >= 0 {
-		display := active
-		if active < len(sec.rawToDisplay) && sec.rawToDisplay[active] >= 0 {
-			display = sec.rawToDisplay[active]
-		}
-		sec.viewport.EnsureVisible(display, 0, 0)
-	}
+	explorer.EnsureActiveVisible(toExplorerSectionData(*sec), &sec.viewport, m.navMode)
 }
 
 func (m Model) editorLineForCurrentSelection() int {

@@ -49,112 +49,36 @@ func (m *Model) syncDiffViewport() {
 }
 
 func (m *Model) activeRawLineIndex() int {
-	if m.diffNavMode == explorer.NavHunk {
-		if m.section.ActiveHunk >= 0 && m.section.ActiveHunk < len(m.section.Parsed.Hunks) {
-			return m.section.Parsed.Hunks[m.section.ActiveHunk].StartLine
-		}
-		return -1
-	}
-	if m.section.ActiveLine >= 0 && m.section.ActiveLine < len(m.section.Parsed.Changed) {
-		return m.section.Parsed.Changed[m.section.ActiveLine].LineIndex
-	}
-	return -1
+	return explorer.ActiveRawLineIndex(m.section, m.diffNavMode)
 }
 
 func (m *Model) ensureActiveVisible() {
-	if m.diffNavMode == explorer.NavHunk && m.section.ActiveHunk >= 0 && m.section.ActiveHunk < len(m.section.HunkDisplayRange) {
-		r := m.section.HunkDisplayRange[m.section.ActiveHunk]
-		m.diffViewport.EnsureVisible(r[0], 0, 0)
-		return
-	}
-	if m.diffNavMode == explorer.NavLine && m.section.ActiveLine >= 0 && m.section.ActiveLine < len(m.section.ChangedDisplay) && m.section.ChangedDisplay[m.section.ActiveLine] >= 0 {
-		m.diffViewport.EnsureVisible(m.section.ChangedDisplay[m.section.ActiveLine], 0, 0)
-		return
-	}
-	active := m.activeRawLineIndex()
-	if active >= 0 {
-		display := active
-		if active < len(m.section.RawToDisplay) && m.section.RawToDisplay[active] >= 0 {
-			display = m.section.RawToDisplay[active]
-		}
-		m.diffViewport.EnsureVisible(display, 0, 0)
-	}
+	explorer.EnsureActiveVisible(m.section, &m.diffViewport, m.diffNavMode)
 }
 
 func (m *Model) moveDiffActive(delta int) {
-	if m.diffNavMode == explorer.NavHunk {
-		if len(m.section.Parsed.Hunks) == 0 {
-			return
-		}
-		m.section.ActiveHunk += delta
-		if m.section.ActiveHunk < 0 {
-			m.section.ActiveHunk = 0
-		}
-		if m.section.ActiveHunk >= len(m.section.Parsed.Hunks) {
-			m.section.ActiveHunk = len(m.section.Parsed.Hunks) - 1
-		}
-	} else {
-		if len(m.section.Parsed.Changed) == 0 {
-			return
-		}
-		m.section.ActiveLine += delta
-		if m.section.ActiveLine < 0 {
-			m.section.ActiveLine = 0
-		}
-		if m.section.ActiveLine >= len(m.section.Parsed.Changed) {
-			m.section.ActiveLine = len(m.section.Parsed.Changed) - 1
-		}
+	if !explorer.MoveActive(&m.section, &m.diffViewport, m.diffNavMode, delta, false) {
+		return
 	}
 	m.syncSearchCursorFromDiffFocus()
 	m.ensureActiveVisible()
 }
 
 func (m *Model) scrollDiffPage(direction int) {
-	visible := m.diffViewport.VisibleLineCount()
-	if visible <= 0 {
-		return
-	}
-	step := maxInt(1, visible/2)
-	if direction > 0 {
-		m.diffViewport.ScrollDown(step)
-	} else {
-		m.diffViewport.ScrollUp(step)
-	}
+	explorer.ScrollPage(&m.diffViewport, direction)
 }
 
 func (m *Model) jumpDiffTop() {
-	m.diffViewport.SetYOffset(0)
-	if m.diffNavMode == explorer.NavHunk {
-		if len(m.section.Parsed.Hunks) == 0 {
-			return
-		}
-		m.section.ActiveHunk = 0
+	if !explorer.JumpTop(&m.section, &m.diffViewport, m.diffNavMode) {
 		return
 	}
-	if len(m.section.Parsed.Changed) == 0 {
-		return
-	}
-	m.section.ActiveLine = 0
 	m.syncSearchCursorFromDiffFocus()
 }
 
 func (m *Model) jumpDiffBottom() {
-	maxOffset := m.diffViewport.TotalLineCount() - m.diffViewport.VisibleLineCount()
-	if maxOffset < 0 {
-		maxOffset = 0
-	}
-	m.diffViewport.SetYOffset(maxOffset)
-	if m.diffNavMode == explorer.NavHunk {
-		if len(m.section.Parsed.Hunks) == 0 {
-			return
-		}
-		m.section.ActiveHunk = len(m.section.Parsed.Hunks) - 1
+	if !explorer.JumpBottom(&m.section, &m.diffViewport, m.diffNavMode) {
 		return
 	}
-	if len(m.section.Parsed.Changed) == 0 {
-		return
-	}
-	m.section.ActiveLine = len(m.section.Parsed.Changed) - 1
 	m.syncSearchCursorFromDiffFocus()
 }
 
