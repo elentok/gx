@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/diff"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -76,8 +77,8 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 	if file, ok := m.selectedExplorerFile(); ok && file.renameFrom != "" {
 		titleText += " [moved: " + file.renameFrom + " -> " + file.path + "]"
 	}
-	if si := parseSymlinkDiffInfo(sec.parsed); si.IsSymlink {
-		if label := si.titleLabel(); label != "" {
+	if si := diff.ParseSymlinkDiffInfo(sec.parsed); si.IsSymlink {
+		if label := si.TitleLabel(); label != "" {
 			titleText += " " + label
 		}
 	}
@@ -107,7 +108,7 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 	overflowTopMark, overflowBottomMark, overflowBothMark := m.hunkOverflowMarkers()
 
 	lines := make([]string, 0, bodyH)
-	if len(sec.viewLines) == 0 && sectionHasBinaryDiff(*sec) {
+	if len(sec.viewLines) == 0 && diff.SectionHasBinaryDiff(sec.parsed) {
 		lines = append(lines, lipgloss.NewStyle().Foreground(catSubtle).Render(m.binarySummaryLine()))
 	}
 
@@ -187,7 +188,7 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 					body = lipgloss.NewStyle().Foreground(catDeepBg).Render(ansi.Strip(body))
 				}
 			}
-			body += m.diffBodyPadding(rowKind, maxInt(0, bodyW-ansi.StringWidth(body)))
+			body += diff.DiffBodyPadding(rowKind, maxInt(0, bodyW-ansi.StringWidth(body)))
 			lines = append(lines, mark+body+indicator)
 		}
 	}
@@ -314,7 +315,7 @@ func reflowSectionLines(sec *sectionState, wrapWidth int, wrapSoft bool) {
 		sec.viewLines = nil
 		sec.viewLineKinds = nil
 		sec.displayToRaw = nil
-		sec.rawToDisplay = buildRawToDisplayMap(sec.parsed, nil)
+		sec.rawToDisplay = diff.BuildRawToDisplayMap(sec.parsed, nil)
 		sec.viewport.SetContent("")
 		sec.viewport.SetYOffset(0)
 		return
@@ -340,7 +341,7 @@ func reflowSectionLines(sec *sectionState, wrapWidth int, wrapSoft bool) {
 			mapRaw = append(mapRaw, rawIdx)
 			continue
 		}
-		parts := wrapANSI(line, wrapWidth)
+		parts := diff.WrapANSI(line, wrapWidth)
 		for _, p := range parts {
 			view = append(view, p)
 			kinds = append(kinds, kind)
@@ -351,44 +352,9 @@ func reflowSectionLines(sec *sectionState, wrapWidth int, wrapSoft bool) {
 	sec.viewLines = view
 	sec.viewLineKinds = kinds
 	sec.displayToRaw = mapRaw
-	sec.rawToDisplay = buildRawToDisplayMap(sec.parsed, sec.displayToRaw)
+	sec.rawToDisplay = diff.BuildRawToDisplayMap(sec.parsed, sec.displayToRaw)
 	sec.viewport.SetContentLines(sec.viewLines)
 	sec.viewport.SetYOffset(prevOffset)
-}
-
-func wrapANSI(s string, width int) []string {
-	if width <= 0 {
-		return []string{s}
-	}
-	total := ansi.StringWidth(s)
-	if total <= width {
-		return []string{s}
-	}
-	out := make([]string, 0, total/width+1)
-	for start := 0; start < total; start += width {
-		end := start + width
-		if end > total {
-			end = total
-		}
-		part := ansi.Cut(s, start, end)
-		if part == "" {
-			break
-		}
-		out = append(out, part)
-	}
-	if len(out) == 0 {
-		return []string{s}
-	}
-	return out
-}
-
-func sectionHasBinaryDiff(sec sectionState) bool {
-	for _, line := range sec.rawLines {
-		if strings.HasPrefix(line, "Binary files ") || strings.HasPrefix(line, "GIT binary patch") {
-			return true
-		}
-	}
-	return false
 }
 
 func (m Model) binarySummaryLine() string {
@@ -435,19 +401,4 @@ func formatSize(size int64, ok bool) string {
 		return fmt.Sprintf("%.0f %s", v, units[idx])
 	}
 	return fmt.Sprintf("%.1f %s", v, units[idx])
-}
-
-func (m Model) diffBodyPadding(kind diffDisplayRowKind, width int) string {
-	if width <= 0 {
-		return ""
-	}
-	spaces := strings.Repeat(" ", width)
-	switch kind {
-	case diffRowAdded:
-		return lipgloss.NewStyle().Background(lipgloss.Color("#2c3239")).Render(spaces)
-	case diffRowRemoved:
-		return lipgloss.NewStyle().Background(lipgloss.Color("#34293a")).Render(spaces)
-	default:
-		return spaces
-	}
 }

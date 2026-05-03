@@ -239,6 +239,40 @@ func HasBinaryDiff(parsed ParsedDiff) bool {
 	return false
 }
 
+func SectionHasBinaryDiff(parsed ParsedDiff) bool { return HasBinaryDiff(parsed) }
+
+func (si SymlinkDiffInfo) TitleLabel() string {
+	switch {
+	case si.WasSymlink && si.IsNowSymlink:
+		switch {
+		case si.OldTarget != "" && si.NewTarget != "":
+			return "[symlink: " + si.OldTarget + " -> " + si.NewTarget + "]"
+		case si.NewTarget != "":
+			return "[symlink -> " + si.NewTarget + "]"
+		case si.OldTarget != "":
+			return "[symlink: " + si.OldTarget + " (removed)]"
+		default:
+			return "[symlink]"
+		}
+	case !si.WasSymlink && si.IsNowSymlink && si.TypeChange:
+		if si.NewTarget != "" {
+			return "[symlink -> " + si.NewTarget + "]"
+		}
+		return "[symlink]"
+	case si.WasSymlink && !si.IsNowSymlink && si.TypeChange:
+		if si.OldTarget != "" {
+			return "[symlink: " + si.OldTarget + " (removed)]"
+		}
+		return "[symlink removed]"
+	case si.IsNowSymlink && si.NewTarget != "":
+		return "[symlink -> " + si.NewTarget + "]"
+	case si.WasSymlink && si.OldTarget != "":
+		return "[symlink: " + si.OldTarget + " (removed)]"
+	default:
+		return "[symlink]"
+	}
+}
+
 func ParseSymlinkDiffInfo(parsed ParsedDiff) SymlinkDiffInfo {
 	var info SymlinkDiffInfo
 	var hasNonSymlinkMode bool
@@ -353,6 +387,8 @@ func cleanHunkHeader(line string) string {
 	return tail
 }
 
+func CleanHunkHeader(line string) string { return cleanHunkHeader(line) }
+
 func stripUnifiedVisibleMarker(line string, marker byte) string {
 	if line == "" {
 		return line
@@ -400,6 +436,10 @@ func stripUnifiedVisibleMarker(line string, marker byte) string {
 	return before + " " + after
 }
 
+func StripUnifiedVisibleMarker(line string, marker byte) string {
+	return stripUnifiedVisibleMarker(line, marker)
+}
+
 func sanitizeANSIInline(s string) string {
 	s = ansiOSCRe.ReplaceAllString(s, "")
 	s = ansiCSIRe.ReplaceAllStringFunc(s, func(seq string) string {
@@ -419,6 +459,8 @@ func sanitizeANSIInline(s string) string {
 	return string(b)
 }
 
+func SanitizeANSIInline(s string) string { return sanitizeANSIInline(s) }
+
 func buildRawToDisplayMap(parsed ParsedDiff, displayToRaw []int) []int {
 	rawToDisplay := make([]int, len(parsed.Lines))
 	for i := range rawToDisplay {
@@ -430,6 +472,10 @@ func buildRawToDisplayMap(parsed ParsedDiff, displayToRaw []int) []int {
 		}
 	}
 	return rawToDisplay
+}
+
+func BuildRawToDisplayMap(parsed ParsedDiff, displayToRaw []int) []int {
+	return buildRawToDisplayMap(parsed, displayToRaw)
 }
 
 func wrapANSI(s string, width int) []string {
@@ -457,3 +503,5 @@ func wrapANSI(s string, width int) []string {
 	}
 	return out
 }
+
+func WrapANSI(s string, width int) []string { return wrapANSI(s, width) }

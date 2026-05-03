@@ -1,6 +1,10 @@
 package status
 
-import "charm.land/bubbles/v2/viewport"
+import (
+	"charm.land/bubbles/v2/viewport"
+
+	"github.com/elentok/gx/ui/diff"
+)
 
 // These types model the reusable diff explorer core that both live status and
 // historical commit review will eventually share.
@@ -33,13 +37,13 @@ const (
 	renderSideBySide
 )
 
-type diffDisplayRowKind int
+type diffDisplayRowKind = diff.RowKind
 
 const (
-	diffRowPlain diffDisplayRowKind = iota
-	diffRowAdded
-	diffRowRemoved
-	diffRowHunkHeader
+	diffRowPlain      = diff.RowPlain
+	diffRowAdded      = diff.RowAdded
+	diffRowRemoved    = diff.RowRemoved
+	diffRowHunkHeader = diff.RowHunkHeader
 )
 
 type sectionState struct {

@@ -2,144 +2,17 @@ package status
 
 import (
 	"fmt"
-	"regexp"
 	"sort"
-	"strconv"
 	"strings"
+
+	"github.com/elentok/gx/ui/diff"
 )
 
-var hunkHeaderRE = regexp.MustCompile(`^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@`)
+type parsedDiff = diff.ParsedDiff
+type parsedHunk = diff.ParsedHunk
+type changedLine = diff.ChangedLine
 
-type parsedDiff struct {
-	FileHeader []string
-	Lines      []string
-	Hunks      []parsedHunk
-	Changed    []changedLine
-}
-
-type parsedHunk struct {
-	Header            string
-	StartLine         int
-	EndLine           int
-	OldStart          int
-	OldCount          int
-	NewStart          int
-	NewCount          int
-	ChangedLineOffset []int
-}
-
-type changedLine struct {
-	LineIndex int
-	HunkIndex int
-	Prefix    byte
-	Text      string
-	OldLine   int
-	NewLine   int
-}
-
-func parseUnifiedDiff(raw string) parsedDiff {
-	raw = strings.ReplaceAll(raw, "\r\n", "\n")
-	trimmed := strings.TrimSuffix(raw, "\n")
-	if strings.TrimSpace(trimmed) == "" {
-		return parsedDiff{}
-	}
-	lines := strings.Split(trimmed, "\n")
-	out := parsedDiff{Lines: lines}
-
-	firstHunk := -1
-	for i, line := range lines {
-		if hunkHeaderRE.MatchString(line) {
-			firstHunk = i
-			break
-		}
-	}
-	if firstHunk == -1 {
-		out.FileHeader = append(out.FileHeader, lines...)
-		return out
-	}
-	out.FileHeader = append(out.FileHeader, lines[:firstHunk]...)
-
-	current := -1
-	oldLine := 0
-	newLine := 0
-
-	for i, line := range lines {
-		if m := hunkHeaderRE.FindStringSubmatch(line); m != nil {
-			if current >= 0 {
-				out.Hunks[current].EndLine = i - 1
-			}
-			oldStart, _ := strconv.Atoi(m[1])
-			oldCount := 1
-			if m[2] != "" {
-				oldCount, _ = strconv.Atoi(m[2])
-			}
-			newStart, _ := strconv.Atoi(m[3])
-			newCount := 1
-			if m[4] != "" {
-				newCount, _ = strconv.Atoi(m[4])
-			}
-
-			out.Hunks = append(out.Hunks, parsedHunk{
-				Header:    line,
-				StartLine: i,
-				OldStart:  oldStart,
-				OldCount:  oldCount,
-				NewStart:  newStart,
-				NewCount:  newCount,
-			})
-			current = len(out.Hunks) - 1
-			oldLine = oldStart
-			newLine = newStart
-			continue
-		}
-
-		if current < 0 || line == "" {
-			continue
-		}
-
-		switch line[0] {
-		case ' ':
-			oldLine++
-			newLine++
-		case '-':
-			cl := changedLine{
-				LineIndex: i,
-				HunkIndex: current,
-				Prefix:    '-',
-				Text:      line,
-				OldLine:   oldLine,
-				NewLine:   newLine,
-			}
-			out.Changed = append(out.Changed, cl)
-			h := &out.Hunks[current]
-			h.ChangedLineOffset = append(h.ChangedLineOffset, len(out.Changed)-1)
-			oldLine++
-		case '+':
-			cl := changedLine{
-				LineIndex: i,
-				HunkIndex: current,
-				Prefix:    '+',
-				Text:      line,
-				OldLine:   oldLine,
-				NewLine:   newLine,
-			}
-			out.Changed = append(out.Changed, cl)
-			h := &out.Hunks[current]
-			h.ChangedLineOffset = append(h.ChangedLineOffset, len(out.Changed)-1)
-			newLine++
-		case '\\':
-			// "\ No newline at end of file"
-		default:
-			// Headers and other metadata inside diff output.
-		}
-	}
-
-	if current >= 0 {
-		out.Hunks[current].EndLine = len(lines) - 1
-	}
-
-	return out
-}
+func parseUnifiedDiff(raw string) parsedDiff { return diff.ParseUnifiedDiff(raw) }
 
 func buildHunkPatch(parsed parsedDiff, hunkIndex int) (string, error) {
 	if hunkIndex < 0 || hunkIndex >= len(parsed.Hunks) {

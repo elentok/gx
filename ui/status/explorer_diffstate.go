@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/diff"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -309,11 +310,11 @@ func buildSectionState(raw, color string, prev sectionState, sideBySide bool) se
 	} else if len(colorLines) > len(state.rawLines) {
 		colorLines = colorLines[:len(state.rawLines)]
 	}
-	state.baseLines, state.baseLineKinds, state.baseDisplayToRaw = buildDisplayBaseLines(state.parsed, colorLines)
+	state.baseLines, state.baseLineKinds, state.baseDisplayToRaw = diff.BuildDisplayBaseLines(state.parsed, colorLines)
 	state.viewLines = append([]string{}, state.baseLines...)
 	state.viewLineKinds = append([]diffDisplayRowKind{}, state.baseLineKinds...)
 	state.displayToRaw = append([]int{}, state.baseDisplayToRaw...)
-	state.rawToDisplay = buildRawToDisplayMap(state.parsed, state.displayToRaw)
+	state.rawToDisplay = diff.BuildRawToDisplayMap(state.parsed, state.displayToRaw)
 	state.hunkDisplayRange = nil
 	state.changedDisplay = nil
 	prevOffset := state.viewport.YOffset()
@@ -486,7 +487,7 @@ func mapSideBySideDisplayLinesToChanged(state *sectionState) {
 			}
 		}
 	}
-	state.rawToDisplay = buildRawToDisplayMap(state.parsed, state.displayToRaw)
+	state.rawToDisplay = diff.BuildRawToDisplayMap(state.parsed, state.displayToRaw)
 }
 
 func parseOptionalLineNumber(s string) int {

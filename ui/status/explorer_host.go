@@ -1,6 +1,9 @@
 package status
 
-import "github.com/elentok/gx/git"
+import (
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/diff"
+)
 
 type explorerFileSelection struct {
 	path       string
@@ -38,7 +41,7 @@ func (m Model) sectionHasContent(section diffSection) bool {
 	} else {
 		sec = m.unstaged
 	}
-	return len(sec.viewLines) > 0 || sectionHasBinaryDiff(sec)
+	return len(sec.viewLines) > 0 || diff.SectionHasBinaryDiff(sec.parsed)
 }
 
 func (m Model) visibleDiffSections() []diffSection {
