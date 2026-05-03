@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/app"
+	commitui "github.com/elentok/gx/ui/commit"
 	"github.com/elentok/gx/ui/confirm"
 	logui "github.com/elentok/gx/ui/log"
 	"github.com/elentok/gx/ui/menu"
@@ -32,6 +33,7 @@ type deps struct {
 	runWorktrees         func(string) error
 	runStatus            func(string) error
 	runLog               func(string) error
+	runShow              func(string) error
 	confirmForce         func(string) (bool, error)
 	choosePushDivergence func(io.Reader, io.Writer, *git.PushDivergence) (int, error)
 	initConfig           func() (string, error)
@@ -52,6 +54,7 @@ func defaultDeps() deps {
 		runWorktrees:         runWorktrees,
 		runStatus:            runStatus,
 		runLog:               runLog,
+		runShow:              runShow,
 		choosePushDivergence: choosePushDivergence,
 		initConfig:           config.Init,
 		getenv:               os.Getenv,
@@ -92,6 +95,15 @@ func execute(args []string, d deps) error {
 			ref = args[1]
 		}
 		return d.runLog(ref)
+	case "show":
+		ref := ""
+		if len(args) > 2 {
+			return fmt.Errorf("usage: gx show [hash-or-ref]")
+		}
+		if len(args) == 2 {
+			ref = args[1]
+		}
+		return d.runShow(ref)
 	case "init":
 		return runInit(d)
 	case "edit-config":
@@ -122,6 +134,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  gx push|ps")
 	fmt.Fprintln(w, "  gx status|s")
 	fmt.Fprintln(w, "  gx log [hash-or-ref]")
+	fmt.Fprintln(w, "  gx show [hash-or-ref]")
 	fmt.Fprintln(w, "  gx init")
 	fmt.Fprintln(w, "  gx edit-config")
 	fmt.Fprintln(w, "  gx bump [major|minor|patch]  create a version tag and optionally push")
@@ -305,6 +318,71 @@ func runLog(ref string) error {
 	m := app.New(*repo, app.Settings{
 		InitialRoute:       nav.Route{Kind: nav.RouteLog, WorktreeRoot: root, Ref: ref},
 		ActiveWorktreePath: root,
+		Commit: commitui.Settings{
+			UseNerdFontIcons: cfg.UseNerdFontIcons,
+			InputModalBottom: cfg.InputModalBottom,
+			EnableNavigation: true,
+		},
+		Log: logui.Settings{
+			UseNerdFontIcons: cfg.UseNerdFontIcons,
+			InputModalBottom: cfg.InputModalBottom,
+			EnableNavigation: true,
+		},
+		Worktrees: worktrees.Settings{
+			UseNerdFontIcons: cfg.UseNerdFontIcons,
+			InputModalBottom: cfg.InputModalBottom,
+			NameAliases:      cfg.NameAliases,
+			Terminal:         ui.DetectTerminal(),
+			EnableNavigation: true,
+		},
+		Status: statusui.Settings{
+			DiffContextLines: cfg.StageDiffContextLines,
+			UseNerdFontIcons: cfg.UseNerdFontIcons,
+			Terminal:         ui.DetectTerminal(),
+			InputModalBottom: cfg.InputModalBottom,
+			EnableNavigation: true,
+		},
+	})
+	p := tea.NewProgram(m)
+	_, err = p.Run()
+	return err
+}
+
+func runShow(ref string) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	info, err := git.IdentifyDir(cwd)
+	if err != nil {
+		return err
+	}
+	if info.Repo.IsBare && info.WorktreeRoot == "" {
+		return fmt.Errorf("gx show must be run from a regular repo or linked worktree")
+	}
+
+	root, err := git.WorktreeRoot(cwd)
+	if err != nil {
+		return err
+	}
+	repo, err := git.FindRepo(root)
+	if err != nil {
+		return err
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	m := app.New(*repo, app.Settings{
+		InitialRoute:       nav.Route{Kind: nav.RouteCommit, WorktreeRoot: root, Ref: ref},
+		ActiveWorktreePath: root,
+		Commit: commitui.Settings{
+			UseNerdFontIcons: cfg.UseNerdFontIcons,
+			InputModalBottom: cfg.InputModalBottom,
+			EnableNavigation: true,
+		},
 		Log: logui.Settings{
 			UseNerdFontIcons: cfg.UseNerdFontIcons,
 			InputModalBottom: cfg.InputModalBottom,

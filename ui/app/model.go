@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
+	commitui "github.com/elentok/gx/ui/commit"
 	logui "github.com/elentok/gx/ui/log"
 	"github.com/elentok/gx/ui/nav"
 	statusui "github.com/elentok/gx/ui/status"
@@ -16,6 +17,7 @@ import (
 type Settings struct {
 	InitialRoute       nav.Route
 	ActiveWorktreePath string
+	Commit             commitui.Settings
 	Log                logui.Settings
 	Worktrees          worktrees.Settings
 	Status             statusui.Settings
@@ -201,9 +203,11 @@ func (m Model) newPage(route nav.Route) pageState {
 			model: logui.NewWithSettings(route.WorktreeRoot, route.Ref, settings),
 		}
 	case nav.RouteCommit:
+		settings := m.settings.Commit
+		settings.EnableNavigation = true
 		return pageState{
 			route: route,
-			model: newPlaceholderModel("Commit", "Commit page not implemented yet.", route),
+			model: commitui.NewWithSettings(route.WorktreeRoot, route.Ref, settings),
 		}
 	case nav.RouteWorktrees:
 		fallthrough
