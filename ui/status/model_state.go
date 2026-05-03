@@ -24,25 +24,9 @@ type Model struct {
 	height int
 	ready  bool
 
-	focus            focusPane
-	section          diffSection
-	navMode          navMode
-	renderMode       diffRenderMode
-	diffFullscreen   bool
+	explorerState
 	diffContextLines int
-	wrapSoft         bool
-
-	files         []git.StageFileStatus
-	branchName    string
-	branchBaseRef string
-	branchSync    git.SyncStatus
-	branchCommits []branchCommitRow
-	statusEntries []statusEntry
-	collapsedDirs map[string]bool
-	selected      int
-
-	unstaged sectionState
-	staged   sectionState
+	statusPageState
 
 	statusMsg               string
 	statusUntil             time.Time
@@ -88,8 +72,19 @@ type Model struct {
 	outputContent           string
 	outputViewport          viewport.Model
 	pendingActionOutput     string
-	flash                   flashState
 	keyPrefix               string
+}
+
+type statusPageState struct {
+	files          []git.StageFileStatus
+	branchName     string
+	branchBaseRef  string
+	branchSync     git.SyncStatus
+	branchCommits  []branchCommitRow
+	statusEntries  []statusEntry
+	collapsedDirs  map[string]bool
+	selected       int
+	activeFilePath string
 }
 
 type Settings struct {
@@ -163,17 +158,21 @@ func NewWithSettings(worktreeRoot string, settings Settings) Model {
 		worktreeRoot:     worktreeRoot,
 		settings:         settings,
 		initialPath:      settings.InitialPath,
-		focus:            focusStatus,
-		section:          sectionUnstaged,
-		navMode:          navHunk,
-		renderMode:       renderUnified,
 		diffContextLines: settings.DiffContextLines,
-		wrapSoft:         true,
-		collapsedDirs:    map[string]bool{},
-		selected:         0,
-		unstaged:         newSectionState(),
-		staged:           newSectionState(),
-		help:             newStageHelpModel(),
+		explorerState: explorerState{
+			focus:      focusStatus,
+			section:    sectionUnstaged,
+			navMode:    navHunk,
+			renderMode: renderUnified,
+			wrapSoft:   true,
+			unstaged:   newSectionState(),
+			staged:     newSectionState(),
+		},
+		statusPageState: statusPageState{
+			collapsedDirs: map[string]bool{},
+			selected:      0,
+		},
+		help: newStageHelpModel(),
 	}
 	m.reload("")
 	return m

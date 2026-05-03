@@ -70,6 +70,18 @@ type flashState struct {
 	frames  int
 }
 
+type explorerState struct {
+	focus          focusPane
+	section        diffSection
+	navMode        navMode
+	renderMode     diffRenderMode
+	diffFullscreen bool
+	wrapSoft       bool
+	unstaged       sectionState
+	staged         sectionState
+	flash          flashState
+}
+
 func newSectionState() sectionState {
 	vp := viewport.New()
 	return sectionState{

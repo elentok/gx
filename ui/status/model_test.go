@@ -41,17 +41,19 @@ func TestSplitWidthUsesMinimumStatusPaneWidthForShortContent(t *testing.T) {
 func TestSplitWidthExpandsForLongVisibleStatusRows(t *testing.T) {
 	m := Model{
 		width: 180,
-		statusEntries: []statusEntry{{
-			Kind:        statusEntryFile,
-			DisplayName: "renamed.go",
-			File: git.StageFileStatus{
-				Path:         "new/path/renamed.go",
-				RenameFrom:   "old/path/original-name.go",
-				IndexStatus:  'R',
-				WorktreeCode: ' ',
-			},
-			HasStaged: true,
-		}},
+		statusPageState: statusPageState{
+			statusEntries: []statusEntry{{
+				Kind:        statusEntryFile,
+				DisplayName: "renamed.go",
+				File: git.StageFileStatus{
+					Path:         "new/path/renamed.go",
+					RenameFrom:   "old/path/original-name.go",
+					IndexStatus:  'R',
+					WorktreeCode: ' ',
+				},
+				HasStaged: true,
+			}},
+		},
 	}
 
 	statusW, diffW := m.splitWidth()
@@ -69,10 +71,12 @@ func TestSplitWidthExpandsForLongVisibleStatusRows(t *testing.T) {
 
 func TestSplitWidthHonorsMaximumStatusPaneWidth(t *testing.T) {
 	m := Model{
-		width:         200,
-		branchName:    "feature/some-extremely-verbose-branch-name-that-keeps-going",
-		branchBaseRef: "origin/release/very-long-train-name",
-		branchSync:    git.SyncStatus{Name: git.StatusDiverged, Ahead: 12, Behind: 8},
+		width: 200,
+		statusPageState: statusPageState{
+			branchName:    "feature/some-extremely-verbose-branch-name-that-keeps-going",
+			branchBaseRef: "origin/release/very-long-train-name",
+			branchSync:    git.SyncStatus{Name: git.StatusDiverged, Ahead: 12, Behind: 8},
+		},
 	}
 
 	statusW, diffW := m.splitWidth()
@@ -86,10 +90,12 @@ func TestSplitWidthHonorsMaximumStatusPaneWidth(t *testing.T) {
 
 func TestSplitWidthPreservesMinimumDiffWidth(t *testing.T) {
 	m := Model{
-		width:         101,
-		branchName:    "feature/some-extremely-verbose-branch-name-that-keeps-going",
-		branchBaseRef: "origin/release/very-long-train-name",
-		branchSync:    git.SyncStatus{Name: git.StatusDiverged, Ahead: 12, Behind: 8},
+		width: 101,
+		statusPageState: statusPageState{
+			branchName:    "feature/some-extremely-verbose-branch-name-that-keeps-going",
+			branchBaseRef: "origin/release/very-long-train-name",
+			branchSync:    git.SyncStatus{Name: git.StatusDiverged, Ahead: 12, Behind: 8},
+		},
 	}
 
 	statusW, diffW := m.splitWidth()
@@ -352,7 +358,14 @@ func TestNewWithInitialPathSelectsFileAndKeepsStatusFocus(t *testing.T) {
 }
 
 func TestBranchSummaryTitleShowsBaseOnlyWhenNonDefault(t *testing.T) {
-	m := Model{settings: Settings{UseNerdFontIcons: true}, branchName: "feature/x", branchBaseRef: "origin/release", branchSync: git.SyncStatus{Name: git.StatusBehind, Behind: 1}}
+	m := Model{
+		settings: Settings{UseNerdFontIcons: true},
+		statusPageState: statusPageState{
+			branchName:    "feature/x",
+			branchBaseRef: "origin/release",
+			branchSync:    git.SyncStatus{Name: git.StatusBehind, Behind: 1},
+		},
+	}
 	line := m.branchSummaryTitleSuffix()
 	if !strings.Contains(line, " feature/x ↓1") {
 		t.Fatalf("unexpected title suffix: %q", line)
@@ -374,7 +387,7 @@ func TestLeftPaneHeightsHideCommitPaneOnlyWhenTooSmall(t *testing.T) {
 }
 
 func TestLeftPaneHeightsFitCommitContentsWithMaximum(t *testing.T) {
-	m := Model{branchCommits: []branchCommitRow{
+	m := Model{statusPageState: statusPageState{branchCommits: []branchCommitRow{
 		{subject: "one", hash: "a1", date: time.Now(), class: git.BranchHistoryLocalOnly},
 		{subject: "two", hash: "b2", date: time.Now(), class: git.BranchHistoryLocalOnly},
 		{subject: "three", hash: "c3", date: time.Now(), class: git.BranchHistoryLocalOnly},
@@ -383,7 +396,7 @@ func TestLeftPaneHeightsFitCommitContentsWithMaximum(t *testing.T) {
 		{subject: "six", hash: "f6", date: time.Now(), class: git.BranchHistoryLocalOnly},
 		{subject: "seven", hash: "g7", date: time.Now(), class: git.BranchHistoryLocalOnly},
 		{subject: "eight", hash: "h8", date: time.Now(), class: git.BranchHistoryLocalOnly},
-	}}
+	}}}
 	statusH, commitsH := m.leftPaneHeights(40, 40)
 	if commitsH != maxCommitsPaneHeight {
 		t.Fatalf("expected max commit pane height %d, got %d", maxCommitsPaneHeight, commitsH)
@@ -395,12 +408,12 @@ func TestLeftPaneHeightsFitCommitContentsWithMaximum(t *testing.T) {
 
 func TestRenderBranchCommitsPane_ShowsWrappedSubjectAndMetadata(t *testing.T) {
 	m := Model{
-		branchCommits: []branchCommitRow{{
+		statusPageState: statusPageState{branchCommits: []branchCommitRow{{
 			subject: "this is a long commit subject that should wrap nicely",
 			hash:    "abc1234",
 			date:    time.Now().Add(-5 * time.Minute),
 			class:   git.BranchHistoryLocalOnly,
-		}},
+		}}},
 	}
 
 	pane := ansi.Strip(m.renderBranchCommitsPane(28, 8))
