@@ -1,25 +1,18 @@
 package status
 
 func (m *Model) pickAvailableSection() {
-	hasUnstaged := len(m.unstaged.viewLines) > 0
-	hasStaged := len(m.staged.viewLines) > 0
-	if hasUnstaged && !hasStaged {
-		m.section = sectionUnstaged
-	}
-	if hasStaged && !hasUnstaged {
-		m.section = sectionStaged
+	sections := m.visibleDiffSections()
+	if len(sections) == 1 {
+		m.section = sections[0]
 	}
 }
 
 func (m Model) canSwitchSections() bool {
-	return len(m.unstaged.viewLines) > 0 && len(m.staged.viewLines) > 0
+	return len(m.visibleDiffSections()) > 1
 }
 
 func (m *Model) currentSection() *sectionState {
-	if m.section == sectionStaged {
-		return &m.staged
-	}
-	return &m.unstaged
+	return m.sectionState(m.section)
 }
 
 func (m *Model) ensureActiveVisible(sec *sectionState) {

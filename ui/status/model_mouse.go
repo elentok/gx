@@ -55,19 +55,15 @@ func (m Model) diffRect(mainH int) (x, y, w, h int, ok bool) {
 }
 
 func (m *Model) mouseTargetSection(relY, diffH int) *sectionState {
-	hasUnstaged := len(m.unstaged.viewLines) > 0 || sectionHasBinaryDiff(m.unstaged)
-	hasStaged := len(m.staged.viewLines) > 0 || sectionHasBinaryDiff(m.staged)
-	if !hasUnstaged && !hasStaged {
+	sections := m.visibleDiffSections()
+	if len(sections) == 0 {
 		return nil
 	}
 	if m.diffFullscreen {
 		return m.currentSection()
 	}
-	if hasUnstaged && !hasStaged {
-		return &m.unstaged
-	}
-	if hasStaged && !hasUnstaged {
-		return &m.staged
+	if len(sections) == 1 {
+		return m.sectionState(sections[0])
 	}
 
 	topH := diffH / 2
@@ -80,7 +76,7 @@ func (m *Model) mouseTargetSection(relY, diffH int) *sectionState {
 		topH = diffH - bottomH
 	}
 	if relY < topH {
-		return &m.unstaged
+		return m.sectionState(sections[0])
 	}
-	return &m.staged
+	return m.sectionState(sections[1])
 }

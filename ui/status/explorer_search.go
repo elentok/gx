@@ -215,9 +215,9 @@ func (m *Model) syncSearchCursorFromDiffFocus() {
 
 func (m *Model) searchScopeSection(scope stageSearchScope) *sectionState {
 	if scope == searchScopeStaged {
-		return &m.staged
+		return m.sectionState(sectionStaged)
 	}
-	return &m.unstaged
+	return m.sectionState(sectionUnstaged)
 }
 
 func (m Model) statusEntrySearchText(entry statusEntry) string {

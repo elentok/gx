@@ -73,21 +73,33 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "r":
 		m.refresh()
 	case "p":
+		if !m.explorerCanRunBranchActions() {
+			return m, nil
+		}
 		m.startPullAction()
 		return m, actionPollCmd()
 	case "P":
+		if !m.explorerCanRunBranchActions() {
+			return m, nil
+		}
 		if err := m.preparePushConfirm(); err != nil {
 			m.showGitError(err)
 			return m, nil
 		}
 		return m, nil
 	case "b":
+		if !m.explorerCanRunBranchActions() {
+			return m, nil
+		}
 		if err := m.prepareRebaseConfirm(); err != nil {
 			m.showGitError(err)
 			return m, nil
 		}
 		return m, nil
 	case "A":
+		if !m.explorerCanRunBranchActions() {
+			return m, nil
+		}
 		if err := m.openAmendConfirm(); err != nil {
 			m.showGitError(err)
 		}
@@ -106,9 +118,15 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+u":
 		m.scrollDiffPage(-1)
 	case "space", " ":
+		if !m.explorerCanApplySelection() {
+			return m, nil
+		}
 		cmd := m.applySelection()
 		return m, cmd
 	case "d":
+		if !m.explorerCanDiscardSelection() {
+			return m, nil
+		}
 		if m.section == sectionStaged {
 			cmd := m.applySelection()
 			return m, cmd
@@ -118,14 +136,23 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "?":
 		m.showHelpOverlay()
 	case ".":
+		if !m.explorerCanJumpFiles() {
+			return m, nil
+		}
 		if m.moveToAdjacentFile(1) {
 			return m, nil
 		}
 	case ",":
+		if !m.explorerCanJumpFiles() {
+			return m, nil
+		}
 		if m.moveToAdjacentFile(-1) {
 			return m, nil
 		}
 	case "e":
+		if !m.explorerCanEditSelection() {
+			return m, nil
+		}
 		return m, m.cmdEditSelectedFile()
 	}
 	return m, nil

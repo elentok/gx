@@ -13,28 +13,22 @@ import (
 )
 
 func (m *Model) renderDiffPane(width, height int) string {
-	hasUnstaged := len(m.unstaged.viewLines) > 0 || sectionHasBinaryDiff(m.unstaged)
-	hasStaged := len(m.staged.viewLines) > 0 || sectionHasBinaryDiff(m.staged)
+	sections := m.visibleDiffSections()
 
-	if !hasUnstaged && !hasStaged {
-		content := lipgloss.NewStyle().Foreground(catSubtle).Render("No file selected")
+	if len(sections) == 0 {
+		content := lipgloss.NewStyle().Foreground(catSubtle).Render(m.diffEmptyMessage())
 		return m.panelStyle(m.focus == focusDiff).
 			Width(width).
 			Height(height).
 			Render(content)
 	}
 
-	if hasUnstaged && !hasStaged {
-		return m.renderSectionPane(width, height, "Unstaged", &m.unstaged, sectionUnstaged)
-	}
-	if hasStaged && !hasUnstaged {
-		return m.renderSectionPane(width, height, "Staged", &m.staged, sectionStaged)
+	if len(sections) == 1 {
+		section := sections[0]
+		return m.renderSectionPane(width, height, m.sectionTitle(section), m.sectionState(section), section)
 	}
 	if m.diffFullscreen {
-		if m.section == sectionStaged {
-			return m.renderSectionPane(width, height, "Staged", &m.staged, sectionStaged)
-		}
-		return m.renderSectionPane(width, height, "Unstaged", &m.unstaged, sectionUnstaged)
+		return m.renderSectionPane(width, height, m.sectionTitle(m.section), m.currentSection(), m.section)
 	}
 
 	topH := height / 2
@@ -47,8 +41,10 @@ func (m *Model) renderDiffPane(width, height int) string {
 		topH = height - bottomH
 	}
 
-	top := m.renderSectionPane(width, topH, "Unstaged", &m.unstaged, sectionUnstaged)
-	bottom := m.renderSectionPane(width, bottomH, "Staged", &m.staged, sectionStaged)
+	topSection := sections[0]
+	bottomSection := sections[1]
+	top := m.renderSectionPane(width, topH, m.sectionTitle(topSection), m.sectionState(topSection), topSection)
+	bottom := m.renderSectionPane(width, bottomH, m.sectionTitle(bottomSection), m.sectionState(bottomSection), bottomSection)
 	return lipgloss.JoinVertical(lipgloss.Left, top, bottom)
 }
 
@@ -259,11 +255,11 @@ func (m *Model) syncDiffViewports() {
 	_, diffH := m.splitHeight(mainH)
 	vpW := maxInt(1, diffW-4)
 	wrapWidth := maxInt(1, vpW-2)
-	reflowSectionLines(&m.unstaged, wrapWidth, m.wrapSoft)
-	reflowSectionLines(&m.staged, wrapWidth, m.wrapSoft)
+	reflowSectionLines(m.sectionState(sectionUnstaged), wrapWidth, m.wrapSoft)
+	reflowSectionLines(m.sectionState(sectionStaged), wrapWidth, m.wrapSoft)
 
-	hasUnstaged := len(m.unstaged.viewLines) > 0 || sectionHasBinaryDiff(m.unstaged)
-	hasStaged := len(m.staged.viewLines) > 0 || sectionHasBinaryDiff(m.staged)
+	hasUnstaged := m.sectionHasContent(sectionUnstaged)
+	hasStaged := m.sectionHasContent(sectionStaged)
 	if m.diffFullscreen {
 		if m.section == sectionUnstaged {
 			m.unstaged.viewport.SetHeight(maxInt(0, diffH-3))
