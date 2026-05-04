@@ -33,12 +33,16 @@ type Model struct {
 	bodyExpanded  bool
 	details       git.CommitDetails
 	files         []git.CommitFile
+	fileEntries   []commitFileEntry
+	collapsedDirs map[string]bool
 	selected      int
 	section       explorer.SectionData
 	diffViewport  viewport.Model
 	searchMode    commitSearchMode
+	searchScope   commitSearchScope
 	searchQuery   string
 	searchMatches []explorer.DiffSearchMatch
+	fileMatches   []int
 	searchCursor  int
 	searchInput   textinput.Model
 	statusMsg     string
@@ -51,13 +55,14 @@ func New(worktreeRoot, ref string) Model {
 
 func NewWithSettings(worktreeRoot, ref string, settings Settings) Model {
 	m := Model{
-		worktreeRoot: worktreeRoot,
-		ref:          normalizedRef(ref),
-		settings:     settings,
-		bodyExpanded: true,
-		diffNavMode:  explorer.NavHunk,
-		wrapSoft:     true,
-		diffViewport: viewport.New(),
+		worktreeRoot:  worktreeRoot,
+		ref:           normalizedRef(ref),
+		settings:      settings,
+		bodyExpanded:  true,
+		diffNavMode:   explorer.NavHunk,
+		wrapSoft:      true,
+		diffViewport:  viewport.New(),
+		collapsedDirs: map[string]bool{},
 	}
 	m.reload()
 	return m
@@ -85,8 +90,9 @@ func (m *Model) reload() {
 		m.section = explorer.NewSectionData()
 		return
 	}
-	if m.selected >= len(m.files) {
-		m.selected = len(m.files) - 1
+	m.fileEntries = buildCommitFileEntries(m.files, m.collapsedDirs)
+	if m.selected >= len(m.fileEntries) {
+		m.selected = len(m.fileEntries) - 1
 	}
 	if m.selected < 0 {
 		m.selected = 0
@@ -95,11 +101,11 @@ func (m *Model) reload() {
 }
 
 func (m *Model) refreshDiff() {
-	if len(m.files) == 0 {
+	file, ok := m.selectedCommitFile()
+	if !ok {
 		m.section = explorer.NewSectionData()
 		return
 	}
-	file := m.files[m.selected]
 	rawDiff, err := git.CommitFileDiffForRef(m.worktreeRoot, m.ref, file.Path)
 	if err != nil {
 		m.err = err
@@ -107,5 +113,16 @@ func (m *Model) refreshDiff() {
 		return
 	}
 	m.section = explorer.BuildSectionData(rawDiff, rawDiff, m.section, false)
+	if strings.TrimSpace(m.searchQuery) != "" && m.searchScope == searchScopeDiff {
+		cursor := m.searchCursor
+		m.recomputeSearchMatches()
+		if len(m.searchMatches) == 0 {
+			m.searchCursor = 0
+		} else if cursor < len(m.searchMatches) {
+			m.searchCursor = cursor
+		} else {
+			m.searchCursor = len(m.searchMatches) - 1
+		}
+	}
 	m.syncDiffViewport()
 }

@@ -14,13 +14,7 @@ func (m *Model) diffPaneSize() (int, int) {
 		diffH := maxInt(5, contentH-filesH)
 		return m.width, diffH
 	}
-	leftW := maxInt(24, m.width/4)
-	if leftW > m.width-40 {
-		leftW = m.width - 40
-	}
-	if leftW < 24 {
-		leftW = 24
-	}
+	leftW := m.filesPaneWidth(contentH)
 	return m.width - leftW, contentH
 }
 
@@ -29,7 +23,7 @@ func (m *Model) syncDiffViewport() {
 	bodyW := maxInt(1, diffW-4)
 	bodyH := maxInt(0, diffH-2)
 	explorer.ReflowSectionData(&m.section, bodyW, m.wrapSoft)
-	if strings.TrimSpace(m.searchQuery) != "" {
+	if strings.TrimSpace(m.searchQuery) != "" && m.searchScope == searchScopeDiff {
 		cursor := m.searchCursor
 		m.recomputeSearchMatches()
 		if len(m.searchMatches) > 0 {

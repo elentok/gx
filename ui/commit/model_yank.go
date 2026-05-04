@@ -19,10 +19,11 @@ func (m *Model) clearStatus() {
 }
 
 func (m *Model) selectedFile() (path string, ok bool) {
-	if m.selected < 0 || m.selected >= len(m.files) {
+	file, ok := m.selectedCommitFile()
+	if !ok {
 		return "", false
 	}
-	return m.files[m.selected].Path, true
+	return file.Path, true
 }
 
 func (m *Model) yankFilename() {

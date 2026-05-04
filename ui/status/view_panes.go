@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/explorer"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -121,83 +122,37 @@ func (m Model) statusPaneTitle() string {
 
 func (m Model) visibleStatusLines(height int) []string {
 	innerH := maxInt(1, height-2)
-	lines := make([]string, 0, innerH)
-
-	bodyH := innerH
-	if bodyH < 0 {
-		bodyH = 0
-	}
-
-	if len(m.statusEntries) == 0 {
-		lines = append(lines, lipgloss.NewStyle().Foreground(catSubtle).Render("clean working tree"))
-	} else {
-		icons := statusPaneIconsFor(m.settings.UseNerdFontIcons)
-		start := m.selected - bodyH/2
-		if start < 0 {
-			start = 0
+	icons := statusPaneIconsFor(m.settings.UseNerdFontIcons)
+	rows := explorer.BuildVisibleSidebarRenderableRows(m.statusEntries, m.selected, innerH, func(i int, entry statusEntry) explorer.SidebarRenderableRow {
+		statusColor := statusEntryColor(entry)
+		deleted := entry.Kind == statusEntryFile && isDeletedFileStatus(entry.File)
+		metaRaw := statusEntryMeta(entry, m.settings.UseNerdFontIcons, icons)
+		name := entry.DisplayName
+		if entry.Kind == statusEntryDir {
+			symbol := icons.folderOpen
+			if !entry.Expanded {
+				symbol = icons.folderClosed
+			}
+			name = symbol + " " + name + "/"
+		} else {
+			if entry.File.IsRenamed() && entry.File.RenameFrom != "" {
+				name = entry.File.RenameFrom + " -> " + entry.File.Path
+			}
+			name = statusFileIcon(entry.File, isWorktreeSymlink(m.worktreeRoot, entry.File.Path), icons) + " " + name
 		}
-		if start > len(m.statusEntries)-bodyH {
-			start = len(m.statusEntries) - bodyH
+		if m.searchMatchStatusIndex(i) {
+			name = highlightMatchText(name, m.searchQuery)
 		}
-		if start < 0 {
-			start = 0
+		return explorer.SidebarRenderableRow{
+			Depth:    entry.Depth,
+			MetaRaw:  metaRaw,
+			NameRaw:  name,
+			Color:    statusColor,
+			Selected: i == m.selected,
+			Faint:    deleted,
 		}
-		end := start + bodyH
-		if end > len(m.statusEntries) {
-			end = len(m.statusEntries)
-		}
-		for i := start; i < end; i++ {
-			entry := m.statusEntries[i]
-			mark := " "
-			if i == m.selected {
-				mark = lipgloss.NewStyle().Foreground(catOrange).Render("▌")
-			}
-			indent := strings.Repeat("  ", entry.Depth)
-			statusColor := statusEntryColor(entry)
-			deleted := entry.Kind == statusEntryFile && isDeletedFileStatus(entry.File)
-			metaRaw := statusEntryMeta(entry, m.settings.UseNerdFontIcons, icons)
-			metaStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(statusColor))
-			if deleted {
-				metaStyle = metaStyle.Faint(true)
-			}
-			meta := metaStyle.Render(metaRaw)
-			name := entry.DisplayName
-			if entry.Kind == statusEntryDir {
-				symbol := icons.folderOpen
-				if !entry.Expanded {
-					symbol = icons.folderClosed
-				}
-				name = symbol + " " + name + "/"
-			} else {
-				if entry.File.IsRenamed() && entry.File.RenameFrom != "" {
-					name = entry.File.RenameFrom + " -> " + entry.File.Path
-				}
-				name = statusFileIcon(entry.File, isWorktreeSymlink(m.worktreeRoot, entry.File.Path), icons) + " " + name
-			}
-			if m.searchMatchStatusIndex(i) {
-				name = highlightMatchText(name, m.searchQuery)
-			}
-			nameStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(statusColor))
-			if deleted {
-				nameStyle = nameStyle.Faint(true)
-			}
-			name = nameStyle.Render(name)
-			sep := " "
-			if strings.TrimSpace(metaRaw) == "" {
-				sep = ""
-			}
-			line := fmt.Sprintf("%s%s%s%s%s", mark, indent, meta, sep, name)
-			if i == m.selected && !deleted {
-				line = lipgloss.NewStyle().Bold(true).Render(line)
-			}
-			lines = append(lines, line)
-		}
-	}
-
-	for len(lines) < innerH {
-		lines = append(lines, "")
-	}
-	return lines
+	})
+	return explorer.RenderSidebarRows(rows, innerH, lipgloss.NewStyle().Foreground(catSubtle).Render("clean working tree"), catOrange)
 }
 
 func (m Model) requiredStatusPaneWidth(height int) int {

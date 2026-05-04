@@ -1,10 +1,13 @@
 package commit
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/explorer"
 
 	tea "charm.land/bubbletea/v2"
@@ -131,11 +134,13 @@ func TestEscLeavesDiffFocusBeforeBackingOut(t *testing.T) {
 	}
 }
 
-func TestSearchMovesToMatchesAndNavigates(t *testing.T) {
+func TestSidebarSearchMovesToFileMatches(t *testing.T) {
 	repo := testutil.TempRepo(t)
-	testutil.WriteFile(t, repo, "a.txt", "one\ntwo\nthree\nfour\n")
+	testutil.WriteFile(t, repo, "alpha.txt", "one\n")
+	testutil.WriteFile(t, repo, "beta.txt", "two\n")
 	testutil.CommitAll(t, repo, "base")
-	testutil.WriteFile(t, repo, "a.txt", "alpha\nTWO\nalpha three\nfour\n")
+	testutil.WriteFile(t, repo, "alpha.txt", "ONE\n")
+	testutil.WriteFile(t, repo, "beta.txt", "TWO\n")
 	testutil.CommitAll(t, repo, "change")
 
 	m := New(repo, "HEAD")
@@ -150,38 +155,74 @@ func TestSearchMovesToMatchesAndNavigates(t *testing.T) {
 		t.Fatalf("expected / to enter search mode")
 	}
 
-	for _, r := range []rune("alpha") {
+	for _, r := range []rune("txt") {
 		updated, _ = m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
 		m = updated.(Model)
 	}
-	if m.searchQuery != "alpha" {
-		t.Fatalf("searchQuery = %q, want alpha", m.searchQuery)
+	if m.searchQuery != "txt" {
+		t.Fatalf("searchQuery = %q, want txt", m.searchQuery)
 	}
-	if len(m.searchMatches) < 2 {
-		t.Fatalf("expected multiple matches, got %d", len(m.searchMatches))
+	if len(m.fileMatches) < 2 {
+		t.Fatalf("expected multiple sidebar matches, got %d", len(m.fileMatches))
 	}
-	if !m.focusDiff || m.diffNavMode != explorer.NavLine {
-		t.Fatalf("expected search to focus diff in line mode")
+	if m.focusDiff {
+		t.Fatalf("expected sidebar search to keep focus in sidebar")
 	}
 
-	first := m.section.ActiveLine
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
 	if m.searchMode != searchModeNone {
 		t.Fatalf("expected enter to leave search mode")
 	}
 
+	first := m.selected
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
+	m = updated.(Model)
+	if m.selected == first {
+		t.Fatalf("expected n to move to next sidebar match")
+	}
+}
+
+func TestDiffSearchMovesToMatchesAndNavigates(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\ntwo\nthree\nfour\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "a.txt", "alpha\nTWO\nalpha three\nfour\n")
+	testutil.CommitAll(t, repo, "change")
+
+	m := New(repo, "HEAD")
+	m.ready = true
+	m.width = 100
+	m.height = 24
+	m.syncDiffViewport()
+	m.focusDiff = true
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	m = updated.(Model)
+	for _, r := range []rune("alpha") {
+		updated, _ = m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
+		m = updated.(Model)
+	}
+	if len(m.searchMatches) < 2 {
+		t.Fatalf("expected multiple diff matches, got %d", len(m.searchMatches))
+	}
+	if !m.focusDiff || m.diffNavMode != explorer.NavLine {
+		t.Fatalf("expected diff search to focus diff in line mode")
+	}
+
+	first := m.section.ActiveLine
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	m = updated.(Model)
 	if m.section.ActiveLine == first {
-		t.Fatalf("expected n to move to next match")
+		t.Fatalf("expected n to move to next diff match")
 	}
-
 	second := m.section.ActiveLine
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'N', Text: "N", ShiftedCode: 'N'})
 	m = updated.(Model)
 	if m.section.ActiveLine == second {
-		t.Fatalf("expected N to move to previous match")
+		t.Fatalf("expected N to move to previous diff match")
 	}
 }
 
@@ -244,5 +285,30 @@ func TestYankAllContextWithYAInDiff(t *testing.T) {
 	}
 	if !strings.Contains(got, "-old-1") {
 		t.Fatalf("expected ya output to include selected diff line, got %q", got)
+	}
+}
+
+func TestFilesPaneShowsNerdFontIcons(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	if err := os.MkdirAll(filepath.Join(repo, "dir"), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	testutil.WriteFile(t, repo, "dir/file.txt", "one\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "dir/file.txt", "two\n")
+	testutil.CommitAll(t, repo, "change")
+
+	m := NewWithSettings(repo, "HEAD", Settings{UseNerdFontIcons: true})
+	m.ready = true
+	m.width = 100
+	m.height = 24
+
+	pane := m.renderFilesPane(30, 10)
+	icons := ui.Icons(true)
+	if !strings.Contains(pane, icons.FolderOpen) {
+		t.Fatalf("expected files pane to show folder icon, got:\n%s", pane)
+	}
+	if !strings.Contains(pane, icons.FileModified) {
+		t.Fatalf("expected files pane to show file icon, got:\n%s", pane)
 	}
 }

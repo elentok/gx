@@ -2,6 +2,7 @@ package commit
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 
 	"github.com/elentok/gx/git"
@@ -11,6 +12,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 var commitMetaStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
@@ -70,7 +72,7 @@ func (m Model) headerLines() []string {
 func (m Model) contentView() string {
 	headerH := maxInt(4, len(m.headerLines())+2)
 	contentH := maxInt(5, m.height-1-headerH-1)
-	if len(m.files) == 0 {
+	if len(m.fileEntries) == 0 {
 		return ui.RenderPanelFrame(ui.PanelFrameOptions{
 			Width:       maxInt(20, m.width),
 			Height:      contentH,
@@ -90,13 +92,7 @@ func (m Model) contentView() string {
 		diff := m.renderDiffPane(m.width, diffH)
 		return lipgloss.JoinVertical(lipgloss.Left, files, diff)
 	}
-	leftW := maxInt(24, m.width/4)
-	if leftW > m.width-40 {
-		leftW = m.width - 40
-	}
-	if leftW < 24 {
-		leftW = 24
-	}
+	leftW := m.filesPaneWidth(mainH)
 	rightW := m.width - leftW
 	left := m.renderFilesPane(leftW, mainH)
 	right := m.renderDiffPane(rightW, mainH)
@@ -104,18 +100,7 @@ func (m Model) contentView() string {
 }
 
 func (m Model) renderFilesPane(width, height int) string {
-	lines := make([]string, 0, maxInt(1, len(m.files)))
-	for i, file := range m.files {
-		name := file.Path
-		if file.RenameFrom != "" {
-			name = file.RenameFrom + " -> " + file.Path
-		}
-		line := fmt.Sprintf("%s %s", file.Status, name)
-		if i == m.selected {
-			line = ui.RenderRowHighlight(line)
-		}
-		lines = append(lines, line)
-	}
+	lines := m.visibleFileLines(height)
 	if len(lines) == 0 {
 		lines = append(lines, ui.StyleMuted.Render("no changed files"))
 	}
@@ -123,8 +108,9 @@ func (m Model) renderFilesPane(width, height int) string {
 		Width:       width,
 		Height:      height,
 		Title:       "Files",
+		RightTitle:  m.filesPaneRightTitle(),
 		BorderColor: ui.ColorBorder,
-		TitleColor:  ui.ColorBlue,
+		TitleColor:  m.filesPaneTitleColor(),
 		Background:  ui.ColorBase,
 		Lines:       lines,
 	})
@@ -228,9 +214,9 @@ func (m Model) footerView() string {
 	if m.searchMode == searchModeInput {
 		return m.searchFooterText()
 	}
-	left := "j/k files  enter diff  b body"
+	left := "j/k move  h/l tree  enter open  b body"
 	if m.focusDiff {
-		left = "j/k move  a mode  / search  y yank"
+		left = "j/k move  a mode  .,/ files  / search  y yank"
 	}
 	right := ui.StyleHint.Render("gw worktrees · gl log · gs status · q back")
 	if m.width <= 0 {
@@ -242,6 +228,133 @@ func (m Model) footerView() string {
 		return left + "  " + right
 	}
 	return left + strings.Repeat(" ", m.width-leftW-rightW) + right
+}
+
+func (m Model) visibleFileLines(height int) []string {
+	innerH := maxInt(1, height-2)
+	icons := ui.Icons(m.settings.UseNerdFontIcons)
+	rows := explorer.BuildVisibleSidebarRenderableRows(m.fileEntries, m.selected, innerH, func(i int, entry commitFileEntry) explorer.SidebarRenderableRow {
+		statusColor := commitEntryColor(entry)
+		name := entry.DisplayName
+		if entry.Kind == commitFileEntryDir {
+			symbol := icons.FolderOpen
+			if !entry.Expanded {
+				symbol = icons.FolderClosed
+			}
+			name = symbol + " " + name + "/"
+		} else {
+			if entry.File.RenameFrom != "" {
+				name = entry.File.RenameFrom + " -> " + entry.File.Path
+			}
+			name = commitFileIcon(entry.File, m.settings.UseNerdFontIcons) + " " + name
+		}
+		if matched, current := m.searchMatchSidebarIndex(i); matched {
+			name = highlightMatchText(name, m.searchQuery, current)
+		}
+		return explorer.SidebarRenderableRow{
+			Depth:    entry.Depth,
+			MetaRaw:  commitEntryMeta(entry, m.settings.UseNerdFontIcons),
+			NameRaw:  name,
+			Color:    statusColor,
+			Selected: i == m.selected,
+		}
+	})
+	return explorer.RenderSidebarRows(rows, innerH, ui.StyleMuted.Render("no changed files"), ui.ColorOrange)
+}
+
+func (m Model) requiredFilesPaneWidth(height int) int {
+	required := ansi.StringWidth(" Files ")
+	for _, line := range m.visibleFileLines(height) {
+		if w := ansi.StringWidth(line); w > required {
+			required = w
+		}
+	}
+	return required + 2
+}
+
+func (m Model) filesPaneWidth(height int) int {
+	width := m.requiredFilesPaneWidth(height)
+	maxWidth := minInt(72, int(float64(m.width)*0.45))
+	if maxWidth < 24 {
+		maxWidth = 24
+	}
+	if width < 24 {
+		width = 24
+	}
+	if width > maxWidth {
+		width = maxWidth
+	}
+	if m.width-width < 40 {
+		width = m.width - 40
+	}
+	if width < 24 {
+		width = 24
+	}
+	return width
+}
+
+func (m Model) filesPaneTitleColor() color.Color {
+	if m.focusDiff {
+		return ui.ColorBlue
+	}
+	return ui.ColorOrange
+}
+
+func (m Model) filesPaneRightTitle() string {
+	if m.focusDiff {
+		return ""
+	}
+	if len(m.fileEntries) == 0 {
+		return ""
+	}
+	return "tree"
+}
+
+func commitEntryMeta(entry commitFileEntry, useNerdFontIcons bool) string {
+	if useNerdFontIcons {
+		return "  "
+	}
+	if entry.Kind == commitFileEntryDir {
+		return "-"
+	}
+	status := strings.TrimSpace(entry.File.Status)
+	if status == "" {
+		return "  "
+	}
+	if len(status) > 2 {
+		status = status[:2]
+	}
+	return status
+}
+
+func commitEntryColor(entry commitFileEntry) string {
+	if entry.Kind == commitFileEntryDir {
+		return "#cdd6f4"
+	}
+	switch {
+	case strings.HasPrefix(entry.File.Status, "D"):
+		return "#a6adc8"
+	case strings.HasPrefix(entry.File.Status, "R"), strings.HasPrefix(entry.File.Status, "C"):
+		return "#89b4fa"
+	case strings.HasPrefix(entry.File.Status, "A"):
+		return "#a6e3a1"
+	default:
+		return "#cdd6f4"
+	}
+}
+
+func commitFileIcon(file git.CommitFile, useNerdFontIcons bool) string {
+	icons := ui.Icons(useNerdFontIcons)
+	switch {
+	case strings.HasPrefix(file.Status, "D"):
+		return icons.FileDeleted
+	case strings.HasPrefix(file.Status, "R"), strings.HasPrefix(file.Status, "C"):
+		return icons.FileRenamed
+	case strings.HasPrefix(file.Status, "A"):
+		return icons.FileAdded
+	default:
+		return icons.FileModified
+	}
 }
 
 func maxInt(a, b int) int {

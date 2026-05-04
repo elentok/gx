@@ -16,7 +16,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.syncDiffViewport()
 		return m, nil
 	case tea.KeyPressMsg:
-		if msg.String() == "ctrl+c" {
+		key := msg.String()
+		shiftG := (msg.Mod&tea.ModShift) != 0 && (msg.Code == 'g' || msg.Code == 'G' || msg.Text == "g" || msg.Text == "G")
+		isUpperG := key == "G" || key == "shift+g" || msg.Text == "G" || msg.ShiftedCode == 'G' || shiftG
+		if key == "ctrl+c" {
 			return m, tea.Quit
 		}
 		if handled, cmd := m.handleSearchKey(msg); handled {
@@ -28,7 +31,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.handleSearchNavigateKey(msg) {
 			return m, nil
 		}
-		switch msg.String() {
+		switch key {
 		case "q", "esc":
 			if m.focusDiff {
 				m.focusDiff = false
@@ -65,24 +68,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.moveDiffActive(1)
 				return m, nil
 			}
-			if len(m.files) > 0 {
-				if m.selected < len(m.files)-1 {
-					m.selected++
-					m.refreshDiff()
-				}
-			}
+			m.moveSidebar(1)
 			return m, nil
 		case "k", "up":
 			if m.focusDiff {
 				m.moveDiffActive(-1)
 				return m, nil
 			}
-			if len(m.files) > 0 {
-				if m.selected > 0 {
-					m.selected--
-					m.refreshDiff()
-				}
-			}
+			m.moveSidebar(-1)
 			return m, nil
 		case "J":
 			if m.focusDiff {
@@ -104,19 +97,39 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.scrollDiffPage(-1)
 			}
 			return m, nil
-		case "G":
+		case ".":
 			if m.focusDiff {
-				m.jumpDiffBottom()
+				m.moveToAdjacentFile(1)
+			}
+			return m, nil
+		case ",":
+			if m.focusDiff {
+				m.moveToAdjacentFile(-1)
+			}
+			return m, nil
+		case "G":
+			if isUpperG {
+				if m.focusDiff {
+					m.jumpDiffBottom()
+				} else {
+					m.jumpSidebarBottom()
+				}
+			}
+			return m, nil
+		case "enter":
+			if m.toggleDirOnEnter() {
 				return m, nil
 			}
-		case "enter":
-			if len(m.files) > 0 {
+			if _, ok := m.selectedCommitFile(); ok {
 				m.focusDiff = true
 				m.ensureActiveVisible()
 			}
 			return m, nil
 		case "l", "right":
-			if len(m.files) > 0 {
+			if !m.focusDiff && m.expandSelectedDir() {
+				return m, nil
+			}
+			if _, ok := m.selectedCommitFile(); ok {
 				m.focusDiff = true
 				m.ensureActiveVisible()
 			}
@@ -124,7 +137,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "h", "left":
 			if m.focusDiff {
 				m.focusDiff = false
+				return m, nil
 			}
+			if m.focusParentInSidebar() {
+				m.refreshDiff()
+				return m, nil
+			}
+			m.collapseSelectedDir()
 			return m, nil
 		}
 	}
@@ -132,9 +151,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
+	key := msg.String()
+	shiftG := (msg.Mod&tea.ModShift) != 0 && (msg.Code == 'g' || msg.Code == 'G' || msg.Text == "g" || msg.Text == "G")
+	isUpperG := key == "G" || key == "shift+g" || msg.Text == "G" || msg.ShiftedCode == 'G' || shiftG
 	if m.keyPrefix == "y" {
 		m.keyPrefix = ""
-		switch msg.String() {
+		switch key {
 		case "l":
 			m.yankLocationOnly()
 			return m, nil, true
@@ -155,7 +177,14 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	}
 	if m.keyPrefix == "g" {
 		m.keyPrefix = ""
-		switch msg.String() {
+		switch key {
+		case "g":
+			if m.focusDiff {
+				m.jumpDiffTop()
+			} else {
+				m.jumpSidebarTop()
+			}
+			return m, nil, true
 		case "w":
 			return m, nav.Replace(nav.Route{Kind: nav.RouteWorktrees}), true
 		case "l":
@@ -165,13 +194,21 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		}
 		return m, nil, true
 	}
-	if msg.String() == "y" {
+	if key == "y" {
 		m.keyPrefix = "y"
 		m.setStatus("yy content · yl location · ya all · yf filename")
 		return m, nil, true
 	}
-	if msg.String() == "g" {
+	if key == "g" && !isUpperG {
 		m.keyPrefix = "g"
+		return m, nil, true
+	}
+	if isUpperG {
+		if m.focusDiff {
+			m.jumpDiffBottom()
+		} else {
+			m.jumpSidebarBottom()
+		}
 		return m, nil, true
 	}
 	return m, nil, false

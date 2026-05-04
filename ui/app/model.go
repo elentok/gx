@@ -64,6 +64,9 @@ func New(repo git.Repo, settings Settings) Model {
 	page := m.newTabPage(m.tabStateForRoute(m.settings.InitialRoute))
 	page.initialized = true
 	m.tabs[m.activeTab] = page
+	if m.settings.InitialRoute.Kind == nav.RouteCommit {
+		m.history = append(m.history, m.newPage(m.settings.InitialRoute))
+	}
 	return m
 }
 

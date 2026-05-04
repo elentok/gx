@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/explorer"
 )
 
 func (m Model) selectedStatusEntry() (statusEntry, bool) {
@@ -121,11 +122,9 @@ func (m *Model) reloadBranchState() {
 }
 
 func (m *Model) toggleDirOnEnter() bool {
-	entry, ok := m.selectedStatusEntry()
-	if !ok || entry.Kind != statusEntryDir {
+	if !explorer.FileTreeToggleDirOnEnter(m.statusFileTreeRows(), m.collapsedDirs, m.selected) {
 		return false
 	}
-	m.collapsedDirs[entry.Path] = entry.Expanded
 	m.statusEntries = buildStatusEntries(m.files, m.collapsedDirs)
 	if m.selected >= len(m.statusEntries) {
 		m.selected = len(m.statusEntries) - 1
@@ -134,11 +133,9 @@ func (m *Model) toggleDirOnEnter() bool {
 }
 
 func (m *Model) collapseSelectedDir() {
-	entry, ok := m.selectedStatusEntry()
-	if !ok || entry.Kind != statusEntryDir || !entry.Expanded {
+	if !explorer.FileTreeCollapseSelectedDir(m.statusFileTreeRows(), m.collapsedDirs, m.selected) {
 		return
 	}
-	m.collapsedDirs[entry.Path] = true
 	m.statusEntries = buildStatusEntries(m.files, m.collapsedDirs)
 	if m.selected >= len(m.statusEntries) {
 		m.selected = len(m.statusEntries) - 1
@@ -146,56 +143,35 @@ func (m *Model) collapseSelectedDir() {
 }
 
 func (m *Model) focusParentInStatus() bool {
-	entry, ok := m.selectedStatusEntry()
-	if !ok {
+	rows := m.statusFileTreeRows()
+	idx, ok := explorer.FileTreeParentIndex(rows, m.selected)
+	if !ok || m.selected == idx {
 		return false
 	}
-	parent := strings.TrimSpace(entry.ParentPath)
-	if parent == "" || parent == entry.Path {
-		return false
-	}
-	for i, candidate := range m.statusEntries {
-		if candidate.Kind == statusEntryDir && candidate.Path == parent {
-			if m.selected == i {
-				return false
-			}
-			m.selected = i
-			m.onStatusSelectionChanged()
-			return true
-		}
-	}
-	return false
+	m.selected = idx
+	m.onStatusSelectionChanged()
+	return true
 }
 
 func (m *Model) expandSelectedDir() {
-	entry, ok := m.selectedStatusEntry()
-	if !ok || entry.Kind != statusEntryDir || entry.Expanded {
+	if !explorer.FileTreeExpandSelectedDir(m.statusFileTreeRows(), m.collapsedDirs, m.selected) {
 		return
 	}
-	delete(m.collapsedDirs, entry.Path)
 	m.statusEntries = buildStatusEntries(m.files, m.collapsedDirs)
 }
 
 func (m *Model) moveToAdjacentFile(delta int) bool {
-	if delta == 0 || len(m.statusEntries) == 0 {
+	idx, ok := explorer.FileTreeAdjacentFileIndex(m.statusFileTreeRows(), m.selected, delta)
+	if !ok {
 		return false
 	}
-	idx := m.selected
-	for {
-		idx += delta
-		if idx < 0 || idx >= len(m.statusEntries) {
-			return false
-		}
-		if m.statusEntries[idx].Kind == statusEntryFile {
-			m.selected = idx
-			m.onStatusSelectionChanged()
-			m.reloadDiffsForSelection()
-			if m.focus == focusDiff {
-				m.ensureActiveVisible(m.currentSection())
-			}
-			return true
-		}
+	m.selected = idx
+	m.onStatusSelectionChanged()
+	m.reloadDiffsForSelection()
+	if m.focus == focusDiff {
+		m.ensureActiveVisible(m.currentSection())
 	}
+	return true
 }
 
 func (m *Model) toggleStageStatusEntry() {
@@ -256,4 +232,25 @@ func (m *Model) openDiscardStatusConfirm() {
 	m.openConfirm(title, lines, confirmDiscardStatus, "", "")
 	m.confirmDiscardUntracked = entry.File.IsUntracked()
 	m.confirmPaths = uniqueNonEmpty(paths)
+}
+
+func (m Model) statusFileTreeRows() []explorer.FileTreeRow[git.StageFileStatus] {
+	rows := make([]explorer.FileTreeRow[git.StageFileStatus], 0, len(m.statusEntries))
+	for _, entry := range m.statusEntries {
+		row := explorer.FileTreeRow[git.StageFileStatus]{
+			Path:        entry.Path,
+			ParentPath:  entry.ParentPath,
+			Depth:       entry.Depth,
+			DisplayName: entry.DisplayName,
+			Expanded:    entry.Expanded,
+		}
+		if entry.Kind == statusEntryDir {
+			row.Kind = explorer.FileTreeRowDir
+		} else {
+			row.Kind = explorer.FileTreeRowFile
+			row.Value = entry.File
+		}
+		rows = append(rows, row)
+	}
+	return rows
 }

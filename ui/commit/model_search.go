@@ -20,6 +20,13 @@ const (
 	searchModeInput
 )
 
+type commitSearchScope int
+
+const (
+	searchScopeSidebar commitSearchScope = iota
+	searchScopeDiff
+)
+
 var commitSearchHighlightStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true)
 var commitSearchCurrentStyle = lipgloss.NewStyle().Foreground(ui.ColorGreen).Bold(true)
 
@@ -31,22 +38,30 @@ func (m *Model) enterSearchMode() {
 	ti.Focus()
 	m.searchInput = ti
 	m.searchMode = searchModeInput
+	m.searchScope = searchScopeSidebar
+	if m.focusDiff {
+		m.searchScope = searchScopeDiff
+	}
 }
 
 func (m *Model) handleSearchKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	if m.searchMode != searchModeInput {
 		return false, nil
 	}
+	total := len(m.searchMatches)
+	if m.searchScope == searchScopeSidebar {
+		total = len(m.fileMatches)
+	}
 	switch msg.String() {
 	case "esc":
 		m.searchMode = searchModeNone
-		if strings.TrimSpace(m.searchQuery) == "" || len(m.searchMatches) == 0 {
+		if strings.TrimSpace(m.searchQuery) == "" || total == 0 {
 			m.clearSearch()
 		}
 		return true, nil
 	case "enter":
 		m.searchMode = searchModeNone
-		if strings.TrimSpace(m.searchQuery) == "" || len(m.searchMatches) == 0 {
+		if strings.TrimSpace(m.searchQuery) == "" || total == 0 {
 			m.clearSearch()
 		}
 		return true, nil
@@ -61,12 +76,16 @@ func (m *Model) handleSearchKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 }
 
 func (m *Model) handleSearchNavigateKey(msg tea.KeyPressMsg) bool {
-	if strings.TrimSpace(m.searchQuery) == "" || len(m.searchMatches) == 0 {
+	total := len(m.searchMatches)
+	if m.searchScope == searchScopeSidebar {
+		total = len(m.fileMatches)
+	}
+	if strings.TrimSpace(m.searchQuery) == "" || total == 0 {
 		return false
 	}
 	switch msg.String() {
 	case "n":
-		if m.searchCursor < len(m.searchMatches)-1 {
+		if m.searchCursor < total-1 {
 			m.searchCursor++
 		}
 		m.jumpToSearchCursor()
@@ -84,16 +103,39 @@ func (m *Model) handleSearchNavigateKey(msg tea.KeyPressMsg) bool {
 func (m *Model) clearSearch() {
 	m.searchQuery = ""
 	m.searchMatches = nil
+	m.fileMatches = nil
 	m.searchCursor = 0
 }
 
 func (m *Model) recomputeSearchMatches() {
 	m.searchMatches = nil
+	m.fileMatches = nil
 	m.searchCursor = 0
+	if strings.TrimSpace(m.searchQuery) == "" {
+		return
+	}
+	if m.searchScope == searchScopeSidebar {
+		q := strings.ToLower(strings.TrimSpace(m.searchQuery))
+		for i, entry := range m.fileEntries {
+			if strings.Contains(strings.ToLower(m.fileEntrySearchText(entry)), q) {
+				m.fileMatches = append(m.fileMatches, i)
+			}
+		}
+		return
+	}
 	m.searchMatches = explorer.ComputeDiffSearchMatches(m.section.ViewLines, m.section.DisplayToRaw, m.searchQuery)
 }
 
 func (m *Model) jumpToSearchCursor() {
+	if m.searchScope == searchScopeSidebar {
+		if len(m.fileMatches) == 0 || m.searchCursor < 0 || m.searchCursor >= len(m.fileMatches) {
+			return
+		}
+		m.focusDiff = false
+		m.selected = m.fileMatches[m.searchCursor]
+		m.refreshDiff()
+		return
+	}
 	if len(m.searchMatches) == 0 || m.searchCursor < 0 || m.searchCursor >= len(m.searchMatches) {
 		return
 	}
@@ -104,6 +146,9 @@ func (m *Model) jumpToSearchCursor() {
 }
 
 func (m Model) searchMatchDiffDisplay(displayIdx int) (matched bool, current bool) {
+	if m.searchScope != searchScopeDiff {
+		return false, false
+	}
 	if strings.TrimSpace(m.searchQuery) == "" {
 		return false, false
 	}
@@ -111,6 +156,28 @@ func (m Model) searchMatchDiffDisplay(displayIdx int) (matched bool, current boo
 		return true, i == m.searchCursor
 	}
 	return false, false
+}
+
+func (m Model) searchMatchSidebarIndex(idx int) (matched bool, current bool) {
+	if m.searchScope != searchScopeSidebar || strings.TrimSpace(m.searchQuery) == "" {
+		return false, false
+	}
+	for i, match := range m.fileMatches {
+		if match == idx {
+			return true, i == m.searchCursor
+		}
+	}
+	return false, false
+}
+
+func (m Model) fileEntrySearchText(entry commitFileEntry) string {
+	if entry.Kind == commitFileEntryDir {
+		return entry.DisplayName + "/"
+	}
+	if entry.File.RenameFrom != "" {
+		return entry.File.RenameFrom + " -> " + entry.File.Path
+	}
+	return entry.File.Path
 }
 
 func highlightMatchText(text, query string, current bool) string {
@@ -139,6 +206,9 @@ func (m Model) searchFooterText() string {
 		return ""
 	}
 	total := len(m.searchMatches)
+	if m.searchScope == searchScopeSidebar {
+		total = len(m.fileMatches)
+	}
 	right := ""
 	if strings.TrimSpace(m.searchQuery) != "" {
 		if total == 0 {

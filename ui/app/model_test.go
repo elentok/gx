@@ -198,6 +198,29 @@ func TestCommitMapsToLogTab(t *testing.T) {
 	}
 }
 
+func TestInitialCommitRouteStartsOnCommitPage(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.Route{Kind: nav.RouteCommit, WorktreeRoot: repoDir, Ref: "HEAD"},
+		ActiveWorktreePath: repoDir,
+	})
+
+	if got := m.activePage().route.Kind; got != nav.RouteCommit {
+		t.Fatalf("expected active page commit, got %q", got)
+	}
+	if m.activeTab != nav.RouteLog {
+		t.Fatalf("expected active tab log for commit-backed page, got %q", m.activeTab)
+	}
+	if len(m.history) != 1 {
+		t.Fatalf("expected initial commit route in history, got %d", len(m.history))
+	}
+}
+
 func TestBackWithEmptyHistoryQuits(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
