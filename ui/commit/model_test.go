@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/ui/explorer"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestNewLoadsCommitDetails(t *testing.T) {
@@ -453,5 +454,29 @@ func TestRenderDiffPaneShowsActiveHunkMarkerInUnifiedMode(t *testing.T) {
 	pane := m.renderDiffPane(70, 10)
 	if !strings.Contains(pane, "▌") {
 		t.Fatalf("expected active hunk marker in diff pane, got:\n%s", pane)
+	}
+}
+
+func TestViewFitsWindowHeight(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\ntwo\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "a.txt", "ONE\nTWO\n")
+	testutil.CommitAll(t, repo, "change")
+
+	m := New(repo, "HEAD")
+	m.ready = true
+	m.width = 100
+	m.height = 24
+
+	view := m.View().Content
+	lines := strings.Split(strings.TrimRight(view, "\n"), "\n")
+	if len(lines) != m.height {
+		t.Fatalf("expected exactly %d lines, got %d", m.height, len(lines))
+	}
+	for i, line := range lines {
+		if got := ansi.StringWidth(line); got != m.width {
+			t.Fatalf("line %d width: got %d want %d", i, got, m.width)
+		}
 	}
 }

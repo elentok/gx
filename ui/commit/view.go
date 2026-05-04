@@ -27,9 +27,10 @@ func (m Model) View() tea.View {
 		return tea.NewView("\n  Error: " + m.err.Error())
 	}
 
+	bodyH, contentH := m.layoutHeights()
 	body := ui.RenderPanelFrame(ui.PanelFrameOptions{
 		Width:       maxInt(20, m.width),
-		Height:      maxInt(10, minInt(m.height-1, 12)),
+		Height:      bodyH,
 		Title:       "Commit",
 		RightTitle:  m.ref,
 		Lines:       m.headerLines(),
@@ -37,7 +38,7 @@ func (m Model) View() tea.View {
 		TitleColor:  ui.ColorBlue,
 		Background:  ui.ColorBase,
 	})
-	content := m.contentView()
+	content := m.contentView(contentH)
 	footer := m.footerView()
 	v := tea.NewView(lipgloss.JoinVertical(lipgloss.Left, body, content, footer))
 	v.AltScreen = true
@@ -69,9 +70,7 @@ func (m Model) headerLines() []string {
 	return lines
 }
 
-func (m Model) contentView() string {
-	headerH := maxInt(4, len(m.headerLines())+2)
-	contentH := maxInt(5, m.height-1-headerH-1)
+func (m Model) contentView(contentH int) string {
 	if len(m.fileEntries) == 0 {
 		return ui.RenderPanelFrame(ui.PanelFrameOptions{
 			Width:       maxInt(20, m.width),
@@ -97,6 +96,20 @@ func (m Model) contentView() string {
 	left := m.renderFilesPane(leftW, mainH)
 	right := m.renderDiffPane(rightW, mainH)
 	return lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+}
+
+func (m Model) layoutHeights() (bodyH, contentH int) {
+	available := maxInt(2, m.height-1) // reserve one line for footer
+	naturalBody := maxInt(4, len(m.headerLines())+2)
+	bodyH = minInt(12, naturalBody)
+	if bodyH > available-1 {
+		bodyH = maxInt(1, available-1)
+	}
+	contentH = available - bodyH
+	if contentH < 1 {
+		contentH = 1
+	}
+	return bodyH, contentH
 }
 
 func (m Model) renderFilesPane(width, height int) string {
