@@ -8,18 +8,23 @@ import (
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		m.ready = true
-		return m, nil
+
+		m.help, cmd = m.help.Update(msg)
+		return m, cmd
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
-		if m.helpOpen {
-			return m.handleHelpKey(msg)
+		if m.help.IsOpen {
+			m.help, cmd = m.help.Update(msg)
+			return m, cmd
 		}
 		if m.searchMode == searchModeInput {
 			return m.handleSearchKey(msg)
@@ -32,7 +37,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		switch msg.String() {
 		case "?":
-			return m.enterHelpMode(), nil
+			m.help.Open(m.width, m.height)
+			return m, nil
 		case "q":
 			if m.settings.EnableNavigation {
 				return m, nav.Back()

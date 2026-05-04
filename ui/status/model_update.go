@@ -190,7 +190,7 @@ func (m Model) handleErrorKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleHelpKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "?", "esc", "enter":
+	case "q", "?", "esc", "enter":
 		m.helpOpen = false
 		return m, nil
 	}

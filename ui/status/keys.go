@@ -4,12 +4,8 @@ import (
 	"fmt"
 
 	"charm.land/bubbles/v2/key"
-	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/help"
 )
-
-type stageKeyMap struct {
-	m Model
-}
 
 var (
 	stageKeyUp         = key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up"))
@@ -60,11 +56,11 @@ var (
 	stageKeyDiffBack   = key.NewBinding(key.WithKeys("esc", "h"), key.WithHelp("esc/h", "back to status"))
 )
 
-var keySections = []ui.KeySection{
-	ui.NewKeySection("Global", stageKeyHelp, stageKeyQuit, stageKeyCommit, stageKeyOutput, stageKeyGoWorktree, stageKeyGoLog, stageKeyGoStatus, stageKeyLog, stageKeyYank, stageKeyPull, stageKeyPush, stageKeyRebase, stageKeyAmend),
-	ui.NewKeySection("Search", stageKeySearch, stageKeySearchNext, stageKeySearchPrev),
-	ui.NewKeySection("Status", stageKeyUp, stageKeyDown, stageKeyTop, stageKeyBottom, stageKeyPageUp, stageKeyPageDown, stageKeyLeft, stageKeyRight, stageKeyStage, stageKeyDiscard, stageKeyEdit, stageKeyOpenDiff, stageKeyContextDec, stageKeyContextInc, stageKeyRefresh),
-	ui.NewKeySection("Diff", stageKeyDiffBack, stageKeyTop, stageKeyBottom, stageKeyPageUp, stageKeyPageDown, stageKeyTab, stageKeyMode, stageKeyVisual, stageKeyUp, stageKeyDown, stageKeyPrevFile, stageKeyNextFile, stageKeyScrollDown, stageKeyScrollUp, stageKeyRenderMode, stageKeyContextDec, stageKeyContextInc, stageKeyStage, stageKeyDiscard, stageKeyEdit, stageKeyFullscreen, stageKeyWrap, stageKeyRefresh),
+var keySections = []help.KeySection{
+	help.NewKeySection("Global", stageKeyHelp, stageKeyQuit, stageKeyCommit, stageKeyOutput, stageKeyGoWorktree, stageKeyGoLog, stageKeyGoStatus, stageKeyLog, stageKeyYank, stageKeyPull, stageKeyPush, stageKeyRebase, stageKeyAmend),
+	help.NewKeySection("Search", stageKeySearch, stageKeySearchNext, stageKeySearchPrev),
+	help.NewKeySection("Status", stageKeyUp, stageKeyDown, stageKeyTop, stageKeyBottom, stageKeyPageUp, stageKeyPageDown, stageKeyLeft, stageKeyRight, stageKeyStage, stageKeyDiscard, stageKeyEdit, stageKeyOpenDiff, stageKeyContextDec, stageKeyContextInc, stageKeyRefresh),
+	help.NewKeySection("Diff", stageKeyDiffBack, stageKeyTop, stageKeyBottom, stageKeyPageUp, stageKeyPageDown, stageKeyTab, stageKeyMode, stageKeyVisual, stageKeyUp, stageKeyDown, stageKeyPrevFile, stageKeyNextFile, stageKeyScrollDown, stageKeyScrollUp, stageKeyRenderMode, stageKeyContextDec, stageKeyContextInc, stageKeyStage, stageKeyDiscard, stageKeyEdit, stageKeyFullscreen, stageKeyWrap, stageKeyRefresh),
 }
 
 func (m Model) helpSectionLabel() string {

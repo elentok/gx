@@ -5,9 +5,9 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/help"
 
 	"charm.land/bubbles/v2/textinput"
-	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -61,8 +61,7 @@ type Model struct {
 	searchCursor int
 	err          error
 
-	helpOpen     bool
-	helpViewport viewport.Model
+	help help.Model
 }
 
 func New(worktreeRoot, startRef string) Model {
@@ -75,6 +74,7 @@ func NewWithSettings(worktreeRoot, startRef string, settings Settings) Model {
 		settings:     settings,
 		startRef:     normalizedRef(startRef),
 		cursor:       0,
+		help:         help.NewModel(keySections),
 	}
 	m.reload()
 	return m

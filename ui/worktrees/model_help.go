@@ -2,25 +2,14 @@ package worktrees
 
 import (
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/help"
 
-	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 )
 
 func (m Model) enterHelpMode() Model {
-	vpW := m.width * 2 / 3
-	if vpW < 56 {
-		vpW = 56
-	}
-	if vpW > 104 {
-		vpW = 104
-	}
-	vpH := m.height/2 - 4
-	if vpH < 8 {
-		vpH = 8
-	}
-	vp := viewport.New(viewport.WithWidth(vpW-2), viewport.WithHeight(vpH))
-	vp.SetContent(m.helpFullView(vpW - 2))
+	vp := help.NewViewportModel(m.width, m.height)
+	vp.SetContent(m.helpFullView(vp.Width() - 2))
 	m.helpViewport = vp
 	m.mode = modeHelp
 	return m

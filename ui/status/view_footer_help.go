@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/help"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -134,8 +135,8 @@ func (m Model) terminalLabel() string {
 }
 
 func (m *Model) showHelpOverlay() {
-	vp := ui.HelpViewportModel(m.width, m.height)
-	vp.SetContent(ui.RenderHelpView(keySections))
+	vp := help.NewViewportModel(m.width, m.height)
+	vp.SetContent(help.RenderView(keySections))
 	m.helpVP = vp
 	m.helpOpen = true
 }
