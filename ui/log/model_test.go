@@ -242,3 +242,57 @@ func TestNAndNShiftMoveBetweenSearchResults(t *testing.T) {
 		t.Fatalf("expected N to move to previous result")
 	}
 }
+
+func TestTagJumpChordsMoveToTaggedCommits(t *testing.T) {
+	m := Model{
+		rows: []row{
+			{kind: rowCommit, commit: git.LogEntry{Subject: "c0"}},
+			{kind: rowCommit, commit: git.LogEntry{Subject: "c1", Decorations: []git.RefDecoration{{Name: "v1.0.0", Kind: git.RefDecorationTag}}}},
+			{kind: rowCommit, commit: git.LogEntry{Subject: "c2"}},
+			{kind: rowCommit, commit: git.LogEntry{Subject: "c3", Decorations: []git.RefDecoration{{Name: "v2.0.0", Kind: git.RefDecorationTag}}}},
+		},
+		cursor: 0,
+	}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: ']', Text: "]"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+	m = updated.(Model)
+	if m.cursor != 1 {
+		t.Fatalf("expected ]t to jump to first tag at 1, got %d", m.cursor)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: ']', Text: "]"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+	m = updated.(Model)
+	if m.cursor != 3 {
+		t.Fatalf("expected ]t to jump to next tag at 3, got %d", m.cursor)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '[', Text: "["})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+	m = updated.(Model)
+	if m.cursor != 1 {
+		t.Fatalf("expected [t to jump back to tag at 1, got %d", m.cursor)
+	}
+}
+
+func TestTagJumpChordStopsAtEdges(t *testing.T) {
+	m := Model{
+		rows: []row{
+			{kind: rowCommit, commit: git.LogEntry{Subject: "c0", Decorations: []git.RefDecoration{{Name: "v1", Kind: git.RefDecorationTag}}}},
+			{kind: rowCommit, commit: git.LogEntry{Subject: "c1"}},
+		},
+		cursor: 0,
+	}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '[', Text: "["})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+	m = updated.(Model)
+	if m.cursor != 0 {
+		t.Fatalf("expected [t at first tag to stay put, got %d", m.cursor)
+	}
+}
