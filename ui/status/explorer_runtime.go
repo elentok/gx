@@ -13,6 +13,23 @@ func (m Model) canSwitchSections() bool {
 	return len(m.visibleDiffSections()) > 1
 }
 
+func (m *Model) cycleFrameForward() {
+	if m.focus == focusStatus {
+		m.focus = focusDiff
+		m.pickAvailableSection()
+		m.syncDiffViewports()
+		m.ensureActiveVisible(m.currentSection())
+		return
+	}
+	if m.section == sectionUnstaged && m.canSwitchSections() {
+		m.section = sectionStaged
+		m.syncDiffViewports()
+		m.ensureActiveVisible(m.currentSection())
+		return
+	}
+	m.focus = focusStatus
+}
+
 func (m *Model) currentSection() *sectionState {
 	return m.sectionState(m.section)
 }

@@ -3,6 +3,10 @@ package status
 import tea "charm.land/bubbletea/v2"
 
 func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if msg.Code == tea.KeyTab {
+		m.cycleFrameForward()
+		return m, nil
+	}
 	switch msg.String() {
 	case "[":
 		return m, m.adjustDiffContextLines(-1)
@@ -24,16 +28,6 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "h", "left":
 		m.focus = focusStatus
 		return m, nil
-	case "tab":
-		if m.canSwitchSections() {
-			if m.section == sectionUnstaged {
-				m.section = sectionStaged
-			} else {
-				m.section = sectionUnstaged
-			}
-			m.syncDiffViewports()
-			m.ensureActiveVisible(m.currentSection())
-		}
 	case "a":
 		sec := m.currentSection()
 		sec.visualActive = false

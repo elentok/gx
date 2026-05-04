@@ -7,6 +7,10 @@ import (
 )
 
 func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if msg.Code == tea.KeyTab {
+		m.cycleFrameForward()
+		return m, nil
+	}
 	switch msg.String() {
 	case "q":
 		if m.settings.EnableNavigation {

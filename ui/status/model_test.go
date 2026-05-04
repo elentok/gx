@@ -192,6 +192,41 @@ func TestStatusLOnFileEntersDiffAndResetsSectionOnFileChange(t *testing.T) {
 	}
 }
 
+func TestTabCyclesStatusThenUnstagedThenStaged(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\ntwo\n")
+	testutil.MustGitExported(t, repo, "add", "a.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+
+	// Ensure both unstaged and staged sections exist for same file.
+	testutil.WriteFile(t, repo, "a.txt", "ONE\ntwo\n")
+	testutil.MustGitExported(t, repo, "add", "a.txt")
+	testutil.WriteFile(t, repo, "a.txt", "ONE-again\ntwo\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusStatus
+	m.section = sectionUnstaged
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
+	m = updated.(Model)
+	if m.focus != focusDiff || m.section != sectionUnstaged {
+		t.Fatalf("first tab should focus unstaged diff, got focus=%v section=%v", m.focus, m.section)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
+	m = updated.(Model)
+	if m.focus != focusDiff || m.section != sectionStaged {
+		t.Fatalf("second tab should focus staged diff, got focus=%v section=%v", m.focus, m.section)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
+	m = updated.(Model)
+	if m.focus != focusStatus {
+		t.Fatalf("third tab should return to status, got focus=%v", m.focus)
+	}
+}
+
 func TestStatusHFocusesParentFolder(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.Mkdir(t, repo+"/ui/status")

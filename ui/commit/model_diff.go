@@ -7,7 +7,7 @@ import (
 )
 
 func (m *Model) diffPaneSize() (int, int) {
-	headerH := maxInt(4, len(m.headerLines())+2)
+	headerH := maxInt(3, len(m.headerLines())+2)
 	contentH := maxInt(5, m.height-1-headerH-1)
 	if m.width < 90 {
 		filesH := maxInt(5, contentH/3)

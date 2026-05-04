@@ -16,6 +16,7 @@ import (
 )
 
 var commitMetaStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
+var commitSubjectStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true)
 var commitDiffMarkerStyle = lipgloss.NewStyle().Foreground(ui.ColorOrange)
 var commitDiffMarkerActiveStyle = lipgloss.NewStyle().Foreground(ui.ColorOrange).Bold(true)
 
@@ -32,7 +33,7 @@ func (m Model) View() tea.View {
 		Width:       maxInt(20, m.width),
 		Height:      bodyH,
 		Title:       "Commit",
-		RightTitle:  m.ref,
+		RightTitle:  m.headerRightTitle(),
 		Lines:       m.headerLines(),
 		BorderColor: ui.ColorBorder,
 		TitleColor:  ui.ColorBlue,
@@ -47,27 +48,49 @@ func (m Model) View() tea.View {
 
 func (m Model) headerLines() []string {
 	lines := []string{
-		ui.StyleHeading.Render(m.details.Subject),
-		"",
-		fmt.Sprintf("%s  %s", ui.StyleTitle.Render(m.details.Hash), commitMetaStyle.Render(ui.RelativeTimeCompact(m.details.Date))),
-		commitMetaStyle.Render(m.details.Date.Format("2006-01-02 15:04:05 -0700")),
-		commitMetaStyle.Render(m.details.AuthorName + " · " + m.details.AuthorShort),
+		commitSubjectStyle.Render(m.details.Subject) + commitMetaStyle.Render(" (by "+m.details.AuthorName+")"),
 	}
-	if badges := renderBadges(m.details.Decorations); badges != "" {
-		lines = append(lines, badges)
-	}
-	lines = append(lines, "")
 	if m.bodyExpanded {
-		body := strings.TrimSpace(m.details.Body)
-		if body == "" {
-			lines = append(lines, ui.StyleMuted.Render("(no body)"))
-		} else {
+		body := m.commitMessageBody()
+		if body != "" {
+			lines = append(lines, "")
 			lines = append(lines, strings.Split(body, "\n")...)
 		}
 	} else {
+		lines = append(lines, "")
 		lines = append(lines, ui.StyleMuted.Render("(body hidden; press b to expand)"))
 	}
 	return lines
+}
+
+func (m Model) commitMessageBody() string {
+	body := strings.TrimSpace(m.details.Body)
+	if body == "" {
+		return ""
+	}
+	subject := strings.TrimSpace(m.details.Subject)
+	if subject == "" {
+		return body
+	}
+	lines := strings.Split(body, "\n")
+	if len(lines) == 0 {
+		return ""
+	}
+	if strings.TrimSpace(lines[0]) == subject {
+		lines = lines[1:]
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+func (m Model) headerRightTitle() string {
+	date := m.details.Date.Format("2006-01-02 15:04")
+	rel := ui.RelativeTimeCompact(m.details.Date)
+	return fmt.Sprintf(
+		"%s %s %s",
+		ui.StyleTitle.Render(m.details.Hash),
+		commitMetaStyle.Render(date),
+		commitMetaStyle.Render("("+rel+")"),
+	)
 }
 
 func (m Model) contentView(contentH int) string {
@@ -100,7 +123,7 @@ func (m Model) contentView(contentH int) string {
 
 func (m Model) layoutHeights() (bodyH, contentH int) {
 	available := maxInt(2, m.height-1) // reserve one line for footer
-	naturalBody := maxInt(4, len(m.headerLines())+2)
+	naturalBody := maxInt(3, len(m.headerLines())+2)
 	bodyH = minInt(12, naturalBody)
 	if bodyH > available-1 {
 		bodyH = maxInt(1, available-1)
