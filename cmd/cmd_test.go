@@ -144,12 +144,12 @@ func TestExecute_WorktreeAbsPath_MissingArg(t *testing.T) {
 	}
 }
 
-func TestExecute_DefaultRunsWorktrees(t *testing.T) {
+func TestExecute_DefaultRunsStatus(t *testing.T) {
 	called := 0
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
-		runWorktrees: func(_ string) error {
+		runStatus: func(_ string) error {
 			called++
 			return nil
 		},
@@ -159,7 +159,7 @@ func TestExecute_DefaultRunsWorktrees(t *testing.T) {
 		t.Fatalf("execute: %v", err)
 	}
 	if called != 1 {
-		t.Fatalf("runWorktrees called %d times, want 1", called)
+		t.Fatalf("runStatus called %d times, want 1", called)
 	}
 }
 

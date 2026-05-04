@@ -69,7 +69,7 @@ func Execute(args []string) error {
 
 func execute(args []string, d deps) error {
 	if len(args) == 0 {
-		return d.runWorktrees("")
+		return d.runStatus("")
 	}
 
 	switch args[0] {
@@ -127,6 +127,7 @@ func execute(args []string, d deps) error {
 
 func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "Usage:")
+	fmt.Fprintln(w, "  gx                           open the status UI")
 	fmt.Fprintln(w, "  gx [worktrees|wt]            open the worktree UI")
 	fmt.Fprintln(w, "  gx wt list                   list worktree names")
 	fmt.Fprintln(w, "  gx wt abs-path <name>        print absolute path of a worktree")
