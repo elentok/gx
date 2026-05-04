@@ -90,31 +90,32 @@ func (m *Model) cmdEditSelectedFile() tea.Cmd {
 	})
 }
 
-func (m *Model) refresh() {
-	m.refreshWithBehavior(false)
+func (m *Model) refresh() tea.Cmd {
+	return m.refreshWithBehavior(false)
 }
 
-func (m *Model) refreshPreserveScroll() {
-	m.refreshWithBehavior(true)
+func (m *Model) refreshPreserveScroll() tea.Cmd {
+	return m.refreshWithBehavior(true)
 }
 
-func (m *Model) refreshWithBehavior(preserveScroll bool) {
+func (m *Model) refreshWithBehavior(preserveScroll bool) tea.Cmd {
 	preserve := ""
 	if entry, ok := m.selectedStatusEntry(); ok {
 		preserve = entry.Path
 	}
 	unstagedOffset := m.unstaged.viewport.YOffset()
 	stagedOffset := m.staged.viewport.YOffset()
-	m.reload(preserve)
+	cmd := m.reload(preserve)
 	m.syncDiffViewports()
 	if preserveScroll {
 		explorer.RestoreViewportYOffset(&m.unstaged.viewport, unstagedOffset)
 		explorer.RestoreViewportYOffset(&m.staged.viewport, stagedOffset)
-		return
+		return cmd
 	}
 	if m.focus == focusDiff {
 		m.ensureActiveVisible(m.currentSection())
 	}
+	return cmd
 }
 
 func uniqueNonEmpty(paths []string) []string {

@@ -392,6 +392,12 @@ func TestReloadBranchStateUsesBranchUpstream(t *testing.T) {
 	if m.branchBaseRef != "origin/feature" {
 		t.Fatalf("expected upstream base ref origin/feature, got %q", m.branchBaseRef)
 	}
+
+	// Branch sync is now async; run the cmd synchronously to get the result.
+	if cmd := m.cmdLoadBranchSync(); cmd != nil {
+		updated, _ := m.Update(cmd())
+		m = updated.(Model)
+	}
 	if m.branchSync.Name != git.StatusAhead || m.branchSync.Ahead != 1 {
 		t.Fatalf("expected branch sync ahead of origin/feature, got %+v", m.branchSync)
 	}
@@ -430,13 +436,18 @@ func TestToggleSideBySideModeWithS(t *testing.T) {
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
 
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
+	updated, colorizeCmd := m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
 	m = updated.(Model)
 	if m.renderMode != renderSideBySide {
 		t.Fatalf("expected render mode side-by-side, got %v", m.renderMode)
 	}
 	if !strings.Contains(m.statusMsg, "side-by-side mode") {
 		t.Fatalf("expected side-by-side status message, got %q", m.statusMsg)
+	}
+	// Delta colorization is async; run the cmd synchronously to get colored output.
+	if colorizeCmd != nil {
+		updated, _ = m.Update(colorizeCmd())
+		m = updated.(Model)
 	}
 	view := ansi.Strip(m.renderDiffPane(80, 16))
 	if strings.Contains(view, "No file selected") {

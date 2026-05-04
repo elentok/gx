@@ -87,6 +87,37 @@ func DiffUntrackedPath(worktreeRoot, path string, color bool, sideBySide bool, r
 	)
 }
 
+// ColorizeDiff colorizes a raw unified diff using delta if available, falling
+// back to git diff --color=always.
+func ColorizeDiff(worktreeRoot, path, rawDiff string, cached, sideBySide bool, renderWidth, contextLines int) (string, error) {
+	if strings.TrimSpace(rawDiff) == "" {
+		return "", nil
+	}
+	if out, err := colorizeWithDelta(worktreeRoot, rawDiff, sideBySide, renderWidth); err == nil {
+		return out, nil
+	}
+	args := []string{"diff", "--color=always", diffContextArg(contextLines)}
+	if cached {
+		args = append(args, "--cached")
+	}
+	args = append(args, "--", path)
+	out, _, err := run(worktreeRoot, args)
+	return out, err
+}
+
+// ColorizeUntrackedDiff colorizes a raw untracked diff using delta if
+// available, falling back to git diff --no-index --color=always.
+func ColorizeUntrackedDiff(worktreeRoot, path, rawDiff string, sideBySide bool, renderWidth, contextLines int) (string, error) {
+	if strings.TrimSpace(rawDiff) == "" {
+		return "", nil
+	}
+	if out, err := colorizeWithDelta(worktreeRoot, rawDiff, sideBySide, renderWidth); err == nil {
+		return out, nil
+	}
+	return runGitAllowExitCodes(worktreeRoot, nil, map[int]bool{0: true, 1: true},
+		"diff", "--no-index", "--color=always", diffContextArg(contextLines), "--", "/dev/null", path)
+}
+
 func colorizeWithDelta(worktreeRoot, raw string, sideBySide bool, renderWidth int) (string, error) {
 	args := []string{"--paging=never"}
 	if !sideBySide {

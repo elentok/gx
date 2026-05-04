@@ -19,11 +19,9 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "[":
-		m.adjustDiffContextLines(-1)
-		return m, nil
+		return m, m.adjustDiffContextLines(-1)
 	case "]":
-		m.adjustDiffContextLines(1)
-		return m, nil
+		return m, m.adjustDiffContextLines(1)
 	case "j", "down":
 		if m.selected < len(m.statusEntries)-1 {
 			m.selected++
@@ -41,19 +39,18 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, m.scheduleDiffReload()
 		}
 		m.collapseSelectedDir()
-		m.reloadDiffsForSelection()
+		return m, m.reloadDiffsForSelection()
 	case "l", "right":
 		entry, ok := m.selectedStatusEntry()
 		if ok && entry.Kind == statusEntryFile {
-			m.enterDiffFromStatus(false)
-			return m, nil
+			return m, m.enterDiffFromStatus(false)
 		}
 		m.expandSelectedDir()
-		m.reloadDiffsForSelection()
+		return m, m.reloadDiffsForSelection()
 	case "r":
-		m.refresh()
+		return m, m.refresh()
 	case "s":
-		m.toggleRenderMode()
+		return m, m.toggleRenderMode()
 	case "p":
 		return m.startPullAction()
 	case "P":
@@ -81,14 +78,12 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, m.scheduleDiffReload()
 		}
 	case "space", " ":
-		m.toggleStageStatusEntry()
-		m.reloadDiffsForSelection()
+		return m, m.toggleStageStatusEntry()
 	case "enter":
 		if m.toggleDirOnEnter() {
-			m.reloadDiffsForSelection()
-			return m, nil
+			return m, m.reloadDiffsForSelection()
 		}
-		m.enterDiffFromStatus(false)
+		return m, m.enterDiffFromStatus(false)
 	case "?":
 		m.showHelpOverlay()
 	case "d":

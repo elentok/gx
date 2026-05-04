@@ -13,7 +13,7 @@ func (m Model) Init() tea.Cmd {
 	if m.settings.EnableNavigation {
 		return tea.Batch(statusTickCmd(), statusStartupLoadCmd())
 	}
-	return statusTickCmd()
+	return tea.Batch(statusTickCmd(), m.cmdColorizeDiffsForSelection(), m.cmdLoadBranchSync())
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -23,14 +23,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.ready = true
 		m.help.SetWidth(msg.Width)
+		var cmd tea.Cmd
 		if m.renderMode == renderSideBySide {
-			m.reloadDiffsForSelection()
+			cmd = m.reloadDiffsForSelection()
 		}
 		m.syncDiffViewports()
-		return m, nil
+		return m, cmd
 	case tea.FocusMsg:
-		m.refreshPreserveScroll()
-		return m, nil
+		cmd := m.refreshPreserveScroll()
+		return m, cmd
 	case statusTickMsg:
 		if m.statusMsg != "" && !m.statusUntil.IsZero() && time.Now().After(m.statusUntil) {
 			m.clearStatus()
@@ -38,9 +39,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, statusTickCmd()
 	case statusStartupLoadMsg:
 		m.reloadBranchState()
-		m.reloadDiffsForSelection()
-		return m, nil
+		colorizeCmd := m.reloadDiffsForSelection()
+		return m, tea.Batch(colorizeCmd, m.cmdLoadBranchSync())
 	case actionPollMsg:
+		var actionCmd tea.Cmd
 		if m.runningRunner != nil {
 			if chunk := m.runningRunner.Consume(); chunk != "" {
 				m.appendRunningOutput(chunk)
@@ -53,17 +55,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				if res, done := m.runningRunner.Result(); done {
 					m.runningDone = true
-					m.handleActionResult(res)
+					actionCmd = m.handleActionResult(res)
 				}
 			}
 		}
 		if m.runningOpen && !m.runningDone {
-			return m, actionPollCmd()
+			return m, tea.Batch(actionCmd, actionPollCmd())
 		}
-		return m, nil
+		return m, actionCmd
 	case diffReloadMsg:
 		if msg.seq == m.diffReloadSeq && m.focus == focusStatus {
-			m.reloadDiffsForSelection()
+			return m, m.reloadDiffsForSelection()
+		}
+		return m, nil
+	case diffColorizeMsg:
+		if msg.seq != m.colorizeSeq || msg.filePath != m.activeFilePath {
+			return m, nil
+		}
+		sideBySide := m.renderMode == renderSideBySide
+		if msg.unstagedColor != "" {
+			m.unstaged = buildSectionState(msg.unstagedRaw, msg.unstagedColor, m.unstaged, sideBySide)
+		}
+		if msg.stagedColor != "" {
+			m.staged = buildSectionState(msg.stagedRaw, msg.stagedColor, m.staged, sideBySide)
+		}
+		m.syncDiffViewports()
+		return m, nil
+	case branchSyncLoadedMsg:
+		if msg.branchName == m.branchName {
+			m.branchSync = msg.sync
 		}
 		return m, nil
 	case tea.MouseWheelMsg:
@@ -139,24 +159,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.setStatus(ui.MessageClosed("git commit"))
-		m.refresh()
-		return m, nil
+		return m, m.refresh()
 	case lazygitLogFinishedMsg:
 		if msg.err != nil {
 			m.setStatus("lazygit log failed: " + msg.err.Error())
 			return m, nil
 		}
 		m.setStatus(ui.MessageClosed("lazygit log"))
-		m.refresh()
-		return m, nil
+		return m, m.refresh()
 	case editFileFinishedMsg:
 		if msg.err != nil {
 			m.setStatus("edit failed: " + msg.err.Error())
 			return m, nil
 		}
 		m.setStatus(ui.MessageClosed("editor"))
-		m.refresh()
-		return m, nil
+		return m, m.refresh()
 	}
 	return m, nil
 }

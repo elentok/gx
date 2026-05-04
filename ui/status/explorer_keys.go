@@ -5,11 +5,9 @@ import tea "charm.land/bubbletea/v2"
 func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "[":
-		m.adjustDiffContextLines(-1)
-		return m, nil
+		return m, m.adjustDiffContextLines(-1)
 	case "]":
-		m.adjustDiffContextLines(1)
-		return m, nil
+		return m, m.adjustDiffContextLines(1)
 	case "esc", "q":
 		sec := m.currentSection()
 		if sec.visualActive {
@@ -59,19 +57,21 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.ensureActiveVisible(sec)
 	case "f":
 		m.diffFullscreen = !m.diffFullscreen
+		var cmd tea.Cmd
 		if m.renderMode == renderSideBySide {
-			m.reloadDiffsForSelection()
+			cmd = m.reloadDiffsForSelection()
 		}
 		m.syncDiffViewports()
 		m.ensureActiveVisible(m.currentSection())
+		return m, cmd
 	case "s":
-		m.toggleRenderMode()
+		return m, m.toggleRenderMode()
 	case "w":
 		m.wrapSoft = !m.wrapSoft
 		m.syncDiffViewports()
 		m.ensureActiveVisible(m.currentSection())
 	case "r":
-		m.refresh()
+		return m, m.refresh()
 	case "p":
 		if !m.explorerCanRunBranchActions() {
 			return m, nil
@@ -139,15 +139,15 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if !m.explorerCanJumpFiles() {
 			return m, nil
 		}
-		if m.moveToAdjacentFile(1) {
-			return m, nil
+		if ok, cmd := m.moveToAdjacentFile(1); ok {
+			return m, cmd
 		}
 	case ",":
 		if !m.explorerCanJumpFiles() {
 			return m, nil
 		}
-		if m.moveToAdjacentFile(-1) {
-			return m, nil
+		if ok, cmd := m.moveToAdjacentFile(-1); ok {
+			return m, cmd
 		}
 	case "e":
 		if !m.explorerCanEditSelection() {

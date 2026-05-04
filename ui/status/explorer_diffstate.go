@@ -10,6 +10,43 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
+func (m *Model) cmdColorizeDiffs(seq int, filePath, unstagedRaw, stagedRaw string, sideBySide bool, renderWidth int) tea.Cmd {
+	worktreeRoot := m.worktreeRoot
+	contextLines := m.currentDiffContextLines()
+	return func() tea.Msg {
+		unstagedColor, _ := git.ColorizeDiff(worktreeRoot, filePath, unstagedRaw, false, sideBySide, renderWidth, contextLines)
+		stagedColor, _ := git.ColorizeDiff(worktreeRoot, filePath, stagedRaw, true, sideBySide, renderWidth, contextLines)
+		return diffColorizeMsg{seq: seq, filePath: filePath, unstagedRaw: unstagedRaw, unstagedColor: unstagedColor, stagedRaw: stagedRaw, stagedColor: stagedColor}
+	}
+}
+
+func (m *Model) cmdColorizeUntracked(seq int, filePath, rawDiff string, sideBySide bool, renderWidth int) tea.Cmd {
+	worktreeRoot := m.worktreeRoot
+	contextLines := m.currentDiffContextLines()
+	return func() tea.Msg {
+		color, _ := git.ColorizeUntrackedDiff(worktreeRoot, filePath, rawDiff, sideBySide, renderWidth, contextLines)
+		return diffColorizeMsg{seq: seq, filePath: filePath, unstagedRaw: rawDiff, unstagedColor: color}
+	}
+}
+
+func (m *Model) cmdColorizeDiffsForSelection() tea.Cmd {
+	sel, ok := m.selectedExplorerDiff()
+	if !ok {
+		return nil
+	}
+	file := sel.file
+	seq := m.colorizeSeq
+	sideBySide := m.renderMode == renderSideBySide
+	renderWidth := m.deltaRenderWidth()
+	if file.Untracked {
+		rawDiff := strings.Join(m.unstaged.rawLines, "\n")
+		return m.cmdColorizeUntracked(seq, file.Path, rawDiff, sideBySide, renderWidth)
+	}
+	unstagedRaw := strings.Join(m.unstaged.rawLines, "\n")
+	stagedRaw := strings.Join(m.staged.rawLines, "\n")
+	return m.cmdColorizeDiffs(seq, file.Path, unstagedRaw, stagedRaw, sideBySide, renderWidth)
+}
+
 type movedTarget struct {
 	fromSection diffSection
 	navMode     navMode
@@ -130,7 +167,12 @@ func (m *Model) shouldSwitchAfterApply(from diffSection) bool {
 	return len(sec.parsed.Hunks) == 0
 }
 
-func (m *Model) reloadDiffsForSelection() {
+func (m *Model) reloadDiffsForSelection() tea.Cmd {
+	m.colorizeSeq++
+	seq := m.colorizeSeq
+	sideBySide := m.renderMode == renderSideBySide
+	renderWidth := m.deltaRenderWidth()
+
 	sel, ok := m.selectedExplorerDiff()
 	if !ok {
 		m.activeFilePath = ""
@@ -140,7 +182,7 @@ func (m *Model) reloadDiffsForSelection() {
 		if strings.TrimSpace(m.searchQuery) != "" && (m.searchScope == searchScopeUnstaged || m.searchScope == searchScopeStaged) {
 			m.recomputeSearchMatches()
 		}
-		return
+		return nil
 	}
 
 	file := sel.file
@@ -149,21 +191,16 @@ func (m *Model) reloadDiffsForSelection() {
 		m.activeFilePath = file.Path
 	}
 	if file.Untracked {
-		renderWidth := m.deltaRenderWidth()
 		raw, err := git.DiffUntrackedPath(m.worktreeRoot, file.Path, false, false, 0, m.currentDiffContextLines())
 		if err != nil {
 			m.showGitError(err)
 			raw = ""
 		}
-		col, err := git.DiffUntrackedPath(m.worktreeRoot, file.Path, true, m.renderMode == renderSideBySide, renderWidth, m.currentDiffContextLines())
-		if err != nil {
-			col = raw
-		}
-		m.unstaged = buildSectionState(raw, col, m.unstaged, m.renderMode == renderSideBySide)
+		m.unstaged = buildSectionState(raw, raw, m.unstaged, sideBySide)
 		m.staged = newSectionState()
 		m.section = sectionUnstaged
 		m.syncDiffViewports()
-		return
+		return m.cmdColorizeUntracked(seq, file.Path, raw, sideBySide, renderWidth)
 	}
 
 	unstagedRaw, err := git.DiffPath(m.worktreeRoot, file.Path, false, m.currentDiffContextLines())
@@ -171,37 +208,28 @@ func (m *Model) reloadDiffsForSelection() {
 		m.showGitError(err)
 		unstagedRaw = ""
 	}
-	renderWidth := m.deltaRenderWidth()
-	unstagedColor, err := git.DiffPathWithDelta(m.worktreeRoot, file.Path, false, m.renderMode == renderSideBySide, renderWidth, m.currentDiffContextLines())
-	if err != nil {
-		unstagedColor = unstagedRaw
-	}
-
 	stagedRaw, err := git.DiffPath(m.worktreeRoot, file.Path, true, m.currentDiffContextLines())
 	if err != nil {
 		m.showGitError(err)
 		stagedRaw = ""
 	}
-	stagedColor, err := git.DiffPathWithDelta(m.worktreeRoot, file.Path, true, m.renderMode == renderSideBySide, renderWidth, m.currentDiffContextLines())
-	if err != nil {
-		stagedColor = stagedRaw
-	}
 
-	m.unstaged = buildSectionState(unstagedRaw, unstagedColor, m.unstaged, m.renderMode == renderSideBySide)
-	m.staged = buildSectionState(stagedRaw, stagedColor, m.staged, m.renderMode == renderSideBySide)
+	m.unstaged = buildSectionState(unstagedRaw, unstagedRaw, m.unstaged, sideBySide)
+	m.staged = buildSectionState(stagedRaw, stagedRaw, m.staged, sideBySide)
 	m.pickAvailableSection()
 	m.syncDiffViewports()
 	if strings.TrimSpace(m.searchQuery) != "" && (m.searchScope == searchScopeUnstaged || m.searchScope == searchScopeStaged) {
 		m.recomputeSearchMatches()
 	}
+	return m.cmdColorizeDiffs(seq, file.Path, unstagedRaw, stagedRaw, sideBySide, renderWidth)
 }
 
-func (m *Model) enterDiffFromStatus(resetSection bool) {
+func (m *Model) enterDiffFromStatus(resetSection bool) tea.Cmd {
 	if _, ok := m.selectedExplorerFile(); !ok {
-		return
+		return nil
 	}
 	m.diffReloadSeq++
-	m.reloadDiffsForSelection()
+	cmd := m.reloadDiffsForSelection()
 	m.focus = focusDiff
 	if resetSection {
 		m.section = sectionUnstaged
@@ -209,6 +237,7 @@ func (m *Model) enterDiffFromStatus(resetSection bool) {
 	m.pickAvailableSection()
 	m.syncDiffViewports()
 	m.ensureActiveVisible(m.currentSection())
+	return cmd
 }
 
 func (m *Model) openDiscardDiffConfirm() {

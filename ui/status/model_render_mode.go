@@ -1,7 +1,11 @@
 package status
 
-import "github.com/elentok/gx/git"
-import "github.com/charmbracelet/x/ansi"
+import (
+	"github.com/elentok/gx/git"
+	"github.com/charmbracelet/x/ansi"
+
+	tea "charm.land/bubbletea/v2"
+)
 
 func (m Model) deltaRenderWidth() int {
 	mainH := m.height - 1
@@ -24,11 +28,11 @@ func (m Model) deltaRenderWidth() int {
 	return maxInt(1, innerW-markW-indicatorW)
 }
 
-func (m *Model) toggleRenderMode() {
+func (m *Model) toggleRenderMode() tea.Cmd {
 	if m.renderMode == renderUnified {
 		if !git.DeltaAvailable() {
 			m.setStatus("side-by-side requires delta; staying in unified mode")
-			return
+			return nil
 		}
 		m.renderMode = renderSideBySide
 		m.setStatus("side-by-side mode")
@@ -36,9 +40,10 @@ func (m *Model) toggleRenderMode() {
 		m.renderMode = renderUnified
 		m.setStatus("unified mode")
 	}
-	m.reloadDiffsForSelection()
+	cmd := m.reloadDiffsForSelection()
 	m.syncDiffViewports()
 	m.ensureActiveVisible(m.currentSection())
+	return cmd
 }
 
 func (m Model) isSideBySideMode() bool {

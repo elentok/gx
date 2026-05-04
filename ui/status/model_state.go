@@ -37,6 +37,7 @@ type Model struct {
 	helpVP                  viewport.Model
 	activeFilePath          string
 	diffReloadSeq           int
+	colorizeSeq             int
 	searchMode              stageSearchMode
 	searchScope             stageSearchScope
 	searchQuery             string
@@ -104,6 +105,20 @@ type statusTickMsg struct{}
 type actionPollMsg struct{}
 type diffReloadMsg struct{ seq int }
 type statusStartupLoadMsg struct{}
+
+type diffColorizeMsg struct {
+	seq           int
+	filePath      string
+	unstagedRaw   string
+	unstagedColor string
+	stagedRaw     string
+	stagedColor   string
+}
+
+type branchSyncLoadedMsg struct {
+	branchName string
+	sync       git.SyncStatus
+}
 
 type commitFinishedMsg struct {
 	err      error

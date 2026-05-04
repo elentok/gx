@@ -1,6 +1,10 @@
 package status
 
-import "fmt"
+import (
+	"fmt"
+
+	tea "charm.land/bubbletea/v2"
+)
 
 func (m Model) currentDiffContextLines() int {
 	if m.diffContextLines < 1 {
@@ -12,7 +16,7 @@ func (m Model) currentDiffContextLines() int {
 	return m.diffContextLines
 }
 
-func (m *Model) adjustDiffContextLines(delta int) {
+func (m *Model) adjustDiffContextLines(delta int) tea.Cmd {
 	next := m.currentDiffContextLines() + delta
 	if next < 1 {
 		next = 1
@@ -22,13 +26,14 @@ func (m *Model) adjustDiffContextLines(delta int) {
 	}
 	if next == m.currentDiffContextLines() {
 		m.setStatus(fmt.Sprintf("diff context: %d", next))
-		return
+		return nil
 	}
 	m.diffContextLines = next
 	m.setStatus(fmt.Sprintf("diff context: %d", next))
-	m.reloadDiffsForSelection()
+	cmd := m.reloadDiffsForSelection()
 	m.syncDiffViewports()
 	if m.focus == focusDiff {
 		m.ensureActiveVisible(m.currentSection())
 	}
+	return cmd
 }

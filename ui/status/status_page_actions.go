@@ -38,7 +38,7 @@ func (m *Model) openCheckingDivergence() {
 	m.runningRunner = nil
 }
 
-func (m *Model) handleActionResult(res stageActionResult) {
+func (m *Model) handleActionResult(res stageActionResult) tea.Cmd {
 	if strings.TrimSpace(res.output) != "" {
 		m.recordCommandOutput(stageActionOutputTitle(res.kind), res.output)
 	}
@@ -47,13 +47,13 @@ func (m *Model) handleActionResult(res stageActionResult) {
 		if res.err != nil {
 			m.showGitError(fmt.Errorf("%w\n%s", res.err, strings.TrimSpace(res.output)))
 			m.runningOpen = false
-			return
+			return nil
 		}
 		div, err := git.DetectPushDivergenceAfterFetch(m.worktreeRoot, res.branch)
 		if err != nil {
 			m.showGitError(err)
 			m.runningOpen = false
-			return
+			return nil
 		}
 		if div != nil {
 			m.pendingActionOutput = res.output
@@ -77,16 +77,16 @@ func (m *Model) handleActionResult(res stageActionResult) {
 				Cursor: 0,
 			}
 			m.runningOpen = false
-			return
+			return nil
 		}
 		runner := newStageActionRunnerWithOutput(actionPush, m.worktreeRoot, res.remote, res.branch, res.output)
 		m.openRunning("Push", runner)
-		return
+		return nil
 	}
 	if res.promptForce {
 		m.openConfirm("Force push?", []string{"Push was rejected as non-fast-forward.", "Force push with --force?"}, confirmForcePush, res.remote, res.branch)
 		m.runningOpen = false
-		return
+		return nil
 	}
 	if res.promptPopStash {
 		a := confirmPullPopStash
@@ -97,13 +97,13 @@ func (m *Model) handleActionResult(res stageActionResult) {
 		}
 		m.openConfirm(title, []string{"The action failed after stashing changes.", "Pop the stash now?"}, a, "", "")
 		m.runningOpen = false
-		return
+		return nil
 	}
 
 	if res.err != nil {
 		m.showGitError(fmt.Errorf("%w\n%s", res.err, strings.TrimSpace(res.output)))
 		m.runningOpen = false
-		return
+		return nil
 	}
 
 	switch res.kind {
@@ -131,7 +131,7 @@ func (m *Model) handleActionResult(res stageActionResult) {
 		m.setStatus("amended last commit")
 	}
 	m.runningOpen = false
-	m.refresh()
+	return m.refresh()
 }
 
 func (m Model) confirmAccept() (tea.Model, tea.Cmd) {
@@ -189,8 +189,7 @@ func (m Model) confirmAccept() (tea.Model, tea.Cmd) {
 			}
 		}
 		m.setStatus("discarded " + m.confirmPaths[0])
-		m.reload(m.confirmPaths[0])
-		return m, nil
+		return m, m.reload(m.confirmPaths[0])
 	case confirmDiscardUnstaged:
 		if err := git.ApplyPatchToWorktree(m.worktreeRoot, m.confirmPatch, true, m.confirmPatchUnidiffZero); err != nil {
 			m.showGitError(err)
@@ -201,11 +200,11 @@ func (m Model) confirmAccept() (tea.Model, tea.Cmd) {
 			m.unstaged.visualAnchor = m.unstaged.activeLine
 		}
 		m.setStatus("discarded " + m.confirmPaths[0])
-		m.reload(m.confirmPaths[0])
+		cmd := m.reload(m.confirmPaths[0])
 		if m.focus == focusDiff {
 			m.ensureActiveVisible(m.currentSection())
 		}
-		return m, nil
+		return m, cmd
 	}
 	return m, nil
 }

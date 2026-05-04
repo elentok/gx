@@ -6,6 +6,8 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/explorer"
+
+	tea "charm.land/bubbletea/v2"
 )
 
 func (m Model) selectedStatusEntry() (statusEntry, bool) {
@@ -23,10 +25,10 @@ func (m Model) selectedFile() (git.StageFileStatus, bool) {
 	return entry.File, true
 }
 
-func (m *Model) reload(preservePath string) {
+func (m *Model) reload(preservePath string) tea.Cmd {
 	m.reloadBranchState()
 	m.reloadFileList(preservePath)
-	m.reloadDiffsForSelection()
+	return m.reloadDiffsForSelection()
 }
 
 func (m *Model) reloadFileList(preservePath string) {
@@ -88,14 +90,22 @@ func (m *Model) reloadBranchState() {
 	}
 	m.branchName = strings.TrimSpace(branch)
 	m.branchBaseRef = git.UpstreamBranch(m.worktreeRoot, m.branchName)
-	if m.branchBaseRef == "" {
-		return
+}
+
+func (m *Model) cmdLoadBranchSync() tea.Cmd {
+	if m.branchName == "" || m.branchBaseRef == "" {
+		return nil
 	}
-	sync, err := git.BranchSyncStatusAgainstRef(m.worktreeRoot, m.branchName, m.branchBaseRef)
-	if err != nil {
-		return
+	worktreeRoot := m.worktreeRoot
+	branchName := m.branchName
+	branchBaseRef := m.branchBaseRef
+	return func() tea.Msg {
+		sync, err := git.BranchSyncStatusAgainstRef(worktreeRoot, branchName, branchBaseRef)
+		if err != nil {
+			return branchSyncLoadedMsg{branchName: branchName, sync: git.SyncStatus{Name: git.StatusUnknown}}
+		}
+		return branchSyncLoadedMsg{branchName: branchName, sync: sync}
 	}
-	m.branchSync = sync
 }
 
 func (m *Model) toggleDirOnEnter() bool {
@@ -137,24 +147,24 @@ func (m *Model) expandSelectedDir() {
 	m.statusEntries = buildStatusEntries(m.files, m.collapsedDirs)
 }
 
-func (m *Model) moveToAdjacentFile(delta int) bool {
+func (m *Model) moveToAdjacentFile(delta int) (bool, tea.Cmd) {
 	idx, ok := explorer.FileTreeAdjacentFileIndex(m.statusFileTreeRows(), m.selected, delta)
 	if !ok {
-		return false
+		return false, nil
 	}
 	m.selected = idx
 	m.onStatusSelectionChanged()
-	m.reloadDiffsForSelection()
+	cmd := m.reloadDiffsForSelection()
 	if m.focus == focusDiff {
 		m.ensureActiveVisible(m.currentSection())
 	}
-	return true
+	return true, cmd
 }
 
-func (m *Model) toggleStageStatusEntry() {
+func (m *Model) toggleStageStatusEntry() tea.Cmd {
 	entry, ok := m.selectedStatusEntry()
 	if !ok {
-		return
+		return nil
 	}
 
 	path := entry.Path
@@ -165,18 +175,18 @@ func (m *Model) toggleStageStatusEntry() {
 	} else if entry.HasStaged {
 		err = git.UnstagePath(m.worktreeRoot, path)
 	} else {
-		return
+		return nil
 	}
 	if err != nil {
 		m.showGitError(err)
-		return
+		return nil
 	}
 	if stageAll {
 		m.setStatus("staged " + path)
 	} else {
 		m.setStatus("unstaged " + path)
 	}
-	m.reload(path)
+	return m.reload(path)
 }
 
 func (m *Model) openDiscardStatusConfirm() {
