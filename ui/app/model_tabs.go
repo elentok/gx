@@ -22,10 +22,13 @@ func (m *Model) ensureTabs() {
 func (m Model) switchTab(route nav.Route) (tea.Model, tea.Cmd) {
 	tabState := m.tabStateForRoute(route)
 	m.ensureTabs()
-	m.history = nil
+	m.histories[m.activeTab] = m.history
 	m.activeTab = tabState.kind
+	m.history = m.histories[m.activeTab]
 	current, ok := m.tabs[tabState.kind]
 	if !ok || current.model == nil || !sameTabState(current, tabState) {
+		m.history = nil
+		m.histories[m.activeTab] = nil
 		current = m.newTabPage(tabState)
 		current.initialized = true
 		m.tabs[tabState.kind] = current

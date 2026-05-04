@@ -46,6 +46,7 @@ type Model struct {
 
 	activeTab nav.RouteKind
 	tabs      map[nav.RouteKind]tabPageState
+	histories map[nav.RouteKind][]pageState
 	history   []pageState
 	keyPrefix string
 }
@@ -55,6 +56,7 @@ func New(repo git.Repo, settings Settings) Model {
 		repo:     repo,
 		settings: settings,
 		tabs:     make(map[nav.RouteKind]tabPageState),
+		histories: make(map[nav.RouteKind][]pageState),
 	}
 	if m.settings.InitialRoute.Kind == "" {
 		m.settings.InitialRoute = nav.Route{Kind: nav.RouteWorktrees}
@@ -66,6 +68,7 @@ func New(repo git.Repo, settings Settings) Model {
 	m.tabs[m.activeTab] = page
 	if m.settings.InitialRoute.Kind == nav.RouteCommit {
 		m.history = append(m.history, m.newPage(m.settings.InitialRoute))
+		m.histories[m.activeTab] = m.history
 	}
 	return m
 }

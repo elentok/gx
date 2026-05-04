@@ -261,6 +261,37 @@ func TestReplaceClearsHistoryAfterPush(t *testing.T) {
 	}
 }
 
+func TestTabSwitchRestoresCommitRouteInLogTab(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.Route{Kind: nav.RouteLog, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	updated, _ := m.Update(nav.Push(nav.Route{Kind: nav.RouteCommit, WorktreeRoot: repoDir, Ref: "HEAD"})())
+	m = updated.(Model)
+	if got := m.activePage().route.Kind; got != nav.RouteCommit {
+		t.Fatalf("expected commit page after push, got %q", got)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '3', Text: "3"})
+	m = updated.(Model)
+	if got := m.activePage().route.Kind; got != nav.RouteStatus {
+		t.Fatalf("expected status page after switching tab, got %q", got)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '2', Text: "2"})
+	m = updated.(Model)
+	if got := m.activePage().route.Kind; got != nav.RouteCommit {
+		t.Fatalf("expected returning to log tab to restore commit page, got %q", got)
+	}
+}
+
 func TestCommitMapsToLogTab(t *testing.T) {
 	if got := tabForRoute(nav.RouteCommit); got != nav.RouteLog {
 		t.Fatalf("expected commit to map to log tab, got %q", got)
