@@ -50,7 +50,7 @@ func HintDismiss() string {
 	return RenderInlineBindings(key.NewBinding(key.WithHelp("esc/enter/q", "dismiss")))
 }
 
-func HintDismissScroll() string {
+func HintDismissAndScroll() string {
 	return JoinStatus(HintDismiss(), RenderInlineBindings(key.NewBinding(key.WithHelp("j/k", "scroll"))))
 }
 

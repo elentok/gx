@@ -3,10 +3,8 @@ package status
 import (
 	"fmt"
 
-	"github.com/elentok/gx/ui"
-
-	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
+	"github.com/elentok/gx/ui"
 )
 
 type stageKeyMap struct {
@@ -62,71 +60,11 @@ var (
 	stageKeyDiffBack   = key.NewBinding(key.WithKeys("esc", "h"), key.WithHelp("esc/h", "back to status"))
 )
 
-func newStageHelpModel() help.Model {
-	h := help.New()
-	h.ShortSeparator = " · "
-	h.FullSeparator = "  "
-	h.Styles.ShortKey = h.Styles.ShortKey.Foreground(catBlue).Bold(true)
-	h.Styles.ShortDesc = h.Styles.ShortDesc.Foreground(catSubtle)
-	h.Styles.ShortSeparator = h.Styles.ShortSeparator.Foreground(catSubtle)
-	h.Styles.FullKey = h.Styles.FullKey.Foreground(catBlue).Bold(true)
-	h.Styles.FullDesc = h.Styles.FullDesc.Foreground(catText)
-	h.Styles.FullSeparator = h.Styles.FullSeparator.Foreground(catSubtle)
-	return h
-}
-
-func (m Model) currentKeyMap() stageKeyMap {
-	return stageKeyMap{m: m}
-}
-
-func (k stageKeyMap) ShortHelp() []key.Binding {
-	if k.m.focus == focusStatus {
-		return []key.Binding{stageKeySearch, stageKeyOutput}
-	}
-	return []key.Binding{stageKeyTab, stageKeyMode, stageKeyVisual, stageKeyRenderMode}
-}
-
-func (k stageKeyMap) FullHelp() [][]key.Binding {
-	global := []key.Binding{
-		stageKeyHelp, stageKeyQuit, stageKeyCommit, stageKeyOutput, stageKeyGoWorktree, stageKeyGoLog, stageKeyGoStatus, stageKeyLog,
-		stageKeyYank, stageKeyPull, stageKeyPush, stageKeyRebase, stageKeyAmend,
-	}
-	search := []key.Binding{stageKeySearch, stageKeySearchNext, stageKeySearchPrev}
-	status := []key.Binding{
-		stageKeyUp, stageKeyDown, stageKeyTop, stageKeyBottom,
-		stageKeyPageUp, stageKeyPageDown, stageKeyLeft, stageKeyRight,
-		stageKeyStage, stageKeyDiscard, stageKeyEdit, stageKeyOpenDiff,
-		stageKeyContextDec, stageKeyContextInc, stageKeyRefresh,
-	}
-	diff := []key.Binding{
-		stageKeyDiffBack, stageKeyTop, stageKeyBottom,
-		stageKeyPageUp, stageKeyPageDown, stageKeyTab, stageKeyMode, stageKeyVisual,
-		stageKeyUp, stageKeyDown, stageKeyPrevFile, stageKeyNextFile,
-		stageKeyScrollDown, stageKeyScrollUp, stageKeyRenderMode,
-		stageKeyContextDec, stageKeyContextInc, stageKeyStage, stageKeyDiscard,
-		stageKeyEdit, stageKeyFullscreen, stageKeyWrap, stageKeyRefresh,
-	}
-	if k.m.focus == focusStatus {
-		return [][]key.Binding{global, status, search}
-	}
-	return [][]key.Binding{global, diff, search}
-}
-
-func (m Model) helpShortView() string {
-	return m.help.ShortHelpView(m.currentKeyMap().ShortHelp())
-}
-
-func (m Model) helpFullView(width int) string {
-	h := m.help
-	h.ShowAll = true
-	if width > 0 {
-		h.SetWidth(width)
-	}
-	return h.View(m.currentKeyMap())
-}
-
-func (m Model) inlineHints(bindings ...key.Binding) string {
-	return ui.RenderInlineBindings(bindings...)
+var keySections = []ui.KeySection{
+	ui.NewKeySection("Global", stageKeyHelp, stageKeyQuit, stageKeyCommit, stageKeyOutput, stageKeyGoWorktree, stageKeyGoLog, stageKeyGoStatus, stageKeyLog, stageKeyYank, stageKeyPull, stageKeyPush, stageKeyRebase, stageKeyAmend),
+	ui.NewKeySection("Search", stageKeySearch, stageKeySearchNext, stageKeySearchPrev),
+	ui.NewKeySection("Status", stageKeyUp, stageKeyDown, stageKeyTop, stageKeyBottom, stageKeyPageUp, stageKeyPageDown, stageKeyLeft, stageKeyRight, stageKeyStage, stageKeyDiscard, stageKeyEdit, stageKeyOpenDiff, stageKeyContextDec, stageKeyContextInc, stageKeyRefresh),
+	ui.NewKeySection("Diff", stageKeyDiffBack, stageKeyTop, stageKeyBottom, stageKeyPageUp, stageKeyPageDown, stageKeyTab, stageKeyMode, stageKeyVisual, stageKeyUp, stageKeyDown, stageKeyPrevFile, stageKeyNextFile, stageKeyScrollDown, stageKeyScrollUp, stageKeyRenderMode, stageKeyContextDec, stageKeyContextInc, stageKeyStage, stageKeyDiscard, stageKeyEdit, stageKeyFullscreen, stageKeyWrap, stageKeyRefresh),
 }
 
 func (m Model) helpSectionLabel() string {

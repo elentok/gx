@@ -494,15 +494,15 @@ func (m Model) runningModalView() string {
 	}
 	hint := ui.HintCancelScroll()
 	if m.runningDone {
-		hint = ui.HintDismissScroll()
+		hint = ui.HintDismissAndScroll()
 	}
 	return components.RenderOutputModal(
 		title,
 		m.runningVP.View(),
 		hint,
-		catYellow,
-		catYellow,
-		catSubtle,
+		ui.ColorYellow,
+		ui.ColorYellow,
+		ui.ColorSubtle,
 		m.runningVP.Width(),
 	)
 }
@@ -515,10 +515,10 @@ func (m Model) outputModalView() string {
 	return components.RenderOutputModal(
 		title,
 		m.outputViewport.View(),
-		ui.HintDismissScroll(),
-		catYellow,
-		catYellow,
-		catSubtle,
+		ui.HintDismissAndScroll(),
+		ui.ColorYellow,
+		ui.ColorYellow,
+		ui.ColorSubtle,
 		m.outputViewport.Width(),
 	)
 }
@@ -534,9 +534,9 @@ func (m Model) credentialModalView() string {
 		m.credentialPrompt,
 		input,
 		ui.HintSubmitCancel(),
-		catBlue,
-		catBlue,
-		catSubtle,
+		ui.ColorBlue,
+		ui.ColorBlue,
+		ui.ColorSubtle,
 		0,
 	)
 }
@@ -552,20 +552,20 @@ func (m Model) confirmModalView() string {
 			prompt,
 			m.confirmMenu,
 			"",
-			catYellow,
-			catYellow,
-			catSubtle,
-			catGreen,
+			ui.ColorYellow,
+			ui.ColorYellow,
+			ui.ColorSubtle,
+			ui.ColorGreen,
 			maxInt(56, m.width/2),
 		)
 	}
 	return components.RenderConfirmModal(
 		prompt,
 		m.confirmYes,
-		catYellow,
-		catGreen,
-		catRed,
-		catSubtle,
+		ui.ColorYellow,
+		ui.ColorGreen,
+		ui.ColorRed,
+		ui.ColorSubtle,
 		maxInt(56, m.width/2),
 	)
 }

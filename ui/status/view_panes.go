@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/explorer"
 
 	"charm.land/lipgloss/v2"
@@ -120,7 +121,7 @@ func (m Model) visibleStatusLines(height int) []string {
 			Faint:    deleted,
 		}
 	})
-	return explorer.RenderSidebarRows(rows, innerH, lipgloss.NewStyle().Foreground(catSubtle).Render("clean working tree"), catOrange)
+	return explorer.RenderSidebarRows(rows, innerH, lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render("clean working tree"), ui.ColorOrange)
 }
 
 func (m Model) requiredStatusPaneWidth(height int) int {

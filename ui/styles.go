@@ -35,8 +35,10 @@ var (
 
 // Semantic text and surface styles.
 var (
-	StyleTitle    = lipgloss.NewStyle().Foreground(ColorBlue).Bold(true)
-	StyleHeading  = lipgloss.NewStyle().Foreground(ColorText).Bold(true)
+	StyleTitle       = lipgloss.NewStyle().Foreground(ColorBlue).Bold(true)
+	StyleHeading     = lipgloss.NewStyle().Foreground(ColorText).Bold(true)
+	StyleHelpHeading = lipgloss.NewStyle().Foreground(ColorOrange).Bold(true)
+
 	StyleStrong   = lipgloss.NewStyle().Foreground(ColorText).Bold(true)
 	StyleBody     = lipgloss.NewStyle().Foreground(ColorText)
 	StyleMuted    = lipgloss.NewStyle().Foreground(ColorSubtle)

@@ -22,7 +22,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.ready = true
-		m.help.SetWidth(msg.Width)
 		var cmd tea.Cmd
 		if m.renderMode == renderSideBySide {
 			cmd = m.reloadDiffsForSelection()

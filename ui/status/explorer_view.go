@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diff"
 	"github.com/elentok/gx/ui/explorer"
 
@@ -18,7 +19,7 @@ func (m *Model) renderDiffPane(width, height int) string {
 	sections := m.visibleDiffSections()
 
 	if len(sections) == 0 {
-		content := lipgloss.NewStyle().Foreground(catSubtle).Render(m.diffEmptyMessage())
+		content := lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render(m.diffEmptyMessage())
 		return m.panelStyle(m.focus == focusDiff).
 			Width(width).
 			Height(height).
@@ -62,9 +63,9 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 	}
 
 	active := m.activeRawLineIndex(*sec)
-	accent := catOrange
+	accent := ui.ColorOrange
 	if section == sectionStaged {
-		accent = catGreen
+		accent = ui.ColorGreen
 	}
 	hunkStart, hunkEnd := -1, -1
 	if m.navMode == navHunk && sec.activeHunk >= 0 && sec.activeHunk < len(sec.parsed.Hunks) {
@@ -110,7 +111,7 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 
 	lines := make([]string, 0, bodyH)
 	if len(sec.viewLines) == 0 && diff.SectionHasBinaryDiff(sec.parsed) {
-		lines = append(lines, lipgloss.NewStyle().Foreground(catSubtle).Render(m.binarySummaryLine()))
+		lines = append(lines, lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render(m.binarySummaryLine()))
 	}
 
 	if len(lines) == 0 {
@@ -156,7 +157,7 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 				}
 			}
 			if rawIdx >= 0 && m.flashMarker(section, rawIdx, sec) {
-				mark = lipgloss.NewStyle().Foreground(catGreen).Bold(true).Render("◆ ")
+				mark = lipgloss.NewStyle().Foreground(ui.ColorGreen).Bold(true).Render("◆ ")
 			}
 
 			indicator := "  "
@@ -174,7 +175,7 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 			if m.renderMode == renderSideBySide {
 				plain := strings.TrimSpace(ansi.Strip(body))
 				if isDeltaSectionDivider(plain) {
-					body = lipgloss.NewStyle().Foreground(catDeepBg).Render(ansi.Strip(body))
+					body = lipgloss.NewStyle().Foreground(ui.ColorDeepBg).Render(ansi.Strip(body))
 				}
 			}
 			if matched, current := m.searchMatchDiffDisplay(section, displayIdx); matched {

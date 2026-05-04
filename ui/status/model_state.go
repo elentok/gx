@@ -9,10 +9,8 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 
-	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
-	"charm.land/lipgloss/v2"
 )
 
 type Model struct {
@@ -44,7 +42,6 @@ type Model struct {
 	searchMatches           []stageSearchMatch
 	searchCursor            int
 	searchInput             textinput.Model
-	help                    help.Model
 	confirmOpen             bool
 	confirmTitle            string
 	confirmLines            []string
@@ -128,21 +125,6 @@ type commitFinishedMsg struct {
 type lazygitLogFinishedMsg struct{ err error }
 type editFileFinishedMsg struct{ err error }
 
-var (
-	catBase0   = lipgloss.Color("#1e1e2e")
-	catDeepBg  = lipgloss.Color("#11111a")
-	catText    = lipgloss.Color("#cdd6f4")
-	catSubtle  = lipgloss.Color("#a6adc8")
-	catBlue    = lipgloss.Color("#89b4fa")
-	catGreen   = lipgloss.Color("#a6e3a1")
-	catYellow  = lipgloss.Color("#f9e2af")
-	catRed     = lipgloss.Color("#f38ba8")
-	catOrange  = lipgloss.Color("#fab387")
-	catSurface = lipgloss.Color("#313244")
-)
-
-const ansiReset = "\x1b[0m"
-
 const statusMessageTTL = 5 * time.Second
 const statusDiffReloadDebounce = 100 * time.Millisecond
 
@@ -180,7 +162,6 @@ func NewWithSettings(worktreeRoot string, settings Settings) Model {
 			collapsedDirs: map[string]bool{},
 			selected:      0,
 		},
-		help: newStageHelpModel(),
 	}
 	if settings.EnableNavigation {
 		m.reloadFileList("")

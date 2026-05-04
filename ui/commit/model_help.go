@@ -108,7 +108,7 @@ func (m Model) helpModalView() string {
 	return ui.RenderModalFrame(ui.ModalFrameOptions{
 		Title:       "Keyboard Help",
 		Body:        m.helpViewport.View(),
-		Hint:        ui.JoinStatus(ui.RenderInlineBindings(commitKeyHelp), ui.HintDismissScroll()),
+		Hint:        ui.JoinStatus(ui.RenderInlineBindings(commitKeyHelp), ui.HintDismissAndScroll()),
 		Width:       m.helpViewport.Width(),
 		BorderColor: ui.ColorBlue,
 		TitleColor:  ui.ColorBlue,

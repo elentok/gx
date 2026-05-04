@@ -12,46 +12,47 @@ func (m Model) errorModalView() string {
 	return components.RenderOutputModal(
 		"Error",
 		m.errorVP.View(),
-		ui.HintDismissScroll(),
-		catRed,
-		catRed,
-		catSubtle,
+		ui.HintDismissAndScroll(),
+		ui.ColorRed,
+		ui.ColorRed,
+		ui.ColorSubtle,
 		m.errorVP.Width(),
 	)
 }
 
 func (m Model) helpModalView() string {
 	return ui.RenderModalFrame(ui.ModalFrameOptions{
-		Title:       "Keyboard Help",
-		Body:        m.helpVP.View(),
-		Hint:        ui.JoinStatus(ui.RenderInlineBindings(stageKeyHelp), ui.HintDismissScroll()),
-		Width:       m.helpVP.Width(),
-		BorderColor: catBlue,
-		TitleColor:  catBlue,
-		HintColor:   catSubtle,
+		Title:         "Keybindings",
+		TitleInBorder: true,
+		Body:          m.helpVP.View(),
+		Hint:          ui.JoinStatus(ui.RenderInlineBindings(stageKeyHelp), ui.HintDismissAndScroll()),
+		Width:         m.helpVP.Width(),
+		BorderColor:   ui.ColorBlue,
+		TitleColor:    ui.ColorBlue,
+		HintColor:     ui.ColorSubtle,
 	})
 }
 
 func (m Model) panelStyle(active bool) lipgloss.Style {
-	borderColor := catSubtle
+	borderColor := ui.ColorSubtle
 	if active {
-		borderColor = catOrange
+		borderColor = ui.ColorOrange
 	}
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(borderColor).
-		Background(catBase0)
+		Background(ui.ColorBase)
 }
 
 func (m Model) renderPanelWithBorderTitle(width, height int, title, rightTitle string, lines []string, active bool, section diffSection) string {
-	borderColor := catSubtle
-	titleColor := catBlue
+	borderColor := ui.ColorSubtle
+	titleColor := ui.ColorBlue
 	if section == sectionStaged {
-		borderColor = catGreen
-		titleColor = catGreen
+		borderColor = ui.ColorGreen
+		titleColor = ui.ColorGreen
 	} else if active {
-		borderColor = catOrange
-		titleColor = catOrange
+		borderColor = ui.ColorOrange
+		titleColor = ui.ColorOrange
 	}
 	return ui.RenderPanelFrame(ui.PanelFrameOptions{
 		Width:       width,
@@ -61,7 +62,7 @@ func (m Model) renderPanelWithBorderTitle(width, height int, title, rightTitle s
 		Lines:       lines,
 		BorderColor: borderColor,
 		TitleColor:  titleColor,
-		Background:  catBase0,
+		Background:  ui.ColorBase,
 	})
 }
 

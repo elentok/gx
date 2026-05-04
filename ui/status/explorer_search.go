@@ -34,8 +34,8 @@ type stageSearchMatch struct {
 	scope        stageSearchScope
 }
 
-var stageSearchHighlightStyle = lipgloss.NewStyle().Foreground(catYellow).Bold(true).Underline(true)
-var stageSearchCurrentStyle = lipgloss.NewStyle().Foreground(catGreen).Bold(true).Underline(true)
+var stageSearchHighlightStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true).Underline(true)
+var stageSearchCurrentStyle = lipgloss.NewStyle().Foreground(ui.ColorGreen).Bold(true).Underline(true)
 
 func (m *Model) enterSearchMode() {
 	ti := textinput.New()

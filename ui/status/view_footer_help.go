@@ -6,7 +6,6 @@ import (
 
 	"github.com/elentok/gx/ui"
 
-	"charm.land/bubbles/v2/viewport"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -76,7 +75,7 @@ func (m Model) renderFooterLine(hint string) string {
 
 func (m Model) renderFooterLineWithPrefix(prefix, hint string) string {
 	hintText := "· " + hint
-	hintStyled := lipgloss.NewStyle().Foreground(catSubtle).Render(hintText)
+	hintStyled := lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render(hintText)
 	leftText := ""
 	if prefix != "" {
 		leftText = prefix
@@ -135,19 +134,8 @@ func (m Model) terminalLabel() string {
 }
 
 func (m *Model) showHelpOverlay() {
-	vpW := m.width * 2 / 3
-	if vpW < 56 {
-		vpW = 56
-	}
-	if vpW > 104 {
-		vpW = 104
-	}
-	vpH := m.height/2 - 4
-	if vpH < 8 {
-		vpH = 8
-	}
-	vp := viewport.New(viewport.WithWidth(vpW-2), viewport.WithHeight(vpH))
-	vp.SetContent(m.helpFullView(vpW - 2))
+	vp := ui.HelpViewportModel(m.width, m.height)
+	vp.SetContent(ui.RenderHelpView(keySections))
 	m.helpVP = vp
 	m.helpOpen = true
 }
