@@ -90,7 +90,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(m.history) == 0 {
 			return m, tea.Quit
 		}
+		popped := m.history[len(m.history)-1]
 		m.history = m.history[:len(m.history)-1]
+		m.restoreLogSelectionFromPoppedPage(popped)
 		return m, tea.Batch(tea.ClearScreen, m.resizeCurrentCmd())
 	}
 
@@ -247,4 +249,25 @@ func (m Model) resizeCurrentCmd() tea.Cmd {
 	return func() tea.Msg {
 		return size
 	}
+}
+
+func (m *Model) restoreLogSelectionFromPoppedPage(popped pageState) {
+	commitModel, ok := popped.model.(commitui.Model)
+	if !ok {
+		return
+	}
+	ref := commitModel.CurrentRef()
+	if ref == "" {
+		return
+	}
+	current := m.activePage()
+	if current.route.Kind != nav.RouteLog {
+		return
+	}
+	logModel, ok := current.model.(logui.Model)
+	if !ok {
+		return
+	}
+	current.model = logModel.SelectRef(ref)
+	m.setActivePage(current)
 }

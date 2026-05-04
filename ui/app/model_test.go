@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
+	logui "github.com/elentok/gx/ui/log"
 	"github.com/elentok/gx/ui/nav"
 
 	tea "charm.land/bubbletea/v2"
@@ -196,6 +197,45 @@ func TestPushCommitAndBackRestoresTab(t *testing.T) {
 	}
 	if len(m.history) != 0 {
 		t.Fatalf("expected empty history after back, got %d", len(m.history))
+	}
+}
+
+func TestBackFromCommitRestoresSelectionInLog(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	testutil.WriteFile(t, repoDir, "a.txt", "one\n")
+	testutil.CommitAll(t, repoDir, "base")
+	testutil.WriteFile(t, repoDir, "a.txt", "two\n")
+	testutil.CommitAll(t, repoDir, "middle")
+	testutil.WriteFile(t, repoDir, "a.txt", "three\n")
+	testutil.CommitAll(t, repoDir, "top")
+
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+	m := New(*repo, Settings{
+		InitialRoute:       nav.Route{Kind: nav.RouteLog, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	updated, _ := m.Update(nav.Push(nav.Route{Kind: nav.RouteCommit, WorktreeRoot: repoDir, Ref: "HEAD~1"})())
+	m = updated.(Model)
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '.', Text: "."}) // move to newer commit (top)
+	m = updated.(Model)
+	top, err := git.LogEntries(repoDir, "HEAD", 1)
+	if err != nil || len(top) == 0 {
+		t.Fatalf("LogEntries: %v", err)
+	}
+
+	updated, _ = m.Update(nav.Back()())
+	m = updated.(Model)
+	logModel, ok := m.activePage().model.(logui.Model)
+	if !ok {
+		t.Fatalf("expected active model log.Model, got %T", m.activePage().model)
+	}
+	if got := logModel.SelectedRef(); got != top[0].FullHash {
+		t.Fatalf("expected selected ref %q after back, got %q", top[0].FullHash, got)
 	}
 }
 
