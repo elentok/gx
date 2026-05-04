@@ -83,7 +83,7 @@ func (m Model) headerPaneBorderColor() color.Color {
 }
 
 func (m Model) commitMessageBody() string {
-	body := strings.TrimSpace(m.details.Body)
+	body := normalizeCommitBody(m.details.Body)
 	if body == "" {
 		return ""
 	}
@@ -99,6 +99,12 @@ func (m Model) commitMessageBody() string {
 		lines = lines[1:]
 	}
 	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+func normalizeCommitBody(body string) string {
+	body = strings.ReplaceAll(body, "\r\n", "\n")
+	body = strings.ReplaceAll(body, "\r", "\n")
+	return strings.TrimSpace(body)
 }
 
 func (m Model) headerRightTitle() string {

@@ -44,6 +44,12 @@ func CommitDetailsForRef(repoRoot, ref string) (CommitDetails, error) {
 		Date:        date,
 		Subject:     strings.TrimSpace(parts[5]),
 		Decorations: parseDecorations(parts[6]),
-		Body:        strings.TrimRight(parts[7], "\n"),
+		Body:        normalizeNewlines(strings.TrimRight(parts[7], "\n")),
 	}, nil
+}
+
+func normalizeNewlines(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.ReplaceAll(s, "\r", "\n")
+	return s
 }

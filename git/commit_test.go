@@ -37,3 +37,18 @@ func TestCommitDetailsForRef(t *testing.T) {
 		t.Fatalf("expected v1 tag decoration, got %#v", got.Decorations)
 	}
 }
+
+func TestCommitDetailsForRefNormalizesMixedNewlines(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.MustGitExported(t, repo, "add", "a.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "subject", "-m", "line 1\r\nline 2\nline 3\rline 4")
+
+	got, err := CommitDetailsForRef(repo, "HEAD")
+	if err != nil {
+		t.Fatalf("CommitDetailsForRef: %v", err)
+	}
+	if got.Body != "subject\n\nline 1\nline 2\nline 3\nline 4" {
+		t.Fatalf("body = %q", got.Body)
+	}
+}

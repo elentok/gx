@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/explorer"
@@ -352,6 +353,19 @@ func TestYankCommitBodyWithYYInHeader(t *testing.T) {
 
 	if got != "line 1\nline 2" {
 		t.Fatalf("expected yanked commit body, got %q", got)
+	}
+}
+
+func TestCommitMessageBodyNormalizesMixedNewlines(t *testing.T) {
+	m := Model{
+		details: git.CommitDetails{
+			Subject: "subject",
+			Body:    "subject\r\nline 1\nline 2\rline 3",
+		},
+	}
+
+	if got := m.commitMessageBody(); got != "line 1\nline 2\nline 3" {
+		t.Fatalf("commitMessageBody = %q", got)
 	}
 }
 
