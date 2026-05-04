@@ -109,7 +109,7 @@ func (m Model) renderFilesPane(width, height int) string {
 		Height:      height,
 		Title:       "Files",
 		RightTitle:  m.filesPaneRightTitle(),
-		BorderColor: ui.ColorBorder,
+		BorderColor: m.filesPaneBorderColor(),
 		TitleColor:  m.filesPaneTitleColor(),
 		Background:  ui.ColorBase,
 		Lines:       lines,
@@ -157,8 +157,8 @@ func (m Model) renderDiffPane(width, height int) string {
 		Height:      height,
 		Title:       "Diff",
 		RightTitle:  m.diffTitle(),
-		BorderColor: ui.ColorBorder,
-		TitleColor:  ui.ColorBlue,
+		BorderColor: m.diffPaneBorderColor(),
+		TitleColor:  m.diffPaneTitleColor(),
 		Background:  ui.ColorBase,
 		Lines:       lines,
 	})
@@ -300,6 +300,13 @@ func (m Model) filesPaneTitleColor() color.Color {
 	return ui.ColorOrange
 }
 
+func (m Model) filesPaneBorderColor() color.Color {
+	if m.focusDiff {
+		return ui.ColorBorder
+	}
+	return ui.ColorOrange
+}
+
 func (m Model) filesPaneRightTitle() string {
 	if m.focusDiff {
 		return ""
@@ -308,6 +315,20 @@ func (m Model) filesPaneRightTitle() string {
 		return ""
 	}
 	return "tree"
+}
+
+func (m Model) diffPaneTitleColor() color.Color {
+	if m.focusDiff {
+		return ui.ColorOrange
+	}
+	return ui.ColorBlue
+}
+
+func (m Model) diffPaneBorderColor() color.Color {
+	if m.focusDiff {
+		return ui.ColorOrange
+	}
+	return ui.ColorBorder
 }
 
 func commitEntryMeta(entry commitFileEntry, useNerdFontIcons bool) string {
