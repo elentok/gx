@@ -328,6 +328,33 @@ func TestYankAllContextWithYAInDiff(t *testing.T) {
 	}
 }
 
+func TestYankCommitBodyWithYYInHeader(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.CommitAll(t, repo, "subject\n\nline 1\nline 2")
+
+	var got string
+	prev := commitClipboardWrite
+	commitClipboardWrite = func(s string) error {
+		got = s
+		return nil
+	}
+	t.Cleanup(func() { commitClipboardWrite = prev })
+
+	m := New(repo, "HEAD")
+	m.ready = true
+	m.focusHeader = true
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	m = updated.(Model)
+
+	if got != "line 1\nline 2" {
+		t.Fatalf("expected yanked commit body, got %q", got)
+	}
+}
+
 func TestFilesPaneShowsNerdFontIcons(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	if err := os.MkdirAll(filepath.Join(repo, "dir"), 0o755); err != nil {

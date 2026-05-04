@@ -111,6 +111,19 @@ func (m *Model) yankContentOnly() {
 	m.setStatus("yanked content")
 }
 
+func (m *Model) yankCommitBody() {
+	body := m.commitMessageBody()
+	if body == "" {
+		m.setStatus("no commit body to yank")
+		return
+	}
+	if err := commitClipboardWrite(body); err != nil {
+		m.setStatus("clipboard copy failed: " + err.Error())
+		return
+	}
+	m.setStatus("yanked commit body")
+}
+
 func (m *Model) focusedLocationAndBody() (string, []string, bool) {
 	if explorer.ActiveHunkIndexForYank(m.section, m.diffNavMode) < 0 {
 		m.setStatus("no hunk selected")
