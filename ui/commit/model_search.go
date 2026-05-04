@@ -30,6 +30,10 @@ const (
 var commitSearchHighlightStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true)
 var commitSearchCurrentStyle = lipgloss.NewStyle().Foreground(ui.ColorGreen).Bold(true)
 
+func (m Model) InputFocused() bool {
+	return m.searchMode == searchModeInput
+}
+
 func (m *Model) enterSearchMode() {
 	ti := textinput.New()
 	ti.Prompt = "/"

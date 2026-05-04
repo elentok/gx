@@ -78,6 +78,10 @@ func NewWithSettings(worktreeRoot, startRef string, settings Settings) Model {
 
 func (m Model) Init() tea.Cmd { return nil }
 
+func (m Model) InputFocused() bool {
+	return m.searchMode == searchModeInput
+}
+
 func normalizedRef(ref string) string {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {

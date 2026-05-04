@@ -97,8 +97,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		msg = m.childWindowSizeMsg()
 	}
 	if key, ok := msg.(tea.KeyPressMsg); ok {
-		if handled, cmd := m.handleShellChordKey(key); handled {
-			return m, cmd
+		type inputFocuser interface{ InputFocused() bool }
+		active := m.activePage().model
+		if f, ok := active.(inputFocuser); !ok || !f.InputFocused() {
+			if handled, cmd := m.handleShellChordKey(key); handled {
+				return m, cmd
+			}
 		}
 	}
 

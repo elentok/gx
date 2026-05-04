@@ -56,6 +56,10 @@ func (m *Model) exitSearchMode() {
 	m.searchCursor = 0
 }
 
+func (m Model) InputFocused() bool {
+	return m.searchMode == searchModeInput
+}
+
 func (m Model) currentSearchScope() stageSearchScope {
 	if m.focus == focusStatus {
 		return searchScopeStatus

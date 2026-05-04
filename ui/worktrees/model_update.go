@@ -24,6 +24,11 @@ func (m Model) Init() tea.Cmd {
 	return cmdLoadWorktrees(m.repo)
 }
 
+func (m Model) InputFocused() bool {
+	return m.mode == modeRename || m.mode == modeClone || m.mode == modeNew ||
+		m.mode == modeNewAndOpen || m.mode == modeCredentialPrompt || m.mode == modeSearch
+}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
