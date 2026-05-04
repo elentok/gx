@@ -10,13 +10,7 @@ func (m *Model) moveToAdjacentCommit(delta int) bool {
 	if err != nil || len(entries) == 0 {
 		return false
 	}
-	idx := -1
-	for i, entry := range entries {
-		if entry.FullHash == m.details.FullHash {
-			idx = i
-			break
-		}
-	}
+	idx := indexOfCommit(entries, m.details.FullHash)
 	if idx < 0 {
 		return false
 	}
@@ -27,4 +21,13 @@ func (m *Model) moveToAdjacentCommit(delta int) bool {
 	m.ref = entries[next].FullHash
 	m.reload()
 	return true
+}
+
+func indexOfCommit(entries []git.LogEntry, fullHash string) int {
+	for i, entry := range entries {
+		if entry.FullHash == fullHash {
+			return i
+		}
+	}
+	return -1
 }

@@ -405,6 +405,32 @@ func TestCommaDotInFilesFrameSwitchCommits(t *testing.T) {
 	}
 }
 
+func TestCommaDotInHeaderFrameSwitchCommits(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "a.txt", "two\n")
+	testutil.CommitAll(t, repo, "middle")
+	testutil.WriteFile(t, repo, "a.txt", "three\n")
+	testutil.CommitAll(t, repo, "top")
+
+	m := New(repo, "HEAD~1")
+	m.ready = true
+	m.focusHeader = true
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '.', Text: "."})
+	m = updated.(Model)
+	if m.details.Subject != "top" {
+		t.Fatalf("expected . in header frame to move newer, got %q", m.details.Subject)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: ',', Text: ","})
+	m = updated.(Model)
+	if m.details.Subject != "middle" {
+		t.Fatalf("expected , in header frame to move older, got %q", m.details.Subject)
+	}
+}
+
 func TestCommaDotInDiffFrameSwitchFiles(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
