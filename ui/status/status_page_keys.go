@@ -14,6 +14,10 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Quit
 	case "esc":
+		if len(m.searchMatches) > 0 {
+			m.exitSearchMode()
+			return m, nil
+		}
 		if m.settings.EnableNavigation {
 			return m, nav.Back()
 		}

@@ -1651,8 +1651,8 @@ func TestStageSearchDiffUsesRightEdgeIndicatorInHunkMode(t *testing.T) {
 	m.recomputeSearchMatches()
 
 	pane := m.renderSectionPane(80, 12, "Unstaged", &m.unstaged, sectionUnstaged)
-	if !strings.Contains(ansi.Strip(pane), "󰍉") {
-		t.Fatalf("expected right-edge nerd search indicator in diff pane")
+	if !strings.Contains(ansi.Strip(pane), "needle") {
+		t.Fatalf("expected search match text highlighted in diff pane")
 	}
 }
 

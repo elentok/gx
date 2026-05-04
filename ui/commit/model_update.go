@@ -43,6 +43,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		switch key {
 		case "q", "esc":
+			if len(m.searchMatches) > 0 {
+				m.clearSearch()
+				return m, nil
+			}
 			if m.focusDiff {
 				m.focusDiff = false
 				return m, nil

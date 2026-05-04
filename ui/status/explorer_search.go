@@ -34,7 +34,8 @@ type stageSearchMatch struct {
 	scope        stageSearchScope
 }
 
-var stageSearchHighlightStyle = lipgloss.NewStyle().Foreground(catYellow).Bold(true)
+var stageSearchHighlightStyle = lipgloss.NewStyle().Foreground(catYellow).Bold(true).Underline(true)
+var stageSearchCurrentStyle = lipgloss.NewStyle().Foreground(catGreen).Bold(true).Underline(true)
 
 func (m *Model) enterSearchMode() {
 	ti := textinput.New()
@@ -297,7 +298,7 @@ func (m Model) searchMatchDiffDisplay(scope diffSection, displayIdx int) (matche
 	return false, false
 }
 
-func highlightMatchText(text, query string) string {
+func highlightMatchText(text, query string, current bool) string {
 	if strings.TrimSpace(query) == "" {
 		return text
 	}
@@ -311,5 +312,9 @@ func highlightMatchText(text, query string) string {
 	if end > len(text) {
 		end = len(text)
 	}
-	return text[:idx] + stageSearchHighlightStyle.Render(text[idx:end]) + text[end:]
+	style := stageSearchHighlightStyle
+	if current {
+		style = stageSearchCurrentStyle
+	}
+	return text[:idx] + style.Render(text[idx:end]) + text[end:]
 }

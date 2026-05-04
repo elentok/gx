@@ -160,18 +160,6 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 			}
 
 			indicator := "  "
-			if matched, current := m.searchMatchDiffDisplay(section, displayIdx); matched {
-				icon := "* "
-				if m.settings.UseNerdFontIcons {
-					icon = "󰍉 "
-				}
-				style := lipgloss.NewStyle().Foreground(catYellow).Bold(true)
-				if current {
-					style = style.Foreground(catGreen)
-				}
-				indicator = style.Render(icon)
-			}
-
 			markW := ansi.StringWidth(mark)
 			indicatorW := ansi.StringWidth(indicator)
 			bodyW := innerW - markW - indicatorW
@@ -188,6 +176,9 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 				if isDeltaSectionDivider(plain) {
 					body = lipgloss.NewStyle().Foreground(catDeepBg).Render(ansi.Strip(body))
 				}
+			}
+			if matched, current := m.searchMatchDiffDisplay(section, displayIdx); matched {
+				body = highlightMatchText(ansi.Strip(body), m.searchQuery, current)
 			}
 			body += diff.DiffBodyPadding(rowKind, maxInt(0, bodyW-ansi.StringWidth(body)))
 			lines = append(lines, mark+body+indicator)
