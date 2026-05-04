@@ -45,8 +45,15 @@ func TestBToggleBody(t *testing.T) {
 	m.ready = true
 	m.width = 80
 	m.height = 20
-	if !strings.Contains(m.View().Content, "body hidden") {
-		t.Fatalf("expected collapsed body hint")
+	view := ansi.Strip(m.View().Content)
+	if strings.Contains(view, "body hidden") {
+		t.Fatalf("expected collapsed view without body-hidden hint")
+	}
+	if !strings.Contains(view, "subject (by ") {
+		t.Fatalf("expected collapsed header to show subject line")
+	}
+	if !strings.Contains(view, "Commit (b to expand)") {
+		t.Fatalf("expected collapsed title hint")
 	}
 }
 
@@ -135,7 +142,7 @@ func TestEscLeavesDiffFocusBeforeBackingOut(t *testing.T) {
 	}
 }
 
-func TestTabSwitchesBetweenSidebarAndDiff(t *testing.T) {
+func TestTabCyclesBetweenSidebarDiffAndHeader(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 	testutil.CommitAll(t, repo, "base")
@@ -156,8 +163,14 @@ func TestTabSwitchesBetweenSidebarAndDiff(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
 	m = updated.(Model)
-	if m.focusDiff {
-		t.Fatalf("expected second tab to return focus to files")
+	if !m.focusHeader || m.focusDiff {
+		t.Fatalf("expected second tab to focus header")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
+	m = updated.(Model)
+	if m.focusHeader || m.focusDiff {
+		t.Fatalf("expected third tab to return focus to files")
 	}
 }
 
@@ -478,5 +491,69 @@ func TestViewFitsWindowHeight(t *testing.T) {
 		if got := ansi.StringWidth(line); got != m.width {
 			t.Fatalf("line %d width: got %d want %d", i, got, m.width)
 		}
+	}
+}
+
+func TestHeaderViewportMaxRowsAndScrollMarkers(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.CommitAll(t, repo, "subject\n\nl1\nl2\nl3\nl4\nl5\nl6\nl7\nl8")
+
+	m := New(repo, "HEAD")
+	m.ready = true
+	m.width = 100
+	m.height = 24
+
+	bodyH, _ := m.layoutHeights()
+	if got := bodyH - 2; got != 6 {
+		t.Fatalf("expected header viewport rows capped at 6, got %d", got)
+	}
+	view := ansi.Strip(m.View().Content)
+	if !strings.Contains(view, "↓") && !strings.Contains(view, "") {
+		t.Fatalf("expected bottom overflow marker at top of header scroll")
+	}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
+	m = updated.(Model)
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'J', Text: "J", ShiftedCode: 'J'})
+	m = updated.(Model)
+	view = ansi.Strip(m.View().Content)
+	if !strings.Contains(view, "↑") && !strings.Contains(view, "") {
+		t.Fatalf("expected top overflow marker after scrolling header")
+	}
+}
+
+func TestHeaderScrollRequiresHeaderFocus(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.CommitAll(t, repo, "subject\n\nl1\nl2\nl3\nl4\nl5\nl6\nl7\nl8")
+
+	m := New(repo, "HEAD")
+	m.ready = true
+	m.width = 100
+	m.height = 24
+
+	before := m.headerOffset
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	if m.headerOffset != before {
+		t.Fatalf("expected j without header focus not to scroll header")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
+	m = updated.(Model)
+	if !m.focusHeader {
+		t.Fatalf("expected header focus after second tab")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	if m.headerOffset <= before {
+		t.Fatalf("expected j with header focus to scroll header")
 	}
 }

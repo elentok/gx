@@ -29,14 +29,15 @@ func (m Model) View() tea.View {
 	}
 
 	bodyH, contentH := m.layoutHeights()
+	headerRows := maxInt(1, bodyH-2)
 	body := ui.RenderPanelFrame(ui.PanelFrameOptions{
 		Width:       maxInt(20, m.width),
 		Height:      bodyH,
-		Title:       "Commit",
+		Title:       m.headerTitle(),
 		RightTitle:  m.headerRightTitle(),
-		Lines:       m.headerLines(),
-		BorderColor: ui.ColorBorder,
-		TitleColor:  ui.ColorBlue,
+		Lines:       m.visibleHeaderLines(headerRows),
+		BorderColor: m.headerPaneBorderColor(),
+		TitleColor:  m.headerPaneTitleColor(),
 		Background:  ui.ColorBase,
 	})
 	content := m.contentView(contentH)
@@ -56,11 +57,29 @@ func (m Model) headerLines() []string {
 			lines = append(lines, "")
 			lines = append(lines, strings.Split(body, "\n")...)
 		}
-	} else {
-		lines = append(lines, "")
-		lines = append(lines, ui.StyleMuted.Render("(body hidden; press b to expand)"))
 	}
 	return lines
+}
+
+func (m Model) headerTitle() string {
+	if !m.bodyExpanded {
+		return "Commit " + commitMetaStyle.Render("(b to expand)")
+	}
+	return "Commit"
+}
+
+func (m Model) headerPaneTitleColor() color.Color {
+	if m.focusHeader {
+		return ui.ColorOrange
+	}
+	return ui.ColorBlue
+}
+
+func (m Model) headerPaneBorderColor() color.Color {
+	if m.focusHeader {
+		return ui.ColorOrange
+	}
+	return ui.ColorBorder
 }
 
 func (m Model) commitMessageBody() string {
@@ -123,7 +142,7 @@ func (m Model) contentView(contentH int) string {
 
 func (m Model) layoutHeights() (bodyH, contentH int) {
 	available := maxInt(2, m.height-1) // reserve one line for footer
-	naturalBody := maxInt(3, len(m.headerLines())+2)
+	naturalBody := minInt(commitHeaderMaxRows, maxInt(1, len(m.headerLines()))) + 2
 	bodyH = minInt(12, naturalBody)
 	if bodyH > available-1 {
 		bodyH = maxInt(1, available-1)
@@ -133,6 +152,56 @@ func (m Model) layoutHeights() (bodyH, contentH int) {
 		contentH = 1
 	}
 	return bodyH, contentH
+}
+
+func (m Model) headerViewportRowsCount() int {
+	rows := minInt(commitHeaderMaxRows, maxInt(1, len(m.headerLines())))
+	if rows < 1 {
+		return 1
+	}
+	return rows
+}
+
+func (m Model) visibleHeaderLines(viewportRows int) []string {
+	all := m.headerLines()
+	if len(all) == 0 {
+		return []string{""}
+	}
+	if viewportRows < 1 {
+		viewportRows = 1
+	}
+	if viewportRows > commitHeaderMaxRows {
+		viewportRows = commitHeaderMaxRows
+	}
+	if viewportRows > len(all) {
+		viewportRows = len(all)
+	}
+	offset := m.headerOffset
+	maxOffset := maxInt(0, len(all)-viewportRows)
+	if offset < 0 {
+		offset = 0
+	}
+	if offset > maxOffset {
+		offset = maxOffset
+	}
+	out := make([]string, 0, viewportRows)
+	for i := 0; i < viewportRows; i++ {
+		out = append(out, all[offset+i])
+	}
+	if len(all) > viewportRows {
+		topMark, bottomMark := "↑ ", "↓ "
+		if m.settings.UseNerdFontIcons {
+			topMark, bottomMark = " ", " "
+		}
+		markerStyle := commitMetaStyle.Bold(true)
+		if offset > 0 && len(out) > 0 {
+			out[0] = markerStyle.Render(topMark) + out[0]
+		}
+		if offset+viewportRows < len(all) && len(out) > 0 {
+			out[len(out)-1] = markerStyle.Render(bottomMark) + out[len(out)-1]
+		}
+	}
+	return out
 }
 
 func (m Model) renderFilesPane(width, height int) string {
@@ -349,14 +418,14 @@ func (m Model) filesPaneWidth(height int) int {
 }
 
 func (m Model) filesPaneTitleColor() color.Color {
-	if m.focusDiff {
+	if m.focusDiff || m.focusHeader {
 		return ui.ColorBlue
 	}
 	return ui.ColorOrange
 }
 
 func (m Model) filesPaneBorderColor() color.Color {
-	if m.focusDiff {
+	if m.focusDiff || m.focusHeader {
 		return ui.ColorBorder
 	}
 	return ui.ColorOrange

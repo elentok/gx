@@ -32,11 +32,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if msg.Code == tea.KeyTab || msg.Text == "\t" {
-			if _, ok := m.selectedCommitFile(); !ok {
+			if m.focusHeader {
+				m.focusHeader = false
+				m.focusDiff = false
 				return m, nil
 			}
-			m.focusDiff = !m.focusDiff
+			if _, ok := m.selectedCommitFile(); !ok {
+				m.focusHeader = true
+				m.focusDiff = false
+				return m, nil
+			}
 			if m.focusDiff {
+				m.focusDiff = false
+				m.focusHeader = true
+			} else {
+				m.focusDiff = true
+				m.focusHeader = false
 				m.ensureActiveVisible()
 			}
 			return m, nil
@@ -51,12 +62,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.focusDiff = false
 				return m, nil
 			}
+			if m.focusHeader {
+				m.focusHeader = false
+				return m, nil
+			}
 			return m, nav.Back()
 		case "/":
 			m.enterSearchMode()
 			return m, nil
 		case "b":
 			m.bodyExpanded = !m.bodyExpanded
+			m.scrollHeader(0)
 			m.syncDiffViewport()
 			return m, nil
 		case "a":
@@ -78,6 +94,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.syncDiffViewport()
 			return m, nil
 		case "j", "down":
+			if m.focusHeader {
+				m.scrollHeader(1)
+				return m, nil
+			}
 			if m.focusDiff {
 				m.moveDiffActive(1)
 				return m, nil
@@ -85,6 +105,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.moveSidebar(1)
 			return m, nil
 		case "k", "up":
+			if m.focusHeader {
+				m.scrollHeader(-1)
+				return m, nil
+			}
 			if m.focusDiff {
 				m.moveDiffActive(-1)
 				return m, nil
@@ -92,22 +116,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.moveSidebar(-1)
 			return m, nil
 		case "J":
-			if m.focusDiff {
+			if m.focusHeader {
+				m.scrollHeader(1)
+			} else if m.focusDiff {
 				m.diffViewport.ScrollDown(3)
 			}
 			return m, nil
 		case "K":
-			if m.focusDiff {
+			if m.focusHeader {
+				m.scrollHeader(-1)
+			} else if m.focusDiff {
 				m.diffViewport.ScrollUp(3)
 			}
 			return m, nil
 		case "ctrl+d":
-			if m.focusDiff {
+			if m.focusHeader {
+				m.scrollHeaderPage(1)
+			} else if m.focusDiff {
 				m.scrollDiffPage(1)
 			}
 			return m, nil
 		case "ctrl+u":
-			if m.focusDiff {
+			if m.focusHeader {
+				m.scrollHeaderPage(-1)
+			} else if m.focusDiff {
 				m.scrollDiffPage(-1)
 			}
 			return m, nil
@@ -135,6 +167,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case "enter":
+			if m.focusHeader {
+				m.focusHeader = false
+				return m, nil
+			}
 			if m.toggleDirOnEnter() {
 				return m, nil
 			}
@@ -144,6 +180,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case "l", "right":
+			if m.focusHeader {
+				m.focusHeader = false
+				return m, nil
+			}
 			if !m.focusDiff && m.expandSelectedDir() {
 				return m, nil
 			}
@@ -155,6 +195,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "h", "left":
 			if m.focusDiff {
 				m.focusDiff = false
+				return m, nil
+			}
+			if m.focusHeader {
+				m.focusHeader = false
 				return m, nil
 			}
 			if m.focusParentInSidebar() {

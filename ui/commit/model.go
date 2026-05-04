@@ -26,6 +26,7 @@ type Model struct {
 	width         int
 	height        int
 	ready         bool
+	focusHeader   bool
 	focusDiff     bool
 	diffNavMode   explorer.NavMode
 	wrapSoft      bool
@@ -46,6 +47,7 @@ type Model struct {
 	searchCursor  int
 	searchInput   textinput.Model
 	statusMsg     string
+	headerOffset  int
 	err           error
 }
 
@@ -83,11 +85,13 @@ func (m *Model) reload() {
 	if m.err != nil {
 		m.files = nil
 		m.section = explorer.NewSectionData()
+		m.headerOffset = 0
 		return
 	}
 	m.files, m.err = git.CommitFilesForRef(m.worktreeRoot, m.ref)
 	if m.err != nil {
 		m.section = explorer.NewSectionData()
+		m.headerOffset = 0
 		return
 	}
 	m.fileEntries = buildCommitFileEntries(m.files, m.collapsedDirs)
@@ -100,6 +104,7 @@ func (m *Model) reload() {
 	if entry, ok := m.selectedCommitEntry(); !ok || entry.Kind != commitFileEntryFile {
 		m.selectFirstCommitFile()
 	}
+	m.headerOffset = 0
 	m.refreshDiff()
 }
 
