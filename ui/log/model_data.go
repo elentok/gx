@@ -1,8 +1,6 @@
 package log
 
 import (
-	"fmt"
-
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/nav"
 
@@ -18,17 +16,7 @@ func (m *Model) reload() {
 	m.err = nil
 	classes := m.branchHistoryClasses()
 
-	rows := make([]row, 0, len(entries)+1)
-	if m.startRef == "HEAD" {
-		changes, changeErr := git.UncommittedChanges(m.worktreeRoot)
-		if changeErr == nil && len(changes) > 0 {
-			rows = append(rows, row{
-				kind:   rowPseudoStatus,
-				label:  "working tree",
-				detail: fmt.Sprintf("%d uncommitted change(s)", len(changes)),
-			})
-		}
-	}
+	rows := make([]row, 0, len(entries))
 	for _, entry := range entries {
 		rows = append(rows, row{kind: rowCommit, commit: entry, class: classes[entry.FullHash]})
 	}
@@ -78,8 +66,5 @@ func (m Model) openSelected() tea.Cmd {
 		return nil
 	}
 	selected := m.rows[m.cursor]
-	if selected.kind == rowPseudoStatus {
-		return nav.Push(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: m.worktreeRoot})
-	}
 	return nav.Push(nav.Route{Kind: nav.RouteCommit, WorktreeRoot: m.worktreeRoot, Ref: selected.commit.FullHash})
 }

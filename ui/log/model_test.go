@@ -67,29 +67,6 @@ func TestRenderCommitRowUsesBranchHistoryColors(t *testing.T) {
 	}
 }
 
-func TestEnterOnPseudoRowOpensStatus(t *testing.T) {
-	repo := testutil.TempRepo(t)
-	testutil.WriteFile(t, repo, "dirty.txt", "dirty\n")
-
-	m := New(repo, "")
-	if len(m.rows) == 0 || m.rows[0].kind != rowPseudoStatus {
-		t.Fatalf("expected pseudo status row first")
-	}
-
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	if cmd == nil {
-		t.Fatalf("expected nav command on enter")
-	}
-	route, ok := nav.IsPush(cmd())
-	if !ok {
-		t.Fatalf("expected nav push")
-	}
-	if route.Kind != nav.RouteStatus {
-		t.Fatalf("expected status route, got %q", route.Kind)
-	}
-	_ = updated
-}
-
 func TestGHResetsCustomRefToHead(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "one.txt", "one\n")
