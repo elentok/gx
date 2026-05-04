@@ -10,6 +10,9 @@ import (
 )
 
 func (m Model) Init() tea.Cmd {
+	if m.settings.EnableNavigation {
+		return tea.Batch(statusTickCmd(), statusStartupLoadCmd())
+	}
 	return statusTickCmd()
 }
 
@@ -33,6 +36,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.clearStatus()
 		}
 		return m, statusTickCmd()
+	case statusStartupLoadMsg:
+		m.reloadBranchState()
+		m.reloadDiffsForSelection()
+		return m, nil
 	case actionPollMsg:
 		if m.runningRunner != nil {
 			if chunk := m.runningRunner.Consume(); chunk != "" {

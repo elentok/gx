@@ -1,6 +1,7 @@
 package log
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +14,58 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 )
+
+func TestReloadAssignsBranchHistoryClasses(t *testing.T) {
+	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
+	wtDir := filepath.Join(repoDir, "feature")
+
+	testutil.PushBranchWithUpstream(t, wtDir, "origin", "feature")
+	testutil.MustGitExported(t, wtDir, "reset", "--hard", "HEAD~1")
+	testutil.WriteFile(t, wtDir, "shared.txt", "shared\n")
+	testutil.CommitAll(t, wtDir, "shared commit")
+	testutil.MustGitExported(t, wtDir, "push", "--force-with-lease", "-u", "origin", "feature")
+
+	testutil.WriteFile(t, wtDir, "remote.txt", "remote\n")
+	testutil.CommitAll(t, wtDir, "remote only")
+	testutil.MustGitExported(t, wtDir, "push")
+
+	testutil.MustGitExported(t, wtDir, "reset", "--hard", "HEAD~1")
+	testutil.WriteFile(t, wtDir, "local.txt", "local\n")
+	testutil.CommitAll(t, wtDir, "local only")
+
+	m := New(wtDir, "")
+	got := map[string]git.BranchHistoryClass{}
+	for _, row := range m.rows {
+		if row.kind != rowCommit {
+			continue
+		}
+		got[row.commit.Subject] = row.class
+	}
+
+	if got["shared commit"] != git.BranchHistoryShared {
+		t.Fatalf("shared commit class = %q", got["shared commit"])
+	}
+	if got["local only"] != git.BranchHistoryLocalOnly {
+		t.Fatalf("local only class = %q", got["local only"])
+	}
+}
+
+func TestRenderCommitRowUsesBranchHistoryColors(t *testing.T) {
+	local := logSubjectStyle(git.BranchHistoryLocalOnly).Render("local only")
+	if ansi.Strip(local) != "local only" || local == "local only" {
+		t.Fatalf("expected local-only subject to be colorized, got %q", local)
+	}
+
+	remote := logSubjectStyle(git.BranchHistoryRemoteOnly).Render("remote only")
+	if ansi.Strip(remote) != "remote only" || remote == "remote only" {
+		t.Fatalf("expected remote-only subject to be colorized, got %q", remote)
+	}
+
+	shared := logSubjectStyle(git.BranchHistoryShared).Render("shared")
+	if shared != "shared" {
+		t.Fatalf("expected shared subject to stay uncolored, got %q", shared)
+	}
+}
 
 func TestEnterOnPseudoRowOpensStatus(t *testing.T) {
 	repo := testutil.TempRepo(t)

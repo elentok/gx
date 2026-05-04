@@ -16,6 +16,7 @@ func (m *Model) reload() {
 		return
 	}
 	m.err = nil
+	classes := m.branchHistoryClasses()
 
 	rows := make([]row, 0, len(entries)+1)
 	if m.startRef == "HEAD" {
@@ -29,7 +30,7 @@ func (m *Model) reload() {
 		}
 	}
 	for _, entry := range entries {
-		rows = append(rows, row{kind: rowCommit, commit: entry})
+		rows = append(rows, row{kind: rowCommit, commit: entry, class: classes[entry.FullHash]})
 	}
 	m.rows = rows
 	if m.cursor >= len(m.rows) {
@@ -39,6 +40,37 @@ func (m *Model) reload() {
 		m.cursor = 0
 	}
 	m.recomputeSearchMatches()
+}
+
+func (m Model) branchHistoryClasses() map[string]git.BranchHistoryClass {
+	if m.startRef != "HEAD" {
+		return nil
+	}
+
+	branch, err := git.CurrentBranch(m.worktreeRoot)
+	if err != nil {
+		return nil
+	}
+	branch = normalizedRef(branch)
+	if branch == "HEAD" {
+		return nil
+	}
+
+	repo, err := git.FindRepo(m.worktreeRoot)
+	if err != nil {
+		return nil
+	}
+
+	history, err := git.BranchHistorySinceMain(*repo, branch, git.UpstreamBranch(m.worktreeRoot, branch))
+	if err != nil {
+		return nil
+	}
+
+	classes := make(map[string]git.BranchHistoryClass, len(history))
+	for _, commit := range history {
+		classes[commit.FullHash] = commit.Class
+	}
+	return classes
 }
 
 func (m Model) openSelected() tea.Cmd {

@@ -15,7 +15,7 @@ func (m *Model) ensureTabs() {
 		if _, ok := m.tabs[kind]; ok {
 			continue
 		}
-		m.tabs[kind] = m.newTabPage(m.tabStateForRoute(nav.Route{Kind: kind}))
+		m.tabs[kind] = tabPageState{kind: kind}
 	}
 }
 
@@ -25,7 +25,7 @@ func (m Model) switchTab(route nav.Route) (tea.Model, tea.Cmd) {
 	m.history = nil
 	m.activeTab = tabState.kind
 	current, ok := m.tabs[tabState.kind]
-	if !ok || !sameTabState(current, tabState) {
+	if !ok || current.model == nil || !sameTabState(current, tabState) {
 		current = m.newTabPage(tabState)
 		current.initialized = true
 		m.tabs[tabState.kind] = current

@@ -24,6 +24,7 @@ type row struct {
 	commit git.LogEntry
 	label  string
 	detail string
+	class  git.BranchHistoryClass
 }
 
 type searchMode int

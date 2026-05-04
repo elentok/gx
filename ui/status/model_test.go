@@ -376,119 +376,6 @@ func TestBranchSummaryTitleShowsBaseOnlyWhenNonDefault(t *testing.T) {
 	}
 }
 
-func TestLeftPaneHeightsHideCommitPaneOnlyWhenTooSmall(t *testing.T) {
-	m := Model{}
-	statusH, commitsH := m.leftPaneHeights(20, 40)
-	if commitsH != minCommitsPaneHeight {
-		t.Fatalf("expected minimum commit pane height %d, got %d", minCommitsPaneHeight, commitsH)
-	}
-	if statusH != 20-minCommitsPaneHeight {
-		t.Fatalf("expected status height %d, got %d", 20-minCommitsPaneHeight, statusH)
-	}
-}
-
-func TestLeftPaneHeightsFitCommitContentsWithMaximum(t *testing.T) {
-	m := Model{statusPageState: statusPageState{branchCommits: []branchCommitRow{
-		{subject: "one", hash: "a1", date: time.Now(), class: git.BranchHistoryLocalOnly},
-		{subject: "two", hash: "b2", date: time.Now(), class: git.BranchHistoryLocalOnly},
-		{subject: "three", hash: "c3", date: time.Now(), class: git.BranchHistoryLocalOnly},
-		{subject: "four", hash: "d4", date: time.Now(), class: git.BranchHistoryLocalOnly},
-		{subject: "five", hash: "e5", date: time.Now(), class: git.BranchHistoryLocalOnly},
-		{subject: "six", hash: "f6", date: time.Now(), class: git.BranchHistoryLocalOnly},
-		{subject: "seven", hash: "g7", date: time.Now(), class: git.BranchHistoryLocalOnly},
-		{subject: "eight", hash: "h8", date: time.Now(), class: git.BranchHistoryLocalOnly},
-	}}}
-	statusH, commitsH := m.leftPaneHeights(40, 40)
-	if commitsH != maxCommitsPaneHeight {
-		t.Fatalf("expected max commit pane height %d, got %d", maxCommitsPaneHeight, commitsH)
-	}
-	if statusH != 40-maxCommitsPaneHeight {
-		t.Fatalf("expected status height %d, got %d", 40-maxCommitsPaneHeight, statusH)
-	}
-}
-
-func TestRenderBranchCommitsPane_ShowsWrappedSubjectAndMetadata(t *testing.T) {
-	m := Model{
-		statusPageState: statusPageState{branchCommits: []branchCommitRow{{
-			subject: "this is a long commit subject that should wrap nicely",
-			hash:    "abc1234",
-			date:    time.Now().Add(-5 * time.Minute),
-			class:   git.BranchHistoryLocalOnly,
-		}}},
-	}
-
-	pane := ansi.Strip(m.renderBranchCommitsPane(28, 8))
-	if !strings.Contains(pane, "Commits") {
-		t.Fatalf("expected commits title, got:\n%s", pane)
-	}
-	if !strings.Contains(pane, "abc1234") {
-		t.Fatalf("expected commit hash metadata, got:\n%s", pane)
-	}
-	if !strings.Contains(pane, "minutes ago") && !strings.Contains(pane, "minute ago") {
-		t.Fatalf("expected relative time metadata, got:\n%s", pane)
-	}
-	if !strings.Contains(pane, "this is a long commit") || !strings.Contains(pane, "subject that should") {
-		t.Fatalf("expected wrapped subject lines, got:\n%s", pane)
-	}
-}
-
-func TestReloadBranchCommitsIncludesDivergedRemoteCommits(t *testing.T) {
-	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
-	wtDir := filepath.Join(repoDir, "feature")
-
-	testutil.PushBranchWithUpstream(t, wtDir, "origin", "feature")
-	testutil.MustGitExported(t, wtDir, "reset", "--hard", "HEAD~1")
-	testutil.WriteFile(t, wtDir, "shared.txt", "shared\n")
-	testutil.CommitAll(t, wtDir, "shared commit")
-	testutil.MustGitExported(t, wtDir, "push", "--force-with-lease", "-u", "origin", "feature")
-
-	testutil.WriteFile(t, wtDir, "remote.txt", "remote\n")
-	testutil.CommitAll(t, wtDir, "remote only")
-	testutil.MustGitExported(t, wtDir, "push")
-
-	testutil.MustGitExported(t, wtDir, "reset", "--hard", "HEAD~1")
-	testutil.WriteFile(t, wtDir, "local.txt", "local\n")
-	testutil.CommitAll(t, wtDir, "local only")
-
-	m := New(wtDir)
-	if len(m.branchCommits) < 3 {
-		t.Fatalf("expected at least 3 branch commits, got %d", len(m.branchCommits))
-	}
-
-	got := map[string]git.BranchHistoryClass{}
-	for _, commit := range m.branchCommits {
-		got[commit.subject] = commit.class
-	}
-	if got["shared commit"] != git.BranchHistoryShared {
-		t.Fatalf("shared commit class = %q", got["shared commit"])
-	}
-	if got["remote only"] != git.BranchHistoryRemoteOnly {
-		t.Fatalf("remote only class = %q", got["remote only"])
-	}
-	if got["local only"] != git.BranchHistoryLocalOnly {
-		t.Fatalf("local only class = %q", got["local only"])
-	}
-}
-
-func TestRefreshesBranchCommitsOnFocusMsg(t *testing.T) {
-	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
-	wtDir := filepath.Join(repoDir, "feature")
-
-	m := New(wtDir)
-	m.ready = true
-	countBefore := len(m.branchCommits)
-
-	testutil.WriteFile(t, wtDir, "later.txt", "later\n")
-	testutil.CommitAll(t, wtDir, "later commit")
-
-	updated, _ := m.Update(tea.FocusMsg{})
-	m = updated.(Model)
-
-	if len(m.branchCommits) <= countBefore {
-		t.Fatalf("expected focus refresh to reload branch commits; before=%d after=%d", countBefore, len(m.branchCommits))
-	}
-}
-
 func TestReloadBranchStateUsesBranchUpstream(t *testing.T) {
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	wtDir := filepath.Join(repoDir, "feature")
@@ -1930,6 +1817,28 @@ func TestGLNavigatesToLogWhenNavigationEnabled(t *testing.T) {
 	m = updated.(Model)
 	if m.keyPrefix != "" {
 		t.Fatalf("expected keyPrefix reset after gl, got %q", m.keyPrefix)
+	}
+}
+
+func TestNavigationStartupDefersInitialDiffLoad(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "dirty.txt", "dirty\n")
+
+	m := NewWithSettings(repo, Settings{EnableNavigation: true})
+	if m.activeFilePath != "" {
+		t.Fatalf("expected initial navigation startup to skip diff load, got %q", m.activeFilePath)
+	}
+	if len(m.unstaged.parsed.Hunks) != 0 {
+		t.Fatalf("expected no diff hunks before startup load, got %d", len(m.unstaged.parsed.Hunks))
+	}
+
+	updated, _ := m.Update(statusStartupLoadMsg{})
+	m = updated.(Model)
+	if m.activeFilePath != "dirty.txt" {
+		t.Fatalf("expected startup load to select dirty diff, got %q", m.activeFilePath)
+	}
+	if len(m.unstaged.parsed.Hunks) == 0 {
+		t.Fatalf("expected diff hunks after startup load")
 	}
 }
 

@@ -25,12 +25,15 @@ func (m Model) selectedFile() (git.StageFileStatus, bool) {
 
 func (m *Model) reload(preservePath string) {
 	m.reloadBranchState()
-	m.reloadBranchCommits()
+	m.reloadFileList(preservePath)
+	m.reloadDiffsForSelection()
+}
+
+func (m *Model) reloadFileList(preservePath string) {
 	files, err := git.ListStageFiles(m.worktreeRoot)
 	if err != nil {
 		m.err = err
 		m.files = nil
-		m.branchCommits = nil
 		m.statusEntries = nil
 		m.unstaged = newSectionState()
 		m.staged = newSectionState()
@@ -45,6 +48,7 @@ func (m *Model) reload(preservePath string) {
 
 	if len(m.statusEntries) == 0 {
 		m.selected = 0
+		m.activeFilePath = ""
 		m.unstaged = newSectionState()
 		m.staged = newSectionState()
 		m.focus = focusStatus
@@ -71,33 +75,6 @@ func (m *Model) reload(preservePath string) {
 	if m.selected < 0 {
 		m.selected = 0
 	}
-
-	m.reloadDiffsForSelection()
-}
-
-func (m *Model) reloadBranchCommits() {
-	m.branchCommits = nil
-	if strings.TrimSpace(m.branchName) == "" || strings.TrimSpace(m.branchName) == "HEAD" {
-		return
-	}
-	repo, err := git.FindRepo(m.worktreeRoot)
-	if err != nil {
-		return
-	}
-	history, err := git.BranchHistorySinceMain(*repo, m.branchName, m.branchBaseRef)
-	if err != nil {
-		return
-	}
-	rows := make([]branchCommitRow, 0, len(history))
-	for _, commit := range history {
-		rows = append(rows, branchCommitRow{
-			subject: commit.Subject,
-			hash:    commit.Hash,
-			date:    commit.Date,
-			class:   commit.Class,
-		})
-	}
-	m.branchCommits = rows
 }
 
 func (m *Model) reloadBranchState() {

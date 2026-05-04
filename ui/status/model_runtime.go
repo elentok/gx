@@ -26,6 +26,12 @@ func statusTickCmd() tea.Cmd {
 	})
 }
 
+func statusStartupLoadCmd() tea.Cmd {
+	return func() tea.Msg {
+		return statusStartupLoadMsg{}
+	}
+}
+
 func cmdGitCommit(worktreeRoot string, terminal ui.Terminal) tea.Cmd {
 	if terminal == ui.TerminalTmux {
 		return func() tea.Msg {

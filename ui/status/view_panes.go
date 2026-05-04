@@ -12,12 +12,10 @@ import (
 )
 
 const (
-	minStatusPaneWidth   = 30
-	maxStatusPaneWidth   = 72
-	minDiffPaneWidth     = 60
-	minCommitsPaneHeight = 5
-	maxCommitsPaneHeight = 20
-	minStatusPaneHeight  = 5
+	minStatusPaneWidth  = 30
+	maxStatusPaneWidth  = 72
+	minDiffPaneWidth    = 60
+	minStatusPaneHeight = 5
 )
 
 func (m Model) splitWidth() (statusW, diffW int) {
@@ -25,8 +23,7 @@ func (m Model) splitWidth() (statusW, diffW int) {
 		return m.width, m.width
 	}
 
-	statusH, _ := m.leftPaneHeights(m.mainContentHeight(), minStatusPaneWidth)
-	statusW = m.requiredStatusPaneWidth(statusH)
+	statusW = m.requiredStatusPaneWidth(m.mainContentHeight())
 	statusMax := minInt(maxStatusPaneWidth, int(float64(m.width)*0.45))
 	if statusMax < minStatusPaneWidth {
 		statusMax = minStatusPaneWidth
@@ -80,36 +77,7 @@ func (m Model) mainContentHeight() int {
 }
 
 func (m Model) renderLeftPane(width, height int) string {
-	statusH, commitsH := m.leftPaneHeights(height, width)
-	return lipgloss.JoinVertical(
-		lipgloss.Left,
-		m.renderStatusPane(width, statusH),
-		m.renderBranchCommitsPane(width, commitsH),
-	)
-}
-
-func (m Model) leftPaneHeights(total, width int) (statusH, commitsH int) {
-	commitsH = m.requiredBranchCommitsPaneHeight(width)
-	if commitsH > total-2 {
-		commitsH = maxInt(2, total/2)
-	}
-	statusH = total - commitsH
-	if statusH < minStatusPaneHeight {
-		commitsH -= minStatusPaneHeight - statusH
-		if commitsH < 2 {
-			commitsH = 2
-		}
-		statusH = total - commitsH
-	}
-	if statusH < 2 {
-		statusH = 2
-		commitsH = total - statusH
-	}
-	if commitsH < 2 {
-		commitsH = 2
-		statusH = total - commitsH
-	}
-	return statusH, commitsH
+	return m.renderStatusPane(width, maxInt(minStatusPaneHeight, height))
 }
 
 func (m Model) statusPaneTitle() string {

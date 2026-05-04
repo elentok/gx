@@ -17,6 +17,8 @@ var (
 	logMetaStyle   = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
 	logPseudoStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true)
 	logSearchStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true).Underline(true)
+	logLocalStyle  = lipgloss.NewStyle().Foreground(ui.ColorGreen)
+	logRemoteStyle = lipgloss.NewStyle().Foreground(ui.ColorRed)
 )
 
 func (m Model) View() tea.View {
@@ -117,7 +119,18 @@ func (m Model) renderCommitRow(row row) string {
 		{Text: m.highlightSearch(row.commit.AuthorShort), Width: 4, Style: logMetaStyle},
 	}
 	meta := ui.RenderFixedColumns(cols)
-	return meta + "  " + m.highlightSearch(row.commit.Subject)
+	return meta + "  " + logSubjectStyle(row.class).Render(m.highlightSearch(row.commit.Subject))
+}
+
+func logSubjectStyle(class git.BranchHistoryClass) lipgloss.Style {
+	switch class {
+	case git.BranchHistoryLocalOnly:
+		return logLocalStyle
+	case git.BranchHistoryRemoteOnly:
+		return logRemoteStyle
+	default:
+		return lipgloss.NewStyle()
+	}
 }
 
 func (m Model) renderBadges(decorations []git.RefDecoration) string {
