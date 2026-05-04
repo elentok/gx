@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.13.2
+
+- Normalize keymappings (partially, there's still work to do)
+- Show chort keys overlay (like neovim's whichkey)
+- Code cleanup
+
 ## v0.13.1
 
 - Normalize commit message newlines
