@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.13.0
+
+- Changed `gx` startup to open the status view by default (`gx worktrees` / `gx wt` still opens the worktree UI)
+- Added a focused commit-view header with scrollable metadata, commit-body yanking, and cleaner subject/author rendering
+- Added log/commit navigation refinements, including tag-jump chords in `gx log`, commit selection restoration when backing out of commit view, and tab-aware log history
+- Kept the shared diff-explorer extraction moving forward so commit and status views continue to reuse the same rendering/navigation core
+
 ## v0.12.11
 
 - Added a real `gx show [hash-or-ref]` entrypoint that opens a new commit view with commit metadata, ref badges, and body collapse/expand
