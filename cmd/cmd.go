@@ -221,6 +221,10 @@ func runWorktrees(_ string) error {
 			Terminal:         ui.DetectTerminal(),
 			InputModalBottom: cfg.InputModalBottom,
 		},
+		Commit: commitui.Settings{
+			UseNerdFontIcons: cfg.UseNerdFontIcons,
+			InputModalBottom: cfg.InputModalBottom,
+		},
 	})
 	p := tea.NewProgram(m)
 	_, err = p.Run()
@@ -280,6 +284,10 @@ func runStatus(target string) error {
 			UseNerdFontIcons: cfg.UseNerdFontIcons,
 			InitialPath:      initialPath,
 			Terminal:         ui.DetectTerminal(),
+			InputModalBottom: cfg.InputModalBottom,
+		},
+		Commit: commitui.Settings{
+			UseNerdFontIcons: cfg.UseNerdFontIcons,
 			InputModalBottom: cfg.InputModalBottom,
 		},
 	})
