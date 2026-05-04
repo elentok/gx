@@ -73,6 +73,14 @@ func (m *Model) handleShellChordKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	if m.keyPrefix == "g" {
 		m.keyPrefix = ""
 		switch key {
+		case ",":
+			next, cmd := m.switchRelativeTab(-1)
+			*m = next.(Model)
+			return true, cmd
+		case ".":
+			next, cmd := m.switchRelativeTab(1)
+			*m = next.(Model)
+			return true, cmd
 		case "w":
 			next, cmd := m.switchTab(nav.Route{Kind: nav.RouteWorktrees})
 			*m = next.(Model)
@@ -96,6 +104,20 @@ func (m *Model) handleShellChordKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	if key == "g" {
 		m.keyPrefix = "g"
 		return true, nil
+	}
+	switch key {
+	case "1":
+		next, cmd := m.switchTab(nav.Route{Kind: nav.RouteWorktrees})
+		*m = next.(Model)
+		return true, cmd
+	case "2":
+		next, cmd := m.switchTab(nav.Route{Kind: nav.RouteLog})
+		*m = next.(Model)
+		return true, cmd
+	case "3":
+		next, cmd := m.switchTab(nav.Route{Kind: nav.RouteStatus})
+		*m = next.(Model)
+		return true, cmd
 	}
 	return false, nil
 }
@@ -185,4 +207,27 @@ func renderTab(tab tabSpec) string {
 		return ui.RenderBadge(tab.label, ui.BadgeVariantOrange, true)
 	}
 	return ui.RenderBadge(tab.label, ui.BadgeVariantSurface, true)
+}
+
+func orderedTabs() []nav.RouteKind {
+	return []nav.RouteKind{nav.RouteWorktrees, nav.RouteLog, nav.RouteStatus}
+}
+
+func (m Model) switchRelativeTab(delta int) (tea.Model, tea.Cmd) {
+	tabs := orderedTabs()
+	idx := 0
+	for i, kind := range tabs {
+		if kind == m.activeTab {
+			idx = i
+			break
+		}
+	}
+	next := idx + delta
+	if next < 0 {
+		next = 0
+	}
+	if next >= len(tabs) {
+		next = len(tabs) - 1
+	}
+	return m.switchTab(nav.Route{Kind: tabs[next]})
 }

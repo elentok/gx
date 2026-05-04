@@ -31,6 +31,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.handleSearchNavigateKey(msg) {
 			return m, nil
 		}
+		if msg.Code == tea.KeyTab || msg.Text == "\t" {
+			if _, ok := m.selectedCommitFile(); !ok {
+				return m, nil
+			}
+			m.focusDiff = !m.focusDiff
+			if m.focusDiff {
+				m.ensureActiveVisible()
+			}
+			return m, nil
+		}
 		switch key {
 		case "q", "esc":
 			if m.focusDiff {
@@ -100,11 +110,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case ".":
 			if m.focusDiff {
 				m.moveToAdjacentFile(1)
+			} else {
+				m.moveToAdjacentCommit(-1)
 			}
 			return m, nil
 		case ",":
 			if m.focusDiff {
 				m.moveToAdjacentFile(-1)
+			} else {
+				m.moveToAdjacentCommit(1)
 			}
 			return m, nil
 		case "G":

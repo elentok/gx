@@ -134,6 +134,32 @@ func TestEscLeavesDiffFocusBeforeBackingOut(t *testing.T) {
 	}
 }
 
+func TestTabSwitchesBetweenSidebarAndDiff(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "a.txt", "two\n")
+	testutil.CommitAll(t, repo, "change")
+
+	m := New(repo, "HEAD")
+	m.ready = true
+	m.width = 100
+	m.height = 24
+	m.syncDiffViewport()
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
+	m = updated.(Model)
+	if !m.focusDiff {
+		t.Fatalf("expected tab to focus diff")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
+	m = updated.(Model)
+	if m.focusDiff {
+		t.Fatalf("expected second tab to return focus to files")
+	}
+}
+
 func TestSidebarSearchMovesToFileMatches(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "alpha.txt", "one\n")
@@ -333,6 +359,77 @@ func TestInitialSelectionChoosesFirstFileOverDirectory(t *testing.T) {
 	}
 	if len(m.section.ViewLines) == 0 {
 		t.Fatal("expected initial file selection to load diff")
+	}
+}
+
+func TestCommaDotInFilesFrameSwitchCommits(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "a.txt", "two\n")
+	testutil.CommitAll(t, repo, "middle")
+	testutil.WriteFile(t, repo, "a.txt", "three\n")
+	testutil.CommitAll(t, repo, "top")
+
+	m := New(repo, "HEAD~1")
+	m.ready = true
+
+	if m.details.Subject != "middle" {
+		t.Fatalf("expected initial middle commit, got %q", m.details.Subject)
+	}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '.', Text: "."})
+	m = updated.(Model)
+	if m.details.Subject != "top" {
+		t.Fatalf("expected . in files frame to move to newer commit, got %q", m.details.Subject)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: ',', Text: ","})
+	m = updated.(Model)
+	if m.details.Subject != "middle" {
+		t.Fatalf("expected , in files frame to move back to previous commit, got %q", m.details.Subject)
+	}
+}
+
+func TestCommaDotInDiffFrameSwitchFiles(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.WriteFile(t, repo, "b.txt", "one\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "a.txt", "A\n")
+	testutil.WriteFile(t, repo, "b.txt", "B\n")
+	testutil.CommitAll(t, repo, "change")
+
+	m := New(repo, "HEAD")
+	m.ready = true
+	m.width = 100
+	m.height = 24
+	m.syncDiffViewport()
+	m.focusDiff = true
+
+	before, ok := m.selectedCommitFile()
+	if !ok {
+		t.Fatal("expected selected file")
+	}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '.', Text: "."})
+	m = updated.(Model)
+	after, ok := m.selectedCommitFile()
+	if !ok {
+		t.Fatal("expected selected file after .")
+	}
+	if after.Path == before.Path {
+		t.Fatalf("expected . in diff frame to move files, stayed on %q", after.Path)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: ',', Text: ","})
+	m = updated.(Model)
+	back, ok := m.selectedCommitFile()
+	if !ok {
+		t.Fatal("expected selected file after ,")
+	}
+	if back.Path != before.Path {
+		t.Fatalf("expected , in diff frame to return to %q, got %q", before.Path, back.Path)
 	}
 }
 

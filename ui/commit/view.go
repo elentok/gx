@@ -233,9 +233,9 @@ func (m Model) footerView() string {
 	if m.searchMode == searchModeInput {
 		return m.searchFooterText()
 	}
-	left := "j/k move  h/l tree  enter open  b body"
+	left := "j/k move  h/l tree  tab pane  ,/. commits"
 	if m.focusDiff {
-		left = "j/k move  a mode  .,/ files  / search  y yank"
+		left = "j/k move  a mode  tab pane  ,/. files  / search"
 	}
 	right := ui.StyleHint.Render("gw worktrees · gl log · gs status · q back")
 	if m.width <= 0 {

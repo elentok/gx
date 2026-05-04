@@ -67,6 +67,75 @@ func TestShellChordReplacesTabWithoutHistory(t *testing.T) {
 	}
 }
 
+func TestShellChordSwitchesRelativeTabs(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.Route{Kind: nav.RouteLog, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	m = updated.(Model)
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: ',', Text: ","})
+	if cmd == nil {
+		t.Fatalf("expected resize cmd when switching tabs with g,")
+	}
+	m = updated.(Model)
+	if m.activeTab != nav.RouteWorktrees {
+		t.Fatalf("expected g, to move left to worktrees, got %q", m.activeTab)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	m = updated.(Model)
+	updated, cmd = m.Update(tea.KeyPressMsg{Code: '.', Text: "."})
+	if cmd == nil {
+		t.Fatalf("expected resize cmd when switching tabs with g.")
+	}
+	m = updated.(Model)
+	if m.activeTab != nav.RouteLog {
+		t.Fatalf("expected g. to move right to log, got %q", m.activeTab)
+	}
+}
+
+func TestNumberKeysSwitchTabsGlobally(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.Route{Kind: nav.RouteStatus, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: '1', Text: "1"})
+	if cmd == nil {
+		t.Fatalf("expected resize cmd when switching to worktrees with 1")
+	}
+	m = updated.(Model)
+	if m.activeTab != nav.RouteWorktrees {
+		t.Fatalf("expected 1 to switch to worktrees, got %q", m.activeTab)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '2', Text: "2"})
+	m = updated.(Model)
+	if m.activeTab != nav.RouteLog {
+		t.Fatalf("expected 2 to switch to log, got %q", m.activeTab)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '3', Text: "3"})
+	m = updated.(Model)
+	if m.activeTab != nav.RouteStatus {
+		t.Fatalf("expected 3 to switch to status, got %q", m.activeTab)
+	}
+}
+
 func TestSwitchToUninitializedTabRunsInit(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
