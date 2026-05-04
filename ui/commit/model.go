@@ -97,6 +97,9 @@ func (m *Model) reload() {
 	if m.selected < 0 {
 		m.selected = 0
 	}
+	if entry, ok := m.selectedCommitEntry(); !ok || entry.Kind != commitFileEntryFile {
+		m.selectFirstCommitFile()
+	}
 	m.refreshDiff()
 }
 
@@ -112,7 +115,11 @@ func (m *Model) refreshDiff() {
 		m.section = explorer.NewSectionData()
 		return
 	}
-	m.section = explorer.BuildSectionData(rawDiff, rawDiff, m.section, false)
+	colorDiff, err := git.CommitFileDiffWithDeltaForRef(m.worktreeRoot, m.ref, file.Path, m.currentDiffRenderWidth())
+	if err != nil {
+		colorDiff = rawDiff
+	}
+	m.section = explorer.BuildSectionData(rawDiff, colorDiff, m.section, false)
 	if strings.TrimSpace(m.searchQuery) != "" && m.searchScope == searchScopeDiff {
 		cursor := m.searchCursor
 		m.recomputeSearchMatches()
@@ -125,4 +132,13 @@ func (m *Model) refreshDiff() {
 		}
 	}
 	m.syncDiffViewport()
+}
+
+func (m *Model) selectFirstCommitFile() {
+	for i, entry := range m.fileEntries {
+		if entry.Kind == commitFileEntryFile {
+			m.selected = i
+			return
+		}
+	}
 }

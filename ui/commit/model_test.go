@@ -312,3 +312,49 @@ func TestFilesPaneShowsNerdFontIcons(t *testing.T) {
 		t.Fatalf("expected files pane to show file icon, got:\n%s", pane)
 	}
 }
+
+func TestInitialSelectionChoosesFirstFileOverDirectory(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	if err := os.MkdirAll(filepath.Join(repo, "dir"), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	testutil.WriteFile(t, repo, "dir/file.txt", "one\ntwo\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "dir/file.txt", "ONE\nTWO\nTHREE\n")
+	testutil.CommitAll(t, repo, "change")
+
+	m := New(repo, "HEAD")
+	entry, ok := m.selectedCommitEntry()
+	if !ok {
+		t.Fatal("expected selected commit entry")
+	}
+	if entry.Kind != commitFileEntryFile {
+		t.Fatalf("expected initial selection to choose file entry, got %#v", entry)
+	}
+	if len(m.section.ViewLines) == 0 {
+		t.Fatal("expected initial file selection to load diff")
+	}
+}
+
+func TestRenderDiffPaneShowsActiveHunkMarkerInUnifiedMode(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	if err := os.MkdirAll(filepath.Join(repo, "dir"), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	testutil.WriteFile(t, repo, "dir/file.txt", "one\ntwo\nthree\nfour\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "dir/file.txt", "one\nTWO\nTHREE\nfour\n")
+	testutil.CommitAll(t, repo, "change")
+
+	m := New(repo, "HEAD")
+	m.ready = true
+	m.width = 100
+	m.height = 24
+	m.focusDiff = true
+	m.syncDiffViewport()
+
+	pane := m.renderDiffPane(70, 10)
+	if !strings.Contains(pane, "▌") {
+		t.Fatalf("expected active hunk marker in diff pane, got:\n%s", pane)
+	}
+}

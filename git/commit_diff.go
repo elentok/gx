@@ -75,3 +75,44 @@ func CommitFileDiffForRef(repoRoot, ref, path string) (string, error) {
 	}
 	return strings.TrimSpace(out), nil
 }
+
+func CommitFileDiffWithDeltaForRef(repoRoot, ref, path string, renderWidth int) (string, error) {
+	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		ref = "HEAD"
+	}
+	raw, _, err := run(repoRoot, []string{
+		"show",
+		"--find-renames",
+		"--unified=1",
+		"--no-color",
+		"--format=",
+		ref,
+		"--",
+		path,
+	})
+	if err != nil {
+		return "", err
+	}
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+	if out, deltaErr := colorizeWithDelta(repoRoot, raw, false, renderWidth); deltaErr == nil {
+		return out, nil
+	}
+	out, _, err := run(repoRoot, []string{
+		"show",
+		"--find-renames",
+		"--unified=1",
+		"--color=always",
+		"--format=",
+		ref,
+		"--",
+		path,
+	})
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}

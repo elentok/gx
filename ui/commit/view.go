@@ -121,21 +121,40 @@ func (m Model) renderDiffPane(width, height int) string {
 	if len(m.section.ViewLines) > 0 {
 		lines = make([]string, 0, maxInt(1, m.diffViewport.VisibleLineCount()))
 		bodyH := maxInt(1, height-2)
+		active := m.activeRawLineIndex()
+		hunkStart, hunkEnd := -1, -1
+		if m.diffNavMode == explorer.NavHunk && m.section.ActiveHunk >= 0 && m.section.ActiveHunk < len(m.section.Parsed.Hunks) {
+			hunkStart = m.section.Parsed.Hunks[m.section.ActiveHunk].StartLine
+			hunkEnd = m.section.Parsed.Hunks[m.section.ActiveHunk].EndLine
+		}
 		for i := 0; i < bodyH; i++ {
 			displayIdx := m.diffViewport.YOffset() + i
 			if displayIdx >= len(m.section.ViewLines) {
 				lines = append(lines, "")
 				continue
 			}
+			rawIdx := -1
+			if displayIdx >= 0 && displayIdx < len(m.section.DisplayToRaw) {
+				rawIdx = m.section.DisplayToRaw[displayIdx]
+			}
 			mark := "  "
 			if m.focusDiff {
-				if m.diffNavMode == explorer.NavHunk && m.section.ActiveHunk >= 0 && m.section.ActiveHunk < len(m.section.HunkDisplayRange) {
-					r := m.section.HunkDisplayRange[m.section.ActiveHunk]
-					if displayIdx >= r[0] && displayIdx <= r[1] {
-						mark = commitDiffMarkerStyle.Render("▌ ")
+				inActiveHunk := false
+				if m.diffNavMode == explorer.NavHunk {
+					if m.section.ActiveHunk >= 0 && m.section.ActiveHunk < len(m.section.HunkDisplayRange) {
+						r := m.section.HunkDisplayRange[m.section.ActiveHunk]
+						inActiveHunk = displayIdx >= r[0] && displayIdx <= r[1]
+					} else {
+						inActiveHunk = rawIdx >= 0 && rawIdx >= hunkStart && rawIdx <= hunkEnd
 					}
 				}
-				if m.diffNavMode == explorer.NavLine && m.section.ActiveLine >= 0 && m.section.ActiveLine < len(m.section.ChangedDisplay) && m.section.ChangedDisplay[m.section.ActiveLine] == displayIdx {
+				if inActiveHunk {
+					mark = commitDiffMarkerStyle.Render("▌ ")
+				}
+				if rawIdx >= 0 && rawIdx == active {
+					mark = commitDiffMarkerActiveStyle.Render("▌ ")
+				}
+				if rawIdx < 0 && m.diffNavMode == explorer.NavLine && m.section.ActiveLine >= 0 && m.section.ActiveLine < len(m.section.ChangedDisplay) && m.section.ChangedDisplay[m.section.ActiveLine] == displayIdx {
 					mark = commitDiffMarkerActiveStyle.Render("▌ ")
 				}
 			}
