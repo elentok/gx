@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.13.1
+
+- Normalize commit message newlines
+
 ## v0.13.0
 
 - Changed `gx` startup to open the status view by default (`gx worktrees` / `gx wt` still opens the worktree UI)
