@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui"
 	commitui "github.com/elentok/gx/ui/commit"
 	logui "github.com/elentok/gx/ui/log"
 	"github.com/elentok/gx/ui/nav"
@@ -126,6 +127,15 @@ func (m Model) View() tea.View {
 	}
 	content = normalizeFrameContent(content, m.width, m.height)
 	content = injectTabsIntoFooter(content, m.tabsView(), m.width)
+	if m.keyPrefix != "" {
+		hints := m.appChordHints(m.keyPrefix)
+		if hinter, ok := m.activePage().model.(ui.ChordHinter); ok {
+			hints = append(hints, hinter.ChordHints(m.keyPrefix)...)
+		}
+		if len(hints) > 0 {
+			content = ui.OverlayTopRight(content, ui.RenderChordOverlay(m.keyPrefix, hints), m.width)
+		}
+	}
 
 	v := tea.NewView(content)
 	v.AltScreen = true

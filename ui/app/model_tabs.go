@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
 
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -96,6 +97,8 @@ func (m *Model) handleShellChordKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 			next, cmd := m.switchTab(nav.Route{Kind: nav.RouteStatus})
 			*m = next.(Model)
 			return true, cmd
+		case "esc":
+			return true, nil
 		default:
 			current := m.activePage()
 			replayed, cmd := replayKeys(current.model, tea.KeyPressMsg{Code: 'g', Text: "g"}, msg)
@@ -234,3 +237,18 @@ func (m Model) switchRelativeTab(delta int) (tea.Model, tea.Cmd) {
 	}
 	return m.switchTab(nav.Route{Kind: tabs[next]})
 }
+
+// appChordHints returns the app-level chord completions for the given prefix key.
+func (m Model) appChordHints(prefix string) []key.Binding {
+	if prefix != "g" {
+		return nil
+	}
+	return []key.Binding{
+		key.NewBinding(key.WithHelp(",", "prev tab")),
+		key.NewBinding(key.WithHelp(".", "next tab")),
+		key.NewBinding(key.WithHelp("w", "worktrees tab")),
+		key.NewBinding(key.WithHelp("l", "log tab")),
+		key.NewBinding(key.WithHelp("s", "status tab")),
+	}
+}
+

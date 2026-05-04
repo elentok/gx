@@ -49,6 +49,9 @@ type Model struct {
 	statusMsg     string
 	headerOffset  int
 	err           error
+
+	helpOpen     bool
+	helpViewport viewport.Model
 }
 
 func New(worktreeRoot, ref string) Model {

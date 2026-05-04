@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/git"
 
 	"charm.land/bubbles/v2/textinput"
+	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -59,6 +60,9 @@ type Model struct {
 	searchMatch  []int
 	searchCursor int
 	err          error
+
+	helpOpen     bool
+	helpViewport viewport.Model
 }
 
 func New(worktreeRoot, startRef string) Model {

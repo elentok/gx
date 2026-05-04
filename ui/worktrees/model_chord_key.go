@@ -4,6 +4,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
 
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -64,7 +65,6 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	}
 	if key == "g" {
 		m.keyPrefix = "g"
-		m.statusMsg = ui.RenderInlineBindings(keys.Top, keys.GoOutput, keys.GoWorktrees, keys.GoLog, keys.GoStatus)
 		return m, nil, true
 	}
 	if key == "L" {
@@ -88,4 +88,19 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		return m, nil, true
 	}
 	return m, nil, false
+}
+
+// ChordHints returns chord completion hints for the given prefix.
+// Implements ui.ChordHinter.
+func (m Model) ChordHints(prefix string) []key.Binding {
+	if prefix == "g" {
+		return []key.Binding{
+			key.NewBinding(key.WithHelp("g", "top")),
+			key.NewBinding(key.WithHelp("o", "view output")),
+			key.NewBinding(key.WithHelp("w", "goto worktrees")),
+			key.NewBinding(key.WithHelp("l", "goto log")),
+			key.NewBinding(key.WithHelp("s", "goto status")),
+		}
+	}
+	return nil
 }

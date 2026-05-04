@@ -42,7 +42,17 @@ func (m Model) View() tea.View {
 	})
 	content := m.contentView(contentH)
 	footer := m.footerView()
-	v := tea.NewView(lipgloss.JoinVertical(lipgloss.Left, body, content, footer))
+	out := lipgloss.JoinVertical(lipgloss.Left, body, content, footer)
+	if m.keyPrefix != "" {
+		hints := m.ChordHints(m.keyPrefix)
+		if len(hints) > 0 {
+			out = ui.OverlayTopRight(out, ui.RenderChordOverlay(m.keyPrefix, hints), m.width)
+		}
+	}
+	if m.helpOpen {
+		out = ui.OverlayCenter(out, m.helpModalView(), m.width, m.height)
+	}
+	v := tea.NewView(out)
 	v.AltScreen = true
 	return v
 }
@@ -338,24 +348,24 @@ func isMainOrMasterRef(name string) bool {
 }
 
 func (m Model) footerView() string {
-	if m.statusMsg != "" {
-		return ui.StyleHint.Render(m.statusMsg)
-	}
 	if m.searchMode == searchModeInput {
 		return m.searchFooterText()
 	}
-	left := "j/k move  h/l tree  tab pane  ,/. commits"
-	if m.focusDiff {
-		left = "j/k move  a mode  tab pane  ,/. files  / search"
-	}
-	right := ui.StyleHint.Render("gw worktrees · gl log · gs status · q back")
+	left := m.statusMsg
+	right := ui.StyleHint.Render("? help")
 	if m.width <= 0 {
+		if left == "" {
+			return right
+		}
 		return left + "  " + right
 	}
-	leftW := len([]rune(left))
-	rightW := len([]rune(right))
-	if leftW+rightW >= m.width {
-		return left + "  " + right
+	rightW := ansi.StringWidth(right)
+	if left == "" {
+		return strings.Repeat(" ", m.width-rightW) + right
+	}
+	leftW := ansi.StringWidth(left)
+	if leftW+rightW+2 >= m.width {
+		return ansi.Truncate(left, m.width-rightW-2, "…") + "  " + right
 	}
 	return left + strings.Repeat(" ", m.width-leftW-rightW) + right
 }

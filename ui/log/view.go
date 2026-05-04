@@ -46,6 +46,15 @@ func (m Model) View() tea.View {
 		y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
 		out = ui.OverlayBottomCenter(out, overlay, m.width, y)
 	}
+	if m.keyPrefix != "" {
+		hints := m.ChordHints(m.keyPrefix)
+		if len(hints) > 0 {
+			out = ui.OverlayTopRight(out, ui.RenderChordOverlay(m.keyPrefix, hints), m.width)
+		}
+	}
+	if m.helpOpen {
+		out = ui.OverlayCenter(out, m.helpModalView(), m.width, m.height)
+	}
 	v := tea.NewView(out)
 	v.AltScreen = true
 	return v
@@ -202,7 +211,7 @@ func (m Model) footerView() string {
 	if left == "" {
 		left = "enter open commit"
 	}
-	right := ui.StyleHint.Render("/ search · q back · L lazygit log")
+	right := ui.StyleHint.Render("? help")
 	if m.width <= 0 {
 		return left + "  " + right
 	}

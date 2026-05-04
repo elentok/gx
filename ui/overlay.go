@@ -31,6 +31,16 @@ func OverlayBottomCenter(bg, fg string, screenW, y int) string {
 	return PlaceOverlay(bg, fg, x, y)
 }
 
+// OverlayTopRight places fg flush against the top-right corner of bg.
+func OverlayTopRight(bg, fg string, screenW int) string {
+	fgW := lipgloss.Width(fg)
+	x := screenW - fgW
+	if x < 0 {
+		x = 0
+	}
+	return PlaceOverlay(bg, fg, x, 0)
+}
+
 func PlaceOverlay(bg, fg string, x, y int) string {
 	bgLines := strings.Split(bg, "\n")
 	fgLines := strings.Split(fg, "\n")

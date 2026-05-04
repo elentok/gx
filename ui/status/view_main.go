@@ -58,6 +58,11 @@ func (m Model) View() tea.View {
 		out = ui.OverlayCenter(out, m.errorModalView(), m.width, m.height)
 	} else if m.helpOpen {
 		out = ui.OverlayCenter(out, m.helpModalView(), m.width, m.height)
+	} else if m.keyPrefix != "" {
+		hints := m.ChordHints(m.keyPrefix)
+		if len(hints) > 0 {
+			out = ui.OverlayTopRight(out, ui.RenderChordOverlay(m.keyPrefix, hints), m.width)
+		}
 	}
 	v := tea.NewView(out)
 	v.AltScreen = true

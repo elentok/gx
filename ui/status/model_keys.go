@@ -3,9 +3,10 @@ package status
 import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
-)
 
-import tea "charm.land/bubbletea/v2"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+)
 
 func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	key := msg.String()
@@ -44,12 +45,10 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	}
 	if key == "c" {
 		m.keyPrefix = "c"
-		m.setStatus(m.inlineHints(stageKeyCommit))
 		return m, nil, true
 	}
 	if key == "y" {
 		m.keyPrefix = "y"
-		m.setStatus(m.inlineHints(stageKeyYankText, stageKeyYankPath, stageKeyYankAll, stageKeyYankName))
 		return m, nil, true
 	}
 	if m.keyPrefix == "g" {
@@ -97,7 +96,6 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	}
 	if key == "g" && !isUpperG {
 		m.keyPrefix = "g"
-		m.setStatus(m.inlineHints(stageKeyTop, stageKeyOutput, stageKeyGoWorktree, stageKeyGoLog, stageKeyGoStatus))
 		return m, nil, true
 	}
 	if key == "L" {
@@ -114,4 +112,31 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	}
 	m.keyPrefix = ""
 	return m, nil, false
+}
+
+// ChordHints returns chord completion hints for the given prefix.
+// Implements ui.ChordHinter.
+func (m Model) ChordHints(prefix string) []key.Binding {
+	switch prefix {
+	case "g":
+		return []key.Binding{
+			key.NewBinding(key.WithHelp("g", "top")),
+			key.NewBinding(key.WithHelp("o", "view output")),
+			// key.NewBinding(key.WithHelp("w", "goto worktrees")),
+			// key.NewBinding(key.WithHelp("l", "goto log")),
+			// key.NewBinding(key.WithHelp("s", "goto status")),
+		}
+	case "c":
+		return []key.Binding{
+			key.NewBinding(key.WithHelp("c", "git commit")),
+		}
+	case "y":
+		return []key.Binding{
+			key.NewBinding(key.WithHelp("y", "yank content")),
+			key.NewBinding(key.WithHelp("l", "yank location")),
+			key.NewBinding(key.WithHelp("a", "yank all")),
+			key.NewBinding(key.WithHelp("f", "yank filename")),
+		}
+	}
+	return nil
 }

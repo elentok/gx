@@ -2,7 +2,6 @@ package log
 
 import (
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
 
 	tea "charm.land/bubbletea/v2"
@@ -19,6 +18,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
+		if m.helpOpen {
+			return m.handleHelpKey(msg)
+		}
 		if m.searchMode == searchModeInput {
 			return m.handleSearchKey(msg)
 		}
@@ -29,6 +31,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		switch msg.String() {
+		case "?":
+			return m.enterHelpMode(), nil
 		case "q":
 			if m.settings.EnableNavigation {
 				return m, nav.Back()
@@ -49,10 +53,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "g":
 			m.keyPrefix = "g"
-			m.statusMsg = ui.RenderInlineBindings(logKeyTop, logKeyWorktrees, logKeyHead, logKeyStatus, logKeyGotoLog)
 		case "]", "[":
 			m.keyPrefix = msg.String()
-			m.statusMsg = ""
 		case "G":
 			if len(m.rows) > 0 {
 				m.cursor = len(m.rows) - 1
@@ -65,8 +67,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.advanceSearch(-1)
 		case "enter":
 			return m, m.openSelected()
-		case "L":
-			m.statusMsg = "lazygit log not wired here yet"
 		case "R":
 			m.reload()
 		}

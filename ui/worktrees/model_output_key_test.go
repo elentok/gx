@@ -11,7 +11,6 @@ import (
 	"github.com/elentok/gx/ui/nav"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/charmbracelet/x/ansi"
 )
 
 func TestGGJumpsToTop(t *testing.T) {
@@ -95,10 +94,18 @@ func TestGShowsChordHint(t *testing.T) {
 	}
 	m = updated.(Model)
 
-	hint := ansi.Strip(m.statusMsg)
-	for _, want := range []string{"gg", "top", "go", "view output", "gw", "goto worktrees", "gl", "goto log", "gs", "goto status"} {
-		if !strings.Contains(hint, want) {
-			t.Fatalf("expected chord hint %q in %q", want, hint)
+	if m.keyPrefix != "g" {
+		t.Fatalf("expected keyPrefix=g, got %q", m.keyPrefix)
+	}
+	// Chord hints are now shown in the chord overlay (via ChordHints), not statusMsg.
+	hints := m.ChordHints("g")
+	allDescs := ""
+	for _, h := range hints {
+		allDescs += " " + h.Help().Key + " " + h.Help().Desc
+	}
+	for _, want := range []string{"g", "top", "o", "view output", "w", "goto worktrees", "l", "goto log", "s", "goto status"} {
+		if !strings.Contains(allDescs, want) {
+			t.Fatalf("expected chord hint %q in ChordHints descriptions %q", want, allDescs)
 		}
 	}
 }

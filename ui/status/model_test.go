@@ -1763,8 +1763,20 @@ func TestCCTriggersCommitCommand(t *testing.T) {
 	if m.keyPrefix != "c" {
 		t.Fatalf("expected keyPrefix=c after first c, got %q", m.keyPrefix)
 	}
-	if hint := ansi.Strip(m.statusMsg); !strings.Contains(hint, "cc") || !strings.Contains(hint, "git commit") {
-		t.Fatalf("expected binding-driven commit hint, got %q", hint)
+	// Chord hints are now shown in the chord overlay (via ChordHints), not statusMsg.
+	hints := m.ChordHints("c")
+	if len(hints) == 0 {
+		t.Fatalf("expected ChordHints(\"c\") to return bindings, got none")
+	}
+	found := false
+	for _, h := range hints {
+		if strings.Contains(h.Help().Desc, "commit") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected \"commit\" in ChordHints(\"c\") descriptions")
 	}
 
 	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
@@ -1788,11 +1800,19 @@ func TestYShowsBindingDrivenYankHint(t *testing.T) {
 		t.Fatalf("first y should not launch command")
 	}
 	m = updated.(Model)
+	if m.keyPrefix != "y" {
+		t.Fatalf("expected keyPrefix=y, got %q", m.keyPrefix)
+	}
 
-	hint := ansi.Strip(m.statusMsg)
-	for _, want := range []string{"yy", "content", "yl", "location", "ya", "all", "yf", "filename"} {
-		if !strings.Contains(hint, want) {
-			t.Fatalf("expected yank hint %q in %q", want, hint)
+	// Chord hints are now shown in the chord overlay (via ChordHints), not statusMsg.
+	hints := m.ChordHints("y")
+	allDescs := ""
+	for _, h := range hints {
+		allDescs += " " + h.Help().Key + " " + h.Help().Desc
+	}
+	for _, want := range []string{"y", "content", "l", "location", "a", "all", "f", "filename"} {
+		if !strings.Contains(allDescs, want) {
+			t.Fatalf("expected yank hint %q in ChordHints descriptions %q", want, allDescs)
 		}
 	}
 }

@@ -22,6 +22,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if key == "ctrl+c" {
 			return m, tea.Quit
 		}
+		if m.helpOpen {
+			return m.handleHelpKey(msg)
+		}
 		if handled, cmd := m.handleSearchKey(msg); handled {
 			return m, cmd
 		}
@@ -53,6 +56,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		switch key {
+		case "?":
+			return m.enterHelpMode(), nil
 		case "q", "esc":
 			if len(m.searchMatches) > 0 {
 				m.clearSearch()
@@ -257,16 +262,13 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 			return m, nav.Replace(nav.Route{Kind: nav.RouteLog, WorktreeRoot: m.worktreeRoot, Ref: m.ref}), true
 		case "s":
 			return m, nav.Replace(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: m.worktreeRoot}), true
+		case "esc":
+			return m, nil, true
 		}
 		return m, nil, true
 	}
 	if key == "y" {
 		m.keyPrefix = "y"
-		if m.focusHeader {
-			m.setStatus("yy commit body · yl location · ya all · yf filename")
-		} else {
-			m.setStatus("yy content · yl location · ya all · yf filename")
-		}
 		return m, nil, true
 	}
 	if key == "g" && !isUpperG {
