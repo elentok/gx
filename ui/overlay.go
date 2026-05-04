@@ -24,21 +24,26 @@ func OverlayCenter(bg, fg string, screenW, screenH int) string {
 // OverlayBottomCenter places fg horizontally centered at the given y coordinate.
 func OverlayBottomCenter(bg, fg string, screenW, y int) string {
 	fgW := lipgloss.Width(fg)
-	x := (screenW - fgW) / 2
-	if x < 0 {
-		x = 0
-	}
+	x := max((screenW-fgW)/2, 0)
 	return PlaceOverlay(bg, fg, x, y)
 }
 
-// OverlayTopRight places fg flush against the top-right corner of bg.
+// OverlayBottomRight places fg against the top-right corner of bg (1px margin).
 func OverlayTopRight(bg, fg string, screenW int) string {
 	fgW := lipgloss.Width(fg)
-	x := screenW - fgW
-	if x < 0 {
-		x = 0
-	}
-	return PlaceOverlay(bg, fg, x, 0)
+	x := max(screenW-fgW-1, 0)
+	return PlaceOverlay(bg, fg, x, 1)
+}
+
+// OverlayTopRight places fg against the bottom-right corner of bg
+// (1px horizontal margin and 2px vertical margin)
+func OverlayBottomRight(bg, fg string, screenW int, screenH int) string {
+	fgW := lipgloss.Width(fg)
+	fgH := lipgloss.Height(fg)
+	x := max(screenW-fgW-1, 0)
+	y := max(screenH-fgH-2, 0)
+
+	return PlaceOverlay(bg, fg, x, y)
 }
 
 func PlaceOverlay(bg, fg string, x, y int) string {

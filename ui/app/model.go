@@ -54,9 +54,9 @@ type Model struct {
 
 func New(repo git.Repo, settings Settings) Model {
 	m := Model{
-		repo:     repo,
-		settings: settings,
-		tabs:     make(map[nav.RouteKind]tabPageState),
+		repo:      repo,
+		settings:  settings,
+		tabs:      make(map[nav.RouteKind]tabPageState),
 		histories: make(map[nav.RouteKind][]pageState),
 	}
 	if m.settings.InitialRoute.Kind == "" {
@@ -133,7 +133,7 @@ func (m Model) View() tea.View {
 			hints = append(hints, hinter.ChordHints(m.keyPrefix)...)
 		}
 		if len(hints) > 0 {
-			content = ui.OverlayTopRight(content, ui.RenderChordOverlay(m.keyPrefix, hints), m.width)
+			content = ui.OverlayBottomRight(content, ui.RenderChordOverlay(m.keyPrefix, hints), m.width, m.height)
 		}
 	}
 

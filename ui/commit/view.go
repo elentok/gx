@@ -46,7 +46,7 @@ func (m Model) View() tea.View {
 	if m.keyPrefix != "" {
 		hints := m.ChordHints(m.keyPrefix)
 		if len(hints) > 0 {
-			out = ui.OverlayTopRight(out, ui.RenderChordOverlay(m.keyPrefix, hints), m.width)
+			out = ui.OverlayBottomRight(out, ui.RenderChordOverlay(m.keyPrefix, hints), m.width, m.height)
 		}
 	}
 	if m.helpOpen {
