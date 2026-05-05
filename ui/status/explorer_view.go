@@ -253,6 +253,9 @@ func (m *Model) syncDiffViewports() {
 	}
 	_, diffW := m.splitWidth()
 	_, diffH := m.splitHeight(mainH)
+	if m.diffFullscreen && m.focus == focusDiff {
+		diffW = m.width
+	}
 	vpW := maxInt(1, diffW-4)
 	wrapWidth := maxInt(1, vpW-2)
 	reflowSectionLines(m.sectionState(sectionUnstaged), wrapWidth, m.wrapSoft)
