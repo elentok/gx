@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/help"
 
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
@@ -31,8 +32,7 @@ type Model struct {
 	err                     error
 	errorOpen               bool
 	errorVP                 viewport.Model
-	helpOpen                bool
-	helpVP                  viewport.Model
+	help                    help.Model
 	activeFilePath          string
 	diffReloadSeq           int
 	colorizeSeq             int
@@ -133,11 +133,7 @@ var (
 	ansiOSCRe = regexp.MustCompile(`\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)`) // OSC ... BEL/ST
 )
 
-func New(worktreeRoot string) Model {
-	return NewWithSettings(worktreeRoot, DefaultSettings())
-}
-
-func NewWithSettings(worktreeRoot string, settings Settings) Model {
+func NewModel(worktreeRoot string, settings Settings) Model {
 	if settings.DiffContextLines < 0 {
 		settings.DiffContextLines = 0
 	}
@@ -149,6 +145,7 @@ func NewWithSettings(worktreeRoot string, settings Settings) Model {
 		settings:         settings,
 		initialPath:      settings.InitialPath,
 		diffContextLines: settings.DiffContextLines,
+		help:             help.NewModel(keySections),
 		explorerState: explorerState{
 			focus:      focusStatus,
 			section:    sectionUnstaged,

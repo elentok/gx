@@ -64,11 +64,7 @@ type Model struct {
 	help help.Model
 }
 
-func New(worktreeRoot, startRef string) Model {
-	return NewWithSettings(worktreeRoot, startRef, Settings{UseNerdFontIcons: true})
-}
-
-func NewWithSettings(worktreeRoot, startRef string, settings Settings) Model {
+func NewModel(worktreeRoot, startRef string, settings Settings) Model {
 	m := Model{
 		worktreeRoot: worktreeRoot,
 		settings:     settings,

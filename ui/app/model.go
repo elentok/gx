@@ -215,14 +215,14 @@ func (m Model) newPage(route nav.Route) pageState {
 		}
 		return pageState{
 			route: route,
-			model: statusui.NewWithSettings(route.WorktreeRoot, settings),
+			model: statusui.NewModel(route.WorktreeRoot, settings),
 		}
 	case nav.RouteLog:
 		settings := m.settings.Log
 		settings.EnableNavigation = true
 		return pageState{
 			route: route,
-			model: logui.NewWithSettings(route.WorktreeRoot, route.Ref, settings),
+			model: logui.NewModel(route.WorktreeRoot, route.Ref, settings),
 		}
 	case nav.RouteCommit:
 		settings := m.settings.Commit

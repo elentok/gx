@@ -20,19 +20,6 @@ func (m Model) errorModalView() string {
 	)
 }
 
-func (m Model) helpModalView() string {
-	return ui.RenderModalFrame(ui.ModalFrameOptions{
-		Title:         "Keybindings",
-		TitleInBorder: true,
-		Body:          m.helpVP.View(),
-		Hint:          ui.JoinStatus(ui.RenderInlineBindings(stageKeyHelp), ui.HintDismissAndScroll()),
-		Width:         m.helpVP.Width(),
-		BorderColor:   ui.ColorBlue,
-		TitleColor:    ui.ColorBlue,
-		HintColor:     ui.ColorSubtle,
-	})
-}
-
 func (m Model) panelStyle(active bool) lipgloss.Style {
 	borderColor := ui.ColorSubtle
 	if active {

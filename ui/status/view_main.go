@@ -56,8 +56,8 @@ func (m Model) View() tea.View {
 		out = ui.OverlayCenter(out, m.confirmModalView(), m.width, m.height)
 	} else if m.errorOpen {
 		out = ui.OverlayCenter(out, m.errorModalView(), m.width, m.height)
-	} else if m.helpOpen {
-		out = ui.OverlayCenter(out, m.helpModalView(), m.width, m.height)
+	} else if m.help.IsOpen {
+		out = ui.OverlayCenter(out, m.help.View(), m.width, m.height)
 	} else if m.keyPrefix != "" {
 		hints := m.ChordHints(m.keyPrefix)
 		if len(hints) > 0 {

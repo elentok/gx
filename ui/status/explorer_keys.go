@@ -131,8 +131,6 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		m.openDiscardDiffConfirm()
 		return m, nil
-	case "?":
-		m.showHelpOverlay()
 	case ".":
 		if !m.explorerCanJumpFiles() {
 			return m, nil

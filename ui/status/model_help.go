@@ -72,10 +72,3 @@ func (m Model) navModeLabel() string {
 	}
 	return "hunk"
 }
-
-func (m *Model) showHelpOverlay() {
-	vp := help.NewViewportModel(m.width, m.height)
-	vp.SetContent(help.RenderView(keySections))
-	m.helpVP = vp
-	m.helpOpen = true
-}

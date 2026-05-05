@@ -6,12 +6,6 @@ import (
 	"charm.land/bubbles/v2/key"
 )
 
-const (
-	MIN_WIDTH  = 56
-	MAX_WIDTH  = 104
-	MIN_HEIGHT = 8
-)
-
 var keySections = []help.KeySection{
 	help.NewKeySection("Navigation", logKeyUp, logKeyDown, logKeyTop, logKeyBottom, logKeyOpen),
 	help.NewKeySection("Search", logKeySearch, logKeyResultNext, logKeyResultPrev),

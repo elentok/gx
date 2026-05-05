@@ -3,7 +3,7 @@ package status
 import tea "charm.land/bubbletea/v2"
 
 func (m *Model) handleMouseWheel(msg tea.MouseWheelMsg) bool {
-	if m.runningOpen || m.confirmOpen || m.errorOpen || m.helpOpen || m.searchMode != searchModeNone {
+	if m.runningOpen || m.confirmOpen || m.errorOpen || m.help.IsOpen || m.searchMode != searchModeNone {
 		return false
 	}
 	mouse := msg.Mouse()

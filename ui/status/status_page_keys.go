@@ -92,8 +92,6 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, m.reloadDiffsForSelection()
 		}
 		return m, m.enterDiffFromStatus(false)
-	case "?":
-		m.showHelpOverlay()
 	case "d":
 		m.openDiscardStatusConfirm()
 	case "e":

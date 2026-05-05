@@ -15,6 +15,8 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
+var settings = Settings{}
+
 func TestReloadAssignsBranchHistoryClasses(t *testing.T) {
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	wtDir := filepath.Join(repoDir, "feature")
@@ -33,7 +35,7 @@ func TestReloadAssignsBranchHistoryClasses(t *testing.T) {
 	testutil.WriteFile(t, wtDir, "local.txt", "local\n")
 	testutil.CommitAll(t, wtDir, "local only")
 
-	m := New(wtDir, "")
+	m := NewModel(wtDir, "", settings)
 	got := map[string]git.BranchHistoryClass{}
 	for _, row := range m.rows {
 		if row.kind != rowCommit {
@@ -72,7 +74,7 @@ func TestGHResetsCustomRefToHead(t *testing.T) {
 	testutil.WriteFile(t, repo, "one.txt", "one\n")
 	testutil.CommitAll(t, repo, "one")
 
-	m := NewWithSettings(repo, "HEAD~1", Settings{EnableNavigation: true})
+	m := NewModel(repo, "HEAD~1", Settings{EnableNavigation: true})
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	m = updated.(Model)
 
@@ -92,7 +94,7 @@ func TestGHResetsCustomRefToHead(t *testing.T) {
 func TestEnterOnCommitRowOpensCommitRoute(t *testing.T) {
 	repo := testutil.TempRepo(t)
 
-	m := New(repo, "")
+	m := NewModel(repo, "", settings)
 	for i := range m.rows {
 		if m.rows[i].kind == rowCommit {
 			m.cursor = i
@@ -197,7 +199,7 @@ func TestCloseSearchKeepsMatchesVisible(t *testing.T) {
 	testutil.WriteFile(t, repo, "two.txt", "two\n")
 	testutil.CommitAll(t, repo, "fix two")
 
-	m := New(repo, "")
+	m := NewModel(repo, "", settings)
 	m.enterSearchMode()
 	m.searchQuery = "fix"
 	m.recomputeSearchMatches()
@@ -221,7 +223,7 @@ func TestNAndNShiftMoveBetweenSearchResults(t *testing.T) {
 	testutil.WriteFile(t, repo, "two.txt", "two\n")
 	testutil.CommitAll(t, repo, "fix two")
 
-	m := New(repo, "")
+	m := NewModel(repo, "", settings)
 	m.searchQuery = "fix"
 	m.recomputeSearchMatches()
 	if len(m.searchMatch) < 2 {

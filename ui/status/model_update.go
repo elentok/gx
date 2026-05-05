@@ -17,17 +17,24 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		m.ready = true
-		var cmd tea.Cmd
+
+		var helpCmd tea.Cmd
+		var reloadCmd tea.Cmd
+
 		if m.renderMode == renderSideBySide {
-			cmd = m.reloadDiffsForSelection()
+			reloadCmd = m.reloadDiffsForSelection()
 		}
 		m.syncDiffViewports()
-		return m, cmd
+
+		m.help, helpCmd = m.help.Update(msg)
+		return m, tea.Batch(reloadCmd, helpCmd)
 	case tea.FocusMsg:
 		cmd := m.refreshPreserveScroll()
 		return m, cmd
@@ -106,6 +113,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, tea.Quit
 		}
+		if msg.String() == "?" {
+			m.help.Open(m.width, m.height)
+			return m, nil
+		}
 		if m.credentialOpen {
 			return m.handleCredentialKey(msg)
 		}
@@ -121,8 +132,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.errorOpen {
 			return m.handleErrorKey(msg)
 		}
-		if m.helpOpen {
-			return m.handleHelpKey(msg)
+		if m.help.IsOpen {
+			m.help, cmd = m.help.Update(msg)
+			return m, cmd
 		}
 		if m.searchMode != searchModeNone {
 			return m.handleSearchKey(msg)
@@ -187,16 +199,5 @@ func (m Model) handleErrorKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	var cmd tea.Cmd
 	m.errorVP, cmd = m.errorVP.Update(msg)
-	return m, cmd
-}
-
-func (m Model) handleHelpKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "q", "?", "esc", "enter":
-		m.helpOpen = false
-		return m, nil
-	}
-	var cmd tea.Cmd
-	m.helpVP, cmd = m.helpVP.Update(msg)
 	return m, cmd
 }

@@ -32,11 +32,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.SetContainerSize(msg.Width, msg.Height)
+		m.setContainerSize(msg.Width, msg.Height)
 		return m, nil
 
 	case tea.KeyPressMsg:
-		m, cmd = m.HandleKey(msg)
+		m, cmd = m.handleKey(msg)
 		return m, cmd
 	}
 	return m, nil
@@ -61,7 +61,7 @@ func (m Model) View() string {
 	})
 }
 
-func (m Model) HandleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "?", "esc", "enter":
 		m.IsOpen = false
@@ -82,10 +82,10 @@ func NewViewportModel(containerWidth int, containerHeight int) viewport.Model {
 
 func (m *Model) Open(containerWidth, containerHeight int) {
 	m.IsOpen = true
-	m.SetContainerSize(containerWidth, containerHeight)
+	m.setContainerSize(containerWidth, containerHeight)
 }
 
-func (m *Model) SetContainerSize(containerWidth, containerHeight int) {
+func (m *Model) setContainerSize(containerWidth, containerHeight int) {
 	vpW := min(max(containerWidth*2/3, MIN_WIDTH), MAX_WIDTH)
 	vpH := max(containerHeight/2-4, MIN_HEIGHT)
 	m.Viewport.SetWidth(vpW)
