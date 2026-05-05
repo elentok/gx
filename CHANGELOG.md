@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.13.3
+
+- Add left padding to unified diff while async delta colorization is pending, reducing flicker when switching files
+- Fix syntax highlighting disappearing after staging a hunk
+- Fix unified diff not reflowing to the new width when toggling fullscreen in the status view
+
 ## v0.13.2
 
 - Normalize keymappings (partially, there's still work to do)
