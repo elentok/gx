@@ -47,8 +47,8 @@ func TestSplitWidthExpandsForLongVisibleStatusRows(t *testing.T) {
 				Kind:        statusEntryFile,
 				DisplayName: "renamed.go",
 				File: git.StageFileStatus{
-					Path:         "new/path/renamed.go",
-					RenameFrom:   "old/path/original-name.go",
+					Path:         "new/renamed.go",
+					RenameFrom:   "old/name.go",
 					IndexStatus:  'R',
 					WorktreeCode: ' ',
 				},
@@ -65,7 +65,7 @@ func TestSplitWidthExpandsForLongVisibleStatusRows(t *testing.T) {
 		t.Fatalf("expected diff pane to shrink when status pane grows, got %d", diffW)
 	}
 	pane := ansi.Strip(m.renderStatusPane(statusW, 10))
-	if !strings.Contains(pane, "old/path/original-name.go -> new/path/renamed.go") {
+	if !strings.Contains(pane, "old/name.go -> new/renamed.go") {
 		t.Fatalf("expected full renamed path to fit without truncation, got:\n%s", pane)
 	}
 }
@@ -81,6 +81,7 @@ func TestSplitWidthHonorsMaximumStatusPaneWidth(t *testing.T) {
 	}
 
 	statusW, diffW := m.splitWidth()
+	fmt.Printf("statusW: %d", statusW)
 	if statusW != maxStatusPaneWidth {
 		t.Fatalf("expected status pane max width %d, got %d", maxStatusPaneWidth, statusW)
 	}
