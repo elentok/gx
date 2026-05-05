@@ -136,17 +136,17 @@ func (m *Model) applySelection() tea.Cmd {
 	sec.visualAnchor = sec.activeLine
 	m.setStatus("updated " + file.Path)
 	from := m.section
-	m.reload(file.Path)
+	reloadCmd := m.reload(file.Path)
 	if m.shouldSwitchAfterApply(from) {
 		m.focusMovedTarget(sig)
 		if m.flash.active {
-			return nextFlashCmd()
+			return tea.Batch(reloadCmd, nextFlashCmd())
 		}
 	} else {
 		m.section = from
 		m.ensureActiveVisible(m.currentSection())
 	}
-	return nil
+	return reloadCmd
 }
 
 func isCorruptPatchErr(err error) bool {
