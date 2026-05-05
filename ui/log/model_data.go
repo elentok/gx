@@ -7,6 +7,11 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
+type reloadMsg struct {
+	rows []row
+	err  error
+}
+
 func (m *Model) reload() {
 	entries, err := git.LogEntries(m.worktreeRoot, m.startRef, maxLogEntries)
 	if err != nil {
@@ -30,12 +35,33 @@ func (m *Model) reload() {
 	m.recomputeSearchMatches()
 }
 
+func (m Model) cmdReload() tea.Cmd {
+	worktreeRoot := m.worktreeRoot
+	startRef := m.startRef
+	return func() tea.Msg {
+		entries, err := git.LogEntries(worktreeRoot, startRef, maxLogEntries)
+		if err != nil {
+			return reloadMsg{err: err}
+		}
+		classes := fetchBranchHistoryClasses(worktreeRoot, startRef)
+		rows := make([]row, 0, len(entries))
+		for _, entry := range entries {
+			rows = append(rows, row{kind: rowCommit, commit: entry, class: classes[entry.FullHash]})
+		}
+		return reloadMsg{rows: rows}
+	}
+}
+
 func (m Model) branchHistoryClasses() map[string]git.BranchHistoryClass {
-	if m.startRef != "HEAD" {
+	return fetchBranchHistoryClasses(m.worktreeRoot, m.startRef)
+}
+
+func fetchBranchHistoryClasses(worktreeRoot, startRef string) map[string]git.BranchHistoryClass {
+	if startRef != "HEAD" {
 		return nil
 	}
 
-	branch, err := git.CurrentBranch(m.worktreeRoot)
+	branch, err := git.CurrentBranch(worktreeRoot)
 	if err != nil {
 		return nil
 	}
@@ -44,12 +70,12 @@ func (m Model) branchHistoryClasses() map[string]git.BranchHistoryClass {
 		return nil
 	}
 
-	repo, err := git.FindRepo(m.worktreeRoot)
+	repo, err := git.FindRepo(worktreeRoot)
 	if err != nil {
 		return nil
 	}
 
-	history, err := git.BranchHistorySinceMain(*repo, branch, git.UpstreamBranch(m.worktreeRoot, branch))
+	history, err := git.BranchHistorySinceMain(*repo, branch, git.UpstreamBranch(worktreeRoot, branch))
 	if err != nil {
 		return nil
 	}

@@ -11,6 +11,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case reloadMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		m.err = nil
+		m.rows = msg.rows
+		if m.cursor >= len(m.rows) {
+			m.cursor = len(m.rows) - 1
+		}
+		if m.cursor < 0 {
+			m.cursor = 0
+		}
+		m.recomputeSearchMatches()
+		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -74,7 +89,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			return m, m.openSelected()
 		case "R":
-			m.reload()
+			return m, m.cmdReload()
 		}
 	}
 	return m, nil

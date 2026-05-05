@@ -80,7 +80,7 @@ func NewWithSettings(worktreeRoot, startRef string, settings Settings) Model {
 	return m
 }
 
-func (m Model) Init() tea.Cmd { return nil }
+func (m Model) Init() tea.Cmd { return m.cmdReload() }
 
 func (m Model) InputFocused() bool {
 	return m.searchMode == searchModeInput
