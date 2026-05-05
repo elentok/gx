@@ -15,6 +15,12 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
+const (
+	FILE_TREE_MIN_WIDTH = 25
+	FILE_TREE_MAX_WIDTH = 45
+	DIFF_MIN_WIDTH      = 40
+)
+
 var commitMetaStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
 var commitSubjectStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true)
 var commitDiffMarkerStyle = lipgloss.NewStyle().Foreground(ui.ColorOrange)
@@ -29,9 +35,9 @@ func (m Model) View() tea.View {
 	}
 
 	bodyH, contentH := m.layoutHeights()
-	headerRows := maxInt(1, bodyH-2)
+	headerRows := max(1, bodyH-2)
 	body := ui.RenderPanelFrame(ui.PanelFrameOptions{
-		Width:       maxInt(20, m.width),
+		Width:       max(20, m.width),
 		Height:      bodyH,
 		Title:       m.headerTitle(),
 		RightTitle:  m.headerRightTitle(),
@@ -131,7 +137,7 @@ func (m Model) headerRightTitle() string {
 func (m Model) contentView(contentH int) string {
 	if len(m.fileEntries) == 0 {
 		return ui.RenderPanelFrame(ui.PanelFrameOptions{
-			Width:       maxInt(20, m.width),
+			Width:       max(20, m.width),
 			Height:      contentH,
 			Title:       "Changes",
 			BorderColor: ui.ColorBorder,
@@ -143,8 +149,8 @@ func (m Model) contentView(contentH int) string {
 
 	mainH := contentH
 	if m.width < 90 {
-		filesH := maxInt(5, mainH/3)
-		diffH := maxInt(5, mainH-filesH)
+		filesH := max(5, mainH/3)
+		diffH := max(5, mainH-filesH)
 		files := m.renderFilesPane(m.width, filesH)
 		diff := m.renderDiffPane(m.width, diffH)
 		return lipgloss.JoinVertical(lipgloss.Left, files, diff)
@@ -157,11 +163,11 @@ func (m Model) contentView(contentH int) string {
 }
 
 func (m Model) layoutHeights() (bodyH, contentH int) {
-	available := maxInt(2, m.height-1) // reserve one line for footer
-	naturalBody := minInt(commitHeaderMaxRows, maxInt(1, len(m.headerLines()))) + 2
-	bodyH = minInt(12, naturalBody)
+	available := max(2, m.height-1) // reserve one line for footer
+	naturalBody := min(commitHeaderMaxRows, max(1, len(m.headerLines()))) + 2
+	bodyH = min(12, naturalBody)
 	if bodyH > available-1 {
-		bodyH = maxInt(1, available-1)
+		bodyH = max(1, available-1)
 	}
 	contentH = available - bodyH
 	if contentH < 1 {
@@ -171,7 +177,7 @@ func (m Model) layoutHeights() (bodyH, contentH int) {
 }
 
 func (m Model) headerViewportRowsCount() int {
-	rows := minInt(commitHeaderMaxRows, maxInt(1, len(m.headerLines())))
+	rows := min(commitHeaderMaxRows, max(1, len(m.headerLines())))
 	if rows < 1 {
 		return 1
 	}
@@ -193,7 +199,7 @@ func (m Model) visibleHeaderLines(viewportRows int) []string {
 		viewportRows = len(all)
 	}
 	offset := m.headerOffset
-	maxOffset := maxInt(0, len(all)-viewportRows)
+	maxOffset := max(0, len(all)-viewportRows)
 	if offset < 0 {
 		offset = 0
 	}
@@ -240,8 +246,8 @@ func (m Model) renderFilesPane(width, height int) string {
 func (m Model) renderDiffPane(width, height int) string {
 	lines := []string{ui.StyleMuted.Render("no diff")}
 	if len(m.section.ViewLines) > 0 {
-		lines = make([]string, 0, maxInt(1, m.diffViewport.VisibleLineCount()))
-		bodyH := maxInt(1, height-2)
+		lines = make([]string, 0, max(1, m.diffViewport.VisibleLineCount()))
+		bodyH := max(1, height-2)
 		active := m.activeRawLineIndex()
 		hunkStart, hunkEnd := -1, -1
 		if m.diffNavMode == explorer.NavHunk && m.section.ActiveHunk >= 0 && m.section.ActiveHunk < len(m.section.Parsed.Hunks) {
@@ -371,7 +377,7 @@ func (m Model) footerView() string {
 }
 
 func (m Model) visibleFileLines(height int) []string {
-	innerH := maxInt(1, height-2)
+	innerH := max(1, height-2)
 	icons := ui.Icons(m.settings.UseNerdFontIcons)
 	rows := explorer.BuildVisibleSidebarRenderableRows(m.fileEntries, m.selected, innerH, func(i int, entry commitFileEntry) explorer.SidebarRenderableRow {
 		statusColor := commitEntryColor(entry)
@@ -409,26 +415,17 @@ func (m Model) requiredFilesPaneWidth(height int) int {
 			required = w
 		}
 	}
-	return required + 2
+	// 2 for the frame + 1 for padding
+	return required + 2 + 1
 }
 
 func (m Model) filesPaneWidth(height int) int {
-	width := m.requiredFilesPaneWidth(height)
-	maxWidth := minInt(72, int(float64(m.width)*0.45))
-	if maxWidth < 24 {
-		maxWidth = 24
+	width := max(FILE_TREE_MIN_WIDTH, min(FILE_TREE_MAX_WIDTH, m.requiredFilesPaneWidth(height)))
+	if m.width-width < DIFF_MIN_WIDTH {
+		width = m.width - DIFF_MIN_WIDTH
 	}
-	if width < 24 {
-		width = 24
-	}
-	if width > maxWidth {
-		width = maxWidth
-	}
-	if m.width-width < 40 {
-		width = m.width - 40
-	}
-	if width < 24 {
-		width = 24
+	if width < FILE_TREE_MIN_WIDTH {
+		width = FILE_TREE_MIN_WIDTH
 	}
 	return width
 }
@@ -516,18 +513,4 @@ func commitFileIcon(file git.CommitFile, useNerdFontIcons bool) string {
 	default:
 		return icons.FileModified
 	}
-}
-
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

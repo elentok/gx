@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	minStatusPaneWidth  = 30
-	maxStatusPaneWidth  = 72
+	minStatusPaneWidth  = 25
+	maxStatusPaneWidth  = 45
 	minDiffPaneWidth    = 60
 	minStatusPaneHeight = 5
 )
