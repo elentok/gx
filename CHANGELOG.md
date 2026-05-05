@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.13.4
+
+- Log view now reloads commits on open and supports `R` to reload manually
+- Fix commit sidebar min width (25 instead of 45) so short file lists don't waste space
+
 ## v0.13.3
 
 - Add left padding to unified diff while async delta colorization is pending, reducing flicker when switching files
