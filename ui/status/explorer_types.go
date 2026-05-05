@@ -32,6 +32,10 @@ type sectionState struct {
 	visualActive     bool
 	visualAnchor     int
 	viewport         viewport.Model
+	// colorized is true once the async delta colorization has arrived.
+	// While false, the view adds left padding to reserve space for the delta
+	// line-number gutter that will appear once colorization completes.
+	colorized bool
 }
 
 type flashState struct {

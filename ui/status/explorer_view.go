@@ -171,7 +171,13 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 			if displayIdx >= 0 && displayIdx < len(sec.viewLineKinds) {
 				rowKind = sec.viewLineKinds[displayIdx]
 			}
-			body := ansi.Truncate(sec.viewLines[displayIdx], bodyW, "")
+			gutterPad := ""
+			effectiveBodyW := bodyW
+			if !sec.colorized && !m.isSideBySideMode() && rowKind != diffRowHunkHeader {
+				gutterPad = strings.Repeat(" ", unifiedGutterPad)
+				effectiveBodyW = maxInt(0, bodyW-unifiedGutterPad)
+			}
+			body := gutterPad + ansi.Truncate(sec.viewLines[displayIdx], effectiveBodyW, "")
 			if m.renderMode == renderSideBySide {
 				plain := strings.TrimSpace(ansi.Strip(body))
 				if isDeltaSectionDivider(plain) {
@@ -303,11 +309,18 @@ func (m *Model) syncDiffViewports() {
 	m.staged.viewport.SetContentLines(m.staged.viewLines)
 }
 
+// unifiedGutterPad is the number of spaces prepended to raw (not-yet-colorized)
+// content lines in unified mode to reserve space for the delta line-number
+// gutter that will appear once async colorization completes.
+const unifiedGutterPad = 10
+
 func reflowSectionLines(sec *sectionState, wrapWidth int, wrapSoft bool) {
 	prevOffset := sec.viewport.YOffset()
+	colorized := sec.colorized
 	data := toExplorerSectionData(*sec)
 	explorer.ReflowSectionData(&data, wrapWidth, wrapSoft)
 	*sec = fromExplorerSectionData(data, sec.viewport)
+	sec.colorized = colorized
 	if len(sec.baseLines) == 0 {
 		sec.viewport.SetContent("")
 		sec.viewport.SetYOffset(0)

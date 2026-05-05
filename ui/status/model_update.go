@@ -74,9 +74,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		sideBySide := m.renderMode == renderSideBySide
 		if msg.unstagedColor != "" {
 			m.unstaged = buildSectionState(msg.unstagedRaw, msg.unstagedColor, m.unstaged, sideBySide)
+			m.unstaged.colorized = true
 		}
 		if msg.stagedColor != "" {
 			m.staged = buildSectionState(msg.stagedRaw, msg.stagedColor, m.staged, sideBySide)
+			m.staged.colorized = true
 		}
 		m.syncDiffViewports()
 		return m, nil
