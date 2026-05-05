@@ -24,10 +24,6 @@ var (
 	stageKeyGoStatus   = key.NewBinding(key.WithKeys("gs"), key.WithHelp("gs", "goto status"))
 	stageKeyLog        = key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "lazygit log"))
 	stageKeyYank       = key.NewBinding(key.WithKeys("yy", "yl", "ya", "yf"), key.WithHelp("yy/yl/ya/yf", "yank"))
-	stageKeyYankText   = key.NewBinding(key.WithKeys("yy"), key.WithHelp("yy", "content"))
-	stageKeyYankPath   = key.NewBinding(key.WithKeys("yl"), key.WithHelp("yl", "location"))
-	stageKeyYankAll    = key.NewBinding(key.WithKeys("ya"), key.WithHelp("ya", "all"))
-	stageKeyYankName   = key.NewBinding(key.WithKeys("yf"), key.WithHelp("yf", "filename"))
 	stageKeyPull       = key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "pull"))
 	stageKeyPush       = key.NewBinding(key.WithKeys("P"), key.WithHelp("P", "push"))
 	stageKeyRebase     = key.NewBinding(key.WithKeys("b"), key.WithHelp("b", "rebase"))
@@ -75,4 +71,11 @@ func (m Model) navModeLabel() string {
 		return "line"
 	}
 	return "hunk"
+}
+
+func (m *Model) showHelpOverlay() {
+	vp := help.NewViewportModel(m.width, m.height)
+	vp.SetContent(help.RenderView(keySections))
+	m.helpVP = vp
+	m.helpOpen = true
 }

@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/help"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -132,11 +131,4 @@ func (m Model) renderFooterLineWithPrefix(prefix, hint string) string {
 
 func (m Model) terminalLabel() string {
 	return m.settings.Terminal.String()
-}
-
-func (m *Model) showHelpOverlay() {
-	vp := help.NewViewportModel(m.width, m.height)
-	vp.SetContent(help.RenderView(keySections))
-	m.helpVP = vp
-	m.helpOpen = true
 }
