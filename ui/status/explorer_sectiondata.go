@@ -26,7 +26,7 @@ func toExplorerSectionData(sec sectionState) explorer.SectionData {
 	}
 }
 
-func fromExplorerSectionData(data explorer.SectionData, vp viewport.Model) sectionState {
+func fromExplorerSectionData(data explorer.SectionData, vp viewport.Model, colorized bool) sectionState {
 	return sectionState{
 		rawLines:         data.RawLines,
 		baseLines:        data.BaseLines,
@@ -44,5 +44,6 @@ func fromExplorerSectionData(data explorer.SectionData, vp viewport.Model) secti
 		visualActive:     data.VisualActive,
 		visualAnchor:     data.VisualAnchor,
 		viewport:         vp,
+		colorized:        colorized,
 	}
 }

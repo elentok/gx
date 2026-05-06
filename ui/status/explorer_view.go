@@ -322,8 +322,7 @@ func reflowSectionLines(sec *sectionState, wrapWidth int, wrapSoft bool) {
 	colorized := sec.colorized
 	data := toExplorerSectionData(*sec)
 	explorer.ReflowSectionData(&data, wrapWidth, wrapSoft)
-	*sec = fromExplorerSectionData(data, sec.viewport)
-	sec.colorized = colorized
+	*sec = fromExplorerSectionData(data, sec.viewport, colorized)
 	if len(sec.baseLines) == 0 {
 		sec.viewport.SetContent("")
 		sec.viewport.SetYOffset(0)

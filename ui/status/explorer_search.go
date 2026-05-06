@@ -173,7 +173,7 @@ func (m *Model) jumpToSearchCursor() tea.Cmd {
 		DisplayIndex: match.displayIndex,
 		RawIndex:     match.rawIndex,
 	})
-	*sec = fromExplorerSectionData(data, sec.viewport)
+	*sec = fromExplorerSectionData(data, sec.viewport, sec.colorized)
 	return nil
 }
 

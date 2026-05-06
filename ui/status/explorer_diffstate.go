@@ -298,7 +298,7 @@ func (m *Model) openDiscardDiffConfirm() {
 
 func buildSectionState(raw, color string, prev sectionState, sideBySide bool) sectionState {
 	data := explorer.BuildSectionData(raw, color, toExplorerSectionData(prev), sideBySide)
-	state := fromExplorerSectionData(data, prev.viewport)
+	state := fromExplorerSectionData(data, prev.viewport, prev.colorized)
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		state.viewport.SetContent("")

@@ -8,7 +8,7 @@ func (m *Model) moveActive(delta int) {
 	if !explorer.MoveActive(&data, &sec.viewport, m.navMode, delta, true) {
 		return
 	}
-	*sec = fromExplorerSectionData(data, sec.viewport)
+	*sec = fromExplorerSectionData(data, sec.viewport, sec.colorized)
 	m.syncSearchCursorFromDiffFocus()
 	m.ensureActiveVisible(sec)
 }
@@ -24,7 +24,7 @@ func (m *Model) jumpDiffTop() {
 	if !explorer.JumpTop(&data, &sec.viewport, m.navMode) {
 		return
 	}
-	*sec = fromExplorerSectionData(data, sec.viewport)
+	*sec = fromExplorerSectionData(data, sec.viewport, sec.colorized)
 	m.syncSearchCursorFromDiffFocus()
 }
 
@@ -34,6 +34,6 @@ func (m *Model) jumpDiffBottom() {
 	if !explorer.JumpBottom(&data, &sec.viewport, m.navMode) {
 		return
 	}
-	*sec = fromExplorerSectionData(data, sec.viewport)
+	*sec = fromExplorerSectionData(data, sec.viewport, sec.colorized)
 	m.syncSearchCursorFromDiffFocus()
 }
