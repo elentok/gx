@@ -167,13 +167,13 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 			if bodyW < 0 {
 				bodyW = 0
 			}
-			rowKind := diffRowPlain
+			rowKind := diff.RowPlain
 			if displayIdx >= 0 && displayIdx < len(sec.viewLineKinds) {
 				rowKind = sec.viewLineKinds[displayIdx]
 			}
 			gutterPad := ""
 			effectiveBodyW := bodyW
-			if !sec.colorized && !m.isSideBySideMode() && rowKind != diffRowHunkHeader {
+			if !sec.colorized && !m.isSideBySideMode() && rowKind != diff.RowHunkHeader {
 				gutterPad = strings.Repeat(" ", unifiedGutterPad)
 				effectiveBodyW = maxInt(0, bodyW-unifiedGutterPad)
 			}

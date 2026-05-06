@@ -6,22 +6,13 @@ import (
 	"github.com/elentok/gx/ui/diff"
 )
 
-type diffDisplayRowKind = diff.RowKind
-
-const (
-	diffRowPlain      = diff.RowPlain
-	diffRowAdded      = diff.RowAdded
-	diffRowRemoved    = diff.RowRemoved
-	diffRowHunkHeader = diff.RowHunkHeader
-)
-
 type sectionState struct {
 	rawLines         []string
 	baseLines        []string
-	baseLineKinds    []diffDisplayRowKind
+	baseLineKinds    []diff.RowKind
 	baseDisplayToRaw []int
 	viewLines        []string
-	viewLineKinds    []diffDisplayRowKind
+	viewLineKinds    []diff.RowKind
 	displayToRaw     []int
 	rawToDisplay     []int
 	hunkDisplayRange [][2]int
