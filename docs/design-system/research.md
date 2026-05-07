@@ -97,7 +97,7 @@ Representative files:
 What exists:
 
 - Full screen TUI with split panes and overlays
-- A complete local palette (`catBase0`, `catText`, `catBlue`, etc.)
+- A complete local palette (`ui.ColorBase`, `ui.ColorText`, `ui.ColorBlue`, etc.)
 - Local panel rendering with titled borders
 - Local help/footer rendering
 - Local icon registry for status entries

@@ -131,7 +131,7 @@ I do not recommend a flat `ui/root.go` / `ui/model.go` under `ui/`; that will bl
   - Wire worktrees `enter` to navigate to the selected worktree’s log view instead of opening terminal/lazygit behavior on that path.
   - Keep lazygit log available on its remapped key (`L`) as a separate action.
 
-- [ ] Milestone 3: Extract reusable diff explorer from status
+- [x] Milestone 3: Extract reusable diff explorer from status
   - Split `ui/status` into:
     - page/shell concerns
     - reusable file-tree + diff-navigation + modal/action scaffolding
@@ -146,7 +146,7 @@ I do not recommend a flat `ui/root.go` / `ui/model.go` under `ui/`; that will bl
     - standalone page behavior/wrappers
   - This milestone is the real foundation for the commit page; do not skip it.
 
-- [ ] Milestone 4: Commit page backed by historical commit diffs
+- [/] Milestone 4: Commit page backed by historical commit diffs
   - Add git plumbing for commit inspection:
     - commit metadata with message body
     - per-file diff for a commit vs parent
