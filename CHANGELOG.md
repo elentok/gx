@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.13.5
+
+- Fix status diff `Tab` cycle order to `sidebar -> unstaged -> staged -> sidebar`
+- Preserve status unified diff colorization state while navigating hunks, preventing temporary raw gutter padding from reappearing
+
 ## v0.13.4
 
 - Log view now reloads commits on open and supports `R` to reload manually
