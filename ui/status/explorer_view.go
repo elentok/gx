@@ -68,9 +68,9 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 		accent = ui.ColorGreen
 	}
 	hunkStart, hunkEnd := -1, -1
-	if m.navMode == navHunk && sec.activeHunk >= 0 && sec.activeHunk < len(sec.parsed.Hunks) {
-		hunkStart = sec.parsed.Hunks[sec.activeHunk].StartLine
-		hunkEnd = sec.parsed.Hunks[sec.activeHunk].EndLine
+	if m.navMode == navHunk && sec.data.ActiveHunk >= 0 && sec.data.ActiveHunk < len(sec.data.Parsed.Hunks) {
+		hunkStart = sec.data.Parsed.Hunks[sec.data.ActiveHunk].StartLine
+		hunkEnd = sec.data.Parsed.Hunks[sec.data.ActiveHunk].EndLine
 	}
 	sec.viewport.SetHeight(maxInt(0, bodyH))
 	sec.viewport.SetWidth(innerW)
@@ -79,7 +79,7 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 	if file, ok := m.selectedExplorerFile(); ok && file.RenameFrom != "" {
 		titleText += " [moved: " + file.RenameFrom + " -> " + file.Path + "]"
 	}
-	if si := diff.ParseSymlinkDiffInfo(sec.parsed); si.IsSymlink {
+	if si := diff.ParseSymlinkDiffInfo(sec.data.Parsed); si.IsSymlink {
 		if label := si.TitleLabel(); label != "" {
 			titleText += " " + label
 		}
@@ -95,8 +95,8 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 
 	overflowTopDisplay := -1
 	overflowBottomDisplay := -1
-	if m.navMode == navHunk && activeSection && sec.activeHunk >= 0 {
-		if start, end, ok := hunkDisplayBounds(*sec, sec.activeHunk); ok && sec.viewport.VisibleLineCount() > 0 {
+	if m.navMode == navHunk && activeSection && sec.data.ActiveHunk >= 0 {
+		if start, end, ok := hunkDisplayBounds(*sec, sec.data.ActiveHunk); ok && sec.viewport.VisibleLineCount() > 0 {
 			vpTop := sec.viewport.YOffset()
 			vpBottom := vpTop + sec.viewport.VisibleLineCount() - 1
 			if start < vpTop {
@@ -110,29 +110,29 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 	overflowTopMark, overflowBottomMark, overflowBothMark := m.hunkOverflowMarkers()
 
 	lines := make([]string, 0, bodyH)
-	if len(sec.viewLines) == 0 && diff.SectionHasBinaryDiff(sec.parsed) {
+	if len(sec.data.ViewLines) == 0 && diff.SectionHasBinaryDiff(sec.data.Parsed) {
 		lines = append(lines, lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render(m.binarySummaryLine()))
 	}
 
 	if len(lines) == 0 {
 		for i := 0; i < bodyH; i++ {
 			displayIdx := sec.viewport.YOffset() + i
-			if displayIdx >= len(sec.viewLines) {
+			if displayIdx >= len(sec.data.ViewLines) {
 				lines = append(lines, "")
 				continue
 			}
 			rawIdx := -1
-			if displayIdx >= 0 && displayIdx < len(sec.displayToRaw) {
-				rawIdx = sec.displayToRaw[displayIdx]
+			if displayIdx >= 0 && displayIdx < len(sec.data.DisplayToRaw) {
+				rawIdx = sec.data.DisplayToRaw[displayIdx]
 			}
 			mark := "  "
-			if m.navMode == navLine && sec.visualActive && m.visualMatchDiffDisplay(*sec, displayIdx) {
+			if m.navMode == navLine && sec.data.VisualActive && m.visualMatchDiffDisplay(*sec, displayIdx) {
 				mark = lipgloss.NewStyle().Foreground(accent).Render("▎ ")
 			}
 			inActiveHunk := false
 			if m.navMode == navHunk {
-				if len(sec.hunkDisplayRange) > 0 && sec.activeHunk >= 0 && sec.activeHunk < len(sec.hunkDisplayRange) {
-					r := sec.hunkDisplayRange[sec.activeHunk]
+				if len(sec.data.HunkDisplayRange) > 0 && sec.data.ActiveHunk >= 0 && sec.data.ActiveHunk < len(sec.data.HunkDisplayRange) {
+					r := sec.data.HunkDisplayRange[sec.data.ActiveHunk]
 					inActiveHunk = displayIdx >= r[0] && displayIdx <= r[1]
 				} else {
 					inActiveHunk = rawIdx >= 0 && rawIdx >= hunkStart && rawIdx <= hunkEnd
@@ -144,7 +144,7 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 			if rawIdx >= 0 && rawIdx == active && activeSection {
 				mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render("▌ ")
 			}
-			if rawIdx < 0 && m.navMode == navLine && activeSection && sec.activeLine >= 0 && sec.activeLine < len(sec.changedDisplay) && sec.changedDisplay[sec.activeLine] == displayIdx {
+			if rawIdx < 0 && m.navMode == navLine && activeSection && sec.data.ActiveLine >= 0 && sec.data.ActiveLine < len(sec.data.ChangedDisplay) && sec.data.ChangedDisplay[sec.data.ActiveLine] == displayIdx {
 				mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render("▌ ")
 			}
 			if inActiveHunk {
@@ -168,8 +168,8 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 				bodyW = 0
 			}
 			rowKind := diff.RowPlain
-			if displayIdx >= 0 && displayIdx < len(sec.viewLineKinds) {
-				rowKind = sec.viewLineKinds[displayIdx]
+			if displayIdx >= 0 && displayIdx < len(sec.data.ViewLineKinds) {
+				rowKind = sec.data.ViewLineKinds[displayIdx]
 			}
 			gutterPad := ""
 			effectiveBodyW := bodyW
@@ -177,7 +177,7 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 				gutterPad = strings.Repeat(" ", unifiedGutterPad)
 				effectiveBodyW = maxInt(0, bodyW-unifiedGutterPad)
 			}
-			body := gutterPad + ansi.Truncate(sec.viewLines[displayIdx], effectiveBodyW, "")
+			body := gutterPad + ansi.Truncate(sec.data.ViewLines[displayIdx], effectiveBodyW, "")
 			if m.renderMode == renderSideBySide {
 				plain := strings.TrimSpace(ansi.Strip(body))
 				if isDeltaSectionDivider(plain) {
@@ -205,28 +205,28 @@ func (m Model) hunkOverflowMarkers() (top, bottom, both string) {
 }
 
 func (m Model) visualMatchDiffDisplay(sec sectionState, displayIdx int) bool {
-	if !sec.visualActive || m.navMode != navLine {
+	if !sec.data.VisualActive || m.navMode != navLine {
 		return false
 	}
-	if len(sec.changedDisplay) > 0 {
+	if len(sec.data.ChangedDisplay) > 0 {
 		start, end := visualLineBounds(sec)
-		for i := start; i <= end && i < len(sec.changedDisplay); i++ {
-			if i >= 0 && sec.changedDisplay[i] == displayIdx {
+		for i := start; i <= end && i < len(sec.data.ChangedDisplay); i++ {
+			if i >= 0 && sec.data.ChangedDisplay[i] == displayIdx {
 				return true
 			}
 		}
 		return false
 	}
-	if displayIdx < 0 || displayIdx >= len(sec.displayToRaw) {
+	if displayIdx < 0 || displayIdx >= len(sec.data.DisplayToRaw) {
 		return false
 	}
-	rawIdx := sec.displayToRaw[displayIdx]
+	rawIdx := sec.data.DisplayToRaw[displayIdx]
 	if rawIdx < 0 {
 		return false
 	}
 	start, end := visualLineBounds(sec)
-	for i := start; i <= end && i < len(sec.parsed.Changed); i++ {
-		if i >= 0 && sec.parsed.Changed[i].LineIndex == rawIdx {
+	for i := start; i <= end && i < len(sec.data.Parsed.Changed); i++ {
+		if i >= 0 && sec.data.Parsed.Changed[i].LineIndex == rawIdx {
 			return true
 		}
 	}
@@ -235,13 +235,13 @@ func (m Model) visualMatchDiffDisplay(sec sectionState, displayIdx int) bool {
 
 func (m Model) activeRawLineIndex(sec sectionState) int {
 	if m.navMode == navHunk {
-		if sec.activeHunk >= 0 && sec.activeHunk < len(sec.parsed.Hunks) {
-			return sec.parsed.Hunks[sec.activeHunk].StartLine
+		if sec.data.ActiveHunk >= 0 && sec.data.ActiveHunk < len(sec.data.Parsed.Hunks) {
+			return sec.data.Parsed.Hunks[sec.data.ActiveHunk].StartLine
 		}
 		return -1
 	}
-	if sec.activeLine >= 0 && sec.activeLine < len(sec.parsed.Changed) {
-		return sec.parsed.Changed[sec.activeLine].LineIndex
+	if sec.data.ActiveLine >= 0 && sec.data.ActiveLine < len(sec.data.Parsed.Changed) {
+		return sec.data.Parsed.Changed[sec.data.ActiveLine].LineIndex
 	}
 	return -1
 }
@@ -273,8 +273,8 @@ func (m *Model) syncDiffViewports() {
 		}
 		m.unstaged.viewport.SetWidth(vpW)
 		m.staged.viewport.SetWidth(vpW)
-		m.unstaged.viewport.SetContentLines(m.unstaged.viewLines)
-		m.staged.viewport.SetContentLines(m.staged.viewLines)
+		m.unstaged.viewport.SetContentLines(m.unstaged.data.ViewLines)
+		m.staged.viewport.SetContentLines(m.staged.data.ViewLines)
 		return
 	}
 
@@ -308,8 +308,8 @@ func (m *Model) syncDiffViewports() {
 		m.unstaged.viewport.SetWidth(vpW)
 		m.staged.viewport.SetWidth(vpW)
 	}
-	m.unstaged.viewport.SetContentLines(m.unstaged.viewLines)
-	m.staged.viewport.SetContentLines(m.staged.viewLines)
+	m.unstaged.viewport.SetContentLines(m.unstaged.data.ViewLines)
+	m.staged.viewport.SetContentLines(m.staged.data.ViewLines)
 }
 
 // unifiedGutterPad is the number of spaces prepended to raw (not-yet-colorized)
@@ -319,16 +319,13 @@ const unifiedGutterPad = 10
 
 func reflowSectionLines(sec *sectionState, wrapWidth int, wrapSoft bool) {
 	prevOffset := sec.viewport.YOffset()
-	colorized := sec.colorized
-	data := toExplorerSectionData(*sec)
-	explorer.ReflowSectionData(&data, wrapWidth, wrapSoft)
-	*sec = fromExplorerSectionData(data, sec.viewport, colorized)
-	if len(sec.baseLines) == 0 {
+	explorer.ReflowSectionData(&sec.data, wrapWidth, wrapSoft)
+	if len(sec.data.BaseLines) == 0 {
 		sec.viewport.SetContent("")
 		sec.viewport.SetYOffset(0)
 		return
 	}
-	sec.viewport.SetContentLines(sec.viewLines)
+	sec.viewport.SetContentLines(sec.data.ViewLines)
 	sec.viewport.SetYOffset(prevOffset)
 }
 

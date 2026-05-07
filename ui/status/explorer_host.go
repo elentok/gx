@@ -40,7 +40,7 @@ func (m Model) sectionHasContent(section diffSection) bool {
 	} else {
 		sec = m.unstaged
 	}
-	return len(sec.viewLines) > 0 || diff.SectionHasBinaryDiff(sec.parsed)
+	return len(sec.data.ViewLines) > 0 || diff.SectionHasBinaryDiff(sec.data.Parsed)
 }
 
 func (m Model) visibleDiffSections() []diffSection {

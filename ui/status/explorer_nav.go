@@ -4,11 +4,9 @@ import "github.com/elentok/gx/ui/explorer"
 
 func (m *Model) moveActive(delta int) {
 	sec := m.currentSection()
-	data := toExplorerSectionData(*sec)
-	if !explorer.MoveActive(&data, &sec.viewport, m.navMode, delta, true) {
+	if !explorer.MoveActive(&sec.data, &sec.viewport, m.navMode, delta, true) {
 		return
 	}
-	*sec = fromExplorerSectionData(data, sec.viewport, sec.colorized)
 	m.syncSearchCursorFromDiffFocus()
 	m.ensureActiveVisible(sec)
 }
@@ -20,20 +18,16 @@ func (m *Model) scrollDiffPage(direction int) {
 
 func (m *Model) jumpDiffTop() {
 	sec := m.currentSection()
-	data := toExplorerSectionData(*sec)
-	if !explorer.JumpTop(&data, &sec.viewport, m.navMode) {
+	if !explorer.JumpTop(&sec.data, &sec.viewport, m.navMode) {
 		return
 	}
-	*sec = fromExplorerSectionData(data, sec.viewport, sec.colorized)
 	m.syncSearchCursorFromDiffFocus()
 }
 
 func (m *Model) jumpDiffBottom() {
 	sec := m.currentSection()
-	data := toExplorerSectionData(*sec)
-	if !explorer.JumpBottom(&data, &sec.viewport, m.navMode) {
+	if !explorer.JumpBottom(&sec.data, &sec.viewport, m.navMode) {
 		return
 	}
-	*sec = fromExplorerSectionData(data, sec.viewport, sec.colorized)
 	m.syncSearchCursorFromDiffFocus()
 }

@@ -167,3 +167,7 @@ func NewModel(worktreeRoot string, settings Settings) Model {
 	}
 	return m
 }
+
+func New(worktreeRoot string) Model {
+	return NewModel(worktreeRoot, DefaultSettings())
+}

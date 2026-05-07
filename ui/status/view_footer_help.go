@@ -38,7 +38,7 @@ func (m Model) helpLine() string {
 	if s := m.searchCounterLabel(); s != "" {
 		hint = s + " · " + hint
 	}
-	if m.currentSection().visualActive {
+	if m.currentSection().data.VisualActive {
 		return m.renderFooterLineWithPrefix("VISUAL", hint)
 	}
 	return m.renderFooterLine(hint)

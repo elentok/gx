@@ -82,11 +82,11 @@ func (m *Model) yankContentOnly() {
 		return
 	}
 	sec := m.currentSection()
-	if explorer.ActiveHunkIndexForYank(toExplorerSectionData(*sec), m.navMode) < 0 {
+	if explorer.ActiveHunkIndexForYank(sec.data, m.navMode) < 0 {
 		m.setStatus("no hunk selected")
 		return
 	}
-	body := explorer.FocusedYankBody(toExplorerSectionData(*sec), m.navMode)
+	body := explorer.FocusedYankBody(sec.data, m.navMode)
 	if len(body) == 0 {
 		m.setStatus("no lines to yank")
 		return
@@ -100,17 +100,16 @@ func (m *Model) yankContentOnly() {
 
 func (m *Model) focusedLocationAndBody() (string, []string, bool) {
 	sec := m.currentSection()
-	data := toExplorerSectionData(*sec)
-	hunkIdx := explorer.ActiveHunkIndexForYank(data, m.navMode)
-	if hunkIdx < 0 || hunkIdx >= len(sec.parsed.Hunks) {
+	hunkIdx := explorer.ActiveHunkIndexForYank(sec.data, m.navMode)
+	if hunkIdx < 0 || hunkIdx >= len(sec.data.Parsed.Hunks) {
 		m.setStatus("no hunk selected")
 		return "", nil, false
 	}
-	body := explorer.FocusedYankBody(data, m.navMode)
+	body := explorer.FocusedYankBody(sec.data, m.navMode)
 	if len(body) == 0 {
 		m.setStatus("no lines to yank")
 		return "", nil, false
 	}
-	loc := explorer.FocusedLocation(data, m.navMode)
+	loc := explorer.FocusedLocation(sec.data, m.navMode)
 	return loc, body, true
 }

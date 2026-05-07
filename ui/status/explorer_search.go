@@ -143,7 +143,7 @@ func (m *Model) recomputeSearchMatches() {
 		}
 	} else {
 		sec := m.searchScopeSection(scope)
-		for _, match := range explorer.ComputeDiffSearchMatches(sec.viewLines, sec.displayToRaw, q) {
+		for _, match := range explorer.ComputeDiffSearchMatches(sec.data.ViewLines, sec.data.DisplayToRaw, q) {
 			m.searchMatches = append(m.searchMatches, stageSearchMatch{
 				displayIndex: match.DisplayIndex,
 				rawIndex:     match.RawIndex,
@@ -168,12 +168,10 @@ func (m *Model) jumpToSearchCursor() tea.Cmd {
 	}
 
 	sec := m.searchScopeSection(match.scope)
-	data := toExplorerSectionData(*sec)
-	explorer.ApplyDiffSearchMatch(&data, &sec.viewport, explorer.DiffSearchMatch{
+	explorer.ApplyDiffSearchMatch(&sec.data, &sec.viewport, explorer.DiffSearchMatch{
 		DisplayIndex: match.displayIndex,
 		RawIndex:     match.rawIndex,
 	})
-	*sec = fromExplorerSectionData(data, sec.viewport, sec.colorized)
 	return nil
 }
 
@@ -189,7 +187,6 @@ func (m *Model) syncSearchCursorFromDiffFocus() {
 		return
 	}
 	sec := m.searchScopeSection(expected)
-	data := toExplorerSectionData(*sec)
 	diffMatches := make([]explorer.DiffSearchMatch, 0, len(m.searchMatches))
 	for _, match := range m.searchMatches {
 		if match.scope == expected {
@@ -199,7 +196,7 @@ func (m *Model) syncSearchCursorFromDiffFocus() {
 			})
 		}
 	}
-	idx := explorer.CurrentDiffSearchMatchIndex(data, diffMatches, explorer.NavLine)
+	idx := explorer.CurrentDiffSearchMatchIndex(sec.data, diffMatches, explorer.NavLine)
 	if idx < 0 {
 		return
 	}

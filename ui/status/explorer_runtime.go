@@ -44,7 +44,7 @@ func (m *Model) currentSection() *sectionState {
 }
 
 func (m *Model) ensureActiveVisible(sec *sectionState) {
-	explorer.EnsureActiveVisible(toExplorerSectionData(*sec), &sec.viewport, m.navMode)
+	explorer.EnsureActiveVisible(sec.data, &sec.viewport, m.navMode)
 }
 
 func (m Model) editorLineForCurrentSelection() int {
@@ -53,19 +53,19 @@ func (m Model) editorLineForCurrentSelection() int {
 	}
 	sec := m.currentSection()
 	if m.navMode == navLine {
-		if sec.activeLine < 0 || sec.activeLine >= len(sec.parsed.Changed) {
+		if sec.data.ActiveLine < 0 || sec.data.ActiveLine >= len(sec.data.Parsed.Changed) {
 			return 0
 		}
-		cl := sec.parsed.Changed[sec.activeLine]
+		cl := sec.data.Parsed.Changed[sec.data.ActiveLine]
 		if cl.NewLine > 0 {
 			return cl.NewLine
 		}
 		return cl.OldLine
 	}
-	if sec.activeHunk < 0 || sec.activeHunk >= len(sec.parsed.Hunks) {
+	if sec.data.ActiveHunk < 0 || sec.data.ActiveHunk >= len(sec.data.Parsed.Hunks) {
 		return 0
 	}
-	h := sec.parsed.Hunks[sec.activeHunk]
+	h := sec.data.Parsed.Hunks[sec.data.ActiveHunk]
 	if h.NewStart > 0 {
 		return h.NewStart
 	}
@@ -73,9 +73,9 @@ func (m Model) editorLineForCurrentSelection() int {
 }
 
 func hunkDisplayBounds(sec sectionState, hunkIdx int) (start int, end int, ok bool) {
-	return explorer.HunkDisplayBounds(sec.hunkDisplayRange, sec.parsed, sec.displayToRaw, hunkIdx)
+	return explorer.HunkDisplayBounds(sec.data.HunkDisplayRange, sec.data.Parsed, sec.data.DisplayToRaw, hunkIdx)
 }
 
 func visualLineBounds(sec sectionState) (start, end int) {
-	return explorer.VisualLineBounds(sec.visualAnchor, sec.activeLine, len(sec.parsed.Changed))
+	return explorer.VisualLineBounds(sec.data.VisualAnchor, sec.data.ActiveLine, len(sec.data.Parsed.Changed))
 }

@@ -18,9 +18,9 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		sec := m.currentSection()
-		if sec.visualActive {
-			sec.visualActive = false
-			sec.visualAnchor = sec.activeLine
+		if sec.data.VisualActive {
+			sec.data.VisualActive = false
+			sec.data.VisualAnchor = sec.data.ActiveLine
 			return m, nil
 		}
 		m.focus = focusStatus
@@ -30,7 +30,7 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "a":
 		sec := m.currentSection()
-		sec.visualActive = false
+		sec.data.VisualActive = false
 		if m.navMode == navHunk {
 			m.navMode = navLine
 		} else {
@@ -42,15 +42,15 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.navMode == navHunk {
 			m.navMode = navLine
 		}
-		if len(sec.parsed.Changed) == 0 {
+		if len(sec.data.Parsed.Changed) == 0 {
 			return m, nil
 		}
-		if !sec.visualActive {
-			sec.visualActive = true
-			sec.visualAnchor = sec.activeLine
+		if !sec.data.VisualActive {
+			sec.data.VisualActive = true
+			sec.data.VisualAnchor = sec.data.ActiveLine
 		} else {
-			sec.visualActive = false
-			sec.visualAnchor = sec.activeLine
+			sec.data.VisualActive = false
+			sec.data.VisualAnchor = sec.data.ActiveLine
 		}
 		m.ensureActiveVisible(sec)
 	case "f":

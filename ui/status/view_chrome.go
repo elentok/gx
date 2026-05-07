@@ -137,16 +137,16 @@ func (m Model) flashMarker(section diffSection, rawIdx int, sec *sectionState) b
 		return false
 	}
 	if m.flash.navMode == navHunk {
-		if m.flash.hunk < 0 || m.flash.hunk >= len(sec.parsed.Hunks) {
+		if m.flash.hunk < 0 || m.flash.hunk >= len(sec.data.Parsed.Hunks) {
 			return false
 		}
-		h := sec.parsed.Hunks[m.flash.hunk]
+		h := sec.data.Parsed.Hunks[m.flash.hunk]
 		return rawIdx >= h.StartLine && rawIdx <= h.EndLine
 	}
-	if m.flash.line < 0 || m.flash.line >= len(sec.parsed.Changed) {
+	if m.flash.line < 0 || m.flash.line >= len(sec.data.Parsed.Changed) {
 		return false
 	}
-	return sec.parsed.Changed[m.flash.line].LineIndex == rawIdx
+	return sec.data.Parsed.Changed[m.flash.line].LineIndex == rawIdx
 }
 
 func maxInt(a, b int) int {

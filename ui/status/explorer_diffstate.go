@@ -39,11 +39,11 @@ func (m *Model) cmdColorizeDiffsForSelection() tea.Cmd {
 	sideBySide := m.renderMode == renderSideBySide
 	renderWidth := m.deltaRenderWidth()
 	if file.Untracked {
-		rawDiff := strings.Join(m.unstaged.rawLines, "\n")
+		rawDiff := strings.Join(m.unstaged.data.RawLines, "\n")
 		return m.cmdColorizeUntracked(seq, file.Path, rawDiff, sideBySide, renderWidth)
 	}
-	unstagedRaw := strings.Join(m.unstaged.rawLines, "\n")
-	stagedRaw := strings.Join(m.staged.rawLines, "\n")
+	unstagedRaw := strings.Join(m.unstaged.data.RawLines, "\n")
+	stagedRaw := strings.Join(m.staged.data.RawLines, "\n")
 	return m.cmdColorizeDiffs(seq, file.Path, unstagedRaw, stagedRaw, sideBySide, renderWidth)
 }
 
@@ -70,11 +70,11 @@ func (m *Model) applySelection() tea.Cmd {
 	}
 
 	if m.navMode == navHunk {
-		if sec.activeHunk < 0 || sec.activeHunk >= len(sec.parsed.Hunks) {
+		if sec.data.ActiveHunk < 0 || sec.data.ActiveHunk >= len(sec.data.Parsed.Hunks) {
 			return nil
 		}
-		sig.hunkHeader = sec.parsed.Hunks[sec.activeHunk].Header
-		patch, err := diff.BuildHunkPatch(sec.parsed, sec.activeHunk)
+		sig.hunkHeader = sec.data.Parsed.Hunks[sec.data.ActiveHunk].Header
+		patch, err := diff.BuildHunkPatch(sec.data.Parsed, sec.data.ActiveHunk)
 		if err != nil {
 			m.setStatus(err.Error())
 			return nil
@@ -85,14 +85,14 @@ func (m *Model) applySelection() tea.Cmd {
 				m.showGitError(err)
 				return nil
 			}
-			h := sec.parsed.Hunks[sec.activeHunk]
+			h := sec.data.Parsed.Hunks[sec.data.ActiveHunk]
 			if len(h.ChangedLineOffset) == 0 {
 				m.showGitError(err)
 				return nil
 			}
 			startChanged := h.ChangedLineOffset[0]
 			endChanged := h.ChangedLineOffset[len(h.ChangedLineOffset)-1]
-			fallbackPatch, fallbackErr := diff.BuildLineRangePatch(sec.parsed, startChanged, endChanged)
+			fallbackPatch, fallbackErr := diff.BuildLineRangePatch(sec.data.Parsed, startChanged, endChanged)
 			if fallbackErr != nil {
 				m.showGitError(err)
 				return nil
@@ -103,23 +103,23 @@ func (m *Model) applySelection() tea.Cmd {
 			}
 		}
 	} else {
-		if sec.activeLine < 0 || sec.activeLine >= len(sec.parsed.Changed) {
+		if sec.data.ActiveLine < 0 || sec.data.ActiveLine >= len(sec.data.Parsed.Changed) {
 			return nil
 		}
-		startLine, endLine := sec.activeLine, sec.activeLine
-		if sec.visualActive {
+		startLine, endLine := sec.data.ActiveLine, sec.data.ActiveLine
+		if sec.data.VisualActive {
 			startLine, endLine = visualLineBounds(*sec)
 		}
-		sig.lineText = sec.parsed.Changed[endLine].Text
+		sig.lineText = sec.data.Parsed.Changed[endLine].Text
 
 		var (
 			patch string
 			err   error
 		)
-		if sec.visualActive && endLine > startLine {
-			patch, err = diff.BuildLineRangePatch(sec.parsed, startLine, endLine)
+		if sec.data.VisualActive && endLine > startLine {
+			patch, err = diff.BuildLineRangePatch(sec.data.Parsed, startLine, endLine)
 		} else {
-			patch, err = diff.BuildSingleLinePatch(sec.parsed, sec.activeLine)
+			patch, err = diff.BuildSingleLinePatch(sec.data.Parsed, sec.data.ActiveLine)
 		}
 		if err != nil {
 			m.setStatus(err.Error())
@@ -132,8 +132,8 @@ func (m *Model) applySelection() tea.Cmd {
 		}
 	}
 
-	sec.visualActive = false
-	sec.visualAnchor = sec.activeLine
+	sec.data.VisualActive = false
+	sec.data.VisualAnchor = sec.data.ActiveLine
 	m.setStatus("updated " + file.Path)
 	from := m.section
 	reloadCmd := m.reload(file.Path)
@@ -164,7 +164,7 @@ func (m *Model) shouldSwitchAfterApply(from diffSection) bool {
 	} else {
 		sec = m.unstaged
 	}
-	return len(sec.parsed.Hunks) == 0
+	return len(sec.data.Parsed.Hunks) == 0
 }
 
 func (m *Model) reloadDiffsForSelection() tea.Cmd {
@@ -259,26 +259,26 @@ func (m *Model) openDiscardDiffConfirm() {
 	)
 
 	if m.navMode == navHunk {
-		if sec.activeHunk < 0 || sec.activeHunk >= len(sec.parsed.Hunks) {
+		if sec.data.ActiveHunk < 0 || sec.data.ActiveHunk >= len(sec.data.Parsed.Hunks) {
 			return
 		}
-		patch, err = diff.BuildHunkPatch(sec.parsed, sec.activeHunk)
+		patch, err = diff.BuildHunkPatch(sec.data.Parsed, sec.data.ActiveHunk)
 		title = "Discard selected hunk?"
 		lines = []string{"This will discard the selected hunk from your working tree."}
 	} else {
-		if sec.activeLine < 0 || sec.activeLine >= len(sec.parsed.Changed) {
+		if sec.data.ActiveLine < 0 || sec.data.ActiveLine >= len(sec.data.Parsed.Changed) {
 			return
 		}
-		startLine, endLine := sec.activeLine, sec.activeLine
-		if sec.visualActive {
+		startLine, endLine := sec.data.ActiveLine, sec.data.ActiveLine
+		if sec.data.VisualActive {
 			startLine, endLine = visualLineBounds(*sec)
 		}
-		if sec.visualActive && endLine > startLine {
-			patch, err = diff.BuildLineRangePatch(sec.parsed, startLine, endLine)
+		if sec.data.VisualActive && endLine > startLine {
+			patch, err = diff.BuildLineRangePatch(sec.data.Parsed, startLine, endLine)
 			title = "Discard selected lines?"
 			lines = []string{"This will discard the selected lines from your working tree."}
 		} else {
-			patch, err = diff.BuildSingleLinePatch(sec.parsed, sec.activeLine)
+			patch, err = diff.BuildSingleLinePatch(sec.data.Parsed, sec.data.ActiveLine)
 			title = "Discard selected line?"
 			lines = []string{"This will discard the selected line from your working tree."}
 		}
@@ -297,8 +297,11 @@ func (m *Model) openDiscardDiffConfirm() {
 }
 
 func buildSectionState(raw, color string, prev sectionState, sideBySide bool) sectionState {
-	data := explorer.BuildSectionData(raw, color, toExplorerSectionData(prev), sideBySide)
-	state := fromExplorerSectionData(data, prev.viewport, prev.colorized)
+	state := sectionState{
+		data:      explorer.BuildSectionData(raw, color, prev.data, sideBySide),
+		viewport:  prev.viewport,
+		colorized: prev.colorized,
+	}
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		state.viewport.SetContent("")
@@ -306,7 +309,7 @@ func buildSectionState(raw, color string, prev sectionState, sideBySide bool) se
 		return state
 	}
 	prevOffset := state.viewport.YOffset()
-	state.viewport.SetContentLines(state.viewLines)
+	state.viewport.SetContentLines(state.data.ViewLines)
 	state.viewport.SetYOffset(prevOffset)
 	return state
 }
@@ -325,32 +328,32 @@ func (m *Model) focusMovedTarget(sig movedTarget) {
 	}
 
 	if sig.navMode == navHunk {
-		for i := range sec.parsed.Hunks {
-			if sec.parsed.Hunks[i].Header == sig.hunkHeader {
-				sec.activeHunk = i
+		for i := range sec.data.Parsed.Hunks {
+			if sec.data.Parsed.Hunks[i].Header == sig.hunkHeader {
+				sec.data.ActiveHunk = i
 				m.ensureActiveVisible(sec)
 				m.flash = flashState{active: true, section: m.section, navMode: navHunk, hunk: i, frames: 4}
 				return
 			}
 		}
-		if len(sec.parsed.Hunks) > 0 {
-			sec.activeHunk = 0
+		if len(sec.data.Parsed.Hunks) > 0 {
+			sec.data.ActiveHunk = 0
 			m.ensureActiveVisible(sec)
 			m.flash = flashState{active: true, section: m.section, navMode: navHunk, hunk: 0, frames: 4}
 		}
 		return
 	}
 
-	for i := range sec.parsed.Changed {
-		if sec.parsed.Changed[i].Text == sig.lineText {
-			sec.activeLine = i
+	for i := range sec.data.Parsed.Changed {
+		if sec.data.Parsed.Changed[i].Text == sig.lineText {
+			sec.data.ActiveLine = i
 			m.ensureActiveVisible(sec)
 			m.flash = flashState{active: true, section: m.section, navMode: navLine, line: i, frames: 4}
 			return
 		}
 	}
-	if len(sec.parsed.Changed) > 0 {
-		sec.activeLine = 0
+	if len(sec.data.Parsed.Changed) > 0 {
+		sec.data.ActiveLine = 0
 		m.ensureActiveVisible(sec)
 		m.flash = flashState{active: true, section: m.section, navMode: navLine, line: 0, frames: 4}
 	}
