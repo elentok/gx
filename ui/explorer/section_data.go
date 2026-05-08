@@ -3,21 +3,22 @@ package explorer
 import (
 	"strings"
 
-	"github.com/elentok/gx/ui/diff"
+	diffcore "github.com/elentok/gx/ui/diff/core"
+	diffrender "github.com/elentok/gx/ui/diff/render"
 )
 
 type SectionData struct {
 	RawLines         []string
 	BaseLines        []string
-	BaseLineKinds    []diff.RowKind
+	BaseLineKinds    []diffrender.RowKind
 	BaseDisplayToRaw []int
 	ViewLines        []string
-	ViewLineKinds    []diff.RowKind
+	ViewLineKinds    []diffrender.RowKind
 	DisplayToRaw     []int
 	RawToDisplay     []int
 	HunkDisplayRange [][2]int
 	ChangedDisplay   []int
-	Parsed           diff.ParsedDiff
+	Parsed           diffcore.ParsedDiff
 	ActiveHunk       int
 	ActiveLine       int
 	VisualActive     bool
@@ -48,7 +49,7 @@ func BuildSectionData(raw, color string, prev SectionData, sideBySide bool) Sect
 		return state
 	}
 
-	state.Parsed = diff.ParseUnifiedDiff(raw)
+	state.Parsed = diffcore.ParseUnifiedDiff(raw)
 	state.RawLines = append([]string{}, state.Parsed.Lines...)
 	if sideBySide {
 		initSideBySideSectionData(&state, color)
@@ -63,11 +64,11 @@ func BuildSectionData(raw, color string, prev SectionData, sideBySide bool) Sect
 	} else if len(colorLines) > len(state.RawLines) {
 		colorLines = colorLines[:len(state.RawLines)]
 	}
-	state.BaseLines, state.BaseLineKinds, state.BaseDisplayToRaw = diff.BuildDisplayBaseLines(state.Parsed, colorLines)
+	state.BaseLines, state.BaseLineKinds, state.BaseDisplayToRaw = diffrender.BuildDisplayBaseLines(state.Parsed, colorLines)
 	state.ViewLines = append([]string{}, state.BaseLines...)
-	state.ViewLineKinds = append([]diff.RowKind{}, state.BaseLineKinds...)
+	state.ViewLineKinds = append([]diffrender.RowKind{}, state.BaseLineKinds...)
 	state.DisplayToRaw = append([]int{}, state.BaseDisplayToRaw...)
-	state.RawToDisplay = diff.BuildRawToDisplayMap(state.Parsed, state.DisplayToRaw)
+	state.RawToDisplay = diffcore.BuildRawToDisplayMap(state.Parsed, state.DisplayToRaw)
 	state.HunkDisplayRange = nil
 	state.ChangedDisplay = nil
 
@@ -80,17 +81,17 @@ func ReflowSectionData(state *SectionData, wrapWidth int, wrapSoft bool) {
 		state.ViewLines = nil
 		state.ViewLineKinds = nil
 		state.DisplayToRaw = nil
-		state.RawToDisplay = diff.BuildRawToDisplayMap(state.Parsed, nil)
+		state.RawToDisplay = diffcore.BuildRawToDisplayMap(state.Parsed, nil)
 		return
 	}
 
 	view := make([]string, 0, len(state.BaseLines))
-	kinds := make([]diff.RowKind, 0, len(state.BaseLines))
+	kinds := make([]diffrender.RowKind, 0, len(state.BaseLines))
 	mapRaw := make([]int, 0, len(state.BaseDisplayToRaw))
 
 	for i, line := range state.BaseLines {
 		rawIdx := -1
-		kind := diff.RowPlain
+		kind := diffrender.RowPlain
 		if i < len(state.BaseDisplayToRaw) {
 			rawIdx = state.BaseDisplayToRaw[i]
 		}
@@ -103,7 +104,7 @@ func ReflowSectionData(state *SectionData, wrapWidth int, wrapSoft bool) {
 			mapRaw = append(mapRaw, rawIdx)
 			continue
 		}
-		parts := diff.WrapANSI(line, wrapWidth)
+		parts := diffrender.WrapANSI(line, wrapWidth)
 		for _, p := range parts {
 			view = append(view, p)
 			kinds = append(kinds, kind)
@@ -114,7 +115,7 @@ func ReflowSectionData(state *SectionData, wrapWidth int, wrapSoft bool) {
 	state.ViewLines = view
 	state.ViewLineKinds = kinds
 	state.DisplayToRaw = mapRaw
-	state.RawToDisplay = diff.BuildRawToDisplayMap(state.Parsed, state.DisplayToRaw)
+	state.RawToDisplay = diffcore.BuildRawToDisplayMap(state.Parsed, state.DisplayToRaw)
 }
 
 func initSideBySideSectionData(state *SectionData, color string) {
@@ -123,12 +124,12 @@ func initSideBySideSectionData(state *SectionData, color string) {
 		state.ViewLines = append([]string{}, state.RawLines...)
 	}
 	state.BaseLines = append([]string{}, state.ViewLines...)
-	state.BaseLineKinds = make([]diff.RowKind, len(state.BaseLines))
+	state.BaseLineKinds = make([]diffrender.RowKind, len(state.BaseLines))
 	state.BaseDisplayToRaw = make([]int, len(state.BaseLines))
 	for i := range state.BaseDisplayToRaw {
 		state.BaseDisplayToRaw[i] = -1
 	}
-	state.ViewLineKinds = append([]diff.RowKind{}, state.BaseLineKinds...)
+	state.ViewLineKinds = append([]diffrender.RowKind{}, state.BaseLineKinds...)
 
 	mapping := BuildSideBySideMapping(state.Parsed, state.ViewLines)
 	state.DisplayToRaw = mapping.DisplayToRaw
