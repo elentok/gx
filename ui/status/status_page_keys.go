@@ -11,6 +11,16 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.cycleFrameForward()
 		return m, nil
 	}
+
+	if updatedFileTree, childCmd := m.fileTreeModel.Update(msg); updatedFileTree.SelectedIndex() != m.fileTreeModel.SelectedIndex() {
+		m.fileTreeModel = updatedFileTree
+		m.selected = m.fileTreeModel.SelectedIndex()
+		m.onStatusSelectionChanged()
+		return m, tea.Batch(childCmd, m.scheduleDiffReload())
+	} else {
+		m.fileTreeModel = updatedFileTree
+	}
+
 	switch msg.String() {
 	case "q":
 		if m.settings.EnableNavigation {
@@ -26,18 +36,6 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.adjustDiffContextLines(-1)
 	case "]":
 		return m, m.adjustDiffContextLines(1)
-	case "j", "down":
-		if m.selected < len(m.statusEntries)-1 {
-			m.setStatusSelection(m.selected + 1)
-			m.onStatusSelectionChanged()
-			return m, m.scheduleDiffReload()
-		}
-	case "k", "up":
-		if m.selected > 0 {
-			m.setStatusSelection(m.selected - 1)
-			m.onStatusSelectionChanged()
-			return m, m.scheduleDiffReload()
-		}
 	case "h", "left":
 		if m.focusParentInStatus() {
 			return m, m.scheduleDiffReload()

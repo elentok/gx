@@ -109,10 +109,5 @@ func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd) {
 			return m, nil
 		}
 	}
-
-	if nextSearch, cmd, handled := m.search.Update(msg); handled {
-		m.search = nextSearch
-		return m, cmd
-	}
 	return m, nil
 }
