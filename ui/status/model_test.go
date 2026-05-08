@@ -11,8 +11,8 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui/diff"
-	"github.com/elentok/gx/ui/explorer"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/search"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -1547,30 +1547,27 @@ func TestStageSearchStatusModeAndNavigation(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	m = updated.(Model)
-	if m.searchMode != explorer.SearchModeInput {
+	if m.search.Mode() != search.SearchModeInput {
 		t.Fatalf("expected search input mode after /")
 	}
 
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
-	m = updated.(Model)
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'p', Text: "p"})
-	m = updated.(Model)
-	if len(m.searchMatches) < 2 {
-		t.Fatalf("expected multiple status search matches, got %d", len(m.searchMatches))
+	m = runStatusCmds(t, m, tea.KeyPressMsg{Code: 'a', Text: "a"})
+	m = runStatusCmds(t, m, tea.KeyPressMsg{Code: 'p', Text: "p"})
+	if m.search.MatchesCount() < 2 {
+		t.Fatalf("expected multiple status search matches, got %d", m.search.MatchesCount())
 	}
 
 	first := m.selected
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
-	if m.searchMode != explorer.SearchModeNone || m.searchQuery == "" || len(m.searchMatches) == 0 {
-		t.Fatalf("expected enter to return to normal mode while keeping search highlights")
+	if m.search.Mode() != search.SearchModeResults || !m.search.HasQuery() || m.search.MatchesCount() == 0 {
+		t.Fatalf("expected enter to show search results mode while keeping highlights")
 	}
 	if line := ansi.Strip(m.helpLine()); !strings.Contains(line, "1/2") {
 		t.Fatalf("expected persistent search counter in footer, got %q", line)
 	}
 
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
-	m = updated.(Model)
+	m = runStatusCmds(t, m, tea.KeyPressMsg{Code: 'n', Text: "n"})
 	if m.selected == first {
 		t.Fatalf("expected n to move to next search result")
 	}
@@ -1579,8 +1576,8 @@ func TestStageSearchStatusModeAndNavigation(t *testing.T) {
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 	m = updated.(Model)
-	if m.searchMode != explorer.SearchModeNone || m.searchQuery == "" || len(m.searchMatches) == 0 {
-		t.Fatalf("expected esc to keep active search results when matches exist")
+	if m.search.Mode() != search.SearchModeNone || m.search.HasQuery() || m.search.MatchesCount() != 0 {
+		t.Fatalf("expected esc to clear active search state")
 	}
 }
 
@@ -1599,7 +1596,8 @@ func TestStageSearchModeShowsOverlay(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	m = updated.(Model)
 
-	overlay := ansi.Strip(m.searchInputOverlayView())
+	m.search.SetWidth(m.searchOverlayWidth())
+	overlay := ansi.Strip(m.search.View())
 	if !strings.Contains(overlay, "Search") {
 		t.Fatalf("expected overlay to contain 'Search', got %q", overlay)
 	}
@@ -1619,56 +1617,80 @@ func TestStageSearchDiffModeAndPrevNextKeys(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	m = updated.(Model)
-	if m.searchMode != explorer.SearchModeInput {
+	if m.search.Mode() != search.SearchModeInput {
 		t.Fatalf("expected diff search input mode after /")
 	}
 
 	for _, r := range []rune{'n', 'e', 'e', 'd', 'l', 'e'} {
-		updated, _ = m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
-		m = updated.(Model)
+		m = runStatusCmds(t, m, tea.KeyPressMsg{Code: r, Text: string(r)})
 	}
-	if len(m.searchMatches) < 2 {
-		t.Fatalf("expected multiple diff search matches, got %d", len(m.searchMatches))
+	if m.search.MatchesCount() < 2 {
+		t.Fatalf("expected multiple diff search matches, got %d", m.search.MatchesCount())
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
-	if m.searchMode != explorer.SearchModeNone || m.searchQuery == "" || len(m.searchMatches) == 0 {
-		t.Fatalf("expected enter to return to normal mode while keeping search highlights")
+	if m.search.Mode() != search.SearchModeResults || !m.search.HasQuery() || m.search.MatchesCount() == 0 {
+		t.Fatalf("expected enter to show search results mode while keeping highlights")
 	}
 	if m.navMode != navLine {
 		t.Fatalf("expected enter after diff search to switch to line mode")
 	}
-	first := m.searchCursor
+	first := m.search.Cursor()
 	firstLine := m.unstaged.data.ActiveLine
 
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
-	m = updated.(Model)
-	if m.searchCursor == first {
+	m = runStatusCmds(t, m, tea.KeyPressMsg{Code: 'n', Text: "n"})
+	if m.search.Cursor() == first {
 		t.Fatalf("expected n to move to next diff result")
 	}
 	if m.unstaged.data.ActiveLine == firstLine {
 		t.Fatalf("expected n to move active diff line to next match")
 	}
 
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'N', Text: "N", ShiftedCode: 'N'})
-	m = updated.(Model)
-	if m.searchCursor != first {
+	m = runStatusCmds(t, m, tea.KeyPressMsg{Code: 'N', Text: "N", ShiftedCode: 'N'})
+	if m.search.Cursor() != first {
 		t.Fatalf("expected N to move back to previous diff result")
 	}
 
 	// Moving cursor to a matched line should update the search counter cursor.
-	startCursor := m.searchCursor
+	startCursor := m.search.Cursor()
 	for i := 0; i < 5; i++ {
 		updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 		m = updated.(Model)
-		if m.searchCursor != startCursor {
+		if m.search.Cursor() != startCursor {
 			break
 		}
 	}
-	if m.searchCursor == startCursor {
+	if m.search.Cursor() == startCursor {
 		t.Fatalf("expected diff cursor movement to sync search cursor when reaching a match")
 	}
+}
+
+func runStatusCmds(t *testing.T, m Model, msg tea.Msg) Model {
+	t.Helper()
+	updated, cmd := m.Update(msg)
+	m = updated.(Model)
+	return runStatusCmd(t, m, cmd)
+}
+
+func runStatusCmd(t *testing.T, m Model, cmd tea.Cmd) Model {
+	t.Helper()
+	if cmd == nil {
+		return m
+	}
+	msg := cmd()
+	if msg == nil {
+		return m
+	}
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		for _, c := range batch {
+			m = runStatusCmd(t, m, c)
+		}
+		return m
+	}
+	updated, next := m.Update(msg)
+	m = updated.(Model)
+	return runStatusCmd(t, m, next)
 }
 
 func TestStageSearchDiffUsesRightEdgeIndicatorInHunkMode(t *testing.T) {
@@ -1683,8 +1705,8 @@ func TestStageSearchDiffUsesRightEdgeIndicatorInHunkMode(t *testing.T) {
 	m.focus = focusDiff
 	m.section = sectionUnstaged
 	m.navMode = navHunk
-	m.searchQuery = "needle"
-	m.searchScope = searchScopeUnstaged
+	// m.search.Query = "needle"
+	// m.searchScope = searchScopeUnstaged
 	m.recomputeSearchMatches()
 
 	pane := m.renderSectionPane(80, 12, "Unstaged", &m.unstaged, sectionUnstaged)

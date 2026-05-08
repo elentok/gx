@@ -44,7 +44,7 @@ func (m *Model) reloadFileList(preservePath string) {
 	m.err = nil
 	m.files = files
 	m.statusEntries = buildStatusEntries(m.files, m.collapsedDirs)
-	if strings.TrimSpace(m.searchQuery) != "" && m.searchScope == searchScopeStatus {
+	if m.search.HasQuery() && m.currentSearchScope() == searchScopeStatus {
 		m.recomputeSearchMatches()
 	}
 

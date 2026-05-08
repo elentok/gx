@@ -5,6 +5,7 @@ import (
 
 	"charm.land/bubbles/v2/viewport"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/elentok/gx/ui/search"
 )
 
 type DiffSearchMatch struct {
@@ -30,7 +31,7 @@ func ComputeDiffSearchMatches(viewLines []string, displayToRaw []int, query stri
 	return matches
 }
 
-func ApplyDiffSearchMatch(section *SectionData, vp *viewport.Model, match DiffSearchMatch) {
+func ApplyDiffSearchMatch(section *SectionData, vp *viewport.Model, match search.Match) {
 	if match.DisplayIndex >= 0 {
 		if match.DisplayIndex < vp.YOffset() {
 			vp.SetYOffset(match.DisplayIndex)
@@ -41,17 +42,17 @@ func ApplyDiffSearchMatch(section *SectionData, vp *viewport.Model, match DiffSe
 			}
 		}
 	}
-	if match.RawIndex < 0 {
+	if match.Index < 0 {
 		return
 	}
 	for i, ch := range section.Parsed.Changed {
-		if ch.LineIndex == match.RawIndex {
+		if ch.LineIndex == match.Index {
 			section.ActiveLine = i
 			break
 		}
 	}
 	for i, h := range section.Parsed.Hunks {
-		if match.RawIndex >= h.StartLine && match.RawIndex <= h.EndLine {
+		if match.Index >= h.StartLine && match.Index <= h.EndLine {
 			section.ActiveHunk = i
 			break
 		}

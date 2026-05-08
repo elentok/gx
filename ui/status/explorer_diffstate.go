@@ -153,7 +153,7 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 		m.unstaged = newSectionState()
 		m.staged = newSectionState()
 		m.syncDiffViewports()
-		if strings.TrimSpace(m.searchQuery) != "" && (m.searchScope == searchScopeUnstaged || m.searchScope == searchScopeStaged) {
+		if m.search.HasQuery() && (m.currentSearchScope() == searchScopeUnstaged || m.currentSearchScope() == searchScopeStaged) {
 			m.recomputeSearchMatches()
 		}
 		return nil
@@ -206,7 +206,7 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 	m.staged.colorized = true
 	m.pickAvailableSection()
 	m.syncDiffViewports()
-	if strings.TrimSpace(m.searchQuery) != "" && (m.searchScope == searchScopeUnstaged || m.searchScope == searchScopeStaged) {
+	if m.search.HasQuery() && (m.currentSearchScope() == searchScopeUnstaged || m.currentSearchScope() == searchScopeStaged) {
 		m.recomputeSearchMatches()
 	}
 	return nil

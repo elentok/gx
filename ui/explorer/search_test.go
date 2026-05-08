@@ -6,6 +6,7 @@ import (
 	"charm.land/bubbles/v2/viewport"
 
 	"github.com/elentok/gx/ui/diff"
+	"github.com/elentok/gx/ui/search"
 )
 
 func TestComputeDiffSearchMatches(t *testing.T) {
@@ -27,7 +28,7 @@ func TestApplyDiffSearchMatch(t *testing.T) {
 	vp := viewport.New(viewport.WithWidth(20), viewport.WithHeight(2))
 	vp.SetContentLines(section.ViewLines)
 
-	match := DiffSearchMatch{DisplayIndex: 3, RawIndex: 7}
+	match := search.Match{DisplayIndex: 3, Index: 7}
 	ApplyDiffSearchMatch(&section, &vp, match)
 	if vp.YOffset() != 2 {
 		t.Fatalf("YOffset = %d, want 2", vp.YOffset())

@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diff"
 	"github.com/elentok/gx/ui/explorer"
+	"github.com/elentok/gx/ui/search"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -154,7 +155,7 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 				}
 			}
 			if matched, current := m.searchMatchDiffDisplay(section, displayIdx); matched {
-				body = highlightMatchText(ansi.Strip(body), m.searchQuery, current)
+				body = search.Highlight(ansi.Strip(body), m.search.Query(), current)
 			}
 			body += diff.DiffBodyPadding(rowKind, maxInt(0, bodyW-ansi.StringWidth(body)))
 			lines = append(lines, mark+body+indicator)

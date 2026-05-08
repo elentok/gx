@@ -8,8 +8,8 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
-	"github.com/elentok/gx/ui/explorer"
 	"github.com/elentok/gx/ui/help"
+	"github.com/elentok/gx/ui/search"
 
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
@@ -28,20 +28,17 @@ type Model struct {
 	diffContextLines int
 	statusPageState
 
-	statusMsg               string
-	statusUntil             time.Time
-	err                     error
-	errorOpen               bool
-	errorVP                 viewport.Model
-	help                    help.Model
-	activeFilePath          string
-	diffReloadSeq           int
-	searchMode              explorer.SearchMode
-	searchScope             stageSearchScope
-	searchQuery             string
-	searchMatches           []stageSearchMatch
-	searchCursor            int
-	searchInput             textinput.Model
+	statusMsg      string
+	statusUntil    time.Time
+	err            error
+	errorOpen      bool
+	errorVP        viewport.Model
+	help           help.Model
+	activeFilePath string
+	diffReloadSeq  int
+
+	search search.Model
+
 	confirmOpen             bool
 	confirmTitle            string
 	confirmLines            []string
@@ -137,6 +134,7 @@ func NewModel(worktreeRoot string, settings Settings) Model {
 		initialPath:      settings.InitialPath,
 		diffContextLines: settings.DiffContextLines,
 		help:             help.NewModel(keySections),
+		search:           search.NewModel(),
 		explorerState: explorerState{
 			focus:      focusStatus,
 			section:    sectionUnstaged,
@@ -151,6 +149,7 @@ func NewModel(worktreeRoot string, settings Settings) Model {
 			selected:      0,
 		},
 	}
+
 	if settings.EnableNavigation {
 		m.reloadFileList("")
 	} else {

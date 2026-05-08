@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/explorer"
+	"github.com/elentok/gx/ui/search"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -110,7 +111,7 @@ func (m Model) visibleStatusLines(height int) []string {
 			name = statusFileIcon(entry.File, isWorktreeSymlink(m.worktreeRoot, entry.File.Path), icons) + " " + name
 		}
 		if m.searchMatchStatusIndex(i) {
-			name = highlightMatchText(name, m.searchQuery, false)
+			name = search.Highlight(name, m.search.Query(), false)
 		}
 		return explorer.SidebarRenderableRow{
 			Depth:    entry.Depth,

@@ -44,6 +44,9 @@ var (
 	StyleMuted    = lipgloss.NewStyle().Foreground(ColorSubtle)
 	StyleHint     = lipgloss.NewStyle().Foreground(ColorSubtle)
 	StyleCodeLike = lipgloss.NewStyle().Foreground(ColorTeal)
+
+	StyleSearchResult       = lipgloss.NewStyle().Foreground(ColorYellow).Bold(true).Underline(true)
+	StyleActiveSearchResult = lipgloss.NewStyle().Foreground(ColorGreen).Bold(true).Underline(true)
 )
 
 // Status styles.

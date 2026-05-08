@@ -13,10 +13,6 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "]":
 		return m, m.adjustDiffContextLines(1)
 	case "esc", "q":
-		if len(m.searchMatches) > 0 {
-			m.exitSearchMode()
-			return m, nil
-		}
 		sec := m.currentSection()
 		if sec.data.VisualActive {
 			sec.data.VisualActive = false

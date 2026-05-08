@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/explorer"
+	"github.com/elentok/gx/ui/search"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
@@ -147,7 +148,7 @@ func (m *Model) jumpToSearchCursor() {
 	match := m.searchMatches[m.searchCursor]
 	m.focusDiff = true
 	m.diffNavMode = explorer.NavLine
-	explorer.ApplyDiffSearchMatch(&m.section, &m.diffViewport, match)
+	explorer.ApplyDiffSearchMatch(&m.section, &m.diffViewport, search.Match{Index: match.RawIndex, DisplayIndex: match.DisplayIndex})
 }
 
 func (m Model) searchMatchDiffDisplay(displayIdx int) (matched bool, current bool) {

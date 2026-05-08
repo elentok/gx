@@ -45,21 +45,21 @@ func (m Model) helpLine() string {
 }
 
 func (m Model) searchCounterLabel() string {
-	if strings.TrimSpace(m.searchQuery) == "" || len(m.searchMatches) == 0 {
+	if !m.search.HasQuery() || m.search.MatchesCount() == 0 {
 		return ""
 	}
-	idx := m.searchCursor + 1
+	idx := m.search.Cursor() + 1
 	if idx < 1 {
 		idx = 1
 	}
-	if idx > len(m.searchMatches) {
-		idx = len(m.searchMatches)
+	if idx > m.search.MatchesCount() {
+		idx = m.search.MatchesCount()
 	}
 	icon := "*"
 	if m.settings.UseNerdFontIcons {
 		icon = ui.Icons(true).Search
 	}
-	return fmt.Sprintf("%s %d/%d", icon, idx, len(m.searchMatches))
+	return fmt.Sprintf("%s %d/%d", icon, idx, m.search.MatchesCount())
 }
 
 func (m Model) diffContextLabel() string {

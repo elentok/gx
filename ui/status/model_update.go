@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/explorer"
+	"github.com/elentok/gx/ui/search"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -45,8 +45,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleLazygitLogFinished(msg)
 	case editFileFinishedMsg:
 		return m.handleEditFileFinished(msg)
+	case search.JumpToMatchMsg:
+		return m.handleJumpToMatch(msg)
+	case search.SearchQueryUpdatedMsg:
+		return m.handleSearchQueryUpdated(msg)
 	}
 	return m, nil
+}
+
+func (m Model) handleSearchQueryUpdated(msg search.SearchQueryUpdatedMsg) (Model, tea.Cmd) {
+	matches := m.computeSearchMatches(msg.Query)
+	return m, m.search.SetMatchesAndJump(matches)
 }
 
 func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
@@ -123,6 +132,10 @@ func (m Model) handleMouseWheelMsg(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	var handled bool
+	// var cmds []tea.Cmd
+
 	if msg.String() == "ctrl+c" {
 		if m.runningOpen && !m.runningDone && m.runningRunner != nil {
 			m.runningRunner.Cancel()
@@ -161,16 +174,15 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.help, cmd = m.help.Update(msg)
 		return m, cmd
 	}
-	if m.searchMode != explorer.SearchModeNone {
-		return m.handleSearchKey(msg)
-	}
-	if cmd, handled := m.handleSearchNavigateKey(msg); handled {
+
+	if m.search, cmd, handled = m.search.Update(msg); handled {
+		if m.search.Mode() == search.SearchModeResults && m.focus == focusDiff {
+			m.navMode = navLine
+		}
+
 		return m, cmd
 	}
-	if msg.String() == "/" {
-		m.enterSearchMode()
-		return m, nil
-	}
+
 	if handledModel, cmd, handled := m.handleChordKey(msg); handled {
 		return handledModel, cmd
 	}
