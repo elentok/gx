@@ -10,209 +10,228 @@ import (
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-		m.ready = true
+		return m.handleWindowSize(msg)
+	case tea.KeyPressMsg:
+		return m.handleKeyPress(msg)
+	}
+	return m, nil
+}
+
+func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
+	m.width = msg.Width
+	m.height = msg.Height
+	m.ready = true
+	m.syncDiffViewport()
+	return m, nil
+}
+
+func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	key := msg.String()
+	if key == "ctrl+c" {
+		return m, tea.Quit
+	}
+	if m.helpOpen {
+		return m.handleHelpKey(msg)
+	}
+	if handled, cmd := m.handleSearchKey(msg); handled {
+		return m, cmd
+	}
+	if next, cmd, handled := m.handleChordKey(msg); handled {
+		return next, cmd
+	}
+	if m.handleSearchNavigateKey(msg) {
+		return m, nil
+	}
+	if msg.Code == tea.KeyTab || msg.Text == "\t" {
+		return m.handleTabFocusCycle()
+	}
+	return m.handleKeyRouting(msg)
+}
+
+func (m Model) handleTabFocusCycle() (tea.Model, tea.Cmd) {
+	if m.focusHeader {
+		m.focusHeader = false
+		m.focusDiff = false
+		return m, nil
+	}
+	if _, ok := m.selectedCommitFile(); !ok {
+		m.focusHeader = true
+		m.focusDiff = false
+		return m, nil
+	}
+	if m.focusDiff {
+		m.focusDiff = false
+		m.focusHeader = true
+	} else {
+		m.focusDiff = true
+		m.focusHeader = false
+		m.ensureActiveVisible()
+	}
+	return m, nil
+}
+
+func (m Model) handleKeyRouting(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	key := msg.String()
+	shiftG := (msg.Mod&tea.ModShift) != 0 && (msg.Code == 'g' || msg.Code == 'G' || msg.Text == "g" || msg.Text == "G")
+	isUpperG := key == "G" || key == "shift+g" || msg.Text == "G" || msg.ShiftedCode == 'G' || shiftG
+
+	switch key {
+	case "?":
+		return m.enterHelpMode(), nil
+	case "q", "esc":
+		if len(m.searchMatches) > 0 {
+			m.clearSearch()
+			return m, nil
+		}
+		if m.focusDiff {
+			m.focusDiff = false
+			return m, nil
+		}
+		if m.focusHeader {
+			m.focusHeader = false
+			return m, nil
+		}
+		return m, nav.Back()
+	case "/":
+		m.enterSearchMode()
+		return m, nil
+	case "b":
+		m.bodyExpanded = !m.bodyExpanded
+		m.scrollHeader(0)
 		m.syncDiffViewport()
 		return m, nil
-	case tea.KeyPressMsg:
-		key := msg.String()
-		shiftG := (msg.Mod&tea.ModShift) != 0 && (msg.Code == 'g' || msg.Code == 'G' || msg.Text == "g" || msg.Text == "G")
-		isUpperG := key == "G" || key == "shift+g" || msg.Text == "G" || msg.ShiftedCode == 'G' || shiftG
-		if key == "ctrl+c" {
-			return m, tea.Quit
-		}
-		if m.helpOpen {
-			return m.handleHelpKey(msg)
-		}
-		if handled, cmd := m.handleSearchKey(msg); handled {
-			return m, cmd
-		}
-		if next, cmd, handled := m.handleChordKey(msg); handled {
-			return next, cmd
-		}
-		if m.handleSearchNavigateKey(msg) {
+	case "a":
+		if !m.focusDiff {
 			return m, nil
 		}
-		if msg.Code == tea.KeyTab || msg.Text == "\t" {
-			if m.focusHeader {
-				m.focusHeader = false
-				m.focusDiff = false
-				return m, nil
-			}
-			if _, ok := m.selectedCommitFile(); !ok {
-				m.focusHeader = true
-				m.focusDiff = false
-				return m, nil
-			}
+		if m.diffNavMode == explorer.NavHunk {
+			m.diffNavMode = explorer.NavLine
+		} else {
+			m.diffNavMode = explorer.NavHunk
+		}
+		m.ensureActiveVisible()
+		return m, nil
+	case "w":
+		if !m.focusDiff {
+			return m, nil
+		}
+		m.wrapSoft = !m.wrapSoft
+		m.syncDiffViewport()
+		return m, nil
+	case "j", "down":
+		if m.focusHeader {
+			m.scrollHeader(1)
+			return m, nil
+		}
+		if m.focusDiff {
+			m.moveDiffActive(1)
+			return m, nil
+		}
+		m.moveSidebar(1)
+		return m, nil
+	case "k", "up":
+		if m.focusHeader {
+			m.scrollHeader(-1)
+			return m, nil
+		}
+		if m.focusDiff {
+			m.moveDiffActive(-1)
+			return m, nil
+		}
+		m.moveSidebar(-1)
+		return m, nil
+	case "J":
+		if m.focusHeader {
+			m.scrollHeader(1)
+		} else if m.focusDiff {
+			m.diffViewport.ScrollDown(3)
+		}
+		return m, nil
+	case "K":
+		if m.focusHeader {
+			m.scrollHeader(-1)
+		} else if m.focusDiff {
+			m.diffViewport.ScrollUp(3)
+		}
+		return m, nil
+	case "ctrl+d":
+		if m.focusHeader {
+			m.scrollHeaderPage(1)
+		} else if m.focusDiff {
+			m.scrollDiffPage(1)
+		}
+		return m, nil
+	case "ctrl+u":
+		if m.focusHeader {
+			m.scrollHeaderPage(-1)
+		} else if m.focusDiff {
+			m.scrollDiffPage(-1)
+		}
+		return m, nil
+	case ".":
+		if m.focusDiff {
+			m.moveToAdjacentFile(1)
+		} else {
+			m.moveToAdjacentCommit(-1)
+		}
+		return m, nil
+	case ",":
+		if m.focusDiff {
+			m.moveToAdjacentFile(-1)
+		} else {
+			m.moveToAdjacentCommit(1)
+		}
+		return m, nil
+	case "G":
+		if isUpperG {
 			if m.focusDiff {
-				m.focusDiff = false
-				m.focusHeader = true
+				m.jumpDiffBottom()
 			} else {
-				m.focusDiff = true
-				m.focusHeader = false
-				m.ensureActiveVisible()
+				m.jumpSidebarBottom()
 			}
+		}
+		return m, nil
+	case "enter":
+		if m.focusHeader {
+			m.focusHeader = false
 			return m, nil
 		}
-		switch key {
-		case "?":
-			return m.enterHelpMode(), nil
-		case "q", "esc":
-			if len(m.searchMatches) > 0 {
-				m.clearSearch()
-				return m, nil
-			}
-			if m.focusDiff {
-				m.focusDiff = false
-				return m, nil
-			}
-			if m.focusHeader {
-				m.focusHeader = false
-				return m, nil
-			}
-			return m, nav.Back()
-		case "/":
-			m.enterSearchMode()
+		if m.toggleDirOnEnter() {
 			return m, nil
-		case "b":
-			m.bodyExpanded = !m.bodyExpanded
-			m.scrollHeader(0)
-			m.syncDiffViewport()
-			return m, nil
-		case "a":
-			if !m.focusDiff {
-				return m, nil
-			}
-			if m.diffNavMode == explorer.NavHunk {
-				m.diffNavMode = explorer.NavLine
-			} else {
-				m.diffNavMode = explorer.NavHunk
-			}
+		}
+		if _, ok := m.selectedCommitFile(); ok {
+			m.focusDiff = true
 			m.ensureActiveVisible()
-			return m, nil
-		case "w":
-			if !m.focusDiff {
-				return m, nil
-			}
-			m.wrapSoft = !m.wrapSoft
-			m.syncDiffViewport()
-			return m, nil
-		case "j", "down":
-			if m.focusHeader {
-				m.scrollHeader(1)
-				return m, nil
-			}
-			if m.focusDiff {
-				m.moveDiffActive(1)
-				return m, nil
-			}
-			m.moveSidebar(1)
-			return m, nil
-		case "k", "up":
-			if m.focusHeader {
-				m.scrollHeader(-1)
-				return m, nil
-			}
-			if m.focusDiff {
-				m.moveDiffActive(-1)
-				return m, nil
-			}
-			m.moveSidebar(-1)
-			return m, nil
-		case "J":
-			if m.focusHeader {
-				m.scrollHeader(1)
-			} else if m.focusDiff {
-				m.diffViewport.ScrollDown(3)
-			}
-			return m, nil
-		case "K":
-			if m.focusHeader {
-				m.scrollHeader(-1)
-			} else if m.focusDiff {
-				m.diffViewport.ScrollUp(3)
-			}
-			return m, nil
-		case "ctrl+d":
-			if m.focusHeader {
-				m.scrollHeaderPage(1)
-			} else if m.focusDiff {
-				m.scrollDiffPage(1)
-			}
-			return m, nil
-		case "ctrl+u":
-			if m.focusHeader {
-				m.scrollHeaderPage(-1)
-			} else if m.focusDiff {
-				m.scrollDiffPage(-1)
-			}
-			return m, nil
-		case ".":
-			if m.focusDiff {
-				m.moveToAdjacentFile(1)
-			} else {
-				m.moveToAdjacentCommit(-1)
-			}
-			return m, nil
-		case ",":
-			if m.focusDiff {
-				m.moveToAdjacentFile(-1)
-			} else {
-				m.moveToAdjacentCommit(1)
-			}
-			return m, nil
-		case "G":
-			if isUpperG {
-				if m.focusDiff {
-					m.jumpDiffBottom()
-				} else {
-					m.jumpSidebarBottom()
-				}
-			}
-			return m, nil
-		case "enter":
-			if m.focusHeader {
-				m.focusHeader = false
-				return m, nil
-			}
-			if m.toggleDirOnEnter() {
-				return m, nil
-			}
-			if _, ok := m.selectedCommitFile(); ok {
-				m.focusDiff = true
-				m.ensureActiveVisible()
-			}
-			return m, nil
-		case "l", "right":
-			if m.focusHeader {
-				m.focusHeader = false
-				return m, nil
-			}
-			if !m.focusDiff && m.expandSelectedDir() {
-				return m, nil
-			}
-			if _, ok := m.selectedCommitFile(); ok {
-				m.focusDiff = true
-				m.ensureActiveVisible()
-			}
-			return m, nil
-		case "h", "left":
-			if m.focusDiff {
-				m.focusDiff = false
-				return m, nil
-			}
-			if m.focusHeader {
-				m.focusHeader = false
-				return m, nil
-			}
-			if m.focusParentInSidebar() {
-				m.refreshDiff()
-				return m, nil
-			}
-			m.collapseSelectedDir()
+		}
+		return m, nil
+	case "l", "right":
+		if m.focusHeader {
+			m.focusHeader = false
 			return m, nil
 		}
+		if !m.focusDiff && m.expandSelectedDir() {
+			return m, nil
+		}
+		if _, ok := m.selectedCommitFile(); ok {
+			m.focusDiff = true
+			m.ensureActiveVisible()
+		}
+		return m, nil
+	case "h", "left":
+		if m.focusDiff {
+			m.focusDiff = false
+			return m, nil
+		}
+		if m.focusHeader {
+			m.focusHeader = false
+			return m, nil
+		}
+		if m.focusParentInSidebar() {
+			m.refreshDiff()
+			return m, nil
+		}
+		m.collapseSelectedDir()
+		return m, nil
 	}
 	return m, nil
 }
