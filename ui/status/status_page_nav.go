@@ -12,15 +12,9 @@ func (m *Model) scrollStatusPage(direction int) bool {
 	statusH, _ := m.splitHeight(mainH)
 	visible := maxInt(1, (statusH-2)/2)
 	if direction > 0 {
-		m.selected += visible
+		m.setStatusSelection(m.selected + visible)
 	} else {
-		m.selected -= visible
-	}
-	if m.selected < 0 {
-		m.selected = 0
-	}
-	if m.selected >= len(m.statusEntries) {
-		m.selected = len(m.statusEntries) - 1
+		m.setStatusSelection(m.selected - visible)
 	}
 	if m.selected == old {
 		return false
@@ -36,7 +30,7 @@ func (m *Model) jumpStatusTop() {
 	if m.selected == 0 {
 		return
 	}
-	m.selected = 0
+	m.setStatusSelection(0)
 	m.onStatusSelectionChanged()
 }
 
@@ -47,7 +41,7 @@ func (m *Model) jumpStatusBottom() {
 	if m.selected == len(m.statusEntries)-1 {
 		return
 	}
-	m.selected = len(m.statusEntries) - 1
+	m.setStatusSelection(len(m.statusEntries) - 1)
 	m.onStatusSelectionChanged()
 }
 

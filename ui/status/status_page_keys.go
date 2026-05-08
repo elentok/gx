@@ -28,13 +28,13 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.adjustDiffContextLines(1)
 	case "j", "down":
 		if m.selected < len(m.statusEntries)-1 {
-			m.selected++
+			m.setStatusSelection(m.selected + 1)
 			m.onStatusSelectionChanged()
 			return m, m.scheduleDiffReload()
 		}
 	case "k", "up":
 		if m.selected > 0 {
-			m.selected--
+			m.setStatusSelection(m.selected - 1)
 			m.onStatusSelectionChanged()
 			return m, m.scheduleDiffReload()
 		}

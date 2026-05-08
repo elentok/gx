@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/search"
 
@@ -27,6 +28,7 @@ type Model struct {
 	explorerState
 	diffContextLines int
 	statusPageState
+	fileTreeModel filetree.Model[git.StageFileStatus]
 
 	statusMsg      string
 	statusUntil    time.Time
@@ -148,6 +150,7 @@ func NewModel(worktreeRoot string, settings Settings) Model {
 			collapsedDirs: map[string]bool{},
 			selected:      0,
 		},
+		fileTreeModel: filetree.NewModel[git.StageFileStatus](),
 	}
 
 	if settings.EnableNavigation {

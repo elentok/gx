@@ -82,7 +82,7 @@ func (m Model) handleJumpToMatch(msg search.JumpToMatchMsg) (Model, tea.Cmd) {
 	match := msg.Match
 	if m.currentSearchScope() == searchScopeStatus {
 		if match.Index >= 0 && match.Index < len(m.statusEntries) {
-			m.selected = match.Index
+			m.setStatusSelection(match.Index)
 			m.onStatusSelectionChanged()
 			return m, m.scheduleDiffReload()
 		}

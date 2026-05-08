@@ -37,6 +37,7 @@ func (m *Model) reloadFileList(preservePath string) {
 		m.err = err
 		m.files = nil
 		m.statusEntries = nil
+		m.syncFileTreeModel()
 		m.unstaged = newSectionState()
 		m.staged = newSectionState()
 		return
@@ -44,12 +45,13 @@ func (m *Model) reloadFileList(preservePath string) {
 	m.err = nil
 	m.files = files
 	m.statusEntries = buildStatusEntries(m.files, m.collapsedDirs)
+	m.syncFileTreeModel()
 	if m.search.HasQuery() && m.currentSearchScope() == searchScopeStatus {
 		m.recomputeSearchMatches()
 	}
 
 	if len(m.statusEntries) == 0 {
-		m.selected = 0
+		m.setStatusSelection(0)
 		m.activeFilePath = ""
 		m.unstaged = newSectionState()
 		m.staged = newSectionState()
@@ -66,17 +68,12 @@ func (m *Model) reloadFileList(preservePath string) {
 	if targetPath != "" {
 		for i, entry := range m.statusEntries {
 			if entry.Path == targetPath {
-				m.selected = i
+				m.setStatusSelection(i)
 				break
 			}
 		}
 	}
-	if m.selected >= len(m.statusEntries) {
-		m.selected = len(m.statusEntries) - 1
-	}
-	if m.selected < 0 {
-		m.selected = 0
-	}
+	m.setStatusSelection(m.selected)
 }
 
 func (m *Model) reloadBranchState() {
@@ -113,9 +110,7 @@ func (m *Model) toggleDirOnEnter() bool {
 		return false
 	}
 	m.statusEntries = buildStatusEntries(m.files, m.collapsedDirs)
-	if m.selected >= len(m.statusEntries) {
-		m.selected = len(m.statusEntries) - 1
-	}
+	m.syncFileTreeModel()
 	return true
 }
 
@@ -124,9 +119,7 @@ func (m *Model) collapseSelectedDir() {
 		return
 	}
 	m.statusEntries = buildStatusEntries(m.files, m.collapsedDirs)
-	if m.selected >= len(m.statusEntries) {
-		m.selected = len(m.statusEntries) - 1
-	}
+	m.syncFileTreeModel()
 }
 
 func (m *Model) focusParentInStatus() bool {
@@ -135,7 +128,7 @@ func (m *Model) focusParentInStatus() bool {
 	if !ok || m.selected == idx {
 		return false
 	}
-	m.selected = idx
+	m.setStatusSelection(idx)
 	m.onStatusSelectionChanged()
 	return true
 }
@@ -145,6 +138,7 @@ func (m *Model) expandSelectedDir() {
 		return
 	}
 	m.statusEntries = buildStatusEntries(m.files, m.collapsedDirs)
+	m.syncFileTreeModel()
 }
 
 func (m *Model) moveToAdjacentFile(delta int) (bool, tea.Cmd) {
@@ -152,7 +146,7 @@ func (m *Model) moveToAdjacentFile(delta int) (bool, tea.Cmd) {
 	if !ok {
 		return false, nil
 	}
-	m.selected = idx
+	m.setStatusSelection(idx)
 	m.onStatusSelectionChanged()
 	cmd := m.reloadDiffsForSelection()
 	if m.focus == focusDiff {
