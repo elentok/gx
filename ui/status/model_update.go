@@ -14,7 +14,7 @@ func (m Model) Init() tea.Cmd {
 	if m.settings.EnableNavigation {
 		return tea.Batch(statusTickCmd(), statusStartupLoadCmd())
 	}
-	return tea.Batch(statusTickCmd(), m.cmdColorizeDiffsForSelection(), m.cmdLoadBranchSync())
+	return tea.Batch(statusTickCmd(), m.cmdLoadBranchSync())
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -46,8 +46,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, statusTickCmd()
 	case statusStartupLoadMsg:
 		m.reloadBranchState()
-		colorizeCmd := m.reloadDiffsForSelection()
-		return m, tea.Batch(colorizeCmd, m.cmdLoadBranchSync())
+		reloadCmd := m.reloadDiffsForSelection()
+		return m, tea.Batch(reloadCmd, m.cmdLoadBranchSync())
 	case actionPollMsg:
 		var actionCmd tea.Cmd
 		if m.runningRunner != nil {
@@ -74,21 +74,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.seq == m.diffReloadSeq && m.focus == focusStatus {
 			return m, m.reloadDiffsForSelection()
 		}
-		return m, nil
-	case diffColorizeMsg:
-		if msg.seq != m.colorizeSeq || msg.filePath != m.activeFilePath {
-			return m, nil
-		}
-		sideBySide := m.renderMode == renderSideBySide
-		if msg.unstagedColor != "" {
-			m.unstaged = buildSectionState(msg.unstagedRaw, msg.unstagedColor, m.unstaged, sideBySide)
-			m.unstaged.colorized = true
-		}
-		if msg.stagedColor != "" {
-			m.staged = buildSectionState(msg.stagedRaw, msg.stagedColor, m.staged, sideBySide)
-			m.staged.colorized = true
-		}
-		m.syncDiffViewports()
 		return m, nil
 	case branchSyncLoadedMsg:
 		if msg.branchName == m.branchName {

@@ -10,41 +10,17 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-func (m *Model) cmdColorizeDiffs(seq int, filePath, unstagedRaw, stagedRaw string, sideBySide bool, renderWidth int) tea.Cmd {
-	worktreeRoot := m.worktreeRoot
+func (m *Model) colorizeDiffsSync(filePath, unstagedRaw, stagedRaw string, sideBySide bool, renderWidth int) (unstagedColor, stagedColor string) {
 	contextLines := m.currentDiffContextLines()
-	return func() tea.Msg {
-		unstagedColor, _ := git.ColorizeDiff(worktreeRoot, filePath, unstagedRaw, false, sideBySide, renderWidth, contextLines)
-		stagedColor, _ := git.ColorizeDiff(worktreeRoot, filePath, stagedRaw, true, sideBySide, renderWidth, contextLines)
-		return diffColorizeMsg{seq: seq, filePath: filePath, unstagedRaw: unstagedRaw, unstagedColor: unstagedColor, stagedRaw: stagedRaw, stagedColor: stagedColor}
-	}
+	unstagedColor, _ = git.ColorizeDiff(m.worktreeRoot, filePath, unstagedRaw, false, sideBySide, renderWidth, contextLines)
+	stagedColor, _ = git.ColorizeDiff(m.worktreeRoot, filePath, stagedRaw, true, sideBySide, renderWidth, contextLines)
+	return unstagedColor, stagedColor
 }
 
-func (m *Model) cmdColorizeUntracked(seq int, filePath, rawDiff string, sideBySide bool, renderWidth int) tea.Cmd {
-	worktreeRoot := m.worktreeRoot
+func (m *Model) colorizeUntrackedSync(filePath, rawDiff string, sideBySide bool, renderWidth int) string {
 	contextLines := m.currentDiffContextLines()
-	return func() tea.Msg {
-		color, _ := git.ColorizeUntrackedDiff(worktreeRoot, filePath, rawDiff, sideBySide, renderWidth, contextLines)
-		return diffColorizeMsg{seq: seq, filePath: filePath, unstagedRaw: rawDiff, unstagedColor: color}
-	}
-}
-
-func (m *Model) cmdColorizeDiffsForSelection() tea.Cmd {
-	sel, ok := m.selectedExplorerDiff()
-	if !ok {
-		return nil
-	}
-	file := sel.file
-	seq := m.colorizeSeq
-	sideBySide := m.renderMode == renderSideBySide
-	renderWidth := m.deltaRenderWidth()
-	if file.Untracked {
-		rawDiff := strings.Join(m.unstaged.data.RawLines, "\n")
-		return m.cmdColorizeUntracked(seq, file.Path, rawDiff, sideBySide, renderWidth)
-	}
-	unstagedRaw := strings.Join(m.unstaged.data.RawLines, "\n")
-	stagedRaw := strings.Join(m.staged.data.RawLines, "\n")
-	return m.cmdColorizeDiffs(seq, file.Path, unstagedRaw, stagedRaw, sideBySide, renderWidth)
+	color, _ := git.ColorizeUntrackedDiff(m.worktreeRoot, filePath, rawDiff, sideBySide, renderWidth, contextLines)
+	return color
 }
 
 type movedTarget struct {
@@ -168,8 +144,6 @@ func (m *Model) shouldSwitchAfterApply(from diffSection) bool {
 }
 
 func (m *Model) reloadDiffsForSelection() tea.Cmd {
-	m.colorizeSeq++
-	seq := m.colorizeSeq
 	sideBySide := m.renderMode == renderSideBySide
 	renderWidth := m.deltaRenderWidth()
 
@@ -196,11 +170,16 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 			m.showGitError(err)
 			raw = ""
 		}
-		m.unstaged = buildSectionState(raw, raw, m.unstaged, sideBySide)
+		color := m.colorizeUntrackedSync(file.Path, raw, sideBySide, renderWidth)
+		if color == "" {
+			color = raw
+		}
+		m.unstaged = buildSectionState(raw, color, m.unstaged, sideBySide)
+		m.unstaged.colorized = true
 		m.staged = newSectionState()
 		m.section = sectionUnstaged
 		m.syncDiffViewports()
-		return m.cmdColorizeUntracked(seq, file.Path, raw, sideBySide, renderWidth)
+		return nil
 	}
 
 	unstagedRaw, err := git.DiffPath(m.worktreeRoot, file.Path, false, m.currentDiffContextLines())
@@ -214,14 +193,23 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 		stagedRaw = ""
 	}
 
-	m.unstaged = buildSectionState(unstagedRaw, unstagedRaw, m.unstaged, sideBySide)
-	m.staged = buildSectionState(stagedRaw, stagedRaw, m.staged, sideBySide)
+	unstagedColor, stagedColor := m.colorizeDiffsSync(file.Path, unstagedRaw, stagedRaw, sideBySide, renderWidth)
+	if unstagedColor == "" {
+		unstagedColor = unstagedRaw
+	}
+	if stagedColor == "" {
+		stagedColor = stagedRaw
+	}
+	m.unstaged = buildSectionState(unstagedRaw, unstagedColor, m.unstaged, sideBySide)
+	m.staged = buildSectionState(stagedRaw, stagedColor, m.staged, sideBySide)
+	m.unstaged.colorized = true
+	m.staged.colorized = true
 	m.pickAvailableSection()
 	m.syncDiffViewports()
 	if strings.TrimSpace(m.searchQuery) != "" && (m.searchScope == searchScopeUnstaged || m.searchScope == searchScopeStaged) {
 		m.recomputeSearchMatches()
 	}
-	return m.cmdColorizeDiffs(seq, file.Path, unstagedRaw, stagedRaw, sideBySide, renderWidth)
+	return nil
 }
 
 func (m *Model) enterDiffFromStatus(resetSection bool) tea.Cmd {

@@ -9,9 +9,9 @@ import (
 type sectionState struct {
 	data     explorer.SectionData
 	viewport viewport.Model
-	// colorized is true once the async delta colorization has arrived.
-	// While false, the view adds left padding to reserve space for the delta
-	// line-number gutter that will appear once colorization completes.
+	// colorized indicates whether this section has delta-colored content.
+	// When false in unified mode, the view reserves gutter width to keep
+	// alignment with colored rendering.
 	colorized bool
 }
 
