@@ -192,7 +192,7 @@ func TestSidebarSearchMovesToFileMatches(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	m = updated.(Model)
-	if m.searchMode != searchModeInput {
+	if m.searchMode != explorer.SearchModeInput {
 		t.Fatalf("expected / to enter search mode")
 	}
 
@@ -212,7 +212,7 @@ func TestSidebarSearchMovesToFileMatches(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
-	if m.searchMode != searchModeNone {
+	if m.searchMode != explorer.SearchModeNone {
 		t.Fatalf("expected enter to leave search mode")
 	}
 

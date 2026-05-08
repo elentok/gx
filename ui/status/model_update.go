@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/explorer"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -136,7 +137,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.help, cmd = m.help.Update(msg)
 			return m, cmd
 		}
-		if m.searchMode != searchModeNone {
+		if m.searchMode != explorer.SearchModeNone {
 			return m.handleSearchKey(msg)
 		}
 		if cmd, handled := m.handleSearchNavigateKey(msg); handled {

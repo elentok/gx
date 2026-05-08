@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/explorer"
 	"github.com/elentok/gx/ui/help"
 
 	"charm.land/bubbles/v2/textinput"
@@ -36,7 +37,7 @@ type Model struct {
 	activeFilePath          string
 	diffReloadSeq           int
 	colorizeSeq             int
-	searchMode              stageSearchMode
+	searchMode              explorer.SearchMode
 	searchScope             stageSearchScope
 	searchQuery             string
 	searchMatches           []stageSearchMatch

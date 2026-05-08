@@ -13,13 +13,6 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-type commitSearchMode int
-
-const (
-	searchModeNone commitSearchMode = iota
-	searchModeInput
-)
-
 type commitSearchScope int
 
 const (
@@ -31,7 +24,7 @@ var commitSearchHighlightStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow).
 var commitSearchCurrentStyle = lipgloss.NewStyle().Foreground(ui.ColorGreen).Bold(true)
 
 func (m Model) InputFocused() bool {
-	return m.searchMode == searchModeInput
+	return m.searchMode == explorer.SearchModeInput
 }
 
 func (m *Model) enterSearchMode() {
@@ -41,7 +34,7 @@ func (m *Model) enterSearchMode() {
 	ti.CursorEnd()
 	ti.Focus()
 	m.searchInput = ti
-	m.searchMode = searchModeInput
+	m.searchMode = explorer.SearchEnter()
 	m.searchScope = searchScopeSidebar
 	if m.focusDiff {
 		m.searchScope = searchScopeDiff
@@ -49,7 +42,7 @@ func (m *Model) enterSearchMode() {
 }
 
 func (m *Model) handleSearchKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
-	if m.searchMode != searchModeInput {
+	if m.searchMode != explorer.SearchModeInput {
 		return false, nil
 	}
 	total := len(m.searchMatches)
@@ -58,14 +51,26 @@ func (m *Model) handleSearchKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	}
 	switch msg.String() {
 	case "esc":
-		m.searchMode = searchModeNone
-		if strings.TrimSpace(m.searchQuery) == "" || total == 0 {
+		mode, cleared := explorer.SearchDismiss(
+			&m.searchQuery,
+			&m.searchCursor,
+			total,
+			explorer.SearchDismissKeepResultsUnlessEmptyOrNoMatches,
+		)
+		m.searchMode = mode
+		if cleared {
 			m.clearSearch()
 		}
 		return true, nil
 	case "enter":
-		m.searchMode = searchModeNone
-		if strings.TrimSpace(m.searchQuery) == "" || total == 0 {
+		mode, cleared := explorer.SearchDismiss(
+			&m.searchQuery,
+			&m.searchCursor,
+			total,
+			explorer.SearchDismissKeepResultsUnlessEmptyOrNoMatches,
+		)
+		m.searchMode = mode
+		if cleared {
 			m.clearSearch()
 		}
 		return true, nil
@@ -84,20 +89,16 @@ func (m *Model) handleSearchNavigateKey(msg tea.KeyPressMsg) bool {
 	if m.searchScope == searchScopeSidebar {
 		total = len(m.fileMatches)
 	}
-	if strings.TrimSpace(m.searchQuery) == "" || total == 0 {
+	if !explorer.SearchCanNavigate(m.searchQuery, total) {
 		return false
 	}
 	switch msg.String() {
 	case "n":
-		if m.searchCursor < total-1 {
-			m.searchCursor++
-		}
+		explorer.SearchCursorNext(&m.searchCursor, total)
 		m.jumpToSearchCursor()
 		return true
 	case "N", "shift+n":
-		if m.searchCursor > 0 {
-			m.searchCursor--
-		}
+		explorer.SearchCursorPrev(&m.searchCursor, total)
 		m.jumpToSearchCursor()
 		return true
 	}
@@ -206,7 +207,7 @@ func highlightMatchText(text, query string, current bool) string {
 }
 
 func (m Model) searchFooterText() string {
-	if m.searchMode != searchModeInput {
+	if m.searchMode != explorer.SearchModeInput {
 		return ""
 	}
 	total := len(m.searchMatches)

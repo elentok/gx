@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui/diff"
+	"github.com/elentok/gx/ui/explorer"
 	"github.com/elentok/gx/ui/nav"
 
 	tea "charm.land/bubbletea/v2"
@@ -1546,7 +1547,7 @@ func TestStageSearchStatusModeAndNavigation(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	m = updated.(Model)
-	if m.searchMode != searchModeInput {
+	if m.searchMode != explorer.SearchModeInput {
 		t.Fatalf("expected search input mode after /")
 	}
 
@@ -1561,7 +1562,7 @@ func TestStageSearchStatusModeAndNavigation(t *testing.T) {
 	first := m.selected
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
-	if m.searchMode != searchModeNone || m.searchQuery == "" || len(m.searchMatches) == 0 {
+	if m.searchMode != explorer.SearchModeNone || m.searchQuery == "" || len(m.searchMatches) == 0 {
 		t.Fatalf("expected enter to return to normal mode while keeping search highlights")
 	}
 	if line := ansi.Strip(m.helpLine()); !strings.Contains(line, "1/2") {
@@ -1578,8 +1579,8 @@ func TestStageSearchStatusModeAndNavigation(t *testing.T) {
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 	m = updated.(Model)
-	if m.searchMode != searchModeNone || m.searchQuery != "" || len(m.searchMatches) != 0 {
-		t.Fatalf("expected esc to clear search state")
+	if m.searchMode != explorer.SearchModeNone || m.searchQuery == "" || len(m.searchMatches) == 0 {
+		t.Fatalf("expected esc to keep active search results when matches exist")
 	}
 }
 
@@ -1618,7 +1619,7 @@ func TestStageSearchDiffModeAndPrevNextKeys(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	m = updated.(Model)
-	if m.searchMode != searchModeInput {
+	if m.searchMode != explorer.SearchModeInput {
 		t.Fatalf("expected diff search input mode after /")
 	}
 
@@ -1632,7 +1633,7 @@ func TestStageSearchDiffModeAndPrevNextKeys(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
-	if m.searchMode != searchModeNone || m.searchQuery == "" || len(m.searchMatches) == 0 {
+	if m.searchMode != explorer.SearchModeNone || m.searchQuery == "" || len(m.searchMatches) == 0 {
 		t.Fatalf("expected enter to return to normal mode while keeping search highlights")
 	}
 	if m.navMode != navLine {

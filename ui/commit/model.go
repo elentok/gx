@@ -39,7 +39,7 @@ type Model struct {
 	selected      int
 	section       explorer.SectionData
 	diffViewport  viewport.Model
-	searchMode    commitSearchMode
+	searchMode    explorer.SearchMode
 	searchScope   commitSearchScope
 	searchQuery   string
 	searchMatches []explorer.DiffSearchMatch

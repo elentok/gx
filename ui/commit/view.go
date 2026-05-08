@@ -345,7 +345,7 @@ func isMainOrMasterRef(name string) bool {
 }
 
 func (m Model) footerView() string {
-	if m.searchMode == searchModeInput {
+	if m.searchMode == explorer.SearchModeInput {
 		return m.searchFooterText()
 	}
 	left := m.statusMsg

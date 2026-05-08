@@ -2,6 +2,7 @@ package status
 
 import (
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/explorer"
 
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
@@ -41,7 +42,7 @@ func (m Model) View() tea.View {
 
 	footer := m.helpLine()
 	out := lipgloss.JoinVertical(lipgloss.Left, body, footer)
-	if m.searchMode == searchModeInput {
+	if m.searchMode == explorer.SearchModeInput {
 		overlay := m.searchInputOverlayView()
 		y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
 		out = ui.OverlayBottomCenter(out, overlay, m.width, y)

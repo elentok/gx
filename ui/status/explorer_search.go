@@ -12,13 +12,6 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-type stageSearchMode int
-
-const (
-	searchModeNone stageSearchMode = iota
-	searchModeInput
-)
-
 type stageSearchScope int
 
 const (
@@ -40,24 +33,28 @@ var stageSearchCurrentStyle = lipgloss.NewStyle().Foreground(ui.ColorGreen).Bold
 func (m *Model) enterSearchMode() {
 	ti := textinput.New()
 	ti.Prompt = ""
+	ti.SetValue(m.searchQuery)
+	ti.CursorEnd()
 	ti.Focus()
 	m.searchInput = ti
-	m.searchMode = searchModeInput
+	m.searchMode = explorer.SearchEnter()
 	m.searchScope = m.currentSearchScope()
-	m.searchQuery = ""
-	m.searchMatches = nil
-	m.searchCursor = 0
 }
 
 func (m *Model) exitSearchMode() {
-	m.searchMode = searchModeNone
-	m.searchQuery = ""
-	m.searchMatches = nil
-	m.searchCursor = 0
+	m.searchMode, _ = explorer.SearchDismiss(
+		&m.searchQuery,
+		&m.searchCursor,
+		len(m.searchMatches),
+		explorer.SearchDismissKeepResultsUnlessEmptyOrNoMatches,
+	)
+	if strings.TrimSpace(m.searchQuery) == "" {
+		m.searchMatches = nil
+	}
 }
 
 func (m Model) InputFocused() bool {
-	return m.searchMode == searchModeInput
+	return m.searchMode == explorer.SearchModeInput
 }
 
 func (m Model) currentSearchScope() stageSearchScope {
@@ -72,7 +69,7 @@ func (m Model) currentSearchScope() stageSearchScope {
 
 func (m Model) handleSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch m.searchMode {
-	case searchModeInput:
+	case explorer.SearchModeInput:
 		switch msg.String() {
 		case "esc":
 			m.exitSearchMode()
@@ -81,7 +78,7 @@ func (m Model) handleSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			if m.focus == focusDiff {
 				m.navMode = navLine
 			}
-			m.searchMode = searchModeNone
+			m.searchMode = explorer.SearchExitInput()
 			return m, nil
 		}
 
@@ -99,19 +96,16 @@ func (m Model) handleSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleSearchNavigateKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
-	if strings.TrimSpace(m.searchQuery) == "" || len(m.searchMatches) == 0 {
+	total := len(m.searchMatches)
+	if !explorer.SearchCanNavigate(m.searchQuery, total) {
 		return nil, false
 	}
 	switch msg.String() {
 	case "n":
-		if m.searchCursor < len(m.searchMatches)-1 {
-			m.searchCursor++
-		}
+		explorer.SearchCursorNext(&m.searchCursor, total)
 		return m.jumpToSearchCursor(), true
 	case "N", "shift+n":
-		if m.searchCursor > 0 {
-			m.searchCursor--
-		}
+		explorer.SearchCursorPrev(&m.searchCursor, total)
 		return m.jumpToSearchCursor(), true
 	}
 	return nil, false
