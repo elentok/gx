@@ -7,7 +7,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/diff"
+	"github.com/elentok/gx/ui/diff/diffrender"
 	"github.com/elentok/gx/ui/explorer"
 
 	tea "charm.land/bubbletea/v2"
@@ -283,7 +283,7 @@ func (m Model) renderDiffPane(width, height int) string {
 			lines = append(lines, mark+body)
 		}
 	} else if len(m.section.Parsed.Lines) > 0 {
-		if diff.HasBinaryDiff(m.section.Parsed) {
+		if diffrender.HasBinaryDiff(m.section.Parsed) {
 			lines = []string{ui.StyleMuted.Render("binary file")}
 		} else {
 			lines = []string{ui.StyleMuted.Render("no diff")}

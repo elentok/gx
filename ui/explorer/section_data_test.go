@@ -4,7 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/elentok/gx/ui/diff"
+	"github.com/elentok/gx/ui/diff/diffcore"
+	"github.com/elentok/gx/ui/diff/diffrender"
 )
 
 func TestBuildSectionData_Unified(t *testing.T) {
@@ -37,9 +38,9 @@ func TestBuildSectionData_SideBySide(t *testing.T) {
 
 func TestReflowSectionData(t *testing.T) {
 	data := SectionData{
-		Parsed:           diff.ParseUnifiedDiff(sampleSectionUnifiedDiff),
+		Parsed:           diffcore.ParseUnifiedDiff(sampleSectionUnifiedDiff),
 		BaseLines:        []string{"0123456789"},
-		BaseLineKinds:    []diff.RowKind{diff.RowAdded},
+		BaseLineKinds:    []diffrender.RowKind{diffrender.RowAdded},
 		BaseDisplayToRaw: []int{6},
 	}
 

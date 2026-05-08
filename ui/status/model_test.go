@@ -10,7 +10,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/ui/diff"
+	"github.com/elentok/gx/ui/diff/diffrender"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/search"
 
@@ -527,7 +527,7 @@ func TestToggleSideBySideModeWithSFromStatusPane(t *testing.T) {
 
 func TestStripUnifiedVisibleMarkerRemovesChangedPrefix(t *testing.T) {
 	line := "  1 ⋮    │-old"
-	got := diff.StripUnifiedVisibleMarker(line, '-')
+	got := diffrender.StripUnifiedVisibleMarker(line, '-')
 	if strings.Contains(got, "│-old") {
 		t.Fatalf("expected visible marker stripped, got %q", got)
 	}
@@ -536,13 +536,13 @@ func TestStripUnifiedVisibleMarkerRemovesChangedPrefix(t *testing.T) {
 	}
 
 	raw := "+new"
-	got = diff.StripUnifiedVisibleMarker(raw, '+')
+	got = diffrender.StripUnifiedVisibleMarker(raw, '+')
 	if got != " new" {
 		t.Fatalf("expected raw unified marker replaced with space, got %q", got)
 	}
 
 	line = "    ⋮ 579│+\tline := \"  1 ⋮    │-old\""
-	got = diff.StripUnifiedVisibleMarker(line, '+')
+	got = diffrender.StripUnifiedVisibleMarker(line, '+')
 	if strings.Contains(got, "│+\tline") {
 		t.Fatalf("expected gutter marker stripped before source text, got %q", got)
 	}
@@ -626,9 +626,9 @@ func TestUnifiedDiffViewHidesVisibleChangeMarkers(t *testing.T) {
 }
 
 func TestDiffBodyPaddingStylesChangedRows(t *testing.T) {
-	added := diff.DiffBodyPadding(diff.RowAdded, 3)
-	removed := diff.DiffBodyPadding(diff.RowRemoved, 3)
-	plain := diff.DiffBodyPadding(diff.RowPlain, 3)
+	added := diffrender.DiffBodyPadding(diffrender.RowAdded, 3)
+	removed := diffrender.DiffBodyPadding(diffrender.RowRemoved, 3)
+	plain := diffrender.DiffBodyPadding(diffrender.RowPlain, 3)
 
 	if ansi.Strip(added) != "   " || ansi.Strip(removed) != "   " || plain != "   " {
 		t.Fatalf("expected padding width preserved")

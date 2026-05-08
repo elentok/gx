@@ -1,6 +1,10 @@
-package diff
+package diffrender
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/elentok/gx/ui/diff/diffcore"
+)
 
 func TestBuildDisplayBaseLines(t *testing.T) {
 	raw := `diff --git a/a.txt b/a.txt
@@ -12,7 +16,7 @@ index 1111111..2222222 100644
 +new
 `
 
-	parsed := ParseUnifiedDiff(raw)
+	parsed := diffcore.ParseUnifiedDiff(raw)
 	if len(parsed.Hunks) != 1 {
 		t.Fatalf("expected one hunk, got %#v", parsed.Hunks)
 	}

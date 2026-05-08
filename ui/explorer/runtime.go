@@ -3,7 +3,7 @@ package explorer
 import (
 	"charm.land/bubbles/v2/viewport"
 
-	"github.com/elentok/gx/ui/diff"
+	"github.com/elentok/gx/ui/diff/diffcore"
 )
 
 func RestoreViewportYOffset(vp *viewport.Model, y int) {
@@ -22,7 +22,7 @@ func RestoreViewportYOffset(vp *viewport.Model, y int) {
 
 func HunkDisplayBounds(
 	hunkDisplayRange [][2]int,
-	parsed diff.ParsedDiff,
+	parsed diffcore.ParsedDiff,
 	displayToRaw []int,
 	hunkIdx int,
 ) (start int, end int, ok bool) {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/diff"
+	"github.com/elentok/gx/ui/diff/diffrender"
 	"github.com/elentok/gx/ui/explorer"
 	"github.com/elentok/gx/ui/search"
 
@@ -75,7 +75,7 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 	if file, ok := m.selectedExplorerFile(); ok && file.RenameFrom != "" {
 		titleText += " [moved: " + file.RenameFrom + " -> " + file.Path + "]"
 	}
-	if si := diff.ParseSymlinkDiffInfo(sec.data.Parsed); si.IsSymlink {
+	if si := diffrender.ParseSymlinkDiffInfo(sec.data.Parsed); si.IsSymlink {
 		if label := si.TitleLabel(); label != "" {
 			titleText += " " + label
 		}
@@ -92,7 +92,7 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 	overflowTopMark, overflowBottomMark, overflowBothMark := m.hunkOverflowMarkers()
 
 	lines := make([]string, 0, bodyH)
-	if len(sec.data.ViewLines) == 0 && diff.SectionHasBinaryDiff(sec.data.Parsed) {
+	if len(sec.data.ViewLines) == 0 && diffrender.SectionHasBinaryDiff(sec.data.Parsed) {
 		lines = append(lines, lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render(m.binarySummaryLine()))
 	}
 
@@ -157,7 +157,7 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 			if matched, current := m.searchMatchDiffDisplay(section, displayIdx); matched {
 				body = search.Highlight(ansi.Strip(body), m.search.Query(), current)
 			}
-			body += diff.DiffBodyPadding(rowKind, maxInt(0, bodyW-ansi.StringWidth(body)))
+			body += diffrender.DiffBodyPadding(rowKind, maxInt(0, bodyW-ansi.StringWidth(body)))
 			lines = append(lines, mark+body+indicator)
 		}
 	}

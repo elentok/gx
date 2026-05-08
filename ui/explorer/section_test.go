@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/elentok/gx/ui/diff"
+	"github.com/elentok/gx/ui/diff/diffcore"
 )
 
 func TestSplitLines(t *testing.T) {
@@ -32,7 +32,7 @@ func TestIsDeltaSectionDivider(t *testing.T) {
 }
 
 func TestBuildSideBySideMapping(t *testing.T) {
-	parsed := diff.ParseUnifiedDiff(sampleSectionUnifiedDiff)
+	parsed := diffcore.ParseUnifiedDiff(sampleSectionUnifiedDiff)
 	viewLines := []string{
 		" file:1: header",
 		"  │ 1 │ one         │ 1 │ one         │",

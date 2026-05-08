@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui/diff"
+	"github.com/elentok/gx/ui/diff/diffcore"
 	"github.com/elentok/gx/ui/explorer"
 
 	tea "charm.land/bubbletea/v2"
@@ -50,7 +50,7 @@ func (m *Model) applySelection() tea.Cmd {
 			return nil
 		}
 		sig.hunkHeader = sec.data.Parsed.Hunks[sec.data.ActiveHunk].Header
-		patch, err := diff.BuildHunkPatch(sec.data.Parsed, sec.data.ActiveHunk)
+		patch, err := diffcore.BuildHunkPatch(sec.data.Parsed, sec.data.ActiveHunk)
 		if err != nil {
 			m.setStatus(err.Error())
 			return nil
@@ -68,7 +68,7 @@ func (m *Model) applySelection() tea.Cmd {
 			}
 			startChanged := h.ChangedLineOffset[0]
 			endChanged := h.ChangedLineOffset[len(h.ChangedLineOffset)-1]
-			fallbackPatch, fallbackErr := diff.BuildLineRangePatch(sec.data.Parsed, startChanged, endChanged)
+			fallbackPatch, fallbackErr := diffcore.BuildLineRangePatch(sec.data.Parsed, startChanged, endChanged)
 			if fallbackErr != nil {
 				m.showGitError(err)
 				return nil
@@ -93,9 +93,9 @@ func (m *Model) applySelection() tea.Cmd {
 			err   error
 		)
 		if sec.data.VisualActive && endLine > startLine {
-			patch, err = diff.BuildLineRangePatch(sec.data.Parsed, startLine, endLine)
+			patch, err = diffcore.BuildLineRangePatch(sec.data.Parsed, startLine, endLine)
 		} else {
-			patch, err = diff.BuildSingleLinePatch(sec.data.Parsed, sec.data.ActiveLine)
+			patch, err = diffcore.BuildSingleLinePatch(sec.data.Parsed, sec.data.ActiveLine)
 		}
 		if err != nil {
 			m.setStatus(err.Error())
@@ -250,7 +250,7 @@ func (m *Model) openDiscardDiffConfirm() {
 		if sec.data.ActiveHunk < 0 || sec.data.ActiveHunk >= len(sec.data.Parsed.Hunks) {
 			return
 		}
-		patch, err = diff.BuildHunkPatch(sec.data.Parsed, sec.data.ActiveHunk)
+		patch, err = diffcore.BuildHunkPatch(sec.data.Parsed, sec.data.ActiveHunk)
 		title = "Discard selected hunk?"
 		lines = []string{"This will discard the selected hunk from your working tree."}
 	} else {
@@ -262,11 +262,11 @@ func (m *Model) openDiscardDiffConfirm() {
 			startLine, endLine = visualLineBounds(*sec)
 		}
 		if sec.data.VisualActive && endLine > startLine {
-			patch, err = diff.BuildLineRangePatch(sec.data.Parsed, startLine, endLine)
+			patch, err = diffcore.BuildLineRangePatch(sec.data.Parsed, startLine, endLine)
 			title = "Discard selected lines?"
 			lines = []string{"This will discard the selected lines from your working tree."}
 		} else {
-			patch, err = diff.BuildSingleLinePatch(sec.data.Parsed, sec.data.ActiveLine)
+			patch, err = diffcore.BuildSingleLinePatch(sec.data.Parsed, sec.data.ActiveLine)
 			title = "Discard selected line?"
 			lines = []string{"This will discard the selected line from your working tree."}
 		}

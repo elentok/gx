@@ -1,4 +1,4 @@
-package core
+package diffcore
 
 import (
 	"fmt"

@@ -7,7 +7,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/ui/diff"
+	"github.com/elentok/gx/ui/diff/diffcore"
 )
 
 var deltaHunkHeaderRe = regexp.MustCompile(`^\s*(?:[•*]\s+)?[^:]+:\d+:(?:\s.*)?$`)
@@ -41,7 +41,7 @@ func IsDeltaSectionDivider(plain string) bool {
 	return true
 }
 
-func BuildSideBySideMapping(parsed diff.ParsedDiff, viewLines []string) SideBySideMapping {
+func BuildSideBySideMapping(parsed diffcore.ParsedDiff, viewLines []string) SideBySideMapping {
 	displayToRaw := make([]int, len(viewLines))
 	for i := range displayToRaw {
 		displayToRaw[i] = -1
@@ -93,7 +93,7 @@ func BuildSideBySideMapping(parsed diff.ParsedDiff, viewLines []string) SideBySi
 
 	return SideBySideMapping{
 		DisplayToRaw:     displayToRaw,
-		RawToDisplay:     diff.BuildRawToDisplayMap(parsed, displayToRaw),
+		RawToDisplay:     diffcore.BuildRawToDisplayMap(parsed, displayToRaw),
 		ChangedDisplay:   changedDisplay,
 		HunkDisplayRange: sideBySideHunkDisplayRanges(viewLines, len(parsed.Hunks)),
 	}

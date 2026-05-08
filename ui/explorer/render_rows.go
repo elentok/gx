@@ -1,12 +1,12 @@
 package explorer
 
-import "github.com/elentok/gx/ui/diff"
+import "github.com/elentok/gx/ui/diff/diffrender"
 
 type VisibleDiffRow struct {
 	DisplayIndex       int
 	RawIndex           int
 	Text               string
-	Kind               diff.RowKind
+	Kind               diffrender.RowKind
 	InActiveHunk       bool
 	IsActiveRaw        bool
 	IsActiveChangedRaw bool
@@ -60,7 +60,7 @@ func BuildVisibleDiffRows(opts VisibleDiffRowsOptions) []VisibleDiffRow {
 		if displayIdx >= 0 && displayIdx < len(opts.Section.DisplayToRaw) {
 			rawIdx = opts.Section.DisplayToRaw[displayIdx]
 		}
-		rowKind := diff.RowPlain
+		rowKind := diffrender.RowPlain
 		if displayIdx >= 0 && displayIdx < len(opts.Section.ViewLineKinds) {
 			rowKind = opts.Section.ViewLineKinds[displayIdx]
 		}

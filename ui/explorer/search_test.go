@@ -5,7 +5,7 @@ import (
 
 	"charm.land/bubbles/v2/viewport"
 
-	"github.com/elentok/gx/ui/diff"
+	"github.com/elentok/gx/ui/diff/diffcore"
 	"github.com/elentok/gx/ui/search"
 )
 
@@ -43,7 +43,7 @@ func TestApplyDiffSearchMatch(t *testing.T) {
 
 func TestCurrentDiffSearchMatchIndex(t *testing.T) {
 	section := SectionData{
-		Parsed:     diff.ParseUnifiedDiff(sampleSectionUnifiedDiff),
+		Parsed:     diffcore.ParseUnifiedDiff(sampleSectionUnifiedDiff),
 		ActiveLine: 1,
 	}
 	matches := []DiffSearchMatch{

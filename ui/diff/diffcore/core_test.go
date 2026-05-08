@@ -1,4 +1,4 @@
-package diff
+package diffcore_test
 
 import (
 	"strings"
@@ -6,6 +6,8 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/ui/diff/diffcore"
+	"github.com/elentok/gx/ui/diff/diffrender"
 )
 
 func TestParseUnifiedDiff_TracksHunksAndChangedLines(t *testing.T) {
@@ -21,7 +23,7 @@ func TestParseUnifiedDiff_TracksHunksAndChangedLines(t *testing.T) {
 		" three",
 	}, "\n") + "\n"
 
-	p := ParseUnifiedDiff(raw)
+	p := diffcore.ParseUnifiedDiff(raw)
 	if len(p.Hunks) != 1 {
 		t.Fatalf("hunks = %d, want 1", len(p.Hunks))
 	}
@@ -43,8 +45,8 @@ func TestBuildSingleLinePatch(t *testing.T) {
 		"-old",
 		"+new",
 	}, "\n") + "\n"
-	p := ParseUnifiedDiff(raw)
-	patch, err := BuildSingleLinePatch(p, 1)
+	p := diffcore.ParseUnifiedDiff(raw)
+	patch, err := diffcore.BuildSingleLinePatch(p, 1)
 	if err != nil {
 		t.Fatalf("BuildSingleLinePatch: %v", err)
 	}
@@ -71,9 +73,9 @@ func TestBuildSingleLinePatch_DoesNotIncludeNonContiguousContext(t *testing.T) {
 		"+new-4",
 		" keep-5",
 	}, "\n") + "\n"
-	p := ParseUnifiedDiff(raw)
+	p := diffcore.ParseUnifiedDiff(raw)
 
-	patch, err := BuildSingleLinePatch(p, 1) // +new-2
+	patch, err := diffcore.BuildSingleLinePatch(p, 1) // +new-2
 	if err != nil {
 		t.Fatalf("BuildSingleLinePatch: %v", err)
 	}
@@ -97,9 +99,9 @@ func TestBuildHunkPatch_PreservesFullFileHeader(t *testing.T) {
 		"+one",
 		"+two",
 	}, "\n") + "\n"
-	p := ParseUnifiedDiff(raw)
+	p := diffcore.ParseUnifiedDiff(raw)
 
-	patch, err := BuildHunkPatch(p, 0)
+	patch, err := diffcore.BuildHunkPatch(p, 0)
 	if err != nil {
 		t.Fatalf("BuildHunkPatch: %v", err)
 	}
@@ -123,9 +125,9 @@ func TestBuildLineRangePatch_IncludesSelectedRange(t *testing.T) {
 		"+new-4",
 		" keep-5",
 	}, "\n") + "\n"
-	p := ParseUnifiedDiff(raw)
+	p := diffcore.ParseUnifiedDiff(raw)
 
-	patch, err := BuildLineRangePatch(p, 1, 3)
+	patch, err := diffcore.BuildLineRangePatch(p, 1, 3)
 	if err != nil {
 		t.Fatalf("BuildLineRangePatch: %v", err)
 	}
@@ -167,11 +169,11 @@ func TestBuildHunkPatch_ApplyToIndex_WithIndentedGoLines(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DiffPath: %v", err)
 	}
-	p := ParseUnifiedDiff(raw)
+	p := diffcore.ParseUnifiedDiff(raw)
 	if len(p.Hunks) != 1 {
 		t.Fatalf("expected one hunk, got %d", len(p.Hunks))
 	}
-	patch, err := BuildHunkPatch(p, 0)
+	patch, err := diffcore.BuildHunkPatch(p, 0)
 	if err != nil {
 		t.Fatalf("BuildHunkPatch: %v", err)
 	}
@@ -337,8 +339,8 @@ func TestParseSymlinkDiffInfo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := ParseUnifiedDiff(tt.raw)
-			si := ParseSymlinkDiffInfo(p)
+			p := diffcore.ParseUnifiedDiff(tt.raw)
+			si := diffrender.ParseSymlinkDiffInfo(p)
 			if si.IsSymlink != tt.isSymlink {
 				t.Errorf("IsSymlink = %v, want %v", si.IsSymlink, tt.isSymlink)
 			}

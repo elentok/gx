@@ -5,7 +5,7 @@ import (
 
 	"charm.land/bubbles/v2/viewport"
 
-	"github.com/elentok/gx/ui/diff"
+	"github.com/elentok/gx/ui/diff/diffcore"
 )
 
 func TestRestoreViewportYOffset_ClampsToVisibleRange(t *testing.T) {
@@ -24,7 +24,7 @@ func TestRestoreViewportYOffset_ClampsToVisibleRange(t *testing.T) {
 }
 
 func TestHunkDisplayBounds_UsesExplicitDisplayRange(t *testing.T) {
-	parsed := diff.ParseUnifiedDiff(sampleUnifiedDiff)
+	parsed := diffcore.ParseUnifiedDiff(sampleUnifiedDiff)
 
 	start, end, ok := HunkDisplayBounds([][2]int{{4, 8}}, parsed, nil, 0)
 	if !ok || start != 4 || end != 8 {
@@ -33,7 +33,7 @@ func TestHunkDisplayBounds_UsesExplicitDisplayRange(t *testing.T) {
 }
 
 func TestHunkDisplayBounds_FallsBackToDisplayMap(t *testing.T) {
-	parsed := diff.ParseUnifiedDiff(sampleUnifiedDiff)
+	parsed := diffcore.ParseUnifiedDiff(sampleUnifiedDiff)
 
 	displayToRaw := []int{-1, -1, 4, 5, 6}
 	start, end, ok := HunkDisplayBounds(nil, parsed, displayToRaw, 0)

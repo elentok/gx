@@ -2,7 +2,7 @@ package status
 
 import (
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui/diff"
+	"github.com/elentok/gx/ui/diff/diffrender"
 	"github.com/elentok/gx/ui/explorer"
 )
 
@@ -40,7 +40,7 @@ func (m Model) sectionHasContent(section diffSection) bool {
 	} else {
 		sec = m.unstaged
 	}
-	return len(sec.data.ViewLines) > 0 || diff.SectionHasBinaryDiff(sec.data.Parsed)
+	return len(sec.data.ViewLines) > 0 || diffrender.SectionHasBinaryDiff(sec.data.Parsed)
 }
 
 func (m Model) visibleDiffSections() []diffSection {

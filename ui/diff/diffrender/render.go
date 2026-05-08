@@ -1,11 +1,11 @@
-package render
+package diffrender
 
 import (
 	"regexp"
 	"strings"
 
 	"github.com/elentok/gx/ui"
-	diffcore "github.com/elentok/gx/ui/diff/core"
+	diffcore "github.com/elentok/gx/ui/diff/diffcore"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
