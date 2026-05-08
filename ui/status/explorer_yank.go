@@ -1,7 +1,6 @@
 package status
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/atotto/clipboard"
@@ -31,7 +30,7 @@ func (m *Model) yankLocationOnly() {
 		return
 	}
 	if m.focus == focusStatus {
-		if err := stageClipboardWrite("@" + file.Path); err != nil {
+		if err := stageClipboardWrite(explorer.FormatYankLocation(file.Path, "")); err != nil {
 			m.setStatus("clipboard copy failed: " + err.Error())
 			return
 		}
@@ -42,7 +41,7 @@ func (m *Model) yankLocationOnly() {
 	if !ok {
 		return
 	}
-	if err := stageClipboardWrite("@" + file.Path + " " + loc); err != nil {
+	if err := stageClipboardWrite(explorer.FormatYankLocation(file.Path, loc)); err != nil {
 		m.setStatus("clipboard copy failed: " + err.Error())
 		return
 	}
@@ -56,7 +55,7 @@ func (m *Model) yankAllContext() {
 		return
 	}
 	if m.focus == focusStatus {
-		if err := stageClipboardWrite("@" + file.Path); err != nil {
+		if err := stageClipboardWrite(explorer.FormatYankLocation(file.Path, "")); err != nil {
 			m.setStatus("clipboard copy failed: " + err.Error())
 			return
 		}
@@ -68,7 +67,7 @@ func (m *Model) yankAllContext() {
 	if !ok {
 		return
 	}
-	text := fmt.Sprintf("@%s %s\n\n%s", file.Path, loc, strings.Join(body, "\n"))
+	text := explorer.FormatYankAllContext(file.Path, loc, body)
 	if err := stageClipboardWrite(text); err != nil {
 		m.setStatus("clipboard copy failed: " + err.Error())
 		return
@@ -82,13 +81,13 @@ func (m *Model) yankContentOnly() {
 		return
 	}
 	sec := m.currentSection()
-	if explorer.ActiveHunkIndexForYank(sec.data, m.navMode) < 0 {
-		m.setStatus("no hunk selected")
+	_, body, yankErr := explorer.FocusedLocationAndBody(sec.data, m.navMode)
+	if yankErr == explorer.FocusedYankErrNoHunk {
+		m.setStatus(string(yankErr))
 		return
 	}
-	body := explorer.FocusedYankBody(sec.data, m.navMode)
-	if len(body) == 0 {
-		m.setStatus("no lines to yank")
+	if yankErr == explorer.FocusedYankErrNoLines {
+		m.setStatus(string(yankErr))
 		return
 	}
 	if err := stageClipboardWrite(strings.Join(body, "\n")); err != nil {
@@ -100,16 +99,10 @@ func (m *Model) yankContentOnly() {
 
 func (m *Model) focusedLocationAndBody() (string, []string, bool) {
 	sec := m.currentSection()
-	hunkIdx := explorer.ActiveHunkIndexForYank(sec.data, m.navMode)
-	if hunkIdx < 0 || hunkIdx >= len(sec.data.Parsed.Hunks) {
-		m.setStatus("no hunk selected")
+	loc, body, yankErr := explorer.FocusedLocationAndBody(sec.data, m.navMode)
+	if yankErr != "" {
+		m.setStatus(string(yankErr))
 		return "", nil, false
 	}
-	body := explorer.FocusedYankBody(sec.data, m.navMode)
-	if len(body) == 0 {
-		m.setStatus("no lines to yank")
-		return "", nil, false
-	}
-	loc := explorer.FocusedLocation(sec.data, m.navMode)
 	return loc, body, true
 }

@@ -1,7 +1,6 @@
 package commit
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/atotto/clipboard"
@@ -46,7 +45,7 @@ func (m *Model) yankLocationOnly() {
 		return
 	}
 	if !m.focusDiff {
-		if err := commitClipboardWrite("@" + path); err != nil {
+		if err := commitClipboardWrite(explorer.FormatYankLocation(path, "")); err != nil {
 			m.setStatus("clipboard copy failed: " + err.Error())
 			return
 		}
@@ -57,7 +56,7 @@ func (m *Model) yankLocationOnly() {
 	if !ok {
 		return
 	}
-	if err := commitClipboardWrite("@" + path + " " + loc); err != nil {
+	if err := commitClipboardWrite(explorer.FormatYankLocation(path, loc)); err != nil {
 		m.setStatus("clipboard copy failed: " + err.Error())
 		return
 	}
@@ -71,7 +70,7 @@ func (m *Model) yankAllContext() {
 		return
 	}
 	if !m.focusDiff {
-		if err := commitClipboardWrite("@" + path); err != nil {
+		if err := commitClipboardWrite(explorer.FormatYankLocation(path, "")); err != nil {
 			m.setStatus("clipboard copy failed: " + err.Error())
 			return
 		}
@@ -82,7 +81,7 @@ func (m *Model) yankAllContext() {
 	if !ok {
 		return
 	}
-	text := fmt.Sprintf("@%s %s\n\n%s", path, loc, strings.Join(body, "\n"))
+	text := explorer.FormatYankAllContext(path, loc, body)
 	if err := commitClipboardWrite(text); err != nil {
 		m.setStatus("clipboard copy failed: " + err.Error())
 		return
@@ -95,13 +94,13 @@ func (m *Model) yankContentOnly() {
 		m.setStatus("no diff selection to yank")
 		return
 	}
-	if explorer.ActiveHunkIndexForYank(m.section, m.diffNavMode) < 0 {
-		m.setStatus("no hunk selected")
+	_, body, yankErr := explorer.FocusedLocationAndBody(m.section, m.diffNavMode)
+	if yankErr == explorer.FocusedYankErrNoHunk {
+		m.setStatus(string(yankErr))
 		return
 	}
-	body := explorer.FocusedYankBody(m.section, m.diffNavMode)
-	if len(body) == 0 {
-		m.setStatus("no lines to yank")
+	if yankErr == explorer.FocusedYankErrNoLines {
+		m.setStatus(string(yankErr))
 		return
 	}
 	if err := commitClipboardWrite(strings.Join(body, "\n")); err != nil {
@@ -125,15 +124,10 @@ func (m *Model) yankCommitBody() {
 }
 
 func (m *Model) focusedLocationAndBody() (string, []string, bool) {
-	if explorer.ActiveHunkIndexForYank(m.section, m.diffNavMode) < 0 {
-		m.setStatus("no hunk selected")
+	loc, body, yankErr := explorer.FocusedLocationAndBody(m.section, m.diffNavMode)
+	if yankErr != "" {
+		m.setStatus(string(yankErr))
 		return "", nil, false
 	}
-	body := explorer.FocusedYankBody(m.section, m.diffNavMode)
-	if len(body) == 0 {
-		m.setStatus("no lines to yank")
-		return "", nil, false
-	}
-	loc := explorer.FocusedLocation(m.section, m.diffNavMode)
 	return loc, body, true
 }
