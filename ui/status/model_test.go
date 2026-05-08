@@ -165,6 +165,8 @@ func TestStatusLOnFileEntersDiffAndResetsSectionOnFileChange(t *testing.T) {
 
 	m := New(repo)
 	m.ready = true
+	m.width = 100
+	m.height = 20
 	m.focus = focusStatus
 	m.section = sectionStaged
 
@@ -1563,8 +1565,8 @@ func TestStageSearchStatusModeAndNavigation(t *testing.T) {
 	if m.search.Mode() != search.SearchModeResults || !m.search.HasQuery() || m.search.MatchesCount() == 0 {
 		t.Fatalf("expected enter to show search results mode while keeping highlights")
 	}
-	if line := ansi.Strip(m.helpLine()); !strings.Contains(line, "1/2") {
-		t.Fatalf("expected persistent search counter in footer, got %q", line)
+	if pane := ansi.Strip(m.renderStatusPane(40, 10)); !strings.Contains(pane, "1/2") {
+		t.Fatalf("expected persistent search counter in status frame, got %q", pane)
 	}
 
 	m = runStatusCmds(t, m, tea.KeyPressMsg{Code: 'n', Text: "n"})

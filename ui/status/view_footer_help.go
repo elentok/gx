@@ -17,9 +17,6 @@ func (m Model) helpLine() string {
 			hint += " · " + t
 		}
 		hint += " · ? help"
-		if s := m.searchCounterLabel(); s != "" {
-			hint = s + " · " + hint
-		}
 		return m.renderFooterLine(hint)
 	}
 	modeLabel := "hunk"
@@ -35,31 +32,10 @@ func (m Model) helpLine() string {
 		hint += " · " + t
 	}
 	hint += " · ? help"
-	if s := m.searchCounterLabel(); s != "" {
-		hint = s + " · " + hint
-	}
 	if m.currentSection().data.VisualActive {
 		return m.renderFooterLineWithPrefix("VISUAL", hint)
 	}
 	return m.renderFooterLine(hint)
-}
-
-func (m Model) searchCounterLabel() string {
-	if !m.search.HasQuery() || m.search.MatchesCount() == 0 {
-		return ""
-	}
-	idx := m.search.Cursor() + 1
-	if idx < 1 {
-		idx = 1
-	}
-	if idx > m.search.MatchesCount() {
-		idx = m.search.MatchesCount()
-	}
-	icon := "*"
-	if m.settings.UseNerdFontIcons {
-		icon = ui.Icons(true).Search
-	}
-	return fmt.Sprintf("%s %d/%d", icon, idx, m.search.MatchesCount())
 }
 
 func (m Model) diffContextLabel() string {

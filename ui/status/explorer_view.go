@@ -88,6 +88,13 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 		pct := int(sec.viewport.ScrollPercent()*100 + 0.5)
 		rightTitleText = fmt.Sprintf("%d%%", pct)
 	}
+	if s := m.searchCounterForDiffSection(section); s != "" {
+		if rightTitleText == "" {
+			rightTitleText = s
+		} else {
+			rightTitleText += " · " + s
+		}
+	}
 
 	overflowTopMark, overflowBottomMark, overflowBothMark := m.hunkOverflowMarkers()
 

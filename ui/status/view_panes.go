@@ -137,7 +137,7 @@ func (m Model) requiredStatusPaneWidth(height int) int {
 
 func (m Model) renderStatusPane(width, height int) string {
 	lines := m.visibleStatusLines(height)
-	return m.renderPanelWithBorderTitle(width, height, m.statusPaneTitle(), "", lines, m.focus == focusStatus, sectionUnstaged)
+	return m.renderPanelWithBorderTitle(width, height, m.statusPaneTitle(), m.searchCounterForStatusPane(), lines, m.focus == focusStatus, sectionUnstaged)
 }
 
 func (m Model) branchSummaryTitleSuffix() string {
