@@ -67,11 +67,6 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 	if section == sectionStaged {
 		accent = ui.ColorGreen
 	}
-	hunkStart, hunkEnd := -1, -1
-	if m.navMode == navHunk && sec.data.ActiveHunk >= 0 && sec.data.ActiveHunk < len(sec.data.Parsed.Hunks) {
-		hunkStart = sec.data.Parsed.Hunks[sec.data.ActiveHunk].StartLine
-		hunkEnd = sec.data.Parsed.Hunks[sec.data.ActiveHunk].EndLine
-	}
 	sec.viewport.SetHeight(maxInt(0, bodyH))
 	sec.viewport.SetWidth(innerW)
 
@@ -93,20 +88,6 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 		rightTitleText = fmt.Sprintf("%d%%", pct)
 	}
 
-	overflowTopDisplay := -1
-	overflowBottomDisplay := -1
-	if m.navMode == navHunk && activeSection && sec.data.ActiveHunk >= 0 {
-		if start, end, ok := hunkDisplayBounds(*sec, sec.data.ActiveHunk); ok && sec.viewport.VisibleLineCount() > 0 {
-			vpTop := sec.viewport.YOffset()
-			vpBottom := vpTop + sec.viewport.VisibleLineCount() - 1
-			if start < vpTop {
-				overflowTopDisplay = vpTop
-			}
-			if end > vpBottom {
-				overflowBottomDisplay = vpBottom
-			}
-		}
-	}
 	overflowTopMark, overflowBottomMark, overflowBothMark := m.hunkOverflowMarkers()
 
 	lines := make([]string, 0, bodyH)
@@ -115,44 +96,41 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 	}
 
 	if len(lines) == 0 {
-		for i := 0; i < bodyH; i++ {
-			displayIdx := sec.viewport.YOffset() + i
-			if displayIdx >= len(sec.data.ViewLines) {
+		rows := explorer.BuildVisibleDiffRows(explorer.VisibleDiffRowsOptions{
+			Section:    sec.data,
+			ViewportY:  sec.viewport.YOffset(),
+			Visible:    sec.viewport.VisibleLineCount(),
+			BodyHeight: bodyH,
+			NavMode:    m.navMode,
+			Active:     activeSection,
+			ActiveRaw:  active,
+		})
+		for _, row := range rows {
+			if row.DisplayIndex < 0 || row.DisplayIndex >= len(sec.data.ViewLines) {
 				lines = append(lines, "")
 				continue
 			}
-			rawIdx := -1
-			if displayIdx >= 0 && displayIdx < len(sec.data.DisplayToRaw) {
-				rawIdx = sec.data.DisplayToRaw[displayIdx]
-			}
+			displayIdx := row.DisplayIndex
+			rawIdx := row.RawIndex
 			mark := "  "
 			if m.navMode == navLine && sec.data.VisualActive && m.visualMatchDiffDisplay(*sec, displayIdx) {
 				mark = lipgloss.NewStyle().Foreground(accent).Render("▎ ")
 			}
-			inActiveHunk := false
-			if m.navMode == navHunk {
-				if len(sec.data.HunkDisplayRange) > 0 && sec.data.ActiveHunk >= 0 && sec.data.ActiveHunk < len(sec.data.HunkDisplayRange) {
-					r := sec.data.HunkDisplayRange[sec.data.ActiveHunk]
-					inActiveHunk = displayIdx >= r[0] && displayIdx <= r[1]
-				} else {
-					inActiveHunk = rawIdx >= 0 && rawIdx >= hunkStart && rawIdx <= hunkEnd
-				}
-			}
-			if inActiveHunk && activeSection {
+			if row.InActiveHunk && activeSection {
 				mark = lipgloss.NewStyle().Foreground(accent).Render("▌ ")
 			}
-			if rawIdx >= 0 && rawIdx == active && activeSection {
+			if row.IsActiveRaw {
 				mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render("▌ ")
 			}
-			if rawIdx < 0 && m.navMode == navLine && activeSection && sec.data.ActiveLine >= 0 && sec.data.ActiveLine < len(sec.data.ChangedDisplay) && sec.data.ChangedDisplay[sec.data.ActiveLine] == displayIdx {
+			if row.IsActiveChangedRaw {
 				mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render("▌ ")
 			}
-			if inActiveHunk {
-				if displayIdx == overflowTopDisplay && displayIdx == overflowBottomDisplay {
+			if row.InActiveHunk {
+				if row.OverflowTop && row.OverflowBottom {
 					mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render(overflowBothMark)
-				} else if displayIdx == overflowTopDisplay {
+				} else if row.OverflowTop {
 					mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render(overflowTopMark)
-				} else if displayIdx == overflowBottomDisplay {
+				} else if row.OverflowBottom {
 					mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render(overflowBottomMark)
 				}
 			}
@@ -167,17 +145,14 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 			if bodyW < 0 {
 				bodyW = 0
 			}
-			rowKind := diff.RowPlain
-			if displayIdx >= 0 && displayIdx < len(sec.data.ViewLineKinds) {
-				rowKind = sec.data.ViewLineKinds[displayIdx]
-			}
+			rowKind := row.Kind
 			gutterPad := ""
 			effectiveBodyW := bodyW
 			if !sec.colorized && !m.isSideBySideMode() && rowKind != diff.RowHunkHeader {
 				gutterPad = strings.Repeat(" ", unifiedGutterPad)
 				effectiveBodyW = maxInt(0, bodyW-unifiedGutterPad)
 			}
-			body := gutterPad + ansi.Truncate(sec.data.ViewLines[displayIdx], effectiveBodyW, "")
+			body := gutterPad + ansi.Truncate(row.Text, effectiveBodyW, "")
 			if m.renderMode == renderSideBySide {
 				plain := strings.TrimSpace(ansi.Strip(body))
 				if isDeltaSectionDivider(plain) {
