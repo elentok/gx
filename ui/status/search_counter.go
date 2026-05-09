@@ -7,10 +7,11 @@ import (
 )
 
 func (m Model) searchCounterForStatusPane() string {
-	if m.currentSearchScope() != searchScopeStatus || !m.search.HasQuery() || m.search.MatchesCount() == 0 {
+	search := m.fileTreeModel.Search()
+	if m.currentSearchScope() != searchScopeStatus || !search.HasQuery() || search.MatchesCount() == 0 {
 		return ""
 	}
-	return m.searchCounterText()
+	return m.searchCounterText(search.Cursor(), search.MatchesCount())
 }
 
 func (m Model) searchCounterForDiffSection(section diffSection) string {
@@ -25,15 +26,14 @@ func (m Model) searchCounterForDiffSection(section diffSection) string {
 	if m.currentSearchScope() != expected {
 		return ""
 	}
-	return m.searchCounterText()
+	return m.searchCounterText(m.search.Cursor(), m.search.MatchesCount())
 }
 
-func (m Model) searchCounterText() string {
-	total := m.search.MatchesCount()
+func (m Model) searchCounterText(cursorZeroBased, total int) string {
 	if total == 0 {
 		return ""
 	}
-	cursor := m.search.Cursor() + 1
+	cursor := cursorZeroBased + 1
 	if cursor < 1 {
 		cursor = 1
 	}

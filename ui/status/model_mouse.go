@@ -7,7 +7,7 @@ import (
 )
 
 func (m *Model) handleMouseWheel(msg tea.MouseWheelMsg) bool {
-	if m.runningOpen || m.confirmOpen || m.errorOpen || m.help.IsOpen || m.search.Mode() != search.SearchModeNone {
+	if m.runningOpen || m.confirmOpen || m.errorOpen || m.help.IsOpen || m.searchActive() {
 		return false
 	}
 	mouse := msg.Mouse()
@@ -21,6 +21,10 @@ func (m *Model) handleMouseWheel(msg tea.MouseWheelMsg) bool {
 		return false
 	}
 	return m.scrollDiffByMouse(mouse.X, mouse.Y, dir)
+}
+
+func (m Model) searchActive() bool {
+	return m.search.Mode() != search.SearchModeNone || m.fileTreeModel.Search().Mode() != search.SearchModeNone
 }
 
 func (m *Model) scrollDiffByMouse(x, y, dir int) bool {

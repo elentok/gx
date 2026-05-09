@@ -46,8 +46,9 @@ func (m *Model) reloadFileList(preservePath string) {
 	m.files = files
 	m.statusEntries = buildStatusEntries(m.files, m.collapsedDirs)
 	m.syncFileTreeModel()
-	if m.search.HasQuery() && m.currentSearchScope() == searchScopeStatus {
-		m.recomputeSearchMatches()
+	if m.fileTreeModel.Search().HasQuery() {
+		matches := m.computeSearchMatches(m.fileTreeModel.Search().Query())
+		_ = m.fileTreeModel.Search().SetMatchesAndJump(matches)
 	}
 
 	if len(m.statusEntries) == 0 {

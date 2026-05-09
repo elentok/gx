@@ -30,6 +30,9 @@ var stageSearchHighlightStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow).B
 var stageSearchCurrentStyle = lipgloss.NewStyle().Foreground(ui.ColorGreen).Bold(true).Underline(true)
 
 func (m Model) InputFocused() bool {
+	if m.focus == focusStatus {
+		return m.fileTreeModel.Search().Mode() == search.SearchModeInput
+	}
 	return m.search.Mode() == search.SearchModeInput
 }
 
@@ -159,10 +162,11 @@ func (m Model) searchOverlayWidth() int {
 }
 
 func (m Model) searchMatchStatusIndex(idx int) bool {
-	if m.currentSearchScope() != searchScopeStatus || !m.search.HasQuery() {
+	search := m.fileTreeModel.Search()
+	if m.currentSearchScope() != searchScopeStatus || !search.HasQuery() {
 		return false
 	}
-	for _, match := range m.search.Matches() {
+	for _, match := range search.Matches() {
 		if match.Index == idx {
 			return true
 		}

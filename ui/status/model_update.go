@@ -74,6 +74,12 @@ func (m Model) handleFileTreeOpenSelected() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleSearchQueryUpdated(msg search.SearchQueryUpdatedMsg) (Model, tea.Cmd) {
+	if m.focus == focusStatus {
+		matches := m.computeSearchMatches(msg.Query)
+		cmd := m.fileTreeModel.Search().SetMatchesAndJump(matches)
+		m.search = *m.fileTreeModel.Search()
+		return m, cmd
+	}
 	matches := m.computeSearchMatches(msg.Query)
 	return m, m.search.SetMatchesAndJump(matches)
 }
@@ -195,6 +201,13 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
+	if m.focus == focusStatus {
+		if handledModel, cmd, handled := m.handleChordKey(msg); handled {
+			return handledModel, cmd
+		}
+		return m.handleStatusKey(msg)
+	}
+
 	if m.search, cmd, handled = m.search.Update(msg); handled {
 		if m.search.Mode() == search.SearchModeResults && m.focus == focusDiff {
 			m.navMode = navLine
@@ -202,13 +215,10 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 		return m, cmd
 	}
-
 	if handledModel, cmd, handled := m.handleChordKey(msg); handled {
 		return handledModel, cmd
 	}
-	if m.focus == focusStatus {
-		return m.handleStatusKey(msg)
-	}
+
 	return m.handleDiffKey(msg)
 }
 

@@ -3,6 +3,7 @@ package status
 import (
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/search"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -17,20 +18,24 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	if updatedFileTree, childCmd := m.fileTreeModel.Update(msg); updatedFileTree.SelectedIndex() != m.fileTreeModel.SelectedIndex() {
 		m.fileTreeModel = updatedFileTree
+		m.search = *m.fileTreeModel.Search()
 		m.selected = m.fileTreeModel.SelectedIndex()
 		m.onStatusSelectionChanged()
 		if childCmd != nil {
-			if handledModel, handledCmd, handled := m.handleFileTreeIntentMsg(childCmd()); handled {
+			if handledModel, handledCmd, handled := m.handleFileTreeChildMsg(childCmd()); handled {
 				return handledModel, tea.Batch(handledCmd, m.scheduleDiffReload())
 			}
+			return m, tea.Batch(msgCmd(childCmd()), m.scheduleDiffReload())
 		}
 		return m, m.scheduleDiffReload()
 	} else {
 		m.fileTreeModel = updatedFileTree
+		m.search = *m.fileTreeModel.Search()
 		if childCmd != nil {
-			if handledModel, handledCmd, handled := m.handleFileTreeIntentMsg(childCmd()); handled {
+			if handledModel, handledCmd, handled := m.handleFileTreeChildMsg(childCmd()); handled {
 				return handledModel, handledCmd
 			}
+			return m, msgCmd(childCmd())
 		}
 	}
 
@@ -89,7 +94,7 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleFileTreeIntentMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+func (m Model) handleFileTreeChildMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg.(type) {
 	case filetree.RebuildRequestedMsg:
 		model, cmd := m.handleFileTreeRebuildRequested()
@@ -97,7 +102,17 @@ func (m Model) handleFileTreeIntentMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case filetree.OpenSelectedMsg:
 		model, cmd := m.handleFileTreeOpenSelected()
 		return model, cmd, true
+	case search.JumpToMatchMsg:
+		model, cmd := m.handleJumpToMatch(msg.(search.JumpToMatchMsg))
+		return model, cmd, true
+	case search.SearchQueryUpdatedMsg:
+		model, cmd := m.handleSearchQueryUpdated(msg.(search.SearchQueryUpdatedMsg))
+		return model, cmd, true
 	default:
 		return m, nil, false
 	}
+}
+
+func msgCmd(msg tea.Msg) tea.Cmd {
+	return func() tea.Msg { return msg }
 }

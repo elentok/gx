@@ -106,11 +106,16 @@ func (m *Model[T]) SetCollapsedDirs(dirs map[string]bool) {
 	maps.Copy(m.collapsedDirs, dirs)
 }
 
-func (m Model[T]) Search() search.Model {
-	return m.search
+func (m *Model[T]) Search() *search.Model {
+	return &m.search
 }
 
 func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd) {
+	if nextSearch, cmd, handled := m.search.Update(msg); handled {
+		m.search = nextSearch
+		return m, cmd
+	}
+
 	if key, ok := msg.(tea.KeyPressMsg); ok {
 		switch key.String() {
 		case "j", "down":

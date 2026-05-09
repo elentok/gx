@@ -111,7 +111,7 @@ func (m Model) visibleStatusLines(height int) []string {
 			name = statusFileIcon(entry.File, isWorktreeSymlink(m.worktreeRoot, entry.File.Path), icons) + " " + name
 		}
 		if m.searchMatchStatusIndex(i) {
-			name = search.Highlight(name, m.search.Query(), false)
+			name = search.Highlight(name, m.fileTreeModel.Search().Query(), false)
 		}
 		return explorer.SidebarRenderableRow{
 			Depth:    entry.Depth,
