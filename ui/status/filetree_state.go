@@ -5,11 +5,16 @@ import (
 	"github.com/elentok/gx/ui/filetree"
 )
 
-func (m *Model) syncFileTreeModel() {
+// reconcileFileTreeFromStatusState rebuilds filetree view state from status state.
+//
+// The final setStatusSelection call is required after SetEntries because row
+// count/shape may have changed. It reapplies m.selected, clamps it to a valid
+// index in fileTreeModel, and writes the clamped value back to m.selected so
+// parent and child selection cannot drift.
+func (m *Model) reconcileFileTreeFromStatusState() {
 	m.fileTreeModel.SetCollapsedDirs(m.collapsedDirs)
 	m.fileTreeModel.SetEntries(statusEntriesToFileTreeEntries(m.statusEntries))
-	m.fileTreeModel.SetSelectedIndex(m.selected)
-	m.selected = m.fileTreeModel.SelectedIndex()
+	m.setStatusSelection(m.selected)
 }
 
 func (m *Model) setStatusSelection(index int) {
@@ -17,6 +22,9 @@ func (m *Model) setStatusSelection(index int) {
 	m.selected = m.fileTreeModel.SelectedIndex()
 }
 
+// statusEntriesToFileTreeEntries is temporary migration glue while status keeps
+// mirrored sidebar rows. It should be removed once filetree.Model is the sole
+// source of truth for rows/selection/collapse state.
 func statusEntriesToFileTreeEntries(entries []statusEntry) []filetree.Entry[git.StageFileStatus] {
 	out := make([]filetree.Entry[git.StageFileStatus], 0, len(entries))
 	for _, entry := range entries {

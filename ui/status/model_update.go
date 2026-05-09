@@ -61,7 +61,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) handleFileTreeRebuildRequested() (tea.Model, tea.Cmd) {
 	m.collapsedDirs = m.fileTreeModel.CollapsedDirs()
 	m.statusEntries = buildStatusEntries(m.files, m.collapsedDirs)
-	m.syncFileTreeModel()
+	m.reconcileFileTreeFromStatusState()
 	return m, m.reloadDiffsForSelection()
 }
 

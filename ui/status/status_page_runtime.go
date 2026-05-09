@@ -36,14 +36,14 @@ func (m *Model) reloadFileList(preservePath string) {
 		m.err = err
 		m.files = nil
 		m.statusEntries = nil
-		m.syncFileTreeModel()
+		m.reconcileFileTreeFromStatusState()
 		m.resetDiffSections()
 		return
 	}
 	m.err = nil
 	m.files = files
 	m.statusEntries = buildStatusEntries(m.files, m.collapsedDirs)
-	m.syncFileTreeModel()
+	m.reconcileFileTreeFromStatusState()
 	if m.fileTreeModel.Search().HasQuery() {
 		matches := m.computeSearchMatches(m.fileTreeModel.Search().Query())
 		_ = m.fileTreeModel.Search().SetMatchesAndJump(matches)

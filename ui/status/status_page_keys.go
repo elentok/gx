@@ -72,7 +72,7 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleFocusedChildKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	switch m.focus {
 	case focusStatus:
-		m.syncFileTreeModel()
+		m.reconcileFileTreeFromStatusState()
 		updatedFileTree, childCmd, handled := m.fileTreeModel.Update(msg)
 		selectionChanged := updatedFileTree.SelectedIndex() != m.fileTreeModel.SelectedIndex()
 		m.fileTreeModel = updatedFileTree

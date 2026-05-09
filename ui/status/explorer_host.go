@@ -50,26 +50,6 @@ func (m Model) visibleDiffSections() []diffSection {
 	return sections
 }
 
-func (m Model) explorerCanApplySelection() bool {
-	return true
-}
-
-func (m Model) explorerCanDiscardSelection() bool {
-	return true
-}
-
-func (m Model) explorerCanJumpFiles() bool {
-	return true
-}
-
-func (m Model) explorerCanEditSelection() bool {
-	return true
-}
-
-func (m Model) explorerCanRunBranchActions() bool {
-	return true
-}
-
 func (m Model) selectedExplorerFile() (statusExplorerFileSelection, bool) {
 	file, ok := m.selectedFile()
 	if !ok {
