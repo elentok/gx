@@ -1,9 +1,9 @@
-package diff
+package diffview
 
 import (
 	"strings"
 
-	"github.com/elentok/gx/ui/diff/diffrender"
+	"github.com/elentok/gx/ui/diffview/diffrender"
 	"github.com/elentok/gx/ui/explorer"
 	"github.com/elentok/gx/ui/search"
 

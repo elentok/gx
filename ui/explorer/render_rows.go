@@ -1,6 +1,6 @@
 package explorer
 
-import "github.com/elentok/gx/ui/diff/diffrender"
+import "github.com/elentok/gx/ui/diffview/diffrender"
 
 type VisibleDiffRow struct {
 	DisplayIndex       int

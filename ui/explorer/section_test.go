@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/elentok/gx/ui/diff/diffcore"
+	"github.com/elentok/gx/ui/diffview/diffcore"
 )
 
 func TestSplitLines(t *testing.T) {

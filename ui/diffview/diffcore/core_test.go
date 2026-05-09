@@ -6,8 +6,8 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/ui/diff/diffcore"
-	"github.com/elentok/gx/ui/diff/diffrender"
+	"github.com/elentok/gx/ui/diffview/diffcore"
+	"github.com/elentok/gx/ui/diffview/diffrender"
 )
 
 func TestParseUnifiedDiff_TracksHunksAndChangedLines(t *testing.T) {

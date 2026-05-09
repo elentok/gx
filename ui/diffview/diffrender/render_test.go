@@ -3,7 +3,7 @@ package diffrender
 import (
 	"testing"
 
-	"github.com/elentok/gx/ui/diff/diffcore"
+	"github.com/elentok/gx/ui/diffview/diffcore"
 )
 
 func TestBuildDisplayBaseLines(t *testing.T) {

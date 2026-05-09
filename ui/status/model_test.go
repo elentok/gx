@@ -10,7 +10,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/ui/diff/diffrender"
+	"github.com/elentok/gx/ui/diffview/diffrender"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/search"
 

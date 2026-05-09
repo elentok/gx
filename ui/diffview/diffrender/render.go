@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/ui"
-	diffcore "github.com/elentok/gx/ui/diff/diffcore"
+	diffcore "github.com/elentok/gx/ui/diffview/diffcore"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"

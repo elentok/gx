@@ -7,7 +7,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/diff/diffrender"
+	"github.com/elentok/gx/ui/diffview/diffrender"
 	"github.com/elentok/gx/ui/explorer"
 
 	tea "charm.land/bubbletea/v2"

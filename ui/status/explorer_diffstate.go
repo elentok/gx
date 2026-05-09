@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui/diff/diffcore"
+	"github.com/elentok/gx/ui/diffview/diffcore"
 	"github.com/elentok/gx/ui/explorer"
 
 	tea "charm.land/bubbletea/v2"

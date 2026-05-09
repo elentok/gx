@@ -2,8 +2,8 @@ package status
 
 import (
 	"github.com/elentok/gx/git"
-	uidiff "github.com/elentok/gx/ui/diff"
-	"github.com/elentok/gx/ui/diff/diffrender"
+	"github.com/elentok/gx/ui/diffview"
+	"github.com/elentok/gx/ui/diffview/diffrender"
 	"github.com/elentok/gx/ui/explorer"
 )
 
@@ -93,14 +93,14 @@ func (m Model) selectedExplorerDiff() (statusExplorerDiffSelection, bool) {
 	return statusExplorerDiffSelection{file: file}, true
 }
 
-func (m *Model) currentDiffModelPtr() *uidiff.Model {
+func (m *Model) currentDiffModelPtr() *diffview.Model {
 	if m.section == sectionStaged {
 		return &m.stagedDiffModel
 	}
 	return &m.unstagedDiffModel
 }
 
-func (m *Model) diffModelForSectionPtr(section diffSection) *uidiff.Model {
+func (m *Model) diffModelForSectionPtr(section diffSection) *diffview.Model {
 	if section == sectionStaged {
 		return &m.stagedDiffModel
 	}

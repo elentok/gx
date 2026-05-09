@@ -7,7 +7,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/ui/diff/diffcore"
+	"github.com/elentok/gx/ui/diffview/diffcore"
 )
 
 var deltaHunkHeaderRe = regexp.MustCompile(`^\s*(?:[•*]\s+)?[^:]+:\d+:(?:\s.*)?$`)

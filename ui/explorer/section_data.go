@@ -3,8 +3,8 @@ package explorer
 import (
 	"strings"
 
-	diffcore "github.com/elentok/gx/ui/diff/diffcore"
-	diffrender "github.com/elentok/gx/ui/diff/diffrender"
+	diffcore "github.com/elentok/gx/ui/diffview/diffcore"
+	diffrender "github.com/elentok/gx/ui/diffview/diffrender"
 )
 
 type SectionData struct {

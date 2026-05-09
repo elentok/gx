@@ -1,4 +1,4 @@
-package diff
+package diffview
 
 import (
 	"testing"

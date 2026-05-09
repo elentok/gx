@@ -3,7 +3,7 @@ package explorer
 import (
 	"charm.land/bubbles/v2/viewport"
 
-	"github.com/elentok/gx/ui/diff/diffcore"
+	"github.com/elentok/gx/ui/diffview/diffcore"
 )
 
 func RestoreViewportYOffset(vp *viewport.Model, y int) {

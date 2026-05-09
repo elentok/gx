@@ -5,7 +5,7 @@ import (
 
 	"charm.land/bubbles/v2/viewport"
 
-	"github.com/elentok/gx/ui/diff/diffcore"
+	"github.com/elentok/gx/ui/diffview/diffcore"
 	"github.com/elentok/gx/ui/search"
 )
 

@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/elentok/gx/ui/diff/diffcore"
-	"github.com/elentok/gx/ui/diff/diffrender"
+	"github.com/elentok/gx/ui/diffview/diffcore"
+	"github.com/elentok/gx/ui/diffview/diffrender"
 )
 
 func TestBuildSectionData_Unified(t *testing.T) {
