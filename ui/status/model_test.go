@@ -1549,20 +1549,20 @@ func TestStageSearchStatusModeAndNavigation(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	m = updated.(Model)
-	if m.search.Mode() != search.SearchModeInput {
+	if m.fileTreeModel.Search().Mode() != search.SearchModeInput {
 		t.Fatalf("expected search input mode after /")
 	}
 
 	m = runStatusCmds(t, m, tea.KeyPressMsg{Code: 'a', Text: "a"})
 	m = runStatusCmds(t, m, tea.KeyPressMsg{Code: 'p', Text: "p"})
-	if m.search.MatchesCount() < 2 {
-		t.Fatalf("expected multiple status search matches, got %d", m.search.MatchesCount())
+	if m.fileTreeModel.Search().MatchesCount() < 2 {
+		t.Fatalf("expected multiple status search matches, got %d", m.fileTreeModel.Search().MatchesCount())
 	}
 
 	first := m.selected
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
-	if m.search.Mode() != search.SearchModeResults || !m.search.HasQuery() || m.search.MatchesCount() == 0 {
+	if m.fileTreeModel.Search().Mode() != search.SearchModeResults || !m.fileTreeModel.Search().HasQuery() || m.fileTreeModel.Search().MatchesCount() == 0 {
 		t.Fatalf("expected enter to show search results mode while keeping highlights")
 	}
 	if pane := ansi.Strip(m.renderStatusPane(40, 10)); !strings.Contains(pane, "1/2") {
@@ -1578,7 +1578,7 @@ func TestStageSearchStatusModeAndNavigation(t *testing.T) {
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 	m = updated.(Model)
-	if m.search.Mode() != search.SearchModeNone || m.search.HasQuery() || m.search.MatchesCount() != 0 {
+	if m.fileTreeModel.Search().Mode() != search.SearchModeNone || m.fileTreeModel.Search().HasQuery() || m.fileTreeModel.Search().MatchesCount() != 0 {
 		t.Fatalf("expected esc to clear active search state")
 	}
 }

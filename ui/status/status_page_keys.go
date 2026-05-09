@@ -18,7 +18,6 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	if updatedFileTree, childCmd := m.fileTreeModel.Update(msg); updatedFileTree.SelectedIndex() != m.fileTreeModel.SelectedIndex() {
 		m.fileTreeModel = updatedFileTree
-		m.search = *m.fileTreeModel.Search()
 		m.selected = m.fileTreeModel.SelectedIndex()
 		m.onStatusSelectionChanged()
 		if childCmd != nil {
@@ -30,7 +29,6 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.scheduleDiffReload()
 	} else {
 		m.fileTreeModel = updatedFileTree
-		m.search = *m.fileTreeModel.Search()
 		if childCmd != nil {
 			if handledModel, handledCmd, handled := m.handleFileTreeChildMsg(childCmd()); handled {
 				return handledModel, handledCmd

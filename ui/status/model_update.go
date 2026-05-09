@@ -76,9 +76,7 @@ func (m Model) handleFileTreeOpenSelected() (tea.Model, tea.Cmd) {
 func (m Model) handleSearchQueryUpdated(msg search.SearchQueryUpdatedMsg) (Model, tea.Cmd) {
 	if m.focus == focusStatus {
 		matches := m.computeSearchMatches(msg.Query)
-		cmd := m.fileTreeModel.Search().SetMatchesAndJump(matches)
-		m.search = *m.fileTreeModel.Search()
-		return m, cmd
+		return m, m.fileTreeModel.Search().SetMatchesAndJump(matches)
 	}
 	matches := m.computeSearchMatches(msg.Query)
 	return m, m.search.SetMatchesAndJump(matches)
