@@ -181,7 +181,7 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 		m.syncSectionsFromDiffModels()
 		m.unstaged.colorized = true
 		m.staged = newSectionState()
-		m.syncDiffModels()
+		m.stagedDiffModel.SetData(m.staged.data)
 		m.section = sectionUnstaged
 		m.syncDiffViewports()
 		return nil
@@ -210,7 +210,6 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 	m.syncSectionsFromDiffModels()
 	m.unstaged.colorized = true
 	m.staged.colorized = true
-	m.syncDiffModels()
 	m.pickAvailableSection()
 	m.syncDiffViewports()
 	if m.currentDiffSearch().HasQuery() && (m.currentSearchScope() == searchScopeUnstaged || m.currentSearchScope() == searchScopeStaged) {

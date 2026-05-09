@@ -153,7 +153,6 @@ func NewModel(worktreeRoot string, settings Settings) Model {
 		unstagedDiffModel: uidiff.NewModel(),
 		stagedDiffModel:   uidiff.NewModel(),
 	}
-	m.syncDiffModels()
 
 	if settings.EnableNavigation {
 		m.reloadFileList("")
