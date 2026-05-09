@@ -134,18 +134,13 @@ func isCorruptPatchErr(err error) bool {
 }
 
 func (m *Model) shouldSwitchAfterApply(from diffSection) bool {
-	var sec sectionState
-	if from == sectionStaged {
-		sec = m.staged
-	} else {
-		sec = m.unstaged
-	}
-	return len(sec.data.Parsed.Hunks) == 0
+	data := m.diffModelForSectionPtr(from).Data()
+	return len(data.Parsed.Hunks) == 0
 }
 
 func (m *Model) reloadDiffsForSelection() tea.Cmd {
-	m.unstagedDiffModel.SetData(m.unstaged.data)
-	m.stagedDiffModel.SetData(m.staged.data)
+	m.diffModelForSectionPtr(sectionUnstaged).SetData(m.unstaged.data)
+	m.diffModelForSectionPtr(sectionStaged).SetData(m.staged.data)
 	sideBySide := m.renderMode == renderSideBySide
 	renderWidth := m.deltaRenderWidth()
 
@@ -154,8 +149,8 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 		m.activeFilePath = ""
 		m.unstaged = newSectionState()
 		m.staged = newSectionState()
-		m.unstagedDiffModel.SetData(m.unstaged.data)
-		m.stagedDiffModel.SetData(m.staged.data)
+		m.diffModelForSectionPtr(sectionUnstaged).SetData(m.unstaged.data)
+		m.diffModelForSectionPtr(sectionStaged).SetData(m.staged.data)
 		m.syncDiffViewports()
 		if m.currentDiffSearch().HasQuery() && (m.currentSearchScope() == searchScopeUnstaged || m.currentSearchScope() == searchScopeStaged) {
 			m.recomputeSearchMatches()
@@ -178,12 +173,13 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 		if color == "" {
 			color = raw
 		}
-		m.unstagedDiffModel.BuildFromRaw(raw, color, sideBySide)
-		m.stagedDiffModel.BuildFromRaw("", "", sideBySide)
-		m.syncSectionsFromDiffModels()
+		m.diffModelForSectionPtr(sectionUnstaged).BuildFromRaw(raw, color, sideBySide)
+		m.diffModelForSectionPtr(sectionStaged).BuildFromRaw("", "", sideBySide)
+		m.unstaged.data = m.diffModelForSectionPtr(sectionUnstaged).Data()
+		m.staged.data = m.diffModelForSectionPtr(sectionStaged).Data()
 		m.unstaged.colorized = true
 		m.staged = newSectionState()
-		m.stagedDiffModel.SetData(m.staged.data)
+		m.diffModelForSectionPtr(sectionStaged).SetData(m.staged.data)
 		m.section = sectionUnstaged
 		m.syncDiffViewports()
 		return nil
@@ -207,9 +203,10 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 	if stagedColor == "" {
 		stagedColor = stagedRaw
 	}
-	m.unstagedDiffModel.BuildFromRaw(unstagedRaw, unstagedColor, sideBySide)
-	m.stagedDiffModel.BuildFromRaw(stagedRaw, stagedColor, sideBySide)
-	m.syncSectionsFromDiffModels()
+	m.diffModelForSectionPtr(sectionUnstaged).BuildFromRaw(unstagedRaw, unstagedColor, sideBySide)
+	m.diffModelForSectionPtr(sectionStaged).BuildFromRaw(stagedRaw, stagedColor, sideBySide)
+	m.unstaged.data = m.diffModelForSectionPtr(sectionUnstaged).Data()
+	m.staged.data = m.diffModelForSectionPtr(sectionStaged).Data()
 	m.unstaged.colorized = true
 	m.staged.colorized = true
 	m.pickAvailableSection()

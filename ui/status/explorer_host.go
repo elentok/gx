@@ -2,6 +2,7 @@ package status
 
 import (
 	"github.com/elentok/gx/git"
+	uidiff "github.com/elentok/gx/ui/diff"
 	"github.com/elentok/gx/ui/diff/diffrender"
 	"github.com/elentok/gx/ui/explorer"
 )
@@ -34,13 +35,8 @@ func (m *Model) sectionState(section diffSection) *sectionState {
 }
 
 func (m Model) sectionHasContent(section diffSection) bool {
-	var sec sectionState
-	if section == sectionStaged {
-		sec = m.staged
-	} else {
-		sec = m.unstaged
-	}
-	return len(sec.data.ViewLines) > 0 || diffrender.SectionHasBinaryDiff(sec.data.Parsed)
+	data := m.diffModelForSectionPtr(section).Data()
+	return len(data.ViewLines) > 0 || diffrender.SectionHasBinaryDiff(data.Parsed)
 }
 
 func (m Model) visibleDiffSections() []diffSection {
@@ -95,4 +91,18 @@ func (m Model) selectedExplorerDiff() (statusExplorerDiffSelection, bool) {
 		return statusExplorerDiffSelection{}, false
 	}
 	return statusExplorerDiffSelection{file: file}, true
+}
+
+func (m *Model) currentDiffModelPtr() *uidiff.Model {
+	if m.section == sectionStaged {
+		return &m.stagedDiffModel
+	}
+	return &m.unstagedDiffModel
+}
+
+func (m *Model) diffModelForSectionPtr(section diffSection) *uidiff.Model {
+	if section == sectionStaged {
+		return &m.stagedDiffModel
+	}
+	return &m.unstagedDiffModel
 }
