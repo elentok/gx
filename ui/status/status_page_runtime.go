@@ -39,6 +39,7 @@ func (m *Model) reloadFileList(preservePath string) {
 		m.syncFileTreeModel()
 		m.unstaged = newSectionState()
 		m.staged = newSectionState()
+		m.syncDiffModels()
 		return
 	}
 	m.err = nil
@@ -55,6 +56,7 @@ func (m *Model) reloadFileList(preservePath string) {
 		m.activeFilePath = ""
 		m.unstaged = newSectionState()
 		m.staged = newSectionState()
+		m.syncDiffModels()
 		m.focus = focusStatus
 		return
 	}

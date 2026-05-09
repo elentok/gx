@@ -152,6 +152,7 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 		m.activeFilePath = ""
 		m.unstaged = newSectionState()
 		m.staged = newSectionState()
+		m.syncDiffModels()
 		m.syncDiffViewports()
 		if m.search.HasQuery() && (m.currentSearchScope() == searchScopeUnstaged || m.currentSearchScope() == searchScopeStaged) {
 			m.recomputeSearchMatches()
@@ -177,6 +178,7 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 		m.unstaged = buildSectionState(raw, color, m.unstaged, sideBySide)
 		m.unstaged.colorized = true
 		m.staged = newSectionState()
+		m.syncDiffModels()
 		m.section = sectionUnstaged
 		m.syncDiffViewports()
 		return nil
@@ -204,6 +206,7 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 	m.staged = buildSectionState(stagedRaw, stagedColor, m.staged, sideBySide)
 	m.unstaged.colorized = true
 	m.staged.colorized = true
+	m.syncDiffModels()
 	m.pickAvailableSection()
 	m.syncDiffViewports()
 	if m.search.HasQuery() && (m.currentSearchScope() == searchScopeUnstaged || m.currentSearchScope() == searchScopeStaged) {

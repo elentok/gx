@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
+	uidiff "github.com/elentok/gx/ui/diff"
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/search"
@@ -28,7 +29,9 @@ type Model struct {
 	explorerState
 	diffContextLines int
 	statusPageState
-	fileTreeModel filetree.Model[git.StageFileStatus]
+	fileTreeModel     filetree.Model[git.StageFileStatus]
+	unstagedDiffModel uidiff.Model
+	stagedDiffModel   uidiff.Model
 
 	statusMsg      string
 	statusUntil    time.Time
@@ -150,8 +153,11 @@ func NewModel(worktreeRoot string, settings Settings) Model {
 			collapsedDirs: map[string]bool{},
 			selected:      0,
 		},
-		fileTreeModel: filetree.NewModel[git.StageFileStatus](),
+		fileTreeModel:     filetree.NewModel[git.StageFileStatus](),
+		unstagedDiffModel: uidiff.NewModel(),
+		stagedDiffModel:   uidiff.NewModel(),
 	}
+	m.syncDiffModels()
 
 	if settings.EnableNavigation {
 		m.reloadFileList("")
