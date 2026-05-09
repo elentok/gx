@@ -33,7 +33,7 @@ func (m Model) InputFocused() bool {
 	if m.focus == focusStatus {
 		return m.fileTreeModel.Search().Mode() == search.SearchModeInput
 	}
-	return m.search.Mode() == search.SearchModeInput
+	return m.currentDiffSearch().Mode() == search.SearchModeInput
 }
 
 func (m Model) currentSearchScope() stageSearchScope {
@@ -77,8 +77,9 @@ func (m *Model) computeSearchMatches(query string) []search.Match {
 }
 
 func (m *Model) recomputeSearchMatches() {
-	matches := m.computeSearchMatches(m.search.Query())
-	m.search.SetMatches(matches)
+	diffSearch := m.currentDiffSearch()
+	matches := m.computeSearchMatches(diffSearch.Query())
+	diffSearch.SetMatches(matches)
 }
 
 func (m Model) handleJumpToMatch(msg search.JumpToMatchMsg) (Model, tea.Cmd) {
@@ -99,7 +100,8 @@ func (m Model) handleJumpToMatch(msg search.JumpToMatchMsg) (Model, tea.Cmd) {
 }
 
 func (m *Model) syncSearchCursorFromDiffFocus() {
-	if !m.search.HasQuery() || m.search.MatchesCount() == 0 || m.focus != focusDiff {
+	diffSearch := m.currentDiffSearch()
+	if !diffSearch.HasQuery() || diffSearch.MatchesCount() == 0 || m.focus != focusDiff {
 		return
 	}
 	expected := searchScopeUnstaged
@@ -110,8 +112,8 @@ func (m *Model) syncSearchCursorFromDiffFocus() {
 		return
 	}
 	sec := m.searchScopeSection(expected)
-	diffMatches := make([]explorer.DiffSearchMatch, 0, m.search.MatchesCount())
-	for _, match := range m.search.Matches() {
+	diffMatches := make([]explorer.DiffSearchMatch, 0, diffSearch.MatchesCount())
+	for _, match := range diffSearch.Matches() {
 		diffMatches = append(diffMatches, explorer.DiffSearchMatch{
 			DisplayIndex: match.DisplayIndex,
 			RawIndex:     match.Index,
@@ -124,13 +126,27 @@ func (m *Model) syncSearchCursorFromDiffFocus() {
 
 	// TODO: check if this is working
 	cursor := 0
-	for i, _ := range m.search.Matches() {
+	for i := range diffSearch.Matches() {
 		if cursor == idx {
-			m.search.SetCursor(i)
+			diffSearch.SetCursor(i)
 			return
 		}
 		cursor++
 	}
+}
+
+func (m *Model) currentDiffSearch() *search.Model {
+	if m.section == sectionStaged {
+		return m.stagedDiffModel.Search()
+	}
+	return m.unstagedDiffModel.Search()
+}
+
+func (m *Model) diffSearchForSection(section diffSection) *search.Model {
+	if section == sectionStaged {
+		return m.stagedDiffModel.Search()
+	}
+	return m.unstagedDiffModel.Search()
 }
 
 func (m *Model) searchScopeSection(scope stageSearchScope) *sectionState {
@@ -175,7 +191,8 @@ func (m Model) searchMatchStatusIndex(idx int) bool {
 }
 
 func (m Model) searchMatchDiffDisplay(scope diffSection, displayIdx int) (matched bool, current bool) {
-	if !m.search.HasQuery() {
+	diffSearch := m.diffSearchForSection(scope)
+	if !diffSearch.HasQuery() {
 		return false, false
 	}
 	expected := searchScopeUnstaged
@@ -185,9 +202,9 @@ func (m Model) searchMatchDiffDisplay(scope diffSection, displayIdx int) (matche
 	if m.currentSearchScope() != expected {
 		return false, false
 	}
-	for i, match := range m.search.Matches() {
+	for i, match := range diffSearch.Matches() {
 		if match.DisplayIndex == displayIdx {
-			return true, i == m.search.Cursor()
+			return true, i == diffSearch.Cursor()
 		}
 	}
 	return false, false

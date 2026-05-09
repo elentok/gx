@@ -7,8 +7,8 @@ import (
 	"github.com/elentok/gx/ui/explorer"
 	"github.com/elentok/gx/ui/search"
 
-	tea "charm.land/bubbletea/v2"
 	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
 )
 
 // Model owns one diff pane state (unstaged or staged), including local search.
@@ -76,10 +76,10 @@ func (m *Model) Reflow(wrapWidth int, wrapSoft bool) {
 	m.viewport.SetYOffset(prevOffset)
 }
 
-func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, bool) {
 	if nextSearch, cmd, handled := m.search.Update(msg); handled {
 		m.search = nextSearch
-		return m, cmd
+		return m, cmd, true
 	}
-	return m, nil
+	return m, nil, false
 }

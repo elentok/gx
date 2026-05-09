@@ -32,12 +32,18 @@ func TestModelBuildFromRawAndHasContent(t *testing.T) {
 func TestModelUpdate_SearchLifecycle(t *testing.T) {
 	m := NewModel()
 
-	next, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	next, _, handled := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	if !handled {
+		t.Fatal("expected / to be handled by search")
+	}
 	if next.Search().Mode() != search.SearchModeInput {
 		t.Fatalf("mode=%v want input", next.Search().Mode())
 	}
 
-	next, cmd := next.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	next, cmd, handled := next.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	if !handled {
+		t.Fatal("expected query key to be handled by search")
+	}
 	if cmd == nil {
 		t.Fatal("expected search batch cmd")
 	}
@@ -62,4 +68,3 @@ func TestModelUpdate_SearchLifecycle(t *testing.T) {
 		t.Fatal("expected SearchQueryUpdatedMsg in batch")
 	}
 }
-

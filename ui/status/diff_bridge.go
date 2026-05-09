@@ -1,8 +1,32 @@
 package status
 
+import uidiff "github.com/elentok/gx/ui/diff"
+
 // syncDiffModels keeps the diff child models in sync while status still owns
 // the legacy sectionState fields during incremental migration.
 func (m *Model) syncDiffModels() {
 	m.unstagedDiffModel.SetData(m.unstaged.data)
 	m.stagedDiffModel.SetData(m.staged.data)
+}
+
+func (m *Model) syncSectionsFromDiffModels() {
+	m.unstaged.data = m.unstagedDiffModel.Data()
+	m.staged.data = m.stagedDiffModel.Data()
+}
+
+func (m *Model) currentDiffModel() uidiff.Model {
+	if m.section == sectionStaged {
+		return m.stagedDiffModel
+	}
+	return m.unstagedDiffModel
+}
+
+func (m *Model) setCurrentDiffModel(model uidiff.Model) {
+	if m.section == sectionStaged {
+		m.stagedDiffModel = model
+		m.staged.data = model.Data()
+		return
+	}
+	m.unstagedDiffModel = model
+	m.unstaged.data = model.Data()
 }

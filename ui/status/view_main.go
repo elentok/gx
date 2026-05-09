@@ -47,8 +47,9 @@ func (m Model) View() tea.View {
 			m.fileTreeModel.Search().SetWidth(m.searchOverlayWidth())
 			overlay = m.fileTreeModel.Search().View()
 		} else {
-			m.search.SetWidth(m.searchOverlayWidth())
-			overlay = m.search.View()
+			diffSearch := m.currentDiffSearch()
+			diffSearch.SetWidth(m.searchOverlayWidth())
+			overlay = diffSearch.View()
 		}
 
 		y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))

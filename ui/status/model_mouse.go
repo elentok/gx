@@ -1,10 +1,6 @@
 package status
 
-import (
-	"github.com/elentok/gx/ui/search"
-
-	tea "charm.land/bubbletea/v2"
-)
+import tea "charm.land/bubbletea/v2"
 
 func (m *Model) handleMouseWheel(msg tea.MouseWheelMsg) bool {
 	if m.runningOpen || m.confirmOpen || m.errorOpen || m.help.IsOpen || m.searchActive() {
@@ -24,7 +20,9 @@ func (m *Model) handleMouseWheel(msg tea.MouseWheelMsg) bool {
 }
 
 func (m Model) searchActive() bool {
-	return m.search.Mode() != search.SearchModeNone || m.fileTreeModel.Search().Mode() != search.SearchModeNone
+	return m.fileTreeModel.Search().IsActive() ||
+		m.unstagedDiffModel.Search().IsActive() ||
+		m.stagedDiffModel.Search().IsActive()
 }
 
 func (m *Model) scrollDiffByMouse(x, y, dir int) bool {

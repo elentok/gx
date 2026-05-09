@@ -50,6 +50,10 @@ func (m *Model) Mode() SearchMode {
 	return m.mode
 }
 
+func (m *Model) IsActive() bool {
+	return m.mode != SearchModeNone
+}
+
 func (m *Model) MatchesCount() int {
 	return len(m.matches)
 }

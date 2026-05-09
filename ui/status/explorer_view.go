@@ -162,7 +162,7 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 				}
 			}
 			if matched, current := m.searchMatchDiffDisplay(section, displayIdx); matched {
-				body = search.Highlight(ansi.Strip(body), m.search.Query(), current)
+				body = search.Highlight(ansi.Strip(body), m.diffSearchForSection(section).Query(), current)
 			}
 			body += diffrender.DiffBodyPadding(rowKind, maxInt(0, bodyW-ansi.StringWidth(body)))
 			lines = append(lines, mark+body+indicator)

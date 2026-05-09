@@ -15,7 +15,8 @@ func (m Model) searchCounterForStatusPane() string {
 }
 
 func (m Model) searchCounterForDiffSection(section diffSection) string {
-	if !m.search.HasQuery() || m.search.MatchesCount() == 0 {
+	search := m.diffSearchForSection(section)
+	if !search.HasQuery() || search.MatchesCount() == 0 {
 		return ""
 	}
 
@@ -26,7 +27,7 @@ func (m Model) searchCounterForDiffSection(section diffSection) string {
 	if m.currentSearchScope() != expected {
 		return ""
 	}
-	return m.searchCounterText(m.search.Cursor(), m.search.MatchesCount())
+	return m.searchCounterText(search.Cursor(), search.MatchesCount())
 }
 
 func (m Model) searchCounterText(cursorZeroBased, total int) string {

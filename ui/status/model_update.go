@@ -79,7 +79,7 @@ func (m Model) handleSearchQueryUpdated(msg search.SearchQueryUpdatedMsg) (Model
 		return m, m.fileTreeModel.Search().SetMatchesAndJump(matches)
 	}
 	matches := m.computeSearchMatches(msg.Query)
-	return m, m.search.SetMatchesAndJump(matches)
+	return m, m.currentDiffSearch().SetMatchesAndJump(matches)
 }
 
 func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
@@ -156,10 +156,6 @@ func (m Model) handleMouseWheelMsg(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
-	var handled bool
-	// var cmds []tea.Cmd
-
 	if msg.String() == "ctrl+c" {
 		if m.runningOpen && !m.runningDone && m.runningRunner != nil {
 			m.runningRunner.Cancel()
@@ -206,11 +202,11 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handleStatusKey(msg)
 	}
 
-	if m.search, cmd, handled = m.search.Update(msg); handled {
-		if m.search.Mode() == search.SearchModeResults && m.focus == focusDiff {
+	if updatedDiff, cmd, handled := m.currentDiffModel().Update(msg); handled {
+		m.setCurrentDiffModel(updatedDiff)
+		if m.currentDiffSearch().Mode() == search.SearchModeResults && m.focus == focusDiff {
 			m.navMode = navLine
 		}
-
 		return m, cmd
 	}
 	if handledModel, cmd, handled := m.handleChordKey(msg); handled {

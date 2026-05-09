@@ -144,6 +144,7 @@ func (m *Model) shouldSwitchAfterApply(from diffSection) bool {
 }
 
 func (m *Model) reloadDiffsForSelection() tea.Cmd {
+	m.syncDiffModels()
 	sideBySide := m.renderMode == renderSideBySide
 	renderWidth := m.deltaRenderWidth()
 
@@ -154,7 +155,7 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 		m.staged = newSectionState()
 		m.syncDiffModels()
 		m.syncDiffViewports()
-		if m.search.HasQuery() && (m.currentSearchScope() == searchScopeUnstaged || m.currentSearchScope() == searchScopeStaged) {
+		if m.currentDiffSearch().HasQuery() && (m.currentSearchScope() == searchScopeUnstaged || m.currentSearchScope() == searchScopeStaged) {
 			m.recomputeSearchMatches()
 		}
 		return nil
@@ -175,7 +176,9 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 		if color == "" {
 			color = raw
 		}
-		m.unstaged = buildSectionState(raw, color, m.unstaged, sideBySide)
+		m.unstagedDiffModel.BuildFromRaw(raw, color, sideBySide)
+		m.stagedDiffModel.BuildFromRaw("", "", sideBySide)
+		m.syncSectionsFromDiffModels()
 		m.unstaged.colorized = true
 		m.staged = newSectionState()
 		m.syncDiffModels()
@@ -202,14 +205,15 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 	if stagedColor == "" {
 		stagedColor = stagedRaw
 	}
-	m.unstaged = buildSectionState(unstagedRaw, unstagedColor, m.unstaged, sideBySide)
-	m.staged = buildSectionState(stagedRaw, stagedColor, m.staged, sideBySide)
+	m.unstagedDiffModel.BuildFromRaw(unstagedRaw, unstagedColor, sideBySide)
+	m.stagedDiffModel.BuildFromRaw(stagedRaw, stagedColor, sideBySide)
+	m.syncSectionsFromDiffModels()
 	m.unstaged.colorized = true
 	m.staged.colorized = true
 	m.syncDiffModels()
 	m.pickAvailableSection()
 	m.syncDiffViewports()
-	if m.search.HasQuery() && (m.currentSearchScope() == searchScopeUnstaged || m.currentSearchScope() == searchScopeStaged) {
+	if m.currentDiffSearch().HasQuery() && (m.currentSearchScope() == searchScopeUnstaged || m.currentSearchScope() == searchScopeStaged) {
 		m.recomputeSearchMatches()
 	}
 	return nil

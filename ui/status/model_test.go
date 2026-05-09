@@ -1598,8 +1598,8 @@ func TestStageSearchModeShowsOverlay(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	m = updated.(Model)
 
-	m.search.SetWidth(m.searchOverlayWidth())
-	overlay := ansi.Strip(m.search.View())
+	m.fileTreeModel.Search().SetWidth(m.searchOverlayWidth())
+	overlay := ansi.Strip(m.fileTreeModel.Search().View())
 	if !strings.Contains(overlay, "Search") {
 		t.Fatalf("expected overlay to contain 'Search', got %q", overlay)
 	}
@@ -1619,30 +1619,30 @@ func TestStageSearchDiffModeAndPrevNextKeys(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	m = updated.(Model)
-	if m.search.Mode() != search.SearchModeInput {
+	if m.currentDiffSearch().Mode() != search.SearchModeInput {
 		t.Fatalf("expected diff search input mode after /")
 	}
 
 	for _, r := range []rune{'n', 'e', 'e', 'd', 'l', 'e'} {
 		m = runStatusCmds(t, m, tea.KeyPressMsg{Code: r, Text: string(r)})
 	}
-	if m.search.MatchesCount() < 2 {
-		t.Fatalf("expected multiple diff search matches, got %d", m.search.MatchesCount())
+	if m.currentDiffSearch().MatchesCount() < 2 {
+		t.Fatalf("expected multiple diff search matches, got %d", m.currentDiffSearch().MatchesCount())
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
-	if m.search.Mode() != search.SearchModeResults || !m.search.HasQuery() || m.search.MatchesCount() == 0 {
+	if m.currentDiffSearch().Mode() != search.SearchModeResults || !m.currentDiffSearch().HasQuery() || m.currentDiffSearch().MatchesCount() == 0 {
 		t.Fatalf("expected enter to show search results mode while keeping highlights")
 	}
 	if m.navMode != navLine {
 		t.Fatalf("expected enter after diff search to switch to line mode")
 	}
-	first := m.search.Cursor()
+	first := m.currentDiffSearch().Cursor()
 	firstLine := m.unstaged.data.ActiveLine
 
 	m = runStatusCmds(t, m, tea.KeyPressMsg{Code: 'n', Text: "n"})
-	if m.search.Cursor() == first {
+	if m.currentDiffSearch().Cursor() == first {
 		t.Fatalf("expected n to move to next diff result")
 	}
 	if m.unstaged.data.ActiveLine == firstLine {
@@ -1650,20 +1650,20 @@ func TestStageSearchDiffModeAndPrevNextKeys(t *testing.T) {
 	}
 
 	m = runStatusCmds(t, m, tea.KeyPressMsg{Code: 'N', Text: "N", ShiftedCode: 'N'})
-	if m.search.Cursor() != first {
+	if m.currentDiffSearch().Cursor() != first {
 		t.Fatalf("expected N to move back to previous diff result")
 	}
 
 	// Moving cursor to a matched line should update the search counter cursor.
-	startCursor := m.search.Cursor()
+	startCursor := m.currentDiffSearch().Cursor()
 	for i := 0; i < 5; i++ {
 		updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 		m = updated.(Model)
-		if m.search.Cursor() != startCursor {
+		if m.currentDiffSearch().Cursor() != startCursor {
 			break
 		}
 	}
-	if m.search.Cursor() == startCursor {
+	if m.currentDiffSearch().Cursor() == startCursor {
 		t.Fatalf("expected diff cursor movement to sync search cursor when reaching a match")
 	}
 }
