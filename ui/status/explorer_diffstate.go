@@ -144,7 +144,8 @@ func (m *Model) shouldSwitchAfterApply(from diffSection) bool {
 }
 
 func (m *Model) reloadDiffsForSelection() tea.Cmd {
-	m.syncDiffModels()
+	m.unstagedDiffModel.SetData(m.unstaged.data)
+	m.stagedDiffModel.SetData(m.staged.data)
 	sideBySide := m.renderMode == renderSideBySide
 	renderWidth := m.deltaRenderWidth()
 
@@ -153,7 +154,8 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 		m.activeFilePath = ""
 		m.unstaged = newSectionState()
 		m.staged = newSectionState()
-		m.syncDiffModels()
+		m.unstagedDiffModel.SetData(m.unstaged.data)
+		m.stagedDiffModel.SetData(m.staged.data)
 		m.syncDiffViewports()
 		if m.currentDiffSearch().HasQuery() && (m.currentSearchScope() == searchScopeUnstaged || m.currentSearchScope() == searchScopeStaged) {
 			m.recomputeSearchMatches()
