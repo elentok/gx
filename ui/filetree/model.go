@@ -23,6 +23,7 @@ type Entry[T any] struct {
 	DisplayName string
 	Expanded    bool
 	Value       T
+	Leaves      []T
 }
 
 // Model owns the status/filetree list state and its local search state.

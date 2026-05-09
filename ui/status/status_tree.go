@@ -33,16 +33,11 @@ type aggregateStatus struct {
 }
 
 func buildStatusEntries(files []git.StageFileStatus, collapsed map[string]bool) []statusEntry {
-	leaves := make([]filetree.Leaf[git.StageFileStatus], 0, len(files))
-	for i := range files {
-		leaves = append(leaves, filetree.Leaf[git.StageFileStatus]{
-			Path:  files[i].Path,
-			Value: files[i],
-		})
-	}
-	rows := filetree.BuildRows(leaves, collapsed)
-	out := make([]statusEntry, 0, len(rows))
-	for _, row := range rows {
+	entries := filetree.BuildEntriesFromValues(files, func(file git.StageFileStatus) string {
+		return file.Path
+	}, collapsed)
+	out := make([]statusEntry, 0, len(entries))
+	for _, row := range entries {
 		entry := statusEntry{
 			Path:        row.Path,
 			ParentPath:  row.ParentPath,
@@ -50,7 +45,7 @@ func buildStatusEntries(files []git.StageFileStatus, collapsed map[string]bool) 
 			DisplayName: row.DisplayName,
 			Expanded:    row.Expanded,
 		}
-		if row.Kind == filetree.RowDir {
+		if row.Kind == filetree.EntryDir {
 			entry.Kind = statusEntryDir
 			agg := aggregateStatusFiles(row.Leaves)
 			entry.HasStaged = agg.hasStaged

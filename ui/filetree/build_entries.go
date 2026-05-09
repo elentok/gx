@@ -6,37 +6,30 @@ import (
 	"strings"
 )
 
-type RowKind int
-
-const (
-	RowFile RowKind = iota
-	RowDir
-)
-
-type Leaf[T any] struct {
+type leaf[T any] struct {
 	Path  string
 	Value T
-}
-
-type Row[T any] struct {
-	Kind        RowKind
-	Path        string
-	ParentPath  string
-	Depth       int
-	DisplayName string
-	Expanded    bool
-	Value       T
-	Leaves      []T
 }
 
 type node[T any] struct {
 	name     string
 	path     string
 	children map[string]*node[T]
-	leaf     *Leaf[T]
+	leaf     *leaf[T]
 }
 
-func BuildRows[T any](leaves []Leaf[T], collapsed map[string]bool) []Row[T] {
+func BuildEntriesFromValues[T any](values []T, pathFn func(T) string, collapsed map[string]bool) []Entry[T] {
+	leaves := make([]leaf[T], 0, len(values))
+	for i := range values {
+		leaves = append(leaves, leaf[T]{
+			Path:  pathFn(values[i]),
+			Value: values[i],
+		})
+	}
+	return buildEntries(leaves, collapsed)
+}
+
+func buildEntries[T any](leaves []leaf[T], collapsed map[string]bool) []Entry[T] {
 	root := &node[T]{children: map[string]*node[T]{}}
 	for i := range leaves {
 		parts := strings.Split(leaves[i].Path, "/")
@@ -55,20 +48,20 @@ func BuildRows[T any](leaves []Leaf[T], collapsed map[string]bool) []Row[T] {
 		cur.leaf = &copyLeaf
 	}
 
-	var rows []Row[T]
-	appendRows(root, "", 0, collapsed, &rows)
-	return rows
+	var entries []Entry[T]
+	appendEntries(root, "", 0, collapsed, &entries)
+	return entries
 }
 
-func appendRows[T any](cur *node[T], parentPath string, depth int, collapsed map[string]bool, rows *[]Row[T]) {
+func appendEntries[T any](cur *node[T], parentPath string, depth int, collapsed map[string]bool, entries *[]Entry[T]) {
 	for _, child := range sortedChildren(cur) {
 		isDir := len(child.children) > 0
 		if !isDir {
 			if child.leaf == nil {
 				continue
 			}
-			*rows = append(*rows, Row[T]{
-				Kind:        RowFile,
+			*entries = append(*entries, Entry[T]{
+				Kind:        EntryFile,
 				Path:        child.path,
 				ParentPath:  parentPath,
 				Depth:       depth,
@@ -81,8 +74,8 @@ func appendRows[T any](cur *node[T], parentPath string, depth int, collapsed map
 
 		displayName, dir := collapsedDirChain(child)
 		expanded := !collapsed[dir.path]
-		*rows = append(*rows, Row[T]{
-			Kind:        RowDir,
+		*entries = append(*entries, Entry[T]{
+			Kind:        EntryDir,
 			Path:        dir.path,
 			ParentPath:  parentPath,
 			Depth:       depth,
@@ -91,7 +84,7 @@ func appendRows[T any](cur *node[T], parentPath string, depth int, collapsed map
 			Leaves:      collectLeaves(dir),
 		})
 		if expanded {
-			appendRows(dir, dir.path, depth+1, collapsed, rows)
+			appendEntries(dir, dir.path, depth+1, collapsed, entries)
 		}
 	}
 }
