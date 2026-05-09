@@ -3,12 +3,10 @@ package status
 import (
 	"strings"
 
-	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/explorer"
 	"github.com/elentok/gx/ui/search"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 )
 
 type stageSearchScope int
@@ -18,16 +16,6 @@ const (
 	searchScopeUnstaged
 	searchScopeStaged
 )
-
-type stageSearchMatch struct {
-	statusIndex  int
-	displayIndex int
-	rawIndex     int
-	scope        stageSearchScope
-}
-
-var stageSearchHighlightStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true).Underline(true)
-var stageSearchCurrentStyle = lipgloss.NewStyle().Foreground(ui.ColorGreen).Bold(true).Underline(true)
 
 func (m Model) InputFocused() bool {
 	if m.focus == focusStatus {

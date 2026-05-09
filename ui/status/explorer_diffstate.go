@@ -291,24 +291,6 @@ func (m *Model) openDiscardDiffConfirm() {
 	m.confirmPatchUnidiffZero = unidiffZero
 }
 
-func buildSectionState(raw, color string, prev sectionState, sideBySide bool) sectionState {
-	state := sectionState{
-		data:      explorer.BuildSectionData(raw, color, prev.data, sideBySide),
-		viewport:  prev.viewport,
-		colorized: prev.colorized,
-	}
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		state.viewport.SetContent("")
-		state.viewport.SetYOffset(0)
-		return state
-	}
-	prevOffset := state.viewport.YOffset()
-	state.viewport.SetContentLines(state.data.ViewLines)
-	state.viewport.SetYOffset(prevOffset)
-	return state
-}
-
 func (m *Model) focusMovedTarget(sig movedTarget) {
 	if sig.fromSection == sectionUnstaged {
 		m.section = sectionStaged

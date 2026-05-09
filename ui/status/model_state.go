@@ -11,7 +11,6 @@ import (
 	uidiff "github.com/elentok/gx/ui/diff"
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/help"
-	"github.com/elentok/gx/ui/search"
 
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
@@ -41,8 +40,6 @@ type Model struct {
 	help           help.Model
 	activeFilePath string
 	diffReloadSeq  int
-
-	search search.Model
 
 	confirmOpen             bool
 	confirmTitle            string
@@ -139,7 +136,6 @@ func NewModel(worktreeRoot string, settings Settings) Model {
 		initialPath:      settings.InitialPath,
 		diffContextLines: settings.DiffContextLines,
 		help:             help.NewModel(keySections),
-		search:           search.NewModel(),
 		explorerState: explorerState{
 			focus:      focusStatus,
 			section:    sectionUnstaged,
