@@ -14,19 +14,25 @@ func (m *Model) syncSectionsFromDiffModels() {
 	m.staged.data = m.stagedDiffModel.Data()
 }
 
-func (m *Model) currentDiffModel() uidiff.Model {
+func (m *Model) currentDiffModelPtr() *uidiff.Model {
 	if m.section == sectionStaged {
-		return m.stagedDiffModel
+		return &m.stagedDiffModel
 	}
-	return m.unstagedDiffModel
+	return &m.unstagedDiffModel
 }
 
-func (m *Model) setCurrentDiffModel(model uidiff.Model) {
-	if m.section == sectionStaged {
-		m.stagedDiffModel = model
+func (m *Model) diffModelForSectionPtr(section diffSection) *uidiff.Model {
+	if section == sectionStaged {
+		return &m.stagedDiffModel
+	}
+	return &m.unstagedDiffModel
+}
+
+func (m *Model) syncSectionFromDiffModel(section diffSection) {
+	model := m.diffModelForSectionPtr(section)
+	if section == sectionStaged {
 		m.staged.data = model.Data()
 		return
 	}
-	m.unstagedDiffModel = model
 	m.unstaged.data = model.Data()
 }

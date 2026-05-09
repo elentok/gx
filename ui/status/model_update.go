@@ -202,8 +202,9 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handleStatusKey(msg)
 	}
 
-	if updatedDiff, cmd, handled := m.currentDiffModel().Update(msg); handled {
-		m.setCurrentDiffModel(updatedDiff)
+	if updatedDiff, cmd, handled := m.currentDiffModelPtr().Update(msg); handled {
+		*m.currentDiffModelPtr() = updatedDiff
+		m.syncSectionFromDiffModel(m.section)
 		if m.currentDiffSearch().Mode() == search.SearchModeResults && m.focus == focusDiff {
 			m.navMode = navLine
 		}
