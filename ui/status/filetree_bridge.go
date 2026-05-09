@@ -6,6 +6,7 @@ import (
 )
 
 func (m *Model) syncFileTreeModel() {
+	m.fileTreeModel.SetCollapsedDirs(m.collapsedDirs)
 	m.fileTreeModel.SetEntries(statusEntriesToFileTreeEntries(m.statusEntries))
 	m.fileTreeModel.SetSelectedIndex(m.selected)
 	m.selected = m.fileTreeModel.SelectedIndex()

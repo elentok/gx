@@ -88,6 +88,16 @@ Emits intent messages:
 
 - Create `ui/filetree` model and migrate status pane logic.
 - Parent consumes child msgs for reload/focus transitions.
+- Follow-up cleanup in this slice:
+  - Move `FileTree*` helper functions from `ui/explorer` into `ui/filetree`.
+  - Make helpers operate directly on `[]filetree.Entry[T]`.
+  - Remove `filetree -> explorer.FileTreeRow` adapter conversion from `ui/filetree/model.go`.
+  - Keep temporary wrappers only during migration; delete wrappers after all call sites are switched.
+  - Remove `ui/status/filetree_bridge.go` sync bridging (`syncFileTreeModel`) once `filetree.Model` is the source of truth for:
+    - entries
+    - collapsed dirs
+    - selected index
+  - Parent should read child state and orchestrate side effects only (no mirrored filetree state fields in `status.Model`).
 
 ### Slice C (diff child extraction)
 
@@ -108,3 +118,5 @@ Emits intent messages:
 - Add explicit tests for independent search state:
   - filetree query unaffected by unstaged/staged query
   - staged/unstaged queries preserved when switching focus
+- Add explicit tests for filetree helper ownership migration:
+  - `ui/filetree` tests cover expand/collapse/parent/adjacent-file behavior without importing `ui/explorer`.

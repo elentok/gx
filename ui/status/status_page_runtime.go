@@ -105,42 +105,6 @@ func (m *Model) cmdLoadBranchSync() tea.Cmd {
 	}
 }
 
-func (m *Model) toggleDirOnEnter() bool {
-	if !explorer.FileTreeToggleDirOnEnter(m.statusFileTreeRows(), m.collapsedDirs, m.selected) {
-		return false
-	}
-	m.statusEntries = buildStatusEntries(m.files, m.collapsedDirs)
-	m.syncFileTreeModel()
-	return true
-}
-
-func (m *Model) collapseSelectedDir() {
-	if !explorer.FileTreeCollapseSelectedDir(m.statusFileTreeRows(), m.collapsedDirs, m.selected) {
-		return
-	}
-	m.statusEntries = buildStatusEntries(m.files, m.collapsedDirs)
-	m.syncFileTreeModel()
-}
-
-func (m *Model) focusParentInStatus() bool {
-	rows := m.statusFileTreeRows()
-	idx, ok := explorer.FileTreeParentIndex(rows, m.selected)
-	if !ok || m.selected == idx {
-		return false
-	}
-	m.setStatusSelection(idx)
-	m.onStatusSelectionChanged()
-	return true
-}
-
-func (m *Model) expandSelectedDir() {
-	if !explorer.FileTreeExpandSelectedDir(m.statusFileTreeRows(), m.collapsedDirs, m.selected) {
-		return
-	}
-	m.statusEntries = buildStatusEntries(m.files, m.collapsedDirs)
-	m.syncFileTreeModel()
-}
-
 func (m *Model) moveToAdjacentFile(delta int) (bool, tea.Cmd) {
 	idx, ok := explorer.FileTreeAdjacentFileIndex(m.statusFileTreeRows(), m.selected, delta)
 	if !ok {

@@ -1,12 +1,15 @@
 package status
 
 import (
+	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/nav"
 
 	tea "charm.land/bubbletea/v2"
 )
 
 func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	m.syncFileTreeModel()
+
 	if msg.Code == tea.KeyTab {
 		m.cycleFrameForward()
 		return m, nil
@@ -16,9 +19,19 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.fileTreeModel = updatedFileTree
 		m.selected = m.fileTreeModel.SelectedIndex()
 		m.onStatusSelectionChanged()
-		return m, tea.Batch(childCmd, m.scheduleDiffReload())
+		if childCmd != nil {
+			if handledModel, handledCmd, handled := m.handleFileTreeIntentMsg(childCmd()); handled {
+				return handledModel, tea.Batch(handledCmd, m.scheduleDiffReload())
+			}
+		}
+		return m, m.scheduleDiffReload()
 	} else {
 		m.fileTreeModel = updatedFileTree
+		if childCmd != nil {
+			if handledModel, handledCmd, handled := m.handleFileTreeIntentMsg(childCmd()); handled {
+				return handledModel, handledCmd
+			}
+		}
 	}
 
 	switch msg.String() {
@@ -36,19 +49,6 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.adjustDiffContextLines(-1)
 	case "]":
 		return m, m.adjustDiffContextLines(1)
-	case "h", "left":
-		if m.focusParentInStatus() {
-			return m, m.scheduleDiffReload()
-		}
-		m.collapseSelectedDir()
-		return m, m.reloadDiffsForSelection()
-	case "l", "right":
-		entry, ok := m.selectedStatusEntry()
-		if ok && entry.Kind == statusEntryFile {
-			return m, m.enterDiffFromStatus(false)
-		}
-		m.expandSelectedDir()
-		return m, m.reloadDiffsForSelection()
 	case "r":
 		return m, m.refresh()
 	case "s":
@@ -81,15 +81,23 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	case "space", " ":
 		return m, m.toggleStageStatusEntry()
-	case "enter":
-		if m.toggleDirOnEnter() {
-			return m, m.reloadDiffsForSelection()
-		}
-		return m, m.enterDiffFromStatus(false)
 	case "d":
 		m.openDiscardStatusConfirm()
 	case "e":
 		return m, m.cmdEditSelectedFile()
 	}
 	return m, nil
+}
+
+func (m Model) handleFileTreeIntentMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg.(type) {
+	case filetree.RebuildRequestedMsg:
+		model, cmd := m.handleFileTreeRebuildRequested()
+		return model, cmd, true
+	case filetree.OpenSelectedMsg:
+		model, cmd := m.handleFileTreeOpenSelected()
+		return model, cmd, true
+	default:
+		return m, nil, false
+	}
 }
