@@ -33,6 +33,11 @@ type aggregateStatus struct {
 }
 
 func buildStatusEntries(files []git.StageFileStatus, collapsed map[string]bool) []statusEntry {
+	entries, _ := buildStatusEntriesAndRows(files, collapsed)
+	return entries
+}
+
+func buildStatusEntriesAndRows(files []git.StageFileStatus, collapsed map[string]bool) ([]statusEntry, []filetree.Entry[git.StageFileStatus]) {
 	entries := filetree.BuildEntriesFromValues(files, func(file git.StageFileStatus) string {
 		return file.Path
 	}, collapsed)
@@ -60,7 +65,7 @@ func buildStatusEntries(files []git.StageFileStatus, collapsed map[string]bool) 
 		}
 		out = append(out, entry)
 	}
-	return out
+	return out, entries
 }
 
 func aggregateStatusFiles(files []git.StageFileStatus) aggregateStatus {

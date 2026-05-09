@@ -78,6 +78,7 @@ type statusPageState struct {
 	branchBaseRef  string
 	branchSync     git.SyncStatus
 	statusEntries  []statusEntry
+	statusRows     []filetree.Entry[git.StageFileStatus]
 	collapsedDirs  map[string]bool
 	selected       int
 }
