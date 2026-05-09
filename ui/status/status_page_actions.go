@@ -196,8 +196,9 @@ func (m Model) confirmAccept() (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.section == sectionUnstaged {
-			m.unstaged.data.VisualActive = false
-			m.unstaged.data.VisualAnchor = m.unstaged.data.ActiveLine
+			sec := m.sectionState(sectionUnstaged)
+			sec.data.VisualActive = false
+			sec.data.VisualAnchor = sec.data.ActiveLine
 		}
 		m.setStatus("discarded " + m.confirmPaths[0])
 		cmd := m.reload(m.confirmPaths[0])

@@ -16,18 +16,27 @@ func TestModelUpdate_NavigationAndOpen(t *testing.T) {
 		{Kind: EntryFile, Path: "dir/b.txt", ParentPath: "dir", DisplayName: "b.txt", Value: 2},
 	})
 
-	next, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	next, _, handled := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	if !handled {
+		t.Fatal("expected j to be handled")
+	}
 	if next.SelectedIndex() != 1 {
 		t.Fatalf("selected=%d want=1", next.SelectedIndex())
 	}
 
-	next, _ = next.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
+	next, _, handled = next.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
+	if !handled {
+		t.Fatal("expected k to be handled")
+	}
 	if next.SelectedIndex() != 0 {
 		t.Fatalf("selected=%d want=0", next.SelectedIndex())
 	}
 
 	next.SetSelectedIndex(1)
-	next, cmd := next.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+	next, cmd, handled := next.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+	if !handled {
+		t.Fatal("expected l to be handled")
+	}
 	if cmd == nil {
 		t.Fatal("expected open-selected cmd")
 	}
@@ -43,7 +52,10 @@ func TestModelUpdate_DirExpandCollapse(t *testing.T) {
 		{Kind: EntryFile, Path: "dir/a.txt", ParentPath: "dir", DisplayName: "a.txt", Value: 1},
 	})
 
-	next, cmd := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
+	next, cmd, handled := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
+	if !handled {
+		t.Fatal("expected h to be handled")
+	}
 	if cmd == nil {
 		t.Fatal("expected rebuild cmd for collapse")
 	}
@@ -57,7 +69,10 @@ func TestModelUpdate_DirExpandCollapse(t *testing.T) {
 	next.SetEntries([]Entry[int]{
 		{Kind: EntryDir, Path: "dir", DisplayName: "dir", Expanded: false},
 	})
-	next, cmd = next.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	next, cmd, handled = next.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if !handled {
+		t.Fatal("expected enter to be handled")
+	}
 	if cmd == nil {
 		t.Fatal("expected rebuild cmd for enter toggle")
 	}
@@ -99,12 +114,18 @@ func TestMoveToAdjacentFile(t *testing.T) {
 func TestModelUpdate_SearchStartAndQueryMsg(t *testing.T) {
 	m := NewModel[int]()
 
-	next, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	next, _, handled := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	if !handled {
+		t.Fatal("expected / to be handled")
+	}
 	if next.Search().Mode() != search.SearchModeInput {
 		t.Fatalf("mode=%v want input", next.Search().Mode())
 	}
 
-	next, cmd := next.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	next, cmd, handled := next.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	if !handled {
+		t.Fatal("expected a to be handled in search input")
+	}
 	if cmd == nil {
 		t.Fatal("expected search query updated cmd")
 	}

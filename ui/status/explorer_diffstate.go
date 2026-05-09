@@ -147,10 +147,7 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 	sel, ok := m.selectedExplorerDiff()
 	if !ok {
 		m.activeFilePath = ""
-		m.unstaged = newSectionState()
-		m.staged = newSectionState()
-		m.diffModelForSectionPtr(sectionUnstaged).SetData(m.unstaged.data)
-		m.diffModelForSectionPtr(sectionStaged).SetData(m.staged.data)
+		m.resetDiffSections()
 		m.syncDiffViewports()
 		if m.currentDiffSearch().HasQuery() && (m.currentSearchScope() == searchScopeUnstaged || m.currentSearchScope() == searchScopeStaged) {
 			m.recomputeSearchMatches()

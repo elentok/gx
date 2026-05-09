@@ -9,32 +9,9 @@ import (
 )
 
 func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	m.syncFileTreeModel()
-
 	if msg.Code == tea.KeyTab {
 		m.cycleFrameForward()
 		return m, nil
-	}
-
-	if updatedFileTree, childCmd := m.fileTreeModel.Update(msg); updatedFileTree.SelectedIndex() != m.fileTreeModel.SelectedIndex() {
-		m.fileTreeModel = updatedFileTree
-		m.selected = m.fileTreeModel.SelectedIndex()
-		m.onStatusSelectionChanged()
-		if childCmd != nil {
-			if handledModel, handledCmd, handled := m.handleFileTreeChildMsg(childCmd()); handled {
-				return handledModel, tea.Batch(handledCmd, m.scheduleDiffReload())
-			}
-			return m, tea.Batch(msgCmd(childCmd()), m.scheduleDiffReload())
-		}
-		return m, m.scheduleDiffReload()
-	} else {
-		m.fileTreeModel = updatedFileTree
-		if childCmd != nil {
-			if handledModel, handledCmd, handled := m.handleFileTreeChildMsg(childCmd()); handled {
-				return handledModel, handledCmd
-			}
-			return m, msgCmd(childCmd())
-		}
 	}
 
 	switch msg.String() {
@@ -90,6 +67,52 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.cmdEditSelectedFile()
 	}
 	return m, nil
+}
+
+func (m Model) handleFocusedChildKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
+	switch m.focus {
+	case focusStatus:
+		m.syncFileTreeModel()
+		updatedFileTree, childCmd, handled := m.fileTreeModel.Update(msg)
+		selectionChanged := updatedFileTree.SelectedIndex() != m.fileTreeModel.SelectedIndex()
+		m.fileTreeModel = updatedFileTree
+		if !handled {
+			return m, nil, false
+		}
+		if selectionChanged {
+			m.selected = m.fileTreeModel.SelectedIndex()
+			m.onStatusSelectionChanged()
+		}
+		if childCmd != nil {
+			if handledModel, handledCmd, handled := m.handleFileTreeChildMsg(childCmd()); handled {
+				if selectionChanged {
+					return handledModel, tea.Batch(handledCmd, m.scheduleDiffReload()), true
+				}
+				return handledModel, handledCmd, true
+			}
+			if selectionChanged {
+				return m, tea.Batch(msgCmd(childCmd()), m.scheduleDiffReload()), true
+			}
+			return m, msgCmd(childCmd()), true
+		}
+		if selectionChanged {
+			return m, m.scheduleDiffReload(), true
+		}
+		return m, nil, true
+	case focusDiff:
+		updatedDiff, cmd, handled := m.diffModelForSectionPtr(m.section).Update(msg)
+		if !handled {
+			return m, nil, false
+		}
+		*m.diffModelForSectionPtr(m.section) = updatedDiff
+		m.sectionState(m.section).data = updatedDiff.Data()
+		if m.currentDiffSearch().Mode() == search.SearchModeResults && m.focus == focusDiff {
+			m.navMode = navLine
+		}
+		return m, cmd, true
+	default:
+		return m, nil, false
+	}
 }
 
 func (m Model) handleFileTreeChildMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {

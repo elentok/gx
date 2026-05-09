@@ -93,16 +93,16 @@ func (m Model) selectedExplorerDiff() (statusExplorerDiffSelection, bool) {
 	return statusExplorerDiffSelection{file: file}, true
 }
 
-func (m *Model) currentDiffModelPtr() *diffview.Model {
-	if m.section == sectionStaged {
-		return &m.stagedDiffModel
-	}
-	return &m.unstagedDiffModel
-}
-
 func (m *Model) diffModelForSectionPtr(section diffSection) *diffview.Model {
 	if section == sectionStaged {
 		return &m.stagedDiffModel
 	}
 	return &m.unstagedDiffModel
+}
+
+func (m *Model) resetDiffSections() {
+	m.unstaged = newSectionState()
+	m.staged = newSectionState()
+	m.diffModelForSectionPtr(sectionUnstaged).SetData(m.unstaged.data)
+	m.diffModelForSectionPtr(sectionStaged).SetData(m.staged.data)
 }

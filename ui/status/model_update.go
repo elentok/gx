@@ -195,25 +195,23 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	if m.focus == focusStatus {
+	if m.keyPrefix != "" {
 		if handledModel, cmd, handled := m.handleChordKey(msg); handled {
 			return handledModel, cmd
 		}
-		return m.handleStatusKey(msg)
 	}
 
-	if updatedDiff, cmd, handled := m.currentDiffModelPtr().Update(msg); handled {
-		*m.currentDiffModelPtr() = updatedDiff
-		m.sectionState(m.section).data = updatedDiff.Data()
-		if m.currentDiffSearch().Mode() == search.SearchModeResults && m.focus == focusDiff {
-			m.navMode = navLine
-		}
-		return m, cmd
+	if handledModel, cmd, handled := m.handleFocusedChildKey(msg); handled {
+		return handledModel, cmd
 	}
+
 	if handledModel, cmd, handled := m.handleChordKey(msg); handled {
 		return handledModel, cmd
 	}
 
+	if m.focus == focusStatus {
+		return m.handleStatusKey(msg)
+	}
 	return m.handleDiffKey(msg)
 }
 
