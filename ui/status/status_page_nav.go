@@ -1,10 +1,11 @@
 package status
 
 func (m *Model) scrollStatusPage(direction int) bool {
-	if len(m.statusEntries) == 0 {
+	m.setStatusSelection(m.selected)
+	if len(m.fileTreeModel.Entries()) == 0 {
 		return false
 	}
-	old := m.selected
+	old := m.fileTreeModel.SelectedIndex()
 	mainH := m.height - 1
 	if mainH < 4 {
 		mainH = 4
@@ -12,11 +13,11 @@ func (m *Model) scrollStatusPage(direction int) bool {
 	statusH, _ := m.splitHeight(mainH)
 	visible := maxInt(1, (statusH-2)/2)
 	if direction > 0 {
-		m.setStatusSelection(m.selected + visible)
+		m.setStatusSelection(old + visible)
 	} else {
-		m.setStatusSelection(m.selected - visible)
+		m.setStatusSelection(old - visible)
 	}
-	if m.selected == old {
+	if m.fileTreeModel.SelectedIndex() == old {
 		return false
 	}
 	m.onStatusSelectionChanged()
@@ -24,10 +25,11 @@ func (m *Model) scrollStatusPage(direction int) bool {
 }
 
 func (m *Model) jumpStatusTop() {
-	if len(m.statusEntries) == 0 {
+	m.setStatusSelection(m.selected)
+	if len(m.fileTreeModel.Entries()) == 0 {
 		return
 	}
-	if m.selected == 0 {
+	if m.fileTreeModel.SelectedIndex() == 0 {
 		return
 	}
 	m.setStatusSelection(0)
@@ -35,13 +37,15 @@ func (m *Model) jumpStatusTop() {
 }
 
 func (m *Model) jumpStatusBottom() {
-	if len(m.statusEntries) == 0 {
+	m.setStatusSelection(m.selected)
+	entryCount := len(m.fileTreeModel.Entries())
+	if entryCount == 0 {
 		return
 	}
-	if m.selected == len(m.statusEntries)-1 {
+	if m.fileTreeModel.SelectedIndex() == entryCount-1 {
 		return
 	}
-	m.setStatusSelection(len(m.statusEntries) - 1)
+	m.setStatusSelection(entryCount - 1)
 	m.onStatusSelectionChanged()
 }
 

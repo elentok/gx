@@ -8,7 +8,7 @@ import (
 
 func (m Model) searchCounterForStatusPane() string {
 	search := m.fileTreeModel.Search()
-	if m.currentSearchScope() != searchScopeStatus || !search.HasQuery() || search.MatchesCount() == 0 {
+	if m.focus != focusStatus || !search.HasQuery() || search.MatchesCount() == 0 {
 		return ""
 	}
 	return m.searchCounterText(search.Cursor(), search.MatchesCount())
@@ -20,11 +20,7 @@ func (m Model) searchCounterForDiffSection(section diffSection) string {
 		return ""
 	}
 
-	expected := searchScopeUnstaged
-	if section == sectionStaged {
-		expected = searchScopeStaged
-	}
-	if m.currentSearchScope() != expected {
+	if m.focus != focusDiff || m.section != section {
 		return ""
 	}
 	return m.searchCounterText(search.Cursor(), search.MatchesCount())

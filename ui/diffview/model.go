@@ -38,10 +38,6 @@ func (m *Model) SetData(data explorer.SectionData) {
 	m.data = data
 }
 
-func (m Model) Viewport() viewport.Model {
-	return m.viewport
-}
-
 func (m *Model) Search() *search.Model {
 	return &m.search
 }

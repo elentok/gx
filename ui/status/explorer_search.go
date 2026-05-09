@@ -3,18 +3,12 @@ package status
 import (
 	"strings"
 
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/explorer"
+	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/search"
 
 	tea "charm.land/bubbletea/v2"
-)
-
-type stageSearchScope int
-
-const (
-	searchScopeStatus stageSearchScope = iota
-	searchScopeUnstaged
-	searchScopeStaged
 )
 
 func (m Model) InputFocused() bool {
@@ -22,16 +16,6 @@ func (m Model) InputFocused() bool {
 		return m.fileTreeModel.Search().Mode() == search.SearchModeInput
 	}
 	return m.currentDiffSearch().Mode() == search.SearchModeInput
-}
-
-func (m Model) currentSearchScope() stageSearchScope {
-	if m.focus == focusStatus {
-		return searchScopeStatus
-	}
-	if m.section == sectionStaged {
-		return searchScopeStaged
-	}
-	return searchScopeUnstaged
 }
 
 func (m *Model) computeSearchMatches(query string) []search.Match {
@@ -43,16 +27,15 @@ func (m *Model) computeSearchMatches(query string) []search.Match {
 
 	var matches []search.Match
 
-	scope := m.currentSearchScope()
-	if scope == searchScopeStatus {
-		for i, entry := range m.statusEntries {
-			text := strings.ToLower(m.statusEntrySearchText(entry))
+	if m.focus == focusStatus {
+		for i, entry := range m.fileTreeModel.Entries() {
+			text := strings.ToLower(m.statusFileTreeEntrySearchText(entry))
 			if strings.Contains(text, q) {
 				matches = append(matches, search.Match{Index: i})
 			}
 		}
 	} else {
-		sec := m.searchScopeSection(scope)
+		sec := m.sectionState(m.section)
 		for _, match := range explorer.ComputeDiffSearchMatches(sec.data.ViewLines, sec.data.DisplayToRaw, q) {
 			matches = append(matches, search.Match{
 				DisplayIndex: match.DisplayIndex,
@@ -70,10 +53,14 @@ func (m *Model) recomputeSearchMatches() {
 	diffSearch.SetMatches(matches)
 }
 
+func (m *Model) diffSearchActiveInFocus() bool {
+	return m.focus == focusDiff && m.currentDiffSearch().HasQuery()
+}
+
 func (m Model) handleJumpToMatch(msg search.JumpToMatchMsg) (Model, tea.Cmd) {
 	match := msg.Match
-	if m.currentSearchScope() == searchScopeStatus {
-		if match.Index >= 0 && match.Index < len(m.statusEntries) {
+	if m.focus == focusStatus {
+		if match.Index >= 0 && match.Index < len(m.fileTreeModel.Entries()) {
 			m.setStatusSelection(match.Index)
 			m.onStatusSelectionChanged()
 			return m, m.scheduleDiffReload()
@@ -81,7 +68,7 @@ func (m Model) handleJumpToMatch(msg search.JumpToMatchMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	sec := m.searchScopeSection(m.currentSearchScope())
+	sec := m.sectionState(m.section)
 	explorer.ApplyDiffSearchMatch(&sec.data, &sec.viewport, match)
 	return m, nil
 
@@ -92,14 +79,7 @@ func (m *Model) syncSearchCursorFromDiffFocus() {
 	if !diffSearch.HasQuery() || diffSearch.MatchesCount() == 0 || m.focus != focusDiff {
 		return
 	}
-	expected := searchScopeUnstaged
-	if m.section == sectionStaged {
-		expected = searchScopeStaged
-	}
-	if m.currentSearchScope() != expected {
-		return
-	}
-	sec := m.searchScopeSection(expected)
+	sec := m.sectionState(m.section)
 	diffMatches := make([]explorer.DiffSearchMatch, 0, diffSearch.MatchesCount())
 	for _, match := range diffSearch.Matches() {
 		diffMatches = append(diffMatches, explorer.DiffSearchMatch{
@@ -137,19 +117,12 @@ func (m *Model) diffSearchForSection(section diffSection) *search.Model {
 	return m.unstagedDiffModel.Search()
 }
 
-func (m *Model) searchScopeSection(scope stageSearchScope) *sectionState {
-	if scope == searchScopeStaged {
-		return m.sectionState(sectionStaged)
-	}
-	return m.sectionState(sectionUnstaged)
-}
-
-func (m Model) statusEntrySearchText(entry statusEntry) string {
+func (m Model) statusFileTreeEntrySearchText(entry filetree.Entry[git.StageFileStatus]) string {
 	name := entry.DisplayName
-	if entry.Kind == statusEntryFile && entry.File.IsRenamed() && entry.File.RenameFrom != "" {
-		name = entry.File.RenameFrom + " -> " + entry.File.Path
+	if entry.Kind == filetree.EntryFile && entry.Value.IsRenamed() && entry.Value.RenameFrom != "" {
+		name = entry.Value.RenameFrom + " -> " + entry.Path
 	}
-	if entry.Kind == statusEntryDir {
+	if entry.Kind == filetree.EntryDir {
 		return name + "/"
 	}
 	return name
@@ -167,7 +140,7 @@ func (m Model) searchOverlayWidth() int {
 
 func (m Model) searchMatchStatusIndex(idx int) bool {
 	search := m.fileTreeModel.Search()
-	if m.currentSearchScope() != searchScopeStatus || !search.HasQuery() {
+	if m.focus != focusStatus || !search.HasQuery() {
 		return false
 	}
 	for _, match := range search.Matches() {
@@ -183,11 +156,7 @@ func (m Model) searchMatchDiffDisplay(scope diffSection, displayIdx int) (matche
 	if !diffSearch.HasQuery() {
 		return false, false
 	}
-	expected := searchScopeUnstaged
-	if scope == sectionStaged {
-		expected = searchScopeStaged
-	}
-	if m.currentSearchScope() != expected {
+	if m.focus != focusDiff || m.section != scope {
 		return false, false
 	}
 	for i, match := range diffSearch.Matches() {

@@ -149,7 +149,7 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 		m.activeFilePath = ""
 		m.resetDiffSections()
 		m.syncDiffViewports()
-		if m.currentDiffSearch().HasQuery() && (m.currentSearchScope() == searchScopeUnstaged || m.currentSearchScope() == searchScopeStaged) {
+		if m.diffSearchActiveInFocus() {
 			m.recomputeSearchMatches()
 		}
 		return nil
@@ -208,7 +208,7 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 	m.staged.colorized = true
 	m.pickAvailableSection()
 	m.syncDiffViewports()
-	if m.currentDiffSearch().HasQuery() && (m.currentSearchScope() == searchScopeUnstaged || m.currentSearchScope() == searchScopeStaged) {
+	if m.diffSearchActiveInFocus() {
 		m.recomputeSearchMatches()
 	}
 	return nil

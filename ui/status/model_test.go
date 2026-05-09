@@ -1707,8 +1707,6 @@ func TestStageSearchDiffUsesRightEdgeIndicatorInHunkMode(t *testing.T) {
 	m.focus = focusDiff
 	m.section = sectionUnstaged
 	m.navMode = navHunk
-	// m.search.Query = "needle"
-	// m.searchScope = searchScopeUnstaged
 	m.recomputeSearchMatches()
 
 	pane := m.renderSectionPane(80, 12, "Unstaged", &m.unstaged, sectionUnstaged)

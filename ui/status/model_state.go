@@ -80,7 +80,6 @@ type statusPageState struct {
 	statusEntries  []statusEntry
 	collapsedDirs  map[string]bool
 	selected       int
-	activeFilePath string
 }
 
 type Settings struct {

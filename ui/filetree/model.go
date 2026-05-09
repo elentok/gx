@@ -88,7 +88,7 @@ func (m *Model[T]) SetSelectedIndex(index int) {
 	m.selected = index
 }
 
-func (m Model[T]) SelectedEntry() (Entry[T], bool) {
+func (m Model[T]) selectedEntry() (Entry[T], bool) {
 	if m.selected < 0 || m.selected >= len(m.entries) {
 		return Entry[T]{}, false
 	}
@@ -138,7 +138,7 @@ func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd, bool) {
 			}
 			return m, nil, true
 		case "l", "right":
-			entry, ok := m.SelectedEntry()
+			entry, ok := m.selectedEntry()
 			if !ok {
 				return m, nil, true
 			}
