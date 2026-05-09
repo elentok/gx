@@ -2,7 +2,6 @@ package filetree
 
 import (
 	tea "charm.land/bubbletea/v2"
-	"github.com/elentok/gx/ui/explorer"
 	"github.com/elentok/gx/ui/search"
 	"maps"
 )
@@ -129,12 +128,11 @@ func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd) {
 			}
 			return m, nil
 		case "h", "left":
-			rows := m.fileTreeRows()
-			if idx, ok := explorer.FileTreeParentIndex(rows, m.selected); ok && idx != m.selected {
+			if idx, ok := ParentIndex(m.entries, m.selected); ok && idx != m.selected {
 				m.selected = idx
 				return m, nil
 			}
-			if explorer.FileTreeCollapseSelectedDir(rows, m.collapsedDirs, m.selected) {
+			if CollapseSelectedDir(m.entries, m.collapsedDirs, m.selected) {
 				return m, rebuildRequestedCmd()
 			}
 			return m, nil
@@ -146,39 +144,18 @@ func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd) {
 			if entry.Kind == EntryFile {
 				return m, openSelectedCmd()
 			}
-			if explorer.FileTreeExpandSelectedDir(m.fileTreeRows(), m.collapsedDirs, m.selected) {
+			if ExpandSelectedDir(m.entries, m.collapsedDirs, m.selected) {
 				return m, rebuildRequestedCmd()
 			}
 			return m, nil
 		case "enter":
-			if explorer.FileTreeToggleDirOnEnter(m.fileTreeRows(), m.collapsedDirs, m.selected) {
+			if ToggleDirOnEnter(m.entries, m.collapsedDirs, m.selected) {
 				return m, rebuildRequestedCmd()
 			}
 			return m, openSelectedCmd()
 		}
 	}
 	return m, nil
-}
-
-func (m Model[T]) fileTreeRows() []explorer.FileTreeRow[T] {
-	rows := make([]explorer.FileTreeRow[T], 0, len(m.entries))
-	for _, entry := range m.entries {
-		row := explorer.FileTreeRow[T]{
-			Path:        entry.Path,
-			ParentPath:  entry.ParentPath,
-			Depth:       entry.Depth,
-			DisplayName: entry.DisplayName,
-			Expanded:    entry.Expanded,
-			Value:       entry.Value,
-		}
-		if entry.Kind == EntryDir {
-			row.Kind = explorer.FileTreeRowDir
-		} else {
-			row.Kind = explorer.FileTreeRowFile
-		}
-		rows = append(rows, row)
-	}
-	return rows
 }
 
 func rebuildRequestedCmd() tea.Cmd {

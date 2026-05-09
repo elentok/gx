@@ -120,3 +120,10 @@ Emits intent messages:
   - staged/unstaged queries preserved when switching focus
 - Add explicit tests for filetree helper ownership migration:
   - `ui/filetree` tests cover expand/collapse/parent/adjacent-file behavior without importing `ui/explorer`.
+
+## API cleanup task
+
+- Audit exported/public functions and types touched by this refactor in `ui/status`, `ui/filetree`, `ui/diff`, and `ui/explorer`.
+- For each exported symbol, verify it is used outside its package.
+- Convert symbols that are package-local in practice to unexported/private names.
+- Keep exported API only where cross-package usage is intentional and documented.

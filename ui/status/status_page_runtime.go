@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui/explorer"
+	"github.com/elentok/gx/ui/filetree"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -107,7 +107,7 @@ func (m *Model) cmdLoadBranchSync() tea.Cmd {
 }
 
 func (m *Model) moveToAdjacentFile(delta int) (bool, tea.Cmd) {
-	idx, ok := explorer.FileTreeAdjacentFileIndex(m.statusFileTreeRows(), m.selected, delta)
+	idx, ok := filetree.AdjacentFileIndex(m.fileTreeModel.Entries(), m.selected, delta)
 	if !ok {
 		return false, nil
 	}
@@ -178,25 +178,4 @@ func (m *Model) openDiscardStatusConfirm() {
 	m.openConfirm(title, lines, confirmDiscardStatus, "", "")
 	m.confirmDiscardUntracked = entry.File.IsUntracked()
 	m.confirmPaths = uniqueNonEmpty(paths)
-}
-
-func (m Model) statusFileTreeRows() []explorer.FileTreeRow[git.StageFileStatus] {
-	rows := make([]explorer.FileTreeRow[git.StageFileStatus], 0, len(m.statusEntries))
-	for _, entry := range m.statusEntries {
-		row := explorer.FileTreeRow[git.StageFileStatus]{
-			Path:        entry.Path,
-			ParentPath:  entry.ParentPath,
-			Depth:       entry.Depth,
-			DisplayName: entry.DisplayName,
-			Expanded:    entry.Expanded,
-		}
-		if entry.Kind == statusEntryDir {
-			row.Kind = explorer.FileTreeRowDir
-		} else {
-			row.Kind = explorer.FileTreeRowFile
-			row.Value = entry.File
-		}
-		rows = append(rows, row)
-	}
-	return rows
 }

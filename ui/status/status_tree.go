@@ -2,7 +2,7 @@ package status
 
 import (
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui/explorer"
+	"github.com/elentok/gx/ui/filetree"
 )
 
 type statusEntryKind int
@@ -33,14 +33,14 @@ type aggregateStatus struct {
 }
 
 func buildStatusEntries(files []git.StageFileStatus, collapsed map[string]bool) []statusEntry {
-	leaves := make([]explorer.FileTreeLeaf[git.StageFileStatus], 0, len(files))
+	leaves := make([]filetree.Leaf[git.StageFileStatus], 0, len(files))
 	for i := range files {
-		leaves = append(leaves, explorer.FileTreeLeaf[git.StageFileStatus]{
+		leaves = append(leaves, filetree.Leaf[git.StageFileStatus]{
 			Path:  files[i].Path,
 			Value: files[i],
 		})
 	}
-	rows := explorer.BuildFileTreeRows(leaves, collapsed)
+	rows := filetree.BuildRows(leaves, collapsed)
 	out := make([]statusEntry, 0, len(rows))
 	for _, row := range rows {
 		entry := statusEntry{
@@ -50,7 +50,7 @@ func buildStatusEntries(files []git.StageFileStatus, collapsed map[string]bool) 
 			DisplayName: row.DisplayName,
 			Expanded:    row.Expanded,
 		}
-		if row.Kind == explorer.FileTreeRowDir {
+		if row.Kind == filetree.RowDir {
 			entry.Kind = statusEntryDir
 			agg := aggregateStatusFiles(row.Leaves)
 			entry.HasStaged = agg.hasStaged

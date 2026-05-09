@@ -1,0 +1,75 @@
+package filetree
+
+import "strings"
+
+func ParentIndex[T any](entries []Entry[T], selected int) (int, bool) {
+	if selected < 0 || selected >= len(entries) {
+		return 0, false
+	}
+	parent := strings.TrimSpace(entries[selected].ParentPath)
+	if parent == "" || parent == entries[selected].Path {
+		return 0, false
+	}
+	for i, entry := range entries {
+		if entry.Kind == EntryDir && entry.Path == parent {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
+func AdjacentFileIndex[T any](entries []Entry[T], selected, delta int) (int, bool) {
+	if delta == 0 || len(entries) == 0 {
+		return 0, false
+	}
+	idx := selected
+	for {
+		idx += delta
+		if idx < 0 || idx >= len(entries) {
+			return 0, false
+		}
+		if entries[idx].Kind == EntryFile {
+			return idx, true
+		}
+	}
+}
+
+func CollapseSelectedDir[T any](entries []Entry[T], collapsed map[string]bool, selected int) bool {
+	if selected < 0 || selected >= len(entries) {
+		return false
+	}
+	entry := entries[selected]
+	if entry.Kind != EntryDir || !entry.Expanded {
+		return false
+	}
+	collapsed[entry.Path] = true
+	return true
+}
+
+func ExpandSelectedDir[T any](entries []Entry[T], collapsed map[string]bool, selected int) bool {
+	if selected < 0 || selected >= len(entries) {
+		return false
+	}
+	entry := entries[selected]
+	if entry.Kind != EntryDir || entry.Expanded {
+		return false
+	}
+	delete(collapsed, entry.Path)
+	return true
+}
+
+func ToggleDirOnEnter[T any](entries []Entry[T], collapsed map[string]bool, selected int) bool {
+	if selected < 0 || selected >= len(entries) {
+		return false
+	}
+	entry := entries[selected]
+	if entry.Kind != EntryDir {
+		return false
+	}
+	if entry.Expanded {
+		collapsed[entry.Path] = true
+	} else {
+		delete(collapsed, entry.Path)
+	}
+	return true
+}
