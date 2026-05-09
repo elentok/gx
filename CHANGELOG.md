@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.13.6
+
+- Complete the status nested-model cleanup: focused-child key routing, per-pane search ownership, and removal of legacy status search-scope adapters
+- Replace filetree sync bridge code with explicit status/filetree reconciliation helpers and cleaner state ownership
+- Simplify status/filetree integration by caching filetree rows alongside status entries and removing the status-to-filetree conversion helper
+- Prune dead status/diffview/filetree API surface used only during migration
+
 ## v0.13.5
 
 - Fix status diff `Tab` cycle order to `sidebar -> unstaged -> staged -> sidebar`
