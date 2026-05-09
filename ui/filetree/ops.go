@@ -2,7 +2,7 @@ package filetree
 
 import "strings"
 
-func ParentIndex[T any](entries []Entry[T], selected int) (int, bool) {
+func parentIndex[T any](entries []Entry[T], selected int) (int, bool) {
 	if selected < 0 || selected >= len(entries) {
 		return 0, false
 	}
@@ -18,7 +18,7 @@ func ParentIndex[T any](entries []Entry[T], selected int) (int, bool) {
 	return 0, false
 }
 
-func AdjacentFileIndex[T any](entries []Entry[T], selected, delta int) (int, bool) {
+func adjacentFileIndex[T any](entries []Entry[T], selected, delta int) (int, bool) {
 	if delta == 0 || len(entries) == 0 {
 		return 0, false
 	}
@@ -34,7 +34,7 @@ func AdjacentFileIndex[T any](entries []Entry[T], selected, delta int) (int, boo
 	}
 }
 
-func CollapseSelectedDir[T any](entries []Entry[T], collapsed map[string]bool, selected int) bool {
+func collapseSelectedDir[T any](entries []Entry[T], collapsed map[string]bool, selected int) bool {
 	if selected < 0 || selected >= len(entries) {
 		return false
 	}
@@ -46,7 +46,7 @@ func CollapseSelectedDir[T any](entries []Entry[T], collapsed map[string]bool, s
 	return true
 }
 
-func ExpandSelectedDir[T any](entries []Entry[T], collapsed map[string]bool, selected int) bool {
+func expandSelectedDir[T any](entries []Entry[T], collapsed map[string]bool, selected int) bool {
 	if selected < 0 || selected >= len(entries) {
 		return false
 	}
@@ -58,7 +58,7 @@ func ExpandSelectedDir[T any](entries []Entry[T], collapsed map[string]bool, sel
 	return true
 }
 
-func ToggleDirOnEnter[T any](entries []Entry[T], collapsed map[string]bool, selected int) bool {
+func toggleDirOnEnter[T any](entries []Entry[T], collapsed map[string]bool, selected int) bool {
 	if selected < 0 || selected >= len(entries) {
 		return false
 	}

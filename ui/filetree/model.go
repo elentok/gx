@@ -128,11 +128,11 @@ func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd) {
 			}
 			return m, nil
 		case "h", "left":
-			if idx, ok := ParentIndex(m.entries, m.selected); ok && idx != m.selected {
+			if idx, ok := parentIndex(m.entries, m.selected); ok && idx != m.selected {
 				m.selected = idx
 				return m, nil
 			}
-			if CollapseSelectedDir(m.entries, m.collapsedDirs, m.selected) {
+			if collapseSelectedDir(m.entries, m.collapsedDirs, m.selected) {
 				return m, rebuildRequestedCmd()
 			}
 			return m, nil
@@ -144,18 +144,27 @@ func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd) {
 			if entry.Kind == EntryFile {
 				return m, openSelectedCmd()
 			}
-			if ExpandSelectedDir(m.entries, m.collapsedDirs, m.selected) {
+			if expandSelectedDir(m.entries, m.collapsedDirs, m.selected) {
 				return m, rebuildRequestedCmd()
 			}
 			return m, nil
 		case "enter":
-			if ToggleDirOnEnter(m.entries, m.collapsedDirs, m.selected) {
+			if toggleDirOnEnter(m.entries, m.collapsedDirs, m.selected) {
 				return m, rebuildRequestedCmd()
 			}
 			return m, openSelectedCmd()
 		}
 	}
 	return m, nil
+}
+
+func (m *Model[T]) MoveToAdjacentFile(delta int) bool {
+	idx, ok := adjacentFileIndex(m.entries, m.selected, delta)
+	if !ok {
+		return false
+	}
+	m.selected = idx
+	return true
 }
 
 func rebuildRequestedCmd() tea.Cmd {

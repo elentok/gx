@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui/filetree"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -107,11 +106,10 @@ func (m *Model) cmdLoadBranchSync() tea.Cmd {
 }
 
 func (m *Model) moveToAdjacentFile(delta int) (bool, tea.Cmd) {
-	idx, ok := filetree.AdjacentFileIndex(m.fileTreeModel.Entries(), m.selected, delta)
-	if !ok {
+	if !m.fileTreeModel.MoveToAdjacentFile(delta) {
 		return false, nil
 	}
-	m.setStatusSelection(idx)
+	m.setStatusSelection(m.fileTreeModel.SelectedIndex())
 	m.onStatusSelectionChanged()
 	cmd := m.reloadDiffsForSelection()
 	if m.focus == focusDiff {
