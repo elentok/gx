@@ -472,3 +472,57 @@ func TestViewMatchesScreenHeight(t *testing.T) {
 		t.Fatalf("expected 24 lines, got %d", len(lines))
 	}
 }
+
+func TestInjectTabsIntoFooterUsesEllipsisForRightTruncation(t *testing.T) {
+	width := 32
+	tabs := "worktrees log status"
+	right := "· 󰉸 context: 1 · filetree · ? help"
+	content := "body\n" + right
+
+	merged := injectTabsIntoFooter(content, tabs, width)
+	lines := strings.Split(ansi.Strip(merged), "\n")
+	last := lines[len(lines)-1]
+
+	if ansi.StringWidth(last) != width {
+		t.Fatalf("expected merged footer width %d, got %d (%q)", width, ansi.StringWidth(last), last)
+	}
+	if !strings.Contains(last, "…") {
+		t.Fatalf("expected right-side truncation to include ellipsis, got %q", last)
+	}
+}
+
+func TestInjectTabsIntoFooterIgnoresRightLineLeadingPadding(t *testing.T) {
+	width := 90
+	tabs := " worktrees   log   status "
+	right := strings.Repeat(" ", 120) + "· 󰉸 context: 1 · filetree · ? help"
+	content := "body\n" + right
+
+	merged := injectTabsIntoFooter(content, tabs, width)
+	lines := strings.Split(ansi.Strip(merged), "\n")
+	last := lines[len(lines)-1]
+
+	if ansi.StringWidth(last) != width {
+		t.Fatalf("expected merged footer width %d, got %d (%q)", width, ansi.StringWidth(last), last)
+	}
+	if !strings.Contains(last, "context: 1") {
+		t.Fatalf("expected context label to remain visible after merge, got %q", last)
+	}
+}
+
+func TestInjectTabsIntoFooterPreservesRightHintTailWithStatusPrefix(t *testing.T) {
+	width := 90
+	tabs := " worktrees   log   status "
+	right := "staged README.md" + strings.Repeat(" ", 20) + "· 󰉸 context: 1 · filetree · ? help"
+	content := "body\n" + right
+
+	merged := injectTabsIntoFooter(content, tabs, width)
+	lines := strings.Split(ansi.Strip(merged), "\n")
+	last := lines[len(lines)-1]
+
+	if ansi.StringWidth(last) != width {
+		t.Fatalf("expected merged footer width %d, got %d (%q)", width, ansi.StringWidth(last), last)
+	}
+	if !strings.Contains(last, "context: 1") {
+		t.Fatalf("expected context label to remain visible with status prefix, got %q", last)
+	}
+}

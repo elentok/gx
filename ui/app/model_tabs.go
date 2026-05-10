@@ -2,6 +2,7 @@ package app
 
 import (
 	"strings"
+	"unicode"
 
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
@@ -62,8 +63,20 @@ func injectTabsIntoFooter(content, tabs string, width int) string {
 	if rightMax < 0 {
 		rightMax = 0
 	}
-	right := ansi.Truncate(lines[len(lines)-1], rightMax, "")
-	rightW := ansi.StringWidth(right)
+	rightContent := strings.TrimLeftFunc(lines[len(lines)-1], unicode.IsSpace)
+	right := rightContent
+	rightW := ansi.StringWidth(rightContent)
+	if rightW > rightMax {
+		if rightMax <= 0 {
+			right = ""
+		} else if rightMax == 1 {
+			right = "…"
+		} else {
+			// Keep the tail where compact footer hints live (context/mode/help).
+			right = "…" + ansi.TruncateLeft(rightContent, rightW-rightMax+1, "")
+		}
+	}
+	rightW = ansi.StringWidth(right)
 	gap := width - tabsW - rightW
 	if gap < 1 {
 		gap = 1
@@ -251,4 +264,3 @@ func (m Model) appChordHints(prefix string) []key.Binding {
 		key.NewBinding(key.WithHelp("s", "status tab")),
 	}
 }
-

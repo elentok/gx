@@ -73,7 +73,7 @@ func (m Model) renderFooterLineWithPrefix(prefix, hint string) string {
 	hintW := ansi.StringWidth(hintText)
 	if leftText == "" {
 		if hintW >= lineW {
-			return ansi.Truncate(hintStyled, lineW, "")
+			return ansi.Truncate(hintStyled, lineW, "…")
 		}
 		return strings.Repeat(" ", lineW-hintW) + hintStyled
 	}
@@ -86,9 +86,9 @@ func (m Model) renderFooterLineWithPrefix(prefix, hint string) string {
 			left := leftText + sep
 			leftW := ansi.StringWidth(left)
 			if leftW >= lineW {
-				return ansi.Truncate(leftText, lineW, "...")
+				return ansi.Truncate(leftText, lineW, "…")
 			}
-			return left + ansi.Truncate(hintStyled, lineW-leftW, "")
+			return left + ansi.Truncate(hintStyled, lineW-leftW, "…")
 		}
 		if hintW >= lineW {
 			return ansi.Truncate(hintStyled, lineW, "")
@@ -96,7 +96,7 @@ func (m Model) renderFooterLineWithPrefix(prefix, hint string) string {
 		return strings.Repeat(" ", lineW-hintW) + hintStyled
 	}
 
-	status := ansi.Truncate(leftText, statusMax, "...")
+	status := ansi.Truncate(leftText, statusMax, "…")
 	left := status + sep
 	leftW := ansi.StringWidth(left)
 	if leftW+hintW >= lineW {

@@ -385,11 +385,50 @@ func TestHelpLineRightAlignsHintAndTruncatesStatus(t *testing.T) {
 	if ansi.StringWidth(plain) != m.width {
 		t.Fatalf("expected footer width %d, got %d (%q)", m.width, ansi.StringWidth(plain), plain)
 	}
-	if !strings.Contains(plain, "...") {
+	if !strings.Contains(plain, "…") {
 		t.Fatalf("expected truncated status with ellipsis, got %q", plain)
 	}
 	if !strings.HasSuffix(plain, "· 󰉸 context: 1 · filetree · ? help") {
 		t.Fatalf("expected hint right-aligned at end, got %q", plain)
+	}
+}
+
+func TestHelpLineTruncatesBareHintWithEllipsis(t *testing.T) {
+	t.Setenv("TMUX", "")
+	t.Setenv("KITTY_WINDOW_ID", "")
+	m := New(testutil.TempRepo(t))
+	m.ready = true
+	m.width = 12
+	m.focus = focusFiletree
+
+	line := m.helpLine()
+	plain := ansi.Strip(line)
+
+	if ansi.StringWidth(plain) != m.width {
+		t.Fatalf("expected footer width %d, got %d (%q)", m.width, ansi.StringWidth(plain), plain)
+	}
+	if !strings.Contains(plain, "…") {
+		t.Fatalf("expected bare hint truncation to use ellipsis, got %q", plain)
+	}
+}
+
+func TestHelpLineTruncatesHintWithEllipsisWhenStatusConsumesWidth(t *testing.T) {
+	t.Setenv("TMUX", "")
+	t.Setenv("KITTY_WINDOW_ID", "")
+	m := New(testutil.TempRepo(t))
+	m.ready = true
+	m.width = 18
+	m.focus = focusFiletree
+	m.statusMsg = "busy"
+
+	line := m.helpLine()
+	plain := ansi.Strip(line)
+
+	if ansi.StringWidth(plain) != m.width {
+		t.Fatalf("expected footer width %d, got %d (%q)", m.width, ansi.StringWidth(plain), plain)
+	}
+	if !strings.Contains(plain, "…") {
+		t.Fatalf("expected truncated hint to use ellipsis when status is present, got %q", plain)
 	}
 }
 
