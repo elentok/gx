@@ -53,19 +53,27 @@ func TestReloadAssignsBranchHistoryClasses(t *testing.T) {
 }
 
 func TestRenderCommitRowUsesBranchHistoryColors(t *testing.T) {
-	local := logSubjectStyle(git.BranchHistoryLocalOnly).Render("local only")
+	local := logSubjectStyle(git.BranchHistoryLocalOnly, false).Render("local only")
 	if ansi.Strip(local) != "local only" || local == "local only" {
 		t.Fatalf("expected local-only subject to be colorized, got %q", local)
 	}
 
-	remote := logSubjectStyle(git.BranchHistoryRemoteOnly).Render("remote only")
+	remote := logSubjectStyle(git.BranchHistoryRemoteOnly, false).Render("remote only")
 	if ansi.Strip(remote) != "remote only" || remote == "remote only" {
 		t.Fatalf("expected remote-only subject to be colorized, got %q", remote)
 	}
 
-	shared := logSubjectStyle(git.BranchHistoryShared).Render("shared")
+	shared := logSubjectStyle(git.BranchHistoryShared, false).Render("shared")
 	if shared != "shared" {
 		t.Fatalf("expected shared subject to stay uncolored, got %q", shared)
+	}
+}
+
+func TestRenderCommitRowUsesDivergedLocalColor(t *testing.T) {
+	normal := logSubjectStyle(git.BranchHistoryLocalOnly, false).Render("local only")
+	diverged := logSubjectStyle(git.BranchHistoryLocalOnly, true).Render("local only")
+	if normal == diverged {
+		t.Fatalf("expected diverged local style to differ from normal local style")
 	}
 }
 

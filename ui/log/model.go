@@ -62,6 +62,8 @@ type Model struct {
 	err          error
 
 	help help.Model
+
+	branchDiverged bool
 }
 
 func NewModel(worktreeRoot, startRef string, settings Settings) Model {

@@ -128,12 +128,15 @@ func (m Model) renderCommitRow(row row) string {
 		{Text: m.highlightSearch(row.commit.AuthorShort), Width: 4, Style: logMetaStyle},
 	}
 	meta := ui.RenderFixedColumns(cols)
-	return meta + "  " + logSubjectStyle(row.class).Render(m.highlightSearch(row.commit.Subject))
+	return meta + "  " + logSubjectStyle(row.class, m.branchDiverged).Render(m.highlightSearch(row.commit.Subject))
 }
 
-func logSubjectStyle(class git.BranchHistoryClass) lipgloss.Style {
+func logSubjectStyle(class git.BranchHistoryClass, branchDiverged bool) lipgloss.Style {
 	switch class {
 	case git.BranchHistoryLocalOnly:
+		if branchDiverged {
+			return lipgloss.NewStyle().Foreground(ui.ColorOrange)
+		}
 		return logLocalStyle
 	case git.BranchHistoryRemoteOnly:
 		return logRemoteStyle

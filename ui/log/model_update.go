@@ -18,6 +18,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.err = nil
 		m.rows = msg.rows
+		m.branchDiverged = msg.branchDiverged
 		if m.cursor >= len(m.rows) {
 			m.cursor = len(m.rows) - 1
 		}
