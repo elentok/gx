@@ -10,7 +10,7 @@ func (m *Model) pickAvailableSection() {
 }
 
 func (m Model) canSwitchSections() bool {
-	return len(m.visibleDiffSections()) > 1
+	return true
 }
 
 func (m *Model) cycleFrameForward() {

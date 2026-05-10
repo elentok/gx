@@ -113,15 +113,8 @@ func (m *Model) applySelection() tea.Cmd {
 	m.setStatus("updated " + file.Path)
 	from := m.section
 	reloadCmd := m.reload(file.Path)
-	if m.shouldSwitchAfterApply(from) {
-		m.focusMovedTarget(sig)
-		if m.flash.active {
-			return tea.Batch(reloadCmd, nextFlashCmd())
-		}
-	} else {
-		m.section = from
-		m.ensureActiveVisible(m.currentSection())
-	}
+	m.section = from
+	m.ensureActiveVisible(m.currentSection())
 	return reloadCmd
 }
 
@@ -131,11 +124,6 @@ func isCorruptPatchErr(err error) bool {
 	}
 	s := strings.ToLower(err.Error())
 	return strings.Contains(s, "corrupt patch")
-}
-
-func (m *Model) shouldSwitchAfterApply(from diffSection) bool {
-	data := m.diffModelForSectionPtr(from).Data()
-	return len(data.Parsed.Hunks) == 0
 }
 
 func (m *Model) reloadDiffsForSelection() tea.Cmd {

@@ -1821,6 +1821,34 @@ func TestApplySelection_DoesNotSwitchSectionWhenHunksRemain(t *testing.T) {
 	}
 }
 
+func TestApplySelection_DoesNotSwitchSectionWhenCurrentSectionBecomesEmpty(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "README.md", "one\ntwo\n")
+	testutil.CommitAll(t, repo, "baseline")
+	testutil.WriteFile(t, repo, "README.md", "ONE\ntwo\n")
+
+	m := New(repo)
+	m.ready = true
+	m.width = 120
+	m.height = 24
+	m.syncDiffViewports()
+	m.focus = focusDiff
+	m.section = sectionUnstaged
+	m.navMode = navHunk
+
+	if len(m.unstaged.data.Parsed.Hunks) != 1 {
+		t.Fatalf("expected exactly 1 unstaged hunk before apply, got %d", len(m.unstaged.data.Parsed.Hunks))
+	}
+
+	cmd := m.applySelection()
+	if cmd != nil {
+		// animation may or may not be set; ignore command
+	}
+	if m.section != sectionUnstaged {
+		t.Fatalf("section switched unexpectedly after source became empty: got=%v", m.section)
+	}
+}
+
 func TestCCTriggersCommitCommand(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "changed\n")

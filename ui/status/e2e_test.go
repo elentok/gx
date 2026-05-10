@@ -482,7 +482,14 @@ func TestStageE2E_UnstageOneHunkAfterStagingBoth_HunkMode(t *testing.T) {
 	tm.Send(keyRune('j'))
 	tm.Send(keySpecial(tea.KeySpace))
 
+	waitForGitState(t, tm, stageActionWait, func() bool {
+		staged, unstaged := stagedAndUnstagedDiff(t, repoDir, path)
+		return hasAddedLine(staged, "new-1") && hasAddedLine(staged, "new-8") && !hasAddedLine(unstaged, "new-1") && !hasAddedLine(unstaged, "new-8")
+	})
+
 	// Unstage one hunk from staged section.
+	tm.Send(keySpecial(tea.KeyTab))
+	tm.Send(keyRune('j'))
 	tm.Send(keySpecial(tea.KeySpace))
 
 	waitForGitState(t, tm, stageActionWait, func() bool {
