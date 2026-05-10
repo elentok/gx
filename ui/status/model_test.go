@@ -696,6 +696,24 @@ func TestDiffPaneKeepsEmptySectionVisible(t *testing.T) {
 	}
 }
 
+func TestExpandedDiffPaneTitleShowsSelectedPathWithoutDiffFocus(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "only-unstaged.txt", "one\n")
+
+	m := New(repo)
+	m.ready = true
+	m.width = 100
+	m.height = 20
+	m.focus = focusFiletree
+	m.section = sectionUnstaged
+	m.syncDiffViewports()
+
+	view := ansi.Strip(m.renderDiffPane(80, 12))
+	if !strings.Contains(view, "Unstaged: only-unstaged.txt") {
+		t.Fatalf("expected active unstaged title to include path, got:\n%s", view)
+	}
+}
+
 func TestDiffPaneAnchorsCollapsedUnstagedAtTopWhenStagedActive(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\ntwo\n")

@@ -56,10 +56,7 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 	sec.viewport.SetHeight(maxInt(0, bodyH))
 	sec.viewport.SetWidth(innerW)
 
-	titleText := m.sectionPaneTitle(title, section)
-	if file, ok := m.selectedExplorerFile(); ok && file.RenameFrom != "" {
-		titleText += " [moved: " + file.RenameFrom + " -> " + file.Path + "]"
-	}
+	titleText := m.diffSectionPaneTitle(title, section, !collapsed)
 	if si := diffrender.ParseSymlinkDiffInfo(sec.data.Parsed); si.IsSymlink {
 		if label := si.TitleLabel(); label != "" {
 			titleText += " " + label
@@ -197,6 +194,24 @@ func (m Model) sectionPaneTitle(title string, section diffSection) string {
 		return title + " (empty)"
 	}
 	return title
+}
+
+func (m Model) diffSectionPaneTitle(title string, section diffSection, expanded bool) string {
+	if !expanded {
+		return m.sectionPaneTitle(title, section)
+	}
+	file, ok := m.selectedExplorerFile()
+	if !ok {
+		return m.sectionPaneTitle(title, section)
+	}
+	return title + ": " + m.diffDisplayedPath(file.stageFile)
+}
+
+func (m Model) diffDisplayedPath(file git.StageFileStatus) string {
+	if file.IsRenamed() && file.RenameFrom != "" {
+		return file.RenameFrom + " -> " + file.Path
+	}
+	return file.Path
 }
 
 func (m Model) sectionPlaceholder(section diffSection, collapsed bool) string {

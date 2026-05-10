@@ -656,7 +656,7 @@ func TestStageE2E_RenamedFileShownInStatusAndDiffHeader(t *testing.T) {
 	waitForStageText(t, tm, "old-name.txt -> new-name.txt", stageLoadWait)
 
 	tm.Send(keySpecial(tea.KeyEnter))
-	waitForStageText(t, tm, "[moved: old-name.txt -> new-name.txt]", stageActionWait)
+	waitForStageText(t, tm, "Unstaged: old-name.txt -> new-name.txt", stageActionWait)
 
 	quitStage(t, tm)
 }
