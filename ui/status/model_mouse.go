@@ -61,28 +61,24 @@ func (m Model) diffRect(mainH int) (x, y, w, h int, ok bool) {
 }
 
 func (m *Model) mouseTargetSection(relY, diffH int) *sectionState {
-	sections := m.visibleDiffSections()
-	if len(sections) == 0 {
+	if diffH <= 0 {
 		return nil
 	}
-	if m.diffFullscreen {
-		return m.currentSection()
+	expandedH, collapsedH := diffPaneHeights(diffH)
+	if m.section == sectionStaged {
+		if relY < collapsedH {
+			return m.sectionState(sectionUnstaged)
+		}
+		if relY < collapsedH+expandedH {
+			return m.sectionState(sectionStaged)
+		}
+		return nil
 	}
-	if len(sections) == 1 {
-		return m.sectionState(sections[0])
+	if relY < expandedH {
+		return m.sectionState(sectionUnstaged)
 	}
-
-	topH := diffH / 2
-	if topH < 5 {
-		topH = 5
+	if relY < expandedH+collapsedH {
+		return m.sectionState(sectionStaged)
 	}
-	bottomH := diffH - topH
-	if bottomH < 5 {
-		bottomH = 5
-		topH = diffH - bottomH
-	}
-	if relY < topH {
-		return m.sectionState(sections[0])
-	}
-	return m.sectionState(sections[1])
+	return nil
 }

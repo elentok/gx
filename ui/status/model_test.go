@@ -627,6 +627,55 @@ func TestUnifiedDiffViewHidesVisibleChangeMarkers(t *testing.T) {
 	}
 }
 
+func TestDiffPaneKeepsEmptySectionVisible(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "only-unstaged.txt", "one\n")
+
+	m := New(repo)
+	m.ready = true
+	m.width = 100
+	m.height = 20
+	m.focus = focusDiff
+	m.section = sectionUnstaged
+	m.syncDiffViewports()
+
+	view := ansi.Strip(m.renderDiffPane(80, 12))
+	if !strings.Contains(view, "Unstaged") {
+		t.Fatalf("expected unstaged section title, got:\n%s", view)
+	}
+	if !strings.Contains(view, "Staged (empty)") {
+		t.Fatalf("expected staged empty strip to remain visible, got:\n%s", view)
+	}
+}
+
+func TestDiffPaneAnchorsCollapsedUnstagedAtTopWhenStagedActive(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\ntwo\n")
+	testutil.MustGitExported(t, repo, "add", "a.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+	testutil.WriteFile(t, repo, "a.txt", "ONE\ntwo\n")
+	testutil.MustGitExported(t, repo, "add", "a.txt")
+	testutil.WriteFile(t, repo, "a.txt", "ONE-again\ntwo\n")
+
+	m := New(repo)
+	m.ready = true
+	m.width = 100
+	m.height = 20
+	m.focus = focusDiff
+	m.section = sectionStaged
+	m.syncDiffViewports()
+
+	view := ansi.Strip(m.renderDiffPane(80, 12))
+	unstagedIdx := strings.Index(view, "Unstaged")
+	stagedIdx := strings.Index(view, "Staged")
+	if unstagedIdx < 0 || stagedIdx < 0 {
+		t.Fatalf("expected both section titles, got:\n%s", view)
+	}
+	if unstagedIdx >= stagedIdx {
+		t.Fatalf("expected collapsed unstaged strip above staged pane, got:\n%s", view)
+	}
+}
+
 func TestDiffBodyPaddingStylesChangedRows(t *testing.T) {
 	added := diffrender.DiffBodyPadding(diffrender.RowAdded, 3)
 	removed := diffrender.DiffBodyPadding(diffrender.RowRemoved, 3)

@@ -17,46 +17,31 @@ import (
 )
 
 func (m *Model) renderDiffPane(width, height int) string {
-	sections := m.visibleDiffSections()
-
-	if len(sections) == 0 {
-		content := lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render(m.diffEmptyMessage())
-		return m.panelStyle(m.focus == focusDiff).
-			Width(width).
-			Height(height).
-			Render(content)
+	if height <= 0 || width <= 0 {
+		return ""
 	}
 
-	if len(sections) == 1 {
-		section := sections[0]
-		return m.renderSectionPane(width, height, m.sectionTitle(section), m.sectionState(section), section)
-	}
-	if m.diffFullscreen {
-		return m.renderSectionPane(width, height, m.sectionTitle(m.section), m.currentSection(), m.section)
-	}
-
-	topH := height / 2
-	if topH < 5 {
-		topH = 5
-	}
-	bottomH := height - topH
-	if bottomH < 5 {
-		bottomH = 5
-		topH = height - bottomH
+	expandedH, collapsedH := diffPaneHeights(height)
+	if m.section == sectionStaged {
+		top := m.renderSectionPane(width, collapsedH, m.sectionTitle(sectionUnstaged), m.sectionState(sectionUnstaged), sectionUnstaged)
+		bottom := m.renderSectionPane(width, expandedH, m.sectionTitle(sectionStaged), m.sectionState(sectionStaged), sectionStaged)
+		return lipgloss.JoinVertical(lipgloss.Left, top, bottom)
 	}
 
-	topSection := sections[0]
-	bottomSection := sections[1]
-	top := m.renderSectionPane(width, topH, m.sectionTitle(topSection), m.sectionState(topSection), topSection)
-	bottom := m.renderSectionPane(width, bottomH, m.sectionTitle(bottomSection), m.sectionState(bottomSection), bottomSection)
+	top := m.renderSectionPane(width, expandedH, m.sectionTitle(sectionUnstaged), m.sectionState(sectionUnstaged), sectionUnstaged)
+	bottom := m.renderSectionPane(width, collapsedH, m.sectionTitle(sectionStaged), m.sectionState(sectionStaged), sectionStaged)
 	return lipgloss.JoinVertical(lipgloss.Left, top, bottom)
 }
 
 func (m *Model) renderSectionPane(width, height int, title string, sec *sectionState, section diffSection) string {
+	if width <= 0 || height <= 0 {
+		return ""
+	}
 	innerW := maxInt(1, width-2)
 	innerH := maxInt(1, height-2)
 
 	activeSection := m.focus == focusDiff && m.section == section
+	collapsed := !activeSection && height <= collapsedDiffSectionHeight
 
 	bodyH := innerH
 	if bodyH < 0 {
@@ -71,7 +56,7 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 	sec.viewport.SetHeight(maxInt(0, bodyH))
 	sec.viewport.SetWidth(innerW)
 
-	titleText := title
+	titleText := m.sectionPaneTitle(title, section)
 	if file, ok := m.selectedExplorerFile(); ok && file.RenameFrom != "" {
 		titleText += " [moved: " + file.RenameFrom + " -> " + file.Path + "]"
 	}
@@ -101,6 +86,11 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 	lines := make([]string, 0, bodyH)
 	if len(sec.data.ViewLines) == 0 && diffrender.SectionHasBinaryDiff(sec.data.Parsed) {
 		lines = append(lines, lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render(m.binarySummaryLine()))
+	}
+	if len(lines) == 0 && bodyH > 0 {
+		if placeholder := m.sectionPlaceholder(section, collapsed); placeholder != "" {
+			lines = append(lines, lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render(placeholder))
+		}
 	}
 
 	if len(lines) == 0 {
@@ -174,6 +164,47 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 	return m.renderPanelWithBorderTitle(width, height, titleText, rightTitleText, lines, activeSection, section)
 }
 
+const collapsedDiffSectionHeight = 3
+
+func diffPaneHeights(total int) (expanded, collapsed int) {
+	if total <= 0 {
+		return 0, 0
+	}
+	collapsed = collapsedDiffSectionHeight
+	if total < collapsed+3 {
+		collapsed = maxInt(1, total-3)
+	}
+	if collapsed < 0 {
+		collapsed = 0
+	}
+	expanded = total - collapsed
+	if expanded <= 0 {
+		expanded = total
+		collapsed = 0
+	}
+	return expanded, collapsed
+}
+
+func (m Model) sectionPaneTitle(title string, section diffSection) string {
+	if !m.sectionHasContent(section) {
+		return title + " (empty)"
+	}
+	return title
+}
+
+func (m Model) sectionPlaceholder(section diffSection, collapsed bool) string {
+	if _, ok := m.selectedExplorerFile(); !ok {
+		return m.diffEmptyMessage()
+	}
+	if !m.sectionHasContent(section) {
+		if collapsed {
+			return "empty"
+		}
+		return "No changes"
+	}
+	return ""
+}
+
 func (m Model) hunkOverflowMarkers() (top, bottom, both string) {
 	if m.settings.UseNerdFontIcons {
 		return " ", " ", "↕ "
@@ -238,52 +269,15 @@ func (m *Model) syncDiffViewports() {
 	reflowSectionLines(m.sectionState(sectionUnstaged), wrapWidth, m.wrapSoft)
 	reflowSectionLines(m.sectionState(sectionStaged), wrapWidth, m.wrapSoft)
 
-	hasUnstaged := m.sectionHasContent(sectionUnstaged)
-	hasStaged := m.sectionHasContent(sectionStaged)
-	if m.diffFullscreen {
-		if m.section == sectionUnstaged {
-			m.unstaged.viewport.SetHeight(maxInt(0, diffH-3))
-			m.staged.viewport.SetHeight(0)
-		} else {
-			m.staged.viewport.SetHeight(maxInt(0, diffH-3))
-			m.unstaged.viewport.SetHeight(0)
-		}
-		m.unstaged.viewport.SetWidth(vpW)
-		m.staged.viewport.SetWidth(vpW)
-		m.unstaged.viewport.SetContentLines(m.unstaged.data.ViewLines)
-		m.staged.viewport.SetContentLines(m.staged.data.ViewLines)
-		return
-	}
-
-	if hasUnstaged && hasStaged {
-		topH := diffH / 2
-		if topH < 5 {
-			topH = 5
-		}
-		bottomH := diffH - topH
-		if bottomH < 5 {
-			bottomH = 5
-			topH = diffH - bottomH
-		}
-		m.unstaged.viewport.SetHeight(maxInt(0, topH-3))
-		m.staged.viewport.SetHeight(maxInt(0, bottomH-3))
-		m.unstaged.viewport.SetWidth(vpW)
-		m.staged.viewport.SetWidth(vpW)
-	} else if hasUnstaged {
-		m.unstaged.viewport.SetHeight(maxInt(0, diffH-3))
-		m.unstaged.viewport.SetWidth(vpW)
-		m.staged.viewport.SetHeight(0)
-		m.staged.viewport.SetWidth(vpW)
-	} else if hasStaged {
-		m.staged.viewport.SetHeight(maxInt(0, diffH-3))
-		m.staged.viewport.SetWidth(vpW)
-		m.unstaged.viewport.SetHeight(0)
-		m.unstaged.viewport.SetWidth(vpW)
+	expandedH, collapsedH := diffPaneHeights(diffH)
+	m.unstaged.viewport.SetWidth(vpW)
+	m.staged.viewport.SetWidth(vpW)
+	if m.section == sectionStaged {
+		m.unstaged.viewport.SetHeight(maxInt(0, collapsedH-3))
+		m.staged.viewport.SetHeight(maxInt(0, expandedH-3))
 	} else {
-		m.unstaged.viewport.SetHeight(0)
-		m.staged.viewport.SetHeight(0)
-		m.unstaged.viewport.SetWidth(vpW)
-		m.staged.viewport.SetWidth(vpW)
+		m.unstaged.viewport.SetHeight(maxInt(0, expandedH-3))
+		m.staged.viewport.SetHeight(maxInt(0, collapsedH-3))
 	}
 	m.unstaged.viewport.SetContentLines(m.unstaged.data.ViewLines)
 	m.staged.viewport.SetContentLines(m.staged.data.ViewLines)
