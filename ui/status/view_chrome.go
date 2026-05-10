@@ -23,7 +23,7 @@ func (m Model) errorModalView() string {
 func (m Model) panelStyle(active bool) lipgloss.Style {
 	borderColor := ui.ColorSubtle
 	if active {
-		borderColor = ui.ColorOrange
+		borderColor = ui.ColorBlue
 	}
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -31,13 +31,47 @@ func (m Model) panelStyle(active bool) lipgloss.Style {
 		Background(ui.ColorBase)
 }
 
-func (m Model) renderPanelWithBorderTitle(width, height int, title, rightTitle string, lines []string, active bool, section diffSection) string {
+func (m Model) renderFiletreePanelWithBorderTitle(width, height int, title, rightTitle string, lines []string, active bool) string {
 	borderColor := ui.ColorSubtle
 	titleColor := ui.ColorBlue
+	if active {
+		borderColor = ui.ColorBlue
+		titleColor = ui.ColorBlue
+	}
+	return ui.RenderPanelFrame(ui.PanelFrameOptions{
+		Width:       width,
+		Height:      height,
+		Title:       title,
+		RightTitle:  rightTitle,
+		Lines:       lines,
+		BorderColor: borderColor,
+		TitleColor:  titleColor,
+		TitleBold:   active,
+		Background:  ui.ColorBase,
+	})
+}
+
+func (m Model) renderPanelWithBorderTitle(width, height int, title, rightTitle string, lines []string, active bool, section diffSection) string {
+	borderColor := ui.ColorSubtle
+	titleColor := ui.ColorOrange
 	if section == sectionStaged {
 		borderColor = ui.ColorGreen
 		titleColor = ui.ColorGreen
-	} else if active {
+	} else {
+		borderColor = ui.ColorOrange
+		titleColor = ui.ColorOrange
+	}
+	if !active {
+		borderColor = ui.ColorSubtle
+		if section == sectionStaged {
+			titleColor = ui.ColorGreen
+		} else {
+			titleColor = ui.ColorOrange
+		}
+	} else if section == sectionStaged {
+		borderColor = ui.ColorGreen
+		titleColor = ui.ColorGreen
+	} else {
 		borderColor = ui.ColorOrange
 		titleColor = ui.ColorOrange
 	}
@@ -49,6 +83,7 @@ func (m Model) renderPanelWithBorderTitle(width, height int, title, rightTitle s
 		Lines:       lines,
 		BorderColor: borderColor,
 		TitleColor:  titleColor,
+		TitleBold:   active,
 		Background:  ui.ColorBase,
 	})
 }

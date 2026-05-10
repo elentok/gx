@@ -93,6 +93,7 @@ func (m Model) filetreePaneTitle() string {
 func (m Model) visibleStatusLines(height int) []string {
 	innerH := maxInt(1, height-2)
 	icons := filetreePaneIconsFor(m.settings.UseNerdFontIcons)
+	start, _ := explorer.VisibleWindow(len(m.statusEntries), m.selected, innerH)
 	rows := explorer.BuildVisibleSidebarRenderableRows(m.statusEntries, m.selected, innerH, func(i int, entry statusEntry) explorer.SidebarRenderableRow {
 		statusColor := statusEntryColor(entry)
 		deleted := entry.Kind == statusEntryFile && isDeletedFileStatus(entry.File)
@@ -122,7 +123,14 @@ func (m Model) visibleStatusLines(height int) []string {
 			Faint:    deleted,
 		}
 	})
-	return explorer.RenderSidebarRows(rows, innerH, lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render("clean working tree"), ui.ColorOrange)
+	lines := explorer.RenderSidebarRows(rows, innerH, lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render("clean working tree"), ui.ColorBlue)
+	if m.focus == focusFiletree {
+		selectedIdx := m.selected - start
+		if selectedIdx >= 0 && selectedIdx < len(lines) && lines[selectedIdx] != "" {
+			lines[selectedIdx] = ui.RenderRowHighlight(lines[selectedIdx])
+		}
+	}
+	return lines
 }
 
 func (m Model) requiredFiletreePaneWidth(height int) int {
@@ -137,7 +145,7 @@ func (m Model) requiredFiletreePaneWidth(height int) int {
 
 func (m Model) renderFiletreePane(width, height int) string {
 	lines := m.visibleStatusLines(height)
-	return m.renderPanelWithBorderTitle(width, height, m.filetreePaneTitle(), m.searchCounterForFiletreePane(), lines, m.focus == focusFiletree, sectionUnstaged)
+	return m.renderFiletreePanelWithBorderTitle(width, height, m.filetreePaneTitle(), m.searchCounterForFiletreePane(), lines, m.focus == focusFiletree)
 }
 
 func (m Model) branchSummaryTitleSuffix() string {

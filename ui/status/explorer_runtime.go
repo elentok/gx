@@ -13,30 +13,14 @@ func (m Model) canSwitchSections() bool {
 	return true
 }
 
-func (m *Model) cycleFrameForward() {
-	if m.focus == focusFiletree {
-		m.focus = focusDiff
-		switch {
-		case m.sectionHasContent(sectionUnstaged):
-			m.section = sectionUnstaged
-		case m.sectionHasContent(sectionStaged):
-			m.section = sectionStaged
-		default:
-			m.pickAvailableSection()
-		}
-		m.syncDiffViewports()
-		m.ensureActiveVisible(m.currentSection())
-		return
+func (m *Model) switchDiffSection() {
+	if m.section == sectionUnstaged {
+		m.section = sectionStaged
+	} else {
+		m.section = sectionUnstaged
 	}
-	if m.canSwitchSections() {
-		if m.section == sectionUnstaged && m.sectionHasContent(sectionStaged) {
-			m.section = sectionStaged
-			m.syncDiffViewports()
-			m.ensureActiveVisible(m.currentSection())
-			return
-		}
-	}
-	m.focus = focusFiletree
+	m.syncDiffViewports()
+	m.ensureActiveVisible(m.currentSection())
 }
 
 func (m *Model) currentSection() *sectionState {

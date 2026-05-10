@@ -11,17 +11,17 @@ import (
 const ansiReset = "\x1b[0m"
 
 type ModalFrameOptions struct {
-	Title         string
-	RightTitle    string
-	Body          string
-	Hint          string
-	Width         int
-	BorderColor   color.Color
-	TitleColor    color.Color
+	Title           string
+	RightTitle      string
+	Body            string
+	Hint            string
+	Width           int
+	BorderColor     color.Color
+	TitleColor      color.Color
 	RightTitleColor color.Color
-	HintColor     color.Color
-	PaddingX      int
-	TitleInBorder bool
+	HintColor       color.Color
+	PaddingX        int
+	TitleInBorder   bool
 }
 
 func RenderModalFrame(opts ModalFrameOptions) string {
@@ -101,6 +101,7 @@ type PanelFrameOptions struct {
 	Lines       []string
 	BorderColor color.Color
 	TitleColor  color.Color
+	TitleBold   bool
 	Background  color.Color
 }
 
@@ -112,6 +113,9 @@ func RenderPanelFrame(opts PanelFrameOptions) string {
 	innerH := opts.Height - 2
 	border := lipgloss.NewStyle().Foreground(opts.BorderColor)
 	titleStyle := lipgloss.NewStyle().Foreground(opts.TitleColor)
+	if opts.TitleBold {
+		titleStyle = titleStyle.Bold(true)
+	}
 	if opts.Background != nil {
 		border = border.Background(opts.Background)
 		titleStyle = titleStyle.Background(opts.Background)

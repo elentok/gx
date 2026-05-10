@@ -9,11 +9,6 @@ import (
 )
 
 func (m Model) handleFiletreeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if msg.Code == tea.KeyTab {
-		m.cycleFrameForward()
-		return m, nil
-	}
-
 	switch msg.String() {
 	case "q":
 		if m.settings.EnableNavigation {
@@ -24,6 +19,12 @@ func (m Model) handleFiletreeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.settings.EnableNavigation {
 			return m, nav.Back()
 		}
+		return m, nil
+	case "l", "right":
+		return m, m.enterDiffFromStatus(false)
+	case "enter":
+		return m, m.enterDiffFromStatus(false)
+	case "h", "left":
 		return m, nil
 	case "[":
 		return m, m.adjustDiffContextLines(-1)
@@ -72,6 +73,15 @@ func (m Model) handleFiletreeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleFocusedChildKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	switch m.focus {
 	case focusFiletree:
+		switch msg.String() {
+		case "h", "left", "l", "right":
+			return m, nil, false
+		case "enter":
+			if m.fileTreeModel.Search().IsActive() {
+				break
+			}
+			return m, nil, false
+		}
 		m.reconcileFileTreeFromStatusState()
 		updatedFileTree, childCmd, handled := m.fileTreeModel.Update(msg)
 		selectionChanged := updatedFileTree.SelectedIndex() != m.fileTreeModel.SelectedIndex()

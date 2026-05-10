@@ -196,7 +196,7 @@ func TestFiletreeLOnFileEntersDiffAndResetsSectionOnFileChange(t *testing.T) {
 	}
 }
 
-func TestTabCyclesFiletreeThenUnstagedThenStaged(t *testing.T) {
+func TestTabSwitchesDiffSectionsOnly(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\ntwo\n")
 	testutil.MustGitExported(t, repo, "add", "a.txt")
@@ -214,24 +214,29 @@ func TestTabCyclesFiletreeThenUnstagedThenStaged(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
 	m = updated.(Model)
-	if m.focus != focusDiff || m.section != sectionUnstaged {
-		t.Fatalf("first tab should focus unstaged diff, got focus=%v section=%v", m.focus, m.section)
+	if m.focus != focusFiletree || m.section != sectionUnstaged {
+		t.Fatalf("tab in filetree should not move focus, got focus=%v section=%v", m.focus, m.section)
 	}
 
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+	m = updated.(Model)
+	if m.focus != focusDiff || m.section != sectionUnstaged {
+		t.Fatalf("l should focus unstaged diff, got focus=%v section=%v", m.focus, m.section)
+	}
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
 	m = updated.(Model)
 	if m.focus != focusDiff || m.section != sectionStaged {
-		t.Fatalf("second tab should focus staged diff, got focus=%v section=%v", m.focus, m.section)
+		t.Fatalf("tab in diff should switch to staged, got focus=%v section=%v", m.focus, m.section)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
 	m = updated.(Model)
-	if m.focus != focusFiletree {
-		t.Fatalf("third tab should return to filetree, got focus=%v", m.focus)
+	if m.focus != focusDiff || m.section != sectionUnstaged {
+		t.Fatalf("second tab in diff should switch back to unstaged, got focus=%v section=%v", m.focus, m.section)
 	}
 }
 
-func TestFiletreeHFocusesParentFolder(t *testing.T) {
+func TestFiletreeHDoesNotMoveFocusOrSelection(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.Mkdir(t, repo+"/ui/status")
 	testutil.WriteFile(t, repo, "ui/status/model.go", "package status\n")
@@ -254,16 +259,19 @@ func TestFiletreeHFocusesParentFolder(t *testing.T) {
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	m = updated.(Model)
-	if cmd == nil {
-		t.Fatalf("expected h to schedule diff reload after focusing parent")
+	if cmd != nil {
+		t.Fatalf("expected h in filetree to be a no-op")
+	}
+	if m.focus != focusFiletree {
+		t.Fatalf("expected h to keep filetree focus")
 	}
 	entry, ok := m.selectedFiletreeEntry()
-	if !ok || entry.Kind != statusEntryDir || entry.Path != "ui/status" {
-		t.Fatalf("expected selection to move to parent dir ui/status, got %+v", entry)
+	if !ok || entry.Kind != statusEntryFile || entry.Path != "ui/status/model.go" {
+		t.Fatalf("expected selection to stay on file, got %+v", entry)
 	}
 }
 
-func TestFiletreeHOnCompressedDirDoesNotFocusHiddenParent(t *testing.T) {
+func TestFiletreeLeftDoesNotMoveCompressedDirSelection(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.Mkdir(t, repo+"/keyboards/iris/keymaps")
 	testutil.WriteFile(t, repo, "keyboards/iris/keymaps/myfile.c", "changed\n")
@@ -277,10 +285,10 @@ func TestFiletreeHOnCompressedDirDoesNotFocusHiddenParent(t *testing.T) {
 		t.Fatalf("expected compressed dir selected by default, got %+v", entry)
 	}
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
 	m = updated.(Model)
 	if cmd != nil {
-		t.Fatalf("expected no diff reload cmd when no visible parent exists")
+		t.Fatalf("expected left in filetree to be a no-op")
 	}
 	entry, ok = m.selectedFiletreeEntry()
 	if !ok || entry.Kind != statusEntryDir || entry.Path != "keyboards/iris/keymaps" {

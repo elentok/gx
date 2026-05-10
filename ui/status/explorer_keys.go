@@ -4,7 +4,7 @@ import tea "charm.land/bubbletea/v2"
 
 func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if msg.Code == tea.KeyTab {
-		m.cycleFrameForward()
+		m.switchDiffSection()
 		return m, nil
 	}
 	switch msg.String() {
