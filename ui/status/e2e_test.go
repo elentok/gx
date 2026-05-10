@@ -518,6 +518,8 @@ func TestStageE2E_UnstageOneLineAfterStagingAll_LineMode(t *testing.T) {
 	// Enter diff view and unstage just one line.
 	tm.Send(keySpecial(tea.KeyEnter))
 	waitForStageText(t, tm, "diff: mode:hunk", stageActionWait)
+	tm.Send(keySpecial(tea.KeyTab))
+	waitForStageText(t, tm, "Staged", stageActionWait)
 	tm.Send(keyRune('a'))
 	waitForStageText(t, tm, "diff: mode:line", stageActionWait)
 	tm.Send(keyRune('j'))

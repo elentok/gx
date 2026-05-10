@@ -145,7 +145,6 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 
 	file := sel.file
 	if file.Path != m.activeFilePath {
-		m.section = sectionUnstaged
 		m.activeFilePath = file.Path
 	}
 	if file.Untracked {
@@ -165,7 +164,6 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 		m.unstaged.colorized = true
 		m.staged = newSectionState()
 		m.diffModelForSectionPtr(sectionStaged).SetData(m.staged.data)
-		m.section = sectionUnstaged
 		m.syncDiffViewports()
 		return nil
 	}
@@ -194,7 +192,6 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 	m.staged.data = m.diffModelForSectionPtr(sectionStaged).Data()
 	m.unstaged.colorized = true
 	m.staged.colorized = true
-	m.pickAvailableSection()
 	m.syncDiffViewports()
 	if m.diffSearchActiveInFocus() {
 		m.recomputeSearchMatches()
@@ -212,7 +209,6 @@ func (m *Model) enterDiffFromStatus(resetSection bool) tea.Cmd {
 	if resetSection {
 		m.section = sectionUnstaged
 	}
-	m.pickAvailableSection()
 	m.syncDiffViewports()
 	m.ensureActiveVisible(m.currentSection())
 	return cmd

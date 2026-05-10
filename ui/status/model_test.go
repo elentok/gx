@@ -148,7 +148,7 @@ func TestQAlwaysQuitsFromDiffFocus(t *testing.T) {
 	}
 }
 
-func TestFiletreeLOnFileEntersDiffAndResetsSectionOnFileChange(t *testing.T) {
+func TestFiletreeLOnFileEntersDiffAndKeepsSectionOnFileChange(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\ntwo\n")
 	testutil.WriteFile(t, repo, "b.txt", "one\ntwo\n")
@@ -191,8 +191,48 @@ func TestFiletreeLOnFileEntersDiffAndResetsSectionOnFileChange(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
-	if m.section != sectionUnstaged {
-		t.Fatalf("expected section reset to unstaged after active file change")
+	if m.section != sectionStaged {
+		t.Fatalf("expected section to remain staged after active file change")
+	}
+}
+
+func TestReloadDiffsForSelection_KeepsSectionForUntrackedFile(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "tracked.txt", "one\n")
+	testutil.MustGitExported(t, repo, "add", "tracked.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+	testutil.WriteFile(t, repo, "untracked.txt", "hello\n")
+
+	m := New(repo)
+	m.ready = true
+	m.width = 100
+	m.height = 20
+	m.focus = focusFiletree
+	m.section = sectionStaged
+
+	found := false
+	for i, entry := range m.statusEntries {
+		if entry.Path == "untracked.txt" {
+			m.setStatusSelection(i)
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected untracked file entry")
+	}
+
+	cmd := m.reloadDiffsForSelection()
+	m = runStatusCmd(t, m, cmd)
+
+	if m.section != sectionStaged {
+		t.Fatalf("expected section to remain staged for untracked file, got %v", m.section)
+	}
+	if len(m.staged.data.Parsed.Hunks) != 0 {
+		t.Fatalf("expected staged section to remain empty for untracked file")
+	}
+	if len(m.unstaged.data.Parsed.Hunks) == 0 {
+		t.Fatalf("expected unstaged diff content for untracked file")
 	}
 }
 
@@ -2160,11 +2200,12 @@ func TestMouseWheelScrollsStagedDiffViewport(t *testing.T) {
 	m.ready = true
 	m.width = 120
 	m.height = 26
-	m.syncDiffViewports()
 	m.focus = focusDiff
+	m.section = sectionStaged
+	m.syncDiffViewports()
 
 	beforeOffset := m.staged.viewport.YOffset()
-	updated, _ := m.Update(tea.MouseWheelMsg{X: 50, Y: 6, Button: tea.MouseWheelDown})
+	updated, _ := m.Update(tea.MouseWheelMsg{X: 50, Y: 12, Button: tea.MouseWheelDown})
 	m = updated.(Model)
 	if m.staged.viewport.YOffset() <= beforeOffset {
 		t.Fatalf("expected staged viewport to scroll down, before=%d after=%d", beforeOffset, m.staged.viewport.YOffset())
@@ -2319,6 +2360,8 @@ func TestLineModeCanUnstageSingleModifiedLine(t *testing.T) {
 
 	// Enter diff view and switch to line mode.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	m = updated.(Model)

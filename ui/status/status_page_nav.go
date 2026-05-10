@@ -50,12 +50,4 @@ func (m *Model) jumpFiletreeBottom() {
 }
 
 func (m *Model) onFiletreeSelectionChanged() {
-	entry, ok := m.selectedFiletreeEntry()
-	if !ok || entry.Kind == statusEntryDir {
-		m.section = sectionUnstaged
-		return
-	}
-	if entry.File.Path != m.activeFilePath {
-		m.section = sectionUnstaged
-	}
 }

@@ -2,13 +2,6 @@ package status
 
 import "github.com/elentok/gx/ui/explorer"
 
-func (m *Model) pickAvailableSection() {
-	sections := m.visibleDiffSections()
-	if len(sections) == 1 {
-		m.section = sections[0]
-	}
-}
-
 func (m Model) canSwitchSections() bool {
 	return true
 }
