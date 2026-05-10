@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.14.0
+
+- Redesign `gx status` with a focused-section layout: one expanded diff section plus always-visible collapsed strips for `Unstaged` and `Staged`
+- Simplify status navigation and focus behavior: `h/l` now moves between filetree and diff, `Tab` switches diff sections, and section choice stays stable across reloads and file changes
+- Improve status visual identity and focus clarity: filetree uses blue focus styling, diff sections keep stable unstaged/staged colors, active pane titles are bold, and filetree row focus is more explicit
+- Keep stage/unstage context in place by removing auto-jumps when a section becomes empty, while keeping destination flash feedback
+- Show selected file paths directly in the expanded diff section title (`Unstaged: …` / `Staged: …`), including renamed-file format (`old -> new`)
+- Fix footer composition with app tabs so right-side hints remain readable: preserve the hint tail (context/mode/help), handle padded footer lines correctly, and use Unicode ellipsis (`…`) for truncation
+- Update `gx log` commit highlighting so diverged local-only commits are styled distinctly instead of sharing normal local-only green
+
 ## v0.13.6
 
 - Complete the status nested-model cleanup: focused-child key routing, per-pane search ownership, and removal of legacy status search-scope adapters
