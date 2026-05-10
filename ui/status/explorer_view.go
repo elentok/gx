@@ -77,13 +77,6 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 			rightTitleText += " · " + s
 		}
 	}
-	if m.flash.active && m.flash.section == section {
-		if rightTitleText == "" {
-			rightTitleText = "moved"
-		} else {
-			rightTitleText += " · moved"
-		}
-	}
 
 	overflowTopMark, overflowBottomMark, overflowBothMark := m.hunkOverflowMarkers()
 
