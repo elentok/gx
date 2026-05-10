@@ -115,6 +115,10 @@ func (m *Model) applySelection() tea.Cmd {
 	reloadCmd := m.reload(file.Path)
 	m.section = from
 	m.ensureActiveVisible(m.currentSection())
+	m.markMovedTarget(sig)
+	if m.flash.active {
+		return tea.Batch(reloadCmd, nextFlashCmd())
+	}
 	return reloadCmd
 }
 
@@ -270,48 +274,35 @@ func (m *Model) openDiscardDiffConfirm() {
 	m.confirmPatchUnidiffZero = unidiffZero
 }
 
-func (m *Model) focusMovedTarget(sig movedTarget) {
+func (m *Model) markMovedTarget(sig movedTarget) {
+	target := sectionUnstaged
 	if sig.fromSection == sectionUnstaged {
-		m.section = sectionStaged
-	} else {
-		m.section = sectionUnstaged
+		target = sectionStaged
 	}
-	var sec *sectionState
-	if m.section == sectionStaged {
-		sec = &m.staged
-	} else {
-		sec = &m.unstaged
-	}
+	sec := m.sectionState(target)
+	m.flash = flashState{active: true, section: target, navMode: sig.navMode, hunk: -1, line: -1, frames: 4}
 
 	if sig.navMode == navHunk {
 		for i := range sec.data.Parsed.Hunks {
 			if sec.data.Parsed.Hunks[i].Header == sig.hunkHeader {
-				sec.data.ActiveHunk = i
-				m.ensureActiveVisible(sec)
-				m.flash = flashState{active: true, section: m.section, navMode: navHunk, hunk: i, frames: 4}
+				m.flash.hunk = i
 				return
 			}
 		}
 		if len(sec.data.Parsed.Hunks) > 0 {
-			sec.data.ActiveHunk = 0
-			m.ensureActiveVisible(sec)
-			m.flash = flashState{active: true, section: m.section, navMode: navHunk, hunk: 0, frames: 4}
+			m.flash.hunk = 0
 		}
 		return
 	}
 
 	for i := range sec.data.Parsed.Changed {
 		if sec.data.Parsed.Changed[i].Text == sig.lineText {
-			sec.data.ActiveLine = i
-			m.ensureActiveVisible(sec)
-			m.flash = flashState{active: true, section: m.section, navMode: navLine, line: i, frames: 4}
+			m.flash.line = i
 			return
 		}
 	}
 	if len(sec.data.Parsed.Changed) > 0 {
-		sec.data.ActiveLine = 0
-		m.ensureActiveVisible(sec)
-		m.flash = flashState{active: true, section: m.section, navMode: navLine, line: 0, frames: 4}
+		m.flash.line = 0
 	}
 }
 

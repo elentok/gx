@@ -1897,6 +1897,34 @@ func TestApplySelection_DoesNotSwitchSectionWhenCurrentSectionBecomesEmpty(t *te
 	}
 }
 
+func TestApplySelection_FlashesDestinationSectionWithoutSwitching(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "README.md", "one\ntwo\n")
+	testutil.CommitAll(t, repo, "baseline")
+	testutil.WriteFile(t, repo, "README.md", "ONE\ntwo\n")
+
+	m := New(repo)
+	m.ready = true
+	m.width = 120
+	m.height = 24
+	m.syncDiffViewports()
+	m.focus = focusDiff
+	m.section = sectionUnstaged
+	m.navMode = navHunk
+
+	_ = m.applySelection()
+
+	if m.section != sectionUnstaged {
+		t.Fatalf("section switched unexpectedly: got=%v", m.section)
+	}
+	if !m.flash.active {
+		t.Fatalf("expected destination flash to be active")
+	}
+	if m.flash.section != sectionStaged {
+		t.Fatalf("expected flash on staged destination, got=%v", m.flash.section)
+	}
+}
+
 func TestCCTriggersCommitCommand(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "changed\n")

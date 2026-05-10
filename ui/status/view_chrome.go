@@ -52,6 +52,7 @@ func (m Model) renderFiletreePanelWithBorderTitle(width, height int, title, righ
 }
 
 func (m Model) renderPanelWithBorderTitle(width, height int, title, rightTitle string, lines []string, active bool, section diffSection) string {
+	highlightMoved := m.flash.active && m.flash.section == section
 	borderColor := ui.ColorSubtle
 	titleColor := ui.ColorOrange
 	if section == sectionStaged {
@@ -75,6 +76,9 @@ func (m Model) renderPanelWithBorderTitle(width, height int, title, rightTitle s
 		borderColor = ui.ColorOrange
 		titleColor = ui.ColorOrange
 	}
+	if highlightMoved {
+		borderColor = titleColor
+	}
 	return ui.RenderPanelFrame(ui.PanelFrameOptions{
 		Width:       width,
 		Height:      height,
@@ -83,7 +87,7 @@ func (m Model) renderPanelWithBorderTitle(width, height int, title, rightTitle s
 		Lines:       lines,
 		BorderColor: borderColor,
 		TitleColor:  titleColor,
-		TitleBold:   active,
+		TitleBold:   active || highlightMoved,
 		Background:  ui.ColorBase,
 	})
 }
