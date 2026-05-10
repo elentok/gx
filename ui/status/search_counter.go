@@ -6,9 +6,9 @@ import (
 	"github.com/elentok/gx/ui"
 )
 
-func (m Model) searchCounterForStatusPane() string {
+func (m Model) searchCounterForFiletreePane() string {
 	search := m.fileTreeModel.Search()
-	if m.focus != focusStatus || !search.HasQuery() || search.MatchesCount() == 0 {
+	if m.focus != focusFiletree || !search.HasQuery() || search.MatchesCount() == 0 {
 		return ""
 	}
 	return m.searchCounterText(search.Cursor(), search.MatchesCount())

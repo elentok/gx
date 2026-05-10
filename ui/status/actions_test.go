@@ -19,7 +19,7 @@ func TestPushKeyOpensSpecificConfirm(t *testing.T) {
 
 	m := New(repo)
 	m.ready = true
-	m.focus = focusStatus
+	m.focus = focusFiletree
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'P', Text: "P", ShiftedCode: 'P'})
 	m = updated.(Model)
@@ -44,7 +44,7 @@ func TestRebaseKeyOpensSpecificConfirm(t *testing.T) {
 
 	m := New(repo)
 	m.ready = true
-	m.focus = focusStatus
+	m.focus = focusFiletree
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'b', Text: "b"})
 	m = updated.(Model)

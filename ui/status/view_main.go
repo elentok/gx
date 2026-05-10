@@ -23,19 +23,19 @@ func (m Model) View() tea.View {
 
 	mainH := m.mainContentHeight()
 
-	statusW, diffW := m.splitWidth()
-	statusH, diffH := m.splitHeight(mainH)
+	filetreeW, diffW := m.splitWidth()
+	filetreeH, diffH := m.splitHeight(mainH)
 
 	var body string
 	if m.diffFullscreen && m.focus == focusDiff {
 		body = m.renderDiffPane(m.width, mainH)
 	} else {
-		statusPanel := m.renderLeftPane(statusW, statusH)
+		filetreePanel := m.renderLeftPane(filetreeW, filetreeH)
 		diffPanel := m.renderDiffPane(diffW, diffH)
 		if m.useStackedLayout() {
-			body = lipgloss.JoinVertical(lipgloss.Left, statusPanel, diffPanel)
+			body = lipgloss.JoinVertical(lipgloss.Left, filetreePanel, diffPanel)
 		} else {
-			body = lipgloss.JoinHorizontal(lipgloss.Top, statusPanel, diffPanel)
+			body = lipgloss.JoinHorizontal(lipgloss.Top, filetreePanel, diffPanel)
 		}
 	}
 
@@ -43,7 +43,7 @@ func (m Model) View() tea.View {
 	out := lipgloss.JoinVertical(lipgloss.Left, body, footer)
 	if m.InputFocused() {
 		overlay := ""
-		if m.focus == focusStatus {
+		if m.focus == focusFiletree {
 			m.fileTreeModel.Search().SetWidth(m.searchOverlayWidth())
 			overlay = m.fileTreeModel.Search().View()
 		} else {

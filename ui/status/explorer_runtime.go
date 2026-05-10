@@ -14,7 +14,7 @@ func (m Model) canSwitchSections() bool {
 }
 
 func (m *Model) cycleFrameForward() {
-	if m.focus == focusStatus {
+	if m.focus == focusFiletree {
 		m.focus = focusDiff
 		switch {
 		case m.sectionHasContent(sectionUnstaged):
@@ -36,7 +36,7 @@ func (m *Model) cycleFrameForward() {
 			return
 		}
 	}
-	m.focus = focusStatus
+	m.focus = focusFiletree
 }
 
 func (m *Model) currentSection() *sectionState {

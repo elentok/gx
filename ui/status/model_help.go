@@ -49,19 +49,19 @@ var (
 	stageKeyRenderMode = key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "render"))
 	stageKeyFullscreen = key.NewBinding(key.WithKeys("f"), key.WithHelp("f", "fullscreen"))
 	stageKeyWrap       = key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "soft wrap"))
-	stageKeyDiffBack   = key.NewBinding(key.WithKeys("esc", "h"), key.WithHelp("esc/h", "back to status"))
+	stageKeyDiffBack   = key.NewBinding(key.WithKeys("esc", "h"), key.WithHelp("esc/h", "back to filetree"))
 )
 
 var keySections = []help.KeySection{
 	help.NewKeySection("Global", stageKeyHelp, stageKeyQuit, stageKeyCommit, stageKeyOutput, stageKeyGoWorktree, stageKeyGoLog, stageKeyGoStatus, stageKeyLog, stageKeyYank, stageKeyPull, stageKeyPush, stageKeyRebase, stageKeyAmend),
 	help.NewKeySection("Search", stageKeySearch, stageKeySearchNext, stageKeySearchPrev),
-	help.NewKeySection("Status", stageKeyUp, stageKeyDown, stageKeyTop, stageKeyBottom, stageKeyPageUp, stageKeyPageDown, stageKeyLeft, stageKeyRight, stageKeyStage, stageKeyDiscard, stageKeyEdit, stageKeyOpenDiff, stageKeyContextDec, stageKeyContextInc, stageKeyRefresh),
+	help.NewKeySection("Filetree", stageKeyUp, stageKeyDown, stageKeyTop, stageKeyBottom, stageKeyPageUp, stageKeyPageDown, stageKeyLeft, stageKeyRight, stageKeyStage, stageKeyDiscard, stageKeyEdit, stageKeyOpenDiff, stageKeyContextDec, stageKeyContextInc, stageKeyRefresh),
 	help.NewKeySection("Diff", stageKeyDiffBack, stageKeyTop, stageKeyBottom, stageKeyPageUp, stageKeyPageDown, stageKeyTab, stageKeyMode, stageKeyVisual, stageKeyUp, stageKeyDown, stageKeyPrevFile, stageKeyNextFile, stageKeyScrollDown, stageKeyScrollUp, stageKeyRenderMode, stageKeyContextDec, stageKeyContextInc, stageKeyStage, stageKeyDiscard, stageKeyEdit, stageKeyFullscreen, stageKeyWrap, stageKeyRefresh),
 }
 
 func (m Model) helpSectionLabel() string {
-	if m.focus == focusStatus {
-		return "status"
+	if m.focus == focusFiletree {
+		return "filetree"
 	}
 	return fmt.Sprintf("diff:%s:%s", m.navModeLabel(), m.renderModeLabel())
 }

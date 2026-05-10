@@ -5,8 +5,8 @@ import "github.com/elentok/gx/ui/explorer"
 type focusPane = explorer.FocusPane
 
 const (
-	focusStatus = explorer.FocusList
-	focusDiff   = explorer.FocusDiff
+	focusFiletree = explorer.FocusList
+	focusDiff     = explorer.FocusDiff
 )
 
 type diffSection = explorer.Section

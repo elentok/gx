@@ -73,14 +73,14 @@ type Model struct {
 }
 
 type statusPageState struct {
-	files          []git.StageFileStatus
-	branchName     string
-	branchBaseRef  string
-	branchSync     git.SyncStatus
-	statusEntries  []statusEntry
-	statusRows     []filetree.Entry[git.StageFileStatus]
-	collapsedDirs  map[string]bool
-	selected       int
+	files         []git.StageFileStatus
+	branchName    string
+	branchBaseRef string
+	branchSync    git.SyncStatus
+	statusEntries []statusEntry
+	statusRows    []filetree.Entry[git.StageFileStatus]
+	collapsedDirs map[string]bool
+	selected      int
 }
 
 type Settings struct {
@@ -137,7 +137,7 @@ func NewModel(worktreeRoot string, settings Settings) Model {
 		diffContextLines: settings.DiffContextLines,
 		help:             help.NewModel(keySections),
 		explorerState: explorerState{
-			focus:      focusStatus,
+			focus:      focusFiletree,
 			section:    sectionUnstaged,
 			navMode:    navHunk,
 			renderMode: renderUnified,

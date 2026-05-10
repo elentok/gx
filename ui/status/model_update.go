@@ -66,7 +66,7 @@ func (m Model) handleFileTreeRebuildRequested() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleFileTreeOpenSelected() (tea.Model, tea.Cmd) {
-	entry, ok := m.selectedStatusEntry()
+	entry, ok := m.selectedFiletreeEntry()
 	if ok && entry.Kind == statusEntryFile {
 		return m, m.enterDiffFromStatus(false)
 	}
@@ -74,7 +74,7 @@ func (m Model) handleFileTreeOpenSelected() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleSearchQueryUpdated(msg search.SearchQueryUpdatedMsg) (Model, tea.Cmd) {
-	if m.focus == focusStatus {
+	if m.focus == focusFiletree {
 		matches := m.computeSearchMatches(msg.Query)
 		return m, m.fileTreeModel.Search().SetMatchesAndJump(matches)
 	}
@@ -135,7 +135,7 @@ func (m Model) handleActionPoll() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleDiffReload(msg diffReloadMsg) (tea.Model, tea.Cmd) {
-	if msg.seq == m.diffReloadSeq && m.focus == focusStatus {
+	if msg.seq == m.diffReloadSeq && m.focus == focusFiletree {
 		return m, m.reloadDiffsForSelection()
 	}
 	return m, nil
@@ -209,8 +209,8 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return handledModel, cmd
 	}
 
-	if m.focus == focusStatus {
-		return m.handleStatusKey(msg)
+	if m.focus == focusFiletree {
+		return m.handleFiletreeKey(msg)
 	}
 	return m.handleDiffKey(msg)
 }

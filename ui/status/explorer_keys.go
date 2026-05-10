@@ -19,10 +19,10 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			sec.data.VisualAnchor = sec.data.ActiveLine
 			return m, nil
 		}
-		m.focus = focusStatus
+		m.focus = focusFiletree
 		return m, nil
 	case "h", "left":
-		m.focus = focusStatus
+		m.focus = focusFiletree
 		return m, nil
 	case "a":
 		sec := m.currentSection()

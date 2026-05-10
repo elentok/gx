@@ -14,56 +14,56 @@ import (
 )
 
 const (
-	minStatusPaneWidth  = 25
-	maxStatusPaneWidth  = 45
-	minDiffPaneWidth    = 60
-	minStatusPaneHeight = 5
+	minFiletreePaneWidth  = 25
+	maxFiletreePaneWidth  = 45
+	minDiffPaneWidth      = 60
+	minFiletreePaneHeight = 5
 )
 
-func (m Model) splitWidth() (statusW, diffW int) {
+func (m Model) splitWidth() (filetreeW, diffW int) {
 	if m.useStackedLayout() {
 		return m.width, m.width
 	}
 
-	statusW = m.requiredStatusPaneWidth(m.mainContentHeight())
-	statusMax := minInt(maxStatusPaneWidth, int(float64(m.width)*0.45))
-	if statusMax < minStatusPaneWidth {
-		statusMax = minStatusPaneWidth
+	filetreeW = m.requiredFiletreePaneWidth(m.mainContentHeight())
+	filetreeMax := minInt(maxFiletreePaneWidth, int(float64(m.width)*0.45))
+	if filetreeMax < minFiletreePaneWidth {
+		filetreeMax = minFiletreePaneWidth
 	}
-	if statusW < minStatusPaneWidth {
-		statusW = minStatusPaneWidth
+	if filetreeW < minFiletreePaneWidth {
+		filetreeW = minFiletreePaneWidth
 	}
-	if statusW > statusMax {
-		statusW = statusMax
+	if filetreeW > filetreeMax {
+		filetreeW = filetreeMax
 	}
-	if m.width-statusW < minDiffPaneWidth {
-		statusW = m.width - minDiffPaneWidth
+	if m.width-filetreeW < minDiffPaneWidth {
+		filetreeW = m.width - minDiffPaneWidth
 	}
-	if statusW < minStatusPaneWidth {
-		statusW = minStatusPaneWidth
+	if filetreeW < minFiletreePaneWidth {
+		filetreeW = minFiletreePaneWidth
 	}
-	diffW = m.width - statusW
+	diffW = m.width - filetreeW
 	if diffW < minDiffPaneWidth {
 		diffW = minDiffPaneWidth
-		statusW = m.width - diffW
+		filetreeW = m.width - diffW
 	}
-	return statusW, diffW
+	return filetreeW, diffW
 }
 
-func (m Model) splitHeight(total int) (statusH, diffH int) {
+func (m Model) splitHeight(total int) (filetreeH, diffH int) {
 	if !m.useStackedLayout() {
 		return total, total
 	}
-	statusH = int(float64(total) * 0.30)
-	if statusH < 5 {
-		statusH = 5
+	filetreeH = int(float64(total) * 0.30)
+	if filetreeH < 5 {
+		filetreeH = 5
 	}
-	diffH = total - statusH
+	diffH = total - filetreeH
 	if diffH < 5 {
 		diffH = 5
-		statusH = total - diffH
+		filetreeH = total - diffH
 	}
-	return statusH, diffH
+	return filetreeH, diffH
 }
 
 func (m Model) useStackedLayout() bool {
@@ -79,11 +79,11 @@ func (m Model) mainContentHeight() int {
 }
 
 func (m Model) renderLeftPane(width, height int) string {
-	return m.renderStatusPane(width, maxInt(minStatusPaneHeight, height))
+	return m.renderFiletreePane(width, maxInt(minFiletreePaneHeight, height))
 }
 
-func (m Model) statusPaneTitle() string {
-	title := "Status"
+func (m Model) filetreePaneTitle() string {
+	title := "Filetree"
 	if summary := m.branchSummaryTitleSuffix(); summary != "" {
 		title += " (" + summary + ")"
 	}
@@ -92,7 +92,7 @@ func (m Model) statusPaneTitle() string {
 
 func (m Model) visibleStatusLines(height int) []string {
 	innerH := maxInt(1, height-2)
-	icons := statusPaneIconsFor(m.settings.UseNerdFontIcons)
+	icons := filetreePaneIconsFor(m.settings.UseNerdFontIcons)
 	rows := explorer.BuildVisibleSidebarRenderableRows(m.statusEntries, m.selected, innerH, func(i int, entry statusEntry) explorer.SidebarRenderableRow {
 		statusColor := statusEntryColor(entry)
 		deleted := entry.Kind == statusEntryFile && isDeletedFileStatus(entry.File)
@@ -125,8 +125,8 @@ func (m Model) visibleStatusLines(height int) []string {
 	return explorer.RenderSidebarRows(rows, innerH, lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render("clean working tree"), ui.ColorOrange)
 }
 
-func (m Model) requiredStatusPaneWidth(height int) int {
-	required := ansi.StringWidth(" " + m.statusPaneTitle() + " ")
+func (m Model) requiredFiletreePaneWidth(height int) int {
+	required := ansi.StringWidth(" " + m.filetreePaneTitle() + " ")
 	for _, line := range m.visibleStatusLines(height) {
 		if w := ansi.StringWidth(line); w > required {
 			required = w
@@ -135,9 +135,9 @@ func (m Model) requiredStatusPaneWidth(height int) int {
 	return required + 2
 }
 
-func (m Model) renderStatusPane(width, height int) string {
+func (m Model) renderFiletreePane(width, height int) string {
 	lines := m.visibleStatusLines(height)
-	return m.renderPanelWithBorderTitle(width, height, m.statusPaneTitle(), m.searchCounterForStatusPane(), lines, m.focus == focusStatus, sectionUnstaged)
+	return m.renderPanelWithBorderTitle(width, height, m.filetreePaneTitle(), m.searchCounterForFiletreePane(), lines, m.focus == focusFiletree, sectionUnstaged)
 }
 
 func (m Model) branchSummaryTitleSuffix() string {

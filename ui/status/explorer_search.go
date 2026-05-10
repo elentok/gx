@@ -12,7 +12,7 @@ import (
 )
 
 func (m Model) InputFocused() bool {
-	if m.focus == focusStatus {
+	if m.focus == focusFiletree {
 		return m.fileTreeModel.Search().Mode() == search.SearchModeInput
 	}
 	return m.currentDiffSearch().Mode() == search.SearchModeInput
@@ -27,9 +27,9 @@ func (m *Model) computeSearchMatches(query string) []search.Match {
 
 	var matches []search.Match
 
-	if m.focus == focusStatus {
+	if m.focus == focusFiletree {
 		for i, entry := range m.fileTreeModel.Entries() {
-			text := strings.ToLower(m.statusFileTreeEntrySearchText(entry))
+			text := strings.ToLower(m.filetreeEntrySearchText(entry))
 			if strings.Contains(text, q) {
 				matches = append(matches, search.Match{Index: i})
 			}
@@ -59,10 +59,10 @@ func (m *Model) diffSearchActiveInFocus() bool {
 
 func (m Model) handleJumpToMatch(msg search.JumpToMatchMsg) (Model, tea.Cmd) {
 	match := msg.Match
-	if m.focus == focusStatus {
+	if m.focus == focusFiletree {
 		if match.Index >= 0 && match.Index < len(m.fileTreeModel.Entries()) {
 			m.setStatusSelection(match.Index)
-			m.onStatusSelectionChanged()
+			m.onFiletreeSelectionChanged()
 			return m, m.scheduleDiffReload()
 		}
 		return m, nil
@@ -117,7 +117,7 @@ func (m *Model) diffSearchForSection(section diffSection) *search.Model {
 	return m.unstagedDiffModel.Search()
 }
 
-func (m Model) statusFileTreeEntrySearchText(entry filetree.Entry[git.StageFileStatus]) string {
+func (m Model) filetreeEntrySearchText(entry filetree.Entry[git.StageFileStatus]) string {
 	name := entry.DisplayName
 	if entry.Kind == filetree.EntryFile && entry.Value.IsRenamed() && entry.Value.RenameFrom != "" {
 		name = entry.Value.RenameFrom + " -> " + entry.Path
@@ -140,7 +140,7 @@ func (m Model) searchOverlayWidth() int {
 
 func (m Model) searchMatchStatusIndex(idx int) bool {
 	search := m.fileTreeModel.Search()
-	if m.focus != focusStatus || !search.HasQuery() {
+	if m.focus != focusFiletree || !search.HasQuery() {
 		return false
 	}
 	for _, match := range search.Matches() {

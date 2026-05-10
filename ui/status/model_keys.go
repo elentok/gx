@@ -57,7 +57,7 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		case "g":
 			m.jumpToTop()
 			m.clearStatus()
-			if m.focus == focusStatus {
+			if m.focus == focusFiletree {
 				return m, m.scheduleDiffReload(), true
 			}
 			return m, nil, true
@@ -105,7 +105,7 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	if isUpperG {
 		m.keyPrefix = ""
 		m.jumpToBottom()
-		if m.focus == focusStatus {
+		if m.focus == focusFiletree {
 			return m, m.scheduleDiffReload(), true
 		}
 		return m, nil, true

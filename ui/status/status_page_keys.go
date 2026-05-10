@@ -8,7 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleFiletreeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if msg.Code == tea.KeyTab {
 		m.cycleFrameForward()
 		return m, nil
@@ -52,11 +52,11 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.showGitError(err)
 		}
 	case "ctrl+d":
-		if m.scrollStatusPage(1) {
+		if m.scrollFiletreePage(1) {
 			return m, m.scheduleDiffReload()
 		}
 	case "ctrl+u":
-		if m.scrollStatusPage(-1) {
+		if m.scrollFiletreePage(-1) {
 			return m, m.scheduleDiffReload()
 		}
 	case "space", " ":
@@ -71,7 +71,7 @@ func (m Model) handleStatusKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleFocusedChildKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	switch m.focus {
-	case focusStatus:
+	case focusFiletree:
 		m.reconcileFileTreeFromStatusState()
 		updatedFileTree, childCmd, handled := m.fileTreeModel.Update(msg)
 		selectionChanged := updatedFileTree.SelectedIndex() != m.fileTreeModel.SelectedIndex()
@@ -81,7 +81,7 @@ func (m Model) handleFocusedChildKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, b
 		}
 		if selectionChanged {
 			m.selected = m.fileTreeModel.SelectedIndex()
-			m.onStatusSelectionChanged()
+			m.onFiletreeSelectionChanged()
 		}
 		if childCmd != nil {
 			if handledModel, handledCmd, handled := m.handleFileTreeChildMsg(childCmd()); handled {

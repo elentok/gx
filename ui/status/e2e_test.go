@@ -501,7 +501,7 @@ func TestStageE2E_UnstageOneLineAfterStagingAll_LineMode(t *testing.T) {
 	tm := startStageTUI(t, repoDir)
 	waitForStageText(t, tm, path, stageLoadWait)
 
-	// Stage everything from status view first.
+	// Stage everything from the filetree view first.
 	tm.Send(keyRune(' '))
 	waitForGitState(t, tm, stageActionWait, func() bool {
 		staged, unstaged := stagedAndUnstagedDiff(t, repoDir, path)
@@ -559,7 +559,7 @@ func TestStageE2E_PushActionWithConfirm(t *testing.T) {
 	mustRunGit(t, repoDir, "commit", "-m", "push commit")
 
 	tm := startStageTUI(t, repoDir)
-	waitForStageText(t, tm, "Status", stageLoadWait)
+	waitForStageText(t, tm, "Filetree", stageLoadWait)
 
 	tm.Send(keyRune('P'))
 	waitForStageText(t, tm, "Push branch feature/push to origin?", stageActionWait)
@@ -588,7 +588,7 @@ func TestStageE2E_PullActionUpdatesWorktree(t *testing.T) {
 	mustRunGit(t, other, "push", "origin", "main")
 
 	tm := startStageTUI(t, repoDir)
-	waitForStageText(t, tm, "Status", stageLoadWait)
+	waitForStageText(t, tm, "Filetree", stageLoadWait)
 	tm.Send(keyRune('p'))
 
 	waitForGitState(t, tm, stageLoadWait, func() bool {
@@ -618,7 +618,7 @@ func TestStageE2E_RebaseActionWithConfirm(t *testing.T) {
 	mustRunGit(t, other, "push", "origin", "master")
 
 	tm := startStageTUI(t, repoDir)
-	waitForStageText(t, tm, "Status", stageLoadWait)
+	waitForStageText(t, tm, "Filetree", stageLoadWait)
 	tm.Send(keyRune('b'))
 	waitForStageText(t, tm, "Rebase branch feature/rebase on origin/master?", stageActionWait)
 	tm.Send(keyRune('y'))
@@ -671,7 +671,7 @@ func TestStageE2E_SideBySideShowsActiveHunkGutterIndicator(t *testing.T) {
 	quitStage(t, tm)
 }
 
-func TestStageE2E_StatusSearchKeepsHighlightsAfterEnter(t *testing.T) {
+func TestStageE2E_FiletreeSearchKeepsHighlightsAfterEnter(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	testutil.WriteFile(t, repoDir, "apple.txt", "one\n")
 	testutil.WriteFile(t, repoDir, "apricot.txt", "two\n")
@@ -684,7 +684,7 @@ func TestStageE2E_StatusSearchKeepsHighlightsAfterEnter(t *testing.T) {
 	tm.Send(keyRune('p'))
 	waitForStageText(t, tm, "Search", stageActionWait)
 	tm.Send(keySpecial(tea.KeyEnter))
-	waitForStageText(t, tm, "status · ? help", stageActionWait)
+	waitForStageText(t, tm, "filetree · ? help", stageActionWait)
 	tm.Send(keyRune('n'))
 	tm.Send(keyRune('/'))
 	tm.Send(keySpecial(tea.KeyEsc))

@@ -53,11 +53,11 @@ func (m Model) diffRect(mainH int) (x, y, w, h int, ok bool) {
 		return 0, 0, m.width, mainH, true
 	}
 	if m.useStackedLayout() {
-		statusH, diffH := m.splitHeight(mainH)
-		return 0, statusH, m.width, diffH, true
+		filetreeH, diffH := m.splitHeight(mainH)
+		return 0, filetreeH, m.width, diffH, true
 	}
-	statusW, diffW := m.splitWidth()
-	return statusW, 0, diffW, mainH, true
+	filetreeW, diffW := m.splitWidth()
+	return filetreeW, 0, diffW, mainH, true
 }
 
 func (m *Model) mouseTargetSection(relY, diffH int) *sectionState {

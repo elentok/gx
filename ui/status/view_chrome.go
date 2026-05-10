@@ -53,7 +53,7 @@ func (m Model) renderPanelWithBorderTitle(width, height int, title, rightTitle s
 	})
 }
 
-type statusPaneIcons struct {
+type filetreePaneIcons struct {
 	folderClosed string
 	folderOpen   string
 	fileModified string
@@ -65,9 +65,9 @@ type statusPaneIcons struct {
 	staged       string
 }
 
-func statusPaneIconsFor(useNerdFontIcons bool) statusPaneIcons {
+func filetreePaneIconsFor(useNerdFontIcons bool) filetreePaneIcons {
 	shared := ui.Icons(useNerdFontIcons)
-	return statusPaneIcons{
+	return filetreePaneIcons{
 		folderClosed: shared.FolderClosed,
 		folderOpen:   shared.FolderOpen,
 		fileModified: shared.FileModified,
@@ -96,7 +96,7 @@ func statusEntryColor(entry statusEntry) string {
 	return "#cdd6f4"
 }
 
-func statusEntryMeta(entry statusEntry, useNerdFontIcons bool, icons statusPaneIcons) string {
+func statusEntryMeta(entry statusEntry, useNerdFontIcons bool, icons filetreePaneIcons) string {
 	if entry.HasStaged && entry.HasUnstaged {
 		return icons.partial
 	}
@@ -112,7 +112,7 @@ func statusEntryMeta(entry statusEntry, useNerdFontIcons bool, icons statusPaneI
 	return entry.File.XY()
 }
 
-func statusFileIcon(file git.StageFileStatus, isSymlink bool, icons statusPaneIcons) string {
+func statusFileIcon(file git.StageFileStatus, isSymlink bool, icons filetreePaneIcons) string {
 	if isDeletedFileStatus(file) {
 		return icons.fileDeleted
 	}

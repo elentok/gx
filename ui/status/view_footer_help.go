@@ -11,7 +11,7 @@ import (
 )
 
 func (m Model) helpLine() string {
-	if m.focus == focusStatus {
+	if m.focus == focusFiletree {
 		hint := m.diffContextLabel() + " · " + m.helpSectionLabel()
 		if t := m.terminalLabel(); t != "" {
 			hint += " · " + t

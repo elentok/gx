@@ -29,18 +29,18 @@ func TestUseStackedLayoutThreshold(t *testing.T) {
 	}
 }
 
-func TestSplitWidthUsesMinimumStatusPaneWidthForShortContent(t *testing.T) {
+func TestSplitWidthUsesMinimumFiletreePaneWidthForShortContent(t *testing.T) {
 	m := Model{width: 160}
-	statusW, diffW := m.splitWidth()
-	if statusW != minStatusPaneWidth {
-		t.Fatalf("expected minimum status width %d, got %d", minStatusPaneWidth, statusW)
+	filetreeW, diffW := m.splitWidth()
+	if filetreeW != minFiletreePaneWidth {
+		t.Fatalf("expected minimum filetree width %d, got %d", minFiletreePaneWidth, filetreeW)
 	}
-	if diffW != 160-minStatusPaneWidth {
-		t.Fatalf("expected diff width %d, got %d", 160-minStatusPaneWidth, diffW)
+	if diffW != 160-minFiletreePaneWidth {
+		t.Fatalf("expected diff width %d, got %d", 160-minFiletreePaneWidth, diffW)
 	}
 }
 
-func TestSplitWidthExpandsForLongVisibleStatusRows(t *testing.T) {
+func TestSplitWidthExpandsForLongVisibleFiletreeRows(t *testing.T) {
 	m := Model{
 		width: 180,
 		statusPageState: statusPageState{
@@ -58,20 +58,20 @@ func TestSplitWidthExpandsForLongVisibleStatusRows(t *testing.T) {
 		},
 	}
 
-	statusW, diffW := m.splitWidth()
-	if statusW <= minStatusPaneWidth {
-		t.Fatalf("expected status pane to grow past minimum width, got %d", statusW)
+	filetreeW, diffW := m.splitWidth()
+	if filetreeW <= minFiletreePaneWidth {
+		t.Fatalf("expected filetree pane to grow past minimum width, got %d", filetreeW)
 	}
-	if diffW >= 180-minStatusPaneWidth {
-		t.Fatalf("expected diff pane to shrink when status pane grows, got %d", diffW)
+	if diffW >= 180-minFiletreePaneWidth {
+		t.Fatalf("expected diff pane to shrink when filetree pane grows, got %d", diffW)
 	}
-	pane := ansi.Strip(m.renderStatusPane(statusW, 10))
+	pane := ansi.Strip(m.renderFiletreePane(filetreeW, 10))
 	if !strings.Contains(pane, "old/name.go -> new/renamed.go") {
 		t.Fatalf("expected full renamed path to fit without truncation, got:\n%s", pane)
 	}
 }
 
-func TestSplitWidthHonorsMaximumStatusPaneWidth(t *testing.T) {
+func TestSplitWidthHonorsMaximumFiletreePaneWidth(t *testing.T) {
 	m := Model{
 		width: 200,
 		statusPageState: statusPageState{
@@ -81,13 +81,13 @@ func TestSplitWidthHonorsMaximumStatusPaneWidth(t *testing.T) {
 		},
 	}
 
-	statusW, diffW := m.splitWidth()
-	fmt.Printf("statusW: %d", statusW)
-	if statusW != maxStatusPaneWidth {
-		t.Fatalf("expected status pane max width %d, got %d", maxStatusPaneWidth, statusW)
+	filetreeW, diffW := m.splitWidth()
+	fmt.Printf("filetreeW: %d", filetreeW)
+	if filetreeW != maxFiletreePaneWidth {
+		t.Fatalf("expected filetree pane max width %d, got %d", maxFiletreePaneWidth, filetreeW)
 	}
-	if diffW != 200-maxStatusPaneWidth {
-		t.Fatalf("expected diff width %d, got %d", 200-maxStatusPaneWidth, diffW)
+	if diffW != 200-maxFiletreePaneWidth {
+		t.Fatalf("expected diff width %d, got %d", 200-maxFiletreePaneWidth, diffW)
 	}
 }
 
@@ -101,12 +101,12 @@ func TestSplitWidthPreservesMinimumDiffWidth(t *testing.T) {
 		},
 	}
 
-	statusW, diffW := m.splitWidth()
+	filetreeW, diffW := m.splitWidth()
 	if diffW != minDiffPaneWidth {
 		t.Fatalf("expected minimum diff width %d, got %d", minDiffPaneWidth, diffW)
 	}
-	if statusW != 101-minDiffPaneWidth {
-		t.Fatalf("expected status width %d, got %d", 101-minDiffPaneWidth, statusW)
+	if filetreeW != 101-minDiffPaneWidth {
+		t.Fatalf("expected filetree width %d, got %d", 101-minDiffPaneWidth, filetreeW)
 	}
 }
 
@@ -123,14 +123,14 @@ func TestQAndEscFocusBehavior(t *testing.T) {
 		t.Fatalf("expected nil cmd on esc")
 	}
 	m2 := updated.(Model)
-	if m2.focus != focusStatus {
-		t.Fatalf("esc should move focus to status")
+	if m2.focus != focusFiletree {
+		t.Fatalf("esc should move focus to filetree")
 	}
 
-	m2.focus = focusStatus
+	m2.focus = focusFiletree
 	updated, cmd = m2.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
 	if cmd == nil {
-		t.Fatalf("q in status should quit")
+		t.Fatalf("q in filetree should quit")
 	}
 }
 
@@ -148,7 +148,7 @@ func TestQAlwaysQuitsFromDiffFocus(t *testing.T) {
 	}
 }
 
-func TestStatusLOnFileEntersDiffAndResetsSectionOnFileChange(t *testing.T) {
+func TestFiletreeLOnFileEntersDiffAndResetsSectionOnFileChange(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\ntwo\n")
 	testutil.WriteFile(t, repo, "b.txt", "one\ntwo\n")
@@ -167,7 +167,7 @@ func TestStatusLOnFileEntersDiffAndResetsSectionOnFileChange(t *testing.T) {
 	m.ready = true
 	m.width = 100
 	m.height = 20
-	m.focus = focusStatus
+	m.focus = focusFiletree
 	m.section = sectionStaged
 
 	if len(m.statusEntries) < 2 {
@@ -185,8 +185,8 @@ func TestStatusLOnFileEntersDiffAndResetsSectionOnFileChange(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	m = updated.(Model)
-	if m.focus != focusStatus {
-		t.Fatalf("expected h in diff to return to status")
+	if m.focus != focusFiletree {
+		t.Fatalf("expected h in diff to return to filetree")
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
@@ -196,7 +196,7 @@ func TestStatusLOnFileEntersDiffAndResetsSectionOnFileChange(t *testing.T) {
 	}
 }
 
-func TestTabCyclesStatusThenUnstagedThenStaged(t *testing.T) {
+func TestTabCyclesFiletreeThenUnstagedThenStaged(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\ntwo\n")
 	testutil.MustGitExported(t, repo, "add", "a.txt")
@@ -209,7 +209,7 @@ func TestTabCyclesStatusThenUnstagedThenStaged(t *testing.T) {
 
 	m := New(repo)
 	m.ready = true
-	m.focus = focusStatus
+	m.focus = focusFiletree
 	m.section = sectionUnstaged
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
@@ -226,19 +226,19 @@ func TestTabCyclesStatusThenUnstagedThenStaged(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
 	m = updated.(Model)
-	if m.focus != focusStatus {
-		t.Fatalf("third tab should return to status, got focus=%v", m.focus)
+	if m.focus != focusFiletree {
+		t.Fatalf("third tab should return to filetree, got focus=%v", m.focus)
 	}
 }
 
-func TestStatusHFocusesParentFolder(t *testing.T) {
+func TestFiletreeHFocusesParentFolder(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.Mkdir(t, repo+"/ui/status")
 	testutil.WriteFile(t, repo, "ui/status/model.go", "package status\n")
 
 	m := New(repo)
 	m.ready = true
-	m.focus = focusStatus
+	m.focus = focusFiletree
 
 	fileIdx := -1
 	for i, entry := range m.statusEntries {
@@ -257,22 +257,22 @@ func TestStatusHFocusesParentFolder(t *testing.T) {
 	if cmd == nil {
 		t.Fatalf("expected h to schedule diff reload after focusing parent")
 	}
-	entry, ok := m.selectedStatusEntry()
+	entry, ok := m.selectedFiletreeEntry()
 	if !ok || entry.Kind != statusEntryDir || entry.Path != "ui/status" {
 		t.Fatalf("expected selection to move to parent dir ui/status, got %+v", entry)
 	}
 }
 
-func TestStatusHOnCompressedDirDoesNotFocusHiddenParent(t *testing.T) {
+func TestFiletreeHOnCompressedDirDoesNotFocusHiddenParent(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.Mkdir(t, repo+"/keyboards/iris/keymaps")
 	testutil.WriteFile(t, repo, "keyboards/iris/keymaps/myfile.c", "changed\n")
 
 	m := New(repo)
 	m.ready = true
-	m.focus = focusStatus
+	m.focus = focusFiletree
 
-	entry, ok := m.selectedStatusEntry()
+	entry, ok := m.selectedFiletreeEntry()
 	if !ok || entry.Kind != statusEntryDir || entry.Path != "keyboards/iris/keymaps" {
 		t.Fatalf("expected compressed dir selected by default, got %+v", entry)
 	}
@@ -282,7 +282,7 @@ func TestStatusHOnCompressedDirDoesNotFocusHiddenParent(t *testing.T) {
 	if cmd != nil {
 		t.Fatalf("expected no diff reload cmd when no visible parent exists")
 	}
-	entry, ok = m.selectedStatusEntry()
+	entry, ok = m.selectedFiletreeEntry()
 	if !ok || entry.Kind != statusEntryDir || entry.Path != "keyboards/iris/keymaps" {
 		t.Fatalf("expected selection to stay on compressed dir, got %+v", entry)
 	}
@@ -296,7 +296,7 @@ func TestHelpOverlayToggleAndCompactStatusBar(t *testing.T) {
 	m.ready = true
 	m.width = 120
 	m.height = 40
-	m.focus = focusStatus
+	m.focus = focusFiletree
 
 	line := m.helpLine()
 	if !strings.Contains(line, "? help") || strings.Contains(line, "j/k") {
@@ -328,7 +328,7 @@ func TestHelpLineRightAlignsHintAndTruncatesStatus(t *testing.T) {
 	m := New(testutil.TempRepo(t))
 	m.ready = true
 	m.width = 48
-	m.focus = focusStatus
+	m.focus = focusFiletree
 	m.statusMsg = "this is a very long status message that should truncate"
 
 	line := m.helpLine()
@@ -340,12 +340,12 @@ func TestHelpLineRightAlignsHintAndTruncatesStatus(t *testing.T) {
 	if !strings.Contains(plain, "...") {
 		t.Fatalf("expected truncated status with ellipsis, got %q", plain)
 	}
-	if !strings.HasSuffix(plain, "· 󰉸 context: 1 · status · ? help") {
+	if !strings.HasSuffix(plain, "· 󰉸 context: 1 · filetree · ? help") {
 		t.Fatalf("expected hint right-aligned at end, got %q", plain)
 	}
 }
 
-func TestStatusPaneShowsBranchSummaryInTitle(t *testing.T) {
+func TestFiletreePaneShowsBranchSummaryInTitle(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	m := New(repo)
 	m.ready = true
@@ -355,9 +355,9 @@ func TestStatusPaneShowsBranchSummaryInTitle(t *testing.T) {
 	m.branchBaseRef = "origin/main"
 	m.branchSync = git.SyncStatus{Name: git.StatusAhead, Ahead: 2}
 
-	pane := ansi.Strip(m.renderStatusPane(72, 10))
-	if !strings.Contains(pane, "Status (") {
-		t.Fatalf("expected branch summary in status title, got:\n%s", pane)
+	pane := ansi.Strip(m.renderFiletreePane(72, 10))
+	if !strings.Contains(pane, "Filetree (") {
+		t.Fatalf("expected branch summary in filetree title, got:\n%s", pane)
 	}
 	if !strings.Contains(pane, "feature/test") {
 		t.Fatalf("expected branch summary to include branch name, got:\n%s", pane)
@@ -370,7 +370,7 @@ func TestStatusPaneShowsBranchSummaryInTitle(t *testing.T) {
 	}
 }
 
-func TestNewWithInitialPathSelectsFileAndKeepsStatusFocus(t *testing.T) {
+func TestNewWithInitialPathSelectsFileAndKeepsFiletreeFocus(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.Mkdir(t, repo+"/dir")
 	testutil.WriteFile(t, repo, "dir/a.txt", "one\n")
@@ -382,15 +382,15 @@ func TestNewWithInitialPathSelectsFileAndKeepsStatusFocus(t *testing.T) {
 		InitialPath:      "dir/b.txt",
 	})
 
-	entry, ok := m.selectedStatusEntry()
+	entry, ok := m.selectedFiletreeEntry()
 	if !ok {
 		t.Fatal("expected selected entry")
 	}
 	if entry.Kind != statusEntryFile || entry.Path != "dir/b.txt" {
 		t.Fatalf("selected entry = %+v, want file dir/b.txt", entry)
 	}
-	if m.focus != focusStatus {
-		t.Fatalf("focus = %v, want %v", m.focus, focusStatus)
+	if m.focus != focusFiletree {
+		t.Fatalf("focus = %v, want %v", m.focus, focusFiletree)
 	}
 	if m.activeFilePath != "dir/b.txt" {
 		t.Fatalf("activeFilePath = %q, want %q", m.activeFilePath, "dir/b.txt")
@@ -503,7 +503,7 @@ func TestToggleSideBySideModeWithS(t *testing.T) {
 	}
 }
 
-func TestToggleSideBySideModeWithSFromStatusPane(t *testing.T) {
+func TestToggleSideBySideModeWithSFromFiletreePane(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "status-s.txt", "one\n")
 	testutil.MustGitExported(t, repo, "add", "status-s.txt")
@@ -512,12 +512,12 @@ func TestToggleSideBySideModeWithSFromStatusPane(t *testing.T) {
 
 	m := New(repo)
 	m.ready = true
-	m.focus = focusStatus
+	m.focus = focusFiletree
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
 	m = updated.(Model)
 	if m.renderMode != renderSideBySide {
-		t.Fatalf("expected render mode side-by-side from status pane, got %v", m.renderMode)
+		t.Fatalf("expected render mode side-by-side from filetree pane, got %v", m.renderMode)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
@@ -649,7 +649,7 @@ func TestAdjustDiffContextLinesIsSessionOnly(t *testing.T) {
 
 	m := NewModel(repo, Settings{DiffContextLines: 3, UseNerdFontIcons: true})
 	m.ready = true
-	m.focus = focusStatus
+	m.focus = focusFiletree
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '[', Text: "["})
 	m = updated.(Model)
@@ -804,7 +804,7 @@ func TestViewEnablesReportFocus(t *testing.T) {
 	}
 }
 
-func TestFullscreenDiffHidesStatusPane(t *testing.T) {
+func TestFullscreenDiffHidesFiletreePane(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 
@@ -817,8 +817,8 @@ func TestFullscreenDiffHidesStatusPane(t *testing.T) {
 
 	v := m.View()
 	plain := ansi.Strip(v.Content)
-	if strings.Contains(plain, "Status") {
-		t.Fatalf("expected status pane hidden in fullscreen diff view")
+	if strings.Contains(plain, "Filetree") {
+		t.Fatalf("expected filetree pane hidden in fullscreen diff view")
 	}
 }
 
@@ -846,13 +846,13 @@ func TestSpaceStagesSingleLineInLineMode(t *testing.T) {
 	}
 }
 
-func TestStatusSpaceTogglesWholeFile(t *testing.T) {
+func TestFiletreeSpaceTogglesWholeFile(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "changed\n")
 
 	m := New(repo)
 	m.ready = true
-	m.focus = focusStatus
+	m.focus = focusFiletree
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	m = updated.(Model)
@@ -862,7 +862,7 @@ func TestStatusSpaceTogglesWholeFile(t *testing.T) {
 		t.Fatalf("DiffPath cached: %v", err)
 	}
 	if staged == "" {
-		t.Fatalf("expected file to be staged by status space")
+		t.Fatalf("expected file to be staged by filetree space")
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
@@ -873,17 +873,17 @@ func TestStatusSpaceTogglesWholeFile(t *testing.T) {
 		t.Fatalf("DiffPath cached after unstage: %v", err)
 	}
 	if staged != "" {
-		t.Fatalf("expected file to be unstaged by second status space")
+		t.Fatalf("expected file to be unstaged by second filetree space")
 	}
 }
 
-func TestStatusDDiscardsUntrackedFileAfterConfirm(t *testing.T) {
+func TestFiletreeDDiscardsUntrackedFileAfterConfirm(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "new.txt", "new\n")
 
 	m := New(repo)
 	m.ready = true
-	m.focus = focusStatus
+	m.focus = focusFiletree
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	m = updated.(Model)
@@ -964,7 +964,7 @@ func TestDiffStagedDUnstagesSelectionWithoutConfirm(t *testing.T) {
 	}
 }
 
-func TestYankFilenameWithYFInStatusView(t *testing.T) {
+func TestYankFilenameWithYFInFiletreeView(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 
@@ -978,7 +978,7 @@ func TestYankFilenameWithYFInStatusView(t *testing.T) {
 
 	m := New(repo)
 	m.ready = true
-	m.focus = focusStatus
+	m.focus = focusFiletree
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
 	m = updated.(Model)
@@ -990,7 +990,7 @@ func TestYankFilenameWithYFInStatusView(t *testing.T) {
 	}
 }
 
-func TestYankLocationWithYLInStatusViewYanksFilenameOnly(t *testing.T) {
+func TestYankLocationWithYLInFiletreeViewYanksFilenameOnly(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "b.txt", "one\n")
 
@@ -1004,7 +1004,7 @@ func TestYankLocationWithYLInStatusViewYanksFilenameOnly(t *testing.T) {
 
 	m := New(repo)
 	m.ready = true
-	m.focus = focusStatus
+	m.focus = focusFiletree
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
 	m = updated.(Model)
@@ -1012,7 +1012,7 @@ func TestYankLocationWithYLInStatusViewYanksFilenameOnly(t *testing.T) {
 	m = updated.(Model)
 
 	if got != "@b.txt" {
-		t.Fatalf("expected yl in status to yank filename only, got %q", got)
+		t.Fatalf("expected yl in filetree to yank filename only, got %q", got)
 	}
 }
 
@@ -1303,7 +1303,7 @@ func TestHunkOverflowViewportMarkers(t *testing.T) {
 	assertMarkers(false, "↑", "↓")
 }
 
-func TestGInStatusAndDiffJumpsBottom(t *testing.T) {
+func TestGInFiletreeAndDiffJumpsBottom(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 	testutil.WriteFile(t, repo, "b.txt", "two\n")
@@ -1311,13 +1311,13 @@ func TestGInStatusAndDiffJumpsBottom(t *testing.T) {
 
 	m := New(repo)
 	m.ready = true
-	m.focus = focusStatus
+	m.focus = focusFiletree
 	m.selected = 0
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	m = updated.(Model)
 	if m.selected != len(m.statusEntries)-1 {
-		t.Fatalf("expected G to jump status selection to bottom, got %d", m.selected)
+		t.Fatalf("expected G to jump filetree selection to bottom, got %d", m.selected)
 	}
 
 	m.focus = focusDiff
@@ -1342,7 +1342,7 @@ func TestUppercaseGUsingShiftedCodeJumpsBottom(t *testing.T) {
 
 	m := New(repo)
 	m.ready = true
-	m.focus = focusStatus
+	m.focus = focusFiletree
 	m.selected = 0
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "G", ShiftedCode: 'G'})
@@ -1359,7 +1359,7 @@ func TestUppercaseGUsingShiftModifierJumpsBottom(t *testing.T) {
 
 	m := New(repo)
 	m.ready = true
-	m.focus = focusStatus
+	m.focus = focusFiletree
 	m.selected = 0
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g", Mod: tea.ModShift})
@@ -1406,7 +1406,7 @@ func TestGInDiffHunkModeJumpsViewportToBottom(t *testing.T) {
 	}
 }
 
-func TestCtrlDAndCtrlUScrollStatusAndDiff(t *testing.T) {
+func TestCtrlDAndCtrlUScrollFiletreeAndDiff(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	for i := 0; i < 16; i++ {
 		testutil.WriteFile(t, repo, fmt.Sprintf("f%02d.txt", i), "x\n")
@@ -1416,20 +1416,20 @@ func TestCtrlDAndCtrlUScrollStatusAndDiff(t *testing.T) {
 	m.ready = true
 	m.width = 120
 	m.height = 24
-	m.focus = focusStatus
+	m.focus = focusFiletree
 	beforeSel := m.selected
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	m = updated.(Model)
 	if m.selected <= beforeSel {
-		t.Fatalf("expected ctrl+d to move status selection down")
+		t.Fatalf("expected ctrl+d to move filetree selection down")
 	}
 
 	midSel := m.selected
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	m = updated.(Model)
 	if m.selected >= midSel {
-		t.Fatalf("expected ctrl+u to move status selection up")
+		t.Fatalf("expected ctrl+u to move filetree selection up")
 	}
 
 	m.focus = focusDiff
@@ -1454,12 +1454,12 @@ func TestCtrlDAndCtrlUScrollStatusAndDiff(t *testing.T) {
 func TestStatusFileIconDeletedAndFallback(t *testing.T) {
 	deleted := git.StageFileStatus{Path: "gone.txt", WorktreeCode: 'D'}
 
-	nerd := statusPaneIconsFor(true)
+	nerd := filetreePaneIconsFor(true)
 	if got := statusFileIcon(deleted, false, nerd); got != "" {
 		t.Fatalf("expected deleted nerd icon, got %q", got)
 	}
 
-	plain := statusPaneIconsFor(false)
+	plain := filetreePaneIconsFor(false)
 	if got := statusFileIcon(deleted, false, plain); got != "D" {
 		t.Fatalf("expected deleted fallback icon, got %q", got)
 	}
@@ -1478,12 +1478,12 @@ func TestStatusEntryColorDeletedFileIsDim(t *testing.T) {
 func TestStatusFileIconRenamedAndFallback(t *testing.T) {
 	renamed := git.StageFileStatus{Path: "new.txt", RenameFrom: "old.txt", IndexStatus: 'R'}
 
-	nerd := statusPaneIconsFor(true)
+	nerd := filetreePaneIconsFor(true)
 	if got := statusFileIcon(renamed, false, nerd); got != "󰁔" {
 		t.Fatalf("expected renamed nerd icon, got %q", got)
 	}
 
-	plain := statusPaneIconsFor(false)
+	plain := filetreePaneIconsFor(false)
 	if got := statusFileIcon(renamed, false, plain); got != "R" {
 		t.Fatalf("expected renamed fallback icon, got %q", got)
 	}
@@ -1512,20 +1512,20 @@ func TestStatusMessageClearsAfterTimeoutTick(t *testing.T) {
 	}
 }
 
-func TestStatusSelectionDebouncesDiffReload(t *testing.T) {
+func TestFiletreeSelectionDebouncesDiffReload(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 	testutil.WriteFile(t, repo, "b.txt", "two\n")
 
 	m := New(repo)
 	m.ready = true
-	m.focus = focusStatus
+	m.focus = focusFiletree
 
 	before := m.activeFilePath
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 	if cmd == nil {
-		t.Fatalf("expected j in status to schedule debounced reload")
+		t.Fatalf("expected j in filetree to schedule debounced reload")
 	}
 	if m.activeFilePath != before {
 		t.Fatalf("expected active file to remain unchanged before debounce fires")
@@ -1538,14 +1538,14 @@ func TestStatusSelectionDebouncesDiffReload(t *testing.T) {
 	}
 }
 
-func TestStageSearchStatusModeAndNavigation(t *testing.T) {
+func TestStageSearchFiletreeModeAndNavigation(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "apple.txt", "one\n")
 	testutil.WriteFile(t, repo, "apricot.txt", "two\n")
 
 	m := New(repo)
 	m.ready = true
-	m.focus = focusStatus
+	m.focus = focusFiletree
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	m = updated.(Model)
@@ -1556,7 +1556,7 @@ func TestStageSearchStatusModeAndNavigation(t *testing.T) {
 	m = runStatusCmds(t, m, tea.KeyPressMsg{Code: 'a', Text: "a"})
 	m = runStatusCmds(t, m, tea.KeyPressMsg{Code: 'p', Text: "p"})
 	if m.fileTreeModel.Search().MatchesCount() < 2 {
-		t.Fatalf("expected multiple status search matches, got %d", m.fileTreeModel.Search().MatchesCount())
+		t.Fatalf("expected multiple filetree search matches, got %d", m.fileTreeModel.Search().MatchesCount())
 	}
 
 	first := m.selected
@@ -1565,8 +1565,8 @@ func TestStageSearchStatusModeAndNavigation(t *testing.T) {
 	if m.fileTreeModel.Search().Mode() != search.SearchModeResults || !m.fileTreeModel.Search().HasQuery() || m.fileTreeModel.Search().MatchesCount() == 0 {
 		t.Fatalf("expected enter to show search results mode while keeping highlights")
 	}
-	if pane := ansi.Strip(m.renderStatusPane(40, 10)); !strings.Contains(pane, "1/2") {
-		t.Fatalf("expected persistent search counter in status frame, got %q", pane)
+	if pane := ansi.Strip(m.renderFiletreePane(40, 10)); !strings.Contains(pane, "1/2") {
+		t.Fatalf("expected persistent search counter in filetree frame, got %q", pane)
 	}
 
 	m = runStatusCmds(t, m, tea.KeyPressMsg{Code: 'n', Text: "n"})
@@ -1583,7 +1583,7 @@ func TestStageSearchStatusModeAndNavigation(t *testing.T) {
 	}
 }
 
-func TestStageSearchModeShowsOverlay(t *testing.T) {
+func TestFiletreeSearchModeShowsOverlay(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "apple.txt", "one\n")
 
@@ -1591,7 +1591,7 @@ func TestStageSearchModeShowsOverlay(t *testing.T) {
 	m.ready = true
 	m.width = 60
 	m.height = 20
-	m.focus = focusStatus
+	m.focus = focusFiletree
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	m = updated.(Model)
@@ -1846,7 +1846,7 @@ func TestGGJumpsToTop(t *testing.T) {
 
 	m := New(repo)
 	m.ready = true
-	m.focus = focusStatus
+	m.focus = focusFiletree
 	m.statusEntries = []statusEntry{{Kind: statusEntryFile}, {Kind: statusEntryFile}, {Kind: statusEntryFile}}
 	m.selected = 2
 
@@ -1958,19 +1958,19 @@ func TestGOOpensOutputModal(t *testing.T) {
 	}
 }
 
-func TestEOpensEditorFromStatusAndDiff(t *testing.T) {
+func TestEOpensEditorFromFiletreeAndDiff(t *testing.T) {
 	t.Setenv("EDITOR", "true")
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "edit.txt", "one\n")
 
 	m := New(repo)
 	m.ready = true
-	m.focus = focusStatus
+	m.focus = focusFiletree
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})
 	m = updated.(Model)
 	if cmd == nil {
-		t.Fatalf("expected e in status view to launch editor command")
+		t.Fatalf("expected e in filetree view to launch editor command")
 	}
 
 	m.focus = focusDiff
@@ -2175,7 +2175,7 @@ func TestStatusEntryColor(t *testing.T) {
 }
 
 func TestStatusEntryMeta_NerdFont(t *testing.T) {
-	icons := statusPaneIconsFor(true)
+	icons := filetreePaneIconsFor(true)
 
 	if got := statusEntryMeta(statusEntry{HasStaged: true, HasUnstaged: true}, true, icons); got != "" {
 		t.Fatalf("partial nerd icon = %q", got)
@@ -2186,7 +2186,7 @@ func TestStatusEntryMeta_NerdFont(t *testing.T) {
 }
 
 func TestStatusFileIcon(t *testing.T) {
-	icons := statusPaneIconsFor(true)
+	icons := filetreePaneIconsFor(true)
 
 	if got := statusFileIcon(git.StageFileStatus{IndexStatus: '?', WorktreeCode: '?'}, false, icons); got != "" {
 		t.Fatalf("untracked icon = %q, want new file icon", got)
@@ -2200,8 +2200,8 @@ func TestStatusFileIcon(t *testing.T) {
 }
 
 func TestStatusFileIconSymlink(t *testing.T) {
-	nerd := statusPaneIconsFor(true)
-	plain := statusPaneIconsFor(false)
+	nerd := filetreePaneIconsFor(true)
+	plain := filetreePaneIconsFor(false)
 
 	modified := git.StageFileStatus{Path: "link", IndexStatus: ' ', WorktreeCode: 'M'}
 	if got := statusFileIcon(modified, true, nerd); got != "󰌷" {

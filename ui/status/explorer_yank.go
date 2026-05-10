@@ -29,7 +29,7 @@ func (m *Model) yankLocationOnly() {
 		m.setStatus("no file selected")
 		return
 	}
-	if m.focus == focusStatus {
+	if m.focus == focusFiletree {
 		if err := stageClipboardWrite(explorer.FormatYankLocation(file.Path, "")); err != nil {
 			m.setStatus("clipboard copy failed: " + err.Error())
 			return
@@ -54,7 +54,7 @@ func (m *Model) yankAllContext() {
 		m.setStatus("no file selected")
 		return
 	}
-	if m.focus == focusStatus {
+	if m.focus == focusFiletree {
 		if err := stageClipboardWrite(explorer.FormatYankLocation(file.Path, "")); err != nil {
 			m.setStatus("clipboard copy failed: " + err.Error())
 			return
@@ -76,7 +76,7 @@ func (m *Model) yankAllContext() {
 }
 
 func (m *Model) yankContentOnly() {
-	if m.focus == focusStatus {
+	if m.focus == focusFiletree {
 		m.setStatus("no diff selection to yank")
 		return
 	}

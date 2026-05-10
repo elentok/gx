@@ -7,16 +7,16 @@ import (
 )
 
 func (m *Model) jumpToTop() {
-	if m.focus == focusStatus {
-		m.jumpStatusTop()
+	if m.focus == focusFiletree {
+		m.jumpFiletreeTop()
 		return
 	}
 	m.jumpDiffTop()
 }
 
 func (m *Model) jumpToBottom() {
-	if m.focus == focusStatus {
-		m.jumpStatusBottom()
+	if m.focus == focusFiletree {
+		m.jumpFiletreeBottom()
 		return
 	}
 	m.jumpDiffBottom()

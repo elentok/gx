@@ -9,7 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-func (m Model) selectedStatusEntry() (statusEntry, bool) {
+func (m Model) selectedFiletreeEntry() (statusEntry, bool) {
 	if m.selected < 0 || m.selected >= len(m.statusEntries) {
 		return statusEntry{}, false
 	}
@@ -17,7 +17,7 @@ func (m Model) selectedStatusEntry() (statusEntry, bool) {
 }
 
 func (m Model) selectedFile() (git.StageFileStatus, bool) {
-	entry, ok := m.selectedStatusEntry()
+	entry, ok := m.selectedFiletreeEntry()
 	if !ok || entry.Kind != statusEntryFile {
 		return git.StageFileStatus{}, false
 	}
@@ -54,7 +54,7 @@ func (m *Model) reloadFileList(preservePath string) {
 		m.setStatusSelection(0)
 		m.activeFilePath = ""
 		m.resetDiffSections()
-		m.focus = focusStatus
+		m.focus = focusFiletree
 		return
 	}
 
@@ -109,7 +109,7 @@ func (m *Model) moveToAdjacentFile(delta int) (bool, tea.Cmd) {
 		return false, nil
 	}
 	m.setStatusSelection(m.fileTreeModel.SelectedIndex())
-	m.onStatusSelectionChanged()
+	m.onFiletreeSelectionChanged()
 	cmd := m.reloadDiffsForSelection()
 	if m.focus == focusDiff {
 		m.ensureActiveVisible(m.currentSection())
@@ -118,7 +118,7 @@ func (m *Model) moveToAdjacentFile(delta int) (bool, tea.Cmd) {
 }
 
 func (m *Model) toggleStageStatusEntry() tea.Cmd {
-	entry, ok := m.selectedStatusEntry()
+	entry, ok := m.selectedFiletreeEntry()
 	if !ok {
 		return nil
 	}
@@ -146,7 +146,7 @@ func (m *Model) toggleStageStatusEntry() tea.Cmd {
 }
 
 func (m *Model) openDiscardStatusConfirm() {
-	entry, ok := m.selectedStatusEntry()
+	entry, ok := m.selectedFiletreeEntry()
 	if !ok || entry.Kind != statusEntryFile {
 		return
 	}
