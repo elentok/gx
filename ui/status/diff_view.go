@@ -66,7 +66,7 @@ func (m *Model) renderSectionPane(width, height int, section diffarea.Section) s
 			titleText += " " + label
 		}
 	}
-	if m.diff.DiffFullscreen {
+	if m.diff.Fullscreen {
 		titleText += " [fullscreen]"
 	}
 	rightTitleText := ""
@@ -259,7 +259,7 @@ func (m *Model) syncDiffViewports() {
 	}
 	_, diffW := m.splitWidth()
 	_, diffH := m.splitHeight(mainH)
-	if m.diff.DiffFullscreen && m.focus == focusDiff {
+	if m.diff.Fullscreen && m.focus == focusDiff {
 		diffW = m.width
 	}
 	vpW := maxInt(1, diffW-4)

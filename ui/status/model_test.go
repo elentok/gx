@@ -975,7 +975,7 @@ func TestFullscreenDiffHidesFiletreePane(t *testing.T) {
 	m.width = 120
 	m.height = 30
 	m.focus = focusDiff
-	m.diff.DiffFullscreen = true
+	m.diff.Fullscreen = true
 
 	v := m.View()
 	plain := ansi.Strip(v.Content)

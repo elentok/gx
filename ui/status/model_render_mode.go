@@ -14,7 +14,7 @@ func (m Model) deltaRenderWidth() int {
 		mainH = 4
 	}
 	_, diffW := m.splitWidth()
-	if m.diff.DiffFullscreen && m.focus == focusDiff {
+	if m.diff.Fullscreen && m.focus == focusDiff {
 		diffW = m.width
 	}
 	innerW := maxInt(1, diffW-2)

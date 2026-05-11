@@ -41,7 +41,7 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		activeModel.EnsureActiveVisible(m.diff.NavMode())
 	case "f":
-		m.diff.DiffFullscreen = !m.diff.DiffFullscreen
+		m.diff.Fullscreen = !m.diff.Fullscreen
 		var cmd tea.Cmd
 		if m.diff.RenderMode() == diffview.RenderModeSideBySide {
 			cmd = m.reloadDiffsForSelection()

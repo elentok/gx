@@ -24,7 +24,7 @@ type Model struct {
 	ActiveSection  Section
 	navMode        diffview.NavMode
 	renderMode     diffview.RenderMode
-	DiffFullscreen bool
+	Fullscreen bool
 	wrap           bool
 	Unstaged       diffview.Model
 	Staged         diffview.Model

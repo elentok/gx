@@ -27,7 +27,7 @@ func (m Model) View() tea.View {
 	filetreeH, diffH := m.splitHeight(mainH)
 
 	var body string
-	if m.diff.DiffFullscreen && m.focus == focusDiff {
+	if m.diff.Fullscreen && m.focus == focusDiff {
 		body = m.renderDiffPane(m.width, mainH)
 	} else {
 		filetreePanel := m.renderLeftPane(filetreeW, filetreeH)

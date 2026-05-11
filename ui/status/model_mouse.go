@@ -54,7 +54,7 @@ func (m *Model) scrollDiffByMouse(x, y, dir int) bool {
 }
 
 func (m Model) diffRect(mainH int) (x, y, w, h int, ok bool) {
-	if m.diff.DiffFullscreen && m.focus == focusDiff {
+	if m.diff.Fullscreen && m.focus == focusDiff {
 		return 0, 0, m.width, mainH, true
 	}
 	if m.useStackedLayout() {
