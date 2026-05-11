@@ -85,7 +85,7 @@ func (m *Model) applySelection() tea.Cmd {
 		}
 		startLine, endLine := sec.DataRef().ActiveLine, sec.DataRef().ActiveLine
 		if sec.DataRef().VisualActive {
-			startLine, endLine = visualLineBounds(sec.Data())
+			startLine, endLine = sec.Data().VisualLineBounds()
 		}
 		sig.lineText = sec.DataRef().Parsed.Changed[endLine].Text
 
@@ -240,7 +240,7 @@ func (m *Model) openDiscardDiffConfirm() {
 		}
 		startLine, endLine := sec.DataRef().ActiveLine, sec.DataRef().ActiveLine
 		if sec.DataRef().VisualActive {
-			startLine, endLine = visualLineBounds(sec.Data())
+			startLine, endLine = sec.Data().VisualLineBounds()
 		}
 		if sec.DataRef().VisualActive && endLine > startLine {
 			patch, err = diffcore.BuildLineRangePatch(sec.DataRef().Parsed, startLine, endLine)

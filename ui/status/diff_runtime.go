@@ -33,7 +33,3 @@ func (m Model) editorLineForCurrentSelection() int {
 	}
 	return h.OldStart
 }
-
-func visualLineBounds(diff diffview.DiffData) (start, end int) {
-	return diff.VisualLineBounds()
-}

@@ -234,7 +234,7 @@ func (m Model) visualMatchDiffDisplay(sec diffview.DiffData, displayIdx int) boo
 		return false
 	}
 	if len(sec.ChangedDisplay) > 0 {
-		start, end := visualLineBounds(sec)
+		start, end := sec.VisualLineBounds()
 		for i := start; i <= end && i < len(sec.ChangedDisplay); i++ {
 			if i >= 0 && sec.ChangedDisplay[i] == displayIdx {
 				return true
@@ -249,7 +249,7 @@ func (m Model) visualMatchDiffDisplay(sec diffview.DiffData, displayIdx int) boo
 	if rawIdx < 0 {
 		return false
 	}
-	start, end := visualLineBounds(sec)
+	start, end := sec.VisualLineBounds()
 	for i := start; i <= end && i < len(sec.Parsed.Changed); i++ {
 		if i >= 0 && sec.Parsed.Changed[i].LineIndex == rawIdx {
 			return true
