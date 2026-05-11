@@ -15,7 +15,7 @@ type VisibleDiffRow struct {
 }
 
 type VisibleDiffRowsOptions struct {
-	Section    DiffBuffer
+	Section    DiffData
 	ViewportY  int
 	Visible    int
 	BodyHeight int
@@ -39,7 +39,7 @@ func BuildVisibleDiffRows(opts VisibleDiffRowsOptions) []VisibleDiffRow {
 	overflowTopDisplay := -1
 	overflowBottomDisplay := -1
 	if opts.NavMode == NavModeHunk && opts.Active && opts.Section.ActiveHunk >= 0 {
-		if start, end, ok := HunkDisplayBounds(opts.Section.HunkDisplayRange, opts.Section.Parsed, opts.Section.DisplayToRaw, opts.Section.ActiveHunk); ok && opts.Visible > 0 {
+		if start, end, ok := hunkDisplayBounds(opts.Section.HunkDisplayRange, opts.Section.Parsed, opts.Section.DisplayToRaw, opts.Section.ActiveHunk); ok && opts.Visible > 0 {
 			vpBottom := opts.ViewportY + opts.Visible - 1
 			if start < opts.ViewportY {
 				overflowTopDisplay = opts.ViewportY

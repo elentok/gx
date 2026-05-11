@@ -98,7 +98,7 @@ func (m Model) handleFocusedChildKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, b
 			return m, nil, false
 		}
 		if selectionChanged {
-			m.selected = m.fileTreeModel.SelectedIndex()
+			m.page.selected = m.fileTreeModel.SelectedIndex()
 			m.onFiletreeSelectionChanged()
 		}
 		if childCmd != nil {
@@ -118,15 +118,14 @@ func (m Model) handleFocusedChildKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, b
 		}
 		return m, nil, true
 	case focusDiff:
-		updatedDiff, cmd, handled := m.diffModelForSectionPtr(m.section).Update(msg)
+		updatedDiff, cmd, handled := m.diff.SectionModel(m.diff.ActiveSection).Update(msg)
 		if !handled {
 			return m, nil, false
 		}
-		*m.diffModelForSectionPtr(m.section) = updatedDiff
-		m.sectionState(m.section).data = updatedDiff.Data()
+		*m.diff.SectionModel(m.diff.ActiveSection) = updatedDiff
 		if m.currentDiffSearch().Mode() == search.SearchModeResults && m.focus == focusDiff {
-			m.navMode = diffview.NavModeLine
-			m.diffArea.applyModes()
+			m.diff.SetNavMode(diffview.NavModeLine)
+
 		}
 		return m, cmd, true
 	default:

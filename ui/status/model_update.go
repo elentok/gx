@@ -60,8 +60,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleFileTreeRebuildRequested() (tea.Model, tea.Cmd) {
-	m.collapsedDirs = m.fileTreeModel.CollapsedDirs()
-	m.statusEntries, m.statusRows = buildStatusEntriesAndRows(m.files, m.collapsedDirs)
+	m.page.collapsedDirs = m.fileTreeModel.CollapsedDirs()
+	m.page.statusEntries, m.page.statusRows = buildStatusEntriesAndRows(m.page.files, m.page.collapsedDirs)
 	m.reconcileFileTreeFromStatusState()
 	return m, m.reloadDiffsForSelection()
 }
@@ -90,7 +90,7 @@ func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 
 	var helpCmd tea.Cmd
 	var reloadCmd tea.Cmd
-	if m.renderMode == diffview.RenderModeSideBySide {
+	if m.diff.RenderMode() == diffview.RenderModeSideBySide {
 		reloadCmd = m.reloadDiffsForSelection()
 	}
 	m.syncDiffViewports()
@@ -143,8 +143,8 @@ func (m Model) handleDiffReload(msg diffReloadMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleBranchSyncLoaded(msg branchSyncLoadedMsg) (tea.Model, tea.Cmd) {
-	if msg.branchName == m.branchName {
-		m.branchSync = msg.sync
+	if msg.branchName == m.page.branchName {
+		m.page.branchSync = msg.sync
 	}
 	return m, nil
 }
@@ -217,10 +217,10 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleFlashTick() (tea.Model, tea.Cmd) {
-	if m.flash.active {
-		m.flash.frames--
-		if m.flash.frames <= 0 {
-			m.flash.active = false
+	if m.diff.Flash.Active {
+		m.diff.Flash.Frames--
+		if m.diff.Flash.Frames <= 0 {
+			m.diff.Flash.Active = false
 			return m, nil
 		}
 		return m, nextFlashCmd()

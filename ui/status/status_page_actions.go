@@ -195,15 +195,15 @@ func (m Model) confirmAccept() (tea.Model, tea.Cmd) {
 			m.showGitError(err)
 			return m, nil
 		}
-		if m.section == sectionUnstaged {
-			sec := m.sectionState(sectionUnstaged)
-			sec.data.VisualActive = false
-			sec.data.VisualAnchor = sec.data.ActiveLine
+		if m.diff.ActiveSection == sectionUnstaged {
+			sec := m.diff.SectionModel(sectionUnstaged)
+			sec.DataRef().VisualActive = false
+			sec.DataRef().VisualAnchor = sec.DataRef().ActiveLine
 		}
 		m.setStatus("discarded " + m.confirmPaths[0])
 		cmd := m.reload(m.confirmPaths[0])
 		if m.focus == focusDiff {
-			m.ensureActiveVisible(m.currentSection())
+			m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
 		}
 		return m, cmd
 	}

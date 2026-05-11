@@ -93,8 +93,8 @@ func (m Model) filetreePaneTitle() string {
 func (m Model) visibleStatusLines(height int) []string {
 	innerH := maxInt(1, height-2)
 	icons := filetreePaneIconsFor(m.settings.UseNerdFontIcons)
-	start, _ := sidebar.VisibleWindow(len(m.statusEntries), m.selected, innerH)
-	rows := sidebar.BuildVisibleRenderableRows(m.statusEntries, m.selected, innerH, func(i int, entry statusEntry) sidebar.RenderableRow {
+	start, _ := sidebar.VisibleWindow(len(m.page.statusEntries), m.page.selected, innerH)
+	rows := sidebar.BuildVisibleRenderableRows(m.page.statusEntries, m.page.selected, innerH, func(i int, entry statusEntry) sidebar.RenderableRow {
 		statusColor := statusEntryColor(entry)
 		deleted := entry.Kind == statusEntryFile && isDeletedFileStatus(entry.File)
 		metaRaw := statusEntryMeta(entry, m.settings.UseNerdFontIcons, icons)
@@ -119,13 +119,13 @@ func (m Model) visibleStatusLines(height int) []string {
 			MetaRaw:  metaRaw,
 			NameRaw:  name,
 			Color:    statusColor,
-			Selected: i == m.selected,
+			Selected: i == m.page.selected,
 			Faint:    deleted,
 		}
 	})
 	lines := sidebar.RenderRows(rows, innerH, lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render("clean working tree"), ui.ColorBlue)
 	if m.focus == focusFiletree {
-		selectedIdx := m.selected - start
+		selectedIdx := m.page.selected - start
 		if selectedIdx >= 0 && selectedIdx < len(lines) && lines[selectedIdx] != "" {
 			lines[selectedIdx] = ui.RenderRowHighlight(lines[selectedIdx])
 		}
@@ -149,15 +149,15 @@ func (m Model) renderFiletreePane(width, height int) string {
 }
 
 func (m Model) branchSummaryTitleSuffix() string {
-	if strings.TrimSpace(m.branchName) == "" {
+	if strings.TrimSpace(m.page.branchName) == "" {
 		return ""
 	}
 	branchLabel := "branch"
 	if m.settings.UseNerdFontIcons {
 		branchLabel = ""
 	}
-	out := branchLabel + " " + m.branchName + " " + m.branchSyncToken()
-	base := strings.TrimSpace(m.branchBaseRef)
+	out := branchLabel + " " + m.page.branchName + " " + m.branchSyncToken()
+	base := strings.TrimSpace(m.page.branchBaseRef)
 	if shouldShowBranchBaseRef(base) {
 		out += " · vs " + base
 	}
@@ -165,15 +165,15 @@ func (m Model) branchSummaryTitleSuffix() string {
 }
 
 func (m Model) branchSyncToken() string {
-	switch m.branchSync.Name {
+	switch m.page.branchSync.Name {
 	case git.StatusSame:
 		return "✓"
 	case git.StatusAhead:
-		return fmt.Sprintf("↑%d", m.branchSync.Ahead)
+		return fmt.Sprintf("↑%d", m.page.branchSync.Ahead)
 	case git.StatusBehind:
-		return fmt.Sprintf("↓%d", m.branchSync.Behind)
+		return fmt.Sprintf("↓%d", m.page.branchSync.Behind)
 	case git.StatusDiverged:
-		return fmt.Sprintf("↑%d ↓%d", m.branchSync.Ahead, m.branchSync.Behind)
+		return fmt.Sprintf("↑%d ↓%d", m.page.branchSync.Ahead, m.page.branchSync.Behind)
 	}
 	return "?"
 }

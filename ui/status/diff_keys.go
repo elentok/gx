@@ -17,10 +17,8 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "]":
 		return m, m.adjustDiffContextLines(1)
 	case "esc", "q":
-		sec := m.currentSection()
-		if sec.data.VisualActive {
-			sec.data.VisualActive = false
-			sec.data.VisualAnchor = sec.data.ActiveLine
+		if m.diff.ActiveSectionModel().DataRef().VisualActive {
+			m.diff.DisableVisual()
 			return m, nil
 		}
 		m.focus = focusFiletree
@@ -29,48 +27,34 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.focus = focusFiletree
 		return m, nil
 	case "a":
-		sec := m.currentSection()
-		sec.data.VisualActive = false
-		if m.navMode == diffview.NavModeHunk {
-			m.navMode = diffview.NavModeLine
-		} else {
-			m.navMode = diffview.NavModeHunk
-		}
-		m.diffArea.applyModes()
-		m.ensureActiveVisible(m.currentSection())
+		m.diff.DisableVisual()
+		m.diff.ToggleNavMode()
+		m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
 	case "v":
-		sec := m.currentSection()
-		if m.navMode == diffview.NavModeHunk {
-			m.navMode = diffview.NavModeLine
-			m.diffArea.applyModes()
+		activeModel := m.diff.ActiveSectionModel()
+		if m.diff.NavMode() == diffview.NavModeHunk {
+			m.diff.SetNavMode(diffview.NavModeLine)
 		}
-		if len(sec.data.Parsed.Changed) == 0 {
+		if !m.diff.ToggleVisual() {
 			return m, nil
 		}
-		if !sec.data.VisualActive {
-			sec.data.VisualActive = true
-			sec.data.VisualAnchor = sec.data.ActiveLine
-		} else {
-			sec.data.VisualActive = false
-			sec.data.VisualAnchor = sec.data.ActiveLine
-		}
-		m.ensureActiveVisible(sec)
+		activeModel.EnsureActiveVisible(m.diff.NavMode())
 	case "f":
-		m.diffFullscreen = !m.diffFullscreen
+		m.diff.DiffFullscreen = !m.diff.DiffFullscreen
 		var cmd tea.Cmd
-		if m.renderMode == diffview.RenderModeSideBySide {
+		if m.diff.RenderMode() == diffview.RenderModeSideBySide {
 			cmd = m.reloadDiffsForSelection()
 		}
 		m.syncDiffViewports()
-		m.ensureActiveVisible(m.currentSection())
+		m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
 		return m, cmd
 	case "s":
 		return m, m.toggleRenderMode()
 	case "w":
-		m.wrapSoft = !m.wrapSoft
-		m.diffArea.applyModes()
+		m.diff.SetWrap(!m.diff.Wrap())
+
 		m.syncDiffViewports()
-		m.ensureActiveVisible(m.currentSection())
+		m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
 	case "r":
 		return m, m.refresh()
 	case "p":
@@ -97,11 +81,11 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "k", "up":
 		m.moveActive(-1)
 	case "J":
-		sec := m.currentSection()
-		sec.viewport.ScrollDown(3)
+		activeModel := m.diff.ActiveSectionModel()
+		activeModel.Viewport().ScrollDown(3)
 	case "K":
-		sec := m.currentSection()
-		sec.viewport.ScrollUp(3)
+		activeModel := m.diff.ActiveSectionModel()
+		activeModel.Viewport().ScrollUp(3)
 	case "ctrl+d":
 		m.scrollDiffPage(1)
 	case "ctrl+u":
@@ -110,7 +94,7 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		cmd := m.applySelection()
 		return m, cmd
 	case "d":
-		if m.section == sectionStaged {
+		if m.diff.ActiveSection == sectionStaged {
 			cmd := m.applySelection()
 			return m, cmd
 		}

@@ -68,7 +68,7 @@ func (m Model) helpSectionLabel() string {
 }
 
 func (m Model) navModeLabel() string {
-	if m.navMode == diffview.NavModeLine {
+	if m.diff.NavMode() == diffview.NavModeLine {
 		return "line"
 	}
 	return "hunk"

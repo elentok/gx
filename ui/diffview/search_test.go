@@ -10,7 +10,7 @@ import (
 )
 
 func TestComputeDiffSearchMatches(t *testing.T) {
-	matches := ComputeDiffSearchMatches(
+	matches := computeDiffSearchMatches(
 		[]string{"one", "Two", "three two"},
 		[]int{-1, 7, 9},
 		"two",
@@ -24,12 +24,12 @@ func TestComputeDiffSearchMatches(t *testing.T) {
 }
 
 func TestApplyDiffSearchMatch(t *testing.T) {
-	section := BuildDiffBuffer(sampleSectionUnifiedDiff, "", NewDiffBuffer(), false)
+	section := BuildDiffData(sampleSectionUnifiedDiff, "", NewDiffData(), false)
 	vp := viewport.New(viewport.WithWidth(20), viewport.WithHeight(2))
 	vp.SetContentLines(section.ViewLines)
 
 	match := search.Match{DisplayIndex: 3, Index: 7}
-	ApplyDiffSearchMatch(&section, &vp, match)
+	applyDiffSearchMatch(&section, &vp, match)
 	if vp.YOffset() != 2 {
 		t.Fatalf("YOffset = %d, want 2", vp.YOffset())
 	}
@@ -42,7 +42,7 @@ func TestApplyDiffSearchMatch(t *testing.T) {
 }
 
 func TestCurrentDiffSearchMatchIndex(t *testing.T) {
-	section := DiffBuffer{
+	section := DiffData{
 		Parsed:     diffcore.ParseUnifiedDiff(sampleSectionUnifiedDiff),
 		ActiveLine: 1,
 	}
@@ -50,7 +50,7 @@ func TestCurrentDiffSearchMatchIndex(t *testing.T) {
 		{DisplayIndex: 2, RawIndex: 6},
 		{DisplayIndex: 3, RawIndex: 7},
 	}
-	got := CurrentDiffSearchMatchIndex(section, matches, NavModeLine)
+	got := currentDiffSearchMatchIndex(section, matches, NavModeLine)
 	if got != 1 {
 		t.Fatalf("CurrentDiffSearchMatchIndex = %d, want 1", got)
 	}

@@ -33,7 +33,7 @@ func (m *Model) adjustDiffContextLines(delta int) tea.Cmd {
 	cmd := m.reloadDiffsForSelection()
 	m.syncDiffViewports()
 	if m.focus == focusDiff {
-		m.ensureActiveVisible(m.currentSection())
+		m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
 	}
 	return cmd
 }

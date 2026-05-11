@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/help"
+	"github.com/elentok/gx/ui/status/diffarea"
 
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
@@ -24,11 +25,11 @@ type Model struct {
 	height int
 	ready  bool
 
-	focus focusPane
-	diffArea
+	focus            focusPane
+	diff             diffarea.Model
 	diffContextLines int
-	statusPageState
-	fileTreeModel filetree.Model[git.StageFileStatus]
+	page             statusPageState
+	fileTreeModel    filetree.Model[git.StageFileStatus]
 
 	statusMsg      string
 	statusUntil    time.Time
@@ -135,8 +136,8 @@ func NewModel(worktreeRoot string, settings Settings) Model {
 		diffContextLines: settings.DiffContextLines,
 		help:             help.NewModel(keySections),
 		focus:            focusFiletree,
-		diffArea:         newDiffArea(),
-		statusPageState: statusPageState{
+		diff:             diffarea.NewModel(),
+		page: statusPageState{
 			collapsedDirs: map[string]bool{},
 			selected:      0,
 		},

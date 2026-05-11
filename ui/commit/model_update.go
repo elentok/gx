@@ -112,10 +112,10 @@ func (m Model) handleKeyRouting(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if !m.focusDiff {
 			return m, nil
 		}
-		if m.diffNavMode == diffview.NavModeHunk {
-			m.diffNavMode = diffview.NavModeLine
+		if m.diffModel.NavMode() == diffview.NavModeHunk {
+			m.diffModel.SetNavMode(diffview.NavModeLine)
 		} else {
-			m.diffNavMode = diffview.NavModeHunk
+			m.diffModel.SetNavMode(diffview.NavModeHunk)
 		}
 		m.ensureActiveVisible()
 		return m, nil
@@ -123,7 +123,7 @@ func (m Model) handleKeyRouting(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if !m.focusDiff {
 			return m, nil
 		}
-		m.wrapSoft = !m.wrapSoft
+		m.diffModel.EnableWrap(!m.diffModel.WrapEnabled())
 		m.syncDiffViewport()
 		return m, nil
 	case "j", "down":
@@ -152,14 +152,14 @@ func (m Model) handleKeyRouting(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.focusHeader {
 			m.scrollHeader(1)
 		} else if m.focusDiff {
-			m.diffViewport.ScrollDown(3)
+			m.diffModel.Viewport().ScrollDown(3)
 		}
 		return m, nil
 	case "K":
 		if m.focusHeader {
 			m.scrollHeader(-1)
 		} else if m.focusDiff {
-			m.diffViewport.ScrollUp(3)
+			m.diffModel.Viewport().ScrollUp(3)
 		}
 		return m, nil
 	case "ctrl+d":

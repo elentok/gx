@@ -1,5 +1,7 @@
 package status
 
+import "github.com/elentok/gx/ui/status/diffarea"
+
 type focusPane int
 
 const (
@@ -7,9 +9,9 @@ const (
 	focusDiff
 )
 
-type diffSection int
+type diffSection = diffarea.Section
 
 const (
-	sectionUnstaged diffSection = iota
-	sectionStaged
+	sectionUnstaged = diffarea.SectionUnstaged
+	sectionStaged   = diffarea.SectionStaged
 )

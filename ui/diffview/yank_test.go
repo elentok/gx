@@ -6,7 +6,7 @@ import (
 )
 
 func TestFocusedYankBodyLineMode(t *testing.T) {
-	section := BuildDiffBuffer(sampleSectionUnifiedDiff, "", NewDiffBuffer(), false)
+	section := BuildDiffData(sampleSectionUnifiedDiff, "", NewDiffData(), false)
 	section.ActiveLine = 1
 
 	got := FocusedYankBody(section, NavModeLine)
@@ -17,7 +17,7 @@ func TestFocusedYankBodyLineMode(t *testing.T) {
 }
 
 func TestFocusedYankBodyHunkMode(t *testing.T) {
-	section := BuildDiffBuffer(sampleSectionUnifiedDiff, "", NewDiffBuffer(), false)
+	section := BuildDiffData(sampleSectionUnifiedDiff, "", NewDiffData(), false)
 
 	got := FocusedYankBody(section, NavModeHunk)
 	want := []string{" one", "-two", "+two changed", " three"}
@@ -27,7 +27,7 @@ func TestFocusedYankBodyHunkMode(t *testing.T) {
 }
 
 func TestFocusedLocationVisualLineMode(t *testing.T) {
-	section := BuildDiffBuffer(sampleSectionUnifiedDiff, "", NewDiffBuffer(), false)
+	section := BuildDiffData(sampleSectionUnifiedDiff, "", NewDiffData(), false)
 	section.ActiveLine = 1
 	section.VisualActive = true
 	section.VisualAnchor = 0

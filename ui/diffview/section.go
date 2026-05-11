@@ -20,7 +20,7 @@ type SideBySideMapping struct {
 	HunkDisplayRange [][2]int
 }
 
-func SplitLines(s string) []string {
+func splitLines(s string) []string {
 	s = strings.ReplaceAll(s, "\r\n", "\n")
 	s = strings.TrimSuffix(s, "\n")
 	if strings.TrimSpace(s) == "" {
@@ -29,7 +29,7 @@ func SplitLines(s string) []string {
 	return strings.Split(s, "\n")
 }
 
-func IsDeltaSectionDivider(plain string) bool {
+func isDeltaSectionDivider(plain string) bool {
 	if plain == "" {
 		return false
 	}
@@ -41,7 +41,7 @@ func IsDeltaSectionDivider(plain string) bool {
 	return true
 }
 
-func BuildSideBySideMapping(parsed diffcore.ParsedDiff, viewLines []string) SideBySideMapping {
+func buildSideBySideMapping(parsed diffcore.ParsedDiff, viewLines []string) SideBySideMapping {
 	displayToRaw := make([]int, len(viewLines))
 	for i := range displayToRaw {
 		displayToRaw[i] = -1
@@ -133,7 +133,7 @@ func sideBySideHunkDisplayRanges(lines []string, hunkCount int) [][2]int {
 		}
 		for end >= start {
 			plain := strings.TrimSpace(ansi.Strip(lines[end]))
-			if plain == "" || IsDeltaSectionDivider(plain) {
+			if plain == "" || isDeltaSectionDivider(plain) {
 				end--
 				continue
 			}
@@ -141,7 +141,7 @@ func sideBySideHunkDisplayRanges(lines []string, hunkCount int) [][2]int {
 		}
 		for start <= end {
 			plain := strings.TrimSpace(ansi.Strip(lines[start]))
-			if IsDeltaSectionDivider(plain) {
+			if isDeltaSectionDivider(plain) {
 				start++
 				continue
 			}

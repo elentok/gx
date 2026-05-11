@@ -3,7 +3,6 @@ package diffview
 import (
 	"strings"
 
-	"github.com/elentok/gx/ui/diffview/diffrender"
 	"github.com/elentok/gx/ui/search"
 
 	"charm.land/bubbles/v2/viewport"
@@ -26,7 +25,7 @@ const (
 
 // Model owns one diff pane state (unstaged or staged), including local search.
 type Model struct {
-	data       DiffBuffer
+	data       DiffData
 	viewport   viewport.Model
 	search     search.Model
 	renderMode RenderMode
@@ -36,7 +35,7 @@ type Model struct {
 
 func NewModel() Model {
 	return Model{
-		data:       NewDiffBuffer(),
+		data:       NewDiffData(),
 		viewport:   viewport.New(),
 		search:     search.NewModel(),
 		renderMode: RenderModeUnified,
@@ -49,12 +48,20 @@ func (m Model) Init() tea.Cmd {
 	return nil
 }
 
-func (m Model) Data() DiffBuffer {
+func (m Model) Data() DiffData {
 	return m.data
 }
 
-func (m *Model) SetData(data DiffBuffer) {
+func (m *Model) DataRef() *DiffData {
+	return &m.data
+}
+
+func (m *Model) SetData(data DiffData) {
 	m.data = data
+}
+
+func (m *Model) Viewport() *viewport.Model {
+	return &m.viewport
 }
 
 func (m *Model) Search() *search.Model {
@@ -89,13 +96,9 @@ func (m *Model) EnableWrap(enabled bool) {
 	m.wrapSoft = enabled
 }
 
-func (m Model) HasContent() bool {
-	return len(m.data.ViewLines) > 0 || diffrender.SectionHasBinaryDiff(m.data.Parsed)
-}
-
 func (m *Model) BuildFromRaw(raw, color string) {
 	prevOffset := m.viewport.YOffset()
-	m.data = BuildDiffBuffer(raw, color, m.data, m.IsSideBySide())
+	m.data = BuildDiffData(raw, color, m.data, m.IsSideBySide())
 
 	if strings.TrimSpace(raw) == "" {
 		m.viewport.SetContent("")
@@ -109,7 +112,7 @@ func (m *Model) BuildFromRaw(raw, color string) {
 
 func (m *Model) Reflow(wrapWidth int) {
 	prevOffset := m.viewport.YOffset()
-	ReflowDiffBuffer(&m.data, wrapWidth, m.wrapSoft)
+	reflowDiffData(&m.data, wrapWidth, m.wrapSoft)
 	if len(m.data.BaseLines) == 0 {
 		m.viewport.SetContent("")
 		m.viewport.SetYOffset(0)
@@ -117,6 +120,88 @@ func (m *Model) Reflow(wrapWidth int) {
 	}
 	m.viewport.SetContentLines(m.data.ViewLines)
 	m.viewport.SetYOffset(prevOffset)
+}
+
+func (m *Model) SyncViewport(width, height int) {
+	m.viewport.SetWidth(width)
+	m.viewport.SetHeight(height)
+	m.viewport.SetContentLines(m.data.ViewLines)
+}
+
+func (m *Model) EnsureActiveVisible(navMode NavMode) {
+	if navMode == NavModeHunk && m.data.ActiveHunk >= 0 && m.data.ActiveHunk < len(m.data.HunkDisplayRange) {
+		r := m.data.HunkDisplayRange[m.data.ActiveHunk]
+		m.viewport.EnsureVisible(r[0], 0, 0)
+		return
+	}
+	if navMode == NavModeLine && m.data.ActiveLine >= 0 && m.data.ActiveLine < len(m.data.ChangedDisplay) && m.data.ChangedDisplay[m.data.ActiveLine] >= 0 {
+		m.viewport.EnsureVisible(m.data.ChangedDisplay[m.data.ActiveLine], 0, 0)
+		return
+	}
+	active := activeRawLineIndex(m.data, navMode)
+	if active >= 0 {
+		display := active
+		if active < len(m.data.RawToDisplay) && m.data.RawToDisplay[active] >= 0 {
+			display = m.data.RawToDisplay[active]
+		}
+		m.viewport.EnsureVisible(display, 0, 0)
+	}
+}
+
+func (m Model) ComputeSearchMatches(query string) []DiffSearchMatch {
+	return computeDiffSearchMatches(m.data.ViewLines, m.data.DisplayToRaw, query)
+}
+
+func (m Model) ActiveRawLineIndex() int {
+	return activeRawLineIndex(m.data, m.navMode)
+}
+
+func (m *Model) MoveActive(delta int, allowViewportScroll bool) bool {
+	return moveActive(&m.data, &m.viewport, m.navMode, delta, allowViewportScroll)
+}
+
+func (m *Model) ScrollPage(direction int) {
+	scrollPage(&m.viewport, direction)
+}
+
+func (m *Model) JumpTop() bool {
+	return jumpTop(&m.data, &m.viewport, m.navMode)
+}
+
+func (m *Model) JumpBottom() bool {
+	return jumpBottom(&m.data, &m.viewport, m.navMode)
+}
+
+func (m *Model) ApplySearchMatch(match search.Match) {
+	applyDiffSearchMatch(&m.data, &m.viewport, match)
+}
+
+func (m *Model) FocusSearchMatch(match search.Match) {
+	m.navMode = NavModeLine
+	m.ApplySearchMatch(match)
+}
+
+func (m Model) CurrentSearchMatchIndex(matches []DiffSearchMatch) int {
+	return currentDiffSearchMatchIndex(m.data, matches, NavModeLine)
+}
+
+func (m *Model) RestoreViewportYOffset(y int) {
+	restoreViewportYOffset(&m.viewport, y)
+}
+
+func (m Model) CurrentSearchCursor(matches []search.Match) int {
+	diffMatches := make([]DiffSearchMatch, 0, len(matches))
+	for _, match := range matches {
+		diffMatches = append(diffMatches, DiffSearchMatch{
+			DisplayIndex: match.DisplayIndex,
+			RawIndex:     match.Index,
+		})
+	}
+	return m.CurrentSearchMatchIndex(diffMatches)
+}
+
+func (m Model) FocusedLocationAndBody() (string, []string, FocusedYankError) {
+	return FocusedLocationAndBody(m.data, m.navMode)
 }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, bool) {

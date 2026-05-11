@@ -8,7 +8,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
-	"github.com/elentok/gx/ui/diffview/diffrender"
+	"github.com/elentok/gx/ui/diffview/diffcore"
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/sidebar"
 
@@ -254,21 +254,21 @@ func (m Model) renderFilesPane(width, height int) string {
 
 func (m Model) renderDiffPane(width, height int) string {
 	lines := []string{ui.StyleMuted.Render("no diff")}
-	if len(m.section.ViewLines) > 0 {
-		lines = make([]string, 0, max(1, m.diffViewport.VisibleLineCount()))
+	if len(m.diffModel.Data().ViewLines) > 0 {
+		lines = make([]string, 0, max(1, m.diffModel.Viewport().VisibleLineCount()))
 		bodyH := max(1, height-2)
 		active := m.activeRawLineIndex()
 		rows := diffview.BuildVisibleDiffRows(diffview.VisibleDiffRowsOptions{
-			Section:    m.section,
-			ViewportY:  m.diffViewport.YOffset(),
-			Visible:    m.diffViewport.VisibleLineCount(),
+			Section:    m.diffModel.Data(),
+			ViewportY:  m.diffModel.Viewport().YOffset(),
+			Visible:    m.diffModel.Viewport().VisibleLineCount(),
 			BodyHeight: bodyH,
-			NavMode:    m.diffNavMode,
+			NavMode:    m.diffModel.NavMode(),
 			Active:     m.focusDiff,
 			ActiveRaw:  active,
 		})
 		for _, row := range rows {
-			if row.DisplayIndex < 0 || row.DisplayIndex >= len(m.section.ViewLines) {
+			if row.DisplayIndex < 0 || row.DisplayIndex >= len(m.diffModel.Data().ViewLines) {
 				lines = append(lines, "")
 				continue
 			}
@@ -291,8 +291,8 @@ func (m Model) renderDiffPane(width, height int) string {
 			}
 			lines = append(lines, mark+body)
 		}
-	} else if len(m.section.Parsed.Lines) > 0 {
-		if diffrender.HasBinaryDiff(m.section.Parsed) {
+	} else if len(m.diffModel.Data().Parsed.Lines) > 0 {
+		if diffcore.HasBinaryDiff(m.diffModel.Data().Parsed) {
 			lines = []string{ui.StyleMuted.Render("binary file")}
 		} else {
 			lines = []string{ui.StyleMuted.Render("no diff")}
@@ -314,7 +314,7 @@ func (m Model) diffTitle() string {
 	if !m.focusDiff {
 		return ""
 	}
-	if m.diffNavMode == diffview.NavModeLine {
+	if m.diffModel.NavMode() == diffview.NavModeLine {
 		return "line"
 	}
 	return "hunk"

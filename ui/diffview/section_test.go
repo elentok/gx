@@ -8,25 +8,25 @@ import (
 )
 
 func TestSplitLines(t *testing.T) {
-	got := SplitLines("a\r\nb\r\n")
+	got := splitLines("a\r\nb\r\n")
 	want := []string{"a", "b"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("SplitLines = %#v, want %#v", got, want)
 	}
 
-	if got := SplitLines(" \n"); got != nil {
+	if got := splitLines(" \n"); got != nil {
 		t.Fatalf("SplitLines blank = %#v, want nil", got)
 	}
 }
 
 func TestIsDeltaSectionDivider(t *testing.T) {
-	if !IsDeltaSectionDivider("────") {
+	if !isDeltaSectionDivider("────") {
 		t.Fatal("expected box divider to match")
 	}
-	if !IsDeltaSectionDivider("----") {
+	if !isDeltaSectionDivider("----") {
 		t.Fatal("expected ascii divider to match")
 	}
-	if IsDeltaSectionDivider("-- x --") {
+	if isDeltaSectionDivider("-- x --") {
 		t.Fatal("expected mixed content not to match")
 	}
 }
@@ -41,7 +41,7 @@ func TestBuildSideBySideMapping(t *testing.T) {
 		"  │ 3 │ three       │ 3 │ three       │",
 	}
 
-	got := BuildSideBySideMapping(parsed, viewLines)
+	got := buildSideBySideMapping(parsed, viewLines)
 
 	if !reflect.DeepEqual(got.DisplayToRaw, []int{-1, -1, 6, 7, -1}) {
 		t.Fatalf("DisplayToRaw = %#v", got.DisplayToRaw)

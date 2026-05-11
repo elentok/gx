@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/search"
 
 	"charm.land/lipgloss/v2"
@@ -39,7 +38,7 @@ func (m *Model) computeSearchMatches(query string) []search.Match {
 		return matches
 	}
 	var matches []search.Match
-	for _, match := range diffview.ComputeDiffSearchMatches(m.section.ViewLines, m.section.DisplayToRaw, q) {
+	for _, match := range m.diffModel.ComputeSearchMatches(q) {
 		matches = append(matches, search.Match{Index: match.RawIndex, DisplayIndex: match.DisplayIndex})
 	}
 	return matches
@@ -61,22 +60,14 @@ func (m *Model) jumpToCurrentMatch() {
 		return
 	}
 	m.focusDiff = true
-	m.diffNavMode = diffview.NavModeLine
-	diffview.ApplyDiffSearchMatch(&m.section, &m.diffViewport, match)
+	m.diffModel.FocusSearchMatch(match)
 }
 
 func (m *Model) syncSearchCursorFromDiffFocus() {
 	if !m.search.HasQuery() || m.search.MatchesCount() == 0 || !m.focusDiff {
 		return
 	}
-	diffMatches := make([]diffview.DiffSearchMatch, 0, m.search.MatchesCount())
-	for _, match := range m.search.Matches() {
-		diffMatches = append(diffMatches, diffview.DiffSearchMatch{
-			DisplayIndex: match.DisplayIndex,
-			RawIndex:     match.Index,
-		})
-	}
-	idx := diffview.CurrentDiffSearchMatchIndex(m.section, diffMatches, diffview.NavModeLine)
+	idx := m.diffModel.CurrentSearchCursor(m.search.Matches())
 	if idx >= 0 {
 		m.search.SetCursor(idx)
 	}

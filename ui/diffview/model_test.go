@@ -10,13 +10,13 @@ import (
 
 func TestModelBuildFromRawAndHasContent(t *testing.T) {
 	m := NewModel()
-	if m.HasContent() {
+	if m.DataRef().HasContent() {
 		t.Fatal("expected empty model to have no content")
 	}
 
 	raw := "@@ -1 +1 @@\n-old\n+new\n"
 	m.BuildFromRaw(raw, raw)
-	if !m.HasContent() {
+	if !m.DataRef().HasContent() {
 		t.Fatal("expected model to have content")
 	}
 	if len(m.Data().ViewLines) == 0 {
@@ -24,7 +24,7 @@ func TestModelBuildFromRawAndHasContent(t *testing.T) {
 	}
 
 	m.BuildFromRaw("", "")
-	if m.HasContent() {
+	if m.DataRef().HasContent() {
 		t.Fatal("expected cleared model to have no content")
 	}
 }

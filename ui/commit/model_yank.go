@@ -95,7 +95,7 @@ func (m *Model) yankContentOnly() {
 		m.setStatus("no diff selection to yank")
 		return
 	}
-	_, body, yankErr := diffview.FocusedLocationAndBody(m.section, m.diffNavMode)
+	_, body, yankErr := m.diffModel.FocusedLocationAndBody()
 	if yankErr == diffview.FocusedYankErrNoHunk {
 		m.setStatus(string(yankErr))
 		return
@@ -125,7 +125,7 @@ func (m *Model) yankCommitBody() {
 }
 
 func (m *Model) focusedLocationAndBody() (string, []string, bool) {
-	loc, body, yankErr := diffview.FocusedLocationAndBody(m.section, m.diffNavMode)
+	loc, body, yankErr := m.diffModel.FocusedLocationAndBody()
 	if yankErr != "" {
 		m.setStatus(string(yankErr))
 		return "", nil, false

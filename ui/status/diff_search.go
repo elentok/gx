@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/search"
 
@@ -35,8 +34,8 @@ func (m *Model) computeSearchMatches(query string) []search.Match {
 			}
 		}
 	} else {
-		sec := m.sectionState(m.section)
-		for _, match := range diffview.ComputeDiffSearchMatches(sec.data.ViewLines, sec.data.DisplayToRaw, q) {
+		sec := m.diff.SectionModel(m.diff.ActiveSection)
+		for _, match := range sec.ComputeSearchMatches(q) {
 			matches = append(matches, search.Match{
 				DisplayIndex: match.DisplayIndex,
 				Index:        match.RawIndex,
@@ -68,8 +67,8 @@ func (m Model) handleJumpToMatch(msg search.JumpToMatchMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	sec := m.sectionState(m.section)
-	diffview.ApplyDiffSearchMatch(&sec.data, &sec.viewport, match)
+	sec := m.diff.SectionModel(m.diff.ActiveSection)
+	sec.ApplySearchMatch(match)
 	return m, nil
 
 }
@@ -79,15 +78,8 @@ func (m *Model) syncSearchCursorFromDiffFocus() {
 	if !diffSearch.HasQuery() || diffSearch.MatchesCount() == 0 || m.focus != focusDiff {
 		return
 	}
-	sec := m.sectionState(m.section)
-	diffMatches := make([]diffview.DiffSearchMatch, 0, diffSearch.MatchesCount())
-	for _, match := range diffSearch.Matches() {
-		diffMatches = append(diffMatches, diffview.DiffSearchMatch{
-			DisplayIndex: match.DisplayIndex,
-			RawIndex:     match.Index,
-		})
-	}
-	idx := diffview.CurrentDiffSearchMatchIndex(sec.data, diffMatches, diffview.NavModeLine)
+	sec := m.diff.SectionModel(m.diff.ActiveSection)
+	idx := sec.CurrentSearchCursor(diffSearch.Matches())
 	if idx < 0 {
 		return
 	}
@@ -101,17 +93,17 @@ func (m *Model) syncSearchCursorFromDiffFocus() {
 }
 
 func (m *Model) currentDiffSearch() *search.Model {
-	if m.section == sectionStaged {
-		return m.stagedModel.Search()
+	if m.diff.ActiveSection == sectionStaged {
+		return m.diff.Staged.Search()
 	}
-	return m.unstagedModel.Search()
+	return m.diff.Unstaged.Search()
 }
 
 func (m *Model) diffSearchForSection(section diffSection) *search.Model {
 	if section == sectionStaged {
-		return m.stagedModel.Search()
+		return m.diff.Staged.Search()
 	}
-	return m.unstagedModel.Search()
+	return m.diff.Unstaged.Search()
 }
 
 func (m Model) filetreeEntrySearchText(entry filetree.Entry[git.StageFileStatus]) string {
@@ -153,7 +145,7 @@ func (m Model) searchMatchDiffDisplay(scope diffSection, displayIdx int) (matche
 	if !diffSearch.HasQuery() {
 		return false, false
 	}
-	if m.focus != focusDiff || m.section != scope {
+	if m.focus != focusDiff || m.diff.ActiveSection != scope {
 		return false, false
 	}
 	for i, match := range diffSearch.Matches() {

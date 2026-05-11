@@ -1,9 +1,5 @@
 package commit
 
-import (
-	"github.com/elentok/gx/ui/diffview"
-)
-
 func (m *Model) diffPaneSize() (int, int) {
 	headerH := m.headerViewportRowsCount() + 2
 	contentH := max(5, m.height-1-headerH-1)
@@ -25,48 +21,45 @@ func (m *Model) syncDiffViewport() {
 	_, diffH := m.diffPaneSize()
 	bodyW := m.currentDiffRenderWidth()
 	bodyH := max(0, diffH-2)
-	diffview.ReflowDiffBuffer(&m.section, bodyW, m.wrapSoft)
+	m.diffModel.Reflow(bodyW)
 	if m.search.HasQuery() && m.searchScope == searchScopeDiff {
 		matches := m.computeSearchMatches(m.search.Query())
 		m.search.SetMatches(matches)
 	}
-	m.diffViewport.SetWidth(bodyW)
-	m.diffViewport.SetHeight(bodyH)
-	m.diffViewport.SetContentLines(m.section.ViewLines)
+	m.diffModel.SyncViewport(bodyW, bodyH)
 	m.ensureActiveVisible()
 }
 
 func (m *Model) activeRawLineIndex() int {
-	return diffview.ActiveRawLineIndex(m.section, m.diffNavMode)
-}
-
-func (m *Model) ensureActiveVisible() {
-	diffview.EnsureActiveVisible(m.section, &m.diffViewport, m.diffNavMode)
+	return m.diffModel.ActiveRawLineIndex()
 }
 
 func (m *Model) moveDiffActive(delta int) {
-	if !diffview.MoveActive(&m.section, &m.diffViewport, m.diffNavMode, delta, false) {
+	if !m.diffModel.MoveActive(delta, false) {
 		return
 	}
 	m.syncSearchCursorFromDiffFocus()
 	m.ensureActiveVisible()
 }
 
+func (m *Model) ensureActiveVisible() {
+	m.diffModel.EnsureActiveVisible(m.diffModel.NavMode())
+}
+
 func (m *Model) scrollDiffPage(direction int) {
-	diffview.ScrollPage(&m.diffViewport, direction)
+	m.diffModel.ScrollPage(direction)
 }
 
 func (m *Model) jumpDiffTop() {
-	if !diffview.JumpTop(&m.section, &m.diffViewport, m.diffNavMode) {
+	if !m.diffModel.JumpTop() {
 		return
 	}
 	m.syncSearchCursorFromDiffFocus()
 }
 
 func (m *Model) jumpDiffBottom() {
-	if !diffview.JumpBottom(&m.section, &m.diffViewport, m.diffNavMode) {
+	if !m.diffModel.JumpBottom() {
 		return
 	}
 	m.syncSearchCursorFromDiffFocus()
 }
-

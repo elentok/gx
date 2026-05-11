@@ -8,6 +8,15 @@ import (
 	"strings"
 )
 
+func HasBinaryDiff(parsed ParsedDiff) bool {
+	for _, line := range parsed.Lines {
+		if strings.HasPrefix(line, "Binary files ") || strings.HasPrefix(line, "GIT binary patch") {
+			return true
+		}
+	}
+	return false
+}
+
 type ParsedDiff struct {
 	FileHeader []string
 	Lines      []string

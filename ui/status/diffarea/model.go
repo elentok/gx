@@ -1,0 +1,153 @@
+package diffarea
+
+import (
+	"github.com/elentok/gx/ui/diffview"
+)
+
+type Section int
+
+const (
+	SectionUnstaged Section = iota
+	SectionStaged
+)
+
+type FlashState struct {
+	Active  bool
+	Section Section
+	NavMode diffview.NavMode
+	Hunk    int
+	Line    int
+	Frames  int
+}
+
+type Model struct {
+	ActiveSection  Section
+	navMode        diffview.NavMode
+	renderMode     diffview.RenderMode
+	DiffFullscreen bool
+	wrap           bool
+	Unstaged       diffview.Model
+	Staged         diffview.Model
+	Flash          FlashState
+}
+
+func NewModel() Model {
+	area := Model{
+		ActiveSection: SectionUnstaged,
+		navMode:       diffview.NavModeHunk,
+		renderMode:    diffview.RenderModeUnified,
+		wrap:          true,
+		Unstaged:      diffview.NewModel(),
+		Staged:        diffview.NewModel(),
+	}
+	area.SetRenderMode(area.renderMode)
+	area.SetNavMode(area.navMode)
+	area.SetWrap(area.wrap)
+	return area
+}
+
+func (d Model) RenderMode() diffview.RenderMode {
+	return d.renderMode
+}
+
+func (d *Model) SetRenderMode(mode diffview.RenderMode) {
+	d.renderMode = mode
+	d.Unstaged.SetRenderMode(mode)
+	d.Staged.SetRenderMode(mode)
+}
+
+func (d Model) NavMode() diffview.NavMode {
+	return d.navMode
+}
+
+func (d *Model) SetNavMode(mode diffview.NavMode) {
+	d.navMode = mode
+	d.Unstaged.SetNavMode(mode)
+	d.Staged.SetNavMode(mode)
+}
+
+func (d *Model) ToggleNavMode() {
+	if d.navMode == diffview.NavModeHunk {
+		d.SetNavMode(diffview.NavModeLine)
+		return
+	}
+	d.SetNavMode(diffview.NavModeHunk)
+}
+
+func (d Model) Wrap() bool {
+	return d.wrap
+}
+
+func (d *Model) SetWrap(enabled bool) {
+	d.wrap = enabled
+	d.Unstaged.EnableWrap(enabled)
+	d.Staged.EnableWrap(enabled)
+}
+
+func (d *Model) SectionModel(section Section) *diffview.Model {
+	if section == SectionStaged {
+		return &d.Staged
+	}
+	return &d.Unstaged
+}
+
+func (d *Model) ActiveSectionModel() *diffview.Model {
+	return d.SectionModel(d.ActiveSection)
+}
+
+func (d *Model) DisableVisual() {
+	active := d.ActiveSectionModel().DataRef()
+	active.VisualActive = false
+	active.VisualAnchor = active.ActiveLine
+}
+
+func (d *Model) ToggleVisual() bool {
+	active := d.ActiveSectionModel().DataRef()
+	if len(active.Parsed.Changed) == 0 {
+		return false
+	}
+	if !active.VisualActive {
+		active.VisualActive = true
+		active.VisualAnchor = active.ActiveLine
+		return true
+	}
+	active.VisualActive = false
+	active.VisualAnchor = active.ActiveLine
+	return true
+}
+
+func (d *Model) ToggleSection() {
+	if d.ActiveSection == SectionUnstaged {
+		d.ActiveSection = SectionStaged
+		return
+	}
+	d.ActiveSection = SectionUnstaged
+}
+
+func (d *Model) ResetSections() {
+	d.Unstaged = diffview.NewModel()
+	d.Staged = diffview.NewModel()
+	d.SetRenderMode(d.renderMode)
+	d.SetNavMode(d.navMode)
+	d.SetWrap(d.wrap)
+}
+
+func (d *Model) MoveActive(delta int) bool {
+	sec := d.ActiveSectionModel()
+	return sec.MoveActive(delta, true)
+}
+
+func (d *Model) ScrollPage(direction int) {
+	sec := d.ActiveSectionModel()
+	sec.ScrollPage(direction)
+}
+
+func (d *Model) JumpTop() bool {
+	sec := d.ActiveSectionModel()
+	return sec.JumpTop()
+}
+
+func (d *Model) JumpBottom() bool {
+	sec := d.ActiveSectionModel()
+	return sec.JumpBottom()
+}

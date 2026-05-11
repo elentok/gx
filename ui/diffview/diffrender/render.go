@@ -97,17 +97,6 @@ func DiffBodyPadding(kind RowKind, width int) string {
 	}
 }
 
-func HasBinaryDiff(parsed ParsedDiff) bool {
-	for _, line := range parsed.Lines {
-		if strings.HasPrefix(line, "Binary files ") || strings.HasPrefix(line, "GIT binary patch") {
-			return true
-		}
-	}
-	return false
-}
-
-func SectionHasBinaryDiff(parsed ParsedDiff) bool { return HasBinaryDiff(parsed) }
-
 func (si SymlinkDiffInfo) TitleLabel() string {
 	switch {
 	case si.WasSymlink && si.IsNowSymlink:

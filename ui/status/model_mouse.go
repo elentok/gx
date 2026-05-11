@@ -1,6 +1,10 @@
 package status
 
-import tea "charm.land/bubbletea/v2"
+import (
+	"github.com/elentok/gx/ui/diffview"
+
+	tea "charm.land/bubbletea/v2"
+)
 
 func (m *Model) handleMouseWheel(msg tea.MouseWheelMsg) bool {
 	if m.runningOpen || m.confirmOpen || m.errorOpen || m.help.IsOpen || m.searchActive() {
@@ -21,8 +25,8 @@ func (m *Model) handleMouseWheel(msg tea.MouseWheelMsg) bool {
 
 func (m Model) searchActive() bool {
 	return m.fileTreeModel.Search().IsActive() ||
-		m.unstagedModel.Search().IsActive() ||
-		m.stagedModel.Search().IsActive()
+		m.diff.Unstaged.Search().IsActive() ||
+		m.diff.Staged.Search().IsActive()
 }
 
 func (m *Model) scrollDiffByMouse(x, y, dir int) bool {
@@ -41,15 +45,15 @@ func (m *Model) scrollDiffByMouse(x, y, dir int) bool {
 		return false
 	}
 	if dir > 0 {
-		sec.viewport.ScrollDown(3)
+		sec.Viewport().ScrollDown(3)
 	} else {
-		sec.viewport.ScrollUp(3)
+		sec.Viewport().ScrollUp(3)
 	}
 	return true
 }
 
 func (m Model) diffRect(mainH int) (x, y, w, h int, ok bool) {
-	if m.diffFullscreen && m.focus == focusDiff {
+	if m.diff.DiffFullscreen && m.focus == focusDiff {
 		return 0, 0, m.width, mainH, true
 	}
 	if m.useStackedLayout() {
@@ -60,25 +64,25 @@ func (m Model) diffRect(mainH int) (x, y, w, h int, ok bool) {
 	return filetreeW, 0, diffW, mainH, true
 }
 
-func (m *Model) mouseTargetSection(relY, diffH int) *sectionState {
+func (m *Model) mouseTargetSection(relY, diffH int) *diffview.Model {
 	if diffH <= 0 {
 		return nil
 	}
 	expandedH, collapsedH := diffPaneHeights(diffH)
-	if m.section == sectionStaged {
+	if m.diff.ActiveSection == sectionStaged {
 		if relY < collapsedH {
-			return m.sectionState(sectionUnstaged)
+			return m.diff.SectionModel(sectionUnstaged)
 		}
 		if relY < collapsedH+expandedH {
-			return m.sectionState(sectionStaged)
+			return m.diff.SectionModel(sectionStaged)
 		}
 		return nil
 	}
 	if relY < expandedH {
-		return m.sectionState(sectionUnstaged)
+		return m.diff.SectionModel(sectionUnstaged)
 	}
 	if relY < expandedH+collapsedH {
-		return m.sectionState(sectionStaged)
+		return m.diff.SectionModel(sectionStaged)
 	}
 	return nil
 }

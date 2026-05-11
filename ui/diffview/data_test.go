@@ -9,8 +9,8 @@ import (
 )
 
 func TestBuildDiffBuffer_Unified(t *testing.T) {
-	prev := NewDiffBuffer()
-	data := BuildDiffBuffer(sampleSectionUnifiedDiff, "", prev, false)
+	prev := NewDiffData()
+	data := BuildDiffData(sampleSectionUnifiedDiff, "", prev, false)
 
 	if len(data.Parsed.Hunks) != 1 {
 		t.Fatalf("hunks = %d, want 1", len(data.Parsed.Hunks))
@@ -24,9 +24,9 @@ func TestBuildDiffBuffer_Unified(t *testing.T) {
 }
 
 func TestBuildDiffBuffer_SideBySide(t *testing.T) {
-	prev := NewDiffBuffer()
+	prev := NewDiffData()
 	color := " file:1: header\n  │ 1 │ one         │ 1 │ one         │\n  │ 2 │ two         │   │             │\n  │   │             │ 2 │ two changed │\n  │ 3 │ three       │ 3 │ three       │"
-	data := BuildDiffBuffer(sampleSectionUnifiedDiff, color, prev, true)
+	data := BuildDiffData(sampleSectionUnifiedDiff, color, prev, true)
 
 	if !reflect.DeepEqual(data.ChangedDisplay, []int{2, 3}) {
 		t.Fatalf("ChangedDisplay = %#v", data.ChangedDisplay)
@@ -36,15 +36,15 @@ func TestBuildDiffBuffer_SideBySide(t *testing.T) {
 	}
 }
 
-func TestReflowDiffBuffer(t *testing.T) {
-	data := DiffBuffer{
+func TestReflowDiffData(t *testing.T) {
+	data := DiffData{
 		Parsed:           diffcore.ParseUnifiedDiff(sampleSectionUnifiedDiff),
 		BaseLines:        []string{"0123456789"},
 		BaseLineKinds:    []diffrender.RowKind{diffrender.RowAdded},
 		BaseDisplayToRaw: []int{6},
 	}
 
-	ReflowDiffBuffer(&data, 4, true)
+	reflowDiffData(&data, 4, true)
 	if len(data.ViewLines) < 2 {
 		t.Fatalf("expected wrapped lines, got %#v", data.ViewLines)
 	}

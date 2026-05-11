@@ -53,7 +53,7 @@ func (m Model) renderFiletreePanelWithBorderTitle(width, height int, title, righ
 }
 
 func (m Model) renderPanelWithBorderTitle(width, height int, title, rightTitle string, lines []string, active bool, section diffSection) string {
-	highlightMoved := m.flash.active && m.flash.section == section
+	highlightMoved := m.diff.Flash.Active && m.diff.Flash.Section == section
 	borderColor := ui.ColorSubtle
 	titleColor := ui.ColorOrange
 	if section == sectionStaged {
@@ -172,21 +172,22 @@ func isDeletedFileStatus(file git.StageFileStatus) bool {
 	return file.IndexStatus == 'D' || file.WorktreeCode == 'D'
 }
 
-func (m Model) flashMarker(section diffSection, rawIdx int, sec *sectionState) bool {
-	if !m.flash.active || m.flash.section != section {
+func (m Model) flashMarker(section diffSection, rawIdx int, sec *diffview.Model) bool {
+	diff := sec.DataRef()
+	if !m.diff.Flash.Active || m.diff.Flash.Section != section {
 		return false
 	}
-	if m.flash.navMode == diffview.NavModeHunk {
-		if m.flash.hunk < 0 || m.flash.hunk >= len(sec.data.Parsed.Hunks) {
+	if m.diff.Flash.NavMode == diffview.NavModeHunk {
+		if m.diff.Flash.Hunk < 0 || m.diff.Flash.Hunk >= len(diff.Parsed.Hunks) {
 			return false
 		}
-		h := sec.data.Parsed.Hunks[m.flash.hunk]
+		h := diff.Parsed.Hunks[m.diff.Flash.Hunk]
 		return rawIdx >= h.StartLine && rawIdx <= h.EndLine
 	}
-	if m.flash.line < 0 || m.flash.line >= len(sec.data.Parsed.Changed) {
+	if m.diff.Flash.Line < 0 || m.diff.Flash.Line >= len(diff.Parsed.Changed) {
 		return false
 	}
-	return sec.data.Parsed.Changed[m.flash.line].LineIndex == rawIdx
+	return diff.Parsed.Changed[m.diff.Flash.Line].LineIndex == rawIdx
 }
 
 func maxInt(a, b int) int {

@@ -14,7 +14,7 @@ func (m Model) deltaRenderWidth() int {
 		mainH = 4
 	}
 	_, diffW := m.splitWidth()
-	if m.diffFullscreen && m.focus == focusDiff {
+	if m.diff.DiffFullscreen && m.focus == focusDiff {
 		diffW = m.width
 	}
 	innerW := maxInt(1, diffW-2)
@@ -30,30 +30,30 @@ func (m Model) deltaRenderWidth() int {
 }
 
 func (m *Model) toggleRenderMode() tea.Cmd {
-	if m.renderMode == diffview.RenderModeUnified {
+	if m.diff.RenderMode() == diffview.RenderModeUnified {
 		if !git.DeltaAvailable() {
 			m.setStatus("side-by-side requires delta; staying in unified mode")
 			return nil
 		}
-		m.renderMode = diffview.RenderModeSideBySide
+		m.diff.SetRenderMode(diffview.RenderModeSideBySide)
 		m.setStatus("side-by-side mode")
 	} else {
-		m.renderMode = diffview.RenderModeUnified
+		m.diff.SetRenderMode(diffview.RenderModeUnified)
 		m.setStatus("unified mode")
 	}
-	m.diffArea.applyModes()
+
 	cmd := m.reloadDiffsForSelection()
 	m.syncDiffViewports()
-	m.ensureActiveVisible(m.currentSection())
+	m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
 	return cmd
 }
 
 func (m Model) isSideBySideMode() bool {
-	return m.renderMode == diffview.RenderModeSideBySide
+	return m.diff.RenderMode() == diffview.RenderModeSideBySide
 }
 
 func (m Model) renderModeLabel() string {
-	if m.renderMode == diffview.RenderModeSideBySide {
+	if m.diff.RenderMode() == diffview.RenderModeSideBySide {
 		return "side-by-side"
 	}
 	return "unified"

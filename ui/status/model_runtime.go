@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/diffview"
-
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -103,17 +101,17 @@ func (m *Model) refreshWithBehavior(preserveScroll bool) tea.Cmd {
 	if entry, ok := m.selectedFiletreeEntry(); ok {
 		preserve = entry.Path
 	}
-	unstagedOffset := m.unstaged.viewport.YOffset()
-	stagedOffset := m.staged.viewport.YOffset()
+	unstagedOffset := m.diff.Unstaged.Viewport().YOffset()
+	stagedOffset := m.diff.Staged.Viewport().YOffset()
 	cmd := m.reload(preserve)
 	m.syncDiffViewports()
 	if preserveScroll {
-		diffview.RestoreViewportYOffset(&m.unstaged.viewport, unstagedOffset)
-		diffview.RestoreViewportYOffset(&m.staged.viewport, stagedOffset)
+		m.diff.Unstaged.RestoreViewportYOffset(unstagedOffset)
+		m.diff.Staged.RestoreViewportYOffset(stagedOffset)
 		return cmd
 	}
 	if m.focus == focusDiff {
-		m.ensureActiveVisible(m.currentSection())
+		m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
 	}
 	return cmd
 }

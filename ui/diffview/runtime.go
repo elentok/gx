@@ -5,7 +5,7 @@ import (
 	"github.com/elentok/gx/ui/diffview/diffcore"
 )
 
-func RestoreViewportYOffset(vp *viewport.Model, y int) {
+func restoreViewportYOffset(vp *viewport.Model, y int) {
 	if y < 0 {
 		y = 0
 	}
@@ -19,7 +19,7 @@ func RestoreViewportYOffset(vp *viewport.Model, y int) {
 	vp.SetYOffset(y)
 }
 
-func HunkDisplayBounds(
+func hunkDisplayBounds(
 	hunkDisplayRange [][2]int,
 	parsed diffcore.ParsedDiff,
 	displayToRaw []int,
@@ -52,7 +52,7 @@ func HunkDisplayBounds(
 	return start, end, true
 }
 
-func VisualLineBounds(visualAnchor, activeLine, changedCount int) (start, end int) {
+func visualLineBounds(visualAnchor, activeLine, changedCount int) (start, end int) {
 	start = visualAnchor
 	end = activeLine
 	if start > end {

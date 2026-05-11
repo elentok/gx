@@ -2,57 +2,38 @@ package status
 
 import "github.com/elentok/gx/ui/diffview"
 
-func (m Model) canSwitchSections() bool {
-	return true
-}
-
 func (m *Model) switchDiffSection() {
-	if m.section == sectionUnstaged {
-		m.section = sectionStaged
-	} else {
-		m.section = sectionUnstaged
-	}
+	m.diff.ToggleSection()
 	m.syncDiffViewports()
-	m.ensureActiveVisible(m.currentSection())
-}
-
-func (m *Model) currentSection() *sectionState {
-	return m.sectionState(m.section)
-}
-
-func (m *Model) ensureActiveVisible(sec *sectionState) {
-	diffview.EnsureActiveVisible(sec.data, &sec.viewport, m.navMode)
+	m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
 }
 
 func (m Model) editorLineForCurrentSelection() int {
 	if m.focus != focusDiff {
 		return 0
 	}
-	sec := m.currentSection()
-	if m.navMode == diffview.NavModeLine {
-		if sec.data.ActiveLine < 0 || sec.data.ActiveLine >= len(sec.data.Parsed.Changed) {
+	sec := m.diff.ActiveSectionModel()
+	diff := sec.DataRef()
+	if m.diff.NavMode() == diffview.NavModeLine {
+		if diff.ActiveLine < 0 || diff.ActiveLine >= len(diff.Parsed.Changed) {
 			return 0
 		}
-		cl := sec.data.Parsed.Changed[sec.data.ActiveLine]
+		cl := diff.Parsed.Changed[diff.ActiveLine]
 		if cl.NewLine > 0 {
 			return cl.NewLine
 		}
 		return cl.OldLine
 	}
-	if sec.data.ActiveHunk < 0 || sec.data.ActiveHunk >= len(sec.data.Parsed.Hunks) {
+	if diff.ActiveHunk < 0 || diff.ActiveHunk >= len(diff.Parsed.Hunks) {
 		return 0
 	}
-	h := sec.data.Parsed.Hunks[sec.data.ActiveHunk]
+	h := diff.Parsed.Hunks[diff.ActiveHunk]
 	if h.NewStart > 0 {
 		return h.NewStart
 	}
 	return h.OldStart
 }
 
-func hunkDisplayBounds(sec sectionState, hunkIdx int) (start int, end int, ok bool) {
-	return diffview.HunkDisplayBounds(sec.data.HunkDisplayRange, sec.data.Parsed, sec.data.DisplayToRaw, hunkIdx)
-}
-
-func visualLineBounds(sec sectionState) (start, end int) {
-	return diffview.VisualLineBounds(sec.data.VisualAnchor, sec.data.ActiveLine, len(sec.data.Parsed.Changed))
+func visualLineBounds(diff diffview.DiffData) (start, end int) {
+	return diff.VisualLineBounds()
 }

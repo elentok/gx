@@ -77,21 +77,21 @@ func TestEnterFocusesDiffAndJKMoveInsideDiff(t *testing.T) {
 	if !m.focusDiff {
 		t.Fatalf("expected enter to focus diff")
 	}
-	if m.diffNavMode != diffview.NavModeHunk {
-		t.Fatalf("expected default nav mode hunk, got %v", m.diffNavMode)
+	if m.diffModel.NavMode() != diffview.NavModeHunk {
+		t.Fatalf("expected default nav mode hunk, got %v", m.diffModel.NavMode())
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	m = updated.(Model)
-	if m.diffNavMode != diffview.NavModeLine {
-		t.Fatalf("expected a to switch to line mode, got %v", m.diffNavMode)
+	if m.diffModel.NavMode() != diffview.NavModeLine {
+		t.Fatalf("expected a to switch to line mode, got %v", m.diffModel.NavMode())
 	}
 
-	before := m.section.ActiveLine
+	before := m.diffModel.Data().ActiveLine
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
-	if m.section.ActiveLine <= before {
-		t.Fatalf("expected j to move active line, before=%d after=%d", before, m.section.ActiveLine)
+	if m.diffModel.Data().ActiveLine <= before {
+		t.Fatalf("expected j to move active line, before=%d after=%d", before, m.diffModel.Data().ActiveLine)
 	}
 }
 
@@ -248,22 +248,22 @@ func TestDiffSearchMovesToMatchesAndNavigates(t *testing.T) {
 	if m.search.MatchesCount() < 2 {
 		t.Fatalf("expected multiple diff matches, got %d", m.search.MatchesCount())
 	}
-	if !m.focusDiff || m.diffNavMode != diffview.NavModeLine {
+	if !m.focusDiff || m.diffModel.NavMode() != diffview.NavModeLine {
 		t.Fatalf("expected diff search to focus diff in line mode")
 	}
 
-	first := m.section.ActiveLine
+	first := m.diffModel.Data().ActiveLine
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	m = updated.(Model)
-	if m.section.ActiveLine == first {
+	if m.diffModel.Data().ActiveLine == first {
 		t.Fatalf("expected n to move to next diff match")
 	}
-	second := m.section.ActiveLine
+	second := m.diffModel.Data().ActiveLine
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'N', Text: "N", ShiftedCode: 'N'})
 	m = updated.(Model)
-	if m.section.ActiveLine == second {
+	if m.diffModel.Data().ActiveLine == second {
 		t.Fatalf("expected N to move to previous diff match")
 	}
 }
@@ -315,7 +315,7 @@ func TestYankAllContextWithYAInDiff(t *testing.T) {
 	m.height = 24
 	m.syncDiffViewport()
 	m.focusDiff = true
-	m.diffNavMode = diffview.NavModeLine
+	m.diffModel.SetNavMode(diffview.NavModeLine)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
 	m = updated.(Model)
@@ -413,7 +413,7 @@ func TestInitialSelectionChoosesFirstFileOverDirectory(t *testing.T) {
 	if entry.Kind != commitFileEntryFile {
 		t.Fatalf("expected initial selection to choose file entry, got %#v", entry)
 	}
-	if len(m.section.ViewLines) == 0 {
+	if len(m.diffModel.Data().ViewLines) == 0 {
 		t.Fatal("expected initial file selection to load diff")
 	}
 }

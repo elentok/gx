@@ -44,10 +44,7 @@ type Model struct {
 }
 
 type commitDiffArea struct {
-	diffNavMode  diffview.NavMode
-	wrapSoft     bool
-	section      diffview.DiffBuffer
-	diffViewport viewport.Model
+	diffModel diffview.Model
 }
 
 type commitSearchState struct {
@@ -73,9 +70,7 @@ func NewWithSettings(worktreeRoot, ref string, settings Settings) Model {
 		settings:     settings,
 		bodyExpanded: true,
 		commitDiffArea: commitDiffArea{
-			diffNavMode:  diffview.NavModeHunk,
-			wrapSoft:     true,
-			diffViewport: viewport.New(),
+			diffModel: diffview.NewModel(),
 		},
 		commitSearchState: commitSearchState{
 			search: search.NewModel(),
@@ -102,13 +97,13 @@ func (m *Model) reload() {
 	m.details, m.err = git.CommitDetailsForRef(m.worktreeRoot, m.ref)
 	if m.err != nil {
 		m.files = nil
-		m.section = diffview.NewDiffBuffer()
+		m.diffModel.SetData(diffview.NewDiffData())
 		m.headerOffset = 0
 		return
 	}
 	m.files, m.err = git.CommitFilesForRef(m.worktreeRoot, m.ref)
 	if m.err != nil {
-		m.section = diffview.NewDiffBuffer()
+		m.diffModel.SetData(diffview.NewDiffData())
 		m.headerOffset = 0
 		return
 	}
@@ -129,20 +124,20 @@ func (m *Model) reload() {
 func (m *Model) refreshDiff() {
 	file, ok := m.selectedCommitFile()
 	if !ok {
-		m.section = diffview.NewDiffBuffer()
+		m.diffModel.SetData(diffview.NewDiffData())
 		return
 	}
 	rawDiff, err := git.CommitFileDiffForRef(m.worktreeRoot, m.ref, file.Path)
 	if err != nil {
 		m.err = err
-		m.section = diffview.NewDiffBuffer()
+		m.diffModel.SetData(diffview.NewDiffData())
 		return
 	}
 	colorDiff, err := git.CommitFileDiffWithDeltaForRef(m.worktreeRoot, m.ref, file.Path, m.currentDiffRenderWidth())
 	if err != nil {
 		colorDiff = rawDiff
 	}
-	m.section = diffview.BuildDiffBuffer(rawDiff, colorDiff, m.section, false)
+	m.diffModel.BuildFromRaw(rawDiff, colorDiff)
 	if m.search.HasQuery() && m.searchScope == searchScopeDiff {
 		matches := m.computeSearchMatches(m.search.Query())
 		m.search.SetMatches(matches)

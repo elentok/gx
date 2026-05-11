@@ -7,7 +7,9 @@ import (
 	diffrender "github.com/elentok/gx/ui/diffview/diffrender"
 )
 
-type DiffBuffer struct {
+// DiffData contains the complete per-pane diff state:
+// parsed diff, rendered lines/mappings, and active selection/cursor.
+type DiffData struct {
 	RawLines         []string
 	BaseLines        []string
 	BaseLineKinds    []diffrender.RowKind
@@ -25,16 +27,35 @@ type DiffBuffer struct {
 	VisualAnchor     int
 }
 
-func NewDiffBuffer() DiffBuffer {
-	return DiffBuffer{
+func (d *DiffData) HasContent() bool {
+	if d == nil {
+		return false
+	}
+	return len(d.ViewLines) > 0 || diffcore.HasBinaryDiff(d.Parsed)
+}
+
+func (d DiffData) ActiveRawLineIndex(navMode NavMode) int {
+	return activeRawLineIndex(d, navMode)
+}
+
+func (d DiffData) HunkDisplayBounds(hunkIdx int) (start int, end int, ok bool) {
+	return hunkDisplayBounds(d.HunkDisplayRange, d.Parsed, d.DisplayToRaw, hunkIdx)
+}
+
+func (d DiffData) VisualLineBounds() (start, end int) {
+	return visualLineBounds(d.VisualAnchor, d.ActiveLine, len(d.Parsed.Changed))
+}
+
+func NewDiffData() DiffData {
+	return DiffData{
 		ActiveHunk:   -1,
 		ActiveLine:   -1,
 		VisualAnchor: -1,
 	}
 }
 
-func BuildDiffBuffer(raw, color string, prev DiffBuffer, sideBySide bool) DiffBuffer {
-	state := DiffBuffer{
+func BuildDiffData(raw, color string, prev DiffData, sideBySide bool) DiffData {
+	state := DiffData{
 		ActiveHunk:   prev.ActiveHunk,
 		ActiveLine:   prev.ActiveLine,
 		VisualActive: prev.VisualActive,
@@ -52,11 +73,11 @@ func BuildDiffBuffer(raw, color string, prev DiffBuffer, sideBySide bool) DiffBu
 	state.Parsed = diffcore.ParseUnifiedDiff(raw)
 	state.RawLines = append([]string{}, state.Parsed.Lines...)
 	if sideBySide {
-		initSideBySideDiffBuffer(&state, color)
+		initSideBySideDiffData(&state, color)
 		return state
 	}
 
-	colorLines := SplitLines(color)
+	colorLines := splitLines(color)
 	if len(colorLines) == 0 {
 		colorLines = append([]string{}, state.RawLines...)
 	} else if len(colorLines) < len(state.RawLines) {
@@ -72,11 +93,11 @@ func BuildDiffBuffer(raw, color string, prev DiffBuffer, sideBySide bool) DiffBu
 	state.HunkDisplayRange = nil
 	state.ChangedDisplay = nil
 
-	clampDiffBufferSelection(&state)
+	clampDiffDataSelection(&state)
 	return state
 }
 
-func ReflowDiffBuffer(state *DiffBuffer, wrapWidth int, wrapSoft bool) {
+func reflowDiffData(state *DiffData, wrapWidth int, wrapSoft bool) {
 	if len(state.BaseLines) == 0 {
 		state.ViewLines = nil
 		state.ViewLineKinds = nil
@@ -118,8 +139,8 @@ func ReflowDiffBuffer(state *DiffBuffer, wrapWidth int, wrapSoft bool) {
 	state.RawToDisplay = diffcore.BuildRawToDisplayMap(state.Parsed, state.DisplayToRaw)
 }
 
-func initSideBySideDiffBuffer(state *DiffBuffer, color string) {
-	state.ViewLines = SplitLines(color)
+func initSideBySideDiffData(state *DiffData, color string) {
+	state.ViewLines = splitLines(color)
 	if len(state.ViewLines) == 0 {
 		state.ViewLines = append([]string{}, state.RawLines...)
 	}
@@ -131,16 +152,16 @@ func initSideBySideDiffBuffer(state *DiffBuffer, color string) {
 	}
 	state.ViewLineKinds = append([]diffrender.RowKind{}, state.BaseLineKinds...)
 
-	mapping := BuildSideBySideMapping(state.Parsed, state.ViewLines)
+	mapping := buildSideBySideMapping(state.Parsed, state.ViewLines)
 	state.DisplayToRaw = mapping.DisplayToRaw
 	state.RawToDisplay = mapping.RawToDisplay
 	state.ChangedDisplay = mapping.ChangedDisplay
 	state.HunkDisplayRange = mapping.HunkDisplayRange
 
-	clampDiffBufferSelection(state)
+	clampDiffDataSelection(state)
 }
 
-func clampDiffBufferSelection(state *DiffBuffer) {
+func clampDiffDataSelection(state *DiffData) {
 	if len(state.Parsed.Hunks) == 0 {
 		state.ActiveHunk = -1
 	} else {

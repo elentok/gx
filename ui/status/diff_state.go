@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/diffview/diffcore"
+	"github.com/elentok/gx/ui/status/diffarea"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -36,39 +37,39 @@ func (m *Model) applySelection() tea.Cmd {
 		return nil
 	}
 
-	sec := m.currentSection()
-	sig := movedTarget{fromSection: m.section, navMode: m.navMode}
-	if file.Untracked && m.section == sectionUnstaged {
+	sec := m.diff.ActiveSectionModel()
+	sig := movedTarget{fromSection: m.diff.ActiveSection, navMode: m.diff.NavMode()}
+	if file.Untracked && m.diff.ActiveSection == sectionUnstaged {
 		if err := git.StageIntentPath(m.worktreeRoot, file.Path); err != nil {
 			m.showGitError(err)
 			return nil
 		}
 	}
 
-	if m.navMode == diffview.NavModeHunk {
-		if sec.data.ActiveHunk < 0 || sec.data.ActiveHunk >= len(sec.data.Parsed.Hunks) {
+	if m.diff.NavMode() == diffview.NavModeHunk {
+		if sec.DataRef().ActiveHunk < 0 || sec.DataRef().ActiveHunk >= len(sec.DataRef().Parsed.Hunks) {
 			return nil
 		}
-		sig.hunkHeader = sec.data.Parsed.Hunks[sec.data.ActiveHunk].Header
-		patch, err := diffcore.BuildHunkPatch(sec.data.Parsed, sec.data.ActiveHunk)
+		sig.hunkHeader = sec.DataRef().Parsed.Hunks[sec.DataRef().ActiveHunk].Header
+		patch, err := diffcore.BuildHunkPatch(sec.DataRef().Parsed, sec.DataRef().ActiveHunk)
 		if err != nil {
 			m.setStatus(err.Error())
 			return nil
 		}
-		reverse := m.section == sectionStaged
+		reverse := m.diff.ActiveSection == sectionStaged
 		if err := git.ApplyPatchToIndex(m.worktreeRoot, patch, reverse, false); err != nil {
 			if !isCorruptPatchErr(err) {
 				m.showGitError(err)
 				return nil
 			}
-			h := sec.data.Parsed.Hunks[sec.data.ActiveHunk]
+			h := sec.DataRef().Parsed.Hunks[sec.DataRef().ActiveHunk]
 			if len(h.ChangedLineOffset) == 0 {
 				m.showGitError(err)
 				return nil
 			}
 			startChanged := h.ChangedLineOffset[0]
 			endChanged := h.ChangedLineOffset[len(h.ChangedLineOffset)-1]
-			fallbackPatch, fallbackErr := diffcore.BuildLineRangePatch(sec.data.Parsed, startChanged, endChanged)
+			fallbackPatch, fallbackErr := diffcore.BuildLineRangePatch(sec.DataRef().Parsed, startChanged, endChanged)
 			if fallbackErr != nil {
 				m.showGitError(err)
 				return nil
@@ -79,44 +80,44 @@ func (m *Model) applySelection() tea.Cmd {
 			}
 		}
 	} else {
-		if sec.data.ActiveLine < 0 || sec.data.ActiveLine >= len(sec.data.Parsed.Changed) {
+		if sec.DataRef().ActiveLine < 0 || sec.DataRef().ActiveLine >= len(sec.DataRef().Parsed.Changed) {
 			return nil
 		}
-		startLine, endLine := sec.data.ActiveLine, sec.data.ActiveLine
-		if sec.data.VisualActive {
-			startLine, endLine = visualLineBounds(*sec)
+		startLine, endLine := sec.DataRef().ActiveLine, sec.DataRef().ActiveLine
+		if sec.DataRef().VisualActive {
+			startLine, endLine = visualLineBounds(sec.Data())
 		}
-		sig.lineText = sec.data.Parsed.Changed[endLine].Text
+		sig.lineText = sec.DataRef().Parsed.Changed[endLine].Text
 
 		var (
 			patch string
 			err   error
 		)
-		if sec.data.VisualActive && endLine > startLine {
-			patch, err = diffcore.BuildLineRangePatch(sec.data.Parsed, startLine, endLine)
+		if sec.DataRef().VisualActive && endLine > startLine {
+			patch, err = diffcore.BuildLineRangePatch(sec.DataRef().Parsed, startLine, endLine)
 		} else {
-			patch, err = diffcore.BuildSingleLinePatch(sec.data.Parsed, sec.data.ActiveLine)
+			patch, err = diffcore.BuildSingleLinePatch(sec.DataRef().Parsed, sec.DataRef().ActiveLine)
 		}
 		if err != nil {
 			m.setStatus(err.Error())
 			return nil
 		}
-		reverse := m.section == sectionStaged
+		reverse := m.diff.ActiveSection == sectionStaged
 		if err := git.ApplyPatchToIndex(m.worktreeRoot, patch, reverse, true); err != nil {
 			m.showGitError(err)
 			return nil
 		}
 	}
 
-	sec.data.VisualActive = false
-	sec.data.VisualAnchor = sec.data.ActiveLine
+	sec.DataRef().VisualActive = false
+	sec.DataRef().VisualAnchor = sec.DataRef().ActiveLine
 	m.setStatus("updated " + file.Path)
-	from := m.section
+	from := m.diff.ActiveSection
 	reloadCmd := m.reload(file.Path)
-	m.section = from
-	m.ensureActiveVisible(m.currentSection())
+	m.diff.ActiveSection = from
+	m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
 	m.markMovedTarget(sig)
-	if m.flash.active {
+	if m.diff.Flash.Active {
 		return tea.Batch(reloadCmd, nextFlashCmd())
 	}
 	return reloadCmd
@@ -131,16 +132,14 @@ func isCorruptPatchErr(err error) bool {
 }
 
 func (m *Model) reloadDiffsForSelection() tea.Cmd {
-	m.diffModelForSectionPtr(sectionUnstaged).SetData(m.unstaged.data)
-	m.diffModelForSectionPtr(sectionStaged).SetData(m.staged.data)
-	m.diffArea.applyModes()
-	sideBySide := m.renderMode == diffview.RenderModeSideBySide
+
+	sideBySide := m.diff.RenderMode() == diffview.RenderModeSideBySide
 	renderWidth := m.deltaRenderWidth()
 
 	sel, ok := m.selectedStatusDiff()
 	if !ok {
 		m.activeFilePath = ""
-		m.resetDiffSections()
+		m.diff.ResetSections()
 		m.syncDiffViewports()
 		if m.diffSearchActiveInFocus() {
 			m.recomputeSearchMatches()
@@ -162,13 +161,8 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 		if color == "" {
 			color = raw
 		}
-		m.diffModelForSectionPtr(sectionUnstaged).BuildFromRaw(raw, color)
-		m.diffModelForSectionPtr(sectionStaged).BuildFromRaw("", "")
-		m.unstaged.data = m.diffModelForSectionPtr(sectionUnstaged).Data()
-		m.staged.data = m.diffModelForSectionPtr(sectionStaged).Data()
-		m.unstaged.colorized = true
-		m.staged = newSectionState()
-		m.diffModelForSectionPtr(sectionStaged).SetData(m.staged.data)
+		m.diff.SectionModel(sectionUnstaged).BuildFromRaw(raw, color)
+		m.diff.SectionModel(sectionStaged).BuildFromRaw("", "")
 		m.syncDiffViewports()
 		return nil
 	}
@@ -191,12 +185,8 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 	if stagedColor == "" {
 		stagedColor = stagedRaw
 	}
-	m.diffModelForSectionPtr(sectionUnstaged).BuildFromRaw(unstagedRaw, unstagedColor)
-	m.diffModelForSectionPtr(sectionStaged).BuildFromRaw(stagedRaw, stagedColor)
-	m.unstaged.data = m.diffModelForSectionPtr(sectionUnstaged).Data()
-	m.staged.data = m.diffModelForSectionPtr(sectionStaged).Data()
-	m.unstaged.colorized = true
-	m.staged.colorized = true
+	m.diff.SectionModel(sectionUnstaged).BuildFromRaw(unstagedRaw, unstagedColor)
+	m.diff.SectionModel(sectionStaged).BuildFromRaw(stagedRaw, stagedColor)
 	m.syncDiffViewports()
 	if m.diffSearchActiveInFocus() {
 		m.recomputeSearchMatches()
@@ -212,22 +202,22 @@ func (m *Model) enterDiffFromStatus(resetSection bool) tea.Cmd {
 	cmd := m.reloadDiffsForSelection()
 	m.focus = focusDiff
 	if resetSection {
-		m.section = sectionUnstaged
+		m.diff.ActiveSection = sectionUnstaged
 	}
 	m.syncDiffViewports()
-	m.ensureActiveVisible(m.currentSection())
+	m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
 	return cmd
 }
 
 func (m *Model) openDiscardDiffConfirm() {
-	if m.section != sectionUnstaged {
+	if m.diff.ActiveSection != sectionUnstaged {
 		return
 	}
 	file, ok := m.selectedStatusFile()
 	if !ok {
 		return
 	}
-	sec := m.currentSection()
+	sec := m.diff.ActiveSectionModel()
 
 	var (
 		title       string
@@ -237,27 +227,27 @@ func (m *Model) openDiscardDiffConfirm() {
 		err         error
 	)
 
-	if m.navMode == diffview.NavModeHunk {
-		if sec.data.ActiveHunk < 0 || sec.data.ActiveHunk >= len(sec.data.Parsed.Hunks) {
+	if m.diff.NavMode() == diffview.NavModeHunk {
+		if sec.DataRef().ActiveHunk < 0 || sec.DataRef().ActiveHunk >= len(sec.DataRef().Parsed.Hunks) {
 			return
 		}
-		patch, err = diffcore.BuildHunkPatch(sec.data.Parsed, sec.data.ActiveHunk)
+		patch, err = diffcore.BuildHunkPatch(sec.DataRef().Parsed, sec.DataRef().ActiveHunk)
 		title = "Discard selected hunk?"
 		lines = []string{"This will discard the selected hunk from your working tree."}
 	} else {
-		if sec.data.ActiveLine < 0 || sec.data.ActiveLine >= len(sec.data.Parsed.Changed) {
+		if sec.DataRef().ActiveLine < 0 || sec.DataRef().ActiveLine >= len(sec.DataRef().Parsed.Changed) {
 			return
 		}
-		startLine, endLine := sec.data.ActiveLine, sec.data.ActiveLine
-		if sec.data.VisualActive {
-			startLine, endLine = visualLineBounds(*sec)
+		startLine, endLine := sec.DataRef().ActiveLine, sec.DataRef().ActiveLine
+		if sec.DataRef().VisualActive {
+			startLine, endLine = visualLineBounds(sec.Data())
 		}
-		if sec.data.VisualActive && endLine > startLine {
-			patch, err = diffcore.BuildLineRangePatch(sec.data.Parsed, startLine, endLine)
+		if sec.DataRef().VisualActive && endLine > startLine {
+			patch, err = diffcore.BuildLineRangePatch(sec.DataRef().Parsed, startLine, endLine)
 			title = "Discard selected lines?"
 			lines = []string{"This will discard the selected lines from your working tree."}
 		} else {
-			patch, err = diffcore.BuildSingleLinePatch(sec.data.Parsed, sec.data.ActiveLine)
+			patch, err = diffcore.BuildSingleLinePatch(sec.DataRef().Parsed, sec.DataRef().ActiveLine)
 			title = "Discard selected line?"
 			lines = []string{"This will discard the selected line from your working tree."}
 		}
@@ -280,37 +270,41 @@ func (m *Model) markMovedTarget(sig movedTarget) {
 	if sig.fromSection == sectionUnstaged {
 		target = sectionStaged
 	}
-	sec := m.sectionState(target)
-	m.flash = flashState{active: true, section: target, navMode: sig.navMode, hunk: -1, line: -1, frames: 4}
+	sec := m.diff.SectionModel(target)
+	m.diff.Flash = diffarea.FlashState{Active: true, Section: target, NavMode: sig.navMode, Hunk: -1, Line: -1, Frames: 4}
 
 	if sig.navMode == diffview.NavModeHunk {
-		for i := range sec.data.Parsed.Hunks {
-			if sec.data.Parsed.Hunks[i].Header == sig.hunkHeader {
-				m.flash.hunk = i
+		for i := range sec.DataRef().Parsed.Hunks {
+			if sec.DataRef().Parsed.Hunks[i].Header == sig.hunkHeader {
+				m.diff.Flash.Hunk = i
 				return
 			}
 		}
-		if len(sec.data.Parsed.Hunks) > 0 {
-			m.flash.hunk = 0
+		if len(sec.DataRef().Parsed.Hunks) > 0 {
+			m.diff.Flash.Hunk = 0
 		}
 		return
 	}
 
-	for i := range sec.data.Parsed.Changed {
-		if sec.data.Parsed.Changed[i].Text == sig.lineText {
-			m.flash.line = i
+	for i := range sec.DataRef().Parsed.Changed {
+		if sec.DataRef().Parsed.Changed[i].Text == sig.lineText {
+			m.diff.Flash.Line = i
 			return
 		}
 	}
-	if len(sec.data.Parsed.Changed) > 0 {
-		m.flash.line = 0
+	if len(sec.DataRef().Parsed.Changed) > 0 {
+		m.diff.Flash.Line = 0
 	}
 }
 
 func isDeltaSectionDivider(plain string) bool {
-	return diffview.IsDeltaSectionDivider(plain)
-}
-
-func splitLines(s string) []string {
-	return diffview.SplitLines(s)
+	if plain == "" {
+		return false
+	}
+	for _, r := range plain {
+		if r != '─' && r != '-' {
+			return false
+		}
+	}
+	return true
 }
