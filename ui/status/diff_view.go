@@ -268,17 +268,7 @@ func (m *Model) syncDiffViewports() {
 	reflowSectionLines(m.diff.SectionModel(diffarea.SectionStaged), wrapWidth, m.diff.Wrap())
 
 	expandedH, collapsedH := diffPaneHeights(diffH)
-	m.diff.Unstaged.Viewport().SetWidth(vpW)
-	m.diff.Staged.Viewport().SetWidth(vpW)
-	if m.diff.ActiveSection == diffarea.SectionStaged {
-		m.diff.Unstaged.Viewport().SetHeight(maxInt(0, collapsedH-3))
-		m.diff.Staged.Viewport().SetHeight(maxInt(0, expandedH-3))
-	} else {
-		m.diff.Unstaged.Viewport().SetHeight(maxInt(0, expandedH-3))
-		m.diff.Staged.Viewport().SetHeight(maxInt(0, collapsedH-3))
-	}
-	m.diff.Unstaged.Viewport().SetContentLines(m.diff.Unstaged.Data().ViewLines)
-	m.diff.Staged.Viewport().SetContentLines(m.diff.Staged.Data().ViewLines)
+	m.diff.SyncViewports(vpW, expandedH, collapsedH)
 }
 
 func reflowSectionLines(diffviewModel *diffview.Model, wrapWidth int, wrap bool) {

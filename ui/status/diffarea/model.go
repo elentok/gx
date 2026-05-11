@@ -132,6 +132,15 @@ func (d *Model) ResetSections() {
 	d.SetWrap(d.wrap)
 }
 
+func (d *Model) SyncViewports(vpW, expandedH, collapsedH int) {
+	unstagedH, stagedH := expandedH-3, collapsedH-3
+	if d.ActiveSection == SectionStaged {
+		unstagedH, stagedH = collapsedH-3, expandedH-3
+	}
+	d.Unstaged.SyncViewport(vpW, max(0, unstagedH))
+	d.Staged.SyncViewport(vpW, max(0, stagedH))
+}
+
 func (d *Model) MoveActive(delta int) bool {
 	diffviewModel := d.ActiveSectionModel()
 	return diffviewModel.MoveActive(delta, true)
