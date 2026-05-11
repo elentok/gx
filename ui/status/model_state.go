@@ -8,7 +8,6 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
-	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/help"
 
@@ -25,12 +24,11 @@ type Model struct {
 	height int
 	ready  bool
 
-	diffInteractionState
+	focus focusPane
+	diffArea
 	diffContextLines int
 	statusPageState
-	fileTreeModel     filetree.Model[git.StageFileStatus]
-	unstagedDiffModel diffview.Model
-	stagedDiffModel   diffview.Model
+	fileTreeModel filetree.Model[git.StageFileStatus]
 
 	statusMsg      string
 	statusUntil    time.Time
@@ -136,22 +134,13 @@ func NewModel(worktreeRoot string, settings Settings) Model {
 		initialPath:      settings.InitialPath,
 		diffContextLines: settings.DiffContextLines,
 		help:             help.NewModel(keySections),
-		diffInteractionState: diffInteractionState{
-			focus:      focusFiletree,
-			section:    sectionUnstaged,
-			navMode:    navHunk,
-			renderMode: renderUnified,
-			wrapSoft:   true,
-			unstaged:   newSectionState(),
-			staged:     newSectionState(),
-		},
+		focus:            focusFiletree,
+		diffArea:         newDiffArea(),
 		statusPageState: statusPageState{
 			collapsedDirs: map[string]bool{},
 			selected:      0,
 		},
-		fileTreeModel:     filetree.NewModel[git.StageFileStatus](),
-		unstagedDiffModel: diffview.NewModel(),
-		stagedDiffModel:   diffview.NewModel(),
+		fileTreeModel: filetree.NewModel[git.StageFileStatus](),
 	}
 
 	if settings.EnableNavigation {

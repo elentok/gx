@@ -21,8 +21,8 @@ func (m *Model) handleMouseWheel(msg tea.MouseWheelMsg) bool {
 
 func (m Model) searchActive() bool {
 	return m.fileTreeModel.Search().IsActive() ||
-		m.unstagedDiffModel.Search().IsActive() ||
-		m.stagedDiffModel.Search().IsActive()
+		m.unstagedModel.Search().IsActive() ||
+		m.stagedModel.Search().IsActive()
 }
 
 func (m *Model) scrollDiffByMouse(x, y, dir int) bool {

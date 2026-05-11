@@ -1,6 +1,9 @@
 package status
 
-import "github.com/elentok/gx/ui/explorer"
+import (
+	"github.com/elentok/gx/ui/diffview"
+	"github.com/elentok/gx/ui/explorer"
+)
 
 type focusPane int
 
@@ -16,18 +19,18 @@ const (
 	sectionStaged
 )
 
-type navMode int
+type navMode = diffview.NavMode
 
 const (
-	navHunk navMode = iota
-	navLine
+	navHunk = diffview.NavModeHunk
+	navLine = diffview.NavModeLine
 )
 
-type diffRenderMode int
+type diffRenderMode = diffview.RenderMode
 
 const (
-	renderUnified diffRenderMode = iota
-	renderSideBySide
+	renderUnified    = diffview.RenderModeUnified
+	renderSideBySide = diffview.RenderModeSideBySide
 )
 
 func toExplorerNavMode(mode navMode) explorer.NavMode {

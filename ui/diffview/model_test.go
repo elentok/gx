@@ -3,6 +3,7 @@ package diffview
 import (
 	"testing"
 
+	"github.com/elentok/gx/ui/explorer"
 	"github.com/elentok/gx/ui/search"
 
 	tea "charm.land/bubbletea/v2"
@@ -15,7 +16,7 @@ func TestModelBuildFromRawAndHasContent(t *testing.T) {
 	}
 
 	raw := "@@ -1 +1 @@\n-old\n+new\n"
-	m.BuildFromRaw(raw, raw, false)
+	m.BuildFromRaw(raw, raw)
 	if !m.HasContent() {
 		t.Fatal("expected model to have content")
 	}
@@ -23,9 +24,40 @@ func TestModelBuildFromRawAndHasContent(t *testing.T) {
 		t.Fatal("expected view lines")
 	}
 
-	m.BuildFromRaw("", "", false)
+	m.BuildFromRaw("", "")
 	if m.HasContent() {
 		t.Fatal("expected cleared model to have no content")
+	}
+}
+
+func TestModelDiffSettings(t *testing.T) {
+	m := NewModel()
+	if m.RenderMode() != RenderModeUnified {
+		t.Fatalf("render mode=%v want unified", m.RenderMode())
+	}
+	if m.NavMode() != NavModeHunk {
+		t.Fatalf("nav mode=%v want hunk", m.NavMode())
+	}
+	if !m.WrapEnabled() {
+		t.Fatal("expected wrap enabled by default")
+	}
+
+	m.SetRenderMode(RenderModeSideBySide)
+	if !m.IsSideBySide() {
+		t.Fatal("expected side-by-side mode")
+	}
+
+	m.SetNavMode(NavModeLine)
+	if m.NavMode() != NavModeLine {
+		t.Fatalf("nav mode=%v want line", m.NavMode())
+	}
+	if m.ExplorerNavMode() != explorer.NavLine {
+		t.Fatalf("explorer nav mode=%v want line", m.ExplorerNavMode())
+	}
+
+	m.EnableWrap(false)
+	if m.WrapEnabled() {
+		t.Fatal("expected wrap disabled")
 	}
 }
 

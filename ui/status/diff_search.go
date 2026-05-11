@@ -92,29 +92,26 @@ func (m *Model) syncSearchCursorFromDiffFocus() {
 		return
 	}
 
-	// TODO: check if this is working
-	cursor := 0
 	for i := range diffSearch.Matches() {
-		if cursor == idx {
+		if i == idx {
 			diffSearch.SetCursor(i)
 			return
 		}
-		cursor++
 	}
 }
 
 func (m *Model) currentDiffSearch() *search.Model {
 	if m.section == sectionStaged {
-		return m.stagedDiffModel.Search()
+		return m.stagedModel.Search()
 	}
-	return m.unstagedDiffModel.Search()
+	return m.unstagedModel.Search()
 }
 
 func (m *Model) diffSearchForSection(section diffSection) *search.Model {
 	if section == sectionStaged {
-		return m.stagedDiffModel.Search()
+		return m.stagedModel.Search()
 	}
-	return m.unstagedDiffModel.Search()
+	return m.unstagedModel.Search()
 }
 
 func (m Model) filetreeEntrySearchText(entry filetree.Entry[git.StageFileStatus]) string {

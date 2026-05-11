@@ -14,8 +14,10 @@ End-state target: remove `ui/explorer` entirely if possible; if any shared helpe
 - Keep temporary calls into current `ui/explorer` helpers where needed.
 
 ### Wave 2: Extract status-owned nested child boundaries (without changing UX)
-- Keep current `search.Model`, but make diff-search wiring status-owned (query/match/cursor/nav integration owned by status child boundary, not page root).
-- Move diff interaction state/routing (section, nav mode, render mode, flash, viewport sync, active visibility) behind a status child boundary.
+- Replace temporary wrapper boundaries with a real status-owned `diffArea` state container.
+- Keep page focus on the parent status model; `diffArea` owns active section, staged/unstaged diff panes, fullscreen state, flash state, and shared diff controls.
+- Move shared diff controls into `ui/diffview.Model`: `SetRenderMode(RenderModeUnified|RenderModeSideBySide)`, `SetNavMode(NavModeHunk|NavModeLine)`, and `EnableWrap(bool)`.
+- Keep current `search.Model`, but make diff-search wiring status-owned (query/match/cursor/nav integration owned by status diff code, not a shared explorer namespace).
 - Keep parent `Model` as orchestration shell (modals, actions, page routing, chord handling, top-level key dispatch).
 - Shared code usage must be pure/helper-only; no shared mutable state structs across pages.
 

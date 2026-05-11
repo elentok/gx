@@ -11,18 +11,38 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
+type RenderMode int
+
+const (
+	RenderModeUnified RenderMode = iota
+	RenderModeSideBySide
+)
+
+type NavMode int
+
+const (
+	NavModeHunk NavMode = iota
+	NavModeLine
+)
+
 // Model owns one diff pane state (unstaged or staged), including local search.
 type Model struct {
-	data     explorer.SectionData
-	viewport viewport.Model
-	search   search.Model
+	data       explorer.SectionData
+	viewport   viewport.Model
+	search     search.Model
+	renderMode RenderMode
+	navMode    NavMode
+	wrapSoft   bool
 }
 
 func NewModel() Model {
 	return Model{
-		data:     explorer.NewSectionData(),
-		viewport: viewport.New(),
-		search:   search.NewModel(),
+		data:       explorer.NewSectionData(),
+		viewport:   viewport.New(),
+		search:     search.NewModel(),
+		renderMode: RenderModeUnified,
+		navMode:    NavModeHunk,
+		wrapSoft:   true,
 	}
 }
 
@@ -42,13 +62,48 @@ func (m *Model) Search() *search.Model {
 	return &m.search
 }
 
+func (m Model) RenderMode() RenderMode {
+	return m.renderMode
+}
+
+func (m *Model) SetRenderMode(mode RenderMode) {
+	m.renderMode = mode
+}
+
+func (m Model) IsSideBySide() bool {
+	return m.renderMode == RenderModeSideBySide
+}
+
+func (m Model) NavMode() NavMode {
+	return m.navMode
+}
+
+func (m *Model) SetNavMode(mode NavMode) {
+	m.navMode = mode
+}
+
+func (m Model) ExplorerNavMode() explorer.NavMode {
+	if m.navMode == NavModeLine {
+		return explorer.NavLine
+	}
+	return explorer.NavHunk
+}
+
+func (m Model) WrapEnabled() bool {
+	return m.wrapSoft
+}
+
+func (m *Model) EnableWrap(enabled bool) {
+	m.wrapSoft = enabled
+}
+
 func (m Model) HasContent() bool {
 	return len(m.data.ViewLines) > 0 || diffrender.SectionHasBinaryDiff(m.data.Parsed)
 }
 
-func (m *Model) BuildFromRaw(raw, color string, sideBySide bool) {
+func (m *Model) BuildFromRaw(raw, color string) {
 	prevOffset := m.viewport.YOffset()
-	m.data = explorer.BuildSectionData(raw, color, m.data, sideBySide)
+	m.data = explorer.BuildSectionData(raw, color, m.data, m.IsSideBySide())
 
 	if strings.TrimSpace(raw) == "" {
 		m.viewport.SetContent("")
@@ -60,9 +115,9 @@ func (m *Model) BuildFromRaw(raw, color string, sideBySide bool) {
 	m.viewport.SetYOffset(prevOffset)
 }
 
-func (m *Model) Reflow(wrapWidth int, wrapSoft bool) {
+func (m *Model) Reflow(wrapWidth int) {
 	prevOffset := m.viewport.YOffset()
-	explorer.ReflowSectionData(&m.data, wrapWidth, wrapSoft)
+	explorer.ReflowSectionData(&m.data, wrapWidth, m.wrapSoft)
 	if len(m.data.BaseLines) == 0 {
 		m.viewport.SetContent("")
 		m.viewport.SetYOffset(0)

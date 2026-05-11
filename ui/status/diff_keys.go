@@ -32,11 +32,13 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.navMode = navHunk
 		}
+		m.diffArea.applyModes()
 		m.ensureActiveVisible(m.currentSection())
 	case "v":
 		sec := m.currentSection()
 		if m.navMode == navHunk {
 			m.navMode = navLine
+			m.diffArea.applyModes()
 		}
 		if len(sec.data.Parsed.Changed) == 0 {
 			return m, nil
@@ -62,6 +64,7 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.toggleRenderMode()
 	case "w":
 		m.wrapSoft = !m.wrapSoft
+		m.diffArea.applyModes()
 		m.syncDiffViewports()
 		m.ensureActiveVisible(m.currentSection())
 	case "r":

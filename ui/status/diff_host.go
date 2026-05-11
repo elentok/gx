@@ -75,9 +75,9 @@ func (m Model) selectedStatusDiff() (statusDiffSelection, bool) {
 
 func (m *Model) diffModelForSectionPtr(section diffSection) *diffview.Model {
 	if section == sectionStaged {
-		return &m.stagedDiffModel
+		return &m.stagedModel
 	}
-	return &m.unstagedDiffModel
+	return &m.unstagedModel
 }
 
 func (m *Model) resetDiffSections() {

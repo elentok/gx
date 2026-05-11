@@ -133,6 +133,7 @@ func isCorruptPatchErr(err error) bool {
 func (m *Model) reloadDiffsForSelection() tea.Cmd {
 	m.diffModelForSectionPtr(sectionUnstaged).SetData(m.unstaged.data)
 	m.diffModelForSectionPtr(sectionStaged).SetData(m.staged.data)
+	m.diffArea.applyModes()
 	sideBySide := m.renderMode == renderSideBySide
 	renderWidth := m.deltaRenderWidth()
 
@@ -161,8 +162,8 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 		if color == "" {
 			color = raw
 		}
-		m.diffModelForSectionPtr(sectionUnstaged).BuildFromRaw(raw, color, sideBySide)
-		m.diffModelForSectionPtr(sectionStaged).BuildFromRaw("", "", sideBySide)
+		m.diffModelForSectionPtr(sectionUnstaged).BuildFromRaw(raw, color)
+		m.diffModelForSectionPtr(sectionStaged).BuildFromRaw("", "")
 		m.unstaged.data = m.diffModelForSectionPtr(sectionUnstaged).Data()
 		m.staged.data = m.diffModelForSectionPtr(sectionStaged).Data()
 		m.unstaged.colorized = true
@@ -190,8 +191,8 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 	if stagedColor == "" {
 		stagedColor = stagedRaw
 	}
-	m.diffModelForSectionPtr(sectionUnstaged).BuildFromRaw(unstagedRaw, unstagedColor, sideBySide)
-	m.diffModelForSectionPtr(sectionStaged).BuildFromRaw(stagedRaw, stagedColor, sideBySide)
+	m.diffModelForSectionPtr(sectionUnstaged).BuildFromRaw(unstagedRaw, unstagedColor)
+	m.diffModelForSectionPtr(sectionStaged).BuildFromRaw(stagedRaw, stagedColor)
 	m.unstaged.data = m.diffModelForSectionPtr(sectionUnstaged).Data()
 	m.staged.data = m.diffModelForSectionPtr(sectionStaged).Data()
 	m.unstaged.colorized = true

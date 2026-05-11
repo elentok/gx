@@ -3,6 +3,7 @@ package status
 import (
 	"charm.land/bubbles/v2/viewport"
 
+	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/explorer"
 )
 
@@ -24,8 +25,7 @@ type flashState struct {
 	frames  int
 }
 
-type diffInteractionState struct {
-	focus          focusPane
+type diffArea struct {
 	section        diffSection
 	navMode        navMode
 	renderMode     diffRenderMode
@@ -33,7 +33,33 @@ type diffInteractionState struct {
 	wrapSoft       bool
 	unstaged       sectionState
 	staged         sectionState
+	unstagedModel  diffview.Model
+	stagedModel    diffview.Model
 	flash          flashState
+}
+
+func newDiffArea() diffArea {
+	area := diffArea{
+		section:       sectionUnstaged,
+		navMode:       navHunk,
+		renderMode:    renderUnified,
+		wrapSoft:      true,
+		unstaged:      newSectionState(),
+		staged:        newSectionState(),
+		unstagedModel: diffview.NewModel(),
+		stagedModel:   diffview.NewModel(),
+	}
+	area.applyModes()
+	return area
+}
+
+func (d *diffArea) applyModes() {
+	d.unstagedModel.SetRenderMode(d.renderMode)
+	d.stagedModel.SetRenderMode(d.renderMode)
+	d.unstagedModel.SetNavMode(d.navMode)
+	d.stagedModel.SetNavMode(d.navMode)
+	d.unstagedModel.EnableWrap(d.wrapSoft)
+	d.stagedModel.EnableWrap(d.wrapSoft)
 }
 
 func newSectionState() sectionState {

@@ -118,6 +118,7 @@ func (m Model) handleFocusedChildKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, b
 		m.sectionState(m.section).data = updatedDiff.Data()
 		if m.currentDiffSearch().Mode() == search.SearchModeResults && m.focus == focusDiff {
 			m.navMode = navLine
+			m.diffArea.applyModes()
 		}
 		return m, cmd, true
 	default:

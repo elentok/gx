@@ -1,8 +1,8 @@
 package status
 
 import (
-	"github.com/elentok/gx/git"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/elentok/gx/git"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -40,6 +40,7 @@ func (m *Model) toggleRenderMode() tea.Cmd {
 		m.renderMode = renderUnified
 		m.setStatus("unified mode")
 	}
+	m.diffArea.applyModes()
 	cmd := m.reloadDiffsForSelection()
 	m.syncDiffViewports()
 	m.ensureActiveVisible(m.currentSection())
