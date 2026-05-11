@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui/explorer"
 )
 
 type commitFileEntryKind int
@@ -25,14 +24,14 @@ type commitFileEntry struct {
 }
 
 func buildCommitFileEntries(files []git.CommitFile, collapsed map[string]bool) []commitFileEntry {
-	leaves := make([]explorer.FileTreeLeaf[git.CommitFile], 0, len(files))
+	leaves := make([]commitTreeLeaf[git.CommitFile], 0, len(files))
 	for i := range files {
-		leaves = append(leaves, explorer.FileTreeLeaf[git.CommitFile]{
+		leaves = append(leaves, commitTreeLeaf[git.CommitFile]{
 			Path:  files[i].Path,
 			Value: files[i],
 		})
 	}
-	rows := explorer.BuildFileTreeRows(leaves, collapsed)
+	rows := buildCommitTreeRows(leaves, collapsed)
 	entries := make([]commitFileEntry, 0, len(rows))
 	for _, row := range rows {
 		entry := commitFileEntry{
@@ -42,7 +41,7 @@ func buildCommitFileEntries(files []git.CommitFile, collapsed map[string]bool) [
 			DisplayName: row.DisplayName,
 			Expanded:    row.Expanded,
 		}
-		if row.Kind == explorer.FileTreeRowDir {
+		if row.Kind == commitTreeRowDir {
 			entry.Kind = commitFileEntryDir
 		} else {
 			entry.Kind = commitFileEntryFile
@@ -53,10 +52,10 @@ func buildCommitFileEntries(files []git.CommitFile, collapsed map[string]bool) [
 	return entries
 }
 
-func (m Model) commitFileTreeRows() []explorer.FileTreeRow[git.CommitFile] {
-	rows := make([]explorer.FileTreeRow[git.CommitFile], 0, len(m.fileEntries))
+func (m Model) commitFileTreeRows() []commitTreeRow[git.CommitFile] {
+	rows := make([]commitTreeRow[git.CommitFile], 0, len(m.fileEntries))
 	for _, entry := range m.fileEntries {
-		row := explorer.FileTreeRow[git.CommitFile]{
+		row := commitTreeRow[git.CommitFile]{
 			Path:        entry.Path,
 			ParentPath:  entry.ParentPath,
 			Depth:       entry.Depth,
@@ -64,9 +63,9 @@ func (m Model) commitFileTreeRows() []explorer.FileTreeRow[git.CommitFile] {
 			Expanded:    entry.Expanded,
 		}
 		if entry.Kind == commitFileEntryDir {
-			row.Kind = explorer.FileTreeRowDir
+			row.Kind = commitTreeRowDir
 		} else {
-			row.Kind = explorer.FileTreeRowFile
+			row.Kind = commitTreeRowFile
 			row.Value = entry.File
 		}
 		rows = append(rows, row)
@@ -90,7 +89,7 @@ func (m Model) selectedCommitFile() (git.CommitFile, bool) {
 }
 
 func (m *Model) toggleDirOnEnter() bool {
-	if !explorer.FileTreeToggleDirOnEnter(m.commitFileTreeRows(), m.collapsedDirs, m.selected) {
+	if !commitTreeToggleDirOnEnter(m.commitFileTreeRows(), m.collapsedDirs, m.selected) {
 		return false
 	}
 	m.fileEntries = buildCommitFileEntries(m.files, m.collapsedDirs)
@@ -104,7 +103,7 @@ func (m *Model) toggleDirOnEnter() bool {
 }
 
 func (m *Model) collapseSelectedDir() bool {
-	if !explorer.FileTreeCollapseSelectedDir(m.commitFileTreeRows(), m.collapsedDirs, m.selected) {
+	if !commitTreeCollapseSelectedDir(m.commitFileTreeRows(), m.collapsedDirs, m.selected) {
 		return false
 	}
 	m.fileEntries = buildCommitFileEntries(m.files, m.collapsedDirs)
@@ -118,7 +117,7 @@ func (m *Model) collapseSelectedDir() bool {
 }
 
 func (m *Model) expandSelectedDir() bool {
-	if !explorer.FileTreeExpandSelectedDir(m.commitFileTreeRows(), m.collapsedDirs, m.selected) {
+	if !commitTreeExpandSelectedDir(m.commitFileTreeRows(), m.collapsedDirs, m.selected) {
 		return false
 	}
 	m.fileEntries = buildCommitFileEntries(m.files, m.collapsedDirs)
@@ -129,7 +128,7 @@ func (m *Model) expandSelectedDir() bool {
 }
 
 func (m *Model) focusParentInSidebar() bool {
-	idx, ok := explorer.FileTreeParentIndex(m.commitFileTreeRows(), m.selected)
+	idx, ok := commitTreeParentIndex(m.commitFileTreeRows(), m.selected)
 	if !ok || idx == m.selected {
 		return false
 	}
@@ -138,7 +137,7 @@ func (m *Model) focusParentInSidebar() bool {
 }
 
 func (m *Model) moveToAdjacentFile(delta int) bool {
-	idx, ok := explorer.FileTreeAdjacentFileIndex(m.commitFileTreeRows(), m.selected, delta)
+	idx, ok := commitTreeAdjacentFileIndex(m.commitFileTreeRows(), m.selected, delta)
 	if !ok {
 		return false
 	}

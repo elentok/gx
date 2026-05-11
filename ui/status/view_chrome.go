@@ -4,6 +4,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/diffview"
 
 	"charm.land/lipgloss/v2"
 )
@@ -175,7 +176,7 @@ func (m Model) flashMarker(section diffSection, rawIdx int, sec *sectionState) b
 	if !m.flash.active || m.flash.section != section {
 		return false
 	}
-	if m.flash.navMode == navHunk {
+	if m.flash.navMode == diffview.NavModeHunk {
 		if m.flash.hunk < 0 || m.flash.hunk >= len(sec.data.Parsed.Hunks) {
 			return false
 		}

@@ -1,36 +1,32 @@
-package explorer
+package commit
 
 import "strings"
 
-type SearchMode int
+type commitSearchMode int
 
 const (
-	SearchModeNone SearchMode = iota
-	SearchModeInput
+	commitSearchModeNone commitSearchMode = iota
+	commitSearchModeInput
 )
 
-type SearchDismissPolicy int
+type commitSearchDismissPolicy int
 
 const (
-	SearchDismissAlwaysClear SearchDismissPolicy = iota
-	SearchDismissKeepResultsUnlessEmptyOrNoMatches
+	commitSearchDismissAlwaysClear commitSearchDismissPolicy = iota
+	commitSearchDismissKeepResultsUnlessEmptyOrNoMatches
 )
 
-func SearchEnter() SearchMode {
-	return SearchModeInput
+func commitSearchEnter() commitSearchMode {
+	return commitSearchModeInput
 }
 
-func SearchExitInput() SearchMode {
-	return SearchModeNone
-}
-
-func SearchDismiss(query *string, cursor *int, total int, policy SearchDismissPolicy) (mode SearchMode, cleared bool) {
-	mode = SearchModeNone
+func commitSearchDismiss(query *string, cursor *int, total int, policy commitSearchDismissPolicy) (mode commitSearchMode, cleared bool) {
+	mode = commitSearchModeNone
 	if cursor != nil && *cursor < 0 {
 		*cursor = 0
 	}
 	switch policy {
-	case SearchDismissAlwaysClear:
+	case commitSearchDismissAlwaysClear:
 		if query != nil {
 			*query = ""
 		}
@@ -38,7 +34,7 @@ func SearchDismiss(query *string, cursor *int, total int, policy SearchDismissPo
 			*cursor = 0
 		}
 		return mode, true
-	case SearchDismissKeepResultsUnlessEmptyOrNoMatches:
+	case commitSearchDismissKeepResultsUnlessEmptyOrNoMatches:
 		if strings.TrimSpace(derefString(query)) == "" || total == 0 {
 			if query != nil {
 				*query = ""
@@ -52,11 +48,11 @@ func SearchDismiss(query *string, cursor *int, total int, policy SearchDismissPo
 	return mode, false
 }
 
-func SearchCanNavigate(query string, total int) bool {
+func commitSearchCanNavigate(query string, total int) bool {
 	return strings.TrimSpace(query) != "" && total > 0
 }
 
-func SearchCursorNext(cursor *int, total int) bool {
+func commitSearchCursorNext(cursor *int, total int) bool {
 	if cursor == nil || total <= 0 {
 		return false
 	}
@@ -67,7 +63,7 @@ func SearchCursorNext(cursor *int, total int) bool {
 	return false
 }
 
-func SearchCursorPrev(cursor *int, total int) bool {
+func commitSearchCursorPrev(cursor *int, total int) bool {
 	if cursor == nil || total <= 0 {
 		return false
 	}

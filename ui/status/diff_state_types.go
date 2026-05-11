@@ -4,11 +4,10 @@ import (
 	"charm.land/bubbles/v2/viewport"
 
 	"github.com/elentok/gx/ui/diffview"
-	"github.com/elentok/gx/ui/explorer"
 )
 
 type sectionState struct {
-	data     explorer.SectionData
+	data     diffview.DiffBuffer
 	viewport viewport.Model
 	// colorized indicates whether this section has delta-colored content.
 	// When false in unified mode, the view reserves gutter width to keep
@@ -19,7 +18,7 @@ type sectionState struct {
 type flashState struct {
 	active  bool
 	section diffSection
-	navMode navMode
+	navMode diffview.NavMode
 	hunk    int
 	line    int
 	frames  int
@@ -27,8 +26,8 @@ type flashState struct {
 
 type diffArea struct {
 	section        diffSection
-	navMode        navMode
-	renderMode     diffRenderMode
+	navMode        diffview.NavMode
+	renderMode     diffview.RenderMode
 	diffFullscreen bool
 	wrapSoft       bool
 	unstaged       sectionState
@@ -41,8 +40,8 @@ type diffArea struct {
 func newDiffArea() diffArea {
 	area := diffArea{
 		section:       sectionUnstaged,
-		navMode:       navHunk,
-		renderMode:    renderUnified,
+		navMode:       diffview.NavModeHunk,
+		renderMode:    diffview.RenderModeUnified,
 		wrapSoft:      true,
 		unstaged:      newSectionState(),
 		staged:        newSectionState(),
@@ -65,7 +64,7 @@ func (d *diffArea) applyModes() {
 func newSectionState() sectionState {
 	vp := viewport.New()
 	return sectionState{
-		data:     explorer.NewSectionData(),
+		data:     diffview.NewDiffBuffer(),
 		viewport: vp,
 	}
 }

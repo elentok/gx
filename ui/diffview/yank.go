@@ -1,4 +1,4 @@
-package explorer
+package diffview
 
 import "fmt"
 
@@ -34,7 +34,7 @@ func (c changedLineAdapter) NewLineNumber() int  { return c.new }
 func (c changedLineAdapter) HunkIndexValue() int { return c.hunk }
 func (c changedLineAdapter) TextValue() string   { return c.text }
 
-func changedLineAt(section SectionData, idx int) (changedLineAdapter, bool) {
+func changedLineAt(section DiffBuffer, idx int) (changedLineAdapter, bool) {
 	if idx < 0 || idx >= len(section.Parsed.Changed) {
 		return changedLineAdapter{}, false
 	}
@@ -48,8 +48,8 @@ func changedLineAt(section SectionData, idx int) (changedLineAdapter, bool) {
 	}, true
 }
 
-func ActiveHunkIndexForYank(section SectionData, navMode NavMode) int {
-	if navMode == NavHunk {
+func ActiveHunkIndexForYank(section DiffBuffer, navMode NavMode) int {
+	if navMode == NavModeHunk {
 		return section.ActiveHunk
 	}
 	if cl, ok := changedLineAt(section, section.ActiveLine); ok {
@@ -58,12 +58,12 @@ func ActiveHunkIndexForYank(section SectionData, navMode NavMode) int {
 	return section.ActiveHunk
 }
 
-func FocusedYankBody(section SectionData, navMode NavMode) []string {
+func FocusedYankBody(section DiffBuffer, navMode NavMode) []string {
 	hunkIdx := ActiveHunkIndexForYank(section, navMode)
 	if hunkIdx < 0 || hunkIdx >= len(section.Parsed.Hunks) {
 		return nil
 	}
-	if navMode == NavLine {
+	if navMode == NavModeLine {
 		startIdx, endIdx := section.ActiveLine, section.ActiveLine
 		if section.VisualActive {
 			startIdx, endIdx = VisualLineBounds(section.VisualAnchor, section.ActiveLine, len(section.Parsed.Changed))
@@ -94,13 +94,13 @@ func FocusedYankBody(section SectionData, navMode NavMode) []string {
 	return body
 }
 
-func FocusedLineSpanForYank(section SectionData, navMode NavMode) (int, int) {
+func FocusedLineSpanForYank(section DiffBuffer, navMode NavMode) (int, int) {
 	hunkIdx := ActiveHunkIndexForYank(section, navMode)
 	if hunkIdx < 0 || hunkIdx >= len(section.Parsed.Hunks) {
 		return 0, 0
 	}
 	h := section.Parsed.Hunks[hunkIdx]
-	if navMode != NavLine {
+	if navMode != NavModeLine {
 		count := h.NewCount
 		if count < 1 {
 			count = 1
@@ -143,7 +143,7 @@ func FocusedLineSpanForYank(section SectionData, navMode NavMode) (int, int) {
 	return lineStart, lineEnd
 }
 
-func FocusedLocation(section SectionData, navMode NavMode) string {
+func FocusedLocation(section DiffBuffer, navMode NavMode) string {
 	hunkIdx := ActiveHunkIndexForYank(section, navMode)
 	if hunkIdx < 0 || hunkIdx >= len(section.Parsed.Hunks) {
 		return ""

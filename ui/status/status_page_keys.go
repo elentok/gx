@@ -1,6 +1,7 @@
 package status
 
 import (
+	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/search"
@@ -124,7 +125,7 @@ func (m Model) handleFocusedChildKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, b
 		*m.diffModelForSectionPtr(m.section) = updatedDiff
 		m.sectionState(m.section).data = updatedDiff.Data()
 		if m.currentDiffSearch().Mode() == search.SearchModeResults && m.focus == focusDiff {
-			m.navMode = navLine
+			m.navMode = diffview.NavModeLine
 			m.diffArea.applyModes()
 		}
 		return m, cmd, true

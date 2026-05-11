@@ -1,7 +1,7 @@
 package commit
 
 import (
-	"github.com/elentok/gx/ui/explorer"
+	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/nav"
 
 	tea "charm.land/bubbletea/v2"
@@ -104,10 +104,10 @@ func (m Model) handleKeyRouting(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if !m.focusDiff {
 			return m, nil
 		}
-		if m.diffNavMode == explorer.NavHunk {
-			m.diffNavMode = explorer.NavLine
+		if m.diffNavMode == diffview.NavModeHunk {
+			m.diffNavMode = diffview.NavModeLine
 		} else {
-			m.diffNavMode = explorer.NavHunk
+			m.diffNavMode = diffview.NavModeHunk
 		}
 		m.ensureActiveVisible()
 		return m, nil

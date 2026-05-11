@@ -1,4 +1,4 @@
-package explorer
+package diffview
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ const (
 	FocusedYankErrNoLines FocusedYankError = "no lines to yank"
 )
 
-func FocusedLocationAndBody(section SectionData, navMode NavMode) (string, []string, FocusedYankError) {
+func FocusedLocationAndBody(section DiffBuffer, navMode NavMode) (string, []string, FocusedYankError) {
 	hunkIdx := ActiveHunkIndexForYank(section, navMode)
 	if hunkIdx < 0 || hunkIdx >= len(section.Parsed.Hunks) {
 		return "", nil, FocusedYankErrNoHunk

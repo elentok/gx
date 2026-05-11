@@ -1,10 +1,10 @@
 package status
 
-import "github.com/elentok/gx/ui/explorer"
+import "github.com/elentok/gx/ui/diffview"
 
 func (m *Model) moveActive(delta int) {
 	sec := m.currentSection()
-	if !explorer.MoveActive(&sec.data, &sec.viewport, toExplorerNavMode(m.navMode), delta, true) {
+	if !diffview.MoveActive(&sec.data, &sec.viewport, m.navMode, delta, true) {
 		return
 	}
 	m.syncSearchCursorFromDiffFocus()
@@ -13,12 +13,12 @@ func (m *Model) moveActive(delta int) {
 
 func (m *Model) scrollDiffPage(direction int) {
 	sec := m.currentSection()
-	explorer.ScrollPage(&sec.viewport, direction)
+	diffview.ScrollPage(&sec.viewport, direction)
 }
 
 func (m *Model) jumpDiffTop() {
 	sec := m.currentSection()
-	if !explorer.JumpTop(&sec.data, &sec.viewport, toExplorerNavMode(m.navMode)) {
+	if !diffview.JumpTop(&sec.data, &sec.viewport, m.navMode) {
 		return
 	}
 	m.syncSearchCursorFromDiffFocus()
@@ -26,7 +26,7 @@ func (m *Model) jumpDiffTop() {
 
 func (m *Model) jumpDiffBottom() {
 	sec := m.currentSection()
-	if !explorer.JumpBottom(&sec.data, &sec.viewport, toExplorerNavMode(m.navMode)) {
+	if !diffview.JumpBottom(&sec.data, &sec.viewport, m.navMode) {
 		return
 	}
 	m.syncSearchCursorFromDiffFocus()

@@ -4,4 +4,3 @@ package commit
 func (m Model) CurrentRef() string {
 	return m.ref
 }
-

@@ -6,8 +6,8 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/explorer"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/sidebar"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -93,8 +93,8 @@ func (m Model) filetreePaneTitle() string {
 func (m Model) visibleStatusLines(height int) []string {
 	innerH := maxInt(1, height-2)
 	icons := filetreePaneIconsFor(m.settings.UseNerdFontIcons)
-	start, _ := explorer.VisibleWindow(len(m.statusEntries), m.selected, innerH)
-	rows := explorer.BuildVisibleSidebarRenderableRows(m.statusEntries, m.selected, innerH, func(i int, entry statusEntry) explorer.SidebarRenderableRow {
+	start, _ := sidebar.VisibleWindow(len(m.statusEntries), m.selected, innerH)
+	rows := sidebar.BuildVisibleRenderableRows(m.statusEntries, m.selected, innerH, func(i int, entry statusEntry) sidebar.RenderableRow {
 		statusColor := statusEntryColor(entry)
 		deleted := entry.Kind == statusEntryFile && isDeletedFileStatus(entry.File)
 		metaRaw := statusEntryMeta(entry, m.settings.UseNerdFontIcons, icons)
@@ -114,7 +114,7 @@ func (m Model) visibleStatusLines(height int) []string {
 		if m.searchMatchStatusIndex(i) {
 			name = search.Highlight(name, m.fileTreeModel.Search().Query(), false)
 		}
-		return explorer.SidebarRenderableRow{
+		return sidebar.RenderableRow{
 			Depth:    entry.Depth,
 			MetaRaw:  metaRaw,
 			NameRaw:  name,
@@ -123,7 +123,7 @@ func (m Model) visibleStatusLines(height int) []string {
 			Faint:    deleted,
 		}
 	})
-	lines := explorer.RenderSidebarRows(rows, innerH, lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render("clean working tree"), ui.ColorBlue)
+	lines := sidebar.RenderRows(rows, innerH, lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render("clean working tree"), ui.ColorBlue)
 	if m.focus == focusFiletree {
 		selectedIdx := m.selected - start
 		if selectedIdx >= 0 && selectedIdx < len(lines) && lines[selectedIdx] != "" {

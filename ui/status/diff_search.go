@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui/explorer"
+	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/search"
 
@@ -36,7 +36,7 @@ func (m *Model) computeSearchMatches(query string) []search.Match {
 		}
 	} else {
 		sec := m.sectionState(m.section)
-		for _, match := range explorer.ComputeDiffSearchMatches(sec.data.ViewLines, sec.data.DisplayToRaw, q) {
+		for _, match := range diffview.ComputeDiffSearchMatches(sec.data.ViewLines, sec.data.DisplayToRaw, q) {
 			matches = append(matches, search.Match{
 				DisplayIndex: match.DisplayIndex,
 				Index:        match.RawIndex,
@@ -69,7 +69,7 @@ func (m Model) handleJumpToMatch(msg search.JumpToMatchMsg) (Model, tea.Cmd) {
 	}
 
 	sec := m.sectionState(m.section)
-	explorer.ApplyDiffSearchMatch(&sec.data, &sec.viewport, match)
+	diffview.ApplyDiffSearchMatch(&sec.data, &sec.viewport, match)
 	return m, nil
 
 }
@@ -80,14 +80,14 @@ func (m *Model) syncSearchCursorFromDiffFocus() {
 		return
 	}
 	sec := m.sectionState(m.section)
-	diffMatches := make([]explorer.DiffSearchMatch, 0, diffSearch.MatchesCount())
+	diffMatches := make([]diffview.DiffSearchMatch, 0, diffSearch.MatchesCount())
 	for _, match := range diffSearch.Matches() {
-		diffMatches = append(diffMatches, explorer.DiffSearchMatch{
+		diffMatches = append(diffMatches, diffview.DiffSearchMatch{
 			DisplayIndex: match.DisplayIndex,
 			RawIndex:     match.Index,
 		})
 	}
-	idx := explorer.CurrentDiffSearchMatchIndex(sec.data, diffMatches, explorer.NavLine)
+	idx := diffview.CurrentDiffSearchMatchIndex(sec.data, diffMatches, diffview.NavModeLine)
 	if idx < 0 {
 		return
 	}

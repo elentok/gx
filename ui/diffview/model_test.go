@@ -3,7 +3,6 @@ package diffview
 import (
 	"testing"
 
-	"github.com/elentok/gx/ui/explorer"
 	"github.com/elentok/gx/ui/search"
 
 	tea "charm.land/bubbletea/v2"
@@ -50,9 +49,6 @@ func TestModelDiffSettings(t *testing.T) {
 	m.SetNavMode(NavModeLine)
 	if m.NavMode() != NavModeLine {
 		t.Fatalf("nav mode=%v want line", m.NavMode())
-	}
-	if m.ExplorerNavMode() != explorer.NavLine {
-		t.Fatalf("explorer nav mode=%v want line", m.ExplorerNavMode())
 	}
 
 	m.EnableWrap(false)

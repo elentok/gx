@@ -1,4 +1,4 @@
-package explorer
+package diffview
 
 import (
 	"reflect"
@@ -6,10 +6,10 @@ import (
 )
 
 func TestFocusedYankBodyLineMode(t *testing.T) {
-	section := BuildSectionData(sampleSectionUnifiedDiff, "", NewSectionData(), false)
+	section := BuildDiffBuffer(sampleSectionUnifiedDiff, "", NewDiffBuffer(), false)
 	section.ActiveLine = 1
 
-	got := FocusedYankBody(section, NavLine)
+	got := FocusedYankBody(section, NavModeLine)
 	want := []string{"+two changed"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("FocusedYankBody = %#v, want %#v", got, want)
@@ -17,9 +17,9 @@ func TestFocusedYankBodyLineMode(t *testing.T) {
 }
 
 func TestFocusedYankBodyHunkMode(t *testing.T) {
-	section := BuildSectionData(sampleSectionUnifiedDiff, "", NewSectionData(), false)
+	section := BuildDiffBuffer(sampleSectionUnifiedDiff, "", NewDiffBuffer(), false)
 
-	got := FocusedYankBody(section, NavHunk)
+	got := FocusedYankBody(section, NavModeHunk)
 	want := []string{" one", "-two", "+two changed", " three"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("FocusedYankBody = %#v, want %#v", got, want)
@@ -27,12 +27,12 @@ func TestFocusedYankBodyHunkMode(t *testing.T) {
 }
 
 func TestFocusedLocationVisualLineMode(t *testing.T) {
-	section := BuildSectionData(sampleSectionUnifiedDiff, "", NewSectionData(), false)
+	section := BuildDiffBuffer(sampleSectionUnifiedDiff, "", NewDiffBuffer(), false)
 	section.ActiveLine = 1
 	section.VisualActive = true
 	section.VisualAnchor = 0
 
-	got := FocusedLocation(section, NavLine)
+	got := FocusedLocation(section, NavModeLine)
 	if got != "L2" {
 		t.Fatalf("FocusedLocation = %q, want L2", got)
 	}

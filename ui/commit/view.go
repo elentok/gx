@@ -7,8 +7,9 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/diffview/diffrender"
-	"github.com/elentok/gx/ui/explorer"
+	"github.com/elentok/gx/ui/sidebar"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -249,7 +250,7 @@ func (m Model) renderDiffPane(width, height int) string {
 		lines = make([]string, 0, max(1, m.diffViewport.VisibleLineCount()))
 		bodyH := max(1, height-2)
 		active := m.activeRawLineIndex()
-		rows := explorer.BuildVisibleDiffRows(explorer.VisibleDiffRowsOptions{
+		rows := diffview.BuildVisibleDiffRows(diffview.VisibleDiffRowsOptions{
 			Section:    m.section,
 			ViewportY:  m.diffViewport.YOffset(),
 			Visible:    m.diffViewport.VisibleLineCount(),
@@ -305,7 +306,7 @@ func (m Model) diffTitle() string {
 	if !m.focusDiff {
 		return ""
 	}
-	if m.diffNavMode == explorer.NavLine {
+	if m.diffNavMode == diffview.NavModeLine {
 		return "line"
 	}
 	return "hunk"
@@ -345,7 +346,7 @@ func isMainOrMasterRef(name string) bool {
 }
 
 func (m Model) footerView() string {
-	if m.searchMode == explorer.SearchModeInput {
+	if m.searchMode == commitSearchModeInput {
 		return m.searchFooterText()
 	}
 	left := m.statusMsg
@@ -370,7 +371,7 @@ func (m Model) footerView() string {
 func (m Model) visibleFileLines(height int) []string {
 	innerH := max(1, height-2)
 	icons := ui.Icons(m.settings.UseNerdFontIcons)
-	rows := explorer.BuildVisibleSidebarRenderableRows(m.fileEntries, m.selected, innerH, func(i int, entry commitFileEntry) explorer.SidebarRenderableRow {
+	rows := sidebar.BuildVisibleRenderableRows(m.fileEntries, m.selected, innerH, func(i int, entry commitFileEntry) sidebar.RenderableRow {
 		statusColor := commitEntryColor(entry)
 		name := entry.DisplayName
 		if entry.Kind == commitFileEntryDir {
@@ -388,7 +389,7 @@ func (m Model) visibleFileLines(height int) []string {
 		if matched, current := m.searchMatchSidebarIndex(i); matched {
 			name = highlightMatchText(name, m.searchQuery, current)
 		}
-		return explorer.SidebarRenderableRow{
+		return sidebar.RenderableRow{
 			Depth:    entry.Depth,
 			MetaRaw:  commitEntryMeta(entry, m.settings.UseNerdFontIcons),
 			NameRaw:  name,
@@ -396,7 +397,7 @@ func (m Model) visibleFileLines(height int) []string {
 			Selected: i == m.selected,
 		}
 	})
-	return explorer.RenderSidebarRows(rows, innerH, ui.StyleMuted.Render("no changed files"), ui.ColorOrange)
+	return sidebar.RenderRows(rows, innerH, ui.StyleMuted.Render("no changed files"), ui.ColorOrange)
 }
 
 func (m Model) requiredFilesPaneWidth(height int) int {

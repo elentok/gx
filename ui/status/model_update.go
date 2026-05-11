@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/search"
 
@@ -89,7 +90,7 @@ func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 
 	var helpCmd tea.Cmd
 	var reloadCmd tea.Cmd
-	if m.renderMode == renderSideBySide {
+	if m.renderMode == diffview.RenderModeSideBySide {
 		reloadCmd = m.reloadDiffsForSelection()
 	}
 	m.syncDiffViewports()

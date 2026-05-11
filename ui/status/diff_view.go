@@ -8,8 +8,8 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/diffview/diffrender"
-	"github.com/elentok/gx/ui/explorer"
 	"github.com/elentok/gx/ui/search"
 
 	"charm.land/lipgloss/v2"
@@ -91,12 +91,12 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 	}
 
 	if len(lines) == 0 {
-		rows := explorer.BuildVisibleDiffRows(explorer.VisibleDiffRowsOptions{
+		rows := diffview.BuildVisibleDiffRows(diffview.VisibleDiffRowsOptions{
 			Section:    sec.data,
 			ViewportY:  sec.viewport.YOffset(),
 			Visible:    sec.viewport.VisibleLineCount(),
 			BodyHeight: bodyH,
-			NavMode:    toExplorerNavMode(m.navMode),
+			NavMode:    m.navMode,
 			Active:     activeSection,
 			ActiveRaw:  active,
 		})
@@ -108,7 +108,7 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 			displayIdx := row.DisplayIndex
 			rawIdx := row.RawIndex
 			mark := "  "
-			if m.navMode == navLine && sec.data.VisualActive && m.visualMatchDiffDisplay(*sec, displayIdx) {
+			if m.navMode == diffview.NavModeLine && sec.data.VisualActive && m.visualMatchDiffDisplay(*sec, displayIdx) {
 				mark = lipgloss.NewStyle().Foreground(accent).Render("▎ ")
 			}
 			if row.InActiveHunk && activeSection {
@@ -142,7 +142,7 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 			}
 			rowKind := row.Kind
 			body := ansi.Truncate(row.Text, bodyW, "")
-			if m.renderMode == renderSideBySide {
+			if m.renderMode == diffview.RenderModeSideBySide {
 				plain := strings.TrimSpace(ansi.Strip(body))
 				if isDeltaSectionDivider(plain) {
 					body = lipgloss.NewStyle().Foreground(ui.ColorDeepBg).Render(ansi.Strip(body))
@@ -228,7 +228,7 @@ func (m Model) hunkOverflowMarkers() (top, bottom, both string) {
 }
 
 func (m Model) visualMatchDiffDisplay(sec sectionState, displayIdx int) bool {
-	if !sec.data.VisualActive || m.navMode != navLine {
+	if !sec.data.VisualActive || m.navMode != diffview.NavModeLine {
 		return false
 	}
 	if len(sec.data.ChangedDisplay) > 0 {
@@ -257,7 +257,7 @@ func (m Model) visualMatchDiffDisplay(sec sectionState, displayIdx int) bool {
 }
 
 func (m Model) activeRawLineIndex(sec sectionState) int {
-	if m.navMode == navHunk {
+	if m.navMode == diffview.NavModeHunk {
 		if sec.data.ActiveHunk >= 0 && sec.data.ActiveHunk < len(sec.data.Parsed.Hunks) {
 			return sec.data.Parsed.Hunks[sec.data.ActiveHunk].StartLine
 		}
@@ -300,7 +300,7 @@ func (m *Model) syncDiffViewports() {
 
 func reflowSectionLines(sec *sectionState, wrapWidth int, wrapSoft bool) {
 	prevOffset := sec.viewport.YOffset()
-	explorer.ReflowSectionData(&sec.data, wrapWidth, wrapSoft)
+	diffview.ReflowDiffBuffer(&sec.data, wrapWidth, wrapSoft)
 	if len(sec.data.BaseLines) == 0 {
 		sec.viewport.SetContent("")
 		sec.viewport.SetYOffset(0)

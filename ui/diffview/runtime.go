@@ -1,8 +1,7 @@
-package explorer
+package diffview
 
 import (
 	"charm.land/bubbles/v2/viewport"
-
 	"github.com/elentok/gx/ui/diffview/diffcore"
 )
 

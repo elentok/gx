@@ -1,4 +1,4 @@
-package explorer
+package sidebar
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-type SidebarRenderableRow struct {
+type RenderableRow struct {
 	Depth    int
 	MetaRaw  string
 	NameRaw  string
@@ -17,9 +17,9 @@ type SidebarRenderableRow struct {
 	Faint    bool
 }
 
-func BuildVisibleSidebarRenderableRows[T any](entries []T, selected, innerH int, build func(index int, entry T) SidebarRenderableRow) []SidebarRenderableRow {
+func BuildVisibleRenderableRows[T any](entries []T, selected, innerH int, build func(index int, entry T) RenderableRow) []RenderableRow {
 	start, end := VisibleWindow(len(entries), selected, innerH)
-	rows := make([]SidebarRenderableRow, 0, sidebarMaxInt(0, end-start))
+	rows := make([]RenderableRow, 0, maxInt(0, end-start))
 	for i := start; i < end; i++ {
 		rows = append(rows, build(i, entries[i]))
 	}
@@ -47,14 +47,14 @@ func VisibleWindow(total, selected, bodyH int) (start, end int) {
 	return start, end
 }
 
-func sidebarMaxInt(a, b int) int {
+func maxInt(a, b int) int {
 	if a > b {
 		return a
 	}
 	return b
 }
 
-func RenderSidebarRows(rows []SidebarRenderableRow, innerH int, emptyLine string, accent color.Color) []string {
+func RenderRows(rows []RenderableRow, innerH int, emptyLine string, accent color.Color) []string {
 	lines := make([]string, 0, innerH)
 	if len(rows) == 0 {
 		lines = append(lines, emptyLine)

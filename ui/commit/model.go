@@ -5,7 +5,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui/explorer"
+	"github.com/elentok/gx/ui/diffview"
 
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
@@ -23,35 +23,48 @@ type Model struct {
 	ref          string
 	settings     Settings
 
-	width         int
-	height        int
-	ready         bool
-	focusHeader   bool
-	focusDiff     bool
-	diffNavMode   explorer.NavMode
-	wrapSoft      bool
-	keyPrefix     string
-	bodyExpanded  bool
-	details       git.CommitDetails
+	width        int
+	height       int
+	ready        bool
+	focusHeader  bool
+	focusDiff    bool
+	keyPrefix    string
+	bodyExpanded bool
+	details      git.CommitDetails
+	statusMsg    string
+	headerOffset int
+	err          error
+
+	commitDiffArea
+	commitSearchState
+	commitSidebarState
+
+	helpOpen     bool
+	helpViewport viewport.Model
+}
+
+type commitDiffArea struct {
+	diffNavMode  diffview.NavMode
+	wrapSoft     bool
+	section      diffview.DiffBuffer
+	diffViewport viewport.Model
+}
+
+type commitSearchState struct {
+	searchMode    commitSearchMode
+	searchScope   commitSearchScope
+	searchQuery   string
+	searchMatches []diffview.DiffSearchMatch
+	searchCursor  int
+	searchInput   textinput.Model
+}
+
+type commitSidebarState struct {
 	files         []git.CommitFile
 	fileEntries   []commitFileEntry
 	collapsedDirs map[string]bool
 	selected      int
-	section       explorer.SectionData
-	diffViewport  viewport.Model
-	searchMode    explorer.SearchMode
-	searchScope   commitSearchScope
-	searchQuery   string
-	searchMatches []explorer.DiffSearchMatch
 	fileMatches   []int
-	searchCursor  int
-	searchInput   textinput.Model
-	statusMsg     string
-	headerOffset  int
-	err           error
-
-	helpOpen     bool
-	helpViewport viewport.Model
 }
 
 func New(worktreeRoot, ref string) Model {
@@ -60,14 +73,18 @@ func New(worktreeRoot, ref string) Model {
 
 func NewWithSettings(worktreeRoot, ref string, settings Settings) Model {
 	m := Model{
-		worktreeRoot:  worktreeRoot,
-		ref:           normalizedRef(ref),
-		settings:      settings,
-		bodyExpanded:  true,
-		diffNavMode:   explorer.NavHunk,
-		wrapSoft:      true,
-		diffViewport:  viewport.New(),
-		collapsedDirs: map[string]bool{},
+		worktreeRoot: worktreeRoot,
+		ref:          normalizedRef(ref),
+		settings:     settings,
+		bodyExpanded: true,
+		commitDiffArea: commitDiffArea{
+			diffNavMode:  diffview.NavModeHunk,
+			wrapSoft:     true,
+			diffViewport: viewport.New(),
+		},
+		commitSidebarState: commitSidebarState{
+			collapsedDirs: map[string]bool{},
+		},
 	}
 	m.reload()
 	return m
@@ -87,13 +104,13 @@ func (m *Model) reload() {
 	m.details, m.err = git.CommitDetailsForRef(m.worktreeRoot, m.ref)
 	if m.err != nil {
 		m.files = nil
-		m.section = explorer.NewSectionData()
+		m.section = diffview.NewDiffBuffer()
 		m.headerOffset = 0
 		return
 	}
 	m.files, m.err = git.CommitFilesForRef(m.worktreeRoot, m.ref)
 	if m.err != nil {
-		m.section = explorer.NewSectionData()
+		m.section = diffview.NewDiffBuffer()
 		m.headerOffset = 0
 		return
 	}
@@ -114,20 +131,20 @@ func (m *Model) reload() {
 func (m *Model) refreshDiff() {
 	file, ok := m.selectedCommitFile()
 	if !ok {
-		m.section = explorer.NewSectionData()
+		m.section = diffview.NewDiffBuffer()
 		return
 	}
 	rawDiff, err := git.CommitFileDiffForRef(m.worktreeRoot, m.ref, file.Path)
 	if err != nil {
 		m.err = err
-		m.section = explorer.NewSectionData()
+		m.section = diffview.NewDiffBuffer()
 		return
 	}
 	colorDiff, err := git.CommitFileDiffWithDeltaForRef(m.worktreeRoot, m.ref, file.Path, m.currentDiffRenderWidth())
 	if err != nil {
 		colorDiff = rawDiff
 	}
-	m.section = explorer.BuildSectionData(rawDiff, colorDiff, m.section, false)
+	m.section = diffview.BuildDiffBuffer(rawDiff, colorDiff, m.section, false)
 	if strings.TrimSpace(m.searchQuery) != "" && m.searchScope == searchScopeDiff {
 		cursor := m.searchCursor
 		m.recomputeSearchMatches()

@@ -1,4 +1,4 @@
-package explorer
+package commit
 
 import (
 	"path"
@@ -6,20 +6,20 @@ import (
 	"strings"
 )
 
-type FileTreeRowKind int
+type commitTreeRowKind int
 
 const (
-	FileTreeRowFile FileTreeRowKind = iota
-	FileTreeRowDir
+	commitTreeRowFile commitTreeRowKind = iota
+	commitTreeRowDir
 )
 
-type FileTreeLeaf[T any] struct {
+type commitTreeLeaf[T any] struct {
 	Path  string
 	Value T
 }
 
-type FileTreeRow[T any] struct {
-	Kind        FileTreeRowKind
+type commitTreeRow[T any] struct {
+	Kind        commitTreeRowKind
 	Path        string
 	ParentPath  string
 	Depth       int
@@ -29,15 +29,15 @@ type FileTreeRow[T any] struct {
 	Leaves      []T
 }
 
-type fileTreeNode[T any] struct {
+type commitTreeNode[T any] struct {
 	name     string
 	path     string
-	children map[string]*fileTreeNode[T]
-	leaf     *FileTreeLeaf[T]
+	children map[string]*commitTreeNode[T]
+	leaf     *commitTreeLeaf[T]
 }
 
-func BuildFileTreeRows[T any](leaves []FileTreeLeaf[T], collapsed map[string]bool) []FileTreeRow[T] {
-	root := &fileTreeNode[T]{children: map[string]*fileTreeNode[T]{}}
+func buildCommitTreeRows[T any](leaves []commitTreeLeaf[T], collapsed map[string]bool) []commitTreeRow[T] {
+	root := &commitTreeNode[T]{children: map[string]*commitTreeNode[T]{}}
 	for i := range leaves {
 		parts := strings.Split(leaves[i].Path, "/")
 		cur := root
@@ -46,7 +46,7 @@ func BuildFileTreeRows[T any](leaves []FileTreeLeaf[T], collapsed map[string]boo
 			p := path.Join(parts[:j+1]...)
 			next, ok := cur.children[name]
 			if !ok {
-				next = &fileTreeNode[T]{name: name, path: p, children: map[string]*fileTreeNode[T]{}}
+				next = &commitTreeNode[T]{name: name, path: p, children: map[string]*commitTreeNode[T]{}}
 				cur.children[name] = next
 			}
 			cur = next
@@ -55,20 +55,20 @@ func BuildFileTreeRows[T any](leaves []FileTreeLeaf[T], collapsed map[string]boo
 		cur.leaf = &copy
 	}
 
-	var rows []FileTreeRow[T]
-	appendFileTreeRows(root, "", 0, collapsed, &rows)
+	var rows []commitTreeRow[T]
+	appendCommitTreeRows(root, "", 0, collapsed, &rows)
 	return rows
 }
 
-func appendFileTreeRows[T any](node *fileTreeNode[T], parentPath string, depth int, collapsed map[string]bool, rows *[]FileTreeRow[T]) {
-	for _, child := range sortedFileTreeChildren(node) {
+func appendCommitTreeRows[T any](node *commitTreeNode[T], parentPath string, depth int, collapsed map[string]bool, rows *[]commitTreeRow[T]) {
+	for _, child := range sortedCommitTreeChildren(node) {
 		isDir := len(child.children) > 0
 		if !isDir {
 			if child.leaf == nil {
 				continue
 			}
-			*rows = append(*rows, FileTreeRow[T]{
-				Kind:        FileTreeRowFile,
+			*rows = append(*rows, commitTreeRow[T]{
+				Kind:        commitTreeRowFile,
 				Path:        child.path,
 				ParentPath:  parentPath,
 				Depth:       depth,
@@ -79,28 +79,28 @@ func appendFileTreeRows[T any](node *fileTreeNode[T], parentPath string, depth i
 			continue
 		}
 
-		displayName, dir := collapsedFileTreeDirChain(child)
+		displayName, dir := collapsedCommitTreeDirChain(child)
 		expanded := !collapsed[dir.path]
-		*rows = append(*rows, FileTreeRow[T]{
-			Kind:        FileTreeRowDir,
+		*rows = append(*rows, commitTreeRow[T]{
+			Kind:        commitTreeRowDir,
 			Path:        dir.path,
 			ParentPath:  parentPath,
 			Depth:       depth,
 			DisplayName: displayName,
 			Expanded:    expanded,
-			Leaves:      collectFileTreeLeaves(dir),
+			Leaves:      collectCommitTreeLeaves(dir),
 		})
 		if expanded {
-			appendFileTreeRows(dir, dir.path, depth+1, collapsed, rows)
+			appendCommitTreeRows(dir, dir.path, depth+1, collapsed, rows)
 		}
 	}
 }
 
-func collapsedFileTreeDirChain[T any](node *fileTreeNode[T]) (string, *fileTreeNode[T]) {
+func collapsedCommitTreeDirChain[T any](node *commitTreeNode[T]) (string, *commitTreeNode[T]) {
 	parts := []string{node.name}
 	cur := node
 	for len(cur.children) == 1 && cur.leaf == nil {
-		next := onlyFileTreeChild(cur)
+		next := onlyCommitTreeChild(cur)
 		if next == nil || len(next.children) == 0 {
 			break
 		}
@@ -110,26 +110,26 @@ func collapsedFileTreeDirChain[T any](node *fileTreeNode[T]) (string, *fileTreeN
 	return path.Join(parts...), cur
 }
 
-func onlyFileTreeChild[T any](node *fileTreeNode[T]) *fileTreeNode[T] {
+func onlyCommitTreeChild[T any](node *commitTreeNode[T]) *commitTreeNode[T] {
 	for _, child := range node.children {
 		return child
 	}
 	return nil
 }
 
-func collectFileTreeLeaves[T any](node *fileTreeNode[T]) []T {
+func collectCommitTreeLeaves[T any](node *commitTreeNode[T]) []T {
 	var leaves []T
 	if node.leaf != nil {
 		leaves = append(leaves, node.leaf.Value)
 	}
-	for _, child := range sortedFileTreeChildren(node) {
-		leaves = append(leaves, collectFileTreeLeaves(child)...)
+	for _, child := range sortedCommitTreeChildren(node) {
+		leaves = append(leaves, collectCommitTreeLeaves(child)...)
 	}
 	return leaves
 }
 
-func sortedFileTreeChildren[T any](node *fileTreeNode[T]) []*fileTreeNode[T] {
-	children := make([]*fileTreeNode[T], 0, len(node.children))
+func sortedCommitTreeChildren[T any](node *commitTreeNode[T]) []*commitTreeNode[T] {
+	children := make([]*commitTreeNode[T], 0, len(node.children))
 	for _, child := range node.children {
 		children = append(children, child)
 	}
@@ -144,7 +144,7 @@ func sortedFileTreeChildren[T any](node *fileTreeNode[T]) []*fileTreeNode[T] {
 	return children
 }
 
-func FileTreeParentIndex[T any](rows []FileTreeRow[T], selected int) (int, bool) {
+func commitTreeParentIndex[T any](rows []commitTreeRow[T], selected int) (int, bool) {
 	if selected < 0 || selected >= len(rows) {
 		return 0, false
 	}
@@ -153,14 +153,14 @@ func FileTreeParentIndex[T any](rows []FileTreeRow[T], selected int) (int, bool)
 		return 0, false
 	}
 	for i, row := range rows {
-		if row.Kind == FileTreeRowDir && row.Path == parent {
+		if row.Kind == commitTreeRowDir && row.Path == parent {
 			return i, true
 		}
 	}
 	return 0, false
 }
 
-func FileTreeAdjacentFileIndex[T any](rows []FileTreeRow[T], selected, delta int) (int, bool) {
+func commitTreeAdjacentFileIndex[T any](rows []commitTreeRow[T], selected, delta int) (int, bool) {
 	if delta == 0 || len(rows) == 0 {
 		return 0, false
 	}
@@ -170,42 +170,42 @@ func FileTreeAdjacentFileIndex[T any](rows []FileTreeRow[T], selected, delta int
 		if idx < 0 || idx >= len(rows) {
 			return 0, false
 		}
-		if rows[idx].Kind == FileTreeRowFile {
+		if rows[idx].Kind == commitTreeRowFile {
 			return idx, true
 		}
 	}
 }
 
-func FileTreeCollapseSelectedDir[T any](rows []FileTreeRow[T], collapsed map[string]bool, selected int) bool {
+func commitTreeCollapseSelectedDir[T any](rows []commitTreeRow[T], collapsed map[string]bool, selected int) bool {
 	if selected < 0 || selected >= len(rows) {
 		return false
 	}
 	row := rows[selected]
-	if row.Kind != FileTreeRowDir || !row.Expanded {
+	if row.Kind != commitTreeRowDir || !row.Expanded {
 		return false
 	}
 	collapsed[row.Path] = true
 	return true
 }
 
-func FileTreeExpandSelectedDir[T any](rows []FileTreeRow[T], collapsed map[string]bool, selected int) bool {
+func commitTreeExpandSelectedDir[T any](rows []commitTreeRow[T], collapsed map[string]bool, selected int) bool {
 	if selected < 0 || selected >= len(rows) {
 		return false
 	}
 	row := rows[selected]
-	if row.Kind != FileTreeRowDir || row.Expanded {
+	if row.Kind != commitTreeRowDir || row.Expanded {
 		return false
 	}
 	delete(collapsed, row.Path)
 	return true
 }
 
-func FileTreeToggleDirOnEnter[T any](rows []FileTreeRow[T], collapsed map[string]bool, selected int) bool {
+func commitTreeToggleDirOnEnter[T any](rows []commitTreeRow[T], collapsed map[string]bool, selected int) bool {
 	if selected < 0 || selected >= len(rows) {
 		return false
 	}
 	row := rows[selected]
-	if row.Kind != FileTreeRowDir {
+	if row.Kind != commitTreeRowDir {
 		return false
 	}
 	if row.Expanded {

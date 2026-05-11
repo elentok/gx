@@ -1,4 +1,4 @@
-package explorer
+package diffview
 
 import (
 	"strings"
@@ -31,7 +31,7 @@ func ComputeDiffSearchMatches(viewLines []string, displayToRaw []int, query stri
 	return matches
 }
 
-func ApplyDiffSearchMatch(section *SectionData, vp *viewport.Model, match search.Match) {
+func ApplyDiffSearchMatch(section *DiffBuffer, vp *viewport.Model, match search.Match) {
 	if match.DisplayIndex >= 0 {
 		if match.DisplayIndex < vp.YOffset() {
 			vp.SetYOffset(match.DisplayIndex)
@@ -59,8 +59,8 @@ func ApplyDiffSearchMatch(section *SectionData, vp *viewport.Model, match search
 	}
 }
 
-func CurrentDiffSearchMatchIndex(section SectionData, matches []DiffSearchMatch, navMode NavMode) int {
-	if navMode != NavLine || section.ActiveLine < 0 || section.ActiveLine >= len(section.Parsed.Changed) {
+func CurrentDiffSearchMatchIndex(section DiffBuffer, matches []DiffSearchMatch, navMode NavMode) int {
+	if navMode != NavModeLine || section.ActiveLine < 0 || section.ActiveLine >= len(section.Parsed.Changed) {
 		return -1
 	}
 	raw := section.Parsed.Changed[section.ActiveLine].LineIndex

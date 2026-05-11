@@ -1,4 +1,4 @@
-package explorer
+package diffview
 
 import "github.com/elentok/gx/ui/diffview/diffrender"
 
@@ -15,7 +15,7 @@ type VisibleDiffRow struct {
 }
 
 type VisibleDiffRowsOptions struct {
-	Section    SectionData
+	Section    DiffBuffer
 	ViewportY  int
 	Visible    int
 	BodyHeight int
@@ -31,14 +31,14 @@ func BuildVisibleDiffRows(opts VisibleDiffRowsOptions) []VisibleDiffRow {
 	}
 
 	hunkStart, hunkEnd := -1, -1
-	if opts.NavMode == NavHunk && opts.Section.ActiveHunk >= 0 && opts.Section.ActiveHunk < len(opts.Section.Parsed.Hunks) {
+	if opts.NavMode == NavModeHunk && opts.Section.ActiveHunk >= 0 && opts.Section.ActiveHunk < len(opts.Section.Parsed.Hunks) {
 		hunkStart = opts.Section.Parsed.Hunks[opts.Section.ActiveHunk].StartLine
 		hunkEnd = opts.Section.Parsed.Hunks[opts.Section.ActiveHunk].EndLine
 	}
 
 	overflowTopDisplay := -1
 	overflowBottomDisplay := -1
-	if opts.NavMode == NavHunk && opts.Active && opts.Section.ActiveHunk >= 0 {
+	if opts.NavMode == NavModeHunk && opts.Active && opts.Section.ActiveHunk >= 0 {
 		if start, end, ok := HunkDisplayBounds(opts.Section.HunkDisplayRange, opts.Section.Parsed, opts.Section.DisplayToRaw, opts.Section.ActiveHunk); ok && opts.Visible > 0 {
 			vpBottom := opts.ViewportY + opts.Visible - 1
 			if start < opts.ViewportY {
@@ -66,7 +66,7 @@ func BuildVisibleDiffRows(opts VisibleDiffRowsOptions) []VisibleDiffRow {
 		}
 
 		inActiveHunk := false
-		if opts.NavMode == NavHunk {
+		if opts.NavMode == NavModeHunk {
 			if len(opts.Section.HunkDisplayRange) > 0 && opts.Section.ActiveHunk >= 0 && opts.Section.ActiveHunk < len(opts.Section.HunkDisplayRange) {
 				r := opts.Section.HunkDisplayRange[opts.Section.ActiveHunk]
 				inActiveHunk = displayIdx >= r[0] && displayIdx <= r[1]
@@ -75,7 +75,7 @@ func BuildVisibleDiffRows(opts VisibleDiffRowsOptions) []VisibleDiffRow {
 			}
 		}
 
-		isChanged := rawIdx < 0 && opts.NavMode == NavLine && opts.Active && opts.Section.ActiveLine >= 0 && opts.Section.ActiveLine < len(opts.Section.ChangedDisplay) && opts.Section.ChangedDisplay[opts.Section.ActiveLine] == displayIdx
+		isChanged := rawIdx < 0 && opts.NavMode == NavModeLine && opts.Active && opts.Section.ActiveLine >= 0 && opts.Section.ActiveLine < len(opts.Section.ChangedDisplay) && opts.Section.ChangedDisplay[opts.Section.ActiveLine] == displayIdx
 
 		rows = append(rows, VisibleDiffRow{
 			DisplayIndex:       displayIdx,

@@ -1,6 +1,10 @@
 package status
 
-import tea "charm.land/bubbletea/v2"
+import (
+	"github.com/elentok/gx/ui/diffview"
+
+	tea "charm.land/bubbletea/v2"
+)
 
 func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if msg.Code == tea.KeyTab {
@@ -27,17 +31,17 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "a":
 		sec := m.currentSection()
 		sec.data.VisualActive = false
-		if m.navMode == navHunk {
-			m.navMode = navLine
+		if m.navMode == diffview.NavModeHunk {
+			m.navMode = diffview.NavModeLine
 		} else {
-			m.navMode = navHunk
+			m.navMode = diffview.NavModeHunk
 		}
 		m.diffArea.applyModes()
 		m.ensureActiveVisible(m.currentSection())
 	case "v":
 		sec := m.currentSection()
-		if m.navMode == navHunk {
-			m.navMode = navLine
+		if m.navMode == diffview.NavModeHunk {
+			m.navMode = diffview.NavModeLine
 			m.diffArea.applyModes()
 		}
 		if len(sec.data.Parsed.Changed) == 0 {
@@ -54,7 +58,7 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "f":
 		m.diffFullscreen = !m.diffFullscreen
 		var cmd tea.Cmd
-		if m.renderMode == renderSideBySide {
+		if m.renderMode == diffview.RenderModeSideBySide {
 			cmd = m.reloadDiffsForSelection()
 		}
 		m.syncDiffViewports()

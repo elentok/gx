@@ -22,39 +22,39 @@ End-state target: remove `ui/explorer` entirely if possible; if any shared helpe
 - [x] Shared code usage must be pure/helper-only; no shared mutable state structs across pages.
 
 ### Wave 3: Remove or rename `ui/explorer` with explicit package semantics
-- [ ] Attempt full removal by inlining feature-specific logic into `ui/status` and `ui/commit`.
-- [ ] If shared helpers are still valuable, split/rename into explicit packages by concern (examples: diff navigation helpers, sidebar row render helpers, yank formatting helpers).
-- [ ] Ban reintroduction of a catch-all `explorer` package name.
+- [x] Attempt full removal by inlining feature-specific logic into `ui/status` and `ui/commit`.
+- [x] If shared helpers are still valuable, split/rename into explicit packages by concern (examples: diff navigation helpers, sidebar row render helpers, yank formatting helpers).
+- [x] Ban reintroduction of a catch-all `explorer` package name.
 
 ### Wave 3a: Detach `ui/diffview` from `ui/explorer`
-- [ ] Move `explorer.SectionData` and its builders/reflow helpers into `ui/diffview`; rename it to `DiffBuffer`.
-- [ ] Treat `DiffBuffer` as one pane's parsed/rendered diff buffer plus cursor/visual-selection state, not generic data.
-- [ ] Move diff navigation/search/yank helpers that operate on the buffer into `ui/diffview` or narrow subpackages under it.
-- [ ] Remove `diffview.Model.ExplorerNavMode`; `ui/diffview` must not expose conversion helpers back to `ui/explorer`.
-- [ ] Update `ui/status` and `ui/commit` to use `diffview.DiffBuffer`, `diffview.NavMode`, and `diffview.RenderMode` directly.
-- [ ] Remove the temporary aliases in `ui/status/diff_types.go` (`navMode`, `diffRenderMode`, `navHunk`, `navLine`, `renderUnified`, `renderSideBySide`) once status call sites use `diffview` names directly.
-- [ ] Leave sidebar/filetree helpers out of `ui/diffview`; split them separately only if they remain shared.
+- [x] Move `explorer.SectionData` and its builders/reflow helpers into `ui/diffview`; rename it to `DiffBuffer`.
+- [x] Treat `DiffBuffer` as one pane's parsed/rendered diff buffer plus cursor/visual-selection state, not generic data.
+- [x] Move diff navigation/search/yank helpers that operate on the buffer into `ui/diffview` or narrow subpackages under it.
+- [x] Remove `diffview.Model.ExplorerNavMode`; `ui/diffview` must not expose conversion helpers back to `ui/explorer`.
+- [x] Update `ui/status` and `ui/commit` to use `diffview.DiffBuffer`, `diffview.NavMode`, and `diffview.RenderMode` directly.
+- [x] Remove the temporary aliases in `ui/status/diff_types.go` (`navMode`, `diffRenderMode`, `navHunk`, `navLine`, `renderUnified`, `renderSideBySide`) once status call sites use `diffview` names directly.
+- [x] Leave sidebar/filetree helpers out of `ui/diffview`; split them separately only if they remain shared.
 
 ### Wave 4: Apply stabilized pattern to `ui/commit`
-- [ ] Mirror status architecture in commit:
-  - [ ] commit-owned diff interaction boundary,
-  - [ ] commit-owned diff-search wiring boundary (still using existing `search.Model`),
-  - [ ] commit-owned filetree/sidebar boundary.
-- [ ] Reuse only explicit pure shared packages chosen in Wave 3.
-- [ ] No alias shims or ambiguous cross-feature ownership.
+- [x] Mirror status architecture in commit:
+  - [x] commit-owned diff interaction boundary,
+  - [x] commit-owned diff-search wiring boundary (still using existing `search.Model`),
+  - [x] commit-owned filetree/sidebar boundary.
+- [x] Reuse only explicit pure shared packages chosen in Wave 3.
+- [x] No alias shims or ambiguous cross-feature ownership.
 
 ## Public/Internal Interface Changes
 - Internal refactor only; no intentional keymap/UX changes during Wave 1/2.
 - Package-level moves/renames expected in Wave 3; keep temporary compatibility wrappers only if needed to land incrementally.
-- `ui/explorer` is deprecated during migration and must be fully removed or replaced by explicitly named pure packages at completion.
+- [x] `ui/explorer` is removed and replaced by explicitly named status/commit-local code plus pure shared packages.
 
 ## Test Plan
 - [x] Wave 1: full `ui/status` unit + e2e parity run.
 - [x] Wave 1: compile checks for removed alias paths/types.
 - [x] Wave 2: focused tests for diff/search ownership boundaries and parent orchestration routing.
 - [x] Wave 2: preserve existing regressions: section stability, staging/unstaging behavior, flash behavior, footer behavior, mouse wheel routing.
-- [ ] Wave 3: run `ui/status` + `ui/commit` + shared helper package tests to confirm no hidden coupling.
-- [ ] Wave 4: full `ui/commit` and `ui/status` suites to validate architecture parity and no behavior regressions.
+- [x] Wave 3: run `ui/status` + `ui/commit` + shared helper package tests to confirm no hidden coupling.
+- [x] Wave 4: full `ui/commit` and `ui/status` suites to validate architecture parity and no behavior regressions.
 
 ## Assumptions
 - Existing user-facing behavior remains stable during status stabilization unless fixing known bugs.

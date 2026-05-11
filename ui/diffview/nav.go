@@ -1,9 +1,9 @@
-package explorer
+package diffview
 
 import "charm.land/bubbles/v2/viewport"
 
-func ActiveRawLineIndex(section SectionData, navMode NavMode) int {
-	if navMode == NavHunk {
+func ActiveRawLineIndex(section DiffBuffer, navMode NavMode) int {
+	if navMode == NavModeHunk {
 		if section.ActiveHunk >= 0 && section.ActiveHunk < len(section.Parsed.Hunks) {
 			return section.Parsed.Hunks[section.ActiveHunk].StartLine
 		}
@@ -15,13 +15,13 @@ func ActiveRawLineIndex(section SectionData, navMode NavMode) int {
 	return -1
 }
 
-func EnsureActiveVisible(section SectionData, vp *viewport.Model, navMode NavMode) {
-	if navMode == NavHunk && section.ActiveHunk >= 0 && section.ActiveHunk < len(section.HunkDisplayRange) {
+func EnsureActiveVisible(section DiffBuffer, vp *viewport.Model, navMode NavMode) {
+	if navMode == NavModeHunk && section.ActiveHunk >= 0 && section.ActiveHunk < len(section.HunkDisplayRange) {
 		r := section.HunkDisplayRange[section.ActiveHunk]
 		vp.EnsureVisible(r[0], 0, 0)
 		return
 	}
-	if navMode == NavLine && section.ActiveLine >= 0 && section.ActiveLine < len(section.ChangedDisplay) && section.ChangedDisplay[section.ActiveLine] >= 0 {
+	if navMode == NavModeLine && section.ActiveLine >= 0 && section.ActiveLine < len(section.ChangedDisplay) && section.ChangedDisplay[section.ActiveLine] >= 0 {
 		vp.EnsureVisible(section.ChangedDisplay[section.ActiveLine], 0, 0)
 		return
 	}
@@ -35,8 +35,8 @@ func EnsureActiveVisible(section SectionData, vp *viewport.Model, navMode NavMod
 	}
 }
 
-func MoveActive(section *SectionData, vp *viewport.Model, navMode NavMode, delta int, allowViewportScroll bool) bool {
-	if navMode == NavHunk {
+func MoveActive(section *DiffBuffer, vp *viewport.Model, navMode NavMode, delta int, allowViewportScroll bool) bool {
+	if navMode == NavModeHunk {
 		if len(section.Parsed.Hunks) == 0 {
 			return false
 		}
@@ -95,9 +95,9 @@ func ScrollPage(vp *viewport.Model, direction int) {
 	}
 }
 
-func JumpTop(section *SectionData, vp *viewport.Model, navMode NavMode) bool {
+func JumpTop(section *DiffBuffer, vp *viewport.Model, navMode NavMode) bool {
 	vp.SetYOffset(0)
-	if navMode == NavHunk {
+	if navMode == NavModeHunk {
 		if len(section.Parsed.Hunks) == 0 {
 			return false
 		}
@@ -111,13 +111,13 @@ func JumpTop(section *SectionData, vp *viewport.Model, navMode NavMode) bool {
 	return true
 }
 
-func JumpBottom(section *SectionData, vp *viewport.Model, navMode NavMode) bool {
+func JumpBottom(section *DiffBuffer, vp *viewport.Model, navMode NavMode) bool {
 	maxOffset := vp.TotalLineCount() - vp.VisibleLineCount()
 	if maxOffset < 0 {
 		maxOffset = 0
 	}
 	vp.SetYOffset(maxOffset)
-	if navMode == NavHunk {
+	if navMode == NavModeHunk {
 		if len(section.Parsed.Hunks) == 0 {
 			return false
 		}

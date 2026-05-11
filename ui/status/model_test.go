@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/diffview/diffrender"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/search"
@@ -542,7 +543,7 @@ func TestHelpLineShowsVisualAtLeftInDiffFocus(t *testing.T) {
 	m.ready = true
 	m.width = 96
 	m.focus = focusDiff
-	m.navMode = navLine
+	m.navMode = diffview.NavModeLine
 	m.unstaged.data.VisualActive = true
 
 	line := m.helpLine()
@@ -570,7 +571,7 @@ func TestToggleSideBySideModeWithS(t *testing.T) {
 
 	updated, colorizeCmd := m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
 	m = updated.(Model)
-	if m.renderMode != renderSideBySide {
+	if m.renderMode != diffview.RenderModeSideBySide {
 		t.Fatalf("expected render mode side-by-side, got %v", m.renderMode)
 	}
 	if !strings.Contains(m.statusMsg, "side-by-side mode") {
@@ -591,7 +592,7 @@ func TestToggleSideBySideModeWithS(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
 	m = updated.(Model)
-	if m.renderMode != renderUnified {
+	if m.renderMode != diffview.RenderModeUnified {
 		t.Fatalf("expected render mode unified, got %v", m.renderMode)
 	}
 }
@@ -609,13 +610,13 @@ func TestToggleSideBySideModeWithSFromFiletreePane(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
 	m = updated.(Model)
-	if m.renderMode != renderSideBySide {
+	if m.renderMode != diffview.RenderModeSideBySide {
 		t.Fatalf("expected render mode side-by-side from filetree pane, got %v", m.renderMode)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
 	m = updated.(Model)
-	if m.renderMode != renderUnified {
+	if m.renderMode != diffview.RenderModeUnified {
 		t.Fatalf("expected render mode unified after second toggle, got %v", m.renderMode)
 	}
 }
@@ -865,7 +866,7 @@ func TestSideBySideModeAllowsLineModeToggle(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	m = updated.(Model)
-	if m.navMode != navLine {
+	if m.navMode != diffview.NavModeLine {
 		t.Fatalf("expected nav mode to switch to line in side-by-side, got %v", m.navMode)
 	}
 
@@ -993,7 +994,7 @@ func TestSpaceStagesSingleLineInLineMode(t *testing.T) {
 	m.syncDiffViewports()
 	m.focus = focusDiff
 	m.section = sectionUnstaged
-	m.navMode = navLine
+	m.navMode = diffview.NavModeLine
 
 	m.applySelection()
 
@@ -1073,7 +1074,7 @@ func TestDiffUnstagedDDiscardsLineAfterConfirm(t *testing.T) {
 	m.ready = true
 	m.focus = focusDiff
 	m.section = sectionUnstaged
-	m.navMode = navLine
+	m.navMode = diffview.NavModeLine
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
@@ -1107,7 +1108,7 @@ func TestDiffStagedDUnstagesSelectionWithoutConfirm(t *testing.T) {
 	m = updated.(Model)
 	m.focus = focusDiff
 	m.section = sectionStaged
-	m.navMode = navLine
+	m.navMode = diffview.NavModeLine
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	m = updated.(Model)
@@ -1195,7 +1196,7 @@ func TestYankAllContextWithYAInDiffLineModeIncludesLocationAndSelectedLine(t *te
 	m.ready = true
 	m.focus = focusDiff
 	m.section = sectionUnstaged
-	m.navMode = navLine
+	m.navMode = diffview.NavModeLine
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
@@ -1234,7 +1235,7 @@ func TestYankFilenameWithYFInDiffLineModeYanksFilenameOnly(t *testing.T) {
 	m.ready = true
 	m.focus = focusDiff
 	m.section = sectionUnstaged
-	m.navMode = navLine
+	m.navMode = diffview.NavModeLine
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
 	m = updated.(Model)
@@ -1265,7 +1266,7 @@ func TestYankLocationOnlyWithYLInDiffVisualModeYanksOnlyLocation(t *testing.T) {
 	m.ready = true
 	m.focus = focusDiff
 	m.section = sectionUnstaged
-	m.navMode = navLine
+	m.navMode = diffview.NavModeLine
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
 	m = updated.(Model)
@@ -1303,7 +1304,7 @@ func TestYankSelectionOnlyWithYYInDiffLineMode(t *testing.T) {
 	m.ready = true
 	m.focus = focusDiff
 	m.section = sectionUnstaged
-	m.navMode = navLine
+	m.navMode = diffview.NavModeLine
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
 	m = updated.(Model)
@@ -1329,7 +1330,7 @@ func TestDiffJKScrollsWithoutMovingCursor(t *testing.T) {
 	m.syncDiffViewports()
 	m.focus = focusDiff
 	m.section = sectionUnstaged
-	m.navMode = navLine
+	m.navMode = diffview.NavModeLine
 
 	beforeLine := m.unstaged.data.ActiveLine
 	beforeOffset := m.unstaged.viewport.YOffset()
@@ -1392,7 +1393,7 @@ func TestHunkModeJKScrollsLargeHunkBeforeSwitching(t *testing.T) {
 	m.height = 16
 	m.focus = focusDiff
 	m.section = sectionUnstaged
-	m.navMode = navHunk
+	m.navMode = diffview.NavModeHunk
 	m.syncDiffViewports()
 
 	if m.unstaged.data.ActiveHunk != 0 {
@@ -1445,7 +1446,7 @@ func TestHunkOverflowViewportMarkers(t *testing.T) {
 		m.height = 16
 		m.focus = focusDiff
 		m.section = sectionUnstaged
-		m.navMode = navHunk
+		m.navMode = diffview.NavModeHunk
 		m.syncDiffViewports()
 
 		m.unstaged.viewport.SetYOffset(3)
@@ -1482,7 +1483,7 @@ func TestGInFiletreeAndDiffJumpsBottom(t *testing.T) {
 
 	m.focus = focusDiff
 	m.section = sectionUnstaged
-	m.navMode = navLine
+	m.navMode = diffview.NavModeLine
 	if len(m.unstaged.data.Parsed.Changed) == 0 {
 		t.Fatalf("expected unstaged changes in diff view")
 	}
@@ -1551,7 +1552,7 @@ func TestGInDiffHunkModeJumpsViewportToBottom(t *testing.T) {
 	m.height = 16
 	m.focus = focusDiff
 	m.section = sectionUnstaged
-	m.navMode = navHunk
+	m.navMode = diffview.NavModeHunk
 	m.syncDiffViewports()
 
 	updatedModel, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "G", ShiftedCode: 'G'})
@@ -1594,7 +1595,7 @@ func TestCtrlDAndCtrlUScrollFiletreeAndDiff(t *testing.T) {
 
 	m.focus = focusDiff
 	m.section = sectionUnstaged
-	m.navMode = navHunk
+	m.navMode = diffview.NavModeHunk
 	m.syncDiffViewports()
 	beforeOffset := m.unstaged.viewport.YOffset()
 
@@ -1795,7 +1796,7 @@ func TestStageSearchDiffModeAndPrevNextKeys(t *testing.T) {
 	if m.currentDiffSearch().Mode() != search.SearchModeResults || !m.currentDiffSearch().HasQuery() || m.currentDiffSearch().MatchesCount() == 0 {
 		t.Fatalf("expected enter to show search results mode while keeping highlights")
 	}
-	if m.navMode != navLine {
+	if m.navMode != diffview.NavModeLine {
 		t.Fatalf("expected enter after diff search to switch to line mode")
 	}
 	first := m.currentDiffSearch().Cursor()
@@ -1866,7 +1867,7 @@ func TestStageSearchDiffUsesRightEdgeIndicatorInHunkMode(t *testing.T) {
 	m.syncDiffViewports()
 	m.focus = focusDiff
 	m.section = sectionUnstaged
-	m.navMode = navHunk
+	m.navMode = diffview.NavModeHunk
 	m.recomputeSearchMatches()
 
 	pane := m.renderSectionPane(80, 12, "Unstaged", &m.unstaged, sectionUnstaged)
@@ -1914,7 +1915,7 @@ func TestApplySelection_DoesNotSwitchSectionWhenHunksRemain(t *testing.T) {
 	m.syncDiffViewports()
 	m.focus = focusDiff
 	m.section = sectionUnstaged
-	m.navMode = navHunk
+	m.navMode = diffview.NavModeHunk
 	m.unstaged.data.ActiveHunk = 0
 	if len(m.unstaged.data.Parsed.Hunks) < 2 {
 		t.Fatalf("expected at least 2 hunks before apply, got %d", len(m.unstaged.data.Parsed.Hunks))
@@ -1945,7 +1946,7 @@ func TestApplySelection_DoesNotSwitchSectionWhenCurrentSectionBecomesEmpty(t *te
 	m.syncDiffViewports()
 	m.focus = focusDiff
 	m.section = sectionUnstaged
-	m.navMode = navHunk
+	m.navMode = diffview.NavModeHunk
 
 	if len(m.unstaged.data.Parsed.Hunks) != 1 {
 		t.Fatalf("expected exactly 1 unstaged hunk before apply, got %d", len(m.unstaged.data.Parsed.Hunks))
@@ -1973,7 +1974,7 @@ func TestApplySelection_FlashesDestinationSectionWithoutSwitching(t *testing.T) 
 	m.syncDiffViewports()
 	m.focus = focusDiff
 	m.section = sectionUnstaged
-	m.navMode = navHunk
+	m.navMode = diffview.NavModeHunk
 
 	_ = m.applySelection()
 
@@ -2230,7 +2231,7 @@ func TestEditorLineForCurrentSelectionInDiffMode(t *testing.T) {
 	m.ready = true
 	m.focus = focusDiff
 	m.section = sectionUnstaged
-	m.navMode = navLine
+	m.navMode = diffview.NavModeLine
 
 	for i, cl := range m.unstaged.data.Parsed.Changed {
 		if cl.NewLine == 2 {
@@ -2621,7 +2622,7 @@ func TestVisualModeStagesLineRange(t *testing.T) {
 	m.ready = true
 	m.focus = focusDiff
 	m.section = sectionUnstaged
-	m.navMode = navLine
+	m.navMode = diffview.NavModeLine
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
 	m = updated.(Model)
@@ -2654,7 +2655,7 @@ func TestEscExitsVisualModeAndKeepsDiffFocus(t *testing.T) {
 	m.ready = true
 	m.focus = focusDiff
 	m.section = sectionUnstaged
-	m.navMode = navLine
+	m.navMode = diffview.NavModeLine
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
 	m = updated.(Model)
@@ -2744,7 +2745,7 @@ func TestVisualModeUnstagesLineRange(t *testing.T) {
 	m = updated.(Model)
 	m.focus = focusDiff
 	m.section = sectionStaged
-	m.navMode = navLine
+	m.navMode = diffview.NavModeLine
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
 	m = updated.(Model)

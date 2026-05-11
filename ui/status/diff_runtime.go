@@ -1,6 +1,6 @@
 package status
 
-import "github.com/elentok/gx/ui/explorer"
+import "github.com/elentok/gx/ui/diffview"
 
 func (m Model) canSwitchSections() bool {
 	return true
@@ -21,7 +21,7 @@ func (m *Model) currentSection() *sectionState {
 }
 
 func (m *Model) ensureActiveVisible(sec *sectionState) {
-	explorer.EnsureActiveVisible(sec.data, &sec.viewport, toExplorerNavMode(m.navMode))
+	diffview.EnsureActiveVisible(sec.data, &sec.viewport, m.navMode)
 }
 
 func (m Model) editorLineForCurrentSelection() int {
@@ -29,7 +29,7 @@ func (m Model) editorLineForCurrentSelection() int {
 		return 0
 	}
 	sec := m.currentSection()
-	if m.navMode == navLine {
+	if m.navMode == diffview.NavModeLine {
 		if sec.data.ActiveLine < 0 || sec.data.ActiveLine >= len(sec.data.Parsed.Changed) {
 			return 0
 		}
@@ -50,9 +50,9 @@ func (m Model) editorLineForCurrentSelection() int {
 }
 
 func hunkDisplayBounds(sec sectionState, hunkIdx int) (start int, end int, ok bool) {
-	return explorer.HunkDisplayBounds(sec.data.HunkDisplayRange, sec.data.Parsed, sec.data.DisplayToRaw, hunkIdx)
+	return diffview.HunkDisplayBounds(sec.data.HunkDisplayRange, sec.data.Parsed, sec.data.DisplayToRaw, hunkIdx)
 }
 
 func visualLineBounds(sec sectionState) (start, end int) {
-	return explorer.VisualLineBounds(sec.data.VisualAnchor, sec.data.ActiveLine, len(sec.data.Parsed.Changed))
+	return diffview.VisualLineBounds(sec.data.VisualAnchor, sec.data.ActiveLine, len(sec.data.Parsed.Changed))
 }

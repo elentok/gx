@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/explorer"
+	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/search"
 
 	"charm.land/bubbles/v2/textinput"
@@ -25,7 +25,7 @@ var commitSearchHighlightStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow).
 var commitSearchCurrentStyle = lipgloss.NewStyle().Foreground(ui.ColorGreen).Bold(true)
 
 func (m Model) InputFocused() bool {
-	return m.searchMode == explorer.SearchModeInput
+	return m.searchMode == commitSearchModeInput
 }
 
 func (m *Model) enterSearchMode() {
@@ -35,7 +35,7 @@ func (m *Model) enterSearchMode() {
 	ti.CursorEnd()
 	ti.Focus()
 	m.searchInput = ti
-	m.searchMode = explorer.SearchEnter()
+	m.searchMode = commitSearchEnter()
 	m.searchScope = searchScopeSidebar
 	if m.focusDiff {
 		m.searchScope = searchScopeDiff
@@ -43,7 +43,7 @@ func (m *Model) enterSearchMode() {
 }
 
 func (m *Model) handleSearchKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
-	if m.searchMode != explorer.SearchModeInput {
+	if m.searchMode != commitSearchModeInput {
 		return false, nil
 	}
 	total := len(m.searchMatches)
@@ -52,11 +52,11 @@ func (m *Model) handleSearchKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	}
 	switch msg.String() {
 	case "esc":
-		mode, cleared := explorer.SearchDismiss(
+		mode, cleared := commitSearchDismiss(
 			&m.searchQuery,
 			&m.searchCursor,
 			total,
-			explorer.SearchDismissKeepResultsUnlessEmptyOrNoMatches,
+			commitSearchDismissKeepResultsUnlessEmptyOrNoMatches,
 		)
 		m.searchMode = mode
 		if cleared {
@@ -64,11 +64,11 @@ func (m *Model) handleSearchKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		}
 		return true, nil
 	case "enter":
-		mode, cleared := explorer.SearchDismiss(
+		mode, cleared := commitSearchDismiss(
 			&m.searchQuery,
 			&m.searchCursor,
 			total,
-			explorer.SearchDismissKeepResultsUnlessEmptyOrNoMatches,
+			commitSearchDismissKeepResultsUnlessEmptyOrNoMatches,
 		)
 		m.searchMode = mode
 		if cleared {
@@ -90,16 +90,16 @@ func (m *Model) handleSearchNavigateKey(msg tea.KeyPressMsg) bool {
 	if m.searchScope == searchScopeSidebar {
 		total = len(m.fileMatches)
 	}
-	if !explorer.SearchCanNavigate(m.searchQuery, total) {
+	if !commitSearchCanNavigate(m.searchQuery, total) {
 		return false
 	}
 	switch msg.String() {
 	case "n":
-		explorer.SearchCursorNext(&m.searchCursor, total)
+		commitSearchCursorNext(&m.searchCursor, total)
 		m.jumpToSearchCursor()
 		return true
 	case "N", "shift+n":
-		explorer.SearchCursorPrev(&m.searchCursor, total)
+		commitSearchCursorPrev(&m.searchCursor, total)
 		m.jumpToSearchCursor()
 		return true
 	}
@@ -129,7 +129,7 @@ func (m *Model) recomputeSearchMatches() {
 		}
 		return
 	}
-	m.searchMatches = explorer.ComputeDiffSearchMatches(m.section.ViewLines, m.section.DisplayToRaw, m.searchQuery)
+	m.searchMatches = diffview.ComputeDiffSearchMatches(m.section.ViewLines, m.section.DisplayToRaw, m.searchQuery)
 }
 
 func (m *Model) jumpToSearchCursor() {
@@ -147,8 +147,8 @@ func (m *Model) jumpToSearchCursor() {
 	}
 	match := m.searchMatches[m.searchCursor]
 	m.focusDiff = true
-	m.diffNavMode = explorer.NavLine
-	explorer.ApplyDiffSearchMatch(&m.section, &m.diffViewport, search.Match{Index: match.RawIndex, DisplayIndex: match.DisplayIndex})
+	m.diffNavMode = diffview.NavModeLine
+	diffview.ApplyDiffSearchMatch(&m.section, &m.diffViewport, search.Match{Index: match.RawIndex, DisplayIndex: match.DisplayIndex})
 }
 
 func (m Model) searchMatchDiffDisplay(displayIdx int) (matched bool, current bool) {
@@ -158,7 +158,7 @@ func (m Model) searchMatchDiffDisplay(displayIdx int) (matched bool, current boo
 	if strings.TrimSpace(m.searchQuery) == "" {
 		return false, false
 	}
-	if i := explorer.DiffSearchMatchIndex(m.searchMatches, displayIdx); i >= 0 {
+	if i := diffview.DiffSearchMatchIndex(m.searchMatches, displayIdx); i >= 0 {
 		return true, i == m.searchCursor
 	}
 	return false, false
@@ -208,7 +208,7 @@ func highlightMatchText(text, query string, current bool) string {
 }
 
 func (m Model) searchFooterText() string {
-	if m.searchMode != explorer.SearchModeInput {
+	if m.searchMode != commitSearchModeInput {
 		return ""
 	}
 	total := len(m.searchMatches)

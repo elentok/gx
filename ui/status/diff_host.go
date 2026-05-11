@@ -4,12 +4,13 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/diffview/diffrender"
-	"github.com/elentok/gx/ui/explorer"
 )
 
 type statusDiffFileSelection struct {
-	explorer.FileSelection
-	stageFile git.StageFileStatus
+	Path       string
+	RenameFrom string
+	Untracked  bool
+	stageFile  git.StageFileStatus
 }
 
 type statusDiffSelection struct {
@@ -56,12 +57,10 @@ func (m Model) selectedStatusFile() (statusDiffFileSelection, bool) {
 		return statusDiffFileSelection{}, false
 	}
 	return statusDiffFileSelection{
-		FileSelection: explorer.FileSelection{
-			Path:       file.Path,
-			RenameFrom: file.RenameFrom,
-			Untracked:  file.IsUntracked(),
-		},
-		stageFile: file,
+		Path:       file.Path,
+		RenameFrom: file.RenameFrom,
+		Untracked:  file.IsUntracked(),
+		stageFile:  file,
 	}, true
 }
 

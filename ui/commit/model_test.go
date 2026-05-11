@@ -9,7 +9,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/explorer"
+	"github.com/elentok/gx/ui/diffview"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -76,13 +76,13 @@ func TestEnterFocusesDiffAndJKMoveInsideDiff(t *testing.T) {
 	if !m.focusDiff {
 		t.Fatalf("expected enter to focus diff")
 	}
-	if m.diffNavMode != explorer.NavHunk {
+	if m.diffNavMode != diffview.NavModeHunk {
 		t.Fatalf("expected default nav mode hunk, got %v", m.diffNavMode)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	m = updated.(Model)
-	if m.diffNavMode != explorer.NavLine {
+	if m.diffNavMode != diffview.NavModeLine {
 		t.Fatalf("expected a to switch to line mode, got %v", m.diffNavMode)
 	}
 
@@ -192,7 +192,7 @@ func TestSidebarSearchMovesToFileMatches(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	m = updated.(Model)
-	if m.searchMode != explorer.SearchModeInput {
+	if m.searchMode != commitSearchModeInput {
 		t.Fatalf("expected / to enter search mode")
 	}
 
@@ -212,7 +212,7 @@ func TestSidebarSearchMovesToFileMatches(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
-	if m.searchMode != explorer.SearchModeNone {
+	if m.searchMode != commitSearchModeNone {
 		t.Fatalf("expected enter to leave search mode")
 	}
 
@@ -247,7 +247,7 @@ func TestDiffSearchMovesToMatchesAndNavigates(t *testing.T) {
 	if len(m.searchMatches) < 2 {
 		t.Fatalf("expected multiple diff matches, got %d", len(m.searchMatches))
 	}
-	if !m.focusDiff || m.diffNavMode != explorer.NavLine {
+	if !m.focusDiff || m.diffNavMode != diffview.NavModeLine {
 		t.Fatalf("expected diff search to focus diff in line mode")
 	}
 
@@ -314,7 +314,7 @@ func TestYankAllContextWithYAInDiff(t *testing.T) {
 	m.height = 24
 	m.syncDiffViewport()
 	m.focusDiff = true
-	m.diffNavMode = explorer.NavLine
+	m.diffNavMode = diffview.NavModeLine
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
 	m = updated.(Model)

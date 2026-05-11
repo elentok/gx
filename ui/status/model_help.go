@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"charm.land/bubbles/v2/key"
+	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/help"
 )
 
@@ -67,7 +68,7 @@ func (m Model) helpSectionLabel() string {
 }
 
 func (m Model) navModeLabel() string {
-	if m.navMode == navLine {
+	if m.navMode == diffview.NavModeLine {
 		return "line"
 	}
 	return "hunk"

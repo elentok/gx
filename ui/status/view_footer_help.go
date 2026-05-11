@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/diffview"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -20,7 +21,7 @@ func (m Model) helpLine() string {
 		return m.renderFooterLine(hint)
 	}
 	modeLabel := "hunk"
-	if m.navMode == navLine {
+	if m.navMode == diffview.NavModeLine {
 		modeLabel = "line"
 	}
 	wrapLabel := "off"

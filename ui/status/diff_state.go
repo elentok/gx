@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/diffview/diffcore"
-	"github.com/elentok/gx/ui/explorer"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -25,7 +25,7 @@ func (m *Model) colorizeUntrackedSync(filePath, rawDiff string, sideBySide bool,
 
 type movedTarget struct {
 	fromSection diffSection
-	navMode     navMode
+	navMode     diffview.NavMode
 	hunkHeader  string
 	lineText    string
 }
@@ -45,7 +45,7 @@ func (m *Model) applySelection() tea.Cmd {
 		}
 	}
 
-	if m.navMode == navHunk {
+	if m.navMode == diffview.NavModeHunk {
 		if sec.data.ActiveHunk < 0 || sec.data.ActiveHunk >= len(sec.data.Parsed.Hunks) {
 			return nil
 		}
@@ -134,7 +134,7 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 	m.diffModelForSectionPtr(sectionUnstaged).SetData(m.unstaged.data)
 	m.diffModelForSectionPtr(sectionStaged).SetData(m.staged.data)
 	m.diffArea.applyModes()
-	sideBySide := m.renderMode == renderSideBySide
+	sideBySide := m.renderMode == diffview.RenderModeSideBySide
 	renderWidth := m.deltaRenderWidth()
 
 	sel, ok := m.selectedStatusDiff()
@@ -237,7 +237,7 @@ func (m *Model) openDiscardDiffConfirm() {
 		err         error
 	)
 
-	if m.navMode == navHunk {
+	if m.navMode == diffview.NavModeHunk {
 		if sec.data.ActiveHunk < 0 || sec.data.ActiveHunk >= len(sec.data.Parsed.Hunks) {
 			return
 		}
@@ -283,7 +283,7 @@ func (m *Model) markMovedTarget(sig movedTarget) {
 	sec := m.sectionState(target)
 	m.flash = flashState{active: true, section: target, navMode: sig.navMode, hunk: -1, line: -1, frames: 4}
 
-	if sig.navMode == navHunk {
+	if sig.navMode == diffview.NavModeHunk {
 		for i := range sec.data.Parsed.Hunks {
 			if sec.data.Parsed.Hunks[i].Header == sig.hunkHeader {
 				m.flash.hunk = i
@@ -308,9 +308,9 @@ func (m *Model) markMovedTarget(sig movedTarget) {
 }
 
 func isDeltaSectionDivider(plain string) bool {
-	return explorer.IsDeltaSectionDivider(plain)
+	return diffview.IsDeltaSectionDivider(plain)
 }
 
 func splitLines(s string) []string {
-	return explorer.SplitLines(s)
+	return diffview.SplitLines(s)
 }

@@ -1,4 +1,4 @@
-package explorer
+package diffview
 
 import (
 	"strings"
@@ -7,7 +7,7 @@ import (
 	diffrender "github.com/elentok/gx/ui/diffview/diffrender"
 )
 
-type SectionData struct {
+type DiffBuffer struct {
 	RawLines         []string
 	BaseLines        []string
 	BaseLineKinds    []diffrender.RowKind
@@ -25,16 +25,16 @@ type SectionData struct {
 	VisualAnchor     int
 }
 
-func NewSectionData() SectionData {
-	return SectionData{
+func NewDiffBuffer() DiffBuffer {
+	return DiffBuffer{
 		ActiveHunk:   -1,
 		ActiveLine:   -1,
 		VisualAnchor: -1,
 	}
 }
 
-func BuildSectionData(raw, color string, prev SectionData, sideBySide bool) SectionData {
-	state := SectionData{
+func BuildDiffBuffer(raw, color string, prev DiffBuffer, sideBySide bool) DiffBuffer {
+	state := DiffBuffer{
 		ActiveHunk:   prev.ActiveHunk,
 		ActiveLine:   prev.ActiveLine,
 		VisualActive: prev.VisualActive,
@@ -52,7 +52,7 @@ func BuildSectionData(raw, color string, prev SectionData, sideBySide bool) Sect
 	state.Parsed = diffcore.ParseUnifiedDiff(raw)
 	state.RawLines = append([]string{}, state.Parsed.Lines...)
 	if sideBySide {
-		initSideBySideSectionData(&state, color)
+		initSideBySideDiffBuffer(&state, color)
 		return state
 	}
 
@@ -72,11 +72,11 @@ func BuildSectionData(raw, color string, prev SectionData, sideBySide bool) Sect
 	state.HunkDisplayRange = nil
 	state.ChangedDisplay = nil
 
-	clampSectionSelection(&state)
+	clampDiffBufferSelection(&state)
 	return state
 }
 
-func ReflowSectionData(state *SectionData, wrapWidth int, wrapSoft bool) {
+func ReflowDiffBuffer(state *DiffBuffer, wrapWidth int, wrapSoft bool) {
 	if len(state.BaseLines) == 0 {
 		state.ViewLines = nil
 		state.ViewLineKinds = nil
@@ -118,7 +118,7 @@ func ReflowSectionData(state *SectionData, wrapWidth int, wrapSoft bool) {
 	state.RawToDisplay = diffcore.BuildRawToDisplayMap(state.Parsed, state.DisplayToRaw)
 }
 
-func initSideBySideSectionData(state *SectionData, color string) {
+func initSideBySideDiffBuffer(state *DiffBuffer, color string) {
 	state.ViewLines = SplitLines(color)
 	if len(state.ViewLines) == 0 {
 		state.ViewLines = append([]string{}, state.RawLines...)
@@ -137,10 +137,10 @@ func initSideBySideSectionData(state *SectionData, color string) {
 	state.ChangedDisplay = mapping.ChangedDisplay
 	state.HunkDisplayRange = mapping.HunkDisplayRange
 
-	clampSectionSelection(state)
+	clampDiffBufferSelection(state)
 }
 
-func clampSectionSelection(state *SectionData) {
+func clampDiffBufferSelection(state *DiffBuffer) {
 	if len(state.Parsed.Hunks) == 0 {
 		state.ActiveHunk = -1
 	} else {

@@ -1,4 +1,4 @@
-package explorer
+package diffview
 
 import (
 	"testing"
@@ -24,7 +24,7 @@ func TestComputeDiffSearchMatches(t *testing.T) {
 }
 
 func TestApplyDiffSearchMatch(t *testing.T) {
-	section := BuildSectionData(sampleSectionUnifiedDiff, "", NewSectionData(), false)
+	section := BuildDiffBuffer(sampleSectionUnifiedDiff, "", NewDiffBuffer(), false)
 	vp := viewport.New(viewport.WithWidth(20), viewport.WithHeight(2))
 	vp.SetContentLines(section.ViewLines)
 
@@ -42,7 +42,7 @@ func TestApplyDiffSearchMatch(t *testing.T) {
 }
 
 func TestCurrentDiffSearchMatchIndex(t *testing.T) {
-	section := SectionData{
+	section := DiffBuffer{
 		Parsed:     diffcore.ParseUnifiedDiff(sampleSectionUnifiedDiff),
 		ActiveLine: 1,
 	}
@@ -50,7 +50,7 @@ func TestCurrentDiffSearchMatchIndex(t *testing.T) {
 		{DisplayIndex: 2, RawIndex: 6},
 		{DisplayIndex: 3, RawIndex: 7},
 	}
-	got := CurrentDiffSearchMatchIndex(section, matches, NavLine)
+	got := CurrentDiffSearchMatchIndex(section, matches, NavModeLine)
 	if got != 1 {
 		t.Fatalf("CurrentDiffSearchMatchIndex = %d, want 1", got)
 	}

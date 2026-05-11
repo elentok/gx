@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/ui/diffview/diffrender"
-	"github.com/elentok/gx/ui/explorer"
 	"github.com/elentok/gx/ui/search"
 
 	"charm.land/bubbles/v2/viewport"
@@ -27,7 +26,7 @@ const (
 
 // Model owns one diff pane state (unstaged or staged), including local search.
 type Model struct {
-	data       explorer.SectionData
+	data       DiffBuffer
 	viewport   viewport.Model
 	search     search.Model
 	renderMode RenderMode
@@ -37,7 +36,7 @@ type Model struct {
 
 func NewModel() Model {
 	return Model{
-		data:       explorer.NewSectionData(),
+		data:       NewDiffBuffer(),
 		viewport:   viewport.New(),
 		search:     search.NewModel(),
 		renderMode: RenderModeUnified,
@@ -50,11 +49,11 @@ func (m Model) Init() tea.Cmd {
 	return nil
 }
 
-func (m Model) Data() explorer.SectionData {
+func (m Model) Data() DiffBuffer {
 	return m.data
 }
 
-func (m *Model) SetData(data explorer.SectionData) {
+func (m *Model) SetData(data DiffBuffer) {
 	m.data = data
 }
 
@@ -82,13 +81,6 @@ func (m *Model) SetNavMode(mode NavMode) {
 	m.navMode = mode
 }
 
-func (m Model) ExplorerNavMode() explorer.NavMode {
-	if m.navMode == NavModeLine {
-		return explorer.NavLine
-	}
-	return explorer.NavHunk
-}
-
 func (m Model) WrapEnabled() bool {
 	return m.wrapSoft
 }
@@ -103,7 +95,7 @@ func (m Model) HasContent() bool {
 
 func (m *Model) BuildFromRaw(raw, color string) {
 	prevOffset := m.viewport.YOffset()
-	m.data = explorer.BuildSectionData(raw, color, m.data, m.IsSideBySide())
+	m.data = BuildDiffBuffer(raw, color, m.data, m.IsSideBySide())
 
 	if strings.TrimSpace(raw) == "" {
 		m.viewport.SetContent("")
@@ -117,7 +109,7 @@ func (m *Model) BuildFromRaw(raw, color string) {
 
 func (m *Model) Reflow(wrapWidth int) {
 	prevOffset := m.viewport.YOffset()
-	explorer.ReflowSectionData(&m.data, wrapWidth, m.wrapSoft)
+	ReflowDiffBuffer(&m.data, wrapWidth, m.wrapSoft)
 	if len(m.data.BaseLines) == 0 {
 		m.viewport.SetContent("")
 		m.viewport.SetYOffset(0)

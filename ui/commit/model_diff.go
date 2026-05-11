@@ -3,7 +3,7 @@ package commit
 import (
 	"strings"
 
-	"github.com/elentok/gx/ui/explorer"
+	"github.com/elentok/gx/ui/diffview"
 )
 
 func (m *Model) diffPaneSize() (int, int) {
@@ -27,7 +27,7 @@ func (m *Model) syncDiffViewport() {
 	_, diffH := m.diffPaneSize()
 	bodyW := m.currentDiffRenderWidth()
 	bodyH := max(0, diffH-2)
-	explorer.ReflowSectionData(&m.section, bodyW, m.wrapSoft)
+	diffview.ReflowDiffBuffer(&m.section, bodyW, m.wrapSoft)
 	if strings.TrimSpace(m.searchQuery) != "" && m.searchScope == searchScopeDiff {
 		cursor := m.searchCursor
 		m.recomputeSearchMatches()
@@ -48,15 +48,15 @@ func (m *Model) syncDiffViewport() {
 }
 
 func (m *Model) activeRawLineIndex() int {
-	return explorer.ActiveRawLineIndex(m.section, m.diffNavMode)
+	return diffview.ActiveRawLineIndex(m.section, m.diffNavMode)
 }
 
 func (m *Model) ensureActiveVisible() {
-	explorer.EnsureActiveVisible(m.section, &m.diffViewport, m.diffNavMode)
+	diffview.EnsureActiveVisible(m.section, &m.diffViewport, m.diffNavMode)
 }
 
 func (m *Model) moveDiffActive(delta int) {
-	if !explorer.MoveActive(&m.section, &m.diffViewport, m.diffNavMode, delta, false) {
+	if !diffview.MoveActive(&m.section, &m.diffViewport, m.diffNavMode, delta, false) {
 		return
 	}
 	m.syncSearchCursorFromDiffFocus()
@@ -64,18 +64,18 @@ func (m *Model) moveDiffActive(delta int) {
 }
 
 func (m *Model) scrollDiffPage(direction int) {
-	explorer.ScrollPage(&m.diffViewport, direction)
+	diffview.ScrollPage(&m.diffViewport, direction)
 }
 
 func (m *Model) jumpDiffTop() {
-	if !explorer.JumpTop(&m.section, &m.diffViewport, m.diffNavMode) {
+	if !diffview.JumpTop(&m.section, &m.diffViewport, m.diffNavMode) {
 		return
 	}
 	m.syncSearchCursorFromDiffFocus()
 }
 
 func (m *Model) jumpDiffBottom() {
-	if !explorer.JumpBottom(&m.section, &m.diffViewport, m.diffNavMode) {
+	if !diffview.JumpBottom(&m.section, &m.diffViewport, m.diffNavMode) {
 		return
 	}
 	m.syncSearchCursorFromDiffFocus()
@@ -85,7 +85,7 @@ func (m *Model) syncSearchCursorFromDiffFocus() {
 	if strings.TrimSpace(m.searchQuery) == "" || len(m.searchMatches) == 0 || !m.focusDiff {
 		return
 	}
-	if i := explorer.CurrentDiffSearchMatchIndex(m.section, m.searchMatches, m.diffNavMode); i >= 0 {
+	if i := diffview.CurrentDiffSearchMatchIndex(m.section, m.searchMatches, m.diffNavMode); i >= 0 {
 		m.searchCursor = i
 	}
 }

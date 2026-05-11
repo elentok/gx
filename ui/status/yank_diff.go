@@ -4,7 +4,8 @@ import (
 	"strings"
 
 	"github.com/atotto/clipboard"
-	"github.com/elentok/gx/ui/explorer"
+	"github.com/elentok/gx/ui/diffview"
+	"github.com/elentok/gx/ui/yankfmt"
 )
 
 var stageClipboardWrite = clipboard.WriteAll
@@ -30,7 +31,7 @@ func (m *Model) yankLocationOnly() {
 		return
 	}
 	if m.focus == focusFiletree {
-		if err := stageClipboardWrite(explorer.FormatYankLocation(file.Path, "")); err != nil {
+		if err := stageClipboardWrite(yankfmt.FormatYankLocation(file.Path, "")); err != nil {
 			m.setStatus("clipboard copy failed: " + err.Error())
 			return
 		}
@@ -41,7 +42,7 @@ func (m *Model) yankLocationOnly() {
 	if !ok {
 		return
 	}
-	if err := stageClipboardWrite(explorer.FormatYankLocation(file.Path, loc)); err != nil {
+	if err := stageClipboardWrite(yankfmt.FormatYankLocation(file.Path, loc)); err != nil {
 		m.setStatus("clipboard copy failed: " + err.Error())
 		return
 	}
@@ -55,7 +56,7 @@ func (m *Model) yankAllContext() {
 		return
 	}
 	if m.focus == focusFiletree {
-		if err := stageClipboardWrite(explorer.FormatYankLocation(file.Path, "")); err != nil {
+		if err := stageClipboardWrite(yankfmt.FormatYankLocation(file.Path, "")); err != nil {
 			m.setStatus("clipboard copy failed: " + err.Error())
 			return
 		}
@@ -67,7 +68,7 @@ func (m *Model) yankAllContext() {
 	if !ok {
 		return
 	}
-	text := explorer.FormatYankAllContext(file.Path, loc, body)
+	text := yankfmt.FormatYankAllContext(file.Path, loc, body)
 	if err := stageClipboardWrite(text); err != nil {
 		m.setStatus("clipboard copy failed: " + err.Error())
 		return
@@ -81,12 +82,12 @@ func (m *Model) yankContentOnly() {
 		return
 	}
 	sec := m.currentSection()
-	_, body, yankErr := explorer.FocusedLocationAndBody(sec.data, toExplorerNavMode(m.navMode))
-	if yankErr == explorer.FocusedYankErrNoHunk {
+	_, body, yankErr := diffview.FocusedLocationAndBody(sec.data, m.navMode)
+	if yankErr == diffview.FocusedYankErrNoHunk {
 		m.setStatus(string(yankErr))
 		return
 	}
-	if yankErr == explorer.FocusedYankErrNoLines {
+	if yankErr == diffview.FocusedYankErrNoLines {
 		m.setStatus(string(yankErr))
 		return
 	}
@@ -99,7 +100,7 @@ func (m *Model) yankContentOnly() {
 
 func (m *Model) focusedLocationAndBody() (string, []string, bool) {
 	sec := m.currentSection()
-	loc, body, yankErr := explorer.FocusedLocationAndBody(sec.data, toExplorerNavMode(m.navMode))
+	loc, body, yankErr := diffview.FocusedLocationAndBody(sec.data, m.navMode)
 	if yankErr != "" {
 		m.setStatus(string(yankErr))
 		return "", nil, false
