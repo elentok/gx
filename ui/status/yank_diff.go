@@ -81,8 +81,8 @@ func (m *Model) yankContentOnly() {
 		m.setStatus("no diff selection to yank")
 		return
 	}
-	sec := m.diff.ActiveSectionModel()
-	_, body, yankErr := sec.FocusedLocationAndBody()
+	diffviewModel := m.diff.ActiveSectionModel()
+	_, body, yankErr := diffviewModel.FocusedLocationAndBody()
 	if yankErr == diffview.FocusedYankErrNoHunk {
 		m.setStatus(string(yankErr))
 		return
@@ -99,8 +99,8 @@ func (m *Model) yankContentOnly() {
 }
 
 func (m *Model) focusedLocationAndBody() (string, []string, bool) {
-	sec := m.diff.ActiveSectionModel()
-	loc, body, yankErr := sec.FocusedLocationAndBody()
+	diffviewModel := m.diff.ActiveSectionModel()
+	loc, body, yankErr := diffviewModel.FocusedLocationAndBody()
 	if yankErr != "" {
 		m.setStatus(string(yankErr))
 		return "", nil, false

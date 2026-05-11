@@ -40,14 +40,14 @@ func (m *Model) scrollDiffByMouse(x, y, dir int) bool {
 		return false
 	}
 
-	sec := m.mouseTargetSection(y-diffY, diffH)
-	if sec == nil {
+	diffviewModel := m.mouseTargetSection(y-diffY, diffH)
+	if diffviewModel == nil {
 		return false
 	}
 	if dir > 0 {
-		sec.Viewport().ScrollDown(3)
+		diffviewModel.Viewport().ScrollDown(3)
 	} else {
-		sec.Viewport().ScrollUp(3)
+		diffviewModel.Viewport().ScrollUp(3)
 	}
 	return true
 }

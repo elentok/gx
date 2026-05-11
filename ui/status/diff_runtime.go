@@ -12,8 +12,8 @@ func (m Model) editorLineForCurrentSelection() int {
 	if m.focus != focusDiff {
 		return 0
 	}
-	sec := m.diff.ActiveSectionModel()
-	diff := sec.DataRef()
+	diffviewModel := m.diff.ActiveSectionModel()
+	diff := diffviewModel.DataRef()
 	if m.diff.NavMode() == diffview.NavModeLine {
 		if diff.ActiveLine < 0 || diff.ActiveLine >= len(diff.Parsed.Changed) {
 			return 0

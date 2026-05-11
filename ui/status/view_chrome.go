@@ -172,8 +172,8 @@ func isDeletedFileStatus(file git.StageFileStatus) bool {
 	return file.IndexStatus == 'D' || file.WorktreeCode == 'D'
 }
 
-func (m Model) flashMarker(section diffSection, rawIdx int, sec *diffview.Model) bool {
-	diff := sec.DataRef()
+func (m Model) flashMarker(section diffSection, rawIdx int, diffviewModel *diffview.Model) bool {
+	diff := diffviewModel.DataRef()
 	if !m.diff.Flash.Active || m.diff.Flash.Section != section {
 		return false
 	}

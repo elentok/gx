@@ -34,7 +34,7 @@ func (m *Model) renderDiffPane(width, height int) string {
 	return lipgloss.JoinVertical(lipgloss.Left, top, bottom)
 }
 
-func (m *Model) renderSectionPane(width, height int, title string, sec *diffview.Model, section diffSection) string {
+func (m *Model) renderSectionPane(width, height int, title string, diffviewModel *diffview.Model, section diffSection) string {
 	if width <= 0 || height <= 0 {
 		return ""
 	}
@@ -49,14 +49,14 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *diffview
 		bodyH = 0
 	}
 
-	diff := sec.DataRef()
-	active := sec.ActiveRawLineIndex()
+	diff := diffviewModel.DataRef()
+	active := diffviewModel.ActiveRawLineIndex()
 	accent := ui.ColorOrange
 	if section == sectionStaged {
 		accent = ui.ColorGreen
 	}
-	sec.Viewport().SetHeight(maxInt(0, bodyH))
-	sec.Viewport().SetWidth(innerW)
+	diffviewModel.Viewport().SetHeight(maxInt(0, bodyH))
+	diffviewModel.Viewport().SetWidth(innerW)
 
 	titleText := m.diffSectionPaneTitle(title, section, !collapsed)
 	if si := diffrender.ParseSymlinkDiffInfo(diff.Parsed); si.IsSymlink {
@@ -68,8 +68,8 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *diffview
 		titleText += " [fullscreen]"
 	}
 	rightTitleText := ""
-	if sec.Viewport().TotalLineCount() > sec.Viewport().VisibleLineCount() && sec.Viewport().VisibleLineCount() > 0 {
-		pct := int(sec.Viewport().ScrollPercent()*100 + 0.5)
+	if diffviewModel.Viewport().TotalLineCount() > diffviewModel.Viewport().VisibleLineCount() && diffviewModel.Viewport().VisibleLineCount() > 0 {
+		pct := int(diffviewModel.Viewport().ScrollPercent()*100 + 0.5)
 		rightTitleText = fmt.Sprintf("%d%%", pct)
 	}
 	if s := m.searchCounterForDiffSection(section); s != "" {
@@ -95,8 +95,8 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *diffview
 	if len(lines) == 0 {
 		rows := diffview.BuildVisibleDiffRows(diffview.VisibleDiffRowsOptions{
 			Section:    *diff,
-			ViewportY:  sec.Viewport().YOffset(),
-			Visible:    sec.Viewport().VisibleLineCount(),
+			ViewportY:  diffviewModel.Viewport().YOffset(),
+			Visible:    diffviewModel.Viewport().VisibleLineCount(),
 			BodyHeight: bodyH,
 			NavMode:    m.diff.NavMode(),
 			Active:     activeSection,
@@ -131,7 +131,7 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *diffview
 					mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render(overflowBottomMark)
 				}
 			}
-			if rawIdx >= 0 && m.flashMarker(section, rawIdx, sec) {
+			if rawIdx >= 0 && m.flashMarker(section, rawIdx, diffviewModel) {
 				mark = lipgloss.NewStyle().Foreground(ui.ColorGreen).Bold(true).Render("◆ ")
 			}
 
@@ -229,29 +229,29 @@ func (m Model) hunkOverflowMarkers() (top, bottom, both string) {
 	return "↑ ", "↓ ", "↕ "
 }
 
-func (m Model) visualMatchDiffDisplay(sec diffview.DiffData, displayIdx int) bool {
-	if !sec.VisualActive || m.diff.NavMode() != diffview.NavModeLine {
+func (m Model) visualMatchDiffDisplay(diffData diffview.DiffData, displayIdx int) bool {
+	if !diffData.VisualActive || m.diff.NavMode() != diffview.NavModeLine {
 		return false
 	}
-	if len(sec.ChangedDisplay) > 0 {
-		start, end := sec.VisualLineBounds()
-		for i := start; i <= end && i < len(sec.ChangedDisplay); i++ {
-			if i >= 0 && sec.ChangedDisplay[i] == displayIdx {
+	if len(diffData.ChangedDisplay) > 0 {
+		start, end := diffData.VisualLineBounds()
+		for i := start; i <= end && i < len(diffData.ChangedDisplay); i++ {
+			if i >= 0 && diffData.ChangedDisplay[i] == displayIdx {
 				return true
 			}
 		}
 		return false
 	}
-	if displayIdx < 0 || displayIdx >= len(sec.DisplayToRaw) {
+	if displayIdx < 0 || displayIdx >= len(diffData.DisplayToRaw) {
 		return false
 	}
-	rawIdx := sec.DisplayToRaw[displayIdx]
+	rawIdx := diffData.DisplayToRaw[displayIdx]
 	if rawIdx < 0 {
 		return false
 	}
-	start, end := sec.VisualLineBounds()
-	for i := start; i <= end && i < len(sec.Parsed.Changed); i++ {
-		if i >= 0 && sec.Parsed.Changed[i].LineIndex == rawIdx {
+	start, end := diffData.VisualLineBounds()
+	for i := start; i <= end && i < len(diffData.Parsed.Changed); i++ {
+		if i >= 0 && diffData.Parsed.Changed[i].LineIndex == rawIdx {
 			return true
 		}
 	}
@@ -287,9 +287,9 @@ func (m *Model) syncDiffViewports() {
 	m.diff.Staged.Viewport().SetContentLines(m.diff.Staged.Data().ViewLines)
 }
 
-func reflowSectionLines(sec *diffview.Model, wrapWidth int, wrap bool) {
-	sec.EnableWrap(wrap)
-	sec.Reflow(wrapWidth)
+func reflowSectionLines(diffviewModel *diffview.Model, wrapWidth int, wrap bool) {
+	diffviewModel.EnableWrap(wrap)
+	diffviewModel.Reflow(wrapWidth)
 }
 
 func (m Model) binarySummaryLine() string {

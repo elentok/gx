@@ -34,8 +34,8 @@ func (m *Model) computeSearchMatches(query string) []search.Match {
 			}
 		}
 	} else {
-		sec := m.diff.SectionModel(m.diff.ActiveSection)
-		for _, match := range sec.ComputeSearchMatches(q) {
+		diffviewModel := m.diff.SectionModel(m.diff.ActiveSection)
+		for _, match := range diffviewModel.ComputeSearchMatches(q) {
 			matches = append(matches, search.Match{
 				DisplayIndex: match.DisplayIndex,
 				Index:        match.RawIndex,
@@ -67,8 +67,8 @@ func (m Model) handleJumpToMatch(msg search.JumpToMatchMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	sec := m.diff.SectionModel(m.diff.ActiveSection)
-	sec.ApplySearchMatch(match)
+	diffviewModel := m.diff.SectionModel(m.diff.ActiveSection)
+	diffviewModel.ApplySearchMatch(match)
 	return m, nil
 
 }
@@ -78,8 +78,8 @@ func (m *Model) syncSearchCursorFromDiffFocus() {
 	if !diffSearch.HasQuery() || diffSearch.MatchesCount() == 0 || m.focus != focusDiff {
 		return
 	}
-	sec := m.diff.SectionModel(m.diff.ActiveSection)
-	idx := sec.CurrentSearchCursor(diffSearch.Matches())
+	diffviewModel := m.diff.SectionModel(m.diff.ActiveSection)
+	idx := diffviewModel.CurrentSearchCursor(diffSearch.Matches())
 	if idx < 0 {
 		return
 	}

@@ -133,21 +133,21 @@ func (d *Model) ResetSections() {
 }
 
 func (d *Model) MoveActive(delta int) bool {
-	sec := d.ActiveSectionModel()
-	return sec.MoveActive(delta, true)
+	diffviewModel := d.ActiveSectionModel()
+	return diffviewModel.MoveActive(delta, true)
 }
 
 func (d *Model) ScrollPage(direction int) {
-	sec := d.ActiveSectionModel()
-	sec.ScrollPage(direction)
+	diffviewModel := d.ActiveSectionModel()
+	diffviewModel.ScrollPage(direction)
 }
 
 func (d *Model) JumpTop() bool {
-	sec := d.ActiveSectionModel()
-	return sec.JumpTop()
+	diffviewModel := d.ActiveSectionModel()
+	return diffviewModel.JumpTop()
 }
 
 func (d *Model) JumpBottom() bool {
-	sec := d.ActiveSectionModel()
-	return sec.JumpBottom()
+	diffviewModel := d.ActiveSectionModel()
+	return diffviewModel.JumpBottom()
 }
