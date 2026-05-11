@@ -24,6 +24,9 @@ func (m Model) handleFiletreeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.enterDiffFromStatus(false)
 	case "enter":
 		return m, m.enterDiffFromStatus(false)
+	case "tab":
+		m.switchDiffSection()
+		return m, nil
 	case "h", "left":
 		return m, nil
 	case "[":
@@ -73,6 +76,10 @@ func (m Model) handleFiletreeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleFocusedChildKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	switch m.focus {
 	case focusFiletree:
+		if msg.Code == tea.KeyTab {
+			m.switchDiffSection()
+			return m, nil, true
+		}
 		switch msg.String() {
 		case "h", "left", "l", "right":
 			return m, nil, false

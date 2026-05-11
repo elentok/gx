@@ -254,8 +254,14 @@ func TestTabSwitchesDiffSectionsOnly(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
 	m = updated.(Model)
+	if m.focus != focusFiletree || m.section != sectionStaged {
+		t.Fatalf("tab in filetree should switch to staged without moving focus, got focus=%v section=%v", m.focus, m.section)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
+	m = updated.(Model)
 	if m.focus != focusFiletree || m.section != sectionUnstaged {
-		t.Fatalf("tab in filetree should not move focus, got focus=%v section=%v", m.focus, m.section)
+		t.Fatalf("second tab in filetree should switch back to unstaged without moving focus, got focus=%v section=%v", m.focus, m.section)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
