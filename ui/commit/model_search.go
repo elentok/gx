@@ -1,17 +1,13 @@
 package commit
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/search"
 
-	"charm.land/bubbles/v2/textinput"
-	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/ansi"
 )
 
 type commitSearchScope int
@@ -25,152 +21,86 @@ var commitSearchHighlightStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow).
 var commitSearchCurrentStyle = lipgloss.NewStyle().Foreground(ui.ColorGreen).Bold(true)
 
 func (m Model) InputFocused() bool {
-	return m.searchMode == commitSearchModeInput
+	return m.search.Mode() == search.SearchModeInput
 }
 
-func (m *Model) enterSearchMode() {
-	ti := textinput.New()
-	ti.Prompt = "/"
-	ti.SetValue(m.searchQuery)
-	ti.CursorEnd()
-	ti.Focus()
-	m.searchInput = ti
-	m.searchMode = commitSearchEnter()
-	m.searchScope = searchScopeSidebar
-	if m.focusDiff {
-		m.searchScope = searchScopeDiff
-	}
-}
-
-func (m *Model) handleSearchKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
-	if m.searchMode != commitSearchModeInput {
-		return false, nil
-	}
-	total := len(m.searchMatches)
-	if m.searchScope == searchScopeSidebar {
-		total = len(m.fileMatches)
-	}
-	switch msg.String() {
-	case "esc":
-		mode, cleared := commitSearchDismiss(
-			&m.searchQuery,
-			&m.searchCursor,
-			total,
-			commitSearchDismissKeepResultsUnlessEmptyOrNoMatches,
-		)
-		m.searchMode = mode
-		if cleared {
-			m.clearSearch()
-		}
-		return true, nil
-	case "enter":
-		mode, cleared := commitSearchDismiss(
-			&m.searchQuery,
-			&m.searchCursor,
-			total,
-			commitSearchDismissKeepResultsUnlessEmptyOrNoMatches,
-		)
-		m.searchMode = mode
-		if cleared {
-			m.clearSearch()
-		}
-		return true, nil
-	}
-
-	var cmd tea.Cmd
-	m.searchInput, cmd = m.searchInput.Update(msg)
-	m.searchQuery = m.searchInput.Value()
-	m.recomputeSearchMatches()
-	m.jumpToSearchCursor()
-	return true, cmd
-}
-
-func (m *Model) handleSearchNavigateKey(msg tea.KeyPressMsg) bool {
-	total := len(m.searchMatches)
-	if m.searchScope == searchScopeSidebar {
-		total = len(m.fileMatches)
-	}
-	if !commitSearchCanNavigate(m.searchQuery, total) {
-		return false
-	}
-	switch msg.String() {
-	case "n":
-		commitSearchCursorNext(&m.searchCursor, total)
-		m.jumpToSearchCursor()
-		return true
-	case "N", "shift+n":
-		commitSearchCursorPrev(&m.searchCursor, total)
-		m.jumpToSearchCursor()
-		return true
-	}
-	return false
-}
-
-func (m *Model) clearSearch() {
-	m.searchQuery = ""
-	m.searchMatches = nil
-	m.fileMatches = nil
-	m.searchCursor = 0
-}
-
-func (m *Model) recomputeSearchMatches() {
-	m.searchMatches = nil
-	m.fileMatches = nil
-	m.searchCursor = 0
-	if strings.TrimSpace(m.searchQuery) == "" {
-		return
+func (m *Model) computeSearchMatches(query string) []search.Match {
+	q := strings.ToLower(strings.TrimSpace(query))
+	if q == "" {
+		return []search.Match{}
 	}
 	if m.searchScope == searchScopeSidebar {
-		q := strings.ToLower(strings.TrimSpace(m.searchQuery))
+		var matches []search.Match
 		for i, entry := range m.fileEntries {
 			if strings.Contains(strings.ToLower(m.fileEntrySearchText(entry)), q) {
-				m.fileMatches = append(m.fileMatches, i)
+				matches = append(matches, search.Match{Index: i})
 			}
 		}
-		return
+		return matches
 	}
-	m.searchMatches = diffview.ComputeDiffSearchMatches(m.section.ViewLines, m.section.DisplayToRaw, m.searchQuery)
+	var matches []search.Match
+	for _, match := range diffview.ComputeDiffSearchMatches(m.section.ViewLines, m.section.DisplayToRaw, q) {
+		matches = append(matches, search.Match{Index: match.RawIndex, DisplayIndex: match.DisplayIndex})
+	}
+	return matches
 }
 
-func (m *Model) jumpToSearchCursor() {
+// jumpToCurrentMatch navigates to the match at the current search cursor position.
+// Called synchronously after search state changes to avoid async message round-trips.
+func (m *Model) jumpToCurrentMatch() {
+	match, ok := m.search.Match(m.search.Cursor())
+	if !ok {
+		return
+	}
 	if m.searchScope == searchScopeSidebar {
-		if len(m.fileMatches) == 0 || m.searchCursor < 0 || m.searchCursor >= len(m.fileMatches) {
-			return
+		if match.Index >= 0 && match.Index < len(m.fileEntries) {
+			m.focusDiff = false
+			m.selected = match.Index
+			m.refreshDiff()
 		}
-		m.focusDiff = false
-		m.selected = m.fileMatches[m.searchCursor]
-		m.refreshDiff()
 		return
 	}
-	if len(m.searchMatches) == 0 || m.searchCursor < 0 || m.searchCursor >= len(m.searchMatches) {
-		return
-	}
-	match := m.searchMatches[m.searchCursor]
 	m.focusDiff = true
 	m.diffNavMode = diffview.NavModeLine
-	diffview.ApplyDiffSearchMatch(&m.section, &m.diffViewport, search.Match{Index: match.RawIndex, DisplayIndex: match.DisplayIndex})
+	diffview.ApplyDiffSearchMatch(&m.section, &m.diffViewport, match)
+}
+
+func (m *Model) syncSearchCursorFromDiffFocus() {
+	if !m.search.HasQuery() || m.search.MatchesCount() == 0 || !m.focusDiff {
+		return
+	}
+	diffMatches := make([]diffview.DiffSearchMatch, 0, m.search.MatchesCount())
+	for _, match := range m.search.Matches() {
+		diffMatches = append(diffMatches, diffview.DiffSearchMatch{
+			DisplayIndex: match.DisplayIndex,
+			RawIndex:     match.Index,
+		})
+	}
+	idx := diffview.CurrentDiffSearchMatchIndex(m.section, diffMatches, diffview.NavModeLine)
+	if idx >= 0 {
+		m.search.SetCursor(idx)
+	}
 }
 
 func (m Model) searchMatchDiffDisplay(displayIdx int) (matched bool, current bool) {
-	if m.searchScope != searchScopeDiff {
+	if m.searchScope != searchScopeDiff || !m.search.HasQuery() {
 		return false, false
 	}
-	if strings.TrimSpace(m.searchQuery) == "" {
-		return false, false
-	}
-	if i := diffview.DiffSearchMatchIndex(m.searchMatches, displayIdx); i >= 0 {
-		return true, i == m.searchCursor
+	for i, match := range m.search.Matches() {
+		if match.DisplayIndex == displayIdx {
+			return true, i == m.search.Cursor()
+		}
 	}
 	return false, false
 }
 
 func (m Model) searchMatchSidebarIndex(idx int) (matched bool, current bool) {
-	if m.searchScope != searchScopeSidebar || strings.TrimSpace(m.searchQuery) == "" {
+	if m.searchScope != searchScopeSidebar || !m.search.HasQuery() {
 		return false, false
 	}
-	for i, match := range m.fileMatches {
-		if match == idx {
-			return true, i == m.searchCursor
+	for i, match := range m.search.Matches() {
+		if match.Index == idx {
+			return true, i == m.search.Cursor()
 		}
 	}
 	return false, false
@@ -207,30 +137,10 @@ func highlightMatchText(text, query string, current bool) string {
 	return text[:idx] + style.Render(text[idx:end]) + text[end:]
 }
 
-func (m Model) searchFooterText() string {
-	if m.searchMode != commitSearchModeInput {
-		return ""
+func (m Model) searchOverlayWidth() int {
+	maxW := m.width * 80 / 100
+	if 50 < maxW {
+		return 50
 	}
-	total := len(m.searchMatches)
-	if m.searchScope == searchScopeSidebar {
-		total = len(m.fileMatches)
-	}
-	right := ""
-	if strings.TrimSpace(m.searchQuery) != "" {
-		if total == 0 {
-			right = "no matches"
-		} else {
-			right = fmt.Sprintf("%d/%d", m.searchCursor+1, total)
-		}
-	}
-	left := m.searchInput.View()
-	if right == "" || m.width <= 0 {
-		return left
-	}
-	leftW := ansi.StringWidth(left)
-	rightW := ansi.StringWidth(right)
-	if leftW+rightW+1 >= m.width {
-		return left + " " + right
-	}
-	return left + strings.Repeat(" ", m.width-leftW-rightW) + right
+	return maxW
 }

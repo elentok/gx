@@ -33,14 +33,25 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.helpOpen {
 		return m.handleHelpKey(msg)
 	}
-	if handled, cmd := m.handleSearchKey(msg); handled {
+	newSearch, cmd, result := m.search.Update(msg)
+	m.search = newSearch
+	if result.Handled {
+		if result.Activated {
+			m.searchScope = searchScopeSidebar
+			if m.focusDiff {
+				m.searchScope = searchScopeDiff
+			}
+		}
+		if result.QueryChanged {
+			m.search.SetMatches(m.computeSearchMatches(m.search.Query()))
+		}
+		if result.QueryChanged || result.CursorChanged {
+			m.jumpToCurrentMatch()
+		}
 		return m, cmd
 	}
 	if next, cmd, handled := m.handleChordKey(msg); handled {
 		return next, cmd
-	}
-	if m.handleSearchNavigateKey(msg) {
-		return m, nil
 	}
 	if msg.Code == tea.KeyTab || msg.Text == "\t" {
 		return m.handleTabFocusCycle()
@@ -79,8 +90,8 @@ func (m Model) handleKeyRouting(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "?":
 		return m.enterHelpMode(), nil
 	case "q", "esc":
-		if len(m.searchMatches) > 0 {
-			m.clearSearch()
+		if m.search.IsActive() {
+			m.search.DismissAndClear()
 			return m, nil
 		}
 		if m.focusDiff {
@@ -92,9 +103,6 @@ func (m Model) handleKeyRouting(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, nav.Back()
-	case "/":
-		m.enterSearchMode()
-		return m, nil
 	case "b":
 		m.bodyExpanded = !m.bodyExpanded
 		m.scrollHeader(0)

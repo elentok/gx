@@ -111,7 +111,7 @@ func (m *Model[T]) Search() *search.Model {
 }
 
 func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd, bool) {
-	if nextSearch, cmd, handled := m.search.Update(msg); handled {
+	if nextSearch, cmd, result := m.search.Update(msg); result.Handled {
 		m.search = nextSearch
 		return m, cmd, true
 	}

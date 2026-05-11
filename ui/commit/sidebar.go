@@ -1,8 +1,6 @@
 package commit
 
 import (
-	"strings"
-
 	"github.com/elentok/gx/git"
 )
 
@@ -96,8 +94,9 @@ func (m *Model) toggleDirOnEnter() bool {
 	if m.selected >= len(m.fileEntries) {
 		m.selected = len(m.fileEntries) - 1
 	}
-	if m.searchScope == searchScopeSidebar && strings.TrimSpace(m.searchQuery) != "" {
-		m.recomputeSearchMatches()
+	if m.searchScope == searchScopeSidebar && m.search.HasQuery() {
+		matches := m.computeSearchMatches(m.search.Query())
+		m.search.SetMatches(matches)
 	}
 	return true
 }
@@ -110,8 +109,9 @@ func (m *Model) collapseSelectedDir() bool {
 	if m.selected >= len(m.fileEntries) {
 		m.selected = len(m.fileEntries) - 1
 	}
-	if m.searchScope == searchScopeSidebar && strings.TrimSpace(m.searchQuery) != "" {
-		m.recomputeSearchMatches()
+	if m.searchScope == searchScopeSidebar && m.search.HasQuery() {
+		matches := m.computeSearchMatches(m.search.Query())
+		m.search.SetMatches(matches)
 	}
 	return true
 }
@@ -121,8 +121,9 @@ func (m *Model) expandSelectedDir() bool {
 		return false
 	}
 	m.fileEntries = buildCommitFileEntries(m.files, m.collapsedDirs)
-	if m.searchScope == searchScopeSidebar && strings.TrimSpace(m.searchQuery) != "" {
-		m.recomputeSearchMatches()
+	if m.searchScope == searchScopeSidebar && m.search.HasQuery() {
+		matches := m.computeSearchMatches(m.search.Query())
+		m.search.SetMatches(matches)
 	}
 	return true
 }

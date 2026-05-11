@@ -120,7 +120,7 @@ func (m *Model) Reflow(wrapWidth int) {
 }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, bool) {
-	if nextSearch, cmd, handled := m.search.Update(msg); handled {
+	if nextSearch, cmd, result := m.search.Update(msg); result.Handled {
 		m.search = nextSearch
 		return m, cmd, true
 	}

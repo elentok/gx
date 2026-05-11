@@ -4,20 +4,41 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, bool) {
+// Result describes what changed during a single Update call.
+type Result struct {
+	Handled       bool // key was consumed by search
+	Activated     bool // transitioned None → Input (search session just started)
+	QueryChanged  bool // query text changed this update
+	CursorChanged bool // match cursor moved this update (n / N)
+}
+
+func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, Result) {
+	prevMode := m.mode
+	prevQuery := m.query
+	prevCursor := m.cursor
+
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
+		var newModel Model
+		var cmd tea.Cmd
+		var handled bool
 		switch m.mode {
 		case SearchModeNone:
-			return m.handleKeyPressOutOfSearch(msg)
+			newModel, cmd, handled = m.handleKeyPressOutOfSearch(msg)
 		case SearchModeInput:
-			return m.handleKeyPressInput(msg)
+			newModel, cmd, handled = m.handleKeyPressInput(msg)
 		case SearchModeResults:
-			return m.handleKeyPressResults(msg)
+			newModel, cmd, handled = m.handleKeyPressResults(msg)
+		}
+		return newModel, cmd, Result{
+			Handled:       handled,
+			Activated:     handled && prevMode == SearchModeNone && newModel.mode != SearchModeNone,
+			QueryChanged:  handled && newModel.query != prevQuery,
+			CursorChanged: handled && newModel.cursor != prevCursor,
 		}
 	}
 
-	return m, nil, false
+	return m, nil, Result{}
 }
 
 func (m Model) handleKeyPressOutOfSearch(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {

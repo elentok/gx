@@ -6,8 +6,8 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/diffview"
+	"github.com/elentok/gx/ui/search"
 
-	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 )
@@ -51,12 +51,8 @@ type commitDiffArea struct {
 }
 
 type commitSearchState struct {
-	searchMode    commitSearchMode
-	searchScope   commitSearchScope
-	searchQuery   string
-	searchMatches []diffview.DiffSearchMatch
-	searchCursor  int
-	searchInput   textinput.Model
+	search      search.Model
+	searchScope commitSearchScope
 }
 
 type commitSidebarState struct {
@@ -64,7 +60,6 @@ type commitSidebarState struct {
 	fileEntries   []commitFileEntry
 	collapsedDirs map[string]bool
 	selected      int
-	fileMatches   []int
 }
 
 func New(worktreeRoot, ref string) Model {
@@ -81,6 +76,9 @@ func NewWithSettings(worktreeRoot, ref string, settings Settings) Model {
 			diffNavMode:  diffview.NavModeHunk,
 			wrapSoft:     true,
 			diffViewport: viewport.New(),
+		},
+		commitSearchState: commitSearchState{
+			search: search.NewModel(),
 		},
 		commitSidebarState: commitSidebarState{
 			collapsedDirs: map[string]bool{},
@@ -145,16 +143,9 @@ func (m *Model) refreshDiff() {
 		colorDiff = rawDiff
 	}
 	m.section = diffview.BuildDiffBuffer(rawDiff, colorDiff, m.section, false)
-	if strings.TrimSpace(m.searchQuery) != "" && m.searchScope == searchScopeDiff {
-		cursor := m.searchCursor
-		m.recomputeSearchMatches()
-		if len(m.searchMatches) == 0 {
-			m.searchCursor = 0
-		} else if cursor < len(m.searchMatches) {
-			m.searchCursor = cursor
-		} else {
-			m.searchCursor = len(m.searchMatches) - 1
-		}
+	if m.search.HasQuery() && m.searchScope == searchScopeDiff {
+		matches := m.computeSearchMatches(m.search.Query())
+		m.search.SetMatches(matches)
 	}
 	m.syncDiffViewport()
 }

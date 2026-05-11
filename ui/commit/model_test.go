@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
+	"github.com/elentok/gx/ui/search"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -192,7 +193,7 @@ func TestSidebarSearchMovesToFileMatches(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	m = updated.(Model)
-	if m.searchMode != commitSearchModeInput {
+	if m.search.Mode() != search.SearchModeInput {
 		t.Fatalf("expected / to enter search mode")
 	}
 
@@ -200,11 +201,11 @@ func TestSidebarSearchMovesToFileMatches(t *testing.T) {
 		updated, _ = m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
 		m = updated.(Model)
 	}
-	if m.searchQuery != "txt" {
-		t.Fatalf("searchQuery = %q, want txt", m.searchQuery)
+	if m.search.Query() != "txt" {
+		t.Fatalf("search.Query() = %q, want txt", m.search.Query())
 	}
-	if len(m.fileMatches) < 2 {
-		t.Fatalf("expected multiple sidebar matches, got %d", len(m.fileMatches))
+	if m.search.MatchesCount() < 2 {
+		t.Fatalf("expected multiple sidebar matches, got %d", m.search.MatchesCount())
 	}
 	if m.focusDiff {
 		t.Fatalf("expected sidebar search to keep focus in sidebar")
@@ -212,8 +213,8 @@ func TestSidebarSearchMovesToFileMatches(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
-	if m.searchMode != commitSearchModeNone {
-		t.Fatalf("expected enter to leave search mode")
+	if m.search.Mode() == search.SearchModeInput {
+		t.Fatalf("expected enter to leave input mode")
 	}
 
 	first := m.selected
@@ -244,8 +245,8 @@ func TestDiffSearchMovesToMatchesAndNavigates(t *testing.T) {
 		updated, _ = m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
 		m = updated.(Model)
 	}
-	if len(m.searchMatches) < 2 {
-		t.Fatalf("expected multiple diff matches, got %d", len(m.searchMatches))
+	if m.search.MatchesCount() < 2 {
+		t.Fatalf("expected multiple diff matches, got %d", m.search.MatchesCount())
 	}
 	if !m.focusDiff || m.diffNavMode != diffview.NavModeLine {
 		t.Fatalf("expected diff search to focus diff in line mode")

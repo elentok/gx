@@ -1,8 +1,6 @@
 package commit
 
 import (
-	"strings"
-
 	"github.com/elentok/gx/ui/diffview"
 )
 
@@ -28,18 +26,9 @@ func (m *Model) syncDiffViewport() {
 	bodyW := m.currentDiffRenderWidth()
 	bodyH := max(0, diffH-2)
 	diffview.ReflowDiffBuffer(&m.section, bodyW, m.wrapSoft)
-	if strings.TrimSpace(m.searchQuery) != "" && m.searchScope == searchScopeDiff {
-		cursor := m.searchCursor
-		m.recomputeSearchMatches()
-		if len(m.searchMatches) > 0 {
-			if cursor >= len(m.searchMatches) {
-				cursor = len(m.searchMatches) - 1
-			}
-			if cursor < 0 {
-				cursor = 0
-			}
-			m.searchCursor = cursor
-		}
+	if m.search.HasQuery() && m.searchScope == searchScopeDiff {
+		matches := m.computeSearchMatches(m.search.Query())
+		m.search.SetMatches(matches)
 	}
 	m.diffViewport.SetWidth(bodyW)
 	m.diffViewport.SetHeight(bodyH)
@@ -81,11 +70,3 @@ func (m *Model) jumpDiffBottom() {
 	m.syncSearchCursorFromDiffFocus()
 }
 
-func (m *Model) syncSearchCursorFromDiffFocus() {
-	if strings.TrimSpace(m.searchQuery) == "" || len(m.searchMatches) == 0 || !m.focusDiff {
-		return
-	}
-	if i := diffview.CurrentDiffSearchMatchIndex(m.section, m.searchMatches, m.diffNavMode); i >= 0 {
-		m.searchCursor = i
-	}
-}

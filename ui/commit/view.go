@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/diffview/diffrender"
+	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/sidebar"
 
 	tea "charm.land/bubbletea/v2"
@@ -50,6 +51,13 @@ func (m Model) View() tea.View {
 	content := m.contentView(contentH)
 	footer := m.footerView()
 	out := lipgloss.JoinVertical(lipgloss.Left, body, content, footer)
+	if m.search.Mode() == search.SearchModeInput {
+		overlayW := m.searchOverlayWidth()
+		m.search.SetWidth(overlayW)
+		overlay := m.search.View()
+		y := m.height - 2 - lipgloss.Height(overlay)
+		out = ui.OverlayBottomCenter(out, overlay, m.width, y)
+	}
 	if m.keyPrefix != "" {
 		hints := m.ChordHints(m.keyPrefix)
 		if len(hints) > 0 {
@@ -279,7 +287,7 @@ func (m Model) renderDiffPane(width, height int) string {
 			}
 			body := row.Text
 			if matched, current := m.searchMatchDiffDisplay(displayIdx); matched {
-				body = highlightMatchText(body, m.searchQuery, current)
+				body = highlightMatchText(body, m.search.Query(), current)
 			}
 			lines = append(lines, mark+body)
 		}
@@ -346,9 +354,6 @@ func isMainOrMasterRef(name string) bool {
 }
 
 func (m Model) footerView() string {
-	if m.searchMode == commitSearchModeInput {
-		return m.searchFooterText()
-	}
 	left := m.statusMsg
 	right := ui.StyleHint.Render("? help")
 	if m.width <= 0 {
@@ -387,7 +392,7 @@ func (m Model) visibleFileLines(height int) []string {
 			name = commitFileIcon(entry.File, m.settings.UseNerdFontIcons) + " " + name
 		}
 		if matched, current := m.searchMatchSidebarIndex(i); matched {
-			name = highlightMatchText(name, m.searchQuery, current)
+			name = highlightMatchText(name, m.search.Query(), current)
 		}
 		return sidebar.RenderableRow{
 			Depth:    entry.Depth,
