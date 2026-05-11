@@ -25,7 +25,7 @@ func (m *Model) colorizeUntrackedSync(filePath, rawDiff string, sideBySide bool,
 }
 
 type movedTarget struct {
-	fromSection diffSection
+	fromSection diffarea.Section
 	navMode     diffview.NavMode
 	hunkHeader  string
 	lineText    string
@@ -39,7 +39,7 @@ func (m *Model) applySelection() tea.Cmd {
 
 	diffviewModel := m.diff.ActiveSectionModel()
 	sig := movedTarget{fromSection: m.diff.ActiveSection, navMode: m.diff.NavMode()}
-	if file.Untracked && m.diff.ActiveSection == sectionUnstaged {
+	if file.Untracked && m.diff.ActiveSection == diffarea.SectionUnstaged {
 		if err := git.StageIntentPath(m.worktreeRoot, file.Path); err != nil {
 			m.showGitError(err)
 			return nil
@@ -56,7 +56,7 @@ func (m *Model) applySelection() tea.Cmd {
 			m.setStatus(err.Error())
 			return nil
 		}
-		reverse := m.diff.ActiveSection == sectionStaged
+		reverse := m.diff.ActiveSection == diffarea.SectionStaged
 		if err := git.ApplyPatchToIndex(m.worktreeRoot, patch, reverse, false); err != nil {
 			if !isCorruptPatchErr(err) {
 				m.showGitError(err)
@@ -102,7 +102,7 @@ func (m *Model) applySelection() tea.Cmd {
 			m.setStatus(err.Error())
 			return nil
 		}
-		reverse := m.diff.ActiveSection == sectionStaged
+		reverse := m.diff.ActiveSection == diffarea.SectionStaged
 		if err := git.ApplyPatchToIndex(m.worktreeRoot, patch, reverse, true); err != nil {
 			m.showGitError(err)
 			return nil
@@ -161,8 +161,8 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 		if color == "" {
 			color = raw
 		}
-		m.diff.SectionModel(sectionUnstaged).BuildFromRaw(raw, color)
-		m.diff.SectionModel(sectionStaged).BuildFromRaw("", "")
+		m.diff.SectionModel(diffarea.SectionUnstaged).BuildFromRaw(raw, color)
+		m.diff.SectionModel(diffarea.SectionStaged).BuildFromRaw("", "")
 		m.syncDiffViewports()
 		return nil
 	}
@@ -185,8 +185,8 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 	if stagedColor == "" {
 		stagedColor = stagedRaw
 	}
-	m.diff.SectionModel(sectionUnstaged).BuildFromRaw(unstagedRaw, unstagedColor)
-	m.diff.SectionModel(sectionStaged).BuildFromRaw(stagedRaw, stagedColor)
+	m.diff.SectionModel(diffarea.SectionUnstaged).BuildFromRaw(unstagedRaw, unstagedColor)
+	m.diff.SectionModel(diffarea.SectionStaged).BuildFromRaw(stagedRaw, stagedColor)
 	m.syncDiffViewports()
 	if m.diffSearchActiveInFocus() {
 		m.recomputeSearchMatches()
@@ -202,7 +202,7 @@ func (m *Model) enterDiffFromStatus(resetSection bool) tea.Cmd {
 	cmd := m.reloadDiffsForSelection()
 	m.focus = focusDiff
 	if resetSection {
-		m.diff.ActiveSection = sectionUnstaged
+		m.diff.ActiveSection = diffarea.SectionUnstaged
 	}
 	m.syncDiffViewports()
 	m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
@@ -210,7 +210,7 @@ func (m *Model) enterDiffFromStatus(resetSection bool) tea.Cmd {
 }
 
 func (m *Model) openDiscardDiffConfirm() {
-	if m.diff.ActiveSection != sectionUnstaged {
+	if m.diff.ActiveSection != diffarea.SectionUnstaged {
 		return
 	}
 	file, ok := m.selectedStatusFile()
@@ -266,9 +266,9 @@ func (m *Model) openDiscardDiffConfirm() {
 }
 
 func (m *Model) markMovedTarget(sig movedTarget) {
-	target := sectionUnstaged
-	if sig.fromSection == sectionUnstaged {
-		target = sectionStaged
+	target := diffarea.SectionUnstaged
+	if sig.fromSection == diffarea.SectionUnstaged {
+		target = diffarea.SectionStaged
 	}
 	diffviewModel := m.diff.SectionModel(target)
 	m.diff.Flash = diffarea.FlashState{Active: true, Section: target, NavMode: sig.navMode, Hunk: -1, Line: -1, Frames: 4}

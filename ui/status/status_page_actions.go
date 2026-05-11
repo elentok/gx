@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/status/diffarea"
 
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
@@ -195,8 +196,8 @@ func (m Model) confirmAccept() (tea.Model, tea.Cmd) {
 			m.showGitError(err)
 			return m, nil
 		}
-		if m.diff.ActiveSection == sectionUnstaged {
-			diffviewModel := m.diff.SectionModel(sectionUnstaged)
+		if m.diff.ActiveSection == diffarea.SectionUnstaged {
+			diffviewModel := m.diff.SectionModel(diffarea.SectionUnstaged)
 			diffviewModel.DataRef().VisualActive = false
 			diffviewModel.DataRef().VisualAnchor = diffviewModel.DataRef().ActiveLine
 		}

@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/ui/diffview/diffrender"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/status/diffarea"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -169,7 +170,7 @@ func TestFiletreeLOnFileEntersDiffAndKeepsSectionOnFileChange(t *testing.T) {
 	m.width = 100
 	m.height = 20
 	m.focus = focusFiletree
-	m.diff.ActiveSection = sectionStaged
+	m.diff.ActiveSection = diffarea.SectionStaged
 
 	if len(m.page.statusEntries) < 2 {
 		t.Fatalf("expected two status entries, got %d", len(m.page.statusEntries))
@@ -180,7 +181,7 @@ func TestFiletreeLOnFileEntersDiffAndKeepsSectionOnFileChange(t *testing.T) {
 	if m.focus != focusDiff {
 		t.Fatalf("expected l on file to enter diff")
 	}
-	if m.diff.ActiveSection != sectionStaged {
+	if m.diff.ActiveSection != diffarea.SectionStaged {
 		t.Fatalf("expected section to remain staged for same file")
 	}
 
@@ -192,7 +193,7 @@ func TestFiletreeLOnFileEntersDiffAndKeepsSectionOnFileChange(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
-	if m.diff.ActiveSection != sectionStaged {
+	if m.diff.ActiveSection != diffarea.SectionStaged {
 		t.Fatalf("expected section to remain staged after active file change")
 	}
 }
@@ -209,7 +210,7 @@ func TestReloadDiffsForSelection_KeepsSectionForUntrackedFile(t *testing.T) {
 	m.width = 100
 	m.height = 20
 	m.focus = focusFiletree
-	m.diff.ActiveSection = sectionStaged
+	m.diff.ActiveSection = diffarea.SectionStaged
 
 	found := false
 	for i, entry := range m.page.statusEntries {
@@ -226,7 +227,7 @@ func TestReloadDiffsForSelection_KeepsSectionForUntrackedFile(t *testing.T) {
 	cmd := m.reloadDiffsForSelection()
 	m = runStatusCmd(t, m, cmd)
 
-	if m.diff.ActiveSection != sectionStaged {
+	if m.diff.ActiveSection != diffarea.SectionStaged {
 		t.Fatalf("expected section to remain staged for untracked file, got %v", m.diff.ActiveSection)
 	}
 	if len(m.diff.Staged.DataRef().Parsed.Hunks) != 0 {
@@ -251,34 +252,34 @@ func TestTabSwitchesDiffSectionsOnly(t *testing.T) {
 	m := New(repo)
 	m.ready = true
 	m.focus = focusFiletree
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
 	m = updated.(Model)
-	if m.focus != focusFiletree || m.diff.ActiveSection != sectionStaged {
+	if m.focus != focusFiletree || m.diff.ActiveSection != diffarea.SectionStaged {
 		t.Fatalf("tab in filetree should switch to staged without moving focus, got focus=%v section=%v", m.focus, m.diff.ActiveSection)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
 	m = updated.(Model)
-	if m.focus != focusFiletree || m.diff.ActiveSection != sectionUnstaged {
+	if m.focus != focusFiletree || m.diff.ActiveSection != diffarea.SectionUnstaged {
 		t.Fatalf("second tab in filetree should switch back to unstaged without moving focus, got focus=%v section=%v", m.focus, m.diff.ActiveSection)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	m = updated.(Model)
-	if m.focus != focusDiff || m.diff.ActiveSection != sectionUnstaged {
+	if m.focus != focusDiff || m.diff.ActiveSection != diffarea.SectionUnstaged {
 		t.Fatalf("l should focus unstaged diff, got focus=%v section=%v", m.focus, m.diff.ActiveSection)
 	}
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
 	m = updated.(Model)
-	if m.focus != focusDiff || m.diff.ActiveSection != sectionStaged {
+	if m.focus != focusDiff || m.diff.ActiveSection != diffarea.SectionStaged {
 		t.Fatalf("tab in diff should switch to staged, got focus=%v section=%v", m.focus, m.diff.ActiveSection)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
 	m = updated.(Model)
-	if m.focus != focusDiff || m.diff.ActiveSection != sectionUnstaged {
+	if m.focus != focusDiff || m.diff.ActiveSection != diffarea.SectionUnstaged {
 		t.Fatalf("second tab in diff should switch back to unstaged, got focus=%v section=%v", m.focus, m.diff.ActiveSection)
 	}
 }
@@ -730,7 +731,7 @@ func TestDiffPaneKeepsEmptySectionVisible(t *testing.T) {
 	m.width = 100
 	m.height = 20
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 	m.syncDiffViewports()
 
 	view := ansi.Strip(m.renderDiffPane(80, 12))
@@ -751,7 +752,7 @@ func TestExpandedDiffPaneTitleShowsSelectedPathWithoutDiffFocus(t *testing.T) {
 	m.width = 100
 	m.height = 20
 	m.focus = focusFiletree
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 	m.syncDiffViewports()
 
 	view := ansi.Strip(m.renderDiffPane(80, 12))
@@ -774,7 +775,7 @@ func TestDiffPaneAnchorsCollapsedUnstagedAtTopWhenStagedActive(t *testing.T) {
 	m.width = 100
 	m.height = 20
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionStaged
+	m.diff.ActiveSection = diffarea.SectionStaged
 	m.syncDiffViewports()
 
 	view := ansi.Strip(m.renderDiffPane(80, 12))
@@ -993,7 +994,7 @@ func TestSpaceStagesSingleLineInLineMode(t *testing.T) {
 	m.height = 20
 	m.syncDiffViewports()
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 	m.diff.SetNavMode(diffview.NavModeLine)
 
 	m.applySelection()
@@ -1073,7 +1074,7 @@ func TestDiffUnstagedDDiscardsLineAfterConfirm(t *testing.T) {
 	m := New(repo)
 	m.ready = true
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 	m.diff.SetNavMode(diffview.NavModeLine)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
@@ -1107,7 +1108,7 @@ func TestDiffStagedDUnstagesSelectionWithoutConfirm(t *testing.T) {
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	m = updated.(Model)
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionStaged
+	m.diff.ActiveSection = diffarea.SectionStaged
 	m.diff.SetNavMode(diffview.NavModeLine)
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
@@ -1195,7 +1196,7 @@ func TestYankAllContextWithYAInDiffLineModeIncludesLocationAndSelectedLine(t *te
 	m := New(repo)
 	m.ready = true
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 	m.diff.SetNavMode(diffview.NavModeLine)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
@@ -1234,7 +1235,7 @@ func TestYankFilenameWithYFInDiffLineModeYanksFilenameOnly(t *testing.T) {
 	m := New(repo)
 	m.ready = true
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 	m.diff.SetNavMode(diffview.NavModeLine)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
@@ -1265,7 +1266,7 @@ func TestYankLocationOnlyWithYLInDiffVisualModeYanksOnlyLocation(t *testing.T) {
 	m := New(repo)
 	m.ready = true
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 	m.diff.SetNavMode(diffview.NavModeLine)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
@@ -1303,7 +1304,7 @@ func TestYankSelectionOnlyWithYYInDiffLineMode(t *testing.T) {
 	m := New(repo)
 	m.ready = true
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 	m.diff.SetNavMode(diffview.NavModeLine)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
@@ -1329,7 +1330,7 @@ func TestDiffJKScrollsWithoutMovingCursor(t *testing.T) {
 	m.height = 20
 	m.syncDiffViewports()
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 	m.diff.SetNavMode(diffview.NavModeLine)
 
 	beforeLine := m.diff.Unstaged.DataRef().ActiveLine
@@ -1392,7 +1393,7 @@ func TestHunkModeJKScrollsLargeHunkBeforeSwitching(t *testing.T) {
 	m.width = 100
 	m.height = 16
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 	m.diff.SetNavMode(diffview.NavModeHunk)
 	m.syncDiffViewports()
 
@@ -1445,12 +1446,12 @@ func TestHunkOverflowViewportMarkers(t *testing.T) {
 		m.width = 100
 		m.height = 16
 		m.focus = focusDiff
-		m.diff.ActiveSection = sectionUnstaged
+		m.diff.ActiveSection = diffarea.SectionUnstaged
 		m.diff.SetNavMode(diffview.NavModeHunk)
 		m.syncDiffViewports()
 
 		m.diff.Unstaged.Viewport().SetYOffset(3)
-		pane := m.renderSectionPane(80, 10, "Unstaged", m.diff.SectionModel(sectionUnstaged), sectionUnstaged)
+		pane := m.renderSectionPane(80, 10, diffarea.SectionUnstaged)
 
 		if strings.Contains(pane, "hunk>view") {
 			t.Fatalf("unexpected legacy hunk>view indicator in pane:\n%s", pane)
@@ -1482,7 +1483,7 @@ func TestGInFiletreeAndDiffJumpsBottom(t *testing.T) {
 	}
 
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 	m.diff.SetNavMode(diffview.NavModeLine)
 	if len(m.diff.Unstaged.DataRef().Parsed.Changed) == 0 {
 		t.Fatalf("expected unstaged changes in diff view")
@@ -1551,7 +1552,7 @@ func TestGInDiffHunkModeJumpsViewportToBottom(t *testing.T) {
 	m.width = 100
 	m.height = 16
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 	m.diff.SetNavMode(diffview.NavModeHunk)
 	m.syncDiffViewports()
 
@@ -1594,7 +1595,7 @@ func TestCtrlDAndCtrlUScrollFiletreeAndDiff(t *testing.T) {
 	}
 
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 	m.diff.SetNavMode(diffview.NavModeHunk)
 	m.syncDiffViewports()
 	beforeOffset := m.diff.Unstaged.Viewport().YOffset()
@@ -1776,7 +1777,7 @@ func TestStageSearchDiffModeAndPrevNextKeys(t *testing.T) {
 	m.height = 20
 	m.syncDiffViewports()
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	m = updated.(Model)
@@ -1866,11 +1867,11 @@ func TestStageSearchDiffUsesRightEdgeIndicatorInHunkMode(t *testing.T) {
 	m.height = 20
 	m.syncDiffViewports()
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 	m.diff.SetNavMode(diffview.NavModeHunk)
 	m.recomputeSearchMatches()
 
-	pane := m.renderSectionPane(80, 12, "Unstaged", m.diff.SectionModel(sectionUnstaged), sectionUnstaged)
+	pane := m.renderSectionPane(80, 12, diffarea.SectionUnstaged)
 	if !strings.Contains(ansi.Strip(pane), "needle") {
 		t.Fatalf("expected search match text highlighted in diff pane")
 	}
@@ -1886,7 +1887,7 @@ func TestDiffJDoesNotOverscrollPastContent(t *testing.T) {
 	m.height = 20
 	m.syncDiffViewports()
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 
 	for i := 0; i < 300; i++ {
 		updated, _ := m.Update(tea.KeyPressMsg{Code: 'J', Text: "J"})
@@ -1914,7 +1915,7 @@ func TestApplySelection_DoesNotSwitchSectionWhenHunksRemain(t *testing.T) {
 	m.height = 24
 	m.syncDiffViewports()
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 	m.diff.SetNavMode(diffview.NavModeHunk)
 	m.diff.Unstaged.DataRef().ActiveHunk = 0
 	if len(m.diff.Unstaged.DataRef().Parsed.Hunks) < 2 {
@@ -1925,7 +1926,7 @@ func TestApplySelection_DoesNotSwitchSectionWhenHunksRemain(t *testing.T) {
 	if cmd != nil {
 		// animation may or may not be set; ignore command
 	}
-	if m.diff.ActiveSection != sectionUnstaged {
+	if m.diff.ActiveSection != diffarea.SectionUnstaged {
 		t.Fatalf("section switched unexpectedly while hunks remain: got=%v", m.diff.ActiveSection)
 	}
 	if len(m.diff.Unstaged.DataRef().Parsed.Hunks) == 0 {
@@ -1945,7 +1946,7 @@ func TestApplySelection_DoesNotSwitchSectionWhenCurrentSectionBecomesEmpty(t *te
 	m.height = 24
 	m.syncDiffViewports()
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 	m.diff.SetNavMode(diffview.NavModeHunk)
 
 	if len(m.diff.Unstaged.DataRef().Parsed.Hunks) != 1 {
@@ -1956,7 +1957,7 @@ func TestApplySelection_DoesNotSwitchSectionWhenCurrentSectionBecomesEmpty(t *te
 	if cmd != nil {
 		// animation may or may not be set; ignore command
 	}
-	if m.diff.ActiveSection != sectionUnstaged {
+	if m.diff.ActiveSection != diffarea.SectionUnstaged {
 		t.Fatalf("section switched unexpectedly after source became empty: got=%v", m.diff.ActiveSection)
 	}
 }
@@ -1973,18 +1974,18 @@ func TestApplySelection_FlashesDestinationSectionWithoutSwitching(t *testing.T) 
 	m.height = 24
 	m.syncDiffViewports()
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 	m.diff.SetNavMode(diffview.NavModeHunk)
 
 	_ = m.applySelection()
 
-	if m.diff.ActiveSection != sectionUnstaged {
+	if m.diff.ActiveSection != diffarea.SectionUnstaged {
 		t.Fatalf("section switched unexpectedly: got=%v", m.diff.ActiveSection)
 	}
 	if !m.diff.Flash.Active {
 		t.Fatalf("expected destination flash to be active")
 	}
-	if m.diff.Flash.Section != sectionStaged {
+	if m.diff.Flash.Section != diffarea.SectionStaged {
 		t.Fatalf("expected flash on staged destination, got=%v", m.diff.Flash.Section)
 	}
 }
@@ -2230,7 +2231,7 @@ func TestEditorLineForCurrentSelectionInDiffMode(t *testing.T) {
 	m := New(repo)
 	m.ready = true
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 	m.diff.SetNavMode(diffview.NavModeLine)
 
 	for i, cl := range m.diff.Unstaged.DataRef().Parsed.Changed {
@@ -2293,7 +2294,7 @@ func TestMouseWheelScrollsStagedDiffViewport(t *testing.T) {
 	m.width = 120
 	m.height = 26
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionStaged
+	m.diff.ActiveSection = diffarea.SectionStaged
 	m.syncDiffViewports()
 
 	beforeOffset := m.diff.Staged.Viewport().YOffset()
@@ -2313,7 +2314,7 @@ func TestWToggleSoftWrap(t *testing.T) {
 	m.width = 80
 	m.height = 20
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 	m.syncDiffViewports()
 
 	wrappedCount := len(m.diff.Unstaged.DataRef().ViewLines)
@@ -2621,7 +2622,7 @@ func TestVisualModeStagesLineRange(t *testing.T) {
 	m := New(repo)
 	m.ready = true
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 	m.diff.SetNavMode(diffview.NavModeLine)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
@@ -2654,7 +2655,7 @@ func TestEscExitsVisualModeAndKeepsDiffFocus(t *testing.T) {
 	m := New(repo)
 	m.ready = true
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 	m.diff.SetNavMode(diffview.NavModeLine)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
@@ -2682,7 +2683,7 @@ func TestDiffDotMovesToNextFile(t *testing.T) {
 	m := New(repo)
 	m.ready = true
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 
 	before, ok := m.selectedFile()
 	if !ok {
@@ -2712,7 +2713,7 @@ func TestDiffCommaMovesToPreviousFile(t *testing.T) {
 	m := New(repo)
 	m.ready = true
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionUnstaged
+	m.diff.ActiveSection = diffarea.SectionUnstaged
 
 	first, ok := m.selectedFile()
 	if !ok {
@@ -2744,7 +2745,7 @@ func TestVisualModeUnstagesLineRange(t *testing.T) {
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	m = updated.(Model)
 	m.focus = focusDiff
-	m.diff.ActiveSection = sectionStaged
+	m.diff.ActiveSection = diffarea.SectionStaged
 	m.diff.SetNavMode(diffview.NavModeLine)
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})

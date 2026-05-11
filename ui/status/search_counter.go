@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/status/diffarea"
 )
 
 func (m Model) searchCounterForFiletreePane() string {
@@ -14,7 +15,7 @@ func (m Model) searchCounterForFiletreePane() string {
 	return m.searchCounterText(search.Cursor(), search.MatchesCount())
 }
 
-func (m Model) searchCounterForDiffSection(section diffSection) string {
+func (m Model) searchCounterForDiffSection(section diffarea.Section) string {
 	search := m.diffSearchForSection(section)
 	if !search.HasQuery() || search.MatchesCount() == 0 {
 		return ""

@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/status/diffarea"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -93,14 +94,14 @@ func (m *Model) syncSearchCursorFromDiffFocus() {
 }
 
 func (m *Model) currentDiffSearch() *search.Model {
-	if m.diff.ActiveSection == sectionStaged {
+	if m.diff.ActiveSection == diffarea.SectionStaged {
 		return m.diff.Staged.Search()
 	}
 	return m.diff.Unstaged.Search()
 }
 
-func (m *Model) diffSearchForSection(section diffSection) *search.Model {
-	if section == sectionStaged {
+func (m *Model) diffSearchForSection(section diffarea.Section) *search.Model {
+	if section == diffarea.SectionStaged {
 		return m.diff.Staged.Search()
 	}
 	return m.diff.Unstaged.Search()
@@ -140,7 +141,7 @@ func (m Model) searchMatchStatusIndex(idx int) bool {
 	return false
 }
 
-func (m Model) searchMatchDiffDisplay(scope diffSection, displayIdx int) (matched bool, current bool) {
+func (m Model) searchMatchDiffDisplay(scope diffarea.Section, displayIdx int) (matched bool, current bool) {
 	diffSearch := m.diffSearchForSection(scope)
 	if !diffSearch.HasQuery() {
 		return false, false

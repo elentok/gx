@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ui/diffview/diffcore"
 	"github.com/elentok/gx/ui/diffview/diffrender"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/status/diffarea"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -23,18 +24,18 @@ func (m *Model) renderDiffPane(width, height int) string {
 	}
 
 	expandedH, collapsedH := diffPaneHeights(height)
-	if m.diff.ActiveSection == sectionStaged {
-		top := m.renderSectionPane(width, collapsedH, m.sectionTitle(sectionUnstaged), m.diff.SectionModel(sectionUnstaged), sectionUnstaged)
-		bottom := m.renderSectionPane(width, expandedH, m.sectionTitle(sectionStaged), m.diff.SectionModel(sectionStaged), sectionStaged)
+	if m.diff.ActiveSection == diffarea.SectionStaged {
+		top := m.renderSectionPane(width, collapsedH, diffarea.SectionUnstaged)
+		bottom := m.renderSectionPane(width, expandedH, diffarea.SectionStaged)
 		return lipgloss.JoinVertical(lipgloss.Left, top, bottom)
 	}
 
-	top := m.renderSectionPane(width, expandedH, m.sectionTitle(sectionUnstaged), m.diff.SectionModel(sectionUnstaged), sectionUnstaged)
-	bottom := m.renderSectionPane(width, collapsedH, m.sectionTitle(sectionStaged), m.diff.SectionModel(sectionStaged), sectionStaged)
+	top := m.renderSectionPane(width, expandedH, diffarea.SectionUnstaged)
+	bottom := m.renderSectionPane(width, collapsedH, diffarea.SectionStaged)
 	return lipgloss.JoinVertical(lipgloss.Left, top, bottom)
 }
 
-func (m *Model) renderSectionPane(width, height int, title string, diffviewModel *diffview.Model, section diffSection) string {
+func (m *Model) renderSectionPane(width, height int, section diffarea.Section) string {
 	if width <= 0 || height <= 0 {
 		return ""
 	}
@@ -49,10 +50,12 @@ func (m *Model) renderSectionPane(width, height int, title string, diffviewModel
 		bodyH = 0
 	}
 
+	title := m.sectionTitle(section)
+	diffviewModel := m.diff.SectionModel(section)
 	diff := diffviewModel.DataRef()
 	active := diffviewModel.ActiveRawLineIndex()
 	accent := ui.ColorOrange
-	if section == sectionStaged {
+	if section == diffarea.SectionStaged {
 		accent = ui.ColorGreen
 	}
 	diffviewModel.Viewport().SetHeight(maxInt(0, bodyH))
@@ -184,14 +187,14 @@ func diffPaneHeights(total int) (expanded, collapsed int) {
 	return expanded, collapsed
 }
 
-func (m Model) sectionPaneTitle(title string, section diffSection) string {
+func (m Model) sectionPaneTitle(title string, section diffarea.Section) string {
 	if !m.sectionHasContent(section) {
 		return title + " (empty)"
 	}
 	return title
 }
 
-func (m Model) diffSectionPaneTitle(title string, section diffSection, expanded bool) string {
+func (m Model) diffSectionPaneTitle(title string, section diffarea.Section, expanded bool) string {
 	if !expanded {
 		return m.sectionPaneTitle(title, section)
 	}
@@ -209,7 +212,7 @@ func (m Model) diffDisplayedPath(file git.StageFileStatus) string {
 	return file.Path
 }
 
-func (m Model) sectionPlaceholder(section diffSection, collapsed bool) string {
+func (m Model) sectionPlaceholder(section diffarea.Section, collapsed bool) string {
 	if _, ok := m.selectedStatusFile(); !ok {
 		return m.diffEmptyMessage()
 	}
@@ -270,13 +273,13 @@ func (m *Model) syncDiffViewports() {
 	}
 	vpW := maxInt(1, diffW-4)
 	wrapWidth := maxInt(1, vpW-2)
-	reflowSectionLines(m.diff.SectionModel(sectionUnstaged), wrapWidth, m.diff.Wrap())
-	reflowSectionLines(m.diff.SectionModel(sectionStaged), wrapWidth, m.diff.Wrap())
+	reflowSectionLines(m.diff.SectionModel(diffarea.SectionUnstaged), wrapWidth, m.diff.Wrap())
+	reflowSectionLines(m.diff.SectionModel(diffarea.SectionStaged), wrapWidth, m.diff.Wrap())
 
 	expandedH, collapsedH := diffPaneHeights(diffH)
 	m.diff.Unstaged.Viewport().SetWidth(vpW)
 	m.diff.Staged.Viewport().SetWidth(vpW)
-	if m.diff.ActiveSection == sectionStaged {
+	if m.diff.ActiveSection == diffarea.SectionStaged {
 		m.diff.Unstaged.Viewport().SetHeight(maxInt(0, collapsedH-3))
 		m.diff.Staged.Viewport().SetHeight(maxInt(0, expandedH-3))
 	} else {

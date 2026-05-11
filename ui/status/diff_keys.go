@@ -2,6 +2,7 @@ package status
 
 import (
 	"github.com/elentok/gx/ui/diffview"
+	"github.com/elentok/gx/ui/status/diffarea"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -94,7 +95,7 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		cmd := m.applySelection()
 		return m, cmd
 	case "d":
-		if m.diff.ActiveSection == sectionStaged {
+		if m.diff.ActiveSection == diffarea.SectionStaged {
 			cmd := m.applySelection()
 			return m, cmd
 		}

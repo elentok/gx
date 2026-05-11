@@ -5,6 +5,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/diffview"
+	"github.com/elentok/gx/ui/status/diffarea"
 
 	"charm.land/lipgloss/v2"
 )
@@ -52,11 +53,11 @@ func (m Model) renderFiletreePanelWithBorderTitle(width, height int, title, righ
 	})
 }
 
-func (m Model) renderPanelWithBorderTitle(width, height int, title, rightTitle string, lines []string, active bool, section diffSection) string {
+func (m Model) renderPanelWithBorderTitle(width, height int, title, rightTitle string, lines []string, active bool, section diffarea.Section) string {
 	highlightMoved := m.diff.Flash.Active && m.diff.Flash.Section == section
 	borderColor := ui.ColorSubtle
 	titleColor := ui.ColorOrange
-	if section == sectionStaged {
+	if section == diffarea.SectionStaged {
 		borderColor = ui.ColorGreen
 		titleColor = ui.ColorGreen
 	} else {
@@ -65,12 +66,12 @@ func (m Model) renderPanelWithBorderTitle(width, height int, title, rightTitle s
 	}
 	if !active {
 		borderColor = ui.ColorSubtle
-		if section == sectionStaged {
+		if section == diffarea.SectionStaged {
 			titleColor = ui.ColorGreen
 		} else {
 			titleColor = ui.ColorOrange
 		}
-	} else if section == sectionStaged {
+	} else if section == diffarea.SectionStaged {
 		borderColor = ui.ColorGreen
 		titleColor = ui.ColorGreen
 	} else {
@@ -172,7 +173,7 @@ func isDeletedFileStatus(file git.StageFileStatus) bool {
 	return file.IndexStatus == 'D' || file.WorktreeCode == 'D'
 }
 
-func (m Model) flashMarker(section diffSection, rawIdx int, diffviewModel *diffview.Model) bool {
+func (m Model) flashMarker(section diffarea.Section, rawIdx int, diffviewModel *diffview.Model) bool {
 	diff := diffviewModel.DataRef()
 	if !m.diff.Flash.Active || m.diff.Flash.Section != section {
 		return false

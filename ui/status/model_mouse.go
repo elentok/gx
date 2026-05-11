@@ -2,6 +2,7 @@ package status
 
 import (
 	"github.com/elentok/gx/ui/diffview"
+	"github.com/elentok/gx/ui/status/diffarea"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -69,20 +70,20 @@ func (m *Model) mouseTargetSection(relY, diffH int) *diffview.Model {
 		return nil
 	}
 	expandedH, collapsedH := diffPaneHeights(diffH)
-	if m.diff.ActiveSection == sectionStaged {
+	if m.diff.ActiveSection == diffarea.SectionStaged {
 		if relY < collapsedH {
-			return m.diff.SectionModel(sectionUnstaged)
+			return m.diff.SectionModel(diffarea.SectionUnstaged)
 		}
 		if relY < collapsedH+expandedH {
-			return m.diff.SectionModel(sectionStaged)
+			return m.diff.SectionModel(diffarea.SectionStaged)
 		}
 		return nil
 	}
 	if relY < expandedH {
-		return m.diff.SectionModel(sectionUnstaged)
+		return m.diff.SectionModel(diffarea.SectionUnstaged)
 	}
 	if relY < expandedH+collapsedH {
-		return m.diff.SectionModel(sectionStaged)
+		return m.diff.SectionModel(diffarea.SectionStaged)
 	}
 	return nil
 }
