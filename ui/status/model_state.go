@@ -25,7 +25,7 @@ type Model struct {
 	height int
 	ready  bool
 
-	explorerState
+	diffInteractionState
 	diffContextLines int
 	statusPageState
 	fileTreeModel     filetree.Model[git.StageFileStatus]
@@ -136,7 +136,7 @@ func NewModel(worktreeRoot string, settings Settings) Model {
 		initialPath:      settings.InitialPath,
 		diffContextLines: settings.DiffContextLines,
 		help:             help.NewModel(keySections),
-		explorerState: explorerState{
+		diffInteractionState: diffInteractionState{
 			focus:      focusFiletree,
 			section:    sectionUnstaged,
 			navMode:    navHunk,

@@ -21,7 +21,7 @@ func (m *Model) currentSection() *sectionState {
 }
 
 func (m *Model) ensureActiveVisible(sec *sectionState) {
-	explorer.EnsureActiveVisible(sec.data, &sec.viewport, m.navMode)
+	explorer.EnsureActiveVisible(sec.data, &sec.viewport, toExplorerNavMode(m.navMode))
 }
 
 func (m Model) editorLineForCurrentSelection() int {

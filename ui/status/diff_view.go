@@ -96,7 +96,7 @@ func (m *Model) renderSectionPane(width, height int, title string, sec *sectionS
 			ViewportY:  sec.viewport.YOffset(),
 			Visible:    sec.viewport.VisibleLineCount(),
 			BodyHeight: bodyH,
-			NavMode:    m.navMode,
+			NavMode:    toExplorerNavMode(m.navMode),
 			Active:     activeSection,
 			ActiveRaw:  active,
 		})
@@ -193,7 +193,7 @@ func (m Model) diffSectionPaneTitle(title string, section diffSection, expanded 
 	if !expanded {
 		return m.sectionPaneTitle(title, section)
 	}
-	file, ok := m.selectedExplorerFile()
+	file, ok := m.selectedStatusFile()
 	if !ok {
 		return m.sectionPaneTitle(title, section)
 	}
@@ -208,7 +208,7 @@ func (m Model) diffDisplayedPath(file git.StageFileStatus) string {
 }
 
 func (m Model) sectionPlaceholder(section diffSection, collapsed bool) string {
-	if _, ok := m.selectedExplorerFile(); !ok {
+	if _, ok := m.selectedStatusFile(); !ok {
 		return m.diffEmptyMessage()
 	}
 	if !m.sectionHasContent(section) {
@@ -311,7 +311,7 @@ func reflowSectionLines(sec *sectionState, wrapWidth int, wrapSoft bool) {
 }
 
 func (m Model) binarySummaryLine() string {
-	file, ok := m.selectedExplorerFile()
+	file, ok := m.selectedStatusFile()
 	if !ok {
 		return "binary file"
 	}

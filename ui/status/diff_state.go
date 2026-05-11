@@ -31,7 +31,7 @@ type movedTarget struct {
 }
 
 func (m *Model) applySelection() tea.Cmd {
-	file, ok := m.selectedExplorerFile()
+	file, ok := m.selectedStatusFile()
 	if !ok {
 		return nil
 	}
@@ -136,7 +136,7 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 	sideBySide := m.renderMode == renderSideBySide
 	renderWidth := m.deltaRenderWidth()
 
-	sel, ok := m.selectedExplorerDiff()
+	sel, ok := m.selectedStatusDiff()
 	if !ok {
 		m.activeFilePath = ""
 		m.resetDiffSections()
@@ -204,7 +204,7 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 }
 
 func (m *Model) enterDiffFromStatus(resetSection bool) tea.Cmd {
-	if _, ok := m.selectedExplorerFile(); !ok {
+	if _, ok := m.selectedStatusFile(); !ok {
 		return nil
 	}
 	m.diffReloadSeq++
@@ -222,7 +222,7 @@ func (m *Model) openDiscardDiffConfirm() {
 	if m.section != sectionUnstaged {
 		return
 	}
-	file, ok := m.selectedExplorerFile()
+	file, ok := m.selectedStatusFile()
 	if !ok {
 		return
 	}

@@ -10,7 +10,7 @@ import (
 var stageClipboardWrite = clipboard.WriteAll
 
 func (m *Model) yankFilename() {
-	file, ok := m.selectedExplorerFile()
+	file, ok := m.selectedStatusFile()
 	if !ok {
 		m.setStatus("no file selected")
 		return
@@ -24,7 +24,7 @@ func (m *Model) yankFilename() {
 }
 
 func (m *Model) yankLocationOnly() {
-	file, ok := m.selectedExplorerFile()
+	file, ok := m.selectedStatusFile()
 	if !ok {
 		m.setStatus("no file selected")
 		return
@@ -49,7 +49,7 @@ func (m *Model) yankLocationOnly() {
 }
 
 func (m *Model) yankAllContext() {
-	file, ok := m.selectedExplorerFile()
+	file, ok := m.selectedStatusFile()
 	if !ok {
 		m.setStatus("no file selected")
 		return
@@ -81,7 +81,7 @@ func (m *Model) yankContentOnly() {
 		return
 	}
 	sec := m.currentSection()
-	_, body, yankErr := explorer.FocusedLocationAndBody(sec.data, m.navMode)
+	_, body, yankErr := explorer.FocusedLocationAndBody(sec.data, toExplorerNavMode(m.navMode))
 	if yankErr == explorer.FocusedYankErrNoHunk {
 		m.setStatus(string(yankErr))
 		return
@@ -99,7 +99,7 @@ func (m *Model) yankContentOnly() {
 
 func (m *Model) focusedLocationAndBody() (string, []string, bool) {
 	sec := m.currentSection()
-	loc, body, yankErr := explorer.FocusedLocationAndBody(sec.data, m.navMode)
+	loc, body, yankErr := explorer.FocusedLocationAndBody(sec.data, toExplorerNavMode(m.navMode))
 	if yankErr != "" {
 		m.setStatus(string(yankErr))
 		return "", nil, false

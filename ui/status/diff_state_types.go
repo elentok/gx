@@ -24,7 +24,7 @@ type flashState struct {
 	frames  int
 }
 
-type explorerState struct {
+type diffInteractionState struct {
 	focus          focusPane
 	section        diffSection
 	navMode        navMode

@@ -7,13 +7,13 @@ import (
 	"github.com/elentok/gx/ui/explorer"
 )
 
-type statusExplorerFileSelection struct {
+type statusDiffFileSelection struct {
 	explorer.FileSelection
 	stageFile git.StageFileStatus
 }
 
-type statusExplorerDiffSelection struct {
-	file statusExplorerFileSelection
+type statusDiffSelection struct {
+	file statusDiffFileSelection
 }
 
 func (m Model) diffEmptyMessage() string {
@@ -50,12 +50,12 @@ func (m Model) visibleDiffSections() []diffSection {
 	return sections
 }
 
-func (m Model) selectedExplorerFile() (statusExplorerFileSelection, bool) {
+func (m Model) selectedStatusFile() (statusDiffFileSelection, bool) {
 	file, ok := m.selectedFile()
 	if !ok {
-		return statusExplorerFileSelection{}, false
+		return statusDiffFileSelection{}, false
 	}
-	return statusExplorerFileSelection{
+	return statusDiffFileSelection{
 		FileSelection: explorer.FileSelection{
 			Path:       file.Path,
 			RenameFrom: file.RenameFrom,
@@ -65,12 +65,12 @@ func (m Model) selectedExplorerFile() (statusExplorerFileSelection, bool) {
 	}, true
 }
 
-func (m Model) selectedExplorerDiff() (statusExplorerDiffSelection, bool) {
-	file, ok := m.selectedExplorerFile()
+func (m Model) selectedStatusDiff() (statusDiffSelection, bool) {
+	file, ok := m.selectedStatusFile()
 	if !ok {
-		return statusExplorerDiffSelection{}, false
+		return statusDiffSelection{}, false
 	}
-	return statusExplorerDiffSelection{file: file}, true
+	return statusDiffSelection{file: file}, true
 }
 
 func (m *Model) diffModelForSectionPtr(section diffSection) *diffview.Model {
