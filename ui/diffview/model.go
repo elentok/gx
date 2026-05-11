@@ -3,6 +3,7 @@ package diffview
 import (
 	"strings"
 
+	"github.com/elentok/gx/ui/diffview/diffrender"
 	"github.com/elentok/gx/ui/search"
 
 	"charm.land/bubbles/v2/viewport"
@@ -154,6 +155,80 @@ func (m Model) ComputeSearchMatches(query string) []DiffSearchMatch {
 
 func (m Model) ActiveRawLineIndex() int {
 	return activeRawLineIndex(m.data, m.navMode)
+}
+
+func (m *Model) VisibleRows(bodyH int, active bool) []VisibleDiffRow {
+	viewportY := m.viewport.YOffset()
+	visible := m.viewport.VisibleLineCount()
+	activeRaw := m.ActiveRawLineIndex()
+	data := m.data
+
+	rows := make([]VisibleDiffRow, 0, maxInt(0, bodyH))
+	if bodyH <= 0 {
+		return rows
+	}
+
+	hunkStart, hunkEnd := -1, -1
+	if m.navMode == NavModeHunk && data.ActiveHunk >= 0 && data.ActiveHunk < len(data.Parsed.Hunks) {
+		hunkStart = data.Parsed.Hunks[data.ActiveHunk].StartLine
+		hunkEnd = data.Parsed.Hunks[data.ActiveHunk].EndLine
+	}
+
+	overflowTopDisplay := -1
+	overflowBottomDisplay := -1
+	if m.navMode == NavModeHunk && active && data.ActiveHunk >= 0 {
+		if start, end, ok := hunkDisplayBounds(data.HunkDisplayRange, data.Parsed, data.DisplayToRaw, data.ActiveHunk); ok && visible > 0 {
+			vpBottom := viewportY + visible - 1
+			if start < viewportY {
+				overflowTopDisplay = viewportY
+			}
+			if end > vpBottom {
+				overflowBottomDisplay = vpBottom
+			}
+		}
+	}
+
+	for i := 0; i < bodyH; i++ {
+		displayIdx := viewportY + i
+		if displayIdx >= len(data.ViewLines) {
+			rows = append(rows, VisibleDiffRow{DisplayIndex: displayIdx, RawIndex: -1})
+			continue
+		}
+		rawIdx := -1
+		if displayIdx >= 0 && displayIdx < len(data.DisplayToRaw) {
+			rawIdx = data.DisplayToRaw[displayIdx]
+		}
+		rowKind := diffrender.RowPlain
+		if displayIdx >= 0 && displayIdx < len(data.ViewLineKinds) {
+			rowKind = data.ViewLineKinds[displayIdx]
+		}
+
+		inActiveHunk := false
+		if m.navMode == NavModeHunk {
+			if len(data.HunkDisplayRange) > 0 && data.ActiveHunk >= 0 && data.ActiveHunk < len(data.HunkDisplayRange) {
+				r := data.HunkDisplayRange[data.ActiveHunk]
+				inActiveHunk = displayIdx >= r[0] && displayIdx <= r[1]
+			} else {
+				inActiveHunk = rawIdx >= 0 && rawIdx >= hunkStart && rawIdx <= hunkEnd
+			}
+		}
+
+		isChanged := rawIdx < 0 && m.navMode == NavModeLine && active && data.ActiveLine >= 0 && data.ActiveLine < len(data.ChangedDisplay) && data.ChangedDisplay[data.ActiveLine] == displayIdx
+
+		rows = append(rows, VisibleDiffRow{
+			DisplayIndex:       displayIdx,
+			RawIndex:           rawIdx,
+			Text:               data.ViewLines[displayIdx],
+			Kind:               rowKind,
+			InActiveHunk:       inActiveHunk,
+			IsActiveRaw:        rawIdx >= 0 && rawIdx == activeRaw && active,
+			IsActiveChangedRaw: isChanged,
+			OverflowTop:        displayIdx == overflowTopDisplay && inActiveHunk,
+			OverflowBottom:     displayIdx == overflowBottomDisplay && inActiveHunk,
+		})
+	}
+
+	return rows
 }
 
 func (m *Model) MoveActive(delta int, allowViewportScroll bool) bool {

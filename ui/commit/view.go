@@ -257,16 +257,7 @@ func (m Model) renderDiffPane(width, height int) string {
 	if len(m.diffModel.Data().ViewLines) > 0 {
 		lines = make([]string, 0, max(1, m.diffModel.Viewport().VisibleLineCount()))
 		bodyH := max(1, height-2)
-		active := m.activeRawLineIndex()
-		rows := diffview.BuildVisibleDiffRows(diffview.VisibleDiffRowsOptions{
-			Section:    m.diffModel.Data(),
-			ViewportY:  m.diffModel.Viewport().YOffset(),
-			Visible:    m.diffModel.Viewport().VisibleLineCount(),
-			BodyHeight: bodyH,
-			NavMode:    m.diffModel.NavMode(),
-			Active:     m.focusDiff,
-			ActiveRaw:  active,
-		})
+		rows := m.diffModel.VisibleRows(bodyH, m.focusDiff)
 		for _, row := range rows {
 			if row.DisplayIndex < 0 || row.DisplayIndex >= len(m.diffModel.Data().ViewLines) {
 				lines = append(lines, "")

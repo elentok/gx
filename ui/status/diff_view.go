@@ -53,7 +53,6 @@ func (m *Model) renderSectionPane(width, height int, section diffarea.Section) s
 	title := m.sectionTitle(section)
 	diffviewModel := m.diff.SectionModel(section)
 	diff := diffviewModel.DataRef()
-	active := diffviewModel.ActiveRawLineIndex()
 	accent := ui.ColorOrange
 	if section == diffarea.SectionStaged {
 		accent = ui.ColorGreen
@@ -96,15 +95,7 @@ func (m *Model) renderSectionPane(width, height int, section diffarea.Section) s
 	}
 
 	if len(lines) == 0 {
-		rows := diffview.BuildVisibleDiffRows(diffview.VisibleDiffRowsOptions{
-			Section:    *diff,
-			ViewportY:  diffviewModel.Viewport().YOffset(),
-			Visible:    diffviewModel.Viewport().VisibleLineCount(),
-			BodyHeight: bodyH,
-			NavMode:    m.diff.NavMode(),
-			Active:     activeSection,
-			ActiveRaw:  active,
-		})
+		rows := diffviewModel.VisibleRows(bodyH, activeSection)
 		for _, row := range rows {
 			if row.DisplayIndex < 0 || row.DisplayIndex >= len(diff.ViewLines) {
 				lines = append(lines, "")
