@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.14.1
+
+- Refactor diff interaction ownership so `gx status` and `gx commit` route navigation/search/yank/viewport behavior through `ui/diffview.Model` methods instead of package-level helper wiring
+- Extract a dedicated `ui/status/diffarea` model to clarify staged/unstaged orchestration boundaries and reduce status-page coupling
+- Rename diff state internals from buffer-oriented naming to `DiffData` and prune legacy status alias/host glue files
+- Reduce `ui/diffview` exported helper surface by making internal navigation/search/runtime helpers private once call sites were migrated
+
 ## v0.14.0
 
 - Redesign `gx status` with a focused-section layout: one expanded diff section plus always-visible collapsed strips for `Unstaged` and `Staged`
