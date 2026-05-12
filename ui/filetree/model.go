@@ -168,6 +168,37 @@ func (m *Model[T]) MoveToAdjacentFile(delta int) bool {
 	return true
 }
 
+func (m *Model[T]) ToggleSelectedDir() bool {
+	if !toggleDirOnEnter(m.entries, m.collapsedDirs, m.selected) {
+		return false
+	}
+	return true
+}
+
+func (m *Model[T]) CollapseSelectedDir() bool {
+	if collapseSelectedDir(m.entries, m.collapsedDirs, m.selected) {
+		return true
+	}
+	if idx, ok := parentIndex(m.entries, m.selected); ok && idx != m.selected {
+		m.selected = idx
+		return true
+	}
+	return false
+}
+
+func (m *Model[T]) ExpandSelectedDir() bool {
+	return expandSelectedDir(m.entries, m.collapsedDirs, m.selected)
+}
+
+func (m *Model[T]) FocusParent() bool {
+	idx, ok := parentIndex(m.entries, m.selected)
+	if !ok || idx == m.selected {
+		return false
+	}
+	m.selected = idx
+	return true
+}
+
 func rebuildRequestedCmd() tea.Cmd {
 	return func() tea.Msg { return RebuildRequestedMsg{} }
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/diffview"
+	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/search"
 
 	"charm.land/bubbles/v2/viewport"
@@ -54,9 +55,7 @@ type commitSearchState struct {
 
 type commitSidebarState struct {
 	files         []git.CommitFile
-	fileEntries   []commitFileEntry
-	collapsedDirs map[string]bool
-	selected      int
+	fileTreeModel filetree.Model[git.CommitFile]
 }
 
 func New(worktreeRoot, ref string) Model {
@@ -76,7 +75,7 @@ func NewWithSettings(worktreeRoot, ref string, settings Settings) Model {
 			search: search.NewModel(),
 		},
 		commitSidebarState: commitSidebarState{
-			collapsedDirs: map[string]bool{},
+			fileTreeModel: filetree.NewModel[git.CommitFile](),
 		},
 	}
 	m.reload()
@@ -107,14 +106,13 @@ func (m *Model) reload() {
 		m.headerOffset = 0
 		return
 	}
-	m.fileEntries = buildCommitFileEntries(m.files, m.collapsedDirs)
-	if m.selected >= len(m.fileEntries) {
-		m.selected = len(m.fileEntries) - 1
-	}
-	if m.selected < 0 {
-		m.selected = 0
-	}
-	if entry, ok := m.selectedCommitEntry(); !ok || entry.Kind != commitFileEntryFile {
+	entries := filetree.BuildEntriesFromValues(
+		m.files,
+		func(file git.CommitFile) string { return file.Path },
+		m.fileTreeModel.CollapsedDirs(),
+	)
+	m.fileTreeModel.SetEntries(entries)
+	if entry, ok := m.selectedCommitEntry(); !ok || entry.Kind != filetree.EntryFile {
 		m.selectFirstCommitFile()
 	}
 	m.headerOffset = 0
@@ -146,9 +144,10 @@ func (m *Model) refreshDiff() {
 }
 
 func (m *Model) selectFirstCommitFile() {
-	for i, entry := range m.fileEntries {
-		if entry.Kind == commitFileEntryFile {
-			m.selected = i
+	entries := m.fileTreeModel.Entries()
+	for i, entry := range entries {
+		if entry.Kind == filetree.EntryFile {
+			m.fileTreeModel.SetSelectedIndex(i)
 			return
 		}
 	}

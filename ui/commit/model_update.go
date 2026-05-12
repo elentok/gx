@@ -234,7 +234,7 @@ func (m Model) handleKeyRouting(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.focusHeader = false
 			return m, nil
 		}
-		if m.focusParentInSidebar() {
+		if m.fileTreeModel.FocusParent() {
 			m.refreshDiff()
 			return m, nil
 		}

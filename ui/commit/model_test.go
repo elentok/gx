@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
+	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/search"
 
 	tea "charm.land/bubbletea/v2"
@@ -112,8 +113,8 @@ func TestJKWithoutDiffFocusMoveFiles(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
-	if m.selected != 1 {
-		t.Fatalf("expected j to move selected file, got %d", m.selected)
+	if m.fileTreeModel.SelectedIndex() != 1 {
+		t.Fatalf("expected j to move selected file, got %d", m.fileTreeModel.SelectedIndex())
 	}
 	if m.focusDiff {
 		t.Fatalf("expected file navigation not to force diff focus")
@@ -217,10 +218,10 @@ func TestSidebarSearchMovesToFileMatches(t *testing.T) {
 		t.Fatalf("expected enter to leave input mode")
 	}
 
-	first := m.selected
+	first := m.fileTreeModel.SelectedIndex()
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	m = updated.(Model)
-	if m.selected == first {
+	if m.fileTreeModel.SelectedIndex() == first {
 		t.Fatalf("expected n to move to next sidebar match")
 	}
 }
@@ -410,7 +411,7 @@ func TestInitialSelectionChoosesFirstFileOverDirectory(t *testing.T) {
 	if !ok {
 		t.Fatal("expected selected commit entry")
 	}
-	if entry.Kind != commitFileEntryFile {
+	if entry.Kind != filetree.EntryFile {
 		t.Fatalf("expected initial selection to choose file entry, got %#v", entry)
 	}
 	if len(m.diffModel.Data().ViewLines) == 0 {

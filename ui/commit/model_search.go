@@ -3,7 +3,9 @@ package commit
 import (
 	"strings"
 
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/search"
 
 	"charm.land/lipgloss/v2"
@@ -30,7 +32,7 @@ func (m *Model) computeSearchMatches(query string) []search.Match {
 	}
 	if m.searchScope == searchScopeSidebar {
 		var matches []search.Match
-		for i, entry := range m.fileEntries {
+		for i, entry := range m.fileTreeModel.Entries() {
 			if strings.Contains(strings.ToLower(m.fileEntrySearchText(entry)), q) {
 				matches = append(matches, search.Match{Index: i})
 			}
@@ -52,9 +54,9 @@ func (m *Model) jumpToCurrentMatch() {
 		return
 	}
 	if m.searchScope == searchScopeSidebar {
-		if match.Index >= 0 && match.Index < len(m.fileEntries) {
+		if match.Index >= 0 && match.Index < len(m.fileTreeModel.Entries()) {
 			m.focusDiff = false
-			m.selected = match.Index
+			m.fileTreeModel.SetSelectedIndex(match.Index)
 			m.refreshDiff()
 		}
 		return
@@ -97,14 +99,14 @@ func (m Model) searchMatchSidebarIndex(idx int) (matched bool, current bool) {
 	return false, false
 }
 
-func (m Model) fileEntrySearchText(entry commitFileEntry) string {
-	if entry.Kind == commitFileEntryDir {
+func (m Model) fileEntrySearchText(entry filetree.Entry[git.CommitFile]) string {
+	if entry.Kind == filetree.EntryDir {
 		return entry.DisplayName + "/"
 	}
-	if entry.File.RenameFrom != "" {
-		return entry.File.RenameFrom + " -> " + entry.File.Path
+	if entry.Value.RenameFrom != "" {
+		return entry.Value.RenameFrom + " -> " + entry.Value.Path
 	}
-	return entry.File.Path
+	return entry.Value.Path
 }
 
 func highlightMatchText(text, query string, current bool) string {

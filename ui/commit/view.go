@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/diffview/diffcore"
+	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/sidebar"
 
@@ -144,7 +145,7 @@ func (m Model) headerRightTitle() string {
 }
 
 func (m Model) contentView(contentH int) string {
-	if len(m.fileEntries) == 0 {
+	if len(m.fileTreeModel.Entries()) == 0 {
 		return ui.RenderPanelFrame(ui.PanelFrameOptions{
 			Width:       max(20, m.width),
 			Height:      contentH,
@@ -367,20 +368,22 @@ func (m Model) footerView() string {
 func (m Model) visibleFileLines(height int) []string {
 	innerH := max(1, height-2)
 	icons := ui.Icons(m.settings.UseNerdFontIcons)
-	rows := sidebar.BuildVisibleRenderableRows(m.fileEntries, m.selected, innerH, func(i int, entry commitFileEntry) sidebar.RenderableRow {
+	entries := m.fileTreeModel.Entries()
+	selected := m.fileTreeModel.SelectedIndex()
+	rows := sidebar.BuildVisibleRenderableRows(entries, selected, innerH, func(i int, entry filetree.Entry[git.CommitFile]) sidebar.RenderableRow {
 		statusColor := commitEntryColor(entry)
 		name := entry.DisplayName
-		if entry.Kind == commitFileEntryDir {
+		if entry.Kind == filetree.EntryDir {
 			symbol := icons.FolderOpen
 			if !entry.Expanded {
 				symbol = icons.FolderClosed
 			}
 			name = symbol + " " + name + "/"
 		} else {
-			if entry.File.RenameFrom != "" {
-				name = entry.File.RenameFrom + " -> " + entry.File.Path
+			if entry.Value.RenameFrom != "" {
+				name = entry.Value.RenameFrom + " -> " + entry.Value.Path
 			}
-			name = commitFileIcon(entry.File, m.settings.UseNerdFontIcons) + " " + name
+			name = commitFileIcon(entry.Value, m.settings.UseNerdFontIcons) + " " + name
 		}
 		if matched, current := m.searchMatchSidebarIndex(i); matched {
 			name = highlightMatchText(name, m.search.Query(), current)
@@ -390,7 +393,7 @@ func (m Model) visibleFileLines(height int) []string {
 			MetaRaw:  commitEntryMeta(entry, m.settings.UseNerdFontIcons),
 			NameRaw:  name,
 			Color:    statusColor,
-			Selected: i == m.selected,
+			Selected: i == selected,
 		}
 	})
 	return sidebar.RenderRows(rows, innerH, ui.StyleMuted.Render("no changed files"), ui.ColorOrange)
@@ -436,7 +439,7 @@ func (m Model) filesPaneRightTitle() string {
 	if m.focusDiff {
 		return ""
 	}
-	if len(m.fileEntries) == 0 {
+	if len(m.fileTreeModel.Entries()) == 0 {
 		return ""
 	}
 	return "tree"
@@ -456,14 +459,14 @@ func (m Model) diffPaneBorderColor() color.Color {
 	return ui.ColorBorder
 }
 
-func commitEntryMeta(entry commitFileEntry, useNerdFontIcons bool) string {
+func commitEntryMeta(entry filetree.Entry[git.CommitFile], useNerdFontIcons bool) string {
 	if useNerdFontIcons {
 		return "  "
 	}
-	if entry.Kind == commitFileEntryDir {
+	if entry.Kind == filetree.EntryDir {
 		return "-"
 	}
-	status := strings.TrimSpace(entry.File.Status)
+	status := strings.TrimSpace(entry.Value.Status)
 	if status == "" {
 		return "  "
 	}
@@ -473,16 +476,16 @@ func commitEntryMeta(entry commitFileEntry, useNerdFontIcons bool) string {
 	return status
 }
 
-func commitEntryColor(entry commitFileEntry) string {
-	if entry.Kind == commitFileEntryDir {
+func commitEntryColor(entry filetree.Entry[git.CommitFile]) string {
+	if entry.Kind == filetree.EntryDir {
 		return "#cdd6f4"
 	}
 	switch {
-	case strings.HasPrefix(entry.File.Status, "D"):
+	case strings.HasPrefix(entry.Value.Status, "D"):
 		return "#a6adc8"
-	case strings.HasPrefix(entry.File.Status, "R"), strings.HasPrefix(entry.File.Status, "C"):
+	case strings.HasPrefix(entry.Value.Status, "R"), strings.HasPrefix(entry.Value.Status, "C"):
 		return "#89b4fa"
-	case strings.HasPrefix(entry.File.Status, "A"):
+	case strings.HasPrefix(entry.Value.Status, "A"):
 		return "#a6e3a1"
 	default:
 		return "#cdd6f4"
