@@ -22,6 +22,7 @@ var (
 	commitKeyFileNext = key.NewBinding(key.WithKeys(","), key.WithHelp(",/.", "prev/next file (diff)"))
 	commitKeyMode     = key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "toggle hunk/line mode"))
 	commitKeyWrap     = key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "toggle wrap"))
+	commitKeyRefresh  = key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "refresh"))
 	commitKeyEnter    = key.NewBinding(key.WithKeys("enter", "l"), key.WithHelp("enter/l", "open / expand"))
 	commitKeyCollapse = key.NewBinding(key.WithKeys("h"), key.WithHelp("h", "collapse / exit diff"))
 	commitKeyYank     = key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "yank…"))
@@ -78,8 +79,8 @@ func (m Model) helpFullView(_ int) string {
 		bindings []key.Binding
 	}{
 		{"Header pane", []key.Binding{commitKeyTab, commitKeyExpand, commitKeyUp, commitKeyDown, commitKeyBack}},
-		{"Files pane", []key.Binding{commitKeyTab, commitKeyUp, commitKeyDown, commitKeyTop, commitKeyBottom, commitKeyEnter, commitKeyCollapse, commitKeyFilePrev, commitKeyBack}},
-		{"Diff pane", []key.Binding{commitKeyTab, commitKeyUp, commitKeyDown, commitKeyTop, commitKeyBottom, commitKeyMode, commitKeyWrap, commitKeySearch, commitKeyFileNext, commitKeyCollapse}},
+		{"Files pane", []key.Binding{commitKeyTab, commitKeyUp, commitKeyDown, commitKeyTop, commitKeyBottom, commitKeyEnter, commitKeyCollapse, commitKeyFilePrev, commitKeyBack, commitKeyRefresh}},
+		{"Diff pane", []key.Binding{commitKeyTab, commitKeyUp, commitKeyDown, commitKeyTop, commitKeyBottom, commitKeyMode, commitKeyWrap, commitKeySearch, commitKeyFileNext, commitKeyCollapse, commitKeyRefresh}},
 		{"Yank", []key.Binding{commitKeyYankText, commitKeyYankPath, commitKeyYankAll, commitKeyYankFile}},
 		{"Go to", []key.Binding{commitKeyGotoWT, commitKeyGotoLog, commitKeyGotoSt}},
 	}
@@ -141,6 +142,10 @@ func (m Model) ChordHints(prefix string) []key.Binding {
 			key.NewBinding(key.WithHelp("l", "yank location")),
 			key.NewBinding(key.WithHelp("a", "yank all")),
 			key.NewBinding(key.WithHelp("f", "yank filename")),
+		}
+	case "m":
+		return []key.Binding{
+			key.NewBinding(key.WithHelp("r", "refresh")),
 		}
 	}
 	return nil

@@ -240,6 +240,9 @@ func (m Model) handleKeyRouting(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		m.collapseSelectedDir()
 		return m, nil
+	case "R":
+		m.reload()
+		return m, nil
 	}
 	return m, nil
 }
@@ -294,8 +297,23 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		}
 		return m, nil, true
 	}
+	if m.keyPrefix == "m" {
+		m.keyPrefix = ""
+		switch key {
+		case "r":
+			m.reload()
+			return m, nil, true
+		case "esc":
+			return m, nil, true
+		}
+		return m, nil, true
+	}
 	if key == "y" {
 		m.keyPrefix = "y"
+		return m, nil, true
+	}
+	if key == "m" {
+		m.keyPrefix = "m"
 		return m, nil, true
 	}
 	if key == "g" && !isUpperG {

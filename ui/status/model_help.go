@@ -30,7 +30,7 @@ var (
 	stageKeyRebase     = key.NewBinding(key.WithKeys("b"), key.WithHelp("b", "rebase"))
 	stageKeyAmend      = key.NewBinding(key.WithKeys("A"), key.WithHelp("A", "amend"))
 	stageKeyEdit       = key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "edit"))
-	stageKeyRefresh    = key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh"))
+	stageKeyRefresh    = key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "refresh"))
 	stageKeyContextDec = key.NewBinding(key.WithKeys("["), key.WithHelp("[", "less context"))
 	stageKeyContextInc = key.NewBinding(key.WithKeys("]"), key.WithHelp("]", "more context"))
 	stageKeyPageDown   = key.NewBinding(key.WithKeys("ctrl+d"), key.WithHelp("ctrl+d", "half page down"))

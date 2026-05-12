@@ -63,8 +63,27 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 			return m, nil, true
 		}
 	}
+	if m.keyPrefix == "m" {
+		m.keyPrefix = ""
+		switch key {
+		case "r":
+			if m.spinnerActive {
+				return m, nil, true
+			}
+			m.loading = true
+			return m, tea.Batch(cmdLoadWorktrees(m.repo), cmdPruneRemotes(m.repo)), true
+		case "esc":
+			return m, nil, true
+		default:
+			return m, nil, true
+		}
+	}
 	if key == "g" {
 		m.keyPrefix = "g"
+		return m, nil, true
+	}
+	if key == "m" {
+		m.keyPrefix = "m"
 		return m, nil, true
 	}
 	if key == "L" {
@@ -100,6 +119,11 @@ func (m Model) ChordHints(prefix string) []key.Binding {
 			key.NewBinding(key.WithHelp("w", "goto worktrees")),
 			key.NewBinding(key.WithHelp("l", "goto log")),
 			key.NewBinding(key.WithHelp("s", "goto status")),
+		}
+	}
+	if prefix == "m" {
+		return []key.Binding{
+			key.NewBinding(key.WithHelp("r", "refresh")),
 		}
 	}
 	return nil

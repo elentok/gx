@@ -34,7 +34,7 @@ func (m Model) handleFiletreeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.adjustDiffContextLines(-1)
 	case "]":
 		return m, m.adjustDiffContextLines(1)
-	case "r":
+	case "R":
 		return m, m.refresh()
 	case "s":
 		return m, m.toggleRenderMode()

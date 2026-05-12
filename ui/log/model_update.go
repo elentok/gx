@@ -75,6 +75,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "g":
 			m.keyPrefix = "g"
+		case "m":
+			m.keyPrefix = "m"
 		case "]", "[":
 			m.keyPrefix = msg.String()
 		case "G":
@@ -135,6 +137,17 @@ func rowHasTag(r row) bool {
 }
 
 func (m *Model) handleChordKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
+	if m.keyPrefix == "m" {
+		m.keyPrefix = ""
+		switch msg.String() {
+		case "r":
+			return true, m.cmdReload()
+		case "esc":
+			return true, nil
+		default:
+			return true, nil
+		}
+	}
 	if m.keyPrefix != "g" {
 		return false, nil
 	}

@@ -30,6 +30,8 @@ func (m Model) ChordHints(prefix string) []key.Binding {
 		return []key.Binding{key.NewBinding(key.WithHelp("t", "next tag"))}
 	case "[":
 		return []key.Binding{key.NewBinding(key.WithHelp("t", "prev tag"))}
+	case "m":
+		return []key.Binding{key.NewBinding(key.WithHelp("r", "refresh"))}
 	}
 	return nil
 }

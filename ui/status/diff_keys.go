@@ -56,7 +56,7 @@ func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 		m.syncDiffViewports()
 		m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
-	case "r":
+	case "R":
 		return m, m.refresh()
 	case "p":
 		m.startPullAction()
