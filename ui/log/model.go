@@ -6,8 +6,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/help"
-
-	"charm.land/bubbles/v2/textinput"
+	"github.com/elentok/gx/ui/search"
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -28,13 +27,6 @@ type row struct {
 	class  git.BranchHistoryClass
 }
 
-type searchMode int
-
-const (
-	searchModeNone searchMode = iota
-	searchModeInput
-)
-
 type Settings struct {
 	UseNerdFontIcons bool
 	InputModalBottom config.InputModalBottom
@@ -54,11 +46,7 @@ type Model struct {
 	cursor       int
 	statusMsg    string
 	keyPrefix    string
-	searchMode   searchMode
-	searchInput  textinput.Model
-	searchQuery  string
-	searchMatch  []int
-	searchCursor int
+	search       search.Model
 	err          error
 
 	help help.Model
@@ -73,6 +61,7 @@ func NewModel(worktreeRoot, startRef string, settings Settings) Model {
 		startRef:     normalizedRef(startRef),
 		cursor:       0,
 		help:         help.NewModel(keySections),
+		search:       search.NewModel(),
 	}
 	m.reload()
 	return m
@@ -81,7 +70,7 @@ func NewModel(worktreeRoot, startRef string, settings Settings) Model {
 func (m Model) Init() tea.Cmd { return m.cmdReload() }
 
 func (m Model) InputFocused() bool {
-	return m.searchMode == searchModeInput
+	return m.search.Mode() == search.SearchModeInput
 }
 
 func normalizedRef(ref string) string {

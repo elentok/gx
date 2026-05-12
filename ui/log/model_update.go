@@ -26,6 +26,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cursor = 0
 		}
 		m.recomputeSearchMatches()
+		m.jumpToCurrentMatch()
 		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -42,8 +43,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.help, cmd = m.help.Update(msg)
 			return m, cmd
 		}
-		if m.searchMode == searchModeInput {
-			return m.handleSearchKey(msg)
+		if nextSearch, cmd, result := m.search.Update(msg); result.Handled {
+			m.search = nextSearch
+			if result.QueryChanged {
+				m.recomputeSearchMatches()
+			}
+			if result.QueryChanged || result.CursorChanged {
+				m.jumpToCurrentMatch()
+			}
+			return m, cmd
 		}
 		if handled, cmd := m.handleChordKey(msg); handled {
 			return m, cmd
@@ -83,12 +91,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.rows) > 0 {
 				m.cursor = len(m.rows) - 1
 			}
-		case "/":
-			m.enterSearchMode()
-		case "n":
-			m.advanceSearch(1)
-		case "N":
-			m.advanceSearch(-1)
 		case "enter":
 			return m, m.openSelected()
 		case "R":

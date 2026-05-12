@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/search"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -169,7 +170,11 @@ func TestBadgeVariantForDecoration(t *testing.T) {
 
 func TestRenderCommitRowHighlightsSearchMatches(t *testing.T) {
 	m := Model{
-		searchQuery: "fix",
+		search: func() search.Model {
+			s := search.NewModel()
+			s.Start("fix")
+			return s
+		}(),
 		rows: []row{{
 			kind: rowCommit,
 			commit: git.LogEntry{
@@ -190,7 +195,11 @@ func TestRenderCommitRowHighlightsSearchMatches(t *testing.T) {
 }
 
 func TestRenderBadgesHighlightsSearchMatches(t *testing.T) {
-	m := Model{searchQuery: "main"}
+	m := Model{search: func() search.Model {
+		s := search.NewModel()
+		s.Start("main")
+		return s
+	}()}
 	line := m.renderBadges([]git.RefDecoration{{Name: "origin/main", Kind: git.RefDecorationRemoteBranch}})
 	if stripped := ansi.Strip(line); !strings.Contains(stripped, "origin/main") {
 		t.Fatalf("stripped badges = %q", stripped)
@@ -208,18 +217,17 @@ func TestCloseSearchKeepsMatchesVisible(t *testing.T) {
 	testutil.CommitAll(t, repo, "fix two")
 
 	m := NewModel(repo, "", settings)
-	m.enterSearchMode()
-	m.searchQuery = "fix"
+	m.search.Start("fix")
 	m.recomputeSearchMatches()
-	if len(m.searchMatch) == 0 {
+	if m.search.MatchesCount() == 0 {
 		t.Fatalf("expected search matches")
 	}
 
-	m.closeSearch()
-	if m.searchQuery != "fix" {
-		t.Fatalf("expected query to persist after close, got %q", m.searchQuery)
+	m.search.DismissAndKeepResults()
+	if m.search.Query() != "fix" {
+		t.Fatalf("expected query to persist after close, got %q", m.search.Query())
 	}
-	if len(m.searchMatch) == 0 {
+	if m.search.MatchesCount() == 0 {
 		t.Fatalf("expected matches to persist after close")
 	}
 }
@@ -232,23 +240,25 @@ func TestNAndNShiftMoveBetweenSearchResults(t *testing.T) {
 	testutil.CommitAll(t, repo, "fix two")
 
 	m := NewModel(repo, "", settings)
-	m.searchQuery = "fix"
+	m.search.Start("fix")
 	m.recomputeSearchMatches()
-	if len(m.searchMatch) < 2 {
-		t.Fatalf("expected at least two search matches, got %d", len(m.searchMatch))
+	if m.search.MatchesCount() < 2 {
+		t.Fatalf("expected at least two search matches, got %d", m.search.MatchesCount())
 	}
-	m.cursor = m.searchMatch[0]
-	m.searchCursor = 0
+	if match, ok := m.search.Match(0); ok {
+		m.cursor = match.Index
+	}
+	m.search.SetCursor(0)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	m = updated.(Model)
-	if m.cursor != m.searchMatch[1] {
+	if match, ok := m.search.Match(1); ok && m.cursor != match.Index {
 		t.Fatalf("expected n to move to next result")
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'N', Text: "N", ShiftedCode: 'N', Mod: tea.ModShift})
 	m = updated.(Model)
-	if m.cursor != m.searchMatch[0] {
+	if match, ok := m.search.Match(0); ok && m.cursor != match.Index {
 		t.Fatalf("expected N to move to previous result")
 	}
 }

@@ -89,6 +89,7 @@ func (m Model) Init() tea.Cmd {
 
 func (m *Model) Start(initialQuery string) {
 	m.textinput.SetValue(initialQuery)
+	m.query = initialQuery
 	m.mode = SearchModeInput
 }
 

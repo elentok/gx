@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/search"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -41,8 +42,10 @@ func (m Model) View() tea.View {
 	})
 	footer := m.footerView()
 	out := lipgloss.JoinVertical(lipgloss.Left, body, footer)
-	if m.searchMode == searchModeInput {
-		overlay := m.searchOverlayView()
+	if m.search.Mode() == search.SearchModeInput {
+		overlayW := m.searchOverlayWidth()
+		m.search.SetWidth(overlayW)
+		overlay := m.search.View()
 		y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
 		out = ui.OverlayBottomCenter(out, overlay, m.width, y)
 	}
@@ -157,7 +160,7 @@ func (m Model) renderBadges(decorations []git.RefDecoration) string {
 }
 
 func (m Model) highlightSearch(text string) string {
-	query := strings.TrimSpace(m.searchQuery)
+	query := strings.TrimSpace(m.search.Query())
 	if query == "" {
 		return text
 	}
@@ -208,8 +211,8 @@ func isMainOrMasterRef(name string) bool {
 
 func (m Model) footerView() string {
 	left := m.statusMsg
-	if left == "" && m.searchQuery != "" && len(m.searchMatch) > 0 {
-		left = fmt.Sprintf("%d/%d matches", m.searchCursor+1, len(m.searchMatch))
+	if left == "" && m.search.HasQuery() && m.search.MatchesCount() > 0 {
+		left = fmt.Sprintf("%d/%d matches", m.search.Cursor()+1, m.search.MatchesCount())
 	}
 	if left == "" {
 		left = "enter open commit"
@@ -227,7 +230,7 @@ func (m Model) footerView() string {
 	return left + strings.Repeat(" ", m.width-leftW-rightW) + right
 }
 
-func (m Model) searchOverlayView() string {
+func (m Model) searchOverlayWidth() int {
 	outerW := m.width * 80 / 100
 	if outerW > 50 {
 		outerW = 50
@@ -235,23 +238,7 @@ func (m Model) searchOverlayView() string {
 	if outerW < 20 {
 		outerW = 20
 	}
-	ti := m.searchInput
-	ti.SetWidth(outerW - 4)
-	rightTitle := ""
-	if m.searchQuery != "" && len(m.searchMatch) == 0 {
-		rightTitle = "no matches"
-	} else if len(m.searchMatch) > 0 {
-		rightTitle = fmt.Sprintf("%d/%d", m.searchCursor+1, len(m.searchMatch))
-	}
-	return ui.RenderModalFrame(ui.ModalFrameOptions{
-		Title:         "Search",
-		RightTitle:    rightTitle,
-		Body:          ti.View(),
-		Width:         outerW,
-		BorderColor:   ui.ColorBorder,
-		TitleColor:    ui.ColorBlue,
-		TitleInBorder: true,
-	})
+	return outerW
 }
 
 func maxInt(a, b int) int {
