@@ -66,7 +66,7 @@ func FocusedYankBody(section DiffData, navMode NavMode) []string {
 	if navMode == NavModeLine {
 		startIdx, endIdx := section.ActiveLine, section.ActiveLine
 		if section.VisualActive {
-			startIdx, endIdx = visualLineBounds(section.VisualAnchor, section.ActiveLine, len(section.Parsed.Changed))
+			startIdx, endIdx = section.VisualLineBounds()
 		}
 		body := make([]string, 0, maxInt(1, endIdx-startIdx+1))
 		for i := startIdx; i <= endIdx && i < len(section.Parsed.Changed); i++ {
@@ -112,7 +112,7 @@ func FocusedLineSpanForYank(section DiffData, navMode NavMode) (int, int) {
 	}
 	startIdx, endIdx := section.ActiveLine, section.ActiveLine
 	if section.VisualActive {
-		startIdx, endIdx = visualLineBounds(section.VisualAnchor, section.ActiveLine, len(section.Parsed.Changed))
+		startIdx, endIdx = section.VisualLineBounds()
 	}
 	lineStart := 0
 	lineEnd := 0

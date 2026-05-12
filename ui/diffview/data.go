@@ -35,15 +35,69 @@ func (d *DiffData) HasContent() bool {
 }
 
 func (d DiffData) ActiveRawLineIndex(navMode NavMode) int {
-	return activeRawLineIndex(d, navMode)
+	if navMode == NavModeHunk {
+		if d.ActiveHunk >= 0 && d.ActiveHunk < len(d.Parsed.Hunks) {
+			return d.Parsed.Hunks[d.ActiveHunk].StartLine
+		}
+		return -1
+	}
+	if d.ActiveLine >= 0 && d.ActiveLine < len(d.Parsed.Changed) {
+		return d.Parsed.Changed[d.ActiveLine].LineIndex
+	}
+	return -1
 }
 
 func (d DiffData) HunkDisplayBounds(hunkIdx int) (start int, end int, ok bool) {
-	return hunkDisplayBounds(d.HunkDisplayRange, d.Parsed, d.DisplayToRaw, hunkIdx)
+	if hunkIdx >= 0 && hunkIdx < len(d.HunkDisplayRange) {
+		r := d.HunkDisplayRange[hunkIdx]
+		if r[0] >= 0 && r[1] >= r[0] {
+			return r[0], r[1], true
+		}
+	}
+	if hunkIdx < 0 || hunkIdx >= len(d.Parsed.Hunks) {
+		return 0, 0, false
+	}
+	h := d.Parsed.Hunks[hunkIdx]
+	start = -1
+	end = -1
+	for displayIdx, rawIdx := range d.DisplayToRaw {
+		if rawIdx < h.StartLine || rawIdx > h.EndLine {
+			continue
+		}
+		if start < 0 {
+			start = displayIdx
+		}
+		end = displayIdx
+	}
+	if start < 0 || end < 0 {
+		return 0, 0, false
+	}
+	return start, end, true
 }
 
 func (d DiffData) VisualLineBounds() (start, end int) {
-	return visualLineBounds(d.VisualAnchor, d.ActiveLine, len(d.Parsed.Changed))
+	start = d.VisualAnchor
+	end = d.ActiveLine
+	if start > end {
+		start, end = end, start
+	}
+	if start < 0 {
+		start = 0
+	}
+	if end < 0 {
+		end = 0
+	}
+	changedCount := len(d.Parsed.Changed)
+	if end >= changedCount {
+		end = changedCount - 1
+	}
+	if start >= changedCount {
+		start = changedCount - 1
+	}
+	if start < 0 {
+		start = 0
+	}
+	return start, end
 }
 
 func NewDiffData() DiffData {

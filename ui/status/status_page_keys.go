@@ -118,11 +118,10 @@ func (m Model) handleFocusedChildKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, b
 		}
 		return m, nil, true
 	case focusDiff:
-		updatedDiff, cmd, handled := m.diff.SectionModel(m.diff.ActiveSection).Update(msg)
+		cmd, handled := m.diff.UpdateActive(msg)
 		if !handled {
 			return m, nil, false
 		}
-		*m.diff.SectionModel(m.diff.ActiveSection) = updatedDiff
 		if m.currentDiffSearch().Mode() == search.SearchModeResults && m.focus == focusDiff {
 			m.diff.SetNavMode(diffview.NavModeLine)
 

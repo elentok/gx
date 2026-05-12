@@ -12,19 +12,6 @@ const (
 	FocusedYankErrNoLines FocusedYankError = "no lines to yank"
 )
 
-func FocusedLocationAndBody(section DiffData, navMode NavMode) (string, []string, FocusedYankError) {
-	hunkIdx := ActiveHunkIndexForYank(section, navMode)
-	if hunkIdx < 0 || hunkIdx >= len(section.Parsed.Hunks) {
-		return "", nil, FocusedYankErrNoHunk
-	}
-	body := FocusedYankBody(section, navMode)
-	if len(body) == 0 {
-		return "", nil, FocusedYankErrNoLines
-	}
-	loc := FocusedLocation(section, navMode)
-	return loc, body, ""
-}
-
 func FormatYankLocation(path, loc string) string {
 	path = strings.TrimSpace(path)
 	loc = strings.TrimSpace(loc)

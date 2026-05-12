@@ -2,19 +2,6 @@ package diffview
 
 import "charm.land/bubbles/v2/viewport"
 
-func activeRawLineIndex(section DiffData, navMode NavMode) int {
-	if navMode == NavModeHunk {
-		if section.ActiveHunk >= 0 && section.ActiveHunk < len(section.Parsed.Hunks) {
-			return section.Parsed.Hunks[section.ActiveHunk].StartLine
-		}
-		return -1
-	}
-	if section.ActiveLine >= 0 && section.ActiveLine < len(section.Parsed.Changed) {
-		return section.Parsed.Changed[section.ActiveLine].LineIndex
-	}
-	return -1
-}
-
 func moveActive(section *DiffData, vp *viewport.Model, navMode NavMode, delta int, allowViewportScroll bool) bool {
 	if navMode == NavModeHunk {
 		if len(section.Parsed.Hunks) == 0 {
@@ -22,7 +9,7 @@ func moveActive(section *DiffData, vp *viewport.Model, navMode NavMode, delta in
 		}
 		old := section.ActiveHunk
 		if allowViewportScroll && section.ActiveHunk >= 0 && section.ActiveHunk < len(section.Parsed.Hunks) {
-			if start, end, ok := hunkDisplayBounds(section.HunkDisplayRange, section.Parsed, section.DisplayToRaw, section.ActiveHunk); ok {
+			if start, end, ok := section.HunkDisplayBounds(section.ActiveHunk); ok {
 				visible := vp.VisibleLineCount()
 				y := vp.YOffset()
 				if visible > 0 {

@@ -18,7 +18,7 @@ type RenderableRow struct {
 }
 
 func BuildVisibleRenderableRows[T any](entries []T, selected, innerH int, build func(index int, entry T) RenderableRow) []RenderableRow {
-	start, end := VisibleWindow(len(entries), selected, innerH)
+	start, end := visibleRowsForSelection(len(entries), selected, innerH)
 	rows := make([]RenderableRow, 0, maxInt(0, end-start))
 	for i := start; i < end; i++ {
 		rows = append(rows, build(i, entries[i]))
@@ -26,7 +26,8 @@ func BuildVisibleRenderableRows[T any](entries []T, selected, innerH int, build 
 	return rows
 }
 
-func VisibleWindow(total, selected, bodyH int) (start, end int) {
+// Calculate the row indexes to show in the window
+func visibleRowsForSelection(total, selected, bodyH int) (start, end int) {
 	if total <= 0 || bodyH <= 0 {
 		return 0, 0
 	}

@@ -30,10 +30,6 @@ func (m *Model) syncDiffViewport() {
 	m.ensureActiveVisible()
 }
 
-func (m *Model) activeRawLineIndex() int {
-	return m.diffModel.ActiveRawLineIndex()
-}
-
 func (m *Model) moveDiffActive(delta int) {
 	if !m.diffModel.MoveActive(delta, false) {
 		return

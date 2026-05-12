@@ -93,7 +93,6 @@ func (m Model) filetreePaneTitle() string {
 func (m Model) visibleStatusLines(height int) []string {
 	innerH := maxInt(1, height-2)
 	icons := filetreePaneIconsFor(m.settings.UseNerdFontIcons)
-	start, _ := sidebar.VisibleWindow(len(m.page.statusEntries), m.page.selected, innerH)
 	rows := sidebar.BuildVisibleRenderableRows(m.page.statusEntries, m.page.selected, innerH, func(i int, entry statusEntry) sidebar.RenderableRow {
 		statusColor := statusEntryColor(entry)
 		deleted := entry.Kind == statusEntryFile && isDeletedFileStatus(entry.File)
@@ -125,7 +124,13 @@ func (m Model) visibleStatusLines(height int) []string {
 	})
 	lines := sidebar.RenderRows(rows, innerH, lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render("clean working tree"), ui.ColorBlue)
 	if m.focus == focusFiletree {
-		selectedIdx := m.page.selected - start
+		selectedIdx := -1
+		for i, row := range rows {
+			if row.Selected {
+				selectedIdx = i
+				break
+			}
+		}
 		if selectedIdx >= 0 && selectedIdx < len(lines) && lines[selectedIdx] != "" {
 			lines[selectedIdx] = ui.RenderRowHighlight(lines[selectedIdx])
 		}

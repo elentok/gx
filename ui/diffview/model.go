@@ -3,6 +3,7 @@ package diffview
 import (
 	"strings"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/ui/diffview/diffrender"
 	"github.com/elentok/gx/ui/search"
 
@@ -139,7 +140,7 @@ func (m *Model) EnsureActiveVisible(navMode NavMode) {
 		m.viewport.EnsureVisible(m.data.ChangedDisplay[m.data.ActiveLine], 0, 0)
 		return
 	}
-	active := activeRawLineIndex(m.data, navMode)
+	active := m.data.ActiveRawLineIndex(navMode)
 	if active >= 0 {
 		display := active
 		if active < len(m.data.RawToDisplay) && m.data.RawToDisplay[active] >= 0 {
@@ -150,11 +151,25 @@ func (m *Model) EnsureActiveVisible(navMode NavMode) {
 }
 
 func (m Model) ComputeSearchMatches(query string) []DiffSearchMatch {
-	return computeDiffSearchMatches(m.data.ViewLines, m.data.DisplayToRaw, query)
+	q := strings.ToLower(strings.TrimSpace(query))
+	if q == "" {
+		return nil
+	}
+	matches := make([]DiffSearchMatch, 0)
+	for i := 0; i < len(m.data.ViewLines) && i < len(m.data.DisplayToRaw); i++ {
+		line := strings.ToLower(ansi.Strip(m.data.ViewLines[i]))
+		if strings.Contains(line, q) {
+			matches = append(matches, DiffSearchMatch{
+				DisplayIndex: i,
+				RawIndex:     m.data.DisplayToRaw[i],
+			})
+		}
+	}
+	return matches
 }
 
 func (m Model) ActiveRawLineIndex() int {
-	return activeRawLineIndex(m.data, m.navMode)
+	return m.data.ActiveRawLineIndex(m.navMode)
 }
 
 func (m *Model) VisibleRows(bodyH int, active bool) []VisibleDiffRow {
@@ -177,7 +192,7 @@ func (m *Model) VisibleRows(bodyH int, active bool) []VisibleDiffRow {
 	overflowTopDisplay := -1
 	overflowBottomDisplay := -1
 	if m.navMode == NavModeHunk && active && data.ActiveHunk >= 0 {
-		if start, end, ok := hunkDisplayBounds(data.HunkDisplayRange, data.Parsed, data.DisplayToRaw, data.ActiveHunk); ok && visible > 0 {
+		if start, end, ok := data.HunkDisplayBounds(data.ActiveHunk); ok && visible > 0 {
 			vpBottom := viewportY + visible - 1
 			if start < viewportY {
 				overflowTopDisplay = viewportY
@@ -232,19 +247,99 @@ func (m *Model) VisibleRows(bodyH int, active bool) []VisibleDiffRow {
 }
 
 func (m *Model) MoveActive(delta int, allowViewportScroll bool) bool {
-	return moveActive(&m.data, &m.viewport, m.navMode, delta, allowViewportScroll)
+	if m.navMode == NavModeHunk {
+		if len(m.data.Parsed.Hunks) == 0 {
+			return false
+		}
+		old := m.data.ActiveHunk
+		if allowViewportScroll && m.data.ActiveHunk >= 0 && m.data.ActiveHunk < len(m.data.Parsed.Hunks) {
+			if start, end, ok := m.data.HunkDisplayBounds(m.data.ActiveHunk); ok {
+				visible := m.viewport.VisibleLineCount()
+				y := m.viewport.YOffset()
+				if visible > 0 {
+					last := y + visible - 1
+					if delta > 0 && end > last {
+						m.viewport.ScrollDown(1)
+						return false
+					}
+					if delta < 0 && start < y {
+						m.viewport.ScrollUp(1)
+						return false
+					}
+				}
+			}
+		}
+		m.data.ActiveHunk += delta
+		if m.data.ActiveHunk < 0 {
+			m.data.ActiveHunk = 0
+		}
+		if m.data.ActiveHunk >= len(m.data.Parsed.Hunks) {
+			m.data.ActiveHunk = len(m.data.Parsed.Hunks) - 1
+		}
+		return m.data.ActiveHunk != old
+	}
+
+	if len(m.data.Parsed.Changed) == 0 {
+		return false
+	}
+	old := m.data.ActiveLine
+	m.data.ActiveLine += delta
+	if m.data.ActiveLine < 0 {
+		m.data.ActiveLine = 0
+	}
+	if m.data.ActiveLine >= len(m.data.Parsed.Changed) {
+		m.data.ActiveLine = len(m.data.Parsed.Changed) - 1
+	}
+	return m.data.ActiveLine != old
 }
 
 func (m *Model) ScrollPage(direction int) {
-	scrollPage(&m.viewport, direction)
+	visible := m.viewport.VisibleLineCount()
+	if visible <= 0 {
+		return
+	}
+	step := maxInt(1, visible/2)
+	if direction > 0 {
+		m.viewport.ScrollDown(step)
+	} else {
+		m.viewport.ScrollUp(step)
+	}
 }
 
 func (m *Model) JumpTop() bool {
-	return jumpTop(&m.data, &m.viewport, m.navMode)
+	m.viewport.SetYOffset(0)
+	if m.navMode == NavModeHunk {
+		if len(m.data.Parsed.Hunks) == 0 {
+			return false
+		}
+		m.data.ActiveHunk = 0
+		return true
+	}
+	if len(m.data.Parsed.Changed) == 0 {
+		return false
+	}
+	m.data.ActiveLine = 0
+	return true
 }
 
 func (m *Model) JumpBottom() bool {
-	return jumpBottom(&m.data, &m.viewport, m.navMode)
+	maxOffset := m.viewport.TotalLineCount() - m.viewport.VisibleLineCount()
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	m.viewport.SetYOffset(maxOffset)
+	if m.navMode == NavModeHunk {
+		if len(m.data.Parsed.Hunks) == 0 {
+			return false
+		}
+		m.data.ActiveHunk = len(m.data.Parsed.Hunks) - 1
+		return true
+	}
+	if len(m.data.Parsed.Changed) == 0 {
+		return false
+	}
+	m.data.ActiveLine = len(m.data.Parsed.Changed) - 1
+	return true
 }
 
 func (m *Model) ApplySearchMatch(match search.Match) {
@@ -257,7 +352,16 @@ func (m *Model) FocusSearchMatch(match search.Match) {
 }
 
 func (m Model) CurrentSearchMatchIndex(matches []DiffSearchMatch) int {
-	return currentDiffSearchMatchIndex(m.data, matches, NavModeLine)
+	if m.data.ActiveLine < 0 || m.data.ActiveLine >= len(m.data.Parsed.Changed) {
+		return -1
+	}
+	raw := m.data.Parsed.Changed[m.data.ActiveLine].LineIndex
+	for i, match := range matches {
+		if match.RawIndex == raw {
+			return i
+		}
+	}
+	return -1
 }
 
 func (m *Model) RestoreViewportYOffset(y int) {
@@ -276,7 +380,16 @@ func (m Model) CurrentSearchCursor(matches []search.Match) int {
 }
 
 func (m Model) FocusedLocationAndBody() (string, []string, FocusedYankError) {
-	return FocusedLocationAndBody(m.data, m.navMode)
+	hunkIdx := ActiveHunkIndexForYank(m.data, m.navMode)
+	if hunkIdx < 0 || hunkIdx >= len(m.data.Parsed.Hunks) {
+		return "", nil, FocusedYankErrNoHunk
+	}
+	body := FocusedYankBody(m.data, m.navMode)
+	if len(body) == 0 {
+		return "", nil, FocusedYankErrNoLines
+	}
+	loc := FocusedLocation(m.data, m.navMode)
+	return loc, body, ""
 }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, bool) {

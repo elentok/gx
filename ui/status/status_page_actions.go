@@ -197,9 +197,7 @@ func (m Model) confirmAccept() (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.diff.ActiveSection == diffarea.SectionUnstaged {
-			diffviewModel := m.diff.SectionModel(diffarea.SectionUnstaged)
-			diffviewModel.DataRef().VisualActive = false
-			diffviewModel.DataRef().VisualAnchor = diffviewModel.DataRef().ActiveLine
+			m.diff.DisableVisual()
 		}
 		m.setStatus("discarded " + m.confirmPaths[0])
 		cmd := m.reload(m.confirmPaths[0])

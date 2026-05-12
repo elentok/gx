@@ -2,6 +2,8 @@ package diffarea
 
 import (
 	"github.com/elentok/gx/ui/diffview"
+
+	tea "charm.land/bubbletea/v2"
 )
 
 type Section int
@@ -159,4 +161,14 @@ func (d *Model) JumpTop() bool {
 func (d *Model) JumpBottom() bool {
 	diffviewModel := d.ActiveSectionModel()
 	return diffviewModel.JumpBottom()
+}
+
+func (d *Model) UpdateActive(msg tea.Msg) (tea.Cmd, bool) {
+	active := d.ActiveSectionModel()
+	updated, cmd, handled := active.Update(msg)
+	if !handled {
+		return nil, false
+	}
+	*active = updated
+	return cmd, true
 }
