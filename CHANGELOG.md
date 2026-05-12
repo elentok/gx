@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.14.2
+
+- Align filetree left/right behavior across `gx status` and `gx commit`: `h/left` now collapses expanded folders first (then moves to parent), `h/left` on files moves to parent folder, and `l/right` on expanded folders moves to first child
+- Remove status-specific filetree key interception so status delegates folder/file navigation to `ui/filetree` consistently
+- Refresh `gx log` when the log page is activated via app navigation and when terminal focus returns, so new on-disk commits appear without manual reload
+
 ## v0.14.1
 
 - Refactor diff interaction ownership so `gx status` and `gx commit` route navigation/search/yank/viewport behavior through `ui/diffview.Model` methods instead of package-level helper wiring
