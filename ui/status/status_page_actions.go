@@ -37,6 +37,7 @@ func (m *Model) openCheckingDivergence() {
 	m.runningDone = false
 	m.runningTitle = "Checking push status"
 	m.runningRunner = nil
+	m.keys.Reset()
 }
 
 func (m *Model) handleActionResult(res stageActionResult) tea.Cmd {

@@ -2,160 +2,138 @@ package status
 
 import (
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/keybindings"
 	"github.com/elentok/gx/ui/nav"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 )
 
-func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
-	key := msg.String()
-	shiftG := (msg.Mod&tea.ModShift) != 0 && (msg.Code == 'g' || msg.Code == 'G' || msg.Text == "g" || msg.Text == "G")
-	isUpperG := key == "G" || key == "shift+g" || msg.Text == "G" || msg.ShiftedCode == 'G' || shiftG
-	if m.keyPrefix == "c" {
-		m.keyPrefix = ""
-		if key == "c" {
-			m.setStatus(ui.MessageOpening("git commit"))
-			return m, cmdGitCommit(m.worktreeRoot, m.settings.Terminal), true
-		}
-		if key == "esc" {
-			m.clearStatus()
-			return m, nil, true
-		}
-	}
-	if m.keyPrefix == "y" {
-		m.keyPrefix = ""
-		switch key {
-		case "l":
-			m.yankLocationOnly()
-			return m, nil, true
-		case "a":
-			m.yankAllContext()
-			return m, nil, true
-		case "f":
-			m.yankFilename()
-			return m, nil, true
-		case "y":
-			m.yankContentOnly()
-			return m, nil, true
-		case "esc":
-			m.clearStatus()
-			return m, nil, true
-		}
-	}
-	if m.keyPrefix == "m" {
-		m.keyPrefix = ""
-		switch key {
-		case "r":
-			return m, m.refresh(), true
-		case "esc":
-			m.clearStatus()
-			return m, nil, true
-		}
-		return m, nil, true
-	}
-	if key == "c" {
-		m.keyPrefix = "c"
-		return m, nil, true
-	}
-	if key == "m" {
-		m.keyPrefix = "m"
-		return m, nil, true
-	}
-	if key == "y" {
-		m.keyPrefix = "y"
-		return m, nil, true
-	}
-	if m.keyPrefix == "g" {
-		m.keyPrefix = ""
-		switch key {
-		case "g":
-			m.jumpToTop()
-			m.clearStatus()
-			if m.focus == focusFiletree {
-				return m, m.scheduleDiffReload(), true
-			}
-			return m, nil, true
-		case "o":
-			if m.outputContent == "" {
-				m.setStatus(ui.MessageNoOutput())
-				return m, nil, true
-			}
-			m.openOutputModal()
-			return m, nil, true
-		case "l":
-			if m.settings.EnableNavigation {
-				m.clearStatus()
-				return m, nav.Replace(nav.Route{Kind: nav.RouteLog, WorktreeRoot: m.worktreeRoot}), true
-			}
-			return m, nil, true
-		case "s":
-			if m.settings.EnableNavigation {
-				m.clearStatus()
-				return m, nav.Replace(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: m.worktreeRoot}), true
-			}
-			return m, nil, true
-		case "w":
-			if m.settings.EnableNavigation {
-				m.clearStatus()
-				return m, nav.Replace(nav.Route{Kind: nav.RouteWorktrees}), true
-			}
-			return m, nil, true
-		case "esc":
-			m.clearStatus()
-			return m, nil, true
-		default:
-			m.clearStatus()
-			return m, nil, true
-		}
-	}
-	if key == "g" && !isUpperG {
-		m.keyPrefix = "g"
-		return m, nil, true
-	}
-	if key == "L" {
-		m.setStatus(ui.MessageOpening("lazygit log"))
-		return m, cmdLazygitLog(m.worktreeRoot), true
-	}
-	if isUpperG {
-		m.keyPrefix = ""
-		m.jumpToBottom()
-		if m.focus == focusFiletree {
-			return m, m.scheduleDiffReload(), true
-		}
-		return m, nil, true
-	}
-	m.keyPrefix = ""
-	return m, nil, false
+const (
+	bindingGotoBottom    keybindings.BindingID = "goto-bottom"
+	bindingGotoTop       keybindings.BindingID = "goto-top"
+	bindingViewOutput    keybindings.BindingID = "view-output"
+	bindingGotoLog       keybindings.BindingID = "goto-log"
+	bindingGotoStatus    keybindings.BindingID = "goto-status"
+	bindingGotoWorktrees keybindings.BindingID = "goto-worktrees"
+	bindingGitCommit     keybindings.BindingID = "git-commit"
+	bindingYankContent   keybindings.BindingID = "yank-content"
+	bindingYankLocation  keybindings.BindingID = "yank-location"
+	bindingYankAll       keybindings.BindingID = "yank-all"
+	bindingYankFilename  keybindings.BindingID = "yank-filename"
+	bindingLazygitLog    keybindings.BindingID = "lazygit-log"
+	bindingRefreshMenu   keybindings.BindingID = "refresh-menu"
+	bindingCancelChord   keybindings.BindingID = "cancel-chord"
+)
+
+func newStatusManager() keybindings.Manager {
+	return keybindings.New([]keybindings.Binding{
+		// Single-key globals
+		{ID: bindingLazygitLog, Seq: []string{"L"}, Categories: []string{"Global"}, Title: "lazygit log"},
+		// G (shift+G) — register both forms since terminal encoding varies
+		{ID: bindingGotoBottom, Seq: []string{"G"}, Categories: []string{"Navigation"}, Title: "go to bottom", Display: "G"},
+		{ID: bindingGotoBottom, Seq: []string{"shift+g"}, Categories: []string{"Navigation"}, Title: "go to bottom", Display: "G"},
+
+		// g-prefix chords
+		{ID: bindingGotoTop, Seq: []string{"g", "g"}, Categories: []string{"Navigation"}, Title: "go to top"},
+		{ID: bindingViewOutput, Seq: []string{"g", "o"}, Categories: []string{"Global"}, Title: "view output"},
+		{ID: bindingGotoLog, Seq: []string{"g", "l"}, Categories: []string{"Go to"}, Title: "goto log"},
+		{ID: bindingGotoStatus, Seq: []string{"g", "s"}, Categories: []string{"Go to"}, Title: "goto status"},
+		{ID: bindingGotoWorktrees, Seq: []string{"g", "w"}, Categories: []string{"Go to"}, Title: "goto worktrees"},
+		{ID: bindingCancelChord, Seq: []string{"g", "esc"}, Categories: []string{}, Title: ""},
+
+		// c-prefix chords
+		{ID: bindingGitCommit, Seq: []string{"c", "c"}, Categories: []string{"Global"}, Title: "git commit"},
+		{ID: bindingCancelChord, Seq: []string{"c", "esc"}, Categories: []string{}, Title: ""},
+
+		// y-prefix chords
+		{ID: bindingYankContent, Seq: []string{"y", "y"}, Categories: []string{"Yank"}, Title: "yank content"},
+		{ID: bindingYankLocation, Seq: []string{"y", "l"}, Categories: []string{"Yank"}, Title: "yank location"},
+		{ID: bindingYankAll, Seq: []string{"y", "a"}, Categories: []string{"Yank"}, Title: "yank all"},
+		{ID: bindingYankFilename, Seq: []string{"y", "f"}, Categories: []string{"Yank"}, Title: "yank filename"},
+		{ID: bindingCancelChord, Seq: []string{"y", "esc"}, Categories: []string{}, Title: ""},
+
+		// m-prefix chords
+		{ID: bindingRefreshMenu, Seq: []string{"m", "r"}, Categories: []string{"Global"}, Title: "refresh"},
+		{ID: bindingCancelChord, Seq: []string{"m", "esc"}, Categories: []string{}, Title: ""},
+	})
 }
 
-// ChordHints returns chord completion hints for the given prefix.
-// Implements ui.ChordHinter.
-func (m Model) ChordHints(prefix string) []key.Binding {
-	switch prefix {
-	case "g":
-		return []key.Binding{
-			key.NewBinding(key.WithHelp("g", "top")),
-			key.NewBinding(key.WithHelp("o", "view output")),
-			// key.NewBinding(key.WithHelp("w", "goto worktrees")),
-			// key.NewBinding(key.WithHelp("l", "goto log")),
-			// key.NewBinding(key.WithHelp("s", "goto status")),
+func (m Model) dispatchBinding(id keybindings.BindingID, _ tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch id {
+	case bindingLazygitLog:
+		m.setStatus(ui.MessageOpening("lazygit log"))
+		return m, cmdLazygitLog(m.worktreeRoot)
+	case bindingGotoBottom:
+		m.jumpToBottom()
+		if m.focus == focusFiletree {
+			return m, m.scheduleDiffReload()
 		}
-	case "m":
-		return []key.Binding{
-			key.NewBinding(key.WithHelp("r", "refresh")),
+		return m, nil
+	case bindingGotoTop:
+		m.jumpToTop()
+		m.clearStatus()
+		if m.focus == focusFiletree {
+			return m, m.scheduleDiffReload()
 		}
-	case "c":
-		return []key.Binding{
-			key.NewBinding(key.WithHelp("c", "git commit")),
+		return m, nil
+	case bindingViewOutput:
+		if m.outputContent == "" {
+			m.setStatus(ui.MessageNoOutput())
+			return m, nil
 		}
-	case "y":
-		return []key.Binding{
-			key.NewBinding(key.WithHelp("y", "yank content")),
-			key.NewBinding(key.WithHelp("l", "yank location")),
-			key.NewBinding(key.WithHelp("a", "yank all")),
-			key.NewBinding(key.WithHelp("f", "yank filename")),
+		m.openOutputModal()
+		return m, nil
+	case bindingGotoLog:
+		if m.settings.EnableNavigation {
+			m.clearStatus()
+			return m, nav.Replace(nav.Route{Kind: nav.RouteLog, WorktreeRoot: m.worktreeRoot})
 		}
+		return m, nil
+	case bindingGotoStatus:
+		if m.settings.EnableNavigation {
+			m.clearStatus()
+			return m, nav.Replace(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: m.worktreeRoot})
+		}
+		return m, nil
+	case bindingGotoWorktrees:
+		if m.settings.EnableNavigation {
+			m.clearStatus()
+			return m, nav.Replace(nav.Route{Kind: nav.RouteWorktrees})
+		}
+		return m, nil
+	case bindingGitCommit:
+		m.setStatus(ui.MessageOpening("git commit"))
+		return m, cmdGitCommit(m.worktreeRoot, m.settings.Terminal)
+	case bindingYankContent:
+		m.yankContentOnly()
+		return m, nil
+	case bindingYankLocation:
+		m.yankLocationOnly()
+		return m, nil
+	case bindingYankAll:
+		m.yankAllContext()
+		return m, nil
+	case bindingYankFilename:
+		m.yankFilename()
+		return m, nil
+	case bindingRefreshMenu:
+		return m, m.refresh()
+	case bindingCancelChord:
+		m.clearStatus()
+		return m, nil
 	}
-	return nil
+	return m, nil
+}
+
+// ChordHints satisfies ui.ChordHinter so the app model can include status-model
+// chord hints in its own overlay. The prefix argument is ignored — the Manager
+// tracks prefix state internally.
+func (m Model) ChordHints(_ string) []key.Binding {
+	hints := m.keys.ChordHints()
+	result := make([]key.Binding, len(hints))
+	for i, h := range hints {
+		result[i] = key.NewBinding(key.WithHelp(h.Key, h.Desc))
+	}
+	return result
 }

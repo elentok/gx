@@ -167,6 +167,7 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if msg.String() == "?" {
 		m.help.Open(m.width, m.height)
+		m.keys.Reset()
 		return m, nil
 	}
 	if m.credentialOpen {
@@ -190,17 +191,15 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	if m.keyPrefix != "" {
-		if handledModel, cmd, handled := m.handleChordKey(msg); handled {
-			return handledModel, cmd
-		}
+	match, consumed := m.keys.Process(msg)
+	if match != nil {
+		return m.dispatchBinding(match.ID, msg)
+	}
+	if consumed {
+		return m, nil
 	}
 
 	if handledModel, cmd, handled := m.handleFocusedChildKey(msg); handled {
-		return handledModel, cmd
-	}
-
-	if handledModel, cmd, handled := m.handleChordKey(msg); handled {
 		return handledModel, cmd
 	}
 

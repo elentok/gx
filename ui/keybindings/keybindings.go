@@ -1,6 +1,10 @@
 package keybindings
 
-import "strings"
+import (
+	"strings"
+
+	tea "charm.land/bubbletea/v2"
+)
 
 // BindingID is a type-safe identifier for a keybinding. Each model defines its
 // own constants using this type.
@@ -9,10 +13,10 @@ type BindingID string
 // Binding describes a single keybinding — its key sequence, help metadata, and categories.
 type Binding struct {
 	ID         BindingID // dispatch identifier, e.g. "goto-log"
-	Seq        []string // key sequence: ["g","l"] for chord, ["j"] for single key
-	Categories []string // help sections this binding appears in
-	Title      string   // description shown in help, e.g. "goto log"
-	Display    string   // optional key display override (defaults to Seq joined with "/")
+	Seq        []string  // key sequence: ["g","l"] for chord, ["j"] for single key
+	Categories []string  // help sections this binding appears in
+	Title      string    // description shown in help, e.g. "goto log"
+	Display    string    // optional key display override (defaults to Seq joined with "/")
 }
 
 // Keys returns the display string for this binding's key sequence.
@@ -39,7 +43,22 @@ func New(bindings []Binding) Manager {
 //   - match != nil, consumed=true  → sequence complete, dispatch on match.ID
 //   - match == nil, consumed=true  → chord in progress, call ChordHints() for status bar
 //   - match == nil, consumed=false → key not registered, fall through to child delegation
-func (m *Manager) Process(key string) (match *Binding, consumed bool) {
+func (m *Manager) Process(msg tea.KeyPressMsg) (match *Binding, consumed bool) {
+	return m.process(normalizeKey(msg))
+}
+
+// normalizeKey converts a KeyPressMsg to the canonical string the Manager matches
+// against. It handles bubbletea terminal inconsistencies, such as some terminals
+// sending lowercase 'g' with ModShift instead of 'G'.
+func normalizeKey(msg tea.KeyPressMsg) string {
+	key := msg.String()
+	if key == "g" && msg.Mod&tea.ModShift != 0 {
+		return "G"
+	}
+	return key
+}
+
+func (m *Manager) process(key string) (match *Binding, consumed bool) {
 	candidate := append(m.prefix, key)
 
 	// Check for an exact match.
@@ -64,8 +83,8 @@ func (m *Manager) Process(key string) (match *Binding, consumed bool) {
 	return nil, false
 }
 
-// ChordHints returns key.Binding-style hints for all bindings that extend the
-// current internal prefix, so the caller can render them in the status bar.
+// ChordHints returns hints for all bindings that extend the current internal
+// prefix, so the caller can render them in the status bar.
 func (m Manager) ChordHints() []ChordHint {
 	if len(m.prefix) == 0 {
 		return nil

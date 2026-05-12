@@ -2106,23 +2106,23 @@ func TestCCTriggersCommitCommand(t *testing.T) {
 		t.Fatalf("first c should not launch command")
 	}
 	m = updated.(Model)
-	if m.keyPrefix != "c" {
-		t.Fatalf("expected keyPrefix=c after first c, got %q", m.keyPrefix)
+	if len(m.keys.Prefix()) == 0 || m.keys.Prefix()[0] != "c" {
+		t.Fatalf("expected chord prefix=c after first c, got %v", m.keys.Prefix())
 	}
-	// Chord hints are now shown in the chord overlay (via ChordHints), not statusMsg.
-	hints := m.ChordHints("c")
+	// Chord hints are shown in the chord overlay via Manager.ChordHints().
+	hints := m.keys.ChordHints()
 	if len(hints) == 0 {
-		t.Fatalf("expected ChordHints(\"c\") to return bindings, got none")
+		t.Fatalf("expected ChordHints to return bindings for c prefix, got none")
 	}
 	found := false
 	for _, h := range hints {
-		if strings.Contains(h.Help().Desc, "commit") {
+		if strings.Contains(h.Desc, "commit") {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Fatalf("expected \"commit\" in ChordHints(\"c\") descriptions")
+		t.Fatalf("expected \"commit\" in ChordHints descriptions")
 	}
 
 	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
@@ -2130,8 +2130,8 @@ func TestCCTriggersCommitCommand(t *testing.T) {
 		t.Fatalf("second c should launch commit command")
 	}
 	m = updated.(Model)
-	if m.keyPrefix != "" {
-		t.Fatalf("expected keyPrefix reset after cc, got %q", m.keyPrefix)
+	if m.keys.Prefix() != nil {
+		t.Fatalf("expected prefix cleared after cc, got %v", m.keys.Prefix())
 	}
 }
 
@@ -2146,15 +2146,15 @@ func TestYShowsBindingDrivenYankHint(t *testing.T) {
 		t.Fatalf("first y should not launch command")
 	}
 	m = updated.(Model)
-	if m.keyPrefix != "y" {
-		t.Fatalf("expected keyPrefix=y, got %q", m.keyPrefix)
+	if len(m.keys.Prefix()) == 0 || m.keys.Prefix()[0] != "y" {
+		t.Fatalf("expected chord prefix=y, got %v", m.keys.Prefix())
 	}
 
-	// Chord hints are now shown in the chord overlay (via ChordHints), not statusMsg.
-	hints := m.ChordHints("y")
+	// Chord hints are shown in the chord overlay via Manager.ChordHints().
+	hints := m.keys.ChordHints()
 	allDescs := ""
 	for _, h := range hints {
-		allDescs += " " + h.Help().Key + " " + h.Help().Desc
+		allDescs += " " + h.Key + " " + h.Desc
 	}
 	for _, want := range []string{"y", "content", "l", "location", "a", "all", "f", "filename"} {
 		if !strings.Contains(allDescs, want) {
@@ -2172,11 +2172,11 @@ func TestGGJumpsToTop(t *testing.T) {
 	m.statusData.statusEntries = []statusEntry{{Kind: statusEntryFile}, {Kind: statusEntryFile}, {Kind: statusEntryFile}}
 	m.statusData.selected = 2
 
-	// First g sets keyPrefix
+	// First g sets chord prefix
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	m = updated.(Model)
-	if m.keyPrefix != "g" {
-		t.Fatalf("expected keyPrefix=g after first g, got %q", m.keyPrefix)
+	if len(m.keys.Prefix()) == 0 || m.keys.Prefix()[0] != "g" {
+		t.Fatalf("expected chord prefix=g after first g, got %v", m.keys.Prefix())
 	}
 
 	// Second g jumps to top
@@ -2227,8 +2227,8 @@ func TestGLNavigatesToLogWhenNavigationEnabled(t *testing.T) {
 		t.Fatalf("expected log route, got %q", route.Kind)
 	}
 	m = updated.(Model)
-	if m.keyPrefix != "" {
-		t.Fatalf("expected keyPrefix reset after gl, got %q", m.keyPrefix)
+	if m.keys.Prefix() != nil {
+		t.Fatalf("expected prefix cleared after gl, got %v", m.keys.Prefix())
 	}
 }
 
@@ -2266,8 +2266,8 @@ func TestGOOpensOutputModal(t *testing.T) {
 		t.Fatalf("first g should not launch command")
 	}
 	m = updated.(Model)
-	if m.keyPrefix != "g" {
-		t.Fatalf("expected keyPrefix=g after first g, got %q", m.keyPrefix)
+	if len(m.keys.Prefix()) == 0 || m.keys.Prefix()[0] != "g" {
+		t.Fatalf("expected chord prefix=g after first g, got %v", m.keys.Prefix())
 	}
 
 	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})

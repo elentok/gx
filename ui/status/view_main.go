@@ -1,8 +1,11 @@
 package status
 
 import (
+	"strings"
+
 	"github.com/elentok/gx/ui"
 
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -67,11 +70,13 @@ func (m Model) View() tea.View {
 		out = ui.OverlayCenter(out, m.errorModalView(), m.width, m.height)
 	} else if m.help.IsOpen {
 		out = ui.OverlayCenter(out, m.help.View(), m.width, m.height)
-	} else if m.keyPrefix != "" {
-		hints := m.ChordHints(m.keyPrefix)
-		if len(hints) > 0 {
-			out = ui.OverlayBottomRight(out, ui.RenderChordOverlay(m.keyPrefix, hints), m.width, m.height)
+	} else if chordHints := m.keys.ChordHints(); len(chordHints) > 0 {
+		prefix := strings.Join(m.keys.Prefix(), "")
+		bindings := make([]key.Binding, len(chordHints))
+		for i, h := range chordHints {
+			bindings[i] = key.NewBinding(key.WithHelp(h.Key, h.Desc))
 		}
+		out = ui.OverlayBottomRight(out, ui.RenderChordOverlay(prefix, bindings), m.width, m.height)
 	}
 	v := tea.NewView(out)
 	v.AltScreen = true
@@ -100,4 +105,5 @@ func (m *Model) showGitError(err error) {
 	vp.SetContent(err.Error())
 	m.errorVP = vp
 	m.errorOpen = true
+	m.keys.Reset()
 }

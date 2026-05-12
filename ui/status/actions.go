@@ -299,6 +299,7 @@ func (m *Model) openCredentialPrompt(prompt components.CredentialPrompt) {
 	m.credentialSecret = prompt.Kind == components.PromptKindSecret
 	m.credentialInput = newCredentialInput(m.credentialSecret)
 	m.credentialOpen = true
+	m.keys.Reset()
 }
 
 func (m *Model) handleCredentialKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -409,6 +410,7 @@ func (m *Model) openRunning(title string, runner *stageActionRunner) {
 	m.runningDone = false
 	m.runningTitle = title
 	m.runningRunner = runner
+	m.keys.Reset()
 	runner.Start()
 }
 
@@ -458,6 +460,7 @@ func (m *Model) openOutputModal() {
 	vp.SetContent(m.outputContent)
 	m.outputViewport = vp
 	m.outputOpen = true
+	m.keys.Reset()
 }
 
 func (m Model) handleOutputKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -473,6 +476,7 @@ func (m Model) handleOutputKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) openConfirm(title string, lines []string, action stageConfirmAction, remote, branch string) {
 	m.confirmOpen = true
+	m.keys.Reset()
 	m.confirmTitle = title
 	m.confirmLines = append([]string{}, lines...)
 	m.confirmAction = action

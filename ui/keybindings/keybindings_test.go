@@ -3,6 +3,7 @@ package keybindings_test
 import (
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui/keybindings"
 )
 
@@ -24,9 +25,13 @@ func testManager() keybindings.Manager {
 	})
 }
 
+func press(text string) tea.KeyPressMsg {
+	return tea.KeyPressMsg{Text: text}
+}
+
 func TestProcess_SingleKey_Match(t *testing.T) {
 	m := testManager()
-	match, consumed := m.Process("j")
+	match, consumed := m.Process(press("j"))
 	if match == nil {
 		t.Fatal("expected a match")
 	}
@@ -43,7 +48,7 @@ func TestProcess_SingleKey_Match(t *testing.T) {
 
 func TestProcess_Chord_FirstKey_Consumed(t *testing.T) {
 	m := testManager()
-	match, consumed := m.Process("g")
+	match, consumed := m.Process(press("g"))
 	if match != nil {
 		t.Fatal("expected no match for first chord key")
 	}
@@ -57,8 +62,8 @@ func TestProcess_Chord_FirstKey_Consumed(t *testing.T) {
 
 func TestProcess_Chord_SecondKey_Match(t *testing.T) {
 	m := testManager()
-	m.Process("g")
-	match, consumed := m.Process("l")
+	m.Process(press("g"))
+	match, consumed := m.Process(press("l"))
 	if match == nil {
 		t.Fatal("expected a match after full chord")
 	}
@@ -75,8 +80,8 @@ func TestProcess_Chord_SecondKey_Match(t *testing.T) {
 
 func TestProcess_Chord_Cancellation(t *testing.T) {
 	m := testManager()
-	m.Process("g")
-	match, consumed := m.Process("z")
+	m.Process(press("g"))
+	match, consumed := m.Process(press("z"))
 	if match != nil {
 		t.Fatal("expected no match for unrecognized chord completion")
 	}
@@ -90,7 +95,7 @@ func TestProcess_Chord_Cancellation(t *testing.T) {
 
 func TestProcess_Unregistered_Key(t *testing.T) {
 	m := testManager()
-	match, consumed := m.Process("x")
+	match, consumed := m.Process(press("x"))
 	if match != nil {
 		t.Fatal("expected no match")
 	}
@@ -99,9 +104,24 @@ func TestProcess_Unregistered_Key(t *testing.T) {
 	}
 }
 
+func TestProcess_ShiftModifier_Normalization(t *testing.T) {
+	m := keybindings.New([]keybindings.Binding{
+		{ID: "goto-bottom", Seq: []string{"G"}, Title: "go to bottom"},
+	})
+	// Some terminals send lowercase 'g' with ModShift instead of 'G'.
+	msg := tea.KeyPressMsg{Text: "g", Mod: tea.ModShift}
+	match, consumed := m.Process(msg)
+	if match == nil {
+		t.Fatal("expected shift+g to match 'G' binding")
+	}
+	if !consumed {
+		t.Fatal("expected consumed=true")
+	}
+}
+
 func TestChordHints_AfterFirstKey(t *testing.T) {
 	m := testManager()
-	m.Process("g")
+	m.Process(press("g"))
 	hints := m.ChordHints()
 	if len(hints) != 2 {
 		t.Fatalf("expected 2 hints after 'g', got %d: %v", len(hints), hints)
@@ -114,7 +134,7 @@ func TestChordHints_AfterFirstKey(t *testing.T) {
 
 func TestChordHints_AfterYankPrefix(t *testing.T) {
 	m := testManager()
-	m.Process("y")
+	m.Process(press("y"))
 	hints := m.ChordHints()
 	if len(hints) != 2 {
 		t.Fatalf("expected 2 hints after 'y', got %d: %v", len(hints), hints)
@@ -148,7 +168,7 @@ func TestBindings_ReturnsAll(t *testing.T) {
 
 func TestReset_ClearsPrefix(t *testing.T) {
 	m := testManager()
-	m.Process("g")
+	m.Process(press("g"))
 	if m.Prefix() == nil {
 		t.Fatal("expected non-nil prefix after 'g'")
 	}

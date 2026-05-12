@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/help"
+	"github.com/elentok/gx/ui/keybindings"
 	"github.com/elentok/gx/ui/status/diffarea"
 
 	"charm.land/bubbles/v2/textinput"
@@ -67,8 +68,8 @@ type Model struct {
 	outputTitle             string
 	outputContent           string
 	outputViewport          viewport.Model
-	pendingActionOutput     string
-	keyPrefix               string
+	pendingActionOutput string
+	keys                keybindings.Manager
 }
 
 type statusData struct {
@@ -134,6 +135,7 @@ func NewModel(worktreeRoot string, settings Settings) Model {
 		initialPath:      settings.InitialPath,
 		diffContextLines: settings.DiffContextLines,
 		help:             help.NewModel(keySections),
+		keys:             newStatusManager(),
 		focus:            focusFiletree,
 		diff:             diffarea.NewModel(),
 		statusData: statusData{
