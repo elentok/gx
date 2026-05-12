@@ -38,8 +38,12 @@ type Model[T any] struct {
 	search search.Model
 }
 
-type RebuildRequestedMsg struct{}
-type OpenSelectedMsg struct{}
+type Result struct {
+	Handled          bool
+	SelectionChanged bool
+	RebuildRequested bool
+	OpenSelected     bool
+}
 
 func NewModel[T any]() Model[T] {
 	return Model[T]{
@@ -110,10 +114,14 @@ func (m *Model[T]) Search() *search.Model {
 	return &m.search
 }
 
-func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd, bool) {
+func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd, Result) {
+	prevSelected := m.selected
 	if nextSearch, cmd, result := m.search.Update(msg); result.Handled {
 		m.search = nextSearch
-		return m, cmd, true
+		return m, cmd, Result{
+			Handled:          true,
+			SelectionChanged: m.selected != prevSelected,
+		}
 	}
 
 	if key, ok := msg.(tea.KeyPressMsg); ok {
@@ -122,41 +130,65 @@ func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd, bool) {
 			if m.selected < len(m.entries)-1 {
 				m.selected++
 			}
-			return m, nil, true
+			return m, nil, Result{
+				Handled:          true,
+				SelectionChanged: m.selected != prevSelected,
+			}
 		case "k", "up":
 			if m.selected > 0 {
 				m.selected--
 			}
-			return m, nil, true
+			return m, nil, Result{
+				Handled:          true,
+				SelectionChanged: m.selected != prevSelected,
+			}
 		case "h", "left":
+			if collapseSelectedDir(m.entries, m.collapsedDirs, m.selected) {
+				return m, nil, Result{
+					Handled:          true,
+					RebuildRequested: true,
+				}
+			}
 			if idx, ok := parentIndex(m.entries, m.selected); ok && idx != m.selected {
 				m.selected = idx
-				return m, nil, true
+				return m, nil, Result{
+					Handled:          true,
+					SelectionChanged: true,
+				}
 			}
-			if collapseSelectedDir(m.entries, m.collapsedDirs, m.selected) {
-				return m, rebuildRequestedCmd(), true
-			}
-			return m, nil, true
+			return m, nil, Result{Handled: true}
 		case "l", "right":
 			entry, ok := m.selectedEntry()
 			if !ok {
-				return m, nil, true
+				return m, nil, Result{Handled: true}
 			}
 			if entry.Kind == EntryFile {
-				return m, openSelectedCmd(), true
+				return m, nil, Result{
+					Handled:      true,
+					OpenSelected: true,
+				}
 			}
 			if expandSelectedDir(m.entries, m.collapsedDirs, m.selected) {
-				return m, rebuildRequestedCmd(), true
+				return m, nil, Result{
+					Handled:          true,
+					RebuildRequested: true,
+				}
 			}
-			return m, nil, true
+			return m, nil, Result{Handled: true}
 		case "enter":
 			if toggleDirOnEnter(m.entries, m.collapsedDirs, m.selected) {
-				return m, rebuildRequestedCmd(), true
+				return m, nil, Result{
+					Handled:          true,
+					RebuildRequested: true,
+				}
 			}
-			return m, openSelectedCmd(), true
+			return m, nil, Result{
+				Handled:      true,
+				OpenSelected: true,
+			}
 		}
 	}
-	return m, nil, false
+	return m, nil, Result{}
 }
 
 func (m *Model[T]) MoveToAdjacentFile(delta int) bool {
@@ -197,12 +229,4 @@ func (m *Model[T]) FocusParent() bool {
 	}
 	m.selected = idx
 	return true
-}
-
-func rebuildRequestedCmd() tea.Cmd {
-	return func() tea.Msg { return RebuildRequestedMsg{} }
-}
-
-func openSelectedCmd() tea.Cmd {
-	return func() tea.Msg { return OpenSelectedMsg{} }
 }

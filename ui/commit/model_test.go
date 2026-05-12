@@ -516,6 +516,78 @@ func TestCommaDotInDiffFrameSwitchFiles(t *testing.T) {
 	}
 }
 
+func TestLeftOnSelectedDirCollapsesCommitFiletreeDir(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	if err := os.MkdirAll(filepath.Join(repo, "dir"), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	testutil.WriteFile(t, repo, "dir/a.txt", "one\n")
+	testutil.WriteFile(t, repo, "dir/b.txt", "two\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "dir/a.txt", "ONE\n")
+	testutil.WriteFile(t, repo, "dir/b.txt", "TWO\n")
+	testutil.CommitAll(t, repo, "change")
+
+	m := New(repo, "HEAD")
+	m.ready = true
+	m.width = 100
+	m.height = 24
+	entries := m.fileTreeModel.Entries()
+	if len(entries) < 3 {
+		t.Fatalf("expected expanded dir + files, got %d entries", len(entries))
+	}
+	if entries[0].Kind != filetree.EntryDir || !entries[0].Expanded {
+		t.Fatalf("expected first entry to be expanded dir, got kind=%v expanded=%v", entries[0].Kind, entries[0].Expanded)
+	}
+	m.fileTreeModel.SetSelectedIndex(0)
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
+	m = updated.(Model)
+	entries = m.fileTreeModel.Entries()
+	if len(entries) != 1 {
+		t.Fatalf("expected collapsed tree with 1 dir row, got %d", len(entries))
+	}
+	if entries[0].Kind != filetree.EntryDir || entries[0].Expanded {
+		t.Fatalf("expected collapsed dir row, got kind=%v expanded=%v", entries[0].Kind, entries[0].Expanded)
+	}
+}
+
+func TestEnterOnSelectedDirCollapsesCommitFiletreeDir(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	if err := os.MkdirAll(filepath.Join(repo, "dir"), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	testutil.WriteFile(t, repo, "dir/a.txt", "one\n")
+	testutil.WriteFile(t, repo, "dir/b.txt", "two\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "dir/a.txt", "ONE\n")
+	testutil.WriteFile(t, repo, "dir/b.txt", "TWO\n")
+	testutil.CommitAll(t, repo, "change")
+
+	m := New(repo, "HEAD")
+	m.ready = true
+	m.width = 100
+	m.height = 24
+	entries := m.fileTreeModel.Entries()
+	if len(entries) < 3 {
+		t.Fatalf("expected expanded dir + files, got %d entries", len(entries))
+	}
+	if entries[0].Kind != filetree.EntryDir || !entries[0].Expanded {
+		t.Fatalf("expected first entry to be expanded dir, got kind=%v expanded=%v", entries[0].Kind, entries[0].Expanded)
+	}
+	m.fileTreeModel.SetSelectedIndex(0)
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	entries = m.fileTreeModel.Entries()
+	if len(entries) != 1 {
+		t.Fatalf("expected collapsed tree with 1 dir row after enter, got %d", len(entries))
+	}
+	if entries[0].Kind != filetree.EntryDir || entries[0].Expanded {
+		t.Fatalf("expected collapsed dir row after enter, got kind=%v expanded=%v", entries[0].Kind, entries[0].Expanded)
+	}
+}
+
 func TestRenderDiffPaneShowsActiveHunkMarkerInUnifiedMode(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	if err := os.MkdirAll(filepath.Join(repo, "dir"), 0o755); err != nil {

@@ -85,6 +85,7 @@ func (m Model) handleKeyRouting(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 	shiftG := (msg.Mod&tea.ModShift) != 0 && (msg.Code == 'g' || msg.Code == 'G' || msg.Text == "g" || msg.Text == "G")
 	isUpperG := key == "G" || key == "shift+g" || msg.Text == "G" || msg.ShiftedCode == 'G' || shiftG
+	isEnter := msg.Code == tea.KeyEnter || key == "enter"
 
 	switch key {
 	case "?":
@@ -199,7 +200,9 @@ func (m Model) handleKeyRouting(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
-	case "enter":
+	}
+
+	if isEnter {
 		if m.focusHeader {
 			m.focusHeader = false
 			return m, nil
@@ -212,6 +215,9 @@ func (m Model) handleKeyRouting(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.ensureActiveVisible()
 		}
 		return m, nil
+	}
+
+	switch key {
 	case "l", "right":
 		if m.focusHeader {
 			m.focusHeader = false
@@ -234,11 +240,13 @@ func (m Model) handleKeyRouting(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.focusHeader = false
 			return m, nil
 		}
+		if !m.focusDiff && m.collapseSelectedDir() {
+			return m, nil
+		}
 		if m.fileTreeModel.FocusParent() {
 			m.refreshDiff()
 			return m, nil
 		}
-		m.collapseSelectedDir()
 		return m, nil
 	case "R":
 		m.reload()

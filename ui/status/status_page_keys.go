@@ -2,7 +2,6 @@ package status
 
 import (
 	"github.com/elentok/gx/ui/diffview"
-	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/search"
 
@@ -81,21 +80,40 @@ func (m Model) handleFocusedChildKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, b
 			m.switchDiffSection()
 			return m, nil, true
 		}
+		selectedEntry, selectedOK := m.selectedFiletreeEntry()
 		switch msg.String() {
-		case "h", "left", "l", "right":
+		case "h", "left":
+			if selectedOK && selectedEntry.Kind == statusEntryDir {
+				break
+			}
+			return m, nil, false
+		case "l", "right":
+			if selectedOK && selectedEntry.Kind == statusEntryDir {
+				break
+			}
 			return m, nil, false
 		case "enter":
 			if m.fileTreeModel.Search().IsActive() {
 				break
 			}
+			if selectedOK && selectedEntry.Kind == statusEntryDir {
+				break
+			}
 			return m, nil, false
 		}
 		m.reconcileFileTreeFromStatusState()
-		updatedFileTree, childCmd, handled := m.fileTreeModel.Update(msg)
+		updatedFileTree, childCmd, result := m.fileTreeModel.Update(msg)
 		selectionChanged := updatedFileTree.SelectedIndex() != m.fileTreeModel.SelectedIndex()
 		m.fileTreeModel = updatedFileTree
-		if !handled {
+		if !result.Handled {
 			return m, nil, false
+		}
+		var actionCmd tea.Cmd
+		if result.RebuildRequested {
+			m, actionCmd = m.handleFileTreeRebuildRequested()
+		}
+		if result.OpenSelected {
+			m, actionCmd = m.handleFileTreeOpenSelected()
 		}
 		if selectionChanged {
 			m.statusData.selected = m.fileTreeModel.SelectedIndex()
@@ -104,19 +122,19 @@ func (m Model) handleFocusedChildKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, b
 		if childCmd != nil {
 			if handledModel, handledCmd, handled := m.handleFileTreeChildMsg(childCmd()); handled {
 				if selectionChanged {
-					return handledModel, tea.Batch(handledCmd, m.scheduleDiffReload()), true
+					return handledModel, tea.Batch(actionCmd, handledCmd, m.scheduleDiffReload()), true
 				}
-				return handledModel, handledCmd, true
+				return handledModel, tea.Batch(actionCmd, handledCmd), true
 			}
 			if selectionChanged {
-				return m, tea.Batch(msgCmd(childCmd()), m.scheduleDiffReload()), true
+				return m, tea.Batch(actionCmd, msgCmd(childCmd()), m.scheduleDiffReload()), true
 			}
-			return m, msgCmd(childCmd()), true
+			return m, tea.Batch(actionCmd, msgCmd(childCmd())), true
 		}
 		if selectionChanged {
-			return m, m.scheduleDiffReload(), true
+			return m, tea.Batch(actionCmd, m.scheduleDiffReload()), true
 		}
-		return m, nil, true
+		return m, actionCmd, true
 	case focusDiff:
 		cmd, handled := m.diff.UpdateActive(msg)
 		if !handled {
@@ -134,12 +152,6 @@ func (m Model) handleFocusedChildKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, b
 
 func (m Model) handleFileTreeChildMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg.(type) {
-	case filetree.RebuildRequestedMsg:
-		model, cmd := m.handleFileTreeRebuildRequested()
-		return model, cmd, true
-	case filetree.OpenSelectedMsg:
-		model, cmd := m.handleFileTreeOpenSelected()
-		return model, cmd, true
 	case search.JumpToMatchMsg:
 		model, cmd := m.handleJumpToMatch(msg.(search.JumpToMatchMsg))
 		return model, cmd, true

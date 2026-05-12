@@ -344,6 +344,112 @@ func TestFiletreeLeftDoesNotMoveCompressedDirSelection(t *testing.T) {
 	}
 }
 
+func TestFiletreeHOnSelectedDirCollapsesDirectory(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.Mkdir(t, repo+"/docs")
+	testutil.WriteFile(t, repo, "docs/a.md", "a\n")
+	testutil.WriteFile(t, repo, "docs/b.md", "b\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusFiletree
+
+	dirIdx := -1
+	for i, entry := range m.statusData.statusEntries {
+		if entry.Kind == statusEntryDir && entry.Path == "docs" {
+			dirIdx = i
+			break
+		}
+	}
+	if dirIdx < 0 {
+		t.Fatalf("expected docs dir in status tree")
+	}
+	m.setStatusSelection(dirIdx)
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
+	m = updated.(Model)
+	entry, ok := m.selectedFiletreeEntry()
+	if !ok || entry.Kind != statusEntryDir || entry.Path != "docs" {
+		t.Fatalf("expected docs dir selected after h, got %+v", entry)
+	}
+	if entry.Expanded {
+		t.Fatalf("expected docs dir to collapse on h")
+	}
+}
+
+func TestFiletreeEnterOnSelectedDirCollapsesDirectory(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.Mkdir(t, repo+"/docs")
+	testutil.WriteFile(t, repo, "docs/a.md", "a\n")
+	testutil.WriteFile(t, repo, "docs/b.md", "b\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusFiletree
+
+	dirIdx := -1
+	for i, entry := range m.statusData.statusEntries {
+		if entry.Kind == statusEntryDir && entry.Path == "docs" {
+			dirIdx = i
+			break
+		}
+	}
+	if dirIdx < 0 {
+		t.Fatalf("expected docs dir in status tree")
+	}
+	m.setStatusSelection(dirIdx)
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	entry, ok := m.selectedFiletreeEntry()
+	if !ok || entry.Kind != statusEntryDir || entry.Path != "docs" {
+		t.Fatalf("expected docs dir selected after enter, got %+v", entry)
+	}
+	if entry.Expanded {
+		t.Fatalf("expected docs dir to collapse on enter")
+	}
+}
+
+func TestFiletreeRightOnSelectedDirExpandsDirectory(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.Mkdir(t, repo+"/docs")
+	testutil.WriteFile(t, repo, "docs/a.md", "a\n")
+	testutil.WriteFile(t, repo, "docs/b.md", "b\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusFiletree
+
+	dirIdx := -1
+	for i, entry := range m.statusData.statusEntries {
+		if entry.Kind == statusEntryDir && entry.Path == "docs" {
+			dirIdx = i
+			break
+		}
+	}
+	if dirIdx < 0 {
+		t.Fatalf("expected docs dir in status tree")
+	}
+	m.setStatusSelection(dirIdx)
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
+	m = updated.(Model)
+	entry, ok := m.selectedFiletreeEntry()
+	if !ok || entry.Kind != statusEntryDir || entry.Path != "docs" || entry.Expanded {
+		t.Fatalf("expected docs dir collapsed before expand test, got %+v", entry)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+	m = updated.(Model)
+	entry, ok = m.selectedFiletreeEntry()
+	if !ok || entry.Kind != statusEntryDir || entry.Path != "docs" {
+		t.Fatalf("expected docs dir selected after l, got %+v", entry)
+	}
+	if !entry.Expanded {
+		t.Fatalf("expected docs dir to expand on l")
+	}
+}
+
 func TestHelpOverlayToggleAndCompactStatusBar(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "changed\n")

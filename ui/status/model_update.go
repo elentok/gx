@@ -6,7 +6,6 @@ import (
 
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
-	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/search"
 
 	tea "charm.land/bubbletea/v2"
@@ -51,21 +50,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleJumpToMatch(msg)
 	case search.SearchQueryUpdatedMsg:
 		return m.handleSearchQueryUpdated(msg)
-	case filetree.RebuildRequestedMsg:
-		return m.handleFileTreeRebuildRequested()
-	case filetree.OpenSelectedMsg:
-		return m.handleFileTreeOpenSelected()
 	}
 	return m, nil
 }
 
-func (m Model) handleFileTreeRebuildRequested() (tea.Model, tea.Cmd) {
+func (m Model) handleFileTreeRebuildRequested() (Model, tea.Cmd) {
 	m.statusData.statusEntries, m.statusData.statusRows = buildStatusEntriesAndRows(m.statusData.files, m.fileTreeModel.CollapsedDirs())
 	m.reconcileFileTreeFromStatusState()
 	return m, m.reloadDiffsForSelection()
 }
 
-func (m Model) handleFileTreeOpenSelected() (tea.Model, tea.Cmd) {
+func (m Model) handleFileTreeOpenSelected() (Model, tea.Cmd) {
 	entry, ok := m.selectedFiletreeEntry()
 	if ok && entry.Kind == statusEntryFile {
 		return m, m.enterDiffFromStatus(false)
