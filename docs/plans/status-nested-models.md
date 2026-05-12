@@ -89,9 +89,9 @@ Emits intent messages:
 - Create `ui/filetree` model and migrate status pane logic.
 - Parent consumes child msgs for reload/focus transitions.
 - Follow-up cleanup in this slice:
-  - Move `FileTree*` helper functions from `ui/explorer` into `ui/filetree`.
+  - Move remaining filetree helper functions into `ui/filetree`.
   - Make helpers operate directly on `[]filetree.Entry[T]`.
-  - Remove `filetree -> explorer.FileTreeRow` adapter conversion from `ui/filetree/model.go`.
+  - Remove any temporary adapter conversion from `ui/filetree/model.go`.
   - Keep temporary wrappers only during migration; delete wrappers after all call sites are switched.
   - Remove `ui/status/filetree_bridge.go` sync bridging (`syncFileTreeModel`) once `filetree.Model` is the source of truth for:
     - entries
@@ -119,11 +119,11 @@ Emits intent messages:
   - filetree query unaffected by unstaged/staged query
   - staged/unstaged queries preserved when switching focus
 - Add explicit tests for filetree helper ownership migration:
-  - `ui/filetree` tests cover expand/collapse/parent/adjacent-file behavior without importing `ui/explorer`.
+  - `ui/filetree` tests cover expand/collapse/parent/adjacent-file behavior without importing generic explorer helpers.
 
 ## API cleanup task
 
-- Audit exported/public functions and types touched by this refactor in `ui/status`, `ui/filetree`, `ui/diff`, and `ui/explorer`.
+- Audit exported/public functions and types touched by this refactor in `ui/status`, `ui/filetree`, `ui/diff`, and `ui/diffview`.
 - For each exported symbol, verify it is used outside its package.
 - Convert symbols that are package-local in practice to unexported/private names.
 - Keep exported API only where cross-package usage is intentional and documented.

@@ -57,11 +57,11 @@ Do not build this by cloning the status model into a second commit-only model.
 The low-risk path is:
 
 1. Introduce a top-level app shell that owns page routing, page history, footer tabs, and global page jumps.
-2. Extract a reusable “diff explorer” core out of `ui/status` so both live status and historical commit review can render the same tree/diff interaction model.
-3. Add a commit-data source abstraction so the explorer can be backed by:
+2. Extract reusable diff/sidebar primitives out of `ui/status` so both live status and historical commit review can render the same tree/diff interaction model.
+3. Add a commit-data source abstraction so the shared primitives can be backed by:
    - live worktree staged/unstaged state
    - a single commit diff against parent
-4. Layer commit-only actions (`restore`, `delete change`, commit-specific yank values) on top of that explorer.
+4. Layer commit-only actions (`restore`, `delete change`, commit-specific yank values) on top of those primitives.
 
 This is more upfront refactor than a copy/paste, but it avoids two diverging implementations of the hardest UI in the repo.
 
