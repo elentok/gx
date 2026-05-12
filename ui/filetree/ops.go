@@ -34,6 +34,26 @@ func adjacentFileIndex[T any](entries []Entry[T], selected, delta int) (int, boo
 	}
 }
 
+func firstChildIndex[T any](entries []Entry[T], selected int) (int, bool) {
+	if selected < 0 || selected >= len(entries) {
+		return 0, false
+	}
+	entry := entries[selected]
+	if entry.Kind != EntryDir {
+		return 0, false
+	}
+	for i := selected + 1; i < len(entries); i++ {
+		candidate := entries[i]
+		if candidate.ParentPath == entry.Path {
+			return i, true
+		}
+		if candidate.Depth <= entry.Depth {
+			break
+		}
+	}
+	return 0, false
+}
+
 func collapseSelectedDir[T any](entries []Entry[T], collapsed map[string]bool, selected int) bool {
 	if selected < 0 || selected >= len(entries) {
 		return false

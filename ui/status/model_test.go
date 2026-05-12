@@ -284,7 +284,7 @@ func TestTabSwitchesDiffSectionsOnly(t *testing.T) {
 	}
 }
 
-func TestFiletreeHDoesNotMoveFocusOrSelection(t *testing.T) {
+func TestFiletreeHOnFileMovesSelectionToParentDir(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.Mkdir(t, repo+"/ui/status")
 	testutil.WriteFile(t, repo, "ui/status/model.go", "package status\n")
@@ -307,15 +307,13 @@ func TestFiletreeHDoesNotMoveFocusOrSelection(t *testing.T) {
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	m = updated.(Model)
-	if cmd != nil {
-		t.Fatalf("expected h in filetree to be a no-op")
-	}
+	_ = cmd
 	if m.focus != focusFiletree {
 		t.Fatalf("expected h to keep filetree focus")
 	}
 	entry, ok := m.selectedFiletreeEntry()
-	if !ok || entry.Kind != statusEntryFile || entry.Path != "ui/status/model.go" {
-		t.Fatalf("expected selection to stay on file, got %+v", entry)
+	if !ok || entry.Kind != statusEntryDir || entry.Path != "ui/status" {
+		t.Fatalf("expected selection to move to parent dir, got %+v", entry)
 	}
 }
 

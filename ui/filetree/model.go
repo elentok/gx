@@ -174,6 +174,13 @@ func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd, Result) {
 					RebuildRequested: true,
 				}
 			}
+			if idx, ok := firstChildIndex(m.entries, m.selected); ok && idx != m.selected {
+				m.selected = idx
+				return m, nil, Result{
+					Handled:          true,
+					SelectionChanged: true,
+				}
+			}
 			return m, nil, Result{Handled: true}
 		case "enter":
 			if toggleDirOnEnter(m.entries, m.collapsedDirs, m.selected) {

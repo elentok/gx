@@ -80,27 +80,6 @@ func (m Model) handleFocusedChildKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, b
 			m.switchDiffSection()
 			return m, nil, true
 		}
-		selectedEntry, selectedOK := m.selectedFiletreeEntry()
-		switch msg.String() {
-		case "h", "left":
-			if selectedOK && selectedEntry.Kind == statusEntryDir {
-				break
-			}
-			return m, nil, false
-		case "l", "right":
-			if selectedOK && selectedEntry.Kind == statusEntryDir {
-				break
-			}
-			return m, nil, false
-		case "enter":
-			if m.fileTreeModel.Search().IsActive() {
-				break
-			}
-			if selectedOK && selectedEntry.Kind == statusEntryDir {
-				break
-			}
-			return m, nil, false
-		}
 		m.reconcileFileTreeFromStatusState()
 		updatedFileTree, childCmd, result := m.fileTreeModel.Update(msg)
 		selectionChanged := updatedFileTree.SelectedIndex() != m.fileTreeModel.SelectedIndex()

@@ -75,6 +75,44 @@ func TestModelUpdate_DirExpandCollapse(t *testing.T) {
 	}
 }
 
+func TestModelUpdate_LeftOnFileMovesToParentDir(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{
+		{Kind: EntryDir, Path: "dir", DisplayName: "dir", Expanded: true, Depth: 0},
+		{Kind: EntryFile, Path: "dir/a.txt", ParentPath: "dir", DisplayName: "a.txt", Value: 1, Depth: 1},
+	})
+	m.SetSelectedIndex(1)
+
+	next, _, result := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
+	if !result.Handled {
+		t.Fatal("expected h to be handled")
+	}
+	if next.SelectedIndex() != 0 {
+		t.Fatalf("selected=%d want=0", next.SelectedIndex())
+	}
+}
+
+func TestModelUpdate_RightOnExpandedDirMovesToFirstChild(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{
+		{Kind: EntryDir, Path: "dir", DisplayName: "dir", Expanded: true, Depth: 0},
+		{Kind: EntryDir, Path: "dir/nested", ParentPath: "dir", DisplayName: "nested", Expanded: true, Depth: 1},
+		{Kind: EntryFile, Path: "dir/a.txt", ParentPath: "dir", DisplayName: "a.txt", Value: 1, Depth: 1},
+	})
+	m.SetSelectedIndex(0)
+
+	next, _, result := m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+	if !result.Handled {
+		t.Fatal("expected l to be handled")
+	}
+	if !result.SelectionChanged {
+		t.Fatal("expected selection change")
+	}
+	if next.SelectedIndex() != 1 {
+		t.Fatalf("selected=%d want=1", next.SelectedIndex())
+	}
+}
+
 func TestModelUpdate_LeftOnNestedExpandedDirCollapsesBeforeParent(t *testing.T) {
 	m := NewModel[int]()
 	m.SetEntries([]Entry[int]{
