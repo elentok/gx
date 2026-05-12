@@ -69,6 +69,9 @@ func NewModel(worktreeRoot, startRef string, settings Settings) Model {
 
 func (m Model) Init() tea.Cmd { return m.cmdReload() }
 
+// OnPageActivated is called by the app shell when switching to the log page.
+func (m Model) OnPageActivated() tea.Cmd { return m.cmdReload() }
+
 func (m Model) InputFocused() bool {
 	return m.search.Mode() == search.SearchModeInput
 }

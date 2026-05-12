@@ -34,14 +34,25 @@ func (m Model) switchTab(route nav.Route) (tea.Model, tea.Cmd) {
 		current = m.newTabPage(tabState)
 		current.initialized = true
 		m.tabs[tabState.kind] = current
-		return m, tea.Batch(tea.ClearScreen, current.model.Init(), m.resizeCurrentCmd())
+		return m, tea.Batch(tea.ClearScreen, current.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(current.model))
 	}
 	if !current.initialized {
 		current.initialized = true
 		m.tabs[tabState.kind] = current
-		return m, tea.Batch(tea.ClearScreen, current.model.Init(), m.resizeCurrentCmd())
+		return m, tea.Batch(tea.ClearScreen, current.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(current.model))
 	}
-	return m, tea.Batch(tea.ClearScreen, m.resizeCurrentCmd())
+	return m, tea.Batch(tea.ClearScreen, m.resizeCurrentCmd(), onPageActivatedCmd(current.model))
+}
+
+type pageActivationAware interface {
+	OnPageActivated() tea.Cmd
+}
+
+func onPageActivatedCmd(model tea.Model) tea.Cmd {
+	if activator, ok := model.(pageActivationAware); ok {
+		return activator.OnPageActivated()
+	}
+	return nil
 }
 
 func injectTabsIntoFooter(content, tabs string, width int) string {
