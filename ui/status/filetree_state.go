@@ -7,7 +7,6 @@ package status
 // index in fileTreeModel, and writes the clamped value back to m.page.selected so
 // parent and child selection cannot drift.
 func (m *Model) reconcileFileTreeFromStatusState() {
-	m.fileTreeModel.SetCollapsedDirs(m.page.collapsedDirs)
 	m.fileTreeModel.SetEntries(m.page.statusRows)
 	m.setStatusSelection(m.page.selected)
 }

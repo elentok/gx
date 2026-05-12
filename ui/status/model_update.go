@@ -60,8 +60,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleFileTreeRebuildRequested() (tea.Model, tea.Cmd) {
-	m.page.collapsedDirs = m.fileTreeModel.CollapsedDirs()
-	m.page.statusEntries, m.page.statusRows = buildStatusEntriesAndRows(m.page.files, m.page.collapsedDirs)
+	m.page.statusEntries, m.page.statusRows = buildStatusEntriesAndRows(m.page.files, m.fileTreeModel.CollapsedDirs())
 	m.reconcileFileTreeFromStatusState()
 	return m, m.reloadDiffsForSelection()
 }

@@ -78,7 +78,6 @@ type statusPageState struct {
 	branchSync    git.SyncStatus
 	statusEntries []statusEntry
 	statusRows    []filetree.Entry[git.StageFileStatus]
-	collapsedDirs map[string]bool
 	selected      int
 }
 
@@ -138,8 +137,7 @@ func NewModel(worktreeRoot string, settings Settings) Model {
 		focus:            focusFiletree,
 		diff:             diffarea.NewModel(),
 		page: statusPageState{
-			collapsedDirs: map[string]bool{},
-			selected:      0,
+			selected: 0,
 		},
 		fileTreeModel: filetree.NewModel[git.StageFileStatus](),
 	}

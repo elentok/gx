@@ -43,7 +43,7 @@ func (m *Model) reloadFileList(preservePath string) {
 	}
 	m.err = nil
 	m.page.files = files
-	m.page.statusEntries, m.page.statusRows = buildStatusEntriesAndRows(m.page.files, m.page.collapsedDirs)
+	m.page.statusEntries, m.page.statusRows = buildStatusEntriesAndRows(m.page.files, m.fileTreeModel.CollapsedDirs())
 	m.reconcileFileTreeFromStatusState()
 	if m.fileTreeModel.Search().HasQuery() {
 		matches := m.computeSearchMatches(m.fileTreeModel.Search().Query())
