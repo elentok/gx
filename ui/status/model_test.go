@@ -45,7 +45,7 @@ func TestSplitWidthUsesMinimumFiletreePaneWidthForShortContent(t *testing.T) {
 func TestSplitWidthExpandsForLongVisibleFiletreeRows(t *testing.T) {
 	m := Model{
 		width: 180,
-		page: statusPageState{
+		statusData: statusData{
 			statusEntries: []statusEntry{{
 				Kind:        statusEntryFile,
 				DisplayName: "renamed.go",
@@ -76,7 +76,7 @@ func TestSplitWidthExpandsForLongVisibleFiletreeRows(t *testing.T) {
 func TestSplitWidthHonorsMaximumFiletreePaneWidth(t *testing.T) {
 	m := Model{
 		width: 200,
-		page: statusPageState{
+		statusData: statusData{
 			branchName:    "feature/some-extremely-verbose-branch-name-that-keeps-going",
 			branchBaseRef: "origin/release/very-long-train-name",
 			branchSync:    git.SyncStatus{Name: git.StatusDiverged, Ahead: 12, Behind: 8},
@@ -96,7 +96,7 @@ func TestSplitWidthHonorsMaximumFiletreePaneWidth(t *testing.T) {
 func TestSplitWidthPreservesMinimumDiffWidth(t *testing.T) {
 	m := Model{
 		width: 101,
-		page: statusPageState{
+		statusData: statusData{
 			branchName:    "feature/some-extremely-verbose-branch-name-that-keeps-going",
 			branchBaseRef: "origin/release/very-long-train-name",
 			branchSync:    git.SyncStatus{Name: git.StatusDiverged, Ahead: 12, Behind: 8},
@@ -172,8 +172,8 @@ func TestFiletreeLOnFileEntersDiffAndKeepsSectionOnFileChange(t *testing.T) {
 	m.focus = focusFiletree
 	m.diff.ActiveSection = diffarea.SectionStaged
 
-	if len(m.page.statusEntries) < 2 {
-		t.Fatalf("expected two status entries, got %d", len(m.page.statusEntries))
+	if len(m.statusData.statusEntries) < 2 {
+		t.Fatalf("expected two status entries, got %d", len(m.statusData.statusEntries))
 	}
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
@@ -213,7 +213,7 @@ func TestReloadDiffsForSelection_KeepsSectionForUntrackedFile(t *testing.T) {
 	m.diff.ActiveSection = diffarea.SectionStaged
 
 	found := false
-	for i, entry := range m.page.statusEntries {
+	for i, entry := range m.statusData.statusEntries {
 		if entry.Path == "untracked.txt" {
 			m.setStatusSelection(i)
 			found = true
@@ -294,7 +294,7 @@ func TestFiletreeHDoesNotMoveFocusOrSelection(t *testing.T) {
 	m.focus = focusFiletree
 
 	fileIdx := -1
-	for i, entry := range m.page.statusEntries {
+	for i, entry := range m.statusData.statusEntries {
 		if entry.Kind == statusEntryFile && entry.Path == "ui/status/model.go" {
 			fileIdx = i
 			break
@@ -303,7 +303,7 @@ func TestFiletreeHDoesNotMoveFocusOrSelection(t *testing.T) {
 	if fileIdx < 0 {
 		t.Fatalf("expected ui/status/model.go entry in status tree")
 	}
-	m.page.selected = fileIdx
+	m.statusData.selected = fileIdx
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	m = updated.(Model)
@@ -446,9 +446,9 @@ func TestFiletreePaneShowsBranchSummaryInTitle(t *testing.T) {
 	m.ready = true
 	m.width = 100
 	m.height = 20
-	m.page.branchName = "feature/test"
-	m.page.branchBaseRef = "origin/main"
-	m.page.branchSync = git.SyncStatus{Name: git.StatusAhead, Ahead: 2}
+	m.statusData.branchName = "feature/test"
+	m.statusData.branchBaseRef = "origin/main"
+	m.statusData.branchSync = git.SyncStatus{Name: git.StatusAhead, Ahead: 2}
 
 	pane := ansi.Strip(m.renderFiletreePane(72, 10))
 	if !strings.Contains(pane, "Filetree (") {
@@ -495,7 +495,7 @@ func TestNewWithInitialPathSelectsFileAndKeepsFiletreeFocus(t *testing.T) {
 func TestBranchSummaryTitleShowsBaseOnlyWhenNonDefault(t *testing.T) {
 	m := Model{
 		settings: Settings{UseNerdFontIcons: true},
-		page: statusPageState{
+		statusData: statusData{
 			branchName:    "feature/x",
 			branchBaseRef: "origin/release",
 			branchSync:    git.SyncStatus{Name: git.StatusBehind, Behind: 1},
@@ -520,11 +520,11 @@ func TestReloadBranchStateUsesBranchUpstream(t *testing.T) {
 	m := New(wtDir)
 	m.reloadBranchState()
 
-	if m.page.branchName != "feature" {
-		t.Fatalf("expected current branch feature, got %q", m.page.branchName)
+	if m.statusData.branchName != "feature" {
+		t.Fatalf("expected current branch feature, got %q", m.statusData.branchName)
 	}
-	if m.page.branchBaseRef != "origin/feature" {
-		t.Fatalf("expected upstream base ref origin/feature, got %q", m.page.branchBaseRef)
+	if m.statusData.branchBaseRef != "origin/feature" {
+		t.Fatalf("expected upstream base ref origin/feature, got %q", m.statusData.branchBaseRef)
 	}
 
 	// Branch sync is now async; run the cmd synchronously to get the result.
@@ -532,8 +532,8 @@ func TestReloadBranchStateUsesBranchUpstream(t *testing.T) {
 		updated, _ := m.Update(cmd())
 		m = updated.(Model)
 	}
-	if m.page.branchSync.Name != git.StatusAhead || m.page.branchSync.Ahead != 1 {
-		t.Fatalf("expected branch sync ahead of origin/feature, got %+v", m.page.branchSync)
+	if m.statusData.branchSync.Name != git.StatusAhead || m.statusData.branchSync.Ahead != 1 {
+		t.Fatalf("expected branch sync ahead of origin/feature, got %+v", m.statusData.branchSync)
 	}
 }
 
@@ -917,14 +917,14 @@ func TestRefreshesOnFocusMsg(t *testing.T) {
 	m := New(repo)
 	m.ready = true
 
-	countBefore := len(m.page.statusEntries)
+	countBefore := len(m.statusData.statusEntries)
 	testutil.WriteFile(t, repo, "b.txt", "two\n")
 
 	updated, _ := m.Update(tea.FocusMsg{})
 	m = updated.(Model)
 
-	if len(m.page.statusEntries) <= countBefore {
-		t.Fatalf("expected refresh on focus to include new file; before=%d after=%d", countBefore, len(m.page.statusEntries))
+	if len(m.statusData.statusEntries) <= countBefore {
+		t.Fatalf("expected refresh on focus to include new file; before=%d after=%d", countBefore, len(m.statusData.statusEntries))
 	}
 }
 
@@ -1059,8 +1059,8 @@ func TestFiletreeDDiscardsUntrackedFileAfterConfirm(t *testing.T) {
 	if _, err := os.Stat(repo + "/new.txt"); err == nil {
 		t.Fatalf("expected untracked file to be deleted after discard confirm")
 	}
-	if len(m.page.statusEntries) != 0 {
-		t.Fatalf("expected no status entries after discard, got %d", len(m.page.statusEntries))
+	if len(m.statusData.statusEntries) != 0 {
+		t.Fatalf("expected no status entries after discard, got %d", len(m.statusData.statusEntries))
 	}
 }
 
@@ -1474,12 +1474,12 @@ func TestGInFiletreeAndDiffJumpsBottom(t *testing.T) {
 	m := New(repo)
 	m.ready = true
 	m.focus = focusFiletree
-	m.page.selected = 0
+	m.statusData.selected = 0
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	m = updated.(Model)
-	if m.page.selected != len(m.page.statusEntries)-1 {
-		t.Fatalf("expected G to jump filetree selection to bottom, got %d", m.page.selected)
+	if m.statusData.selected != len(m.statusData.statusEntries)-1 {
+		t.Fatalf("expected G to jump filetree selection to bottom, got %d", m.statusData.selected)
 	}
 
 	m.focus = focusDiff
@@ -1505,12 +1505,12 @@ func TestUppercaseGUsingShiftedCodeJumpsBottom(t *testing.T) {
 	m := New(repo)
 	m.ready = true
 	m.focus = focusFiletree
-	m.page.selected = 0
+	m.statusData.selected = 0
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "G", ShiftedCode: 'G'})
 	m = updated.(Model)
-	if m.page.selected != len(m.page.statusEntries)-1 {
-		t.Fatalf("expected shifted G to jump to bottom, got %d", m.page.selected)
+	if m.statusData.selected != len(m.statusData.statusEntries)-1 {
+		t.Fatalf("expected shifted G to jump to bottom, got %d", m.statusData.selected)
 	}
 }
 
@@ -1522,12 +1522,12 @@ func TestUppercaseGUsingShiftModifierJumpsBottom(t *testing.T) {
 	m := New(repo)
 	m.ready = true
 	m.focus = focusFiletree
-	m.page.selected = 0
+	m.statusData.selected = 0
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g", Mod: tea.ModShift})
 	m = updated.(Model)
-	if m.page.selected != len(m.page.statusEntries)-1 {
-		t.Fatalf("expected shifted modifier G to jump to bottom, got %d", m.page.selected)
+	if m.statusData.selected != len(m.statusData.statusEntries)-1 {
+		t.Fatalf("expected shifted modifier G to jump to bottom, got %d", m.statusData.selected)
 	}
 }
 
@@ -1579,18 +1579,18 @@ func TestCtrlDAndCtrlUScrollFiletreeAndDiff(t *testing.T) {
 	m.width = 120
 	m.height = 24
 	m.focus = focusFiletree
-	beforeSel := m.page.selected
+	beforeSel := m.statusData.selected
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	m = updated.(Model)
-	if m.page.selected <= beforeSel {
+	if m.statusData.selected <= beforeSel {
 		t.Fatalf("expected ctrl+d to move filetree selection down")
 	}
 
-	midSel := m.page.selected
+	midSel := m.statusData.selected
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	m = updated.(Model)
-	if m.page.selected >= midSel {
+	if m.statusData.selected >= midSel {
 		t.Fatalf("expected ctrl+u to move filetree selection up")
 	}
 
@@ -1721,7 +1721,7 @@ func TestStageSearchFiletreeModeAndNavigation(t *testing.T) {
 		t.Fatalf("expected multiple filetree search matches, got %d", m.fileTreeModel.Search().MatchesCount())
 	}
 
-	first := m.page.selected
+	first := m.statusData.selected
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
 	if m.fileTreeModel.Search().Mode() != search.SearchModeResults || !m.fileTreeModel.Search().HasQuery() || m.fileTreeModel.Search().MatchesCount() == 0 {
@@ -1732,7 +1732,7 @@ func TestStageSearchFiletreeModeAndNavigation(t *testing.T) {
 	}
 
 	m = runStatusCmds(t, m, tea.KeyPressMsg{Code: 'n', Text: "n"})
-	if m.page.selected == first {
+	if m.statusData.selected == first {
 		t.Fatalf("expected n to move to next search result")
 	}
 
@@ -2065,8 +2065,8 @@ func TestGGJumpsToTop(t *testing.T) {
 	m := New(repo)
 	m.ready = true
 	m.focus = focusFiletree
-	m.page.statusEntries = []statusEntry{{Kind: statusEntryFile}, {Kind: statusEntryFile}, {Kind: statusEntryFile}}
-	m.page.selected = 2
+	m.statusData.statusEntries = []statusEntry{{Kind: statusEntryFile}, {Kind: statusEntryFile}, {Kind: statusEntryFile}}
+	m.statusData.selected = 2
 
 	// First g sets keyPrefix
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
@@ -2081,8 +2081,8 @@ func TestGGJumpsToTop(t *testing.T) {
 		t.Fatalf("gg should schedule a diff reload after jumping to top")
 	}
 	m = updated.(Model)
-	if m.page.selected != 0 {
-		t.Fatalf("expected gg to jump to top, got selected=%d", m.page.selected)
+	if m.statusData.selected != 0 {
+		t.Fatalf("expected gg to jump to top, got selected=%d", m.statusData.selected)
 	}
 }
 

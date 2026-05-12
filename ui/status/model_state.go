@@ -28,7 +28,7 @@ type Model struct {
 	focus            focusPane
 	diff             diffarea.Model
 	diffContextLines int
-	page             statusPageState
+	statusData       statusData
 	fileTreeModel    filetree.Model[git.StageFileStatus]
 
 	statusMsg      string
@@ -71,7 +71,7 @@ type Model struct {
 	keyPrefix               string
 }
 
-type statusPageState struct {
+type statusData struct {
 	files         []git.StageFileStatus
 	branchName    string
 	branchBaseRef string
@@ -136,7 +136,7 @@ func NewModel(worktreeRoot string, settings Settings) Model {
 		help:             help.NewModel(keySections),
 		focus:            focusFiletree,
 		diff:             diffarea.NewModel(),
-		page: statusPageState{
+		statusData: statusData{
 			selected: 0,
 		},
 		fileTreeModel: filetree.NewModel[git.StageFileStatus](),

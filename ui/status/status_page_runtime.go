@@ -10,10 +10,10 @@ import (
 )
 
 func (m Model) selectedFiletreeEntry() (statusEntry, bool) {
-	if m.page.selected < 0 || m.page.selected >= len(m.page.statusEntries) {
+	if m.statusData.selected < 0 || m.statusData.selected >= len(m.statusData.statusEntries) {
 		return statusEntry{}, false
 	}
-	return m.page.statusEntries[m.page.selected], true
+	return m.statusData.statusEntries[m.statusData.selected], true
 }
 
 func (m Model) selectedFile() (git.StageFileStatus, bool) {
@@ -34,23 +34,23 @@ func (m *Model) reloadFileList(preservePath string) {
 	files, err := git.ListStageFiles(m.worktreeRoot)
 	if err != nil {
 		m.err = err
-		m.page.files = nil
-		m.page.statusEntries = nil
-		m.page.statusRows = nil
+		m.statusData.files = nil
+		m.statusData.statusEntries = nil
+		m.statusData.statusRows = nil
 		m.reconcileFileTreeFromStatusState()
 		m.diff.ResetSections()
 		return
 	}
 	m.err = nil
-	m.page.files = files
-	m.page.statusEntries, m.page.statusRows = buildStatusEntriesAndRows(m.page.files, m.fileTreeModel.CollapsedDirs())
+	m.statusData.files = files
+	m.statusData.statusEntries, m.statusData.statusRows = buildStatusEntriesAndRows(m.statusData.files, m.fileTreeModel.CollapsedDirs())
 	m.reconcileFileTreeFromStatusState()
 	if m.fileTreeModel.Search().HasQuery() {
 		matches := m.computeSearchMatches(m.fileTreeModel.Search().Query())
 		_ = m.fileTreeModel.Search().SetMatchesAndJump(matches)
 	}
 
-	if len(m.page.statusEntries) == 0 {
+	if len(m.statusData.statusEntries) == 0 {
 		m.setStatusSelection(0)
 		m.activeFilePath = ""
 		m.diff.ResetSections()
@@ -65,36 +65,36 @@ func (m *Model) reloadFileList(preservePath string) {
 	}
 
 	if targetPath != "" {
-		for i, entry := range m.page.statusEntries {
+		for i, entry := range m.statusData.statusEntries {
 			if entry.Path == targetPath {
 				m.setStatusSelection(i)
 				break
 			}
 		}
 	}
-	m.setStatusSelection(m.page.selected)
+	m.setStatusSelection(m.statusData.selected)
 }
 
 func (m *Model) reloadBranchState() {
-	m.page.branchName = ""
-	m.page.branchBaseRef = ""
-	m.page.branchSync = git.SyncStatus{Name: git.StatusUnknown}
+	m.statusData.branchName = ""
+	m.statusData.branchBaseRef = ""
+	m.statusData.branchSync = git.SyncStatus{Name: git.StatusUnknown}
 
 	branch, err := git.CurrentBranch(m.worktreeRoot)
 	if err != nil || strings.TrimSpace(branch) == "" || strings.TrimSpace(branch) == "HEAD" {
 		return
 	}
-	m.page.branchName = strings.TrimSpace(branch)
-	m.page.branchBaseRef = git.UpstreamBranch(m.worktreeRoot, m.page.branchName)
+	m.statusData.branchName = strings.TrimSpace(branch)
+	m.statusData.branchBaseRef = git.UpstreamBranch(m.worktreeRoot, m.statusData.branchName)
 }
 
 func (m *Model) cmdLoadBranchSync() tea.Cmd {
-	if m.page.branchName == "" || m.page.branchBaseRef == "" {
+	if m.statusData.branchName == "" || m.statusData.branchBaseRef == "" {
 		return nil
 	}
 	worktreeRoot := m.worktreeRoot
-	branchName := m.page.branchName
-	branchBaseRef := m.page.branchBaseRef
+	branchName := m.statusData.branchName
+	branchBaseRef := m.statusData.branchBaseRef
 	return func() tea.Msg {
 		sync, err := git.BranchSyncStatusAgainstRef(worktreeRoot, branchName, branchBaseRef)
 		if err != nil {

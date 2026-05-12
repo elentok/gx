@@ -98,7 +98,7 @@ func (m Model) handleFocusedChildKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, b
 			return m, nil, false
 		}
 		if selectionChanged {
-			m.page.selected = m.fileTreeModel.SelectedIndex()
+			m.statusData.selected = m.fileTreeModel.SelectedIndex()
 			m.onFiletreeSelectionChanged()
 		}
 		if childCmd != nil {

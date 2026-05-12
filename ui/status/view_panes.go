@@ -93,7 +93,7 @@ func (m Model) filetreePaneTitle() string {
 func (m Model) visibleStatusLines(height int) []string {
 	innerH := maxInt(1, height-2)
 	icons := filetreePaneIconsFor(m.settings.UseNerdFontIcons)
-	rows := sidebar.BuildVisibleRenderableRows(m.page.statusEntries, m.page.selected, innerH, func(i int, entry statusEntry) sidebar.RenderableRow {
+	rows := sidebar.BuildVisibleRenderableRows(m.statusData.statusEntries, m.statusData.selected, innerH, func(i int, entry statusEntry) sidebar.RenderableRow {
 		statusColor := statusEntryColor(entry)
 		deleted := entry.Kind == statusEntryFile && isDeletedFileStatus(entry.File)
 		metaRaw := statusEntryMeta(entry, m.settings.UseNerdFontIcons, icons)
@@ -118,7 +118,7 @@ func (m Model) visibleStatusLines(height int) []string {
 			MetaRaw:  metaRaw,
 			NameRaw:  name,
 			Color:    statusColor,
-			Selected: i == m.page.selected,
+			Selected: i == m.statusData.selected,
 			Faint:    deleted,
 		}
 	})
@@ -154,15 +154,15 @@ func (m Model) renderFiletreePane(width, height int) string {
 }
 
 func (m Model) branchSummaryTitleSuffix() string {
-	if strings.TrimSpace(m.page.branchName) == "" {
+	if strings.TrimSpace(m.statusData.branchName) == "" {
 		return ""
 	}
 	branchLabel := "branch"
 	if m.settings.UseNerdFontIcons {
 		branchLabel = ""
 	}
-	out := branchLabel + " " + m.page.branchName + " " + m.branchSyncToken()
-	base := strings.TrimSpace(m.page.branchBaseRef)
+	out := branchLabel + " " + m.statusData.branchName + " " + m.branchSyncToken()
+	base := strings.TrimSpace(m.statusData.branchBaseRef)
 	if shouldShowBranchBaseRef(base) {
 		out += " · vs " + base
 	}
@@ -170,15 +170,15 @@ func (m Model) branchSummaryTitleSuffix() string {
 }
 
 func (m Model) branchSyncToken() string {
-	switch m.page.branchSync.Name {
+	switch m.statusData.branchSync.Name {
 	case git.StatusSame:
 		return "✓"
 	case git.StatusAhead:
-		return fmt.Sprintf("↑%d", m.page.branchSync.Ahead)
+		return fmt.Sprintf("↑%d", m.statusData.branchSync.Ahead)
 	case git.StatusBehind:
-		return fmt.Sprintf("↓%d", m.page.branchSync.Behind)
+		return fmt.Sprintf("↓%d", m.statusData.branchSync.Behind)
 	case git.StatusDiverged:
-		return fmt.Sprintf("↑%d ↓%d", m.page.branchSync.Ahead, m.page.branchSync.Behind)
+		return fmt.Sprintf("↑%d ↓%d", m.statusData.branchSync.Ahead, m.statusData.branchSync.Behind)
 	}
 	return "?"
 }

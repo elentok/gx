@@ -1,7 +1,7 @@
 package status
 
 func (m *Model) scrollFiletreePage(direction int) bool {
-	m.setStatusSelection(m.page.selected)
+	m.setStatusSelection(m.statusData.selected)
 	if len(m.fileTreeModel.Entries()) == 0 {
 		return false
 	}
@@ -25,7 +25,7 @@ func (m *Model) scrollFiletreePage(direction int) bool {
 }
 
 func (m *Model) jumpFiletreeTop() {
-	m.setStatusSelection(m.page.selected)
+	m.setStatusSelection(m.statusData.selected)
 	if len(m.fileTreeModel.Entries()) == 0 {
 		return
 	}
@@ -37,7 +37,7 @@ func (m *Model) jumpFiletreeTop() {
 }
 
 func (m *Model) jumpFiletreeBottom() {
-	m.setStatusSelection(m.page.selected)
+	m.setStatusSelection(m.statusData.selected)
 	entryCount := len(m.fileTreeModel.Entries())
 	if entryCount == 0 {
 		return

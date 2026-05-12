@@ -60,7 +60,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleFileTreeRebuildRequested() (tea.Model, tea.Cmd) {
-	m.page.statusEntries, m.page.statusRows = buildStatusEntriesAndRows(m.page.files, m.fileTreeModel.CollapsedDirs())
+	m.statusData.statusEntries, m.statusData.statusRows = buildStatusEntriesAndRows(m.statusData.files, m.fileTreeModel.CollapsedDirs())
 	m.reconcileFileTreeFromStatusState()
 	return m, m.reloadDiffsForSelection()
 }
@@ -142,8 +142,8 @@ func (m Model) handleDiffReload(msg diffReloadMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleBranchSyncLoaded(msg branchSyncLoadedMsg) (tea.Model, tea.Cmd) {
-	if msg.branchName == m.page.branchName {
-		m.page.branchSync = msg.sync
+	if msg.branchName == m.statusData.branchName {
+		m.statusData.branchSync = msg.sync
 	}
 	return m, nil
 }
