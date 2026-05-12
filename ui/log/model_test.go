@@ -316,3 +316,30 @@ func TestTagJumpChordStopsAtEdges(t *testing.T) {
 		t.Fatalf("expected [t at first tag to stay put, got %d", m.cursor)
 	}
 }
+
+func TestFocusReloadsRowsAfterOnDiskChange(t *testing.T) {
+	repo := testutil.TempRepo(t)
+
+	m := NewModel(repo, "", settings)
+	initialRows := len(m.rows)
+
+	testutil.WriteFile(t, repo, "new.txt", "new\n")
+	testutil.CommitAll(t, repo, "new commit")
+
+	updated, cmd := m.Update(tea.FocusMsg{})
+	m = updated.(Model)
+	if cmd == nil {
+		t.Fatalf("expected focus to trigger reload command")
+	}
+
+	reload, ok := cmd().(reloadMsg)
+	if !ok {
+		t.Fatalf("expected reloadMsg from focus reload cmd")
+	}
+
+	updated, _ = m.Update(reload)
+	m = updated.(Model)
+	if len(m.rows) <= initialRows {
+		t.Fatalf("expected more rows after focus reload; before=%d after=%d", initialRows, len(m.rows))
+	}
+}

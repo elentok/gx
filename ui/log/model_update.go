@@ -35,6 +35,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.help, cmd = m.help.Update(msg)
 		return m, cmd
+	case tea.FocusMsg:
+		return m, m.cmdReload()
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
