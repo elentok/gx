@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.14.4
+
+- Make the panel frame color darker
+
 ## v0.14.3
 
 - Introduce a `keybindings.Manager` to centralize key binding definitions, chord dispatch, and help-text generation across `gx status`, filetree, and diff area — replacing scattered per-component key structs and manual chord tracking
