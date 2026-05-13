@@ -2,115 +2,89 @@ package status
 
 import (
 	"github.com/elentok/gx/ui/diffview"
+	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/status/diffarea"
 
 	tea "charm.land/bubbletea/v2"
 )
 
-func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if msg.Code == tea.KeyTab {
-		m.switchDiffSection()
+func (m Model) delegateToDiff(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	// Search routing first.
+	cmd, handled := m.diff.UpdateActive(msg)
+	if handled {
+		if m.currentDiffSearch().Mode() == search.SearchModeResults {
+			m.diff.SetNavMode(diffview.NavModeLine)
+		}
+		return m, cmd
+	}
+
+	match, consumed := m.diff.Keys().Process(msg)
+	if consumed && match == nil {
+		return m, nil // chord in progress
+	}
+	if match == nil {
 		return m, nil
 	}
-	switch msg.String() {
-	case "[":
-		return m, m.adjustDiffContextLines(-1)
-	case "]":
-		return m, m.adjustDiffContextLines(1)
-	case "esc", "q":
-		if m.diff.ActiveSectionModel().DataRef().VisualActive {
-			m.diff.DisableVisual()
-			return m, nil
-		}
-		m.focus = focusFiletree
-		return m, nil
-	case "h", "left":
-		m.focus = focusFiletree
-		return m, nil
-	case "a":
+
+	switch match.ID {
+	case diffarea.BindingMoveDown:
+		m.moveActive(1)
+	case diffarea.BindingMoveUp:
+		m.moveActive(-1)
+	case diffarea.BindingScrollDown:
+		m.diff.ActiveSectionModel().Viewport().ScrollDown(3)
+	case diffarea.BindingScrollUp:
+		m.diff.ActiveSectionModel().Viewport().ScrollUp(3)
+	case diffarea.BindingPageDown:
+		m.diff.ScrollPage(1)
+	case diffarea.BindingPageUp:
+		m.diff.ScrollPage(-1)
+	case diffarea.BindingNavMode:
 		m.diff.DisableVisual()
 		m.diff.ToggleNavMode()
 		m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
-	case "v":
-		activeModel := m.diff.ActiveSectionModel()
+	case diffarea.BindingVisual:
 		if m.diff.NavMode() == diffview.NavModeHunk {
 			m.diff.SetNavMode(diffview.NavModeLine)
 		}
 		if !m.diff.ToggleVisual() {
 			return m, nil
 		}
-		activeModel.EnsureActiveVisible(m.diff.NavMode())
-	case "f":
+		m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
+	case diffarea.BindingFullscreen:
 		m.diff.Fullscreen = !m.diff.Fullscreen
-		var cmd tea.Cmd
+		var reloadCmd tea.Cmd
 		if m.diff.RenderMode() == diffview.RenderModeSideBySide {
-			cmd = m.reloadDiffsForSelection()
+			reloadCmd = m.reloadDiffsForSelection()
 		}
 		m.syncDiffViewports()
 		m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
-		return m, cmd
-	case "s":
-		return m, m.toggleRenderMode()
-	case "w":
+		return m, reloadCmd
+	case diffarea.BindingWrap:
 		m.diff.SetWrap(!m.diff.Wrap())
-
 		m.syncDiffViewports()
 		m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
-	case "R":
-		return m, m.refresh()
-	case "p":
-		m.startPullAction()
-		return m, actionPollCmd()
-	case "P":
-		if err := m.preparePushConfirm(); err != nil {
-			m.showGitError(err)
-			return m, nil
+	case diffarea.BindingBack:
+		if m.diff.ActiveSectionModel().DataRef().VisualActive {
+			m.diff.DisableVisual()
+		} else {
+			m.focus = focusFiletree
 		}
-		return m, nil
-	case "b":
-		if err := m.prepareRebaseConfirm(); err != nil {
-			m.showGitError(err)
-			return m, nil
-		}
-		return m, nil
-	case "A":
-		if err := m.openAmendConfirm(); err != nil {
-			m.showGitError(err)
-		}
-	case "j", "down":
-		m.moveActive(1)
-	case "k", "up":
-		m.moveActive(-1)
-	case "J":
-		activeModel := m.diff.ActiveSectionModel()
-		activeModel.Viewport().ScrollDown(3)
-	case "K":
-		activeModel := m.diff.ActiveSectionModel()
-		activeModel.Viewport().ScrollUp(3)
-	case "ctrl+d":
-		m.scrollDiffPage(1)
-	case "ctrl+u":
-		m.scrollDiffPage(-1)
-	case "space", " ":
-		cmd := m.applySelection()
-		return m, cmd
-	case "d":
+	case diffarea.BindingApply:
+		return m, m.applySelection()
+	case diffarea.BindingDiscard:
 		if m.diff.ActiveSection == diffarea.SectionStaged {
-			cmd := m.applySelection()
-			return m, cmd
+			return m, m.applySelection()
 		}
 		m.openDiscardDiffConfirm()
-		return m, nil
-	case ".":
+	case diffarea.BindingNextFile:
 		if ok, cmd := m.moveToAdjacentFile(1); ok {
 			return m, cmd
 		}
-	case ",":
+	case diffarea.BindingPrevFile:
 		if ok, cmd := m.moveToAdjacentFile(-1); ok {
 			return m, cmd
 		}
-	case "e":
-		return m, m.cmdEditSelectedFile()
 	}
 	return m, nil
 }

@@ -48,12 +48,17 @@ func (m *Manager) Process(msg tea.KeyPressMsg) (match *Binding, consumed bool) {
 }
 
 // normalizeKey converts a KeyPressMsg to the canonical string the Manager matches
-// against. It handles bubbletea terminal inconsistencies, such as some terminals
-// sending lowercase 'g' with ModShift instead of 'G'.
+// against. It handles bubbletea terminal inconsistencies such as some terminals
+// sending lowercase 'g' with ModShift instead of 'G', and control keys with
+// raw Text instead of the human-readable name from Keystroke().
 func normalizeKey(msg tea.KeyPressMsg) string {
 	key := msg.String()
 	if key == "g" && msg.Mod&tea.ModShift != 0 {
 		return "G"
+	}
+	// Tab: KeyPressMsg with Text="\t" returns "\t" from String(); normalize to "tab".
+	if key == "\t" {
+		return "tab"
 	}
 	return key
 }

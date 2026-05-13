@@ -8,10 +8,6 @@ func (m *Model) moveActive(delta int) {
 	m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
 }
 
-func (m *Model) scrollDiffPage(direction int) {
-	m.diff.ScrollPage(direction)
-}
-
 func (m *Model) jumpDiffTop() {
 	if !m.diff.JumpTop() {
 		return

@@ -191,6 +191,11 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
+	// In search input mode the child model owns all keystrokes; bypass Manager.
+	if m.InputFocused() {
+		return m.delegateToChild(msg)
+	}
+
 	match, consumed := m.keys.Process(msg)
 	if match != nil {
 		return m.dispatchBinding(match.ID, msg)
@@ -199,14 +204,7 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if handledModel, cmd, handled := m.handleFocusedChildKey(msg); handled {
-		return handledModel, cmd
-	}
-
-	if m.focus == focusFiletree {
-		return m.handleFiletreeKey(msg)
-	}
-	return m.handleDiffKey(msg)
+	return m.delegateToChild(msg)
 }
 
 func (m Model) handleFlashTick() (tea.Model, tea.Cmd) {

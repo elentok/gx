@@ -1,132 +1,81 @@
 package status
 
 import (
-	"github.com/elentok/gx/ui/diffview"
+	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/search"
 
 	tea "charm.land/bubbletea/v2"
 )
 
-func (m Model) handleFiletreeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "q":
-		if m.settings.EnableNavigation {
-			return m, nav.Back()
-		}
-		return m, tea.Quit
-	case "esc":
-		if m.settings.EnableNavigation {
-			return m, nav.Back()
-		}
-		return m, nil
-	case "l", "right":
-		return m, m.enterDiffFromStatus(false)
-	case "enter":
-		return m, m.enterDiffFromStatus(false)
-	case "tab":
-		m.switchDiffSection()
-		return m, nil
-	case "h", "left":
-		return m, nil
-	case "[":
-		return m, m.adjustDiffContextLines(-1)
-	case "]":
-		return m, m.adjustDiffContextLines(1)
-	case "R":
-		return m, m.refresh()
-	case "s":
-		return m, m.toggleRenderMode()
-	case "p":
-		return m.startPullAction()
-	case "P":
-		if err := m.preparePushConfirm(); err != nil {
-			m.showGitError(err)
-			return m, nil
-		}
-		return m, nil
-	case "b":
-		if err := m.prepareRebaseConfirm(); err != nil {
-			m.showGitError(err)
-			return m, nil
-		}
-		return m, nil
-	case "A":
-		if err := m.openAmendConfirm(); err != nil {
-			m.showGitError(err)
-		}
-	case "ctrl+d":
-		if m.scrollFiletreePage(1) {
-			return m, m.scheduleDiffReload()
-		}
-	case "ctrl+u":
-		if m.scrollFiletreePage(-1) {
-			return m, m.scheduleDiffReload()
-		}
-	case "space", " ":
-		return m, m.toggleStageStatusEntry()
-	case "d":
-		m.openDiscardStatusConfirm()
-	case "e":
-		return m, m.cmdEditSelectedFile()
+func (m Model) delegateToChild(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.focus == focusFiletree {
+		return m.delegateToFiletree(msg)
 	}
-	return m, nil
+	return m.delegateToDiff(msg)
 }
 
-func (m Model) handleFocusedChildKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
-	switch m.focus {
-	case focusFiletree:
-		if msg.Code == tea.KeyTab {
-			m.switchDiffSection()
-			return m, nil, true
-		}
-		m.reconcileFileTreeFromStatusState()
-		updatedFileTree, childCmd, result := m.fileTreeModel.Update(msg)
-		selectionChanged := updatedFileTree.SelectedIndex() != m.fileTreeModel.SelectedIndex()
-		m.fileTreeModel = updatedFileTree
-		if !result.Handled {
-			return m, nil, false
-		}
-		var actionCmd tea.Cmd
-		if result.RebuildRequested {
-			m, actionCmd = m.handleFileTreeRebuildRequested()
-		}
-		if result.OpenSelected {
-			m, actionCmd = m.handleFileTreeOpenSelected()
-		}
-		if selectionChanged {
-			m.statusData.selected = m.fileTreeModel.SelectedIndex()
-			m.onFiletreeSelectionChanged()
-		}
-		if childCmd != nil {
-			if handledModel, handledCmd, handled := m.handleFileTreeChildMsg(childCmd()); handled {
-				if selectionChanged {
-					return handledModel, tea.Batch(actionCmd, handledCmd, m.scheduleDiffReload()), true
-				}
-				return handledModel, tea.Batch(actionCmd, handledCmd), true
-			}
-			if selectionChanged {
-				return m, tea.Batch(actionCmd, msgCmd(childCmd()), m.scheduleDiffReload()), true
-			}
-			return m, tea.Batch(actionCmd, msgCmd(childCmd())), true
-		}
-		if selectionChanged {
-			return m, tea.Batch(actionCmd, m.scheduleDiffReload()), true
-		}
-		return m, actionCmd, true
-	case focusDiff:
-		cmd, handled := m.diff.UpdateActive(msg)
-		if !handled {
-			return m, nil, false
-		}
-		if m.currentDiffSearch().Mode() == search.SearchModeResults && m.focus == focusDiff {
-			m.diff.SetNavMode(diffview.NavModeLine)
+func (m Model) delegateToFiletree(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	m.reconcileFileTreeFromStatusState()
+	updatedFileTree, childCmd, result := m.fileTreeModel.Update(msg)
+	selectionChanged := updatedFileTree.SelectedIndex() != m.fileTreeModel.SelectedIndex()
+	m.fileTreeModel = updatedFileTree
 
+	if !result.Handled {
+		match, consumed := m.fileTreeModel.Keys().Process(msg)
+		if consumed && match == nil {
+			return m, nil // chord in progress
 		}
-		return m, cmd, true
-	default:
-		return m, nil, false
+		if match != nil {
+			switch match.ID {
+			case filetree.BindingBack:
+				if m.settings.EnableNavigation {
+					return m, nav.Back()
+				}
+			case filetree.BindingPageDown:
+				if m.scrollFiletreePage(1) {
+					return m, m.scheduleDiffReload()
+				}
+			case filetree.BindingPageUp:
+				if m.scrollFiletreePage(-1) {
+					return m, m.scheduleDiffReload()
+				}
+			case filetree.BindingToggleStage:
+				return m, m.toggleStageStatusEntry()
+			case filetree.BindingDiscard:
+				m.openDiscardStatusConfirm()
+			}
+		}
+		return m, nil
 	}
+
+	var actionCmd tea.Cmd
+	if result.RebuildRequested {
+		m, actionCmd = m.handleFileTreeRebuildRequested()
+	}
+	if result.OpenSelected {
+		m, actionCmd = m.handleFileTreeOpenSelected()
+	}
+	if selectionChanged {
+		m.statusData.selected = m.fileTreeModel.SelectedIndex()
+		m.onFiletreeSelectionChanged()
+	}
+	if childCmd != nil {
+		if handledModel, handledCmd, handled := m.handleFileTreeChildMsg(childCmd()); handled {
+			if selectionChanged {
+				return handledModel, tea.Batch(actionCmd, handledCmd, m.scheduleDiffReload())
+			}
+			return handledModel, tea.Batch(actionCmd, handledCmd)
+		}
+		if selectionChanged {
+			return m, tea.Batch(actionCmd, msgCmd(childCmd()), m.scheduleDiffReload())
+		}
+		return m, tea.Batch(actionCmd, msgCmd(childCmd()))
+	}
+	if selectionChanged {
+		return m, tea.Batch(actionCmd, m.scheduleDiffReload())
+	}
+	return m, actionCmd
 }
 
 func (m Model) handleFileTreeChildMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
