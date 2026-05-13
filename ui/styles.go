@@ -11,24 +11,26 @@ import (
 // Base palette. This follows the Catppuccin-inspired colors already used by the
 // status UI so the rest of the app can share one visual language.
 var (
-	ColorBase    = lipgloss.Color("#1e1e2e")
-	ColorDeepBg  = lipgloss.Color("#11111a")
-	ColorText    = lipgloss.Color("#cdd6f4")
-	ColorSubtle  = lipgloss.Color("#a6adc8")
-	ColorBlue    = lipgloss.Color("#89b4fa")
-	ColorGreen   = lipgloss.Color("#a6e3a1")
-	ColorYellow  = lipgloss.Color("#f9e2af")
-	ColorRed     = lipgloss.Color("#f38ba8")
-	ColorOrange  = lipgloss.Color("#fab387")
-	ColorMauve   = lipgloss.Color("#cba6f7")
-	ColorTeal    = lipgloss.Color("#94e2d5")
-	ColorSurface = lipgloss.Color("#313244")
+	ColorBase     = lipgloss.Color("#1e1e2e")
+	ColorDeepBg   = lipgloss.Color("#11111a")
+	ColorText     = lipgloss.Color("#cdd6f4")
+	ColorSubtle   = lipgloss.Color("#a6adc8")
+	ColorOverlay  = lipgloss.Color("#6c7086")
+	ColorBlue     = lipgloss.Color("#89b4fa")
+	ColorGreen    = lipgloss.Color("#a6e3a1")
+	ColorYellow   = lipgloss.Color("#f9e2af")
+	ColorRed      = lipgloss.Color("#f38ba8")
+	ColorOrange   = lipgloss.Color("#fab387")
+	ColorMauve    = lipgloss.Color("#cba6f7")
+	ColorTeal     = lipgloss.Color("#94e2d5")
+	ColorSurface  = lipgloss.Color("#313244")
+	ColorSurface1 = lipgloss.Color("#45475a")
 )
 
 // Backwards-compatible aliases still used by some call sites.
 var (
 	ColorGray    = ColorSubtle
-	ColorBorder  = ColorSubtle
+	ColorBorder  = ColorSurface1
 	ColorCyan    = ColorTeal
 	ColorMagenta = ColorMauve
 )

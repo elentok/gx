@@ -6,8 +6,6 @@ import (
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/status/diffarea"
-
-	"charm.land/lipgloss/v2"
 )
 
 func (m Model) errorModalView() string {
@@ -22,19 +20,8 @@ func (m Model) errorModalView() string {
 	)
 }
 
-func (m Model) panelStyle(active bool) lipgloss.Style {
-	borderColor := ui.ColorSubtle
-	if active {
-		borderColor = ui.ColorBlue
-	}
-	return lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(borderColor).
-		Background(ui.ColorBase)
-}
-
 func (m Model) renderFiletreePanelWithBorderTitle(width, height int, title, rightTitle string, lines []string, active bool) string {
-	borderColor := ui.ColorSubtle
+	borderColor := ui.ColorBorder
 	titleColor := ui.ColorBlue
 	if active {
 		borderColor = ui.ColorBlue
@@ -55,7 +42,7 @@ func (m Model) renderFiletreePanelWithBorderTitle(width, height int, title, righ
 
 func (m Model) renderPanelWithBorderTitle(width, height int, title, rightTitle string, lines []string, active bool, section diffarea.Section) string {
 	highlightMoved := m.diffarea.Flash.Active && m.diffarea.Flash.Section == section
-	borderColor := ui.ColorSubtle
+	borderColor := ui.ColorBorder
 	titleColor := ui.ColorOrange
 	if section == diffarea.SectionStaged {
 		borderColor = ui.ColorGreen
@@ -65,7 +52,7 @@ func (m Model) renderPanelWithBorderTitle(width, height int, title, rightTitle s
 		titleColor = ui.ColorOrange
 	}
 	if !active {
-		borderColor = ui.ColorSubtle
+		borderColor = ui.ColorBorder
 		if section == diffarea.SectionStaged {
 			titleColor = ui.ColorGreen
 		} else {
