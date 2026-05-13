@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.14.3
+
+- Introduce a `keybindings.Manager` to centralize key binding definitions, chord dispatch, and help-text generation across `gx status`, filetree, and diff area — replacing scattered per-component key structs and manual chord tracking
+- Extract keybinding definitions for filetree and diffarea into dedicated `model_keys.go` files; generate help content from binding metadata instead of hand-maintained lists
+- Fix `q` in `gx status` not quitting — `bindingQuit` was registered in the keybindings manager but had no dispatch case
+
 ## v0.14.2
 
 - Align filetree left/right behavior across `gx status` and `gx commit`: `h/left` now collapses expanded folders first (then moves to parent), `h/left` on files moves to parent folder, and `l/right` on expanded folders moves to first child
