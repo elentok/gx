@@ -38,7 +38,7 @@ func (m *Model) reloadFileList(preservePath string) {
 		m.statusData.statusEntries = nil
 		m.statusData.statusRows = nil
 		m.reconcileFileTreeFromStatusState()
-		m.diff.ResetSections()
+		m.diffarea.ResetSections()
 		return
 	}
 	m.err = nil
@@ -53,7 +53,7 @@ func (m *Model) reloadFileList(preservePath string) {
 	if len(m.statusData.statusEntries) == 0 {
 		m.setStatusSelection(0)
 		m.activeFilePath = ""
-		m.diff.ResetSections()
+		m.diffarea.ResetSections()
 		m.focus = focusFiletree
 		return
 	}
@@ -112,7 +112,7 @@ func (m *Model) moveToAdjacentFile(delta int) (bool, tea.Cmd) {
 	m.onFiletreeSelectionChanged()
 	cmd := m.reloadDiffsForSelection()
 	if m.focus == focusDiff {
-		m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
+		m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 	}
 	return true, cmd
 }

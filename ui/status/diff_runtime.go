@@ -3,18 +3,18 @@ package status
 import "github.com/elentok/gx/ui/diffview"
 
 func (m *Model) switchDiffSection() {
-	m.diff.ToggleSection()
+	m.diffarea.ToggleSection()
 	m.syncDiffViewports()
-	m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
+	m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 }
 
 func (m Model) editorLineForCurrentSelection() int {
 	if m.focus != focusDiff {
 		return 0
 	}
-	diffviewModel := m.diff.ActiveSectionModel()
+	diffviewModel := m.diffarea.ActiveSectionModel()
 	diff := diffviewModel.DataRef()
-	if m.diff.NavMode() == diffview.NavModeLine {
+	if m.diffarea.NavMode() == diffview.NavModeLine {
 		if diff.ActiveLine < 0 || diff.ActiveLine >= len(diff.Parsed.Changed) {
 			return 0
 		}

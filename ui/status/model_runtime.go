@@ -101,17 +101,17 @@ func (m *Model) refreshWithBehavior(preserveScroll bool) tea.Cmd {
 	if entry, ok := m.selectedFiletreeEntry(); ok {
 		preserve = entry.Path
 	}
-	unstagedOffset := m.diff.Unstaged.Viewport().YOffset()
-	stagedOffset := m.diff.Staged.Viewport().YOffset()
+	unstagedOffset := m.diffarea.Unstaged.Viewport().YOffset()
+	stagedOffset := m.diffarea.Staged.Viewport().YOffset()
 	cmd := m.reload(preserve)
 	m.syncDiffViewports()
 	if preserveScroll {
-		m.diff.Unstaged.RestoreViewportYOffset(unstagedOffset)
-		m.diff.Staged.RestoreViewportYOffset(stagedOffset)
+		m.diffarea.Unstaged.RestoreViewportYOffset(unstagedOffset)
+		m.diffarea.Staged.RestoreViewportYOffset(stagedOffset)
 		return cmd
 	}
 	if m.focus == focusDiff {
-		m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
+		m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 	}
 	return cmd
 }

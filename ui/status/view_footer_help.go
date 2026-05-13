@@ -21,11 +21,11 @@ func (m Model) helpLine() string {
 		return m.renderFooterLine(hint)
 	}
 	modeLabel := "hunk"
-	if m.diff.NavMode() == diffview.NavModeLine {
+	if m.diffarea.NavMode() == diffview.NavModeLine {
 		modeLabel = "line"
 	}
 	wrapLabel := "off"
-	if m.diff.Wrap() {
+	if m.diffarea.Wrap() {
 		wrapLabel = "on"
 	}
 	hint := m.diffContextLabel() + " · diff: mode:" + modeLabel + " · render:" + m.renderModeLabel() + " · wrap:" + wrapLabel
@@ -33,7 +33,7 @@ func (m Model) helpLine() string {
 		hint += " · " + t
 	}
 	hint += " · ? help"
-	if m.diff.ActiveSectionModel().DataRef().VisualActive {
+	if m.diffarea.ActiveSectionModel().DataRef().VisualActive {
 		return m.renderFooterLineWithPrefix("VISUAL", hint)
 	}
 	return m.renderFooterLine(hint)

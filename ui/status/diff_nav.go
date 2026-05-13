@@ -1,22 +1,22 @@
 package status
 
 func (m *Model) moveActive(delta int) {
-	if !m.diff.MoveActive(delta) {
+	if !m.diffarea.MoveActive(delta) {
 		return
 	}
 	m.syncSearchCursorFromDiffFocus()
-	m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
+	m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 }
 
 func (m *Model) jumpDiffTop() {
-	if !m.diff.JumpTop() {
+	if !m.diffarea.JumpTop() {
 		return
 	}
 	m.syncSearchCursorFromDiffFocus()
 }
 
 func (m *Model) jumpDiffBottom() {
-	if !m.diff.JumpBottom() {
+	if !m.diffarea.JumpBottom() {
 		return
 	}
 	m.syncSearchCursorFromDiffFocus()

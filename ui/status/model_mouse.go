@@ -26,8 +26,8 @@ func (m *Model) handleMouseWheel(msg tea.MouseWheelMsg) bool {
 
 func (m Model) searchActive() bool {
 	return m.fileTreeModel.Search().IsActive() ||
-		m.diff.Unstaged.Search().IsActive() ||
-		m.diff.Staged.Search().IsActive()
+		m.diffarea.Unstaged.Search().IsActive() ||
+		m.diffarea.Staged.Search().IsActive()
 }
 
 func (m *Model) scrollDiffByMouse(x, y, dir int) bool {
@@ -54,7 +54,7 @@ func (m *Model) scrollDiffByMouse(x, y, dir int) bool {
 }
 
 func (m Model) diffRect(mainH int) (x, y, w, h int, ok bool) {
-	if m.diff.Fullscreen && m.focus == focusDiff {
+	if m.diffarea.Fullscreen && m.focus == focusDiff {
 		return 0, 0, m.width, mainH, true
 	}
 	if m.useStackedLayout() {
@@ -70,20 +70,20 @@ func (m *Model) mouseTargetSection(relY, diffH int) *diffview.Model {
 		return nil
 	}
 	expandedH, collapsedH := diffPaneHeights(diffH)
-	if m.diff.ActiveSection == diffarea.SectionStaged {
+	if m.diffarea.ActiveSection == diffarea.SectionStaged {
 		if relY < collapsedH {
-			return m.diff.SectionModel(diffarea.SectionUnstaged)
+			return m.diffarea.SectionModel(diffarea.SectionUnstaged)
 		}
 		if relY < collapsedH+expandedH {
-			return m.diff.SectionModel(diffarea.SectionStaged)
+			return m.diffarea.SectionModel(diffarea.SectionStaged)
 		}
 		return nil
 	}
 	if relY < expandedH {
-		return m.diff.SectionModel(diffarea.SectionUnstaged)
+		return m.diffarea.SectionModel(diffarea.SectionUnstaged)
 	}
 	if relY < expandedH+collapsedH {
-		return m.diff.SectionModel(diffarea.SectionStaged)
+		return m.diffarea.SectionModel(diffarea.SectionStaged)
 	}
 	return nil
 }

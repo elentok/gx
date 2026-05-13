@@ -10,15 +10,15 @@ import (
 
 func (m Model) delegateToDiff(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Search routing first.
-	cmd, handled := m.diff.UpdateActive(msg)
+	cmd, handled := m.diffarea.UpdateActive(msg)
 	if handled {
 		if m.currentDiffSearch().Mode() == search.SearchModeResults {
-			m.diff.SetNavMode(diffview.NavModeLine)
+			m.diffarea.SetNavMode(diffview.NavModeLine)
 		}
 		return m, cmd
 	}
 
-	match, consumed := m.diff.Keys().Process(msg)
+	match, consumed := m.diffarea.Keys().Process(msg)
 	if consumed && match == nil {
 		return m, nil // chord in progress
 	}
@@ -32,48 +32,48 @@ func (m Model) delegateToDiff(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case diffarea.BindingMoveUp:
 		m.moveActive(-1)
 	case diffarea.BindingScrollDown:
-		m.diff.ActiveSectionModel().Viewport().ScrollDown(3)
+		m.diffarea.ActiveSectionModel().Viewport().ScrollDown(3)
 	case diffarea.BindingScrollUp:
-		m.diff.ActiveSectionModel().Viewport().ScrollUp(3)
+		m.diffarea.ActiveSectionModel().Viewport().ScrollUp(3)
 	case diffarea.BindingPageDown:
-		m.diff.ScrollPage(1)
+		m.diffarea.ScrollPage(1)
 	case diffarea.BindingPageUp:
-		m.diff.ScrollPage(-1)
+		m.diffarea.ScrollPage(-1)
 	case diffarea.BindingNavMode:
-		m.diff.DisableVisual()
-		m.diff.ToggleNavMode()
-		m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
+		m.diffarea.DisableVisual()
+		m.diffarea.ToggleNavMode()
+		m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 	case diffarea.BindingVisual:
-		if m.diff.NavMode() == diffview.NavModeHunk {
-			m.diff.SetNavMode(diffview.NavModeLine)
+		if m.diffarea.NavMode() == diffview.NavModeHunk {
+			m.diffarea.SetNavMode(diffview.NavModeLine)
 		}
-		if !m.diff.ToggleVisual() {
+		if !m.diffarea.ToggleVisual() {
 			return m, nil
 		}
-		m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
+		m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 	case diffarea.BindingFullscreen:
-		m.diff.Fullscreen = !m.diff.Fullscreen
+		m.diffarea.Fullscreen = !m.diffarea.Fullscreen
 		var reloadCmd tea.Cmd
-		if m.diff.RenderMode() == diffview.RenderModeSideBySide {
+		if m.diffarea.RenderMode() == diffview.RenderModeSideBySide {
 			reloadCmd = m.reloadDiffsForSelection()
 		}
 		m.syncDiffViewports()
-		m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
+		m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 		return m, reloadCmd
 	case diffarea.BindingWrap:
-		m.diff.SetWrap(!m.diff.Wrap())
+		m.diffarea.SetWrap(!m.diffarea.Wrap())
 		m.syncDiffViewports()
-		m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
+		m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 	case diffarea.BindingBack:
-		if m.diff.ActiveSectionModel().DataRef().VisualActive {
-			m.diff.DisableVisual()
+		if m.diffarea.ActiveSectionModel().DataRef().VisualActive {
+			m.diffarea.DisableVisual()
 		} else {
 			m.focus = focusFiletree
 		}
 	case diffarea.BindingApply:
 		return m, m.applySelection()
 	case diffarea.BindingDiscard:
-		if m.diff.ActiveSection == diffarea.SectionStaged {
+		if m.diffarea.ActiveSection == diffarea.SectionStaged {
 			return m, m.applySelection()
 		}
 		m.openDiscardDiffConfirm()

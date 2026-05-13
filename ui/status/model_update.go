@@ -84,7 +84,7 @@ func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 
 	var helpCmd tea.Cmd
 	var reloadCmd tea.Cmd
-	if m.diff.RenderMode() == diffview.RenderModeSideBySide {
+	if m.diffarea.RenderMode() == diffview.RenderModeSideBySide {
 		reloadCmd = m.reloadDiffsForSelection()
 	}
 	m.syncDiffViewports()
@@ -208,10 +208,10 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleFlashTick() (tea.Model, tea.Cmd) {
-	if m.diff.Flash.Active {
-		m.diff.Flash.Frames--
-		if m.diff.Flash.Frames <= 0 {
-			m.diff.Flash.Active = false
+	if m.diffarea.Flash.Active {
+		m.diffarea.Flash.Frames--
+		if m.diffarea.Flash.Frames <= 0 {
+			m.diffarea.Flash.Active = false
 			return m, nil
 		}
 		return m, nextFlashCmd()

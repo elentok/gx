@@ -28,7 +28,7 @@ func (m Model) sectionTitle(section diffarea.Section) string {
 }
 
 func (m Model) sectionHasContent(section diffarea.Section) bool {
-	data := m.diff.SectionModel(section).Data()
+	data := m.diffarea.SectionModel(section).Data()
 	return data.HasContent()
 }
 

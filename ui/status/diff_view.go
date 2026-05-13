@@ -24,7 +24,7 @@ func (m *Model) renderDiffPane(width, height int) string {
 	}
 
 	expandedH, collapsedH := diffPaneHeights(height)
-	if m.diff.ActiveSection == diffarea.SectionStaged {
+	if m.diffarea.ActiveSection == diffarea.SectionStaged {
 		top := m.renderSectionPane(width, collapsedH, diffarea.SectionUnstaged)
 		bottom := m.renderSectionPane(width, expandedH, diffarea.SectionStaged)
 		return lipgloss.JoinVertical(lipgloss.Left, top, bottom)
@@ -42,7 +42,7 @@ func (m *Model) renderSectionPane(width, height int, section diffarea.Section) s
 	innerW := maxInt(1, width-2)
 	innerH := maxInt(1, height-2)
 
-	activeSection := m.focus == focusDiff && m.diff.ActiveSection == section
+	activeSection := m.focus == focusDiff && m.diffarea.ActiveSection == section
 	collapsed := !activeSection && height <= collapsedDiffSectionHeight
 
 	bodyH := innerH
@@ -51,7 +51,7 @@ func (m *Model) renderSectionPane(width, height int, section diffarea.Section) s
 	}
 
 	title := m.sectionTitle(section)
-	diffviewModel := m.diff.SectionModel(section)
+	diffviewModel := m.diffarea.SectionModel(section)
 	diff := diffviewModel.DataRef()
 	accent := ui.ColorOrange
 	if section == diffarea.SectionStaged {
@@ -66,7 +66,7 @@ func (m *Model) renderSectionPane(width, height int, section diffarea.Section) s
 			titleText += " " + label
 		}
 	}
-	if m.diff.Fullscreen {
+	if m.diffarea.Fullscreen {
 		titleText += " [fullscreen]"
 	}
 	rightTitleText := ""
@@ -104,7 +104,7 @@ func (m *Model) renderSectionPane(width, height int, section diffarea.Section) s
 			displayIdx := row.DisplayIndex
 			rawIdx := row.RawIndex
 			mark := "  "
-			if m.diff.NavMode() == diffview.NavModeLine && diff.VisualActive && m.visualMatchDiffDisplay(*diff, displayIdx) {
+			if m.diffarea.NavMode() == diffview.NavModeLine && diff.VisualActive && m.visualMatchDiffDisplay(*diff, displayIdx) {
 				mark = lipgloss.NewStyle().Foreground(accent).Render("▎ ")
 			}
 			if row.InActiveHunk && activeSection {
@@ -138,7 +138,7 @@ func (m *Model) renderSectionPane(width, height int, section diffarea.Section) s
 			}
 			rowKind := row.Kind
 			body := ansi.Truncate(row.Text, bodyW, "")
-			if m.diff.RenderMode() == diffview.RenderModeSideBySide {
+			if m.diffarea.RenderMode() == diffview.RenderModeSideBySide {
 				plain := strings.TrimSpace(ansi.Strip(body))
 				if isDeltaSectionDivider(plain) {
 					body = lipgloss.NewStyle().Foreground(ui.ColorDeepBg).Render(ansi.Strip(body))
@@ -224,7 +224,7 @@ func (m Model) hunkOverflowMarkers() (top, bottom, both string) {
 }
 
 func (m Model) visualMatchDiffDisplay(diffData diffview.DiffData, displayIdx int) bool {
-	if !diffData.VisualActive || m.diff.NavMode() != diffview.NavModeLine {
+	if !diffData.VisualActive || m.diffarea.NavMode() != diffview.NavModeLine {
 		return false
 	}
 	if len(diffData.ChangedDisplay) > 0 {
@@ -259,16 +259,16 @@ func (m *Model) syncDiffViewports() {
 	}
 	_, diffW := m.splitWidth()
 	_, diffH := m.splitHeight(mainH)
-	if m.diff.Fullscreen && m.focus == focusDiff {
+	if m.diffarea.Fullscreen && m.focus == focusDiff {
 		diffW = m.width
 	}
 	vpW := maxInt(1, diffW-4)
 	wrapWidth := maxInt(1, vpW-2)
-	reflowSectionLines(m.diff.SectionModel(diffarea.SectionUnstaged), wrapWidth, m.diff.Wrap())
-	reflowSectionLines(m.diff.SectionModel(diffarea.SectionStaged), wrapWidth, m.diff.Wrap())
+	reflowSectionLines(m.diffarea.SectionModel(diffarea.SectionUnstaged), wrapWidth, m.diffarea.Wrap())
+	reflowSectionLines(m.diffarea.SectionModel(diffarea.SectionStaged), wrapWidth, m.diffarea.Wrap())
 
 	expandedH, collapsedH := diffPaneHeights(diffH)
-	m.diff.SyncViewports(vpW, expandedH, collapsedH)
+	m.diffarea.SyncViewports(vpW, expandedH, collapsedH)
 }
 
 func reflowSectionLines(diffviewModel *diffview.Model, wrapWidth int, wrap bool) {

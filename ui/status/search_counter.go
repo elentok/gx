@@ -21,7 +21,7 @@ func (m Model) searchCounterForDiffSection(section diffarea.Section) string {
 		return ""
 	}
 
-	if m.focus != focusDiff || m.diff.ActiveSection != section {
+	if m.focus != focusDiff || m.diffarea.ActiveSection != section {
 		return ""
 	}
 	return m.searchCounterText(search.Cursor(), search.MatchesCount())

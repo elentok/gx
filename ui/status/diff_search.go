@@ -35,7 +35,7 @@ func (m *Model) computeSearchMatches(query string) []search.Match {
 			}
 		}
 	} else {
-		diffviewModel := m.diff.SectionModel(m.diff.ActiveSection)
+		diffviewModel := m.diffarea.SectionModel(m.diffarea.ActiveSection)
 		for _, match := range diffviewModel.ComputeSearchMatches(q) {
 			matches = append(matches, search.Match{
 				DisplayIndex: match.DisplayIndex,
@@ -68,7 +68,7 @@ func (m Model) handleJumpToMatch(msg search.JumpToMatchMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	diffviewModel := m.diff.SectionModel(m.diff.ActiveSection)
+	diffviewModel := m.diffarea.SectionModel(m.diffarea.ActiveSection)
 	diffviewModel.ApplySearchMatch(match)
 	return m, nil
 
@@ -79,7 +79,7 @@ func (m *Model) syncSearchCursorFromDiffFocus() {
 	if !diffSearch.HasQuery() || diffSearch.MatchesCount() == 0 || m.focus != focusDiff {
 		return
 	}
-	diffviewModel := m.diff.SectionModel(m.diff.ActiveSection)
+	diffviewModel := m.diffarea.SectionModel(m.diffarea.ActiveSection)
 	idx := diffviewModel.CurrentSearchCursor(diffSearch.Matches())
 	if idx < 0 {
 		return
@@ -94,17 +94,17 @@ func (m *Model) syncSearchCursorFromDiffFocus() {
 }
 
 func (m *Model) currentDiffSearch() *search.Model {
-	if m.diff.ActiveSection == diffarea.SectionStaged {
-		return m.diff.Staged.Search()
+	if m.diffarea.ActiveSection == diffarea.SectionStaged {
+		return m.diffarea.Staged.Search()
 	}
-	return m.diff.Unstaged.Search()
+	return m.diffarea.Unstaged.Search()
 }
 
 func (m *Model) diffSearchForSection(section diffarea.Section) *search.Model {
 	if section == diffarea.SectionStaged {
-		return m.diff.Staged.Search()
+		return m.diffarea.Staged.Search()
 	}
-	return m.diff.Unstaged.Search()
+	return m.diffarea.Unstaged.Search()
 }
 
 func (m Model) filetreeEntrySearchText(entry filetree.Entry[git.StageFileStatus]) string {
@@ -146,7 +146,7 @@ func (m Model) searchMatchDiffDisplay(scope diffarea.Section, displayIdx int) (m
 	if !diffSearch.HasQuery() {
 		return false, false
 	}
-	if m.focus != focusDiff || m.diff.ActiveSection != scope {
+	if m.focus != focusDiff || m.diffarea.ActiveSection != scope {
 		return false, false
 	}
 	for i, match := range diffSearch.Matches() {

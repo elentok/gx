@@ -27,7 +27,7 @@ type Model struct {
 	ready  bool
 
 	focus            focusPane
-	diff             diffarea.Model
+	diffarea diffarea.Model
 	diffContextLines int
 	statusData       statusData
 	fileTreeModel    filetree.Model[git.StageFileStatus]
@@ -137,7 +137,7 @@ func NewModel(worktreeRoot string, settings Settings) Model {
 		help:             help.NewModel(keySections),
 		keys:             newStatusManager(),
 		focus:            focusFiletree,
-		diff:             diffarea.NewModel(),
+		diffarea:         diffarea.NewModel(),
 		statusData: statusData{
 			selected: 0,
 		},

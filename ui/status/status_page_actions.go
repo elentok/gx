@@ -197,13 +197,13 @@ func (m Model) confirmAccept() (tea.Model, tea.Cmd) {
 			m.showGitError(err)
 			return m, nil
 		}
-		if m.diff.ActiveSection == diffarea.SectionUnstaged {
-			m.diff.DisableVisual()
+		if m.diffarea.ActiveSection == diffarea.SectionUnstaged {
+			m.diffarea.DisableVisual()
 		}
 		m.setStatus("discarded " + m.confirmPaths[0])
 		cmd := m.reload(m.confirmPaths[0])
 		if m.focus == focusDiff {
-			m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
+			m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 		}
 		return m, cmd
 	}

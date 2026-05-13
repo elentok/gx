@@ -37,16 +37,16 @@ func (m *Model) applySelection() tea.Cmd {
 		return nil
 	}
 
-	diffviewModel := m.diff.ActiveSectionModel()
-	sig := movedTarget{fromSection: m.diff.ActiveSection, navMode: m.diff.NavMode()}
-	if file.Untracked && m.diff.ActiveSection == diffarea.SectionUnstaged {
+	diffviewModel := m.diffarea.ActiveSectionModel()
+	sig := movedTarget{fromSection: m.diffarea.ActiveSection, navMode: m.diffarea.NavMode()}
+	if file.Untracked && m.diffarea.ActiveSection == diffarea.SectionUnstaged {
 		if err := git.StageIntentPath(m.worktreeRoot, file.Path); err != nil {
 			m.showGitError(err)
 			return nil
 		}
 	}
 
-	if m.diff.NavMode() == diffview.NavModeHunk {
+	if m.diffarea.NavMode() == diffview.NavModeHunk {
 		if diffviewModel.DataRef().ActiveHunk < 0 || diffviewModel.DataRef().ActiveHunk >= len(diffviewModel.DataRef().Parsed.Hunks) {
 			return nil
 		}
@@ -56,7 +56,7 @@ func (m *Model) applySelection() tea.Cmd {
 			m.setStatus(err.Error())
 			return nil
 		}
-		reverse := m.diff.ActiveSection == diffarea.SectionStaged
+		reverse := m.diffarea.ActiveSection == diffarea.SectionStaged
 		if err := git.ApplyPatchToIndex(m.worktreeRoot, patch, reverse, false); err != nil {
 			if !isCorruptPatchErr(err) {
 				m.showGitError(err)
@@ -102,7 +102,7 @@ func (m *Model) applySelection() tea.Cmd {
 			m.setStatus(err.Error())
 			return nil
 		}
-		reverse := m.diff.ActiveSection == diffarea.SectionStaged
+		reverse := m.diffarea.ActiveSection == diffarea.SectionStaged
 		if err := git.ApplyPatchToIndex(m.worktreeRoot, patch, reverse, true); err != nil {
 			m.showGitError(err)
 			return nil
@@ -112,12 +112,12 @@ func (m *Model) applySelection() tea.Cmd {
 	diffviewModel.DataRef().VisualActive = false
 	diffviewModel.DataRef().VisualAnchor = diffviewModel.DataRef().ActiveLine
 	m.setStatus("updated " + file.Path)
-	from := m.diff.ActiveSection
+	from := m.diffarea.ActiveSection
 	reloadCmd := m.reload(file.Path)
-	m.diff.ActiveSection = from
-	m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
+	m.diffarea.ActiveSection = from
+	m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 	m.markMovedTarget(sig)
-	if m.diff.Flash.Active {
+	if m.diffarea.Flash.Active {
 		return tea.Batch(reloadCmd, nextFlashCmd())
 	}
 	return reloadCmd
@@ -133,13 +133,13 @@ func isCorruptPatchErr(err error) bool {
 
 func (m *Model) reloadDiffsForSelection() tea.Cmd {
 
-	sideBySide := m.diff.RenderMode() == diffview.RenderModeSideBySide
+	sideBySide := m.diffarea.RenderMode() == diffview.RenderModeSideBySide
 	renderWidth := m.deltaRenderWidth()
 
 	sel, ok := m.selectedStatusDiff()
 	if !ok {
 		m.activeFilePath = ""
-		m.diff.ResetSections()
+		m.diffarea.ResetSections()
 		m.syncDiffViewports()
 		if m.diffSearchActiveInFocus() {
 			m.recomputeSearchMatches()
@@ -161,8 +161,8 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 		if color == "" {
 			color = raw
 		}
-		m.diff.SectionModel(diffarea.SectionUnstaged).BuildFromRaw(raw, color)
-		m.diff.SectionModel(diffarea.SectionStaged).BuildFromRaw("", "")
+		m.diffarea.SectionModel(diffarea.SectionUnstaged).BuildFromRaw(raw, color)
+		m.diffarea.SectionModel(diffarea.SectionStaged).BuildFromRaw("", "")
 		m.syncDiffViewports()
 		return nil
 	}
@@ -185,8 +185,8 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 	if stagedColor == "" {
 		stagedColor = stagedRaw
 	}
-	m.diff.SectionModel(diffarea.SectionUnstaged).BuildFromRaw(unstagedRaw, unstagedColor)
-	m.diff.SectionModel(diffarea.SectionStaged).BuildFromRaw(stagedRaw, stagedColor)
+	m.diffarea.SectionModel(diffarea.SectionUnstaged).BuildFromRaw(unstagedRaw, unstagedColor)
+	m.diffarea.SectionModel(diffarea.SectionStaged).BuildFromRaw(stagedRaw, stagedColor)
 	m.syncDiffViewports()
 	if m.diffSearchActiveInFocus() {
 		m.recomputeSearchMatches()
@@ -202,22 +202,22 @@ func (m *Model) enterDiffFromStatus(resetSection bool) tea.Cmd {
 	cmd := m.reloadDiffsForSelection()
 	m.focus = focusDiff
 	if resetSection {
-		m.diff.ActiveSection = diffarea.SectionUnstaged
+		m.diffarea.ActiveSection = diffarea.SectionUnstaged
 	}
 	m.syncDiffViewports()
-	m.diff.ActiveSectionModel().EnsureActiveVisible(m.diff.NavMode())
+	m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 	return cmd
 }
 
 func (m *Model) openDiscardDiffConfirm() {
-	if m.diff.ActiveSection != diffarea.SectionUnstaged {
+	if m.diffarea.ActiveSection != diffarea.SectionUnstaged {
 		return
 	}
 	file, ok := m.selectedStatusFile()
 	if !ok {
 		return
 	}
-	diffviewModel := m.diff.ActiveSectionModel()
+	diffviewModel := m.diffarea.ActiveSectionModel()
 
 	var (
 		title       string
@@ -227,7 +227,7 @@ func (m *Model) openDiscardDiffConfirm() {
 		err         error
 	)
 
-	if m.diff.NavMode() == diffview.NavModeHunk {
+	if m.diffarea.NavMode() == diffview.NavModeHunk {
 		if diffviewModel.DataRef().ActiveHunk < 0 || diffviewModel.DataRef().ActiveHunk >= len(diffviewModel.DataRef().Parsed.Hunks) {
 			return
 		}
@@ -270,30 +270,30 @@ func (m *Model) markMovedTarget(sig movedTarget) {
 	if sig.fromSection == diffarea.SectionUnstaged {
 		target = diffarea.SectionStaged
 	}
-	diffviewModel := m.diff.SectionModel(target)
-	m.diff.Flash = diffarea.FlashState{Active: true, Section: target, NavMode: sig.navMode, Hunk: -1, Line: -1, Frames: 4}
+	diffviewModel := m.diffarea.SectionModel(target)
+	m.diffarea.Flash = diffarea.FlashState{Active: true, Section: target, NavMode: sig.navMode, Hunk: -1, Line: -1, Frames: 4}
 
 	if sig.navMode == diffview.NavModeHunk {
 		for i := range diffviewModel.DataRef().Parsed.Hunks {
 			if diffviewModel.DataRef().Parsed.Hunks[i].Header == sig.hunkHeader {
-				m.diff.Flash.Hunk = i
+				m.diffarea.Flash.Hunk = i
 				return
 			}
 		}
 		if len(diffviewModel.DataRef().Parsed.Hunks) > 0 {
-			m.diff.Flash.Hunk = 0
+			m.diffarea.Flash.Hunk = 0
 		}
 		return
 	}
 
 	for i := range diffviewModel.DataRef().Parsed.Changed {
 		if diffviewModel.DataRef().Parsed.Changed[i].Text == sig.lineText {
-			m.diff.Flash.Line = i
+			m.diffarea.Flash.Line = i
 			return
 		}
 	}
 	if len(diffviewModel.DataRef().Parsed.Changed) > 0 {
-		m.diff.Flash.Line = 0
+		m.diffarea.Flash.Line = 0
 	}
 }
 
