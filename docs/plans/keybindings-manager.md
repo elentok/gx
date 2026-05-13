@@ -32,8 +32,12 @@ Child models expose their Manager via a `Keybindings() keybindings.Manager` meth
 ### Types
 
 ```go
+// BindingID is a type-safe identifier. Each model defines its own constants:
+//   const bindingGotoLog keybindings.BindingID = "goto-log"
+type BindingID string
+
 type Binding struct {
-    ID         string     // dispatch identifier, e.g. "goto-log"
+    ID         BindingID  // dispatch identifier, e.g. "goto-log"
     Seq        []string   // key sequence: ["g","l"] for chord, ["j"] for single key
     Categories []string   // help sections this binding appears in (can be multiple)
     Title      string     // description shown in help, e.g. "goto log"
@@ -80,8 +84,8 @@ func (m *Manager) Reset()
 
 ## Phase 1: Create `ui/keybindings` package
 
-- [ ] Create `ui/keybindings/keybindings.go` with `Binding`, `Manager`, and all methods above
-- [ ] Write unit tests in `ui/keybindings/keybindings_test.go`:
+- [x] Create `ui/keybindings/keybindings.go` with `Binding`, `Manager`, and all methods above
+- [x] Write unit tests in `ui/keybindings/keybindings_test.go`:
   - Single-key binding matches immediately
   - Two-key chord: first key → consumed, no match; second key → match
   - Cancellation: unrecognized second key → not consumed, prefix cleared
@@ -92,18 +96,20 @@ func (m *Manager) Reset()
 
 ### 2a. Status model Manager
 
-- [ ] Define the status model's `Manager` covering only status-level bindings:
+- [x] Define the status model's `Manager` covering only status-level bindings:
   - Global: quit, help, `?`, chord prefixes and their completions (goto-log, git-commit, yank-*, etc.)
   - Status-owned context-specific actions available in filetree and/or diff focus: pull, push, rebase, amend, context-inc/dec, refresh, render-mode, etc.
   - Use `Categories []string` for bindings that apply in both filetree and diff focus
   - Do NOT include j/k navigation, search input, or other bindings owned by child models
-- [ ] Add `keys keybindings.Manager` to `Model` struct; remove `keyPrefix string`
-- [ ] Call `m.keys.Reset()` wherever modal flags are set (credential, running, output, confirm, error)
+- [x] Add `keys keybindings.Manager` to `Model` struct; remove `keyPrefix string`
+- [x] Call `m.keys.Reset()` wherever modal flags are set (credential, running, output, confirm, error)
+- Note: `Process()` accepts `tea.KeyPressMsg` (not `string`) to handle bubbletea shift+G normalization internally
 
 ### 2b. Child model Managers
 
-- [ ] Add `keys keybindings.Manager` to `filetree.Model` covering its internal bindings (cursor nav, collapse, search, etc.); expose via `Keybindings() keybindings.Manager`
-- [ ] Add `keys keybindings.Manager` to the diff model covering its internal bindings (scroll, hunk nav, visual, wrap, etc.); expose via `Keybindings() keybindings.Manager`
+- [x] Add `keys keybindings.Manager` to `filetree.Model` covering its internal bindings (cursor nav, collapse, search, etc.); expose via `Keybindings() keybindings.Manager`
+- [x] Add `keys keybindings.Manager` to the diff model covering its internal bindings (scroll, hunk nav, visual, wrap, etc.); expose via `Keybindings() keybindings.Manager`
+- Note: binding metadata only for now; dispatch still uses existing switch/handleDiffKey. Full dispatch migration is Phase 2d.
 
 ### 2c. Wire up help
 
@@ -120,7 +126,7 @@ func (m *Manager) Reset()
 
 ### 2d. Simplify key dispatch
 
-- [ ] Rewrite `handleKeyPress` to use `m.keys.Process()`:
+- [x] Rewrite `handleKeyPress` to use `m.keys.Process()`:
   ```go
   match, consumed := m.keys.Process(msg.String())
   switch {
@@ -131,14 +137,14 @@ func (m *Manager) Reset()
   }
   return m.delegateToChild(msg)
   ```
-- [ ] Add `dispatchBinding(id string, msg tea.KeyPressMsg)` — the single dispatch point for all status-model-owned bindings, replacing `handleChordKey` + `handleFiletreeKey` + `handleDiffKey`
-- [ ] Add `delegateToChild(msg tea.KeyPressMsg)` — forwards unmatched keys to the focused child model's `Update()`; replaces `handleFocusedChildKey` with a clearly-scoped function
-- [ ] Delete `handleChordKey`, `handleFiletreeKey`, `handleDiffKey`, `handleFocusedChildKey`
+- [x] Add `dispatchBinding(id keybindings.BindingID, msg tea.KeyPressMsg)` — the single dispatch point for all status-model-owned bindings, replacing `handleChordKey` + `handleFiletreeKey` + `handleDiffKey`
+- [x] Add `delegateToChild(msg tea.KeyPressMsg)` — forwards unmatched keys to the focused child model's `Update()`; replaces `handleFocusedChildKey` with a clearly-scoped function
+- [x] Delete `handleChordKey`, `handleFiletreeKey`, `handleDiffKey`, `handleFocusedChildKey`
 - [ ] Delete `ChordHints(prefix string)` method; update the `ChordHinter` interface usage to call `m.keys.ChordHints()` directly
 
 ### 2e. Verify
 
-- [ ] `go build ./...` and `go test ./...`
+- [x] `go build ./...` and `go test ./...`
 
 ## Out of scope (follow-up)
 

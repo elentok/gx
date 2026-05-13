@@ -342,16 +342,18 @@ func TestFiletreeLeftDoesNotMoveCompressedDirSelection(t *testing.T) {
 	}
 }
 
-func TestFiletreeHOnSelectedDirCollapsesDirectory(t *testing.T) {
+// statusModelWithDir creates a status model with an unstaged "docs/" directory
+// containing two files. The docs dir row is pre-selected.
+// Precondition asserts the dir is expanded so callers start from a known state.
+func statusModelWithDir(t *testing.T) Model {
+	t.Helper()
 	repo := testutil.TempRepo(t)
 	testutil.Mkdir(t, repo+"/docs")
 	testutil.WriteFile(t, repo, "docs/a.md", "a\n")
 	testutil.WriteFile(t, repo, "docs/b.md", "b\n")
-
 	m := New(repo)
 	m.ready = true
 	m.focus = focusFiletree
-
 	dirIdx := -1
 	for i, entry := range m.statusData.statusEntries {
 		if entry.Kind == statusEntryDir && entry.Path == "docs" {
@@ -360,9 +362,18 @@ func TestFiletreeHOnSelectedDirCollapsesDirectory(t *testing.T) {
 		}
 	}
 	if dirIdx < 0 {
-		t.Fatalf("expected docs dir in status tree")
+		t.Fatalf("precondition: expected docs dir in status tree")
 	}
 	m.setStatusSelection(dirIdx)
+	entry, ok := m.selectedFiletreeEntry()
+	if !ok || !entry.Expanded {
+		t.Fatalf("precondition: expected docs dir to be expanded")
+	}
+	return m
+}
+
+func TestFiletreeHOnSelectedDirCollapsesDirectory(t *testing.T) {
+	m := statusModelWithDir(t)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	m = updated.(Model)
@@ -376,26 +387,7 @@ func TestFiletreeHOnSelectedDirCollapsesDirectory(t *testing.T) {
 }
 
 func TestFiletreeEnterOnSelectedDirCollapsesDirectory(t *testing.T) {
-	repo := testutil.TempRepo(t)
-	testutil.Mkdir(t, repo+"/docs")
-	testutil.WriteFile(t, repo, "docs/a.md", "a\n")
-	testutil.WriteFile(t, repo, "docs/b.md", "b\n")
-
-	m := New(repo)
-	m.ready = true
-	m.focus = focusFiletree
-
-	dirIdx := -1
-	for i, entry := range m.statusData.statusEntries {
-		if entry.Kind == statusEntryDir && entry.Path == "docs" {
-			dirIdx = i
-			break
-		}
-	}
-	if dirIdx < 0 {
-		t.Fatalf("expected docs dir in status tree")
-	}
-	m.setStatusSelection(dirIdx)
+	m := statusModelWithDir(t)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
@@ -409,26 +401,7 @@ func TestFiletreeEnterOnSelectedDirCollapsesDirectory(t *testing.T) {
 }
 
 func TestFiletreeRightOnSelectedDirExpandsDirectory(t *testing.T) {
-	repo := testutil.TempRepo(t)
-	testutil.Mkdir(t, repo+"/docs")
-	testutil.WriteFile(t, repo, "docs/a.md", "a\n")
-	testutil.WriteFile(t, repo, "docs/b.md", "b\n")
-
-	m := New(repo)
-	m.ready = true
-	m.focus = focusFiletree
-
-	dirIdx := -1
-	for i, entry := range m.statusData.statusEntries {
-		if entry.Kind == statusEntryDir && entry.Path == "docs" {
-			dirIdx = i
-			break
-		}
-	}
-	if dirIdx < 0 {
-		t.Fatalf("expected docs dir in status tree")
-	}
-	m.setStatusSelection(dirIdx)
+	m := statusModelWithDir(t)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	m = updated.(Model)

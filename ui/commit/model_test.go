@@ -516,7 +516,11 @@ func TestCommaDotInDiffFrameSwitchFiles(t *testing.T) {
 	}
 }
 
-func TestLeftOnSelectedDirCollapsesCommitFiletreeDir(t *testing.T) {
+// commitModelWithDir creates a commit model with HEAD pointing to a commit
+// that modified two files inside "dir/". The dir row is pre-selected.
+// Precondition asserts the dir is expanded so callers start from a known state.
+func commitModelWithDir(t *testing.T) Model {
+	t.Helper()
 	repo := testutil.TempRepo(t)
 	if err := os.MkdirAll(filepath.Join(repo, "dir"), 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
@@ -527,23 +531,27 @@ func TestLeftOnSelectedDirCollapsesCommitFiletreeDir(t *testing.T) {
 	testutil.WriteFile(t, repo, "dir/a.txt", "ONE\n")
 	testutil.WriteFile(t, repo, "dir/b.txt", "TWO\n")
 	testutil.CommitAll(t, repo, "change")
-
 	m := New(repo, "HEAD")
 	m.ready = true
 	m.width = 100
 	m.height = 24
 	entries := m.fileTreeModel.Entries()
 	if len(entries) < 3 {
-		t.Fatalf("expected expanded dir + files, got %d entries", len(entries))
+		t.Fatalf("precondition: expected expanded dir + files, got %d entries", len(entries))
 	}
 	if entries[0].Kind != filetree.EntryDir || !entries[0].Expanded {
-		t.Fatalf("expected first entry to be expanded dir, got kind=%v expanded=%v", entries[0].Kind, entries[0].Expanded)
+		t.Fatalf("precondition: expected expanded dir row, got kind=%v expanded=%v", entries[0].Kind, entries[0].Expanded)
 	}
 	m.fileTreeModel.SetSelectedIndex(0)
+	return m
+}
+
+func TestLeftOnSelectedDirCollapsesCommitFiletreeDir(t *testing.T) {
+	m := commitModelWithDir(t)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	m = updated.(Model)
-	entries = m.fileTreeModel.Entries()
+	entries := m.fileTreeModel.Entries()
 	if len(entries) != 1 {
 		t.Fatalf("expected collapsed tree with 1 dir row, got %d", len(entries))
 	}
@@ -553,38 +561,39 @@ func TestLeftOnSelectedDirCollapsesCommitFiletreeDir(t *testing.T) {
 }
 
 func TestEnterOnSelectedDirCollapsesCommitFiletreeDir(t *testing.T) {
-	repo := testutil.TempRepo(t)
-	if err := os.MkdirAll(filepath.Join(repo, "dir"), 0o755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-	testutil.WriteFile(t, repo, "dir/a.txt", "one\n")
-	testutil.WriteFile(t, repo, "dir/b.txt", "two\n")
-	testutil.CommitAll(t, repo, "base")
-	testutil.WriteFile(t, repo, "dir/a.txt", "ONE\n")
-	testutil.WriteFile(t, repo, "dir/b.txt", "TWO\n")
-	testutil.CommitAll(t, repo, "change")
-
-	m := New(repo, "HEAD")
-	m.ready = true
-	m.width = 100
-	m.height = 24
-	entries := m.fileTreeModel.Entries()
-	if len(entries) < 3 {
-		t.Fatalf("expected expanded dir + files, got %d entries", len(entries))
-	}
-	if entries[0].Kind != filetree.EntryDir || !entries[0].Expanded {
-		t.Fatalf("expected first entry to be expanded dir, got kind=%v expanded=%v", entries[0].Kind, entries[0].Expanded)
-	}
-	m.fileTreeModel.SetSelectedIndex(0)
+	m := commitModelWithDir(t)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
-	entries = m.fileTreeModel.Entries()
+	entries := m.fileTreeModel.Entries()
 	if len(entries) != 1 {
 		t.Fatalf("expected collapsed tree with 1 dir row after enter, got %d", len(entries))
 	}
 	if entries[0].Kind != filetree.EntryDir || entries[0].Expanded {
 		t.Fatalf("expected collapsed dir row after enter, got kind=%v expanded=%v", entries[0].Kind, entries[0].Expanded)
+	}
+}
+
+func TestRightOnCollapsedDirExpandsCommitFiletreeDir(t *testing.T) {
+	m := commitModelWithDir(t)
+
+	// collapse first
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
+	m = updated.(Model)
+	entries := m.fileTreeModel.Entries()
+	if len(entries) != 1 || entries[0].Expanded {
+		t.Fatalf("precondition: expected 1 collapsed dir row, got %d entries expanded=%v", len(entries), entries[0].Expanded)
+	}
+
+	// expand with l
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+	m = updated.(Model)
+	entries = m.fileTreeModel.Entries()
+	if len(entries) < 3 {
+		t.Fatalf("expected expanded dir + files after l, got %d entries", len(entries))
+	}
+	if entries[0].Kind != filetree.EntryDir || !entries[0].Expanded {
+		t.Fatalf("expected expanded dir row after l, got kind=%v expanded=%v", entries[0].Kind, entries[0].Expanded)
 	}
 }
 
