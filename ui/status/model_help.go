@@ -6,58 +6,47 @@ import (
 	"charm.land/bubbles/v2/key"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/help"
+	"github.com/elentok/gx/ui/keybindings"
 )
 
-var (
-	stageKeyUp         = key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up"))
-	stageKeyDown       = key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down"))
-	stageKeyTop        = key.NewBinding(key.WithKeys("gg"), key.WithHelp("gg", "top"))
-	stageKeyBottom     = key.NewBinding(key.WithKeys("G"), key.WithHelp("G", "bottom"))
-	stageKeyHelp       = key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help"))
-	stageKeyQuit       = key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit"))
-	stageKeySearch     = key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search"))
-	stageKeySearchNext = key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next match"))
-	stageKeySearchPrev = key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "prev match"))
-	stageKeyCommit     = key.NewBinding(key.WithKeys("cc"), key.WithHelp("cc", "git commit"))
-	stageKeyOutput     = key.NewBinding(key.WithKeys("go"), key.WithHelp("go", "view output"))
-	stageKeyGoWorktree = key.NewBinding(key.WithKeys("gw"), key.WithHelp("gw", "goto worktrees"))
-	stageKeyGoLog      = key.NewBinding(key.WithKeys("gl"), key.WithHelp("gl", "goto log"))
-	stageKeyGoStatus   = key.NewBinding(key.WithKeys("gs"), key.WithHelp("gs", "goto status"))
-	stageKeyLog        = key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "lazygit log"))
-	stageKeyYank       = key.NewBinding(key.WithKeys("yy", "yl", "ya", "yf"), key.WithHelp("yy/yl/ya/yf", "yank"))
-	stageKeyPull       = key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "pull"))
-	stageKeyPush       = key.NewBinding(key.WithKeys("P"), key.WithHelp("P", "push"))
-	stageKeyRebase     = key.NewBinding(key.WithKeys("b"), key.WithHelp("b", "rebase"))
-	stageKeyAmend      = key.NewBinding(key.WithKeys("A"), key.WithHelp("A", "amend"))
-	stageKeyEdit       = key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "edit"))
-	stageKeyRefresh    = key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "refresh"))
-	stageKeyContextDec = key.NewBinding(key.WithKeys("["), key.WithHelp("[", "less context"))
-	stageKeyContextInc = key.NewBinding(key.WithKeys("]"), key.WithHelp("]", "more context"))
-	stageKeyPageDown   = key.NewBinding(key.WithKeys("ctrl+d"), key.WithHelp("ctrl+d", "half page down"))
-	stageKeyPageUp     = key.NewBinding(key.WithKeys("ctrl+u"), key.WithHelp("ctrl+u", "half page up"))
-	stageKeyOpenDiff   = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "open diff"))
-	stageKeyStage      = key.NewBinding(key.WithKeys("space"), key.WithHelp("space", "stage/unstage"))
-	stageKeyDiscard    = key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "discard"))
-	stageKeyLeft       = key.NewBinding(key.WithKeys("h", "left"), key.WithHelp("h/←", "back"))
-	stageKeyRight      = key.NewBinding(key.WithKeys("l", "right"), key.WithHelp("l/→", "open"))
-	stageKeyTab        = key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "switch"))
-	stageKeyMode       = key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "mode"))
-	stageKeyVisual     = key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "visual mode"))
-	stageKeyPrevFile   = key.NewBinding(key.WithKeys(","), key.WithHelp(",", "prev file"))
-	stageKeyNextFile   = key.NewBinding(key.WithKeys("."), key.WithHelp(".", "next file"))
-	stageKeyScrollDown = key.NewBinding(key.WithKeys("J"), key.WithHelp("J", "scroll down"))
-	stageKeyScrollUp   = key.NewBinding(key.WithKeys("K"), key.WithHelp("K", "scroll up"))
-	stageKeyRenderMode = key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "render"))
-	stageKeyFullscreen = key.NewBinding(key.WithKeys("f"), key.WithHelp("f", "fullscreen"))
-	stageKeyWrap       = key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "soft wrap"))
-	stageKeyDiffBack   = key.NewBinding(key.WithKeys("esc", "h"), key.WithHelp("esc/h", "back to filetree"))
-)
+var helpSectionOrder = []string{"Global", "Go to", "Git", "Yank", "Search", "Filetree", "Diff"}
 
-var keySections = []help.KeySection{
-	help.NewKeySection("Global", stageKeyHelp, stageKeyQuit, stageKeyCommit, stageKeyOutput, stageKeyGoWorktree, stageKeyGoLog, stageKeyGoStatus, stageKeyLog, stageKeyYank, stageKeyPull, stageKeyPush, stageKeyRebase, stageKeyAmend),
-	help.NewKeySection("Search", stageKeySearch, stageKeySearchNext, stageKeySearchPrev),
-	help.NewKeySection("Filetree", stageKeyUp, stageKeyDown, stageKeyTop, stageKeyBottom, stageKeyPageUp, stageKeyPageDown, stageKeyLeft, stageKeyRight, stageKeyStage, stageKeyDiscard, stageKeyEdit, stageKeyOpenDiff, stageKeyContextDec, stageKeyContextInc, stageKeyRefresh),
-	help.NewKeySection("Diff", stageKeyDiffBack, stageKeyTop, stageKeyBottom, stageKeyPageUp, stageKeyPageDown, stageKeyTab, stageKeyMode, stageKeyVisual, stageKeyUp, stageKeyDown, stageKeyPrevFile, stageKeyNextFile, stageKeyScrollDown, stageKeyScrollUp, stageKeyRenderMode, stageKeyContextDec, stageKeyContextInc, stageKeyStage, stageKeyDiscard, stageKeyEdit, stageKeyFullscreen, stageKeyWrap, stageKeyRefresh),
+// buildKeySections generates help sections from the provided key managers.
+// Bindings with an empty Title are skipped. Within each category, only the
+// first binding per BindingID is shown (aliases are suppressed).
+func buildKeySections(managers ...keybindings.Manager) []help.KeySection {
+	categoryBindings := make(map[string][]key.Binding)
+	seenInCategory := make(map[string]map[keybindings.BindingID]bool)
+
+	for _, mgr := range managers {
+		for _, b := range mgr.Bindings() {
+			if b.Title == "" {
+				continue
+			}
+			for _, cat := range b.Categories {
+				if cat == "" {
+					continue
+				}
+				if seenInCategory[cat] == nil {
+					seenInCategory[cat] = make(map[keybindings.BindingID]bool)
+				}
+				if seenInCategory[cat][b.ID] {
+					continue
+				}
+				seenInCategory[cat][b.ID] = true
+				categoryBindings[cat] = append(categoryBindings[cat],
+					key.NewBinding(key.WithKeys(b.Seq...), key.WithHelp(b.Keys(), b.Title)))
+			}
+		}
+	}
+
+	sections := make([]help.KeySection, 0, len(helpSectionOrder))
+	for _, cat := range helpSectionOrder {
+		if bindings, ok := categoryBindings[cat]; ok {
+			sections = append(sections, help.NewKeySection(cat, bindings...))
+		}
+	}
+	return sections
 }
 
 func (m Model) helpSectionLabel() string {

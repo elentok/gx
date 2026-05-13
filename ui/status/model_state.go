@@ -129,19 +129,22 @@ func NewModel(worktreeRoot string, settings Settings) Model {
 	if settings.DiffContextLines > 20 {
 		settings.DiffContextLines = 20
 	}
+	statusKeys := newStatusManager()
+	diffarreaModel := diffarea.NewModel()
+	fileTreeModel := filetree.NewModel[git.StageFileStatus]()
 	m := Model{
 		worktreeRoot:     worktreeRoot,
 		settings:         settings,
 		initialPath:      settings.InitialPath,
 		diffContextLines: settings.DiffContextLines,
-		help:             help.NewModel(keySections),
-		keys:             newStatusManager(),
+		help:             help.NewModel(buildKeySections(statusKeys, *diffarreaModel.Keys(), *fileTreeModel.Keys())),
+		keys:             statusKeys,
 		focus:            focusFiletree,
-		diffarea:         diffarea.NewModel(),
+		diffarea:         diffarreaModel,
 		statusData: statusData{
 			selected: 0,
 		},
-		fileTreeModel: filetree.NewModel[git.StageFileStatus](),
+		fileTreeModel: fileTreeModel,
 	}
 
 	if settings.EnableNavigation {

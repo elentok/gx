@@ -10,6 +10,8 @@ import (
 )
 
 const (
+	bindingHelp          keybindings.BindingID = "help"
+	bindingQuit          keybindings.BindingID = "quit"
 	bindingGotoBottom    keybindings.BindingID = "goto-bottom"
 	bindingGotoTop       keybindings.BindingID = "goto-top"
 	bindingViewOutput    keybindings.BindingID = "view-output"
@@ -41,13 +43,16 @@ const (
 func newStatusManager() keybindings.Manager {
 	return keybindings.New([]keybindings.Binding{
 		// Single-key globals
+		{ID: bindingHelp, Seq: []string{"?"}, Categories: []string{"Global"}, Title: "help"},
+		{ID: bindingQuit, Seq: []string{"q"}, Categories: []string{"Global"}, Title: "quit", Display: "q/ctrl+c"},
+		{ID: bindingQuit, Seq: []string{"ctrl+c"}, Categories: []string{}, Title: ""},
 		{ID: bindingLazygitLog, Seq: []string{"L"}, Categories: []string{"Global"}, Title: "lazygit log"},
 		// G (shift+G) — register both forms since terminal encoding varies
-		{ID: bindingGotoBottom, Seq: []string{"G"}, Categories: []string{"Navigation"}, Title: "go to bottom", Display: "G"},
-		{ID: bindingGotoBottom, Seq: []string{"shift+g"}, Categories: []string{"Navigation"}, Title: "go to bottom", Display: "G"},
+		{ID: bindingGotoBottom, Seq: []string{"G"}, Categories: []string{"Filetree", "Diff"}, Title: "go to bottom", Display: "G"},
+		{ID: bindingGotoBottom, Seq: []string{"shift+g"}, Categories: []string{}, Title: ""},
 
 		// g-prefix chords
-		{ID: bindingGotoTop, Seq: []string{"g", "g"}, Categories: []string{"Navigation"}, Title: "go to top"},
+		{ID: bindingGotoTop, Seq: []string{"g", "g"}, Categories: []string{"Filetree", "Diff"}, Title: "go to top"},
 		{ID: bindingViewOutput, Seq: []string{"g", "o"}, Categories: []string{"Global"}, Title: "view output"},
 		{ID: bindingGotoLog, Seq: []string{"g", "l"}, Categories: []string{"Go to"}, Title: "goto log"},
 		{ID: bindingGotoStatus, Seq: []string{"g", "s"}, Categories: []string{"Go to"}, Title: "goto status"},
@@ -66,20 +71,20 @@ func newStatusManager() keybindings.Manager {
 		{ID: bindingCancelChord, Seq: []string{"y", "esc"}, Categories: []string{}, Title: ""},
 
 		// m-prefix chords
-		{ID: bindingRefreshMenu, Seq: []string{"m", "r"}, Categories: []string{"Global"}, Title: "refresh"},
+		{ID: bindingRefreshMenu, Seq: []string{"m", "r"}, Categories: []string{"Global"}, Title: "refresh menu"},
 		{ID: bindingCancelChord, Seq: []string{"m", "esc"}, Categories: []string{}, Title: ""},
 
 		// Shared single-key bindings (both filetree and diff focus)
 		{ID: bindingToggleSection, Seq: []string{"tab"}, Categories: []string{"Diff"}, Title: "toggle staged/unstaged"},
-		{ID: bindingContextDec, Seq: []string{"["}, Categories: []string{"Diff"}, Title: "fewer context lines"},
-		{ID: bindingContextInc, Seq: []string{"]"}, Categories: []string{"Diff"}, Title: "more context lines"},
-		{ID: bindingRefresh, Seq: []string{"R"}, Categories: []string{"Global"}, Title: "refresh"},
+		{ID: bindingContextDec, Seq: []string{"["}, Categories: []string{"Filetree", "Diff"}, Title: "fewer context lines"},
+		{ID: bindingContextInc, Seq: []string{"]"}, Categories: []string{"Filetree", "Diff"}, Title: "more context lines"},
+		{ID: bindingRefresh, Seq: []string{"R"}, Categories: []string{"Filetree", "Diff"}, Title: "refresh"},
 		{ID: bindingRenderMode, Seq: []string{"s"}, Categories: []string{"Diff"}, Title: "toggle render mode"},
 		{ID: bindingPull, Seq: []string{"p"}, Categories: []string{"Git"}, Title: "pull"},
 		{ID: bindingPush, Seq: []string{"P"}, Categories: []string{"Git"}, Title: "push"},
 		{ID: bindingRebase, Seq: []string{"b"}, Categories: []string{"Git"}, Title: "rebase"},
 		{ID: bindingAmend, Seq: []string{"A"}, Categories: []string{"Git"}, Title: "amend"},
-		{ID: bindingEdit, Seq: []string{"e"}, Categories: []string{"Global"}, Title: "edit file"},
+		{ID: bindingEdit, Seq: []string{"e"}, Categories: []string{"Filetree", "Diff"}, Title: "edit file"},
 	})
 }
 
