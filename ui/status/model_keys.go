@@ -90,6 +90,11 @@ func newStatusManager() keybindings.Manager {
 
 func (m Model) dispatchBinding(id keybindings.BindingID, _ tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch id {
+	case bindingQuit:
+		if m.runningRunner != nil && !m.runningDone {
+			m.runningRunner.Cancel()
+		}
+		return m, tea.Quit
 	case bindingLazygitLog:
 		m.setStatus(ui.MessageOpening("lazygit log"))
 		return m, cmdLazygitLog(m.worktreeRoot)
