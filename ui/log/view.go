@@ -49,10 +49,10 @@ func (m Model) View() tea.View {
 		y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
 		out = ui.OverlayBottomCenter(out, overlay, m.width, y)
 	}
-	if m.keyPrefix != "" {
-		hints := m.ChordHints(m.keyPrefix)
+	if prefix := m.keys.Prefix(); len(prefix) > 0 {
+		hints := m.ChordHints("")
 		if len(hints) > 0 {
-			out = ui.OverlayBottomRight(out, ui.RenderChordOverlay(m.keyPrefix, hints), m.width, m.height)
+			out = ui.OverlayBottomRight(out, ui.RenderChordOverlay(prefix[0], hints), m.width, m.height)
 		}
 	}
 	if m.help.IsOpen {

@@ -2,36 +2,53 @@ package log
 
 import (
 	"github.com/elentok/gx/ui/help"
+	"github.com/elentok/gx/ui/keys"
 
 	"charm.land/bubbles/v2/key"
 )
 
-var keySections = []help.KeySection{
-	help.NewKeySection("Navigation", logKeyUp, logKeyDown, logKeyTop, logKeyBottom, logKeyOpen),
-	help.NewKeySection("Search", logKeySearch, logKeyResultNext, logKeyResultPrev),
-	help.NewKeySection("Jump", logKeyHead, logKeyNextTag, logKeyPrevTag),
-	help.NewKeySection("Go to", logKeyWorktrees, logKeyGotoLog, logKeyStatus),
-	help.NewKeySection("Other", logKeyReload, logKeyBack, logKeyHelp),
+var helpSectionOrder = []string{"Navigation", "Search", "Jump", "Go to", "Other"}
+
+func buildKeySections(manager keys.Manager) []help.KeySection {
+	categoryBindings := make(map[string][]key.Binding)
+	seenInCategory := make(map[string]map[keys.BindingID]bool)
+	for _, b := range manager.Bindings() {
+		if b.Title == "" {
+			continue
+		}
+		for _, cat := range b.Categories {
+			if cat == "" {
+				continue
+			}
+			if seenInCategory[cat] == nil {
+				seenInCategory[cat] = map[keys.BindingID]bool{}
+			}
+			if seenInCategory[cat][b.ID] {
+				continue
+			}
+			seenInCategory[cat][b.ID] = true
+			categoryBindings[cat] = append(categoryBindings[cat], key.NewBinding(key.WithKeys(b.Seq...), key.WithHelp(b.Keys(), b.Title)))
+		}
+	}
+
+	sections := make([]help.KeySection, 0, len(helpSectionOrder))
+	for _, cat := range helpSectionOrder {
+		if bindings, ok := categoryBindings[cat]; ok {
+			sections = append(sections, help.NewKeySection(cat, bindings...))
+			continue
+		}
+		if cat == "Search" {
+			sections = append(sections, help.NewKeySection(cat, logKeySearch, logKeyResultNext, logKeyResultPrev))
+		}
+	}
+	return sections
 }
 
-// ChordHints returns the available chord completions for the given prefix.
-// Implements ui.ChordHinter.
-func (m Model) ChordHints(prefix string) []key.Binding {
-	switch prefix {
-	case "g":
-		return []key.Binding{
-			key.NewBinding(key.WithHelp("g", "top")),
-			key.NewBinding(key.WithHelp("h", "goto HEAD")),
-			key.NewBinding(key.WithHelp("w", "goto worktrees")),
-			key.NewBinding(key.WithHelp("l", "goto log")),
-			key.NewBinding(key.WithHelp("s", "goto status")),
-		}
-	case "]":
-		return []key.Binding{key.NewBinding(key.WithHelp("t", "next tag"))}
-	case "[":
-		return []key.Binding{key.NewBinding(key.WithHelp("t", "prev tag"))}
-	case "m":
-		return []key.Binding{key.NewBinding(key.WithHelp("r", "refresh"))}
+func (m Model) ChordHints(_ string) []key.Binding {
+	hints := m.keys.ChordHints()
+	result := make([]key.Binding, len(hints))
+	for i, h := range hints {
+		result[i] = key.NewBinding(key.WithHelp(h.Key, h.Desc))
 	}
-	return nil
+	return result
 }

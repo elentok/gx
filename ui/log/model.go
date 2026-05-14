@@ -3,11 +3,12 @@ package log
 import (
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/help"
+	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/search"
-	tea "charm.land/bubbletea/v2"
 )
 
 const maxLogEntries = 250
@@ -42,12 +43,12 @@ type Model struct {
 	height int
 	ready  bool
 
-	rows         []row
-	cursor       int
-	statusMsg    string
-	keyPrefix    string
-	search       search.Model
-	err          error
+	rows      []row
+	cursor    int
+	statusMsg string
+	keys      keys.Manager
+	search    search.Model
+	err       error
 
 	help help.Model
 
@@ -60,9 +61,10 @@ func NewModel(worktreeRoot, startRef string, settings Settings) Model {
 		settings:     settings,
 		startRef:     normalizedRef(startRef),
 		cursor:       0,
-		help:         help.NewModel(keySections),
+		keys:         newLogManager(),
 		search:       search.NewModel(),
 	}
+	m.help = help.NewModel(buildKeySections(m.keys))
 	m.reload()
 	return m
 }

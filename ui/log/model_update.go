@@ -2,7 +2,6 @@ package log
 
 import (
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui/nav"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -55,68 +54,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, cmd
 		}
-		if handled, cmd := m.handleChordKey(msg); handled {
-			return m, cmd
+		match, consumed := m.keys.Process(msg)
+		if match != nil {
+			return m.dispatchBinding(match.ID)
 		}
-		if handled := m.handleTagJumpChord(msg); handled {
+		if consumed {
 			return m, nil
-		}
-		switch msg.String() {
-		case "?":
-			m.help.Open(m.width, m.height)
-			return m, nil
-		case "q":
-			if m.settings.EnableNavigation {
-				return m, nav.Back()
-			}
-			return m, tea.Quit
-		case "esc":
-			if m.settings.EnableNavigation {
-				return m, nav.Back()
-			}
-			return m, nil
-		case "j", "down":
-			if m.cursor < len(m.rows)-1 {
-				m.cursor++
-			}
-		case "k", "up":
-			if m.cursor > 0 {
-				m.cursor--
-			}
-		case "g":
-			m.keyPrefix = "g"
-		case "m":
-			m.keyPrefix = "m"
-		case "]", "[":
-			m.keyPrefix = msg.String()
-		case "G":
-			if len(m.rows) > 0 {
-				m.cursor = len(m.rows) - 1
-			}
-		case "enter":
-			return m, m.openSelected()
-		case "R":
-			return m, m.cmdReload()
 		}
 	}
 	return m, nil
-}
-
-func (m *Model) handleTagJumpChord(msg tea.KeyPressMsg) bool {
-	if m.keyPrefix != "]" && m.keyPrefix != "[" {
-		return false
-	}
-	prefix := m.keyPrefix
-	m.keyPrefix = ""
-	if msg.String() != "t" {
-		return true
-	}
-	step := 1
-	if prefix == "[" {
-		step = -1
-	}
-	m.jumpToTaggedCommit(step)
-	return true
 }
 
 func (m *Model) jumpToTaggedCommit(step int) {
@@ -138,49 +84,4 @@ func rowHasTag(r row) bool {
 		}
 	}
 	return false
-}
-
-func (m *Model) handleChordKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
-	if m.keyPrefix == "m" {
-		m.keyPrefix = ""
-		switch msg.String() {
-		case "r":
-			return true, m.cmdReload()
-		case "esc":
-			return true, nil
-		default:
-			return true, nil
-		}
-	}
-	if m.keyPrefix != "g" {
-		return false, nil
-	}
-	m.keyPrefix = ""
-	switch msg.String() {
-	case "g":
-		m.cursor = 0
-		m.statusMsg = ""
-		return true, nil
-	case "w":
-		m.statusMsg = ""
-		return true, nav.Replace(nav.Route{Kind: nav.RouteWorktrees})
-	case "s":
-		m.statusMsg = ""
-		return true, nav.Replace(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: m.worktreeRoot})
-	case "l":
-		m.statusMsg = ""
-		return true, nav.Replace(nav.Route{Kind: nav.RouteLog, WorktreeRoot: m.worktreeRoot, Ref: m.startRef})
-	case "h":
-		m.statusMsg = ""
-		if m.startRef != "HEAD" {
-			return true, nav.Replace(nav.Route{Kind: nav.RouteLog, WorktreeRoot: m.worktreeRoot, Ref: "HEAD"})
-		}
-		return true, nil
-	case "esc":
-		m.statusMsg = ""
-		return true, nil
-	default:
-		m.statusMsg = ""
-		return true, nil
-	}
 }

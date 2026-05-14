@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/search"
 
@@ -17,6 +18,15 @@ import (
 )
 
 var settings = Settings{}
+
+func newTestModel() Model {
+	m := Model{
+		keys:   newLogManager(),
+		search: search.NewModel(),
+	}
+	m.help = help.NewModel(buildKeySections(m.keys))
+	return m
+}
 
 func TestReloadAssignsBranchHistoryClasses(t *testing.T) {
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
@@ -126,20 +136,19 @@ func TestEnterOnCommitRowOpensCommitRoute(t *testing.T) {
 }
 
 func TestSelectedCommitRowFillsFullWidth(t *testing.T) {
-	m := Model{
-		width: 80,
-		rows: []row{{
-			kind: rowCommit,
-			commit: git.LogEntry{
-				Hash:        "12345678",
-				AuthorShort: "AB",
-				Subject:     "subject",
-				Date:        time.Now().Add(-2 * time.Hour),
-				Graph:       "*",
-				Decorations: []git.RefDecoration{{Name: "main", Kind: git.RefDecorationLocalBranch}},
-			},
-		}},
-	}
+	m := newTestModel()
+	m.width = 80
+	m.rows = []row{{
+		kind: rowCommit,
+		commit: git.LogEntry{
+			Hash:        "12345678",
+			AuthorShort: "AB",
+			Subject:     "subject",
+			Date:        time.Now().Add(-2 * time.Hour),
+			Graph:       "*",
+			Decorations: []git.RefDecoration{{Name: "main", Kind: git.RefDecorationLocalBranch}},
+		},
+	}}
 	line := m.renderRow(m.rows[0], true, 40)
 	if got := ansi.StringWidth(ansi.Strip(line)); got != 40 {
 		t.Fatalf("selected row width = %d, want 40", got)
@@ -169,21 +178,16 @@ func TestBadgeVariantForDecoration(t *testing.T) {
 }
 
 func TestRenderCommitRowHighlightsSearchMatches(t *testing.T) {
-	m := Model{
-		search: func() search.Model {
-			s := search.NewModel()
-			s.Start("fix")
-			return s
-		}(),
-		rows: []row{{
-			kind: rowCommit,
-			commit: git.LogEntry{
-				Hash:        "12345678",
-				AuthorShort: "AB",
-				Subject:     "fix search highlighting",
-			},
-		}},
-	}
+	m := newTestModel()
+	m.search.Start("fix")
+	m.rows = []row{{
+		kind: rowCommit,
+		commit: git.LogEntry{
+			Hash:        "12345678",
+			AuthorShort: "AB",
+			Subject:     "fix search highlighting",
+		},
+	}}
 
 	line := m.renderCommitRow(m.rows[0])
 	if stripped := ansi.Strip(line); !strings.Contains(stripped, "fix search highlighting") {
@@ -195,11 +199,8 @@ func TestRenderCommitRowHighlightsSearchMatches(t *testing.T) {
 }
 
 func TestRenderBadgesHighlightsSearchMatches(t *testing.T) {
-	m := Model{search: func() search.Model {
-		s := search.NewModel()
-		s.Start("main")
-		return s
-	}()}
+	m := newTestModel()
+	m.search.Start("main")
 	line := m.renderBadges([]git.RefDecoration{{Name: "origin/main", Kind: git.RefDecorationRemoteBranch}})
 	if stripped := ansi.Strip(line); !strings.Contains(stripped, "origin/main") {
 		t.Fatalf("stripped badges = %q", stripped)
@@ -264,15 +265,14 @@ func TestNAndNShiftMoveBetweenSearchResults(t *testing.T) {
 }
 
 func TestTagJumpChordsMoveToTaggedCommits(t *testing.T) {
-	m := Model{
-		rows: []row{
-			{kind: rowCommit, commit: git.LogEntry{Subject: "c0"}},
-			{kind: rowCommit, commit: git.LogEntry{Subject: "c1", Decorations: []git.RefDecoration{{Name: "v1.0.0", Kind: git.RefDecorationTag}}}},
-			{kind: rowCommit, commit: git.LogEntry{Subject: "c2"}},
-			{kind: rowCommit, commit: git.LogEntry{Subject: "c3", Decorations: []git.RefDecoration{{Name: "v2.0.0", Kind: git.RefDecorationTag}}}},
-		},
-		cursor: 0,
+	m := newTestModel()
+	m.rows = []row{
+		{kind: rowCommit, commit: git.LogEntry{Subject: "c0"}},
+		{kind: rowCommit, commit: git.LogEntry{Subject: "c1", Decorations: []git.RefDecoration{{Name: "v1.0.0", Kind: git.RefDecorationTag}}}},
+		{kind: rowCommit, commit: git.LogEntry{Subject: "c2"}},
+		{kind: rowCommit, commit: git.LogEntry{Subject: "c3", Decorations: []git.RefDecoration{{Name: "v2.0.0", Kind: git.RefDecorationTag}}}},
 	}
+	m.cursor = 0
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: ']', Text: "]"})
 	m = updated.(Model)
@@ -300,13 +300,12 @@ func TestTagJumpChordsMoveToTaggedCommits(t *testing.T) {
 }
 
 func TestTagJumpChordStopsAtEdges(t *testing.T) {
-	m := Model{
-		rows: []row{
-			{kind: rowCommit, commit: git.LogEntry{Subject: "c0", Decorations: []git.RefDecoration{{Name: "v1", Kind: git.RefDecorationTag}}}},
-			{kind: rowCommit, commit: git.LogEntry{Subject: "c1"}},
-		},
-		cursor: 0,
+	m := newTestModel()
+	m.rows = []row{
+		{kind: rowCommit, commit: git.LogEntry{Subject: "c0", Decorations: []git.RefDecoration{{Name: "v1", Kind: git.RefDecorationTag}}}},
+		{kind: rowCommit, commit: git.LogEntry{Subject: "c1"}},
 	}
+	m.cursor = 0
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '[', Text: "["})
 	m = updated.(Model)
