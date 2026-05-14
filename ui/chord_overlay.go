@@ -3,23 +3,30 @@ package ui
 import (
 	"strings"
 
-	"charm.land/bubbles/v2/key"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/elentok/gx/ui/keys"
 )
 
-// ChordHinter is implemented by models that expose chord completion hints.
-// The app model queries the active child via this interface to combine app-level
-// and child-level hints into one overlay.
-type ChordHinter interface {
-	ChordHints(prefix string) []key.Binding
+// ChordHintSource is implemented by models that expose a key manager.
+// The app model queries the active child via this interface to render chord hints.
+type ChordHintSource interface {
+	KeyManager() *keys.Manager
+}
+
+func ChordBindingsFromHints(hints []keys.ChordHint) []keys.Binding {
+	out := make([]keys.Binding, len(hints))
+	for i, h := range hints {
+		out[i] = keys.Binding{Seq: []string{h.Key}, Title: h.Desc}
+	}
+	return out
 }
 
 // RenderChordOverlay renders a compact box listing the available chord completions
 // for the given prefix key. The prefix is embedded in the top border and the
 // "esc close" hint is right-aligned. Intended for placement in the top-right
 // corner via OverlayTopRight.
-func RenderChordOverlay(prefix string, bindings []key.Binding) string {
+func RenderChordOverlay(prefix string, bindings []keys.Binding) string {
 	arrow := "➜"
 
 	type row struct {
@@ -29,12 +36,11 @@ func RenderChordOverlay(prefix string, bindings []key.Binding) string {
 	rows := make([]row, 0, len(bindings))
 	maxKeyW := 0
 	for _, b := range bindings {
-		h := b.Help()
-		if h.Key == "" && h.Desc == "" {
+		if b.Keys() == "" && b.Title == "" {
 			continue
 		}
-		rows = append(rows, row{keyLabel: h.Key, desc: h.Desc})
-		if w := ansi.StringWidth(h.Key); w > maxKeyW {
+		rows = append(rows, row{keyLabel: b.Keys(), desc: b.Title})
+		if w := ansi.StringWidth(b.Keys()); w > maxKeyW {
 			maxKeyW = w
 		}
 	}

@@ -5,9 +5,9 @@ import (
 	"unicode"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 
-	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -263,15 +263,15 @@ func (m Model) switchRelativeTab(delta int) (tea.Model, tea.Cmd) {
 }
 
 // appChordHints returns the app-level chord completions for the given prefix key.
-func (m Model) appChordHints(prefix string) []key.Binding {
+func (m Model) appChordHints(prefix string) []keys.Binding {
 	if prefix != "g" {
 		return nil
 	}
-	return []key.Binding{
-		key.NewBinding(key.WithHelp(",", "prev tab")),
-		key.NewBinding(key.WithHelp(".", "next tab")),
-		key.NewBinding(key.WithHelp("w", "worktrees tab")),
-		key.NewBinding(key.WithHelp("l", "log tab")),
-		key.NewBinding(key.WithHelp("s", "status tab")),
+	return []keys.Binding{
+		{Seq: []string{","}, Title: "prev tab"},
+		{Seq: []string{"."}, Title: "next tab"},
+		{Seq: []string{"w"}, Title: "worktrees tab"},
+		{Seq: []string{"l"}, Title: "log tab"},
+		{Seq: []string{"s"}, Title: "status tab"},
 	}
 }

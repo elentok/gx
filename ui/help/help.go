@@ -3,10 +3,10 @@ package help
 import (
 	"strings"
 
-	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/keys"
 )
 
 const (
@@ -93,10 +93,10 @@ func (m *Model) setContainerSize(containerWidth, containerHeight int) {
 
 type KeySection struct {
 	Title    string
-	Bindings []key.Binding
+	Bindings []keys.Binding
 }
 
-func NewKeySection(title string, bindings ...key.Binding) KeySection {
+func NewKeySection(title string, bindings ...keys.Binding) KeySection {
 	return KeySection{Title: title, Bindings: bindings}
 }
 
@@ -110,8 +110,7 @@ func RenderView(sections []KeySection) string {
 		heading := ui.StyleHelpHeading.Render(section.Title)
 		parts = append(parts, heading)
 		for _, b := range section.Bindings {
-			h := b.Help()
-			parts = append(parts, "  "+keyStyle.Render(h.Key)+sep+descStyle.Render(h.Desc))
+			parts = append(parts, "  "+keyStyle.Render(b.Keys())+sep+descStyle.Render(b.Title))
 		}
 		parts = append(parts, "")
 	}

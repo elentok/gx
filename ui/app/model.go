@@ -129,8 +129,10 @@ func (m Model) View() tea.View {
 	content = injectTabsIntoFooter(content, m.tabsView(), m.width)
 	if m.keyPrefix != "" {
 		hints := m.appChordHints(m.keyPrefix)
-		if hinter, ok := m.activePage().model.(ui.ChordHinter); ok {
-			hints = append(hints, hinter.ChordHints(m.keyPrefix)...)
+		if source, ok := m.activePage().model.(ui.ChordHintSource); ok {
+			if km := source.KeyManager(); km != nil {
+				hints = append(hints, ui.ChordBindingsFromHints(km.ChordHints())...)
+			}
 		}
 		if len(hints) > 0 {
 			content = ui.OverlayBottomRight(content, ui.RenderChordOverlay(m.keyPrefix, hints), m.width, m.height)

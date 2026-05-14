@@ -3,14 +3,12 @@ package log
 import (
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
-
-	"charm.land/bubbles/v2/key"
 )
 
 var helpSectionOrder = []string{"Navigation", "Search", "Jump", "Go to", "Other"}
 
 func buildKeySections(manager keys.Manager) []help.KeySection {
-	categoryBindings := make(map[string][]key.Binding)
+	categoryBindings := make(map[string][]keys.Binding)
 	seenInCategory := make(map[string]map[keys.BindingID]bool)
 	for _, b := range manager.Bindings() {
 		if b.Title == "" {
@@ -27,7 +25,7 @@ func buildKeySections(manager keys.Manager) []help.KeySection {
 				continue
 			}
 			seenInCategory[cat][b.ID] = true
-			categoryBindings[cat] = append(categoryBindings[cat], key.NewBinding(key.WithKeys(b.Seq...), key.WithHelp(b.Keys(), b.Title)))
+			categoryBindings[cat] = append(categoryBindings[cat], keys.Binding{ID: b.ID, Seq: b.Seq, Title: b.Title, Display: b.Display})
 		}
 	}
 
@@ -42,13 +40,4 @@ func buildKeySections(manager keys.Manager) []help.KeySection {
 		}
 	}
 	return sections
-}
-
-func (m Model) ChordHints(_ string) []key.Binding {
-	hints := m.keys.ChordHints()
-	result := make([]key.Binding, len(hints))
-	for i, h := range hints {
-		result[i] = key.NewBinding(key.WithHelp(h.Key, h.Desc))
-	}
-	return result
 }

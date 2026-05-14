@@ -3,7 +3,6 @@ package status
 import (
 	"fmt"
 
-	"charm.land/bubbles/v2/key"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
@@ -15,7 +14,7 @@ var helpSectionOrder = []string{"Global", "Go to", "Git", "Yank", "Search", "Fil
 // Bindings with an empty Title are skipped. Within each category, only the
 // first binding per BindingID is shown (aliases are suppressed).
 func buildKeySections(managers ...keys.Manager) []help.KeySection {
-	categoryBindings := make(map[string][]key.Binding)
+	categoryBindings := make(map[string][]keys.Binding)
 	seenInCategory := make(map[string]map[keys.BindingID]bool)
 
 	for _, mgr := range managers {
@@ -35,7 +34,7 @@ func buildKeySections(managers ...keys.Manager) []help.KeySection {
 				}
 				seenInCategory[cat][b.ID] = true
 				categoryBindings[cat] = append(categoryBindings[cat],
-					key.NewBinding(key.WithKeys(b.Seq...), key.WithHelp(b.Keys(), b.Title)))
+					keys.Binding{ID: b.ID, Seq: b.Seq, Title: b.Title, Display: b.Display})
 			}
 		}
 	}

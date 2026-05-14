@@ -98,10 +98,10 @@ func TestGShowsChordHint(t *testing.T) {
 		t.Fatalf("expected prefix=[g], got %v", p)
 	}
 	// Chord hints are now shown in the chord overlay (via ChordHints), not statusMsg.
-	hints := m.ChordHints("")
+	hints := ui.ChordBindingsFromHints(m.keyManager.ChordHints())
 	allDescs := ""
 	for _, h := range hints {
-		allDescs += " " + h.Help().Key + " " + h.Help().Desc
+		allDescs += " " + h.Keys() + " " + h.Title
 	}
 	for _, want := range []string{"g", "top", "o", "view output", "w", "goto worktrees", "l", "goto log", "s", "goto status"} {
 		if !strings.Contains(allDescs, want) {

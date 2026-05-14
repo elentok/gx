@@ -5,7 +5,6 @@ import (
 
 	"github.com/elentok/gx/ui"
 
-	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -72,10 +71,7 @@ func (m Model) View() tea.View {
 		out = ui.OverlayCenter(out, m.help.View(), m.width, m.height)
 	} else if chordHints := m.keys.ChordHints(); len(chordHints) > 0 {
 		prefix := strings.Join(m.keys.Prefix(), "")
-		bindings := make([]key.Binding, len(chordHints))
-		for i, h := range chordHints {
-			bindings[i] = key.NewBinding(key.WithHelp(h.Key, h.Desc))
-		}
+		bindings := ui.ChordBindingsFromHints(chordHints)
 		out = ui.OverlayBottomRight(out, ui.RenderChordOverlay(prefix, bindings), m.width, m.height)
 	}
 	v := tea.NewView(out)

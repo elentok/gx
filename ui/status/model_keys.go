@@ -5,7 +5,6 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 
-	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -201,16 +200,4 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model,
 		return m, m.cmdEditSelectedFile()
 	}
 	return m, nil
-}
-
-// ChordHints satisfies ui.ChordHinter so the app model can include status-model
-// chord hints in its own overlay. The prefix argument is ignored — the Manager
-// tracks prefix state internally.
-func (m Model) ChordHints(_ string) []key.Binding {
-	hints := m.keys.ChordHints()
-	result := make([]key.Binding, len(hints))
-	for i, h := range hints {
-		result[i] = key.NewBinding(key.WithHelp(h.Key, h.Desc))
-	}
-	return result
 }

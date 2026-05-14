@@ -1,7 +1,6 @@
 package commit
 
 import (
-	"charm.land/bubbles/v2/key"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
 )
@@ -10,7 +9,7 @@ var commitHelpSectionOrder = []string{"Global", "Go to", "Header", "Diff", "Yank
 
 func buildCommitKeySections(manager keys.Manager) []help.KeySection {
 	sections := []help.KeySection{}
-	byCategory := map[string][]key.Binding{}
+	byCategory := map[string][]keys.Binding{}
 	seen := map[string]map[keys.BindingID]bool{}
 	for _, b := range manager.Bindings() {
 		if b.Title == "" {
@@ -27,7 +26,7 @@ func buildCommitKeySections(manager keys.Manager) []help.KeySection {
 				continue
 			}
 			seen[cat][b.ID] = true
-			byCategory[cat] = append(byCategory[cat], key.NewBinding(key.WithKeys(b.Seq...), key.WithHelp(b.Keys(), b.Title)))
+			byCategory[cat] = append(byCategory[cat], keys.Binding{ID: b.ID, Seq: b.Seq, Title: b.Title, Display: b.Display})
 		}
 	}
 	for _, cat := range commitHelpSectionOrder {
@@ -38,13 +37,4 @@ func buildCommitKeySections(manager keys.Manager) []help.KeySection {
 		sections = append(sections, help.NewKeySection(cat, bindings...))
 	}
 	return sections
-}
-
-func (m Model) ChordHints(_ string) []key.Binding {
-	hints := m.keys.ChordHints()
-	out := make([]key.Binding, len(hints))
-	for i, h := range hints {
-		out[i] = key.NewBinding(key.WithHelp(h.Key, h.Desc))
-	}
-	return out
 }
