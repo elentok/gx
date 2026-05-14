@@ -10,7 +10,8 @@ import (
 	"github.com/elentok/gx/ui/keybindings"
 	"github.com/elentok/gx/ui/search"
 
-	"charm.land/bubbles/v2/viewport"
+	"github.com/elentok/gx/ui/help"
+
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -40,9 +41,8 @@ type Model struct {
 	commitSearchState
 	commitSidebarState
 
-	helpOpen     bool
-	helpViewport viewport.Model
-	keys         keybindings.Manager
+	help help.Model
+	keys keybindings.Manager
 }
 
 type editCommentFinishedMsg struct {
@@ -85,6 +85,7 @@ func NewWithSettings(worktreeRoot, ref string, settings Settings) Model {
 		},
 		keys: newCommitManager(),
 	}
+	m.help = help.NewModel(buildCommitKeySections(m.keys))
 	m.reload()
 	return m
 }

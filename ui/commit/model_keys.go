@@ -93,7 +93,8 @@ func (m Model) dispatchBinding(id keybindings.BindingID) (tea.Model, tea.Cmd) {
 	switch id {
 	case bindingHelp:
 		m.keys.Reset()
-		return m.enterHelpMode(), nil
+		m.help.Open(m.width, m.height)
+		return m, nil
 	case bindingQuit:
 		if m.search.IsActive() {
 			m.search.DismissAndClear()

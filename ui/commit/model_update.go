@@ -29,8 +29,10 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if key == "ctrl+c" {
 		return m, tea.Quit
 	}
-	if m.helpOpen {
-		return m.handleHelpKey(msg)
+	if m.help.IsOpen {
+		var cmd tea.Cmd
+		m.help, cmd = m.help.Update(msg)
+		return m, cmd
 	}
 	newSearch, cmd, result := m.search.Update(msg)
 	m.search = newSearch

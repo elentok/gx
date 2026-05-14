@@ -1,0 +1,20 @@
+date,branch,commit_subject,d_tokens,t_tokens,d_over_t
+2026-05-09,main,"status: inline diff bridge helpers into explorer host [est]",180,2400,0.075
+2026-05-09,main,"status: rename filetree bridge and centralize reconciliation [est]",170,2200,0.077
+2026-05-09,main,"status: simplify search scope and prune dead api [est]",160,2400,0.067
+2026-05-10,main,"status: keep empty diff sections visible [est]",320,2600,0.123
+2026-05-10,main,"status: tighten filetree focus and diff switching [est]",340,2800,0.121
+2026-05-10,main,"status: keep selected diff section on file change [est]",300,2500,0.120
+2026-05-10,main,"status: flash moved destination section [est]",290,2400,0.121
+2026-05-10,main,"status: show selected path in expanded diff pane [est]",280,2300,0.122
+2026-05-10,main,"status: use ellipsis in footer truncation [est]",300,2400,0.125
+2026-05-11,main,"status: clarify diff ownership [est]",260,3000,0.087
+2026-05-11,main,"status: extract diff area state [est]",330,3100,0.106
+2026-05-11,main,"refactor: complete explorer removal and stabilize commit architecture [est]",4200,36000,0.117
+2026-05-11,main,"search: replace bool return with Result struct for state signals [est]",140,2000,0.070
+2026-05-11,main,"status: remove diffSection alias and simplify renderSectionPane [est]",150,2200,0.068
+2026-05-12,main,"keybindings+status: migrate chord dispatch to keybindings.Manager",8200,33726,0.243
+2026-05-13,main,"status+filetree+diffarea: migrate key dispatch to keybindings.Manager",30881,75000,0.412
+2026-05-13,main,"status+filetree+diffarea: generate help from keybindings metadata [est]",34555,55000,0.628
+2026-05-13,main,"filetree+diffarea: extract keybindings to model_keys.go [est]",3200,9000,0.356
+2026-05-13,main,"status: cancel running runner on quit [est]",2400,28197,0.085
