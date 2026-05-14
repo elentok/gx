@@ -19,6 +19,7 @@ const (
 	bindingGotoStatus    keybindings.BindingID = "goto-status"
 	bindingGotoWorktrees keybindings.BindingID = "goto-worktrees"
 	bindingGitCommit     keybindings.BindingID = "git-commit"
+	bindingComment       keybindings.BindingID = "comment"
 	bindingYankContent   keybindings.BindingID = "yank-content"
 	bindingYankLocation  keybindings.BindingID = "yank-location"
 	bindingYankAll       keybindings.BindingID = "yank-all"
@@ -61,6 +62,7 @@ func newStatusManager() keybindings.Manager {
 
 		// c-prefix chords
 		{ID: bindingGitCommit, Seq: []string{"c", "c"}, Categories: []string{"Global"}, Title: "git commit"},
+		{ID: bindingComment, Seq: []string{"c", "m"}, Categories: []string{"Diff"}, Title: "comment"},
 		{ID: bindingCancelChord, Seq: []string{"c", "esc"}, Categories: []string{}, Title: ""},
 
 		// y-prefix chords
@@ -139,6 +141,11 @@ func (m Model) dispatchBinding(id keybindings.BindingID, _ tea.KeyPressMsg) (tea
 	case bindingGitCommit:
 		m.setStatus(ui.MessageOpening("git commit"))
 		return m, cmdGitCommit(m.worktreeRoot, m.settings.Terminal)
+	case bindingComment:
+		if m.focus != focusDiff {
+			return m, nil
+		}
+		return m, m.cmdCreateCommentFromDiff()
 	case bindingYankContent:
 		m.yankContentOnly()
 		return m, nil

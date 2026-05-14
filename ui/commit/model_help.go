@@ -147,6 +147,13 @@ func (m Model) ChordHints(prefix string) []key.Binding {
 		return []key.Binding{
 			key.NewBinding(key.WithHelp("r", "refresh")),
 		}
+	case "c":
+		if m.focusDiff {
+			return []key.Binding{
+				key.NewBinding(key.WithHelp("m", "comment")),
+			}
+		}
+		return nil
 	}
 	return nil
 }

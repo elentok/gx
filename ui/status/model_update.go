@@ -46,6 +46,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleLazygitLogFinished(msg)
 	case editFileFinishedMsg:
 		return m.handleEditFileFinished(msg)
+	case editCommentFinishedMsg:
+		return m.handleEditCommentFinished(msg)
 	case search.JumpToMatchMsg:
 		return m.handleJumpToMatch(msg)
 	case search.SearchQueryUpdatedMsg:
@@ -247,6 +249,19 @@ func (m Model) handleEditFileFinished(msg editFileFinishedMsg) (tea.Model, tea.C
 		return m, nil
 	}
 	m.setStatus(ui.MessageClosed("editor"))
+	return m, m.refresh()
+}
+
+func (m Model) handleEditCommentFinished(msg editCommentFinishedMsg) (tea.Model, tea.Cmd) {
+	if msg.err != nil {
+		m.setStatus("comment edit failed: " + msg.err.Error())
+		return m, nil
+	}
+	if msg.splitApp != "" {
+		m.setStatus("opened " + msg.splitApp + " split: comment editor")
+		return m, nil
+	}
+	m.setStatus(ui.MessageClosed("comment editor"))
 	return m, m.refresh()
 }
 

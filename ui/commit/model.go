@@ -44,6 +44,11 @@ type Model struct {
 	helpViewport viewport.Model
 }
 
+type editCommentFinishedMsg struct {
+	err      error
+	splitApp string
+}
+
 type commitDiffArea struct {
 	diffModel diffview.Model
 }

@@ -2108,6 +2108,49 @@ func TestCCTriggersCommitCommand(t *testing.T) {
 	}
 }
 
+func TestCMInFiletreeDoesNothing(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "README.md", "changed\n")
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusFiletree
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+	if cmd != nil {
+		t.Fatalf("first c should not launch command")
+	}
+	m = updated.(Model)
+
+	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
+	if cmd != nil {
+		t.Fatalf("cm in filetree should not launch command")
+	}
+	m = updated.(Model)
+	if m.statusMsg != "" {
+		t.Fatalf("cm in filetree should not set status, got %q", m.statusMsg)
+	}
+}
+
+func TestCMInDiffWithoutFileContextShowsError(t *testing.T) {
+	repo := testutil.TempRepo(t)
+
+	m := New(repo)
+	m.ready = true
+	m.focus = focusDiff
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+	m = updated.(Model)
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
+	if cmd != nil {
+		t.Fatalf("cm without file context should not launch command")
+	}
+	m = updated.(Model)
+	if m.statusMsg != "no file context for comment" {
+		t.Fatalf("status = %q, want %q", m.statusMsg, "no file context for comment")
+	}
+}
+
 func TestYShowsBindingDrivenYankHint(t *testing.T) {
 	repo := testutil.TempRepo(t)
 

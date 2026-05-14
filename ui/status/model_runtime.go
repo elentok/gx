@@ -1,15 +1,16 @@
 package status
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/elentok/gx/ui"
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/comments"
+	"github.com/elentok/gx/ui/terminalrun"
 )
 
 func nextFlashCmd() tea.Cmd {
@@ -31,27 +32,8 @@ func statusStartupLoadCmd() tea.Cmd {
 }
 
 func cmdGitCommit(worktreeRoot string, terminal ui.Terminal) tea.Cmd {
-	if terminal == ui.TerminalTmux {
-		return func() tea.Msg {
-			err := exec.Command("tmux", "split-window", "-v", "-c", worktreeRoot, "git commit").Run()
-			return commitFinishedMsg{err: err, splitApp: "tmux"}
-		}
-	}
-	if terminal == ui.TerminalKittyRemote {
-		return func() tea.Msg {
-			args := []string{"@", "launch", "--copy-env", "--location=hsplit", "--cwd=" + worktreeRoot}
-			args = append(args, "git", "commit")
-			out, err := exec.Command("kitty", args...).CombinedOutput()
-			if err != nil {
-				err = fmt.Errorf("$ kitty %s\n\n%w\n\n%s", strings.Join(args, " "), err, strings.TrimSpace(string(out)))
-			}
-			return commitFinishedMsg{err: err, splitApp: "kitty"}
-		}
-	}
-	c := exec.Command("git", "commit")
-	c.Dir = worktreeRoot
-	return tea.ExecProcess(c, func(err error) tea.Msg {
-		return commitFinishedMsg{err: err}
+	return terminalrun.Command(worktreeRoot, terminal, "git", []string{"commit"}, func(err error, splitApp string) tea.Msg {
+		return commitFinishedMsg{err: err, splitApp: splitApp}
 	})
 }
 
@@ -86,6 +68,23 @@ func (m *Model) cmdEditSelectedFile() tea.Cmd {
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		return editFileFinishedMsg{err: err}
 	})
+}
+
+func (m *Model) cmdCreateCommentFromDiff() tea.Cmd {
+	file, ok := m.selectedStatusFile()
+	if !ok {
+		m.setStatus("no file context for comment")
+		return nil
+	}
+	loc, body, ok := m.commentLocationAndBody()
+	if !ok {
+		return nil
+	}
+	cmd, msg := comments.CmdOpenEditor(file.Path, loc, body, m.worktreeRoot, m.settings.Terminal, func(err error, splitApp string) tea.Msg {
+		return editCommentFinishedMsg{err: err, splitApp: splitApp}
+	})
+	m.setStatus(msg)
+	return cmd
 }
 
 func (m *Model) refresh() tea.Cmd {

@@ -707,3 +707,45 @@ func TestHeaderScrollRequiresHeaderFocus(t *testing.T) {
 		t.Fatalf("expected j with header focus to scroll header")
 	}
 }
+
+func TestCMOutsideDiffDoesNothing(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "README.md", "one\n")
+	testutil.CommitAll(t, repo, "base")
+
+	m := New(repo, "HEAD")
+	m.focusDiff = false
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+	m = updated.(Model)
+	if cmd != nil {
+		t.Fatalf("first c should not run command")
+	}
+	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
+	m = updated.(Model)
+	if cmd != nil {
+		t.Fatalf("cm outside diff should not run command")
+	}
+	if m.statusMsg != "" {
+		t.Fatalf("status = %q, want empty", m.statusMsg)
+	}
+}
+
+func TestCMInDiffWithoutFileContextShowsError(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	m := New(repo, "HEAD")
+	m.focusDiff = true
+	m.files = nil
+	m.fileTreeModel.SetEntries(nil)
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+	m = updated.(Model)
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
+	m = updated.(Model)
+	if cmd != nil {
+		t.Fatalf("cm without file context should not run command")
+	}
+	if m.statusMsg != "no file context for comment" {
+		t.Fatalf("status = %q, want %q", m.statusMsg, "no file context for comment")
+	}
+}

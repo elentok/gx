@@ -13,6 +13,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleWindowSize(msg)
 	case tea.KeyPressMsg:
 		return m.handleKeyPress(msg)
+	case editCommentFinishedMsg:
+		return m.handleEditCommentFinished(msg)
 	}
 	return m, nil
 }
@@ -316,12 +318,29 @@ func (m Model) handleChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		}
 		return m, nil, true
 	}
+	if m.keyPrefix == "c" {
+		m.keyPrefix = ""
+		switch key {
+		case "m":
+			if !m.focusDiff {
+				return m, nil, true
+			}
+			return m, m.cmdCreateCommentFromDiff(), true
+		case "esc":
+			return m, nil, true
+		}
+		return m, nil, true
+	}
 	if key == "y" {
 		m.keyPrefix = "y"
 		return m, nil, true
 	}
 	if key == "m" {
 		m.keyPrefix = "m"
+		return m, nil, true
+	}
+	if key == "c" {
+		m.keyPrefix = "c"
 		return m, nil, true
 	}
 	if key == "g" && !isUpperG {

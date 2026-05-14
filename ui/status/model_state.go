@@ -27,7 +27,7 @@ type Model struct {
 	ready  bool
 
 	focus            focusPane
-	diffarea diffarea.Model
+	diffarea         diffarea.Model
 	diffContextLines int
 	statusData       statusData
 	fileTreeModel    filetree.Model[git.StageFileStatus]
@@ -68,8 +68,8 @@ type Model struct {
 	outputTitle             string
 	outputContent           string
 	outputViewport          viewport.Model
-	pendingActionOutput string
-	keys                keybindings.Manager
+	pendingActionOutput     string
+	keys                    keybindings.Manager
 }
 
 type statusData struct {
@@ -113,6 +113,10 @@ type commitFinishedMsg struct {
 
 type lazygitLogFinishedMsg struct{ err error }
 type editFileFinishedMsg struct{ err error }
+type editCommentFinishedMsg struct {
+	err      error
+	splitApp string
+}
 
 const statusMessageTTL = 5 * time.Second
 const statusDiffReloadDebounce = 100 * time.Millisecond
