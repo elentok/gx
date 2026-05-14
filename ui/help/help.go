@@ -47,8 +47,6 @@ func (m Model) View() string {
 		return ""
 	}
 
-	m.Viewport.SetContent(RenderView(m.KeySections))
-
 	return ui.RenderModalFrame(ui.ModalFrameOptions{
 		Title:         "Keybindings",
 		Body:          m.Viewport.View(),
@@ -83,6 +81,7 @@ func NewViewportModel(containerWidth int, containerHeight int) viewport.Model {
 func (m *Model) Open(containerWidth, containerHeight int) {
 	m.IsOpen = true
 	m.setContainerSize(containerWidth, containerHeight)
+	m.Viewport.SetContent(RenderView(m.KeySections))
 }
 
 func (m *Model) setContainerSize(containerWidth, containerHeight int) {
