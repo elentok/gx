@@ -106,13 +106,27 @@ func buildSteps(root, hash string) ([]execStep, error) {
 		}, nil
 	}
 
-	changes, err := git.UncommittedChanges(root)
+	// Check for unstaged working-tree changes BEFORE the fixup commit is created.
+	// These need to be stashed so the rebase can run on a clean working tree.
+	// Staged changes are consumed by the fixup commit (step 1) and don't need stashing.
+	needStash, err := git.HasUnstagedChanges(root)
 	if err != nil {
 		return nil, err
 	}
-	needStash := len(changes) > 0
 
-	var steps []execStep
+	// Step order: fixup first (consumes staged changes), then stash unstaged changes,
+	// then rebase, then pop. This avoids stashing the staged changes.
+	steps := []execStep{
+		{
+			Step: components.Step{
+				TitleBefore:  "create fixup commit",
+				RunningTitle: "creating fixup commit...",
+				TitleAfter:   "created fixup commit",
+				TitleFailed:  "fixup commit failed",
+			},
+			run: func() (string, error) { return git.CommitFixup(root, hash) },
+		},
+	}
 	if needStash {
 		steps = append(steps, execStep{
 			Step: components.Step{
@@ -125,15 +139,6 @@ func buildSteps(root, hash string) ([]execStep, error) {
 		})
 	}
 	steps = append(steps,
-		execStep{
-			Step: components.Step{
-				TitleBefore:  "create fixup commit",
-				RunningTitle: "creating fixup commit...",
-				TitleAfter:   "created fixup commit",
-				TitleFailed:  "fixup commit failed",
-			},
-			run: func() (string, error) { return git.CommitFixup(root, hash) },
-		},
 		execStep{
 			Step: components.Step{
 				TitleBefore:  "rebase",

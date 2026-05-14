@@ -215,6 +215,36 @@ func PushBranchWithUpstream(t *testing.T, dir, remote, branch string) {
 	mustGit(t, dir, "push", "--set-upstream", remote, branch)
 }
 
+// TempRepoWithThreeCommits creates a regular git repo with three commits:
+//   - "initial": README.md
+//   - "middle":  a.txt ("a original\n"), b.txt ("b original\n")
+//   - "tip":     c.txt ("c original\n")
+func TempRepoWithThreeCommits(t *testing.T) string {
+	t.Helper()
+	dir := TempRepo(t)
+	WriteFile(t, dir, "a.txt", "a original\n")
+	WriteFile(t, dir, "b.txt", "b original\n")
+	CommitAll(t, dir, "middle")
+	WriteFile(t, dir, "c.txt", "c original\n")
+	CommitAll(t, dir, "tip")
+	return dir
+}
+
+// TempRepoWithConflictSetup creates a regular git repo where amending "middle"
+// with any change to a.txt will conflict with "tip":
+//   - "initial": README.md
+//   - "middle":  a.txt ("line from middle\n")
+//   - "tip":     a.txt ("line from tip\n") — same file, different content
+func TempRepoWithConflictSetup(t *testing.T) string {
+	t.Helper()
+	dir := TempRepo(t)
+	WriteFile(t, dir, "a.txt", "line from middle\n")
+	CommitAll(t, dir, "middle")
+	WriteFile(t, dir, "a.txt", "line from tip\n")
+	CommitAll(t, dir, "tip")
+	return dir
+}
+
 // AmendLastCommit adds a marker file and amends the last commit, changing its hash.
 func AmendLastCommit(t *testing.T, dir string) {
 	t.Helper()

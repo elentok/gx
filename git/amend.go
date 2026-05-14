@@ -63,7 +63,19 @@ func RebaseAutosquash(root, hash string) (string, error) {
 	)
 }
 
-// StashPushAuto stashes all changes (including untracked) with a gx auto-stash label.
+// HasUnstagedChanges reports whether there are tracked working-tree changes not yet in the index.
+func HasUnstagedChanges(root string) (bool, error) {
+	_, _, err := run(root, []string{"diff", "--quiet"})
+	if err != nil {
+		if runErr, ok := err.(*RunError); ok && runErr.Code == 1 {
+			return true, nil
+		}
+		return false, err
+	}
+	return false, nil
+}
+
+// StashPushAuto stashes all tracked working-tree changes plus untracked files.
 func StashPushAuto(root string) (string, error) {
 	stdout, stderr, err := run(root, []string{"stash", "push", "-u", "-m", "gx-amend-auto-stash"})
 	return joinOutput(stdout, stderr), err
