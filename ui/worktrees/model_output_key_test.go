@@ -36,8 +36,8 @@ func TestGGJumpsToTop(t *testing.T) {
 		// just set keyPrefix, no cmd yet
 	}
 	m = updated.(Model)
-	if m.keyPrefix != "g" {
-		t.Fatalf("expected keyPrefix=g after first g, got %q", m.keyPrefix)
+	if p := m.keyManager.Prefix(); len(p) != 1 || p[0] != "g" {
+		t.Fatalf("expected prefix=[g] after first g, got %v", p)
 	}
 
 	// Second g jumps to top
@@ -64,8 +64,8 @@ func TestGOOpensLogsMode(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	m = updated.(Model)
-	if m.keyPrefix != "g" {
-		t.Fatalf("expected keyPrefix=g after g, got %q", m.keyPrefix)
+	if p := m.keyManager.Prefix(); len(p) != 1 || p[0] != "g" {
+		t.Fatalf("expected prefix=[g] after g, got %v", p)
 	}
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
@@ -94,11 +94,11 @@ func TestGShowsChordHint(t *testing.T) {
 	}
 	m = updated.(Model)
 
-	if m.keyPrefix != "g" {
-		t.Fatalf("expected keyPrefix=g, got %q", m.keyPrefix)
+	if p := m.keyManager.Prefix(); len(p) != 1 || p[0] != "g" {
+		t.Fatalf("expected prefix=[g], got %v", p)
 	}
 	// Chord hints are now shown in the chord overlay (via ChordHints), not statusMsg.
-	hints := m.ChordHints("g")
+	hints := m.ChordHints("")
 	allDescs := ""
 	for _, h := range hints {
 		allDescs += " " + h.Help().Key + " " + h.Help().Desc
@@ -161,8 +161,8 @@ func TestGLNavigatesToLogWhenNavigationEnabled(t *testing.T) {
 		t.Fatalf("expected log route, got %q", route.Kind)
 	}
 	m = updated.(Model)
-	if m.keyPrefix != "" {
-		t.Fatalf("expected keyPrefix reset after gl, got %q", m.keyPrefix)
+	if p := m.keyManager.Prefix(); len(p) != 0 {
+		t.Fatalf("expected prefix reset after gl, got %v", p)
 	}
 }
 

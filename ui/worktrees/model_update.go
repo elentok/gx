@@ -6,9 +6,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
-	"github.com/elentok/gx/ui/nav"
 
-	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 )
@@ -91,101 +89,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case modePushDiverged:
 			return m.handlePushDivergedKey(msg)
 		}
-		if handledModel, cmd, handled := m.handleChordKey(msg); handled {
-			return handledModel, cmd
+		match, consumed := m.keyManager.Process(msg)
+		if match != nil {
+			return m.dispatchBinding(match.ID)
 		}
-		switch {
-		case key.Matches(msg, keys.Search) && !m.spinnerActive:
-			m = m.enterSearchMode()
+		if consumed {
 			return m, nil
-		case msg.String() == "esc" && m.settings.EnableNavigation:
-			return m, nav.Back()
-		case key.Matches(msg, keys.Quit):
-			if m.settings.EnableNavigation {
-				return m, nav.Back()
-			}
-			return m, tea.Quit
-		case key.Matches(msg, keys.Help):
-			m = m.enterHelpMode()
-			return m, nil
-		case key.Matches(msg, keys.New) && !m.spinnerActive:
-			m = m.enterNewMode()
-			return m, nil
-		case key.Matches(msg, keys.NewAndOpen) && !m.spinnerActive:
-			m = m.enterNewAndOpenMode()
-			return m, nil
-		case key.Matches(msg, keys.Delete) && len(m.worktrees) > 0 && !m.spinnerActive:
-			return m.enterDeleteConfirm(), nil
-		case key.Matches(msg, keys.Rename) && len(m.worktrees) > 0 && !m.spinnerActive:
-			m = m.enterRenameMode()
-			return m, nil
-		case key.Matches(msg, keys.Clone) && len(m.worktrees) > 0 && !m.spinnerActive:
-			m = m.enterCloneMode()
-			return m, nil
-		case key.Matches(msg, keys.Yank) && len(m.worktrees) > 0 && !m.spinnerActive:
-			return m.enterYankMode()
-		case key.Matches(msg, keys.Pull) && len(m.worktrees) > 0 && !m.spinnerActive:
-			wt := m.selectedWorktree()
-			if wt != nil {
-				dirty := m.dirties[wt.Path]
-				if dirty.hasModified || dirty.hasUntracked {
-					return m.enterConfirmWithCancel(
-						"Stash changes before pulling "+wt.Name+"?",
-						cmdStashPull(*wt),
-						"Pulling "+wt.Name+"…",
-						"pull aborted (dirty worktree)",
-					), nil
-				}
-				return m, cmdStartPromptableJob(promptableJobPull, *wt, "", false)
-			}
-		case key.Matches(msg, keys.Push) && len(m.worktrees) > 0 && !m.spinnerActive:
-			wt := m.selectedWorktree()
-			if wt != nil {
-				if wt.Branch == "" {
-					return m.showError("cannot push: worktree is in detached HEAD state"), nil
-				}
-				prompt := fmt.Sprintf("Push %s?", wt.Branch)
-				return m.enterConfirm(prompt, cmdStartPromptableJob(promptableJobPushFetch, *wt, "", false), "Checking remote divergence…"), nil
-			}
-		case key.Matches(msg, keys.Rebase) && len(m.worktrees) > 0 && !m.spinnerActive:
-			wt := m.selectedWorktree()
-			if wt != nil {
-				if wt.Branch == "" {
-					return m.showError("cannot rebase: worktree is in detached HEAD state"), nil
-				}
-				if m.repo.MainBranch == "" {
-					return m.showError("cannot rebase: no main branch detected"), nil
-				}
-				if wt.Branch == m.repo.MainBranch {
-					return m.showError("cannot rebase: already on " + m.repo.MainBranch), nil
-				}
-				prompt := fmt.Sprintf("Rebase %s on %s?", wt.Branch, m.repo.MainBranch)
-				dirty := m.dirties[wt.Path]
-				if dirty.hasModified || dirty.hasUntracked {
-					return m.enterConfirm(prompt, cmdRebasePreflight(m.repo, *wt), ""), nil
-				}
-				return m.enterConfirm(prompt, cmdRebase(m.repo, *wt, false), "Rebasing "+wt.Name+"…"), nil
-			}
-		case key.Matches(msg, keys.Refresh) && !m.spinnerActive:
-			m.loading = true
-			return m, tea.Batch(cmdLoadWorktrees(m.repo), cmdPruneRemotes(m.repo))
-		case key.Matches(msg, keys.RemoteUpdate) && !m.spinnerActive:
-			m.spinnerActive = true
-			m.spinnerLabel = "Fetching remotes…"
-			return m, tea.Batch(cmdRemoteUpdate(m.repo), m.spinner.Tick)
-		case key.Matches(msg, keys.Track) && len(m.worktrees) > 0 && !m.spinnerActive && m.sidebarUpstream == "":
-			wt := m.selectedWorktree()
-			if wt != nil {
-				if wt.Branch == "" {
-					return m.showError("cannot track: worktree is in detached HEAD state"), nil
-				}
-				return m.enterTrackConfirm(), nil
-			}
-		case msg.String() == "enter" && len(m.worktrees) > 0 && m.settings.EnableNavigation:
-			wt := m.selectedWorktree()
-			if wt != nil {
-				return m, nav.Replace(nav.Route{Kind: nav.RouteLog, WorktreeRoot: wt.Path})
-			}
 		}
 
 	case deleteResultMsg:

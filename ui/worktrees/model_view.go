@@ -43,10 +43,10 @@ func (m Model) View() tea.View {
 			content = ui.OverlayBottomCenter(bg, overlay, m.width, y)
 		default:
 			content = bg
-			if m.keyPrefix != "" {
-				hints := m.ChordHints(m.keyPrefix)
+			if prefix := m.keyManager.Prefix(); len(prefix) > 0 {
+				hints := m.ChordHints("")
 				if len(hints) > 0 {
-					content = ui.OverlayBottomRight(content, ui.RenderChordOverlay(m.keyPrefix, hints), m.width, m.height)
+					content = ui.OverlayBottomRight(content, ui.RenderChordOverlay(prefix[0], hints), m.width, m.height)
 				}
 			}
 		}

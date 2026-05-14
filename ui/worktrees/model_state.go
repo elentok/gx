@@ -5,6 +5,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
+	keymgr "github.com/elentok/gx/ui/keys"
 
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/spinner"
@@ -112,7 +113,7 @@ type Model struct {
 	searchQuery   string
 	searchMatches []int
 	searchCursor  int
-	keyPrefix     string
+	keyManager    keymgr.Manager
 
 	openTargetName string
 	openTargetPath string
@@ -153,6 +154,7 @@ func NewWithSettings(repo git.Repo, activeWorktreePath string, settings Settings
 		table:              newTable(),
 		loading:            true,
 		help:               newWorktreeHelpModel(),
+		keyManager:         newWorktreesManager(),
 		spinner:            sp,
 	}
 }
