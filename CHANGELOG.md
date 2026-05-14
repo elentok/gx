@@ -2,9 +2,9 @@
 
 ## v0.14.5
 
+- Add `cm` keybinding in `gx status` and `gx commit` to open `$EDITOR` and write a comment on the currently selected diff hunk
+- Fix help modal scroll — scrolling past the last visible line no longer gets stuck
 - Add `A` keybinding in log and commit views to amend a specific commit with currently staged changes
-- HEAD commits use `git commit --amend --no-edit`; non-HEAD commits use fixup + non-interactive autosquash rebase with auto-stash/restore
-- Confirmation modal shows target commit hash, subject, staged files, and an orange warning if the commit has been pushed to a remote
 
 ## v0.14.4
 
