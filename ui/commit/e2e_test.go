@@ -135,6 +135,19 @@ func TestAmendE2E_NonHEAD_FromCommitView(t *testing.T) {
 	tm.Send(commitE2EKeySpecial(tea.KeyEnter))
 	middleHashAfter := waitForCommitHashChange(t, tm, repoDir, "middle", middleHashBefore)
 
+	// waitForCommitHashChange returns when the rebase lands, but the stash-pop
+	// step is still running as a background goroutine. Wait for it to finish
+	// (b.txt appears unstaged) before sending ctrl+c so WaitFinished doesn't race.
+	teatest.WaitFor(t, tm.Output(), func(_ []byte) bool {
+		cmd := exec.Command("git", "diff", "--name-only")
+		cmd.Dir = repoDir
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return false
+		}
+		return strings.Contains(string(out), "b.txt")
+	}, teatest.WithDuration(commitE2EActionWait))
+
 	commitE2EQuit(t, tm)
 
 	// a.txt diff in the amended commit should contain the staged change
