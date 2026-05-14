@@ -1,30 +1,30 @@
 package diffarea
 
-import "github.com/elentok/gx/ui/keybindings"
+import "github.com/elentok/gx/ui/keys"
 
 const (
 	diffCat = "Diff"
 
-	BindingMoveDown   keybindings.BindingID = "move-down"
-	BindingMoveUp     keybindings.BindingID = "move-up"
-	BindingScrollDown keybindings.BindingID = "scroll-down"
-	BindingScrollUp   keybindings.BindingID = "scroll-up"
-	BindingPageDown   keybindings.BindingID = "page-down"
-	BindingPageUp     keybindings.BindingID = "page-up"
-	BindingNavMode    keybindings.BindingID = "nav-mode"
-	BindingVisual     keybindings.BindingID = "visual"
-	BindingFullscreen keybindings.BindingID = "fullscreen"
-	BindingWrap       keybindings.BindingID = "wrap"
-	BindingSearchNext keybindings.BindingID = "search-next"
-	BindingSearchPrev keybindings.BindingID = "search-prev"
-	BindingBack       keybindings.BindingID = "back"
-	BindingApply      keybindings.BindingID = "apply"
-	BindingDiscard    keybindings.BindingID = "discard"
-	BindingNextFile   keybindings.BindingID = "next-file"
-	BindingPrevFile   keybindings.BindingID = "prev-file"
+	BindingMoveDown   keys.BindingID = "move-down"
+	BindingMoveUp     keys.BindingID = "move-up"
+	BindingScrollDown keys.BindingID = "scroll-down"
+	BindingScrollUp   keys.BindingID = "scroll-up"
+	BindingPageDown   keys.BindingID = "page-down"
+	BindingPageUp     keys.BindingID = "page-up"
+	BindingNavMode    keys.BindingID = "nav-mode"
+	BindingVisual     keys.BindingID = "visual"
+	BindingFullscreen keys.BindingID = "fullscreen"
+	BindingWrap       keys.BindingID = "wrap"
+	BindingSearchNext keys.BindingID = "search-next"
+	BindingSearchPrev keys.BindingID = "search-prev"
+	BindingBack       keys.BindingID = "back"
+	BindingApply      keys.BindingID = "apply"
+	BindingDiscard    keys.BindingID = "discard"
+	BindingNextFile   keys.BindingID = "next-file"
+	BindingPrevFile   keys.BindingID = "prev-file"
 )
 
-var diffBindings = []keybindings.Binding{
+var diffBindings = []keys.Binding{
 	{ID: BindingMoveDown, Seq: []string{"j"}, Categories: []string{diffCat}, Title: "move down", Display: "↓/j"},
 	{ID: BindingMoveUp, Seq: []string{"k"}, Categories: []string{diffCat}, Title: "move up", Display: "↑/k"},
 	{ID: BindingScrollDown, Seq: []string{"J"}, Categories: []string{diffCat}, Title: "scroll down"},

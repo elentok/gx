@@ -1,22 +1,22 @@
-package keybindings_test
+package keys_test
 
 import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/elentok/gx/ui/keybindings"
+	"github.com/elentok/gx/ui/keys"
 )
 
 const (
-	bindingMoveDown     keybindings.BindingID = "move-down"
-	bindingGotoTop      keybindings.BindingID = "goto-top"
-	bindingGotoLog      keybindings.BindingID = "goto-log"
-	bindingYankContent  keybindings.BindingID = "yank-content"
-	bindingYankLocation keybindings.BindingID = "yank-location"
+	bindingMoveDown     keys.BindingID = "move-down"
+	bindingGotoTop      keys.BindingID = "goto-top"
+	bindingGotoLog      keys.BindingID = "goto-log"
+	bindingYankContent  keys.BindingID = "yank-content"
+	bindingYankLocation keys.BindingID = "yank-location"
 )
 
-func testManager() keybindings.Manager {
-	return keybindings.New([]keybindings.Binding{
+func testManager() keys.Manager {
+	return keys.New([]keys.Binding{
 		{ID: bindingMoveDown, Seq: []string{"j"}, Categories: []string{"Navigation"}, Title: "move down"},
 		{ID: bindingGotoTop, Seq: []string{"g", "g"}, Categories: []string{"Navigation"}, Title: "go to top"},
 		{ID: bindingGotoLog, Seq: []string{"g", "l"}, Categories: []string{"Go to"}, Title: "goto log"},
@@ -105,7 +105,7 @@ func TestProcess_Unregistered_Key(t *testing.T) {
 }
 
 func TestProcess_ShiftModifier_Normalization(t *testing.T) {
-	m := keybindings.New([]keybindings.Binding{
+	m := keys.New([]keys.Binding{
 		{ID: "goto-bottom", Seq: []string{"G"}, Title: "go to bottom"},
 	})
 	// Some terminals send lowercase 'g' with ModShift instead of 'G'.
@@ -179,14 +179,14 @@ func TestReset_ClearsPrefix(t *testing.T) {
 }
 
 func TestBinding_Keys_Default(t *testing.T) {
-	b := keybindings.Binding{Seq: []string{"g", "l"}}
+	b := keys.Binding{Seq: []string{"g", "l"}}
 	if b.Keys() != "g/l" {
 		t.Fatalf("Keys()=%q want g/l", b.Keys())
 	}
 }
 
 func TestBinding_Keys_Override(t *testing.T) {
-	b := keybindings.Binding{Seq: []string{"up", "k"}, Display: "↑/k"}
+	b := keys.Binding{Seq: []string{"up", "k"}, Display: "↑/k"}
 	if b.Keys() != "↑/k" {
 		t.Fatalf("Keys()=%q want ↑/k", b.Keys())
 	}

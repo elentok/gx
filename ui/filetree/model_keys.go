@@ -1,26 +1,26 @@
 package filetree
 
-import "github.com/elentok/gx/ui/keybindings"
+import "github.com/elentok/gx/ui/keys"
 
 const (
 	filetreeCat = "Filetree"
 
-	BindingMoveDown    keybindings.BindingID = "move-down"
-	BindingMoveUp      keybindings.BindingID = "move-up"
-	BindingCollapse    keybindings.BindingID = "collapse"
-	BindingExpand      keybindings.BindingID = "expand"
-	BindingToggle      keybindings.BindingID = "toggle"
-	BindingSearch      keybindings.BindingID = "search"
-	BindingSearchNext  keybindings.BindingID = "search-next"
-	BindingSearchPrev  keybindings.BindingID = "search-prev"
-	BindingBack        keybindings.BindingID = "back"
-	BindingPageDown    keybindings.BindingID = "page-down"
-	BindingPageUp      keybindings.BindingID = "page-up"
-	BindingToggleStage keybindings.BindingID = "toggle-stage"
-	BindingDiscard     keybindings.BindingID = "discard"
+	BindingMoveDown    keys.BindingID = "move-down"
+	BindingMoveUp      keys.BindingID = "move-up"
+	BindingCollapse    keys.BindingID = "collapse"
+	BindingExpand      keys.BindingID = "expand"
+	BindingToggle      keys.BindingID = "toggle"
+	BindingSearch      keys.BindingID = "search"
+	BindingSearchNext  keys.BindingID = "search-next"
+	BindingSearchPrev  keys.BindingID = "search-prev"
+	BindingBack        keys.BindingID = "back"
+	BindingPageDown    keys.BindingID = "page-down"
+	BindingPageUp      keys.BindingID = "page-up"
+	BindingToggleStage keys.BindingID = "toggle-stage"
+	BindingDiscard     keys.BindingID = "discard"
 )
 
-var filetreeBindings = []keybindings.Binding{
+var filetreeBindings = []keys.Binding{
 	{ID: BindingMoveDown, Seq: []string{"j"}, Categories: []string{filetreeCat}, Title: "move down", Display: "↓/j"},
 	{ID: BindingMoveUp, Seq: []string{"k"}, Categories: []string{filetreeCat}, Title: "move up", Display: "↑/k"},
 	{ID: BindingCollapse, Seq: []string{"h"}, Categories: []string{filetreeCat}, Title: "collapse / go to parent", Display: "h/←"},

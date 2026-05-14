@@ -1,4 +1,4 @@
-package keybindings
+package keys
 
 import (
 	"strings"

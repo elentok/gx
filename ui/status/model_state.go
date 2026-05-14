@@ -10,7 +10,7 @@ import (
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/help"
-	"github.com/elentok/gx/ui/keybindings"
+	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/status/diffarea"
 
 	"charm.land/bubbles/v2/textinput"
@@ -69,7 +69,7 @@ type Model struct {
 	outputContent           string
 	outputViewport          viewport.Model
 	pendingActionOutput     string
-	keys                    keybindings.Manager
+	keys                    keys.Manager
 }
 
 type statusData struct {

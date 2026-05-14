@@ -2,7 +2,7 @@ package diffarea
 
 import (
 	"github.com/elentok/gx/ui/diffview"
-	"github.com/elentok/gx/ui/keybindings"
+	"github.com/elentok/gx/ui/keys"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -32,7 +32,7 @@ type Model struct {
 	Unstaged       diffview.Model
 	Staged         diffview.Model
 	Flash          FlashState
-	keys           keybindings.Manager
+	keys           keys.Manager
 }
 
 func NewModel() Model {
@@ -43,7 +43,7 @@ func NewModel() Model {
 		wrap:          true,
 		Unstaged:      diffview.NewModel(),
 		Staged:        diffview.NewModel(),
-		keys:          keybindings.New(diffBindings),
+		keys:          keys.New(diffBindings),
 	}
 	area.SetRenderMode(area.renderMode)
 	area.SetNavMode(area.navMode)
@@ -176,6 +176,6 @@ func (d *Model) UpdateActive(msg tea.Msg) (tea.Cmd, bool) {
 	return cmd, true
 }
 
-func (d *Model) Keys() *keybindings.Manager {
+func (d *Model) Keys() *keys.Manager {
 	return &d.keys
 }

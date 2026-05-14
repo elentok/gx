@@ -2,47 +2,47 @@ package commit
 
 import (
 	"github.com/elentok/gx/ui/diffview"
-	"github.com/elentok/gx/ui/keybindings"
+	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 
 	tea "charm.land/bubbletea/v2"
 )
 
 const (
-	bindingHelp        keybindings.BindingID = "help"
-	bindingQuit        keybindings.BindingID = "quit"
-	bindingTab         keybindings.BindingID = "tab"
-	bindingExpandBody  keybindings.BindingID = "expand-body"
-	bindingToggleMode  keybindings.BindingID = "toggle-mode"
-	bindingToggleWrap  keybindings.BindingID = "toggle-wrap"
-	bindingDown        keybindings.BindingID = "down"
-	bindingUp          keybindings.BindingID = "up"
-	bindingScrollDown  keybindings.BindingID = "scroll-down"
-	bindingScrollUp    keybindings.BindingID = "scroll-up"
-	bindingPageDown    keybindings.BindingID = "page-down"
-	bindingPageUp      keybindings.BindingID = "page-up"
-	bindingNext        keybindings.BindingID = "next"
-	bindingPrev        keybindings.BindingID = "prev"
-	bindingBottom      keybindings.BindingID = "bottom"
-	bindingEnter       keybindings.BindingID = "enter"
-	bindingRight       keybindings.BindingID = "right"
-	bindingLeft        keybindings.BindingID = "left"
-	bindingRefresh     keybindings.BindingID = "refresh"
-	bindingGotoTop     keybindings.BindingID = "goto-top"
-	bindingGotoWT      keybindings.BindingID = "goto-worktrees"
-	bindingGotoLog     keybindings.BindingID = "goto-log"
-	bindingGotoStatus  keybindings.BindingID = "goto-status"
-	bindingYankContent keybindings.BindingID = "yank-content"
-	bindingYankLoc     keybindings.BindingID = "yank-location"
-	bindingYankAll     keybindings.BindingID = "yank-all"
-	bindingYankFile    keybindings.BindingID = "yank-filename"
-	bindingComment     keybindings.BindingID = "comment"
-	bindingRefreshMenu keybindings.BindingID = "refresh-menu"
-	bindingCancelChord keybindings.BindingID = "cancel-chord"
+	bindingHelp        keys.BindingID = "help"
+	bindingQuit        keys.BindingID = "quit"
+	bindingTab         keys.BindingID = "tab"
+	bindingExpandBody  keys.BindingID = "expand-body"
+	bindingToggleMode  keys.BindingID = "toggle-mode"
+	bindingToggleWrap  keys.BindingID = "toggle-wrap"
+	bindingDown        keys.BindingID = "down"
+	bindingUp          keys.BindingID = "up"
+	bindingScrollDown  keys.BindingID = "scroll-down"
+	bindingScrollUp    keys.BindingID = "scroll-up"
+	bindingPageDown    keys.BindingID = "page-down"
+	bindingPageUp      keys.BindingID = "page-up"
+	bindingNext        keys.BindingID = "next"
+	bindingPrev        keys.BindingID = "prev"
+	bindingBottom      keys.BindingID = "bottom"
+	bindingEnter       keys.BindingID = "enter"
+	bindingRight       keys.BindingID = "right"
+	bindingLeft        keys.BindingID = "left"
+	bindingRefresh     keys.BindingID = "refresh"
+	bindingGotoTop     keys.BindingID = "goto-top"
+	bindingGotoWT      keys.BindingID = "goto-worktrees"
+	bindingGotoLog     keys.BindingID = "goto-log"
+	bindingGotoStatus  keys.BindingID = "goto-status"
+	bindingYankContent keys.BindingID = "yank-content"
+	bindingYankLoc     keys.BindingID = "yank-location"
+	bindingYankAll     keys.BindingID = "yank-all"
+	bindingYankFile    keys.BindingID = "yank-filename"
+	bindingComment     keys.BindingID = "comment"
+	bindingRefreshMenu keys.BindingID = "refresh-menu"
+	bindingCancelChord keys.BindingID = "cancel-chord"
 )
 
-func newCommitManager() keybindings.Manager {
-	return keybindings.New([]keybindings.Binding{
+func newCommitManager() keys.Manager {
+	return keys.New([]keys.Binding{
 		{ID: bindingHelp, Seq: []string{"?"}, Categories: []string{"Global"}, Title: "help"},
 		{ID: bindingQuit, Seq: []string{"q"}, Categories: []string{"Global"}, Title: "back / exit pane", Display: "q/esc"},
 		{ID: bindingQuit, Seq: []string{"esc"}, Categories: []string{}, Title: ""},
@@ -89,7 +89,7 @@ func newCommitManager() keybindings.Manager {
 	})
 }
 
-func (m Model) dispatchBinding(id keybindings.BindingID) (tea.Model, tea.Cmd) {
+func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 	switch id {
 	case bindingHelp:
 		m.keys.Reset()

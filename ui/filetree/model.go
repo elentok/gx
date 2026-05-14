@@ -2,7 +2,7 @@ package filetree
 
 import (
 	tea "charm.land/bubbletea/v2"
-	"github.com/elentok/gx/ui/keybindings"
+	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/search"
 	"maps"
 )
@@ -37,7 +37,7 @@ type Model[T any] struct {
 	selected      int
 
 	search search.Model
-	keys   keybindings.Manager
+	keys   keys.Manager
 }
 
 type Result struct {
@@ -51,7 +51,7 @@ func NewModel[T any]() Model[T] {
 	return Model[T]{
 		collapsedDirs: map[string]bool{},
 		search:        search.NewModel(),
-		keys:          keybindings.New(filetreeBindings),
+		keys:          keys.New(filetreeBindings),
 	}
 }
 
@@ -117,7 +117,7 @@ func (m *Model[T]) Search() *search.Model {
 	return &m.search
 }
 
-func (m *Model[T]) Keys() *keybindings.Manager {
+func (m *Model[T]) Keys() *keys.Manager {
 	return &m.keys
 }
 

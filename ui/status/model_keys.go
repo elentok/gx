@@ -2,7 +2,7 @@ package status
 
 import (
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/keybindings"
+	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 
 	"charm.land/bubbles/v2/key"
@@ -10,39 +10,39 @@ import (
 )
 
 const (
-	bindingHelp          keybindings.BindingID = "help"
-	bindingQuit          keybindings.BindingID = "quit"
-	bindingGotoBottom    keybindings.BindingID = "goto-bottom"
-	bindingGotoTop       keybindings.BindingID = "goto-top"
-	bindingViewOutput    keybindings.BindingID = "view-output"
-	bindingGotoLog       keybindings.BindingID = "goto-log"
-	bindingGotoStatus    keybindings.BindingID = "goto-status"
-	bindingGotoWorktrees keybindings.BindingID = "goto-worktrees"
-	bindingGitCommit     keybindings.BindingID = "git-commit"
-	bindingComment       keybindings.BindingID = "comment"
-	bindingYankContent   keybindings.BindingID = "yank-content"
-	bindingYankLocation  keybindings.BindingID = "yank-location"
-	bindingYankAll       keybindings.BindingID = "yank-all"
-	bindingYankFilename  keybindings.BindingID = "yank-filename"
-	bindingLazygitLog    keybindings.BindingID = "lazygit-log"
-	bindingRefreshMenu   keybindings.BindingID = "refresh-menu"
-	bindingCancelChord   keybindings.BindingID = "cancel-chord"
+	bindingHelp          keys.BindingID = "help"
+	bindingQuit          keys.BindingID = "quit"
+	bindingGotoBottom    keys.BindingID = "goto-bottom"
+	bindingGotoTop       keys.BindingID = "goto-top"
+	bindingViewOutput    keys.BindingID = "view-output"
+	bindingGotoLog       keys.BindingID = "goto-log"
+	bindingGotoStatus    keys.BindingID = "goto-status"
+	bindingGotoWorktrees keys.BindingID = "goto-worktrees"
+	bindingGitCommit     keys.BindingID = "git-commit"
+	bindingComment       keys.BindingID = "comment"
+	bindingYankContent   keys.BindingID = "yank-content"
+	bindingYankLocation  keys.BindingID = "yank-location"
+	bindingYankAll       keys.BindingID = "yank-all"
+	bindingYankFilename  keys.BindingID = "yank-filename"
+	bindingLazygitLog    keys.BindingID = "lazygit-log"
+	bindingRefreshMenu   keys.BindingID = "refresh-menu"
+	bindingCancelChord   keys.BindingID = "cancel-chord"
 
 	// Shared bindings: same action in both filetree and diff focus
-	bindingToggleSection keybindings.BindingID = "toggle-section"
-	bindingContextDec    keybindings.BindingID = "context-dec"
-	bindingContextInc    keybindings.BindingID = "context-inc"
-	bindingRefresh       keybindings.BindingID = "refresh"
-	bindingRenderMode    keybindings.BindingID = "render-mode"
-	bindingPull          keybindings.BindingID = "pull"
-	bindingPush          keybindings.BindingID = "push"
-	bindingRebase        keybindings.BindingID = "rebase"
-	bindingAmend         keybindings.BindingID = "amend"
-	bindingEdit          keybindings.BindingID = "edit"
+	bindingToggleSection keys.BindingID = "toggle-section"
+	bindingContextDec    keys.BindingID = "context-dec"
+	bindingContextInc    keys.BindingID = "context-inc"
+	bindingRefresh       keys.BindingID = "refresh"
+	bindingRenderMode    keys.BindingID = "render-mode"
+	bindingPull          keys.BindingID = "pull"
+	bindingPush          keys.BindingID = "push"
+	bindingRebase        keys.BindingID = "rebase"
+	bindingAmend         keys.BindingID = "amend"
+	bindingEdit          keys.BindingID = "edit"
 )
 
-func newStatusManager() keybindings.Manager {
-	return keybindings.New([]keybindings.Binding{
+func newStatusManager() keys.Manager {
+	return keys.New([]keys.Binding{
 		// Single-key globals
 		{ID: bindingHelp, Seq: []string{"?"}, Categories: []string{"Global"}, Title: "help"},
 		{ID: bindingQuit, Seq: []string{"q"}, Categories: []string{"Global"}, Title: "quit", Display: "q/ctrl+c"},
@@ -90,7 +90,7 @@ func newStatusManager() keybindings.Manager {
 	})
 }
 
-func (m Model) dispatchBinding(id keybindings.BindingID, _ tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch id {
 	case bindingQuit:
 		if m.runningRunner != nil && !m.runningDone {

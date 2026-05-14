@@ -3,15 +3,15 @@ package commit
 import (
 	"charm.land/bubbles/v2/key"
 	"github.com/elentok/gx/ui/help"
-	"github.com/elentok/gx/ui/keybindings"
+	"github.com/elentok/gx/ui/keys"
 )
 
 var commitHelpSectionOrder = []string{"Global", "Go to", "Header", "Diff", "Yank", "Navigation"}
 
-func buildCommitKeySections(manager keybindings.Manager) []help.KeySection {
+func buildCommitKeySections(manager keys.Manager) []help.KeySection {
 	sections := []help.KeySection{}
 	byCategory := map[string][]key.Binding{}
-	seen := map[string]map[keybindings.BindingID]bool{}
+	seen := map[string]map[keys.BindingID]bool{}
 	for _, b := range manager.Bindings() {
 		if b.Title == "" {
 			continue
@@ -21,7 +21,7 @@ func buildCommitKeySections(manager keybindings.Manager) []help.KeySection {
 				continue
 			}
 			if seen[cat] == nil {
-				seen[cat] = map[keybindings.BindingID]bool{}
+				seen[cat] = map[keys.BindingID]bool{}
 			}
 			if seen[cat][b.ID] {
 				continue

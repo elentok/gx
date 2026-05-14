@@ -7,7 +7,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/filetree"
-	"github.com/elentok/gx/ui/keybindings"
+	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/search"
 
 	"github.com/elentok/gx/ui/help"
@@ -42,7 +42,7 @@ type Model struct {
 	commitSidebarState
 
 	help help.Model
-	keys keybindings.Manager
+	keys keys.Manager
 }
 
 type editCommentFinishedMsg struct {

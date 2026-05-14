@@ -6,7 +6,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/help"
-	"github.com/elentok/gx/ui/keybindings"
+	"github.com/elentok/gx/ui/keys"
 )
 
 var helpSectionOrder = []string{"Global", "Go to", "Git", "Yank", "Search", "Filetree", "Diff"}
@@ -14,9 +14,9 @@ var helpSectionOrder = []string{"Global", "Go to", "Git", "Yank", "Search", "Fil
 // buildKeySections generates help sections from the provided key managers.
 // Bindings with an empty Title are skipped. Within each category, only the
 // first binding per BindingID is shown (aliases are suppressed).
-func buildKeySections(managers ...keybindings.Manager) []help.KeySection {
+func buildKeySections(managers ...keys.Manager) []help.KeySection {
 	categoryBindings := make(map[string][]key.Binding)
-	seenInCategory := make(map[string]map[keybindings.BindingID]bool)
+	seenInCategory := make(map[string]map[keys.BindingID]bool)
 
 	for _, mgr := range managers {
 		for _, b := range mgr.Bindings() {
@@ -28,7 +28,7 @@ func buildKeySections(managers ...keybindings.Manager) []help.KeySection {
 					continue
 				}
 				if seenInCategory[cat] == nil {
-					seenInCategory[cat] = make(map[keybindings.BindingID]bool)
+					seenInCategory[cat] = make(map[keys.BindingID]bool)
 				}
 				if seenInCategory[cat][b.ID] {
 					continue
