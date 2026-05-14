@@ -4,20 +4,14 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/key"
-	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
+	uisearch "github.com/elentok/gx/ui/search"
 )
 
 // enterSearchMode transitions the model into search mode with an empty query.
 func (m Model) enterSearchMode() Model {
-	ti := textinput.New()
-	ti.Prompt = ""
-	ti.Focus()
 	m.mode = modeSearch
-	m.textInput = ti
-	m.searchQuery = ""
-	m.searchMatches = nil
-	m.searchCursor = 0
+	m.search.Start("")
 	m.statusMsg = ""
 	return m
 }
@@ -25,26 +19,35 @@ func (m Model) enterSearchMode() Model {
 // exitSearchMode clears search state and returns to normal mode.
 func (m Model) exitSearchMode() Model {
 	m.mode = modeNormal
-	m.searchQuery = ""
-	m.searchMatches = nil
-	m.searchCursor = 0
+	m.search.DismissAndClear()
 	m.table.SetRows(m.buildRows())
 	return m
 }
 
-// recomputeSearchMatches rebuilds the searchMatches slice from the current query.
-func (m Model) recomputeSearchMatches() Model {
-	q := strings.ToLower(m.searchQuery)
-	m.searchMatches = nil
+func (m Model) computeSearchMatches(query string) []uisearch.Match {
+	q := strings.ToLower(strings.TrimSpace(query))
 	if q == "" {
-		return m
+		return nil
 	}
+	matches := make([]uisearch.Match, 0)
 	for i, wt := range m.worktrees {
 		if strings.Contains(strings.ToLower(wt.Name), q) || strings.Contains(strings.ToLower(wt.Branch), q) {
-			m.searchMatches = append(m.searchMatches, i)
+			matches = append(matches, uisearch.Match{Index: i})
 		}
 	}
-	return m
+	return matches
+}
+
+func (m Model) updateSearchMatches() (Model, tea.Cmd) {
+	matches := m.computeSearchMatches(m.search.Query())
+	m.search.SetMatches(matches)
+	if len(matches) > 0 {
+		if match, ok := m.search.Match(m.search.Cursor()); ok {
+			return m.jumpToSearchMatch(match)
+		}
+	}
+	m.table.SetRows(m.buildRows())
+	return m, nil
 }
 
 // handleSearchKey handles key events while in search mode.
@@ -53,40 +56,50 @@ func (m Model) handleSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.SearchClose):
 		m = m.exitSearchMode()
 		return m, nil
-
 	case key.Matches(msg, keys.SearchNext):
-		if len(m.searchMatches) > 0 {
-			m.searchCursor = (m.searchCursor + 1) % len(m.searchMatches)
-			return m.jumpToSearchCursor()
+		if m.search.MatchesCount() > 0 {
+			nextIdx := (m.search.Cursor() + 1) % m.search.MatchesCount()
+			m.search.SetCursor(nextIdx)
+			if match, ok := m.search.Match(nextIdx); ok {
+				return m.jumpToSearchMatch(match)
+			}
 		}
 		return m, nil
-
 	case key.Matches(msg, keys.SearchPrev):
-		if len(m.searchMatches) > 0 {
-			m.searchCursor = (m.searchCursor - 1 + len(m.searchMatches)) % len(m.searchMatches)
-			return m.jumpToSearchCursor()
+		if m.search.MatchesCount() > 0 {
+			prevIdx := (m.search.Cursor() - 1 + m.search.MatchesCount()) % m.search.MatchesCount()
+			m.search.SetCursor(prevIdx)
+			if match, ok := m.search.Match(prevIdx); ok {
+				return m.jumpToSearchMatch(match)
+			}
 		}
 		return m, nil
 	}
 
-	var tiCmd tea.Cmd
-	m.textInput, tiCmd = m.textInput.Update(msg)
-	m.searchQuery = m.textInput.Value()
-	m = m.recomputeSearchMatches()
-	if len(m.searchMatches) > 0 {
-		m.searchCursor = 0
-		return m.jumpToSearchCursor()
+	next, cmd, result := m.search.Update(msg)
+	m.search = next
+	if !result.Handled {
+		return m, nil
 	}
-	m.table.SetRows(m.buildRows())
-	return m, tiCmd
+	if result.QueryChanged {
+		return m.updateSearchMatches()
+	}
+	if result.CursorChanged {
+		if match, ok := m.search.Match(m.search.Cursor()); ok {
+			return m.jumpToSearchMatch(match)
+		}
+	}
+	return m, cmd
 }
 
-// jumpToSearchCursor moves the table cursor to the current search match and
+// jumpToSearchMatch moves the table cursor to the given search match and
 // returns the sidebar-reload command.
-func (m Model) jumpToSearchCursor() (Model, tea.Cmd) {
-	idx := m.searchMatches[m.searchCursor]
+func (m Model) jumpToSearchMatch(match uisearch.Match) (Model, tea.Cmd) {
+	idx := match.Index
+	if idx < 0 || idx >= len(m.worktrees) {
+		return m, nil
+	}
 	m.table.SetCursor(idx)
 	m.table.SetRows(m.buildRows())
 	return m, cmdLoadSidebarData(m.repo, m.worktrees[idx])
 }
-

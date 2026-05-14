@@ -45,16 +45,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.textInput, cmd = m.textInput.Update(msg)
 			return m, cmd
 		case modeSearch:
-			var cmd tea.Cmd
-			m.textInput, cmd = m.textInput.Update(msg)
-			m.searchQuery = m.textInput.Value()
-			m = m.recomputeSearchMatches()
-			if len(m.searchMatches) > 0 {
-				m.searchCursor = 0
-				return m.jumpToSearchCursor()
-			}
-			m.table.SetRows(m.buildRows())
-			return m, cmd
+			m.search.Start(msg.Content)
+			return m.updateSearchMatches()
 		}
 
 	case tea.KeyPressMsg:

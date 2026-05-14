@@ -45,10 +45,10 @@ func TestPasteMsgUpdatesSearchQuery(t *testing.T) {
 	updated, _ := m.Update(tea.PasteMsg{Content: "bug"})
 	m = updated.(Model)
 
-	if got := m.searchQuery; got != "bug" {
+	if got := m.search.Query(); got != "bug" {
 		t.Fatalf("search query after paste = %q, want %q", got, "bug")
 	}
-	if len(m.searchMatches) != 1 || m.searchMatches[0] != 1 {
-		t.Fatalf("search matches after paste = %v, want [1]", m.searchMatches)
+	if got := m.search.Matches(); len(got) != 1 || got[0].Index != 1 {
+		t.Fatalf("search matches after paste = %v, want [{Index:1}]", got)
 	}
 }

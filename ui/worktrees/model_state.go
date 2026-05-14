@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 	keymgr "github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/search"
 
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/spinner"
@@ -110,10 +111,8 @@ type Model struct {
 	yankChecklist components.Checklist
 	clipboard     *clipboardState
 
-	searchQuery   string
-	searchMatches []int
-	searchCursor  int
-	keyManager    keymgr.Manager
+	keyManager keymgr.Manager
+	search     search.Model
 
 	openTargetName string
 	openTargetPath string
@@ -155,6 +154,7 @@ func NewWithSettings(repo git.Repo, activeWorktreePath string, settings Settings
 		loading:            true,
 		help:               newWorktreeHelpModel(),
 		keyManager:         newWorktreesManager(),
+		search:             search.NewModel(),
 		spinner:            sp,
 	}
 }

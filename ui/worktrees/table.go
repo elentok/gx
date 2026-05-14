@@ -168,8 +168,8 @@ func (m Model) buildRows() []table.Row {
 		isSelected := i == m.table.Cursor()
 		isMain := wt.Branch == m.repo.MainBranch
 		nameCol := worktreeCell(wt.Name, wt.Branch, ic, isMain, isSelected)
-		if m.searchQuery != "" && !isSelected {
-			nameCol = highlightMatch(nameCol, m.searchQuery)
+		if q := m.search.Query(); q != "" && !isSelected {
+			nameCol = highlightMatch(nameCol, q)
 		}
 		rows[i] = table.Row{
 			nameCol,

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/search"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -37,7 +38,7 @@ func (m Model) View() tea.View {
 			content = ui.OverlayCenter(bg, m.yankModalView(), m.width, m.height)
 		case modeTerminalMenu:
 			content = ui.OverlayCenter(bg, m.terminalMenuModalView(), m.width, m.height)
-		case modeRename, modeClone, modeNew, modeNewAndOpen, modeSearch:
+		case modeRename, modeClone, modeNew, modeNewAndOpen:
 			overlay := m.textInputOverlayView()
 			y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
 			content = ui.OverlayBottomCenter(bg, overlay, m.width, y)
@@ -49,12 +50,27 @@ func (m Model) View() tea.View {
 					content = ui.OverlayBottomRight(content, ui.RenderChordOverlay(prefix[0], hints), m.width, m.height)
 				}
 			}
+			if m.search.Mode() == search.SearchModeInput {
+				overlayW := m.searchOverlayWidth()
+				m.search.SetWidth(overlayW)
+				overlay := m.search.View()
+				y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
+				content = ui.OverlayBottomCenter(content, overlay, m.width, y)
+			}
 		}
 	}
 
 	v := tea.NewView(content)
 	v.AltScreen = true
 	return v
+}
+
+func (m Model) searchOverlayWidth() int {
+	max := m.width * 80 / 100
+	if search.DESIRED_WIDTH < max {
+		return search.DESIRED_WIDTH
+	}
+	return max
 }
 
 const textInputOverlayDesiredWidth = 50
@@ -92,11 +108,6 @@ func (m Model) textInputOverlayView() string {
 	case modeSearch:
 		title = "Search"
 		body = inputView
-		if m.searchQuery != "" && len(m.searchMatches) == 0 {
-			rightTitle = "no matches"
-		} else if len(m.searchMatches) > 0 {
-			rightTitle = fmt.Sprintf("%d/%d", m.searchCursor+1, len(m.searchMatches))
-		}
 	}
 
 	return ui.RenderModalFrame(ui.ModalFrameOptions{
