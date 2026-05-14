@@ -5,7 +5,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 )
 
-var helpSectionOrder = []string{"Navigation", "Search", "Jump", "Go to", "Other"}
+var helpSectionOrder = []string{"Navigation", "Search", "Jump", "Go to", "Actions", "Other"}
 
 func buildKeySections(manager keys.Manager) []help.KeySection {
 	categoryBindings := make(map[string][]keys.Binding)

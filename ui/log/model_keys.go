@@ -24,6 +24,7 @@ const (
 	bindingPrevTag    keys.BindingID = "prev-tag"
 	bindingRefresh    keys.BindingID = "refresh"
 	bindingCancel     keys.BindingID = "cancel-chord"
+	bindingAmend      keys.BindingID = "amend"
 )
 
 func newLogManager() keys.Manager {
@@ -58,6 +59,8 @@ func newLogManager() keys.Manager {
 
 		{ID: bindingRefresh, Seq: []string{"m", "r"}, Categories: []string{"Other"}, Title: "refresh"},
 		{ID: bindingCancel, Seq: []string{"m", "esc"}, Categories: []string{}, Title: ""},
+
+		{ID: bindingAmend, Seq: []string{"A"}, Categories: []string{"Actions"}, Title: "amend commit with staged changes"},
 	})
 }
 
@@ -118,6 +121,11 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, nil
 	case bindingCancel:
 		m.statusMsg = ""
+		return m, nil
+	case bindingAmend:
+		if err := m.openAmendConfirm(); err != nil {
+			m.statusMsg = err.Error()
+		}
 		return m, nil
 	}
 	return m, nil

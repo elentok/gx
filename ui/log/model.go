@@ -6,6 +6,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/amend"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/search"
@@ -53,6 +54,8 @@ type Model struct {
 	help help.Model
 
 	branchDiverged bool
+
+	amendConfirm amend.Model
 }
 
 func NewModel(worktreeRoot, startRef string, settings Settings) Model {
@@ -65,6 +68,7 @@ func NewModel(worktreeRoot, startRef string, settings Settings) Model {
 		search:       search.NewModel(),
 	}
 	m.help = help.NewModel(buildKeySections(m.keys))
+	m.amendConfirm = amend.New()
 	m.reload()
 	return m
 }

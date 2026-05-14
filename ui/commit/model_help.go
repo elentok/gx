@@ -5,7 +5,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 )
 
-var commitHelpSectionOrder = []string{"Global", "Go to", "Header", "Diff", "Yank", "Navigation"}
+var commitHelpSectionOrder = []string{"Global", "Go to", "Header", "Diff", "Yank", "Navigation", "Actions"}
 
 func buildCommitKeySections(manager keys.Manager) []help.KeySection {
 	sections := []help.KeySection{}

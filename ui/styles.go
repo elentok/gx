@@ -45,6 +45,7 @@ var (
 	StyleBody     = lipgloss.NewStyle().Foreground(ColorText)
 	StyleMuted    = lipgloss.NewStyle().Foreground(ColorSubtle)
 	StyleHint     = lipgloss.NewStyle().Foreground(ColorSubtle)
+	StyleWarning  = lipgloss.NewStyle().Foreground(ColorOrange)
 	StyleCodeLike = lipgloss.NewStyle().Foreground(ColorTeal)
 
 	StyleSearchResult       = lipgloss.NewStyle().Foreground(ColorYellow).Bold(true).Underline(true)

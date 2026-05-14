@@ -11,6 +11,7 @@ type reloadMsg struct {
 	rows           []row
 	branchDiverged bool
 	err            error
+	focusSubject   string // if set, cursor is moved to first matching commit
 }
 
 func (m *Model) reload() {

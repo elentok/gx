@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/search"
 
+	"github.com/elentok/gx/ui/amend"
 	"github.com/elentok/gx/ui/help"
 
 	tea "charm.land/bubbletea/v2"
@@ -43,6 +44,8 @@ type Model struct {
 
 	help help.Model
 	keys keys.Manager
+
+	amendConfirm amend.Model
 }
 
 type editCommentFinishedMsg struct {
@@ -86,6 +89,7 @@ func NewWithSettings(worktreeRoot, ref string, settings Settings) Model {
 		keys: newCommitManager(),
 	}
 	m.help = help.NewModel(buildCommitKeySections(m.keys))
+	m.amendConfirm = amend.New()
 	m.reload()
 	return m
 }

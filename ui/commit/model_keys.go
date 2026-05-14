@@ -39,6 +39,7 @@ const (
 	bindingComment     keys.BindingID = "comment"
 	bindingRefreshMenu keys.BindingID = "refresh-menu"
 	bindingCancelChord keys.BindingID = "cancel-chord"
+	bindingAmend       keys.BindingID = "amend"
 )
 
 func newCommitManager() keys.Manager {
@@ -86,6 +87,8 @@ func newCommitManager() keys.Manager {
 
 		{ID: bindingComment, Seq: []string{"c", "m"}, Categories: []string{"Diff"}, Title: "comment"},
 		{ID: bindingCancelChord, Seq: []string{"c", "esc"}, Categories: []string{}, Title: ""},
+
+		{ID: bindingAmend, Seq: []string{"A"}, Categories: []string{"Actions"}, Title: "amend commit with staged changes"},
 	})
 }
 
@@ -284,6 +287,11 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, m.cmdCreateCommentFromDiff()
+	case bindingAmend:
+		if err := m.openAmendConfirm(); err != nil {
+			m.statusMsg = err.Error()
+		}
+		return m, nil
 	case bindingCancelChord:
 		m.clearStatus()
 		return m, nil

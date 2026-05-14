@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.14.5
+
+- Add `A` keybinding in log and commit views to amend a specific commit with currently staged changes
+- HEAD commits use `git commit --amend --no-edit`; non-HEAD commits use fixup + non-interactive autosquash rebase with auto-stash/restore
+- Confirmation modal shows target commit hash, subject, staged files, and an orange warning if the commit has been pushed to a remote
+
 ## v0.14.4
 
 - Make the panel frame color darker

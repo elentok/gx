@@ -5,6 +5,11 @@ import (
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Delegate all messages to amend.Model while it's open.
+	if m.amendConfirm.IsOpen {
+		return m.handleAmendUpdate(msg)
+	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)
