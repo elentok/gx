@@ -5,6 +5,10 @@ import (
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// ctrl+c quits unconditionally even when a modal is open.
+	if kp, ok := msg.(tea.KeyPressMsg); ok && kp.String() == "ctrl+c" {
+		return m, tea.Quit
+	}
 	// Delegate all messages to amend.Model while it's open.
 	if m.amendConfirm.IsOpen {
 		return m.handleAmendUpdate(msg)
