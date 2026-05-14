@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/filetree"
+	"github.com/elentok/gx/ui/keybindings"
 	"github.com/elentok/gx/ui/search"
 
 	"charm.land/bubbles/v2/viewport"
@@ -29,7 +30,6 @@ type Model struct {
 	ready        bool
 	focusHeader  bool
 	focusDiff    bool
-	keyPrefix    string
 	bodyExpanded bool
 	details      git.CommitDetails
 	statusMsg    string
@@ -42,6 +42,7 @@ type Model struct {
 
 	helpOpen     bool
 	helpViewport viewport.Model
+	keys         keybindings.Manager
 }
 
 type editCommentFinishedMsg struct {
@@ -82,6 +83,7 @@ func NewWithSettings(worktreeRoot, ref string, settings Settings) Model {
 		commitSidebarState: commitSidebarState{
 			fileTreeModel: filetree.NewModel[git.CommitFile](),
 		},
+		keys: newCommitManager(),
 	}
 	m.reload()
 	return m
