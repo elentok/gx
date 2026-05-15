@@ -19,6 +19,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
+	case tea.MouseWheelMsg:
+		return m.handleMouseWheel(msg)
 	case reloadMsg:
 		return m.handleReload(msg)
 	case tea.WindowSizeMsg:

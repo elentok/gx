@@ -782,32 +782,33 @@ func TestMouseWheelScrollsDiffViewport(t *testing.T) {
 	}
 }
 
-func TestMouseWheelScrollsDiffWhenFocused(t *testing.T) {
+func TestMouseWheelOverFiletreeScrollsFiletree(t *testing.T) {
 	repo := testutil.TempRepo(t)
-	before := make([]string, 0, 80)
-	after := make([]string, 0, 80)
-	for i := 1; i <= 80; i++ {
-		before = append(before, fmt.Sprintf("old-%03d", i))
-		after = append(after, fmt.Sprintf("new-%03d", i))
+	// Create and then change enough files so the filetree can scroll
+	for i := 1; i <= 40; i++ {
+		testutil.WriteFile(t, repo, fmt.Sprintf("file%03d.txt", i), "original")
 	}
-	testutil.WriteFile(t, repo, "scroll.txt", strings.Join(before, "\n")+"\n")
-	testutil.CommitAll(t, repo, "base")
-	testutil.WriteFile(t, repo, "scroll.txt", strings.Join(after, "\n")+"\n")
-	testutil.CommitAll(t, repo, "change")
+	testutil.CommitAll(t, repo, "add files")
+	for i := 1; i <= 40; i++ {
+		testutil.WriteFile(t, repo, fmt.Sprintf("file%03d.txt", i), "changed")
+	}
+	testutil.CommitAll(t, repo, "change all")
 
 	m := New(repo, "HEAD")
 	m.ready = true
 	m.width = 100
 	m.height = 24
 	m.syncDiffViewport()
-	m.focusDiff = true
 
-	// Scroll with mouse over filetree area (x=1) — should still scroll when diff is focused
-	beforeOffset := m.diffModel.Viewport().YOffset()
-	updated, _ := m.Update(tea.MouseWheelMsg{X: 1, Y: 10, Button: tea.MouseWheelDown})
+	bodyH, _ := m.layoutHeights()
+	filetreeX := 1
+	filetreeY := bodyH + 1
+
+	beforeOffset := m.fileTreeModel.ScrollOffset()
+	updated, _ := m.Update(tea.MouseWheelMsg{X: filetreeX, Y: filetreeY, Button: tea.MouseWheelDown})
 	m = updated.(Model)
-	if m.diffModel.Viewport().YOffset() <= beforeOffset {
-		t.Fatalf("expected diff viewport to scroll when focused even with mouse outside, before=%d after=%d", beforeOffset, m.diffModel.Viewport().YOffset())
+	if m.fileTreeModel.ScrollOffset() <= beforeOffset {
+		t.Fatalf("expected filetree to scroll down on wheel over filetree, before=%d after=%d", beforeOffset, m.fileTreeModel.ScrollOffset())
 	}
 }
 

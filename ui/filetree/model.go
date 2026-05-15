@@ -77,6 +77,7 @@ func (m Model[T]) SelectedIndex() int {
 
 func (m *Model[T]) SetSelectedIndex(index int) {
 	m.list.SetSelected(index, len(m.entries))
+	m.list.EnsureSelectionVisible(len(m.entries), m.visibleH)
 }
 
 // ScrollOffset returns the current scroll offset of the list.

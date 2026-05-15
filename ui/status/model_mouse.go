@@ -21,7 +21,10 @@ func (m *Model) handleMouseWheel(msg tea.MouseWheelMsg) bool {
 	default:
 		return false
 	}
-	return m.scrollDiffByMouse(mouse.X, mouse.Y, dir)
+	if m.scrollDiffByMouse(mouse.X, mouse.Y, dir) {
+		return true
+	}
+	return m.scrollFiletreeByMouse(mouse.X, mouse.Y, dir)
 }
 
 func (m Model) searchActive() bool {
@@ -45,12 +48,32 @@ func (m *Model) scrollDiffByMouse(x, y, dir int) bool {
 	if diffviewModel == nil {
 		return false
 	}
-	if dir > 0 {
-		diffviewModel.Viewport().ScrollDown(3)
-	} else {
-		diffviewModel.Viewport().ScrollUp(3)
-	}
+	diffviewModel.ScrollViewport(dir * 3)
 	return true
+}
+
+func (m *Model) scrollFiletreeByMouse(x, y, dir int) bool {
+	mainH := m.height - 1
+	if mainH < 1 || y < 0 || y >= mainH || x < 0 || x >= m.width {
+		return false
+	}
+	filetreeX, filetreeY, filetreeW, filetreeH := m.filetreeRect(mainH)
+	if x < filetreeX || x >= filetreeX+filetreeW || y < filetreeY || y >= filetreeY+filetreeH {
+		return false
+	}
+	innerH := maxInt(1, filetreeH-2)
+	m.fileTreeModel.SetVisibleHeight(innerH)
+	m.fileTreeModel.ScrollViewport(dir * 3)
+	return true
+}
+
+func (m Model) filetreeRect(mainH int) (x, y, w, h int) {
+	if m.useStackedLayout() {
+		filetreeH, _ := m.splitHeight(mainH)
+		return 0, 0, m.width, filetreeH
+	}
+	filetreeW, _ := m.splitWidth()
+	return 0, 0, filetreeW, mainH
 }
 
 func (m Model) diffRect(mainH int) (x, y, w, h int, ok bool) {
