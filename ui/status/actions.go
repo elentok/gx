@@ -435,43 +435,13 @@ func stageActionOutputTitle(kind stageActionKind) string {
 	}
 }
 
-func (m *Model) recordCommandOutput(title, output string) {
-	output = strings.TrimSpace(output)
-	if output == "" {
-		return
-	}
-	m.outputTitle = title
-	m.outputContent = output
+func (m *Model) recordCommandOutput(title, out string) {
+	m.output.Set(title, out)
 }
 
 func (m *Model) openOutputModal() {
-	vpW := m.width * 2 / 3
-	if vpW < 56 {
-		vpW = 56
-	}
-	if vpW > 110 {
-		vpW = 110
-	}
-	vpH := m.height/2 - 4
-	if vpH < 8 {
-		vpH = 8
-	}
-	vp := viewport.New(viewport.WithWidth(vpW-2), viewport.WithHeight(vpH))
-	vp.SetContent(m.outputContent)
-	m.outputViewport = vp
-	m.outputOpen = true
+	m.output.Open(m.width, m.height)
 	m.keys.Reset()
-}
-
-func (m Model) handleOutputKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc", "enter", "q":
-		m.outputOpen = false
-		return m, nil
-	}
-	var cmd tea.Cmd
-	m.outputViewport, cmd = m.outputViewport.Update(msg)
-	return m, cmd
 }
 
 func (m *Model) openConfirm(title string, lines []string, action stageConfirmAction, remote, branch string) {
@@ -511,21 +481,6 @@ func (m Model) runningModalView() string {
 	)
 }
 
-func (m Model) outputModalView() string {
-	title := m.outputTitle
-	if title == "" {
-		title = "Command output"
-	}
-	return components.RenderOutputModal(
-		title,
-		m.outputViewport.View(),
-		ui.HintDismissAndScroll(),
-		ui.ColorYellow,
-		ui.ColorYellow,
-		ui.ColorSubtle,
-		m.outputViewport.Width(),
-	)
-}
 
 func (m Model) credentialModalView() string {
 	title := "Credential Required"

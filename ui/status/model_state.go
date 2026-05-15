@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/list"
+	"github.com/elentok/gx/ui/output"
 	"github.com/elentok/gx/ui/status/diffarea"
 
 	"charm.land/bubbles/v2/textinput"
@@ -65,11 +66,8 @@ type Model struct {
 	credentialPrompt        string
 	credentialInput         textinput.Model
 	credentialSecret        bool
-	outputOpen              bool
-	outputTitle             string
-	outputContent           string
-	outputViewport          viewport.Model
-	pendingActionOutput     string
+	output              output.Model
+	pendingActionOutput string
 	keys                    keys.Manager
 }
 
@@ -146,8 +144,9 @@ func NewModel(worktreeRoot string, settings Settings) Model {
 		keys:             statusKeys,
 		focus:            focusFiletree,
 		diffarea:         diffarreaModel,
-		statusData: statusData{},
-		fileTreeModel: fileTreeModel,
+		statusData:       statusData{},
+		fileTreeModel:    fileTreeModel,
+		output:           output.New(),
 	}
 
 	if settings.EnableNavigation {

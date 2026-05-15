@@ -113,7 +113,7 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model,
 		}
 		return m, nil
 	case bindingViewOutput:
-		if m.outputContent == "" {
+		if !m.output.HasContent() {
 			m.setStatus(ui.MessageNoOutput())
 			return m, nil
 		}

@@ -178,8 +178,10 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.runningOpen {
 		return m.handleRunningKey(msg)
 	}
-	if m.outputOpen {
-		return m.handleOutputKey(msg)
+	if m.output.IsOpen {
+		next, cmd := m.output.Update(msg)
+		m.output = next
+		return m, cmd
 	}
 	if m.confirmOpen {
 		return m.handleConfirmKey(msg)

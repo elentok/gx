@@ -11,6 +11,9 @@ import (
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/list"
+	"github.com/elentok/gx/ui/output"
+	"github.com/elentok/gx/ui/pull"
+	"github.com/elentok/gx/ui/push"
 	"github.com/elentok/gx/ui/reword"
 	"github.com/elentok/gx/ui/search"
 )
@@ -59,6 +62,9 @@ type Model struct {
 	branchDiverged bool
 
 	amendConfirm amend.Model
+	push         push.Model
+	pull         pull.Model
+	output       output.Model
 
 	reword           reword.Model
 	rewordTmpFile    string
@@ -82,6 +88,9 @@ func NewModel(worktreeRoot, startRef string, settings Settings) Model {
 	}
 	m.help = help.NewModel(buildKeySections(m.keys))
 	m.amendConfirm = amend.New()
+	m.push = push.New()
+	m.pull = pull.New()
+	m.output = output.New()
 	m.reword = reword.New()
 	m.reload()
 	return m

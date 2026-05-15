@@ -29,6 +29,9 @@ const (
 	bindingReword     keys.BindingID = "reword"
 	bindingPageDown   keys.BindingID = "page-down"
 	bindingPageUp     keys.BindingID = "page-up"
+	bindingPull       keys.BindingID = "pull"
+	bindingPush       keys.BindingID = "push"
+	bindingViewOutput keys.BindingID = "view-output"
 )
 
 func newLogManager() keys.Manager {
@@ -46,6 +49,7 @@ func newLogManager() keys.Manager {
 		{ID: bindingReload, Seq: []string{"R"}, Categories: []string{"Other"}, Title: "reload"},
 
 		{ID: bindingTop, Seq: []string{"g", "g"}, Categories: []string{"Navigation"}, Title: "top"},
+		{ID: bindingViewOutput, Seq: []string{"g", "o"}, Categories: []string{"Other"}, Title: "view output"},
 		{ID: bindingGotoHead, Seq: []string{"g", "h"}, Categories: []string{"Jump"}, Title: "goto HEAD"},
 		{ID: bindingGotoWT, Seq: []string{"g", "w"}, Categories: []string{"Go to"}, Title: "goto worktrees"},
 		{ID: bindingGotoLog, Seq: []string{"g", "l"}, Categories: []string{"Go to"}, Title: "goto log"},
@@ -64,6 +68,8 @@ func newLogManager() keys.Manager {
 		{ID: bindingRefresh, Seq: []string{"m", "r"}, Categories: []string{"Other"}, Title: "refresh"},
 		{ID: bindingCancel, Seq: []string{"m", "esc"}, Categories: []string{}, Title: ""},
 
+		{ID: bindingPull, Seq: []string{"p"}, Categories: []string{"Git"}, Title: "pull"},
+		{ID: bindingPush, Seq: []string{"P"}, Categories: []string{"Git"}, Title: "push"},
 		{ID: bindingAmend, Seq: []string{"A"}, Categories: []string{"Actions"}, Title: "amend commit with staged changes"},
 		{ID: bindingReword, Seq: []string{"c", "r"}, Categories: []string{"Actions"}, Title: "reword commit"},
 		{ID: bindingCancel, Seq: []string{"c", "esc"}, Categories: []string{}, Title: ""},
@@ -125,6 +131,20 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, nil
 	case bindingCancel:
 		m.statusMsg = ""
+		return m, nil
+	case bindingViewOutput:
+		if m.output.HasContent() {
+			m.output.Open(m.width, m.height)
+		}
+		return m, nil
+	case bindingPull:
+		cmd := m.pull.Open(m.worktreeRoot)
+		return m, cmd
+	case bindingPush:
+		if err := m.push.Open(m.worktreeRoot); err != nil {
+			m.statusMsg = err.Error()
+			return m, nil
+		}
 		return m, nil
 	case bindingAmend:
 		if err := m.openAmendConfirm(); err != nil {

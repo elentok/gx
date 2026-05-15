@@ -2275,7 +2275,7 @@ func TestGOOpensOutputModal(t *testing.T) {
 
 	m := New(repo)
 	m.ready = true
-	m.outputContent = "hello"
+	m.output.Set("test", "hello")
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	if cmd != nil {
@@ -2291,7 +2291,7 @@ func TestGOOpensOutputModal(t *testing.T) {
 		t.Fatalf("go should not launch a command")
 	}
 	m = updated.(Model)
-	if !m.outputOpen {
+	if !m.output.IsOpen {
 		t.Fatalf("expected go to open output modal")
 	}
 }

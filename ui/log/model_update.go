@@ -28,9 +28,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.amendConfirm.IsOpen {
 		return m.handleAmendUpdate(msg)
 	}
+	// Delegate all messages to push.Model while it's open.
+	if m.push.IsOpen {
+		return m.handlePushUpdate(msg)
+	}
+	// Delegate all messages to pull.Model while it's open.
+	if m.pull.IsOpen {
+		return m.handlePullUpdate(msg)
+	}
 	// Delegate all messages to reword.Model while it's running.
 	if m.reword.IsOpen {
 		return m.handleRewordRunningUpdate(msg)
+	}
+
+	// Delegate output modal keys.
+	if m.output.IsOpen {
+		next, cmd := m.output.Update(msg)
+		m.output = next
+		return m, cmd
 	}
 
 	switch msg := msg.(type) {
