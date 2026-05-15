@@ -258,7 +258,7 @@ func (m *Model) syncDiffViewports() {
 		mainH = 4
 	}
 	_, diffW := m.splitWidth()
-	_, diffH := m.splitHeight(mainH)
+	filetreeH, diffH := m.splitHeight(mainH)
 	if m.diffarea.Fullscreen && m.focus == focusDiff {
 		diffW = m.width
 	}
@@ -269,6 +269,7 @@ func (m *Model) syncDiffViewports() {
 
 	expandedH, collapsedH := diffPaneHeights(diffH)
 	m.diffarea.SyncViewports(vpW, expandedH, collapsedH)
+	m.fileTreeModel.SetVisibleHeight(maxInt(1, filetreeH-2))
 }
 
 func reflowSectionLines(diffviewModel *diffview.Model, wrapWidth int, wrap bool) {

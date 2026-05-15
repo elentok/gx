@@ -1,5 +1,8 @@
 package list
 
+// DefaultScroll is the number of lines moved by ctrl+d/ctrl+u (vim-style).
+const DefaultScroll = 7
+
 // Model holds the shared state for a list panel: selection and scroll offset.
 type Model struct {
 	selected     int
@@ -105,4 +108,42 @@ func (m *Model) VisibleRange(total, visibleH int) (start, end int) {
 		end = total
 	}
 	return start, end
+}
+
+// ScrollPage moves both the selection and the viewport by delta lines (vim-style
+// ctrl+d/ctrl+u: cursor and viewport move together, staying at the same screen position).
+// No-op if already at the boundary in the direction of delta.
+func (m *Model) ScrollPage(delta, total, visibleH int) {
+	if total == 0 {
+		return
+	}
+	if delta > 0 && m.selected >= total-1 {
+		return
+	}
+	if delta < 0 && m.selected <= 0 {
+		return
+	}
+
+	newSelected := m.selected + delta
+	if newSelected < 0 {
+		newSelected = 0
+	}
+	if newSelected > total-1 {
+		newSelected = total - 1
+	}
+
+	maxOffset := total - visibleH
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	newOffset := m.scrollOffset + delta
+	if newOffset < 0 {
+		newOffset = 0
+	}
+	if newOffset > maxOffset {
+		newOffset = maxOffset
+	}
+
+	m.selected = newSelected
+	m.scrollOffset = newOffset
 }

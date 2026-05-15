@@ -1,26 +1,17 @@
 package status
 
+import "github.com/elentok/gx/ui/list"
+
 func (m *Model) scrollFiletreePage(direction int) bool {
-	m.setStatusSelection(m.statusData.listState.Selected())
 	if len(m.fileTreeModel.Entries()) == 0 {
 		return false
 	}
 	old := m.fileTreeModel.SelectedIndex()
-	mainH := m.height - 1
-	if mainH < 4 {
-		mainH = 4
-	}
-	filetreeH, _ := m.splitHeight(mainH)
-	visible := maxInt(1, (filetreeH-2)/2)
-	if direction > 0 {
-		m.setStatusSelection(old + visible)
-	} else {
-		m.setStatusSelection(old - visible)
-	}
+	m.fileTreeModel.ScrollPage(direction * list.DefaultScroll)
 	if m.fileTreeModel.SelectedIndex() == old {
 		return false
 	}
-	m.onFiletreeSelectionChanged()
+	m.setStatusSelection(m.fileTreeModel.SelectedIndex())
 	return true
 }
 

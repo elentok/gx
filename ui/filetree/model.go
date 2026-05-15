@@ -95,6 +95,11 @@ func (m *Model[T]) ScrollViewport(delta int) {
 	m.list.ScrollViewport(delta, len(m.entries), m.visibleH)
 }
 
+// ScrollPage moves selection and viewport together by delta (vim-style ctrl+d/u).
+func (m *Model[T]) ScrollPage(delta int) {
+	m.list.ScrollPage(delta, len(m.entries), m.visibleH)
+}
+
 func (m Model[T]) selectedEntry() (Entry[T], bool) {
 	sel := m.list.Selected()
 	if sel < 0 || sel >= len(m.entries) {

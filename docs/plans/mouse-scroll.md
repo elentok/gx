@@ -61,8 +61,8 @@ Tests live in `ui/list/list_test.go`.
 - Add `ScrollViewport(delta, visibleH int)` method
 - Update `Navigate` (j/k) to call `list.Navigate` instead of raw increment
 
-- [ ] Update `ui/filetree/model.go`
-- [ ] Update callers in `ui/commit/`
+- [x] Update `ui/filetree/model.go`
+- [x] Update callers in `ui/commit/`
 
 ### 2b — `statusData` in `ui/status`
 
@@ -70,7 +70,7 @@ Tests live in `ui/list/list_test.go`.
 - Update `statusData.selected` reads/writes to use `listState.Selected()`
 - Add `ScrollViewport` call path from mouse handler
 
-- [ ] Update `ui/status/model_state.go` and related files
+- [x] Update `ui/status/model_state.go` and related files
 
 ### 2c — `log.Model`
 
@@ -78,7 +78,7 @@ Tests live in `ui/list/list_test.go`.
 - Update `cursor` reads/writes to use `list.Selected()`
 - Replace inline centering in `visibleLines()` with `list.VisibleRange()`
 
-- [ ] Update `ui/log/model.go`, `ui/log/view.go`, `ui/log/model_keys.go`
+- [x] Update `ui/log/model.go`, `ui/log/view.go`, `ui/log/model_keys.go`
 
 ---
 
@@ -95,8 +95,8 @@ func BuildVisibleRenderableRows[T any](
 
 Remove `visibleRowsForSelection`. Pass `list.VisibleRange()` output as `offset`.
 
-- [ ] Update `ui/sidebar/sidebar.go`
-- [ ] Update callers: `ui/commit/view.go`, `ui/status/view_panes.go`
+- [x] Update `ui/sidebar/sidebar.go`
+- [x] Update callers: `ui/commit/view.go`, `ui/status/view_panes.go`
 
 ---
 

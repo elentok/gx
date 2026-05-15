@@ -2,6 +2,7 @@ package status
 
 import (
 	"github.com/elentok/gx/ui/diffview"
+	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/status/diffarea"
 
@@ -36,9 +37,9 @@ func (m Model) delegateToDiff(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case diffarea.BindingScrollUp:
 		m.diffarea.ActiveSectionModel().ScrollViewport(-3)
 	case diffarea.BindingPageDown:
-		m.diffarea.ScrollPage(1)
+		m.diffarea.ScrollPage(list.DefaultScroll)
 	case diffarea.BindingPageUp:
-		m.diffarea.ScrollPage(-1)
+		m.diffarea.ScrollPage(-list.DefaultScroll)
 	case diffarea.BindingNavMode:
 		m.diffarea.DisableVisual()
 		m.diffarea.ToggleNavMode()

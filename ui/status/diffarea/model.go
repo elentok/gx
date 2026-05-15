@@ -151,9 +151,9 @@ func (d *Model) MoveActive(delta int) bool {
 	return diffviewModel.MoveActive(delta, true)
 }
 
-func (d *Model) ScrollPage(direction int) {
+func (d *Model) ScrollPage(delta int) {
 	diffviewModel := d.ActiveSectionModel()
-	diffviewModel.ScrollPage(direction)
+	diffviewModel.ScrollPage(delta)
 }
 
 func (d *Model) JumpTop() bool {

@@ -1,5 +1,7 @@
 package commit
 
+import "github.com/elentok/gx/ui/list"
+
 func (m *Model) diffPaneSize() (int, int) {
 	headerH := m.headerViewportRowsCount() + 2
 	contentH := max(5, m.height-1-headerH-1)
@@ -28,6 +30,16 @@ func (m *Model) syncDiffViewport() {
 	}
 	m.diffModel.SyncViewport(bodyW, bodyH)
 	m.ensureActiveVisible()
+	m.fileTreeModel.SetVisibleHeight(m.filesInnerHeight())
+}
+
+func (m *Model) filesInnerHeight() int {
+	headerH := m.headerViewportRowsCount() + 2
+	contentH := max(5, m.height-1-headerH-1)
+	if m.width < 90 {
+		return max(1, max(5, contentH/3)-2)
+	}
+	return max(1, contentH-2)
 }
 
 func (m *Model) moveDiffActive(delta int) {
@@ -43,7 +55,7 @@ func (m *Model) ensureActiveVisible() {
 }
 
 func (m *Model) scrollDiffPage(direction int) {
-	m.diffModel.ScrollPage(direction)
+	m.diffModel.ScrollPage(direction * list.DefaultScroll)
 }
 
 func (m *Model) jumpDiffTop() {

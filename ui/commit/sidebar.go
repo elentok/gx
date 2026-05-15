@@ -3,6 +3,7 @@ package commit
 import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/filetree"
+	"github.com/elentok/gx/ui/list"
 )
 
 func (m Model) selectedCommitEntry() (filetree.Entry[git.CommitFile], bool) {
@@ -111,6 +112,14 @@ func (m *Model) jumpSidebarBottom() bool {
 	m.fileTreeModel.SetSelectedIndex(len(entries) - 1)
 	m.refreshDiff()
 	return true
+}
+
+func (m *Model) scrollSidebarPage(direction int) {
+	prev := m.fileTreeModel.SelectedIndex()
+	m.fileTreeModel.ScrollPage(direction * list.DefaultScroll)
+	if m.fileTreeModel.SelectedIndex() != prev {
+		m.refreshDiff()
+	}
 }
 
 func (m *Model) rebuildCommitFiletree() {

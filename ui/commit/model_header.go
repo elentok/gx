@@ -1,5 +1,7 @@
 package commit
 
+import "github.com/elentok/gx/ui/list"
+
 const commitHeaderMaxRows = 6
 
 func (m *Model) scrollHeader(delta int) {
@@ -16,9 +18,5 @@ func (m *Model) scrollHeader(delta int) {
 }
 
 func (m *Model) scrollHeaderPage(direction int) {
-	step := m.headerViewportRowsCount() / 2
-	if step < 1 {
-		step = 1
-	}
-	m.scrollHeader(direction * step)
+	m.scrollHeader(direction * list.DefaultScroll)
 }

@@ -293,18 +293,19 @@ func (m *Model) MoveActive(delta int, allowViewportScroll bool) bool {
 	return m.data.ActiveLine != old
 }
 
-func (m *Model) ScrollPage(direction int) {
-	visible := m.viewport.VisibleLineCount()
-	if visible <= 0 {
+// ScrollPage scrolls the viewport by delta display lines and co-scrolls the
+// active hunk/line to the nearest one at the new display position (vim-style
+// ctrl+d/ctrl+u). In unified mode (HunkDisplayRange/ChangedDisplay are nil)
+// only the viewport scrolls.
+func (m *Model) ScrollPage(delta int) {
+	if delta > 0 {
+		m.viewport.ScrollDown(delta)
+	} else if delta < 0 {
+		m.viewport.ScrollUp(-delta)
+	} else {
 		return
 	}
-	step := maxInt(1, visible/2)
-	if direction > 0 {
-		m.viewport.ScrollDown(step)
-	} else {
-		m.viewport.ScrollUp(step)
-	}
-	m.snapActiveToViewport()
+	m.coScrollActive(delta)
 }
 
 func (m *Model) ScrollViewport(delta int) {
@@ -387,6 +388,88 @@ func (m *Model) snapActiveToViewport() {
 			m.data.ActiveLine = last
 		}
 	}
+}
+
+// coScrollActive moves the active hunk/line to the nearest one at activeDisplay+delta.
+// Works in both unified and side-by-side modes.
+func (m *Model) coScrollActive(delta int) {
+	if m.navMode == NavModeHunk {
+		// Use HunkDisplayRange count in side-by-side, Parsed.Hunks count in unified.
+		n := len(m.data.HunkDisplayRange)
+		if n == 0 {
+			n = len(m.data.Parsed.Hunks)
+		}
+		if n == 0 {
+			return
+		}
+		activeDisplay := 0
+		if start, _, ok := m.data.HunkDisplayBounds(m.data.ActiveHunk); ok {
+			activeDisplay = start
+		}
+		m.data.ActiveHunk = nearestIndex(n, func(i int) int {
+			start, _, ok := m.data.HunkDisplayBounds(i)
+			if !ok {
+				return -1
+			}
+			return start
+		}, activeDisplay+delta)
+		return
+	}
+
+	// Use ChangedDisplay count in side-by-side, Parsed.Changed count in unified.
+	n := len(m.data.ChangedDisplay)
+	if n == 0 {
+		n = len(m.data.Parsed.Changed)
+	}
+	if n == 0 {
+		return
+	}
+	activeDisplay := m.changedLineDisplay(m.data.ActiveLine)
+	m.data.ActiveLine = nearestIndex(n, func(i int) int {
+		return m.changedLineDisplay(i)
+	}, activeDisplay+delta)
+}
+
+// changedLineDisplay returns the display row for changed line i, using
+// ChangedDisplay (side-by-side) or RawToDisplay (unified) as available.
+func (m *Model) changedLineDisplay(i int) int {
+	if i < 0 {
+		return 0
+	}
+	if i < len(m.data.ChangedDisplay) {
+		return m.data.ChangedDisplay[i]
+	}
+	if i < len(m.data.Parsed.Changed) {
+		rawIdx := m.data.Parsed.Changed[i].LineIndex
+		if rawIdx >= 0 && rawIdx < len(m.data.RawToDisplay) {
+			return m.data.RawToDisplay[rawIdx]
+		}
+	}
+	return 0
+}
+
+// nearestIndex returns the index in [0, n) whose displayAt value is closest to target.
+func nearestIndex(n int, displayAt func(i int) int, target int) int {
+	if n == 0 {
+		return 0
+	}
+	best := 0
+	bestDist := absInt(displayAt(0) - target)
+	for i := 1; i < n; i++ {
+		d := absInt(displayAt(i) - target)
+		if d < bestDist {
+			bestDist = d
+			best = i
+		}
+	}
+	return best
+}
+
+func absInt(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
 func (m *Model) JumpTop() bool {

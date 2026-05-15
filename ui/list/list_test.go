@@ -232,3 +232,82 @@ func TestVisibleRange_ClipsAtTotal(t *testing.T) {
 		t.Errorf("expected end=20, got %d", end)
 	}
 }
+
+func TestScrollPage_MovesSelectionAndOffsetTogether(t *testing.T) {
+	// 20 items, visible height 5, start at selected=5, offset=5
+	m := &list.Model{}
+	m.ScrollViewport(5, 20, 5) // offset=5, selection snaps to 5
+	m.SetSelected(5, 20)
+
+	m.ScrollPage(7, 20, 5)
+
+	if m.Selected() != 12 {
+		t.Errorf("expected selected=12, got %d", m.Selected())
+	}
+	if m.Offset() != 12 {
+		t.Errorf("expected offset=12, got %d", m.Offset())
+	}
+}
+
+func TestScrollPage_NoOpAtBottomBoundary(t *testing.T) {
+	m := &list.Model{}
+	m.SetSelected(19, 20)
+	m.ScrollViewport(15, 20, 5) // offset=15
+
+	m.ScrollPage(7, 20, 5)
+
+	if m.Selected() != 19 {
+		t.Errorf("expected selected=19 (no-op), got %d", m.Selected())
+	}
+	if m.Offset() != 15 {
+		t.Errorf("expected offset=15 (no-op), got %d", m.Offset())
+	}
+}
+
+func TestScrollPage_NoOpAtTopBoundary(t *testing.T) {
+	m := &list.Model{}
+	// selected=0, offset=0
+
+	m.ScrollPage(-7, 20, 5)
+
+	if m.Selected() != 0 {
+		t.Errorf("expected selected=0 (no-op), got %d", m.Selected())
+	}
+	if m.Offset() != 0 {
+		t.Errorf("expected offset=0 (no-op), got %d", m.Offset())
+	}
+}
+
+func TestScrollPage_ClampsNearBoundary(t *testing.T) {
+	// 20 items, selected=16, offset=12, visible=5 → max offset=15
+	// ScrollPage(7): newSelected=23→19, newOffset=19→15
+	m := &list.Model{}
+	m.ScrollViewport(12, 20, 5)
+	m.SetSelected(16, 20)
+
+	m.ScrollPage(7, 20, 5)
+
+	if m.Selected() != 19 {
+		t.Errorf("expected selected=19 (clamped), got %d", m.Selected())
+	}
+	if m.Offset() != 15 {
+		t.Errorf("expected offset=15 (clamped), got %d", m.Offset())
+	}
+}
+
+func TestScrollPage_NegativeDelta(t *testing.T) {
+	// 20 items, selected=10, offset=10, visible=5
+	// ScrollPage(-7): newSelected=3, newOffset=3
+	m := &list.Model{}
+	m.ScrollViewport(10, 20, 5)
+	m.SetSelected(10, 20)
+
+	m.ScrollPage(-7, 20, 5)
+
+	if m.Selected() != 3 {
+		t.Errorf("expected selected=3, got %d", m.Selected())
+	}
+	if m.Offset() != 3 {
+		t.Errorf("expected offset=3, got %d", m.Offset())
+	}
+}

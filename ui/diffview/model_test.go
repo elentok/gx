@@ -9,6 +9,70 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
+func TestNearestIndex_FindsClosest(t *testing.T) {
+	// displays at 0, 5, 10, 15
+	displayAt := func(i int) int { return i * 5 }
+
+	if got := nearestIndex(4, displayAt, 7); got != 1 { // 5 is nearer to 7 than 10
+		t.Errorf("expected 1, got %d", got)
+	}
+	if got := nearestIndex(4, displayAt, 8); got != 2 { // 10 is nearer to 8 than 5... wait 8-5=3, 10-8=2 → index 2
+		t.Errorf("expected 2, got %d", got)
+	}
+	if got := nearestIndex(4, displayAt, 0); got != 0 {
+		t.Errorf("expected 0, got %d", got)
+	}
+	if got := nearestIndex(4, displayAt, 100); got != 3 {
+		t.Errorf("expected 3, got %d", got)
+	}
+}
+
+func TestNearestIndex_EmptySlice(t *testing.T) {
+	if got := nearestIndex(0, func(i int) int { return i }, 5); got != 0 {
+		t.Errorf("expected 0 for empty, got %d", got)
+	}
+}
+
+func TestCoScrollActive_HunkMode(t *testing.T) {
+	m := NewModel()
+	m.navMode = NavModeHunk
+	// hunks start at display rows 0, 10, 20
+	m.data.HunkDisplayRange = [][2]int{{0, 3}, {10, 13}, {20, 23}}
+	m.data.ActiveHunk = 0
+
+	// scroll by 12: target=0+12=12 → nearest is index 1 (display 10, dist=2) vs index 2 (display 20, dist=8)
+	m.coScrollActive(12)
+	if m.data.ActiveHunk != 1 {
+		t.Errorf("expected ActiveHunk=1, got %d", m.data.ActiveHunk)
+	}
+}
+
+func TestCoScrollActive_LineMode(t *testing.T) {
+	m := NewModel()
+	m.navMode = NavModeLine
+	// changed lines at display rows 2, 8, 14
+	m.data.ChangedDisplay = []int{2, 8, 14}
+	m.data.ActiveLine = 0 // display=2
+
+	// scroll by 7: target=2+7=9 → nearest is index 1 (display 8, dist=1) vs index 2 (display 14, dist=5)
+	m.coScrollActive(7)
+	if m.data.ActiveLine != 1 {
+		t.Errorf("expected ActiveLine=1, got %d", m.data.ActiveLine)
+	}
+}
+
+func TestCoScrollActive_EmptyHunkRange_NoOp(t *testing.T) {
+	m := NewModel()
+	m.navMode = NavModeHunk
+	m.data.HunkDisplayRange = nil
+	m.data.ActiveHunk = 0
+
+	m.coScrollActive(7)
+	if m.data.ActiveHunk != 0 {
+		t.Errorf("expected ActiveHunk=0 (no-op), got %d", m.data.ActiveHunk)
+	}
+}
+
 func TestModelBuildFromRawAndHasContent(t *testing.T) {
 	m := NewModel()
 	if m.DataRef().HasContent() {

@@ -49,19 +49,6 @@ func moveActive(section *DiffData, vp *viewport.Model, navMode NavMode, delta in
 	return section.ActiveLine != old
 }
 
-func scrollPage(vp *viewport.Model, direction int) {
-	visible := vp.VisibleLineCount()
-	if visible <= 0 {
-		return
-	}
-	step := maxInt(1, visible/2)
-	if direction > 0 {
-		vp.ScrollDown(step)
-	} else {
-		vp.ScrollUp(step)
-	}
-}
-
 func jumpTop(section *DiffData, vp *viewport.Model, navMode NavMode) bool {
 	vp.SetYOffset(0)
 	if navMode == NavModeHunk {

@@ -178,6 +178,8 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 			m.scrollHeaderPage(1)
 		} else if m.focusDiff {
 			m.scrollDiffPage(1)
+		} else {
+			m.scrollSidebarPage(1)
 		}
 		return m, nil
 	case bindingPageUp:
@@ -185,6 +187,8 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 			m.scrollHeaderPage(-1)
 		} else if m.focusDiff {
 			m.scrollDiffPage(-1)
+		} else {
+			m.scrollSidebarPage(-1)
 		}
 		return m, nil
 	case bindingNext:
