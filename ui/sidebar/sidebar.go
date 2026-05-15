@@ -17,35 +17,20 @@ type RenderableRow struct {
 	Faint    bool
 }
 
-func BuildVisibleRenderableRows[T any](entries []T, selected, innerH int, build func(index int, entry T) RenderableRow) []RenderableRow {
-	start, end := visibleRowsForSelection(len(entries), selected, innerH)
-	rows := make([]RenderableRow, 0, maxInt(0, end-start))
-	for i := start; i < end; i++ {
-		rows = append(rows, build(i, entries[i]))
+func BuildVisibleRenderableRows[T any](entries []T, offset, innerH int, build func(index int, entry T) RenderableRow) []RenderableRow {
+	total := len(entries)
+	if total <= 0 || innerH <= 0 {
+		return nil
 	}
-	return rows
-}
-
-// Calculate the row indexes to show in the window
-func visibleRowsForSelection(total, selected, bodyH int) (start, end int) {
-	if total <= 0 || bodyH <= 0 {
-		return 0, 0
-	}
-	start = selected - bodyH/2
-	if start < 0 {
-		start = 0
-	}
-	if start > total-bodyH {
-		start = total - bodyH
-	}
-	if start < 0 {
-		start = 0
-	}
-	end = start + bodyH
+	end := offset + innerH
 	if end > total {
 		end = total
 	}
-	return start, end
+	rows := make([]RenderableRow, 0, maxInt(0, end-offset))
+	for i := offset; i < end; i++ {
+		rows = append(rows, build(i, entries[i]))
+	}
+	return rows
 }
 
 func maxInt(a, b int) int {

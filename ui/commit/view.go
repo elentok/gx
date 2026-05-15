@@ -373,8 +373,8 @@ func (m Model) visibleFileLines(height int) []string {
 	innerH := max(1, height-2)
 	icons := ui.Icons(m.settings.UseNerdFontIcons)
 	entries := m.fileTreeModel.Entries()
-	selected := m.fileTreeModel.SelectedIndex()
-	rows := sidebar.BuildVisibleRenderableRows(entries, selected, innerH, func(i int, entry filetree.Entry[git.CommitFile]) sidebar.RenderableRow {
+	offset := m.fileTreeModel.ScrollOffset()
+	rows := sidebar.BuildVisibleRenderableRows(entries, offset, innerH, func(i int, entry filetree.Entry[git.CommitFile]) sidebar.RenderableRow {
 		statusColor := commitEntryColor(entry)
 		name := entry.DisplayName
 		if entry.Kind == filetree.EntryDir {
@@ -397,7 +397,7 @@ func (m Model) visibleFileLines(height int) []string {
 			MetaRaw:  commitEntryMeta(entry, m.settings.UseNerdFontIcons),
 			NameRaw:  name,
 			Color:    statusColor,
-			Selected: i == selected,
+			Selected: i == m.fileTreeModel.SelectedIndex(),
 		}
 	})
 	return sidebar.RenderRows(rows, innerH, ui.StyleMuted.Render("no changed files"), ui.ColorOrange)

@@ -93,7 +93,7 @@ func (m Model) filetreePaneTitle() string {
 func (m Model) visibleStatusLines(height int) []string {
 	innerH := maxInt(1, height-2)
 	icons := filetreePaneIconsFor(m.settings.UseNerdFontIcons)
-	rows := sidebar.BuildVisibleRenderableRows(m.statusData.statusEntries, m.statusData.listState.Selected(), innerH, func(i int, entry statusEntry) sidebar.RenderableRow {
+	rows := sidebar.BuildVisibleRenderableRows(m.statusData.statusEntries, m.statusData.listState.Offset(), innerH, func(i int, entry statusEntry) sidebar.RenderableRow {
 		statusColor := statusEntryColor(entry)
 		deleted := entry.Kind == statusEntryFile && isDeletedFileStatus(entry.File)
 		metaRaw := statusEntryMeta(entry, m.settings.UseNerdFontIcons, icons)
