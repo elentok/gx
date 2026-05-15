@@ -57,7 +57,7 @@ func (m Model) delegateToFiletree(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m, actionCmd = m.handleFileTreeOpenSelected()
 	}
 	if selectionChanged {
-		m.statusData.selected = m.fileTreeModel.SelectedIndex()
+		m.statusData.listState.SetSelected(m.fileTreeModel.SelectedIndex(), len(m.statusData.statusEntries))
 		m.onFiletreeSelectionChanged()
 	}
 	if childCmd != nil {

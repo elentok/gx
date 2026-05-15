@@ -8,10 +8,11 @@ package status
 // parent and child selection cannot drift.
 func (m *Model) reconcileFileTreeFromStatusState() {
 	m.fileTreeModel.SetEntries(m.statusData.statusRows)
-	m.setStatusSelection(m.statusData.selected)
+	m.setStatusSelection(m.statusData.listState.Selected())
 }
 
 func (m *Model) setStatusSelection(index int) {
 	m.fileTreeModel.SetSelectedIndex(index)
-	m.statusData.selected = m.fileTreeModel.SelectedIndex()
+	total := len(m.statusData.statusEntries)
+	m.statusData.listState.SetSelected(m.fileTreeModel.SelectedIndex(), total)
 }

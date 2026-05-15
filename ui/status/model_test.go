@@ -303,7 +303,7 @@ func TestFiletreeHOnFileMovesSelectionToParentDir(t *testing.T) {
 	if fileIdx < 0 {
 		t.Fatalf("expected ui/status/model.go entry in status tree")
 	}
-	m.statusData.selected = fileIdx
+	m.statusData.listState.SetSelected(fileIdx, len(m.statusData.statusEntries))
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	m = updated.(Model)
@@ -1551,12 +1551,12 @@ func TestGInFiletreeAndDiffJumpsBottom(t *testing.T) {
 	m := New(repo)
 	m.ready = true
 	m.focus = focusFiletree
-	m.statusData.selected = 0
+	m.statusData.listState.SetSelected(0, len(m.statusData.statusEntries))
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	m = updated.(Model)
-	if m.statusData.selected != len(m.statusData.statusEntries)-1 {
-		t.Fatalf("expected G to jump filetree selection to bottom, got %d", m.statusData.selected)
+	if m.statusData.listState.Selected() != len(m.statusData.statusEntries)-1 {
+		t.Fatalf("expected G to jump filetree selection to bottom, got %d", m.statusData.listState.Selected())
 	}
 
 	m.focus = focusDiff
@@ -1582,12 +1582,12 @@ func TestUppercaseGUsingShiftedCodeJumpsBottom(t *testing.T) {
 	m := New(repo)
 	m.ready = true
 	m.focus = focusFiletree
-	m.statusData.selected = 0
+	m.statusData.listState.SetSelected(0, len(m.statusData.statusEntries))
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "G", ShiftedCode: 'G'})
 	m = updated.(Model)
-	if m.statusData.selected != len(m.statusData.statusEntries)-1 {
-		t.Fatalf("expected shifted G to jump to bottom, got %d", m.statusData.selected)
+	if m.statusData.listState.Selected() != len(m.statusData.statusEntries)-1 {
+		t.Fatalf("expected shifted G to jump to bottom, got %d", m.statusData.listState.Selected())
 	}
 }
 
@@ -1599,12 +1599,12 @@ func TestUppercaseGUsingShiftModifierJumpsBottom(t *testing.T) {
 	m := New(repo)
 	m.ready = true
 	m.focus = focusFiletree
-	m.statusData.selected = 0
+	m.statusData.listState.SetSelected(0, len(m.statusData.statusEntries))
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g", Mod: tea.ModShift})
 	m = updated.(Model)
-	if m.statusData.selected != len(m.statusData.statusEntries)-1 {
-		t.Fatalf("expected shifted modifier G to jump to bottom, got %d", m.statusData.selected)
+	if m.statusData.listState.Selected() != len(m.statusData.statusEntries)-1 {
+		t.Fatalf("expected shifted modifier G to jump to bottom, got %d", m.statusData.listState.Selected())
 	}
 }
 
@@ -1656,18 +1656,18 @@ func TestCtrlDAndCtrlUScrollFiletreeAndDiff(t *testing.T) {
 	m.width = 120
 	m.height = 24
 	m.focus = focusFiletree
-	beforeSel := m.statusData.selected
+	beforeSel := m.statusData.listState.Selected()
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	m = updated.(Model)
-	if m.statusData.selected <= beforeSel {
+	if m.statusData.listState.Selected() <= beforeSel {
 		t.Fatalf("expected ctrl+d to move filetree selection down")
 	}
 
-	midSel := m.statusData.selected
+	midSel := m.statusData.listState.Selected()
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	m = updated.(Model)
-	if m.statusData.selected >= midSel {
+	if m.statusData.listState.Selected() >= midSel {
 		t.Fatalf("expected ctrl+u to move filetree selection up")
 	}
 
@@ -1798,7 +1798,7 @@ func TestStageSearchFiletreeModeAndNavigation(t *testing.T) {
 		t.Fatalf("expected multiple filetree search matches, got %d", m.fileTreeModel.Search().MatchesCount())
 	}
 
-	first := m.statusData.selected
+	first := m.statusData.listState.Selected()
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
 	if m.fileTreeModel.Search().Mode() != search.SearchModeResults || !m.fileTreeModel.Search().HasQuery() || m.fileTreeModel.Search().MatchesCount() == 0 {
@@ -1809,7 +1809,7 @@ func TestStageSearchFiletreeModeAndNavigation(t *testing.T) {
 	}
 
 	m = runStatusCmds(t, m, tea.KeyPressMsg{Code: 'n', Text: "n"})
-	if m.statusData.selected == first {
+	if m.statusData.listState.Selected() == first {
 		t.Fatalf("expected n to move to next search result")
 	}
 
@@ -2186,7 +2186,7 @@ func TestGGJumpsToTop(t *testing.T) {
 	m.ready = true
 	m.focus = focusFiletree
 	m.statusData.statusEntries = []statusEntry{{Kind: statusEntryFile}, {Kind: statusEntryFile}, {Kind: statusEntryFile}}
-	m.statusData.selected = 2
+	m.statusData.listState.SetSelected(2, len(m.statusData.statusEntries))
 
 	// First g sets chord prefix
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
@@ -2201,8 +2201,8 @@ func TestGGJumpsToTop(t *testing.T) {
 		t.Fatalf("gg should schedule a diff reload after jumping to top")
 	}
 	m = updated.(Model)
-	if m.statusData.selected != 0 {
-		t.Fatalf("expected gg to jump to top, got selected=%d", m.statusData.selected)
+	if m.statusData.listState.Selected() != 0 {
+		t.Fatalf("expected gg to jump to top, got selected=%d", m.statusData.listState.Selected())
 	}
 }
 

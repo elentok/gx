@@ -10,10 +10,10 @@ import (
 )
 
 func (m Model) selectedFiletreeEntry() (statusEntry, bool) {
-	if m.statusData.selected < 0 || m.statusData.selected >= len(m.statusData.statusEntries) {
+	if m.statusData.listState.Selected() < 0 || m.statusData.listState.Selected() >= len(m.statusData.statusEntries) {
 		return statusEntry{}, false
 	}
-	return m.statusData.statusEntries[m.statusData.selected], true
+	return m.statusData.statusEntries[m.statusData.listState.Selected()], true
 }
 
 func (m Model) selectedFile() (git.StageFileStatus, bool) {
@@ -72,7 +72,7 @@ func (m *Model) reloadFileList(preservePath string) {
 			}
 		}
 	}
-	m.setStatusSelection(m.statusData.selected)
+	m.setStatusSelection(m.statusData.listState.Selected())
 }
 
 func (m *Model) reloadBranchState() {

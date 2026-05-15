@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/status/diffarea"
 
 	"charm.land/bubbles/v2/textinput"
@@ -79,7 +80,7 @@ type statusData struct {
 	branchSync    git.SyncStatus
 	statusEntries []statusEntry
 	statusRows    []filetree.Entry[git.StageFileStatus]
-	selected      int
+	listState     list.Model
 }
 
 type Settings struct {
@@ -145,9 +146,7 @@ func NewModel(worktreeRoot string, settings Settings) Model {
 		keys:             statusKeys,
 		focus:            focusFiletree,
 		diffarea:         diffarreaModel,
-		statusData: statusData{
-			selected: 0,
-		},
+		statusData: statusData{},
 		fileTreeModel: fileTreeModel,
 	}
 
