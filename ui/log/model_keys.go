@@ -26,6 +26,7 @@ const (
 	bindingRefresh    keys.BindingID = "refresh"
 	bindingCancel     keys.BindingID = "cancel-chord"
 	bindingAmend      keys.BindingID = "amend"
+	bindingReword     keys.BindingID = "reword"
 	bindingPageDown   keys.BindingID = "page-down"
 	bindingPageUp     keys.BindingID = "page-up"
 )
@@ -64,6 +65,8 @@ func newLogManager() keys.Manager {
 		{ID: bindingCancel, Seq: []string{"m", "esc"}, Categories: []string{}, Title: ""},
 
 		{ID: bindingAmend, Seq: []string{"A"}, Categories: []string{"Actions"}, Title: "amend commit with staged changes"},
+		{ID: bindingReword, Seq: []string{"c", "r"}, Categories: []string{"Actions"}, Title: "reword commit"},
+		{ID: bindingCancel, Seq: []string{"c", "esc"}, Categories: []string{}, Title: ""},
 		{ID: bindingPageDown, Seq: []string{"ctrl+d"}, Categories: []string{"Navigation"}, Title: "page down"},
 		{ID: bindingPageUp, Seq: []string{"ctrl+u"}, Categories: []string{"Navigation"}, Title: "page up"},
 	})
@@ -128,6 +131,8 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 			m.statusMsg = err.Error()
 		}
 		return m, nil
+	case bindingReword:
+		return m, m.cmdFetchRewordDetails()
 	case bindingPageDown:
 		m.list.ScrollPage(list.DefaultScroll, len(m.rows), maxInt(1, m.height-3))
 		return m, nil

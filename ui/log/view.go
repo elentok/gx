@@ -58,6 +58,9 @@ func (m Model) View() tea.View {
 	if m.amendConfirm.IsOpen {
 		out = ui.OverlayCenter(out, m.amendConfirm.View(m.width), m.width, m.height)
 	}
+	if m.reword.IsOpen {
+		out = ui.OverlayCenter(out, m.reword.View(m.width), m.width, m.height)
+	}
 	if m.help.IsOpen {
 		out = ui.OverlayCenter(out, m.help.View(), m.width, m.height)
 	}

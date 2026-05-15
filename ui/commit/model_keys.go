@@ -40,6 +40,7 @@ const (
 	bindingRefreshMenu keys.BindingID = "refresh-menu"
 	bindingCancelChord keys.BindingID = "cancel-chord"
 	bindingAmend       keys.BindingID = "amend"
+	bindingReword      keys.BindingID = "reword"
 )
 
 func newCommitManager() keys.Manager {
@@ -86,6 +87,7 @@ func newCommitManager() keys.Manager {
 		{ID: bindingCancelChord, Seq: []string{"m", "esc"}, Categories: []string{}, Title: ""},
 
 		{ID: bindingComment, Seq: []string{"c", "m"}, Categories: []string{"Diff"}, Title: "comment"},
+		{ID: bindingReword, Seq: []string{"c", "r"}, Categories: []string{"Actions"}, Title: "reword commit"},
 		{ID: bindingCancelChord, Seq: []string{"c", "esc"}, Categories: []string{}, Title: ""},
 
 		{ID: bindingAmend, Seq: []string{"A"}, Categories: []string{"Actions"}, Title: "amend commit with staged changes"},
@@ -296,6 +298,8 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 			m.statusMsg = err.Error()
 		}
 		return m, nil
+	case bindingReword:
+		return m, m.openRewordEditor()
 	case bindingCancelChord:
 		m.clearStatus()
 		return m, nil

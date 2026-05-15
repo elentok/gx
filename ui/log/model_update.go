@@ -2,6 +2,7 @@ package log
 
 import (
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/reword"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -17,12 +18,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.amendConfirm.IsOpen {
 		return m.handleAmendUpdate(msg)
 	}
+	// Delegate all messages to reword.Model while it's running.
+	if m.reword.IsOpen {
+		return m.handleRewordRunningUpdate(msg)
+	}
 
 	switch msg := msg.(type) {
 	case tea.MouseWheelMsg:
 		return m.handleMouseWheel(msg)
 	case reloadMsg:
 		return m.handleReload(msg)
+	case rewordDetailsMsg:
+		return m.handleRewordDetails(msg)
+	case reword.EditorFinishedMsg:
+		return m.handleRewordEditorDone(msg.Err)
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
