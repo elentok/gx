@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/ui/amend"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/search"
 )
 
@@ -45,7 +46,7 @@ type Model struct {
 	ready  bool
 
 	rows      []row
-	cursor    int
+	list      list.Model
 	statusMsg string
 	keys      keys.Manager
 	search    search.Model
@@ -63,7 +64,6 @@ func NewModel(worktreeRoot, startRef string, settings Settings) Model {
 		worktreeRoot: worktreeRoot,
 		settings:     settings,
 		startRef:     normalizedRef(startRef),
-		cursor:       0,
 		keys:         newLogManager(),
 		search:       search.NewModel(),
 	}

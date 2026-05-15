@@ -67,21 +67,17 @@ func (m Model) handleReload(msg reloadMsg) (tea.Model, tea.Cmd) {
 	m.rows = msg.rows
 	m.branchDiverged = msg.branchDiverged
 	if msg.focusSubject != "" {
-		m.cursor = 0
+		m.list.SetSelected(0, len(m.rows))
 		for i, r := range m.rows {
 			if r.commit.Subject == msg.focusSubject {
-				m.cursor = i
+				m.list.SetSelected(i, len(m.rows))
 				break
 			}
 		}
 	} else {
-		if m.cursor >= len(m.rows) {
-			m.cursor = len(m.rows) - 1
-		}
-		if m.cursor < 0 {
-			m.cursor = 0
-		}
+		m.list.SetSelected(m.list.Selected(), len(m.rows))
 	}
+	m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))
 	m.recomputeSearchMatches()
 	m.jumpToCurrentMatch()
 	return m, nil
@@ -91,9 +87,10 @@ func (m *Model) jumpToTaggedCommit(step int) {
 	if len(m.rows) == 0 || step == 0 {
 		return
 	}
-	for i := m.cursor + step; i >= 0 && i < len(m.rows); i += step {
+	for i := m.list.Selected() + step; i >= 0 && i < len(m.rows); i += step {
 		if rowHasTag(m.rows[i]) {
-			m.cursor = i
+			m.list.SetSelected(i, len(m.rows))
+			m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))
 			return
 		}
 	}

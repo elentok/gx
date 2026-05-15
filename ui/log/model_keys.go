@@ -76,26 +76,22 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Quit
 	case bindingDown:
-		if m.cursor < len(m.rows)-1 {
-			m.cursor++
-		}
+		m.list.Navigate(1, len(m.rows), maxInt(1, m.height-3))
 		return m, nil
 	case bindingUp:
-		if m.cursor > 0 {
-			m.cursor--
-		}
+		m.list.Navigate(-1, len(m.rows), maxInt(1, m.height-3))
 		return m, nil
 	case bindingOpen:
 		return m, m.openSelected()
 	case bindingBottom:
-		if len(m.rows) > 0 {
-			m.cursor = len(m.rows) - 1
-		}
+		m.list.SetSelected(len(m.rows)-1, len(m.rows))
+		m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))
 		return m, nil
 	case bindingReload, bindingRefresh:
 		return m, m.cmdReload()
 	case bindingTop:
-		m.cursor = 0
+		m.list.SetSelected(0, len(m.rows))
+		m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))
 		m.statusMsg = ""
 		return m, nil
 	case bindingGotoHead:

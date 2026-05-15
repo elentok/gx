@@ -116,7 +116,7 @@ func TestEnterOnCommitRowOpensCommitRoute(t *testing.T) {
 	m := NewModel(repo, "", settings)
 	for i := range m.rows {
 		if m.rows[i].kind == rowCommit {
-			m.cursor = i
+			m.list.SetSelected(i, len(m.rows))
 			break
 		}
 	}
@@ -247,19 +247,19 @@ func TestNAndNShiftMoveBetweenSearchResults(t *testing.T) {
 		t.Fatalf("expected at least two search matches, got %d", m.search.MatchesCount())
 	}
 	if match, ok := m.search.Match(0); ok {
-		m.cursor = match.Index
+		m.list.SetSelected(match.Index, len(m.rows))
 	}
 	m.search.SetCursor(0)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	m = updated.(Model)
-	if match, ok := m.search.Match(1); ok && m.cursor != match.Index {
+	if match, ok := m.search.Match(1); ok && m.list.Selected() != match.Index {
 		t.Fatalf("expected n to move to next result")
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'N', Text: "N", ShiftedCode: 'N', Mod: tea.ModShift})
 	m = updated.(Model)
-	if match, ok := m.search.Match(0); ok && m.cursor != match.Index {
+	if match, ok := m.search.Match(0); ok && m.list.Selected() != match.Index {
 		t.Fatalf("expected N to move to previous result")
 	}
 }
@@ -272,30 +272,30 @@ func TestTagJumpChordsMoveToTaggedCommits(t *testing.T) {
 		{kind: rowCommit, commit: git.LogEntry{Subject: "c2"}},
 		{kind: rowCommit, commit: git.LogEntry{Subject: "c3", Decorations: []git.RefDecoration{{Name: "v2.0.0", Kind: git.RefDecorationTag}}}},
 	}
-	m.cursor = 0
+	m.list.SetSelected(0, len(m.rows))
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: ']', Text: "]"})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updated.(Model)
-	if m.cursor != 1 {
-		t.Fatalf("expected ]t to jump to first tag at 1, got %d", m.cursor)
+	if m.list.Selected() != 1 {
+		t.Fatalf("expected ]t to jump to first tag at 1, got %d", m.list.Selected())
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: ']', Text: "]"})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updated.(Model)
-	if m.cursor != 3 {
-		t.Fatalf("expected ]t to jump to next tag at 3, got %d", m.cursor)
+	if m.list.Selected() != 3 {
+		t.Fatalf("expected ]t to jump to next tag at 3, got %d", m.list.Selected())
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: '[', Text: "["})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updated.(Model)
-	if m.cursor != 1 {
-		t.Fatalf("expected [t to jump back to tag at 1, got %d", m.cursor)
+	if m.list.Selected() != 1 {
+		t.Fatalf("expected [t to jump back to tag at 1, got %d", m.list.Selected())
 	}
 }
 
@@ -305,14 +305,14 @@ func TestTagJumpChordStopsAtEdges(t *testing.T) {
 		{kind: rowCommit, commit: git.LogEntry{Subject: "c0", Decorations: []git.RefDecoration{{Name: "v1", Kind: git.RefDecorationTag}}}},
 		{kind: rowCommit, commit: git.LogEntry{Subject: "c1"}},
 	}
-	m.cursor = 0
+	m.list.SetSelected(0, len(m.rows))
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '[', Text: "["})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updated.(Model)
-	if m.cursor != 0 {
-		t.Fatalf("expected [t at first tag to stay put, got %d", m.cursor)
+	if m.list.Selected() != 0 {
+		t.Fatalf("expected [t at first tag to stay put, got %d", m.list.Selected())
 	}
 }
 

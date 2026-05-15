@@ -12,7 +12,8 @@ func (m *Model) jumpToCurrentMatch() {
 		return
 	}
 	if match.Index >= 0 && match.Index < len(m.rows) {
-		m.cursor = match.Index
+		m.list.SetSelected(match.Index, len(m.rows))
+		m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))
 	}
 }
 

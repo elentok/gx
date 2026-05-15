@@ -29,12 +29,8 @@ func (m *Model) reload() {
 	}
 	m.rows = rows
 	m.branchDiverged = branchDiverged
-	if m.cursor >= len(m.rows) {
-		m.cursor = len(m.rows) - 1
-	}
-	if m.cursor < 0 {
-		m.cursor = 0
-	}
+	m.list.SetSelected(m.list.Selected(), len(m.rows))
+	m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))
 	m.recomputeSearchMatches()
 }
 
@@ -98,9 +94,10 @@ func fetchBranchHistoryClasses(worktreeRoot, startRef string) (map[string]git.Br
 }
 
 func (m Model) openSelected() tea.Cmd {
-	if len(m.rows) == 0 || m.cursor < 0 || m.cursor >= len(m.rows) {
+	cursor := m.list.Selected()
+	if len(m.rows) == 0 || cursor < 0 || cursor >= len(m.rows) {
 		return nil
 	}
-	selected := m.rows[m.cursor]
+	selected := m.rows[cursor]
 	return nav.Push(nav.Route{Kind: nav.RouteCommit, WorktreeRoot: m.worktreeRoot, Ref: selected.commit.FullHash})
 }

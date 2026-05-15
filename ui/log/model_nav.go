@@ -8,7 +8,8 @@ func (m Model) SelectRef(fullHash string) Model {
 	}
 	for i := range m.rows {
 		if m.rows[i].kind == rowCommit && m.rows[i].commit.FullHash == fullHash {
-			m.cursor = i
+			m.list.SetSelected(i, len(m.rows))
+			m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))
 			return m
 		}
 	}
@@ -17,12 +18,13 @@ func (m Model) SelectRef(fullHash string) Model {
 
 // SelectedRef returns the full hash of the currently selected commit row.
 func (m Model) SelectedRef() string {
-	if m.cursor < 0 || m.cursor >= len(m.rows) {
+	cursor := m.list.Selected()
+	if cursor < 0 || cursor >= len(m.rows) {
 		return ""
 	}
-	if m.rows[m.cursor].kind != rowCommit {
+	if m.rows[cursor].kind != rowCommit {
 		return ""
 	}
-	return m.rows[m.cursor].commit.FullHash
+	return m.rows[cursor].commit.FullHash
 }
 

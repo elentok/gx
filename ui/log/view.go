@@ -72,24 +72,11 @@ func (m Model) visibleLines() []string {
 	}
 
 	innerHeight := maxInt(1, m.height-3)
-	start := m.cursor - innerHeight/2
-	if start < 0 {
-		start = 0
-	}
-	if start > len(m.rows)-innerHeight {
-		start = len(m.rows) - innerHeight
-	}
-	if start < 0 {
-		start = 0
-	}
-	end := start + innerHeight
-	if end > len(m.rows) {
-		end = len(m.rows)
-	}
+	start, end := m.list.VisibleRange(len(m.rows), innerHeight)
 
 	lines := make([]string, 0, end-start)
 	for i := start; i < end; i++ {
-		lines = append(lines, m.renderRow(m.rows[i], i == m.cursor, m.width-4))
+		lines = append(lines, m.renderRow(m.rows[i], i == m.list.Selected(), m.width-4))
 	}
 	return lines
 }
