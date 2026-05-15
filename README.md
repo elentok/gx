@@ -21,7 +21,8 @@ and [go-migration-plan.md](/docs/go-migration-plan.md)).
 - Rebase the selected worktree on main (`b`), with optional stash-and-restore for dirty worktrees
 - `gx wt clone` clones using the `.bare` directory trick for a clean layout
 - `gx wt list` and `gx wt abs-path` for scripting and shell integration
-- `gx log` and `gx show` for commit history and single-commit inspection
+- `gx log` for commit history: amend (`A`), reword (`cr` opens `$EDITOR`), pull (`p`), and push (`P`) directly from the log; flashes and re-focuses the entry after amend or reword
+- `gx show` for single-commit inspection
 - `gx status` interactive status UI with file/hunk/line stage + unstage flows
 - `gx` opens status by default, while `gx worktrees` / `gx wt` open the worktree UI
 - Press `/` to search and highlight matching worktrees by name or branch
@@ -101,8 +102,8 @@ Status UI highlights:
 - Yank content/location/all/filename with `yy` / `yl` / `ya` / `yf`
 - Status header shows branch sync at a glance (`✓`, `↑N`, `↓N`, `↑N ↓N`)
 - Live search in status/diff with highlights and `n` / `N` navigation
-- Vim-like navigation (`j`/`k`, `G`, `ctrl+u`/`ctrl+d`)
-- Mouse wheel scrolling in diff panes (unstaged/staged, including fullscreen)
+- Vim-like navigation (`j`/`k`, `G`, `ctrl+u`/`ctrl+d` co-scroll) across status, log, and commit views
+- Mouse wheel scrolling in diff panes (unstaged/staged, including fullscreen) and in log and commit views
 - Toggle unified/side-by-side diff rendering with `s` (supports hunk, line, and visual actions)
 - Adjust diff context for the current session with `[` / `]`
 - File-to-file diff jumps with `,` / `.`

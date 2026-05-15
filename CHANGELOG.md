@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.14.6
+
+- Add `p`/`P` keybindings in `gx log` to pull and push the current branch (same flow as `gx status`, including credential prompting, stash/pop for dirty worktrees, and divergence handling)
+- Add `ctrl+d`/`ctrl+u` vim-style co-scroll in `gx commit`, `gx status`, and `gx log`
+- Wire mouse scroll in `gx commit`, `gx status`, and `gx log`
+- Add `cr` chord in reword view to open `$EDITOR` for editing the commit message
+- Flash and re-focus the log entry after returning from amend or reword
+- Fix wide-character rendering causing a CPU spike or skipped characters (bubbletea v2.0.6 upstream fix)
+
 ## v0.14.5
 
 - Add `cm` keybinding in `gx status` and `gx commit` to open `$EDITOR` and write a comment on the currently selected diff hunk
