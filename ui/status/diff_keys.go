@@ -32,9 +32,9 @@ func (m Model) delegateToDiff(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case diffarea.BindingMoveUp:
 		m.moveActive(-1)
 	case diffarea.BindingScrollDown:
-		m.diffarea.ActiveSectionModel().Viewport().ScrollDown(3)
+		m.diffarea.ActiveSectionModel().ScrollViewport(3)
 	case diffarea.BindingScrollUp:
-		m.diffarea.ActiveSectionModel().Viewport().ScrollUp(3)
+		m.diffarea.ActiveSectionModel().ScrollViewport(-3)
 	case diffarea.BindingPageDown:
 		m.diffarea.ScrollPage(1)
 	case diffarea.BindingPageUp:

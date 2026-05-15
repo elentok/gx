@@ -304,6 +304,89 @@ func (m *Model) ScrollPage(direction int) {
 	} else {
 		m.viewport.ScrollUp(step)
 	}
+	m.snapActiveToViewport()
+}
+
+func (m *Model) ScrollViewport(delta int) {
+	if delta > 0 {
+		m.viewport.ScrollDown(delta)
+	} else if delta < 0 {
+		m.viewport.ScrollUp(-delta)
+	} else {
+		return
+	}
+	m.snapActiveToViewport()
+}
+
+func (m *Model) snapActiveToViewport() {
+	yOffset := m.viewport.YOffset()
+	visibleH := m.viewport.VisibleLineCount()
+	if visibleH <= 0 {
+		return
+	}
+	bottom := yOffset + visibleH
+
+	if m.navMode == NavModeHunk {
+		if len(m.data.Parsed.Hunks) == 0 {
+			return
+		}
+		if m.data.ActiveHunk >= 0 && m.data.ActiveHunk < len(m.data.HunkDisplayRange) {
+			r := m.data.HunkDisplayRange[m.data.ActiveHunk]
+			if r[0] >= yOffset && r[0] < bottom {
+				return // still visible
+			}
+			if r[0] < yOffset {
+				// active is above — find first hunk visible
+				for i, hr := range m.data.HunkDisplayRange {
+					if hr[0] >= yOffset {
+						m.data.ActiveHunk = i
+						return
+					}
+				}
+				m.data.ActiveHunk = len(m.data.Parsed.Hunks) - 1
+			} else {
+				// active is below — find last hunk visible
+				last := 0
+				for i, hr := range m.data.HunkDisplayRange {
+					if hr[0] < bottom {
+						last = i
+					}
+				}
+				m.data.ActiveHunk = last
+			}
+		}
+		return
+	}
+
+	// NavModeLine
+	if len(m.data.Parsed.Changed) == 0 {
+		return
+	}
+	if m.data.ActiveLine >= 0 && m.data.ActiveLine < len(m.data.ChangedDisplay) {
+		displayRow := m.data.ChangedDisplay[m.data.ActiveLine]
+		if displayRow >= yOffset && displayRow < bottom {
+			return // still visible
+		}
+		if displayRow < yOffset {
+			// active is above — find first changed line visible
+			for i, d := range m.data.ChangedDisplay {
+				if d >= yOffset {
+					m.data.ActiveLine = i
+					return
+				}
+			}
+			m.data.ActiveLine = len(m.data.Parsed.Changed) - 1
+		} else {
+			// active is below — find last changed line visible
+			last := 0
+			for i, d := range m.data.ChangedDisplay {
+				if d < bottom {
+					last = i
+				}
+			}
+			m.data.ActiveLine = last
+		}
+	}
 }
 
 func (m *Model) JumpTop() bool {

@@ -163,14 +163,14 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		if m.focusHeader {
 			m.scrollHeader(1)
 		} else if m.focusDiff {
-			m.diffModel.Viewport().ScrollDown(3)
+			m.diffModel.ScrollViewport(3)
 		}
 		return m, nil
 	case bindingScrollUp:
 		if m.focusHeader {
 			m.scrollHeader(-1)
 		} else if m.focusDiff {
-			m.diffModel.Viewport().ScrollUp(3)
+			m.diffModel.ScrollViewport(-3)
 		}
 		return m, nil
 	case bindingPageDown:
