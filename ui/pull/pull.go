@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
-	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/creds"
 )
 
 type phase int
@@ -72,11 +72,7 @@ type Model struct {
 	// failed
 	failErr error
 
-	// credential prompt
-	credOpen   bool
-	credPrompt string
-	credSecret bool
-	credInput  textinput.Model
+	creds creds.Model
 }
 
 // New returns a zero-value Model.
@@ -93,7 +89,7 @@ func (m *Model) Open(root string) tea.Cmd {
 	m.stashed = false
 	m.stashYes = true
 	m.failErr = nil
-	m.credOpen = false
+	m.creds = creds.New()
 	m.activeRunner = nil
 	m.log = ui.NewCommandOutputLog()
 	m.IsOpen = true
@@ -102,8 +98,24 @@ func (m *Model) Open(root string) tea.Cmd {
 
 // Update handles all messages while the modal is open.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, Result) {
-	if m.credOpen {
-		return m.handleCredKey(msg)
+	if m.creds.IsOpen {
+		next, cmd, res := m.creds.Update(msg)
+		m.creds = next
+		if res.Decided {
+			if res.Cancelled {
+				if m.activeRunner != nil {
+					m.activeRunner.Cancel()
+				}
+				m.phase = phaseFailed
+				m.failErr = fmt.Errorf("cancelled")
+				return m, nil, Result{}
+			}
+			if m.activeRunner != nil {
+				_ = m.activeRunner.SubmitPromptInput(res.Value)
+			}
+			return m, cmdPoll(), Result{}
+		}
+		return m, cmd, Result{}
 	}
 
 	switch msg := msg.(type) {
@@ -223,47 +235,10 @@ func (m Model) handlePoll() (Model, tea.Cmd, Result) {
 		return m, nil, Result{}
 	}
 	if prompt, ok := m.activeRunner.Prompt(); ok {
-		m.credOpen = true
-		m.credPrompt = prompt.Text
-		m.credSecret = prompt.Kind == components.PromptKindSecret
-		ti := textinput.New()
-		ti.Focus()
-		if m.credSecret {
-			ti.EchoMode = textinput.EchoPassword
-			ti.EchoCharacter = '*'
-		}
-		m.credInput = ti
+		m.creds.Open(prompt)
 		return m, nil, Result{}
 	}
 	return m, cmdPoll(), Result{}
-}
-
-func (m Model) handleCredKey(msg tea.Msg) (Model, tea.Cmd, Result) {
-	kp, ok := msg.(tea.KeyPressMsg)
-	if !ok {
-		var cmd tea.Cmd
-		m.credInput, cmd = m.credInput.Update(msg)
-		return m, cmd, Result{}
-	}
-	switch kp.String() {
-	case "esc":
-		if m.activeRunner != nil {
-			m.activeRunner.Cancel()
-		}
-		m.credOpen = false
-		m.phase = phaseFailed
-		m.failErr = fmt.Errorf("cancelled")
-		return m, nil, Result{}
-	case "enter":
-		if m.activeRunner != nil {
-			_ = m.activeRunner.SubmitPromptInput(m.credInput.Value())
-		}
-		m.credOpen = false
-		return m, cmdPoll(), Result{}
-	}
-	var cmd tea.Cmd
-	m.credInput, cmd = m.credInput.Update(msg)
-	return m, cmd, Result{}
 }
 
 // startPulling stores the runner in m.activeRunner so handlePoll can surface
@@ -309,21 +284,8 @@ func cmdStashPop(root string) tea.Cmd {
 func (m Model) View(width int) string {
 	w := modalWidth(width)
 
-	if m.credOpen {
-		input := m.credInput.View()
-		if input == "" {
-			input = " "
-		}
-		return components.RenderInputModal(
-			"Credential Required",
-			m.credPrompt,
-			input,
-			ui.HintSubmitCancel(),
-			ui.ColorBlue,
-			ui.ColorBlue,
-			ui.ColorSubtle,
-			w,
-		)
+	if m.creds.IsOpen {
+		return m.creds.View(w)
 	}
 
 	switch m.phase {
