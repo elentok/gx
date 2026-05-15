@@ -15,8 +15,11 @@ import (
 type phase int
 
 const (
-	phaseRunning phase = iota
-	phasePopStashConfirm
+	phaseChecking        phase = iota // checking for uncommitted changes
+	phaseStashing                     // git stash (local, no creds)
+	phasePulling                      // git pull (network, needs credential poll)
+	phaseStashPopping                 // git stash pop after success (local)
+	phasePopStashConfirm              // pull failed with stash — offer manual pop
 	phaseFailed
 )
 
@@ -27,12 +30,22 @@ type Result struct {
 	Err    error
 }
 
-type runnerDoneMsg struct {
-	phase       phase
-	output      string
-	err         error
-	stashed     bool
-	promptStash bool // pull failed after stash — offer pop
+// internal messages
+type changesCheckMsg struct {
+	hasChanges bool
+	err        error
+}
+type stashDoneMsg struct {
+	err    error
+	output string
+}
+type pullDoneMsg struct {
+	err    error
+	output string
+}
+type stashPopDoneMsg struct {
+	err    error
+	output string
 }
 
 type pollMsg struct{}
@@ -45,9 +58,9 @@ func cmdPoll() tea.Cmd {
 type Model struct {
 	IsOpen bool
 
-	root string
-
+	root    string
 	phase   phase
+	stashed bool
 	spinner spinner.Model
 	log     *ui.CommandOutputLog
 
@@ -55,7 +68,6 @@ type Model struct {
 
 	// pop-stash confirm
 	stashYes bool
-	stashed  bool
 
 	// failed
 	failErr error
@@ -77,15 +89,15 @@ func New() Model {
 // Open starts the pull immediately (no confirm step).
 func (m *Model) Open(root string) tea.Cmd {
 	m.root = root
-	m.phase = phaseRunning
-	m.failErr = nil
-	m.credOpen = false
+	m.phase = phaseChecking
 	m.stashed = false
 	m.stashYes = true
-	m.log = ui.NewCommandOutputLog()
+	m.failErr = nil
+	m.credOpen = false
 	m.activeRunner = nil
+	m.log = ui.NewCommandOutputLog()
 	m.IsOpen = true
-	return m.startPull()
+	return cmdCheckChanges(root)
 }
 
 // Update handles all messages while the modal is open.
@@ -103,8 +115,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, Result) {
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd, Result{}
 
-	case runnerDoneMsg:
-		return m.handleRunnerDone(msg)
+	case changesCheckMsg:
+		return m.handleChangesCheck(msg)
+
+	case stashDoneMsg:
+		return m.handleStashDone(msg)
+
+	case pullDoneMsg:
+		return m.handlePullDone(msg)
+
+	case stashPopDoneMsg:
+		return m.handleStashPopDone(msg)
 
 	case pollMsg:
 		return m.handlePoll()
@@ -128,7 +149,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 			m.IsOpen = false
 			return m, nil, Result{Done: true, Output: m.log.String()}
 		}
-		return m, m.startStashPop(), Result{}
+		m.phase = phaseStashPopping
+		return m, cmdStashPop(m.root), Result{}
 
 	case phaseFailed:
 		switch msg.String() {
@@ -140,38 +162,60 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 	return m, nil, Result{}
 }
 
-func (m Model) handleRunnerDone(msg runnerDoneMsg) (Model, tea.Cmd, Result) {
-	m.activeRunner = nil
-
-	switch msg.phase {
-	case phaseRunning:
-		m.log.AppendCommand("git", []string{"pull"}, msg.output)
-		m.stashed = msg.stashed
-		if msg.err != nil {
-			if msg.promptStash {
-				m.phase = phasePopStashConfirm
-				m.stashYes = true
-				return m, nil, Result{}
-			}
-			m.phase = phaseFailed
-			m.failErr = msg.err
-			return m, nil, Result{}
-		}
-		m.IsOpen = false
-		return m, nil, Result{Done: true, Output: m.log.String()}
-
-	case phasePopStashConfirm: // stash pop
-		m.log.AppendCommand("git", []string{"stash", "pop"}, msg.output)
-		if msg.err != nil {
-			m.phase = phaseFailed
-			m.failErr = fmt.Errorf("stash pop failed: %w", msg.err)
-			return m, nil, Result{}
-		}
-		m.IsOpen = false
-		return m, nil, Result{Done: true, Output: m.log.String()}
+func (m Model) handleChangesCheck(msg changesCheckMsg) (Model, tea.Cmd, Result) {
+	if msg.err != nil {
+		m.phase = phaseFailed
+		m.failErr = msg.err
+		return m, nil, Result{}
 	}
+	if msg.hasChanges {
+		m.stashed = true
+		m.phase = phaseStashing
+		return m, cmdStash(m.root), Result{}
+	}
+	return m, m.startPulling(), Result{}
+}
 
-	return m, nil, Result{}
+func (m Model) handleStashDone(msg stashDoneMsg) (Model, tea.Cmd, Result) {
+	m.log.AppendCommand("git", []string{"stash", "push"}, msg.output)
+	if msg.err != nil {
+		m.phase = phaseFailed
+		m.failErr = fmt.Errorf("stash failed: %w", msg.err)
+		return m, nil, Result{}
+	}
+	return m, m.startPulling(), Result{}
+}
+
+func (m Model) handlePullDone(msg pullDoneMsg) (Model, tea.Cmd, Result) {
+	m.activeRunner = nil
+	m.log.AppendCommand("git", []string{"pull"}, msg.output)
+	if msg.err != nil {
+		if m.stashed {
+			m.phase = phasePopStashConfirm
+			m.stashYes = true
+			return m, nil, Result{}
+		}
+		m.phase = phaseFailed
+		m.failErr = msg.err
+		return m, nil, Result{}
+	}
+	if m.stashed {
+		m.phase = phaseStashPopping
+		return m, cmdStashPop(m.root), Result{}
+	}
+	m.IsOpen = false
+	return m, nil, Result{Done: true, Output: m.log.String()}
+}
+
+func (m Model) handleStashPopDone(msg stashPopDoneMsg) (Model, tea.Cmd, Result) {
+	m.log.AppendCommand("git", []string{"stash", "pop"}, msg.output)
+	if msg.err != nil {
+		m.phase = phaseFailed
+		m.failErr = fmt.Errorf("stash pop failed: %w", msg.err)
+		return m, nil, Result{}
+	}
+	m.IsOpen = false
+	return m, nil, Result{Done: true, Output: m.log.String()}
 }
 
 func (m Model) handlePoll() (Model, tea.Cmd, Result) {
@@ -222,58 +266,42 @@ func (m Model) handleCredKey(msg tea.Msg) (Model, tea.Cmd, Result) {
 	return m, cmd, Result{}
 }
 
-func (m *Model) startPull() tea.Cmd {
+// startPulling stores the runner in m.activeRunner so handlePoll can surface
+// credential prompts, then returns poll + wait commands.
+func (m *Model) startPulling() tea.Cmd {
+	runner := components.NewCommandRunnerWithPolicy(m.root, "git", components.CredentialPolicyPrompt, "pull")
+	m.activeRunner = runner
+	m.phase = phasePulling
+	runner.Start()
+	return tea.Batch(cmdPoll(), m.spinner.Tick, func() tea.Msg {
+		err := runner.Wait()
+		return pullDoneMsg{err: err, output: runner.Output()}
+	})
+}
+
+func cmdCheckChanges(root string) tea.Cmd {
 	return func() tea.Msg {
-		log := ui.NewCommandOutputLog()
-
-		changes, err := git.UncommittedChanges(m.root)
-		if err != nil {
-			return runnerDoneMsg{phase: phaseRunning, err: err}
-		}
-
-		stashed := false
-		if len(changes) > 0 {
-			runner := components.NewCommandRunnerWithPolicy(m.root, "git", components.CredentialPolicyPrompt,
-				"stash", "push", "-u", "-m", "gx-pull-auto-stash")
-			runner.Start()
-			if err := runner.Wait(); err != nil {
-				log.AppendCommand("git", []string{"stash", "push"}, runner.Output())
-				return runnerDoneMsg{phase: phaseRunning, output: log.String(), err: fmt.Errorf("stash failed: %w", err)}
-			}
-			log.AppendCommand("git", []string{"stash", "push"}, runner.Output())
-			stashed = true
-		}
-
-		runner := components.NewCommandRunnerWithPolicy(m.root, "git", components.CredentialPolicyPrompt, "pull")
-		runner.Start()
-		pullErr := runner.Wait()
-		log.AppendCommand("git", []string{"pull"}, runner.Output())
-
-		if pullErr != nil {
-			return runnerDoneMsg{phase: phaseRunning, output: log.String(), err: pullErr, stashed: stashed, promptStash: stashed}
-		}
-
-		if stashed {
-			popRunner := components.NewCommandRunnerWithPolicy(m.root, "git", components.CredentialPolicyPrompt, "stash", "pop")
-			popRunner.Start()
-			if err := popRunner.Wait(); err != nil {
-				log.AppendCommand("git", []string{"stash", "pop"}, popRunner.Output())
-				return runnerDoneMsg{phase: phaseRunning, output: log.String(), stashed: true, promptStash: true}
-			}
-			log.AppendCommand("git", []string{"stash", "pop"}, popRunner.Output())
-		}
-
-		return runnerDoneMsg{phase: phaseRunning, output: log.String(), stashed: stashed}
+		changes, err := git.UncommittedChanges(root)
+		return changesCheckMsg{hasChanges: len(changes) > 0, err: err}
 	}
 }
 
-func (m *Model) startStashPop() tea.Cmd {
-	root := m.root
+func cmdStash(root string) tea.Cmd {
+	return func() tea.Msg {
+		runner := components.NewCommandRunnerWithPolicy(root, "git", components.CredentialPolicyPrompt,
+			"stash", "push", "-u", "-m", "gx-pull-auto-stash")
+		runner.Start()
+		err := runner.Wait()
+		return stashDoneMsg{err: err, output: runner.Output()}
+	}
+}
+
+func cmdStashPop(root string) tea.Cmd {
 	return func() tea.Msg {
 		runner := components.NewCommandRunnerWithPolicy(root, "git", components.CredentialPolicyPrompt, "stash", "pop")
 		runner.Start()
 		err := runner.Wait()
-		return runnerDoneMsg{phase: phasePopStashConfirm, output: runner.Output(), err: err}
+		return stashPopDoneMsg{err: err, output: runner.Output()}
 	}
 }
 
@@ -299,7 +327,7 @@ func (m Model) View(width int) string {
 	}
 
 	switch m.phase {
-	case phaseRunning:
+	case phaseChecking, phaseStashing, phasePulling, phaseStashPopping:
 		body := m.spinner.View() + " Pulling…"
 		return ui.RenderModalFrame(ui.ModalFrameOptions{
 			Title:       "Pull",
@@ -311,9 +339,11 @@ func (m Model) View(width int) string {
 		})
 
 	case phasePopStashConfirm:
-		prompt := "Pull failed. Pop the stash?"
-		return components.RenderConfirmModal(prompt, m.stashYes,
-			ui.ColorYellow, ui.ColorGreen, ui.ColorRed, ui.ColorSubtle, w)
+		return components.RenderConfirmModal(
+			"Pull failed. Pop the stash?",
+			m.stashYes,
+			ui.ColorYellow, ui.ColorGreen, ui.ColorRed, ui.ColorSubtle, w,
+		)
 
 	case phaseFailed:
 		body := ui.StyleWarning.Render(m.failErr.Error()) + "\n\n" + ui.StyleMuted.Render("press esc to dismiss")
