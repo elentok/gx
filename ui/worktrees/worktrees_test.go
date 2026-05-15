@@ -408,7 +408,9 @@ func TestStashPullMainRefreshesBaseStatus(t *testing.T) {
 	testutil.WriteFile(t, mainWtDir, "README.md", "modified")
 
 	_, tm := startTUI(t, repoDir)
-	waitForTexts(t, tm, loadWait, "main", "✓") // feature-a rebased on old main
+	// Also wait for "M" (dirty column) so m.dirties is populated before pressing p.
+	// Without this, p can fire before dirtyStatusMsg arrives and takes the clean-pull path.
+	waitForTexts(t, tm, loadWait, "✓", "M") // feature-a rebased on old main; main is dirty
 
 	// Pull main — dirty worktree triggers the stash prompt.
 	tm.Send(keyRune('p'))
