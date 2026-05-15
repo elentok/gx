@@ -3,6 +3,7 @@ package filetree
 import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/search"
 	"maps"
 )
@@ -34,7 +35,8 @@ type Entry[T any] struct {
 type Model[T any] struct {
 	entries       []Entry[T]
 	collapsedDirs map[string]bool
-	selected      int
+	list          list.Model
+	visibleH      int
 
 	search search.Model
 	keys   keys.Manager
@@ -65,41 +67,39 @@ func (m Model[T]) Entries() []Entry[T] {
 
 func (m *Model[T]) SetEntries(entries []Entry[T]) {
 	m.entries = entries
-	if len(m.entries) == 0 {
-		m.selected = 0
-		return
-	}
-	if m.selected < 0 {
-		m.selected = 0
-	}
-	if m.selected >= len(m.entries) {
-		m.selected = len(m.entries) - 1
-	}
+	// Re-clamp selection to the new entry count.
+	m.list.SetSelected(m.list.Selected(), len(m.entries))
 }
 
 func (m Model[T]) SelectedIndex() int {
-	return m.selected
+	return m.list.Selected()
 }
 
 func (m *Model[T]) SetSelectedIndex(index int) {
-	if len(m.entries) == 0 {
-		m.selected = 0
-		return
-	}
-	if index < 0 {
-		index = 0
-	}
-	if index >= len(m.entries) {
-		index = len(m.entries) - 1
-	}
-	m.selected = index
+	m.list.SetSelected(index, len(m.entries))
+}
+
+// ScrollOffset returns the current scroll offset of the list.
+func (m Model[T]) ScrollOffset() int {
+	return m.list.Offset()
+}
+
+// SetVisibleHeight stores the visible height used for navigation and scroll.
+func (m *Model[T]) SetVisibleHeight(h int) {
+	m.visibleH = h
+}
+
+// ScrollViewport scrolls the viewport by delta rows, snapping selection into view.
+func (m *Model[T]) ScrollViewport(delta int) {
+	m.list.ScrollViewport(delta, len(m.entries), m.visibleH)
 }
 
 func (m Model[T]) selectedEntry() (Entry[T], bool) {
-	if m.selected < 0 || m.selected >= len(m.entries) {
+	sel := m.list.Selected()
+	if sel < 0 || sel >= len(m.entries) {
 		return Entry[T]{}, false
 	}
-	return m.entries[m.selected], true
+	return m.entries[sel], true
 }
 
 func (m Model[T]) CollapsedDirs() map[string]bool {
@@ -122,12 +122,12 @@ func (m *Model[T]) Keys() *keys.Manager {
 }
 
 func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd, Result) {
-	prevSelected := m.selected
+	prevSelected := m.list.Selected()
 	if nextSearch, cmd, result := m.search.Update(msg); result.Handled {
 		m.search = nextSearch
 		return m, cmd, Result{
 			Handled:          true,
-			SelectionChanged: m.selected != prevSelected,
+			SelectionChanged: m.list.Selected() != prevSelected,
 		}
 	}
 
@@ -139,21 +139,17 @@ func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd, Result) {
 		if match != nil {
 			switch match.ID {
 			case BindingMoveDown:
-				if m.selected < len(m.entries)-1 {
-					m.selected++
-				}
-				return m, nil, Result{Handled: true, SelectionChanged: m.selected != prevSelected}
+				m.list.Navigate(+1, len(m.entries), m.visibleH)
+				return m, nil, Result{Handled: true, SelectionChanged: m.list.Selected() != prevSelected}
 			case BindingMoveUp:
-				if m.selected > 0 {
-					m.selected--
-				}
-				return m, nil, Result{Handled: true, SelectionChanged: m.selected != prevSelected}
+				m.list.Navigate(-1, len(m.entries), m.visibleH)
+				return m, nil, Result{Handled: true, SelectionChanged: m.list.Selected() != prevSelected}
 			case BindingCollapse:
-				if collapseSelectedDir(m.entries, m.collapsedDirs, m.selected) {
+				if collapseSelectedDir(m.entries, m.collapsedDirs, m.list.Selected()) {
 					return m, nil, Result{Handled: true, RebuildRequested: true}
 				}
-				if idx, ok := parentIndex(m.entries, m.selected); ok && idx != m.selected {
-					m.selected = idx
+				if idx, ok := parentIndex(m.entries, m.list.Selected()); ok && idx != m.list.Selected() {
+					m.list.SetSelected(idx, len(m.entries))
 					return m, nil, Result{Handled: true, SelectionChanged: true}
 				}
 				return m, nil, Result{Handled: true}
@@ -165,16 +161,16 @@ func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd, Result) {
 				if entry.Kind == EntryFile {
 					return m, nil, Result{Handled: true, OpenSelected: true}
 				}
-				if expandSelectedDir(m.entries, m.collapsedDirs, m.selected) {
+				if expandSelectedDir(m.entries, m.collapsedDirs, m.list.Selected()) {
 					return m, nil, Result{Handled: true, RebuildRequested: true}
 				}
-				if idx, ok := firstChildIndex(m.entries, m.selected); ok && idx != m.selected {
-					m.selected = idx
+				if idx, ok := firstChildIndex(m.entries, m.list.Selected()); ok && idx != m.list.Selected() {
+					m.list.SetSelected(idx, len(m.entries))
 					return m, nil, Result{Handled: true, SelectionChanged: true}
 				}
 				return m, nil, Result{Handled: true}
 			case BindingToggle:
-				if toggleDirOnEnter(m.entries, m.collapsedDirs, m.selected) {
+				if toggleDirOnEnter(m.entries, m.collapsedDirs, m.list.Selected()) {
 					return m, nil, Result{Handled: true, RebuildRequested: true}
 				}
 				return m, nil, Result{Handled: true, OpenSelected: true}
@@ -188,41 +184,41 @@ func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd, Result) {
 }
 
 func (m *Model[T]) MoveToAdjacentFile(delta int) bool {
-	idx, ok := adjacentFileIndex(m.entries, m.selected, delta)
+	idx, ok := adjacentFileIndex(m.entries, m.list.Selected(), delta)
 	if !ok {
 		return false
 	}
-	m.selected = idx
+	m.list.SetSelected(idx, len(m.entries))
 	return true
 }
 
 func (m *Model[T]) ToggleSelectedDir() bool {
-	if !toggleDirOnEnter(m.entries, m.collapsedDirs, m.selected) {
+	if !toggleDirOnEnter(m.entries, m.collapsedDirs, m.list.Selected()) {
 		return false
 	}
 	return true
 }
 
 func (m *Model[T]) CollapseSelectedDir() bool {
-	if collapseSelectedDir(m.entries, m.collapsedDirs, m.selected) {
+	if collapseSelectedDir(m.entries, m.collapsedDirs, m.list.Selected()) {
 		return true
 	}
-	if idx, ok := parentIndex(m.entries, m.selected); ok && idx != m.selected {
-		m.selected = idx
+	if idx, ok := parentIndex(m.entries, m.list.Selected()); ok && idx != m.list.Selected() {
+		m.list.SetSelected(idx, len(m.entries))
 		return true
 	}
 	return false
 }
 
 func (m *Model[T]) ExpandSelectedDir() bool {
-	return expandSelectedDir(m.entries, m.collapsedDirs, m.selected)
+	return expandSelectedDir(m.entries, m.collapsedDirs, m.list.Selected())
 }
 
 func (m *Model[T]) FocusParent() bool {
-	idx, ok := parentIndex(m.entries, m.selected)
-	if !ok || idx == m.selected {
+	idx, ok := parentIndex(m.entries, m.list.Selected())
+	if !ok || idx == m.list.Selected() {
 		return false
 	}
-	m.selected = idx
+	m.list.SetSelected(idx, len(m.entries))
 	return true
 }
