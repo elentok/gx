@@ -1,6 +1,7 @@
 package commit
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -747,5 +748,93 @@ func TestCMInDiffWithoutFileContextShowsError(t *testing.T) {
 	}
 	if m.statusMsg != "no file context for comment" {
 		t.Fatalf("status = %q, want %q", m.statusMsg, "no file context for comment")
+	}
+}
+
+func TestMouseWheelScrollsDiffViewport(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	before := make([]string, 0, 80)
+	after := make([]string, 0, 80)
+	for i := 1; i <= 80; i++ {
+		before = append(before, fmt.Sprintf("old-%03d", i))
+		after = append(after, fmt.Sprintf("new-%03d", i))
+	}
+	testutil.WriteFile(t, repo, "scroll.txt", strings.Join(before, "\n")+"\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "scroll.txt", strings.Join(after, "\n")+"\n")
+	testutil.CommitAll(t, repo, "change")
+
+	m := New(repo, "HEAD")
+	m.ready = true
+	m.width = 100
+	m.height = 24
+	m.syncDiffViewport()
+
+	bodyH, contentH := m.layoutHeights()
+	diffX := m.filesPaneWidth(contentH) + 1
+	diffY := bodyH + 1
+
+	beforeOffset := m.diffModel.Viewport().YOffset()
+	updated, _ := m.Update(tea.MouseWheelMsg{X: diffX, Y: diffY, Button: tea.MouseWheelDown})
+	m = updated.(Model)
+	if m.diffModel.Viewport().YOffset() <= beforeOffset {
+		t.Fatalf("expected diff viewport to scroll down on wheel, before=%d after=%d", beforeOffset, m.diffModel.Viewport().YOffset())
+	}
+}
+
+func TestMouseWheelScrollsDiffWhenFocused(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	before := make([]string, 0, 80)
+	after := make([]string, 0, 80)
+	for i := 1; i <= 80; i++ {
+		before = append(before, fmt.Sprintf("old-%03d", i))
+		after = append(after, fmt.Sprintf("new-%03d", i))
+	}
+	testutil.WriteFile(t, repo, "scroll.txt", strings.Join(before, "\n")+"\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "scroll.txt", strings.Join(after, "\n")+"\n")
+	testutil.CommitAll(t, repo, "change")
+
+	m := New(repo, "HEAD")
+	m.ready = true
+	m.width = 100
+	m.height = 24
+	m.syncDiffViewport()
+	m.focusDiff = true
+
+	// Scroll with mouse over filetree area (x=1) — should still scroll when diff is focused
+	beforeOffset := m.diffModel.Viewport().YOffset()
+	updated, _ := m.Update(tea.MouseWheelMsg{X: 1, Y: 10, Button: tea.MouseWheelDown})
+	m = updated.(Model)
+	if m.diffModel.Viewport().YOffset() <= beforeOffset {
+		t.Fatalf("expected diff viewport to scroll when focused even with mouse outside, before=%d after=%d", beforeOffset, m.diffModel.Viewport().YOffset())
+	}
+}
+
+func TestMouseWheelOutsideDiffDoesNotScroll(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	before := make([]string, 0, 80)
+	after := make([]string, 0, 80)
+	for i := 1; i <= 80; i++ {
+		before = append(before, fmt.Sprintf("old-%03d", i))
+		after = append(after, fmt.Sprintf("new-%03d", i))
+	}
+	testutil.WriteFile(t, repo, "scroll.txt", strings.Join(before, "\n")+"\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "scroll.txt", strings.Join(after, "\n")+"\n")
+	testutil.CommitAll(t, repo, "change")
+
+	m := New(repo, "HEAD")
+	m.ready = true
+	m.width = 100
+	m.height = 24
+	m.syncDiffViewport()
+
+	beforeOffset := m.diffModel.Viewport().YOffset()
+	// scroll over the file sidebar (x=1 is in the sidebar for wide layout)
+	updated, _ := m.Update(tea.MouseWheelMsg{X: 1, Y: 10, Button: tea.MouseWheelDown})
+	m = updated.(Model)
+	if m.diffModel.Viewport().YOffset() != beforeOffset {
+		t.Fatalf("expected diff viewport not to scroll when wheel is over sidebar, before=%d after=%d", beforeOffset, m.diffModel.Viewport().YOffset())
 	}
 }
