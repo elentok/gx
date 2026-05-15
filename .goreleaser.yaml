@@ -43,7 +43,6 @@ release:
 
 homebrew_casks:
   - name: gx
-    binary: gx
     url:
       template: "https://github.com/elentok/git-helpers/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     commit_msg_template: "Brew cask update for {{ .ProjectName }} version {{ .Tag }}"
