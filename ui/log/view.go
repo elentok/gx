@@ -3,6 +3,7 @@ package log
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
@@ -12,6 +13,10 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
+
+const logFlashDuration = 2 * time.Second
+
+var logFlashBg = lipgloss.Color("#3d2810")
 
 var (
 	logHashStyle   = lipgloss.NewStyle().Foreground(ui.ColorBlue)
@@ -101,11 +106,17 @@ func (m Model) renderRow(row row, selected bool, width int) string {
 		}
 	}
 	line = ansi.Truncate(line, maxInt(1, width), "…")
+	lineW := ansi.StringWidth(line)
+	if lineW < width {
+		line += strings.Repeat(" ", width-lineW)
+	}
+	if row.kind == rowCommit &&
+		row.commit.Subject == m.flashSubject &&
+		!m.flashUntil.IsZero() &&
+		time.Now().Before(m.flashUntil) {
+		return ui.RenderRowWithBackground(line, logFlashBg)
+	}
 	if selected {
-		lineW := ansi.StringWidth(line)
-		if lineW < width {
-			line += strings.Repeat(" ", width-lineW)
-		}
 		return ui.RenderRowHighlight(line)
 	}
 	return line

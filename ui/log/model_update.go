@@ -1,11 +1,21 @@
 package log
 
 import (
+	"time"
+
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/reword"
 
 	tea "charm.land/bubbletea/v2"
 )
+
+type flashClearMsg struct{}
+
+func cmdFlashClear() tea.Cmd {
+	return tea.Tick(logFlashDuration, func(time.Time) tea.Msg {
+		return flashClearMsg{}
+	})
+}
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
@@ -32,6 +42,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleRewordDetails(msg)
 	case reword.EditorFinishedMsg:
 		return m.handleRewordEditorDone(msg.Err)
+	case flashClearMsg:
+		m.flashSubject = ""
+		m.flashUntil = time.Time{}
+		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -77,6 +91,7 @@ func (m Model) handleReload(msg reloadMsg) (tea.Model, tea.Cmd) {
 	m.err = nil
 	m.rows = msg.rows
 	m.branchDiverged = msg.branchDiverged
+	m.pendingFocusSubject = ""
 	if msg.focusSubject != "" {
 		m.list.SetSelected(0, len(m.rows))
 		for i, r := range m.rows {
@@ -85,9 +100,14 @@ func (m Model) handleReload(msg reloadMsg) (tea.Model, tea.Cmd) {
 				break
 			}
 		}
-	} else {
-		m.list.SetSelected(m.list.Selected(), len(m.rows))
+		m.flashSubject = msg.focusSubject
+		m.flashUntil = time.Now().Add(logFlashDuration)
+		m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))
+		m.recomputeSearchMatches()
+		m.jumpToCurrentMatch()
+		return m, cmdFlashClear()
 	}
+	m.list.SetSelected(m.list.Selected(), len(m.rows))
 	m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))
 	m.recomputeSearchMatches()
 	m.jumpToCurrentMatch()

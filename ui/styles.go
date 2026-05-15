@@ -72,10 +72,16 @@ var (
 // it after nested ANSI resets so per-cell foreground colors stay visible across
 // the full row.
 func RenderRowHighlight(text string) string {
-	bg := backgroundANSI(ColorSurface)
-	text = strings.ReplaceAll(text, "\x1b[0m", "\x1b[0m"+bg)
-	text = strings.ReplaceAll(text, "\x1b[m", "\x1b[m"+bg)
-	return bg + text + "\x1b[0m"
+	return RenderRowWithBackground(text, ColorSurface)
+}
+
+// RenderRowWithBackground applies an arbitrary background color and re-applies
+// it after nested ANSI resets so per-cell foreground colors stay visible.
+func RenderRowWithBackground(text string, bg color.Color) string {
+	bgSeq := backgroundANSI(bg)
+	text = strings.ReplaceAll(text, "\x1b[0m", "\x1b[0m"+bgSeq)
+	text = strings.ReplaceAll(text, "\x1b[m", "\x1b[m"+bgSeq)
+	return bgSeq + text + "\x1b[0m"
 }
 
 func backgroundANSI(c color.Color) string {

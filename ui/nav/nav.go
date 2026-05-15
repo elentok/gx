@@ -16,6 +16,7 @@ type Route struct {
 	WorktreeRoot string
 	Ref          string
 	InitialPath  string
+	FocusSubject string
 }
 
 type pushMsg struct {

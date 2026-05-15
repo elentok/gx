@@ -69,5 +69,6 @@ func (m Model) handleRewordDone(err error) (tea.Model, tea.Cmd) {
 		Kind:         nav.RouteLog,
 		WorktreeRoot: m.worktreeRoot,
 		Ref:          "HEAD",
+		FocusSubject: m.rewordNewSubject,
 	})
 }

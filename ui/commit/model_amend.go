@@ -33,5 +33,6 @@ func (m Model) handleAmendDone(err error) (tea.Model, tea.Cmd) {
 		Kind:         nav.RouteLog,
 		WorktreeRoot: m.worktreeRoot,
 		Ref:          "HEAD",
+		FocusSubject: m.details.Subject,
 	})
 }

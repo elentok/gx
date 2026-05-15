@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	logui "github.com/elentok/gx/ui/log"
 	"github.com/elentok/gx/ui/nav"
 
 	tea "charm.land/bubbletea/v2"
@@ -40,6 +41,12 @@ func (m Model) switchTab(route nav.Route) (tea.Model, tea.Cmd) {
 		current.initialized = true
 		m.tabs[tabState.kind] = current
 		return m, tea.Batch(tea.ClearScreen, current.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(current.model))
+	}
+	if route.FocusSubject != "" {
+		if logModel, ok := current.model.(logui.Model); ok {
+			current.model = logModel.WithPendingFocus(route.FocusSubject)
+			m.tabs[tabState.kind] = current
+		}
 	}
 	return m, tea.Batch(tea.ClearScreen, m.resizeCurrentCmd(), onPageActivatedCmd(current.model))
 }

@@ -2,6 +2,7 @@ package log
 
 import (
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/config"
@@ -59,12 +60,16 @@ type Model struct {
 
 	amendConfirm amend.Model
 
-	reword          reword.Model
-	rewordTmpFile   string
-	rewordOrigMsg   string
-	rewordHash      string
-	rewordSubject   string
+	reword           reword.Model
+	rewordTmpFile    string
+	rewordOrigMsg    string
+	rewordHash       string
+	rewordSubject    string
 	rewordNewSubject string
+
+	pendingFocusSubject string
+	flashSubject        string
+	flashUntil          time.Time
 }
 
 func NewModel(worktreeRoot, startRef string, settings Settings) Model {
@@ -85,7 +90,18 @@ func NewModel(worktreeRoot, startRef string, settings Settings) Model {
 func (m Model) Init() tea.Cmd { return m.cmdReload() }
 
 // OnPageActivated is called by the app shell when switching to the log page.
-func (m Model) OnPageActivated() tea.Cmd { return m.cmdReload() }
+func (m Model) OnPageActivated() tea.Cmd {
+	if m.pendingFocusSubject != "" {
+		return m.cmdReloadFocusSubject(m.pendingFocusSubject)
+	}
+	return m.cmdReload()
+}
+
+// WithPendingFocus sets a subject to focus on when the page next activates.
+func (m Model) WithPendingFocus(subject string) Model {
+	m.pendingFocusSubject = subject
+	return m
+}
 
 func (m Model) InputFocused() bool {
 	return m.search.Mode() == search.SearchModeInput

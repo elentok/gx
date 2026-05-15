@@ -48,7 +48,7 @@ func TestCommitDetailsForRefNormalizesMixedNewlines(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CommitDetailsForRef: %v", err)
 	}
-	if got.Body != "subject\n\nline 1\nline 2\nline 3\nline 4" {
+	if got.Body != "line 1\nline 2\nline 3\nline 4" {
 		t.Fatalf("body = %q", got.Body)
 	}
 }

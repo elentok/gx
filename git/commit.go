@@ -25,7 +25,7 @@ func CommitDetailsForRef(repoRoot, ref string) (CommitDetails, error) {
 		"show",
 		"--no-patch",
 		"--date=iso-strict",
-		"--format=format:%x1f%H%x1f%h%x1f%an%x1f%aI%x1f%s%x1f%D%x1f%B",
+		"--format=format:%x1f%H%x1f%h%x1f%an%x1f%aI%x1f%s%x1f%D%x1f%b",
 		ref,
 	})
 	if err != nil {
