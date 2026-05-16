@@ -3,7 +3,6 @@ package app
 import (
 	"strings"
 
-	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/git"
@@ -46,13 +45,12 @@ type Model struct {
 	width  int
 	height int
 
-	activeTab     nav.RouteKind
-	tabs          map[nav.RouteKind]tabPageState
-	histories     map[nav.RouteKind][]pageState
-	history       []pageState
-	keyPrefix     string
-	notifications []notification
-	spinner       spinner.Model
+	activeTab nav.RouteKind
+	tabs      map[nav.RouteKind]tabPageState
+	histories map[nav.RouteKind][]pageState
+	history   []pageState
+	keyPrefix string
+	notify    notify.Model
 }
 
 func New(repo git.Repo, settings Settings) Model {
@@ -61,7 +59,7 @@ func New(repo git.Repo, settings Settings) Model {
 		settings:  settings,
 		tabs:      make(map[nav.RouteKind]tabPageState),
 		histories: make(map[nav.RouteKind][]pageState),
-		spinner:   newSpinner(),
+		notify:    notify.New(settings.Status.UseNerdFontIcons),
 	}
 	if m.settings.InitialRoute.Kind == "" {
 		m.settings.InitialRoute = nav.Route{Kind: nav.RouteWorktrees}
@@ -83,26 +81,17 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch v := msg.(type) {
-	case notify.NotifyMsg:
-		return m, m.handleNotifyMsg(v)
-	case notify.CloseMsg:
-		m.handleCloseMsg(v)
-		return m, nil
-	case notifyExpireMsg:
-		m.handleExpireMsg(v)
-		return m, nil
-	case spinner.TickMsg:
-		return m, m.handleSpinnerTick(v)
-	}
+	var notifyCmd tea.Cmd
+	m.notify, notifyCmd = m.notify.Update(msg)
 
 	if route, ok := nav.IsReplace(msg); ok {
-		return m.switchTab(route)
+		next, cmd := m.switchTab(route)
+		return next, tea.Batch(notifyCmd, cmd)
 	}
 	if route, ok := nav.IsPush(msg); ok {
 		next := m.newPage(route)
 		m.history = append(m.history, next)
-		return m, tea.Batch(tea.ClearScreen, next.model.Init(), m.resizeCurrentCmd())
+		return m, tea.Batch(notifyCmd, tea.ClearScreen, next.model.Init(), m.resizeCurrentCmd())
 	}
 	if nav.IsBack(msg) {
 		if len(m.history) == 0 {
@@ -111,7 +100,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		popped := m.history[len(m.history)-1]
 		m.history = m.history[:len(m.history)-1]
 		m.restoreLogSelectionFromPoppedPage(popped)
-		return m, tea.Batch(tea.ClearScreen, m.resizeCurrentCmd())
+		return m, tea.Batch(notifyCmd, tea.ClearScreen, m.resizeCurrentCmd())
 	}
 
 	if size, ok := msg.(tea.WindowSizeMsg); ok {
@@ -124,7 +113,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		active := m.activePage().model
 		if f, ok := active.(inputFocuser); !ok || !f.InputFocused() {
 			if handled, cmd := m.handleShellChordKey(key); handled {
-				return m, cmd
+				return m, tea.Batch(notifyCmd, cmd)
 			}
 		}
 	}
@@ -133,7 +122,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	nextModel, cmd := current.model.Update(msg)
 	current.model = nextModel
 	m.setActivePage(current)
-	return m, cmd
+	return m, tea.Batch(notifyCmd, cmd)
 }
 
 func (m Model) View() tea.View {
@@ -155,9 +144,8 @@ func (m Model) View() tea.View {
 			content = ui.OverlayBottomRight(content, ui.RenderChordOverlay(m.keyPrefix, hints), m.width, m.height)
 		}
 	}
-	useNerdFont := m.settings.Status.UseNerdFontIcons
-	if stack := m.renderNotificationStack(useNerdFont); stack != "" {
-		content = ui.OverlayTopRightMargin(content, stack, m.width, 2, 2)
+	if stack := m.notify.View(); stack != "" {
+		content = ui.OverlayTopRightMargin(content, stack, m.width, 1, 1)
 	}
 
 	v := tea.NewView(content)
