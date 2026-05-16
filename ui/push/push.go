@@ -6,6 +6,7 @@ import (
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	humanize "github.com/dustin/go-humanize"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
@@ -411,8 +412,7 @@ func (m Model) View(width int) string {
 
 	switch m.phase {
 	case phaseConfirm:
-		prompt := fmt.Sprintf("Push branch %s to %s?", m.branch, m.remote)
-		return components.RenderConfirmModal(prompt, m.yes,
+		return components.RenderConfirmModal(m.confirmPrompt(), m.yes,
 			ui.ColorYellow, ui.ColorGreen, ui.ColorRed, ui.ColorSubtle, w)
 
 	case phaseFetching, phaseRebasing, phasePushing, phaseTagPushing, phaseForcePushing:
@@ -512,6 +512,18 @@ func humanizeOrUnknown(t time.Time) string {
 		return "unknown time"
 	}
 	return humanize.Time(t)
+}
+
+var pushBranchStyle = lipgloss.NewStyle().Foreground(ui.ColorOrange)
+var pushRemoteStyle = lipgloss.NewStyle().Foreground(ui.ColorTeal)
+
+func (m Model) confirmPrompt() string {
+	branch := pushBranchStyle.Render(m.branch)
+	remote := pushRemoteStyle.Render(m.remote)
+	if m.tag != "" {
+		return fmt.Sprintf("Push branch %s and tag %s to %s?", branch, pushBranchStyle.Render(m.tag), remote)
+	}
+	return fmt.Sprintf("Push branch %s to %s?", branch, remote)
 }
 
 func selectedMenuValue(state components.MenuState) string {

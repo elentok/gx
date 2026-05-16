@@ -15,12 +15,9 @@ func (m Model) handleBumpUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.showGitError(result.Err)
 		return m, nil
 	}
-	if result.PushRequested {
-		if err := m.push.OpenWithTag(m.worktreeRoot, result.NewTag); err != nil {
-			m.showGitError(err)
-			return m, nil
-		}
-		return m, notify.Success("tag created — opening push")
+	if err := m.push.OpenWithTag(m.worktreeRoot, result.NewTag); err != nil {
+		m.showGitError(err)
+		return m, nil
 	}
 	return m, notify.Success("tag created")
 }

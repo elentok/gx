@@ -13,9 +13,8 @@ import (
 type phase int
 
 const (
-	phasePick         phase = iota
+	phasePick    phase = iota
 	phaseTagging
-	phaseConfirmPush
 	phaseFailed
 )
 
@@ -23,13 +22,12 @@ type tagDoneMsg struct{ err error }
 
 // Result is returned on each Update call when the modal finishes.
 type Result struct {
-	Done          bool
-	PushRequested bool
-	NewTag        string
-	Err           error
+	Done   bool
+	NewTag string
+	Err    error
 }
 
-// Model owns the bump lifecycle: pick version → create tag → confirm push.
+// Model owns the bump lifecycle: pick version → create tag → hand off to push.
 type Model struct {
 	IsOpen bool
 
@@ -39,7 +37,6 @@ type Model struct {
 
 	phase   phase
 	menu    components.MenuState
-	pushYes bool
 	spinner spinner.Model
 	failErr error
 }
@@ -64,7 +61,6 @@ func (m *Model) Open(root string) error {
 	m.lastTag = lastTag
 	m.newTag = ""
 	m.phase = phasePick
-	m.pushYes = true
 	m.failErr = nil
 	m.menu = components.MenuState{
 		Items: []components.MenuItem{
@@ -89,8 +85,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, Result) {
 			m.failErr = msg.err
 			return m, nil, Result{}
 		}
-		m.phase = phaseConfirmPush
-		return m, nil, Result{}
+		m.IsOpen = false
+		return m, nil, Result{Done: true, NewTag: m.newTag}
 
 	case spinner.TickMsg:
 		if m.phase != phaseTagging {
@@ -121,18 +117,6 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 		m.newTag = m.selectedNewTag()
 		m.phase = phaseTagging
 		return m, tea.Batch(m.cmdCreateTag(), m.spinner.Tick), Result{}
-
-	case phaseConfirmPush:
-		nextYes, decided, accepted, handled := components.UpdateConfirm(msg, m.pushYes)
-		if !handled {
-			return m, nil, Result{}
-		}
-		m.pushYes = nextYes
-		if !decided {
-			return m, nil, Result{}
-		}
-		m.IsOpen = false
-		return m, nil, Result{Done: true, PushRequested: accepted, NewTag: m.newTag}
 
 	case phaseFailed:
 		switch msg.String() {
@@ -185,19 +169,6 @@ func (m Model) View(width int) string {
 		return ui.RenderModalFrame(ui.ModalFrameOptions{
 			Title:       "Bump Version",
 			Body:        body,
-			Width:       w,
-			BorderColor: ui.ColorYellow,
-			TitleColor:  ui.ColorYellow,
-			HintColor:   ui.ColorSubtle,
-		})
-
-	case phaseConfirmPush:
-		body := "Created tag " + ui.StyleTitle.Render(m.newTag) + "\n\nPush to origin?"
-		body += "\n\n" + components.RenderConfirmChoices(m.pushYes, false)
-		return ui.RenderModalFrame(ui.ModalFrameOptions{
-			Title:       "Bump Version",
-			Body:        body,
-			Hint:        components.ConfirmHint,
 			Width:       w,
 			BorderColor: ui.ColorYellow,
 			TitleColor:  ui.ColorYellow,
