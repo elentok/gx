@@ -25,6 +25,7 @@ type tagDoneMsg struct{ err error }
 type Result struct {
 	Done          bool
 	PushRequested bool
+	NewTag        string
 	Err           error
 }
 
@@ -131,7 +132,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 			return m, nil, Result{}
 		}
 		m.IsOpen = false
-		return m, nil, Result{Done: true, PushRequested: accepted}
+		return m, nil, Result{Done: true, PushRequested: accepted, NewTag: m.newTag}
 
 	case phaseFailed:
 		switch msg.String() {

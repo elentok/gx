@@ -21,6 +21,7 @@ const (
 	phaseDiverged           // menu: rebase / force / abort
 	phaseRebasing           // git rebase <upstream>
 	phasePushing            // git push <remote> <branch>
+	phaseTagPushing         // git push <remote> <tag>
 	phaseForceConfirm       // yes/no: force push?
 	phaseForcePushing       // git push --force <remote> <branch>
 	phasePRPrompt           // yes/no: open PR URL?
@@ -80,6 +81,9 @@ type Model struct {
 	prURL  string
 	prYes  bool
 
+	// tag push (optional, set via OpenWithTag)
+	tag string
+
 	// failed
 	failErr error
 
@@ -91,6 +95,15 @@ func New() Model {
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
 	return Model{spinner: sp}
+}
+
+// OpenWithTag is like Open but also pushes the given tag after a successful branch push.
+func (m *Model) OpenWithTag(root, tag string) error {
+	if err := m.Open(root); err != nil {
+		return err
+	}
+	m.tag = tag
+	return nil
 }
 
 // Open resolves branch/remote and opens the initial confirm dialog.
@@ -188,6 +201,10 @@ var (
 	stepPush      = components.Step{TitleBefore: "push", RunningTitle: "pushing...", TitleAfter: "pushed", TitleFailed: "push failed (non-fast-forward)"}
 	stepForcePush = components.Step{TitleBefore: "force push", RunningTitle: "force pushing...", TitleAfter: "force pushed", TitleFailed: "force push failed"}
 )
+
+func (m Model) stepPushTag() components.Step {
+	return components.Step{TitleBefore: "push tag " + m.tag, RunningTitle: "pushing tag " + m.tag + "...", TitleAfter: "pushed tag " + m.tag, TitleFailed: "tag push failed"}
+}
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 	switch m.phase {
@@ -329,9 +346,22 @@ func (m Model) handleRunnerDone(msg runnerDoneMsg) (Model, tea.Cmd, Result) {
 		return m, m.startRunner(phasePushing, "push", m.remote, m.branch), Result{}
 
 	case phasePushing:
-		prURL := git.ExtractPRURL(msg.output)
-		if prURL != "" {
-			m.prURL = prURL
+		// Capture PR URL now; we may still need to push the tag first.
+		m.prURL = git.ExtractPRURL(msg.output)
+		if m.tag != "" {
+			m.appendRunningStep(m.stepPushTag())
+			return m, m.startRunner(phaseTagPushing, "push", m.remote, m.tag), Result{}
+		}
+		if m.prURL != "" {
+			m.phase = phasePRPrompt
+			m.prYes = true
+			return m, nil, Result{}
+		}
+		m.IsOpen = false
+		return m, nil, Result{Done: true, Output: m.log.String()}
+
+	case phaseTagPushing:
+		if m.prURL != "" {
 			m.phase = phasePRPrompt
 			m.prYes = true
 			return m, nil, Result{}
@@ -385,7 +415,7 @@ func (m Model) View(width int) string {
 		return components.RenderConfirmModal(prompt, m.yes,
 			ui.ColorYellow, ui.ColorGreen, ui.ColorRed, ui.ColorSubtle, w)
 
-	case phaseFetching, phaseRebasing, phasePushing, phaseForcePushing:
+	case phaseFetching, phaseRebasing, phasePushing, phaseTagPushing, phaseForcePushing:
 		return ui.RenderModalFrame(ui.ModalFrameOptions{
 			Title:       "Push",
 			Body:        stepsStr,
@@ -465,6 +495,8 @@ func (m Model) runnerArgs(p phase) []string {
 		return []string{"rebase"}
 	case phasePushing:
 		return []string{"push", m.remote, m.branch}
+	case phaseTagPushing:
+		return []string{"push", m.remote, m.tag}
 	case phaseForcePushing:
 		return []string{"push", "--force", m.remote, m.branch}
 	}
