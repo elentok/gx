@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.15.2 - 2026-05-16
+
+- Commit view: top panel now sizes to fit its content, capped at 50% of screen height; `(b to expand)` hint only appears when a commit body actually exists
+- Bump flow: remove the redundant "Push to origin?" confirmation inside the bump modal — the push modal's own confirmation is used instead; push confirm prompt now highlights the branch name in orange and remote in teal, and shows a different message when a tag will also be pushed
+- Status view: remove stage/unstage notifications
+
 ## v0.15.1 - 2026-05-16
 
 - Fix bump push flow not pushing the tag — the push modal now runs `git push <remote> <tag>` as an additional step after a successful branch push
