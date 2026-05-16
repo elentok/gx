@@ -132,7 +132,7 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model,
 		}
 		return m, nil
 	case bindingGitCommit:
-		return m, tea.Batch(notify.Info(ui.MessageOpening("git commit")), cmdGitCommit(m.worktreeRoot, m.settings.Terminal))
+		return m, cmdGitCommit(m.worktreeRoot, m.settings.Terminal)
 	case bindingComment:
 		if m.focus != focusDiff {
 			return m, nil
