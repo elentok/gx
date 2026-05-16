@@ -2151,7 +2151,7 @@ func TestYShowsBindingDrivenYankHint(t *testing.T) {
 	for _, h := range hints {
 		allDescs += " " + h.Key + " " + h.Desc
 	}
-	for _, want := range []string{"y", "content", "l", "location", "a", "all", "f", "filename"} {
+	for _, want := range []string{"y", "content", "l", "location", "a", "AI agent", "f", "filename"} {
 		if !strings.Contains(allDescs, want) {
 			t.Fatalf("expected yank hint %q in ChordHints descriptions %q", want, allDescs)
 		}
