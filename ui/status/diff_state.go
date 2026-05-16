@@ -115,9 +115,9 @@ func (m *Model) applySelection() tea.Cmd {
 	m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 	m.markMovedTarget(sig)
 	if m.diffarea.Flash.Active {
-		return tea.Batch(notify.Info("updated "+file.Path), reloadCmd, nextFlashCmd())
+		return tea.Batch(reloadCmd, nextFlashCmd())
 	}
-	return tea.Batch(notify.Info("updated "+file.Path), reloadCmd)
+	return reloadCmd
 }
 
 func isCorruptPatchErr(err error) bool {
