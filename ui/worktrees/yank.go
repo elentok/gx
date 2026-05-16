@@ -42,7 +42,6 @@ func (m Model) enterYankMode() (Model, tea.Cmd) {
 	m.mode = modeYank
 	m.yankLoading = true
 	m.yankSource = *wt
-	m.statusMsg = ""
 	return m, cmdLoadYankData(*wt)
 }
 

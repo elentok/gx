@@ -3,6 +3,7 @@ package worktrees
 import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/notify"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -17,7 +18,6 @@ func (m Model) enterConfirm(prompt string, cmd tea.Cmd, spinnerLabel string) Mod
 	m.confirmCmd = cmd
 	m.confirmSpinnerLabel = spinnerLabel
 	m.confirmCancelMsg = ""
-	m.statusMsg = ""
 	return m
 }
 
@@ -41,9 +41,7 @@ func (m Model) handleConfirmKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	m.mode = modeNormal
 	if m.confirmCancelMsg != "" {
-		m.statusGen++
-		m.statusMsg = m.confirmCancelMsg
-		return m, cmdClearStatus(m.statusGen)
+		return m, notify.Info(m.confirmCancelMsg)
 	}
 	return m, nil
 }

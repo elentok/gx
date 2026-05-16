@@ -3,12 +3,12 @@ package status
 import (
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/diffview/diffcore"
+	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/status/diffarea"
-
-	tea "charm.land/bubbletea/v2"
 )
 
 func (m *Model) colorizeDiffsSync(filePath, unstagedRaw, stagedRaw string, sideBySide bool, renderWidth int) (unstagedColor, stagedColor string) {
@@ -53,8 +53,7 @@ func (m *Model) applySelection() tea.Cmd {
 		sig.hunkHeader = diffviewModel.DataRef().Parsed.Hunks[diffviewModel.DataRef().ActiveHunk].Header
 		patch, err := diffcore.BuildHunkPatch(diffviewModel.DataRef().Parsed, diffviewModel.DataRef().ActiveHunk)
 		if err != nil {
-			m.setStatus(err.Error())
-			return nil
+			return notify.Error(err.Error())
 		}
 		reverse := m.diffarea.ActiveSection == diffarea.SectionStaged
 		if err := git.ApplyPatchToIndex(m.worktreeRoot, patch, reverse, false); err != nil {
@@ -99,8 +98,7 @@ func (m *Model) applySelection() tea.Cmd {
 			patch, err = diffcore.BuildSingleLinePatch(diffviewModel.DataRef().Parsed, diffviewModel.DataRef().ActiveLine)
 		}
 		if err != nil {
-			m.setStatus(err.Error())
-			return nil
+			return notify.Error(err.Error())
 		}
 		reverse := m.diffarea.ActiveSection == diffarea.SectionStaged
 		if err := git.ApplyPatchToIndex(m.worktreeRoot, patch, reverse, true); err != nil {
@@ -111,16 +109,15 @@ func (m *Model) applySelection() tea.Cmd {
 
 	diffviewModel.DataRef().VisualActive = false
 	diffviewModel.DataRef().VisualAnchor = diffviewModel.DataRef().ActiveLine
-	m.setStatus("updated " + file.Path)
 	from := m.diffarea.ActiveSection
 	reloadCmd := m.reload(file.Path)
 	m.diffarea.ActiveSection = from
 	m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 	m.markMovedTarget(sig)
 	if m.diffarea.Flash.Active {
-		return tea.Batch(reloadCmd, nextFlashCmd())
+		return tea.Batch(notify.Info("updated "+file.Path), reloadCmd, nextFlashCmd())
 	}
-	return reloadCmd
+	return tea.Batch(notify.Info("updated "+file.Path), reloadCmd)
 }
 
 func isCorruptPatchErr(err error) bool {
@@ -209,13 +206,13 @@ func (m *Model) enterDiffFromStatus(resetSection bool) tea.Cmd {
 	return cmd
 }
 
-func (m *Model) openDiscardDiffConfirm() {
+func (m *Model) openDiscardDiffConfirm() tea.Cmd {
 	if m.diffarea.ActiveSection != diffarea.SectionUnstaged {
-		return
+		return nil
 	}
 	file, ok := m.selectedStatusFile()
 	if !ok {
-		return
+		return nil
 	}
 	diffviewModel := m.diffarea.ActiveSectionModel()
 
@@ -229,14 +226,14 @@ func (m *Model) openDiscardDiffConfirm() {
 
 	if m.diffarea.NavMode() == diffview.NavModeHunk {
 		if diffviewModel.DataRef().ActiveHunk < 0 || diffviewModel.DataRef().ActiveHunk >= len(diffviewModel.DataRef().Parsed.Hunks) {
-			return
+			return nil
 		}
 		patch, err = diffcore.BuildHunkPatch(diffviewModel.DataRef().Parsed, diffviewModel.DataRef().ActiveHunk)
 		title = "Discard selected hunk?"
 		lines = []string{"This will discard the selected hunk from your working tree."}
 	} else {
 		if diffviewModel.DataRef().ActiveLine < 0 || diffviewModel.DataRef().ActiveLine >= len(diffviewModel.DataRef().Parsed.Changed) {
-			return
+			return nil
 		}
 		startLine, endLine := diffviewModel.DataRef().ActiveLine, diffviewModel.DataRef().ActiveLine
 		if diffviewModel.DataRef().VisualActive {
@@ -255,14 +252,14 @@ func (m *Model) openDiscardDiffConfirm() {
 	}
 
 	if err != nil {
-		m.setStatus(err.Error())
-		return
+		return notify.Error(err.Error())
 	}
 
 	m.openConfirm(title, lines, confirmDiscardUnstaged, "", "")
 	m.confirmPaths = []string{file.Path}
 	m.confirmPatch = patch
 	m.confirmPatchUnidiffZero = unidiffZero
+	return nil
 }
 
 func (m *Model) markMovedTarget(sig movedTarget) {

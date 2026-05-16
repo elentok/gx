@@ -172,10 +172,6 @@ func (m Model) statusBarView() string {
 			line = "  " + m.spinner.View() + " " + m.spinnerLabel
 			break
 		}
-		if m.statusMsg != "" {
-			line = "  " + m.statusMsg
-			break
-		}
 		line = "  " + ui.StyleHint.Render("? help")
 	}
 	if m.width > 0 {

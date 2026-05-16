@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/ui"
 	keymgr "github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/notify"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -209,15 +210,12 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 	case bindingLazygitLog:
 		wt := m.selectedWorktree()
 		if wt != nil {
-			m.statusMsg = ui.MessageOpening("lazygit log")
-			return m, cmdLazygitLog(*wt)
+			return m, tea.Batch(notify.Info(ui.MessageOpening("lazygit log")), cmdLazygitLog(*wt))
 		}
 		return m, nil
 	case bindingOpenTerminal:
 		if m.settings.Terminal == ui.TerminalPlain {
-			m.statusGen++
-			m.statusMsg = "use tmux or kitty for more options"
-			return m, cmdClearStatus(m.statusGen)
+			return m, notify.Info("use tmux or kitty for more options")
 		}
 		wt := m.selectedWorktree()
 		if wt != nil {
@@ -229,20 +227,16 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.table.SetCursor(0)
-		m.statusMsg = ""
 		return m, cmdLoadSidebarData(m.repo, m.worktrees[0])
 	case bindingGoOutput:
 		if m.lastJobLog == "" {
-			m.statusGen++
-			m.statusMsg = ui.MessageNoOutput()
-			return m, cmdClearStatus(m.statusGen)
+			return m, notify.Info(ui.MessageNoOutput())
 		}
 		return m.enterLogsMode(), nil
 	case bindingGotoLog:
 		if m.settings.EnableNavigation {
 			wt := m.selectedWorktree()
 			if wt != nil {
-				m.statusMsg = ""
 				return m, nav.Replace(nav.Route{Kind: nav.RouteLog, WorktreeRoot: wt.Path})
 			}
 		}
@@ -251,19 +245,16 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 		if m.settings.EnableNavigation {
 			wt := m.selectedWorktree()
 			if wt != nil {
-				m.statusMsg = ""
 				return m, nav.Replace(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: wt.Path})
 			}
 		}
 		return m, nil
 	case bindingGotoWorktrees:
 		if m.settings.EnableNavigation {
-			m.statusMsg = ""
 			return m, nav.Replace(nav.Route{Kind: nav.RouteWorktrees})
 		}
 		return m, nil
 	case bindingCancelChord:
-		m.statusMsg = ""
 		return m, nil
 	}
 	return m, nil

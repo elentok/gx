@@ -57,12 +57,6 @@ func (m Model) renderFooterLineWithPrefix(prefix, hint string) string {
 	if prefix != "" {
 		leftText = prefix
 	}
-	if m.statusMsg != "" {
-		if leftText != "" {
-			leftText += " · "
-		}
-		leftText += m.statusMsg
-	}
 	lineW := m.width
 	if lineW <= 0 {
 		if leftText == "" {

@@ -6,10 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
-
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
+	notifypkg "github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/diffview/diffrender"
 	"github.com/elentok/gx/ui/nav"
@@ -455,23 +454,19 @@ func TestHelpOverlayToggleAndCompactStatusBar(t *testing.T) {
 	}
 }
 
-func TestHelpLineRightAlignsHintAndTruncatesStatus(t *testing.T) {
+func TestHelpLineRightAlignsHint(t *testing.T) {
 	t.Setenv("TMUX", "")
 	t.Setenv("KITTY_WINDOW_ID", "")
 	m := New(testutil.TempRepo(t))
 	m.ready = true
 	m.width = 48
 	m.focus = focusFiletree
-	m.statusMsg = "this is a very long status message that should truncate"
 
 	line := m.helpLine()
 	plain := ansi.Strip(line)
 
 	if ansi.StringWidth(plain) != m.width {
 		t.Fatalf("expected footer width %d, got %d (%q)", m.width, ansi.StringWidth(plain), plain)
-	}
-	if !strings.Contains(plain, "…") {
-		t.Fatalf("expected truncated status with ellipsis, got %q", plain)
 	}
 	if !strings.HasSuffix(plain, "· 󰉸 context: 1 · filetree · ? help") {
 		t.Fatalf("expected hint right-aligned at end, got %q", plain)
@@ -497,14 +492,13 @@ func TestHelpLineTruncatesBareHintWithEllipsis(t *testing.T) {
 	}
 }
 
-func TestHelpLineTruncatesHintWithEllipsisWhenStatusConsumesWidth(t *testing.T) {
+func TestHelpLineTruncatesHintWithEllipsisWhenNarrow(t *testing.T) {
 	t.Setenv("TMUX", "")
 	t.Setenv("KITTY_WINDOW_ID", "")
 	m := New(testutil.TempRepo(t))
 	m.ready = true
 	m.width = 18
 	m.focus = focusFiletree
-	m.statusMsg = "busy"
 
 	line := m.helpLine()
 	plain := ansi.Strip(line)
@@ -513,7 +507,7 @@ func TestHelpLineTruncatesHintWithEllipsisWhenStatusConsumesWidth(t *testing.T) 
 		t.Fatalf("expected footer width %d, got %d (%q)", m.width, ansi.StringWidth(plain), plain)
 	}
 	if !strings.Contains(plain, "…") {
-		t.Fatalf("expected truncated hint to use ellipsis when status is present, got %q", plain)
+		t.Fatalf("expected truncated hint to use ellipsis when narrow, got %q", plain)
 	}
 }
 
@@ -652,9 +646,6 @@ func TestToggleSideBySideModeWithS(t *testing.T) {
 	if m.diffarea.RenderMode() != diffview.RenderModeSideBySide {
 		t.Fatalf("expected render mode side-by-side, got %v", m.diffarea.RenderMode())
 	}
-	if !strings.Contains(m.statusMsg, "side-by-side mode") {
-		t.Fatalf("expected side-by-side status message, got %q", m.statusMsg)
-	}
 	// Delta colorization is async; run the cmd synchronously to get colored output.
 	if colorizeCmd != nil {
 		updated, _ = m.Update(colorizeCmd())
@@ -742,9 +733,6 @@ func TestAdjustDiffContextLinesInDiffFocus(t *testing.T) {
 	m = updated.(Model)
 	if m.currentDiffContextLines() != 2 {
 		t.Fatalf("expected diff context 2 after ], got %d", m.currentDiffContextLines())
-	}
-	if !strings.Contains(m.statusMsg, "diff context: 2") {
-		t.Fatalf("expected diff context status message, got %q", m.statusMsg)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: '[', Text: "["})
@@ -1081,7 +1069,7 @@ func TestSpaceStagesSingleLineInLineMode(t *testing.T) {
 		t.Fatalf("DiffPath cached: %v", err)
 	}
 	if staged == "" {
-		t.Fatalf("expected staged diff after line-mode space, status=%q", m.statusMsg)
+		t.Fatalf("expected staged diff after line-mode space")
 	}
 }
 
@@ -1738,18 +1726,6 @@ func TestStatusEntryColorRenamedFileIsBlue(t *testing.T) {
 	}
 }
 
-func TestStatusMessageClearsAfterTimeoutTick(t *testing.T) {
-	m := New(testutil.TempRepo(t))
-	m.ready = true
-	m.statusMsg = "temporary"
-	m.statusUntil = time.Now().Add(-time.Second)
-
-	updated, _ := m.Update(statusTickMsg{})
-	m = updated.(Model)
-	if m.statusMsg != "" {
-		t.Fatalf("expected status message to clear after timeout tick")
-	}
-}
 
 func TestFiletreeSelectionDebouncesDiffReload(t *testing.T) {
 	repo := testutil.TempRepo(t)
@@ -2127,10 +2103,8 @@ func TestCMInFiletreeDoesNothing(t *testing.T) {
 		t.Fatalf("cm in filetree should not launch command")
 	}
 	m = updated.(Model)
-	if m.statusMsg != "" {
-		t.Fatalf("cm in filetree should not set status, got %q", m.statusMsg)
-	}
 }
+
 
 func TestCMInDiffWithoutFileContextShowsError(t *testing.T) {
 	repo := testutil.TempRepo(t)
@@ -2142,12 +2116,17 @@ func TestCMInDiffWithoutFileContextShowsError(t *testing.T) {
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
 	m = updated.(Model)
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
-	if cmd != nil {
-		t.Fatalf("cm without file context should not launch command")
-	}
 	m = updated.(Model)
-	if m.statusMsg != "no file context for comment" {
-		t.Fatalf("status = %q, want %q", m.statusMsg, "no file context for comment")
+	if cmd == nil {
+		t.Fatalf("cm without file context should return a warning notification cmd")
+	}
+	msg := cmd()
+	notifyMsg, ok := msg.(notifypkg.NotifyMsg)
+	if !ok {
+		t.Fatalf("expected NotifyMsg, got %T", msg)
+	}
+	if notifyMsg.Message != "no file context for comment" {
+		t.Fatalf("notification = %q, want %q", notifyMsg.Message, "no file context for comment")
 	}
 }
 
@@ -2212,13 +2191,9 @@ func TestLTriggersLazygitLogCommand(t *testing.T) {
 	m := New(repo)
 	m.ready = true
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'L', Text: "L", ShiftedCode: 'L', Mod: tea.ModShift})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'L', Text: "L", ShiftedCode: 'L', Mod: tea.ModShift})
 	if cmd == nil {
 		t.Fatalf("L should launch lazygit log command")
-	}
-	m = updated.(Model)
-	if m.statusMsg == "" {
-		t.Fatalf("expected status message after L")
 	}
 }
 
@@ -2597,7 +2572,7 @@ func TestLineModeCanUnstageSingleModifiedLine(t *testing.T) {
 	}
 
 	if !strings.Contains(staged, "+new-1") || strings.Contains(staged, "+new-2") || !strings.Contains(unstaged, "+new-2") {
-		t.Fatalf("unexpected diffs after unstage line; status=%q\nSTAGED:\n%s\nUNSTAGED:\n%s", m.statusMsg, staged, unstaged)
+		t.Fatalf("unexpected diffs after unstage line\nSTAGED:\n%s\nUNSTAGED:\n%s", staged, unstaged)
 	}
 }
 
@@ -2622,7 +2597,7 @@ func TestLineModeStagesSingleLineInUntrackedFile(t *testing.T) {
 		t.Fatalf("staged diff: %v", err)
 	}
 	if strings.Contains(staged, "+line-1") || !strings.Contains(staged, "+line-2") || strings.Contains(staged, "+line-3") {
-		t.Fatalf("expected single line staged for untracked file; status=%q\nSTAGED:\n%s", m.statusMsg, staged)
+		t.Fatalf("expected single line staged for untracked file\nSTAGED:\n%s", staged)
 	}
 }
 

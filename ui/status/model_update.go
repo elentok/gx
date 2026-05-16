@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
+	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/search"
 
 	tea "charm.land/bubbletea/v2"
@@ -13,9 +14,13 @@ import (
 
 func (m Model) Init() tea.Cmd {
 	if m.settings.EnableNavigation {
-		return tea.Batch(statusTickCmd(), statusStartupLoadCmd())
+		return tea.Batch(renderTickCmd(), statusStartupLoadCmd())
 	}
-	return tea.Batch(statusTickCmd(), m.cmdLoadBranchSync())
+	return tea.Batch(renderTickCmd(), m.cmdLoadBranchSync())
+}
+
+func renderTickCmd() tea.Cmd {
+	return tea.Tick(time.Second, func(time.Time) tea.Msg { return renderTickMsg{} })
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -30,8 +35,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleWindowSize(msg)
 	case tea.FocusMsg:
 		return m, m.refreshPreserveScroll()
-	case statusTickMsg:
-		return m.handleStatusTick()
+	case renderTickMsg:
+		return m, renderTickCmd()
 	case statusStartupLoadMsg:
 		return m.handleStartupLoad()
 	case actionPollMsg:
@@ -100,13 +105,6 @@ func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(reloadCmd, helpCmd)
 }
 
-func (m Model) handleStatusTick() (tea.Model, tea.Cmd) {
-	if m.statusMsg != "" && !m.statusUntil.IsZero() && time.Now().After(m.statusUntil) {
-		m.clearStatus()
-	}
-	return m, statusTickCmd()
-}
-
 func (m Model) handleStartupLoad() (tea.Model, tea.Cmd) {
 	m.reloadBranchState()
 	reloadCmd := m.reloadDiffsForSelection()
@@ -162,8 +160,7 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if msg.String() == "ctrl+c" {
 		if m.runningOpen && !m.runningDone && m.runningRunner != nil {
 			m.runningRunner.Cancel()
-			m.setStatus("cancel requested")
-			return m, nil
+			return m, notify.Info("cancel requested")
 		}
 		return m, tea.Quit
 	}
@@ -235,42 +232,33 @@ func (m Model) handleCommitFinished(msg commitFinishedMsg) (tea.Model, tea.Cmd) 
 		return m, nil
 	}
 	if msg.splitApp != "" {
-		m.setStatus("opened " + msg.splitApp + " split: git commit")
-		return m, nil
+		return m, notify.Info("opened " + msg.splitApp + " split: git commit")
 	}
-	m.setStatus(ui.MessageClosed("git commit"))
-	return m, m.refresh()
+	return m, tea.Batch(notify.Info(ui.MessageClosed("git commit")), m.refresh())
 }
 
 func (m Model) handleLazygitLogFinished(msg lazygitLogFinishedMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
-		m.setStatus("lazygit log failed: " + msg.err.Error())
-		return m, nil
+		return m, notify.Error("lazygit log failed: " + msg.err.Error())
 	}
-	m.setStatus(ui.MessageClosed("lazygit log"))
-	return m, m.refresh()
+	return m, tea.Batch(notify.Info(ui.MessageClosed("lazygit log")), m.refresh())
 }
 
 func (m Model) handleEditFileFinished(msg editFileFinishedMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
-		m.setStatus("edit failed: " + msg.err.Error())
-		return m, nil
+		return m, notify.Error("edit failed: " + msg.err.Error())
 	}
-	m.setStatus(ui.MessageClosed("editor"))
-	return m, m.refresh()
+	return m, tea.Batch(notify.Info(ui.MessageClosed("editor")), m.refresh())
 }
 
 func (m Model) handleEditCommentFinished(msg editCommentFinishedMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
-		m.setStatus("comment edit failed: " + msg.err.Error())
-		return m, nil
+		return m, notify.Error("comment edit failed: " + msg.err.Error())
 	}
 	if msg.splitApp != "" {
-		m.setStatus("opened " + msg.splitApp + " split: comment editor")
-		return m, nil
+		return m, notify.Info("opened " + msg.splitApp + " split: comment editor")
 	}
-	m.setStatus(ui.MessageClosed("comment editor"))
-	return m, m.refresh()
+	return m, tea.Batch(notify.Info(ui.MessageClosed("comment editor")), m.refresh())
 }
 
 func (m Model) handleErrorKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {

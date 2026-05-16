@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/filetree"
+	notifypkg "github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/search"
 
 	tea "charm.land/bubbletea/v2"
@@ -727,9 +728,6 @@ func TestCMOutsideDiffDoesNothing(t *testing.T) {
 	if cmd != nil {
 		t.Fatalf("cm outside diff should not run command")
 	}
-	if m.statusMsg != "" {
-		t.Fatalf("status = %q, want empty", m.statusMsg)
-	}
 }
 
 func TestCMInDiffWithoutFileContextShowsError(t *testing.T) {
@@ -743,11 +741,14 @@ func TestCMInDiffWithoutFileContextShowsError(t *testing.T) {
 	m = updated.(Model)
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
 	m = updated.(Model)
-	if cmd != nil {
-		t.Fatalf("cm without file context should not run command")
+	_ = m
+	if cmd == nil {
+		t.Fatalf("cm without file context should return a notify cmd")
 	}
-	if m.statusMsg != "no file context for comment" {
-		t.Fatalf("status = %q, want %q", m.statusMsg, "no file context for comment")
+	msg := cmd()
+	notifyMsg, ok := msg.(notifypkg.NotifyMsg)
+	if !ok || notifyMsg.Message != "no file context for comment" {
+		t.Fatalf("expected notify msg %q, got %T %+v", "no file context for comment", msg, msg)
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/notify"
 
 	tea "charm.land/bubbletea/v2"
 	humanize "github.com/dustin/go-humanize"
@@ -25,7 +26,6 @@ func (m Model) enterPushDivergedMode(wt git.Worktree, div *git.PushDivergence) M
 		},
 		Cursor: 0,
 	}
-	m.statusMsg = ""
 	return m
 }
 
@@ -47,9 +47,7 @@ func (m Model) handlePushDivergedKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if !accepted {
 		m.mode = modeNormal
-		m.statusGen++
-		m.statusMsg = ui.MessageAborted("push")
-		return m, cmdClearStatus(m.statusGen)
+		return m, notify.Info(ui.MessageAborted("push"))
 	}
 	choice := m.pushMenu.Items[m.pushMenu.Cursor].Value
 	switch choice {
@@ -63,9 +61,7 @@ func (m Model) handlePushDivergedKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, cmdStartPromptableJob(promptableJobForcePush, wt, m.lastJobLog, false)
 	default:
 		m.mode = modeNormal
-		m.statusGen++
-		m.statusMsg = ui.MessageAborted("push")
-		return m, cmdClearStatus(m.statusGen)
+		return m, notify.Info(ui.MessageAborted("push"))
 	}
 }
 

@@ -35,8 +35,6 @@ type Model struct {
 	statusData       statusData
 	fileTreeModel    filetree.Model[git.StageFileStatus]
 
-	statusMsg      string
-	statusUntil    time.Time
 	err            error
 	errorOpen      bool
 	errorVP        viewport.Model
@@ -96,7 +94,7 @@ func DefaultSettings() Settings {
 }
 
 type flashTickMsg struct{}
-type statusTickMsg struct{}
+type renderTickMsg struct{}
 type actionPollMsg struct{}
 type diffReloadMsg struct{ seq int }
 type statusStartupLoadMsg struct{}
@@ -118,7 +116,6 @@ type editCommentFinishedMsg struct {
 	splitApp string
 }
 
-const statusMessageTTL = 5 * time.Second
 const statusDiffReloadDebounce = 100 * time.Millisecond
 
 var (

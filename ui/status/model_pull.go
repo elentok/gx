@@ -1,18 +1,22 @@
 package status
 
-import tea "charm.land/bubbletea/v2"
+import (
+	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/ui/notify"
+)
 
 func (m Model) handlePullUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd, result := m.pull.Update(msg)
 	m.pull = next
 	if result.Done {
 		m.output.Set("Pull output", result.Output)
+		var notifyCmd tea.Cmd
 		if result.Err != nil {
-			m.setStatus("pull failed: " + result.Err.Error())
+			notifyCmd = notify.Error("pull failed: " + result.Err.Error())
 		} else {
-			m.setStatus("pulled")
+			notifyCmd = notify.Success("pulled")
 		}
-		return m, m.refresh()
+		return m, tea.Batch(notifyCmd, m.refresh())
 	}
 	return m, cmd
 }

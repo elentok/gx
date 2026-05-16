@@ -44,14 +44,12 @@ func newWorktreeInput() textinput.Model {
 func (m Model) enterNewMode() Model {
 	m.mode = modeNew
 	m.textInput = newWorktreeInput()
-	m.statusMsg = ""
 	return m
 }
 
 func (m Model) enterNewAndOpenMode() Model {
 	m.mode = modeNewAndOpen
 	m.textInput = newWorktreeInput()
-	m.statusMsg = ""
 	return m
 }
 
@@ -62,18 +60,15 @@ func (m Model) handleNewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, cancel):
 		m.mode = modeNormal
-		m.statusMsg = ""
 		return m, nil
 	case key.Matches(msg, submit):
 		newName := strings.TrimSpace(m.textInput.Value())
 		if newName == "" {
 			m.mode = modeNormal
-			m.statusMsg = ""
 			return m, nil
 		}
 		prevMode := m.mode
 		m.mode = modeNormal
-		m.statusMsg = "Creating…"
 		if prevMode == modeNewAndOpen {
 			return m, cmdNewWorktreeAndOpen(m.repo, newName)
 		}

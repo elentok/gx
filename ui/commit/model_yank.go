@@ -5,18 +5,13 @@ import (
 
 	"github.com/atotto/clipboard"
 	"github.com/elentok/gx/ui/diffview"
+	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/yankfmt"
+
+	tea "charm.land/bubbletea/v2"
 )
 
 var commitClipboardWrite = clipboard.WriteAll
-
-func (m *Model) setStatus(msg string) {
-	m.statusMsg = msg
-}
-
-func (m *Model) clearStatus() {
-	m.statusMsg = ""
-}
 
 func (m *Model) selectedFile() (path string, ok bool) {
 	file, ok := m.selectedCommitFile()
@@ -26,109 +21,92 @@ func (m *Model) selectedFile() (path string, ok bool) {
 	return file.Path, true
 }
 
-func (m *Model) yankFilename() {
+func (m *Model) yankFilename() tea.Cmd {
 	path, ok := m.selectedFile()
 	if !ok {
-		m.setStatus("no file selected")
-		return
+		return notify.Warning("no file selected")
 	}
 	if err := commitClipboardWrite(path); err != nil {
-		m.setStatus("clipboard copy failed: " + err.Error())
-		return
+		return notify.Error("clipboard copy failed: " + err.Error())
 	}
-	m.setStatus("yanked filename")
+	return notify.Info("yanked filename")
 }
 
-func (m *Model) yankLocationOnly() {
+func (m *Model) yankLocationOnly() tea.Cmd {
 	path, ok := m.selectedFile()
 	if !ok {
-		m.setStatus("no file selected")
-		return
+		return notify.Warning("no file selected")
 	}
 	if !m.focusDiff {
 		if err := commitClipboardWrite(yankfmt.FormatYankLocation(path, "")); err != nil {
-			m.setStatus("clipboard copy failed: " + err.Error())
-			return
+			return notify.Error("clipboard copy failed: " + err.Error())
 		}
-		m.setStatus("yanked location")
-		return
+		return notify.Info("yanked location")
 	}
-	loc, _, ok := m.focusedLocationAndBody()
+	loc, _, cmd, ok := m.focusedLocationAndBody()
 	if !ok {
-		return
+		return cmd
 	}
 	if err := commitClipboardWrite(yankfmt.FormatYankLocation(path, loc)); err != nil {
-		m.setStatus("clipboard copy failed: " + err.Error())
-		return
+		return notify.Error("clipboard copy failed: " + err.Error())
 	}
-	m.setStatus("yanked location")
+	return notify.Info("yanked location")
 }
 
-func (m *Model) yankAllContext() {
+func (m *Model) yankAllContext() tea.Cmd {
 	path, ok := m.selectedFile()
 	if !ok {
-		m.setStatus("no file selected")
-		return
+		return notify.Warning("no file selected")
 	}
 	if !m.focusDiff {
 		if err := commitClipboardWrite(yankfmt.FormatYankLocation(path, "")); err != nil {
-			m.setStatus("clipboard copy failed: " + err.Error())
-			return
+			return notify.Error("clipboard copy failed: " + err.Error())
 		}
-		m.setStatus("yanked all context")
-		return
+		return notify.Info("yanked all context")
 	}
-	loc, body, ok := m.focusedLocationAndBody()
+	loc, body, cmd, ok := m.focusedLocationAndBody()
 	if !ok {
-		return
+		return cmd
 	}
 	text := yankfmt.FormatYankAllContext(path, loc, body)
 	if err := commitClipboardWrite(text); err != nil {
-		m.setStatus("clipboard copy failed: " + err.Error())
-		return
+		return notify.Error("clipboard copy failed: " + err.Error())
 	}
-	m.setStatus("yanked all context")
+	return notify.Info("yanked all context")
 }
 
-func (m *Model) yankContentOnly() {
+func (m *Model) yankContentOnly() tea.Cmd {
 	if !m.focusDiff {
-		m.setStatus("no diff selection to yank")
-		return
+		return notify.Warning("no diff selection to yank")
 	}
 	_, body, yankErr := m.diffModel.FocusedLocationAndBody()
 	if yankErr == diffview.FocusedYankErrNoHunk {
-		m.setStatus(string(yankErr))
-		return
+		return notify.Warning(string(yankErr))
 	}
 	if yankErr == diffview.FocusedYankErrNoLines {
-		m.setStatus(string(yankErr))
-		return
+		return notify.Warning(string(yankErr))
 	}
 	if err := commitClipboardWrite(strings.Join(body, "\n")); err != nil {
-		m.setStatus("clipboard copy failed: " + err.Error())
-		return
+		return notify.Error("clipboard copy failed: " + err.Error())
 	}
-	m.setStatus("yanked content")
+	return notify.Info("yanked content")
 }
 
-func (m *Model) yankCommitBody() {
+func (m *Model) yankCommitBody() tea.Cmd {
 	body := m.commitMessageBody()
 	if body == "" {
-		m.setStatus("no commit body to yank")
-		return
+		return notify.Warning("no commit body to yank")
 	}
 	if err := commitClipboardWrite(body); err != nil {
-		m.setStatus("clipboard copy failed: " + err.Error())
-		return
+		return notify.Error("clipboard copy failed: " + err.Error())
 	}
-	m.setStatus("yanked commit body")
+	return notify.Info("yanked commit body")
 }
 
-func (m *Model) focusedLocationAndBody() (string, []string, bool) {
+func (m *Model) focusedLocationAndBody() (string, []string, tea.Cmd, bool) {
 	loc, body, yankErr := m.diffModel.FocusedLocationAndBody()
 	if yankErr != "" {
-		m.setStatus(string(yankErr))
-		return "", nil, false
+		return "", nil, notify.Warning(string(yankErr)), false
 	}
-	return loc, body, true
+	return loc, body, nil, true
 }

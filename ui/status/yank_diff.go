@@ -3,107 +3,94 @@ package status
 import (
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/atotto/clipboard"
 	"github.com/elentok/gx/ui/diffview"
+	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/yankfmt"
 )
 
 var stageClipboardWrite = clipboard.WriteAll
 
-func (m *Model) yankFilename() {
+func (m *Model) yankFilename() tea.Cmd {
 	file, ok := m.selectedStatusFile()
 	if !ok {
-		m.setStatus("no file selected")
-		return
+		return notify.Warning("no file selected")
 	}
 	text := file.Path
 	if err := stageClipboardWrite(text); err != nil {
-		m.setStatus("clipboard copy failed: " + err.Error())
-		return
+		return notify.Error("clipboard copy failed: " + err.Error())
 	}
-	m.setStatus("yanked filename")
+	return notify.Info("yanked filename")
 }
 
-func (m *Model) yankLocationOnly() {
+func (m *Model) yankLocationOnly() tea.Cmd {
 	file, ok := m.selectedStatusFile()
 	if !ok {
-		m.setStatus("no file selected")
-		return
+		return notify.Warning("no file selected")
 	}
 	if m.focus == focusFiletree {
 		if err := stageClipboardWrite(yankfmt.FormatYankLocation(file.Path, "")); err != nil {
-			m.setStatus("clipboard copy failed: " + err.Error())
-			return
+			return notify.Error("clipboard copy failed: " + err.Error())
 		}
-		m.setStatus("yanked location")
-		return
+		return notify.Info("yanked location")
 	}
-	loc, _, ok := m.focusedLocationAndBody()
+	loc, _, cmd, ok := m.focusedLocationAndBody()
 	if !ok {
-		return
+		return cmd
 	}
 	if err := stageClipboardWrite(yankfmt.FormatYankLocation(file.Path, loc)); err != nil {
-		m.setStatus("clipboard copy failed: " + err.Error())
-		return
+		return notify.Error("clipboard copy failed: " + err.Error())
 	}
-	m.setStatus("yanked location")
+	return notify.Info("yanked location")
 }
 
-func (m *Model) yankAllContext() {
+func (m *Model) yankAllContext() tea.Cmd {
 	file, ok := m.selectedStatusFile()
 	if !ok {
-		m.setStatus("no file selected")
-		return
+		return notify.Warning("no file selected")
 	}
 	if m.focus == focusFiletree {
 		if err := stageClipboardWrite(yankfmt.FormatYankLocation(file.Path, "")); err != nil {
-			m.setStatus("clipboard copy failed: " + err.Error())
-			return
+			return notify.Error("clipboard copy failed: " + err.Error())
 		}
-		m.setStatus("yanked all context")
-		return
+		return notify.Info("yanked all context")
 	}
 
-	loc, body, ok := m.focusedLocationAndBody()
+	loc, body, cmd, ok := m.focusedLocationAndBody()
 	if !ok {
-		return
+		return cmd
 	}
 	text := yankfmt.FormatYankAllContext(file.Path, loc, body)
 	if err := stageClipboardWrite(text); err != nil {
-		m.setStatus("clipboard copy failed: " + err.Error())
-		return
+		return notify.Error("clipboard copy failed: " + err.Error())
 	}
-	m.setStatus("yanked all context")
+	return notify.Info("yanked all context")
 }
 
-func (m *Model) yankContentOnly() {
+func (m *Model) yankContentOnly() tea.Cmd {
 	if m.focus == focusFiletree {
-		m.setStatus("no diff selection to yank")
-		return
+		return notify.Warning("no diff selection to yank")
 	}
 	diffviewModel := m.diffarea.ActiveSectionModel()
 	_, body, yankErr := diffviewModel.FocusedLocationAndBody()
 	if yankErr == diffview.FocusedYankErrNoHunk {
-		m.setStatus(string(yankErr))
-		return
+		return notify.Warning(string(yankErr))
 	}
 	if yankErr == diffview.FocusedYankErrNoLines {
-		m.setStatus(string(yankErr))
-		return
+		return notify.Warning(string(yankErr))
 	}
 	if err := stageClipboardWrite(strings.Join(body, "\n")); err != nil {
-		m.setStatus("clipboard copy failed: " + err.Error())
-		return
+		return notify.Error("clipboard copy failed: " + err.Error())
 	}
-	m.setStatus("yanked content")
+	return notify.Info("yanked content")
 }
 
-func (m *Model) focusedLocationAndBody() (string, []string, bool) {
+func (m *Model) focusedLocationAndBody() (string, []string, tea.Cmd, bool) {
 	diffviewModel := m.diffarea.ActiveSectionModel()
 	loc, body, yankErr := diffviewModel.FocusedLocationAndBody()
 	if yankErr != "" {
-		m.setStatus(string(yankErr))
-		return "", nil, false
+		return "", nil, notify.Warning(string(yankErr)), false
 	}
-	return loc, body, true
+	return loc, body, nil, true
 }

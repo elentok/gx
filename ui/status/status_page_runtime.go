@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/elentok/gx/git"
-
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/notify"
 )
 
 func (m Model) selectedFiletreeEntry() (statusEntry, bool) {
@@ -137,12 +137,13 @@ func (m *Model) toggleStageStatusEntry() tea.Cmd {
 		m.showGitError(err)
 		return nil
 	}
+	var notifyCmd tea.Cmd
 	if stageAll {
-		m.setStatus("staged " + path)
+		notifyCmd = notify.Success("staged " + path)
 	} else {
-		m.setStatus("unstaged " + path)
+		notifyCmd = notify.Success("unstaged " + path)
 	}
-	return m.reload(path)
+	return tea.Batch(notifyCmd, m.reload(path))
 }
 
 func (m *Model) openDiscardStatusConfirm() {

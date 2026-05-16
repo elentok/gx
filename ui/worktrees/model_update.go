@@ -6,17 +6,11 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/notify"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 )
-
-func worktreeStatusMessage(message string, hasOutput bool) string {
-	if !hasOutput {
-		return message
-	}
-	return ui.StatusWithHints(message, keys.GoOutput)
-}
 
 func (m Model) Init() tea.Cmd {
 	return cmdLoadWorktrees(m.repo)
@@ -94,36 +88,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			return m.showError(msg.err.Error()), nil
 		}
-		m.statusGen++
-		m.statusMsg = fmt.Sprintf("deleted worktree %s", msg.name)
-		return m, tea.Batch(cmdLoadWorktrees(m.repo), cmdClearStatus(m.statusGen))
+		return m, tea.Batch(notify.Info(fmt.Sprintf("deleted worktree %s", msg.name)), cmdLoadWorktrees(m.repo))
 
 	case renameResultMsg:
 		if msg.err != nil {
 			return m.showError(msg.err.Error()), nil
 		}
-		m.statusMsg = ""
 		return m, cmdLoadWorktrees(m.repo)
 
 	case cloneResultMsg:
 		if msg.err != nil {
 			return m.showError(msg.err.Error()), nil
 		}
-		m.statusMsg = ""
 		return m, cmdLoadWorktrees(m.repo)
 
 	case newResultMsg:
 		if msg.err != nil {
 			return m.showError(msg.err.Error()), nil
 		}
-		m.statusMsg = ""
 		return m, cmdLoadWorktrees(m.repo)
 
 	case newOpenResultMsg:
 		if msg.err != nil {
 			return m.showError(msg.err.Error()), nil
 		}
-		m.statusMsg = ""
 		m = m.enterTerminalMenuFor(msg.name, msg.path)
 		return m, cmdLoadWorktrees(m.repo)
 
@@ -142,12 +130,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.yankLoading = false
 		m.yankChecklist = components.NewChecklist(changesToChecklistItems(msg.changes))
-		return m, nil
-
-	case clearStatusMsg:
-		if msg.gen == m.statusGen {
-			m.statusMsg = ""
-		}
 		return m, nil
 
 	case promptableJobStartMsg:
@@ -191,9 +173,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			return m.showError(msg.err.Error()), nil
 		}
-		m.statusGen++
-		m.statusMsg = worktreeStatusMessage(ui.MessageComplete("pull"), msg.log != "")
-		cmds = append(cmds, cmdClearStatus(m.statusGen))
+		cmds = append(cmds, notify.Info(ui.MessageComplete("pull")))
 		if wt := m.selectedWorktree(); wt != nil && wt.Branch != "" {
 			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, *wt))
 			if wt.Branch == m.repo.MainBranch {
@@ -236,9 +216,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(cmdStashPop(msg.wtPath, "pull", msg.log), m.spinner.Tick)
 		}
 		// Should not reach here (stashPull always stashes), but handle gracefully
-		m.statusGen++
-		m.statusMsg = worktreeStatusMessage(ui.MessageComplete("pull"), msg.log != "")
-		cmds = append(cmds, cmdClearStatus(m.statusGen))
+		cmds = append(cmds, notify.Info(ui.MessageComplete("pull")))
 		if wt := m.selectedWorktree(); wt != nil && wt.Branch != "" {
 			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, *wt))
 		}
@@ -270,9 +248,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.spinnerLabel = "Popping stash…"
 			return m, tea.Batch(cmdStashPop(msg.wtPath, "rebase", msg.log), m.spinner.Tick)
 		}
-		m.statusGen++
-		m.statusMsg = worktreeStatusMessage(ui.MessageComplete("rebase"), msg.log != "")
-		cmds = append(cmds, cmdClearStatus(m.statusGen))
+		cmds = append(cmds, notify.Info(ui.MessageComplete("rebase")))
 		for _, w := range m.worktrees {
 			if w.Branch != "" {
 				cmds = append(cmds, cmdLoadBaseStatus(m.repo, w.Branch))
@@ -289,17 +265,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			return m.showError(fmt.Sprintf("Stash pop failed: %s", msg.err.Error())), nil
 		}
-		m.statusGen++
+		var stashPopMsg string
 		switch msg.opLabel {
 		case "pull":
-			m.statusMsg = "pull complete (stash restored)"
+			stashPopMsg = "pull complete (stash restored)"
 		case "rebase":
-			m.statusMsg = "rebase complete (stash restored)"
+			stashPopMsg = "rebase complete (stash restored)"
 		default:
-			m.statusMsg = "stash restored"
+			stashPopMsg = "stash restored"
 		}
-		m.statusMsg = worktreeStatusMessage(m.statusMsg, m.lastJobLog != "")
-		cmds = append(cmds, cmdClearStatus(m.statusGen))
+		cmds = append(cmds, notify.Info(stashPopMsg))
 		if wt := m.selectedWorktree(); wt != nil {
 			cmds = append(cmds, cmdLoadDirtyStatus(*wt), cmdLoadSidebarData(m.repo, *wt))
 			if wt.Branch != "" {
@@ -342,9 +317,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m.showError(msg.err.Error()), nil
 		}
-		m.statusGen++
-		m.statusMsg = worktreeStatusMessage(ui.MessageComplete("push"), msg.log != "")
-		cmds = append(cmds, cmdClearStatus(m.statusGen))
+		cmds = append(cmds, notify.Info(ui.MessageComplete("push")))
 		if wt := m.selectedWorktree(); wt != nil && wt.Branch != "" {
 			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, *wt))
 		}
@@ -390,9 +363,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			return m.showError(msg.err.Error()), nil
 		}
-		m.statusGen++
-		m.statusMsg = worktreeStatusMessage(ui.MessageComplete("force push"), msg.log != "")
-		cmds = append(cmds, cmdClearStatus(m.statusGen))
+		cmds = append(cmds, notify.Info(ui.MessageComplete("force push")))
 		if wt := m.selectedWorktree(); wt != nil && wt.Branch != "" {
 			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, *wt))
 		}
@@ -419,9 +390,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			return m.showError(msg.err.Error()), nil
 		}
-		m.statusGen++
-		m.statusMsg = "tracking remote branch"
-		cmds = append(cmds, cmdClearStatus(m.statusGen))
+		cmds = append(cmds, notify.Info("tracking remote branch"))
 		if wt := m.selectedWorktree(); wt != nil && wt.Branch != "" {
 			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, *wt))
 		}
@@ -432,10 +401,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.showError(msg.err.Error()), nil
 		}
 		m.clipboard = nil
-		m.statusGen++
-		m.statusMsg = fmt.Sprintf("pasted %d file(s)", msg.n)
-		clearCmd := cmdClearStatus(m.statusGen)
-		return m, tea.Batch(clearCmd, cmdLoadWorktrees(m.repo))
+		return m, tea.Batch(notify.Info(fmt.Sprintf("pasted %d file(s)", msg.n)), cmdLoadWorktrees(m.repo))
 
 	case worktreesLoadedMsg:
 		m.loading = false

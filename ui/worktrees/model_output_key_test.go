@@ -125,12 +125,10 @@ func TestLTriggersLazygitLogCommand(t *testing.T) {
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'L', Text: "L", ShiftedCode: 'L', Mod: tea.ModShift})
 	if cmd == nil {
-		t.Fatalf("L should launch lazygit log command")
+		t.Fatalf("L should launch lazygit log command and emit a notification")
 	}
-	m = updated.(Model)
-	if m.statusMsg == "" {
-		t.Fatalf("expected status message after L")
-	}
+	// Status notifications are now emitted as notify.NotifyMsg via tea.Cmd (not m.statusMsg).
+	_ = updated
 }
 
 func TestGLNavigatesToLogWhenNavigationEnabled(t *testing.T) {

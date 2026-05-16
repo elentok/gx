@@ -46,6 +46,13 @@ func OverlayBottomRight(bg, fg string, screenW int, screenH int) string {
 	return PlaceOverlay(bg, fg, x, y)
 }
 
+// OverlayTopRightMargin places fg against the top-right corner with explicit margins.
+func OverlayTopRightMargin(bg, fg string, screenW, marginX, marginY int) string {
+	fgW := lipgloss.Width(fg)
+	x := max(screenW-fgW-marginX, 0)
+	return PlaceOverlay(bg, fg, x, marginY)
+}
+
 func PlaceOverlay(bg, fg string, x, y int) string {
 	bgLines := strings.Split(bg, "\n")
 	fgLines := strings.Split(fg, "\n")

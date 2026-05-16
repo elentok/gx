@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/notify"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
@@ -103,9 +104,7 @@ func (m Model) finishPromptableJob(err error) (tea.Model, tea.Cmd) {
 			m.spinnerLabel = "Popping stash…"
 			return m, tea.Batch(cmdStashPop(wt.Path, "pull", log), m.spinner.Tick)
 		}
-		m.statusGen++
-		m.statusMsg = worktreeStatusMessage(ui.MessageComplete("pull"), log != "")
-		cmds := []tea.Cmd{cmdClearStatus(m.statusGen)}
+		cmds := []tea.Cmd{notify.Info(ui.MessageComplete("pull"))}
 		if wt.Branch != "" {
 			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, wt))
 			if wt.Branch == m.repo.MainBranch {
@@ -136,9 +135,7 @@ func (m Model) finishPromptableJob(err error) (tea.Model, tea.Cmd) {
 			}
 			return m.showError(err.Error()), nil
 		}
-		m.statusGen++
-		m.statusMsg = worktreeStatusMessage(ui.MessageComplete("push"), log != "")
-		cmds := []tea.Cmd{cmdClearStatus(m.statusGen)}
+		cmds := []tea.Cmd{notify.Info(ui.MessageComplete("push"))}
 		if wt.Branch != "" {
 			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, wt))
 		}
@@ -154,9 +151,7 @@ func (m Model) finishPromptableJob(err error) (tea.Model, tea.Cmd) {
 		if err != nil {
 			return m.showError(err.Error()), nil
 		}
-		m.statusGen++
-		m.statusMsg = worktreeStatusMessage(ui.MessageComplete("force push"), log != "")
-		cmds := []tea.Cmd{cmdClearStatus(m.statusGen)}
+		cmds := []tea.Cmd{notify.Info(ui.MessageComplete("force push"))}
 		if wt.Branch != "" {
 			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, wt))
 		}

@@ -38,18 +38,6 @@ func waitForStageText(t *testing.T, tm *teatest.TestModel, text string, timeout 
 	}, teatest.WithDuration(timeout))
 }
 
-func waitForStageAnyText(t *testing.T, tm *teatest.TestModel, timeout time.Duration, texts ...string) {
-	t.Helper()
-	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
-		for _, text := range texts {
-			if bytes.Contains(bts, []byte(text)) {
-				return true
-			}
-		}
-		return false
-	}, teatest.WithDuration(timeout))
-}
-
 func waitForStageStrippedText(t *testing.T, tm *teatest.TestModel, text string, timeout time.Duration) {
 	t.Helper()
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
@@ -397,7 +385,9 @@ func TestStageE2E_YankFilenameFromStatus(t *testing.T) {
 
 	tm.Send(keyRune('y'))
 	tm.Send(keyRune('f'))
-	waitForStageAnyText(t, tm, stageActionWait, "yanked filename", "clipboard copy failed")
+	// Yank notifications are delivered via the app-level overlay; just verify
+	// the model remains stable (still showing the file).
+	waitForStageText(t, tm, path, stageActionWait)
 
 	quitStage(t, tm)
 }
@@ -413,7 +403,9 @@ func TestStageE2E_YankContextFromDiff(t *testing.T) {
 	tm.Send(keySpecial(tea.KeyEnter))
 	tm.Send(keyRune('y'))
 	tm.Send(keyRune('a'))
-	waitForStageAnyText(t, tm, stageActionWait, "yanked all context", "clipboard copy failed")
+	// Yank notifications are delivered via the app-level overlay; just verify
+	// the model remains stable (diff view is still showing).
+	waitForStageText(t, tm, path, stageActionWait)
 
 	quitStage(t, tm)
 }
@@ -637,7 +629,6 @@ func TestStageE2E_RebaseActionWithConfirm(t *testing.T) {
 		head := gitOutput(t, repoDir, "rev-parse", "origin/master")
 		return base == head
 	})
-	waitForStageStrippedText(t, tm, "rebase complete", stageActionWait)
 
 	quitStage(t, tm)
 }

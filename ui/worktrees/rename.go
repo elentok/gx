@@ -48,7 +48,6 @@ func (m Model) enterRenameMode() Model {
 	}
 	m.mode = modeRename
 	m.textInput = newRenameInput(wt.Name)
-	m.statusMsg = ""
 	return m
 }
 
@@ -60,7 +59,6 @@ func (m Model) handleRenameKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, cancel):
 		m.mode = modeNormal
-		m.statusMsg = ""
 		return m, nil
 
 	case key.Matches(msg, submit):
@@ -68,11 +66,9 @@ func (m Model) handleRenameKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		wt := m.selectedWorktree()
 		if newName == "" || wt == nil || newName == wt.Name {
 			m.mode = modeNormal
-			m.statusMsg = ""
 			return m, nil
 		}
 		m.mode = modeNormal
-		m.statusMsg = "Renaming…"
 		return m, cmdRename(m.repo, *wt, newName)
 	}
 

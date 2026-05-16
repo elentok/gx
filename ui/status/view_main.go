@@ -89,7 +89,6 @@ func (m *Model) showGitError(err error) {
 	if err == nil {
 		return
 	}
-	m.setStatus("git command failed")
 	vpW := m.width * 2 / 3
 	if vpW < 44 {
 		vpW = 44

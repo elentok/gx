@@ -1,11 +1,11 @@
 package status
 
 import (
+	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
-
-	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/ui/notify"
 )
 
 const (
@@ -97,8 +97,7 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model,
 		}
 		return m, tea.Quit
 	case bindingLazygitLog:
-		m.setStatus(ui.MessageOpening("lazygit log"))
-		return m, cmdLazygitLog(m.worktreeRoot)
+		return m, tea.Batch(notify.Info(ui.MessageOpening("lazygit log")), cmdLazygitLog(m.worktreeRoot))
 	case bindingGotoBottom:
 		m.jumpToBottom()
 		if m.focus == focusFiletree {
@@ -107,60 +106,49 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model,
 		return m, nil
 	case bindingGotoTop:
 		m.jumpToTop()
-		m.clearStatus()
 		if m.focus == focusFiletree {
 			return m, m.scheduleDiffReload()
 		}
 		return m, nil
 	case bindingViewOutput:
 		if !m.output.HasContent() {
-			m.setStatus(ui.MessageNoOutput())
-			return m, nil
+			return m, notify.Info(ui.MessageNoOutput())
 		}
 		m.openOutputModal()
 		return m, nil
 	case bindingGotoLog:
 		if m.settings.EnableNavigation {
-			m.clearStatus()
 			return m, nav.Replace(nav.Route{Kind: nav.RouteLog, WorktreeRoot: m.worktreeRoot})
 		}
 		return m, nil
 	case bindingGotoStatus:
 		if m.settings.EnableNavigation {
-			m.clearStatus()
 			return m, nav.Replace(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: m.worktreeRoot})
 		}
 		return m, nil
 	case bindingGotoWorktrees:
 		if m.settings.EnableNavigation {
-			m.clearStatus()
 			return m, nav.Replace(nav.Route{Kind: nav.RouteWorktrees})
 		}
 		return m, nil
 	case bindingGitCommit:
-		m.setStatus(ui.MessageOpening("git commit"))
-		return m, cmdGitCommit(m.worktreeRoot, m.settings.Terminal)
+		return m, tea.Batch(notify.Info(ui.MessageOpening("git commit")), cmdGitCommit(m.worktreeRoot, m.settings.Terminal))
 	case bindingComment:
 		if m.focus != focusDiff {
 			return m, nil
 		}
 		return m, m.cmdCreateCommentFromDiff()
 	case bindingYankContent:
-		m.yankContentOnly()
-		return m, nil
+		return m, m.yankContentOnly()
 	case bindingYankLocation:
-		m.yankLocationOnly()
-		return m, nil
+		return m, m.yankLocationOnly()
 	case bindingYankAll:
-		m.yankAllContext()
-		return m, nil
+		return m, m.yankAllContext()
 	case bindingYankFilename:
-		m.yankFilename()
-		return m, nil
+		return m, m.yankFilename()
 	case bindingRefreshMenu:
 		return m, m.refresh()
 	case bindingCancelChord:
-		m.clearStatus()
 		return m, nil
 	case bindingToggleSection:
 		m.switchDiffSection()

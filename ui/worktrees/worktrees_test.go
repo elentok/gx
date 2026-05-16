@@ -112,7 +112,7 @@ func TestDeleteWorktree(t *testing.T) {
 	quit(t, tm)
 }
 
-func TestDeleteWorktree_ShowsToastAfterDeletion(t *testing.T) {
+func TestDeleteWorktree_SpinnerClearsAfterDeletion(t *testing.T) {
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a", "feature-b")
 	_, tm := startTUI(t, repoDir)
 
@@ -122,9 +122,12 @@ func TestDeleteWorktree_ShowsToastAfterDeletion(t *testing.T) {
 	waitForText(t, tm, "Delete", actionWait)
 	tm.Send(keyRune('y'))
 
-	// The toast proves spinnerActive was cleared — if the spinner stays stuck
-	// the model never re-renders status messages and this will time out.
-	waitForText(t, tm, "deleted worktree feature-a", loadWait)
+	// Verify the deletion completed: feature-a disappears from the worktrees table.
+	// Status notifications now go through notify.NotifyMsg (not the status bar),
+	// so we check the table content instead.
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return !bytes.Contains(bts, []byte("feature-a"))
+	}, teatest.WithDuration(loadWait))
 
 	quit(t, tm)
 }
@@ -314,7 +317,9 @@ func TestPushWorktree(t *testing.T) {
 	waitForText(t, tm, "Push feature-a?", actionWait)
 	tm.Send(keyRune('y'))
 
-	waitForText(t, tm, "push complete", loadWait)
+	// Status notifications now go through notify.NotifyMsg (not the status bar).
+	// Wait for the spinner to clear (? help appears) as a sign the push completed.
+	waitForText(t, tm, "? help", loadWait)
 
 	quit(t, tm)
 }
@@ -367,7 +372,9 @@ func TestPushRejectedForcePushConfirmed(t *testing.T) {
 	tm.Send(keyRune('j'))
 	tm.Send(keySpecial(tea.KeyEnter))
 
-	waitForText(t, tm, "force push complete", loadWait)
+	// Status notifications now go through notify.NotifyMsg (not the status bar).
+	// Wait for the spinner to clear (? help appears) as a sign the force push completed.
+	waitForText(t, tm, "? help", loadWait)
 
 	quit(t, tm)
 }
@@ -388,8 +395,8 @@ func TestPullMainRefreshesBaseStatus(t *testing.T) {
 
 	// Pull main (cursor is on main).
 	tm.Send(keyRune('p'))
-	waitForText(t, tm, "pull complete", loadWait)
 
+	// Status notifications now go through notify.NotifyMsg (not the status bar).
 	// After pulling, main advances; feature-a is now behind main → ✗.
 	waitForText(t, tm, "✗", loadWait)
 
@@ -417,7 +424,9 @@ func TestStashPullMainRefreshesBaseStatus(t *testing.T) {
 	waitForText(t, tm, "Stash", actionWait)
 	tm.Send(keyRune('y'))
 
-	waitForText(t, tm, "pull complete (stash restored)", loadWait)
+	// Status notifications now go through notify.NotifyMsg (not the status bar).
+	// Wait for the spinner to clear before pressing g+o to view output.
+	waitForText(t, tm, "? help", loadWait)
 
 	tm.Send(keyRune('g'))
 	tm.Send(keyRune('o'))

@@ -353,7 +353,7 @@ func isMainOrMasterRef(name string) bool {
 }
 
 func (m Model) footerView() string {
-	left := m.statusMsg
+	left := ""
 	right := ui.StyleHint.Render("? help")
 	if m.width <= 0 {
 		if left == "" {

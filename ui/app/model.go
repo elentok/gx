@@ -3,16 +3,17 @@ package app
 import (
 	"strings"
 
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	commitui "github.com/elentok/gx/ui/commit"
 	logui "github.com/elentok/gx/ui/log"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/notify"
 	statusui "github.com/elentok/gx/ui/status"
 	"github.com/elentok/gx/ui/worktrees"
-
-	tea "charm.land/bubbletea/v2"
-	"github.com/charmbracelet/x/ansi"
 )
 
 type Settings struct {
@@ -45,11 +46,13 @@ type Model struct {
 	width  int
 	height int
 
-	activeTab nav.RouteKind
-	tabs      map[nav.RouteKind]tabPageState
-	histories map[nav.RouteKind][]pageState
-	history   []pageState
-	keyPrefix string
+	activeTab     nav.RouteKind
+	tabs          map[nav.RouteKind]tabPageState
+	histories     map[nav.RouteKind][]pageState
+	history       []pageState
+	keyPrefix     string
+	notifications []notification
+	spinner       spinner.Model
 }
 
 func New(repo git.Repo, settings Settings) Model {
@@ -58,6 +61,7 @@ func New(repo git.Repo, settings Settings) Model {
 		settings:  settings,
 		tabs:      make(map[nav.RouteKind]tabPageState),
 		histories: make(map[nav.RouteKind][]pageState),
+		spinner:   newSpinner(),
 	}
 	if m.settings.InitialRoute.Kind == "" {
 		m.settings.InitialRoute = nav.Route{Kind: nav.RouteWorktrees}
@@ -79,6 +83,19 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch v := msg.(type) {
+	case notify.NotifyMsg:
+		return m, m.handleNotifyMsg(v)
+	case notify.CloseMsg:
+		m.handleCloseMsg(v)
+		return m, nil
+	case notifyExpireMsg:
+		m.handleExpireMsg(v)
+		return m, nil
+	case spinner.TickMsg:
+		return m, m.handleSpinnerTick(v)
+	}
+
 	if route, ok := nav.IsReplace(msg); ok {
 		return m.switchTab(route)
 	}
@@ -137,6 +154,10 @@ func (m Model) View() tea.View {
 		if len(hints) > 0 {
 			content = ui.OverlayBottomRight(content, ui.RenderChordOverlay(m.keyPrefix, hints), m.width, m.height)
 		}
+	}
+	useNerdFont := m.settings.Status.UseNerdFontIcons
+	if stack := m.renderNotificationStack(useNerdFont); stack != "" {
+		content = ui.OverlayTopRightMargin(content, stack, m.width, 2, 2)
 	}
 
 	v := tea.NewView(content)

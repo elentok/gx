@@ -5,6 +5,7 @@ import (
 
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/notify"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -50,7 +51,6 @@ func (m Model) handleTerminalMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				return m.executeTerminalAction(m.terminalMenu.Items[m.terminalMenu.Cursor].Value)
 			}
 			m.mode = modeNormal
-			m.statusMsg = ""
 		}
 		return m, nil
 	}
@@ -87,13 +87,9 @@ func (m Model) executeTerminalAction(action string) (Model, tea.Cmd) {
 			return m, cmdKittyNewTab(path)
 		}
 	case ui.TerminalKitty:
-		m.statusGen++
-		m.statusMsg = "enable kitty remote control for this to work"
-		return m, cmdClearStatus(m.statusGen)
+		return m, notify.Info("enable kitty remote control for this to work")
 	default:
-		m.statusGen++
-		m.statusMsg = "use tmux or kitty for more options"
-		return m, cmdClearStatus(m.statusGen)
+		return m, notify.Info("use tmux or kitty for more options")
 	}
 	return m, nil
 }

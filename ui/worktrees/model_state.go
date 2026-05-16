@@ -82,8 +82,6 @@ type Model struct {
 
 	mode          mode
 	textInput     textinput.Model // shared by rename and clone modes
-	statusMsg     string
-	statusGen     int // incremented each time statusMsg is set, used to expire old ticks
 	errorViewport viewport.Model
 	helpViewport  viewport.Model
 	jobRunner     *components.CommandRunner
@@ -100,7 +98,7 @@ type Model struct {
 	confirmYes          bool
 	confirmCmd          tea.Cmd // executed when the user confirms
 	confirmSpinnerLabel string  // if non-empty, spinner is started on confirm
-	confirmCancelMsg    string  // if non-empty, shown as statusMsg when user cancels
+	confirmCancelMsg    string  // if non-empty, shown as notification when user cancels
 
 	pushDivergence   *git.PushDivergence
 	pushDivergenceWT *git.Worktree

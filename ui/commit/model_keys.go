@@ -1,11 +1,11 @@
 package commit
 
 import (
+	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
-
-	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/ui/notify"
 )
 
 const (
@@ -274,20 +274,15 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, nav.Replace(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: m.worktreeRoot})
 	case bindingYankContent:
 		if m.focusHeader {
-			m.yankCommitBody()
-		} else {
-			m.yankContentOnly()
+			return m, m.yankCommitBody()
 		}
-		return m, nil
+		return m, m.yankContentOnly()
 	case bindingYankLoc:
-		m.yankLocationOnly()
-		return m, nil
+		return m, m.yankLocationOnly()
 	case bindingYankAll:
-		m.yankAllContext()
-		return m, nil
+		return m, m.yankAllContext()
 	case bindingYankFile:
-		m.yankFilename()
-		return m, nil
+		return m, m.yankFilename()
 	case bindingComment:
 		if !m.focusDiff {
 			return m, nil
@@ -295,13 +290,12 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, m.cmdCreateCommentFromDiff()
 	case bindingAmend:
 		if err := m.openAmendConfirm(); err != nil {
-			m.statusMsg = err.Error()
+			return m, notify.Error(err.Error())
 		}
 		return m, nil
 	case bindingReword:
 		return m, m.openRewordEditor()
 	case bindingCancelChord:
-		m.clearStatus()
 		return m, nil
 	}
 	return m, nil

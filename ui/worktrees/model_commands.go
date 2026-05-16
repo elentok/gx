@@ -1,18 +1,10 @@
 package worktrees
 
 import (
-	"time"
-
 	"github.com/elentok/gx/git"
 
 	tea "charm.land/bubbletea/v2"
 )
-
-func cmdClearStatus(gen int) tea.Cmd {
-	return tea.Tick(2*time.Second, func(time.Time) tea.Msg {
-		return clearStatusMsg{gen: gen}
-	})
-}
 
 func cmdLoadWorktrees(repo git.Repo) tea.Cmd {
 	return func() tea.Msg {

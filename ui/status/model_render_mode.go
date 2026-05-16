@@ -1,11 +1,11 @@
 package status
 
 import (
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/diffview"
-
-	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/ui/notify"
 )
 
 func (m Model) deltaRenderWidth() int {
@@ -30,26 +30,21 @@ func (m Model) deltaRenderWidth() int {
 }
 
 func (m *Model) toggleRenderMode() tea.Cmd {
+	var notifyMsg string
 	if m.diffarea.RenderMode() == diffview.RenderModeUnified {
 		if !git.DeltaAvailable() {
-			m.setStatus("side-by-side requires delta; staying in unified mode")
-			return nil
+			return notify.Warning("side-by-side requires delta; staying in unified mode")
 		}
 		m.diffarea.SetRenderMode(diffview.RenderModeSideBySide)
-		m.setStatus("side-by-side mode")
+		notifyMsg = "side-by-side mode"
 	} else {
 		m.diffarea.SetRenderMode(diffview.RenderModeUnified)
-		m.setStatus("unified mode")
+		notifyMsg = "unified mode"
 	}
-
 	cmd := m.reloadDiffsForSelection()
 	m.syncDiffViewports()
 	m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
-	return cmd
-}
-
-func (m Model) isSideBySideMode() bool {
-	return m.diffarea.RenderMode() == diffview.RenderModeSideBySide
+	return tea.Batch(notify.Info(notifyMsg), cmd)
 }
 
 func (m Model) renderModeLabel() string {

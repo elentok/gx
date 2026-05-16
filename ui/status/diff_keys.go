@@ -77,7 +77,7 @@ func (m Model) delegateToDiff(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.diffarea.ActiveSection == diffarea.SectionStaged {
 			return m, m.applySelection()
 		}
-		m.openDiscardDiffConfirm()
+		return m, m.openDiscardDiffConfirm()
 	case diffarea.BindingNextFile:
 		if ok, cmd := m.moveToAdjacentFile(1); ok {
 			return m, cmd

@@ -35,7 +35,6 @@ type Model struct {
 	focusDiff    bool
 	bodyExpanded bool
 	details      git.CommitDetails
-	statusMsg    string
 	headerOffset int
 	err          error
 

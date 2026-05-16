@@ -6,11 +6,11 @@ import (
 	"os/exec"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/status/diffarea"
-
-	tea "charm.land/bubbletea/v2"
 )
 
 func (m *Model) handleActionResult(res stageActionResult) tea.Cmd {
@@ -27,16 +27,17 @@ func (m *Model) handleActionResult(res stageActionResult) tea.Cmd {
 		m.runningOpen = false
 		return nil
 	}
+	var notifyCmd tea.Cmd
 	switch res.kind {
 	case actionRebase:
-		m.setStatus(ui.MessageComplete("rebase"))
+		notifyCmd = notify.Success(ui.MessageComplete("rebase"))
 	case actionPopStashRebase:
-		m.setStatus("stash restored")
+		notifyCmd = notify.Info("stash restored")
 	case actionAmend:
-		m.setStatus("amended last commit")
+		notifyCmd = notify.Success("amended last commit")
 	}
 	m.runningOpen = false
-	return m.refresh()
+	return tea.Batch(notifyCmd, m.refresh())
 }
 
 func (m Model) confirmAccept() (tea.Model, tea.Cmd) {
@@ -78,8 +79,7 @@ func (m Model) confirmAccept() (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 		}
-		m.setStatus("discarded " + m.confirmPaths[0])
-		return m, m.reload(m.confirmPaths[0])
+		return m, tea.Batch(notify.Success("discarded "+m.confirmPaths[0]), m.reload(m.confirmPaths[0]))
 	case confirmDiscardUnstaged:
 		if err := git.ApplyPatchToWorktree(m.worktreeRoot, m.confirmPatch, true, m.confirmPatchUnidiffZero); err != nil {
 			m.showGitError(err)
@@ -88,12 +88,11 @@ func (m Model) confirmAccept() (tea.Model, tea.Cmd) {
 		if m.diffarea.ActiveSection == diffarea.SectionUnstaged {
 			m.diffarea.DisableVisual()
 		}
-		m.setStatus("discarded " + m.confirmPaths[0])
 		cmd := m.reload(m.confirmPaths[0])
 		if m.focus == focusDiff {
 			m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 		}
-		return m, cmd
+		return m, tea.Batch(notify.Success("discarded "+m.confirmPaths[0]), cmd)
 	}
 	return m, nil
 }

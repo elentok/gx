@@ -12,7 +12,6 @@ import (
 func (m Model) enterSearchMode() Model {
 	m.mode = modeSearch
 	m.search.Start("")
-	m.statusMsg = ""
 	return m
 }
 

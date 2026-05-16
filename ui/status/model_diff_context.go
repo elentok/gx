@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/ui/notify"
 )
 
 func (m Model) currentDiffContextLines() int {
@@ -25,15 +26,13 @@ func (m *Model) adjustDiffContextLines(delta int) tea.Cmd {
 		next = 20
 	}
 	if next == m.currentDiffContextLines() {
-		m.setStatus(fmt.Sprintf("diff context: %d", next))
-		return nil
+		return notify.Info(fmt.Sprintf("diff context: %d", next))
 	}
 	m.diffContextLines = next
-	m.setStatus(fmt.Sprintf("diff context: %d", next))
 	cmd := m.reloadDiffsForSelection()
 	m.syncDiffViewports()
 	if m.focus == focusDiff {
 		m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 	}
-	return cmd
+	return tea.Batch(notify.Info(fmt.Sprintf("diff context: %d", next)), cmd)
 }

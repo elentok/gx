@@ -3,9 +3,9 @@ package commit
 import (
 	"fmt"
 
-	"github.com/elentok/gx/ui/nav"
-
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/notify"
 )
 
 func (m *Model) openAmendConfirm() error {
@@ -26,8 +26,7 @@ func (m Model) handleAmendUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleAmendDone(err error) (tea.Model, tea.Cmd) {
 	if err != nil {
-		m.statusMsg = "Amend failed: " + err.Error()
-		return m, nil
+		return m, notify.Error("Amend failed: " + err.Error())
 	}
 	return m, nav.Replace(nav.Route{
 		Kind:         nav.RouteLog,

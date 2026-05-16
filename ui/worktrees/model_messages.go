@@ -2,8 +2,6 @@ package worktrees
 
 import "github.com/elentok/gx/git"
 
-type clearStatusMsg struct{ gen int }
-
 type pruneRemotesMsg struct{ err error }
 
 type worktreesLoadedMsg struct {

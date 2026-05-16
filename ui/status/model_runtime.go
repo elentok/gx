@@ -10,18 +10,13 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/comments"
+	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/terminalrun"
 )
 
 func nextFlashCmd() tea.Cmd {
 	return tea.Tick(90*time.Millisecond, func(time.Time) tea.Msg {
 		return flashTickMsg{}
-	})
-}
-
-func statusTickCmd() tea.Cmd {
-	return tea.Tick(time.Second, func(time.Time) tea.Msg {
-		return statusTickMsg{}
 	})
 }
 
@@ -47,44 +42,39 @@ func cmdLazygitLog(worktreeRoot string) tea.Cmd {
 func (m *Model) cmdEditSelectedFile() tea.Cmd {
 	file, ok := m.selectedFile()
 	if !ok {
-		m.setStatus("no file selected")
-		return nil
+		return notify.Warning("no file selected")
 	}
 	editor := strings.TrimSpace(os.Getenv("EDITOR"))
 	if editor == "" {
-		m.setStatus("$EDITOR is not set")
-		return nil
+		return notify.Warning("$EDITOR is not set")
 	}
 	parts := strings.Fields(editor)
 	if len(parts) == 0 {
-		m.setStatus("$EDITOR is empty")
-		return nil
+		return notify.Warning("$EDITOR is empty")
 	}
 	target := filepath.Join(m.worktreeRoot, file.Path)
 	line := m.editorLineForCurrentSelection()
 	args := editorLaunchArgs(parts[0], parts[1:], target, line)
 	c := exec.Command(parts[0], args...)
-	m.setStatus(ui.MessageOpening("editor"))
-	return tea.ExecProcess(c, func(err error) tea.Msg {
+	cmd := tea.ExecProcess(c, func(err error) tea.Msg {
 		return editFileFinishedMsg{err: err}
 	})
+	return tea.Batch(notify.Info(ui.MessageOpening("editor")), cmd)
 }
 
 func (m *Model) cmdCreateCommentFromDiff() tea.Cmd {
 	file, ok := m.selectedStatusFile()
 	if !ok {
-		m.setStatus("no file context for comment")
-		return nil
+		return notify.Warning("no file context for comment")
 	}
-	loc, body, ok := m.commentLocationAndBody()
+	loc, body, errMsg, ok := m.commentLocationAndBody()
 	if !ok {
-		return nil
+		return notify.Warning(errMsg)
 	}
 	cmd, msg := comments.CmdOpenEditor(file.Path, loc, body, m.worktreeRoot, m.settings.Terminal, func(err error, splitApp string) tea.Msg {
 		return editCommentFinishedMsg{err: err, splitApp: splitApp}
 	})
-	m.setStatus(msg)
-	return cmd
+	return tea.Batch(notify.Info(msg), cmd)
 }
 
 func (m *Model) refresh() tea.Cmd {
@@ -127,18 +117,4 @@ func uniqueNonEmpty(paths []string) []string {
 		out = append(out, p)
 	}
 	return out
-}
-
-func (m *Model) setStatus(msg string) {
-	m.statusMsg = msg
-	if msg == "" {
-		m.statusUntil = time.Time{}
-		return
-	}
-	m.statusUntil = time.Now().Add(statusMessageTTL)
-}
-
-func (m *Model) clearStatus() {
-	m.statusMsg = ""
-	m.statusUntil = time.Time{}
 }
