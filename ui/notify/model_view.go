@@ -58,7 +58,7 @@ func iconAndColor(n notification, icons ui.IconSet, spinnerFrame string) (string
 	case KindProgress:
 		return lipgloss.NewStyle().Foreground(colorProgress).Render(spinnerFrame), colorProgress
 	default: // KindInfo
-		return lipgloss.NewStyle().Foreground(colorInfo).Render("i"), colorInfo
+		return lipgloss.NewStyle().Foreground(colorInfo).Render(icons.Info), colorInfo
 	}
 }
 

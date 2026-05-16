@@ -20,6 +20,7 @@ type IconSet struct {
 	Partial      string
 	Staged       string
 	Warning      string
+	Info         string
 }
 
 func Icons(useNerdFont bool) IconSet {
@@ -43,6 +44,7 @@ func Icons(useNerdFont bool) IconSet {
 			Partial:      "+",
 			Staged:       "✓",
 			Warning:      "⚠",
+			Info:         "i",
 		}
 	}
 	return IconSet{
@@ -64,5 +66,6 @@ func Icons(useNerdFont bool) IconSet {
 		Partial:      "",
 		Staged:       "",
 		Warning:      "",
+		Info:         "",
 	}
 }
