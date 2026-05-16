@@ -57,7 +57,11 @@ func (m Model) View() tea.View {
 		y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
 		out = ui.OverlayBottomCenter(out, overlay, m.width, y)
 	}
-	if m.credentialOpen {
+	if m.push.IsOpen {
+		out = ui.OverlayCenter(out, m.push.View(m.width), m.width, m.height)
+	} else if m.pull.IsOpen {
+		out = ui.OverlayCenter(out, m.pull.View(m.width), m.width, m.height)
+	} else if m.credentialOpen {
 		out = ui.OverlayCenter(out, m.credentialModalView(), m.width, m.height)
 	} else if m.runningOpen {
 		out = ui.OverlayCenter(out, m.runningModalView(), m.width, m.height)

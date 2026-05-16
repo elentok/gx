@@ -5,129 +5,32 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/status/diffarea"
 
-	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
-	humanize "github.com/dustin/go-humanize"
 )
-
-func (m *Model) openCheckingDivergence() {
-	vpW := m.width * 2 / 3
-	if vpW < 56 {
-		vpW = 56
-	}
-	if vpW > 110 {
-		vpW = 110
-	}
-	vpH := m.height/2 - 4
-	if vpH < 8 {
-		vpH = 8
-	}
-	vp := viewport.New(viewport.WithWidth(vpW-2), viewport.WithHeight(vpH))
-	vp.SetContent("Fetching remote and checking branch divergence…")
-	m.runningVP = vp
-	m.runningContent = "Fetching remote and checking branch divergence…\n"
-	m.runningOpen = true
-	m.runningDone = false
-	m.runningTitle = "Checking push status"
-	m.runningRunner = nil
-	m.keys.Reset()
-}
 
 func (m *Model) handleActionResult(res stageActionResult) tea.Cmd {
 	if strings.TrimSpace(res.output) != "" {
 		m.recordCommandOutput(stageActionOutputTitle(res.kind), res.output)
 	}
-	if res.kind == actionPushFetch {
-		m.pendingActionOutput = ""
-		if res.err != nil {
-			m.showGitError(fmt.Errorf("%w\n%s", res.err, strings.TrimSpace(res.output)))
-			m.runningOpen = false
-			return nil
-		}
-		div, err := git.DetectPushDivergenceAfterFetch(m.worktreeRoot, res.branch)
-		if err != nil {
-			m.showGitError(err)
-			m.runningOpen = false
-			return nil
-		}
-		if div != nil {
-			m.pendingActionOutput = res.output
-			m.openConfirm(
-				fmt.Sprintf("Branch %s has diverged from the remote branch:", div.Branch),
-				[]string{
-					"",
-					fmt.Sprintf("Last local commit: %s", humanizeOrUnknown(div.Local.Date)),
-					fmt.Sprintf("  %s %s", div.Local.Hash, div.Local.Message),
-					"",
-					fmt.Sprintf("Last remote commit: %s", humanizeOrUnknown(div.RemoteHead.Date)),
-					fmt.Sprintf("  %s %s", div.RemoteHead.Hash, div.RemoteHead.Message),
-				},
-				confirmPushDiverged,
-				div.Remote,
-				res.branch,
-			)
-			m.confirmUpstream = div.Upstream
-			m.confirmMenu = components.MenuState{
-				Items:  []components.MenuItem{{Label: "Rebase", Value: "rebase"}, {Label: "Push --force", Value: "force"}, {Label: "Abort", Value: "abort"}},
-				Cursor: 0,
-			}
-			m.runningOpen = false
-			return nil
-		}
-		runner := newStageActionRunnerWithOutput(actionPush, m.worktreeRoot, res.remote, res.branch, res.output)
-		m.openRunning("Push", runner)
-		return nil
-	}
-	if res.promptForce {
-		m.openConfirm("Force push?", []string{"Push was rejected as non-fast-forward.", "Force push with --force?"}, confirmForcePush, res.remote, res.branch)
-		m.runningOpen = false
-		return nil
-	}
 	if res.promptPopStash {
-		a := confirmPullPopStash
-		title := "Pop stash after pull failure?"
-		if res.kind == actionRebase {
-			a = confirmRebasePopStash
-			title = "Pop stash after rebase failure?"
-		}
-		m.openConfirm(title, []string{"The action failed after stashing changes.", "Pop the stash now?"}, a, "", "")
+		m.openConfirm("Pop stash after rebase failure?", []string{"The rebase failed after stashing changes.", "Pop the stash now?"}, confirmRebasePopStash, "", "")
 		m.runningOpen = false
 		return nil
 	}
-
 	if res.err != nil {
 		m.showGitError(fmt.Errorf("%w\n%s", res.err, strings.TrimSpace(res.output)))
 		m.runningOpen = false
 		return nil
 	}
-
 	switch res.kind {
-	case actionPull:
-		m.setStatus(ui.MessageComplete("pull"))
-	case actionPush:
-		m.setStatus(ui.MessageComplete("push"))
-		if res.prURL != "" {
-			m.openConfirm(
-				fmt.Sprintf("Open pull request page?\n\n%s", res.prURL),
-				nil,
-				confirmOpenPR,
-				res.prURL,
-				"",
-			)
-			m.confirmYes = true
-		}
-	case actionForcePush:
-		m.setStatus(ui.MessageComplete("force push"))
 	case actionRebase:
 		m.setStatus(ui.MessageComplete("rebase"))
-	case actionPopStashPull, actionPopStashRebase:
+	case actionPopStashRebase:
 		m.setStatus("stash restored")
 	case actionAmend:
 		m.setStatus("amended last commit")
@@ -147,10 +50,6 @@ func (m Model) confirmAccept() (tea.Model, tea.Cmd) {
 	m.confirmAction = confirmNone
 
 	switch a {
-	case confirmPush:
-		runner := newStageActionRunner(actionPushFetch, m.worktreeRoot, m.confirmRemote, m.confirmBranch)
-		m.openRunning("Checking push status", runner)
-		return m, actionPollCmd()
 	case confirmRebase:
 		titleTarget := strings.TrimSpace(m.confirmRemote)
 		if titleTarget == "" {
@@ -158,14 +57,6 @@ func (m Model) confirmAccept() (tea.Model, tea.Cmd) {
 		}
 		runner := newStageActionRunner(actionRebase, m.worktreeRoot, titleTarget, m.confirmBranch)
 		m.openRunning("Rebase on "+titleTarget, runner)
-		return m, actionPollCmd()
-	case confirmForcePush:
-		runner := newStageActionRunner(actionForcePush, m.worktreeRoot, m.confirmRemote, m.confirmBranch)
-		m.openRunning("Force push", runner)
-		return m, actionPollCmd()
-	case confirmPullPopStash:
-		runner := newStageActionRunner(actionPopStashPull, m.worktreeRoot, "", "")
-		m.openRunning("Pop stash", runner)
 		return m, actionPollCmd()
 	case confirmRebasePopStash:
 		runner := newStageActionRunner(actionPopStashRebase, m.worktreeRoot, "", "")
@@ -175,9 +66,6 @@ func (m Model) confirmAccept() (tea.Model, tea.Cmd) {
 		runner := newStageActionRunner(actionAmend, m.worktreeRoot, "", "")
 		m.openRunning("Amend commit", runner)
 		return m, actionPollCmd()
-	case confirmOpenPR:
-		m.setStatus(ui.MessageOpening("PR URL"))
-		return m, ui.CmdOpenURL(m.confirmRemote)
 	case confirmDiscardStatus:
 		if m.confirmDiscardUntracked {
 			if err := git.DiscardUntrackedPath(m.worktreeRoot, m.confirmPaths[0]); err != nil {
@@ -208,38 +96,6 @@ func (m Model) confirmAccept() (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	return m, nil
-}
-
-func (m Model) startPullAction() (tea.Model, tea.Cmd) {
-	runner := newStageActionRunner(actionPull, m.worktreeRoot, "", "")
-	m.openRunning("Pull", runner)
-	return m, actionPollCmd()
-}
-
-func (m *Model) preparePushConfirm() error {
-	branch, err := git.CurrentBranch(m.worktreeRoot)
-	if err != nil {
-		return err
-	}
-	if branch == "" || branch == "HEAD" {
-		return fmt.Errorf("cannot push: detached HEAD")
-	}
-	remote := git.BranchRemote(git.Repo{Root: m.worktreeRoot}, branch)
-	m.openConfirm(
-		fmt.Sprintf("Push branch %s to %s?", branch, remote),
-		nil,
-		confirmPush,
-		remote,
-		branch,
-	)
-	return nil
-}
-
-func humanizeOrUnknown(t time.Time) string {
-	if t.IsZero() {
-		return "unknown time"
-	}
-	return humanize.Time(t)
 }
 
 func (m *Model) prepareRebaseConfirm() error {

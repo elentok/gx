@@ -19,6 +19,12 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.push.IsOpen {
+		return m.handlePushUpdate(msg)
+	}
+	if m.pull.IsOpen {
+		return m.handlePullUpdate(msg)
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)

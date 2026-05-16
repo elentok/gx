@@ -7,12 +7,13 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/output"
+	"github.com/elentok/gx/ui/pull"
+	"github.com/elentok/gx/ui/push"
 	"github.com/elentok/gx/ui/status/diffarea"
 
 	"charm.land/bubbles/v2/textinput"
@@ -43,19 +44,20 @@ type Model struct {
 	activeFilePath string
 	diffReloadSeq  int
 
+	push push.Model
+	pull pull.Model
+
 	confirmOpen             bool
 	confirmTitle            string
 	confirmLines            []string
 	confirmYes              bool
 	confirmAction           stageConfirmAction
 	confirmRemote           string
-	confirmUpstream         string
 	confirmBranch           string
 	confirmPaths            []string
 	confirmPatch            string
 	confirmPatchUnidiffZero bool
 	confirmDiscardUntracked bool
-	confirmMenu             components.MenuState
 	runningOpen             bool
 	runningTitle            string
 	runningVP               viewport.Model
@@ -66,9 +68,8 @@ type Model struct {
 	credentialPrompt        string
 	credentialInput         textinput.Model
 	credentialSecret        bool
-	output              output.Model
-	pendingActionOutput string
-	keys                    keys.Manager
+	output output.Model
+	keys   keys.Manager
 }
 
 type statusData struct {
@@ -147,6 +148,8 @@ func NewModel(worktreeRoot string, settings Settings) Model {
 		statusData:       statusData{},
 		fileTreeModel:    fileTreeModel,
 		output:           output.New(),
+		push:             push.New(),
+		pull:             pull.New(),
 	}
 
 	if settings.EnableNavigation {

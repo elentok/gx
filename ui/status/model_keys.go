@@ -174,13 +174,10 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model,
 	case bindingRenderMode:
 		return m, m.toggleRenderMode()
 	case bindingPull:
-		if m.focus == focusFiletree {
-			return m.startPullAction()
-		}
-		m.startPullAction()
-		return m, actionPollCmd()
+		cmd := m.pull.Open(m.worktreeRoot)
+		return m, cmd
 	case bindingPush:
-		if err := m.preparePushConfirm(); err != nil {
+		if err := m.push.Open(m.worktreeRoot); err != nil {
 			m.showGitError(err)
 			return m, nil
 		}

@@ -20,27 +20,17 @@ type stageConfirmAction int
 
 const (
 	confirmNone stageConfirmAction = iota
-	confirmPush
 	confirmRebase
-	confirmForcePush
-	confirmPullPopStash
 	confirmRebasePopStash
 	confirmAmend
-	confirmOpenPR
 	confirmDiscardStatus
 	confirmDiscardUnstaged
-	confirmPushDiverged
 )
 
 type stageActionKind int
 
 const (
-	actionPull stageActionKind = iota
-	actionPushFetch
-	actionPush
-	actionForcePush
-	actionRebase
-	actionPopStashPull
+	actionRebase stageActionKind = iota
 	actionPopStashRebase
 	actionAmend
 )
@@ -49,11 +39,7 @@ type stageActionResult struct {
 	kind           stageActionKind
 	err            error
 	output         string
-	promptForce    bool
 	promptPopStash bool
-	remote         string
-	branch         string
-	prURL          string
 }
 
 type stageActionRunner struct {
@@ -126,34 +112,8 @@ func (r *stageActionRunner) Result() (stageActionResult, bool) {
 
 func (r *stageActionRunner) run() stageActionResult {
 	switch r.kind {
-	case actionPull:
-		return r.runPullLike(actionPull)
-	case actionPushFetch:
-		res := stageActionResult{kind: r.kind, remote: r.remote, branch: r.branch}
-		res.err = r.execGit("fetch", r.remote)
-		return res
 	case actionRebase:
-		return r.runPullLike(actionRebase)
-	case actionPush:
-		res := stageActionResult{kind: r.kind, remote: r.remote, branch: r.branch}
-		if err := r.execGit("push", r.remote, r.branch); err != nil {
-			res.err = err
-			if git.IsNonFastForwardPushError(err) {
-				res.promptForce = true
-				res.err = nil
-			}
-		} else {
-			res.prURL = git.ExtractPRURL(r.runner.Output())
-		}
-		return res
-	case actionForcePush:
-		res := stageActionResult{kind: r.kind}
-		res.err = r.execGit("push", "--force", r.remote, r.branch)
-		return res
-	case actionPopStashPull:
-		res := stageActionResult{kind: r.kind}
-		res.err = r.execGit("stash", "pop")
-		return res
+		return r.runRebase()
 	case actionPopStashRebase:
 		res := stageActionResult{kind: r.kind}
 		res.err = r.execGit("stash", "pop")
@@ -167,8 +127,8 @@ func (r *stageActionRunner) run() stageActionResult {
 	}
 }
 
-func (r *stageActionRunner) runPullLike(kind stageActionKind) stageActionResult {
-	res := stageActionResult{kind: kind}
+func (r *stageActionRunner) runRebase() stageActionResult {
+	res := stageActionResult{kind: actionRebase}
 	changes, err := git.UncommittedChanges(r.root)
 	if err != nil {
 		res.err = err
@@ -181,40 +141,28 @@ func (r *stageActionRunner) runPullLike(kind stageActionKind) stageActionResult 
 			return res
 		}
 	}
-
-	if kind == actionRebase {
-		target := strings.TrimSpace(r.remote)
-		if target == "" {
-			target = detectRebaseTarget(r.root)
-		}
-		fetchRemote := "origin"
-		if i := strings.Index(target, "/"); i > 0 {
-			fetchRemote = strings.TrimSpace(target[:i])
-		}
-		if err := r.execGit("fetch", fetchRemote); err != nil {
-			res.err = err
-			if stashed {
-				res.promptPopStash = true
-			}
-			return res
-		}
-		if err := r.execGit("rebase", target); err != nil {
-			res.err = err
-			if stashed {
-				res.promptPopStash = true
-			}
-			return res
-		}
-	} else {
-		if err := r.execGit("pull"); err != nil {
-			res.err = err
-			if stashed {
-				res.promptPopStash = true
-			}
-			return res
-		}
+	target := strings.TrimSpace(r.remote)
+	if target == "" {
+		target = detectRebaseTarget(r.root)
 	}
-
+	fetchRemote := "origin"
+	if i := strings.Index(target, "/"); i > 0 {
+		fetchRemote = strings.TrimSpace(target[:i])
+	}
+	if err := r.execGit("fetch", fetchRemote); err != nil {
+		res.err = err
+		if stashed {
+			res.promptPopStash = true
+		}
+		return res
+	}
+	if err := r.execGit("rebase", target); err != nil {
+		res.err = err
+		if stashed {
+			res.promptPopStash = true
+		}
+		return res
+	}
 	if stashed {
 		if err := r.execGit("stash", "pop"); err != nil {
 			res.err = err
@@ -325,55 +273,6 @@ func (m *Model) handleCredentialKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleConfirmKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if m.confirmAction == confirmPushDiverged {
-		next, decided, accepted, handled := components.UpdateMenu(msg, m.confirmMenu)
-		if !handled {
-			return m, nil
-		}
-		m.confirmMenu = next
-		if !decided {
-			return m, nil
-		}
-		if !accepted {
-			m.confirmOpen = false
-			m.confirmAction = confirmNone
-			m.setStatus(ui.MessageAborted("push"))
-			return m, nil
-		}
-		choice := "abort"
-		if len(m.confirmMenu.Items) > 0 && m.confirmMenu.Cursor >= 0 && m.confirmMenu.Cursor < len(m.confirmMenu.Items) {
-			choice = m.confirmMenu.Items[m.confirmMenu.Cursor].Value
-		}
-		switch choice {
-		case "rebase":
-			m.confirmOpen = false
-			m.confirmAction = confirmNone
-			initialOutput := m.pendingActionOutput
-			m.pendingActionOutput = ""
-			target := strings.TrimSpace(m.confirmUpstream)
-			if target == "" {
-				target = strings.TrimSpace(m.confirmRemote)
-			}
-			runner := newStageActionRunnerWithOutput(actionRebase, m.worktreeRoot, target, m.confirmBranch, initialOutput)
-			m.openRunning("Rebase on "+target, runner)
-			return m, actionPollCmd()
-		case "force":
-			m.confirmOpen = false
-			m.confirmAction = confirmNone
-			initialOutput := m.pendingActionOutput
-			m.pendingActionOutput = ""
-			runner := newStageActionRunnerWithOutput(actionForcePush, m.worktreeRoot, m.confirmRemote, m.confirmBranch, initialOutput)
-			m.openRunning("Force push", runner)
-			return m, actionPollCmd()
-		default:
-			m.confirmOpen = false
-			m.confirmAction = confirmNone
-			m.pendingActionOutput = ""
-			m.setStatus(ui.MessageAborted("push"))
-			return m, nil
-		}
-	}
-
 	nextYes, decided, accepted, handled := components.UpdateConfirm(msg, m.confirmYes)
 	if !handled {
 		return m, nil
@@ -416,17 +315,9 @@ func (m *Model) openRunning(title string, runner *stageActionRunner) {
 
 func stageActionOutputTitle(kind stageActionKind) string {
 	switch kind {
-	case actionPull:
-		return "Pull output"
-	case actionPushFetch:
-		return "Fetch output"
-	case actionPush:
-		return "Push output"
-	case actionForcePush:
-		return "Force push output"
 	case actionRebase:
 		return "Rebase output"
-	case actionPopStashPull, actionPopStashRebase:
+	case actionPopStashRebase:
 		return "Stash output"
 	case actionAmend:
 		return "Amend output"
@@ -451,13 +342,11 @@ func (m *Model) openConfirm(title string, lines []string, action stageConfirmAct
 	m.confirmLines = append([]string{}, lines...)
 	m.confirmAction = action
 	m.confirmRemote = remote
-	m.confirmUpstream = ""
 	m.confirmBranch = branch
 	m.confirmPaths = nil
 	m.confirmPatch = ""
 	m.confirmPatchUnidiffZero = false
 	m.confirmDiscardUntracked = false
-	m.confirmMenu = components.MenuState{}
 	m.confirmYes = true
 }
 
@@ -504,19 +393,6 @@ func (m Model) confirmModalView() string {
 	prompt := m.confirmTitle
 	if len(m.confirmLines) > 0 {
 		prompt = prompt + "\n\n" + strings.Join(m.confirmLines, "\n")
-	}
-	if m.confirmAction == confirmPushDiverged {
-		return components.RenderMenuModal(
-			"Push Diverged",
-			prompt,
-			m.confirmMenu,
-			"",
-			ui.ColorYellow,
-			ui.ColorYellow,
-			ui.ColorSubtle,
-			ui.ColorGreen,
-			maxInt(56, m.width/2),
-		)
 	}
 	return components.RenderConfirmModal(
 		prompt,

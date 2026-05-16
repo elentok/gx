@@ -9,7 +9,7 @@ Add `P` (push) and `p` (pull) to the log view, matching the status view experien
 - Both support credential prompting via `components.CommandRunner` with `CredentialPolicyPrompt`
 - Spinner + result (no streaming); accumulated output stored so `g o` works
 - New `ui/push` and `ui/pull` packages (same pattern as `ui/amend`)
-- Status refactoring (to use the shared packages) is a separate follow-up
+- Status refactoring (to use the shared packages) is a separate follow-up ✓ done
 
 ## Tasks
 
