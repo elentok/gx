@@ -79,7 +79,7 @@ func newCommitManager() keys.Manager {
 
 		{ID: bindingYankContent, Seq: []string{"y", "y"}, Categories: []string{"Yank"}, Title: "yank content"},
 		{ID: bindingYankLoc, Seq: []string{"y", "l"}, Categories: []string{"Yank"}, Title: "yank location"},
-		{ID: bindingYankAll, Seq: []string{"y", "a"}, Categories: []string{"Yank"}, Title: "yank all"},
+		{ID: bindingYankAll, Seq: []string{"y", "a"}, Categories: []string{"Yank"}, Title: "yank for AI agent"},
 		{ID: bindingYankFile, Seq: []string{"y", "f"}, Categories: []string{"Yank"}, Title: "yank filename"},
 		{ID: bindingCancelChord, Seq: []string{"y", "esc"}, Categories: []string{}, Title: ""},
 

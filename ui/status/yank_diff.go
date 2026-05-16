@@ -54,18 +54,18 @@ func (m *Model) yankAllContext() tea.Cmd {
 		if err := stageClipboardWrite(yankfmt.FormatYankLocation(file.Path, "")); err != nil {
 			return notify.Error("clipboard copy failed: " + err.Error())
 		}
-		return notify.Info("yanked all context")
+		return notify.Info("yanked for AI agent")
 	}
 
 	loc, body, cmd, ok := m.focusedLocationAndBody()
 	if !ok {
 		return cmd
 	}
-	text := yankfmt.FormatYankAllContext(file.Path, loc, body)
+	text := yankfmt.FormatForAgent(file.Path, loc, body)
 	if err := stageClipboardWrite(text); err != nil {
 		return notify.Error("clipboard copy failed: " + err.Error())
 	}
-	return notify.Info("yanked all context")
+	return notify.Info("yanked for AI agent")
 }
 
 func (m *Model) yankContentOnly() tea.Cmd {
