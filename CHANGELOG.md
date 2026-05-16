@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.15.3 - 2026-05-16
+
+- Fix commit view header scrolling broken when expanded body fills the viewport
+
 ## v0.15.2 - 2026-05-16
 
 - Commit view: top panel now sizes to fit its content, capped at 50% of screen height; `(b to expand)` hint only appears when a commit body actually exists
