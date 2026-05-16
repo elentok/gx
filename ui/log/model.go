@@ -76,6 +76,8 @@ type Model struct {
 	pendingFocusSubject string
 	flashSubject        string
 	flashUntil          time.Time
+
+	refreshing bool
 }
 
 func NewModel(worktreeRoot, startRef string, settings Settings) Model {

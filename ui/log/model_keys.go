@@ -4,6 +4,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/notify"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -23,7 +24,6 @@ const (
 	bindingGotoStatus keys.BindingID = "goto-status"
 	bindingNextTag    keys.BindingID = "next-tag"
 	bindingPrevTag    keys.BindingID = "prev-tag"
-	bindingRefresh    keys.BindingID = "refresh"
 	bindingCancel     keys.BindingID = "cancel-chord"
 	bindingAmend      keys.BindingID = "amend"
 	bindingReword     keys.BindingID = "reword"
@@ -65,9 +65,6 @@ func newLogManager() keys.Manager {
 		{ID: bindingPrevTag, Seq: []string{"shift+[", "t"}, Categories: []string{}, Title: ""},
 		{ID: bindingCancel, Seq: []string{"shift+[", "esc"}, Categories: []string{}, Title: ""},
 
-		{ID: bindingRefresh, Seq: []string{"m", "r"}, Categories: []string{"Other"}, Title: "refresh"},
-		{ID: bindingCancel, Seq: []string{"m", "esc"}, Categories: []string{}, Title: ""},
-
 		{ID: bindingPull, Seq: []string{"p"}, Categories: []string{"Git"}, Title: "pull"},
 		{ID: bindingPush, Seq: []string{"P"}, Categories: []string{"Git"}, Title: "push"},
 		{ID: bindingAmend, Seq: []string{"A"}, Categories: []string{"Actions"}, Title: "amend commit with staged changes"},
@@ -101,8 +98,9 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		m.list.SetSelected(len(m.rows)-1, len(m.rows))
 		m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))
 		return m, nil
-	case bindingReload, bindingRefresh:
-		return m, m.cmdReload()
+	case bindingReload:
+		m.refreshing = true
+		return m, tea.Batch(notify.Progress("refresh", "refreshing..."), m.cmdReload())
 	case bindingTop:
 		m.list.SetSelected(0, len(m.rows))
 		m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))

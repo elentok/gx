@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/reword"
 
 	tea "charm.land/bubbletea/v2"
@@ -103,6 +104,11 @@ func (m Model) handleReload(msg reloadMsg) (tea.Model, tea.Cmd) {
 		m.err = msg.err
 		return m, nil
 	}
+	var refreshCmds []tea.Cmd
+	if m.refreshing {
+		m.refreshing = false
+		refreshCmds = []tea.Cmd{notify.Close("refresh"), notify.Success("refreshed")}
+	}
 	m.err = nil
 	m.rows = msg.rows
 	m.branchDiverged = msg.branchDiverged
@@ -120,13 +126,13 @@ func (m Model) handleReload(msg reloadMsg) (tea.Model, tea.Cmd) {
 		m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))
 		m.recomputeSearchMatches()
 		m.jumpToCurrentMatch()
-		return m, cmdFlashClear()
+		return m, tea.Batch(append(refreshCmds, cmdFlashClear())...)
 	}
 	m.list.SetSelected(m.list.Selected(), len(m.rows))
 	m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))
 	m.recomputeSearchMatches()
 	m.jumpToCurrentMatch()
-	return m, nil
+	return m, tea.Batch(refreshCmds...)
 }
 
 func (m *Model) jumpToTaggedCommit(step int) {

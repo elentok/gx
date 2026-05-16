@@ -440,6 +440,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			cmds = append(cmds, cmdLoadSidebarData(m.repo, m.worktrees[m.table.Cursor()]))
 		}
+		if m.refreshing {
+			m.refreshing = false
+			cmds = append(cmds, notify.Close("refresh"), notify.Success("refreshed"))
+		}
 		return m, tea.Batch(cmds...)
 
 	case syncStatusMsg:

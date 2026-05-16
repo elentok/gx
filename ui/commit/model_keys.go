@@ -258,7 +258,7 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, nil
 	case bindingRefresh, bindingRefreshMenu:
 		m.reload()
-		return m, nil
+		return m, notify.Success("refreshed")
 	case bindingGotoTop:
 		if m.focusDiff {
 			m.jumpDiffTop()

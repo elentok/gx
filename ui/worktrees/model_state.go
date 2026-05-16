@@ -126,7 +126,8 @@ type Model struct {
 	height int
 	ready  bool // true once we've received the first WindowSizeMsg
 
-	loading bool
+	loading    bool
+	refreshing bool
 	err     error
 }
 
