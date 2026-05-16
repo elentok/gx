@@ -15,6 +15,9 @@ func (m Model) handleBumpUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusMsg = "bump failed: " + result.Err.Error()
 		return m, nil
 	}
+	if result.NewTag == "" {
+		return m, nil
+	}
 	if err := m.push.OpenWithTag(m.worktreeRoot, result.NewTag); err != nil {
 		m.statusMsg = err.Error()
 		return m, nil
