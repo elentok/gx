@@ -2,13 +2,22 @@ package cmd
 
 import (
 	"bytes"
+	"os/exec"
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 
 	tea "charm.land/bubbletea/v2"
 )
+
+func gitOutput(dir string, args ...string) (string, error) {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	return strings.TrimSpace(string(out)), err
+}
 
 // tagRepo creates a git tag in the given repo directory.
 func tagRepo(t *testing.T, dir, tag string) {
@@ -29,13 +38,13 @@ func TestParseVersion_Valid(t *testing.T) {
 		{"1.2.3", 1, 2, 3}, // no "v" prefix
 	}
 	for _, tt := range tests {
-		major, minor, patch, err := parseVersion(tt.tag)
+		major, minor, patch, err := git.ParseVersion(tt.tag)
 		if err != nil {
-			t.Errorf("parseVersion(%q) error: %v", tt.tag, err)
+			t.Errorf("git.ParseVersion(%q) error: %v", tt.tag, err)
 			continue
 		}
 		if major != tt.major || minor != tt.minor || patch != tt.patch {
-			t.Errorf("parseVersion(%q) = %d.%d.%d, want %d.%d.%d",
+			t.Errorf("git.ParseVersion(%q) = %d.%d.%d, want %d.%d.%d",
 				tt.tag, major, minor, patch, tt.major, tt.minor, tt.patch)
 		}
 	}
@@ -43,9 +52,9 @@ func TestParseVersion_Valid(t *testing.T) {
 
 func TestParseVersion_Invalid(t *testing.T) {
 	for _, tag := range []string{"v1.2", "v1", "vx.y.z", "v1.2.x", ""} {
-		_, _, _, err := parseVersion(tag)
+		_, _, _, err := git.ParseVersion(tag)
 		if err == nil {
-			t.Errorf("parseVersion(%q): expected error, got nil", tag)
+			t.Errorf("git.ParseVersion(%q): expected error, got nil", tag)
 		}
 	}
 }

@@ -24,6 +24,9 @@ func renderTickCmd() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.bump.IsOpen {
+		return m.handleBumpUpdate(msg)
+	}
 	if m.push.IsOpen {
 		return m.handlePushUpdate(msg)
 	}

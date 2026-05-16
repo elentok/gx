@@ -37,6 +37,7 @@ const (
 	bindingPush          keys.BindingID = "push"
 	bindingRebase        keys.BindingID = "rebase"
 	bindingAmend         keys.BindingID = "amend"
+	bindingBump          keys.BindingID = "bump"
 	bindingEdit          keys.BindingID = "edit"
 )
 
@@ -85,6 +86,7 @@ func newStatusManager() keys.Manager {
 		{ID: bindingPush, Seq: []string{"P"}, Categories: []string{"Git"}, Title: "push"},
 		{ID: bindingRebase, Seq: []string{"b"}, Categories: []string{"Git"}, Title: "rebase"},
 		{ID: bindingAmend, Seq: []string{"A"}, Categories: []string{"Git"}, Title: "amend"},
+		{ID: bindingBump, Seq: []string{"B"}, Categories: []string{"Git"}, Title: "bump version"},
 		{ID: bindingEdit, Seq: []string{"e"}, Categories: []string{"Filetree", "Diff"}, Title: "edit file"},
 	})
 }
@@ -178,6 +180,11 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model,
 		return m, nil
 	case bindingAmend:
 		if err := m.openAmendConfirm(); err != nil {
+			m.showGitError(err)
+		}
+		return m, nil
+	case bindingBump:
+		if err := m.bump.Open(m.worktreeRoot); err != nil {
 			m.showGitError(err)
 		}
 		return m, nil

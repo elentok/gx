@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/amend"
+	"github.com/elentok/gx/ui/bump"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/list"
@@ -62,6 +63,7 @@ type Model struct {
 	branchDiverged bool
 
 	amendConfirm amend.Model
+	bump         bump.Model
 	push         push.Model
 	pull         pull.Model
 	output       output.Model
@@ -90,6 +92,7 @@ func NewModel(worktreeRoot, startRef string, settings Settings) Model {
 	}
 	m.help = help.NewModel(buildKeySections(m.keys))
 	m.amendConfirm = amend.New()
+	m.bump = bump.New()
 	m.push = push.New()
 	m.pull = pull.New()
 	m.output = output.New()

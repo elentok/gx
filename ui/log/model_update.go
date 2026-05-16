@@ -29,6 +29,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.amendConfirm.IsOpen {
 		return m.handleAmendUpdate(msg)
 	}
+	// Delegate all messages to bump.Model while it's open.
+	if m.bump.IsOpen {
+		return m.handleBumpUpdate(msg)
+	}
 	// Delegate all messages to push.Model while it's open.
 	if m.push.IsOpen {
 		return m.handlePushUpdate(msg)

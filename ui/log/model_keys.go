@@ -26,6 +26,7 @@ const (
 	bindingPrevTag    keys.BindingID = "prev-tag"
 	bindingCancel     keys.BindingID = "cancel-chord"
 	bindingAmend      keys.BindingID = "amend"
+	bindingBump       keys.BindingID = "bump"
 	bindingReword     keys.BindingID = "reword"
 	bindingPageDown   keys.BindingID = "page-down"
 	bindingPageUp     keys.BindingID = "page-up"
@@ -68,6 +69,7 @@ func newLogManager() keys.Manager {
 		{ID: bindingPull, Seq: []string{"p"}, Categories: []string{"Git"}, Title: "pull"},
 		{ID: bindingPush, Seq: []string{"P"}, Categories: []string{"Git"}, Title: "push"},
 		{ID: bindingAmend, Seq: []string{"A"}, Categories: []string{"Actions"}, Title: "amend commit with staged changes"},
+		{ID: bindingBump, Seq: []string{"B"}, Categories: []string{"Actions"}, Title: "bump version"},
 		{ID: bindingReword, Seq: []string{"c", "r"}, Categories: []string{"Actions"}, Title: "reword commit"},
 		{ID: bindingCancel, Seq: []string{"c", "esc"}, Categories: []string{}, Title: ""},
 		{ID: bindingPageDown, Seq: []string{"ctrl+d"}, Categories: []string{"Navigation"}, Title: "page down"},
@@ -146,6 +148,11 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, nil
 	case bindingAmend:
 		if err := m.openAmendConfirm(); err != nil {
+			m.statusMsg = err.Error()
+		}
+		return m, nil
+	case bindingBump:
+		if err := m.bump.Open(m.worktreeRoot); err != nil {
 			m.statusMsg = err.Error()
 		}
 		return m, nil

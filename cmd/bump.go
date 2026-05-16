@@ -3,10 +3,9 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os/exec"
-	"strconv"
 	"strings"
 
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 
 	"charm.land/bubbles/v2/key"
@@ -20,12 +19,9 @@ func runBump(args []string, d deps) error {
 		return err
 	}
 
-	lastTag, err := gitOutput(cwd, "describe", "--tags", "--abbrev=0")
-	if err != nil {
-		lastTag = "v0.0.0"
-	}
+	lastTag := git.LastTag(cwd)
 
-	major, minor, patch, err := parseVersion(lastTag)
+	major, minor, patch, err := git.ParseVersion(lastTag)
 	if err != nil {
 		return err
 	}
@@ -58,7 +54,7 @@ func runBump(args []string, d deps) error {
 	newTag := fmt.Sprintf("v%d.%d.%d", major, minor, patch)
 	fmt.Fprintf(d.stdout, "Bumping %s → %s\n", lastTag, newTag)
 
-	if err := gitRun(cwd, "tag", "-a", newTag, "-m", "Release "+newTag); err != nil {
+	if err := git.CreateAnnotatedTag(cwd, newTag, "Release "+newTag); err != nil {
 		return fmt.Errorf("failed to create tag: %w", err)
 	}
 	fmt.Fprintf(d.stdout, "Created annotated tag %s\n\n", newTag)
@@ -68,10 +64,10 @@ func runBump(args []string, d deps) error {
 		return err
 	}
 	if confirmed {
-		if err := gitRun(cwd, "push", "origin"); err != nil {
+		if err := git.PushOrigin(cwd); err != nil {
 			return err
 		}
-		if err := gitRun(cwd, "push", "origin", newTag); err != nil {
+		if err := git.PushTag(cwd, newTag); err != nil {
 			return err
 		}
 		fmt.Fprintln(d.stdout, "Pushed.")
@@ -81,21 +77,6 @@ func runBump(args []string, d deps) error {
 		fmt.Fprintf(d.stdout, "  git push origin %s\n", newTag)
 	}
 	return nil
-}
-
-// parseVersion parses a "vMAJOR.MINOR.PATCH" tag into its components.
-func parseVersion(tag string) (major, minor, patch int, err error) {
-	parts := strings.SplitN(strings.TrimPrefix(tag, "v"), ".", 3)
-	if len(parts) != 3 {
-		return 0, 0, 0, fmt.Errorf("cannot parse version from tag %q", tag)
-	}
-	major, err1 := strconv.Atoi(parts[0])
-	minor, err2 := strconv.Atoi(parts[1])
-	patch, err3 := strconv.Atoi(parts[2])
-	if err1 != nil || err2 != nil || err3 != nil {
-		return 0, 0, 0, fmt.Errorf("cannot parse version from tag %q", tag)
-	}
-	return major, minor, patch, nil
 }
 
 // pickBump shows an interactive menu and returns the chosen bump type, or ""
@@ -195,15 +176,3 @@ func (m bumpPickerModel) View() tea.View {
 	return tea.NewView(b.String())
 }
 
-func gitOutput(dir string, args ...string) (string, error) {
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	out, err := cmd.Output()
-	return strings.TrimSpace(string(out)), err
-}
-
-func gitRun(dir string, args ...string) error {
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	return cmd.Run()
-}

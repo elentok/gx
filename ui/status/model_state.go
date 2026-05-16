@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/list"
+	"github.com/elentok/gx/ui/bump"
 	"github.com/elentok/gx/ui/output"
 	"github.com/elentok/gx/ui/pull"
 	"github.com/elentok/gx/ui/push"
@@ -42,6 +43,7 @@ type Model struct {
 	activeFilePath string
 	diffReloadSeq  int
 
+	bump bump.Model
 	push push.Model
 	pull pull.Model
 
@@ -145,6 +147,7 @@ func NewModel(worktreeRoot string, settings Settings) Model {
 		statusData:       statusData{},
 		fileTreeModel:    fileTreeModel,
 		output:           output.New(),
+		bump:             bump.New(),
 		push:             push.New(),
 		pull:             pull.New(),
 	}
