@@ -2,8 +2,6 @@ package commit
 
 import "github.com/elentok/gx/ui/list"
 
-const commitHeaderMaxRows = 6
-
 func (m *Model) scrollHeader(delta int) {
 	visible := m.headerViewportRowsCount()
 	total := len(m.headerLines())

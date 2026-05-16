@@ -95,7 +95,7 @@ func (m Model) headerLines() []string {
 }
 
 func (m Model) headerTitle() string {
-	if !m.bodyExpanded {
+	if !m.bodyExpanded && m.commitMessageBody() != "" {
 		return "Commit " + commitMetaStyle.Render("(b to expand)")
 	}
 	return "Commit"
@@ -181,11 +181,9 @@ func (m Model) contentView(contentH int) string {
 
 func (m Model) layoutHeights() (bodyH, contentH int) {
 	available := max(2, m.height-1) // reserve one line for footer
-	naturalBody := min(commitHeaderMaxRows, max(1, len(m.headerLines()))) + 2
-	bodyH = min(12, naturalBody)
-	if bodyH > available-1 {
-		bodyH = max(1, available-1)
-	}
+	maxBody := max(1, available/2)
+	naturalBody := max(1, len(m.headerLines())) + 2
+	bodyH = min(maxBody, naturalBody)
 	contentH = available - bodyH
 	if contentH < 1 {
 		contentH = 1
@@ -194,11 +192,7 @@ func (m Model) layoutHeights() (bodyH, contentH int) {
 }
 
 func (m Model) headerViewportRowsCount() int {
-	rows := min(commitHeaderMaxRows, max(1, len(m.headerLines())))
-	if rows < 1 {
-		return 1
-	}
-	return rows
+	return max(1, len(m.headerLines()))
 }
 
 func (m Model) visibleHeaderLines(viewportRows int) []string {
@@ -208,9 +202,6 @@ func (m Model) visibleHeaderLines(viewportRows int) []string {
 	}
 	if viewportRows < 1 {
 		viewportRows = 1
-	}
-	if viewportRows > commitHeaderMaxRows {
-		viewportRows = commitHeaderMaxRows
 	}
 	if viewportRows > len(all) {
 		viewportRows = len(all)
