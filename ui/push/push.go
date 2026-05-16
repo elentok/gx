@@ -65,6 +65,7 @@ type Model struct {
 	yes     bool
 	spinner spinner.Model
 	log     *ui.CommandOutputLog
+	steps   []components.Step
 
 	activeRunner *components.CommandRunner
 
@@ -114,6 +115,7 @@ func (m *Model) Open(root string) error {
 	m.creds = creds.New()
 	m.log = ui.NewCommandOutputLog()
 	m.activeRunner = nil
+	m.steps = nil
 	m.IsOpen = true
 	return nil
 }
@@ -159,6 +161,34 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, Result) {
 	return m, nil, Result{}
 }
 
+func (m *Model) appendRunningStep(s components.Step) {
+	s.IsRunning = true
+	m.steps = append(m.steps, s)
+}
+
+func (m *Model) completeCurrentStep() {
+	if len(m.steps) > 0 {
+		last := len(m.steps) - 1
+		m.steps[last].IsRunning = false
+		m.steps[last].IsDone = true
+	}
+}
+
+func (m *Model) failCurrentStep() {
+	if len(m.steps) > 0 {
+		last := len(m.steps) - 1
+		m.steps[last].IsRunning = false
+		m.steps[last].HasFailed = true
+	}
+}
+
+var (
+	stepFetch     = components.Step{TitleBefore: "fetch", RunningTitle: "fetching...", TitleAfter: "fetched", TitleFailed: "fetch failed"}
+	stepRebase    = components.Step{TitleBefore: "rebase", RunningTitle: "rebasing...", TitleAfter: "rebased", TitleFailed: "rebase failed"}
+	stepPush      = components.Step{TitleBefore: "push", RunningTitle: "pushing...", TitleAfter: "pushed", TitleFailed: "push failed (non-fast-forward)"}
+	stepForcePush = components.Step{TitleBefore: "force push", RunningTitle: "force pushing...", TitleAfter: "force pushed", TitleFailed: "force push failed"}
+)
+
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 	switch m.phase {
 	case phaseConfirm:
@@ -174,6 +204,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 			m.IsOpen = false
 			return m, nil, Result{Done: true}
 		}
+		m.appendRunningStep(stepFetch)
 		return m, m.startRunner(phaseFetching, "fetch", m.remote), Result{}
 
 	case phaseDiverged:
@@ -196,6 +227,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 			if upstream == "" {
 				upstream = m.divergence.Remote
 			}
+			m.appendRunningStep(stepRebase)
 			return m, m.startRunner(phaseRebasing, "rebase", upstream), Result{}
 		case "force":
 			m.phase = phaseForceConfirm
@@ -219,6 +251,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 			m.IsOpen = false
 			return m, nil, Result{Done: true, Output: m.log.String()}
 		}
+		m.appendRunningStep(stepForcePush)
 		return m, m.startRunner(phaseForcePushing, "push", "--force", m.remote, m.branch), Result{}
 
 	case phasePRPrompt:
@@ -251,18 +284,22 @@ func (m Model) handleRunnerDone(msg runnerDoneMsg) (Model, tea.Cmd, Result) {
 	m.log.AppendCommand("git", m.runnerArgs(msg.phase), msg.output)
 	m.activeRunner = nil
 
-	// Non-fast-forward push is handled as a prompt, not a hard failure.
+	// Non-fast-forward push transitions to force confirm, not hard failure.
 	if msg.phase == phasePushing && git.IsNonFastForwardPushError(msg.err) {
+		m.failCurrentStep()
 		m.phase = phaseForceConfirm
 		m.forceYes = true
 		return m, nil, Result{}
 	}
 
 	if msg.err != nil {
+		m.failCurrentStep()
 		m.phase = phaseFailed
 		m.failErr = msg.err
 		return m, nil, Result{}
 	}
+
+	m.completeCurrentStep()
 
 	switch msg.phase {
 	case phaseFetching:
@@ -284,9 +321,11 @@ func (m Model) handleRunnerDone(msg runnerDoneMsg) (Model, tea.Cmd, Result) {
 			}
 			return m, nil, Result{}
 		}
+		m.appendRunningStep(stepPush)
 		return m, m.startRunner(phasePushing, "push", m.remote, m.branch), Result{}
 
 	case phaseRebasing:
+		m.appendRunningStep(stepPush)
 		return m, m.startRunner(phasePushing, "push", m.remote, m.branch), Result{}
 
 	case phasePushing:
@@ -335,17 +374,29 @@ func (m Model) View(width int) string {
 		return m.creds.View(w)
 	}
 
+	stepsStr := ""
+	if len(m.steps) > 0 {
+		stepsStr = components.RenderSteps(m.steps, m.spinner.View())
+	}
+
 	switch m.phase {
 	case phaseConfirm:
 		prompt := fmt.Sprintf("Push branch %s to %s?", m.branch, m.remote)
 		return components.RenderConfirmModal(prompt, m.yes,
 			ui.ColorYellow, ui.ColorGreen, ui.ColorRed, ui.ColorSubtle, w)
 
-	case phaseFetching:
-		return m.spinnerModal("Checking push status", "Fetching remote…", w)
+	case phaseFetching, phaseRebasing, phasePushing, phaseForcePushing:
+		return ui.RenderModalFrame(ui.ModalFrameOptions{
+			Title:       "Push",
+			Body:        stepsStr,
+			Width:       w,
+			BorderColor: ui.ColorYellow,
+			TitleColor:  ui.ColorYellow,
+			HintColor:   ui.ColorSubtle,
+		})
 
 	case phaseDiverged:
-		prompt := fmt.Sprintf("Branch %s has diverged from the remote branch:\n\n"+
+		divergeInfo := fmt.Sprintf("Branch %s has diverged from the remote branch:\n\n"+
 			"Last local commit: %s\n  %s %s\n\n"+
 			"Last remote commit: %s\n  %s %s",
 			m.divergence.Branch,
@@ -354,36 +405,42 @@ func (m Model) View(width int) string {
 			humanizeOrUnknown(m.divergence.RemoteHead.Date),
 			m.divergence.RemoteHead.Hash, m.divergence.RemoteHead.Message,
 		)
+		prompt := stepsStr + "\n\n" + divergeInfo
 		return components.RenderMenuModal(
 			"Push Diverged", prompt, m.menu, "",
 			ui.ColorYellow, ui.ColorYellow, ui.ColorSubtle, ui.ColorGreen, w,
 		)
 
-	case phaseRebasing:
-		upstream := ""
-		if m.divergence != nil {
-			upstream = m.divergence.Upstream
-		}
-		return m.spinnerModal("Rebasing", "Rebasing on "+upstream+"…", w)
-
-	case phasePushing:
-		return m.spinnerModal("Pushing", fmt.Sprintf("Pushing %s to %s…", m.branch, m.remote), w)
-
 	case phaseForceConfirm:
-		prompt := "Push was rejected as non-fast-forward.\n\nForce push with --force?"
-		return components.RenderConfirmModal(prompt, m.forceYes,
-			ui.ColorYellow, ui.ColorGreen, ui.ColorRed, ui.ColorSubtle, w)
-
-	case phaseForcePushing:
-		return m.spinnerModal("Force Pushing", fmt.Sprintf("Force pushing %s to %s…", m.branch, m.remote), w)
+		body := stepsStr + "\n\n" + "Push was rejected as non-fast-forward.\n\nForce push with --force?" + "\n\n" + components.RenderConfirmChoices(m.forceYes, false)
+		return ui.RenderModalFrame(ui.ModalFrameOptions{
+			Title:       "Push",
+			Body:        body,
+			Hint:        components.ConfirmHint,
+			Width:       w,
+			BorderColor: ui.ColorYellow,
+			TitleColor:  ui.ColorYellow,
+			HintColor:   ui.ColorSubtle,
+		})
 
 	case phasePRPrompt:
-		prompt := fmt.Sprintf("Open pull request page?\n\n%s", m.prURL)
-		return components.RenderConfirmModal(prompt, m.prYes,
-			ui.ColorYellow, ui.ColorGreen, ui.ColorRed, ui.ColorSubtle, w)
+		body := stepsStr + "\n\n" + fmt.Sprintf("Open pull request page?\n\n%s", m.prURL) + "\n\n" + components.RenderConfirmChoices(m.prYes, false)
+		return ui.RenderModalFrame(ui.ModalFrameOptions{
+			Title:       "Push",
+			Body:        body,
+			Hint:        components.ConfirmHint,
+			Width:       w,
+			BorderColor: ui.ColorYellow,
+			TitleColor:  ui.ColorYellow,
+			HintColor:   ui.ColorSubtle,
+		})
 
 	case phaseFailed:
-		body := ui.StyleWarning.Render(m.failErr.Error()) + "\n\n" + ui.StyleMuted.Render("press esc to dismiss")
+		body := stepsStr
+		if body != "" {
+			body += "\n\n"
+		}
+		body += ui.StyleWarning.Render(m.failErr.Error()) + "\n\n" + ui.StyleMuted.Render("press esc to dismiss")
 		return ui.RenderModalFrame(ui.ModalFrameOptions{
 			Title:       "Push Failed",
 			Body:        body,
@@ -396,17 +453,6 @@ func (m Model) View(width int) string {
 	return ""
 }
 
-func (m Model) spinnerModal(title, label string, width int) string {
-	body := m.spinner.View() + " " + label
-	return ui.RenderModalFrame(ui.ModalFrameOptions{
-		Title:       title,
-		Body:        body,
-		Width:       width,
-		BorderColor: ui.ColorYellow,
-		TitleColor:  ui.ColorYellow,
-		HintColor:   ui.ColorSubtle,
-	})
-}
 
 func (m Model) runnerArgs(p phase) []string {
 	switch p {

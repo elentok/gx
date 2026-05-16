@@ -63,6 +63,7 @@ type Model struct {
 	stashed bool
 	spinner spinner.Model
 	log     *ui.CommandOutputLog
+	steps   []components.Step
 
 	activeRunner *components.CommandRunner
 
@@ -92,6 +93,7 @@ func (m *Model) Open(root string) tea.Cmd {
 	m.creds = creds.New()
 	m.activeRunner = nil
 	m.log = ui.NewCommandOutputLog()
+	m.steps = nil
 	m.IsOpen = true
 	return cmdCheckChanges(root)
 }
@@ -162,6 +164,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 			return m, nil, Result{Done: true, Output: m.log.String()}
 		}
 		m.phase = phaseStashPopping
+		m.appendRunningStep(stepStashPop)
 		return m, cmdStashPop(m.root), Result{}
 
 	case phaseFailed:
@@ -174,6 +177,33 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 	return m, nil, Result{}
 }
 
+func (m *Model) appendRunningStep(s components.Step) {
+	s.IsRunning = true
+	m.steps = append(m.steps, s)
+}
+
+func (m *Model) completeCurrentStep() {
+	if len(m.steps) > 0 {
+		last := len(m.steps) - 1
+		m.steps[last].IsRunning = false
+		m.steps[last].IsDone = true
+	}
+}
+
+func (m *Model) failCurrentStep() {
+	if len(m.steps) > 0 {
+		last := len(m.steps) - 1
+		m.steps[last].IsRunning = false
+		m.steps[last].HasFailed = true
+	}
+}
+
+var (
+	stepStash    = components.Step{TitleBefore: "stash", RunningTitle: "stashing...", TitleAfter: "stashed", TitleFailed: "stash failed"}
+	stepPull     = components.Step{TitleBefore: "pull", RunningTitle: "pulling...", TitleAfter: "pulled", TitleFailed: "pull failed"}
+	stepStashPop = components.Step{TitleBefore: "restore stash", RunningTitle: "restoring stash...", TitleAfter: "restored stash", TitleFailed: "stash pop failed"}
+)
+
 func (m Model) handleChangesCheck(msg changesCheckMsg) (Model, tea.Cmd, Result) {
 	if msg.err != nil {
 		m.phase = phaseFailed
@@ -183,18 +213,23 @@ func (m Model) handleChangesCheck(msg changesCheckMsg) (Model, tea.Cmd, Result) 
 	if msg.hasChanges {
 		m.stashed = true
 		m.phase = phaseStashing
+		m.appendRunningStep(stepStash)
 		return m, cmdStash(m.root), Result{}
 	}
+	m.appendRunningStep(stepPull)
 	return m, m.startPulling(), Result{}
 }
 
 func (m Model) handleStashDone(msg stashDoneMsg) (Model, tea.Cmd, Result) {
 	m.log.AppendCommand("git", []string{"stash", "push"}, msg.output)
 	if msg.err != nil {
+		m.failCurrentStep()
 		m.phase = phaseFailed
 		m.failErr = fmt.Errorf("stash failed: %w", msg.err)
 		return m, nil, Result{}
 	}
+	m.completeCurrentStep()
+	m.appendRunningStep(stepPull)
 	return m, m.startPulling(), Result{}
 }
 
@@ -202,6 +237,7 @@ func (m Model) handlePullDone(msg pullDoneMsg) (Model, tea.Cmd, Result) {
 	m.activeRunner = nil
 	m.log.AppendCommand("git", []string{"pull"}, msg.output)
 	if msg.err != nil {
+		m.failCurrentStep()
 		if m.stashed {
 			m.phase = phasePopStashConfirm
 			m.stashYes = true
@@ -211,8 +247,10 @@ func (m Model) handlePullDone(msg pullDoneMsg) (Model, tea.Cmd, Result) {
 		m.failErr = msg.err
 		return m, nil, Result{}
 	}
+	m.completeCurrentStep()
 	if m.stashed {
 		m.phase = phaseStashPopping
+		m.appendRunningStep(stepStashPop)
 		return m, cmdStashPop(m.root), Result{}
 	}
 	m.IsOpen = false
@@ -222,10 +260,12 @@ func (m Model) handlePullDone(msg pullDoneMsg) (Model, tea.Cmd, Result) {
 func (m Model) handleStashPopDone(msg stashPopDoneMsg) (Model, tea.Cmd, Result) {
 	m.log.AppendCommand("git", []string{"stash", "pop"}, msg.output)
 	if msg.err != nil {
+		m.failCurrentStep()
 		m.phase = phaseFailed
 		m.failErr = fmt.Errorf("stash pop failed: %w", msg.err)
 		return m, nil, Result{}
 	}
+	m.completeCurrentStep()
 	m.IsOpen = false
 	return m, nil, Result{Done: true, Output: m.log.String()}
 }
@@ -288,8 +328,13 @@ func (m Model) View(width int) string {
 		return m.creds.View(w)
 	}
 
+	stepsStr := ""
+	if len(m.steps) > 0 {
+		stepsStr = components.RenderSteps(m.steps, m.spinner.View())
+	}
+
 	switch m.phase {
-	case phaseChecking, phaseStashing, phasePulling, phaseStashPopping:
+	case phaseChecking:
 		body := m.spinner.View() + " Pulling…"
 		return ui.RenderModalFrame(ui.ModalFrameOptions{
 			Title:       "Pull",
@@ -300,15 +345,34 @@ func (m Model) View(width int) string {
 			HintColor:   ui.ColorSubtle,
 		})
 
+	case phaseStashing, phasePulling, phaseStashPopping:
+		return ui.RenderModalFrame(ui.ModalFrameOptions{
+			Title:       "Pull",
+			Body:        stepsStr,
+			Width:       w,
+			BorderColor: ui.ColorYellow,
+			TitleColor:  ui.ColorYellow,
+			HintColor:   ui.ColorSubtle,
+		})
+
 	case phasePopStashConfirm:
-		return components.RenderConfirmModal(
-			"Pull failed. Pop the stash?",
-			m.stashYes,
-			ui.ColorYellow, ui.ColorGreen, ui.ColorRed, ui.ColorSubtle, w,
-		)
+		body := stepsStr + "\n\n" + "Pull failed. Pop the stash?" + "\n\n" + components.RenderConfirmChoices(m.stashYes, false)
+		return ui.RenderModalFrame(ui.ModalFrameOptions{
+			Title:       "Pull",
+			Body:        body,
+			Hint:        components.ConfirmHint,
+			Width:       w,
+			BorderColor: ui.ColorYellow,
+			TitleColor:  ui.ColorYellow,
+			HintColor:   ui.ColorSubtle,
+		})
 
 	case phaseFailed:
-		body := ui.StyleWarning.Render(m.failErr.Error()) + "\n\n" + ui.StyleMuted.Render("press esc to dismiss")
+		body := stepsStr
+		if body != "" {
+			body += "\n\n"
+		}
+		body += ui.StyleWarning.Render(m.failErr.Error()) + "\n\n" + ui.StyleMuted.Render("press esc to dismiss")
 		return ui.RenderModalFrame(ui.ModalFrameOptions{
 			Title:       "Pull Failed",
 			Body:        body,
