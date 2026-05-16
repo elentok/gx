@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.15.0 - 2026-05-16
+
+- Add `B` keybinding in `gx status` and `gx log` to bump the version — shows a picker (patch/minor/major), creates an annotated tag, then optionally triggers the push flow
+- Add `R` keybinding in `gx log` for refresh (previously only available via `m r` chord); remove the `m r` alias
+- Add refresh notifications: synchronous views (status, commit) show "refreshed"; background views (worktrees, log) show a spinner while loading then "refreshed" on completion
+- Change `ya` keybinding title and output format to "yank for AI agent" — wraps the diff in a `\`\`\`diff` code block matching the `cm` comment format
+- Notification system: migrate all views to a shared `ui/notify` overlay model with Info/Success/Warning/Error/Progress kinds
+
 ## v0.14.6
 
 - Add `p`/`P` keybindings in `gx log` to pull and push the current branch (same flow as `gx status`, including credential prompting, stash/pop for dirty worktrees, and divergence handling)

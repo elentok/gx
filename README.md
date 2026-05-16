@@ -21,7 +21,7 @@ and [go-migration-plan.md](/docs/go-migration-plan.md)).
 - Rebase the selected worktree on main (`b`), with optional stash-and-restore for dirty worktrees
 - `gx wt clone` clones using the `.bare` directory trick for a clean layout
 - `gx wt list` and `gx wt abs-path` for scripting and shell integration
-- `gx log` for commit history: amend (`A`), reword (`cr` opens `$EDITOR`), pull (`p`), and push (`P`) directly from the log; flashes and re-focuses the entry after amend or reword
+- `gx log` for commit history: amend (`A`), reword (`cr` opens `$EDITOR`), bump version (`B`), pull (`p`), and push (`P`) directly from the log; flashes and re-focuses the entry after amend or reword
 - `gx show` for single-commit inspection
 - `gx status` interactive status UI with file/hunk/line stage + unstage flows
 - `gx` opens status by default, while `gx worktrees` / `gx wt` open the worktree UI
@@ -99,7 +99,7 @@ Status UI highlights:
 - Stage or unstage at file, hunk, or line level
 - Visual line-range mode (`v`) to stage/unstage selected blocks with `space`
 - Discard changes with confirmation (`d`) in status and diff views
-- Yank content/location/all/filename with `yy` / `yl` / `ya` / `yf`
+- Yank content/location/filename with `yy` / `yl` / `yf`; yank for AI agent with `ya` (wraps diff in a ` ```diff ` block with file/line context)
 - Status header shows branch sync at a glance (`✓`, `↑N`, `↓N`, `↑N ↓N`)
 - Live search in status/diff with highlights and `n` / `N` navigation
 - Vim-like navigation (`j`/`k`, `G`, `ctrl+u`/`ctrl+d` co-scroll) across status, log, and commit views
@@ -111,7 +111,7 @@ Status UI highlights:
 - Jump to the top with `g`
 - Open lazygit log with `ol`
 - View the last command output with `oo`
-- Pull/push/rebase/amend actions directly in status (`p`/`P`/`b`/`A`) with confirmations; push confirms first, then checks divergence if needed
+- Pull/push/rebase/amend/bump actions directly in status (`p`/`P`/`b`/`A`/`B`) with confirmations; push confirms first, then checks divergence if needed
 - Push divergence flow uses a menu (`j`/`k` + `enter`) with relative commit times
 - Push in status detects GitHub PR URLs and asks whether to open them
 - Keyboard help overlay (`?`) and full git-error overlay
