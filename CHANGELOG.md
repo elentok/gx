@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.15.1 - 2026-05-16
+
+- Fix bump push flow not pushing the tag — the push modal now runs `git push <remote> <tag>` as an additional step after a successful branch push
+
 ## v0.15.0 - 2026-05-16
 
 - Add `B` keybinding in `gx status` and `gx log` to bump the version — shows a picker (patch/minor/major), creates an annotated tag, then optionally triggers the push flow
