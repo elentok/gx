@@ -657,8 +657,8 @@ func TestHeaderViewportMaxRowsAndScrollMarkers(t *testing.T) {
 	m.height = 24
 
 	bodyH, _ := m.layoutHeights()
-	if got := bodyH - 2; got != 6 {
-		t.Fatalf("expected header viewport rows capped at 6, got %d", got)
+	if got := bodyH - 2; got != 9 {
+		t.Fatalf("expected header viewport rows capped at 9 (50%% of height=24), got %d", got)
 	}
 	view := ansi.Strip(m.View().Content)
 	if !strings.Contains(view, "↓") && !strings.Contains(view, "") {

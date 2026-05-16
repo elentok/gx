@@ -563,7 +563,7 @@ func TestStageE2E_PushActionWithConfirm(t *testing.T) {
 	waitForStageText(t, tm, "Filetree", stageLoadWait)
 
 	tm.Send(keyRune('P'))
-	waitForStageText(t, tm, "Push branch feature/push to origin?", stageActionWait)
+	waitForStageStrippedText(t, tm, "Push branch feature/push to origin?", stageActionWait)
 	tm.Send(keyRune('y'))
 
 	waitForGitState(t, tm, stageLoadWait, func() bool {

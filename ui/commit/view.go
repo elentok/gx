@@ -192,7 +192,8 @@ func (m Model) layoutHeights() (bodyH, contentH int) {
 }
 
 func (m Model) headerViewportRowsCount() int {
-	return max(1, len(m.headerLines()))
+	bodyH, _ := m.layoutHeights()
+	return max(1, bodyH-2)
 }
 
 func (m Model) visibleHeaderLines(viewportRows int) []string {
