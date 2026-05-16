@@ -7,15 +7,22 @@ import (
 	"github.com/elentok/gx/ui/notify"
 )
 
-func (m *Model) commentLocationAndBody() (string, []string, string, bool) {
+type commentLocation struct {
+	loc    string
+	body   []string
+	errMsg string
+	ok     bool
+}
+
+func (m *Model) commentLocationAndBody() commentLocation {
 	loc, body, yankErr := m.diffModel.FocusedLocationAndBody()
 	if yankErr == "" {
-		return loc, body, "", true
+		return commentLocation{loc: loc, body: body, ok: true}
 	}
 	if len(m.diffModel.Data().RawLines) > 0 {
-		return "", m.diffModel.Data().RawLines, "", true
+		return commentLocation{body: m.diffModel.Data().RawLines, ok: true}
 	}
-	return "", nil, string(yankErr), false
+	return commentLocation{errMsg: string(yankErr)}
 }
 
 func (m *Model) cmdCreateCommentFromDiff() tea.Cmd {
@@ -23,11 +30,11 @@ func (m *Model) cmdCreateCommentFromDiff() tea.Cmd {
 	if !ok {
 		return notify.Warning("no file context for comment")
 	}
-	loc, body, errMsg, ok := m.commentLocationAndBody()
-	if !ok {
-		return notify.Warning(errMsg)
+	cl := m.commentLocationAndBody()
+	if !cl.ok {
+		return notify.Warning(cl.errMsg)
 	}
-	cmd, msg := comments.CmdOpenEditor(path, loc, body, m.worktreeRoot, ui.DetectTerminal(), func(err error, splitApp string) tea.Msg {
+	cmd, msg := comments.CmdOpenEditor(path, cl.loc, cl.body, m.worktreeRoot, ui.DetectTerminal(), func(err error, splitApp string) tea.Msg {
 		return editCommentFinishedMsg{err: err, splitApp: splitApp}
 	})
 	return tea.Batch(notify.Info(msg), cmd)
