@@ -596,6 +596,9 @@ func TestStageE2E_PullActionUpdatesWorktree(t *testing.T) {
 		log := gitOutput(t, repoDir, "log", "--oneline", "-1")
 		return strings.Contains(log, "remote update")
 	})
+	// wait for the TUI to process the completion and close the pull modal;
+	// without this, 'q' is routed to the pull modal handler instead of quit
+	waitForStageText(t, tm, "Filetree", stageLoadWait)
 
 	quitStage(t, tm)
 }
