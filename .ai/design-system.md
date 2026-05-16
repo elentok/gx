@@ -22,6 +22,8 @@ The design system is centered in `ui/`:
 - feedback and hint helpers: `ui/feedback.go`, `ui/keyhints.go`
 - shared frames and overlays: `ui/frame.go`, `ui/overlay.go`
 - shared interaction components: `ui/components/`
+- **notifications**: `ui/notify/notify.go` — emit `notify.Info/Success/Warning/Error/Progress()` as
+  tea.Cmd; handled and rendered by `app.Model` as a top-right overlay
 
 Screen packages should compose these:
 
@@ -41,14 +43,17 @@ Screen packages should compose these:
 
 - Use `ui.RenderModalFrame(...)` and `ui.RenderPanelFrame(...)`
 - Use `ui.OverlayCenter(...)` for centered modal overlays
-- Use `ui.OverlayBottomCenter(bg, fg, screenW, y)` + `ui.RenderModalFrame(TitleInBorder: true)` for text-input overlays (horizontally centered, y from `settings.InputModalBottom.ResolveY`)
-- Do not hand-roll borders, padding, or hint rows in screen packages unless there is a strong screen-specific reason
+- Use `ui.OverlayBottomCenter(bg, fg, screenW, y)` + `ui.RenderModalFrame(TitleInBorder: true)` for
+  text-input overlays (horizontally centered, y from `settings.InputModalBottom.ResolveY`)
+- Do not hand-roll borders, padding, or hint rows in screen packages unless there is a strong
+  screen-specific reason
 
 3. Reuse shared components for common interaction patterns
 
 - confirm: `ui/components/modal_confirm.go`
 - menu: `ui/components/modal_menu.go`
-- input: `ui/components/modal_input.go` — for prompt-style inputs; for single-line text entry use `RenderModalFrame` with `TitleInBorder: true` and `OverlayBottomCenter`
+- input: `ui/components/modal_input.go` — for prompt-style inputs; for single-line text entry use
+  `RenderModalFrame` with `TitleInBorder: true` and `OverlayBottomCenter`
 - output/log modal: `ui/components/modal_output.go`
 - checklist: `ui/components/checklist.go`
 
@@ -57,13 +62,20 @@ Screen packages should compose these:
 - Start from `ui.Icons(useNerdFont)`
 - Add new icon roles there if needed
 - Do not scatter raw nerd-font/private-use glyphs across screens unless there is no shared role yet
+- **Icon editing**: Never use Write/Edit tools to rewrite `ui/icons.go` entirely — nerd font PUA characters (U+E000–U+F8FF) will be silently dropped. Use a Python script to insert them by Unicode codepoint: `python3 -c "icon = chr(0xF071); ..."`
 
-5. Keep CLI and TUI conceptually aligned
+5. Use the notification system for transient feedback
+
+- Emit `notify.Info(msg)`, `notify.Success(msg)`, `notify.Warning(msg)`, `notify.Error(msg)`, `notify.Progress(label)` as `tea.Cmd` returns — never set `m.statusMsg` directly
+- `notify.NotifyMsg` is only handled by `app.Model`; screen packages that instantiate themselves (e.g., in tests via `status.New()`) will not see notifications in their rendered output
+- For E2E tests that bypass `app.Model`, verify side-effects via git state or model stability rather than notification text
+
+6. Keep CLI and TUI conceptually aligned
 
 - If CLI and TUI both expose a menu, confirm, output view, or status message, they should share wording and interaction semantics where practical
 - They do not need identical shells, but they should feel like the same product
 
-6. Keep screen-local code for domain rendering only
+7. Keep screen-local code for domain rendering only
 
 Acceptable screen-local logic:
 
@@ -78,7 +90,7 @@ Not acceptable by default:
 - one-off success/error wording for common actions
 - duplicate keybinding copy
 
-7. Extract repeated Lip Gloss styles into named variables
+8. Extract repeated Lip Gloss styles into named variables
 
 - If a style is reused or makes a render helper harder to read, extract it to a package-level variable with a semantic name
 - Prefer `activeTabStyle`, `inactiveTabStyle`, `errorTitleStyle`, etc. over rebuilding the same `lipgloss.NewStyle()` chain inline
@@ -91,10 +103,11 @@ Not acceptable by default:
 - Good: derive from `key.Binding` and `ui.RenderInlineBindings(...)`
 - Bad: hard-coded strings like `"j/k navigate · enter select · esc cancel"`
 
-### Status messages
+### Status messages (transient notifications)
 
-- Good: `ui.StatusWithHints(ui.MessageComplete("push"), keys.Logs)`
-- Bad: ad hoc concatenation like `"Pushed" + "  ·  o  view output"`
+- Good: `return m, notify.Info("pushed")` or `return m, notify.Success(ui.MessageComplete("push"))`
+- Bad: `m.statusMsg = "pushed"` — the `statusMsg` field no longer exists on screen models
+- Note: `notify.*()` commands are only rendered when routed through `app.Model`. Screen-level E2E tests (`status.New()`, `worktrees.New()`) will not display them.
 
 ### Modals
 
@@ -121,6 +134,7 @@ Not acceptable by default:
 When adding a new reusable UI idea:
 
 1. Decide whether it belongs in:
+
 - `ui/styles.go` / `ui/icons.go`
 - `ui/feedback.go` / `ui/keyhints.go`
 - `ui/frame.go` / `ui/overlay.go`

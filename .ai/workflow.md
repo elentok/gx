@@ -9,10 +9,21 @@
 
 ## Subagents
 
-- Use subagents liberally to keep main contect window clean
+- Use subagents liberally to keep main context window clean
 - Offload research, exploration, and parallel analysis to subagents
 - For complex problems, throw more compute at it via subagents
 - One task per subagent for focused execution
+
+### Subagent worktree integration
+
+After a subagent completes work in an isolated worktree (`worktree-agent-*` branch):
+
+1. **Check uncommitted state first**: `git --git-dir=.bare --work-tree=<worktree-path> status --short`
+   - If the branch has zero new commits vs main, the work is uncommitted in the working tree (normal)
+2. **Verify in the worktree**: `go build ./... && go test ./...` from the worktree path
+3. **Find changed files**: `diff -rq <main-pkg-path> <worktree-pkg-path>`
+4. **Copy to main**: `cp <worktree-pkg-path>/*.go <main-pkg-path>/`
+5. **Verify in main**: build + test again before staging
 
 ## Self-improvement loop
 
@@ -27,6 +38,7 @@
 - Diff behavior between main and your changes when relevant
 - Ask yourself: "Would a staff engineer approve this?"
 - Run tests, check logs, demonstrate correctness
+- **Before debugging build failures**: run `git diff --stat` first to confirm each file actually has the intended changes. Prior sessions (especially after context compaction) may describe changes that were never applied.
 
 ## Demand elegance (Balanced)
 
