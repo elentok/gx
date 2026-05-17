@@ -31,10 +31,10 @@ var commitDiffMarkerActiveStyle = lipgloss.NewStyle().Foreground(ui.ColorOrange)
 
 func (m Model) View() tea.View {
 	if !m.ready {
-		return tea.NewView("\n  Loading commit…")
+		return ui.NewMainView("\n  Loading commit…")
 	}
 	if m.err != nil {
-		return tea.NewView("\n  Error: " + m.err.Error())
+		return ui.NewMainView("\n  Error: " + m.err.Error())
 	}
 
 	bodyH, contentH := m.layoutHeights()
@@ -74,10 +74,7 @@ func (m Model) View() tea.View {
 	if m.help.IsOpen {
 		out = ui.OverlayCenter(out, m.help.View(), m.width, m.height)
 	}
-	v := tea.NewView(out)
-	v.AltScreen = true
-	v.MouseMode = tea.MouseModeCellMotion
-	return v
+	return ui.NewMainView(out)
 }
 
 func (m Model) headerLines() []string {

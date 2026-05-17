@@ -60,9 +60,7 @@ func (m Model) View() tea.View {
 		}
 	}
 
-	v := tea.NewView(content)
-	v.AltScreen = true
-	return v
+	return ui.NewMainView(content)
 }
 
 func (m Model) searchOverlayWidth() int {

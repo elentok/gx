@@ -12,15 +12,11 @@ import (
 
 func (m Model) View() tea.View {
 	if !m.ready {
-		v := tea.NewView("\n  Loading status UI…")
-		v.AltScreen = true
-		return v
+		return ui.NewMainView("\n  Loading status UI…")
 	}
 
 	if m.err != nil {
-		v := tea.NewView("\n  Error: " + m.err.Error())
-		v.AltScreen = true
-		return v
+		return ui.NewMainView("\n  Error: " + m.err.Error())
 	}
 
 	mainH := m.mainContentHeight()
@@ -80,11 +76,7 @@ func (m Model) View() tea.View {
 		bindings := ui.ChordBindingsFromHints(chordHints)
 		out = ui.OverlayBottomRight(out, ui.RenderChordOverlay(prefix, bindings), m.width, m.height)
 	}
-	v := tea.NewView(out)
-	v.AltScreen = true
-	v.ReportFocus = true
-	v.MouseMode = tea.MouseModeCellMotion
-	return v
+	return ui.NewMainView(out)
 }
 
 func (m *Model) showGitError(err error) {

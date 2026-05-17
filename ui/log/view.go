@@ -29,10 +29,10 @@ var (
 
 func (m Model) View() tea.View {
 	if !m.ready {
-		return tea.NewView("\n  Loading log…")
+		return ui.NewMainView("\n  Loading log…")
 	}
 	if m.err != nil {
-		return tea.NewView("\n  Error: " + m.err.Error())
+		return ui.NewMainView("\n  Error: " + m.err.Error())
 	}
 
 	body := ui.RenderPanelFrame(ui.PanelFrameOptions{
@@ -81,10 +81,7 @@ func (m Model) View() tea.View {
 	if m.help.IsOpen {
 		out = ui.OverlayCenter(out, m.help.View(), m.width, m.height)
 	}
-	v := tea.NewView(out)
-	v.AltScreen = true
-	v.MouseMode = tea.MouseModeCellMotion
-	return v
+	return ui.NewMainView(out)
 }
 
 func (m Model) visibleLines() []string {
