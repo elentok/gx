@@ -248,9 +248,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 			m.appendRunningStep(stepRebase)
 			return m, m.startRunner(phaseRebasing, "rebase", upstream), Result{}
 		case "force":
-			m.phase = phaseForceConfirm
-			m.forceYes = true
-			return m, nil, Result{}
+			m.appendRunningStep(stepForcePush)
+			return m, m.startRunner(phaseForcePushing, "push", "--force", m.remote, m.branch), Result{}
 		default:
 			m.IsOpen = false
 			return m, nil, Result{Done: true, Output: m.log.String()}
