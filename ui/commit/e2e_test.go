@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/testutil"
 	teatest "github.com/elentok/gx/testutil/teatestv2"
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/commit"
 )
 
@@ -22,7 +23,7 @@ const (
 
 func startCommitTUI(t *testing.T, repoDir, ref string) *teatest.TestModel {
 	t.Helper()
-	m := commit.NewWithSettings(repoDir, ref, commit.Settings{})
+	m := commit.NewWithSettings(repoDir, ref, ui.Settings{})
 	return teatest.NewTestModel(t, m, teatest.WithInitialTermSize(commitE2ETermWidth, commitE2ETermHeight))
 }
 

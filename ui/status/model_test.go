@@ -8,6 +8,7 @@ import (
 	"testing"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/ui"
 	notifypkg "github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/diffview/diffrender"
@@ -560,11 +561,10 @@ func TestNewWithInitialPathSelectsFileAndKeepsFiletreeFocus(t *testing.T) {
 	testutil.WriteFile(t, repo, "dir/a.txt", "one\n")
 	testutil.WriteFile(t, repo, "dir/b.txt", "two\n")
 
-	m := NewModel(repo, Settings{
+	m := NewModel(repo, ui.Settings{
 		DiffContextLines: 1,
 		UseNerdFontIcons: true,
-		InitialPath:      "dir/b.txt",
-	})
+	}, "dir/b.txt")
 
 	entry, ok := m.selectedFiletreeEntry()
 	if !ok {
@@ -584,7 +584,7 @@ func TestNewWithInitialPathSelectsFileAndKeepsFiletreeFocus(t *testing.T) {
 func TestBranchSummaryTitleShowsBaseOnlyWhenNonDefault(t *testing.T) {
 	t.Parallel()
 	m := Model{
-		settings: Settings{UseNerdFontIcons: true},
+		settings: ui.Settings{UseNerdFontIcons: true},
 		statusData: statusData{
 			branchName:    "feature/x",
 			branchBaseRef: "origin/release",
@@ -744,7 +744,7 @@ func TestAdjustDiffContextLinesInDiffFocus(t *testing.T) {
 	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
 	testutil.WriteFile(t, repo, "ctx.txt", "zero\none\ntwo\nTHREE\n")
 
-	m := NewModel(repo, Settings{DiffContextLines: 1, UseNerdFontIcons: true})
+	m := NewModel(repo, ui.Settings{DiffContextLines: 1, UseNerdFontIcons: true}, "")
 	m.ready = true
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -904,7 +904,7 @@ func TestAdjustDiffContextLinesIsSessionOnly(t *testing.T) {
 	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
 	testutil.WriteFile(t, repo, "ctx-status.txt", "ONE\ntwo\n")
 
-	m := NewModel(repo, Settings{DiffContextLines: 3, UseNerdFontIcons: true})
+	m := NewModel(repo, ui.Settings{DiffContextLines: 3, UseNerdFontIcons: true}, "")
 	m.ready = true
 	m.focus = focusFiletree
 
@@ -1551,7 +1551,7 @@ func TestHunkOverflowViewportMarkers(t *testing.T) {
 
 	assertMarkers := func(useNerd bool, up, down string) {
 		t.Helper()
-		m := NewModel(repo, Settings{DiffContextLines: 1, UseNerdFontIcons: useNerd})
+		m := NewModel(repo, ui.Settings{DiffContextLines: 1, UseNerdFontIcons: useNerd}, "")
 		m.ready = true
 		m.width = 100
 		m.height = 16
@@ -2270,7 +2270,7 @@ func TestGLNavigatesToLogWhenNavigationEnabled(t *testing.T) {
 	t.Parallel()
 	repo := testutil.TempRepo(t)
 
-	m := NewModel(repo, Settings{EnableNavigation: true})
+	m := NewModel(repo, ui.Settings{EnableNavigation: true}, "")
 	m.ready = true
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
@@ -2298,7 +2298,7 @@ func TestNavigationStartupDefersInitialDiffLoad(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "dirty.txt", "dirty\n")
 
-	m := NewModel(repo, Settings{EnableNavigation: true})
+	m := NewModel(repo, ui.Settings{EnableNavigation: true}, "")
 	if m.activeFilePath != "" {
 		t.Fatalf("expected initial navigation startup to skip diff load, got %q", m.activeFilePath)
 	}

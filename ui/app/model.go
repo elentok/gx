@@ -18,10 +18,7 @@ import (
 type Settings struct {
 	InitialRoute       nav.Route
 	ActiveWorktreePath string
-	Commit             commitui.Settings
-	Log                logui.Settings
-	Worktrees          worktrees.Settings
-	Status             statusui.Settings
+	ui.Settings
 }
 
 type pageState struct {
@@ -59,7 +56,7 @@ func New(repo git.Repo, settings Settings) Model {
 		settings:  settings,
 		tabs:      make(map[nav.RouteKind]tabPageState),
 		histories: make(map[nav.RouteKind][]pageState),
-		notify:    notify.New(settings.Status.UseNerdFontIcons),
+		notify:    notify.New(settings.UseNerdFontIcons),
 	}
 	if m.settings.InitialRoute.Kind == "" {
 		m.settings.InitialRoute = nav.Route{Kind: nav.RouteWorktrees}
@@ -217,39 +214,30 @@ func normalizeFrameContent(content string, targetWidth, targetHeight int) string
 }
 
 func (m Model) newPage(route nav.Route) pageState {
+	s := m.settings.Settings
+	s.EnableNavigation = true
 	switch route.Kind {
 	case nav.RouteStatus:
-		settings := m.settings.Status
-		settings.EnableNavigation = true
-		if strings.TrimSpace(route.InitialPath) != "" {
-			settings.InitialPath = route.InitialPath
-		}
 		return pageState{
 			route: route,
-			model: statusui.NewModel(route.WorktreeRoot, settings),
+			model: statusui.NewModel(route.WorktreeRoot, s, route.InitialPath),
 		}
 	case nav.RouteLog:
-		settings := m.settings.Log
-		settings.EnableNavigation = true
 		return pageState{
 			route: route,
-			model: logui.NewModel(route.WorktreeRoot, route.Ref, settings),
+			model: logui.NewModel(route.WorktreeRoot, route.Ref, s),
 		}
 	case nav.RouteCommit:
-		settings := m.settings.Commit
-		settings.EnableNavigation = true
 		return pageState{
 			route: route,
-			model: commitui.NewWithSettings(route.WorktreeRoot, route.Ref, settings),
+			model: commitui.NewWithSettings(route.WorktreeRoot, route.Ref, s),
 		}
 	case nav.RouteWorktrees:
 		fallthrough
 	default:
-		settings := m.settings.Worktrees
-		settings.EnableNavigation = true
 		return pageState{
 			route: nav.Route{Kind: nav.RouteWorktrees},
-			model: worktrees.NewWithSettings(m.repo, m.settings.ActiveWorktreePath, settings),
+			model: worktrees.NewWithSettings(m.repo, m.settings.ActiveWorktreePath, s),
 		}
 	}
 }

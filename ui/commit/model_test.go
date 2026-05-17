@@ -383,7 +383,7 @@ func TestFilesPaneShowsNerdFontIcons(t *testing.T) {
 	testutil.WriteFile(t, repo, "dir/file.txt", "two\n")
 	testutil.CommitAll(t, repo, "change")
 
-	m := NewWithSettings(repo, "HEAD", Settings{UseNerdFontIcons: true})
+	m := NewWithSettings(repo, "HEAD", ui.Settings{UseNerdFontIcons: true})
 	m.ready = true
 	m.width = 100
 	m.height = 24

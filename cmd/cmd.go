@@ -13,13 +13,9 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/app"
-	commitui "github.com/elentok/gx/ui/commit"
 	"github.com/elentok/gx/ui/confirm"
-	logui "github.com/elentok/gx/ui/log"
 	"github.com/elentok/gx/ui/menu"
 	"github.com/elentok/gx/ui/nav"
-	statusui "github.com/elentok/gx/ui/status"
-	"github.com/elentok/gx/ui/worktrees"
 
 	tea "charm.land/bubbletea/v2"
 	humanize "github.com/dustin/go-humanize"
@@ -201,31 +197,10 @@ func runWorktrees(_ string) error {
 	if err != nil {
 		return err
 	}
-	settings := worktrees.Settings{
-		UseNerdFontIcons: cfg.UseNerdFontIcons,
-		InputModalBottom: cfg.InputModalBottom,
-		NameAliases:      cfg.NameAliases,
-		Terminal:         ui.DetectTerminal(),
-	}
 	m := app.New(*repo, app.Settings{
 		InitialRoute:       nav.Route{Kind: nav.RouteWorktrees},
 		ActiveWorktreePath: activeWorktreePath,
-		Log: logui.Settings{
-			UseNerdFontIcons: cfg.UseNerdFontIcons,
-			InputModalBottom: cfg.InputModalBottom,
-			EnableNavigation: true,
-		},
-		Worktrees: settings,
-		Status: statusui.Settings{
-			DiffContextLines: cfg.StageDiffContextLines,
-			UseNerdFontIcons: cfg.UseNerdFontIcons,
-			Terminal:         ui.DetectTerminal(),
-			InputModalBottom: cfg.InputModalBottom,
-		},
-		Commit: commitui.Settings{
-			UseNerdFontIcons: cfg.UseNerdFontIcons,
-			InputModalBottom: cfg.InputModalBottom,
-		},
+		Settings: settingsFromConfig(cfg),
 	})
 	p := tea.NewProgram(m)
 	_, err = p.Run()
@@ -269,28 +244,7 @@ func runStatus(target string) error {
 	m := app.New(*repo, app.Settings{
 		InitialRoute:       nav.Route{Kind: nav.RouteStatus, WorktreeRoot: root, InitialPath: initialPath},
 		ActiveWorktreePath: root,
-		Log: logui.Settings{
-			UseNerdFontIcons: cfg.UseNerdFontIcons,
-			InputModalBottom: cfg.InputModalBottom,
-			EnableNavigation: true,
-		},
-		Worktrees: worktrees.Settings{
-			UseNerdFontIcons: cfg.UseNerdFontIcons,
-			InputModalBottom: cfg.InputModalBottom,
-			NameAliases:      cfg.NameAliases,
-			Terminal:         ui.DetectTerminal(),
-		},
-		Status: statusui.Settings{
-			DiffContextLines: cfg.StageDiffContextLines,
-			UseNerdFontIcons: cfg.UseNerdFontIcons,
-			InitialPath:      initialPath,
-			Terminal:         ui.DetectTerminal(),
-			InputModalBottom: cfg.InputModalBottom,
-		},
-		Commit: commitui.Settings{
-			UseNerdFontIcons: cfg.UseNerdFontIcons,
-			InputModalBottom: cfg.InputModalBottom,
-		},
+		Settings: settingsFromConfig(cfg),
 	})
 	p := tea.NewProgram(m)
 	_, err = p.Run()
@@ -327,30 +281,7 @@ func runLog(ref string) error {
 	m := app.New(*repo, app.Settings{
 		InitialRoute:       nav.Route{Kind: nav.RouteLog, WorktreeRoot: root, Ref: ref},
 		ActiveWorktreePath: root,
-		Commit: commitui.Settings{
-			UseNerdFontIcons: cfg.UseNerdFontIcons,
-			InputModalBottom: cfg.InputModalBottom,
-			EnableNavigation: true,
-		},
-		Log: logui.Settings{
-			UseNerdFontIcons: cfg.UseNerdFontIcons,
-			InputModalBottom: cfg.InputModalBottom,
-			EnableNavigation: true,
-		},
-		Worktrees: worktrees.Settings{
-			UseNerdFontIcons: cfg.UseNerdFontIcons,
-			InputModalBottom: cfg.InputModalBottom,
-			NameAliases:      cfg.NameAliases,
-			Terminal:         ui.DetectTerminal(),
-			EnableNavigation: true,
-		},
-		Status: statusui.Settings{
-			DiffContextLines: cfg.StageDiffContextLines,
-			UseNerdFontIcons: cfg.UseNerdFontIcons,
-			Terminal:         ui.DetectTerminal(),
-			InputModalBottom: cfg.InputModalBottom,
-			EnableNavigation: true,
-		},
+		Settings: settingsFromConfig(cfg),
 	})
 	p := tea.NewProgram(m)
 	_, err = p.Run()
@@ -387,34 +318,22 @@ func runShow(ref string) error {
 	m := app.New(*repo, app.Settings{
 		InitialRoute:       nav.Route{Kind: nav.RouteCommit, WorktreeRoot: root, Ref: ref},
 		ActiveWorktreePath: root,
-		Commit: commitui.Settings{
-			UseNerdFontIcons: cfg.UseNerdFontIcons,
-			InputModalBottom: cfg.InputModalBottom,
-			EnableNavigation: true,
-		},
-		Log: logui.Settings{
-			UseNerdFontIcons: cfg.UseNerdFontIcons,
-			InputModalBottom: cfg.InputModalBottom,
-			EnableNavigation: true,
-		},
-		Worktrees: worktrees.Settings{
-			UseNerdFontIcons: cfg.UseNerdFontIcons,
-			InputModalBottom: cfg.InputModalBottom,
-			NameAliases:      cfg.NameAliases,
-			Terminal:         ui.DetectTerminal(),
-			EnableNavigation: true,
-		},
-		Status: statusui.Settings{
-			DiffContextLines: cfg.StageDiffContextLines,
-			UseNerdFontIcons: cfg.UseNerdFontIcons,
-			Terminal:         ui.DetectTerminal(),
-			InputModalBottom: cfg.InputModalBottom,
-			EnableNavigation: true,
-		},
+		Settings: settingsFromConfig(cfg),
 	})
 	p := tea.NewProgram(m)
 	_, err = p.Run()
 	return err
+}
+
+func settingsFromConfig(cfg config.Config) ui.Settings {
+	return ui.Settings{
+		UseNerdFontIcons: cfg.UseNerdFontIcons,
+		InputModalBottom: cfg.InputModalBottom,
+		Terminal:         ui.DetectTerminal(),
+		EnableNavigation: true,
+		DiffContextLines: cfg.StageDiffContextLines,
+		NameAliases:      cfg.NameAliases,
+	}
 }
 
 func resolveStatusTargetPath(worktreeRoot, cwd, target string) (string, error) {

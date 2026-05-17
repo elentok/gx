@@ -5,8 +5,8 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/amend"
 	"github.com/elentok/gx/ui/bump"
 	"github.com/elentok/gx/ui/help"
@@ -36,15 +36,9 @@ type row struct {
 	class  git.BranchHistoryClass
 }
 
-type Settings struct {
-	UseNerdFontIcons bool
-	InputModalBottom config.InputModalBottom
-	EnableNavigation bool
-}
-
 type Model struct {
 	worktreeRoot string
-	settings     Settings
+	settings     ui.Settings
 	startRef     string
 
 	width  int
@@ -82,7 +76,7 @@ type Model struct {
 	refreshing bool
 }
 
-func NewModel(worktreeRoot, startRef string, settings Settings) Model {
+func NewModel(worktreeRoot, startRef string, settings ui.Settings) Model {
 	m := Model{
 		worktreeRoot: worktreeRoot,
 		settings:     settings,

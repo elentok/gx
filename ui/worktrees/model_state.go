@@ -1,7 +1,6 @@
 package worktrees
 
 import (
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
@@ -50,20 +49,11 @@ type dirtyState struct {
 	hasUntracked bool
 }
 
-// Settings controls optional rendering behavior for the worktrees UI.
-type Settings struct {
-	UseNerdFontIcons bool
-	InputModalBottom config.InputModalBottom
-	NameAliases      map[string]string
-	Terminal         ui.Terminal
-	EnableNavigation bool
-}
-
 // Model is the BubbleTea model for the worktrees page.
 type Model struct {
 	repo               git.Repo
 	activeWorktreePath string // path of the worktree the user launched from
-	settings           Settings
+	settings           ui.Settings
 
 	worktrees  []git.Worktree
 	statuses   map[string]git.SyncStatus
@@ -134,11 +124,11 @@ type Model struct {
 // New creates a new worktrees page model. activeWorktreePath is the path of the
 // worktree the user is currently in (empty if launched from the bare repo root).
 func New(repo git.Repo, activeWorktreePath string) Model {
-	return NewWithSettings(repo, activeWorktreePath, Settings{})
+	return NewWithSettings(repo, activeWorktreePath, ui.Settings{})
 }
 
 // NewWithSettings creates a new worktrees page model with explicit settings.
-func NewWithSettings(repo git.Repo, activeWorktreePath string, settings Settings) Model {
+func NewWithSettings(repo git.Repo, activeWorktreePath string, settings ui.Settings) Model {
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
 

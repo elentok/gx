@@ -17,7 +17,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-var settings = Settings{}
+var settings = ui.Settings{}
 
 func newTestModel() Model {
 	m := Model{
@@ -93,7 +93,7 @@ func TestGHResetsCustomRefToHead(t *testing.T) {
 	testutil.WriteFile(t, repo, "one.txt", "one\n")
 	testutil.CommitAll(t, repo, "one")
 
-	m := NewModel(repo, "HEAD~1", Settings{EnableNavigation: true})
+	m := NewModel(repo, "HEAD~1", ui.Settings{EnableNavigation: true})
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	m = updated.(Model)
 

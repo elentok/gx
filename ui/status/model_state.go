@@ -4,7 +4,6 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/filetree"
@@ -23,7 +22,7 @@ import (
 
 type Model struct {
 	worktreeRoot string
-	settings     Settings
+	settings     ui.Settings
 	initialPath  string
 
 	width  int
@@ -82,17 +81,8 @@ type statusData struct {
 	listState     list.Model
 }
 
-type Settings struct {
-	DiffContextLines int
-	UseNerdFontIcons bool
-	InitialPath      string
-	Terminal         ui.Terminal
-	InputModalBottom config.InputModalBottom
-	EnableNavigation bool
-}
-
-func DefaultSettings() Settings {
-	return Settings{DiffContextLines: 1, UseNerdFontIcons: true, Terminal: ui.TerminalPlain}
+func DefaultSettings() ui.Settings {
+	return ui.Settings{UseNerdFontIcons: true, Terminal: ui.TerminalPlain, DiffContextLines: 1}
 }
 
 type flashTickMsg struct{}
@@ -125,7 +115,7 @@ var (
 	ansiOSCRe = regexp.MustCompile(`\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)`) // OSC ... BEL/ST
 )
 
-func NewModel(worktreeRoot string, settings Settings) Model {
+func NewModel(worktreeRoot string, settings ui.Settings, initialPath string) Model {
 	if settings.DiffContextLines < 0 {
 		settings.DiffContextLines = 0
 	}
@@ -138,7 +128,7 @@ func NewModel(worktreeRoot string, settings Settings) Model {
 	m := Model{
 		worktreeRoot:     worktreeRoot,
 		settings:         settings,
-		initialPath:      settings.InitialPath,
+		initialPath:      initialPath,
 		diffContextLines: settings.DiffContextLines,
 		help:             help.NewModel(buildKeySections(statusKeys, *diffarreaModel.Keys(), *fileTreeModel.Keys())),
 		keys:             statusKeys,
@@ -161,5 +151,5 @@ func NewModel(worktreeRoot string, settings Settings) Model {
 }
 
 func New(worktreeRoot string) Model {
-	return NewModel(worktreeRoot, DefaultSettings())
+	return NewModel(worktreeRoot, DefaultSettings(), "")
 }

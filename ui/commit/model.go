@@ -3,8 +3,8 @@ package commit
 import (
 	"strings"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/keys"
@@ -17,16 +17,10 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-type Settings struct {
-	UseNerdFontIcons bool
-	InputModalBottom config.InputModalBottom
-	EnableNavigation bool
-}
-
 type Model struct {
 	worktreeRoot string
 	ref          string
-	settings     Settings
+	settings     ui.Settings
 
 	width        int
 	height       int
@@ -73,10 +67,10 @@ type commitSidebarState struct {
 }
 
 func New(worktreeRoot, ref string) Model {
-	return NewWithSettings(worktreeRoot, ref, Settings{UseNerdFontIcons: true})
+	return NewWithSettings(worktreeRoot, ref, ui.Settings{UseNerdFontIcons: true})
 }
 
-func NewWithSettings(worktreeRoot, ref string, settings Settings) Model {
+func NewWithSettings(worktreeRoot, ref string, settings ui.Settings) Model {
 	m := Model{
 		worktreeRoot: worktreeRoot,
 		ref:          normalizedRef(ref),

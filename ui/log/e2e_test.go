@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/testutil"
 	teatest "github.com/elentok/gx/testutil/teatestv2"
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/commit"
 	"github.com/elentok/gx/ui/log"
 )
@@ -23,13 +24,13 @@ const (
 
 func startLogTUI(t *testing.T, repoDir string) *teatest.TestModel {
 	t.Helper()
-	m := log.NewModel(repoDir, "", log.Settings{})
+	m := log.NewModel(repoDir, "", ui.Settings{})
 	return teatest.NewTestModel(t, m, teatest.WithInitialTermSize(logE2ETermWidth, logE2ETermHeight))
 }
 
 func startCommitViewFromLog(t *testing.T, repoDir, ref string) *teatest.TestModel {
 	t.Helper()
-	m := commit.NewWithSettings(repoDir, ref, commit.Settings{})
+	m := commit.NewWithSettings(repoDir, ref, ui.Settings{})
 	return teatest.NewTestModel(t, m, teatest.WithInitialTermSize(logE2ETermWidth, logE2ETermHeight))
 }
 

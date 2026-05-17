@@ -138,7 +138,7 @@ func TestGLNavigatesToLogWhenNavigationEnabled(t *testing.T) {
 		t.Fatalf("FindRepo: %v", err)
 	}
 
-	m := NewWithSettings(*repo, "", Settings{EnableNavigation: true})
+	m := NewWithSettings(*repo, "", ui.Settings{EnableNavigation: true})
 	m.ready = true
 	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.MainBranch}}
 	resizeTable(&m.table, 100, 10)
@@ -171,7 +171,7 @@ func TestEnterNavigatesToLogWhenNavigationEnabled(t *testing.T) {
 		t.Fatalf("FindRepo: %v", err)
 	}
 
-	m := NewWithSettings(*repo, "", Settings{EnableNavigation: true})
+	m := NewWithSettings(*repo, "", ui.Settings{EnableNavigation: true})
 	m.ready = true
 	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.MainBranch}}
 	resizeTable(&m.table, 100, 10)
@@ -198,7 +198,7 @@ func TestOEntersTerminalMenuMode(t *testing.T) {
 		t.Fatalf("FindRepo: %v", err)
 	}
 
-	m := NewWithSettings(*repo, "", Settings{Terminal: ui.TerminalTmux})
+	m := NewWithSettings(*repo, "", ui.Settings{Terminal: ui.TerminalTmux})
 	m.ready = true
 	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.MainBranch}}
 	resizeTable(&m.table, 100, 10)
