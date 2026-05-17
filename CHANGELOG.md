@@ -1,6 +1,14 @@
 # Changelog
 
-## v0.15.3 - 2026-05-16
+## v0.15.3 - 2026-05-17
+
+- Log: add `ri` keybinding to launch `git rebase -i` from the selected commit; if there are unstaged changes, a modal confirms stashing first; after the rebase completes, a second modal confirms popping the stash
+- Fix log view not reloading on focus (missing `ReportFocus = true`); as a side-effect, `FocusMsg` now works in log, enabling the stash-pop prompt after an interactive rebase in a terminal split
+- Extract `ui.NewMainView` shared helper that sets `AltScreen`, `MouseMode`, and `ReportFocus` — used by all top-level page views (log, status, commit, worktrees) to prevent flags from being missed
+- Consolidate all view-specific Settings structs into a single `ui.Settings` struct
+- Fix double force-push confirmation in `gx push`
+- `make install` now embeds the version string in the binary via `-ldflags`
+- Parallelize git and UI tests with `t.Parallel()`
 
 - Fix commit view header scrolling broken when expanded body fills the viewport
 
@@ -19,7 +27,7 @@
 - Add `B` keybinding in `gx status` and `gx log` to bump the version — shows a picker (patch/minor/major), creates an annotated tag, then optionally triggers the push flow
 - Add `R` keybinding in `gx log` for refresh (previously only available via `m r` chord); remove the `m r` alias
 - Add refresh notifications: synchronous views (status, commit) show "refreshed"; background views (worktrees, log) show a spinner while loading then "refreshed" on completion
-- Change `ya` keybinding title and output format to "yank for AI agent" — wraps the diff in a `\`\`\`diff` code block matching the `cm` comment format
+- Change `ya` keybinding title and output format to "yank for AI agent" — wraps the diff in a `\`\`\`diff`code block matching the`cm` comment format
 - Notification system: migrate all views to a shared `ui/notify` overlay model with Info/Success/Warning/Error/Progress kinds
 
 ## v0.14.6
