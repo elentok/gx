@@ -6,7 +6,7 @@ build:
 	go build -ldflags "-X github.com/elentok/gx/cmd.version=$(shell git describe --tags --always --dirty)" -o gx .
 
 install:
-	go install .
+	go install -ldflags "-X github.com/elentok/gx/cmd.version=$(shell git describe --tags --always --dirty)" .
 
 test:
 	go test ./...
