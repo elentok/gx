@@ -8,9 +8,41 @@ import (
 	"github.com/elentok/gx/testutil"
 )
 
+func evalDir(t *testing.T, dir string) string {
+	t.Helper()
+	real, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		t.Fatalf("EvalSymlinks(%s): %v", dir, err)
+	}
+	return real
+}
+
+func tempBareRepoLight(t *testing.T) string {
+	t.Helper()
+	src := testutil.TempRepo(t)
+	bare := filepath.Join(evalDir(t, t.TempDir()), "repo.git")
+	testutil.MustGitExported(t, ".", "clone", "--bare", src, bare)
+	return bare
+}
+
+func tempBareRepoWithWorktreesLight(t *testing.T, names ...string) string {
+	t.Helper()
+	repoDir := tempBareRepoLight(t)
+	for _, name := range names {
+		wtDir := filepath.Join(repoDir, name)
+		testutil.MustGitExported(t, repoDir, "worktree", "add", "-b", name, wtDir)
+		testutil.MustGitExported(t, wtDir, "config", "user.email", "test@test.com")
+		testutil.MustGitExported(t, wtDir, "config", "user.name", "Test")
+		testutil.WriteFile(t, wtDir, "file.txt", name)
+		testutil.MustGitExported(t, wtDir, "add", ".")
+		testutil.MustGitExported(t, wtDir, "commit", "-m", "add "+name)
+	}
+	return repoDir
+}
+
 func TestUncommittedChanges_clean(t *testing.T) {
 	t.Parallel()
-	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
+	repoDir := tempBareRepoWithWorktreesLight(t, "feature")
 	wtDir := filepath.Join(repoDir, "feature")
 
 	changes, err := git.UncommittedChanges(wtDir)
@@ -24,7 +56,7 @@ func TestUncommittedChanges_clean(t *testing.T) {
 
 func TestUncommittedChanges_modified(t *testing.T) {
 	t.Parallel()
-	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
+	repoDir := tempBareRepoWithWorktreesLight(t, "feature")
 	wtDir := filepath.Join(repoDir, "feature")
 
 	testutil.WriteFile(t, wtDir, "file.txt", "modified")
@@ -50,7 +82,7 @@ func TestUncommittedChanges_modified(t *testing.T) {
 
 func TestUncommittedChanges_untracked(t *testing.T) {
 	t.Parallel()
-	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
+	repoDir := tempBareRepoWithWorktreesLight(t, "feature")
 	wtDir := filepath.Join(repoDir, "feature")
 
 	testutil.WriteFile(t, wtDir, "new.txt", "untracked")
@@ -73,16 +105,16 @@ func TestUncommittedChanges_untracked(t *testing.T) {
 
 func TestWorktreeSyncStatus_aheadOfUpstream(t *testing.T) {
 	t.Parallel()
-	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
-	// Set feature to track origin/main so there is a configured upstream.
-	testutil.SetBranchUpstream(t, repoDir, "feature", "origin/main")
+	repoDir := tempBareRepoWithWorktreesLight(t, "feature")
+	// Set feature to track main so there is a configured upstream.
+	testutil.SetBranchUpstream(t, repoDir, "feature", "main")
 	repo, _ := git.FindRepo(repoDir)
 
 	status, err := git.WorktreeSyncStatus(*repo, "feature")
 	if err != nil {
 		t.Fatalf("WorktreeSyncStatus: %v", err)
 	}
-	// feature has 1 commit ahead of origin/main
+	// feature has 1 commit ahead of main
 	if status.Name != git.StatusAhead {
 		t.Errorf("Status = %q, want %q", status.Name, git.StatusAhead)
 	}
@@ -93,14 +125,14 @@ func TestWorktreeSyncStatus_aheadOfUpstream(t *testing.T) {
 
 func TestWorktreeSyncStatus_noUpstream(t *testing.T) {
 	t.Parallel()
-	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
+	repoDir := tempBareRepoWithWorktreesLight(t, "feature")
 	repo, _ := git.FindRepo(repoDir)
 
 	status, err := git.WorktreeSyncStatus(*repo, "feature")
 	if err != nil {
 		t.Fatalf("WorktreeSyncStatus: %v", err)
 	}
-	// No upstream configured → unknown
+	// No upstream configured -> unknown
 	if status.Name != git.StatusUnknown {
 		t.Errorf("Status = %q, want %q", status.Name, git.StatusUnknown)
 	}

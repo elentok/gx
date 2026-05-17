@@ -122,11 +122,11 @@ func TestDeleteWorktree_SpinnerClearsAfterDeletion(t *testing.T) {
 	waitForText(t, tm, "Delete", actionWait)
 	tm.Send(keyRune('y'))
 
-	// Verify the deletion completed: feature-a disappears from the worktrees table.
-	// Status notifications now go through notify.NotifyMsg (not the status bar),
-	// so we check the table content instead.
-	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
-		return !bytes.Contains(bts, []byte("feature-a"))
+	// Verify deletion completed and spinner cleared: feature-a must be absent
+	// from the current rendered frame (accumulated output always contains
+	// "feature-a" from the confirmation dialog, so we check the live frame).
+	teatest.WaitFor(t, tm.Output(), func(_ []byte) bool {
+		return !bytes.Contains(tm.CurrentFrame(), []byte("feature-a"))
 	}, teatest.WithDuration(loadWait))
 
 	quit(t, tm)

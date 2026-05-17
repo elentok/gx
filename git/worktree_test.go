@@ -5,12 +5,11 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/testutil"
 )
 
 func TestListWorktrees_empty(t *testing.T) {
 	t.Parallel()
-	repoDir := testutil.TempBareRepo(t)
+	repoDir := tempBareRepoLight(t)
 	repo, _ := git.FindRepo(repoDir)
 
 	wts, err := git.ListWorktrees(*repo)
@@ -25,7 +24,7 @@ func TestListWorktrees_empty(t *testing.T) {
 
 func TestListWorktrees_withWorktrees(t *testing.T) {
 	t.Parallel()
-	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a", "feature-b")
+	repoDir := tempBareRepoWithWorktreesLight(t, "feature-a", "feature-b")
 	repo, _ := git.FindRepo(repoDir)
 
 	wts, err := git.ListWorktrees(*repo)
@@ -56,7 +55,7 @@ func TestListWorktrees_withWorktrees(t *testing.T) {
 
 func TestListWorktrees_paths(t *testing.T) {
 	t.Parallel()
-	repoDir := testutil.TempBareRepoWithWorktrees(t, "my-feature")
+	repoDir := tempBareRepoWithWorktreesLight(t, "my-feature")
 	repo, _ := git.FindRepo(repoDir)
 
 	wts, err := git.ListWorktrees(*repo)
@@ -81,7 +80,7 @@ func TestListWorktrees_paths(t *testing.T) {
 
 func TestAddWorktree(t *testing.T) {
 	t.Parallel()
-	repoDir := testutil.TempBareRepo(t)
+	repoDir := tempBareRepoLight(t)
 	repo, _ := git.FindRepo(repoDir)
 
 	newPath := filepath.Join(repoDir, "feature")
@@ -106,7 +105,7 @@ func TestAddWorktree(t *testing.T) {
 
 func TestRemoveWorktree(t *testing.T) {
 	t.Parallel()
-	repoDir := testutil.TempBareRepoWithWorktrees(t, "to-delete", "keep")
+	repoDir := tempBareRepoWithWorktreesLight(t, "to-delete", "keep")
 	repo, _ := git.FindRepo(repoDir)
 
 	if err := git.RemoveWorktree(*repo, "to-delete", false); err != nil {

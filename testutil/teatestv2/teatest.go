@@ -91,13 +91,25 @@ type TestModel struct {
 	modelCh chan tea.Model
 	model   tea.Model
 
-	done   sync.Once
-	doneCh chan bool
+	done         sync.Once
+	doneCh       chan bool
+	currentFrame struct {
+		mu   sync.RWMutex
+		data []byte
+	}
+}
+
+// CurrentFrame returns the most recently rendered frame content.
+func (tm *TestModel) CurrentFrame() []byte {
+	tm.currentFrame.mu.RLock()
+	defer tm.currentFrame.mu.RUnlock()
+	return append([]byte(nil), tm.currentFrame.data...)
 }
 
 type trackingModel struct {
 	inner tea.Model
 	out   io.ReadWriter
+	tm    *TestModel
 }
 
 func (m trackingModel) Init() tea.Cmd {
@@ -106,13 +118,16 @@ func (m trackingModel) Init() tea.Cmd {
 
 func (m trackingModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.inner.Update(msg)
-	return trackingModel{inner: next, out: m.out}, cmd
+	return trackingModel{inner: next, out: m.out, tm: m.tm}, cmd
 }
 
 func (m trackingModel) View() tea.View {
 	v := m.inner.View()
 	_, _ = m.out.Write([]byte(v.Content))
 	_, _ = m.out.Write([]byte("\n"))
+	m.tm.currentFrame.mu.Lock()
+	m.tm.currentFrame.data = []byte(v.Content)
+	m.tm.currentFrame.mu.Unlock()
 	return v
 }
 
@@ -140,7 +155,7 @@ func NewTestModel(tb testing.TB, m tea.Model, options ...TestOption) *TestModel 
 		programOpts = append(programOpts, tea.WithWindowSize(opts.width, opts.height))
 	}
 
-	tm.program = tea.NewProgram(trackingModel{inner: m, out: tm.out}, programOpts...)
+	tm.program = tea.NewProgram(trackingModel{inner: m, out: tm.out, tm: tm}, programOpts...)
 
 	interruptions := make(chan os.Signal, 1)
 	signal.Notify(interruptions, syscall.SIGINT)
