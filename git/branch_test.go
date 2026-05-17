@@ -8,6 +8,7 @@ import (
 )
 
 func TestListBranches(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a", "feature-b")
 	repo, _ := git.FindRepo(repoDir)
 
@@ -31,6 +32,7 @@ func TestListBranches(t *testing.T) {
 }
 
 func TestDeleteLocalBranch(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "to-delete")
 	repo, _ := git.FindRepo(repoDir)
 
@@ -52,6 +54,7 @@ func TestDeleteLocalBranch(t *testing.T) {
 }
 
 func TestRenameBranch(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "old-name")
 	repo, _ := git.FindRepo(repoDir)
 
@@ -75,6 +78,7 @@ func TestRenameBranch(t *testing.T) {
 }
 
 func TestParseBranchLine_local(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, _ := git.FindRepo(repoDir)
 

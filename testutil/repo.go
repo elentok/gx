@@ -186,6 +186,8 @@ func configUser(t *testing.T, dir string) {
 	t.Helper()
 	mustGit(t, dir, "config", "user.email", "test@test.com")
 	mustGit(t, dir, "config", "user.name", "Test")
+	mustGit(t, dir, "config", "gc.auto", "0")
+	mustGit(t, dir, "config", "gc.autoDetach", "false")
 }
 
 // Mkdir creates a directory, failing the test if it can't.

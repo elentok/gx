@@ -62,7 +62,7 @@ func WaitFor(tb testing.TB, r io.Reader, condition func(bts []byte) bool, option
 func doWaitFor(r io.Reader, condition func(bts []byte) bool, options ...WaitForOption) error {
 	wf := WaitingForContext{
 		Duration:      time.Second,
-		CheckInterval: 50 * time.Millisecond,
+		CheckInterval: 20 * time.Millisecond,
 	}
 	for _, opt := range options {
 		opt(&wf)

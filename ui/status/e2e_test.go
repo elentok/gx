@@ -21,7 +21,7 @@ import (
 const (
 	stageTermWidth  = 120
 	stageTermHeight = 40
-	stageLoadWait   = 5 * time.Second
+	stageLoadWait   = 10 * time.Second
 	stageActionWait = 3 * time.Second
 )
 

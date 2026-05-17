@@ -132,6 +132,7 @@ func verifyAmendedNonHEADCommit(t *testing.T, repoDir, middleHashBefore string) 
 }
 
 func TestAmendE2E_NonHEAD_FromLog(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepoWithThreeCommits(t)
 	middleHashBefore := logE2EFindCommitHash(t, repoDir, "middle")
 
@@ -162,6 +163,7 @@ func TestAmendE2E_NonHEAD_FromLog(t *testing.T) {
 }
 
 func TestAmendE2E_HEAD_FromLog(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepoWithThreeCommits(t)
 	headHashBefore := logE2EGitOutput(t, repoDir, "rev-parse", "HEAD")
 

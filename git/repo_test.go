@@ -9,6 +9,7 @@ import (
 )
 
 func TestFindRepo_standardRepo(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempRepo(t)
 
 	repo, err := git.FindRepo(dir)
@@ -24,6 +25,7 @@ func TestFindRepo_standardRepo(t *testing.T) {
 }
 
 func TestFindRepo_standardRepo_subdir(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempRepo(t)
 	sub := filepath.Join(dir, "sub")
 	testutil.Mkdir(t, sub)
@@ -38,6 +40,7 @@ func TestFindRepo_standardRepo_subdir(t *testing.T) {
 }
 
 func TestFindRepo_bareRepo(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempBareRepo(t)
 
 	repo, err := git.FindRepo(dir)
@@ -53,6 +56,7 @@ func TestFindRepo_bareRepo(t *testing.T) {
 }
 
 func TestIdentifyDir_worktreeRoot(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	wtDir := filepath.Join(repoDir, "feature")
 
@@ -78,6 +82,7 @@ func TestIdentifyDir_worktreeRoot(t *testing.T) {
 }
 
 func TestIdentifyDir_bareRepoRoot(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempBareRepo(t)
 
 	info, err := git.IdentifyDir(dir)
@@ -93,6 +98,7 @@ func TestIdentifyDir_bareRepoRoot(t *testing.T) {
 }
 
 func TestFindRepo_notARepo(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	_, err := git.FindRepo(dir)
 	if err == nil {
@@ -101,6 +107,7 @@ func TestFindRepo_notARepo(t *testing.T) {
 }
 
 func TestDetectMainBranch(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempBareRepo(t)
 	repo, err := git.FindRepo(dir)
 	if err != nil {

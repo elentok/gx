@@ -113,6 +113,7 @@ func commitE2EQuit(t *testing.T, tm *teatest.TestModel) {
 }
 
 func TestAmendE2E_NonHEAD_FromCommitView(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepoWithThreeCommits(t)
 	middleHashBefore := commitE2EFindCommitHash(t, repoDir, "middle")
 
@@ -178,6 +179,7 @@ func TestAmendE2E_NonHEAD_FromCommitView(t *testing.T) {
 }
 
 func TestAmendE2E_HEAD_FromCommitView(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepoWithThreeCommits(t)
 	headHashBefore := commitE2EGitOutput(t, repoDir, "rev-parse", "HEAD")
 
@@ -237,6 +239,7 @@ func TestAmendE2E_HEAD_FromCommitView(t *testing.T) {
 }
 
 func TestAmendE2E_Conflict_FromCommitView(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepoWithConflictSetup(t)
 	middleHash := commitE2EFindCommitHash(t, repoDir, "middle")
 

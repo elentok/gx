@@ -9,6 +9,7 @@ import (
 )
 
 func TestListWorktrees_empty(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepo(t)
 	repo, _ := git.FindRepo(repoDir)
 
@@ -23,6 +24,7 @@ func TestListWorktrees_empty(t *testing.T) {
 }
 
 func TestListWorktrees_withWorktrees(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a", "feature-b")
 	repo, _ := git.FindRepo(repoDir)
 
@@ -53,6 +55,7 @@ func TestListWorktrees_withWorktrees(t *testing.T) {
 }
 
 func TestListWorktrees_paths(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "my-feature")
 	repo, _ := git.FindRepo(repoDir)
 
@@ -77,6 +80,7 @@ func TestListWorktrees_paths(t *testing.T) {
 }
 
 func TestAddWorktree(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepo(t)
 	repo, _ := git.FindRepo(repoDir)
 
@@ -101,6 +105,7 @@ func TestAddWorktree(t *testing.T) {
 }
 
 func TestRemoveWorktree(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "to-delete", "keep")
 	repo, _ := git.FindRepo(repoDir)
 

@@ -3,12 +3,14 @@ package git
 import "testing"
 
 func TestParseDecorations_Empty(t *testing.T) {
+	t.Parallel()
 	if got := parseDecorations(""); got != nil {
 		t.Fatalf("expected nil decorations, got %+v", got)
 	}
 }
 
 func TestParseDecorations_TagLocalRemoteHead(t *testing.T) {
+	t.Parallel()
 	got := parseDecorations("HEAD -> main, origin/main, tag: v1.0.0, feature/x")
 	if len(got) != 4 {
 		t.Fatalf("expected 4 decorations, got %+v", got)
@@ -28,6 +30,7 @@ func TestParseDecorations_TagLocalRemoteHead(t *testing.T) {
 }
 
 func TestParseDecorations_IgnoresWhitespace(t *testing.T) {
+	t.Parallel()
 	got := parseDecorations("  tag: v1.0.0,   origin/main  ")
 	if len(got) != 2 {
 		t.Fatalf("expected 2 decorations, got %+v", got)
@@ -38,30 +41,35 @@ func TestParseDecorations_IgnoresWhitespace(t *testing.T) {
 }
 
 func TestInitials_Empty(t *testing.T) {
+	t.Parallel()
 	if got := initials(""); got != "?" {
 		t.Fatalf("initials(\"\") = %q, want ?", got)
 	}
 }
 
 func TestInitials_SingleWord(t *testing.T) {
+	t.Parallel()
 	if got := initials("alice"); got != "AL" {
 		t.Fatalf("initials(single) = %q, want AL", got)
 	}
 }
 
 func TestInitials_SingleRune(t *testing.T) {
+	t.Parallel()
 	if got := initials("q"); got != "Q" {
 		t.Fatalf("initials(single rune) = %q, want Q", got)
 	}
 }
 
 func TestInitials_TwoWords(t *testing.T) {
+	t.Parallel()
 	if got := initials("Alice Baker"); got != "AB" {
 		t.Fatalf("initials(two words) = %q, want AB", got)
 	}
 }
 
 func TestInitials_MultiWordUsesFirstAndLast(t *testing.T) {
+	t.Parallel()
 	if got := initials("Alice Beth Carter"); got != "AC" {
 		t.Fatalf("initials(multiword) = %q, want AC", got)
 	}

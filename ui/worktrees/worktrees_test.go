@@ -18,7 +18,7 @@ import (
 const (
 	termWidth  = 120
 	termHeight = 40
-	loadWait   = 5 * time.Second
+	loadWait   = 15 * time.Second
 	actionWait = 3 * time.Second
 )
 

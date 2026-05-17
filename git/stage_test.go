@@ -8,6 +8,7 @@ import (
 )
 
 func TestListStageFiles(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 
 	testutil.WriteFile(t, repo, "README.md", "first\n")
@@ -46,6 +47,7 @@ func TestListStageFiles(t *testing.T) {
 }
 
 func TestDiffUntrackedPath(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "new.txt", "hello\n")
 
@@ -67,6 +69,7 @@ func TestDiffUntrackedPath(t *testing.T) {
 }
 
 func TestListStageFiles_UntrackedDirectoryListsFiles(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.Mkdir(t, repo+"/newdir")
 	testutil.WriteFile(t, repo, "newdir/a.txt", "a\n")
@@ -90,6 +93,7 @@ func TestListStageFiles_UntrackedDirectoryListsFiles(t *testing.T) {
 }
 
 func TestDiffPath_ContextLinesAffectHunkGrouping(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "l1\nl2\nl3\nl4\nl5\nl6\nl7\nl8\n")
 	testutil.MustGitExported(t, repo, "add", "README.md")
@@ -114,6 +118,7 @@ func TestDiffPath_ContextLinesAffectHunkGrouping(t *testing.T) {
 }
 
 func TestListStageFiles_RenameTracksSourceAndDestination(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "old.txt", "one\n")
 	testutil.MustGitExported(t, repo, "add", "old.txt")

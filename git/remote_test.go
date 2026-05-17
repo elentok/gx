@@ -5,6 +5,7 @@ import (
 )
 
 func TestExtractPRURL(t *testing.T) {
+	t.Parallel()
 	// Simulated GitHub stderr from a first-time push
 	githubOutput := `
 remote: Create a pull request for 'my-branch' on GitHub by visiting:
@@ -23,6 +24,7 @@ remote:
 }
 
 func TestExtractPRURL_StripsTerminalEscapes(t *testing.T) {
+	t.Parallel()
 	const want = "https://github.com/elentok/gx/pull/new/my-branch"
 	output := "" +
 		"remote: Create a pull request for 'my-branch' on GitHub by visiting:\n" +
@@ -34,6 +36,7 @@ func TestExtractPRURL_StripsTerminalEscapes(t *testing.T) {
 }
 
 func TestIsNonFastForwardPushError(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		err  error

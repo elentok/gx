@@ -9,6 +9,7 @@ import (
 )
 
 func TestDetectPushDivergence_NoUpstream(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	wtDir := filepath.Join(repoDir, "feature-a")
 
@@ -22,6 +23,7 @@ func TestDetectPushDivergence_NoUpstream(t *testing.T) {
 }
 
 func TestDetectPushDivergence_Diverged(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	wtDir := filepath.Join(repoDir, "feature-a")
 

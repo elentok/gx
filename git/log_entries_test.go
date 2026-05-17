@@ -8,6 +8,7 @@ import (
 )
 
 func TestLogEntries_StartsAtExactRef(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	testutil.WriteFile(t, repoDir, "one.txt", "one\n")
 	testutil.CommitAll(t, repoDir, "one")
@@ -35,6 +36,7 @@ func TestLogEntries_StartsAtExactRef(t *testing.T) {
 }
 
 func TestLogEntries_ParsesTagDecoration(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	mustGit(t, repoDir, "tag", "v1.0.0")
 

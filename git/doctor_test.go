@@ -70,6 +70,7 @@ func setupDotBareRepo(t *testing.T) (outerDir string, repo git.Repo) {
 }
 
 func TestCheckRepo_NoIssuesOnCleanDotBare(t *testing.T) {
+	t.Parallel()
 	_, repo := setupDotBareRepo(t)
 
 	issues, err := git.CheckRepo(repo)
@@ -82,6 +83,7 @@ func TestCheckRepo_NoIssuesOnCleanDotBare(t *testing.T) {
 }
 
 func TestCheckRepo_DetectsMissingOuterGitFile(t *testing.T) {
+	t.Parallel()
 	outerDir, repo := setupDotBareRepo(t)
 
 	gitFile := filepath.Join(outerDir, ".git")
@@ -99,6 +101,7 @@ func TestCheckRepo_DetectsMissingOuterGitFile(t *testing.T) {
 }
 
 func TestCheckRepo_FixesOuterGitFile(t *testing.T) {
+	t.Parallel()
 	outerDir, repo := setupDotBareRepo(t)
 
 	// Corrupt the .git file.
@@ -127,6 +130,7 @@ func TestCheckRepo_FixesOuterGitFile(t *testing.T) {
 }
 
 func TestCheckRepo_DetectsBadWorktreeGitFile(t *testing.T) {
+	t.Parallel()
 	outerDir, repo := setupDotBareRepo(t)
 
 	// Corrupt the worktree .git file.
@@ -145,6 +149,7 @@ func TestCheckRepo_DetectsBadWorktreeGitFile(t *testing.T) {
 }
 
 func TestCheckRepo_FixesWorktreeGitFile(t *testing.T) {
+	t.Parallel()
 	outerDir, repo := setupDotBareRepo(t)
 
 	// Corrupt the worktree .git file.
@@ -178,6 +183,7 @@ func TestCheckRepo_FixesWorktreeGitFile(t *testing.T) {
 }
 
 func TestCheckRepo_NoIssuesForRegularBareRepo(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempBareRepo(t)
 	repo, err := git.FindRepo(dir)
 	if err != nil {

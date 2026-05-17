@@ -11,6 +11,7 @@ import (
 )
 
 func TestCommitsSinceMain_hasCommits(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	repo, _ := git.FindRepo(repoDir)
 
@@ -33,6 +34,7 @@ func TestCommitsSinceMain_hasCommits(t *testing.T) {
 }
 
 func TestCommitsSinceMain_noCommits(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepo(t)
 	repo, _ := git.FindRepo(repoDir)
 
@@ -46,6 +48,7 @@ func TestCommitsSinceMain_noCommits(t *testing.T) {
 }
 
 func TestCommitsSinceMain_multipleCommits(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	wtDir := filepath.Join(repoDir, "feature")
 	repo, _ := git.FindRepo(repoDir)
@@ -64,6 +67,7 @@ func TestCommitsSinceMain_multipleCommits(t *testing.T) {
 }
 
 func TestCommitsBehindMain(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempRepo(t)
 	repo, _ := git.FindRepo(dir)
 
@@ -88,6 +92,7 @@ func TestCommitsBehindMain(t *testing.T) {
 }
 
 func TestBranchHistorySinceMain_NoUpstreamMarksLocalCommits(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	repo, _ := git.FindRepo(repoDir)
 
@@ -107,6 +112,7 @@ func TestBranchHistorySinceMain_NoUpstreamMarksLocalCommits(t *testing.T) {
 }
 
 func TestBranchHistorySinceMain_UsesRemoteMainNotLocalMain(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	repo, _ := git.FindRepo(repoDir)
 	mainDir := filepath.Join(repoDir, "main")
@@ -130,6 +136,7 @@ func TestBranchHistorySinceMain_UsesRemoteMainNotLocalMain(t *testing.T) {
 }
 
 func TestBranchHistorySinceMain_DivergedIncludesRemoteOnly(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	repo, _ := git.FindRepo(repoDir)
 	featureDir := filepath.Join(repoDir, "feature")
@@ -179,6 +186,7 @@ func TestBranchHistorySinceMain_DivergedIncludesRemoteOnly(t *testing.T) {
 }
 
 func TestHeadCommit_PopulatesFullHashAndDate(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	head, err := git.HeadCommit(repoDir, "main")
 	if err != nil {

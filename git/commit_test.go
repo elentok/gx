@@ -7,6 +7,7 @@ import (
 )
 
 func TestCommitDetailsForRef(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 	testutil.CommitAll(t, repo, "first")
@@ -39,6 +40,7 @@ func TestCommitDetailsForRef(t *testing.T) {
 }
 
 func TestCommitDetailsForRefNormalizesMixedNewlines(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 	testutil.MustGitExported(t, repo, "add", "a.txt")

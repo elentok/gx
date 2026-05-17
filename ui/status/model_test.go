@@ -20,6 +20,7 @@ import (
 )
 
 func TestUseStackedLayoutThreshold(t *testing.T) {
+	t.Parallel()
 	m := Model{width: 100}
 	if !m.useStackedLayout() {
 		t.Fatal("expected stacked layout at width 100")
@@ -31,6 +32,7 @@ func TestUseStackedLayoutThreshold(t *testing.T) {
 }
 
 func TestSplitWidthUsesMinimumFiletreePaneWidthForShortContent(t *testing.T) {
+	t.Parallel()
 	m := Model{width: 160}
 	filetreeW, diffW := m.splitWidth()
 	if filetreeW != minFiletreePaneWidth {
@@ -42,6 +44,7 @@ func TestSplitWidthUsesMinimumFiletreePaneWidthForShortContent(t *testing.T) {
 }
 
 func TestSplitWidthExpandsForLongVisibleFiletreeRows(t *testing.T) {
+	t.Parallel()
 	m := Model{
 		width: 180,
 		statusData: statusData{
@@ -73,6 +76,7 @@ func TestSplitWidthExpandsForLongVisibleFiletreeRows(t *testing.T) {
 }
 
 func TestSplitWidthHonorsMaximumFiletreePaneWidth(t *testing.T) {
+	t.Parallel()
 	m := Model{
 		width: 200,
 		statusData: statusData{
@@ -93,6 +97,7 @@ func TestSplitWidthHonorsMaximumFiletreePaneWidth(t *testing.T) {
 }
 
 func TestSplitWidthPreservesMinimumDiffWidth(t *testing.T) {
+	t.Parallel()
 	m := Model{
 		width: 101,
 		statusData: statusData{
@@ -112,6 +117,7 @@ func TestSplitWidthPreservesMinimumDiffWidth(t *testing.T) {
 }
 
 func TestQAndEscFocusBehavior(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "changed\n")
 
@@ -136,6 +142,7 @@ func TestQAndEscFocusBehavior(t *testing.T) {
 }
 
 func TestQAlwaysQuitsFromDiffFocus(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "changed\n")
 
@@ -150,6 +157,7 @@ func TestQAlwaysQuitsFromDiffFocus(t *testing.T) {
 }
 
 func TestFiletreeLOnFileEntersDiffAndKeepsSectionOnFileChange(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\ntwo\n")
 	testutil.WriteFile(t, repo, "b.txt", "one\ntwo\n")
@@ -198,6 +206,7 @@ func TestFiletreeLOnFileEntersDiffAndKeepsSectionOnFileChange(t *testing.T) {
 }
 
 func TestReloadDiffsForSelection_KeepsSectionForUntrackedFile(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "tracked.txt", "one\n")
 	testutil.MustGitExported(t, repo, "add", "tracked.txt")
@@ -238,6 +247,7 @@ func TestReloadDiffsForSelection_KeepsSectionForUntrackedFile(t *testing.T) {
 }
 
 func TestTabSwitchesDiffSectionsOnly(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\ntwo\n")
 	testutil.MustGitExported(t, repo, "add", "a.txt")
@@ -284,6 +294,7 @@ func TestTabSwitchesDiffSectionsOnly(t *testing.T) {
 }
 
 func TestFiletreeHOnFileMovesSelectionToParentDir(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.Mkdir(t, repo+"/ui/status")
 	testutil.WriteFile(t, repo, "ui/status/model.go", "package status\n")
@@ -317,6 +328,7 @@ func TestFiletreeHOnFileMovesSelectionToParentDir(t *testing.T) {
 }
 
 func TestFiletreeLeftDoesNotMoveCompressedDirSelection(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.Mkdir(t, repo+"/keyboards/iris/keymaps")
 	testutil.WriteFile(t, repo, "keyboards/iris/keymaps/myfile.c", "changed\n")
@@ -372,6 +384,7 @@ func statusModelWithDir(t *testing.T) Model {
 }
 
 func TestFiletreeHOnSelectedDirCollapsesDirectory(t *testing.T) {
+	t.Parallel()
 	m := statusModelWithDir(t)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
@@ -386,6 +399,7 @@ func TestFiletreeHOnSelectedDirCollapsesDirectory(t *testing.T) {
 }
 
 func TestFiletreeEnterOnSelectedDirCollapsesDirectory(t *testing.T) {
+	t.Parallel()
 	m := statusModelWithDir(t)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -400,6 +414,7 @@ func TestFiletreeEnterOnSelectedDirCollapsesDirectory(t *testing.T) {
 }
 
 func TestFiletreeRightOnSelectedDirExpandsDirectory(t *testing.T) {
+	t.Parallel()
 	m := statusModelWithDir(t)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
@@ -421,6 +436,7 @@ func TestFiletreeRightOnSelectedDirExpandsDirectory(t *testing.T) {
 }
 
 func TestHelpOverlayToggleAndCompactStatusBar(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "changed\n")
 
@@ -512,6 +528,7 @@ func TestHelpLineTruncatesHintWithEllipsisWhenNarrow(t *testing.T) {
 }
 
 func TestFiletreePaneShowsBranchSummaryInTitle(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	m := New(repo)
 	m.ready = true
@@ -537,6 +554,7 @@ func TestFiletreePaneShowsBranchSummaryInTitle(t *testing.T) {
 }
 
 func TestNewWithInitialPathSelectsFileAndKeepsFiletreeFocus(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.Mkdir(t, repo+"/dir")
 	testutil.WriteFile(t, repo, "dir/a.txt", "one\n")
@@ -564,6 +582,7 @@ func TestNewWithInitialPathSelectsFileAndKeepsFiletreeFocus(t *testing.T) {
 }
 
 func TestBranchSummaryTitleShowsBaseOnlyWhenNonDefault(t *testing.T) {
+	t.Parallel()
 	m := Model{
 		settings: Settings{UseNerdFontIcons: true},
 		statusData: statusData{
@@ -582,6 +601,7 @@ func TestBranchSummaryTitleShowsBaseOnlyWhenNonDefault(t *testing.T) {
 }
 
 func TestReloadBranchStateUsesBranchUpstream(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	wtDir := filepath.Join(repoDir, "feature")
 	testutil.PushBranchWithUpstream(t, wtDir, "origin", "feature")
@@ -630,6 +650,7 @@ func TestHelpLineShowsVisualAtLeftInDiffFocus(t *testing.T) {
 }
 
 func TestToggleSideBySideModeWithS(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 	testutil.MustGitExported(t, repo, "add", "a.txt")
@@ -667,6 +688,7 @@ func TestToggleSideBySideModeWithS(t *testing.T) {
 }
 
 func TestToggleSideBySideModeWithSFromFiletreePane(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "status-s.txt", "one\n")
 	testutil.MustGitExported(t, repo, "add", "status-s.txt")
@@ -691,6 +713,7 @@ func TestToggleSideBySideModeWithSFromFiletreePane(t *testing.T) {
 }
 
 func TestStripUnifiedVisibleMarkerRemovesChangedPrefix(t *testing.T) {
+	t.Parallel()
 	line := "  1 ⋮    │-old"
 	got := diffrender.StripUnifiedVisibleMarker(line, '-')
 	if strings.Contains(got, "│-old") {
@@ -714,6 +737,7 @@ func TestStripUnifiedVisibleMarkerRemovesChangedPrefix(t *testing.T) {
 }
 
 func TestAdjustDiffContextLinesInDiffFocus(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "ctx.txt", "one\ntwo\nthree\n")
 	testutil.MustGitExported(t, repo, "add", "ctx.txt")
@@ -743,6 +767,7 @@ func TestAdjustDiffContextLinesInDiffFocus(t *testing.T) {
 }
 
 func TestUnifiedDiffViewHidesVisibleChangeMarkers(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "clean.txt", "old-value\nkeep\n")
 	testutil.MustGitExported(t, repo, "add", "clean.txt")
@@ -788,6 +813,7 @@ func TestUnifiedDiffViewHidesVisibleChangeMarkers(t *testing.T) {
 }
 
 func TestDiffPaneKeepsEmptySectionVisible(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "only-unstaged.txt", "one\n")
 
@@ -809,6 +835,7 @@ func TestDiffPaneKeepsEmptySectionVisible(t *testing.T) {
 }
 
 func TestExpandedDiffPaneTitleShowsSelectedPathWithoutDiffFocus(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "only-unstaged.txt", "one\n")
 
@@ -827,6 +854,7 @@ func TestExpandedDiffPaneTitleShowsSelectedPathWithoutDiffFocus(t *testing.T) {
 }
 
 func TestDiffPaneAnchorsCollapsedUnstagedAtTopWhenStagedActive(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\ntwo\n")
 	testutil.MustGitExported(t, repo, "add", "a.txt")
@@ -855,6 +883,7 @@ func TestDiffPaneAnchorsCollapsedUnstagedAtTopWhenStagedActive(t *testing.T) {
 }
 
 func TestDiffBodyPaddingStylesChangedRows(t *testing.T) {
+	t.Parallel()
 	added := diffrender.DiffBodyPadding(diffrender.RowAdded, 3)
 	removed := diffrender.DiffBodyPadding(diffrender.RowRemoved, 3)
 	plain := diffrender.DiffBodyPadding(diffrender.RowPlain, 3)
@@ -868,6 +897,7 @@ func TestDiffBodyPaddingStylesChangedRows(t *testing.T) {
 }
 
 func TestAdjustDiffContextLinesIsSessionOnly(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "ctx-status.txt", "one\ntwo\n")
 	testutil.MustGitExported(t, repo, "add", "ctx-status.txt")
@@ -895,6 +925,7 @@ func TestAdjustDiffContextLinesIsSessionOnly(t *testing.T) {
 }
 
 func TestSideBySideModeAllowsHunkStaging(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "b.txt", "one\n")
 	testutil.MustGitExported(t, repo, "add", "b.txt")
@@ -920,6 +951,7 @@ func TestSideBySideModeAllowsHunkStaging(t *testing.T) {
 }
 
 func TestSideBySideModeAllowsLineModeToggle(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "c.txt", "one\ntwo\n")
 
@@ -948,6 +980,7 @@ func TestSideBySideModeAllowsLineModeToggle(t *testing.T) {
 }
 
 func TestSideBySideModeAllowsVisualLineRangeStaging(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "v.txt", "new-1\nnew-2\nnew-3\n")
 
@@ -976,6 +1009,7 @@ func TestSideBySideModeAllowsVisualLineRangeStaging(t *testing.T) {
 }
 
 func TestRefreshesOnFocusMsg(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 
@@ -994,6 +1028,7 @@ func TestRefreshesOnFocusMsg(t *testing.T) {
 }
 
 func TestFocusMsgRefreshPreservesDiffScrollOffset(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	base := make([]string, 0, 80)
 	updated := make([]string, 0, 80)
@@ -1023,6 +1058,7 @@ func TestFocusMsgRefreshPreservesDiffScrollOffset(t *testing.T) {
 }
 
 func TestViewEnablesReportFocus(t *testing.T) {
+	t.Parallel()
 	m := New(testutil.TempRepo(t))
 	m.ready = true
 	v := m.View()
@@ -1032,6 +1068,7 @@ func TestViewEnablesReportFocus(t *testing.T) {
 }
 
 func TestFullscreenDiffHidesFiletreePane(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 
@@ -1050,6 +1087,7 @@ func TestFullscreenDiffHidesFiletreePane(t *testing.T) {
 }
 
 func TestSpaceStagesSingleLineInLineMode(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "line.txt", "line-1\nline-2\n")
 
@@ -1074,6 +1112,7 @@ func TestSpaceStagesSingleLineInLineMode(t *testing.T) {
 }
 
 func TestFiletreeSpaceTogglesWholeFile(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "changed\n")
 
@@ -1105,6 +1144,7 @@ func TestFiletreeSpaceTogglesWholeFile(t *testing.T) {
 }
 
 func TestFiletreeDDiscardsUntrackedFileAfterConfirm(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "new.txt", "new\n")
 
@@ -1130,6 +1170,7 @@ func TestFiletreeDDiscardsUntrackedFileAfterConfirm(t *testing.T) {
 }
 
 func TestDiffUnstagedDDiscardsLineAfterConfirm(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "line.txt", "one\ntwo\n")
 	testutil.MustGitExported(t, repo, "add", "line.txt")
@@ -1164,6 +1205,7 @@ func TestDiffUnstagedDDiscardsLineAfterConfirm(t *testing.T) {
 }
 
 func TestDiffStagedDUnstagesSelectionWithoutConfirm(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "line.txt", "one\ntwo\n")
 
@@ -1386,6 +1428,7 @@ func TestYankSelectionOnlyWithYYInDiffLineMode(t *testing.T) {
 }
 
 func TestDiffJKScrollsWithoutMovingCursor(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "# test\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n")
 
@@ -1434,6 +1477,7 @@ func TestDiffJKScrollsWithoutMovingCursor(t *testing.T) {
 }
 
 func TestHunkModeJKScrollsLargeHunkBeforeSwitching(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 
 	base := make([]string, 0, 48)
@@ -1488,6 +1532,7 @@ func TestHunkModeJKScrollsLargeHunkBeforeSwitching(t *testing.T) {
 }
 
 func TestHunkOverflowViewportMarkers(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 
 	base := make([]string, 0, 40)
@@ -1531,6 +1576,7 @@ func TestHunkOverflowViewportMarkers(t *testing.T) {
 }
 
 func TestGInFiletreeAndDiffJumpsBottom(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 	testutil.WriteFile(t, repo, "b.txt", "two\n")
@@ -1563,6 +1609,7 @@ func TestGInFiletreeAndDiffJumpsBottom(t *testing.T) {
 }
 
 func TestUppercaseGUsingShiftedCodeJumpsBottom(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 	testutil.WriteFile(t, repo, "b.txt", "two\n")
@@ -1580,6 +1627,7 @@ func TestUppercaseGUsingShiftedCodeJumpsBottom(t *testing.T) {
 }
 
 func TestUppercaseGUsingShiftModifierJumpsBottom(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 	testutil.WriteFile(t, repo, "b.txt", "two\n")
@@ -1597,6 +1645,7 @@ func TestUppercaseGUsingShiftModifierJumpsBottom(t *testing.T) {
 }
 
 func TestGInDiffHunkModeJumpsViewportToBottom(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	base := make([]string, 0, 40)
 	for i := 1; i <= 40; i++ {
@@ -1634,6 +1683,7 @@ func TestGInDiffHunkModeJumpsViewportToBottom(t *testing.T) {
 }
 
 func TestCtrlDAndCtrlUScrollFiletreeAndDiff(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	for i := 0; i < 16; i++ {
 		testutil.WriteFile(t, repo, fmt.Sprintf("f%02d.txt", i), "x\n")
@@ -1679,6 +1729,7 @@ func TestCtrlDAndCtrlUScrollFiletreeAndDiff(t *testing.T) {
 }
 
 func TestStatusFileIconDeletedAndFallback(t *testing.T) {
+	t.Parallel()
 	deleted := git.StageFileStatus{Path: "gone.txt", WorktreeCode: 'D'}
 
 	nerd := filetreePaneIconsFor(true)
@@ -1693,6 +1744,7 @@ func TestStatusFileIconDeletedAndFallback(t *testing.T) {
 }
 
 func TestStatusEntryColorDeletedFileIsDim(t *testing.T) {
+	t.Parallel()
 	entry := statusEntry{
 		Kind: statusEntryFile,
 		File: git.StageFileStatus{Path: "gone.txt", WorktreeCode: 'D'},
@@ -1703,6 +1755,7 @@ func TestStatusEntryColorDeletedFileIsDim(t *testing.T) {
 }
 
 func TestStatusFileIconRenamedAndFallback(t *testing.T) {
+	t.Parallel()
 	renamed := git.StageFileStatus{Path: "new.txt", RenameFrom: "old.txt", IndexStatus: 'R'}
 
 	nerd := filetreePaneIconsFor(true)
@@ -1717,6 +1770,7 @@ func TestStatusFileIconRenamedAndFallback(t *testing.T) {
 }
 
 func TestStatusEntryColorRenamedFileIsBlue(t *testing.T) {
+	t.Parallel()
 	entry := statusEntry{
 		Kind: statusEntryFile,
 		File: git.StageFileStatus{Path: "new.txt", RenameFrom: "old.txt", IndexStatus: 'R'},
@@ -1728,6 +1782,7 @@ func TestStatusEntryColorRenamedFileIsBlue(t *testing.T) {
 
 
 func TestFiletreeSelectionDebouncesDiffReload(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 	testutil.WriteFile(t, repo, "b.txt", "two\n")
@@ -1754,6 +1809,7 @@ func TestFiletreeSelectionDebouncesDiffReload(t *testing.T) {
 }
 
 func TestStageSearchFiletreeModeAndNavigation(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "apple.txt", "one\n")
 	testutil.WriteFile(t, repo, "apricot.txt", "two\n")
@@ -1799,6 +1855,7 @@ func TestStageSearchFiletreeModeAndNavigation(t *testing.T) {
 }
 
 func TestFiletreeSearchModeShowsOverlay(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "apple.txt", "one\n")
 
@@ -1821,6 +1878,7 @@ func TestFiletreeSearchModeShowsOverlay(t *testing.T) {
 }
 
 func TestStageSearchDiffModeAndPrevNextKeys(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "needle-one\nline\nneedle-two\n")
 
@@ -1911,6 +1969,7 @@ func runStatusCmd(t *testing.T, m Model, cmd tea.Cmd) Model {
 }
 
 func TestStageSearchDiffUsesRightEdgeIndicatorInHunkMode(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "needle-one\nline\nneedle-two\n")
 
@@ -1931,6 +1990,7 @@ func TestStageSearchDiffUsesRightEdgeIndicatorInHunkMode(t *testing.T) {
 }
 
 func TestDiffJDoesNotOverscrollPastContent(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "# test\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n")
 
@@ -1957,6 +2017,7 @@ func TestDiffJDoesNotOverscrollPastContent(t *testing.T) {
 }
 
 func TestApplySelection_DoesNotSwitchSectionWhenHunksRemain(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "l01\nl02\nl03\nl04\nl05\nl06\nl07\nl08\nl09\nl10\nl11\nl12\nl13\nl14\nl15\nl16\nl17\nl18\nl19\nl20\nl21\nl22\nl23\nl24\nl25\nl26\nl27\nl28\nl29\nl30\n")
 	testutil.CommitAll(t, repo, "baseline")
@@ -1988,6 +2049,7 @@ func TestApplySelection_DoesNotSwitchSectionWhenHunksRemain(t *testing.T) {
 }
 
 func TestApplySelection_DoesNotSwitchSectionWhenCurrentSectionBecomesEmpty(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "one\ntwo\n")
 	testutil.CommitAll(t, repo, "baseline")
@@ -2016,6 +2078,7 @@ func TestApplySelection_DoesNotSwitchSectionWhenCurrentSectionBecomesEmpty(t *te
 }
 
 func TestApplySelection_FlashesDestinationSectionWithoutSwitching(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "one\ntwo\n")
 	testutil.CommitAll(t, repo, "baseline")
@@ -2044,6 +2107,7 @@ func TestApplySelection_FlashesDestinationSectionWithoutSwitching(t *testing.T) 
 }
 
 func TestCCTriggersCommitCommand(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "changed\n")
 
@@ -2085,6 +2149,7 @@ func TestCCTriggersCommitCommand(t *testing.T) {
 }
 
 func TestCMInFiletreeDoesNothing(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "changed\n")
 
@@ -2107,6 +2172,7 @@ func TestCMInFiletreeDoesNothing(t *testing.T) {
 
 
 func TestCMInDiffWithoutFileContextShowsError(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 
 	m := New(repo)
@@ -2131,6 +2197,7 @@ func TestCMInDiffWithoutFileContextShowsError(t *testing.T) {
 }
 
 func TestYShowsBindingDrivenYankHint(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 
 	m := New(repo)
@@ -2159,6 +2226,7 @@ func TestYShowsBindingDrivenYankHint(t *testing.T) {
 }
 
 func TestGGJumpsToTop(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 
 	m := New(repo)
@@ -2186,6 +2254,7 @@ func TestGGJumpsToTop(t *testing.T) {
 }
 
 func TestLTriggersLazygitLogCommand(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 
 	m := New(repo)
@@ -2198,6 +2267,7 @@ func TestLTriggersLazygitLogCommand(t *testing.T) {
 }
 
 func TestGLNavigatesToLogWhenNavigationEnabled(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 
 	m := NewModel(repo, Settings{EnableNavigation: true})
@@ -2224,6 +2294,7 @@ func TestGLNavigatesToLogWhenNavigationEnabled(t *testing.T) {
 }
 
 func TestNavigationStartupDefersInitialDiffLoad(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "dirty.txt", "dirty\n")
 
@@ -2246,6 +2317,7 @@ func TestNavigationStartupDefersInitialDiffLoad(t *testing.T) {
 }
 
 func TestGOOpensOutputModal(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 
 	m := New(repo)
@@ -2295,6 +2367,7 @@ func TestEOpensEditorFromFiletreeAndDiff(t *testing.T) {
 }
 
 func TestEditorLaunchArgsUsesGotoForKnownEditors(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		editor string
@@ -2317,6 +2390,7 @@ func TestEditorLaunchArgsUsesGotoForKnownEditors(t *testing.T) {
 }
 
 func TestEditorLineForCurrentSelectionInDiffMode(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "line.txt", "old-1\nold-2\nold-3\n")
 	testutil.MustGitExported(t, repo, "add", "line.txt")
@@ -2343,6 +2417,7 @@ func TestEditorLineForCurrentSelectionInDiffMode(t *testing.T) {
 }
 
 func TestMouseWheelScrollsUnstagedDiffViewport(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	before := make([]string, 0, 80)
 	after := make([]string, 0, 80)
@@ -2371,6 +2446,7 @@ func TestMouseWheelScrollsUnstagedDiffViewport(t *testing.T) {
 }
 
 func TestMouseWheelScrollsStagedDiffViewport(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	before := make([]string, 0, 80)
 	after := make([]string, 0, 80)
@@ -2401,6 +2477,7 @@ func TestMouseWheelScrollsStagedDiffViewport(t *testing.T) {
 }
 
 func TestWToggleSoftWrap(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "this is a very long line that should wrap in narrow diff panes\n")
 
@@ -2435,6 +2512,7 @@ func TestWToggleSoftWrap(t *testing.T) {
 }
 
 func TestBinaryFileShowsSizeSummaryInsteadOfNoFileSelected(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	path := repo + "/bin.dat"
 	if err := os.WriteFile(path, []byte{0x00, 0x01, 0x02, 0x03}, 0644); err != nil {
@@ -2462,6 +2540,7 @@ func TestBinaryFileShowsSizeSummaryInsteadOfNoFileSelected(t *testing.T) {
 }
 
 func TestDefaultSettingsEnableNerdFontIcons(t *testing.T) {
+	t.Parallel()
 	settings := DefaultSettings()
 	if !settings.UseNerdFontIcons {
 		t.Fatal("UseNerdFontIcons = false, want true")
@@ -2469,6 +2548,7 @@ func TestDefaultSettingsEnableNerdFontIcons(t *testing.T) {
 }
 
 func TestStatusEntryColor(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		entry statusEntry
@@ -2489,6 +2569,7 @@ func TestStatusEntryColor(t *testing.T) {
 }
 
 func TestStatusEntryMeta_NerdFont(t *testing.T) {
+	t.Parallel()
 	icons := filetreePaneIconsFor(true)
 
 	if got := statusEntryMeta(statusEntry{HasStaged: true, HasUnstaged: true}, true, icons); got != "" {
@@ -2500,6 +2581,7 @@ func TestStatusEntryMeta_NerdFont(t *testing.T) {
 }
 
 func TestStatusFileIcon(t *testing.T) {
+	t.Parallel()
 	icons := filetreePaneIconsFor(true)
 
 	if got := statusFileIcon(git.StageFileStatus{IndexStatus: '?', WorktreeCode: '?'}, false, icons); got != "" {
@@ -2514,6 +2596,7 @@ func TestStatusFileIcon(t *testing.T) {
 }
 
 func TestStatusFileIconSymlink(t *testing.T) {
+	t.Parallel()
 	nerd := filetreePaneIconsFor(true)
 	plain := filetreePaneIconsFor(false)
 
@@ -2533,6 +2616,7 @@ func TestStatusFileIconSymlink(t *testing.T) {
 }
 
 func TestLineModeCanUnstageSingleModifiedLine(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "old-1\nold-2\nold-3\n")
 	testutil.MustGitExported(t, repo, "add", "README.md")
@@ -2577,6 +2661,7 @@ func TestLineModeCanUnstageSingleModifiedLine(t *testing.T) {
 }
 
 func TestLineModeStagesSingleLineInUntrackedFile(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "new.txt", "line-1\nline-2\nline-3\n")
 
@@ -2602,6 +2687,7 @@ func TestLineModeStagesSingleLineInUntrackedFile(t *testing.T) {
 }
 
 func TestLineModeUnstageOneOfAdjacentDeletedLinesDoesNotDuplicate(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	base := strings.Join([]string{
 		"func f() {",
@@ -2647,6 +2733,7 @@ func TestLineModeUnstageOneOfAdjacentDeletedLinesDoesNotDuplicate(t *testing.T) 
 }
 
 func TestLineModeUnstageBraceFromFirstHunkBlock(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	base := strings.Join([]string{
 		"package git",
@@ -2711,6 +2798,7 @@ func TestLineModeUnstageBraceFromFirstHunkBlock(t *testing.T) {
 }
 
 func TestVisualModeStagesLineRange(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "range.txt", "one\ntwo\nthree\n")
 
@@ -2744,6 +2832,7 @@ func TestVisualModeStagesLineRange(t *testing.T) {
 }
 
 func TestEscExitsVisualModeAndKeepsDiffFocus(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "range.txt", "one\ntwo\n")
 
@@ -2771,6 +2860,7 @@ func TestEscExitsVisualModeAndKeepsDiffFocus(t *testing.T) {
 }
 
 func TestDiffDotMovesToNextFile(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 	testutil.WriteFile(t, repo, "b.txt", "two\n")
@@ -2801,6 +2891,7 @@ func TestDiffDotMovesToNextFile(t *testing.T) {
 }
 
 func TestDiffCommaMovesToPreviousFile(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 	testutil.WriteFile(t, repo, "b.txt", "two\n")
@@ -2831,6 +2922,7 @@ func TestDiffCommaMovesToPreviousFile(t *testing.T) {
 }
 
 func TestVisualModeUnstagesLineRange(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "range.txt", "one\ntwo\nthree\n")
 

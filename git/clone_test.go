@@ -10,6 +10,7 @@ import (
 )
 
 func TestCloneBare_dotBareLayout(t *testing.T) {
+	t.Parallel()
 	src := testutil.TempRepo(t)
 	cwd := t.TempDir()
 
@@ -103,6 +104,7 @@ func TestCloneBare_dotBareLayout(t *testing.T) {
 }
 
 func TestCloneBare_stripsGitSuffix(t *testing.T) {
+	t.Parallel()
 	src := testutil.TempRepo(t)
 	cwd := t.TempDir()
 

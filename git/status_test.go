@@ -9,6 +9,7 @@ import (
 )
 
 func TestUncommittedChanges_clean(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	wtDir := filepath.Join(repoDir, "feature")
 
@@ -22,6 +23,7 @@ func TestUncommittedChanges_clean(t *testing.T) {
 }
 
 func TestUncommittedChanges_modified(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	wtDir := filepath.Join(repoDir, "feature")
 
@@ -47,6 +49,7 @@ func TestUncommittedChanges_modified(t *testing.T) {
 }
 
 func TestUncommittedChanges_untracked(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	wtDir := filepath.Join(repoDir, "feature")
 
@@ -69,6 +72,7 @@ func TestUncommittedChanges_untracked(t *testing.T) {
 }
 
 func TestWorktreeSyncStatus_aheadOfUpstream(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	// Set feature to track origin/main so there is a configured upstream.
 	testutil.SetBranchUpstream(t, repoDir, "feature", "origin/main")
@@ -88,6 +92,7 @@ func TestWorktreeSyncStatus_aheadOfUpstream(t *testing.T) {
 }
 
 func TestWorktreeSyncStatus_noUpstream(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	repo, _ := git.FindRepo(repoDir)
 
@@ -102,6 +107,7 @@ func TestWorktreeSyncStatus_noUpstream(t *testing.T) {
 }
 
 func TestWorktreeSyncStatus_main(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepo(t)
 	repo, _ := git.FindRepo(repoDir)
 
