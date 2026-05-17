@@ -28,11 +28,12 @@ const (
 	bindingAmend      keys.BindingID = "amend"
 	bindingBump       keys.BindingID = "bump"
 	bindingReword     keys.BindingID = "reword"
-	bindingPageDown   keys.BindingID = "page-down"
-	bindingPageUp     keys.BindingID = "page-up"
-	bindingPull       keys.BindingID = "pull"
-	bindingPush       keys.BindingID = "push"
-	bindingViewOutput keys.BindingID = "view-output"
+	bindingPageDown          keys.BindingID = "page-down"
+	bindingPageUp            keys.BindingID = "page-up"
+	bindingPull              keys.BindingID = "pull"
+	bindingPush              keys.BindingID = "push"
+	bindingViewOutput        keys.BindingID = "view-output"
+	bindingRebaseInteractive keys.BindingID = "rebase-interactive"
 )
 
 func newLogManager() keys.Manager {
@@ -72,6 +73,8 @@ func newLogManager() keys.Manager {
 		{ID: bindingBump, Seq: []string{"B"}, Categories: []string{"Actions"}, Title: "bump version"},
 		{ID: bindingReword, Seq: []string{"c", "r"}, Categories: []string{"Actions"}, Title: "reword commit"},
 		{ID: bindingCancel, Seq: []string{"c", "esc"}, Categories: []string{}, Title: ""},
+		{ID: bindingRebaseInteractive, Seq: []string{"r", "i"}, Categories: []string{"Actions"}, Title: "rebase -i from commit"},
+		{ID: bindingCancel, Seq: []string{"r", "esc"}, Categories: []string{}, Title: ""},
 		{ID: bindingPageDown, Seq: []string{"ctrl+d"}, Categories: []string{"Navigation"}, Title: "page down"},
 		{ID: bindingPageUp, Seq: []string{"ctrl+u"}, Categories: []string{"Navigation"}, Title: "page up"},
 	})
@@ -164,6 +167,8 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 	case bindingPageUp:
 		m.list.ScrollPage(-list.DefaultScroll, len(m.rows), maxInt(1, m.height-3))
 		return m, nil
+	case bindingRebaseInteractive:
+		return m.startRebaseInteractive()
 	}
 	return m, nil
 }

@@ -25,6 +25,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if kp, ok := msg.(tea.KeyPressMsg); ok && kp.String() == "ctrl+c" {
 		return m, tea.Quit
 	}
+	// Delegate to rebase confirm modal while it's open.
+	if m.rebaseConfirm.isOpen() {
+		return m.handleRebaseConfirmUpdate(msg)
+	}
 	// Delegate all messages to amend.Model while it's open.
 	if m.amendConfirm.IsOpen {
 		return m.handleAmendUpdate(msg)
@@ -62,6 +66,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleRewordDetails(msg)
 	case reword.EditorFinishedMsg:
 		return m.handleRewordEditorDone(msg.Err)
+	case rebaseFinishedMsg:
+		return m.handleRebaseFinished(msg)
+	case rebaseStashMsg:
+		return m.handleRebaseStash(msg)
+	case rebaseStashPopMsg:
+		return m.handleRebaseStashPop(msg)
 	case flashClearMsg:
 		m.flashSubject = ""
 		m.flashUntil = time.Time{}
@@ -73,10 +83,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.help, cmd = m.help.Update(msg)
 		return m, cmd
 	case tea.FocusMsg:
+		if m.rebaseDidStash {
+			m.rebaseDidStash = false
+			m.rebaseConfirm = rebaseConfirmState{kind: rebaseConfirmStashPop, yes: true}
+		}
 		return m, m.cmdReload()
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
+		}
+		// If focus events aren't working (e.g. tmux without focus-events on),
+		// catch the pending stash pop on the first key press instead.
+		if m.rebaseDidStash {
+			m.rebaseDidStash = false
+			m.rebaseConfirm = rebaseConfirmState{kind: rebaseConfirmStashPop, yes: true}
+			return m, nil
 		}
 		if m.help.IsOpen {
 			m.help, cmd = m.help.Update(msg)

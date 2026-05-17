@@ -74,6 +74,9 @@ type Model struct {
 	flashUntil          time.Time
 
 	refreshing bool
+
+	rebaseConfirm  rebaseConfirmState // confirm modal for stash-before-rebase and stash-pop-after-rebase
+	rebaseDidStash bool               // stash was pushed before rebase; pop prompt fires on FocusMsg (kitty/tmux) or immediately (exec)
 }
 
 func NewModel(worktreeRoot, startRef string, settings ui.Settings) Model {

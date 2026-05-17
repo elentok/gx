@@ -60,6 +60,9 @@ func (m Model) View() tea.View {
 			out = ui.OverlayBottomRight(out, ui.RenderChordOverlay(prefix[0], hints), m.width, m.height)
 		}
 	}
+	if m.rebaseConfirm.isOpen() {
+		out = ui.OverlayCenter(out, m.rebaseConfirmView(m.width), m.width, m.height)
+	}
 	if m.amendConfirm.IsOpen {
 		out = ui.OverlayCenter(out, m.amendConfirm.View(m.width), m.width, m.height)
 	}
