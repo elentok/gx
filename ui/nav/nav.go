@@ -17,6 +17,10 @@ type Route struct {
 	Ref          string
 	InitialPath  string
 	FocusSubject string
+
+	FilterPath      string
+	FilterStartLine int
+	FilterEndLine   int
 }
 
 type pushMsg struct {

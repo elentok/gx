@@ -41,6 +41,7 @@ const (
 	bindingCancelChord keys.BindingID = "cancel-chord"
 	bindingAmend       keys.BindingID = "amend"
 	bindingReword      keys.BindingID = "reword"
+	bindingFilterLog   keys.BindingID = "filter-log"
 )
 
 func newCommitManager() keys.Manager {
@@ -91,6 +92,7 @@ func newCommitManager() keys.Manager {
 		{ID: bindingCancelChord, Seq: []string{"c", "esc"}, Categories: []string{}, Title: ""},
 
 		{ID: bindingAmend, Seq: []string{"A"}, Categories: []string{"Actions"}, Title: "amend commit with staged changes"},
+		{ID: bindingFilterLog, Seq: []string{"g", "h"}, Categories: []string{"Navigation"}, Title: "log for file/hunk"},
 	})
 }
 
@@ -297,8 +299,49 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, m.openRewordEditor()
 	case bindingCancelChord:
 		return m, nil
+	case bindingFilterLog:
+		return m, nav.Push(m.filterLogRoute())
 	}
 	return m, nil
+}
+
+func (m Model) filterLogRoute() nav.Route {
+	route := nav.Route{Kind: nav.RouteLog, WorktreeRoot: m.worktreeRoot}
+	file, ok := m.selectedCommitFile()
+	if !ok {
+		return route
+	}
+	route.FilterPath = file.Path
+	if m.focusDiff {
+		startLine, endLine := m.activeLogLineRange()
+		route.FilterStartLine = startLine
+		route.FilterEndLine = endLine
+	}
+	return route
+}
+
+func (m Model) activeLogLineRange() (startLine, endLine int) {
+	data := m.diffModel.Data()
+	navMode := m.diffModel.NavMode()
+
+	if navMode == diffview.NavModeHunk {
+		if data.ActiveHunk >= 0 && data.ActiveHunk < len(data.Parsed.Hunks) {
+			h := data.Parsed.Hunks[data.ActiveHunk]
+			end := h.NewStart + h.NewCount - 1
+			if end < h.NewStart {
+				end = h.NewStart
+			}
+			return h.NewStart, end
+		}
+		return 0, 0
+	}
+	if data.ActiveLine >= 0 && data.ActiveLine < len(data.Parsed.Changed) {
+		cl := data.Parsed.Changed[data.ActiveLine]
+		if cl.NewLine > 0 {
+			return cl.NewLine, cl.NewLine
+		}
+	}
+	return 0, 0
 }
 
 func (m Model) handleTabFocusCycle() (tea.Model, tea.Cmd) {

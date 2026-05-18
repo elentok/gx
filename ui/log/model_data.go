@@ -15,7 +15,7 @@ type reloadMsg struct {
 }
 
 func (m *Model) reload() {
-	entries, err := git.LogEntries(m.worktreeRoot, m.startRef, maxLogEntries)
+	entries, err := git.LogEntriesFiltered(m.worktreeRoot, m.startRef, maxLogEntries, m.gitFilter())
 	if err != nil {
 		m.err = err
 		return
@@ -34,11 +34,20 @@ func (m *Model) reload() {
 	m.recomputeSearchMatches()
 }
 
+func (m Model) gitFilter() git.LogFilter {
+	return git.LogFilter{
+		Path:      m.filter.Path,
+		StartLine: m.filter.StartLine,
+		EndLine:   m.filter.EndLine,
+	}
+}
+
 func (m Model) cmdReload() tea.Cmd {
 	worktreeRoot := m.worktreeRoot
 	startRef := m.startRef
+	filter := m.gitFilter()
 	return func() tea.Msg {
-		entries, err := git.LogEntries(worktreeRoot, startRef, maxLogEntries)
+		entries, err := git.LogEntriesFiltered(worktreeRoot, startRef, maxLogEntries, filter)
 		if err != nil {
 			return reloadMsg{err: err}
 		}
@@ -99,5 +108,10 @@ func (m Model) openSelected() tea.Cmd {
 		return nil
 	}
 	selected := m.rows[cursor]
-	return nav.Push(nav.Route{Kind: nav.RouteCommit, WorktreeRoot: m.worktreeRoot, Ref: selected.commit.FullHash})
+	return nav.Push(nav.Route{
+		Kind:         nav.RouteCommit,
+		WorktreeRoot: m.worktreeRoot,
+		Ref:          selected.commit.FullHash,
+		FilterPath:   m.filter.Path,
+	})
 }

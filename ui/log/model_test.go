@@ -135,6 +135,33 @@ func TestEnterOnCommitRowOpensCommitRoute(t *testing.T) {
 	_ = updated
 }
 
+func TestEnterOnCommitRowCarriesActiveFilterPath(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.Mkdir(t, filepath.Join(repo, "src"))
+	testutil.WriteFile(t, repo, "src/main.go", "package main\n")
+	testutil.CommitAll(t, repo, "add file")
+
+	m := NewModelFiltered(repo, "", settings, LogFilter{Path: "src/main.go"})
+	for i := range m.rows {
+		if m.rows[i].kind == rowCommit {
+			m.list.SetSelected(i, len(m.rows))
+			break
+		}
+	}
+
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatalf("expected nav command on enter")
+	}
+	route, ok := nav.IsPush(cmd())
+	if !ok {
+		t.Fatalf("expected nav push")
+	}
+	if route.FilterPath != "src/main.go" {
+		t.Fatalf("route.FilterPath = %q, want %q", route.FilterPath, "src/main.go")
+	}
+}
+
 func TestSelectedCommitRowFillsFullWidth(t *testing.T) {
 	m := newTestModel()
 	m.width = 80

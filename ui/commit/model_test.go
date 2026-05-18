@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/filetree"
+	"github.com/elentok/gx/ui/nav"
 	notifypkg "github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/search"
 
@@ -225,6 +226,54 @@ func TestSidebarSearchMovesToFileMatches(t *testing.T) {
 	m = updated.(Model)
 	if m.fileTreeModel.SelectedIndex() == first {
 		t.Fatalf("expected n to move to next sidebar match")
+	}
+}
+
+func TestFilterPathHighlightsAndFocusesFileOnOpen(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "alpha.txt", "one\n")
+	testutil.WriteFile(t, repo, "beta.txt", "two\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "alpha.txt", "ONE\n")
+	testutil.WriteFile(t, repo, "beta.txt", "TWO\n")
+	testutil.CommitAll(t, repo, "change")
+
+	m := NewWithSettingsAndFilter(repo, "HEAD", "beta.txt", ui.Settings{})
+	file, ok := m.selectedCommitFile()
+	if !ok {
+		t.Fatalf("expected selected commit file")
+	}
+	if file.Path != "beta.txt" {
+		t.Fatalf("selected file = %q, want %q", file.Path, "beta.txt")
+	}
+	if m.search.Query() != "beta.txt" {
+		t.Fatalf("search.Query() = %q, want %q", m.search.Query(), "beta.txt")
+	}
+	if m.search.Mode() != search.SearchModeNone {
+		t.Fatalf("search.Mode() = %v, want SearchModeNone", m.search.Mode())
+	}
+	if m.searchScope != searchScopeSidebar {
+		t.Fatalf("searchScope = %v, want sidebar", m.searchScope)
+	}
+	if m.search.MatchesCount() == 0 {
+		t.Fatalf("expected sidebar search matches")
+	}
+}
+
+func TestFilterPathPassiveSearchDoesNotBlockBack(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "alpha.txt", "one\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "alpha.txt", "ONE\n")
+	testutil.CommitAll(t, repo, "change")
+
+	m := NewWithSettingsAndFilter(repo, "HEAD", "alpha.txt", ui.Settings{})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
+	if cmd == nil {
+		t.Fatalf("expected nav back command on q")
+	}
+	if !nav.IsBack(cmd()) {
+		t.Fatalf("expected nav back message")
 	}
 }
 

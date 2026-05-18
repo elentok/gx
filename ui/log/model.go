@@ -21,6 +21,15 @@ import (
 
 const maxLogEntries = 250
 
+// LogFilter restricts the log view to a file path or a line range within a file.
+type LogFilter struct {
+	Path      string
+	StartLine int // 0 = file-only
+	EndLine   int
+}
+
+func (f LogFilter) IsActive() bool { return f.Path != "" }
+
 type rowKind int
 
 const (
@@ -40,6 +49,7 @@ type Model struct {
 	worktreeRoot string
 	settings     ui.Settings
 	startRef     string
+	filter       LogFilter
 
 	width  int
 	height int
@@ -80,10 +90,15 @@ type Model struct {
 }
 
 func NewModel(worktreeRoot, startRef string, settings ui.Settings) Model {
+	return NewModelFiltered(worktreeRoot, startRef, settings, LogFilter{})
+}
+
+func NewModelFiltered(worktreeRoot, startRef string, settings ui.Settings, filter LogFilter) Model {
 	m := Model{
 		worktreeRoot: worktreeRoot,
 		settings:     settings,
 		startRef:     normalizedRef(startRef),
+		filter:       filter,
 		keys:         newLogManager(),
 		search:       search.NewModel(),
 	}

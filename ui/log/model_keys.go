@@ -34,6 +34,7 @@ const (
 	bindingPush              keys.BindingID = "push"
 	bindingViewOutput        keys.BindingID = "view-output"
 	bindingRebaseInteractive keys.BindingID = "rebase-interactive"
+	bindingClearFilter       keys.BindingID = "clear-filter"
 )
 
 func newLogManager() keys.Manager {
@@ -76,6 +77,7 @@ func newLogManager() keys.Manager {
 		{ID: bindingCancel, Seq: []string{"r", "esc"}, Categories: []string{}, Title: ""},
 		{ID: bindingPageDown, Seq: []string{"ctrl+d"}, Categories: []string{"Navigation"}, Title: "page down"},
 		{ID: bindingPageUp, Seq: []string{"ctrl+u"}, Categories: []string{"Navigation"}, Title: "page up"},
+		{ID: bindingClearFilter, Seq: []string{"f"}, Categories: []string{"Filter"}, Title: "clear filter"},
 	})
 }
 
@@ -168,6 +170,13 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, nil
 	case bindingRebaseInteractive:
 		return m.startRebaseInteractive()
+	case bindingClearFilter:
+		if !m.filter.IsActive() {
+			return m, nil
+		}
+		m.filter = LogFilter{}
+		m.refreshing = true
+		return m, tea.Batch(notify.Progress("filter", "clearing filter..."), m.cmdReload())
 	}
 	return m, nil
 }

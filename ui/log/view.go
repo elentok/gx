@@ -39,7 +39,7 @@ func (m Model) View() tea.View {
 		Width:       maxInt(20, m.width),
 		Height:      maxInt(4, m.height-1),
 		Title:       "Log",
-		RightTitle:  m.startRef,
+		RightTitle:  m.frameRightTitle(),
 		Lines:       m.visibleLines(),
 		BorderColor: ui.ColorBorder,
 		TitleColor:  ui.ColorBlue,
@@ -85,6 +85,16 @@ func (m Model) View() tea.View {
 		out = ui.OverlayCenter(out, m.help.View(), m.width, m.height)
 	}
 	return ui.NewMainView(out)
+}
+
+func (m Model) frameRightTitle() string {
+	if m.filter.IsActive() {
+		if m.filter.StartLine > 0 {
+			return fmt.Sprintf("%s L%d-%d", m.filter.Path, m.filter.StartLine, m.filter.EndLine)
+		}
+		return m.filter.Path
+	}
+	return m.startRef
 }
 
 func (m Model) visibleLines() []string {

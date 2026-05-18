@@ -21,6 +21,7 @@ type Model struct {
 	worktreeRoot string
 	ref          string
 	settings     ui.Settings
+	filterPath   string
 
 	width        int
 	height       int
@@ -41,9 +42,9 @@ type Model struct {
 
 	amendConfirm amend.Model
 
-	reword          reword.Model
-	rewordTmpFile   string
-	rewordOrigMsg   string
+	reword           reword.Model
+	rewordTmpFile    string
+	rewordOrigMsg    string
 	rewordNewSubject string
 }
 
@@ -67,14 +68,19 @@ type commitSidebarState struct {
 }
 
 func New(worktreeRoot, ref string) Model {
-	return NewWithSettings(worktreeRoot, ref, ui.Settings{UseNerdFontIcons: true})
+	return NewWithSettingsAndFilter(worktreeRoot, ref, "", ui.Settings{UseNerdFontIcons: true})
 }
 
 func NewWithSettings(worktreeRoot, ref string, settings ui.Settings) Model {
+	return NewWithSettingsAndFilter(worktreeRoot, ref, "", settings)
+}
+
+func NewWithSettingsAndFilter(worktreeRoot, ref, filterPath string, settings ui.Settings) Model {
 	m := Model{
 		worktreeRoot: worktreeRoot,
 		ref:          normalizedRef(ref),
 		settings:     settings,
+		filterPath:   strings.TrimSpace(filterPath),
 		bodyExpanded: true,
 		commitDiffArea: commitDiffArea{
 			diffModel: diffview.NewModel(),
@@ -127,6 +133,7 @@ func (m *Model) reload() {
 	if entry, ok := m.selectedCommitEntry(); !ok || entry.Kind != filetree.EntryFile {
 		m.selectFirstCommitFile()
 	}
+	m.applyFilterPathSearch()
 	m.headerOffset = 0
 	m.refreshDiff()
 }
@@ -163,4 +170,14 @@ func (m *Model) selectFirstCommitFile() {
 			return
 		}
 	}
+}
+
+func (m *Model) applyFilterPathSearch() {
+	if m.filterPath == "" {
+		return
+	}
+	m.searchScope = searchScopeSidebar
+	matches := m.computeSearchMatches(m.filterPath)
+	m.search.SetPassiveResults(m.filterPath, matches)
+	m.jumpToCurrentMatch()
 }

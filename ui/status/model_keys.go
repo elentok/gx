@@ -3,9 +3,11 @@ package status
 import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/status/diffarea"
 )
 
 const (
@@ -39,6 +41,7 @@ const (
 	bindingAmend         keys.BindingID = "amend"
 	bindingBump          keys.BindingID = "bump"
 	bindingEdit          keys.BindingID = "edit"
+	bindingFilterLog     keys.BindingID = "filter-log"
 )
 
 func newStatusManager() keys.Manager {
@@ -88,6 +91,7 @@ func newStatusManager() keys.Manager {
 		{ID: bindingAmend, Seq: []string{"A"}, Categories: []string{"Git"}, Title: "amend"},
 		{ID: bindingBump, Seq: []string{"B"}, Categories: []string{"Git"}, Title: "bump version"},
 		{ID: bindingEdit, Seq: []string{"e"}, Categories: []string{"Filetree", "Diff"}, Title: "edit file"},
+		{ID: bindingFilterLog, Seq: []string{"g", "h"}, Categories: []string{"Filetree", "Diff"}, Title: "log for file/hunk"},
 	})
 }
 
@@ -190,6 +194,51 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model,
 		return m, nil
 	case bindingEdit:
 		return m, m.cmdEditSelectedFile()
+	case bindingFilterLog:
+		if !m.settings.EnableNavigation {
+			return m, nil
+		}
+		return m, nav.Push(m.filterLogRoute())
 	}
 	return m, nil
+}
+
+func (m Model) filterLogRoute() nav.Route {
+	route := nav.Route{Kind: nav.RouteLog, WorktreeRoot: m.worktreeRoot}
+	file, ok := m.selectedStatusFile()
+	if !ok {
+		return route
+	}
+	route.FilterPath = file.Path
+	if m.focus == focusDiff {
+		startLine, endLine := m.activeLogLineRange()
+		route.FilterStartLine = startLine
+		route.FilterEndLine = endLine
+	}
+	return route
+}
+
+func (m Model) activeLogLineRange() (startLine, endLine int) {
+	navMode := m.diffarea.NavMode()
+	data := m.diffarea.SectionModel(diffarea.SectionUnstaged).Data()
+
+	if navMode == diffview.NavModeHunk {
+		if data.ActiveHunk >= 0 && data.ActiveHunk < len(data.Parsed.Hunks) {
+			h := data.Parsed.Hunks[data.ActiveHunk]
+			end := h.NewStart + h.NewCount - 1
+			if end < h.NewStart {
+				end = h.NewStart
+			}
+			return h.NewStart, end
+		}
+		return 0, 0
+	}
+	// NavModeLine: only changed lines have NewLine > 0
+	if data.ActiveLine >= 0 && data.ActiveLine < len(data.Parsed.Changed) {
+		cl := data.Parsed.Changed[data.ActiveLine]
+		if cl.NewLine > 0 {
+			return cl.NewLine, cl.NewLine
+		}
+	}
+	return 0, 0
 }

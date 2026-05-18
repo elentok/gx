@@ -1,6 +1,7 @@
 package git
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -89,21 +90,55 @@ func ResolveCommitish(repoRoot, ref string) (string, error) {
 	return strings.TrimSpace(out), nil
 }
 
+// LogFilter restricts a log query to a file path or a line range within a file.
+type LogFilter struct {
+	Path      string
+	StartLine int // 0 = file-only (no -L)
+	EndLine   int
+}
+
+func (f LogFilter) IsActive() bool { return f.Path != "" }
+
 func LogEntries(repoRoot, startRef string, limit int) ([]LogEntry, error) {
+	return LogEntriesFiltered(repoRoot, startRef, limit, LogFilter{})
+}
+
+func LogEntriesFiltered(repoRoot, startRef string, limit int, filter LogFilter) ([]LogEntry, error) {
 	if strings.TrimSpace(startRef) == "" {
 		startRef = "HEAD"
 	}
-	args := []string{
-		"log",
-		"--graph",
-		"--decorate=short",
-		"--date=iso-strict",
-		"--format=format:%x1f%H%x1f%h%x1f%an%x1f%aI%x1f%s%x1f%D",
+
+	useLineRange := filter.Path != "" && filter.StartLine > 0
+
+	var args []string
+	if useLineRange {
+		endLine := filter.EndLine
+		if endLine < filter.StartLine {
+			endLine = filter.StartLine
+		}
+		args = []string{
+			"log",
+			"--decorate=short",
+			"--date=iso-strict",
+			"--format=format:%x1f%H%x1f%h%x1f%an%x1f%aI%x1f%s%x1f%D",
+			fmt.Sprintf("-L%d,%d:%s", filter.StartLine, endLine, filter.Path),
+		}
+	} else {
+		args = []string{
+			"log",
+			"--graph",
+			"--decorate=short",
+			"--date=iso-strict",
+			"--format=format:%x1f%H%x1f%h%x1f%an%x1f%aI%x1f%s%x1f%D",
+		}
 	}
 	if limit > 0 {
 		args = append(args, "--max-count", strconv.Itoa(limit))
 	}
 	args = append(args, startRef)
+	if filter.Path != "" && !useLineRange {
+		args = append(args, "--", filter.Path)
+	}
 
 	out, _, err := run(repoRoot, args)
 	if err != nil {

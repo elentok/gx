@@ -129,6 +129,15 @@ func (m *Model) SetMatches(matches []Match) {
 	}
 }
 
+// SetPassiveResults stores query + matches while leaving search inactive.
+// This preserves highlight/navigation context without consuming esc/q.
+func (m *Model) SetPassiveResults(query string, matches []Match) {
+	m.textinput.SetValue(query)
+	m.query = query
+	m.mode = SearchModeNone
+	m.SetMatches(matches)
+}
+
 func (m *Model) SetMatchesAndJump(matches []Match) tea.Cmd {
 	m.SetMatches(matches)
 	if match, ok := m.Match(m.cursor); ok {

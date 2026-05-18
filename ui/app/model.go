@@ -225,12 +225,16 @@ func (m Model) newPage(route nav.Route) pageState {
 	case nav.RouteLog:
 		return pageState{
 			route: route,
-			model: logui.NewModel(route.WorktreeRoot, route.Ref, s),
+			model: logui.NewModelFiltered(route.WorktreeRoot, route.Ref, s, logui.LogFilter{
+				Path:      route.FilterPath,
+				StartLine: route.FilterStartLine,
+				EndLine:   route.FilterEndLine,
+			}),
 		}
 	case nav.RouteCommit:
 		return pageState{
 			route: route,
-			model: commitui.NewWithSettings(route.WorktreeRoot, route.Ref, s),
+			model: commitui.NewWithSettingsAndFilter(route.WorktreeRoot, route.Ref, route.FilterPath, s),
 		}
 	case nav.RouteWorktrees:
 		fallthrough
