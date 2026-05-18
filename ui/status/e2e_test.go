@@ -670,7 +670,7 @@ func TestStageE2E_SideBySideShowsActiveHunkGutterIndicator(t *testing.T) {
 
 	tm.Send(keySpecial(tea.KeyEnter))
 	tm.Send(keyRune('s'))
-	tm.Send(keyRune('F'))
+	tm.Send(keyRune('f'))
 
 	waitForStageStrippedText(t, tm, "render:side-by-side", stageActionWait)
 	waitForStageStrippedText(t, tm, "[fullscreen]", stageActionWait)
