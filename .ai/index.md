@@ -6,3 +6,5 @@
 - Don't show any keymaps on the statusbar, only "? help"
 - Whenever possible prefer using the LSP (gopls-mcp) over grepping
 - Transient feedback uses `ui/notify` (not `m.statusMsg`): emit `notify.Info/Success/Warning/Error/Progress()` as `tea.Cmd`
+- Avoid creating `New()` functions and prefer more descriptive functions, e.g.
+  `log.NewModel()`, `keys.NewManager()`, ...
