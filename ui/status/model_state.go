@@ -115,7 +115,7 @@ var (
 	ansiOSCRe = regexp.MustCompile(`\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)`) // OSC ... BEL/ST
 )
 
-func NewModel(worktreeRoot string, settings ui.Settings, initialPath string) Model {
+func NewModel(worktreeRoot string, settings ui.Settings, initialPath string, extraKeys keys.Manager) Model {
 	if settings.DiffContextLines < 0 {
 		settings.DiffContextLines = 0
 	}
@@ -130,7 +130,7 @@ func NewModel(worktreeRoot string, settings ui.Settings, initialPath string) Mod
 		settings:         settings,
 		initialPath:      initialPath,
 		diffContextLines: settings.DiffContextLines,
-		help:             help.NewModel(buildKeySections(statusKeys, *diffarreaModel.Keys(), *fileTreeModel.Keys())),
+		help:             help.NewModel(help.BuildSections(statusKeys, *diffarreaModel.Keys(), *fileTreeModel.Keys(), extraKeys)),
 		keys:             statusKeys,
 		focus:            focusFiletree,
 		diffarea:         diffarreaModel,
@@ -150,6 +150,7 @@ func NewModel(worktreeRoot string, settings ui.Settings, initialPath string) Mod
 	return m
 }
 
-func New(worktreeRoot string) Model {
-	return NewModel(worktreeRoot, DefaultSettings(), "")
+
+func (m *Model) KeyManager() *keys.Manager {
+	return &m.keys
 }

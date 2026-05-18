@@ -2,23 +2,31 @@ package status
 
 import (
 	"fmt"
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/diffview"
+	"github.com/elentok/gx/ui/diffview/diffrender"
+	notifypkg "github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/status/diffarea"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/ui"
-	notifypkg "github.com/elentok/gx/ui/notify"
-	"github.com/elentok/gx/ui/diffview"
-	"github.com/elentok/gx/ui/diffview/diffrender"
-	"github.com/elentok/gx/ui/nav"
-	"github.com/elentok/gx/ui/search"
-	"github.com/elentok/gx/ui/status/diffarea"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 )
+
+func newTestModel(worktreeRoot string, settings ui.Settings, initialPath string) Model {
+	return NewModel(worktreeRoot, settings, initialPath, keys.Manager{})
+}
+
+func newTestModelDefault(worktreeRoot string) Model {
+	return newTestModel(worktreeRoot, DefaultSettings(), "")
+}
 
 func TestUseStackedLayoutThreshold(t *testing.T) {
 	t.Parallel()
@@ -122,7 +130,7 @@ func TestQAndEscFocusBehavior(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "changed\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusDiff
 
@@ -147,7 +155,7 @@ func TestQAlwaysQuitsFromDiffFocus(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "changed\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusDiff
 
@@ -173,7 +181,7 @@ func TestFiletreeLOnFileEntersDiffAndKeepsSectionOnFileChange(t *testing.T) {
 	// File b is only unstaged.
 	testutil.WriteFile(t, repo, "b.txt", "ONE\ntwo\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 100
 	m.height = 20
@@ -214,7 +222,7 @@ func TestReloadDiffsForSelection_KeepsSectionForUntrackedFile(t *testing.T) {
 	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
 	testutil.WriteFile(t, repo, "untracked.txt", "hello\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 100
 	m.height = 20
@@ -259,7 +267,7 @@ func TestTabSwitchesDiffSectionsOnly(t *testing.T) {
 	testutil.MustGitExported(t, repo, "add", "a.txt")
 	testutil.WriteFile(t, repo, "a.txt", "ONE-again\ntwo\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusFiletree
 	m.diffarea.ActiveSection = diffarea.SectionUnstaged
@@ -300,7 +308,7 @@ func TestFiletreeHOnFileMovesSelectionToParentDir(t *testing.T) {
 	testutil.Mkdir(t, repo+"/ui/status")
 	testutil.WriteFile(t, repo, "ui/status/model.go", "package status\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusFiletree
 
@@ -334,7 +342,7 @@ func TestFiletreeLeftDoesNotMoveCompressedDirSelection(t *testing.T) {
 	testutil.Mkdir(t, repo+"/keyboards/iris/keymaps")
 	testutil.WriteFile(t, repo, "keyboards/iris/keymaps/myfile.c", "changed\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusFiletree
 
@@ -363,7 +371,7 @@ func statusModelWithDir(t *testing.T) Model {
 	testutil.Mkdir(t, repo+"/docs")
 	testutil.WriteFile(t, repo, "docs/a.md", "a\n")
 	testutil.WriteFile(t, repo, "docs/b.md", "b\n")
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusFiletree
 	dirIdx := -1
@@ -441,7 +449,7 @@ func TestHelpOverlayToggleAndCompactStatusBar(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "changed\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 120
 	m.height = 40
@@ -474,7 +482,7 @@ func TestHelpOverlayToggleAndCompactStatusBar(t *testing.T) {
 func TestHelpLineRightAlignsHint(t *testing.T) {
 	t.Setenv("TMUX", "")
 	t.Setenv("KITTY_WINDOW_ID", "")
-	m := New(testutil.TempRepo(t))
+	m := newTestModelDefault(testutil.TempRepo(t))
 	m.ready = true
 	m.width = 48
 	m.focus = focusFiletree
@@ -493,7 +501,7 @@ func TestHelpLineRightAlignsHint(t *testing.T) {
 func TestHelpLineTruncatesBareHintWithEllipsis(t *testing.T) {
 	t.Setenv("TMUX", "")
 	t.Setenv("KITTY_WINDOW_ID", "")
-	m := New(testutil.TempRepo(t))
+	m := newTestModelDefault(testutil.TempRepo(t))
 	m.ready = true
 	m.width = 12
 	m.focus = focusFiletree
@@ -512,7 +520,7 @@ func TestHelpLineTruncatesBareHintWithEllipsis(t *testing.T) {
 func TestHelpLineTruncatesHintWithEllipsisWhenNarrow(t *testing.T) {
 	t.Setenv("TMUX", "")
 	t.Setenv("KITTY_WINDOW_ID", "")
-	m := New(testutil.TempRepo(t))
+	m := newTestModelDefault(testutil.TempRepo(t))
 	m.ready = true
 	m.width = 18
 	m.focus = focusFiletree
@@ -531,7 +539,7 @@ func TestHelpLineTruncatesHintWithEllipsisWhenNarrow(t *testing.T) {
 func TestFiletreePaneShowsBranchSummaryInTitle(t *testing.T) {
 	t.Parallel()
 	repo := testutil.TempRepo(t)
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 100
 	m.height = 20
@@ -561,7 +569,7 @@ func TestNewWithInitialPathSelectsFileAndKeepsFiletreeFocus(t *testing.T) {
 	testutil.WriteFile(t, repo, "dir/a.txt", "one\n")
 	testutil.WriteFile(t, repo, "dir/b.txt", "two\n")
 
-	m := NewModel(repo, ui.Settings{
+	m := newTestModel(repo, ui.Settings{
 		DiffContextLines: 1,
 		UseNerdFontIcons: true,
 	}, "dir/b.txt")
@@ -608,7 +616,7 @@ func TestReloadBranchStateUsesBranchUpstream(t *testing.T) {
 	testutil.WriteFile(t, wtDir, "ahead.txt", "ahead")
 	testutil.CommitAll(t, wtDir, "ahead")
 
-	m := New(wtDir)
+	m := newTestModelDefault(wtDir)
 	m.reloadBranchState()
 
 	if m.statusData.branchName != "feature" {
@@ -631,7 +639,7 @@ func TestReloadBranchStateUsesBranchUpstream(t *testing.T) {
 func TestHelpLineShowsVisualAtLeftInDiffFocus(t *testing.T) {
 	t.Setenv("TMUX", "")
 	t.Setenv("KITTY_WINDOW_ID", "")
-	m := New(testutil.TempRepo(t))
+	m := newTestModelDefault(testutil.TempRepo(t))
 	m.ready = true
 	m.width = 96
 	m.focus = focusDiff
@@ -657,7 +665,7 @@ func TestToggleSideBySideModeWithS(t *testing.T) {
 	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
 	testutil.WriteFile(t, repo, "a.txt", "two\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
@@ -695,7 +703,7 @@ func TestToggleSideBySideModeWithSFromFiletreePane(t *testing.T) {
 	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
 	testutil.WriteFile(t, repo, "status-s.txt", "two\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusFiletree
 
@@ -744,7 +752,7 @@ func TestAdjustDiffContextLinesInDiffFocus(t *testing.T) {
 	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
 	testutil.WriteFile(t, repo, "ctx.txt", "zero\none\ntwo\nTHREE\n")
 
-	m := NewModel(repo, ui.Settings{DiffContextLines: 1, UseNerdFontIcons: true}, "")
+	m := newTestModel(repo, ui.Settings{DiffContextLines: 1, UseNerdFontIcons: true}, "")
 	m.ready = true
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -774,7 +782,7 @@ func TestUnifiedDiffViewHidesVisibleChangeMarkers(t *testing.T) {
 	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
 	testutil.WriteFile(t, repo, "clean.txt", "new-value\nkeep\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 120
 	m.height = 20
@@ -817,7 +825,7 @@ func TestDiffPaneKeepsEmptySectionVisible(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "only-unstaged.txt", "one\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 100
 	m.height = 20
@@ -839,7 +847,7 @@ func TestExpandedDiffPaneTitleShowsSelectedPathWithoutDiffFocus(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "only-unstaged.txt", "one\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 100
 	m.height = 20
@@ -863,7 +871,7 @@ func TestDiffPaneAnchorsCollapsedUnstagedAtTopWhenStagedActive(t *testing.T) {
 	testutil.MustGitExported(t, repo, "add", "a.txt")
 	testutil.WriteFile(t, repo, "a.txt", "ONE-again\ntwo\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 100
 	m.height = 20
@@ -904,7 +912,7 @@ func TestAdjustDiffContextLinesIsSessionOnly(t *testing.T) {
 	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
 	testutil.WriteFile(t, repo, "ctx-status.txt", "ONE\ntwo\n")
 
-	m := NewModel(repo, ui.Settings{DiffContextLines: 3, UseNerdFontIcons: true}, "")
+	m := newTestModel(repo, ui.Settings{DiffContextLines: 3, UseNerdFontIcons: true}, "")
 	m.ready = true
 	m.focus = focusFiletree
 
@@ -932,7 +940,7 @@ func TestSideBySideModeAllowsHunkStaging(t *testing.T) {
 	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
 	testutil.WriteFile(t, repo, "b.txt", "two\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
@@ -955,7 +963,7 @@ func TestSideBySideModeAllowsLineModeToggle(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "c.txt", "one\ntwo\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
@@ -984,7 +992,7 @@ func TestSideBySideModeAllowsVisualLineRangeStaging(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "v.txt", "new-1\nnew-2\nnew-3\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
@@ -1013,7 +1021,7 @@ func TestRefreshesOnFocusMsg(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 
 	countBefore := len(m.statusData.statusEntries)
@@ -1041,7 +1049,7 @@ func TestFocusMsgRefreshPreservesDiffScrollOffset(t *testing.T) {
 	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
 	testutil.WriteFile(t, repo, "scroll-focus.txt", strings.Join(updated, "\n")+"\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 120
 	m.height = 28
@@ -1059,7 +1067,7 @@ func TestFocusMsgRefreshPreservesDiffScrollOffset(t *testing.T) {
 
 func TestViewEnablesReportFocus(t *testing.T) {
 	t.Parallel()
-	m := New(testutil.TempRepo(t))
+	m := newTestModelDefault(testutil.TempRepo(t))
 	m.ready = true
 	v := m.View()
 	if !v.ReportFocus {
@@ -1072,7 +1080,7 @@ func TestFullscreenDiffHidesFiletreePane(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 120
 	m.height = 30
@@ -1091,7 +1099,7 @@ func TestSpaceStagesSingleLineInLineMode(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "line.txt", "line-1\nline-2\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 100
 	m.height = 20
@@ -1116,7 +1124,7 @@ func TestFiletreeSpaceTogglesWholeFile(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "changed\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusFiletree
 
@@ -1148,7 +1156,7 @@ func TestFiletreeDDiscardsUntrackedFileAfterConfirm(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "new.txt", "new\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusFiletree
 
@@ -1177,7 +1185,7 @@ func TestDiffUnstagedDDiscardsLineAfterConfirm(t *testing.T) {
 	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
 	testutil.WriteFile(t, repo, "line.txt", "ONE\ntwo\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusDiff
 	m.diffarea.ActiveSection = diffarea.SectionUnstaged
@@ -1209,7 +1217,7 @@ func TestDiffStagedDUnstagesSelectionWithoutConfirm(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "line.txt", "one\ntwo\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
@@ -1245,7 +1253,7 @@ func TestYankFilenameWithYFInFiletreeView(t *testing.T) {
 	}
 	t.Cleanup(func() { stageClipboardWrite = prev })
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusFiletree
 
@@ -1271,7 +1279,7 @@ func TestYankLocationWithYLInFiletreeViewYanksFilenameOnly(t *testing.T) {
 	}
 	t.Cleanup(func() { stageClipboardWrite = prev })
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusFiletree
 
@@ -1300,7 +1308,7 @@ func TestYankAllContextWithYAInDiffLineModeIncludesLocationAndSelectedLine(t *te
 	}
 	t.Cleanup(func() { stageClipboardWrite = prev })
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusDiff
 	m.diffarea.ActiveSection = diffarea.SectionUnstaged
@@ -1339,7 +1347,7 @@ func TestYankFilenameWithYFInDiffLineModeYanksFilenameOnly(t *testing.T) {
 	}
 	t.Cleanup(func() { stageClipboardWrite = prev })
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusDiff
 	m.diffarea.ActiveSection = diffarea.SectionUnstaged
@@ -1370,7 +1378,7 @@ func TestYankLocationOnlyWithYLInDiffVisualModeYanksOnlyLocation(t *testing.T) {
 	}
 	t.Cleanup(func() { stageClipboardWrite = prev })
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusDiff
 	m.diffarea.ActiveSection = diffarea.SectionUnstaged
@@ -1408,7 +1416,7 @@ func TestYankSelectionOnlyWithYYInDiffLineMode(t *testing.T) {
 	}
 	t.Cleanup(func() { stageClipboardWrite = prev })
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusDiff
 	m.diffarea.ActiveSection = diffarea.SectionUnstaged
@@ -1432,7 +1440,7 @@ func TestDiffJKScrollsWithoutMovingCursor(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "# test\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 120
 	m.height = 20
@@ -1497,7 +1505,7 @@ func TestHunkModeJKScrollsLargeHunkBeforeSwitching(t *testing.T) {
 	}
 	testutil.WriteFile(t, repo, "big.txt", strings.Join(updated, "\n")+"\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 100
 	m.height = 16
@@ -1551,7 +1559,7 @@ func TestHunkOverflowViewportMarkers(t *testing.T) {
 
 	assertMarkers := func(useNerd bool, up, down string) {
 		t.Helper()
-		m := NewModel(repo, ui.Settings{DiffContextLines: 1, UseNerdFontIcons: useNerd}, "")
+		m := newTestModel(repo, ui.Settings{DiffContextLines: 1, UseNerdFontIcons: useNerd}, "")
 		m.ready = true
 		m.width = 100
 		m.height = 16
@@ -1582,7 +1590,7 @@ func TestGInFiletreeAndDiffJumpsBottom(t *testing.T) {
 	testutil.WriteFile(t, repo, "b.txt", "two\n")
 	testutil.WriteFile(t, repo, "c.txt", "three\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusFiletree
 	m.statusData.listState.SetSelected(0, len(m.statusData.statusEntries))
@@ -1614,7 +1622,7 @@ func TestUppercaseGUsingShiftedCodeJumpsBottom(t *testing.T) {
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 	testutil.WriteFile(t, repo, "b.txt", "two\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusFiletree
 	m.statusData.listState.SetSelected(0, len(m.statusData.statusEntries))
@@ -1632,7 +1640,7 @@ func TestUppercaseGUsingShiftModifierJumpsBottom(t *testing.T) {
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 	testutil.WriteFile(t, repo, "b.txt", "two\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusFiletree
 	m.statusData.listState.SetSelected(0, len(m.statusData.statusEntries))
@@ -1656,12 +1664,12 @@ func TestGInDiffHunkModeJumpsViewportToBottom(t *testing.T) {
 	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
 
 	updated := append([]string{}, base...)
-	for i := 0; i < 28; i++ {
+	for i := range 28 {
 		updated[i] = "new-" + updated[i]
 	}
 	testutil.WriteFile(t, repo, "big.txt", strings.Join(updated, "\n")+"\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 100
 	m.height = 16
@@ -1689,7 +1697,7 @@ func TestCtrlDAndCtrlUScrollFiletreeAndDiff(t *testing.T) {
 		testutil.WriteFile(t, repo, fmt.Sprintf("f%02d.txt", i), "x\n")
 	}
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 120
 	m.height = 24
@@ -1780,14 +1788,13 @@ func TestStatusEntryColorRenamedFileIsBlue(t *testing.T) {
 	}
 }
 
-
 func TestFiletreeSelectionDebouncesDiffReload(t *testing.T) {
 	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 	testutil.WriteFile(t, repo, "b.txt", "two\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusFiletree
 
@@ -1814,7 +1821,7 @@ func TestStageSearchFiletreeModeAndNavigation(t *testing.T) {
 	testutil.WriteFile(t, repo, "apple.txt", "one\n")
 	testutil.WriteFile(t, repo, "apricot.txt", "two\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusFiletree
 
@@ -1859,7 +1866,7 @@ func TestFiletreeSearchModeShowsOverlay(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "apple.txt", "one\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 60
 	m.height = 20
@@ -1882,7 +1889,7 @@ func TestStageSearchDiffModeAndPrevNextKeys(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "needle-one\nline\nneedle-two\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 100
 	m.height = 20
@@ -1973,7 +1980,7 @@ func TestStageSearchDiffUsesRightEdgeIndicatorInHunkMode(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "needle-one\nline\nneedle-two\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 100
 	m.height = 20
@@ -1994,7 +2001,7 @@ func TestDiffJDoesNotOverscrollPastContent(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "# test\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 120
 	m.height = 20
@@ -2023,7 +2030,7 @@ func TestApplySelection_DoesNotSwitchSectionWhenHunksRemain(t *testing.T) {
 	testutil.CommitAll(t, repo, "baseline")
 	testutil.WriteFile(t, repo, "README.md", "L01\nl02\nl03\nl04\nl05\nl06\nl07\nl08\nl09\nl10\nl11\nl12\nl13\nl14\nl15\nl16\nl17\nl18\nl19\nL20\nl21\nl22\nl23\nl24\nl25\nl26\nl27\nl28\nl29\nl30\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 120
 	m.height = 24
@@ -2055,7 +2062,7 @@ func TestApplySelection_DoesNotSwitchSectionWhenCurrentSectionBecomesEmpty(t *te
 	testutil.CommitAll(t, repo, "baseline")
 	testutil.WriteFile(t, repo, "README.md", "ONE\ntwo\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 120
 	m.height = 24
@@ -2084,7 +2091,7 @@ func TestApplySelection_FlashesDestinationSectionWithoutSwitching(t *testing.T) 
 	testutil.CommitAll(t, repo, "baseline")
 	testutil.WriteFile(t, repo, "README.md", "ONE\ntwo\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 120
 	m.height = 24
@@ -2111,7 +2118,7 @@ func TestCCTriggersCommitCommand(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "changed\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
@@ -2153,7 +2160,7 @@ func TestCMInFiletreeDoesNothing(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "changed\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusFiletree
 
@@ -2170,12 +2177,11 @@ func TestCMInFiletreeDoesNothing(t *testing.T) {
 	m = updated.(Model)
 }
 
-
 func TestCMInDiffWithoutFileContextShowsError(t *testing.T) {
 	t.Parallel()
 	repo := testutil.TempRepo(t)
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusDiff
 
@@ -2200,7 +2206,7 @@ func TestYShowsBindingDrivenYankHint(t *testing.T) {
 	t.Parallel()
 	repo := testutil.TempRepo(t)
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
@@ -2229,7 +2235,7 @@ func TestGGJumpsToTop(t *testing.T) {
 	t.Parallel()
 	repo := testutil.TempRepo(t)
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusFiletree
 	m.statusData.statusEntries = []statusEntry{{Kind: statusEntryFile}, {Kind: statusEntryFile}, {Kind: statusEntryFile}}
@@ -2257,7 +2263,7 @@ func TestLTriggersLazygitLogCommand(t *testing.T) {
 	t.Parallel()
 	repo := testutil.TempRepo(t)
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 
 	_, cmd := m.Update(tea.KeyPressMsg{Code: 'L', Text: "L", ShiftedCode: 'L', Mod: tea.ModShift})
@@ -2266,39 +2272,12 @@ func TestLTriggersLazygitLogCommand(t *testing.T) {
 	}
 }
 
-func TestGLNavigatesToLogWhenNavigationEnabled(t *testing.T) {
-	t.Parallel()
-	repo := testutil.TempRepo(t)
-
-	m := NewModel(repo, ui.Settings{EnableNavigation: true}, "")
-	m.ready = true
-
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
-	m = updated.(Model)
-
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
-	if cmd == nil {
-		t.Fatalf("gl should navigate to log when navigation is enabled")
-	}
-	route, ok := nav.IsReplace(cmd())
-	if !ok {
-		t.Fatalf("expected nav replace message")
-	}
-	if route.Kind != nav.RouteLog {
-		t.Fatalf("expected log route, got %q", route.Kind)
-	}
-	m = updated.(Model)
-	if m.keys.Prefix() != nil {
-		t.Fatalf("expected prefix cleared after gl, got %v", m.keys.Prefix())
-	}
-}
-
 func TestNavigationStartupDefersInitialDiffLoad(t *testing.T) {
 	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "dirty.txt", "dirty\n")
 
-	m := NewModel(repo, ui.Settings{EnableNavigation: true}, "")
+	m := newTestModel(repo, ui.Settings{EnableNavigation: true}, "")
 	if m.activeFilePath != "" {
 		t.Fatalf("expected initial navigation startup to skip diff load, got %q", m.activeFilePath)
 	}
@@ -2320,7 +2299,7 @@ func TestGOOpensOutputModal(t *testing.T) {
 	t.Parallel()
 	repo := testutil.TempRepo(t)
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.output.Set("test", "hello")
 
@@ -2348,7 +2327,7 @@ func TestEOpensEditorFromFiletreeAndDiff(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "edit.txt", "one\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusFiletree
 
@@ -2397,7 +2376,7 @@ func TestEditorLineForCurrentSelectionInDiffMode(t *testing.T) {
 	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
 	testutil.WriteFile(t, repo, "line.txt", "new-1\nnew-2\nnew-3\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusDiff
 	m.diffarea.ActiveSection = diffarea.SectionUnstaged
@@ -2430,7 +2409,7 @@ func TestMouseWheelScrollsUnstagedDiffViewport(t *testing.T) {
 	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
 	testutil.WriteFile(t, repo, "scroll.txt", strings.Join(after, "\n")+"\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 120
 	m.height = 26
@@ -2460,7 +2439,7 @@ func TestMouseWheelScrollsStagedDiffViewport(t *testing.T) {
 	testutil.WriteFile(t, repo, "staged-scroll.txt", strings.Join(after, "\n")+"\n")
 	testutil.MustGitExported(t, repo, "add", "staged-scroll.txt")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 120
 	m.height = 26
@@ -2481,7 +2460,7 @@ func TestWToggleSoftWrap(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "this is a very long line that should wrap in narrow diff panes\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 80
 	m.height = 20
@@ -2524,7 +2503,7 @@ func TestBinaryFileShowsSizeSummaryInsteadOfNoFileSelected(t *testing.T) {
 		t.Fatalf("write modified binary: %v", err)
 	}
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.width = 120
 	m.height = 24
@@ -2623,7 +2602,7 @@ func TestLineModeCanUnstageSingleModifiedLine(t *testing.T) {
 	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
 	testutil.WriteFile(t, repo, "README.md", "new-1\nnew-2\nnew-3\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 
 	// Stage everything first.
@@ -2665,7 +2644,7 @@ func TestLineModeStagesSingleLineInUntrackedFile(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "new.txt", "line-1\nline-2\nline-3\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -2709,7 +2688,7 @@ func TestLineModeUnstageOneOfAdjacentDeletedLinesDoesNotDuplicate(t *testing.T) 
 	}, "\n") + "\n"
 	testutil.WriteFile(t, repo, "f.go", updated)
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 
 	updatedModel, _ := m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
@@ -2770,7 +2749,7 @@ func TestLineModeUnstageBraceFromFirstHunkBlock(t *testing.T) {
 	}, "\n") + "\n"
 	testutil.WriteFile(t, repo, "stage.go", updated)
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 
 	updatedModel, _ := m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
@@ -2802,7 +2781,7 @@ func TestVisualModeStagesLineRange(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "range.txt", "one\ntwo\nthree\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusDiff
 	m.diffarea.ActiveSection = diffarea.SectionUnstaged
@@ -2836,7 +2815,7 @@ func TestEscExitsVisualModeAndKeepsDiffFocus(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "range.txt", "one\ntwo\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusDiff
 	m.diffarea.ActiveSection = diffarea.SectionUnstaged
@@ -2865,7 +2844,7 @@ func TestDiffDotMovesToNextFile(t *testing.T) {
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 	testutil.WriteFile(t, repo, "b.txt", "two\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusDiff
 	m.diffarea.ActiveSection = diffarea.SectionUnstaged
@@ -2896,7 +2875,7 @@ func TestDiffCommaMovesToPreviousFile(t *testing.T) {
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 	testutil.WriteFile(t, repo, "b.txt", "two\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusDiff
 	m.diffarea.ActiveSection = diffarea.SectionUnstaged
@@ -2926,7 +2905,7 @@ func TestVisualModeUnstagesLineRange(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "range.txt", "one\ntwo\nthree\n")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeySpace})

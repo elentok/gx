@@ -19,9 +19,6 @@ const (
 	bindingReload     keys.BindingID = "reload"
 	bindingTop        keys.BindingID = "top"
 	bindingGotoHead   keys.BindingID = "goto-head"
-	bindingGotoWT     keys.BindingID = "goto-worktrees"
-	bindingGotoLog    keys.BindingID = "goto-log"
-	bindingGotoStatus keys.BindingID = "goto-status"
 	bindingNextTag    keys.BindingID = "next-tag"
 	bindingPrevTag    keys.BindingID = "prev-tag"
 	bindingCancel     keys.BindingID = "cancel-chord"
@@ -54,9 +51,6 @@ func newLogManager() keys.Manager {
 		{ID: bindingTop, Seq: []string{"g", "g"}, Categories: []string{"Navigation"}, Title: "top"},
 		{ID: bindingViewOutput, Seq: []string{"g", "o"}, Categories: []string{"Other"}, Title: "view output"},
 		{ID: bindingGotoHead, Seq: []string{"g", "h"}, Categories: []string{"Jump"}, Title: "goto HEAD"},
-		{ID: bindingGotoWT, Seq: []string{"g", "w"}, Categories: []string{"Go to"}, Title: "goto worktrees"},
-		{ID: bindingGotoLog, Seq: []string{"g", "l"}, Categories: []string{"Go to"}, Title: "goto log"},
-		{ID: bindingGotoStatus, Seq: []string{"g", "s"}, Categories: []string{"Go to"}, Title: "goto status"},
 		{ID: bindingCancel, Seq: []string{"g", "esc"}, Categories: []string{}, Title: ""},
 
 		{ID: bindingNextTag, Seq: []string{"]", "t"}, Categories: []string{"Jump"}, Title: "next tag"},
@@ -118,15 +112,6 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 			return m, nav.Replace(nav.Route{Kind: nav.RouteLog, WorktreeRoot: m.worktreeRoot, Ref: "HEAD"})
 		}
 		return m, nil
-	case bindingGotoWT:
-		m.statusMsg = ""
-		return m, nav.Replace(nav.Route{Kind: nav.RouteWorktrees})
-	case bindingGotoLog:
-		m.statusMsg = ""
-		return m, nav.Replace(nav.Route{Kind: nav.RouteLog, WorktreeRoot: m.worktreeRoot, Ref: m.startRef})
-	case bindingGotoStatus:
-		m.statusMsg = ""
-		return m, nav.Replace(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: m.worktreeRoot})
 	case bindingNextTag:
 		m.jumpToTaggedCommit(1)
 		return m, nil

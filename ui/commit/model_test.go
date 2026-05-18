@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/nav"
@@ -20,12 +21,20 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
+func newTestModel(worktreeRoot, ref string) Model {
+	return NewModel(worktreeRoot, ref, "", ui.Settings{UseNerdFontIcons: true}, keys.Manager{})
+}
+
+func newTestModelWithFilter(worktreeRoot, ref, filterPath string, settings ui.Settings) Model {
+	return NewModel(worktreeRoot, ref, filterPath, settings, keys.Manager{})
+}
+
 func TestNewLoadsCommitDetails(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 	testutil.CommitAll(t, repo, "first")
 
-	m := New(repo, "HEAD")
+	m := newTestModel(repo, "HEAD")
 	if m.err != nil {
 		t.Fatalf("New err: %v", m.err)
 	}
@@ -39,7 +48,7 @@ func TestBToggleBody(t *testing.T) {
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 	testutil.CommitAll(t, repo, "subject\n\nbody")
 
-	m := New(repo, "HEAD")
+	m := newTestModel(repo, "HEAD")
 	if !m.bodyExpanded {
 		t.Fatalf("expected body expanded by default")
 	}
@@ -70,7 +79,7 @@ func TestEnterFocusesDiffAndJKMoveInsideDiff(t *testing.T) {
 	testutil.WriteFile(t, repo, "a.txt", "one\nTWO\nTHREE\nfour\n")
 	testutil.CommitAll(t, repo, "change")
 
-	m := New(repo, "HEAD")
+	m := newTestModel(repo, "HEAD")
 	m.ready = true
 	m.width = 100
 	m.height = 24
@@ -108,7 +117,7 @@ func TestJKWithoutDiffFocusMoveFiles(t *testing.T) {
 	testutil.WriteFile(t, repo, "b.txt", "B\n")
 	testutil.CommitAll(t, repo, "change")
 
-	m := New(repo, "HEAD")
+	m := newTestModel(repo, "HEAD")
 	m.ready = true
 	if len(m.files) < 2 {
 		t.Fatalf("expected multiple files, got %d", len(m.files))
@@ -131,7 +140,7 @@ func TestEscLeavesDiffFocusBeforeBackingOut(t *testing.T) {
 	testutil.WriteFile(t, repo, "a.txt", "two\n")
 	testutil.CommitAll(t, repo, "change")
 
-	m := New(repo, "HEAD")
+	m := newTestModel(repo, "HEAD")
 	m.ready = true
 	m.width = 100
 	m.height = 24
@@ -155,7 +164,7 @@ func TestTabCyclesBetweenSidebarDiffAndHeader(t *testing.T) {
 	testutil.WriteFile(t, repo, "a.txt", "two\n")
 	testutil.CommitAll(t, repo, "change")
 
-	m := New(repo, "HEAD")
+	m := newTestModel(repo, "HEAD")
 	m.ready = true
 	m.width = 100
 	m.height = 24
@@ -189,7 +198,7 @@ func TestSidebarSearchMovesToFileMatches(t *testing.T) {
 	testutil.WriteFile(t, repo, "beta.txt", "TWO\n")
 	testutil.CommitAll(t, repo, "change")
 
-	m := New(repo, "HEAD")
+	m := newTestModel(repo, "HEAD")
 	m.ready = true
 	m.width = 100
 	m.height = 24
@@ -238,7 +247,7 @@ func TestFilterPathHighlightsAndFocusesFileOnOpen(t *testing.T) {
 	testutil.WriteFile(t, repo, "beta.txt", "TWO\n")
 	testutil.CommitAll(t, repo, "change")
 
-	m := NewWithSettingsAndFilter(repo, "HEAD", "beta.txt", ui.Settings{})
+	m := newTestModelWithFilter(repo, "HEAD", "beta.txt", ui.Settings{})
 	file, ok := m.selectedCommitFile()
 	if !ok {
 		t.Fatalf("expected selected commit file")
@@ -267,7 +276,7 @@ func TestFilterPathPassiveSearchDoesNotBlockBack(t *testing.T) {
 	testutil.WriteFile(t, repo, "alpha.txt", "ONE\n")
 	testutil.CommitAll(t, repo, "change")
 
-	m := NewWithSettingsAndFilter(repo, "HEAD", "alpha.txt", ui.Settings{})
+	m := newTestModelWithFilter(repo, "HEAD", "alpha.txt", ui.Settings{})
 	_, cmd := m.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
 	if cmd == nil {
 		t.Fatalf("expected nav back command on q")
@@ -284,7 +293,7 @@ func TestDiffSearchMovesToMatchesAndNavigates(t *testing.T) {
 	testutil.WriteFile(t, repo, "a.txt", "alpha\nTWO\nalpha three\nfour\n")
 	testutil.CommitAll(t, repo, "change")
 
-	m := New(repo, "HEAD")
+	m := newTestModel(repo, "HEAD")
 	m.ready = true
 	m.width = 100
 	m.height = 24
@@ -333,7 +342,7 @@ func TestYankFilenameWithYF(t *testing.T) {
 	}
 	t.Cleanup(func() { commitClipboardWrite = prev })
 
-	m := New(repo, "HEAD")
+	m := newTestModel(repo, "HEAD")
 	m.ready = true
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
@@ -361,7 +370,7 @@ func TestYankAllContextWithYAInDiff(t *testing.T) {
 	}
 	t.Cleanup(func() { commitClipboardWrite = prev })
 
-	m := New(repo, "HEAD")
+	m := newTestModel(repo, "HEAD")
 	m.ready = true
 	m.width = 100
 	m.height = 24
@@ -395,7 +404,7 @@ func TestYankCommitBodyWithYYInHeader(t *testing.T) {
 	}
 	t.Cleanup(func() { commitClipboardWrite = prev })
 
-	m := New(repo, "HEAD")
+	m := newTestModel(repo, "HEAD")
 	m.ready = true
 	m.focusHeader = true
 
@@ -432,7 +441,7 @@ func TestFilesPaneShowsNerdFontIcons(t *testing.T) {
 	testutil.WriteFile(t, repo, "dir/file.txt", "two\n")
 	testutil.CommitAll(t, repo, "change")
 
-	m := NewWithSettings(repo, "HEAD", ui.Settings{UseNerdFontIcons: true})
+	m := newTestModel(repo, "HEAD")
 	m.ready = true
 	m.width = 100
 	m.height = 24
@@ -457,7 +466,7 @@ func TestInitialSelectionChoosesFirstFileOverDirectory(t *testing.T) {
 	testutil.WriteFile(t, repo, "dir/file.txt", "ONE\nTWO\nTHREE\n")
 	testutil.CommitAll(t, repo, "change")
 
-	m := New(repo, "HEAD")
+	m := newTestModel(repo, "HEAD")
 	entry, ok := m.selectedCommitEntry()
 	if !ok {
 		t.Fatal("expected selected commit entry")
@@ -479,7 +488,7 @@ func TestCommaDotInFilesFrameSwitchCommits(t *testing.T) {
 	testutil.WriteFile(t, repo, "a.txt", "three\n")
 	testutil.CommitAll(t, repo, "top")
 
-	m := New(repo, "HEAD~1")
+	m := newTestModel(repo, "HEAD~1")
 	m.ready = true
 
 	if m.details.Subject != "middle" {
@@ -508,7 +517,7 @@ func TestCommaDotInHeaderFrameSwitchCommits(t *testing.T) {
 	testutil.WriteFile(t, repo, "a.txt", "three\n")
 	testutil.CommitAll(t, repo, "top")
 
-	m := New(repo, "HEAD~1")
+	m := newTestModel(repo, "HEAD~1")
 	m.ready = true
 	m.focusHeader = true
 
@@ -534,7 +543,7 @@ func TestCommaDotInDiffFrameSwitchFiles(t *testing.T) {
 	testutil.WriteFile(t, repo, "b.txt", "B\n")
 	testutil.CommitAll(t, repo, "change")
 
-	m := New(repo, "HEAD")
+	m := newTestModel(repo, "HEAD")
 	m.ready = true
 	m.width = 100
 	m.height = 24
@@ -582,7 +591,7 @@ func commitModelWithDir(t *testing.T) Model {
 	testutil.WriteFile(t, repo, "dir/a.txt", "ONE\n")
 	testutil.WriteFile(t, repo, "dir/b.txt", "TWO\n")
 	testutil.CommitAll(t, repo, "change")
-	m := New(repo, "HEAD")
+	m := newTestModel(repo, "HEAD")
 	m.ready = true
 	m.width = 100
 	m.height = 24
@@ -658,7 +667,7 @@ func TestRenderDiffPaneShowsActiveHunkMarkerInUnifiedMode(t *testing.T) {
 	testutil.WriteFile(t, repo, "dir/file.txt", "one\nTWO\nTHREE\nfour\n")
 	testutil.CommitAll(t, repo, "change")
 
-	m := New(repo, "HEAD")
+	m := newTestModel(repo, "HEAD")
 	m.ready = true
 	m.width = 100
 	m.height = 24
@@ -678,7 +687,7 @@ func TestViewFitsWindowHeight(t *testing.T) {
 	testutil.WriteFile(t, repo, "a.txt", "ONE\nTWO\n")
 	testutil.CommitAll(t, repo, "change")
 
-	m := New(repo, "HEAD")
+	m := newTestModel(repo, "HEAD")
 	m.ready = true
 	m.width = 100
 	m.height = 24
@@ -700,7 +709,7 @@ func TestHeaderViewportMaxRowsAndScrollMarkers(t *testing.T) {
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 	testutil.CommitAll(t, repo, "subject\n\nl1\nl2\nl3\nl4\nl5\nl6\nl7\nl8")
 
-	m := New(repo, "HEAD")
+	m := newTestModel(repo, "HEAD")
 	m.ready = true
 	m.width = 100
 	m.height = 24
@@ -732,7 +741,7 @@ func TestHeaderScrollRequiresHeaderFocus(t *testing.T) {
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 	testutil.CommitAll(t, repo, "subject\n\nl1\nl2\nl3\nl4\nl5\nl6\nl7\nl8")
 
-	m := New(repo, "HEAD")
+	m := newTestModel(repo, "HEAD")
 	m.ready = true
 	m.width = 100
 	m.height = 24
@@ -764,7 +773,7 @@ func TestCMOutsideDiffDoesNothing(t *testing.T) {
 	testutil.WriteFile(t, repo, "README.md", "one\n")
 	testutil.CommitAll(t, repo, "base")
 
-	m := New(repo, "HEAD")
+	m := newTestModel(repo, "HEAD")
 	m.focusDiff = false
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
@@ -781,7 +790,7 @@ func TestCMOutsideDiffDoesNothing(t *testing.T) {
 
 func TestCMInDiffWithoutFileContextShowsError(t *testing.T) {
 	repo := testutil.TempRepo(t)
-	m := New(repo, "HEAD")
+	m := newTestModel(repo, "HEAD")
 	m.focusDiff = true
 	m.files = nil
 	m.fileTreeModel.SetEntries(nil)
@@ -814,7 +823,7 @@ func TestMouseWheelScrollsDiffViewport(t *testing.T) {
 	testutil.WriteFile(t, repo, "scroll.txt", strings.Join(after, "\n")+"\n")
 	testutil.CommitAll(t, repo, "change")
 
-	m := New(repo, "HEAD")
+	m := newTestModel(repo, "HEAD")
 	m.ready = true
 	m.width = 100
 	m.height = 24
@@ -844,7 +853,7 @@ func TestMouseWheelOverFiletreeScrollsFiletree(t *testing.T) {
 	}
 	testutil.CommitAll(t, repo, "change all")
 
-	m := New(repo, "HEAD")
+	m := newTestModel(repo, "HEAD")
 	m.ready = true
 	m.width = 100
 	m.height = 24
@@ -875,7 +884,7 @@ func TestMouseWheelOutsideDiffDoesNotScroll(t *testing.T) {
 	testutil.WriteFile(t, repo, "scroll.txt", strings.Join(after, "\n")+"\n")
 	testutil.CommitAll(t, repo, "change")
 
-	m := New(repo, "HEAD")
+	m := newTestModel(repo, "HEAD")
 	m.ready = true
 	m.width = 100
 	m.height = 24

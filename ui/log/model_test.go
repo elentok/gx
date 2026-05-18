@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/help"
+	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/search"
 
@@ -24,8 +25,16 @@ func newTestModel() Model {
 		keys:   newLogManager(),
 		search: search.NewModel(),
 	}
-	m.help = help.NewModel(buildKeySections(m.keys))
+	m.help = help.NewModel(help.BuildSections(m.keys, m.search.Keys()))
 	return m
+}
+
+func newTestModelDefault(worktreeRoot, startRef string, settings ui.Settings) Model {
+	return NewModel(worktreeRoot, startRef, settings, LogFilter{}, keys.Manager{})
+}
+
+func newTestModelFiltered(worktreeRoot, startRef string, settings ui.Settings, filter LogFilter) Model {
+	return NewModel(worktreeRoot, startRef, settings, filter, keys.Manager{})
 }
 
 func TestReloadAssignsBranchHistoryClasses(t *testing.T) {
@@ -46,7 +55,7 @@ func TestReloadAssignsBranchHistoryClasses(t *testing.T) {
 	testutil.WriteFile(t, wtDir, "local.txt", "local\n")
 	testutil.CommitAll(t, wtDir, "local only")
 
-	m := NewModel(wtDir, "", settings)
+	m := newTestModelDefault(wtDir, "", settings)
 	got := map[string]git.BranchHistoryClass{}
 	for _, row := range m.rows {
 		if row.kind != rowCommit {
@@ -93,7 +102,7 @@ func TestGHResetsCustomRefToHead(t *testing.T) {
 	testutil.WriteFile(t, repo, "one.txt", "one\n")
 	testutil.CommitAll(t, repo, "one")
 
-	m := NewModel(repo, "HEAD~1", ui.Settings{EnableNavigation: true})
+	m := newTestModelDefault(repo, "HEAD~1", ui.Settings{EnableNavigation: true})
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	m = updated.(Model)
 
@@ -113,7 +122,7 @@ func TestGHResetsCustomRefToHead(t *testing.T) {
 func TestEnterOnCommitRowOpensCommitRoute(t *testing.T) {
 	repo := testutil.TempRepo(t)
 
-	m := NewModel(repo, "", settings)
+	m := newTestModelDefault(repo, "", settings)
 	for i := range m.rows {
 		if m.rows[i].kind == rowCommit {
 			m.list.SetSelected(i, len(m.rows))
@@ -141,7 +150,7 @@ func TestEnterOnCommitRowCarriesActiveFilterPath(t *testing.T) {
 	testutil.WriteFile(t, repo, "src/main.go", "package main\n")
 	testutil.CommitAll(t, repo, "add file")
 
-	m := NewModelFiltered(repo, "", settings, LogFilter{Path: "src/main.go"})
+	m := newTestModelFiltered(repo, "", settings, LogFilter{Path: "src/main.go"})
 	for i := range m.rows {
 		if m.rows[i].kind == rowCommit {
 			m.list.SetSelected(i, len(m.rows))
@@ -244,7 +253,7 @@ func TestCloseSearchKeepsMatchesVisible(t *testing.T) {
 	testutil.WriteFile(t, repo, "two.txt", "two\n")
 	testutil.CommitAll(t, repo, "fix two")
 
-	m := NewModel(repo, "", settings)
+	m := newTestModelDefault(repo, "", settings)
 	m.search.Start("fix")
 	m.recomputeSearchMatches()
 	if m.search.MatchesCount() == 0 {
@@ -267,7 +276,7 @@ func TestNAndNShiftMoveBetweenSearchResults(t *testing.T) {
 	testutil.WriteFile(t, repo, "two.txt", "two\n")
 	testutil.CommitAll(t, repo, "fix two")
 
-	m := NewModel(repo, "", settings)
+	m := newTestModelDefault(repo, "", settings)
 	m.search.Start("fix")
 	m.recomputeSearchMatches()
 	if m.search.MatchesCount() < 2 {
@@ -346,7 +355,7 @@ func TestTagJumpChordStopsAtEdges(t *testing.T) {
 func TestFocusReloadsRowsAfterOnDiskChange(t *testing.T) {
 	repo := testutil.TempRepo(t)
 
-	m := NewModel(repo, "", settings)
+	m := newTestModelDefault(repo, "", settings)
 	initialRows := len(m.rows)
 
 	testutil.WriteFile(t, repo, "new.txt", "new\n")

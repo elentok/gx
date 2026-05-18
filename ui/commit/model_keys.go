@@ -29,9 +29,6 @@ const (
 	bindingLeft        keys.BindingID = "left"
 	bindingRefresh     keys.BindingID = "refresh"
 	bindingGotoTop     keys.BindingID = "goto-top"
-	bindingGotoWT      keys.BindingID = "goto-worktrees"
-	bindingGotoLog     keys.BindingID = "goto-log"
-	bindingGotoStatus  keys.BindingID = "goto-status"
 	bindingYankContent keys.BindingID = "yank-content"
 	bindingYankLoc     keys.BindingID = "yank-location"
 	bindingYankAll     keys.BindingID = "yank-all"
@@ -73,9 +70,6 @@ func newCommitManager() keys.Manager {
 		{ID: bindingRefresh, Seq: []string{"R"}, Categories: []string{"Global"}, Title: "refresh"},
 
 		{ID: bindingGotoTop, Seq: []string{"g", "g"}, Categories: []string{"Go to"}, Title: "top"},
-		{ID: bindingGotoWT, Seq: []string{"g", "w"}, Categories: []string{"Go to"}, Title: "goto worktrees"},
-		{ID: bindingGotoLog, Seq: []string{"g", "l"}, Categories: []string{"Go to"}, Title: "goto log"},
-		{ID: bindingGotoStatus, Seq: []string{"g", "s"}, Categories: []string{"Go to"}, Title: "goto status"},
 		{ID: bindingCancelChord, Seq: []string{"g", "esc"}, Categories: []string{}, Title: ""},
 
 		{ID: bindingYankContent, Seq: []string{"y", "y"}, Categories: []string{"Yank"}, Title: "yank content"},
@@ -268,12 +262,6 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 			m.jumpSidebarTop()
 		}
 		return m, nil
-	case bindingGotoWT:
-		return m, nav.Replace(nav.Route{Kind: nav.RouteWorktrees})
-	case bindingGotoLog:
-		return m, nav.Replace(nav.Route{Kind: nav.RouteLog, WorktreeRoot: m.worktreeRoot, Ref: m.ref})
-	case bindingGotoStatus:
-		return m, nav.Replace(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: m.worktreeRoot})
 	case bindingYankContent:
 		if m.focusHeader {
 			return m, m.yankCommitBody()

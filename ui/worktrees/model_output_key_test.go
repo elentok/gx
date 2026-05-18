@@ -103,7 +103,7 @@ func TestGShowsChordHint(t *testing.T) {
 	for _, h := range hints {
 		allDescs += " " + h.Keys() + " " + h.Title
 	}
-	for _, want := range []string{"g", "top", "o", "view output", "w", "goto worktrees", "l", "goto log", "s", "goto status"} {
+	for _, want := range []string{"g", "top", "o", "view output"} {
 		if !strings.Contains(allDescs, want) {
 			t.Fatalf("expected chord hint %q in ChordHints descriptions %q", want, allDescs)
 		}
@@ -131,7 +131,7 @@ func TestLTriggersLazygitLogCommand(t *testing.T) {
 	_ = updated
 }
 
-func TestGLNavigatesToLogWhenNavigationEnabled(t *testing.T) {
+func TestGLIsNotHandledByWorktreesView(t *testing.T) {
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -148,15 +148,8 @@ func TestGLNavigatesToLogWhenNavigationEnabled(t *testing.T) {
 	m = updated.(Model)
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
-	if cmd == nil {
-		t.Fatalf("gl should navigate to log when navigation is enabled")
-	}
-	route, ok := nav.IsReplace(cmd())
-	if !ok {
-		t.Fatalf("expected nav replace message")
-	}
-	if route.Kind != nav.RouteLog {
-		t.Fatalf("expected log route, got %q", route.Kind)
+	if cmd != nil {
+		t.Fatalf("gl should be app-level and not handled by worktrees view directly")
 	}
 	m = updated.(Model)
 	if p := m.keyManager.Prefix(); len(p) != 0 {

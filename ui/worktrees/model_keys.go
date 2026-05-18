@@ -33,9 +33,6 @@ const (
 
 	bindingGotoTop       keymgr.BindingID = "goto-top"
 	bindingGoOutput      keymgr.BindingID = "go-output"
-	bindingGotoWorktrees keymgr.BindingID = "goto-worktrees"
-	bindingGotoLog       keymgr.BindingID = "goto-log"
-	bindingGotoStatus    keymgr.BindingID = "goto-status"
 	bindingRefreshMenu   keymgr.BindingID = "refresh-menu"
 	bindingCancelChord   keymgr.BindingID = "cancel-chord"
 )
@@ -65,9 +62,6 @@ func newWorktreesManager() keymgr.Manager {
 
 		{ID: bindingGotoTop, Seq: []string{"g", "g"}, Categories: []string{"Go to"}, Title: "top"},
 		{ID: bindingGoOutput, Seq: []string{"g", "o"}, Categories: []string{"Go to"}, Title: "view output"},
-		{ID: bindingGotoWorktrees, Seq: []string{"g", "w"}, Categories: []string{"Go to"}, Title: "goto worktrees"},
-		{ID: bindingGotoLog, Seq: []string{"g", "l"}, Categories: []string{"Go to"}, Title: "goto log"},
-		{ID: bindingGotoStatus, Seq: []string{"g", "s"}, Categories: []string{"Go to"}, Title: "goto status"},
 		{ID: bindingCancelChord, Seq: []string{"g", "esc"}, Categories: []string{}, Title: ""},
 
 		{ID: bindingRefreshMenu, Seq: []string{"m", "r"}, Categories: []string{"Global"}, Title: "refresh"},
@@ -234,27 +228,6 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 			return m, notify.Info(ui.MessageNoOutput())
 		}
 		return m.enterLogsMode(), nil
-	case bindingGotoLog:
-		if m.settings.EnableNavigation {
-			wt := m.selectedWorktree()
-			if wt != nil {
-				return m, nav.Replace(nav.Route{Kind: nav.RouteLog, WorktreeRoot: wt.Path})
-			}
-		}
-		return m, nil
-	case bindingGotoStatus:
-		if m.settings.EnableNavigation {
-			wt := m.selectedWorktree()
-			if wt != nil {
-				return m, nav.Replace(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: wt.Path})
-			}
-		}
-		return m, nil
-	case bindingGotoWorktrees:
-		if m.settings.EnableNavigation {
-			return m, nav.Replace(nav.Route{Kind: nav.RouteWorktrees})
-		}
-		return m, nil
 	case bindingCancelChord:
 		return m, nil
 	}

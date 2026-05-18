@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	teatest "github.com/elentok/gx/testutil/teatestv2"
+	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/status"
 
 	tea "charm.land/bubbletea/v2"
@@ -25,9 +26,13 @@ const (
 	stageActionWait = 3 * time.Second
 )
 
+func newTestStatusModel(repoDir string) status.Model {
+	return status.NewModel(repoDir, status.DefaultSettings(), "", keys.Manager{})
+}
+
 func startStageTUI(t *testing.T, repoDir string) *teatest.TestModel {
 	t.Helper()
-	m := status.New(repoDir)
+	m := newTestStatusModel(repoDir)
 	return teatest.NewTestModel(t, m, teatest.WithInitialTermSize(stageTermWidth, stageTermHeight))
 }
 

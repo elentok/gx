@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	commitui "github.com/elentok/gx/ui/commit"
+	"github.com/elentok/gx/ui/keys"
 	logui "github.com/elentok/gx/ui/log"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
@@ -131,10 +132,10 @@ func (m Model) View() tea.View {
 	content = normalizeFrameContent(content, m.width, m.height)
 	content = injectTabsIntoFooter(content, m.tabsView(), m.width)
 	if m.keyPrefix != "" {
-		hints := m.appChordHints(m.keyPrefix)
+		hints := hintsForPrefix(m.keyPrefix)
 		if source, ok := m.activePage().model.(ui.ChordHintSource); ok {
 			if km := source.KeyManager(); km != nil {
-				hints = append(hints, ui.ChordBindingsFromHints(km.ChordHints())...)
+				hints = append(hints, ui.ChordBindingsFromHints(km.HintsForPrefix(m.keyPrefix))...)
 			}
 		}
 		if len(hints) > 0 {
@@ -220,7 +221,7 @@ func (m Model) newPage(route nav.Route) pageState {
 	case nav.RouteStatus:
 		return pageState{
 			route: route,
-			model: statusui.NewModel(route.WorktreeRoot, s, route.InitialPath),
+			model: statusui.NewModel(route.WorktreeRoot, s, route.InitialPath, keys.New(Bindings())),
 		}
 	case nav.RouteLog:
 		return pageState{
@@ -229,12 +230,12 @@ func (m Model) newPage(route nav.Route) pageState {
 				Path:      route.FilterPath,
 				StartLine: route.FilterStartLine,
 				EndLine:   route.FilterEndLine,
-			}),
+			}, keys.New(Bindings())),
 		}
 	case nav.RouteCommit:
 		return pageState{
 			route: route,
-			model: commitui.NewWithSettingsAndFilter(route.WorktreeRoot, route.Ref, route.FilterPath, s),
+			model: commitui.NewWithSettingsAndFilter(route.WorktreeRoot, route.Ref, route.FilterPath, s, keys.New(Bindings())),
 		}
 	case nav.RouteWorktrees:
 		fallthrough

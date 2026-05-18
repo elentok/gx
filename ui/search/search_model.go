@@ -5,6 +5,7 @@ import (
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/ui/keys"
 )
 
 type SearchMode int
@@ -85,6 +86,14 @@ func NewModel() Model {
 
 func (m Model) Init() tea.Cmd {
 	return nil
+}
+
+func (m Model) Keys() keys.Manager {
+	return keys.New([]keys.Binding{
+		{Seq: []string{"/"}, Categories: []string{"Search"}, Title: "search"},
+		{Seq: []string{"n"}, Categories: []string{"Search"}, Title: "next result"},
+		{Seq: []string{"N"}, Categories: []string{"Search"}, Title: "prev result"},
+	})
 }
 
 func (m *Model) Start(initialQuery string) {

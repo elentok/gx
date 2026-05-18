@@ -25,9 +25,11 @@ type keyMap struct {
 	Refresh      key.Binding
 	RemoteUpdate key.Binding
 	GoOutput     key.Binding
-	GoWorktrees  key.Binding
-	GoLog        key.Binding
-	GoStatus     key.Binding
+	PrevTab      key.Binding
+	NextTab      key.Binding
+	TabWorktrees key.Binding
+	TabLog       key.Binding
+	TabStatus    key.Binding
 	LazygitLog   key.Binding
 	Open         key.Binding
 	SearchNext   key.Binding
@@ -112,17 +114,25 @@ var keys = keyMap{
 		key.WithKeys("go"),
 		key.WithHelp("go", "view output"),
 	),
-	GoWorktrees: key.NewBinding(
-		key.WithKeys("gw"),
-		key.WithHelp("gw", "goto worktrees"),
+	PrevTab: key.NewBinding(
+		key.WithKeys("g,"),
+		key.WithHelp("g,", "prev tab"),
 	),
-	GoLog: key.NewBinding(
-		key.WithKeys("gl"),
-		key.WithHelp("gl", "goto log"),
+	NextTab: key.NewBinding(
+		key.WithKeys("g."),
+		key.WithHelp("g.", "next tab"),
 	),
-	GoStatus: key.NewBinding(
-		key.WithKeys("gs"),
-		key.WithHelp("gs", "goto status"),
+	TabWorktrees: key.NewBinding(
+		key.WithKeys("1", "gw"),
+		key.WithHelp("1/gw", "worktrees tab"),
+	),
+	TabLog: key.NewBinding(
+		key.WithKeys("2", "gl"),
+		key.WithHelp("2/gl", "log tab"),
+	),
+	TabStatus: key.NewBinding(
+		key.WithKeys("3", "gs"),
+		key.WithHelp("3/gs", "status tab"),
 	),
 	LazygitLog: key.NewBinding(
 		key.WithKeys("L"),
@@ -167,7 +177,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 		{k.Up, k.Down, k.Top},
 		{k.New, k.NewAndOpen, k.Open, k.Delete, k.Rename, k.Clone},
 		{k.Yank, k.Search},
-		{k.Pull, k.Push, k.Rebase, k.Track, k.Refresh, k.RemoteUpdate, k.GoWorktrees, k.GoLog, k.GoStatus, k.LazygitLog, k.Help, k.Quit},
+		{k.Pull, k.Push, k.Rebase, k.Track, k.Refresh, k.RemoteUpdate, k.PrevTab, k.NextTab, k.TabWorktrees, k.TabLog, k.TabStatus, k.LazygitLog, k.Help, k.Quit},
 	}
 }
 

@@ -94,11 +94,27 @@ func (m Manager) ChordHints() []ChordHint {
 	if len(m.prefix) == 0 {
 		return nil
 	}
+	return m.hintsForPrefix(m.prefix)
+}
+
+// HintsForPrefix returns chord completion hints for a given first key,
+// independent of the manager's current internal prefix state.
+func (m Manager) HintsForPrefix(prefix string) []ChordHint {
+	if prefix == "" {
+		return nil
+	}
+	return m.hintsForPrefix([]string{prefix})
+}
+
+func (m Manager) hintsForPrefix(prefix []string) []ChordHint {
+	if len(prefix) == 0 {
+		return nil
+	}
 	var hints []ChordHint
 	for _, b := range m.bindings {
-		if len(b.Seq) > len(m.prefix) && seqEqual(b.Seq[:len(m.prefix)], m.prefix) {
+		if len(b.Seq) > len(prefix) && seqEqual(b.Seq[:len(prefix)], prefix) {
 			hints = append(hints, ChordHint{
-				Key:  b.Seq[len(m.prefix)],
+				Key:  b.Seq[len(prefix)],
 				Desc: b.Title,
 			})
 		}

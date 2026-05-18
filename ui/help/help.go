@@ -1,6 +1,7 @@
 package help
 
 import (
+	"sort"
 	"strings"
 
 	"charm.land/bubbles/v2/viewport"
@@ -98,6 +99,41 @@ type KeySection struct {
 
 func NewKeySection(title string, bindings ...keys.Binding) KeySection {
 	return KeySection{Title: title, Bindings: bindings}
+}
+
+func BuildSections(managers ...keys.Manager) []KeySection {
+	categoryBindings := make(map[string][]keys.Binding)
+	seenInCategory := make(map[string]map[keys.BindingID]bool)
+	for _, manager := range managers {
+		for _, b := range manager.Bindings() {
+			if b.Title == "" {
+				continue
+			}
+			for _, cat := range b.Categories {
+				if cat == "" {
+					continue
+				}
+				if seenInCategory[cat] == nil {
+					seenInCategory[cat] = make(map[keys.BindingID]bool)
+				}
+				if seenInCategory[cat][b.ID] {
+					continue
+				}
+				seenInCategory[cat][b.ID] = true
+				categoryBindings[cat] = append(categoryBindings[cat], keys.Binding{ID: b.ID, Seq: b.Seq, Title: b.Title, Display: b.Display})
+			}
+		}
+	}
+	cats := make([]string, 0, len(categoryBindings))
+	for cat := range categoryBindings {
+		cats = append(cats, cat)
+	}
+	sort.Strings(cats)
+	sections := make([]KeySection, 0, len(cats))
+	for _, cat := range cats {
+		sections = append(sections, NewKeySection(cat, categoryBindings[cat]...))
+	}
+	return sections
 }
 
 func RenderView(sections []KeySection) string {

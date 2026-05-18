@@ -160,6 +160,10 @@ func dirtyStateFromChanges(changes []git.Change) dirtyState {
 	return out
 }
 
+func (m *Model) KeyManager() *keymgr.Manager {
+	return &m.keyManager
+}
+
 // selectedWorktree returns a pointer to the currently highlighted worktree, or nil.
 func (m Model) selectedWorktree() *git.Worktree {
 	if len(m.worktrees) == 0 {

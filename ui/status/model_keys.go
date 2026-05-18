@@ -16,9 +16,6 @@ const (
 	bindingGotoBottom    keys.BindingID = "goto-bottom"
 	bindingGotoTop       keys.BindingID = "goto-top"
 	bindingViewOutput    keys.BindingID = "view-output"
-	bindingGotoLog       keys.BindingID = "goto-log"
-	bindingGotoStatus    keys.BindingID = "goto-status"
-	bindingGotoWorktrees keys.BindingID = "goto-worktrees"
 	bindingGitCommit     keys.BindingID = "git-commit"
 	bindingComment       keys.BindingID = "comment"
 	bindingYankContent   keys.BindingID = "yank-content"
@@ -58,9 +55,6 @@ func newStatusManager() keys.Manager {
 		// g-prefix chords
 		{ID: bindingGotoTop, Seq: []string{"g", "g"}, Categories: []string{"Filetree", "Diff"}, Title: "go to top"},
 		{ID: bindingViewOutput, Seq: []string{"g", "o"}, Categories: []string{"Global"}, Title: "view output"},
-		{ID: bindingGotoLog, Seq: []string{"g", "l"}, Categories: []string{"Go to"}, Title: "goto log"},
-		{ID: bindingGotoStatus, Seq: []string{"g", "s"}, Categories: []string{"Go to"}, Title: "goto status"},
-		{ID: bindingGotoWorktrees, Seq: []string{"g", "w"}, Categories: []string{"Go to"}, Title: "goto worktrees"},
 		{ID: bindingCancelChord, Seq: []string{"g", "esc"}, Categories: []string{}, Title: ""},
 
 		// c-prefix chords
@@ -121,21 +115,6 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model,
 			return m, notify.Info(ui.MessageNoOutput())
 		}
 		m.openOutputModal()
-		return m, nil
-	case bindingGotoLog:
-		if m.settings.EnableNavigation {
-			return m, nav.Replace(nav.Route{Kind: nav.RouteLog, WorktreeRoot: m.worktreeRoot})
-		}
-		return m, nil
-	case bindingGotoStatus:
-		if m.settings.EnableNavigation {
-			return m, nav.Replace(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: m.worktreeRoot})
-		}
-		return m, nil
-	case bindingGotoWorktrees:
-		if m.settings.EnableNavigation {
-			return m, nav.Replace(nav.Route{Kind: nav.RouteWorktrees})
-		}
 		return m, nil
 	case bindingGitCommit:
 		return m, cmdGitCommit(m.worktreeRoot, m.settings.Terminal)

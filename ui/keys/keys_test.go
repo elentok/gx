@@ -152,6 +152,18 @@ func TestChordHints_NoPrefix(t *testing.T) {
 	}
 }
 
+func TestHintsForPrefix_WithNoInternalPrefix(t *testing.T) {
+	m := testManager()
+	hints := m.HintsForPrefix("g")
+	if len(hints) != 2 {
+		t.Fatalf("expected 2 hints for prefix 'g', got %d: %v", len(hints), hints)
+	}
+	keys := map[string]bool{hints[0].Key: true, hints[1].Key: true}
+	if !keys["g"] || !keys["l"] {
+		t.Fatalf("expected hints for g and l, got %v", hints)
+	}
+}
+
 func TestBindings_ReturnsAll(t *testing.T) {
 	m := testManager()
 	all := m.Bindings()

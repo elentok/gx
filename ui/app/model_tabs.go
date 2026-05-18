@@ -5,7 +5,6 @@ import (
 	"unicode"
 
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/keys"
 	logui "github.com/elentok/gx/ui/log"
 	"github.com/elentok/gx/ui/nav"
 
@@ -267,18 +266,4 @@ func (m Model) switchRelativeTab(delta int) (tea.Model, tea.Cmd) {
 		next = len(tabs) - 1
 	}
 	return m.switchTab(nav.Route{Kind: tabs[next]})
-}
-
-// appChordHints returns the app-level chord completions for the given prefix key.
-func (m Model) appChordHints(prefix string) []keys.Binding {
-	if prefix != "g" {
-		return nil
-	}
-	return []keys.Binding{
-		{Seq: []string{","}, Title: "prev tab"},
-		{Seq: []string{"."}, Title: "next tab"},
-		{Seq: []string{"w"}, Title: "worktrees tab"},
-		{Seq: []string{"l"}, Title: "log tab"},
-		{Seq: []string{"s"}, Title: "status tab"},
-	}
 }

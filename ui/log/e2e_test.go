@@ -12,6 +12,7 @@ import (
 	teatest "github.com/elentok/gx/testutil/teatestv2"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/commit"
+	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/log"
 )
 
@@ -24,13 +25,13 @@ const (
 
 func startLogTUI(t *testing.T, repoDir string) *teatest.TestModel {
 	t.Helper()
-	m := log.NewModel(repoDir, "", ui.Settings{})
+	m := log.NewModel(repoDir, "", ui.Settings{}, log.LogFilter{}, keys.Manager{})
 	return teatest.NewTestModel(t, m, teatest.WithInitialTermSize(logE2ETermWidth, logE2ETermHeight))
 }
 
 func startCommitViewFromLog(t *testing.T, repoDir, ref string) *teatest.TestModel {
 	t.Helper()
-	m := commit.NewWithSettings(repoDir, ref, ui.Settings{})
+	m := commit.NewModel(repoDir, ref, "", ui.Settings{}, keys.Manager{})
 	return teatest.NewTestModel(t, m, teatest.WithInitialTermSize(logE2ETermWidth, logE2ETermHeight))
 }
 

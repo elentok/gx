@@ -89,11 +89,7 @@ type Model struct {
 	rebaseDidStash bool               // stash was pushed before rebase; pop prompt fires on FocusMsg (kitty/tmux) or immediately (exec)
 }
 
-func NewModel(worktreeRoot, startRef string, settings ui.Settings) Model {
-	return NewModelFiltered(worktreeRoot, startRef, settings, LogFilter{})
-}
-
-func NewModelFiltered(worktreeRoot, startRef string, settings ui.Settings, filter LogFilter) Model {
+func NewModel(worktreeRoot, startRef string, settings ui.Settings, filter LogFilter, extraKeys keys.Manager) Model {
 	m := Model{
 		worktreeRoot: worktreeRoot,
 		settings:     settings,
@@ -102,7 +98,7 @@ func NewModelFiltered(worktreeRoot, startRef string, settings ui.Settings, filte
 		keys:         newLogManager(),
 		search:       search.NewModel(),
 	}
-	m.help = help.NewModel(buildKeySections(m.keys))
+	m.help = help.NewModel(help.BuildSections(m.keys, m.search.Keys(), extraKeys))
 	m.amendConfirm = amend.New()
 	m.bump = bump.New()
 	m.push = push.New()
@@ -111,6 +107,10 @@ func NewModelFiltered(worktreeRoot, startRef string, settings ui.Settings, filte
 	m.reword = reword.New()
 	m.reload()
 	return m
+}
+
+func (m *Model) KeyManager() *keys.Manager {
+	return &m.keys
 }
 
 func (m Model) Init() tea.Cmd { return m.cmdReload() }

@@ -12,6 +12,7 @@ import (
 	teatest "github.com/elentok/gx/testutil/teatestv2"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/commit"
+	"github.com/elentok/gx/ui/keys"
 )
 
 const (
@@ -23,7 +24,7 @@ const (
 
 func startCommitTUI(t *testing.T, repoDir, ref string) *teatest.TestModel {
 	t.Helper()
-	m := commit.NewWithSettings(repoDir, ref, ui.Settings{})
+	m := commit.NewModel(repoDir, ref, "", ui.Settings{}, keys.Manager{})
 	return teatest.NewTestModel(t, m, teatest.WithInitialTermSize(commitE2ETermWidth, commitE2ETermHeight))
 }
 

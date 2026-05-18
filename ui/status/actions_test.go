@@ -16,7 +16,7 @@ func TestPushKeyOpensPushModel(t *testing.T) {
 	testutil.MustGitExported(t, repo, "commit", "-m", "init")
 	testutil.MustGitExported(t, repo, "checkout", "-b", "feature/test")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusFiletree
 
@@ -35,7 +35,7 @@ func TestRebaseKeyOpensSpecificConfirm(t *testing.T) {
 	testutil.MustGitExported(t, repo, "commit", "-m", "init")
 	testutil.MustGitExported(t, repo, "checkout", "-b", "feature/test")
 
-	m := New(repo)
+	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusFiletree
 
@@ -51,7 +51,7 @@ func TestRebaseKeyOpensSpecificConfirm(t *testing.T) {
 }
 
 func TestAppendRunningOutputStripsTerminalControlSequences(t *testing.T) {
-	m := New(testutil.TempRepo(t))
+	m := newTestModelDefault(testutil.TempRepo(t))
 	m.ready = true
 	m.openRunning("Amend", newStageActionRunner(actionAmend, m.worktreeRoot, "", ""))
 

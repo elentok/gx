@@ -67,15 +67,7 @@ type commitSidebarState struct {
 	fileTreeModel filetree.Model[git.CommitFile]
 }
 
-func New(worktreeRoot, ref string) Model {
-	return NewWithSettingsAndFilter(worktreeRoot, ref, "", ui.Settings{UseNerdFontIcons: true})
-}
-
-func NewWithSettings(worktreeRoot, ref string, settings ui.Settings) Model {
-	return NewWithSettingsAndFilter(worktreeRoot, ref, "", settings)
-}
-
-func NewWithSettingsAndFilter(worktreeRoot, ref, filterPath string, settings ui.Settings) Model {
+func NewModel(worktreeRoot, ref, filterPath string, settings ui.Settings, extraKeys keys.Manager) Model {
 	m := Model{
 		worktreeRoot: worktreeRoot,
 		ref:          normalizedRef(ref),
@@ -93,7 +85,7 @@ func NewWithSettingsAndFilter(worktreeRoot, ref, filterPath string, settings ui.
 		},
 		keys: newCommitManager(),
 	}
-	m.help = help.NewModel(buildCommitKeySections(m.keys))
+	m.help = help.NewModel(help.BuildSections(m.keys, extraKeys))
 	m.amendConfirm = amend.New()
 	m.reword = reword.New()
 	m.reload()
@@ -108,6 +100,10 @@ func normalizedRef(ref string) string {
 		return "HEAD"
 	}
 	return ref
+}
+
+func (m *Model) KeyManager() *keys.Manager {
+	return &m.keys
 }
 
 func (m *Model) reload() {
