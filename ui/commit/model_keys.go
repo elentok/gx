@@ -87,7 +87,7 @@ func newCommitManager() keys.Manager {
 		{ID: bindingCancelChord, Seq: []string{"m", "esc"}, Categories: []string{}, Title: ""},
 
 		{ID: bindingComment, Seq: []string{"c", "m"}, Categories: []string{"Diff"}, Title: "comment"},
-		{ID: bindingReword, Seq: []string{"c", "r"}, Categories: []string{"Actions"}, Title: "reword commit"},
+		{ID: bindingReword, Seq: []string{"r", "w"}, Categories: []string{"Actions"}, Title: "reword commit"},
 		{ID: bindingCancelChord, Seq: []string{"c", "esc"}, Categories: []string{}, Title: ""},
 
 		{ID: bindingAmend, Seq: []string{"A"}, Categories: []string{"Actions"}, Title: "amend commit with staged changes"},
