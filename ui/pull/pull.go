@@ -16,6 +16,7 @@ type phase int
 
 const (
 	phaseChecking        phase = iota // checking for uncommitted changes
+	phaseStashConfirm                 // uncommitted changes detected — ask user to confirm stash
 	phaseStashing                     // git stash (local, no creds)
 	phasePulling                      // git pull (network, needs credential poll)
 	phaseStashPopping                 // git stash pop after success (local)
@@ -54,7 +55,7 @@ func cmdPoll() tea.Cmd {
 	return tea.Tick(120*time.Millisecond, func(time.Time) tea.Msg { return pollMsg{} })
 }
 
-// Model owns the entire pull lifecycle (no confirm — starts immediately).
+// Model owns the entire pull lifecycle.
 type Model struct {
 	IsOpen bool
 
@@ -66,6 +67,9 @@ type Model struct {
 	steps   []components.Step
 
 	activeRunner *components.CommandRunner
+
+	// stash-before-pull confirm
+	stashConfirmYes bool
 
 	// pop-stash confirm
 	stashYes bool
@@ -83,7 +87,7 @@ func New() Model {
 	return Model{spinner: sp}
 }
 
-// Open starts the pull immediately (no confirm step).
+// Open starts the pull (checks for uncommitted changes; stashes only after confirmation).
 func (m *Model) Open(root string) tea.Cmd {
 	m.root = root
 	m.phase = phaseChecking
@@ -150,6 +154,24 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, Result) {
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 	switch m.phase {
+	case phaseStashConfirm:
+		next, decided, accepted, handled := components.UpdateConfirm(msg, m.stashConfirmYes)
+		if !handled {
+			return m, nil, Result{}
+		}
+		m.stashConfirmYes = next
+		if !decided {
+			return m, nil, Result{}
+		}
+		if !accepted {
+			m.IsOpen = false
+			return m, nil, Result{Done: true}
+		}
+		m.stashed = true
+		m.phase = phaseStashing
+		m.appendRunningStep(stepStash)
+		return m, cmdStash(m.root), Result{}
+
 	case phasePopStashConfirm:
 		next, decided, accepted, handled := components.UpdateConfirm(msg, m.stashYes)
 		if !handled {
@@ -211,10 +233,9 @@ func (m Model) handleChangesCheck(msg changesCheckMsg) (Model, tea.Cmd, Result) 
 		return m, nil, Result{}
 	}
 	if msg.hasChanges {
-		m.stashed = true
-		m.phase = phaseStashing
-		m.appendRunningStep(stepStash)
-		return m, cmdStash(m.root), Result{}
+		m.phase = phaseStashConfirm
+		m.stashConfirmYes = true
+		return m, nil, Result{}
 	}
 	m.appendRunningStep(stepPull)
 	return m, m.startPulling(), Result{}
@@ -339,6 +360,18 @@ func (m Model) View(width int) string {
 		return ui.RenderModalFrame(ui.ModalFrameOptions{
 			Title:       "Pull",
 			Body:        body,
+			Width:       w,
+			BorderColor: ui.ColorYellow,
+			TitleColor:  ui.ColorYellow,
+			HintColor:   ui.ColorSubtle,
+		})
+
+	case phaseStashConfirm:
+		body := "You have uncommitted changes.\n\nStash and pull?" + "\n\n" + components.RenderConfirmChoices(m.stashConfirmYes, false)
+		return ui.RenderModalFrame(ui.ModalFrameOptions{
+			Title:       "Pull",
+			Body:        body,
+			Hint:        components.ConfirmHint,
 			Width:       w,
 			BorderColor: ui.ColorYellow,
 			TitleColor:  ui.ColorYellow,
