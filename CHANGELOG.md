@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.15.4 - 2026-05-19
+
+- Log: color commits based on their status
+- Log: add filtering by file path and line range
+- Log: interactive rebase window no longer closes automatically after rebase completes
+- Pull: confirm before stashing when there are uncommitted changes
+- Worktrees: use the shared pull UI for the pull command
+- Status: change fullscreen key mapping back to `f`
+- Change reword key mapping from `cr` to `rw`
+- Consolidate keybinding and help management across all UI modules
+- Fix chord hints display issue
+
 ## v0.15.3 - 2026-05-17
 
 - Log: add `ri` keybinding to launch `git rebase -i` from the selected commit; if there are unstaged changes, a modal confirms stashing first; after the rebase completes, a second modal confirms popping the stash

@@ -21,7 +21,7 @@ and [go-migration-plan.md](/docs/go-migration-plan.md)).
 - Rebase the selected worktree on main (`b`), with optional stash-and-restore for dirty worktrees
 - `gx wt clone` clones using the `.bare` directory trick for a clean layout
 - `gx wt list` and `gx wt abs-path` for scripting and shell integration
-- `gx log` for commit history: amend (`A`), reword (`cr` opens `$EDITOR`), interactive rebase (`ri`), bump version (`B`), pull (`p`), and push (`P`) directly from the log; flashes and re-focuses the entry after amend or reword; `ri` stashes dirty worktrees before launching rebase and prompts to pop the stash when done
+- `gx log` for commit history: amend (`A`), reword (`rw` opens `$EDITOR`), interactive rebase (`ri`), bump version (`B`), pull (`p`), and push (`P`) directly from the log; flashes and re-focuses the entry after amend or reword; `ri` stashes dirty worktrees before launching rebase and prompts to pop the stash when done; commits are colored by status; filter history by file path and line range
 - `gx show` for single-commit inspection
 - `gx status` interactive status UI with file/hunk/line stage + unstage flows
 - `gx` opens status by default, while `gx worktrees` / `gx wt` open the worktree UI
