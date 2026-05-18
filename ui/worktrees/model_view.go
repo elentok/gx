@@ -21,6 +21,11 @@ func (m Model) View() tea.View {
 	} else {
 		bg := m.normalView()
 
+		if m.pull.IsOpen {
+			content = ui.OverlayCenter(bg, m.pull.View(m.width), m.width, m.height)
+			return ui.NewMainView(content)
+		}
+
 		switch m.mode {
 		case modeConfirm:
 			content = ui.OverlayCenter(bg, m.confirmModalView(), m.width, m.height)

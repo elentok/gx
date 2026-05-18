@@ -415,26 +415,22 @@ func TestStashPullMainRefreshesBaseStatus(t *testing.T) {
 	testutil.WriteFile(t, mainWtDir, "README.md", "modified")
 
 	_, tm := startTUI(t, repoDir)
-	// Also wait for "M" (dirty column) so m.dirties is populated before pressing p.
-	// Without this, p can fire before dirtyStatusMsg arrives and takes the clean-pull path.
 	waitForTexts(t, tm, loadWait, "✓", "M") // feature-a rebased on old main; main is dirty
 
-	// Pull main — dirty worktree triggers the stash prompt.
+	// Pull main — dirty worktree triggers the pull modal's stash prompt.
 	tm.Send(keyRune('p'))
 	waitForText(t, tm, "Stash", actionWait)
 	tm.Send(keyRune('y'))
 
-	// Status notifications now go through notify.NotifyMsg (not the status bar).
-	// Wait for the spinner to clear before pressing g+o to view output.
-	waitForText(t, tm, "? help", loadWait)
+	// Wait for base status to update (✗ = feature-a is now behind the advanced main).
+	// This confirms stash→pull→pop all completed and base statuses were refreshed.
+	waitForText(t, tm, "✗", loadWait)
 
+	// Verify the output log captured all three git operations.
 	tm.Send(keyRune('g'))
 	tm.Send(keyRune('o'))
 	waitForTexts(t, tm, actionWait, "$ git stash", "$ git pull", "$ git stash pop")
 	tm.Send(keySpecial(tea.KeyEsc))
-
-	// After stash-pull + stash-pop, main advanced; feature-a is behind → ✗.
-	waitForText(t, tm, "✗", loadWait)
 
 	quit(t, tm)
 }

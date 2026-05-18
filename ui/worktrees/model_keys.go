@@ -122,16 +122,8 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 		if wt == nil {
 			return m, nil
 		}
-		dirty := m.dirties[wt.Path]
-		if dirty.hasModified || dirty.hasUntracked {
-			return m.enterConfirmWithCancel(
-				"Stash changes before pulling "+wt.Name+"?",
-				cmdStashPull(*wt),
-				"Pulling "+wt.Name+"…",
-				"pull aborted (dirty worktree)",
-			), nil
-		}
-		return m, cmdStartPromptableJob(promptableJobPull, *wt, "", false)
+		m.pullWT = wt
+		return m, m.pull.Open(wt.Path)
 	case bindingPush:
 		if len(m.worktrees) == 0 || m.spinnerActive {
 			return m, nil

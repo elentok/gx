@@ -5,6 +5,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 	keymgr "github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/pull"
 	"github.com/elentok/gx/ui/search"
 
 	"charm.land/bubbles/v2/help"
@@ -38,8 +39,7 @@ const (
 type promptableJobKind int
 
 const (
-	promptableJobPull promptableJobKind = iota
-	promptableJobPushFetch
+	promptableJobPushFetch promptableJobKind = iota
 	promptableJobPush
 	promptableJobForcePush
 )
@@ -69,6 +69,9 @@ type Model struct {
 	sidebarBehindCommits []git.Commit
 	sidebarChanges       []git.Change
 	sidebarLoading       bool
+
+	pull   pull.Model
+	pullWT *git.Worktree // worktree being pulled, set when pull.Open is called
 
 	mode          mode
 	textInput     textinput.Model // shared by rename and clone modes
@@ -141,6 +144,7 @@ func NewWithSettings(repo git.Repo, activeWorktreePath string, settings ui.Setti
 		baseStatus:         make(map[string]*bool),
 		table:              newTable(),
 		loading:            true,
+		pull:               pull.New(),
 		help:               newWorktreeHelpModel(),
 		keyManager:         newWorktreesManager(),
 		search:             search.NewModel(),

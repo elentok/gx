@@ -9,10 +9,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-type pullResultMsg struct {
-	err error
-	log string
-}
 type pushResultMsg struct {
 	err        error
 	prURL      string
@@ -34,18 +30,6 @@ type promptableJobStartMsg struct {
 	wt         git.Worktree
 	initialLog string
 	stashed    bool
-}
-
-type stashPullResultMsg struct {
-	err     error
-	log     string
-	stashed bool
-	wtPath  string
-}
-type stashPullStartedMsg struct {
-	err error
-	wt  git.Worktree
-	log string
 }
 
 type rebasePreflightMsg struct {
@@ -74,8 +58,6 @@ func cmdStartPromptableJob(kind promptableJobKind, wt git.Worktree, initialLog s
 
 func promptableJobArgs(repo git.Repo, kind promptableJobKind, wt git.Worktree) []string {
 	switch kind {
-	case promptableJobPull:
-		return []string{"pull"}
 	case promptableJobPushFetch:
 		return []string{"fetch", git.BranchRemote(repo, wt.Branch)}
 	case promptableJobPush:
@@ -91,8 +73,6 @@ func promptableJobArgs(repo git.Repo, kind promptableJobKind, wt git.Worktree) [
 
 func promptableJobLabel(kind promptableJobKind, wt git.Worktree) string {
 	switch kind {
-	case promptableJobPull:
-		return "Pulling " + wt.Name + "…"
 	case promptableJobPushFetch:
 		return "Checking remote divergence…"
 	case promptableJobPush:
@@ -106,8 +86,6 @@ func promptableJobLabel(kind promptableJobKind, wt git.Worktree) string {
 
 func promptableJobOutputTitle(kind promptableJobKind) string {
 	switch kind {
-	case promptableJobPull:
-		return "Pull output"
 	case promptableJobPushFetch:
 		return "Fetch output"
 	case promptableJobPush:
@@ -121,18 +99,6 @@ func promptableJobOutputTitle(kind promptableJobKind) string {
 
 func cmdOpenURL(url string) tea.Cmd {
 	return ui.CmdOpenURL(url)
-}
-
-func cmdStashPull(wt git.Worktree) tea.Cmd {
-	return func() tea.Msg {
-		out, err := git.Stash(wt.Path)
-		log := ui.NewCommandOutputLog()
-		log.AppendCommand("git", []string{"stash"}, out)
-		if err != nil {
-			return stashPullStartedMsg{err: fmt.Errorf("stash failed: %w", err), wt: wt, log: log.String()}
-		}
-		return stashPullStartedMsg{wt: wt, log: log.String()}
-	}
 }
 
 func cmdRebasePreflight(repo git.Repo, wt git.Worktree) tea.Cmd {

@@ -22,6 +22,10 @@ func (m Model) InputFocused() bool {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.pull.IsOpen {
+		return m.handlePullUpdate(msg)
+	}
+
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
@@ -165,62 +169,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		return m, nil
-
-	case pullResultMsg:
-		m.spinnerActive = false
-		m.lastJobLog = msg.log
-		m.lastJobLabel = "Pull output"
-		if msg.err != nil {
-			return m.showError(msg.err.Error()), nil
-		}
-		cmds = append(cmds, notify.Info(ui.MessageComplete("pull")))
-		if wt := m.selectedWorktree(); wt != nil && wt.Branch != "" {
-			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, *wt))
-			if wt.Branch == m.repo.MainBranch {
-				for _, w := range m.worktrees {
-					if w.Branch != "" {
-						cmds = append(cmds, cmdLoadBaseStatus(m.repo, w.Branch))
-					}
-				}
-			}
-		}
-		return m, tea.Batch(cmds...)
-
-	case stashPullStartedMsg:
-		m.spinnerActive = false
-		m.lastJobLog = msg.log
-		m.lastJobLabel = "Pull output"
-		if msg.err != nil {
-			return m.showError(msg.err.Error()), nil
-		}
-		m.spinnerActive = true
-		m.spinnerLabel = promptableJobLabel(promptableJobPull, msg.wt)
-		return m, tea.Batch(cmdStartPromptableJob(promptableJobPull, msg.wt, msg.log, true), m.spinner.Tick)
-
-	case stashPullResultMsg:
-		m.spinnerActive = false
-		m.lastJobLog = msg.log
-		m.lastJobLabel = "Pull output"
-		if msg.err != nil {
-			if msg.stashed {
-				prompt := fmt.Sprintf("Pull failed: %s\n\nPop stash?", msg.err.Error())
-				m = m.enterConfirm(prompt, cmdStashPop(msg.wtPath, "pull", msg.log), "Popping stash…")
-				m.confirmYes = true
-				return m, nil
-			}
-			return m.showError(msg.err.Error()), nil
-		}
-		if msg.stashed {
-			m.spinnerActive = true
-			m.spinnerLabel = "Popping stash…"
-			return m, tea.Batch(cmdStashPop(msg.wtPath, "pull", msg.log), m.spinner.Tick)
-		}
-		// Should not reach here (stashPull always stashes), but handle gracefully
-		cmds = append(cmds, notify.Info(ui.MessageComplete("pull")))
-		if wt := m.selectedWorktree(); wt != nil && wt.Branch != "" {
-			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, *wt))
-		}
-		return m, tea.Batch(cmds...)
 
 	case rebasePreflightMsg:
 		return m.enterConfirmWithCancel(

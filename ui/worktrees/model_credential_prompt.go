@@ -79,7 +79,6 @@ func (m Model) finishPromptableJob(err error) (tea.Model, tea.Cmd) {
 	m.jobLog.AppendCommand("git", args, output)
 	log := m.jobLog.String()
 	kind := m.jobKind
-	stashed := m.jobStashed
 
 	m.jobRunner = nil
 	m.jobWorktree = nil
@@ -91,31 +90,6 @@ func (m Model) finishPromptableJob(err error) (tea.Model, tea.Cmd) {
 	m.lastJobLabel = promptableJobOutputTitle(kind)
 
 	switch kind {
-	case promptableJobPull:
-		if err != nil {
-			if stashed {
-				prompt := fmt.Sprintf("Pull failed: %s\n\nPop stash?", err.Error())
-				return m.enterConfirm(prompt, cmdStashPop(wt.Path, "pull", log), "Popping stash…"), nil
-			}
-			return m.showError(err.Error()), nil
-		}
-		if stashed {
-			m.spinnerActive = true
-			m.spinnerLabel = "Popping stash…"
-			return m, tea.Batch(cmdStashPop(wt.Path, "pull", log), m.spinner.Tick)
-		}
-		cmds := []tea.Cmd{notify.Info(ui.MessageComplete("pull"))}
-		if wt.Branch != "" {
-			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, wt))
-			if wt.Branch == m.repo.MainBranch {
-				for _, w := range m.worktrees {
-					if w.Branch != "" {
-						cmds = append(cmds, cmdLoadBaseStatus(m.repo, w.Branch))
-					}
-				}
-			}
-		}
-		return m, tea.Batch(cmds...)
 	case promptableJobPushFetch:
 		if err != nil {
 			return m.showError(err.Error()), nil
