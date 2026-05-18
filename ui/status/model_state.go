@@ -151,6 +151,6 @@ func NewModel(worktreeRoot string, settings ui.Settings, initialPath string, ext
 }
 
 
-func (m *Model) KeyManager() *keys.Manager {
-	return &m.keys
+func (m Model) KeyManager() keys.Manager {
+	return m.keys
 }

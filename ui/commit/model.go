@@ -102,8 +102,8 @@ func normalizedRef(ref string) string {
 	return ref
 }
 
-func (m *Model) KeyManager() *keys.Manager {
-	return &m.keys
+func (m Model) KeyManager() keys.Manager {
+	return m.keys
 }
 
 func (m *Model) reload() {

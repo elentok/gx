@@ -11,7 +11,7 @@ import (
 // ChordHintSource is implemented by models that expose a key manager.
 // The app model queries the active child via this interface to render chord hints.
 type ChordHintSource interface {
-	KeyManager() *keys.Manager
+	KeyManager() keys.Manager
 }
 
 func ChordBindingsFromHints(hints []keys.ChordHint) []keys.Binding {

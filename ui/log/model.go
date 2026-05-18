@@ -109,8 +109,8 @@ func NewModel(worktreeRoot, startRef string, settings ui.Settings, filter LogFil
 	return m
 }
 
-func (m *Model) KeyManager() *keys.Manager {
-	return &m.keys
+func (m Model) KeyManager() keys.Manager {
+	return m.keys
 }
 
 func (m Model) Init() tea.Cmd { return m.cmdReload() }
