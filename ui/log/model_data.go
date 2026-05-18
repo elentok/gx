@@ -65,16 +65,19 @@ func (m Model) branchHistoryClasses() (map[string]git.BranchHistoryClass, bool) 
 }
 
 func fetchBranchHistoryClasses(worktreeRoot, startRef string) (map[string]git.BranchHistoryClass, bool) {
-	if startRef != "HEAD" {
-		return nil, false
-	}
-
-	branch, err := git.CurrentBranch(worktreeRoot)
-	if err != nil {
-		return nil, false
-	}
-	branch = normalizedRef(branch)
-	if branch == "HEAD" {
+	var branch string
+	if startRef == "HEAD" {
+		b, err := git.CurrentBranch(worktreeRoot)
+		if err != nil {
+			return nil, false
+		}
+		branch = normalizedRef(b)
+		if branch == "HEAD" {
+			return nil, false
+		}
+	} else if git.IsLocalBranch(worktreeRoot, startRef) {
+		branch = startRef
+	} else {
 		return nil, false
 	}
 

@@ -78,6 +78,14 @@ func HeadCommit(repoRoot, branch string) (Commit, error) {
 	return Commit{FullHash: fullHash, Hash: hash, Subject: subject, Date: date}, nil
 }
 
+func IsLocalBranch(repoRoot, ref string) bool {
+	out, _, err := run(repoRoot, []string{"branch", "--list", ref})
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(out) != ""
+}
+
 func ResolveCommitish(repoRoot, ref string) (string, error) {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
