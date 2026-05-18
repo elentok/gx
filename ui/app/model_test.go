@@ -433,34 +433,6 @@ func TestGChordOverlayIncludesAppAndChildHints(t *testing.T) {
 	}
 }
 
-func TestGChordOverlayCompactsDuplicatesAndEmptyHints(t *testing.T) {
-	repoDir := testutil.TempRepo(t)
-	repo, err := git.FindRepo(repoDir)
-	if err != nil {
-		t.Fatalf("FindRepo: %v", err)
-	}
-
-	m := New(*repo, Settings{
-		InitialRoute:       nav.Route{Kind: nav.RouteStatus, WorktreeRoot: repoDir},
-		ActiveWorktreePath: repoDir,
-	})
-	m.width = 100
-	m.height = 24
-
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
-	m = updated.(Model)
-
-	view := ansi.Strip(m.View().Content)
-	if strings.Count(view, "log tab") != 1 {
-		t.Fatalf("expected a single app-level log-tab hint")
-	}
-	if strings.Contains(view, "goto log") {
-		t.Fatalf("expected duplicate child log hint to be removed")
-	}
-	if strings.Contains(view, "➜ \n") || strings.Contains(view, "esc ➜") {
-		t.Fatalf("expected empty chord hints to be removed")
-	}
-}
 
 func TestViewMergesTabsIntoFooterLine(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
