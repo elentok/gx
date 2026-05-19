@@ -15,7 +15,7 @@ and [go-migration-plan.md](/docs/go-migration-plan.md)).
 
 - Browse all linked worktrees in a table with sync status (ahead / behind / diverged) and rebase status relative to main
 - Sidebar showing the latest commit (with relative date), commits ahead/behind the remote tracking branch, rebase status relative to main, and uncommitted file changes
-- Create, rename, clone, and delete worktrees interactively (optionally opening a new tmux session or window)
+- Create, rename, clone, and delete worktrees interactively; select multiple with `space` for bulk delete with a progress modal (optionally opening a new tmux session or window)
 - Yank files from one worktree and paste them into another
 - Pull, push, and remote-update the selected worktree's branch; pull on a dirty worktree offers to stash first
 - Rebase the selected worktree on main (`b`), with optional stash-and-restore for dirty worktrees
@@ -249,7 +249,8 @@ Example config:
 | `n`            | New worktree                                              |
 | `N`            | New worktree and open a tmux session (switches to it)     |
 | `T`            | New worktree and open a tmux window                       |
-| `d`            | Delete selected worktree (and its branch)                 |
+| `space`        | Toggle worktree selection for bulk operations             |
+| `d`            | Delete selected worktree(s) (and their branches); shows progress modal for bulk deletes |
 | `r`            | Rename selected worktree and branch                       |
 | `c`            | Clone selected worktree (copies uncommitted files)        |
 | `y`            | Yank files from selected worktree into clipboard          |

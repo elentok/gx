@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.15.7 - 2026-05-19
+
+- Worktrees: add bulk-delete with multi-select and progress modal
+- Push: fix PR URL detection
+- Push: clean state on startup
+
 ## v0.15.6 - 2026-05-19
 
 - Log: add `important-refs` config to highlight specific refs with custom colors and control their sort order
