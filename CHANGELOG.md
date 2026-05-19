@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.15.6 - 2026-05-19
+
+- Log: add `important-refs` config to highlight specific refs with custom colors and control their sort order
+- Log: add `hide-refs` config to hide specific refs by regex pattern
+
 ## v0.15.5 - 2026-05-19
 
 - Log: move the status icon next to the commit subject

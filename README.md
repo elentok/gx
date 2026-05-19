@@ -193,17 +193,50 @@ gx version
 
 ## Configuration
 
-Optional config file:
+Optional config file at `~/.config/gx/config.json` (run `gx edit-config` to open it).
 
-```sh
-~/.config/gx/config.json
+| Key | Type | Default | Description |
+| --- | ---- | ------- | ----------- |
+| `use-nerdfont-icons` | boolean | `true` | Enable Nerd Font pill-shaped badges and icons throughout the UI. |
+| `stage-diff-context-lines` | integer (0–20) | `1` | Number of context lines shown around each diff hunk in the staging view. |
+| `input-modal-bottom` | integer \| `"N%"` \| `"center"` | `"5%"` | Vertical position of text-input overlays. An integer is a fixed line count from the bottom; a percentage string (e.g. `"10%"`) is relative to screen height; `"center"` centers the overlay. |
+| `name-aliases` | object | `{}` | Map of exact worktree full-names to display aliases, applied before the normal dash-segment compression. |
+| `log.important-refs` | array | see below | Rules for highlighting important refs in the log view. Refs matching a rule get a bright colored badge and are sorted to the front; all others get a dim surface badge. |
+| `log.hide-refs` | array of strings | `[]` | Regular expressions matched against full ref names. Matching refs are hidden from the log view entirely. Takes priority over `important-refs`. |
+
+### `log.important-refs`
+
+Each rule is an object with:
+
+- `patterns` — list of regular expressions matched against the full ref name
+- `color` — badge color: a named Catppuccin color (`blue`, `green`, `yellow`, `orange`, `mauve`, `teal`, `red`, `surface`) or a hex value (`#rrggbb`)
+
+Rules are evaluated in order — the first match wins. The rule order also controls sort priority: refs matching earlier rules appear first in the badge list.
+
+Default:
+
+```json
+[
+  { "patterns": ["^main$", "^master$", "^origin/main$", "^origin/master$"], "color": "yellow" },
+  { "patterns": ["^v\\d"], "color": "blue" }
+]
 ```
 
-Example:
+Example config:
 
 ```json
 {
-  "use-nerdfont-icons": true
+  "$schema": "https://raw.githubusercontent.com/elentok/gx/main/docs/config-schema.json",
+  "use-nerdfont-icons": true,
+  "stage-diff-context-lines": 3,
+  "log": {
+    "important-refs": [
+      { "patterns": ["^main$", "^master$", "^origin/main$", "^origin/master$"], "color": "yellow" },
+      { "patterns": ["^v\\d"], "color": "blue" },
+      { "patterns": ["prod", "staging"], "color": "#fab387" }
+    ],
+    "hide-refs": ["^origin/HEAD$"]
+  }
 }
 ```
 
