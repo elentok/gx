@@ -51,13 +51,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
+		if m.confirm.IsOpen {
+			return m.handleConfirmUpdate(msg)
+		}
 		switch m.mode {
 		case modeError:
 			return m.handleErrorKey(msg)
 		case modeHelp:
 			return m.handleHelpKey(msg)
-		case modeConfirm:
-			return m.handleConfirmKey(msg)
 		case modeCredentialPrompt:
 			return m.handleCredentialKey(msg)
 		case modeRename:
@@ -193,8 +194,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			if msg.stashed {
 				prompt := fmt.Sprintf("Rebase failed: %s\n\nPop stash?", msg.err.Error())
-				m = m.enterConfirm(prompt, cmdStashPop(msg.wtPath, "rebase", msg.log), "Popping stash…")
-				m.confirmYes = true
+				m = m.enterConfirmDefaultYes(prompt, cmdStashPop(msg.wtPath, "rebase", msg.log), "Popping stash…")
 				return m, nil
 			}
 			return m.showError(msg.err.Error()), nil
@@ -279,8 +279,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if msg.prURL != "" {
 			prompt := fmt.Sprintf("Open pull request page?\n\n%s", msg.prURL)
-			m = m.enterConfirm(prompt, cmdOpenURL(msg.prURL), "")
-			m.confirmYes = true
+			m = m.enterConfirmDefaultYes(prompt, cmdOpenURL(msg.prURL), "")
 			return m, tea.Batch(cmds...)
 		}
 		return m, tea.Batch(cmds...)

@@ -25,7 +25,7 @@ func newCredentialInput(secret bool) textinput.Model {
 func (m Model) enterCredentialPrompt(prompt components.CredentialPrompt) Model {
 	m.mode = modeCredentialPrompt
 	m.textInput = newCredentialInput(prompt.Kind == components.PromptKindSecret)
-	m.confirmPrompt = prompt.Text
+	m.credentialPromptText = prompt.Text
 	return m
 }
 
@@ -56,7 +56,7 @@ func (m Model) credentialModalView() string {
 	}
 	return components.RenderInputModal(
 		"Credential Required",
-		m.confirmPrompt,
+		m.credentialPromptText,
 		input,
 		ui.HintSubmitCancel(),
 		ui.ColorBorder,
@@ -116,8 +116,7 @@ func (m Model) finishPromptableJob(err error) (tea.Model, tea.Cmd) {
 		prURL := git.ExtractPRURL(output)
 		if prURL != "" {
 			prompt := fmt.Sprintf("Open pull request page?\n\n%s", prURL)
-			m = m.enterConfirm(prompt, cmdOpenURL(prURL), "")
-			m.confirmYes = true
+			m = m.enterConfirmDefaultYes(prompt, cmdOpenURL(prURL), "")
 			return m, tea.Batch(cmds...)
 		}
 		return m, tea.Batch(cmds...)

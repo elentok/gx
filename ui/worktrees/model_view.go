@@ -26,43 +26,45 @@ func (m Model) View() tea.View {
 			return ui.NewMainView(content)
 		}
 
-		switch m.mode {
-		case modeConfirm:
+		if m.confirm.IsOpen {
 			content = ui.OverlayCenter(bg, m.confirmModalView(), m.width, m.height)
-		case modeCredentialPrompt:
-			content = ui.OverlayCenter(bg, m.credentialModalView(), m.width, m.height)
-		case modePushDiverged:
-			content = ui.OverlayCenter(bg, m.pushDivergedModalView(), m.width, m.height)
-		case modeError:
-			content = ui.OverlayCenter(bg, m.errorModalView(), m.width, m.height)
-		case modeDeleteProgress:
-			content = ui.OverlayCenter(bg, m.deleteProgressModalView(), m.width, m.height)
-		case modeLogs:
-			content = ui.OverlayCenter(bg, m.logsModalView(), m.width, m.height)
-		case modeHelp:
-			content = ui.OverlayCenter(bg, m.helpModalView(), m.width, m.height)
-		case modeYank:
-			content = ui.OverlayCenter(bg, m.yankModalView(), m.width, m.height)
-		case modeTerminalMenu:
-			content = ui.OverlayCenter(bg, m.terminalMenuModalView(), m.width, m.height)
-		case modeRename, modeClone, modeNew, modeNewAndOpen:
-			overlay := m.textInputOverlayView()
-			y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
-			content = ui.OverlayBottomCenter(bg, overlay, m.width, y)
-		default:
-			content = bg
-			if prefix := m.keyManager.Prefix(); len(prefix) > 0 {
-				hints := ui.ChordBindingsFromHints(m.keyManager.ChordHints())
-				if len(hints) > 0 {
-					content = ui.OverlayBottomRight(content, ui.RenderChordOverlay(prefix[0], hints), m.width, m.height)
-				}
-			}
-			if m.search.Mode() == search.SearchModeInput {
-				overlayW := m.searchOverlayWidth()
-				m.search.SetWidth(overlayW)
-				overlay := m.search.View()
+		} else {
+			switch m.mode {
+			case modeCredentialPrompt:
+				content = ui.OverlayCenter(bg, m.credentialModalView(), m.width, m.height)
+			case modePushDiverged:
+				content = ui.OverlayCenter(bg, m.pushDivergedModalView(), m.width, m.height)
+			case modeError:
+				content = ui.OverlayCenter(bg, m.errorModalView(), m.width, m.height)
+			case modeDeleteProgress:
+				content = ui.OverlayCenter(bg, m.deleteProgressModalView(), m.width, m.height)
+			case modeLogs:
+				content = ui.OverlayCenter(bg, m.logsModalView(), m.width, m.height)
+			case modeHelp:
+				content = ui.OverlayCenter(bg, m.helpModalView(), m.width, m.height)
+			case modeYank:
+				content = ui.OverlayCenter(bg, m.yankModalView(), m.width, m.height)
+			case modeTerminalMenu:
+				content = ui.OverlayCenter(bg, m.terminalMenuModalView(), m.width, m.height)
+			case modeRename, modeClone, modeNew, modeNewAndOpen:
+				overlay := m.textInputOverlayView()
 				y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
-				content = ui.OverlayBottomCenter(content, overlay, m.width, y)
+				content = ui.OverlayBottomCenter(bg, overlay, m.width, y)
+			default:
+				content = bg
+				if prefix := m.keyManager.Prefix(); len(prefix) > 0 {
+					hints := ui.ChordBindingsFromHints(m.keyManager.ChordHints())
+					if len(hints) > 0 {
+						content = ui.OverlayBottomRight(content, ui.RenderChordOverlay(prefix[0], hints), m.width, m.height)
+					}
+				}
+				if m.search.Mode() == search.SearchModeInput {
+					overlayW := m.searchOverlayWidth()
+					m.search.SetWidth(overlayW)
+					overlay := m.search.View()
+					y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
+					content = ui.OverlayBottomCenter(content, overlay, m.width, y)
+				}
 			}
 		}
 	}

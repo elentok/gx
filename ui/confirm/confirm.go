@@ -1,73 +1,108 @@
 package confirm
 
 import (
-	"io"
-	"os"
-	"strings"
-
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/notify"
 
 	tea "charm.land/bubbletea/v2"
 )
 
-type doneMsg struct{}
-
-type model struct {
-	prompt    string
-	choiceYes bool
-	done      bool
-	nerd      bool
+// Options configures a confirm modal.
+type Options struct {
+	Prompt       string
+	Items        []string // optional bullet list rendered below the prompt
+	AcceptCmd    tea.Cmd  // executed when the user confirms
+	SpinnerLabel string   // returned in Result so the parent can start its own spinner
+	CancelMsg    string   // emitted as notify.Info when the user cancels
+	DefaultYes   bool     // initial cursor position; false = No
 }
 
-// Run renders a small styled confirmation UI and returns true when accepted.
-// Yes is the default selection.
-func Run(prompt string) (bool, error) {
-	return run(prompt, false, os.Stdin, os.Stdout)
+// Result is returned by Update when the user has made a decision.
+type Result struct {
+	Done         bool
+	Accepted     bool
+	SpinnerLabel string
 }
 
-// RunWithNerd is like Run but uses nerd-font pill-shaped buttons when nerd is true.
-func RunWithNerd(prompt string, nerd bool) (bool, error) {
-	return run(prompt, nerd, os.Stdin, os.Stdout)
+type storedOpts struct {
+	prompt       string
+	items        []string
+	acceptCmd    tea.Cmd
+	spinnerLabel string
+	cancelMsg    string
 }
 
-func run(prompt string, nerd bool, in io.Reader, out io.Writer) (bool, error) {
-	m := model{prompt: prompt, choiceYes: true, nerd: nerd}
-	p := tea.NewProgram(m, tea.WithInput(in), tea.WithOutput(out))
-	finalModel, err := p.Run()
-	if err != nil {
-		return false, err
+// Model is an embeddable confirm modal sub-model.
+type Model struct {
+	IsOpen bool
+
+	opts storedOpts
+	yes  bool
+}
+
+// New returns a zero-value Model.
+func New() Model {
+	return Model{}
+}
+
+// Open opens the modal with the given options and returns the updated model.
+func (m Model) Open(opts Options) Model {
+	m.IsOpen = true
+	m.yes = opts.DefaultYes
+	m.opts = storedOpts{
+		prompt:       opts.Prompt,
+		items:        opts.Items,
+		acceptCmd:    opts.AcceptCmd,
+		spinnerLabel: opts.SpinnerLabel,
+		cancelMsg:    opts.CancelMsg,
 	}
-	fm := finalModel.(model)
-	return fm.done && fm.choiceYes, nil
+	return m
 }
 
-func (m model) Init() tea.Cmd { return nil }
+// Update handles key events while the modal is open.
+// Returns the updated model, a command to run, and a Result.
+func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, Result) {
+	keyMsg, ok := msg.(tea.KeyPressMsg)
+	if !ok {
+		return m, nil, Result{}
+	}
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyPressMsg:
-		nextYes, decided, accepted, handled := components.UpdateConfirm(msg, m.choiceYes)
-		if !handled {
-			return m, nil
-		}
-		m.choiceYes = nextYes
-		if decided {
-			m.done = true
-			m.choiceYes = accepted
-			return m, tea.Quit
+	nextYes, decided, accepted, handled := components.UpdateConfirm(keyMsg, m.yes)
+	if !handled {
+		return m, nil, Result{}
+	}
+	m.yes = nextYes
+	if !decided {
+		return m, nil, Result{}
+	}
+
+	m.IsOpen = false
+	if accepted {
+		return m, m.opts.acceptCmd, Result{
+			Done:         true,
+			Accepted:     true,
+			SpinnerLabel: m.opts.spinnerLabel,
 		}
 	}
-	return m, nil
+
+	var cmd tea.Cmd
+	if m.opts.cancelMsg != "" {
+		cmd = notify.Info(m.opts.cancelMsg)
+	}
+	return m, cmd, Result{Done: true, Accepted: false}
 }
 
-func (m model) View() tea.View {
-	hint := ui.StyleDim.Render(components.ConfirmHint)
-	return tea.NewView(strings.Join([]string{
-		m.prompt,
-		"",
-		components.RenderConfirmChoices(m.choiceYes, m.nerd),
-		"  " + hint,
-		"",
-	}, "\n"))
+// View renders the confirm modal.
+func (m Model) View(width int) string {
+	return components.RenderConfirmModal(
+		m.opts.prompt,
+		m.yes,
+		ui.ColorBorder,
+		ui.ColorGreen,
+		ui.ColorRed,
+		ui.ColorGray,
+		width,
+		m.opts.items...,
+	)
 }

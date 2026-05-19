@@ -4,6 +4,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/confirm"
 	keymgr "github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/pull"
 	"github.com/elentok/gx/ui/search"
@@ -14,14 +15,12 @@ import (
 	"charm.land/bubbles/v2/table"
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
-	tea "charm.land/bubbletea/v2"
 )
 
 type mode int
 
 const (
 	modeNormal mode = iota
-	modeConfirm
 	modeRename
 	modeClone
 	modeNew
@@ -76,9 +75,10 @@ type Model struct {
 	pull   pull.Model
 	pullWT *git.Worktree // worktree being pulled, set when pull.Open is called
 
-	mode          mode
-	textInput     textinput.Model // shared by rename and clone modes
-	errorViewport viewport.Model
+	mode                 mode
+	textInput            textinput.Model // shared by rename and clone modes
+	credentialPromptText string
+	errorViewport        viewport.Model
 	helpModel     help.Model
 	jobRunner     *components.CommandRunner
 	jobKind       promptableJobKind
@@ -90,12 +90,7 @@ type Model struct {
 	lastJobLabel string
 	logsViewport viewport.Model
 
-	confirmPrompt       string
-	confirmItems        []string // optional list rendered below the confirm prompt
-	confirmYes          bool
-	confirmCmd          tea.Cmd // executed when the user confirms
-	confirmSpinnerLabel string  // if non-empty, spinner is started on confirm
-	confirmCancelMsg    string  // if non-empty, shown as notification when user cancels
+	confirm confirm.Model
 
 	deleteQueue   []git.Worktree    // worktrees pending deletion in the current batch
 	deleteInFlight int              // number of concurrent deletes in progress
@@ -155,6 +150,7 @@ func NewWithSettings(repo git.Repo, activeWorktreePath string, settings ui.Setti
 		selectedWorktrees:  make(map[string]bool),
 		table:              newTable(),
 		loading:            true,
+		confirm:            confirm.New(),
 		pull:               pull.New(),
 		helpModel:          help.NewModel(help.BuildSections(km)),
 		keyManager:         km,

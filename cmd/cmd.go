@@ -13,7 +13,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/app"
-	"github.com/elentok/gx/ui/confirm"
+	"github.com/elentok/gx/cli/confirm"
 	"github.com/elentok/gx/ui/menu"
 	"github.com/elentok/gx/ui/nav"
 

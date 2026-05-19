@@ -76,14 +76,14 @@ func (m Model) enterDeleteConfirm() (tea.Model, tea.Cmd) {
 		prompt = fmt.Sprintf("Delete %d worktrees?", len(batch))
 	}
 
-	m = m.enterConfirm(prompt, cmdStartBatchDelete(batch), "")
+	var items []string
 	if len(batch) > 1 {
-		names := make([]string, len(batch))
+		items = make([]string, len(batch))
 		for i, wt := range batch {
-			names[i] = wt.Name
+			items[i] = wt.Name
 		}
-		m.confirmItems = names
 	}
+	m = m.enterConfirmWithItems(prompt, items, cmdStartBatchDelete(batch), "")
 	return m, nil
 }
 
