@@ -175,15 +175,15 @@ func (m Model) renderCommitRow(row row) string {
 	state := commitState(row.class, m.branchDiverged)
 	cols := []ui.FixedColumn{
 		{Text: graph, Width: 4},
-		{Text: state.icon, Width: 2, Style: state.style},
 		{Text: m.highlightSearch(row.commit.Hash), Width: 8, Style: logHashStyle},
 		{Text: "", Width: 2},
 		{Text: ui.RelativeTimeCompact(row.commit.Date), Width: 10, Style: logMetaStyle},
 		{Text: "", Width: 1},
-		{Text: m.highlightSearch(row.commit.AuthorShort), Width: 4, Style: logMetaStyle},
+		{Text: m.highlightSearch(row.commit.AuthorShort), Width: 3, Style: logMetaStyle},
+		{Text: state.icon, Width: 1, Style: state.style},
 	}
 	meta := ui.RenderFixedColumns(cols)
-	return meta + "  " + state.style.Render(m.highlightSearch(row.commit.Subject))
+	return meta + " " + state.style.Render(m.highlightSearch(row.commit.Subject))
 }
 
 func (m Model) renderBadges(decorations []git.RefDecoration) string {
