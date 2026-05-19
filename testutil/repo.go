@@ -23,6 +23,17 @@ func evalDir(t *testing.T, dir string) string {
 func TempRepo(t *testing.T) string {
 	t.Helper()
 	dir := evalDir(t, t.TempDir())
+	// Register a cleanup that removes the repo before t.TempDir's cleanup runs
+	// (t.Cleanup is LIFO). Retrying handles lingering git processes (e.g.
+	// receive-pack after a push) that are still writing to .git/objects.
+	t.Cleanup(func() {
+		for range 10 {
+			if os.RemoveAll(dir) == nil {
+				return
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+	})
 	mustGit(t, dir, "init", "--initial-branch=main")
 	configUser(t, dir)
 	WriteFile(t, dir, "README.md", "# test")
