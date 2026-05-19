@@ -367,3 +367,30 @@ func TestParseSymlinkDiffInfo(t *testing.T) {
 		})
 	}
 }
+
+func TestHasBinaryDiff(t *testing.T) {
+	t.Parallel()
+	binaryRaw := "diff --git a/img.png b/img.png\nBinary files a/img.png and b/img.png differ\n"
+	parsed := diffcore.ParseUnifiedDiff(binaryRaw)
+	if !diffcore.HasBinaryDiff(parsed) {
+		t.Error("expected HasBinaryDiff=true for binary diff")
+	}
+
+	textRaw := "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-old\n+new\n"
+	parsed = diffcore.ParseUnifiedDiff(textRaw)
+	if diffcore.HasBinaryDiff(parsed) {
+		t.Error("expected HasBinaryDiff=false for text diff")
+	}
+}
+
+func TestBuildRawToDisplayMap(t *testing.T) {
+	t.Parallel()
+	parsed := diffcore.ParseUnifiedDiff(
+		"diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-old\n+new\n",
+	)
+	_, _, displayToRaw := diffrender.BuildDisplayBaseLines(parsed, nil)
+	rawToDisplay := diffcore.BuildRawToDisplayMap(parsed, displayToRaw)
+	if len(rawToDisplay) != len(parsed.Lines) {
+		t.Errorf("rawToDisplay len=%d, want %d", len(rawToDisplay), len(parsed.Lines))
+	}
+}

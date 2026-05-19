@@ -9,6 +9,183 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
+func TestModelInit(t *testing.T) {
+	m := NewModel()
+	if m.Init() != nil {
+		t.Error("Init() should return nil")
+	}
+}
+
+func TestModelSetDataAndViewport(t *testing.T) {
+	m := NewModel()
+	raw := "@@ -1 +1 @@\n-old\n+new\n"
+	m.BuildFromRaw(raw, raw)
+	data := m.Data()
+
+	m2 := NewModel()
+	m2.SetData(data)
+	if !m2.DataRef().HasContent() {
+		t.Error("SetData: expected content after setting data")
+	}
+
+	vp := m2.Viewport()
+	if vp == nil {
+		t.Error("Viewport() should not be nil")
+	}
+}
+
+func TestModelReflow(t *testing.T) {
+	m := NewModel()
+	raw := "@@ -1 +1 @@\n-old\n+new\n"
+	m.BuildFromRaw(raw, raw)
+	m.SyncViewport(80, 10)
+	m.Reflow(80) // should not panic
+}
+
+func TestModelEnsureActiveVisible(t *testing.T) {
+	m := NewModel()
+	raw := "@@ -1 +1 @@\n-old\n+new\n"
+	m.BuildFromRaw(raw, raw)
+	m.SyncViewport(80, 10)
+	m.EnsureActiveVisible(NavModeHunk)
+	m.EnsureActiveVisible(NavModeLine)
+}
+
+func TestModelComputeSearchMatches(t *testing.T) {
+	m := NewModel()
+	raw := "@@ -1 +1 @@\n-old text\n+new text\n"
+	m.BuildFromRaw(raw, raw)
+
+	matches := m.ComputeSearchMatches("text")
+	if len(matches) == 0 {
+		t.Error("expected search matches for 'text'")
+	}
+
+	empty := m.ComputeSearchMatches("")
+	if len(empty) != 0 {
+		t.Errorf("expected no matches for empty query, got %d", len(empty))
+	}
+}
+
+func TestModelActiveRawLineIndex(t *testing.T) {
+	m := NewModel()
+	raw := "@@ -1 +1 @@\n-old\n+new\n"
+	m.BuildFromRaw(raw, raw)
+	m.SyncViewport(80, 10)
+	idx := m.ActiveRawLineIndex()
+	_ = idx // just verify no panic
+}
+
+func TestModelVisibleRows(t *testing.T) {
+	m := NewModel()
+	raw := "@@ -1 +1 @@\n-old\n+new\n"
+	m.BuildFromRaw(raw, raw)
+	m.SyncViewport(80, 10)
+	rows := m.VisibleRows(5, true)
+	_ = rows // just verify no panic; 0 height is handled
+	rows0 := m.VisibleRows(0, true)
+	if len(rows0) != 0 {
+		t.Errorf("VisibleRows(0) should be empty, got %d", len(rows0))
+	}
+}
+
+func TestModelMoveActive(t *testing.T) {
+	m := NewModel()
+	raw := "@@ -1 +1 @@\n-old\n+new\n@@ -3 +3 @@\n-a\n+b\n"
+	m.BuildFromRaw(raw, raw)
+	m.SyncViewport(80, 10)
+	m.SetNavMode(NavModeHunk)
+
+	// Move to next hunk
+	moved := m.MoveActive(1, false)
+	if !moved {
+		t.Error("expected MoveActive to return true when moving to next hunk")
+	}
+
+	// Move to line mode
+	m.SetNavMode(NavModeLine)
+	moved = m.MoveActive(1, false)
+	_ = moved
+}
+
+func TestModelScrollPage(t *testing.T) {
+	m := NewModel()
+	raw := "@@ -1 +1 @@\n-old\n+new\n"
+	m.BuildFromRaw(raw, raw)
+	m.SyncViewport(80, 3)
+	m.ScrollPage(1)
+	m.ScrollPage(-1)
+	m.ScrollPage(0) // no-op
+}
+
+func TestModelJumpTopAndBottom(t *testing.T) {
+	m := NewModel()
+	raw := "@@ -1 +1 @@\n-old\n+new\n@@ -5 +5 @@\n-x\n+y\n"
+	m.BuildFromRaw(raw, raw)
+	m.SyncViewport(80, 3)
+
+	m.JumpBottom()
+	m.JumpTop()
+	if m.Data().ActiveHunk != 0 {
+		t.Errorf("JumpTop: expected ActiveHunk=0, got %d", m.Data().ActiveHunk)
+	}
+
+	m.SetNavMode(NavModeLine)
+	m.JumpTop()
+	m.JumpBottom()
+}
+
+func TestModelJumpTopEmptyHunks(t *testing.T) {
+	m := NewModel()
+	got := m.JumpTop()
+	if got {
+		t.Error("JumpTop on empty model should return false")
+	}
+	got = m.JumpBottom()
+	if got {
+		t.Error("JumpBottom on empty model should return false")
+	}
+}
+
+func TestModelRestoreViewportYOffset(t *testing.T) {
+	m := NewModel()
+	raw := "@@ -1 +1 @@\n-old\n+new\n"
+	m.BuildFromRaw(raw, raw)
+	m.SyncViewport(80, 3)
+	m.RestoreViewportYOffset(0)
+}
+
+func TestModelCurrentSearchMatchIndex(t *testing.T) {
+	m := NewModel()
+	// Empty model — no changed lines
+	idx := m.CurrentSearchMatchIndex(nil)
+	if idx != -1 {
+		t.Errorf("expected -1 for empty model, got %d", idx)
+	}
+}
+
+func TestModelFocusedLocationAndBody_Empty(t *testing.T) {
+	m := NewModel()
+	_, _, err := m.FocusedLocationAndBody()
+	if err == "" {
+		t.Error("expected error for empty model with no hunk")
+	}
+}
+
+func TestModelApplyAndFocusSearchMatch(t *testing.T) {
+	m := NewModel()
+	raw := "@@ -1 +1 @@\n-old\n+new\n"
+	m.BuildFromRaw(raw, raw)
+	m.SyncViewport(80, 10)
+
+	matches := m.ComputeSearchMatches("old")
+	if len(matches) > 0 {
+		sm := search.Match{Index: matches[0].RawIndex, DisplayIndex: matches[0].DisplayIndex}
+		m.ApplySearchMatch(sm)
+		m.FocusSearchMatch(sm)
+	}
+}
+
 func TestNearestIndex_FindsClosest(t *testing.T) {
 	// displays at 0, 5, 10, 15
 	displayAt := func(i int) int { return i * 5 }

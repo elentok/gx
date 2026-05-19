@@ -164,6 +164,94 @@ func TestMoveToAdjacentFile(t *testing.T) {
 	}
 }
 
+func TestModelAccessors(t *testing.T) {
+	m := NewModel[int]()
+	entries := []Entry[int]{
+		{Kind: EntryDir, Path: "dir", DisplayName: "dir", Expanded: true},
+		{Kind: EntryFile, Path: "dir/a.txt", ParentPath: "dir", DisplayName: "a.txt", Value: 1},
+	}
+	m.SetEntries(entries)
+
+	if m.Init() != nil {
+		t.Error("Init() should return nil")
+	}
+	if len(m.Entries()) != 2 {
+		t.Errorf("Entries() len=%d want 2", len(m.Entries()))
+	}
+	if m.ScrollOffset() != 0 {
+		t.Errorf("ScrollOffset()=%d want 0", m.ScrollOffset())
+	}
+	m.SetVisibleHeight(10)
+	m.ScrollViewport(1)
+	m.ScrollPage(1)
+
+	m.SetCollapsedDirs(map[string]bool{"dir": true})
+	if !m.CollapsedDirs()["dir"] {
+		t.Error("expected collapsed dir after SetCollapsedDirs")
+	}
+	if m.Keys() == nil {
+		t.Error("Keys() should not be nil")
+	}
+}
+
+func TestModelDirOperations(t *testing.T) {
+	entries := []Entry[int]{
+		{Kind: EntryDir, Path: "top", DisplayName: "top", Expanded: true, Depth: 0},
+		{Kind: EntryFile, Path: "top/a.txt", ParentPath: "top", DisplayName: "a.txt", Value: 1, Depth: 1},
+	}
+
+	t.Run("CollapseSelectedDir", func(t *testing.T) {
+		m := NewModel[int]()
+		m.SetEntries(entries)
+		m.SetSelectedIndex(0)
+		if !m.CollapseSelectedDir() {
+			t.Error("expected CollapseSelectedDir=true on expanded dir")
+		}
+	})
+
+	t.Run("ExpandSelectedDir", func(t *testing.T) {
+		m := NewModel[int]()
+		m.SetEntries([]Entry[int]{
+			{Kind: EntryDir, Path: "top", DisplayName: "top", Expanded: false, Depth: 0},
+		})
+		m.SetCollapsedDirs(map[string]bool{"top": true})
+		m.SetSelectedIndex(0)
+		if !m.ExpandSelectedDir() {
+			t.Error("expected ExpandSelectedDir=true on collapsed dir")
+		}
+	})
+
+	t.Run("ToggleSelectedDir_collapsed", func(t *testing.T) {
+		m := NewModel[int]()
+		m.SetEntries(entries)
+		m.SetSelectedIndex(0)
+		if !m.ToggleSelectedDir() {
+			t.Error("expected ToggleSelectedDir=true on expanded dir")
+		}
+	})
+
+	t.Run("FocusParent", func(t *testing.T) {
+		m := NewModel[int]()
+		m.SetEntries(entries)
+		m.SetSelectedIndex(1)
+		if !m.FocusParent() {
+			t.Error("expected FocusParent=true when on child")
+		}
+		if m.SelectedIndex() != 0 {
+			t.Errorf("expected selection at parent (0), got %d", m.SelectedIndex())
+		}
+	})
+
+	t.Run("FocusParent_at_root", func(t *testing.T) {
+		m := NewModel[int]()
+		m.SetEntries(entries)
+		m.SetSelectedIndex(0)
+		if m.FocusParent() {
+			t.Error("expected FocusParent=false when already at root")
+		}
+	})
+}
+
 func TestModelUpdate_SearchStartAndQueryMsg(t *testing.T) {
 	m := NewModel[int]()
 

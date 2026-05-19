@@ -6,6 +6,24 @@ import (
 	"testing"
 )
 
+func TestDefaultLogConfig(t *testing.T) {
+	cfg := DefaultLogConfig()
+	if len(cfg.ImportantRefs) == 0 {
+		t.Error("expected non-empty ImportantRefs")
+	}
+	found := false
+	for _, rule := range cfg.ImportantRefs {
+		for _, p := range rule.Patterns {
+			if p == "^main$" {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Error("expected ^main$ pattern in DefaultLogConfig")
+	}
+}
+
 func TestLoadMissingUsesDefaults(t *testing.T) {
 	tmp := t.TempDir()
 	prev := userConfigDirFn

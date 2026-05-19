@@ -20,3 +20,43 @@ func TestStatusWithHintsRendersInlineBindingHints(t *testing.T) {
 		t.Fatalf("StatusWithHints() = %q", got)
 	}
 }
+
+func TestStatusWithHints_NoHints(t *testing.T) {
+	got := StatusWithHints("done")
+	if got != "done" {
+		t.Fatalf("StatusWithHints(no hints) = %q", got)
+	}
+}
+
+func TestMessageHelpers(t *testing.T) {
+	if got := MessageComplete("pull"); got != "pull complete" {
+		t.Errorf("MessageComplete = %q", got)
+	}
+	if got := MessageAborted("push"); got != "push aborted" {
+		t.Errorf("MessageAborted = %q", got)
+	}
+	if got := MessageNoOutput(); got == "" {
+		t.Error("MessageNoOutput should be non-empty")
+	}
+	if got := MessageOpening("editor"); got != "opening editor..." {
+		t.Errorf("MessageOpening = %q", got)
+	}
+	if got := MessageClosed("modal"); got != "modal closed" {
+		t.Errorf("MessageClosed = %q", got)
+	}
+}
+
+func TestHintHelpers_NonEmpty(t *testing.T) {
+	hints := []string{
+		HintDismiss(),
+		HintDismissAndScroll(),
+		HintSubmitCancel(),
+		HintChecklistConfirm(),
+		HintCancelScroll(),
+	}
+	for i, h := range hints {
+		if h == "" {
+			t.Errorf("hint[%d] should be non-empty", i)
+		}
+	}
+}

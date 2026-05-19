@@ -36,6 +36,62 @@ func TestBuildDiffBuffer_SideBySide(t *testing.T) {
 	}
 }
 
+func TestHunkDisplayBounds(t *testing.T) {
+	prev := NewDiffData()
+	data := BuildDiffData(sampleSectionUnifiedDiff, "", prev, false)
+
+	// valid hunk index
+	start, end, ok := data.HunkDisplayBounds(0)
+	if !ok {
+		t.Fatal("expected ok=true for hunk 0")
+	}
+	if start > end {
+		t.Errorf("start(%d) > end(%d)", start, end)
+	}
+
+	// out of range
+	_, _, ok = data.HunkDisplayBounds(-1)
+	if ok {
+		t.Error("expected ok=false for hunk -1")
+	}
+	_, _, ok = data.HunkDisplayBounds(999)
+	if ok {
+		t.Error("expected ok=false for hunk 999")
+	}
+
+	// with HunkDisplayRange populated (side-by-side path)
+	color := " file:1: header\n  │ 1 │ one         │ 1 │ one         │\n  │ 2 │ two         │   │             │\n  │   │             │ 2 │ two changed │\n  │ 3 │ three       │ 3 │ three       │"
+	sbsData := BuildDiffData(sampleSectionUnifiedDiff, color, prev, true)
+	start, end, ok = sbsData.HunkDisplayBounds(0)
+	if !ok {
+		t.Fatal("expected ok=true for sbs hunk 0")
+	}
+	if start > end {
+		t.Errorf("sbs: start(%d) > end(%d)", start, end)
+	}
+}
+
+func TestVisualLineBounds(t *testing.T) {
+	prev := NewDiffData()
+	data := BuildDiffData(sampleSectionUnifiedDiff, "", prev, false)
+
+	// no visual selection: anchor=-1, active=0 → both clamp to valid
+	data.VisualAnchor = -1
+	data.ActiveLine = 0
+	s, e := data.VisualLineBounds()
+	if s < 0 || e < 0 {
+		t.Errorf("bounds should be non-negative, got (%d, %d)", s, e)
+	}
+
+	// anchor > active → they swap
+	data.VisualAnchor = 2
+	data.ActiveLine = 0
+	s, e = data.VisualLineBounds()
+	if s > e {
+		t.Errorf("expected s <= e after swap, got (%d, %d)", s, e)
+	}
+}
+
 func TestReflowDiffData(t *testing.T) {
 	data := DiffData{
 		Parsed:           diffcore.ParseUnifiedDiff(sampleSectionUnifiedDiff),

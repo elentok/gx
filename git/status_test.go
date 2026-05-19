@@ -8,6 +8,37 @@ import (
 	"github.com/elentok/gx/testutil"
 )
 
+func TestSyncStatusPretty(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		s    git.SyncStatus
+		want string
+	}{
+		{git.SyncStatus{Name: git.StatusSame}, "synced"},
+		{git.SyncStatus{Name: git.StatusAhead, Ahead: 3}, "3 ahead"},
+		{git.SyncStatus{Name: git.StatusBehind, Behind: 2}, "2 behind"},
+		{git.SyncStatus{Name: git.StatusDiverged, Ahead: 1, Behind: 4}, "1 ahead, 4 behind"},
+		{git.SyncStatus{Name: git.StatusUnknown}, "unknown"},
+	}
+	for _, tt := range tests {
+		if got := tt.s.Pretty(); got != tt.want {
+			t.Errorf("Pretty() = %q, want %q (status=%s)", got, tt.want, tt.s.Name)
+		}
+	}
+}
+
+func TestBranchSyncStatusAgainstRef_EmptyRefs(t *testing.T) {
+	t.Parallel()
+	repoDir := testutil.TempRepo(t)
+	status, err := git.BranchSyncStatusAgainstRef(repoDir, "", "main")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if status.Name != git.StatusUnknown {
+		t.Errorf("expected StatusUnknown for empty localRef, got %q", status.Name)
+	}
+}
+
 func evalDir(t *testing.T, dir string) string {
 	t.Helper()
 	real, err := filepath.EvalSymlinks(dir)

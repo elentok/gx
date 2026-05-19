@@ -200,6 +200,51 @@ func TestHeadCommit_PopulatesFullHashAndDate(t *testing.T) {
 	}
 }
 
+func TestIsLocalBranch_Exists(t *testing.T) {
+	t.Parallel()
+	repoDir := testutil.TempRepo(t)
+	if !git.IsLocalBranch(repoDir, "main") {
+		t.Error("expected IsLocalBranch=true for 'main'")
+	}
+}
+
+func TestIsLocalBranch_Missing(t *testing.T) {
+	t.Parallel()
+	repoDir := testutil.TempRepo(t)
+	if git.IsLocalBranch(repoDir, "nonexistent-branch-xyz") {
+		t.Error("expected IsLocalBranch=false for nonexistent branch")
+	}
+}
+
+func TestCommitsBetween_ReturnsNewCommits(t *testing.T) {
+	t.Parallel()
+	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
+	repo, _ := git.FindRepo(repoDir)
+
+	commits, err := git.CommitsBetween(*repo, "main", "feature")
+	if err != nil {
+		t.Fatalf("CommitsBetween: %v", err)
+	}
+	if len(commits) != 1 {
+		t.Fatalf("expected 1 commit, got %d", len(commits))
+	}
+	if commits[0].Subject != "add feature" {
+		t.Errorf("Subject = %q, want 'add feature'", commits[0].Subject)
+	}
+}
+
+func TestLogFilterIsActive(t *testing.T) {
+	t.Parallel()
+	empty := git.LogFilter{}
+	if empty.IsActive() {
+		t.Error("empty LogFilter should not be active")
+	}
+	withPath := git.LogFilter{Path: "main.go"}
+	if !withPath.IsActive() {
+		t.Error("LogFilter with path should be active")
+	}
+}
+
 func mustGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
 	cmd := exec.Command("git", args...)

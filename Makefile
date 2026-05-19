@@ -11,6 +11,10 @@ install:
 test:
 	go test ./...
 
+coverage:
+	go test ./... -coverprofile=coverage.out
+	go tool cover -func=coverage.out
+
 test-docker-ubuntu:
 	docker run --rm \
 		-v $(CURDIR):/work \

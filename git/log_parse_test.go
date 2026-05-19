@@ -40,6 +40,15 @@ func TestParseDecorations_IgnoresWhitespace(t *testing.T) {
 	}
 }
 
+func TestParseDecorations_SkipsEmptyParts(t *testing.T) {
+	t.Parallel()
+	// a part that is all whitespace after trimming should be skipped
+	got := parseDecorations("main,  , origin/main")
+	if len(got) != 2 {
+		t.Fatalf("expected 2 decorations, got %+v", got)
+	}
+}
+
 func TestInitials_Empty(t *testing.T) {
 	t.Parallel()
 	if got := initials(""); got != "?" {

@@ -2,6 +2,8 @@ package git
 
 import (
 	"testing"
+
+	"github.com/elentok/gx/testutil"
 )
 
 func TestExtractPRURL(t *testing.T) {
@@ -34,6 +36,47 @@ func TestExtractPRURL_StripsTerminalEscapes(t *testing.T) {
 		t.Fatalf("ExtractPRURL() = %q, want %q", got, want)
 	}
 }
+
+func TestIsNonFastForwardPushError_NonRunError(t *testing.T) {
+	t.Parallel()
+	// A non-RunError should return false
+	if IsNonFastForwardPushError(fakeRemoteErr("something else")) {
+		t.Error("expected false for non-RunError")
+	}
+}
+
+func TestCheckFetchConfig_NoRemote(t *testing.T) {
+	t.Parallel()
+	// Plain repo with no remote → nil problem
+	dir := testutil.TempRepo(t)
+	if prob := CheckFetchConfig(dir); prob != nil {
+		t.Errorf("expected nil for repo with no remote, got %+v", prob)
+	}
+}
+
+func TestCheckFetchConfig_CorrectSetup(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempBareRepo(t)
+	// TempBareRepo already sets remote.origin.fetch and fetches → should be fine
+	if prob := CheckFetchConfig(dir); prob != nil {
+		t.Errorf("expected nil for correctly configured bare repo, got: %s", prob.Description)
+	}
+}
+
+func TestBranchRemote_FallsBackToOrigin(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	repo := Repo{Root: dir}
+	// No upstream configured → should fall back to "origin"
+	remote := BranchRemote(repo, "main")
+	if remote != "origin" {
+		t.Errorf("expected 'origin' fallback, got %q", remote)
+	}
+}
+
+type fakeRemoteErr string
+
+func (e fakeRemoteErr) Error() string { return string(e) }
 
 func TestIsNonFastForwardPushError(t *testing.T) {
 	t.Parallel()

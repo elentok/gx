@@ -46,3 +46,45 @@ func TestCommandRunnerCancel(t *testing.T) {
 		t.Fatalf("expected cancelled command to return error")
 	}
 }
+
+func TestCommandRunner_ResultAndOutput(t *testing.T) {
+	r := NewCommandRunner(".", "sh", "-c", "printf 'hello'")
+	r.Start()
+	if err := r.Wait(); err != nil {
+		t.Fatalf("Wait: %v", err)
+	}
+
+	// Result should be available after completion
+	resErr, done := r.Result()
+	if !done {
+		t.Error("expected Result done=true after Wait")
+	}
+	if resErr != nil {
+		t.Errorf("expected nil error, got %v", resErr)
+	}
+
+	// Output should contain the full output
+	if out := r.Output(); !strings.Contains(out, "hello") {
+		t.Errorf("Output() = %q, expected 'hello'", out)
+	}
+}
+
+func TestCommandRunner_ClearPrompt(t *testing.T) {
+	r := NewCommandRunner(".", "sh", "-c", "echo done")
+	r.ClearPrompt() // should not panic when called with no prompt
+	r.Start()
+	r.Wait()        //nolint
+	r.ClearPrompt() // should not panic after completion
+}
+
+func TestCommandRunner_ResultBeforeCompletion(t *testing.T) {
+	r := NewCommandRunner(".", "sh", "-c", "sleep 2")
+	r.Start()
+	// Immediately call Result() - command not done yet
+	_, done := r.Result()
+	if done {
+		t.Error("expected done=false before command completion")
+	}
+	r.Cancel()
+	r.Wait() //nolint
+}

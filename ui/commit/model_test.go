@@ -29,6 +29,29 @@ func newTestModelWithFilter(worktreeRoot, ref, filterPath string, settings ui.Se
 	return NewModel(worktreeRoot, ref, filterPath, settings, keys.Manager{})
 }
 
+func TestCurrentRef(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	m := newTestModel(repo, "HEAD")
+	if m.CurrentRef() != "HEAD" {
+		t.Errorf("CurrentRef() = %q, want 'HEAD'", m.CurrentRef())
+	}
+}
+
+func TestKeyManager(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	m := newTestModel(repo, "HEAD")
+	km := m.KeyManager()
+	_ = km // just verify no panic
+}
+
+func TestInputFocused(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	m := newTestModel(repo, "HEAD")
+	if m.InputFocused() {
+		t.Error("expected InputFocused=false initially")
+	}
+}
+
 func TestNewLoadsCommitDetails(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")

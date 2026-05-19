@@ -1,6 +1,7 @@
 package components
 
 import (
+	"image/color"
 	"strings"
 	"testing"
 
@@ -33,6 +34,44 @@ func TestUpdateConfirmKeyHandling(t *testing.T) {
 
 	if _, decided, accepted, handled := UpdateConfirm(tea.KeyPressMsg{Code: tea.KeyEnter}, false); !handled || !decided || accepted {
 		t.Fatalf("enter should reject when no selected")
+	}
+}
+
+func TestRenderSteps(t *testing.T) {
+	steps := []Step{
+		{TitleBefore: "fetch", TitleAfter: "fetched", TitleFailed: "fetch failed", RunningTitle: "fetching..."},
+		{TitleBefore: "push", IsDone: true, TitleAfter: "pushed"},
+		{TitleBefore: "rebase", HasFailed: true, TitleFailed: "rebase failed"},
+		{TitleBefore: "stash", IsRunning: true, RunningTitle: "stashing..."},
+	}
+	rendered := RenderSteps(steps, ">")
+	plain := ansi.Strip(rendered)
+	for _, want := range []string{"fetch", "pushed", "rebase failed", "stashing..."} {
+		if !strings.Contains(plain, want) {
+			t.Errorf("expected %q in RenderSteps output: %q", want, plain)
+		}
+	}
+}
+
+func TestRenderOutputModal_NonEmpty(t *testing.T) {
+	out := RenderOutputModal("Title", "body content", "hint", color.White, color.Black, color.RGBA{R: 128, G: 128, B: 128, A: 255}, 40)
+	if out == "" {
+		t.Error("expected non-empty RenderOutputModal")
+	}
+	plain := ansi.Strip(out)
+	if !strings.Contains(plain, "body content") {
+		t.Errorf("expected body in output modal, got: %q", plain)
+	}
+}
+
+func TestRenderInputModal_NonEmpty(t *testing.T) {
+	out := RenderInputModal("Input", "Enter value:", "> cursor", "hint", color.White, color.Black, color.RGBA{R: 128, G: 128, B: 128, A: 255}, 40)
+	if out == "" {
+		t.Error("expected non-empty RenderInputModal")
+	}
+	plain := ansi.Strip(out)
+	if !strings.Contains(plain, "Enter value:") {
+		t.Errorf("expected prompt in input modal, got: %q", plain)
 	}
 }
 
