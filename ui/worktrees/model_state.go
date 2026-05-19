@@ -34,6 +34,7 @@ const (
 	modeCredentialPrompt
 	modeHelp
 	modeTerminalMenu
+	modeDeleteProgress
 )
 
 type promptableJobKind int
@@ -55,10 +56,11 @@ type Model struct {
 	activeWorktreePath string // path of the worktree the user launched from
 	settings           ui.Settings
 
-	worktrees  []git.Worktree
-	statuses   map[string]git.SyncStatus
-	dirties    map[string]dirtyState
-	baseStatus map[string]*bool // keyed by branch; nil=loading, &true=rebased, &false=needs rebase
+	worktrees         []git.Worktree
+	selectedWorktrees map[string]bool // worktree names tagged for bulk operations
+	statuses          map[string]git.SyncStatus
+	dirties           map[string]dirtyState
+	baseStatus        map[string]*bool // keyed by branch; nil=loading, &true=rebased, &false=needs rebase
 
 	table    table.Model
 	viewport viewport.Model
@@ -88,10 +90,16 @@ type Model struct {
 	logsViewport viewport.Model
 
 	confirmPrompt       string
+	confirmItems        []string // optional list rendered below the confirm prompt
 	confirmYes          bool
 	confirmCmd          tea.Cmd // executed when the user confirms
 	confirmSpinnerLabel string  // if non-empty, spinner is started on confirm
 	confirmCancelMsg    string  // if non-empty, shown as notification when user cancels
+
+	deleteQueue   []git.Worktree    // worktrees pending deletion in the current batch
+	deleteInFlight int              // number of concurrent deletes in progress
+	deleteSteps   []components.Step // one per worktree in the batch, for the progress modal
+	deleteResults []deleteResultMsg // accumulated results from the batch
 
 	pushDivergence   *git.PushDivergence
 	pushDivergenceWT *git.Worktree
@@ -142,6 +150,7 @@ func NewWithSettings(repo git.Repo, activeWorktreePath string, settings ui.Setti
 		statuses:           make(map[string]git.SyncStatus),
 		dirties:            make(map[string]dirtyState),
 		baseStatus:         make(map[string]*bool),
+		selectedWorktrees:  make(map[string]bool),
 		table:              newTable(),
 		loading:            true,
 		pull:               pull.New(),
@@ -168,8 +177,8 @@ func (m Model) KeyManager() keymgr.Manager {
 	return m.keyManager
 }
 
-// selectedWorktree returns a pointer to the currently highlighted worktree, or nil.
-func (m Model) selectedWorktree() *git.Worktree {
+// cursorWorktree returns a pointer to the currently highlighted worktree, or nil.
+func (m Model) cursorWorktree() *git.Worktree {
 	if len(m.worktrees) == 0 {
 		return nil
 	}

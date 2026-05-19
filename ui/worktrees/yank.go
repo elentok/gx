@@ -35,7 +35,7 @@ func cmdLoadYankData(wt git.Worktree) tea.Cmd {
 
 // enterYankMode initiates loading the file list for the selected worktree.
 func (m Model) enterYankMode() (Model, tea.Cmd) {
-	wt := m.selectedWorktree()
+	wt := m.cursorWorktree()
 	if wt == nil {
 		return m, nil
 	}

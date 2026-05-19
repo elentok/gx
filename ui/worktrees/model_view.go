@@ -35,6 +35,8 @@ func (m Model) View() tea.View {
 			content = ui.OverlayCenter(bg, m.pushDivergedModalView(), m.width, m.height)
 		case modeError:
 			content = ui.OverlayCenter(bg, m.errorModalView(), m.width, m.height)
+		case modeDeleteProgress:
+			content = ui.OverlayCenter(bg, m.deleteProgressModalView(), m.width, m.height)
 		case modeLogs:
 			content = ui.OverlayCenter(bg, m.logsModalView(), m.width, m.height)
 		case modeHelp:

@@ -95,7 +95,7 @@ func (m Model) executeTerminalAction(action string) (Model, tea.Cmd) {
 }
 
 func (m Model) terminalMenuModalView() string {
-	wt := m.selectedWorktree()
+	wt := m.cursorWorktree()
 	title := "Open in Terminal"
 	if wt != nil {
 		title = "Open: " + wt.Name

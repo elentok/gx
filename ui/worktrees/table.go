@@ -56,11 +56,12 @@ func resizeTable(t *table.Model, width, height int) {
 	// Account for default table cell left/right padding (2 chars per column)
 	// plus inter-column spaces to avoid overflow/wrapping.
 	const (
-		cols       = 4
+		cols       = 5
 		separators = cols - 1
 		padding    = cols * 2
+		selW       = 2
 	)
-	usable := width - separators - padding
+	usable := width - separators - padding - selW
 	if usable < 20 {
 		usable = 20
 	}
@@ -76,6 +77,7 @@ func resizeTable(t *table.Model, width, height int) {
 		nameW = 8
 	}
 	t.SetColumns([]table.Column{
+		{Title: "", Width: selW},
 		{Title: "Worktree", Width: nameW},
 		{Title: "Dirty", Width: dirtyW},
 		{Title: "Base", Width: baseW},
@@ -161,21 +163,29 @@ func renderRow(row table.Row, cols []table.Column, selected bool) string {
 // buildRows builds the table rows, applying search highlighting when a query
 // is active. Since tableView uses ansi.Truncate (which is ANSI-aware), cell
 // values may contain arbitrary lipgloss styles without any pre-truncation.
+var styleSelected = lipgloss.NewStyle().Foreground(lipgloss.Color("#cba6f7")) // mauve
+
 func (m Model) buildRows() []table.Row {
 	ic := icons(m.settings.UseNerdFontIcons)
 	rows := make([]table.Row, len(m.worktrees))
 	for i, wt := range m.worktrees {
-		isSelected := i == m.table.Cursor()
+		isCursorRow := i == m.table.Cursor()
+		isTagged := m.selectedWorktrees[wt.Name]
 		isMain := wt.Branch == m.repo.MainBranch
-		nameCol := worktreeCell(wt.Name, wt.Branch, ic, isMain, isSelected)
-		if q := m.search.Query(); q != "" && !isSelected {
+		selCell := ""
+		if isTagged {
+			selCell = styleSelected.Render(ic.checkmark)
+		}
+		nameCol := worktreeCell(wt.Name, wt.Branch, ic, isMain, isCursorRow)
+		if q := m.search.Query(); q != "" && !isCursorRow {
 			nameCol = highlightMatch(nameCol, q)
 		}
 		rows[i] = table.Row{
+			selCell,
 			nameCol,
-			dirtyCell(m.dirties[wt.Path], ic, isSelected),
-			baseCell(m.baseStatus[wt.Branch], ic, wt.Branch == m.repo.MainBranch, isSelected),
-			statusCell(m.statuses[wt.Branch], ic, isSelected, m.settings.UseNerdFontIcons),
+			dirtyCell(m.dirties[wt.Path], ic, isCursorRow),
+			baseCell(m.baseStatus[wt.Branch], ic, wt.Branch == m.repo.MainBranch, isCursorRow),
+			statusCell(m.statuses[wt.Branch], ic, isCursorRow, m.settings.UseNerdFontIcons),
 		}
 	}
 	return rows

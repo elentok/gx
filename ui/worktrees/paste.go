@@ -26,7 +26,7 @@ func (m Model) handlePasteModeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case key.Matches(msg, keys.PasteConfirm):
 		if m.clipboard != nil {
-			wt := m.selectedWorktree()
+			wt := m.cursorWorktree()
 			if wt != nil {
 				m.mode = modeNormal
 				return m, cmdPaste(*m.clipboard, *wt)

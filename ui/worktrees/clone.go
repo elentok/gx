@@ -62,7 +62,7 @@ func newCloneInput(sourceName string) textinput.Model {
 
 // enterCloneMode transitions the model into clone mode.
 func (m Model) enterCloneMode() Model {
-	wt := m.selectedWorktree()
+	wt := m.cursorWorktree()
 	if wt == nil {
 		return m
 	}
@@ -83,7 +83,7 @@ func (m Model) handleCloneKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, submit):
 		newName := strings.TrimSpace(m.textInput.Value())
-		wt := m.selectedWorktree()
+		wt := m.cursorWorktree()
 		if newName == "" || wt == nil || newName == wt.Name {
 			m.mode = modeNormal
 			return m, nil

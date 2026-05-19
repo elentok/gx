@@ -18,7 +18,7 @@ func cmdTrack(repo git.Repo, wt git.Worktree) tea.Cmd {
 }
 
 func (m Model) enterTrackConfirm() Model {
-	wt := m.selectedWorktree()
+	wt := m.cursorWorktree()
 	if wt == nil {
 		return m
 	}

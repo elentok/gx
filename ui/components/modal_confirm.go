@@ -2,6 +2,7 @@ package components
 
 import (
 	"image/color"
+	"strings"
 
 	"github.com/elentok/gx/ui"
 
@@ -39,13 +40,24 @@ func RenderConfirmChoices(yes bool, nerd bool) string {
 	return "  " + ui.RenderButton("Yes", yes, nerd) + "   " + ui.RenderButton("No", !yes, nerd)
 }
 
-func RenderConfirmContent(prompt string, yes bool, nerd bool) string {
-	return prompt + "\n\n" + RenderConfirmChoices(yes, nerd)
+func RenderConfirmContent(prompt string, yes bool, nerd bool, items ...string) string {
+	var sb strings.Builder
+	sb.WriteString(prompt)
+	if len(items) > 0 {
+		sb.WriteString("\n")
+		for _, item := range items {
+			sb.WriteString("\n  • ")
+			sb.WriteString(item)
+		}
+	}
+	sb.WriteString("\n\n")
+	sb.WriteString(RenderConfirmChoices(yes, nerd))
+	return sb.String()
 }
 
-func RenderConfirmModal(prompt string, yes bool, borderColor, yesColor, noColor, subtleColor color.Color, width int) string {
+func RenderConfirmModal(prompt string, yes bool, borderColor, yesColor, noColor, subtleColor color.Color, width int, items ...string) string {
 	return ui.RenderModalFrame(ui.ModalFrameOptions{
-		Body:        RenderConfirmContent(prompt, yes, false),
+		Body:        RenderConfirmContent(prompt, yes, false, items...),
 		Hint:        ConfirmHint,
 		Width:       width,
 		BorderColor: borderColor,

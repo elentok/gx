@@ -42,7 +42,7 @@ func newRenameInput(currentName string) textinput.Model {
 
 // enterRenameMode transitions the model into rename mode.
 func (m Model) enterRenameMode() Model {
-	wt := m.selectedWorktree()
+	wt := m.cursorWorktree()
 	if wt == nil {
 		return m
 	}
@@ -63,7 +63,7 @@ func (m Model) handleRenameKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, submit):
 		newName := strings.TrimSpace(m.textInput.Value())
-		wt := m.selectedWorktree()
+		wt := m.cursorWorktree()
 		if newName == "" || wt == nil || newName == wt.Name {
 			m.mode = modeNormal
 			return m, nil

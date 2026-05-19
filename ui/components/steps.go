@@ -8,6 +8,7 @@ import (
 
 // Step represents one unit of work in a multi-step operation.
 type Step struct {
+	ID           string // identifier used to match results to steps (not rendered)
 	TitleBefore  string // shown while pending    e.g. "rebase"
 	RunningTitle string // shown while running    e.g. "rebasing..."
 	TitleAfter   string // shown when done        e.g. "rebased"

@@ -78,6 +78,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleLogsKey(msg)
 		case modePushDiverged:
 			return m.handlePushDivergedKey(msg)
+		case modeDeleteProgress:
+			return m, nil
 		}
 		match, consumed := m.keyManager.Process(msg)
 		if match != nil {
@@ -87,7 +89,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+	case startBatchDeleteMsg:
+		return m.enterDeleteProgress(msg.worktrees)
+
 	case deleteResultMsg:
+		if m.mode == modeDeleteProgress {
+			return m.handleDeleteProgressResult(msg)
+		}
 		m.spinnerActive = false
 		if msg.err != nil {
 			return m.showError(msg.err.Error()), nil
@@ -160,7 +168,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.finishPromptableJob(err)
 			}
 		}
-		if m.spinnerActive || m.sidebarLoading {
+		if m.spinnerActive || m.sidebarLoading || m.mode == modeDeleteProgress {
 			var cmd tea.Cmd
 			m.spinner, cmd = m.spinner.Update(msg)
 			if m.sidebarLoading {
@@ -202,7 +210,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, cmdLoadBaseStatus(m.repo, w.Branch))
 			}
 		}
-		if wt := m.selectedWorktree(); wt != nil && wt.Branch != "" {
+		if wt := m.cursorWorktree(); wt != nil && wt.Branch != "" {
 			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, *wt))
 		}
 		return m, tea.Batch(cmds...)
@@ -223,7 +231,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			stashPopMsg = "stash restored"
 		}
 		cmds = append(cmds, notify.Info(stashPopMsg))
-		if wt := m.selectedWorktree(); wt != nil {
+		if wt := m.cursorWorktree(); wt != nil {
 			cmds = append(cmds, cmdLoadDirtyStatus(*wt), cmdLoadSidebarData(m.repo, *wt))
 			if wt.Branch != "" {
 				cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch))
@@ -237,7 +245,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "pull":
-			if wt := m.selectedWorktree(); wt != nil && wt.Branch == m.repo.MainBranch {
+			if wt := m.cursorWorktree(); wt != nil && wt.Branch == m.repo.MainBranch {
 				for _, w := range m.worktrees {
 					if w.Branch != "" {
 						cmds = append(cmds, cmdLoadBaseStatus(m.repo, w.Branch))
@@ -252,21 +260,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.lastJobLog = msg.log
 		m.lastJobLabel = "Push output"
 		if msg.divergence != nil {
-			wt := m.selectedWorktree()
+			wt := m.cursorWorktree()
 			if wt != nil {
 				return m.enterPushDivergedMode(*wt, msg.divergence), nil
 			}
 			return m.showError("cannot resolve selected worktree for diverged push"), nil
 		}
 		if msg.err != nil {
-			wt := m.selectedWorktree()
+			wt := m.cursorWorktree()
 			if wt != nil && git.IsNonFastForwardPushError(msg.err) {
 				return m.enterConfirm(forcePushPrompt(*wt), cmdStartPromptableJob(promptableJobForcePush, *wt, msg.log, false), "Force-pushing "+wt.Name+"…"), nil
 			}
 			return m.showError(msg.err.Error()), nil
 		}
 		cmds = append(cmds, notify.Info(ui.MessageComplete("push")))
-		if wt := m.selectedWorktree(); wt != nil && wt.Branch != "" {
+		if wt := m.cursorWorktree(); wt != nil && wt.Branch != "" {
 			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, *wt))
 		}
 		if msg.prURL != "" {
@@ -312,7 +320,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.showError(msg.err.Error()), nil
 		}
 		cmds = append(cmds, notify.Info(ui.MessageComplete("force push")))
-		if wt := m.selectedWorktree(); wt != nil && wt.Branch != "" {
+		if wt := m.cursorWorktree(); wt != nil && wt.Branch != "" {
 			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, *wt))
 		}
 		return m, tea.Batch(cmds...)
@@ -339,7 +347,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.showError(msg.err.Error()), nil
 		}
 		cmds = append(cmds, notify.Info("tracking remote branch"))
-		if wt := m.selectedWorktree(); wt != nil && wt.Branch != "" {
+		if wt := m.cursorWorktree(); wt != nil && wt.Branch != "" {
 			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, *wt))
 		}
 		return m, tea.Batch(cmds...)
@@ -404,7 +412,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.baseStatus[msg.branch] = &rebased
 		m.table.SetRows(m.buildRows())
 		// Refresh sidebar if the updated branch belongs to the selected worktree
-		if wt := m.selectedWorktree(); wt != nil && wt.Branch == msg.branch {
+		if wt := m.cursorWorktree(); wt != nil && wt.Branch == msg.branch {
 			m.viewport.SetContent(m.sidebarContent())
 		}
 		return m, nil

@@ -13,6 +13,7 @@ import (
 
 const (
 	bindingSearch       keymgr.BindingID = "search"
+	bindingSelectToggle keymgr.BindingID = "select-toggle"
 	bindingBack         keymgr.BindingID = "back"
 	bindingHelp         keymgr.BindingID = "help"
 	bindingNew          keymgr.BindingID = "new"
@@ -46,7 +47,8 @@ func newWorktreesManager() keymgr.Manager {
 		{ID: bindingHelp, Seq: []string{"?"}, Categories: []string{"Global"}, Title: "help"},
 		{ID: bindingNew, Seq: []string{"n"}, Categories: []string{"Worktree"}, Title: "new worktree"},
 		{ID: bindingNewAndOpen, Seq: []string{"N"}, Categories: []string{"Worktree"}, Title: "new worktree + open"},
-		{ID: bindingDelete, Seq: []string{"d"}, Categories: []string{"Worktree"}, Title: "delete"},
+		{ID: bindingSelectToggle, Seq: []string{"space"}, Categories: []string{"Worktree"}, Title: "select"},
+		{ID: bindingDelete, Seq: []string{"d"}, Categories: []string{"Worktree"}, Title: "delete selected"},
 		{ID: bindingRename, Seq: []string{"r"}, Categories: []string{"Worktree"}, Title: "rename"},
 		{ID: bindingClone, Seq: []string{"c"}, Categories: []string{"Worktree"}, Title: "clone"},
 		{ID: bindingYank, Seq: []string{"y"}, Categories: []string{"Worktree"}, Title: "yank files"},
@@ -76,7 +78,25 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 			m = m.enterSearchMode()
 		}
 		return m, nil
+	case bindingSelectToggle:
+		if len(m.worktrees) > 0 {
+			wt := m.cursorWorktree()
+			if wt != nil {
+				if m.selectedWorktrees[wt.Name] {
+					delete(m.selectedWorktrees, wt.Name)
+				} else {
+					m.selectedWorktrees[wt.Name] = true
+				}
+				m.table.SetRows(m.buildRows())
+			}
+		}
+		return m, nil
 	case bindingBack:
+		if len(m.selectedWorktrees) > 0 {
+			m.selectedWorktrees = make(map[string]bool)
+			m.table.SetRows(m.buildRows())
+			return m, nil
+		}
 		if m.settings.EnableNavigation {
 			return m, nav.Back()
 		}
@@ -96,7 +116,7 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 		return m, nil
 	case bindingDelete:
 		if len(m.worktrees) > 0 && !m.spinnerActive {
-			return m.enterDeleteConfirm(), nil
+			return m.enterDeleteConfirm()
 		}
 		return m, nil
 	case bindingRename:
@@ -118,7 +138,7 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 		if len(m.worktrees) == 0 || m.spinnerActive {
 			return m, nil
 		}
-		wt := m.selectedWorktree()
+		wt := m.cursorWorktree()
 		if wt == nil {
 			return m, nil
 		}
@@ -128,7 +148,7 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 		if len(m.worktrees) == 0 || m.spinnerActive {
 			return m, nil
 		}
-		wt := m.selectedWorktree()
+		wt := m.cursorWorktree()
 		if wt == nil {
 			return m, nil
 		}
@@ -141,7 +161,7 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 		if len(m.worktrees) == 0 || m.spinnerActive {
 			return m, nil
 		}
-		wt := m.selectedWorktree()
+		wt := m.cursorWorktree()
 		if wt == nil {
 			return m, nil
 		}
@@ -178,7 +198,7 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 		if len(m.worktrees) == 0 || m.spinnerActive || m.sidebarUpstream != "" {
 			return m, nil
 		}
-		wt := m.selectedWorktree()
+		wt := m.cursorWorktree()
 		if wt == nil {
 			return m, nil
 		}
@@ -188,14 +208,14 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 		return m.enterTrackConfirm(), nil
 	case bindingOpenLog:
 		if len(m.worktrees) > 0 && m.settings.EnableNavigation {
-			wt := m.selectedWorktree()
+			wt := m.cursorWorktree()
 			if wt != nil {
 				return m, nav.Replace(nav.Route{Kind: nav.RouteLog, WorktreeRoot: wt.Path})
 			}
 		}
 		return m, nil
 	case bindingLazygitLog:
-		wt := m.selectedWorktree()
+		wt := m.cursorWorktree()
 		if wt != nil {
 			return m, tea.Batch(notify.Info(ui.MessageOpening("lazygit log")), cmdLazygitLog(*wt))
 		}
@@ -204,7 +224,7 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 		if m.settings.Terminal == ui.TerminalPlain {
 			return m, notify.Info("use tmux or kitty for more options")
 		}
-		wt := m.selectedWorktree()
+		wt := m.cursorWorktree()
 		if wt != nil {
 			return m.enterTerminalMenuFor(wt.Name, wt.Path), nil
 		}

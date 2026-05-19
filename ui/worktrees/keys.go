@@ -11,6 +11,7 @@ type keyMap struct {
 	Up           key.Binding
 	Down         key.Binding
 	Top          key.Binding
+	Select       key.Binding
 	New          key.Binding
 	NewAndOpen   key.Binding
 	Delete       key.Binding
@@ -54,9 +55,13 @@ var keys = keyMap{
 		key.WithKeys("gg"),
 		key.WithHelp("gg", "top"),
 	),
+	Select: key.NewBinding(
+		key.WithKeys("space"),
+		key.WithHelp("space", "select"),
+	),
 	Delete: key.NewBinding(
 		key.WithKeys("d"),
-		key.WithHelp("d", "delete"),
+		key.WithHelp("d", "delete selected"),
 	),
 	New: key.NewBinding(
 		key.WithKeys("n"),
@@ -169,13 +174,13 @@ var keys = keyMap{
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.Top, k.New, k.NewAndOpen, k.Open, k.Delete, k.Rename, k.Clone, k.Yank, k.Pull, k.Push, k.Search, k.Track, k.Refresh, k.Quit, k.Help}
+	return []key.Binding{k.Up, k.Down, k.Top, k.Select, k.New, k.NewAndOpen, k.Open, k.Delete, k.Rename, k.Clone, k.Yank, k.Pull, k.Push, k.Search, k.Track, k.Refresh, k.Quit, k.Help}
 }
 
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Top},
-		{k.New, k.NewAndOpen, k.Open, k.Delete, k.Rename, k.Clone},
+		{k.Select, k.New, k.NewAndOpen, k.Open, k.Delete, k.Rename, k.Clone},
 		{k.Yank, k.Search},
 		{k.Pull, k.Push, k.Rebase, k.Track, k.Refresh, k.RemoteUpdate, k.PrevTab, k.NextTab, k.TabWorktrees, k.TabLog, k.TabStatus, k.LazygitLog, k.Help, k.Quit},
 	}

@@ -14,6 +14,7 @@ import (
 func (m Model) enterConfirm(prompt string, cmd tea.Cmd, spinnerLabel string) Model {
 	m.mode = modeConfirm
 	m.confirmPrompt = prompt
+	m.confirmItems = nil
 	m.confirmYes = false
 	m.confirmCmd = cmd
 	m.confirmSpinnerLabel = spinnerLabel
@@ -65,5 +66,6 @@ func (m Model) confirmModalView() string {
 		ui.ColorRed,
 		ui.ColorGray,
 		0,
+		m.confirmItems...,
 	)
 }
