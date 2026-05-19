@@ -77,6 +77,12 @@
           "default": [
             { "patterns": ["^main$", "^master$", "^origin/main$", "^origin/master$"], "color": "yellow" }
           ]
+        },
+        "hide-refs": {
+          "type": "array",
+          "description": "Regular expressions matched against the full ref name. Matching refs are hidden from the log view entirely. Takes priority over important-refs. Default: empty (nothing hidden).",
+          "items": { "type": "string" },
+          "default": []
         }
       }
     }

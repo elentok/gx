@@ -191,7 +191,13 @@ func (m Model) renderBadges(decorations []git.RefDecoration) string {
 		return ""
 	}
 	nerd := m.settings.UseNerdFontIcons
-	sorted := sortDecorations(decorations, m.compiledRefRules)
+	visible := make([]git.RefDecoration, 0, len(decorations))
+	for _, dec := range decorations {
+		if !isHiddenRef(dec.Name, m.compiledHideRefs) {
+			visible = append(visible, dec)
+		}
+	}
+	sorted := sortDecorations(visible, m.compiledRefRules)
 	parts := make([]string, 0, len(sorted))
 	for _, dec := range sorted {
 		label := m.highlightSearch(dec.Name)

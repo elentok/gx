@@ -14,6 +14,27 @@ type compiledRefRule struct {
 	color    color.Color
 }
 
+func compileHideRefs(patterns []string) []*regexp.Regexp {
+	out := make([]*regexp.Regexp, 0, len(patterns))
+	for _, p := range patterns {
+		re, err := regexp.Compile(p)
+		if err != nil {
+			continue
+		}
+		out = append(out, re)
+	}
+	return out
+}
+
+func isHiddenRef(name string, hideRefs []*regexp.Regexp) bool {
+	for _, re := range hideRefs {
+		if re.MatchString(name) {
+			return true
+		}
+	}
+	return false
+}
+
 func compileRefRules(rules []config.ImportantRefRule) []compiledRefRule {
 	out := make([]compiledRefRule, 0, len(rules))
 	for _, rule := range rules {

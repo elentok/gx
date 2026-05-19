@@ -3,6 +3,7 @@ package config
 // LogConfig holds log-view display settings.
 type LogConfig struct {
 	ImportantRefs []ImportantRefRule `json:"important-refs,omitempty"`
+	HideRefs      []string           `json:"hide-refs,omitempty"`
 }
 
 // ImportantRefRule matches refs by regex patterns and assigns them a highlight color.

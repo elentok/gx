@@ -208,7 +208,8 @@ func TestMatchRefRule(t *testing.T) {
 		{name: "origin/main matches", ref: "origin/main", wantMatch: true},
 		{name: "origin/master matches", ref: "origin/master", wantMatch: true},
 		{name: "feature branch does not match", ref: "feature/x", wantMatch: false},
-		{name: "tag does not match", ref: "v1.0.0", wantMatch: false},
+		{name: "version tag matches", ref: "v1.0.0", wantMatch: true},
+		{name: "non-version ref does not match", ref: "some-branch", wantMatch: false},
 	}
 
 	for _, tt := range tests {

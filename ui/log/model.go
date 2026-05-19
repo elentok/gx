@@ -1,6 +1,7 @@
 package log
 
 import (
+	"regexp"
 	"strings"
 	"time"
 
@@ -46,10 +47,11 @@ type row struct {
 }
 
 type Model struct {
-	worktreeRoot    string
-	settings        ui.Settings
+	worktreeRoot     string
+	settings         ui.Settings
 	compiledRefRules []compiledRefRule
-	startRef        string
+	compiledHideRefs []*regexp.Regexp
+	startRef         string
 	filter          LogFilter
 
 	width  int
@@ -92,10 +94,11 @@ type Model struct {
 
 func NewModel(worktreeRoot, startRef string, settings ui.Settings, filter LogFilter, extraKeys keys.Manager) Model {
 	m := Model{
-		worktreeRoot:    worktreeRoot,
-		settings:        settings,
+		worktreeRoot:     worktreeRoot,
+		settings:         settings,
 		compiledRefRules: compileRefRules(settings.LogConfig.ImportantRefs),
-		startRef:        normalizedRef(startRef),
+		compiledHideRefs: compileHideRefs(settings.LogConfig.HideRefs),
+		startRef:         normalizedRef(startRef),
 		filter:          filter,
 		keys:            newLogManager(),
 		search:          search.NewModel(),
