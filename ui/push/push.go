@@ -130,6 +130,10 @@ func (m *Model) Open(root string) error {
 	m.log = ui.NewCommandOutputLog()
 	m.activeRunner = nil
 	m.steps = nil
+	m.tag = ""
+	m.divergence = nil
+	m.menu = components.MenuState{}
+	m.prURL = ""
 	m.IsOpen = true
 	return nil
 }
