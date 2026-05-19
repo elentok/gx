@@ -48,7 +48,7 @@ func (m Model) handleErrorKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 func (m Model) errorHint() string {
 	hint := "esc / enter / q  dismiss"
 	if m.lastJobLog != "" {
-		hint = ui.JoinStatus(hint, ui.RenderInlineBindings(keys.GoOutput))
+		hint = ui.JoinStatus(hint, ui.StyleTitle.Render("go")+" "+ui.StyleHint.Render("view output"))
 	}
 	return ui.StyleDim.Render(hint)
 }

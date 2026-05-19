@@ -48,7 +48,6 @@ func (m Model) contentHeight() int {
 }
 
 func (m Model) resized() Model {
-	m.help.SetWidth(m.width)
 	tableW, sidebarW := m.splitWidth()
 	h := m.contentHeight()
 	tableH, sidebarH := m.splitHeight(h)

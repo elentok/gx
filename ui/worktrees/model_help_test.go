@@ -53,8 +53,8 @@ func TestQuestionMarkOpensHelpOverlay(t *testing.T) {
 	if m.mode != modeHelp {
 		t.Fatalf("expected modeHelp after ?, got %v", m.mode)
 	}
-	if m.helpViewport.Width() == 0 || m.helpViewport.Height() == 0 {
-		t.Fatalf("expected initialized help viewport, got %dx%d", m.helpViewport.Width(), m.helpViewport.Height())
+	if m.helpModel.Viewport.Width() == 0 || m.helpModel.Viewport.Height() == 0 {
+		t.Fatalf("expected initialized help viewport, got %dx%d", m.helpModel.Viewport.Width(), m.helpModel.Viewport.Height())
 	}
 
 	updated, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})

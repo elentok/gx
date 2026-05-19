@@ -6,7 +6,6 @@ import (
 
 	"github.com/elentok/gx/git"
 
-	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -19,12 +18,12 @@ type pasteResultMsg struct {
 // handlePasteModeKey handles key events in paste mode (clipboard active, waiting for destination).
 // Only navigation (j/k/arrows), paste (p), and cancel (esc) are active.
 func (m Model) handlePasteModeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch {
-	case key.Matches(msg, keys.PasteCancel):
+	switch msg.String() {
+	case "esc", "q":
 		m.clipboard = nil
 		m.mode = modeNormal
 		return m, nil
-	case key.Matches(msg, keys.PasteConfirm):
+	case "p":
 		if m.clipboard != nil {
 			wt := m.cursorWorktree()
 			if wt != nil {
@@ -34,7 +33,7 @@ func (m Model) handlePasteModeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		m.mode = modeNormal
 		return m, nil
-	case key.Matches(msg, keys.Up), key.Matches(msg, keys.Down):
+	case "up", "k", "down", "j":
 		prevCursor := m.table.Cursor()
 		var tableCmd tea.Cmd
 		m.table, tableCmd = m.table.Update(msg)

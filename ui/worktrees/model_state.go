@@ -8,7 +8,8 @@ import (
 	"github.com/elentok/gx/ui/pull"
 	"github.com/elentok/gx/ui/search"
 
-	"charm.land/bubbles/v2/help"
+	"github.com/elentok/gx/ui/help"
+
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/table"
 	"charm.land/bubbles/v2/textinput"
@@ -78,7 +79,7 @@ type Model struct {
 	mode          mode
 	textInput     textinput.Model // shared by rename and clone modes
 	errorViewport viewport.Model
-	helpViewport  viewport.Model
+	helpModel     help.Model
 	jobRunner     *components.CommandRunner
 	jobKind       promptableJobKind
 	jobWorktree   *git.Worktree
@@ -142,6 +143,7 @@ func New(repo git.Repo, activeWorktreePath string) Model {
 func NewWithSettings(repo git.Repo, activeWorktreePath string, settings ui.Settings) Model {
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
+	km := newWorktreesManager()
 
 	return Model{
 		repo:               repo,
@@ -154,8 +156,8 @@ func NewWithSettings(repo git.Repo, activeWorktreePath string, settings ui.Setti
 		table:              newTable(),
 		loading:            true,
 		pull:               pull.New(),
-		help:               newWorktreeHelpModel(),
-		keyManager:         newWorktreesManager(),
+		helpModel:          help.NewModel(help.BuildSections(km)),
+		keyManager:         km,
 		search:             search.NewModel(),
 		spinner:            sp,
 	}

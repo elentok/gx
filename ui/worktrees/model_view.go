@@ -170,7 +170,13 @@ func (m Model) statusBarView() string {
 	default:
 		if m.mode == modePaste && m.clipboard != nil {
 			prefix := ui.StyleDim.Render(fmt.Sprintf("  %d file(s) from %s", len(m.clipboard.files), m.clipboard.srcName))
-			line = prefix + ui.StyleDim.Render("  ·  ") + ui.RenderInlineBindings(keys.Up, keys.Down, keys.PasteConfirm, keys.PasteCancel)
+			pasteHints := strings.Join([]string{
+				ui.StyleTitle.Render("↑/k") + " " + ui.StyleHint.Render("up"),
+				ui.StyleTitle.Render("↓/j") + " " + ui.StyleHint.Render("down"),
+				ui.StyleTitle.Render("p") + " " + ui.StyleHint.Render("paste"),
+				ui.StyleTitle.Render("esc/q") + " " + ui.StyleHint.Render("cancel"),
+			}, ui.StyleHint.Render(" · "))
+			line = prefix + ui.StyleDim.Render("  ·  ") + pasteHints
 			break
 		}
 		if m.spinnerActive {

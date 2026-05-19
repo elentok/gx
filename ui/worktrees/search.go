@@ -3,7 +3,6 @@ package worktrees
 import (
 	"strings"
 
-	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	uisearch "github.com/elentok/gx/ui/search"
 )
@@ -51,11 +50,11 @@ func (m Model) updateSearchMatches() (Model, tea.Cmd) {
 
 // handleSearchKey handles key events while in search mode.
 func (m Model) handleSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch {
-	case key.Matches(msg, keys.SearchClose):
+	switch msg.String() {
+	case "esc", "enter":
 		m = m.exitSearchMode()
 		return m, nil
-	case key.Matches(msg, keys.SearchNext):
+	case "ctrl+n":
 		if m.search.MatchesCount() > 0 {
 			nextIdx := (m.search.Cursor() + 1) % m.search.MatchesCount()
 			m.search.SetCursor(nextIdx)
@@ -64,7 +63,7 @@ func (m Model) handleSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
-	case key.Matches(msg, keys.SearchPrev):
+	case "ctrl+p":
 		if m.search.MatchesCount() > 0 {
 			prevIdx := (m.search.Cursor() - 1 + m.search.MatchesCount()) % m.search.MatchesCount()
 			m.search.SetCursor(prevIdx)
