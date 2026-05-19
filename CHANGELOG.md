@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.15.5 - 2026-05-19
+
+- Log: move the status icon next to the commit subject
+
 ## v0.15.4 - 2026-05-19
 
 - Log: color commits based on their status
