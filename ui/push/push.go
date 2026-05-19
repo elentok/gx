@@ -98,6 +98,16 @@ func New() Model {
 	return Model{spinner: sp}
 }
 
+// OpenAtPRPrompt puts the model directly into the PR-prompt phase. Intended for
+// testing parent models that embed push.Model.
+func (m *Model) OpenAtPRPrompt(prURL string) {
+	m.IsOpen = true
+	m.phase = phasePRPrompt
+	m.prURL = prURL
+	m.prYes = true
+	m.log = ui.NewCommandOutputLog()
+}
+
 // OpenWithTag is like Open but also pushes the given tag after a successful branch push.
 func (m *Model) OpenWithTag(root, tag string) error {
 	if err := m.Open(root); err != nil {

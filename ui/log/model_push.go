@@ -12,7 +12,7 @@ func (m Model) handlePushUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.statusMsg = "pushed"
 		}
-		return m, m.cmdReload()
+		return m, tea.Batch(cmd, m.cmdReload())
 	}
 	return m, cmd
 }
