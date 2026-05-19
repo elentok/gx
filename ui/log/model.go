@@ -75,12 +75,7 @@ type Model struct {
 	pull         pull.Model
 	output       output.Model
 
-	reword           reword.Model
-	rewordTmpFile    string
-	rewordOrigMsg    string
-	rewordHash       string
-	rewordSubject    string
-	rewordNewSubject string
+	reword reword.Model
 
 	pendingFocusSubject string
 	flashSubject        string

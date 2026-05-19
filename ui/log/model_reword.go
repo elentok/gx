@@ -1,11 +1,8 @@
 package log
 
 import (
-	"strings"
-
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui/reword"
 )
 
 type rewordDetailsMsg struct {
@@ -47,15 +44,11 @@ func (m Model) handleRewordDetails(msg rewordDetailsMsg) (tea.Model, tea.Cmd) {
 		m.statusMsg = "reword: " + msg.err.Error()
 		return m, nil
 	}
-	cmd, tmpFile, original, err := reword.CmdOpenEditor(m.worktreeRoot, msg.hash, msg.subject, msg.body, msg.pushed)
+	cmd, err := m.reword.CmdOpenEditor(m.worktreeRoot, msg.hash, msg.subject, msg.body, msg.pushed)
 	if err != nil {
 		m.statusMsg = "reword: " + err.Error()
 		return m, nil
 	}
-	m.rewordTmpFile = tmpFile
-	m.rewordOrigMsg = original
-	m.rewordHash = msg.hash
-	m.rewordSubject = msg.subject
 	return m, cmd
 }
 
@@ -64,7 +57,7 @@ func (m Model) handleRewordEditorDone(err error) (tea.Model, tea.Cmd) {
 		m.statusMsg = "reword: editor failed: " + err.Error()
 		return m, nil
 	}
-	changed, newMsg, err := reword.ReadResult(m.rewordTmpFile, m.rewordOrigMsg)
+	changed, newMsg, err := m.reword.ReadEditorResult()
 	if err != nil {
 		m.statusMsg = "reword: " + err.Error()
 		return m, nil
@@ -73,9 +66,7 @@ func (m Model) handleRewordEditorDone(err error) (tea.Model, tea.Cmd) {
 		m.statusMsg = "reword: no changes"
 		return m, nil
 	}
-	newSubject := strings.SplitN(newMsg, "\n", 2)[0]
-	m.rewordNewSubject = newSubject
-	cmd, err := m.reword.StartRunning(m.worktreeRoot, m.rewordHash, m.rewordSubject, newMsg)
+	cmd, err := m.reword.StartRunning(m.worktreeRoot, newMsg)
 	if err != nil {
 		m.statusMsg = "reword: " + err.Error()
 		return m, nil
@@ -98,5 +89,5 @@ func (m Model) handleRewordDone(err error) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.statusMsg = "rewrote commit"
-	return m, m.cmdReloadFocusSubject(m.rewordNewSubject)
+	return m, m.cmdReloadFocusSubject(m.reword.NewSubject)
 }

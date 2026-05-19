@@ -42,10 +42,7 @@ type Model struct {
 
 	amendConfirm amend.Model
 
-	reword           reword.Model
-	rewordTmpFile    string
-	rewordOrigMsg    string
-	rewordNewSubject string
+	reword reword.Model
 }
 
 type editCommentFinishedMsg struct {

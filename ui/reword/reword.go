@@ -37,9 +37,13 @@ type stepResultMsg struct {
 
 // Model owns the running phase of a reword operation (no confirm dialog).
 type Model struct {
-	IsOpen  bool
-	Hash    string
-	Subject string
+	IsOpen     bool
+	Hash       string
+	Subject    string
+	NewSubject string
+
+	tmpFile string
+	origMsg string
 
 	running bool
 	steps   []execStep
@@ -56,15 +60,15 @@ func New() Model {
 }
 
 // CmdOpenEditor writes a temp file pre-populated with the commit message and returns a
-// tea.ExecProcess cmd that opens $EDITOR on it. The caller must handle EditorFinishedMsg
-// and then call ReadResult with the returned tmpFile and original.
-func CmdOpenEditor(root, hash, subject, body string, pushed bool) (cmd tea.Cmd, tmpFile string, original string, err error) {
+// tea.ExecProcess cmd that opens $EDITOR on it. Stores hash, subject, tmpFile, and
+// original message on the model. Call ReadEditorResult after EditorFinishedMsg.
+func (m *Model) CmdOpenEditor(root, hash, subject, body string, pushed bool) (tea.Cmd, error) {
 	editor := strings.TrimSpace(os.Getenv("EDITOR"))
 	if editor == "" {
-		return nil, "", "", fmt.Errorf("$EDITOR is not set")
+		return nil, fmt.Errorf("$EDITOR is not set")
 	}
 
-	original = subject
+	original := subject
 	if body != "" {
 		original = subject + "\n\n" + body
 	}
@@ -76,29 +80,34 @@ func CmdOpenEditor(root, hash, subject, body string, pushed bool) (cmd tea.Cmd, 
 
 	f, err := os.CreateTemp("", "gx-reword-*.txt")
 	if err != nil {
-		return nil, "", "", fmt.Errorf("create temp file: %w", err)
+		return nil, fmt.Errorf("create temp file: %w", err)
 	}
-	tmpFile = f.Name()
+	tmpFile := f.Name()
 	if _, err = f.WriteString(content); err != nil {
 		f.Close()
 		os.Remove(tmpFile)
-		return nil, "", "", fmt.Errorf("write temp file: %w", err)
+		return nil, fmt.Errorf("write temp file: %w", err)
 	}
 	f.Close()
+
+	m.Hash = hash
+	m.Subject = subject
+	m.tmpFile = tmpFile
+	m.origMsg = original
+	m.NewSubject = ""
 
 	parts := strings.Fields(editor)
 	args := append(parts[1:], tmpFile)
 	c := exec.Command(parts[0], args...)
-	cmd = tea.ExecProcess(c, func(e error) tea.Msg {
+	return tea.ExecProcess(c, func(e error) tea.Msg {
 		return EditorFinishedMsg{Err: e}
-	})
-	return cmd, tmpFile, original, nil
+	}), nil
 }
 
-// ReadResult reads the temp file, strips comment lines, and compares to the original message.
-// Returns changed=false if the result is empty/whitespace or unchanged.
-func ReadResult(tmpFile, original string) (changed bool, newMsg string, err error) {
-	data, err := os.ReadFile(tmpFile)
+// ReadEditorResult reads the temp file written by CmdOpenEditor, strips comment lines,
+// and compares to the original message. Returns changed=false if empty or unchanged.
+func (m *Model) ReadEditorResult() (changed bool, newMsg string, err error) {
+	data, err := os.ReadFile(m.tmpFile)
 	if err != nil {
 		return false, "", fmt.Errorf("read temp file: %w", err)
 	}
@@ -113,21 +122,23 @@ func ReadResult(tmpFile, original string) (changed bool, newMsg string, err erro
 	}
 
 	result := strings.TrimRight(strings.Join(lines, "\n"), "\n\r\t ")
-	normalizedOriginal := strings.TrimRight(original, "\n\r\t ")
+	normalizedOriginal := strings.TrimRight(m.origMsg, "\n\r\t ")
 
 	if result == "" || result == normalizedOriginal {
-		return false, original, nil
+		return false, m.origMsg, nil
 	}
 	return true, result, nil
 }
 
 // StartRunning sets up the running steps and returns the first cmd.
-func (m *Model) StartRunning(root, hash, subject, newMsg string) (tea.Cmd, error) {
-	isHead, err := git.IsHEAD(root, hash)
+// Hash and Subject must already be set (via CmdOpenEditor or directly).
+func (m *Model) StartRunning(root, newMsg string) (tea.Cmd, error) {
+	isHead, err := git.IsHEAD(root, m.Hash)
 	if err != nil {
 		return nil, err
 	}
 
+	hash := m.Hash
 	var steps []execStep
 	if isHead {
 		steps = []execStep{{
@@ -151,9 +162,8 @@ func (m *Model) StartRunning(root, hash, subject, newMsg string) (tea.Cmd, error
 		}}
 	}
 
+	m.NewSubject = strings.SplitN(newMsg, "\n", 2)[0]
 	m.root = root
-	m.Hash = hash
-	m.Subject = subject
 	m.steps = steps
 	m.stepIdx = 0
 	m.running = true

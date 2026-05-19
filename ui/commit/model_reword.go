@@ -1,13 +1,10 @@
 package commit
 
 import (
-	"strings"
-
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
-	"github.com/elentok/gx/ui/reword"
 )
 
 func (m *Model) openRewordEditor() tea.Cmd {
@@ -15,15 +12,13 @@ func (m *Model) openRewordEditor() tea.Cmd {
 		return notify.Warning("no commit loaded")
 	}
 	pushed, _ := git.IsCommitPushed(m.worktreeRoot, m.details.FullHash)
-	cmd, tmpFile, original, err := reword.CmdOpenEditor(
+	cmd, err := m.reword.CmdOpenEditor(
 		m.worktreeRoot, m.details.FullHash,
 		m.details.Subject, m.details.Body, pushed,
 	)
 	if err != nil {
 		return notify.Error("reword: " + err.Error())
 	}
-	m.rewordTmpFile = tmpFile
-	m.rewordOrigMsg = original
 	return cmd
 }
 
@@ -31,15 +26,14 @@ func (m Model) handleRewordEditorDone(err error) (tea.Model, tea.Cmd) {
 	if err != nil {
 		return m, notify.Error("reword: editor failed: " + err.Error())
 	}
-	changed, newMsg, err := reword.ReadResult(m.rewordTmpFile, m.rewordOrigMsg)
+	changed, newMsg, err := m.reword.ReadEditorResult()
 	if err != nil {
 		return m, notify.Error("reword: " + err.Error())
 	}
 	if !changed {
 		return m, notify.Info("reword: no changes")
 	}
-	m.rewordNewSubject = strings.SplitN(newMsg, "\n", 2)[0]
-	cmd, err := m.reword.StartRunning(m.worktreeRoot, m.details.FullHash, m.details.Subject, newMsg)
+	cmd, err := m.reword.StartRunning(m.worktreeRoot, newMsg)
 	if err != nil {
 		return m, notify.Error("reword: " + err.Error())
 	}
@@ -63,6 +57,6 @@ func (m Model) handleRewordDone(err error) (tea.Model, tea.Cmd) {
 		Kind:         nav.RouteLog,
 		WorktreeRoot: m.worktreeRoot,
 		Ref:          "HEAD",
-		FocusSubject: m.rewordNewSubject,
+		FocusSubject: m.reword.NewSubject,
 	})
 }
