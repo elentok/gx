@@ -314,7 +314,7 @@ func renderBadges(decorations []git.RefDecoration) string {
 	}
 	parts := make([]string, 0, len(decorations))
 	for _, decoration := range decorations {
-		parts = append(parts, ui.RenderBadge(decoration.Name, badgeVariantForDecoration(decoration), true))
+		parts = append(parts, ui.RenderBadge(decoration.Name, badgeVariantForDecoration(decoration), true, true))
 	}
 	return strings.Join(parts, " ")
 }

@@ -8,7 +8,7 @@ import (
 )
 
 func TestRenderBadgeUsesPillCaps(t *testing.T) {
-	got := RenderBadge("main", BadgeVariantYellow, true)
+	got := RenderBadge("main", BadgeVariantYellow, true, true)
 	if !strings.Contains(got, capLeft) || !strings.Contains(got, capRight) {
 		t.Fatalf("expected badge to render pill caps")
 	}

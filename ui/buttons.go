@@ -26,5 +26,5 @@ func RenderButton(label string, selected bool, nerd bool) string {
 		fgColor = lipgloss.Color("7")
 	}
 
-	return renderPill(label, bgColor, fgColor, selected, nerd)
+	return renderPill(label, bgColor, fgColor, selected, nerd, true)
 }

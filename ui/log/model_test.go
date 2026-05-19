@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
@@ -194,21 +195,26 @@ func TestSelectedCommitRowFillsFullWidth(t *testing.T) {
 	}
 }
 
-func TestBadgeVariantForDecoration(t *testing.T) {
+func TestMatchRefRule(t *testing.T) {
+	rules := compileRefRules(config.DefaultLogConfig().ImportantRefs)
+
 	tests := []struct {
-		name string
-		dec  git.RefDecoration
-		want ui.BadgeVariant
+		name      string
+		ref       string
+		wantMatch bool
 	}{
-		{name: "main local branch", dec: git.RefDecoration{Name: "main", Kind: git.RefDecorationLocalBranch}, want: ui.BadgeVariantYellow},
-		{name: "main remote branch", dec: git.RefDecoration{Name: "origin/main", Kind: git.RefDecorationRemoteBranch}, want: ui.BadgeVariantYellow},
-		{name: "feature branch", dec: git.RefDecoration{Name: "feature/x", Kind: git.RefDecorationLocalBranch}, want: ui.BadgeVariantMauve},
-		{name: "tag", dec: git.RefDecoration{Name: "v1.0.0", Kind: git.RefDecorationTag}, want: ui.BadgeVariantBlue},
+		{name: "main matches", ref: "main", wantMatch: true},
+		{name: "master matches", ref: "master", wantMatch: true},
+		{name: "origin/main matches", ref: "origin/main", wantMatch: true},
+		{name: "origin/master matches", ref: "origin/master", wantMatch: true},
+		{name: "feature branch does not match", ref: "feature/x", wantMatch: false},
+		{name: "tag does not match", ref: "v1.0.0", wantMatch: false},
 	}
 
 	for _, tt := range tests {
-		if got := badgeVariantForDecoration(tt.dec); got != tt.want {
-			t.Fatalf("%s: variant = %q, want %q", tt.name, got, tt.want)
+		_, ok := matchRefRule(tt.ref, rules)
+		if ok != tt.wantMatch {
+			t.Fatalf("%s: match = %v, want %v", tt.name, ok, tt.wantMatch)
 		}
 	}
 }

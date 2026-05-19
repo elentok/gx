@@ -46,10 +46,11 @@ type row struct {
 }
 
 type Model struct {
-	worktreeRoot string
-	settings     ui.Settings
-	startRef     string
-	filter       LogFilter
+	worktreeRoot    string
+	settings        ui.Settings
+	compiledRefRules []compiledRefRule
+	startRef        string
+	filter          LogFilter
 
 	width  int
 	height int
@@ -91,12 +92,13 @@ type Model struct {
 
 func NewModel(worktreeRoot, startRef string, settings ui.Settings, filter LogFilter, extraKeys keys.Manager) Model {
 	m := Model{
-		worktreeRoot: worktreeRoot,
-		settings:     settings,
-		startRef:     normalizedRef(startRef),
-		filter:       filter,
-		keys:         newLogManager(),
-		search:       search.NewModel(),
+		worktreeRoot:    worktreeRoot,
+		settings:        settings,
+		compiledRefRules: compileRefRules(settings.LogConfig.ImportantRefs),
+		startRef:        normalizedRef(startRef),
+		filter:          filter,
+		keys:            newLogManager(),
+		search:          search.NewModel(),
 	}
 	m.help = help.NewModel(help.BuildSections(m.keys, m.search.Keys(), extraKeys))
 	m.amendConfirm = amend.New()

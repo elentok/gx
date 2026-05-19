@@ -48,6 +48,37 @@
         "type": "string"
       },
       "default": {}
+    },
+    "log": {
+      "type": "object",
+      "description": "Log view display settings.",
+      "additionalProperties": false,
+      "properties": {
+        "important-refs": {
+          "type": "array",
+          "description": "Rules for highlighting important refs in the log view. Refs matching a rule get a bright colored badge; all others get a dim surface badge. Rules are evaluated in order — the first match wins. The order also controls sort priority: refs matching earlier rules appear first.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["patterns", "color"],
+            "properties": {
+              "patterns": {
+                "type": "array",
+                "description": "Regular expressions matched against the full ref name (e.g. \"^main$\", \"^origin/main$\", \"^v\\\\d\").",
+                "items": { "type": "string" },
+                "minItems": 1
+              },
+              "color": {
+                "type": "string",
+                "description": "Badge color. Named Catppuccin colors: blue, green, yellow, orange, mauve, teal, red, surface. Or a hex value: #rrggbb or #rgb."
+              }
+            }
+          },
+          "default": [
+            { "patterns": ["^main$", "^master$", "^origin/main$", "^origin/master$"], "color": "yellow" }
+          ]
+        }
+      }
     }
   }
 }

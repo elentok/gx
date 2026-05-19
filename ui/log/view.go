@@ -190,9 +190,16 @@ func (m Model) renderBadges(decorations []git.RefDecoration) string {
 	if len(decorations) == 0 {
 		return ""
 	}
-	parts := make([]string, 0, len(decorations))
-	for _, decoration := range decorations {
-		parts = append(parts, ui.RenderBadge(m.highlightSearch(decoration.Name), badgeVariantForDecoration(decoration), true))
+	nerd := m.settings.UseNerdFontIcons
+	sorted := sortDecorations(decorations, m.compiledRefRules)
+	parts := make([]string, 0, len(sorted))
+	for _, dec := range sorted {
+		label := m.highlightSearch(dec.Name)
+		if c, ok := matchRefRule(dec.Name, m.compiledRefRules); ok {
+			parts = append(parts, ui.RenderBadgeWithColor(label, c, nerd, false))
+		} else {
+			parts = append(parts, ui.RenderBadge(label, ui.BadgeVariantSurface, nerd, false))
+		}
 	}
 	return strings.Join(parts, " ")
 }
@@ -225,27 +232,6 @@ func (m Model) highlightSearch(text string) string {
 	return out.String()
 }
 
-func badgeVariantForDecoration(decoration git.RefDecoration) ui.BadgeVariant {
-	switch decoration.Kind {
-	case git.RefDecorationTag:
-		return ui.BadgeVariantBlue
-	case git.RefDecorationRemoteBranch, git.RefDecorationLocalBranch:
-		if isMainOrMasterRef(decoration.Name) {
-			return ui.BadgeVariantYellow
-		}
-		return ui.BadgeVariantMauve
-	default:
-		return ui.BadgeVariantSurface
-	}
-}
-
-func isMainOrMasterRef(name string) bool {
-	name = strings.TrimSpace(name)
-	if idx := strings.LastIndex(name, "/"); idx >= 0 {
-		name = name[idx+1:]
-	}
-	return name == "main" || name == "master"
-}
 
 func (m Model) footerView() string {
 	left := m.statusMsg

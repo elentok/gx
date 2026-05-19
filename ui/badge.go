@@ -19,18 +19,29 @@ const (
 )
 
 // RenderBadge returns a pill-shaped badge with a Catppuccin variant color theme.
-func RenderBadge(label string, variant BadgeVariant, nerd bool) string {
-	return renderPill(label, badgeBackground(variant), badgeForeground(variant), false, nerd)
+// padding adds a space on each side of the label.
+func RenderBadge(label string, variant BadgeVariant, nerd bool, padding bool) string {
+	return renderPill(label, badgeBackground(variant), badgeForeground(variant), false, nerd, padding)
 }
 
-func renderPill(label string, bgColor color.Color, fgColor color.Color, bold bool, nerd bool) string {
+// RenderBadgeWithColor renders a pill badge using an explicit background color.
+// padding adds a space on each side of the label.
+func RenderBadgeWithColor(label string, bg color.Color, nerd bool, padding bool) string {
+	return renderPill(label, bg, ColorDeepBg, false, nerd, padding)
+}
+
+func renderPill(label string, bgColor color.Color, fgColor color.Color, bold bool, nerd bool, padding bool) string {
 	bodyStyle := lipgloss.NewStyle().
 		Background(bgColor).
 		Foreground(fgColor)
 	if bold {
 		bodyStyle = bodyStyle.Bold(true)
 	}
-	body := bodyStyle.Render(" " + strings.TrimSpace(label) + " ")
+	text := strings.TrimSpace(label)
+	if padding {
+		text = " " + text + " "
+	}
+	body := bodyStyle.Render(text)
 
 	if !nerd {
 		return body

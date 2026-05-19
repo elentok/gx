@@ -333,6 +333,7 @@ func settingsFromConfig(cfg config.Config) ui.Settings {
 		EnableNavigation: true,
 		DiffContextLines: cfg.StageDiffContextLines,
 		NameAliases:      cfg.NameAliases,
+		LogConfig:        cfg.Log,
 	}
 }
 

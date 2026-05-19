@@ -13,11 +13,12 @@ const SchemaURL = "https://raw.githubusercontent.com/elentok/gx/main/docs/config
 
 // Config is gx's user configuration.
 type Config struct {
-	Schema                string           `json:"$schema,omitempty"`
-	UseNerdFontIcons      bool             `json:"use-nerdfont-icons"`
-	StageDiffContextLines int              `json:"stage-diff-context-lines"`
-	InputModalBottom      InputModalBottom `json:"input-modal-bottom"`
+	Schema                string            `json:"$schema,omitempty"`
+	UseNerdFontIcons      bool              `json:"use-nerdfont-icons"`
+	StageDiffContextLines int               `json:"stage-diff-context-lines"`
+	InputModalBottom      InputModalBottom  `json:"input-modal-bottom"`
 	NameAliases           map[string]string `json:"name-aliases,omitempty"`
+	Log                   LogConfig         `json:"log,omitempty"`
 }
 
 // Default returns the default configuration.
@@ -26,6 +27,7 @@ func Default() Config {
 		UseNerdFontIcons:      true,
 		StageDiffContextLines: 1,
 		InputModalBottom:      DefaultInputModalBottom(),
+		Log:                   DefaultLogConfig(),
 	}
 }
 
@@ -59,6 +61,7 @@ func Load() (Config, error) {
 		StageDiffContextLines *int              `json:"stage-diff-context-lines"`
 		InputModalBottom      *InputModalBottom `json:"input-modal-bottom"`
 		NameAliases           map[string]string `json:"name-aliases"`
+		Log                   *LogConfig        `json:"log"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return cfg, fmt.Errorf("parse config %s: %w", path, err)
@@ -77,6 +80,9 @@ func Load() (Config, error) {
 		for k, v := range raw.NameAliases {
 			cfg.NameAliases[k] = v
 		}
+	}
+	if raw.Log != nil {
+		cfg.Log = *raw.Log
 	}
 
 	return cfg, nil
