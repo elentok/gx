@@ -58,10 +58,9 @@ type Model struct {
 	height int
 	ready  bool
 
-	rows      []row
-	list      list.Model
-	statusMsg string
-	keys      keys.Manager
+	rows []row
+	list list.Model
+	keys keys.Manager
 	search    search.Model
 	err       error
 

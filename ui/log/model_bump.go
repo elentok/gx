@@ -12,15 +12,13 @@ func (m Model) handleBumpUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	if result.Err != nil {
-		m.statusMsg = "bump failed: " + result.Err.Error()
-		return m, nil
+		return m, notify.Error("bump failed: " + result.Err.Error())
 	}
 	if result.NewTag == "" {
 		return m, nil
 	}
 	if err := m.push.OpenWithTag(m.worktreeRoot, result.NewTag); err != nil {
-		m.statusMsg = err.Error()
-		return m, nil
+		return m, notify.Error(err.Error())
 	}
 	return m, notify.Success("tag created")
 }

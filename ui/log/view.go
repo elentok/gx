@@ -240,8 +240,8 @@ func (m Model) highlightSearch(text string) string {
 
 
 func (m Model) footerView() string {
-	left := m.statusMsg
-	if left == "" && m.search.HasQuery() && m.search.MatchesCount() > 0 {
+	left := ""
+	if m.search.HasQuery() && m.search.MatchesCount() > 0 {
 		left = fmt.Sprintf("%d/%d matches", m.search.Cursor()+1, m.search.MatchesCount())
 	}
 	if left == "" {

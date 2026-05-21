@@ -104,10 +104,8 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 	case bindingTop:
 		m.list.SetSelected(0, len(m.rows))
 		m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))
-		m.statusMsg = ""
 		return m, nil
 	case bindingGotoHead:
-		m.statusMsg = ""
 		if m.startRef != "HEAD" {
 			return m, nav.Replace(nav.Route{Kind: nav.RouteLog, WorktreeRoot: m.worktreeRoot, Ref: "HEAD"})
 		}
@@ -119,7 +117,6 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		m.jumpToTaggedCommit(-1)
 		return m, nil
 	case bindingCancel:
-		m.statusMsg = ""
 		return m, nil
 	case bindingViewOutput:
 		if m.output.HasContent() {
@@ -131,18 +128,17 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, cmd
 	case bindingPush:
 		if err := m.push.Open(m.worktreeRoot); err != nil {
-			m.statusMsg = err.Error()
-			return m, nil
+			return m, notify.Error(err.Error())
 		}
 		return m, nil
 	case bindingAmend:
 		if err := m.openAmendConfirm(); err != nil {
-			m.statusMsg = err.Error()
+			return m, notify.Error(err.Error())
 		}
 		return m, nil
 	case bindingBump:
 		if err := m.bump.Open(m.worktreeRoot); err != nil {
-			m.statusMsg = err.Error()
+			return m, notify.Error(err.Error())
 		}
 		return m, nil
 	case bindingReword:

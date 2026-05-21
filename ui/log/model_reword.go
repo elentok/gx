@@ -3,6 +3,7 @@ package log
 import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/notify"
 )
 
 type rewordDetailsMsg struct {
@@ -41,35 +42,29 @@ func (m Model) cmdFetchRewordDetails() tea.Cmd {
 
 func (m Model) handleRewordDetails(msg rewordDetailsMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
-		m.statusMsg = "reword: " + msg.err.Error()
-		return m, nil
+		return m, notify.Error("reword: " + msg.err.Error())
 	}
 	cmd, err := m.reword.CmdOpenEditor(m.worktreeRoot, msg.hash, msg.subject, msg.body, msg.pushed)
 	if err != nil {
-		m.statusMsg = "reword: " + err.Error()
-		return m, nil
+		return m, notify.Error("reword: " + err.Error())
 	}
 	return m, cmd
 }
 
 func (m Model) handleRewordEditorDone(err error) (tea.Model, tea.Cmd) {
 	if err != nil {
-		m.statusMsg = "reword: editor failed: " + err.Error()
-		return m, nil
+		return m, notify.Error("reword: editor failed: " + err.Error())
 	}
 	changed, newMsg, err := m.reword.ReadEditorResult()
 	if err != nil {
-		m.statusMsg = "reword: " + err.Error()
-		return m, nil
+		return m, notify.Error("reword: " + err.Error())
 	}
 	if !changed {
-		m.statusMsg = "reword: no changes"
-		return m, nil
+		return m, notify.Info("reword: no changes")
 	}
 	cmd, err := m.reword.StartRunning(m.worktreeRoot, newMsg)
 	if err != nil {
-		m.statusMsg = "reword: " + err.Error()
-		return m, nil
+		return m, notify.Error("reword: " + err.Error())
 	}
 	return m, cmd
 }
@@ -85,9 +80,7 @@ func (m Model) handleRewordRunningUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleRewordDone(err error) (tea.Model, tea.Cmd) {
 	if err != nil {
-		m.statusMsg = "reword failed: " + err.Error()
-		return m, nil
+		return m, notify.Error("reword failed: " + err.Error())
 	}
-	m.statusMsg = "rewrote commit"
-	return m, m.cmdReloadFocusSubject(m.reword.NewSubject)
+	return m, tea.Batch(notify.Success("rewrote commit"), m.cmdReloadFocusSubject(m.reword.NewSubject))
 }

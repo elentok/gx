@@ -90,6 +90,41 @@ func logE2EFindCommitHash(t *testing.T, dir, subject string) string {
 	return ""
 }
 
+// waitForLogHashChange polls git until the commit with subject has a different hash.
+func waitForLogHashChange(t *testing.T, tm *teatest.TestModel, repoDir, subject, oldHash string) {
+	t.Helper()
+	teatest.WaitFor(t, tm.Output(), func(_ []byte) bool {
+		cmd := exec.Command("git", "log", "--format=%H %s")
+		cmd.Dir = repoDir
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return false
+		}
+		for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+			parts := strings.SplitN(line, " ", 2)
+			if len(parts) == 2 && parts[1] == subject && parts[0] != oldHash {
+				return true
+			}
+		}
+		return false
+	}, teatest.WithDuration(logE2EActionWait))
+}
+
+// waitForStashPop waits for file to appear in unstaged changes, indicating the
+// post-rebase stash-pop background step has finished.
+func waitForStashPop(t *testing.T, tm *teatest.TestModel, repoDir, file string) {
+	t.Helper()
+	teatest.WaitFor(t, tm.Output(), func(_ []byte) bool {
+		cmd := exec.Command("git", "diff", "--name-only")
+		cmd.Dir = repoDir
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return false
+		}
+		return strings.Contains(string(out), file)
+	}, teatest.WithDuration(logE2EActionWait))
+}
+
 // logE2EQuit uses ctrl+c because q sends nav.Back() (handled by the app shell, not the model).
 func logE2EQuit(t *testing.T, tm *teatest.TestModel) {
 	t.Helper()
@@ -155,10 +190,11 @@ func TestAmendE2E_NonHEAD_FromLog(t *testing.T) {
 	// Confirm modal shows commit info and the staged file
 	waitForLogE2ETexts(t, tm, logE2EActionWait, "Amend staged changes into:", "middle", "a.txt")
 
-	// Accept and wait for the log to confirm completion via its status footer
+	// Accept and wait for the git hash to change (amend complete)
 	tm.Send(logE2EKeySpecial(tea.KeyEnter))
-	waitForLogE2EText(t, tm, "amended commit", logE2EActionWait)
+	waitForLogHashChange(t, tm, repoDir, "middle", middleHashBefore)
 
+	waitForStashPop(t, tm, repoDir, "b.txt")
 	logE2EQuit(t, tm)
 
 	verifyAmendedNonHEADCommit(t, repoDir, middleHashBefore)
@@ -183,9 +219,9 @@ func TestAmendE2E_HEAD_FromLog(t *testing.T) {
 	// Confirm modal
 	waitForLogE2ETexts(t, tm, logE2EActionWait, "Amend staged changes into:", "tip", "c.txt")
 
-	// Accept and wait for completion
+	// Accept and wait for the git hash to change (amend complete)
 	tm.Send(logE2EKeySpecial(tea.KeyEnter))
-	waitForLogE2EText(t, tm, "amended commit", logE2EActionWait)
+	waitForLogHashChange(t, tm, repoDir, "tip", headHashBefore)
 
 	logE2EQuit(t, tm)
 
