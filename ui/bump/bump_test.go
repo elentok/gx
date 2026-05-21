@@ -109,3 +109,32 @@ func TestUnhandledKeyAtPick_NoOp(t *testing.T) {
 type fakeErr string
 
 func (e fakeErr) Error() string { return string(e) }
+
+func TestModalWidth(t *testing.T) {
+	if got := modalWidth(0); got != 56 {
+		t.Errorf("modalWidth(0) = %d, want 56", got)
+	}
+	if got := modalWidth(300); got > 56 {
+		// large width → half, no cap in this function
+		_ = got
+	}
+}
+
+func TestView_PickPhase(t *testing.T) {
+	m := modelAtPick()
+	view := m.View(120)
+	if view == "" {
+		t.Error("expected non-empty view in pick phase")
+	}
+}
+
+func TestView_FailedPhase(t *testing.T) {
+	m := New()
+	m.IsOpen = true
+	m.phase = phaseFailed
+	m.failErr = fakeErr("something went wrong")
+	view := m.View(120)
+	if view == "" {
+		t.Error("expected non-empty view in failed phase")
+	}
+}

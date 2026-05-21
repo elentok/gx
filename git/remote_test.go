@@ -116,3 +116,57 @@ func TestIsNonFastForwardPushError(t *testing.T) {
 		})
 	}
 }
+
+func TestListRemotes_NoRemotes(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	remotes, err := ListRemotes(Repo{Root: dir})
+	if err != nil {
+		t.Fatalf("ListRemotes: %v", err)
+	}
+	if len(remotes) != 0 {
+		t.Errorf("expected no remotes, got %v", remotes)
+	}
+}
+
+func TestListRemotes_WithRemote(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempBareRepo(t)
+	remotes, err := ListRemotes(Repo{Root: dir})
+	if err != nil {
+		t.Fatalf("ListRemotes: %v", err)
+	}
+	if len(remotes) == 0 {
+		t.Error("expected at least one remote (origin)")
+	}
+}
+
+func TestPruneRemote_NoOp(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempBareRepo(t)
+	if err := PruneRemote(Repo{Root: dir}, "origin"); err != nil {
+		t.Errorf("PruneRemote: %v", err)
+	}
+}
+
+func TestPruneAllRemotes(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempBareRepo(t)
+	if err := PruneAllRemotes(Repo{Root: dir}); err != nil {
+		t.Errorf("PruneAllRemotes: %v", err)
+	}
+}
+
+func TestCheckFetchConfig_WrongRefspec(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempBareRepo(t)
+	// Set an incorrect refspec
+	testutil.MustGitExported(t, dir, "config", "remote.origin.fetch", "+refs/heads/main:refs/remotes/origin/main")
+	prob := CheckFetchConfig(dir)
+	if prob == nil {
+		t.Error("expected non-nil problem for wrong refspec")
+	}
+	if len(prob.Commands) == 0 {
+		t.Error("expected fix commands in problem")
+	}
+}

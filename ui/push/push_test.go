@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/components"
 )
 
 const testPRURL = "https://github.com/owner/repo/pull/new/feature"
@@ -159,4 +160,77 @@ func TestPRPromptTransitionFromPushOutput(t *testing.T) {
 	if next.prURL != testPRURL {
 		t.Fatalf("prURL=%q, want %q", next.prURL, testPRURL)
 	}
+}
+
+func TestModalWidth(t *testing.T) {
+	// min clamp
+	if got := modalWidth(0); got != 56 {
+		t.Errorf("modalWidth(0) = %d, want 56", got)
+	}
+	// max clamp
+	if got := modalWidth(300); got != 100 {
+		t.Errorf("modalWidth(300) = %d, want 100", got)
+	}
+	// half of 120 = 60, within [56, 100]
+	if got := modalWidth(120); got != 60 {
+		t.Errorf("modalWidth(120) = %d, want 60", got)
+	}
+}
+
+func TestConfirmPrompt_NoTag(t *testing.T) {
+	m := New()
+	m.branch = "main"
+	m.remote = "origin"
+	got := m.confirmPrompt()
+	if got == "" {
+		t.Error("expected non-empty confirmPrompt")
+	}
+}
+
+func TestConfirmPrompt_WithTag(t *testing.T) {
+	m := New()
+	m.branch = "main"
+	m.remote = "origin"
+	m.tag = "v1.0.0"
+	got := m.confirmPrompt()
+	if got == "" {
+		t.Error("expected non-empty confirmPrompt with tag")
+	}
+}
+
+func TestSelectedMenuValue_Empty(t *testing.T) {
+	if got := selectedMenuValue(components.MenuState{}); got != "" {
+		t.Errorf("selectedMenuValue empty = %q, want empty", got)
+	}
+}
+
+func TestView_ConfirmPhase(t *testing.T) {
+	m := newModelWithLog()
+	m.phase = phaseConfirm
+	m.branch = "main"
+	m.remote = "origin"
+	view := m.View(120)
+	if view == "" {
+		t.Error("expected non-empty view in confirm phase")
+	}
+}
+
+func TestView_FailedPhase(t *testing.T) {
+	m := newModelWithLog()
+	m.phase = phaseFailed
+	m.failErr = fakeErr("something failed")
+	view := m.View(120)
+	if view == "" {
+		t.Error("expected non-empty view in failed phase")
+	}
+}
+
+func TestHandlePoll_NilRunner(t *testing.T) {
+	m := newModelWithLog()
+	m.activeRunner = nil
+	next, cmd, result := m.handlePoll()
+	if cmd != nil || result.Done {
+		t.Error("handlePoll with nil runner should return empty result")
+	}
+	_ = next
 }

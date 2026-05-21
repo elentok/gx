@@ -64,3 +64,15 @@ func TestLastTag_WithTag(t *testing.T) {
 		t.Errorf("LastTag() = %q, want 'v1.2.3'", tag)
 	}
 }
+
+func TestCreateAnnotatedTag(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	if err := git.CreateAnnotatedTag(dir, "v2.0.0", "release 2.0"); err != nil {
+		t.Fatalf("CreateAnnotatedTag: %v", err)
+	}
+	tag := git.LastTag(dir)
+	if tag != "v2.0.0" {
+		t.Errorf("after CreateAnnotatedTag, LastTag() = %q, want 'v2.0.0'", tag)
+	}
+}

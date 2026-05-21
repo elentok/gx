@@ -3,6 +3,9 @@ package terminalrun
 import (
 	"strings"
 	"testing"
+
+	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/ui"
 )
 
 func TestSplitShellCommand_DefaultShell(t *testing.T) {
@@ -46,5 +49,21 @@ func TestEscapeShellArg(t *testing.T) {
 	want := "'a'\\''b c'"
 	if got != want {
 		t.Fatalf("escapeShellArg() = %q, want %q", got, want)
+	}
+}
+
+func TestCommand_ReturnsCmd(t *testing.T) {
+	doneFn := func(err error, splitApp string) tea.Msg { return nil }
+	cmd := Command("/tmp", ui.TerminalPlain, "echo", []string{"hello"}, doneFn)
+	if cmd == nil {
+		t.Error("expected non-nil cmd from Command()")
+	}
+}
+
+func TestCommandCustom_KeepOpen(t *testing.T) {
+	doneFn := func(err error, splitApp string) tea.Msg { return nil }
+	cmd := CommandCustom("/tmp", ui.TerminalPlain, "echo", []string{"hello"}, true, doneFn)
+	if cmd == nil {
+		t.Error("expected non-nil cmd from CommandCustom() with keepOpen=true")
 	}
 }

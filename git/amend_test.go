@@ -120,3 +120,43 @@ func TestHasUnstagedChanges_True(t *testing.T) {
 		t.Error("expected unstaged changes after modifying tracked file")
 	}
 }
+
+func TestAmendHead(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	testutil.WriteFile(t, dir, "extra.txt", "added\n")
+	testutil.MustGitExported(t, dir, "add", "extra.txt")
+	out, err := AmendHead(dir)
+	if err != nil {
+		t.Fatalf("AmendHead: %v\n%s", err, out)
+	}
+}
+
+func TestCommitFixup(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	hash, _, err := run(dir, []string{"rev-parse", "HEAD"})
+	if err != nil {
+		t.Fatalf("rev-parse: %v", err)
+	}
+	hash = strings.TrimSpace(hash)
+
+	testutil.WriteFile(t, dir, "fix.txt", "fix\n")
+	testutil.MustGitExported(t, dir, "add", "fix.txt")
+	out, err := CommitFixup(dir, hash)
+	if err != nil {
+		t.Fatalf("CommitFixup: %v\n%s", err, out)
+	}
+}
+
+func TestStashPushAuto_WithChanges(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("modified"), 0644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	out, err := StashPushAuto(dir)
+	if err != nil {
+		t.Fatalf("StashPushAuto: %v\n%s", err, out)
+	}
+}

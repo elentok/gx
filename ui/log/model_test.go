@@ -514,3 +514,42 @@ func TestFocusReloadsRowsAfterOnDiskChange(t *testing.T) {
 		t.Fatalf("expected more rows after focus reload; before=%d after=%d", initialRows, len(m.rows))
 	}
 }
+
+func TestKeyManager(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	m := newTestModelDefault(repo, "", settings)
+	km := m.KeyManager()
+	if len(km.Bindings()) == 0 {
+		t.Error("expected non-empty key bindings")
+	}
+}
+
+func TestInputFocused_False(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	m := newTestModelDefault(repo, "", settings)
+	if m.InputFocused() {
+		t.Error("expected InputFocused=false by default")
+	}
+}
+
+func TestWithPendingFocus(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	m := newTestModelDefault(repo, "", settings)
+	m2 := m.WithPendingFocus("abc123")
+	if m2.pendingFocusSubject != "abc123" {
+		t.Errorf("pendingFocusSubject = %q, want 'abc123'", m2.pendingFocusSubject)
+	}
+}
+
+func TestOnPageActivated_WithPending(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "f.txt", "a\n")
+	testutil.CommitAll(t, repo, "init")
+
+	m := newTestModelDefault(repo, "", settings)
+	m = m.WithPendingFocus("HEAD")
+	cmd := m.OnPageActivated()
+	if cmd == nil {
+		t.Error("expected non-nil cmd from OnPageActivated with pending focus")
+	}
+}

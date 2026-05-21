@@ -2,6 +2,8 @@ package search
 
 import (
 	"testing"
+
+	tea "charm.land/bubbletea/v2"
 )
 
 func TestNewModel_InitialState(t *testing.T) {
@@ -180,5 +182,120 @@ func TestHighlight_ActiveStyle(t *testing.T) {
 	active := Highlight("hello", "hello", true)
 	if inactive == active {
 		t.Error("expected different styles for active vs inactive highlight")
+	}
+}
+
+func TestInit_ReturnsNil(t *testing.T) {
+	m := NewModel()
+	if m.Init() != nil {
+		t.Error("Init() should return nil")
+	}
+}
+
+func TestSetWidth(t *testing.T) {
+	m := NewModel()
+	m.SetWidth(80)
+	// just verify it doesn't panic; width is stored internally
+}
+
+func TestSetMatchesAndJump_WithMatches(t *testing.T) {
+	m := NewModel()
+	m.SetCursor(0)
+	m.SetMatches([]Match{{Index: 5, DisplayIndex: 2}})
+	cmd := m.SetMatchesAndJump([]Match{{Index: 5, DisplayIndex: 2}})
+	if cmd == nil {
+		t.Error("expected non-nil cmd when matches exist")
+	}
+}
+
+func TestSetMatchesAndJump_Empty(t *testing.T) {
+	m := NewModel()
+	cmd := m.SetMatchesAndJump([]Match{})
+	if cmd != nil {
+		t.Error("expected nil cmd for empty matches")
+	}
+}
+
+func TestUpdate_SlashActivates(t *testing.T) {
+	m := NewModel()
+	next, _, result := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	if next.Mode() != SearchModeInput {
+		t.Errorf("expected SearchModeInput, got %d", next.Mode())
+	}
+	if !result.Activated {
+		t.Error("expected Activated=true")
+	}
+}
+
+func TestUpdate_EscClears(t *testing.T) {
+	m := NewModel()
+	m.Start("foo")
+	next, _, result := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	if next.Mode() != SearchModeNone {
+		t.Errorf("expected SearchModeNone, got %d", next.Mode())
+	}
+	if !result.Handled {
+		t.Error("expected Handled=true on esc")
+	}
+}
+
+func TestUpdate_EnterDismissesWithResults(t *testing.T) {
+	m := NewModel()
+	m.Start("foo")
+	m.SetMatches([]Match{{Index: 1}})
+	next, _, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if next.Mode() != SearchModeResults {
+		t.Errorf("expected SearchModeResults after enter, got %d", next.Mode())
+	}
+}
+
+func TestUpdate_ResultsNavNext(t *testing.T) {
+	m := NewModel()
+	m.Start("foo")
+	m.SetMatches([]Match{{Index: 1}, {Index: 2}})
+	m.DismissAndKeepResults()
+	next, cmd, result := m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
+	if !result.CursorChanged {
+		t.Error("expected CursorChanged=true on n")
+	}
+	if next.Cursor() != 1 {
+		t.Errorf("cursor = %d, want 1", next.Cursor())
+	}
+	if cmd == nil {
+		t.Error("expected non-nil cmd after n in results mode")
+	}
+}
+
+func TestUpdate_ResultsNavPrev(t *testing.T) {
+	m := NewModel()
+	m.Start("foo")
+	m.SetMatches([]Match{{Index: 1}, {Index: 2}})
+	m.SetCursor(1)
+	m.DismissAndKeepResults()
+	next, _, result := m.Update(tea.KeyPressMsg{Code: 'N', Text: "N"})
+	if !result.CursorChanged {
+		t.Error("expected CursorChanged=true on N")
+	}
+	if next.Cursor() != 0 {
+		t.Errorf("cursor = %d, want 0", next.Cursor())
+	}
+}
+
+func TestUpdate_NonKeyMsg(t *testing.T) {
+	m := NewModel()
+	next, cmd, result := m.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
+	if result.Handled {
+		t.Error("non-key msg should not be handled")
+	}
+	_ = next
+	_ = cmd
+}
+
+func TestView_Open(t *testing.T) {
+	m := NewModel()
+	m.Start("hello")
+	view := m.View()
+	if view == "" {
+		t.Error("expected non-empty view when active")
 	}
 }

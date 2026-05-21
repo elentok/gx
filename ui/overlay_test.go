@@ -78,3 +78,36 @@ func TestOverlayCenterCentersForeground(t *testing.T) {
 		t.Fatalf("OverlayCenter() = %q, want %q", got, want)
 	}
 }
+
+func TestOverlayBottomCenter(t *testing.T) {
+	bg := strings.Join([]string{"......", "......", "......", "......", "......"}, "\n")
+	got := OverlayBottomCenter(bg, "XX", 6, 3)
+	lines := strings.Split(got, "\n")
+	if !strings.Contains(lines[3], "XX") {
+		t.Errorf("expected 'XX' on line 3, got %q", lines[3])
+	}
+}
+
+func TestOverlayTopRight(t *testing.T) {
+	bg := strings.Join([]string{"......", "......", "......"}, "\n")
+	got := OverlayTopRight(bg, "XX", 6)
+	lines := strings.Split(got, "\n")
+	if !strings.Contains(lines[1], "XX") {
+		t.Errorf("expected 'XX' on line 1, got %q", lines[1])
+	}
+}
+
+func TestOverlayBottomRight(t *testing.T) {
+	bg := strings.Join([]string{"......", "......", "......", "......"}, "\n")
+	got := OverlayBottomRight(bg, "XX", 6, 4)
+	_ = got // just verify no panic
+}
+
+func TestOverlayTopRightMargin(t *testing.T) {
+	bg := strings.Join([]string{"......", "......", "......"}, "\n")
+	got := OverlayTopRightMargin(bg, "XX", 6, 1, 0)
+	lines := strings.Split(got, "\n")
+	if !strings.Contains(lines[0], "XX") {
+		t.Errorf("expected 'XX' on line 0, got %q", lines[0])
+	}
+}

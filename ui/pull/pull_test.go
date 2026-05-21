@@ -274,3 +274,62 @@ var errFake = fakeErr("test error")
 type fakeErr string
 
 func (e fakeErr) Error() string { return string(e) }
+
+func TestModalWidth(t *testing.T) {
+	if got := modalWidth(0); got != 56 {
+		t.Errorf("modalWidth(0) = %d, want 56", got)
+	}
+	if got := modalWidth(300); got != 100 {
+		t.Errorf("modalWidth(300) = %d, want 100", got)
+	}
+	if got := modalWidth(120); got != 60 {
+		t.Errorf("modalWidth(120) = %d, want 60", got)
+	}
+}
+
+func TestHandlePoll_NilRunner(t *testing.T) {
+	m := openedModel()
+	m.activeRunner = nil
+	next, cmd, result := m.handlePoll()
+	if cmd != nil || result.Done {
+		t.Error("handlePoll with nil runner should return empty result")
+	}
+	_ = next
+}
+
+func TestView_CheckingPhase(t *testing.T) {
+	m := openedModel()
+	m.phase = phaseChecking
+	view := m.View(120)
+	if view == "" {
+		t.Error("expected non-empty view in checking phase")
+	}
+}
+
+func TestView_StashConfirmPhase(t *testing.T) {
+	m := openedModel()
+	m.phase = phaseStashConfirm
+	view := m.View(120)
+	if view == "" {
+		t.Error("expected non-empty view in stash confirm phase")
+	}
+}
+
+func TestView_FailedPhase(t *testing.T) {
+	m := openedModel()
+	m.phase = phaseFailed
+	m.failErr = fakeErr("something failed")
+	view := m.View(120)
+	if view == "" {
+		t.Error("expected non-empty view in failed phase")
+	}
+}
+
+func TestView_PullingPhase(t *testing.T) {
+	m := openedModel()
+	m.phase = phasePulling
+	view := m.View(120)
+	if view == "" {
+		t.Error("expected non-empty view in pulling phase")
+	}
+}

@@ -105,3 +105,29 @@ func TestParseBranchLine_local(t *testing.T) {
 		t.Error("branch 'other' not found")
 	}
 }
+
+func TestIsRebasedOnMain_NoMainBranch(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	repo := git.Repo{Root: dir}
+	ok, err := git.IsRebasedOnMain(repo, "main")
+	if err != nil {
+		t.Fatalf("IsRebasedOnMain: %v", err)
+	}
+	if !ok {
+		t.Error("expected true when MainBranch is empty")
+	}
+}
+
+func TestIsRebasedOnMain_SameBranch(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	repo := git.Repo{Root: dir, MainBranch: "main"}
+	ok, err := git.IsRebasedOnMain(repo, "main")
+	if err != nil {
+		t.Fatalf("IsRebasedOnMain: %v", err)
+	}
+	if !ok {
+		t.Error("expected true when branch == MainBranch")
+	}
+}

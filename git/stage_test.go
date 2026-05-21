@@ -219,3 +219,123 @@ func TestListStageFiles_RenameTracksSourceAndDestination(t *testing.T) {
 		t.Fatalf("expected rename source old.txt, got %q", renamed.RenameFrom)
 	}
 }
+
+func TestDiffContextArg(t *testing.T) {
+	cases := []struct {
+		in   int
+		want string
+	}{
+		{3, "-U3"},
+		{0, "-U0"},
+		{-1, "-U0"},
+		{25, "-U20"},
+	}
+	for _, c := range cases {
+		if got := diffContextArg(c.in); got != c.want {
+			t.Errorf("diffContextArg(%d) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestApplyPatchToIndex_InvalidPatch(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "file.txt", "hello\n")
+	testutil.MustGitExported(t, repo, "add", "file.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "init")
+
+	err := ApplyPatchToIndex(repo, "not a valid patch", false, false)
+	if err == nil {
+		t.Error("expected error for invalid patch")
+	}
+}
+
+func TestApplyPatchToWorktree_InvalidPatch(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "file.txt", "hello\n")
+	testutil.MustGitExported(t, repo, "add", "file.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "init")
+
+	err := ApplyPatchToWorktree(repo, "not a valid patch", false, false)
+	if err == nil {
+		t.Error("expected error for invalid patch")
+	}
+}
+
+func TestRestorePaths_EmptyPaths(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	if err := RestorePaths(repo, nil); err != nil {
+		t.Errorf("RestorePaths with empty paths should succeed, got %v", err)
+	}
+}
+
+func TestRestorePaths_ValidPath(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "file.txt", "original\n")
+	testutil.MustGitExported(t, repo, "add", "file.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "init")
+	testutil.WriteFile(t, repo, "file.txt", "changed\n")
+	testutil.MustGitExported(t, repo, "add", "file.txt")
+
+	if err := RestorePaths(repo, []string{"file.txt"}); err != nil {
+		t.Errorf("RestorePaths: %v", err)
+	}
+}
+
+func TestDiscardUntrackedPath_RemovesFile(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "untracked.txt", "data\n")
+
+	if err := DiscardUntrackedPath(repo, "untracked.txt"); err != nil {
+		t.Errorf("DiscardUntrackedPath: %v", err)
+	}
+}
+
+func TestDiscardUntrackedPath_RefusesRoot(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	err := DiscardUntrackedPath(repo, ".")
+	if err == nil {
+		t.Error("expected error when removing worktree root")
+	}
+}
+
+func TestDiscardUntrackedPath_RefusesEscape(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	err := DiscardUntrackedPath(repo, "../../etc/passwd")
+	if err == nil {
+		t.Error("expected error when path escapes worktree")
+	}
+}
+
+func TestStageIntentPath(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "new.txt", "content\n")
+	if err := StageIntentPath(repo, "new.txt"); err != nil {
+		t.Errorf("StageIntentPath: %v", err)
+	}
+}
+
+func TestBinaryFileSizes(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "data.bin", "hello")
+	testutil.MustGitExported(t, repo, "add", "data.bin")
+	testutil.MustGitExported(t, repo, "commit", "-m", "init")
+	testutil.WriteFile(t, repo, "data.bin", "updated content")
+
+	f := StageFileStatus{Path: "data.bin"}
+	_, newSize, _, newOK := BinaryFileSizes(repo, f)
+	if !newOK {
+		t.Error("expected newOK=true for existing file")
+	}
+	if newSize == 0 {
+		t.Error("expected non-zero new size")
+	}
+}

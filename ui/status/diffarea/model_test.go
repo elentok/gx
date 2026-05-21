@@ -145,3 +145,12 @@ func TestKeys(t *testing.T) {
 		t.Error("Keys() should not be nil")
 	}
 }
+
+func TestUpdateActive_Unhandled(t *testing.T) {
+	d := NewModel()
+	cmd, handled := d.UpdateActive(struct{}{})
+	if handled {
+		t.Error("expected unhandled for unknown msg")
+	}
+	_ = cmd
+}
