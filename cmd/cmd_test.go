@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
@@ -447,5 +449,301 @@ func TestExecute_EditConfig_RunsEditor(t *testing.T) {
 	}
 	if gotPath == "" {
 		t.Fatal("expected non-empty config path")
+	}
+}
+
+func TestRelativeDate_Zero(t *testing.T) {
+	got := relativeDate(time.Time{})
+	if got != "unknown time" {
+		t.Fatalf("relativeDate(zero) = %q, want %q", got, "unknown time")
+	}
+}
+
+func TestRelativeDate_NonZero(t *testing.T) {
+	got := relativeDate(time.Now().Add(-time.Hour))
+	if got == "" || got == "unknown time" {
+		t.Fatalf("relativeDate(now-1h) = %q, expected a non-empty relative string", got)
+	}
+}
+
+func TestRunEditorCommand_Success(t *testing.T) {
+	path := t.TempDir() + "/file.txt"
+	err := runEditorCommand("touch", path, bytes.NewBuffer(nil), bytes.NewBuffer(nil), bytes.NewBuffer(nil))
+	if err != nil {
+		t.Fatalf("runEditorCommand touch: %v", err)
+	}
+	if _, statErr := os.Stat(path); statErr != nil {
+		t.Fatal("expected file to be created by touch")
+	}
+}
+
+func TestRunEditorCommand_Failure(t *testing.T) {
+	err := runEditorCommand("false", "/irrelevant", bytes.NewBuffer(nil), bytes.NewBuffer(nil), bytes.NewBuffer(nil))
+	if err == nil {
+		t.Fatal("expected error from false command")
+	}
+}
+
+func TestRunEditorCommand_MultiWordEditor(t *testing.T) {
+	var stdout bytes.Buffer
+	// Verify a multi-word $EDITOR (e.g. "code --wait") gets split correctly.
+	err := runEditorCommand("echo hello", "/dev/null", bytes.NewBuffer(nil), &stdout, bytes.NewBuffer(nil))
+	if err != nil {
+		t.Fatalf("runEditorCommand multi-word: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "hello") {
+		t.Fatalf("expected hello in output, got: %q", stdout.String())
+	}
+}
+
+func TestExecute_Version(t *testing.T) {
+	for _, args := range [][]string{{"version"}, {"--version"}, {"-v"}} {
+		t.Run(args[0], func(t *testing.T) {
+			var stdout bytes.Buffer
+			d := deps{
+				stdout: &stdout,
+				stderr: bytes.NewBuffer(nil),
+			}
+			if err := execute(args, d); err != nil {
+				t.Fatalf("execute %v: %v", args, err)
+			}
+		})
+	}
+}
+
+func TestExecute_Help(t *testing.T) {
+	for _, args := range [][]string{{"-h"}, {"--help"}, {"help"}} {
+		t.Run(args[0], func(t *testing.T) {
+			var stdout bytes.Buffer
+			d := deps{
+				stdout: &stdout,
+				stderr: bytes.NewBuffer(nil),
+			}
+			if err := execute(args, d); err != nil {
+				t.Fatalf("execute %v: %v", args, err)
+			}
+			if stdout.String() == "" {
+				t.Fatal("expected usage output")
+			}
+		})
+	}
+}
+
+func TestExecute_StatusWithTooManyArgs(t *testing.T) {
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+	}
+	err := execute([]string{"status", "a", "b"}, d)
+	if err == nil || !strings.Contains(err.Error(), "usage") {
+		t.Fatalf("expected usage error, got: %v", err)
+	}
+}
+
+func TestExecute_LogWithTooManyArgs(t *testing.T) {
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+	}
+	err := execute([]string{"log", "a", "b"}, d)
+	if err == nil || !strings.Contains(err.Error(), "usage") {
+		t.Fatalf("expected usage error, got: %v", err)
+	}
+}
+
+func TestExecute_ShowWithTooManyArgs(t *testing.T) {
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+	}
+	err := execute([]string{"show", "a", "b"}, d)
+	if err == nil || !strings.Contains(err.Error(), "usage") {
+		t.Fatalf("expected usage error, got: %v", err)
+	}
+}
+
+func TestExecute_StashifyNoArgs(t *testing.T) {
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+		getwd:  func() (string, error) { return t.TempDir(), nil },
+	}
+	err := execute([]string{"stashify"}, d)
+	if err == nil || !strings.Contains(err.Error(), "usage") {
+		t.Fatalf("expected usage error, got: %v", err)
+	}
+}
+
+func TestExecute_WtUnknownSubcommand(t *testing.T) {
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+	}
+	err := execute([]string{"wt", "bogus"}, d)
+	if err == nil {
+		t.Fatal("expected error for unknown wt subcommand")
+	}
+}
+
+func TestExecute_RunInit_Error(t *testing.T) {
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+		initConfig: func() (string, error) {
+			return "", errors.New("init failed")
+		},
+	}
+	err := execute([]string{"init"}, d)
+	if err == nil || !strings.Contains(err.Error(), "init failed") {
+		t.Fatalf("expected init error, got: %v", err)
+	}
+}
+
+func TestRunGitInteractive_Success(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	err := runGitInteractive(repoDir, bytes.NewBuffer(nil), bytes.NewBuffer(nil), bytes.NewBuffer(nil), "status")
+	if err != nil {
+		t.Fatalf("runGitInteractive: %v", err)
+	}
+}
+
+func TestRunGitInteractive_Failure(t *testing.T) {
+	err := runGitInteractive(t.TempDir(), bytes.NewBuffer(nil), bytes.NewBuffer(nil), bytes.NewBuffer(nil), "status")
+	if err == nil {
+		t.Fatal("expected error for non-repo dir")
+	}
+}
+
+func TestExecute_PushConfirmedNoRemote(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	d := deps{
+		stdin:  bytes.NewBuffer(nil),
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+		getwd:  func() (string, error) { return repoDir, nil },
+		confirmForce: func(string) (bool, error) {
+			return true, nil
+		},
+	}
+	err := execute([]string{"push"}, d)
+	// Should fail at git fetch (no remote), not at confirm
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if err.Error() == "push aborted" {
+		t.Fatalf("expected to get past confirm step, got push aborted")
+	}
+}
+
+func TestExecute_PushConfirmError(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	wantErr := errors.New("confirm failed")
+	d := deps{
+		stdin:  bytes.NewBuffer(nil),
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+		getwd:  func() (string, error) { return repoDir, nil },
+		confirmForce: func(string) (bool, error) {
+			return false, wantErr
+		},
+	}
+	err := execute([]string{"push"}, d)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected %v, got %v", wantErr, err)
+	}
+}
+
+func TestResolveStatusTargetPath_ExactRoot(t *testing.T) {
+	_, err := resolveStatusTargetPath("/repo", "/repo", "/repo")
+	if err == nil {
+		t.Fatal("expected error for exact root target")
+	}
+}
+
+func TestExecute_WtClone_NoArgs(t *testing.T) {
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+	}
+	err := execute([]string{"wt", "clone"}, d)
+	if err == nil || !strings.Contains(err.Error(), "usage") {
+		t.Fatalf("expected usage error, got: %v", err)
+	}
+}
+
+func TestExecute_WtClone_TooManyArgs(t *testing.T) {
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+	}
+	err := execute([]string{"wt", "clone", "a", "b", "c"}, d)
+	if err == nil || !strings.Contains(err.Error(), "usage") {
+		t.Fatalf("expected usage error, got: %v", err)
+	}
+}
+
+func TestExecute_WtClone_GetWdError(t *testing.T) {
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+		getwd:  func() (string, error) { return "", errors.New("no dir") },
+	}
+	err := execute([]string{"wt", "clone", "https://example.com/repo.git"}, d)
+	if err == nil || !strings.Contains(err.Error(), "no dir") {
+		t.Fatalf("expected getwd error, got: %v", err)
+	}
+}
+
+func TestExecute_RunLog_DispatchesWithRef(t *testing.T) {
+	var got string
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+		runLog: func(ref string) error {
+			got = ref
+			return nil
+		},
+	}
+	if err := execute([]string{"log", "abc123"}, d); err != nil {
+		t.Fatalf("execute log abc123: %v", err)
+	}
+	if got != "abc123" {
+		t.Fatalf("runLog ref = %q, want %q", got, "abc123")
+	}
+}
+
+func TestExecute_RunShow_DispatchesWithRef(t *testing.T) {
+	var got string
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+		runShow: func(ref string) error {
+			got = ref
+			return nil
+		},
+	}
+	if err := execute([]string{"show", "HEAD"}, d); err != nil {
+		t.Fatalf("execute show HEAD: %v", err)
+	}
+	if got != "HEAD" {
+		t.Fatalf("runShow ref = %q, want %q", got, "HEAD")
+	}
+}
+
+func TestExecute_RunShow_NoRef(t *testing.T) {
+	var got string
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+		runShow: func(ref string) error {
+			got = ref
+			return nil
+		},
+	}
+	if err := execute([]string{"show"}, d); err != nil {
+		t.Fatalf("execute show: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("runShow ref = %q, want empty", got)
 	}
 }
