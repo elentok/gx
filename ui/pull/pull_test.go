@@ -3,8 +3,11 @@ package pull
 import (
 	"testing"
 
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/components"
 )
 
 func openedModel() Model {
@@ -331,5 +334,177 @@ func TestView_PullingPhase(t *testing.T) {
 	view := m.View(120)
 	if view == "" {
 		t.Error("expected non-empty view in pulling phase")
+	}
+}
+
+func TestOpen_InitializesModel(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	m := New()
+	cmd := m.Open(repo)
+	if !m.IsOpen {
+		t.Error("expected IsOpen=true after Open")
+	}
+	if m.phase != phaseChecking {
+		t.Errorf("expected phaseChecking, got %v", m.phase)
+	}
+	if cmd == nil {
+		t.Error("expected non-nil cmd (cmdCheckChanges)")
+	}
+	if m.log == nil {
+		t.Error("expected log to be initialized")
+	}
+}
+
+func TestCompleteCurrentStep_WithSteps(t *testing.T) {
+	m := openedModel()
+	m.steps = []components.Step{{TitleBefore: "pull", IsRunning: true}}
+	m.completeCurrentStep()
+	if !m.steps[0].IsDone {
+		t.Error("expected IsDone=true after completeCurrentStep")
+	}
+	if m.steps[0].IsRunning {
+		t.Error("expected IsRunning=false after completeCurrentStep")
+	}
+}
+
+func TestFailCurrentStep_WithSteps(t *testing.T) {
+	m := openedModel()
+	m.steps = []components.Step{{TitleBefore: "pull", IsRunning: true}}
+	m.failCurrentStep()
+	if !m.steps[0].HasFailed {
+		t.Error("expected HasFailed=true after failCurrentStep")
+	}
+	if m.steps[0].IsRunning {
+		t.Error("expected IsRunning=false after failCurrentStep")
+	}
+}
+
+func TestView_PopStashConfirmPhase(t *testing.T) {
+	m := openedModel()
+	m.phase = phasePopStashConfirm
+	m.stashYes = true
+	view := m.View(120)
+	if view == "" {
+		t.Error("expected non-empty view in pop stash confirm phase")
+	}
+}
+
+func TestHandleStashDone_WithSteps_Success(t *testing.T) {
+	m := openedModel()
+	m.root = testutil.TempRepo(t)
+	m.phase = phaseStashing
+	m.stashed = true
+	m.steps = []components.Step{{TitleBefore: "stash", IsRunning: true}}
+	next, cmd, _ := m.Update(stashDoneMsg{output: "stash output"})
+	if !m.steps[0].IsRunning && next.steps[0].IsDone {
+		// step completed
+	}
+	if next.phase != phasePulling {
+		t.Fatalf("expected phasePulling, got %v", next.phase)
+	}
+	if cmd == nil {
+		t.Fatal("expected pull command")
+	}
+}
+
+func TestHandleStashDone_WithSteps_Error(t *testing.T) {
+	m := openedModel()
+	m.phase = phaseStashing
+	m.steps = []components.Step{{TitleBefore: "stash", IsRunning: true}}
+	next, _, _ := m.Update(stashDoneMsg{err: errFake})
+	if next.phase != phaseFailed {
+		t.Fatalf("expected phaseFailed, got %v", next.phase)
+	}
+	if !next.steps[0].HasFailed {
+		t.Error("expected step HasFailed=true")
+	}
+}
+
+func TestUpdate_SpinnerTick(t *testing.T) {
+	m := openedModel()
+	m.phase = phasePulling
+	_, cmd, result := m.Update(spinner.TickMsg{})
+	if result.Done {
+		t.Fatal("spinner tick should not emit done")
+	}
+	_ = cmd
+}
+
+func TestUpdate_PollMsg_NilRunner(t *testing.T) {
+	m := openedModel()
+	m.activeRunner = nil
+	_, cmd, result := m.Update(pollMsg{})
+	if cmd != nil || result.Done {
+		t.Fatal("pollMsg with nil runner should return empty result")
+	}
+}
+
+func TestView_WithSteps(t *testing.T) {
+	m := openedModel()
+	m.phase = phasePulling
+	m.steps = []components.Step{{TitleBefore: "pull", IsRunning: true}}
+	view := m.View(120)
+	if view == "" {
+		t.Error("expected non-empty view with steps")
+	}
+}
+
+func TestHandleKey_StashConfirm_UnhandledKey(t *testing.T) {
+	m := modelAtStashConfirm()
+	_, _, result := m.Update(tea.KeyPressMsg{Code: 'x', Text: "x"})
+	if result.Done {
+		t.Fatal("unhandled key should not emit done")
+	}
+}
+
+func TestHandleKey_PopStashConfirm_UnhandledKey(t *testing.T) {
+	m := openedModel()
+	m.phase = phasePopStashConfirm
+	m.stashYes = true
+	_, _, result := m.Update(tea.KeyPressMsg{Code: 'x', Text: "x"})
+	if result.Done {
+		t.Fatal("unhandled key should not emit done")
+	}
+}
+
+func TestView_FailedPhase_WithSteps(t *testing.T) {
+	m := openedModel()
+	m.phase = phaseFailed
+	m.failErr = fakeErr("pull failed")
+	m.steps = []components.Step{{TitleBefore: "pull", HasFailed: true}}
+	view := m.View(120)
+	if view == "" {
+		t.Error("expected non-empty view in failed phase with steps")
+	}
+}
+
+func TestHandleKey_Failed_UnhandledKey(t *testing.T) {
+	m := openedModel()
+	m.phase = phaseFailed
+	m.failErr = errFake
+	next, _, result := m.Update(tea.KeyPressMsg{Code: 'x', Text: "x"})
+	if !next.IsOpen {
+		t.Fatal("expected IsOpen to remain true for unhandled key at phaseFailed")
+	}
+	if result.Done {
+		t.Fatal("unhandled key should not emit done")
+	}
+}
+
+func TestCmdCheckChanges_ExecutesOnRepo(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	cmd := cmdCheckChanges(repo)
+	msg := cmd()
+	result, ok := msg.(changesCheckMsg)
+	if !ok {
+		t.Fatalf("expected changesCheckMsg, got %T", msg)
+	}
+	if result.err != nil {
+		t.Fatalf("cmdCheckChanges failed: %v", result.err)
+	}
+	if result.hasChanges {
+		t.Error("expected no changes in clean repo")
 	}
 }

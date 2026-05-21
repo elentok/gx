@@ -1,10 +1,13 @@
 package push
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 )
@@ -233,4 +236,294 @@ func TestHandlePoll_NilRunner(t *testing.T) {
 		t.Error("handlePoll with nil runner should return empty result")
 	}
 	_ = next
+}
+
+func TestOpen_InitializesModel(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	m := New()
+	if err := m.Open(repo); err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	if !m.IsOpen {
+		t.Error("expected IsOpen=true")
+	}
+	if m.phase != phaseConfirm {
+		t.Errorf("expected phaseConfirm, got %v", m.phase)
+	}
+	if m.branch == "" {
+		t.Error("expected branch to be set")
+	}
+	if m.log == nil {
+		t.Error("expected log to be initialized")
+	}
+}
+
+func TestOpenWithTag_SetsTag(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	m := New()
+	if err := m.OpenWithTag(repo, "v1.0.0"); err != nil {
+		t.Fatalf("OpenWithTag: %v", err)
+	}
+	if m.tag != "v1.0.0" {
+		t.Errorf("expected tag=v1.0.0, got %q", m.tag)
+	}
+	if !m.IsOpen {
+		t.Error("expected IsOpen=true")
+	}
+}
+
+func TestRunnerArgs_AllPhases(t *testing.T) {
+	m := New()
+	m.remote = "origin"
+	m.branch = "main"
+	m.tag = "v1.0.0"
+	m.divergence = &git.PushDivergence{Upstream: "origin/main"}
+
+	cases := []struct {
+		phase phase
+		want  []string
+	}{
+		{phaseFetching, []string{"fetch", "origin"}},
+		{phaseRebasing, []string{"rebase", "origin/main"}},
+		{phasePushing, []string{"push", "origin", "main"}},
+		{phaseTagPushing, []string{"push", "origin", "v1.0.0"}},
+		{phaseForcePushing, []string{"push", "--force", "origin", "main"}},
+	}
+	for _, tc := range cases {
+		got := m.runnerArgs(tc.phase)
+		if strings.Join(got, " ") != strings.Join(tc.want, " ") {
+			t.Errorf("runnerArgs(%v) = %v, want %v", tc.phase, got, tc.want)
+		}
+	}
+}
+
+func TestRunnerArgs_RebasingNoUpstream(t *testing.T) {
+	m := New()
+	m.remote = "origin"
+	m.divergence = &git.PushDivergence{Upstream: "", Remote: "origin/main"}
+	got := m.runnerArgs(phaseRebasing)
+	if len(got) < 1 || got[0] != "rebase" {
+		t.Errorf("runnerArgs phaseRebasing no upstream = %v, want rebase ...", got)
+	}
+}
+
+func TestSelectedMenuValue_WithCursor(t *testing.T) {
+	state := components.MenuState{
+		Items: []components.MenuItem{
+			{Label: "A", Value: "alpha"},
+			{Label: "B", Value: "beta"},
+		},
+		Cursor: 1,
+	}
+	if got := selectedMenuValue(state); got != "beta" {
+		t.Errorf("selectedMenuValue cursor=1 = %q, want 'beta'", got)
+	}
+}
+
+func TestSelectedMenuValue_OutOfBounds(t *testing.T) {
+	state := components.MenuState{
+		Items:  []components.MenuItem{{Label: "A", Value: "alpha"}},
+		Cursor: 5,
+	}
+	if got := selectedMenuValue(state); got != "" {
+		t.Errorf("selectedMenuValue out-of-bounds = %q, want empty", got)
+	}
+}
+
+func TestCompleteCurrentStep_WithSteps(t *testing.T) {
+	m := newModelWithLog()
+	m.steps = []components.Step{{TitleBefore: "fetch", IsRunning: true}}
+	m.completeCurrentStep()
+	if !m.steps[0].IsDone {
+		t.Error("expected IsDone=true after completeCurrentStep")
+	}
+	if m.steps[0].IsRunning {
+		t.Error("expected IsRunning=false after completeCurrentStep")
+	}
+}
+
+func TestFailCurrentStep_WithSteps(t *testing.T) {
+	m := newModelWithLog()
+	m.steps = []components.Step{{TitleBefore: "push", IsRunning: true}}
+	m.failCurrentStep()
+	if !m.steps[0].HasFailed {
+		t.Error("expected HasFailed=true after failCurrentStep")
+	}
+	if m.steps[0].IsRunning {
+		t.Error("expected IsRunning=false after failCurrentStep")
+	}
+}
+
+func TestHandleRunnerDone_Rebasing_StartsPush(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	m := newModelWithLog()
+	m.root = repo
+	m.remote = "origin"
+	m.branch = "main"
+	m.steps = []components.Step{{TitleBefore: "rebase", IsRunning: true}}
+	next, cmd, _ := m.Update(runnerDoneMsg{phase: phaseRebasing})
+	if next.phase != phasePushing {
+		t.Fatalf("expected phasePushing after rebase done, got %v", next.phase)
+	}
+	if cmd == nil {
+		t.Fatal("expected non-nil push command")
+	}
+}
+
+func TestHandleRunnerDone_Pushing_NoTagNoPR_Closes(t *testing.T) {
+	m := newModelWithLog()
+	m.phase = phasePushing
+	next, _, result := m.Update(runnerDoneMsg{phase: phasePushing, output: "already up to date"})
+	if next.IsOpen {
+		t.Fatal("expected IsOpen=false after successful push")
+	}
+	if !result.Done {
+		t.Fatal("expected Done=true")
+	}
+}
+
+func TestHandleRunnerDone_Pushing_WithTag_StartsTagPush(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	m := newModelWithLog()
+	m.root = repo
+	m.remote = "origin"
+	m.tag = "v1.0.0"
+	m.steps = []components.Step{{TitleBefore: "push", IsRunning: true}}
+	next, cmd, _ := m.Update(runnerDoneMsg{phase: phasePushing, output: "pushed"})
+	if next.phase != phaseTagPushing {
+		t.Fatalf("expected phaseTagPushing, got %v", next.phase)
+	}
+	if cmd == nil {
+		t.Fatal("expected non-nil tag push command")
+	}
+}
+
+func TestHandleRunnerDone_Pushing_NonFastForward_ForceConfirm(t *testing.T) {
+	m := newModelWithLog()
+	m.phase = phasePushing
+	m.steps = []components.Step{{TitleBefore: "push", IsRunning: true}}
+	nffErr := &git.RunError{Stderr: "[rejected] non-fast-forward"}
+	next, _, result := m.Update(runnerDoneMsg{phase: phasePushing, err: nffErr})
+	if next.phase != phaseForceConfirm {
+		t.Fatalf("expected phaseForceConfirm, got %v", next.phase)
+	}
+	if result.Done {
+		t.Fatal("expected Done=false at force confirm")
+	}
+}
+
+func TestHandleRunnerDone_TagPushing_WithPR_ShowsPRPrompt(t *testing.T) {
+	m := newModelWithLog()
+	m.phase = phaseTagPushing
+	m.prURL = testPRURL
+	m.steps = []components.Step{{TitleBefore: "push tag", IsRunning: true}}
+	next, _, result := m.Update(runnerDoneMsg{phase: phaseTagPushing})
+	if next.phase != phasePRPrompt {
+		t.Fatalf("expected phasePRPrompt, got %v", next.phase)
+	}
+	if result.Done {
+		t.Fatal("expected Done=false at PR prompt")
+	}
+}
+
+func TestHandleRunnerDone_TagPushing_NoPR_Closes(t *testing.T) {
+	m := newModelWithLog()
+	m.phase = phaseTagPushing
+	m.prURL = ""
+	m.steps = []components.Step{{TitleBefore: "push tag", IsRunning: true}}
+	next, _, result := m.Update(runnerDoneMsg{phase: phaseTagPushing})
+	if next.IsOpen {
+		t.Fatal("expected IsOpen=false after tag push with no PR")
+	}
+	if !result.Done {
+		t.Fatal("expected Done=true")
+	}
+}
+
+func TestHandleRunnerDone_ForcePushing_Closes(t *testing.T) {
+	m := newModelWithLog()
+	m.phase = phaseForcePushing
+	m.steps = []components.Step{{TitleBefore: "force push", IsRunning: true}}
+	next, _, result := m.Update(runnerDoneMsg{phase: phaseForcePushing})
+	if next.IsOpen {
+		t.Fatal("expected IsOpen=false after force push")
+	}
+	if !result.Done {
+		t.Fatal("expected Done=true")
+	}
+}
+
+func TestHandleKey_Diverged_AbortChoice(t *testing.T) {
+	m := newModelWithLog()
+	m.phase = phaseDiverged
+	m.menu = components.MenuState{
+		Items: []components.MenuItem{
+			{Label: "Rebase", Value: "rebase"},
+			{Label: "Push --force", Value: "force"},
+			{Label: "Abort", Value: "abort"},
+		},
+		Cursor: 2,
+	}
+	next, _, result := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if next.IsOpen {
+		t.Fatal("expected IsOpen=false after abort")
+	}
+	if !result.Done {
+		t.Fatal("expected Done=true after abort")
+	}
+}
+
+func TestHandleKey_ForceConfirm_Decline(t *testing.T) {
+	m := newModelWithLog()
+	m.phase = phaseForceConfirm
+	m.forceYes = true
+	next, _, result := m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
+	if next.IsOpen {
+		t.Fatal("expected IsOpen=false after declining force confirm")
+	}
+	if !result.Done {
+		t.Fatal("expected Done=true")
+	}
+}
+
+func TestView_FetchingPhase(t *testing.T) {
+	m := newModelWithLog()
+	m.phase = phaseFetching
+	m.steps = []components.Step{{TitleBefore: "fetch", IsRunning: true}}
+	if view := m.View(120); view == "" {
+		t.Error("expected non-empty view in fetching phase")
+	}
+}
+
+func TestView_DivergedPhase(t *testing.T) {
+	m := newModelWithLog()
+	m.phase = phaseDiverged
+	m.divergence = &git.PushDivergence{Branch: "main", Remote: "origin/main"}
+	m.menu = components.MenuState{
+		Items: []components.MenuItem{{Label: "Rebase", Value: "rebase"}},
+	}
+	if view := m.View(120); view == "" {
+		t.Error("expected non-empty view in diverged phase")
+	}
+}
+
+func TestView_ForceConfirmPhase(t *testing.T) {
+	m := newModelWithLog()
+	m.phase = phaseForceConfirm
+	if view := m.View(120); view == "" {
+		t.Error("expected non-empty view in force confirm phase")
+	}
+}
+
+func TestView_PRPromptPhase(t *testing.T) {
+	m := newModelWithLog()
+	m.phase = phasePRPrompt
+	m.prURL = testPRURL
+	if view := m.View(120); view == "" {
+		t.Error("expected non-empty view in PR prompt phase")
+	}
 }

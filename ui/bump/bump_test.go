@@ -1,9 +1,11 @@
 package bump
 
 import (
+	"os/exec"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui/components"
 )
 
@@ -136,5 +138,85 @@ func TestView_FailedPhase(t *testing.T) {
 	view := m.View(120)
 	if view == "" {
 		t.Error("expected non-empty view in failed phase")
+	}
+}
+
+func TestOpen_WithTaggedRepo(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	if out, err := exec.Command("git", "-C", repo, "tag", "-a", "v1.2.3", "-m", "release v1.2.3").CombinedOutput(); err != nil {
+		t.Fatalf("create tag: %v\n%s", err, out)
+	}
+	m := New()
+	if err := m.Open(repo); err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	if !m.IsOpen {
+		t.Error("expected IsOpen=true")
+	}
+	if m.phase != phasePick {
+		t.Errorf("expected phasePick, got %v", m.phase)
+	}
+	if len(m.menu.Items) != 3 {
+		t.Errorf("expected 3 menu items (patch/minor/major), got %d", len(m.menu.Items))
+	}
+	if m.lastTag != "v1.2.3" {
+		t.Errorf("expected lastTag=v1.2.3, got %q", m.lastTag)
+	}
+}
+
+func TestSelectedNewTag_Patch(t *testing.T) {
+	m := modelAtPick()
+	m.menu.Cursor = 0
+	got := m.selectedNewTag()
+	if got != "v0.1.1" {
+		t.Errorf("selectedNewTag patch = %q, want 'v0.1.1'", got)
+	}
+}
+
+func TestSelectedNewTag_Minor(t *testing.T) {
+	m := modelAtPick()
+	m.menu.Cursor = 1
+	got := m.selectedNewTag()
+	if got != "v0.2.0" {
+		t.Errorf("selectedNewTag minor = %q, want 'v0.2.0'", got)
+	}
+}
+
+func TestSelectedNewTag_Major(t *testing.T) {
+	m := modelAtPick()
+	m.menu.Cursor = 2
+	got := m.selectedNewTag()
+	if got != "v1.0.0" {
+		t.Errorf("selectedNewTag major = %q, want 'v1.0.0'", got)
+	}
+}
+
+func TestSelectedNewTag_OutOfBounds(t *testing.T) {
+	m := modelAtPick()
+	m.menu.Cursor = 99
+	if got := m.selectedNewTag(); got != "" {
+		t.Errorf("selectedNewTag out-of-bounds = %q, want empty", got)
+	}
+}
+
+func TestCmdCreateTag_ReturnsNonNilCmd(t *testing.T) {
+	m := New()
+	m.root = t.TempDir()
+	m.newTag = "v1.0.0"
+	cmd := m.cmdCreateTag()
+	if cmd == nil {
+		t.Error("expected non-nil cmd from cmdCreateTag")
+	}
+}
+
+func TestView_TaggingPhase(t *testing.T) {
+	m := New()
+	m.IsOpen = true
+	m.phase = phaseTagging
+	m.newTag = "v1.0.0"
+	view := m.View(120)
+	if view == "" {
+		t.Error("expected non-empty view in tagging phase")
 	}
 }
