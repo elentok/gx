@@ -200,3 +200,23 @@ func TestCheckRepo_NoIssuesForRegularBareRepo(t *testing.T) {
 		_ = iss
 	}
 }
+
+func TestCanFix(t *testing.T) {
+	t.Parallel()
+	outerDir, repo := setupDotBareRepo(t)
+
+	// Create an issue that has a fixFn by corrupting the .git file
+	gitFile := filepath.Join(outerDir, ".git")
+	if err := os.WriteFile(gitFile, []byte("gitdir: wrong\n"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	issues, err := git.CheckRepo(repo)
+	if err != nil {
+		t.Fatalf("CheckRepo: %v", err)
+	}
+	issue := findIssueAbout(t, issues, gitFile)
+	if !issue.CanFix() {
+		t.Error("expected CanFix=true for fixable issue")
+	}
+}

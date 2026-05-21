@@ -64,3 +64,22 @@ func TestCommitFileDiffForRef(t *testing.T) {
 		t.Errorf("unexpected diff content: %q", diff)
 	}
 }
+
+func TestCommitFileDiffWithDeltaForRef(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	testutil.WriteFile(t, dir, "data.txt", "before\n")
+	testutil.MustGitExported(t, dir, "add", ".")
+	testutil.MustGitExported(t, dir, "commit", "-m", "initial data")
+	testutil.WriteFile(t, dir, "data.txt", "after\n")
+	testutil.MustGitExported(t, dir, "add", ".")
+	testutil.MustGitExported(t, dir, "commit", "-m", "update data")
+
+	out, err := git.CommitFileDiffWithDeltaForRef(dir, "HEAD", "data.txt", 80)
+	if err != nil {
+		t.Fatalf("CommitFileDiffWithDeltaForRef: %v", err)
+	}
+	if out == "" {
+		t.Error("expected non-empty diff output")
+	}
+}

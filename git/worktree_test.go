@@ -119,3 +119,33 @@ func TestRemoveWorktree(t *testing.T) {
 		}
 	}
 }
+
+func TestMoveWorktree(t *testing.T) {
+	t.Parallel()
+	repoDir := tempBareRepoWithWorktreesLight(t, "my-branch")
+	repo, _ := git.FindRepo(repoDir)
+
+	oldPath := filepath.Join(repoDir, "my-branch")
+	newPath := filepath.Join(repoDir, "my-branch-moved")
+
+	if err := git.MoveWorktree(*repo, oldPath, newPath); err != nil {
+		t.Fatalf("MoveWorktree: %v", err)
+	}
+
+	wts, err := git.ListWorktrees(*repo)
+	if err != nil {
+		t.Fatalf("ListWorktrees: %v", err)
+	}
+	found := false
+	for _, wt := range wts {
+		if wt.Path == oldPath {
+			t.Error("old path still exists in worktrees after move")
+		}
+		if wt.Path == newPath {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("new path not found in worktrees after move")
+	}
+}

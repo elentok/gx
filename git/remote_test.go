@@ -1,6 +1,10 @@
 package git
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/testutil"
@@ -168,5 +172,141 @@ func TestCheckFetchConfig_WrongRefspec(t *testing.T) {
 	}
 	if len(prob.Commands) == 0 {
 		t.Error("expected fix commands in problem")
+	}
+}
+
+func TestFixFetchConfig(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempBareRepo(t)
+	testutil.MustGitExported(t, dir, "config", "remote.origin.fetch", "+refs/heads/main:refs/remotes/origin/main")
+	if prob := CheckFetchConfig(dir); prob == nil {
+		t.Fatal("expected a problem before fix")
+	}
+	if err := FixFetchConfig(dir); err != nil {
+		t.Fatalf("FixFetchConfig: %v", err)
+	}
+	if prob := CheckFetchConfig(dir); prob != nil {
+		t.Errorf("expected nil problem after fix, got: %s", prob.Description)
+	}
+}
+
+// setupLocalAndBareRemote creates a bare "remote" repo and a regular "local" clone.
+func setupLocalAndBareRemote(t *testing.T) (local, remote string) {
+	t.Helper()
+	src := testutil.TempRepo(t)
+	remote = filepath.Join(t.TempDir(), "remote.git")
+	if err := os.MkdirAll(filepath.Dir(remote), 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	os.RemoveAll(remote)
+	cmd := exec.Command("git", "clone", "--bare", src, remote)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git clone --bare: %v\n%s", err, out)
+	}
+	local = filepath.Join(t.TempDir(), "local")
+	os.RemoveAll(local)
+	cmd = exec.Command("git", "clone", remote, local)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git clone local: %v\n%s", err, out)
+	}
+	testutil.MustGitExported(t, local, "config", "user.email", "test@test.com")
+	testutil.MustGitExported(t, local, "config", "user.name", "Test")
+	return local, remote
+}
+
+func TestPush(t *testing.T) {
+	t.Parallel()
+	local, remote := setupLocalAndBareRemote(t)
+	testutil.WriteFile(t, local, "pushed.txt", "pushed\n")
+	testutil.CommitAll(t, local, "push test commit")
+
+	if err := Push(local, "origin", "main"); err != nil {
+		t.Fatalf("Push: %v", err)
+	}
+
+	out, _, err := run(remote, []string{"log", "--format=%s", "-n", "1"})
+	if err != nil {
+		t.Fatalf("git log remote: %v", err)
+	}
+	if !strings.Contains(out, "push test commit") {
+		t.Errorf("commit not found in remote; log = %q", out)
+	}
+}
+
+func TestPushBranch(t *testing.T) {
+	t.Parallel()
+	local, _ := setupLocalAndBareRemote(t)
+	testutil.MustGitExported(t, local, "checkout", "-b", "feature")
+	testutil.WriteFile(t, local, "feature.txt", "feature\n")
+	testutil.CommitAll(t, local, "feature commit")
+
+	prURL, output, err := PushBranch(local, "origin", "feature")
+	if err != nil {
+		t.Fatalf("PushBranch: %v\n%s", err, output)
+	}
+	_ = prURL // may be empty for local bare remote
+}
+
+func TestPull(t *testing.T) {
+	t.Parallel()
+	local, remote := setupLocalAndBareRemote(t)
+
+	// Add a commit to remote via a second clone
+	local2 := filepath.Join(t.TempDir(), "local2")
+	os.RemoveAll(local2)
+	cmd := exec.Command("git", "clone", remote, local2)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git clone local2: %v\n%s", err, out)
+	}
+	testutil.MustGitExported(t, local2, "config", "user.email", "test@test.com")
+	testutil.MustGitExported(t, local2, "config", "user.name", "Test")
+	testutil.WriteFile(t, local2, "remote_file.txt", "from remote\n")
+	testutil.CommitAll(t, local2, "remote commit")
+	testutil.MustGitExported(t, local2, "push", "origin", "main")
+
+	out, err := Pull(local)
+	if err != nil {
+		t.Fatalf("Pull: %v\n%s", err, out)
+	}
+	log, _, err := run(local, []string{"log", "--format=%s", "-n", "1"})
+	if err != nil {
+		t.Fatalf("git log: %v", err)
+	}
+	if !strings.Contains(log, "remote commit") {
+		t.Errorf("pull didn't bring in remote commit; log = %q", log)
+	}
+}
+
+func TestPushBranchForceWithLease(t *testing.T) {
+	t.Parallel()
+	local, _ := setupLocalAndBareRemote(t)
+	// Push main, then amend locally and force-with-lease push
+	testutil.WriteFile(t, local, "a.txt", "a\n")
+	testutil.CommitAll(t, local, "commit a")
+	testutil.MustGitExported(t, local, "push", "origin", "main")
+	// Amend to diverge
+	testutil.WriteFile(t, local, "a.txt", "amended\n")
+	testutil.MustGitExported(t, local, "add", "a.txt")
+	testutil.MustGitExported(t, local, "commit", "--amend", "--no-edit")
+
+	if err := PushBranchForceWithLease(local, "origin", "main"); err != nil {
+		t.Fatalf("PushBranchForceWithLease: %v", err)
+	}
+}
+
+func TestPushBranchForce(t *testing.T) {
+	t.Parallel()
+	local, _ := setupLocalAndBareRemote(t)
+	testutil.WriteFile(t, local, "b.txt", "b\n")
+	testutil.CommitAll(t, local, "commit b")
+	testutil.MustGitExported(t, local, "push", "origin", "main")
+	// Amend to diverge
+	testutil.WriteFile(t, local, "b.txt", "amended\n")
+	testutil.MustGitExported(t, local, "add", "b.txt")
+	testutil.MustGitExported(t, local, "commit", "--amend", "--no-edit")
+
+	out, err := PushBranchForce(local, "origin", "main")
+	if err != nil {
+		t.Fatalf("PushBranchForce: %v\n%s", err, out)
 	}
 }

@@ -160,3 +160,39 @@ func TestStashPushAuto_WithChanges(t *testing.T) {
 		t.Fatalf("StashPushAuto: %v\n%s", err, out)
 	}
 }
+
+func TestRebaseAutosquash(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	// Need at least two commits so hash^ resolves: initial + target
+	testutil.WriteFile(t, dir, "target.txt", "target\n")
+	testutil.CommitAll(t, dir, "target commit")
+	hash, _, err := run(dir, []string{"rev-parse", "HEAD"})
+	if err != nil {
+		t.Fatalf("rev-parse: %v", err)
+	}
+	hash = strings.TrimSpace(hash)
+
+	// Create a fixup commit for target
+	testutil.WriteFile(t, dir, "fix.txt", "fix\n")
+	testutil.MustGitExported(t, dir, "add", "fix.txt")
+	out, err := CommitFixup(dir, hash)
+	if err != nil {
+		t.Fatalf("CommitFixup: %v\n%s", err, out)
+	}
+
+	// Autosquash should merge fixup! into target, leaving 2 commits total
+	out, err = RebaseAutosquash(dir, hash)
+	if err != nil {
+		t.Fatalf("RebaseAutosquash: %v\n%s", err, out)
+	}
+
+	log, _, err := run(dir, []string{"log", "--format=%H"})
+	if err != nil {
+		t.Fatalf("git log: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(log), "\n")
+	if len(lines) != 2 {
+		t.Errorf("expected 2 commits after autosquash, got %d", len(lines))
+	}
+}

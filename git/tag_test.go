@@ -1,6 +1,9 @@
 package git_test
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
 
 	"github.com/elentok/gx/git"
@@ -74,5 +77,48 @@ func TestCreateAnnotatedTag(t *testing.T) {
 	tag := git.LastTag(dir)
 	if tag != "v2.0.0" {
 		t.Errorf("after CreateAnnotatedTag, LastTag() = %q, want 'v2.0.0'", tag)
+	}
+}
+
+// tempLocalWithBareRemote creates a local clone of a fresh bare repo.
+func tempLocalWithBareRemote(t *testing.T) (local, remote string) {
+	t.Helper()
+	src := testutil.TempRepo(t)
+	remote = filepath.Join(t.TempDir(), "remote.git")
+	os.RemoveAll(remote)
+	cmd := exec.Command("git", "clone", "--bare", src, remote)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git clone --bare: %v\n%s", err, out)
+	}
+	local = filepath.Join(t.TempDir(), "local")
+	os.RemoveAll(local)
+	cmd = exec.Command("git", "clone", remote, local)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git clone local: %v\n%s", err, out)
+	}
+	testutil.MustGitExported(t, local, "config", "user.email", "test@test.com")
+	testutil.MustGitExported(t, local, "config", "user.name", "Test")
+	return local, remote
+}
+
+func TestPushOrigin(t *testing.T) {
+	t.Parallel()
+	local, _ := tempLocalWithBareRemote(t)
+	testutil.WriteFile(t, local, "push.txt", "push\n")
+	testutil.CommitAll(t, local, "push commit")
+
+	if err := git.PushOrigin(local); err != nil {
+		t.Fatalf("PushOrigin: %v", err)
+	}
+}
+
+func TestPushTag(t *testing.T) {
+	t.Parallel()
+	local, _ := tempLocalWithBareRemote(t)
+	if err := git.CreateAnnotatedTag(local, "v1.0.0", "release"); err != nil {
+		t.Fatalf("CreateAnnotatedTag: %v", err)
+	}
+	if err := git.PushTag(local, "v1.0.0"); err != nil {
+		t.Fatalf("PushTag: %v", err)
 	}
 }

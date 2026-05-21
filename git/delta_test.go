@@ -57,3 +57,77 @@ func TestColorizeDiff_FallbackWithoutDelta(t *testing.T) {
 	}
 	_ = out
 }
+
+func TestColorizeDiff_WithContent(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	testutil.WriteFile(t, dir, "col.txt", "original\n")
+	testutil.MustGitExported(t, dir, "add", "col.txt")
+	testutil.MustGitExported(t, dir, "commit", "-m", "init")
+	testutil.WriteFile(t, dir, "col.txt", "modified\n")
+	testutil.MustGitExported(t, dir, "add", "col.txt")
+
+	raw, _, err := run(dir, []string{"diff", "--no-color", "--cached", "--", "col.txt"})
+	if err != nil || raw == "" {
+		t.Skip("could not get raw diff")
+	}
+
+	out, err := ColorizeDiff(dir, "col.txt", raw, true, false, 80, 3)
+	if err != nil {
+		t.Fatalf("ColorizeDiff: %v", err)
+	}
+	if out == "" {
+		t.Error("expected non-empty colorized output")
+	}
+}
+
+func TestColorizeUntrackedDiff_WithContent(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	path := dir + "/untracked.txt"
+	testutil.WriteFile(t, dir, "untracked.txt", "new content\n")
+
+	raw, _ := runGitAllowExitCodes(dir, nil, map[int]bool{0: true, 1: true},
+		"diff", "--no-index", "--no-color", "--unified=3", "--", "/dev/null", path)
+	if raw == "" {
+		t.Skip("could not get raw diff")
+	}
+
+	out, err := ColorizeUntrackedDiff(dir, path, raw, false, 80, 3)
+	if err != nil {
+		t.Fatalf("ColorizeUntrackedDiff: %v", err)
+	}
+	if out == "" {
+		t.Error("expected non-empty colorized output")
+	}
+}
+
+func TestDiffPathWithDelta_EmptyDiff(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	out, err := DiffPathWithDelta(dir, "README.md", false, false, 80, 3)
+	if err != nil {
+		t.Fatalf("DiffPathWithDelta: %v", err)
+	}
+	if out != "" {
+		t.Errorf("expected empty output for no diff, got %q", out)
+	}
+}
+
+func TestDiffPathWithDelta_StagedChange(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	testutil.WriteFile(t, dir, "delta.txt", "original\n")
+	testutil.MustGitExported(t, dir, "add", "delta.txt")
+	testutil.MustGitExported(t, dir, "commit", "-m", "init delta")
+	testutil.WriteFile(t, dir, "delta.txt", "modified\n")
+	testutil.MustGitExported(t, dir, "add", "delta.txt")
+
+	out, err := DiffPathWithDelta(dir, "delta.txt", true, false, 80, 3)
+	if err != nil {
+		t.Fatalf("DiffPathWithDelta: %v", err)
+	}
+	if out == "" {
+		t.Error("expected non-empty diff output for staged change")
+	}
+}
