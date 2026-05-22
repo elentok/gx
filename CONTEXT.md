@@ -51,3 +51,18 @@ without pull). Rendered purple with `󰜮`.
 
 **NavModeLine** — diff navigation moves between individual changed lines. Active item is a changed-
 line index.
+
+## App Navigation
+
+**TabID** — canonical identifier of a top-level app destination (`worktrees`, `log`, `commit`,
+`status`). This is the only term used for tab identity.
+
+**Route** — navigation identity for a screen, composed of a `TabID` plus route context (for
+example worktree root, ref, initial path, or focus subject). A route is not UI state.
+
+**Last route by tab** — app-shell memory of the most recent route seen for each `TabID`. Used when
+switching tabs so users return to their last context in that tab.
+
+**Selected worktree** — the currently highlighted worktree row in the worktrees tab. This is a
+focus identity and is distinct from `worktreeRoot` (repository/worktree context used by other
+tabs).
