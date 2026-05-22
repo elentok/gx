@@ -23,6 +23,10 @@ type Route struct {
 	FilterEndLine   int
 }
 
+type RouteProvider interface {
+	CurrentRoute() (Route, bool)
+}
+
 type openMsg struct {
 	Route Route
 }

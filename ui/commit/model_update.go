@@ -7,7 +7,7 @@ import (
 )
 
 func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
-	prevRoute, prevOK := m.currentRouteIdentity()
+	prevRoute, prevOK := m.CurrentRoute()
 	// Run once on every return path so route-change emission stays centralized.
 	// We compare pre/post route identity and append RouteChanged only when needed.
 	defer func() {
@@ -15,7 +15,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		if !ok {
 			return
 		}
-		route, routeOK := nextModel.currentRouteIdentity()
+		route, routeOK := nextModel.CurrentRoute()
 		cmd = nav.AppendRouteChanged(cmd, m.settings.EnableNavigation, prevRoute, prevOK, route, routeOK)
 	}()
 

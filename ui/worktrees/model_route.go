@@ -2,7 +2,7 @@ package worktrees
 
 import "github.com/elentok/gx/ui/nav"
 
-func (m Model) currentRouteIdentity() (nav.Route, bool) {
+func (m Model) CurrentRoute() (nav.Route, bool) {
 	if len(m.worktrees) == 0 {
 		return nav.Route{}, false
 	}

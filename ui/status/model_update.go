@@ -25,13 +25,13 @@ func renderTickCmd() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
-	prevRoute, prevOK := m.currentRouteIdentity()
+	prevRoute, prevOK := m.CurrentRoute()
 	defer func() {
 		nextModel, ok := next.(Model)
 		if !ok {
 			return
 		}
-		route, routeOK := nextModel.currentRouteIdentity()
+		route, routeOK := nextModel.CurrentRoute()
 		cmd = nav.AppendRouteChanged(cmd, m.settings.EnableNavigation, prevRoute, prevOK, route, routeOK)
 	}()
 

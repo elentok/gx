@@ -2,7 +2,7 @@ package log
 
 import "github.com/elentok/gx/ui/nav"
 
-func (m Model) currentRouteIdentity() (nav.Route, bool) {
+func (m Model) CurrentRoute() (nav.Route, bool) {
 	route := nav.Route{
 		Tab:          nav.TabLog,
 		WorktreeRoot: m.worktreeRoot,
