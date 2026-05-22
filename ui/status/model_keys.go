@@ -11,20 +11,20 @@ import (
 )
 
 const (
-	bindingHelp          keys.BindingID = "help"
-	bindingQuit          keys.BindingID = "quit"
-	bindingGotoBottom    keys.BindingID = "goto-bottom"
-	bindingGotoTop       keys.BindingID = "goto-top"
-	bindingViewOutput    keys.BindingID = "view-output"
-	bindingGitCommit     keys.BindingID = "git-commit"
-	bindingComment       keys.BindingID = "comment"
-	bindingYankContent   keys.BindingID = "yank-content"
-	bindingYankLocation  keys.BindingID = "yank-location"
-	bindingYankAll       keys.BindingID = "yank-all"
-	bindingYankFilename  keys.BindingID = "yank-filename"
-	bindingLazygitLog    keys.BindingID = "lazygit-log"
-	bindingRefreshMenu   keys.BindingID = "refresh-menu"
-	bindingCancelChord   keys.BindingID = "cancel-chord"
+	bindingHelp         keys.BindingID = "help"
+	bindingQuit         keys.BindingID = "quit"
+	bindingGotoBottom   keys.BindingID = "goto-bottom"
+	bindingGotoTop      keys.BindingID = "goto-top"
+	bindingViewOutput   keys.BindingID = "view-output"
+	bindingGitCommit    keys.BindingID = "git-commit"
+	bindingComment      keys.BindingID = "comment"
+	bindingYankContent  keys.BindingID = "yank-content"
+	bindingYankLocation keys.BindingID = "yank-location"
+	bindingYankAll      keys.BindingID = "yank-all"
+	bindingYankFilename keys.BindingID = "yank-filename"
+	bindingLazygitLog   keys.BindingID = "lazygit-log"
+	bindingRefreshMenu  keys.BindingID = "refresh-menu"
+	bindingCancelChord  keys.BindingID = "cancel-chord"
 
 	// Shared bindings: same action in both filetree and diff focus
 	bindingToggleSection keys.BindingID = "toggle-section"
@@ -177,13 +177,13 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model,
 		if !m.settings.EnableNavigation {
 			return m, nil
 		}
-		return m, nav.Push(m.filterLogRoute())
+		return m, nav.Open(m.filterLogRoute())
 	}
 	return m, nil
 }
 
 func (m Model) filterLogRoute() nav.Route {
-	route := nav.Route{Kind: nav.RouteLog, WorktreeRoot: m.worktreeRoot}
+	route := nav.Route{Tab: nav.TabLog, WorktreeRoot: m.worktreeRoot}
 	file, ok := m.selectedStatusFile()
 	if !ok {
 		return route

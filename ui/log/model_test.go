@@ -111,12 +111,12 @@ func TestGHResetsCustomRefToHead(t *testing.T) {
 	if cmd == nil {
 		t.Fatalf("expected nav command for gh")
 	}
-	route, ok := nav.IsReplace(cmd())
+	route, ok := nav.IsSwitch(cmd())
 	if !ok {
 		t.Fatalf("expected nav replace")
 	}
-	if route.Kind != nav.RouteLog || route.Ref != "HEAD" {
-		t.Fatalf("expected log HEAD route, got kind=%q ref=%q", route.Kind, route.Ref)
+	if route.Tab != nav.TabLog || route.Ref != "HEAD" {
+		t.Fatalf("expected log HEAD route, got kind=%q ref=%q", route.Tab, route.Ref)
 	}
 }
 
@@ -135,12 +135,12 @@ func TestEnterOnCommitRowOpensCommitRoute(t *testing.T) {
 	if cmd == nil {
 		t.Fatalf("expected nav command on enter")
 	}
-	route, ok := nav.IsPush(cmd())
+	route, ok := nav.IsOpen(cmd())
 	if !ok {
 		t.Fatalf("expected nav push")
 	}
-	if route.Kind != nav.RouteCommit {
-		t.Fatalf("expected commit route, got %q", route.Kind)
+	if route.Tab != nav.TabCommit {
+		t.Fatalf("expected commit route, got %q", route.Tab)
 	}
 	_ = updated
 }
@@ -163,7 +163,7 @@ func TestEnterOnCommitRowCarriesActiveFilterPath(t *testing.T) {
 	if cmd == nil {
 		t.Fatalf("expected nav command on enter")
 	}
-	route, ok := nav.IsPush(cmd())
+	route, ok := nav.IsOpen(cmd())
 	if !ok {
 		t.Fatalf("expected nav push")
 	}

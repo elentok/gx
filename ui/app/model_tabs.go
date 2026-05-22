@@ -13,11 +13,11 @@ import (
 )
 
 func (m *Model) ensureTabs() {
-	for _, kind := range []nav.RouteKind{nav.RouteWorktrees, nav.RouteLog, nav.RouteStatus} {
+	for _, kind := range []nav.TabID{nav.TabWorktrees, nav.TabLog, nav.TabStatus} {
 		if _, ok := m.tabs[kind]; ok {
 			continue
 		}
-		m.tabs[kind] = tabPageState{kind: kind}
+		m.tabs[kind] = tabPageState{tabID: kind}
 	}
 }
 
@@ -26,26 +26,26 @@ func (m Model) switchTab(route nav.Route) (tea.Model, tea.Cmd) {
 	m.router.replace(route, m.settings.ActiveWorktreePath)
 	m.ensureTabs()
 	m.histories[m.activeTab] = m.history
-	m.activeTab = tabState.kind
+	m.activeTab = tabState.tabID
 	m.history = m.histories[m.activeTab]
-	current, ok := m.tabs[tabState.kind]
+	current, ok := m.tabs[tabState.tabID]
 	if !ok || current.model == nil || !sameTabState(current, tabState) {
 		m.history = nil
 		m.histories[m.activeTab] = nil
 		current = m.newTabPage(tabState)
 		current.initialized = true
-		m.tabs[tabState.kind] = current
+		m.tabs[tabState.tabID] = current
 		return m, tea.Batch(tea.ClearScreen, current.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(current.model))
 	}
 	if !current.initialized {
 		current.initialized = true
-		m.tabs[tabState.kind] = current
+		m.tabs[tabState.tabID] = current
 		return m, tea.Batch(tea.ClearScreen, current.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(current.model))
 	}
 	if route.FocusSubject != "" {
 		if logModel, ok := current.model.(logui.Model); ok {
 			current.model = logModel.WithPendingFocus(route.FocusSubject)
-			m.tabs[tabState.kind] = current
+			m.tabs[tabState.tabID] = current
 		}
 	}
 	return m, tea.Batch(tea.ClearScreen, m.resizeCurrentCmd(), onPageActivatedCmd(current.model))
@@ -117,15 +117,15 @@ func (m *Model) handleShellChordKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 			*m = next.(Model)
 			return true, cmd
 		case "w":
-			next, cmd := m.switchTab(nav.Route{Kind: nav.RouteWorktrees})
+			next, cmd := m.switchTab(nav.Route{Tab: nav.TabWorktrees})
 			*m = next.(Model)
 			return true, cmd
 		case "l":
-			next, cmd := m.switchTab(nav.Route{Kind: nav.RouteLog})
+			next, cmd := m.switchTab(nav.Route{Tab: nav.TabLog})
 			*m = next.(Model)
 			return true, cmd
 		case "s":
-			next, cmd := m.switchTab(nav.Route{Kind: nav.RouteStatus})
+			next, cmd := m.switchTab(nav.Route{Tab: nav.TabStatus})
 			*m = next.(Model)
 			return true, cmd
 		case "esc":
@@ -144,15 +144,15 @@ func (m *Model) handleShellChordKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	}
 	switch key {
 	case "1":
-		next, cmd := m.switchTab(nav.Route{Kind: nav.RouteWorktrees})
+		next, cmd := m.switchTab(nav.Route{Tab: nav.TabWorktrees})
 		*m = next.(Model)
 		return true, cmd
 	case "2":
-		next, cmd := m.switchTab(nav.Route{Kind: nav.RouteLog})
+		next, cmd := m.switchTab(nav.Route{Tab: nav.TabLog})
 		*m = next.(Model)
 		return true, cmd
 	case "3":
-		next, cmd := m.switchTab(nav.Route{Kind: nav.RouteStatus})
+		next, cmd := m.switchTab(nav.Route{Tab: nav.TabStatus})
 		*m = next.(Model)
 		return true, cmd
 	}
@@ -175,26 +175,26 @@ func replayKeys(model tea.Model, msgs ...tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) tabStateForRoute(route nav.Route) tabPageState {
 	r := routerTabStateForRoute(route, m.settings.ActiveWorktreePath)
 	return tabPageState{
-		kind:         r.kind,
+		tabID:        r.tabID,
 		worktreeRoot: r.worktreeRoot,
 		ref:          r.ref,
 		initialPath:  r.initialPath,
 	}
 }
 
-func tabForRoute(kind nav.RouteKind) nav.RouteKind {
+func tabForRoute(kind nav.TabID) nav.TabID {
 	switch kind {
-	case nav.RouteWorktrees, nav.RouteLog, nav.RouteStatus:
+	case nav.TabWorktrees, nav.TabLog, nav.TabStatus:
 		return kind
-	case nav.RouteCommit:
-		return nav.RouteLog
+	case nav.TabCommit:
+		return nav.TabLog
 	default:
-		return nav.RouteWorktrees
+		return nav.TabWorktrees
 	}
 }
 
 func sameTabState(a, b tabPageState) bool {
-	return a.kind == b.kind &&
+	return a.tabID == b.tabID &&
 		a.worktreeRoot == b.worktreeRoot &&
 		a.ref == b.ref &&
 		a.initialPath == b.initialPath
@@ -202,7 +202,7 @@ func sameTabState(a, b tabPageState) bool {
 
 func (m Model) newTabPage(tab tabPageState) tabPageState {
 	tab.model = m.newPage(nav.Route{
-		Kind:         tab.kind,
+		Tab:          tab.tabID,
 		WorktreeRoot: tab.worktreeRoot,
 		Ref:          tab.ref,
 		InitialPath:  tab.initialPath,
@@ -212,9 +212,9 @@ func (m Model) newTabPage(tab tabPageState) tabPageState {
 
 func (m Model) tabsView() string {
 	tabs := []tabSpec{
-		{label: "worktrees", active: m.activeTab == nav.RouteWorktrees},
-		{label: "log", active: m.activeTab == nav.RouteLog},
-		{label: "status", active: m.activeTab == nav.RouteStatus},
+		{label: "worktrees", active: m.activeTab == nav.TabWorktrees},
+		{label: "log", active: m.activeTab == nav.TabLog},
+		{label: "status", active: m.activeTab == nav.TabStatus},
 	}
 	parts := make([]string, 0, len(tabs))
 	for _, tab := range tabs {
@@ -236,8 +236,8 @@ func renderTab(tab tabSpec) string {
 	return ui.RenderBadge(tab.label, ui.BadgeVariantSurface, true, true)
 }
 
-func orderedTabs() []nav.RouteKind {
-	return []nav.RouteKind{nav.RouteWorktrees, nav.RouteLog, nav.RouteStatus}
+func orderedTabs() []nav.TabID {
+	return []nav.TabID{nav.TabWorktrees, nav.TabLog, nav.TabStatus}
 }
 
 func (m Model) switchRelativeTab(delta int) (tea.Model, tea.Cmd) {
@@ -256,5 +256,5 @@ func (m Model) switchRelativeTab(delta int) (tea.Model, tea.Cmd) {
 	if next >= len(tabs) {
 		next = len(tabs) - 1
 	}
-	return m.switchTab(nav.Route{Kind: tabs[next]})
+	return m.switchTab(nav.Route{Tab: tabs[next]})
 }

@@ -28,7 +28,7 @@ type pageState struct {
 }
 
 type tabPageState struct {
-	kind         nav.RouteKind
+	tabID        nav.TabID
 	worktreeRoot string
 	ref          string
 	initialPath  string
@@ -44,9 +44,9 @@ type Model struct {
 	width  int
 	height int
 
-	activeTab nav.RouteKind
-	tabs      map[nav.RouteKind]tabPageState
-	histories map[nav.RouteKind][]pageState
+	activeTab nav.TabID
+	tabs      map[nav.TabID]tabPageState
+	histories map[nav.TabID][]pageState
 	history   []pageState
 	keyPrefix string
 	notify    notify.Model
@@ -56,12 +56,12 @@ func New(repo git.Repo, settings Settings) Model {
 	m := Model{
 		repo:      repo,
 		settings:  settings,
-		tabs:      make(map[nav.RouteKind]tabPageState),
-		histories: make(map[nav.RouteKind][]pageState),
+		tabs:      make(map[nav.TabID]tabPageState),
+		histories: make(map[nav.TabID][]pageState),
 		notify:    notify.New(settings.UseNerdFontIcons),
 	}
-	if m.settings.InitialRoute.Kind == "" {
-		m.settings.InitialRoute = nav.Route{Kind: nav.RouteWorktrees}
+	if m.settings.InitialRoute.Tab == "" {
+		m.settings.InitialRoute = nav.Route{Tab: nav.TabWorktrees}
 	}
 	m.router = newRouterState(m.settings.InitialRoute, m.settings.ActiveWorktreePath)
 	m.activeTab = m.router.activeTab
@@ -69,7 +69,7 @@ func New(repo git.Repo, settings Settings) Model {
 	page := m.newTabPage(m.tabStateForRoute(m.settings.InitialRoute))
 	page.initialized = true
 	m.tabs[m.activeTab] = page
-	if m.settings.InitialRoute.Kind == nav.RouteCommit {
+	if m.settings.InitialRoute.Tab == nav.TabCommit {
 		m.history = append(m.history, m.newPage(m.settings.InitialRoute))
 		m.histories[m.activeTab] = m.history
 	}
@@ -84,11 +84,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var notifyCmd tea.Cmd
 	m.notify, notifyCmd = m.notify.Update(msg)
 
-	if route, ok := nav.IsReplace(msg); ok {
+	if route, ok := nav.IsSwitch(msg); ok {
 		next, cmd := m.switchTab(route)
 		return next, tea.Batch(notifyCmd, cmd)
 	}
-	if route, ok := nav.IsPush(msg); ok {
+	if route, ok := nav.IsOpen(msg); ok {
 		next := m.newPage(route)
 		m.router.push(route)
 		m.history = append(m.history, next)
@@ -165,7 +165,7 @@ func (m Model) activePage() pageState {
 	tab := m.tabs[m.activeTab]
 	return pageState{
 		route: nav.Route{
-			Kind:         tab.kind,
+			Tab:          tab.tabID,
 			WorktreeRoot: tab.worktreeRoot,
 			Ref:          tab.ref,
 			InitialPath:  tab.initialPath,
@@ -220,13 +220,13 @@ func normalizeFrameContent(content string, targetWidth, targetHeight int) string
 func (m Model) newPage(route nav.Route) pageState {
 	s := m.settings.Settings
 	s.EnableNavigation = true
-	switch route.Kind {
-	case nav.RouteStatus:
+	switch route.Tab {
+	case nav.TabStatus:
 		return pageState{
 			route: route,
 			model: statusui.NewModel(route.WorktreeRoot, s, route.InitialPath, keys.New(Bindings())),
 		}
-	case nav.RouteLog:
+	case nav.TabLog:
 		return pageState{
 			route: route,
 			model: logui.NewModel(route.WorktreeRoot, route.Ref, s, logui.LogFilter{
@@ -235,16 +235,16 @@ func (m Model) newPage(route nav.Route) pageState {
 				EndLine:   route.FilterEndLine,
 			}, keys.New(Bindings())),
 		}
-	case nav.RouteCommit:
+	case nav.TabCommit:
 		return pageState{
 			route: route,
 			model: commitui.NewModel(route.WorktreeRoot, route.Ref, route.FilterPath, s, keys.New(Bindings())),
 		}
-	case nav.RouteWorktrees:
+	case nav.TabWorktrees:
 		fallthrough
 	default:
 		return pageState{
-			route: nav.Route{Kind: nav.RouteWorktrees},
+			route: nav.Route{Tab: nav.TabWorktrees},
 			model: worktrees.NewWithSettings(m.repo, m.settings.ActiveWorktreePath, s),
 		}
 	}
@@ -278,7 +278,7 @@ func (m *Model) restoreLogSelectionFromPoppedPage(popped pageState) {
 		return
 	}
 	current := m.activePage()
-	if current.route.Kind != nav.RouteLog {
+	if current.route.Tab != nav.TabLog {
 		return
 	}
 	logModel, ok := current.model.(logui.Model)

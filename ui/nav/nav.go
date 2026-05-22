@@ -2,17 +2,17 @@ package nav
 
 import tea "charm.land/bubbletea/v2"
 
-type RouteKind string
+type TabID string
 
 const (
-	RouteWorktrees RouteKind = "worktrees"
-	RouteLog       RouteKind = "log"
-	RouteStatus    RouteKind = "status"
-	RouteCommit    RouteKind = "commit"
+	TabWorktrees TabID = "worktrees"
+	TabLog       TabID = "log"
+	TabStatus    TabID = "status"
+	TabCommit    TabID = "commit"
 )
 
 type Route struct {
-	Kind         RouteKind
+	Tab          TabID
 	WorktreeRoot string
 	Ref          string
 	InitialPath  string
@@ -23,25 +23,29 @@ type Route struct {
 	FilterEndLine   int
 }
 
-type pushMsg struct {
+type openMsg struct {
 	Route Route
 }
 
-type replaceMsg struct {
+type switchMsg struct {
 	Route Route
 }
 
 type backMsg struct{}
 
-func Push(route Route) tea.Cmd {
+type routeChangedMsg struct {
+	Route Route
+}
+
+func Open(route Route) tea.Cmd {
 	return func() tea.Msg {
-		return pushMsg{Route: route}
+		return openMsg{Route: route}
 	}
 }
 
-func Replace(route Route) tea.Cmd {
+func Switch(route Route) tea.Cmd {
 	return func() tea.Msg {
-		return replaceMsg{Route: route}
+		return switchMsg{Route: route}
 	}
 }
 
@@ -51,17 +55,28 @@ func Back() tea.Cmd {
 	}
 }
 
-func IsPush(msg tea.Msg) (Route, bool) {
-	push, ok := msg.(pushMsg)
-	return push.Route, ok
+func RouteChanged(route Route) tea.Cmd {
+	return func() tea.Msg {
+		return routeChangedMsg{Route: route}
+	}
 }
 
-func IsReplace(msg tea.Msg) (Route, bool) {
-	replace, ok := msg.(replaceMsg)
-	return replace.Route, ok
+func IsOpen(msg tea.Msg) (Route, bool) {
+	open, ok := msg.(openMsg)
+	return open.Route, ok
+}
+
+func IsSwitch(msg tea.Msg) (Route, bool) {
+	switchTo, ok := msg.(switchMsg)
+	return switchTo.Route, ok
 }
 
 func IsBack(msg tea.Msg) bool {
 	_, ok := msg.(backMsg)
 	return ok
+}
+
+func IsRouteChanged(msg tea.Msg) (Route, bool) {
+	changed, ok := msg.(routeChangedMsg)
+	return changed.Route, ok
 }

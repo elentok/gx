@@ -21,16 +21,16 @@ func TestReplaceSwitchesTabWithoutHistory(t *testing.T) {
 	}
 
 	m := New(*repo, Settings{
-		InitialRoute:       nav.Route{Kind: nav.RouteWorktrees},
+		InitialRoute:       nav.Route{Tab: nav.TabWorktrees},
 		ActiveWorktreePath: repoDir,
 	})
 
-	updated, cmd := m.Update(nav.Replace(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: repoDir})())
+	updated, cmd := m.Update(nav.Switch(nav.Route{Tab: nav.TabStatus, WorktreeRoot: repoDir})())
 	if cmd == nil {
 		t.Fatalf("expected resize cmd when switching tabs")
 	}
 	m = updated.(Model)
-	if m.activeTab != nav.RouteStatus {
+	if m.activeTab != nav.TabStatus {
 		t.Fatalf("expected active tab status, got %q", m.activeTab)
 	}
 	if len(m.history) != 0 {
@@ -46,7 +46,7 @@ func TestShellChordReplacesTabWithoutHistory(t *testing.T) {
 	}
 
 	m := New(*repo, Settings{
-		InitialRoute:       nav.Route{Kind: nav.RouteStatus, WorktreeRoot: repoDir},
+		InitialRoute:       nav.Route{Tab: nav.TabStatus, WorktreeRoot: repoDir},
 		ActiveWorktreePath: repoDir,
 	})
 
@@ -60,7 +60,7 @@ func TestShellChordReplacesTabWithoutHistory(t *testing.T) {
 		t.Fatalf("expected resize cmd when switching tabs with gw")
 	}
 	m = updated.(Model)
-	if m.activeTab != nav.RouteWorktrees {
+	if m.activeTab != nav.TabWorktrees {
 		t.Fatalf("expected active tab worktrees, got %q", m.activeTab)
 	}
 	if len(m.history) != 0 {
@@ -76,7 +76,7 @@ func TestShellChordSwitchesRelativeTabs(t *testing.T) {
 	}
 
 	m := New(*repo, Settings{
-		InitialRoute:       nav.Route{Kind: nav.RouteLog, WorktreeRoot: repoDir},
+		InitialRoute:       nav.Route{Tab: nav.TabLog, WorktreeRoot: repoDir},
 		ActiveWorktreePath: repoDir,
 	})
 
@@ -87,7 +87,7 @@ func TestShellChordSwitchesRelativeTabs(t *testing.T) {
 		t.Fatalf("expected resize cmd when switching tabs with g,")
 	}
 	m = updated.(Model)
-	if m.activeTab != nav.RouteWorktrees {
+	if m.activeTab != nav.TabWorktrees {
 		t.Fatalf("expected g, to move left to worktrees, got %q", m.activeTab)
 	}
 
@@ -98,7 +98,7 @@ func TestShellChordSwitchesRelativeTabs(t *testing.T) {
 		t.Fatalf("expected resize cmd when switching tabs with g.")
 	}
 	m = updated.(Model)
-	if m.activeTab != nav.RouteLog {
+	if m.activeTab != nav.TabLog {
 		t.Fatalf("expected g. to move right to log, got %q", m.activeTab)
 	}
 }
@@ -111,7 +111,7 @@ func TestNumberKeysSwitchTabsGlobally(t *testing.T) {
 	}
 
 	m := New(*repo, Settings{
-		InitialRoute:       nav.Route{Kind: nav.RouteStatus, WorktreeRoot: repoDir},
+		InitialRoute:       nav.Route{Tab: nav.TabStatus, WorktreeRoot: repoDir},
 		ActiveWorktreePath: repoDir,
 	})
 
@@ -120,19 +120,19 @@ func TestNumberKeysSwitchTabsGlobally(t *testing.T) {
 		t.Fatalf("expected resize cmd when switching to worktrees with 1")
 	}
 	m = updated.(Model)
-	if m.activeTab != nav.RouteWorktrees {
+	if m.activeTab != nav.TabWorktrees {
 		t.Fatalf("expected 1 to switch to worktrees, got %q", m.activeTab)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: '2', Text: "2"})
 	m = updated.(Model)
-	if m.activeTab != nav.RouteLog {
+	if m.activeTab != nav.TabLog {
 		t.Fatalf("expected 2 to switch to log, got %q", m.activeTab)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: '3', Text: "3"})
 	m = updated.(Model)
-	if m.activeTab != nav.RouteStatus {
+	if m.activeTab != nav.TabStatus {
 		t.Fatalf("expected 3 to switch to status, got %q", m.activeTab)
 	}
 }
@@ -145,11 +145,11 @@ func TestSwitchToUninitializedTabRunsInit(t *testing.T) {
 	}
 
 	m := New(*repo, Settings{
-		InitialRoute:       nav.Route{Kind: nav.RouteStatus, WorktreeRoot: repoDir},
+		InitialRoute:       nav.Route{Tab: nav.TabStatus, WorktreeRoot: repoDir},
 		ActiveWorktreePath: repoDir,
 	})
 
-	worktreesPage := m.tabs[nav.RouteWorktrees]
+	worktreesPage := m.tabs[nav.TabWorktrees]
 	if worktreesPage.initialized {
 		t.Fatalf("expected cached worktrees tab to start uninitialized")
 	}
@@ -161,7 +161,7 @@ func TestSwitchToUninitializedTabRunsInit(t *testing.T) {
 		t.Fatalf("expected init/resize cmd on gw into uninitialized tab")
 	}
 	m = updated.(Model)
-	if !m.tabs[nav.RouteWorktrees].initialized {
+	if !m.tabs[nav.TabWorktrees].initialized {
 		t.Fatalf("expected gw to mark worktrees tab initialized")
 	}
 }
@@ -174,11 +174,11 @@ func TestPushCommitAndBackRestoresTab(t *testing.T) {
 	}
 
 	m := New(*repo, Settings{
-		InitialRoute:       nav.Route{Kind: nav.RouteLog, WorktreeRoot: repoDir},
+		InitialRoute:       nav.Route{Tab: nav.TabLog, WorktreeRoot: repoDir},
 		ActiveWorktreePath: repoDir,
 	})
 
-	updated, cmd := m.Update(nav.Push(nav.Route{Kind: nav.RouteCommit, WorktreeRoot: repoDir, Ref: "HEAD"})())
+	updated, cmd := m.Update(nav.Open(nav.Route{Tab: nav.TabCommit, WorktreeRoot: repoDir, Ref: "HEAD"})())
 	if cmd == nil {
 		t.Fatalf("expected init/resize cmd when pushing commit route")
 	}
@@ -186,13 +186,13 @@ func TestPushCommitAndBackRestoresTab(t *testing.T) {
 	if len(m.history) != 1 {
 		t.Fatalf("expected history depth 1, got %d", len(m.history))
 	}
-	if got := m.activePage().route.Kind; got != nav.RouteCommit {
+	if got := m.activePage().route.Tab; got != nav.TabCommit {
 		t.Fatalf("expected active page commit, got %q", got)
 	}
 
 	updated, cmd = m.Update(nav.Back()())
 	m = updated.(Model)
-	if m.activeTab != nav.RouteLog {
+	if m.activeTab != nav.TabLog {
 		t.Fatalf("expected active tab log after back, got %q", m.activeTab)
 	}
 	if len(m.history) != 0 {
@@ -214,11 +214,11 @@ func TestBackFromCommitRestoresSelectionInLog(t *testing.T) {
 		t.Fatalf("FindRepo: %v", err)
 	}
 	m := New(*repo, Settings{
-		InitialRoute:       nav.Route{Kind: nav.RouteLog, WorktreeRoot: repoDir},
+		InitialRoute:       nav.Route{Tab: nav.TabLog, WorktreeRoot: repoDir},
 		ActiveWorktreePath: repoDir,
 	})
 
-	updated, _ := m.Update(nav.Push(nav.Route{Kind: nav.RouteCommit, WorktreeRoot: repoDir, Ref: "HEAD~1"})())
+	updated, _ := m.Update(nav.Open(nav.Route{Tab: nav.TabCommit, WorktreeRoot: repoDir, Ref: "HEAD~1"})())
 	m = updated.(Model)
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: '.', Text: "."}) // move to newer commit (top)
@@ -247,11 +247,11 @@ func TestPushStatusAndBackRestoresLogTab(t *testing.T) {
 	}
 
 	m := New(*repo, Settings{
-		InitialRoute:       nav.Route{Kind: nav.RouteLog, WorktreeRoot: repoDir},
+		InitialRoute:       nav.Route{Tab: nav.TabLog, WorktreeRoot: repoDir},
 		ActiveWorktreePath: repoDir,
 	})
 
-	updated, cmd := m.Update(nav.Push(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: repoDir})())
+	updated, cmd := m.Update(nav.Open(nav.Route{Tab: nav.TabStatus, WorktreeRoot: repoDir})())
 	if cmd == nil {
 		t.Fatalf("expected init/resize cmd when pushing status route")
 	}
@@ -259,13 +259,13 @@ func TestPushStatusAndBackRestoresLogTab(t *testing.T) {
 	if len(m.history) != 1 {
 		t.Fatalf("expected history depth 1, got %d", len(m.history))
 	}
-	if got := m.activePage().route.Kind; got != nav.RouteStatus {
+	if got := m.activePage().route.Tab; got != nav.TabStatus {
 		t.Fatalf("expected active page status, got %q", got)
 	}
 
 	updated, cmd = m.Update(nav.Back()())
 	m = updated.(Model)
-	if m.activeTab != nav.RouteLog {
+	if m.activeTab != nav.TabLog {
 		t.Fatalf("expected active tab log after back, got %q", m.activeTab)
 	}
 	if len(m.history) != 0 {
@@ -281,19 +281,19 @@ func TestReplaceClearsHistoryAfterPush(t *testing.T) {
 	}
 
 	m := New(*repo, Settings{
-		InitialRoute:       nav.Route{Kind: nav.RouteLog, WorktreeRoot: repoDir},
+		InitialRoute:       nav.Route{Tab: nav.TabLog, WorktreeRoot: repoDir},
 		ActiveWorktreePath: repoDir,
 	})
 
-	updated, _ := m.Update(nav.Push(nav.Route{Kind: nav.RouteCommit, WorktreeRoot: repoDir, Ref: "HEAD"})())
+	updated, _ := m.Update(nav.Open(nav.Route{Tab: nav.TabCommit, WorktreeRoot: repoDir, Ref: "HEAD"})())
 	m = updated.(Model)
 	if len(m.history) != 1 {
 		t.Fatalf("expected history depth 1, got %d", len(m.history))
 	}
 
-	updated, _ = m.Update(nav.Replace(nav.Route{Kind: nav.RouteStatus, WorktreeRoot: repoDir})())
+	updated, _ = m.Update(nav.Switch(nav.Route{Tab: nav.TabStatus, WorktreeRoot: repoDir})())
 	m = updated.(Model)
-	if m.activeTab != nav.RouteStatus {
+	if m.activeTab != nav.TabStatus {
 		t.Fatalf("expected active tab status, got %q", m.activeTab)
 	}
 	if len(m.history) != 0 {
@@ -309,31 +309,31 @@ func TestTabSwitchRestoresCommitRouteInLogTab(t *testing.T) {
 	}
 
 	m := New(*repo, Settings{
-		InitialRoute:       nav.Route{Kind: nav.RouteLog, WorktreeRoot: repoDir},
+		InitialRoute:       nav.Route{Tab: nav.TabLog, WorktreeRoot: repoDir},
 		ActiveWorktreePath: repoDir,
 	})
 
-	updated, _ := m.Update(nav.Push(nav.Route{Kind: nav.RouteCommit, WorktreeRoot: repoDir, Ref: "HEAD"})())
+	updated, _ := m.Update(nav.Open(nav.Route{Tab: nav.TabCommit, WorktreeRoot: repoDir, Ref: "HEAD"})())
 	m = updated.(Model)
-	if got := m.activePage().route.Kind; got != nav.RouteCommit {
+	if got := m.activePage().route.Tab; got != nav.TabCommit {
 		t.Fatalf("expected commit page after push, got %q", got)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: '3', Text: "3"})
 	m = updated.(Model)
-	if got := m.activePage().route.Kind; got != nav.RouteStatus {
+	if got := m.activePage().route.Tab; got != nav.TabStatus {
 		t.Fatalf("expected status page after switching tab, got %q", got)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: '2', Text: "2"})
 	m = updated.(Model)
-	if got := m.activePage().route.Kind; got != nav.RouteCommit {
+	if got := m.activePage().route.Tab; got != nav.TabCommit {
 		t.Fatalf("expected returning to log tab to restore commit page, got %q", got)
 	}
 }
 
 func TestCommitMapsToLogTab(t *testing.T) {
-	if got := tabForRoute(nav.RouteCommit); got != nav.RouteLog {
+	if got := tabForRoute(nav.TabCommit); got != nav.TabLog {
 		t.Fatalf("expected commit to map to log tab, got %q", got)
 	}
 }
@@ -346,14 +346,14 @@ func TestInitialCommitRouteStartsOnCommitPage(t *testing.T) {
 	}
 
 	m := New(*repo, Settings{
-		InitialRoute:       nav.Route{Kind: nav.RouteCommit, WorktreeRoot: repoDir, Ref: "HEAD"},
+		InitialRoute:       nav.Route{Tab: nav.TabCommit, WorktreeRoot: repoDir, Ref: "HEAD"},
 		ActiveWorktreePath: repoDir,
 	})
 
-	if got := m.activePage().route.Kind; got != nav.RouteCommit {
+	if got := m.activePage().route.Tab; got != nav.TabCommit {
 		t.Fatalf("expected active page commit, got %q", got)
 	}
-	if m.activeTab != nav.RouteLog {
+	if m.activeTab != nav.TabLog {
 		t.Fatalf("expected active tab log for commit-backed page, got %q", m.activeTab)
 	}
 	if len(m.history) != 1 {
@@ -369,7 +369,7 @@ func TestBackWithEmptyHistoryQuits(t *testing.T) {
 	}
 
 	m := New(*repo, Settings{
-		InitialRoute:       nav.Route{Kind: nav.RouteWorktrees},
+		InitialRoute:       nav.Route{Tab: nav.TabWorktrees},
 		ActiveWorktreePath: repoDir,
 	})
 
@@ -393,7 +393,7 @@ func TestViewAppendsTabs(t *testing.T) {
 	}
 
 	m := New(*repo, Settings{
-		InitialRoute:       nav.Route{Kind: nav.RouteLog, WorktreeRoot: repoDir},
+		InitialRoute:       nav.Route{Tab: nav.TabLog, WorktreeRoot: repoDir},
 		ActiveWorktreePath: repoDir,
 	})
 	m.width = 80
@@ -415,7 +415,7 @@ func TestGChordOverlayIncludesAppAndChildHints(t *testing.T) {
 	}
 
 	m := New(*repo, Settings{
-		InitialRoute:       nav.Route{Kind: nav.RouteStatus, WorktreeRoot: repoDir},
+		InitialRoute:       nav.Route{Tab: nav.TabStatus, WorktreeRoot: repoDir},
 		ActiveWorktreePath: repoDir,
 	})
 	m.width = 100
@@ -433,7 +433,6 @@ func TestGChordOverlayIncludesAppAndChildHints(t *testing.T) {
 	}
 }
 
-
 func TestViewMergesTabsIntoFooterLine(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
@@ -442,7 +441,7 @@ func TestViewMergesTabsIntoFooterLine(t *testing.T) {
 	}
 
 	m := New(*repo, Settings{
-		InitialRoute:       nav.Route{Kind: nav.RouteWorktrees},
+		InitialRoute:       nav.Route{Tab: nav.TabWorktrees},
 		ActiveWorktreePath: repoDir,
 	})
 	m.width = 80
@@ -466,7 +465,7 @@ func TestTabsUseBadgeCapsInFooter(t *testing.T) {
 	}
 
 	m := New(*repo, Settings{
-		InitialRoute:       nav.Route{Kind: nav.RouteLog, WorktreeRoot: repoDir},
+		InitialRoute:       nav.Route{Tab: nav.TabLog, WorktreeRoot: repoDir},
 		ActiveWorktreePath: repoDir,
 	})
 	m.width = 80
@@ -487,7 +486,7 @@ func TestViewMatchesScreenHeight(t *testing.T) {
 	}
 
 	m := New(*repo, Settings{
-		InitialRoute:       nav.Route{Kind: nav.RouteLog, WorktreeRoot: repoDir},
+		InitialRoute:       nav.Route{Tab: nav.TabLog, WorktreeRoot: repoDir},
 		ActiveWorktreePath: repoDir,
 	})
 	m.width = 80

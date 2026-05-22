@@ -53,8 +53,8 @@ func (m Model) handleRewordDone(err error) (tea.Model, tea.Cmd) {
 	if err != nil {
 		return m, notify.Error("reword failed: " + err.Error())
 	}
-	return m, nav.Replace(nav.Route{
-		Kind:         nav.RouteLog,
+	return m, nav.Switch(nav.Route{
+		Tab:          nav.TabLog,
 		WorktreeRoot: m.worktreeRoot,
 		Ref:          "HEAD",
 		FocusSubject: m.reword.NewSubject,

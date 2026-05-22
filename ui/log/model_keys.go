@@ -10,21 +10,21 @@ import (
 )
 
 const (
-	bindingHelp       keys.BindingID = "help"
-	bindingBack       keys.BindingID = "back"
-	bindingDown       keys.BindingID = "down"
-	bindingUp         keys.BindingID = "up"
-	bindingOpen       keys.BindingID = "open"
-	bindingBottom     keys.BindingID = "bottom"
-	bindingReload     keys.BindingID = "reload"
-	bindingTop        keys.BindingID = "top"
-	bindingGotoHead   keys.BindingID = "goto-head"
-	bindingNextTag    keys.BindingID = "next-tag"
-	bindingPrevTag    keys.BindingID = "prev-tag"
-	bindingCancel     keys.BindingID = "cancel-chord"
-	bindingAmend      keys.BindingID = "amend"
-	bindingBump       keys.BindingID = "bump"
-	bindingReword     keys.BindingID = "reword"
+	bindingHelp              keys.BindingID = "help"
+	bindingBack              keys.BindingID = "back"
+	bindingDown              keys.BindingID = "down"
+	bindingUp                keys.BindingID = "up"
+	bindingOpen              keys.BindingID = "open"
+	bindingBottom            keys.BindingID = "bottom"
+	bindingReload            keys.BindingID = "reload"
+	bindingTop               keys.BindingID = "top"
+	bindingGotoHead          keys.BindingID = "goto-head"
+	bindingNextTag           keys.BindingID = "next-tag"
+	bindingPrevTag           keys.BindingID = "prev-tag"
+	bindingCancel            keys.BindingID = "cancel-chord"
+	bindingAmend             keys.BindingID = "amend"
+	bindingBump              keys.BindingID = "bump"
+	bindingReword            keys.BindingID = "reword"
 	bindingPageDown          keys.BindingID = "page-down"
 	bindingPageUp            keys.BindingID = "page-up"
 	bindingPull              keys.BindingID = "pull"
@@ -107,7 +107,7 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, nil
 	case bindingGotoHead:
 		if m.startRef != "HEAD" {
-			return m, nav.Replace(nav.Route{Kind: nav.RouteLog, WorktreeRoot: m.worktreeRoot, Ref: "HEAD"})
+			return m, nav.Switch(nav.Route{Tab: nav.TabLog, WorktreeRoot: m.worktreeRoot, Ref: "HEAD"})
 		}
 		return m, nil
 	case bindingNextTag:

@@ -7,31 +7,31 @@ import (
 )
 
 type routerTabState struct {
-	kind         nav.RouteKind
+	tabID        nav.TabID
 	worktreeRoot string
 	ref          string
 	initialPath  string
 }
 
 type routerState struct {
-	activeTab nav.RouteKind
-	tabs      map[nav.RouteKind]routerTabState
-	histories map[nav.RouteKind][]nav.Route
+	activeTab nav.TabID
+	tabs      map[nav.TabID]routerTabState
+	histories map[nav.TabID][]nav.Route
 	history   []nav.Route
 }
 
 func newRouterState(initialRoute nav.Route, activeWorktreePath string) routerState {
-	if initialRoute.Kind == "" {
-		initialRoute = nav.Route{Kind: nav.RouteWorktrees}
+	if initialRoute.Tab == "" {
+		initialRoute = nav.Route{Tab: nav.TabWorktrees}
 	}
 	r := routerState{
-		activeTab: tabForRoute(initialRoute.Kind),
-		tabs:      make(map[nav.RouteKind]routerTabState),
-		histories: make(map[nav.RouteKind][]nav.Route),
+		activeTab: tabForRoute(initialRoute.Tab),
+		tabs:      make(map[nav.TabID]routerTabState),
+		histories: make(map[nav.TabID][]nav.Route),
 	}
 	r.ensureTabs()
 	r.tabs[r.activeTab] = routerTabStateForRoute(initialRoute, activeWorktreePath)
-	if initialRoute.Kind == nav.RouteCommit {
+	if initialRoute.Tab == nav.TabCommit {
 		r.history = append(r.history, initialRoute)
 		r.histories[r.activeTab] = append([]nav.Route(nil), r.history...)
 	}
@@ -39,11 +39,11 @@ func newRouterState(initialRoute nav.Route, activeWorktreePath string) routerSta
 }
 
 func (r *routerState) ensureTabs() {
-	for _, kind := range []nav.RouteKind{nav.RouteWorktrees, nav.RouteLog, nav.RouteStatus} {
-		if _, ok := r.tabs[kind]; ok {
+	for _, tabID := range []nav.TabID{nav.TabWorktrees, nav.TabLog, nav.TabStatus} {
+		if _, ok := r.tabs[tabID]; ok {
 			continue
 		}
-		r.tabs[kind] = routerTabState{kind: kind}
+		r.tabs[tabID] = routerTabState{tabID: tabID}
 	}
 }
 
@@ -51,14 +51,14 @@ func (r *routerState) replace(route nav.Route, activeWorktreePath string) {
 	next := routerTabStateForRoute(route, activeWorktreePath)
 	r.ensureTabs()
 	r.histories[r.activeTab] = append([]nav.Route(nil), r.history...)
-	r.activeTab = next.kind
+	r.activeTab = next.tabID
 	r.history = append([]nav.Route(nil), r.histories[r.activeTab]...)
-	current := r.tabs[next.kind]
+	current := r.tabs[next.tabID]
 
 	if !sameRouterTabState(current, next) {
 		r.history = nil
 		r.histories[r.activeTab] = nil
-		r.tabs[next.kind] = next
+		r.tabs[next.tabID] = next
 		return
 	}
 }
@@ -79,15 +79,15 @@ func (r *routerState) back() (nav.Route, bool) {
 }
 
 func routerTabStateForRoute(route nav.Route, activeWorktreePath string) routerTabState {
-	tab := routerTabState{kind: tabForRoute(route.Kind)}
-	switch tab.kind {
-	case nav.RouteLog:
+	tab := routerTabState{tabID: tabForRoute(route.Tab)}
+	switch tab.tabID {
+	case nav.TabLog:
 		tab.ref = route.Ref
 		tab.worktreeRoot = route.WorktreeRoot
 		if strings.TrimSpace(tab.worktreeRoot) == "" {
 			tab.worktreeRoot = activeWorktreePath
 		}
-	case nav.RouteStatus:
+	case nav.TabStatus:
 		tab.initialPath = route.InitialPath
 		tab.worktreeRoot = route.WorktreeRoot
 		if strings.TrimSpace(tab.worktreeRoot) == "" {
@@ -98,7 +98,7 @@ func routerTabStateForRoute(route nav.Route, activeWorktreePath string) routerTa
 }
 
 func sameRouterTabState(a, b routerTabState) bool {
-	return a.kind == b.kind &&
+	return a.tabID == b.tabID &&
 		a.worktreeRoot == b.worktreeRoot &&
 		a.ref == b.ref &&
 		a.initialPath == b.initialPath

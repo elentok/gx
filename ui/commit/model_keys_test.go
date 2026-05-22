@@ -20,8 +20,8 @@ func TestFilterLogRouteReturnsLogRouteForSelectedFile(t *testing.T) {
 
 	route := m.filterLogRoute()
 
-	if route.Kind != nav.RouteLog {
-		t.Fatalf("filterLogRoute kind = %q, want %q", route.Kind, nav.RouteLog)
+	if route.Tab != nav.TabLog {
+		t.Fatalf("filterLogRoute kind = %q, want %q", route.Tab, nav.TabLog)
 	}
 	if route.FilterPath != "foo.txt" {
 		t.Fatalf("filterLogRoute FilterPath = %q, want 'foo.txt'", route.FilterPath)
@@ -110,10 +110,10 @@ func TestFilterLogGHKeyPushesNavRoute(t *testing.T) {
 		t.Fatal("g+h should produce a nav.Push command")
 	}
 	msg := cmd()
-	if route, ok := nav.IsPush(msg); !ok {
+	if route, ok := nav.IsOpen(msg); !ok {
 		t.Fatalf("expected nav.Push message, got %T", msg)
-	} else if route.Kind != nav.RouteLog {
-		t.Fatalf("expected RouteLog, got %q", route.Kind)
+	} else if route.Tab != nav.TabLog {
+		t.Fatalf("expected TabLog, got %q", route.Tab)
 	}
 }
 

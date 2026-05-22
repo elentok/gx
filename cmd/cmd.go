@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/cli/confirm"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/app"
-	"github.com/elentok/gx/cli/confirm"
 	"github.com/elentok/gx/ui/menu"
 	"github.com/elentok/gx/ui/nav"
 
@@ -198,9 +198,9 @@ func runWorktrees(_ string) error {
 		return err
 	}
 	m := app.New(*repo, app.Settings{
-		InitialRoute:       nav.Route{Kind: nav.RouteWorktrees},
+		InitialRoute:       nav.Route{Tab: nav.TabWorktrees},
 		ActiveWorktreePath: activeWorktreePath,
-		Settings: settingsFromConfig(cfg),
+		Settings:           settingsFromConfig(cfg),
 	})
 	p := tea.NewProgram(m)
 	_, err = p.Run()
@@ -242,9 +242,9 @@ func runStatus(target string) error {
 		return err
 	}
 	m := app.New(*repo, app.Settings{
-		InitialRoute:       nav.Route{Kind: nav.RouteStatus, WorktreeRoot: root, InitialPath: initialPath},
+		InitialRoute:       nav.Route{Tab: nav.TabStatus, WorktreeRoot: root, InitialPath: initialPath},
 		ActiveWorktreePath: root,
-		Settings: settingsFromConfig(cfg),
+		Settings:           settingsFromConfig(cfg),
 	})
 	p := tea.NewProgram(m)
 	_, err = p.Run()
@@ -279,9 +279,9 @@ func runLog(ref string) error {
 		return err
 	}
 	m := app.New(*repo, app.Settings{
-		InitialRoute:       nav.Route{Kind: nav.RouteLog, WorktreeRoot: root, Ref: ref},
+		InitialRoute:       nav.Route{Tab: nav.TabLog, WorktreeRoot: root, Ref: ref},
 		ActiveWorktreePath: root,
-		Settings: settingsFromConfig(cfg),
+		Settings:           settingsFromConfig(cfg),
 	})
 	p := tea.NewProgram(m)
 	_, err = p.Run()
@@ -316,9 +316,9 @@ func runShow(ref string) error {
 		return err
 	}
 	m := app.New(*repo, app.Settings{
-		InitialRoute:       nav.Route{Kind: nav.RouteCommit, WorktreeRoot: root, Ref: ref},
+		InitialRoute:       nav.Route{Tab: nav.TabCommit, WorktreeRoot: root, Ref: ref},
 		ActiveWorktreePath: root,
-		Settings: settingsFromConfig(cfg),
+		Settings:           settingsFromConfig(cfg),
 	})
 	p := tea.NewProgram(m)
 	_, err = p.Run()

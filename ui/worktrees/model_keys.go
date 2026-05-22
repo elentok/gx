@@ -32,10 +32,10 @@ const (
 	bindingLazygitLog   keymgr.BindingID = "lazygit-log"
 	bindingOpenTerminal keymgr.BindingID = "open-terminal"
 
-	bindingGotoTop       keymgr.BindingID = "goto-top"
-	bindingGoOutput      keymgr.BindingID = "go-output"
-	bindingRefreshMenu   keymgr.BindingID = "refresh-menu"
-	bindingCancelChord   keymgr.BindingID = "cancel-chord"
+	bindingGotoTop     keymgr.BindingID = "goto-top"
+	bindingGoOutput    keymgr.BindingID = "go-output"
+	bindingRefreshMenu keymgr.BindingID = "refresh-menu"
+	bindingCancelChord keymgr.BindingID = "cancel-chord"
 )
 
 func newWorktreesManager() keymgr.Manager {
@@ -210,7 +210,7 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 		if len(m.worktrees) > 0 && m.settings.EnableNavigation {
 			wt := m.cursorWorktree()
 			if wt != nil {
-				return m, nav.Replace(nav.Route{Kind: nav.RouteLog, WorktreeRoot: wt.Path})
+				return m, nav.Switch(nav.Route{Tab: nav.TabLog, WorktreeRoot: wt.Path})
 			}
 		}
 		return m, nil
