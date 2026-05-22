@@ -39,6 +39,7 @@ type tabPageState struct {
 type Model struct {
 	repo     git.Repo
 	settings Settings
+	router   routerState
 
 	width  int
 	height int
@@ -62,7 +63,8 @@ func New(repo git.Repo, settings Settings) Model {
 	if m.settings.InitialRoute.Kind == "" {
 		m.settings.InitialRoute = nav.Route{Kind: nav.RouteWorktrees}
 	}
-	m.activeTab = tabForRoute(m.settings.InitialRoute.Kind)
+	m.router = newRouterState(m.settings.InitialRoute, m.settings.ActiveWorktreePath)
+	m.activeTab = m.router.activeTab
 	m.ensureTabs()
 	page := m.newTabPage(m.tabStateForRoute(m.settings.InitialRoute))
 	page.initialized = true
@@ -88,11 +90,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	if route, ok := nav.IsPush(msg); ok {
 		next := m.newPage(route)
+		m.router.push(route)
 		m.history = append(m.history, next)
 		return m, tea.Batch(notifyCmd, tea.ClearScreen, next.model.Init(), m.resizeCurrentCmd())
 	}
 	if nav.IsBack(msg) {
-		if len(m.history) == 0 {
+		_, ok := m.router.back()
+		if !ok || len(m.history) == 0 {
 			return m, tea.Quit
 		}
 		popped := m.history[len(m.history)-1]

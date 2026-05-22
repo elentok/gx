@@ -23,6 +23,7 @@ func (m *Model) ensureTabs() {
 
 func (m Model) switchTab(route nav.Route) (tea.Model, tea.Cmd) {
 	tabState := m.tabStateForRoute(route)
+	m.router.replace(route, m.settings.ActiveWorktreePath)
 	m.ensureTabs()
 	m.histories[m.activeTab] = m.history
 	m.activeTab = tabState.kind
@@ -172,23 +173,13 @@ func replayKeys(model tea.Model, msgs ...tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) tabStateForRoute(route nav.Route) tabPageState {
-	tab := tabPageState{kind: tabForRoute(route.Kind)}
-	switch tab.kind {
-	case nav.RouteLog:
-		tab.ref = route.Ref
-		tab.worktreeRoot = route.WorktreeRoot
-		if strings.TrimSpace(tab.worktreeRoot) == "" {
-			tab.worktreeRoot = m.settings.ActiveWorktreePath
-		}
-	case nav.RouteStatus:
-		tab.initialPath = route.InitialPath
-		tab.worktreeRoot = route.WorktreeRoot
-		if strings.TrimSpace(tab.worktreeRoot) == "" {
-			tab.worktreeRoot = m.settings.ActiveWorktreePath
-		}
-	case nav.RouteWorktrees:
+	r := routerTabStateForRoute(route, m.settings.ActiveWorktreePath)
+	return tabPageState{
+		kind:         r.kind,
+		worktreeRoot: r.worktreeRoot,
+		ref:          r.ref,
+		initialPath:  r.initialPath,
 	}
-	return tab
 }
 
 func tabForRoute(kind nav.RouteKind) nav.RouteKind {
