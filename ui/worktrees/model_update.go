@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 
 	"charm.land/bubbles/v2/spinner"
@@ -21,7 +22,17 @@ func (m Model) InputFocused() bool {
 		m.mode == modeNewAndOpen || m.mode == modeCredentialPrompt || m.mode == modeSearch
 }
 
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
+	prevRoute, prevOK := m.currentRouteIdentity()
+	defer func() {
+		nextModel, ok := next.(Model)
+		if !ok {
+			return
+		}
+		route, routeOK := nextModel.currentRouteIdentity()
+		cmd = nav.AppendRouteChanged(cmd, m.settings.EnableNavigation, prevRoute, prevOK, route, routeOK)
+	}()
+
 	if m.pull.IsOpen {
 		return m.handlePullUpdate(msg)
 	}

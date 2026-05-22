@@ -2,10 +2,23 @@ package commit
 
 import (
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/reword"
 )
 
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
+	prevRoute, prevOK := m.currentRouteIdentity()
+	// Run once on every return path so route-change emission stays centralized.
+	// We compare pre/post route identity and append RouteChanged only when needed.
+	defer func() {
+		nextModel, ok := next.(Model)
+		if !ok {
+			return
+		}
+		route, routeOK := nextModel.currentRouteIdentity()
+		cmd = nav.AppendRouteChanged(cmd, m.settings.EnableNavigation, prevRoute, prevOK, route, routeOK)
+	}()
+
 	// ctrl+c quits unconditionally even when a modal is open.
 	if kp, ok := msg.(tea.KeyPressMsg); ok && kp.String() == "ctrl+c" {
 		return m, tea.Quit

@@ -14,41 +14,45 @@ import (
 
 func (m *Model) ensureTabs() {
 	for _, kind := range []nav.TabID{nav.TabWorktrees, nav.TabLog, nav.TabStatus} {
-		if _, ok := m.tabs[kind]; ok {
-			continue
+		if _, ok := m.lastRouteByTab[kind]; !ok {
+			m.lastRouteByTab[kind] = nav.Route{Tab: kind}
 		}
-		m.tabs[kind] = tabPageState{tabID: kind}
+		if _, ok := m.livePageByTab[kind]; !ok {
+			m.livePageByTab[kind] = livePage{}
+		}
 	}
 }
 
 func (m Model) switchTab(route nav.Route) (tea.Model, tea.Cmd) {
-	tabState := m.tabStateForRoute(route)
+	tabRoute := m.tabRouteForRoute(route)
 	m.router.replace(route, m.settings.ActiveWorktreePath)
 	m.ensureTabs()
 	m.histories[m.activeTab] = m.history
-	m.activeTab = tabState.tabID
+	m.activeTab = tabRoute.Tab
 	m.history = m.histories[m.activeTab]
-	current, ok := m.tabs[tabState.tabID]
-	if !ok || current.model == nil || !sameTabState(current, tabState) {
+	currentPage := m.livePageByTab[tabRoute.Tab]
+	currentRoute := m.lastRouteByTab[tabRoute.Tab]
+	m.lastRouteByTab[tabRoute.Tab] = tabRoute
+	if currentPage.model == nil || !sameTabRouteIdentity(currentRoute, tabRoute) {
 		m.history = nil
 		m.histories[m.activeTab] = nil
-		current = m.newTabPage(tabState)
-		current.initialized = true
-		m.tabs[tabState.tabID] = current
-		return m, tea.Batch(tea.ClearScreen, current.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(current.model))
+		currentPage = m.newLivePage(tabRoute)
+		currentPage.didInit = true
+		m.livePageByTab[tabRoute.Tab] = currentPage
+		return m, tea.Batch(tea.ClearScreen, currentPage.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
 	}
-	if !current.initialized {
-		current.initialized = true
-		m.tabs[tabState.tabID] = current
-		return m, tea.Batch(tea.ClearScreen, current.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(current.model))
+	if !currentPage.didInit {
+		currentPage.didInit = true
+		m.livePageByTab[tabRoute.Tab] = currentPage
+		return m, tea.Batch(tea.ClearScreen, currentPage.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
 	}
 	if route.FocusSubject != "" {
-		if logModel, ok := current.model.(logui.Model); ok {
-			current.model = logModel.WithPendingFocus(route.FocusSubject)
-			m.tabs[tabState.tabID] = current
+		if logModel, ok := currentPage.model.(logui.Model); ok {
+			currentPage.model = logModel.WithPendingFocus(route.FocusSubject)
+			m.livePageByTab[tabRoute.Tab] = currentPage
 		}
 	}
-	return m, tea.Batch(tea.ClearScreen, m.resizeCurrentCmd(), onPageActivatedCmd(current.model))
+	return m, tea.Batch(tea.ClearScreen, m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
 }
 
 type pageActivationAware interface {
@@ -172,13 +176,13 @@ func replayKeys(model tea.Model, msgs ...tea.Msg) (tea.Model, tea.Cmd) {
 	return current, tea.Batch(cmds...)
 }
 
-func (m Model) tabStateForRoute(route nav.Route) tabPageState {
+func (m Model) tabRouteForRoute(route nav.Route) nav.Route {
 	r := routerTabStateForRoute(route, m.settings.ActiveWorktreePath)
-	return tabPageState{
-		tabID:        r.tabID,
-		worktreeRoot: r.worktreeRoot,
-		ref:          r.ref,
-		initialPath:  r.initialPath,
+	return nav.Route{
+		Tab:          r.tabID,
+		WorktreeRoot: r.worktreeRoot,
+		Ref:          r.ref,
+		InitialPath:  r.initialPath,
 	}
 }
 
@@ -193,21 +197,17 @@ func tabForRoute(kind nav.TabID) nav.TabID {
 	}
 }
 
-func sameTabState(a, b tabPageState) bool {
-	return a.tabID == b.tabID &&
-		a.worktreeRoot == b.worktreeRoot &&
-		a.ref == b.ref &&
-		a.initialPath == b.initialPath
+func sameTabRouteIdentity(a, b nav.Route) bool {
+	return a.Tab == b.Tab &&
+		a.WorktreeRoot == b.WorktreeRoot &&
+		a.Ref == b.Ref &&
+		a.InitialPath == b.InitialPath
 }
 
-func (m Model) newTabPage(tab tabPageState) tabPageState {
-	tab.model = m.newPage(nav.Route{
-		Tab:          tab.tabID,
-		WorktreeRoot: tab.worktreeRoot,
-		Ref:          tab.ref,
-		InitialPath:  tab.initialPath,
-	}).model
-	return tab
+func (m Model) newLivePage(route nav.Route) livePage {
+	return livePage{
+		model: m.newHistoryEntry(route).model,
+	}
 }
 
 func (m Model) tabsView() string {

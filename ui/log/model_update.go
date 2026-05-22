@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/reword"
 
@@ -18,8 +19,18 @@ func cmdFlashClear() tea.Cmd {
 	})
 }
 
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
+func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
+	prevRoute, prevOK := m.currentRouteIdentity()
+	defer func() {
+		nextModel, ok := next.(Model)
+		if !ok {
+			return
+		}
+		route, routeOK := nextModel.currentRouteIdentity()
+		cmd = nav.AppendRouteChanged(cmd, m.settings.EnableNavigation, prevRoute, prevOK, route, routeOK)
+	}()
+
+	var childCmd tea.Cmd
 
 	// ctrl+c quits unconditionally even when a modal is open.
 	if kp, ok := msg.(tea.KeyPressMsg); ok && kp.String() == "ctrl+c" {
@@ -52,9 +63,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Delegate output modal keys.
 	if m.output.IsOpen {
-		next, cmd := m.output.Update(msg)
+		next, childCmd := m.output.Update(msg)
 		m.output = next
-		return m, cmd
+		return m, childCmd
 	}
 
 	switch msg := msg.(type) {
@@ -80,8 +91,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.ready = true
-		m.help, cmd = m.help.Update(msg)
-		return m, cmd
+		m.help, childCmd = m.help.Update(msg)
+		return m, childCmd
 	case tea.FocusMsg:
 		if m.rebaseDidStash {
 			m.rebaseDidStash = false

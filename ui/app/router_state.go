@@ -63,6 +63,12 @@ func (r *routerState) replace(route nav.Route, activeWorktreePath string) {
 	}
 }
 
+func (r *routerState) routeChanged(route nav.Route, activeWorktreePath string) {
+	next := routerTabStateForRoute(route, activeWorktreePath)
+	r.ensureTabs()
+	r.tabs[next.tabID] = next
+}
+
 func (r *routerState) push(route nav.Route) {
 	r.history = append(r.history, route)
 	r.histories[r.activeTab] = append([]nav.Route(nil), r.history...)
@@ -81,7 +87,7 @@ func (r *routerState) back() (nav.Route, bool) {
 func routerTabStateForRoute(route nav.Route, activeWorktreePath string) routerTabState {
 	tab := routerTabState{tabID: tabForRoute(route.Tab)}
 	switch tab.tabID {
-	case nav.TabLog:
+	case nav.TabLog, nav.TabCommit:
 		tab.ref = route.Ref
 		tab.worktreeRoot = route.WorktreeRoot
 		if strings.TrimSpace(tab.worktreeRoot) == "" {

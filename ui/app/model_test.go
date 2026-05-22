@@ -149,8 +149,8 @@ func TestSwitchToUninitializedTabRunsInit(t *testing.T) {
 		ActiveWorktreePath: repoDir,
 	})
 
-	worktreesPage := m.tabs[nav.TabWorktrees]
-	if worktreesPage.initialized {
+	worktreesPage := m.livePageByTab[nav.TabWorktrees]
+	if worktreesPage.didInit {
 		t.Fatalf("expected cached worktrees tab to start uninitialized")
 	}
 
@@ -161,7 +161,7 @@ func TestSwitchToUninitializedTabRunsInit(t *testing.T) {
 		t.Fatalf("expected init/resize cmd on gw into uninitialized tab")
 	}
 	m = updated.(Model)
-	if !m.tabs[nav.TabWorktrees].initialized {
+	if !m.livePageByTab[nav.TabWorktrees].didInit {
 		t.Fatalf("expected gw to mark worktrees tab initialized")
 	}
 }

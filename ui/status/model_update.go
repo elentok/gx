@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/search"
 
@@ -23,7 +24,17 @@ func renderTickCmd() tea.Cmd {
 	return tea.Tick(time.Second, func(time.Time) tea.Msg { return renderTickMsg{} })
 }
 
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
+	prevRoute, prevOK := m.currentRouteIdentity()
+	defer func() {
+		nextModel, ok := next.(Model)
+		if !ok {
+			return
+		}
+		route, routeOK := nextModel.currentRouteIdentity()
+		cmd = nav.AppendRouteChanged(cmd, m.settings.EnableNavigation, prevRoute, prevOK, route, routeOK)
+	}()
+
 	if m.bump.IsOpen {
 		return m.handleBumpUpdate(msg)
 	}
