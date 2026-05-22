@@ -25,7 +25,7 @@ func (m *Model) ensureTabs() {
 
 func (m Model) switchTab(route nav.Route) (tea.Model, tea.Cmd) {
 	tabRoute := m.tabRouteForRoute(route)
-	m.router.replace(route, m.settings.ActiveWorktreePath)
+	m.router.replace(tabRoute, m.settings.ActiveWorktreePath)
 	m.ensureTabs()
 	m.histories[m.activeTab] = m.history
 	m.activeTab = tabRoute.Tab
@@ -178,12 +178,20 @@ func replayKeys(model tea.Model, msgs ...tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) tabRouteForRoute(route nav.Route) nav.Route {
 	r := routerTabStateForRoute(route, m.settings.ActiveWorktreePath)
-	return nav.Route{
+	tabRoute := nav.Route{
 		Tab:          r.tabID,
 		WorktreeRoot: r.worktreeRoot,
 		Ref:          r.ref,
 		InitialPath:  r.initialPath,
 	}
+	if route.WorktreeRoot == "" && route.Ref == "" && route.InitialPath == "" {
+		if remembered, ok := m.router.tabs[tabRoute.Tab]; ok {
+			tabRoute.WorktreeRoot = remembered.worktreeRoot
+			tabRoute.Ref = remembered.ref
+			tabRoute.InitialPath = remembered.initialPath
+		}
+	}
+	return tabRoute
 }
 
 func tabForRoute(kind nav.TabID) nav.TabID {

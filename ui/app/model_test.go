@@ -332,6 +332,70 @@ func TestTabSwitchRestoresCommitRouteInLogTab(t *testing.T) {
 	}
 }
 
+func TestRouteChangedUpdatesActiveTabRouteState(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.Route{Tab: nav.TabLog, WorktreeRoot: repoDir, Ref: "HEAD"},
+		ActiveWorktreePath: repoDir,
+	})
+
+	updated, _ := m.Update(nav.RouteChanged(nav.Route{
+		Tab:          nav.TabCommit,
+		WorktreeRoot: repoDir,
+		Ref:          "HEAD~1",
+	})())
+	m = updated.(Model)
+
+	if got := m.lastRouteByTab[nav.TabLog].Ref; got != "HEAD~1" {
+		t.Fatalf("expected log tab ref updated to HEAD~1, got %q", got)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '3', Text: "3"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '2', Text: "2"})
+	m = updated.(Model)
+
+	if got := m.activePage().route.Ref; got != "HEAD~1" {
+		t.Fatalf("expected returning to log to keep updated ref, got %q", got)
+	}
+}
+
+func TestRouteChangedPersistsForInactiveTabAndAppliesOnSwitch(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.Route{Tab: nav.TabStatus, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	updated, _ := m.Update(nav.RouteChanged(nav.Route{
+		Tab:          nav.TabCommit,
+		WorktreeRoot: repoDir,
+		Ref:          "HEAD~2",
+	})())
+	m = updated.(Model)
+
+	if got := m.lastRouteByTab[nav.TabLog].Ref; got != "HEAD~2" {
+		t.Fatalf("expected inactive log tab ref updated to HEAD~2, got %q", got)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '2', Text: "2"})
+	m = updated.(Model)
+
+	if got := m.activePage().route.Ref; got != "HEAD~2" {
+		t.Fatalf("expected switch to log to use updated ref, got %q", got)
+	}
+}
+
 func TestCommitMapsToLogTab(t *testing.T) {
 	if got := tabForRoute(nav.TabCommit); got != nav.TabLog {
 		t.Fatalf("expected commit to map to log tab, got %q", got)
