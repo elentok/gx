@@ -2,8 +2,8 @@ package log
 
 import "github.com/elentok/gx/ui/nav"
 
-func (m Model) CurrentRoute() (nav.Route, bool) {
-	route := nav.Route{
+func (m Model) CurrentViewState() (nav.ViewState, bool) {
+	route := nav.ViewState{
 		Tab:          nav.TabLog,
 		WorktreeRoot: m.worktreeRoot,
 		Ref:          m.startRef,

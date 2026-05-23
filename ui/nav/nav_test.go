@@ -7,7 +7,7 @@ import (
 )
 
 func TestPushAndIsPush(t *testing.T) {
-	route := nav.Route{Tab: nav.TabLog, Ref: "HEAD"}
+	route := nav.ViewState{Tab: nav.TabLog, Ref: "HEAD"}
 	cmd := nav.Open(route)
 	msg := cmd()
 	got, ok := nav.IsOpen(msg)
@@ -20,7 +20,7 @@ func TestPushAndIsPush(t *testing.T) {
 }
 
 func TestReplaceAndIsReplace(t *testing.T) {
-	route := nav.Route{Tab: nav.TabStatus}
+	route := nav.ViewState{Tab: nav.TabStatus}
 	cmd := nav.Switch(route)
 	msg := cmd()
 	got, ok := nav.IsSwitch(msg)

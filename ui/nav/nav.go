@@ -11,7 +11,7 @@ const (
 	TabCommit    TabID = "commit"
 )
 
-type Route struct {
+type ViewState struct {
 	Tab          TabID
 	WorktreeRoot string
 	Ref          string
@@ -23,33 +23,33 @@ type Route struct {
 	FilterEndLine   int
 }
 
-type RouteProvider interface {
-	CurrentRoute() (Route, bool)
+type ViewStateProvider interface {
+	CurrentViewState() (ViewState, bool)
 }
 
 type openMsg struct {
-	Route Route
+	ViewState ViewState
 }
 
 type switchMsg struct {
-	Route Route
+	ViewState ViewState
 }
 
 type backMsg struct{}
 
 type routeChangedMsg struct {
-	Route Route
+	ViewState ViewState
 }
 
-func Open(route Route) tea.Cmd {
+func Open(route ViewState) tea.Cmd {
 	return func() tea.Msg {
-		return openMsg{Route: route}
+		return openMsg{ViewState: route}
 	}
 }
 
-func Switch(route Route) tea.Cmd {
+func Switch(route ViewState) tea.Cmd {
 	return func() tea.Msg {
-		return switchMsg{Route: route}
+		return switchMsg{ViewState: route}
 	}
 }
 
@@ -59,20 +59,20 @@ func Back() tea.Cmd {
 	}
 }
 
-func RouteChanged(route Route) tea.Cmd {
+func ViewStateChanged(route ViewState) tea.Cmd {
 	return func() tea.Msg {
-		return routeChangedMsg{Route: route}
+		return routeChangedMsg{ViewState: route}
 	}
 }
 
-func IsOpen(msg tea.Msg) (Route, bool) {
+func IsOpen(msg tea.Msg) (ViewState, bool) {
 	open, ok := msg.(openMsg)
-	return open.Route, ok
+	return open.ViewState, ok
 }
 
-func IsSwitch(msg tea.Msg) (Route, bool) {
+func IsSwitch(msg tea.Msg) (ViewState, bool) {
 	switchTo, ok := msg.(switchMsg)
-	return switchTo.Route, ok
+	return switchTo.ViewState, ok
 }
 
 func IsBack(msg tea.Msg) bool {
@@ -80,7 +80,7 @@ func IsBack(msg tea.Msg) bool {
 	return ok
 }
 
-func IsRouteChanged(msg tea.Msg) (Route, bool) {
+func IsViewStateChanged(msg tea.Msg) (ViewState, bool) {
 	changed, ok := msg.(routeChangedMsg)
-	return changed.Route, ok
+	return changed.ViewState, ok
 }

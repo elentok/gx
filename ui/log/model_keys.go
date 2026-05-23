@@ -107,7 +107,7 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, nil
 	case bindingGotoHead:
 		if m.startRef != "HEAD" {
-			return m, nav.Switch(nav.Route{Tab: nav.TabLog, WorktreeRoot: m.worktreeRoot, Ref: "HEAD"})
+			return m, nav.Switch(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: m.worktreeRoot, Ref: "HEAD"})
 		}
 		return m, nil
 	case bindingNextTag:

@@ -16,24 +16,24 @@ type routerTabState struct {
 type routerState struct {
 	activeTab nav.TabID
 	tabs      map[nav.TabID]routerTabState
-	histories map[nav.TabID][]nav.Route
-	history   []nav.Route
+	histories map[nav.TabID][]nav.ViewState
+	history   []nav.ViewState
 }
 
-func newRouterState(initialRoute nav.Route, activeWorktreePath string) routerState {
+func newRouterState(initialRoute nav.ViewState, activeWorktreePath string) routerState {
 	if initialRoute.Tab == "" {
-		initialRoute = nav.Route{Tab: nav.TabWorktrees}
+		initialRoute = nav.ViewState{Tab: nav.TabWorktrees}
 	}
 	r := routerState{
 		activeTab: tabForRoute(initialRoute.Tab),
 		tabs:      make(map[nav.TabID]routerTabState),
-		histories: make(map[nav.TabID][]nav.Route),
+		histories: make(map[nav.TabID][]nav.ViewState),
 	}
 	r.ensureTabs()
 	r.tabs[r.activeTab] = routerTabStateForRoute(initialRoute, activeWorktreePath)
 	if initialRoute.Tab == nav.TabCommit {
 		r.history = append(r.history, initialRoute)
-		r.histories[r.activeTab] = append([]nav.Route(nil), r.history...)
+		r.histories[r.activeTab] = append([]nav.ViewState(nil), r.history...)
 	}
 	return r
 }
@@ -47,12 +47,12 @@ func (r *routerState) ensureTabs() {
 	}
 }
 
-func (r *routerState) replace(route nav.Route, activeWorktreePath string) {
+func (r *routerState) replace(route nav.ViewState, activeWorktreePath string) {
 	next := routerTabStateForRoute(route, activeWorktreePath)
 	r.ensureTabs()
-	r.histories[r.activeTab] = append([]nav.Route(nil), r.history...)
+	r.histories[r.activeTab] = append([]nav.ViewState(nil), r.history...)
 	r.activeTab = next.tabID
-	r.history = append([]nav.Route(nil), r.histories[r.activeTab]...)
+	r.history = append([]nav.ViewState(nil), r.histories[r.activeTab]...)
 	current := r.tabs[next.tabID]
 
 	if !sameRouterTabState(current, next) {
@@ -63,28 +63,28 @@ func (r *routerState) replace(route nav.Route, activeWorktreePath string) {
 	}
 }
 
-func (r *routerState) routeChanged(route nav.Route, activeWorktreePath string) {
+func (r *routerState) routeChanged(route nav.ViewState, activeWorktreePath string) {
 	next := routerTabStateForRoute(route, activeWorktreePath)
 	r.ensureTabs()
 	r.tabs[next.tabID] = next
 }
 
-func (r *routerState) push(route nav.Route) {
+func (r *routerState) push(route nav.ViewState) {
 	r.history = append(r.history, route)
-	r.histories[r.activeTab] = append([]nav.Route(nil), r.history...)
+	r.histories[r.activeTab] = append([]nav.ViewState(nil), r.history...)
 }
 
-func (r *routerState) back() (nav.Route, bool) {
+func (r *routerState) back() (nav.ViewState, bool) {
 	if len(r.history) == 0 {
-		return nav.Route{}, false
+		return nav.ViewState{}, false
 	}
 	popped := r.history[len(r.history)-1]
 	r.history = r.history[:len(r.history)-1]
-	r.histories[r.activeTab] = append([]nav.Route(nil), r.history...)
+	r.histories[r.activeTab] = append([]nav.ViewState(nil), r.history...)
 	return popped, true
 }
 
-func routerTabStateForRoute(route nav.Route, activeWorktreePath string) routerTabState {
+func routerTabStateForRoute(route nav.ViewState, activeWorktreePath string) routerTabState {
 	tab := routerTabState{tabID: tabForRoute(route.Tab)}
 	switch tab.tabID {
 	case nav.TabLog, nav.TabCommit:

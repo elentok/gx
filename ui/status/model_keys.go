@@ -182,8 +182,8 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model,
 	return m, nil
 }
 
-func (m Model) filterLogRoute() nav.Route {
-	route := nav.Route{Tab: nav.TabLog, WorktreeRoot: m.worktreeRoot}
+func (m Model) filterLogRoute() nav.ViewState {
+	route := nav.ViewState{Tab: nav.TabLog, WorktreeRoot: m.worktreeRoot}
 	file, ok := m.selectedStatusFile()
 	if !ok {
 		return route

@@ -198,7 +198,7 @@ func runWorktrees(_ string) error {
 		return err
 	}
 	m := app.New(*repo, app.Settings{
-		InitialRoute:       nav.Route{Tab: nav.TabWorktrees},
+		InitialRoute:       nav.ViewState{Tab: nav.TabWorktrees},
 		ActiveWorktreePath: activeWorktreePath,
 		Settings:           settingsFromConfig(cfg),
 	})
@@ -242,7 +242,7 @@ func runStatus(target string) error {
 		return err
 	}
 	m := app.New(*repo, app.Settings{
-		InitialRoute:       nav.Route{Tab: nav.TabStatus, WorktreeRoot: root, InitialPath: initialPath},
+		InitialRoute:       nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: root, InitialPath: initialPath},
 		ActiveWorktreePath: root,
 		Settings:           settingsFromConfig(cfg),
 	})
@@ -279,7 +279,7 @@ func runLog(ref string) error {
 		return err
 	}
 	m := app.New(*repo, app.Settings{
-		InitialRoute:       nav.Route{Tab: nav.TabLog, WorktreeRoot: root, Ref: ref},
+		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: root, Ref: ref},
 		ActiveWorktreePath: root,
 		Settings:           settingsFromConfig(cfg),
 	})
@@ -316,7 +316,7 @@ func runShow(ref string) error {
 		return err
 	}
 	m := app.New(*repo, app.Settings{
-		InitialRoute:       nav.Route{Tab: nav.TabCommit, WorktreeRoot: root, Ref: ref},
+		InitialRoute:       nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: root, Ref: ref},
 		ActiveWorktreePath: root,
 		Settings:           settingsFromConfig(cfg),
 	})

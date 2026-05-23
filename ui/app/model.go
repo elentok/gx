@@ -17,19 +17,19 @@ import (
 )
 
 type Settings struct {
-	InitialRoute       nav.Route
+	InitialRoute       nav.ViewState
 	ActiveWorktreePath string
 	ui.Settings
 }
 
 type historyEntry struct {
-	route nav.Route
+	route nav.ViewState
 	model tea.Model
 }
 
 type livePage struct {
-	model        tea.Model
-	didInit      bool
+	model   tea.Model
+	didInit bool
 }
 
 type Model struct {
@@ -40,26 +40,26 @@ type Model struct {
 	width  int
 	height int
 
-	activeTab       nav.TabID
-	lastRouteByTab  map[nav.TabID]nav.Route
-	livePageByTab   map[nav.TabID]livePage
-	histories       map[nav.TabID][]historyEntry
-	history         []historyEntry
-	keyPrefix       string
-	notify          notify.Model
+	activeTab      nav.TabID
+	lastRouteByTab map[nav.TabID]nav.ViewState
+	livePageByTab  map[nav.TabID]livePage
+	histories      map[nav.TabID][]historyEntry
+	history        []historyEntry
+	keyPrefix      string
+	notify         notify.Model
 }
 
 func New(repo git.Repo, settings Settings) Model {
 	m := Model{
 		repo:           repo,
 		settings:       settings,
-		lastRouteByTab: make(map[nav.TabID]nav.Route),
+		lastRouteByTab: make(map[nav.TabID]nav.ViewState),
 		livePageByTab:  make(map[nav.TabID]livePage),
 		histories:      make(map[nav.TabID][]historyEntry),
 		notify:         notify.New(settings.UseNerdFontIcons),
 	}
 	if m.settings.InitialRoute.Tab == "" {
-		m.settings.InitialRoute = nav.Route{Tab: nav.TabWorktrees}
+		m.settings.InitialRoute = nav.ViewState{Tab: nav.TabWorktrees}
 	}
 	m.router = newRouterState(m.settings.InitialRoute, m.settings.ActiveWorktreePath)
 	m.activeTab = m.router.activeTab
@@ -94,7 +94,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.history = append(m.history, next)
 		return m, tea.Batch(notifyCmd, tea.ClearScreen, next.model.Init(), m.resizeCurrentCmd())
 	}
-	if route, ok := nav.IsRouteChanged(msg); ok {
+	if route, ok := nav.IsViewStateChanged(msg); ok {
 		m.applyRouteChanged(route)
 		return m, notifyCmd
 	}
@@ -217,7 +217,7 @@ func normalizeFrameContent(content string, targetWidth, targetHeight int) string
 	return strings.Join(lines, "\n")
 }
 
-func (m Model) newHistoryEntry(route nav.Route) historyEntry {
+func (m Model) newHistoryEntry(route nav.ViewState) historyEntry {
 	s := m.settings.Settings
 	s.EnableNavigation = true
 	switch route.Tab {
@@ -244,7 +244,7 @@ func (m Model) newHistoryEntry(route nav.Route) historyEntry {
 		fallthrough
 	default:
 		return historyEntry{
-			route: nav.Route{Tab: nav.TabWorktrees},
+			route: nav.ViewState{Tab: nav.TabWorktrees},
 			model: worktrees.NewWithSettings(m.repo, m.settings.ActiveWorktreePath, s),
 		}
 	}
@@ -289,7 +289,7 @@ func (m *Model) restoreLogSelectionFromPoppedPage(popped historyEntry) {
 	m.setActivePage(current)
 }
 
-func (m *Model) applyRouteChanged(route nav.Route) {
+func (m *Model) applyRouteChanged(route nav.ViewState) {
 	tabRoute := m.tabRouteForRoute(route)
 	m.router.routeChanged(route, m.settings.ActiveWorktreePath)
 	m.ensureTabs()

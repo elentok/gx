@@ -7,13 +7,13 @@ import (
 )
 
 func TestRouterReplacePreservesPerTabHistory(t *testing.T) {
-	r := newRouterState(nav.Route{Tab: nav.TabLog, WorktreeRoot: "/repo"}, "/repo")
-	r.push(nav.Route{Tab: nav.TabCommit, WorktreeRoot: "/repo", Ref: "HEAD"})
+	r := newRouterState(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: "/repo"}, "/repo")
+	r.push(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: "/repo", Ref: "HEAD"})
 	if len(r.history) != 1 {
 		t.Fatalf("expected log history depth 1, got %d", len(r.history))
 	}
 
-	r.replace(nav.Route{Tab: nav.TabStatus, WorktreeRoot: "/repo"}, "/repo")
+	r.replace(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: "/repo"}, "/repo")
 	if r.activeTab != nav.TabStatus {
 		t.Fatalf("expected status active tab, got %q", r.activeTab)
 	}
@@ -21,7 +21,7 @@ func TestRouterReplacePreservesPerTabHistory(t *testing.T) {
 		t.Fatalf("expected empty status history after replace, got %d", len(r.history))
 	}
 
-	r.replace(nav.Route{Tab: nav.TabLog, WorktreeRoot: "/repo"}, "/repo")
+	r.replace(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: "/repo"}, "/repo")
 	if r.activeTab != nav.TabLog {
 		t.Fatalf("expected log active tab, got %q", r.activeTab)
 	}
@@ -34,7 +34,7 @@ func TestRouterReplacePreservesPerTabHistory(t *testing.T) {
 }
 
 func TestRouterCommitMapsToLogTab(t *testing.T) {
-	r := newRouterState(nav.Route{Tab: nav.TabCommit, WorktreeRoot: "/repo", Ref: "HEAD"}, "/repo")
+	r := newRouterState(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: "/repo", Ref: "HEAD"}, "/repo")
 	if r.activeTab != nav.TabLog {
 		t.Fatalf("expected commit to map to log tab, got %q", r.activeTab)
 	}

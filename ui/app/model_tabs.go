@@ -15,7 +15,7 @@ import (
 func (m *Model) ensureTabs() {
 	for _, kind := range []nav.TabID{nav.TabWorktrees, nav.TabLog, nav.TabStatus} {
 		if _, ok := m.lastRouteByTab[kind]; !ok {
-			m.lastRouteByTab[kind] = nav.Route{Tab: kind}
+			m.lastRouteByTab[kind] = nav.ViewState{Tab: kind}
 		}
 		if _, ok := m.livePageByTab[kind]; !ok {
 			m.livePageByTab[kind] = livePage{}
@@ -23,7 +23,7 @@ func (m *Model) ensureTabs() {
 	}
 }
 
-func (m Model) switchTab(route nav.Route) (tea.Model, tea.Cmd) {
+func (m Model) switchTab(route nav.ViewState) (tea.Model, tea.Cmd) {
 	tabRoute := m.tabRouteForRoute(route)
 	m.router.replace(tabRoute, m.settings.ActiveWorktreePath)
 	m.ensureTabs()
@@ -33,7 +33,7 @@ func (m Model) switchTab(route nav.Route) (tea.Model, tea.Cmd) {
 	currentPage := m.livePageByTab[tabRoute.Tab]
 	currentRoute := m.lastRouteByTab[tabRoute.Tab]
 	m.lastRouteByTab[tabRoute.Tab] = tabRoute
-	if currentPage.model == nil || !sameTabRouteIdentity(currentRoute, tabRoute) {
+	if currentPage.model == nil || !sameRouteForTab(currentRoute, tabRoute) {
 		m.history = nil
 		m.histories[m.activeTab] = nil
 		currentPage = m.newLivePage(tabRoute)
@@ -121,15 +121,15 @@ func (m *Model) handleShellChordKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 			*m = next.(Model)
 			return true, cmd
 		case "w":
-			next, cmd := m.switchTab(nav.Route{Tab: nav.TabWorktrees})
+			next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabWorktrees})
 			*m = next.(Model)
 			return true, cmd
 		case "l":
-			next, cmd := m.switchTab(nav.Route{Tab: nav.TabLog})
+			next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabLog})
 			*m = next.(Model)
 			return true, cmd
 		case "s":
-			next, cmd := m.switchTab(nav.Route{Tab: nav.TabStatus})
+			next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabStatus})
 			*m = next.(Model)
 			return true, cmd
 		case "esc":
@@ -148,15 +148,15 @@ func (m *Model) handleShellChordKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	}
 	switch key {
 	case "1":
-		next, cmd := m.switchTab(nav.Route{Tab: nav.TabWorktrees})
+		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabWorktrees})
 		*m = next.(Model)
 		return true, cmd
 	case "2":
-		next, cmd := m.switchTab(nav.Route{Tab: nav.TabLog})
+		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabLog})
 		*m = next.(Model)
 		return true, cmd
 	case "3":
-		next, cmd := m.switchTab(nav.Route{Tab: nav.TabStatus})
+		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabStatus})
 		*m = next.(Model)
 		return true, cmd
 	}
@@ -176,9 +176,9 @@ func replayKeys(model tea.Model, msgs ...tea.Msg) (tea.Model, tea.Cmd) {
 	return current, tea.Batch(cmds...)
 }
 
-func (m Model) tabRouteForRoute(route nav.Route) nav.Route {
+func (m Model) tabRouteForRoute(route nav.ViewState) nav.ViewState {
 	r := routerTabStateForRoute(route, m.settings.ActiveWorktreePath)
-	tabRoute := nav.Route{
+	tabRoute := nav.ViewState{
 		Tab:          r.tabID,
 		WorktreeRoot: r.worktreeRoot,
 		Ref:          r.ref,
@@ -205,14 +205,14 @@ func tabForRoute(kind nav.TabID) nav.TabID {
 	}
 }
 
-func sameTabRouteIdentity(a, b nav.Route) bool {
+func sameRouteForTab(a, b nav.ViewState) bool {
 	return a.Tab == b.Tab &&
 		a.WorktreeRoot == b.WorktreeRoot &&
 		a.Ref == b.Ref &&
 		a.InitialPath == b.InitialPath
 }
 
-func (m Model) newLivePage(route nav.Route) livePage {
+func (m Model) newLivePage(route nav.ViewState) livePage {
 	return livePage{
 		model: m.newHistoryEntry(route).model,
 	}
@@ -264,5 +264,5 @@ func (m Model) switchRelativeTab(delta int) (tea.Model, tea.Cmd) {
 	if next >= len(tabs) {
 		next = len(tabs) - 1
 	}
-	return m.switchTab(nav.Route{Tab: tabs[next]})
+	return m.switchTab(nav.ViewState{Tab: tabs[next]})
 }

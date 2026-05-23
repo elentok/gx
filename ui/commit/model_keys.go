@@ -293,8 +293,8 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) filterLogRoute() nav.Route {
-	route := nav.Route{Tab: nav.TabLog, WorktreeRoot: m.worktreeRoot}
+func (m Model) filterLogRoute() nav.ViewState {
+	route := nav.ViewState{Tab: nav.TabLog, WorktreeRoot: m.worktreeRoot}
 	file, ok := m.selectedCommitFile()
 	if !ok {
 		return route

@@ -23,14 +23,14 @@ func (m Model) InputFocused() bool {
 }
 
 func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
-	prevRoute, prevOK := m.CurrentRoute()
+	prevRoute, prevOK := m.CurrentViewState()
 	defer func() {
 		nextModel, ok := next.(Model)
 		if !ok {
 			return
 		}
-		route, routeOK := nextModel.CurrentRoute()
-		cmd = nav.AppendRouteChanged(cmd, m.settings.EnableNavigation, prevRoute, prevOK, route, routeOK)
+		route, routeOK := nextModel.CurrentViewState()
+		cmd = nav.AppendViewStateChanged(cmd, m.settings.EnableNavigation, prevRoute, prevOK, route, routeOK)
 	}()
 
 	if m.pull.IsOpen {

@@ -53,7 +53,7 @@ func (m Model) handleRewordDone(err error) (tea.Model, tea.Cmd) {
 	if err != nil {
 		return m, notify.Error("reword failed: " + err.Error())
 	}
-	return m, nav.Switch(nav.Route{
+	return m, nav.Switch(nav.ViewState{
 		Tab:          nav.TabLog,
 		WorktreeRoot: m.worktreeRoot,
 		Ref:          "HEAD",

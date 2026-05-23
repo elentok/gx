@@ -2,8 +2,8 @@ package commit
 
 import "github.com/elentok/gx/ui/nav"
 
-func (m Model) CurrentRoute() (nav.Route, bool) {
-	return nav.Route{
+func (m Model) CurrentViewState() (nav.ViewState, bool) {
+	return nav.ViewState{
 		Tab:          nav.TabCommit,
 		WorktreeRoot: m.worktreeRoot,
 		Ref:          m.ref,

@@ -111,7 +111,7 @@ func (m Model) openSelected() tea.Cmd {
 		return nil
 	}
 	selected := m.rows[cursor]
-	return nav.Open(nav.Route{
+	return nav.Open(nav.ViewState{
 		Tab:          nav.TabCommit,
 		WorktreeRoot: m.worktreeRoot,
 		Ref:          selected.commit.FullHash,
