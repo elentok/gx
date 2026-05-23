@@ -25,7 +25,7 @@ From the user perspective:
 9. As a user, I want back from commit to return to the right underlying route, so that commit does not need special-case routing rules.
 10. As a user, I want `gw/gl/gs/gc` and `1/2/3/4` to behave symmetrically, so that tab navigation is easy to memorize.
 11. As a maintainer, I want one canonical term for tab identity (`TabID`), so that code and docs share the same mental model.
-12. As a maintainer, I want route identity to exclude UI-only details, so that route payloads remain stable and testable.
+12. As a maintainer, I want route state to exclude UI-only details, so that route payloads remain stable and testable.
 13. As a maintainer, I want app-shell to own navigation state transitions, so that child pages communicate intent rather than mutating routing directly.
 14. As a maintainer, I want child pages to emit live route updates, so that app-shell can restore focus correctly without deep coupling.
 15. As a maintainer, I want to remove commit-to-log tab mapping special cases, so that route-to-tab behavior is explicit and uniform.
@@ -46,7 +46,7 @@ From the user perspective:
   - `Open(route)` for deep navigation
   - `Switch(route)` for tab/session switching
   - `Back()` for reverse deep navigation
-  - `RouteChanged(route)` for live route identity updates from active pages
+  - `RouteChanged(route)` for live route-state updates from active pages
 - Build/modify a deep router-state module that encapsulates transition rules behind a small interface:
   - input events: `Open`, `Switch`, `Back`, `RouteChanged`
   - owned state: global `stack []Route`, `lastRouteByTab map[TabID]Route`, `activeTab`
@@ -67,7 +67,7 @@ From the user perspective:
   - `commit` on current ref changes (` , . `)
   - `status` on selected path changes
 - Preserve contextual quit behavior: `Back` on root route quits.
-- Align terminology in domain glossary with refactor (`TabID`, route identity, selected worktree) to reduce future ambiguity.
+- Align terminology in domain glossary with refactor (`TabID`, route state, selected worktree) to reduce future ambiguity.
 
 ## Testing Decisions
 
@@ -90,7 +90,7 @@ From the user perspective:
 
 - Persisting tab/session route memory across process restarts.
 - Encoding viewport offsets, scroll positions, modal visibility, or other UI internals in routes.
-- Redesigning non-navigation page internals beyond what is needed to emit route identity updates.
+- Redesigning non-navigation page internals beyond what is needed to emit route-state updates.
 - Introducing new visual themes or layout redesigns unrelated to tab/navigation semantics.
 
 ## Further Notes

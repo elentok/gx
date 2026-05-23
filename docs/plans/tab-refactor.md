@@ -26,7 +26,7 @@ and replacing them with one coherent model that matches user expectations.
 - `Open(route)`: deep navigation, pushes onto stack.
 - `Switch(route)`: tab/session switch target, replaces visible route without push.
 - `Back()`: pops one deep level; if at root, quits.
-- `RouteChanged(route)`: emitted by active child model whenever restorable route identity changes.
+- `RouteChanged(route)`: emitted by active child model whenever restorable route state changes.
 
 ## Target Behavior (Critical Scenarios)
 
@@ -133,7 +133,7 @@ Note: no modal state, scroll offsets, or other UI-only state in route payloads.
 
 - Large symbol rename (`Kind` -> `Tab`) can collide with unrelated `Kind` fields; must scope replacements carefully.
 - One-shot refactor may break many tests simultaneously; prioritize compile restoration first, then behavior tests.
-- Route payload growth should be controlled to avoid coupling route identity with UI internals.
+- Route payload growth should be controlled to avoid coupling route state with UI internals.
 
 ## Non-Goals
 
