@@ -8,6 +8,7 @@ const (
 	BindingGotoWorktree keys.BindingID = "app-goto-worktrees-tab"
 	BindingGotoLog      keys.BindingID = "app-goto-log-tab"
 	BindingGotoStatus   keys.BindingID = "app-goto-status-tab"
+	BindingGotoCommit   keys.BindingID = "app-goto-commit-tab"
 )
 
 func Bindings() []keys.Binding {
@@ -17,9 +18,11 @@ func Bindings() []keys.Binding {
 		{ID: BindingGotoWorktree, Seq: []string{"g", "w"}, Categories: []string{"App"}, Title: "worktrees tab"},
 		{ID: BindingGotoLog, Seq: []string{"g", "l"}, Categories: []string{"App"}, Title: "log tab"},
 		{ID: BindingGotoStatus, Seq: []string{"g", "s"}, Categories: []string{"App"}, Title: "status tab"},
+		{ID: BindingGotoCommit, Seq: []string{"g", "c"}, Categories: []string{"App"}, Title: "commit tab"},
 		{ID: BindingGotoWorktree, Seq: []string{"1"}, Categories: []string{"App"}, Title: "worktrees tab"},
 		{ID: BindingGotoLog, Seq: []string{"2"}, Categories: []string{"App"}, Title: "log tab"},
 		{ID: BindingGotoStatus, Seq: []string{"3"}, Categories: []string{"App"}, Title: "status tab"},
+		{ID: BindingGotoCommit, Seq: []string{"4"}, Categories: []string{"App"}, Title: "commit tab"},
 	}
 }
 
@@ -33,5 +36,6 @@ func hintsForPrefix(prefix string) []keys.Binding {
 		{Seq: []string{"w"}, Title: "worktrees tab"},
 		{Seq: []string{"l"}, Title: "log tab"},
 		{Seq: []string{"s"}, Title: "status tab"},
+		{Seq: []string{"c"}, Title: "commit tab"},
 	}
 }

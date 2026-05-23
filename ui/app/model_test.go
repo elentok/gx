@@ -33,8 +33,8 @@ func TestSwitchMsgChangesTabWithoutHistory(t *testing.T) {
 	if m.activeTab != nav.TabStatus {
 		t.Fatalf("expected active tab status, got %q", m.activeTab)
 	}
-	if len(m.history) != 0 {
-		t.Fatalf("expected empty history after tab switch, got %d", len(m.history))
+	if len(m.stack) != 0 {
+		t.Fatalf("expected empty stack after tab switch, got %d", len(m.stack))
 	}
 }
 
@@ -63,8 +63,8 @@ func TestShellChordDirectTabSwitchClearsHistory(t *testing.T) {
 	if m.activeTab != nav.TabWorktrees {
 		t.Fatalf("expected active tab worktrees, got %q", m.activeTab)
 	}
-	if len(m.history) != 0 {
-		t.Fatalf("expected empty history after gw, got %d", len(m.history))
+	if len(m.stack) != 0 {
+		t.Fatalf("expected empty stack after gw, got %d", len(m.stack))
 	}
 }
 
@@ -135,6 +135,12 @@ func TestNumberKeysSwitchTabsGlobally(t *testing.T) {
 	if m.activeTab != nav.TabStatus {
 		t.Fatalf("expected 3 to switch to status, got %q", m.activeTab)
 	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '4', Text: "4"})
+	m = updated.(Model)
+	if m.activeTab != nav.TabCommit {
+		t.Fatalf("expected 4 to switch to commit, got %q", m.activeTab)
+	}
 }
 
 func TestSwitchToUninitializedTabRunsInit(t *testing.T) {
@@ -154,9 +160,9 @@ func TestSwitchToUninitializedTabRunsInit(t *testing.T) {
 		t.Fatalf("expected cached worktrees tab to start uninitialized")
 	}
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	m = updated.(Model)
-	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'w', Text: "w"})
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'w', Text: "w"})
 	if cmd == nil {
 		t.Fatalf("expected init/resize cmd on gw into uninitialized tab")
 	}
@@ -183,11 +189,14 @@ func TestOpenCommitAndBackRestoresTab(t *testing.T) {
 		t.Fatalf("expected init/resize cmd when opening commit page")
 	}
 	m = updated.(Model)
-	if len(m.history) != 1 {
-		t.Fatalf("expected history depth 1, got %d", len(m.history))
+	if len(m.stack) != 1 {
+		t.Fatalf("expected stack depth 1, got %d", len(m.stack))
 	}
 	if got := m.activePage().viewState.Tab; got != nav.TabCommit {
 		t.Fatalf("expected active page commit, got %q", got)
+	}
+	if m.activeTab != nav.TabCommit {
+		t.Fatalf("expected activeTab commit while commit is on stack, got %q", m.activeTab)
 	}
 
 	updated, cmd = m.Update(nav.Back()())
@@ -195,8 +204,8 @@ func TestOpenCommitAndBackRestoresTab(t *testing.T) {
 	if m.activeTab != nav.TabLog {
 		t.Fatalf("expected active tab log after back, got %q", m.activeTab)
 	}
-	if len(m.history) != 0 {
-		t.Fatalf("expected empty history after back, got %d", len(m.history))
+	if len(m.stack) != 0 {
+		t.Fatalf("expected empty stack after back, got %d", len(m.stack))
 	}
 }
 
@@ -256,8 +265,8 @@ func TestOpenStatusAndBackRestoresLogTab(t *testing.T) {
 		t.Fatalf("expected init/resize cmd when opening status page")
 	}
 	m = updated.(Model)
-	if len(m.history) != 1 {
-		t.Fatalf("expected history depth 1, got %d", len(m.history))
+	if len(m.stack) != 1 {
+		t.Fatalf("expected stack depth 1, got %d", len(m.stack))
 	}
 	if got := m.activePage().viewState.Tab; got != nav.TabStatus {
 		t.Fatalf("expected active page status, got %q", got)
@@ -268,12 +277,12 @@ func TestOpenStatusAndBackRestoresLogTab(t *testing.T) {
 	if m.activeTab != nav.TabLog {
 		t.Fatalf("expected active tab log after back, got %q", m.activeTab)
 	}
-	if len(m.history) != 0 {
-		t.Fatalf("expected empty history after back, got %d", len(m.history))
+	if len(m.stack) != 0 {
+		t.Fatalf("expected empty stack after back, got %d", len(m.stack))
 	}
 }
 
-func TestSwitchClearsHistoryAfterOpen(t *testing.T) {
+func TestSwitchAlwaysClearsStack(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -287,21 +296,54 @@ func TestSwitchClearsHistoryAfterOpen(t *testing.T) {
 
 	updated, _ := m.Update(nav.Open(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: repoDir, Ref: "HEAD"})())
 	m = updated.(Model)
-	if len(m.history) != 1 {
-		t.Fatalf("expected history depth 1, got %d", len(m.history))
+	if len(m.stack) != 1 {
+		t.Fatalf("expected stack depth 1 after open, got %d", len(m.stack))
 	}
 
+	// Switch always clears the stack regardless of target tab or ViewContext.
 	updated, _ = m.Update(nav.Switch(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: repoDir})())
 	m = updated.(Model)
 	if m.activeTab != nav.TabStatus {
 		t.Fatalf("expected active tab status, got %q", m.activeTab)
 	}
-	if len(m.history) != 0 {
-		t.Fatalf("expected history cleared after tab switch, got %d", len(m.history))
+	if len(m.stack) != 0 {
+		t.Fatalf("expected stack cleared after tab switch, got %d", len(m.stack))
 	}
 }
 
-func TestSameViewContextDifferentOptionsPreservesHistory(t *testing.T) {
+func TestCommitTabIsFirstClass(t *testing.T) {
+	if got := resolveTabID(nav.TabCommit); got != nav.TabCommit {
+		t.Fatalf("expected commit to map to itself, got %q", got)
+	}
+}
+
+func TestInitialCommitRouteUsesCommitTab(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: repoDir, Ref: "HEAD"},
+		ActiveWorktreePath: repoDir,
+	})
+
+	if got := m.activePage().viewState.Tab; got != nav.TabCommit {
+		t.Fatalf("expected active page commit, got %q", got)
+	}
+	if m.activeTab != nav.TabCommit {
+		t.Fatalf("expected active tab commit, got %q", m.activeTab)
+	}
+	if m.liveTab != nav.TabCommit {
+		t.Fatalf("expected live tab commit, got %q", m.liveTab)
+	}
+	if len(m.stack) != 0 {
+		t.Fatalf("expected empty stack for initial commit route (commit is a live tab), got %d", len(m.stack))
+	}
+}
+
+func TestSwitchToCommitTabRestoresRoute(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -313,80 +355,58 @@ func TestSameViewContextDifferentOptionsPreservesHistory(t *testing.T) {
 		ActiveWorktreePath: repoDir,
 	})
 
-	updated, _ := m.Update(nav.Open(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: repoDir, Ref: "HEAD"})())
-	m = updated.(Model)
-	if len(m.history) != 1 {
-		t.Fatalf("expected history depth 1 after open, got %d", len(m.history))
-	}
-
-	// Switch to same tab with same ViewContext but different ViewOptions (FocusSubject).
-	// ViewOptions changes must NOT trigger page reconstruction, so history is preserved.
-	updated, _ = m.Update(nav.Switch(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir, FocusSubject: "some.go"})())
-	m = updated.(Model)
-	if len(m.history) != 1 {
-		t.Fatalf("expected history preserved when ViewContext unchanged, got %d", len(m.history))
-	}
-}
-
-func TestDifferentViewContextClearsHistory(t *testing.T) {
-	repoDir := testutil.TempRepo(t)
-	repo, err := git.FindRepo(repoDir)
-	if err != nil {
-		t.Fatalf("FindRepo: %v", err)
-	}
-
-	m := New(*repo, Settings{
-		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir},
-		ActiveWorktreePath: repoDir,
-	})
-
-	updated, _ := m.Update(nav.Open(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: repoDir, Ref: "HEAD"})())
-	m = updated.(Model)
-	if len(m.history) != 1 {
-		t.Fatalf("expected history depth 1 after open, got %d", len(m.history))
-	}
-
-	// Switch to same tab with a different ViewContext (Ref changed).
-	// ViewContext changes MUST trigger page reconstruction, so history is cleared.
-	updated, _ = m.Update(nav.Switch(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir, Ref: "HEAD~1"})())
-	m = updated.(Model)
-	if len(m.history) != 0 {
-		t.Fatalf("expected history cleared when ViewContext changed, got %d", len(m.history))
-	}
-}
-
-func TestTabSwitchRestoresCommitRouteInLogTab(t *testing.T) {
-	repoDir := testutil.TempRepo(t)
-	repo, err := git.FindRepo(repoDir)
-	if err != nil {
-		t.Fatalf("FindRepo: %v", err)
-	}
-
-	m := New(*repo, Settings{
-		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir},
-		ActiveWorktreePath: repoDir,
-	})
-
+	// Open commit from log.
 	updated, _ := m.Update(nav.Open(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: repoDir, Ref: "HEAD"})())
 	m = updated.(Model)
 	if got := m.activePage().viewState.Tab; got != nav.TabCommit {
 		t.Fatalf("expected commit page after Open, got %q", got)
 	}
 
+	// Switch away to status — clears stack, liveTab=status.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: '3', Text: "3"})
 	m = updated.(Model)
-	if got := m.activePage().viewState.Tab; got != nav.TabStatus {
-		t.Fatalf("expected status page after switching tab, got %q", got)
+	if m.activeTab != nav.TabStatus {
+		t.Fatalf("expected status after pressing 3, got %q", m.activeTab)
 	}
 
-	updated, _ = m.Update(tea.KeyPressMsg{Code: '2', Text: "2"})
+	// Switch to commit tab (4) — should restore remembered commit route.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '4', Text: "4"})
 	m = updated.(Model)
+	if m.activeTab != nav.TabCommit {
+		t.Fatalf("expected commit tab after pressing 4, got %q", m.activeTab)
+	}
 	if got := m.activePage().viewState.Tab; got != nav.TabCommit {
-		t.Fatalf("expected returning to log tab to restore commit page, got %q", got)
+		t.Fatalf("expected commit page after switching to commit tab, got %q", got)
 	}
 }
 
-func TestViewStateChangedUpdatesActiveTabViewState(t *testing.T) {
+func TestGotoCommitWithNoHistoryDefaultsToHEAD(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	// Switch directly to commit tab without any prior Open — should default to HEAD.
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: '4', Text: "4"})
+	if cmd == nil {
+		t.Fatalf("expected cmd when switching to commit tab")
+	}
+	m = updated.(Model)
+	if m.activeTab != nav.TabCommit {
+		t.Fatalf("expected commit tab, got %q", m.activeTab)
+	}
+	if got := m.activePage().viewState.Ref; got != "HEAD" {
+		t.Fatalf("expected commit ref HEAD (default), got %q", got)
+	}
+}
+
+func TestViewStateChangedUpdatesCommitTabState(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -405,17 +425,18 @@ func TestViewStateChangedUpdatesActiveTabViewState(t *testing.T) {
 	})())
 	m = updated.(Model)
 
-	if got := m.lastViewStateByTab[nav.TabLog].Ref; got != "HEAD~1" {
-		t.Fatalf("expected log tab ref updated to HEAD~1, got %q", got)
+	if got := m.lastViewStateByTab[nav.TabCommit].Ref; got != "HEAD~1" {
+		t.Fatalf("expected commit tab ref updated to HEAD~1, got %q", got)
 	}
 
+	// Switch to status then to commit — should restore the remembered ref.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: '3', Text: "3"})
 	m = updated.(Model)
-	updated, _ = m.Update(tea.KeyPressMsg{Code: '2', Text: "2"})
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '4', Text: "4"})
 	m = updated.(Model)
 
 	if got := m.activePage().viewState.Ref; got != "HEAD~1" {
-		t.Fatalf("expected returning to log to keep updated ref, got %q", got)
+		t.Fatalf("expected returning to commit to keep updated ref, got %q", got)
 	}
 }
 
@@ -438,44 +459,16 @@ func TestViewStateChangedPersistsForInactiveTabAndAppliesOnSwitch(t *testing.T) 
 	})())
 	m = updated.(Model)
 
-	if got := m.lastViewStateByTab[nav.TabLog].Ref; got != "HEAD~2" {
-		t.Fatalf("expected inactive log tab ref updated to HEAD~2, got %q", got)
+	if got := m.lastViewStateByTab[nav.TabCommit].Ref; got != "HEAD~2" {
+		t.Fatalf("expected commit tab ref updated to HEAD~2, got %q", got)
 	}
 
-	updated, _ = m.Update(tea.KeyPressMsg{Code: '2', Text: "2"})
+	// Switch to commit tab — should use the remembered ref.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '4', Text: "4"})
 	m = updated.(Model)
 
 	if got := m.activePage().viewState.Ref; got != "HEAD~2" {
-		t.Fatalf("expected switch to log to use updated ref, got %q", got)
-	}
-}
-
-func TestCommitMapsToLogTab(t *testing.T) {
-	if got := resolveTabID(nav.TabCommit); got != nav.TabLog {
-		t.Fatalf("expected commit to map to log tab, got %q", got)
-	}
-}
-
-func TestInitialCommitRouteStartsOnCommitPage(t *testing.T) {
-	repoDir := testutil.TempRepo(t)
-	repo, err := git.FindRepo(repoDir)
-	if err != nil {
-		t.Fatalf("FindRepo: %v", err)
-	}
-
-	m := New(*repo, Settings{
-		InitialRoute:       nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: repoDir, Ref: "HEAD"},
-		ActiveWorktreePath: repoDir,
-	})
-
-	if got := m.activePage().viewState.Tab; got != nav.TabCommit {
-		t.Fatalf("expected active page commit, got %q", got)
-	}
-	if m.activeTab != nav.TabLog {
-		t.Fatalf("expected active tab log for commit-backed page, got %q", m.activeTab)
-	}
-	if len(m.history) != 1 {
-		t.Fatalf("expected initial commit route in history, got %d", len(m.history))
+		t.Fatalf("expected switch to commit to use updated ref, got %q", got)
 	}
 }
 
@@ -514,11 +507,11 @@ func TestViewAppendsTabs(t *testing.T) {
 		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir},
 		ActiveWorktreePath: repoDir,
 	})
-	m.width = 80
+	m.width = 120
 	m.height = 24
 
 	view := ansi.Strip(m.View().Content)
-	for _, want := range []string{"worktrees", "log", "status"} {
+	for _, want := range []string{"worktrees", "log", "status", "commit"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("expected tabs to include %q in %q", want, view)
 		}
@@ -562,7 +555,7 @@ func TestViewMergesTabsIntoFooterLine(t *testing.T) {
 		InitialRoute:       nav.ViewState{Tab: nav.TabWorktrees},
 		ActiveWorktreePath: repoDir,
 	})
-	m.width = 80
+	m.width = 120
 	m.height = 24
 
 	lines := strings.Split(ansi.Strip(m.View().Content), "\n")
@@ -586,12 +579,12 @@ func TestTabsUseBadgeCapsInFooter(t *testing.T) {
 		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir},
 		ActiveWorktreePath: repoDir,
 	})
-	m.width = 80
+	m.width = 120
 	m.height = 24
 
 	last := strings.Split(m.View().Content, "\n")
 	footer := last[len(last)-1]
-	if !strings.Contains(footer, "\uE0B6") || !strings.Contains(footer, "\uE0B4") {
+	if !strings.Contains(footer, "") || !strings.Contains(footer, "") {
 		t.Fatalf("expected pill badge caps in footer tabs")
 	}
 }
@@ -637,7 +630,7 @@ func TestInjectTabsIntoFooterUsesEllipsisForRightTruncation(t *testing.T) {
 
 func TestInjectTabsIntoFooterIgnoresRightLineLeadingPadding(t *testing.T) {
 	width := 90
-	tabs := " worktrees   log   status "
+	tabs := " worktrees   log   status "
 	right := strings.Repeat(" ", 120) + "· 󰉸 context: 1 · filetree · ? help"
 	content := "body\n" + right
 
@@ -655,7 +648,7 @@ func TestInjectTabsIntoFooterIgnoresRightLineLeadingPadding(t *testing.T) {
 
 func TestInjectTabsIntoFooterPreservesRightHintTailWithStatusPrefix(t *testing.T) {
 	width := 90
-	tabs := " worktrees   log   status "
+	tabs := " worktrees   log   status "
 	right := "staged README.md" + strings.Repeat(" ", 20) + "· 󰉸 context: 1 · filetree · ? help"
 	content := "body\n" + right
 

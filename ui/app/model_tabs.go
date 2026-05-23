@@ -25,17 +25,18 @@ func (m *Model) ensureTabs() {
 
 func (m Model) switchTab(viewState nav.ViewState) (tea.Model, tea.Cmd) {
 	tabViewState := m.tabViewStateForViewContext(viewState.Context())
-	m.router.replace(tabViewState, m.settings.ActiveWorktreePath)
-	m.ensureTabs()
-	m.histories[m.activeTab] = m.history
+
+	// Clear global stack — tab switch exits the current deep-navigation session.
+	m.stack = nil
+	m.liveTab = tabViewState.Tab
 	m.activeTab = tabViewState.Tab
-	m.history = m.histories[m.activeTab]
+	m.ensureTabs()
+
 	currentPage := m.livePageByTab[tabViewState.Tab]
-	currentViewState := m.lastViewStateByTab[tabViewState.Tab]
+	prevViewState := m.lastViewStateByTab[tabViewState.Tab]
 	m.lastViewStateByTab[tabViewState.Tab] = tabViewState
-	if currentPage.model == nil || !sameViewContext(currentViewState.Context(), tabViewState.Context()) {
-		m.history = nil
-		m.histories[m.activeTab] = nil
+
+	if currentPage.model == nil || !sameViewContext(prevViewState.Context(), tabViewState.Context()) {
 		currentPage = m.newLivePage(tabViewState)
 		currentPage.didInit = true
 		m.livePageByTab[tabViewState.Tab] = currentPage
@@ -132,6 +133,10 @@ func (m *Model) handleShellChordKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 			next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabStatus})
 			*m = next.(Model)
 			return true, cmd
+		case "c":
+			next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabCommit})
+			*m = next.(Model)
+			return true, cmd
 		case "esc":
 			return true, nil
 		default:
@@ -159,6 +164,10 @@ func (m *Model) handleShellChordKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabStatus})
 		*m = next.(Model)
 		return true, cmd
+	case "4":
+		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabCommit})
+		*m = next.(Model)
+		return true, cmd
 	}
 	return false, nil
 }
@@ -177,29 +186,45 @@ func replayKeys(model tea.Model, msgs ...tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) tabViewStateForViewContext(ctx nav.ViewContext) nav.ViewState {
-	r := tabContextForViewContext(ctx, m.settings.ActiveWorktreePath)
-	tabViewState := nav.ViewState{
-		Tab:          r.tabID,
-		WorktreeRoot: r.worktreeRoot,
-		Ref:          r.ref,
-		InitialPath:  r.initialPath,
-	}
-	if ctx.WorktreeRoot == "" && ctx.Ref == "" && ctx.InitialPath == "" {
-		if remembered, ok := m.router.tabs[tabViewState.Tab]; ok {
-			tabViewState.WorktreeRoot = remembered.worktreeRoot
-			tabViewState.Ref = remembered.ref
-			tabViewState.InitialPath = remembered.initialPath
+	tabID := resolveTabID(ctx.Tab)
+	tabViewState := nav.ViewState{Tab: tabID}
+
+	switch tabID {
+	case nav.TabLog, nav.TabCommit:
+		tabViewState.WorktreeRoot = ctx.WorktreeRoot
+		tabViewState.Ref = ctx.Ref
+		if strings.TrimSpace(tabViewState.WorktreeRoot) == "" {
+			tabViewState.WorktreeRoot = m.settings.ActiveWorktreePath
+		}
+	case nav.TabStatus:
+		tabViewState.WorktreeRoot = ctx.WorktreeRoot
+		tabViewState.InitialPath = ctx.InitialPath
+		if strings.TrimSpace(tabViewState.WorktreeRoot) == "" {
+			tabViewState.WorktreeRoot = m.settings.ActiveWorktreePath
 		}
 	}
+
+	// If context has no specific routing info, restore from per-tab memory.
+	if ctx.WorktreeRoot == "" && ctx.Ref == "" && ctx.InitialPath == "" {
+		if remembered, ok := m.lastViewStateByTab[tabID]; ok {
+			tabViewState.WorktreeRoot = remembered.WorktreeRoot
+			tabViewState.Ref = remembered.Ref
+			tabViewState.InitialPath = remembered.InitialPath
+		}
+	}
+
+	// Commit tab requires a ref — default to HEAD when none is available.
+	if tabID == nav.TabCommit && tabViewState.Ref == "" {
+		tabViewState.Ref = "HEAD"
+	}
+
 	return tabViewState
 }
 
 func resolveTabID(kind nav.TabID) nav.TabID {
 	switch kind {
-	case nav.TabWorktrees, nav.TabLog, nav.TabStatus:
+	case nav.TabWorktrees, nav.TabLog, nav.TabStatus, nav.TabCommit:
 		return kind
-	case nav.TabCommit:
-		return nav.TabLog
 	default:
 		return nav.TabWorktrees
 	}
@@ -220,6 +245,7 @@ func (m Model) tabsView() string {
 		{label: "worktrees", active: m.activeTab == nav.TabWorktrees},
 		{label: "log", active: m.activeTab == nav.TabLog},
 		{label: "status", active: m.activeTab == nav.TabStatus},
+		{label: "commit", active: m.activeTab == nav.TabCommit},
 	}
 	parts := make([]string, 0, len(tabs))
 	for _, tab := range tabs {
@@ -242,7 +268,7 @@ func renderTab(tab tabSpec) string {
 }
 
 func orderedTabs() []nav.TabID {
-	return []nav.TabID{nav.TabWorktrees, nav.TabLog, nav.TabStatus}
+	return []nav.TabID{nav.TabWorktrees, nav.TabLog, nav.TabStatus, nav.TabCommit}
 }
 
 func (m Model) switchRelativeTab(delta int) (tea.Model, tea.Cmd) {
