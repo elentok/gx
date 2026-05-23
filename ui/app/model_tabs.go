@@ -14,8 +14,8 @@ import (
 
 func (m *Model) ensureTabs() {
 	for _, kind := range []nav.TabID{nav.TabWorktrees, nav.TabLog, nav.TabStatus} {
-		if _, ok := m.lastRouteByTab[kind]; !ok {
-			m.lastRouteByTab[kind] = nav.ViewState{Tab: kind}
+		if _, ok := m.lastViewStateByTab[kind]; !ok {
+			m.lastViewStateByTab[kind] = nav.ViewState{Tab: kind}
 		}
 		if _, ok := m.livePageByTab[kind]; !ok {
 			m.livePageByTab[kind] = livePage{}
@@ -23,33 +23,33 @@ func (m *Model) ensureTabs() {
 	}
 }
 
-func (m Model) switchTab(route nav.ViewState) (tea.Model, tea.Cmd) {
-	tabRoute := m.tabRouteForRoute(route)
-	m.router.replace(tabRoute, m.settings.ActiveWorktreePath)
+func (m Model) switchTab(viewState nav.ViewState) (tea.Model, tea.Cmd) {
+	tabViewState := m.tabViewStateForViewState(viewState)
+	m.router.replace(tabViewState, m.settings.ActiveWorktreePath)
 	m.ensureTabs()
 	m.histories[m.activeTab] = m.history
-	m.activeTab = tabRoute.Tab
+	m.activeTab = tabViewState.Tab
 	m.history = m.histories[m.activeTab]
-	currentPage := m.livePageByTab[tabRoute.Tab]
-	currentRoute := m.lastRouteByTab[tabRoute.Tab]
-	m.lastRouteByTab[tabRoute.Tab] = tabRoute
-	if currentPage.model == nil || !sameRouteForTab(currentRoute, tabRoute) {
+	currentPage := m.livePageByTab[tabViewState.Tab]
+	currentViewState := m.lastViewStateByTab[tabViewState.Tab]
+	m.lastViewStateByTab[tabViewState.Tab] = tabViewState
+	if currentPage.model == nil || !sameViewContext(currentViewState, tabViewState) {
 		m.history = nil
 		m.histories[m.activeTab] = nil
-		currentPage = m.newLivePage(tabRoute)
+		currentPage = m.newLivePage(tabViewState)
 		currentPage.didInit = true
-		m.livePageByTab[tabRoute.Tab] = currentPage
+		m.livePageByTab[tabViewState.Tab] = currentPage
 		return m, tea.Batch(tea.ClearScreen, currentPage.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
 	}
 	if !currentPage.didInit {
 		currentPage.didInit = true
-		m.livePageByTab[tabRoute.Tab] = currentPage
+		m.livePageByTab[tabViewState.Tab] = currentPage
 		return m, tea.Batch(tea.ClearScreen, currentPage.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
 	}
-	if route.FocusSubject != "" {
+	if viewState.FocusSubject != "" {
 		if logModel, ok := currentPage.model.(logui.Model); ok {
-			currentPage.model = logModel.WithPendingFocus(route.FocusSubject)
-			m.livePageByTab[tabRoute.Tab] = currentPage
+			currentPage.model = logModel.WithPendingFocus(viewState.FocusSubject)
+			m.livePageByTab[tabViewState.Tab] = currentPage
 		}
 	}
 	return m, tea.Batch(tea.ClearScreen, m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
@@ -176,22 +176,22 @@ func replayKeys(model tea.Model, msgs ...tea.Msg) (tea.Model, tea.Cmd) {
 	return current, tea.Batch(cmds...)
 }
 
-func (m Model) tabRouteForRoute(route nav.ViewState) nav.ViewState {
-	r := routerTabStateForRoute(route, m.settings.ActiveWorktreePath)
-	tabRoute := nav.ViewState{
+func (m Model) tabViewStateForViewState(viewState nav.ViewState) nav.ViewState {
+	r := tabContextForViewState(viewState, m.settings.ActiveWorktreePath)
+	tabViewState := nav.ViewState{
 		Tab:          r.tabID,
 		WorktreeRoot: r.worktreeRoot,
 		Ref:          r.ref,
 		InitialPath:  r.initialPath,
 	}
-	if route.WorktreeRoot == "" && route.Ref == "" && route.InitialPath == "" {
-		if remembered, ok := m.router.tabs[tabRoute.Tab]; ok {
-			tabRoute.WorktreeRoot = remembered.worktreeRoot
-			tabRoute.Ref = remembered.ref
-			tabRoute.InitialPath = remembered.initialPath
+	if viewState.WorktreeRoot == "" && viewState.Ref == "" && viewState.InitialPath == "" {
+		if remembered, ok := m.router.tabs[tabViewState.Tab]; ok {
+			tabViewState.WorktreeRoot = remembered.worktreeRoot
+			tabViewState.Ref = remembered.ref
+			tabViewState.InitialPath = remembered.initialPath
 		}
 	}
-	return tabRoute
+	return tabViewState
 }
 
 func tabForRoute(kind nav.TabID) nav.TabID {
@@ -205,16 +205,16 @@ func tabForRoute(kind nav.TabID) nav.TabID {
 	}
 }
 
-func sameRouteForTab(a, b nav.ViewState) bool {
+func sameViewContext(a, b nav.ViewState) bool {
 	return a.Tab == b.Tab &&
 		a.WorktreeRoot == b.WorktreeRoot &&
 		a.Ref == b.Ref &&
 		a.InitialPath == b.InitialPath
 }
 
-func (m Model) newLivePage(route nav.ViewState) livePage {
+func (m Model) newLivePage(viewState nav.ViewState) livePage {
 	return livePage{
-		model: m.newHistoryEntry(route).model,
+		model: m.newHistoryEntry(viewState).model,
 	}
 }
 

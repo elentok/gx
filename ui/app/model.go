@@ -23,8 +23,8 @@ type Settings struct {
 }
 
 type historyEntry struct {
-	route nav.ViewState
-	model tea.Model
+	viewState nav.ViewState
+	model     tea.Model
 }
 
 type livePage struct {
@@ -40,23 +40,23 @@ type Model struct {
 	width  int
 	height int
 
-	activeTab      nav.TabID
-	lastRouteByTab map[nav.TabID]nav.ViewState
-	livePageByTab  map[nav.TabID]livePage
-	histories      map[nav.TabID][]historyEntry
-	history        []historyEntry
-	keyPrefix      string
-	notify         notify.Model
+	activeTab          nav.TabID
+	lastViewStateByTab map[nav.TabID]nav.ViewState
+	livePageByTab      map[nav.TabID]livePage
+	histories          map[nav.TabID][]historyEntry
+	history            []historyEntry
+	keyPrefix          string
+	notify             notify.Model
 }
 
 func New(repo git.Repo, settings Settings) Model {
 	m := Model{
-		repo:           repo,
-		settings:       settings,
-		lastRouteByTab: make(map[nav.TabID]nav.ViewState),
-		livePageByTab:  make(map[nav.TabID]livePage),
-		histories:      make(map[nav.TabID][]historyEntry),
-		notify:         notify.New(settings.UseNerdFontIcons),
+		repo:               repo,
+		settings:           settings,
+		lastViewStateByTab: make(map[nav.TabID]nav.ViewState),
+		livePageByTab:      make(map[nav.TabID]livePage),
+		histories:          make(map[nav.TabID][]historyEntry),
+		notify:             notify.New(settings.UseNerdFontIcons),
 	}
 	if m.settings.InitialRoute.Tab == "" {
 		m.settings.InitialRoute = nav.ViewState{Tab: nav.TabWorktrees}
@@ -64,10 +64,10 @@ func New(repo git.Repo, settings Settings) Model {
 	m.router = newRouterState(m.settings.InitialRoute, m.settings.ActiveWorktreePath)
 	m.activeTab = m.router.activeTab
 	m.ensureTabs()
-	initialRoute := m.tabRouteForRoute(m.settings.InitialRoute)
+	initialRoute := m.tabViewStateForViewState(m.settings.InitialRoute)
 	page := m.newLivePage(initialRoute)
 	page.didInit = true
-	m.lastRouteByTab[m.activeTab] = initialRoute
+	m.lastViewStateByTab[m.activeTab] = initialRoute
 	m.livePageByTab[m.activeTab] = page
 	if m.settings.InitialRoute.Tab == nav.TabCommit {
 		m.history = append(m.history, m.newHistoryEntry(m.settings.InitialRoute))
@@ -95,7 +95,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(notifyCmd, tea.ClearScreen, next.model.Init(), m.resizeCurrentCmd())
 	}
 	if route, ok := nav.IsViewStateChanged(msg); ok {
-		m.applyRouteChanged(route)
+		m.applyViewStateChanged(route)
 		return m, notifyCmd
 	}
 	if nav.IsBack(msg) {
@@ -166,11 +166,11 @@ func (m Model) activePage() historyEntry {
 	if len(m.history) > 0 {
 		return m.history[len(m.history)-1]
 	}
-	route := m.lastRouteByTab[m.activeTab]
+	viewState := m.lastViewStateByTab[m.activeTab]
 	page := m.livePageByTab[m.activeTab]
 	return historyEntry{
-		route: route,
-		model: page.model,
+		viewState: viewState,
+		model:     page.model,
 	}
 }
 
@@ -217,35 +217,35 @@ func normalizeFrameContent(content string, targetWidth, targetHeight int) string
 	return strings.Join(lines, "\n")
 }
 
-func (m Model) newHistoryEntry(route nav.ViewState) historyEntry {
+func (m Model) newHistoryEntry(viewState nav.ViewState) historyEntry {
 	s := m.settings.Settings
 	s.EnableNavigation = true
-	switch route.Tab {
+	switch viewState.Tab {
 	case nav.TabStatus:
 		return historyEntry{
-			route: route,
-			model: statusui.NewModel(route.WorktreeRoot, s, route.InitialPath, keys.New(Bindings())),
+			viewState: viewState,
+			model:     statusui.NewModel(viewState.WorktreeRoot, s, viewState.InitialPath, keys.New(Bindings())),
 		}
 	case nav.TabLog:
 		return historyEntry{
-			route: route,
-			model: logui.NewModel(route.WorktreeRoot, route.Ref, s, logui.LogFilter{
-				Path:      route.FilterPath,
-				StartLine: route.FilterStartLine,
-				EndLine:   route.FilterEndLine,
+			viewState: viewState,
+			model: logui.NewModel(viewState.WorktreeRoot, viewState.Ref, s, logui.LogFilter{
+				Path:      viewState.FilterPath,
+				StartLine: viewState.FilterStartLine,
+				EndLine:   viewState.FilterEndLine,
 			}, keys.New(Bindings())),
 		}
 	case nav.TabCommit:
 		return historyEntry{
-			route: route,
-			model: commitui.NewModel(route.WorktreeRoot, route.Ref, route.FilterPath, s, keys.New(Bindings())),
+			viewState: viewState,
+			model:     commitui.NewModel(viewState.WorktreeRoot, viewState.Ref, viewState.FilterPath, s, keys.New(Bindings())),
 		}
 	case nav.TabWorktrees:
 		fallthrough
 	default:
 		return historyEntry{
-			route: nav.ViewState{Tab: nav.TabWorktrees},
-			model: worktrees.NewWithSettings(m.repo, m.settings.ActiveWorktreePath, s),
+			viewState: nav.ViewState{Tab: nav.TabWorktrees},
+			model:     worktrees.NewWithSettings(m.repo, m.settings.ActiveWorktreePath, s),
 		}
 	}
 }
@@ -278,7 +278,7 @@ func (m *Model) restoreLogSelectionFromPoppedPage(popped historyEntry) {
 		return
 	}
 	current := m.activePage()
-	if current.route.Tab != nav.TabLog {
+	if current.viewState.Tab != nav.TabLog {
 		return
 	}
 	logModel, ok := current.model.(logui.Model)
@@ -289,9 +289,9 @@ func (m *Model) restoreLogSelectionFromPoppedPage(popped historyEntry) {
 	m.setActivePage(current)
 }
 
-func (m *Model) applyRouteChanged(route nav.ViewState) {
-	tabRoute := m.tabRouteForRoute(route)
-	m.router.routeChanged(route, m.settings.ActiveWorktreePath)
+func (m *Model) applyViewStateChanged(viewState nav.ViewState) {
+	tabViewState := m.tabViewStateForViewState(viewState)
+	m.router.viewStateChanged(viewState, m.settings.ActiveWorktreePath)
 	m.ensureTabs()
-	m.lastRouteByTab[tabRoute.Tab] = tabRoute
+	m.lastViewStateByTab[tabViewState.Tab] = tabViewState
 }

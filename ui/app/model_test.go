@@ -186,7 +186,7 @@ func TestPushCommitAndBackRestoresTab(t *testing.T) {
 	if len(m.history) != 1 {
 		t.Fatalf("expected history depth 1, got %d", len(m.history))
 	}
-	if got := m.activePage().route.Tab; got != nav.TabCommit {
+	if got := m.activePage().viewState.Tab; got != nav.TabCommit {
 		t.Fatalf("expected active page commit, got %q", got)
 	}
 
@@ -259,7 +259,7 @@ func TestPushStatusAndBackRestoresLogTab(t *testing.T) {
 	if len(m.history) != 1 {
 		t.Fatalf("expected history depth 1, got %d", len(m.history))
 	}
-	if got := m.activePage().route.Tab; got != nav.TabStatus {
+	if got := m.activePage().viewState.Tab; got != nav.TabStatus {
 		t.Fatalf("expected active page status, got %q", got)
 	}
 
@@ -315,19 +315,19 @@ func TestTabSwitchRestoresCommitRouteInLogTab(t *testing.T) {
 
 	updated, _ := m.Update(nav.Open(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: repoDir, Ref: "HEAD"})())
 	m = updated.(Model)
-	if got := m.activePage().route.Tab; got != nav.TabCommit {
+	if got := m.activePage().viewState.Tab; got != nav.TabCommit {
 		t.Fatalf("expected commit page after push, got %q", got)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: '3', Text: "3"})
 	m = updated.(Model)
-	if got := m.activePage().route.Tab; got != nav.TabStatus {
+	if got := m.activePage().viewState.Tab; got != nav.TabStatus {
 		t.Fatalf("expected status page after switching tab, got %q", got)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: '2', Text: "2"})
 	m = updated.(Model)
-	if got := m.activePage().route.Tab; got != nav.TabCommit {
+	if got := m.activePage().viewState.Tab; got != nav.TabCommit {
 		t.Fatalf("expected returning to log tab to restore commit page, got %q", got)
 	}
 }
@@ -351,7 +351,7 @@ func TestRouteChangedUpdatesActiveTabRouteState(t *testing.T) {
 	})())
 	m = updated.(Model)
 
-	if got := m.lastRouteByTab[nav.TabLog].Ref; got != "HEAD~1" {
+	if got := m.lastViewStateByTab[nav.TabLog].Ref; got != "HEAD~1" {
 		t.Fatalf("expected log tab ref updated to HEAD~1, got %q", got)
 	}
 
@@ -360,7 +360,7 @@ func TestRouteChangedUpdatesActiveTabRouteState(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: '2', Text: "2"})
 	m = updated.(Model)
 
-	if got := m.activePage().route.Ref; got != "HEAD~1" {
+	if got := m.activePage().viewState.Ref; got != "HEAD~1" {
 		t.Fatalf("expected returning to log to keep updated ref, got %q", got)
 	}
 }
@@ -384,14 +384,14 @@ func TestRouteChangedPersistsForInactiveTabAndAppliesOnSwitch(t *testing.T) {
 	})())
 	m = updated.(Model)
 
-	if got := m.lastRouteByTab[nav.TabLog].Ref; got != "HEAD~2" {
+	if got := m.lastViewStateByTab[nav.TabLog].Ref; got != "HEAD~2" {
 		t.Fatalf("expected inactive log tab ref updated to HEAD~2, got %q", got)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: '2', Text: "2"})
 	m = updated.(Model)
 
-	if got := m.activePage().route.Ref; got != "HEAD~2" {
+	if got := m.activePage().viewState.Ref; got != "HEAD~2" {
 		t.Fatalf("expected switch to log to use updated ref, got %q", got)
 	}
 }
@@ -414,7 +414,7 @@ func TestInitialCommitRouteStartsOnCommitPage(t *testing.T) {
 		ActiveWorktreePath: repoDir,
 	})
 
-	if got := m.activePage().route.Tab; got != nav.TabCommit {
+	if got := m.activePage().viewState.Tab; got != nav.TabCommit {
 		t.Fatalf("expected active page commit, got %q", got)
 	}
 	if m.activeTab != nav.TabLog {
