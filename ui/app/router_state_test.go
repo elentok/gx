@@ -6,7 +6,7 @@ import (
 	"github.com/elentok/gx/ui/nav"
 )
 
-func TestRouterReplacePreservesPerTabHistory(t *testing.T) {
+func TestRouterSwitchPreservesPerTabHistory(t *testing.T) {
 	r := newRouterState(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: "/repo"}, "/repo")
 	r.push(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: "/repo", Ref: "HEAD"})
 	if len(r.history) != 1 {

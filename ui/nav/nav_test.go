@@ -6,29 +6,29 @@ import (
 	"github.com/elentok/gx/ui/nav"
 )
 
-func TestPushAndIsPush(t *testing.T) {
+func TestOpenAndIsOpen(t *testing.T) {
 	route := nav.ViewState{Tab: nav.TabLog, Ref: "HEAD"}
 	cmd := nav.Open(route)
 	msg := cmd()
 	got, ok := nav.IsOpen(msg)
 	if !ok {
-		t.Fatal("expected IsPush=true")
+		t.Fatal("expected IsOpen=true")
 	}
 	if got.Tab != nav.TabLog || got.Ref != "HEAD" {
-		t.Errorf("IsPush route = %+v, want {TabLog, HEAD}", got)
+		t.Errorf("IsOpen route = %+v, want {TabLog, HEAD}", got)
 	}
 }
 
-func TestReplaceAndIsReplace(t *testing.T) {
+func TestSwitchAndIsSwitch(t *testing.T) {
 	route := nav.ViewState{Tab: nav.TabStatus}
 	cmd := nav.Switch(route)
 	msg := cmd()
 	got, ok := nav.IsSwitch(msg)
 	if !ok {
-		t.Fatal("expected IsReplace=true")
+		t.Fatal("expected IsSwitch=true")
 	}
 	if got.Tab != nav.TabStatus {
-		t.Errorf("IsReplace route kind = %q, want %q", got.Tab, nav.TabStatus)
+		t.Errorf("IsSwitch route kind = %q, want %q", got.Tab, nav.TabStatus)
 	}
 }
 
@@ -40,17 +40,17 @@ func TestBackAndIsBack(t *testing.T) {
 	}
 }
 
-func TestIsPush_WrongType(t *testing.T) {
-	_, ok := nav.IsOpen("not-a-push")
+func TestIsOpen_WrongType(t *testing.T) {
+	_, ok := nav.IsOpen("not-an-open")
 	if ok {
-		t.Error("expected IsPush=false for wrong type")
+		t.Error("expected IsOpen=false for wrong type")
 	}
 }
 
-func TestIsReplace_WrongType(t *testing.T) {
+func TestIsSwitch_WrongType(t *testing.T) {
 	_, ok := nav.IsSwitch(42)
 	if ok {
-		t.Error("expected IsReplace=false for wrong type")
+		t.Error("expected IsSwitch=false for wrong type")
 	}
 }
 

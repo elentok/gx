@@ -13,7 +13,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-func TestReplaceSwitchesTabWithoutHistory(t *testing.T) {
+func TestSwitchMsgChangesTabWithoutHistory(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -27,18 +27,18 @@ func TestReplaceSwitchesTabWithoutHistory(t *testing.T) {
 
 	updated, cmd := m.Update(nav.Switch(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: repoDir})())
 	if cmd == nil {
-		t.Fatalf("expected resize cmd when switching tabs")
+		t.Fatalf("expected resize cmd on Switch")
 	}
 	m = updated.(Model)
 	if m.activeTab != nav.TabStatus {
 		t.Fatalf("expected active tab status, got %q", m.activeTab)
 	}
 	if len(m.history) != 0 {
-		t.Fatalf("expected empty history after tab replace, got %d", len(m.history))
+		t.Fatalf("expected empty history after tab switch, got %d", len(m.history))
 	}
 }
 
-func TestShellChordReplacesTabWithoutHistory(t *testing.T) {
+func TestShellChordDirectTabSwitchClearsHistory(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -166,7 +166,7 @@ func TestSwitchToUninitializedTabRunsInit(t *testing.T) {
 	}
 }
 
-func TestPushCommitAndBackRestoresTab(t *testing.T) {
+func TestOpenCommitAndBackRestoresTab(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -180,7 +180,7 @@ func TestPushCommitAndBackRestoresTab(t *testing.T) {
 
 	updated, cmd := m.Update(nav.Open(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: repoDir, Ref: "HEAD"})())
 	if cmd == nil {
-		t.Fatalf("expected init/resize cmd when pushing commit route")
+		t.Fatalf("expected init/resize cmd when opening commit page")
 	}
 	m = updated.(Model)
 	if len(m.history) != 1 {
@@ -239,7 +239,7 @@ func TestBackFromCommitRestoresSelectionInLog(t *testing.T) {
 	}
 }
 
-func TestPushStatusAndBackRestoresLogTab(t *testing.T) {
+func TestOpenStatusAndBackRestoresLogTab(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -253,7 +253,7 @@ func TestPushStatusAndBackRestoresLogTab(t *testing.T) {
 
 	updated, cmd := m.Update(nav.Open(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: repoDir})())
 	if cmd == nil {
-		t.Fatalf("expected init/resize cmd when pushing status route")
+		t.Fatalf("expected init/resize cmd when opening status page")
 	}
 	m = updated.(Model)
 	if len(m.history) != 1 {
@@ -273,7 +273,7 @@ func TestPushStatusAndBackRestoresLogTab(t *testing.T) {
 	}
 }
 
-func TestReplaceClearsHistoryAfterPush(t *testing.T) {
+func TestSwitchClearsHistoryAfterOpen(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -297,7 +297,61 @@ func TestReplaceClearsHistoryAfterPush(t *testing.T) {
 		t.Fatalf("expected active tab status, got %q", m.activeTab)
 	}
 	if len(m.history) != 0 {
-		t.Fatalf("expected history cleared after tab replace, got %d", len(m.history))
+		t.Fatalf("expected history cleared after tab switch, got %d", len(m.history))
+	}
+}
+
+func TestSameViewContextDifferentOptionsPreservesHistory(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	updated, _ := m.Update(nav.Open(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: repoDir, Ref: "HEAD"})())
+	m = updated.(Model)
+	if len(m.history) != 1 {
+		t.Fatalf("expected history depth 1 after open, got %d", len(m.history))
+	}
+
+	// Switch to same tab with same ViewContext but different ViewOptions (FocusSubject).
+	// ViewOptions changes must NOT trigger page reconstruction, so history is preserved.
+	updated, _ = m.Update(nav.Switch(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir, FocusSubject: "some.go"})())
+	m = updated.(Model)
+	if len(m.history) != 1 {
+		t.Fatalf("expected history preserved when ViewContext unchanged, got %d", len(m.history))
+	}
+}
+
+func TestDifferentViewContextClearsHistory(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	updated, _ := m.Update(nav.Open(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: repoDir, Ref: "HEAD"})())
+	m = updated.(Model)
+	if len(m.history) != 1 {
+		t.Fatalf("expected history depth 1 after open, got %d", len(m.history))
+	}
+
+	// Switch to same tab with a different ViewContext (Ref changed).
+	// ViewContext changes MUST trigger page reconstruction, so history is cleared.
+	updated, _ = m.Update(nav.Switch(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir, Ref: "HEAD~1"})())
+	m = updated.(Model)
+	if len(m.history) != 0 {
+		t.Fatalf("expected history cleared when ViewContext changed, got %d", len(m.history))
 	}
 }
 
@@ -316,7 +370,7 @@ func TestTabSwitchRestoresCommitRouteInLogTab(t *testing.T) {
 	updated, _ := m.Update(nav.Open(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: repoDir, Ref: "HEAD"})())
 	m = updated.(Model)
 	if got := m.activePage().viewState.Tab; got != nav.TabCommit {
-		t.Fatalf("expected commit page after push, got %q", got)
+		t.Fatalf("expected commit page after Open, got %q", got)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: '3', Text: "3"})
@@ -332,7 +386,7 @@ func TestTabSwitchRestoresCommitRouteInLogTab(t *testing.T) {
 	}
 }
 
-func TestRouteChangedUpdatesActiveTabRouteState(t *testing.T) {
+func TestViewStateChangedUpdatesActiveTabViewState(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -365,7 +419,7 @@ func TestRouteChangedUpdatesActiveTabRouteState(t *testing.T) {
 	}
 }
 
-func TestRouteChangedPersistsForInactiveTabAndAppliesOnSwitch(t *testing.T) {
+func TestViewStateChangedPersistsForInactiveTabAndAppliesOnSwitch(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
