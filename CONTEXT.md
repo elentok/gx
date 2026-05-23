@@ -57,11 +57,19 @@ line index.
 **TabID** — canonical identifier of a top-level app destination (`worktrees`, `log`, `commit`,
 `status`). This is the only term used for tab identity.
 
-**Route** — navigation identity for a screen, composed of a `TabID` plus route context (for
-example worktree root, ref, initial path, or focus subject). A route is not UI state.
+**ViewState** — the full navigation payload for a screen. Composed of a `ViewContext` and
+`ViewOptions`. This is the canonical navigation term.
 
-**Last route by tab** — app-shell memory of the most recent route seen for each `TabID`. Used when
-switching tabs so users return to their last context in that tab.
+**ViewContext** — the durable subset of `ViewState` that determines tab page identity: `Tab`,
+`WorktreeRoot`, `Ref`, `InitialPath`. Tab reuse/reset decisions are keyed to `ViewContext`
+equality only.
+
+**ViewOptions** — the transient subset of `ViewState` that tunes behavior inside an active view:
+`FocusSubject`, `FilterPath`, `FilterStartLine`, `FilterEndLine`. Changes to `ViewOptions` do not
+trigger page reconstruction.
+
+**Tab memory** — the app-shell record of the most recent `ViewState` seen for each `TabID`. Used
+when switching tabs so users return to their last context in that tab.
 
 **Selected worktree** — the currently highlighted worktree row in the worktrees tab. This is a
 focus identity and is distinct from `worktreeRoot` (repository/worktree context used by other

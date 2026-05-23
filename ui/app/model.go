@@ -64,7 +64,7 @@ func New(repo git.Repo, settings Settings) Model {
 	m.router = newRouterState(m.settings.InitialRoute, m.settings.ActiveWorktreePath)
 	m.activeTab = m.router.activeTab
 	m.ensureTabs()
-	initialRoute := m.tabViewStateForViewState(m.settings.InitialRoute)
+	initialRoute := m.tabViewStateForViewContext(m.settings.InitialRoute.Context())
 	page := m.newLivePage(initialRoute)
 	page.didInit = true
 	m.lastViewStateByTab[m.activeTab] = initialRoute
@@ -290,7 +290,7 @@ func (m *Model) restoreLogSelectionFromPoppedPage(popped historyEntry) {
 }
 
 func (m *Model) applyViewStateChanged(viewState nav.ViewState) {
-	tabViewState := m.tabViewStateForViewState(viewState)
+	tabViewState := m.tabViewStateForViewContext(viewState.Context())
 	m.router.viewStateChanged(viewState, m.settings.ActiveWorktreePath)
 	m.ensureTabs()
 	m.lastViewStateByTab[tabViewState.Tab] = tabViewState

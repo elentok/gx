@@ -23,6 +23,39 @@ type ViewState struct {
 	FilterEndLine   int
 }
 
+type ViewContext struct {
+	Tab          TabID
+	WorktreeRoot string
+	Ref          string
+	InitialPath  string
+}
+
+type ViewOptions struct {
+	FocusSubject string
+	FilterPath   string
+
+	FilterStartLine int
+	FilterEndLine   int
+}
+
+func (s ViewState) Context() ViewContext {
+	return ViewContext{
+		Tab:          s.Tab,
+		WorktreeRoot: s.WorktreeRoot,
+		Ref:          s.Ref,
+		InitialPath:  s.InitialPath,
+	}
+}
+
+func (s ViewState) Options() ViewOptions {
+	return ViewOptions{
+		FocusSubject:    s.FocusSubject,
+		FilterPath:      s.FilterPath,
+		FilterStartLine: s.FilterStartLine,
+		FilterEndLine:   s.FilterEndLine,
+	}
+}
+
 type ViewStateProvider interface {
 	CurrentViewState() (ViewState, bool)
 }

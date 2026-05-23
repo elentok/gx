@@ -24,7 +24,7 @@ func (m *Model) ensureTabs() {
 }
 
 func (m Model) switchTab(viewState nav.ViewState) (tea.Model, tea.Cmd) {
-	tabViewState := m.tabViewStateForViewState(viewState)
+	tabViewState := m.tabViewStateForViewContext(viewState.Context())
 	m.router.replace(tabViewState, m.settings.ActiveWorktreePath)
 	m.ensureTabs()
 	m.histories[m.activeTab] = m.history
@@ -33,7 +33,7 @@ func (m Model) switchTab(viewState nav.ViewState) (tea.Model, tea.Cmd) {
 	currentPage := m.livePageByTab[tabViewState.Tab]
 	currentViewState := m.lastViewStateByTab[tabViewState.Tab]
 	m.lastViewStateByTab[tabViewState.Tab] = tabViewState
-	if currentPage.model == nil || !sameViewContext(currentViewState, tabViewState) {
+	if currentPage.model == nil || !sameViewContext(currentViewState.Context(), tabViewState.Context()) {
 		m.history = nil
 		m.histories[m.activeTab] = nil
 		currentPage = m.newLivePage(tabViewState)
@@ -176,15 +176,15 @@ func replayKeys(model tea.Model, msgs ...tea.Msg) (tea.Model, tea.Cmd) {
 	return current, tea.Batch(cmds...)
 }
 
-func (m Model) tabViewStateForViewState(viewState nav.ViewState) nav.ViewState {
-	r := tabContextForViewState(viewState, m.settings.ActiveWorktreePath)
+func (m Model) tabViewStateForViewContext(ctx nav.ViewContext) nav.ViewState {
+	r := tabContextForViewContext(ctx, m.settings.ActiveWorktreePath)
 	tabViewState := nav.ViewState{
 		Tab:          r.tabID,
 		WorktreeRoot: r.worktreeRoot,
 		Ref:          r.ref,
 		InitialPath:  r.initialPath,
 	}
-	if viewState.WorktreeRoot == "" && viewState.Ref == "" && viewState.InitialPath == "" {
+	if ctx.WorktreeRoot == "" && ctx.Ref == "" && ctx.InitialPath == "" {
 		if remembered, ok := m.router.tabs[tabViewState.Tab]; ok {
 			tabViewState.WorktreeRoot = remembered.worktreeRoot
 			tabViewState.Ref = remembered.ref
@@ -205,11 +205,8 @@ func tabForRoute(kind nav.TabID) nav.TabID {
 	}
 }
 
-func sameViewContext(a, b nav.ViewState) bool {
-	return a.Tab == b.Tab &&
-		a.WorktreeRoot == b.WorktreeRoot &&
-		a.Ref == b.Ref &&
-		a.InitialPath == b.InitialPath
+func sameViewContext(a, b nav.ViewContext) bool {
+	return a == b
 }
 
 func (m Model) newLivePage(viewState nav.ViewState) livePage {

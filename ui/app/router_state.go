@@ -30,7 +30,7 @@ func newRouterState(initialRoute nav.ViewState, activeWorktreePath string) route
 		histories: make(map[nav.TabID][]nav.ViewState),
 	}
 	r.ensureTabs()
-	r.tabs[r.activeTab] = tabContextForViewState(initialRoute, activeWorktreePath)
+	r.tabs[r.activeTab] = tabContextForViewContext(initialRoute.Context(), activeWorktreePath)
 	if initialRoute.Tab == nav.TabCommit {
 		r.history = append(r.history, initialRoute)
 		r.histories[r.activeTab] = append([]nav.ViewState(nil), r.history...)
@@ -48,7 +48,7 @@ func (r *routerState) ensureTabs() {
 }
 
 func (r *routerState) replace(viewState nav.ViewState, activeWorktreePath string) {
-	next := tabContextForViewState(viewState, activeWorktreePath)
+	next := tabContextForViewContext(viewState.Context(), activeWorktreePath)
 	r.ensureTabs()
 	r.histories[r.activeTab] = append([]nav.ViewState(nil), r.history...)
 	r.activeTab = next.tabID
@@ -64,7 +64,7 @@ func (r *routerState) replace(viewState nav.ViewState, activeWorktreePath string
 }
 
 func (r *routerState) viewStateChanged(viewState nav.ViewState, activeWorktreePath string) {
-	next := tabContextForViewState(viewState, activeWorktreePath)
+	next := tabContextForViewContext(viewState.Context(), activeWorktreePath)
 	r.ensureTabs()
 	r.tabs[next.tabID] = next
 }
@@ -84,18 +84,18 @@ func (r *routerState) back() (nav.ViewState, bool) {
 	return popped, true
 }
 
-func tabContextForViewState(viewState nav.ViewState, activeWorktreePath string) routerTabState {
-	tab := routerTabState{tabID: tabForRoute(viewState.Tab)}
+func tabContextForViewContext(ctx nav.ViewContext, activeWorktreePath string) routerTabState {
+	tab := routerTabState{tabID: tabForRoute(ctx.Tab)}
 	switch tab.tabID {
 	case nav.TabLog, nav.TabCommit:
-		tab.ref = viewState.Ref
-		tab.worktreeRoot = viewState.WorktreeRoot
+		tab.ref = ctx.Ref
+		tab.worktreeRoot = ctx.WorktreeRoot
 		if strings.TrimSpace(tab.worktreeRoot) == "" {
 			tab.worktreeRoot = activeWorktreePath
 		}
 	case nav.TabStatus:
-		tab.initialPath = viewState.InitialPath
-		tab.worktreeRoot = viewState.WorktreeRoot
+		tab.initialPath = ctx.InitialPath
+		tab.worktreeRoot = ctx.WorktreeRoot
 		if strings.TrimSpace(tab.worktreeRoot) == "" {
 			tab.worktreeRoot = activeWorktreePath
 		}
