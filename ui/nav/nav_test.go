@@ -7,28 +7,28 @@ import (
 )
 
 func TestOpenAndIsOpen(t *testing.T) {
-	route := nav.ViewState{Tab: nav.TabLog, Ref: "HEAD"}
-	cmd := nav.Open(route)
+	vs := nav.ViewState{Tab: nav.TabLog, Ref: "HEAD"}
+	cmd := nav.Open(vs)
 	msg := cmd()
 	got, ok := nav.IsOpen(msg)
 	if !ok {
 		t.Fatal("expected IsOpen=true")
 	}
 	if got.Tab != nav.TabLog || got.Ref != "HEAD" {
-		t.Errorf("IsOpen route = %+v, want {TabLog, HEAD}", got)
+		t.Errorf("IsOpen view state = %+v, want {TabLog, HEAD}", got)
 	}
 }
 
 func TestSwitchAndIsSwitch(t *testing.T) {
-	route := nav.ViewState{Tab: nav.TabStatus}
-	cmd := nav.Switch(route)
+	vs := nav.ViewState{Tab: nav.TabStatus}
+	cmd := nav.Switch(vs)
 	msg := cmd()
 	got, ok := nav.IsSwitch(msg)
 	if !ok {
 		t.Fatal("expected IsSwitch=true")
 	}
 	if got.Tab != nav.TabStatus {
-		t.Errorf("IsSwitch route kind = %q, want %q", got.Tab, nav.TabStatus)
+		t.Errorf("IsSwitch tab = %q, want %q", got.Tab, nav.TabStatus)
 	}
 }
 

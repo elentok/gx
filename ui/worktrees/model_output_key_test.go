@@ -174,12 +174,12 @@ func TestEnterNavigatesToLogWhenNavigationEnabled(t *testing.T) {
 	if cmd == nil {
 		t.Fatalf("enter should navigate to log when navigation is enabled")
 	}
-	route, ok := nav.IsSwitch(cmd())
+	vs, ok := nav.IsSwitch(cmd())
 	if !ok {
 		t.Fatalf("expected nav switch message")
 	}
-	if route.Tab != nav.TabLog {
-		t.Fatalf("expected log route, got %q", route.Tab)
+	if vs.Tab != nav.TabLog {
+		t.Fatalf("expected log tab, got %q", vs.Tab)
 	}
 	_ = updated
 }

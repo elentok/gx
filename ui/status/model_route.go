@@ -3,12 +3,12 @@ package status
 import "github.com/elentok/gx/ui/nav"
 
 func (m Model) CurrentViewState() (nav.ViewState, bool) {
-	route := nav.ViewState{
+	vs := nav.ViewState{
 		Tab:          nav.TabStatus,
 		WorktreeRoot: m.worktreeRoot,
 	}
 	if file, ok := m.selectedStatusFile(); ok {
-		route.InitialPath = file.Path
+		vs.InitialPath = file.Path
 	}
-	return route, true
+	return vs, true
 }

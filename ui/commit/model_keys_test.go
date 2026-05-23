@@ -10,7 +10,7 @@ import (
 	"github.com/elentok/gx/ui/nav"
 )
 
-func TestFilterLogRouteReturnsLogRouteForSelectedFile(t *testing.T) {
+func TestFilterLogViewStateReturnsLogViewStateForSelectedFile(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "foo.txt", "one\n")
 	testutil.CommitAll(t, repo, "base")
@@ -18,17 +18,17 @@ func TestFilterLogRouteReturnsLogRouteForSelectedFile(t *testing.T) {
 	m := newTestModel(repo, "HEAD")
 	m.ready = true
 
-	route := m.filterLogViewState()
+	vs := m.filterLogViewState()
 
-	if route.Tab != nav.TabLog {
-		t.Fatalf("filterLogViewState kind = %q, want %q", route.Tab, nav.TabLog)
+	if vs.Tab != nav.TabLog {
+		t.Fatalf("filterLogViewState tab = %q, want %q", vs.Tab, nav.TabLog)
 	}
-	if route.FilterPath != "foo.txt" {
-		t.Fatalf("filterLogViewState FilterPath = %q, want 'foo.txt'", route.FilterPath)
+	if vs.FilterPath != "foo.txt" {
+		t.Fatalf("filterLogViewState FilterPath = %q, want 'foo.txt'", vs.FilterPath)
 	}
 }
 
-func TestFilterLogRouteIncludesLineRangeWhenDiffFocusedHunkMode(t *testing.T) {
+func TestFilterLogViewStateIncludesLineRangeWhenDiffFocusedHunkMode(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "bar.txt", "old-1\nold-2\n")
 	testutil.CommitAll(t, repo, "base")
@@ -44,9 +44,9 @@ func TestFilterLogRouteIncludesLineRangeWhenDiffFocusedHunkMode(t *testing.T) {
 	data.ActiveHunk = 0
 	data.Parsed.Hunks = []diffcore.ParsedHunk{{NewStart: 3, NewCount: 2}}
 
-	route := m.filterLogViewState()
+	vs := m.filterLogViewState()
 
-	if route.FilterStartLine == 0 && route.FilterEndLine == 0 {
+	if vs.FilterStartLine == 0 && vs.FilterEndLine == 0 {
 		t.Fatal("expected non-zero line range when diff focused in hunk mode")
 	}
 }
@@ -110,10 +110,10 @@ func TestFilterLogGHKeyPushesNavRoute(t *testing.T) {
 		t.Fatal("g+h should produce a nav.Push command")
 	}
 	msg := cmd()
-	if route, ok := nav.IsOpen(msg); !ok {
+	if vs, ok := nav.IsOpen(msg); !ok {
 		t.Fatalf("expected nav.Push message, got %T", msg)
-	} else if route.Tab != nav.TabLog {
-		t.Fatalf("expected TabLog, got %q", route.Tab)
+	} else if vs.Tab != nav.TabLog {
+		t.Fatalf("expected TabLog, got %q", vs.Tab)
 	}
 }
 

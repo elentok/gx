@@ -70,19 +70,19 @@ type switchMsg struct {
 
 type backMsg struct{}
 
-type routeChangedMsg struct {
+type viewStateChangedMsg struct {
 	ViewState ViewState
 }
 
-func Open(route ViewState) tea.Cmd {
+func Open(vs ViewState) tea.Cmd {
 	return func() tea.Msg {
-		return openMsg{ViewState: route}
+		return openMsg{ViewState: vs}
 	}
 }
 
-func Switch(route ViewState) tea.Cmd {
+func Switch(vs ViewState) tea.Cmd {
 	return func() tea.Msg {
-		return switchMsg{ViewState: route}
+		return switchMsg{ViewState: vs}
 	}
 }
 
@@ -92,9 +92,9 @@ func Back() tea.Cmd {
 	}
 }
 
-func ViewStateChanged(route ViewState) tea.Cmd {
+func ViewStateChanged(vs ViewState) tea.Cmd {
 	return func() tea.Msg {
-		return routeChangedMsg{ViewState: route}
+		return viewStateChangedMsg{ViewState: vs}
 	}
 }
 
@@ -114,6 +114,6 @@ func IsBack(msg tea.Msg) bool {
 }
 
 func IsViewStateChanged(msg tea.Msg) (ViewState, bool) {
-	changed, ok := msg.(routeChangedMsg)
+	changed, ok := msg.(viewStateChangedMsg)
 	return changed.ViewState, ok
 }

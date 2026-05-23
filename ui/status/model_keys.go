@@ -183,18 +183,18 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model,
 }
 
 func (m Model) filterLogViewState() nav.ViewState {
-	route := nav.ViewState{Tab: nav.TabLog, WorktreeRoot: m.worktreeRoot}
+	vs := nav.ViewState{Tab: nav.TabLog, WorktreeRoot: m.worktreeRoot}
 	file, ok := m.selectedStatusFile()
 	if !ok {
-		return route
+		return vs
 	}
-	route.FilterPath = file.Path
+	vs.FilterPath = file.Path
 	if m.focus == focusDiff {
 		startLine, endLine := m.activeLogLineRange()
-		route.FilterStartLine = startLine
-		route.FilterEndLine = endLine
+		vs.FilterStartLine = startLine
+		vs.FilterEndLine = endLine
 	}
-	return route
+	return vs
 }
 
 func (m Model) activeLogLineRange() (startLine, endLine int) {

@@ -54,24 +54,24 @@ func TestRebaseKeyOpensSpecificConfirm(t *testing.T) {
 	}
 }
 
-func TestFilterLogRouteReturnsFilePathWhenFileSelected(t *testing.T) {
+func TestFilterLogViewStateReturnsFilePathWhenFileSelected(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "foo.txt", "hello\n")
 
 	m := newTestModel(repo, ui.Settings{EnableNavigation: true}, "")
 	m.ready = true
 
-	route := m.filterLogViewState()
+	vs := m.filterLogViewState()
 
-	if route.Tab != nav.TabLog {
-		t.Fatalf("filterLogViewState kind = %q, want %q", route.Tab, nav.TabLog)
+	if vs.Tab != nav.TabLog {
+		t.Fatalf("filterLogViewState tab = %q, want %q", vs.Tab, nav.TabLog)
 	}
-	if route.FilterPath != "foo.txt" {
-		t.Fatalf("filterLogViewState FilterPath = %q, want 'foo.txt'", route.FilterPath)
+	if vs.FilterPath != "foo.txt" {
+		t.Fatalf("filterLogViewState FilterPath = %q, want 'foo.txt'", vs.FilterPath)
 	}
 }
 
-func TestFilterLogRouteIncludesLineRangeInDiffHunkMode(t *testing.T) {
+func TestFilterLogViewStateIncludesLineRangeInDiffHunkMode(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "bar.txt", "old-1\nold-2\n")
 	testutil.CommitAll(t, repo, "base")
@@ -88,15 +88,15 @@ func TestFilterLogRouteIncludesLineRangeInDiffHunkMode(t *testing.T) {
 	data.ActiveHunk = 0
 	data.Parsed.Hunks = []diffcore.ParsedHunk{{NewStart: 5, NewCount: 3}}
 
-	route := m.filterLogViewState()
+	vs := m.filterLogViewState()
 
-	if route.Tab != nav.TabLog {
-		t.Fatalf("filterLogViewState kind = %q, want %q", route.Tab, nav.TabLog)
+	if vs.Tab != nav.TabLog {
+		t.Fatalf("filterLogViewState tab = %q, want %q", vs.Tab, nav.TabLog)
 	}
-	if route.FilterPath != "bar.txt" {
-		t.Fatalf("filterLogViewState FilterPath = %q, want 'bar.txt'", route.FilterPath)
+	if vs.FilterPath != "bar.txt" {
+		t.Fatalf("filterLogViewState FilterPath = %q, want 'bar.txt'", vs.FilterPath)
 	}
-	if route.FilterStartLine == 0 && route.FilterEndLine == 0 {
+	if vs.FilterStartLine == 0 && vs.FilterEndLine == 0 {
 		t.Fatal("expected non-zero line range from diff hunk mode")
 	}
 }
@@ -143,7 +143,7 @@ func TestActiveLogLineRangeReturnsZeroWhenNoActiveHunk(t *testing.T) {
 	}
 }
 
-func TestFilterLogRouteGHKeyPushesNavRoute(t *testing.T) {
+func TestFilterLogViewStateGHKeyPushesNav(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "nav.txt", "content\n")
 
@@ -159,10 +159,10 @@ func TestFilterLogRouteGHKeyPushesNavRoute(t *testing.T) {
 		t.Fatal("g+h should produce a nav.Push command")
 	}
 	msg := cmd()
-	if route, ok := nav.IsOpen(msg); !ok {
+	if vs, ok := nav.IsOpen(msg); !ok {
 		t.Fatalf("expected nav.Push message, got %T", msg)
-	} else if route.Tab != nav.TabLog {
-		t.Fatalf("expected TabLog, got %q", route.Tab)
+	} else if vs.Tab != nav.TabLog {
+		t.Fatalf("expected TabLog, got %q", vs.Tab)
 	}
 }
 

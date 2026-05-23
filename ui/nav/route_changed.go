@@ -3,7 +3,7 @@ package nav
 import tea "charm.land/bubbletea/v2"
 
 // AppendViewStateChanged appends a ViewStateChanged command when navigation is enabled
-// and the route changed between pre/post update.
+// and the view state changed between pre/post update.
 func AppendViewStateChanged(cmd tea.Cmd, enabled bool, prev ViewState, prevOK bool, next ViewState, nextOK bool) tea.Cmd {
 	if !enabled || !nextOK {
 		return cmd

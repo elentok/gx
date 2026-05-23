@@ -84,9 +84,10 @@ navigation. All are defined in `ui/nav`:
   tab memory for the target tab when no explicit context is supplied. Does not pollute `Back` depth.
 - `Back()` — reverse deep navigation: pops the top of the global history stack. When the stack is
   empty (at root), `Back` quits the app.
-- `ViewStateChanged(ViewState)` — live route update: emitted by active pages when their internal
-  state changes (selection moves, filter changes, ref advances). Updates tab memory and `routerState`
-  but does not alter the history stack or trigger page reconstruction.
+- `ViewStateChanged(ViewState)` — live view state update: emitted when the active page's internal
+  state changes (selection moves, filter changes, ref advances). Updates tab memory but does not
+  alter the history stack or trigger page reconstruction.
 
-Child models emit `ViewStateChanged` automatically via `AppendViewStateChanged` in their `Update`
-defer. Explicit `ViewStateChanged` emissions remain supported for specialized timing needs.
+The app-shell `Update` wrapper calls `AppendViewStateChanged` after every child `Update`, comparing
+pre/post `ViewState` and emitting `ViewStateChanged` automatically when navigation is enabled.
+Explicit `ViewStateChanged` emissions remain supported for specialized timing needs.

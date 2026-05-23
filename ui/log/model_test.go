@@ -111,16 +111,16 @@ func TestGHResetsCustomRefToHead(t *testing.T) {
 	if cmd == nil {
 		t.Fatalf("expected nav command for gh")
 	}
-	route, ok := nav.IsSwitch(cmd())
+	vs, ok := nav.IsSwitch(cmd())
 	if !ok {
 		t.Fatalf("expected nav replace")
 	}
-	if route.Tab != nav.TabLog || route.Ref != "HEAD" {
-		t.Fatalf("expected log HEAD route, got kind=%q ref=%q", route.Tab, route.Ref)
+	if vs.Tab != nav.TabLog || vs.Ref != "HEAD" {
+		t.Fatalf("expected log HEAD view state, got tab=%q ref=%q", vs.Tab, vs.Ref)
 	}
 }
 
-func TestEnterOnCommitRowOpensCommitRoute(t *testing.T) {
+func TestEnterOnCommitRowOpensCommitView(t *testing.T) {
 	repo := testutil.TempRepo(t)
 
 	m := newTestModelDefault(repo, "", settings)
@@ -135,12 +135,12 @@ func TestEnterOnCommitRowOpensCommitRoute(t *testing.T) {
 	if cmd == nil {
 		t.Fatalf("expected nav command on enter")
 	}
-	route, ok := nav.IsOpen(cmd())
+	vs, ok := nav.IsOpen(cmd())
 	if !ok {
 		t.Fatalf("expected nav push")
 	}
-	if route.Tab != nav.TabCommit {
-		t.Fatalf("expected commit route, got %q", route.Tab)
+	if vs.Tab != nav.TabCommit {
+		t.Fatalf("expected commit tab, got %q", vs.Tab)
 	}
 	_ = updated
 }
@@ -163,12 +163,12 @@ func TestEnterOnCommitRowCarriesActiveFilterPath(t *testing.T) {
 	if cmd == nil {
 		t.Fatalf("expected nav command on enter")
 	}
-	route, ok := nav.IsOpen(cmd())
+	vs, ok := nav.IsOpen(cmd())
 	if !ok {
 		t.Fatalf("expected nav push")
 	}
-	if route.FilterPath != "src/main.go" {
-		t.Fatalf("route.FilterPath = %q, want %q", route.FilterPath, "src/main.go")
+	if vs.FilterPath != "src/main.go" {
+		t.Fatalf("vs.FilterPath = %q, want %q", vs.FilterPath, "src/main.go")
 	}
 }
 

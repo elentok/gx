@@ -339,11 +339,11 @@ func TestInitialCommitRouteUsesCommitTab(t *testing.T) {
 		t.Fatalf("expected live tab commit, got %q", m.liveTab)
 	}
 	if len(m.stack) != 0 {
-		t.Fatalf("expected empty stack for initial commit route (commit is a live tab), got %d", len(m.stack))
+		t.Fatalf("expected empty stack for initial commit view state (commit is a live tab), got %d", len(m.stack))
 	}
 }
 
-func TestSwitchToCommitTabRestoresRoute(t *testing.T) {
+func TestSwitchToCommitTabRestoresViewState(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -369,7 +369,7 @@ func TestSwitchToCommitTabRestoresRoute(t *testing.T) {
 		t.Fatalf("expected status after pressing 3, got %q", m.activeTab)
 	}
 
-	// Switch to commit tab (4) — should restore remembered commit route.
+	// Switch to commit tab (4) — should restore remembered commit view state.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: '4', Text: "4"})
 	m = updated.(Model)
 	if m.activeTab != nav.TabCommit {

@@ -82,19 +82,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var notifyCmd tea.Cmd
 	m.notify, notifyCmd = m.notify.Update(msg)
 
-	if route, ok := nav.IsSwitch(msg); ok {
-		next, cmd := m.switchTab(route)
+	if vs, ok := nav.IsSwitch(msg); ok {
+		next, cmd := m.switchTab(vs)
 		return next, tea.Batch(notifyCmd, cmd)
 	}
-	if route, ok := nav.IsOpen(msg); ok {
-		entry := m.newHistoryEntry(route)
+	if vs, ok := nav.IsOpen(msg); ok {
+		entry := m.newHistoryEntry(vs)
 		m.stack = append(m.stack, entry)
-		m.activeTab = route.Tab
-		m.lastViewStateByTab[route.Tab] = route
+		m.activeTab = vs.Tab
+		m.lastViewStateByTab[vs.Tab] = vs
 		return m, tea.Batch(notifyCmd, tea.ClearScreen, entry.model.Init(), m.resizeCurrentCmd())
 	}
-	if route, ok := nav.IsViewStateChanged(msg); ok {
-		m.applyViewStateChanged(route)
+	if vs, ok := nav.IsViewStateChanged(msg); ok {
+		m.applyViewStateChanged(vs)
 		return m, notifyCmd
 	}
 	if nav.IsBack(msg) {
