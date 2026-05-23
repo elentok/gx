@@ -288,12 +288,12 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 	case bindingCancelChord:
 		return m, nil
 	case bindingFilterLog:
-		return m, nav.Open(m.filterLogRoute())
+		return m, nav.Open(m.filterLogViewState())
 	}
 	return m, nil
 }
 
-func (m Model) filterLogRoute() nav.ViewState {
+func (m Model) filterLogViewState() nav.ViewState {
 	route := nav.ViewState{Tab: nav.TabLog, WorktreeRoot: m.worktreeRoot}
 	file, ok := m.selectedCommitFile()
 	if !ok {

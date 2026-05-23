@@ -25,7 +25,7 @@ func newRouterState(initialRoute nav.ViewState, activeWorktreePath string) route
 		initialRoute = nav.ViewState{Tab: nav.TabWorktrees}
 	}
 	r := routerState{
-		activeTab: tabForRoute(initialRoute.Tab),
+		activeTab: resolveTabID(initialRoute.Tab),
 		tabs:      make(map[nav.TabID]routerTabState),
 		histories: make(map[nav.TabID][]nav.ViewState),
 	}
@@ -85,7 +85,7 @@ func (r *routerState) back() (nav.ViewState, bool) {
 }
 
 func tabContextForViewContext(ctx nav.ViewContext, activeWorktreePath string) routerTabState {
-	tab := routerTabState{tabID: tabForRoute(ctx.Tab)}
+	tab := routerTabState{tabID: resolveTabID(ctx.Tab)}
 	switch tab.tabID {
 	case nav.TabLog, nav.TabCommit:
 		tab.ref = ctx.Ref

@@ -194,7 +194,7 @@ func (m Model) tabViewStateForViewContext(ctx nav.ViewContext) nav.ViewState {
 	return tabViewState
 }
 
-func tabForRoute(kind nav.TabID) nav.TabID {
+func resolveTabID(kind nav.TabID) nav.TabID {
 	switch kind {
 	case nav.TabWorktrees, nav.TabLog, nav.TabStatus:
 		return kind

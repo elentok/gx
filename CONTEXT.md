@@ -74,3 +74,19 @@ when switching tabs so users return to their last context in that tab.
 **Selected worktree** — the currently highlighted worktree row in the worktrees tab. This is a
 focus identity and is distinct from `worktreeRoot` (repository/worktree context used by other
 tabs).
+
+**Navigation messages** — the four app-shell message types that child models emit to drive
+navigation. All are defined in `ui/nav`:
+
+- `Open(ViewState)` — deep navigation: pushes a new entry onto the global history stack. Reversible
+  with `Back`. Used for drill-down flows (e.g., log → commit, status → filtered log).
+- `Switch(ViewState)` — tab switching: changes the active tab without adding history depth. Restores
+  tab memory for the target tab when no explicit context is supplied. Does not pollute `Back` depth.
+- `Back()` — reverse deep navigation: pops the top of the global history stack. When the stack is
+  empty (at root), `Back` quits the app.
+- `ViewStateChanged(ViewState)` — live route update: emitted by active pages when their internal
+  state changes (selection moves, filter changes, ref advances). Updates tab memory and `routerState`
+  but does not alter the history stack or trigger page reconstruction.
+
+Child models emit `ViewStateChanged` automatically via `AppendViewStateChanged` in their `Update`
+defer. Explicit `ViewStateChanged` emissions remain supported for specialized timing needs.

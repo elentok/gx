@@ -177,12 +177,12 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model,
 		if !m.settings.EnableNavigation {
 			return m, nil
 		}
-		return m, nav.Open(m.filterLogRoute())
+		return m, nav.Open(m.filterLogViewState())
 	}
 	return m, nil
 }
 
-func (m Model) filterLogRoute() nav.ViewState {
+func (m Model) filterLogViewState() nav.ViewState {
 	route := nav.ViewState{Tab: nav.TabLog, WorktreeRoot: m.worktreeRoot}
 	file, ok := m.selectedStatusFile()
 	if !ok {

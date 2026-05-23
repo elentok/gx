@@ -61,13 +61,13 @@ func TestFilterLogRouteReturnsFilePathWhenFileSelected(t *testing.T) {
 	m := newTestModel(repo, ui.Settings{EnableNavigation: true}, "")
 	m.ready = true
 
-	route := m.filterLogRoute()
+	route := m.filterLogViewState()
 
 	if route.Tab != nav.TabLog {
-		t.Fatalf("filterLogRoute kind = %q, want %q", route.Tab, nav.TabLog)
+		t.Fatalf("filterLogViewState kind = %q, want %q", route.Tab, nav.TabLog)
 	}
 	if route.FilterPath != "foo.txt" {
-		t.Fatalf("filterLogRoute FilterPath = %q, want 'foo.txt'", route.FilterPath)
+		t.Fatalf("filterLogViewState FilterPath = %q, want 'foo.txt'", route.FilterPath)
 	}
 }
 
@@ -88,13 +88,13 @@ func TestFilterLogRouteIncludesLineRangeInDiffHunkMode(t *testing.T) {
 	data.ActiveHunk = 0
 	data.Parsed.Hunks = []diffcore.ParsedHunk{{NewStart: 5, NewCount: 3}}
 
-	route := m.filterLogRoute()
+	route := m.filterLogViewState()
 
 	if route.Tab != nav.TabLog {
-		t.Fatalf("filterLogRoute kind = %q, want %q", route.Tab, nav.TabLog)
+		t.Fatalf("filterLogViewState kind = %q, want %q", route.Tab, nav.TabLog)
 	}
 	if route.FilterPath != "bar.txt" {
-		t.Fatalf("filterLogRoute FilterPath = %q, want 'bar.txt'", route.FilterPath)
+		t.Fatalf("filterLogViewState FilterPath = %q, want 'bar.txt'", route.FilterPath)
 	}
 	if route.FilterStartLine == 0 && route.FilterEndLine == 0 {
 		t.Fatal("expected non-zero line range from diff hunk mode")

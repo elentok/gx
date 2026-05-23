@@ -451,7 +451,7 @@ func TestViewStateChangedPersistsForInactiveTabAndAppliesOnSwitch(t *testing.T) 
 }
 
 func TestCommitMapsToLogTab(t *testing.T) {
-	if got := tabForRoute(nav.TabCommit); got != nav.TabLog {
+	if got := resolveTabID(nav.TabCommit); got != nav.TabLog {
 		t.Fatalf("expected commit to map to log tab, got %q", got)
 	}
 }

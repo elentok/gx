@@ -25,14 +25,14 @@ func renderTickCmd() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
-	prevRoute, prevOK := m.CurrentViewState()
+	prevViewState, prevOK := m.CurrentViewState()
 	defer func() {
 		nextModel, ok := next.(Model)
 		if !ok {
 			return
 		}
-		route, routeOK := nextModel.CurrentViewState()
-		cmd = nav.AppendViewStateChanged(cmd, m.settings.EnableNavigation, prevRoute, prevOK, route, routeOK)
+		route, viewStateOK := nextModel.CurrentViewState()
+		cmd = nav.AppendViewStateChanged(cmd, m.settings.EnableNavigation, prevViewState, prevOK, route, viewStateOK)
 	}()
 
 	if m.bump.IsOpen {

@@ -7,7 +7,7 @@ import (
 )
 
 func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
-	prevRoute, prevOK := m.CurrentViewState()
+	prevViewState, prevOK := m.CurrentViewState()
 	// Run once on every return path so route-change emission stays centralized.
 	// We compare pre/post route state and append ViewStateChanged only when needed.
 	defer func() {
@@ -15,8 +15,8 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		if !ok {
 			return
 		}
-		route, routeOK := nextModel.CurrentViewState()
-		cmd = nav.AppendViewStateChanged(cmd, m.settings.EnableNavigation, prevRoute, prevOK, route, routeOK)
+		route, viewStateOK := nextModel.CurrentViewState()
+		cmd = nav.AppendViewStateChanged(cmd, m.settings.EnableNavigation, prevViewState, prevOK, route, viewStateOK)
 	}()
 
 	// ctrl+c quits unconditionally even when a modal is open.
