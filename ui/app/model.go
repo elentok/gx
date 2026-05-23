@@ -128,10 +128,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	current := m.activePage()
+	prevViewState, prevOK := viewStateOf(current.model)
 	nextModel, cmd := current.model.Update(msg)
 	current.model = nextModel
 	m.setActivePage(current)
+	nextViewState, nextOK := viewStateOf(nextModel)
+	cmd = nav.AppendViewStateChanged(cmd, m.settings.EnableNavigation, prevViewState, prevOK, nextViewState, nextOK)
 	return m, tea.Batch(notifyCmd, cmd)
+}
+
+func viewStateOf(model tea.Model) (nav.ViewState, bool) {
+	if vsp, ok := model.(nav.ViewStateProvider); ok {
+		return vsp.CurrentViewState()
+	}
+	return nav.ViewState{}, false
 }
 
 func (m Model) View() tea.View {

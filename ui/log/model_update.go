@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/reword"
 
@@ -20,16 +19,6 @@ func cmdFlashClear() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
-	prevViewState, prevOK := m.CurrentViewState()
-	defer func() {
-		nextModel, ok := next.(Model)
-		if !ok {
-			return
-		}
-		route, viewStateOK := nextModel.CurrentViewState()
-		cmd = nav.AppendViewStateChanged(cmd, m.settings.EnableNavigation, prevViewState, prevOK, route, viewStateOK)
-	}()
-
 	var childCmd tea.Cmd
 
 	// ctrl+c quits unconditionally even when a modal is open.

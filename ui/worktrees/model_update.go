@@ -6,7 +6,6 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
-	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 
 	"charm.land/bubbles/v2/spinner"
@@ -23,16 +22,6 @@ func (m Model) InputFocused() bool {
 }
 
 func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
-	prevViewState, prevOK := m.CurrentViewState()
-	defer func() {
-		nextModel, ok := next.(Model)
-		if !ok {
-			return
-		}
-		route, viewStateOK := nextModel.CurrentViewState()
-		cmd = nav.AppendViewStateChanged(cmd, m.settings.EnableNavigation, prevViewState, prevOK, route, viewStateOK)
-	}()
-
 	if m.pull.IsOpen {
 		return m.handlePullUpdate(msg)
 	}

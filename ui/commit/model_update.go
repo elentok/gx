@@ -2,23 +2,10 @@ package commit
 
 import (
 	tea "charm.land/bubbletea/v2"
-	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/reword"
 )
 
 func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
-	prevViewState, prevOK := m.CurrentViewState()
-	// Run once on every return path so route-change emission stays centralized.
-	// We compare pre/post route state and append ViewStateChanged only when needed.
-	defer func() {
-		nextModel, ok := next.(Model)
-		if !ok {
-			return
-		}
-		route, viewStateOK := nextModel.CurrentViewState()
-		cmd = nav.AppendViewStateChanged(cmd, m.settings.EnableNavigation, prevViewState, prevOK, route, viewStateOK)
-	}()
-
 	// ctrl+c quits unconditionally even when a modal is open.
 	if kp, ok := msg.(tea.KeyPressMsg); ok && kp.String() == "ctrl+c" {
 		return m, tea.Quit
