@@ -22,6 +22,7 @@ type Transition struct {
 	ActiveTab   nav.TabID
 	ViewState   nav.ViewState // current active view state after transition
 	PoppedEntry nav.ViewState // only set on TransitionPopped
+	PrevViewState nav.ViewState // only set on TransitionSwitched: state before the switch
 }
 
 type State struct {
@@ -112,6 +113,7 @@ func (s *State) Open(vs nav.ViewState) Transition {
 }
 
 func (s *State) Switch(vs nav.ViewState) Transition {
+	prev := s.Active()
 	tabVS := s.TabViewStateForViewContext(vs.Context())
 	tabVS.FocusSubject = vs.FocusSubject
 
@@ -122,9 +124,10 @@ func (s *State) Switch(vs nav.ViewState) Transition {
 	s.lastViewStateByTab[tabVS.Tab] = tabVS
 
 	return Transition{
-		Kind:      TransitionSwitched,
-		ActiveTab: s.activeTab,
-		ViewState: tabVS,
+		Kind:          TransitionSwitched,
+		ActiveTab:     s.activeTab,
+		ViewState:     tabVS,
+		PrevViewState: prev,
 	}
 }
 
@@ -147,7 +150,7 @@ func (s *State) Back() Transition {
 	}
 }
 
-func (s *State) ApplyViewStateChanged(vs nav.ViewState) {
+func (s *State) ApplyViewStateChanged(vs nav.ViewState) Transition {
 	tabVS := s.TabViewStateForViewContext(vs.Context())
 	s.ensureTabs()
 	s.lastViewStateByTab[tabVS.Tab] = tabVS
@@ -155,6 +158,7 @@ func (s *State) ApplyViewStateChanged(vs nav.ViewState) {
 	if len(s.stack) > 0 && s.stack[len(s.stack)-1].Tab == tabVS.Tab {
 		s.stack[len(s.stack)-1] = tabVS
 	}
+	return Transition{Kind: TransitionUpdated, ActiveTab: s.activeTab, ViewState: tabVS}
 }
 
 func (s *State) SetInitialTab(vs nav.ViewState) {

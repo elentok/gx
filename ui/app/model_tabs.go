@@ -21,9 +21,12 @@ func (m *Model) ensureLivePages() {
 	}
 }
 
-func (m Model) switchTab(viewState nav.ViewState) (tea.Model, tea.Cmd) {
-	prevViewState := m.router.Active()
-	tr := m.router.Switch(viewState)
+// switchTab is called from handleShellChordKey (direct key dispatch, outside the nav message path).
+func (m Model) switchTab(viewState nav.ViewState) (Model, tea.Cmd) {
+	return m.applySwitch(m.router.Switch(viewState))
+}
+
+func (m Model) applySwitch(tr navstate.Transition) (Model, tea.Cmd) {
 	tabViewState := tr.ViewState
 
 	// Clear model-side stack — tab switch exits the current deep-navigation session.
@@ -32,7 +35,7 @@ func (m Model) switchTab(viewState nav.ViewState) (tea.Model, tea.Cmd) {
 
 	currentPage := m.livePageByTab[tabViewState.Tab]
 
-	if currentPage.model == nil || !navstate.SameViewContext(prevViewState.Context(), tabViewState.Context()) {
+	if currentPage.model == nil || !navstate.SameViewContext(tr.PrevViewState.Context(), tabViewState.Context()) {
 		currentPage = m.newLivePage(tabViewState)
 		currentPage.didInit = true
 		m.livePageByTab[tabViewState.Tab] = currentPage
@@ -43,9 +46,9 @@ func (m Model) switchTab(viewState nav.ViewState) (tea.Model, tea.Cmd) {
 		m.livePageByTab[tabViewState.Tab] = currentPage
 		return m, tea.Batch(tea.ClearScreen, currentPage.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
 	}
-	if viewState.FocusSubject != "" {
+	if tabViewState.FocusSubject != "" {
 		if logModel, ok := currentPage.model.(logui.Model); ok {
-			currentPage.model = logModel.WithPendingFocus(viewState.FocusSubject)
+			currentPage.model = logModel.WithPendingFocus(tabViewState.FocusSubject)
 			m.livePageByTab[tabViewState.Tab] = currentPage
 		}
 	}
@@ -111,27 +114,27 @@ func (m *Model) handleShellChordKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		switch key {
 		case ",":
 			next, cmd := m.switchRelativeTab(-1)
-			*m = next.(Model)
+			*m = next
 			return true, cmd
 		case ".":
 			next, cmd := m.switchRelativeTab(1)
-			*m = next.(Model)
+			*m = next
 			return true, cmd
 		case "w":
 			next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabWorktrees})
-			*m = next.(Model)
+			*m = next
 			return true, cmd
 		case "l":
 			next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabLog})
-			*m = next.(Model)
+			*m = next
 			return true, cmd
 		case "s":
 			next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabStatus})
-			*m = next.(Model)
+			*m = next
 			return true, cmd
 		case "c":
 			next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabCommit})
-			*m = next.(Model)
+			*m = next
 			return true, cmd
 		case "esc":
 			return true, nil
@@ -150,19 +153,19 @@ func (m *Model) handleShellChordKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	switch key {
 	case "1":
 		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabWorktrees})
-		*m = next.(Model)
+		*m = next
 		return true, cmd
 	case "2":
 		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabLog})
-		*m = next.(Model)
+		*m = next
 		return true, cmd
 	case "3":
 		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabStatus})
-		*m = next.(Model)
+		*m = next
 		return true, cmd
 	case "4":
 		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabCommit})
-		*m = next.(Model)
+		*m = next
 		return true, cmd
 	}
 	return false, nil
@@ -219,7 +222,7 @@ func orderedTabs() []nav.TabID {
 	return []nav.TabID{nav.TabWorktrees, nav.TabLog, nav.TabStatus, nav.TabCommit}
 }
 
-func (m Model) switchRelativeTab(delta int) (tea.Model, tea.Cmd) {
+func (m Model) switchRelativeTab(delta int) (Model, tea.Cmd) {
 	tabs := orderedTabs()
 	idx := 0
 	activeTab := m.router.ActiveTab()

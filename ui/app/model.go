@@ -77,28 +77,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.notify, notifyCmd = m.notify.Update(msg)
 
 	if vs, ok := nav.IsSwitch(msg); ok {
-		next, cmd := m.switchTab(vs)
+		next, cmd := m.applyTransition(m.router.Switch(vs))
 		return next, tea.Batch(notifyCmd, cmd)
 	}
 	if vs, ok := nav.IsOpen(msg); ok {
-		tr := m.router.Open(vs)
-		entry := m.newHistoryEntry(tr.ViewState)
-		m.stack = append(m.stack, entry)
-		return m, tea.Batch(notifyCmd, tea.ClearScreen, entry.model.Init(), m.resizeCurrentCmd())
+		next, cmd := m.applyTransition(m.router.Open(vs))
+		return next, tea.Batch(notifyCmd, cmd)
 	}
 	if vs, ok := nav.IsViewStateChanged(msg); ok {
-		m.router.ApplyViewStateChanged(vs)
-		return m, notifyCmd
+		next, cmd := m.applyTransition(m.router.ApplyViewStateChanged(vs))
+		return next, tea.Batch(notifyCmd, cmd)
 	}
 	if nav.IsBack(msg) {
-		tr := m.router.Back()
-		if tr.Kind == navstate.TransitionQuit {
-			return m, tea.Quit
-		}
-		popped := m.stack[len(m.stack)-1]
-		m.stack = m.stack[:len(m.stack)-1]
-		m.restoreLogSelectionFromPoppedPage(popped)
-		return m, tea.Batch(notifyCmd, tea.ClearScreen, m.resizeCurrentCmd())
+		next, cmd := m.applyTransition(m.router.Back())
+		return next, tea.Batch(notifyCmd, cmd)
 	}
 
 	if size, ok := msg.(tea.WindowSizeMsg); ok {
@@ -115,7 +107,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	}
-
 	current := m.activePage()
 	prevViewState, prevOK := viewStateOf(current.model)
 	nextModel, cmd := current.model.Update(msg)
@@ -124,6 +115,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	nextViewState, nextOK := viewStateOf(nextModel)
 	cmd = nav.AppendViewStateChanged(cmd, m.settings.EnableNavigation, prevViewState, prevOK, nextViewState, nextOK)
 	return m, tea.Batch(notifyCmd, cmd)
+}
+
+func (m Model) applyTransition(tr navstate.Transition) (Model, tea.Cmd) {
+	switch tr.Kind {
+	case navstate.TransitionSwitched:
+		return m.applySwitch(tr)
+	case navstate.TransitionPushed:
+		entry := m.newHistoryEntry(tr.ViewState)
+		m.stack = append(m.stack, entry)
+		return m, tea.Batch(tea.ClearScreen, entry.model.Init(), m.resizeCurrentCmd())
+	case navstate.TransitionPopped:
+		popped := m.stack[len(m.stack)-1]
+		m.stack = m.stack[:len(m.stack)-1]
+		m.restoreLogSelectionFromPoppedPage(popped)
+		return m, tea.Batch(tea.ClearScreen, m.resizeCurrentCmd())
+	case navstate.TransitionQuit:
+		return m, tea.Quit
+	default: // TransitionUpdated, TransitionNone
+		return m, nil
+	}
 }
 
 func viewStateOf(model tea.Model) (nav.ViewState, bool) {

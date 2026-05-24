@@ -71,6 +71,27 @@ func TestSwitchClearsStack(t *testing.T) {
 	}
 }
 
+func TestSwitchCarriesPrevViewState(t *testing.T) {
+	s := newState()
+	s.SetInitialTab(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT})
+	tr := s.Switch(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: defaultWT})
+	if tr.PrevViewState.Tab != nav.TabLog {
+		t.Fatalf("expected PrevViewState.Tab log, got %q", tr.PrevViewState.Tab)
+	}
+}
+
+func TestApplyViewStateChangedReturnsTransitionUpdated(t *testing.T) {
+	s := newState()
+	s.SetInitialTab(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT})
+	tr := s.ApplyViewStateChanged(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT, Ref: "abc"})
+	if tr.Kind != navstate.TransitionUpdated {
+		t.Fatalf("expected TransitionUpdated, got %v", tr.Kind)
+	}
+	if tr.ViewState.Ref != "abc" {
+		t.Fatalf("expected ViewState.Ref abc, got %q", tr.ViewState.Ref)
+	}
+}
+
 func TestApplyViewStateChangedUpdatesSamTab(t *testing.T) {
 	s := newState()
 	s.SetInitialTab(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT})
