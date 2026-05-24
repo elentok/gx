@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	logui "github.com/elentok/gx/ui/log"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/navstate"
 	"github.com/elentok/gx/ui/notify"
 	statusui "github.com/elentok/gx/ui/status"
 	"github.com/elentok/gx/ui/worktrees"
@@ -39,14 +40,10 @@ type Model struct {
 	width  int
 	height int
 
-	// liveTab is the base tab shown when the stack is empty.
-	// activeTab mirrors the currently visible tab (top of stack, or liveTab).
-	liveTab            nav.TabID
-	activeTab          nav.TabID
-	lastViewStateByTab map[nav.TabID]nav.ViewState
-	livePageByTab      map[nav.TabID]livePage
-	// stack is the single global deep-navigation stack.
-	// Switch() clears it; Open() pushes; Back() pops.
+	router        navstate.State
+	livePageByTab map[nav.TabID]livePage
+	// stack is the model side of the global deep-navigation stack.
+	// router.State holds the parallel ViewState side.
 	stack     []historyEntry
 	keyPrefix string
 	notify    notify.Model
@@ -54,23 +51,20 @@ type Model struct {
 
 func New(repo git.Repo, settings Settings) Model {
 	m := Model{
-		repo:               repo,
-		settings:           settings,
-		lastViewStateByTab: make(map[nav.TabID]nav.ViewState),
-		livePageByTab:      make(map[nav.TabID]livePage),
-		notify:             notify.New(settings.UseNerdFontIcons),
+		repo:          repo,
+		settings:      settings,
+		router:        navstate.NewState(settings.ActiveWorktreePath),
+		livePageByTab: make(map[nav.TabID]livePage),
+		notify:        notify.New(settings.UseNerdFontIcons),
 	}
 	if m.settings.InitialRoute.Tab == "" {
 		m.settings.InitialRoute = nav.ViewState{Tab: nav.TabWorktrees}
 	}
-	initialRoute := m.tabViewStateForViewContext(m.settings.InitialRoute.Context())
-	m.liveTab = initialRoute.Tab
-	m.activeTab = m.liveTab
-	m.ensureTabs()
-	m.lastViewStateByTab[m.activeTab] = initialRoute
+	m.router.SetInitialTab(m.settings.InitialRoute)
+	initialRoute := m.router.Active()
 	page := m.newLivePage(initialRoute)
 	page.didInit = true
-	m.livePageByTab[m.activeTab] = page
+	m.livePageByTab[initialRoute.Tab] = page
 	return m
 }
 
@@ -87,28 +81,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return next, tea.Batch(notifyCmd, cmd)
 	}
 	if vs, ok := nav.IsOpen(msg); ok {
-		entry := m.newHistoryEntry(vs)
+		tr := m.router.Open(vs)
+		entry := m.newHistoryEntry(tr.ViewState)
 		m.stack = append(m.stack, entry)
-		m.activeTab = vs.Tab
-		m.lastViewStateByTab[vs.Tab] = vs
 		return m, tea.Batch(notifyCmd, tea.ClearScreen, entry.model.Init(), m.resizeCurrentCmd())
 	}
 	if vs, ok := nav.IsViewStateChanged(msg); ok {
-		m.applyViewStateChanged(vs)
+		m.router.ApplyViewStateChanged(vs)
 		return m, notifyCmd
 	}
 	if nav.IsBack(msg) {
-		if len(m.stack) == 0 {
+		tr := m.router.Back()
+		if tr.Kind == navstate.TransitionQuit {
 			return m, tea.Quit
 		}
 		popped := m.stack[len(m.stack)-1]
 		m.stack = m.stack[:len(m.stack)-1]
 		m.restoreLogSelectionFromPoppedPage(popped)
-		if len(m.stack) > 0 {
-			m.activeTab = m.stack[len(m.stack)-1].viewState.Tab
-		} else {
-			m.activeTab = m.liveTab
-		}
 		return m, tea.Batch(notifyCmd, tea.ClearScreen, m.resizeCurrentCmd())
 	}
 
@@ -179,8 +168,9 @@ func (m Model) activePage() historyEntry {
 	if len(m.stack) > 0 {
 		return m.stack[len(m.stack)-1]
 	}
-	viewState := m.lastViewStateByTab[m.activeTab]
-	page := m.livePageByTab[m.activeTab]
+	activeTab := m.router.ActiveTab()
+	viewState := m.router.Active()
+	page := m.livePageByTab[activeTab]
 	return historyEntry{
 		viewState: viewState,
 		model:     page.model,
@@ -192,9 +182,10 @@ func (m *Model) setActivePage(page historyEntry) {
 		m.stack[len(m.stack)-1] = page
 		return
 	}
-	live := m.livePageByTab[m.activeTab]
+	activeTab := m.router.ActiveTab()
+	live := m.livePageByTab[activeTab]
 	live.model = page.model
-	m.livePageByTab[m.activeTab] = live
+	m.livePageByTab[activeTab] = live
 }
 
 func normalizeFrameContent(content string, targetWidth, targetHeight int) string {
@@ -300,18 +291,6 @@ func (m *Model) restoreLogSelectionFromPoppedPage(popped historyEntry) {
 	}
 	current.model = logModel.SelectRef(ref)
 	m.setActivePage(current)
-	// Keep lastViewStateByTab in sync so future tab switches restore the correct ref.
-	remembered := m.lastViewStateByTab[nav.TabLog]
-	remembered.Ref = ref
-	m.lastViewStateByTab[nav.TabLog] = remembered
-}
-
-func (m *Model) applyViewStateChanged(viewState nav.ViewState) {
-	tabViewState := m.tabViewStateForViewContext(viewState.Context())
-	m.ensureTabs()
-	m.lastViewStateByTab[tabViewState.Tab] = tabViewState
-	// If the top of the stack is for the same tab, keep it current.
-	if len(m.stack) > 0 && m.stack[len(m.stack)-1].viewState.Tab == tabViewState.Tab {
-		m.stack[len(m.stack)-1].viewState = tabViewState
-	}
+	// Keep router tab memory in sync so future tab switches restore the correct ref.
+	m.router.ApplyViewStateChanged(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: current.viewState.WorktreeRoot, Ref: ref})
 }

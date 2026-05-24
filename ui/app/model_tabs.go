@@ -7,16 +7,14 @@ import (
 	"github.com/elentok/gx/ui"
 	logui "github.com/elentok/gx/ui/log"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/navstate"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 )
 
-func (m *Model) ensureTabs() {
+func (m *Model) ensureLivePages() {
 	for _, kind := range []nav.TabID{nav.TabWorktrees, nav.TabLog, nav.TabStatus} {
-		if _, ok := m.lastViewStateByTab[kind]; !ok {
-			m.lastViewStateByTab[kind] = nav.ViewState{Tab: kind}
-		}
 		if _, ok := m.livePageByTab[kind]; !ok {
 			m.livePageByTab[kind] = livePage{}
 		}
@@ -24,19 +22,17 @@ func (m *Model) ensureTabs() {
 }
 
 func (m Model) switchTab(viewState nav.ViewState) (tea.Model, tea.Cmd) {
-	tabViewState := m.tabViewStateForViewContext(viewState.Context())
+	prevViewState := m.router.Active()
+	tr := m.router.Switch(viewState)
+	tabViewState := tr.ViewState
 
-	// Clear global stack — tab switch exits the current deep-navigation session.
+	// Clear model-side stack — tab switch exits the current deep-navigation session.
 	m.stack = nil
-	m.liveTab = tabViewState.Tab
-	m.activeTab = tabViewState.Tab
-	m.ensureTabs()
+	m.ensureLivePages()
 
 	currentPage := m.livePageByTab[tabViewState.Tab]
-	prevViewState := m.lastViewStateByTab[tabViewState.Tab]
-	m.lastViewStateByTab[tabViewState.Tab] = tabViewState
 
-	if currentPage.model == nil || !sameViewContext(prevViewState.Context(), tabViewState.Context()) {
+	if currentPage.model == nil || !navstate.SameViewContext(prevViewState.Context(), tabViewState.Context()) {
 		currentPage = m.newLivePage(tabViewState)
 		currentPage.didInit = true
 		m.livePageByTab[tabViewState.Tab] = currentPage
@@ -185,55 +181,6 @@ func replayKeys(model tea.Model, msgs ...tea.Msg) (tea.Model, tea.Cmd) {
 	return current, tea.Batch(cmds...)
 }
 
-func (m Model) tabViewStateForViewContext(ctx nav.ViewContext) nav.ViewState {
-	tabID := resolveTabID(ctx.Tab)
-	tabViewState := nav.ViewState{Tab: tabID}
-
-	switch tabID {
-	case nav.TabLog, nav.TabCommit:
-		tabViewState.WorktreeRoot = ctx.WorktreeRoot
-		tabViewState.Ref = ctx.Ref
-		if strings.TrimSpace(tabViewState.WorktreeRoot) == "" {
-			tabViewState.WorktreeRoot = m.settings.ActiveWorktreePath
-		}
-	case nav.TabStatus:
-		tabViewState.WorktreeRoot = ctx.WorktreeRoot
-		tabViewState.InitialPath = ctx.InitialPath
-		if strings.TrimSpace(tabViewState.WorktreeRoot) == "" {
-			tabViewState.WorktreeRoot = m.settings.ActiveWorktreePath
-		}
-	}
-
-	// If context has no specific routing info, restore from per-tab memory.
-	if ctx.WorktreeRoot == "" && ctx.Ref == "" && ctx.InitialPath == "" {
-		if remembered, ok := m.lastViewStateByTab[tabID]; ok {
-			tabViewState.WorktreeRoot = remembered.WorktreeRoot
-			tabViewState.Ref = remembered.Ref
-			tabViewState.InitialPath = remembered.InitialPath
-		}
-	}
-
-	// Commit tab requires a ref — default to HEAD when none is available.
-	if tabID == nav.TabCommit && tabViewState.Ref == "" {
-		tabViewState.Ref = "HEAD"
-	}
-
-	return tabViewState
-}
-
-func resolveTabID(kind nav.TabID) nav.TabID {
-	switch kind {
-	case nav.TabWorktrees, nav.TabLog, nav.TabStatus, nav.TabCommit:
-		return kind
-	default:
-		return nav.TabWorktrees
-	}
-}
-
-func sameViewContext(a, b nav.ViewContext) bool {
-	return a == b
-}
-
 func (m Model) newLivePage(viewState nav.ViewState) livePage {
 	return livePage{
 		model: m.newHistoryEntry(viewState).model,
@@ -241,11 +188,12 @@ func (m Model) newLivePage(viewState nav.ViewState) livePage {
 }
 
 func (m Model) tabsView() string {
+	activeTab := m.router.ActiveTab()
 	tabs := []tabSpec{
-		{label: "worktrees", active: m.activeTab == nav.TabWorktrees},
-		{label: "log", active: m.activeTab == nav.TabLog},
-		{label: "status", active: m.activeTab == nav.TabStatus},
-		{label: "commit", active: m.activeTab == nav.TabCommit},
+		{label: "worktrees", active: activeTab == nav.TabWorktrees},
+		{label: "log", active: activeTab == nav.TabLog},
+		{label: "status", active: activeTab == nav.TabStatus},
+		{label: "commit", active: activeTab == nav.TabCommit},
 	}
 	parts := make([]string, 0, len(tabs))
 	for _, tab := range tabs {
@@ -274,8 +222,9 @@ func orderedTabs() []nav.TabID {
 func (m Model) switchRelativeTab(delta int) (tea.Model, tea.Cmd) {
 	tabs := orderedTabs()
 	idx := 0
+	activeTab := m.router.ActiveTab()
 	for i, kind := range tabs {
-		if kind == m.activeTab {
+		if kind == activeTab {
 			idx = i
 			break
 		}
