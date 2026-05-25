@@ -29,10 +29,13 @@ const (
 	bindingLeft        keys.BindingID = "left"
 	bindingRefresh     keys.BindingID = "refresh"
 	bindingGotoTop     keys.BindingID = "goto-top"
-	bindingYankContent keys.BindingID = "yank-content"
-	bindingYankLoc     keys.BindingID = "yank-location"
-	bindingYankAll     keys.BindingID = "yank-all"
-	bindingYankFile    keys.BindingID = "yank-filename"
+	bindingYankContent  keys.BindingID = "yank-content"
+	bindingYankLoc      keys.BindingID = "yank-location"
+	bindingYankAll      keys.BindingID = "yank-all"
+	bindingYankFile     keys.BindingID = "yank-filename"
+	bindingYankHash     keys.BindingID = "yank-hash"
+	bindingYankSubject  keys.BindingID = "yank-subject"
+	bindingYankMessage  keys.BindingID = "yank-message"
 	bindingComment     keys.BindingID = "comment"
 	bindingRefreshMenu keys.BindingID = "refresh-menu"
 	bindingCancelChord keys.BindingID = "cancel-chord"
@@ -76,6 +79,9 @@ func newCommitManager() keys.Manager {
 		{ID: bindingYankLoc, Seq: []string{"y", "l"}, Categories: []string{"Yank"}, Title: "yank location"},
 		{ID: bindingYankAll, Seq: []string{"y", "a"}, Categories: []string{"Yank"}, Title: "yank for AI agent"},
 		{ID: bindingYankFile, Seq: []string{"y", "f"}, Categories: []string{"Yank"}, Title: "yank filename"},
+		{ID: bindingYankHash, Seq: []string{"y", "h"}, Categories: []string{"Yank"}, Title: "yank commit hash"},
+		{ID: bindingYankSubject, Seq: []string{"y", "s"}, Categories: []string{"Yank"}, Title: "yank commit subject"},
+		{ID: bindingYankMessage, Seq: []string{"y", "m"}, Categories: []string{"Yank"}, Title: "yank commit message"},
 		{ID: bindingCancelChord, Seq: []string{"y", "esc"}, Categories: []string{}, Title: ""},
 
 		{ID: bindingRefreshMenu, Seq: []string{"m", "r"}, Categories: []string{"Global"}, Title: "refresh"},
@@ -273,6 +279,12 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, m.yankAllContext()
 	case bindingYankFile:
 		return m, m.yankFilename()
+	case bindingYankHash:
+		return m, m.yankCommitHash()
+	case bindingYankSubject:
+		return m, m.yankCommitSubject()
+	case bindingYankMessage:
+		return m, m.yankCommitMessage()
 	case bindingComment:
 		if !m.focusDiff {
 			return m, nil

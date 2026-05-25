@@ -103,6 +103,41 @@ func (m *Model) yankCommitBody() tea.Cmd {
 	return notify.Info("yanked commit body")
 }
 
+func (m *Model) yankCommitHash() tea.Cmd {
+	if m.details.FullHash == "" {
+		return notify.Warning("no commit selected")
+	}
+	if err := commitClipboardWrite(m.details.FullHash); err != nil {
+		return notify.Error("clipboard copy failed: " + err.Error())
+	}
+	return notify.Info("yanked commit hash")
+}
+
+func (m *Model) yankCommitSubject() tea.Cmd {
+	if m.details.Subject == "" {
+		return notify.Warning("no commit selected")
+	}
+	if err := commitClipboardWrite(m.details.Subject); err != nil {
+		return notify.Error("clipboard copy failed: " + err.Error())
+	}
+	return notify.Info("yanked commit subject")
+}
+
+func (m *Model) yankCommitMessage() tea.Cmd {
+	if m.details.Subject == "" {
+		return notify.Warning("no commit selected")
+	}
+	body := m.commitMessageBody()
+	msg := m.details.Subject
+	if body != "" {
+		msg = msg + "\n\n" + body
+	}
+	if err := commitClipboardWrite(msg); err != nil {
+		return notify.Error("clipboard copy failed: " + err.Error())
+	}
+	return notify.Info("yanked commit message")
+}
+
 func (m *Model) focusedLocationAndBody() (string, []string, tea.Cmd, bool) {
 	loc, body, yankErr := m.diffModel.FocusedLocationAndBody()
 	if yankErr != "" {

@@ -32,6 +32,9 @@ const (
 	bindingViewOutput        keys.BindingID = "view-output"
 	bindingRebaseInteractive keys.BindingID = "rebase-interactive"
 	bindingClearFilter       keys.BindingID = "clear-filter"
+	bindingYankHash          keys.BindingID = "yank-hash"
+	bindingYankSubject       keys.BindingID = "yank-subject"
+	bindingYankMessage       keys.BindingID = "yank-message"
 )
 
 func newLogManager() keys.Manager {
@@ -72,6 +75,11 @@ func newLogManager() keys.Manager {
 		{ID: bindingPageDown, Seq: []string{"ctrl+d"}, Categories: []string{"Navigation"}, Title: "page down"},
 		{ID: bindingPageUp, Seq: []string{"ctrl+u"}, Categories: []string{"Navigation"}, Title: "page up"},
 		{ID: bindingClearFilter, Seq: []string{"f"}, Categories: []string{"Filter"}, Title: "clear filter"},
+
+		{ID: bindingYankHash, Seq: []string{"y", "h"}, Categories: []string{"Yank"}, Title: "yank commit hash"},
+		{ID: bindingYankSubject, Seq: []string{"y", "s"}, Categories: []string{"Yank"}, Title: "yank commit subject"},
+		{ID: bindingYankMessage, Seq: []string{"y", "m"}, Categories: []string{"Yank"}, Title: "yank commit message"},
+		{ID: bindingCancel, Seq: []string{"y", "esc"}, Categories: []string{}, Title: ""},
 	})
 }
 
@@ -158,6 +166,12 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		m.filter = LogFilter{}
 		m.refreshing = true
 		return m, tea.Batch(notify.Progress("filter", "clearing filter..."), m.cmdReload())
+	case bindingYankHash:
+		return m, m.yankCommitHash()
+	case bindingYankSubject:
+		return m, m.yankCommitSubject()
+	case bindingYankMessage:
+		return m, m.yankCommitMessage()
 	}
 	return m, nil
 }
