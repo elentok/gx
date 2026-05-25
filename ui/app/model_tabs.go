@@ -27,6 +27,15 @@ func (m Model) switchTab(viewState nav.ViewState) (Model, tea.Cmd) {
 }
 
 func (m Model) applySwitch(tr navstate.Transition) (Model, tea.Cmd) {
+	// Derive outgoing model from model-side state: m.router.activeTab has already been
+	// updated by the pointer-receiver Switch call, so m.activePage() would return the
+	// new page. Use the model-side stack or PrevViewState to find what the user was seeing.
+	var outgoing tea.Model
+	if len(m.stack) > 0 {
+		outgoing = m.stack[len(m.stack)-1].model
+	} else {
+		outgoing = m.livePageByTab[tr.PrevViewState.Tab].model
+	}
 	tabViewState := tr.ViewState
 
 	// Clear model-side stack — tab switch exits the current deep-navigation session.
@@ -39,12 +48,12 @@ func (m Model) applySwitch(tr navstate.Transition) (Model, tea.Cmd) {
 		currentPage = m.newLivePage(tabViewState)
 		currentPage.didInit = true
 		m.livePageByTab[tabViewState.Tab] = currentPage
-		return m, tea.Batch(tea.ClearScreen, currentPage.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
+		return m, tea.Batch(tea.ClearScreen, onPageDeactivatedCmd(outgoing), currentPage.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
 	}
 	if !currentPage.didInit {
 		currentPage.didInit = true
 		m.livePageByTab[tabViewState.Tab] = currentPage
-		return m, tea.Batch(tea.ClearScreen, currentPage.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
+		return m, tea.Batch(tea.ClearScreen, onPageDeactivatedCmd(outgoing), currentPage.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
 	}
 	if tabViewState.FocusSubject != "" {
 		if logModel, ok := currentPage.model.(logui.Model); ok {
@@ -52,7 +61,7 @@ func (m Model) applySwitch(tr navstate.Transition) (Model, tea.Cmd) {
 			m.livePageByTab[tabViewState.Tab] = currentPage
 		}
 	}
-	return m, tea.Batch(tea.ClearScreen, m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
+	return m, tea.Batch(tea.ClearScreen, onPageDeactivatedCmd(outgoing), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
 }
 
 type pageActivationAware interface {
@@ -62,6 +71,17 @@ type pageActivationAware interface {
 func onPageActivatedCmd(model tea.Model) tea.Cmd {
 	if activator, ok := model.(pageActivationAware); ok {
 		return activator.OnPageActivated()
+	}
+	return nil
+}
+
+type pageDeactivationAware interface {
+	OnPageDeactivated() tea.Cmd
+}
+
+func onPageDeactivatedCmd(model tea.Model) tea.Cmd {
+	if d, ok := model.(pageDeactivationAware); ok {
+		return d.OnPageDeactivated()
 	}
 	return nil
 }

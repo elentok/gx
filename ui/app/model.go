@@ -122,14 +122,22 @@ func (m Model) applyTransition(tr navstate.Transition) (Model, tea.Cmd) {
 	case navstate.TransitionSwitched:
 		return m.applySwitch(tr)
 	case navstate.TransitionPushed:
+		// m.router.Open has already updated activeTab; use the model-side stack or
+		// LiveTab (unchanged by Open) to find the page the user was looking at.
+		var outgoing tea.Model
+		if len(m.stack) > 0 {
+			outgoing = m.stack[len(m.stack)-1].model
+		} else {
+			outgoing = m.livePageByTab[m.router.LiveTab()].model
+		}
 		entry := m.newHistoryEntry(tr.ViewState)
 		m.stack = append(m.stack, entry)
-		return m, tea.Batch(tea.ClearScreen, entry.model.Init(), m.resizeCurrentCmd())
+		return m, tea.Batch(tea.ClearScreen, onPageDeactivatedCmd(outgoing), entry.model.Init(), m.resizeCurrentCmd())
 	case navstate.TransitionPopped:
 		popped := m.stack[len(m.stack)-1]
 		m.stack = m.stack[:len(m.stack)-1]
 		m.restoreLogSelectionFromPoppedPage(popped)
-		return m, tea.Batch(tea.ClearScreen, m.resizeCurrentCmd())
+		return m, tea.Batch(tea.ClearScreen, onPageDeactivatedCmd(popped.model), onPageActivatedCmd(m.activePage().model), m.resizeCurrentCmd())
 	case navstate.TransitionQuit:
 		return m, tea.Quit
 	default: // TransitionUpdated, TransitionNone
