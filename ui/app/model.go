@@ -102,8 +102,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		type inputFocuser interface{ InputFocused() bool }
 		active := m.activePage().model
 		if f, ok := active.(inputFocuser); !ok || !f.InputFocused() {
-			if handled, cmd := m.handleShellChordKey(key); handled {
-				return m, tea.Batch(notifyCmd, cmd)
+			if next, cmd, handled := m.handleShellChordKey(key); handled {
+				return next, tea.Batch(notifyCmd, cmd)
 			}
 		}
 	}

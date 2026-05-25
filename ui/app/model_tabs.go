@@ -127,68 +127,59 @@ func injectTabsIntoFooter(content, tabs string, width int) string {
 	return strings.Join(lines, "\n")
 }
 
-func (m *Model) handleShellChordKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
+// handleShellChordKey returns (newModel, cmd, handled) where handled indicates the key was consumed.
+func (m Model) handleShellChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	key := msg.String()
 	if m.keyPrefix == "g" {
 		m.keyPrefix = ""
 		switch key {
 		case ",":
 			next, cmd := m.switchRelativeTab(-1)
-			*m = next
-			return true, cmd
+			return next, cmd, true
 		case ".":
 			next, cmd := m.switchRelativeTab(1)
-			*m = next
-			return true, cmd
+			return next, cmd, true
 		case "w":
 			next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabWorktrees})
-			*m = next
-			return true, cmd
+			return next, cmd, true
 		case "l":
 			next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabLog})
-			*m = next
-			return true, cmd
+			return next, cmd, true
 		case "s":
 			next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabStatus})
-			*m = next
-			return true, cmd
+			return next, cmd, true
 		case "c":
 			next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabCommit})
-			*m = next
-			return true, cmd
+			return next, cmd, true
 		case "esc":
-			return true, nil
+			return m, nil, true
 		default:
 			current := m.activePage()
 			replayed, cmd := replayKeys(current.model, tea.KeyPressMsg{Code: 'g', Text: "g"}, msg)
 			current.model = replayed
 			m.setActivePage(current)
-			return true, cmd
+			return m, cmd, true
 		}
 	}
 	if key == "g" {
 		m.keyPrefix = "g"
-		return true, nil
+		return m, nil, true
 	}
 	switch key {
 	case "1":
 		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabWorktrees})
-		*m = next
-		return true, cmd
+		return next, cmd, true
 	case "2":
 		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabLog})
-		*m = next
-		return true, cmd
+		return next, cmd, true
 	case "3":
 		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabStatus})
-		*m = next
-		return true, cmd
+		return next, cmd, true
 	case "4":
 		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabCommit})
-		*m = next
-		return true, cmd
+		return next, cmd, true
 	}
-	return false, nil
+	return m, nil, false
 }
 
 func replayKeys(model tea.Model, msgs ...tea.Msg) (tea.Model, tea.Cmd) {
