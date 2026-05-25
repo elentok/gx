@@ -6,25 +6,6 @@ import (
 	"github.com/elentok/gx/ui/nav"
 )
 
-type TransitionKind int
-
-const (
-	TransitionNone    TransitionKind = iota
-	TransitionPushed                 // Open: new ViewState pushed onto stack
-	TransitionPopped                 // Back: ViewState popped from stack
-	TransitionSwitched               // Switch: tab changed, stack cleared
-	TransitionQuit                   // Back on empty stack
-	TransitionUpdated                // ViewStateChanged: tab memory updated, no page rebuild
-)
-
-type Transition struct {
-	Kind        TransitionKind
-	ActiveTab   nav.TabID
-	ViewState   nav.ViewState // current active view state after transition
-	PoppedEntry nav.ViewState // only set on TransitionPopped
-	PrevViewState nav.ViewState // only set on TransitionSwitched: state before the switch
-}
-
 type State struct {
 	activeTab          nav.TabID
 	liveTab            nav.TabID
@@ -94,7 +75,7 @@ func (s *State) TabViewStateForViewContext(ctx nav.ViewContext) nav.ViewState {
 	return tabViewState
 }
 
-func (s *State) Open(vs nav.ViewState) Transition {
+func (s *State) Open(vs nav.ViewState) nav.ViewState {
 	tabVS := s.TabViewStateForViewContext(vs.Context())
 	tabVS.FocusSubject = vs.FocusSubject
 	tabVS.FilterPath = vs.FilterPath
@@ -105,15 +86,10 @@ func (s *State) Open(vs nav.ViewState) Transition {
 	s.activeTab = tabVS.Tab
 	s.lastViewStateByTab[tabVS.Tab] = tabVS
 	s.initMissingTabs()
-	return Transition{
-		Kind:      TransitionPushed,
-		ActiveTab: s.activeTab,
-		ViewState: tabVS,
-	}
+	return tabVS
 }
 
-func (s *State) Switch(vs nav.ViewState) Transition {
-	prev := s.Active()
+func (s *State) Switch(vs nav.ViewState) nav.ViewState {
 	tabVS := s.TabViewStateForViewContext(vs.Context())
 	tabVS.FocusSubject = vs.FocusSubject
 
@@ -123,34 +99,25 @@ func (s *State) Switch(vs nav.ViewState) Transition {
 	s.initMissingTabs()
 	s.lastViewStateByTab[tabVS.Tab] = tabVS
 
-	return Transition{
-		Kind:          TransitionSwitched,
-		ActiveTab:     s.activeTab,
-		ViewState:     tabVS,
-		PrevViewState: prev,
-	}
+	return tabVS
 }
 
-func (s *State) Back() Transition {
+// Back pops the navigation stack. Returns (active, quit): quit is true when
+// the stack was empty and the app should exit.
+func (s *State) Back() (nav.ViewState, bool) {
 	if len(s.history) == 0 {
-		return Transition{Kind: TransitionQuit}
+		return nav.ViewState{}, true
 	}
-	popped := s.history[len(s.history)-1]
 	s.history = s.history[:len(s.history)-1]
 	if len(s.history) > 0 {
 		s.activeTab = s.history[len(s.history)-1].Tab
 	} else {
 		s.activeTab = s.liveTab
 	}
-	return Transition{
-		Kind:        TransitionPopped,
-		ActiveTab:   s.activeTab,
-		ViewState:   s.Active(),
-		PoppedEntry: popped,
-	}
+	return s.Active(), false
 }
 
-func (s *State) ApplyViewStateChanged(vs nav.ViewState) Transition {
+func (s *State) ApplyViewStateChanged(vs nav.ViewState) nav.ViewState {
 	tabVS := s.TabViewStateForViewContext(vs.Context())
 	s.initMissingTabs()
 	s.lastViewStateByTab[tabVS.Tab] = tabVS
@@ -158,7 +125,7 @@ func (s *State) ApplyViewStateChanged(vs nav.ViewState) Transition {
 	if len(s.history) > 0 && s.history[len(s.history)-1].Tab == tabVS.Tab {
 		s.history[len(s.history)-1] = tabVS
 	}
-	return Transition{Kind: TransitionUpdated, ActiveTab: s.activeTab, ViewState: tabVS}
+	return tabVS
 }
 
 func (s *State) SetInitialTab(vs nav.ViewState) {

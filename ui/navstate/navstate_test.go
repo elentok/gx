@@ -16,21 +16,18 @@ func newState() navstate.State {
 func TestBackOnEmptyStackReturnsQuit(t *testing.T) {
 	s := newState()
 	s.SetInitialTab(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT})
-	tr := s.Back()
-	if tr.Kind != navstate.TransitionQuit {
-		t.Fatalf("expected TransitionQuit, got %v", tr.Kind)
+	_, quit := s.Back()
+	if !quit {
+		t.Fatalf("expected quit=true on empty stack back")
 	}
 }
 
 func TestOpenPushesAndSetsActiveTab(t *testing.T) {
 	s := newState()
 	s.SetInitialTab(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT})
-	tr := s.Open(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: defaultWT, Ref: "HEAD"})
-	if tr.Kind != navstate.TransitionPushed {
-		t.Fatalf("expected TransitionPushed, got %v", tr.Kind)
-	}
-	if tr.ActiveTab != nav.TabCommit {
-		t.Fatalf("expected active tab commit, got %q", tr.ActiveTab)
+	tabVS := s.Open(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: defaultWT, Ref: "HEAD"})
+	if tabVS.Tab != nav.TabCommit {
+		t.Fatalf("expected returned tab commit, got %q", tabVS.Tab)
 	}
 	if s.ActiveTab() != nav.TabCommit {
 		t.Fatalf("expected state active tab commit, got %q", s.ActiveTab())
@@ -41,15 +38,15 @@ func TestBackPopsAndRestoresPreviousTab(t *testing.T) {
 	s := newState()
 	s.SetInitialTab(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT})
 	s.Open(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: defaultWT, Ref: "HEAD"})
-	tr := s.Back()
-	if tr.Kind != navstate.TransitionPopped {
-		t.Fatalf("expected TransitionPopped, got %v", tr.Kind)
+	active, quit := s.Back()
+	if quit {
+		t.Fatalf("expected quit=false after popping non-empty stack")
 	}
-	if tr.ActiveTab != nav.TabLog {
-		t.Fatalf("expected active tab log after back, got %q", tr.ActiveTab)
+	if active.Tab != nav.TabLog {
+		t.Fatalf("expected active tab log after back, got %q", active.Tab)
 	}
-	if tr.PoppedEntry.Tab != nav.TabCommit {
-		t.Fatalf("expected popped entry tab commit, got %q", tr.PoppedEntry.Tab)
+	if s.ActiveTab() != nav.TabLog {
+		t.Fatalf("expected state active tab log after back, got %q", s.ActiveTab())
 	}
 }
 
@@ -57,38 +54,26 @@ func TestSwitchClearsStack(t *testing.T) {
 	s := newState()
 	s.SetInitialTab(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT})
 	s.Open(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: defaultWT, Ref: "HEAD"})
-	tr := s.Switch(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: defaultWT})
-	if tr.Kind != navstate.TransitionSwitched {
-		t.Fatalf("expected TransitionSwitched, got %v", tr.Kind)
+	tabVS := s.Switch(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: defaultWT})
+	if tabVS.Tab != nav.TabStatus {
+		t.Fatalf("expected returned tab status, got %q", tabVS.Tab)
 	}
-	if tr.ActiveTab != nav.TabStatus {
-		t.Fatalf("expected active tab status, got %q", tr.ActiveTab)
+	if s.ActiveTab() != nav.TabStatus {
+		t.Fatalf("expected active tab status, got %q", s.ActiveTab())
 	}
-	// Verify stack is cleared by doing a Back which should return Quit.
-	tr2 := s.Back()
-	if tr2.Kind != navstate.TransitionQuit {
-		t.Fatalf("expected TransitionQuit after Switch+Back, got %v", tr2.Kind)
-	}
-}
-
-func TestSwitchCarriesPrevViewState(t *testing.T) {
-	s := newState()
-	s.SetInitialTab(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT})
-	tr := s.Switch(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: defaultWT})
-	if tr.PrevViewState.Tab != nav.TabLog {
-		t.Fatalf("expected PrevViewState.Tab log, got %q", tr.PrevViewState.Tab)
+	// Verify stack is cleared by doing a Back which should quit.
+	_, quit := s.Back()
+	if !quit {
+		t.Fatalf("expected quit=true after Switch+Back (stack should be cleared)")
 	}
 }
 
-func TestApplyViewStateChangedReturnsTransitionUpdated(t *testing.T) {
+func TestApplyViewStateChangedReturnsResolvedViewState(t *testing.T) {
 	s := newState()
 	s.SetInitialTab(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT})
-	tr := s.ApplyViewStateChanged(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT, Ref: "abc"})
-	if tr.Kind != navstate.TransitionUpdated {
-		t.Fatalf("expected TransitionUpdated, got %v", tr.Kind)
-	}
-	if tr.ViewState.Ref != "abc" {
-		t.Fatalf("expected ViewState.Ref abc, got %q", tr.ViewState.Ref)
+	tabVS := s.ApplyViewStateChanged(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT, Ref: "abc"})
+	if tabVS.Ref != "abc" {
+		t.Fatalf("expected returned Ref abc, got %q", tabVS.Ref)
 	}
 }
 
@@ -121,9 +106,9 @@ func TestApplyViewStateChangedIgnoresDifferentTab(t *testing.T) {
 func TestEmptyWorktreeRootFallsBackToDefault(t *testing.T) {
 	s := newState()
 	// Ref is non-empty → all-empty-context check fails → memory restore skipped → defaultWT applies.
-	tr := s.Open(nav.ViewState{Tab: nav.TabLog, Ref: "main"})
-	if tr.ViewState.WorktreeRoot != defaultWT {
-		t.Fatalf("expected WorktreeRoot %q, got %q", defaultWT, tr.ViewState.WorktreeRoot)
+	tabVS := s.Open(nav.ViewState{Tab: nav.TabLog, Ref: "main"})
+	if tabVS.WorktreeRoot != defaultWT {
+		t.Fatalf("expected WorktreeRoot %q, got %q", defaultWT, tabVS.WorktreeRoot)
 	}
 }
 
@@ -133,26 +118,26 @@ func TestEmptyContextRestoresFromTabMemory(t *testing.T) {
 	// Seed log tab memory with a specific ref.
 	s.Switch(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT, Ref: "main"})
 	// Now switch to log with empty context — should restore "main".
-	tr := s.Switch(nav.ViewState{Tab: nav.TabLog})
-	if tr.ViewState.Ref != "main" {
-		t.Fatalf("expected restored ref %q, got %q", "main", tr.ViewState.Ref)
+	tabVS := s.Switch(nav.ViewState{Tab: nav.TabLog})
+	if tabVS.Ref != "main" {
+		t.Fatalf("expected restored ref %q, got %q", "main", tabVS.Ref)
 	}
 }
 
 func TestCommitTabDefaultsRefToHEAD(t *testing.T) {
 	s := newState()
 	s.SetInitialTab(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT})
-	tr := s.Open(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: defaultWT})
-	if tr.ViewState.Ref != "HEAD" {
-		t.Fatalf("expected commit ref HEAD, got %q", tr.ViewState.Ref)
+	tabVS := s.Open(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: defaultWT})
+	if tabVS.Ref != "HEAD" {
+		t.Fatalf("expected commit ref HEAD, got %q", tabVS.Ref)
 	}
 }
 
 func TestUnknownTabResolvesToWorktrees(t *testing.T) {
 	s := newState()
-	tr := s.Switch(nav.ViewState{Tab: nav.TabID("unknown")})
-	if tr.ActiveTab != nav.TabWorktrees {
-		t.Fatalf("expected unknown tab to resolve to worktrees, got %q", tr.ActiveTab)
+	tabVS := s.Switch(nav.ViewState{Tab: nav.TabID("unknown")})
+	if tabVS.Tab != nav.TabWorktrees {
+		t.Fatalf("expected unknown tab to resolve to worktrees, got %q", tabVS.Tab)
 	}
 }
 
@@ -175,9 +160,9 @@ func TestSetInitialTabSeedsStateWithoutPushingStack(t *testing.T) {
 		t.Fatalf("expected seeded ref %q, got %q", "main", got)
 	}
 	// Back on an empty stack should quit, not pop.
-	tr := s.Back()
-	if tr.Kind != navstate.TransitionQuit {
-		t.Fatalf("expected TransitionQuit (SetInitialTab leaves stack empty), got %v", tr.Kind)
+	_, quit := s.Back()
+	if !quit {
+		t.Fatalf("expected quit=true (SetInitialTab leaves stack empty)")
 	}
 }
 
@@ -187,28 +172,25 @@ func TestBackWithStackDepthTwoPopsToMiddleEntry(t *testing.T) {
 	s.Open(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: defaultWT, Ref: "HEAD"})
 	s.Open(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: defaultWT})
 	// Stack: [commit, status]. First Back pops status → commit.
-	tr1 := s.Back()
-	if tr1.Kind != navstate.TransitionPopped {
-		t.Fatalf("expected TransitionPopped on first back, got %v", tr1.Kind)
+	active1, quit1 := s.Back()
+	if quit1 {
+		t.Fatalf("expected quit=false on first back")
 	}
-	if tr1.ActiveTab != nav.TabCommit {
-		t.Fatalf("expected active tab commit after first back, got %q", tr1.ActiveTab)
-	}
-	if tr1.PoppedEntry.Tab != nav.TabStatus {
-		t.Fatalf("expected popped entry status, got %q", tr1.PoppedEntry.Tab)
+	if active1.Tab != nav.TabCommit {
+		t.Fatalf("expected active tab commit after first back, got %q", active1.Tab)
 	}
 	// Second Back pops commit → empty stack, falls back to liveTab (log).
-	tr2 := s.Back()
-	if tr2.Kind != navstate.TransitionPopped {
-		t.Fatalf("expected TransitionPopped on second back, got %v", tr2.Kind)
+	active2, quit2 := s.Back()
+	if quit2 {
+		t.Fatalf("expected quit=false on second back")
 	}
-	if tr2.ActiveTab != nav.TabLog {
-		t.Fatalf("expected active tab log after second back, got %q", tr2.ActiveTab)
+	if active2.Tab != nav.TabLog {
+		t.Fatalf("expected active tab log after second back, got %q", active2.Tab)
 	}
 	// Third Back: stack empty → quit.
-	tr3 := s.Back()
-	if tr3.Kind != navstate.TransitionQuit {
-		t.Fatalf("expected TransitionQuit after stack exhausted, got %v", tr3.Kind)
+	_, quit3 := s.Back()
+	if !quit3 {
+		t.Fatalf("expected quit=true after stack exhausted")
 	}
 }
 
@@ -224,17 +206,17 @@ func TestOpenPropagatesViewOptionsToPushedEntry(t *testing.T) {
 		FilterStartLine: 5,
 		FilterEndLine:   20,
 	}
-	tr := s.Open(vs)
-	if tr.ViewState.FocusSubject != "main.go" {
-		t.Fatalf("expected FocusSubject %q, got %q", "main.go", tr.ViewState.FocusSubject)
+	tabVS := s.Open(vs)
+	if tabVS.FocusSubject != "main.go" {
+		t.Fatalf("expected FocusSubject %q, got %q", "main.go", tabVS.FocusSubject)
 	}
-	if tr.ViewState.FilterPath != "cmd/" {
-		t.Fatalf("expected FilterPath %q, got %q", "cmd/", tr.ViewState.FilterPath)
+	if tabVS.FilterPath != "cmd/" {
+		t.Fatalf("expected FilterPath %q, got %q", "cmd/", tabVS.FilterPath)
 	}
-	if tr.ViewState.FilterStartLine != 5 {
-		t.Fatalf("expected FilterStartLine 5, got %d", tr.ViewState.FilterStartLine)
+	if tabVS.FilterStartLine != 5 {
+		t.Fatalf("expected FilterStartLine 5, got %d", tabVS.FilterStartLine)
 	}
-	if tr.ViewState.FilterEndLine != 20 {
-		t.Fatalf("expected FilterEndLine 20, got %d", tr.ViewState.FilterEndLine)
+	if tabVS.FilterEndLine != 20 {
+		t.Fatalf("expected FilterEndLine 20, got %d", tabVS.FilterEndLine)
 	}
 }

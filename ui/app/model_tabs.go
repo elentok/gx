@@ -23,42 +23,43 @@ func (m *Model) ensureLivePages() {
 
 // switchTab is called from handleShellChordKey (direct key dispatch, outside the nav message path).
 func (m Model) switchTab(viewState nav.ViewState) (Model, tea.Cmd) {
-	return m.applySwitch(m.navState.Switch(viewState))
+	prev := m.navState.Active()
+	tabVS := m.navState.Switch(viewState)
+	return m.applySwitch(tabVS, prev)
 }
 
-func (m Model) applySwitch(tr navstate.Transition) (Model, tea.Cmd) {
+func (m Model) applySwitch(tabVS, prevVS nav.ViewState) (Model, tea.Cmd) {
 	// Derive outgoing model from model-side state: m.navState.activeTab has already been
 	// updated by the pointer-receiver Switch call, so m.activePage() would return the
-	// new page. Use the model-side stack or PrevViewState to find what the user was seeing.
+	// new page. Use the model-side stack or prevVS to find what the user was seeing.
 	var outgoing tea.Model
 	if len(m.history) > 0 {
 		outgoing = m.history[len(m.history)-1].model
 	} else {
-		outgoing = m.livePageByTab[tr.PrevViewState.Tab].model
+		outgoing = m.livePageByTab[prevVS.Tab].model
 	}
-	tabViewState := tr.ViewState
 
 	// Clear model-side stack — tab switch exits the current deep-navigation session.
 	m.history = nil
 	m.ensureLivePages()
 
-	currentPage := m.livePageByTab[tabViewState.Tab]
+	currentPage := m.livePageByTab[tabVS.Tab]
 
-	if currentPage.model == nil || !navstate.SameViewContext(tr.PrevViewState.Context(), tabViewState.Context()) {
-		currentPage = m.newLivePage(tabViewState)
+	if currentPage.model == nil || !navstate.SameViewContext(prevVS.Context(), tabVS.Context()) {
+		currentPage = m.newLivePage(tabVS)
 		currentPage.didInit = true
-		m.livePageByTab[tabViewState.Tab] = currentPage
+		m.livePageByTab[tabVS.Tab] = currentPage
 		return m, tea.Batch(tea.ClearScreen, onPageDeactivatedCmd(outgoing), currentPage.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
 	}
 	if !currentPage.didInit {
 		currentPage.didInit = true
-		m.livePageByTab[tabViewState.Tab] = currentPage
+		m.livePageByTab[tabVS.Tab] = currentPage
 		return m, tea.Batch(tea.ClearScreen, onPageDeactivatedCmd(outgoing), currentPage.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
 	}
-	if tabViewState.FocusSubject != "" {
+	if tabVS.FocusSubject != "" {
 		if logModel, ok := currentPage.model.(logui.Model); ok {
-			currentPage.model = logModel.WithPendingFocus(tabViewState.FocusSubject)
-			m.livePageByTab[tabViewState.Tab] = currentPage
+			currentPage.model = logModel.WithPendingFocus(tabVS.FocusSubject)
+			m.livePageByTab[tabVS.Tab] = currentPage
 		}
 	}
 	return m, tea.Batch(tea.ClearScreen, onPageDeactivatedCmd(outgoing), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
