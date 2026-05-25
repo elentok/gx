@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.16.0 - 2026-05-25
+
+- Log + Commit: add `yh`, `ys`, `ym` to yank commit hash, subject, and message
+- Log: show worktree root in panel title
+- Log: `q`/`esc` from a worktree's log view returns to the worktrees list
+- Log: update ref badge colors
+- Massive navigation refactor
+
 ## v0.15.7 - 2026-05-19
 
 - Worktrees: add bulk-delete with multi-select and progress modal
