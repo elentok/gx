@@ -40,11 +40,11 @@ type Model struct {
 	width  int
 	height int
 
-	router        navstate.State
+	navState      navstate.State
 	livePageByTab map[nav.TabID]livePage
-	// stack is the model side of the global deep-navigation stack.
-	// router.State holds the parallel ViewState side.
-	stack     []historyEntry
+	// history is the model side of the global deep-navigation stack.
+	// navState.State holds the parallel ViewState side.
+	history   []historyEntry
 	keyPrefix string
 	notify    notify.Model
 }
@@ -53,15 +53,15 @@ func New(repo git.Repo, settings Settings) Model {
 	m := Model{
 		repo:          repo,
 		settings:      settings,
-		router:        navstate.NewState(settings.ActiveWorktreePath),
+		navState:      navstate.NewState(settings.ActiveWorktreePath),
 		livePageByTab: make(map[nav.TabID]livePage),
 		notify:        notify.New(settings.UseNerdFontIcons),
 	}
 	if m.settings.InitialRoute.Tab == "" {
 		m.settings.InitialRoute = nav.ViewState{Tab: nav.TabWorktrees}
 	}
-	m.router.SetInitialTab(m.settings.InitialRoute)
-	initialRoute := m.router.Active()
+	m.navState.SetInitialTab(m.settings.InitialRoute)
+	initialRoute := m.navState.Active()
 	page := m.newLivePage(initialRoute)
 	page.didInit = true
 	m.livePageByTab[initialRoute.Tab] = page
@@ -77,19 +77,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.notify, notifyCmd = m.notify.Update(msg)
 
 	if vs, ok := nav.IsSwitch(msg); ok {
-		next, cmd := m.applyTransition(m.router.Switch(vs))
+		next, cmd := m.applyTransition(m.navState.Switch(vs))
 		return next, tea.Batch(notifyCmd, cmd)
 	}
 	if vs, ok := nav.IsOpen(msg); ok {
-		next, cmd := m.applyTransition(m.router.Open(vs))
+		next, cmd := m.applyTransition(m.navState.Open(vs))
 		return next, tea.Batch(notifyCmd, cmd)
 	}
 	if vs, ok := nav.IsViewStateChanged(msg); ok {
-		next, cmd := m.applyTransition(m.router.ApplyViewStateChanged(vs))
+		next, cmd := m.applyTransition(m.navState.ApplyViewStateChanged(vs))
 		return next, tea.Batch(notifyCmd, cmd)
 	}
 	if nav.IsBack(msg) {
-		next, cmd := m.applyTransition(m.router.Back())
+		next, cmd := m.applyTransition(m.navState.Back())
 		return next, tea.Batch(notifyCmd, cmd)
 	}
 
@@ -122,20 +122,20 @@ func (m Model) applyTransition(tr navstate.Transition) (Model, tea.Cmd) {
 	case navstate.TransitionSwitched:
 		return m.applySwitch(tr)
 	case navstate.TransitionPushed:
-		// m.router.Open has already updated activeTab; use the model-side stack or
+		// m.navState.Open has already updated activeTab; use the model-side stack or
 		// LiveTab (unchanged by Open) to find the page the user was looking at.
 		var outgoing tea.Model
-		if len(m.stack) > 0 {
-			outgoing = m.stack[len(m.stack)-1].model
+		if len(m.history) > 0 {
+			outgoing = m.history[len(m.history)-1].model
 		} else {
-			outgoing = m.livePageByTab[m.router.LiveTab()].model
+			outgoing = m.livePageByTab[m.navState.LiveTab()].model
 		}
 		entry := m.newHistoryEntry(tr.ViewState)
-		m.stack = append(m.stack, entry)
+		m.history = append(m.history, entry)
 		return m, tea.Batch(tea.ClearScreen, onPageDeactivatedCmd(outgoing), entry.model.Init(), m.resizeCurrentCmd())
 	case navstate.TransitionPopped:
-		popped := m.stack[len(m.stack)-1]
-		m.stack = m.stack[:len(m.stack)-1]
+		popped := m.history[len(m.history)-1]
+		m.history = m.history[:len(m.history)-1]
 		m.restoreLogSelectionFromPoppedPage(popped)
 		return m, tea.Batch(tea.ClearScreen, onPageDeactivatedCmd(popped.model), onPageActivatedCmd(m.activePage().model), m.resizeCurrentCmd())
 	case navstate.TransitionQuit:
@@ -184,11 +184,11 @@ func (m Model) View() tea.View {
 }
 
 func (m Model) activePage() historyEntry {
-	if len(m.stack) > 0 {
-		return m.stack[len(m.stack)-1]
+	if len(m.history) > 0 {
+		return m.history[len(m.history)-1]
 	}
-	activeTab := m.router.ActiveTab()
-	viewState := m.router.Active()
+	activeTab := m.navState.ActiveTab()
+	viewState := m.navState.Active()
 	page := m.livePageByTab[activeTab]
 	return historyEntry{
 		viewState: viewState,
@@ -197,11 +197,11 @@ func (m Model) activePage() historyEntry {
 }
 
 func (m *Model) setActivePage(page historyEntry) {
-	if len(m.stack) > 0 {
-		m.stack[len(m.stack)-1] = page
+	if len(m.history) > 0 {
+		m.history[len(m.history)-1] = page
 		return
 	}
-	activeTab := m.router.ActiveTab()
+	activeTab := m.navState.ActiveTab()
 	live := m.livePageByTab[activeTab]
 	live.model = page.model
 	m.livePageByTab[activeTab] = live
@@ -311,5 +311,5 @@ func (m *Model) restoreLogSelectionFromPoppedPage(popped historyEntry) {
 	current.model = logModel.SelectRef(ref)
 	m.setActivePage(current)
 	// Keep router tab memory in sync so future tab switches restore the correct ref.
-	m.router.ApplyViewStateChanged(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: current.viewState.WorktreeRoot, Ref: ref})
+	m.navState.ApplyViewStateChanged(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: current.viewState.WorktreeRoot, Ref: ref})
 }

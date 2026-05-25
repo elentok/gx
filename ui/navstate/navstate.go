@@ -28,7 +28,7 @@ type Transition struct {
 type State struct {
 	activeTab          nav.TabID
 	liveTab            nav.TabID
-	stack              []nav.ViewState
+	history            []nav.ViewState
 	lastViewStateByTab map[nav.TabID]nav.ViewState
 	defaultWorktree    string
 }
@@ -38,7 +38,7 @@ func NewState(defaultWorktreePath string) State {
 		defaultWorktree:    defaultWorktreePath,
 		lastViewStateByTab: make(map[nav.TabID]nav.ViewState),
 	}
-	s.ensureTabs()
+	s.initMissingTabs()
 	return s
 }
 
@@ -50,8 +50,8 @@ func (s State) LastViewStateForTab(tab nav.TabID) nav.ViewState {
 }
 
 func (s State) Active() nav.ViewState {
-	if len(s.stack) > 0 {
-		return s.stack[len(s.stack)-1]
+	if len(s.history) > 0 {
+		return s.history[len(s.history)-1]
 	}
 	return s.lastViewStateByTab[s.activeTab]
 }
@@ -101,10 +101,10 @@ func (s *State) Open(vs nav.ViewState) Transition {
 	tabVS.FilterStartLine = vs.FilterStartLine
 	tabVS.FilterEndLine = vs.FilterEndLine
 
-	s.stack = append(s.stack, tabVS)
+	s.history = append(s.history, tabVS)
 	s.activeTab = tabVS.Tab
 	s.lastViewStateByTab[tabVS.Tab] = tabVS
-	s.ensureTabs()
+	s.initMissingTabs()
 	return Transition{
 		Kind:      TransitionPushed,
 		ActiveTab: s.activeTab,
@@ -117,10 +117,10 @@ func (s *State) Switch(vs nav.ViewState) Transition {
 	tabVS := s.TabViewStateForViewContext(vs.Context())
 	tabVS.FocusSubject = vs.FocusSubject
 
-	s.stack = nil
+	s.history = nil
 	s.liveTab = tabVS.Tab
 	s.activeTab = tabVS.Tab
-	s.ensureTabs()
+	s.initMissingTabs()
 	s.lastViewStateByTab[tabVS.Tab] = tabVS
 
 	return Transition{
@@ -132,13 +132,13 @@ func (s *State) Switch(vs nav.ViewState) Transition {
 }
 
 func (s *State) Back() Transition {
-	if len(s.stack) == 0 {
+	if len(s.history) == 0 {
 		return Transition{Kind: TransitionQuit}
 	}
-	popped := s.stack[len(s.stack)-1]
-	s.stack = s.stack[:len(s.stack)-1]
-	if len(s.stack) > 0 {
-		s.activeTab = s.stack[len(s.stack)-1].Tab
+	popped := s.history[len(s.history)-1]
+	s.history = s.history[:len(s.history)-1]
+	if len(s.history) > 0 {
+		s.activeTab = s.history[len(s.history)-1].Tab
 	} else {
 		s.activeTab = s.liveTab
 	}
@@ -152,11 +152,11 @@ func (s *State) Back() Transition {
 
 func (s *State) ApplyViewStateChanged(vs nav.ViewState) Transition {
 	tabVS := s.TabViewStateForViewContext(vs.Context())
-	s.ensureTabs()
+	s.initMissingTabs()
 	s.lastViewStateByTab[tabVS.Tab] = tabVS
 	// If the top of the stack is for the same tab, keep it current.
-	if len(s.stack) > 0 && s.stack[len(s.stack)-1].Tab == tabVS.Tab {
-		s.stack[len(s.stack)-1] = tabVS
+	if len(s.history) > 0 && s.history[len(s.history)-1].Tab == tabVS.Tab {
+		s.history[len(s.history)-1] = tabVS
 	}
 	return Transition{Kind: TransitionUpdated, ActiveTab: s.activeTab, ViewState: tabVS}
 }
@@ -165,11 +165,11 @@ func (s *State) SetInitialTab(vs nav.ViewState) {
 	tabVS := s.TabViewStateForViewContext(vs.Context())
 	s.liveTab = tabVS.Tab
 	s.activeTab = tabVS.Tab
-	s.ensureTabs()
+	s.initMissingTabs()
 	s.lastViewStateByTab[tabVS.Tab] = tabVS
 }
 
-func (s *State) ensureTabs() {
+func (s *State) initMissingTabs() {
 	for _, kind := range []nav.TabID{nav.TabWorktrees, nav.TabLog, nav.TabStatus} {
 		if _, ok := s.lastViewStateByTab[kind]; !ok {
 			s.lastViewStateByTab[kind] = nav.ViewState{Tab: kind}

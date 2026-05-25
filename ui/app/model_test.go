@@ -104,8 +104,8 @@ func TestBackFiresDeactivateOnPoppedAndActivateOnRevealed(t *testing.T) {
 
 	// Replace the pushed entry with a spy so we can observe OnPageDeactivated.
 	poppedSpy := &lifecycleSpy{}
-	m.stack[len(m.stack)-1] = historyEntry{
-		viewState: m.stack[len(m.stack)-1].viewState,
+	m.history[len(m.history)-1] = historyEntry{
+		viewState: m.history[len(m.history)-1].viewState,
 		model:     poppedSpy,
 	}
 
@@ -136,11 +136,11 @@ func TestSwitchMsgChangesTabWithoutHistory(t *testing.T) {
 		t.Fatalf("expected resize cmd on Switch")
 	}
 	m = updated.(Model)
-	if m.router.ActiveTab() != nav.TabStatus {
-		t.Fatalf("expected active tab status, got %q", m.router.ActiveTab())
+	if m.navState.ActiveTab() != nav.TabStatus {
+		t.Fatalf("expected active tab status, got %q", m.navState.ActiveTab())
 	}
-	if len(m.stack) != 0 {
-		t.Fatalf("expected empty stack after tab switch, got %d", len(m.stack))
+	if len(m.history) != 0 {
+		t.Fatalf("expected empty stack after tab switch, got %d", len(m.history))
 	}
 }
 
@@ -166,11 +166,11 @@ func TestShellChordDirectTabSwitchClearsHistory(t *testing.T) {
 		t.Fatalf("expected resize cmd when switching tabs with gw")
 	}
 	m = updated.(Model)
-	if m.router.ActiveTab() != nav.TabWorktrees {
-		t.Fatalf("expected active tab worktrees, got %q", m.router.ActiveTab())
+	if m.navState.ActiveTab() != nav.TabWorktrees {
+		t.Fatalf("expected active tab worktrees, got %q", m.navState.ActiveTab())
 	}
-	if len(m.stack) != 0 {
-		t.Fatalf("expected empty stack after gw, got %d", len(m.stack))
+	if len(m.history) != 0 {
+		t.Fatalf("expected empty stack after gw, got %d", len(m.history))
 	}
 }
 
@@ -193,8 +193,8 @@ func TestShellChordSwitchesRelativeTabs(t *testing.T) {
 		t.Fatalf("expected resize cmd when switching tabs with g,")
 	}
 	m = updated.(Model)
-	if m.router.ActiveTab() != nav.TabWorktrees {
-		t.Fatalf("expected g, to move left to worktrees, got %q", m.router.ActiveTab())
+	if m.navState.ActiveTab() != nav.TabWorktrees {
+		t.Fatalf("expected g, to move left to worktrees, got %q", m.navState.ActiveTab())
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
@@ -204,8 +204,8 @@ func TestShellChordSwitchesRelativeTabs(t *testing.T) {
 		t.Fatalf("expected resize cmd when switching tabs with g.")
 	}
 	m = updated.(Model)
-	if m.router.ActiveTab() != nav.TabLog {
-		t.Fatalf("expected g. to move right to log, got %q", m.router.ActiveTab())
+	if m.navState.ActiveTab() != nav.TabLog {
+		t.Fatalf("expected g. to move right to log, got %q", m.navState.ActiveTab())
 	}
 }
 
@@ -226,26 +226,26 @@ func TestNumberKeysSwitchTabsGlobally(t *testing.T) {
 		t.Fatalf("expected resize cmd when switching to worktrees with 1")
 	}
 	m = updated.(Model)
-	if m.router.ActiveTab() != nav.TabWorktrees {
-		t.Fatalf("expected 1 to switch to worktrees, got %q", m.router.ActiveTab())
+	if m.navState.ActiveTab() != nav.TabWorktrees {
+		t.Fatalf("expected 1 to switch to worktrees, got %q", m.navState.ActiveTab())
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: '2', Text: "2"})
 	m = updated.(Model)
-	if m.router.ActiveTab() != nav.TabLog {
-		t.Fatalf("expected 2 to switch to log, got %q", m.router.ActiveTab())
+	if m.navState.ActiveTab() != nav.TabLog {
+		t.Fatalf("expected 2 to switch to log, got %q", m.navState.ActiveTab())
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: '3', Text: "3"})
 	m = updated.(Model)
-	if m.router.ActiveTab() != nav.TabStatus {
-		t.Fatalf("expected 3 to switch to status, got %q", m.router.ActiveTab())
+	if m.navState.ActiveTab() != nav.TabStatus {
+		t.Fatalf("expected 3 to switch to status, got %q", m.navState.ActiveTab())
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: '4', Text: "4"})
 	m = updated.(Model)
-	if m.router.ActiveTab() != nav.TabCommit {
-		t.Fatalf("expected 4 to switch to commit, got %q", m.router.ActiveTab())
+	if m.navState.ActiveTab() != nav.TabCommit {
+		t.Fatalf("expected 4 to switch to commit, got %q", m.navState.ActiveTab())
 	}
 }
 
@@ -295,23 +295,23 @@ func TestOpenCommitAndBackRestoresTab(t *testing.T) {
 		t.Fatalf("expected init/resize cmd when opening commit page")
 	}
 	m = updated.(Model)
-	if len(m.stack) != 1 {
-		t.Fatalf("expected stack depth 1, got %d", len(m.stack))
+	if len(m.history) != 1 {
+		t.Fatalf("expected stack depth 1, got %d", len(m.history))
 	}
 	if got := m.activePage().viewState.Tab; got != nav.TabCommit {
 		t.Fatalf("expected active page commit, got %q", got)
 	}
-	if m.router.ActiveTab() != nav.TabCommit {
-		t.Fatalf("expected activeTab commit while commit is on stack, got %q", m.router.ActiveTab())
+	if m.navState.ActiveTab() != nav.TabCommit {
+		t.Fatalf("expected activeTab commit while commit is on stack, got %q", m.navState.ActiveTab())
 	}
 
 	updated, cmd = m.Update(nav.Back()())
 	m = updated.(Model)
-	if m.router.ActiveTab() != nav.TabLog {
-		t.Fatalf("expected active tab log after back, got %q", m.router.ActiveTab())
+	if m.navState.ActiveTab() != nav.TabLog {
+		t.Fatalf("expected active tab log after back, got %q", m.navState.ActiveTab())
 	}
-	if len(m.stack) != 0 {
-		t.Fatalf("expected empty stack after back, got %d", len(m.stack))
+	if len(m.history) != 0 {
+		t.Fatalf("expected empty stack after back, got %d", len(m.history))
 	}
 }
 
@@ -371,8 +371,8 @@ func TestOpenStatusAndBackRestoresLogTab(t *testing.T) {
 		t.Fatalf("expected init/resize cmd when opening status page")
 	}
 	m = updated.(Model)
-	if len(m.stack) != 1 {
-		t.Fatalf("expected stack depth 1, got %d", len(m.stack))
+	if len(m.history) != 1 {
+		t.Fatalf("expected stack depth 1, got %d", len(m.history))
 	}
 	if got := m.activePage().viewState.Tab; got != nav.TabStatus {
 		t.Fatalf("expected active page status, got %q", got)
@@ -380,11 +380,11 @@ func TestOpenStatusAndBackRestoresLogTab(t *testing.T) {
 
 	updated, cmd = m.Update(nav.Back()())
 	m = updated.(Model)
-	if m.router.ActiveTab() != nav.TabLog {
-		t.Fatalf("expected active tab log after back, got %q", m.router.ActiveTab())
+	if m.navState.ActiveTab() != nav.TabLog {
+		t.Fatalf("expected active tab log after back, got %q", m.navState.ActiveTab())
 	}
-	if len(m.stack) != 0 {
-		t.Fatalf("expected empty stack after back, got %d", len(m.stack))
+	if len(m.history) != 0 {
+		t.Fatalf("expected empty stack after back, got %d", len(m.history))
 	}
 }
 
@@ -402,18 +402,18 @@ func TestSwitchAlwaysClearsStack(t *testing.T) {
 
 	updated, _ := m.Update(nav.Open(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: repoDir, Ref: "HEAD"})())
 	m = updated.(Model)
-	if len(m.stack) != 1 {
-		t.Fatalf("expected stack depth 1 after open, got %d", len(m.stack))
+	if len(m.history) != 1 {
+		t.Fatalf("expected stack depth 1 after open, got %d", len(m.history))
 	}
 
 	// Switch always clears the stack regardless of target tab or ViewContext.
 	updated, _ = m.Update(nav.Switch(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: repoDir})())
 	m = updated.(Model)
-	if m.router.ActiveTab() != nav.TabStatus {
-		t.Fatalf("expected active tab status, got %q", m.router.ActiveTab())
+	if m.navState.ActiveTab() != nav.TabStatus {
+		t.Fatalf("expected active tab status, got %q", m.navState.ActiveTab())
 	}
-	if len(m.stack) != 0 {
-		t.Fatalf("expected stack cleared after tab switch, got %d", len(m.stack))
+	if len(m.history) != 0 {
+		t.Fatalf("expected stack cleared after tab switch, got %d", len(m.history))
 	}
 }
 
@@ -438,14 +438,14 @@ func TestInitialCommitRouteUsesCommitTab(t *testing.T) {
 	if got := m.activePage().viewState.Tab; got != nav.TabCommit {
 		t.Fatalf("expected active page commit, got %q", got)
 	}
-	if m.router.ActiveTab() != nav.TabCommit {
-		t.Fatalf("expected active tab commit, got %q", m.router.ActiveTab())
+	if m.navState.ActiveTab() != nav.TabCommit {
+		t.Fatalf("expected active tab commit, got %q", m.navState.ActiveTab())
 	}
-	if m.router.LiveTab() != nav.TabCommit {
-		t.Fatalf("expected live tab commit, got %q", m.router.LiveTab())
+	if m.navState.LiveTab() != nav.TabCommit {
+		t.Fatalf("expected live tab commit, got %q", m.navState.LiveTab())
 	}
-	if len(m.stack) != 0 {
-		t.Fatalf("expected empty stack for initial commit view state (commit is a live tab), got %d", len(m.stack))
+	if len(m.history) != 0 {
+		t.Fatalf("expected empty stack for initial commit view state (commit is a live tab), got %d", len(m.history))
 	}
 }
 
@@ -471,15 +471,15 @@ func TestSwitchToCommitTabRestoresViewState(t *testing.T) {
 	// Switch away to status — clears stack, liveTab=status.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: '3', Text: "3"})
 	m = updated.(Model)
-	if m.router.ActiveTab() != nav.TabStatus {
-		t.Fatalf("expected status after pressing 3, got %q", m.router.ActiveTab())
+	if m.navState.ActiveTab() != nav.TabStatus {
+		t.Fatalf("expected status after pressing 3, got %q", m.navState.ActiveTab())
 	}
 
 	// Switch to commit tab (4) — should restore remembered commit view state.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: '4', Text: "4"})
 	m = updated.(Model)
-	if m.router.ActiveTab() != nav.TabCommit {
-		t.Fatalf("expected commit tab after pressing 4, got %q", m.router.ActiveTab())
+	if m.navState.ActiveTab() != nav.TabCommit {
+		t.Fatalf("expected commit tab after pressing 4, got %q", m.navState.ActiveTab())
 	}
 	if got := m.activePage().viewState.Tab; got != nav.TabCommit {
 		t.Fatalf("expected commit page after switching to commit tab, got %q", got)
@@ -504,8 +504,8 @@ func TestGotoCommitWithNoHistoryDefaultsToHEAD(t *testing.T) {
 		t.Fatalf("expected cmd when switching to commit tab")
 	}
 	m = updated.(Model)
-	if m.router.ActiveTab() != nav.TabCommit {
-		t.Fatalf("expected commit tab, got %q", m.router.ActiveTab())
+	if m.navState.ActiveTab() != nav.TabCommit {
+		t.Fatalf("expected commit tab, got %q", m.navState.ActiveTab())
 	}
 	if got := m.activePage().viewState.Ref; got != "HEAD" {
 		t.Fatalf("expected commit ref HEAD (default), got %q", got)
@@ -531,7 +531,7 @@ func TestViewStateChangedUpdatesCommitTabState(t *testing.T) {
 	})())
 	m = updated.(Model)
 
-	if got := m.router.LastViewStateForTab(nav.TabCommit).Ref; got != "HEAD~1" {
+	if got := m.navState.LastViewStateForTab(nav.TabCommit).Ref; got != "HEAD~1" {
 		t.Fatalf("expected commit tab ref updated to HEAD~1, got %q", got)
 	}
 
@@ -565,7 +565,7 @@ func TestViewStateChangedPersistsForInactiveTabAndAppliesOnSwitch(t *testing.T) 
 	})())
 	m = updated.(Model)
 
-	if got := m.router.LastViewStateForTab(nav.TabCommit).Ref; got != "HEAD~2" {
+	if got := m.navState.LastViewStateForTab(nav.TabCommit).Ref; got != "HEAD~2" {
 		t.Fatalf("expected commit tab ref updated to HEAD~2, got %q", got)
 	}
 

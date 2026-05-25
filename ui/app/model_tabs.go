@@ -23,23 +23,23 @@ func (m *Model) ensureLivePages() {
 
 // switchTab is called from handleShellChordKey (direct key dispatch, outside the nav message path).
 func (m Model) switchTab(viewState nav.ViewState) (Model, tea.Cmd) {
-	return m.applySwitch(m.router.Switch(viewState))
+	return m.applySwitch(m.navState.Switch(viewState))
 }
 
 func (m Model) applySwitch(tr navstate.Transition) (Model, tea.Cmd) {
-	// Derive outgoing model from model-side state: m.router.activeTab has already been
+	// Derive outgoing model from model-side state: m.navState.activeTab has already been
 	// updated by the pointer-receiver Switch call, so m.activePage() would return the
 	// new page. Use the model-side stack or PrevViewState to find what the user was seeing.
 	var outgoing tea.Model
-	if len(m.stack) > 0 {
-		outgoing = m.stack[len(m.stack)-1].model
+	if len(m.history) > 0 {
+		outgoing = m.history[len(m.history)-1].model
 	} else {
 		outgoing = m.livePageByTab[tr.PrevViewState.Tab].model
 	}
 	tabViewState := tr.ViewState
 
 	// Clear model-side stack — tab switch exits the current deep-navigation session.
-	m.stack = nil
+	m.history = nil
 	m.ensureLivePages()
 
 	currentPage := m.livePageByTab[tabViewState.Tab]
@@ -211,7 +211,7 @@ func (m Model) newLivePage(viewState nav.ViewState) livePage {
 }
 
 func (m Model) tabsView() string {
-	activeTab := m.router.ActiveTab()
+	activeTab := m.navState.ActiveTab()
 	tabs := []tabSpec{
 		{label: "worktrees", active: activeTab == nav.TabWorktrees},
 		{label: "log", active: activeTab == nav.TabLog},
@@ -245,7 +245,7 @@ func orderedTabs() []nav.TabID {
 func (m Model) switchRelativeTab(delta int) (Model, tea.Cmd) {
 	tabs := orderedTabs()
 	idx := 0
-	activeTab := m.router.ActiveTab()
+	activeTab := m.navState.ActiveTab()
 	for i, kind := range tabs {
 		if kind == activeTab {
 			idx = i
