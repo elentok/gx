@@ -204,7 +204,7 @@ func (m Model) renderBadges(decorations []git.RefDecoration) string {
 		if c, ok := matchRefRule(dec.Name, m.compiledRefRules); ok {
 			parts = append(parts, ui.RenderBadgeWithColor(label, c, nerd, false))
 		} else {
-			parts = append(parts, ui.RenderBadge(label, ui.BadgeVariantSurface, nerd, false))
+			parts = append(parts, ui.RenderBadge(label, ui.BadgeVariantDeepBg, nerd, false))
 		}
 	}
 	return strings.Join(parts, " ")
@@ -237,7 +237,6 @@ func (m Model) highlightSearch(text string) string {
 	}
 	return out.String()
 }
-
 
 func (m Model) footerView() string {
 	left := ""

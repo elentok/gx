@@ -11,6 +11,7 @@ type BadgeVariant string
 
 const (
 	BadgeVariantSurface BadgeVariant = "surface"
+	BadgeVariantDeepBg  BadgeVariant = "deepbg"
 	BadgeVariantBlue    BadgeVariant = "blue"
 	BadgeVariantGreen   BadgeVariant = "green"
 	BadgeVariantYellow  BadgeVariant = "yellow"
@@ -24,10 +25,10 @@ func RenderBadge(label string, variant BadgeVariant, nerd bool, padding bool) st
 	return renderPill(label, badgeBackground(variant), badgeForeground(variant), false, nerd, padding)
 }
 
-// RenderBadgeWithColor renders a pill badge using an explicit background color.
+// RenderBadgeWithColor renders a pill badge using an explicit foreground color.
 // padding adds a space on each side of the label.
-func RenderBadgeWithColor(label string, bg color.Color, nerd bool, padding bool) string {
-	return renderPill(label, bg, ColorDeepBg, false, nerd, padding)
+func RenderBadgeWithColor(label string, fg color.Color, nerd bool, padding bool) string {
+	return renderPill(label, ColorDeepBg, fg, false, nerd, padding)
 }
 
 func renderPill(label string, bgColor color.Color, fgColor color.Color, bold bool, nerd bool, padding bool) string {
@@ -63,6 +64,8 @@ func badgeBackground(variant BadgeVariant) color.Color {
 		return ColorOrange
 	case BadgeVariantMauve:
 		return ColorMauve
+	case BadgeVariantDeepBg:
+		return ColorDeepBg
 	default:
 		return ColorSurface
 	}
@@ -71,6 +74,8 @@ func badgeBackground(variant BadgeVariant) color.Color {
 func badgeForeground(variant BadgeVariant) color.Color {
 	switch variant {
 	case BadgeVariantSurface:
+		return ColorSubtle
+	case BadgeVariantDeepBg:
 		return ColorSubtle
 	default:
 		return ColorDeepBg
