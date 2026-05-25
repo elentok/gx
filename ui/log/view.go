@@ -37,10 +37,15 @@ func (m Model) View() tea.View {
 		return ui.NewMainView("\n  Error: " + m.err.Error())
 	}
 
+	title := "Log"
+	if m.worktreeRoot != "" {
+		title = fmt.Sprintf("Log (%s)", m.worktreeRoot)
+	}
+
 	body := ui.RenderPanelFrame(ui.PanelFrameOptions{
 		Width:       maxInt(20, m.width),
 		Height:      maxInt(4, m.height-1),
-		Title:       "Log",
+		Title:       title,
 		RightTitle:  m.frameRightTitle(),
 		Lines:       m.visibleLines(),
 		BorderColor: ui.ColorBorder,
