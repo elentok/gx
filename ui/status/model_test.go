@@ -2331,17 +2331,54 @@ func TestEOpensEditorFromFiletreeAndDiff(t *testing.T) {
 	m.ready = true
 	m.focus = focusFiletree
 
+	// ee chord: filetree focus
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})
+	m = updated.(Model)
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})
 	m = updated.(Model)
 	if cmd == nil {
-		t.Fatalf("expected e in filetree view to launch editor command")
+		t.Fatalf("expected ee in filetree view to launch editor command")
 	}
 
+	// ee chord: diff focus
 	m.focus = focusDiff
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})
+	m = updated.(Model)
 	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})
 	m = updated.(Model)
 	if cmd == nil {
-		t.Fatalf("expected e in diff view to launch editor command")
+		t.Fatalf("expected ee in diff view to launch editor command")
+	}
+}
+
+func TestEditChordSplitVariants(t *testing.T) {
+	t.Setenv("EDITOR", "true")
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "edit.txt", "one\n")
+
+	chords := []struct {
+		name   string
+		second string
+	}{
+		{"es (hsplit)", "s"},
+		{"ev (vsplit)", "v"},
+		{"et (tab)", "t"},
+	}
+
+	for _, tt := range chords {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newTestModelDefault(repo)
+			m.ready = true
+			m.focus = focusFiletree
+
+			updated, _ := m.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})
+			m = updated.(Model)
+			updated, cmd := m.Update(tea.KeyPressMsg{Text: tt.second})
+			_ = updated.(Model)
+			if cmd == nil {
+				t.Fatalf("expected e%s chord to return a non-nil cmd", tt.second)
+			}
+		})
 	}
 }
 

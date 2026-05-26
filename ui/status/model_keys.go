@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/status/diffarea"
+	"github.com/elentok/gx/ui/terminalrun"
 )
 
 const (
@@ -37,7 +38,10 @@ const (
 	bindingRebase        keys.BindingID = "rebase"
 	bindingAmend         keys.BindingID = "amend"
 	bindingBump          keys.BindingID = "bump"
-	bindingEdit          keys.BindingID = "edit"
+	bindingEditInPlace   keys.BindingID = "edit"
+	bindingEditHSplit    keys.BindingID = "edit-hsplit"
+	bindingEditVSplit    keys.BindingID = "edit-vsplit"
+	bindingEditTab       keys.BindingID = "edit-tab"
 	bindingFilterLog     keys.BindingID = "filter-log"
 )
 
@@ -84,7 +88,12 @@ func newStatusManager() keys.Manager {
 		{ID: bindingRebase, Seq: []string{"b"}, Categories: []string{"Git"}, Title: "rebase"},
 		{ID: bindingAmend, Seq: []string{"A"}, Categories: []string{"Git"}, Title: "amend"},
 		{ID: bindingBump, Seq: []string{"B"}, Categories: []string{"Git"}, Title: "bump version"},
-		{ID: bindingEdit, Seq: []string{"e"}, Categories: []string{"Filetree", "Diff"}, Title: "edit file"},
+		// e-prefix chords
+		{ID: bindingEditInPlace, Seq: []string{"e", "e"}, Categories: []string{"Filetree", "Diff"}, Title: "edit file"},
+		{ID: bindingEditHSplit, Seq: []string{"e", "s"}, Categories: []string{"Filetree", "Diff"}, Title: "edit file (hsplit)"},
+		{ID: bindingEditVSplit, Seq: []string{"e", "v"}, Categories: []string{"Filetree", "Diff"}, Title: "edit file (vsplit)"},
+		{ID: bindingEditTab, Seq: []string{"e", "t"}, Categories: []string{"Filetree", "Diff"}, Title: "edit file (tab)"},
+		{ID: bindingCancelChord, Seq: []string{"e", "esc"}, Categories: []string{}, Title: ""},
 		{ID: bindingFilterLog, Seq: []string{"g", "h"}, Categories: []string{"Filetree", "Diff"}, Title: "log for file/hunk"},
 	})
 }
@@ -171,8 +180,14 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model,
 			m.showGitError(err)
 		}
 		return m, nil
-	case bindingEdit:
-		return m, m.cmdEditSelectedFile()
+	case bindingEditInPlace:
+		return m, m.cmdEditSelectedFile(terminalrun.InPlace)
+	case bindingEditHSplit:
+		return m, m.cmdEditSelectedFile(terminalrun.HSplit)
+	case bindingEditVSplit:
+		return m, m.cmdEditSelectedFile(terminalrun.VSplit)
+	case bindingEditTab:
+		return m, m.cmdEditSelectedFile(terminalrun.Tab)
 	case bindingFilterLog:
 		if !m.settings.EnableNavigation {
 			return m, nil

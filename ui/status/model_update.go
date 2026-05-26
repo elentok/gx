@@ -251,6 +251,9 @@ func (m Model) handleEditFileFinished(msg editFileFinishedMsg) (tea.Model, tea.C
 	if msg.err != nil {
 		return m, notify.Error("edit failed: " + msg.err.Error())
 	}
+	if msg.splitApp != "" {
+		return m, notify.Info("opened " + msg.splitApp + " split: editor")
+	}
 	return m, tea.Batch(notify.Info(ui.MessageClosed("editor")), m.refresh())
 }
 

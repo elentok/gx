@@ -102,7 +102,10 @@ type commitFinishedMsg struct {
 }
 
 type lazygitLogFinishedMsg struct{ err error }
-type editFileFinishedMsg struct{ err error }
+type editFileFinishedMsg struct {
+	err      error
+	splitApp string
+}
 type editCommentFinishedMsg struct {
 	err      error
 	splitApp string

@@ -39,7 +39,7 @@ func cmdLazygitLog(worktreeRoot string) tea.Cmd {
 	})
 }
 
-func (m *Model) cmdEditSelectedFile() tea.Cmd {
+func (m *Model) cmdEditSelectedFile(splitType terminalrun.SplitType) tea.Cmd {
 	file, ok := m.selectedFile()
 	if !ok {
 		return notify.Warning("no file selected")
@@ -55,9 +55,8 @@ func (m *Model) cmdEditSelectedFile() tea.Cmd {
 	target := filepath.Join(m.worktreeRoot, file.Path)
 	line := m.editorLineForCurrentSelection()
 	args := ui.EditorLaunchArgs(parts[0], parts[1:], target, line)
-	c := exec.Command(parts[0], args...)
-	cmd := tea.ExecProcess(c, func(err error) tea.Msg {
-		return editFileFinishedMsg{err: err}
+	cmd := terminalrun.CommandWithSplit(m.worktreeRoot, m.settings.Terminal, splitType, parts[0], args, func(err error, splitApp string) tea.Msg {
+		return editFileFinishedMsg{err: err, splitApp: splitApp}
 	})
 	return tea.Batch(notify.Info(ui.MessageOpening("editor")), cmd)
 }
