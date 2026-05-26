@@ -54,7 +54,7 @@ func (m *Model) cmdEditSelectedFile() tea.Cmd {
 	}
 	target := filepath.Join(m.worktreeRoot, file.Path)
 	line := m.editorLineForCurrentSelection()
-	args := editorLaunchArgs(parts[0], parts[1:], target, line)
+	args := ui.EditorLaunchArgs(parts[0], parts[1:], target, line)
 	c := exec.Command(parts[0], args...)
 	cmd := tea.ExecProcess(c, func(err error) tea.Msg {
 		return editFileFinishedMsg{err: err}

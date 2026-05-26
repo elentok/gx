@@ -1,4 +1,4 @@
-package status
+package ui
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func editorLaunchArgs(editorBin string, editorArgs []string, target string, line int) []string {
+func EditorLaunchArgs(editorBin string, editorArgs []string, target string, line int) []string {
 	if line <= 0 {
 		return append(editorArgs, target)
 	}
