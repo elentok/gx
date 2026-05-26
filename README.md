@@ -22,6 +22,7 @@ and [go-migration-plan.md](/docs/go-migration-plan.md)).
 - `gx wt clone` clones using the `.bare` directory trick for a clean layout
 - `gx wt list` and `gx wt abs-path` for scripting and shell integration
 - `gx log` for commit history: amend (`A`), reword (`rw` opens `$EDITOR`), interactive rebase (`ri`), bump version (`B`), pull (`p`), and push (`P`) directly from the log; flashes and re-focuses the entry after amend or reword; `ri` stashes dirty worktrees before launching rebase and prompts to pop the stash when done; commits are colored by status; filter history by file path and line range; yank commit hash (`yh`), subject (`ys`), or full message (`ym`) to clipboard; panel title shows the worktree root
+- Press `g p` in any view (worktrees, status, log, commit) to open the GitHub PR for the current context in the browser; merged commits search by hash, unmerged commits use the branch PR
 - `gx show` for single-commit inspection
 - `gx status` interactive status UI with file/hunk/line stage + unstage flows
 - `gx` opens status by default, while `gx worktrees` / `gx wt` open the worktree UI
@@ -107,7 +108,7 @@ Status UI highlights:
 - Toggle unified/side-by-side diff rendering with `s` (supports hunk, line, and visual actions)
 - Adjust diff context for the current session with `[` / `]`
 - File-to-file diff jumps with `,` / `.`
-- Edit selected file in `$EDITOR` with `e` (opens at selected line/hunk in diff view)
+- Edit selected file in `$EDITOR` with `ee`; open in a horizontal split (`es`), vertical split (`ev`), or new tab (`et`)
 - Jump to the top with `g`
 - Open lazygit log with `ol`
 - View the last command output with `oo`
@@ -257,7 +258,8 @@ Example config:
 | `p`            | Pull selected worktree's branch (stash prompt if dirty)   |
 | `P`            | Push selected worktree's branch (confirms before pushing) |
 | `b`            | Rebase selected worktree on main (stash prompt if dirty)  |
-| `g`            | Jump to the top of the worktree list                      |
+| `g g`          | Jump to the top of the worktree list                      |
+| `g p`          | Open the GitHub PR for the selected worktree in browser   |
 | `oo`           | View output log of the last job                           |
 | `ol`           | Open lazygit log for the selected worktree                |
 | `ot`           | Open a tmux session in the selected worktree              |

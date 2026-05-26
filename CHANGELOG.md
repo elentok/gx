@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.16.1 - 2026-05-26
+
+- All views: add `g p` binding to open the GitHub PR for the current context in the browser
+- Commit + Status: add `e`-prefix chords for editor split variants (`ee`, `es`, `ev`, `et`)
+- Commit: add `[`/`]` bindings to decrease/increase diff context lines
+- Commit: show diff context count on the frame instead of as a notification
+- Worktrees: fix delete progress mode — wait for exit before quitting
+- Tabs: remove extra padding
+
 ## v0.16.0 - 2026-05-25
 
 - Log + Commit: add `yh`, `ys`, `ym` to yank commit hash, subject, and message
