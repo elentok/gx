@@ -225,9 +225,9 @@ type tabSpec struct {
 
 func renderTab(tab tabSpec) string {
 	if tab.active {
-		return ui.RenderBadge(tab.label, ui.BadgeVariantOrange, true, true)
+		return ui.RenderBadge(tab.label, ui.BadgeVariantOrange, true, false)
 	}
-	return ui.RenderBadge(tab.label, ui.BadgeVariantSurface, true, true)
+	return ui.RenderBadge(tab.label, ui.BadgeVariantSurface, true, false)
 }
 
 func orderedTabs() []nav.TabID {
