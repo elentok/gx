@@ -18,23 +18,3 @@ func cmdTmuxNewSession(name, path string) tea.Cmd {
 	}
 }
 
-func cmdTmuxNewWindow(name, path string) tea.Cmd {
-	return func() tea.Msg {
-		err := exec.Command("tmux", "new-window", "-n", name, "-c", path).Run()
-		return terminalResultMsg{err: err}
-	}
-}
-
-func cmdTmuxHSplit(path string) tea.Cmd {
-	return func() tea.Msg {
-		err := exec.Command("tmux", "split-window", "-h", "-c", path).Run()
-		return terminalResultMsg{err: err}
-	}
-}
-
-func cmdTmuxVSplit(path string) tea.Cmd {
-	return func() tea.Msg {
-		err := exec.Command("tmux", "split-window", "-v", "-c", path).Run()
-		return terminalResultMsg{err: err}
-	}
-}

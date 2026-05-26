@@ -1,11 +1,13 @@
 package worktrees
 
 import (
+	"os"
 	"path/filepath"
 
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/terminalrun"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -61,17 +63,23 @@ func (m Model) executeTerminalAction(action string) (Model, tea.Cmd) {
 	name := m.openTargetName
 	path := m.openTargetPath
 
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "/bin/sh"
+	}
+	done := func(err error, _ string) tea.Msg { return terminalResultMsg{err: err} }
+
 	switch m.settings.Terminal {
 	case ui.TerminalTmux:
 		switch action {
 		case "session":
 			return m, cmdTmuxNewSession(name, path)
 		case "hsplit":
-			return m, cmdTmuxHSplit(path)
+			return m, terminalrun.CommandWithSplit(path, ui.TerminalTmux, terminalrun.HSplit, shell, nil, done)
 		case "vsplit":
-			return m, cmdTmuxVSplit(path)
+			return m, terminalrun.CommandWithSplit(path, ui.TerminalTmux, terminalrun.VSplit, shell, nil, done)
 		case "tab":
-			return m, cmdTmuxNewWindow(name, path)
+			return m, terminalrun.CommandWithSplit(path, ui.TerminalTmux, terminalrun.Tab, shell, nil, done)
 		}
 	case ui.TerminalKittyRemote:
 		repoName := filepath.Base(m.repo.LinkedWorktreeDir())
@@ -80,11 +88,11 @@ func (m Model) executeTerminalAction(action string) (Model, tea.Cmd) {
 		case "session":
 			return m, cmdKittySession(sessName, path)
 		case "hsplit":
-			return m, cmdKittySplit(path, true)
+			return m, terminalrun.CommandWithSplit(path, ui.TerminalKittyRemote, terminalrun.HSplit, shell, nil, done)
 		case "vsplit":
-			return m, cmdKittySplit(path, false)
+			return m, terminalrun.CommandWithSplit(path, ui.TerminalKittyRemote, terminalrun.VSplit, shell, nil, done)
 		case "tab":
-			return m, cmdKittyNewTab(path)
+			return m, terminalrun.CommandWithSplit(path, ui.TerminalKittyRemote, terminalrun.Tab, shell, nil, done)
 		}
 	case ui.TerminalKitty:
 		return m, notify.Info("enable kitty remote control for this to work")

@@ -81,22 +81,3 @@ func cmdKittySession(name, wtPath string) tea.Cmd {
 	}
 }
 
-func cmdKittySplit(wtPath string, horizontal bool) tea.Cmd {
-	return func() tea.Msg {
-		location := "vsplit"
-		if horizontal {
-			location = "hsplit"
-		}
-		err := exec.Command("kitty", "@", "launch", "--type=window",
-			"--location="+location, "--no-response", "--cwd="+wtPath).Run()
-		return terminalResultMsg{err: err}
-	}
-}
-
-func cmdKittyNewTab(wtPath string) tea.Cmd {
-	return func() tea.Msg {
-		err := exec.Command("kitty", "@", "launch", "--type=tab",
-			"--no-response", "--cwd="+wtPath).Run()
-		return terminalResultMsg{err: err}
-	}
-}
