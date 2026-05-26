@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/notify"
 )
 
 func TestSplitShellCommand_DefaultShell(t *testing.T) {
@@ -65,5 +66,49 @@ func TestCommandCustom_KeepOpen(t *testing.T) {
 	cmd := CommandCustom("/tmp", ui.TerminalPlain, "echo", []string{"hello"}, true, doneFn)
 	if cmd == nil {
 		t.Error("expected non-nil cmd from CommandCustom() with keepOpen=true")
+	}
+}
+
+func TestCommandWithSplit(t *testing.T) {
+	t.Parallel()
+	doneFn := func(err error, splitApp string) tea.Msg { return nil }
+
+	tests := []struct {
+		name      string
+		terminal  ui.Terminal
+		splitType SplitType
+		wantWarn  bool
+	}{
+		{name: "inplace/plain", terminal: ui.TerminalPlain, splitType: InPlace, wantWarn: false},
+		{name: "inplace/tmux", terminal: ui.TerminalTmux, splitType: InPlace, wantWarn: false},
+		{name: "inplace/kitty-remote", terminal: ui.TerminalKittyRemote, splitType: InPlace, wantWarn: false},
+		{name: "hsplit/tmux", terminal: ui.TerminalTmux, splitType: HSplit, wantWarn: false},
+		{name: "vsplit/tmux", terminal: ui.TerminalTmux, splitType: VSplit, wantWarn: false},
+		{name: "tab/tmux", terminal: ui.TerminalTmux, splitType: Tab, wantWarn: false},
+		{name: "hsplit/kitty-remote", terminal: ui.TerminalKittyRemote, splitType: HSplit, wantWarn: false},
+		{name: "vsplit/kitty-remote", terminal: ui.TerminalKittyRemote, splitType: VSplit, wantWarn: false},
+		{name: "tab/kitty-remote", terminal: ui.TerminalKittyRemote, splitType: Tab, wantWarn: false},
+		{name: "hsplit/plain", terminal: ui.TerminalPlain, splitType: HSplit, wantWarn: true},
+		{name: "vsplit/plain", terminal: ui.TerminalPlain, splitType: VSplit, wantWarn: true},
+		{name: "tab/plain", terminal: ui.TerminalPlain, splitType: Tab, wantWarn: true},
+		{name: "hsplit/kitty", terminal: ui.TerminalKitty, splitType: HSplit, wantWarn: true},
+		{name: "vsplit/kitty", terminal: ui.TerminalKitty, splitType: VSplit, wantWarn: true},
+		{name: "tab/kitty", terminal: ui.TerminalKitty, splitType: Tab, wantWarn: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := CommandWithSplit("/tmp", tt.terminal, tt.splitType, "echo", []string{"hello"}, doneFn)
+			if cmd == nil {
+				t.Fatal("expected non-nil cmd")
+			}
+			if tt.wantWarn {
+				msg := cmd()
+				nm, ok := msg.(notify.NotifyMsg)
+				if !ok || nm.Kind != notify.KindWarning {
+					t.Fatalf("expected warning notify msg, got %T %v", msg, msg)
+				}
+			}
+		})
 	}
 }

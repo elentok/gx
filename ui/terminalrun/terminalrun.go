@@ -8,6 +8,16 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/notify"
+)
+
+type SplitType int
+
+const (
+	InPlace SplitType = iota
+	HSplit
+	VSplit
+	Tab
 )
 
 func splitShellCommand(command string, keepOpen bool) (program string, args []string) {
@@ -92,4 +102,56 @@ func CommandCustom(worktreeRoot string, terminal ui.Terminal, program string, ar
 
 func escapeShellArg(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+func CommandWithSplit(worktreeRoot string, terminal ui.Terminal, splitType SplitType, program string, args []string, done func(err error, splitApp string) tea.Msg) tea.Cmd {
+	if splitType == InPlace {
+		c := exec.Command(program, args...)
+		c.Dir = worktreeRoot
+		return tea.ExecProcess(c, func(err error) tea.Msg {
+			return done(err, "")
+		})
+	}
+
+	if terminal == ui.TerminalTmux {
+		return func() tea.Msg {
+			var tmuxArgs []string
+			switch splitType {
+			case HSplit:
+				tmuxArgs = []string{"split-window", "-h", "-c", worktreeRoot, program}
+			case VSplit:
+				tmuxArgs = []string{"split-window", "-v", "-c", worktreeRoot, program}
+			case Tab:
+				tmuxArgs = []string{"new-window", "-c", worktreeRoot, program}
+			}
+			tmuxArgs = append(tmuxArgs, args...)
+			err := exec.Command("tmux", tmuxArgs...).Run()
+			return done(err, "tmux")
+		}
+	}
+
+	if terminal == ui.TerminalKittyRemote {
+		return func() tea.Msg {
+			var typeAndLoc []string
+			switch splitType {
+			case HSplit:
+				typeAndLoc = []string{"--type=window", "--location=hsplit"}
+			case VSplit:
+				typeAndLoc = []string{"--type=window", "--location=vsplit"}
+			case Tab:
+				typeAndLoc = []string{"--type=tab"}
+			}
+			kittyArgs := []string{"@", "launch", "--copy-env"}
+			kittyArgs = append(kittyArgs, typeAndLoc...)
+			kittyArgs = append(kittyArgs, "--cwd="+worktreeRoot, program)
+			kittyArgs = append(kittyArgs, args...)
+			out, err := exec.Command("kitty", kittyArgs...).CombinedOutput()
+			if err != nil {
+				err = fmt.Errorf("$ kitty %s\n\n%w\n\n%s", strings.Join(kittyArgs, " "), err, strings.TrimSpace(string(out)))
+			}
+			return done(err, "kitty")
+		}
+	}
+
+	return notify.Warning("split not supported for this terminal")
 }
