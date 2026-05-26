@@ -1,6 +1,9 @@
 package commit
 
-import "github.com/elentok/gx/ui/list"
+import (
+	"github.com/elentok/gx/ui/diffview"
+	"github.com/elentok/gx/ui/list"
+)
 
 func (m *Model) diffPaneSize() (int, int) {
 	headerH := m.headerViewportRowsCount() + 2
@@ -70,4 +73,29 @@ func (m *Model) jumpDiffBottom() {
 		return
 	}
 	m.syncSearchCursorFromDiffFocus()
+}
+
+func (m Model) editorLineForCurrentSelection() int {
+	if !m.focusDiff {
+		return 0
+	}
+	diff := m.diffModel.DataRef()
+	if m.diffModel.NavMode() == diffview.NavModeLine {
+		if diff.ActiveLine < 0 || diff.ActiveLine >= len(diff.Parsed.Changed) {
+			return 0
+		}
+		cl := diff.Parsed.Changed[diff.ActiveLine]
+		if cl.NewLine > 0 {
+			return cl.NewLine
+		}
+		return cl.OldLine
+	}
+	if diff.ActiveHunk < 0 || diff.ActiveHunk >= len(diff.Parsed.Hunks) {
+		return 0
+	}
+	h := diff.Parsed.Hunks[diff.ActiveHunk]
+	if h.NewStart > 0 {
+		return h.NewStart
+	}
+	return h.OldStart
 }

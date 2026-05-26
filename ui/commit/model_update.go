@@ -26,6 +26,8 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		return m.handleMouseWheel(msg)
 	case tea.KeyPressMsg:
 		return m.handleKeyPress(msg)
+	case editFileFinishedMsg:
+		return m.handleEditFileFinished(msg)
 	case editCommentFinishedMsg:
 		return m.handleEditCommentFinished(msg)
 	case reword.EditorFinishedMsg:

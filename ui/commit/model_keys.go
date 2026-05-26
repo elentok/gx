@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/terminalrun"
 )
 
 const (
@@ -42,6 +43,10 @@ const (
 	bindingAmend       keys.BindingID = "amend"
 	bindingReword      keys.BindingID = "reword"
 	bindingFilterLog   keys.BindingID = "filter-log"
+	bindingEditInPlace keys.BindingID = "edit"
+	bindingEditHSplit  keys.BindingID = "edit-hsplit"
+	bindingEditVSplit  keys.BindingID = "edit-vsplit"
+	bindingEditTab     keys.BindingID = "edit-tab"
 )
 
 func newCommitManager() keys.Manager {
@@ -93,6 +98,13 @@ func newCommitManager() keys.Manager {
 
 		{ID: bindingAmend, Seq: []string{"A"}, Categories: []string{"Actions"}, Title: "amend commit with staged changes"},
 		{ID: bindingFilterLog, Seq: []string{"g", "h"}, Categories: []string{"Navigation"}, Title: "log for file/hunk"},
+
+		// e-prefix chords
+		{ID: bindingEditInPlace, Seq: []string{"e", "e"}, Categories: []string{"Actions"}, Title: "edit file"},
+		{ID: bindingEditHSplit, Seq: []string{"e", "s"}, Categories: []string{"Actions"}, Title: "edit file (hsplit)"},
+		{ID: bindingEditVSplit, Seq: []string{"e", "v"}, Categories: []string{"Actions"}, Title: "edit file (vsplit)"},
+		{ID: bindingEditTab, Seq: []string{"e", "t"}, Categories: []string{"Actions"}, Title: "edit file (tab)"},
+		{ID: bindingCancelChord, Seq: []string{"e", "esc"}, Categories: []string{}, Title: ""},
 	})
 }
 
@@ -301,6 +313,14 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, nil
 	case bindingFilterLog:
 		return m, nav.Open(m.filterLogViewState())
+	case bindingEditInPlace:
+		return m, m.cmdEditSelectedFile(terminalrun.InPlace)
+	case bindingEditHSplit:
+		return m, m.cmdEditSelectedFile(terminalrun.HSplit)
+	case bindingEditVSplit:
+		return m, m.cmdEditSelectedFile(terminalrun.VSplit)
+	case bindingEditTab:
+		return m, m.cmdEditSelectedFile(terminalrun.Tab)
 	}
 	return m, nil
 }
