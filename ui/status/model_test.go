@@ -493,7 +493,7 @@ func TestHelpLineRightAlignsHint(t *testing.T) {
 	if ansi.StringWidth(plain) != m.width {
 		t.Fatalf("expected footer width %d, got %d (%q)", m.width, ansi.StringWidth(plain), plain)
 	}
-	if !strings.HasSuffix(plain, "· 󰉸 context: 1 · filetree · ? help") {
+	if !strings.HasSuffix(plain, "· filetree · ? help") {
 		t.Fatalf("expected hint right-aligned at end, got %q", plain)
 	}
 }
@@ -652,7 +652,7 @@ func TestHelpLineShowsVisualAtLeftInDiffFocus(t *testing.T) {
 	if !strings.HasPrefix(plain, "VISUAL") {
 		t.Fatalf("expected VISUAL indicator at start of footer, got %q", plain)
 	}
-	if !strings.HasSuffix(plain, "· 󰉸 context: 1 · diff: mode:line · render:unified · wrap:on · ? help") {
+	if !strings.HasSuffix(plain, "· diff: mode:line · render:unified · wrap:on · ? help") {
 		t.Fatalf("expected diff hint at end of footer, got %q", plain)
 	}
 }

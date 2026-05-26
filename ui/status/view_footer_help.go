@@ -1,7 +1,6 @@
 package status
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/elentok/gx/ui"
@@ -13,7 +12,7 @@ import (
 
 func (m Model) helpLine() string {
 	if m.focus == focusFiletree {
-		hint := m.diffContextLabel() + " · " + m.helpSectionLabel()
+		hint := m.helpSectionLabel()
 		if t := m.terminalLabel(); t != "" {
 			hint += " · " + t
 		}
@@ -28,7 +27,7 @@ func (m Model) helpLine() string {
 	if m.diffarea.Wrap() {
 		wrapLabel = "on"
 	}
-	hint := m.diffContextLabel() + " · diff: mode:" + modeLabel + " · render:" + m.renderModeLabel() + " · wrap:" + wrapLabel
+	hint := "diff: mode:" + modeLabel + " · render:" + m.renderModeLabel() + " · wrap:" + wrapLabel
 	if t := m.terminalLabel(); t != "" {
 		hint += " · " + t
 	}
@@ -37,13 +36,6 @@ func (m Model) helpLine() string {
 		return m.renderFooterLineWithPrefix("VISUAL", hint)
 	}
 	return m.renderFooterLine(hint)
-}
-
-func (m Model) diffContextLabel() string {
-	if m.settings.UseNerdFontIcons {
-		return fmt.Sprintf("󰉸 context: %d", m.currentDiffContextLines())
-	}
-	return fmt.Sprintf("context: %d", m.currentDiffContextLines())
 }
 
 func (m Model) renderFooterLine(hint string) string {

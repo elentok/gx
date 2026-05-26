@@ -1,11 +1,6 @@
 package status
 
-import (
-	"fmt"
-
-	tea "charm.land/bubbletea/v2"
-	"github.com/elentok/gx/ui/notify"
-)
+import tea "charm.land/bubbletea/v2"
 
 func (m Model) currentDiffContextLines() int {
 	if m.diffContextLines < 1 {
@@ -26,7 +21,7 @@ func (m *Model) adjustDiffContextLines(delta int) tea.Cmd {
 		next = 20
 	}
 	if next == m.currentDiffContextLines() {
-		return notify.Info(fmt.Sprintf("diff context: %d", next))
+		return nil
 	}
 	m.diffContextLines = next
 	cmd := m.reloadDiffsForSelection()
@@ -34,5 +29,5 @@ func (m *Model) adjustDiffContextLines(delta int) tea.Cmd {
 	if m.focus == focusDiff {
 		m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 	}
-	return tea.Batch(notify.Info(fmt.Sprintf("diff context: %d", next)), cmd)
+	return cmd
 }

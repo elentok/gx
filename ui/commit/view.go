@@ -299,13 +299,15 @@ func (m Model) renderDiffPane(width, height int) string {
 }
 
 func (m Model) diffTitle() string {
+	ctx := fmt.Sprintf("Context: %d", m.currentDiffContextLines())
 	if !m.focusDiff {
-		return ""
+		return ctx
 	}
+	mode := "hunk"
 	if m.diffModel.NavMode() == diffview.NavModeLine {
-		return "line"
+		mode = "line"
 	}
-	return "hunk"
+	return ctx + " · " + mode
 }
 
 func renderBadges(decorations []git.RefDecoration) string {
