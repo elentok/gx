@@ -24,6 +24,8 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		return m.handleWindowSize(msg)
 	case tea.MouseWheelMsg:
 		return m.handleMouseWheel(msg)
+	case gotoPRMsg:
+		return m.handleGotoPR(msg)
 	case tea.KeyPressMsg:
 		return m.handleKeyPress(msg)
 	case editFileFinishedMsg:

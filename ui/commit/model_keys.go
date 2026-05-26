@@ -49,6 +49,7 @@ const (
 	bindingEditTab      keys.BindingID = "edit-tab"
 	bindingContextDec   keys.BindingID = "context-dec"
 	bindingContextInc   keys.BindingID = "context-inc"
+	bindingGotoPR       keys.BindingID = "goto-pr"
 )
 
 func newCommitManager() keys.Manager {
@@ -80,6 +81,7 @@ func newCommitManager() keys.Manager {
 		{ID: bindingRefresh, Seq: []string{"R"}, Categories: []string{"Global"}, Title: "refresh"},
 
 		{ID: bindingGotoTop, Seq: []string{"g", "g"}, Categories: []string{"Go to"}, Title: "top"},
+		{ID: bindingGotoPR, Seq: []string{"g", "p"}, Categories: []string{"Go to"}, Title: "open PR"},
 		{ID: bindingCancelChord, Seq: []string{"g", "esc"}, Categories: []string{}, Title: ""},
 
 		{ID: bindingYankContent, Seq: []string{"y", "y"}, Categories: []string{"Yank"}, Title: "yank content"},
@@ -330,6 +332,8 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, m.adjustDiffContextLines(-1)
 	case bindingContextInc:
 		return m, m.adjustDiffContextLines(1)
+	case bindingGotoPR:
+		return m, m.cmdGotoPR()
 	}
 	return m, nil
 }

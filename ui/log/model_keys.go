@@ -35,6 +35,7 @@ const (
 	bindingYankHash          keys.BindingID = "yank-hash"
 	bindingYankSubject       keys.BindingID = "yank-subject"
 	bindingYankMessage       keys.BindingID = "yank-message"
+	bindingGotoPR            keys.BindingID = "goto-pr"
 )
 
 func newLogManager() keys.Manager {
@@ -54,6 +55,7 @@ func newLogManager() keys.Manager {
 		{ID: bindingTop, Seq: []string{"g", "g"}, Categories: []string{"Navigation"}, Title: "top"},
 		{ID: bindingViewOutput, Seq: []string{"g", "o"}, Categories: []string{"Other"}, Title: "view output"},
 		{ID: bindingGotoHead, Seq: []string{"g", "h"}, Categories: []string{"Jump"}, Title: "goto HEAD"},
+		{ID: bindingGotoPR, Seq: []string{"g", "p"}, Categories: []string{"Go to"}, Title: "open PR"},
 		{ID: bindingCancel, Seq: []string{"g", "esc"}, Categories: []string{}, Title: ""},
 
 		{ID: bindingNextTag, Seq: []string{"]", "t"}, Categories: []string{"Jump"}, Title: "next tag"},
@@ -172,6 +174,8 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, m.yankCommitSubject()
 	case bindingYankMessage:
 		return m, m.yankCommitMessage()
+	case bindingGotoPR:
+		return m, m.cmdGotoPR()
 	}
 	return m, nil
 }

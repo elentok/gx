@@ -60,6 +60,8 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.MouseWheelMsg:
 		return m.handleMouseWheel(msg)
+	case gotoPRMsg:
+		return m.handleGotoPR(msg)
 	case reloadMsg:
 		return m.handleReload(msg)
 	case rewordDetailsMsg:

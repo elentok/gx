@@ -2,7 +2,9 @@ package log
 
 import (
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/notify"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -103,6 +105,37 @@ func fetchBranchHistoryClasses(worktreeRoot, startRef string) (map[string]git.Br
 		classes[commit.FullHash] = commit.Class
 	}
 	return classes, branchDiverged
+}
+
+type gotoPRMsg struct {
+	url string
+	err error
+}
+
+func (m Model) cmdGotoPR() tea.Cmd {
+	cursor := m.list.Selected()
+	if len(m.rows) == 0 || cursor < 0 || cursor >= len(m.rows) {
+		return nil
+	}
+	selected := m.rows[cursor]
+	worktreeRoot := m.worktreeRoot
+	return func() tea.Msg {
+		var url string
+		var err error
+		if selected.class == "" {
+			url, err = git.CommitPRURL(worktreeRoot, selected.commit.FullHash)
+		} else {
+			url, err = git.BranchPRURL(worktreeRoot)
+		}
+		return gotoPRMsg{url: url, err: err}
+	}
+}
+
+func (m Model) handleGotoPR(msg gotoPRMsg) (tea.Model, tea.Cmd) {
+	if msg.err != nil || msg.url == "" {
+		return m, notify.Warning("no PR found")
+	}
+	return m, ui.CmdOpenURL(msg.url)
 }
 
 func (m Model) openSelected() tea.Cmd {
