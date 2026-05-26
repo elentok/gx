@@ -43,10 +43,12 @@ const (
 	bindingAmend       keys.BindingID = "amend"
 	bindingReword      keys.BindingID = "reword"
 	bindingFilterLog   keys.BindingID = "filter-log"
-	bindingEditInPlace keys.BindingID = "edit"
-	bindingEditHSplit  keys.BindingID = "edit-hsplit"
-	bindingEditVSplit  keys.BindingID = "edit-vsplit"
-	bindingEditTab     keys.BindingID = "edit-tab"
+	bindingEditInPlace  keys.BindingID = "edit"
+	bindingEditHSplit   keys.BindingID = "edit-hsplit"
+	bindingEditVSplit   keys.BindingID = "edit-vsplit"
+	bindingEditTab      keys.BindingID = "edit-tab"
+	bindingContextDec   keys.BindingID = "context-dec"
+	bindingContextInc   keys.BindingID = "context-inc"
 )
 
 func newCommitManager() keys.Manager {
@@ -98,6 +100,9 @@ func newCommitManager() keys.Manager {
 
 		{ID: bindingAmend, Seq: []string{"A"}, Categories: []string{"Actions"}, Title: "amend commit with staged changes"},
 		{ID: bindingFilterLog, Seq: []string{"g", "h"}, Categories: []string{"Navigation"}, Title: "log for file/hunk"},
+
+		{ID: bindingContextDec, Seq: []string{"["}, Categories: []string{"Diff"}, Title: "fewer context lines"},
+		{ID: bindingContextInc, Seq: []string{"]"}, Categories: []string{"Diff"}, Title: "more context lines"},
 
 		// e-prefix chords
 		{ID: bindingEditInPlace, Seq: []string{"e", "e"}, Categories: []string{"Actions"}, Title: "edit file"},
@@ -321,6 +326,10 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, m.cmdEditSelectedFile(terminalrun.VSplit)
 	case bindingEditTab:
 		return m, m.cmdEditSelectedFile(terminalrun.Tab)
+	case bindingContextDec:
+		return m, m.adjustDiffContextLines(-1)
+	case bindingContextInc:
+		return m, m.adjustDiffContextLines(1)
 	}
 	return m, nil
 }

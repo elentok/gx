@@ -56,7 +56,7 @@ func CommitFilesForRef(repoRoot, ref string) ([]CommitFile, error) {
 	return files, nil
 }
 
-func CommitFileDiffForRef(repoRoot, ref, path string) (string, error) {
+func CommitFileDiffForRef(repoRoot, ref, path string, contextLines int) (string, error) {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
 		ref = "HEAD"
@@ -64,7 +64,7 @@ func CommitFileDiffForRef(repoRoot, ref, path string) (string, error) {
 	out, _, err := run(repoRoot, []string{
 		"show",
 		"--find-renames",
-		"--unified=1",
+		diffContextArg(contextLines),
 		"--format=",
 		ref,
 		"--",
@@ -76,7 +76,7 @@ func CommitFileDiffForRef(repoRoot, ref, path string) (string, error) {
 	return strings.TrimSpace(out), nil
 }
 
-func CommitFileDiffWithDeltaForRef(repoRoot, ref, path string, renderWidth int) (string, error) {
+func CommitFileDiffWithDeltaForRef(repoRoot, ref, path string, contextLines, renderWidth int) (string, error) {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
 		ref = "HEAD"
@@ -84,7 +84,7 @@ func CommitFileDiffWithDeltaForRef(repoRoot, ref, path string, renderWidth int) 
 	raw, _, err := run(repoRoot, []string{
 		"show",
 		"--find-renames",
-		"--unified=1",
+		diffContextArg(contextLines),
 		"--no-color",
 		"--format=",
 		ref,
@@ -104,7 +104,7 @@ func CommitFileDiffWithDeltaForRef(repoRoot, ref, path string, renderWidth int) 
 	out, _, err := run(repoRoot, []string{
 		"show",
 		"--find-renames",
-		"--unified=1",
+		diffContextArg(contextLines),
 		"--color=always",
 		"--format=",
 		ref,

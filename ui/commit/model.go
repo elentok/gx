@@ -51,7 +51,8 @@ type editCommentFinishedMsg struct {
 }
 
 type commitDiffArea struct {
-	diffModel diffview.Model
+	diffModel        diffview.Model
+	diffContextLines int
 }
 
 type commitSearchState struct {
@@ -72,7 +73,8 @@ func NewModel(worktreeRoot, ref, filterPath string, settings ui.Settings, extraK
 		filterPath:   strings.TrimSpace(filterPath),
 		bodyExpanded: true,
 		commitDiffArea: commitDiffArea{
-			diffModel: diffview.NewModel(),
+			diffModel:        diffview.NewModel(),
+			diffContextLines: settings.DiffContextLines,
 		},
 		commitSearchState: commitSearchState{
 			search: search.NewModel(),
@@ -137,13 +139,13 @@ func (m *Model) refreshDiff() {
 		m.diffModel.SetData(diffview.NewDiffData())
 		return
 	}
-	rawDiff, err := git.CommitFileDiffForRef(m.worktreeRoot, m.ref, file.Path)
+	rawDiff, err := git.CommitFileDiffForRef(m.worktreeRoot, m.ref, file.Path, m.currentDiffContextLines())
 	if err != nil {
 		m.err = err
 		m.diffModel.SetData(diffview.NewDiffData())
 		return
 	}
-	colorDiff, err := git.CommitFileDiffWithDeltaForRef(m.worktreeRoot, m.ref, file.Path, m.currentDiffRenderWidth())
+	colorDiff, err := git.CommitFileDiffWithDeltaForRef(m.worktreeRoot, m.ref, file.Path, m.currentDiffContextLines(), m.currentDiffRenderWidth())
 	if err != nil {
 		colorDiff = rawDiff
 	}
