@@ -26,6 +26,7 @@ const (
 	bindingLazygitLog   keys.BindingID = "lazygit-log"
 	bindingRefreshMenu  keys.BindingID = "refresh-menu"
 	bindingCancelChord  keys.BindingID = "cancel-chord"
+	bindingGotoPR       keys.BindingID = "goto-pr"
 
 	// Shared bindings: same action in both filetree and diff focus
 	bindingToggleSection keys.BindingID = "toggle-section"
@@ -59,6 +60,7 @@ func newStatusManager() keys.Manager {
 		// g-prefix chords
 		{ID: bindingGotoTop, Seq: []string{"g", "g"}, Categories: []string{"Filetree", "Diff"}, Title: "go to top"},
 		{ID: bindingViewOutput, Seq: []string{"g", "o"}, Categories: []string{"Global"}, Title: "view output"},
+		{ID: bindingGotoPR, Seq: []string{"g", "p"}, Categories: []string{"Go to"}, Title: "open PR"},
 		{ID: bindingCancelChord, Seq: []string{"g", "esc"}, Categories: []string{}, Title: ""},
 
 		// c-prefix chords
@@ -193,6 +195,8 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model,
 			return m, nil
 		}
 		return m, nav.Open(m.filterLogViewState())
+	case bindingGotoPR:
+		return m, m.cmdGotoPR()
 	}
 	return m, nil
 }

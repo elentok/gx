@@ -34,6 +34,7 @@ const (
 
 	bindingGotoTop     keymgr.BindingID = "goto-top"
 	bindingGoOutput    keymgr.BindingID = "go-output"
+	bindingGotoPR      keymgr.BindingID = "goto-pr"
 	bindingRefreshMenu keymgr.BindingID = "refresh-menu"
 	bindingCancelChord keymgr.BindingID = "cancel-chord"
 )
@@ -64,6 +65,7 @@ func newWorktreesManager() keymgr.Manager {
 
 		{ID: bindingGotoTop, Seq: []string{"g", "g"}, Categories: []string{"Go to"}, Title: "top"},
 		{ID: bindingGoOutput, Seq: []string{"g", "o"}, Categories: []string{"Go to"}, Title: "view output"},
+		{ID: bindingGotoPR, Seq: []string{"g", "p"}, Categories: []string{"Go to"}, Title: "open PR"},
 		{ID: bindingCancelChord, Seq: []string{"g", "esc"}, Categories: []string{}, Title: ""},
 
 		{ID: bindingRefreshMenu, Seq: []string{"m", "r"}, Categories: []string{"Global"}, Title: "refresh"},
@@ -240,6 +242,12 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 			return m, notify.Info(ui.MessageNoOutput())
 		}
 		return m.enterLogsMode(), nil
+	case bindingGotoPR:
+		wt := m.cursorWorktree()
+		if wt == nil {
+			return m, nil
+		}
+		return m, m.cmdGotoPR(wt.Path)
 	case bindingCancelChord:
 		return m, nil
 	}

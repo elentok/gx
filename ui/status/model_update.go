@@ -34,6 +34,8 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		return m.handlePullUpdate(msg)
 	}
 	switch msg := msg.(type) {
+	case gotoPRMsg:
+		return m.handleGotoPR(msg)
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)
 	case tea.FocusMsg:
