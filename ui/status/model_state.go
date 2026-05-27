@@ -126,7 +126,7 @@ func NewModel(worktreeRoot string, settings ui.Settings, initialPath string, ext
 		settings.DiffContextLines = 20
 	}
 	statusKeys := newStatusManager()
-	diffarreaModel := diffarea.NewModel()
+	diffarreaModel := diffarea.NewModel(settings.UseNerdFontIcons)
 	fileTreeModel := filetree.NewModel[git.StageFileStatus]()
 	m := Model{
 		worktreeRoot:     worktreeRoot,

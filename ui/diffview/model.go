@@ -27,22 +27,24 @@ const (
 
 // Model owns one diff pane state (unstaged or staged), including local search.
 type Model struct {
-	data       DiffData
-	viewport   viewport.Model
-	search     search.Model
-	renderMode RenderMode
-	navMode    NavMode
-	wrapSoft   bool
+	data             DiffData
+	viewport         viewport.Model
+	search           search.Model
+	renderMode       RenderMode
+	navMode          NavMode
+	wrapSoft         bool
+	useNerdFontIcons bool
 }
 
-func NewModel() Model {
+func NewModel(useNerdFontIcons bool) Model {
 	return Model{
-		data:       NewDiffData(),
-		viewport:   viewport.New(),
-		search:     search.NewModel(),
-		renderMode: RenderModeUnified,
-		navMode:    NavModeHunk,
-		wrapSoft:   true,
+		data:             NewDiffData(),
+		viewport:         viewport.New(),
+		search:           search.NewModel(),
+		renderMode:       RenderModeUnified,
+		navMode:          NavModeHunk,
+		wrapSoft:         true,
+		useNerdFontIcons: useNerdFontIcons,
 	}
 }
 

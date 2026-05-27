@@ -62,7 +62,7 @@ func TestCommentLocationAndBodyReturnsErrMsgWhenDiffModelEmpty(t *testing.T) {
 	m.ready = true
 
 	// Replace diffModel with a fully empty one (no raw lines, no hunks).
-	m.diffModel = diffview.NewModel()
+	m.diffModel = diffview.NewModel(false)
 
 	cl := m.commentLocationAndBody()
 

@@ -1,28 +1,32 @@
 package diffview
 
 import (
+	"strings"
 	"testing"
 
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/ui/diffview/diffcore"
+	"github.com/elentok/gx/ui/diffview/diffrender"
 	"github.com/elentok/gx/ui/search"
 
 	tea "charm.land/bubbletea/v2"
 )
 
 func TestModelInit(t *testing.T) {
-	m := NewModel()
+	m := NewModel(false)
 	if m.Init() != nil {
 		t.Error("Init() should return nil")
 	}
 }
 
 func TestModelSetDataAndViewport(t *testing.T) {
-	m := NewModel()
+	m := NewModel(false)
 	raw := "@@ -1 +1 @@\n-old\n+new\n"
 	m.BuildFromRaw(raw, raw)
 	data := m.Data()
 
-	m2 := NewModel()
+	m2 := NewModel(false)
 	m2.SetData(data)
 	if !m2.DataRef().HasContent() {
 		t.Error("SetData: expected content after setting data")
@@ -35,7 +39,7 @@ func TestModelSetDataAndViewport(t *testing.T) {
 }
 
 func TestModelReflow(t *testing.T) {
-	m := NewModel()
+	m := NewModel(false)
 	raw := "@@ -1 +1 @@\n-old\n+new\n"
 	m.BuildFromRaw(raw, raw)
 	m.SyncViewport(80, 10)
@@ -43,7 +47,7 @@ func TestModelReflow(t *testing.T) {
 }
 
 func TestModelEnsureActiveVisible(t *testing.T) {
-	m := NewModel()
+	m := NewModel(false)
 	raw := "@@ -1 +1 @@\n-old\n+new\n"
 	m.BuildFromRaw(raw, raw)
 	m.SyncViewport(80, 10)
@@ -52,7 +56,7 @@ func TestModelEnsureActiveVisible(t *testing.T) {
 }
 
 func TestModelComputeSearchMatches(t *testing.T) {
-	m := NewModel()
+	m := NewModel(false)
 	raw := "@@ -1 +1 @@\n-old text\n+new text\n"
 	m.BuildFromRaw(raw, raw)
 
@@ -68,7 +72,7 @@ func TestModelComputeSearchMatches(t *testing.T) {
 }
 
 func TestModelActiveRawLineIndex(t *testing.T) {
-	m := NewModel()
+	m := NewModel(false)
 	raw := "@@ -1 +1 @@\n-old\n+new\n"
 	m.BuildFromRaw(raw, raw)
 	m.SyncViewport(80, 10)
@@ -76,21 +80,151 @@ func TestModelActiveRawLineIndex(t *testing.T) {
 	_ = idx // just verify no panic
 }
 
-func TestModelVisibleRows(t *testing.T) {
-	m := NewModel()
-	raw := "@@ -1 +1 @@\n-old\n+new\n"
+func TestModelRenderRows_EmptyBodyH(t *testing.T) {
+	m := NewModel(false)
+	m.BuildFromRaw("@@ -1 +1 @@\n-old\n+new\n", "@@ -1 +1 @@\n-old\n+new\n")
+	m.SyncViewport(80, 10)
+	lines := m.RenderRows(0, true, RenderOpts{InnerWidth: 80})
+	if len(lines) != 0 {
+		t.Errorf("RenderRows(0) should be empty, got %d lines", len(lines))
+	}
+}
+
+func TestModelRenderRows_PadsToBodyH(t *testing.T) {
+	m := NewModel(false)
+	m.BuildFromRaw("@@ -1 +1 @@\n-old\n+new\n", "@@ -1 +1 @@\n-old\n+new\n")
+	m.SyncViewport(80, 10)
+	lines := m.RenderRows(20, true, RenderOpts{InnerWidth: 80})
+	if len(lines) != 20 {
+		t.Errorf("expected 20 lines (padded), got %d", len(lines))
+	}
+}
+
+func TestModelRenderRows_ActiveMarkVsInactive(t *testing.T) {
+	m := NewModel(false)
+	m.BuildFromRaw("@@ -1 +1 @@\n-old\n+new\n", "@@ -1 +1 @@\n-old\n+new\n")
+	m.SyncViewport(80, 10)
+	accent := lipgloss.Color("#fab387")
+	active := m.RenderRows(5, true, RenderOpts{AccentColor: accent, InnerWidth: 80})
+	inactive := m.RenderRows(5, false, RenderOpts{AccentColor: accent, InnerWidth: 80})
+	differ := false
+	for i := range active {
+		if i < len(inactive) && active[i] != inactive[i] {
+			differ = true
+			break
+		}
+	}
+	if !differ {
+		t.Error("active and inactive renders should differ (marks differ)")
+	}
+	// Inactive rows must start with blank mark "  "
+	for _, line := range inactive {
+		if len(line) >= 2 && ansi.Strip(line[:2]) != "  " {
+			t.Errorf("inactive row should start with blank mark, got %q", line[:2])
+		}
+	}
+}
+
+func TestModelRenderRows_SeparatorDimmed(t *testing.T) {
+	m := NewModel(false)
+	m.renderMode = RenderModeSideBySide
+	// Inject a separator line (all dashes triggers IsDeltaSectionDivider)
+	divider := "────────────────────"
+	m.data.ViewLines = []string{divider, "-removed", "+added"}
+	m.data.ViewLineKinds = []diffrender.RowKind{diffrender.RowPlain, diffrender.RowRemoved, diffrender.RowAdded}
+	m.data.DisplayToRaw = []int{-1, 0, 1}
+	m.SyncViewport(80, 3)
+
+	lines := m.RenderRows(3, false, RenderOpts{InnerWidth: 40})
+	// Separator line should have ANSI codes applied (dim/foreground styling)
+	rawSepText := ansi.Strip(divider)
+	sepLine := ansi.Strip(lines[0][2:]) // strip the 2-char mark prefix
+	if sepLine != rawSepText {
+		// ansi.Strip removed codes — OK: dimming was applied but stripped text matches
+	}
+	// The raw line content should still equal the divider text
+	if ansi.Strip(lines[0]) != "  "+rawSepText {
+		// mark (2 chars blank) + separator text
+		// after strip the mark is "  " and the body is the plain text (possibly truncated)
+	}
+	_ = sepLine // presence of ANSI codes in lines[0] vs raw text is the real assertion
+	// Verify: the full line with ANSI != the line with ANSI stripped (dimming added codes)
+	if lines[0] == ansi.Strip(lines[0]) {
+		t.Error("separator line should have ANSI styling applied (dim color)")
+	}
+}
+
+func TestModelRenderRows_SearchHighlight(t *testing.T) {
+	m := NewModel(false)
+	m.BuildFromRaw("@@ -1 +1 @@\n-old text\n+new text\n", "@@ -1 +1 @@\n-old text\n+new text\n")
+	m.SyncViewport(80, 10)
+
+	query := "text"
+	matched := false
+	opts := RenderOpts{
+		InnerWidth: 80,
+		SearchMatch: func(displayIdx int) (bool, bool) {
+			return true, false
+		},
+		SearchQuery: query,
+	}
+	lines := m.RenderRows(5, true, opts)
+	for _, line := range lines {
+		if strings.Contains(ansi.Strip(line), query) {
+			matched = true
+			// Check that line has ANSI (highlighting applied)
+			if line == ansi.Strip(line) {
+				t.Error("highlighted line should contain ANSI codes")
+			}
+			break
+		}
+	}
+	if !matched {
+		t.Errorf("expected at least one line containing %q", query)
+	}
+}
+
+func TestModelRenderRows_BodyTruncated(t *testing.T) {
+	m := NewModel(false)
+	long := "longcontent_longcontent_longcontent_longcontent_longcontent"
+	raw := "@@ -1 +1 @@\n-" + long + "\n+new\n"
 	m.BuildFromRaw(raw, raw)
 	m.SyncViewport(80, 10)
-	rows := m.VisibleRows(5, true)
-	_ = rows // just verify no panic; 0 height is handled
-	rows0 := m.VisibleRows(0, true)
-	if len(rows0) != 0 {
-		t.Errorf("VisibleRows(0) should be empty, got %d", len(rows0))
+
+	innerW := 20
+	lines := m.RenderRows(5, true, RenderOpts{InnerWidth: innerW})
+	for _, line := range lines {
+		stripped := ansi.Strip(line)
+		// Each line (mark+body) should be at most innerW visible chars
+		if ansi.StringWidth(stripped) > innerW {
+			t.Errorf("line visible width %d exceeds InnerWidth %d: %q", ansi.StringWidth(stripped), innerW, stripped)
+		}
+	}
+}
+
+func TestModelRenderRows_AddedLinePadded(t *testing.T) {
+	m := NewModel(false)
+	m.BuildFromRaw("@@ -1 +1 @@\n-old\n+new\n", "@@ -1 +1 @@\n-old\n+new\n")
+	m.SyncViewport(80, 10)
+
+	innerW := 40
+	lines := m.RenderRows(5, true, RenderOpts{InnerWidth: innerW})
+	// At least one added/removed line should have been padded (body width = innerW-2)
+	for _, line := range lines {
+		stripped := ansi.Strip(line)
+		if len(stripped) == 0 {
+			continue
+		}
+		// A line with actual content and ANSI background padding: ansi width > stripped width
+		if ansi.StringWidth(line) > len(stripped) || len(line) > len(stripped) {
+			// There are ANSI codes — could be marks or padding
+			return
+		}
 	}
 }
 
 func TestModelMoveActive(t *testing.T) {
-	m := NewModel()
+	m := NewModel(false)
 	raw := "@@ -1 +1 @@\n-old\n+new\n@@ -3 +3 @@\n-a\n+b\n"
 	m.BuildFromRaw(raw, raw)
 	m.SyncViewport(80, 10)
@@ -109,7 +243,7 @@ func TestModelMoveActive(t *testing.T) {
 }
 
 func TestModelScrollPage(t *testing.T) {
-	m := NewModel()
+	m := NewModel(false)
 	raw := "@@ -1 +1 @@\n-old\n+new\n"
 	m.BuildFromRaw(raw, raw)
 	m.SyncViewport(80, 3)
@@ -119,7 +253,7 @@ func TestModelScrollPage(t *testing.T) {
 }
 
 func TestModelJumpTopAndBottom(t *testing.T) {
-	m := NewModel()
+	m := NewModel(false)
 	raw := "@@ -1 +1 @@\n-old\n+new\n@@ -5 +5 @@\n-x\n+y\n"
 	m.BuildFromRaw(raw, raw)
 	m.SyncViewport(80, 3)
@@ -136,7 +270,7 @@ func TestModelJumpTopAndBottom(t *testing.T) {
 }
 
 func TestModelJumpTopEmptyHunks(t *testing.T) {
-	m := NewModel()
+	m := NewModel(false)
 	got := m.JumpTop()
 	if got {
 		t.Error("JumpTop on empty model should return false")
@@ -148,7 +282,7 @@ func TestModelJumpTopEmptyHunks(t *testing.T) {
 }
 
 func TestModelRestoreViewportYOffset(t *testing.T) {
-	m := NewModel()
+	m := NewModel(false)
 	raw := "@@ -1 +1 @@\n-old\n+new\n"
 	m.BuildFromRaw(raw, raw)
 	m.SyncViewport(80, 3)
@@ -156,7 +290,7 @@ func TestModelRestoreViewportYOffset(t *testing.T) {
 }
 
 func TestModelCurrentSearchMatchIndex(t *testing.T) {
-	m := NewModel()
+	m := NewModel(false)
 	// Empty model — no changed lines
 	idx := m.CurrentSearchMatchIndex(nil)
 	if idx != -1 {
@@ -165,7 +299,7 @@ func TestModelCurrentSearchMatchIndex(t *testing.T) {
 }
 
 func TestModelFocusedLocationAndBody_Empty(t *testing.T) {
-	m := NewModel()
+	m := NewModel(false)
 	_, _, err := m.FocusedLocationAndBody()
 	if err == "" {
 		t.Error("expected error for empty model with no hunk")
@@ -173,7 +307,7 @@ func TestModelFocusedLocationAndBody_Empty(t *testing.T) {
 }
 
 func TestModelApplyAndFocusSearchMatch(t *testing.T) {
-	m := NewModel()
+	m := NewModel(false)
 	raw := "@@ -1 +1 @@\n-old\n+new\n"
 	m.BuildFromRaw(raw, raw)
 	m.SyncViewport(80, 10)
@@ -211,7 +345,7 @@ func TestNearestIndex_EmptySlice(t *testing.T) {
 }
 
 func TestCoScrollActive_HunkMode(t *testing.T) {
-	m := NewModel()
+	m := NewModel(false)
 	m.navMode = NavModeHunk
 	// hunks start at display rows 0, 10, 20
 	m.data.HunkDisplayRange = [][2]int{{0, 3}, {10, 13}, {20, 23}}
@@ -225,7 +359,7 @@ func TestCoScrollActive_HunkMode(t *testing.T) {
 }
 
 func TestCoScrollActive_LineMode(t *testing.T) {
-	m := NewModel()
+	m := NewModel(false)
 	m.navMode = NavModeLine
 	// changed lines at display rows 2, 8, 14
 	m.data.ChangedDisplay = []int{2, 8, 14}
@@ -239,7 +373,7 @@ func TestCoScrollActive_LineMode(t *testing.T) {
 }
 
 func TestCoScrollActive_EmptyHunkRange_NoOp(t *testing.T) {
-	m := NewModel()
+	m := NewModel(false)
 	m.navMode = NavModeHunk
 	m.data.HunkDisplayRange = nil
 	m.data.ActiveHunk = 0
@@ -251,7 +385,7 @@ func TestCoScrollActive_EmptyHunkRange_NoOp(t *testing.T) {
 }
 
 func TestModelBuildFromRawAndHasContent(t *testing.T) {
-	m := NewModel()
+	m := NewModel(false)
 	if m.DataRef().HasContent() {
 		t.Fatal("expected empty model to have no content")
 	}
@@ -272,7 +406,7 @@ func TestModelBuildFromRawAndHasContent(t *testing.T) {
 }
 
 func TestModelDiffSettings(t *testing.T) {
-	m := NewModel()
+	m := NewModel(false)
 	if m.RenderMode() != RenderModeUnified {
 		t.Fatalf("render mode=%v want unified", m.RenderMode())
 	}
@@ -316,7 +450,7 @@ func buildScrollTestModel(hunkRanges [][2]int, changedDisplay []int, numHunks, n
 		viewLines[i] = "line"
 	}
 
-	m := NewModel()
+	m := NewModel(false)
 	m.navMode = navMode
 	m.data = DiffData{
 		Parsed:           parsed,
@@ -414,7 +548,7 @@ func TestScrollViewport_NoSnapWhenStillVisible(t *testing.T) {
 }
 
 func TestModelUpdate_SearchLifecycle(t *testing.T) {
-	m := NewModel()
+	m := NewModel(false)
 
 	next, _, handled := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	if !handled {

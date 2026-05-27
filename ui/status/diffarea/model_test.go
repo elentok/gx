@@ -7,7 +7,7 @@ import (
 )
 
 func TestNewModel(t *testing.T) {
-	d := NewModel()
+	d := NewModel(false)
 	if d.ActiveSection != SectionUnstaged {
 		t.Errorf("expected SectionUnstaged, got %d", d.ActiveSection)
 	}
@@ -23,7 +23,7 @@ func TestNewModel(t *testing.T) {
 }
 
 func TestSetRenderMode(t *testing.T) {
-	d := NewModel()
+	d := NewModel(false)
 	d.SetRenderMode(diffview.RenderModeSideBySide)
 	if d.RenderMode() != diffview.RenderModeSideBySide {
 		t.Errorf("RenderMode = %v, want SideBySide", d.RenderMode())
@@ -34,7 +34,7 @@ func TestSetRenderMode(t *testing.T) {
 }
 
 func TestSetNavMode(t *testing.T) {
-	d := NewModel()
+	d := NewModel(false)
 	d.SetNavMode(diffview.NavModeLine)
 	if d.NavMode() != diffview.NavModeLine {
 		t.Errorf("NavMode = %v, want Line", d.NavMode())
@@ -42,7 +42,7 @@ func TestSetNavMode(t *testing.T) {
 }
 
 func TestToggleNavMode(t *testing.T) {
-	d := NewModel()
+	d := NewModel(false)
 	d.ToggleNavMode()
 	if d.NavMode() != diffview.NavModeLine {
 		t.Errorf("after toggle: NavMode = %v, want Line", d.NavMode())
@@ -54,7 +54,7 @@ func TestToggleNavMode(t *testing.T) {
 }
 
 func TestSetWrap(t *testing.T) {
-	d := NewModel()
+	d := NewModel(false)
 	d.SetWrap(false)
 	if d.Wrap() {
 		t.Error("expected Wrap=false after SetWrap(false)")
@@ -62,7 +62,7 @@ func TestSetWrap(t *testing.T) {
 }
 
 func TestToggleSection(t *testing.T) {
-	d := NewModel()
+	d := NewModel(false)
 	d.ToggleSection()
 	if d.ActiveSection != SectionStaged {
 		t.Errorf("expected SectionStaged after toggle, got %d", d.ActiveSection)
@@ -74,7 +74,7 @@ func TestToggleSection(t *testing.T) {
 }
 
 func TestSectionModel(t *testing.T) {
-	d := NewModel()
+	d := NewModel(false)
 	unstaged := d.SectionModel(SectionUnstaged)
 	staged := d.SectionModel(SectionStaged)
 	if unstaged == staged {
@@ -83,7 +83,7 @@ func TestSectionModel(t *testing.T) {
 }
 
 func TestActiveSectionModel(t *testing.T) {
-	d := NewModel()
+	d := NewModel(false)
 	active := d.ActiveSectionModel()
 	if active == nil {
 		t.Error("expected non-nil ActiveSectionModel")
@@ -91,7 +91,7 @@ func TestActiveSectionModel(t *testing.T) {
 }
 
 func TestResetSections(t *testing.T) {
-	d := NewModel()
+	d := NewModel(false)
 	raw := "@@ -1 +1 @@\n-old\n+new\n"
 	d.Unstaged.BuildFromRaw(raw, raw)
 	d.ResetSections()
@@ -101,12 +101,12 @@ func TestResetSections(t *testing.T) {
 }
 
 func TestSyncViewports(t *testing.T) {
-	d := NewModel()
+	d := NewModel(false)
 	d.SyncViewports(80, 20, 10) // should not panic
 }
 
 func TestMoveActive_Empty(t *testing.T) {
-	d := NewModel()
+	d := NewModel(false)
 	moved := d.MoveActive(1)
 	if moved {
 		t.Error("expected MoveActive=false on empty diff")
@@ -114,12 +114,12 @@ func TestMoveActive_Empty(t *testing.T) {
 }
 
 func TestScrollPage_Empty(t *testing.T) {
-	d := NewModel()
+	d := NewModel(false)
 	d.ScrollPage(1) // should not panic
 }
 
 func TestJumpTopBottom_Empty(t *testing.T) {
-	d := NewModel()
+	d := NewModel(false)
 	top := d.JumpTop()
 	bottom := d.JumpBottom()
 	if top || bottom {
@@ -128,26 +128,26 @@ func TestJumpTopBottom_Empty(t *testing.T) {
 }
 
 func TestToggleVisual_Empty(t *testing.T) {
-	d := NewModel()
+	d := NewModel(false)
 	if d.ToggleVisual() {
 		t.Error("expected ToggleVisual=false on empty diff (no changed lines)")
 	}
 }
 
 func TestDisableVisual(t *testing.T) {
-	d := NewModel()
+	d := NewModel(false)
 	d.DisableVisual() // should not panic
 }
 
 func TestKeys(t *testing.T) {
-	d := NewModel()
+	d := NewModel(false)
 	if d.Keys() == nil {
 		t.Error("Keys() should not be nil")
 	}
 }
 
 func TestUpdateActive_Unhandled(t *testing.T) {
-	d := NewModel()
+	d := NewModel(false)
 	cmd, handled := d.UpdateActive(struct{}{})
 	if handled {
 		t.Error("expected unhandled for unknown msg")

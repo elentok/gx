@@ -73,7 +73,7 @@ func NewModel(worktreeRoot, ref, filterPath string, settings ui.Settings, extraK
 		filterPath:   strings.TrimSpace(filterPath),
 		bodyExpanded: true,
 		commitDiffArea: commitDiffArea{
-			diffModel:        diffview.NewModel(),
+			diffModel:        diffview.NewModel(settings.UseNerdFontIcons),
 			diffContextLines: settings.DiffContextLines,
 		},
 		commitSearchState: commitSearchState{

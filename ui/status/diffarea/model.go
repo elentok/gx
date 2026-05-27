@@ -24,26 +24,28 @@ type FlashState struct {
 }
 
 type Model struct {
-	ActiveSection  Section
-	navMode        diffview.NavMode
-	renderMode     diffview.RenderMode
-	Fullscreen     bool
-	wrap           bool
-	Unstaged       diffview.Model
-	Staged         diffview.Model
-	Flash          FlashState
-	keys           keys.Manager
+	ActiveSection    Section
+	navMode          diffview.NavMode
+	renderMode       diffview.RenderMode
+	Fullscreen       bool
+	wrap             bool
+	useNerdFontIcons bool
+	Unstaged         diffview.Model
+	Staged           diffview.Model
+	Flash            FlashState
+	keys             keys.Manager
 }
 
-func NewModel() Model {
+func NewModel(useNerdFontIcons bool) Model {
 	area := Model{
-		ActiveSection: SectionUnstaged,
-		navMode:       diffview.NavModeHunk,
-		renderMode:    diffview.RenderModeUnified,
-		wrap:          true,
-		Unstaged:      diffview.NewModel(),
-		Staged:        diffview.NewModel(),
-		keys:          keys.New(diffBindings),
+		ActiveSection:    SectionUnstaged,
+		navMode:          diffview.NavModeHunk,
+		renderMode:       diffview.RenderModeUnified,
+		wrap:             true,
+		useNerdFontIcons: useNerdFontIcons,
+		Unstaged:         diffview.NewModel(useNerdFontIcons),
+		Staged:           diffview.NewModel(useNerdFontIcons),
+		keys:             keys.New(diffBindings),
 	}
 	area.SetRenderMode(area.renderMode)
 	area.SetNavMode(area.navMode)
@@ -130,8 +132,8 @@ func (d *Model) ToggleSection() {
 }
 
 func (d *Model) ResetSections() {
-	d.Unstaged = diffview.NewModel()
-	d.Staged = diffview.NewModel()
+	d.Unstaged = diffview.NewModel(d.useNerdFontIcons)
+	d.Staged = diffview.NewModel(d.useNerdFontIcons)
 	d.SetRenderMode(d.renderMode)
 	d.SetNavMode(d.navMode)
 	d.SetWrap(d.wrap)
