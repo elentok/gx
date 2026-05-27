@@ -50,6 +50,7 @@ var (
 
 	StyleSearchResult       = lipgloss.NewStyle().Foreground(ColorYellow).Bold(true).Underline(true)
 	StyleActiveSearchResult = lipgloss.NewStyle().Foreground(ColorGreen).Bold(true).Underline(true)
+	StyleDiffSeparator      = lipgloss.NewStyle().Foreground(ColorDeepBg)
 )
 
 // Status styles.

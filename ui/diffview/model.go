@@ -230,16 +230,18 @@ func (m *Model) VisibleRows(bodyH int, active bool) []VisibleDiffRow {
 
 		isChanged := rawIdx < 0 && m.navMode == NavModeLine && active && data.ActiveLine >= 0 && data.ActiveLine < len(data.ChangedDisplay) && data.ChangedDisplay[data.ActiveLine] == displayIdx
 
+		text := data.ViewLines[displayIdx]
 		rows = append(rows, VisibleDiffRow{
 			DisplayIndex:       displayIdx,
 			RawIndex:           rawIdx,
-			Text:               data.ViewLines[displayIdx],
+			Text:               text,
 			Kind:               rowKind,
 			InActiveHunk:       inActiveHunk,
 			IsActiveRaw:        rawIdx >= 0 && rawIdx == activeRaw && active,
 			IsActiveChangedRaw: isChanged,
 			OverflowTop:        displayIdx == overflowTopDisplay && inActiveHunk,
 			OverflowBottom:     displayIdx == overflowBottomDisplay && inActiveHunk,
+			IsSeparator:        isSeparatorRow(text, m.renderMode),
 		})
 	}
 

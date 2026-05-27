@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
@@ -145,11 +144,8 @@ func (m *Model) renderSectionPane(width, height int, section diffarea.Section) s
 			}
 			rowKind := row.Kind
 			body := ansi.Truncate(row.Text, bodyW, "")
-			if m.diffarea.RenderMode() == diffview.RenderModeSideBySide {
-				plain := strings.TrimSpace(ansi.Strip(body))
-				if isDeltaSectionDivider(plain) {
-					body = lipgloss.NewStyle().Foreground(ui.ColorDeepBg).Render(ansi.Strip(body))
-				}
+			if row.IsSeparator {
+				body = ui.StyleDiffSeparator.Render(ansi.Strip(body))
 			}
 			if matched, current := m.searchMatchDiffDisplay(section, displayIdx); matched {
 				body = search.Highlight(ansi.Strip(body), m.diffSearchForSection(section).Query(), current)

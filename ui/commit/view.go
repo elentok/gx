@@ -274,6 +274,9 @@ func (m Model) renderDiffPane(width, height int) string {
 				}
 			}
 			body := row.Text
+			if row.IsSeparator {
+				body = ui.StyleDiffSeparator.Render(ansi.Strip(body))
+			}
 			if matched, current := m.searchMatchDiffDisplay(displayIdx); matched {
 				body = highlightMatchText(body, m.search.Query(), current)
 			}

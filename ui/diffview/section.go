@@ -29,7 +29,7 @@ func splitLines(s string) []string {
 	return strings.Split(s, "\n")
 }
 
-func isDeltaSectionDivider(plain string) bool {
+func IsDeltaSectionDivider(plain string) bool {
 	if plain == "" {
 		return false
 	}
@@ -133,7 +133,7 @@ func sideBySideHunkDisplayRanges(lines []string, hunkCount int) [][2]int {
 		}
 		for end >= start {
 			plain := strings.TrimSpace(ansi.Strip(lines[end]))
-			if plain == "" || isDeltaSectionDivider(plain) {
+			if plain == "" || IsDeltaSectionDivider(plain) {
 				end--
 				continue
 			}
@@ -141,7 +141,7 @@ func sideBySideHunkDisplayRanges(lines []string, hunkCount int) [][2]int {
 		}
 		for start <= end {
 			plain := strings.TrimSpace(ansi.Strip(lines[start]))
-			if isDeltaSectionDivider(plain) {
+			if IsDeltaSectionDivider(plain) {
 				start++
 				continue
 			}

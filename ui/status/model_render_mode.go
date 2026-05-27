@@ -5,7 +5,6 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/diffview"
-	"github.com/elentok/gx/ui/notify"
 )
 
 func (m Model) deltaRenderWidth() int {
@@ -30,21 +29,18 @@ func (m Model) deltaRenderWidth() int {
 }
 
 func (m *Model) toggleRenderMode() tea.Cmd {
-	var notifyMsg string
 	if m.diffarea.RenderMode() == diffview.RenderModeUnified {
 		if !git.DeltaAvailable() {
-			return notify.Warning("side-by-side requires delta; staying in unified mode")
+			return nil
 		}
 		m.diffarea.SetRenderMode(diffview.RenderModeSideBySide)
-		notifyMsg = "side-by-side mode"
 	} else {
 		m.diffarea.SetRenderMode(diffview.RenderModeUnified)
-		notifyMsg = "unified mode"
 	}
 	cmd := m.reloadDiffsForSelection()
 	m.syncDiffViewports()
 	m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
-	return tea.Batch(notify.Info(notifyMsg), cmd)
+	return cmd
 }
 
 func (m Model) renderModeLabel() string {

@@ -293,15 +293,3 @@ func (m *Model) markMovedTarget(sig movedTarget) {
 		m.diffarea.Flash.Line = 0
 	}
 }
-
-func isDeltaSectionDivider(plain string) bool {
-	if plain == "" {
-		return false
-	}
-	for _, r := range plain {
-		if r != '─' && r != '-' {
-			return false
-		}
-	}
-	return true
-}

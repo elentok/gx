@@ -20,13 +20,13 @@ func TestSplitLines(t *testing.T) {
 }
 
 func TestIsDeltaSectionDivider(t *testing.T) {
-	if !isDeltaSectionDivider("────") {
+	if !IsDeltaSectionDivider("────") {
 		t.Fatal("expected box divider to match")
 	}
-	if !isDeltaSectionDivider("----") {
+	if !IsDeltaSectionDivider("----") {
 		t.Fatal("expected ascii divider to match")
 	}
-	if isDeltaSectionDivider("-- x --") {
+	if IsDeltaSectionDivider("-- x --") {
 		t.Fatal("expected mixed content not to match")
 	}
 }
