@@ -6,11 +6,12 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview/diffrender"
 	"github.com/elentok/gx/ui/search"
 )
 
-type VisibleDiffRow struct {
+type visibleDiffRow struct {
 	DisplayIndex       int
 	RawIndex           int
 	Text               string
@@ -31,15 +32,11 @@ type RenderOpts struct {
 	SearchQuery string
 }
 
-// diffSeparatorStyle dims delta section-divider lines in side-by-side mode.
-// Matches ui.StyleDiffSeparator without importing the ui package.
-var diffSeparatorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#11111a"))
-
 // RenderRows returns bodyH fully-assembled diff lines ready to embed in a panel
 // frame. Each line is: mark (2 chars) + body (InnerWidth-2 chars, padded).
 // Lines past the end of content are returned as empty strings.
 func (m *Model) RenderRows(bodyH int, active bool, opts RenderOpts) []string {
-	rows := m.VisibleRows(bodyH, active)
+	rows := m.visibleRows(bodyH, active)
 	const markW = 2
 	bodyW := maxInt(0, opts.InnerWidth-markW)
 	overTop, overBottom, overBoth := m.overflowMarkers()
@@ -84,7 +81,7 @@ func (m *Model) RenderRows(bodyH int, active bool, opts RenderOpts) []string {
 
 		// 3. Separator dimming
 		if row.IsSeparator {
-			body = diffSeparatorStyle.Render(ansi.Strip(body))
+			body = ui.StyleDiffSeparator.Render(ansi.Strip(body))
 		}
 
 		// 4. Search highlighting

@@ -46,7 +46,7 @@ func (m *Model) filesInnerHeight() int {
 }
 
 func (m *Model) moveDiffActive(delta int) {
-	if !m.diffModel.MoveActive(delta, false) {
+	if !m.diffModel.MoveActive(delta, true) {
 		return
 	}
 	m.syncSearchCursorFromDiffFocus()

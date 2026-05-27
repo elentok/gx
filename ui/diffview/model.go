@@ -174,13 +174,12 @@ func (m Model) ActiveRawLineIndex() int {
 	return m.data.ActiveRawLineIndex(m.navMode)
 }
 
-func (m *Model) VisibleRows(bodyH int, active bool) []VisibleDiffRow {
+func (m *Model) visibleRows(bodyH int, active bool) []visibleDiffRow {
 	viewportY := m.viewport.YOffset()
-	visible := m.viewport.VisibleLineCount()
 	activeRaw := m.ActiveRawLineIndex()
 	data := m.data
 
-	rows := make([]VisibleDiffRow, 0, maxInt(0, bodyH))
+	rows := make([]visibleDiffRow, 0, maxInt(0, bodyH))
 	if bodyH <= 0 {
 		return rows
 	}
@@ -194,8 +193,8 @@ func (m *Model) VisibleRows(bodyH int, active bool) []VisibleDiffRow {
 	overflowTopDisplay := -1
 	overflowBottomDisplay := -1
 	if m.navMode == NavModeHunk && active && data.ActiveHunk >= 0 {
-		if start, end, ok := data.HunkDisplayBounds(data.ActiveHunk); ok && visible > 0 {
-			vpBottom := viewportY + visible - 1
+		if start, end, ok := data.HunkDisplayBounds(data.ActiveHunk); ok {
+			vpBottom := viewportY + bodyH - 1
 			if start < viewportY {
 				overflowTopDisplay = viewportY
 			}
@@ -208,7 +207,7 @@ func (m *Model) VisibleRows(bodyH int, active bool) []VisibleDiffRow {
 	for i := 0; i < bodyH; i++ {
 		displayIdx := viewportY + i
 		if displayIdx >= len(data.ViewLines) {
-			rows = append(rows, VisibleDiffRow{DisplayIndex: displayIdx, RawIndex: -1})
+			rows = append(rows, visibleDiffRow{DisplayIndex: displayIdx, RawIndex: -1})
 			continue
 		}
 		rawIdx := -1
@@ -233,7 +232,7 @@ func (m *Model) VisibleRows(bodyH int, active bool) []VisibleDiffRow {
 		isChanged := rawIdx < 0 && m.navMode == NavModeLine && active && data.ActiveLine >= 0 && data.ActiveLine < len(data.ChangedDisplay) && data.ChangedDisplay[data.ActiveLine] == displayIdx
 
 		text := data.ViewLines[displayIdx]
-		rows = append(rows, VisibleDiffRow{
+		rows = append(rows, visibleDiffRow{
 			DisplayIndex:       displayIdx,
 			RawIndex:           rawIdx,
 			Text:               text,
@@ -262,11 +261,11 @@ func (m *Model) MoveActive(delta int, allowViewportScroll bool) bool {
 				y := m.viewport.YOffset()
 				if visible > 0 {
 					last := y + visible - 1
-					if delta > 0 && end > last {
+					if delta > 0 && end >= last {
 						m.viewport.ScrollDown(1)
 						return false
 					}
-					if delta < 0 && start < y {
+					if delta < 0 && start <= y {
 						m.viewport.ScrollUp(1)
 						return false
 					}

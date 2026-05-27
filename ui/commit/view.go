@@ -26,8 +26,6 @@ const (
 
 var commitMetaStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
 var commitSubjectStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true)
-var commitDiffMarkerStyle = lipgloss.NewStyle().Foreground(ui.ColorOrange)
-var commitDiffMarkerActiveStyle = lipgloss.NewStyle().Foreground(ui.ColorOrange).Bold(true)
 
 func (m Model) View() tea.View {
 	if !m.ready {
@@ -252,36 +250,16 @@ func (m Model) renderFilesPane(width, height int) string {
 func (m Model) renderDiffPane(width, height int) string {
 	lines := []string{ui.StyleMuted.Render("no diff")}
 	if len(m.diffModel.Data().ViewLines) > 0 {
-		lines = make([]string, 0, max(1, m.diffModel.Viewport().VisibleLineCount()))
 		bodyH := max(1, height-2)
-		rows := m.diffModel.VisibleRows(bodyH, m.focusDiff)
-		for _, row := range rows {
-			if row.DisplayIndex < 0 || row.DisplayIndex >= len(m.diffModel.Data().ViewLines) {
-				lines = append(lines, "")
-				continue
-			}
-			displayIdx := row.DisplayIndex
-			mark := "  "
-			if m.focusDiff {
-				if row.InActiveHunk {
-					mark = commitDiffMarkerStyle.Render("▌ ")
-				}
-				if row.IsActiveRaw {
-					mark = commitDiffMarkerActiveStyle.Render("▌ ")
-				}
-				if row.IsActiveChangedRaw {
-					mark = commitDiffMarkerActiveStyle.Render("▌ ")
-				}
-			}
-			body := row.Text
-			if row.IsSeparator {
-				body = ui.StyleDiffSeparator.Render(ansi.Strip(body))
-			}
-			if matched, current := m.searchMatchDiffDisplay(displayIdx); matched {
-				body = highlightMatchText(body, m.search.Query(), current)
-			}
-			lines = append(lines, mark+body)
-		}
+		innerW := max(1, width-2)
+		lines = m.diffModel.RenderRows(bodyH, m.focusDiff, diffview.RenderOpts{
+			AccentColor: ui.ColorOrange,
+			InnerWidth:  innerW,
+			SearchMatch: func(displayIdx int) (bool, bool) {
+				return m.searchMatchDiffDisplay(displayIdx)
+			},
+			SearchQuery: m.search.Query(),
+		})
 	} else if len(m.diffModel.Data().Parsed.Lines) > 0 {
 		if diffcore.HasBinaryDiff(m.diffModel.Data().Parsed) {
 			lines = []string{ui.StyleMuted.Render("binary file")}

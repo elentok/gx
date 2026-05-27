@@ -14,11 +14,11 @@ func moveActive(section *DiffData, vp *viewport.Model, navMode NavMode, delta in
 				y := vp.YOffset()
 				if visible > 0 {
 					last := y + visible - 1
-					if delta > 0 && end > last {
+					if delta > 0 && end >= last {
 						vp.ScrollDown(1)
 						return false
 					}
-					if delta < 0 && start < y {
+					if delta < 0 && start <= y {
 						vp.ScrollUp(1)
 						return false
 					}

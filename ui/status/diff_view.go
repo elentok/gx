@@ -10,11 +10,9 @@ import (
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/diffview/diffcore"
 	"github.com/elentok/gx/ui/diffview/diffrender"
-	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/status/diffarea"
 
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/ansi"
 )
 
 func (m *Model) renderDiffPane(width, height int) string {
@@ -88,8 +86,6 @@ func (m *Model) renderSectionPane(width, height int, section diffarea.Section) s
 		}
 	}
 
-	overflowTopMark, overflowBottomMark, overflowBothMark := m.hunkOverflowMarkers()
-
 	lines := make([]string, 0, bodyH)
 	if len(diff.ViewLines) == 0 && diffcore.HasBinaryDiff(diff.Parsed) {
 		lines = append(lines, lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render(m.binarySummaryLine()))
@@ -101,58 +97,14 @@ func (m *Model) renderSectionPane(width, height int, section diffarea.Section) s
 	}
 
 	if len(lines) == 0 {
-		rows := diffviewModel.VisibleRows(bodyH, activeSection)
-		for _, row := range rows {
-			if row.DisplayIndex < 0 || row.DisplayIndex >= len(diff.ViewLines) {
-				lines = append(lines, "")
-				continue
-			}
-			displayIdx := row.DisplayIndex
-			rawIdx := row.RawIndex
-			mark := "  "
-			if m.diffarea.NavMode() == diffview.NavModeLine && diff.VisualActive && m.visualMatchDiffDisplay(*diff, displayIdx) {
-				mark = lipgloss.NewStyle().Foreground(accent).Render("▎ ")
-			}
-			if row.InActiveHunk && activeSection {
-				mark = lipgloss.NewStyle().Foreground(accent).Render("▌ ")
-			}
-			if row.IsActiveRaw {
-				mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render("▌ ")
-			}
-			if row.IsActiveChangedRaw {
-				mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render("▌ ")
-			}
-			if row.InActiveHunk {
-				if row.OverflowTop && row.OverflowBottom {
-					mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render(overflowBothMark)
-				} else if row.OverflowTop {
-					mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render(overflowTopMark)
-				} else if row.OverflowBottom {
-					mark = lipgloss.NewStyle().Foreground(accent).Bold(true).Render(overflowBottomMark)
-				}
-			}
-			if rawIdx >= 0 && m.flashMarker(section, rawIdx, diffviewModel) {
-				mark = lipgloss.NewStyle().Foreground(ui.ColorGreen).Bold(true).Render("◆ ")
-			}
-
-			indicator := "  "
-			markW := ansi.StringWidth(mark)
-			indicatorW := ansi.StringWidth(indicator)
-			bodyW := innerW - markW - indicatorW
-			if bodyW < 0 {
-				bodyW = 0
-			}
-			rowKind := row.Kind
-			body := ansi.Truncate(row.Text, bodyW, "")
-			if row.IsSeparator {
-				body = ui.StyleDiffSeparator.Render(ansi.Strip(body))
-			}
-			if matched, current := m.searchMatchDiffDisplay(section, displayIdx); matched {
-				body = search.Highlight(ansi.Strip(body), m.diffSearchForSection(section).Query(), current)
-			}
-			body += diffrender.DiffBodyPadding(rowKind, maxInt(0, bodyW-ansi.StringWidth(body)))
-			lines = append(lines, mark+body+indicator)
-		}
+		lines = diffviewModel.RenderRows(bodyH, activeSection, diffview.RenderOpts{
+			AccentColor: accent,
+			InnerWidth:  innerW,
+			SearchMatch: func(displayIdx int) (bool, bool) {
+				return m.searchMatchDiffDisplay(section, displayIdx)
+			},
+			SearchQuery: m.diffSearchForSection(section).Query(),
+		})
 	}
 	for len(lines) < bodyH {
 		lines = append(lines, "")
@@ -218,43 +170,6 @@ func (m Model) sectionPlaceholder(section diffarea.Section, collapsed bool) stri
 	}
 	return ""
 }
-
-func (m Model) hunkOverflowMarkers() (top, bottom, both string) {
-	if m.settings.UseNerdFontIcons {
-		return " ", " ", "↕ "
-	}
-	return "↑ ", "↓ ", "↕ "
-}
-
-func (m Model) visualMatchDiffDisplay(diffData diffview.DiffData, displayIdx int) bool {
-	if !diffData.VisualActive || m.diffarea.NavMode() != diffview.NavModeLine {
-		return false
-	}
-	if len(diffData.ChangedDisplay) > 0 {
-		start, end := diffData.VisualLineBounds()
-		for i := start; i <= end && i < len(diffData.ChangedDisplay); i++ {
-			if i >= 0 && diffData.ChangedDisplay[i] == displayIdx {
-				return true
-			}
-		}
-		return false
-	}
-	if displayIdx < 0 || displayIdx >= len(diffData.DisplayToRaw) {
-		return false
-	}
-	rawIdx := diffData.DisplayToRaw[displayIdx]
-	if rawIdx < 0 {
-		return false
-	}
-	start, end := diffData.VisualLineBounds()
-	for i := start; i <= end && i < len(diffData.Parsed.Changed); i++ {
-		if i >= 0 && diffData.Parsed.Changed[i].LineIndex == rawIdx {
-			return true
-		}
-	}
-	return false
-}
-
 func (m *Model) syncDiffViewports() {
 	mainH := m.height - 1
 	if mainH < 4 {

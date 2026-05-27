@@ -4,8 +4,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
-	"github.com/elentok/gx/ui/diffview"
-	"github.com/elentok/gx/ui/status/diffarea"
+"github.com/elentok/gx/ui/status/diffarea"
 )
 
 func (m Model) errorModalView() string {
@@ -158,24 +157,6 @@ func statusFileIcon(file git.StageFileStatus, isSymlink bool, icons filetreePane
 
 func isDeletedFileStatus(file git.StageFileStatus) bool {
 	return file.IndexStatus == 'D' || file.WorktreeCode == 'D'
-}
-
-func (m Model) flashMarker(section diffarea.Section, rawIdx int, diffviewModel *diffview.Model) bool {
-	diff := diffviewModel.DataRef()
-	if !m.diffarea.Flash.Active || m.diffarea.Flash.Section != section {
-		return false
-	}
-	if m.diffarea.Flash.NavMode == diffview.NavModeHunk {
-		if m.diffarea.Flash.Hunk < 0 || m.diffarea.Flash.Hunk >= len(diff.Parsed.Hunks) {
-			return false
-		}
-		h := diff.Parsed.Hunks[m.diffarea.Flash.Hunk]
-		return rawIdx >= h.StartLine && rawIdx <= h.EndLine
-	}
-	if m.diffarea.Flash.Line < 0 || m.diffarea.Flash.Line >= len(diff.Parsed.Changed) {
-		return false
-	}
-	return diff.Parsed.Changed[m.diffarea.Flash.Line].LineIndex == rawIdx
 }
 
 func maxInt(a, b int) int {
