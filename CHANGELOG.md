@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.16.2 - 2026-05-27
+
+- Commit: fix diff scrolling — `j`/`k` now scroll through long hunks before jumping to the next/previous one
+- Commit + Status: scroll one extra line past the hunk boundary before jumping, so the end of a hunk is visible before moving on
+- Commit: show scroll percentage in the diff panel title
+- Commit + Status: search counter (`⌕ N/M`) now appears in the commit diff title when searching
+
 ## v0.16.1 - 2026-05-26
 
 - All views: add `g p` binding to open the GitHub PR for the current context in the browser
