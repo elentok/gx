@@ -573,6 +573,35 @@ func (m Model) ScrollPercentText() string {
 	return fmt.Sprintf("%d%%", pct)
 }
 
+// StatusText returns the model-owned right-title fragments for a diff panel:
+// nav mode (when focused) and scroll percentage. Callers prepend context lines
+// and append search counters using JoinDot.
+func (m Model) StatusText(focused bool) string {
+	parts := []string{}
+	if focused {
+		mode := "hunk"
+		if m.navMode == NavModeLine {
+			mode = "line"
+		}
+		parts = append(parts, mode)
+	}
+	if pct := m.ScrollPercentText(); pct != "" {
+		parts = append(parts, pct)
+	}
+	return JoinDot(parts...)
+}
+
+// JoinDot joins non-empty strings with " · ".
+func JoinDot(parts ...string) string {
+	filtered := parts[:0]
+	for _, p := range parts {
+		if p != "" {
+			filtered = append(filtered, p)
+		}
+	}
+	return strings.Join(filtered, " · ")
+}
+
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, bool) {
 	if nextSearch, cmd, result := m.search.Update(msg); result.Handled {
 		m.search = nextSearch

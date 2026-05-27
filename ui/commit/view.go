@@ -281,19 +281,20 @@ func (m Model) renderDiffPane(width, height int) string {
 
 func (m Model) diffTitle() string {
 	ctx := fmt.Sprintf("Context: %d", m.currentDiffContextLines())
-	pct := m.diffModel.ScrollPercentText()
-	parts := []string{ctx}
-	if m.focusDiff {
-		mode := "hunk"
-		if m.diffModel.NavMode() == diffview.NavModeLine {
-			mode = "line"
-		}
-		parts = append(parts, mode)
+	return diffview.JoinDot(ctx, m.diffModel.StatusText(m.focusDiff), m.diffSearchCounterText())
+}
+
+func (m Model) diffSearchCounterText() string {
+	if m.searchScope != searchScopeDiff || !m.search.HasQuery() || m.search.MatchesCount() == 0 || !m.focusDiff {
+		return ""
 	}
-	if pct != "" {
-		parts = append(parts, pct)
+	cursor := m.search.Cursor() + 1
+	total := m.search.MatchesCount()
+	icon := "⌕"
+	if m.settings.UseNerdFontIcons {
+		icon = ui.Icons(true).Search
 	}
-	return strings.Join(parts, " · ")
+	return fmt.Sprintf("%s %d/%d", icon, cursor, total)
 }
 
 func renderBadges(decorations []git.RefDecoration) string {

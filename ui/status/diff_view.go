@@ -66,24 +66,11 @@ func (m *Model) renderSectionPane(width, height int, section diffarea.Section) s
 	if m.diffarea.Fullscreen {
 		titleText += " [fullscreen]"
 	}
-	rightTitleText := ""
+	contextText := ""
 	if !collapsed {
-		rightTitleText = fmt.Sprintf("Context: %d", m.currentDiffContextLines())
+		contextText = fmt.Sprintf("Context: %d", m.currentDiffContextLines())
 	}
-	if pct := diffviewModel.ScrollPercentText(); pct != "" {
-		if rightTitleText == "" {
-			rightTitleText = pct
-		} else {
-			rightTitleText += " · " + pct
-		}
-	}
-	if s := m.searchCounterForDiffSection(section); s != "" {
-		if rightTitleText == "" {
-			rightTitleText = s
-		} else {
-			rightTitleText += " · " + s
-		}
-	}
+	rightTitleText := diffview.JoinDot(contextText, diffviewModel.StatusText(activeSection), m.searchCounterForDiffSection(section))
 
 	lines := make([]string, 0, bodyH)
 	if len(diff.ViewLines) == 0 && diffcore.HasBinaryDiff(diff.Parsed) {
