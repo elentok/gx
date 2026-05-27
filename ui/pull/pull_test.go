@@ -26,6 +26,21 @@ func modelAtStashConfirm() Model {
 	return m
 }
 
+func TestInputFocused_FalseByDefault(t *testing.T) {
+	m := New()
+	if m.InputFocused() {
+		t.Error("expected InputFocused=false by default")
+	}
+}
+
+func TestInputFocused_TrueWhenCredsOpen(t *testing.T) {
+	m := openedModel()
+	m.creds.IsOpen = true
+	if !m.InputFocused() {
+		t.Error("expected InputFocused=true when creds is open")
+	}
+}
+
 // changesCheckMsg with no changes → goes straight to pulling (no stash confirm).
 func TestChangesCheckNoChanges_StartsPulling(t *testing.T) {
 	m := openedModel()

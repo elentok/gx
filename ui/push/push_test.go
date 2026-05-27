@@ -20,6 +20,21 @@ func newModelAtPRPrompt() Model {
 	return m
 }
 
+func TestInputFocused_FalseByDefault(t *testing.T) {
+	m := New()
+	if m.InputFocused() {
+		t.Error("expected InputFocused=false by default")
+	}
+}
+
+func TestInputFocused_TrueWhenCredsOpen(t *testing.T) {
+	m := newModelAtPRPrompt()
+	m.creds.IsOpen = true
+	if !m.InputFocused() {
+		t.Error("expected InputFocused=true when creds is open")
+	}
+}
+
 func TestPRPromptAcceptReturnsOpenURLCmd(t *testing.T) {
 	m := newModelAtPRPrompt()
 

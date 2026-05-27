@@ -55,6 +55,10 @@ func (m *Model) IsActive() bool {
 	return m.mode != SearchModeNone
 }
 
+func (m *Model) InputFocused() bool {
+	return m.mode == SearchModeInput
+}
+
 func (m *Model) MatchesCount() int {
 	return len(m.matches)
 }

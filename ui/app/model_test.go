@@ -14,6 +14,14 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
+// inputFocusedStub is a page stub that reports InputFocused=true.
+type inputFocusedStub struct{}
+
+func (s *inputFocusedStub) Init() tea.Cmd                       { return nil }
+func (s *inputFocusedStub) Update(tea.Msg) (tea.Model, tea.Cmd) { return s, nil }
+func (s *inputFocusedStub) View() tea.View                      { return tea.NewView("stub") }
+func (s *inputFocusedStub) InputFocused() bool                  { return true }
+
 // lifecycleSpy records OnPageActivated / OnPageDeactivated call counts.
 type lifecycleSpy struct {
 	activated   int
@@ -246,6 +254,30 @@ func TestNumberKeysSwitchTabsGlobally(t *testing.T) {
 	m = updated.(Model)
 	if m.navState.ActiveTab() != nav.TabCommit {
 		t.Fatalf("expected 4 to switch to commit, got %q", m.navState.ActiveTab())
+	}
+}
+
+func TestNumberKeysDoNotSwitchTabsWhenInputFocused(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	stub := &inputFocusedStub{}
+	live := m.livePageByTab[nav.TabStatus]
+	live.model = stub
+	m.livePageByTab[nav.TabStatus] = live
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '2', Text: "2"})
+	m = updated.(Model)
+	if m.navState.ActiveTab() != nav.TabStatus {
+		t.Fatalf("expected tab to stay on status when input is focused, got %q", m.navState.ActiveTab())
 	}
 }
 

@@ -103,6 +103,8 @@ func (m *Model) Open(root string) tea.Cmd {
 }
 
 // Update handles all messages while the modal is open.
+func (m Model) InputFocused() bool { return m.creds.IsOpen }
+
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, Result) {
 	if m.creds.IsOpen {
 		next, cmd, res := m.creds.Update(msg)

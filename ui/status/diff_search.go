@@ -12,10 +12,13 @@ import (
 )
 
 func (m Model) InputFocused() bool {
-	if m.focus == focusFiletree {
-		return m.fileTreeModel.Search().Mode() == search.SearchModeInput
+	if m.push.InputFocused() || m.pull.InputFocused() {
+		return true
 	}
-	return m.currentDiffSearch().Mode() == search.SearchModeInput
+	if m.focus == focusFiletree {
+		return m.fileTreeModel.Search().InputFocused()
+	}
+	return m.currentDiffSearch().InputFocused()
 }
 
 func (m *Model) computeSearchMatches(query string) []search.Match {

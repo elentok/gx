@@ -18,7 +18,8 @@ func (m Model) Init() tea.Cmd {
 
 func (m Model) InputFocused() bool {
 	return m.mode == modeRename || m.mode == modeClone || m.mode == modeNew ||
-		m.mode == modeNewAndOpen || m.mode == modeCredentialPrompt || m.mode == modeSearch
+		m.mode == modeNewAndOpen || m.mode == modeCredentialPrompt || m.mode == modeSearch ||
+		m.pull.InputFocused()
 }
 
 func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {

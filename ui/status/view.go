@@ -39,17 +39,16 @@ func (m Model) View() tea.View {
 
 	footer := m.helpLine()
 	out := lipgloss.JoinVertical(lipgloss.Left, body, footer)
-	if m.InputFocused() {
-		overlay := ""
-		if m.focus == focusFiletree {
-			m.fileTreeModel.Search().SetWidth(m.searchOverlayWidth())
-			overlay = m.fileTreeModel.Search().View()
-		} else {
-			diffSearch := m.currentDiffSearch()
-			diffSearch.SetWidth(m.searchOverlayWidth())
-			overlay = diffSearch.View()
-		}
-
+	if m.focus == focusFiletree && m.fileTreeModel.Search().InputFocused() {
+		s := m.fileTreeModel.Search()
+		s.SetWidth(m.searchOverlayWidth())
+		overlay := s.View()
+		y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
+		out = ui.OverlayBottomCenter(out, overlay, m.width, y)
+	} else if m.focus != focusFiletree && m.currentDiffSearch().InputFocused() {
+		diffSearch := m.currentDiffSearch()
+		diffSearch.SetWidth(m.searchOverlayWidth())
+		overlay := diffSearch.View()
 		y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
 		out = ui.OverlayBottomCenter(out, overlay, m.width, y)
 	}

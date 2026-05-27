@@ -10,6 +10,14 @@ import (
 
 const testPRURL = "https://github.com/owner/repo/pull/new/feature"
 
+func TestInputFocused_FalseByDefault(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	m := newTestModelDefault(repo)
+	if m.InputFocused() {
+		t.Error("expected InputFocused=false by default")
+	}
+}
+
 // TestHandlePushUpdateForwardsCmdOnDone verifies that when push completes with a PR
 // URL the URL-open command is not discarded.
 func TestHandlePushUpdateForwardsCmdOnDone(t *testing.T) {
