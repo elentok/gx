@@ -1,6 +1,7 @@
 package diffview
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/x/ansi"
@@ -559,6 +560,17 @@ func (m Model) FocusedLocationAndBody() (string, []string, FocusedYankError) {
 	}
 	loc := FocusedLocation(m.data, m.navMode)
 	return loc, body, ""
+}
+
+// ScrollPercentText returns a "N%" string when the viewport is scrollable,
+// or "" when all content fits on screen.
+func (m Model) ScrollPercentText() string {
+	vp := &m.viewport
+	if vp.TotalLineCount() <= vp.VisibleLineCount() || vp.VisibleLineCount() <= 0 {
+		return ""
+	}
+	pct := int(vp.ScrollPercent()*100 + 0.5)
+	return fmt.Sprintf("%d%%", pct)
 }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, bool) {
