@@ -75,7 +75,7 @@ func TestCommitFileDiffWithDeltaForRef(t *testing.T) {
 	testutil.MustGitExported(t, dir, "add", ".")
 	testutil.MustGitExported(t, dir, "commit", "-m", "update data")
 
-	out, err := git.CommitFileDiffWithDeltaForRef(dir, "HEAD", "data.txt", 1, 80)
+	out, err := git.CommitFileDiffWithDeltaForRef(dir, "HEAD", "data.txt", 1, 80, false)
 	if err != nil {
 		t.Fatalf("CommitFileDiffWithDeltaForRef: %v", err)
 	}

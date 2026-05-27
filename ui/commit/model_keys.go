@@ -50,6 +50,7 @@ const (
 	bindingContextDec   keys.BindingID = "context-dec"
 	bindingContextInc   keys.BindingID = "context-inc"
 	bindingGotoPR       keys.BindingID = "goto-pr"
+	bindingRenderMode   keys.BindingID = "render-mode"
 )
 
 func newCommitManager() keys.Manager {
@@ -103,6 +104,7 @@ func newCommitManager() keys.Manager {
 		{ID: bindingAmend, Seq: []string{"A"}, Categories: []string{"Actions"}, Title: "amend commit with staged changes"},
 		{ID: bindingFilterLog, Seq: []string{"g", "h"}, Categories: []string{"Navigation"}, Title: "log for file/hunk"},
 
+		{ID: bindingRenderMode, Seq: []string{"s"}, Categories: []string{"Diff"}, Title: "toggle render mode"},
 		{ID: bindingContextDec, Seq: []string{"["}, Categories: []string{"Diff"}, Title: "fewer context lines"},
 		{ID: bindingContextInc, Seq: []string{"]"}, Categories: []string{"Diff"}, Title: "more context lines"},
 
@@ -328,6 +330,8 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, m.cmdEditSelectedFile(terminalrun.VSplit)
 	case bindingEditTab:
 		return m, m.cmdEditSelectedFile(terminalrun.Tab)
+	case bindingRenderMode:
+		return m, m.toggleRenderMode()
 	case bindingContextDec:
 		return m, m.adjustDiffContextLines(-1)
 	case bindingContextInc:
