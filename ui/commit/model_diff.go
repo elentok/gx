@@ -68,6 +68,26 @@ func (m *Model) jumpDiffTop() {
 	m.syncSearchCursorFromDiffFocus()
 }
 
+func (m *Model) disableVisual() {
+	data := m.diffModel.DataRef()
+	data.VisualActive = false
+	data.VisualAnchor = data.ActiveLine
+}
+
+func (m *Model) toggleVisual() {
+	data := m.diffModel.DataRef()
+	if len(data.Parsed.Changed) == 0 {
+		return
+	}
+	if !data.VisualActive {
+		data.VisualActive = true
+		data.VisualAnchor = data.ActiveLine
+		return
+	}
+	data.VisualActive = false
+	data.VisualAnchor = data.ActiveLine
+}
+
 func (m *Model) jumpDiffBottom() {
 	if !m.diffModel.JumpBottom() {
 		return

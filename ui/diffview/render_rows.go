@@ -115,12 +115,27 @@ func (m *Model) isDisplayInVisualRange(displayIdx int) bool {
 	if !m.data.VisualActive || m.navMode != NavModeLine {
 		return false
 	}
-	if len(m.data.ChangedDisplay) == 0 {
+	start, end := m.data.VisualLineBounds()
+	if len(m.data.ChangedDisplay) > 0 {
+		// Side-by-side mode: use ChangedDisplay mapping.
+		for i := start; i <= end && i < len(m.data.ChangedDisplay); i++ {
+			if i >= 0 && m.data.ChangedDisplay[i] == displayIdx {
+				return true
+			}
+		}
 		return false
 	}
-	start, end := m.data.VisualLineBounds()
-	for i := start; i <= end && i < len(m.data.ChangedDisplay); i++ {
-		if i >= 0 && m.data.ChangedDisplay[i] == displayIdx {
+	// Unified mode: map displayIdx back to a raw index via DisplayToRaw,
+	// then check if that raw line is one of the changed lines in [start, end].
+	if displayIdx < 0 || displayIdx >= len(m.data.DisplayToRaw) {
+		return false
+	}
+	rawIdx := m.data.DisplayToRaw[displayIdx]
+	if rawIdx < 0 {
+		return false
+	}
+	for i := start; i <= end && i < len(m.data.Parsed.Changed); i++ {
+		if i >= 0 && m.data.Parsed.Changed[i].LineIndex == rawIdx {
 			return true
 		}
 	}

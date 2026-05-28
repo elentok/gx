@@ -51,6 +51,7 @@ const (
 	bindingContextInc   keys.BindingID = "context-inc"
 	bindingGotoPR       keys.BindingID = "goto-pr"
 	bindingRenderMode   keys.BindingID = "render-mode"
+	bindingVisual       keys.BindingID = "visual"
 )
 
 func newCommitManager() keys.Manager {
@@ -104,6 +105,7 @@ func newCommitManager() keys.Manager {
 		{ID: bindingAmend, Seq: []string{"A"}, Categories: []string{"Actions"}, Title: "amend commit with staged changes"},
 		{ID: bindingFilterLog, Seq: []string{"g", "h"}, Categories: []string{"Navigation"}, Title: "log for file/hunk"},
 
+		{ID: bindingVisual, Seq: []string{"v"}, Categories: []string{"Diff"}, Title: "visual mode"},
 		{ID: bindingRenderMode, Seq: []string{"s"}, Categories: []string{"Diff"}, Title: "toggle render mode"},
 		{ID: bindingContextDec, Seq: []string{"["}, Categories: []string{"Diff"}, Title: "fewer context lines"},
 		{ID: bindingContextInc, Seq: []string{"]"}, Categories: []string{"Diff"}, Title: "more context lines"},
@@ -128,6 +130,10 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 			m.search.DismissAndClear()
 			return m, nil
 		}
+		if m.focusDiff && m.diffModel.DataRef().VisualActive {
+			m.disableVisual()
+			return m, nil
+		}
 		if m.focusDiff {
 			m.focusDiff = false
 			return m, nil
@@ -148,6 +154,7 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		if !m.focusDiff {
 			return m, nil
 		}
+		m.disableVisual()
 		if m.diffModel.NavMode() == diffview.NavModeHunk {
 			m.diffModel.SetNavMode(diffview.NavModeLine)
 		} else {
@@ -330,6 +337,16 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, m.cmdEditSelectedFile(terminalrun.VSplit)
 	case bindingEditTab:
 		return m, m.cmdEditSelectedFile(terminalrun.Tab)
+	case bindingVisual:
+		if !m.focusDiff {
+			return m, nil
+		}
+		if m.diffModel.NavMode() == diffview.NavModeHunk {
+			m.diffModel.SetNavMode(diffview.NavModeLine)
+		}
+		m.toggleVisual()
+		m.ensureActiveVisible()
+		return m, nil
 	case bindingRenderMode:
 		return m, m.toggleRenderMode()
 	case bindingContextDec:
