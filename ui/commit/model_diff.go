@@ -2,7 +2,6 @@ package commit
 
 import (
 	"github.com/elentok/gx/ui/diffview"
-	"github.com/elentok/gx/ui/list"
 )
 
 func (m *Model) diffPaneSize() (int, int) {
@@ -45,35 +44,8 @@ func (m *Model) filesInnerHeight() int {
 	return max(1, contentH-2)
 }
 
-func (m *Model) moveDiffActive(delta int) {
-	if !m.diffModel.MoveActive(delta, true) {
-		return
-	}
-	m.syncSearchCursorFromDiffFocus()
-	m.ensureActiveVisible()
-}
-
 func (m *Model) ensureActiveVisible() {
 	m.diffModel.EnsureActiveVisible(m.diffModel.NavMode())
-}
-
-func (m *Model) scrollDiffPage(direction int) {
-	m.diffModel.ScrollPage(direction * list.DefaultScroll)
-}
-
-func (m *Model) jumpDiffTop() {
-	if !m.diffModel.JumpTop() {
-		return
-	}
-	m.syncSearchCursorFromDiffFocus()
-}
-
-
-func (m *Model) jumpDiffBottom() {
-	if !m.diffModel.JumpBottom() {
-		return
-	}
-	m.syncSearchCursorFromDiffFocus()
 }
 
 func (m Model) editorLineForCurrentSelection() int {

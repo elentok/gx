@@ -14,8 +14,6 @@ const (
 	bindingQuit        keys.BindingID = "quit"
 	bindingTab         keys.BindingID = "tab"
 	bindingExpandBody  keys.BindingID = "expand-body"
-	bindingToggleMode  keys.BindingID = "toggle-mode"
-	bindingToggleWrap  keys.BindingID = "toggle-wrap"
 	bindingDown        keys.BindingID = "down"
 	bindingUp          keys.BindingID = "up"
 	bindingScrollDown  keys.BindingID = "scroll-down"
@@ -50,8 +48,6 @@ const (
 	bindingContextDec   keys.BindingID = "context-dec"
 	bindingContextInc   keys.BindingID = "context-inc"
 	bindingGotoPR       keys.BindingID = "goto-pr"
-	bindingRenderMode   keys.BindingID = "render-mode"
-	bindingVisual       keys.BindingID = "visual"
 )
 
 func newCommitManager() keys.Manager {
@@ -61,8 +57,6 @@ func newCommitManager() keys.Manager {
 		{ID: bindingQuit, Seq: []string{"esc"}, Categories: []string{}, Title: ""},
 		{ID: bindingTab, Seq: []string{"tab"}, Categories: []string{"Global"}, Title: "cycle pane"},
 		{ID: bindingExpandBody, Seq: []string{"b"}, Categories: []string{"Header"}, Title: "toggle commit body"},
-		{ID: bindingToggleMode, Seq: []string{"a"}, Categories: []string{"Diff"}, Title: "toggle hunk/line mode"},
-		{ID: bindingToggleWrap, Seq: []string{"w"}, Categories: []string{"Diff"}, Title: "toggle wrap"},
 		{ID: bindingDown, Seq: []string{"j"}, Categories: []string{"Navigation"}, Title: "down"},
 		{ID: bindingDown, Seq: []string{"down"}, Categories: []string{}, Title: ""},
 		{ID: bindingUp, Seq: []string{"k"}, Categories: []string{"Navigation"}, Title: "up"},
@@ -105,8 +99,6 @@ func newCommitManager() keys.Manager {
 		{ID: bindingAmend, Seq: []string{"A"}, Categories: []string{"Actions"}, Title: "amend commit with staged changes"},
 		{ID: bindingFilterLog, Seq: []string{"g", "h"}, Categories: []string{"Navigation"}, Title: "log for file/hunk"},
 
-		{ID: bindingVisual, Seq: []string{"v"}, Categories: []string{"Diff"}, Title: "visual mode"},
-		{ID: bindingRenderMode, Seq: []string{"s"}, Categories: []string{"Diff"}, Title: "toggle render mode"},
 		{ID: bindingContextDec, Seq: []string{"["}, Categories: []string{"Diff"}, Title: "fewer context lines"},
 		{ID: bindingContextInc, Seq: []string{"]"}, Categories: []string{"Diff"}, Title: "more context lines"},
 
@@ -150,32 +142,9 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		m.scrollHeader(0)
 		m.syncDiffViewport()
 		return m, nil
-	case bindingToggleMode:
-		if !m.focusDiff {
-			return m, nil
-		}
-		m.diffModel.DisableVisual()
-		if m.diffModel.NavMode() == diffview.NavModeHunk {
-			m.diffModel.SetNavMode(diffview.NavModeLine)
-		} else {
-			m.diffModel.SetNavMode(diffview.NavModeHunk)
-		}
-		m.ensureActiveVisible()
-		return m, nil
-	case bindingToggleWrap:
-		if !m.focusDiff {
-			return m, nil
-		}
-		m.diffModel.EnableWrap(!m.diffModel.WrapEnabled())
-		m.syncDiffViewport()
-		return m, nil
 	case bindingDown:
 		if m.focusHeader {
 			m.scrollHeader(1)
-			return m, nil
-		}
-		if m.focusDiff {
-			m.moveDiffActive(1)
 			return m, nil
 		}
 		m.moveSidebar(1)
@@ -185,31 +154,21 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 			m.scrollHeader(-1)
 			return m, nil
 		}
-		if m.focusDiff {
-			m.moveDiffActive(-1)
-			return m, nil
-		}
 		m.moveSidebar(-1)
 		return m, nil
 	case bindingScrollDown:
 		if m.focusHeader {
 			m.scrollHeader(1)
-		} else if m.focusDiff {
-			m.diffModel.ScrollViewport(3)
 		}
 		return m, nil
 	case bindingScrollUp:
 		if m.focusHeader {
 			m.scrollHeader(-1)
-		} else if m.focusDiff {
-			m.diffModel.ScrollViewport(-3)
 		}
 		return m, nil
 	case bindingPageDown:
 		if m.focusHeader {
 			m.scrollHeaderPage(1)
-		} else if m.focusDiff {
-			m.scrollDiffPage(1)
 		} else {
 			m.scrollSidebarPage(1)
 		}
@@ -217,8 +176,6 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 	case bindingPageUp:
 		if m.focusHeader {
 			m.scrollHeaderPage(-1)
-		} else if m.focusDiff {
-			m.scrollDiffPage(-1)
 		} else {
 			m.scrollSidebarPage(-1)
 		}
@@ -238,11 +195,7 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case bindingBottom:
-		if m.focusDiff {
-			m.jumpDiffBottom()
-		} else {
-			m.jumpSidebarBottom()
-		}
+		m.jumpSidebarBottom()
 		return m, nil
 	case bindingEnter:
 		if m.focusHeader {
@@ -290,11 +243,7 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		m.reload()
 		return m, notify.Success("refreshed")
 	case bindingGotoTop:
-		if m.focusDiff {
-			m.jumpDiffTop()
-		} else {
-			m.jumpSidebarTop()
-		}
+		m.jumpSidebarTop()
 		return m, nil
 	case bindingYankContent:
 		if m.focusHeader {
@@ -337,18 +286,6 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, m.cmdEditSelectedFile(terminalrun.VSplit)
 	case bindingEditTab:
 		return m, m.cmdEditSelectedFile(terminalrun.Tab)
-	case bindingVisual:
-		if !m.focusDiff {
-			return m, nil
-		}
-		if m.diffModel.NavMode() == diffview.NavModeHunk {
-			m.diffModel.SetNavMode(diffview.NavModeLine)
-		}
-		m.diffModel.ToggleVisual()
-		m.ensureActiveVisible()
-		return m, nil
-	case bindingRenderMode:
-		return m, m.toggleRenderMode()
 	case bindingContextDec:
 		return m, m.adjustDiffContextLines(-1)
 	case bindingContextInc:

@@ -73,6 +73,19 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, cmd
 	}
+	if m.focusDiff && len(m.keys.Prefix()) == 0 {
+		updated, diffCmd, diffResult := m.diffModel.Update(msg)
+		m.diffModel = updated
+		if diffResult.Handled {
+			m.keys.Reset()
+			m.syncSearchCursorFromDiffFocus()
+			if diffResult.NeedsReload {
+				m.refreshDiff()
+				m.syncDiffViewport()
+			}
+			return m, diffCmd
+		}
+	}
 	match, consumed := m.keys.Process(msg)
 	if match != nil {
 		return m.dispatchBinding(match.ID)

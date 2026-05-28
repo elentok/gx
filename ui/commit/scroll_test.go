@@ -20,21 +20,6 @@ func newScrollTestModel(t *testing.T) Model {
 	return m
 }
 
-func TestScrollDiffPage_NoContent(t *testing.T) {
-	m := newScrollTestModel(t)
-	m.scrollDiffPage(1) // should not panic
-}
-
-func TestJumpDiffTop_NoContent(t *testing.T) {
-	m := newScrollTestModel(t)
-	m.jumpDiffTop() // should not panic
-}
-
-func TestJumpDiffBottom_NoContent(t *testing.T) {
-	m := newScrollTestModel(t)
-	m.jumpDiffBottom() // should not panic
-}
-
 func TestJumpSidebarTop_Empty(t *testing.T) {
 	m := newScrollTestModel(t)
 	moved := m.jumpSidebarTop()
