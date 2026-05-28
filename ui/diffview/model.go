@@ -32,7 +32,7 @@ const (
 type UpdateResult struct {
 	Handled         bool
 	NeedsReload     bool // render mode was toggled; caller must reload diff content
-	ChordInProgress bool // consumed first key of a multi-key chord; caller may also process the key
+	ChordInProgress bool // child consumed the first key of a multi-key chord and expects the completing key next
 }
 
 const (
@@ -117,6 +117,10 @@ func (m *Model) Viewport() *viewport.Model {
 
 func (m *Model) Search() *search.Model {
 	return &m.search
+}
+
+func (m Model) HasPendingChord() bool {
+	return len(m.keys.Prefix()) > 0
 }
 
 func (m Model) RenderMode() RenderMode {

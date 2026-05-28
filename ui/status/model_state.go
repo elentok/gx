@@ -6,11 +6,11 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/bump"
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/list"
-	"github.com/elentok/gx/ui/bump"
 	"github.com/elentok/gx/ui/output"
 	"github.com/elentok/gx/ui/pull"
 	"github.com/elentok/gx/ui/push"
@@ -67,9 +67,8 @@ type Model struct {
 	credentialPrompt        string
 	credentialInput         textinput.Model
 	credentialSecret        bool
-	output               output.Model
-	keys                 keys.Manager
-	diffviewChordActive  bool // diffview started a chord prefix in parallel with status
+	output                  output.Model
+	keys                    keys.Manager
 }
 
 type statusData struct {
@@ -153,7 +152,6 @@ func NewModel(worktreeRoot string, settings ui.Settings, initialPath string, ext
 	}
 	return m
 }
-
 
 func (m Model) KeyManager() keys.Manager {
 	return m.keys

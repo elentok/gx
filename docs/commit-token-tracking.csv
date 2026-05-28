@@ -1,0 +1,64 @@
+date,branch,commit_subject,d_tokens,t_tokens,d_over_t
+2026-05-28,main,"commit+status: use diffview pending chord state [est]",560,8000,0.070
+2026-05-28,worktree-ee5-status-diff-keys,"status: route diff keys through diffview.Update first",28019,190000,0.15 [est]
+2026-05-28,main,"status+diffview: restore g+chord bindings in diff focus",26277,38000,0.69 [est]
+2026-05-23,main,"refactor(routes): replace per-tab histories with single global stack",32255,95000,0.34
+2026-05-23,main,"refactor(routes): complete ViewState terminology migration in models and docs",26959,95000,0.284
+2026-05-23,main,"refactor(routes): clean up route-era naming in nav, models, and docs",30082,95000,0.317
+2026-05-09,main,"status: inline diff bridge helpers into explorer host [est]",180,2400,0.075
+2026-05-09,main,"status: rename filetree bridge and centralize reconciliation [est]",170,2200,0.077
+2026-05-09,main,"status: simplify search scope and prune dead api [est]",160,2400,0.067
+2026-05-10,main,"status: keep empty diff sections visible [est]",320,2600,0.123
+2026-05-10,main,"status: tighten filetree focus and diff switching [est]",340,2800,0.121
+2026-05-10,main,"status: keep selected diff section on file change [est]",300,2500,0.120
+2026-05-10,main,"status: flash moved destination section [est]",290,2400,0.121
+2026-05-10,main,"status: show selected path in expanded diff pane [est]",280,2300,0.122
+2026-05-10,main,"status: use ellipsis in footer truncation [est]",300,2400,0.125
+2026-05-11,main,"status: clarify diff ownership [est]",260,3000,0.087
+2026-05-11,main,"status: extract diff area state [est]",330,3100,0.106
+2026-05-11,main,"refactor: complete explorer removal and stabilize commit architecture [est]",4200,36000,0.117
+2026-05-11,main,"search: replace bool return with Result struct for state signals [est]",140,2000,0.070
+2026-05-11,main,"status: remove diffSection alias and simplify renderSectionPane [est]",150,2200,0.068
+2026-05-12,main,"keybindings+status: migrate chord dispatch to keybindings.Manager",8200,33726,0.243
+2026-05-13,main,"status+filetree+diffarea: migrate key dispatch to keybindings.Manager",30881,75000,0.412
+2026-05-13,main,"status+filetree+diffarea: generate help from keybindings metadata [est]",34555,55000,0.628
+2026-05-13,main,"filetree+diffarea: extract keybindings to model_keys.go [est]",3200,9000,0.356
+2026-05-13,main,"status: cancel running runner on quit [est]",2400,28197,0.085
+2026-05-14,main,"commit: migrate help modal to reusable help.Model [est]",850,26485,0.032
+2026-05-14,main,ui: centralize chord hint rendering on key managers [est],600,2200,0.273
+2026-05-14,main,"log+commit: add A keybinding to amend a specific commit [est]",0,85000,0.000
+2026-05-14,main,amend+test: wait for stash-pop before test cleanup [est],24270,72810,.33
+2026-05-15,main,"scroll: add vim co-scroll ctrl+d/u to commit, status, and log [est]",0,48000,0.000
+2026-05-15,main,"reword: add cr chord to edit commit message via $EDITOR [est]",23103,95000,0.243
+2026-05-15,main,"log: add flash + focus when returning from amend or reword [est]",27447,85000,0.323
+2026-05-15,main,"log: add p/P push and pull; extract output modal to ui/output [est]",30196,120000,0.252
+2026-05-15,main,"ui: extract credential prompt to reusable creds module [est]",500,26000,0.019
+2026-05-15,main,"deps: upgrade charm.land packages to latest [est]",1200,18500,0.065
+2026-05-15,main,"test(worktrees): fix race in stash-pull test [est]",1200,18000,0.067
+2026-05-16,main,ui: add notification overlay system and migrate views,30080,35000,0.86 [est]
+2026-05-16,main,"commit: fix header viewport height calculation for scrolling",23581,32000,0.74 [est]
+2026-05-17,main,"test: parallelize git and ui tests with t.Parallel()",31432,85000,0.37
+2026-05-17,main,"test(worktrees): track current frame for spinner checks [est]",900,3600,0.2500
+2026-05-18,main,log: add filtering by file path and line range [est],31736,47000,0.675
+2026-05-18,main,ui: consolidate keybinding and help management across modules,40531,55000,0.74 [est]
+2026-05-19,main,worktrees: use ui/pull for pull command,27750,~55000,~0.50 [est]
+2026-05-19,main,worktrees: add bulk-delete with multi-select and progress modal,25057,55000,0.46 [est]
+2026-05-19,main,confirm: refactor to embeddable model and move cli to cli/confirm [est],32420,55000,0.59
+2026-05-22,main,refactor(ui): migrate nav route vocabulary to tabs [est],1200,4200,0.2857
+2026-05-23,main,refactor(routes): extract ViewContext and ViewOptions from ViewState,27264,55000,0.50 [est]
+2026-05-23,main,refactor(routes): centralize ViewState change detection in app-shell Update,24036,~48000,~0.50 [est]
+2026-05-24,main,refactor(routes): extract navstate state machine from app.Model [est],8200,42000,0.20
+2026-05-24,main,refactor(routes): unify nav dispatch via applyTransition in app shell [est],2000,8000,0.25
+2026-05-25,main,ui(app): formalize page lifecycle hooks at routing boundary [est],26929,~58000,~0.46
+2026-05-25,main,refactor(ui): rename router→navState stack→history for semantic clarity [est],31679,45000,0.70
+2026-05-26,main,worktrees: wait for delete progress mode to exit before quit,23413,38000,0.62 [est]
+2026-05-26,main,"terminalrun: add SplitType and CommandWithSplit",890,30000,0.030
+2026-05-26,main,"status: add e-prefix chords for editor split variants",3847,32000,0.120
+2026-05-26,main,"commit: add e-prefix chords for editor split variants",26721,55000,0.486
+2026-05-26,main,"worktrees: migrate split/tab actions to terminalrun.CommandWithSplit",24534,38000,0.646
+2026-05-26,main,"git: add pr.go for GitHub PR URL lookup",28066,45000,0.624
+2026-05-27,main,"ui: fix digit-key tab-switch and search overlay during credential input",26620,52000,0.512
+2026-05-27,main,"diffview: centralize side-by-side separator dim; drop toggle notifications [est]",0,28000,0.000
+2026-05-27,main,"diffview: add RenderRows method for centralized line rendering",23592,95000,0.248
+2026-05-28,main,"diffview: own key bindings for diff navigation",27640,95000,0.291
+2026-05-28,main,diffview: privatize nav methods remove diffarea wrappers [est],2100,2400,0.875

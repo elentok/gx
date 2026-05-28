@@ -73,10 +73,10 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, cmd
 	}
-	if m.focusDiff && len(m.keys.Prefix()) == 0 {
+	if m.focusDiff && (len(m.keys.Prefix()) == 0 || m.diffModel.HasPendingChord()) {
 		updated, diffCmd, diffResult := m.diffModel.Update(msg)
 		m.diffModel = updated
-		if diffResult.Handled {
+		if diffResult.Handled && !diffResult.ChordInProgress {
 			m.keys.Reset()
 			m.syncSearchCursorFromDiffFocus()
 			if diffResult.NeedsReload {

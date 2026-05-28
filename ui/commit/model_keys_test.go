@@ -117,6 +117,92 @@ func TestFilterLogGHKeyPushesNavRoute(t *testing.T) {
 	}
 }
 
+func TestGChordBindingsReachableFromDiffFocus(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "nav.txt", "content\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "nav.txt", "content changed\n")
+	testutil.CommitAll(t, repo, "change")
+
+	newDiffFocusModel := func(t *testing.T) Model {
+		t.Helper()
+		m := newTestModel(repo, "HEAD")
+		m.ready = true
+		m.width = 100
+		m.height = 24
+		m.syncDiffViewport()
+		m.focusDiff = true
+		return m
+	}
+
+	t.Run("g+esc cancels chord without leaving diff focus", func(t *testing.T) {
+		m := newDiffFocusModel(t)
+		updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+		m = updated.(Model)
+		if !m.diffModel.HasPendingChord() {
+			t.Fatal("after first g: expected diffview pending chord=true")
+		}
+		if len(m.keys.Prefix()) != 1 || m.keys.Prefix()[0] != "g" {
+			t.Fatalf("after first g: expected commit prefix [g], got %v", m.keys.Prefix())
+		}
+
+		updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+		m = updated.(Model)
+		if m.diffModel.HasPendingChord() {
+			t.Fatal("after g+esc: expected diffview pending chord=false")
+		}
+		if len(m.keys.Prefix()) != 0 {
+			t.Fatalf("after g+esc: expected prefix cleared, got %v", m.keys.Prefix())
+		}
+		if !m.focusDiff {
+			t.Fatal("after g+esc: expected to remain in diff focus")
+		}
+	})
+
+	t.Run("g+g still routes to diffview", func(t *testing.T) {
+		m := newDiffFocusModel(t)
+		updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+		m = updated.(Model)
+		if !m.diffModel.HasPendingChord() {
+			t.Fatal("after first g: expected diffview pending chord=true")
+		}
+
+		updated, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+		m = updated.(Model)
+		if m.diffModel.HasPendingChord() {
+			t.Fatal("after g+g: expected diffview pending chord=false")
+		}
+		if len(m.keys.Prefix()) != 0 {
+			t.Fatalf("after g+g: expected commit prefix cleared, got %v", m.keys.Prefix())
+		}
+	})
+
+	t.Run("g+h remains available from diff focus", func(t *testing.T) {
+		m := newDiffFocusModel(t)
+		updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+		m = updated.(Model)
+		updated, cmd := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
+		m = updated.(Model)
+
+		if cmd == nil {
+			t.Fatal("g+h should produce a nav.Push command from diff focus")
+		}
+		msg := cmd()
+		if vs, ok := nav.IsOpen(msg); !ok {
+			t.Fatalf("expected nav.Push message, got %T", msg)
+		} else if vs.Tab != nav.TabLog {
+			t.Fatalf("expected TabLog, got %q", vs.Tab)
+		}
+		if m.diffModel.HasPendingChord() {
+			t.Fatal("after g+h: expected diffview pending chord=false")
+		}
+		if len(m.keys.Prefix()) != 0 {
+			t.Fatalf("after g+h: expected prefix cleared, got %v", m.keys.Prefix())
+		}
+	})
+}
+
 func TestDispatchBindingAmendOpensConfirm(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")

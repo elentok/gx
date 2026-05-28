@@ -2389,7 +2389,6 @@ func TestEditChordSplitVariants(t *testing.T) {
 	}
 }
 
-
 func TestEditorLineForCurrentSelectionInDiffMode(t *testing.T) {
 	t.Parallel()
 	repo := testutil.TempRepo(t)
@@ -3004,17 +3003,15 @@ func TestGChordBindingsReachableFromDiffFocus(t *testing.T) {
 
 	t.Run("g+g still scrolls diff to top via diffview", func(t *testing.T) {
 		m := newDiffFocusModel(t)
-		before := m.diffviewChordActive
 		m = pressKey(m, 'g')
-		if !m.diffviewChordActive {
-			t.Fatalf("after first g: expected diffviewChordActive=true")
+		if !m.diffarea.ActiveSectionModel().HasPendingChord() {
+			t.Fatalf("after first g: expected diffview pending chord=true")
 		}
 		m = pressKey(m, 'g')
-		// diffview should have won the chord; diffviewChordActive cleared
-		if m.diffviewChordActive {
-			t.Fatalf("after g+g: expected diffviewChordActive=false, diffview handled the chord")
+		// diffview should have won the chord; pending chord cleared.
+		if m.diffarea.ActiveSectionModel().HasPendingChord() {
+			t.Fatalf("after g+g: expected diffview pending chord=false, diffview handled the chord")
 		}
-		_ = before
 	})
 
 	t.Run("subsequent j navigation works after g+o chord", func(t *testing.T) {
@@ -3035,9 +3032,9 @@ func TestGChordBindingsReachableFromDiffFocus(t *testing.T) {
 		if len(m2.keys.Prefix()) != 0 {
 			t.Fatalf("after g+o: expected status prefix cleared, got %v", m2.keys.Prefix())
 		}
-		// diffviewChordActive should be cleared
-		if m2.diffviewChordActive {
-			t.Fatalf("after g+o: expected diffviewChordActive=false")
+		// diffview pending chord should be cleared.
+		if m2.diffarea.ActiveSectionModel().HasPendingChord() {
+			t.Fatalf("after g+o: expected diffview pending chord=false")
 		}
 	})
 }
