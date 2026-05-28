@@ -602,6 +602,25 @@ func JoinDot(parts ...string) string {
 	return strings.Join(filtered, " · ")
 }
 
+func (m *Model) DisableVisual() {
+	m.data.VisualActive = false
+	m.data.VisualAnchor = m.data.ActiveLine
+}
+
+func (m *Model) ToggleVisual() bool {
+	if len(m.data.Parsed.Changed) == 0 {
+		return false
+	}
+	if !m.data.VisualActive {
+		m.data.VisualActive = true
+		m.data.VisualAnchor = m.data.ActiveLine
+		return true
+	}
+	m.data.VisualActive = false
+	m.data.VisualAnchor = m.data.ActiveLine
+	return true
+}
+
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, bool) {
 	if nextSearch, cmd, result := m.search.Update(msg); result.Handled {
 		m.search = nextSearch

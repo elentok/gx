@@ -103,24 +103,11 @@ func (d *Model) ActiveSectionModel() *diffview.Model {
 }
 
 func (d *Model) DisableVisual() {
-	active := d.ActiveSectionModel().DataRef()
-	active.VisualActive = false
-	active.VisualAnchor = active.ActiveLine
+	d.ActiveSectionModel().DisableVisual()
 }
 
 func (d *Model) ToggleVisual() bool {
-	active := d.ActiveSectionModel().DataRef()
-	if len(active.Parsed.Changed) == 0 {
-		return false
-	}
-	if !active.VisualActive {
-		active.VisualActive = true
-		active.VisualAnchor = active.ActiveLine
-		return true
-	}
-	active.VisualActive = false
-	active.VisualAnchor = active.ActiveLine
-	return true
+	return d.ActiveSectionModel().ToggleVisual()
 }
 
 func (d *Model) ToggleSection() {

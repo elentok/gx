@@ -131,7 +131,7 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.focusDiff && m.diffModel.DataRef().VisualActive {
-			m.disableVisual()
+			m.diffModel.DisableVisual()
 			return m, nil
 		}
 		if m.focusDiff {
@@ -154,7 +154,7 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		if !m.focusDiff {
 			return m, nil
 		}
-		m.disableVisual()
+		m.diffModel.DisableVisual()
 		if m.diffModel.NavMode() == diffview.NavModeHunk {
 			m.diffModel.SetNavMode(diffview.NavModeLine)
 		} else {
@@ -344,7 +344,7 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		if m.diffModel.NavMode() == diffview.NavModeHunk {
 			m.diffModel.SetNavMode(diffview.NavModeLine)
 		}
-		m.toggleVisual()
+		m.diffModel.ToggleVisual()
 		m.ensureActiveVisible()
 		return m, nil
 	case bindingRenderMode:
