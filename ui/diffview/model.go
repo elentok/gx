@@ -295,7 +295,7 @@ func (m *Model) visibleRows(bodyH int, active bool) []visibleDiffRow {
 	return rows
 }
 
-func (m *Model) MoveActive(delta int, allowViewportScroll bool) bool {
+func (m *Model) moveActive(delta int, allowViewportScroll bool) bool {
 	if m.navMode == NavModeHunk {
 		if len(m.data.Parsed.Hunks) == 0 {
 			return false
@@ -346,7 +346,7 @@ func (m *Model) MoveActive(delta int, allowViewportScroll bool) bool {
 // active hunk/line to the nearest one at the new display position (vim-style
 // ctrl+d/ctrl+u). In unified mode (HunkDisplayRange/ChangedDisplay are nil)
 // only the viewport scrolls.
-func (m *Model) ScrollPage(delta int) {
+func (m *Model) scrollPage(delta int) {
 	if delta > 0 {
 		m.viewport.ScrollDown(delta)
 	} else if delta < 0 {
@@ -521,7 +521,7 @@ func absInt(x int) int {
 	return x
 }
 
-func (m *Model) JumpTop() bool {
+func (m *Model) jumpTop() bool {
 	m.viewport.SetYOffset(0)
 	if m.navMode == NavModeHunk {
 		if len(m.data.Parsed.Hunks) == 0 {
@@ -537,7 +537,7 @@ func (m *Model) JumpTop() bool {
 	return true
 }
 
-func (m *Model) JumpBottom() bool {
+func (m *Model) jumpBottom() bool {
 	maxOffset := m.viewport.TotalLineCount() - m.viewport.VisibleLineCount()
 	if maxOffset < 0 {
 		maxOffset = 0
@@ -652,7 +652,7 @@ func (m *Model) DisableVisual() {
 	m.data.VisualAnchor = m.data.ActiveLine
 }
 
-func (m *Model) ToggleVisual() bool {
+func (m *Model) toggleVisual() bool {
 	if len(m.data.Parsed.Changed) == 0 {
 		return false
 	}
@@ -688,11 +688,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, UpdateResult) {
 	result := UpdateResult{Handled: true}
 	switch match.ID {
 	case navBindingMoveDown:
-		if m.MoveActive(1, true) {
+		if m.moveActive(1, true) {
 			m.EnsureActiveVisible(m.navMode)
 		}
 	case navBindingMoveUp:
-		if m.MoveActive(-1, true) {
+		if m.moveActive(-1, true) {
 			m.EnsureActiveVisible(m.navMode)
 		}
 	case navBindingScrollDown:
@@ -700,9 +700,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, UpdateResult) {
 	case navBindingScrollUp:
 		m.ScrollViewport(-3)
 	case navBindingPageDown:
-		m.ScrollPage(list.DefaultScroll)
+		m.scrollPage(list.DefaultScroll)
 	case navBindingPageUp:
-		m.ScrollPage(-list.DefaultScroll)
+		m.scrollPage(-list.DefaultScroll)
 	case navBindingNavMode:
 		m.DisableVisual()
 		if m.navMode == NavModeHunk {
@@ -715,16 +715,16 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, UpdateResult) {
 		if m.navMode == NavModeHunk {
 			m.navMode = NavModeLine
 		}
-		m.ToggleVisual()
+		m.toggleVisual()
 		m.EnsureActiveVisible(m.navMode)
 	case navBindingWrap:
 		m.wrapSoft = !m.wrapSoft
 	case navBindingBottom:
-		if m.JumpBottom() {
+		if m.jumpBottom() {
 			m.EnsureActiveVisible(m.navMode)
 		}
 	case navBindingTop:
-		if m.JumpTop() {
+		if m.jumpTop() {
 			m.EnsureActiveVisible(m.navMode)
 		}
 	case navBindingRenderMode:

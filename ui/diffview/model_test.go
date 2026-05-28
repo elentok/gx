@@ -232,14 +232,14 @@ func TestModelMoveActive(t *testing.T) {
 	m.SetNavMode(NavModeHunk)
 
 	// Move to next hunk
-	moved := m.MoveActive(1, false)
+	moved := m.moveActive(1, false)
 	if !moved {
 		t.Error("expected MoveActive to return true when moving to next hunk")
 	}
 
 	// Move to line mode
 	m.SetNavMode(NavModeLine)
-	moved = m.MoveActive(1, false)
+	moved = m.moveActive(1, false)
 	_ = moved
 }
 
@@ -248,9 +248,9 @@ func TestModelScrollPage(t *testing.T) {
 	raw := "@@ -1 +1 @@\n-old\n+new\n"
 	m.BuildFromRaw(raw, raw)
 	m.SyncViewport(80, 3)
-	m.ScrollPage(1)
-	m.ScrollPage(-1)
-	m.ScrollPage(0) // no-op
+	m.scrollPage(1)
+	m.scrollPage(-1)
+	m.scrollPage(0) // no-op
 }
 
 func TestModelJumpTopAndBottom(t *testing.T) {
@@ -259,24 +259,24 @@ func TestModelJumpTopAndBottom(t *testing.T) {
 	m.BuildFromRaw(raw, raw)
 	m.SyncViewport(80, 3)
 
-	m.JumpBottom()
-	m.JumpTop()
+	m.jumpBottom()
+	m.jumpTop()
 	if m.Data().ActiveHunk != 0 {
 		t.Errorf("JumpTop: expected ActiveHunk=0, got %d", m.Data().ActiveHunk)
 	}
 
 	m.SetNavMode(NavModeLine)
-	m.JumpTop()
-	m.JumpBottom()
+	m.jumpTop()
+	m.jumpBottom()
 }
 
 func TestModelJumpTopEmptyHunks(t *testing.T) {
 	m := NewModel(false)
-	got := m.JumpTop()
+	got := m.jumpTop()
 	if got {
 		t.Error("JumpTop on empty model should return false")
 	}
-	got = m.JumpBottom()
+	got = m.jumpBottom()
 	if got {
 		t.Error("JumpBottom on empty model should return false")
 	}

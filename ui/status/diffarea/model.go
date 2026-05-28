@@ -106,10 +106,6 @@ func (d *Model) DisableVisual() {
 	d.ActiveSectionModel().DisableVisual()
 }
 
-func (d *Model) ToggleVisual() bool {
-	return d.ActiveSectionModel().ToggleVisual()
-}
-
 func (d *Model) ToggleSection() {
 	if d.ActiveSection == SectionUnstaged {
 		d.ActiveSection = SectionStaged
@@ -133,26 +129,6 @@ func (d *Model) SyncViewports(vpW, expandedH, collapsedH int) {
 	}
 	d.Unstaged.SyncViewport(vpW, max(0, unstagedH))
 	d.Staged.SyncViewport(vpW, max(0, stagedH))
-}
-
-func (d *Model) moveActive(delta int) bool {
-	diffviewModel := d.ActiveSectionModel()
-	return diffviewModel.MoveActive(delta, true)
-}
-
-func (d *Model) scrollPage(delta int) {
-	diffviewModel := d.ActiveSectionModel()
-	diffviewModel.ScrollPage(delta)
-}
-
-func (d *Model) jumpTop() bool {
-	diffviewModel := d.ActiveSectionModel()
-	return diffviewModel.JumpTop()
-}
-
-func (d *Model) jumpBottom() bool {
-	diffviewModel := d.ActiveSectionModel()
-	return diffviewModel.JumpBottom()
 }
 
 func (d *Model) UpdateActive(msg tea.Msg) (tea.Cmd, diffview.UpdateResult) {

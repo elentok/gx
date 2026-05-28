@@ -105,35 +105,6 @@ func TestSyncViewports(t *testing.T) {
 	d.SyncViewports(80, 20, 10) // should not panic
 }
 
-func TestMoveActive_Empty(t *testing.T) {
-	d := NewModel(false)
-	moved := d.moveActive(1)
-	if moved {
-		t.Error("expected MoveActive=false on empty diff")
-	}
-}
-
-func TestScrollPage_Empty(t *testing.T) {
-	d := NewModel(false)
-	d.scrollPage(1) // should not panic
-}
-
-func TestJumpTopBottom_Empty(t *testing.T) {
-	d := NewModel(false)
-	top := d.jumpTop()
-	bottom := d.jumpBottom()
-	if top || bottom {
-		t.Error("expected JumpTop/Bottom=false for empty diff")
-	}
-}
-
-func TestToggleVisual_Empty(t *testing.T) {
-	d := NewModel(false)
-	if d.ToggleVisual() {
-		t.Error("expected ToggleVisual=false on empty diff (no changed lines)")
-	}
-}
-
 func TestDisableVisual(t *testing.T) {
 	d := NewModel(false)
 	d.DisableVisual() // should not panic
