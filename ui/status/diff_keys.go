@@ -11,8 +11,8 @@ import (
 
 func (m Model) delegateToDiff(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Search routing first.
-	cmd, handled := m.diffarea.UpdateActive(msg)
-	if handled {
+	cmd, result := m.diffarea.UpdateActive(msg)
+	if result.Handled {
 		if m.currentDiffSearch().Mode() == search.SearchModeResults {
 			m.diffarea.SetNavMode(diffview.NavModeLine)
 		}

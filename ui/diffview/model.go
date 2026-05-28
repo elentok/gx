@@ -6,6 +6,8 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/ui/diffview/diffrender"
+	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/search"
 
 	"charm.land/bubbles/v2/viewport"
@@ -26,11 +28,53 @@ const (
 	NavModeLine
 )
 
+// UpdateResult is returned by Model.Update to indicate how the message was handled.
+type UpdateResult struct {
+	Handled     bool
+	NeedsReload bool // render mode was toggled; caller must reload diff content
+}
+
+const (
+	navBindingMoveDown   keys.BindingID = "move-down"
+	navBindingMoveUp     keys.BindingID = "move-up"
+	navBindingScrollDown keys.BindingID = "scroll-down"
+	navBindingScrollUp   keys.BindingID = "scroll-up"
+	navBindingPageDown   keys.BindingID = "page-down"
+	navBindingPageUp     keys.BindingID = "page-up"
+	navBindingNavMode    keys.BindingID = "nav-mode"
+	navBindingVisual     keys.BindingID = "visual"
+	navBindingWrap       keys.BindingID = "wrap"
+	navBindingBottom     keys.BindingID = "bottom"
+	navBindingTop        keys.BindingID = "top"
+	navBindingRenderMode keys.BindingID = "render-mode"
+)
+
+func newNavManager() keys.Manager {
+	return keys.New([]keys.Binding{
+		{ID: navBindingMoveDown, Seq: []string{"j"}},
+		{ID: navBindingMoveDown, Seq: []string{"down"}},
+		{ID: navBindingMoveUp, Seq: []string{"k"}},
+		{ID: navBindingMoveUp, Seq: []string{"up"}},
+		{ID: navBindingScrollDown, Seq: []string{"J"}},
+		{ID: navBindingScrollUp, Seq: []string{"K"}},
+		{ID: navBindingPageDown, Seq: []string{"ctrl+d"}},
+		{ID: navBindingPageUp, Seq: []string{"ctrl+u"}},
+		{ID: navBindingNavMode, Seq: []string{"a"}},
+		{ID: navBindingVisual, Seq: []string{"v"}},
+		{ID: navBindingWrap, Seq: []string{"w"}},
+		{ID: navBindingBottom, Seq: []string{"G"}},
+		{ID: navBindingBottom, Seq: []string{"shift+g"}},
+		{ID: navBindingTop, Seq: []string{"g", "g"}},
+		{ID: navBindingRenderMode, Seq: []string{"s"}},
+	})
+}
+
 // Model owns one diff pane state (unstaged or staged), including local search.
 type Model struct {
 	data             DiffData
 	viewport         viewport.Model
 	search           search.Model
+	keys             keys.Manager
 	renderMode       RenderMode
 	navMode          NavMode
 	wrapSoft         bool
@@ -42,6 +86,7 @@ func NewModel(useNerdFontIcons bool) Model {
 		data:             NewDiffData(),
 		viewport:         viewport.New(),
 		search:           search.NewModel(),
+		keys:             newNavManager(),
 		renderMode:       RenderModeUnified,
 		navMode:          NavModeHunk,
 		wrapSoft:         true,
@@ -621,10 +666,75 @@ func (m *Model) ToggleVisual() bool {
 	return true
 }
 
-func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, bool) {
+func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, UpdateResult) {
 	if nextSearch, cmd, result := m.search.Update(msg); result.Handled {
 		m.search = nextSearch
-		return m, cmd, true
+		return m, cmd, UpdateResult{Handled: true}
 	}
-	return m, nil, false
+
+	key, ok := msg.(tea.KeyPressMsg)
+	if !ok {
+		return m, nil, UpdateResult{}
+	}
+
+	match, consumed := m.keys.Process(key)
+	if !consumed {
+		return m, nil, UpdateResult{}
+	}
+	if match == nil {
+		return m, nil, UpdateResult{Handled: true}
+	}
+
+	result := UpdateResult{Handled: true}
+	switch match.ID {
+	case navBindingMoveDown:
+		if m.MoveActive(1, true) {
+			m.EnsureActiveVisible(m.navMode)
+		}
+	case navBindingMoveUp:
+		if m.MoveActive(-1, true) {
+			m.EnsureActiveVisible(m.navMode)
+		}
+	case navBindingScrollDown:
+		m.ScrollViewport(3)
+	case navBindingScrollUp:
+		m.ScrollViewport(-3)
+	case navBindingPageDown:
+		m.ScrollPage(list.DefaultScroll)
+	case navBindingPageUp:
+		m.ScrollPage(-list.DefaultScroll)
+	case navBindingNavMode:
+		m.DisableVisual()
+		if m.navMode == NavModeHunk {
+			m.navMode = NavModeLine
+		} else {
+			m.navMode = NavModeHunk
+		}
+		m.EnsureActiveVisible(m.navMode)
+	case navBindingVisual:
+		if m.navMode == NavModeHunk {
+			m.navMode = NavModeLine
+		}
+		m.ToggleVisual()
+		m.EnsureActiveVisible(m.navMode)
+	case navBindingWrap:
+		m.wrapSoft = !m.wrapSoft
+	case navBindingBottom:
+		if m.JumpBottom() {
+			m.EnsureActiveVisible(m.navMode)
+		}
+	case navBindingTop:
+		if m.JumpTop() {
+			m.EnsureActiveVisible(m.navMode)
+		}
+	case navBindingRenderMode:
+		if m.renderMode == RenderModeUnified {
+			m.renderMode = RenderModeSideBySide
+		} else {
+			m.renderMode = RenderModeUnified
+		}
+		result.NeedsReload = true
+	}
+
+	return m, nil, result
 }

@@ -155,14 +155,14 @@ func (d *Model) JumpBottom() bool {
 	return diffviewModel.JumpBottom()
 }
 
-func (d *Model) UpdateActive(msg tea.Msg) (tea.Cmd, bool) {
+func (d *Model) UpdateActive(msg tea.Msg) (tea.Cmd, diffview.UpdateResult) {
 	active := d.ActiveSectionModel()
-	updated, cmd, handled := active.Update(msg)
-	if !handled {
-		return nil, false
+	updated, cmd, result := active.Update(msg)
+	if !result.Handled {
+		return nil, diffview.UpdateResult{}
 	}
 	*active = updated
-	return cmd, true
+	return cmd, result
 }
 
 func (d *Model) Keys() *keys.Manager {
