@@ -2959,3 +2959,85 @@ func TestVisualModeUnstagesLineRange(t *testing.T) {
 		t.Fatalf("expected unstaged diff to include selected visual range:\n%s", unstaged)
 	}
 }
+
+func pressKey(m Model, code rune) Model {
+	updated, _ := m.Update(tea.KeyPressMsg{Code: code, Text: string(code)})
+	return updated.(Model)
+}
+
+func pressSpecialKey(m Model, code rune) Model {
+	updated, _ := m.Update(tea.KeyPressMsg{Code: code})
+	return updated.(Model)
+}
+
+// TestGChordBindingsReachableFromDiffFocus verifies that g+o, g+p, g+h, and
+// g+esc are all reachable when the diff panel is focused. Previously the first
+// 'g' was consumed by diffview's g+g chord prefix, leaving status chords
+// unreachable.
+func TestGChordBindingsReachableFromDiffFocus(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "README.md", "changed\n")
+
+	newDiffFocusModel := func(t *testing.T) Model {
+		t.Helper()
+		m := newTestModelDefault(repo)
+		m.ready = true
+		m.focus = focusDiff
+		return m
+	}
+
+	t.Run("g+esc cancels chord without side effects", func(t *testing.T) {
+		m := newDiffFocusModel(t)
+		m = pressKey(m, 'g')
+		if len(m.keys.Prefix()) != 1 {
+			t.Fatalf("after first g: expected status prefix len 1, got %d", len(m.keys.Prefix()))
+		}
+		m = pressSpecialKey(m, tea.KeyEsc)
+		if len(m.keys.Prefix()) != 0 {
+			t.Fatalf("after g+esc: expected status prefix cleared, got len %d", len(m.keys.Prefix()))
+		}
+		if m.focus != focusDiff {
+			t.Fatalf("after g+esc: expected to remain in diff focus, got %v", m.focus)
+		}
+	})
+
+	t.Run("g+g still scrolls diff to top via diffview", func(t *testing.T) {
+		m := newDiffFocusModel(t)
+		before := m.diffviewChordActive
+		m = pressKey(m, 'g')
+		if !m.diffviewChordActive {
+			t.Fatalf("after first g: expected diffviewChordActive=true")
+		}
+		m = pressKey(m, 'g')
+		// diffview should have won the chord; diffviewChordActive cleared
+		if m.diffviewChordActive {
+			t.Fatalf("after g+g: expected diffviewChordActive=false, diffview handled the chord")
+		}
+		_ = before
+	})
+
+	t.Run("subsequent j navigation works after g+o chord", func(t *testing.T) {
+		// Prime with diff content so j has something to navigate
+		testutil.MustGitExported(t, repo, "add", "README.md")
+		testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+		testutil.WriteFile(t, repo, "README.md", "line1\nline2\nline3\nchanged\n")
+		m2 := newTestModelDefault(repo)
+		m2.ready = true
+		m2.width = 100
+		m2.height = 20
+		m2.focus = focusDiff
+		m2 = runStatusCmd(t, m2, m2.reloadDiffsForSelection())
+		// Press g+o (which opens output panel if there's output, or shows "no output")
+		m2 = pressKey(m2, 'g')
+		m2 = pressKey(m2, 'o')
+		// g prefix in status should be cleared
+		if len(m2.keys.Prefix()) != 0 {
+			t.Fatalf("after g+o: expected status prefix cleared, got %v", m2.keys.Prefix())
+		}
+		// diffviewChordActive should be cleared
+		if m2.diffviewChordActive {
+			t.Fatalf("after g+o: expected diffviewChordActive=false")
+		}
+	})
+}

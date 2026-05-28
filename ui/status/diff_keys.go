@@ -9,9 +9,9 @@ import (
 )
 
 func (m Model) delegateToDiff(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	// Route search input mode keys (and any unhandled keys) through diffview.Update.
-	// Navigation keys are routed via handleKeyPress before reaching here.
-	cmd, result := m.diffarea.UpdateActive(msg)
+	var cmd tea.Cmd
+	var result diffview.UpdateResult
+	m.diffarea, cmd, result = m.diffarea.Update(msg)
 	if result.Handled {
 		if m.currentDiffSearch().Mode() == search.SearchModeResults {
 			m.diffarea.SetNavMode(diffview.NavModeLine)

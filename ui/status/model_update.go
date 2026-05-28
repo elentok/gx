@@ -208,13 +208,19 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.delegateToChild(msg)
 	}
 
-	// When diff is focused and no status chord is in progress, let diffview
-	// handle navigation keys before the status key manager sees them.
-	if m.focus == focusDiff && len(m.keys.Prefix()) == 0 {
+	// When diff is focused, let diffview handle navigation keys before the
+	// status key manager sees them. The guard (len Prefix == 0) is skipped
+	// when diffviewChordActive is true: that means diffview started a chord
+	// prefix in parallel with status (e.g. the first "g"), and we must let
+	// diffview compete on the completing key.
+	if m.focus == focusDiff && (len(m.keys.Prefix()) == 0 || m.diffviewChordActive) {
 		prevSearchCursor := m.currentDiffSearch().Cursor()
-		cmd, result := m.diffarea.UpdateActive(msg)
-		if result.Handled {
+		var cmd tea.Cmd
+		var result diffview.UpdateResult
+		m.diffarea, cmd, result = m.diffarea.Update(msg)
+		if result.Handled && !result.ChordInProgress {
 			m.keys.Reset()
+			m.diffviewChordActive = false
 			if m.currentDiffSearch().Mode() == search.SearchModeResults {
 				m.diffarea.SetNavMode(diffview.NavModeLine)
 			} else {
@@ -238,6 +244,7 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, cmd
 		}
+		m.diffviewChordActive = result.ChordInProgress
 	}
 
 	match, consumed := m.keys.Process(msg)

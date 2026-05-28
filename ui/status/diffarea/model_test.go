@@ -117,9 +117,9 @@ func TestKeys(t *testing.T) {
 	}
 }
 
-func TestUpdateActive_Unhandled(t *testing.T) {
+func TestUpdate_Unhandled(t *testing.T) {
 	d := NewModel(false)
-	cmd, result := d.UpdateActive(struct{}{})
+	_, cmd, result := d.Update(struct{}{})
 	if result.Handled {
 		t.Error("expected unhandled for unknown msg")
 	}

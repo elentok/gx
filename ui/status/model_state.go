@@ -67,8 +67,9 @@ type Model struct {
 	credentialPrompt        string
 	credentialInput         textinput.Model
 	credentialSecret        bool
-	output output.Model
-	keys   keys.Manager
+	output               output.Model
+	keys                 keys.Manager
+	diffviewChordActive  bool // diffview started a chord prefix in parallel with status
 }
 
 type statusData struct {

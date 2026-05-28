@@ -30,8 +30,9 @@ const (
 
 // UpdateResult is returned by Model.Update to indicate how the message was handled.
 type UpdateResult struct {
-	Handled     bool
-	NeedsReload bool // render mode was toggled; caller must reload diff content
+	Handled         bool
+	NeedsReload     bool // render mode was toggled; caller must reload diff content
+	ChordInProgress bool // consumed first key of a multi-key chord; caller may also process the key
 }
 
 const (
@@ -682,7 +683,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, UpdateResult) {
 		return m, nil, UpdateResult{}
 	}
 	if match == nil {
-		return m, nil, UpdateResult{Handled: true}
+		return m, nil, UpdateResult{Handled: true, ChordInProgress: true}
 	}
 
 	result := UpdateResult{Handled: true}

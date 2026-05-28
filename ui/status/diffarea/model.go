@@ -131,14 +131,14 @@ func (d *Model) SyncViewports(vpW, expandedH, collapsedH int) {
 	d.Staged.SyncViewport(vpW, max(0, stagedH))
 }
 
-func (d *Model) UpdateActive(msg tea.Msg) (tea.Cmd, diffview.UpdateResult) {
+func (d Model) Update(msg tea.Msg) (Model, tea.Cmd, diffview.UpdateResult) {
 	active := d.ActiveSectionModel()
 	updated, cmd, result := active.Update(msg)
-	if !result.Handled {
-		return nil, diffview.UpdateResult{}
-	}
 	*active = updated
-	return cmd, result
+	if !result.Handled {
+		return d, nil, diffview.UpdateResult{}
+	}
+	return d, cmd, result
 }
 
 func (d *Model) Keys() *keys.Manager {
