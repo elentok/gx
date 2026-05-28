@@ -9,17 +9,13 @@ import (
 func (m *Model) jumpToTop() {
 	if m.focus == focusFiletree {
 		m.jumpFiletreeTop()
-		return
 	}
-	m.jumpDiffTop()
 }
 
 func (m *Model) jumpToBottom() {
 	if m.focus == focusFiletree {
 		m.jumpFiletreeBottom()
-		return
 	}
-	m.jumpDiffBottom()
 }
 
 func (m *Model) scheduleDiffReload() tea.Cmd {

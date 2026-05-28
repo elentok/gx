@@ -135,22 +135,22 @@ func (d *Model) SyncViewports(vpW, expandedH, collapsedH int) {
 	d.Staged.SyncViewport(vpW, max(0, stagedH))
 }
 
-func (d *Model) MoveActive(delta int) bool {
+func (d *Model) moveActive(delta int) bool {
 	diffviewModel := d.ActiveSectionModel()
 	return diffviewModel.MoveActive(delta, true)
 }
 
-func (d *Model) ScrollPage(delta int) {
+func (d *Model) scrollPage(delta int) {
 	diffviewModel := d.ActiveSectionModel()
 	diffviewModel.ScrollPage(delta)
 }
 
-func (d *Model) JumpTop() bool {
+func (d *Model) jumpTop() bool {
 	diffviewModel := d.ActiveSectionModel()
 	return diffviewModel.JumpTop()
 }
 
-func (d *Model) JumpBottom() bool {
+func (d *Model) jumpBottom() bool {
 	diffviewModel := d.ActiveSectionModel()
 	return diffviewModel.JumpBottom()
 }

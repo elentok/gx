@@ -107,7 +107,7 @@ func TestSyncViewports(t *testing.T) {
 
 func TestMoveActive_Empty(t *testing.T) {
 	d := NewModel(false)
-	moved := d.MoveActive(1)
+	moved := d.moveActive(1)
 	if moved {
 		t.Error("expected MoveActive=false on empty diff")
 	}
@@ -115,13 +115,13 @@ func TestMoveActive_Empty(t *testing.T) {
 
 func TestScrollPage_Empty(t *testing.T) {
 	d := NewModel(false)
-	d.ScrollPage(1) // should not panic
+	d.scrollPage(1) // should not panic
 }
 
 func TestJumpTopBottom_Empty(t *testing.T) {
 	d := NewModel(false)
-	top := d.JumpTop()
-	bottom := d.JumpBottom()
+	top := d.jumpTop()
+	bottom := d.jumpBottom()
 	if top || bottom {
 		t.Error("expected JumpTop/Bottom=false for empty diff")
 	}

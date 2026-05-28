@@ -1652,21 +1652,24 @@ func TestUppercaseGUsingShiftModifierJumpsBottom(t *testing.T) {
 	}
 }
 
-func TestGInDiffHunkModeJumpsViewportToBottom(t *testing.T) {
+func TestGInDiffHunkModeJumpsToLastHunk(t *testing.T) {
 	t.Parallel()
+	// Use multiple separated hunks so the last hunk is NOT at display line 0.
+	// G should set ActiveHunk to the last hunk and scroll it into view.
 	repo := testutil.TempRepo(t)
-	base := make([]string, 0, 40)
-	for i := 1; i <= 40; i++ {
-		base = append(base, fmt.Sprintf("line-%02d", i))
+	lines := make([]string, 30)
+	for i := range lines {
+		lines[i] = fmt.Sprintf("line-%02d", i+1)
 	}
-	testutil.WriteFile(t, repo, "big.txt", strings.Join(base, "\n")+"\n")
+	testutil.WriteFile(t, repo, "big.txt", strings.Join(lines, "\n")+"\n")
 	testutil.MustGitExported(t, repo, "add", "big.txt")
 	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
 
-	updated := append([]string{}, base...)
-	for i := range 28 {
-		updated[i] = "new-" + updated[i]
-	}
+	// Modify lines 1, 15, and 30 to create three separate hunks.
+	updated := append([]string{}, lines...)
+	updated[0] = "new-" + updated[0]
+	updated[14] = "new-" + updated[14]
+	updated[29] = "new-" + updated[29]
 	testutil.WriteFile(t, repo, "big.txt", strings.Join(updated, "\n")+"\n")
 
 	m := newTestModelDefault(repo)
@@ -1681,12 +1684,16 @@ func TestGInDiffHunkModeJumpsViewportToBottom(t *testing.T) {
 	updatedModel, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "G", ShiftedCode: 'G'})
 	m = updatedModel.(Model)
 
-	maxOffset := m.diffarea.Unstaged.Viewport().TotalLineCount() - m.diffarea.Unstaged.Viewport().VisibleLineCount()
-	if maxOffset < 0 {
-		maxOffset = 0
+	lastHunk := len(m.diffarea.Unstaged.DataRef().Parsed.Hunks) - 1
+	if lastHunk < 0 {
+		t.Fatal("expected at least one hunk")
 	}
-	if got := m.diffarea.Unstaged.Viewport().YOffset(); got != maxOffset {
-		t.Fatalf("expected G to jump diff viewport to bottom, got %d want %d", got, maxOffset)
+	if got := m.diffarea.Unstaged.DataRef().ActiveHunk; got != lastHunk {
+		t.Fatalf("expected G to set ActiveHunk to last (%d), got %d", lastHunk, got)
+	}
+	// Last hunk should be visible (viewport scrolled from initial position).
+	if m.diffarea.Unstaged.Viewport().YOffset() == 0 && lastHunk > 0 {
+		t.Fatalf("expected G to scroll viewport for multi-hunk content")
 	}
 }
 

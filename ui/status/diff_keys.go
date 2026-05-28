@@ -2,7 +2,6 @@ package status
 
 import (
 	"github.com/elentok/gx/ui/diffview"
-	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/status/diffarea"
 
@@ -10,12 +9,14 @@ import (
 )
 
 func (m Model) delegateToDiff(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	// Search routing first.
+	// Route search input mode keys (and any unhandled keys) through diffview.Update.
+	// Navigation keys are routed via handleKeyPress before reaching here.
 	cmd, result := m.diffarea.UpdateActive(msg)
 	if result.Handled {
 		if m.currentDiffSearch().Mode() == search.SearchModeResults {
 			m.diffarea.SetNavMode(diffview.NavModeLine)
 		}
+		m.syncSearchCursorFromDiffFocus()
 		return m, cmd
 	}
 
@@ -28,30 +29,6 @@ func (m Model) delegateToDiff(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch match.ID {
-	case diffarea.BindingMoveDown:
-		m.moveActive(1)
-	case diffarea.BindingMoveUp:
-		m.moveActive(-1)
-	case diffarea.BindingScrollDown:
-		m.diffarea.ActiveSectionModel().ScrollViewport(3)
-	case diffarea.BindingScrollUp:
-		m.diffarea.ActiveSectionModel().ScrollViewport(-3)
-	case diffarea.BindingPageDown:
-		m.diffarea.ScrollPage(list.DefaultScroll)
-	case diffarea.BindingPageUp:
-		m.diffarea.ScrollPage(-list.DefaultScroll)
-	case diffarea.BindingNavMode:
-		m.diffarea.DisableVisual()
-		m.diffarea.ToggleNavMode()
-		m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
-	case diffarea.BindingVisual:
-		if m.diffarea.NavMode() == diffview.NavModeHunk {
-			m.diffarea.SetNavMode(diffview.NavModeLine)
-		}
-		if !m.diffarea.ToggleVisual() {
-			return m, nil
-		}
-		m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 	case diffarea.BindingFullscreen:
 		m.diffarea.Fullscreen = !m.diffarea.Fullscreen
 		var reloadCmd tea.Cmd
@@ -61,10 +38,6 @@ func (m Model) delegateToDiff(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.syncDiffViewports()
 		m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 		return m, reloadCmd
-	case diffarea.BindingWrap:
-		m.diffarea.SetWrap(!m.diffarea.Wrap())
-		m.syncDiffViewports()
-		m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 	case diffarea.BindingBack:
 		if m.diffarea.ActiveSectionModel().DataRef().VisualActive {
 			m.diffarea.DisableVisual()

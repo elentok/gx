@@ -208,6 +208,38 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.delegateToChild(msg)
 	}
 
+	// When diff is focused and no status chord is in progress, let diffview
+	// handle navigation keys before the status key manager sees them.
+	if m.focus == focusDiff && len(m.keys.Prefix()) == 0 {
+		prevSearchCursor := m.currentDiffSearch().Cursor()
+		cmd, result := m.diffarea.UpdateActive(msg)
+		if result.Handled {
+			m.keys.Reset()
+			if m.currentDiffSearch().Mode() == search.SearchModeResults {
+				m.diffarea.SetNavMode(diffview.NavModeLine)
+			} else {
+				m.diffarea.SetNavMode(m.diffarea.ActiveSectionModel().NavMode())
+			}
+			// Only sync search cursor for navigation moves; skip when search
+			// itself just moved the cursor (n/N) to avoid overriding it.
+			if m.currentDiffSearch().Cursor() == prevSearchCursor {
+				m.syncSearchCursorFromDiffFocus()
+			}
+			if activeWrap := m.diffarea.ActiveSectionModel().WrapEnabled(); activeWrap != m.diffarea.Wrap() {
+				m.diffarea.SetWrap(activeWrap)
+				m.syncDiffViewports()
+			}
+			if result.NeedsReload {
+				newMode := m.diffarea.ActiveSectionModel().RenderMode()
+				m.diffarea.SetRenderMode(newMode)
+				m.syncDiffViewports()
+				m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
+				return m, m.reloadDiffsForSelection()
+			}
+			return m, cmd
+		}
+	}
+
 	match, consumed := m.keys.Process(msg)
 	if match != nil {
 		return m.dispatchBinding(match.ID, msg)
