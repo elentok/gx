@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/diffview/diffrender"
+	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/keys"
 	notifypkg "github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/search"
@@ -69,7 +70,11 @@ func TestSplitWidthExpandsForLongVisibleFiletreeRows(t *testing.T) {
 				HasStaged: true,
 			}},
 		},
+		fileTreeModel: filetree.NewModel[git.StageFileStatus](),
 	}
+	m.fileTreeModel.SetEntries([]filetree.Entry[git.StageFileStatus]{
+		{Kind: filetree.EntryFile, DisplayName: "renamed.go", Value: git.StageFileStatus{Path: "new/renamed.go", RenameFrom: "old/name.go", IndexStatus: 'R', WorktreeCode: ' '}},
+	})
 
 	filetreeW, diffW := m.splitWidth()
 	if filetreeW <= minFiletreePaneWidth {

@@ -1,9 +1,13 @@
 package status
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/filetree"
 )
 
 func TestBuildStatusEntries_CollapsibleDirectory(t *testing.T) {
@@ -70,5 +74,21 @@ func TestBuildStatusEntries_CompressesSingleChildDirectoryChains(t *testing.T) {
 	}
 	if collapsed[0].Kind != statusEntryDir || collapsed[0].Expanded {
 		t.Fatalf("expected collapsed compressed dir row, got %#v", collapsed[0])
+	}
+}
+
+func TestVisibleStatusLines_UsesStatusSpecificLabelAndMeta(t *testing.T) {
+	m := Model{settings: ui.Settings{}, focus: focusFiletree, fileTreeModel: filetree.NewModel[git.StageFileStatus]()}
+	file := git.StageFileStatus{Path: "new.go", RenameFrom: "old.go", IndexStatus: 'R', WorktreeCode: ' '}
+	m.fileTreeModel.SetEntries([]filetree.Entry[git.StageFileStatus]{
+		{Kind: filetree.EntryFile, DisplayName: "new.go", Value: file},
+	})
+
+	lines := m.visibleStatusLines(3)
+	if len(lines) != 1 {
+		t.Fatalf("expected 1 line, got %d", len(lines))
+	}
+	if got := ansi.Strip(lines[0]); !strings.Contains(got, "old.go -> new.go") || !strings.Contains(got, "R") {
+		t.Fatalf("line = %q, want rename path and status metadata", got)
 	}
 }

@@ -131,17 +131,17 @@ func (m Model) searchOverlayWidth() int {
 	return max
 }
 
-func (m Model) searchMatchStatusIndex(idx int) bool {
+func (m Model) searchMatchStatusIndex(idx int) (matched bool, current bool) {
 	search := m.fileTreeModel.Search()
-	if m.focus != focusFiletree || !search.HasQuery() {
-		return false
+	if !search.HasQuery() {
+		return false, false
 	}
-	for _, match := range search.Matches() {
+	for i, match := range search.Matches() {
 		if match.Index == idx {
-			return true
+			return true, m.focus == focusFiletree && i == search.Cursor()
 		}
 	}
-	return false
+	return false, false
 }
 
 func (m Model) searchMatchDiffDisplay(scope diffarea.Section, displayIdx int) (matched bool, current bool) {

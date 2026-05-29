@@ -62,3 +62,4 @@ date,branch,commit_subject,d_tokens,t_tokens,d_over_t
 2026-05-27,main,"diffview: add RenderRows method for centralized line rendering",23592,95000,0.248
 2026-05-28,main,"diffview: own key bindings for diff navigation",27640,95000,0.291
 2026-05-28,main,diffview: privatize nav methods remove diffarea wrappers [est],2100,2400,0.875
+2026-05-29,main,"filetree: share row rendering across commit and status [est]",2800,11000,0.255

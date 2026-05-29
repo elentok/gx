@@ -4,11 +4,8 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/search"
-
-	"charm.land/lipgloss/v2"
 )
 
 type commitSearchScope int
@@ -17,9 +14,6 @@ const (
 	searchScopeSidebar commitSearchScope = iota
 	searchScopeDiff
 )
-
-var commitSearchHighlightStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true)
-var commitSearchCurrentStyle = lipgloss.NewStyle().Foreground(ui.ColorGreen).Bold(true)
 
 func (m Model) InputFocused() bool {
 	return m.search.Mode() == search.SearchModeInput
@@ -107,27 +101,6 @@ func (m Model) fileEntrySearchText(entry filetree.Entry[git.CommitFile]) string 
 		return entry.Value.RenameFrom + " -> " + entry.Value.Path
 	}
 	return entry.Value.Path
-}
-
-func highlightMatchText(text, query string, current bool) string {
-	if strings.TrimSpace(query) == "" {
-		return text
-	}
-	lower := strings.ToLower(text)
-	lq := strings.ToLower(query)
-	idx := strings.Index(lower, lq)
-	if idx < 0 {
-		return text
-	}
-	end := idx + len(query)
-	if end > len(text) {
-		end = len(text)
-	}
-	style := commitSearchHighlightStyle
-	if current {
-		style = commitSearchCurrentStyle
-	}
-	return text[:idx] + style.Render(text[idx:end]) + text[end:]
 }
 
 func (m Model) searchOverlayWidth() int {

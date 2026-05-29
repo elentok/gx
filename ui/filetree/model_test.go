@@ -1,8 +1,12 @@
 package filetree
 
 import (
+	"image/color"
+	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/search"
 
 	tea "charm.land/bubbletea/v2"
@@ -289,5 +293,74 @@ func TestModelUpdate_SearchStartAndQueryMsg(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("expected SearchQueryUpdatedMsg in batch")
+	}
+}
+
+func TestRenderLines_VisibleRangeOffset(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{{Kind: EntryFile, DisplayName: "a"}, {Kind: EntryFile, DisplayName: "b"}, {Kind: EntryFile, DisplayName: "c"}})
+	m.SetVisibleHeight(1)
+	m.ScrollViewport(1)
+
+	lines := m.RenderLines(3, RenderOpts[int]{EmptyLine: "(empty)", AccentColor: color.White})
+	if len(lines) != 1 {
+		t.Fatalf("expected 1 visible line, got %d", len(lines))
+	}
+	if got := ansi.Strip(lines[0]); !strings.Contains(got, "b") {
+		t.Fatalf("visible line = %q, want visible entry containing %q", got, "b")
+	}
+}
+
+func TestRenderLines_EmptyUsesEmptyLine(t *testing.T) {
+	m := NewModel[int]()
+	lines := m.RenderLines(4, RenderOpts[int]{EmptyLine: "(empty)", AccentColor: color.White})
+	if len(lines) != 2 {
+		t.Fatalf("expected body height 2, got %d", len(lines))
+	}
+	if got := ansi.Strip(lines[0]); got != "(empty)" {
+		t.Fatalf("lines[0] = %q, want %q", got, "(empty)")
+	}
+}
+
+func TestRenderLines_PadsToBodyHeight(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{{Kind: EntryFile, DisplayName: "file.go"}})
+	lines := m.RenderLines(5, RenderOpts[int]{AccentColor: color.White})
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 lines, got %d", len(lines))
+	}
+}
+
+func TestRenderLines_SelectedRowActiveHighlight(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{{Kind: EntryFile, DisplayName: "selected.go"}})
+	lines := m.RenderLines(3, RenderOpts[int]{AccentColor: ui.ColorBlue, Active: true})
+	if len(lines) == 0 || lines[0] == ansi.Strip(lines[0]) {
+		t.Fatal("expected ANSI styling on selected active row")
+	}
+	if got := ansi.Strip(lines[0]); got != "▌selected.go" {
+		t.Fatalf("stripped line = %q, want %q", got, "▌selected.go")
+	}
+}
+
+func TestRenderLines_SearchHighlightsCurrentMatch(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{{Kind: EntryFile, DisplayName: "alpha.go"}})
+	lines := m.RenderLines(3, RenderOpts[int]{
+		AccentColor: color.White,
+		SearchQuery: "pha",
+		SearchMatch: func(index int, entry Entry[int]) (bool, bool) { return true, true },
+	})
+	if len(lines) == 0 || lines[0] == ansi.Strip(lines[0]) {
+		t.Fatal("expected search highlight styling")
+	}
+}
+
+func TestRequiredWidth_UsesRenderedLines(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{{Kind: EntryFile, DisplayName: "wide-name.go"}})
+	width := m.RequiredWidth(3, RenderOpts[int]{AccentColor: color.White})
+	if width < len(" wide-name.go") {
+		t.Fatalf("required width too small: %d", width)
 	}
 }

@@ -11,7 +11,6 @@ import (
 	"github.com/elentok/gx/ui/diffview/diffcore"
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/search"
-	"github.com/elentok/gx/ui/sidebar"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -351,48 +350,44 @@ func (m Model) footerView() string {
 }
 
 func (m Model) visibleFileLines(height int) []string {
-	innerH := max(1, height-2)
-	icons := ui.Icons(m.settings.UseNerdFontIcons)
-	entries := m.fileTreeModel.Entries()
-	offset := m.fileTreeModel.ScrollOffset()
-	rows := sidebar.BuildVisibleRenderableRows(entries, offset, innerH, func(i int, entry filetree.Entry[git.CommitFile]) sidebar.RenderableRow {
-		statusColor := commitEntryColor(entry)
-		name := entry.DisplayName
-		if entry.Kind == filetree.EntryDir {
-			symbol := icons.FolderOpen
-			if !entry.Expanded {
-				symbol = icons.FolderClosed
-			}
-			name = symbol + " " + name + "/"
-		} else {
-			if entry.Value.RenameFrom != "" {
-				name = entry.Value.RenameFrom + " -> " + entry.Value.Path
-			}
-			name = commitFileIcon(entry.Value, m.settings.UseNerdFontIcons) + " " + name
-		}
-		if matched, current := m.searchMatchSidebarIndex(i); matched {
-			name = highlightMatchText(name, m.search.Query(), current)
-		}
-		return sidebar.RenderableRow{
-			Depth:    entry.Depth,
-			MetaRaw:  commitEntryMeta(entry, m.settings.UseNerdFontIcons),
-			NameRaw:  name,
-			Color:    statusColor,
-			Selected: i == m.fileTreeModel.SelectedIndex(),
-		}
-	})
-	return sidebar.RenderRows(rows, innerH, ui.StyleMuted.Render("no changed files"), ui.ColorOrange)
+	return m.fileTreeModel.RenderLines(height, m.filetreeRenderOpts())
 }
 
 func (m Model) requiredFilesPaneWidth(height int) int {
 	required := ansi.StringWidth(" Files ")
-	for _, line := range m.visibleFileLines(height) {
-		if w := ansi.StringWidth(line); w > required {
-			required = w
-		}
+	if w := m.fileTreeModel.RequiredWidth(height, m.filetreeRenderOpts()); w > required {
+		required = w
 	}
 	// 2 for the frame + 1 for padding
 	return required + 2 + 1
+}
+
+func (m Model) filetreeRenderOpts() filetree.RenderOpts[git.CommitFile] {
+	return filetree.RenderOpts[git.CommitFile]{
+		AccentColor:      ui.ColorOrange,
+		Active:           !m.focusDiff && !m.focusHeader,
+		EmptyLine:        ui.StyleMuted.Render("no changed files"),
+		UseNerdFontIcons: m.settings.UseNerdFontIcons,
+		FileIcon: func(entry filetree.Entry[git.CommitFile]) string {
+			return commitFileIcon(entry.Value, m.settings.UseNerdFontIcons)
+		},
+		FileLabel: func(entry filetree.Entry[git.CommitFile]) string {
+			if entry.Value.RenameFrom != "" {
+				return entry.Value.RenameFrom + " -> " + entry.Value.Path
+			}
+			return entry.DisplayName
+		},
+		MetaText: func(entry filetree.Entry[git.CommitFile]) string {
+			return commitEntryMeta(entry, m.settings.UseNerdFontIcons)
+		},
+		RowColor: func(entry filetree.Entry[git.CommitFile]) string {
+			return commitEntryColor(entry)
+		},
+		SearchMatch: func(index int, _ filetree.Entry[git.CommitFile]) (bool, bool) {
+			return m.searchMatchSidebarIndex(index)
+		},
+		SearchQuery: m.search.Query(),
+	}
 }
 
 func (m Model) filesPaneWidth(height int) int {

@@ -87,3 +87,27 @@ func aggregateStatusFiles(files []git.StageFileStatus) aggregateStatus {
 	}
 	return agg
 }
+
+func statusEntryFromRow(row filetree.Entry[git.StageFileStatus]) statusEntry {
+	entry := statusEntry{
+		Path:        row.Path,
+		ParentPath:  row.ParentPath,
+		Depth:       row.Depth,
+		DisplayName: row.DisplayName,
+		Expanded:    row.Expanded,
+	}
+	if row.Kind == filetree.EntryDir {
+		entry.Kind = statusEntryDir
+		agg := aggregateStatusFiles(row.Leaves)
+		entry.HasStaged = agg.hasStaged
+		entry.HasUnstaged = agg.hasUnstaged
+		entry.HasOnlyUntracked = agg.onlyUntracked
+		return entry
+	}
+	entry.Kind = statusEntryFile
+	entry.File = row.Value
+	entry.HasStaged = row.Value.HasStagedChanges()
+	entry.HasUnstaged = row.Value.HasUnstagedChanges()
+	entry.HasOnlyUntracked = row.Value.IsUntracked()
+	return entry
+}
