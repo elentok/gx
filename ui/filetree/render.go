@@ -21,8 +21,6 @@ type RenderOpts[T any] struct {
 	MetaText         func(entry Entry[T]) string
 	RowColor         func(entry Entry[T]) string
 	Faint            func(entry Entry[T]) bool
-	SearchMatch      func(index int, entry Entry[T]) (matched, current bool)
-	SearchQuery      string
 }
 
 func (m Model[T]) RenderLines(height int, opts RenderOpts[T]) []string {
@@ -33,7 +31,7 @@ func (m Model[T]) RenderLines(height int, opts RenderOpts[T]) []string {
 		lines = append(lines, opts.EmptyLine)
 	} else {
 		for _, row := range entries {
-			lines = append(lines, renderEntry(row.index, row.entry, opts, row.index == m.SelectedIndex()))
+			lines = append(lines, m.renderEntry(row.index, row.entry, opts, row.index == m.SelectedIndex()))
 		}
 	}
 	for len(lines) < innerH {
@@ -74,7 +72,7 @@ func (m Model[T]) visibleEntries(innerH int) []visibleEntry[T] {
 	return rows
 }
 
-func renderEntry[T any](index int, entry Entry[T], opts RenderOpts[T], selected bool) string {
+func (m Model[T]) renderEntry(index int, entry Entry[T], opts RenderOpts[T], selected bool) string {
 	mark := " "
 	if selected {
 		mark = lipgloss.NewStyle().Foreground(opts.AccentColor).Render("▌")
@@ -93,12 +91,11 @@ func renderEntry[T any](index int, entry Entry[T], opts RenderOpts[T], selected 
 	if opts.MetaText != nil {
 		meta = colorStyle.Render(opts.MetaText(entry))
 	}
-	name := colorStyle.Render(renderLabel(entry, opts))
-	if opts.SearchMatch != nil {
-		if matched, current := opts.SearchMatch(index, entry); matched {
-			name = search.Highlight(name, opts.SearchQuery, current)
-		}
+	name := renderLabel(entry, opts)
+	if matched, current := m.SearchMatch(index); matched {
+		name = search.Highlight(name, m.search.Query(), current)
 	}
+	name = colorStyle.Render(name)
 
 	sep := " "
 	if strings.TrimSpace(meta) == "" {

@@ -5,7 +5,7 @@ import (
 )
 
 func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
-	if m.help.IsOpen || m.amendConfirm.IsOpen || m.search.IsActive() {
+	if m.help.IsOpen || m.amendConfirm.IsOpen || m.search.IsActive() || m.fileTreeModel.Search().IsActive() {
 		return m, nil
 	}
 	mouse := msg.Mouse()

@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/search"
 	"maps"
+	"strings"
 )
 
 // EntryKind identifies whether a row represents a directory or file.
@@ -121,6 +122,51 @@ func (m *Model[T]) SetCollapsedDirs(dirs map[string]bool) {
 
 func (m *Model[T]) Search() *search.Model {
 	return &m.search
+}
+
+func (m Model[T]) ComputeSearchMatches(query string, text func(Entry[T]) string) []search.Match {
+	q := strings.ToLower(strings.TrimSpace(query))
+	if q == "" {
+		return []search.Match{}
+	}
+
+	var matches []search.Match
+	for i, entry := range m.entries {
+		if strings.Contains(strings.ToLower(text(entry)), q) {
+			matches = append(matches, search.Match{Index: i})
+		}
+	}
+	return matches
+}
+
+func (m *Model[T]) RecomputeSearchMatches(text func(Entry[T]) string) {
+	m.search.SetMatches(m.ComputeSearchMatches(m.search.Query(), text))
+}
+
+func (m *Model[T]) ApplyPassiveSearch(query string, text func(Entry[T]) string) {
+	m.search.SetPassiveResults(query, m.ComputeSearchMatches(query, text))
+}
+
+func (m *Model[T]) FocusCurrentSearchMatch() bool {
+	match, ok := m.search.Match(m.search.Cursor())
+	if !ok || match.Index < 0 || match.Index >= len(m.entries) {
+		return false
+	}
+	prev := m.SelectedIndex()
+	m.SetSelectedIndex(match.Index)
+	return m.SelectedIndex() != prev
+}
+
+func (m Model[T]) SearchMatch(index int) (matched bool, current bool) {
+	if !m.search.HasQuery() {
+		return false, false
+	}
+	for i, match := range m.search.Matches() {
+		if match.Index == index {
+			return true, i == m.search.Cursor()
+		}
+	}
+	return false, false
 }
 
 func (m *Model[T]) Keys() *keys.Manager {

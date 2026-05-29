@@ -28,26 +28,26 @@ const (
 	bindingLeft        keys.BindingID = "left"
 	bindingRefresh     keys.BindingID = "refresh"
 	bindingGotoTop     keys.BindingID = "goto-top"
-	bindingYankContent  keys.BindingID = "yank-content"
-	bindingYankLoc      keys.BindingID = "yank-location"
-	bindingYankAll      keys.BindingID = "yank-all"
-	bindingYankFile     keys.BindingID = "yank-filename"
-	bindingYankHash     keys.BindingID = "yank-hash"
-	bindingYankSubject  keys.BindingID = "yank-subject"
-	bindingYankMessage  keys.BindingID = "yank-message"
+	bindingYankContent keys.BindingID = "yank-content"
+	bindingYankLoc     keys.BindingID = "yank-location"
+	bindingYankAll     keys.BindingID = "yank-all"
+	bindingYankFile    keys.BindingID = "yank-filename"
+	bindingYankHash    keys.BindingID = "yank-hash"
+	bindingYankSubject keys.BindingID = "yank-subject"
+	bindingYankMessage keys.BindingID = "yank-message"
 	bindingComment     keys.BindingID = "comment"
 	bindingRefreshMenu keys.BindingID = "refresh-menu"
 	bindingCancelChord keys.BindingID = "cancel-chord"
 	bindingAmend       keys.BindingID = "amend"
 	bindingReword      keys.BindingID = "reword"
 	bindingFilterLog   keys.BindingID = "filter-log"
-	bindingEditInPlace  keys.BindingID = "edit"
-	bindingEditHSplit   keys.BindingID = "edit-hsplit"
-	bindingEditVSplit   keys.BindingID = "edit-vsplit"
-	bindingEditTab      keys.BindingID = "edit-tab"
-	bindingContextDec   keys.BindingID = "context-dec"
-	bindingContextInc   keys.BindingID = "context-inc"
-	bindingGotoPR       keys.BindingID = "goto-pr"
+	bindingEditInPlace keys.BindingID = "edit"
+	bindingEditHSplit  keys.BindingID = "edit-hsplit"
+	bindingEditVSplit  keys.BindingID = "edit-vsplit"
+	bindingEditTab     keys.BindingID = "edit-tab"
+	bindingContextDec  keys.BindingID = "context-dec"
+	bindingContextInc  keys.BindingID = "context-inc"
+	bindingGotoPR      keys.BindingID = "goto-pr"
 )
 
 func newCommitManager() keys.Manager {
@@ -118,8 +118,12 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		m.help.Open(m.width, m.height)
 		return m, nil
 	case bindingQuit:
-		if m.search.IsActive() {
+		if m.focusDiff && m.search.IsActive() {
 			m.search.DismissAndClear()
+			return m, nil
+		}
+		if !m.focusDiff && m.fileTreeModel.Search().IsActive() {
+			m.fileTreeModel.Search().DismissAndClear()
 			return m, nil
 		}
 		if m.focusDiff && m.diffModel.DataRef().VisualActive {

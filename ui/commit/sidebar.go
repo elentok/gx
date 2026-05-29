@@ -32,9 +32,8 @@ func (m *Model) toggleDirOnEnter() bool {
 		return false
 	}
 	m.rebuildCommitFiletree()
-	if m.searchScope == searchScopeSidebar && m.search.HasQuery() {
-		matches := m.computeSearchMatches(m.search.Query())
-		m.search.SetMatches(matches)
+	if m.fileTreeModel.Search().HasQuery() {
+		m.fileTreeModel.RecomputeSearchMatches(m.fileEntrySearchText)
 	}
 	return true
 }
@@ -44,9 +43,8 @@ func (m *Model) collapseSelectedDir() bool {
 		return false
 	}
 	m.rebuildCommitFiletree()
-	if m.searchScope == searchScopeSidebar && m.search.HasQuery() {
-		matches := m.computeSearchMatches(m.search.Query())
-		m.search.SetMatches(matches)
+	if m.fileTreeModel.Search().HasQuery() {
+		m.fileTreeModel.RecomputeSearchMatches(m.fileEntrySearchText)
 	}
 	return true
 }
@@ -56,9 +54,8 @@ func (m *Model) expandSelectedDir() bool {
 		return false
 	}
 	m.rebuildCommitFiletree()
-	if m.searchScope == searchScopeSidebar && m.search.HasQuery() {
-		matches := m.computeSearchMatches(m.search.Query())
-		m.search.SetMatches(matches)
+	if m.fileTreeModel.Search().HasQuery() {
+		m.fileTreeModel.RecomputeSearchMatches(m.fileEntrySearchText)
 	}
 	return true
 }

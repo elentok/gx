@@ -26,9 +26,8 @@ func (m *Model) syncDiffViewport() {
 	bodyW := m.currentDiffRenderWidth()
 	bodyH := max(0, diffH-2)
 	m.diffModel.Reflow(bodyW)
-	if m.search.HasQuery() && m.searchScope == searchScopeDiff {
-		matches := m.computeSearchMatches(m.search.Query())
-		m.search.SetMatches(matches)
+	if m.search.HasQuery() {
+		m.search.SetMatches(m.computeDiffSearchMatches(m.search.Query()))
 	}
 	m.diffModel.SyncViewport(bodyW, bodyH)
 	m.ensureActiveVisible()

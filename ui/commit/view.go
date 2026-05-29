@@ -49,10 +49,10 @@ func (m Model) View() tea.View {
 	content := m.contentView(contentH)
 	footer := m.footerView()
 	out := lipgloss.JoinVertical(lipgloss.Left, body, content, footer)
-	if m.search.Mode() == search.SearchModeInput {
+	if activeSearch := m.activeSearch(); activeSearch.InputFocused() {
 		overlayW := m.searchOverlayWidth()
-		m.search.SetWidth(overlayW)
-		overlay := m.search.View()
+		activeSearch.SetWidth(overlayW)
+		overlay := activeSearch.View()
 		y := m.height - 2 - lipgloss.Height(overlay)
 		out = ui.OverlayBottomCenter(out, overlay, m.width, y)
 	}
@@ -284,7 +284,7 @@ func (m Model) diffTitle() string {
 }
 
 func (m Model) diffSearchCounterText() string {
-	if m.searchScope != searchScopeDiff || !m.search.HasQuery() || m.search.MatchesCount() == 0 || !m.focusDiff {
+	if !m.search.HasQuery() || m.search.MatchesCount() == 0 || !m.focusDiff {
 		return ""
 	}
 	cursor := m.search.Cursor() + 1
@@ -353,6 +353,13 @@ func (m Model) visibleFileLines(height int) []string {
 	return m.fileTreeModel.RenderLines(height, m.filetreeRenderOpts())
 }
 
+func (m Model) activeSearch() *search.Model {
+	if m.focusDiff {
+		return &m.search
+	}
+	return m.fileTreeModel.Search()
+}
+
 func (m Model) requiredFilesPaneWidth(height int) int {
 	required := ansi.StringWidth(" Files ")
 	if w := m.fileTreeModel.RequiredWidth(height, m.filetreeRenderOpts()); w > required {
@@ -383,10 +390,6 @@ func (m Model) filetreeRenderOpts() filetree.RenderOpts[git.CommitFile] {
 		RowColor: func(entry filetree.Entry[git.CommitFile]) string {
 			return commitEntryColor(entry)
 		},
-		SearchMatch: func(index int, _ filetree.Entry[git.CommitFile]) (bool, bool) {
-			return m.searchMatchSidebarIndex(index)
-		},
-		SearchQuery: m.search.Query(),
 	}
 }
 

@@ -3,6 +3,7 @@ package commit
 import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui/reword"
+	"github.com/elentok/gx/ui/search"
 )
 
 func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
@@ -56,20 +57,30 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.help, cmd = m.help.Update(msg)
 		return m, cmd
 	}
-	newSearch, cmd, result := m.search.Update(msg)
-	m.search = newSearch
+	var cmd tea.Cmd
+	var result search.Result
+	if m.focusDiff {
+		m.search, cmd, result = m.search.Update(msg)
+	} else {
+		fileSearch := m.fileTreeModel.Search()
+		var updated search.Model
+		updated, cmd, result = fileSearch.Update(msg)
+		*fileSearch = updated
+	}
 	if result.Handled {
-		if result.Activated {
-			m.searchScope = searchScopeSidebar
+		if result.QueryChanged {
 			if m.focusDiff {
-				m.searchScope = searchScopeDiff
+				m.search.SetMatches(m.computeDiffSearchMatches(m.search.Query()))
+			} else {
+				m.fileTreeModel.RecomputeSearchMatches(m.fileEntrySearchText)
 			}
 		}
-		if result.QueryChanged {
-			m.search.SetMatches(m.computeSearchMatches(m.search.Query()))
-		}
 		if result.QueryChanged || result.CursorChanged {
-			m.jumpToCurrentMatch()
+			if m.focusDiff {
+				m.jumpToCurrentDiffMatch()
+			} else if m.fileTreeModel.FocusCurrentSearchMatch() {
+				m.refreshDiff()
+			}
 		}
 		return m, cmd
 	}

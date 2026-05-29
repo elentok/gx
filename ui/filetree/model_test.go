@@ -296,6 +296,33 @@ func TestModelUpdate_SearchStartAndQueryMsg(t *testing.T) {
 	}
 }
 
+func TestModelSearchHelpers(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{{Kind: EntryFile, DisplayName: "alpha.go"}, {Kind: EntryFile, DisplayName: "beta.go"}})
+
+	m.ApplyPassiveSearch("beta", func(entry Entry[int]) string { return entry.DisplayName })
+	if m.Search().Query() != "beta" {
+		t.Fatalf("query=%q want beta", m.Search().Query())
+	}
+	if m.Search().MatchesCount() != 1 {
+		t.Fatalf("matches=%d want 1", m.Search().MatchesCount())
+	}
+	if !m.FocusCurrentSearchMatch() {
+		t.Fatal("expected current search match to move selection")
+	}
+	if m.SelectedIndex() != 1 {
+		t.Fatalf("selected=%d want 1", m.SelectedIndex())
+	}
+	matched, current := m.SearchMatch(1)
+	if !matched || !current {
+		t.Fatalf("SearchMatch(1) = (%v, %v), want (true, true)", matched, current)
+	}
+	matched, current = m.SearchMatch(0)
+	if matched || current {
+		t.Fatalf("SearchMatch(0) = (%v, %v), want (false, false)", matched, current)
+	}
+}
+
 func TestRenderLines_VisibleRangeOffset(t *testing.T) {
 	m := NewModel[int]()
 	m.SetEntries([]Entry[int]{{Kind: EntryFile, DisplayName: "a"}, {Kind: EntryFile, DisplayName: "b"}, {Kind: EntryFile, DisplayName: "c"}})
@@ -346,13 +373,27 @@ func TestRenderLines_SelectedRowActiveHighlight(t *testing.T) {
 func TestRenderLines_SearchHighlightsCurrentMatch(t *testing.T) {
 	m := NewModel[int]()
 	m.SetEntries([]Entry[int]{{Kind: EntryFile, DisplayName: "alpha.go"}})
+	m.ApplyPassiveSearch("pha", func(entry Entry[int]) string { return entry.DisplayName })
 	lines := m.RenderLines(3, RenderOpts[int]{
 		AccentColor: color.White,
-		SearchQuery: "pha",
-		SearchMatch: func(index int, entry Entry[int]) (bool, bool) { return true, true },
 	})
 	if len(lines) == 0 || lines[0] == ansi.Strip(lines[0]) {
 		t.Fatal("expected search highlight styling")
+	}
+}
+
+func TestRenderLines_SearchHighlightUsesVisibleLabelText(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{{Kind: EntryFile, DisplayName: "model.go"}})
+	m.ApplyPassiveSearch("m", func(entry Entry[int]) string { return entry.DisplayName })
+
+	line := m.RenderLines(3, RenderOpts[int]{AccentColor: color.White})[0]
+	got := ansi.Strip(line)
+	if got != "▌model.go" {
+		t.Fatalf("stripped line = %q, want %q", got, "▌model.go")
+	}
+	if line == got {
+		t.Fatal("expected ANSI styling for highlighted match")
 	}
 }
 

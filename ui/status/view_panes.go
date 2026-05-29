@@ -113,10 +113,6 @@ func (m Model) visibleStatusLines(height int) []string {
 		Faint: func(entry filetree.Entry[git.StageFileStatus]) bool {
 			return entry.Kind == filetree.EntryFile && isDeletedFileStatus(entry.Value)
 		},
-		SearchMatch: func(index int, _ filetree.Entry[git.StageFileStatus]) (bool, bool) {
-			return m.searchMatchStatusIndex(index)
-		},
-		SearchQuery: m.fileTreeModel.Search().Query(),
 	})
 }
 
@@ -146,10 +142,6 @@ func (m Model) requiredFiletreePaneWidth(height int) int {
 		Faint: func(entry filetree.Entry[git.StageFileStatus]) bool {
 			return entry.Kind == filetree.EntryFile && isDeletedFileStatus(entry.Value)
 		},
-		SearchMatch: func(index int, _ filetree.Entry[git.StageFileStatus]) (bool, bool) {
-			return m.searchMatchStatusIndex(index)
-		},
-		SearchQuery: m.fileTreeModel.Search().Query(),
 	}); w > required {
 		required = w
 	}

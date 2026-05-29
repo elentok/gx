@@ -56,8 +56,7 @@ type commitDiffArea struct {
 }
 
 type commitSearchState struct {
-	search      search.Model
-	searchScope commitSearchScope
+	search search.Model
 }
 
 type commitSidebarState struct {
@@ -151,9 +150,8 @@ func (m *Model) refreshDiff() {
 		colorDiff = rawDiff
 	}
 	m.diffModel.BuildFromRaw(rawDiff, colorDiff)
-	if m.search.HasQuery() && m.searchScope == searchScopeDiff {
-		matches := m.computeSearchMatches(m.search.Query())
-		m.search.SetMatches(matches)
+	if m.search.HasQuery() {
+		m.search.SetMatches(m.computeDiffSearchMatches(m.search.Query()))
 	}
 	m.syncDiffViewport()
 }
@@ -172,8 +170,8 @@ func (m *Model) applyFilterPathSearch() {
 	if m.filterPath == "" {
 		return
 	}
-	m.searchScope = searchScopeSidebar
-	matches := m.computeSearchMatches(m.filterPath)
-	m.search.SetPassiveResults(m.filterPath, matches)
-	m.jumpToCurrentMatch()
+	m.fileTreeModel.ApplyPassiveSearch(m.filterPath, m.fileEntrySearchText)
+	if m.fileTreeModel.FocusCurrentSearchMatch() {
+		m.refreshDiff()
+	}
 }
