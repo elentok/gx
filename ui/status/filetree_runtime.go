@@ -46,7 +46,7 @@ func (m *Model) reloadFileList(preservePath string) {
 	m.reconcileFileTreeFromStatusState()
 	if m.fileTreeModel.Search().HasQuery() {
 		matches := m.computeSearchMatches(m.fileTreeModel.Search().Query())
-		_ = m.fileTreeModel.Search().SetMatchesAndJump(matches)
+		_ = m.fileTreeModel.SetSearchMatchesAndJump(matches)
 	}
 
 	if len(m.statusData.statusEntries) == 0 {

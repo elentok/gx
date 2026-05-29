@@ -89,7 +89,7 @@ func (m Model) handleFileTreeOpenSelected() (Model, tea.Cmd) {
 func (m Model) handleSearchQueryUpdated(msg search.SearchQueryUpdatedMsg) (Model, tea.Cmd) {
 	if m.focus == focusFiletree {
 		matches := m.computeSearchMatches(msg.Query)
-		return m, m.fileTreeModel.Search().SetMatchesAndJump(matches)
+		return m, m.fileTreeModel.SetSearchMatchesAndJump(matches)
 	}
 	matches := m.computeSearchMatches(msg.Query)
 	return m, m.currentDiffSearch().SetMatchesAndJump(matches)
