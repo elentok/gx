@@ -71,12 +71,3 @@ func (m Model) filetreeEntrySearchText(entry filetree.Entry[git.StageFileStatus]
 	return name
 }
 
-const searchOverlayDesiredWidth = 50
-
-func (m Model) searchOverlayWidth() int {
-	max := m.width * 80 / 100
-	if searchOverlayDesiredWidth < max {
-		return searchOverlayDesiredWidth
-	}
-	return max
-}

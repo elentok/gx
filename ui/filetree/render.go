@@ -16,6 +16,7 @@ type RenderOpts[T any] struct {
 	Active           bool
 	EmptyLine        string
 	UseNerdFontIcons bool
+	Width            int
 	FileIcon         func(entry Entry[T]) string
 	FileLabel        func(entry Entry[T]) string
 	MetaText         func(entry Entry[T]) string
@@ -25,6 +26,12 @@ type RenderOpts[T any] struct {
 
 func (m Model[T]) RenderLines(height int, opts RenderOpts[T]) []string {
 	innerH := maxInt(1, height-2)
+	var searchLines []string
+	if m.search.InputFocused() && opts.Width > 0 {
+		m.search.SetWidth(opts.Width)
+		searchLines = strings.Split(m.search.View(), "\n")
+		innerH = maxInt(0, innerH-len(searchLines))
+	}
 	entries := m.visibleEntries(innerH)
 	lines := make([]string, 0, innerH)
 	if len(entries) == 0 {
@@ -37,6 +44,7 @@ func (m Model[T]) RenderLines(height int, opts RenderOpts[T]) []string {
 	for len(lines) < innerH {
 		lines = append(lines, "")
 	}
+	lines = append(lines, searchLines...)
 	return lines
 }
 

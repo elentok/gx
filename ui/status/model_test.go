@@ -1873,7 +1873,7 @@ func TestStageSearchFiletreeModeAndNavigation(t *testing.T) {
 	}
 }
 
-func TestFiletreeSearchModeShowsOverlay(t *testing.T) {
+func TestFiletreeSearchModeShowsSearchBox(t *testing.T) {
 	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "apple.txt", "one\n")
@@ -1889,10 +1889,10 @@ func TestFiletreeSearchModeShowsOverlay(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	m = updated.(Model)
 
-	m.fileTreeModel.Search().SetWidth(m.searchOverlayWidth())
-	overlay := ansi.Strip(m.fileTreeModel.Search().View())
-	if !strings.Contains(overlay, "Search") {
-		t.Fatalf("expected overlay to contain 'Search', got %q", overlay)
+	lines := m.visibleStatusLines(30, 20)
+	combined := ansi.Strip(strings.Join(lines, "\n"))
+	if !strings.Contains(combined, "Search") {
+		t.Fatalf("expected rendered lines to contain 'Search', got %q", combined)
 	}
 }
 

@@ -39,13 +39,6 @@ func (m Model) View() tea.View {
 
 	footer := m.helpLine()
 	out := lipgloss.JoinVertical(lipgloss.Left, body, footer)
-	if m.focus == focusFiletree && m.fileTreeModel.Search().InputFocused() {
-		s := m.fileTreeModel.Search()
-		s.SetWidth(m.searchOverlayWidth())
-		overlay := s.View()
-		y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
-		out = ui.OverlayBottomCenter(out, overlay, m.width, y)
-	}
 	if m.bump.IsOpen {
 		out = ui.OverlayCenter(out, m.bump.View(m.width), m.width, m.height)
 	} else if m.push.IsOpen {

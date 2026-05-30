@@ -88,11 +88,12 @@ func (m Model) filetreePaneTitle() string {
 	return title
 }
 
-func (m Model) visibleStatusLines(height int) []string {
+func (m Model) visibleStatusLines(width, height int) []string {
 	icons := filetreePaneIconsFor(m.settings.UseNerdFontIcons)
 	return m.fileTreeModel.RenderLines(height, filetree.RenderOpts[git.StageFileStatus]{
 		AccentColor:      ui.ColorBlue,
 		Active:           m.focus == focusFiletree,
+		Width:            width - 2,
 		EmptyLine:        ui.StyleMuted.Render("clean working tree"),
 		UseNerdFontIcons: m.settings.UseNerdFontIcons,
 		FileIcon: func(entry filetree.Entry[git.StageFileStatus]) string {
@@ -149,7 +150,7 @@ func (m Model) requiredFiletreePaneWidth(height int) int {
 }
 
 func (m Model) renderFiletreePane(width, height int) string {
-	lines := m.visibleStatusLines(height)
+	lines := m.visibleStatusLines(width, height)
 	return m.renderFiletreePanelWithBorderTitle(width, height, m.filetreePaneTitle(), m.searchCounterForFiletreePane(), lines, m.focus == focusFiletree)
 }
 

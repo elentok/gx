@@ -84,7 +84,7 @@ func TestVisibleStatusLines_UsesStatusSpecificLabelAndMeta(t *testing.T) {
 		{Kind: filetree.EntryFile, DisplayName: "new.go", Value: file},
 	})
 
-	lines := m.visibleStatusLines(3)
+	lines := m.visibleStatusLines(30, 3)
 	if len(lines) != 1 {
 		t.Fatalf("expected 1 line, got %d", len(lines))
 	}

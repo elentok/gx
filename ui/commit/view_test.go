@@ -71,7 +71,7 @@ func TestVisibleFileLines_UsesCommitSpecificLabelAndMeta(t *testing.T) {
 		{Kind: filetree.EntryFile, DisplayName: "new.go", Value: git.CommitFile{Path: "new.go", RenameFrom: "old.go", Status: "R "}},
 	})
 
-	lines := m.visibleFileLines(3)
+	lines := m.visibleFileLines(30, 3)
 	if len(lines) != 1 {
 		t.Fatalf("expected 1 line, got %d", len(lines))
 	}

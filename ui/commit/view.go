@@ -48,15 +48,6 @@ func (m Model) View() tea.View {
 	content := m.contentView(contentH)
 	footer := m.footerView()
 	out := lipgloss.JoinVertical(lipgloss.Left, body, content, footer)
-	if !m.focusDiff {
-		if s := m.fileTreeModel.Search(); s.InputFocused() {
-			overlayW := m.searchOverlayWidth()
-			s.SetWidth(overlayW)
-			overlay := s.View()
-			y := m.height - 2 - lipgloss.Height(overlay)
-			out = ui.OverlayBottomCenter(out, overlay, m.width, y)
-		}
-	}
 	if prefix := m.keys.Prefix(); len(prefix) > 0 {
 		hints := ui.ChordBindingsFromHints(m.keys.ChordHints())
 		if len(hints) > 0 {
@@ -231,7 +222,7 @@ func (m Model) visibleHeaderLines(viewportRows int) []string {
 }
 
 func (m Model) renderFilesPane(width, height int) string {
-	lines := m.visibleFileLines(height)
+	lines := m.visibleFileLines(width, height)
 	if len(lines) == 0 {
 		lines = append(lines, ui.StyleMuted.Render("no changed files"))
 	}
@@ -351,8 +342,10 @@ func (m Model) footerView() string {
 	return left + strings.Repeat(" ", m.width-leftW-rightW) + right
 }
 
-func (m Model) visibleFileLines(height int) []string {
-	return m.fileTreeModel.RenderLines(height, m.filetreeRenderOpts())
+func (m Model) visibleFileLines(width, height int) []string {
+	opts := m.filetreeRenderOpts()
+	opts.Width = width - 2
+	return m.fileTreeModel.RenderLines(height, opts)
 }
 
 func (m Model) requiredFilesPaneWidth(height int) int {

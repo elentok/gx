@@ -19,10 +19,3 @@ func (m Model) fileEntrySearchText(entry filetree.Entry[git.CommitFile]) string 
 	return entry.Value.Path
 }
 
-func (m Model) searchOverlayWidth() int {
-	maxW := m.width * 80 / 100
-	if 50 < maxW {
-		return 50
-	}
-	return maxW
-}
