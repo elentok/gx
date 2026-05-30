@@ -79,6 +79,9 @@ func (m Model) handleKeyPressInput(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 
 func (m Model) handleKeyPressResults(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	switch msg.String() {
+	case "/":
+		m.Start(m.query)
+		return m, nil, true
 	case "esc":
 		m.DismissAndClear()
 		return m, nil, true

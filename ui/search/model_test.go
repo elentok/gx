@@ -291,6 +291,23 @@ func TestUpdate_NonKeyMsg(t *testing.T) {
 	_ = cmd
 }
 
+func TestUpdate_ResultsSlashReopensWithQuery(t *testing.T) {
+	m := NewModel()
+	m.Start("foo")
+	m.SetMatches([]Match{{DataIndex: 1}})
+	m.DismissAndKeepResults()
+	next, _, result := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	if next.Mode() != SearchModeInput {
+		t.Errorf("expected SearchModeInput after / in results, got %d", next.Mode())
+	}
+	if next.Query() != "foo" {
+		t.Errorf("query = %q, want 'foo'", next.Query())
+	}
+	if !result.Handled {
+		t.Error("expected Handled=true")
+	}
+}
+
 func TestView_Open(t *testing.T) {
 	m := NewModel()
 	m.Start("hello")

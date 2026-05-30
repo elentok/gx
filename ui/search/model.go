@@ -105,6 +105,7 @@ func (m Model) Keys() keys.Manager {
 
 func (m *Model) Start(initialQuery string) {
 	m.textinput.SetValue(initialQuery)
+	m.textinput.CursorEnd()
 	m.query = initialQuery
 	m.mode = SearchModeInput
 }
