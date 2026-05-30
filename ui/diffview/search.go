@@ -11,27 +11,27 @@ type DiffSearchMatch struct {
 }
 
 func applyDiffSearchMatch(section *DiffData, vp *viewport.Model, match search.Match) {
-	if match.DisplayIndex >= 0 {
-		if match.DisplayIndex < vp.YOffset() {
-			vp.SetYOffset(match.DisplayIndex)
+	if match.ViewportRow >= 0 {
+		if match.ViewportRow < vp.YOffset() {
+			vp.SetYOffset(match.ViewportRow)
 		} else {
 			last := vp.YOffset() + vp.VisibleLineCount() - 1
-			if vp.VisibleLineCount() > 0 && match.DisplayIndex > last {
-				vp.SetYOffset(maxInt(0, match.DisplayIndex-vp.VisibleLineCount()+1))
+			if vp.VisibleLineCount() > 0 && match.ViewportRow > last {
+				vp.SetYOffset(maxInt(0, match.ViewportRow-vp.VisibleLineCount()+1))
 			}
 		}
 	}
-	if match.Index < 0 {
+	if match.DataIndex < 0 {
 		return
 	}
 	for i, ch := range section.Parsed.Changed {
-		if ch.LineIndex == match.Index {
+		if ch.LineIndex == match.DataIndex {
 			section.ActiveLine = i
 			break
 		}
 	}
 	for i, h := range section.Parsed.Hunks {
-		if match.Index >= h.StartLine && match.Index <= h.EndLine {
+		if match.DataIndex >= h.StartLine && match.DataIndex <= h.EndLine {
 			section.ActiveHunk = i
 			break
 		}

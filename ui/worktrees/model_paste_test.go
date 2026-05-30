@@ -48,7 +48,7 @@ func TestPasteMsgUpdatesSearchQuery(t *testing.T) {
 	if got := m.search.Query(); got != "bug" {
 		t.Fatalf("search query after paste = %q, want %q", got, "bug")
 	}
-	if got := m.search.Matches(); len(got) != 1 || got[0].Index != 1 {
+	if got := m.search.Matches(); len(got) != 1 || got[0].DataIndex != 1 {
 		t.Fatalf("search matches after paste = %v, want [{Index:1}]", got)
 	}
 }

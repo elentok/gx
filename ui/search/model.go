@@ -17,8 +17,8 @@ const (
 )
 
 type Match struct {
-	Index        int
-	DisplayIndex int
+	DataIndex   int // filetree entry index or diff raw line index
+	ViewportRow int // index into rendered viewport lines
 }
 
 type Model struct {
@@ -27,6 +27,9 @@ type Model struct {
 	cursor    int
 	query     string
 	matches   []Match
+
+	viewportRowToPos map[int]int
+	dataIndexToPos   map[int]int
 
 	width int
 }
@@ -124,12 +127,24 @@ func (m *Model) clear() {
 	m.query = ""
 	m.cursor = 0
 	m.matches = []Match{}
+	m.viewportRowToPos = nil
+	m.dataIndexToPos = nil
 }
 
 func (m *Model) SetWidth(width int) {
 	m.width = width
 	// 2 columns for the frame + 2 columns for padding
 	m.textinput.SetWidth(width - 4)
+}
+
+func (m *Model) MatchPosByViewportRow(row int) (int, bool) {
+	pos, ok := m.viewportRowToPos[row]
+	return pos, ok
+}
+
+func (m *Model) MatchPosByDataIndex(idx int) (int, bool) {
+	pos, ok := m.dataIndexToPos[idx]
+	return pos, ok
 }
 
 func (m *Model) SetMatches(matches []Match) {
@@ -139,6 +154,13 @@ func (m *Model) SetMatches(matches []Match) {
 		if m.cursor < 0 || m.cursor >= len(m.matches) {
 			m.cursor = 0
 		}
+	}
+
+	m.viewportRowToPos = make(map[int]int, len(matches))
+	m.dataIndexToPos = make(map[int]int, len(matches))
+	for i, match := range matches {
+		m.viewportRowToPos[match.ViewportRow] = i
+		m.dataIndexToPos[match.DataIndex] = i
 	}
 }
 

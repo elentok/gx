@@ -48,7 +48,7 @@ func TestStart_SetsInputMode(t *testing.T) {
 func TestDismissAndClear_ResetsAll(t *testing.T) {
 	m := NewModel()
 	m.Start("bar")
-	m.SetMatches([]Match{{Index: 1}})
+	m.SetMatches([]Match{{DataIndex: 1}})
 	m.DismissAndClear()
 	if m.Mode() != SearchModeNone {
 		t.Errorf("Mode = %d, want SearchModeNone", m.Mode())
@@ -64,7 +64,7 @@ func TestDismissAndClear_ResetsAll(t *testing.T) {
 func TestDismissAndKeepResults_WithMatches_GoesToResults(t *testing.T) {
 	m := NewModel()
 	m.Start("baz")
-	m.SetMatches([]Match{{Index: 2, DisplayIndex: 2}})
+	m.SetMatches([]Match{{DataIndex: 2, ViewportRow: 2}})
 	m.DismissAndKeepResults()
 	if m.Mode() != SearchModeResults {
 		t.Errorf("Mode = %d, want SearchModeResults", m.Mode())
@@ -106,20 +106,20 @@ func TestMatch_OutOfRange(t *testing.T) {
 
 func TestMatch_Valid(t *testing.T) {
 	m := NewModel()
-	m.SetMatches([]Match{{Index: 5, DisplayIndex: 3}})
+	m.SetMatches([]Match{{DataIndex: 5, ViewportRow: 3}})
 	match, ok := m.Match(0)
 	if !ok {
 		t.Fatal("Match(0) should return ok=true")
 	}
-	if match.Index != 5 {
-		t.Errorf("match.Index = %d, want 5", match.Index)
+	if match.DataIndex != 5 {
+		t.Errorf("match.DataIndex = %d, want 5", match.DataIndex)
 	}
 }
 
 func TestSetMatches_ClampsCursor(t *testing.T) {
 	m := NewModel()
 	m.SetCursor(10) // out of future range
-	m.SetMatches([]Match{{Index: 1}, {Index: 2}})
+	m.SetMatches([]Match{{DataIndex: 1}, {DataIndex: 2}})
 	if m.Cursor() != 0 {
 		t.Errorf("cursor should be clamped to 0, got %d", m.Cursor())
 	}
@@ -127,7 +127,7 @@ func TestSetMatches_ClampsCursor(t *testing.T) {
 
 func TestSetPassiveResults(t *testing.T) {
 	m := NewModel()
-	m.SetPassiveResults("query", []Match{{Index: 4}})
+	m.SetPassiveResults("query", []Match{{DataIndex: 4}})
 	if m.Query() != "query" {
 		t.Errorf("Query = %q, want 'query'", m.Query())
 	}
@@ -141,7 +141,7 @@ func TestSetPassiveResults(t *testing.T) {
 
 func TestMatches_ReturnsSlice(t *testing.T) {
 	m := NewModel()
-	m.SetMatches([]Match{{Index: 1}, {Index: 2}})
+	m.SetMatches([]Match{{DataIndex: 1}, {DataIndex: 2}})
 	got := m.Matches()
 	if len(got) != 2 {
 		t.Errorf("Matches() len = %d, want 2", len(got))
@@ -201,8 +201,8 @@ func TestSetWidth(t *testing.T) {
 func TestSetMatchesAndJump_WithMatches(t *testing.T) {
 	m := NewModel()
 	m.SetCursor(0)
-	m.SetMatches([]Match{{Index: 5, DisplayIndex: 2}})
-	cmd := m.SetMatchesAndJump([]Match{{Index: 5, DisplayIndex: 2}})
+	m.SetMatches([]Match{{DataIndex: 5, ViewportRow: 2}})
+	cmd := m.SetMatchesAndJump([]Match{{DataIndex: 5, ViewportRow: 2}})
 	if cmd == nil {
 		t.Error("expected non-nil cmd when matches exist")
 	}
@@ -242,7 +242,7 @@ func TestUpdate_EscClears(t *testing.T) {
 func TestUpdate_EnterDismissesWithResults(t *testing.T) {
 	m := NewModel()
 	m.Start("foo")
-	m.SetMatches([]Match{{Index: 1}})
+	m.SetMatches([]Match{{DataIndex: 1}})
 	next, _, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if next.Mode() != SearchModeResults {
 		t.Errorf("expected SearchModeResults after enter, got %d", next.Mode())
@@ -252,7 +252,7 @@ func TestUpdate_EnterDismissesWithResults(t *testing.T) {
 func TestUpdate_ResultsNavNext(t *testing.T) {
 	m := NewModel()
 	m.Start("foo")
-	m.SetMatches([]Match{{Index: 1}, {Index: 2}})
+	m.SetMatches([]Match{{DataIndex: 1}, {DataIndex: 2}})
 	m.DismissAndKeepResults()
 	next, cmd, result := m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	if !result.CursorChanged {
@@ -269,7 +269,7 @@ func TestUpdate_ResultsNavNext(t *testing.T) {
 func TestUpdate_ResultsNavPrev(t *testing.T) {
 	m := NewModel()
 	m.Start("foo")
-	m.SetMatches([]Match{{Index: 1}, {Index: 2}})
+	m.SetMatches([]Match{{DataIndex: 1}, {DataIndex: 2}})
 	m.SetCursor(1)
 	m.DismissAndKeepResults()
 	next, _, result := m.Update(tea.KeyPressMsg{Code: 'N', Text: "N"})

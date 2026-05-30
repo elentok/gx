@@ -30,7 +30,7 @@ func (m Model) computeSearchMatches(query string) []uisearch.Match {
 	matches := make([]uisearch.Match, 0)
 	for i, wt := range m.worktrees {
 		if strings.Contains(strings.ToLower(wt.Name), q) || strings.Contains(strings.ToLower(wt.Branch), q) {
-			matches = append(matches, uisearch.Match{Index: i})
+			matches = append(matches, uisearch.Match{DataIndex: i})
 		}
 	}
 	return matches
@@ -93,7 +93,7 @@ func (m Model) handleSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // jumpToSearchMatch moves the table cursor to the given search match and
 // returns the sidebar-reload command.
 func (m Model) jumpToSearchMatch(match uisearch.Match) (Model, tea.Cmd) {
-	idx := match.Index
+	idx := match.DataIndex
 	if idx < 0 || idx >= len(m.worktrees) {
 		return m, nil
 	}

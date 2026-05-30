@@ -39,9 +39,8 @@ type Model[T any] struct {
 	list          list.Model
 	visibleH      int
 
-	search                search.Model
-	searchMatchPosByIndex map[int]int
-	keys                  keys.Manager
+	search search.Model
+	keys   keys.Manager
 }
 
 type Result struct {
@@ -129,7 +128,6 @@ func (m *Model[T]) Search() *search.Model {
 
 func (m *Model[T]) SetSearchMatches(matches []search.Match) {
 	m.search.SetMatches(matches)
-	m.rebuildSearchMatchPosByIndex()
 }
 
 func (m *Model[T]) SetSearchMatchesAndJump(matches []search.Match) tea.Cmd {
@@ -150,7 +148,7 @@ func (m Model[T]) ComputeSearchMatches(query string, text func(Entry[T]) string)
 	var matches []search.Match
 	for i, entry := range m.entries {
 		if strings.Contains(strings.ToLower(text(entry)), q) {
-			matches = append(matches, search.Match{Index: i})
+			matches = append(matches, search.Match{DataIndex: i})
 		}
 	}
 	return matches
@@ -162,16 +160,15 @@ func (m *Model[T]) RecomputeSearchMatches(text func(Entry[T]) string) {
 
 func (m *Model[T]) ApplyPassiveSearch(query string, text func(Entry[T]) string) {
 	m.search.SetPassiveResults(query, m.ComputeSearchMatches(query, text))
-	m.rebuildSearchMatchPosByIndex()
 }
 
 func (m *Model[T]) FocusCurrentSearchMatch() bool {
 	match, ok := m.search.Match(m.search.Cursor())
-	if !ok || match.Index < 0 || match.Index >= len(m.entries) {
+	if !ok || match.DataIndex < 0 || match.DataIndex >= len(m.entries) {
 		return false
 	}
 	prev := m.SelectedIndex()
-	m.SetSelectedIndex(match.Index)
+	m.SetSelectedIndex(match.DataIndex)
 	return m.SelectedIndex() != prev
 }
 
@@ -179,24 +176,8 @@ func (m Model[T]) SearchMatch(index int) (matched bool, current bool) {
 	if !m.search.HasQuery() {
 		return false, false
 	}
-	pos, ok := m.searchMatchPosByIndex[index]
-	if !ok {
-		return false, false
-	}
-	return true, pos == m.search.Cursor()
-}
-
-func (m *Model[T]) rebuildSearchMatchPosByIndex() {
-	if len(m.search.Matches()) == 0 {
-		m.searchMatchPosByIndex = nil
-		return
-	}
-
-	positions := make(map[int]int, len(m.search.Matches()))
-	for i, match := range m.search.Matches() {
-		positions[match.Index] = i
-	}
-	m.searchMatchPosByIndex = positions
+	pos, ok := m.search.MatchPosByDataIndex(index)
+	return ok, ok && pos == m.search.Cursor()
 }
 
 func searchJumpToMatchCmd(match search.Match) tea.Cmd {

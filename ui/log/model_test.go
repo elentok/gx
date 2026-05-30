@@ -290,19 +290,19 @@ func TestNAndNShiftMoveBetweenSearchResults(t *testing.T) {
 		t.Fatalf("expected at least two search matches, got %d", m.search.MatchesCount())
 	}
 	if match, ok := m.search.Match(0); ok {
-		m.list.SetSelected(match.Index, len(m.rows))
+		m.list.SetSelected(match.DataIndex, len(m.rows))
 	}
 	m.search.SetCursor(0)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	m = updated.(Model)
-	if match, ok := m.search.Match(1); ok && m.list.Selected() != match.Index {
+	if match, ok := m.search.Match(1); ok && m.list.Selected() != match.DataIndex {
 		t.Fatalf("expected n to move to next result")
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'N', Text: "N", ShiftedCode: 'N', Mod: tea.ModShift})
 	m = updated.(Model)
-	if match, ok := m.search.Match(0); ok && m.list.Selected() != match.Index {
+	if match, ok := m.search.Match(0); ok && m.list.Selected() != match.DataIndex {
 		t.Fatalf("expected N to move to previous result")
 	}
 }

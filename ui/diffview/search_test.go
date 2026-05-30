@@ -13,7 +13,7 @@ func TestApplyDiffSearchMatch(t *testing.T) {
 	vp := viewport.New(viewport.WithWidth(20), viewport.WithHeight(2))
 	vp.SetContentLines(section.ViewLines)
 
-	match := search.Match{DisplayIndex: 3, Index: 7}
+	match := search.Match{ViewportRow: 3, DataIndex: 7}
 	applyDiffSearchMatch(&section, &vp, match)
 	if vp.YOffset() != 2 {
 		t.Fatalf("YOffset = %d, want 2", vp.YOffset())

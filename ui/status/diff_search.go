@@ -28,7 +28,7 @@ func (m *Model) computeSearchMatches(query string) []search.Match {
 	for i, entry := range m.fileTreeModel.Entries() {
 		text := strings.ToLower(m.filetreeEntrySearchText(entry))
 		if strings.Contains(text, q) {
-			matches = append(matches, search.Match{Index: i})
+			matches = append(matches, search.Match{DataIndex: i})
 		}
 	}
 	return matches
@@ -37,8 +37,8 @@ func (m *Model) computeSearchMatches(query string) []search.Match {
 func (m Model) handleJumpToMatch(msg search.JumpToMatchMsg) (Model, tea.Cmd) {
 	match := msg.Match
 	if m.focus == focusFiletree {
-		if match.Index >= 0 && match.Index < len(m.fileTreeModel.Entries()) {
-			m.setStatusSelection(match.Index)
+		if match.DataIndex >= 0 && match.DataIndex < len(m.fileTreeModel.Entries()) {
+			m.setStatusSelection(match.DataIndex)
 			m.onFiletreeSelectionChanged()
 			return m, m.scheduleDiffReload()
 		}
@@ -53,7 +53,7 @@ func (m *Model) syncSearchToInactivePane() {
 	diffMatches := inactive.ComputeSearchMatches(query)
 	searchMatches := make([]search.Match, len(diffMatches))
 	for i, dm := range diffMatches {
-		searchMatches[i] = search.Match{Index: dm.RawIndex, DisplayIndex: dm.DisplayIndex}
+		searchMatches[i] = search.Match{DataIndex: dm.RawIndex, ViewportRow: dm.DisplayIndex}
 	}
 	inactive.Search().Start(query)
 	inactive.Search().SetMatches(searchMatches)

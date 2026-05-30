@@ -237,8 +237,8 @@ func (m *Model) recomputeAndApply() {
 	searchMatches := make([]search.Match, len(diffMatches))
 	for i, dm := range diffMatches {
 		searchMatches[i] = search.Match{
-			Index:        dm.RawIndex,
-			DisplayIndex: dm.DisplayIndex,
+			DataIndex:   dm.RawIndex,
+			ViewportRow: dm.DisplayIndex,
 		}
 	}
 	m.search.SetMatches(searchMatches)
@@ -268,12 +268,8 @@ func (m *Model) SearchMatchAt(displayIdx int) (matched, current bool) {
 	if !m.search.HasQuery() {
 		return false, false
 	}
-	for i, match := range m.search.Matches() {
-		if match.DisplayIndex == displayIdx {
-			return true, i == m.search.Cursor()
-		}
-	}
-	return false, false
+	pos, ok := m.search.MatchPosByViewportRow(displayIdx)
+	return ok, ok && pos == m.search.Cursor()
 }
 
 func (m *Model) visibleRows(bodyH int, active bool) []visibleDiffRow {
@@ -643,8 +639,8 @@ func (m Model) CurrentSearchCursor(matches []search.Match) int {
 	diffMatches := make([]DiffSearchMatch, 0, len(matches))
 	for _, match := range matches {
 		diffMatches = append(diffMatches, DiffSearchMatch{
-			DisplayIndex: match.DisplayIndex,
-			RawIndex:     match.Index,
+			DisplayIndex: match.ViewportRow,
+			RawIndex:     match.DataIndex,
 		})
 	}
 	return m.CurrentSearchMatchIndex(diffMatches)

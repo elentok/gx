@@ -11,8 +11,8 @@ func (m *Model) jumpToCurrentMatch() {
 	if !ok {
 		return
 	}
-	if match.Index >= 0 && match.Index < len(m.rows) {
-		m.list.SetSelected(match.Index, len(m.rows))
+	if match.DataIndex >= 0 && match.DataIndex < len(m.rows) {
+		m.list.SetSelected(match.DataIndex, len(m.rows))
 		m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))
 	}
 }
@@ -27,7 +27,7 @@ func (m *Model) recomputeSearchMatches() {
 	matches := make([]search.Match, 0)
 	for i, row := range m.rows {
 		if strings.Contains(strings.ToLower(m.searchText(row)), q) {
-			matches = append(matches, search.Match{Index: i})
+			matches = append(matches, search.Match{DataIndex: i})
 		}
 	}
 	m.search.SetMatches(matches)

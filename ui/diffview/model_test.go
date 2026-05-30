@@ -315,7 +315,7 @@ func TestModelApplyAndFocusSearchMatch(t *testing.T) {
 
 	matches := m.ComputeSearchMatches("old")
 	if len(matches) > 0 {
-		sm := search.Match{Index: matches[0].RawIndex, DisplayIndex: matches[0].DisplayIndex}
+		sm := search.Match{DataIndex: matches[0].RawIndex, ViewportRow: matches[0].DisplayIndex}
 		m.ApplySearchMatch(sm)
 		m.FocusSearchMatch(sm)
 	}
