@@ -955,6 +955,67 @@ func TestUpdateKey_CtrlUPageUp(t *testing.T) {
 	_ = next
 }
 
+func TestModelRenderRows_SearchBoxAppearsWhenInputActive(t *testing.T) {
+	m := NewModel(false)
+	raw := "@@ -1 +1 @@\n-old text\n+new text\n"
+	m.BuildFromRaw(raw, raw)
+	m.SyncViewport(80, 10)
+
+	bodyH := 10
+	// Activate search input
+	next, _, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	if !next.search.InputFocused() {
+		t.Fatal("setup: expected InputFocused after /")
+	}
+
+	lines := next.RenderRows(bodyH, true, RenderOpts{InnerWidth: 80})
+	if len(lines) != bodyH {
+		t.Fatalf("RenderRows returned %d lines, want %d", len(lines), bodyH)
+	}
+	// The last non-empty line should contain search box content (border char)
+	lastContent := ""
+	for i := len(lines) - 1; i >= 0; i-- {
+		if strings.TrimSpace(ansi.Strip(lines[i])) != "" {
+			lastContent = lines[i]
+			break
+		}
+	}
+	if !strings.Contains(ansi.Strip(lastContent), "Search") && !strings.Contains(lastContent, "╯") && !strings.Contains(lastContent, "─") {
+		t.Errorf("expected bottom lines to contain search box, last non-empty line: %q", ansi.Strip(lastContent))
+	}
+}
+
+func TestModelRenderRows_SearchBoxGoneAfterEnter(t *testing.T) {
+	m := NewModel(false)
+	raw := "@@ -1 +1 @@\n-old text\n+new text\n"
+	m.BuildFromRaw(raw, raw)
+	m.SyncViewport(80, 10)
+
+	bodyH := 10
+
+	// Activate, type a query, then confirm with Enter
+	next, _, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	next, _, _ = next.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+	next, _, result := next.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if !result.SearchConfirmed {
+		t.Fatal("setup: expected SearchConfirmed after Enter")
+	}
+	if next.search.InputFocused() {
+		t.Fatal("setup: expected InputFocused=false after Enter")
+	}
+
+	lines := next.RenderRows(bodyH, true, RenderOpts{InnerWidth: 80})
+	if len(lines) != bodyH {
+		t.Fatalf("RenderRows returned %d lines after Enter, want %d", len(lines), bodyH)
+	}
+	// None of the lines should contain the search input box title "Search"
+	for i, line := range lines {
+		if strings.Contains(ansi.Strip(line), "Search") {
+			t.Errorf("line %d still contains search box after Enter: %q", i, ansi.Strip(line))
+		}
+	}
+}
+
 func TestUpdateKey_NonKeyMsgNotHandled(t *testing.T) {
 	m := buildNavTestModel()
 	type someMsg struct{}

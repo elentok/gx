@@ -35,8 +35,18 @@ type RenderOpts struct {
 // RenderRows returns bodyH fully-assembled diff lines ready to embed in a panel
 // frame. Each line is: mark (2 chars) + body (InnerWidth-2 chars, padded).
 // Lines past the end of content are returned as empty strings.
+// When search input is active, the last few lines are replaced with the search
+// box so the total length is always exactly bodyH.
 func (m *Model) RenderRows(bodyH int, active bool, opts RenderOpts) []string {
-	rows := m.visibleRows(bodyH, active)
+	var searchLines []string
+	diffBodyH := bodyH
+	if m.search.InputFocused() {
+		m.search.SetWidth(m.viewport.Width())
+		searchLines = strings.Split(m.search.View(), "\n")
+		diffBodyH = maxInt(0, bodyH-len(searchLines))
+	}
+
+	rows := m.visibleRows(diffBodyH, active)
 	const markW = 2
 	bodyW := maxInt(0, opts.InnerWidth-markW)
 	overTop, overBottom, overBoth := m.overflowMarkers()
@@ -98,9 +108,10 @@ func (m *Model) RenderRows(bodyH int, active bool, opts RenderOpts) []string {
 		lines = append(lines, mark+body)
 	}
 
-	for len(lines) < bodyH {
+	for len(lines) < diffBodyH {
 		lines = append(lines, "")
 	}
+	lines = append(lines, searchLines...)
 	return lines
 }
 
