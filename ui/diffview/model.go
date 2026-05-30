@@ -33,6 +33,7 @@ type UpdateResult struct {
 	Handled         bool
 	NeedsReload     bool // render mode was toggled; caller must reload diff content
 	ChordInProgress bool // child consumed the first key of a multi-key chord and expects the completing key next
+	SearchConfirmed bool // search transitioned Input→Results (Enter pressed); parent may sync cross-pane
 }
 
 const (
@@ -163,6 +164,9 @@ func (m *Model) BuildFromRaw(raw, color string) {
 
 	m.viewport.SetContentLines(m.data.ViewLines)
 	m.viewport.SetYOffset(prevOffset)
+	if m.search.HasQuery() {
+		m.recomputeAndApply()
+	}
 }
 
 func (m *Model) Reflow(wrapWidth int) {
@@ -175,6 +179,9 @@ func (m *Model) Reflow(wrapWidth int) {
 	}
 	m.viewport.SetContentLines(m.data.ViewLines)
 	m.viewport.SetYOffset(prevOffset)
+	if m.search.HasQuery() {
+		m.recomputeAndApply()
+	}
 }
 
 func (m *Model) SyncViewport(width, height int) {
@@ -223,6 +230,50 @@ func (m Model) ComputeSearchMatches(query string) []DiffSearchMatch {
 
 func (m Model) ActiveRawLineIndex() int {
 	return m.data.ActiveRawLineIndex(m.navMode)
+}
+
+func (m *Model) recomputeAndApply() {
+	diffMatches := m.ComputeSearchMatches(m.search.Query())
+	searchMatches := make([]search.Match, len(diffMatches))
+	for i, dm := range diffMatches {
+		searchMatches[i] = search.Match{
+			Index:        dm.RawIndex,
+			DisplayIndex: dm.DisplayIndex,
+		}
+	}
+	m.search.SetMatches(searchMatches)
+	m.applyCurrentMatch()
+}
+
+func (m *Model) applyCurrentMatch() {
+	match, ok := m.search.Match(m.search.Cursor())
+	if !ok {
+		return
+	}
+	m.ApplySearchMatch(match)
+}
+
+func (m *Model) syncCursorFromNav() {
+	if !m.search.HasQuery() || m.search.MatchesCount() == 0 {
+		return
+	}
+	idx := m.CurrentSearchCursor(m.search.Matches())
+	if idx >= 0 {
+		m.search.SetCursor(idx)
+	}
+}
+
+// SearchMatchAt reports whether the diff row at displayIdx is a search match and whether it is current.
+func (m *Model) SearchMatchAt(displayIdx int) (matched, current bool) {
+	if !m.search.HasQuery() {
+		return false, false
+	}
+	for i, match := range m.search.Matches() {
+		if match.DisplayIndex == displayIdx {
+			return true, i == m.search.Cursor()
+		}
+	}
+	return false, false
 }
 
 func (m *Model) visibleRows(bodyH int, active bool) []visibleDiffRow {
@@ -672,9 +723,21 @@ func (m *Model) toggleVisual() bool {
 }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, UpdateResult) {
-	if nextSearch, cmd, result := m.search.Update(msg); result.Handled {
+	prevSearchMode := m.search.Mode()
+	if nextSearch, _, result := m.search.Update(msg); result.Handled {
 		m.search = nextSearch
-		return m, cmd, UpdateResult{Handled: true}
+		res := UpdateResult{Handled: true}
+		if result.Activated {
+			m.navMode = NavModeLine
+		}
+		if result.QueryChanged {
+			m.recomputeAndApply()
+		}
+		if result.CursorChanged {
+			m.applyCurrentMatch()
+		}
+		res.SearchConfirmed = prevSearchMode == search.SearchModeInput && m.search.Mode() == search.SearchModeResults
+		return m, nil, res
 	}
 
 	key, ok := msg.(tea.KeyPressMsg)
@@ -696,18 +759,24 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, UpdateResult) {
 		if m.moveActive(1, true) {
 			m.EnsureActiveVisible(m.navMode)
 		}
+		m.syncCursorFromNav()
 	case navBindingMoveUp:
 		if m.moveActive(-1, true) {
 			m.EnsureActiveVisible(m.navMode)
 		}
+		m.syncCursorFromNav()
 	case navBindingScrollDown:
 		m.ScrollViewport(3)
+		m.syncCursorFromNav()
 	case navBindingScrollUp:
 		m.ScrollViewport(-3)
+		m.syncCursorFromNav()
 	case navBindingPageDown:
 		m.scrollPage(list.DefaultScroll)
+		m.syncCursorFromNav()
 	case navBindingPageUp:
 		m.scrollPage(-list.DefaultScroll)
+		m.syncCursorFromNav()
 	case navBindingNavMode:
 		m.DisableVisual()
 		if m.navMode == NavModeHunk {
@@ -728,10 +797,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, UpdateResult) {
 		if m.jumpBottom() {
 			m.EnsureActiveVisible(m.navMode)
 		}
+		m.syncCursorFromNav()
 	case navBindingTop:
 		if m.jumpTop() {
 			m.EnsureActiveVisible(m.navMode)
 		}
+		m.syncCursorFromNav()
 	case navBindingRenderMode:
 		if m.renderMode == RenderModeUnified {
 			m.renderMode = RenderModeSideBySide
