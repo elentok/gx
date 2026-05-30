@@ -182,7 +182,7 @@ func (m Model[T]) SearchMatch(index int) (matched bool, current bool) {
 
 func searchJumpToMatchCmd(match search.Match) tea.Cmd {
 	return func() tea.Msg {
-		return match
+		return search.JumpToMatchMsg{Match: match}
 	}
 }
 
