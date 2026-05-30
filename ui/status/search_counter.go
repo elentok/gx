@@ -16,15 +16,14 @@ func (m Model) searchCounterForFiletreePane() string {
 }
 
 func (m Model) searchCounterForDiffSection(section diffarea.Section) string {
-	search := m.diffSearchForSection(section)
-	if !search.HasQuery() || search.MatchesCount() == 0 {
+	if m.focus != focusDiff {
 		return ""
 	}
-
-	if m.focus != focusDiff || m.diffarea.ActiveSection != section {
+	s := m.diffarea.SectionModel(section).Search()
+	if !s.HasQuery() || s.MatchesCount() == 0 {
 		return ""
 	}
-	return m.searchCounterText(search.Cursor(), search.MatchesCount())
+	return m.searchCounterText(s.Cursor(), s.MatchesCount())
 }
 
 func (m Model) searchCounterText(cursorZeroBased, total int) string {

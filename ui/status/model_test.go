@@ -1911,30 +1911,30 @@ func TestStageSearchDiffModeAndPrevNextKeys(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	m = updated.(Model)
-	if m.currentDiffSearch().Mode() != search.SearchModeInput {
+	if m.diffarea.ActiveSectionModel().Search().Mode() != search.SearchModeInput {
 		t.Fatalf("expected diff search input mode after /")
 	}
 
 	for _, r := range []rune{'n', 'e', 'e', 'd', 'l', 'e'} {
 		m = runStatusCmds(t, m, tea.KeyPressMsg{Code: r, Text: string(r)})
 	}
-	if m.currentDiffSearch().MatchesCount() < 2 {
-		t.Fatalf("expected multiple diff search matches, got %d", m.currentDiffSearch().MatchesCount())
+	if m.diffarea.ActiveSectionModel().Search().MatchesCount() < 2 {
+		t.Fatalf("expected multiple diff search matches, got %d", m.diffarea.ActiveSectionModel().Search().MatchesCount())
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
-	if m.currentDiffSearch().Mode() != search.SearchModeResults || !m.currentDiffSearch().HasQuery() || m.currentDiffSearch().MatchesCount() == 0 {
+	if m.diffarea.ActiveSectionModel().Search().Mode() != search.SearchModeResults || !m.diffarea.ActiveSectionModel().Search().HasQuery() || m.diffarea.ActiveSectionModel().Search().MatchesCount() == 0 {
 		t.Fatalf("expected enter to show search results mode while keeping highlights")
 	}
 	if m.diffarea.NavMode() != diffview.NavModeLine {
 		t.Fatalf("expected enter after diff search to switch to line mode")
 	}
-	first := m.currentDiffSearch().Cursor()
+	first := m.diffarea.ActiveSectionModel().Search().Cursor()
 	firstLine := m.diffarea.Unstaged.DataRef().ActiveLine
 
 	m = runStatusCmds(t, m, tea.KeyPressMsg{Code: 'n', Text: "n"})
-	if m.currentDiffSearch().Cursor() == first {
+	if m.diffarea.ActiveSectionModel().Search().Cursor() == first {
 		t.Fatalf("expected n to move to next diff result")
 	}
 	if m.diffarea.Unstaged.DataRef().ActiveLine == firstLine {
@@ -1942,21 +1942,74 @@ func TestStageSearchDiffModeAndPrevNextKeys(t *testing.T) {
 	}
 
 	m = runStatusCmds(t, m, tea.KeyPressMsg{Code: 'N', Text: "N", ShiftedCode: 'N'})
-	if m.currentDiffSearch().Cursor() != first {
+	if m.diffarea.ActiveSectionModel().Search().Cursor() != first {
 		t.Fatalf("expected N to move back to previous diff result")
 	}
 
 	// Moving cursor to a matched line should update the search counter cursor.
-	startCursor := m.currentDiffSearch().Cursor()
+	startCursor := m.diffarea.ActiveSectionModel().Search().Cursor()
 	for i := 0; i < 5; i++ {
 		updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 		m = updated.(Model)
-		if m.currentDiffSearch().Cursor() != startCursor {
+		if m.diffarea.ActiveSectionModel().Search().Cursor() != startCursor {
 			break
 		}
 	}
-	if m.currentDiffSearch().Cursor() == startCursor {
+	if m.diffarea.ActiveSectionModel().Search().Cursor() == startCursor {
 		t.Fatalf("expected diff cursor movement to sync search cursor when reaching a match")
+	}
+}
+
+func TestSearchConfirmedSyncsToCrossPane(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	// Stage a change so the staged diff section has content containing "needle".
+	testutil.WriteFile(t, repo, "README.md", "needle-one\nneedle-two\n")
+	testutil.MustGitExported(t, repo, "add", "README.md")
+	// Also leave an unstaged modification so both sections have diffs.
+	testutil.WriteFile(t, repo, "README.md", "needle-one\nneedle-two\nneedle-three\n")
+
+	m := newTestModelDefault(repo)
+	m.ready = true
+	m.width = 100
+	m.height = 20
+	m.syncDiffViewports()
+	m.focus = focusDiff
+	m.diffarea.ActiveSection = diffarea.SectionUnstaged
+
+	// Activate search and type a query
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	m = updated.(Model)
+	for _, r := range []rune{'n', 'e', 'e', 'd', 'l', 'e'} {
+		m = runStatusCmds(t, m, tea.KeyPressMsg{Code: r, Text: string(r)})
+	}
+
+	// Confirm with Enter
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+
+	// Active (unstaged) section should be in results mode
+	active := m.diffarea.ActiveSectionModel().Search()
+	if active.Mode() != search.SearchModeResults {
+		t.Fatalf("active section: expected SearchModeResults after Enter, got %v", active.Mode())
+	}
+	if !active.HasQuery() {
+		t.Fatal("active section: expected HasQuery=true after Enter")
+	}
+
+	// Inactive (staged) section should have the query synced and be in results mode
+	inactive := m.diffarea.InactiveSectionModel().Search()
+	if !inactive.HasQuery() {
+		t.Fatal("inactive section: expected HasQuery=true after cross-pane sync")
+	}
+	if inactive.Mode() != search.SearchModeResults {
+		t.Fatalf("inactive section: expected SearchModeResults, got %v", inactive.Mode())
+	}
+
+	// Counter for inactive section should be non-empty (advisor check)
+	counter := m.searchCounterForDiffSection(diffarea.SectionStaged)
+	if inactive.MatchesCount() > 0 && counter == "" {
+		t.Fatal("expected non-empty counter for inactive section when it has matches")
 	}
 }
 
@@ -2000,7 +2053,6 @@ func TestStageSearchDiffUsesRightEdgeIndicatorInHunkMode(t *testing.T) {
 	m.focus = focusDiff
 	m.diffarea.ActiveSection = diffarea.SectionUnstaged
 	m.diffarea.SetNavMode(diffview.NavModeHunk)
-	m.recomputeSearchMatches()
 
 	pane := m.renderSectionPane(80, 12, diffarea.SectionUnstaged)
 	if !strings.Contains(ansi.Strip(pane), "needle") {

@@ -2,7 +2,6 @@ package status
 
 import (
 	"github.com/elentok/gx/ui/diffview"
-	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/status/diffarea"
 
 	tea "charm.land/bubbletea/v2"
@@ -13,10 +12,10 @@ func (m Model) delegateToDiff(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	var result diffview.UpdateResult
 	m.diffarea, cmd, result = m.diffarea.Update(msg)
 	if result.Handled {
-		if m.currentDiffSearch().Mode() == search.SearchModeResults {
-			m.diffarea.SetNavMode(diffview.NavModeLine)
+		m.diffarea.SetNavMode(m.diffarea.ActiveSectionModel().NavMode())
+		if result.SearchConfirmed {
+			m.syncSearchToInactivePane()
 		}
-		m.syncSearchCursorFromDiffFocus()
 		return m, cmd
 	}
 

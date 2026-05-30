@@ -45,12 +45,6 @@ func (m Model) View() tea.View {
 		overlay := s.View()
 		y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
 		out = ui.OverlayBottomCenter(out, overlay, m.width, y)
-	} else if m.focus != focusFiletree && m.currentDiffSearch().InputFocused() {
-		diffSearch := m.currentDiffSearch()
-		diffSearch.SetWidth(m.searchOverlayWidth())
-		overlay := diffSearch.View()
-		y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
-		out = ui.OverlayBottomCenter(out, overlay, m.width, y)
 	}
 	if m.bump.IsOpen {
 		out = ui.OverlayCenter(out, m.bump.View(m.width), m.width, m.height)

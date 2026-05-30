@@ -138,9 +138,6 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 		m.activeFilePath = ""
 		m.diffarea.ResetSections()
 		m.syncDiffViewports()
-		if m.diffSearchActiveInFocus() {
-			m.recomputeSearchMatches()
-		}
 		return nil
 	}
 
@@ -185,9 +182,6 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 	m.diffarea.SectionModel(diffarea.SectionUnstaged).BuildFromRaw(unstagedRaw, unstagedColor)
 	m.diffarea.SectionModel(diffarea.SectionStaged).BuildFromRaw(stagedRaw, stagedColor)
 	m.syncDiffViewports()
-	if m.diffSearchActiveInFocus() {
-		m.recomputeSearchMatches()
-	}
 	return nil
 }
 

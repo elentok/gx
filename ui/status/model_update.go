@@ -87,12 +87,8 @@ func (m Model) handleFileTreeOpenSelected() (Model, tea.Cmd) {
 }
 
 func (m Model) handleSearchQueryUpdated(msg search.SearchQueryUpdatedMsg) (Model, tea.Cmd) {
-	if m.focus == focusFiletree {
-		matches := m.computeSearchMatches(msg.Query)
-		return m, m.fileTreeModel.SetSearchMatchesAndJump(matches)
-	}
 	matches := m.computeSearchMatches(msg.Query)
-	return m, m.currentDiffSearch().SetMatchesAndJump(matches)
+	return m, m.fileTreeModel.SetSearchMatchesAndJump(matches)
 }
 
 func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
@@ -214,21 +210,14 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// the completing key while status is still allowed to compete on its own
 	// g-prefix chords.
 	if m.focus == focusDiff && (len(m.keys.Prefix()) == 0 || m.diffarea.ActiveSectionModel().HasPendingChord()) {
-		prevSearchCursor := m.currentDiffSearch().Cursor()
 		var cmd tea.Cmd
 		var result diffview.UpdateResult
 		m.diffarea, cmd, result = m.diffarea.Update(msg)
 		if result.Handled && !result.ChordInProgress {
 			m.keys.Reset()
-			if m.currentDiffSearch().Mode() == search.SearchModeResults {
-				m.diffarea.SetNavMode(diffview.NavModeLine)
-			} else {
-				m.diffarea.SetNavMode(m.diffarea.ActiveSectionModel().NavMode())
-			}
-			// Only sync search cursor for navigation moves; skip when search
-			// itself just moved the cursor (n/N) to avoid overriding it.
-			if m.currentDiffSearch().Cursor() == prevSearchCursor {
-				m.syncSearchCursorFromDiffFocus()
+			m.diffarea.SetNavMode(m.diffarea.ActiveSectionModel().NavMode())
+			if result.SearchConfirmed {
+				m.syncSearchToInactivePane()
 			}
 			if activeWrap := m.diffarea.ActiveSectionModel().WrapEnabled(); activeWrap != m.diffarea.Wrap() {
 				m.diffarea.SetWrap(activeWrap)

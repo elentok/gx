@@ -87,9 +87,9 @@ func (m *Model) renderSectionPane(width, height int, section diffarea.Section) s
 			AccentColor: accent,
 			InnerWidth:  innerW,
 			SearchMatch: func(displayIdx int) (bool, bool) {
-				return m.searchMatchDiffDisplay(section, displayIdx)
+				return diffviewModel.SearchMatchAt(displayIdx)
 			},
-			SearchQuery: m.diffSearchForSection(section).Query(),
+			SearchQuery: diffviewModel.Search().Query(),
 		})
 	}
 	for len(lines) < bodyH {

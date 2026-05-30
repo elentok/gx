@@ -102,6 +102,13 @@ func (d *Model) ActiveSectionModel() *diffview.Model {
 	return d.SectionModel(d.ActiveSection)
 }
 
+func (d *Model) InactiveSectionModel() *diffview.Model {
+	if d.ActiveSection == SectionStaged {
+		return &d.Unstaged
+	}
+	return &d.Staged
+}
+
 func (d *Model) DisableVisual() {
 	d.ActiveSectionModel().DisableVisual()
 }
