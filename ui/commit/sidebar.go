@@ -23,43 +23,6 @@ func (m Model) selectedCommitFile() (git.CommitFile, bool) {
 	return entry.Value, true
 }
 
-func (m *Model) toggleDirOnEnter() bool {
-	entry, ok := m.selectedCommitEntry()
-	if !ok || entry.Kind != filetree.EntryDir {
-		return false
-	}
-	if !m.fileTreeModel.ToggleSelectedDir() {
-		return false
-	}
-	m.rebuildCommitFiletree()
-	if m.fileTreeModel.Search().HasQuery() {
-		m.fileTreeModel.RecomputeSearchMatches(m.fileEntrySearchText)
-	}
-	return true
-}
-
-func (m *Model) collapseSelectedDir() bool {
-	if !m.fileTreeModel.CollapseSelectedDir() {
-		return false
-	}
-	m.rebuildCommitFiletree()
-	if m.fileTreeModel.Search().HasQuery() {
-		m.fileTreeModel.RecomputeSearchMatches(m.fileEntrySearchText)
-	}
-	return true
-}
-
-func (m *Model) expandSelectedDir() bool {
-	if !m.fileTreeModel.ExpandSelectedDir() {
-		return false
-	}
-	m.rebuildCommitFiletree()
-	if m.fileTreeModel.Search().HasQuery() {
-		m.fileTreeModel.RecomputeSearchMatches(m.fileEntrySearchText)
-	}
-	return true
-}
-
 func (m *Model) moveToAdjacentFile(delta int) bool {
 	if !m.fileTreeModel.MoveToAdjacentFile(delta) {
 		return false
@@ -68,27 +31,6 @@ func (m *Model) moveToAdjacentFile(delta int) bool {
 	if m.focusDiff {
 		m.ensureActiveVisible()
 	}
-	return true
-}
-
-func (m *Model) moveSidebar(delta int) bool {
-	entries := m.fileTreeModel.Entries()
-	if len(entries) == 0 {
-		return false
-	}
-	selected := m.fileTreeModel.SelectedIndex()
-	next := selected + delta
-	if next < 0 {
-		next = 0
-	}
-	if next >= len(entries) {
-		next = len(entries) - 1
-	}
-	if next == selected {
-		return false
-	}
-	m.fileTreeModel.SetSelectedIndex(next)
-	m.refreshDiff()
 	return true
 }
 

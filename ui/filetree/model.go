@@ -45,10 +45,12 @@ type Model[T any] struct {
 }
 
 type Result struct {
-	Handled          bool
-	SelectionChanged bool
-	RebuildRequested bool
-	OpenSelected     bool
+	Handled             bool
+	SelectionChanged    bool
+	RebuildRequested    bool
+	OpenSelected        bool
+	SearchQueryChanged  bool
+	SearchCursorChanged bool
 }
 
 func NewModel[T any]() Model[T] {
@@ -207,13 +209,19 @@ func (m *Model[T]) Keys() *keys.Manager {
 	return &m.keys
 }
 
+func (m Model[T]) HasPendingChord() bool {
+	return len(m.keys.Prefix()) > 0
+}
+
 func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd, Result) {
 	prevSelected := m.list.Selected()
 	if nextSearch, cmd, result := m.search.Update(msg); result.Handled {
 		m.search = nextSearch
 		return m, cmd, Result{
-			Handled:          true,
-			SelectionChanged: m.list.Selected() != prevSelected,
+			Handled:             true,
+			SelectionChanged:    m.list.Selected() != prevSelected,
+			SearchQueryChanged:  result.QueryChanged,
+			SearchCursorChanged: result.CursorChanged,
 		}
 	}
 

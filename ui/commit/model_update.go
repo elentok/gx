@@ -2,6 +2,7 @@ package commit
 
 import (
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/reword"
 	"github.com/elentok/gx/ui/search"
 )
@@ -57,44 +58,59 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.help, cmd = m.help.Update(msg)
 		return m, cmd
 	}
-	var cmd tea.Cmd
-	var result search.Result
 	if m.focusDiff {
-		m.search, cmd, result = m.search.Update(msg)
-	} else {
-		fileSearch := m.fileTreeModel.Search()
-		var updated search.Model
-		updated, cmd, result = fileSearch.Update(msg)
-		*fileSearch = updated
-	}
-	if result.Handled {
-		if result.QueryChanged {
-			if m.focusDiff {
+		var searchCmd tea.Cmd
+		var searchResult search.Result
+		m.search, searchCmd, searchResult = m.search.Update(msg)
+		if searchResult.Handled {
+			if searchResult.QueryChanged {
 				m.search.SetMatches(m.computeDiffSearchMatches(m.search.Query()))
-			} else {
+			}
+			if searchResult.QueryChanged || searchResult.CursorChanged {
+				m.jumpToCurrentDiffMatch()
+			}
+			return m, searchCmd
+		}
+		if len(m.keys.Prefix()) == 0 || m.diffModel.HasPendingChord() {
+			updated, diffCmd, diffResult := m.diffModel.Update(msg)
+			m.diffModel = updated
+			if diffResult.Handled && !diffResult.ChordInProgress {
+				m.keys.Reset()
+				m.syncSearchCursorFromDiffFocus()
+				if diffResult.NeedsReload {
+					m.refreshDiff()
+					m.syncDiffViewport()
+				}
+				return m, diffCmd
+			}
+		}
+	} else if !m.focusHeader && (len(m.keys.Prefix()) == 0 || m.fileTreeModel.HasPendingChord()) {
+		var ftCmd tea.Cmd
+		var ftResult filetree.Result
+		m.fileTreeModel, ftCmd, ftResult = m.fileTreeModel.Update(msg)
+		if ftResult.Handled {
+			if ftResult.SearchQueryChanged {
 				m.fileTreeModel.RecomputeSearchMatches(m.fileEntrySearchText)
 			}
-		}
-		if result.QueryChanged || result.CursorChanged {
-			if m.focusDiff {
-				m.jumpToCurrentDiffMatch()
-			} else if m.fileTreeModel.FocusCurrentSearchMatch() {
+			if ftResult.SearchQueryChanged || ftResult.SearchCursorChanged {
+				if m.fileTreeModel.FocusCurrentSearchMatch() {
+					m.refreshDiff()
+				}
+			}
+			if ftResult.OpenSelected {
+				m.focusDiff = true
+				m.ensureActiveVisible()
+			}
+			if ftResult.RebuildRequested {
+				m.rebuildCommitFiletree()
+				if m.fileTreeModel.Search().HasQuery() {
+					m.fileTreeModel.RecomputeSearchMatches(m.fileEntrySearchText)
+				}
+			}
+			if ftResult.SelectionChanged {
 				m.refreshDiff()
 			}
-		}
-		return m, cmd
-	}
-	if m.focusDiff && (len(m.keys.Prefix()) == 0 || m.diffModel.HasPendingChord()) {
-		updated, diffCmd, diffResult := m.diffModel.Update(msg)
-		m.diffModel = updated
-		if diffResult.Handled && !diffResult.ChordInProgress {
-			m.keys.Reset()
-			m.syncSearchCursorFromDiffFocus()
-			if diffResult.NeedsReload {
-				m.refreshDiff()
-				m.syncDiffViewport()
-			}
-			return m, diffCmd
+			return m, ftCmd
 		}
 	}
 	match, consumed := m.keys.Process(msg)

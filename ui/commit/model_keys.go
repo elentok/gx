@@ -149,16 +149,12 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 	case bindingDown:
 		if m.focusHeader {
 			m.scrollHeader(1)
-			return m, nil
 		}
-		m.moveSidebar(1)
 		return m, nil
 	case bindingUp:
 		if m.focusHeader {
 			m.scrollHeader(-1)
-			return m, nil
 		}
-		m.moveSidebar(-1)
 		return m, nil
 	case bindingScrollDown:
 		if m.focusHeader {
@@ -204,27 +200,11 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 	case bindingEnter:
 		if m.focusHeader {
 			m.focusHeader = false
-			return m, nil
-		}
-		if m.toggleDirOnEnter() {
-			return m, nil
-		}
-		if _, ok := m.selectedCommitFile(); ok {
-			m.focusDiff = true
-			m.ensureActiveVisible()
 		}
 		return m, nil
 	case bindingRight:
 		if m.focusHeader {
 			m.focusHeader = false
-			return m, nil
-		}
-		if !m.focusDiff && m.expandSelectedDir() {
-			return m, nil
-		}
-		if _, ok := m.selectedCommitFile(); ok {
-			m.focusDiff = true
-			m.ensureActiveVisible()
 		}
 		return m, nil
 	case bindingLeft:
@@ -234,13 +214,6 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		}
 		if m.focusHeader {
 			m.focusHeader = false
-			return m, nil
-		}
-		if !m.focusDiff && m.collapseSelectedDir() {
-			return m, nil
-		}
-		if m.fileTreeModel.FocusParent() {
-			m.refreshDiff()
 		}
 		return m, nil
 	case bindingRefresh, bindingRefreshMenu:
