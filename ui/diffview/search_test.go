@@ -5,23 +5,8 @@ import (
 
 	"charm.land/bubbles/v2/viewport"
 
-	"github.com/elentok/gx/ui/diffview/diffcore"
 	"github.com/elentok/gx/ui/search"
 )
-
-func TestComputeDiffSearchMatches(t *testing.T) {
-	matches := computeDiffSearchMatches(
-		[]string{"one", "Two", "three two"},
-		[]int{-1, 7, 9},
-		"two",
-	)
-	if len(matches) != 2 {
-		t.Fatalf("matches = %d, want 2", len(matches))
-	}
-	if matches[0].DisplayIndex != 1 || matches[1].DisplayIndex != 2 {
-		t.Fatalf("unexpected matches: %#v", matches)
-	}
-}
 
 func TestApplyDiffSearchMatch(t *testing.T) {
 	section := BuildDiffData(sampleSectionUnifiedDiff, "", NewDiffData(), false)
@@ -41,17 +26,3 @@ func TestApplyDiffSearchMatch(t *testing.T) {
 	}
 }
 
-func TestCurrentDiffSearchMatchIndex(t *testing.T) {
-	section := DiffData{
-		Parsed:     diffcore.ParseUnifiedDiff(sampleSectionUnifiedDiff),
-		ActiveLine: 1,
-	}
-	matches := []DiffSearchMatch{
-		{DisplayIndex: 2, RawIndex: 6},
-		{DisplayIndex: 3, RawIndex: 7},
-	}
-	got := currentDiffSearchMatchIndex(section, matches, NavModeLine)
-	if got != 1 {
-		t.Fatalf("CurrentDiffSearchMatchIndex = %d, want 1", got)
-	}
-}

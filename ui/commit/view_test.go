@@ -80,17 +80,19 @@ func TestVisibleFileLines_UsesCommitSpecificLabelAndMeta(t *testing.T) {
 	}
 }
 
-func TestView_RoutesSearchOverlayToActivePane(t *testing.T) {
+func TestView_FiletreeSearchOverlayAppearsInView(t *testing.T) {
 	m := Model{ready: true, width: 100, height: 20, commitSidebarState: commitSidebarState{fileTreeModel: filetree.NewModel[git.CommitFile]()}}
 	m.fileTreeModel.Search().Start("files")
 	if got := ansi.Strip(m.View().Content); !strings.Contains(got, "files") {
 		t.Fatalf("expected filetree search overlay, got %q", got)
 	}
+}
 
-	m.fileTreeModel.Search().DismissAndClear()
+func TestInputFocused_DiffSearchDelegatesIntoDiffModel(t *testing.T) {
+	m := Model{ready: true, width: 100, height: 20, commitSidebarState: commitSidebarState{fileTreeModel: filetree.NewModel[git.CommitFile]()}}
 	m.focusDiff = true
-	m.search.Start("diff")
-	if got := ansi.Strip(m.View().Content); !strings.Contains(got, "diff") {
-		t.Fatalf("expected diff search overlay, got %q", got)
+	m.diffModel.Search().Start("diff")
+	if !m.InputFocused() {
+		t.Fatal("expected InputFocused=true when diffModel search is active")
 	}
 }

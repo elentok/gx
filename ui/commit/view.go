@@ -10,7 +10,6 @@ import (
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/diffview/diffcore"
 	"github.com/elentok/gx/ui/filetree"
-	"github.com/elentok/gx/ui/search"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -49,12 +48,14 @@ func (m Model) View() tea.View {
 	content := m.contentView(contentH)
 	footer := m.footerView()
 	out := lipgloss.JoinVertical(lipgloss.Left, body, content, footer)
-	if activeSearch := m.activeSearch(); activeSearch.InputFocused() {
-		overlayW := m.searchOverlayWidth()
-		activeSearch.SetWidth(overlayW)
-		overlay := activeSearch.View()
-		y := m.height - 2 - lipgloss.Height(overlay)
-		out = ui.OverlayBottomCenter(out, overlay, m.width, y)
+	if !m.focusDiff {
+		if s := m.fileTreeModel.Search(); s.InputFocused() {
+			overlayW := m.searchOverlayWidth()
+			s.SetWidth(overlayW)
+			overlay := s.View()
+			y := m.height - 2 - lipgloss.Height(overlay)
+			out = ui.OverlayBottomCenter(out, overlay, m.width, y)
+		}
 	}
 	if prefix := m.keys.Prefix(); len(prefix) > 0 {
 		hints := ui.ChordBindingsFromHints(m.keys.ChordHints())
@@ -255,9 +256,9 @@ func (m Model) renderDiffPane(width, height int) string {
 			AccentColor: ui.ColorOrange,
 			InnerWidth:  innerW,
 			SearchMatch: func(displayIdx int) (bool, bool) {
-				return m.searchMatchDiffDisplay(displayIdx)
+				return m.diffModel.SearchMatchAt(displayIdx)
 			},
-			SearchQuery: m.search.Query(),
+			SearchQuery: m.diffModel.Search().Query(),
 		})
 	} else if len(m.diffModel.Data().Parsed.Lines) > 0 {
 		if diffcore.HasBinaryDiff(m.diffModel.Data().Parsed) {
@@ -284,11 +285,12 @@ func (m Model) diffTitle() string {
 }
 
 func (m Model) diffSearchCounterText() string {
-	if !m.search.HasQuery() || m.search.MatchesCount() == 0 || !m.focusDiff {
+	s := m.diffModel.Search()
+	if !s.HasQuery() || s.MatchesCount() == 0 || !m.focusDiff {
 		return ""
 	}
-	cursor := m.search.Cursor() + 1
-	total := m.search.MatchesCount()
+	cursor := s.Cursor() + 1
+	total := s.MatchesCount()
 	icon := "⌕"
 	if m.settings.UseNerdFontIcons {
 		icon = ui.Icons(true).Search
@@ -351,13 +353,6 @@ func (m Model) footerView() string {
 
 func (m Model) visibleFileLines(height int) []string {
 	return m.fileTreeModel.RenderLines(height, m.filetreeRenderOpts())
-}
-
-func (m Model) activeSearch() *search.Model {
-	if m.focusDiff {
-		return &m.search
-	}
-	return m.fileTreeModel.Search()
 }
 
 func (m Model) requiredFilesPaneWidth(height int) int {

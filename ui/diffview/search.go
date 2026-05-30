@@ -1,34 +1,13 @@
 package diffview
 
 import (
-	"strings"
-
 	"charm.land/bubbles/v2/viewport"
-	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/ui/search"
 )
 
 type DiffSearchMatch struct {
 	DisplayIndex int
 	RawIndex     int
-}
-
-func computeDiffSearchMatches(viewLines []string, displayToRaw []int, query string) []DiffSearchMatch {
-	q := strings.ToLower(strings.TrimSpace(query))
-	if q == "" {
-		return nil
-	}
-	matches := make([]DiffSearchMatch, 0)
-	for i := 0; i < len(viewLines) && i < len(displayToRaw); i++ {
-		line := strings.ToLower(ansi.Strip(viewLines[i]))
-		if strings.Contains(line, q) {
-			matches = append(matches, DiffSearchMatch{
-				DisplayIndex: i,
-				RawIndex:     displayToRaw[i],
-			})
-		}
-	}
-	return matches
 }
 
 func applyDiffSearchMatch(section *DiffData, vp *viewport.Model, match search.Match) {
@@ -57,28 +36,6 @@ func applyDiffSearchMatch(section *DiffData, vp *viewport.Model, match search.Ma
 			break
 		}
 	}
-}
-
-func currentDiffSearchMatchIndex(section DiffData, matches []DiffSearchMatch, navMode NavMode) int {
-	if navMode != NavModeLine || section.ActiveLine < 0 || section.ActiveLine >= len(section.Parsed.Changed) {
-		return -1
-	}
-	raw := section.Parsed.Changed[section.ActiveLine].LineIndex
-	for i, match := range matches {
-		if match.RawIndex == raw {
-			return i
-		}
-	}
-	return -1
-}
-
-func diffSearchMatchIndex(matches []DiffSearchMatch, displayIdx int) int {
-	for i, match := range matches {
-		if match.DisplayIndex == displayIdx {
-			return i
-		}
-	}
-	return -1
 }
 
 func maxInt(a, b int) int {

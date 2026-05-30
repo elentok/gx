@@ -4,7 +4,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/reword"
-	"github.com/elentok/gx/ui/search"
 )
 
 func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
@@ -59,24 +58,11 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	if m.focusDiff {
-		var searchCmd tea.Cmd
-		var searchResult search.Result
-		m.search, searchCmd, searchResult = m.search.Update(msg)
-		if searchResult.Handled {
-			if searchResult.QueryChanged {
-				m.search.SetMatches(m.computeDiffSearchMatches(m.search.Query()))
-			}
-			if searchResult.QueryChanged || searchResult.CursorChanged {
-				m.jumpToCurrentDiffMatch()
-			}
-			return m, searchCmd
-		}
 		if len(m.keys.Prefix()) == 0 || m.diffModel.HasPendingChord() {
 			updated, diffCmd, diffResult := m.diffModel.Update(msg)
 			m.diffModel = updated
 			if diffResult.Handled && !diffResult.ChordInProgress {
 				m.keys.Reset()
-				m.syncSearchCursorFromDiffFocus()
 				if diffResult.NeedsReload {
 					m.refreshDiff()
 					m.syncDiffViewport()

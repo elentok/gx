@@ -8,7 +8,6 @@ import (
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/keys"
-	"github.com/elentok/gx/ui/search"
 
 	"github.com/elentok/gx/ui/amend"
 	"github.com/elentok/gx/ui/help"
@@ -34,7 +33,6 @@ type Model struct {
 	err          error
 
 	commitDiffArea
-	commitSearchState
 	commitSidebarState
 
 	help help.Model
@@ -55,10 +53,6 @@ type commitDiffArea struct {
 	diffContextLines int
 }
 
-type commitSearchState struct {
-	search search.Model
-}
-
 type commitSidebarState struct {
 	files         []git.CommitFile
 	fileTreeModel filetree.Model[git.CommitFile]
@@ -74,9 +68,6 @@ func NewModel(worktreeRoot, ref, filterPath string, settings ui.Settings, extraK
 		commitDiffArea: commitDiffArea{
 			diffModel:        diffview.NewModel(settings.UseNerdFontIcons),
 			diffContextLines: settings.DiffContextLines,
-		},
-		commitSearchState: commitSearchState{
-			search: search.NewModel(),
 		},
 		commitSidebarState: commitSidebarState{
 			fileTreeModel: filetree.NewModel[git.CommitFile](),
@@ -150,9 +141,6 @@ func (m *Model) refreshDiff() {
 		colorDiff = rawDiff
 	}
 	m.diffModel.BuildFromRaw(rawDiff, colorDiff)
-	if m.search.HasQuery() {
-		m.search.SetMatches(m.computeDiffSearchMatches(m.search.Query()))
-	}
 	m.syncDiffViewport()
 }
 

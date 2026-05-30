@@ -326,8 +326,8 @@ func TestDiffSearchMovesToMatchesAndNavigates(t *testing.T) {
 		updated, _ = m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
 		m = updated.(Model)
 	}
-	if m.search.MatchesCount() < 2 {
-		t.Fatalf("expected multiple diff matches, got %d", m.search.MatchesCount())
+	if m.diffModel.Search().MatchesCount() < 2 {
+		t.Fatalf("expected multiple diff matches, got %d", m.diffModel.Search().MatchesCount())
 	}
 	if !m.focusDiff || m.diffModel.NavMode() != diffview.NavModeLine {
 		t.Fatalf("expected diff search to focus diff in line mode")

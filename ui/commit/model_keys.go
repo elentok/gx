@@ -118,8 +118,8 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		m.help.Open(m.width, m.height)
 		return m, nil
 	case bindingQuit:
-		if m.focusDiff && m.search.IsActive() {
-			m.search.DismissAndClear()
+		if m.focusDiff && m.diffModel.Search().IsActive() {
+			m.diffModel.Search().DismissAndClear()
 			return m, nil
 		}
 		if !m.focusDiff && m.fileTreeModel.Search().IsActive() {
