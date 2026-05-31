@@ -4,7 +4,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
-"github.com/elentok/gx/ui/status/diffarea"
+	"github.com/elentok/gx/ui/status/diffarea"
 )
 
 func (m Model) errorModalView() string {
@@ -131,7 +131,7 @@ func statusEntryMeta(entry statusEntry, useNerdFontIcons bool, icons filetreePan
 		return icons.staged
 	}
 	if useNerdFontIcons {
-		return "  "
+		return " "
 	}
 	if entry.Kind == statusEntryDir {
 		return "-"
