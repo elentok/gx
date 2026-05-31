@@ -1,8 +1,13 @@
 # Changelog
 
+## v0.17.1 - 2026-05-31
+
+- Status: fix indentation issue
+
 ## v0.17.0 - 2026-05-30
 
 - Search box now renders inline inside the diff view and filetree (no longer a floating overlay)
+- Search: pressing `/` in results mode reopens the search box with the current query pre-filled
 - Status: confirming a search syncs the query and highlights to the inactive pane, so both staged and unstaged sections show counters after confirm
 - Filetree: fix search jump bug
 
