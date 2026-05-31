@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.17.2 - 2026-05-31
+
+- Worktrees: kitty session names now use full repo and worktree names, with optional exact aliases for long names.
+
 ## v0.17.1 - 2026-05-31
 
 - Status: fix indentation issue
