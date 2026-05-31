@@ -43,7 +43,7 @@
     },
     "name-aliases": {
       "type": "object",
-      "description": "Exact full-name aliases applied before kitty session-name compression. Alias values are then compressed with the normal dash-segment rules.",
+      "description": "Exact full-name aliases used for kitty session names.",
       "additionalProperties": {
         "type": "string"
       },

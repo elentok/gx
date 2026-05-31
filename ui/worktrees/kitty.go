@@ -6,45 +6,19 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"unicode"
 
 	tea "charm.land/bubbletea/v2"
 )
 
-// compressSegment shortens a single dash-delimited word: segments of 1-2 runes
-// are kept as-is; longer segments keep their first and last rune and strip
-// interior vowels.
-func compressSegment(s string) string {
-	runes := []rune(s)
-	if len(runes) <= 2 {
-		return s
-	}
-	var b strings.Builder
-	b.WriteRune(runes[0])
-	for _, r := range runes[1 : len(runes)-1] {
-		switch unicode.ToLower(r) {
-		case 'a', 'e', 'i', 'o', 'u':
-		default:
-			b.WriteRune(r)
-		}
-	}
-	b.WriteRune(runes[len(runes)-1])
-	return b.String()
-}
-
-func shortenName(name string, aliases map[string]string) string {
+func sessionNamePart(name string, aliases map[string]string) string {
 	if alias, ok := aliases[name]; ok {
 		name = alias
 	}
-	parts := strings.Split(name, "-")
-	for i, p := range parts {
-		parts[i] = compressSegment(p)
-	}
-	return strings.TrimPrefix(strings.Join(parts, "-"), ".")
+	return strings.TrimPrefix(name, ".")
 }
 
 func sessionNameFor(repoName, wtName string, aliases map[string]string) string {
-	name := shortenName(repoName, aliases) + "-" + shortenName(wtName, aliases)
+	name := sessionNamePart(repoName, aliases) + "-" + sessionNamePart(wtName, aliases)
 	return strings.TrimPrefix(name, ".")
 }
 
@@ -80,4 +54,3 @@ func cmdKittySession(name, wtPath string) tea.Cmd {
 		return terminalResultMsg{err: err}
 	}
 }
-

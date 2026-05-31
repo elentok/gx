@@ -3,27 +3,27 @@ package worktrees
 import "testing"
 
 func TestKittySessionFile_AppendsSuffix(t *testing.T) {
-	got := kittySessionFile("my-rp-ftr-a")
-	want := "my-rp-ftr-a.kitty-session"
+	got := kittySessionFile("my-repo-feature-a")
+	want := "my-repo-feature-a.kitty-session"
 	if got != want {
 		t.Fatalf("kittySessionFile() = %q, want %q", got, want)
 	}
 }
 
-func TestSessionNameFor_CompressesRepoAndWorktree(t *testing.T) {
+func TestSessionNameFor_UsesFullRepoAndWorktree(t *testing.T) {
 	got := sessionNameFor("my-repo", "feature-a", nil)
-	want := "my-rpo-ftre-a"
+	want := "my-repo-feature-a"
 	if got != want {
 		t.Fatalf("sessionNameFor() = %q, want %q", got, want)
 	}
 }
 
-func TestSessionNameFor_AppliesAliasesThenCompresses(t *testing.T) {
+func TestSessionNameFor_AppliesAliasesWithoutShortening(t *testing.T) {
 	got := sessionNameFor("my-project-frontend", "feature-super-long", map[string]string{
-		"my-project-frontend": "project-fe",
-		"feature-super-long":  "feat-long",
+		"my-project-frontend": "proj",
+		"feature-super-long":  "feat",
 	})
-	want := "prjct-fe-ft-lng"
+	want := "proj-feat"
 	if got != want {
 		t.Fatalf("sessionNameFor() = %q, want %q", got, want)
 	}
