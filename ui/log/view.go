@@ -20,7 +20,7 @@ var logFlashBg = lipgloss.Color("#3d2810")
 
 var (
 	logHashStyle       = lipgloss.NewStyle().Foreground(ui.ColorBlue)
-	logMetaStyle       = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
+	logMetaStyle       = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Italic(true)
 	logPseudoStyle     = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true)
 	logSearchStyle     = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true).Underline(true)
 	logPushedStyle     = lipgloss.NewStyle().Foreground(ui.ColorGreen)
@@ -181,10 +181,8 @@ func (m Model) renderCommitRow(row row) string {
 	cols := []ui.FixedColumn{
 		{Text: graph, Width: 4},
 		{Text: m.highlightSearch(row.commit.Hash), Width: 8, Style: logHashStyle},
-		{Text: "", Width: 2},
-		{Text: ui.RelativeTimeCompact(row.commit.Date), Width: 10, Style: logMetaStyle},
-		{Text: "", Width: 1},
 		{Text: m.highlightSearch(row.commit.AuthorShort), Width: 3, Style: logMetaStyle},
+		{Text: ui.RelativeTimeCompact(row.commit.Date), Width: 10, Style: logMetaStyle},
 		{Text: state.icon, Width: 1, Style: state.style},
 	}
 	meta := ui.RenderFixedColumns(cols)
