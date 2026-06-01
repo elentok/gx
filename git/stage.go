@@ -52,6 +52,32 @@ func WorktreeRoot(dir string) (string, error) {
 	return out, nil
 }
 
+// RepoRelativePath resolves a user-supplied path to the repo-relative form the
+// log filter (FilterPath) expects. rawPath is interpreted relative to cwd (or
+// taken as-is when absolute), then made relative to repoRoot.
+//
+// The result uses forward slashes and has no leading "./". It performs no I/O:
+// a path with no history or not present on disk is still valid input. An error
+// is returned when the path resolves outside repoRoot.
+func RepoRelativePath(cwd, rawPath, repoRoot string) (string, error) {
+	abs := rawPath
+	if !filepath.IsAbs(abs) {
+		abs = filepath.Join(cwd, rawPath)
+	}
+	abs = filepath.Clean(abs)
+	root := filepath.Clean(repoRoot)
+
+	rel, err := filepath.Rel(root, abs)
+	if err != nil {
+		return "", fmt.Errorf("cannot resolve %q relative to repo root %q: %w", rawPath, repoRoot, err)
+	}
+	rel = filepath.ToSlash(rel)
+	if rel == ".." || strings.HasPrefix(rel, "../") {
+		return "", fmt.Errorf("path %q escapes the repository root %q", rawPath, repoRoot)
+	}
+	return rel, nil
+}
+
 // ListStageFiles returns status entries suitable for an interactive staging UI.
 func ListStageFiles(worktreeRoot string) ([]StageFileStatus, error) {
 	out, _, err := runNoOptionalLocks(worktreeRoot, []string{"status", "--porcelain=v1", "--untracked-files=all", "-z"})
