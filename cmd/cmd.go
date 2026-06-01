@@ -19,6 +19,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	humanize "github.com/dustin/go-humanize"
+	"github.com/spf13/cobra"
 )
 
 type deps struct {
@@ -63,99 +64,226 @@ func Execute(args []string) error {
 	return execute(args, defaultDeps())
 }
 
+// execute builds the cobra command tree from the given deps and runs it against
+// args. It is the seam used by tests (fake deps + captured args/output) and by
+// Execute (real deps + os.Args).
 func execute(args []string, d deps) error {
-	if len(args) == 0 {
-		return d.runStatus("")
+	if args == nil {
+		// A nil slice would make cobra fall back to os.Args[1:]; force an
+		// explicit empty arg list so "gx" with no arguments opens status.
+		args = []string{}
 	}
+	root := newRootCmd(d)
+	root.SetArgs(args)
+	root.SetOut(d.stdout)
+	root.SetErr(d.stderr)
+	return root.Execute()
+}
 
-	switch args[0] {
-	case "worktrees", "wt":
-		return runWorktreeCmd(args[1:], d)
-	case "push", "ps":
-		return runPush(d)
-	case "status", "s":
-		target := ""
-		if len(args) > 2 {
-			return fmt.Errorf("usage: gx status|s [path]")
-		}
-		if len(args) == 2 {
-			target = args[1]
-		}
-		return d.runStatus(target)
-	case "log":
-		ref := ""
-		if len(args) > 2 {
-			return fmt.Errorf("usage: gx log [hash-or-ref]")
-		}
-		if len(args) == 2 {
-			ref = args[1]
-		}
-		return d.runLog(ref)
-	case "show":
-		ref := ""
-		if len(args) > 2 {
-			return fmt.Errorf("usage: gx show [hash-or-ref]")
-		}
-		if len(args) == 2 {
-			ref = args[1]
-		}
-		return d.runShow(ref)
-	case "init":
-		return runInit(d)
-	case "edit-config":
-		return runEditConfig(d)
-	case "bump":
-		return runBump(args[1:], d)
-	case "stashify":
-		return runStashify(args[1:], d)
-	case "doctor":
-		return runDoctor(args[1:], d)
-	case "version", "--version", "-v":
-		return runVersion(d.stdout)
-	case "-h", "--help", "help":
-		printUsage(d.stdout)
-		return nil
-	default:
-		printUsage(d.stderr)
-		return fmt.Errorf("unknown command %q", args[0])
+// newRootCmd builds the full gx command tree. Each RunE closes over d so that
+// tests can inject fakes. Errors and usage are silenced so that main.go remains
+// the single error printer and can unwrap *ExitError for stashify's exit-code
+// pass-through.
+func newRootCmd(d deps) *cobra.Command {
+	root := &cobra.Command{
+		Use:   "gx",
+		Short: "git worktree, status, log and more — as a TUI",
+		Long: `gx is a git TUI.
+
+Run without a command to open the status UI.`,
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		Args:          cobra.NoArgs,
+		Version:       getVersion(),
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return d.runStatus("")
+		},
+	}
+	root.SetVersionTemplate("gx {{.Version}}\n")
+
+	root.AddCommand(
+		newWorktreesCmd(d),
+		newPushCmd(d),
+		newStatusCmd(d),
+		newLogCmd(d),
+		newShowCmd(d),
+		newInitCmd(d),
+		newEditConfigCmd(d),
+		newBumpCmd(d),
+		newStashifyCmd(d),
+		newDoctorCmd(d),
+		newVersionCmd(d),
+	)
+
+	return root
+}
+
+func newWorktreesCmd(d deps) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "worktrees",
+		Aliases: []string{"wt"},
+		Short:   "open the worktree UI",
+		Args:    cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return d.runWorktrees("")
+		},
+	}
+	cmd.AddCommand(
+		&cobra.Command{
+			Use:   "list",
+			Short: "list worktree names",
+			Args:  cobra.NoArgs,
+			RunE: func(_ *cobra.Command, _ []string) error {
+				return runListWorktrees(d)
+			},
+		},
+		&cobra.Command{
+			Use:   "abs-path <name>",
+			Short: "print absolute path of a worktree",
+			Args:  cobra.ExactArgs(1),
+			RunE: func(_ *cobra.Command, args []string) error {
+				return runWorktreeAbsPath(args[0], d)
+			},
+		},
+		&cobra.Command{
+			Use:   "clone <url> [dir]",
+			Short: "clone using the .bare trick",
+			RunE: func(_ *cobra.Command, args []string) error {
+				return runCloneWT(args, d)
+			},
+		},
+	)
+	return cmd
+}
+
+func newPushCmd(d deps) *cobra.Command {
+	return &cobra.Command{
+		Use:     "push",
+		Aliases: []string{"ps"},
+		Short:   "push the current branch (with divergence handling)",
+		Args:    cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return runPush(d)
+		},
 	}
 }
 
-func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage:")
-	fmt.Fprintln(w, "  gx                           open the status UI")
-	fmt.Fprintln(w, "  gx [worktrees|wt]            open the worktree UI")
-	fmt.Fprintln(w, "  gx wt list                   list worktree names")
-	fmt.Fprintln(w, "  gx wt abs-path <name>        print absolute path of a worktree")
-	fmt.Fprintln(w, "  gx wt clone <url> [dir]      clone using the .bare trick")
-	fmt.Fprintln(w, "  gx push|ps")
-	fmt.Fprintln(w, "  gx status|s")
-	fmt.Fprintln(w, "  gx log [hash-or-ref]")
-	fmt.Fprintln(w, "  gx show [hash-or-ref]")
-	fmt.Fprintln(w, "  gx init")
-	fmt.Fprintln(w, "  gx edit-config")
-	fmt.Fprintln(w, "  gx bump [major|minor|patch]  create a version tag and optionally push")
-	fmt.Fprintln(w, "  gx stashify <cmd...>         stash, run command, pop")
-	fmt.Fprintln(w, "  gx doctor [--fix]")
-	fmt.Fprintln(w, "  gx version")
+func newStatusCmd(d deps) *cobra.Command {
+	return &cobra.Command{
+		Use:     "status [path]",
+		Aliases: []string{"s"},
+		Short:   "open the status UI",
+		RunE: func(_ *cobra.Command, args []string) error {
+			if len(args) > 1 {
+				return fmt.Errorf("usage: gx status|s [path]")
+			}
+			target := ""
+			if len(args) == 1 {
+				target = args[0]
+			}
+			return d.runStatus(target)
+		},
+	}
 }
 
-func runWorktreeCmd(args []string, d deps) error {
-	if len(args) == 0 {
-		return d.runWorktrees("")
+func newLogCmd(d deps) *cobra.Command {
+	return &cobra.Command{
+		Use:   "log [hash-or-ref]",
+		Short: "open the log UI",
+		RunE: func(_ *cobra.Command, args []string) error {
+			if len(args) > 1 {
+				return fmt.Errorf("usage: gx log [hash-or-ref]")
+			}
+			ref := ""
+			if len(args) == 1 {
+				ref = args[0]
+			}
+			return d.runLog(ref)
+		},
 	}
-	switch args[0] {
-	case "list":
-		return runListWorktrees(d)
-	case "abs-path":
-		if len(args) < 2 {
-			return fmt.Errorf("usage: gx wt abs-path <name>")
-		}
-		return runWorktreeAbsPath(args[1], d)
-	case "clone":
-		return runCloneWT(args[1:], d)
-	default:
-		return fmt.Errorf("unknown wt subcommand %q", args[0])
+}
+
+func newShowCmd(d deps) *cobra.Command {
+	return &cobra.Command{
+		Use:   "show [hash-or-ref]",
+		Short: "open the commit UI",
+		RunE: func(_ *cobra.Command, args []string) error {
+			if len(args) > 1 {
+				return fmt.Errorf("usage: gx show [hash-or-ref]")
+			}
+			ref := ""
+			if len(args) == 1 {
+				ref = args[0]
+			}
+			return d.runShow(ref)
+		},
+	}
+}
+
+func newInitCmd(d deps) *cobra.Command {
+	return &cobra.Command{
+		Use:   "init",
+		Short: "create a config file",
+		Args:  cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return runInit(d)
+		},
+	}
+}
+
+func newEditConfigCmd(d deps) *cobra.Command {
+	return &cobra.Command{
+		Use:   "edit-config",
+		Short: "open the config file in $EDITOR",
+		Args:  cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return runEditConfig(d)
+		},
+	}
+}
+
+func newBumpCmd(d deps) *cobra.Command {
+	return &cobra.Command{
+		Use:   "bump [major|minor|patch]",
+		Short: "create a version tag and optionally push",
+		RunE: func(_ *cobra.Command, args []string) error {
+			return runBump(args, d)
+		},
+	}
+}
+
+func newStashifyCmd(d deps) *cobra.Command {
+	return &cobra.Command{
+		Use:   "stashify <cmd...>",
+		Short: "stash, run command, pop",
+		// Pass flags through to the wrapped command untouched.
+		DisableFlagParsing: true,
+		RunE: func(_ *cobra.Command, args []string) error {
+			return runStashify(args, d)
+		},
+	}
+}
+
+func newDoctorCmd(d deps) *cobra.Command {
+	return &cobra.Command{
+		Use:   "doctor [--fix] [--pause]",
+		Short: "check the repo for common configuration issues",
+		// runDoctor does its own flag parsing.
+		DisableFlagParsing: true,
+		RunE: func(_ *cobra.Command, args []string) error {
+			return runDoctor(args, d)
+		},
+	}
+}
+
+func newVersionCmd(d deps) *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "print the gx version",
+		Args:  cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return runVersion(d.stdout)
+		},
 	}
 }
 

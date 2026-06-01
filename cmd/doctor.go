@@ -122,13 +122,6 @@ func findRepoWithFallback(dir string) (*git.Repo, error) {
 	return repo, nil
 }
 
-func printDoctorUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: gx doctor [--fix] [--pause]")
-	fmt.Fprintln(w, "  Checks the current repo for common configuration issues.")
-	fmt.Fprintln(w, "  --fix    Prompt to apply each fix interactively.")
-	fmt.Fprintln(w, "  --pause  Wait for Enter before exiting.")
-}
-
 func printDoctorRuntime(w io.Writer, getenv func(string) string) {
 	terminal := ui.DetectTerminalFrom(getenv)
 	label := terminal.String()

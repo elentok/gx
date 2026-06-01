@@ -188,18 +188,17 @@ func TestExecute_WorktreesAliases(t *testing.T) {
 }
 
 func TestExecute_UnknownCommand(t *testing.T) {
-	var stderr bytes.Buffer
 	d := deps{
 		stdout:       bytes.NewBuffer(nil),
-		stderr:       &stderr,
+		stderr:       bytes.NewBuffer(nil),
 		runWorktrees: func(_ string) error { return nil },
 	}
 	err := execute([]string{"nope"}, d)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if got := stderr.String(); got == "" {
-		t.Fatal("expected usage on stderr")
+	if !strings.Contains(err.Error(), "unknown command") {
+		t.Fatalf("expected unknown command error, got: %v", err)
 	}
 }
 
