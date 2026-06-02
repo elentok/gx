@@ -1,7 +1,7 @@
 package terminalrun
 
 import (
-	"strings"
+	"errors"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -9,47 +9,34 @@ import (
 	"github.com/elentok/gx/ui/notify"
 )
 
-func TestSplitShellCommand_DefaultShell(t *testing.T) {
-	t.Setenv("SHELL", "")
-	program, args := splitShellCommand("git rebase -i abc123", true)
-	if program != "sh" {
-		t.Fatalf("program = %q, want sh", program)
+func TestWrapRun_PrependsGxRun(t *testing.T) {
+	prev := osExecutable
+	osExecutable = func() (string, error) { return "/usr/local/bin/gx", nil }
+	defer func() { osExecutable = prev; resetGxPath() }()
+	resetGxPath()
+
+	program, args := wrapRun("git", []string{"commit", "-m", "msg"})
+	if program != "/usr/local/bin/gx" {
+		t.Fatalf("program = %q, want resolved gx path", program)
 	}
-	if len(args) != 2 || args[0] != "-lc" {
-		t.Fatalf("args = %#v, want -lc script", args)
+	want := []string{"run", "git", "commit", "-m", "msg"}
+	if len(args) != len(want) {
+		t.Fatalf("args = %#v, want %#v", args, want)
 	}
-	script := args[1]
-	if !strings.Contains(script, "read -r _") {
-		t.Fatalf("expected POSIX read in script: %q", script)
-	}
-	if !strings.Contains(script, "gx: COMMAND FAILED, press Enter to close") {
-		t.Fatalf("missing failure prompt in script: %q", script)
-	}
-	if !strings.Contains(script, "--- gx: command finished, press Enter to close ---") {
-		t.Fatalf("missing success prompt in script: %q", script)
+	for i := range want {
+		if args[i] != want[i] {
+			t.Fatalf("args = %#v, want %#v", args, want)
+		}
 	}
 }
 
-func TestSplitShellCommand_FishShell(t *testing.T) {
-	t.Setenv("SHELL", "/usr/bin/fish")
-	program, args := splitShellCommand("git rebase -i abc123", true)
-	if program != "/usr/bin/fish" {
-		t.Fatalf("program = %q, want fish", program)
-	}
-	script := args[1]
-	if !strings.Contains(script, "set code $status") {
-		t.Fatalf("missing fish exit status capture in script: %q", script)
-	}
-	if !strings.Contains(script, "read -P '' _") {
-		t.Fatalf("expected fish read in script: %q", script)
-	}
-}
+func TestResolveGxPath_FallsBackToGx(t *testing.T) {
+	prev := osExecutable
+	osExecutable = func() (string, error) { return "", errors.New("unavailable") }
+	defer func() { osExecutable = prev }()
 
-func TestEscapeShellArg(t *testing.T) {
-	got := escapeShellArg("a'b c")
-	want := "'a'\\''b c'"
-	if got != want {
-		t.Fatalf("escapeShellArg() = %q, want %q", got, want)
+	if got := resolveGxPath(); got != "gx" {
+		t.Fatalf("resolveGxPath() = %q, want gx (fallback)", got)
 	}
 }
 
@@ -61,16 +48,7 @@ func TestCommand_ReturnsCmd(t *testing.T) {
 	}
 }
 
-func TestCommandCustom_KeepOpen(t *testing.T) {
-	doneFn := func(err error, splitApp string) tea.Msg { return nil }
-	cmd := CommandCustom("/tmp", ui.TerminalPlain, "echo", []string{"hello"}, true, doneFn)
-	if cmd == nil {
-		t.Error("expected non-nil cmd from CommandCustom() with keepOpen=true")
-	}
-}
-
 func TestCommandWithSplit(t *testing.T) {
-	t.Parallel()
 	doneFn := func(err error, splitApp string) tea.Msg { return nil }
 
 	tests := []struct {
@@ -110,5 +88,13 @@ func TestCommandWithSplit(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCommandWithSplitBare_ReturnsCmd(t *testing.T) {
+	doneFn := func(err error, splitApp string) tea.Msg { return nil }
+	cmd := CommandWithSplitBare("/tmp", ui.TerminalPlain, InPlace, "fish", nil, doneFn)
+	if cmd == nil {
+		t.Error("expected non-nil cmd from CommandWithSplitBare()")
 	}
 }

@@ -128,7 +128,7 @@ func (m Model) handleRebaseStash(msg rebaseStashMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) cmdRunRebaseInteractive(hash string) tea.Cmd {
-	return terminalrun.CommandCustom(m.worktreeRoot, m.settings.Terminal, "git", []string{"rebase", "-i", hash}, true, func(err error, splitApp string) tea.Msg {
+	return terminalrun.Command(m.worktreeRoot, m.settings.Terminal, "git", []string{"rebase", "-i", hash}, func(err error, splitApp string) tea.Msg {
 		return rebaseFinishedMsg{err: err, splitApp: splitApp}
 	})
 }

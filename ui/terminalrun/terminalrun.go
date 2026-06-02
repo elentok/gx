@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui"
@@ -20,72 +21,63 @@ const (
 	Tab
 )
 
-func splitShellCommand(command string, keepOpen bool) (program string, args []string) {
-	if !keepOpen {
-		return command, nil
-	}
+// osExecutable is a seam so tests can exercise the gx-path fallback.
+var osExecutable = os.Executable
 
-	shell := strings.TrimSpace(os.Getenv("SHELL"))
-	if shell == "" {
-		shell = "sh"
-	}
+var (
+	gxPathOnce  sync.Once
+	gxPathValue string
+)
 
-	var script string
-	if strings.HasSuffix(shell, "fish") {
-		parts := []string{
-			command,
-			"set code $status",
-			"if test $code -ne 0",
-			"echo 'gx: COMMAND FAILED, press Enter to close'",
-			"else",
-			"echo '--- gx: command finished, press Enter to close ---'",
-			"end",
-			"read -P '' _",
-		}
-		script = strings.Join(parts, "; ")
-	} else {
-		parts := []string{
-			command,
-			"code=$?",
-			"if [ \"$code\" -ne 0 ]",
-			"then echo 'gx: COMMAND FAILED, press Enter to close'",
-			"else echo '--- gx: command finished, press Enter to close ---'",
-			"fi",
-			"read -r _",
-		}
-		script = strings.Join(parts, "; ")
-	}
-	return shell, []string{"-lc", script}
+// gxPath returns gx's own absolute path (resolved once, cached). Splits run in
+// a fresh shell where `gx` may not be on PATH, so we invoke the absolute path;
+// if it can't be resolved we fall back to "gx".
+func gxPath() string {
+	gxPathOnce.Do(func() { gxPathValue = resolveGxPath() })
+	return gxPathValue
 }
 
+// resetGxPath clears the cached gx path so tests can re-resolve it.
+func resetGxPath() {
+	gxPathOnce = sync.Once{}
+	gxPathValue = ""
+}
+
+func resolveGxPath() string {
+	if exe, err := osExecutable(); err == nil && exe != "" {
+		return exe
+	}
+	return "gx"
+}
+
+// wrapRun rewrites a command launch so it runs under `gx run`, which keeps the
+// pane open (showing the failed command and a prompt) only when the command
+// fails. Interactive shells skip this — they use the *Bare variants.
+func wrapRun(program string, args []string) (string, []string) {
+	wrapped := make([]string, 0, len(args)+2)
+	wrapped = append(wrapped, "run", program)
+	wrapped = append(wrapped, args...)
+	return gxPath(), wrapped
+}
+
+// Command launches a command into the default split (vertical for tmux,
+// hsplit for kitty) or in place on a plain terminal, wrapped in `gx run` so a
+// failure keeps the pane open.
 func Command(worktreeRoot string, terminal ui.Terminal, program string, args []string, done func(err error, splitApp string) tea.Msg) tea.Cmd {
-	return CommandCustom(worktreeRoot, terminal, program, args, false, done)
-}
-
-func CommandCustom(worktreeRoot string, terminal ui.Terminal, program string, args []string, keepOpen bool, done func(err error, splitApp string) tea.Msg) tea.Cmd {
-	cmdProgram := program
-	cmdArgs := append([]string{}, args...)
-	if keepOpen {
-		escaped := make([]string, 0, len(args)+1)
-		escaped = append(escaped, escapeShellArg(program))
-		for _, arg := range args {
-			escaped = append(escaped, escapeShellArg(arg))
-		}
-		cmdProgram, cmdArgs = splitShellCommand(strings.Join(escaped, " "), true)
-	}
+	program, args = wrapRun(program, args)
 
 	if terminal == ui.TerminalTmux {
 		return func() tea.Msg {
-			tmuxArgs := []string{"split-window", "-v", "-c", worktreeRoot, cmdProgram}
-			tmuxArgs = append(tmuxArgs, cmdArgs...)
+			tmuxArgs := []string{"split-window", "-v", "-c", worktreeRoot, program}
+			tmuxArgs = append(tmuxArgs, args...)
 			err := exec.Command("tmux", tmuxArgs...).Run()
 			return done(err, "tmux")
 		}
 	}
 	if terminal == ui.TerminalKittyRemote {
 		return func() tea.Msg {
-			kittyArgs := []string{"@", "launch", "--copy-env", "--location=hsplit", "--cwd=" + worktreeRoot, cmdProgram}
-			kittyArgs = append(kittyArgs, cmdArgs...)
+			kittyArgs := []string{"@", "launch", "--copy-env", "--location=hsplit", "--cwd=" + worktreeRoot, program}
+			kittyArgs = append(kittyArgs, args...)
 			out, err := exec.Command("kitty", kittyArgs...).CombinedOutput()
 			if err != nil {
 				err = fmt.Errorf("$ kitty %s\n\n%w\n\n%s", strings.Join(kittyArgs, " "), err, strings.TrimSpace(string(out)))
@@ -100,11 +92,22 @@ func CommandCustom(worktreeRoot string, terminal ui.Terminal, program string, ar
 	})
 }
 
-func escapeShellArg(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+// CommandWithSplit launches a command into the requested split type, wrapped in
+// `gx run` so a failure keeps the pane open. Use CommandWithSplitBare for
+// interactive shells, which should not be wrapped.
+func CommandWithSplit(worktreeRoot string, terminal ui.Terminal, splitType SplitType, program string, args []string, done func(err error, splitApp string) tea.Msg) tea.Cmd {
+	program, args = wrapRun(program, args)
+	return commandWithSplit(worktreeRoot, terminal, splitType, program, args, done)
 }
 
-func CommandWithSplit(worktreeRoot string, terminal ui.Terminal, splitType SplitType, program string, args []string, done func(err error, splitApp string) tea.Msg) tea.Cmd {
+// CommandWithSplitBare launches program into the requested split type without
+// the `gx run` wrapper — for interactive shells, where a non-zero exit is
+// normal and a "press Enter" prompt would be meaningless.
+func CommandWithSplitBare(worktreeRoot string, terminal ui.Terminal, splitType SplitType, program string, args []string, done func(err error, splitApp string) tea.Msg) tea.Cmd {
+	return commandWithSplit(worktreeRoot, terminal, splitType, program, args, done)
+}
+
+func commandWithSplit(worktreeRoot string, terminal ui.Terminal, splitType SplitType, program string, args []string, done func(err error, splitApp string) tea.Msg) tea.Cmd {
 	if splitType == InPlace {
 		c := exec.Command(program, args...)
 		c.Dir = worktreeRoot

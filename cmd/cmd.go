@@ -119,6 +119,7 @@ Run without a command to open the status UI.`,
 		newEditConfigCmd(d),
 		newBumpCmd(d),
 		newStashifyCmd(d),
+		newRunCmd(d),
 		newDoctorCmd(d),
 		newVersionCmd(d),
 	)
@@ -299,6 +300,20 @@ func newStashifyCmd(d deps) *cobra.Command {
 		DisableFlagParsing: true,
 		RunE: func(_ *cobra.Command, args []string) error {
 			return runStashify(args, d)
+		},
+	}
+}
+
+func newRunCmd(d deps) *cobra.Command {
+	return &cobra.Command{
+		Use:   "run <cmd...>",
+		Short: "run a command, keeping the pane open on failure",
+		// Internal helper used by split/tab launches; hidden from --help.
+		Hidden: true,
+		// Pass everything after "run" to the wrapped command untouched.
+		DisableFlagParsing: true,
+		RunE: func(_ *cobra.Command, args []string) error {
+			return runRun(args, d)
 		},
 	}
 }
