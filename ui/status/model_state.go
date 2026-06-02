@@ -67,6 +67,9 @@ type Model struct {
 	credentialPrompt        string
 	credentialInput         textinput.Model
 	credentialSecret        bool
+	stashOpen               bool
+	stashInput              textinput.Model
+	stashStagedOnly         bool
 	output                  output.Model
 	keys                    keys.Manager
 }

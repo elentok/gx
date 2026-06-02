@@ -3,6 +3,7 @@ package git
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/testutil"
@@ -33,6 +34,104 @@ func TestStash_WithChanges(t *testing.T) {
 	if popErr != nil {
 		t.Fatalf("StashPop: %v\n%s", popErr, popOut)
 	}
+}
+
+func TestStashPush_AllWithName(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	writeFile(t, dir, "README.md", "stash me")
+
+	out, err := StashPush(dir, "my-stash", false)
+	if err != nil {
+		t.Fatalf("StashPush: %v\n%s", err, out)
+	}
+	if files := listFiles(t, dir); len(files) != 0 {
+		t.Fatalf("expected clean tree after stash all, got %v", files)
+	}
+	if list := stashList(t, dir); !strings.Contains(list, "my-stash") {
+		t.Fatalf("expected stash named my-stash, got: %q", list)
+	}
+}
+
+func TestStashPush_AllWithoutName(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	writeFile(t, dir, "README.md", "stash me")
+
+	out, err := StashPush(dir, "", false)
+	if err != nil {
+		t.Fatalf("StashPush: %v\n%s", err, out)
+	}
+	// git auto-generates a "WIP on <branch>" message.
+	if list := stashList(t, dir); !strings.Contains(list, "WIP on") {
+		t.Fatalf("expected auto-named WIP stash, got: %q", list)
+	}
+}
+
+func TestStashPush_StagedOnlyLeavesUnstaged(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	// staged.txt is staged; unstaged.txt is left in the working tree.
+	writeFile(t, dir, "staged.txt", "staged change")
+	writeFile(t, dir, "unstaged.txt", "unstaged change")
+	if err := StagePath(dir, "staged.txt"); err != nil {
+		t.Fatalf("StagePath: %v", err)
+	}
+
+	out, err := StashPush(dir, "staged-stash", true)
+	if err != nil {
+		t.Fatalf("StashPush staged: %v\n%s", err, out)
+	}
+
+	files := listFiles(t, dir)
+	if len(files) != 1 || files[0].Path != "unstaged.txt" {
+		t.Fatalf("expected only unstaged.txt to remain, got %v", files)
+	}
+	if list := stashList(t, dir); !strings.Contains(list, "staged-stash") {
+		t.Fatalf("expected stash named staged-stash, got: %q", list)
+	}
+}
+
+func TestStashPush_StagedOnlyWithoutName(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	writeFile(t, dir, "staged.txt", "staged change")
+	if err := StagePath(dir, "staged.txt"); err != nil {
+		t.Fatalf("StagePath: %v", err)
+	}
+
+	out, err := StashPush(dir, "", true)
+	if err != nil {
+		t.Fatalf("StashPush staged: %v\n%s", err, out)
+	}
+	if list := stashList(t, dir); !strings.Contains(list, "WIP on") {
+		t.Fatalf("expected auto-named WIP stash, got: %q", list)
+	}
+}
+
+func writeFile(t *testing.T, dir, name, content string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0644); err != nil {
+		t.Fatalf("write %s: %v", name, err)
+	}
+}
+
+func listFiles(t *testing.T, dir string) []StageFileStatus {
+	t.Helper()
+	files, err := ListStageFiles(dir)
+	if err != nil {
+		t.Fatalf("ListStageFiles: %v", err)
+	}
+	return files
+}
+
+func stashList(t *testing.T, dir string) string {
+	t.Helper()
+	stdout, stderr, err := run(dir, []string{"stash", "list"})
+	if err != nil {
+		t.Fatalf("stash list: %v\n%s", err, joinOutput(stdout, stderr))
+	}
+	return stdout
 }
 
 func TestIsIndexLockBusyErr_Nil(t *testing.T) {

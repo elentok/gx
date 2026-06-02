@@ -44,6 +44,7 @@ const (
 	bindingEditVSplit    keys.BindingID = "edit-vsplit"
 	bindingEditTab       keys.BindingID = "edit-tab"
 	bindingFilterLog     keys.BindingID = "filter-log"
+	bindingStashAll      keys.BindingID = "stash-all"
 )
 
 func newStatusManager() keys.Manager {
@@ -90,6 +91,9 @@ func newStatusManager() keys.Manager {
 		{ID: bindingRebase, Seq: []string{"b"}, Categories: []string{"Git"}, Title: "rebase"},
 		{ID: bindingAmend, Seq: []string{"A"}, Categories: []string{"Git"}, Title: "amend"},
 		{ID: bindingBump, Seq: []string{"B"}, Categories: []string{"Git"}, Title: "bump version"},
+		// S-prefix chords (stash)
+		{ID: bindingStashAll, Seq: []string{"S", "a"}, Categories: []string{"Git"}, Title: "stash all"},
+		{ID: bindingCancelChord, Seq: []string{"S", "esc"}, Categories: []string{}, Title: ""},
 		// e-prefix chords
 		{ID: bindingEditInPlace, Seq: []string{"e", "e"}, Categories: []string{"Filetree", "Diff"}, Title: "edit file"},
 		{ID: bindingEditHSplit, Seq: []string{"e", "s"}, Categories: []string{"Filetree", "Diff"}, Title: "edit file (hsplit)"},
@@ -182,6 +186,8 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model,
 			m.showGitError(err)
 		}
 		return m, nil
+	case bindingStashAll:
+		return m, m.openStash(false)
 	case bindingEditInPlace:
 		return m, m.cmdEditSelectedFile(terminalrun.InPlace)
 	case bindingEditHSplit:

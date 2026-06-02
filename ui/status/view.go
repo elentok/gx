@@ -47,6 +47,8 @@ func (m Model) View() tea.View {
 		out = ui.OverlayCenter(out, m.pull.View(m.width), m.width, m.height)
 	} else if m.credentialOpen {
 		out = ui.OverlayCenter(out, m.credentialModalView(), m.width, m.height)
+	} else if m.stashOpen {
+		out = ui.OverlayCenter(out, m.stashModalView(), m.width, m.height)
 	} else if m.runningOpen {
 		out = ui.OverlayCenter(out, m.runningModalView(), m.width, m.height)
 	} else if m.output.IsOpen {
