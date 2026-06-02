@@ -167,6 +167,25 @@ Stash uncommitted changes, run a command, then auto-pop the stash on success (pr
 gx stashify git rebase main
 ```
 
+Launch a command (or your `$SHELL`) into a tmux/kitty split or tab, falling back to running in place when no multiplexer is available:
+
+```sh
+gx term                  # shell, split below (default)
+gx term --below nvim     # nvim in a split below, in the current dir
+gx term --right lazygit  # lazygit side-by-side
+gx term --tab npm test   # npm test in a new tab
+gx term --here ls        # run in the current terminal (exec-replace)
+gx term --cwd /some/dir lazygit
+```
+
+Directions are named by visual outcome (`--right`/`--below`/`--tab`/`--here`), so the same flag produces the same layout on tmux and kitty (which use opposite `hsplit`/`vsplit` conventions internally). `--below` is the default. Splits need tmux or kitty with remote control enabled; on a plain terminal (or kitty without remote control) the command runs in place instead, so the same invocation works everywhere. An explicit command keeps its pane open if it fails; a bare shell does not. With no command, `gx term` opens `$SHELL`.
+
+The headline use case is launching things from neovim. For example, open lazygit in a split below the editor:
+
+```vim
+nnoremap <leader>gg <Cmd>!gx term --below lazygit<CR>
+```
+
 Create an initial config file with defaults:
 
 ```sh

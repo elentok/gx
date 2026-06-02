@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.17.5 - 2026-06-02
+
+- CLI: added `gx term` to launch a command (or `$SHELL`) into a tmux/kitty split, tab, or in place. Directions are named by visual outcome (`--right`/`--below` default/`--tab`/`--here`) so the same flag lays out identically on tmux and kitty; `--cwd` sets the working directory. On a plain terminal (or kitty without remote control) it runs in place, so the same invocation works everywhere — handy for opening things from neovim into a split.
+- Splits/tabs: fixed the kitty split direction — side-by-side and stacked splits were swapped relative to tmux, so they now produce matching layouts on both terminals (affects the worktree terminal menu and `gx term`).
+
 ## v0.17.4 - 2026-06-02
 
 - Log: added `gx log -f/--file <path>` to open the log pre-filtered to a file (path is taken relative to your current directory). Follows renames, so pre-rename history is included.

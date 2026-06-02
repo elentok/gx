@@ -1,7 +1,7 @@
 # ADR 0005 — `gx term` directional split flags (`--right`/`--below`)
 
 ## Status
-Accepted
+Completed
 
 ## Context
 
