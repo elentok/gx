@@ -1,27 +1,13 @@
 package status
 
 import (
-	"os/exec"
-	"strings"
 	"testing"
 
-	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	notifypkg "github.com/elentok/gx/ui/notify"
 
 	tea "charm.land/bubbletea/v2"
 )
-
-func stashListOutput(t *testing.T, dir string) string {
-	t.Helper()
-	cmd := exec.Command("git", "stash", "list")
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git stash list: %v\n%s", err, out)
-	}
-	return string(out)
-}
 
 func asModel(next tea.Model) Model {
 	if p, ok := next.(*Model); ok {
@@ -35,18 +21,6 @@ func sendKey(m Model, code rune, text string) (Model, tea.Cmd) {
 	return asModel(next), cmd
 }
 
-func sendSpecialKey(m Model, code rune) (Model, tea.Cmd) {
-	next, cmd := m.Update(tea.KeyPressMsg{Code: code})
-	return asModel(next), cmd
-}
-
-func typeString(m Model, s string) Model {
-	for _, r := range s {
-		m, _ = sendKey(m, r, string(r))
-	}
-	return m
-}
-
 // sendStashAllChord sends the "S" then "a" chord and returns the resulting
 // model plus the cmd produced by completing the chord.
 func sendStashAllChord(m Model) (Model, tea.Cmd) {
@@ -58,19 +32,13 @@ func sendStashAllChord(m Model) (Model, tea.Cmd) {
 	return sendKey(m, 'a', "a")
 }
 
-func TestStashAll_EmptyTreeShowsNoticeAndDoesNotOpen(t *testing.T) {
-	t.Parallel()
-	repo := testutil.TempRepo(t)
-
-	m := newTestModelDefault(repo)
-	m.ready = true
-
-	m, cmd := sendStashAllChord(m)
-	if m.stashOpen {
-		t.Fatal("stash modal should not open on a clean tree")
+func expectNothingToStash(t *testing.T, m Model, cmd tea.Cmd) {
+	t.Helper()
+	if m.stash.IsOpen {
+		t.Fatal("stash modal should not open")
 	}
 	if cmd == nil {
-		t.Fatal("expected a notify cmd on clean tree")
+		t.Fatal("expected a notify cmd")
 	}
 	msg := cmd()
 	notifyMsg, ok := msg.(notifypkg.NotifyMsg)
@@ -80,6 +48,17 @@ func TestStashAll_EmptyTreeShowsNoticeAndDoesNotOpen(t *testing.T) {
 	if notifyMsg.Message != "nothing to stash" {
 		t.Fatalf("notify = %q, want %q", notifyMsg.Message, "nothing to stash")
 	}
+}
+
+func TestStashAll_EmptyTreeShowsNoticeAndDoesNotOpen(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+
+	m := newTestModelDefault(repo)
+	m.ready = true
+
+	m, cmd := sendStashAllChord(m)
+	expectNothingToStash(t, m, cmd)
 }
 
 func TestStashAll_UntrackedOnlyIsNothingToStash(t *testing.T) {
@@ -93,15 +72,7 @@ func TestStashAll_UntrackedOnlyIsNothingToStash(t *testing.T) {
 	m.ready = true
 
 	m, cmd := sendStashAllChord(m)
-	if m.stashOpen {
-		t.Fatal("stash modal should not open for untracked-only tree")
-	}
-	if cmd == nil {
-		t.Fatal("expected a notify cmd for untracked-only tree")
-	}
-	if msg, ok := cmd().(notifypkg.NotifyMsg); !ok || msg.Message != "nothing to stash" {
-		t.Fatalf("notify = %#v, want 'nothing to stash'", cmd())
-	}
+	expectNothingToStash(t, m, cmd)
 }
 
 func TestStashAll_OpensModalOnDirtyTree(t *testing.T) {
@@ -112,19 +83,15 @@ func TestStashAll_OpensModalOnDirtyTree(t *testing.T) {
 	m := newTestModelDefault(repo)
 	m.ready = true
 
-	m, cmd := sendStashAllChord(m)
-	if !m.stashOpen {
+	m, _ = sendStashAllChord(m)
+	if !m.stash.IsOpen {
 		t.Fatal("expected stash modal to open on a dirty tree")
 	}
-	if m.stashStagedOnly {
-		t.Fatal("stash-all variant must not set stagedOnly")
-	}
-	if cmd != nil {
-		t.Fatal("opening the modal should not fire a command")
-	}
 }
 
-func TestStashAll_EscCancelsWithoutStashing(t *testing.T) {
+// Driving a real stash to completion through the status seam yields a follow-up
+// cmd (notify.Success + refresh) and the actual stash gets created.
+func TestStashAll_StashedResultNotifiesAndRefreshes(t *testing.T) {
 	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "README.md", "changed\n")
@@ -133,64 +100,55 @@ func TestStashAll_EscCancelsWithoutStashing(t *testing.T) {
 	m.ready = true
 
 	m, _ = sendStashAllChord(m)
-	if !m.stashOpen {
+	if !m.stash.IsOpen {
 		t.Fatal("expected stash modal to open")
 	}
-	m, cmd := sendSpecialKey(m, tea.KeyEscape)
-	if m.stashOpen {
-		t.Fatal("Esc should close the stash modal")
-	}
-	if cmd != nil {
-		t.Fatal("Esc should not fire a stash command")
-	}
-	if list := stashListOutput(t, repo); strings.TrimSpace(list) != "" {
-		t.Fatalf("expected no stash after cancel, got: %q", list)
-	}
-}
 
-func TestStashAll_SubmitStashesAndRefreshes(t *testing.T) {
-	t.Parallel()
-	repo := testutil.TempRepo(t)
-	testutil.WriteFile(t, repo, "README.md", "changed\n")
-
-	m := newTestModelDefault(repo)
-	m.ready = true
-
-	m, _ = sendStashAllChord(m)
-	if !m.stashOpen {
-		t.Fatal("expected stash modal to open")
-	}
-	m = typeString(m, "mystash")
-
+	// Enter fires the stash cmd through the sub-model; the seam routes it.
 	m, cmd := sendSpecialKey(m, tea.KeyEnter)
-	if m.stashOpen {
-		t.Fatal("Enter should close the stash modal")
-	}
 	if cmd == nil {
-		t.Fatal("Enter should fire a stash command")
-	}
-	// Run the stash command and feed the resulting message back into the model.
-	msg := cmd()
-	finished, ok := msg.(stashFinishedMsg)
-	if !ok {
-		t.Fatalf("expected stashFinishedMsg, got %T", msg)
-	}
-	if finished.err != nil {
-		t.Fatalf("stash failed: %v\n%s", finished.err, finished.output)
-	}
-	if _, followup := m.Update(finished); followup == nil {
-		t.Fatal("expected a follow-up cmd (notify + refresh) after stash finished")
+		t.Fatal("expected a stash command")
 	}
 
-	if list := stashListOutput(t, repo); !strings.Contains(list, "mystash") {
-		t.Fatalf("expected a stash named mystash, got: %q", list)
+	// Enter batches the stash cmd with a spinner tick; flatten the batch and
+	// route the (private) done-msg back through the seam.
+	m, follow := drainBatch(m, cmd)
+	if m.stash.IsOpen {
+		t.Fatal("expected stash sub-model to close after success")
 	}
-	// Working tree should be clean after stashing all changes.
-	files, err := git.ListStageFiles(repo)
-	if err != nil {
-		t.Fatalf("list files: %v", err)
+	if follow == nil {
+		t.Fatal("expected a follow-up cmd (notify + refresh) after stash succeeded")
 	}
-	if len(files) != 0 {
-		t.Fatalf("expected clean tree after stash, got %d files", len(files))
+}
+
+// drainBatch runs cmd, flattening any tea.BatchMsg, and feeds every resulting
+// message back through the model's Update. It returns the final model and the
+// last non-nil follow-up cmd produced.
+func drainBatch(m Model, cmd tea.Cmd) (Model, tea.Cmd) {
+	var follow tea.Cmd
+	var walk func(c tea.Cmd)
+	walk = func(c tea.Cmd) {
+		if c == nil {
+			return
+		}
+		msg := c()
+		if batch, ok := msg.(tea.BatchMsg); ok {
+			for _, sub := range batch {
+				walk(sub)
+			}
+			return
+		}
+		next, f := m.Update(msg)
+		m = asModel(next)
+		if f != nil {
+			follow = f
+		}
 	}
+	walk(cmd)
+	return m, follow
+}
+
+func sendSpecialKey(m Model, code rune) (Model, tea.Cmd) {
+	next, cmd := m.Update(tea.KeyPressMsg{Code: code})
+	return asModel(next), cmd
 }

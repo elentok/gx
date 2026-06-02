@@ -33,6 +33,9 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	if m.pull.IsOpen {
 		return m.handlePullUpdate(msg)
 	}
+	if m.stash.IsOpen {
+		return m.handleStashUpdate(msg)
+	}
 	switch msg := msg.(type) {
 	case gotoPRMsg:
 		return m.handleGotoPR(msg)
@@ -58,8 +61,6 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		return m.handleFlashTick()
 	case commitFinishedMsg:
 		return m.handleCommitFinished(msg)
-	case stashFinishedMsg:
-		return m.handleStashFinished(msg)
 	case lazygitLogFinishedMsg:
 		return m.handleLazygitLogFinished(msg)
 	case editFileFinishedMsg:
@@ -180,9 +181,6 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.credentialOpen {
 		return m.handleCredentialKey(msg)
-	}
-	if m.stashOpen {
-		return m.handleStashKey(msg)
 	}
 	if m.runningOpen {
 		return m.handleRunningKey(msg)

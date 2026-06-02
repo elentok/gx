@@ -77,3 +77,55 @@ native git implementation).
   runs without `--include-untracked` (out of scope), so `git stash push` ignores them. A tree
   of only-untracked files therefore reads as "nothing to stash" rather than opening a modal
   that would no-op. Captured in `Model.hasStashableChanges`.
+
+## Extract stash into its own `ui/stash` model (decided via /grill)
+
+Refactor: the `Sa` interaction shipped embedded in the status model (`ui/status/stash.go` +
+`stashOpen`/`stashInput`/`stashStagedOnly` fields). Move it into a standalone sub-model under
+`ui/stash`, following the `push`/`pull`/`bump` convention, so it stops polluting the status
+model. Done before w26.2 so `Ss` is built once on the final shape.
+
+### Decisions
+
+- **Convention:** `ui/stash` exposes `New() Model`, `Open(root string, stagedOnly bool) tea.Cmd`,
+  `Update(msg) (Model, tea.Cmd, Result)`, `View(width int) string`, exported `IsOpen`, and
+  `InputFocused()`. First sub-model to own a `textinput`.
+- **Status integration (mirror `pull`):** `stash stash.Model` field constructed with
+  `stash.New()`; top-of-`Update` guard `if m.stash.IsOpen { return m.handleStashUpdate(msg) }`;
+  overlay branch in `view.go`; new glue file `ui/status/model_stash.go` consuming `Result`.
+  `InputFocused()` in `diff_search.go` also delegates to `m.stash.InputFocused()`.
+- **Pre-check stays in status:** `hasStashableChanges` + the `"nothing to stash"` /
+  `"nothing staged to stash"` notify remain in the status dispatch. Status calls
+  `m.stash.Open(...)` only when stashable; the sub-model never models an empty state.
+- **Phases:** `phaseInput` → `phaseStashing` (spinner, like `bump`'s `phaseTagging`) → done,
+  plus `phaseFailed` (red frame, esc/enter/q to dismiss). The model owns failure rendering
+  like `pull`; status does NOT call `showGitError`.
+- **Result:** `Result{Done bool, Outcome Outcome, StagedOnly bool, Err error}`, `Outcome` ∈
+  `{OutcomeNone, OutcomeStashed, OutcomeCancelled}`. Status glue: `OutcomeStashed` →
+  `notify.Success(...)` + `refresh()`; `OutcomeCancelled` → nothing; `Err` → `notify.Error(...)`
+  + record output to `m.output`.
+- **Title/prompt** vary by `StagedOnly` ("Stash all changes" / "Stash staged changes").
+- **git layer unchanged:** `git.StashPush` stays in `git/`; the sub-model calls it (via a
+  `components.CommandRunner`, matching how `pull` runs git, or a plain cmd — implementer's
+  call, but reuse `git.StashPush` so the retry loop is preserved).
+- **No ADR:** follows the established sub-model convention (cf. ADR 0002), cheaply reversible,
+  unsurprising.
+
+### Tasks (extraction)
+
+- [x] Create `ui/stash/stash.go`: `Model`, `New`, `Open(root, stagedOnly) tea.Cmd`,
+      `Update` (phases input/stashing/failed), `View(width)`, `InputFocused`, `Result` + `Outcome`.
+- [x] Reuse `git.StashPush(root, name, stagedOnly)` inside the stashing cmd.
+- [x] Remove `ui/status/stash.go` and the `stashOpen`/`stashInput`/`stashStagedOnly` fields
+      from `model_state.go`; remove the old `handleStashKey`/`stashFinishedMsg`/`stashModalView`.
+- [x] Wire status: `stash stash.Model` field + `stash.New()`; top guard in `Update`;
+      overlay in `view.go`; new `model_stash.go` glue consuming `Result`;
+      `diff_search.go` `InputFocused` delegation.
+- [x] Keybinding dispatch `bindingStashAll` → `m.stash.Open(m.worktreeRoot, false)`
+      (keep the `Sa` + `S,esc` chords and the `hasStashableChanges` pre-check in status).
+- [x] Move deep model tests to `ui/stash/stash_test.go` (mirror `ui/pull/pull_test.go`):
+      open → type → Enter drives input→stashing→Done `OutcomeStashed`; Esc → `OutcomeCancelled`;
+      error → `phaseFailed`.
+- [x] Slim `ui/status/stash_model_test.go` to the seam: pre-check notices (clean /
+      untracked-only) + `Result{OutcomeStashed}` → notify+refresh. Drop the in-modal mechanics tests.
+- [x] `go build ./...`, `go vet`, `go test ./git/ ./ui/stash/ ./ui/status/`.

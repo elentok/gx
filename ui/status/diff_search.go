@@ -3,14 +3,14 @@ package status
 import (
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/search"
-	tea "charm.land/bubbletea/v2"
 )
 
 func (m Model) InputFocused() bool {
-	if m.push.InputFocused() || m.pull.InputFocused() {
+	if m.push.InputFocused() || m.pull.InputFocused() || m.stash.InputFocused() {
 		return true
 	}
 	if m.focus == focusFiletree {
@@ -70,4 +70,3 @@ func (m Model) filetreeEntrySearchText(entry filetree.Entry[git.StageFileStatus]
 	}
 	return name
 }
-

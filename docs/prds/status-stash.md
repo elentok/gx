@@ -70,10 +70,31 @@ opening the modal. The diff-pane toggles `s` (render mode) and `w` (wrap) are le
   `index.lock` busy-retry loop that the current `Stash()` already implements (extracted into
   a shared helper rather than duplicated). This is the one piece with real logic and is unit
   testable in isolation against a temp repo.
-- **Modal:** Mirrors the existing credential-prompt pattern in the status model — a
-  `textinput`-backed modal with open flag, the entered name, and a flag recording which
-  variant (all vs staged). Rendered via the existing `RenderInputModal` component. Title and
-  prompt vary by variant ("Stash all changes" / "Stash staged changes").
+- **Deep module — stash sub-model (`ui/stash`):** The stash interaction is its own
+  bubbletea sub-model under `ui/stash`, following the established `push`/`pull`/`bump`
+  convention rather than living inline in the status model. It exposes
+  `New() Model`, `Open(root string, stagedOnly bool) tea.Cmd`, `Update(msg) (Model, tea.Cmd, Result)`,
+  `View(width int) string`, an exported `IsOpen` flag, and an `InputFocused()` method (it
+  owns a `textinput`, making it the first sub-model with a free-text field). The status
+  model integrates it exactly like `pull`: a `stash stash.Model` field, a top-of-`Update`
+  guard `if m.stash.IsOpen { return m.handleStashUpdate(msg) }`, an overlay branch in
+  `View`, and a `model_stash.go` glue file that consumes `Result`.
+  - **Phases:** `phaseInput` (typing the name) → `phaseStashing` (spinner frame, matching
+    `bump`'s `phaseTagging`) → done, plus `phaseFailed` (red frame, esc/enter/q to dismiss)
+    on error — the model owns its own failure rendering like `pull`, so status does **not**
+    also call `showGitError`.
+  - **Result:** `Result{Done bool, Outcome Outcome, StagedOnly bool, Err error}` where
+    `Outcome` is an explicit enum (`OutcomeNone` / `OutcomeStashed` / `OutcomeCancelled`) so
+    cancellation is first-class rather than inferred from an empty field. Status owns the
+    user-facing messaging: `OutcomeStashed` → `notify.Success(...)` + `refresh()`;
+    `OutcomeCancelled` → nothing; `Err != nil` → `notify.Error(...)` + record output.
+  - **Title/prompt vary by variant** ("Stash all changes" / "Stash staged changes"),
+    selected from `StagedOnly`.
+- **Pre-check stays in status:** The empty-state pre-check reads the status model's
+  in-memory file list, so it stays in the status dispatch (`hasStashableChanges`). Status
+  only calls `stash.Open(...)` when a stash can succeed; the `"nothing to stash"` /
+  `"nothing staged to stash"` notice is emitted by status, and the stash sub-model never
+  models an empty state.
 - **Empty-state pre-check:** Before opening the modal, the dispatch handler checks the
   in-memory status file list — no extra git call. `Sa` with no changes and `Ss` with nothing
   staged short-circuit to a `notify.Info` and do not open the modal. The modal only ever
@@ -114,7 +135,11 @@ right commands/notifications.
 ## Further Notes
 
 The implementation rides almost entirely on existing patterns: `git/stash.go` already has the
-`index.lock` retry loop to reuse, and the status model's credential modal
-(`credentialInput`/`credentialModalView`/`handleCredentialKey`) is a near-exact template for
-the stash-name modal. Work is split into two vertical slices so `Sa` is shippable and
-reviewable before `Ss` is added.
+`index.lock` retry loop to reuse, and `ui/push`, `ui/pull`, `ui/bump` are the template for the
+standalone `ui/stash` sub-model (`New`/`Open`/`Update`/`View`/`Result` + status-side glue).
+The stash sub-model is the first to carry a `textinput`, so its in-modal text handling has no
+exact prior art (the closest is the credential prompt that previously lived in the status model).
+
+The work landed in three slices: (1) `Sa` shipped first embedded in the status model; (2) that
+code was then extracted into the `ui/stash` sub-model; (3) `Ss` is added on top of the extracted
+model. Slicing this way kept each step shippable and separately reviewable.

@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/ui/output"
 	"github.com/elentok/gx/ui/pull"
 	"github.com/elentok/gx/ui/push"
+	"github.com/elentok/gx/ui/stash"
 	"github.com/elentok/gx/ui/status/diffarea"
 
 	"charm.land/bubbles/v2/textinput"
@@ -42,9 +43,10 @@ type Model struct {
 	activeFilePath string
 	diffReloadSeq  int
 
-	bump bump.Model
-	push push.Model
-	pull pull.Model
+	bump  bump.Model
+	push  push.Model
+	pull  pull.Model
+	stash stash.Model
 
 	confirmOpen             bool
 	confirmTitle            string
@@ -67,9 +69,6 @@ type Model struct {
 	credentialPrompt        string
 	credentialInput         textinput.Model
 	credentialSecret        bool
-	stashOpen               bool
-	stashInput              textinput.Model
-	stashStagedOnly         bool
 	output                  output.Model
 	keys                    keys.Manager
 }
@@ -146,6 +145,7 @@ func NewModel(worktreeRoot string, settings ui.Settings, initialPath string, ext
 		bump:             bump.New(),
 		push:             push.New(),
 		pull:             pull.New(),
+		stash:            stash.New(),
 	}
 
 	if settings.EnableNavigation {

@@ -187,7 +187,11 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model,
 		}
 		return m, nil
 	case bindingStashAll:
-		return m, m.openStash(false)
+		if !m.hasStashableChanges(false) {
+			return m, notify.Info("nothing to stash")
+		}
+		m.keys.Reset()
+		return m, m.stash.Open(m.worktreeRoot, false)
 	case bindingEditInPlace:
 		return m, m.cmdEditSelectedFile(terminalrun.InPlace)
 	case bindingEditHSplit:
