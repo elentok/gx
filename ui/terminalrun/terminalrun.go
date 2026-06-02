@@ -57,10 +57,12 @@ func resolveGxPath() string {
 	return "gx"
 }
 
-// wrapRun rewrites a command launch so it runs under `gx run`, which keeps the
+// WrapRun rewrites a command launch so it runs under `gx run`, which keeps the
 // pane open (showing the failed command and a prompt) only when the command
-// fails. Interactive shells skip this — they use the *Bare variants.
-func wrapRun(program string, args []string) (string, []string) {
+// fails. Interactive shells must NOT be wrapped — their exit code is
+// meaningless, so they use the *Bare variants. Returns the gx path and the
+// rewritten argv.
+func WrapRun(program string, args []string) (string, []string) {
 	wrapped := make([]string, 0, len(args)+2)
 	wrapped = append(wrapped, "run", program)
 	wrapped = append(wrapped, args...)
@@ -71,7 +73,7 @@ func wrapRun(program string, args []string) (string, []string) {
 // hsplit for kitty) or in place on a plain terminal, wrapped in `gx run` so a
 // failure keeps the pane open.
 func Command(worktreeRoot string, terminal ui.Terminal, program string, args []string, done func(err error, splitApp string) tea.Msg) tea.Cmd {
-	program, args = wrapRun(program, args)
+	program, args = WrapRun(program, args)
 
 	if terminal == ui.TerminalTmux {
 		return func() tea.Msg {
@@ -103,7 +105,7 @@ func Command(worktreeRoot string, terminal ui.Terminal, program string, args []s
 // `gx run` so a failure keeps the pane open. Use CommandWithSplitBare for
 // interactive shells, which should not be wrapped.
 func CommandWithSplit(worktreeRoot string, terminal ui.Terminal, splitType SplitType, program string, args []string, done func(err error, splitApp string) tea.Msg) tea.Cmd {
-	program, args = wrapRun(program, args)
+	program, args = WrapRun(program, args)
 	return commandWithSplit(worktreeRoot, terminal, splitType, program, args, done)
 }
 
@@ -166,9 +168,13 @@ func launchSplit(worktreeRoot string, terminal ui.Terminal, splitType SplitType,
 		var typeAndLoc []string
 		switch splitType {
 		case HSplit:
-			typeAndLoc = []string{"--type=window", "--location=hsplit"}
-		case VSplit:
+			// HSplit = side-by-side. kitty's "vsplit" produces left/right panes
+			// (the opposite of its "hsplit"), matching tmux's split-window -h.
 			typeAndLoc = []string{"--type=window", "--location=vsplit"}
+		case VSplit:
+			// VSplit = stacked. kitty's "hsplit" produces top/bottom panes,
+			// matching tmux's split-window -v.
+			typeAndLoc = []string{"--type=window", "--location=hsplit"}
 		case Tab:
 			typeAndLoc = []string{"--type=tab"}
 		}

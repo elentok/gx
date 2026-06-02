@@ -120,6 +120,7 @@ Run without a command to open the status UI.`,
 		newBumpCmd(d),
 		newStashifyCmd(d),
 		newRunCmd(d),
+		newTermCmd(d),
 		newDoctorCmd(d),
 		newVersionCmd(d),
 	)

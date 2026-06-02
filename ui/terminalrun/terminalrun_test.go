@@ -17,7 +17,7 @@ func TestWrapRun_PrependsGxRun(t *testing.T) {
 	defer func() { osExecutable = prev; resetGxPath() }()
 	resetGxPath()
 
-	program, args := wrapRun("git", []string{"commit", "-m", "msg"})
+	program, args := WrapRun("git", []string{"commit", "-m", "msg"})
 	if program != "/usr/local/bin/gx" {
 		t.Fatalf("program = %q, want resolved gx path", program)
 	}
@@ -115,12 +115,14 @@ func TestLaunchSplit_ArgVectors(t *testing.T) {
 			wantName: "tmux", wantArgs: []string{"new-window", "-c", "/wt", "gx", "run", "lazygit"},
 		},
 		{
+			// HSplit (side-by-side) maps to kitty's vsplit — see ADR 0005.
 			name: "kitty/hsplit", terminal: ui.TerminalKittyRemote, splitType: HSplit, wantApp: "kitty",
-			wantName: "kitty", wantArgs: []string{"@", "launch", "--copy-env", "--type=window", "--location=hsplit", "--cwd=/wt", "gx", "run", "lazygit"},
+			wantName: "kitty", wantArgs: []string{"@", "launch", "--copy-env", "--type=window", "--location=vsplit", "--cwd=/wt", "gx", "run", "lazygit"},
 		},
 		{
+			// VSplit (stacked) maps to kitty's hsplit — see ADR 0005.
 			name: "kitty/vsplit", terminal: ui.TerminalKittyRemote, splitType: VSplit, wantApp: "kitty",
-			wantName: "kitty", wantArgs: []string{"@", "launch", "--copy-env", "--type=window", "--location=vsplit", "--cwd=/wt", "gx", "run", "lazygit"},
+			wantName: "kitty", wantArgs: []string{"@", "launch", "--copy-env", "--type=window", "--location=hsplit", "--cwd=/wt", "gx", "run", "lazygit"},
 		},
 		{
 			name: "kitty/tab", terminal: ui.TerminalKittyRemote, splitType: Tab, wantApp: "kitty",
