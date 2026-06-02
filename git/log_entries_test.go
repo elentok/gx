@@ -35,6 +35,32 @@ func TestLogEntries_StartsAtExactRef(t *testing.T) {
 	}
 }
 
+func TestLogEntriesFiltered_FollowsRenames(t *testing.T) {
+	t.Parallel()
+	repoDir := testutil.TempRepo(t)
+	testutil.WriteFile(t, repoDir, "old.txt", "one\n")
+	testutil.CommitAll(t, repoDir, "add old")
+	testutil.WriteFile(t, repoDir, "old.txt", "one\ntwo\n")
+	testutil.CommitAll(t, repoDir, "edit old")
+	mustGit(t, repoDir, "mv", "old.txt", "new.txt")
+	testutil.CommitAll(t, repoDir, "rename to new")
+
+	entries, err := git.LogEntriesFiltered(repoDir, "HEAD", 20, git.LogFilter{Path: "new.txt"})
+	if err != nil {
+		t.Fatalf("LogEntriesFiltered: %v", err)
+	}
+
+	subjects := map[string]bool{}
+	for _, e := range entries {
+		subjects[e.Subject] = true
+	}
+	for _, want := range []string{"rename to new", "edit old", "add old"} {
+		if !subjects[want] {
+			t.Fatalf("expected pre-rename history to include %q, got %+v", want, subjects)
+		}
+	}
+}
+
 func TestLogEntries_ParsesTagDecoration(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempRepo(t)

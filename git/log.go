@@ -145,7 +145,9 @@ func LogEntriesFiltered(repoRoot, startRef string, limit int, filter LogFilter) 
 	}
 	args = append(args, startRef)
 	if filter.Path != "" && !useLineRange {
-		args = append(args, "--", filter.Path)
+		// --follow makes the log span renames so a renamed file shows its
+		// pre-rename history. Incompatible with -L, hence only on this branch.
+		args = append(args, "--follow", "--", filter.Path)
 	}
 
 	out, _, err := run(repoRoot, args)
