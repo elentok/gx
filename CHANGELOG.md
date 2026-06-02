@@ -1,10 +1,11 @@
 # Changelog
 
-## Unreleased
+## v0.17.4 - 2026-06-02
 
 - Log: added `gx log -f/--file <path>` to open the log pre-filtered to a file (path is taken relative to your current directory). Follows renames, so pre-rename history is included.
 - Log: file-filtered logs now follow renames everywhere — both `gx log -f` and the status `gh` mapping show a file's history from before it was renamed.
 - CLI: shell completion is now available via `gx completion <bash|zsh|fish|powershell>`.
+- Splits/tabs: commands run in a split or tab (commit, rebase, editing a file) now keep their pane open when they fail, showing the exit code, the command that ran, and a `press Enter to close…` prompt — so you can read the error instead of the pane vanishing. Successful commands close immediately as before.
 
 ## v0.17.3 - 2026-05-31
 
