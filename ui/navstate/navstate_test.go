@@ -124,6 +124,19 @@ func TestEmptyContextRestoresFromTabMemory(t *testing.T) {
 	}
 }
 
+func TestSwitchToSeededTabUsesDefaultWorktree(t *testing.T) {
+	// Mirrors `gx log` (or `gx wt`): the status tab is only seeded by
+	// initMissingTabs, never visited. Switching to it must carry the default
+	// worktree, not a blank path — otherwise a commit there runs in the wrong
+	// directory.
+	s := newState()
+	s.SetInitialTab(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT})
+	tabVS := s.Switch(nav.ViewState{Tab: nav.TabStatus})
+	if tabVS.WorktreeRoot != defaultWT {
+		t.Fatalf("expected switched status WorktreeRoot %q, got %q", defaultWT, tabVS.WorktreeRoot)
+	}
+}
+
 func TestCommitTabDefaultsRefToHEAD(t *testing.T) {
 	s := newState()
 	s.SetInitialTab(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT})

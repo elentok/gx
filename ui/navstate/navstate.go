@@ -23,9 +23,9 @@ func NewState(defaultWorktreePath string) State {
 	return s
 }
 
-func (s State) ActiveTab() nav.TabID        { return s.activeTab }
-func (s State) LiveTab() nav.TabID          { return s.liveTab }
-func (s *State) SetLiveTab(t nav.TabID)     { s.liveTab = t }
+func (s State) ActiveTab() nav.TabID    { return s.activeTab }
+func (s State) LiveTab() nav.TabID      { return s.liveTab }
+func (s *State) SetLiveTab(t nav.TabID) { s.liveTab = t }
 func (s State) LastViewStateForTab(tab nav.TabID) nav.ViewState {
 	return s.lastViewStateByTab[tab]
 }
@@ -47,15 +47,9 @@ func (s *State) TabViewStateForViewContext(ctx nav.ViewContext) nav.ViewState {
 	case nav.TabLog, nav.TabCommit:
 		tabViewState.WorktreeRoot = ctx.WorktreeRoot
 		tabViewState.Ref = ctx.Ref
-		if strings.TrimSpace(tabViewState.WorktreeRoot) == "" {
-			tabViewState.WorktreeRoot = s.defaultWorktree
-		}
 	case nav.TabStatus:
 		tabViewState.WorktreeRoot = ctx.WorktreeRoot
 		tabViewState.InitialPath = ctx.InitialPath
-		if strings.TrimSpace(tabViewState.WorktreeRoot) == "" {
-			tabViewState.WorktreeRoot = s.defaultWorktree
-		}
 	}
 
 	// If context has no specific routing info, restore from per-tab memory.
@@ -64,6 +58,15 @@ func (s *State) TabViewStateForViewContext(ctx nav.ViewContext) nav.ViewState {
 			tabViewState.WorktreeRoot = remembered.WorktreeRoot
 			tabViewState.Ref = remembered.Ref
 			tabViewState.InitialPath = remembered.InitialPath
+		}
+	}
+
+	// Default-worktree fallback applies last so an empty remembered value (e.g.
+	// a tab only seeded by initMissingTabs) can't leave the worktree root blank
+	// — that would make commit/diff run in the wrong directory.
+	if tabID == nav.TabLog || tabID == nav.TabCommit || tabID == nav.TabStatus {
+		if strings.TrimSpace(tabViewState.WorktreeRoot) == "" {
+			tabViewState.WorktreeRoot = s.defaultWorktree
 		}
 	}
 
@@ -145,7 +148,14 @@ func (s *State) SetInitialTab(vs nav.ViewState) {
 func (s *State) initMissingTabs() {
 	for _, kind := range []nav.TabID{nav.TabWorktrees, nav.TabLog, nav.TabStatus} {
 		if _, ok := s.lastViewStateByTab[kind]; !ok {
-			s.lastViewStateByTab[kind] = nav.ViewState{Tab: kind}
+			vs := nav.ViewState{Tab: kind}
+			// Seed the worktree root so an unvisited tab opens against the active
+			// worktree instead of a blank path (the worktrees tab is repo-level
+			// and needs none).
+			if kind == nav.TabLog || kind == nav.TabStatus {
+				vs.WorktreeRoot = s.defaultWorktree
+			}
+			s.lastViewStateByTab[kind] = vs
 		}
 	}
 }
