@@ -22,6 +22,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// LogOptions configures how the log UI opens. Ref is an optional starting
+// commit-ish; File, when set, is a repo-relative path the log is pre-filtered
+// to (equivalent to the status "gh" mapping; follows renames).
+type LogOptions struct {
+	Ref  string
+	File string
+}
+
 type deps struct {
 	stdin                io.Reader
 	stdout               io.Writer
@@ -29,7 +37,7 @@ type deps struct {
 	getwd                func() (string, error)
 	runWorktrees         func(string) error
 	runStatus            func(string) error
-	runLog               func(string) error
+	runLog               func(LogOptions) error
 	runShow              func(string) error
 	confirmForce         func(string) (bool, error)
 	choosePushDivergence func(io.Reader, io.Writer, *git.PushDivergence) (int, error)
@@ -187,7 +195,8 @@ func newStatusCmd(d deps) *cobra.Command {
 }
 
 func newLogCmd(d deps) *cobra.Command {
-	return &cobra.Command{
+	var file string
+	cmd := &cobra.Command{
 		Use:   "log [hash-or-ref]",
 		Short: "open the log UI",
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -198,9 +207,39 @@ func newLogCmd(d deps) *cobra.Command {
 			if len(args) == 1 {
 				ref = args[0]
 			}
-			return d.runLog(ref)
+			resolved, err := resolveLogFile(d, file)
+			if err != nil {
+				return err
+			}
+			return d.runLog(LogOptions{Ref: ref, File: resolved})
 		},
 	}
+	cmd.Flags().StringVarP(&file, "file", "f", "", "open the log pre-filtered to a file (follows renames)")
+	_ = cmd.MarkFlagFilename("file")
+	return cmd
+}
+
+// resolveLogFile turns a user-supplied -f path (cwd-relative or absolute) into
+// the repo-relative form the log filter expects. Empty input stays empty so a
+// plain `gx log` needs no repo lookup. Paths outside the worktree are rejected.
+func resolveLogFile(d deps, file string) (string, error) {
+	if strings.TrimSpace(file) == "" {
+		return "", nil
+	}
+	cwd, err := d.getwd()
+	if err != nil {
+		return "", err
+	}
+	root, err := git.WorktreeRoot(cwd)
+	if err != nil {
+		return "", err
+	}
+	// git reports the canonical (symlink-resolved) root; align cwd so the two
+	// share a prefix before computing the repo-relative path.
+	if canon, e := filepath.EvalSymlinks(cwd); e == nil {
+		cwd = canon
+	}
+	return git.RepoRelativePath(cwd, file, root)
 }
 
 func newShowCmd(d deps) *cobra.Command {
@@ -379,7 +418,7 @@ func runStatus(target string) error {
 	return err
 }
 
-func runLog(ref string) error {
+func runLog(opts LogOptions) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -407,7 +446,7 @@ func runLog(ref string) error {
 		return err
 	}
 	m := app.New(*repo, app.Settings{
-		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: root, Ref: ref},
+		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: root, Ref: opts.Ref, FilterPath: opts.File},
 		ActiveWorktreePath: root,
 		Settings:           settingsFromConfig(cfg),
 	})

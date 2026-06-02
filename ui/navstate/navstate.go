@@ -130,6 +130,12 @@ func (s *State) ApplyViewStateChanged(vs nav.ViewState) nav.ViewState {
 
 func (s *State) SetInitialTab(vs nav.ViewState) {
 	tabVS := s.TabViewStateForViewContext(vs.Context())
+	// Context() drops the filter/focus options, so carry them over explicitly
+	// (matches Open) — otherwise an InitialRoute filter like `gx log -f` is lost.
+	tabVS.FocusSubject = vs.FocusSubject
+	tabVS.FilterPath = vs.FilterPath
+	tabVS.FilterStartLine = vs.FilterStartLine
+	tabVS.FilterEndLine = vs.FilterEndLine
 	s.liveTab = tabVS.Tab
 	s.activeTab = tabVS.Tab
 	s.initMissingTabs()

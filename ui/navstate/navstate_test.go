@@ -166,6 +166,24 @@ func TestSetInitialTabSeedsStateWithoutPushingStack(t *testing.T) {
 	}
 }
 
+func TestSetInitialTabCarriesFilterOptions(t *testing.T) {
+	s := newState()
+	s.SetInitialTab(nav.ViewState{
+		Tab:             nav.TabLog,
+		WorktreeRoot:    defaultWT,
+		FilterPath:      "go.mod",
+		FilterStartLine: 3,
+		FilterEndLine:   9,
+	})
+	active := s.Active()
+	if active.FilterPath != "go.mod" {
+		t.Fatalf("expected seeded FilterPath %q, got %q", "go.mod", active.FilterPath)
+	}
+	if active.FilterStartLine != 3 || active.FilterEndLine != 9 {
+		t.Fatalf("expected seeded filter range 3-9, got %d-%d", active.FilterStartLine, active.FilterEndLine)
+	}
+}
+
 func TestBackWithStackDepthTwoPopsToMiddleEntry(t *testing.T) {
 	s := newState()
 	s.SetInitialTab(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT})
