@@ -2,6 +2,8 @@ package terminalrun
 
 import (
 	"errors"
+	"reflect"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -88,6 +90,88 @@ func TestCommandWithSplit(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestLaunchSplit_ArgVectors(t *testing.T) {
+	tests := []struct {
+		name      string
+		terminal  ui.Terminal
+		splitType SplitType
+		wantName  string
+		wantArgs  []string
+		wantApp   string
+	}{
+		{
+			name: "tmux/hsplit", terminal: ui.TerminalTmux, splitType: HSplit, wantApp: "tmux",
+			wantName: "tmux", wantArgs: []string{"split-window", "-h", "-c", "/wt", "gx", "run", "lazygit"},
+		},
+		{
+			name: "tmux/vsplit", terminal: ui.TerminalTmux, splitType: VSplit, wantApp: "tmux",
+			wantName: "tmux", wantArgs: []string{"split-window", "-v", "-c", "/wt", "gx", "run", "lazygit"},
+		},
+		{
+			name: "tmux/tab", terminal: ui.TerminalTmux, splitType: Tab, wantApp: "tmux",
+			wantName: "tmux", wantArgs: []string{"new-window", "-c", "/wt", "gx", "run", "lazygit"},
+		},
+		{
+			name: "kitty/hsplit", terminal: ui.TerminalKittyRemote, splitType: HSplit, wantApp: "kitty",
+			wantName: "kitty", wantArgs: []string{"@", "launch", "--copy-env", "--type=window", "--location=hsplit", "--cwd=/wt", "gx", "run", "lazygit"},
+		},
+		{
+			name: "kitty/vsplit", terminal: ui.TerminalKittyRemote, splitType: VSplit, wantApp: "kitty",
+			wantName: "kitty", wantArgs: []string{"@", "launch", "--copy-env", "--type=window", "--location=vsplit", "--cwd=/wt", "gx", "run", "lazygit"},
+		},
+		{
+			name: "kitty/tab", terminal: ui.TerminalKittyRemote, splitType: Tab, wantApp: "kitty",
+			wantName: "kitty", wantArgs: []string{"@", "launch", "--copy-env", "--type=tab", "--cwd=/wt", "gx", "run", "lazygit"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotName string
+			var gotArgs []string
+			prev := runCommand
+			runCommand = func(name string, args ...string) ([]byte, error) {
+				gotName, gotArgs = name, args
+				return nil, nil
+			}
+			defer func() { runCommand = prev }()
+
+			app, err := launchSplit("/wt", tt.terminal, tt.splitType, "gx", []string{"run", "lazygit"})
+			if err != nil {
+				t.Fatalf("launchSplit() error = %v", err)
+			}
+			if app != tt.wantApp {
+				t.Errorf("app = %q, want %q", app, tt.wantApp)
+			}
+			if gotName != tt.wantName {
+				t.Errorf("command = %q, want %q", gotName, tt.wantName)
+			}
+			if !reflect.DeepEqual(gotArgs, tt.wantArgs) {
+				t.Errorf("args = %#v, want %#v", gotArgs, tt.wantArgs)
+			}
+		})
+	}
+}
+
+func TestLaunchSplit_KittyErrorIncludesCommandAndOutput(t *testing.T) {
+	prev := runCommand
+	runCommand = func(name string, args ...string) ([]byte, error) {
+		return []byte("no listening socket\n"), errors.New("exit status 1")
+	}
+	defer func() { runCommand = prev }()
+
+	_, err := launchSplit("/wt", ui.TerminalKittyRemote, VSplit, "gx", []string{"run", "lazygit"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	msg := err.Error()
+	for _, want := range []string{"$ kitty @ launch", "exit status 1", "no listening socket"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("error %q missing %q", msg, want)
+		}
 	}
 }
 

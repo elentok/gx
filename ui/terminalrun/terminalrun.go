@@ -24,6 +24,13 @@ const (
 // osExecutable is a seam so tests can exercise the gx-path fallback.
 var osExecutable = os.Executable
 
+// runCommand runs an external command and returns its combined output and exit
+// error. It is a seam so tests can assert the exact tmux/kitty argument vectors
+// launchSplit builds without spawning a real multiplexer.
+var runCommand = func(name string, args ...string) ([]byte, error) {
+	return exec.Command(name, args...).CombinedOutput()
+}
+
 var (
 	gxPathOnce  sync.Once
 	gxPathValue string
@@ -116,45 +123,64 @@ func commandWithSplit(worktreeRoot string, terminal ui.Terminal, splitType Split
 		})
 	}
 
-	if terminal == ui.TerminalTmux {
+	if terminal.CanSplit() {
 		return func() tea.Msg {
-			var tmuxArgs []string
-			switch splitType {
-			case HSplit:
-				tmuxArgs = []string{"split-window", "-h", "-c", worktreeRoot, program}
-			case VSplit:
-				tmuxArgs = []string{"split-window", "-v", "-c", worktreeRoot, program}
-			case Tab:
-				tmuxArgs = []string{"new-window", "-c", worktreeRoot, program}
-			}
-			tmuxArgs = append(tmuxArgs, args...)
-			err := exec.Command("tmux", tmuxArgs...).Run()
-			return done(err, "tmux")
-		}
-	}
-
-	if terminal == ui.TerminalKittyRemote {
-		return func() tea.Msg {
-			var typeAndLoc []string
-			switch splitType {
-			case HSplit:
-				typeAndLoc = []string{"--type=window", "--location=hsplit"}
-			case VSplit:
-				typeAndLoc = []string{"--type=window", "--location=vsplit"}
-			case Tab:
-				typeAndLoc = []string{"--type=tab"}
-			}
-			kittyArgs := []string{"@", "launch", "--copy-env"}
-			kittyArgs = append(kittyArgs, typeAndLoc...)
-			kittyArgs = append(kittyArgs, "--cwd="+worktreeRoot, program)
-			kittyArgs = append(kittyArgs, args...)
-			out, err := exec.Command("kitty", kittyArgs...).CombinedOutput()
-			if err != nil {
-				err = fmt.Errorf("$ kitty %s\n\n%w\n\n%s", strings.Join(kittyArgs, " "), err, strings.TrimSpace(string(out)))
-			}
-			return done(err, "kitty")
+			splitApp, err := launchSplit(worktreeRoot, terminal, splitType, program, args)
+			return done(err, splitApp)
 		}
 	}
 
 	return notify.Warning("split not supported for this terminal")
+}
+
+// Launch synchronously launches program (with args) into the requested
+// split/tab and returns the short app label ("tmux"/"kitty") plus any launch
+// error. It is the entry point for callers outside Bubbletea (the `gx term`
+// CLI), running the same per-terminal logic the TUI drives through
+// CommandWithSplit. splitType must not be InPlace, and terminal must satisfy
+// CanSplit(); the caller owns the in-place / non-splittable fallback.
+func Launch(worktreeRoot string, terminal ui.Terminal, splitType SplitType, program string, args []string) (string, error) {
+	return launchSplit(worktreeRoot, terminal, splitType, program, args)
+}
+
+// launchSplit builds the tmux/kitty argument vector for splitType and runs it,
+// returning the app label and (for kitty) a formatted error including the
+// command and its output. It is synchronous; the TUI wraps it in a tea.Cmd
+// closure and the CLI calls it directly.
+func launchSplit(worktreeRoot string, terminal ui.Terminal, splitType SplitType, program string, args []string) (string, error) {
+	switch terminal {
+	case ui.TerminalTmux:
+		var tmuxArgs []string
+		switch splitType {
+		case HSplit:
+			tmuxArgs = []string{"split-window", "-h", "-c", worktreeRoot, program}
+		case VSplit:
+			tmuxArgs = []string{"split-window", "-v", "-c", worktreeRoot, program}
+		case Tab:
+			tmuxArgs = []string{"new-window", "-c", worktreeRoot, program}
+		}
+		tmuxArgs = append(tmuxArgs, args...)
+		_, err := runCommand("tmux", tmuxArgs...)
+		return "tmux", err
+	case ui.TerminalKittyRemote:
+		var typeAndLoc []string
+		switch splitType {
+		case HSplit:
+			typeAndLoc = []string{"--type=window", "--location=hsplit"}
+		case VSplit:
+			typeAndLoc = []string{"--type=window", "--location=vsplit"}
+		case Tab:
+			typeAndLoc = []string{"--type=tab"}
+		}
+		kittyArgs := []string{"@", "launch", "--copy-env"}
+		kittyArgs = append(kittyArgs, typeAndLoc...)
+		kittyArgs = append(kittyArgs, "--cwd="+worktreeRoot, program)
+		kittyArgs = append(kittyArgs, args...)
+		out, err := runCommand("kitty", kittyArgs...)
+		if err != nil {
+			err = fmt.Errorf("$ kitty %s\n\n%w\n\n%s", strings.Join(kittyArgs, " "), err, strings.TrimSpace(string(out)))
+		}
+		return "kitty", err
+	}
+	return "", fmt.Errorf("split not supported for terminal %v", terminal)
 }
