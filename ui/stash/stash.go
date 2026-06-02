@@ -78,6 +78,9 @@ func (m *Model) Open(root string, stagedOnly bool) tea.Cmd {
 // InputFocused reports whether the text input is currently capturing keys.
 func (m Model) InputFocused() bool { return m.IsOpen && m.phase == phaseInput }
 
+// StagedOnly reports whether the model was opened in staged-only mode.
+func (m Model) StagedOnly() bool { return m.stagedOnly }
+
 // Update handles all messages while the modal is open.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, Result) {
 	switch msg := msg.(type) {

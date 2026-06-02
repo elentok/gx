@@ -3,6 +3,7 @@ package status
 import (
 	"testing"
 
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	notifypkg "github.com/elentok/gx/ui/notify"
 
@@ -30,6 +31,15 @@ func sendStashAllChord(m Model) (Model, tea.Cmd) {
 		panic("S prefix unexpectedly produced a command")
 	}
 	return sendKey(m, 'a', "a")
+}
+
+// sendStashStagedChord sends the "S" then "s" chord.
+func sendStashStagedChord(m Model) (Model, tea.Cmd) {
+	m, cmd := sendKey(m, 'S', "S")
+	if cmd != nil {
+		panic("S prefix unexpectedly produced a command")
+	}
+	return sendKey(m, 's', "s")
 }
 
 func expectNothingToStash(t *testing.T, m Model, cmd tea.Cmd) {
@@ -118,6 +128,52 @@ func TestStashAll_StashedResultNotifiesAndRefreshes(t *testing.T) {
 	}
 	if follow == nil {
 		t.Fatal("expected a follow-up cmd (notify + refresh) after stash succeeded")
+	}
+}
+
+func TestStashStaged_NothingStagedShowsNotice(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	// Only unstaged modifications — nothing staged to stash.
+	testutil.WriteFile(t, repo, "README.md", "changed\n")
+
+	m := newTestModelDefault(repo)
+	m.ready = true
+
+	m, cmd := sendStashStagedChord(m)
+	if m.stash.IsOpen {
+		t.Fatal("stash modal should not open when nothing staged")
+	}
+	if cmd == nil {
+		t.Fatal("expected a notify cmd")
+	}
+	msg := cmd()
+	notifyMsg, ok := msg.(notifypkg.NotifyMsg)
+	if !ok {
+		t.Fatalf("expected NotifyMsg, got %T", msg)
+	}
+	if notifyMsg.Message != "nothing staged to stash" {
+		t.Fatalf("notify = %q, want %q", notifyMsg.Message, "nothing staged to stash")
+	}
+}
+
+func TestStashStaged_OpensStagedModalWhenStagedChangesExist(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "staged.txt", "staged\n")
+	if err := git.StagePath(repo, "staged.txt"); err != nil {
+		t.Fatalf("stage staged.txt: %v", err)
+	}
+
+	m := newTestModelDefault(repo)
+	m.ready = true
+
+	m, _ = sendStashStagedChord(m)
+	if !m.stash.IsOpen {
+		t.Fatal("expected stash modal to open")
+	}
+	if !m.stash.StagedOnly() {
+		t.Fatal("expected stash sub-model to be in staged-only mode")
 	}
 }
 

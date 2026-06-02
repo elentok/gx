@@ -120,6 +120,7 @@ Status UI highlights:
 - Open lazygit log with `ol`
 - View the last command output with `oo`
 - Pull/push/rebase/amend/bump actions directly in status (`p`/`P`/`b`/`A`/`B`) with confirmations; push confirms first, then checks divergence if needed
+- Stash directly from status: `Sa` stashes all tracked changes (staged + unstaged), `Ss` stashes only staged changes — both prompt for an optional name first
 - Push divergence flow uses a menu (`j`/`k` + `enter`) with relative commit times
 - Push in status detects GitHub PR URLs and asks whether to open them
 - Keyboard help overlay (`?`) and full git-error overlay

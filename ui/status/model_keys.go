@@ -45,6 +45,7 @@ const (
 	bindingEditTab       keys.BindingID = "edit-tab"
 	bindingFilterLog     keys.BindingID = "filter-log"
 	bindingStashAll      keys.BindingID = "stash-all"
+	bindingStashStaged   keys.BindingID = "stash-staged"
 )
 
 func newStatusManager() keys.Manager {
@@ -93,6 +94,7 @@ func newStatusManager() keys.Manager {
 		{ID: bindingBump, Seq: []string{"B"}, Categories: []string{"Git"}, Title: "bump version"},
 		// S-prefix chords (stash)
 		{ID: bindingStashAll, Seq: []string{"S", "a"}, Categories: []string{"Git"}, Title: "stash all"},
+		{ID: bindingStashStaged, Seq: []string{"S", "s"}, Categories: []string{"Git"}, Title: "stash staged"},
 		{ID: bindingCancelChord, Seq: []string{"S", "esc"}, Categories: []string{}, Title: ""},
 		// e-prefix chords
 		{ID: bindingEditInPlace, Seq: []string{"e", "e"}, Categories: []string{"Filetree", "Diff"}, Title: "edit file"},
@@ -192,6 +194,12 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model,
 		}
 		m.keys.Reset()
 		return m, m.stash.Open(m.worktreeRoot, false)
+	case bindingStashStaged:
+		if !m.hasStashableChanges(true) {
+			return m, notify.Info("nothing staged to stash")
+		}
+		m.keys.Reset()
+		return m, m.stash.Open(m.worktreeRoot, true)
 	case bindingEditInPlace:
 		return m, m.cmdEditSelectedFile(terminalrun.InPlace)
 	case bindingEditHSplit:

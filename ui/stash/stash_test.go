@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -151,6 +152,51 @@ func TestStagedTitle_RendersStagedVariant(t *testing.T) {
 	view := m.View(120)
 	if !strings.Contains(view, "Stash staged changes") {
 		t.Fatalf("expected staged title in view, got: %q", view)
+	}
+}
+
+func TestStagedOnly_StashesOnlyStagedLeavesUnstaged(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "staged.txt", "staged\n")
+	if err := git.StagePath(repo, "staged.txt"); err != nil {
+		t.Fatalf("stage staged.txt: %v", err)
+	}
+	testutil.WriteFile(t, repo, "unstaged.txt", "unstaged\n")
+
+	m := New()
+	m.Open(repo, true)
+
+	view := m.View(120)
+	if !strings.Contains(view, "Stash staged changes") {
+		t.Fatalf("expected staged title in view, got: %q", view)
+	}
+
+	msg := m.cmdStash("")()
+	m, _, result := m.Update(msg)
+	if !result.Done {
+		t.Fatal("expected Done after stash finished")
+	}
+	if result.Outcome != OutcomeStashed {
+		t.Fatalf("expected OutcomeStashed, got %v", result.Outcome)
+	}
+	if !result.StagedOnly {
+		t.Fatal("expected StagedOnly=true in result")
+	}
+
+	// unstaged.txt must still be present (untracked, not stashed)
+	files, err := git.ListStageFiles(repo)
+	if err != nil {
+		t.Fatalf("ListStageFiles: %v", err)
+	}
+	found := false
+	for _, f := range files {
+		if f.Path == "unstaged.txt" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("expected unstaged.txt to remain after staged-only stash")
 	}
 }
 

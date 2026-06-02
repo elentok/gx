@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.17.6 - 2026-06-02
+
+- Status: added `Sa` / `Ss` stash shortcuts. `Sa` stashes all tracked changes (staged + unstaged); `Ss` stashes only staged changes, leaving unstaged modifications in place. Both prompt for an optional stash name before running.
+
 ## v0.17.5 - 2026-06-02
 
 - CLI: added `gx term` to launch a command (or `$SHELL`) into a tmux/kitty split, tab, or in place. Directions are named by visual outcome (`--right`/`--below` default/`--tab`/`--here`) so the same flag lays out identically on tmux and kitty; `--cwd` sets the working directory. On a plain terminal (or kitty without remote control) it runs in place, so the same invocation works everywhere — handy for opening things from neovim into a split.
