@@ -88,6 +88,13 @@ gx log
 gx show HEAD
 ```
 
+Open the log pre-filtered to a single file (equivalent to the status `gh` mapping; follows renames so pre-rename history is included). The path is taken relative to your current directory:
+
+```sh
+gx log -f path/to/file.go
+gx log --file path/to/file.go HEAD   # optionally start at a ref
+```
+
 Open the interactive staging UI:
 
 ```sh
@@ -190,6 +197,13 @@ Print the current binary version:
 
 ```sh
 gx version
+```
+
+Generate a shell-completion script (bash, zsh, fish, or powershell):
+
+```sh
+gx completion fish | source            # current session
+gx completion zsh > ~/.zsh/_gx         # persist
 ```
 
 ## Configuration

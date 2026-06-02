@@ -1,7 +1,7 @@
 # ADR 0003 — Migrate the CLI to cobra
 
 ## Status
-Proposed
+Completed
 
 ## Context
 

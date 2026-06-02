@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Log: added `gx log -f/--file <path>` to open the log pre-filtered to a file (path is taken relative to your current directory). Follows renames, so pre-rename history is included.
+- Log: file-filtered logs now follow renames everywhere — both `gx log -f` and the status `gh` mapping show a file's history from before it was renamed.
+- CLI: shell completion is now available via `gx completion <bash|zsh|fish|powershell>`.
+
 ## v0.17.3 - 2026-05-31
 
 - Log: improve columns
