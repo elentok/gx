@@ -276,6 +276,33 @@ func TestLoadNameAliases(t *testing.T) {
 	}
 }
 
+func TestLoadLogHideRefsPreservesDefaultImportantRefs(t *testing.T) {
+	tmp := t.TempDir()
+	prev := userConfigDirFn
+	userConfigDirFn = func() (string, error) { return tmp, nil }
+	t.Cleanup(func() { userConfigDirFn = prev })
+
+	dir := filepath.Join(tmp, "gx")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(`{"log":{"hide-refs":["refs/remotes/origin/HEAD"]}}`), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(cfg.Log.HideRefs) != 1 || cfg.Log.HideRefs[0] != "refs/remotes/origin/HEAD" {
+		t.Fatalf("HideRefs = %v, want [refs/remotes/origin/HEAD]", cfg.Log.HideRefs)
+	}
+	def := DefaultLogConfig()
+	if len(cfg.Log.ImportantRefs) != len(def.ImportantRefs) {
+		t.Fatalf("ImportantRefs len = %d, want %d (defaults preserved)", len(cfg.Log.ImportantRefs), len(def.ImportantRefs))
+	}
+}
+
 func TestInitFailsIfConfigExists(t *testing.T) {
 	tmp := t.TempDir()
 	prev := userConfigDirFn

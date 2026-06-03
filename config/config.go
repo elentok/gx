@@ -82,7 +82,12 @@ func Load() (Config, error) {
 		}
 	}
 	if raw.Log != nil {
-		cfg.Log = *raw.Log
+		if raw.Log.ImportantRefs != nil {
+			cfg.Log.ImportantRefs = raw.Log.ImportantRefs
+		}
+		if raw.Log.HideRefs != nil {
+			cfg.Log.HideRefs = raw.Log.HideRefs
+		}
 	}
 
 	return cfg, nil
