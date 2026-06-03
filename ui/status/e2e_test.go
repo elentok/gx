@@ -55,6 +55,21 @@ func waitForGitState(t *testing.T, tm *teatest.TestModel, timeout time.Duration,
 	teatest.WaitFor(t, tm.Output(), func(_ []byte) bool { return cond() }, teatest.WithDuration(timeout))
 }
 
+// waitForCurrentFrameCondition polls tm.CurrentFrame() (always the latest rendered
+// frame, never accumulated) until condition returns true or timeout elapses.
+func waitForCurrentFrameCondition(t *testing.T, tm *teatest.TestModel, condition func(stripped string) bool, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if condition(ansi.Strip(string(tm.CurrentFrame()))) {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("timeout after %s waiting for frame condition. Last frame:\n%s",
+		timeout, ansi.Strip(string(tm.CurrentFrame())))
+}
+
 func quitStage(t *testing.T, tm *teatest.TestModel) {
 	t.Helper()
 	tm.Send(keySpecial(tea.KeyEsc))
@@ -601,9 +616,12 @@ func TestStageE2E_PullActionUpdatesWorktree(t *testing.T) {
 		log := gitOutput(t, repoDir, "log", "--oneline", "-1")
 		return strings.Contains(log, "remote update")
 	})
-	// wait for the TUI to process the completion and close the pull modal;
-	// without this, 'q' is routed to the pull modal handler instead of quit
-	waitForStageText(t, tm, "Filetree", stageLoadWait)
+	// Poll the current frame (not accumulated bytes) until the pull modal's
+	// "Pull" title is gone — this is the reliable signal that m.pull.IsOpen
+	// has become false and 'q' will reach the quit handler instead of the modal.
+	waitForCurrentFrameCondition(t, tm, func(s string) bool {
+		return !strings.Contains(s, "Pull\n") && !strings.Contains(s, " Pull ")
+	}, stageLoadWait)
 
 	quitStage(t, tm)
 }
