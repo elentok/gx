@@ -1,9 +1,14 @@
 package log
 
 // SelectRef returns a copy with cursor moved to the commit matching fullHash.
+// If rows are not yet loaded, stores the ref to apply on the next reload.
 // If no matching row is found, cursor is unchanged.
 func (m Model) SelectRef(fullHash string) Model {
 	if fullHash == "" {
+		return m
+	}
+	if len(m.rows) == 0 {
+		m.pendingFocusRef = fullHash
 		return m
 	}
 	for i := range m.rows {
@@ -16,8 +21,12 @@ func (m Model) SelectRef(fullHash string) Model {
 	return m
 }
 
-// SelectedRef returns the full hash of the currently selected commit row.
+// SelectedRef returns the full hash of the currently selected commit row,
+// or the pending focus ref if rows are not yet loaded.
 func (m Model) SelectedRef() string {
+	if len(m.rows) == 0 {
+		return m.pendingFocusRef
+	}
 	cursor := m.list.Selected()
 	if cursor < 0 || cursor >= len(m.rows) {
 		return ""

@@ -77,6 +77,7 @@ type Model struct {
 	reword reword.Model
 
 	pendingFocusSubject string
+	pendingFocusRef     string
 	flashSubject        string
 	flashUntil          time.Time
 

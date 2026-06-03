@@ -139,6 +139,16 @@ func (m Model) handleReload(msg reloadMsg) (tea.Model, tea.Cmd) {
 	m.err = nil
 	m.rows = msg.rows
 	m.branchDiverged = msg.branchDiverged
+	if m.pendingFocusRef != "" {
+		ref := m.pendingFocusRef
+		m.pendingFocusRef = ""
+		for i, r := range m.rows {
+			if r.kind == rowCommit && r.commit.FullHash == ref {
+				m.list.SetSelected(i, len(m.rows))
+				break
+			}
+		}
+	}
 	m.pendingFocusSubject = ""
 	if msg.focusSubject != "" {
 		m.list.SetSelected(0, len(m.rows))
