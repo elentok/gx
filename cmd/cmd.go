@@ -513,7 +513,7 @@ func runShow(ref string) error {
 		return err
 	}
 	m := app.New(*repo, app.Settings{
-		InitialRoute:       nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: root, Ref: ref},
+		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: root, Ref: ref},
 		ActiveWorktreePath: root,
 		Settings:           settingsFromConfig(cfg),
 	})

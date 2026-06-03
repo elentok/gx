@@ -143,6 +143,32 @@ func revCount(repoRoot, fromRef, toRef string) (int, error) {
 	return n, nil
 }
 
+// WorktreeStatusSummary returns counts of staged, unstaged, and untracked
+// changes in the worktree at dir.
+func WorktreeStatusSummary(dir string) (staged, unstaged, untracked int, err error) {
+	out, _, err := runNoOptionalLocks(dir, []string{"status", "--porcelain=v1"})
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if len(line) < 2 {
+			continue
+		}
+		x, y := line[0], line[1]
+		if x == '?' && y == '?' {
+			untracked++
+		} else {
+			if x != ' ' {
+				staged++
+			}
+			if y != ' ' {
+				unstaged++
+			}
+		}
+	}
+	return staged, unstaged, untracked, nil
+}
+
 // UncommittedChanges returns modified, added, deleted, and untracked files in
 // the worktree at the given path.
 func UncommittedChanges(worktreePath string) ([]Change, error) {

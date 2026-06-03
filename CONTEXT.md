@@ -54,8 +54,9 @@ line index.
 
 ## App Navigation
 
-**TabID** — canonical identifier of a top-level app destination (`worktrees`, `log`, `commit`,
-`status`). This is the only term used for tab identity.
+**TabID** — canonical identifier of a top-level app destination (`worktrees`, `log`, `status`,
+`stash`). This is the only term used for tab identity. `commit` no longer exists as a standalone
+tab — commit detail is rendered as the right/bottom panel of the log split view.
 
 **ViewState** — the full navigation payload for a screen. Composed of a `ViewContext` and
 `ViewOptions`. This is the canonical navigation term.
@@ -74,6 +75,31 @@ when switching tabs so users return to their last context in that tab.
 **Selected worktree** — the currently highlighted worktree row in the worktrees tab. This is a
 focus identity and is distinct from `worktreeRoot` (repository/worktree context used by other
 tabs).
+
+**Split view** — the layout used by the log and stash tabs. A list panel (left or top) paired with
+a commit detail panel (right or bottom). Orientation is auto-detected from terminal width (same
+threshold as status `useStackedLayout`) and toggled manually via the `to` chord
+(`toggle-layout-orientation`).
+
+**Panel visibility state** — the three states a split view can be in:
+- *Collapsed* — only the list panel is visible. Default for the log tab.
+- *Split* — both panels are visible. Default for the stash tab. Detail auto-updates as list
+  selection changes (j/k navigation).
+- *Fullscreen* — one panel fills the entire screen, the other is hidden. Toggled with `f` on
+  the currently focused panel.
+
+Focus and collapse rules: Enter on a list item in collapsed state → expands to split, focuses
+detail. Esc from detail → returns focus to list (stays in split). Esc from list while split →
+collapses back to collapsed state.
+
+**Pseudo-log-line** — a always-present synthetic row at the top of the log list representing the
+working tree. Background-loaded; shows three states: loading, clean ("no local changes"), or dirty
+(staged · unstaged · untracked counts). Pressing Enter on it switches to the status tab carrying
+the current worktree context.
+
+**Shared worktree context** — log and status tabs share the same `WorktreeRoot`. Switching between
+them (via number keys or `g+l`/`g+s`) carries the active worktree to the target tab. The worktrees
+tab remains the explicit way to change which worktree the other tabs point at.
 
 **Navigation messages** — the four app-shell message types that child models emit to drive
 navigation. All are defined in `ui/nav`:

@@ -137,57 +137,6 @@ func TestGHResetsCustomRefToHead(t *testing.T) {
 	}
 }
 
-func TestEnterOnCommitRowOpensCommitView(t *testing.T) {
-	repo := testutil.TempRepo(t)
-
-	m := newTestModelDefault(repo, "", settings)
-	for i := range m.rows {
-		if m.rows[i].kind == rowCommit {
-			m.list.SetSelected(i, len(m.rows))
-			break
-		}
-	}
-
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	if cmd == nil {
-		t.Fatalf("expected nav command on enter")
-	}
-	vs, ok := nav.IsOpen(cmd())
-	if !ok {
-		t.Fatalf("expected nav push")
-	}
-	if vs.Tab != nav.TabCommit {
-		t.Fatalf("expected commit tab, got %q", vs.Tab)
-	}
-	_ = updated
-}
-
-func TestEnterOnCommitRowCarriesActiveFilterPath(t *testing.T) {
-	repo := testutil.TempRepo(t)
-	testutil.Mkdir(t, filepath.Join(repo, "src"))
-	testutil.WriteFile(t, repo, "src/main.go", "package main\n")
-	testutil.CommitAll(t, repo, "add file")
-
-	m := newTestModelFiltered(repo, "", settings, LogFilter{Path: "src/main.go"})
-	for i := range m.rows {
-		if m.rows[i].kind == rowCommit {
-			m.list.SetSelected(i, len(m.rows))
-			break
-		}
-	}
-
-	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	if cmd == nil {
-		t.Fatalf("expected nav command on enter")
-	}
-	vs, ok := nav.IsOpen(cmd())
-	if !ok {
-		t.Fatalf("expected nav push")
-	}
-	if vs.FilterPath != "src/main.go" {
-		t.Fatalf("vs.FilterPath = %q, want %q", vs.FilterPath, "src/main.go")
-	}
-}
 
 func TestSelectedCommitRowFillsFullWidth(t *testing.T) {
 	m := newTestModel()

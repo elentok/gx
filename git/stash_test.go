@@ -134,6 +134,93 @@ func stashList(t *testing.T, dir string) string {
 	return stdout
 }
 
+func TestStashList_Empty(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	entries, err := StashList(dir)
+	if err != nil {
+		t.Fatalf("StashList on empty stash: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("expected 0 entries, got %d", len(entries))
+	}
+}
+
+func TestStashList_SingleEntry(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	writeFile(t, dir, "README.md", "changed content")
+	if _, err := StashPush(dir, "my-stash", false); err != nil {
+		t.Fatalf("StashPush: %v", err)
+	}
+	entries, err := StashList(dir)
+	if err != nil {
+		t.Fatalf("StashList: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	e := entries[0]
+	if e.Index != 0 {
+		t.Errorf("expected index 0, got %d", e.Index)
+	}
+	if e.Ref != "stash@{0}" {
+		t.Errorf("expected ref stash@{0}, got %q", e.Ref)
+	}
+	if !strings.Contains(e.Message, "my-stash") {
+		t.Errorf("expected message to contain %q, got %q", "my-stash", e.Message)
+	}
+	if e.Timestamp.IsZero() {
+		t.Errorf("expected non-zero timestamp")
+	}
+}
+
+func TestStashList_MultipleEntries(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	writeFile(t, dir, "README.md", "first change")
+	if _, err := StashPush(dir, "first-stash", false); err != nil {
+		t.Fatalf("StashPush first: %v", err)
+	}
+	writeFile(t, dir, "README.md", "second change")
+	if _, err := StashPush(dir, "second-stash", false); err != nil {
+		t.Fatalf("StashPush second: %v", err)
+	}
+	entries, err := StashList(dir)
+	if err != nil {
+		t.Fatalf("StashList: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(entries))
+	}
+	// Newest first: second-stash is stash@{0}.
+	if entries[0].Index != 0 || !strings.Contains(entries[0].Message, "second-stash") {
+		t.Errorf("expected entries[0] to be second-stash@{0}, got %+v", entries[0])
+	}
+	if entries[1].Index != 1 || !strings.Contains(entries[1].Message, "first-stash") {
+		t.Errorf("expected entries[1] to be first-stash@{1}, got %+v", entries[1])
+	}
+}
+
+func TestStashList_AutoName(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	writeFile(t, dir, "README.md", "changed content")
+	if _, err := StashPush(dir, "", false); err != nil {
+		t.Fatalf("StashPush: %v", err)
+	}
+	entries, err := StashList(dir)
+	if err != nil {
+		t.Fatalf("StashList: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if !strings.Contains(entries[0].Message, "WIP on") {
+		t.Errorf("expected auto-named WIP message, got %q", entries[0].Message)
+	}
+}
+
 func TestIsIndexLockBusyErr_Nil(t *testing.T) {
 	if isIndexLockBusyErr(nil, "") {
 		t.Error("expected false for nil error")

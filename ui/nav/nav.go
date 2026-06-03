@@ -8,7 +8,7 @@ const (
 	TabWorktrees TabID = "worktrees"
 	TabLog       TabID = "log"
 	TabStatus    TabID = "status"
-	TabCommit    TabID = "commit"
+	TabStash     TabID = "stash"
 )
 
 type ViewState struct {

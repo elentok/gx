@@ -134,6 +134,106 @@ func TestUncommittedChanges_untracked(t *testing.T) {
 	}
 }
 
+func TestWorktreeStatusSummary_clean(t *testing.T) {
+	t.Parallel()
+	repoDir := tempBareRepoWithWorktreesLight(t, "feature")
+	wtDir := filepath.Join(repoDir, "feature")
+
+	staged, unstaged, untracked, err := git.WorktreeStatusSummary(wtDir)
+	if err != nil {
+		t.Fatalf("WorktreeStatusSummary: %v", err)
+	}
+	if staged != 0 || unstaged != 0 || untracked != 0 {
+		t.Errorf("expected all zeros for clean repo, got staged=%d unstaged=%d untracked=%d", staged, unstaged, untracked)
+	}
+}
+
+func TestWorktreeStatusSummary_staged(t *testing.T) {
+	t.Parallel()
+	repoDir := tempBareRepoWithWorktreesLight(t, "feature")
+	wtDir := filepath.Join(repoDir, "feature")
+
+	testutil.WriteFile(t, wtDir, "new.txt", "staged content")
+	testutil.MustGitExported(t, wtDir, "add", "new.txt")
+
+	staged, unstaged, untracked, err := git.WorktreeStatusSummary(wtDir)
+	if err != nil {
+		t.Fatalf("WorktreeStatusSummary: %v", err)
+	}
+	if staged != 1 {
+		t.Errorf("expected staged=1, got %d", staged)
+	}
+	if unstaged != 0 || untracked != 0 {
+		t.Errorf("expected unstaged=0 untracked=0, got unstaged=%d untracked=%d", unstaged, untracked)
+	}
+}
+
+func TestWorktreeStatusSummary_unstaged(t *testing.T) {
+	t.Parallel()
+	repoDir := tempBareRepoWithWorktreesLight(t, "feature")
+	wtDir := filepath.Join(repoDir, "feature")
+
+	testutil.WriteFile(t, wtDir, "file.txt", "modified")
+
+	staged, unstaged, untracked, err := git.WorktreeStatusSummary(wtDir)
+	if err != nil {
+		t.Fatalf("WorktreeStatusSummary: %v", err)
+	}
+	if unstaged != 1 {
+		t.Errorf("expected unstaged=1, got %d", unstaged)
+	}
+	if staged != 0 || untracked != 0 {
+		t.Errorf("expected staged=0 untracked=0, got staged=%d untracked=%d", staged, untracked)
+	}
+}
+
+func TestWorktreeStatusSummary_untracked(t *testing.T) {
+	t.Parallel()
+	repoDir := tempBareRepoWithWorktreesLight(t, "feature")
+	wtDir := filepath.Join(repoDir, "feature")
+
+	testutil.WriteFile(t, wtDir, "newfile.txt", "untracked")
+
+	staged, unstaged, untracked, err := git.WorktreeStatusSummary(wtDir)
+	if err != nil {
+		t.Fatalf("WorktreeStatusSummary: %v", err)
+	}
+	if untracked != 1 {
+		t.Errorf("expected untracked=1, got %d", untracked)
+	}
+	if staged != 0 || unstaged != 0 {
+		t.Errorf("expected staged=0 unstaged=0, got staged=%d unstaged=%d", staged, unstaged)
+	}
+}
+
+func TestWorktreeStatusSummary_mixed(t *testing.T) {
+	t.Parallel()
+	repoDir := tempBareRepoWithWorktreesLight(t, "feature")
+	wtDir := filepath.Join(repoDir, "feature")
+
+	// Staged: new file added to index
+	testutil.WriteFile(t, wtDir, "staged.txt", "staged")
+	testutil.MustGitExported(t, wtDir, "add", "staged.txt")
+	// Unstaged: existing file modified without staging
+	testutil.WriteFile(t, wtDir, "file.txt", "modified")
+	// Untracked: new file not added
+	testutil.WriteFile(t, wtDir, "untracked.txt", "untracked")
+
+	staged, unstaged, untracked, err := git.WorktreeStatusSummary(wtDir)
+	if err != nil {
+		t.Fatalf("WorktreeStatusSummary: %v", err)
+	}
+	if staged != 1 {
+		t.Errorf("expected staged=1, got %d", staged)
+	}
+	if unstaged != 1 {
+		t.Errorf("expected unstaged=1, got %d", unstaged)
+	}
+	if untracked != 1 {
+		t.Errorf("expected untracked=1, got %d", untracked)
+	}
+}
+
 func TestWorktreeSyncStatus_aheadOfUpstream(t *testing.T) {
 	t.Parallel()
 	repoDir := tempBareRepoWithWorktreesLight(t, "feature")

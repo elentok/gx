@@ -1,9 +1,61 @@
 package git
 
 import (
+	"strconv"
 	"strings"
 	"time"
 )
+
+// StashEntry represents one entry from `git stash list`.
+type StashEntry struct {
+	Index     int
+	Ref       string // e.g. "stash@{0}"
+	Message   string // e.g. "On main: my stash"
+	Timestamp time.Time
+}
+
+// StashList returns all stash entries for the repo at dir, newest first.
+func StashList(dir string) ([]StashEntry, error) {
+	out, _, err := run(dir, []string{"stash", "list", "--format=format:%gd%x09%at%x09%gs"})
+	if err != nil {
+		return nil, err
+	}
+	out = strings.TrimSpace(out)
+	if out == "" {
+		return nil, nil
+	}
+	var entries []StashEntry
+	for _, line := range strings.Split(out, "\n") {
+		parts := strings.SplitN(line, "\t", 3)
+		if len(parts) != 3 {
+			continue
+		}
+		ref := parts[0]
+		index := parseStashIndex(ref)
+		ts, _ := strconv.ParseInt(strings.TrimSpace(parts[1]), 10, 64)
+		entries = append(entries, StashEntry{
+			Index:     index,
+			Ref:       ref,
+			Message:   parts[2],
+			Timestamp: time.Unix(ts, 0),
+		})
+	}
+	return entries, nil
+}
+
+// parseStashIndex extracts N from "stash@{N}".
+func parseStashIndex(ref string) int {
+	open := strings.Index(ref, "{")
+	close := strings.Index(ref, "}")
+	if open < 0 || close <= open {
+		return -1
+	}
+	n, err := strconv.Atoi(ref[open+1 : close])
+	if err != nil {
+		return -1
+	}
+	return n
+}
 
 // Stash saves the dirty state of the working directory onto the stash stack.
 func Stash(dir string) (string, error) {

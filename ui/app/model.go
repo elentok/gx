@@ -178,10 +178,10 @@ func (m Model) newHistoryEntry(viewState nav.ViewState) historyEntry {
 				EndLine:   viewState.FilterEndLine,
 			}, keys.New(Bindings())),
 		}
-	case nav.TabCommit:
+	case nav.TabStash:
 		return historyEntry{
 			viewState: viewState,
-			model:     commitui.NewModel(viewState.WorktreeRoot, viewState.Ref, viewState.FilterPath, s, keys.New(Bindings())),
+			model:     &stashPlaceholder{},
 		}
 	case nav.TabWorktrees:
 		fallthrough
@@ -233,3 +233,9 @@ func (m *Model) restoreLogSelectionFromPoppedPage(popped historyEntry) {
 	// Keep router tab memory in sync so future tab switches restore the correct ref.
 	m.navState.ApplyViewStateChanged(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: current.viewState.WorktreeRoot, Ref: ref})
 }
+
+type stashPlaceholder struct{}
+
+func (s *stashPlaceholder) Init() tea.Cmd                       { return nil }
+func (s *stashPlaceholder) Update(tea.Msg) (tea.Model, tea.Cmd) { return s, nil }
+func (s *stashPlaceholder) View() tea.View                      { return tea.NewView("stash (not yet implemented)") }

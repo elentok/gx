@@ -3,7 +3,6 @@ package log
 import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 
 	tea "charm.land/bubbletea/v2"
@@ -122,10 +121,7 @@ func (m Model) openSelected() tea.Cmd {
 		return nil
 	}
 	selected := m.rows[cursor]
-	return nav.Open(nav.ViewState{
-		Tab:          nav.TabCommit,
-		WorktreeRoot: m.worktreeRoot,
-		Ref:          selected.commit.FullHash,
-		FilterPath:   m.filter.Path,
-	})
+	// TODO: open commit detail in the log split view once it is implemented.
+	_ = selected
+	return nil
 }

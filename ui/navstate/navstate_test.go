@@ -25,19 +25,19 @@ func TestBackOnEmptyStackReturnsQuit(t *testing.T) {
 func TestOpenPushesAndSetsActiveTab(t *testing.T) {
 	s := newState()
 	s.SetInitialTab(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT})
-	tabVS := s.Open(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: defaultWT, Ref: "HEAD"})
-	if tabVS.Tab != nav.TabCommit {
-		t.Fatalf("expected returned tab commit, got %q", tabVS.Tab)
+	tabVS := s.Open(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: defaultWT})
+	if tabVS.Tab != nav.TabStatus {
+		t.Fatalf("expected returned tab status, got %q", tabVS.Tab)
 	}
-	if s.ActiveTab() != nav.TabCommit {
-		t.Fatalf("expected state active tab commit, got %q", s.ActiveTab())
+	if s.ActiveTab() != nav.TabStatus {
+		t.Fatalf("expected state active tab status, got %q", s.ActiveTab())
 	}
 }
 
 func TestBackPopsAndRestoresPreviousTab(t *testing.T) {
 	s := newState()
 	s.SetInitialTab(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT})
-	s.Open(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: defaultWT, Ref: "HEAD"})
+	s.Open(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: defaultWT})
 	active, quit := s.Back()
 	if quit {
 		t.Fatalf("expected quit=false after popping non-empty stack")
@@ -53,7 +53,7 @@ func TestBackPopsAndRestoresPreviousTab(t *testing.T) {
 func TestSwitchClearsStack(t *testing.T) {
 	s := newState()
 	s.SetInitialTab(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT})
-	s.Open(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: defaultWT, Ref: "HEAD"})
+	s.Open(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: defaultWT})
 	tabVS := s.Switch(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: defaultWT})
 	if tabVS.Tab != nav.TabStatus {
 		t.Fatalf("expected returned tab status, got %q", tabVS.Tab)
@@ -137,12 +137,34 @@ func TestSwitchToSeededTabUsesDefaultWorktree(t *testing.T) {
 	}
 }
 
-func TestCommitTabDefaultsRefToHEAD(t *testing.T) {
+func TestStashTabSeededWithDefaultWorktree(t *testing.T) {
 	s := newState()
 	s.SetInitialTab(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT})
-	tabVS := s.Open(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: defaultWT})
-	if tabVS.Ref != "HEAD" {
-		t.Fatalf("expected commit ref HEAD, got %q", tabVS.Ref)
+	tabVS := s.Switch(nav.ViewState{Tab: nav.TabStash})
+	if tabVS.WorktreeRoot != defaultWT {
+		t.Fatalf("expected stash WorktreeRoot %q, got %q", defaultWT, tabVS.WorktreeRoot)
+	}
+}
+
+func TestSwitchFromLogToStatusCarriesWorktree(t *testing.T) {
+	const worktreeY = "/worktrees/feature"
+	s := newState()
+	s.SetInitialTab(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: worktreeY})
+	// Switch to status with no explicit worktree — should inherit log's worktree.
+	tabVS := s.Switch(nav.ViewState{Tab: nav.TabStatus})
+	if tabVS.WorktreeRoot != worktreeY {
+		t.Fatalf("expected status WorktreeRoot %q (from log), got %q", worktreeY, tabVS.WorktreeRoot)
+	}
+}
+
+func TestSwitchFromStatusToLogCarriesWorktree(t *testing.T) {
+	const worktreeY = "/worktrees/feature"
+	s := newState()
+	s.SetInitialTab(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: worktreeY})
+	// Switch to log with no explicit worktree — should inherit status's worktree.
+	tabVS := s.Switch(nav.ViewState{Tab: nav.TabLog})
+	if tabVS.WorktreeRoot != worktreeY {
+		t.Fatalf("expected log WorktreeRoot %q (from status), got %q", worktreeY, tabVS.WorktreeRoot)
 	}
 }
 
@@ -154,9 +176,15 @@ func TestUnknownTabResolvesToWorktrees(t *testing.T) {
 	}
 }
 
-func TestResolveTabIDCommitIsFirstClass(t *testing.T) {
-	if got := navstate.ResolveTabID(nav.TabCommit); got != nav.TabCommit {
-		t.Fatalf("expected commit to resolve to itself, got %q", got)
+func TestResolveTabIDStashIsFirstClass(t *testing.T) {
+	if got := navstate.ResolveTabID(nav.TabStash); got != nav.TabStash {
+		t.Fatalf("expected stash to resolve to itself, got %q", got)
+	}
+}
+
+func TestResolveTabIDCommitAbsent(t *testing.T) {
+	if got := navstate.ResolveTabID(nav.TabID("commit")); got != nav.TabWorktrees {
+		t.Fatalf("expected unknown commit tab to resolve to worktrees, got %q", got)
 	}
 }
 
@@ -200,17 +228,17 @@ func TestSetInitialTabCarriesFilterOptions(t *testing.T) {
 func TestBackWithStackDepthTwoPopsToMiddleEntry(t *testing.T) {
 	s := newState()
 	s.SetInitialTab(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT})
-	s.Open(nav.ViewState{Tab: nav.TabCommit, WorktreeRoot: defaultWT, Ref: "HEAD"})
+	s.Open(nav.ViewState{Tab: nav.TabStash, WorktreeRoot: defaultWT})
 	s.Open(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: defaultWT})
-	// Stack: [commit, status]. First Back pops status → commit.
+	// Stack: [stash, status]. First Back pops status → stash.
 	active1, quit1 := s.Back()
 	if quit1 {
 		t.Fatalf("expected quit=false on first back")
 	}
-	if active1.Tab != nav.TabCommit {
-		t.Fatalf("expected active tab commit after first back, got %q", active1.Tab)
+	if active1.Tab != nav.TabStash {
+		t.Fatalf("expected active tab stash after first back, got %q", active1.Tab)
 	}
-	// Second Back pops commit → empty stack, falls back to liveTab (log).
+	// Second Back pops stash → empty stack, falls back to liveTab (log).
 	active2, quit2 := s.Back()
 	if quit2 {
 		t.Fatalf("expected quit=false on second back")
