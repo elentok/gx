@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.17.7 - 2026-06-03
+
+- CLI: `gx init` and `gx edit-config` are replaced by a `gx config` subcommand group — `gx config edit` opens the config in `$EDITOR` (creating it if missing), `gx config show` prints the effective merged config as JSON, and `gx config defaults` prints the built-in defaults as JSON.
+- Config: fixed log config merging — `log.important-refs` and `log.hide-refs` from the user config now merge correctly with defaults instead of replacing the entire log section.
+- Fix: relative timestamps now include the year for dates older than one year.
+
 ## v0.17.6 - 2026-06-02
 
 - Status: added `Sa` / `Ss` stash shortcuts. `Sa` stashes all tracked changes (staged + unstaged); `Ss` stashes only staged changes, leaving unstaged modifications in place. Both prompt for an optional stash name before running.

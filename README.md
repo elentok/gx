@@ -187,16 +187,12 @@ The headline use case is launching things from neovim. For example, open lazygit
 nnoremap <leader>gg <Cmd>!gx term --below lazygit<CR>
 ```
 
-Create an initial config file with defaults:
+Manage config (create, edit, inspect):
 
 ```sh
-gx init
-```
-
-Edit config in `$EDITOR`:
-
-```sh
-gx edit-config
+gx config edit        # open config in $EDITOR (creates it if missing)
+gx config show        # print the effective (merged) config as JSON
+gx config defaults    # print the built-in default config as JSON
 ```
 
 Bump the version tag (interactive picker if no argument given):
@@ -228,7 +224,7 @@ gx completion zsh > ~/.zsh/_gx         # persist
 
 ## Configuration
 
-Optional config file at `~/.config/gx/config.json` (run `gx edit-config` to open it).
+Optional config file at `~/.config/gx/config.json` (run `gx config edit` to open it).
 
 | Key | Type | Default | Description |
 | --- | ---- | ------- | ----------- |
