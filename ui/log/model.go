@@ -104,7 +104,6 @@ func NewModel(worktreeRoot, startRef string, settings ui.Settings, filter LogFil
 	m.pull = pull.New()
 	m.output = output.New()
 	m.reword = reword.New()
-	m.reload()
 	return m
 }
 

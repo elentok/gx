@@ -16,25 +16,6 @@ type reloadMsg struct {
 	focusSubject   string // if set, cursor is moved to first matching commit
 }
 
-func (m *Model) reload() {
-	entries, err := git.LogEntriesFiltered(m.worktreeRoot, m.startRef, maxLogEntries, m.gitFilter())
-	if err != nil {
-		m.err = err
-		return
-	}
-	m.err = nil
-	classes, branchDiverged := m.branchHistoryClasses()
-
-	rows := make([]row, 0, len(entries))
-	for _, entry := range entries {
-		rows = append(rows, row{kind: rowCommit, commit: entry, class: classes[entry.FullHash]})
-	}
-	m.rows = rows
-	m.branchDiverged = branchDiverged
-	m.list.SetSelected(m.list.Selected(), len(m.rows))
-	m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))
-	m.recomputeSearchMatches()
-}
 
 func (m Model) gitFilter() git.LogFilter {
 	return git.LogFilter{
@@ -62,9 +43,6 @@ func (m Model) cmdReload() tea.Cmd {
 	}
 }
 
-func (m Model) branchHistoryClasses() (map[string]git.BranchHistoryClass, bool) {
-	return fetchBranchHistoryClasses(m.worktreeRoot, m.startRef)
-}
 
 func fetchBranchHistoryClasses(worktreeRoot, startRef string) (map[string]git.BranchHistoryClass, bool) {
 	var branch string

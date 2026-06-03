@@ -31,11 +31,28 @@ func newTestModel() Model {
 }
 
 func newTestModelDefault(worktreeRoot, startRef string, settings ui.Settings) Model {
-	return NewModel(worktreeRoot, startRef, settings, LogFilter{}, keys.Manager{})
+	return runModelInit(NewModel(worktreeRoot, startRef, settings, LogFilter{}, keys.Manager{}))
 }
 
 func newTestModelFiltered(worktreeRoot, startRef string, settings ui.Settings, filter LogFilter) Model {
-	return NewModel(worktreeRoot, startRef, settings, filter, keys.Manager{})
+	return runModelInit(NewModel(worktreeRoot, startRef, settings, filter, keys.Manager{}))
+}
+
+// runModelInit executes Init() synchronously so tests can inspect m.rows immediately.
+func runModelInit(m Model) Model {
+	cmd := m.Init()
+	if cmd == nil {
+		return m
+	}
+	msg := cmd()
+	if msg == nil {
+		return m
+	}
+	next, _ := m.Update(msg)
+	if m2, ok := next.(Model); ok {
+		return m2
+	}
+	return m
 }
 
 func TestReloadAssignsBranchHistoryClasses(t *testing.T) {

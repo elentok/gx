@@ -30,7 +30,7 @@ var (
 )
 
 func (m Model) View() tea.View {
-	if !m.ready {
+	if !m.ready || m.rows == nil {
 		return ui.NewMainView("\n  Loading log…")
 	}
 	if m.err != nil {
