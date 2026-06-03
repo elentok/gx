@@ -33,7 +33,15 @@ func RelativeTimeCompact(t time.Time) string {
 		return compactAgo(weeks, "wk")
 	default:
 		months := int(d / (30 * 24 * time.Hour))
-		return compactAgo(months, "mo")
+		if months < 12 {
+			return compactAgo(months, "mo")
+		}
+		years := months / 12
+		remainingMonths := months % 12
+		if remainingMonths > 0 {
+			return strconv.Itoa(years) + "y " + strconv.Itoa(remainingMonths) + "mo ago"
+		}
+		return compactAgo(years, "y")
 	}
 }
 

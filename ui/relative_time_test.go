@@ -21,6 +21,8 @@ func TestRelativeTimeCompactUsesCompactFormats(t *testing.T) {
 		{name: "exact weeks", at: now.Add(-14 * 24 * time.Hour), want: "2wk ago"},
 		{name: "weeks and days", at: now.Add(-(9*24*time.Hour + 2*time.Hour)), want: "1wk 2d ago"},
 		{name: "months", at: now.Add(-60 * 24 * time.Hour), want: "2mo ago"},
+		{name: "exact years", at: now.Add(-24 * 30 * 24 * time.Hour), want: "2y ago"},
+		{name: "years and months", at: now.Add(-54 * 30 * 24 * time.Hour), want: "4y 6mo ago"},
 	}
 	for _, tt := range tests {
 		if got := RelativeTimeCompact(tt.at); got != tt.want {
