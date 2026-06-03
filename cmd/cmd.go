@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -42,6 +43,7 @@ type deps struct {
 	confirmForce         func(string) (bool, error)
 	choosePushDivergence func(io.Reader, io.Writer, *git.PushDivergence) (int, error)
 	initConfig           func() (string, error)
+	loadConfig           func() (config.Config, error)
 	getenv               func(string) string
 	runEditor            func(editor, path string, in io.Reader, out, err io.Writer) error
 }
@@ -62,6 +64,7 @@ func defaultDeps() deps {
 		runShow:              runShow,
 		choosePushDivergence: choosePushDivergence,
 		initConfig:           config.Init,
+		loadConfig:           config.Load,
 		getenv:               os.Getenv,
 		runEditor:            runEditorCommand,
 	}
@@ -115,8 +118,7 @@ Run without a command to open the status UI.`,
 		newStatusCmd(d),
 		newLogCmd(d),
 		newShowCmd(d),
-		newInitCmd(d),
-		newEditConfigCmd(d),
+		newConfigCmd(d),
 		newBumpCmd(d),
 		newStashifyCmd(d),
 		newRunCmd(d),
@@ -261,26 +263,38 @@ func newShowCmd(d deps) *cobra.Command {
 	}
 }
 
-func newInitCmd(d deps) *cobra.Command {
-	return &cobra.Command{
-		Use:   "init",
-		Short: "create a config file",
-		Args:  cobra.NoArgs,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return runInit(d)
-		},
+func newConfigCmd(d deps) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "config",
+		Short: "manage gx configuration",
 	}
-}
-
-func newEditConfigCmd(d deps) *cobra.Command {
-	return &cobra.Command{
-		Use:   "edit-config",
-		Short: "open the config file in $EDITOR",
-		Args:  cobra.NoArgs,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return runEditConfig(d)
+	cmd.AddCommand(
+		&cobra.Command{
+			Use:   "edit",
+			Short: "open the config file in $EDITOR (creates it if missing)",
+			Args:  cobra.NoArgs,
+			RunE: func(_ *cobra.Command, _ []string) error {
+				return runEditConfig(d)
+			},
 		},
-	}
+		&cobra.Command{
+			Use:   "show",
+			Short: "print the effective (merged) config as JSON",
+			Args:  cobra.NoArgs,
+			RunE: func(_ *cobra.Command, _ []string) error {
+				return runConfigShow(d)
+			},
+		},
+		&cobra.Command{
+			Use:   "defaults",
+			Short: "print the built-in default config as JSON",
+			Args:  cobra.NoArgs,
+			RunE: func(_ *cobra.Command, _ []string) error {
+				return runConfigDefaults(d)
+			},
+		},
+	)
+	return cmd
 }
 
 func newBumpCmd(d deps) *cobra.Command {
@@ -804,15 +818,6 @@ func relativeDate(t time.Time) string {
 	return humanize.Time(t)
 }
 
-func runInit(d deps) error {
-	path, err := d.initConfig()
-	if err != nil {
-		return err
-	}
-	fmt.Fprintf(d.stdout, "Created config file at %s\n", path)
-	return nil
-}
-
 func runEditConfig(d deps) error {
 	path, err := config.FilePath()
 	if err != nil {
@@ -833,6 +838,28 @@ func runEditConfig(d deps) error {
 		return fmt.Errorf("$EDITOR is not set")
 	}
 	return d.runEditor(editor, path, d.stdin, d.stdout, d.stderr)
+}
+
+func runConfigShow(d deps) error {
+	cfg, err := d.loadConfig()
+	if err != nil {
+		return err
+	}
+	b, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(d.stdout, "%s\n", b)
+	return nil
+}
+
+func runConfigDefaults(d deps) error {
+	b, err := json.MarshalIndent(config.Default(), "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(d.stdout, "%s\n", b)
+	return nil
 }
 
 func runEditorCommand(editor, path string, in io.Reader, out, errOut io.Writer) error {

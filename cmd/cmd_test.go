@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 )
@@ -379,30 +381,7 @@ func TestExecute_PushConfirmsBeforeCheckingDivergence(t *testing.T) {
 	}
 }
 
-func TestExecute_Init(t *testing.T) {
-	var stdout bytes.Buffer
-	called := false
-	d := deps{
-		stdout: &stdout,
-		stderr: bytes.NewBuffer(nil),
-		initConfig: func() (string, error) {
-			called = true
-			return "/tmp/gx/config.json", nil
-		},
-	}
-
-	if err := execute([]string{"init"}, d); err != nil {
-		t.Fatalf("execute init: %v", err)
-	}
-	if !called {
-		t.Fatal("expected initConfig to be called")
-	}
-	if !strings.Contains(stdout.String(), "Created config file at /tmp/gx/config.json") {
-		t.Fatalf("unexpected stdout: %q", stdout.String())
-	}
-}
-
-func TestExecute_EditConfig_RequiresEditor(t *testing.T) {
+func TestExecute_ConfigEdit_RequiresEditor(t *testing.T) {
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
@@ -412,7 +391,7 @@ func TestExecute_EditConfig_RequiresEditor(t *testing.T) {
 		getenv: func(string) string { return "" },
 	}
 
-	err := execute([]string{"edit-config"}, d)
+	err := execute([]string{"config", "edit"}, d)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -421,7 +400,7 @@ func TestExecute_EditConfig_RequiresEditor(t *testing.T) {
 	}
 }
 
-func TestExecute_EditConfig_RunsEditor(t *testing.T) {
+func TestExecute_ConfigEdit_RunsEditor(t *testing.T) {
 	var stdout bytes.Buffer
 	var gotEditor, gotPath string
 	d := deps{
@@ -443,14 +422,69 @@ func TestExecute_EditConfig_RunsEditor(t *testing.T) {
 		},
 	}
 
-	if err := execute([]string{"edit-config"}, d); err != nil {
-		t.Fatalf("execute edit-config: %v", err)
+	if err := execute([]string{"config", "edit"}, d); err != nil {
+		t.Fatalf("execute config edit: %v", err)
 	}
 	if gotEditor != "vim" {
 		t.Fatalf("editor = %q, want %q", gotEditor, "vim")
 	}
 	if gotPath == "" {
 		t.Fatal("expected non-empty config path")
+	}
+}
+
+func TestExecute_ConfigDefaults_PrintsJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	d := deps{
+		stdout: &stdout,
+		stderr: bytes.NewBuffer(nil),
+	}
+	if err := execute([]string{"config", "defaults"}, d); err != nil {
+		t.Fatalf("execute config defaults: %v", err)
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "use-nerdfont-icons") {
+		t.Fatalf("expected config key in output, got: %q", out)
+	}
+	var v map[string]any
+	if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &v); err != nil {
+		t.Fatalf("output is not valid JSON: %v\n%s", err, out)
+	}
+}
+
+func TestExecute_ConfigShow_PrintsJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	d := deps{
+		stdout: &stdout,
+		stderr: bytes.NewBuffer(nil),
+		loadConfig: func() (config.Config, error) {
+			return config.Default(), nil
+		},
+	}
+	if err := execute([]string{"config", "show"}, d); err != nil {
+		t.Fatalf("execute config show: %v", err)
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "use-nerdfont-icons") {
+		t.Fatalf("expected config key in output, got: %q", out)
+	}
+	var v map[string]any
+	if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &v); err != nil {
+		t.Fatalf("output is not valid JSON: %v\n%s", err, out)
+	}
+}
+
+func TestExecute_ConfigShow_PropagatesError(t *testing.T) {
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+		loadConfig: func() (config.Config, error) {
+			return config.Config{}, errors.New("load failed")
+		},
+	}
+	err := execute([]string{"config", "show"}, d)
+	if err == nil || !strings.Contains(err.Error(), "load failed") {
+		t.Fatalf("expected load error, got: %v", err)
 	}
 }
 
@@ -587,19 +621,6 @@ func TestExecute_WtUnknownSubcommand(t *testing.T) {
 	}
 }
 
-func TestExecute_RunInit_Error(t *testing.T) {
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		initConfig: func() (string, error) {
-			return "", errors.New("init failed")
-		},
-	}
-	err := execute([]string{"init"}, d)
-	if err == nil || !strings.Contains(err.Error(), "init failed") {
-		t.Fatalf("expected init error, got: %v", err)
-	}
-}
 
 func TestRunGitInteractive_Success(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
