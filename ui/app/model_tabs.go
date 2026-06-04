@@ -49,12 +49,12 @@ func (m Model) applySwitch(tabVS, prevVS nav.ViewState) (Model, tea.Cmd) {
 		currentPage = m.newLivePage(tabVS)
 		currentPage.didInit = true
 		m.livePageByTab[tabVS.Tab] = currentPage
-		return m, tea.Batch(tea.ClearScreen, onPageDeactivatedCmd(outgoing), currentPage.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
+		return m, tea.Batch(onPageDeactivatedCmd(outgoing), currentPage.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
 	}
 	if !currentPage.didInit {
 		currentPage.didInit = true
 		m.livePageByTab[tabVS.Tab] = currentPage
-		return m, tea.Batch(tea.ClearScreen, onPageDeactivatedCmd(outgoing), currentPage.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
+		return m, tea.Batch(onPageDeactivatedCmd(outgoing), currentPage.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
 	}
 	if tabVS.FocusSubject != "" {
 		if logModel, ok := currentPage.model.(logui.Model); ok {
@@ -62,7 +62,7 @@ func (m Model) applySwitch(tabVS, prevVS nav.ViewState) (Model, tea.Cmd) {
 			m.livePageByTab[tabVS.Tab] = currentPage
 		}
 	}
-	return m, tea.Batch(tea.ClearScreen, onPageDeactivatedCmd(outgoing), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
+	return m, tea.Batch(onPageDeactivatedCmd(outgoing), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
 }
 
 type pageActivationAware interface {
