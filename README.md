@@ -25,6 +25,8 @@ and [go-migration-plan.md](/docs/go-migration-plan.md)).
 - Press `g p` in any view (worktrees, status, log, commit) to open the GitHub PR for the current context in the browser; merged commits search by hash, unmerged commits use the branch PR
 - `gx show` for single-commit inspection with diff navigation; scroll percentage and search counter (`⌕ N/M`) shown in the diff panel title
 - `gx status` interactive status UI with file/hunk/line stage + unstage flows
+- `gx stash` opens a Stash tab listing the repo's stashes in a split view — apply (`a`), pop (`p`), drop (`d`), or create (`s`) a stash, with the selected stash's diff alongside the list
+- Tabbed UI (worktrees, log, status, stash): switch with `1`–`4`, `g w` / `g l` / `g s` / `g S`, or `,` / `.`; switching is flicker-free and tabs reload only when the repo actually changed
 - `gx` opens status by default, while `gx worktrees` / `gx wt` open the worktree UI
 - Press `/` to search and highlight matching worktrees by name or branch
 - Press `g` to open the selected worktree in lazygit
@@ -86,7 +88,10 @@ gx worktrees
 gx wt
 gx log
 gx show HEAD
+gx stash
 ```
+
+`gx stash` opens the Stash tab: a list of the repo's stashes alongside the selected stash's diff. Apply (`a`), pop (`p`), or drop (`d`) the selected stash, or create a new one (`s`); `enter` / `l` focuses the diff panel and `t o` toggles the split orientation.
 
 Open the log pre-filtered to a single file (equivalent to the status `gh` mapping; follows renames so pre-rename history is included). The path is taken relative to your current directory:
 
@@ -299,6 +304,19 @@ Example config:
 | `U`            | Run `git remote update` and refresh                       |
 | `?`            | Toggle full help                                          |
 | `q` / `Ctrl+C` | Quit                                                      |
+
+### Stash tab
+
+| Key           | Action                                   |
+| ------------- | ---------------------------------------- |
+| `j` / `k`     | Move down / up through stashes           |
+| `enter` / `l` | Focus the diff panel for the stash       |
+| `a`           | Apply the selected stash                 |
+| `p`           | Pop the selected stash                   |
+| `d`           | Drop the selected stash                  |
+| `s`           | Create a new stash                       |
+| `t o`         | Toggle split orientation                 |
+| `esc` / `q`   | Return focus to the list / leave the tab |
 
 ### Search mode (after `/`)
 

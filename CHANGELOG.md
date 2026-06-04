@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.18.0 - 2026-06-04
+
+- Stash: added a **Stash tab** (the fourth tab, reachable with `4`, `g S`, or `,` / `.`) that lists the repo's stashes in a split view — the stash list on one side and the selected stash's diff on the other. Apply (`a`), pop (`p`), drop (`d`), or create a new stash (`s`) directly from the list; `enter` / `l` focuses the diff panel, and `t o` toggles the split orientation (which also auto-stacks on narrow terminals).
+- CLI: added `gx stash` to open the stash UI directly.
+- Log: the log tab now renders in the same shared split view (commit list + commit detail), with a pseudo worktree-status row pinned at the top so uncommitted changes are visible alongside history.
+- UI: switching tabs no longer clears the screen or flickers. Cached tabs reload only when the repo actually changed since they were last loaded (epoch-based invalidation), instead of re-shelling git on every activation; mutating ops (commit, stash, push, …) signal the change so other tabs refresh on their next visit. Manual refresh (`R`) is unchanged.
+- Log: fixed commit-detail focus routing for `h` / `l`, split-panel focus handling, and collapsed-commit frame dimming; realigned the pseudo status line and log columns.
+
 ## v0.17.7 - 2026-06-03
 
 - CLI: `gx init` and `gx edit-config` are replaced by a `gx config` subcommand group — `gx config edit` opens the config in `$EDITOR` (creating it if missing), `gx config show` prints the effective merged config as JSON, and `gx config defaults` prints the built-in defaults as JSON.
