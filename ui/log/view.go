@@ -21,14 +21,15 @@ const logFlashDuration = 2 * time.Second
 var logFlashBg = lipgloss.Color("#3d2810")
 
 var (
-	logHashStyle       = lipgloss.NewStyle().Foreground(ui.ColorBlue)
-	logMetaStyle       = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Italic(true)
-	logPseudoStyle     = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true)
-	logSearchStyle     = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true).Underline(true)
-	logPushedStyle     = lipgloss.NewStyle().Foreground(ui.ColorGreen)
-	logUnpushedStyle   = lipgloss.NewStyle().Foreground(ui.ColorOrange)
-	logDivergedStyle   = lipgloss.NewStyle().Foreground(ui.ColorRed)
-	logRemoteOnlyStyle = lipgloss.NewStyle().Foreground(ui.ColorMauve)
+	logHashStyle         = lipgloss.NewStyle().Foreground(ui.ColorBlue)
+	logMetaStyle         = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Italic(true)
+	logPseudoStyle       = lipgloss.NewStyle().Foreground(ui.ColorYellow).Italic(true)
+	logPseudoStatusStyle = ui.StyleMuted.Italic(true)
+	logSearchStyle       = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true).Underline(true)
+	logPushedStyle       = lipgloss.NewStyle().Foreground(ui.ColorGreen)
+	logUnpushedStyle     = lipgloss.NewStyle().Foreground(ui.ColorOrange)
+	logDivergedStyle     = lipgloss.NewStyle().Foreground(ui.ColorRed)
+	logRemoteOnlyStyle   = lipgloss.NewStyle().Foreground(ui.ColorMauve)
 )
 
 func (m Model) View() tea.View {
@@ -175,9 +176,9 @@ func (m Model) renderRow(row row, selected bool, width int) string {
 	switch row.kind {
 	case rowPseudoStatus:
 		line = fmt.Sprintf(
-			"  %s  %s",
+			"    %s           %s",
 			logPseudoStyle.Render(m.highlightSearch("working tree")),
-			ui.StyleMuted.Render(m.highlightSearch(row.detail)),
+			logPseudoStatusStyle.Render(m.highlightSearch(row.detail)),
 		)
 	default:
 		line = m.renderCommitRow(row)
