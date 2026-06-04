@@ -74,6 +74,8 @@ type viewStateChangedMsg struct {
 	ViewState ViewState
 }
 
+type repoMutatedMsg struct{}
+
 func Open(vs ViewState) tea.Cmd {
 	return func() tea.Msg {
 		return openMsg{ViewState: vs}
@@ -116,4 +118,15 @@ func IsBack(msg tea.Msg) bool {
 func IsViewStateChanged(msg tea.Msg) (ViewState, bool) {
 	changed, ok := msg.(viewStateChangedMsg)
 	return changed.ViewState, ok
+}
+
+func RepoMutated() tea.Cmd {
+	return func() tea.Msg {
+		return repoMutatedMsg{}
+	}
+}
+
+func IsRepoMutated(msg tea.Msg) bool {
+	_, ok := msg.(repoMutatedMsg)
+	return ok
 }
