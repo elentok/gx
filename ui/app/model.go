@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/navstate"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/reloadgate"
 	stashlistui "github.com/elentok/gx/ui/stashlist"
 	statusui "github.com/elentok/gx/ui/status"
 	"github.com/elentok/gx/ui/worktrees"
@@ -30,8 +31,9 @@ type historyEntry struct {
 }
 
 type livePage struct {
-	model   tea.Model
-	didInit bool
+	model     tea.Model
+	didInit   bool
+	viewState nav.ViewState // the ViewState when this page was last created or re-routed
 }
 
 type Model struct {
@@ -48,6 +50,7 @@ type Model struct {
 	history   []historyEntry
 	keyPrefix string
 	notify    notify.Model
+	gate      *reloadgate.ReloadGate
 }
 
 func New(repo git.Repo, settings Settings) Model {
@@ -57,6 +60,7 @@ func New(repo git.Repo, settings Settings) Model {
 		navState:      navstate.NewState(settings.ActiveWorktreePath),
 		livePageByTab: make(map[nav.TabID]livePage),
 		notify:        notify.New(settings.UseNerdFontIcons),
+		gate:          reloadgate.New(),
 	}
 	if m.settings.InitialRoute.Tab == "" {
 		m.settings.InitialRoute = nav.ViewState{Tab: nav.TabWorktrees}
@@ -65,7 +69,9 @@ func New(repo git.Repo, settings Settings) Model {
 	initialRoute := m.navState.Active()
 	page := m.newLivePage(initialRoute)
 	page.didInit = true
+	page.viewState = initialRoute
 	m.livePageByTab[initialRoute.Tab] = page
+	m.gate.MarkLoaded(initialRoute.Tab)
 	return m
 }
 

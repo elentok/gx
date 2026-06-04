@@ -2,6 +2,7 @@ package log
 
 import (
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 )
 
@@ -20,5 +21,5 @@ func (m Model) handleBumpUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if err := m.push.OpenWithTag(m.worktreeRoot, result.NewTag); err != nil {
 		return m, notify.Error(err.Error())
 	}
-	return m, notify.Success("tag created")
+	return m, tea.Batch(notify.Success("tag created"), nav.RepoMutated())
 }

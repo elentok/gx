@@ -3,6 +3,7 @@ package log
 import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 )
 
@@ -82,5 +83,5 @@ func (m Model) handleRewordDone(err error) (tea.Model, tea.Cmd) {
 	if err != nil {
 		return m, notify.Error("reword failed: " + err.Error())
 	}
-	return m, tea.Batch(notify.Success("rewrote commit"), m.cmdReloadFocusSubject(m.reword.NewSubject))
+	return m, tea.Batch(notify.Success("rewrote commit"), m.cmdReloadFocusSubject(m.reword.NewSubject), nav.RepoMutated())
 }

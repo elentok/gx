@@ -258,10 +258,7 @@ func TestShellChordSwitchesRelativeTabs(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	m = updated.(Model)
-	updated, cmd = m.Update(tea.KeyPressMsg{Code: '.', Text: "."})
-	if cmd == nil {
-		t.Fatalf("expected resize cmd when switching tabs with g.")
-	}
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '.', Text: "."})
 	m = updated.(Model)
 	if m.navState.ActiveTab() != nav.TabLog {
 		t.Fatalf("expected g. to move right to log, got %q", m.navState.ActiveTab())
@@ -750,6 +747,141 @@ func TestInjectTabsIntoFooterPreservesRightHintTailWithStatusPrefix(t *testing.T
 	}
 	if !strings.Contains(last, "context: 1") {
 		t.Fatalf("expected context label to remain visible with status prefix, got %q", last)
+	}
+}
+
+// autoReloadSpy is a page stub that counts AutoReload calls.
+type autoReloadSpy struct {
+	reloads int
+}
+
+func (s *autoReloadSpy) Init() tea.Cmd                       { return nil }
+func (s *autoReloadSpy) Update(tea.Msg) (tea.Model, tea.Cmd) { return s, nil }
+func (s *autoReloadSpy) View() tea.View                      { return tea.NewView("spy") }
+func (s *autoReloadSpy) AutoReload() tea.Cmd {
+	s.reloads++
+	return nil
+}
+
+func TestGate_BareSwitch_FreshTab_NoAutoReload(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	spy := &autoReloadSpy{}
+	live := m.livePageByTab[nav.TabLog]
+	live.model = spy
+	live.didInit = true
+	m.livePageByTab[nav.TabLog] = live
+
+	// Switch away and back with no mutations — log is fresh.
+	updated, _ := m.Update(nav.Switch(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: repoDir})())
+	m = updated.(Model)
+	m.Update(nav.Switch(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir})())
+
+	if spy.reloads != 0 {
+		t.Errorf("expected 0 AutoReload calls on fresh tab switch, got %d", spy.reloads)
+	}
+}
+
+func TestGate_BareSwitch_StaleTab_OneAutoReload(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	spy := &autoReloadSpy{}
+	live := m.livePageByTab[nav.TabLog]
+	live.model = spy
+	live.didInit = true
+	m.livePageByTab[nav.TabLog] = live
+
+	// Switch to status first so log is a background tab.
+	updated, _ := m.Update(nav.Switch(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: repoDir})())
+	m = updated.(Model)
+
+	// Emit RepoMutated while on status — log becomes stale.
+	updated, _ = m.Update(nav.RepoMutated()())
+	m = updated.(Model)
+
+	// Switch back to log — should auto-reload exactly once.
+	m.Update(nav.Switch(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir})())
+
+	if spy.reloads != 1 {
+		t.Errorf("expected exactly 1 AutoReload on stale tab switch, got %d", spy.reloads)
+	}
+}
+
+func TestGate_FocusSubject_ForcesReloadWhenFresh(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	spy := &autoReloadSpy{}
+	live := m.livePageByTab[nav.TabLog]
+	live.model = spy
+	live.didInit = true
+	m.livePageByTab[nav.TabLog] = live
+
+	// Switch to status and back with a FocusSubject — no mutations, but reload forced.
+	updated, _ := m.Update(nav.Switch(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: repoDir})())
+	m = updated.(Model)
+	m.Update(nav.Switch(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir, FocusSubject: "abc"})())
+
+	if spy.reloads != 1 {
+		t.Errorf("expected 1 AutoReload for FocusSubject switch, got %d", spy.reloads)
+	}
+}
+
+func TestGate_ReconstructPath_NoDoubleReload(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	// Switch log to a different worktree root — triggers reconstruct, MarkLoaded is called.
+	updated, _ := m.Update(nav.Switch(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir + "/other"})())
+	m = updated.(Model)
+
+	// Now switch to status and back to log with no mutations: should not auto-reload.
+	spy := &autoReloadSpy{}
+	live := m.livePageByTab[nav.TabLog]
+	live.model = spy
+	live.didInit = true
+	m.livePageByTab[nav.TabLog] = live
+
+	updated, _ = m.Update(nav.Switch(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: repoDir})())
+	m = updated.(Model)
+	m.Update(nav.Switch(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir + "/other"})())
+
+	if spy.reloads != 0 {
+		t.Errorf("expected 0 AutoReload after reconstruct (Init already loaded), got %d", spy.reloads)
 	}
 }
 

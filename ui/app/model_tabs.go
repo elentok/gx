@@ -45,15 +45,23 @@ func (m Model) applySwitch(tabVS, prevVS nav.ViewState) (Model, tea.Cmd) {
 
 	currentPage := m.livePageByTab[tabVS.Tab]
 
-	if currentPage.model == nil || !navstate.SameViewContext(prevVS.Context(), tabVS.Context()) {
+	// Reconstruct when: no cached model, or the destination tab's view context changed
+	// (e.g. different worktree or ref) since the cached model was created.
+	if currentPage.model == nil || !navstate.SameViewContext(currentPage.viewState.Context(), tabVS.Context()) {
 		currentPage = m.newLivePage(tabVS)
 		currentPage.didInit = true
+		currentPage.viewState = tabVS
 		m.livePageByTab[tabVS.Tab] = currentPage
+		// Init loads fresh data; stamp the tab so it won't auto-reload on the next switch.
+		m.gate.MarkLoaded(tabVS.Tab)
 		return m, tea.Batch(onPageDeactivatedCmd(outgoing), currentPage.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
 	}
 	if !currentPage.didInit {
 		currentPage.didInit = true
+		currentPage.viewState = tabVS
 		m.livePageByTab[tabVS.Tab] = currentPage
+		// Init loads fresh data; stamp the tab so it won't auto-reload on the next switch.
+		m.gate.MarkLoaded(tabVS.Tab)
 		return m, tea.Batch(onPageDeactivatedCmd(outgoing), currentPage.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
 	}
 	if tabVS.FocusSubject != "" {
@@ -61,8 +69,26 @@ func (m Model) applySwitch(tabVS, prevVS nav.ViewState) (Model, tea.Cmd) {
 			currentPage.model = logModel.WithPendingFocus(tabVS.FocusSubject)
 			m.livePageByTab[tabVS.Tab] = currentPage
 		}
+		// Targeted navigation always reloads regardless of epoch.
+		m.gate.MarkLoaded(tabVS.Tab)
+		return m, tea.Batch(onPageDeactivatedCmd(outgoing), autoReloadCmd(currentPage.model), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
+	}
+	if m.gate.ShouldAutoReload(tabVS.Tab) {
+		m.gate.MarkLoaded(tabVS.Tab)
+		return m, tea.Batch(onPageDeactivatedCmd(outgoing), autoReloadCmd(currentPage.model), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
 	}
 	return m, tea.Batch(onPageDeactivatedCmd(outgoing), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
+}
+
+type pageAutoReloadable interface {
+	AutoReload() tea.Cmd
+}
+
+func autoReloadCmd(model tea.Model) tea.Cmd {
+	if r, ok := model.(pageAutoReloadable); ok {
+		return r.AutoReload()
+	}
+	return nil
 }
 
 type pageActivationAware interface {

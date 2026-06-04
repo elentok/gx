@@ -5,6 +5,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/terminalrun"
 )
@@ -144,14 +145,20 @@ func (m Model) handleRebaseFinished(msg rebaseFinishedMsg) (tea.Model, tea.Cmd) 
 		return m, tea.Batch(
 			notify.Progress("rebase-stash-pop", "popping stash..."),
 			m.cmdReload(),
+			nav.RepoMutated(),
 			func() tea.Msg {
 				_, err := git.StashPop(root)
 				return rebaseStashPopMsg{err: err}
 			},
 		)
 	}
-	// kitty/tmux: rebaseDidStash stays true; pop prompt fires on next FocusMsg
-	return m, m.cmdReload()
+	// kitty/tmux: rebaseDidStash stays true; pop prompt fires on next FocusMsg.
+	// Emit RepoMutated only on success; error in split-terminal mode may not have mutated.
+	var mutatedCmd tea.Cmd
+	if msg.err == nil {
+		mutatedCmd = nav.RepoMutated()
+	}
+	return m, tea.Batch(mutatedCmd, m.cmdReload())
 }
 
 func (m Model) handleRebaseStashPop(msg rebaseStashPopMsg) (tea.Model, tea.Cmd) {

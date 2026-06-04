@@ -138,8 +138,10 @@ func (m Model) KeyManager() keys.Manager {
 
 func (m Model) Init() tea.Cmd { return tea.Batch(m.cmdReload(), m.cmdLoadStatus()) }
 
-// OnPageActivated is called by the app shell when switching to the log page.
-func (m Model) OnPageActivated() tea.Cmd {
+// AutoReload is called by the app shell when the tab is stale or carries a
+// FocusSubject payload. It preserves selection index (cmdReload) and handles
+// the pending-focus path (cmdReloadFocusSubject).
+func (m Model) AutoReload() tea.Cmd {
 	if m.pendingFocusSubject != "" {
 		return m.cmdReloadFocusSubject(m.pendingFocusSubject)
 	}

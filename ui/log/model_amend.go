@@ -3,6 +3,7 @@ package log
 import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 )
 
@@ -28,7 +29,7 @@ func (m Model) handleAmendDone(err error) (tea.Model, tea.Cmd) {
 	if err != nil {
 		return m, notify.Error("Amend failed: " + err.Error())
 	}
-	return m, tea.Batch(notify.Success("amended commit"), m.cmdReloadFocusSubject(m.amendConfirm.Subject))
+	return m, tea.Batch(notify.Success("amended commit"), m.cmdReloadFocusSubject(m.amendConfirm.Subject), nav.RepoMutated())
 }
 
 func (m Model) cmdReloadFocusSubject(subject string) tea.Cmd {

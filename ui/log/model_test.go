@@ -517,16 +517,16 @@ func TestWithPendingFocus(t *testing.T) {
 	}
 }
 
-func TestOnPageActivated_WithPending(t *testing.T) {
+func TestAutoReload_WithPending(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "f.txt", "a\n")
 	testutil.CommitAll(t, repo, "init")
 
 	m := newTestModelDefault(repo, "", settings)
 	m = m.WithPendingFocus("HEAD")
-	cmd := m.OnPageActivated()
+	cmd := m.AutoReload()
 	if cmd == nil {
-		t.Error("expected non-nil cmd from OnPageActivated with pending focus")
+		t.Error("expected non-nil cmd from AutoReload with pending focus")
 	}
 }
 

@@ -9,6 +9,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var notifyCmd tea.Cmd
 	m.notify, notifyCmd = m.notify.Update(msg)
 
+	if nav.IsRepoMutated(msg) {
+		m.gate.Mutated()
+		// Trust-the-self-reload invariant: the page that emitted RepoMutated
+		// self-reloads; stamp it fresh so only the other tabs become stale.
+		m.gate.MarkLoaded(m.navState.ActiveTab())
+		return m, notifyCmd
+	}
+
 	if vs, ok := nav.IsSwitch(msg); ok {
 		prev := m.navState.Active()
 		tabVS := m.navState.Switch(vs)
