@@ -122,3 +122,52 @@ func TestViewAddsFooterRowForAppTabs(t *testing.T) {
 		t.Fatalf("expected blank footer row, got %q", lines[len(lines)-1])
 	}
 }
+
+func TestAutoReloadDispatchesLoadAndPreservesSplit(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "a\n")
+	testutil.CommitAll(t, repo, "commit a")
+	mustStashFile(t, repo, "stash-a")
+	mustStashFile(t, repo, "stash-b")
+	tab := runTabInit(NewTab(repo, ui.Settings{}, keys.Manager{}))
+	tab = sendTab(tab, tea.WindowSizeMsg{Width: 200, Height: 40})
+	splitBefore := tab.split.IsSplit()
+
+	// AutoReload must return a non-nil cmd that produces stashAutoReloadMsg.
+	autoCmd := tab.AutoReload()
+	if autoCmd == nil {
+		t.Fatal("AutoReload returned nil cmd")
+	}
+	if _, ok := autoCmd().(stashAutoReloadMsg); !ok {
+		t.Fatal("AutoReload cmd did not return stashAutoReloadMsg")
+	}
+
+	// Dispatching stashAutoReloadMsg must trigger a list reload (non-nil cmd)
+	// without changing split state.
+	updated, reloadCmd := tab.Update(stashAutoReloadMsg{})
+	tab = updated.(Tab)
+	if reloadCmd == nil {
+		t.Fatal("stashAutoReloadMsg handler returned nil cmd")
+	}
+	if tab.split.IsSplit() != splitBefore {
+		t.Errorf("split state changed: got %v, want %v", tab.split.IsSplit(), splitBefore)
+	}
+
+	// Deliver the reload result; selection index must survive.
+	selBefore := tab.stashList.list.Selected()
+	loadedMsg := reloadCmd()
+	tab = sendTab(tab, loadedMsg)
+	if tab.stashList.list.Selected() != selBefore {
+		t.Errorf("selection changed after reload: got %d, want %d", tab.stashList.list.Selected(), selBefore)
+	}
+}
+
+func TestAutoReloadSatisfiesPageAutoReloadable(t *testing.T) {
+	tab := newReadyTab(t)
+	type autoReloadable interface {
+		AutoReload() tea.Cmd
+	}
+	if _, ok := any(tab).(autoReloadable); !ok {
+		t.Fatal("Tab does not implement pageAutoReloadable interface")
+	}
+}

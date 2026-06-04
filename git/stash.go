@@ -104,6 +104,24 @@ func StashPop(dir string) (string, error) {
 	return joinOutput(stdout, stderr), err
 }
 
+// StashApply applies a specific stash entry without removing it from the stack.
+func StashApply(dir, ref string) (string, error) {
+	stdout, stderr, err := run(dir, []string{"stash", "apply", ref})
+	return joinOutput(stdout, stderr), err
+}
+
+// StashPopRef applies and removes a specific stash entry from the stack.
+func StashPopRef(dir, ref string) (string, error) {
+	stdout, stderr, err := run(dir, []string{"stash", "pop", ref})
+	return joinOutput(stdout, stderr), err
+}
+
+// StashDrop removes a specific stash entry from the stack without applying it.
+func StashDrop(dir, ref string) (string, error) {
+	stdout, stderr, err := run(dir, []string{"stash", "drop", ref})
+	return joinOutput(stdout, stderr), err
+}
+
 // Rebase rebases the current branch onto the given ref.
 func Rebase(dir string, onto string) (string, error) {
 	stdout, stderr, err := run(dir, []string{"rebase", onto})

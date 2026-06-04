@@ -7,6 +7,7 @@ import (
 	commitui "github.com/elentok/gx/ui/commit"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
+	stashpkg "github.com/elentok/gx/ui/stash"
 	"github.com/elentok/gx/ui/splitview"
 )
 
@@ -22,6 +23,7 @@ type Tab struct {
 	stashList    Model
 	split        splitview.Model
 	commitDetail commitui.Model
+	stashCreate  stashpkg.Model
 }
 
 func NewTab(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager) Tab {
@@ -33,6 +35,7 @@ func NewTab(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager) T
 		stashList:    list,
 		commitDetail: detail,
 		split:        splitview.NewSplit(list, detail),
+		stashCreate:  stashpkg.New(),
 	}
 	return t
 }
@@ -45,6 +48,10 @@ func (t Tab) Init() tea.Cmd {
 }
 
 func (t Tab) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if t.stashCreate.IsOpen {
+		return t.handleStashCreateUpdate(msg)
+	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		t.width = msg.Width
@@ -64,6 +71,18 @@ func (t Tab) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			t = t.syncPanelSizes()
 		}
 		return t, cmd
+
+	case stashAutoReloadMsg:
+		return t, t.stashList.cmdLoad()
+
+	case stashApplyDoneMsg:
+		return t.handleApplyDone(msg)
+
+	case stashPopDoneMsg:
+		return t.handlePopDone(msg)
+
+	case stashDropDoneMsg:
+		return t.handleDropDone(msg)
 
 	case splitview.SelectionChangedMsg:
 		if msg.Ref != "" {
@@ -125,6 +144,25 @@ func (t Tab) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return t, cmd
 	}
 
+	// Stash operations — only active when the list panel has focus.
+	switch key {
+	case "a":
+		if ref := t.stashList.SelectedRef(); ref != "" {
+			return t, t.cmdApply(ref)
+		}
+	case "p":
+		if ref := t.stashList.SelectedRef(); ref != "" {
+			return t, t.cmdPopRef(ref)
+		}
+	case "d":
+		if ref := t.stashList.SelectedRef(); ref != "" {
+			return t, t.cmdDrop(ref)
+		}
+	case "s":
+		cmd := t.stashCreate.Open(t.worktreeRoot, false)
+		return t, cmd
+	}
+
 	// Route navigation keys to the stash list.
 	prevRef := t.stashList.SelectedRef()
 	switch key {
@@ -173,6 +211,14 @@ func (t Tab) View() tea.View {
 		return t.commitDetail.WithContainerFocus(true).View()
 	}
 
+	out := t.buildMainContent()
+	if t.stashCreate.IsOpen {
+		out = ui.OverlayCenter(out, t.stashCreate.View(t.width), t.width, t.height)
+	}
+	return ui.NewMainView(out)
+}
+
+func (t Tab) buildMainContent() string {
 	lw, lh := t.split.ListSize()
 	if lw > 0 && lh > 0 {
 		updated, _ := t.stashList.Update(tea.WindowSizeMsg{Width: lw, Height: lh})
@@ -181,17 +227,17 @@ func (t Tab) View() tea.View {
 	listOut := t.stashList.WithContainerFocus(t.isListActive()).View().Content
 
 	if !t.split.IsSplit() {
-		return ui.NewMainView(lipgloss.JoinVertical(lipgloss.Left, listOut, stashFooter()))
+		return lipgloss.JoinVertical(lipgloss.Left, listOut, stashFooter())
 	}
 
 	detailContent := t.commitDetail.WithContainerFocus(t.split.IsDetailFocused()).View().Content
-	var out string
+	var body string
 	if t.split.EffectiveOrientation() == splitview.Vertical {
-		out = lipgloss.JoinHorizontal(lipgloss.Top, listOut, detailContent)
+		body = lipgloss.JoinHorizontal(lipgloss.Top, listOut, detailContent)
 	} else {
-		out = lipgloss.JoinVertical(lipgloss.Left, listOut, detailContent)
+		body = lipgloss.JoinVertical(lipgloss.Left, listOut, detailContent)
 	}
-	return ui.NewMainView(lipgloss.JoinVertical(lipgloss.Left, out, stashFooter()))
+	return lipgloss.JoinVertical(lipgloss.Left, body, stashFooter())
 }
 
 func (t Tab) isListActive() bool {
