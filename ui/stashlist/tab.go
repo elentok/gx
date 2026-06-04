@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/ui"
 	commitui "github.com/elentok/gx/ui/commit"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/splitview"
 )
 
@@ -92,7 +93,18 @@ func (t Tab) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if key == "h" && t.split.IsSplit() && t.split.IsDetailFocused() && (t.commitDetail.IsFileTreeFocused() || t.commitDetail.IsHeaderFocused()) {
 		return t.routeKeyToSplit(tea.KeyPressMsg{Code: tea.KeyEsc})
 	}
-	if (key == "esc" || key == "q") && !t.split.IsCollapsed() {
+	if key == "q" {
+		if t.split.IsDetailFocused() && t.commitDetail.HasInternalFocus() {
+			updated, cmd := t.commitDetail.Update(msg)
+			t.commitDetail = updated.(commitui.Model)
+			return t, cmd
+		}
+		if t.split.IsDetailFocused() {
+			return t.routeKeyToSplit(msg)
+		}
+		return t, nav.Back()
+	}
+	if key == "esc" && !t.split.IsCollapsed() {
 		if t.split.IsDetailFocused() && t.commitDetail.HasInternalFocus() {
 			updated, cmd := t.commitDetail.Update(msg)
 			t.commitDetail = updated.(commitui.Model)
@@ -169,7 +181,7 @@ func (t Tab) View() tea.View {
 	listOut := t.stashList.WithContainerFocus(t.isListActive()).View().Content
 
 	if !t.split.IsSplit() {
-		return ui.NewMainView(listOut)
+		return ui.NewMainView(lipgloss.JoinVertical(lipgloss.Left, listOut, stashFooter()))
 	}
 
 	detailContent := t.commitDetail.WithContainerFocus(t.split.IsDetailFocused()).View().Content
@@ -179,9 +191,13 @@ func (t Tab) View() tea.View {
 	} else {
 		out = lipgloss.JoinVertical(lipgloss.Left, listOut, detailContent)
 	}
-	return ui.NewMainView(out)
+	return ui.NewMainView(lipgloss.JoinVertical(lipgloss.Left, out, stashFooter()))
 }
 
 func (t Tab) isListActive() bool {
 	return !t.split.IsSplit() || t.split.IsListFocused()
+}
+
+func stashFooter() string {
+	return " "
 }

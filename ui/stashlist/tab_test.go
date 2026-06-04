@@ -1,12 +1,14 @@
 package stashlist
 
 import (
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/nav"
 )
 
 func runTabInit(t Tab) Tab {
@@ -80,5 +82,43 @@ func TestQFromDetailReturnsFocusToList(t *testing.T) {
 	}
 	if !tab.split.IsListFocused() {
 		t.Fatal("expected list focused after q from detail")
+	}
+}
+
+func TestQFromListReturnsNavBack(t *testing.T) {
+	tab := newReadyTab(t)
+	if !tab.split.IsListFocused() {
+		t.Fatal("expected list focused before q")
+	}
+
+	updated, cmd := tab.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
+	tab = updated.(Tab)
+	if cmd == nil {
+		t.Fatal("expected nav.Back cmd from q on stash list")
+	}
+	if !nav.IsBack(cmd()) {
+		t.Fatalf("expected nav.Back msg, got %T", cmd())
+	}
+}
+
+func TestWindowSizeLeavesFooterRowForTabs(t *testing.T) {
+	tab := newReadyTab(t)
+	tab = sendTab(tab, tea.WindowSizeMsg{Width: 120, Height: 30})
+
+	if tab.stashList.height != 30 {
+		t.Fatalf("stash list height = %d, want 30", tab.stashList.height)
+	}
+}
+
+func TestViewAddsFooterRowForAppTabs(t *testing.T) {
+	tab := newReadyTab(t)
+	tab = sendTab(tab, tea.WindowSizeMsg{Width: 120, Height: 30})
+
+	lines := strings.Split(tab.View().Content, "\n")
+	if len(lines) == 0 {
+		t.Fatal("expected rendered lines")
+	}
+	if strings.TrimSpace(lines[len(lines)-1]) != "" {
+		t.Fatalf("expected blank footer row, got %q", lines[len(lines)-1])
 	}
 }
