@@ -118,17 +118,21 @@ func (m Model) View() tea.View {
 }
 
 func (m Model) logPaneTitleColor() color.Color {
-	if m.split.IsListFocused() {
+	if m.isLogPaneActive() {
 		return ui.ColorOrange
 	}
 	return ui.ColorBlue
 }
 
 func (m Model) logPaneBorderColor() color.Color {
-	if m.split.IsListFocused() {
+	if m.isLogPaneActive() {
 		return ui.ColorOrange
 	}
 	return ui.ColorBorder
+}
+
+func (m Model) isLogPaneActive() bool {
+	return m.split.IsSplit() && m.split.IsListFocused()
 }
 
 func (m Model) frameRightTitle() string {

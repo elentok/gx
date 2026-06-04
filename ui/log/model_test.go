@@ -969,11 +969,18 @@ func TestQFromListWhileSplitCollapses(t *testing.T) {
 
 func TestLogPaneFrameColorTracksSplitFocus(t *testing.T) {
 	m := newTestModel()
-	if m.logPaneBorderColor() != ui.ColorOrange {
-		t.Fatal("expected log frame orange while list is focused")
+	if m.logPaneBorderColor() != ui.ColorBorder {
+		t.Fatal("expected collapsed log frame to use default border")
+	}
+	if m.logPaneTitleColor() != ui.ColorBlue {
+		t.Fatal("expected collapsed log frame to use default title color")
 	}
 
 	m.split = splitview.NewSplit(logListAdapter{}, m.commitDetail)
+	if m.logPaneBorderColor() != ui.ColorOrange {
+		t.Fatal("expected log frame orange while split list is focused")
+	}
+
 	m.split, _ = m.split.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if !m.split.IsDetailFocused() {
 		t.Fatal("expected detail focused")
