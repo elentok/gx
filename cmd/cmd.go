@@ -40,6 +40,7 @@ type deps struct {
 	runStatus            func(string) error
 	runLog               func(LogOptions) error
 	runShow              func(string) error
+	runStash             func() error
 	confirmForce         func(string) (bool, error)
 	choosePushDivergence func(io.Reader, io.Writer, *git.PushDivergence) (int, error)
 	initConfig           func() (string, error)
@@ -62,6 +63,7 @@ func defaultDeps() deps {
 		runStatus:            runStatus,
 		runLog:               runLog,
 		runShow:              runShow,
+		runStash:             runStash,
 		choosePushDivergence: choosePushDivergence,
 		initConfig:           config.Init,
 		loadConfig:           config.Load,
@@ -118,6 +120,7 @@ Run without a command to open the status UI.`,
 		newStatusCmd(d),
 		newLogCmd(d),
 		newShowCmd(d),
+		newStashCmd(d),
 		newConfigCmd(d),
 		newBumpCmd(d),
 		newStashifyCmd(d),
@@ -259,6 +262,17 @@ func newShowCmd(d deps) *cobra.Command {
 				ref = args[0]
 			}
 			return d.runShow(ref)
+		},
+	}
+}
+
+func newStashCmd(d deps) *cobra.Command {
+	return &cobra.Command{
+		Use:   "stash",
+		Short: "open the stash UI",
+		Args:  cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return d.runStash()
 		},
 	}
 }
@@ -514,6 +528,43 @@ func runShow(ref string) error {
 	}
 	m := app.New(*repo, app.Settings{
 		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: root, Ref: ref},
+		ActiveWorktreePath: root,
+		Settings:           settingsFromConfig(cfg),
+	})
+	p := tea.NewProgram(m)
+	_, err = p.Run()
+	return err
+}
+
+func runStash() error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	info, err := git.IdentifyDir(cwd)
+	if err != nil {
+		return err
+	}
+	if info.Repo.IsBare && info.WorktreeRoot == "" {
+		return fmt.Errorf("gx stash must be run from a regular repo or linked worktree")
+	}
+
+	root, err := git.WorktreeRoot(cwd)
+	if err != nil {
+		return err
+	}
+	repo, err := git.FindRepo(root)
+	if err != nil {
+		return err
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	m := app.New(*repo, app.Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabStash, WorktreeRoot: root},
 		ActiveWorktreePath: root,
 		Settings:           settingsFromConfig(cfg),
 	})
