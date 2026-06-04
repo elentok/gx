@@ -148,6 +148,15 @@ func (m Model) AutoReload() tea.Cmd {
 	return m.cmdReload()
 }
 
+// NeedsInitialLoad reports whether the page's first data load never landed.
+// rows stays nil until a reloadMsg is applied; if the user leaves the tab
+// before the in-flight Init reload returns, that result is delivered to the
+// then-active page and never reaches this model. The app shell uses this to
+// reload on re-activation instead of leaving the page stuck loading.
+func (m Model) NeedsInitialLoad() bool {
+	return m.rows == nil
+}
+
 // WithPendingFocus sets a subject to focus on when the page next activates.
 func (m Model) WithPendingFocus(subject string) Model {
 	m.pendingFocusSubject = subject

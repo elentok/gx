@@ -73,11 +73,27 @@ func (m Model) applySwitch(tabVS, prevVS nav.ViewState) (Model, tea.Cmd) {
 		m.gate.MarkLoaded(tabVS.Tab)
 		return m, tea.Batch(onPageDeactivatedCmd(outgoing), autoReloadCmd(currentPage.model), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
 	}
-	if m.gate.ShouldAutoReload(tabVS.Tab) {
+	// Reload when the tab is stale (a mutation occurred elsewhere) or when its
+	// initial load never completed — e.g. the user left before the in-flight
+	// reload returned, so its result was delivered to another page and the gate
+	// was already optimistically stamped at switch-in. Without this the page
+	// stays stuck on its loading state forever.
+	if m.gate.ShouldAutoReload(tabVS.Tab) || needsInitialLoad(currentPage.model) {
 		m.gate.MarkLoaded(tabVS.Tab)
 		return m, tea.Batch(onPageDeactivatedCmd(outgoing), autoReloadCmd(currentPage.model), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
 	}
 	return m, tea.Batch(onPageDeactivatedCmd(outgoing), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
+}
+
+type pageInitialLoadAware interface {
+	NeedsInitialLoad() bool
+}
+
+func needsInitialLoad(model tea.Model) bool {
+	if a, ok := model.(pageInitialLoadAware); ok {
+		return a.NeedsInitialLoad()
+	}
+	return false
 }
 
 type pageAutoReloadable interface {

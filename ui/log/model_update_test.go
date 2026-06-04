@@ -33,6 +33,19 @@ func TestHandleReload_SetsRows(t *testing.T) {
 	}
 }
 
+func TestNeedsInitialLoad(t *testing.T) {
+	m := newTestModel()
+	if !m.NeedsInitialLoad() {
+		t.Error("expected NeedsInitialLoad true before any reload (rows nil)")
+	}
+
+	rows := []row{{kind: rowCommit, commit: git.LogEntry{FullHash: "abc", Subject: "x"}}}
+	updated, _ := m.Update(reloadMsg{rows: rows})
+	if updated.(Model).NeedsInitialLoad() {
+		t.Error("expected NeedsInitialLoad false after rows loaded")
+	}
+}
+
 func TestHandleReload_Error(t *testing.T) {
 	m := newTestModel()
 	updated, _ := m.Update(reloadMsg{err: errors.New("load failed")})

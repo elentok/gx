@@ -953,9 +953,12 @@ func TestGCDoesNotSwitchToCommitTab(t *testing.T) {
 // reloadCounterModel wraps a real tea.Model, counting AutoReload calls while
 // delegating to the real implementation.
 type reloadCounterModel struct {
-	inner   tea.Model
-	reloads int
+	inner     tea.Model
+	reloads   int
+	needsLoad bool
 }
+
+func (c *reloadCounterModel) NeedsInitialLoad() bool { return c.needsLoad }
 
 func (c *reloadCounterModel) Init() tea.Cmd {
 	return c.inner.Init()
@@ -1085,5 +1088,39 @@ func TestE2E_LogReportsRefThenSwitchReusesPage(t *testing.T) {
 
 	if got := m.livePageByTab[nav.TabLog].model; got != tea.Model(counter) {
 		t.Errorf("log page was rebuilt across switch; expected cached model to be reused")
+	}
+}
+
+// TestE2E_InterruptedInitialLoad_ReloadsOnReturn guards against a page getting
+// stuck on its loading state: if the user leaves before the Init reload lands,
+// the gate was optimistically stamped at switch-in, so a plain revisit would
+// not reload. A page reporting NeedsInitialLoad must trigger an AutoReload when
+// re-activated.
+func TestE2E_InterruptedInitialLoad_ReloadsOnReturn(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	// Simulate the log page whose initial load never completed (rows still nil).
+	counter := &reloadCounterModel{inner: m.livePageByTab[nav.TabLog].model, needsLoad: true}
+	live := m.livePageByTab[nav.TabLog]
+	live.model = counter
+	live.didInit = true
+	m.livePageByTab[nav.TabLog] = live
+
+	// log → status → log with no mutations: the unloaded page must reload.
+	updated, _ := m.Update(nav.Switch(nav.ViewState{Tab: nav.TabStatus})())
+	m = updated.(Model)
+	m.Update(nav.Switch(nav.ViewState{Tab: nav.TabLog})())
+
+	if counter.reloads != 1 {
+		t.Errorf("interrupted initial load → return: expected 1 AutoReload, got %d", counter.reloads)
 	}
 }
