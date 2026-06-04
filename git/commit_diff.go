@@ -15,13 +15,17 @@ func CommitFilesForRef(repoRoot, ref string) ([]CommitFile, error) {
 	if ref == "" {
 		ref = "HEAD"
 	}
-	out, _, err := run(repoRoot, []string{
+	args := []string{
 		"show",
 		"--find-renames",
 		"--format=",
 		"--name-status",
 		ref,
-	})
+	}
+	if isStashRef(ref) {
+		args = []string{"stash", "show", "-u", "--name-status", ref}
+	}
+	out, _, err := run(repoRoot, args)
 	if err != nil {
 		return nil, err
 	}
@@ -61,15 +65,11 @@ func CommitFileDiffForRef(repoRoot, ref, path string, contextLines int) (string,
 	if ref == "" {
 		ref = "HEAD"
 	}
-	out, _, err := run(repoRoot, []string{
-		"show",
-		"--find-renames",
-		diffContextArg(contextLines),
-		"--format=",
-		ref,
-		"--",
-		path,
-	})
+	args, err := singleFileDiffArgs(repoRoot, ref, path, contextLines, false)
+	if err != nil {
+		return "", err
+	}
+	out, _, err := run(repoRoot, args)
 	if err != nil {
 		return "", err
 	}
@@ -81,16 +81,11 @@ func CommitFileDiffWithDeltaForRef(repoRoot, ref, path string, contextLines, ren
 	if ref == "" {
 		ref = "HEAD"
 	}
-	raw, _, err := run(repoRoot, []string{
-		"show",
-		"--find-renames",
-		diffContextArg(contextLines),
-		"--no-color",
-		"--format=",
-		ref,
-		"--",
-		path,
-	})
+	rawArgs, err := singleFileDiffArgs(repoRoot, ref, path, contextLines, false)
+	if err != nil {
+		return "", err
+	}
+	raw, _, err := run(repoRoot, rawArgs)
 	if err != nil {
 		return "", err
 	}
@@ -101,18 +96,65 @@ func CommitFileDiffWithDeltaForRef(repoRoot, ref, path string, contextLines, ren
 	if out, deltaErr := colorizeWithDelta(repoRoot, raw, sideBySide, renderWidth); deltaErr == nil {
 		return out, nil
 	}
-	out, _, err := run(repoRoot, []string{
-		"show",
-		"--find-renames",
-		diffContextArg(contextLines),
-		"--color=always",
-		"--format=",
-		ref,
-		"--",
-		path,
-	})
+	colorArgs, err := singleFileDiffArgs(repoRoot, ref, path, contextLines, true)
+	if err != nil {
+		return "", err
+	}
+	out, _, err := run(repoRoot, colorArgs)
 	if err != nil {
 		return "", err
 	}
 	return strings.TrimSpace(out), nil
+}
+
+func isStashRef(ref string) bool {
+	return strings.HasPrefix(ref, "stash@{") || ref == "stash"
+}
+
+func singleFileDiffArgs(repoRoot, ref, path string, contextLines int, color bool) ([]string, error) {
+	if !isStashRef(ref) {
+		args := []string{
+			"show",
+			"--find-renames",
+			diffContextArg(contextLines),
+		}
+		if color {
+			args = append(args, "--color=always")
+		} else {
+			args = append(args, "--no-color")
+		}
+		args = append(args, "--format=", ref, "--", path)
+		return args, nil
+	}
+
+	targetRef := ref
+	if exists, err := pathExistsInTree(repoRoot, ref, path); err != nil {
+		return nil, err
+	} else if !exists {
+		targetRef = ref + "^3"
+	}
+
+	args := []string{
+		"diff",
+		"--find-renames",
+		diffContextArg(contextLines),
+	}
+	if color {
+		args = append(args, "--color=always")
+	} else {
+		args = append(args, "--no-color")
+	}
+	args = append(args, ref+"^1", targetRef, "--", path)
+	return args, nil
+}
+
+func pathExistsInTree(repoRoot, treeish, path string) (bool, error) {
+	_, _, err := run(repoRoot, []string{"cat-file", "-e", treeish + ":" + path})
+	if err == nil {
+		return true, nil
+	}
+	if _, _, parentErr := run(repoRoot, []string{"rev-parse", "--verify", treeish}); parentErr != nil {
+		return false, parentErr
+	}
+	return false, nil
 }
