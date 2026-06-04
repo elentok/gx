@@ -658,6 +658,65 @@ func TestEnterOnCommitInCollapsedExpandsToSplit(t *testing.T) {
 	}
 }
 
+func TestLOnCommitInCollapsedExpandsToSplit(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "a\n")
+	testutil.CommitAll(t, repo, "commit a")
+
+	m := newTestModelDefault(repo, "", settings)
+	m.width = 200
+	m.height = 40
+	m, _ = m.syncSplitSize()
+	m.list.SetSelected(1, len(m.rows))
+	if !m.split.IsCollapsed() {
+		t.Fatal("expected Collapsed initially")
+	}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+	m = updated.(Model)
+	if !m.split.IsSplit() {
+		t.Fatal("expected Split after l on commit")
+	}
+	if !m.split.IsDetailFocused() {
+		t.Fatal("expected detail focused after l on commit")
+	}
+	if !m.commitDetail.IsFileTreeFocused() {
+		t.Fatal("expected commit file tree focused after l on commit")
+	}
+}
+
+func TestLFromLogPanelFocusesOpenDetail(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "a\n")
+	testutil.CommitAll(t, repo, "commit a")
+
+	m := newTestModelDefault(repo, "", settings)
+	m.width = 200
+	m.height = 40
+	m, _ = m.syncSplitSize()
+	m.list.SetSelected(1, len(m.rows))
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	m = updated.(Model)
+	if !m.split.IsSplit() || !m.split.IsListFocused() {
+		t.Fatal("expected open split with log focused")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+	m = updated.(Model)
+	if !m.split.IsSplit() {
+		t.Fatal("expected split to remain open after l")
+	}
+	if !m.split.IsDetailFocused() {
+		t.Fatal("expected detail focused after l from log panel")
+	}
+	if !m.commitDetail.IsFileTreeFocused() {
+		t.Fatal("expected commit file tree focused after l from log panel")
+	}
+}
+
 func TestEscFromDetailReturnsFocusToList(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "a\n")
@@ -715,6 +774,78 @@ func TestQFromDetailReturnsFocusToList(t *testing.T) {
 	}
 	if !m.split.IsListFocused() {
 		t.Fatal("expected list focused after q from detail")
+	}
+}
+
+func TestHFromDetailFileTreeReturnsFocusToList(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "a\n")
+	testutil.CommitAll(t, repo, "commit a")
+
+	m := newTestModelDefault(repo, "", settings)
+	m.width = 200
+	m.height = 40
+	m, _ = m.syncSplitSize()
+	m.list.SetSelected(1, len(m.rows))
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	if !m.split.IsDetailFocused() {
+		t.Fatal("expected detail focused after Enter")
+	}
+	if !m.commitDetail.IsFileTreeFocused() {
+		t.Fatal("expected commit file tree focused after opening detail")
+	}
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
+	m = updated.(Model)
+	if cmd != nil {
+		msg := cmd()
+		t.Fatalf("expected h to switch focus without cmd, got %T: %v", msg, msg)
+	}
+	if !m.split.IsSplit() {
+		t.Fatal("expected still Split after h from detail file tree")
+	}
+	if !m.split.IsListFocused() {
+		t.Fatal("expected list focused after h from detail file tree")
+	}
+}
+
+func TestHFromDetailHeaderReturnsFocusToList(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "a\n")
+	testutil.CommitAll(t, repo, "commit a")
+
+	m := newTestModelDefault(repo, "", settings)
+	m.width = 200
+	m.height = 40
+	m, _ = m.syncSplitSize()
+	m.list.SetSelected(1, len(m.rows))
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
+	m = updated.(Model)
+	if !m.split.IsDetailFocused() {
+		t.Fatal("expected detail focused before pressing h")
+	}
+	if !m.commitDetail.IsHeaderFocused() {
+		t.Fatal("expected commit header focused before pressing h")
+	}
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
+	m = updated.(Model)
+	if cmd != nil {
+		msg := cmd()
+		t.Fatalf("expected h to switch focus without cmd, got %T: %v", msg, msg)
+	}
+	if !m.split.IsSplit() {
+		t.Fatal("expected still Split after h from detail header")
+	}
+	if !m.split.IsListFocused() {
+		t.Fatal("expected list focused after h from detail header")
 	}
 }
 

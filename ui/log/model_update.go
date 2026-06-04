@@ -120,6 +120,9 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 			// Second key of the "to" chord belongs to the split.
 			return m.routeKeyToSplit(msg)
 		}
+		if key == "h" && m.split.IsSplit() && m.split.IsDetailFocused() && (m.commitDetail.IsFileTreeFocused() || m.commitDetail.IsHeaderFocused()) {
+			return m.routeKeyToSplit(tea.KeyPressMsg{Code: tea.KeyEsc})
+		}
 		if (key == "esc" || key == "q") && !m.split.IsCollapsed() {
 			if m.split.IsDetailFocused() && m.commitDetail.HasInternalFocus() {
 				updated, detailCmd := m.commitDetail.Update(msg)

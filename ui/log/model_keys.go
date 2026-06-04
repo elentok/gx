@@ -48,6 +48,7 @@ func newLogManager() keys.Manager {
 		{ID: bindingUp, Seq: []string{"k"}, Categories: []string{"Navigation"}, Title: "up", Display: "↑/k"},
 		{ID: bindingUp, Seq: []string{"up"}, Categories: []string{}, Title: ""},
 		{ID: bindingOpen, Seq: []string{"enter"}, Categories: []string{"Navigation"}, Title: "open commit"},
+		{ID: bindingOpen, Seq: []string{"l"}, Categories: []string{}, Title: ""},
 		{ID: bindingBottom, Seq: []string{"G"}, Categories: []string{"Navigation"}, Title: "bottom", Display: "G"},
 		{ID: bindingBottom, Seq: []string{"shift+g"}, Categories: []string{}, Title: ""},
 		{ID: bindingReload, Seq: []string{"R"}, Categories: []string{"Other"}, Title: "reload"},

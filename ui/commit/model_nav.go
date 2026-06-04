@@ -10,3 +10,15 @@ func (m Model) CurrentRef() string {
 func (m Model) HasInternalFocus() bool {
 	return m.focusDiff || m.focusHeader || m.fileTreeModel.Search().IsActive()
 }
+
+// IsFileTreeFocused reports whether the commit file tree is the active
+// sub-panel. Search input focus is excluded so typed characters are preserved.
+func (m Model) IsFileTreeFocused() bool {
+	return !m.focusDiff && !m.focusHeader && !m.fileTreeModel.Search().InputFocused()
+}
+
+// IsHeaderFocused reports whether the commit info/header panel owns internal
+// focus.
+func (m Model) IsHeaderFocused() bool {
+	return m.focusHeader
+}
