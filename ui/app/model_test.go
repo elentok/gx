@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui/nav"
@@ -11,7 +12,6 @@ import (
 	stashlistui "github.com/elentok/gx/ui/stashlist"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/charmbracelet/x/ansi"
 )
 
 // inputFocusedStub is a page stub that reports InputFocused=true.
@@ -28,9 +28,9 @@ type lifecycleSpy struct {
 	deactivated int
 }
 
-func (s *lifecycleSpy) Init() tea.Cmd                      { return nil }
+func (s *lifecycleSpy) Init() tea.Cmd                       { return nil }
 func (s *lifecycleSpy) Update(tea.Msg) (tea.Model, tea.Cmd) { return s, nil }
-func (s *lifecycleSpy) View() tea.View                     { return tea.NewView("spy") }
+func (s *lifecycleSpy) View() tea.View                      { return tea.NewView("spy") }
 func (s *lifecycleSpy) OnPageActivated() tea.Cmd {
 	s.activated++
 	return nil
@@ -62,6 +62,57 @@ func TestSwitchFiresDeactivateOnOldPage(t *testing.T) {
 	if spy.deactivated != 1 {
 		t.Fatalf("expected OnPageDeactivated called once on outgoing page, got %d", spy.deactivated)
 	}
+}
+
+func TestLogEnterRendersCommitDetailThroughAppShell(t *testing.T) {
+	repoDir := testutil.TempRepoWithThreeCommits(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	updated, initCmd := m.Update(tea.WindowSizeMsg{Width: 160, Height: 40})
+	m = updated.(Model)
+	m = runAppCmd(m, initCmd)
+
+	m = runAppCmd(m, m.Init())
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+
+	view := ansi.Strip(m.View().Content)
+	if !strings.Contains(view, "Commit") {
+		t.Fatalf("expected commit detail through app shell, got:\n%s", view)
+	}
+	if !strings.Contains(view, "c.txt") {
+		t.Fatalf("expected commit file through app shell, got:\n%s", view)
+	}
+}
+
+func runAppCmd(m Model, cmd tea.Cmd) Model {
+	if cmd == nil {
+		return m
+	}
+	msg := cmd()
+	if msg == nil {
+		return m
+	}
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		for _, c := range batch {
+			m = runAppCmd(m, c)
+		}
+		return m
+	}
+	next, _ := m.Update(msg)
+	if m2, ok := next.(Model); ok {
+		return m2
+	}
+	return m
 }
 
 func TestOpenFiresDeactivateOnOutgoingPage(t *testing.T) {
@@ -346,7 +397,6 @@ func TestOpenStashAndBackRestoresTab(t *testing.T) {
 		t.Fatalf("expected empty stack after back, got %d", len(m.history))
 	}
 }
-
 
 func TestOpenStatusAndBackRestoresLogTab(t *testing.T) {
 	repoDir := testutil.TempRepo(t)

@@ -250,3 +250,21 @@ func TestAmendE2E_HEAD_FromLog(t *testing.T) {
 	waitForLogE2EText(t, commitTM, "c.txt", logE2ELoadWait)
 	logE2EQuit(t, commitTM)
 }
+
+func TestOpenCommitDetailFromLog(t *testing.T) {
+	t.Parallel()
+	repoDir := testutil.TempRepoWithThreeCommits(t)
+
+	tm := startLogTUI(t, repoDir)
+
+	// Wait for log to load — "tip" is HEAD and should appear first
+	waitForLogE2EText(t, tm, "tip", logE2ELoadWait)
+
+	// Press Enter on "tip" to open the split-view detail panel
+	tm.Send(logE2EKeySpecial(tea.KeyEnter))
+
+	// The commit detail should show the file added in "tip"
+	waitForLogE2EText(t, tm, "c.txt", logE2EActionWait)
+
+	logE2EQuit(t, tm)
+}

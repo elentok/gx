@@ -61,8 +61,7 @@ func (m Model) View() tea.View {
 		TitleColor:  ui.ColorBlue,
 		Background:  ui.ColorBase,
 	})
-	footer := m.footerView()
-	listOut := lipgloss.JoinVertical(lipgloss.Left, body, footer)
+	listOut := body
 	if m.search.Mode() == search.SearchModeInput {
 		overlayW := m.searchOverlayWidth()
 		m.search.SetWidth(overlayW)
@@ -118,13 +117,23 @@ func (m Model) View() tea.View {
 }
 
 func (m Model) frameRightTitle() string {
+	searchStatus := m.searchMatchStatus()
+	context := m.startRef
 	if m.filter.IsActive() {
 		if m.filter.StartLine > 0 {
-			return fmt.Sprintf("%s L%d-%d", m.filter.Path, m.filter.StartLine, m.filter.EndLine)
+			context = fmt.Sprintf("%s L%d-%d", m.filter.Path, m.filter.StartLine, m.filter.EndLine)
+		} else {
+			context = m.filter.Path
 		}
-		return m.filter.Path
 	}
-	return m.startRef
+	return ui.JoinStatus(context, searchStatus)
+}
+
+func (m Model) searchMatchStatus() string {
+	if m.search.HasQuery() && m.search.MatchesCount() > 0 {
+		return fmt.Sprintf("%d/%d matches", m.search.Cursor()+1, m.search.MatchesCount())
+	}
+	return ""
 }
 
 func (m Model) visibleLines() []string {
@@ -262,27 +271,6 @@ func (m Model) highlightSearch(text string) string {
 		start = end
 	}
 	return out.String()
-}
-
-func (m Model) footerView() string {
-	left := ""
-	if m.search.HasQuery() && m.search.MatchesCount() > 0 {
-		left = fmt.Sprintf("%d/%d matches", m.search.Cursor()+1, m.search.MatchesCount())
-	}
-	if left == "" {
-		left = "enter open commit"
-	}
-	right := ui.StyleHint.Render("? help")
-	if m.width <= 0 {
-		return left + "  " + right
-	}
-	left = ansi.Truncate(left, m.width, "…")
-	leftW := ansi.StringWidth(left)
-	rightW := ansi.StringWidth(right)
-	if leftW+rightW+2 >= m.width {
-		return left + "  " + ansi.Truncate(right, maxInt(0, m.width-leftW-2), "")
-	}
-	return left + strings.Repeat(" ", m.width-leftW-rightW) + right
 }
 
 func (m Model) searchOverlayWidth() int {

@@ -121,6 +121,11 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 			return m.routeKeyToSplit(msg)
 		}
 		if key == "esc" && !m.split.IsCollapsed() {
+			if m.split.IsDetailFocused() && m.commitDetail.HasInternalFocus() {
+				updated, detailCmd := m.commitDetail.Update(msg)
+				m.commitDetail = updated.(commit.Model)
+				return m, detailCmd
+			}
 			return m.routeKeyToSplit(msg)
 		}
 		if key == "f" && !m.split.IsCollapsed() {

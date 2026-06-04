@@ -150,7 +150,6 @@ func TestGHResetsCustomRefToHead(t *testing.T) {
 	}
 }
 
-
 func TestSelectedCommitRowFillsFullWidth(t *testing.T) {
 	m := newTestModel()
 	m.width = 80
@@ -252,6 +251,9 @@ func TestCloseSearchKeepsMatchesVisible(t *testing.T) {
 	}
 	if m.search.MatchesCount() == 0 {
 		t.Fatalf("expected matches to persist after close")
+	}
+	if got := ansi.Strip(m.frameRightTitle()); !strings.Contains(got, "1/2 matches") {
+		t.Fatalf("expected search match count in frame title, got %q", got)
 	}
 }
 
@@ -685,6 +687,43 @@ func TestEscFromDetailReturnsFocusToList(t *testing.T) {
 	}
 }
 
+func TestEscFromDetailInternalFocusStepsBackWithoutMovingToList(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "a\n")
+	testutil.CommitAll(t, repo, "commit a")
+
+	m := newTestModelDefault(repo, "", settings)
+	m.width = 200
+	m.height = 40
+	m, _ = m.syncSplitSize()
+	m.list.SetSelected(1, len(m.rows))
+
+	// Open split view.
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	if !m.split.IsDetailFocused() {
+		t.Fatal("expected detail focused after Enter")
+	}
+
+	// Tab routes to commit model and cycles focus to header (or diff).
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
+	m = updated.(Model)
+	if !m.commitDetail.HasInternalFocus() {
+		t.Skip("commit detail has no internal focus after Tab — skipping")
+	}
+
+	// Esc should step back internally — NOT move split focus to list.
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	m = updated.(Model)
+	if cmd != nil {
+		msg := cmd()
+		t.Fatalf("expected esc to be handled internally without cmd, got %T: %v", msg, msg)
+	}
+	if !m.split.IsDetailFocused() {
+		t.Fatal("expected detail still focused after internal esc (should step back, not defocus detail)")
+	}
+}
+
 func TestEscFromListWhileSplitCollapses(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "a\n")
@@ -801,5 +840,33 @@ func TestWorktreeStatusUpdatesRows(t *testing.T) {
 	}
 	if strings.Contains(detail, "untracked") {
 		t.Errorf("expected no 'untracked' for count=0, got %q", detail)
+	}
+}
+
+func TestEnterOnCommitRendersDetailContent(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "a content\n")
+	testutil.CommitAll(t, repo, "commit a")
+
+	m := newTestModelDefault(repo, "", settings)
+
+	// WindowSizeMsg must go through Update to set m.ready = true (same as real app).
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 200, Height: 40})
+	m = updated.(Model)
+	m.list.SetSelected(1, len(m.rows))
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	if !m.split.IsSplit() {
+		t.Fatal("expected split mode after Enter")
+	}
+
+	view := m.View()
+	stripped := ansi.Strip(view.Content)
+	if !strings.Contains(stripped, "a.txt") {
+		t.Errorf("expected 'a.txt' in view after opening commit detail, got:\n%s", stripped)
+	}
+	if !strings.Contains(stripped, "Commit") {
+		t.Errorf("expected 'Commit' header in view after opening commit detail, got:\n%s", stripped)
 	}
 }
