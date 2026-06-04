@@ -22,7 +22,7 @@ func (m Model) View() tea.View {
 	lines := m.visibleLines()
 	return tea.NewView(ui.RenderPanelFrame(ui.PanelFrameOptions{
 		Width:       m.width,
-		Height:      m.height,
+		Height:      max(1, m.height-1),
 		Title:       "Stash",
 		Lines:       lines,
 		BorderColor: m.frameBorderColor(),

@@ -78,7 +78,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) visibleH() int {
-	h := m.height - 2
+	h := m.height - 3 // frame is height-1, minus top+bottom borders
 	if h < 1 {
 		return 1
 	}
