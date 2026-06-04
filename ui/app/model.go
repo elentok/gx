@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/navstate"
 	"github.com/elentok/gx/ui/notify"
+	stashlistui "github.com/elentok/gx/ui/stashlist"
 	statusui "github.com/elentok/gx/ui/status"
 	"github.com/elentok/gx/ui/worktrees"
 )
@@ -181,7 +182,7 @@ func (m Model) newHistoryEntry(viewState nav.ViewState) historyEntry {
 	case nav.TabStash:
 		return historyEntry{
 			viewState: viewState,
-			model:     &stashPlaceholder{},
+			model:     stashlistui.NewTab(viewState.WorktreeRoot, s, keys.New(Bindings())),
 		}
 	case nav.TabWorktrees:
 		fallthrough
@@ -234,8 +235,3 @@ func (m *Model) restoreLogSelectionFromPoppedPage(popped historyEntry) {
 	m.navState.ApplyViewStateChanged(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: current.viewState.WorktreeRoot, Ref: ref})
 }
 
-type stashPlaceholder struct{}
-
-func (s *stashPlaceholder) Init() tea.Cmd                       { return nil }
-func (s *stashPlaceholder) Update(tea.Msg) (tea.Model, tea.Cmd) { return s, nil }
-func (s *stashPlaceholder) View() tea.View                      { return tea.NewView("stash (not yet implemented)") }

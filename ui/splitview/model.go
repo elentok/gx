@@ -81,6 +81,13 @@ func New(list ListPanel, detail DetailPanel) Model {
 	}
 }
 
+// NewSplit creates a Model that starts in split mode (both panels visible).
+func NewSplit(list ListPanel, detail DetailPanel) Model {
+	m := New(list, detail)
+	m.vis = visModeSplit
+	return m
+}
+
 // IsCollapsed reports whether only the list panel is visible.
 func (m Model) IsCollapsed() bool { return m.vis == visModeCollapsed }
 

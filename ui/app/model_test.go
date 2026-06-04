@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/navstate"
+	stashlistui "github.com/elentok/gx/ui/stashlist"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -699,5 +700,70 @@ func TestInjectTabsIntoFooterPreservesRightHintTailWithStatusPrefix(t *testing.T
 	}
 	if !strings.Contains(last, "context: 1") {
 		t.Fatalf("expected context label to remain visible with status prefix, got %q", last)
+	}
+}
+
+func newAppModel(t *testing.T) (Model, string) {
+	t.Helper()
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabWorktrees},
+		ActiveWorktreePath: repoDir,
+	})
+	return m, repoDir
+}
+
+func pressKey(m Model, key rune) Model {
+	updated, _ := m.Update(tea.KeyPressMsg{Code: key, Text: string(key)})
+	return updated.(Model)
+}
+
+func TestStashTabReachableVia4(t *testing.T) {
+	m, _ := newAppModel(t)
+	m = pressKey(m, '4')
+	if m.navState.ActiveTab() != nav.TabStash {
+		t.Fatalf("expected stash tab via 4, got %q", m.navState.ActiveTab())
+	}
+}
+
+func TestStashTabReachableViaGS(t *testing.T) {
+	m, _ := newAppModel(t)
+	m = pressKey(m, 'g')
+	m = pressKey(m, 'S')
+	if m.navState.ActiveTab() != nav.TabStash {
+		t.Fatalf("expected stash tab via gS, got %q", m.navState.ActiveTab())
+	}
+}
+
+func TestStashTabOpensInSplitState(t *testing.T) {
+	m, repoDir := newAppModel(t)
+	updated, _ := m.Update(nav.Switch(nav.ViewState{Tab: nav.TabStash, WorktreeRoot: repoDir})())
+	m = updated.(Model)
+	// Give it a size so split layout is active.
+	updated, _ = m.Update(tea.WindowSizeMsg{Width: 200, Height: 50})
+	m = updated.(Model)
+
+	page := m.livePageByTab[nav.TabStash]
+	tab, ok := page.model.(stashlistui.Tab)
+	if !ok {
+		t.Fatalf("expected stash page to be stashlistui.Tab, got %T", page.model)
+	}
+	if !tab.IsSplit() {
+		t.Fatal("expected stash tab to open in split state")
+	}
+}
+
+func TestGCDoesNotSwitchToCommitTab(t *testing.T) {
+	m, _ := newAppModel(t)
+	before := m.navState.ActiveTab()
+	m = pressKey(m, 'g')
+	m = pressKey(m, 'c')
+	// g+c should not change the active tab (no commit tab exists)
+	if m.navState.ActiveTab() != before {
+		t.Fatalf("g+c should not switch tabs, got %q", m.navState.ActiveTab())
 	}
 }
