@@ -117,3 +117,34 @@ navigation. All are defined in `ui/nav`:
 The app-shell `Update` wrapper calls `AppendViewStateChanged` after every child `Update`, comparing
 pre/post `ViewState` and emitting `ViewStateChanged` automatically when navigation is enabled.
 Explicit `ViewStateChanged` emissions remain supported for specialized timing needs.
+
+## Tab Caching and Reload
+
+**Live page cache** — the app shell keeps one live `tea.Model` per `TabID` (`livePageByTab`).
+Switching tabs reuses the same instance, so in-tab view state (selection, scroll offset, split
+state, filetree expansion) is preserved across switches. A page is only reconstructed when its
+`ViewContext` changes (different worktree/ref). Switching tabs does **not** reconstruct or, by
+itself, reload a cached page.
+
+**Repo epoch** — a single monotonic counter on the app shell, bumped once per completed mutating
+git operation. It is the canonical "the repository changed" signal. Global (not keyed per worktree)
+for now: a mutation in any worktree advances the one epoch. The shell records, per cached page, the
+epoch the page's data was last loaded at (`loadedEpoch`, stored shell-side on `livePage`, not inside
+the page model).
+
+**`RepoMutated`** — a fifth navigation message (`ui/nav`) emitted as a `tea.Cmd` by any operation
+that mutates the repository (commit, amend, reword, bump, rebase, push, pull, stage/unstage, stash
+apply/pop/drop/create, worktree create/delete). The emitter only declares "the repo changed"; it
+does not name which tabs are affected. The shell intercepts it, bumps the **repo epoch**, and stamps
+the currently active page as fresh at the new epoch (the active page is the mutator and self-reloads
+to show its own result).
+
+**Auto-reload** — a system-initiated, state-preserving reload the shell triggers on tab activation
+*only when the page is stale* (`loadedEpoch < repo epoch`). Exposed by each cacheable page as
+`AutoReload() tea.Cmd` (satisfying the `pageAutoReloadable` interface). Because the user did not ask
+for it, it preserves maximum view state (e.g. status uses `refreshPreserveScroll`). This replaces
+the previous unconditional reload-on-every-activation.
+
+**Manual reload** — a user-initiated reload via the `R` key (and status `m r`). Louder than
+auto-reload: it may reset scroll and flashes a "refreshed" notification. It is also the escape hatch
+for changes made *outside* gx (external terminal git commands), which do not bump the repo epoch.
