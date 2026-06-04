@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/splitview"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -37,14 +38,22 @@ func (m Model) View() tea.View {
 		return ui.NewMainView("\n  Error: " + m.err.Error())
 	}
 
+	// When detail panel is fullscreened, render it exclusively.
+	if m.split.IsFullscreen() && m.split.IsDetailFocused() {
+		return m.commitDetail.View()
+	}
+
 	title := "Log"
 	if m.worktreeRoot != "" {
 		title = fmt.Sprintf("Log (%s)", m.worktreeRoot)
 	}
 
+	lw := maxInt(20, m.listWidth())
+	lh := maxInt(4, m.listHeight()-1)
+
 	body := ui.RenderPanelFrame(ui.PanelFrameOptions{
-		Width:       maxInt(20, m.width),
-		Height:      maxInt(4, m.height-1),
+		Width:       lw,
+		Height:      lh,
 		Title:       title,
 		RightTitle:  m.frameRightTitle(),
 		Lines:       m.visibleLines(),
@@ -53,20 +62,34 @@ func (m Model) View() tea.View {
 		Background:  ui.ColorBase,
 	})
 	footer := m.footerView()
-	out := lipgloss.JoinVertical(lipgloss.Left, body, footer)
+	listOut := lipgloss.JoinVertical(lipgloss.Left, body, footer)
 	if m.search.Mode() == search.SearchModeInput {
 		overlayW := m.searchOverlayWidth()
 		m.search.SetWidth(overlayW)
 		overlay := m.search.View()
-		y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
-		out = ui.OverlayBottomCenter(out, overlay, m.width, y)
+		y := m.settings.InputModalBottom.ResolveY(m.listHeight(), lipgloss.Height(overlay))
+		listOut = ui.OverlayBottomCenter(listOut, overlay, m.listWidth(), y)
 	}
 	if prefix := m.keys.Prefix(); len(prefix) > 0 {
 		hints := ui.ChordBindingsFromHints(m.keys.ChordHints())
 		if len(hints) > 0 {
-			out = ui.OverlayBottomRight(out, ui.RenderChordOverlay(prefix[0], hints), m.width, m.height)
+			listOut = ui.OverlayBottomRight(listOut, ui.RenderChordOverlay(prefix[0], hints), m.listWidth(), m.listHeight())
 		}
 	}
+
+	// Compose with detail panel when in split mode.
+	var out string
+	if m.split.IsSplit() {
+		detailContent := m.commitDetail.View().Content
+		if m.split.EffectiveOrientation() == splitview.Vertical {
+			out = lipgloss.JoinHorizontal(lipgloss.Top, listOut, detailContent)
+		} else {
+			out = lipgloss.JoinVertical(lipgloss.Left, listOut, detailContent)
+		}
+	} else {
+		out = listOut
+	}
+
 	if m.rebaseConfirm.isOpen() {
 		out = ui.OverlayCenter(out, m.rebaseConfirmView(m.width), m.width, m.height)
 	}
@@ -109,12 +132,12 @@ func (m Model) visibleLines() []string {
 		return []string{ui.StyleMuted.Render("no commits")}
 	}
 
-	innerHeight := maxInt(1, m.height-3)
+	innerHeight := maxInt(1, m.listHeight()-3)
 	start, end := m.list.VisibleRange(len(m.rows), innerHeight)
 
 	lines := make([]string, 0, end-start)
 	for i := start; i < end; i++ {
-		lines = append(lines, m.renderRow(m.rows[i], i == m.list.Selected(), m.width-4))
+		lines = append(lines, m.renderRow(m.rows[i], i == m.list.Selected(), m.listWidth()-4))
 	}
 	return lines
 }

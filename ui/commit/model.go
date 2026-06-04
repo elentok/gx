@@ -95,6 +95,14 @@ func (m Model) KeyManager() keys.Manager {
 	return m.keys
 }
 
+// WithRef loads the given ref and returns an updated model. Used by the log
+// tab split view to swap the displayed commit when list selection changes.
+func (m Model) WithRef(ref string) Model {
+	m.ref = normalizedRef(ref)
+	m.reload()
+	return m
+}
+
 func (m *Model) reload() {
 	m.details, m.err = git.CommitDetailsForRef(m.worktreeRoot, m.ref)
 	if m.err != nil {

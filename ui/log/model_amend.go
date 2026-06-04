@@ -34,13 +34,15 @@ func (m Model) handleAmendDone(err error) (tea.Model, tea.Cmd) {
 func (m Model) cmdReloadFocusSubject(subject string) tea.Cmd {
 	root := m.worktreeRoot
 	startRef := m.startRef
+	statusDetail := m.pseudoStatusDetail()
 	return func() tea.Msg {
 		entries, err := git.LogEntries(root, startRef, maxLogEntries)
 		if err != nil {
 			return reloadMsg{err: err}
 		}
 		classes, branchDiverged := fetchBranchHistoryClasses(root, startRef)
-		rows := make([]row, 0, len(entries))
+		rows := make([]row, 0, len(entries)+1)
+		rows = append(rows, row{kind: rowPseudoStatus, detail: statusDetail})
 		for _, entry := range entries {
 			rows = append(rows, row{kind: rowCommit, commit: entry, class: classes[entry.FullHash]})
 		}

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/commit"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/reword"
 
@@ -64,6 +65,8 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		return m.handleGotoPR(msg)
 	case reloadMsg:
 		return m.handleReload(msg)
+	case worktreeStatusMsg:
+		return m.handleWorktreeStatus(msg)
 	case rewordDetailsMsg:
 		return m.handleRewordDetails(msg)
 	case reword.EditorFinishedMsg:
@@ -83,13 +86,15 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		m.height = msg.Height
 		m.ready = true
 		m.help, childCmd = m.help.Update(msg)
-		return m, childCmd
+		var splitCmd tea.Cmd
+		m, splitCmd = m.syncSplitSize()
+		return m, tea.Batch(childCmd, splitCmd)
 	case tea.FocusMsg:
 		if m.rebaseDidStash {
 			m.rebaseDidStash = false
 			m.rebaseConfirm = rebaseConfirmState{kind: rebaseConfirmStashPop, yes: true}
 		}
-		return m, m.cmdReload()
+		return m, tea.Batch(m.cmdReload(), m.cmdLoadStatus())
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
@@ -105,6 +110,35 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 			m.help, cmd = m.help.Update(msg)
 			return m, cmd
 		}
+
+		// Route split-specific keys before the log key manager so they take
+		// precedence when the split is active. Only when the log's own key
+		// manager has no pending chord prefix (so ]t, [t etc. are not stolen).
+		key := msg.String()
+		logHasPrefix := len(m.keys.Prefix()) > 0
+		if m.split.HasChord() && !logHasPrefix {
+			// Second key of the "to" chord belongs to the split.
+			return m.routeKeyToSplit(msg)
+		}
+		if key == "esc" && !m.split.IsCollapsed() {
+			return m.routeKeyToSplit(msg)
+		}
+		if key == "f" && !m.split.IsCollapsed() {
+			// Fullscreen toggle has priority over detail routing when split is active.
+			return m.routeKeyToSplit(msg)
+		}
+		if key == "t" && !logHasPrefix {
+			// Start of "to" orientation-toggle chord; pass to split container.
+			return m.routeKeyToSplit(msg)
+		}
+
+		// When the detail panel is focused, route remaining keys there.
+		if m.split.IsDetailFocused() {
+			updated, detailCmd := m.commitDetail.Update(msg)
+			m.commitDetail = updated.(commit.Model)
+			return m, detailCmd
+		}
+
 		if nextSearch, cmd, result := m.search.Update(msg); result.Handled {
 			m.search = nextSearch
 			if result.QueryChanged {
@@ -126,6 +160,21 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) handleWorktreeStatus(msg worktreeStatusMsg) (tea.Model, tea.Cmd) {
+	if msg.err != nil {
+		return m, nil
+	}
+	m.statusLoaded = true
+	m.statusStaged = msg.staged
+	m.statusUnstaged = msg.unstaged
+	m.statusUntracked = msg.untracked
+	// Update the pseudo-log-line row in-place if rows are already loaded.
+	if len(m.rows) > 0 && m.rows[0].kind == rowPseudoStatus {
+		m.rows[0].detail = m.pseudoStatusDetail()
+	}
+	return m, nil
+}
+
 func (m Model) handleReload(msg reloadMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
 		m.err = msg.err
@@ -136,8 +185,13 @@ func (m Model) handleReload(msg reloadMsg) (tea.Model, tea.Cmd) {
 		m.refreshing = false
 		refreshCmds = []tea.Cmd{notify.Close("refresh"), notify.Success("refreshed")}
 	}
+	isInitialLoad := len(m.rows) == 0
 	m.err = nil
 	m.rows = msg.rows
+	// Update pseudo-log-line with current status in case it was loaded after cmdReload started.
+	if len(m.rows) > 0 && m.rows[0].kind == rowPseudoStatus {
+		m.rows[0].detail = m.pseudoStatusDetail()
+	}
 	m.branchDiverged = msg.branchDiverged
 	if m.pendingFocusRef != "" {
 		ref := m.pendingFocusRef
@@ -165,7 +219,12 @@ func (m Model) handleReload(msg reloadMsg) (tea.Model, tea.Cmd) {
 		m.jumpToCurrentMatch()
 		return m, tea.Batch(append(refreshCmds, cmdFlashClear())...)
 	}
-	m.list.SetSelected(m.list.Selected(), len(m.rows))
+	sel := m.list.Selected()
+	// On the initial load, start on the first commit (skip the pseudo-line).
+	if isInitialLoad && len(m.rows) > 1 && m.rows[0].kind == rowPseudoStatus {
+		sel = 1
+	}
+	m.list.SetSelected(sel, len(m.rows))
 	m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))
 	m.recomputeSearchMatches()
 	m.jumpToCurrentMatch()

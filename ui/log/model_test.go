@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/splitview"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -27,6 +28,7 @@ func newTestModel() Model {
 		search: search.NewModel(),
 	}
 	m.help = help.NewModel(help.BuildSections(m.keys, m.search.Keys()))
+	m.split = splitview.New(logListAdapter{}, m.commitDetail)
 	return m
 }
 
@@ -40,12 +42,23 @@ func newTestModelFiltered(worktreeRoot, startRef string, settings ui.Settings, f
 
 // runModelInit executes Init() synchronously so tests can inspect m.rows immediately.
 func runModelInit(m Model) Model {
-	cmd := m.Init()
+	return runCmd(m, m.Init())
+}
+
+// runCmd executes a single command synchronously, handling batch commands
+// by running each sub-command in sequence.
+func runCmd(m Model, cmd tea.Cmd) Model {
 	if cmd == nil {
 		return m
 	}
 	msg := cmd()
 	if msg == nil {
+		return m
+	}
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		for _, c := range batch {
+			m = runCmd(m, c)
+		}
 		return m
 	}
 	next, _ := m.Update(msg)
@@ -469,13 +482,8 @@ func TestFocusReloadsRowsAfterOnDiskChange(t *testing.T) {
 		t.Fatalf("expected focus to trigger reload command")
 	}
 
-	reload, ok := cmd().(reloadMsg)
-	if !ok {
-		t.Fatalf("expected reloadMsg from focus reload cmd")
-	}
-
-	updated, _ = m.Update(reload)
-	m = updated.(Model)
+	// FocusMsg now returns a batch (reload + status load); run all sub-commands.
+	m = runCmd(m, cmd)
 	if len(m.rows) <= initialRows {
 		t.Fatalf("expected more rows after focus reload; before=%d after=%d", initialRows, len(m.rows))
 	}
@@ -517,5 +525,281 @@ func TestOnPageActivated_WithPending(t *testing.T) {
 	cmd := m.OnPageActivated()
 	if cmd == nil {
 		t.Error("expected non-nil cmd from OnPageActivated with pending focus")
+	}
+}
+
+// --- Pseudo-log-line tests ---
+
+func TestPseudoLogLineIsFirstRow(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "a\n")
+	testutil.CommitAll(t, repo, "first commit")
+
+	m := newTestModelDefault(repo, "", settings)
+	if len(m.rows) == 0 {
+		t.Fatal("expected rows after init")
+	}
+	if m.rows[0].kind != rowPseudoStatus {
+		t.Fatalf("rows[0].kind = %v, want rowPseudoStatus", m.rows[0].kind)
+	}
+}
+
+func TestPseudoLogLineLoadingState(t *testing.T) {
+	// Before the worktree status is loaded, the pseudo-line shows "loading".
+	m := newTestModel()
+	m.rows = []row{{kind: rowPseudoStatus, detail: ""}}
+	line := m.renderRow(m.rows[0], false, 80)
+	stripped := ansi.Strip(line)
+	if !strings.Contains(stripped, "working tree") {
+		t.Errorf("renderRow: expected 'working tree' label, got %q", stripped)
+	}
+}
+
+func TestPseudoLogLineCleanState(t *testing.T) {
+	m := newTestModel()
+	m.statusLoaded = true
+	// staged=0, unstaged=0, untracked=0 → "no local changes"
+	m.rows = []row{{kind: rowPseudoStatus, detail: m.pseudoStatusDetail()}}
+	line := m.renderRow(m.rows[0], false, 80)
+	stripped := ansi.Strip(line)
+	if !strings.Contains(stripped, "no local changes") {
+		t.Errorf("renderRow: expected 'no local changes', got %q", stripped)
+	}
+}
+
+func TestPseudoLogLineDirtyState(t *testing.T) {
+	m := newTestModel()
+	m.statusLoaded = true
+	m.statusStaged = 2
+	m.statusUnstaged = 3
+	m.statusUntracked = 1
+	m.rows = []row{{kind: rowPseudoStatus, detail: m.pseudoStatusDetail()}}
+	line := m.renderRow(m.rows[0], false, 80)
+	stripped := ansi.Strip(line)
+	if !strings.Contains(stripped, "2 staged") {
+		t.Errorf("expected '2 staged' in %q", stripped)
+	}
+	if !strings.Contains(stripped, "3 unstaged") {
+		t.Errorf("expected '3 unstaged' in %q", stripped)
+	}
+	if !strings.Contains(stripped, "1 untracked") {
+		t.Errorf("expected '1 untracked' in %q", stripped)
+	}
+}
+
+func TestPseudoLogLineDirtyStateZeroCountsOmitted(t *testing.T) {
+	m := newTestModel()
+	m.statusLoaded = true
+	m.statusStaged = 1
+	// unstaged=0, untracked=0 — these counts must be absent from output.
+	m.rows = []row{{kind: rowPseudoStatus, detail: m.pseudoStatusDetail()}}
+	detail := m.pseudoStatusDetail()
+	if strings.Contains(detail, "0 ") {
+		t.Errorf("detail should omit zero counts, got %q", detail)
+	}
+	if !strings.Contains(detail, "1 staged") {
+		t.Errorf("expected '1 staged' in detail %q", detail)
+	}
+}
+
+func TestEnterOnPseudoLogLineEmitsStatusSwitch(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "a\n")
+	testutil.CommitAll(t, repo, "commit a")
+
+	m := newTestModelDefault(repo, "", ui.Settings{EnableNavigation: true})
+	// Move cursor to the pseudo-line (index 0).
+	m.list.SetSelected(0, len(m.rows))
+
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("expected command from Enter on pseudo-log-line")
+	}
+	msg := cmd()
+	vs, ok := nav.IsSwitch(msg)
+	if !ok {
+		t.Fatalf("expected nav.Switch message, got %T", msg)
+	}
+	if vs.Tab != nav.TabStatus {
+		t.Errorf("expected TabStatus, got %q", vs.Tab)
+	}
+	if vs.WorktreeRoot != repo {
+		t.Errorf("expected WorktreeRoot=%q, got %q", repo, vs.WorktreeRoot)
+	}
+}
+
+// --- Split view integration tests ---
+
+func TestEnterOnCommitInCollapsedExpandsToSplit(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "a\n")
+	testutil.CommitAll(t, repo, "commit a")
+
+	m := newTestModelDefault(repo, "", settings)
+	m.width = 200
+	m.height = 40
+	m, _ = m.syncSplitSize()
+
+	// Row 1 is the first real commit (row 0 is pseudo-line).
+	m.list.SetSelected(1, len(m.rows))
+	if !m.split.IsCollapsed() {
+		t.Fatal("expected Collapsed initially")
+	}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	if !m.split.IsSplit() {
+		t.Fatalf("expected Split after Enter on commit, vis = collapsed=%v split=%v", m.split.IsCollapsed(), m.split.IsSplit())
+	}
+	if !m.split.IsDetailFocused() {
+		t.Fatal("expected detail focused after expanding")
+	}
+}
+
+func TestEscFromDetailReturnsFocusToList(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "a\n")
+	testutil.CommitAll(t, repo, "commit a")
+
+	m := newTestModelDefault(repo, "", settings)
+	m.width = 200
+	m.height = 40
+	m, _ = m.syncSplitSize()
+	m.list.SetSelected(1, len(m.rows))
+
+	// Expand to split.
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	if !m.split.IsDetailFocused() {
+		t.Fatal("expected detail focused after Enter")
+	}
+
+	// Esc from detail → list focused, still split.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	m = updated.(Model)
+	if !m.split.IsSplit() {
+		t.Fatal("expected still Split after Esc from detail")
+	}
+	if !m.split.IsListFocused() {
+		t.Fatal("expected list focused after Esc from detail")
+	}
+}
+
+func TestEscFromListWhileSplitCollapses(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "a\n")
+	testutil.CommitAll(t, repo, "commit a")
+
+	m := newTestModelDefault(repo, "", settings)
+	m.width = 200
+	m.height = 40
+	m, _ = m.syncSplitSize()
+	m.list.SetSelected(1, len(m.rows))
+
+	// Expand to split.
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	// Esc → list focused.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	m = updated.(Model)
+	// Esc again → collapsed.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	m = updated.(Model)
+	if !m.split.IsCollapsed() {
+		t.Fatal("expected Collapsed after second Esc")
+	}
+}
+
+func TestFKeyTogglesFullscreenList(t *testing.T) {
+	m := newTestModel()
+	m.width = 200
+	m.height = 40
+	m, _ = m.syncSplitSize()
+	m.rows = []row{
+		{kind: rowPseudoStatus},
+		{kind: rowCommit, commit: git.LogEntry{FullHash: "abc", Subject: "c1"}},
+	}
+	m.list.SetSelected(1, len(m.rows))
+
+	// f in collapsed state → fullscreen list.
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
+	m = updated.(Model)
+	if !m.split.IsFullscreen() {
+		t.Fatal("expected Fullscreen after f in collapsed")
+	}
+	if !m.split.IsListFocused() {
+		t.Fatal("expected list focused in fullscreen")
+	}
+}
+
+func TestFKeyOnDetailFocusedTogglesFullscreenDetail(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "a\n")
+	testutil.CommitAll(t, repo, "commit a")
+
+	m := newTestModelDefault(repo, "", settings)
+	m.width = 200
+	m.height = 40
+	m, _ = m.syncSplitSize()
+	m.list.SetSelected(1, len(m.rows))
+
+	// Expand to split (detail focused).
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	if !m.split.IsDetailFocused() {
+		t.Fatal("expected detail focused after Enter")
+	}
+
+	// f → fullscreen detail.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
+	m = updated.(Model)
+	if !m.split.IsFullscreen() {
+		t.Fatal("expected Fullscreen after f with detail focused")
+	}
+	if !m.split.IsDetailFocused() {
+		t.Fatal("expected detail focused in fullscreen")
+	}
+}
+
+func TestToChordTogglesOrientation(t *testing.T) {
+	m := newTestModel()
+	m.width = 200
+	m.height = 40
+	m, _ = m.syncSplitSize()
+
+	// Press "t" then "o" to toggle orientation.
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	m = updated.(Model)
+
+	// At width 200, auto-orient is Vertical; "to" should override to Horizontal.
+	if m.split.EffectiveOrientation() != splitview.Horizontal {
+		t.Fatalf("expected Horizontal after 'to' at width 200, got %v", m.split.EffectiveOrientation())
+	}
+}
+
+func TestWorktreeStatusUpdatesRows(t *testing.T) {
+	m := newTestModel()
+	m.rows = []row{
+		{kind: rowPseudoStatus, detail: "loading worktree status…"},
+		{kind: rowCommit, commit: git.LogEntry{Subject: "c1"}},
+	}
+
+	updated, _ := m.Update(worktreeStatusMsg{staged: 1, unstaged: 2, untracked: 0})
+	m = updated.(Model)
+
+	if !m.statusLoaded {
+		t.Error("expected statusLoaded=true")
+	}
+	detail := m.rows[0].detail
+	if !strings.Contains(detail, "1 staged") {
+		t.Errorf("expected '1 staged' in detail %q", detail)
+	}
+	if !strings.Contains(detail, "2 unstaged") {
+		t.Errorf("expected '2 unstaged' in detail %q", detail)
+	}
+	if strings.Contains(detail, "untracked") {
+		t.Errorf("expected no 'untracked' for count=0, got %q", detail)
 	}
 }

@@ -96,6 +96,33 @@ func (m Model) IsListFocused() bool { return m.focus == focusList }
 // IsDetailFocused reports whether the detail panel has keyboard focus.
 func (m Model) IsDetailFocused() bool { return m.focus == focusDetail }
 
+// HasChord reports whether the split view is waiting for the second key of a
+// multi-key shortcut (e.g. the "t" in "to"). The containing model should
+// route the next key to the split view when this returns true.
+func (m Model) HasChord() bool { return m.keyPrefix != "" }
+
+// EffectiveOrientation returns the resolved layout direction.
+func (m Model) EffectiveOrientation() Orientation { return m.effectiveOrientation() }
+
+// WithListRef updates the ref reported by the list panel adapter. Used by
+// containers that manage their own list rendering (such as ui/log) so the
+// split container can detect selection changes for auto-update.
+func (m Model) WithListRef(ref string) Model {
+	m.list = logListRef{ref: ref, inner: m.list}
+	return m
+}
+
+// logListRef wraps any ListPanel and overrides its SelectedRef return value.
+type logListRef struct {
+	ref   string
+	inner ListPanel
+}
+
+func (l logListRef) Init() tea.Cmd                           { return l.inner.Init() }
+func (l logListRef) Update(msg tea.Msg) (tea.Model, tea.Cmd) { return l, nil }
+func (l logListRef) View() tea.View                          { return l.inner.View() }
+func (l logListRef) SelectedRef() string                     { return l.ref }
+
 // ListSize returns the (width, height) the list panel should render at.
 func (m Model) ListSize() (w, h int) {
 	switch m.vis {

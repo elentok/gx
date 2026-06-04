@@ -1,8 +1,12 @@
 package log
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 
 	tea "charm.land/bubbletea/v2"
@@ -15,6 +19,41 @@ type reloadMsg struct {
 	focusSubject   string // if set, cursor is moved to first matching commit
 }
 
+type worktreeStatusMsg struct {
+	staged    int
+	unstaged  int
+	untracked int
+	err       error
+}
+
+func (m Model) cmdLoadStatus() tea.Cmd {
+	root := m.worktreeRoot
+	return func() tea.Msg {
+		staged, unstaged, untracked, err := git.WorktreeStatusSummary(root)
+		return worktreeStatusMsg{staged: staged, unstaged: unstaged, untracked: untracked, err: err}
+	}
+}
+
+// pseudoStatusDetail formats the worktree status text for the pseudo-log-line.
+func (m Model) pseudoStatusDetail() string {
+	if !m.statusLoaded {
+		return "loading worktree status…"
+	}
+	if m.statusStaged == 0 && m.statusUnstaged == 0 && m.statusUntracked == 0 {
+		return "no local changes"
+	}
+	var parts []string
+	if m.statusStaged > 0 {
+		parts = append(parts, fmt.Sprintf("%d staged", m.statusStaged))
+	}
+	if m.statusUnstaged > 0 {
+		parts = append(parts, fmt.Sprintf("%d unstaged", m.statusUnstaged))
+	}
+	if m.statusUntracked > 0 {
+		parts = append(parts, fmt.Sprintf("%d untracked", m.statusUntracked))
+	}
+	return strings.Join(parts, " · ")
+}
 
 func (m Model) gitFilter() git.LogFilter {
 	return git.LogFilter{
@@ -28,13 +67,15 @@ func (m Model) cmdReload() tea.Cmd {
 	worktreeRoot := m.worktreeRoot
 	startRef := m.startRef
 	filter := m.gitFilter()
+	statusDetail := m.pseudoStatusDetail()
 	return func() tea.Msg {
 		entries, err := git.LogEntriesFiltered(worktreeRoot, startRef, maxLogEntries, filter)
 		if err != nil {
 			return reloadMsg{err: err}
 		}
 		classes, branchDiverged := fetchBranchHistoryClasses(worktreeRoot, startRef)
-		rows := make([]row, 0, len(entries))
+		rows := make([]row, 0, len(entries)+1)
+		rows = append(rows, row{kind: rowPseudoStatus, detail: statusDetail})
 		for _, entry := range entries {
 			rows = append(rows, row{kind: rowCommit, commit: entry, class: classes[entry.FullHash]})
 		}
@@ -115,13 +156,32 @@ func (m Model) handleGotoPR(msg gotoPRMsg) (tea.Model, tea.Cmd) {
 	return m, ui.CmdOpenURL(msg.url)
 }
 
-func (m Model) openSelected() tea.Cmd {
+// openSelected handles Enter on the currently selected row.
+// Returns (updatedModel, cmd) — the model is returned because entering split
+// mode mutates the split container and commitDetail inline.
+func (m Model) openSelected() (Model, tea.Cmd) {
 	cursor := m.list.Selected()
 	if len(m.rows) == 0 || cursor < 0 || cursor >= len(m.rows) {
-		return nil
+		return m, nil
 	}
 	selected := m.rows[cursor]
-	// TODO: open commit detail in the log split view once it is implemented.
-	_ = selected
-	return nil
+
+	if selected.kind == rowPseudoStatus {
+		return m, nav.Switch(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: m.worktreeRoot})
+	}
+
+	// Real commit row: expand to split view.
+	ref := selected.commit.FullHash
+	if ref == "" {
+		return m, nil
+	}
+	// Update the split list adapter ref so the container tracks the selection.
+	m.split = m.split.WithListRef(ref)
+	// Transition the split container to Split+detail-focused.
+	var splitCmd tea.Cmd
+	m.split, splitCmd = m.split.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	// Load the commit into the detail panel.
+	m.commitDetail = m.commitDetail.WithRef(ref)
+	m = m.withSyncedDetailSize()
+	return m, splitCmd
 }

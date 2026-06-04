@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/amend"
 	"github.com/elentok/gx/ui/bump"
+	"github.com/elentok/gx/ui/commit"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/list"
@@ -18,6 +19,7 @@ import (
 	"github.com/elentok/gx/ui/push"
 	"github.com/elentok/gx/ui/reword"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/splitview"
 )
 
 const maxLogEntries = 250
@@ -45,6 +47,16 @@ type row struct {
 	detail string
 	class  git.BranchHistoryClass
 }
+
+// logListAdapter satisfies splitview.ListPanel for the log model. The log
+// model manages cursor and rendering itself; this thin wrapper lets the split
+// container track the currently selected ref for selection-change detection.
+type logListAdapter struct{ ref string }
+
+func (l logListAdapter) Init() tea.Cmd                           { return nil }
+func (l logListAdapter) Update(msg tea.Msg) (tea.Model, tea.Cmd) { return l, nil }
+func (l logListAdapter) View() tea.View                          { return tea.NewView("") }
+func (l logListAdapter) SelectedRef() string                     { return l.ref }
 
 type Model struct {
 	worktreeRoot     string
@@ -85,6 +97,16 @@ type Model struct {
 
 	rebaseConfirm  rebaseConfirmState // confirm modal for stash-before-rebase and stash-pop-after-rebase
 	rebaseDidStash bool               // stash was pushed before rebase; pop prompt fires on FocusMsg (kitty/tmux) or immediately (exec)
+
+	// Split view state.
+	split        splitview.Model
+	commitDetail commit.Model
+
+	// Worktree status for the pseudo-log-line.
+	statusLoaded    bool
+	statusStaged    int
+	statusUnstaged  int
+	statusUntracked int
 }
 
 func NewModel(worktreeRoot, startRef string, settings ui.Settings, filter LogFilter, extraKeys keys.Manager) Model {
@@ -105,6 +127,8 @@ func NewModel(worktreeRoot, startRef string, settings ui.Settings, filter LogFil
 	m.pull = pull.New()
 	m.output = output.New()
 	m.reword = reword.New()
+	m.commitDetail = commit.NewModel(worktreeRoot, "HEAD", "", settings, keys.Manager{})
+	m.split = splitview.New(logListAdapter{}, m.commitDetail)
 	return m
 }
 
@@ -112,7 +136,7 @@ func (m Model) KeyManager() keys.Manager {
 	return m.keys
 }
 
-func (m Model) Init() tea.Cmd { return m.cmdReload() }
+func (m Model) Init() tea.Cmd { return tea.Batch(m.cmdReload(), m.cmdLoadStatus()) }
 
 // OnPageActivated is called by the app shell when switching to the log page.
 func (m Model) OnPageActivated() tea.Cmd {
