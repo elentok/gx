@@ -136,7 +136,7 @@ func (m *Model) toggleStageStatusEntry() tea.Cmd {
 		m.showGitError(err)
 		return nil
 	}
-	return m.reload(path)
+	return tea.Batch(m.reload(path), statusRepoMutatedCmd())
 }
 
 func (m *Model) openDiscardStatusConfirm() {

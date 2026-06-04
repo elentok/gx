@@ -43,6 +43,8 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		return m.handleWindowSize(msg)
 	case tea.FocusMsg:
 		return m, m.refreshPreserveScroll()
+	case autoReloadMsg:
+		return m, m.refreshPreserveScroll()
 	case renderTickMsg:
 		return m, renderTickCmd()
 	case statusStartupLoadMsg:
@@ -268,7 +270,7 @@ func (m Model) handleCommitFinished(msg commitFinishedMsg) (tea.Model, tea.Cmd) 
 	if msg.splitApp != "" {
 		return m, notify.Info("opened " + msg.splitApp + " split: git commit")
 	}
-	return m, tea.Batch(notify.Info(ui.MessageClosed("git commit")), m.refresh())
+	return m, tea.Batch(notify.Info(ui.MessageClosed("git commit")), m.refresh(), statusRepoMutatedCmd())
 }
 
 func (m Model) handleLazygitLogFinished(msg lazygitLogFinishedMsg) (tea.Model, tea.Cmd) {

@@ -949,3 +949,101 @@ func TestGCDoesNotSwitchToCommitTab(t *testing.T) {
 		t.Fatalf("g+c should not switch tabs, got %q", m.navState.ActiveTab())
 	}
 }
+
+// reloadCounterModel wraps a real tea.Model, counting AutoReload calls while
+// delegating to the real implementation.
+type reloadCounterModel struct {
+	inner   tea.Model
+	reloads int
+}
+
+func (c *reloadCounterModel) Init() tea.Cmd {
+	return c.inner.Init()
+}
+
+func (c *reloadCounterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	updated, cmd := c.inner.Update(msg)
+	c.inner = updated
+	return c, cmd
+}
+
+func (c *reloadCounterModel) View() tea.View {
+	return c.inner.View()
+}
+
+func (c *reloadCounterModel) AutoReload() tea.Cmd {
+	c.reloads++
+	if r, ok := c.inner.(pageAutoReloadable); ok {
+		return r.AutoReload()
+	}
+	return nil
+}
+
+// TestE2E_LogStatusLog_NoReloadWhenFresh is the regression gate for the
+// epoch-based tab-reload feature: log → status → log with no repo mutations
+// must not trigger a git re-fetch on the real log model.
+func TestE2E_LogStatusLog_NoReloadWhenFresh(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	counter := &reloadCounterModel{inner: m.livePageByTab[nav.TabLog].model}
+	live := m.livePageByTab[nav.TabLog]
+	live.model = counter
+	live.didInit = true
+	m.livePageByTab[nav.TabLog] = live
+
+	// log → status (no mutation)
+	updated, _ := m.Update(nav.Switch(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: repoDir})())
+	m = updated.(Model)
+
+	// status → log: gate is fresh, real log model must not AutoReload
+	m.Update(nav.Switch(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir})())
+
+	if counter.reloads != 0 {
+		t.Errorf("log→status→log with no mutations: expected 0 AutoReload calls on real log model, got %d", counter.reloads)
+	}
+}
+
+// TestE2E_StatusCommit_LogReloadsOnSwitch verifies that after a commit in status
+// emits nav.RepoMutated, the log tab auto-reloads exactly once when activated.
+func TestE2E_StatusCommit_LogReloadsOnSwitch(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	counter := &reloadCounterModel{inner: m.livePageByTab[nav.TabLog].model}
+	live := m.livePageByTab[nav.TabLog]
+	live.model = counter
+	live.didInit = true
+	m.livePageByTab[nav.TabLog] = live
+
+	// Switch to status.
+	updated, _ := m.Update(nav.Switch(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: repoDir})())
+	m = updated.(Model)
+
+	// Simulate a commit completing in status (emits RepoMutated).
+	updated, _ = m.Update(nav.RepoMutated()())
+	m = updated.(Model)
+
+	// Switch back to log: gate is stale, real log model must AutoReload exactly once.
+	m.Update(nav.Switch(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir})())
+
+	if counter.reloads != 1 {
+		t.Errorf("status commit → log: expected 1 AutoReload call, got %d", counter.reloads)
+	}
+}

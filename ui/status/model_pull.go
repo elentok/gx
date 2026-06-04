@@ -16,7 +16,7 @@ func (m Model) handlePullUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			notifyCmd = notify.Success("pulled")
 		}
-		return m, tea.Batch(notifyCmd, m.refresh())
+		return m, tea.Batch(notifyCmd, m.refresh(), statusRepoMutatedCmd())
 	}
 	return m, cmd
 }

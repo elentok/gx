@@ -114,10 +114,11 @@ func (m *Model) applySelection() tea.Cmd {
 	m.diffarea.ActiveSection = from
 	m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 	m.markMovedTarget(sig)
+	mutatedCmd := statusRepoMutatedCmd()
 	if m.diffarea.Flash.Active {
-		return tea.Batch(reloadCmd, nextFlashCmd())
+		return tea.Batch(reloadCmd, nextFlashCmd(), mutatedCmd)
 	}
-	return reloadCmd
+	return tea.Batch(reloadCmd, mutatedCmd)
 }
 
 func isCorruptPatchErr(err error) bool {

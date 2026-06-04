@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/comments"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/terminalrun"
 )
@@ -74,6 +75,23 @@ func (m *Model) cmdCreateCommentFromDiff() tea.Cmd {
 		return editCommentFinishedMsg{err: err, splitApp: splitApp}
 	})
 	return tea.Batch(notify.Info(msg), cmd)
+}
+
+type autoReloadMsg struct{}
+
+func statusAutoReloadCmd() tea.Cmd {
+	return func() tea.Msg { return autoReloadMsg{} }
+}
+
+// AutoReload is called by the app shell when this tab is stale (gate epoch
+// mismatch). It dispatches autoReloadMsg so the real refresh runs inside
+// Update, where the model mutations are properly returned to the caller.
+func (m Model) AutoReload() tea.Cmd {
+	return statusAutoReloadCmd()
+}
+
+func statusRepoMutatedCmd() tea.Cmd {
+	return nav.RepoMutated()
 }
 
 func (m *Model) refresh() tea.Cmd {
