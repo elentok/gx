@@ -1047,3 +1047,43 @@ func TestE2E_StatusCommit_LogReloadsOnSwitch(t *testing.T) {
 		t.Errorf("status commit → log: expected 1 AutoReload call, got %d", counter.reloads)
 	}
 }
+
+// TestE2E_LogReportsRefThenSwitchReusesPage guards against the cache-drift bug:
+// the log page is stamped with an empty Ref on first switch, but the model
+// reports its normalized Ref ("HEAD") via ViewStateChanged. If the live page's
+// stamp isn't kept in sync, the next switch sees a context mismatch and rebuilds
+// the page from scratch (losing cached rows). The page model must survive a
+// log → status → log round-trip.
+func TestE2E_LogReportsRefThenSwitchReusesPage(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	counter := &reloadCounterModel{inner: m.livePageByTab[nav.TabLog].model}
+	live := m.livePageByTab[nav.TabLog]
+	live.model = counter
+	live.didInit = true
+	m.livePageByTab[nav.TabLog] = live
+
+	// The log model reports its normalized ref once loaded.
+	updated, _ := m.Update(nav.ViewStateChanged(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir, Ref: "HEAD"})())
+	m = updated.(Model)
+
+	// log → status → log with no mutations. Switch with a bare tab (no worktree/ref),
+	// matching the real key dispatch, so the destination is resolved from per-tab memory.
+	updated, _ = m.Update(nav.Switch(nav.ViewState{Tab: nav.TabStatus})())
+	m = updated.(Model)
+	updated, _ = m.Update(nav.Switch(nav.ViewState{Tab: nav.TabLog})())
+	m = updated.(Model)
+
+	if got := m.livePageByTab[nav.TabLog].model; got != tea.Model(counter) {
+		t.Errorf("log page was rebuilt across switch; expected cached model to be reused")
+	}
+}

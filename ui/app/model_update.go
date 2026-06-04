@@ -27,7 +27,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleOpen(vs, notifyCmd)
 	}
 	if vs, ok := nav.IsViewStateChanged(msg); ok {
-		m.navState.ApplyViewStateChanged(vs)
+		resolved := m.navState.ApplyViewStateChanged(vs)
+		// Keep the live page's stamped viewState aligned with the resolved context.
+		// The page reports its normalized ref (e.g. "" -> "HEAD") here; without this
+		// sync the stamp drifts from navState memory and the next tab switch sees a
+		// context mismatch and needlessly rebuilds the page (dropping cached rows).
+		if len(m.history) == 0 {
+			if live, ok := m.livePageByTab[resolved.Tab]; ok {
+				live.viewState = resolved
+				m.livePageByTab[resolved.Tab] = live
+			}
+		}
 		return m, notifyCmd
 	}
 	if nav.IsBack(msg) {
