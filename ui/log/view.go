@@ -2,6 +2,7 @@ package log
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 	"time"
 
@@ -40,7 +41,7 @@ func (m Model) View() tea.View {
 
 	// When detail panel is fullscreened, render it exclusively.
 	if m.split.IsFullscreen() && m.split.IsDetailFocused() {
-		return m.commitDetail.View()
+		return m.commitDetail.WithContainerFocus(true).View()
 	}
 
 	title := "Log"
@@ -57,8 +58,8 @@ func (m Model) View() tea.View {
 		Title:       title,
 		RightTitle:  m.frameRightTitle(),
 		Lines:       m.visibleLines(),
-		BorderColor: ui.ColorBorder,
-		TitleColor:  ui.ColorBlue,
+		BorderColor: m.logPaneBorderColor(),
+		TitleColor:  m.logPaneTitleColor(),
 		Background:  ui.ColorBase,
 	})
 	listOut := body
@@ -79,7 +80,7 @@ func (m Model) View() tea.View {
 	// Compose with detail panel when in split mode.
 	var out string
 	if m.split.IsSplit() {
-		detailContent := m.commitDetail.View().Content
+		detailContent := m.commitDetail.WithContainerFocus(m.split.IsDetailFocused()).View().Content
 		if m.split.EffectiveOrientation() == splitview.Vertical {
 			out = lipgloss.JoinHorizontal(lipgloss.Top, listOut, detailContent)
 		} else {
@@ -114,6 +115,20 @@ func (m Model) View() tea.View {
 		out = ui.OverlayCenter(out, m.help.View(), m.width, m.height)
 	}
 	return ui.NewMainView(out)
+}
+
+func (m Model) logPaneTitleColor() color.Color {
+	if m.split.IsListFocused() {
+		return ui.ColorOrange
+	}
+	return ui.ColorBlue
+}
+
+func (m Model) logPaneBorderColor() color.Color {
+	if m.split.IsListFocused() {
+		return ui.ColorOrange
+	}
+	return ui.ColorBorder
 }
 
 func (m Model) frameRightTitle() string {

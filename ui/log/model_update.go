@@ -120,7 +120,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 			// Second key of the "to" chord belongs to the split.
 			return m.routeKeyToSplit(msg)
 		}
-		if key == "esc" && !m.split.IsCollapsed() {
+		if (key == "esc" || key == "q") && !m.split.IsCollapsed() {
 			if m.split.IsDetailFocused() && m.commitDetail.HasInternalFocus() {
 				updated, detailCmd := m.commitDetail.Update(msg)
 				m.commitDetail = updated.(commit.Model)

@@ -12,14 +12,14 @@ type mockList struct {
 	ref string
 }
 
-func (m mockList) Init() tea.Cmd                          { return nil }
+func (m mockList) Init() tea.Cmd                           { return nil }
 func (m mockList) Update(msg tea.Msg) (tea.Model, tea.Cmd) { return m, nil }
 func (m mockList) View() tea.View                          { return tea.NewView("list") }
 func (m mockList) SelectedRef() string                     { return m.ref }
 
 type mockDetail struct{}
 
-func (m mockDetail) Init() tea.Cmd                          { return nil }
+func (m mockDetail) Init() tea.Cmd                           { return nil }
 func (m mockDetail) Update(msg tea.Msg) (tea.Model, tea.Cmd) { return m, nil }
 func (m mockDetail) View() tea.View                          { return tea.NewView("detail") }
 
@@ -76,6 +76,20 @@ func TestSplitDetailFocusedEscFocusesList(t *testing.T) {
 	}
 }
 
+func TestSplitDetailFocusedQFocusesList(t *testing.T) {
+	t.Parallel()
+	m := newTestModel(200, 50)
+	m.vis = visModeSplit
+	m.focus = focusDetail
+	m, _ = m.Update(pressKey("q"))
+	if !m.IsSplit() {
+		t.Fatal("expected still in Split state")
+	}
+	if !m.IsListFocused() {
+		t.Fatal("expected list focused after q from detail")
+	}
+}
+
 func TestSplitListFocusedEscCollapse(t *testing.T) {
 	t.Parallel()
 	m := newTestModel(200, 50)
@@ -84,6 +98,17 @@ func TestSplitListFocusedEscCollapse(t *testing.T) {
 	m, _ = m.Update(pressKey("esc"))
 	if !m.IsCollapsed() {
 		t.Fatal("expected Collapsed after esc from list in Split")
+	}
+}
+
+func TestSplitListFocusedQCollapse(t *testing.T) {
+	t.Parallel()
+	m := newTestModel(200, 50)
+	m.vis = visModeSplit
+	m.focus = focusList
+	m, _ = m.Update(pressKey("q"))
+	if !m.IsCollapsed() {
+		t.Fatal("expected Collapsed after q from list in Split")
 	}
 }
 

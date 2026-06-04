@@ -18,7 +18,7 @@ const (
 type visMode int
 
 const (
-	visModeCollapsed  visMode = iota
+	visModeCollapsed visMode = iota
 	visModeSplit
 	visModeFullscreen
 )
@@ -26,7 +26,7 @@ const (
 type focusTarget int
 
 const (
-	focusList   focusTarget = iota
+	focusList focusTarget = iota
 	focusDetail
 )
 
@@ -256,7 +256,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			}
 		}
 
-	case "esc":
+	case "esc", "q":
 		if m.vis == visModeSplit {
 			switch m.focus {
 			case focusDetail:

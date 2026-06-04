@@ -157,7 +157,7 @@ func (t Tab) syncPanelSizes() Tab {
 
 func (t Tab) View() tea.View {
 	if t.split.IsFullscreen() && t.split.IsDetailFocused() {
-		return t.commitDetail.View()
+		return t.commitDetail.WithContainerFocus(true).View()
 	}
 
 	lw, lh := t.split.ListSize()
@@ -171,7 +171,7 @@ func (t Tab) View() tea.View {
 		return ui.NewMainView(listOut)
 	}
 
-	detailContent := t.commitDetail.View().Content
+	detailContent := t.commitDetail.WithContainerFocus(t.split.IsDetailFocused()).View().Content
 	var out string
 	if t.split.EffectiveOrientation() == splitview.Vertical {
 		out = lipgloss.JoinHorizontal(lipgloss.Top, listOut, detailContent)

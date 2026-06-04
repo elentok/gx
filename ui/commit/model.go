@@ -25,6 +25,7 @@ type Model struct {
 	width        int
 	height       int
 	ready        bool
+	inactive     bool
 	focusHeader  bool
 	focusDiff    bool
 	bodyExpanded bool
@@ -100,6 +101,13 @@ func (m Model) KeyManager() keys.Manager {
 func (m Model) WithRef(ref string) Model {
 	m.ref = normalizedRef(ref)
 	m.reload()
+	return m
+}
+
+// WithContainerFocus returns a copy rendered as active only when its containing
+// split/detail panel owns keyboard focus.
+func (m Model) WithContainerFocus(focused bool) Model {
+	m.inactive = !focused
 	return m
 }
 

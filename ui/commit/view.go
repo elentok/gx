@@ -88,14 +88,14 @@ func (m Model) headerTitle() string {
 }
 
 func (m Model) headerPaneTitleColor() color.Color {
-	if m.focusHeader {
+	if m.isContainerFocused() && m.focusHeader {
 		return ui.ColorOrange
 	}
 	return ui.ColorBlue
 }
 
 func (m Model) headerPaneBorderColor() color.Color {
-	if m.focusHeader {
+	if m.isContainerFocused() && m.focusHeader {
 		return ui.ColorOrange
 	}
 	return ui.ColorBorder
@@ -360,7 +360,7 @@ func (m Model) requiredFilesPaneWidth(height int) int {
 func (m Model) filetreeRenderOpts() filetree.RenderOpts[git.CommitFile] {
 	return filetree.RenderOpts[git.CommitFile]{
 		AccentColor:      ui.ColorOrange,
-		Active:           !m.focusDiff && !m.focusHeader,
+		Active:           m.isContainerFocused() && !m.focusDiff && !m.focusHeader,
 		EmptyLine:        ui.StyleMuted.Render("no changed files"),
 		UseNerdFontIcons: m.settings.UseNerdFontIcons,
 		FileIcon: func(entry filetree.Entry[git.CommitFile]) string {
@@ -393,14 +393,14 @@ func (m Model) filesPaneWidth(height int) int {
 }
 
 func (m Model) filesPaneTitleColor() color.Color {
-	if m.focusDiff || m.focusHeader {
+	if !m.isContainerFocused() || m.focusDiff || m.focusHeader {
 		return ui.ColorBlue
 	}
 	return ui.ColorOrange
 }
 
 func (m Model) filesPaneBorderColor() color.Color {
-	if m.focusDiff || m.focusHeader {
+	if !m.isContainerFocused() || m.focusDiff || m.focusHeader {
 		return ui.ColorBorder
 	}
 	return ui.ColorOrange
@@ -417,17 +417,21 @@ func (m Model) filesPaneRightTitle() string {
 }
 
 func (m Model) diffPaneTitleColor() color.Color {
-	if m.focusDiff {
+	if m.isContainerFocused() && m.focusDiff {
 		return ui.ColorOrange
 	}
 	return ui.ColorBlue
 }
 
 func (m Model) diffPaneBorderColor() color.Color {
-	if m.focusDiff {
+	if m.isContainerFocused() && m.focusDiff {
 		return ui.ColorOrange
 	}
 	return ui.ColorBorder
+}
+
+func (m Model) isContainerFocused() bool {
+	return !m.inactive
 }
 
 func commitEntryMeta(entry filetree.Entry[git.CommitFile], useNerdFontIcons bool) string {

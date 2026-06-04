@@ -687,6 +687,37 @@ func TestEscFromDetailReturnsFocusToList(t *testing.T) {
 	}
 }
 
+func TestQFromDetailReturnsFocusToList(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "a\n")
+	testutil.CommitAll(t, repo, "commit a")
+
+	m := newTestModelDefault(repo, "", settings)
+	m.width = 200
+	m.height = 40
+	m, _ = m.syncSplitSize()
+	m.list.SetSelected(1, len(m.rows))
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	if !m.split.IsDetailFocused() {
+		t.Fatal("expected detail focused after Enter")
+	}
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
+	m = updated.(Model)
+	if cmd != nil {
+		msg := cmd()
+		t.Fatalf("expected q to switch focus without cmd, got %T: %v", msg, msg)
+	}
+	if !m.split.IsSplit() {
+		t.Fatal("expected still Split after q from detail")
+	}
+	if !m.split.IsListFocused() {
+		t.Fatal("expected list focused after q from detail")
+	}
+}
+
 func TestEscFromDetailInternalFocusStepsBackWithoutMovingToList(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "a\n")
@@ -724,6 +755,36 @@ func TestEscFromDetailInternalFocusStepsBackWithoutMovingToList(t *testing.T) {
 	}
 }
 
+func TestQFromDetailInternalFocusStepsBackWithoutMovingToList(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "a\n")
+	testutil.CommitAll(t, repo, "commit a")
+
+	m := newTestModelDefault(repo, "", settings)
+	m.width = 200
+	m.height = 40
+	m, _ = m.syncSplitSize()
+	m.list.SetSelected(1, len(m.rows))
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
+	m = updated.(Model)
+	if !m.commitDetail.HasInternalFocus() {
+		t.Skip("commit detail has no internal focus after Tab — skipping")
+	}
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
+	m = updated.(Model)
+	if cmd != nil {
+		msg := cmd()
+		t.Fatalf("expected q to be handled internally without cmd, got %T: %v", msg, msg)
+	}
+	if !m.split.IsDetailFocused() {
+		t.Fatal("expected detail still focused after internal q")
+	}
+}
+
 func TestEscFromListWhileSplitCollapses(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "a\n")
@@ -746,6 +807,53 @@ func TestEscFromListWhileSplitCollapses(t *testing.T) {
 	m = updated.(Model)
 	if !m.split.IsCollapsed() {
 		t.Fatal("expected Collapsed after second Esc")
+	}
+}
+
+func TestQFromListWhileSplitCollapses(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "a\n")
+	testutil.CommitAll(t, repo, "commit a")
+
+	m := newTestModelDefault(repo, "", settings)
+	m.width = 200
+	m.height = 40
+	m, _ = m.syncSplitSize()
+	m.list.SetSelected(1, len(m.rows))
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
+	m = updated.(Model)
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
+	m = updated.(Model)
+	if cmd != nil {
+		msg := cmd()
+		t.Fatalf("expected q from list split to collapse without cmd, got %T: %v", msg, msg)
+	}
+	if !m.split.IsCollapsed() {
+		t.Fatal("expected Collapsed after q from list in split")
+	}
+}
+
+func TestLogPaneFrameColorTracksSplitFocus(t *testing.T) {
+	m := newTestModel()
+	if m.logPaneBorderColor() != ui.ColorOrange {
+		t.Fatal("expected log frame orange while list is focused")
+	}
+
+	m.split = splitview.NewSplit(logListAdapter{}, m.commitDetail)
+	m.split, _ = m.split.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if !m.split.IsDetailFocused() {
+		t.Fatal("expected detail focused")
+	}
+	if m.logPaneBorderColor() != ui.ColorBorder {
+		t.Fatal("expected log frame inactive while detail is focused")
+	}
+
+	m.split, _ = m.split.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
+	if m.logPaneBorderColor() != ui.ColorOrange {
+		t.Fatal("expected log frame orange after focus returns to list")
 	}
 }
 

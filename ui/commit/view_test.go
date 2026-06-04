@@ -80,6 +80,45 @@ func TestVisibleFileLines_UsesCommitSpecificLabelAndMeta(t *testing.T) {
 	}
 }
 
+func TestContainerFocusDisablesCommitPaneActiveStyling(t *testing.T) {
+	m := Model{settings: ui.Settings{}, commitSidebarState: commitSidebarState{fileTreeModel: filetree.NewModel[git.CommitFile]()}}
+	m.fileTreeModel.SetEntries([]filetree.Entry[git.CommitFile]{
+		{Kind: filetree.EntryFile, DisplayName: "selected.go", Value: git.CommitFile{Path: "selected.go", Status: "M "}},
+	})
+
+	if m.filesPaneBorderColor() != ui.ColorOrange {
+		t.Fatal("expected active file tree border by default")
+	}
+	if !m.filetreeRenderOpts().Active {
+		t.Fatal("expected file tree render opts active by default")
+	}
+	if line := m.visibleFileLines(30, 3)[0]; !strings.Contains(line, "\x1b[48;2;") {
+		t.Fatal("expected active selected file row to have a highlight background")
+	}
+
+	inactive := m.WithContainerFocus(false)
+	if inactive.filesPaneBorderColor() != ui.ColorBorder {
+		t.Fatal("expected inactive file tree border when container is not focused")
+	}
+	if inactive.filetreeRenderOpts().Active {
+		t.Fatal("expected inactive file tree render opts when container is not focused")
+	}
+	if line := inactive.visibleFileLines(30, 3)[0]; strings.Contains(line, "\x1b[48;2;") {
+		t.Fatal("expected inactive selected file row without highlight background")
+	}
+
+	inactive.focusDiff = true
+	if inactive.diffPaneBorderColor() != ui.ColorBorder {
+		t.Fatal("expected inactive diff border even when diff has internal focus")
+	}
+
+	inactive.focusDiff = false
+	inactive.focusHeader = true
+	if inactive.headerPaneBorderColor() != ui.ColorBorder {
+		t.Fatal("expected inactive header border even when header has internal focus")
+	}
+}
+
 func TestView_FiletreeSearchOverlayAppearsInView(t *testing.T) {
 	m := Model{ready: true, width: 100, height: 20, commitSidebarState: commitSidebarState{fileTreeModel: filetree.NewModel[git.CommitFile]()}}
 	m.fileTreeModel.Search().Start("files")
