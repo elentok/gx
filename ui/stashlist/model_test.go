@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/ui"
 )
 
 // runInit executes Init() synchronously and feeds the result back to Update.
@@ -115,6 +116,26 @@ func TestSelectionEmitsCorrectRef(t *testing.T) {
 	m = send(m, tea.KeyPressMsg{Code: 'j', Text: "j"})
 	if got := m.SelectedRef(); got != "stash@{1}" {
 		t.Fatalf("after j ref = %q, want stash@{1}", got)
+	}
+}
+
+func TestContainerFocusControlsFrameColors(t *testing.T) {
+	t.Parallel()
+
+	active := NewModel("").WithContainerFocus(true)
+	if active.frameBorderColor() != ui.ColorOrange {
+		t.Fatalf("active border color = %v, want %v", active.frameBorderColor(), ui.ColorOrange)
+	}
+	if active.frameTitleColor() != ui.ColorOrange {
+		t.Fatalf("active title color = %v, want %v", active.frameTitleColor(), ui.ColorOrange)
+	}
+
+	inactive := NewModel("").WithContainerFocus(false)
+	if inactive.frameBorderColor() != ui.ColorBorder {
+		t.Fatalf("inactive border color = %v, want %v", inactive.frameBorderColor(), ui.ColorBorder)
+	}
+	if inactive.frameTitleColor() != ui.ColorMauve {
+		t.Fatalf("inactive title color = %v, want %v", inactive.frameTitleColor(), ui.ColorMauve)
 	}
 }
 

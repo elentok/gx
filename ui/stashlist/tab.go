@@ -87,28 +87,24 @@ func (t Tab) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	// Chord from splitview takes priority.
 	if t.split.HasChord() {
-		var cmd tea.Cmd
-		t.split, cmd = t.split.Update(msg)
-		t = t.syncPanelSizes()
-		return t, cmd
+		return t.routeKeyToSplit(msg)
 	}
-	if key == "esc" && !t.split.IsCollapsed() {
-		var cmd tea.Cmd
-		t.split, cmd = t.split.Update(msg)
-		t = t.syncPanelSizes()
-		return t, cmd
+	if key == "h" && t.split.IsSplit() && t.split.IsDetailFocused() && (t.commitDetail.IsFileTreeFocused() || t.commitDetail.IsHeaderFocused()) {
+		return t.routeKeyToSplit(tea.KeyPressMsg{Code: tea.KeyEsc})
+	}
+	if (key == "esc" || key == "q") && !t.split.IsCollapsed() {
+		if t.split.IsDetailFocused() && t.commitDetail.HasInternalFocus() {
+			updated, cmd := t.commitDetail.Update(msg)
+			t.commitDetail = updated.(commitui.Model)
+			return t, cmd
+		}
+		return t.routeKeyToSplit(msg)
 	}
 	if key == "f" && !t.split.IsCollapsed() {
-		var cmd tea.Cmd
-		t.split, cmd = t.split.Update(msg)
-		t = t.syncPanelSizes()
-		return t, cmd
+		return t.routeKeyToSplit(msg)
 	}
 	if key == "t" {
-		var cmd tea.Cmd
-		t.split, cmd = t.split.Update(msg)
-		t = t.syncPanelSizes()
-		return t, cmd
+		return t.routeKeyToSplit(msg)
 	}
 
 	if t.split.IsDetailFocused() {
@@ -131,14 +127,19 @@ func (t Tab) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return t, cmd
 
 	case "enter":
-		// Delegate enter to splitview to handle collapsed → split transition.
-		var cmd tea.Cmd
-		t.split, cmd = t.split.Update(msg)
-		t = t.syncPanelSizes()
-		return t, cmd
+		return t.routeKeyToSplit(msg)
+	case "l":
+		return t.routeKeyToSplit(tea.KeyPressMsg{Code: tea.KeyEnter})
 	}
 
 	return t, nil
+}
+
+func (t Tab) routeKeyToSplit(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	t.split, cmd = t.split.Update(msg)
+	t = t.syncPanelSizes()
+	return t, cmd
 }
 
 func (t Tab) syncPanelSizes() Tab {
@@ -165,7 +166,7 @@ func (t Tab) View() tea.View {
 		updated, _ := t.stashList.Update(tea.WindowSizeMsg{Width: lw, Height: lh})
 		t.stashList = updated.(Model)
 	}
-	listOut := t.stashList.View().Content
+	listOut := t.stashList.WithContainerFocus(t.isListActive()).View().Content
 
 	if !t.split.IsSplit() {
 		return ui.NewMainView(listOut)
@@ -179,4 +180,8 @@ func (t Tab) View() tea.View {
 		out = lipgloss.JoinVertical(lipgloss.Left, listOut, detailContent)
 	}
 	return ui.NewMainView(out)
+}
+
+func (t Tab) isListActive() bool {
+	return !t.split.IsSplit() || t.split.IsListFocused()
 }

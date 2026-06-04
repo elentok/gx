@@ -20,10 +20,18 @@ type Model struct {
 	height       int
 	loaded       bool
 	err          error
+	inactive     bool
 }
 
 func NewModel(worktreeRoot string) Model {
 	return Model{worktreeRoot: worktreeRoot}
+}
+
+// WithContainerFocus returns a copy rendered as active only when its
+// containing split/list panel owns keyboard focus.
+func (m Model) WithContainerFocus(focused bool) Model {
+	m.inactive = !focused
+	return m
 }
 
 func (m Model) Init() tea.Cmd {

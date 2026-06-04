@@ -2,6 +2,7 @@ package stashlist
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -24,10 +25,28 @@ func (m Model) View() tea.View {
 		Height:      m.height,
 		Title:       "Stash",
 		Lines:       lines,
-		BorderColor: ui.ColorBorder,
-		TitleColor:  ui.ColorMauve,
+		BorderColor: m.frameBorderColor(),
+		TitleColor:  m.frameTitleColor(),
 		Background:  ui.ColorBase,
 	}))
+}
+
+func (m Model) frameTitleColor() color.Color {
+	if m.isContainerFocused() {
+		return ui.ColorOrange
+	}
+	return ui.ColorMauve
+}
+
+func (m Model) frameBorderColor() color.Color {
+	if m.isContainerFocused() {
+		return ui.ColorOrange
+	}
+	return ui.ColorBorder
+}
+
+func (m Model) isContainerFocused() bool {
+	return !m.inactive
 }
 
 func (m Model) visibleLines() []string {
