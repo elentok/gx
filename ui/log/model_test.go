@@ -1120,3 +1120,75 @@ func TestEnterOnCommitRendersDetailContent(t *testing.T) {
 		t.Errorf("expected 'Commit' header in view after opening commit detail, got:\n%s", stripped)
 	}
 }
+
+func TestFlashOnJumpSetsFlashState(t *testing.T) {
+	m := newTestModel()
+	m.listPanel = m.listPanel.WithRows([]row{
+		{kind: rowCommit, commit: git.LogEntry{FullHash: "aaa111", Subject: "target commit"}},
+		{kind: rowCommit, commit: git.LogEntry{FullHash: "bbb222", Subject: "other commit"}},
+	})
+
+	updated, _ := m.Update(reloadMsg{
+		rows: []row{
+			{kind: rowCommit, commit: git.LogEntry{FullHash: "aaa111", Subject: "target commit"}},
+			{kind: rowCommit, commit: git.LogEntry{FullHash: "bbb222", Subject: "other commit"}},
+		},
+		focusSubject: "target commit",
+	})
+	m = updated.(Model)
+
+	if m.flashSubject != "target commit" {
+		t.Errorf("flashSubject = %q, want 'target commit'", m.flashSubject)
+	}
+	if m.flashUntil.IsZero() {
+		t.Error("flashUntil should be set after flash-on-jump")
+	}
+	if m.listPanel.Selected() != 0 {
+		t.Errorf("cursor should be on matched row 0, got %d", m.listPanel.Selected())
+	}
+}
+
+func TestFlashClearMsgResetsFlashState(t *testing.T) {
+	m := newTestModel()
+	m.flashSubject = "some subject"
+	m.flashUntil = time.Now().Add(2 * time.Second)
+
+	updated, _ := m.Update(flashClearMsg{})
+	m = updated.(Model)
+
+	if m.flashSubject != "" {
+		t.Errorf("flashSubject should be cleared, got %q", m.flashSubject)
+	}
+	if !m.flashUntil.IsZero() {
+		t.Error("flashUntil should be zero after clear")
+	}
+}
+
+func TestFilteredLogShowsOnlyFilteredCommits(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "a\n")
+	testutil.CommitAll(t, repo, "commit touching a")
+	testutil.WriteFile(t, repo, "b.txt", "b\n")
+	testutil.CommitAll(t, repo, "commit touching b only")
+
+	m := newTestModelFiltered(repo, "", settings, LogFilter{Path: "b.txt"})
+	rows := m.listPanel.Rows()
+	for _, r := range rows {
+		if r.kind != rowCommit {
+			continue
+		}
+		if r.commit.Subject == "commit touching a" {
+			t.Fatal("filtered log should not contain commits that don't touch b.txt")
+		}
+	}
+	found := false
+	for _, r := range rows {
+		if r.kind == rowCommit && r.commit.Subject == "commit touching b only" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("filtered log should contain commit that touches b.txt")
+	}
+}
