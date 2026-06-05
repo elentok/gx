@@ -18,7 +18,7 @@ var (
 	stashTimeStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Italic(true)
 )
 
-func (m Model) View() tea.View {
+func (m listPanel) View() tea.View {
 	lines := m.visibleLines()
 	return tea.NewView(ui.RenderPanelFrame(ui.PanelFrameOptions{
 		Width:       m.width,
@@ -31,25 +31,25 @@ func (m Model) View() tea.View {
 	}))
 }
 
-func (m Model) frameTitleColor() color.Color {
+func (m listPanel) frameTitleColor() color.Color {
 	if m.isContainerFocused() {
 		return ui.ColorOrange
 	}
 	return ui.ColorMauve
 }
 
-func (m Model) frameBorderColor() color.Color {
+func (m listPanel) frameBorderColor() color.Color {
 	if m.isContainerFocused() {
 		return ui.ColorOrange
 	}
 	return ui.ColorBorder
 }
 
-func (m Model) isContainerFocused() bool {
+func (m listPanel) isContainerFocused() bool {
 	return !m.inactive
 }
 
-func (m Model) visibleLines() []string {
+func (m listPanel) visibleLines() []string {
 	if !m.loaded {
 		return []string{ui.StyleMuted.Render("loading…")}
 	}
@@ -71,7 +71,7 @@ func (m Model) visibleLines() []string {
 	return lines
 }
 
-func (m Model) renderRow(entry git.StashEntry, selected bool, width int) string {
+func (m listPanel) renderRow(entry git.StashEntry, selected bool, width int) string {
 	ref := stashRefStyle.Render(entry.Ref)
 	ts := stashTimeStyle.Render(ui.RelativeTimeCompact(entry.Timestamp))
 	msg := stashMsgStyle.Render(entry.Message)

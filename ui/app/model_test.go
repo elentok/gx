@@ -930,9 +930,9 @@ func TestStashTabOpensInSplitState(t *testing.T) {
 	m = updated.(Model)
 
 	page := m.livePageByTab[nav.TabStash]
-	tab, ok := page.model.(stashlistui.Tab)
+	tab, ok := page.model.(stashlistui.Model)
 	if !ok {
-		t.Fatalf("expected stash page to be stashlistui.Tab, got %T", page.model)
+		t.Fatalf("expected stash page to be stashlistui.Model, got %T", page.model)
 	}
 	if !tab.IsSplit() {
 		t.Fatal("expected stash tab to open in split state")

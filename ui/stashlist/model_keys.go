@@ -47,46 +47,46 @@ func newStashManager() keys.Manager {
 // dispatchBinding runs the action for a resolved stash-list binding. The
 // original key message is forwarded for navigation bindings so the stash list
 // can distinguish j/k/G variants.
-func (t Tab) dispatchBinding(id keys.BindingID, msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+func (m Model) dispatchBinding(id keys.BindingID, msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch id {
 	case bindingStashHelp:
-		t.keys.Reset()
-		t.help.Open(t.width, t.height)
-		return t, nil
+		m.keys.Reset()
+		m.help.Open(m.width, m.height)
+		return m, nil
 	case bindingStashDown, bindingStashUp, bindingStashBottom:
-		return t.navigateList(msg)
+		return m.navigateList(msg)
 	case bindingStashOpen:
-		return t.routeKeyToSplit(tea.KeyPressMsg{Code: tea.KeyEnter})
+		return m.routeKeyToSplit(tea.KeyPressMsg{Code: tea.KeyEnter})
 	case bindingStashApply:
-		if ref := t.stashList.SelectedRef(); ref != "" {
-			return t, t.cmdApply(ref)
+		if ref := m.stashList.SelectedRef(); ref != "" {
+			return m, m.cmdApply(ref)
 		}
-		return t, nil
+		return m, nil
 	case bindingStashPop:
-		if ref := t.stashList.SelectedRef(); ref != "" {
-			return t, t.cmdPopRef(ref)
+		if ref := m.stashList.SelectedRef(); ref != "" {
+			return m, m.cmdPopRef(ref)
 		}
-		return t, nil
+		return m, nil
 	case bindingStashDrop:
-		if ref := t.stashList.SelectedRef(); ref != "" {
-			return t, t.cmdDrop(ref)
+		if ref := m.stashList.SelectedRef(); ref != "" {
+			return m, m.cmdDrop(ref)
 		}
-		return t, nil
+		return m, nil
 	case bindingStashCreate:
-		cmd := t.stashCreate.Open(t.worktreeRoot, false)
-		return t, cmd
+		cmd := m.stashCreate.Open(m.worktreeRoot, false)
+		return m, cmd
 	}
-	return t, nil
+	return m, nil
 }
 
-func (t Tab) navigateList(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	prevRef := t.stashList.SelectedRef()
-	updated, cmd := t.stashList.Update(msg)
-	t.stashList = updated.(Model)
-	t.split = t.split.WithListRef(t.stashList.SelectedRef())
-	if ref := t.stashList.SelectedRef(); t.split.IsSplit() && ref != prevRef && ref != "" {
-		t.commitDetail = t.commitDetail.WithRef(ref)
-		t = t.syncPanelSizes()
+func (m Model) navigateList(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	prevRef := m.stashList.SelectedRef()
+	updated, cmd := m.stashList.Update(msg)
+	m.stashList = updated.(listPanel)
+	m.split = m.split.WithListRef(m.stashList.SelectedRef())
+	if ref := m.stashList.SelectedRef(); m.split.IsSplit() && ref != prevRef && ref != "" {
+		m.commitDetail = m.commitDetail.WithRef(ref)
+		m = m.syncPanelSizes()
 	}
-	return t, cmd
+	return m, cmd
 }

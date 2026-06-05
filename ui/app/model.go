@@ -188,7 +188,7 @@ func (m Model) newHistoryEntry(viewState nav.ViewState) historyEntry {
 	case nav.TabStash:
 		return historyEntry{
 			viewState: viewState,
-			model:     stashlistui.NewTab(viewState.WorktreeRoot, s, keys.New(Bindings())),
+			model:     stashlistui.NewModel(viewState.WorktreeRoot, s, keys.New(Bindings())),
 		}
 	case nav.TabWorktrees:
 		fallthrough
