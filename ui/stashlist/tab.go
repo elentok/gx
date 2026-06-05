@@ -8,8 +8,8 @@ import (
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
-	stashpkg "github.com/elentok/gx/ui/stash"
 	"github.com/elentok/gx/ui/splitview"
+	stashpkg "github.com/elentok/gx/ui/stash"
 )
 
 // Tab is the top-level stash tab model: a stash list paired with a commit
@@ -174,53 +174,6 @@ func (t Tab) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return t, nil
-}
-
-// dispatchBinding runs the action for a resolved stash-list binding. The
-// original key message is forwarded for navigation bindings so the stash list
-// can distinguish j/k/G variants.
-func (t Tab) dispatchBinding(id keys.BindingID, msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch id {
-	case bindingStashHelp:
-		t.keys.Reset()
-		t.help.Open(t.width, t.height)
-		return t, nil
-	case bindingStashDown, bindingStashUp, bindingStashBottom:
-		return t.navigateList(msg)
-	case bindingStashOpen:
-		return t.routeKeyToSplit(tea.KeyPressMsg{Code: tea.KeyEnter})
-	case bindingStashApply:
-		if ref := t.stashList.SelectedRef(); ref != "" {
-			return t, t.cmdApply(ref)
-		}
-		return t, nil
-	case bindingStashPop:
-		if ref := t.stashList.SelectedRef(); ref != "" {
-			return t, t.cmdPopRef(ref)
-		}
-		return t, nil
-	case bindingStashDrop:
-		if ref := t.stashList.SelectedRef(); ref != "" {
-			return t, t.cmdDrop(ref)
-		}
-		return t, nil
-	case bindingStashCreate:
-		cmd := t.stashCreate.Open(t.worktreeRoot, false)
-		return t, cmd
-	}
-	return t, nil
-}
-
-func (t Tab) navigateList(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	prevRef := t.stashList.SelectedRef()
-	updated, cmd := t.stashList.Update(msg)
-	t.stashList = updated.(Model)
-	t.split = t.split.WithListRef(t.stashList.SelectedRef())
-	if ref := t.stashList.SelectedRef(); t.split.IsSplit() && ref != prevRef && ref != "" {
-		t.commitDetail = t.commitDetail.WithRef(ref)
-		t = t.syncPanelSizes()
-	}
-	return t, cmd
 }
 
 func (t Tab) routeKeyToSplit(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
