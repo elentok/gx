@@ -19,8 +19,7 @@ func TestCmdFetchRewordDetails_EmptyRows(t *testing.T) {
 
 func TestCmdFetchRewordDetails_PseudoStatusRow(t *testing.T) {
 	m := newTestModel()
-	m.rows = []row{{kind: rowPseudoStatus, label: "status"}}
-	m.list.SetSelected(0, len(m.rows))
+	m.listPanel = m.listPanel.WithRows([]row{{kind: rowPseudoStatus, label: "status"}}).SetSelected(0)
 	cmd := m.cmdFetchRewordDetails()
 	if cmd != nil {
 		t.Error("expected nil cmd for pseudo-status row")
@@ -31,9 +30,9 @@ func TestCmdFetchRewordDetails_WithCommitRow(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	m := newTestModelDefault(repo, "", ui.Settings{})
 	var found bool
-	for i, r := range m.rows {
+	for i, r := range m.listPanel.Rows() {
 		if r.kind == rowCommit {
-			m.list.SetSelected(i, len(m.rows))
+			m.listPanel = m.listPanel.SetSelected(i)
 			found = true
 			break
 		}
@@ -61,7 +60,7 @@ func TestHandleRewordDetails_WithData(t *testing.T) {
 
 	// Get a real hash from the repo
 	var hash string
-	for _, r := range m.rows {
+	for _, r := range m.listPanel.Rows() {
 		if r.kind == rowCommit {
 			hash = r.commit.FullHash
 			break

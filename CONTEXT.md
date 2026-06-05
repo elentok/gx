@@ -11,6 +11,14 @@ Items have a fixed height of one display row each.
 **Diff panel** — a panel that renders a unified or side-by-side diff. Items are hunks or changed
 lines depending on nav mode.
 
+**Detail panel** — an interactive, focusable panel that mirrors the currently selected list item and
+supports its own keyboard navigation (e.g. the commit detail shown beside the log and stash lists).
+The user can move focus into it and back out. Contrast with a sidebar.
+
+**Sidebar** — a passive, non-focusable panel that renders a read-only summary of the current
+selection. The user never moves focus into it; it only reflects the selected item (e.g. the
+worktrees sidebar, the commit header). Contrast with a detail panel.
+
 **Viewport** — the visible window into a panel's content. Defined by a scroll offset (first visible
 row index) and a height (number of visible rows).
 

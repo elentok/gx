@@ -28,7 +28,8 @@ func newTestModel() Model {
 		search: search.NewModel(),
 	}
 	m.help = help.NewModel(help.BuildSections(m.keys, m.search.Keys()))
-	m.split = splitview.New(logListAdapter{}, m.commitDetail)
+	m.listPanel = newListPanel()
+	m.split = splitview.New(m.listPanel, m.commitDetail)
 	return m
 }
 
@@ -88,7 +89,7 @@ func TestReloadAssignsBranchHistoryClasses(t *testing.T) {
 
 	m := newTestModelDefault(wtDir, "", settings)
 	got := map[string]git.BranchHistoryClass{}
-	for _, row := range m.rows {
+	for _, row := range m.listPanel.Rows() {
 		if row.kind != rowCommit {
 			continue
 		}
@@ -153,7 +154,7 @@ func TestGHResetsCustomRefToHead(t *testing.T) {
 func TestSelectedCommitRowFillsFullWidth(t *testing.T) {
 	m := newTestModel()
 	m.width = 80
-	m.rows = []row{{
+	r := row{
 		kind: rowCommit,
 		commit: git.LogEntry{
 			Hash:        "12345678",
@@ -163,8 +164,9 @@ func TestSelectedCommitRowFillsFullWidth(t *testing.T) {
 			Graph:       "*",
 			Decorations: []git.RefDecoration{{Name: "main", Kind: git.RefDecorationLocalBranch}},
 		},
-	}}
-	line := m.renderRow(m.rows[0], true, 40)
+	}
+	m.listPanel = m.listPanel.WithRows([]row{r})
+	line := m.listPanel.WithHints(m.buildHints()).renderRow(r, true, 40)
 	if got := ansi.StringWidth(ansi.Strip(line)); got != 40 {
 		t.Fatalf("selected row width = %d, want 40", got)
 	}
@@ -201,16 +203,17 @@ func TestMatchRefRule(t *testing.T) {
 func TestRenderCommitRowHighlightsSearchMatches(t *testing.T) {
 	m := newTestModel()
 	m.search.Start("fix")
-	m.rows = []row{{
+	r := row{
 		kind: rowCommit,
 		commit: git.LogEntry{
 			Hash:        "12345678",
 			AuthorShort: "AB",
 			Subject:     "fix search highlighting",
 		},
-	}}
+	}
+	m.listPanel = m.listPanel.WithRows([]row{r})
 
-	line := m.renderCommitRow(m.rows[0])
+	line := m.listPanel.WithHints(m.buildHints()).renderCommitRow(r)
 	if stripped := ansi.Strip(line); !strings.Contains(stripped, "fix search highlighting") {
 		t.Fatalf("stripped line = %q", stripped)
 	}
@@ -222,7 +225,7 @@ func TestRenderCommitRowHighlightsSearchMatches(t *testing.T) {
 func TestRenderBadgesHighlightsSearchMatches(t *testing.T) {
 	m := newTestModel()
 	m.search.Start("main")
-	line := m.renderBadges([]git.RefDecoration{{Name: "origin/main", Kind: git.RefDecorationRemoteBranch}})
+	line := m.listPanel.WithHints(m.buildHints()).renderBadges([]git.RefDecoration{{Name: "origin/main", Kind: git.RefDecorationRemoteBranch}})
 	if stripped := ansi.Strip(line); !strings.Contains(stripped, "origin/main") {
 		t.Fatalf("stripped badges = %q", stripped)
 	}
@@ -271,72 +274,70 @@ func TestNAndNShiftMoveBetweenSearchResults(t *testing.T) {
 		t.Fatalf("expected at least two search matches, got %d", m.search.MatchesCount())
 	}
 	if match, ok := m.search.Match(0); ok {
-		m.list.SetSelected(match.DataIndex, len(m.rows))
+		m.listPanel = m.listPanel.SetSelected(match.DataIndex)
 	}
 	m.search.SetCursor(0)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	m = updated.(Model)
-	if match, ok := m.search.Match(1); ok && m.list.Selected() != match.DataIndex {
+	if match, ok := m.search.Match(1); ok && m.listPanel.Selected() != match.DataIndex {
 		t.Fatalf("expected n to move to next result")
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'N', Text: "N", ShiftedCode: 'N', Mod: tea.ModShift})
 	m = updated.(Model)
-	if match, ok := m.search.Match(0); ok && m.list.Selected() != match.DataIndex {
+	if match, ok := m.search.Match(0); ok && m.listPanel.Selected() != match.DataIndex {
 		t.Fatalf("expected N to move to previous result")
 	}
 }
 
 func TestTagJumpChordsMoveToTaggedCommits(t *testing.T) {
 	m := newTestModel()
-	m.rows = []row{
+	m.listPanel = m.listPanel.WithRows([]row{
 		{kind: rowCommit, commit: git.LogEntry{Subject: "c0"}},
 		{kind: rowCommit, commit: git.LogEntry{Subject: "c1", Decorations: []git.RefDecoration{{Name: "v1.0.0", Kind: git.RefDecorationTag}}}},
 		{kind: rowCommit, commit: git.LogEntry{Subject: "c2"}},
 		{kind: rowCommit, commit: git.LogEntry{Subject: "c3", Decorations: []git.RefDecoration{{Name: "v2.0.0", Kind: git.RefDecorationTag}}}},
-	}
-	m.list.SetSelected(0, len(m.rows))
+	}).SetSelected(0)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: ']', Text: "]"})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updated.(Model)
-	if m.list.Selected() != 1 {
-		t.Fatalf("expected ]t to jump to first tag at 1, got %d", m.list.Selected())
+	if m.listPanel.Selected() != 1 {
+		t.Fatalf("expected ]t to jump to first tag at 1, got %d", m.listPanel.Selected())
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: ']', Text: "]"})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updated.(Model)
-	if m.list.Selected() != 3 {
-		t.Fatalf("expected ]t to jump to next tag at 3, got %d", m.list.Selected())
+	if m.listPanel.Selected() != 3 {
+		t.Fatalf("expected ]t to jump to next tag at 3, got %d", m.listPanel.Selected())
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: '[', Text: "["})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updated.(Model)
-	if m.list.Selected() != 1 {
-		t.Fatalf("expected [t to jump back to tag at 1, got %d", m.list.Selected())
+	if m.listPanel.Selected() != 1 {
+		t.Fatalf("expected [t to jump back to tag at 1, got %d", m.listPanel.Selected())
 	}
 }
 
 func TestTagJumpChordStopsAtEdges(t *testing.T) {
 	m := newTestModel()
-	m.rows = []row{
+	m.listPanel = m.listPanel.WithRows([]row{
 		{kind: rowCommit, commit: git.LogEntry{Subject: "c0", Decorations: []git.RefDecoration{{Name: "v1", Kind: git.RefDecorationTag}}}},
 		{kind: rowCommit, commit: git.LogEntry{Subject: "c1"}},
-	}
-	m.list.SetSelected(0, len(m.rows))
+	}).SetSelected(0)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '[', Text: "["})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updated.(Model)
-	if m.list.Selected() != 0 {
-		t.Fatalf("expected [t at first tag to stay put, got %d", m.list.Selected())
+	if m.listPanel.Selected() != 0 {
+		t.Fatalf("expected [t at first tag to stay put, got %d", m.listPanel.Selected())
 	}
 }
 
@@ -351,15 +352,15 @@ func TestDispatchBinding_Navigation(t *testing.T) {
 
 	// j / k navigation
 	m, _ = sendKey(m, tea.KeyPressMsg{Code: 'j', Text: "j"})
-	initial := m.list.Selected()
+	initial := m.listPanel.Selected()
 	m, _ = sendKey(m, tea.KeyPressMsg{Code: 'k', Text: "k"})
-	if m.list.Selected() != 0 && m.list.Selected() == initial {
+	if m.listPanel.Selected() != 0 && m.listPanel.Selected() == initial {
 		// either k moved up or we were already at top — just verify no crash
 	}
 
 	// G goes to bottom
 	m, _ = sendKey(m, tea.KeyPressMsg{Code: 'G', Text: "G", ShiftedCode: 'G', Mod: tea.ModShift})
-	bottom := m.list.Selected()
+	bottom := m.listPanel.Selected()
 	if bottom < 0 {
 		t.Fatalf("G: expected non-negative selection, got %d", bottom)
 	}
@@ -367,8 +368,8 @@ func TestDispatchBinding_Navigation(t *testing.T) {
 	// gg goes to top
 	m, _ = sendKey(m, tea.KeyPressMsg{Code: 'g', Text: "g"})
 	m, _ = sendKey(m, tea.KeyPressMsg{Code: 'g', Text: "g"})
-	if m.list.Selected() != 0 {
-		t.Fatalf("gg: expected top (0), got %d", m.list.Selected())
+	if m.listPanel.Selected() != 0 {
+		t.Fatalf("gg: expected top (0), got %d", m.listPanel.Selected())
 	}
 
 	// q with navigation → nav back command
@@ -388,9 +389,9 @@ func TestDispatchBinding_PageScrollAndHelp(t *testing.T) {
 	m := newTestModel()
 	m.width = 120
 	m.height = 40
-	m.rows = make([]row, 30)
+	m.listPanel = m.listPanel.WithRows(make([]row, 30))
 
-	before := m.list.Selected()
+	before := m.listPanel.Selected()
 	m, _ = sendKey(m, tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	_ = before
 
@@ -421,11 +422,10 @@ func TestDispatchBinding_ClearFilter(t *testing.T) {
 
 func TestSelectRefAndSelectedRef(t *testing.T) {
 	m := newTestModel()
-	m.rows = []row{
+	m.listPanel = m.listPanel.WithRows([]row{
 		{kind: rowCommit, commit: git.LogEntry{FullHash: "aaa111", Subject: "first"}},
 		{kind: rowCommit, commit: git.LogEntry{FullHash: "bbb222", Subject: "second"}},
-	}
-	m.list.SetSelected(0, len(m.rows))
+	}).SetSelected(0)
 
 	// SelectedRef at row 0
 	if got := m.SelectedRef(); got != "aaa111" {
@@ -434,14 +434,14 @@ func TestSelectRefAndSelectedRef(t *testing.T) {
 
 	// SelectRef moves cursor to matching hash
 	m = m.SelectRef("bbb222")
-	if m.list.Selected() != 1 {
-		t.Errorf("SelectRef: expected selection at 1, got %d", m.list.Selected())
+	if m.listPanel.Selected() != 1 {
+		t.Errorf("SelectRef: expected selection at 1, got %d", m.listPanel.Selected())
 	}
 
 	// SelectRef with unknown hash — cursor unchanged
 	m = m.SelectRef("zzzxxx")
-	if m.list.Selected() != 1 {
-		t.Errorf("SelectRef unknown: expected selection unchanged at 1, got %d", m.list.Selected())
+	if m.listPanel.Selected() != 1 {
+		t.Errorf("SelectRef unknown: expected selection unchanged at 1, got %d", m.listPanel.Selected())
 	}
 
 	// SelectedRef returns empty for empty rows
@@ -453,7 +453,7 @@ func TestSelectRefAndSelectedRef(t *testing.T) {
 
 func TestMouseWheelScrolls(t *testing.T) {
 	m := newTestModel()
-	m.rows = make([]row, 30)
+	m.listPanel = m.listPanel.WithRows(make([]row, 30))
 	m.height = 10
 	updated, _ := m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
 	next := updated.(Model)
@@ -473,7 +473,7 @@ func TestFocusReloadsRowsAfterOnDiskChange(t *testing.T) {
 	repo := testutil.TempRepo(t)
 
 	m := newTestModelDefault(repo, "", settings)
-	initialRows := len(m.rows)
+	initialRows := len(m.listPanel.Rows())
 
 	testutil.WriteFile(t, repo, "new.txt", "new\n")
 	testutil.CommitAll(t, repo, "new commit")
@@ -486,8 +486,8 @@ func TestFocusReloadsRowsAfterOnDiskChange(t *testing.T) {
 
 	// FocusMsg now returns a batch (reload + status load); run all sub-commands.
 	m = runCmd(m, cmd)
-	if len(m.rows) <= initialRows {
-		t.Fatalf("expected more rows after focus reload; before=%d after=%d", initialRows, len(m.rows))
+	if len(m.listPanel.Rows()) <= initialRows {
+		t.Fatalf("expected more rows after focus reload; before=%d after=%d", initialRows, len(m.listPanel.Rows()))
 	}
 }
 
@@ -538,19 +538,21 @@ func TestPseudoLogLineIsFirstRow(t *testing.T) {
 	testutil.CommitAll(t, repo, "first commit")
 
 	m := newTestModelDefault(repo, "", settings)
-	if len(m.rows) == 0 {
+	rows := m.listPanel.Rows()
+	if len(rows) == 0 {
 		t.Fatal("expected rows after init")
 	}
-	if m.rows[0].kind != rowPseudoStatus {
-		t.Fatalf("rows[0].kind = %v, want rowPseudoStatus", m.rows[0].kind)
+	if rows[0].kind != rowPseudoStatus {
+		t.Fatalf("rows[0].kind = %v, want rowPseudoStatus", rows[0].kind)
 	}
 }
 
 func TestPseudoLogLineLoadingState(t *testing.T) {
 	// Before the worktree status is loaded, the pseudo-line shows "loading".
 	m := newTestModel()
-	m.rows = []row{{kind: rowPseudoStatus, detail: ""}}
-	line := m.renderRow(m.rows[0], false, 80)
+	r := row{kind: rowPseudoStatus, detail: ""}
+	m.listPanel = m.listPanel.WithRows([]row{r})
+	line := m.listPanel.WithHints(m.buildHints()).renderRow(r, false, 80)
 	stripped := ansi.Strip(line)
 	if !strings.Contains(stripped, "working tree") {
 		t.Errorf("renderRow: expected 'working tree' label, got %q", stripped)
@@ -561,8 +563,9 @@ func TestPseudoLogLineCleanState(t *testing.T) {
 	m := newTestModel()
 	m.statusLoaded = true
 	// staged=0, unstaged=0, untracked=0 → "no local changes"
-	m.rows = []row{{kind: rowPseudoStatus, detail: m.pseudoStatusDetail()}}
-	line := m.renderRow(m.rows[0], false, 80)
+	r := row{kind: rowPseudoStatus, detail: m.pseudoStatusDetail()}
+	m.listPanel = m.listPanel.WithRows([]row{r})
+	line := m.listPanel.WithHints(m.buildHints()).renderRow(r, false, 80)
 	stripped := ansi.Strip(line)
 	if !strings.Contains(stripped, "no local changes") {
 		t.Errorf("renderRow: expected 'no local changes', got %q", stripped)
@@ -575,8 +578,9 @@ func TestPseudoLogLineDirtyState(t *testing.T) {
 	m.statusStaged = 2
 	m.statusUnstaged = 3
 	m.statusUntracked = 1
-	m.rows = []row{{kind: rowPseudoStatus, detail: m.pseudoStatusDetail()}}
-	line := m.renderRow(m.rows[0], false, 80)
+	r := row{kind: rowPseudoStatus, detail: m.pseudoStatusDetail()}
+	m.listPanel = m.listPanel.WithRows([]row{r})
+	line := m.listPanel.WithHints(m.buildHints()).renderRow(r, false, 80)
 	stripped := ansi.Strip(line)
 	if !strings.Contains(stripped, "2 staged") {
 		t.Errorf("expected '2 staged' in %q", stripped)
@@ -594,7 +598,8 @@ func TestPseudoLogLineDirtyStateZeroCountsOmitted(t *testing.T) {
 	m.statusLoaded = true
 	m.statusStaged = 1
 	// unstaged=0, untracked=0 — these counts must be absent from output.
-	m.rows = []row{{kind: rowPseudoStatus, detail: m.pseudoStatusDetail()}}
+	r := row{kind: rowPseudoStatus, detail: m.pseudoStatusDetail()}
+	m.listPanel = m.listPanel.WithRows([]row{r})
 	detail := m.pseudoStatusDetail()
 	if strings.Contains(detail, "0 ") {
 		t.Errorf("detail should omit zero counts, got %q", detail)
@@ -611,7 +616,7 @@ func TestEnterOnPseudoLogLineEmitsStatusSwitch(t *testing.T) {
 
 	m := newTestModelDefault(repo, "", ui.Settings{EnableNavigation: true})
 	// Move cursor to the pseudo-line (index 0).
-	m.list.SetSelected(0, len(m.rows))
+	m.listPanel = m.listPanel.SetSelected(0)
 
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
@@ -643,7 +648,7 @@ func TestEnterOnCommitInCollapsedExpandsToSplit(t *testing.T) {
 	m, _ = m.syncSplitSize()
 
 	// Row 1 is the first real commit (row 0 is pseudo-line).
-	m.list.SetSelected(1, len(m.rows))
+	m.listPanel = m.listPanel.SetSelected(1)
 	if !m.split.IsCollapsed() {
 		t.Fatal("expected Collapsed initially")
 	}
@@ -667,7 +672,7 @@ func TestLOnCommitInCollapsedExpandsToSplit(t *testing.T) {
 	m.width = 200
 	m.height = 40
 	m, _ = m.syncSplitSize()
-	m.list.SetSelected(1, len(m.rows))
+	m.listPanel = m.listPanel.SetSelected(1)
 	if !m.split.IsCollapsed() {
 		t.Fatal("expected Collapsed initially")
 	}
@@ -694,7 +699,7 @@ func TestLFromLogPanelFocusesOpenDetail(t *testing.T) {
 	m.width = 200
 	m.height = 40
 	m, _ = m.syncSplitSize()
-	m.list.SetSelected(1, len(m.rows))
+	m.listPanel = m.listPanel.SetSelected(1)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
@@ -726,7 +731,7 @@ func TestEscFromDetailReturnsFocusToList(t *testing.T) {
 	m.width = 200
 	m.height = 40
 	m, _ = m.syncSplitSize()
-	m.list.SetSelected(1, len(m.rows))
+	m.listPanel = m.listPanel.SetSelected(1)
 
 	// Expand to split.
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -755,7 +760,7 @@ func TestQFromDetailReturnsFocusToList(t *testing.T) {
 	m.width = 200
 	m.height = 40
 	m, _ = m.syncSplitSize()
-	m.list.SetSelected(1, len(m.rows))
+	m.listPanel = m.listPanel.SetSelected(1)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
@@ -786,7 +791,7 @@ func TestHFromDetailFileTreeReturnsFocusToList(t *testing.T) {
 	m.width = 200
 	m.height = 40
 	m, _ = m.syncSplitSize()
-	m.list.SetSelected(1, len(m.rows))
+	m.listPanel = m.listPanel.SetSelected(1)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
@@ -820,7 +825,7 @@ func TestHFromDetailHeaderReturnsFocusToList(t *testing.T) {
 	m.width = 200
 	m.height = 40
 	m, _ = m.syncSplitSize()
-	m.list.SetSelected(1, len(m.rows))
+	m.listPanel = m.listPanel.SetSelected(1)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
@@ -858,7 +863,7 @@ func TestEscFromDetailInternalFocusStepsBackWithoutMovingToList(t *testing.T) {
 	m.width = 200
 	m.height = 40
 	m, _ = m.syncSplitSize()
-	m.list.SetSelected(1, len(m.rows))
+	m.listPanel = m.listPanel.SetSelected(1)
 
 	// Open split view.
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -895,7 +900,7 @@ func TestQFromDetailInternalFocusStepsBackWithoutMovingToList(t *testing.T) {
 	m.width = 200
 	m.height = 40
 	m, _ = m.syncSplitSize()
-	m.list.SetSelected(1, len(m.rows))
+	m.listPanel = m.listPanel.SetSelected(1)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
@@ -925,7 +930,7 @@ func TestEscFromListWhileSplitCollapses(t *testing.T) {
 	m.width = 200
 	m.height = 40
 	m, _ = m.syncSplitSize()
-	m.list.SetSelected(1, len(m.rows))
+	m.listPanel = m.listPanel.SetSelected(1)
 
 	// Expand to split.
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -950,7 +955,7 @@ func TestQFromListWhileSplitCollapses(t *testing.T) {
 	m.width = 200
 	m.height = 40
 	m, _ = m.syncSplitSize()
-	m.list.SetSelected(1, len(m.rows))
+	m.listPanel = m.listPanel.SetSelected(1)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
@@ -976,7 +981,7 @@ func TestLogPaneFrameColorTracksSplitFocus(t *testing.T) {
 		t.Fatal("expected collapsed log frame to use default title color")
 	}
 
-	m.split = splitview.NewSplit(logListAdapter{}, m.commitDetail)
+	m.split = splitview.NewSplit(m.listPanel, m.commitDetail)
 	if m.logPaneBorderColor() != ui.ColorOrange {
 		t.Fatal("expected log frame orange while split list is focused")
 	}
@@ -1000,11 +1005,10 @@ func TestFKeyTogglesFullscreenList(t *testing.T) {
 	m.width = 200
 	m.height = 40
 	m, _ = m.syncSplitSize()
-	m.rows = []row{
+	m.listPanel = m.listPanel.WithRows([]row{
 		{kind: rowPseudoStatus},
 		{kind: rowCommit, commit: git.LogEntry{FullHash: "abc", Subject: "c1"}},
-	}
-	m.list.SetSelected(1, len(m.rows))
+	}).SetSelected(1)
 
 	// f in collapsed state → fullscreen list.
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
@@ -1026,7 +1030,7 @@ func TestFKeyOnDetailFocusedTogglesFullscreenDetail(t *testing.T) {
 	m.width = 200
 	m.height = 40
 	m, _ = m.syncSplitSize()
-	m.list.SetSelected(1, len(m.rows))
+	m.listPanel = m.listPanel.SetSelected(1)
 
 	// Expand to split (detail focused).
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -1066,10 +1070,10 @@ func TestToChordTogglesOrientation(t *testing.T) {
 
 func TestWorktreeStatusUpdatesRows(t *testing.T) {
 	m := newTestModel()
-	m.rows = []row{
+	m.listPanel = m.listPanel.WithRows([]row{
 		{kind: rowPseudoStatus, detail: "loading worktree status…"},
 		{kind: rowCommit, commit: git.LogEntry{Subject: "c1"}},
-	}
+	})
 
 	updated, _ := m.Update(worktreeStatusMsg{staged: 1, unstaged: 2, untracked: 0})
 	m = updated.(Model)
@@ -1077,7 +1081,7 @@ func TestWorktreeStatusUpdatesRows(t *testing.T) {
 	if !m.statusLoaded {
 		t.Error("expected statusLoaded=true")
 	}
-	detail := m.rows[0].detail
+	detail := m.listPanel.Rows()[0].detail
 	if !strings.Contains(detail, "1 staged") {
 		t.Errorf("expected '1 staged' in detail %q", detail)
 	}
@@ -1099,7 +1103,7 @@ func TestEnterOnCommitRendersDetailContent(t *testing.T) {
 	// WindowSizeMsg must go through Update to set m.ready = true (same as real app).
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 200, Height: 40})
 	m = updated.(Model)
-	m.list.SetSelected(1, len(m.rows))
+	m.listPanel = m.listPanel.SetSelected(1)
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)

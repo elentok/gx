@@ -13,7 +13,6 @@ import (
 	"github.com/elentok/gx/ui/commit"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
-	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/output"
 	"github.com/elentok/gx/ui/pull"
 	"github.com/elentok/gx/ui/push"
@@ -48,16 +47,6 @@ type row struct {
 	class  git.BranchHistoryClass
 }
 
-// logListAdapter satisfies splitview.ListPanel for the log model. The log
-// model manages cursor and rendering itself; this thin wrapper lets the split
-// container track the currently selected ref for selection-change detection.
-type logListAdapter struct{ ref string }
-
-func (l logListAdapter) Init() tea.Cmd                           { return nil }
-func (l logListAdapter) Update(msg tea.Msg) (tea.Model, tea.Cmd) { return l, nil }
-func (l logListAdapter) View() tea.View                          { return tea.NewView("") }
-func (l logListAdapter) SelectedRef() string                     { return l.ref }
-
 type Model struct {
 	worktreeRoot     string
 	settings         ui.Settings
@@ -70,9 +59,8 @@ type Model struct {
 	height int
 	ready  bool
 
-	rows []row
-	list list.Model
-	keys keys.Manager
+	listPanel listPanel
+	keys      keys.Manager
 	search    search.Model
 	err       error
 
@@ -127,8 +115,9 @@ func NewModel(worktreeRoot, startRef string, settings ui.Settings, filter LogFil
 	m.pull = pull.New()
 	m.output = output.New()
 	m.reword = reword.New()
+	m.listPanel = newListPanel()
 	m.commitDetail = commit.NewModel(worktreeRoot, "HEAD", "", settings, keys.Manager{})
-	m.split = splitview.New(logListAdapter{}, m.commitDetail)
+	m.split = splitview.New(m.listPanel, m.commitDetail)
 	return m
 }
 
@@ -154,7 +143,7 @@ func (m Model) AutoReload() tea.Cmd {
 // then-active page and never reaches this model. The app shell uses this to
 // reload on re-activation instead of leaving the page stuck loading.
 func (m Model) NeedsInitialLoad() bool {
-	return m.rows == nil
+	return m.listPanel.Rows() == nil
 }
 
 // WithPendingFocus sets a subject to focus on when the page next activates.

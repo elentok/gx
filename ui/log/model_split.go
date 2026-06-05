@@ -16,8 +16,18 @@ func (m Model) withSyncedDetailSize() Model {
 	return m
 }
 
+// withSyncedListSize resizes listPanel to match the current split layout.
+func (m Model) withSyncedListSize() Model {
+	lw, lh := m.split.ListSize()
+	if lw > 0 && lh > 0 {
+		updated, _ := m.listPanel.Update(tea.WindowSizeMsg{Width: lw, Height: lh})
+		m.listPanel = updated.(listPanel)
+	}
+	return m
+}
+
 // syncSplitSize informs the split container of the current window dimensions
-// and resizes the detail panel accordingly.
+// and resizes both panels accordingly.
 func (m Model) syncSplitSize() (Model, tea.Cmd) {
 	if m.width == 0 || m.height == 0 {
 		return m, nil
@@ -25,6 +35,7 @@ func (m Model) syncSplitSize() (Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.split, cmd = m.split.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 	m = m.withSyncedDetailSize()
+	m = m.withSyncedListSize()
 	return m, cmd
 }
 

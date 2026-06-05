@@ -7,14 +7,14 @@ func (m Model) SelectRef(fullHash string) Model {
 	if fullHash == "" {
 		return m
 	}
-	if len(m.rows) == 0 {
+	rows := m.listPanel.Rows()
+	if len(rows) == 0 {
 		m.pendingFocusRef = fullHash
 		return m
 	}
-	for i := range m.rows {
-		if m.rows[i].kind == rowCommit && m.rows[i].commit.FullHash == fullHash {
-			m.list.SetSelected(i, len(m.rows))
-			m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))
+	for i := range rows {
+		if rows[i].kind == rowCommit && rows[i].commit.FullHash == fullHash {
+			m.listPanel = m.listPanel.SetSelected(i)
 			return m
 		}
 	}
@@ -24,16 +24,9 @@ func (m Model) SelectRef(fullHash string) Model {
 // SelectedRef returns the full hash of the currently selected commit row,
 // or the pending focus ref if rows are not yet loaded.
 func (m Model) SelectedRef() string {
-	if len(m.rows) == 0 {
+	rows := m.listPanel.Rows()
+	if len(rows) == 0 {
 		return m.pendingFocusRef
 	}
-	cursor := m.list.Selected()
-	if cursor < 0 || cursor >= len(m.rows) {
-		return ""
-	}
-	if m.rows[cursor].kind != rowCommit {
-		return ""
-	}
-	return m.rows[cursor].commit.FullHash
+	return m.listPanel.SelectedRef()
 }
-

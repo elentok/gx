@@ -4,36 +4,16 @@ import (
 	"fmt"
 	"image/color"
 	"strings"
-	"time"
-
-	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/search"
-	"github.com/elentok/gx/ui/splitview"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/ansi"
-)
-
-const logFlashDuration = 2 * time.Second
-
-var logFlashBg = lipgloss.Color("#3d2810")
-
-var (
-	logHashStyle         = lipgloss.NewStyle().Foreground(ui.ColorBlue)
-	logMetaStyle         = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Italic(true)
-	logPseudoStyle       = lipgloss.NewStyle().Foreground(ui.ColorYellow).Italic(true)
-	logPseudoStatusStyle = ui.StyleMuted.Italic(true)
-	logSearchStyle       = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true).Underline(true)
-	logPushedStyle       = lipgloss.NewStyle().Foreground(ui.ColorGreen)
-	logUnpushedStyle     = lipgloss.NewStyle().Foreground(ui.ColorOrange)
-	logDivergedStyle     = lipgloss.NewStyle().Foreground(ui.ColorRed)
-	logRemoteOnlyStyle   = lipgloss.NewStyle().Foreground(ui.ColorMauve)
+	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/splitview"
 )
 
 func (m Model) View() tea.View {
-	if !m.ready || m.rows == nil {
+	if !m.ready || m.listPanel.Rows() == nil {
 		return ui.NewMainView("\n  Loading log…")
 	}
 	if m.err != nil {
@@ -45,30 +25,17 @@ func (m Model) View() tea.View {
 		return m.commitDetail.WithContainerFocus(true).View()
 	}
 
-	title := "Log"
-	if m.worktreeRoot != "" {
-		title = fmt.Sprintf("Log (%s)", m.worktreeRoot)
-	}
+	panel := m.listPanel.
+		WithContainerFocus(m.isLogPaneActive()).
+		WithHints(m.buildHints())
 
-	lw := maxInt(20, m.listWidth())
-	lh := maxInt(4, m.listHeight()-1)
-
-	body := ui.RenderPanelFrame(ui.PanelFrameOptions{
-		Width:       lw,
-		Height:      lh,
-		Title:       title,
-		RightTitle:  m.frameRightTitle(),
-		Lines:       m.visibleLines(),
-		BorderColor: m.logPaneBorderColor(),
-		TitleColor:  m.logPaneTitleColor(),
-		Background:  ui.ColorBase,
-	})
-	listOut := body
+	listOut := panel.View().Content
 	if m.search.Mode() == search.SearchModeInput {
 		overlayW := m.searchOverlayWidth()
 		m.search.SetWidth(overlayW)
 		overlay := m.search.View()
-		y := m.settings.InputModalBottom.ResolveY(m.listHeight(), lipgloss.Height(overlay))
+		lh := m.listHeight()
+		y := m.settings.InputModalBottom.ResolveY(lh, lipgloss.Height(overlay))
 		listOut = ui.OverlayBottomCenter(listOut, overlay, m.listWidth(), y)
 	}
 	if prefix := m.keys.Prefix(); len(prefix) > 0 {
@@ -156,115 +123,6 @@ func (m Model) searchMatchStatus() string {
 	return ""
 }
 
-func (m Model) visibleLines() []string {
-	if len(m.rows) == 0 {
-		return []string{ui.StyleMuted.Render("no commits")}
-	}
-
-	innerHeight := maxInt(1, m.listHeight()-3)
-	start, end := m.list.VisibleRange(len(m.rows), innerHeight)
-
-	lines := make([]string, 0, end-start)
-	for i := start; i < end; i++ {
-		lines = append(lines, m.renderRow(m.rows[i], i == m.list.Selected(), m.listWidth()-4))
-	}
-	return lines
-}
-
-func (m Model) renderRow(row row, selected bool, width int) string {
-	line := ""
-	switch row.kind {
-	case rowPseudoStatus:
-		line = fmt.Sprintf(
-			"    %s           %s",
-			logPseudoStyle.Render(m.highlightSearch("working tree")),
-			logPseudoStatusStyle.Render(m.highlightSearch(row.detail)),
-		)
-	default:
-		line = m.renderCommitRow(row)
-		if badges := m.renderBadges(row.commit.Decorations); badges != "" {
-			line += "  " + badges
-		}
-	}
-	line = ansi.Truncate(line, maxInt(1, width), "…")
-	lineW := ansi.StringWidth(line)
-	if lineW < width {
-		line += strings.Repeat(" ", width-lineW)
-	}
-	if row.kind == rowCommit &&
-		row.commit.Subject == m.flashSubject &&
-		!m.flashUntil.IsZero() &&
-		time.Now().Before(m.flashUntil) {
-		return ui.RenderRowWithBackground(line, logFlashBg)
-	}
-	if selected {
-		return ui.RenderRowHighlight(line)
-	}
-	return line
-}
-
-type commitStateInfo struct {
-	icon  string
-	style lipgloss.Style
-}
-
-func commitState(class git.BranchHistoryClass, branchDiverged bool) commitStateInfo {
-	switch class {
-	case git.BranchHistoryLocalOnly:
-		if branchDiverged {
-			return commitStateInfo{"󰃻", logDivergedStyle}
-		}
-		return commitStateInfo{"󰜷", logUnpushedStyle}
-	case git.BranchHistoryShared:
-		return commitStateInfo{"✔", logPushedStyle}
-	case git.BranchHistoryRemoteOnly:
-		return commitStateInfo{"󰜮", logRemoteOnlyStyle}
-	default:
-		return commitStateInfo{" ", lipgloss.NewStyle()}
-	}
-}
-
-func (m Model) renderCommitRow(row row) string {
-	graph := row.commit.Graph
-	if graph == "" {
-		graph = "*"
-	}
-	state := commitState(row.class, m.branchDiverged)
-	cols := []ui.FixedColumn{
-		{Text: graph, Width: 4},
-		{Text: m.highlightSearch(row.commit.Hash), Width: 8, Style: logHashStyle},
-		{Text: m.highlightSearch(row.commit.AuthorShort), Width: 3, Style: logMetaStyle},
-		{Text: ui.RelativeTimeCompact(row.commit.Date), Width: 10, Style: logMetaStyle},
-		{Text: state.icon, Width: 1, Style: state.style},
-	}
-	meta := ui.RenderFixedColumns(cols)
-	return meta + " " + state.style.Render(m.highlightSearch(row.commit.Subject))
-}
-
-func (m Model) renderBadges(decorations []git.RefDecoration) string {
-	if len(decorations) == 0 {
-		return ""
-	}
-	nerd := m.settings.UseNerdFontIcons
-	visible := make([]git.RefDecoration, 0, len(decorations))
-	for _, dec := range decorations {
-		if !isHiddenRef(dec.Name, m.compiledHideRefs) {
-			visible = append(visible, dec)
-		}
-	}
-	sorted := sortDecorations(visible, m.compiledRefRules)
-	parts := make([]string, 0, len(sorted))
-	for _, dec := range sorted {
-		label := m.highlightSearch(dec.Name)
-		if c, ok := matchRefRule(dec.Name, m.compiledRefRules); ok {
-			parts = append(parts, ui.RenderBadgeWithColor(label, c, nerd, false))
-		} else {
-			parts = append(parts, ui.RenderBadge(label, ui.BadgeVariantDeepBg, nerd, false))
-		}
-	}
-	return strings.Join(parts, " ")
-}
-
 func (m Model) highlightSearch(text string) string {
 	query := strings.TrimSpace(m.search.Query())
 	if query == "" {
@@ -291,6 +149,25 @@ func (m Model) highlightSearch(text string) string {
 		start = end
 	}
 	return out.String()
+}
+
+// buildHints assembles the render hints the list panel needs from current page state.
+func (m Model) buildHints() listPanelHints {
+	title := "Log"
+	if m.worktreeRoot != "" {
+		title = fmt.Sprintf("Log (%s)", m.worktreeRoot)
+	}
+	return listPanelHints{
+		title:            title,
+		rightTitle:       m.frameRightTitle(),
+		highlight:        m.highlightSearch,
+		flashSubject:     m.flashSubject,
+		flashUntil:       m.flashUntil,
+		branchDiverged:   m.branchDiverged,
+		compiledRefRules: m.compiledRefRules,
+		compiledHideRefs: m.compiledHideRefs,
+		nerdFont:         m.settings.UseNerdFontIcons,
+	}
 }
 
 func (m Model) searchOverlayWidth() int {

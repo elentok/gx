@@ -99,20 +99,19 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case bindingDown:
 		prevRef := m.SelectedRef()
-		m.list.Navigate(1, len(m.rows), maxInt(1, m.height-3))
+		m.listPanel = m.listPanel.Navigate(1)
 		m = m.handleSelectionChange(prevRef)
 		return m, nil
 	case bindingUp:
 		prevRef := m.SelectedRef()
-		m.list.Navigate(-1, len(m.rows), maxInt(1, m.height-3))
+		m.listPanel = m.listPanel.Navigate(-1)
 		m = m.handleSelectionChange(prevRef)
 		return m, nil
 	case bindingOpen:
 		return m.openSelected()
 	case bindingBottom:
 		prevRef := m.SelectedRef()
-		m.list.SetSelected(len(m.rows)-1, len(m.rows))
-		m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))
+		m.listPanel = m.listPanel.SetSelected(len(m.listPanel.Rows()) - 1)
 		m = m.handleSelectionChange(prevRef)
 		return m, nil
 	case bindingReload:
@@ -120,8 +119,7 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(notify.Progress("refresh", "refreshing..."), m.cmdReload())
 	case bindingTop:
 		prevRef := m.SelectedRef()
-		m.list.SetSelected(0, len(m.rows))
-		m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))
+		m.listPanel = m.listPanel.SetSelected(0)
 		m = m.handleSelectionChange(prevRef)
 		return m, nil
 	case bindingGotoHead:
@@ -164,12 +162,12 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, m.cmdFetchRewordDetails()
 	case bindingPageDown:
 		prevRef := m.SelectedRef()
-		m.list.ScrollPage(list.DefaultScroll, len(m.rows), maxInt(1, m.height-3))
+		m.listPanel = m.listPanel.ScrollPage(list.DefaultScroll)
 		m = m.handleSelectionChange(prevRef)
 		return m, nil
 	case bindingPageUp:
 		prevRef := m.SelectedRef()
-		m.list.ScrollPage(-list.DefaultScroll, len(m.rows), maxInt(1, m.height-3))
+		m.listPanel = m.listPanel.ScrollPage(-list.DefaultScroll)
 		m = m.handleSelectionChange(prevRef)
 		return m, nil
 	case bindingRebaseInteractive:

@@ -25,11 +25,11 @@ func TestHandleReload_SetsRows(t *testing.T) {
 	}
 	updated, _ := m.Update(reloadMsg{rows: rows})
 	next := updated.(Model)
-	if len(next.rows) != 1 {
-		t.Errorf("expected 1 row after reload, got %d", len(next.rows))
+	if len(next.listPanel.Rows()) != 1 {
+		t.Errorf("expected 1 row after reload, got %d", len(next.listPanel.Rows()))
 	}
-	if next.rows[0].commit.Subject != "test commit" {
-		t.Errorf("expected subject 'test commit', got %q", next.rows[0].commit.Subject)
+	if next.listPanel.Rows()[0].commit.Subject != "test commit" {
+		t.Errorf("expected subject 'test commit', got %q", next.listPanel.Rows()[0].commit.Subject)
 	}
 }
 
@@ -67,8 +67,8 @@ func TestHandleReload_WithFocusSubject(t *testing.T) {
 	updated, cmd := m.Update(reloadMsg{rows: rows, focusSubject: "target"})
 	next := updated.(Model)
 
-	if next.list.Selected() != 1 {
-		t.Errorf("expected cursor at row 1 (target), got %d", next.list.Selected())
+	if next.listPanel.Selected() != 1 {
+		t.Errorf("expected cursor at row 1 (target), got %d", next.listPanel.Selected())
 	}
 	if next.flashSubject != "target" {
 		t.Errorf("expected flashSubject='target', got %q", next.flashSubject)
@@ -86,7 +86,7 @@ func TestHandleReload_WithRefreshing(t *testing.T) {
 	m := newTestModelDefault(repo, "", ui.Settings{})
 	m.refreshing = true
 
-	updated, cmd := m.Update(reloadMsg{rows: m.rows})
+	updated, cmd := m.Update(reloadMsg{rows: m.listPanel.Rows()})
 	next := updated.(Model)
 	if next.refreshing {
 		t.Error("expected refreshing=false after reload")

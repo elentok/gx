@@ -18,6 +18,6 @@ func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 	default:
 		return m, nil
 	}
-	m.list.ScrollViewport(dir*3, len(m.rows), maxInt(1, m.height-3))
+	m.listPanel = m.listPanel.ScrollViewport(dir * 3)
 	return m, nil
 }

@@ -39,17 +39,18 @@ type rebaseStashMsg struct {
 type rebaseStashPopMsg struct{ err error }
 
 func (m Model) startRebaseInteractive() (tea.Model, tea.Cmd) {
-	cursor := m.list.Selected()
+	rows := m.listPanel.Rows()
+	cursor := m.listPanel.Selected()
 
 	next := cursor + 1
-	for next < len(m.rows) && m.rows[next].kind != rowCommit {
+	for next < len(rows) && rows[next].kind != rowCommit {
 		next++
 	}
-	if next >= len(m.rows) {
+	if next >= len(rows) {
 		return m, notify.Warning("rebase -i: no parent commit below selection")
 	}
 
-	hash := m.rows[next].commit.FullHash
+	hash := rows[next].commit.FullHash
 
 	dirty, err := git.HasUnstagedChanges(m.worktreeRoot)
 	if err != nil {

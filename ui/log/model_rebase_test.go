@@ -20,10 +20,9 @@ func newRebaseTestModel(t *testing.T) Model {
 
 func TestStartRebaseInteractive_NoRowsBelowCursor(t *testing.T) {
 	m := newTestModel()
-	m.rows = []row{
+	m.listPanel = m.listPanel.WithRows([]row{
 		{kind: rowCommit, commit: git.LogEntry{FullHash: "abc123", Subject: "only commit"}},
-	}
-	m.list.SetSelected(0, len(m.rows))
+	}).SetSelected(0)
 
 	_, cmd := m.startRebaseInteractive()
 	if cmd == nil {
@@ -41,10 +40,10 @@ func TestStartRebaseInteractive_CleanRepo(t *testing.T) {
 	testutil.CommitAll(t, repo, "second commit")
 
 	m := newTestModelDefault(repo, "", ui.Settings{})
-	if len(m.rows) < 2 {
+	if len(m.listPanel.Rows()) < 2 {
 		t.Skip("need at least 2 commit rows for this test")
 	}
-	m.list.SetSelected(0, len(m.rows))
+	m.listPanel = m.listPanel.SetSelected(0)
 
 	_, cmd := m.startRebaseInteractive()
 	if cmd == nil {
@@ -147,10 +146,10 @@ func TestStartRebaseInteractive_DirtyRepo(t *testing.T) {
 	testutil.WriteFile(t, repo, "README.md", "unstaged change\n")
 
 	m := newTestModelDefault(repo, "", ui.Settings{})
-	if len(m.rows) < 2 {
+	if len(m.listPanel.Rows()) < 2 {
 		t.Skip("need at least 2 commit rows for this test")
 	}
-	m.list.SetSelected(0, len(m.rows))
+	m.listPanel = m.listPanel.SetSelected(0)
 
 	updated, cmd := m.startRebaseInteractive()
 	// With dirty repo, should set rebaseConfirm and return nil cmd

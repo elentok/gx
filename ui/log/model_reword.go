@@ -16,11 +16,12 @@ type rewordDetailsMsg struct {
 }
 
 func (m Model) cmdFetchRewordDetails() tea.Cmd {
-	cursor := m.list.Selected()
-	if cursor < 0 || cursor >= len(m.rows) {
+	rows := m.listPanel.Rows()
+	cursor := m.listPanel.Selected()
+	if cursor < 0 || cursor >= len(rows) {
 		return nil
 	}
-	row := m.rows[cursor]
+	row := rows[cursor]
 	if row.kind == rowPseudoStatus {
 		return nil
 	}

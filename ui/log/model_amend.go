@@ -8,11 +8,12 @@ import (
 )
 
 func (m *Model) openAmendConfirm() error {
-	cursor := m.list.Selected()
-	if cursor < 0 || cursor >= len(m.rows) {
+	rows := m.listPanel.Rows()
+	cursor := m.listPanel.Selected()
+	if cursor < 0 || cursor >= len(rows) {
 		return nil
 	}
-	row := m.rows[cursor]
+	row := rows[cursor]
 	return m.amendConfirm.Open(m.worktreeRoot, row.commit.FullHash, row.commit.Subject)
 }
 

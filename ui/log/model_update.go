@@ -177,8 +177,10 @@ func (m Model) handleWorktreeStatus(msg worktreeStatusMsg) (tea.Model, tea.Cmd) 
 	m.statusUnstaged = msg.unstaged
 	m.statusUntracked = msg.untracked
 	// Update the pseudo-log-line row in-place if rows are already loaded.
-	if len(m.rows) > 0 && m.rows[0].kind == rowPseudoStatus {
-		m.rows[0].detail = m.pseudoStatusDetail()
+	rows := m.listPanel.Rows()
+	if len(rows) > 0 && rows[0].kind == rowPseudoStatus {
+		rows[0].detail = m.pseudoStatusDetail()
+		m.listPanel = m.listPanel.WithRows(rows)
 	}
 	return m, nil
 }
@@ -193,60 +195,60 @@ func (m Model) handleReload(msg reloadMsg) (tea.Model, tea.Cmd) {
 		m.refreshing = false
 		refreshCmds = []tea.Cmd{notify.Close("refresh"), notify.Success("refreshed")}
 	}
-	isInitialLoad := len(m.rows) == 0
+	isInitialLoad := m.listPanel.Rows() == nil
 	m.err = nil
-	m.rows = msg.rows
+	rows := msg.rows
 	// Update pseudo-log-line with current status in case it was loaded after cmdReload started.
-	if len(m.rows) > 0 && m.rows[0].kind == rowPseudoStatus {
-		m.rows[0].detail = m.pseudoStatusDetail()
+	if len(rows) > 0 && rows[0].kind == rowPseudoStatus {
+		rows[0].detail = m.pseudoStatusDetail()
 	}
+	m.listPanel = m.listPanel.WithRows(rows)
 	m.branchDiverged = msg.branchDiverged
 	if m.pendingFocusRef != "" {
 		ref := m.pendingFocusRef
 		m.pendingFocusRef = ""
-		for i, r := range m.rows {
+		for i, r := range rows {
 			if r.kind == rowCommit && r.commit.FullHash == ref {
-				m.list.SetSelected(i, len(m.rows))
+				m.listPanel = m.listPanel.SetSelected(i)
 				break
 			}
 		}
 	}
 	m.pendingFocusSubject = ""
 	if msg.focusSubject != "" {
-		m.list.SetSelected(0, len(m.rows))
-		for i, r := range m.rows {
+		targetIdx := 0
+		for i, r := range rows {
 			if r.commit.Subject == msg.focusSubject {
-				m.list.SetSelected(i, len(m.rows))
+				targetIdx = i
 				break
 			}
 		}
+		m.listPanel = m.listPanel.SetSelected(targetIdx)
 		m.flashSubject = msg.focusSubject
 		m.flashUntil = time.Now().Add(logFlashDuration)
-		m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))
 		m.recomputeSearchMatches()
 		m.jumpToCurrentMatch()
 		return m, tea.Batch(append(refreshCmds, cmdFlashClear())...)
 	}
-	sel := m.list.Selected()
+	sel := m.listPanel.Selected()
 	// On the initial load, start on the first commit (skip the pseudo-line).
-	if isInitialLoad && len(m.rows) > 1 && m.rows[0].kind == rowPseudoStatus {
+	if isInitialLoad && len(rows) > 1 && rows[0].kind == rowPseudoStatus {
 		sel = 1
 	}
-	m.list.SetSelected(sel, len(m.rows))
-	m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))
+	m.listPanel = m.listPanel.SetSelected(sel)
 	m.recomputeSearchMatches()
 	m.jumpToCurrentMatch()
 	return m, tea.Batch(refreshCmds...)
 }
 
 func (m *Model) jumpToTaggedCommit(step int) {
-	if len(m.rows) == 0 || step == 0 {
+	rows := m.listPanel.Rows()
+	if len(rows) == 0 || step == 0 {
 		return
 	}
-	for i := m.list.Selected() + step; i >= 0 && i < len(m.rows); i += step {
-		if rowHasTag(m.rows[i]) {
-			m.list.SetSelected(i, len(m.rows))
-			m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))
+	for i := m.listPanel.Selected() + step; i >= 0 && i < len(rows); i += step {
+		if rowHasTag(rows[i]) {
+			m.listPanel = m.listPanel.SetSelected(i)
 			return
 		}
 	}

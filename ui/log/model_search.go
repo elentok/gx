@@ -11,9 +11,9 @@ func (m *Model) jumpToCurrentMatch() {
 	if !ok {
 		return
 	}
-	if match.DataIndex >= 0 && match.DataIndex < len(m.rows) {
-		m.list.SetSelected(match.DataIndex, len(m.rows))
-		m.list.EnsureSelectionVisible(len(m.rows), maxInt(1, m.height-3))
+	rows := m.listPanel.Rows()
+	if match.DataIndex >= 0 && match.DataIndex < len(rows) {
+		m.listPanel = m.listPanel.SetSelected(match.DataIndex)
 	}
 }
 
@@ -25,7 +25,7 @@ func (m *Model) recomputeSearchMatches() {
 	}
 
 	matches := make([]search.Match, 0)
-	for i, row := range m.rows {
+	for i, row := range m.listPanel.Rows() {
 		if strings.Contains(strings.ToLower(m.searchText(row)), q) {
 			matches = append(matches, search.Match{DataIndex: i})
 		}

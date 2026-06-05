@@ -131,11 +131,12 @@ type gotoPRMsg struct {
 }
 
 func (m Model) cmdGotoPR() tea.Cmd {
-	cursor := m.list.Selected()
-	if len(m.rows) == 0 || cursor < 0 || cursor >= len(m.rows) {
+	rows := m.listPanel.Rows()
+	cursor := m.listPanel.Selected()
+	if len(rows) == 0 || cursor < 0 || cursor >= len(rows) {
 		return nil
 	}
-	selected := m.rows[cursor]
+	selected := rows[cursor]
 	worktreeRoot := m.worktreeRoot
 	return func() tea.Msg {
 		var url string
@@ -160,11 +161,12 @@ func (m Model) handleGotoPR(msg gotoPRMsg) (tea.Model, tea.Cmd) {
 // Returns (updatedModel, cmd) — the model is returned because entering split
 // mode mutates the split container and commitDetail inline.
 func (m Model) openSelected() (Model, tea.Cmd) {
-	cursor := m.list.Selected()
-	if len(m.rows) == 0 || cursor < 0 || cursor >= len(m.rows) {
+	rows := m.listPanel.Rows()
+	cursor := m.listPanel.Selected()
+	if len(rows) == 0 || cursor < 0 || cursor >= len(rows) {
 		return m, nil
 	}
-	selected := m.rows[cursor]
+	selected := rows[cursor]
 
 	if selected.kind == rowPseudoStatus {
 		return m, nav.Switch(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: m.worktreeRoot})
@@ -180,6 +182,8 @@ func (m Model) openSelected() (Model, tea.Cmd) {
 	// Transition the split container to Split+detail-focused.
 	var splitCmd tea.Cmd
 	m.split, splitCmd = m.split.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	// Sync both panel sizes now that the layout changed.
+	m = m.withSyncedListSize()
 	// Load the commit into the detail panel.
 	m.commitDetail = m.commitDetail.WithRef(ref)
 	m = m.withSyncedDetailSize()

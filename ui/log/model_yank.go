@@ -11,11 +11,12 @@ import (
 var logClipboardWrite = clipboard.WriteAll
 
 func (m Model) selectedCommit() (git.LogEntry, bool) {
-	cursor := m.list.Selected()
-	if len(m.rows) == 0 || cursor < 0 || cursor >= len(m.rows) {
+	rows := m.listPanel.Rows()
+	cursor := m.listPanel.Selected()
+	if len(rows) == 0 || cursor < 0 || cursor >= len(rows) {
 		return git.LogEntry{}, false
 	}
-	r := m.rows[cursor]
+	r := rows[cursor]
 	if r.kind != rowCommit {
 		return git.LogEntry{}, false
 	}
