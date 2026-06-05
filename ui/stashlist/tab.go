@@ -5,6 +5,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/elentok/gx/ui"
 	commitui "github.com/elentok/gx/ui/commit"
+	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	stashpkg "github.com/elentok/gx/ui/stash"
@@ -24,11 +25,15 @@ type Tab struct {
 	split        splitview.Model
 	commitDetail commitui.Model
 	stashCreate  stashpkg.Model
+
+	keys keys.Manager
+	help help.Model
 }
 
 func NewTab(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager) Tab {
 	list := NewModel(worktreeRoot)
 	detail := commitui.NewModel(worktreeRoot, "", "", settings, keys.Manager{})
+	km := newStashManager()
 	t := Tab{
 		worktreeRoot: worktreeRoot,
 		settings:     settings,
@@ -36,8 +41,16 @@ func NewTab(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager) T
 		commitDetail: detail,
 		split:        splitview.NewSplit(list, detail),
 		stashCreate:  stashpkg.New(),
+		keys:         km,
+		help:         help.NewModel(help.BuildSections(km, extraKeys)),
 	}
 	return t
+}
+
+// KeyManager exposes the stash tab's key bindings (used for chord overlays and
+// help aggregation by the app shell).
+func (t Tab) KeyManager() keys.Manager {
+	return t.keys
 }
 
 // IsSplit reports whether the stash tab is in split mode (both panels visible).
@@ -52,12 +65,21 @@ func (t Tab) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return t.handleStashCreateUpdate(msg)
 	}
 
+	if t.help.IsOpen {
+		if _, ok := msg.(tea.KeyPressMsg); ok {
+			var cmd tea.Cmd
+			t.help, cmd = t.help.Update(msg)
+			return t, cmd
+		}
+	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		t.width = msg.Width
 		t.height = msg.Height
 		var cmd tea.Cmd
 		t.split, cmd = t.split.Update(msg)
+		t.help, _ = t.help.Update(msg)
 		t = t.syncPanelSizes()
 		return t, cmd
 
@@ -144,45 +166,61 @@ func (t Tab) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return t, cmd
 	}
 
-	// Stash operations — only active when the list panel has focus.
-	switch key {
-	case "a":
-		if ref := t.stashList.SelectedRef(); ref != "" {
-			return t, t.cmdApply(ref)
-		}
-	case "p":
-		if ref := t.stashList.SelectedRef(); ref != "" {
-			return t, t.cmdPopRef(ref)
-		}
-	case "d":
-		if ref := t.stashList.SelectedRef(); ref != "" {
-			return t, t.cmdDrop(ref)
-		}
-	case "s":
-		cmd := t.stashCreate.Open(t.worktreeRoot, false)
-		return t, cmd
-	}
-
-	// Route navigation keys to the stash list.
-	prevRef := t.stashList.SelectedRef()
-	switch key {
-	case "j", "down", "k", "up", "G", "shift+g":
-		updated, cmd := t.stashList.Update(msg)
-		t.stashList = updated.(Model)
-		t.split = t.split.WithListRef(t.stashList.SelectedRef())
-		if ref := t.stashList.SelectedRef(); t.split.IsSplit() && ref != prevRef && ref != "" {
-			t.commitDetail = t.commitDetail.WithRef(ref)
-			t = t.syncPanelSizes()
-		}
-		return t, cmd
-
-	case "enter":
-		return t.routeKeyToSplit(msg)
-	case "l":
-		return t.routeKeyToSplit(tea.KeyPressMsg{Code: tea.KeyEnter})
+	// List panel active: dispatch through the key manager.
+	if match, consumed := t.keys.Process(msg); match != nil {
+		return t.dispatchBinding(match.ID, msg)
+	} else if consumed {
+		return t, nil
 	}
 
 	return t, nil
+}
+
+// dispatchBinding runs the action for a resolved stash-list binding. The
+// original key message is forwarded for navigation bindings so the stash list
+// can distinguish j/k/G variants.
+func (t Tab) dispatchBinding(id keys.BindingID, msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch id {
+	case bindingStashHelp:
+		t.keys.Reset()
+		t.help.Open(t.width, t.height)
+		return t, nil
+	case bindingStashDown, bindingStashUp, bindingStashBottom:
+		return t.navigateList(msg)
+	case bindingStashOpen:
+		return t.routeKeyToSplit(tea.KeyPressMsg{Code: tea.KeyEnter})
+	case bindingStashApply:
+		if ref := t.stashList.SelectedRef(); ref != "" {
+			return t, t.cmdApply(ref)
+		}
+		return t, nil
+	case bindingStashPop:
+		if ref := t.stashList.SelectedRef(); ref != "" {
+			return t, t.cmdPopRef(ref)
+		}
+		return t, nil
+	case bindingStashDrop:
+		if ref := t.stashList.SelectedRef(); ref != "" {
+			return t, t.cmdDrop(ref)
+		}
+		return t, nil
+	case bindingStashCreate:
+		cmd := t.stashCreate.Open(t.worktreeRoot, false)
+		return t, cmd
+	}
+	return t, nil
+}
+
+func (t Tab) navigateList(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	prevRef := t.stashList.SelectedRef()
+	updated, cmd := t.stashList.Update(msg)
+	t.stashList = updated.(Model)
+	t.split = t.split.WithListRef(t.stashList.SelectedRef())
+	if ref := t.stashList.SelectedRef(); t.split.IsSplit() && ref != prevRef && ref != "" {
+		t.commitDetail = t.commitDetail.WithRef(ref)
+		t = t.syncPanelSizes()
+	}
+	return t, cmd
 }
 
 func (t Tab) routeKeyToSplit(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -215,6 +253,9 @@ func (t Tab) View() tea.View {
 	if t.stashCreate.IsOpen {
 		out = ui.OverlayCenter(out, t.stashCreate.View(t.width), t.width, t.height)
 	}
+	if t.help.IsOpen {
+		out = ui.OverlayCenter(out, t.help.View(), t.width, t.height)
+	}
 	return ui.NewMainView(out)
 }
 
@@ -245,5 +286,5 @@ func (t Tab) isListActive() bool {
 }
 
 func stashFooter() string {
-	return " "
+	return "  " + ui.StyleHint.Render("? help")
 }

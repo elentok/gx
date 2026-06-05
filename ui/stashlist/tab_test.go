@@ -38,6 +38,34 @@ func newReadyTab(t *testing.T) Tab {
 	return tab
 }
 
+func TestQuestionMarkOpensHelpOverlay(t *testing.T) {
+	tab := newReadyTab(t)
+	if tab.help.IsOpen {
+		t.Fatal("help should start closed")
+	}
+
+	tab = sendTab(tab, tea.KeyPressMsg{Code: '?', Text: "?"})
+	if !tab.help.IsOpen {
+		t.Fatal("expected help open after ?")
+	}
+
+	content := tab.View().Content
+	if !strings.Contains(content, "Keybindings") {
+		t.Fatalf("expected help overlay with Keybindings title, got:\n%s", content)
+	}
+	for _, want := range []string{"apply stash", "pop stash", "drop stash", "create stash"} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("expected help to list %q, got:\n%s", want, content)
+		}
+	}
+
+	// esc closes the help overlay.
+	tab = sendTab(tab, tea.KeyPressMsg{Code: tea.KeyEsc})
+	if tab.help.IsOpen {
+		t.Fatal("expected help closed after esc")
+	}
+}
+
 func TestLFromStashPanelFocusesDetail(t *testing.T) {
 	tab := newReadyTab(t)
 	if !tab.split.IsSplit() || !tab.split.IsListFocused() {
@@ -118,8 +146,10 @@ func TestViewAddsFooterRowForAppTabs(t *testing.T) {
 	if len(lines) == 0 {
 		t.Fatal("expected rendered lines")
 	}
-	if strings.TrimSpace(lines[len(lines)-1]) != "" {
-		t.Fatalf("expected blank footer row, got %q", lines[len(lines)-1])
+	// The footer row carries the "? help" hint and is where the app shell
+	// injects the tab bar.
+	if !strings.Contains(lines[len(lines)-1], "? help") {
+		t.Fatalf("expected footer row with ? help, got %q", lines[len(lines)-1])
 	}
 }
 
