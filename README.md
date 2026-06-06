@@ -4,7 +4,7 @@
 
 ![gx logo](docs/logo.png)
 
-A collection of git helpers (worktree management, staging, etc...)
+_gx_ is a TUI for git worktree management, staging, history inspection, and other everyday repo workflows.
 
 ## Disclaimer
 
