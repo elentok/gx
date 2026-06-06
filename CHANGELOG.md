@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.18.1 - 2026-06-06
+
+- Internal: normalized log and stash tabs onto a shared internal shape — each tab now has an unexported `listPanel` sub-model (row rendering, list navigation, `splitview.ListPanel`) separate from the page orchestrator. Both tabs expose `NewModel` as the sole public constructor.
+
 ## v0.18.0 - 2026-06-04
 
 - Stash: added a **Stash tab** (the fourth tab, reachable with `4`, `g S`, or `,` / `.`) that lists the repo's stashes in a split view — the stash list on one side and the selected stash's diff on the other. Apply (`a`), pop (`p`), drop (`d`), or create a new stash (`s`) directly from the list; `enter` / `l` focuses the diff panel, and `t o` toggles the split orientation (which also auto-stacks on narrow terminals).
