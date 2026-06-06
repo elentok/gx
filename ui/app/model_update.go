@@ -3,6 +3,7 @@ package app
 import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/notify"
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -18,6 +19,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if vs, ok := nav.IsSwitch(msg); ok {
+		type modalOpener interface{ ModalOpen() bool }
+		active := m.activePage().model
+		if mo, ok := active.(modalOpener); ok && mo.ModalOpen() {
+			return m, tea.Batch(notifyCmd, notify.Info("close the modal first"))
+		}
 		prev := m.navState.Active()
 		tabVS := m.navState.Switch(vs)
 		next, cmd := m.applySwitch(tabVS, prev)

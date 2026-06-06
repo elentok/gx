@@ -8,6 +8,7 @@ import (
 	logui "github.com/elentok/gx/ui/log"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/navstate"
+	"github.com/elentok/gx/ui/notify"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -23,6 +24,10 @@ func (m *Model) ensureLivePages() {
 
 // switchTab is called from handleShellChordKey (direct key dispatch, outside the nav message path).
 func (m Model) switchTab(viewState nav.ViewState) (Model, tea.Cmd) {
+	type modalOpener interface{ ModalOpen() bool }
+	if mo, ok := m.activePage().model.(modalOpener); ok && mo.ModalOpen() {
+		return m, notify.Info("close the modal first")
+	}
 	prev := m.navState.Active()
 	tabVS := m.navState.Switch(viewState)
 	return m.applySwitch(tabVS, prev)
@@ -224,6 +229,7 @@ func (m Model) handleShellChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	}
 	return m, nil, false
 }
+
 
 func replayKeys(model tea.Model, msgs ...tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
