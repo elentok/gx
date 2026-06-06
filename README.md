@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/elentok/gx/actions/workflows/ci.yml/badge.svg)](https://github.com/elentok/gx/actions/workflows/ci.yml)
 
-![gx logo](docs/logo.png)
+<img src="docs/logo.png" alt="gx logo" width="400" />
 
 _gx_ is a TUI for git worktree management, staging, history inspection, and other everyday repo workflows.
 
