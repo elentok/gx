@@ -22,6 +22,10 @@ func (m Model) InputFocused() bool {
 		m.pull.InputFocused()
 }
 
+func (m Model) ModalOpen() bool {
+	return m.pull.IsOpen || m.confirm.IsOpen
+}
+
 func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	if m.pull.IsOpen {
 		return m.handlePullUpdate(msg)

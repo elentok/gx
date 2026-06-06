@@ -56,6 +56,10 @@ func (m Model) KeyManager() keys.Manager {
 // IsSplit reports whether the stash tab is in split mode (both panels visible).
 func (m Model) IsSplit() bool { return m.split.IsSplit() }
 
+func (m Model) ModalOpen() bool {
+	return m.stashCreate.IsOpen
+}
+
 func (m Model) Init() tea.Cmd {
 	return m.stashList.Init()
 }

@@ -3095,3 +3095,16 @@ func TestGChordBindingsReachableFromDiffFocus(t *testing.T) {
 		}
 	})
 }
+
+func TestModalOpenAfterPressingPull(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	m := newTestModelDefault(repoDir)
+
+	// Press 'p' to open pull.
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'p', Text: "p"})
+	m = updated.(Model)
+
+	if !m.ModalOpen() {
+		t.Fatal("expected ModalOpen()=true immediately after pressing pull key")
+	}
+}

@@ -156,6 +156,11 @@ func (m Model) InputFocused() bool {
 	return m.search.Mode() == search.SearchModeInput || m.push.InputFocused() || m.pull.InputFocused()
 }
 
+func (m Model) ModalOpen() bool {
+	return m.amendConfirm.IsOpen || m.bump.IsOpen || m.push.IsOpen || m.pull.IsOpen ||
+		m.reword.IsOpen || m.output.IsOpen
+}
+
 func normalizedRef(ref string) string {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {

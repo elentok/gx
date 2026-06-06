@@ -19,6 +19,11 @@ func (m Model) InputFocused() bool {
 	return m.diffarea.ActiveSectionModel().Search().InputFocused()
 }
 
+func (m Model) ModalOpen() bool {
+	return m.runningOpen || m.confirmOpen || m.errorOpen ||
+		m.bump.IsOpen || m.push.IsOpen || m.pull.IsOpen || m.stash.IsOpen || m.output.IsOpen
+}
+
 func (m *Model) computeSearchMatches(query string) []search.Match {
 	q := strings.ToLower(strings.TrimSpace(query))
 	if q == "" {
