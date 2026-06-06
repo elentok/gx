@@ -268,3 +268,65 @@ func TestOpenCommitDetailFromLog(t *testing.T) {
 
 	logE2EQuit(t, tm)
 }
+
+// waitForCurrentFrameContaining polls CurrentFrame until the latest rendered
+// frame contains text, or fails after timeout.
+func waitForCurrentFrameContaining(t *testing.T, tm *teatest.TestModel, text string, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if bytes.Contains(tm.CurrentFrame(), []byte(text)) {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatalf("expected %q in current frame after %v", text, timeout)
+}
+
+// waitForCurrentFrameWithout polls CurrentFrame until the latest rendered
+// frame no longer contains text, or fails after timeout.
+func waitForCurrentFrameWithout(t *testing.T, tm *teatest.TestModel, text string, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if !bytes.Contains(tm.CurrentFrame(), []byte(text)) {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatalf("expected %q to be absent from current frame after %v", text, timeout)
+}
+
+// TestSplitViewPanelSwitchingE2E covers the enter→esc→esc navigation cycle:
+//  1. enter opens the split detail panel (detail focused)
+//  2. first esc moves focus back to the list (split stays open)
+//  3. second esc collapses the split (detail panel disappears)
+func TestSplitViewPanelSwitchingE2E(t *testing.T) {
+	t.Parallel()
+	repoDir := testutil.TempRepoWithThreeCommits(t)
+	tm := startLogTUI(t, repoDir)
+
+	// Wait for the log to load; "tip" (HEAD) is the first real commit.
+	waitForLogE2EText(t, tm, "tip", logE2ELoadWait)
+
+	// Open the split detail panel on the selected commit.
+	tm.Send(logE2EKeySpecial(tea.KeyEnter))
+	// The detail panel renders with the "Commit" frame title.
+	waitForLogE2EText(t, tm, "Commit", logE2EActionWait)
+
+	// First esc: focus moves from detail back to the list; split stays open.
+	tm.Send(logE2EKeySpecial(tea.KeyEsc))
+	// Navigate down in the list — once "middle" appears in the current frame
+	// we know the model has processed the esc and the list has focus.
+	tm.Send(logE2EKeyRune('j'))
+	waitForCurrentFrameContaining(t, tm, "middle", logE2EActionWait)
+	if !bytes.Contains(tm.CurrentFrame(), []byte("Commit")) {
+		t.Fatal("expected 'Commit' panel still visible after first esc (should only defocus, not collapse)")
+	}
+
+	// Second esc: collapses the split — the detail panel must disappear.
+	tm.Send(logE2EKeySpecial(tea.KeyEsc))
+	waitForCurrentFrameWithout(t, tm, "Commit", logE2EActionWait)
+
+	logE2EQuit(t, tm)
+}
