@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.18.2 - 2026-06-06
+
+- Prevent tab switching when a modal is open
+
 ## v0.18.1 - 2026-06-06
 
 - Internal: normalized log and stash tabs onto a shared internal shape — each tab now has an unexported `listPanel` sub-model (row rendering, list navigation, `splitview.ListPanel`) separate from the page orchestrator. Both tabs expose `NewModel` as the sole public constructor.
