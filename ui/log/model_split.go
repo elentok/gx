@@ -45,6 +45,7 @@ func (m Model) routeKeyToSplit(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.split, cmd = m.split.Update(msg)
 	m = m.withSyncedDetailSize()
+	m = m.withSyncedListSize()
 	return m, cmd
 }
 
