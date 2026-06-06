@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/elentok/gx/actions/workflows/ci.yml/badge.svg)](https://github.com/elentok/gx/actions/workflows/ci.yml)
 
+![gx logo](docs/logo.png)
+
 A collection of git helpers (worktree management, staging, etc...)
 
 ## Disclaimer
@@ -231,14 +233,14 @@ gx completion zsh > ~/.zsh/_gx         # persist
 
 Optional config file at `~/.config/gx/config.json` (run `gx config edit` to open it).
 
-| Key | Type | Default | Description |
-| --- | ---- | ------- | ----------- |
-| `use-nerdfont-icons` | boolean | `true` | Enable Nerd Font pill-shaped badges and icons throughout the UI. |
-| `stage-diff-context-lines` | integer (0–20) | `1` | Number of context lines shown around each diff hunk in the staging view. |
-| `input-modal-bottom` | integer \| `"N%"` \| `"center"` | `"5%"` | Vertical position of text-input overlays. An integer is a fixed line count from the bottom; a percentage string (e.g. `"10%"`) is relative to screen height; `"center"` centers the overlay. |
-| `name-aliases` | object | `{}` | Map of exact worktree full-names to display aliases, applied before the normal dash-segment compression. |
-| `log.important-refs` | array | see below | Rules for highlighting important refs in the log view. Refs matching a rule get a bright colored badge and are sorted to the front; all others get a dim surface badge. |
-| `log.hide-refs` | array of strings | `[]` | Regular expressions matched against full ref names. Matching refs are hidden from the log view entirely. Takes priority over `important-refs`. |
+| Key                        | Type                            | Default   | Description                                                                                                                                                                                  |
+| -------------------------- | ------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `use-nerdfont-icons`       | boolean                         | `true`    | Enable Nerd Font pill-shaped badges and icons throughout the UI.                                                                                                                             |
+| `stage-diff-context-lines` | integer (0–20)                  | `1`       | Number of context lines shown around each diff hunk in the staging view.                                                                                                                     |
+| `input-modal-bottom`       | integer \| `"N%"` \| `"center"` | `"5%"`    | Vertical position of text-input overlays. An integer is a fixed line count from the bottom; a percentage string (e.g. `"10%"`) is relative to screen height; `"center"` centers the overlay. |
+| `name-aliases`             | object                          | `{}`      | Map of exact worktree full-names to display aliases, applied before the normal dash-segment compression.                                                                                     |
+| `log.important-refs`       | array                           | see below | Rules for highlighting important refs in the log view. Refs matching a rule get a bright colored badge and are sorted to the front; all others get a dim surface badge.                      |
+| `log.hide-refs`            | array of strings                | `[]`      | Regular expressions matched against full ref names. Matching refs are hidden from the log view entirely. Takes priority over `important-refs`.                                               |
 
 ### `log.important-refs`
 
@@ -253,7 +255,10 @@ Default:
 
 ```json
 [
-  { "patterns": ["^main$", "^master$", "^origin/main$", "^origin/master$"], "color": "yellow" },
+  {
+    "patterns": ["^main$", "^master$", "^origin/main$", "^origin/master$"],
+    "color": "yellow"
+  },
   { "patterns": ["^v\\d"], "color": "blue" }
 ]
 ```
@@ -267,7 +272,10 @@ Example config:
   "stage-diff-context-lines": 3,
   "log": {
     "important-refs": [
-      { "patterns": ["^main$", "^master$", "^origin/main$", "^origin/master$"], "color": "yellow" },
+      {
+        "patterns": ["^main$", "^master$", "^origin/main$", "^origin/master$"],
+        "color": "yellow"
+      },
       { "patterns": ["^v\\d"], "color": "blue" },
       { "patterns": ["prod", "staging"], "color": "#fab387" }
     ],
@@ -278,32 +286,32 @@ Example config:
 
 ## Key bindings
 
-| Key            | Action                                                    |
-| -------------- | --------------------------------------------------------- |
-| `j` / `↓`      | Move down                                                 |
-| `k` / `↑`      | Move up                                                   |
-| `n`            | New worktree                                              |
-| `N`            | New worktree and open a tmux session (switches to it)     |
-| `T`            | New worktree and open a tmux window                       |
-| `space`        | Toggle worktree selection for bulk operations             |
+| Key            | Action                                                                                  |
+| -------------- | --------------------------------------------------------------------------------------- |
+| `j` / `↓`      | Move down                                                                               |
+| `k` / `↑`      | Move up                                                                                 |
+| `n`            | New worktree                                                                            |
+| `N`            | New worktree and open a tmux session (switches to it)                                   |
+| `T`            | New worktree and open a tmux window                                                     |
+| `space`        | Toggle worktree selection for bulk operations                                           |
 | `d`            | Delete selected worktree(s) (and their branches); shows progress modal for bulk deletes |
-| `r`            | Rename selected worktree and branch                       |
-| `c`            | Clone selected worktree (copies uncommitted files)        |
-| `y`            | Yank files from selected worktree into clipboard          |
-| `p`            | Pull selected worktree's branch (stash prompt if dirty)   |
-| `P`            | Push selected worktree's branch (confirms before pushing) |
-| `b`            | Rebase selected worktree on main (stash prompt if dirty)  |
-| `g g`          | Jump to the top of the worktree list                      |
-| `g p`          | Open the GitHub PR for the selected worktree in browser   |
-| `oo`           | View output log of the last job                           |
-| `ol`           | Open lazygit log for the selected worktree                |
-| `ot`           | Open a tmux session in the selected worktree              |
-| `/`            | Search worktrees by name or branch                        |
-| `t`            | Track remote branch (set upstream)                        |
-| `R`            | Refresh worktree list and statuses                        |
-| `U`            | Run `git remote update` and refresh                       |
-| `?`            | Toggle full help                                          |
-| `q` / `Ctrl+C` | Quit                                                      |
+| `r`            | Rename selected worktree and branch                                                     |
+| `c`            | Clone selected worktree (copies uncommitted files)                                      |
+| `y`            | Yank files from selected worktree into clipboard                                        |
+| `p`            | Pull selected worktree's branch (stash prompt if dirty)                                 |
+| `P`            | Push selected worktree's branch (confirms before pushing)                               |
+| `b`            | Rebase selected worktree on main (stash prompt if dirty)                                |
+| `g g`          | Jump to the top of the worktree list                                                    |
+| `g p`          | Open the GitHub PR for the selected worktree in browser                                 |
+| `oo`           | View output log of the last job                                                         |
+| `ol`           | Open lazygit log for the selected worktree                                              |
+| `ot`           | Open a tmux session in the selected worktree                                            |
+| `/`            | Search worktrees by name or branch                                                      |
+| `t`            | Track remote branch (set upstream)                                                      |
+| `R`            | Refresh worktree list and statuses                                                      |
+| `U`            | Run `git remote update` and refresh                                                     |
+| `?`            | Toggle full help                                                                        |
+| `q` / `Ctrl+C` | Quit                                                                                    |
 
 ### Stash tab
 
