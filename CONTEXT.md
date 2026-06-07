@@ -11,6 +11,11 @@ Items have a fixed height of one display row each.
 **Diff panel** — a panel that renders a unified or side-by-side diff. Items are hunks or changed
 lines depending on nav mode.
 
+**Image diff** — the rendering of a changed image file as a side-by-side comparison of its old and
+new versions, in place of the generic binary-file summary line. Falls back to that summary line
+whenever the comparison can't be shown faithfully (unsupported terminal, decode failure, oversized
+file, or user opt-out). See ADR 0010.
+
 **Detail panel** — an interactive, focusable panel that mirrors the currently selected list item and
 supports its own keyboard navigation (e.g. the commit detail shown beside the log and stash lists).
 The user can move focus into it and back out. Contrast with a sidebar.
