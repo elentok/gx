@@ -164,6 +164,42 @@ func BinaryFileSizes(worktreeRoot string, file StageFileStatus) (prevSize, newSi
 	return prevSize, newSize, prevOK, newOK
 }
 
+// ImageDiffBlobs returns the raw old/new file contents for an image diff,
+// following the same per-section resolution rules as DiffPath/BinaryFileSizes:
+//
+//   - Staged section (cached=true): old = HEAD:path (or rename source), new = index blob (:path).
+//   - Unstaged section (cached=false): old = index blob (:path), new = worktree file on disk.
+//
+// oldOK/newOK report whether each side was available (e.g. false for the "old"
+// side of an added file, or the "new" side of a deleted file) — this is an
+// expected, common state, not an error.
+func ImageDiffBlobs(worktreeRoot string, file StageFileStatus, cached bool) (oldBytes, newBytes []byte, oldOK, newOK bool) {
+	prevPath := file.Path
+	if file.RenameFrom != "" {
+		prevPath = file.RenameFrom
+	}
+
+	if cached {
+		oldBytes, oldOK = gitObjectBytes(worktreeRoot, "HEAD:"+prevPath)
+		newBytes, newOK = gitObjectBytes(worktreeRoot, ":"+file.Path)
+		return oldBytes, newBytes, oldOK, newOK
+	}
+
+	oldBytes, oldOK = gitObjectBytes(worktreeRoot, ":"+prevPath)
+	if data, err := os.ReadFile(filepath.Join(worktreeRoot, filepath.FromSlash(file.Path))); err == nil {
+		newBytes, newOK = data, true
+	}
+	return oldBytes, newBytes, oldOK, newOK
+}
+
+func gitObjectBytes(worktreeRoot, object string) ([]byte, bool) {
+	out := runRawAllowFail(worktreeRoot, []string{"cat-file", "-p", object})
+	if out == nil {
+		return nil, false
+	}
+	return out, true
+}
+
 func gitObjectSize(worktreeRoot, object string) (int64, bool) {
 	out := strings.TrimSpace(runAllowFail(worktreeRoot, []string{"cat-file", "-s", object}))
 	if out == "" {

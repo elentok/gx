@@ -62,6 +62,20 @@ func runAllowFail(dir string, args []string) string {
 	return out
 }
 
+// runRawAllowFail runs a git command and returns raw stdout bytes, or nil if it
+// fails. Unlike run/runAllowFail, it does not trim trailing newlines, so it is
+// safe for binary output such as `cat-file -p` on a blob.
+func runRawAllowFail(dir string, args []string) []byte {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	cmd.Env = NonInteractiveEnv()
+	out, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+	return out
+}
+
 // joinOutput combines stdout and stderr into a single string, omitting empty halves.
 func joinOutput(stdout, stderr string) string {
 	stdout = strings.TrimSpace(stdout)
