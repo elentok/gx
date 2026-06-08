@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.19.1 - 2026-06-08
+
+- Commit/Log/Stash: inline image diffs now render in the commit detail view too, so image changes are shown directly (via the kitty graphics protocol) when viewing a commit in the log and stash tabs, not just in the status diff panel.
+
 ## v0.19.0 - 2026-06-08
 
 - Status: added inline image diffs — image files in the diff panel are now rendered directly via the kitty graphics protocol on supported terminals, instead of a binary-file summary. Toggle with the new `image-diffs` config option (enabled by default).
