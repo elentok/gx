@@ -41,4 +41,5 @@ func (m *Model) jumpFiletreeBottom() {
 }
 
 func (m *Model) onFiletreeSelectionChanged() {
+	m.imageDiff.dirty = true
 }

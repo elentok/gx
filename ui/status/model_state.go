@@ -1,6 +1,7 @@
 package status
 
 import (
+	"os"
 	"regexp"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/kittygraphics"
 	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/output"
 	"github.com/elentok/gx/ui/pull"
@@ -71,6 +73,11 @@ type Model struct {
 	credentialSecret        bool
 	output                  output.Model
 	keys                    keys.Manager
+
+	imageDiff                 imageDiffState
+	detectImageDiffCapability func() kittygraphics.Capability
+	fetchImageDiffBlobs       func(file git.StageFileStatus, cached bool) (old, new []byte, oldOK, newOK bool)
+	writeImageDiffBytes       func(data []byte)
 }
 
 type statusData struct {
@@ -84,7 +91,7 @@ type statusData struct {
 }
 
 func DefaultSettings() ui.Settings {
-	return ui.Settings{UseNerdFontIcons: true, Terminal: ui.TerminalPlain, DiffContextLines: 1}
+	return ui.Settings{UseNerdFontIcons: true, ImageDiffs: true, Terminal: ui.TerminalPlain, DiffContextLines: 1}
 }
 
 type flashTickMsg struct{}
@@ -146,6 +153,16 @@ func NewModel(worktreeRoot string, settings ui.Settings, initialPath string, ext
 		push:             push.New(),
 		pull:             pull.New(),
 		stash:            stash.New(),
+
+		detectImageDiffCapability: func() kittygraphics.Capability {
+			return kittygraphics.DetectSupport(os.Getenv, queryTerminalWinSize, probeKittyGraphics)
+		},
+		fetchImageDiffBlobs: func(file git.StageFileStatus, cached bool) (old, new []byte, oldOK, newOK bool) {
+			return git.ImageDiffBlobs(worktreeRoot, file, cached)
+		},
+		writeImageDiffBytes: func(data []byte) {
+			_, _ = os.Stdout.Write(data)
+		},
 	}
 
 	if settings.EnableNavigation {

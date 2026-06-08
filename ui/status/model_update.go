@@ -24,6 +24,20 @@ func renderTickCmd() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
+	// Centralizes ADR 0010's lifecycle rule: any disrupting event handler marks
+	// imageDiff.dirty, and this defer turns that into the eager-clear /
+	// debounced-replace tea.Cmd, regardless of which code path produced the
+	// final model.
+	defer func() {
+		model, ok := next.(Model)
+		if !ok || !model.imageDiff.dirty {
+			return
+		}
+		model.imageDiff.dirty = false
+		cmd = tea.Batch(cmd, model.disruptImageDiff())
+		next = model
+	}()
+
 	if m.bump.IsOpen {
 		return m.handleBumpUpdate(msg)
 	}
@@ -42,7 +56,13 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)
 	case tea.FocusMsg:
+		m.imageDiff.dirty = true
 		return m, m.refreshPreserveScroll()
+	case tea.BlurMsg:
+		m.imageDiff.dirty = true
+		return m, nil
+	case imageDiffSettleMsg:
+		return m.handleImageDiffSettle(msg)
 	case autoReloadMsg:
 		return m, m.refreshPreserveScroll()
 	case renderTickMsg:
@@ -100,6 +120,7 @@ func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.width = msg.Width
 	m.height = msg.Height
 	m.ready = true
+	m.imageDiff.dirty = true
 
 	var helpCmd tea.Cmd
 	var reloadCmd tea.Cmd
@@ -157,6 +178,7 @@ func (m Model) handleBranchSyncLoaded(msg branchSyncLoadedMsg) (tea.Model, tea.C
 
 func (m Model) handleMouseWheelMsg(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 	if m.handleMouseWheel(msg) {
+		m.imageDiff.dirty = true
 		return m, nil
 	}
 	return m, nil

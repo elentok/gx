@@ -30,6 +30,7 @@ func (m Model) delegateToDiff(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch match.ID {
 	case diffarea.BindingFullscreen:
 		m.diffarea.Fullscreen = !m.diffarea.Fullscreen
+		m.imageDiff.dirty = true
 		var reloadCmd tea.Cmd
 		if m.diffarea.RenderMode() == diffview.RenderModeSideBySide {
 			reloadCmd = m.reloadDiffsForSelection()

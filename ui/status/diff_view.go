@@ -74,7 +74,7 @@ func (m *Model) renderSectionPane(width, height int, section diffarea.Section) s
 
 	lines := make([]string, 0, bodyH)
 	if len(diff.ViewLines) == 0 && diffcore.HasBinaryDiff(diff.Parsed) {
-		lines = append(lines, lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render(m.binarySummaryLine()))
+		lines = m.appendBinaryDiffLines(lines, bodyH, innerW)
 	}
 	if len(lines) == 0 && bodyH > 0 {
 		if placeholder := m.sectionPlaceholder(section, collapsed); placeholder != "" {
