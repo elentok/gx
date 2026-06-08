@@ -14,6 +14,9 @@ import (
 
 type SplitType int
 
+// SplitType names follow vim's terminology, not tmux's:
+//   - HSplit = horizontal split (vim :split / <c-w>s) = stacked top/bottom.
+//   - VSplit = vertical split (vim :vsplit / <c-w>v) = side-by-side left/right.
 const (
 	InPlace SplitType = iota
 	HSplit
@@ -155,9 +158,11 @@ func launchSplit(worktreeRoot string, terminal ui.Terminal, splitType SplitType,
 		var tmuxArgs []string
 		switch splitType {
 		case HSplit:
-			tmuxArgs = []string{"split-window", "-h", "-c", worktreeRoot, program}
-		case VSplit:
+			// HSplit = horizontal split (vim :split) = stacked top/bottom.
 			tmuxArgs = []string{"split-window", "-v", "-c", worktreeRoot, program}
+		case VSplit:
+			// VSplit = vertical split (vim :vsplit) = side-by-side left/right.
+			tmuxArgs = []string{"split-window", "-h", "-c", worktreeRoot, program}
 		case Tab:
 			tmuxArgs = []string{"new-window", "-c", worktreeRoot, program}
 		}
@@ -168,13 +173,13 @@ func launchSplit(worktreeRoot string, terminal ui.Terminal, splitType SplitType,
 		var typeAndLoc []string
 		switch splitType {
 		case HSplit:
-			// HSplit = side-by-side. kitty's "vsplit" produces left/right panes
-			// (the opposite of its "hsplit"), matching tmux's split-window -h.
-			typeAndLoc = []string{"--type=window", "--location=vsplit"}
-		case VSplit:
-			// VSplit = stacked. kitty's "hsplit" produces top/bottom panes,
-			// matching tmux's split-window -v.
+			// HSplit = horizontal split (vim :split) = stacked top/bottom.
+			// kitty's "hsplit" produces top/bottom panes, matching tmux -v.
 			typeAndLoc = []string{"--type=window", "--location=hsplit"}
+		case VSplit:
+			// VSplit = vertical split (vim :vsplit) = side-by-side left/right.
+			// kitty's "vsplit" produces left/right panes, matching tmux -h.
+			typeAndLoc = []string{"--type=window", "--location=vsplit"}
 		case Tab:
 			typeAndLoc = []string{"--type=tab"}
 		}

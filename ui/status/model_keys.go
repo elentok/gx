@@ -98,7 +98,7 @@ func newStatusManager() keys.Manager {
 		{ID: bindingCancelChord, Seq: []string{"S", "esc"}, Categories: []string{}, Title: ""},
 		// e-prefix chords
 		{ID: bindingEditInPlace, Seq: []string{"e", "e"}, Categories: []string{"Filetree", "Diff"}, Title: "edit file"},
-		{ID: bindingEditHSplit, Seq: []string{"e", "s"}, Categories: []string{"Filetree", "Diff"}, Title: "edit file (hsplit)"},
+		{ID: bindingEditHSplit, Seq: []string{"e", "s"}, Categories: []string{"Filetree", "Diff"}, Title: "edit file (split)"},
 		{ID: bindingEditVSplit, Seq: []string{"e", "v"}, Categories: []string{"Filetree", "Diff"}, Title: "edit file (vsplit)"},
 		{ID: bindingEditTab, Seq: []string{"e", "t"}, Categories: []string{"Filetree", "Diff"}, Title: "edit file (tab)"},
 		{ID: bindingCancelChord, Seq: []string{"e", "esc"}, Categories: []string{}, Title: ""},

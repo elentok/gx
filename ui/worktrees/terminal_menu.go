@@ -15,8 +15,8 @@ import (
 func terminalMenuItems() []components.MenuItem {
 	return []components.MenuItem{
 		{Label: "s  session", Value: "session", Detail: "new or jump to existing"},
-		{Label: "h  hsplit", Value: "hsplit", Detail: "horizontal split"},
-		{Label: "v  vsplit", Value: "vsplit", Detail: "vertical split"},
+		{Label: "h  hsplit", Value: "hsplit", Detail: "horizontal split (stacked, top/bottom)"},
+		{Label: "v  vsplit", Value: "vsplit", Detail: "vertical split (side-by-side)"},
 		{Label: "t  tab", Value: "tab", Detail: "new tab"},
 	}
 }

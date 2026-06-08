@@ -123,7 +123,7 @@ Status UI highlights:
 - Toggle unified/side-by-side diff rendering with `s` (supports hunk, line, and visual actions)
 - Adjust diff context for the current session with `[` / `]`
 - File-to-file diff jumps with `,` / `.`
-- Edit selected file in `$EDITOR` with `ee`; open in a horizontal split (`es`), vertical split (`ev`), or new tab (`et`)
+- Edit selected file in `$EDITOR` with `ee`; open in a horizontal split (`es`, stacked — like vim `:split`), vertical split (`ev`, side-by-side — like vim `:vsplit`), or new tab (`et`)
 - Jump to the top with `g`
 - Open lazygit log with `ol`
 - View the last command output with `oo`

@@ -934,7 +934,7 @@ func TestEditChordSplitVariantsCommit(t *testing.T) {
 		name   string
 		second string
 	}{
-		{"es (hsplit)", "s"},
+		{"es (split)", "s"},
 		{"ev (vsplit)", "v"},
 		{"et (tab)", "t"},
 	}

@@ -76,15 +76,15 @@ tmux and kitty (with remote control); elsewhere the command runs in place.
 }
 
 // resolveSplitType maps the mutually-exclusive direction flags to a SplitType.
-// No flag defaults to --below (VSplit); more than one is a usage error.
+// No flag defaults to --below (HSplit, stacked); more than one is a usage error.
 func resolveSplitType(f termFlags) (terminalrun.SplitType, error) {
-	st := terminalrun.VSplit // default: --below
+	st := terminalrun.HSplit // default: --below (stacked)
 	n := 0
 	if f.right {
-		st, n = terminalrun.HSplit, n+1
+		st, n = terminalrun.VSplit, n+1
 	}
 	if f.below {
-		st, n = terminalrun.VSplit, n+1
+		st, n = terminalrun.HSplit, n+1
 	}
 	if f.tab {
 		st, n = terminalrun.Tab, n+1

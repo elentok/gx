@@ -103,26 +103,28 @@ func TestLaunchSplit_ArgVectors(t *testing.T) {
 		wantApp   string
 	}{
 		{
+			// HSplit (vim :split) = stacked, maps to tmux -v.
 			name: "tmux/hsplit", terminal: ui.TerminalTmux, splitType: HSplit, wantApp: "tmux",
-			wantName: "tmux", wantArgs: []string{"split-window", "-h", "-c", "/wt", "gx", "run", "lazygit"},
+			wantName: "tmux", wantArgs: []string{"split-window", "-v", "-c", "/wt", "gx", "run", "lazygit"},
 		},
 		{
+			// VSplit (vim :vsplit) = side-by-side, maps to tmux -h.
 			name: "tmux/vsplit", terminal: ui.TerminalTmux, splitType: VSplit, wantApp: "tmux",
-			wantName: "tmux", wantArgs: []string{"split-window", "-v", "-c", "/wt", "gx", "run", "lazygit"},
+			wantName: "tmux", wantArgs: []string{"split-window", "-h", "-c", "/wt", "gx", "run", "lazygit"},
 		},
 		{
 			name: "tmux/tab", terminal: ui.TerminalTmux, splitType: Tab, wantApp: "tmux",
 			wantName: "tmux", wantArgs: []string{"new-window", "-c", "/wt", "gx", "run", "lazygit"},
 		},
 		{
-			// HSplit (side-by-side) maps to kitty's vsplit — see ADR 0005.
+			// HSplit (vim :split, stacked) maps to kitty's hsplit — see ADR 0005.
 			name: "kitty/hsplit", terminal: ui.TerminalKittyRemote, splitType: HSplit, wantApp: "kitty",
-			wantName: "kitty", wantArgs: []string{"@", "launch", "--copy-env", "--type=window", "--location=vsplit", "--cwd=/wt", "gx", "run", "lazygit"},
+			wantName: "kitty", wantArgs: []string{"@", "launch", "--copy-env", "--type=window", "--location=hsplit", "--cwd=/wt", "gx", "run", "lazygit"},
 		},
 		{
-			// VSplit (stacked) maps to kitty's hsplit — see ADR 0005.
+			// VSplit (vim :vsplit, side-by-side) maps to kitty's vsplit — see ADR 0005.
 			name: "kitty/vsplit", terminal: ui.TerminalKittyRemote, splitType: VSplit, wantApp: "kitty",
-			wantName: "kitty", wantArgs: []string{"@", "launch", "--copy-env", "--type=window", "--location=hsplit", "--cwd=/wt", "gx", "run", "lazygit"},
+			wantName: "kitty", wantArgs: []string{"@", "launch", "--copy-env", "--type=window", "--location=vsplit", "--cwd=/wt", "gx", "run", "lazygit"},
 		},
 		{
 			name: "kitty/tab", terminal: ui.TerminalKittyRemote, splitType: Tab, wantApp: "kitty",

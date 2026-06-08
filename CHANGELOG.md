@@ -3,6 +3,7 @@
 ## v0.19.2 - 2026-06-08
 
 - Log: fixed amend (`A`) stalling when triggered with the commit detail panel focused — the modal got stuck after creating the fixup commit and never ran the autosquash rebase. The log now keeps forwarding the detail panel's async modal messages, so the amend completes.
+- Splits: split terminology now matches vim. "Horizontal split" / `es` opens a **stacked** (top/bottom) pane like vim `:split`; "vertical split" / `ev` opens a **side-by-side** pane like vim `:vsplit`. This swaps the behavior of the `es`/`ev` edit-in-split chords and the worktree terminal menu's `h`/`v` actions; `gx term --right`/`--below` are unchanged (they were already named by visual outcome).
 
 ## v0.19.1 - 2026-06-08
 

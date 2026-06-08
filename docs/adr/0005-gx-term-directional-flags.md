@@ -48,6 +48,17 @@ this decision removes, only more quietly.
 The internal `SplitType` enum keeps its `HSplit`/`VSplit` names; the mapping
 from the user-facing directional flags to `SplitType` lives in the CLI layer.
 
+> **Update (2026-06-08):** The internal enum now follows **vim's** terminology
+> rather than tmux's, so the names stop lying about orientation:
+> `HSplit` = horizontal split (vim `:split` / `<c-w>s`) = **stacked** top/bottom;
+> `VSplit` = vertical split (vim `:vsplit` / `<c-w>v`) = **side-by-side**. The
+> `launchSplit` mapping was updated to match (`HSplit` → tmux `-v` / kitty
+> `hsplit`; `VSplit` → tmux `-h` / kitty `vsplit`), and the CLI mapping flipped
+> accordingly (`--below` → `HSplit`, `--right` → `VSplit`) so the visual outcome
+> of every flag is unchanged. The worktree terminal menu and the `es`/`ev`
+> edit-in-split chords now read in vim terms too (`es` = stacked, `ev` =
+> side-by-side).
+
 ## Considered Options
 
 - **Mirror the internal `hsplit`/`vsplit` vocabulary.** Rejected: keeps the CLI
@@ -65,7 +76,9 @@ from the user-facing directional flags to `SplitType` lives in the CLI layer.
 - The CLI flag names (`--right`/`--below`) deliberately do **not** match the
   internal `SplitType` names (`HSplit`/`VSplit`). A future reader touching the
   flag→`SplitType` mapping needs this ADR to understand why they diverge and why
-  there is no `vsplit`/`hsplit`/`left`/`above` flag.
+  there is no `vsplit`/`hsplit`/`left`/`above` flag. (Since the 2026-06-08
+  update the enum follows vim's orientation, so `--right` → `VSplit` and
+  `--below` → `HSplit`.)
 - Users can build neovim mappings on `--right`/`--below` and trust the layout is
   identical on tmux and kitty.
 - Adding `--left`/`--above` later remains possible if kitty ever gains side

@@ -104,7 +104,7 @@ func newCommitManager() keys.Manager {
 
 		// e-prefix chords
 		{ID: bindingEditInPlace, Seq: []string{"e", "e"}, Categories: []string{"Actions"}, Title: "edit file"},
-		{ID: bindingEditHSplit, Seq: []string{"e", "s"}, Categories: []string{"Actions"}, Title: "edit file (hsplit)"},
+		{ID: bindingEditHSplit, Seq: []string{"e", "s"}, Categories: []string{"Actions"}, Title: "edit file (split)"},
 		{ID: bindingEditVSplit, Seq: []string{"e", "v"}, Categories: []string{"Actions"}, Title: "edit file (vsplit)"},
 		{ID: bindingEditTab, Seq: []string{"e", "t"}, Categories: []string{"Actions"}, Title: "edit file (tab)"},
 		{ID: bindingCancelChord, Seq: []string{"e", "esc"}, Categories: []string{}, Title: ""},

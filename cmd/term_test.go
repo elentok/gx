@@ -17,9 +17,9 @@ func TestResolveSplitType(t *testing.T) {
 		want    terminalrun.SplitType
 		wantErr bool
 	}{
-		{name: "default/none", flags: termFlags{}, want: terminalrun.VSplit},
-		{name: "right", flags: termFlags{right: true}, want: terminalrun.HSplit},
-		{name: "below", flags: termFlags{below: true}, want: terminalrun.VSplit},
+		{name: "default/none", flags: termFlags{}, want: terminalrun.HSplit},
+		{name: "right", flags: termFlags{right: true}, want: terminalrun.VSplit},
+		{name: "below", flags: termFlags{below: true}, want: terminalrun.HSplit},
 		{name: "tab", flags: termFlags{tab: true}, want: terminalrun.Tab},
 		{name: "here", flags: termFlags{here: true}, want: terminalrun.InPlace},
 		{name: "conflict/right+tab", flags: termFlags{right: true, tab: true}, wantErr: true},
@@ -105,8 +105,8 @@ func TestRunTerm_SplitWrapsExplicitCommand(t *testing.T) {
 	if !l.called {
 		t.Fatal("expected launchInSplit to be called")
 	}
-	if l.terminal != ui.TerminalTmux || l.splitType != terminalrun.VSplit {
-		t.Fatalf("terminal/split = %v/%v, want tmux/VSplit", l.terminal, l.splitType)
+	if l.terminal != ui.TerminalTmux || l.splitType != terminalrun.HSplit {
+		t.Fatalf("terminal/split = %v/%v, want tmux/HSplit", l.terminal, l.splitType)
 	}
 	// Explicit command is wrapped in `gx run`, with its own flags passed through.
 	wantArgs := []string{"run", "nvim", "-u", "NONE", "file"}
@@ -133,8 +133,8 @@ func TestRunTerm_NoCommandLaunchesShellBare(t *testing.T) {
 	if !l.called {
 		t.Fatal("expected launchInSplit to be called")
 	}
-	if l.splitType != terminalrun.HSplit {
-		t.Fatalf("splitType = %v, want HSplit", l.splitType)
+	if l.splitType != terminalrun.VSplit {
+		t.Fatalf("splitType = %v, want VSplit", l.splitType)
 	}
 	// Shell is launched bare — not wrapped in `gx run`.
 	if l.program != "/usr/bin/fish" {
