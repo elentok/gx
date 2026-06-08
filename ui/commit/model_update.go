@@ -3,6 +3,7 @@ package commit
 import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui/filetree"
+	"github.com/elentok/gx/ui/imagediff"
 	"github.com/elentok/gx/ui/reword"
 )
 
@@ -11,6 +12,31 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	if kp, ok := msg.(tea.KeyPressMsg); ok && kp.String() == "ctrl+c" {
 		return m, tea.Quit
 	}
+
+	// Centralizes ADR 0010's lifecycle rule for in-panel disrupting events
+	// (scroll, file selection, focus, header expand, resize, modal open/close):
+	// if the overlay signature changed across this Update, mark the overlay dirty
+	// and turn that into the eager-clear / debounced-replace command, regardless
+	// of which code path produced the final model. Ref and screen-origin changes
+	// are driven by the container via WithRef / WithScreenOrigin instead.
+	before := m.overlaySignature()
+	defer func() {
+		model, ok := next.(Model)
+		if !ok {
+			return
+		}
+		if model.overlaySignature() != before {
+			model.overlay.MarkDirty()
+		}
+		if !model.overlay.Dirty() {
+			return
+		}
+		var disruptCmd tea.Cmd
+		model.overlay, disruptCmd = model.overlay.Disrupt(model.settings.ImageDiffs)
+		cmd = tea.Batch(cmd, disruptCmd)
+		next = model
+	}()
+
 	// Delegate all messages to amend.Model while it's open.
 	if m.amendConfirm.IsOpen {
 		return m.handleAmendUpdate(msg)
@@ -27,6 +53,8 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		return m.handleMouseWheel(msg)
 	case gotoPRMsg:
 		return m.handleGotoPR(msg)
+	case imagediff.SettleMsg:
+		return m.handleImageDiffSettle(msg)
 	case tea.KeyPressMsg:
 		return m.handleKeyPress(msg)
 	case editFileFinishedMsg:

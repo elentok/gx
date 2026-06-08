@@ -1,7 +1,7 @@
 # ADR 0010 — Inline image diffs render as kitty graphics overlays, not external launches
 
 ## Status
-Accepted
+Accepted (amended — see "Generalization to the commit detail panel" below)
 
 ## Context
 
@@ -69,3 +69,53 @@ rules to keep stale placements from drifting out of sync with the panel:
 - `ui/worktrees/kitty.go` remains the example of the *simpler* "shell out to kitty" pattern (option
   A) for cases where launching an external tool is the right shape (terminal sessions). This ADR
   documents why the diff-panel feature deliberately does not follow that simpler precedent.
+
+## Generalization to the commit detail panel (amendment)
+
+The feature first shipped only in status's diff panel. It is now also available in the **commit
+detail panel** (`ui/commit`), the shared right/bottom panel of the log and stash split views — so
+image diffs render for committed and stashed changes, not just the working tree.
+
+The original implementation lived in `ui/status/image_diff.go`, coupled to the status `Model`. The
+generalization splits it into reusable and host-specific parts:
+
+- **`ui/imagediff`** — the pure layout module (moved up from `ui/status/imagediff`) plus a reusable
+  **`Overlay` controller** that owns the entire ADR-0010 lifecycle: the eager-clear/debounced-
+  replace state machine, the settle timer, the cached terminal capability, and the place/clear
+  `tea.Cmd`s. The controller is parameterized by host callbacks (fetch old/new blobs, report the
+  panel's body geometry in **absolute** screen cells, report whether a modal is open, write bytes
+  to the terminal, detect capability). `status.Model` and `commit.Model` each embed one and supply
+  those callbacks.
+
+- **Two host adapters.** Status keeps its working-tree-vs-index blob source (`git.ImageDiffBlobs`).
+  The commit detail panel uses a ref-based source whose old/new endpoints are resolved by the *same*
+  helper that builds the text-diff arguments (`git/commit_diff.go`), so the image and the unified
+  diff can never disagree about which two versions they compare — including the stash `^3`-untracked
+  case and rename old-paths.
+
+The hard part is **absolute screen coordinates**. Kitty placements are positioned at absolute cell
+coordinates, but a detail panel composed into a split view via `lipgloss.Join*` only receives its
+width/height — never its origin. Two shapes were possible: (a) move the controller up into the
+log/stash container, which knows the absolute layout, and reach into the detail for selection/blob
+state; or (b) keep the controller in the detail panel (consistent with status, where the panel owns
+its overlay) and **inject the detail panel's absolute screen origin** from the container.
+
+Shape (b) was chosen. `splitview` gains `DetailOrigin() (col, row)`; the container pushes it into
+`commit.Model` (`WithScreenOrigin`) on every layout change, and the panel computes its body rect
+relative to (0, 0) then adds the injected origin. This keeps "the panel that draws the overlay also
+owns its lifecycle" true for both hosts, at the cost of a new contract: **a detail panel that paints
+outside bubbletea must be told its screen origin** (see the *Screen origin* glossary entry).
+
+Two lifecycle consequences specific to the embedded case:
+
+- **List-selection changes are out-of-band.** Moving the list cursor (`j`/`k`/Enter) is a key routed
+  to the *list* panel; it never enters `commit.Model.Update`, yet it swaps the detail's ref and is
+  the most common disrupting event. So the detail's mutating setters (`WithRef`, `WithScreenOrigin`)
+  **return the disrupt `tea.Cmd`** for the container to batch — the controller still owns the
+  lifecycle, the container only relays the command it gets back.
+
+- **The settle tick must be routed back in.** `commit.Model` was synchronous before this; the
+  debounce is its first async round-trip. log/stashlist drop unhandled messages rather than
+  broadcasting them, so they add one explicit case forwarding the overlay's settle message
+  (`imagediff.SettleMsg`) to `commit.Model.Update`. Tab-switch-away clearing reuses the existing
+  `OnPageDeactivated` hook, forwarded by the container to the detail's `Overlay`.

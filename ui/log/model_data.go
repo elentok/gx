@@ -83,7 +83,6 @@ func (m Model) cmdReload() tea.Cmd {
 	}
 }
 
-
 func fetchBranchHistoryClasses(worktreeRoot, startRef string) (map[string]git.BranchHistoryClass, bool) {
 	var branch string
 	if startRef == "HEAD" {
@@ -185,7 +184,8 @@ func (m Model) openSelected() (Model, tea.Cmd) {
 	// Sync both panel sizes now that the layout changed.
 	m = m.withSyncedListSize()
 	// Load the commit into the detail panel.
-	m.commitDetail = m.commitDetail.WithRef(ref)
+	var refCmd tea.Cmd
+	m.commitDetail, refCmd = m.commitDetail.WithRef(ref)
 	m = m.withSyncedDetailSize()
-	return m, splitCmd
+	return m, tea.Batch(splitCmd, refCmd)
 }

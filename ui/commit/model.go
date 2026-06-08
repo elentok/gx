@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/filetree"
+	"github.com/elentok/gx/ui/imagediff"
 	"github.com/elentok/gx/ui/keys"
 
 	"github.com/elentok/gx/ui/amend"
@@ -42,6 +43,15 @@ type Model struct {
 	amendConfirm amend.Model
 
 	reword reword.Model
+
+	// Inline image-diff overlay (ADR 0010). The detail panel is composed into a
+	// split view and never learns its absolute screen position from
+	// lipgloss.Join*, so the container injects it via WithScreenOrigin.
+	overlay             imagediff.Overlay
+	screenCol           int
+	screenRow           int
+	screenVisible       bool
+	fetchImageDiffBlobs func(ref string, file git.CommitFile) (old, newBytes []byte, oldOK, newOK bool)
 }
 
 type editCommentFinishedMsg struct {
@@ -74,6 +84,11 @@ func NewModel(worktreeRoot, ref, filterPath string, settings ui.Settings, extraK
 			fileTreeModel: filetree.NewModel[git.CommitFile](),
 		},
 		keys: newCommitManager(),
+		overlay: imagediff.NewOverlay(
+			imagediff.WriteToStdout, imagediff.DefaultDetectCapability),
+		fetchImageDiffBlobs: func(ref string, file git.CommitFile) (old, newBytes []byte, oldOK, newOK bool) {
+			return git.CommitImageDiffBlobs(worktreeRoot, ref, file)
+		},
 	}
 	m.help = help.NewModel(help.BuildSections(m.keys, extraKeys))
 	m.amendConfirm = amend.New()
@@ -96,12 +111,32 @@ func (m Model) KeyManager() keys.Manager {
 	return m.keys
 }
 
-// WithRef loads the given ref and returns an updated model. Used by the log
-// tab split view to swap the displayed commit when list selection changes.
-func (m Model) WithRef(ref string) Model {
+// WithRef loads the given ref and returns an updated model plus the image-diff
+// disrupt command. Used by the log/stash split views to swap the displayed
+// commit when list selection changes. Selection moves are keys routed to the
+// list (never into commit.Update), so the setter returns the disrupt cmd for the
+// container to batch (ADR 0010).
+func (m Model) WithRef(ref string) (Model, tea.Cmd) {
 	m.ref = normalizedRef(ref)
 	m.reload()
-	return m
+	var cmd tea.Cmd
+	m.overlay, cmd = m.overlay.Disrupt(m.settings.ImageDiffs)
+	return m, cmd
+}
+
+// WithScreenOrigin injects the detail panel's absolute screen origin (and
+// whether it is currently visible), computed by the split container. Changing it
+// is a disrupting event for any active image-diff overlay, so it returns the
+// disrupt cmd for the container to batch. A no-op call (unchanged origin) returns
+// no command so resizes that don't move the panel don't thrash placements.
+func (m Model) WithScreenOrigin(col, row int, visible bool) (Model, tea.Cmd) {
+	if m.screenCol == col && m.screenRow == row && m.screenVisible == visible {
+		return m, nil
+	}
+	m.screenCol, m.screenRow, m.screenVisible = col, row, visible
+	var cmd tea.Cmd
+	m.overlay, cmd = m.overlay.Disrupt(m.settings.ImageDiffs)
+	return m, cmd
 }
 
 // WithContainerFocus returns a copy rendered as active only when its containing

@@ -1,7 +1,6 @@
 package status
 
 import (
-	"os"
 	"regexp"
 	"time"
 
@@ -10,8 +9,8 @@ import (
 	"github.com/elentok/gx/ui/bump"
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/help"
+	"github.com/elentok/gx/ui/imagediff"
 	"github.com/elentok/gx/ui/keys"
-	"github.com/elentok/gx/ui/kittygraphics"
 	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/output"
 	"github.com/elentok/gx/ui/pull"
@@ -74,10 +73,8 @@ type Model struct {
 	output                  output.Model
 	keys                    keys.Manager
 
-	imageDiff                 imageDiffState
-	detectImageDiffCapability func() kittygraphics.Capability
-	fetchImageDiffBlobs       func(file git.StageFileStatus, cached bool) (old, new []byte, oldOK, newOK bool)
-	writeImageDiffBytes       func(data []byte)
+	overlay             imagediff.Overlay
+	fetchImageDiffBlobs func(file git.StageFileStatus, cached bool) (old, new []byte, oldOK, newOK bool)
 }
 
 type statusData struct {
@@ -154,14 +151,9 @@ func NewModel(worktreeRoot string, settings ui.Settings, initialPath string, ext
 		pull:             pull.New(),
 		stash:            stash.New(),
 
-		detectImageDiffCapability: func() kittygraphics.Capability {
-			return kittygraphics.DetectSupport(os.Getenv, queryTerminalWinSize, probeKittyGraphics)
-		},
+		overlay: imagediff.NewOverlay(imagediff.WriteToStdout, imagediff.DefaultDetectCapability),
 		fetchImageDiffBlobs: func(file git.StageFileStatus, cached bool) (old, new []byte, oldOK, newOK bool) {
 			return git.ImageDiffBlobs(worktreeRoot, file, cached)
-		},
-		writeImageDiffBytes: func(data []byte) {
-			_, _ = os.Stdout.Write(data)
 		},
 	}
 

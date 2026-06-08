@@ -253,7 +253,7 @@ func (m Model) renderDiffPane(width, height int) string {
 		})
 	} else if len(m.diffModel.Data().Parsed.Lines) > 0 {
 		if diffcore.HasBinaryDiff(m.diffModel.Data().Parsed) {
-			lines = []string{ui.StyleMuted.Render("binary file")}
+			lines = m.binaryDiffLines(max(1, height-2), max(1, width-2))
 		} else {
 			lines = []string{ui.StyleMuted.Render("no diff")}
 		}

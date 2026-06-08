@@ -276,6 +276,66 @@ func TestFullscreenDetailSizes(t *testing.T) {
 	}
 }
 
+// --- Detail origin ---
+
+func TestDetailOriginCollapsedNotVisible(t *testing.T) {
+	t.Parallel()
+	m := newTestModel(200, 50)
+	m.vis = visModeCollapsed
+	if _, _, visible := m.DetailOrigin(); visible {
+		t.Fatalf("expected detail not visible when collapsed")
+	}
+}
+
+func TestDetailOriginVerticalSplit(t *testing.T) {
+	t.Parallel()
+	m := newTestModel(200, 50)
+	m.vis = visModeSplit
+	col, row, visible := m.DetailOrigin()
+	if !visible {
+		t.Fatalf("expected detail visible in split")
+	}
+	expectedCol := int(float64(200) * 0.40) // list width = 80
+	if col != expectedCol || row != 0 {
+		t.Fatalf("origin: got (%d,%d), want (%d,0)", col, row, expectedCol)
+	}
+}
+
+func TestDetailOriginHorizontalSplit(t *testing.T) {
+	t.Parallel()
+	m := newTestModel(80, 40)
+	m.vis = visModeSplit
+	col, row, visible := m.DetailOrigin()
+	if !visible {
+		t.Fatalf("expected detail visible in split")
+	}
+	expectedRow := int(float64(40) * 0.30) // list height = 12
+	if col != 0 || row != expectedRow {
+		t.Fatalf("origin: got (%d,%d), want (0,%d)", col, row, expectedRow)
+	}
+}
+
+func TestDetailOriginFullscreenList(t *testing.T) {
+	t.Parallel()
+	m := newTestModel(200, 50)
+	m.vis = visModeFullscreen
+	m.focus = focusList
+	if _, _, visible := m.DetailOrigin(); visible {
+		t.Fatalf("expected detail not visible when list is fullscreen")
+	}
+}
+
+func TestDetailOriginFullscreenDetail(t *testing.T) {
+	t.Parallel()
+	m := newTestModel(200, 50)
+	m.vis = visModeFullscreen
+	m.focus = focusDetail
+	col, row, visible := m.DetailOrigin()
+	if !visible || col != 0 || row != 0 {
+		t.Fatalf("origin: got (%d,%d,%v), want (0,0,true)", col, row, visible)
+	}
+}
+
 // --- Auto-orientation threshold ---
 
 func TestAutoOrientationHorizontalAtWidth99(t *testing.T) {

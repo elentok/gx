@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/imagediff"
 	"github.com/elentok/gx/ui/kittygraphics"
 
 	tea "charm.land/bubbletea/v2"
@@ -54,16 +55,16 @@ func newImageDiffTestModel(t *testing.T, repo string, settings ui.Settings, capa
 	m.focus = focusFiletree
 
 	spies := &imageDiffSpies{capability: capability, old: old, new: new}
-	m.detectImageDiffCapability = func() kittygraphics.Capability {
-		spies.detectCalls++
-		return spies.capability
-	}
+	m.overlay = imagediff.NewOverlay(
+		func(data []byte) { spies.written = append(spies.written, data...) },
+		func() kittygraphics.Capability {
+			spies.detectCalls++
+			return spies.capability
+		},
+	)
 	m.fetchImageDiffBlobs = func(file git.StageFileStatus, cached bool) (oldBytes, newBytes []byte, oldOK, newOK bool) {
 		spies.fetchCalls++
 		return spies.old, spies.new, len(spies.old) > 0, len(spies.new) > 0
-	}
-	m.writeImageDiffBytes = func(data []byte) {
-		spies.written = append(spies.written, data...)
 	}
 
 	m.syncDiffViewports()
@@ -80,7 +81,7 @@ type imageDiffSpies struct {
 
 func settleImageDiff(t *testing.T, m Model) Model {
 	t.Helper()
-	updated, _ := m.Update(imageDiffSettleMsg{seq: m.imageDiff.settleSeq})
+	updated, _ := m.Update(imagediff.SettleMsg{Seq: m.overlay.SettleSeq()})
 	return updated.(Model)
 }
 
@@ -101,138 +102,6 @@ func setupImageDiffRepo(t *testing.T) string {
 	testutil.WriteFile(t, repo, "0-before.txt", "hello\n")
 	testutil.WriteFile(t, repo, "z-after.txt", "hello\n")
 	return repo
-}
-
-func TestImageDiffSelectionChangeClearsActivePlacementImmediately(t *testing.T) {
-	t.Parallel()
-	repo := setupImageDiffRepo(t)
-	old := encodeTestPNG(t, 8, 8, color.RGBA{R: 255, A: 255})
-	new := encodeTestPNG(t, 16, 8, color.RGBA{G: 255, A: 255})
-	settings := DefaultSettings()
-	settings.ImageDiffs = true
-
-	m, spies := newImageDiffTestModel(t, repo, settings, supportedCapability(), old, new)
-	m.imageDiff.activeIDs = []uint32{1, 2}
-	m.imageDiff.capability = spies.capability
-	m.imageDiff.capabilityDetected = true
-
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	mm := updated.(Model)
-	if cmd == nil {
-		t.Fatalf("expected a clear command to be emitted immediately on selection change")
-	}
-	runStatusCmd(t, mm, cmd)
-
-	if !bytes.Contains(spies.written, []byte("\033_Ga=d,d=I,i=1")) || !bytes.Contains(spies.written, []byte("\033_Ga=d,d=I,i=2")) {
-		t.Fatalf("expected clear sequences for both active placements, got %q", spies.written)
-	}
-	if len(mm.imageDiff.activeIDs) != 0 {
-		t.Fatalf("expected active placements to be cleared from state, got %v", mm.imageDiff.activeIDs)
-	}
-}
-
-func TestImageDiffSettlesAndPlacesAfterDebounce(t *testing.T) {
-	t.Parallel()
-	repo := setupImageDiffRepo(t)
-	old := encodeTestPNG(t, 8, 8, color.RGBA{R: 255, A: 255})
-	new := encodeTestPNG(t, 16, 8, color.RGBA{G: 255, A: 255})
-	settings := DefaultSettings()
-	settings.ImageDiffs = true
-
-	m, spies := newImageDiffTestModel(t, repo, settings, supportedCapability(), old, new)
-
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	mm := updated.(Model)
-	if cmd == nil {
-		t.Fatalf("expected selection change to schedule a settle debounce")
-	}
-	mm = runStatusCmd(t, mm, cmd)
-
-	if spies.fetchCalls == 0 {
-		t.Fatalf("expected blob fetch once the model settled on an eligible file")
-	}
-	if len(mm.imageDiff.activeIDs) == 0 {
-		t.Fatalf("expected active placement IDs to be recorded after settling")
-	}
-	if !bytes.Contains(spies.written, []byte("\033_Ga=T,f=100,i=")) {
-		t.Fatalf("expected a placement transmit sequence to be written, got %q", spies.written)
-	}
-}
-
-func TestImageDiffNoPlacementWhenSelectionMovesAwayBeforeSettling(t *testing.T) {
-	t.Parallel()
-	repo := setupImageDiffRepo(t)
-	old := encodeTestPNG(t, 8, 8, color.RGBA{R: 255, A: 255})
-	new := encodeTestPNG(t, 16, 8, color.RGBA{G: 255, A: 255})
-	settings := DefaultSettings()
-	settings.ImageDiffs = true
-
-	m, spies := newImageDiffTestModel(t, repo, settings, supportedCapability(), old, new)
-
-	// "0-before.txt" is selected initially; move onto the image, then past it
-	// to "z-after.txt" before the first debounce fires — only the stale settle
-	// for the (now-superseded) image selection arrives.
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	mm := updated.(Model)
-	staleSeq := mm.imageDiff.settleSeq
-
-	updated, _ = mm.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	mm = updated.(Model)
-
-	updated, _ = mm.Update(imageDiffSettleMsg{seq: staleSeq})
-	mm = updated.(Model)
-
-	if spies.fetchCalls != 0 {
-		t.Fatalf("expected no fetch for a settle message superseded by a later selection change")
-	}
-	if len(mm.imageDiff.activeIDs) != 0 {
-		t.Fatalf("expected no placement when settle is stale, got %v", mm.imageDiff.activeIDs)
-	}
-}
-
-func TestImageDiffNotPlacedWhileModalIsOpen(t *testing.T) {
-	t.Parallel()
-	repo := setupImageDiffRepo(t)
-	old := encodeTestPNG(t, 8, 8, color.RGBA{R: 255, A: 255})
-	new := encodeTestPNG(t, 16, 8, color.RGBA{G: 255, A: 255})
-	settings := DefaultSettings()
-	settings.ImageDiffs = true
-
-	m, spies := newImageDiffTestModel(t, repo, settings, supportedCapability(), old, new)
-
-	// Select the image, then open a modal before the debounce settles — a
-	// placement here would paint over the modal at the terminal's graphics
-	// layer (ADR 0010), so the settle must bail out without placing.
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	mm := updated.(Model)
-	mm.confirmOpen = true
-
-	updated, _ = mm.Update(imageDiffSettleMsg{seq: mm.imageDiff.settleSeq})
-	mm = updated.(Model)
-
-	if spies.fetchCalls != 0 {
-		t.Fatalf("expected no blob fetch while a modal is open, got %d calls", spies.fetchCalls)
-	}
-	if len(mm.imageDiff.activeIDs) != 0 {
-		t.Fatalf("expected no placement while a modal is open, got %v", mm.imageDiff.activeIDs)
-	}
-
-	// Closing the modal (esc -> handleConfirmKey sets confirmOpen = false)
-	// re-marks imageDiff dirty via the ModalOpen() transition check, scheduling
-	// a fresh settle that places the overlay now that it's safe to.
-	updated, cmd := mm.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
-	mm = updated.(Model)
-	if mm.confirmOpen {
-		t.Fatalf("expected esc to close the confirm modal")
-	}
-	mm = runStatusCmd(t, mm, cmd)
-
-	if spies.fetchCalls == 0 {
-		t.Fatalf("expected a blob fetch once the modal closed and the model resettled")
-	}
-	if len(mm.imageDiff.activeIDs) == 0 {
-		t.Fatalf("expected the overlay to be placed once the modal closed")
-	}
 }
 
 func TestImageDiffsConfigDisabledShortCircuitsToBinarySummary(t *testing.T) {
@@ -299,8 +168,8 @@ func TestImageDiffPlanFallbackShowsBinarySummary(t *testing.T) {
 	mm = runStatusCmd(t, mm, cmd)
 	mm = settleImageDiff(t, mm)
 
-	if len(mm.imageDiff.activeIDs) != 0 {
-		t.Fatalf("expected no placement for a fallback plan, got %v", mm.imageDiff.activeIDs)
+	if mm.overlay.HasActivePlacements() {
+		t.Fatalf("expected no placement for a fallback plan")
 	}
 	if spies.fetchCalls == 0 {
 		t.Fatalf("expected a blob fetch attempt before falling back")
@@ -309,5 +178,37 @@ func TestImageDiffPlanFallbackShowsBinarySummary(t *testing.T) {
 	view := ansi.Strip(mm.renderDiffPane(80, 14))
 	if !strings.Contains(view, "binary file") {
 		t.Fatalf("expected binary summary when the layout plan falls back, got:\n%s", view)
+	}
+}
+
+// TestImageDiffEndToEndPlacesAfterSettle exercises the full status wiring: a
+// selection change schedules a settle, and the settle places the overlay and
+// records active placements (the controller-level lifecycle is covered in
+// ui/imagediff).
+func TestImageDiffEndToEndPlacesAfterSettle(t *testing.T) {
+	t.Parallel()
+	repo := setupImageDiffRepo(t)
+	old := encodeTestPNG(t, 8, 8, color.RGBA{R: 255, A: 255})
+	new := encodeTestPNG(t, 16, 8, color.RGBA{G: 255, A: 255})
+	settings := DefaultSettings()
+	settings.ImageDiffs = true
+
+	m, spies := newImageDiffTestModel(t, repo, settings, supportedCapability(), old, new)
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	mm := updated.(Model)
+	if cmd == nil {
+		t.Fatalf("expected selection change to schedule a settle debounce")
+	}
+	mm = runStatusCmd(t, mm, cmd)
+
+	if spies.fetchCalls == 0 {
+		t.Fatalf("expected blob fetch once the model settled on an eligible file")
+	}
+	if !mm.overlay.HasActivePlacements() {
+		t.Fatalf("expected active placements to be recorded after settling")
+	}
+	if !bytes.Contains(spies.written, []byte("\033_Ga=T,f=100,i=")) {
+		t.Fatalf("expected a placement transmit sequence to be written, got %q", spies.written)
 	}
 }

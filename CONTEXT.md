@@ -12,13 +12,21 @@ Items have a fixed height of one display row each.
 lines depending on nav mode.
 
 **Image diff** — the rendering of a changed image file as a side-by-side comparison of its old and
-new versions, in place of the generic binary-file summary line. Falls back to that summary line
-whenever the comparison can't be shown faithfully (unsupported terminal, decode failure, oversized
-file, or user opt-out). See ADR 0010.
+new versions, in place of the generic binary-file summary line. Available in any diff panel that
+opts in: the status diff panel (working-tree vs index) and the commit detail panel used by the log
+and stash tabs (`<ref>^` vs `<ref>`). Falls back to that summary line whenever the comparison can't
+be shown faithfully (unsupported terminal, decode failure, oversized file, or user opt-out). See
+ADR 0010.
 
 **Detail panel** — an interactive, focusable panel that mirrors the currently selected list item and
 supports its own keyboard navigation (e.g. the commit detail shown beside the log and stash lists).
 The user can move focus into it and back out. Contrast with a sidebar.
+
+**Screen origin** — the absolute (column, row) of a panel's top-left cell on the terminal grid. A
+page that owns the whole screen has origin (0, 0); a detail panel composed into a split view does
+not — it only learns its width/height, so its origin is injected by the container that knows the
+layout (`splitview.DetailOrigin`). Required only by features that paint outside bubbletea's render
+loop at absolute coordinates — currently the image-diff kitty overlay (ADR 0010).
 
 **Sidebar** — a passive, non-focusable panel that renders a read-only summary of the current
 selection. The user never moves focus into it; it only reflects the selected item (e.g. the

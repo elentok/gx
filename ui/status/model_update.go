@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
+	"github.com/elentok/gx/ui/imagediff"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/search"
 
@@ -33,7 +34,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	wasModalOpen := m.ModalOpen()
 
 	// Centralizes ADR 0010's lifecycle rule: any disrupting event handler marks
-	// imageDiff.dirty, and this defer turns that into the eager-clear /
+	// the overlay dirty, and this defer turns that into the eager-clear /
 	// debounced-replace tea.Cmd, regardless of which code path produced the
 	// final model.
 	defer func() {
@@ -42,13 +43,14 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 			return
 		}
 		if model.ModalOpen() != wasModalOpen {
-			model.imageDiff.dirty = true
+			model.overlay.MarkDirty()
 		}
-		if !model.imageDiff.dirty {
+		if !model.overlay.Dirty() {
 			return
 		}
-		model.imageDiff.dirty = false
-		cmd = tea.Batch(cmd, model.disruptImageDiff())
+		var disruptCmd tea.Cmd
+		model.overlay, disruptCmd = model.overlay.Disrupt(model.settings.ImageDiffs)
+		cmd = tea.Batch(cmd, disruptCmd)
 		next = model
 	}()
 
@@ -70,12 +72,12 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)
 	case tea.FocusMsg:
-		m.imageDiff.dirty = true
+		m.overlay.MarkDirty()
 		return m, m.refreshPreserveScroll()
 	case tea.BlurMsg:
-		m.imageDiff.dirty = true
+		m.overlay.MarkDirty()
 		return m, nil
-	case imageDiffSettleMsg:
+	case imagediff.SettleMsg:
 		return m.handleImageDiffSettle(msg)
 	case autoReloadMsg:
 		return m, m.refreshPreserveScroll()
@@ -134,7 +136,7 @@ func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (Model, tea.Cmd) {
 	m.width = msg.Width
 	m.height = msg.Height
 	m.ready = true
-	m.imageDiff.dirty = true
+	m.overlay.MarkDirty()
 
 	var helpCmd tea.Cmd
 	var reloadCmd tea.Cmd
@@ -192,7 +194,7 @@ func (m Model) handleBranchSyncLoaded(msg branchSyncLoadedMsg) (Model, tea.Cmd) 
 
 func (m Model) handleMouseWheelMsg(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
 	if m.handleMouseWheel(msg) {
-		m.imageDiff.dirty = true
+		m.overlay.MarkDirty()
 		return m, nil
 	}
 	return m, nil

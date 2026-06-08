@@ -93,15 +93,12 @@ func (m Model) AutoReload() tea.Cmd {
 // OnPageDeactivated is called by the app shell when the user switches away
 // from the status tab — a disrupting event per ADR 0010, since any active
 // image-diff overlay would otherwise be left floating over whatever the next
-// tab renders. Clearing here is eager and unconditional; m.imageDiff.activeIDs
-// is left as-is (Model is a value here, so it can't be mutated back into the
-// shell's copy) — the next disrupting event will harmlessly re-clear the same
-// (already-cleared) IDs before placing anything new.
+// tab renders. Clearing here is eager and unconditional; the overlay's active
+// IDs are left as-is (Model is a value here, so they can't be mutated back into
+// the shell's copy) — the next disrupting event will harmlessly re-clear the
+// same (already-cleared) IDs before placing anything new.
 func (m Model) OnPageDeactivated() tea.Cmd {
-	if len(m.imageDiff.activeIDs) == 0 {
-		return nil
-	}
-	return m.cmdClearImagePlacements(m.imageDiff.activeIDs)
+	return m.overlay.OnDeactivate()
 }
 
 func statusRepoMutatedCmd() tea.Cmd {

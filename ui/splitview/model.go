@@ -164,6 +164,34 @@ func (m Model) DetailSize() (w, h int) {
 	}
 }
 
+// DetailOrigin returns the absolute (column, row) of the detail panel's
+// top-left cell within the split view, and whether the detail panel is currently
+// visible at all. Containers inject this into a detail panel that paints outside
+// bubbletea's render loop (the image-diff kitty overlay, ADR 0010) so its
+// absolute placements line up with where lipgloss.Join* composed the panel. The
+// origin is relative to the split view's own top-left; a container that itself
+// sits at a non-zero screen offset must add that offset.
+//
+// When the detail panel is not visible (collapsed, or fullscreen on the list),
+// visible is false and the caller should treat any overlay as needing to clear.
+func (m Model) DetailOrigin() (col, row int, visible bool) {
+	switch m.vis {
+	case visModeCollapsed:
+		return 0, 0, false
+	case visModeFullscreen:
+		if m.focus == focusList {
+			return 0, 0, false
+		}
+		return 0, 0, true
+	default: // visModeSplit
+		lw, lh := m.splitListDims()
+		if m.effectiveOrientation() == Vertical {
+			return lw, 0, true
+		}
+		return 0, lh, true
+	}
+}
+
 // effectiveOrientation returns the resolved layout direction.
 func (m Model) effectiveOrientation() Orientation {
 	if m.autoOrient {

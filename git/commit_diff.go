@@ -127,11 +127,9 @@ func singleFileDiffArgs(repoRoot, ref, path string, contextLines int, color bool
 		return args, nil
 	}
 
-	targetRef := ref
-	if exists, err := pathExistsInTree(repoRoot, ref, path); err != nil {
+	targetRef, err := stashTargetRef(repoRoot, ref, path)
+	if err != nil {
 		return nil, err
-	} else if !exists {
-		targetRef = ref + "^3"
 	}
 
 	args := []string{
@@ -146,6 +144,63 @@ func singleFileDiffArgs(repoRoot, ref, path string, contextLines int, color bool
 	}
 	args = append(args, ref+"^1", targetRef, "--", path)
 	return args, nil
+}
+
+// stashTargetRef resolves the "new" side of a stash diff: the stash commit
+// itself for tracked changes, or its third parent (ref^3, the untracked-files
+// commit) for files absent from the stash's own tree.
+func stashTargetRef(repoRoot, ref, path string) (string, error) {
+	exists, err := pathExistsInTree(repoRoot, ref, path)
+	if err != nil {
+		return "", err
+	}
+	if !exists {
+		return ref + "^3", nil
+	}
+	return ref, nil
+}
+
+// commitDiffEndpoints resolves the two object endpoints an image diff compares,
+// using the exact same rules the text diff (singleFileDiffArgs) uses so the two
+// can never disagree about which versions they show: a regular commit compares
+// its first parent (ref^1) against ref; a stash compares its base (ref^1)
+// against the stash commit (or ref^3 for untracked files); renames take the old
+// path from RenameFrom.
+func commitDiffEndpoints(repoRoot, ref string, file CommitFile) (oldRef, oldPath, newRef, newPath string, err error) {
+	oldPath = file.Path
+	if file.RenameFrom != "" {
+		oldPath = file.RenameFrom
+	}
+	newPath = file.Path
+
+	if !isStashRef(ref) {
+		return ref + "^1", oldPath, ref, newPath, nil
+	}
+
+	newRef, err = stashTargetRef(repoRoot, ref, newPath)
+	if err != nil {
+		return "", "", "", "", err
+	}
+	return ref + "^1", oldPath, newRef, newPath, nil
+}
+
+// CommitImageDiffBlobs returns the raw old/new bytes for an image file changed
+// in ref, resolving the two endpoints via commitDiffEndpoints (so they match the
+// unified text diff exactly). oldOK/newOK report side presence — false for the
+// absent side of an added or deleted file, an expected state rather than an
+// error.
+func CommitImageDiffBlobs(repoRoot, ref string, file CommitFile) (oldBytes, newBytes []byte, oldOK, newOK bool) {
+	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		ref = "HEAD"
+	}
+	oldRef, oldPath, newRef, newPath, err := commitDiffEndpoints(repoRoot, ref, file)
+	if err != nil {
+		return nil, nil, false, false
+	}
+	oldBytes, oldOK = gitObjectBytes(repoRoot, oldRef+":"+oldPath)
+	newBytes, newOK = gitObjectBytes(repoRoot, newRef+":"+newPath)
+	return oldBytes, newBytes, oldOK, newOK
 }
 
 func pathExistsInTree(repoRoot, treeish, path string) (bool, error) {

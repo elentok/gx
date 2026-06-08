@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/ui"
 	commitui "github.com/elentok/gx/ui/commit"
 	"github.com/elentok/gx/ui/help"
+	"github.com/elentok/gx/ui/imagediff"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/splitview"
@@ -64,7 +65,23 @@ func (m Model) Init() tea.Cmd {
 	return m.stashList.Init()
 }
 
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
+	// After every Update, re-sync the detail panel's injected screen origin so
+	// its image-diff overlay tracks layout/visibility/modal changes (ADR 0010).
+	// WithScreenOrigin no-ops unless the origin or visibility actually changed.
+	defer func() {
+		model, ok := next.(Model)
+		if !ok {
+			return
+		}
+		var originCmd tea.Cmd
+		model, originCmd = model.withSyncedDetailOrigin()
+		if originCmd != nil {
+			cmd = tea.Batch(cmd, originCmd)
+			next = model
+		}
+	}()
+
 	if m.stashCreate.IsOpen {
 		return m.handleStashCreateUpdate(msg)
 	}
@@ -93,8 +110,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.split = m.split.WithListRef(m.stashList.SelectedRef())
 		// Load the first entry in the commit detail.
 		if ref := m.stashList.SelectedRef(); ref != "" {
-			m.commitDetail = m.commitDetail.WithRef(ref)
+			var refCmd tea.Cmd
+			m.commitDetail, refCmd = m.commitDetail.WithRef(ref)
 			m = m.syncPanelSizes()
+			return m, tea.Batch(cmd, refCmd)
 		}
 		return m, cmd
 
@@ -112,20 +131,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case splitview.SelectionChangedMsg:
 		if msg.Ref != "" {
-			m.commitDetail = m.commitDetail.WithRef(msg.Ref)
+			var refCmd tea.Cmd
+			m.commitDetail, refCmd = m.commitDetail.WithRef(msg.Ref)
 			m = m.syncPanelSizes()
+			return m, refCmd
 		}
 		return m, nil
+
+	case imagediff.SettleMsg:
+		// commit.Model's only async round-trip; forward the debounce tick to the
+		// detail panel that owns the overlay (ADR 0010).
+		updated, detailCmd := m.commitDetail.Update(msg)
+		m.commitDetail = updated.(commitui.Model)
+		return m, detailCmd
 
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
 
 	// Broadcast non-key messages to detail panel.
-	var cmd tea.Cmd
-	updated, cmd := m.commitDetail.Update(msg)
+	updated, detailCmd := m.commitDetail.Update(msg)
 	m.commitDetail = updated.(commitui.Model)
-	return m, cmd
+	return m, detailCmd
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -185,6 +212,25 @@ func (m Model) routeKeyToSplit(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	m.split, cmd = m.split.Update(msg)
 	m = m.syncPanelSizes()
 	return m, cmd
+}
+
+// withSyncedDetailOrigin pushes the detail panel's absolute screen origin (and
+// visibility) into commitDetail so its image-diff kitty overlay lands where the
+// panel is composed (ADR 0010). The detail is treated as not visible whenever a
+// stash-tab modal is open, since a centered modal occludes it.
+func (m Model) withSyncedDetailOrigin() (Model, tea.Cmd) {
+	col, row, visible := m.split.DetailOrigin()
+	visible = visible && !m.stashCreate.IsOpen && !m.help.IsOpen
+	var cmd tea.Cmd
+	m.commitDetail, cmd = m.commitDetail.WithScreenOrigin(col, row, visible)
+	return m, cmd
+}
+
+// OnPageDeactivated is called by the app shell when the user switches away from
+// the stash tab. It clears any active image-diff overlay in the detail panel so
+// it doesn't float over the next tab (ADR 0010).
+func (m Model) OnPageDeactivated() tea.Cmd {
+	return m.commitDetail.OnDeactivate()
 }
 
 func (m Model) syncPanelSizes() Model {

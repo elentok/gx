@@ -9,7 +9,7 @@ import (
 	"image/png"
 	"testing"
 
-	"github.com/elentok/gx/ui/status/imagediff"
+	"github.com/elentok/gx/ui/imagediff"
 )
 
 func encodePNG(t *testing.T, w, h int) []byte {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/commit"
+	"github.com/elentok/gx/ui/imagediff"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/reword"
 
@@ -26,6 +27,22 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	if kp, ok := msg.(tea.KeyPressMsg); ok && kp.String() == "ctrl+c" {
 		return m, tea.Quit
 	}
+
+	// After every Update, re-sync the detail panel's injected screen origin so
+	// its image-diff overlay tracks layout/visibility/modal changes (ADR 0010).
+	// WithScreenOrigin no-ops unless the origin or visibility actually changed.
+	defer func() {
+		model, ok := next.(Model)
+		if !ok {
+			return
+		}
+		var originCmd tea.Cmd
+		model, originCmd = model.withSyncedDetailOrigin()
+		if originCmd != nil {
+			cmd = tea.Batch(cmd, originCmd)
+			next = model
+		}
+	}()
 	// Delegate to rebase confirm modal while it's open.
 	if m.rebaseConfirm.isOpen() {
 		return m.handleRebaseConfirmUpdate(msg)
@@ -59,6 +76,13 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
+	case imagediff.SettleMsg:
+		// commit.Model is synchronous apart from this debounce tick; the log
+		// container doesn't broadcast unknown messages, so forward it explicitly
+		// to the detail panel that owns the overlay (ADR 0010).
+		updated, detailCmd := m.commitDetail.Update(msg)
+		m.commitDetail = updated.(commit.Model)
+		return m, detailCmd
 	case tea.MouseWheelMsg:
 		return m.handleMouseWheel(msg)
 	case gotoPRMsg:

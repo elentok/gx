@@ -100,28 +100,28 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 	case bindingDown:
 		prevRef := m.SelectedRef()
 		m.listPanel = m.listPanel.Navigate(1)
-		m = m.handleSelectionChange(prevRef)
-		return m, nil
+		m, selCmd := m.handleSelectionChange(prevRef)
+		return m, selCmd
 	case bindingUp:
 		prevRef := m.SelectedRef()
 		m.listPanel = m.listPanel.Navigate(-1)
-		m = m.handleSelectionChange(prevRef)
-		return m, nil
+		m, selCmd := m.handleSelectionChange(prevRef)
+		return m, selCmd
 	case bindingOpen:
 		return m.openSelected()
 	case bindingBottom:
 		prevRef := m.SelectedRef()
 		m.listPanel = m.listPanel.SetSelected(len(m.listPanel.Rows()) - 1)
-		m = m.handleSelectionChange(prevRef)
-		return m, nil
+		m, selCmd := m.handleSelectionChange(prevRef)
+		return m, selCmd
 	case bindingReload:
 		m.refreshing = true
 		return m, tea.Batch(notify.Progress("refresh", "refreshing..."), m.cmdReload())
 	case bindingTop:
 		prevRef := m.SelectedRef()
 		m.listPanel = m.listPanel.SetSelected(0)
-		m = m.handleSelectionChange(prevRef)
-		return m, nil
+		m, selCmd := m.handleSelectionChange(prevRef)
+		return m, selCmd
 	case bindingGotoHead:
 		if m.startRef != "HEAD" {
 			return m, nav.Switch(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: m.worktreeRoot, Ref: "HEAD"})
@@ -163,13 +163,13 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 	case bindingPageDown:
 		prevRef := m.SelectedRef()
 		m.listPanel = m.listPanel.ScrollPage(list.DefaultScroll)
-		m = m.handleSelectionChange(prevRef)
-		return m, nil
+		m, selCmd := m.handleSelectionChange(prevRef)
+		return m, selCmd
 	case bindingPageUp:
 		prevRef := m.SelectedRef()
 		m.listPanel = m.listPanel.ScrollPage(-list.DefaultScroll)
-		m = m.handleSelectionChange(prevRef)
-		return m, nil
+		m, selCmd := m.handleSelectionChange(prevRef)
+		return m, selCmd
 	case bindingRebaseInteractive:
 		return m.startRebaseInteractive()
 	case bindingClearFilter:

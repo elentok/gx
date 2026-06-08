@@ -85,8 +85,10 @@ func (m Model) navigateList(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	m.stashList = updated.(listPanel)
 	m.split = m.split.WithListRef(m.stashList.SelectedRef())
 	if ref := m.stashList.SelectedRef(); m.split.IsSplit() && ref != prevRef && ref != "" {
-		m.commitDetail = m.commitDetail.WithRef(ref)
+		var refCmd tea.Cmd
+		m.commitDetail, refCmd = m.commitDetail.WithRef(ref)
 		m = m.syncPanelSizes()
+		return m, tea.Batch(cmd, refCmd)
 	}
 	return m, cmd
 }
