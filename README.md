@@ -27,6 +27,7 @@ and [go-migration-plan.md](/docs/go-migration-plan.md)).
 - Press `g p` in any view (worktrees, status, log, commit) to open the GitHub PR for the current context in the browser; merged commits search by hash, unmerged commits use the branch PR
 - `gx show` for single-commit inspection with diff navigation; scroll percentage and search counter (`⌕ N/M`) shown in the diff panel title
 - `gx status` interactive status UI with file/hunk/line stage + unstage flows
+- Inline image diffs: image files are rendered directly in the status diff panel via the kitty graphics protocol on supported terminals (toggle with the `image-diffs` config option)
 - `gx stash` opens a Stash tab listing the repo's stashes in a split view — apply (`a`), pop (`p`), drop (`d`), or create (`s`) a stash, with the selected stash's diff alongside the list
 - Tabbed UI (worktrees, log, status, stash): switch with `1`–`4`, `g w` / `g l` / `g s` / `g S`, or `,` / `.`; switching is flicker-free and tabs reload only when the repo actually changed
 - `gx` opens status by default, while `gx worktrees` / `gx wt` open the worktree UI
@@ -236,6 +237,7 @@ Optional config file at `~/.config/gx/config.json` (run `gx config edit` to open
 | Key                        | Type                            | Default   | Description                                                                                                                                                                                  |
 | -------------------------- | ------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `use-nerdfont-icons`       | boolean                         | `true`    | Enable Nerd Font pill-shaped badges and icons throughout the UI.                                                                                                                             |
+| `image-diffs`              | boolean                         | `true`    | Render inline image diffs (via the kitty graphics protocol) in the status diff panel on supported terminals.                                                                                 |
 | `stage-diff-context-lines` | integer (0–20)                  | `1`       | Number of context lines shown around each diff hunk in the staging view.                                                                                                                     |
 | `input-modal-bottom`       | integer \| `"N%"` \| `"center"` | `"5%"`    | Vertical position of text-input overlays. An integer is a fixed line count from the bottom; a percentage string (e.g. `"10%"`) is relative to screen height; `"center"` centers the overlay. |
 | `name-aliases`             | object                          | `{}`      | Map of exact worktree full-names to display aliases, applied before the normal dash-segment compression.                                                                                     |

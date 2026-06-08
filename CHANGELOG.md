@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.19.0 - 2026-06-08
+
+- Status: added inline image diffs — image files in the diff panel are now rendered directly via the kitty graphics protocol on supported terminals, instead of a binary-file summary. Toggle with the new `image-diffs` config option (enabled by default).
+
 ## v0.18.2 - 2026-06-06
 
 - Prevent tab switching when a modal is open
