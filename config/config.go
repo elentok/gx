@@ -15,6 +15,7 @@ const SchemaURL = "https://raw.githubusercontent.com/elentok/gx/main/docs/config
 type Config struct {
 	Schema                string            `json:"$schema,omitempty"`
 	UseNerdFontIcons      bool              `json:"use-nerdfont-icons"`
+	ImageDiffs            bool              `json:"image-diffs"`
 	StageDiffContextLines int               `json:"stage-diff-context-lines"`
 	InputModalBottom      InputModalBottom  `json:"input-modal-bottom"`
 	NameAliases           map[string]string `json:"name-aliases,omitempty"`
@@ -25,6 +26,7 @@ type Config struct {
 func Default() Config {
 	return Config{
 		UseNerdFontIcons:      true,
+		ImageDiffs:            true,
 		StageDiffContextLines: 1,
 		InputModalBottom:      DefaultInputModalBottom(),
 		Log:                   DefaultLogConfig(),
@@ -58,6 +60,7 @@ func Load() (Config, error) {
 
 	var raw struct {
 		UseNerdFontIcons      *bool             `json:"use-nerdfont-icons"`
+		ImageDiffs            *bool             `json:"image-diffs"`
 		StageDiffContextLines *int              `json:"stage-diff-context-lines"`
 		InputModalBottom      *InputModalBottom `json:"input-modal-bottom"`
 		NameAliases           map[string]string `json:"name-aliases"`
@@ -68,6 +71,9 @@ func Load() (Config, error) {
 	}
 	if raw.UseNerdFontIcons != nil {
 		cfg.UseNerdFontIcons = *raw.UseNerdFontIcons
+	}
+	if raw.ImageDiffs != nil {
+		cfg.ImageDiffs = *raw.ImageDiffs
 	}
 	if raw.StageDiffContextLines != nil {
 		cfg.StageDiffContextLines = clampStageDiffContext(*raw.StageDiffContextLines)

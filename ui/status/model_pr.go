@@ -20,7 +20,7 @@ func (m Model) cmdGotoPR() tea.Cmd {
 	}
 }
 
-func (m Model) handleGotoPR(msg gotoPRMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleGotoPR(msg gotoPRMsg) (Model, tea.Cmd) {
 	if msg.err != nil || msg.url == "" {
 		return m, notify.Warning("no PR found")
 	}

@@ -576,6 +576,7 @@ func runStash() error {
 func settingsFromConfig(cfg config.Config) ui.Settings {
 	return ui.Settings{
 		UseNerdFontIcons: cfg.UseNerdFontIcons,
+		ImageDiffs:       cfg.ImageDiffs,
 		InputModalBottom: cfg.InputModalBottom,
 		Terminal:         ui.DetectTerminal(),
 		EnableNavigation: true,

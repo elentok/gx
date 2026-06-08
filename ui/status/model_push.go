@@ -5,7 +5,7 @@ import (
 	"github.com/elentok/gx/ui/notify"
 )
 
-func (m Model) handlePushUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) handlePushUpdate(msg tea.Msg) (Model, tea.Cmd) {
 	next, cmd, result := m.push.Update(msg)
 	m.push = next
 	if result.Done {

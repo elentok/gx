@@ -13,6 +13,11 @@
       "description": "Enable Nerd Font icons in the UI. Default: true.",
       "default": true
     },
+    "image-diffs": {
+      "type": "boolean",
+      "description": "Render inline image diffs (via the kitty graphics protocol) in the status diff panel on supported terminals. Default: true.",
+      "default": true
+    },
     "stage-diff-context-lines": {
       "type": "integer",
       "description": "Number of context lines shown around each diff hunk in the staging view. Clamped to 0–20. Default: 1.",

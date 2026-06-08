@@ -40,7 +40,7 @@ func (m *Model) handleActionResult(res stageActionResult) tea.Cmd {
 	return tea.Batch(notifyCmd, m.refresh())
 }
 
-func (m Model) confirmAccept() (tea.Model, tea.Cmd) {
+func (m Model) confirmAccept() (Model, tea.Cmd) {
 	if !m.confirmYes {
 		m.confirmOpen = false
 		m.confirmAction = confirmNone

@@ -5,7 +5,7 @@ import (
 	"github.com/elentok/gx/ui/notify"
 )
 
-func (m Model) handleBumpUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) handleBumpUpdate(msg tea.Msg) (Model, tea.Cmd) {
 	next, cmd, result := m.bump.Update(msg)
 	m.bump = next
 	if !result.Done {

@@ -106,7 +106,7 @@ func newStatusManager() keys.Manager {
 	})
 }
 
-func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch id {
 	case bindingQuit:
 		if m.runningRunner != nil && !m.runningDone {

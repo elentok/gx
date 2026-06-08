@@ -8,14 +8,14 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-func (m Model) delegateToChild(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+func (m Model) delegateToChild(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if m.focus == focusFiletree {
 		return m.delegateToFiletree(msg)
 	}
 	return m.delegateToDiff(msg)
 }
 
-func (m Model) delegateToFiletree(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+func (m Model) delegateToFiletree(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	m.reconcileFileTreeFromStatusState()
 	updatedFileTree, childCmd, result := m.fileTreeModel.Update(msg)
 	selectionChanged := updatedFileTree.SelectedIndex() != m.fileTreeModel.SelectedIndex()
@@ -78,7 +78,7 @@ func (m Model) delegateToFiletree(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, actionCmd
 }
 
-func (m Model) handleFileTreeChildMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+func (m Model) handleFileTreeChildMsg(msg tea.Msg) (Model, tea.Cmd, bool) {
 	switch msg.(type) {
 	case search.JumpToMatchMsg:
 		model, cmd := m.handleJumpToMatch(msg.(search.JumpToMatchMsg))

@@ -44,8 +44,12 @@ rules to keep stale placements from drifting out of sync with the panel:
   command**. Clearing is eager and unconditional; it never waits to see whether a new placement will
   follow.
 - Re-placement happens only once the model **settles**: a short debounce (~80ms) after the last
-  disrupting event, and only if the currently selected file is still an image diff. This avoids
-  placement thrash when the user holds `j`/`k` to move quickly through the file list.
+  disrupting event, and only if the currently selected file is still an image diff *and* no modal
+  is open. The modal check matters because a modal is composed into `View()`'s text output
+  (`ui.OverlayCenter`) — the kitty placement paints over that at the terminal's graphics layer
+  regardless, so placing while a modal is open would occlude it. (Opening or closing a modal is
+  itself treated as a disrupting event, so the overlay reappears once the modal closes.) This also
+  avoids placement thrash when the user holds `j`/`k` to move quickly through the file list.
 - Detection of kitty-graphics support, the host terminal's pixel-per-cell size (for aspect-correct
   scaling), and tmux passthrough capability are all queried once and cached, mirroring how
   `ui.DetectTerminal` already caches `$KITTY_*`/`$TMUX` checks.

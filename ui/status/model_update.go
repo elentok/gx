@@ -24,13 +24,27 @@ func renderTickCmd() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
+	// Captured before any handler can mutate m in place — a modal opening or
+	// closing is itself a disrupting event (its overlay would otherwise occlude,
+	// or be occluded by, a stale image placement), but ModalOpen() is derived
+	// from a dozen scattered fields with no single chokepoint to mark dirty at.
+	// Comparing the snapshot against the final model in the defer below covers
+	// every Update exit path uniformly.
+	wasModalOpen := m.ModalOpen()
+
 	// Centralizes ADR 0010's lifecycle rule: any disrupting event handler marks
 	// imageDiff.dirty, and this defer turns that into the eager-clear /
 	// debounced-replace tea.Cmd, regardless of which code path produced the
 	// final model.
 	defer func() {
 		model, ok := next.(Model)
-		if !ok || !model.imageDiff.dirty {
+		if !ok {
+			return
+		}
+		if model.ModalOpen() != wasModalOpen {
+			model.imageDiff.dirty = true
+		}
+		if !model.imageDiff.dirty {
 			return
 		}
 		model.imageDiff.dirty = false
@@ -116,7 +130,7 @@ func (m Model) handleSearchQueryUpdated(msg search.SearchQueryUpdatedMsg) (Model
 	return m, m.fileTreeModel.SetSearchMatchesAndJump(matches)
 }
 
-func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (Model, tea.Cmd) {
 	m.width = msg.Width
 	m.height = msg.Height
 	m.ready = true
@@ -132,13 +146,13 @@ func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(reloadCmd, helpCmd)
 }
 
-func (m Model) handleStartupLoad() (tea.Model, tea.Cmd) {
+func (m Model) handleStartupLoad() (Model, tea.Cmd) {
 	m.reloadBranchState()
 	reloadCmd := m.reloadDiffsForSelection()
 	return m, tea.Batch(reloadCmd, m.cmdLoadBranchSync())
 }
 
-func (m Model) handleActionPoll() (tea.Model, tea.Cmd) {
+func (m Model) handleActionPoll() (Model, tea.Cmd) {
 	var actionCmd tea.Cmd
 	if m.runningRunner != nil {
 		if chunk := m.runningRunner.Consume(); chunk != "" {
@@ -162,21 +176,21 @@ func (m Model) handleActionPoll() (tea.Model, tea.Cmd) {
 	return m, actionCmd
 }
 
-func (m Model) handleDiffReload(msg diffReloadMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleDiffReload(msg diffReloadMsg) (Model, tea.Cmd) {
 	if msg.seq == m.diffReloadSeq && m.focus == focusFiletree {
 		return m, m.reloadDiffsForSelection()
 	}
 	return m, nil
 }
 
-func (m Model) handleBranchSyncLoaded(msg branchSyncLoadedMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleBranchSyncLoaded(msg branchSyncLoadedMsg) (Model, tea.Cmd) {
 	if msg.branchName == m.statusData.branchName {
 		m.statusData.branchSync = msg.sync
 	}
 	return m, nil
 }
 
-func (m Model) handleMouseWheelMsg(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleMouseWheelMsg(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
 	if m.handleMouseWheel(msg) {
 		m.imageDiff.dirty = true
 		return m, nil
@@ -184,7 +198,7 @@ func (m Model) handleMouseWheelMsg(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if msg.String() == "ctrl+c" {
 		if m.runningOpen && !m.runningDone && m.runningRunner != nil {
 			m.runningRunner.Cancel()
@@ -272,7 +286,7 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m.delegateToChild(msg)
 }
 
-func (m Model) handleFlashTick() (tea.Model, tea.Cmd) {
+func (m Model) handleFlashTick() (Model, tea.Cmd) {
 	if m.diffarea.Flash.Active {
 		m.diffarea.Flash.Frames--
 		if m.diffarea.Flash.Frames <= 0 {
@@ -284,7 +298,7 @@ func (m Model) handleFlashTick() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleCommitFinished(msg commitFinishedMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleCommitFinished(msg commitFinishedMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		m.showGitError(fmt.Errorf("commit failed: %w", msg.err))
 		return m, nil
@@ -295,14 +309,14 @@ func (m Model) handleCommitFinished(msg commitFinishedMsg) (tea.Model, tea.Cmd) 
 	return m, tea.Batch(notify.Info(ui.MessageClosed("git commit")), m.refresh(), statusRepoMutatedCmd())
 }
 
-func (m Model) handleLazygitLogFinished(msg lazygitLogFinishedMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleLazygitLogFinished(msg lazygitLogFinishedMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		return m, notify.Error("lazygit log failed: " + msg.err.Error())
 	}
 	return m, tea.Batch(notify.Info(ui.MessageClosed("lazygit log")), m.refresh())
 }
 
-func (m Model) handleEditFileFinished(msg editFileFinishedMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleEditFileFinished(msg editFileFinishedMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		return m, notify.Error("edit failed: " + msg.err.Error())
 	}
@@ -312,7 +326,7 @@ func (m Model) handleEditFileFinished(msg editFileFinishedMsg) (tea.Model, tea.C
 	return m, tea.Batch(notify.Info(ui.MessageClosed("editor")), m.refresh())
 }
 
-func (m Model) handleEditCommentFinished(msg editCommentFinishedMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleEditCommentFinished(msg editCommentFinishedMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		return m, notify.Error("comment edit failed: " + msg.err.Error())
 	}
@@ -322,7 +336,7 @@ func (m Model) handleEditCommentFinished(msg editCommentFinishedMsg) (tea.Model,
 	return m, tea.Batch(notify.Info(ui.MessageClosed("comment editor")), m.refresh())
 }
 
-func (m Model) handleErrorKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleErrorKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "enter":
 		m.errorOpen = false

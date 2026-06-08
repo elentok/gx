@@ -190,6 +190,51 @@ func TestImageDiffNoPlacementWhenSelectionMovesAwayBeforeSettling(t *testing.T) 
 	}
 }
 
+func TestImageDiffNotPlacedWhileModalIsOpen(t *testing.T) {
+	t.Parallel()
+	repo := setupImageDiffRepo(t)
+	old := encodeTestPNG(t, 8, 8, color.RGBA{R: 255, A: 255})
+	new := encodeTestPNG(t, 16, 8, color.RGBA{G: 255, A: 255})
+	settings := DefaultSettings()
+	settings.ImageDiffs = true
+
+	m, spies := newImageDiffTestModel(t, repo, settings, supportedCapability(), old, new)
+
+	// Select the image, then open a modal before the debounce settles — a
+	// placement here would paint over the modal at the terminal's graphics
+	// layer (ADR 0010), so the settle must bail out without placing.
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	mm := updated.(Model)
+	mm.confirmOpen = true
+
+	updated, _ = mm.Update(imageDiffSettleMsg{seq: mm.imageDiff.settleSeq})
+	mm = updated.(Model)
+
+	if spies.fetchCalls != 0 {
+		t.Fatalf("expected no blob fetch while a modal is open, got %d calls", spies.fetchCalls)
+	}
+	if len(mm.imageDiff.activeIDs) != 0 {
+		t.Fatalf("expected no placement while a modal is open, got %v", mm.imageDiff.activeIDs)
+	}
+
+	// Closing the modal (esc -> handleConfirmKey sets confirmOpen = false)
+	// re-marks imageDiff dirty via the ModalOpen() transition check, scheduling
+	// a fresh settle that places the overlay now that it's safe to.
+	updated, cmd := mm.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	mm = updated.(Model)
+	if mm.confirmOpen {
+		t.Fatalf("expected esc to close the confirm modal")
+	}
+	mm = runStatusCmd(t, mm, cmd)
+
+	if spies.fetchCalls == 0 {
+		t.Fatalf("expected a blob fetch once the modal closed and the model resettled")
+	}
+	if len(mm.imageDiff.activeIDs) == 0 {
+		t.Fatalf("expected the overlay to be placed once the modal closed")
+	}
+}
+
 func TestImageDiffsConfigDisabledShortCircuitsToBinarySummary(t *testing.T) {
 	t.Parallel()
 	repo := setupImageDiffRepo(t)

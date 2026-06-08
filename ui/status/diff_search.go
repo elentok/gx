@@ -20,8 +20,9 @@ func (m Model) InputFocused() bool {
 }
 
 func (m Model) ModalOpen() bool {
-	return m.runningOpen || m.confirmOpen || m.errorOpen ||
-		m.bump.IsOpen || m.push.IsOpen || m.pull.IsOpen || m.stash.IsOpen || m.output.IsOpen
+	return m.runningOpen || m.confirmOpen || m.errorOpen || m.credentialOpen ||
+		m.bump.IsOpen || m.push.IsOpen || m.pull.IsOpen || m.stash.IsOpen ||
+		m.output.IsOpen || m.help.IsOpen
 }
 
 func (m *Model) computeSearchMatches(query string) []search.Match {

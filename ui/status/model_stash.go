@@ -23,7 +23,7 @@ func (m Model) hasStashableChanges(stagedOnly bool) bool {
 	return false
 }
 
-func (m Model) handleStashUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) handleStashUpdate(msg tea.Msg) (Model, tea.Cmd) {
 	next, cmd, result := m.stash.Update(msg)
 	m.stash = next
 	if !result.Done {

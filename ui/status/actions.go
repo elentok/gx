@@ -218,7 +218,7 @@ func sanitizeTerminalOutputForViewport(s string) string {
 	return b.String()
 }
 
-func (m *Model) handleRunningKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleRunningKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if m.runningDone {
 		switch msg.String() {
 		case "esc", "enter":
@@ -250,7 +250,7 @@ func (m *Model) openCredentialPrompt(prompt components.CredentialPrompt) {
 	m.keys.Reset()
 }
 
-func (m *Model) handleCredentialKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleCredentialKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		if m.runningRunner != nil {
@@ -272,7 +272,7 @@ func (m *Model) handleCredentialKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *Model) handleConfirmKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleConfirmKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	nextYes, decided, accepted, handled := components.UpdateConfirm(msg, m.confirmYes)
 	if !handled {
 		return m, nil

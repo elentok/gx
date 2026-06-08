@@ -176,6 +176,16 @@ func (m Model) handleImageDiffSettle(msg imageDiffSettleMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// A modal overlays the diff panel as text composed into View()'s output
+	// (ui.OverlayCenter), but a kitty placement paints over that at the
+	// terminal's graphics layer regardless — so placing here would occlude the
+	// modal. Bail without touching fallbackPath: modal-open says nothing about
+	// whether this file is fallback-worthy, and the modal closing re-marks
+	// imageDiff dirty, triggering a fresh settle that re-evaluates from scratch.
+	if m.ModalOpen() {
+		return m, nil
+	}
+
 	originCol, originRow, availCols, availRows, ok := m.imageDiffPanelGeometry()
 	if !ok {
 		return m, nil

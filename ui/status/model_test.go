@@ -2376,10 +2376,11 @@ func TestGOOpensOutputModal(t *testing.T) {
 		t.Fatalf("expected chord prefix=g after first g, got %v", m.keys.Prefix())
 	}
 
-	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
-	if cmd != nil {
-		t.Fatalf("go should not launch a command")
-	}
+	// Opening the output modal is itself a disrupting event for the image-diff
+	// overlay (ADR 0010: a stale placement would otherwise occlude the modal),
+	// so cmd is expected to carry that internal housekeeping — not an external
+	// command launch, which is what this test guards against.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
 	m = updated.(Model)
 	if !m.output.IsOpen {
 		t.Fatalf("expected go to open output modal")
