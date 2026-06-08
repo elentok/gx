@@ -200,6 +200,42 @@ func TestAmendE2E_NonHEAD_FromLog(t *testing.T) {
 	verifyAmendedNonHEADCommit(t, repoDir, middleHashBefore)
 }
 
+// TestAmendE2E_NonHEAD_FromLogDetailFocused covers amending while the detail
+// panel (not the list) holds focus. In that case the amend modal is driven by
+// the embedded commit detail panel, whose async step/spinner messages must keep
+// being forwarded by the log container — otherwise the run stalls right after
+// the fixup commit is created and the autosquash rebase never happens.
+func TestAmendE2E_NonHEAD_FromLogDetailFocused(t *testing.T) {
+	t.Parallel()
+	repoDir := testutil.TempRepoWithThreeCommits(t)
+	middleHashBefore := logE2EFindCommitHash(t, repoDir, "middle")
+
+	testutil.WriteFile(t, repoDir, "a.txt", "a amended\n")
+	testutil.WriteFile(t, repoDir, "b.txt", "b changed but not staged\n")
+	testutil.WriteFile(t, repoDir, "c.txt", "c changed but not staged\n")
+	testutil.MustGitExported(t, repoDir, "add", "a.txt")
+
+	tm := startLogTUI(t, repoDir)
+
+	waitForLogE2EText(t, tm, "tip", logE2ELoadWait)
+
+	// Navigate to "middle", focus the detail panel, then open the amend modal.
+	tm.Send(logE2EKeyRune('j'))
+	tm.Send(logE2EKeyRune('l'))
+	tm.Send(logE2EKeyRune('A'))
+
+	waitForLogE2ETexts(t, tm, logE2EActionWait, "Amend staged changes into:", "middle", "a.txt")
+
+	// Accept and wait for the git hash to change (amend ran to completion).
+	tm.Send(logE2EKeySpecial(tea.KeyEnter))
+	waitForLogHashChange(t, tm, repoDir, "middle", middleHashBefore)
+
+	waitForStashPop(t, tm, repoDir, "b.txt")
+	logE2EQuit(t, tm)
+
+	verifyAmendedNonHEADCommit(t, repoDir, middleHashBefore)
+}
+
 func TestAmendE2E_HEAD_FromLog(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempRepoWithThreeCommits(t)

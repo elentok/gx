@@ -75,6 +75,16 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		return m, childCmd
 	}
 
+	// While the embedded detail panel drives its own modal (amend/reword),
+	// delegate all messages to it. The log container doesn't broadcast unknown
+	// messages, so the modal's async step/spinner messages would otherwise be
+	// dropped — leaving e.g. an amend stuck after the fixup commit is created.
+	if m.commitDetail.IsModalActive() {
+		updated, detailCmd := m.commitDetail.Update(msg)
+		m.commitDetail = updated.(commit.Model)
+		return m, detailCmd
+	}
+
 	switch msg := msg.(type) {
 	case imagediff.SettleMsg:
 		// commit.Model is synchronous apart from this debounce tick; the log

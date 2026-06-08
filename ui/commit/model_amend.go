@@ -15,6 +15,14 @@ func (m *Model) openAmendConfirm() error {
 	return m.amendConfirm.Open(m.worktreeRoot, m.details.FullHash, m.details.Subject)
 }
 
+// IsModalActive reports whether the detail panel is driving its own modal
+// (amend or reword) that runs asynchronous commands. Containers that embed the
+// panel must keep forwarding every message to it while this is true; otherwise
+// the modal's async step/spinner messages are dropped and it stalls mid-run.
+func (m Model) IsModalActive() bool {
+	return m.amendConfirm.IsOpen || m.reword.IsOpen
+}
+
 func (m Model) handleAmendUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd, result := m.amendConfirm.Update(msg)
 	m.amendConfirm = next

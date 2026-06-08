@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.19.2 - 2026-06-08
+
+- Log: fixed amend (`A`) stalling when triggered with the commit detail panel focused — the modal got stuck after creating the fixup commit and never ran the autosquash rebase. The log now keeps forwarding the detail panel's async modal messages, so the amend completes.
+
 ## v0.19.1 - 2026-06-08
 
 - Commit/Log/Stash: inline image diffs now render in the commit detail view too, so image changes are shown directly (via the kitty graphics protocol) when viewing a commit in the log and stash tabs, not just in the status diff panel.
