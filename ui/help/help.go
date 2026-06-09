@@ -6,6 +6,7 @@ import (
 
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 )
@@ -14,6 +15,14 @@ const (
 	MIN_WIDTH  = 56
 	MARGIN     = 8
 	MIN_HEIGHT = 8
+	// scrollbarGutter is the width reserved to the right of the body for the
+	// scroll indicator (1 gap + 1 bar). It is always reserved so the layout does
+	// not shift when content starts/stops overflowing.
+	scrollbarGutter = 2
+	// frameChromeX is the horizontal space RenderModalFrame consumes outside the
+	// body text: a 1-cell border and 1-cell padding on each side. The frame's
+	// Width is the outer width, so the body text area is Width - frameChromeX.
+	frameChromeX = 4
 )
 
 type Model struct {
@@ -49,15 +58,36 @@ func (m Model) View() string {
 	}
 
 	return ui.RenderModalFrame(ui.ModalFrameOptions{
-		Title:         "Keybindings",
-		Body:          m.Viewport.View(),
-		Hint:          ui.JoinStatus(ui.HintDismissAndScroll()),
-		Width:         m.Viewport.Width(),
+		Title: "Keybindings",
+		Body:  m.bodyWithScrollbar(),
+		Hint:  ui.JoinStatus(ui.HintDismissAndScroll()),
+		// Frame width must hold the body, the scrollbar gutter, and the frame's
+		// own border+padding, or the body+bar block overflows and the bar wraps
+		// onto its own line.
+		Width:         m.Viewport.Width() + scrollbarGutter + frameChromeX,
 		BorderColor:   ui.ColorBlue,
 		TitleInBorder: true,
 		TitleColor:    ui.ColorBlue,
 		HintColor:     ui.ColorGray,
 	})
+}
+
+// bodyWithScrollbar renders the viewport body with a scroll indicator gutter to
+// its right when the content overflows. The gutter width is always reserved in
+// the layout (see scrollbarGutter), so the body width is stable whether or not
+// the bar shows.
+func (m Model) bodyWithScrollbar() string {
+	body := m.Viewport.View()
+	bar := ui.RenderScrollbar(
+		m.Viewport.Height(),
+		m.Viewport.TotalLineCount(),
+		m.Viewport.VisibleLineCount(),
+		m.Viewport.YOffset(),
+	)
+	if bar == "" {
+		return body
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, body, " ", bar)
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
@@ -84,7 +114,10 @@ func helpWidth(containerWidth int) int {
 }
 
 func (m *Model) setContainerSize(containerWidth, containerHeight int) {
-	vpW := helpWidth(containerWidth)
+	// The viewport content width is the modal width less the frame chrome and the
+	// reserved scrollbar gutter, so the body + bar fill the text area exactly
+	// (rather than the bar widening the modal or being clipped at the edge).
+	vpW := helpWidth(containerWidth) - frameChromeX - scrollbarGutter
 	vpH := max(containerHeight/2-4, MIN_HEIGHT)
 	m.Viewport.SetWidth(vpW)
 	m.Viewport.SetHeight(vpH)
