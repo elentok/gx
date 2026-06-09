@@ -50,7 +50,11 @@ var (
 
 	StyleSearchResult       = lipgloss.NewStyle().Foreground(ColorYellow).Bold(true).Underline(true)
 	StyleActiveSearchResult = lipgloss.NewStyle().Foreground(ColorGreen).Bold(true).Underline(true)
-	StyleDiffSeparator      = lipgloss.NewStyle().Foreground(ColorDeepBg)
+	// StyleFilterMatch is a deliberately soft emphasis for the matched substring
+	// in a filtered list: bold + a slightly lighter foreground, no underline or
+	// color shift, so it reads as "this part matched" without shouting.
+	StyleFilterMatch   = lipgloss.NewStyle().Foreground(ColorText).Bold(true)
+	StyleDiffSeparator = lipgloss.NewStyle().Foreground(ColorDeepBg)
 )
 
 // Status styles.

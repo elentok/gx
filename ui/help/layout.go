@@ -80,8 +80,9 @@ func ceilDiv(a, b int) int {
 
 // RenderColumns lays the sections out in a responsive multi-column block sized to
 // `width`. Each section stays intact; sections flow column-major; columns are
-// padded to equal width and joined horizontally.
-func RenderColumns(sections []KeySection, width int) string {
+// padded to equal width and joined horizontally. When `query` is non-empty the
+// matching substring in each key/title is softly highlighted.
+func RenderColumns(sections []KeySection, width int, query string) string {
 	cols := columnCount(width)
 	columns := packColumns(sections, cols)
 	if len(columns) == 0 {
@@ -97,14 +98,14 @@ func RenderColumns(sections []KeySection, width int) string {
 		if i > 0 {
 			withGaps = append(withGaps, gap)
 		}
-		withGaps = append(withGaps, renderColumn(colSections))
+		withGaps = append(withGaps, renderColumn(colSections, query))
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Top, withGaps...)
 }
 
 // renderColumn renders one column's sections (heading + aligned key/title rows)
 // joined vertically, with a blank line between sections.
-func renderColumn(sections []KeySection) string {
+func renderColumn(sections []KeySection, query string) string {
 	keyStyle := ui.StyleTitle
 	descStyle := ui.StyleHint
 	sep := descStyle.Render("  ")
@@ -124,8 +125,39 @@ func renderColumn(sections []KeySection) string {
 		}
 		for _, b := range section.Bindings {
 			pad := strings.Repeat(" ", keyW-ansi.StringWidth(b.Keys()))
-			lines = append(lines, "  "+keyStyle.Render(b.Keys())+pad+sep+descStyle.Render(b.Title))
+			key := highlightMatch(b.Keys(), query, keyStyle)
+			title := highlightMatch(b.Title, query, descStyle)
+			lines = append(lines, "  "+key+pad+sep+title)
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+// highlightMatch renders text in base style, re-rendering every case-insensitive
+// occurrence of query in ui.StyleFilterMatch (bold + slightly lighter). With an
+// empty query it is just base.Render(text).
+func highlightMatch(text, query string, base lipgloss.Style) string {
+	q := strings.TrimSpace(query)
+	if q == "" {
+		return base.Render(text)
+	}
+	lowerText := strings.ToLower(text)
+	lowerQ := strings.ToLower(q)
+
+	var b strings.Builder
+	rest, lowerRest := text, lowerText
+	for {
+		idx := strings.Index(lowerRest, lowerQ)
+		if idx < 0 {
+			b.WriteString(base.Render(rest))
+			break
+		}
+		end := idx + len(lowerQ)
+		if idx > 0 {
+			b.WriteString(base.Render(rest[:idx]))
+		}
+		b.WriteString(ui.StyleFilterMatch.Render(rest[idx:end]))
+		rest, lowerRest = rest[end:], lowerRest[end:]
+	}
+	return b.String()
 }

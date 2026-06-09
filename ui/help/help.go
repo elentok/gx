@@ -184,7 +184,7 @@ func (m *Model) setContainerSize(containerWidth, containerHeight int) {
 	m.Viewport.SetWidth(vpW)
 	m.Viewport.SetHeight(vpH)
 	m.filter.SetWidth(vpW)
-	m.Viewport.SetContent(RenderColumns(m.visibleSections(), vpW))
+	m.Viewport.SetContent(RenderColumns(m.visibleSections(), vpW, m.filter.Query()))
 }
 
 // visibleSections narrows the sections to those with bindings matching the
@@ -222,7 +222,7 @@ func (m Model) matchCount() int {
 // applyFilter re-packs the columns for the current query and resets the scroll
 // position to the top so the first matches are visible.
 func (m *Model) applyFilter() {
-	m.Viewport.SetContent(RenderColumns(m.visibleSections(), m.Viewport.Width()))
+	m.Viewport.SetContent(RenderColumns(m.visibleSections(), m.Viewport.Width(), m.filter.Query()))
 	m.Viewport.GotoTop()
 }
 

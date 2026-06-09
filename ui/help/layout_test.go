@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/x/ansi"
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 )
 
@@ -120,7 +121,7 @@ func TestRenderColumns_NarrowIsSingleColumn(t *testing.T) {
 	sections := []KeySection{sectionN("App", 2), sectionN("Nav", 2)}
 	// Narrow width → 1 column → headings stack vertically (App appears before Nav
 	// on earlier lines, never side-by-side).
-	out := ansi.Strip(RenderColumns(sections, 40))
+	out := ansi.Strip(RenderColumns(sections, 40, ""))
 	lines := strings.Split(out, "\n")
 	appLine, navLine := -1, -1
 	for i, l := range lines {
@@ -139,10 +140,41 @@ func TestRenderColumns_NarrowIsSingleColumn(t *testing.T) {
 	}
 }
 
+func TestHighlightMatch_WrapsMatchOnly(t *testing.T) {
+	base := ui.StyleHint
+	out := highlightMatch("robot", "bo", base)
+	// The plain text is preserved.
+	if got := ansi.Strip(out); got != "robot" {
+		t.Errorf("stripped = %q, want 'robot'", got)
+	}
+	// The matched substring is rendered with the match style, the rest with base.
+	wantMatch := ui.StyleFilterMatch.Render("bo")
+	if !strings.Contains(out, wantMatch) {
+		t.Errorf("expected matched 'bo' to be highlighted; out=%q", out)
+	}
+	if !strings.Contains(out, base.Render("ro")) || !strings.Contains(out, base.Render("t")) {
+		t.Errorf("expected non-matched parts in base style; out=%q", out)
+	}
+}
+
+func TestHighlightMatch_CaseInsensitiveAllOccurrences(t *testing.T) {
+	out := highlightMatch("Go to bottom", "o", ui.StyleHint)
+	if n := strings.Count(out, ui.StyleFilterMatch.Render("o")); n < 3 {
+		t.Errorf("expected every 'o'/'O' highlighted, got %d highlights in %q", n, out)
+	}
+}
+
+func TestHighlightMatch_EmptyQueryIsPlainBase(t *testing.T) {
+	base := ui.StyleHint
+	if got, want := highlightMatch("delete", "", base), base.Render("delete"); got != want {
+		t.Errorf("empty query: got %q want %q", got, want)
+	}
+}
+
 func TestRenderColumns_WideIsMultiColumn(t *testing.T) {
 	sections := []KeySection{sectionN("App", 2), sectionN("Nav", 2), sectionN("Yank", 2)}
 	// Wide width → 3 columns → the three headings share the first line.
-	out := ansi.Strip(RenderColumns(sections, 120))
+	out := ansi.Strip(RenderColumns(sections, 120, ""))
 	firstLine := strings.Split(out, "\n")[0]
 	for _, h := range []string{"App", "Nav", "Yank"} {
 		if !strings.Contains(firstLine, h) {
