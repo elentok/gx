@@ -57,6 +57,94 @@ func TestHelpCloseKeys(t *testing.T) {
 	}
 }
 
+func helpWithBindings() Model {
+	m := NewModel([]KeySection{
+		{Title: "Navigation", Bindings: []keys.Binding{
+			{Seq: []string{"j"}, Title: "move down"},
+			{Seq: []string{"k"}, Title: "move up"},
+		}},
+		{Title: "Actions", Bindings: []keys.Binding{
+			{Seq: []string{"d"}, Title: "delete"},
+			{Seq: []string{"x"}, Title: "down to bottom"},
+		}},
+	})
+	m.Open(120, 40)
+	return m
+}
+
+func keyMsg(r rune) tea.KeyPressMsg { return tea.KeyPressMsg{Code: r, Text: string(r)} }
+
+func TestHelpFilterSlashActivatesAndTypesLiterally(t *testing.T) {
+	m := helpWithBindings()
+	m, _ = m.Update(keyMsg('/'))
+	if !m.filter.IsActive() || !m.filter.InputFocused() {
+		t.Fatal("'/' should activate the filter and focus its input")
+	}
+	// 'q' must type into the query, not close help, while the input is focused.
+	m, _ = m.Update(keyMsg('q'))
+	if !m.IsOpen {
+		t.Error("'q' while filtering should not close help")
+	}
+	if m.filter.Query() != "q" {
+		t.Errorf("query = %q, want 'q'", m.filter.Query())
+	}
+}
+
+func TestHelpFilterEscClearsThenCloses(t *testing.T) {
+	m := helpWithBindings()
+	m, _ = m.Update(keyMsg('/'))
+	m, _ = m.Update(keyMsg('d'))
+	// First esc clears the filter but keeps help open.
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	if !m.IsOpen {
+		t.Fatal("first esc should keep help open")
+	}
+	if m.filter.IsActive() {
+		t.Error("first esc should clear the filter")
+	}
+	// Second esc closes help.
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	if m.IsOpen {
+		t.Error("second esc should close help")
+	}
+}
+
+func TestHelpFilterNarrowsMatchingKeyOrTitle(t *testing.T) {
+	m := helpWithBindings()
+	m, _ = m.Update(keyMsg('/'))
+	// "down" matches "move down" (title) and "down to bottom" (title) → 2.
+	for _, r := range "down" {
+		m, _ = m.Update(keyMsg(r))
+	}
+	if got := m.matchCount(); got != 2 {
+		t.Errorf("matchCount for 'down' = %d, want 2", got)
+	}
+
+	// Filtering by a key display: 'd' matches the 'd' binding (key) and any title
+	// containing 'd' (move down, delete, down to bottom).
+	m2 := helpWithBindings()
+	m2, _ = m2.Update(keyMsg('/'))
+	m2, _ = m2.Update(keyMsg('x'))
+	// 'x' is the key for "down to bottom" and appears in no title → 1 match.
+	if got := m2.matchCount(); got != 1 {
+		t.Errorf("matchCount for key 'x' = %d, want 1", got)
+	}
+}
+
+func TestHelpFilterNoMatches(t *testing.T) {
+	m := helpWithBindings()
+	m, _ = m.Update(keyMsg('/'))
+	for _, r := range "zzz" {
+		m, _ = m.Update(keyMsg(r))
+	}
+	if got := m.matchCount(); got != 0 {
+		t.Errorf("matchCount for 'zzz' = %d, want 0", got)
+	}
+	if rt := m.rightTitle(); rt != "no matches" {
+		t.Errorf("rightTitle = %q, want 'no matches'", rt)
+	}
+}
+
 func TestHelpWindowSizeMsg(t *testing.T) {
 	m := NewModel(nil)
 	m.Open(120, 40)

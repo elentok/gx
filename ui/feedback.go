@@ -54,6 +54,17 @@ func HintDismissAndScroll() string {
 	return JoinStatus(HintDismiss(), RenderInlineBindings(key.NewBinding(key.WithHelp("j/k", "scroll"))))
 }
 
+// HintFilter is the footer hint shown when a filterable view has no active
+// filter: press '/' to start narrowing the list.
+func HintFilter() string {
+	return RenderInlineBindings(key.NewBinding(key.WithHelp("/", "filter")))
+}
+
+// HintClearFilter is the footer hint shown while a filter is active.
+func HintClearFilter() string {
+	return RenderInlineBindings(key.NewBinding(key.WithHelp("esc", "clear filter")))
+}
+
 func HintSubmitCancel() string {
 	return RenderInlineBindings(
 		key.NewBinding(key.WithHelp("enter", "submit")),
