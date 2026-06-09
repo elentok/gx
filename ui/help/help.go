@@ -103,7 +103,10 @@ func NewKeySection(title string, bindings ...keys.Binding) KeySection {
 
 func BuildSections(managers ...keys.Manager) []KeySection {
 	categoryBindings := make(map[string][]keys.Binding)
-	seenInCategory := make(map[string]map[keys.BindingID]bool)
+	// indexInCategory tracks, per category, where each BindingID's entry lives in
+	// categoryBindings so twin bindings (same ID) can be merged into one row whose
+	// key display joins their sequences with "/" (alternatives), e.g. "1/gw".
+	indexInCategory := make(map[string]map[keys.BindingID]int)
 	for _, manager := range managers {
 		for _, b := range manager.Bindings() {
 			if b.Title == "" {
@@ -113,13 +116,15 @@ func BuildSections(managers ...keys.Manager) []KeySection {
 				if cat == "" {
 					continue
 				}
-				if seenInCategory[cat] == nil {
-					seenInCategory[cat] = make(map[keys.BindingID]bool)
+				if indexInCategory[cat] == nil {
+					indexInCategory[cat] = make(map[keys.BindingID]int)
 				}
-				if seenInCategory[cat][b.ID] {
+				if idx, ok := indexInCategory[cat][b.ID]; ok {
+					existing := &categoryBindings[cat][idx]
+					existing.Display = existing.Keys() + "/" + b.Keys()
 					continue
 				}
-				seenInCategory[cat][b.ID] = true
+				indexInCategory[cat][b.ID] = len(categoryBindings[cat])
 				categoryBindings[cat] = append(categoryBindings[cat], keys.Binding{ID: b.ID, Seq: b.Seq, Title: b.Title, Display: b.Display})
 			}
 		}

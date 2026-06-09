@@ -81,6 +81,30 @@ func TestBuildSections_DeduplicatesAndSorts(t *testing.T) {
 	}
 }
 
+func TestBuildSections_MergesTwinsNumberFirst(t *testing.T) {
+	// Number key registered before its chord twin (same BindingID) → merged
+	// display is number-first: "1/gw".
+	num := keys.Binding{ID: "goto-wt", Seq: []string{"1"}, Title: "worktrees tab", Categories: []string{"App"}}
+	chord := keys.Binding{ID: "goto-wt", Seq: []string{"g", "w"}, Title: "worktrees tab", Categories: []string{"App"}}
+	distinct := keys.Binding{ID: "next-tab", Seq: []string{"g", "."}, Title: "next tab", Categories: []string{"App"}}
+
+	sections := BuildSections(keys.New([]keys.Binding{num, chord, distinct}))
+
+	if len(sections) != 1 {
+		t.Fatalf("expected 1 section, got %d", len(sections))
+	}
+	bs := sections[0].Bindings
+	if len(bs) != 2 {
+		t.Fatalf("expected 2 merged bindings, got %d: %+v", len(bs), bs)
+	}
+	if got := bs[0].Keys(); got != "1/gw" {
+		t.Errorf("merged twin Keys()=%q want 1/gw", got)
+	}
+	if got := bs[1].Keys(); got != "g." {
+		t.Errorf("distinct binding Keys()=%q want g.", got)
+	}
+}
+
 func TestRenderView_ContainsBindings(t *testing.T) {
 	sections := []KeySection{
 		{Title: "Nav", Bindings: []keys.Binding{{Seq: []string{"j"}, Title: "down"}}},

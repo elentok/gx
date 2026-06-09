@@ -15,14 +15,16 @@ func Bindings() []keys.Binding {
 	return []keys.Binding{
 		{ID: BindingPrevTab, Seq: []string{"g", ","}, Categories: []string{"App"}, Title: "prev tab"},
 		{ID: BindingNextTab, Seq: []string{"g", "."}, Categories: []string{"App"}, Title: "next tab"},
-		{ID: BindingGotoWorktree, Seq: []string{"g", "w"}, Categories: []string{"App"}, Title: "worktrees tab"},
-		{ID: BindingGotoLog, Seq: []string{"g", "l"}, Categories: []string{"App"}, Title: "log tab"},
-		{ID: BindingGotoStatus, Seq: []string{"g", "s"}, Categories: []string{"App"}, Title: "status tab"},
-		{ID: BindingGotoStash, Seq: []string{"g", "S"}, Categories: []string{"App"}, Title: "stash tab"},
+		// Number keys registered before their chord twins so help merges them
+		// number-first (1/gw, not gw/1).
 		{ID: BindingGotoWorktree, Seq: []string{"1"}, Categories: []string{"App"}, Title: "worktrees tab"},
 		{ID: BindingGotoLog, Seq: []string{"2"}, Categories: []string{"App"}, Title: "log tab"},
 		{ID: BindingGotoStatus, Seq: []string{"3"}, Categories: []string{"App"}, Title: "status tab"},
 		{ID: BindingGotoStash, Seq: []string{"4"}, Categories: []string{"App"}, Title: "stash tab"},
+		{ID: BindingGotoWorktree, Seq: []string{"g", "w"}, Categories: []string{"App"}, Title: "worktrees tab"},
+		{ID: BindingGotoLog, Seq: []string{"g", "l"}, Categories: []string{"App"}, Title: "log tab"},
+		{ID: BindingGotoStatus, Seq: []string{"g", "s"}, Categories: []string{"App"}, Title: "status tab"},
+		{ID: BindingGotoStash, Seq: []string{"g", "S"}, Categories: []string{"App"}, Title: "stash tab"},
 	}
 }
 

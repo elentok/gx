@@ -38,6 +38,25 @@ row index) and a height (number of visible rows).
 **Scroll offset** — the index of the first visible row in a panel's viewport. Independent of
 selection.
 
+## Find: Search and Filter
+
+Two distinct ways to locate things in a view. They are different interaction concepts, owned by
+different components, and must not be conflated.
+
+**Search** — *highlight-and-jump* over a content stream that stays fully visible. The user types a
+query; every match is highlighted in place and `n`/`N` walk the viewport from one match to the next.
+Nothing is hidden. Suited to long single-column streams (diffs, file trees) where staying oriented
+matters. Owned by `ui/search`, which carries match positions (`ViewportRow`/`DataIndex`) and a match
+cursor; the host computes what counts as a match.
+
+**Filter** — *narrow-the-list*. The user types a query and non-matching items disappear; only matches
+remain and the layout re-flows around them. There is no match cursor and no jump — the result *is*
+the narrowing. Suited to short reference lists (keybindings help, and later the file tree / log)
+where the goal is "show me only X." Owned by `ui/filter`, which carries only the query, mode, and
+input box and emits `FilterChangedMsg`; the host owns the matching predicate (e.g. help matches a
+binding's key *and* title). Deliberately a separate component from **Search**, not an extension of
+it.
+
 ## Selection and Active Item
 
 **Selection** (list panels) — the index of the currently highlighted item in a list panel. Used for

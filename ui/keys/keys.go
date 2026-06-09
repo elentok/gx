@@ -16,15 +16,18 @@ type Binding struct {
 	Seq        []string  // key sequence: ["g","l"] for chord, ["j"] for single key
 	Categories []string  // help sections this binding appears in
 	Title      string    // description shown in help, e.g. "goto log"
-	Display    string    // optional key display override (defaults to Seq joined with "/")
+	Display    string    // optional key display override (defaults to Seq joined as a sequence)
 }
 
-// Keys returns the display string for this binding's key sequence.
+// Keys returns the display string for this binding's key sequence. The sequence
+// is joined with "" so a chord like ["g","l"] renders "gl" — matching how it is
+// typed (one key after another). "/" is reserved to mean alternatives, used when
+// help merges twin bindings (e.g. "1/gw").
 func (b Binding) Keys() string {
 	if b.Display != "" {
 		return b.Display
 	}
-	return strings.Join(b.Seq, "/")
+	return strings.Join(b.Seq, "")
 }
 
 // Manager is a value type — embed it in the bubbletea model so prefix state is

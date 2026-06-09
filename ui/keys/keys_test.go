@@ -192,8 +192,15 @@ func TestReset_ClearsPrefix(t *testing.T) {
 
 func TestBinding_Keys_Default(t *testing.T) {
 	b := keys.Binding{Seq: []string{"g", "l"}}
-	if b.Keys() != "g/l" {
-		t.Fatalf("Keys()=%q want g/l", b.Keys())
+	if b.Keys() != "gl" {
+		t.Fatalf("Keys()=%q want gl", b.Keys())
+	}
+}
+
+func TestBinding_Keys_SingleKey(t *testing.T) {
+	b := keys.Binding{Seq: []string{"j"}}
+	if b.Keys() != "j" {
+		t.Fatalf("Keys()=%q want j", b.Keys())
 	}
 }
 
