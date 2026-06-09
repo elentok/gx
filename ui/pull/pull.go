@@ -26,9 +26,10 @@ const (
 
 // Result is returned on each Update call when something changed.
 type Result struct {
-	Done   bool
-	Output string // accumulated git output — store for "g o" viewing
-	Err    error
+	Done    bool
+	Aborted bool   // user cancelled before the pull completed — no success notification
+	Output  string // accumulated git output — store for "g o" viewing
+	Err     error
 }
 
 // internal messages
@@ -167,7 +168,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 		}
 		if !accepted {
 			m.IsOpen = false
-			return m, nil, Result{Done: true}
+			return m, nil, Result{Done: true, Aborted: true}
 		}
 		m.stashed = true
 		m.phase = phaseStashing
@@ -185,7 +186,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 		}
 		if !accepted {
 			m.IsOpen = false
-			return m, nil, Result{Done: true, Output: m.log.String()}
+			return m, nil, Result{Done: true, Aborted: true, Output: m.log.String()}
 		}
 		m.phase = phaseStashPopping
 		m.appendRunningStep(stepStashPop)

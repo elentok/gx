@@ -31,9 +31,10 @@ const (
 
 // Result is returned on each Update call when something noteworthy happened.
 type Result struct {
-	Done   bool   // operation finished (success, failure, or abort)
-	Output string // accumulated git output — store for "g o" viewing
-	Err    error  // non-nil on failure
+	Done    bool   // operation finished (success, failure, or abort)
+	Aborted bool   // user cancelled before the push completed — no success notification
+	Output  string // accumulated git output — store for "g o" viewing
+	Err     error  // non-nil on failure
 }
 
 type runnerDoneMsg struct {
@@ -236,7 +237,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 		}
 		if !accepted {
 			m.IsOpen = false
-			return m, nil, Result{Done: true}
+			return m, nil, Result{Done: true, Aborted: true}
 		}
 		m.appendRunningStep(stepFetch)
 		return m, m.startRunner(phaseFetching, "fetch", m.remote), Result{}
@@ -252,7 +253,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 		}
 		if !accepted {
 			m.IsOpen = false
-			return m, nil, Result{Done: true, Output: m.log.String()}
+			return m, nil, Result{Done: true, Aborted: true, Output: m.log.String()}
 		}
 		choice := selectedMenuValue(m.menu)
 		switch choice {
@@ -268,7 +269,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 			return m, m.startRunner(phaseForcePushing, "push", "--force", m.remote, m.branch), Result{}
 		default:
 			m.IsOpen = false
-			return m, nil, Result{Done: true, Output: m.log.String()}
+			return m, nil, Result{Done: true, Aborted: true, Output: m.log.String()}
 		}
 
 	case phaseForceConfirm:
@@ -282,7 +283,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 		}
 		if !accepted {
 			m.IsOpen = false
-			return m, nil, Result{Done: true, Output: m.log.String()}
+			return m, nil, Result{Done: true, Aborted: true, Output: m.log.String()}
 		}
 		m.appendRunningStep(stepForcePush)
 		return m, m.startRunner(phaseForcePushing, "push", "--force", m.remote, m.branch), Result{}

@@ -16,6 +16,9 @@ func (m Model) handlePushUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 			notifyCmd = notify.Error("push failed: " + result.Err.Error())
 			return m, tea.Batch(cmd, m.cmdReload(), notifyCmd)
 		}
+		if result.Aborted {
+			return m, tea.Batch(cmd, m.cmdReload())
+		}
 		notifyCmd = notify.Success("pushed")
 		return m, tea.Batch(cmd, m.cmdReload(), notifyCmd, nav.RepoMutated())
 	}
@@ -31,6 +34,9 @@ func (m Model) handlePullUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if result.Err != nil {
 			notifyCmd = notify.Error("pull failed: " + result.Err.Error())
 			return m, tea.Batch(cmd, m.cmdReload(), notifyCmd)
+		}
+		if result.Aborted {
+			return m, tea.Batch(cmd, m.cmdReload())
 		}
 		notifyCmd = notify.Success("pulled")
 		return m, tea.Batch(cmd, m.cmdReload(), notifyCmd, nav.RepoMutated())

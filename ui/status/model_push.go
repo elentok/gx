@@ -13,7 +13,7 @@ func (m Model) handlePushUpdate(msg tea.Msg) (Model, tea.Cmd) {
 		var notifyCmd tea.Cmd
 		if result.Err != nil {
 			notifyCmd = notify.Error("push failed: " + result.Err.Error())
-		} else {
+		} else if !result.Aborted {
 			notifyCmd = notify.Success("pushed")
 		}
 		return m, tea.Batch(cmd, notifyCmd, m.refresh(), statusRepoMutatedCmd())

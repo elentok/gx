@@ -13,7 +13,7 @@ func (m Model) handlePullUpdate(msg tea.Msg) (Model, tea.Cmd) {
 		var notifyCmd tea.Cmd
 		if result.Err != nil {
 			notifyCmd = notify.Error("pull failed: " + result.Err.Error())
-		} else {
+		} else if !result.Aborted {
 			notifyCmd = notify.Success("pulled")
 		}
 		return m, tea.Batch(notifyCmd, m.refresh(), statusRepoMutatedCmd())
