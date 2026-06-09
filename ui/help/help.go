@@ -12,7 +12,7 @@ import (
 
 const (
 	MIN_WIDTH  = 56
-	MAX_WIDTH  = 104
+	MARGIN     = 8
 	MIN_HEIGHT = 8
 )
 
@@ -72,24 +72,23 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 }
 
-// deprecated
-func NewViewportModel(containerWidth int, containerHeight int) viewport.Model {
-	vpW := min(max(containerWidth*2/3, MIN_WIDTH), MAX_WIDTH)
-	vpH := max(containerHeight/2-4, MIN_HEIGHT)
-	return viewport.New(viewport.WithWidth(vpW-2), viewport.WithHeight(vpH))
-}
-
 func (m *Model) Open(containerWidth, containerHeight int) {
 	m.IsOpen = true
 	m.setContainerSize(containerWidth, containerHeight)
-	m.Viewport.SetContent(RenderView(m.KeySections))
+}
+
+// helpWidth returns the viewport (body) width: widen toward the container, less a
+// margin, with a MIN_WIDTH fallback for narrow terminals.
+func helpWidth(containerWidth int) int {
+	return max(containerWidth-MARGIN, MIN_WIDTH)
 }
 
 func (m *Model) setContainerSize(containerWidth, containerHeight int) {
-	vpW := min(max(containerWidth*2/3, MIN_WIDTH), MAX_WIDTH)
+	vpW := helpWidth(containerWidth)
 	vpH := max(containerHeight/2-4, MIN_HEIGHT)
 	m.Viewport.SetWidth(vpW)
 	m.Viewport.SetHeight(vpH)
+	m.Viewport.SetContent(RenderColumns(m.KeySections, vpW))
 }
 
 type KeySection struct {
