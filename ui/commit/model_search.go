@@ -6,7 +6,7 @@ import (
 )
 
 func (m Model) InputFocused() bool {
-	return m.fileTreeModel.Search().InputFocused() || m.diffModel.Search().InputFocused()
+	return m.fileTreeModel.Search().InputFocused() || m.diffModel.Search().InputFocused() || m.help.InputFocused()
 }
 
 func (m Model) fileEntrySearchText(entry filetree.Entry[git.CommitFile]) string {

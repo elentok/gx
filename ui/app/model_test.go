@@ -630,6 +630,35 @@ func TestGChordOverlayIncludesAppAndChildHints(t *testing.T) {
 	}
 }
 
+func TestChordNotTriggeredWhileHelpFilterFocused(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 40})
+	m = updated.(Model)
+
+	// Open help, then activate its filter input.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '?', Text: "?"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	m = updated.(Model)
+
+	// 'g' must type into the filter, not open the chord overlay.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	m = updated.(Model)
+
+	if m.keyPrefix != "" {
+		t.Errorf("expected no chord prefix while help filter is focused, got %q", m.keyPrefix)
+	}
+}
+
 func TestViewMergesTabsIntoFooterLine(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)

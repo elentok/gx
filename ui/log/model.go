@@ -153,7 +153,7 @@ func (m Model) WithPendingFocus(subject string) Model {
 }
 
 func (m Model) InputFocused() bool {
-	return m.search.Mode() == search.SearchModeInput || m.push.InputFocused() || m.pull.InputFocused()
+	return m.search.Mode() == search.SearchModeInput || m.push.InputFocused() || m.pull.InputFocused() || m.help.InputFocused()
 }
 
 func (m Model) ModalOpen() bool {

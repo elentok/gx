@@ -61,6 +61,12 @@ func (m Model) ModalOpen() bool {
 	return m.stashCreate.IsOpen
 }
 
+// InputFocused reports whether a text input currently owns keystrokes, so the
+// app shell stops intercepting chord keys (e.g. 'g') while typing.
+func (m Model) InputFocused() bool {
+	return m.stashCreate.InputFocused() || m.help.InputFocused()
+}
+
 func (m Model) Init() tea.Cmd {
 	return m.stashList.Init()
 }

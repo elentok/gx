@@ -38,6 +38,13 @@ func NewModel(keySections []KeySection) Model {
 	return Model{IsOpen: false, KeySections: keySections, Viewport: viewport.New(), filter: filter.NewModel()}
 }
 
+// InputFocused reports whether the help filter input is currently capturing
+// keystrokes. Hosts must OR this into their own InputFocused() so the app shell
+// stops intercepting chord keys (e.g. 'g') while the user is typing a filter.
+func (m Model) InputFocused() bool {
+	return m.IsOpen && m.filter.InputFocused()
+}
+
 // This makes HelpModel compatible with tea.Model
 func (m Model) Init() tea.Cmd { return nil }
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
