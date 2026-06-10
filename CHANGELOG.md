@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.19.4 - 2026-06-10
+
+- Pull/push: don't show notification if aborted
+- Push: allow aborting
+
 ## v0.19.3 - 2026-06-09
 
 - Help: the help page (`?`) got a substantial overhaul — bindings now render across multiple columns to fit more on screen, with a scrollbar when the content overflows. Added filtering: start typing to filter the visible bindings by key or description. Chord bindings are displayed more cleanly, and duplicate/merged key bindings are consolidated.
