@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/creds"
+	"github.com/elentok/gx/ui/notify"
 )
 
 type phase int
@@ -26,6 +27,7 @@ const (
 	phaseForceConfirm       // yes/no: force push?
 	phaseForcePushing       // git push --force <remote> <branch>
 	phasePRPrompt           // yes/no: open PR URL?
+	phaseAbortConfirm       // yes/no: interrupt the running network command?
 	phaseFailed
 )
 
@@ -82,6 +84,10 @@ type Model struct {
 	// pr prompt
 	prURL  string
 	prYes  bool
+
+	// abort confirm (interrupt a running network command)
+	abortConfirmYes  bool
+	phaseBeforeAbort phase
 
 	// tag push (optional, set via OpenWithTag)
 	tag string
@@ -304,6 +310,37 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 		}
 		return m, nil, Result{Done: true, Output: out}
 
+	case phaseFetching, phasePushing, phaseTagPushing, phaseForcePushing:
+		// Esc during a running network command opens the abort confirm.
+		// The runner keeps running underneath; completion still wins (see
+		// handleRunnerDone, which branches on msg.phase, not m.phase).
+		if msg.String() == "esc" {
+			m.phaseBeforeAbort = m.phase
+			m.abortConfirmYes = false
+			m.phase = phaseAbortConfirm
+		}
+		return m, nil, Result{}
+
+	case phaseAbortConfirm:
+		next, decided, accepted, handled := components.UpdateConfirm(msg, m.abortConfirmYes)
+		if !handled {
+			return m, nil, Result{}
+		}
+		m.abortConfirmYes = next
+		if !decided {
+			return m, nil, Result{}
+		}
+		if !accepted {
+			// Resume the running phase; the command was never touched.
+			m.phase = m.phaseBeforeAbort
+			return m, nil, Result{}
+		}
+		if m.activeRunner != nil {
+			m.activeRunner.Cancel()
+		}
+		m.IsOpen = false
+		return m, notify.Warning("push aborted"), Result{Done: true, Aborted: true, Output: m.log.String()}
+
 	case phaseFailed:
 		switch msg.String() {
 		case "esc", "enter", "q":
@@ -459,6 +496,18 @@ func (m Model) View(width int) string {
 
 	case phaseForceConfirm:
 		body := stepsStr + "\n\n" + "Push was rejected as non-fast-forward.\n\nForce push with --force?" + "\n\n" + components.RenderConfirmChoices(m.forceYes, false)
+		return ui.RenderModalFrame(ui.ModalFrameOptions{
+			Title:       "Push",
+			Body:        body,
+			Hint:        components.ConfirmHint,
+			Width:       w,
+			BorderColor: ui.ColorYellow,
+			TitleColor:  ui.ColorYellow,
+			HintColor:   ui.ColorSubtle,
+		})
+
+	case phaseAbortConfirm:
+		body := stepsStr + "\n\n" + "Abort push?" + "\n\n" + components.RenderConfirmChoices(m.abortConfirmYes, false)
 		return ui.RenderModalFrame(ui.ModalFrameOptions{
 			Title:       "Push",
 			Body:        body,

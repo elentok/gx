@@ -505,6 +505,146 @@ func TestHandleKey_ForceConfirm_Decline(t *testing.T) {
 	}
 }
 
+// Esc during a running network phase opens the abort confirm without
+// cancelling the runner.
+func TestAbort_EscDuringPushing_OpensConfirm(t *testing.T) {
+	m := newModelWithLog()
+	m.phase = phasePushing
+	runner := startedRunner(t)
+	m.activeRunner = runner
+
+	next, _, result := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+
+	if next.phase != phaseAbortConfirm {
+		t.Fatalf("expected phaseAbortConfirm, got %d", next.phase)
+	}
+	if next.phaseBeforeAbort != phasePushing {
+		t.Fatalf("expected phaseBeforeAbort=phasePushing, got %d", next.phaseBeforeAbort)
+	}
+	if next.abortConfirmYes {
+		t.Error("expected abortConfirmYes=false (default No)")
+	}
+	if result.Done {
+		t.Fatal("expected Done=false: runner still running")
+	}
+}
+
+// Confirming the abort cancels the runner and reports Aborted with a warning.
+func TestAbort_Confirm_CancelsAndAborts(t *testing.T) {
+	m := newModelWithLog()
+	m.phase = phaseAbortConfirm
+	m.phaseBeforeAbort = phasePushing
+	m.abortConfirmYes = true
+	runner := startedRunner(t)
+	m.activeRunner = runner
+
+	next, cmd, result := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	if next.IsOpen {
+		t.Fatal("expected IsOpen=false after confirming abort")
+	}
+	if !result.Done || !result.Aborted {
+		t.Fatalf("expected Done && Aborted, got Done=%v Aborted=%v", result.Done, result.Aborted)
+	}
+	if cmd == nil {
+		t.Fatal("expected non-nil notify cmd after abort")
+	}
+
+	// The runner's process must actually be killed.
+	waited := make(chan error, 1)
+	go func() { waited <- runner.Wait() }()
+	select {
+	case <-waited:
+	case <-time.After(2 * time.Second):
+		t.Fatal("runner was not cancelled: Wait did not return")
+	}
+}
+
+// Declining the abort resumes the prior running phase and leaves the runner alone.
+func TestAbort_Decline_ResumesRunningPhase(t *testing.T) {
+	m := newModelWithLog()
+	m.phase = phaseAbortConfirm
+	m.phaseBeforeAbort = phaseFetching
+	m.abortConfirmYes = false
+	runner := startedRunner(t)
+	m.activeRunner = runner
+
+	next, _, result := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+
+	if next.phase != phaseFetching {
+		t.Fatalf("expected resume to phaseFetching, got %d", next.phase)
+	}
+	if result.Done {
+		t.Fatal("expected Done=false after declining abort")
+	}
+	if _, done := runner.Result(); done {
+		t.Fatal("runner should not have been cancelled after declining abort")
+	}
+}
+
+// Completion wins: a runnerDoneMsg arriving while the abort confirm is showing
+// completes the push normally; the abort becomes a no-op.
+func TestAbort_CompletionWins(t *testing.T) {
+	m := newModelWithLog()
+	m.phase = phaseAbortConfirm
+	m.phaseBeforeAbort = phasePushing
+
+	next, _, result := m.Update(runnerDoneMsg{phase: phasePushing, output: "everything up-to-date"})
+
+	if next.IsOpen {
+		t.Fatal("expected IsOpen=false: push completed while confirm was showing")
+	}
+	if !result.Done {
+		t.Fatal("expected Done=true after completion")
+	}
+	if result.Aborted {
+		t.Fatal("expected Aborted=false: completion won over abort")
+	}
+}
+
+// Esc during the local rebase phase does nothing — rebase is non-interruptible.
+func TestAbort_EscDuringRebase_NoOp(t *testing.T) {
+	m := newModelWithLog()
+	m.phase = phaseRebasing
+
+	next, _, result := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+
+	if next.phase != phaseRebasing {
+		t.Fatalf("expected phase unchanged (phaseRebasing), got %d", next.phase)
+	}
+	if result.Done {
+		t.Fatal("expected Done=false")
+	}
+}
+
+func TestView_AbortConfirmPhase(t *testing.T) {
+	m := newModelWithLog()
+	m.phase = phaseAbortConfirm
+	m.steps = []components.Step{{TitleBefore: "push", IsRunning: true}}
+	if view := m.View(120); view == "" {
+		t.Error("expected non-empty view in abort confirm phase")
+	}
+}
+
+// startedRunner returns a CommandRunner whose process is confirmed running.
+// It echoes a marker then sleeps, so polling its output proves exec started —
+// avoiding a race where Cancel() no-ops because the process isn't up yet.
+func startedRunner(t *testing.T) *components.CommandRunner {
+	t.Helper()
+	runner := components.NewCommandRunner(t.TempDir(), "sh", "-c", "echo started; exec sleep 30")
+	runner.Start()
+	t.Cleanup(runner.Cancel)
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if strings.Contains(runner.Output(), "started") {
+			return runner
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatal("runner process did not start in time")
+	return nil
+}
+
 func TestView_FetchingPhase(t *testing.T) {
 	m := newModelWithLog()
 	m.phase = phaseFetching

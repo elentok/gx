@@ -158,6 +158,28 @@ The app-shell `Update` wrapper calls `AppendViewStateChanged` after every child 
 pre/post `ViewState` and emitting `ViewStateChanged` automatically when navigation is enabled.
 Explicit `ViewStateChanged` emissions remain supported for specialized timing needs.
 
+## Pull and Push Lifecycle
+
+A pull or push runs as a sequence of **phases**, some of which are interactive prompts and some of
+which execute a git command (fetch, pull, push, rebase, stash). The user can leave the flow early in
+two distinct ways, which must not be conflated:
+
+**Decline** — the user says No / Esc at a *prompt* phase (confirm push, stash-before-pull, diverged
+menu, force-push confirm). Nothing was executing, so the repository is untouched. Surfaced as
+`Result{Aborted: true}`; suppresses the success notification.
+
+**Interrupt** — the user kills a git command that is *mid-execution*. Implemented on top of
+`CommandRunner.Cancel()`, which kills the running process. Reuses `Result{Aborted: true}` (so the
+success notification is suppressed, same as a decline) but additionally emits a
+`notify.Warning("push aborted")`, so the two cases are distinguished only by that warning, not by a
+separate `Result` field. Unlike a decline, the working tree *can* be left in a partial state, so
+interrupt is only offered on phases where killing is clean — currently the push flow's network
+phases (fetch, push, force-push, tag-push). The local `rebase` phase is deliberately
+non-interruptible because killing it mid-rebase leaves the repo in a `rebase-in-progress` state.
+Triggered by Esc, gated behind an "Abort push?" confirm modal (default No) to guard against an
+accidental keypress; if the command completes while that confirm is showing, completion wins and the
+abort becomes a no-op.
+
 ## Tab Caching and Reload
 
 **Live page cache** — the app shell keeps one live `tea.Model` per `TabID` (`livePageByTab`).
