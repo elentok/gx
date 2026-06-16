@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.19.5 - 2027-06-16
+
+- Running `gx` with no args from a bare repo root (the `.bare`-trick layout, before `cd`-ing into a worktree) now opens the worktree UI instead of erroring with "must be run from a regular repo or linked worktree".
+
 ## v0.19.4 - 2026-06-10
 
 - Pull/push: don't show notification if aborted

@@ -109,6 +109,13 @@ Run without a command to open the status UI.`,
 		Args:          cobra.NoArgs,
 		Version:       getVersion(),
 		RunE: func(_ *cobra.Command, _ []string) error {
+			// From a bare repo root there's no worktree to show a status for,
+			// so open the worktree UI — that's the management view for this layout.
+			if cwd, err := d.getwd(); err == nil {
+				if info, err := git.IdentifyDir(cwd); err == nil && info.Repo.IsBare && info.WorktreeRoot == "" {
+					return d.runWorktrees("")
+				}
+			}
 			return d.runStatus("")
 		},
 	}

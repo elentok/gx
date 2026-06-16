@@ -156,6 +156,7 @@ func TestExecute_DefaultRunsStatus(t *testing.T) {
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
+		getwd:  func() (string, error) { return testutil.TempRepo(t), nil },
 		runStatus: func(_ string) error {
 			called++
 			return nil
@@ -167,6 +168,32 @@ func TestExecute_DefaultRunsStatus(t *testing.T) {
 	}
 	if called != 1 {
 		t.Fatalf("runStatus called %d times, want 1", called)
+	}
+}
+
+func TestExecute_DefaultFromBareRootRunsWorktrees(t *testing.T) {
+	bareRoot := testutil.TempBareRepo(t)
+
+	statusCalled, worktreesCalled := 0, 0
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+		getwd:  func() (string, error) { return bareRoot, nil },
+		runStatus: func(_ string) error {
+			statusCalled++
+			return nil
+		},
+		runWorktrees: func(_ string) error {
+			worktreesCalled++
+			return nil
+		},
+	}
+
+	if err := execute(nil, d); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if worktreesCalled != 1 || statusCalled != 0 {
+		t.Fatalf("from bare root: runWorktrees=%d runStatus=%d, want 1 and 0", worktreesCalled, statusCalled)
 	}
 }
 
