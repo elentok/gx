@@ -151,7 +151,11 @@ func (m Model) requiredFiletreePaneWidth(height int) int {
 
 func (m Model) renderFiletreePane(width, height int) string {
 	lines := m.visibleStatusLines(width, height)
-	return m.renderFiletreePanelWithBorderTitle(width, height, m.filetreePaneTitle(), m.searchCounterForFiletreePane(), lines, m.focus == focusFiletree)
+	rightTitle := ui.JoinStatus(
+		ui.WorktreeLabel(m.worktreeRoot, m.settings.UseNerdFontIcons),
+		m.searchCounterForFiletreePane(),
+	)
+	return m.renderFiletreePanelWithBorderTitle(width, height, m.filetreePaneTitle(), rightTitle, lines, m.focus == focusFiletree)
 }
 
 func (m Model) branchSummaryTitleSuffix() string {

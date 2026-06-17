@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.19.6 - 2026-06-17
+
+- Log and status tabs now show the current worktree name in the top-right of the panel frame (next to the ref), prefixed with a worktree icon when nerd fonts are enabled. The log tab's left title is now simply "Log".
+
 ## v0.19.5 - 2027-06-16
 
 - Running `gx` with no args from a bare repo root (the `.bare`-trick layout, before `cd`-ing into a worktree) now opens the worktree UI instead of erroring with "must be run from a regular repo or linked worktree".

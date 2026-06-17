@@ -113,7 +113,8 @@ func (m Model) frameRightTitle() string {
 			context = m.filter.Path
 		}
 	}
-	return ui.JoinStatus(context, searchStatus)
+	worktree := ui.WorktreeLabel(m.worktreeRoot, m.settings.UseNerdFontIcons)
+	return ui.JoinStatus(worktree, context, searchStatus)
 }
 
 func (m Model) searchMatchStatus() string {
@@ -153,12 +154,8 @@ func (m Model) highlightSearch(text string) string {
 
 // buildHints assembles the render hints the list panel needs from current page state.
 func (m Model) buildHints() listPanelHints {
-	title := "Log"
-	if m.worktreeRoot != "" {
-		title = fmt.Sprintf("Log (%s)", m.worktreeRoot)
-	}
 	return listPanelHints{
-		title:            title,
+		title:            "Log",
 		rightTitle:       m.frameRightTitle(),
 		highlight:        m.highlightSearch,
 		flashSubject:     m.flashSubject,

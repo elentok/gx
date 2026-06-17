@@ -1,10 +1,25 @@
 package ui
 
 import (
+	"path/filepath"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
 )
+
+// WorktreeLabel renders the current worktree's short name (the basename of its
+// root path) for display in a panel frame title. When nerd fonts are enabled it
+// is prefixed with the worktree icon; otherwise the bare name is returned.
+func WorktreeLabel(worktreeRoot string, useNerdFont bool) string {
+	name := filepath.Base(worktreeRoot)
+	if name == "" || name == "." || name == string(filepath.Separator) {
+		return ""
+	}
+	if useNerdFont {
+		return Icons(true).Worktree + " " + name
+	}
+	return name
+}
 
 func JoinStatus(parts ...string) string {
 	out := make([]string, 0, len(parts))
