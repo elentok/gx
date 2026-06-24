@@ -1,0 +1,81 @@
+/*
+ * Design tokens for the gx landing site.
+ *
+ * The palette is Catppuccin Mocha, mirrored 1:1 from the real TUI in
+ * ui/styles.go so the page reads as a gx screen rather than a generic dark
+ * theme. The one deliberate departure is --lime: a touch of the logo's
+ * off-palette lime pulled into a single accent (primary CTA / active tab) so
+ * the lime mascot reads intentional instead of stray. See ADR 0012 and the
+ * "Visual identity" section of docs/prds/publish-gx-website.md.
+ */
+:root {
+  /* Catppuccin Mocha — surfaces (ui/styles.go: ColorBase/DeepBg/Surface...) */
+  --base: #1e1e2e; /* app background */
+  --deepbg: #11111a; /* panel insets / pill troughs (darker than base) */
+  --surface: #313244; /* row highlight, badge surface */
+  --surface1: #45475a; /* borders */
+  --overlay: #6c7086; /* dim borders / disabled */
+
+  /* Text */
+  --text: #cdd6f4;
+  --subtle: #a6adc8;
+
+  /* Accents (ui/styles.go) */
+  --blue: #89b4fa;
+  --green: #a6e3a1;
+  --yellow: #f9e2af;
+  --red: #f38ba8;
+  --orange: #fab387;
+  --mauve: #cba6f7;
+  --teal: #94e2d5;
+
+  /* The single off-palette accent, sampled from docs/logo.png (~#c0d010)
+     and brightened for legibility on the dark base. */
+  --lime: #c4d92e;
+  --lime-dim: #9fb025;
+  --lime-ink: #11160a; /* near-black text on lime fills */
+
+  /* Semantic sync colors — match ui/styles.go StyleStatus* */
+  --sync-synced: var(--green);
+  --sync-ahead: var(--mauve);
+  --sync-behind: var(--yellow);
+  --sync-diverged: var(--red);
+  --sync-unknown: var(--subtle);
+
+  /* Typography */
+  --font-mono: "Agave", "Symbols Nerd Font", ui-monospace, "SF Mono",
+    "Cascadia Code", Menlo, monospace;
+  --font-nerd: "Symbols Nerd Font", "Agave", monospace;
+
+  /* Spacing / shape — small radii keep the boxy TUI feel */
+  --radius: 6px;
+  --radius-sm: 4px;
+  --gap: 1rem;
+  --border: 1px solid var(--surface1);
+
+  /* Nerd Font icon codepoints, mirrored from ui/icons.go so markup can say
+     content: var(--i-branch) instead of pasting raw PUA glyphs. */
+  --i-check: "\f00c";
+  --i-close: "\f0159";
+  --i-branch: "\f418";
+  --i-worktree: "\f0645";
+  --i-folder-closed: "\e5ff";
+  --i-folder-open: "\e5fe";
+  --i-file-modified: "\f4d2";
+  --i-file-added: "\f4d0";
+  --i-file-deleted: "\f4d6";
+  --i-file-renamed: "\f0054";
+  --i-ahead: "\f062";
+  --i-behind: "\f063";
+  --i-search: "\f0349";
+  --i-staged: "\ee29";
+  --i-warning: "\f071";
+  --i-info: "\f449";
+  --i-star: "\f005";
+  --i-copy: "\f0c5";
+  --i-github: "\f09b";
+
+  /* Powerline soft caps for pill badges (ui/buttons.go capLeft/capRight) */
+  --cap-left: "\e0b6";
+  --cap-right: "\e0b4";
+}

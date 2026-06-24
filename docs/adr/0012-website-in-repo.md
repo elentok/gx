@@ -23,9 +23,12 @@ The reference precedent (`~/dev/cryptowl`) is a *standalone* repo deployed with 
 The website lives **in the `gx` repo** under `web/`, but is **deployed standalone** to Cloudflare
 Pages (not Git-connected).
 
-- `web/` is a self-contained Vite + vanilla-TypeScript project with its own `package.json`. It does
-  not participate in the Go module or `make` build except via a `make demos` target that regenerates
-  the shared GIFs.
+- `web/` is a self-contained Vite project with its own `package.json`. It does not participate in the
+  Go module or `make` build except via a `make demos` target that regenerates the shared GIFs.
+- The page is authored in **Preact + TypeScript (JSX)** and **prerendered to static HTML at build
+  time** (`@preact/preset-vite` `prerender`), then fully hydrated on the client (~8 KB gz). Styling
+  stays **hand-written CSS** — no CSS-in-JS, Chakra, or Emotion. (This supersedes the original
+  "vanilla TypeScript" choice; see Considered Options.)
 - Deploy is **manual**, mirroring cryptowl: `cd web && npm run deploy`
   (`wrangler pages deploy dist --project-name=gx`). No CI/Git-connected build.
 - The custom domain `gx.elentok.com` is configured once in the Cloudflare Pages dashboard.
@@ -39,6 +42,11 @@ Pages (not Git-connected).
   build-root configuration for the monorepo subdir and a Node build step in an otherwise Go repo's CI.
   Manual deploy keeps the toolchains cleanly separated and matches existing muscle memory. Can be
   revisited if deploy frequency justifies it.
+- **Vanilla TypeScript (no framework), the original choice.** Reversed: authoring static content by
+  assigning `innerHTML` template strings in TS gave no HTML tooling, no type safety, and mixed markup
+  with data. Preact authored in JSX + prerendered to static HTML restores component structure and
+  type-checking while still shipping a static, fast page. React was rejected as heavier than the page
+  needs; the "no CSS-in-JS / Chakra / Emotion" guardrail from the original decision is retained.
 
 ## Consequences
 

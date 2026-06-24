@@ -1,0 +1,77 @@
+/* Page composition — layout for the hero and the primitive-preview panels.
+   Primitive look-and-feel lives in primitives.css; this file only arranges. */
+
+/* ── Hero ──────────────────────────────────────────────────────────────────
+   The full mascot logo is the centerpiece, with wordmark, tagline and CTAs
+   stacked beneath it inside the terminal-bordered panel. */
+.hero {
+  text-align: center;
+  padding: 2.25rem 1.25rem 2rem;
+}
+.hero > .panel-title {
+  color: var(--lime);
+}
+.hero-logo {
+  display: block;
+  width: 200px;
+  height: auto;
+  margin: 0.5rem auto 1rem;
+}
+.hero-tagline {
+  color: var(--subtle);
+  font-size: 1.15rem;
+  margin-bottom: 1.5rem;
+}
+.hero-ctas {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* ── Worktrees preview table ─────────────────────────────────────────────── */
+.wt-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.wt-table td {
+  padding: 0.4rem 0.5rem;
+  border-top: 1px solid var(--surface);
+}
+.wt-table tr:first-child td {
+  border-top: 0;
+}
+.wt-sync {
+  text-align: right;
+}
+
+/* ── Rows of primitives ──────────────────────────────────────────────────── */
+.badge-row,
+.cmd-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+.cmd-row {
+  gap: 0.75rem;
+}
+.ai-hint {
+  margin-top: 0.9rem;
+  color: var(--subtle);
+}
+.ai-hint kbd + kbd {
+  margin-left: 2px;
+}
+
+@media (max-width: 640px) {
+  .hero {
+    padding: 1.75rem 0.85rem 1.5rem;
+  }
+  .hero-logo {
+    width: 160px;
+  }
+  .hero-tagline {
+    font-size: 1.05rem;
+  }
+}

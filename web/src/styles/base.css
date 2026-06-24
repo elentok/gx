@@ -1,0 +1,63 @@
+/* Reset + page-level base. All-monospace, Catppuccin Mocha. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--base);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 16px;
+  line-height: 1.5;
+  font-variant-ligatures: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: var(--blue);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+::selection {
+  background: var(--lime);
+  color: var(--lime-ink);
+}
+
+/* Nerd Font glyph helper. Use as <i class="nf" data-glyph></i> with the glyph
+   injected via a CSS custom property, e.g. style="--glyph: var(--i-branch)". */
+.nf {
+  font-family: var(--font-nerd);
+  font-style: normal;
+  line-height: 1;
+}
+.nf::before {
+  content: var(--glyph, "");
+}
+
+#app {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+@media (max-width: 640px) {
+  body {
+    font-size: 15px;
+  }
+  #app {
+    padding: 1.25rem 0.85rem 3rem;
+  }
+}

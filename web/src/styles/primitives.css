@@ -1,0 +1,248 @@
+/*
+ * Faux-TUI primitives — the visual vocabulary the landing page is built from.
+ * Each maps to something the real gx TUI draws:
+ *   .panel     -> ui/frame.go  (rounded border with a title in the top edge)
+ *   .badge     -> ui/badge.go  (pill with powerline soft caps)
+ *   .sync      -> ui/styles.go StyleStatus* + ui/icons.go Ahead/Behind
+ *   .tabbar    -> ui/app tab bar
+ *   .btn       -> ui/buttons.go (pill button; primary = the lime accent)
+ */
+
+/* ── Panel ─────────────────────────────────────────────────────────────────
+   A bordered box whose title sits "in" the top border, like RenderModalFrame's
+   TitleInBorder. The title is a chip that masks the border line behind it. */
+.panel {
+  position: relative;
+  border: var(--border);
+  border-radius: var(--radius);
+  background: var(--base);
+  padding: 1rem 1.1rem;
+  margin-block: 1.25rem;
+}
+.panel > .panel-title {
+  position: absolute;
+  top: 0;
+  left: 1rem;
+  transform: translateY(-50%);
+  padding: 0 0.5rem;
+  background: var(--base);
+  color: var(--blue);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.panel > .panel-title--right {
+  left: auto;
+  right: 1rem;
+  color: var(--subtle);
+  font-weight: 400;
+}
+/* Inset variant for content wells (e.g. a diff body). */
+.panel--inset {
+  background: var(--deepbg);
+  border-color: var(--surface);
+}
+
+/* ── Badge ─────────────────────────────────────────────────────────────────
+   Pill rendered with the same powerline soft caps as the TUI: a left/right cap
+   glyph painted in the fill color so the rectangular body reads as a rounded
+   pill regardless of background. */
+.badge {
+  --badge-bg: var(--surface);
+  --badge-fg: var(--subtle);
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.85em;
+  line-height: 1.4;
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+.badge::before,
+.badge::after {
+  font-family: var(--font-nerd);
+  color: var(--badge-bg);
+  line-height: 1;
+}
+.badge::before {
+  content: var(--cap-left);
+}
+.badge::after {
+  content: var(--cap-right);
+}
+.badge > .badge-body {
+  background: var(--badge-bg);
+  color: var(--badge-fg);
+  padding: 0 0.15em;
+}
+.badge--deepbg {
+  --badge-bg: var(--deepbg);
+  --badge-fg: var(--subtle);
+}
+.badge--blue {
+  --badge-bg: var(--blue);
+  --badge-fg: var(--deepbg);
+}
+.badge--green {
+  --badge-bg: var(--green);
+  --badge-fg: var(--deepbg);
+}
+.badge--yellow {
+  --badge-bg: var(--yellow);
+  --badge-fg: var(--deepbg);
+}
+.badge--orange {
+  --badge-bg: var(--orange);
+  --badge-fg: var(--deepbg);
+}
+.badge--mauve {
+  --badge-bg: var(--mauve);
+  --badge-fg: var(--deepbg);
+}
+.badge--lime {
+  --badge-bg: var(--lime);
+  --badge-fg: var(--lime-ink);
+}
+
+/* ── Sync glyphs ─────────────────────────────────────────────────────────────
+   Ahead/behind arrows + counts, colored by the same semantics as the worktrees
+   table (mauve ahead, yellow behind, green synced, red diverged). */
+.sync {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
+  font-variant-numeric: tabular-nums;
+}
+.sync-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15em;
+}
+.sync-item::before {
+  font-family: var(--font-nerd);
+  line-height: 1;
+}
+.sync-ahead {
+  color: var(--sync-ahead);
+}
+.sync-ahead::before {
+  content: var(--i-ahead);
+}
+.sync-behind {
+  color: var(--sync-behind);
+}
+.sync-behind::before {
+  content: var(--i-behind);
+}
+.sync-synced {
+  color: var(--sync-synced);
+}
+.sync-synced::before {
+  content: var(--i-check);
+}
+.sync-diverged {
+  color: var(--sync-diverged);
+}
+
+/* ── Tab bar ─────────────────────────────────────────────────────────────────
+   A row of tabs; the active tab carries the lime accent (underline + text). */
+.tabbar {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: var(--border);
+  padding: 0 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabbar::-webkit-scrollbar {
+  display: none;
+}
+.tab {
+  appearance: none;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--subtle);
+  font: inherit;
+  padding: 0.5rem 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transform: translateY(1px);
+}
+.tab:hover {
+  color: var(--text);
+}
+.tab[aria-selected="true"] {
+  color: var(--lime);
+  border-bottom-color: var(--lime);
+  font-weight: 700;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────────
+   Pill buttons. The primary action uses the lime accent (the page's single
+   strongest pop); secondary is a quiet outlined pill. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 0.55rem 1.1rem;
+  border: 1px solid var(--surface1);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    transform 0.05s ease;
+}
+.btn:hover {
+  border-color: var(--overlay);
+  text-decoration: none;
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn .nf {
+  font-size: 0.95em;
+}
+.btn--primary {
+  background: var(--lime);
+  border-color: var(--lime);
+  color: var(--lime-ink);
+  font-weight: 700;
+}
+.btn--primary:hover {
+  background: var(--lime-dim);
+  border-color: var(--lime-dim);
+}
+
+/* ── Code / install line ─────────────────────────────────────────────────────
+   A copy-paste command in an inset well with a leading prompt. */
+.cmd {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
+  background: var(--deepbg);
+  border: 1px solid var(--surface);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+  color: var(--text);
+}
+.cmd::before {
+  content: "$";
+  color: var(--lime);
+  font-weight: 700;
+}
+code,
+kbd {
+  font-family: var(--font-mono);
+}
+kbd {
+  background: var(--surface);
+  border: 1px solid var(--surface1);
+  border-radius: var(--radius-sm);
+  padding: 0.05em 0.4em;
+  font-size: 0.85em;
+  color: var(--text);
+}
