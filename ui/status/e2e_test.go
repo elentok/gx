@@ -337,7 +337,7 @@ func TestStageE2E_StageOneLineInNewFileFromDiffView_LineMode(t *testing.T) {
 	waitForStageText(t, tm, path, stageLoadWait)
 
 	tm.Send(keySpecial(tea.KeyEnter))
-	tm.Send(keyRune('a'))
+	tm.Send(keyRune('t'))
 	tm.Send(keyRune('j'))
 	tm.Send(keyRune(' '))
 
@@ -358,7 +358,7 @@ func TestStageE2E_StageOneLineInModifiedFileFromDiffView_LineMode(t *testing.T) 
 	waitForStageText(t, tm, path, stageLoadWait)
 
 	tm.Send(keySpecial(tea.KeyEnter))
-	tm.Send(keyRune('a'))
+	tm.Send(keyRune('t'))
 	tm.Send(keyRune('j'))
 	tm.Send(keySpecial(tea.KeySpace))
 
@@ -379,7 +379,7 @@ func TestStageE2E_StageVisualRangeInNewFileFromDiffView(t *testing.T) {
 	waitForStageText(t, tm, path, stageLoadWait)
 
 	tm.Send(keySpecial(tea.KeyEnter))
-	tm.Send(keyRune('a'))
+	tm.Send(keyRune('t'))
 	tm.Send(keyRune('j'))
 	tm.Send(keyRune('j'))
 	tm.Send(keyRune('j'))
@@ -439,7 +439,7 @@ func TestStageE2E_StageThirdLineInNewFileFromDiffView_LineMode(t *testing.T) {
 	waitForStageText(t, tm, path, stageLoadWait)
 
 	tm.Send(keySpecial(tea.KeyEnter))
-	tm.Send(keyRune('a'))
+	tm.Send(keyRune('t'))
 	tm.Send(keyRune('j'))
 	tm.Send(keyRune('j'))
 	tm.Send(keyRune('j'))
@@ -464,7 +464,7 @@ func TestStageE2E_StageThirdLineInModifiedFileFromDiffView_LineMode(t *testing.T
 	waitForStageText(t, tm, path, stageLoadWait)
 
 	tm.Send(keySpecial(tea.KeyEnter))
-	tm.Send(keyRune('a'))
+	tm.Send(keyRune('t'))
 	tm.Send(keyRune('j'))
 	tm.Send(keyRune('j'))
 	tm.Send(keyRune('j'))
@@ -532,7 +532,7 @@ func TestStageE2E_UnstageOneLineAfterStagingAll_LineMode(t *testing.T) {
 	waitForStageText(t, tm, "diff: mode:hunk", stageActionWait)
 	tm.Send(keySpecial(tea.KeyTab))
 	waitForStageText(t, tm, "Staged", stageActionWait)
-	tm.Send(keyRune('a'))
+	tm.Send(keyRune('t'))
 	waitForStageText(t, tm, "diff: mode:line", stageActionWait)
 	tm.Send(keyRune('j'))
 	tm.Send(keyRune(' '))

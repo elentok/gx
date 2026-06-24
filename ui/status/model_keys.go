@@ -67,13 +67,17 @@ func newStatusManager() keys.Manager {
 
 		// c-prefix chords
 		{ID: bindingGitCommit, Seq: []string{"c", "c"}, Categories: []string{"Global"}, Title: "git commit"},
-		{ID: bindingComment, Seq: []string{"c", "m"}, Categories: []string{"Diff"}, Title: "comment"},
 		{ID: bindingCancelChord, Seq: []string{"c", "esc"}, Categories: []string{}, Title: ""},
+
+		// a-prefix chords (AI)
+		{ID: bindingComment, Seq: []string{"a", "a"}, Categories: []string{"AI"}, Title: "ask AI"},
+		{ID: bindingYankAll, Seq: []string{"a", "y"}, Categories: []string{"AI"}, Title: "yank for AI agent"},
+		{ID: bindingCancelChord, Seq: []string{"a", "esc"}, Categories: []string{}, Title: ""},
 
 		// y-prefix chords
 		{ID: bindingYankContent, Seq: []string{"y", "y"}, Categories: []string{"Yank"}, Title: "yank content"},
 		{ID: bindingYankLocation, Seq: []string{"y", "l"}, Categories: []string{"Yank"}, Title: "yank location"},
-		{ID: bindingYankAll, Seq: []string{"y", "a"}, Categories: []string{"Yank"}, Title: "yank for AI agent"},
+		{ID: bindingYankAll, Seq: []string{"y", "a"}, Categories: []string{}, Title: ""}, // hidden back-compat alias for 'ay'
 		{ID: bindingYankFilename, Seq: []string{"y", "f"}, Categories: []string{"Yank"}, Title: "yank filename"},
 		{ID: bindingCancelChord, Seq: []string{"y", "esc"}, Categories: []string{}, Title: ""},
 

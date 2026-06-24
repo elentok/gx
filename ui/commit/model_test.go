@@ -117,10 +117,10 @@ func TestEnterFocusesDiffAndJKMoveInsideDiff(t *testing.T) {
 		t.Fatalf("expected default nav mode hunk, got %v", m.diffModel.NavMode())
 	}
 
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updated.(Model)
 	if m.diffModel.NavMode() != diffview.NavModeLine {
-		t.Fatalf("expected a to switch to line mode, got %v", m.diffModel.NavMode())
+		t.Fatalf("expected t to switch to line mode, got %v", m.diffModel.NavMode())
 	}
 
 	before := m.diffModel.Data().ActiveLine
@@ -808,20 +808,20 @@ func TestCMOutsideDiffDoesNothing(t *testing.T) {
 	}
 }
 
-func TestCMInDiffWithoutFileContextShowsError(t *testing.T) {
+func TestAskAIInDiffWithoutFileContextShowsError(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	m := newTestModel(repo, "HEAD")
 	m.focusDiff = true
 	m.files = nil
 	m.fileTreeModel.SetEntries(nil)
 
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	m = updated.(Model)
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	m = updated.(Model)
 	_ = m
 	if cmd == nil {
-		t.Fatalf("cm without file context should return a notify cmd")
+		t.Fatalf("aa (Ask AI) without file context should return a notify cmd")
 	}
 	msg := cmd()
 	notifyMsg, ok := msg.(notifypkg.NotifyMsg)

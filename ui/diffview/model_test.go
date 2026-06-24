@@ -789,31 +789,42 @@ func TestUpdateKey_JKScrollViewport(t *testing.T) {
 	}
 }
 
-func TestUpdateKey_ATogglesNavMode(t *testing.T) {
+func TestUpdateKey_TTogglesNavMode(t *testing.T) {
 	m := buildNavTestModel()
 	m.SetNavMode(NavModeHunk)
 	m.data.VisualActive = true
-	next, result := pressText(m, "a")
+	next, result := pressText(m, "t")
 	if !result.Handled {
-		t.Fatal("a: expected Handled=true")
+		t.Fatal("t: expected Handled=true")
 	}
 	if next.NavMode() != NavModeLine {
-		t.Fatalf("a: expected NavModeLine, got %v", next.NavMode())
+		t.Fatalf("t: expected NavModeLine, got %v", next.NavMode())
 	}
 	if next.data.VisualActive {
-		t.Fatal("a: expected VisualActive=false after toggle")
+		t.Fatal("t: expected VisualActive=false after toggle")
 	}
 }
 
-func TestUpdateKey_ATogglesNavModeBackToHunk(t *testing.T) {
+func TestUpdateKey_TTogglesNavModeBackToHunk(t *testing.T) {
 	m := buildNavTestModel()
 	m.SetNavMode(NavModeLine)
-	next, result := pressText(m, "a")
+	next, result := pressText(m, "t")
 	if !result.Handled {
-		t.Fatal("a: expected Handled=true")
+		t.Fatal("t: expected Handled=true")
 	}
 	if next.NavMode() != NavModeHunk {
-		t.Fatalf("a: expected NavModeHunk, got %v", next.NavMode())
+		t.Fatalf("t: expected NavModeHunk, got %v", next.NavMode())
+	}
+}
+
+// 'a' was the old nav-mode toggle; it is now free (reserved as the AI chord
+// prefix at the host level) and must no longer toggle nav-mode in the diff pane.
+func TestUpdateKey_ANoLongerTogglesNavMode(t *testing.T) {
+	m := buildNavTestModel()
+	m.SetNavMode(NavModeHunk)
+	next, _ := pressText(m, "a")
+	if next.NavMode() != NavModeHunk {
+		t.Fatalf("a: expected NavMode unchanged (NavModeHunk), got %v", next.NavMode())
 	}
 }
 

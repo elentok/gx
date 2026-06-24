@@ -61,7 +61,7 @@ func newNavManager() keys.Manager {
 		{ID: navBindingScrollUp, Seq: []string{"K"}},
 		{ID: navBindingPageDown, Seq: []string{"ctrl+d"}},
 		{ID: navBindingPageUp, Seq: []string{"ctrl+u"}},
-		{ID: navBindingNavMode, Seq: []string{"a"}},
+		{ID: navBindingNavMode, Seq: []string{"t"}},
 		{ID: navBindingVisual, Seq: []string{"v"}},
 		{ID: navBindingWrap, Seq: []string{"w"}},
 		{ID: navBindingBottom, Seq: []string{"G"}},

@@ -82,7 +82,7 @@ func newCommitManager() keys.Manager {
 
 		{ID: bindingYankContent, Seq: []string{"y", "y"}, Categories: []string{"Yank"}, Title: "yank content"},
 		{ID: bindingYankLoc, Seq: []string{"y", "l"}, Categories: []string{"Yank"}, Title: "yank location"},
-		{ID: bindingYankAll, Seq: []string{"y", "a"}, Categories: []string{"Yank"}, Title: "yank for AI agent"},
+		{ID: bindingYankAll, Seq: []string{"y", "a"}, Categories: []string{}, Title: ""}, // hidden back-compat alias for 'ay'
 		{ID: bindingYankFile, Seq: []string{"y", "f"}, Categories: []string{"Yank"}, Title: "yank filename"},
 		{ID: bindingYankHash, Seq: []string{"y", "h"}, Categories: []string{"Yank"}, Title: "yank commit hash"},
 		{ID: bindingYankSubject, Seq: []string{"y", "s"}, Categories: []string{"Yank"}, Title: "yank commit subject"},
@@ -92,9 +92,12 @@ func newCommitManager() keys.Manager {
 		{ID: bindingRefreshMenu, Seq: []string{"m", "r"}, Categories: []string{"Global"}, Title: "refresh"},
 		{ID: bindingCancelChord, Seq: []string{"m", "esc"}, Categories: []string{}, Title: ""},
 
-		{ID: bindingComment, Seq: []string{"c", "m"}, Categories: []string{"Diff"}, Title: "comment"},
 		{ID: bindingReword, Seq: []string{"r", "w"}, Categories: []string{"Actions"}, Title: "reword commit"},
-		{ID: bindingCancelChord, Seq: []string{"c", "esc"}, Categories: []string{}, Title: ""},
+
+		// a-prefix chords (AI)
+		{ID: bindingComment, Seq: []string{"a", "a"}, Categories: []string{"AI"}, Title: "ask AI"},
+		{ID: bindingYankAll, Seq: []string{"a", "y"}, Categories: []string{"AI"}, Title: "yank for AI agent"},
+		{ID: bindingCancelChord, Seq: []string{"a", "esc"}, Categories: []string{}, Title: ""},
 
 		{ID: bindingAmend, Seq: []string{"A"}, Categories: []string{"Actions"}, Title: "amend commit with staged changes"},
 		{ID: bindingFilterLog, Seq: []string{"g", "h"}, Categories: []string{"Navigation"}, Title: "log for file/hunk"},

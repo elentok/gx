@@ -811,7 +811,7 @@ func TestUnifiedDiffViewHidesVisibleChangeMarkers(t *testing.T) {
 		t.Fatalf("expected no staged diff before apply, got:\n%s", stagedBefore)
 	}
 
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	m = updated.(Model)
@@ -975,7 +975,7 @@ func TestSideBySideModeAllowsLineModeToggle(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
 	m = updated.(Model)
 
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updated.(Model)
 	if m.diffarea.NavMode() != diffview.NavModeLine {
 		t.Fatalf("expected nav mode to switch to line in side-by-side, got %v", m.diffarea.NavMode())
@@ -1003,7 +1003,7 @@ func TestSideBySideModeAllowsVisualLineRangeStaging(t *testing.T) {
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
 	m = updated.(Model)
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
 	m = updated.(Model)
@@ -2241,7 +2241,7 @@ func TestCMInFiletreeDoesNothing(t *testing.T) {
 	m = updated.(Model)
 }
 
-func TestCMInDiffWithoutFileContextShowsError(t *testing.T) {
+func TestAskAIInDiffWithoutFileContextShowsError(t *testing.T) {
 	t.Parallel()
 	repo := testutil.TempRepo(t)
 
@@ -2249,12 +2249,12 @@ func TestCMInDiffWithoutFileContextShowsError(t *testing.T) {
 	m.ready = true
 	m.focus = focusDiff
 
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	m = updated.(Model)
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	m = updated.(Model)
 	if cmd == nil {
-		t.Fatalf("cm without file context should return a warning notification cmd")
+		t.Fatalf("aa (Ask AI) without file context should return a warning notification cmd")
 	}
 	msg := cmd()
 	notifyMsg, ok := msg.(notifypkg.NotifyMsg)
@@ -2288,7 +2288,9 @@ func TestYShowsBindingDrivenYankHint(t *testing.T) {
 	for _, h := range hints {
 		allDescs += " " + h.Key + " " + h.Desc
 	}
-	for _, want := range []string{"y", "content", "l", "location", "a", "AI agent", "f", "filename"} {
+	// yank-for-AI moved off the 'y' chord to 'ay'; the legacy 'ya' alias is
+	// hidden, so it no longer appears in the 'y' chord hint overlay.
+	for _, want := range []string{"y", "content", "l", "location", "f", "filename"} {
 		if !strings.Contains(allDescs, want) {
 			t.Fatalf("expected yank hint %q in ChordHints descriptions %q", want, allDescs)
 		}
@@ -2693,7 +2695,7 @@ func TestLineModeCanUnstageSingleModifiedLine(t *testing.T) {
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	m = updated.(Model)
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updated.(Model)
 
 	// Move to second changed line and unstage it.
@@ -2728,7 +2730,7 @@ func TestLineModeStagesSingleLineInUntrackedFile(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
@@ -2774,7 +2776,7 @@ func TestLineModeUnstageOneOfAdjacentDeletedLinesDoesNotDuplicate(t *testing.T) 
 	m = updatedModel.(Model)
 	updatedModel, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updatedModel.(Model)
-	updatedModel, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updatedModel.(Model)
 	updatedModel, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updatedModel.(Model)
@@ -2835,7 +2837,7 @@ func TestLineModeUnstageBraceFromFirstHunkBlock(t *testing.T) {
 	m = updatedModel.(Model)
 	updatedModel, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updatedModel.(Model)
-	updatedModel, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updatedModel.(Model)
 
 	// Move to the deletion of the closing brace line.
