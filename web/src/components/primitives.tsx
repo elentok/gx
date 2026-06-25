@@ -1,4 +1,5 @@
 import type { ComponentChildren } from "preact"
+import { useState } from "preact/hooks"
 import { Icon, type IconName } from "./Icon.tsx"
 
 /* Faux-TUI primitive components. Each wraps a class from primitives.css so the
@@ -75,10 +76,37 @@ export function Button({
   )
 }
 
-export function Cmd({ children }: { children: ComponentChildren }) {
+export function Cmd({
+  children,
+  copy: showCopy,
+}: {
+  children: ComponentChildren
+  copy?: boolean
+}) {
+  const [copied, setCopied] = useState(false)
+
+  function handleCopy() {
+    const text = typeof children === "string" ? children : ""
+    navigator.clipboard?.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
   return (
     <span class="cmd">
       <code>{children}</code>
+      {showCopy && (
+        <button
+          class="cmd-copy"
+          type="button"
+          aria-label="copy to clipboard"
+          title="copy to clipboard"
+          onClick={handleCopy}
+        >
+          <Icon name={copied ? "check" : "copy"} />
+        </button>
+      )}
     </span>
   )
 }

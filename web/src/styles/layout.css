@@ -1,9 +1,8 @@
-/* Page composition — layout for the hero and the primitive-preview panels.
+/* Page composition — layout for the landing sections.
    Primitive look-and-feel lives in primitives.css; this file only arranges. */
 
 /* ── Hero ──────────────────────────────────────────────────────────────────
-   The full mascot logo is the centerpiece, with wordmark, tagline and CTAs
-   stacked beneath it inside the terminal-bordered panel. */
+   GIF is the centerpiece; logo + tagline sit above it, CTAs below. */
 .hero {
   text-align: center;
   padding: 2.25rem 1.25rem 2rem;
@@ -11,15 +10,29 @@
 .hero > .panel-title {
   color: var(--lime);
 }
+.hero-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
 .hero-logo {
-  display: block;
-  width: 200px;
+  width: 72px;
   height: auto;
-  margin: 0.5rem auto 1rem;
+  flex-shrink: 0;
 }
 .hero-tagline {
   color: var(--subtle);
   font-size: 1.15rem;
+  text-align: left;
+}
+.hero-demo {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
   margin-bottom: 1.5rem;
 }
 .hero-ctas {
@@ -29,49 +42,146 @@
   flex-wrap: wrap;
 }
 
-/* ── Worktrees preview table ─────────────────────────────────────────────── */
-.wt-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.wt-table td {
-  padding: 0.4rem 0.5rem;
-  border-top: 1px solid var(--surface);
-}
-.wt-table tr:first-child td {
-  border-top: 0;
-}
-.wt-sync {
-  text-align: right;
+/* ── Install ───────────────────────────────────────────────────────────────── */
+.cmd-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
 }
 
-/* ── Rows of primitives ──────────────────────────────────────────────────── */
-.badge-row,
-.cmd-row {
+/* ── Copy button inside Cmd ────────────────────────────────────────────────── */
+.cmd-copy {
+  appearance: none;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  color: var(--subtle);
+  font-family: var(--font-nerd);
+  font-size: 0.9em;
+  padding: 0 0.1em;
+  line-height: 1;
+  transition: color 0.1s ease;
+}
+.cmd-copy:hover {
+  color: var(--lime);
+}
+
+/* ── The Why ───────────────────────────────────────────────────────────────── */
+.why-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  color: var(--subtle);
+  max-width: 68ch;
+}
+.why-body kbd {
+  color: var(--text);
+}
+.why-body kbd + kbd {
+  margin-left: 2px;
+}
+.why-coda {
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* ── Feature Showcase ──────────────────────────────────────────────────────── */
+.showcase-tabs {
+  margin: -1rem -1.1rem 1rem;
+  border-radius: var(--radius) var(--radius) 0 0;
+  border-bottom: var(--border);
+}
+.showcase-gif {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+  margin-bottom: 1rem;
+}
+.showcase-captions {
+  list-style: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem 1.5rem;
+}
+.showcase-caption {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5em;
+  color: var(--subtle);
+  font-size: 0.95em;
+}
+.showcase-caption .nf {
+  flex-shrink: 0;
+  font-size: 0.85em;
+}
+
+/* ── Closing CTA ───────────────────────────────────────────────────────────── */
+.cta-closing {
+  text-align: center;
+  padding: 1.75rem 1.25rem;
+}
+
+/* ── Footer ────────────────────────────────────────────────────────────────── */
+.footer {
+  border-top: var(--border);
+  padding: 1.5rem 0 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+}
+.footer-links a {
+  color: var(--subtle);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  font-size: 0.9em;
+}
+.footer-links a:hover {
+  color: var(--text);
+  text-decoration: none;
+}
+.footer-byline {
+  color: var(--overlay);
+  font-size: 0.875em;
+}
+
+/* ── Badge row (primitives preview — kept for reference) ───────────────────── */
+.badge-row {
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
   align-items: center;
 }
-.cmd-row {
-  gap: 0.75rem;
-}
-.ai-hint {
-  margin-top: 0.9rem;
-  color: var(--subtle);
-}
-.ai-hint kbd + kbd {
-  margin-left: 2px;
-}
 
+/* ── Responsive ────────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .hero {
     padding: 1.75rem 0.85rem 1.5rem;
   }
-  .hero-logo {
-    width: 160px;
+  .hero-brand {
+    flex-direction: column;
+    gap: 0.5rem;
   }
   .hero-tagline {
-    font-size: 1.05rem;
+    text-align: center;
+  }
+  .hero-logo {
+    width: 56px;
+  }
+  .showcase-captions {
+    grid-template-columns: 1fr;
+  }
+  .footer {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

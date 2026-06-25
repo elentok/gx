@@ -1,48 +1,81 @@
-import { Tabs } from "./components/Tabs.tsx"
+import { useState } from "preact/hooks"
 import { Icon } from "./components/Icon.tsx"
-import {
-  Badge,
-  Button,
-  Cmd,
-  Panel,
-  SyncStatus,
-  type SyncState,
-} from "./components/primitives.tsx"
+import { Button, Cmd, Panel } from "./components/primitives.tsx"
 
-interface Worktree {
-  branch: string
-  state: SyncState
-  ahead?: number
-  behind?: number
+/* ── Static data ───────────────────────────────────────────────── */
+
+interface Pillar {
+  id: string
+  label: string
+  gif: string
+  gifAlt: string
+  captions: string[]
 }
 
-const WORKTREES: Worktree[] = [
-  { branch: "main", state: "synced" },
-  { branch: "feat/ask-ai", state: "ahead", ahead: 3 },
-  { branch: "fix/diff-nav", state: "behind", behind: 2 },
-  { branch: "spike/kitty", state: "diverged", ahead: 4, behind: 1 },
+const PILLARS: Pillar[] = [
+  {
+    id: "review",
+    label: "review & stage",
+    gif: "/demos/demo-status.gif",
+    gifAlt: "gx status view — staging changes at the hunk and line level",
+    captions: [
+      "Stage by file, hunk, or individual line",
+      "Side-by-side ↔ unified diff, adjustable context",
+      "Inline image diffs (kitty graphics protocol)",
+      "ay  Yank for AI   ·   aa  Ask AI",
+    ],
+  },
+  {
+    id: "log",
+    label: "inspect history",
+    gif: "/demos/demo-log.gif",
+    gifAlt: "gx log view — amend, reword, and browse commit history",
+    captions: [
+      "Amend, reword, or interactive-rebase from the log",
+      "Commit show + stash split view",
+      "Path-filtered history",
+      "Bump version directly in the log",
+    ],
+  },
+  {
+    id: "worktrees",
+    label: "manage worktrees",
+    gif: "/demos/demo-worktrees.gif",
+    gifAlt: "gx worktrees view — create, sync, and switch between worktrees",
+    captions: [
+      "Sync / rebase-status table at a glance",
+      "Create, clone, or bulk-delete worktrees",
+      "First-class .bare layout support",
+      "Yank / paste paths between worktrees",
+    ],
+  },
 ]
+
+/* ── 1. Hero ───────────────────────────────────────────────────── */
 
 function Hero() {
   return (
     <Panel class="hero" title="gx" rightTitle="~/dev/gx">
+      <div class="hero-brand">
+        <img
+          class="hero-logo"
+          src="/logo-440.webp"
+          width={72}
+          height={79}
+          alt="gx goblin mascot"
+        />
+        <p class="hero-tagline">a git TUI for reviewing changes, fast</p>
+      </div>
       <img
-        class="hero-logo"
-        src="/logo-440.webp"
-        width={200}
-        height={219}
-        alt="gx — a goblin in a terminal window holding a graffiti 'gx' wordmark"
+        class="hero-demo"
+        src="/demos/demo-status.gif"
+        alt="gx status view — staging changes at the hunk and line level"
       />
-      <p class="hero-tagline">a git TUI for reviewing changes, fast</p>
       <div class="hero-ctas">
         <Button href="#install" primary icon="copy">
           Install
         </Button>
-        <Button
-          href="https://github.com/elentok/gx"
-          icon="github"
-          trailingIcon="star"
-        >
+        <Button href="https://github.com/elentok/gx" icon="github" trailingIcon="star">
           GitHub
         </Button>
       </div>
@@ -50,75 +83,129 @@ function Hero() {
   )
 }
 
-function WorktreesPreview() {
-  return (
-    <Panel
-      title={
-        <>
-          <Icon name="worktree" /> worktrees
-        </>
-      }
-      rightTitle="~/dev/gx"
-    >
-      <table class="wt-table">
-        <tbody>
-          {WORKTREES.map((wt) => (
-            <tr key={wt.branch}>
-              <td>
-                <Icon name="branch" color="var(--mauve)" /> {wt.branch}
-              </td>
-              <td class="wt-sync">
-                <SyncStatus state={wt.state} ahead={wt.ahead} behind={wt.behind} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </Panel>
-  )
-}
+/* ── 2. Install ────────────────────────────────────────────────── */
 
-function BadgesPreview() {
+function Install() {
   return (
-    <Panel inset title="badges">
-      <div class="badge-row">
-        <Badge variant="green">staged</Badge>
-        <Badge variant="yellow">modified</Badge>
-        <Badge variant="orange">untracked</Badge>
-        <Badge variant="mauve">renamed</Badge>
-        <Badge variant="blue">info</Badge>
-        <Badge variant="lime">AI</Badge>
-        <Badge>default</Badge>
-        <Badge variant="deepbg">deepbg</Badge>
-      </div>
-    </Panel>
-  )
-}
-
-function Actions() {
-  return (
-    <Panel id="install" title="install">
+    <Panel id="install" title="install in seconds">
       <div class="cmd-row">
-        <Cmd>brew install --cask gx</Cmd>
-        <Cmd>go install github.com/elentok/gx@latest</Cmd>
+        <Cmd copy>brew install --cask gx</Cmd>
+        <Cmd copy>go install github.com/elentok/gx@latest</Cmd>
       </div>
-      <p class="ai-hint">
-        press <kbd>a</kbd>
-        <kbd>a</kbd> to Ask AI, <kbd>a</kbd>
-        <kbd>y</kbd> to Yank for AI
-      </p>
     </Panel>
   )
 }
+
+/* ── 3. The Why ────────────────────────────────────────────────── */
+
+function TheWhy() {
+  return (
+    <Panel title="the why — reviewing AI code">
+      <div class="why-body">
+        <p>
+          When parallel worktrees each carry a feature branch authored by an AI assistant, you
+          review constantly — code you didn't write, at volume, across contexts that blur together.
+          gx was built for exactly this.
+        </p>
+        <p>
+          Keyboard-driven review, precise line-level staging, and two commands that close the
+          loop: <kbd>a</kbd>
+          <kbd>y</kbd> yanks the diff straight to your clipboard for any LLM,{" "}
+          <kbd>a</kbd>
+          <kbd>a</kbd> asks Claude inline. No context-switching, no copy-paste ceremony.
+        </p>
+        <p class="why-coda">Review first. Commit when you're sure.</p>
+      </div>
+    </Panel>
+  )
+}
+
+/* ── 4. Feature Showcase ───────────────────────────────────────── */
+
+function FeatureShowcase() {
+  const [active, setActive] = useState(0)
+  const pillar = PILLARS[active]
+
+  return (
+    <Panel title="features" class="showcase">
+      <nav class="tabbar showcase-tabs" aria-label="feature pillars">
+        {PILLARS.map((p, i) => (
+          <button
+            key={p.id}
+            class="tab"
+            role="tab"
+            type="button"
+            aria-selected={i === active}
+            onClick={() => setActive(i)}
+          >
+            {p.label}
+          </button>
+        ))}
+      </nav>
+      <img
+        key={pillar.gif}
+        class="showcase-gif"
+        src={pillar.gif}
+        alt={pillar.gifAlt}
+      />
+      <ul class="showcase-captions">
+        {pillar.captions.map((caption) => (
+          <li key={caption} class="showcase-caption">
+            <Icon name="check" color="var(--lime)" />
+            {caption}
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  )
+}
+
+/* ── 5. Closing CTA ────────────────────────────────────────────── */
+
+function ClosingCTA() {
+  return (
+    <Panel class="cta-closing">
+      <div class="hero-ctas">
+        <Button href="#install" primary icon="copy">
+          Install
+        </Button>
+        <Button href="https://github.com/elentok/gx" icon="github" trailingIcon="star">
+          GitHub
+        </Button>
+      </div>
+    </Panel>
+  )
+}
+
+/* ── 6. Footer ─────────────────────────────────────────────────── */
+
+function Footer() {
+  return (
+    <footer class="footer">
+      <nav class="footer-links" aria-label="footer links">
+        <a href="https://github.com/elentok/gx">
+          <Icon name="github" /> GitHub
+        </a>
+        <a href="https://github.com/elentok/gx/blob/main/CHANGELOG.md">Changelog</a>
+        <a href="https://github.com/elentok/gx/blob/main/README.md">README</a>
+        <a href="https://github.com/elentok/gx/blob/main/LICENSE">License</a>
+      </nav>
+      <p class="footer-byline">by David Elentok</p>
+    </footer>
+  )
+}
+
+/* ── Root ──────────────────────────────────────────────────────── */
 
 export function App() {
   return (
     <>
       <Hero />
-      <Tabs />
-      <WorktreesPreview />
-      <BadgesPreview />
-      <Actions />
+      <Install />
+      <TheWhy />
+      <FeatureShowcase />
+      <ClosingCTA />
+      <Footer />
     </>
   )
 }
