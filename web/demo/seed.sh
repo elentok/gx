@@ -287,8 +287,70 @@ type Session struct {
 	ExpiresAt time.Time
 }"
   commit "Add session management"
-  # Unstaged modification
-  printf 'package main\n\n// BUG: needs constant-time comparison\nfunc login(user, pass string) bool { return false }\nfunc logout(token string)          {}\n' > src/auth.go
+  # Expand auth.go into a multi-function file so the status demo has a diff with
+  # two separated hunks (needed to show "stage a hunk" then "stage a line").
+  write-file src/auth.go "package main
+
+import \"time\"
+
+const loginTimeout = 30 * time.Second
+
+func login(user, pass string) bool {
+	if user == \"\" || pass == \"\" {
+		return false
+	}
+	return checkCredentials(user, pass)
+}
+
+func checkCredentials(user, pass string) bool {
+	// TODO: hash comparison
+	return false
+}
+
+func refresh(token string) bool {
+	return false
+}
+
+func logout(token string) {
+	revoke(token)
+}
+
+func revoke(token string) {}"
+  commit "Flesh out auth flow"
+  # Unstaged 3-hunk modification so the status demo can stage one hunk, stage a
+  # single line of the next in visual mode, and still leave a hunk to hand to the
+  # AI. The unchanged functions between the edits keep them as distinct hunks
+  # even at 1 context line.
+  printf 'package main
+
+import "time"
+
+// SECURITY: shorter session window
+const loginTimeout = 15 * time.Second
+
+func login(user, pass string) bool {
+	if user == "" || pass == "" {
+		return false
+	}
+	return checkCredentials(user, pass)
+}
+
+func checkCredentials(user, pass string) bool {
+	// TODO: hash comparison
+	return false
+}
+
+func refresh(token string) bool {
+	return renew(token)
+}
+
+func logout(token string) {
+	revoke(token)
+}
+
+func revoke(token string) {
+	delete(activeTokens, token)
+}\n' > src/auth.go
   cd ..
 
   # feature-api — pinned to v1 (2 commits behind origin/feature-api)

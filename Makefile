@@ -35,12 +35,17 @@ demo-seed:
 	bash $(DEMO_DIR)/seed.sh $(DEMO_WORK)
 
 # demos regenerates all demo GIFs into docs/ (single source for README + web/).
-# Builds gx, seeds the fixture, then renders every VHS tape. The .tape files
-# arrive in a later task; until then this just (re)builds the fixture.
-demos: build demo-seed
+# Builds gx, then renders every VHS tape — re-seeding the fixture before each one
+# so the tapes (which stage hunks, reword, create worktrees, …) always start from
+# a clean, deterministic state regardless of order. Requires vhs + ttyd and the
+# "Agave Nerd Font" installed. The kitty image-diff demo is captured separately
+# via web/demo/image-diff.sh (VHS can't render the kitty graphics protocol).
+demos: build
 	@if ls $(DEMO_TAPES)/*.tape >/dev/null 2>&1; then \
 		for tape in $(DEMO_TAPES)/*.tape; do \
-			echo "vhs $$tape"; \
+			echo "==> seeding fixture"; \
+			bash $(DEMO_DIR)/seed.sh $(DEMO_WORK) >/dev/null; \
+			echo "==> vhs $$tape"; \
 			PATH="$(CURDIR):$$PATH" vhs "$$tape"; \
 		done; \
 	else \
