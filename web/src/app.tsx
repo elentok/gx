@@ -60,8 +60,8 @@ function Hero() {
         <img
           class="hero-logo"
           src="/logo-440.webp"
-          width={72}
-          height={79}
+          width={240}
+          height={264}
           alt="gx goblin mascot"
         />
         <p class="hero-tagline">a git TUI for reviewing changes, fast</p>
@@ -72,7 +72,7 @@ function Hero() {
         alt="gx status view — staging changes at the hunk and line level"
       />
       <div class="hero-ctas">
-        <Button href="#install" primary icon="copy">
+        <Button href="#install" icon="copy">
           Install
         </Button>
         <Button href="https://github.com/elentok/gx" icon="github" trailingIcon="star">
@@ -151,7 +151,7 @@ function FeatureShowcase() {
       <ul class="showcase-captions">
         {pillar.captions.map((caption) => (
           <li key={caption} class="showcase-caption">
-            <Icon name="check" color="var(--lime)" />
+            <Icon name="check" color="var(--accent)" />
             {caption}
           </li>
         ))}
@@ -160,24 +160,7 @@ function FeatureShowcase() {
   )
 }
 
-/* ── 5. Closing CTA ────────────────────────────────────────────── */
-
-function ClosingCTA() {
-  return (
-    <Panel class="cta-closing">
-      <div class="hero-ctas">
-        <Button href="#install" primary icon="copy">
-          Install
-        </Button>
-        <Button href="https://github.com/elentok/gx" icon="github" trailingIcon="star">
-          GitHub
-        </Button>
-      </div>
-    </Panel>
-  )
-}
-
-/* ── 6. Footer ─────────────────────────────────────────────────── */
+/* ── 5. Footer ─────────────────────────────────────────────────── */
 
 function Footer() {
   return (
@@ -204,7 +187,6 @@ export function App() {
       <Install />
       <TheWhy />
       <FeatureShowcase />
-      <ClosingCTA />
       <Footer />
     </>
   )

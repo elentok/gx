@@ -35,6 +35,13 @@
   --lime-dim: #9fb025;
   --lime-ink: #11160a; /* near-black text on lime fills */
 
+  /* Site accent — the primary CTA / active-tab / focus color.
+     Kept separate from --lime so the logo's lime reads as the mascot's
+     identity rather than the UI accent. */
+  --accent: var(--mauve);   /* #cba6f7 */
+  --accent-dim: #b08de0;
+  --accent-ink: #1e1e2e;    /* dark text on mauve fills */
+
   /* Semantic sync colors — match ui/styles.go StyleStatus* */
   --sync-synced: var(--green);
   --sync-ahead: var(--mauve);

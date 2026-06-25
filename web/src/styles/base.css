@@ -32,8 +32,8 @@ a:hover {
 }
 
 ::selection {
-  background: var(--lime);
-  color: var(--lime-ink);
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 
 /* Nerd Font glyph helper. Use as <i class="nf" data-glyph></i> with the glyph

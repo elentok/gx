@@ -171,8 +171,8 @@
   color: var(--text);
 }
 .tab[aria-selected="true"] {
-  color: var(--lime);
-  border-bottom-color: var(--lime);
+  color: var(--accent);
+  border-bottom-color: var(--accent);
   font-weight: 700;
 }
 
@@ -207,14 +207,14 @@
   font-size: 0.95em;
 }
 .btn--primary {
-  background: var(--lime);
-  border-color: var(--lime);
-  color: var(--lime-ink);
+  background: transparent;
+  border-color: var(--accent);
+  color: var(--accent);
   font-weight: 700;
 }
 .btn--primary:hover {
-  background: var(--lime-dim);
-  border-color: var(--lime-dim);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: var(--accent);
 }
 
 /* ── Code / install line ─────────────────────────────────────────────────────
@@ -231,7 +231,7 @@
 }
 .cmd::before {
   content: "$";
-  color: var(--lime);
+  color: var(--accent);
   font-weight: 700;
 }
 code,
