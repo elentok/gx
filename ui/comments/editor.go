@@ -11,7 +11,8 @@ import (
 
 // CmdOpenEditor writes a comment file from path/loc/body and opens it in
 // $EDITOR. Returns the tea.Cmd to run (nil on failure) and a status message
-// (error description on failure, opening message on success).
+// (error description on failure, empty on success — the editor takeover is its
+// own feedback, so no toast is shown).
 func CmdOpenEditor(
 	path, loc string,
 	body []string,
@@ -33,5 +34,5 @@ func CmdOpenEditor(
 	}
 	args := append(parts[1:], commentPath)
 	cmd := terminalrun.Command(worktreeRoot, terminal, parts[0], args, makeMsg)
-	return cmd, ui.MessageOpening("comment editor")
+	return cmd, ""
 }

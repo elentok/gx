@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/imagediff"
 	"github.com/elentok/gx/ui/notify"
@@ -308,14 +307,14 @@ func (m Model) handleCommitFinished(msg commitFinishedMsg) (Model, tea.Cmd) {
 	if msg.splitApp != "" {
 		return m, notify.Info("opened " + msg.splitApp + " split: git commit")
 	}
-	return m, tea.Batch(notify.Info(ui.MessageClosed("git commit")), m.refresh(), statusRepoMutatedCmd())
+	return m, tea.Batch(notify.Success("committed"), m.refresh(), statusRepoMutatedCmd())
 }
 
 func (m Model) handleLazygitLogFinished(msg lazygitLogFinishedMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		return m, notify.Error("lazygit log failed: " + msg.err.Error())
 	}
-	return m, tea.Batch(notify.Info(ui.MessageClosed("lazygit log")), m.refresh())
+	return m, m.refresh()
 }
 
 func (m Model) handleEditFileFinished(msg editFileFinishedMsg) (Model, tea.Cmd) {
@@ -325,7 +324,7 @@ func (m Model) handleEditFileFinished(msg editFileFinishedMsg) (Model, tea.Cmd) 
 	if msg.splitApp != "" {
 		return m, notify.Info("opened " + msg.splitApp + " split: editor")
 	}
-	return m, tea.Batch(notify.Info(ui.MessageClosed("editor")), m.refresh())
+	return m, m.refresh()
 }
 
 func (m Model) handleEditCommentFinished(msg editCommentFinishedMsg) (Model, tea.Cmd) {
@@ -335,7 +334,7 @@ func (m Model) handleEditCommentFinished(msg editCommentFinishedMsg) (Model, tea
 	if msg.splitApp != "" {
 		return m, notify.Info("opened " + msg.splitApp + " split: comment editor")
 	}
-	return m, tea.Batch(notify.Info(ui.MessageClosed("comment editor")), m.refresh())
+	return m, m.refresh()
 }
 
 func (m Model) handleErrorKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {

@@ -219,7 +219,7 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 	case bindingLazygitLog:
 		wt := m.cursorWorktree()
 		if wt != nil {
-			return m, tea.Batch(notify.Info(ui.MessageOpening("lazygit log")), cmdLazygitLog(*wt))
+			return m, cmdLazygitLog(*wt)
 		}
 		return m, nil
 	case bindingOpenTerminal:

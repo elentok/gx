@@ -116,7 +116,9 @@ func TestHandleEditCommentFinishedSuccess(t *testing.T) {
 	updatedModel, cmd := m.handleEditCommentFinished(editCommentFinishedMsg{})
 	_ = updatedModel
 
-	if cmd == nil {
-		t.Fatal("expected notify cmd on successful comment edit")
+	// Success is silent: the editor takeover and reload are their own feedback,
+	// so no toast is emitted (only the split-app and error paths notify).
+	if cmd != nil {
+		t.Fatal("expected no notify cmd on successful comment edit")
 	}
 }

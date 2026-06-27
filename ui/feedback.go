@@ -53,14 +53,6 @@ func MessageNoOutput() string {
 	return "no command output"
 }
 
-func MessageOpening(target string) string {
-	return "opening " + strings.TrimSpace(target) + "..."
-}
-
-func MessageClosed(target string) string {
-	return strings.TrimSpace(target) + " closed"
-}
-
 func HintDismiss() string {
 	return RenderInlineBindings(key.NewBinding(key.WithHelp("esc/enter/q", "dismiss")))
 }

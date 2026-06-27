@@ -180,6 +180,22 @@ Triggered by Esc, gated behind an "Abort push?" confirm modal (default No) to gu
 accidental keypress; if the command completes while that confirm is showing, completion wins and the
 abort becomes a no-op.
 
+## Launching External Programs
+
+gx runs external programs (`$EDITOR`, the comment editor, `lazygit`, `git commit`) in one of two
+modes, which have opposite feedback needs and must not be conflated:
+
+**Takeover launch** — gx suspends and hands the *entire* terminal to the program; the TUI is not
+visible while it runs and resumes when the program exits. Because the takeover itself is the
+feedback, no "opening…"/"closed" toast is shown. On return the screen simply refreshes (the diff /
+filetree updates under the user). The exception is a **mutation** run this way — `git commit` —
+which reports its outcome like every other mutation: `notify.Success("committed")` plus the
+repo-mutated signal. Errors always surface loudly.
+
+**Split launch** — the program opens in a tmux/kitty split and the TUI keeps running beside it. Here
+a toast (`"opened <app> split: …"`) *is* shown, because it is the only signal that the program
+launched and where it went.
+
 ## Tab Caching and Reload
 
 **Live page cache** — the app shell keeps one live `tea.Model` per `TabID` (`livePageByTab`).

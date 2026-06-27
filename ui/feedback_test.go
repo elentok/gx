@@ -38,12 +38,6 @@ func TestMessageHelpers(t *testing.T) {
 	if got := MessageNoOutput(); got == "" {
 		t.Error("MessageNoOutput should be non-empty")
 	}
-	if got := MessageOpening("editor"); got != "opening editor..." {
-		t.Errorf("MessageOpening = %q", got)
-	}
-	if got := MessageClosed("modal"); got != "modal closed" {
-		t.Errorf("MessageClosed = %q", got)
-	}
 }
 
 func TestHintHelpers_NonEmpty(t *testing.T) {

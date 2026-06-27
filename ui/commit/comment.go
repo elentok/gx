@@ -47,7 +47,10 @@ func (m *Model) cmdCreateCommentFromDiff() tea.Cmd {
 	cmd, msg := comments.CmdOpenEditor(path, cl.loc, cl.body, m.worktreeRoot, ui.DetectTerminal(), func(err error, splitApp string) tea.Msg {
 		return editCommentFinishedMsg{err: err, splitApp: splitApp}
 	})
-	return tea.Batch(notify.Info(msg), cmd)
+	if cmd == nil {
+		return notify.Warning(msg)
+	}
+	return cmd
 }
 
 func (m *Model) cmdEditSelectedFile(splitType terminalrun.SplitType) tea.Cmd {
@@ -69,7 +72,7 @@ func (m *Model) cmdEditSelectedFile(splitType terminalrun.SplitType) tea.Cmd {
 	cmd := terminalrun.CommandWithSplit(m.worktreeRoot, m.settings.Terminal, splitType, parts[0], args, func(err error, splitApp string) tea.Msg {
 		return editFileFinishedMsg{err: err, splitApp: splitApp}
 	})
-	return tea.Batch(notify.Info(ui.MessageOpening("editor")), cmd)
+	return cmd
 }
 
 func (m Model) handleEditFileFinished(msg editFileFinishedMsg) (tea.Model, tea.Cmd) {
@@ -80,7 +83,7 @@ func (m Model) handleEditFileFinished(msg editFileFinishedMsg) (tea.Model, tea.C
 		return m, notify.Info("opened " + msg.splitApp + " split: editor")
 	}
 	m.reload()
-	return m, notify.Info(ui.MessageClosed("editor"))
+	return m, nil
 }
 
 func (m Model) handleEditCommentFinished(msg editCommentFinishedMsg) (tea.Model, tea.Cmd) {
@@ -91,5 +94,5 @@ func (m Model) handleEditCommentFinished(msg editCommentFinishedMsg) (tea.Model,
 		return m, notify.Info("opened " + msg.splitApp + " split: comment editor")
 	}
 	m.reload()
-	return m, notify.Info(ui.MessageClosed("comment editor"))
+	return m, nil
 }

@@ -59,7 +59,7 @@ func (m *Model) cmdEditSelectedFile(splitType terminalrun.SplitType) tea.Cmd {
 	cmd := terminalrun.CommandWithSplit(m.worktreeRoot, m.settings.Terminal, splitType, parts[0], args, func(err error, splitApp string) tea.Msg {
 		return editFileFinishedMsg{err: err, splitApp: splitApp}
 	})
-	return tea.Batch(notify.Info(ui.MessageOpening("editor")), cmd)
+	return cmd
 }
 
 func (m *Model) cmdCreateCommentFromDiff() tea.Cmd {
@@ -74,7 +74,10 @@ func (m *Model) cmdCreateCommentFromDiff() tea.Cmd {
 	cmd, msg := comments.CmdOpenEditor(file.Path, loc, body, m.worktreeRoot, m.settings.Terminal, func(err error, splitApp string) tea.Msg {
 		return editCommentFinishedMsg{err: err, splitApp: splitApp}
 	})
-	return tea.Batch(notify.Info(msg), cmd)
+	if cmd == nil {
+		return notify.Warning(msg)
+	}
+	return cmd
 }
 
 type autoReloadMsg struct{}

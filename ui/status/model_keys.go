@@ -118,7 +118,7 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (Model, tea
 		}
 		return m, tea.Quit
 	case bindingLazygitLog:
-		return m, tea.Batch(notify.Info(ui.MessageOpening("lazygit log")), cmdLazygitLog(m.worktreeRoot))
+		return m, cmdLazygitLog(m.worktreeRoot)
 	case bindingGotoBottom:
 		m.jumpToBottom()
 		if m.focus == focusFiletree {
