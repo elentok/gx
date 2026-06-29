@@ -68,6 +68,24 @@ func TestLastTag_WithTag(t *testing.T) {
 	}
 }
 
+func TestLastTag_NonVersionTagBetweenHeadAndVersionTag(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	testutil.WriteFile(t, dir, "README.md", "content")
+	testutil.MustGitExported(t, dir, "add", ".")
+	testutil.MustGitExported(t, dir, "commit", "-m", "initial")
+	testutil.MustGitExported(t, dir, "tag", "-a", "v1.2.3", "-m", "release")
+	testutil.WriteFile(t, dir, "README.md", "updated")
+	testutil.MustGitExported(t, dir, "add", ".")
+	testutil.MustGitExported(t, dir, "commit", "-m", "update")
+	testutil.MustGitExported(t, dir, "tag", "-a", "some-non-version-tag", "-m", "not a version")
+
+	tag := git.LastTag(dir)
+	if tag != "v1.2.3" {
+		t.Errorf("LastTag() = %q, want 'v1.2.3' when non-version tag is newer", tag)
+	}
+}
+
 func TestCreateAnnotatedTag(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)

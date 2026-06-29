@@ -8,7 +8,7 @@ import (
 
 // LastTag returns the most recent tag reachable from HEAD, or "v0.0.0" if none.
 func LastTag(root string) string {
-	tag := runAllowFail(root, []string{"describe", "--tags", "--abbrev=0"})
+	tag := runAllowFail(root, []string{"describe", "--tags", "--abbrev=0", "--match", "v[0-9]*.[0-9]*.[0-9]*"})
 	if tag == "" {
 		return "v0.0.0"
 	}
