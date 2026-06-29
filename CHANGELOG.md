@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.19.7 - 2026-06-29
+
+- Bump: fixed version bump failing when a non-semver tag exists between HEAD and the last version tag.
+- AI keys: renamed yank-for-AI binding `ya` → `ay`, and ask-AI binding `cm` → `ai`.
+- Takeover apps (editor, comment editor, lazygit log): success no longer shows a stale "opening…/closed" toast — the screen refresh on return is feedback enough. Git commit still reports via a "committed" success notification.
+
 ## v0.19.6 - 2026-06-17
 
 - Log and status tabs now show the current worktree name in the top-right of the panel frame (next to the ref), prefixed with a worktree icon when nerd fonts are enabled. The log tab's left title is now simply "Log".
