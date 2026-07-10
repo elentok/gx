@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.19.8 - 2026-07-11
+
+- Status: directories in the file tree can now be discarded directly — discarding a directory undoes tracked changes and deletes untracked files for everything inside it.
+
 ## v0.19.7 - 2026-06-29
 
 - Bump: fixed version bump failing when a non-semver tag exists between HEAD and the last version tag.
