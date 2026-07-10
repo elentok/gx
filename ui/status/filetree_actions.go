@@ -79,7 +79,23 @@ func (m Model) confirmAccept() (Model, tea.Cmd) {
 				return m, nil
 			}
 		}
-		return m, tea.Batch(notify.Success("discarded "+m.confirmPaths[0]), m.reload(m.confirmPaths[0]))
+		if len(m.confirmDeletePaths) > 0 {
+			for _, path := range m.confirmDeletePaths {
+				if err := git.DiscardUntrackedPath(m.worktreeRoot, path); err != nil {
+					m.showGitError(err)
+					return m, nil
+				}
+			}
+		}
+		displayPath := m.confirmDisplayPath
+		if displayPath == "" && len(m.confirmPaths) > 0 {
+			displayPath = m.confirmPaths[0]
+		}
+		preservePath := m.confirmPreservePath
+		if preservePath == "" {
+			preservePath = displayPath
+		}
+		return m, tea.Batch(notify.Success("discarded "+displayPath), m.reload(preservePath))
 	case confirmDiscardUnstaged:
 		if err := git.ApplyPatchToWorktree(m.worktreeRoot, m.confirmPatch, true, m.confirmPatchUnidiffZero); err != nil {
 			m.showGitError(err)

@@ -1182,6 +1182,49 @@ func TestFiletreeDDiscardsUntrackedFileAfterConfirm(t *testing.T) {
 	}
 }
 
+func TestFiletreeDDiscardsDirectoryAfterConfirm(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	testutil.Mkdir(t, repo+"/dir")
+	testutil.WriteFile(t, repo, "dir/tracked.txt", "original\n")
+	testutil.MustGitExported(t, repo, "add", "dir/tracked.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+	testutil.WriteFile(t, repo, "dir/tracked.txt", "changed\n")
+	testutil.WriteFile(t, repo, "dir/new.txt", "new\n")
+
+	m := newTestModelDefault(repo)
+	m.ready = true
+	m.focus = focusFiletree
+
+	entry, ok := m.selectedFiletreeEntry()
+	if !ok || entry.Kind != statusEntryDir || entry.Path != "dir" {
+		t.Fatalf("expected selected directory entry, got %+v ok=%v", entry, ok)
+	}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
+	m = updated.(Model)
+	if !m.confirmOpen {
+		t.Fatalf("expected discard confirmation to open for directory")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	m = updated.(Model)
+
+	content, err := os.ReadFile(filepath.Join(repo, "dir/tracked.txt"))
+	if err != nil {
+		t.Fatalf("expected tracked file to remain after directory discard: %v", err)
+	}
+	if string(content) != "original\n" {
+		t.Fatalf("expected tracked file to be restored, got %q", string(content))
+	}
+	if _, err := os.Stat(filepath.Join(repo, "dir/new.txt")); err == nil {
+		t.Fatalf("expected untracked file inside directory to be deleted after discard confirm")
+	}
+	if len(m.statusData.statusEntries) != 0 {
+		t.Fatalf("expected no status entries after directory discard, got %d", len(m.statusData.statusEntries))
+	}
+}
+
 func TestDiffUnstagedDDiscardsLineAfterConfirm(t *testing.T) {
 	t.Parallel()
 	repo := testutil.TempRepo(t)

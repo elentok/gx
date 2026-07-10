@@ -57,9 +57,12 @@ type Model struct {
 	confirmRemote           string
 	confirmBranch           string
 	confirmPaths            []string
+	confirmDeletePaths      []string
 	confirmPatch            string
 	confirmPatchUnidiffZero bool
 	confirmDiscardUntracked bool
+	confirmDisplayPath      string
+	confirmPreservePath     string
 	runningOpen             bool
 	runningTitle            string
 	runningVP               viewport.Model

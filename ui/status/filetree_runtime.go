@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/filetree"
 )
 
 func (m Model) selectedFiletreeEntry() (statusEntry, bool) {
@@ -13,6 +14,13 @@ func (m Model) selectedFiletreeEntry() (statusEntry, bool) {
 		return statusEntry{}, false
 	}
 	return m.statusData.statusEntries[m.statusData.listState.Selected()], true
+}
+
+func (m Model) selectedFiletreeRow() (filetree.Entry[git.StageFileStatus], bool) {
+	if m.statusData.listState.Selected() < 0 || m.statusData.listState.Selected() >= len(m.statusData.statusRows) {
+		return filetree.Entry[git.StageFileStatus]{}, false
+	}
+	return m.statusData.statusRows[m.statusData.listState.Selected()], true
 }
 
 func (m Model) selectedFile() (git.StageFileStatus, bool) {
@@ -141,32 +149,73 @@ func (m *Model) toggleStageStatusEntry() tea.Cmd {
 
 func (m *Model) openDiscardStatusConfirm() {
 	entry, ok := m.selectedFiletreeEntry()
-	if !ok || entry.Kind != statusEntryFile {
+	if !ok {
+		return
+	}
+	row, ok := m.selectedFiletreeRow()
+	if !ok {
 		return
 	}
 
 	title := fmt.Sprintf("Discard changes in %s?", entry.Path)
-	paths := []string{entry.Path}
+	restorePaths := []string{entry.Path}
+	deletePaths := []string{}
 	lines := []string{}
 
-	switch {
-	case entry.File.IsUntracked():
-		lines = append(lines, "This will delete the untracked file.")
-	case entry.File.IsRenamed() && entry.File.RenameFrom != "":
-		lines = append(lines,
-			"This will undo the rename.",
-			entry.File.RenameFrom+" -> "+entry.File.Path,
-		)
-		paths = []string{entry.File.RenameFrom, entry.File.Path}
-	case entry.File.IndexStatus == 'A' || entry.File.WorktreeCode == 'A':
-		lines = append(lines, "This will delete the new file.")
-	case entry.File.IndexStatus == 'D' || entry.File.WorktreeCode == 'D':
-		lines = append(lines, "This will restore the deleted file from HEAD.")
+	switch entry.Kind {
+	case statusEntryDir:
+		restorePaths, deletePaths = statusDiscardPathsForLeaves(row.Leaves)
+		hasUntracked := len(deletePaths) > 0
+		switch {
+		case len(restorePaths) == 0 && hasUntracked:
+			lines = append(lines, "This will delete all untracked files in this directory.")
+		case hasUntracked:
+			lines = append(lines,
+				"This will discard all tracked changes in this directory.",
+				"Untracked files inside it will be deleted.",
+			)
+		default:
+			lines = append(lines, "This will discard all tracked changes in this directory.")
+		}
+	case statusEntryFile:
+		switch {
+		case entry.File.IsUntracked():
+			lines = append(lines, "This will delete the untracked file.")
+		case entry.File.IsRenamed() && entry.File.RenameFrom != "":
+			lines = append(lines,
+				"This will undo the rename.",
+				entry.File.RenameFrom+" -> "+entry.File.Path,
+			)
+			restorePaths = []string{entry.File.RenameFrom, entry.File.Path}
+		case entry.File.IndexStatus == 'A' || entry.File.WorktreeCode == 'A':
+			lines = append(lines, "This will delete the new file.")
+		case entry.File.IndexStatus == 'D' || entry.File.WorktreeCode == 'D':
+			lines = append(lines, "This will restore the deleted file from HEAD.")
+		default:
+			lines = append(lines, "This will undo all changes in this file.")
+		}
 	default:
-		lines = append(lines, "This will undo all changes in this file.")
+		return
 	}
 
 	m.openConfirm(title, lines, confirmDiscardStatus, "", "")
-	m.confirmDiscardUntracked = entry.File.IsUntracked()
-	m.confirmPaths = uniqueNonEmpty(paths)
+	m.confirmDiscardUntracked = entry.Kind == statusEntryFile && entry.File.IsUntracked()
+	m.confirmPaths = uniqueNonEmpty(restorePaths)
+	m.confirmDeletePaths = uniqueNonEmpty(deletePaths)
+	m.confirmDisplayPath = entry.Path
+	m.confirmPreservePath = entry.Path
+}
+
+func statusDiscardPathsForLeaves(files []git.StageFileStatus) (restorePaths, deletePaths []string) {
+	for _, file := range files {
+		switch {
+		case file.IsUntracked():
+			deletePaths = append(deletePaths, file.Path)
+		case file.IsRenamed() && file.RenameFrom != "":
+			restorePaths = append(restorePaths, file.RenameFrom, file.Path)
+		default:
+			restorePaths = append(restorePaths, file.Path)
+		}
+	}
+	return uniqueNonEmpty(restorePaths), uniqueNonEmpty(deletePaths)
 }

@@ -344,9 +344,12 @@ func (m *Model) openConfirm(title string, lines []string, action stageConfirmAct
 	m.confirmRemote = remote
 	m.confirmBranch = branch
 	m.confirmPaths = nil
+	m.confirmDeletePaths = nil
 	m.confirmPatch = ""
 	m.confirmPatchUnidiffZero = false
 	m.confirmDiscardUntracked = false
+	m.confirmDisplayPath = ""
+	m.confirmPreservePath = ""
 	m.confirmYes = true
 }
 
@@ -369,7 +372,6 @@ func (m Model) runningModalView() string {
 		m.runningVP.Width(),
 	)
 }
-
 
 func (m Model) credentialModalView() string {
 	title := "Credential Required"
