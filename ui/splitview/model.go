@@ -3,6 +3,7 @@ package splitview
 import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/elentok/gx/ui"
 )
 
 // Orientation controls the layout direction.
@@ -70,7 +71,7 @@ type Model struct {
 	keyPrefix string
 }
 
-// New creates a Model with auto-orientation enabled (width ≤100 → Horizontal).
+// New creates a Model with auto-orientation enabled (width ≤ui.NarrowWidthThreshold → Horizontal).
 func New(list ListPanel, detail DetailPanel) Model {
 	return Model{
 		list:       list,
@@ -195,7 +196,7 @@ func (m Model) DetailOrigin() (col, row int, visible bool) {
 // effectiveOrientation returns the resolved layout direction.
 func (m Model) effectiveOrientation() Orientation {
 	if m.autoOrient {
-		if m.width <= 100 {
+		if m.width <= ui.NarrowWidthThreshold {
 			return Horizontal
 		}
 		return Vertical

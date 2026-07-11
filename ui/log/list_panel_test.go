@@ -155,7 +155,7 @@ func TestListPanelSearchHighlightPresent(t *testing.T) {
 			return text
 		},
 	}
-	line := m.WithHints(hints).renderCommitRow(r)
+	line := m.WithHints(hints).renderCommitRow(r, false)
 	stripped := ansi.Strip(line)
 	if !strings.Contains(stripped, "fix the bug") {
 		t.Fatalf("stripped row missing subject: %q", stripped)
@@ -252,6 +252,38 @@ func TestListPanelHiddenRefOmittedFromBadges(t *testing.T) {
 	}
 	if !strings.Contains(stripped, "origin/main") {
 		t.Fatalf("non-hidden ref missing from %q", stripped)
+	}
+}
+
+// --- Condensed rows ---
+
+func TestRenderRowUsesShortDateAndSingleSpaceGapWhenCondensed(t *testing.T) {
+	r := row{
+		kind: rowCommit,
+		commit: git.LogEntry{
+			Hash:        "abcdef1",
+			Subject:     "subject",
+			AuthorShort: "AB",
+			Date:        time.Now().Add(-2 * time.Hour),
+			Decorations: []git.RefDecoration{{Name: "origin/main", Kind: git.RefDecorationRemoteBranch}},
+		},
+	}
+	m := sizedLP(80, 20).WithRows([]row{r})
+
+	condensed := ansi.Strip(m.renderRow(r, false, ui.NarrowWidthThreshold-1))
+	wide := ansi.Strip(m.renderRow(r, false, ui.NarrowWidthThreshold+50))
+
+	if !strings.Contains(condensed, "2h ") || strings.Contains(condensed, "2h ago") {
+		t.Fatalf("condensed row should show short date without 'ago', got %q", condensed)
+	}
+	if !strings.Contains(wide, "2h ago") {
+		t.Fatalf("wide row should keep full 'ago' date, got %q", wide)
+	}
+	if !strings.Contains(condensed, "subject origin/main") {
+		t.Fatalf("condensed row should have single-space gap before badges, got %q", condensed)
+	}
+	if !strings.Contains(wide, "subject  origin/main") {
+		t.Fatalf("wide row should keep double-space gap before badges, got %q", wide)
 	}
 }
 

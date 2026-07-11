@@ -213,7 +213,7 @@ func TestRenderCommitRowHighlightsSearchMatches(t *testing.T) {
 	}
 	m.listPanel = m.listPanel.WithRows([]row{r})
 
-	line := m.listPanel.WithHints(m.buildHints()).renderCommitRow(r)
+	line := m.listPanel.WithHints(m.buildHints()).renderCommitRow(r, false)
 	if stripped := ansi.Strip(line); !strings.Contains(stripped, "fix search highlighting") {
 		t.Fatalf("stripped line = %q", stripped)
 	}

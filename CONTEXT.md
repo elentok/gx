@@ -85,6 +85,24 @@ branch. Rendered red with `󰃻`.
 **Remote-only** — the commit exists on the remote tracking branch but not on the local branch (fetch
 without pull). Rendered purple with `󰜮`.
 
+## Decorations and Badges (Log View)
+
+**Decoration** — a git ref (local branch, remote branch, tag, or `HEAD`) that points directly at a
+commit. A commit may carry zero, one, or several. Decorations are shown wherever a commit is
+presented in detail: each log row, and the commit detail header.
+
+**Badge** — the rendering of a single decoration as its own colored pill.
+
+**Badge group** — multiple decorations on one commit rendered as a single merged pill: one shared
+background with each decoration's name keeping its own text color, instead of one pill per
+decoration. Used only by condensed rows; normal-width rows render each decoration as its own
+separate badge.
+
+**Condensed row** — the narrow-width rendering of a log row: relative dates drop their "ago" suffix,
+decorations render as a badge group instead of separate badges, and the gap between subject and
+decorations narrows from two spaces to one. Triggered below the same width threshold used elsewhere
+for narrow layouts (see Split view). Normal-width rows are unaffected by any of this.
+
 ## Navigation Modes
 
 **NavModeHunk** — diff navigation moves between hunks. Active item is a hunk index.

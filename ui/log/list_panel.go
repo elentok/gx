@@ -191,9 +191,14 @@ func (m listPanel) renderRow(r row, selected bool, width int) string {
 			logPseudoStatusStyle.Render(m.hl(r.detail)),
 		)
 	default:
-		line = m.renderCommitRow(r)
+		condensed := width < ui.NarrowWidthThreshold
+		line = m.renderCommitRow(r, condensed)
 		if badges := m.renderBadges(r.commit.Decorations); badges != "" {
-			line += "  " + badges
+			gap := "  "
+			if condensed {
+				gap = " "
+			}
+			line += gap + badges
 		}
 	}
 	line = ansi.Truncate(line, maxInt(1, width), "…")
@@ -234,17 +239,23 @@ func commitState(class git.BranchHistoryClass, branchDiverged bool) commitStateI
 	}
 }
 
-func (m listPanel) renderCommitRow(r row) string {
+func (m listPanel) renderCommitRow(r row, condensed bool) string {
 	graph := r.commit.Graph
 	if graph == "" {
 		graph = "*"
 	}
 	state := commitState(r.class, m.hints.branchDiverged)
+	date := ui.RelativeTimeCompact(r.commit.Date)
+	dateWidth := 10
+	if condensed {
+		date = ui.RelativeTimeCompactShort(r.commit.Date)
+		dateWidth = 6
+	}
 	cols := []ui.FixedColumn{
 		{Text: graph, Width: 4},
 		{Text: m.hl(r.commit.Hash), Width: 8, Style: logHashStyle},
 		{Text: m.hl(r.commit.AuthorShort), Width: 3, Style: logMetaStyle},
-		{Text: ui.RelativeTimeCompact(r.commit.Date), Width: 10, Style: logMetaStyle},
+		{Text: date, Width: dateWidth, Style: logMetaStyle},
 		{Text: state.icon, Width: 1, Style: state.style},
 	}
 	meta := ui.RenderFixedColumns(cols)

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Log: rows in narrow panels now render in a condensed style — relative dates drop the " ago" suffix (e.g. "2h" instead of "2h ago") and the gap before decoration badges narrows to one space.
+
 ## v0.19.8 - 2026-07-11
 
 - Status: directories in the file tree can now be discarded directly — discarding a directory undoes tracked changes and deletes untracked files for everything inside it.
