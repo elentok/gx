@@ -192,14 +192,8 @@ func (m listPanel) renderRow(r row, selected bool, width int) string {
 		)
 	default:
 		condensed := width < ui.NarrowWidthThreshold
-		line = m.renderCommitRow(r, condensed)
-		if badges := m.renderBadges(r.commit.Decorations, condensed); badges != "" {
-			gap := "  "
-			if condensed {
-				gap = " "
-			}
-			line += gap + badges
-		}
+		badges := m.renderBadges(r.commit.Decorations, condensed)
+		line = m.renderCommitRow(r, condensed, badges)
 	}
 	line = ansi.Truncate(line, maxInt(1, width), "…")
 	lineW := ansi.StringWidth(line)
@@ -239,7 +233,7 @@ func commitState(class git.BranchHistoryClass, branchDiverged bool) commitStateI
 	}
 }
 
-func (m listPanel) renderCommitRow(r row, condensed bool) string {
+func (m listPanel) renderCommitRow(r row, condensed bool, badges ...string) string {
 	graph := r.commit.Graph
 	if graph == "" {
 		graph = "*"
@@ -259,7 +253,11 @@ func (m listPanel) renderCommitRow(r row, condensed bool) string {
 		{Text: state.icon, Width: 1, Style: state.style},
 	}
 	meta := ui.RenderFixedColumns(cols)
-	return meta + " " + state.style.Render(m.hl(r.commit.Subject))
+	subject := state.style.Render(m.hl(r.commit.Subject))
+	if len(badges) == 0 || badges[0] == "" {
+		return meta + " " + subject
+	}
+	return meta + " " + badges[0] + " " + subject
 }
 
 func (m listPanel) renderBadges(decorations []git.RefDecoration, condensed bool) string {

@@ -257,7 +257,7 @@ func TestListPanelHiddenRefOmittedFromBadges(t *testing.T) {
 
 // --- Condensed rows ---
 
-func TestRenderRowUsesShortDateAndSingleSpaceGapWhenCondensed(t *testing.T) {
+func TestRenderRowUsesShortDateAndSingleSpaceGapForBadges(t *testing.T) {
 	r := row{
 		kind: rowCommit,
 		commit: git.LogEntry{
@@ -279,11 +279,11 @@ func TestRenderRowUsesShortDateAndSingleSpaceGapWhenCondensed(t *testing.T) {
 	if !strings.Contains(wide, "2h ago") {
 		t.Fatalf("wide row should keep full 'ago' date, got %q", wide)
 	}
-	if !strings.Contains(condensed, "subject origin/main") {
-		t.Fatalf("condensed row should have single-space gap before badges, got %q", condensed)
+	if !strings.Contains(condensed, "origin/main subject") {
+		t.Fatalf("condensed row should have single-space gap after badges, got %q", condensed)
 	}
-	if !strings.Contains(wide, "subject  origin/main") {
-		t.Fatalf("wide row should keep double-space gap before badges, got %q", wide)
+	if !strings.Contains(wide, "origin/main subject") {
+		t.Fatalf("wide row should have single-space gap after badges, got %q", wide)
 	}
 }
 

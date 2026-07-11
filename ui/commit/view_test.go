@@ -65,46 +65,33 @@ func TestRenderBadges_NonEmpty(t *testing.T) {
 	}
 }
 
-func TestWrapDecorationBadges_NoBadges(t *testing.T) {
-	lines := wrapDecorationBadges("subject", nil, 80)
-	if len(lines) != 1 || lines[0] != "subject" {
-		t.Errorf("wrapDecorationBadges(no badges) = %v, want [\"subject\"]", lines)
+func TestPackBadgeLines_Empty(t *testing.T) {
+	lines := packBadgeLines(nil, 80)
+	if len(lines) != 0 {
+		t.Errorf("packBadgeLines(nil) = %v, want empty", lines)
 	}
 }
 
-func TestWrapDecorationBadges_FitsOnFirstLine(t *testing.T) {
-	lines := wrapDecorationBadges("subject", []string{"a", "b"}, 80)
+func TestPackBadgeLines_FitsOnOneLine(t *testing.T) {
+	lines := packBadgeLines([]string{"a", "b"}, 80)
 	if len(lines) != 1 {
 		t.Fatalf("expected 1 line, got %d: %v", len(lines), lines)
 	}
-	if !strings.HasPrefix(lines[0], "subject") || !strings.Contains(lines[0], "a") || !strings.Contains(lines[0], "b") {
-		t.Errorf("expected subject and badges on line 1, got %q", lines[0])
+	if !strings.Contains(lines[0], "a") || !strings.Contains(lines[0], "b") {
+		t.Errorf("expected both badges on line 1, got %q", lines[0])
 	}
 }
 
-func TestWrapDecorationBadges_WrapsOntoNewLines(t *testing.T) {
-	subject := "subject"
+func TestPackBadgeLines_WrapsOntoNewLines(t *testing.T) {
 	badges := []string{"aaaaaaaaaa", "bbbbbbbbbb", "cccccccccc"}
-	lines := wrapDecorationBadges(subject, badges, 15)
+	lines := packBadgeLines(badges, 15)
 	if len(lines) < 2 {
 		t.Fatalf("expected wrapping onto multiple lines, got %v", lines)
 	}
-	if lines[0] != subject {
-		t.Errorf("expected line 1 to be subject alone when no badge fits, got %q", lines[0])
-	}
-	for _, l := range lines[1:] {
+	for _, l := range lines {
 		if ansi.StringWidth(l) > 15 {
 			t.Errorf("line %q exceeds maxWidth", l)
 		}
-	}
-}
-
-func TestWrapDecorationBadges_SubjectAlwaysOnLine1(t *testing.T) {
-	subject := "a very long subject line that takes most of the width"
-	badges := []string{"tag1", "tag2"}
-	lines := wrapDecorationBadges(subject, badges, 20)
-	if !strings.HasPrefix(lines[0], subject) {
-		t.Errorf("expected line 1 to start with subject, got %q", lines[0])
 	}
 }
 
@@ -116,7 +103,7 @@ func TestHeaderLines_NoDecorations_Unchanged(t *testing.T) {
 	}
 }
 
-func TestHeaderLines_WithDecorations_AddsBadges(t *testing.T) {
+func TestHeaderLines_WithDecorations_KeepsSubjectOnSameLineWhenItFits(t *testing.T) {
 	m := Model{
 		details: git.CommitDetails{
 			Subject:     "fix bug",
@@ -127,10 +114,33 @@ func TestHeaderLines_WithDecorations_AddsBadges(t *testing.T) {
 	}
 	lines := m.headerLines()
 	if len(lines) != 1 {
-		t.Fatalf("expected badges to fit on line 1, got %d lines: %v", len(lines), lines)
+		t.Fatalf("expected badges and subject on one line, got %d lines: %v", len(lines), lines)
+	}
+	badgeIdx := strings.Index(lines[0], "main")
+	subjectIdx := strings.Index(lines[0], "fix bug")
+	if badgeIdx == -1 || subjectIdx == -1 || badgeIdx > subjectIdx {
+		t.Errorf("expected badge before subject on the same line, got %q", lines[0])
+	}
+}
+
+func TestHeaderLines_WithDecorations_WrapsSubjectWhenItDoesNotFit(t *testing.T) {
+	m := Model{
+		details: git.CommitDetails{
+			Subject:     "a very long subject that will not fit next to the badge",
+			AuthorName:  "Dave",
+			Decorations: []git.RefDecoration{{Kind: git.RefDecorationLocalBranch, Name: "main"}},
+		},
+		width: 30,
+	}
+	lines := m.headerLines()
+	if len(lines) != 2 {
+		t.Fatalf("expected badge line + separate subject line, got %d lines: %v", len(lines), lines)
 	}
 	if !strings.Contains(lines[0], "main") {
-		t.Errorf("expected badge label in header line, got %q", lines[0])
+		t.Errorf("expected badge label on line 1, got %q", lines[0])
+	}
+	if !strings.Contains(lines[1], "a very long subject") {
+		t.Errorf("expected subject on line 2, got %q", lines[1])
 	}
 }
 

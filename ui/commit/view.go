@@ -69,7 +69,7 @@ func (m Model) View() tea.View {
 func (m Model) headerLines() []string {
 	subjectLine := commitSubjectStyle.Render(m.details.Subject) + commitMetaStyle.Render(" (by "+m.details.AuthorName+")")
 	badges := decorationBadgeParts(m.details.Decorations, m.settings.UseNerdFontIcons)
-	lines := wrapDecorationBadges(subjectLine, badges, max(1, m.width-2))
+	lines := badgeLinesWithTrailingSubject(badges, subjectLine, max(1, m.width-2))
 	if m.bodyExpanded {
 		body := m.commitMessageBody()
 		if body != "" {
@@ -80,34 +80,20 @@ func (m Model) headerLines() []string {
 	return lines
 }
 
-// wrapDecorationBadges places subjectLine on the first header line, packing as
-// many badges after it as fit; any remaining badges wrap onto additional
-// lines, greedily packed to maxWidth. subjectLine itself is never wrapped or
-// truncated.
-func wrapDecorationBadges(subjectLine string, badges []string, maxWidth int) []string {
-	if len(badges) == 0 {
+// badgeLinesWithTrailingSubject packs badges onto one or more lines, then
+// appends subjectLine to the last badge line if it fits; otherwise subject
+// gets its own line. With no badges, subjectLine is the sole line.
+func badgeLinesWithTrailingSubject(badges []string, subjectLine string, maxWidth int) []string {
+	lines := packBadgeLines(badges, maxWidth)
+	if len(lines) == 0 {
 		return []string{subjectLine}
 	}
-	if maxWidth < 1 {
-		maxWidth = 1
-	}
-	var line1 strings.Builder
-	line1.WriteString(subjectLine)
-	avail := maxWidth - ansi.StringWidth(subjectLine)
-	idx := 0
-	for idx < len(badges) {
-		needed := ansi.StringWidth(badges[idx]) + 1 // +1 for the gap
-		if needed > avail {
-			break
-		}
-		line1.WriteString(" ")
-		line1.WriteString(badges[idx])
-		avail -= needed
-		idx++
-	}
-	lines := []string{line1.String()}
-	if idx < len(badges) {
-		lines = append(lines, packBadgeLines(badges[idx:], maxWidth)...)
+	lastIdx := len(lines) - 1
+	avail := maxWidth - ansi.StringWidth(lines[lastIdx])
+	if ansi.StringWidth(subjectLine)+1 <= avail {
+		lines[lastIdx] = lines[lastIdx] + " " + subjectLine
+	} else {
+		lines = append(lines, subjectLine)
 	}
 	return lines
 }
