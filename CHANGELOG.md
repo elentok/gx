@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Log: rows in narrow panels now render in a condensed style — relative dates drop the " ago" suffix (e.g. "2h" instead of "2h ago") and the gap before decoration badges narrows to one space.
+- Log: rows in narrow panels now render in a condensed style — relative dates drop the " ago" suffix (e.g. "2h" instead of "2h ago"), the gap before decoration badges narrows to one space, and multiple decorations merge into a single badge group with one shared background and per-decoration text colors.
 
 ## v0.19.8 - 2026-07-11
 

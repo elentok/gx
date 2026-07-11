@@ -193,7 +193,7 @@ func (m listPanel) renderRow(r row, selected bool, width int) string {
 	default:
 		condensed := width < ui.NarrowWidthThreshold
 		line = m.renderCommitRow(r, condensed)
-		if badges := m.renderBadges(r.commit.Decorations); badges != "" {
+		if badges := m.renderBadges(r.commit.Decorations, condensed); badges != "" {
 			gap := "  "
 			if condensed {
 				gap = " "
@@ -262,7 +262,7 @@ func (m listPanel) renderCommitRow(r row, condensed bool) string {
 	return meta + " " + state.style.Render(m.hl(r.commit.Subject))
 }
 
-func (m listPanel) renderBadges(decorations []git.RefDecoration) string {
+func (m listPanel) renderBadges(decorations []git.RefDecoration, condensed bool) string {
 	if len(decorations) == 0 {
 		return ""
 	}
@@ -274,6 +274,15 @@ func (m listPanel) renderBadges(decorations []git.RefDecoration) string {
 		}
 	}
 	sorted := sortDecorations(visible, m.hints.compiledRefRules)
+
+	if condensed {
+		items := make([]ui.BadgeGroupItem, 0, len(sorted))
+		for _, dec := range sorted {
+			items = append(items, ui.BadgeGroupItem{Label: m.hl(dec.Name), Fg: m.decorationColor(dec)})
+		}
+		return ui.RenderBadgeGroup(items, nerd)
+	}
+
 	parts := make([]string, 0, len(sorted))
 	for _, dec := range sorted {
 		label := m.hl(dec.Name)
@@ -284,6 +293,16 @@ func (m listPanel) renderBadges(decorations []git.RefDecoration) string {
 		}
 	}
 	return strings.Join(parts, " ")
+}
+
+// decorationColor returns the foreground color a decoration would use as its
+// own separate badge, matching ui.BadgeVariantDeepBg's foreground when no
+// rule matches.
+func (m listPanel) decorationColor(dec git.RefDecoration) color.Color {
+	if c, ok := matchRefRule(dec.Name, m.hints.compiledRefRules); ok {
+		return c
+	}
+	return ui.ColorSubtle
 }
 
 // hl applies the search-highlight function to text, falling back to identity.

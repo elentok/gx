@@ -31,6 +31,37 @@ func RenderBadgeWithColor(label string, fg color.Color, nerd bool, padding bool)
 	return renderPill(label, ColorDeepBg, fg, false, nerd, padding)
 }
 
+// BadgeGroupItem is one decoration name plus its foreground color, to be
+// rendered as part of a merged badge group.
+type BadgeGroupItem struct {
+	Label string
+	Fg    color.Color
+}
+
+// RenderBadgeGroup renders multiple decorations as a single merged pill: one
+// shared neutral background spans all names joined by spaces, with each name
+// keeping its own foreground color. Used by condensed log rows in place of
+// one separate badge per decoration.
+func RenderBadgeGroup(items []BadgeGroupItem, nerd bool) string {
+	if len(items) == 0 {
+		return ""
+	}
+	bg := ColorDeepBg
+	sep := lipgloss.NewStyle().Background(bg).Render(" ")
+	parts := make([]string, 0, len(items))
+	for _, item := range items {
+		style := lipgloss.NewStyle().Background(bg).Foreground(item.Fg)
+		parts = append(parts, style.Render(strings.TrimSpace(item.Label)))
+	}
+	body := strings.Join(parts, sep)
+
+	if !nerd {
+		return body
+	}
+	capStyle := lipgloss.NewStyle().Foreground(bg)
+	return capStyle.Render(capLeft) + body + capStyle.Render(capRight)
+}
+
 func renderPill(label string, bgColor color.Color, fgColor color.Color, bold bool, nerd bool, padding bool) string {
 	bodyStyle := lipgloss.NewStyle().
 		Background(bgColor).

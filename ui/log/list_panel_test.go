@@ -223,7 +223,7 @@ func TestListPanelDecorationsRenderedAsBadges(t *testing.T) {
 		},
 	}
 	m := sizedLP(80, 20).WithRows([]row{r})
-	line := m.renderBadges(r.commit.Decorations)
+	line := m.renderBadges(r.commit.Decorations, false)
 	if !strings.Contains(ansi.Strip(line), "origin/main") {
 		t.Fatalf("badges %q missing 'origin/main'", ansi.Strip(line))
 	}
@@ -245,7 +245,7 @@ func TestListPanelHiddenRefOmittedFromBadges(t *testing.T) {
 	}
 	m := sizedLP(80, 20).WithRows([]row{r})
 	hints := listPanelHints{compiledHideRefs: import_re}
-	line := m.WithHints(hints).renderBadges(r.commit.Decorations)
+	line := m.WithHints(hints).renderBadges(r.commit.Decorations, false)
 	stripped := ansi.Strip(line)
 	if strings.Contains(stripped, "refs/heads/main") {
 		t.Fatalf("hidden ref should be omitted, got %q", stripped)
@@ -284,6 +284,36 @@ func TestRenderRowUsesShortDateAndSingleSpaceGapWhenCondensed(t *testing.T) {
 	}
 	if !strings.Contains(wide, "subject  origin/main") {
 		t.Fatalf("wide row should keep double-space gap before badges, got %q", wide)
+	}
+}
+
+func TestRenderBadgesMergesIntoGroupWhenCondensed(t *testing.T) {
+	decorations := []git.RefDecoration{
+		{Name: "main", Kind: git.RefDecorationLocalBranch},
+		{Name: "origin/main", Kind: git.RefDecorationRemoteBranch},
+	}
+	m := sizedLP(80, 20)
+
+	condensed := m.renderBadges(decorations, true)
+	separate := m.renderBadges(decorations, false)
+
+	if ansi.Strip(condensed) != ansi.Strip(separate) {
+		t.Fatalf("condensed and separate badges should show the same names, got %q vs %q", ansi.Strip(condensed), ansi.Strip(separate))
+	}
+	if condensed == separate {
+		t.Fatalf("expected condensed (merged) and separate badge rendering to differ in styling")
+	}
+}
+
+func TestRenderBadgesSingleDecorationUnchangedWhenCondensed(t *testing.T) {
+	decorations := []git.RefDecoration{{Name: "main", Kind: git.RefDecorationLocalBranch}}
+	m := sizedLP(80, 20)
+
+	condensed := m.renderBadges(decorations, true)
+	separate := m.renderBadges(decorations, false)
+
+	if condensed != separate {
+		t.Fatalf("single-decoration badge should render identically condensed or not: %q vs %q", condensed, separate)
 	}
 }
 

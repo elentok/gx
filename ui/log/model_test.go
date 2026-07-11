@@ -225,7 +225,7 @@ func TestRenderCommitRowHighlightsSearchMatches(t *testing.T) {
 func TestRenderBadgesHighlightsSearchMatches(t *testing.T) {
 	m := newTestModel()
 	m.search.Start("main")
-	line := m.listPanel.WithHints(m.buildHints()).renderBadges([]git.RefDecoration{{Name: "origin/main", Kind: git.RefDecorationRemoteBranch}})
+	line := m.listPanel.WithHints(m.buildHints()).renderBadges([]git.RefDecoration{{Name: "origin/main", Kind: git.RefDecorationRemoteBranch}}, false)
 	if stripped := ansi.Strip(line); !strings.Contains(stripped, "origin/main") {
 		t.Fatalf("stripped badges = %q", stripped)
 	}
