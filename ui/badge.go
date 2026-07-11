@@ -31,6 +31,15 @@ func RenderBadgeWithColor(label string, fg color.Color, nerd bool, padding bool)
 	return renderPill(label, ColorDeepBg, fg, false, nerd, padding)
 }
 
+// RenderBadgeText renders a label as plain colored text with no background
+// pill. Use it where badges sit inline among other plain text (e.g. next to
+// a commit subject): a background box there would make the subject start at
+// a different column depending on whether a row has decorations, which reads
+// as misaligned.
+func RenderBadgeText(label string, fg color.Color) string {
+	return lipgloss.NewStyle().Foreground(fg).Render(strings.TrimSpace(label))
+}
+
 // BadgeGroupItem is one decoration name plus its foreground color, to be
 // rendered as part of a merged badge group.
 type BadgeGroupItem struct {

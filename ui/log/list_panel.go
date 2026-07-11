@@ -31,6 +31,11 @@ var (
 	logRemoteOnlyStyle   = lipgloss.NewStyle().Foreground(ui.ColorMauve)
 )
 
+// badgeSubjectSeparator delicately separates decoration badges from the
+// subject, without a background box that would shift the subject's start
+// column relative to rows with no decorations.
+var badgeSubjectSeparator = ui.StyleHint.Render(" · ")
+
 // listPanelHints carries page-owned render state into the list panel.
 type listPanelHints struct {
 	title            string
@@ -41,7 +46,6 @@ type listPanelHints struct {
 	branchDiverged   bool
 	compiledRefRules []compiledRefRule
 	compiledHideRefs []*regexp.Regexp
-	nerdFont         bool
 }
 
 // listPanel is the log list panel. It implements splitview.ListPanel.
@@ -192,7 +196,7 @@ func (m listPanel) renderRow(r row, selected bool, width int) string {
 		)
 	default:
 		condensed := width < ui.NarrowWidthThreshold
-		badges := m.renderBadges(r.commit.Decorations, condensed)
+		badges := m.renderBadges(r.commit.Decorations)
 		line = m.renderCommitRow(r, condensed, badges)
 	}
 	line = ansi.Truncate(line, maxInt(1, width), "…")
@@ -257,14 +261,13 @@ func (m listPanel) renderCommitRow(r row, condensed bool, badges ...string) stri
 	if len(badges) == 0 || badges[0] == "" {
 		return meta + " " + subject
 	}
-	return meta + " " + badges[0] + " " + subject
+	return meta + " " + badges[0] + badgeSubjectSeparator + subject
 }
 
-func (m listPanel) renderBadges(decorations []git.RefDecoration, condensed bool) string {
+func (m listPanel) renderBadges(decorations []git.RefDecoration) string {
 	if len(decorations) == 0 {
 		return ""
 	}
-	nerd := m.hints.nerdFont
 	visible := make([]git.RefDecoration, 0, len(decorations))
 	for _, dec := range decorations {
 		if !isHiddenRef(dec.Name, m.hints.compiledHideRefs) {
@@ -273,22 +276,9 @@ func (m listPanel) renderBadges(decorations []git.RefDecoration, condensed bool)
 	}
 	sorted := sortDecorations(visible, m.hints.compiledRefRules)
 
-	if condensed {
-		items := make([]ui.BadgeGroupItem, 0, len(sorted))
-		for _, dec := range sorted {
-			items = append(items, ui.BadgeGroupItem{Label: m.hl(dec.Name), Fg: m.decorationColor(dec)})
-		}
-		return ui.RenderBadgeGroup(items, nerd)
-	}
-
 	parts := make([]string, 0, len(sorted))
 	for _, dec := range sorted {
-		label := m.hl(dec.Name)
-		if c, ok := matchRefRule(dec.Name, m.hints.compiledRefRules); ok {
-			parts = append(parts, ui.RenderBadgeWithColor(label, c, nerd, false))
-		} else {
-			parts = append(parts, ui.RenderBadge(label, ui.BadgeVariantDeepBg, nerd, false))
-		}
+		parts = append(parts, ui.RenderBadgeText(m.hl(dec.Name), m.decorationColor(dec)))
 	}
 	return strings.Join(parts, " ")
 }

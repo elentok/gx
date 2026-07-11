@@ -25,6 +25,11 @@ const (
 var commitMetaStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
 var commitSubjectStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true)
 
+// badgeSubjectSeparator delicately separates decoration badges from the
+// subject when they share a line, without a background box that would shift
+// the subject's start column relative to lines with no decorations.
+var badgeSubjectSeparator = ui.StyleHint.Render(" · ")
+
 func (m Model) View() tea.View {
 	if !m.ready {
 		return ui.NewMainView("\n  Loading commit…")
@@ -68,7 +73,7 @@ func (m Model) View() tea.View {
 
 func (m Model) headerLines() []string {
 	subjectLine := commitSubjectStyle.Render(m.details.Subject) + commitMetaStyle.Render(" (by "+m.details.AuthorName+")")
-	badges := decorationBadgeParts(m.details.Decorations, m.settings.UseNerdFontIcons)
+	badges := decorationBadgeParts(m.details.Decorations)
 	lines := badgeLinesWithTrailingSubject(badges, subjectLine, max(1, m.width-2))
 	if m.bodyExpanded {
 		body := m.commitMessageBody()
@@ -90,8 +95,8 @@ func badgeLinesWithTrailingSubject(badges []string, subjectLine string, maxWidth
 	}
 	lastIdx := len(lines) - 1
 	avail := maxWidth - ansi.StringWidth(lines[lastIdx])
-	if ansi.StringWidth(subjectLine)+1 <= avail {
-		lines[lastIdx] = lines[lastIdx] + " " + subjectLine
+	if ansi.StringWidth(subjectLine)+ansi.StringWidth(badgeSubjectSeparator) <= avail {
+		lines[lastIdx] = lines[lastIdx] + badgeSubjectSeparator + subjectLine
 	} else {
 		lines = append(lines, subjectLine)
 	}
@@ -335,16 +340,16 @@ func (m Model) diffSearchCounterText() string {
 }
 
 func renderBadges(decorations []git.RefDecoration) string {
-	return strings.Join(decorationBadgeParts(decorations, true), " ")
+	return strings.Join(decorationBadgeParts(decorations), " ")
 }
 
-func decorationBadgeParts(decorations []git.RefDecoration, nerd bool) []string {
+func decorationBadgeParts(decorations []git.RefDecoration) []string {
 	if len(decorations) == 0 {
 		return nil
 	}
 	parts := make([]string, 0, len(decorations))
 	for _, decoration := range decorations {
-		parts = append(parts, ui.RenderBadgeWithColor(decoration.Name, badgeColorForDecoration(decoration), nerd, false))
+		parts = append(parts, ui.RenderBadgeText(decoration.Name, badgeColorForDecoration(decoration)))
 	}
 	return parts
 }

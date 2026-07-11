@@ -223,7 +223,7 @@ func TestListPanelDecorationsRenderedAsBadges(t *testing.T) {
 		},
 	}
 	m := sizedLP(80, 20).WithRows([]row{r})
-	line := m.renderBadges(r.commit.Decorations, false)
+	line := m.renderBadges(r.commit.Decorations)
 	if !strings.Contains(ansi.Strip(line), "origin/main") {
 		t.Fatalf("badges %q missing 'origin/main'", ansi.Strip(line))
 	}
@@ -245,7 +245,7 @@ func TestListPanelHiddenRefOmittedFromBadges(t *testing.T) {
 	}
 	m := sizedLP(80, 20).WithRows([]row{r})
 	hints := listPanelHints{compiledHideRefs: import_re}
-	line := m.WithHints(hints).renderBadges(r.commit.Decorations, false)
+	line := m.WithHints(hints).renderBadges(r.commit.Decorations)
 	stripped := ansi.Strip(line)
 	if strings.Contains(stripped, "refs/heads/main") {
 		t.Fatalf("hidden ref should be omitted, got %q", stripped)
@@ -257,7 +257,7 @@ func TestListPanelHiddenRefOmittedFromBadges(t *testing.T) {
 
 // --- Condensed rows ---
 
-func TestRenderRowUsesShortDateAndSingleSpaceGapForBadges(t *testing.T) {
+func TestRenderRowUsesShortDateAndSeparatorForBadges(t *testing.T) {
 	r := row{
 		kind: rowCommit,
 		commit: git.LogEntry{
@@ -279,41 +279,28 @@ func TestRenderRowUsesShortDateAndSingleSpaceGapForBadges(t *testing.T) {
 	if !strings.Contains(wide, "2h ago") {
 		t.Fatalf("wide row should keep full 'ago' date, got %q", wide)
 	}
-	if !strings.Contains(condensed, "origin/main subject") {
-		t.Fatalf("condensed row should have single-space gap after badges, got %q", condensed)
+	if !strings.Contains(condensed, "origin/main · subject") {
+		t.Fatalf("condensed row should have a delicate separator after badges, got %q", condensed)
 	}
-	if !strings.Contains(wide, "origin/main subject") {
-		t.Fatalf("wide row should have single-space gap after badges, got %q", wide)
+	if !strings.Contains(wide, "origin/main · subject") {
+		t.Fatalf("wide row should have a delicate separator after badges, got %q", wide)
 	}
 }
 
-func TestRenderBadgesMergesIntoGroupWhenCondensed(t *testing.T) {
+func TestRenderBadgesRendersPlainColoredTextWithoutBackground(t *testing.T) {
 	decorations := []git.RefDecoration{
 		{Name: "main", Kind: git.RefDecorationLocalBranch},
 		{Name: "origin/main", Kind: git.RefDecorationRemoteBranch},
 	}
 	m := sizedLP(80, 20)
 
-	condensed := m.renderBadges(decorations, true)
-	separate := m.renderBadges(decorations, false)
+	line := m.renderBadges(decorations)
 
-	if ansi.Strip(condensed) != ansi.Strip(separate) {
-		t.Fatalf("condensed and separate badges should show the same names, got %q vs %q", ansi.Strip(condensed), ansi.Strip(separate))
+	if ansi.Strip(line) != "main origin/main" {
+		t.Fatalf("stripped badges = %q, want 'main origin/main'", ansi.Strip(line))
 	}
-	if condensed == separate {
-		t.Fatalf("expected condensed (merged) and separate badge rendering to differ in styling")
-	}
-}
-
-func TestRenderBadgesSingleDecorationUnchangedWhenCondensed(t *testing.T) {
-	decorations := []git.RefDecoration{{Name: "main", Kind: git.RefDecorationLocalBranch}}
-	m := sizedLP(80, 20)
-
-	condensed := m.renderBadges(decorations, true)
-	separate := m.renderBadges(decorations, false)
-
-	if condensed != separate {
-		t.Fatalf("single-decoration badge should render identically condensed or not: %q vs %q", condensed, separate)
+	if strings.Contains(line, "\x1b[48;2;") {
+		t.Fatalf("expected badges to render without a background color, got %q", line)
 	}
 }
 
