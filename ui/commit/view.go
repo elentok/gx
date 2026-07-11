@@ -67,15 +67,74 @@ func (m Model) View() tea.View {
 }
 
 func (m Model) headerLines() []string {
-	lines := []string{
-		commitSubjectStyle.Render(m.details.Subject) + commitMetaStyle.Render(" (by "+m.details.AuthorName+")"),
-	}
+	subjectLine := commitSubjectStyle.Render(m.details.Subject) + commitMetaStyle.Render(" (by "+m.details.AuthorName+")")
+	badges := decorationBadgeParts(m.details.Decorations, m.settings.UseNerdFontIcons)
+	lines := wrapDecorationBadges(subjectLine, badges, max(1, m.width-2))
 	if m.bodyExpanded {
 		body := m.commitMessageBody()
 		if body != "" {
 			lines = append(lines, "")
 			lines = append(lines, strings.Split(body, "\n")...)
 		}
+	}
+	return lines
+}
+
+// wrapDecorationBadges places subjectLine on the first header line, packing as
+// many badges after it as fit; any remaining badges wrap onto additional
+// lines, greedily packed to maxWidth. subjectLine itself is never wrapped or
+// truncated.
+func wrapDecorationBadges(subjectLine string, badges []string, maxWidth int) []string {
+	if len(badges) == 0 {
+		return []string{subjectLine}
+	}
+	if maxWidth < 1 {
+		maxWidth = 1
+	}
+	var line1 strings.Builder
+	line1.WriteString(subjectLine)
+	avail := maxWidth - ansi.StringWidth(subjectLine)
+	idx := 0
+	for idx < len(badges) {
+		needed := ansi.StringWidth(badges[idx]) + 1 // +1 for the gap
+		if needed > avail {
+			break
+		}
+		line1.WriteString(" ")
+		line1.WriteString(badges[idx])
+		avail -= needed
+		idx++
+	}
+	lines := []string{line1.String()}
+	if idx < len(badges) {
+		lines = append(lines, packBadgeLines(badges[idx:], maxWidth)...)
+	}
+	return lines
+}
+
+// packBadgeLines greedily packs badges onto full-width lines.
+func packBadgeLines(badges []string, maxWidth int) []string {
+	var lines []string
+	current := ""
+	currentW := 0
+	for _, badge := range badges {
+		badgeW := ansi.StringWidth(badge)
+		if current == "" {
+			current = badge
+			currentW = badgeW
+			continue
+		}
+		if currentW+1+badgeW > maxWidth {
+			lines = append(lines, current)
+			current = badge
+			currentW = badgeW
+			continue
+		}
+		current += " " + badge
+		currentW += 1 + badgeW
+	}
+	if current != "" {
+		lines = append(lines, current)
 	}
 	return lines
 }
@@ -290,27 +349,31 @@ func (m Model) diffSearchCounterText() string {
 }
 
 func renderBadges(decorations []git.RefDecoration) string {
+	return strings.Join(decorationBadgeParts(decorations, true), " ")
+}
+
+func decorationBadgeParts(decorations []git.RefDecoration, nerd bool) []string {
 	if len(decorations) == 0 {
-		return ""
+		return nil
 	}
 	parts := make([]string, 0, len(decorations))
 	for _, decoration := range decorations {
-		parts = append(parts, ui.RenderBadge(decoration.Name, badgeVariantForDecoration(decoration), true, true))
+		parts = append(parts, ui.RenderBadgeWithColor(decoration.Name, badgeColorForDecoration(decoration), nerd, false))
 	}
-	return strings.Join(parts, " ")
+	return parts
 }
 
-func badgeVariantForDecoration(decoration git.RefDecoration) ui.BadgeVariant {
+func badgeColorForDecoration(decoration git.RefDecoration) color.Color {
 	switch decoration.Kind {
 	case git.RefDecorationTag:
-		return ui.BadgeVariantBlue
+		return ui.ColorBlue
 	case git.RefDecorationRemoteBranch, git.RefDecorationLocalBranch:
 		if isMainOrMasterRef(decoration.Name) {
-			return ui.BadgeVariantYellow
+			return ui.ColorYellow
 		}
-		return ui.BadgeVariantMauve
+		return ui.ColorMauve
 	default:
-		return ui.BadgeVariantSurface
+		return ui.ColorSubtle
 	}
 }
 

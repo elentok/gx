@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## v0.19.9 - 2026-07-11
 
+- Commit view: the header now shows branch/tag decorations next to the subject/author line, styled like the log view's badges (dark background, colored text). Decorations wrap onto extra header lines when they don't fit.
 - Log: rows in narrow panels now render in a condensed style — relative dates drop the " ago" suffix (e.g. "2h" instead of "2h ago"), the gap before decoration badges narrows to one space, and multiple decorations merge into a single badge group with one shared background and per-decoration text colors.
 
 ## v0.19.8 - 2026-07-11
