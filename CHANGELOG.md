@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.19.10 - 2026-07-11
+
+- Commit view and log: decoration badges (branch/tag) now render as plain colored text instead of a dark-background pill, joined to the subject by a delicate " · " separator. This avoids the subject shifting column depending on whether a row has decorations.
+- Log: the working-tree pseudo-row now always reads "working tree: <detail>" instead of relying on fixed-width padding that only lined up in wide panels.
+
 ## v0.19.9 - 2026-07-11
 
 - Commit view: the header now shows branch/tag decorations next to the subject/author line, styled like the log view's badges (dark background, colored text). Decorations wrap onto extra header lines when they don't fit.

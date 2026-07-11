@@ -190,7 +190,7 @@ func (m listPanel) renderRow(r row, selected bool, width int) string {
 	switch r.kind {
 	case rowPseudoStatus:
 		line = fmt.Sprintf(
-			"    %s           %s",
+			"    %s: %s",
 			logPseudoStyle.Render(m.hl("working tree")),
 			logPseudoStatusStyle.Render(m.hl(r.detail)),
 		)
