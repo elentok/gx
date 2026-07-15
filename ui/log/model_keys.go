@@ -36,6 +36,8 @@ const (
 	bindingYankSubject       keys.BindingID = "yank-subject"
 	bindingYankMessage       keys.BindingID = "yank-message"
 	bindingGotoPR            keys.BindingID = "goto-pr"
+	bindingToggleGraph       keys.BindingID = "toggle-graph"
+	bindingToggleOrientation keys.BindingID = "toggle-orientation"
 )
 
 func newLogManager() keys.Manager {
@@ -78,6 +80,9 @@ func newLogManager() keys.Manager {
 		{ID: bindingPageDown, Seq: []string{"ctrl+d"}, Categories: []string{"Navigation"}, Title: "page down"},
 		{ID: bindingPageUp, Seq: []string{"ctrl+u"}, Categories: []string{"Navigation"}, Title: "page up"},
 		{ID: bindingClearFilter, Seq: []string{"f"}, Categories: []string{"Filter"}, Title: "clear filter"},
+		{ID: bindingToggleGraph, Seq: []string{"t", "g"}, Categories: []string{"Other"}, Title: "toggle graph"},
+		{ID: bindingToggleOrientation, Seq: []string{"t", "o"}, Categories: []string{"Other"}, Title: "toggle split orientation"},
+		{ID: bindingCancel, Seq: []string{"t", "esc"}, Categories: []string{}, Title: ""},
 
 		{ID: bindingYankHash, Seq: []string{"y", "h"}, Categories: []string{"Yank"}, Title: "yank commit hash"},
 		{ID: bindingYankSubject, Seq: []string{"y", "s"}, Categories: []string{"Yank"}, Title: "yank commit subject"},
@@ -188,6 +193,15 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, m.yankCommitMessage()
 	case bindingGotoPR:
 		return m, m.cmdGotoPR()
+	case bindingToggleGraph:
+		m.showGraph = !m.showGraph
+		return m, nil
+	case bindingToggleOrientation:
+		var cmd tea.Cmd
+		m.split, cmd = m.split.ToggleOrientation()
+		m = m.withSyncedDetailSize()
+		m = m.withSyncedListSize()
+		return m, cmd
 	}
 	return m, nil
 }

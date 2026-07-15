@@ -53,7 +53,7 @@ type Model struct {
 	compiledRefRules []compiledRefRule
 	compiledHideRefs []*regexp.Regexp
 	startRef         string
-	filter          LogFilter
+	filter           LogFilter
 
 	width  int
 	height int
@@ -83,6 +83,8 @@ type Model struct {
 
 	refreshing bool
 
+	showGraph bool
+
 	rebaseConfirm  rebaseConfirmState // confirm modal for stash-before-rebase and stash-pop-after-rebase
 	rebaseDidStash bool               // stash was pushed before rebase; pop prompt fires on FocusMsg (kitty/tmux) or immediately (exec)
 
@@ -104,9 +106,9 @@ func NewModel(worktreeRoot, startRef string, settings ui.Settings, filter LogFil
 		compiledRefRules: compileRefRules(settings.LogConfig.ImportantRefs),
 		compiledHideRefs: compileHideRefs(settings.LogConfig.HideRefs),
 		startRef:         normalizedRef(startRef),
-		filter:          filter,
-		keys:            newLogManager(),
-		search:          search.NewModel(),
+		filter:           filter,
+		keys:             newLogManager(),
+		search:           search.NewModel(),
 	}
 	m.help = help.NewModel(help.BuildSections(m.keys, m.search.Keys(), extraKeys))
 	m.amendConfirm = amend.New()

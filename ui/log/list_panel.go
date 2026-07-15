@@ -27,8 +27,13 @@ var (
 )
 
 // subjectIndent lines the second (metadata) line of a commit row up under
-// the subject column of the first (subject) line.
+// the subject column of the first (subject) line, when the graph column is
+// shown (graph width 4 + push/pull state width 2).
 const subjectIndent = "      "
+
+// subjectIndentNoGraph is the metadata line indent when the graph column is
+// hidden (push/pull state width 2 only).
+const subjectIndentNoGraph = "  "
 
 // listPanelHints carries page-owned render state into the list panel.
 type listPanelHints struct {
@@ -40,6 +45,7 @@ type listPanelHints struct {
 	branchDiverged   bool
 	compiledRefRules []compiledRefRule
 	compiledHideRefs []*regexp.Regexp
+	showGraph        bool
 }
 
 // listPanel is the log list panel. It implements splitview.ListPanel.
@@ -227,19 +233,24 @@ func (m listPanel) renderRow(r row, selected bool, width int) []string {
 // (graph, push/pull state, subject) and an indented metadata line below it
 // (hash, date, author, decoration badges).
 func (m listPanel) renderCommitRow(r row) []string {
-	graph := r.commit.Graph
-	if graph == "" {
-		graph = "*"
-	}
 	state := ui.CommitPushState(r.class, m.hints.branchDiverged)
 	date := ui.RelativeTimeCompact(r.commit.Date)
-	cols := []ui.FixedColumn{
-		{Text: graph, Width: 4},
-		{Text: state.Icon, Width: 2, Style: state.Style},
+	cols := make([]ui.FixedColumn, 0, 2)
+	if m.hints.showGraph {
+		graph := r.commit.Graph
+		if graph == "" {
+			graph = "*"
+		}
+		cols = append(cols, ui.FixedColumn{Text: graph, Width: 4})
 	}
+	cols = append(cols, ui.FixedColumn{Text: state.Icon, Width: 2, Style: state.Style})
 	subject := ui.RenderFixedColumns(cols) + state.Style.Render(m.hl(r.commit.Subject))
 
-	meta := subjectIndent + logMetaStyle.Render(m.hl(r.commit.Hash)) + " " +
+	indent := subjectIndentNoGraph
+	if m.hints.showGraph {
+		indent = subjectIndent
+	}
+	meta := indent + logMetaStyle.Render(m.hl(r.commit.Hash)) + " " +
 		logMetaStyle.Render(date) + logMetaStyle.Render(" by ") + logMetaStyle.Render(m.hl(r.commit.AuthorShort))
 	if badges := m.renderBadges(r.commit.Decorations); badges != "" {
 		meta += logMetaStyle.Render(" · ") + badges

@@ -161,6 +161,7 @@ func (m Model) buildHints() listPanelHints {
 		flashSubject:     m.flashSubject,
 		flashUntil:       m.flashUntil,
 		branchDiverged:   m.branchDiverged,
+		showGraph:        m.showGraph,
 		compiledRefRules: m.compiledRefRules,
 		compiledHideRefs: m.compiledHideRefs,
 	}

@@ -149,11 +149,8 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		// precedence when the split is active. Only when the log's own key
 		// manager has no pending chord prefix (so ]t, [t etc. are not stolen).
 		key := msg.String()
-		logHasPrefix := len(m.keys.Prefix()) > 0
-		if m.split.HasChord() && !logHasPrefix {
-			// Second key of the "to" chord belongs to the split.
-			return m.routeKeyToSplit(msg)
-		}
+		logPrefix := m.keys.Prefix()
+		logHasPrefix := len(logPrefix) > 0
 		if key == "h" && m.split.IsSplit() && m.split.IsDetailFocused() && (m.commitDetail.IsFileTreeFocused() || m.commitDetail.IsHeaderFocused()) {
 			return m.routeKeyToSplit(tea.KeyPressMsg{Code: tea.KeyEsc})
 		}
@@ -169,9 +166,19 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 			// Fullscreen toggle has priority over detail routing when split is active.
 			return m.routeKeyToSplit(msg)
 		}
-		if key == "t" && !logHasPrefix {
-			// Start of "to" orientation-toggle chord; pass to split container.
-			return m.routeKeyToSplit(msg)
+
+		// The "t"-prefixed chord (tg toggle-graph, to toggle-orientation, t,esc
+		// cancel) is owned by the log's own key manager, but must still reach it
+		// even when the detail panel has focus — mirroring the old dedicated
+		// bypass this replaced for the "to" orientation toggle. An invalid
+		// continuation is swallowed here (rather than falling through to be
+		// reinterpreted as a fresh keystroke), matching how every other chord
+		// in this manager silently cancels on a bad second key.
+		if key == "t" || (logHasPrefix && logPrefix[0] == "t") {
+			if match, _ := m.keys.Process(msg); match != nil {
+				return m.dispatchBinding(match.ID)
+			}
+			return m, nil
 		}
 
 		// When the detail panel is focused, route remaining keys there.

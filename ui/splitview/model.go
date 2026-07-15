@@ -112,6 +112,21 @@ func (m Model) HasChord() bool { return m.keyPrefix != "" }
 // EffectiveOrientation returns the resolved layout direction.
 func (m Model) EffectiveOrientation() Orientation { return m.effectiveOrientation() }
 
+// ToggleOrientation flips the split layout between vertical and horizontal,
+// disabling auto-orientation. This is the same effect as the "to" chord
+// handled internally by handleKey; it's exposed for containers (like ui/log)
+// that own a "t"-prefixed chord in their own key manager and need to trigger
+// the toggle without routing raw key events through handleKey.
+func (m Model) ToggleOrientation() (Model, tea.Cmd) {
+	m.autoOrient = false
+	if m.orientation == Vertical {
+		m.orientation = Horizontal
+	} else {
+		m.orientation = Vertical
+	}
+	return m.resize()
+}
+
 // WithListRef updates the ref reported by the list panel adapter. Used by
 // containers that manage their own list rendering (such as ui/log) so the
 // split container can detect selection changes for auto-update.
@@ -256,13 +271,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if m.keyPrefix == "t" {
 		m.keyPrefix = ""
 		if key == "o" {
-			m.autoOrient = false
-			if m.orientation == Vertical {
-				m.orientation = Horizontal
-			} else {
-				m.orientation = Vertical
-			}
-			return m.resize()
+			return m.ToggleOrientation()
 		}
 		return m.delegateKey(msg)
 	}
