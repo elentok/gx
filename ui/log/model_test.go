@@ -166,12 +166,17 @@ func TestSelectedCommitRowFillsFullWidth(t *testing.T) {
 		},
 	}
 	m.listPanel = m.listPanel.WithRows([]row{r})
-	line := m.listPanel.WithHints(m.buildHints()).renderRow(r, true, 40)
-	if got := ansi.StringWidth(ansi.Strip(line)); got != 40 {
-		t.Fatalf("selected row width = %d, want 40", got)
+	lines := m.listPanel.WithHints(m.buildHints()).renderRow(r, true, 40)
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 lines for a commit row, got %d", len(lines))
 	}
-	if line == ansi.Strip(line) {
-		t.Fatalf("expected selected row to preserve nested ansi colors")
+	for _, line := range lines {
+		if got := ansi.StringWidth(ansi.Strip(line)); got != 40 {
+			t.Fatalf("selected row line width = %d, want 40 (line %q)", got, line)
+		}
+		if line == ansi.Strip(line) {
+			t.Fatalf("expected selected row to preserve nested ansi colors")
+		}
 	}
 }
 
@@ -213,7 +218,8 @@ func TestRenderCommitRowHighlightsSearchMatches(t *testing.T) {
 	}
 	m.listPanel = m.listPanel.WithRows([]row{r})
 
-	line := m.listPanel.WithHints(m.buildHints()).renderCommitRow(r, false)
+	lines := m.listPanel.WithHints(m.buildHints()).renderCommitRow(r)
+	line := strings.Join(lines, "\n")
 	if stripped := ansi.Strip(line); !strings.Contains(stripped, "fix search highlighting") {
 		t.Fatalf("stripped line = %q", stripped)
 	}
@@ -552,8 +558,8 @@ func TestPseudoLogLineLoadingState(t *testing.T) {
 	m := newTestModel()
 	r := row{kind: rowPseudoStatus, detail: ""}
 	m.listPanel = m.listPanel.WithRows([]row{r})
-	line := m.listPanel.WithHints(m.buildHints()).renderRow(r, false, 80)
-	stripped := ansi.Strip(line)
+	lines := m.listPanel.WithHints(m.buildHints()).renderRow(r, false, 80)
+	stripped := ansi.Strip(strings.Join(lines, "\n"))
 	if !strings.Contains(stripped, "working tree") {
 		t.Errorf("renderRow: expected 'working tree' label, got %q", stripped)
 	}
@@ -565,8 +571,8 @@ func TestPseudoLogLineCleanState(t *testing.T) {
 	// staged=0, unstaged=0, untracked=0 → "no local changes"
 	r := row{kind: rowPseudoStatus, detail: m.pseudoStatusDetail()}
 	m.listPanel = m.listPanel.WithRows([]row{r})
-	line := m.listPanel.WithHints(m.buildHints()).renderRow(r, false, 80)
-	stripped := ansi.Strip(line)
+	lines := m.listPanel.WithHints(m.buildHints()).renderRow(r, false, 80)
+	stripped := ansi.Strip(strings.Join(lines, "\n"))
 	if !strings.Contains(stripped, "no local changes") {
 		t.Errorf("renderRow: expected 'no local changes', got %q", stripped)
 	}
@@ -580,8 +586,8 @@ func TestPseudoLogLineDirtyState(t *testing.T) {
 	m.statusUntracked = 1
 	r := row{kind: rowPseudoStatus, detail: m.pseudoStatusDetail()}
 	m.listPanel = m.listPanel.WithRows([]row{r})
-	line := m.listPanel.WithHints(m.buildHints()).renderRow(r, false, 80)
-	stripped := ansi.Strip(line)
+	lines := m.listPanel.WithHints(m.buildHints()).renderRow(r, false, 80)
+	stripped := ansi.Strip(strings.Join(lines, "\n"))
 	if !strings.Contains(stripped, "2 staged") {
 		t.Errorf("expected '2 staged' in %q", stripped)
 	}

@@ -155,7 +155,8 @@ func TestListPanelSearchHighlightPresent(t *testing.T) {
 			return text
 		},
 	}
-	line := m.WithHints(hints).renderCommitRow(r, false)
+	lines := m.WithHints(hints).renderCommitRow(r)
+	line := strings.Join(lines, "\n")
 	stripped := ansi.Strip(line)
 	if !strings.Contains(stripped, "fix the bug") {
 		t.Fatalf("stripped row missing subject: %q", stripped)
@@ -177,7 +178,8 @@ func TestListPanelFlashedRowHasAnsiDecoration(t *testing.T) {
 		flashSubject: "my subject",
 		flashUntil:   time.Now().Add(5 * time.Second),
 	}
-	line := m.WithHints(hints).renderRow(r, false, 40)
+	lines := m.WithHints(hints).renderRow(r, false, 40)
+	line := strings.Join(lines, "\n")
 	stripped := ansi.Strip(line)
 	if !strings.Contains(stripped, "my subject") {
 		t.Fatalf("flashed row stripped %q missing 'my subject'", stripped)
@@ -197,14 +199,14 @@ func TestListPanelExpiredFlashIsNotApplied(t *testing.T) {
 		flashSubject: "my subject",
 		flashUntil:   time.Now().Add(-1 * time.Second), // already expired
 	}
-	line := m.WithHints(hints).renderRow(r, false, 40)
+	line := strings.Join(m.WithHints(hints).renderRow(r, false, 40), "\n")
 	// Non-selected + expired flash should not have the flash background.
 	// We can't guarantee no ANSI (the row styles may still apply), but it
 	// must at least not match a flashed selected row.
-	flashedLine := m.WithHints(listPanelHints{
+	flashedLine := strings.Join(m.WithHints(listPanelHints{
 		flashSubject: "my subject",
 		flashUntil:   time.Now().Add(5 * time.Second),
-	}).renderRow(r, false, 40)
+	}).renderRow(r, false, 40), "\n")
 	if line == flashedLine {
 		t.Fatal("expired flash should render differently from active flash")
 	}
@@ -255,9 +257,7 @@ func TestListPanelHiddenRefOmittedFromBadges(t *testing.T) {
 	}
 }
 
-// --- Condensed rows ---
-
-func TestRenderRowUsesShortDateAndSeparatorForBadges(t *testing.T) {
+func TestRenderRowPutsSubjectOnFirstLineAndMetadataOnSecond(t *testing.T) {
 	r := row{
 		kind: rowCommit,
 		commit: git.LogEntry{
@@ -270,24 +270,24 @@ func TestRenderRowUsesShortDateAndSeparatorForBadges(t *testing.T) {
 	}
 	m := sizedLP(80, 20).WithRows([]row{r})
 
-	condensed := ansi.Strip(m.renderRow(r, false, ui.NarrowWidthThreshold-1))
-	wide := ansi.Strip(m.renderRow(r, false, ui.NarrowWidthThreshold+50))
+	lines := m.renderRow(r, false, 80)
+	stripped := ansi.Strip(strings.Join(lines, "\n"))
 
-	if !strings.Contains(condensed, "2h ") || strings.Contains(condensed, "2h ago") {
-		t.Fatalf("condensed row should show short date without 'ago', got %q", condensed)
+	if !strings.Contains(stripped, "2h ago") {
+		t.Fatalf("expected full 'ago' date, got %q", stripped)
 	}
-	if !strings.Contains(wide, "2h ago") {
-		t.Fatalf("wide row should keep full 'ago' date, got %q", wide)
+	if len(lines) != 2 {
+		t.Fatalf("expected subject + metadata lines, got %d", len(lines))
 	}
-	if !strings.Contains(condensed, "origin/main · subject") {
-		t.Fatalf("condensed row should have a delicate separator after badges, got %q", condensed)
+	if !strings.Contains(ansi.Strip(lines[0]), "subject") {
+		t.Fatalf("subject line missing subject, got %q", ansi.Strip(lines[0]))
 	}
-	if !strings.Contains(wide, "origin/main · subject") {
-		t.Fatalf("wide row should have a delicate separator after badges, got %q", wide)
+	if !strings.Contains(ansi.Strip(lines[1]), "origin/main") {
+		t.Fatalf("metadata line should contain the badge, got %q", ansi.Strip(lines[1]))
 	}
 }
 
-func TestRenderBadgesRendersPlainColoredTextWithoutBackground(t *testing.T) {
+func TestRenderBadgesRendersBoxedPills(t *testing.T) {
 	decorations := []git.RefDecoration{
 		{Name: "main", Kind: git.RefDecorationLocalBranch},
 		{Name: "origin/main", Kind: git.RefDecorationRemoteBranch},
@@ -296,11 +296,12 @@ func TestRenderBadgesRendersPlainColoredTextWithoutBackground(t *testing.T) {
 
 	line := m.renderBadges(decorations)
 
-	if ansi.Strip(line) != "main origin/main" {
-		t.Fatalf("stripped badges = %q, want 'main origin/main'", ansi.Strip(line))
+	stripped := ansi.Strip(line)
+	if !strings.Contains(stripped, "main") || !strings.Contains(stripped, "origin/main") {
+		t.Fatalf("stripped badges = %q, want both 'main' and 'origin/main'", stripped)
 	}
-	if strings.Contains(line, "\x1b[48;2;") {
-		t.Fatalf("expected badges to render without a background color, got %q", line)
+	if !strings.Contains(line, "48;2;") {
+		t.Fatalf("expected boxed badges to render with a background color, got %q", line)
 	}
 }
 
@@ -309,8 +310,9 @@ func TestRenderBadgesRendersPlainColoredTextWithoutBackground(t *testing.T) {
 func TestListPanelPseudoStatusRowShowsWorkingTree(t *testing.T) {
 	r := row{kind: rowPseudoStatus, detail: ""}
 	m := sizedLP(80, 20).WithRows([]row{r})
-	line := m.renderRow(r, false, 76)
-	if !strings.Contains(ansi.Strip(line), "working tree") {
-		t.Fatalf("pseudo-status line %q missing 'working tree'", ansi.Strip(line))
+	lines := m.renderRow(r, false, 76)
+	joined := ansi.Strip(strings.Join(lines, "\n"))
+	if !strings.Contains(joined, "working tree") {
+		t.Fatalf("pseudo-status line %q missing 'working tree'", joined)
 	}
 }

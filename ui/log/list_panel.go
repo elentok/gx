@@ -20,7 +20,6 @@ const logFlashDuration = 2 * time.Second
 var logFlashBg = lipgloss.Color("#3d2810")
 
 var (
-	logHashStyle         = lipgloss.NewStyle().Foreground(ui.ColorBlue)
 	logMetaStyle         = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Italic(true)
 	logPseudoStyle       = lipgloss.NewStyle().Foreground(ui.ColorYellow).Italic(true)
 	logPseudoStatusStyle = ui.StyleMuted.Italic(true)
@@ -31,10 +30,9 @@ var (
 	logRemoteOnlyStyle   = lipgloss.NewStyle().Foreground(ui.ColorMauve)
 )
 
-// badgeSubjectSeparator delicately separates decoration badges from the
-// subject, without a background box that would shift the subject's start
-// column relative to rows with no decorations.
-var badgeSubjectSeparator = ui.StyleHint.Render(" · ")
+// subjectIndent lines the second (metadata) line of a commit row up under
+// the subject column of the first (subject) line.
+const subjectIndent = "      "
 
 // listPanelHints carries page-owned render state into the list panel.
 type listPanelHints struct {
@@ -46,6 +44,7 @@ type listPanelHints struct {
 	branchDiverged   bool
 	compiledRefRules []compiledRefRule
 	compiledHideRefs []*regexp.Regexp
+	useNerdFont      bool
 }
 
 // listPanel is the log list panel. It implements splitview.ListPanel.
@@ -134,8 +133,12 @@ func (m listPanel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// visibleH returns how many rows fit on screen. Commit rows render as two
+// physical lines, so this is conservative: it assumes every row takes two
+// lines, which slightly under-counts when the single-line pseudo-status row
+// is in view but never overflows the frame.
 func (m listPanel) visibleH() int {
-	h := m.height - 3
+	h := (m.height - 3) / 2
 	if h < 1 {
 		return 1
 	}
@@ -176,44 +179,53 @@ func (m listPanel) visibleLines() []string {
 	if len(m.rows) == 0 {
 		return []string{ui.StyleMuted.Render("no commits")}
 	}
-	innerHeight := maxInt(1, m.visibleH())
-	start, end := m.list.VisibleRange(len(m.rows), innerHeight)
-	lines := make([]string, 0, end-start)
+	rowBudget := maxInt(1, m.visibleH())
+	start, end := m.list.VisibleRange(len(m.rows), rowBudget)
+	lines := make([]string, 0, (end-start)*2)
 	for i := start; i < end; i++ {
-		lines = append(lines, m.renderRow(m.rows[i], i == m.list.Selected(), m.width-4))
+		lines = append(lines, m.renderRow(m.rows[i], i == m.list.Selected(), m.width-4)...)
 	}
 	return lines
 }
 
-func (m listPanel) renderRow(r row, selected bool, width int) string {
-	var line string
+// renderRow renders one row as one or more physical lines (pseudo-status
+// rows are a single line; commit rows are a subject line plus an indented
+// metadata line), each padded/truncated to width and background-styled
+// uniformly so a selection or flash highlight covers the full row.
+func (m listPanel) renderRow(r row, selected bool, width int) []string {
+	var rawLines []string
 	switch r.kind {
 	case rowPseudoStatus:
-		line = fmt.Sprintf(
-			"    %s: %s",
+		rawLines = []string{fmt.Sprintf(
+			"%s: %s",
 			logPseudoStyle.Render(m.hl("working tree")),
 			logPseudoStatusStyle.Render(m.hl(r.detail)),
-		)
+		)}
 	default:
-		condensed := width < ui.NarrowWidthThreshold
-		badges := m.renderBadges(r.commit.Decorations)
-		line = m.renderCommitRow(r, condensed, badges)
+		rawLines = m.renderCommitRow(r)
 	}
-	line = ansi.Truncate(line, maxInt(1, width), "…")
-	lineW := ansi.StringWidth(line)
-	if lineW < width {
-		line += strings.Repeat(" ", width-lineW)
-	}
-	if r.kind == rowCommit &&
+
+	flash := r.kind == rowCommit &&
 		r.commit.Subject == m.hints.flashSubject &&
 		!m.hints.flashUntil.IsZero() &&
-		time.Now().Before(m.hints.flashUntil) {
-		return ui.RenderRowWithBackground(line, logFlashBg)
+		time.Now().Before(m.hints.flashUntil)
+
+	lines := make([]string, len(rawLines))
+	for i, line := range rawLines {
+		line = ansi.Truncate(line, maxInt(1, width), "…")
+		lineW := ansi.StringWidth(line)
+		if lineW < width {
+			line += strings.Repeat(" ", width-lineW)
+		}
+		switch {
+		case flash:
+			line = ui.RenderRowWithBackground(line, logFlashBg)
+		case selected:
+			line = ui.RenderRowHighlight(line)
+		}
+		lines[i] = line
 	}
-	if selected {
-		return ui.RenderRowHighlight(line)
-	}
-	return line
+	return lines
 }
 
 type commitStateInfo struct {
@@ -237,33 +249,31 @@ func commitState(class git.BranchHistoryClass, branchDiverged bool) commitStateI
 	}
 }
 
-func (m listPanel) renderCommitRow(r row, condensed bool, badges ...string) string {
+// renderCommitRow renders a commit as two lines: the subject line up top
+// (graph, push/pull state, subject) and an indented metadata line below it
+// (hash, date, author, decoration badges).
+func (m listPanel) renderCommitRow(r row) []string {
 	graph := r.commit.Graph
 	if graph == "" {
 		graph = "*"
 	}
 	state := commitState(r.class, m.hints.branchDiverged)
 	date := ui.RelativeTimeCompact(r.commit.Date)
-	dateWidth := 10
-	if condensed {
-		date = ui.RelativeTimeCompactShort(r.commit.Date)
-		dateWidth = 6
-	}
 	cols := []ui.FixedColumn{
 		{Text: graph, Width: 4},
-		{Text: m.hl(r.commit.Hash), Width: 8, Style: logHashStyle},
-		{Text: m.hl(r.commit.AuthorShort), Width: 3, Style: logMetaStyle},
-		{Text: date, Width: dateWidth, Style: logMetaStyle},
-		{Text: state.icon, Width: 1, Style: state.style},
+		{Text: state.icon, Width: 2, Style: state.style},
 	}
-	meta := ui.RenderFixedColumns(cols)
-	subject := state.style.Render(m.hl(r.commit.Subject))
-	if len(badges) == 0 || badges[0] == "" {
-		return meta + " " + subject
+	subject := ui.RenderFixedColumns(cols) + state.style.Render(m.hl(r.commit.Subject))
+
+	meta := subjectIndent + logMetaStyle.Render(m.hl(r.commit.Hash)) + " " +
+		logMetaStyle.Render(date) + logMetaStyle.Render(" by ") + logMetaStyle.Render(m.hl(r.commit.AuthorShort))
+	if badges := m.renderBadges(r.commit.Decorations); badges != "" {
+		meta += " " + badges
 	}
-	return meta + " " + badges[0] + badgeSubjectSeparator + subject
+	return []string{subject, meta}
 }
 
+// renderBadges renders decoration names as boxed pill badges.
 func (m listPanel) renderBadges(decorations []git.RefDecoration) string {
 	if len(decorations) == 0 {
 		return ""
@@ -278,7 +288,7 @@ func (m listPanel) renderBadges(decorations []git.RefDecoration) string {
 
 	parts := make([]string, 0, len(sorted))
 	for _, dec := range sorted {
-		parts = append(parts, ui.RenderBadgeText(m.hl(dec.Name), m.decorationColor(dec)))
+		parts = append(parts, ui.RenderBadgeWithColor(m.hl(dec.Name), m.decorationColor(dec), m.hints.useNerdFont, false))
 	}
 	return strings.Join(parts, " ")
 }

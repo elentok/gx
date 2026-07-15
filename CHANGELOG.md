@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.19.11 - 2026-07-15
+
+- Log: commit rows now render across two lines — subject (with graph and push/pull state) on top, hash/date/author/decoration badges indented below. Decoration badges are back as condensed boxed pills. Selection and flash highlighting span both lines.
+
 ## v0.19.10 - 2026-07-11
 
 - Commit view and log: decoration badges (branch/tag) now render as plain colored text instead of a dark-background pill, joined to the subject by a delicate " · " separator. This avoids the subject shifting column depending on whether a row has decorations.
