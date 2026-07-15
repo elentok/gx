@@ -1,6 +1,7 @@
 package commit
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/elentok/gx/git"
@@ -32,7 +33,13 @@ type Model struct {
 	bodyExpanded bool
 	details      git.CommitDetails
 	headerOffset int
+	pushState    ui.PushState
 	err          error
+
+	// compiledRefRules/compiledHideRefs sort and filter decoration badges the
+	// same way ui/log does, so tags appear in the same order in both views.
+	compiledRefRules []ui.CompiledRefRule
+	compiledHideRefs []*regexp.Regexp
 
 	commitDiffArea
 	commitSidebarState
@@ -71,11 +78,13 @@ type commitSidebarState struct {
 
 func NewModel(worktreeRoot, ref, filterPath string, settings ui.Settings, extraKeys keys.Manager) Model {
 	m := Model{
-		worktreeRoot: worktreeRoot,
-		ref:          normalizedRef(ref),
-		settings:     settings,
-		filterPath:   strings.TrimSpace(filterPath),
-		bodyExpanded: true,
+		worktreeRoot:     worktreeRoot,
+		ref:              normalizedRef(ref),
+		settings:         settings,
+		filterPath:       strings.TrimSpace(filterPath),
+		bodyExpanded:     true,
+		compiledRefRules: ui.CompileRefRules(settings.LogConfig.ImportantRefs),
+		compiledHideRefs: ui.CompileHideRefs(settings.LogConfig.HideRefs),
 		commitDiffArea: commitDiffArea{
 			diffModel:        diffview.NewModel(settings.UseNerdFontIcons),
 			diffContextLines: settings.DiffContextLines,
@@ -137,6 +146,15 @@ func (m Model) WithScreenOrigin(col, row int, visible bool) (Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.overlay, cmd = m.overlay.Disrupt(m.settings.ImageDiffs)
 	return m, cmd
+}
+
+// WithPushState sets the push/pull status (icon + label) shown next to the
+// commit subject in the header. Callers that track branch history against an
+// upstream (the log/stash split containers) compute this per selection change,
+// since a single ref lookup can't classify a commit's push state in isolation.
+func (m Model) WithPushState(state ui.PushState) Model {
+	m.pushState = state
+	return m
 }
 
 // WithContainerFocus returns a copy rendered as active only when its containing

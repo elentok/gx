@@ -87,8 +87,11 @@ func TestBToggleBody(t *testing.T) {
 	if strings.Contains(view, "body hidden") {
 		t.Fatalf("expected collapsed view without body-hidden hint")
 	}
-	if !strings.Contains(view, "subject (by ") {
+	if !strings.Contains(view, "subject") {
 		t.Fatalf("expected collapsed header to show subject line")
+	}
+	if !strings.Contains(view, "by Test") {
+		t.Fatalf("expected collapsed header to show author line")
 	}
 	if !strings.Contains(view, "Commit (b to expand)") {
 		t.Fatalf("expected collapsed title hint")

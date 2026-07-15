@@ -24,10 +24,6 @@ var (
 	logPseudoStyle       = lipgloss.NewStyle().Foreground(ui.ColorYellow).Italic(true)
 	logPseudoStatusStyle = ui.StyleMuted.Italic(true)
 	logSearchStyle       = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true).Underline(true)
-	logPushedStyle       = lipgloss.NewStyle().Foreground(ui.ColorGreen)
-	logUnpushedStyle     = lipgloss.NewStyle().Foreground(ui.ColorOrange)
-	logDivergedStyle     = lipgloss.NewStyle().Foreground(ui.ColorRed)
-	logRemoteOnlyStyle   = lipgloss.NewStyle().Foreground(ui.ColorMauve)
 )
 
 // subjectIndent lines the second (metadata) line of a commit row up under
@@ -44,7 +40,6 @@ type listPanelHints struct {
 	branchDiverged   bool
 	compiledRefRules []compiledRefRule
 	compiledHideRefs []*regexp.Regexp
-	useNerdFont      bool
 }
 
 // listPanel is the log list panel. It implements splitview.ListPanel.
@@ -228,27 +223,6 @@ func (m listPanel) renderRow(r row, selected bool, width int) []string {
 	return lines
 }
 
-type commitStateInfo struct {
-	icon  string
-	style lipgloss.Style
-}
-
-func commitState(class git.BranchHistoryClass, branchDiverged bool) commitStateInfo {
-	switch class {
-	case git.BranchHistoryLocalOnly:
-		if branchDiverged {
-			return commitStateInfo{"󰃻", logDivergedStyle}
-		}
-		return commitStateInfo{"󰜷", logUnpushedStyle}
-	case git.BranchHistoryShared:
-		return commitStateInfo{"✔", logPushedStyle}
-	case git.BranchHistoryRemoteOnly:
-		return commitStateInfo{"󰜮", logRemoteOnlyStyle}
-	default:
-		return commitStateInfo{" ", lipgloss.NewStyle()}
-	}
-}
-
 // renderCommitRow renders a commit as two lines: the subject line up top
 // (graph, push/pull state, subject) and an indented metadata line below it
 // (hash, date, author, decoration badges).
@@ -257,23 +231,24 @@ func (m listPanel) renderCommitRow(r row) []string {
 	if graph == "" {
 		graph = "*"
 	}
-	state := commitState(r.class, m.hints.branchDiverged)
+	state := ui.CommitPushState(r.class, m.hints.branchDiverged)
 	date := ui.RelativeTimeCompact(r.commit.Date)
 	cols := []ui.FixedColumn{
 		{Text: graph, Width: 4},
-		{Text: state.icon, Width: 2, Style: state.style},
+		{Text: state.Icon, Width: 2, Style: state.Style},
 	}
-	subject := ui.RenderFixedColumns(cols) + state.style.Render(m.hl(r.commit.Subject))
+	subject := ui.RenderFixedColumns(cols) + state.Style.Render(m.hl(r.commit.Subject))
 
 	meta := subjectIndent + logMetaStyle.Render(m.hl(r.commit.Hash)) + " " +
 		logMetaStyle.Render(date) + logMetaStyle.Render(" by ") + logMetaStyle.Render(m.hl(r.commit.AuthorShort))
 	if badges := m.renderBadges(r.commit.Decorations); badges != "" {
-		meta += " " + badges
+		meta += logMetaStyle.Render(" · ") + badges
 	}
 	return []string{subject, meta}
 }
 
-// renderBadges renders decoration names as boxed pill badges.
+// renderBadges renders decoration names as plain colored text (no pill
+// background), separated from the rest of the metadata line by a dot.
 func (m listPanel) renderBadges(decorations []git.RefDecoration) string {
 	if len(decorations) == 0 {
 		return ""
@@ -288,7 +263,7 @@ func (m listPanel) renderBadges(decorations []git.RefDecoration) string {
 
 	parts := make([]string, 0, len(sorted))
 	for _, dec := range sorted {
-		parts = append(parts, ui.RenderBadgeWithColor(m.hl(dec.Name), m.decorationColor(dec), m.hints.useNerdFont, false))
+		parts = append(parts, ui.RenderBadgeText(m.hl(dec.Name), m.decorationColor(dec)))
 	}
 	return strings.Join(parts, " ")
 }

@@ -186,6 +186,7 @@ func (m Model) openSelected() (Model, tea.Cmd) {
 	// Load the commit into the detail panel.
 	var refCmd tea.Cmd
 	m.commitDetail, refCmd = m.commitDetail.WithRef(ref)
+	m.commitDetail = m.commitDetail.WithPushState(ui.CommitPushState(selected.class, m.branchDiverged))
 	m = m.withSyncedDetailSize()
 	return m, tea.Batch(splitCmd, refCmd)
 }

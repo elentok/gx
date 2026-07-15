@@ -163,7 +163,6 @@ func (m Model) buildHints() listPanelHints {
 		branchDiverged:   m.branchDiverged,
 		compiledRefRules: m.compiledRefRules,
 		compiledHideRefs: m.compiledHideRefs,
-		useNerdFont:      m.settings.UseNerdFontIcons,
 	}
 }
 

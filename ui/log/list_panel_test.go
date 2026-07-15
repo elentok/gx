@@ -287,7 +287,7 @@ func TestRenderRowPutsSubjectOnFirstLineAndMetadataOnSecond(t *testing.T) {
 	}
 }
 
-func TestRenderBadgesRendersBoxedPills(t *testing.T) {
+func TestRenderBadgesRendersPlainColoredText(t *testing.T) {
 	decorations := []git.RefDecoration{
 		{Name: "main", Kind: git.RefDecorationLocalBranch},
 		{Name: "origin/main", Kind: git.RefDecorationRemoteBranch},
@@ -300,8 +300,8 @@ func TestRenderBadgesRendersBoxedPills(t *testing.T) {
 	if !strings.Contains(stripped, "main") || !strings.Contains(stripped, "origin/main") {
 		t.Fatalf("stripped badges = %q, want both 'main' and 'origin/main'", stripped)
 	}
-	if !strings.Contains(line, "48;2;") {
-		t.Fatalf("expected boxed badges to render with a background color, got %q", line)
+	if strings.Contains(line, "48;2;") {
+		t.Fatalf("expected plain text badges without a background color, got %q", line)
 	}
 }
 

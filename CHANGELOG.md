@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.19.12 - 2026-07-15
+
+- Align log and commit views commit rendering
+
 ## v0.19.11 - 2026-07-15
 
 - Log: commit rows now render across two lines — subject (with graph and push/pull state) on top, hash/date/author/decoration badges indented below. Decoration badges are back as condensed boxed pills. Selection and flash highlighting span both lines.

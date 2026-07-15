@@ -1,10 +1,22 @@
 package log
 
 import (
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/commit"
 
 	tea "charm.land/bubbletea/v2"
 )
+
+// selectedPushState computes the push/pull state of the currently selected
+// commit row, for display in the commit detail header.
+func (m Model) selectedPushState() ui.PushState {
+	rows := m.listPanel.Rows()
+	cursor := m.listPanel.Selected()
+	if cursor < 0 || cursor >= len(rows) || rows[cursor].kind != rowCommit {
+		return ui.PushState{}
+	}
+	return ui.CommitPushState(rows[cursor].class, m.branchDiverged)
+}
 
 // withSyncedDetailSize resizes commitDetail to match the current split layout.
 func (m Model) withSyncedDetailSize() Model {
@@ -59,6 +71,7 @@ func (m Model) handleSelectionChange(prevRef string) (Model, tea.Cmd) {
 	if m.split.IsSplit() && newRef != prevRef && newRef != "" {
 		var cmd tea.Cmd
 		m.commitDetail, cmd = m.commitDetail.WithRef(newRef)
+		m.commitDetail = m.commitDetail.WithPushState(m.selectedPushState())
 		m = m.withSyncedDetailSize()
 		return m, cmd
 	}

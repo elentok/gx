@@ -3,6 +3,7 @@ package commit
 import (
 	"fmt"
 	"image/color"
+	"regexp"
 	"strings"
 
 	"github.com/elentok/gx/git"
@@ -22,13 +23,8 @@ const (
 	DIFF_MIN_WIDTH      = 40
 )
 
-var commitMetaStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
+var commitMetaStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Italic(true)
 var commitSubjectStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true)
-
-// badgeSubjectSeparator delicately separates decoration badges from the
-// subject when they share a line, without a background box that would shift
-// the subject's start column relative to lines with no decorations.
-var badgeSubjectSeparator = ui.StyleHint.Render(" · ")
 
 func (m Model) View() tea.View {
 	if !m.ready {
@@ -72,9 +68,10 @@ func (m Model) View() tea.View {
 }
 
 func (m Model) headerLines() []string {
-	subjectLine := commitSubjectStyle.Render(m.details.Subject) + commitMetaStyle.Render(" (by "+m.details.AuthorName+")")
-	badges := decorationBadgeParts(m.details.Decorations)
-	lines := badgeLinesWithTrailingSubject(badges, subjectLine, max(1, m.width-2))
+	subjectLine := m.subjectLine()
+	metaLine := m.metaLine()
+	badges := decorationBadgeParts(m.details.Decorations, m.compiledHideRefs, m.compiledRefRules)
+	lines := append([]string{subjectLine}, metaLineWithBadges(metaLine, badges, max(1, m.width-2))...)
 	if m.bodyExpanded {
 		body := m.commitMessageBody()
 		if body != "" {
@@ -85,20 +82,53 @@ func (m Model) headerLines() []string {
 	return lines
 }
 
-// badgeLinesWithTrailingSubject packs badges onto one or more lines, then
-// appends subjectLine to the last badge line if it fits; otherwise subject
-// gets its own line. With no badges, subjectLine is the sole line.
-func badgeLinesWithTrailingSubject(badges []string, subjectLine string, maxWidth int) []string {
-	lines := packBadgeLines(badges, maxWidth)
-	if len(lines) == 0 {
-		return []string{subjectLine}
+// subjectLine renders the commit subject, colored by push/pull state when
+// known, with a parenthetical icon + label spelling out that state (there's
+// no surrounding list to infer it from, unlike the log view's rows).
+func (m Model) subjectLine() string {
+	subject := commitSubjectStyle.Render(m.details.Subject)
+	if m.pushState.Label == "" {
+		return subject
 	}
-	lastIdx := len(lines) - 1
-	avail := maxWidth - ansi.StringWidth(lines[lastIdx])
-	if ansi.StringWidth(subjectLine)+ansi.StringWidth(badgeSubjectSeparator) <= avail {
-		lines[lastIdx] = lines[lastIdx] + badgeSubjectSeparator + subjectLine
-	} else {
-		lines = append(lines, subjectLine)
+	return m.pushState.Style.Render(m.details.Subject) + " " +
+		commitMetaStyle.Render("(") + m.pushState.Style.Render(m.pushState.Icon) +
+		commitMetaStyle.Render(" "+m.pushState.Label+")")
+}
+
+// metaLine renders the hash, relative date, and author on their own line
+// below the subject.
+func (m Model) metaLine() string {
+	return commitMetaStyle.Render(m.details.Hash) + " " +
+		commitMetaStyle.Render(ui.RelativeTimeCompact(m.details.Date)) +
+		commitMetaStyle.Render(" by ") + commitMetaStyle.Render(m.details.AuthorName)
+}
+
+// metaLineWithBadges appends as many badges as fit onto metaLine (separated
+// from the meta text by a dot), then packs any remaining badges onto further
+// lines. With no badges, metaLine is the sole line.
+func metaLineWithBadges(metaLine string, badges []string, maxWidth int) []string {
+	if len(badges) == 0 {
+		return []string{metaLine}
+	}
+	sep := commitMetaStyle.Render(" · ")
+	lines := []string{metaLine}
+	avail := maxWidth - ansi.StringWidth(metaLine)
+	i := 0
+	for i < len(badges) {
+		prefix := " "
+		if i == 0 {
+			prefix = sep
+		}
+		badgeW := ansi.StringWidth(badges[i])
+		if ansi.StringWidth(prefix)+badgeW > avail {
+			break
+		}
+		lines[0] += prefix + badges[i]
+		avail -= ansi.StringWidth(prefix) + badgeW
+		i++
+	}
+	if i < len(badges) {
+		lines = append(lines, packBadgeLines(badges[i:], maxWidth)...)
 	}
 	return lines
 }
@@ -177,14 +207,7 @@ func normalizeCommitBody(body string) string {
 }
 
 func (m Model) headerRightTitle() string {
-	date := m.details.Date.Format("2006-01-02 15:04")
-	rel := ui.RelativeTimeCompact(m.details.Date)
-	return fmt.Sprintf(
-		"%s %s %s",
-		ui.StyleTitle.Render(m.details.Hash),
-		commitMetaStyle.Render(date),
-		commitMetaStyle.Render("("+rel+")"),
-	)
+	return commitMetaStyle.Render(m.details.Date.Format("2006-01-02 15:04"))
 }
 
 func (m Model) contentView(contentH int) string {
@@ -340,15 +363,25 @@ func (m Model) diffSearchCounterText() string {
 }
 
 func renderBadges(decorations []git.RefDecoration) string {
-	return strings.Join(decorationBadgeParts(decorations), " ")
+	return strings.Join(decorationBadgeParts(decorations, nil, nil), " ")
 }
 
-func decorationBadgeParts(decorations []git.RefDecoration) []string {
+// decorationBadgeParts filters out hidden refs and sorts decorations the same
+// way ui/log does (important-refs rules first, in rule order), so the tags
+// shown here appear in the same order as the log view's rows.
+func decorationBadgeParts(decorations []git.RefDecoration, hideRefs []*regexp.Regexp, rules []ui.CompiledRefRule) []string {
 	if len(decorations) == 0 {
 		return nil
 	}
-	parts := make([]string, 0, len(decorations))
+	visible := make([]git.RefDecoration, 0, len(decorations))
 	for _, decoration := range decorations {
+		if !ui.IsHiddenRef(decoration.Name, hideRefs) {
+			visible = append(visible, decoration)
+		}
+	}
+	sorted := ui.SortDecorations(visible, rules)
+	parts := make([]string, 0, len(sorted))
+	for _, decoration := range sorted {
 		parts = append(parts, ui.RenderBadgeText(decoration.Name, badgeColorForDecoration(decoration)))
 	}
 	return parts

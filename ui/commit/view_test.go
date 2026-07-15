@@ -98,12 +98,34 @@ func TestPackBadgeLines_WrapsOntoNewLines(t *testing.T) {
 func TestHeaderLines_NoDecorations_Unchanged(t *testing.T) {
 	m := Model{details: git.CommitDetails{Subject: "fix bug", AuthorName: "Dave"}, width: 80}
 	lines := m.headerLines()
-	if len(lines) != 1 {
-		t.Fatalf("expected 1 line with no decorations, got %d: %v", len(lines), lines)
+	if len(lines) != 2 {
+		t.Fatalf("expected subject line + meta line with no decorations, got %d: %v", len(lines), lines)
+	}
+	if !strings.Contains(ansi.Strip(lines[0]), "fix bug") {
+		t.Errorf("expected subject on line 1, got %q", ansi.Strip(lines[0]))
+	}
+	if !strings.Contains(ansi.Strip(lines[1]), "by Dave") {
+		t.Errorf("expected author on line 2, got %q", ansi.Strip(lines[1]))
 	}
 }
 
-func TestHeaderLines_WithDecorations_KeepsSubjectOnSameLineWhenItFits(t *testing.T) {
+func TestHeaderLines_PushStateColorsSubjectAndAddsLabel(t *testing.T) {
+	m := Model{
+		details:   git.CommitDetails{Subject: "fix bug", AuthorName: "Dave"},
+		width:     80,
+		pushState: ui.CommitPushState(git.BranchHistoryLocalOnly, false),
+	}
+	lines := m.headerLines()
+	stripped := ansi.Strip(lines[0])
+	if !strings.Contains(stripped, "fix bug") || !strings.Contains(stripped, "unpushed") {
+		t.Fatalf("expected subject line with unpushed label, got %q", stripped)
+	}
+	if lines[0] == stripped {
+		t.Fatal("expected subject line to be colorized by push state")
+	}
+}
+
+func TestHeaderLines_WithDecorations_KeepsBadgeOnMetaLineWhenItFits(t *testing.T) {
 	m := Model{
 		details: git.CommitDetails{
 			Subject:     "fix bug",
@@ -113,34 +135,35 @@ func TestHeaderLines_WithDecorations_KeepsSubjectOnSameLineWhenItFits(t *testing
 		width: 80,
 	}
 	lines := m.headerLines()
-	if len(lines) != 1 {
-		t.Fatalf("expected badges and subject on one line, got %d lines: %v", len(lines), lines)
+	if len(lines) != 2 {
+		t.Fatalf("expected subject line + meta line with badge, got %d lines: %v", len(lines), lines)
 	}
-	badgeIdx := strings.Index(lines[0], "main")
-	subjectIdx := strings.Index(lines[0], "fix bug")
-	if badgeIdx == -1 || subjectIdx == -1 || badgeIdx > subjectIdx {
-		t.Errorf("expected badge before subject on the same line, got %q", lines[0])
+	stripped := ansi.Strip(lines[1])
+	byIdx := strings.Index(stripped, "by Dave")
+	badgeIdx := strings.Index(stripped, "main")
+	if badgeIdx == -1 || byIdx == -1 || badgeIdx < byIdx {
+		t.Errorf("expected badge after author on the meta line, got %q", stripped)
 	}
 }
 
-func TestHeaderLines_WithDecorations_WrapsSubjectWhenItDoesNotFit(t *testing.T) {
+func TestHeaderLines_WithDecorations_WrapsBadgeWhenItDoesNotFit(t *testing.T) {
 	m := Model{
 		details: git.CommitDetails{
-			Subject:     "a very long subject that will not fit next to the badge",
+			Subject:     "fix bug",
 			AuthorName:  "Dave",
 			Decorations: []git.RefDecoration{{Kind: git.RefDecorationLocalBranch, Name: "main"}},
 		},
-		width: 30,
+		width: 15,
 	}
 	lines := m.headerLines()
-	if len(lines) != 2 {
-		t.Fatalf("expected badge line + separate subject line, got %d lines: %v", len(lines), lines)
+	if len(lines) != 3 {
+		t.Fatalf("expected subject line + meta line + separate badge line, got %d lines: %v", len(lines), lines)
 	}
-	if !strings.Contains(lines[0], "main") {
-		t.Errorf("expected badge label on line 1, got %q", lines[0])
+	if !strings.Contains(ansi.Strip(lines[1]), "by Dave") {
+		t.Errorf("expected meta line without badge, got %q", ansi.Strip(lines[1]))
 	}
-	if !strings.Contains(lines[1], "a very long subject") {
-		t.Errorf("expected subject on line 2, got %q", lines[1])
+	if !strings.Contains(ansi.Strip(lines[2]), "main") {
+		t.Errorf("expected badge on its own line, got %q", ansi.Strip(lines[2]))
 	}
 }
 
