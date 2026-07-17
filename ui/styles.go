@@ -12,6 +12,7 @@ import (
 // status UI so the rest of the app can share one visual language.
 var (
 	ColorBase     = lipgloss.Color("#1e1e2e")
+	ColorMantle   = lipgloss.Color("#181825")
 	ColorDeepBg   = lipgloss.Color("#11111a")
 	ColorText     = lipgloss.Color("#cdd6f4")
 	ColorSubtle   = lipgloss.Color("#a6adc8")

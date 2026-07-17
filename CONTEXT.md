@@ -2,8 +2,10 @@
 
 ## Panels and Viewports
 
-**Panel** — a bordered rectangular region of the screen. A view is composed of one or more panels
-(e.g. commit view = header panel + filetree panel + diff panel).
+**Panel** — a rectangular region of the screen. A view is composed of one or more panels (e.g.
+commit view = header panel + filetree panel + diff panel). Persistent layout panels render
+frame-free (no border glyphs); a border is reserved for transient overlays (modals, menus,
+confirms). See ADR 0013.
 
 **List panel** — a panel that renders a navigable list of items (filetree, file list, commit list).
 Items have a fixed height of one display row each.
@@ -20,7 +22,7 @@ ADR 0010.
 
 **Detail panel** — an interactive, focusable panel that mirrors the currently selected list item and
 supports its own keyboard navigation (e.g. the commit detail shown beside the log and stash lists).
-The user can move focus into it and back out. Contrast with a sidebar.
+The user can move focus into it and back out. Contrast with a preview panel.
 
 **Screen origin** — the absolute (column, row) of a panel's top-left cell on the terminal grid. A
 page that owns the whole screen has origin (0, 0); a detail panel composed into a split view does
@@ -28,9 +30,19 @@ not — it only learns its width/height, so its origin is injected by the contai
 layout (`splitview.DetailOrigin`). Required only by features that paint outside bubbletea's render
 loop at absolute coordinates — currently the image-diff kitty overlay (ADR 0010).
 
-**Sidebar** — a passive, non-focusable panel that renders a read-only summary of the current
+**Preview panel** — a passive, non-focusable panel that renders a read-only summary of the current
 selection. The user never moves focus into it; it only reflects the selected item (e.g. the
-worktrees sidebar, the commit header). Contrast with a detail panel.
+worktrees preview panel, the commit header). Contrast with a detail panel.
+
+**Sidebar** — a list panel shown alongside another panel (typically a detail panel), where navigating
+the list drives what the other panel shows. Focusable and selection-driving, unlike a preview panel.
+The four sidebars in this project: the commit list in the log view, the stash list in the stash
+view, the filetree in the status view, and the worktree list in the worktrees view (paired with its
+preview panel).
+
+**Sidebar mode** — the state a panel is in when it is rendered next to a detail or preview panel, as
+opposed to standalone (the only content on screen). A panel in sidebar mode is visually distinguished
+(e.g. a slightly darker background) so it reads as secondary to the panel beside it. See ADR 0013.
 
 **Viewport** — the visible window into a panel's content. Defined by a scroll offset (first visible
 row index) and a height (number of visible rows).

@@ -9,12 +9,12 @@ import (
 
 func boolPtr(v bool) *bool { return &v }
 
-func TestRenderSidebarContent_IncludesBehindSection(t *testing.T) {
+func TestRenderPreviewContent_IncludesBehindSection(t *testing.T) {
 	wt := &git.Worktree{Name: "feature-a"}
 	ahead := []git.Commit{{Hash: "abc1234", Subject: "ahead commit"}}
 	behind := []git.Commit{{Hash: "def5678", Subject: "behind commit"}}
 
-	out := renderSidebarContent(wt, "origin/feature-a", git.Commit{}, ahead, behind, nil, false, nil, "", false)
+	out := renderPreviewContent(wt, "origin/feature-a", git.Commit{}, ahead, behind, nil, false, nil, "", false)
 	if !strings.Contains(out, "Commits ahead of remote") {
 		t.Fatal("missing ahead section")
 	}
@@ -26,9 +26,9 @@ func TestRenderSidebarContent_IncludesBehindSection(t *testing.T) {
 	}
 }
 
-func TestRenderSidebarContent_NoUpstream(t *testing.T) {
+func TestRenderPreviewContent_NoUpstream(t *testing.T) {
 	wt := &git.Worktree{Name: "feature-a"}
-	out := renderSidebarContent(wt, "", git.Commit{}, nil, nil, nil, false, nil, "", false)
+	out := renderPreviewContent(wt, "", git.Commit{}, nil, nil, nil, false, nil, "", false)
 	if !strings.Contains(out, "no remote tracking branch") {
 		t.Fatal("missing no-tracking note")
 	}
@@ -40,9 +40,9 @@ func TestRenderSidebarContent_NoUpstream(t *testing.T) {
 	}
 }
 
-func TestRenderSidebarContent_UsesNerdFontIcons(t *testing.T) {
+func TestRenderPreviewContent_UsesNerdFontIcons(t *testing.T) {
 	wt := &git.Worktree{Name: "feature-a"}
-	out := renderSidebarContent(wt, "origin/feature-a", git.Commit{}, nil, nil, nil, false, nil, "", true)
+	out := renderPreviewContent(wt, "origin/feature-a", git.Commit{}, nil, nil, nil, false, nil, "", true)
 	if !strings.Contains(out, "󰙅 Worktree") {
 		t.Fatal("missing nerd-font worktree title")
 	}
@@ -51,33 +51,33 @@ func TestRenderSidebarContent_UsesNerdFontIcons(t *testing.T) {
 	}
 }
 
-func TestRenderSidebarContent_RebasedOnMain(t *testing.T) {
+func TestRenderPreviewContent_RebasedOnMain(t *testing.T) {
 	wt := &git.Worktree{Name: "feature-a", Branch: "feature-a"}
-	out := renderSidebarContent(wt, "origin/feature-a", git.Commit{}, nil, nil, boolPtr(true), false, nil, "", false)
+	out := renderPreviewContent(wt, "origin/feature-a", git.Commit{}, nil, nil, boolPtr(true), false, nil, "", false)
 	if !strings.Contains(out, "rebased on main") {
 		t.Fatal("expected 'rebased on main' indicator")
 	}
 }
 
-func TestRenderSidebarContent_NeedsRebase(t *testing.T) {
+func TestRenderPreviewContent_NeedsRebase(t *testing.T) {
 	wt := &git.Worktree{Name: "feature-a", Branch: "feature-a"}
-	out := renderSidebarContent(wt, "origin/feature-a", git.Commit{}, nil, nil, boolPtr(false), false, nil, "", false)
+	out := renderPreviewContent(wt, "origin/feature-a", git.Commit{}, nil, nil, boolPtr(false), false, nil, "", false)
 	if !strings.Contains(out, "needs rebase on main") {
 		t.Fatal("expected 'needs rebase on main' indicator")
 	}
 }
 
-func TestRenderSidebarContent_MainBranchHidesSection(t *testing.T) {
+func TestRenderPreviewContent_MainBranchHidesSection(t *testing.T) {
 	wt := &git.Worktree{Name: "main", Branch: "main"}
-	out := renderSidebarContent(wt, "origin/main", git.Commit{}, nil, nil, nil, true, nil, "", false)
+	out := renderPreviewContent(wt, "origin/main", git.Commit{}, nil, nil, nil, true, nil, "", false)
 	if strings.Contains(out, "Base") {
 		t.Fatal("main branch should not show base section")
 	}
 }
 
-func TestRenderSidebarContent_SpinnerInTitle(t *testing.T) {
+func TestRenderPreviewContent_SpinnerInTitle(t *testing.T) {
 	wt := &git.Worktree{Name: "feature-a"}
-	out := renderSidebarContent(wt, "", git.Commit{}, nil, nil, nil, false, nil, "⣾", false)
+	out := renderPreviewContent(wt, "", git.Commit{}, nil, nil, nil, false, nil, "⣾", false)
 	if !strings.Contains(out, "⣾") {
 		t.Fatal("expected spinner in output")
 	}

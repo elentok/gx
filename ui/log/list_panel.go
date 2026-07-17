@@ -50,12 +50,13 @@ type listPanelHints struct {
 
 // listPanel is the log list panel. It implements splitview.ListPanel.
 type listPanel struct {
-	rows     []row
-	list     list.Model
-	width    int
-	height   int
-	inactive bool
-	hints    listPanelHints
+	rows        []row
+	list        list.Model
+	width       int
+	height      int
+	inactive    bool
+	sidebarMode bool
+	hints       listPanelHints
 }
 
 func newListPanel() listPanel { return listPanel{} }
@@ -63,6 +64,14 @@ func newListPanel() listPanel { return listPanel{} }
 // WithContainerFocus returns a copy that renders as active only when focused.
 func (m listPanel) WithContainerFocus(focused bool) listPanel {
 	m.inactive = !focused
+	return m
+}
+
+// WithSidebarMode returns a copy that renders with the sidebar-mode
+// background (see CONTEXT.md) when the commit list is shown alongside the
+// detail panel, as opposed to standalone.
+func (m listPanel) WithSidebarMode(sidebar bool) listPanel {
+	m.sidebarMode = sidebar
 	return m
 }
 
@@ -150,16 +159,14 @@ func (m listPanel) visibleH() int {
 func (m listPanel) View() tea.View {
 	lw := maxInt(20, m.width)
 	lh := maxInt(4, m.height-1)
-	return tea.NewView(ui.RenderPanelFrame(ui.PanelFrameOptions{
-		Width:       lw,
-		Height:      lh,
-		Title:       m.hints.title,
-		RightTitle:  m.hints.rightTitle,
-		Lines:       m.visibleLines(),
-		BorderColor: m.frameBorderColor(),
-		TitleColor:  m.frameTitleColor(),
-		Background:  ui.ColorBase,
-	}))
+	active := !m.inactive
+	accent := color.Color(nil)
+	if active {
+		accent = m.frameTitleColor()
+	}
+	return tea.NewView(ui.RenderPanel(ui.PanelOptionsFor(
+		lw, lh, m.hints.title, m.hints.rightTitle, m.visibleLines(), active, m.frameTitleColor(), accent, m.sidebarMode,
+	)))
 }
 
 func (m listPanel) frameTitleColor() color.Color {
@@ -184,7 +191,7 @@ func (m listPanel) visibleLines() []string {
 	start, end := m.list.VisibleRange(len(m.rows), rowBudget)
 	lines := make([]string, 0, (end-start)*2)
 	for i := start; i < end; i++ {
-		lines = append(lines, m.renderRow(m.rows[i], i == m.list.Selected(), m.width-4)...)
+		lines = append(lines, m.renderRow(m.rows[i], i == m.list.Selected(), m.width-2)...)
 	}
 	return lines
 }

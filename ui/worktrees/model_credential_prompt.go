@@ -111,7 +111,7 @@ func (m Model) finishPromptableJob(err error) (tea.Model, tea.Cmd) {
 		}
 		cmds := []tea.Cmd{notify.Info(ui.MessageComplete("push"))}
 		if wt.Branch != "" {
-			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, wt))
+			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadPreviewData(m.repo, wt))
 		}
 		prURL := git.ExtractPRURL(output)
 		if prURL != "" {
@@ -126,7 +126,7 @@ func (m Model) finishPromptableJob(err error) (tea.Model, tea.Cmd) {
 		}
 		cmds := []tea.Cmd{notify.Info(ui.MessageComplete("force push"))}
 		if wt.Branch != "" {
-			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, wt))
+			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadPreviewData(m.repo, wt))
 		}
 		return m, tea.Batch(cmds...)
 	default:

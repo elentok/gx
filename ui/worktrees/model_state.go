@@ -65,12 +65,12 @@ type Model struct {
 	table    table.Model
 	viewport viewport.Model
 
-	sidebarUpstream      string // empty if no remote tracking branch found
-	sidebarHeadCommit    git.Commit
-	sidebarAheadCommits  []git.Commit
-	sidebarBehindCommits []git.Commit
-	sidebarChanges       []git.Change
-	sidebarLoading       bool
+	previewUpstream      string // empty if no remote tracking branch found
+	previewHeadCommit    git.Commit
+	previewAheadCommits  []git.Commit
+	previewBehindCommits []git.Commit
+	previewChanges       []git.Change
+	previewLoading       bool
 
 	pull   pull.Model
 	pullWT *git.Worktree // worktree being pulled, set when pull.Open is called
@@ -79,12 +79,12 @@ type Model struct {
 	textInput            textinput.Model // shared by rename and clone modes
 	credentialPromptText string
 	errorViewport        viewport.Model
-	helpModel     help.Model
-	jobRunner     *components.CommandRunner
-	jobKind       promptableJobKind
-	jobWorktree   *git.Worktree
-	jobLog        *ui.CommandOutputLog
-	jobStashed    bool
+	helpModel            help.Model
+	jobRunner            *components.CommandRunner
+	jobKind              promptableJobKind
+	jobWorktree          *git.Worktree
+	jobLog               *ui.CommandOutputLog
+	jobStashed           bool
 
 	lastJobLog   string
 	lastJobLabel string
@@ -92,10 +92,10 @@ type Model struct {
 
 	confirm confirm.Model
 
-	deleteQueue   []git.Worktree    // worktrees pending deletion in the current batch
-	deleteInFlight int              // number of concurrent deletes in progress
-	deleteSteps   []components.Step // one per worktree in the batch, for the progress modal
-	deleteResults []deleteResultMsg // accumulated results from the batch
+	deleteQueue    []git.Worktree    // worktrees pending deletion in the current batch
+	deleteInFlight int               // number of concurrent deletes in progress
+	deleteSteps    []components.Step // one per worktree in the batch, for the progress modal
+	deleteResults  []deleteResultMsg // accumulated results from the batch
 
 	pushDivergence   *git.PushDivergence
 	pushDivergenceWT *git.Worktree
@@ -125,7 +125,7 @@ type Model struct {
 
 	loading    bool
 	refreshing bool
-	err     error
+	err        error
 }
 
 // New creates a new worktrees page model. activeWorktreePath is the path of the

@@ -274,7 +274,7 @@ func (m Model) buildMainContent() string {
 		updated, _ := m.stashList.Update(tea.WindowSizeMsg{Width: lw, Height: lh})
 		m.stashList = updated.(listPanel)
 	}
-	listOut := m.stashList.WithContainerFocus(m.isListActive()).View().Content
+	listOut := m.stashList.WithContainerFocus(m.isListActive()).WithSidebarMode(m.split.IsSplit()).View().Content
 
 	if !m.split.IsSplit() {
 		return lipgloss.JoinVertical(lipgloss.Left, listOut, stashFooter())
@@ -283,9 +283,11 @@ func (m Model) buildMainContent() string {
 	detailContent := m.commitDetail.WithContainerFocus(m.split.IsDetailFocused()).View().Content
 	var body string
 	if m.split.EffectiveOrientation() == splitview.Vertical {
-		body = lipgloss.JoinHorizontal(lipgloss.Top, listOut, detailContent)
+		seam := ui.RenderSeamColumn(lh, ui.SeamColor)
+		body = lipgloss.JoinHorizontal(lipgloss.Top, listOut, seam, detailContent)
 	} else {
-		body = lipgloss.JoinVertical(lipgloss.Left, listOut, detailContent)
+		seam := ui.RenderSeamRow(lw, ui.SeamColor)
+		body = lipgloss.JoinVertical(lipgloss.Left, listOut, seam, detailContent)
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, body, stashFooter())
 }

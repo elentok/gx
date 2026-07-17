@@ -20,15 +20,15 @@ var (
 
 func (m listPanel) View() tea.View {
 	lines := m.visibleLines()
-	return tea.NewView(ui.RenderPanelFrame(ui.PanelFrameOptions{
-		Width:       m.width,
-		Height:      max(1, m.height-1),
-		Title:       "Stash",
-		Lines:       lines,
-		BorderColor: m.frameBorderColor(),
-		TitleColor:  m.frameTitleColor(),
-		Background:  ui.ColorBase,
-	}))
+	height := max(1, m.height-1)
+	active := !m.inactive
+	accent := color.Color(nil)
+	if active {
+		accent = m.frameTitleColor()
+	}
+	return tea.NewView(ui.RenderPanel(ui.PanelOptionsFor(
+		m.width, height, "Stash", "", lines, active, m.frameTitleColor(), accent, m.sidebarMode,
+	)))
 }
 
 func (m listPanel) frameTitleColor() color.Color {

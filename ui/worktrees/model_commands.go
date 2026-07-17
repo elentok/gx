@@ -44,7 +44,7 @@ func cmdLoadBaseStatus(repo git.Repo, branch string) tea.Cmd {
 	}
 }
 
-func cmdLoadSidebarData(repo git.Repo, wt git.Worktree) tea.Cmd {
+func cmdLoadPreviewData(repo git.Repo, wt git.Worktree) tea.Cmd {
 	return func() tea.Msg {
 		upstream := git.UpstreamBranch(repo.Root, wt.Branch)
 		var aheadCommits, behindCommits []git.Commit
@@ -54,7 +54,7 @@ func cmdLoadSidebarData(repo git.Repo, wt git.Worktree) tea.Cmd {
 		}
 		headCommit, _ := git.HeadCommit(wt.Path, "HEAD")
 		changes, _ := git.UncommittedChanges(wt.Path)
-		return sidebarDataMsg{
+		return previewDataMsg{
 			worktreePath:  wt.Path,
 			upstream:      upstream,
 			headCommit:    headCommit,

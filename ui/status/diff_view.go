@@ -20,16 +20,17 @@ func (m *Model) renderDiffPane(width, height int) string {
 		return ""
 	}
 
-	expandedH, collapsedH := diffPaneHeights(height)
+	expandedH, collapsedH := diffPaneHeights(height - 1)
+	seam := ui.RenderSeamRow(width, ui.SeamColor)
 	if m.diffarea.ActiveSection == diffarea.SectionStaged {
 		top := m.renderSectionPane(width, collapsedH, diffarea.SectionUnstaged)
 		bottom := m.renderSectionPane(width, expandedH, diffarea.SectionStaged)
-		return lipgloss.JoinVertical(lipgloss.Left, top, bottom)
+		return lipgloss.JoinVertical(lipgloss.Left, top, seam, bottom)
 	}
 
 	top := m.renderSectionPane(width, expandedH, diffarea.SectionUnstaged)
 	bottom := m.renderSectionPane(width, collapsedH, diffarea.SectionStaged)
-	return lipgloss.JoinVertical(lipgloss.Left, top, bottom)
+	return lipgloss.JoinVertical(lipgloss.Left, top, seam, bottom)
 }
 
 func (m *Model) renderSectionPane(width, height int, section diffarea.Section) string {
@@ -171,7 +172,7 @@ func (m *Model) syncDiffViewports() {
 	reflowSectionLines(m.diffarea.SectionModel(diffarea.SectionUnstaged), wrapWidth, m.diffarea.Wrap())
 	reflowSectionLines(m.diffarea.SectionModel(diffarea.SectionStaged), wrapWidth, m.diffarea.Wrap())
 
-	expandedH, collapsedH := diffPaneHeights(diffH)
+	expandedH, collapsedH := diffPaneHeights(diffH - 1)
 	m.diffarea.SyncViewports(vpW, expandedH, collapsedH)
 	m.fileTreeModel.SetVisibleHeight(maxInt(1, filetreeH-2))
 }

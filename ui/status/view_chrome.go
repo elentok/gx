@@ -1,6 +1,8 @@
 package status
 
 import (
+	"image/color"
+
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
@@ -20,64 +22,25 @@ func (m Model) errorModalView() string {
 }
 
 func (m Model) renderFiletreePanelWithBorderTitle(width, height int, title, rightTitle string, lines []string, active bool) string {
-	borderColor := ui.ColorBorder
 	titleColor := ui.ColorBlue
+	accent := color.Color(nil)
 	if active {
-		borderColor = ui.ColorBlue
-		titleColor = ui.ColorBlue
+		accent = ui.ColorBlue
 	}
-	return ui.RenderPanelFrame(ui.PanelFrameOptions{
-		Width:       width,
-		Height:      height,
-		Title:       title,
-		RightTitle:  rightTitle,
-		Lines:       lines,
-		BorderColor: borderColor,
-		TitleColor:  titleColor,
-		TitleBold:   active,
-		Background:  ui.ColorBase,
-	})
+	return ui.RenderPanel(ui.PanelOptionsFor(width, height, title, rightTitle, lines, active, titleColor, accent, true))
 }
 
 func (m Model) renderPanelWithBorderTitle(width, height int, title, rightTitle string, lines []string, active bool, section diffarea.Section) string {
 	highlightMoved := m.diffarea.Flash.Active && m.diffarea.Flash.Section == section
-	borderColor := ui.ColorBorder
 	titleColor := ui.ColorOrange
 	if section == diffarea.SectionStaged {
-		borderColor = ui.ColorGreen
 		titleColor = ui.ColorGreen
-	} else {
-		borderColor = ui.ColorOrange
-		titleColor = ui.ColorOrange
 	}
-	if !active {
-		borderColor = ui.ColorBorder
-		if section == diffarea.SectionStaged {
-			titleColor = ui.ColorGreen
-		} else {
-			titleColor = ui.ColorOrange
-		}
-	} else if section == diffarea.SectionStaged {
-		borderColor = ui.ColorGreen
-		titleColor = ui.ColorGreen
-	} else {
-		borderColor = ui.ColorOrange
-		titleColor = ui.ColorOrange
+	accent := color.Color(nil)
+	if active || highlightMoved {
+		accent = titleColor
 	}
-	if highlightMoved {
-		borderColor = titleColor
-	}
-	return ui.RenderPanelFrame(ui.PanelFrameOptions{
-		Width:       width,
-		Height:      height,
-		Title:       title,
-		RightTitle:  rightTitle,
-		Lines:       lines,
-		BorderColor: borderColor,
-		TitleColor:  titleColor,
-		TitleBold:   active || highlightMoved,
-		Background:  ui.ColorBase,
-	})
+	return ui.RenderPanel(ui.PanelOptionsFor(width, height, title, rightTitle, lines, active || highlightMoved, titleColor, accent, false))
 }
 
 type filetreePaneIcons struct {

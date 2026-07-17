@@ -48,8 +48,8 @@ func TestSplitWidthUsesMinimumFiletreePaneWidthForShortContent(t *testing.T) {
 	if filetreeW != minFiletreePaneWidth {
 		t.Fatalf("expected minimum filetree width %d, got %d", minFiletreePaneWidth, filetreeW)
 	}
-	if diffW != 160-minFiletreePaneWidth {
-		t.Fatalf("expected diff width %d, got %d", 160-minFiletreePaneWidth, diffW)
+	if diffW != 160-minFiletreePaneWidth-1 {
+		t.Fatalf("expected diff width %d, got %d", 160-minFiletreePaneWidth-1, diffW)
 	}
 }
 
@@ -105,8 +105,8 @@ func TestSplitWidthHonorsMaximumFiletreePaneWidth(t *testing.T) {
 	if filetreeW != maxFiletreePaneWidth {
 		t.Fatalf("expected filetree pane max width %d, got %d", maxFiletreePaneWidth, filetreeW)
 	}
-	if diffW != 200-maxFiletreePaneWidth {
-		t.Fatalf("expected diff width %d, got %d", 200-maxFiletreePaneWidth, diffW)
+	if diffW != 200-maxFiletreePaneWidth-1 {
+		t.Fatalf("expected diff width %d, got %d", 200-maxFiletreePaneWidth-1, diffW)
 	}
 }
 
@@ -125,8 +125,8 @@ func TestSplitWidthPreservesMinimumDiffWidth(t *testing.T) {
 	if diffW != minDiffPaneWidth {
 		t.Fatalf("expected minimum diff width %d, got %d", minDiffPaneWidth, diffW)
 	}
-	if filetreeW != 101-minDiffPaneWidth {
-		t.Fatalf("expected filetree width %d, got %d", 101-minDiffPaneWidth, filetreeW)
+	if filetreeW != 101-minDiffPaneWidth-1 {
+		t.Fatalf("expected filetree width %d, got %d", 101-minDiffPaneWidth-1, filetreeW)
 	}
 }
 
@@ -541,7 +541,7 @@ func TestHelpLineTruncatesHintWithEllipsisWhenNarrow(t *testing.T) {
 	}
 }
 
-func TestFiletreePaneShowsBranchSummaryInTitle(t *testing.T) {
+func TestFiletreePaneShowsBranchSummaryAtBottom(t *testing.T) {
 	t.Parallel()
 	repo := testutil.TempRepo(t)
 	m := newTestModelDefault(repo)
@@ -553,8 +553,8 @@ func TestFiletreePaneShowsBranchSummaryInTitle(t *testing.T) {
 	m.statusData.branchSync = git.SyncStatus{Name: git.StatusAhead, Ahead: 2}
 
 	pane := ansi.Strip(m.renderFiletreePane(72, 10))
-	if !strings.Contains(pane, "Filetree (") {
-		t.Fatalf("expected branch summary in filetree title, got:\n%s", pane)
+	if strings.Contains(pane, "Filetree (") {
+		t.Fatalf("expected branch summary out of the title (moved to bottom lines), got:\n%s", pane)
 	}
 	if !strings.Contains(pane, "feature/test") {
 		t.Fatalf("expected branch summary to include branch name, got:\n%s", pane)

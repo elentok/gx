@@ -27,6 +27,7 @@ func (m Model) View() tea.View {
 
 	panel := m.listPanel.
 		WithContainerFocus(m.isLogPaneActive()).
+		WithSidebarMode(m.split.IsSplit()).
 		WithHints(m.buildHints())
 
 	listOut := panel.View().Content
@@ -50,9 +51,11 @@ func (m Model) View() tea.View {
 	if m.split.IsSplit() {
 		detailContent := m.commitDetail.WithContainerFocus(m.split.IsDetailFocused()).View().Content
 		if m.split.EffectiveOrientation() == splitview.Vertical {
-			out = lipgloss.JoinHorizontal(lipgloss.Top, listOut, detailContent)
+			seam := ui.RenderSeamColumn(m.listHeight(), ui.SeamColor)
+			out = lipgloss.JoinHorizontal(lipgloss.Top, listOut, seam, detailContent)
 		} else {
-			out = lipgloss.JoinVertical(lipgloss.Left, listOut, detailContent)
+			seam := ui.RenderSeamRow(m.listWidth(), ui.SeamColor)
+			out = lipgloss.JoinVertical(lipgloss.Left, listOut, seam, detailContent)
 		}
 	} else {
 		out = listOut

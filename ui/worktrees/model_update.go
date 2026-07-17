@@ -176,11 +176,11 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 				return m.finishPromptableJob(err)
 			}
 		}
-		if m.spinnerActive || m.sidebarLoading || m.mode == modeDeleteProgress {
+		if m.spinnerActive || m.previewLoading || m.mode == modeDeleteProgress {
 			var cmd tea.Cmd
 			m.spinner, cmd = m.spinner.Update(msg)
-			if m.sidebarLoading {
-				m.viewport.SetContent(m.sidebarContent())
+			if m.previewLoading {
+				m.viewport.SetContent(m.previewContent())
 			}
 			return m, cmd
 		}
@@ -218,7 +218,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 			}
 		}
 		if wt := m.cursorWorktree(); wt != nil && wt.Branch != "" {
-			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, *wt))
+			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadPreviewData(m.repo, *wt))
 		}
 		return m, tea.Batch(cmds...)
 
@@ -239,7 +239,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		}
 		cmds = append(cmds, notify.Info(stashPopMsg))
 		if wt := m.cursorWorktree(); wt != nil {
-			cmds = append(cmds, cmdLoadDirtyStatus(*wt), cmdLoadSidebarData(m.repo, *wt))
+			cmds = append(cmds, cmdLoadDirtyStatus(*wt), cmdLoadPreviewData(m.repo, *wt))
 			if wt.Branch != "" {
 				cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch))
 			}
@@ -282,7 +282,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		}
 		cmds = append(cmds, notify.Info(ui.MessageComplete("push")))
 		if wt := m.cursorWorktree(); wt != nil && wt.Branch != "" {
-			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, *wt))
+			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadPreviewData(m.repo, *wt))
 		}
 		if msg.prURL != "" {
 			prompt := fmt.Sprintf("Open pull request page?\n\n%s", msg.prURL)
@@ -327,7 +327,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		}
 		cmds = append(cmds, notify.Info(ui.MessageComplete("force push")))
 		if wt := m.cursorWorktree(); wt != nil && wt.Branch != "" {
-			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, *wt))
+			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadPreviewData(m.repo, *wt))
 		}
 		return m, tea.Batch(cmds...)
 
@@ -354,7 +354,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		}
 		cmds = append(cmds, notify.Info("tracking remote branch"))
 		if wt := m.cursorWorktree(); wt != nil && wt.Branch != "" {
-			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadSidebarData(m.repo, *wt))
+			cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadPreviewData(m.repo, *wt))
 		}
 		return m, tea.Batch(cmds...)
 
@@ -396,11 +396,11 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		}
 		if len(m.worktrees) > 0 {
 			if firstLoad {
-				m.sidebarLoading = true
-				m.viewport.SetContent(m.sidebarContent())
+				m.previewLoading = true
+				m.viewport.SetContent(m.previewContent())
 				cmds = append(cmds, m.spinner.Tick)
 			}
-			cmds = append(cmds, cmdLoadSidebarData(m.repo, m.worktrees[m.table.Cursor()]))
+			cmds = append(cmds, cmdLoadPreviewData(m.repo, m.worktrees[m.table.Cursor()]))
 		}
 		if m.refreshing {
 			m.refreshing = false
@@ -417,9 +417,9 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		rebased := msg.rebased
 		m.baseStatus[msg.branch] = &rebased
 		m.table.SetRows(m.buildRows())
-		// Refresh sidebar if the updated branch belongs to the selected worktree
+		// Refresh preview if the updated branch belongs to the selected worktree
 		if wt := m.cursorWorktree(); wt != nil && wt.Branch == msg.branch {
-			m.viewport.SetContent(m.sidebarContent())
+			m.viewport.SetContent(m.previewContent())
 		}
 		return m, nil
 
@@ -428,15 +428,15 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		m.table.SetRows(m.buildRows())
 		return m, nil
 
-	case sidebarDataMsg:
+	case previewDataMsg:
 		if len(m.worktrees) > 0 && m.worktrees[m.table.Cursor()].Path == msg.worktreePath {
-			m.sidebarUpstream = msg.upstream
-			m.sidebarHeadCommit = msg.headCommit
-			m.sidebarAheadCommits = msg.aheadCommits
-			m.sidebarBehindCommits = msg.behindCommits
-			m.sidebarChanges = msg.changes
-			m.sidebarLoading = false
-			m.viewport.SetContent(m.sidebarContent())
+			m.previewUpstream = msg.upstream
+			m.previewHeadCommit = msg.headCommit
+			m.previewAheadCommits = msg.aheadCommits
+			m.previewBehindCommits = msg.behindCommits
+			m.previewChanges = msg.changes
+			m.previewLoading = false
+			m.viewport.SetContent(m.previewContent())
 		}
 		return m, nil
 	}
@@ -449,13 +449,13 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 
 	if m.table.Cursor() != prevCursor && len(m.worktrees) > 0 {
 		m.table.SetRows(m.buildRows())
-		m.sidebarLoading = true
-		m.viewport.SetContent(m.sidebarContent())
+		m.previewLoading = true
+		m.viewport.SetContent(m.previewContent())
 		var spinnerCmd tea.Cmd
 		if !m.spinnerActive {
 			spinnerCmd = m.spinner.Tick
 		}
-		cmds = append(cmds, cmdLoadSidebarData(m.repo, m.worktrees[m.table.Cursor()]), spinnerCmd)
+		cmds = append(cmds, cmdLoadPreviewData(m.repo, m.worktrees[m.table.Cursor()]), spinnerCmd)
 	}
 
 	var vpCmd tea.Cmd

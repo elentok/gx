@@ -170,6 +170,128 @@ func RenderPanelFrame(opts PanelFrameOptions) string {
 	return strings.Join(append([]string{top}, append(body, bottom)...), "\n")
 }
 
+// PanelOptions is the frame-free sibling of PanelFrameOptions, used for
+// persistent layout panels (see docs/plans/frame-free-panel-design-map.md).
+// Panels render edge-to-edge: separation between adjacent panels is not a
+// property of the panel itself (a single full-screen panel needs none) - it's
+// a seam drawn by the layout that composes panels together, see RenderSeamRow
+// / RenderSeamColumn.
+type PanelOptions struct {
+	Width      int
+	Height     int
+	Title      string
+	RightTitle string
+	Lines      []string
+	TitleColor color.Color
+	TitleBold  bool
+	Background color.Color // body fill
+	// HeaderBackground fills the title row only, distinct from the body so an
+	// active panel's header can read as more prominent than an inactive
+	// one's. Defaults to Background when unset.
+	HeaderBackground color.Color
+	PaddingX         int // inner gap painted with Background
+	PaddingY         int
+}
+
+// RenderPanel renders a panel with no border glyphs: separation comes
+// from the header/body background split, a 1-cell margin between them, and
+// the surrounding seam drawn by the layout.
+func RenderPanel(opts PanelOptions) string {
+	if opts.Width < 2 || opts.Height < 2 {
+		return ""
+	}
+	headerBg := opts.HeaderBackground
+	if headerBg == nil {
+		headerBg = opts.Background
+	}
+	titleStyle := lipgloss.NewStyle().Foreground(opts.TitleColor).Background(headerBg)
+	if opts.TitleBold {
+		titleStyle = titleStyle.Bold(true)
+	}
+
+	contentW := opts.Width - 2*opts.PaddingX
+
+	renderRow := func(rowBg color.Color, content string, contentIsRaw bool) string {
+		fillStyle := lipgloss.NewStyle().Background(rowBg)
+		blank := func(w int) string {
+			if w <= 0 {
+				return ""
+			}
+			return fillStyle.Render(strings.Repeat(" ", w))
+		}
+		var mid string
+		if contentIsRaw {
+			text := ansi.Truncate(content, contentW, "")
+			text += strings.Repeat(" ", maxInt(0, contentW-ansi.StringWidth(text)))
+			mid = RenderRowWithBackground(text, rowBg)
+		} else {
+			mid = content
+			w := ansi.StringWidth(content)
+			mid += fillStyle.Render(strings.Repeat(" ", maxInt(0, contentW-w)))
+		}
+		return blank(opts.PaddingX) + mid + blank(opts.PaddingX)
+	}
+
+	titleSeg := ""
+	if opts.Title != "" {
+		titleSeg = titleStyle.Render(opts.Title)
+	}
+	rightSeg := ""
+	if opts.RightTitle != "" {
+		rightSeg = lipgloss.NewStyle().Foreground(ColorSubtle).Background(headerBg).Render(opts.RightTitle)
+	}
+	titleW := ansi.StringWidth(titleSeg)
+	rightW := ansi.StringWidth(rightSeg)
+	gap := maxInt(0, contentW-titleW-rightW)
+	titleLine := titleSeg + lipgloss.NewStyle().Background(headerBg).Render(strings.Repeat(" ", gap)) + rightSeg
+
+	rows := make([]string, 0, opts.Height)
+	rows = append(rows, renderRow(headerBg, titleLine, false))
+	// 1-cell margin between header and content, always painted with the body
+	// background so the header reads as its own band.
+	rows = append(rows, renderRow(opts.Background, "", true))
+	for i := 0; i < opts.PaddingY; i++ {
+		rows = append(rows, renderRow(opts.Background, "", true))
+	}
+	bodyH := opts.Height - 2*opts.PaddingY - 2 // header row + margin row
+	lines := opts.Lines
+	for i := 0; i < bodyH; i++ {
+		line := ""
+		if i < len(lines) {
+			line = lines[i]
+		}
+		rows = append(rows, renderRow(opts.Background, line, true))
+	}
+	for i := 0; i < opts.PaddingY; i++ {
+		rows = append(rows, renderRow(opts.Background, "", true))
+	}
+	return strings.Join(rows, "\n")
+}
+
+// RenderSeamRow draws a full-width horizontal gap between two vertically
+// stacked frameless panels. The seam has its own background so it reads as a
+// visible (but low-contrast) separator rather than empty space.
+func RenderSeamRow(width int, seamColor color.Color) string {
+	if width <= 0 {
+		return ""
+	}
+	return lipgloss.NewStyle().Background(seamColor).Render(strings.Repeat(" ", width))
+}
+
+// RenderSeamColumn draws a full-height vertical gap between two
+// horizontally adjacent frameless panels.
+func RenderSeamColumn(height int, seamColor color.Color) string {
+	if height <= 0 {
+		return ""
+	}
+	row := lipgloss.NewStyle().Background(seamColor).Render(" ")
+	rows := make([]string, height)
+	for i := range rows {
+		rows[i] = row
+	}
+	return strings.Join(rows, "\n")
+}
+
 func maxInt(a, b int) int {
 	if a > b {
 		return a

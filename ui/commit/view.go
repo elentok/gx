@@ -36,19 +36,11 @@ func (m Model) View() tea.View {
 
 	bodyH, contentH := m.layoutHeights()
 	headerRows := max(1, bodyH-2)
-	body := ui.RenderPanelFrame(ui.PanelFrameOptions{
-		Width:       max(20, m.width),
-		Height:      bodyH,
-		Title:       m.headerTitle(),
-		RightTitle:  m.headerRightTitle(),
-		Lines:       m.visibleHeaderLines(headerRows),
-		BorderColor: m.headerPaneBorderColor(),
-		TitleColor:  m.headerPaneTitleColor(),
-		Background:  ui.ColorBase,
-	})
+	body := m.renderHeaderPane(headerRows, bodyH)
 	content := m.contentView(contentH)
 	footer := m.footerView()
-	out := lipgloss.JoinVertical(lipgloss.Left, body, content, footer)
+	seam := ui.RenderSeamRow(max(20, m.width), ui.SeamColor)
+	out := lipgloss.JoinVertical(lipgloss.Left, body, seam, content, footer)
 	if prefix := m.keys.Prefix(); len(prefix) > 0 {
 		hints := ui.ChordBindingsFromHints(m.keys.ChordHints())
 		if len(hints) > 0 {
@@ -167,6 +159,20 @@ func (m Model) headerTitle() string {
 	return "Commit"
 }
 
+func (m Model) renderHeaderPane(headerRows, bodyH int) string {
+	width := max(20, m.width)
+	title := m.headerTitle()
+	rightTitle := m.headerRightTitle()
+	lines := m.visibleHeaderLines(headerRows)
+	active := m.isContainerFocused() && m.focusHeader
+	titleColor := m.headerPaneTitleColor()
+	accent := color.Color(nil)
+	if active {
+		accent = titleColor
+	}
+	return ui.RenderPanel(ui.PanelOptionsFor(width, bodyH, title, rightTitle, lines, active, titleColor, accent, false))
+}
+
 func (m Model) headerPaneTitleColor() color.Color {
 	if m.isContainerFocused() && m.focusHeader {
 		return ui.ColorOrange
@@ -212,41 +218,35 @@ func (m Model) headerRightTitle() string {
 
 func (m Model) contentView(contentH int) string {
 	if len(m.fileTreeModel.Entries()) == 0 {
-		return ui.RenderPanelFrame(ui.PanelFrameOptions{
-			Width:       max(20, m.width),
-			Height:      contentH,
-			Title:       "Changes",
-			BorderColor: ui.ColorBorder,
-			TitleColor:  ui.ColorBlue,
-			Background:  ui.ColorBase,
-			Lines:       []string{ui.StyleMuted.Render("no changed files")},
-		})
+		width := max(20, m.width)
+		lines := []string{ui.StyleMuted.Render("no changed files")}
+		return ui.RenderPanel(ui.PanelOptionsFor(width, contentH, "Changes", "", lines, false, ui.ColorBlue, nil, false))
 	}
 
 	mainH := contentH
 	if m.width < 90 {
+		mainH--
 		filesH := max(5, mainH/3)
 		diffH := max(5, mainH-filesH)
 		files := m.renderFilesPane(m.width, filesH)
 		diff := m.renderDiffPane(m.width, diffH)
-		return lipgloss.JoinVertical(lipgloss.Left, files, diff)
+		return lipgloss.JoinVertical(lipgloss.Left, files, ui.RenderSeamRow(m.width, ui.SeamColor), diff)
 	}
+	width := m.width - 1
 	leftW := m.filesPaneWidth(mainH)
-	rightW := m.width - leftW
+	rightW := width - leftW
 	left := m.renderFilesPane(leftW, mainH)
 	right := m.renderDiffPane(rightW, mainH)
-	return lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, ui.RenderSeamColumn(mainH, ui.SeamColor), right)
 }
 
 func (m Model) layoutHeights() (bodyH, contentH int) {
 	available := max(2, m.height-1) // reserve one line for footer
+	available = max(2, available-1) // reserve one line for the header/content seam
 	maxBody := max(1, available/2)
 	naturalBody := max(1, len(m.headerLines())) + 2
 	bodyH = min(maxBody, naturalBody)
-	contentH = available - bodyH
-	if contentH < 1 {
-		contentH = 1
-	}
+	contentH = max(1, available-bodyH)
 	return bodyH, contentH
 }
 
@@ -299,16 +299,14 @@ func (m Model) renderFilesPane(width, height int) string {
 	if len(lines) == 0 {
 		lines = append(lines, ui.StyleMuted.Render("no changed files"))
 	}
-	return ui.RenderPanelFrame(ui.PanelFrameOptions{
-		Width:       width,
-		Height:      height,
-		Title:       "Files",
-		RightTitle:  m.filesPaneRightTitle(),
-		BorderColor: m.filesPaneBorderColor(),
-		TitleColor:  m.filesPaneTitleColor(),
-		Background:  ui.ColorBase,
-		Lines:       lines,
-	})
+	title, rightTitle := "Files", m.filesPaneRightTitle()
+	active := m.isContainerFocused() && !m.focusDiff && !m.focusHeader
+	titleColor := m.filesPaneTitleColor()
+	accent := color.Color(nil)
+	if active {
+		accent = titleColor
+	}
+	return ui.RenderPanel(ui.PanelOptionsFor(width, height, title, rightTitle, lines, active, titleColor, accent, false))
 }
 
 func (m Model) renderDiffPane(width, height int) string {
@@ -331,16 +329,14 @@ func (m Model) renderDiffPane(width, height int) string {
 			lines = []string{ui.StyleMuted.Render("no diff")}
 		}
 	}
-	return ui.RenderPanelFrame(ui.PanelFrameOptions{
-		Width:       width,
-		Height:      height,
-		Title:       "Diff",
-		RightTitle:  m.diffTitle(),
-		BorderColor: m.diffPaneBorderColor(),
-		TitleColor:  m.diffPaneTitleColor(),
-		Background:  ui.ColorBase,
-		Lines:       lines,
-	})
+	title, rightTitle := "Diff", m.diffTitle()
+	active := m.isContainerFocused() && m.focusDiff
+	titleColor := m.diffPaneTitleColor()
+	accent := color.Color(nil)
+	if active {
+		accent = titleColor
+	}
+	return ui.RenderPanel(ui.PanelOptionsFor(width, height, title, rightTitle, lines, active, titleColor, accent, false))
 }
 
 func (m Model) diffTitle() string {

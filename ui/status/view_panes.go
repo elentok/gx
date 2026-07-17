@@ -19,12 +19,14 @@ const (
 )
 
 func (m Model) splitWidth() (filetreeW, diffW int) {
+	seamW := 1
 	if m.useStackedLayout() {
 		return m.width, m.width
 	}
 
+	width := m.width - seamW
 	filetreeW = m.requiredFiletreePaneWidth(m.mainContentHeight())
-	filetreeMax := minInt(maxFiletreePaneWidth, int(float64(m.width)*0.45))
+	filetreeMax := minInt(maxFiletreePaneWidth, int(float64(width)*0.45))
 	if filetreeMax < minFiletreePaneWidth {
 		filetreeMax = minFiletreePaneWidth
 	}
@@ -34,16 +36,16 @@ func (m Model) splitWidth() (filetreeW, diffW int) {
 	if filetreeW > filetreeMax {
 		filetreeW = filetreeMax
 	}
-	if m.width-filetreeW < minDiffPaneWidth {
-		filetreeW = m.width - minDiffPaneWidth
+	if width-filetreeW < minDiffPaneWidth {
+		filetreeW = width - minDiffPaneWidth
 	}
 	if filetreeW < minFiletreePaneWidth {
 		filetreeW = minFiletreePaneWidth
 	}
-	diffW = m.width - filetreeW
+	diffW = width - filetreeW
 	if diffW < minDiffPaneWidth {
 		diffW = minDiffPaneWidth
-		filetreeW = m.width - diffW
+		filetreeW = width - diffW
 	}
 	return filetreeW, diffW
 }
@@ -52,6 +54,7 @@ func (m Model) splitHeight(total int) (filetreeH, diffH int) {
 	if !m.useStackedLayout() {
 		return total, total
 	}
+	total--
 	filetreeH = int(float64(total) * 0.30)
 	if filetreeH < 5 {
 		filetreeH = 5
@@ -149,13 +152,30 @@ func (m Model) requiredFiletreePaneWidth(height int) int {
 	return required + 2
 }
 
+// renderFiletreePane moves the branch/worktree info out of the title row
+// (where it doesn't fit alongside "Filetree" + search counter) and onto two
+// dim lines at the bottom of the panel instead.
 func (m Model) renderFiletreePane(width, height int) string {
-	lines := m.visibleStatusLines(width, height)
-	rightTitle := ui.JoinStatus(
-		ui.WorktreeLabel(m.worktreeRoot, m.settings.UseNerdFontIcons),
-		m.searchCounterForFiletreePane(),
-	)
-	return m.renderFiletreePanelWithBorderTitle(width, height, m.filetreePaneTitle(), rightTitle, lines, m.focus == focusFiletree)
+	info := m.filetreeInfoLines()
+	contentHeight := height - len(info)
+	if contentHeight < minFiletreePaneHeight {
+		contentHeight = height
+		info = nil
+	}
+	lines := append(m.visibleStatusLines(width, contentHeight), info...)
+	return m.renderFiletreePanelWithBorderTitle(width, height, "Filetree", m.searchCounterForFiletreePane(), lines, m.focus == focusFiletree)
+}
+
+func (m Model) filetreeInfoLines() []string {
+	var lines []string
+	if branch := strings.TrimSpace(m.statusData.branchName); branch != "" {
+		icon := ui.Icons(m.settings.UseNerdFontIcons).Branch
+		lines = append(lines, ui.StyleMuted.Render(icon+" "+branch+" ("+m.branchSyncToken()+")"))
+	}
+	if wt := ui.WorktreeLabel(m.worktreeRoot, m.settings.UseNerdFontIcons); wt != "" {
+		lines = append(lines, ui.StyleMuted.Render(wt))
+	}
+	return lines
 }
 
 func (m Model) branchSummaryTitleSuffix() string {

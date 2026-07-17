@@ -197,7 +197,7 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case bindingTrack:
-		if len(m.worktrees) == 0 || m.spinnerActive || m.sidebarUpstream != "" {
+		if len(m.worktrees) == 0 || m.spinnerActive || m.previewUpstream != "" {
 			return m, nil
 		}
 		wt := m.cursorWorktree()
@@ -236,7 +236,7 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.table.SetCursor(0)
-		return m, cmdLoadSidebarData(m.repo, m.worktrees[0])
+		return m, cmdLoadPreviewData(m.repo, m.worktrees[0])
 	case bindingGoOutput:
 		if m.lastJobLog == "" {
 			return m, notify.Info(ui.MessageNoOutput())

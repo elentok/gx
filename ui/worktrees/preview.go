@@ -10,7 +10,7 @@ import (
 	humanize "github.com/dustin/go-humanize"
 )
 
-func renderSidebarContent(wt *git.Worktree, upstream string, headCommit git.Commit, aheadCommits, behindCommits []git.Commit, rebasedOnMain *bool, isMainBranch bool, changes []git.Change, spinnerView string, useNerdFontIcons bool) string {
+func renderPreviewContent(wt *git.Worktree, upstream string, headCommit git.Commit, aheadCommits, behindCommits []git.Commit, rebasedOnMain *bool, isMainBranch bool, changes []git.Change, spinnerView string, useNerdFontIcons bool) string {
 	if wt == nil {
 		return ui.StyleDim.Render("  no worktree selected")
 	}

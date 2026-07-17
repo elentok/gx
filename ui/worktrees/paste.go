@@ -39,13 +39,13 @@ func (m Model) handlePasteModeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.table, tableCmd = m.table.Update(msg)
 		if m.table.Cursor() != prevCursor && len(m.worktrees) > 0 {
 			m.table.SetRows(m.buildRows())
-			m.sidebarLoading = true
-			m.sidebarUpstream = ""
-			m.sidebarAheadCommits = nil
-			m.sidebarBehindCommits = nil
-			m.sidebarChanges = nil
-			m.viewport.SetContent(m.sidebarContent())
-			return m, tea.Batch(tableCmd, cmdLoadSidebarData(m.repo, m.worktrees[m.table.Cursor()]))
+			m.previewLoading = true
+			m.previewUpstream = ""
+			m.previewAheadCommits = nil
+			m.previewBehindCommits = nil
+			m.previewChanges = nil
+			m.viewport.SetContent(m.previewContent())
+			return m, tea.Batch(tableCmd, cmdLoadPreviewData(m.repo, m.worktrees[m.table.Cursor()]))
 		}
 		return m, tableCmd
 	}

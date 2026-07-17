@@ -19,7 +19,7 @@ type dirtyStatusMsg struct {
 	dirty        dirtyState
 }
 
-type sidebarDataMsg struct {
+type previewDataMsg struct {
 	worktreePath  string
 	upstream      string // empty if no remote tracking branch found
 	headCommit    git.Commit

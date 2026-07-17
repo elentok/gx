@@ -2,6 +2,7 @@ package worktrees
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 
 	"github.com/elentok/gx/ui"
@@ -128,39 +129,38 @@ func (m Model) textInputOverlayView() string {
 	})
 }
 
-// normalView renders the worktrees table, sidebar, and status bar.
+// normalView renders the worktrees table, preview panel, and status bar.
 func (m Model) normalView() string {
 	h := m.contentHeight()
-	tableW, sidebarW := m.splitWidth()
-	tableH, sidebarH := m.splitHeight(h)
+	tableW, previewW := m.splitWidth()
+	tableH, previewH := m.splitHeight(h)
 
-	tableView := ui.RenderPanelFrame(ui.PanelFrameOptions{
-		Width:       tableW,
-		Height:      tableH,
-		Title:       "Worktrees",
-		Lines:       strings.Split(tableView(m.table), "\n"),
-		BorderColor: ui.ColorBorder,
-		TitleColor:  ui.ColorBlue,
-		Background:  ui.ColorBase,
-	})
-
-	sidebarView := ui.RenderPanelFrame(ui.PanelFrameOptions{
-		Width:       sidebarW,
-		Height:      sidebarH,
-		Title:       "Details",
-		Lines:       strings.Split(m.viewport.View(), "\n"),
-		BorderColor: ui.ColorBorder,
-		TitleColor:  ui.ColorBlue,
-		Background:  ui.ColorBase,
-	})
+	// The table is always the focused, selection-driving pane (there's no
+	// standalone-table state and no focus toggle into the details viewport),
+	// so it always renders active and always in sidebar mode.
+	tableView := m.renderWorktreesPanel(tableW, tableH, "Worktrees", strings.Split(tableView(m.table), "\n"), true, true)
+	previewView := m.renderWorktreesPanel(previewW, previewH, "Details", strings.Split(m.viewport.View(), "\n"), false, false)
 
 	var content string
 	if m.useStackedLayout() {
-		content = lipgloss.JoinVertical(lipgloss.Left, tableView, sidebarView)
+		seam := ui.RenderSeamRow(tableW, ui.SeamColor)
+		content = lipgloss.JoinVertical(lipgloss.Left, tableView, seam, previewView)
 	} else {
-		content = lipgloss.JoinHorizontal(lipgloss.Top, tableView, sidebarView)
+		seam := ui.RenderSeamColumn(tableH, ui.SeamColor)
+		content = lipgloss.JoinHorizontal(lipgloss.Top, tableView, seam, previewView)
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, content, m.statusBarView())
+}
+
+// renderWorktreesPanel renders one panel (table or details) of the normal
+// view, following the frame-free pattern in ui/log/list_panel.go and
+// ui/status/view_chrome.go.
+func (m Model) renderWorktreesPanel(width, height int, title string, lines []string, active, sidebar bool) string {
+	accent := color.Color(nil)
+	if active {
+		accent = ui.ColorBlue
+	}
+	return ui.RenderPanel(ui.PanelOptionsFor(width, height, title, "", lines, active, ui.ColorBlue, accent, sidebar))
 }
 
 // statusBarView renders the 1-line bar at the bottom of the screen.

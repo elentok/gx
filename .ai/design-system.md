@@ -41,7 +41,10 @@ Screen packages should compose these:
 
 2. Reuse shared modal/panel surfaces
 
-- Use `ui.RenderModalFrame(...)` and `ui.RenderPanelFrame(...)`
+- Use `ui.RenderPanel(...)` (`ui.PanelOptionsFor(...)`) for persistent layout panels — frame-free,
+  no border glyphs. See ADR 0013.
+- Use `ui.RenderModalFrame(...)` and `ui.RenderPanelFrame(...)` for transient overlays
+  (modals/menus/confirms) — these are the only surfaces that still get a border.
 - Use `ui.OverlayCenter(...)` for centered modal overlays
 - Use `ui.OverlayBottomCenter(bg, fg, screenW, y)` + `ui.RenderModalFrame(TitleInBorder: true)` for
   text-input overlays (horizontally centered, y from `settings.InputModalBottom.ResolveY`)

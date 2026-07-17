@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.20.0 - 2026-07-18
+
+- Persistent layout panels (status, log, commit, stashlist, worktrees) now render without borders —
+  background/header shading replaces frame glyphs, with borders kept only for modals/popups.
+
 ## v0.19.12 - 2026-07-15
 
 - Align log and commit views commit rendering

@@ -14,23 +14,23 @@ import (
 func TestSplitHeight_StackedLayout(t *testing.T) {
 	m := Model{width: 80, height: 30} // width <= 100 → stacked
 	m.worktrees = make([]git.Worktree, 5)
-	tableH, sidebarH := m.splitHeight(30)
-	if tableH+sidebarH != 30 {
-		t.Errorf("tableH(%d) + sidebarH(%d) != total(30)", tableH, sidebarH)
+	tableH, previewH := m.splitHeight(30)
+	if tableH+previewH != 29 { // 30 minus the 1-cell seam between table and preview
+		t.Errorf("tableH(%d) + previewH(%d) != total(29)", tableH, previewH)
 	}
 	if tableH < 4 {
 		t.Errorf("tableH should be at least 4, got %d", tableH)
 	}
-	if sidebarH < 1 {
-		t.Errorf("sidebarH should be at least 1, got %d", sidebarH)
+	if previewH < 1 {
+		t.Errorf("previewH should be at least 1, got %d", previewH)
 	}
 }
 
 func TestSplitHeight_NonStackedLayout(t *testing.T) {
 	m := Model{width: 200, height: 40} // width > 100 → side-by-side
-	tableH, sidebarH := m.splitHeight(40)
-	if tableH != 40 || sidebarH != 40 {
-		t.Errorf("expected both to be 40, got tableH=%d sidebarH=%d", tableH, sidebarH)
+	tableH, previewH := m.splitHeight(40)
+	if tableH != 40 || previewH != 40 {
+		t.Errorf("expected both to be 40, got tableH=%d previewH=%d", tableH, previewH)
 	}
 }
 
@@ -49,7 +49,7 @@ func TestContentHeight_Normal(t *testing.T) {
 }
 
 // Regression: table.SetRows with empty rows clamps cursor to -1 (len(rows)-1).
-// If worktrees is non-empty when sidebarContent is subsequently called,
+// If worktrees is non-empty when previewContent is subsequently called,
 // m.worktrees[m.table.Cursor()] panics with index out of range [-1].
 func TestWindowSizeMsgWithNegativeTableCursorDoesNotPanic(t *testing.T) {
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")

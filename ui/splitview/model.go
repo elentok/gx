@@ -174,10 +174,17 @@ func (m Model) DetailSize() (w, h int) {
 	default: // visModeSplit
 		lw, lh := m.splitListDims()
 		if m.effectiveOrientation() == Vertical {
-			return m.width - lw, m.height
+			return m.width - lw - m.seamWidth(), m.height
 		}
-		return m.width, m.height - lh
+		return m.width, m.height - lh - m.seamWidth()
 	}
+}
+
+// seamWidth is the 1-cell gap reserved between the list and detail panels;
+// the panels themselves render edge-to-edge, so the split container - not
+// either panel - owns this gap.
+func (m Model) seamWidth() int {
+	return 1
 }
 
 // DetailOrigin returns the absolute (column, row) of the detail panel's
@@ -202,9 +209,9 @@ func (m Model) DetailOrigin() (col, row int, visible bool) {
 	default: // visModeSplit
 		lw, lh := m.splitListDims()
 		if m.effectiveOrientation() == Vertical {
-			return lw, 0, true
+			return lw + m.seamWidth(), 0, true
 		}
-		return 0, lh, true
+		return 0, lh + m.seamWidth(), true
 	}
 }
 

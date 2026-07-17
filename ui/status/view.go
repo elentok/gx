@@ -31,9 +31,11 @@ func (m Model) View() tea.View {
 		filetreePanel := m.renderLeftPane(filetreeW, filetreeH)
 		diffPanel := m.renderDiffPane(diffW, diffH)
 		if m.useStackedLayout() {
-			body = lipgloss.JoinVertical(lipgloss.Left, filetreePanel, diffPanel)
+			seam := ui.RenderSeamRow(m.width, ui.SeamColor)
+			body = lipgloss.JoinVertical(lipgloss.Left, filetreePanel, seam, diffPanel)
 		} else {
-			body = lipgloss.JoinHorizontal(lipgloss.Top, filetreePanel, diffPanel)
+			seam := ui.RenderSeamColumn(filetreeH, ui.SeamColor)
+			body = lipgloss.JoinHorizontal(lipgloss.Top, filetreePanel, seam, diffPanel)
 		}
 	}
 

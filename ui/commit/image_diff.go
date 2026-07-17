@@ -160,7 +160,12 @@ func (m Model) diffPaneBodyRect() (col, row, w, h int, ok bool) {
 	if paneW <= 2 || paneH <= 2 {
 		return 0, 0, 0, 0, false
 	}
-	// The pane is rendered with a 1-cell border on every side; the body starts
-	// just inside it (see renderDiffPane / RenderPanelFrame).
+	// The pane is rendered with 1-cell horizontal padding; the body starts
+	// just inside it (see renderDiffPane / RenderPanel).
+	//
+	// TODO: paneY+1 assumes a 1-row offset into the pane, matching the old
+	// bordered frame. The frame-free header renders as a header row plus a
+	// 1-cell margin row before the body, so the real offset may need to be
+	// +2 — unverified against a real kitty-graphics terminal (ADR 0013).
 	return paneX + 1, paneY + 1, paneW - 2, paneH - 2, true
 }

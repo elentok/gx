@@ -4,3 +4,4 @@ docs/TODO.md
 coverage.out
 web/demo/.work/
 .playwright-cli/
+.scratch/

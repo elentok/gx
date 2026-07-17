@@ -1,32 +1,43 @@
 package worktrees
 
-import "github.com/elentok/gx/git"
+import (
+	"github.com/elentok/gx/git"
+)
 
-func (m Model) splitWidth() (tableW, sidebarW int) {
+// seamWidth is the 1-cell gap reserved between the table and details panels;
+// the panels themselves render edge-to-edge, so the layout - not either
+// panel - owns this gap.
+func (m Model) seamWidth() int {
+	return 1
+}
+
+func (m Model) splitWidth() (tableW, previewW int) {
 	if m.useStackedLayout() {
 		return m.width, m.width
 	}
-	tableW = int(float64(m.width) * 0.55)
-	sidebarW = m.width - tableW
+	width := m.width - m.seamWidth()
+	tableW = int(float64(width) * 0.55)
+	previewW = width - tableW
 	return
 }
 
-func (m Model) splitHeight(total int) (tableH, sidebarH int) {
+func (m Model) splitHeight(total int) (tableH, previewH int) {
 	if !m.useStackedLayout() {
 		return total, total
 	}
+	total -= m.seamWidth()
 	// Size the table to exactly fit its rows: N rows + 2 (header+border) + 2 (box borders).
-	const minSidebarH = 6
+	const minPreviewH = 6
 	tableH = len(m.worktrees) + 4
-	if tableH > total-minSidebarH {
-		tableH = total - minSidebarH
+	if tableH > total-minPreviewH {
+		tableH = total - minPreviewH
 	}
 	if tableH < 4 {
 		tableH = 4
 	}
-	sidebarH = total - tableH
-	if sidebarH < 1 {
-		sidebarH = 1
+	previewH = total - tableH
+	if previewH < 1 {
+		previewH = 1
 	}
 	return
 }
@@ -48,9 +59,9 @@ func (m Model) contentHeight() int {
 }
 
 func (m Model) resized() Model {
-	tableW, sidebarW := m.splitWidth()
+	tableW, previewW := m.splitWidth()
 	h := m.contentHeight()
-	tableH, sidebarH := m.splitHeight(h)
+	tableH, previewH := m.splitHeight(h)
 
 	tableInnerW := tableW - 2
 	tableInnerH := tableH - 2
@@ -62,8 +73,8 @@ func (m Model) resized() Model {
 	}
 	resizeTable(&m.table, tableInnerW, tableInnerH)
 
-	vpW := sidebarW - 2
-	vpH := sidebarH - 2
+	vpW := previewW - 2
+	vpH := previewH - 2
 	if vpW < 1 {
 		vpW = 1
 	}
@@ -72,12 +83,12 @@ func (m Model) resized() Model {
 	}
 	m.viewport.SetWidth(vpW)
 	m.viewport.SetHeight(vpH)
-	m.viewport.SetContent(m.sidebarContent())
+	m.viewport.SetContent(m.previewContent())
 
 	return m
 }
 
-func (m Model) sidebarContent() string {
+func (m Model) previewContent() string {
 	var wt *git.Worktree
 	if cursor := m.table.Cursor(); cursor >= 0 && cursor < len(m.worktrees) {
 		w := m.worktrees[cursor]
@@ -90,18 +101,18 @@ func (m Model) sidebarContent() string {
 		isMainBranch = wt.Branch == m.repo.MainBranch
 	}
 	spinnerView := ""
-	if m.sidebarLoading {
+	if m.previewLoading {
 		spinnerView = m.spinner.View()
 	}
-	return renderSidebarContent(
+	return renderPreviewContent(
 		wt,
-		m.sidebarUpstream,
-		m.sidebarHeadCommit,
-		m.sidebarAheadCommits,
-		m.sidebarBehindCommits,
+		m.previewUpstream,
+		m.previewHeadCommit,
+		m.previewAheadCommits,
+		m.previewBehindCommits,
 		rebasedOnMain,
 		isMainBranch,
-		m.sidebarChanges,
+		m.previewChanges,
 		spinnerView,
 		m.settings.UseNerdFontIcons,
 	)

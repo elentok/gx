@@ -21,6 +21,7 @@ type listPanel struct {
 	loaded       bool
 	err          error
 	inactive     bool
+	sidebarMode  bool
 }
 
 func newListPanel(worktreeRoot string) listPanel {
@@ -31,6 +32,14 @@ func newListPanel(worktreeRoot string) listPanel {
 // containing split/list panel owns keyboard focus.
 func (m listPanel) WithContainerFocus(focused bool) listPanel {
 	m.inactive = !focused
+	return m
+}
+
+// WithSidebarMode returns a copy that renders with the sidebar-mode
+// background (see CONTEXT.md) when the stash list is shown alongside the
+// stash detail panel, as opposed to standalone.
+func (m listPanel) WithSidebarMode(sidebar bool) listPanel {
+	m.sidebarMode = sidebar
 	return m
 }
 

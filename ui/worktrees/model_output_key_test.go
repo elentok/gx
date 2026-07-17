@@ -43,7 +43,7 @@ func TestGGJumpsToTop(t *testing.T) {
 	// Second g jumps to top
 	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	if cmd == nil {
-		t.Fatalf("gg should load sidebar data after jumping to top")
+		t.Fatalf("gg should load preview data after jumping to top")
 	}
 	m = updated.(Model)
 	if m.table.Cursor() != 0 {

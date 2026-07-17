@@ -216,8 +216,8 @@ func TestSplitVerticalSizes(t *testing.T) {
 	if lh != 50 {
 		t.Fatalf("list height: got %d, want 50", lh)
 	}
-	if dw != 200-expectedListW {
-		t.Fatalf("detail width: got %d, want %d", dw, 200-expectedListW)
+	if dw != 200-expectedListW-1 {
+		t.Fatalf("detail width: got %d, want %d", dw, 200-expectedListW-1)
 	}
 	if dh != 50 {
 		t.Fatalf("detail height: got %d, want 50", dh)
@@ -241,8 +241,8 @@ func TestSplitHorizontalSizes(t *testing.T) {
 	if dw != 80 {
 		t.Fatalf("detail width: got %d, want 80", dw)
 	}
-	if dh != 40-expectedListH {
-		t.Fatalf("detail height: got %d, want %d", dh, 40-expectedListH)
+	if dh != 40-expectedListH-1 {
+		t.Fatalf("detail height: got %d, want %d", dh, 40-expectedListH-1)
 	}
 }
 
@@ -295,7 +295,7 @@ func TestDetailOriginVerticalSplit(t *testing.T) {
 	if !visible {
 		t.Fatalf("expected detail visible in split")
 	}
-	expectedCol := int(float64(200) * 0.40) // list width = 80
+	expectedCol := int(float64(200)*0.40) + 1 // list width = 80 + 1-cell seam
 	if col != expectedCol || row != 0 {
 		t.Fatalf("origin: got (%d,%d), want (%d,0)", col, row, expectedCol)
 	}
@@ -309,7 +309,7 @@ func TestDetailOriginHorizontalSplit(t *testing.T) {
 	if !visible {
 		t.Fatalf("expected detail visible in split")
 	}
-	expectedRow := int(float64(40) * 0.30) // list height = 12
+	expectedRow := int(float64(40)*0.30) + 1 // list height = 12 + 1-cell seam
 	if col != 0 || row != expectedRow {
 		t.Fatalf("origin: got (%d,%d), want (0,%d)", col, row, expectedRow)
 	}

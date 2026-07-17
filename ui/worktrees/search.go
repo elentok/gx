@@ -91,7 +91,7 @@ func (m Model) handleSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 }
 
 // jumpToSearchMatch moves the table cursor to the given search match and
-// returns the sidebar-reload command.
+// returns the preview-reload command.
 func (m Model) jumpToSearchMatch(match uisearch.Match) (Model, tea.Cmd) {
 	idx := match.DataIndex
 	if idx < 0 || idx >= len(m.worktrees) {
@@ -99,5 +99,5 @@ func (m Model) jumpToSearchMatch(match uisearch.Match) (Model, tea.Cmd) {
 	}
 	m.table.SetCursor(idx)
 	m.table.SetRows(m.buildRows())
-	return m, cmdLoadSidebarData(m.repo, m.worktrees[idx])
+	return m, cmdLoadPreviewData(m.repo, m.worktrees[idx])
 }
