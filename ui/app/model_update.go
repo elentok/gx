@@ -2,6 +2,7 @@ package app
 
 import (
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 )
@@ -57,8 +58,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	if key, ok := msg.(tea.KeyPressMsg); ok {
 		type inputFocuser interface{ InputFocused() bool }
+		type keyManagerProvider interface{ KeyManager() keys.Manager }
 		active := m.activePage().model
-		if f, ok := active.(inputFocuser); !ok || !f.InputFocused() {
+		var activeHasPendingChord bool
+		if kmp, ok := active.(keyManagerProvider); ok {
+			activeHasPendingChord = len(kmp.KeyManager().Prefix()) > 0
+		}
+		if f, ok := active.(inputFocuser); (!ok || !f.InputFocused()) && !activeHasPendingChord {
 			if next, cmd, handled := m.handleShellChordKey(key); handled {
 				return next, tea.Batch(notifyCmd, cmd)
 			}
