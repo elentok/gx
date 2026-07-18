@@ -344,8 +344,8 @@ func TestRenderLines_EmptyUsesEmptyLine(t *testing.T) {
 	if len(lines) != 2 {
 		t.Fatalf("expected body height 2, got %d", len(lines))
 	}
-	if got := ansi.Strip(lines[0]); got != "(empty)" {
-		t.Fatalf("lines[0] = %q, want %q", got, "(empty)")
+	if got := ansi.Strip(lines[0]); got != "(empty)  " {
+		t.Fatalf("lines[0] = %q, want %q", got, "(empty)  ")
 	}
 }
 
@@ -365,8 +365,8 @@ func TestRenderLines_SelectedRowActiveHighlight(t *testing.T) {
 	if len(lines) == 0 || lines[0] == ansi.Strip(lines[0]) {
 		t.Fatal("expected ANSI styling on selected active row")
 	}
-	if got := ansi.Strip(lines[0]); got != "▌selected.go" {
-		t.Fatalf("stripped line = %q, want %q", got, "▌selected.go")
+	if got := ansi.Strip(lines[0]); got != "▌selected.go  " {
+		t.Fatalf("stripped line = %q, want %q", got, "▌selected.go  ")
 	}
 }
 
@@ -389,8 +389,8 @@ func TestRenderLines_SearchHighlightUsesVisibleLabelText(t *testing.T) {
 
 	line := m.RenderLines(3, RenderOpts[int]{AccentColor: color.White})[0]
 	got := ansi.Strip(line)
-	if got != "▌model.go" {
-		t.Fatalf("stripped line = %q, want %q", got, "▌model.go")
+	if got != "▌model.go  " {
+		t.Fatalf("stripped line = %q, want %q", got, "▌model.go  ")
 	}
 	if line == got {
 		t.Fatal("expected ANSI styling for highlighted match")

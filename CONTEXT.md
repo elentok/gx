@@ -55,18 +55,18 @@ selection.
 Two distinct ways to locate things in a view. They are different interaction concepts, owned by
 different components, and must not be conflated.
 
-**Search** — *highlight-and-jump* over a content stream that stays fully visible. The user types a
+**Search** — _highlight-and-jump_ over a content stream that stays fully visible. The user types a
 query; every match is highlighted in place and `n`/`N` walk the viewport from one match to the next.
 Nothing is hidden. Suited to long single-column streams (diffs, file trees) where staying oriented
 matters. Owned by `ui/search`, which carries match positions (`ViewportRow`/`DataIndex`) and a match
 cursor; the host computes what counts as a match.
 
-**Filter** — *narrow-the-list*. The user types a query and non-matching items disappear; only matches
-remain and the layout re-flows around them. There is no match cursor and no jump — the result *is*
+**Filter** — _narrow-the-list_. The user types a query and non-matching items disappear; only matches
+remain and the layout re-flows around them. There is no match cursor and no jump — the result _is_
 the narrowing. Suited to short reference lists (keybindings help, and later the file tree / log)
 where the goal is "show me only X." Owned by `ui/filter`, which carries only the query, mode, and
 input box and emits `FilterChangedMsg`; the host owns the matching predicate (e.g. help matches a
-binding's key *and* title). Deliberately a separate component from **Search**, not an extension of
+binding's key _and_ title). Deliberately a separate component from **Search**, not an extension of
 it.
 
 ## Selection and Active Item
@@ -152,10 +152,11 @@ threshold as status `useStackedLayout`) and toggled manually via the `to` chord
 (`toggle-layout-orientation`).
 
 **Panel visibility state** — the three states a split view can be in:
-- *Collapsed* — only the list panel is visible. Default for the log tab.
-- *Split* — both panels are visible. Default for the stash tab. Detail auto-updates as list
+
+- _Collapsed_ — only the list panel is visible. Default for the log tab.
+- _Split_ — both panels are visible. Default for the stash tab. Detail auto-updates as list
   selection changes (j/k navigation).
-- *Fullscreen* — one panel fills the entire screen, the other is hidden. Toggled with `f` on
+- _Fullscreen_ — one panel fills the entire screen, the other is hidden. Toggled with `f` on
   the currently focused panel.
 
 Focus and collapse rules: Enter on a list item in collapsed state → expands to split, focuses
@@ -194,15 +195,15 @@ A pull or push runs as a sequence of **phases**, some of which are interactive p
 which execute a git command (fetch, pull, push, rebase, stash). The user can leave the flow early in
 two distinct ways, which must not be conflated:
 
-**Decline** — the user says No / Esc at a *prompt* phase (confirm push, stash-before-pull, diverged
+**Decline** — the user says No / Esc at a _prompt_ phase (confirm push, stash-before-pull, diverged
 menu, force-push confirm). Nothing was executing, so the repository is untouched. Surfaced as
 `Result{Aborted: true}`; suppresses the success notification.
 
-**Interrupt** — the user kills a git command that is *mid-execution*. Implemented on top of
+**Interrupt** — the user kills a git command that is _mid-execution_. Implemented on top of
 `CommandRunner.Cancel()`, which kills the running process. Reuses `Result{Aborted: true}` (so the
 success notification is suppressed, same as a decline) but additionally emits a
 `notify.Warning("push aborted")`, so the two cases are distinguished only by that warning, not by a
-separate `Result` field. Unlike a decline, the working tree *can* be left in a partial state, so
+separate `Result` field. Unlike a decline, the working tree _can_ be left in a partial state, so
 interrupt is only offered on phases where killing is clean — currently the push flow's network
 phases (fetch, push, force-push, tag-push). The local `rebase` phase is deliberately
 non-interruptible because killing it mid-rebase leaves the repo in a `rebase-in-progress` state.
@@ -215,7 +216,7 @@ abort becomes a no-op.
 gx runs external programs (`$EDITOR`, the comment editor, `lazygit`, `git commit`) in one of two
 modes, which have opposite feedback needs and must not be conflated:
 
-**Takeover launch** — gx suspends and hands the *entire* terminal to the program; the TUI is not
+**Takeover launch** — gx suspends and hands the _entire_ terminal to the program; the TUI is not
 visible while it runs and resumes when the program exits. Because the takeover itself is the
 feedback, no "opening…"/"closed" toast is shown. On return the screen simply refreshes (the diff /
 filetree updates under the user). The exception is a **mutation** run this way — `git commit` —
@@ -223,7 +224,7 @@ which reports its outcome like every other mutation: `notify.Success("committed"
 repo-mutated signal. Errors always surface loudly.
 
 **Split launch** — the program opens in a tmux/kitty split and the TUI keeps running beside it. Here
-a toast (`"opened <app> split: …"`) *is* shown, because it is the only signal that the program
+a toast (`"opened <app> split: …"`) _is_ shown, because it is the only signal that the program
 launched and where it went.
 
 ## Tab Caching and Reload
@@ -248,11 +249,11 @@ the currently active page as fresh at the new epoch (the active page is the muta
 to show its own result).
 
 **Auto-reload** — a system-initiated, state-preserving reload the shell triggers on tab activation
-*only when the page is stale* (`loadedEpoch < repo epoch`). Exposed by each cacheable page as
+_only when the page is stale_ (`loadedEpoch < repo epoch`). Exposed by each cacheable page as
 `AutoReload() tea.Cmd` (satisfying the `pageAutoReloadable` interface). Because the user did not ask
 for it, it preserves maximum view state (e.g. status uses `refreshPreserveScroll`). This replaces
 the previous unconditional reload-on-every-activation.
 
 **Manual reload** — a user-initiated reload via the `R` key (and status `m r`). Louder than
 auto-reload: it may reset scroll and flashes a "refreshed" notification. It is also the escape hatch
-for changes made *outside* gx (external terminal git commands), which do not bump the repo epoch.
+for changes made _outside_ gx (external terminal git commands), which do not bump the repo epoch.

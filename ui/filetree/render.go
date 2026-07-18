@@ -44,8 +44,41 @@ func (m Model[T]) RenderLines(height int, opts RenderOpts[T]) []string {
 	for len(lines) < innerH {
 		lines = append(lines, "")
 	}
+	lines = m.appendScrollbar(lines, innerH, opts)
 	lines = append(lines, searchLines...)
 	return lines
+}
+
+// appendScrollbar right-aligns a 2-column gutter (" " + glyph) onto each of
+// the height entry rows, padding shorter rows out first so every glyph lands
+// in the same column; the gutter renders blank when the entries fit without
+// scrolling. Rows are padded to opts.Width-2 when a width is set, or to the
+// widest row otherwise (e.g. when called from RequiredWidth).
+func (m Model[T]) appendScrollbar(lines []string, height int, opts RenderOpts[T]) []string {
+	bar := ui.RenderScrollbar(height, len(m.entries), height, m.ScrollOffset())
+	var barLines []string
+	if bar != "" {
+		barLines = strings.Split(bar, "\n")
+	}
+	padW := opts.Width - 2
+	if padW <= 0 {
+		padW = 0
+		for _, line := range lines {
+			if w := ansi.StringWidth(line); w > padW {
+				padW = w
+			}
+		}
+	}
+	out := make([]string, len(lines))
+	for i, line := range lines {
+		b := " "
+		if i < len(barLines) {
+			b = barLines[i]
+		}
+		pad := max(0, padW-ansi.StringWidth(line))
+		out[i] = line + strings.Repeat(" ", pad) + " " + b
+	}
+	return out
 }
 
 func (m Model[T]) RequiredWidth(height int, opts RenderOpts[T]) int {

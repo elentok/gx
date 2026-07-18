@@ -6,14 +6,18 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-// Scrollbar glyphs: a full block for the thumb over a thin track.
+// Scrollbar glyphs: both thumb and track are thin vertical lines - a heavy
+// stroke for the thumb over a light stroke for the track - so the track
+// stays visible along the full gutter height. That visible track is what
+// lets the thumb's position read as "where in the whole list am I", not just
+// "how much more is there".
 const (
-	scrollbarThumbGlyph = "█"
+	scrollbarThumbGlyph = "┃"
 	scrollbarTrackGlyph = "│"
 )
 
 var (
-	styleScrollbarThumb = lipgloss.NewStyle().Foreground(ColorOverlay)
+	styleScrollbarThumb = lipgloss.NewStyle().Foreground(ColorSubtle)
 	styleScrollbarTrack = lipgloss.NewStyle().Foreground(ColorSurface1)
 )
 
