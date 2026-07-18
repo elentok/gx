@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.20.2 - 2026-07-18
+
+- Filetree: added a scrollbar indicator when content exceeds the visible area.
+- Panel: removed the spacing between the header and contents for a tighter layout.
+- Status: moved the branch summary into the panel title and the worktree line to the top of the filetree.
+- Fixed filetree scroll-clamp/render height mismatches that caused the selected row to scroll out of the visible area without a highlight.
+
+## v0.20.1 - 2026-07-17
+
+- Fixed key handling so a page's pending chord takes priority over the shell chord.
+
 ## v0.20.0 - 2026-07-18
 
 - Persistent layout panels (status, log, commit, stashlist, worktrees) now render without borders —
