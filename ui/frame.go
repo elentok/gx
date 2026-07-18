@@ -247,13 +247,10 @@ func RenderPanel(opts PanelOptions) string {
 
 	rows := make([]string, 0, opts.Height)
 	rows = append(rows, renderRow(headerBg, titleLine, false))
-	// 1-cell margin between header and content, always painted with the body
-	// background so the header reads as its own band.
-	rows = append(rows, renderRow(opts.Background, "", true))
 	for i := 0; i < opts.PaddingY; i++ {
 		rows = append(rows, renderRow(opts.Background, "", true))
 	}
-	bodyH := opts.Height - 2*opts.PaddingY - 2 // header row + margin row
+	bodyH := opts.Height - 2*opts.PaddingY - 1 // header row
 	lines := opts.Lines
 	for i := 0; i < bodyH; i++ {
 		line := ""
