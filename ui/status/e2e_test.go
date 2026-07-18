@@ -27,7 +27,7 @@ const (
 )
 
 func newTestStatusModel(repoDir string) status.Model {
-	return status.NewModel(repoDir, status.DefaultSettings(), "", keys.Manager{})
+	return status.NewModel(repoDir, false, status.DefaultSettings(), "", keys.Manager{})
 }
 
 func startStageTUI(t *testing.T, repoDir string) *teatest.TestModel {
@@ -580,7 +580,7 @@ func TestStageE2E_PushActionWithConfirm(t *testing.T) {
 	mustRunGit(t, repoDir, "commit", "-m", "push commit")
 
 	tm := startStageTUI(t, repoDir)
-	waitForStageText(t, tm, "Filetree", stageLoadWait)
+	waitForStageText(t, tm, "clean working tree", stageLoadWait)
 
 	tm.Send(keyRune('P'))
 	waitForStageStrippedText(t, tm, "Push branch feature/push to origin?", stageActionWait)
@@ -609,7 +609,7 @@ func TestStageE2E_PullActionUpdatesWorktree(t *testing.T) {
 	mustRunGit(t, other, "push", "origin", "main")
 
 	tm := startStageTUI(t, repoDir)
-	waitForStageText(t, tm, "Filetree", stageLoadWait)
+	waitForStageText(t, tm, "clean working tree", stageLoadWait)
 	tm.Send(keyRune('p'))
 
 	waitForGitState(t, tm, stageLoadWait, func() bool {
@@ -645,7 +645,7 @@ func TestStageE2E_RebaseActionWithConfirm(t *testing.T) {
 	mustRunGit(t, other, "push", "origin", "master")
 
 	tm := startStageTUI(t, repoDir)
-	waitForStageText(t, tm, "Filetree", stageLoadWait)
+	waitForStageText(t, tm, "clean working tree", stageLoadWait)
 	tm.Send(keyRune('b'))
 	waitForStageText(t, tm, "Rebase branch feature/rebase on origin/master?", stageActionWait)
 	tm.Send(keyRune('y'))

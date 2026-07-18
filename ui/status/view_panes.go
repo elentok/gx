@@ -84,11 +84,10 @@ func (m Model) renderLeftPane(width, height int) string {
 }
 
 func (m Model) filetreePaneTitle() string {
-	title := "Filetree"
 	if summary := m.branchSummaryTitleSuffix(); summary != "" {
-		title += " (" + summary + ")"
+		return "Changes in " + summary
 	}
-	return title
+	return "Filetree"
 }
 
 func (m Model) visibleStatusLines(width, height int) []string {
@@ -152,9 +151,8 @@ func (m Model) requiredFiletreePaneWidth(height int) int {
 	return required + 2
 }
 
-// renderFiletreePane moves the branch/worktree info out of the title row
-// (where it doesn't fit alongside "Filetree" + search counter) and onto two
-// dim lines at the bottom of the panel instead.
+// renderFiletreePane puts the branch summary in the title and the worktree
+// name as a dim line at the top of the content, ahead of the file list.
 func (m Model) renderFiletreePane(width, height int) string {
 	info := m.filetreeInfoLines()
 	contentHeight := height - len(info)
@@ -162,20 +160,26 @@ func (m Model) renderFiletreePane(width, height int) string {
 		contentHeight = height
 		info = nil
 	}
-	lines := append(m.visibleStatusLines(width, contentHeight), info...)
-	return m.renderFiletreePanelWithBorderTitle(width, height, "Filetree", m.searchCounterForFiletreePane(), lines, m.focus == focusFiletree)
+	lines := append(info, m.visibleStatusLines(width, contentHeight)...)
+	return m.renderFiletreePanelWithBorderTitle(width, height, m.filetreePaneTitle(), m.searchCounterForFiletreePane(), lines, m.focus == focusFiletree)
 }
 
+// filetreeInfoLines shows which worktree is active, but only when the repo
+// actually uses multiple worktrees (the .bare technique) — for a plain
+// single-checkout clone the worktree name adds no information.
 func (m Model) filetreeInfoLines() []string {
-	var lines []string
-	if branch := strings.TrimSpace(m.statusData.branchName); branch != "" {
-		icon := ui.Icons(m.settings.UseNerdFontIcons).Branch
-		lines = append(lines, ui.StyleMuted.Render(icon+" "+branch+" ("+m.branchSyncToken()+")"))
+	if !m.isBareRepo {
+		return nil
 	}
-	if wt := ui.WorktreeLabel(m.worktreeRoot, m.settings.UseNerdFontIcons); wt != "" {
-		lines = append(lines, ui.StyleMuted.Render(wt))
+	name := ui.WorktreeName(m.worktreeRoot)
+	if name == "" {
+		return nil
 	}
-	return lines
+	icon := ""
+	if m.settings.UseNerdFontIcons {
+		icon = ui.Icons(true).Worktree + " "
+	}
+	return []string{ui.StyleMuted.Faint(true).Render(icon + "worktree: " + name)}
 }
 
 func (m Model) branchSummaryTitleSuffix() string {

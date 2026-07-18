@@ -174,7 +174,7 @@ func (m Model) newHistoryEntry(viewState nav.ViewState) historyEntry {
 	case nav.TabStatus:
 		return historyEntry{
 			viewState: viewState,
-			model:     statusui.NewModel(viewState.WorktreeRoot, s, viewState.InitialPath, keys.New(Bindings())),
+			model:     statusui.NewModel(viewState.WorktreeRoot, m.repo.IsBare, s, viewState.InitialPath, keys.New(Bindings())),
 		}
 	case nav.TabLog:
 		return historyEntry{
@@ -240,4 +240,3 @@ func (m *Model) restoreLogSelectionFromPoppedPage(popped historyEntry) {
 	// Keep router tab memory in sync so future tab switches restore the correct ref.
 	m.navState.ApplyViewStateChanged(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: current.viewState.WorktreeRoot, Ref: ref})
 }
-

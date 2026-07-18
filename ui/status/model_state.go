@@ -24,6 +24,7 @@ import (
 
 type Model struct {
 	worktreeRoot string
+	isBareRepo   bool
 	settings     ui.Settings
 	initialPath  string
 
@@ -127,7 +128,7 @@ var (
 	ansiOSCRe = regexp.MustCompile(`\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)`) // OSC ... BEL/ST
 )
 
-func NewModel(worktreeRoot string, settings ui.Settings, initialPath string, extraKeys keys.Manager) Model {
+func NewModel(worktreeRoot string, isBareRepo bool, settings ui.Settings, initialPath string, extraKeys keys.Manager) Model {
 	if settings.DiffContextLines < 0 {
 		settings.DiffContextLines = 0
 	}
@@ -139,6 +140,7 @@ func NewModel(worktreeRoot string, settings ui.Settings, initialPath string, ext
 	fileTreeModel := filetree.NewModel[git.StageFileStatus]()
 	m := Model{
 		worktreeRoot:     worktreeRoot,
+		isBareRepo:       isBareRepo,
 		settings:         settings,
 		initialPath:      initialPath,
 		diffContextLines: settings.DiffContextLines,

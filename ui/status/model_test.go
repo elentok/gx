@@ -22,7 +22,7 @@ import (
 )
 
 func newTestModel(worktreeRoot string, settings ui.Settings, initialPath string) Model {
-	return NewModel(worktreeRoot, settings, initialPath, keys.Manager{})
+	return NewModel(worktreeRoot, false, settings, initialPath, keys.Manager{})
 }
 
 func newTestModelDefault(worktreeRoot string) Model {
@@ -541,7 +541,7 @@ func TestHelpLineTruncatesHintWithEllipsisWhenNarrow(t *testing.T) {
 	}
 }
 
-func TestFiletreePaneShowsBranchSummaryAtBottom(t *testing.T) {
+func TestFiletreePaneShowsBranchSummaryInTitle(t *testing.T) {
 	t.Parallel()
 	repo := testutil.TempRepo(t)
 	m := newTestModelDefault(repo)
@@ -553,8 +553,8 @@ func TestFiletreePaneShowsBranchSummaryAtBottom(t *testing.T) {
 	m.statusData.branchSync = git.SyncStatus{Name: git.StatusAhead, Ahead: 2}
 
 	pane := ansi.Strip(m.renderFiletreePane(72, 10))
-	if strings.Contains(pane, "Filetree (") {
-		t.Fatalf("expected branch summary out of the title (moved to bottom lines), got:\n%s", pane)
+	if !strings.Contains(pane, "Changes in") {
+		t.Fatalf("expected branch summary title, got:\n%s", pane)
 	}
 	if !strings.Contains(pane, "feature/test") {
 		t.Fatalf("expected branch summary to include branch name, got:\n%s", pane)
@@ -564,6 +564,32 @@ func TestFiletreePaneShowsBranchSummaryAtBottom(t *testing.T) {
 	}
 	if strings.Contains(pane, "vs origin/main") {
 		t.Fatalf("expected default base ref to stay hidden, got:\n%s", pane)
+	}
+}
+
+func TestFiletreePaneHidesWorktreeLineForNonBareRepo(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	m := newTestModelDefault(repo)
+	m.ready = true
+
+	pane := ansi.Strip(m.renderFiletreePane(72, 10))
+	if strings.Contains(pane, "worktree:") {
+		t.Fatalf("expected no worktree line for a plain single-worktree clone, got:\n%s", pane)
+	}
+}
+
+func TestFiletreePaneShowsWorktreeLineForBareRepo(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	m := newTestModel(repo, DefaultSettings(), "")
+	m.isBareRepo = true
+	m.ready = true
+
+	pane := ansi.Strip(m.renderFiletreePane(72, 10))
+	want := "worktree: " + filepath.Base(repo)
+	if !strings.Contains(pane, want) {
+		t.Fatalf("expected worktree line %q, got:\n%s", want, pane)
 	}
 }
 

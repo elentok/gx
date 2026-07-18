@@ -7,12 +7,22 @@ import (
 	"charm.land/bubbles/v2/key"
 )
 
+// WorktreeName returns the basename of the given worktree root, or "" if the
+// path doesn't resolve to a meaningful name.
+func WorktreeName(worktreeRoot string) string {
+	name := filepath.Base(worktreeRoot)
+	if name == "" || name == "." || name == string(filepath.Separator) {
+		return ""
+	}
+	return name
+}
+
 // WorktreeLabel renders the current worktree's short name (the basename of its
 // root path) for display in a panel frame title. When nerd fonts are enabled it
 // is prefixed with the worktree icon; otherwise the bare name is returned.
 func WorktreeLabel(worktreeRoot string, useNerdFont bool) string {
-	name := filepath.Base(worktreeRoot)
-	if name == "" || name == "." || name == string(filepath.Separator) {
+	name := WorktreeName(worktreeRoot)
+	if name == "" {
 		return ""
 	}
 	if useNerdFont {
