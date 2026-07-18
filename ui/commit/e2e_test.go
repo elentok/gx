@@ -2,6 +2,7 @@ package commit_test
 
 import (
 	"bytes"
+	"fmt"
 	"os/exec"
 	"strings"
 	"testing"
@@ -238,6 +239,59 @@ func TestAmendE2E_HEAD_FromCommitView(t *testing.T) {
 	verifyTM := startCommitTUI(t, repoDir, headHashAfter)
 	waitForCommitE2EText(t, verifyTM, "c.txt", commitE2ELoadWait)
 	commitE2EQuit(t, verifyTM)
+}
+
+// TestNarrowFiletreeSelectionStaysVisible_E2E is a regression test for a bug
+// where, in narrow/portrait terminals, the files pane's scroll-clamp height
+// and its actually-rendered row count disagreed. Pressing down enough times
+// moved the selection past what was rendered: the selected row's highlight
+// disappeared from the files pane even though the diff pane kept tracking
+// the (now offscreen) selected file.
+func TestNarrowFiletreeSelectionStaysVisible_E2E(t *testing.T) {
+	t.Parallel()
+	repoDir := testutil.TempRepo(t)
+	const fileCount = 30
+	for i := 1; i <= fileCount; i++ {
+		testutil.WriteFile(t, repoDir, fmt.Sprintf("file%03d.txt", i), "original\n")
+	}
+	testutil.CommitAll(t, repoDir, "add files")
+	for i := 1; i <= fileCount; i++ {
+		testutil.WriteFile(t, repoDir, fmt.Sprintf("file%03d.txt", i), fmt.Sprintf("changed%03d\n", i))
+	}
+	testutil.CommitAll(t, repoDir, "change all")
+
+	m := commit.NewModel(repoDir, "HEAD", "", ui.Settings{}, keys.Manager{})
+	// Narrow terminal (width < 90) triggers the stacked/portrait files+diff layout.
+	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(60, 24))
+
+	waitForCommitE2ETexts(t, tm, commitE2ELoadWait, "change all", "file001.txt")
+
+	// Move the selection past the bottom of the files pane.
+	for range fileCount + 5 {
+		tm.Send(commitE2EKeyRune('j'))
+	}
+
+	// The diff pane tracks the selected file's unique content, so waiting for
+	// the last file's diff to appear confirms the selection has settled on it.
+	waitForCommitE2EText(t, tm, "changed030", commitE2EActionWait)
+
+	frame := string(tm.CurrentFrame())
+	lines := strings.Split(frame, "\n")
+	var fileLine string
+	for _, line := range lines {
+		if strings.Contains(line, "file030.txt") {
+			fileLine = line
+			break
+		}
+	}
+	if fileLine == "" {
+		t.Fatalf("expected file030.txt (the selected file) to be visible in the files pane, but it was scrolled out of view:\n%s", frame)
+	}
+	if !strings.Contains(fileLine, "\x1b[48;2;") {
+		t.Errorf("expected the selected file's row to be highlighted; got: %q", fileLine)
+	}
+
+	commitE2EQuit(t, tm)
 }
 
 func TestAmendE2E_Conflict_FromCommitView(t *testing.T) {

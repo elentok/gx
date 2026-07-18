@@ -223,21 +223,32 @@ func (m Model) contentView(contentH int) string {
 		return ui.RenderPanel(ui.PanelOptionsFor(width, contentH, "Changes", "", lines, false, ui.ColorBlue, nil, false))
 	}
 
-	mainH := contentH
 	if m.width < 90 {
-		mainH--
-		filesH := max(5, mainH/3)
-		diffH := max(5, mainH-filesH)
+		filesH, diffH := m.narrowPaneHeights(contentH)
 		files := m.renderFilesPane(m.width, filesH)
 		diff := m.renderDiffPane(m.width, diffH)
 		return lipgloss.JoinVertical(lipgloss.Left, files, ui.RenderSeamRow(m.width, ui.SeamColor), diff)
 	}
+	mainH := contentH
 	width := m.width - 1
 	leftW := m.filesPaneWidth(mainH)
 	rightW := width - leftW
 	left := m.renderFilesPane(leftW, mainH)
 	right := m.renderDiffPane(rightW, mainH)
 	return lipgloss.JoinHorizontal(lipgloss.Top, left, ui.RenderSeamColumn(mainH, ui.SeamColor), right)
+}
+
+// narrowPaneHeights splits contentH (the full content area height, as returned
+// by layoutHeights) into the files pane and diff pane heights used in the
+// stacked/portrait layout (width < 90). It reserves one row for the seam
+// between the two panes. This must stay the single source of truth for that
+// split: diffPaneSize and filesInnerHeight derive the same values so the
+// files pane's rendered row count and its scroll-clamp height never diverge.
+func (m Model) narrowPaneHeights(contentH int) (filesH, diffH int) {
+	mainH := contentH - 1
+	filesH = max(5, mainH/3)
+	diffH = max(5, mainH-filesH)
+	return filesH, diffH
 }
 
 func (m Model) layoutHeights() (bodyH, contentH int) {

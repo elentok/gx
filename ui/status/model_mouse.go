@@ -61,8 +61,7 @@ func (m *Model) scrollFiletreeByMouse(x, y, dir int) bool {
 	if x < filetreeX || x >= filetreeX+filetreeW || y < filetreeY || y >= filetreeY+filetreeH {
 		return false
 	}
-	innerH := maxInt(1, filetreeH-2)
-	m.fileTreeModel.SetVisibleHeight(innerH)
+	m.fileTreeModel.SetVisibleHeight(m.filetreeInnerHeight(filetreeH))
 	m.fileTreeModel.ScrollViewport(dir * 3)
 	return true
 }

@@ -164,6 +164,21 @@ func (m Model) renderFiletreePane(width, height int) string {
 	return m.renderFiletreePanelWithBorderTitle(width, height, m.filetreePaneTitle(), m.searchCounterForFiletreePane(), lines, m.focus == focusFiletree)
 }
 
+// filetreeInnerHeight returns the number of file rows actually rendered
+// inside the filetree pane at the given outer height. It mirrors
+// renderFiletreePane's reservation of filetreeInfoLines() (e.g. the
+// "worktree: X" line shown for bare-repo checkouts), so callers that clamp
+// scroll/selection via fileTreeModel.SetVisibleHeight never diverge from what
+// is actually rendered.
+func (m Model) filetreeInnerHeight(height int) int {
+	info := m.filetreeInfoLines()
+	contentHeight := height - len(info)
+	if contentHeight < minFiletreePaneHeight {
+		contentHeight = height
+	}
+	return maxInt(1, contentHeight-2)
+}
+
 // filetreeInfoLines shows which worktree is active, but only when the repo
 // actually uses multiple worktrees (the .bare technique) — for a plain
 // single-checkout clone the worktree name adds no information.

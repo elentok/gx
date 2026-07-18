@@ -146,16 +146,14 @@ func (m Model) diffPaneBodyRect() (col, row, w, h int, ok bool) {
 		return 0, 0, 0, 0, false
 	}
 	bodyH, contentH := m.layoutHeights()
-	mainH := contentH
 
 	var paneX, paneY, paneW, paneH int
 	if m.width < 90 {
-		filesH := max(5, mainH/3)
-		diffH := max(5, mainH-filesH)
-		paneX, paneY, paneW, paneH = 0, bodyH+filesH, m.width, diffH
+		filesH, diffH := m.narrowPaneHeights(contentH)
+		paneX, paneY, paneW, paneH = 0, bodyH+filesH+1, m.width, diffH
 	} else {
-		leftW := m.filesPaneWidth(mainH)
-		paneX, paneY, paneW, paneH = leftW, bodyH, m.width-leftW, mainH
+		leftW := m.filesPaneWidth(contentH)
+		paneX, paneY, paneW, paneH = leftW, bodyH, m.width-leftW, contentH
 	}
 	if paneW <= 2 || paneH <= 2 {
 		return 0, 0, 0, 0, false

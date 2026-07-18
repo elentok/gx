@@ -5,11 +5,9 @@ import (
 )
 
 func (m *Model) diffPaneSize() (int, int) {
-	headerH := m.headerViewportRowsCount() + 2
-	contentH := max(5, m.height-1-headerH-1)
+	_, contentH := m.layoutHeights()
 	if m.width < 90 {
-		filesH := max(5, contentH/3)
-		diffH := max(5, contentH-filesH)
+		_, diffH := m.narrowPaneHeights(contentH)
 		return m.width, diffH
 	}
 	leftW := m.filesPaneWidth(contentH)
@@ -32,10 +30,10 @@ func (m *Model) syncDiffViewport() {
 }
 
 func (m *Model) filesInnerHeight() int {
-	headerH := m.headerViewportRowsCount() + 2
-	contentH := max(5, m.height-1-headerH-1)
+	_, contentH := m.layoutHeights()
 	if m.width < 90 {
-		return max(1, max(5, contentH/3)-2)
+		filesH, _ := m.narrowPaneHeights(contentH)
+		return max(1, filesH-2)
 	}
 	return max(1, contentH-2)
 }

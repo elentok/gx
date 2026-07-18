@@ -717,3 +717,66 @@ func TestStageE2E_FiletreeSearchKeepsHighlightsAfterEnter(t *testing.T) {
 
 	quitStage(t, tm)
 }
+
+// TestStageE2E_BareRepoNarrowFiletreeSelectionStaysVisible is a regression
+// test for a bug where, in bare-repo/worktree checkouts (isBareRepo=true),
+// the filetree pane reserves an extra "worktree: X" info line above the file
+// list (see filetreeInfoLines), but the scroll-clamp height didn't account
+// for that line. Pressing down enough times moved the selection past what
+// was actually rendered: the selected row's highlight disappeared even
+// though the diff pane kept tracking the (now offscreen) selected file. This
+// only reproduces with isBareRepo=true, since the info line is otherwise
+// absent and rendered/clamped heights already agree.
+func TestStageE2E_BareRepoNarrowFiletreeSelectionStaysVisible(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	const fileCount = 30
+	for i := 1; i <= fileCount; i++ {
+		testutil.WriteFile(t, repoDir, fmt.Sprintf("file%03d.txt", i), fmt.Sprintf("line%03d\n", i))
+	}
+
+	m := status.NewModel(repoDir, true, status.DefaultSettings(), "", keys.Manager{})
+	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(60, 24))
+
+	waitForStageText(t, tm, "file001.txt", stageLoadWait)
+
+	for range fileCount + 5 {
+		tm.Send(keyRune('j'))
+	}
+
+	waitForStageText(t, tm, "line030", stageActionWait)
+
+	// "file030.txt" also appears in the diff pane's "Unstaged: file030.txt"
+	// title, so only lines that look like a filetree row (leading indent, no
+	// diff-pane chrome) count as the file actually being visible in the tree.
+	isTreeRow := func(line string) bool {
+		return strings.Contains(line, "file030.txt") &&
+			!strings.Contains(line, "Unstaged") && !strings.Contains(line, "Staged") &&
+			!strings.Contains(line, "Context")
+	}
+
+	frame := ansi.Strip(string(tm.CurrentFrame()))
+	strippedLine := ""
+	for _, line := range strings.Split(frame, "\n") {
+		if isTreeRow(line) {
+			strippedLine = line
+			break
+		}
+	}
+	if strippedLine == "" {
+		t.Fatalf("expected file030.txt (the selected file) to be visible in the filetree pane, but it was scrolled out of view:\n%s", frame)
+	}
+
+	rawFrame := string(tm.CurrentFrame())
+	var rawLine string
+	for _, line := range strings.Split(rawFrame, "\n") {
+		if isTreeRow(ansi.Strip(line)) {
+			rawLine = line
+			break
+		}
+	}
+	if !strings.Contains(rawLine, "\x1b[48;2;") {
+		t.Errorf("expected the selected file's row to be highlighted; got: %q", rawLine)
+	}
+
+	quitStage(t, tm)
+}

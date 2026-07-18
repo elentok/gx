@@ -174,7 +174,7 @@ func (m *Model) syncDiffViewports() {
 
 	expandedH, collapsedH := diffPaneHeights(diffH - 1)
 	m.diffarea.SyncViewports(vpW, expandedH, collapsedH)
-	m.fileTreeModel.SetVisibleHeight(maxInt(1, filetreeH-2))
+	m.fileTreeModel.SetVisibleHeight(m.filetreeInnerHeight(filetreeH))
 }
 
 func reflowSectionLines(diffviewModel *diffview.Model, wrapWidth int, wrap bool) {
