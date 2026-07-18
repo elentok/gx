@@ -159,11 +159,9 @@ func (m Model) diffPaneBodyRect() (col, row, w, h int, ok bool) {
 		return 0, 0, 0, 0, false
 	}
 	// The pane is rendered with 1-cell horizontal padding; the body starts
-	// just inside it (see renderDiffPane / RenderPanel).
-	//
-	// TODO: paneY+1 assumes a 1-row offset into the pane, matching the old
-	// bordered frame. The frame-free header renders as a header row plus a
-	// 1-cell margin row before the body, so the real offset may need to be
-	// +2 — unverified against a real kitty-graphics terminal (ADR 0013).
+	// just inside it (see renderDiffPane / RenderPanel). PanelOptionsFor
+	// always sets PaddingY: 0 (ui/panel.go), so RenderPanel emits no margin
+	// row between header and body — the body starts right after the single
+	// header row, hence +1 (see ADR 0013).
 	return paneX + 1, paneY + 1, paneW - 2, paneH - 2, true
 }

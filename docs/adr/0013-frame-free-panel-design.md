@@ -90,9 +90,10 @@ et al.) was also renamed to `preview` (`ui/worktrees/preview.go`) as part of thi
 - All persistent layout panels (status, log, commit, stashlist, worktrees) now share one rendering
   path (`ui.RenderPanel`) with no feature flag; any new persistent panel should use it directly
   rather than reaching for `ui.RenderPanelFrame`.
-- **Known follow-up, not yet fixed:** `ui/commit/image_diff.go`'s `diffPaneBodyRect()` computes the
-  kitty image-diff overlay's body origin assuming a 1-row offset into the pane, matching the old
-  bordered frame. The frame-free header now renders as a header row plus a 1-cell margin row before
-  the body, so the real vertical offset may need to be 2, not 1 — flagged but not fixed, since it
-  needs verification against a real kitty-graphics terminal before touching. See the comment on
-  `diffPaneBodyRect`.
+- **Resolved:** `ui/commit/image_diff.go`'s `diffPaneBodyRect()` was flagged as a follow-up on the
+  assumption that the frame-free header renders a header row plus a 1-cell margin row before the
+  body, which would have shifted the kitty image-diff overlay's vertical offset from 1 to 2. That
+  assumption doesn't hold: `PanelOptionsFor` (`ui/panel.go`) always sets `PaddingY: 0`, and
+  `RenderPanel` (`ui/frame.go`) only inserts `PaddingY` margin rows, so no margin row exists between
+  header and body for any panel. The existing `paneY+1` offset is correct as-is; no code change or
+  terminal verification was needed.
