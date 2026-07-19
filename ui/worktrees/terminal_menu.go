@@ -94,10 +94,23 @@ func (m Model) executeTerminalAction(action string) (Model, tea.Cmd) {
 		case "tab":
 			return m, terminalrun.CommandWithSplitBare(path, ui.TerminalKittyRemote, terminalrun.Tab, shell, nil, done)
 		}
+	case ui.TerminalHerdr:
+		repoName := filepath.Base(m.repo.LinkedWorktreeDir())
+		sessName := sessionNameFor(repoName, name, m.settings.NameAliases)
+		switch action {
+		case "session":
+			return m, cmdHerdrSession(sessName, path)
+		case "hsplit":
+			return m, terminalrun.CommandWithSplitBare(path, ui.TerminalHerdr, terminalrun.HSplit, shell, nil, done)
+		case "vsplit":
+			return m, terminalrun.CommandWithSplitBare(path, ui.TerminalHerdr, terminalrun.VSplit, shell, nil, done)
+		case "tab":
+			return m, terminalrun.CommandWithSplitBare(path, ui.TerminalHerdr, terminalrun.Tab, shell, nil, done)
+		}
 	case ui.TerminalKitty:
 		return m, notify.Info("enable kitty remote control for this to work")
 	default:
-		return m, notify.Info("use tmux or kitty for more options")
+		return m, notify.Info("use tmux, kitty or herdr for more options")
 	}
 	return m, nil
 }

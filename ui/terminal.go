@@ -10,15 +10,18 @@ const (
 	TerminalTmux                        // inside tmux ($TMUX set)
 	TerminalKitty                       // inside kitty, no remote control ($KITTY_WINDOW_ID set)
 	TerminalKittyRemote                 // inside kitty with remote control ($KITTY_LISTEN_ON set)
+	TerminalHerdr                       // inside herdr ($HERDR_ENV set)
 )
 
-// String returns a short display label ("tmux", "kitty") or "" for plain terminals.
+// String returns a short display label ("tmux", "kitty", "herdr") or "" for plain terminals.
 func (t Terminal) String() string {
 	switch t {
 	case TerminalTmux:
 		return "tmux"
 	case TerminalKitty, TerminalKittyRemote:
 		return "kitty"
+	case TerminalHerdr:
+		return "herdr"
 	default:
 		return ""
 	}
@@ -26,7 +29,7 @@ func (t Terminal) String() string {
 
 // CanSplit reports whether gx can open a new split pane for git commit.
 func (t Terminal) CanSplit() bool {
-	return t == TerminalTmux || t == TerminalKittyRemote
+	return t == TerminalTmux || t == TerminalKittyRemote || t == TerminalHerdr
 }
 
 // DetectTerminal detects the current terminal environment from environment variables.
@@ -36,6 +39,9 @@ func DetectTerminal() Terminal {
 
 // DetectTerminalFrom detects the terminal environment using the provided getter.
 func DetectTerminalFrom(getenv func(string) string) Terminal {
+	if getenv("HERDR_ENV") != "" {
+		return TerminalHerdr
+	}
 	if getenv("KITTY_LISTEN_ON") != "" {
 		return TerminalKittyRemote
 	}

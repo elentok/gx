@@ -2,7 +2,19 @@ package ui
 
 import "testing"
 
+func TestDetectTerminalPrefersHerdrOverEverything(t *testing.T) {
+	t.Setenv("HERDR_ENV", "1")
+	t.Setenv("TMUX", "/tmp/tmux-1000/default,123,0")
+	t.Setenv("KITTY_LISTEN_ON", "unix:/tmp/mykitty-70704")
+	t.Setenv("KITTY_WINDOW_ID", "12")
+
+	if got := DetectTerminal(); got != TerminalHerdr {
+		t.Fatalf("DetectTerminal() = %v, want %v", got, TerminalHerdr)
+	}
+}
+
 func TestDetectTerminalPrefersKittyRemoteOverTmux(t *testing.T) {
+	t.Setenv("HERDR_ENV", "")
 	t.Setenv("TMUX", "/tmp/tmux-1000/default,123,0")
 	t.Setenv("KITTY_LISTEN_ON", "unix:/tmp/mykitty-70704")
 	t.Setenv("KITTY_WINDOW_ID", "12")
@@ -13,6 +25,7 @@ func TestDetectTerminalPrefersKittyRemoteOverTmux(t *testing.T) {
 }
 
 func TestDetectTerminalPrefersKittyWindowOverTmux(t *testing.T) {
+	t.Setenv("HERDR_ENV", "")
 	t.Setenv("TMUX", "/tmp/tmux-1000/default,123,0")
 	t.Setenv("KITTY_LISTEN_ON", "")
 	t.Setenv("KITTY_WINDOW_ID", "12")
@@ -23,6 +36,7 @@ func TestDetectTerminalPrefersKittyWindowOverTmux(t *testing.T) {
 }
 
 func TestDetectTerminalFallsBackToTmux(t *testing.T) {
+	t.Setenv("HERDR_ENV", "")
 	t.Setenv("TMUX", "/tmp/tmux-1000/default,123,0")
 	t.Setenv("KITTY_LISTEN_ON", "")
 	t.Setenv("KITTY_WINDOW_ID", "")
@@ -55,6 +69,7 @@ func TestTerminal_String(t *testing.T) {
 		{TerminalTmux, "tmux"},
 		{TerminalKitty, "kitty"},
 		{TerminalKittyRemote, "kitty"},
+		{TerminalHerdr, "herdr"},
 		{TerminalPlain, ""},
 	}
 	for _, c := range cases {
@@ -70,6 +85,9 @@ func TestTerminal_CanSplit(t *testing.T) {
 	}
 	if !TerminalKittyRemote.CanSplit() {
 		t.Error("expected TerminalKittyRemote.CanSplit()=true")
+	}
+	if !TerminalHerdr.CanSplit() {
+		t.Error("expected TerminalHerdr.CanSplit()=true")
 	}
 	if TerminalKitty.CanSplit() {
 		t.Error("expected TerminalKitty.CanSplit()=false")

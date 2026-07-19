@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.21.0 - 2026-07-19
+
+- Terminal: added support for herdr — split/tab launching (hsplit, vsplit, tab) and worktree session workspace focus/create.
+
 ## v0.20.2 - 2026-07-18
 
 - Filetree: added a scrollbar indicator when content exceeds the visible area.

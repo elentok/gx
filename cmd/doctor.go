@@ -132,7 +132,8 @@ func printDoctorRuntime(w io.Writer, getenv func(string) string) {
 	fmt.Fprintf(w, "  terminal: %s\n", label)
 	fmt.Fprintf(w, "  TMUX=%q\n", getenv("TMUX"))
 	fmt.Fprintf(w, "  KITTY_WINDOW_ID=%q\n", getenv("KITTY_WINDOW_ID"))
-	fmt.Fprintf(w, "  KITTY_LISTEN_ON=%q\n\n", getenv("KITTY_LISTEN_ON"))
+	fmt.Fprintf(w, "  KITTY_LISTEN_ON=%q\n", getenv("KITTY_LISTEN_ON"))
+	fmt.Fprintf(w, "  HERDR_ENV=%q\n\n", getenv("HERDR_ENV"))
 }
 
 func pauseDoctor(stdout io.Writer, stdin io.Reader) {

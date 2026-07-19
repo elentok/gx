@@ -1,9 +1,11 @@
 package terminalrun
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -95,6 +97,12 @@ func Command(worktreeRoot string, terminal ui.Terminal, program string, args []s
 				err = fmt.Errorf("$ kitty %s\n\n%w\n\n%s", strings.Join(kittyArgs, " "), err, strings.TrimSpace(string(out)))
 			}
 			return done(err, "kitty")
+		}
+	}
+	if terminal == ui.TerminalHerdr {
+		return func() tea.Msg {
+			_, err := launchSplit(worktreeRoot, terminal, HSplit, program, args)
+			return done(err, "herdr")
 		}
 	}
 	c := exec.Command(program, args...)
@@ -192,6 +200,66 @@ func launchSplit(worktreeRoot string, terminal ui.Terminal, splitType SplitType,
 			err = fmt.Errorf("$ kitty %s\n\n%w\n\n%s", strings.Join(kittyArgs, " "), err, strings.TrimSpace(string(out)))
 		}
 		return "kitty", err
+	case ui.TerminalHerdr:
+		// `herdr agent start` is documented for launching coding agents, but
+		// `pane split`/`tab create` (the commands meant for ordinary programs)
+		// don't accept a program to exec — they only open a pane running an
+		// interactive shell, which `pane run` then has to type a command line
+		// into. That adds a visible delay waiting for the shell (and its
+		// prompt) to finish starting up before it can process input. `agent
+		// start` directly execs the given argv (same as tmux split-window/kitty
+		// @ launch) and, when the process exits cleanly, closes the pane
+		// automatically — so it's used here for any program, not just agents.
+		name := filepath.Base(program)
+		herdrArgs := []string{"agent", "start", name}
+		switch splitType {
+		case HSplit:
+			// HSplit (vim :split, stacked) maps to herdr's "down" split.
+			herdrArgs = append(herdrArgs, "--cwd", worktreeRoot, "--split", "down")
+		case VSplit:
+			// VSplit (vim :vsplit, side-by-side) maps to herdr's "right" split.
+			herdrArgs = append(herdrArgs, "--cwd", worktreeRoot, "--split", "right")
+		case Tab:
+			tabID, err := herdrTabCreate(worktreeRoot)
+			if err != nil {
+				return "herdr", err
+			}
+			herdrArgs = append(herdrArgs, "--tab", tabID)
+		}
+		herdrArgs = append(herdrArgs, "--focus", "--")
+		herdrArgs = append(herdrArgs, program)
+		herdrArgs = append(herdrArgs, args...)
+		out, err := runCommand("herdr", herdrArgs...)
+		if err != nil {
+			err = fmt.Errorf("$ herdr %s\n\n%w\n\n%s", strings.Join(herdrArgs, " "), err, strings.TrimSpace(string(out)))
+		}
+		return "herdr", err
 	}
 	return "", fmt.Errorf("split not supported for terminal %v", terminal)
+}
+
+// herdrTabCreate creates a new herdr tab rooted at worktreeRoot and returns
+// its tab id, for use with `herdr agent start --tab <id>` (herdr's
+// tab-create step doesn't accept a program to launch, unlike tmux
+// new-window/kitty --type=tab).
+func herdrTabCreate(worktreeRoot string) (string, error) {
+	tabArgs := []string{"tab", "create", "--cwd", worktreeRoot}
+	out, err := runCommand("herdr", tabArgs...)
+	if err != nil {
+		return "", fmt.Errorf("$ herdr %s\n\n%w\n\n%s", strings.Join(tabArgs, " "), err, strings.TrimSpace(string(out)))
+	}
+	var resp struct {
+		Result struct {
+			Tab struct {
+				TabID string `json:"tab_id"`
+			} `json:"tab"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(out, &resp); err != nil {
+		return "", fmt.Errorf("parsing herdr tab create output: %w", err)
+	}
+	if resp.Result.Tab.TabID == "" {
+		return "", fmt.Errorf("herdr tab create returned no tab id: %s", strings.TrimSpace(string(out)))
+	}
+	return resp.Result.Tab.TabID, nil
 }

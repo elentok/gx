@@ -74,6 +74,10 @@ func TestCommandWithSplit(t *testing.T) {
 		{name: "hsplit/kitty", terminal: ui.TerminalKitty, splitType: HSplit, wantWarn: true},
 		{name: "vsplit/kitty", terminal: ui.TerminalKitty, splitType: VSplit, wantWarn: true},
 		{name: "tab/kitty", terminal: ui.TerminalKitty, splitType: Tab, wantWarn: true},
+		{name: "inplace/herdr", terminal: ui.TerminalHerdr, splitType: InPlace, wantWarn: false},
+		{name: "hsplit/herdr", terminal: ui.TerminalHerdr, splitType: HSplit, wantWarn: false},
+		{name: "vsplit/herdr", terminal: ui.TerminalHerdr, splitType: VSplit, wantWarn: false},
+		{name: "tab/herdr", terminal: ui.TerminalHerdr, splitType: Tab, wantWarn: false},
 	}
 
 	for _, tt := range tests {
@@ -130,6 +134,16 @@ func TestLaunchSplit_ArgVectors(t *testing.T) {
 			name: "kitty/tab", terminal: ui.TerminalKittyRemote, splitType: Tab, wantApp: "kitty",
 			wantName: "kitty", wantArgs: []string{"@", "launch", "--copy-env", "--type=tab", "--cwd=/wt", "gx", "run", "lazygit"},
 		},
+		{
+			// HSplit (vim :split, stacked) maps to herdr's "down" split.
+			name: "herdr/hsplit", terminal: ui.TerminalHerdr, splitType: HSplit, wantApp: "herdr",
+			wantName: "herdr", wantArgs: []string{"agent", "start", "gx", "--cwd", "/wt", "--split", "down", "--focus", "--", "gx", "run", "lazygit"},
+		},
+		{
+			// VSplit (vim :vsplit, side-by-side) maps to herdr's "right" split.
+			name: "herdr/vsplit", terminal: ui.TerminalHerdr, splitType: VSplit, wantApp: "herdr",
+			wantName: "herdr", wantArgs: []string{"agent", "start", "gx", "--cwd", "/wt", "--split", "right", "--focus", "--", "gx", "run", "lazygit"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -157,6 +171,57 @@ func TestLaunchSplit_ArgVectors(t *testing.T) {
 				t.Errorf("args = %#v, want %#v", gotArgs, tt.wantArgs)
 			}
 		})
+	}
+}
+
+func TestLaunchSplit_HerdrTabCreatesTabThenStartsAgent(t *testing.T) {
+	prev := runCommand
+	var calls [][]string
+	runCommand = func(name string, args ...string) ([]byte, error) {
+		calls = append(calls, append([]string{name}, args...))
+		if len(calls) == 1 {
+			return []byte(`{"result":{"tab":{"tab_id":"w2:t9"}}}`), nil
+		}
+		return nil, nil
+	}
+	defer func() { runCommand = prev }()
+
+	app, err := launchSplit("/wt", ui.TerminalHerdr, Tab, "gx", []string{"run", "lazygit"})
+	if err != nil {
+		t.Fatalf("launchSplit() error = %v", err)
+	}
+	if app != "herdr" {
+		t.Errorf("app = %q, want herdr", app)
+	}
+	if len(calls) != 2 {
+		t.Fatalf("expected 2 herdr calls, got %d: %#v", len(calls), calls)
+	}
+	wantTabCreate := []string{"herdr", "tab", "create", "--cwd", "/wt"}
+	if !reflect.DeepEqual(calls[0], wantTabCreate) {
+		t.Errorf("first call = %#v, want %#v", calls[0], wantTabCreate)
+	}
+	wantAgentStart := []string{"herdr", "agent", "start", "gx", "--tab", "w2:t9", "--focus", "--", "gx", "run", "lazygit"}
+	if !reflect.DeepEqual(calls[1], wantAgentStart) {
+		t.Errorf("second call = %#v, want %#v", calls[1], wantAgentStart)
+	}
+}
+
+func TestLaunchSplit_HerdrErrorIncludesCommandAndOutput(t *testing.T) {
+	prev := runCommand
+	runCommand = func(name string, args ...string) ([]byte, error) {
+		return []byte("no such agent name\n"), errors.New("exit status 1")
+	}
+	defer func() { runCommand = prev }()
+
+	_, err := launchSplit("/wt", ui.TerminalHerdr, VSplit, "gx", []string{"run", "lazygit"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	msg := err.Error()
+	for _, want := range []string{"$ herdr agent start", "exit status 1", "no such agent name"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("error %q missing %q", msg, want)
+		}
 	}
 }
 
