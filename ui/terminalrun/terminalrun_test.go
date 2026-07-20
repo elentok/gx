@@ -137,14 +137,18 @@ func TestLaunchSplit_ArgVectors(t *testing.T) {
 		{
 			// HSplit (vim :split, stacked) maps to herdr's "down" split.
 			name: "herdr/hsplit", terminal: ui.TerminalHerdr, splitType: HSplit, wantApp: "herdr",
-			wantName: "herdr", wantArgs: []string{"agent", "start", "gx", "--cwd", "/wt", "--split", "down", "--focus", "--", "gx", "run", "lazygit"},
+			wantName: "herdr", wantArgs: []string{"agent", "start", "gx-x1", "--cwd", "/wt", "--split", "down", "--focus", "--", "gx", "run", "lazygit"},
 		},
 		{
 			// VSplit (vim :vsplit, side-by-side) maps to herdr's "right" split.
 			name: "herdr/vsplit", terminal: ui.TerminalHerdr, splitType: VSplit, wantApp: "herdr",
-			wantName: "herdr", wantArgs: []string{"agent", "start", "gx", "--cwd", "/wt", "--split", "right", "--focus", "--", "gx", "run", "lazygit"},
+			wantName: "herdr", wantArgs: []string{"agent", "start", "gx-x1", "--cwd", "/wt", "--split", "right", "--focus", "--", "gx", "run", "lazygit"},
 		},
 	}
+
+	prevSuffix := herdrAgentSuffix
+	herdrAgentSuffix = func() string { return "x1" }
+	defer func() { herdrAgentSuffix = prevSuffix }()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -175,6 +179,10 @@ func TestLaunchSplit_ArgVectors(t *testing.T) {
 }
 
 func TestLaunchSplit_HerdrTabCreatesTabThenStartsAgent(t *testing.T) {
+	prevSuffix := herdrAgentSuffix
+	herdrAgentSuffix = func() string { return "x1" }
+	defer func() { herdrAgentSuffix = prevSuffix }()
+
 	prev := runCommand
 	var calls [][]string
 	runCommand = func(name string, args ...string) ([]byte, error) {
@@ -200,7 +208,7 @@ func TestLaunchSplit_HerdrTabCreatesTabThenStartsAgent(t *testing.T) {
 	if !reflect.DeepEqual(calls[0], wantTabCreate) {
 		t.Errorf("first call = %#v, want %#v", calls[0], wantTabCreate)
 	}
-	wantAgentStart := []string{"herdr", "agent", "start", "gx", "--tab", "w2:t9", "--focus", "--", "gx", "run", "lazygit"}
+	wantAgentStart := []string{"herdr", "agent", "start", "gx-x1", "--tab", "w2:t9", "--focus", "--", "gx", "run", "lazygit"}
 	if !reflect.DeepEqual(calls[1], wantAgentStart) {
 		t.Errorf("second call = %#v, want %#v", calls[1], wantAgentStart)
 	}

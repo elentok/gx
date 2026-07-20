@@ -6,8 +6,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui"
@@ -28,6 +30,15 @@ const (
 
 // osExecutable is a seam so tests can exercise the gx-path fallback.
 var osExecutable = os.Executable
+
+// herdrAgentSuffix is a seam so tests get deterministic agent names. herdr
+// requires agent names to be unique among live agents, so each `agent start`
+// gets a fresh suffix — otherwise a still-open pane from a prior launch (e.g.
+// one `gx run` kept open after a failed command) collides with the next
+// launch's name and herdr rejects it with "agent name ... is already used".
+var herdrAgentSuffix = func() string {
+	return strconv.FormatInt(time.Now().UnixNano(), 36)
+}
 
 // runCommand runs an external command and returns its combined output and exit
 // error. It is a seam so tests can assert the exact tmux/kitty argument vectors
@@ -210,7 +221,7 @@ func launchSplit(worktreeRoot string, terminal ui.Terminal, splitType SplitType,
 		// start` directly execs the given argv (same as tmux split-window/kitty
 		// @ launch) and, when the process exits cleanly, closes the pane
 		// automatically — so it's used here for any program, not just agents.
-		name := filepath.Base(program)
+		name := filepath.Base(program) + "-" + herdrAgentSuffix()
 		herdrArgs := []string{"agent", "start", name}
 		switch splitType {
 		case HSplit:
