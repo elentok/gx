@@ -590,6 +590,13 @@ func TestStageE2E_PushActionWithConfirm(t *testing.T) {
 		out, ok := gitOutputAllowFail(repoDir, "rev-parse", "--verify", "refs/remotes/origin/feature/push")
 		return ok && out != ""
 	})
+	// The ref can land before the TUI has processed the runnerDoneMsg and
+	// closed the push modal; wait for the modal's "Push" title to be gone so
+	// quitStage's Esc/q reach the quit handler instead of the still-open
+	// modal (Esc there opens an abort-confirm, not quit).
+	waitForCurrentFrameCondition(t, tm, func(s string) bool {
+		return !strings.Contains(s, "Push\n") && !strings.Contains(s, " Push ")
+	}, stageLoadWait)
 
 	quitStage(t, tm)
 }
