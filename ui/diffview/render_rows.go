@@ -48,7 +48,8 @@ func (m *Model) RenderRows(bodyH int, active bool, opts RenderOpts) []string {
 
 	rows := m.visibleRows(diffBodyH, active)
 	const markW = 2
-	bodyW := maxInt(0, opts.InnerWidth-markW)
+	const scrollGutterW = 2
+	bodyW := maxInt(0, opts.InnerWidth-markW-scrollGutterW)
 	overTop, overBottom, overBoth := m.overflowMarkers()
 
 	lines := make([]string, 0, bodyH)
@@ -111,8 +112,33 @@ func (m *Model) RenderRows(bodyH int, active bool, opts RenderOpts) []string {
 	for len(lines) < diffBodyH {
 		lines = append(lines, "")
 	}
+	lines = appendScrollbar(lines, markW+bodyW, diffBodyH, len(m.data.ViewLines), diffBodyH, m.viewport.YOffset())
 	lines = append(lines, searchLines...)
 	return lines
+}
+
+// appendScrollbar right-aligns a 2-column gutter (" " + glyph) onto each of
+// the height content rows, padding shorter rows (e.g. blank rows past the end
+// of content) out to padW first so every glyph lands in the same column,
+// mirroring filetree's scrollbar gutter so diff panes get the same visual
+// scroll indicator. The gutter renders blank when the content fits without
+// scrolling.
+func appendScrollbar(lines []string, padW, height, total, visible, offset int) []string {
+	bar := ui.RenderScrollbar(height, total, visible, offset)
+	var barLines []string
+	if bar != "" {
+		barLines = strings.Split(bar, "\n")
+	}
+	out := make([]string, len(lines))
+	for i, line := range lines {
+		b := " "
+		if i < len(barLines) {
+			b = barLines[i]
+		}
+		pad := maxInt(0, padW-ansi.StringWidth(line))
+		out[i] = line + strings.Repeat(" ", pad) + " " + b
+	}
+	return out
 }
 
 func (m *Model) overflowMarkers() (top, bottom, both string) {

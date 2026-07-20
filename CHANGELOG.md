@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.21.1 - 2026-07-20
+
+- Diff view: added a scrollbar indicator (status, stage, and commit views) when the diff exceeds the visible area.
+- Fixed a filetree scrollbar rendering bug.
+
 ## v0.21.0 - 2026-07-19
 
 - Terminal: added support for herdr — split/tab launching (hsplit, vsplit, tab) and worktree session workspace focus/create.
