@@ -149,6 +149,9 @@ func (m Model[T]) renderEntry(index int, entry Entry[T], opts RenderOpts[T], sel
 	if selected && opts.Active && line != "" {
 		line = ui.RenderRowHighlight(line)
 	}
+	if opts.Width > 0 {
+		line = ansi.Truncate(line, opts.Width-2, "")
+	}
 	return line
 }
 
