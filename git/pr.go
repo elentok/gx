@@ -233,10 +233,14 @@ func (pr ClosedPR) IsMerged() bool {
 }
 
 // ListClosedPRs returns the current user's outgoing PRs closed (merged or
-// closed-unmerged) in the last two weeks in the repo at dir, most recently
-// closed first.
-func ListClosedPRs(dir string) ([]ClosedPR, error) {
+// closed-unmerged) in the last two weeks, most recently closed first. When
+// allRepos is false the search is scoped to the repo at dir; when true it
+// spans every repo the user has closed PRs in.
+func ListClosedPRs(dir string, allRepos bool) ([]ClosedPR, error) {
 	cutoff := time.Now().Add(-closedPRWindow).Format("2006-01-02")
+	if allRepos {
+		return listClosedPRsAllRepos(dir, cutoff)
+	}
 	out, err := runGH(dir, []string{
 		"pr", "list",
 		"--state", "closed",
@@ -254,6 +258,53 @@ func ListClosedPRs(dir string) ([]ClosedPR, error) {
 	}
 	sortClosedPRs(prs)
 	return prs, nil
+}
+
+// listClosedPRsAllRepos discovers the repos the user has recently-closed PRs
+// in via a single cross-repo search, then re-fetches each repo's closed PRs
+// with the full field set via `gh pr list` (the search API doesn't expose
+// enough fields to render the closed-PR row, only enough to locate repos).
+func listClosedPRsAllRepos(dir, cutoff string) ([]ClosedPR, error) {
+	repos, err := searchPRRepos(dir, "--state", "closed", "--closed", ">"+cutoff)
+	if err != nil {
+		return nil, err
+	}
+	all, err := fetchPerRepo(repos, func(repo string) ([]ClosedPR, error) {
+		out, err := runGH(dir, []string{
+			"pr", "list",
+			"--repo", repo,
+			"--state", "closed",
+			"--search", "closed:>" + cutoff,
+			"--limit", "100",
+			"--author", "@me",
+			"--json", prClosedListFields,
+		})
+		if err != nil {
+			return nil, classifyPRListError(err)
+		}
+		return parseClosedPRList(out)
+	})
+	if err != nil {
+		return nil, err
+	}
+	sortClosedPRs(all)
+	return all, nil
+}
+
+// fetchPerRepo runs fetch once per repo and concatenates the results,
+// shared by listOpenPRsAllRepos and listClosedPRsAllRepos so the "one
+// gh pr list call per discovered repo, merge the results" shape isn't
+// duplicated for each PR kind.
+func fetchPerRepo[T any](repos []string, fetch func(repo string) ([]T, error)) ([]T, error) {
+	var all []T
+	for _, repo := range repos {
+		items, err := fetch(repo)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, items...)
+	}
+	return all, nil
 }
 
 // sortClosedPRs orders prs by closed date, most recent first.
@@ -316,11 +367,15 @@ func isGHAuthFailure(stderr string) bool {
 	return strings.Contains(strings.ToLower(stderr), "gh auth login")
 }
 
-// ListOpenPRs returns the current user's outgoing open PRs in the repo at
-// dir: actionable PRs first (green group, then red group), each group
-// most-recently-updated first, followed by non-actionable PRs, also
-// most-recently-updated first.
-func ListOpenPRs(dir string) ([]PR, error) {
+// ListOpenPRs returns the current user's outgoing open PRs: actionable PRs
+// first (green group, then red group), each group most-recently-updated
+// first, followed by non-actionable PRs, also most-recently-updated first.
+// When allRepos is false the search is scoped to the repo at dir; when true
+// it spans every repo the user has open PRs in.
+func ListOpenPRs(dir string, allRepos bool) ([]PR, error) {
+	if allRepos {
+		return listOpenPRsAllRepos(dir)
+	}
 	out, err := runGH(dir, []string{
 		"pr", "list",
 		"--author", "@me",
@@ -337,10 +392,101 @@ func ListOpenPRs(dir string) ([]PR, error) {
 	return prs, nil
 }
 
-// AnyPRsExist reports whether the user has any PRs at all (open or closed)
-// in the repo at dir. Used to distinguish "no open PRs" from "no PRs found"
-// when the open-PR list comes back empty.
-func AnyPRsExist(dir string) (bool, error) {
+// listOpenPRsAllRepos discovers the repos the user has open PRs in via a
+// single cross-repo search, then re-fetches each repo's open PRs with the
+// full field set via `gh pr list` (the search API doesn't expose the facet
+// fields — statusCheckRollup, reviewDecision, reviews, mergeable,
+// reviewRequests — only enough to locate repos).
+func listOpenPRsAllRepos(dir string) ([]PR, error) {
+	repos, err := searchPRRepos(dir, "--state", "open")
+	if err != nil {
+		return nil, err
+	}
+	all, err := fetchPerRepo(repos, func(repo string) ([]PR, error) {
+		out, err := runGH(dir, []string{
+			"pr", "list",
+			"--repo", repo,
+			"--author", "@me",
+			"--json", prListFields,
+		})
+		if err != nil {
+			return nil, classifyPRListError(err)
+		}
+		return parsePRList(out)
+	})
+	if err != nil {
+		return nil, err
+	}
+	sortPRs(all)
+	return all, nil
+}
+
+// searchRepoResult is the minimal shape needed from `gh search prs` to
+// discover which repos to re-query for full-fidelity data.
+type searchRepoResult struct {
+	Repository struct {
+		NameWithOwner string `json:"nameWithOwner"`
+	} `json:"repository"`
+}
+
+// runGHSearchPRs runs `gh search prs --author @me --json <jsonFields>` with
+// the given extra filter args, the shared entry point for every cross-repo
+// PR search (repo discovery and the all-repos existence probe alike).
+func runGHSearchPRs(dir, jsonFields string, extraArgs ...string) (string, error) {
+	args := append([]string{
+		"search", "prs",
+		"--author", "@me",
+		"--limit", "100",
+		"--json", jsonFields,
+	}, extraArgs...)
+	out, err := runGH(dir, args)
+	if err != nil {
+		return "", classifyPRListError(err)
+	}
+	return out, nil
+}
+
+// searchPRRepos returns the deduped set of repos (owner/name) containing PRs
+// authored by the current user matching the given `gh search prs` filters.
+func searchPRRepos(dir string, extraArgs ...string) ([]string, error) {
+	out, err := runGHSearchPRs(dir, "repository", extraArgs...)
+	if err != nil {
+		return nil, err
+	}
+	var results []searchRepoResult
+	out = strings.TrimSpace(out)
+	if out == "" {
+		return nil, nil
+	}
+	if err := json.Unmarshal([]byte(out), &results); err != nil {
+		return nil, fmt.Errorf("parsing gh search prs output: %w", err)
+	}
+	seen := make(map[string]bool)
+	var repos []string
+	for _, r := range results {
+		name := r.Repository.NameWithOwner
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		repos = append(repos, name)
+	}
+	return repos, nil
+}
+
+// AnyPRsExist reports whether the user has any PRs at all (open or closed),
+// scoped to the repo at dir when allRepos is false, or across every repo
+// when true. Used to distinguish "no open PRs" from "no PRs found" when the
+// open-PR list comes back empty.
+func AnyPRsExist(dir string, allRepos bool) (bool, error) {
+	if allRepos {
+		out, err := runGHSearchPRs(dir, "number", "--limit", "1")
+		if err != nil {
+			return false, err
+		}
+		out = strings.TrimSpace(out)
+		return out != "" && out != "[]", nil
+	}
 	out, err := runGH(dir, []string{
 		"pr", "list",
 		"--author", "@me",

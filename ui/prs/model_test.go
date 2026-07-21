@@ -240,6 +240,41 @@ func TestRKeyTriggersRefresh(t *testing.T) {
 	}
 }
 
+func TestAKeyTogglesAllReposScopeAndTriggersRefetch(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	if m.allRepos {
+		t.Fatal("expected allRepos false by default")
+	}
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	m = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected a refetch cmd from a")
+	}
+	if !m.allRepos {
+		t.Fatal("expected allRepos true after pressing a")
+	}
+
+	content := m.View().Content
+	if !strings.Contains(content, "all repos") {
+		t.Fatalf("expected all-repos indicator in panel, got:\n%s", content)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	m = updated.(Model)
+	if m.allRepos {
+		t.Fatal("expected allRepos false after toggling again")
+	}
+}
+
+func TestNewModelWithScopeStartsAllRepos(t *testing.T) {
+	m := NewModelWithScope("/repo", ui.Settings{}, keys.Manager{}, true)
+	if !m.allRepos {
+		t.Fatal("expected NewModelWithScope(..., true) to start allRepos scoped")
+	}
+}
+
 func TestRefreshMenuChordTriggersRefresh(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})

@@ -16,13 +16,14 @@ type prsLoadedMsg struct {
 
 func (m Model) cmdLoad() tea.Cmd {
 	worktreeRoot := m.worktreeRoot
+	allRepos := m.allRepos
 	return func() tea.Msg {
 		// The closed-PR section is independent of the open-PR pipeline (no
 		// facets, no actionable marker), so a closed-fetch failure is treated
 		// as "no recently-closed PRs" rather than surfacing its own error UI.
-		closedPRs, _ := git.ListClosedPRs(worktreeRoot)
+		closedPRs, _ := git.ListClosedPRs(worktreeRoot, allRepos)
 
-		prs, err := git.ListOpenPRs(worktreeRoot)
+		prs, err := git.ListOpenPRs(worktreeRoot, allRepos)
 		if err != nil {
 			return prsLoadedMsg{err: err, closedPRs: closedPRs}
 		}
@@ -32,7 +33,7 @@ func (m Model) cmdLoad() tea.Cmd {
 			// default to the less alarming "no open PRs" rather than falsely
 			// claiming the user has no PRs at all.
 			var probeErr error
-			anyPRs, probeErr = git.AnyPRsExist(worktreeRoot)
+			anyPRs, probeErr = git.AnyPRsExist(worktreeRoot, allRepos)
 			if probeErr != nil {
 				anyPRs = true
 			}

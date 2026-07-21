@@ -30,17 +30,27 @@ type Model struct {
 	closedPRs []git.ClosedPR
 	list      list.Model
 
+	allRepos bool
+
 	keys keys.Manager
 	help help.Model
 }
 
 func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager) Model {
+	return NewModelWithScope(worktreeRoot, settings, extraKeys, false)
+}
+
+// NewModelWithScope builds the PRs tab model with an initial repo scope:
+// allRepos true starts it already scoped to all repos (the `gx prs --all`
+// CLI entry point), false starts it current-repo scoped.
+func NewModelWithScope(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager, allRepos bool) Model {
 	km := newPRsManager()
 	return Model{
 		worktreeRoot: worktreeRoot,
 		settings:     settings,
 		keys:         km,
 		help:         help.NewModel(help.BuildSections(km, extraKeys)),
+		allRepos:     allRepos,
 	}
 }
 
@@ -127,8 +137,12 @@ func (m Model) View() tea.View {
 
 func (m Model) buildMainContent() string {
 	panelHeight := max(1, m.height-1)
+	subtitle := ""
+	if m.allRepos {
+		subtitle = "all repos"
+	}
 	panel := ui.RenderPanel(ui.PanelOptionsFor(
-		m.width, panelHeight, "PRs", "", m.visibleLines(), true, prsTitleColor, prsTitleColor, false,
+		m.width, panelHeight, "PRs", subtitle, m.visibleLines(), true, prsTitleColor, prsTitleColor, false,
 	))
 	return lipgloss.JoinVertical(lipgloss.Left, panel, prsFooter())
 }

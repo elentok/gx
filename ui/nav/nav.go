@@ -18,6 +18,7 @@ type ViewState struct {
 	Ref          string
 	InitialPath  string
 	FocusSubject string
+	AllRepos     bool
 
 	FilterPath      string
 	FilterStartLine int

@@ -225,6 +225,30 @@ func TestSetInitialTabCarriesFilterOptions(t *testing.T) {
 	}
 }
 
+func TestSetInitialTabCarriesAllRepos(t *testing.T) {
+	s := newState()
+	s.SetInitialTab(nav.ViewState{Tab: nav.TabPRs, AllRepos: true})
+	if !s.Active().AllRepos {
+		t.Fatal("expected SetInitialTab to carry AllRepos through")
+	}
+}
+
+func TestSwitchToPRsTabResetsAllRepos(t *testing.T) {
+	s := newState()
+	s.SetInitialTab(nav.ViewState{Tab: nav.TabPRs, AllRepos: true})
+	// Switching tabs via the digit/chord keys always passes a bare
+	// ViewState{Tab: nav.TabPRs} (see model_tabs.go), so AllRepos must not be
+	// carried across a Switch the way FocusSubject/filters are.
+	got := s.Switch(nav.ViewState{Tab: nav.TabWorktrees})
+	if got.Tab != nav.TabWorktrees {
+		t.Fatalf("expected active tab worktrees, got %q", got.Tab)
+	}
+	got = s.Switch(nav.ViewState{Tab: nav.TabPRs})
+	if got.AllRepos {
+		t.Fatal("expected AllRepos reset to false when reopening PRs tab via Switch")
+	}
+}
+
 func TestBackWithStackDepthTwoPopsToMiddleEntry(t *testing.T) {
 	s := newState()
 	s.SetInitialTab(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT})

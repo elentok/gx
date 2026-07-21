@@ -41,7 +41,7 @@ type deps struct {
 	runLog               func(LogOptions) error
 	runShow              func(string) error
 	runStash             func() error
-	runPRs               func() error
+	runPRs               func(allRepos bool) error
 	confirmForce         func(string) (bool, error)
 	choosePushDivergence func(io.Reader, io.Writer, *git.PushDivergence) (int, error)
 	initConfig           func() (string, error)
@@ -288,14 +288,17 @@ func newStashCmd(d deps) *cobra.Command {
 }
 
 func newPRsCmd(d deps) *cobra.Command {
-	return &cobra.Command{
+	var allRepos bool
+	cmd := &cobra.Command{
 		Use:   "prs",
 		Short: "open the PRs UI",
 		Args:  cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return d.runPRs()
+			return d.runPRs(allRepos)
 		},
 	}
+	cmd.Flags().BoolVar(&allRepos, "all", false, "show outgoing PRs across all repos, not just the current one")
+	return cmd
 }
 
 func newConfigCmd(d deps) *cobra.Command {
@@ -594,7 +597,7 @@ func runStash() error {
 	return err
 }
 
-func runPRs() error {
+func runPRs(allRepos bool) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -622,7 +625,7 @@ func runPRs() error {
 		return err
 	}
 	m := app.New(*repo, app.Settings{
-		InitialRoute:       nav.ViewState{Tab: nav.TabPRs, WorktreeRoot: root},
+		InitialRoute:       nav.ViewState{Tab: nav.TabPRs, WorktreeRoot: root, AllRepos: allRepos},
 		ActiveWorktreePath: root,
 		Settings:           settingsFromConfig(cfg),
 	})

@@ -62,11 +62,13 @@ func TestExecute_LogDispatchesToRunLog(t *testing.T) {
 
 func TestExecute_PRsDispatchesToRunPRs(t *testing.T) {
 	called := 0
+	var gotAllRepos bool
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
-		runPRs: func() error {
+		runPRs: func(allRepos bool) error {
 			called++
+			gotAllRepos = allRepos
 			return nil
 		},
 	}
@@ -76,6 +78,33 @@ func TestExecute_PRsDispatchesToRunPRs(t *testing.T) {
 	}
 	if called != 1 {
 		t.Fatalf("runPRs called %d times, want 1", called)
+	}
+	if gotAllRepos {
+		t.Fatal("expected allRepos false without --all flag")
+	}
+}
+
+func TestExecute_PRsAllFlagDispatchesAllRepos(t *testing.T) {
+	called := 0
+	var gotAllRepos bool
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+		runPRs: func(allRepos bool) error {
+			called++
+			gotAllRepos = allRepos
+			return nil
+		},
+	}
+
+	if err := execute([]string{"prs", "--all"}, d); err != nil {
+		t.Fatalf("execute prs --all: %v", err)
+	}
+	if called != 1 {
+		t.Fatalf("runPRs called %d times, want 1", called)
+	}
+	if !gotAllRepos {
+		t.Fatal("expected allRepos true with --all flag")
 	}
 }
 

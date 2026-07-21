@@ -194,7 +194,7 @@ func (m Model) newHistoryEntry(viewState nav.ViewState) historyEntry {
 	case nav.TabPRs:
 		return historyEntry{
 			viewState: viewState,
-			model:     prsui.NewModel(viewState.WorktreeRoot, s, keys.New(Bindings())),
+			model:     prsui.NewModelWithScope(viewState.WorktreeRoot, s, keys.New(Bindings()), viewState.AllRepos),
 		}
 	case nav.TabWorktrees:
 		fallthrough

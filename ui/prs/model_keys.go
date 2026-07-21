@@ -14,6 +14,7 @@ const (
 	bindingPRsOpen        keys.BindingID = "open"
 	bindingPRsRefresh     keys.BindingID = "refresh"
 	bindingPRsRefreshMenu keys.BindingID = "refresh-menu"
+	bindingPRsToggleAll   keys.BindingID = "toggle-all-repos"
 )
 
 // newPRsManager builds the key manager for the PRs tab.
@@ -30,6 +31,7 @@ func newPRsManager() keys.Manager {
 		{ID: bindingPRsOpen, Seq: []string{"o"}, Categories: []string{}, Title: ""},
 		{ID: bindingPRsRefresh, Seq: []string{"R"}, Categories: []string{"Other"}, Title: "refresh"},
 		{ID: bindingPRsRefreshMenu, Seq: []string{"m", "r"}, Categories: []string{"Global"}, Title: "refresh"},
+		{ID: bindingPRsToggleAll, Seq: []string{"a"}, Categories: []string{"Other"}, Title: "toggle all-repos scope"},
 	})
 }
 
@@ -52,6 +54,9 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model,
 		return m, m.cmdOpenSelected()
 	case bindingPRsRefresh, bindingPRsRefreshMenu:
 		return m, tea.Batch(notify.Success("refreshed"), m.cmdLoad())
+	case bindingPRsToggleAll:
+		m.allRepos = !m.allRepos
+		return m, m.cmdLoad()
 	}
 	return m, nil
 }
