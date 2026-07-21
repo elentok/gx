@@ -184,6 +184,21 @@ func (m Model) totalItems() int {
 	return len(m.prs) + len(m.closedPRs)
 }
 
+// actionableCount returns how many leading entries of m.prs are actionable
+// (Marker() != MarkerNeutral). git.ListOpenPRs always sorts actionable PRs
+// first, so this is the length of a contiguous prefix — see
+// issues/02-split-actionable-non-actionable.md.
+func (m Model) actionableCount() int {
+	n := 0
+	for _, pr := range m.prs {
+		if pr.Marker() == git.MarkerNeutral {
+			break
+		}
+		n++
+	}
+	return n
+}
+
 // lineRange is a selectable item's [start, end) line span within the
 // unwindowed combined content (open rows, then the closed section).
 type lineRange struct {
@@ -203,15 +218,42 @@ func (m Model) openLineCount() int {
 	if len(m.prs) == 0 {
 		return 1
 	}
-	return len(m.prs) * 2
+	return 1 + m.actionableContentLineCount() + 2 + m.nonActionableContentLineCount()
 }
 
-// itemLineRange returns the line span of combined item i: open-PR rows
-// render as two lines each starting at line 0, followed by a 2-line spacer
-// and closed-section header, then one line per closed PR.
+// actionableContentLineCount is the line height of the Actionable section's
+// body (below its header): either its empty-state line or two lines per row.
+func (m Model) actionableContentLineCount() int {
+	if n := m.actionableCount(); n > 0 {
+		return n * 2
+	}
+	return 1
+}
+
+// nonActionableContentLineCount is the line height of the Non-actionable
+// section's body (below its header): either its empty-state line or two
+// lines per row.
+func (m Model) nonActionableContentLineCount() int {
+	if n := len(m.prs) - m.actionableCount(); n > 0 {
+		return n * 2
+	}
+	return 1
+}
+
+// itemLineRange returns the line span of combined item i. Open-PR rows sit
+// under an Actionable header (1 line) and, once that section's rows/empty
+// state end, a 2-line spacer/header before the Non-actionable rows; the
+// closed section follows with its own 2-line spacer/header, then one line
+// per closed PR — see issues/02-split-actionable-non-actionable.md.
 func (m Model) itemLineRange(i int) lineRange {
 	if i < len(m.prs) {
-		start := i * 2
+		n := m.actionableCount()
+		if i < n {
+			start := 1 + i*2
+			return lineRange{start, start + 2}
+		}
+		nonActionableStart := 1 + m.actionableContentLineCount() + 2
+		start := nonActionableStart + (i-n)*2
 		return lineRange{start, start + 2}
 	}
 	start := m.openLineCount() + 2 + (i - len(m.prs))

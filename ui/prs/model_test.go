@@ -105,6 +105,88 @@ func TestModelRendersPRRows(t *testing.T) {
 	}
 }
 
+// neutralPR returns a PR whose facets classify as MarkerNeutral (waiting on
+// others): CI passed, a comment-only review (not approved, not changes
+// requested), and a clean merge state.
+func neutralPR(number int, title string) git.PR {
+	return git.PR{
+		Number:            number,
+		Title:             title,
+		UpdatedAt:         time.Now(),
+		StatusCheckRollup: []git.PRStatusCheck{{Status: "COMPLETED", Conclusion: "SUCCESS"}},
+		Reviews:           []git.PRReview{{State: "COMMENTED"}},
+		Mergeable:         "MERGEABLE",
+	}
+}
+
+// greenPR returns a PR whose facets classify as MarkerGreen (actionable,
+// ready to merge): CI passed, approved, and mergeable-clean.
+func greenPR(number int, title string) git.PR {
+	return git.PR{
+		Number:            number,
+		Title:             title,
+		UpdatedAt:         time.Now(),
+		StatusCheckRollup: []git.PRStatusCheck{{Status: "COMPLETED", Conclusion: "SUCCESS"}},
+		ReviewDecision:    "APPROVED",
+		Mergeable:         "MERGEABLE",
+	}
+}
+
+func TestModelSplitsActionableAndNonActionableSections(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = loadPRs(m, []git.PR{
+		greenPR(1, "Ready PR"),
+		neutralPR(2, "Waiting PR"),
+	}, true, nil, nil)
+
+	content := m.View().Content
+	if !strings.Contains(content, "── Actionable (1) ──") {
+		t.Fatalf("expected Actionable(1) header, got:\n%s", content)
+	}
+	if !strings.Contains(content, "── Non-actionable (1) ──") {
+		t.Fatalf("expected Non-actionable(1) header, got:\n%s", content)
+	}
+
+	actionableIdx := strings.Index(content, "Actionable")
+	nonActionableIdx := strings.Index(content, "Non-actionable")
+	closedIdx := strings.Index(content, "Closed (last 2 weeks)")
+	if !(actionableIdx < nonActionableIdx && nonActionableIdx < closedIdx) {
+		t.Fatalf("expected section order Actionable, Non-actionable, Closed, got:\n%s", content)
+	}
+}
+
+func TestModelRendersEmptySectionStates(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = loadPRs(m, []git.PR{neutralPR(1, "Waiting PR")}, true, nil, nil)
+
+	content := m.View().Content
+	if !strings.Contains(content, "── Actionable (0) ──") {
+		t.Fatalf("expected Actionable(0) header, got:\n%s", content)
+	}
+	if !strings.Contains(content, "no actionable PRs") {
+		t.Fatalf("expected actionable empty-state line, got:\n%s", content)
+	}
+}
+
+func TestNavigationMovesFromActionableIntoNonActionable(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = loadPRs(m, []git.PR{
+		greenPR(1, "Ready PR"),
+		neutralPR(2, "Waiting PR"),
+	}, true, nil, nil)
+
+	if m.list.Selected() != 0 {
+		t.Fatalf("expected initial selection on actionable row 0, got %d", m.list.Selected())
+	}
+	m = sendModel(m, tea.KeyPressMsg{Code: 'j', Text: "j"})
+	if m.list.Selected() != 1 {
+		t.Fatalf("expected selection to move onto non-actionable row (index 1), got %d", m.list.Selected())
+	}
+}
+
 func TestModelRendersRepoNameInAllReposMode(t *testing.T) {
 	m := NewModelWithScope("/repo", ui.Settings{}, keys.Manager{}, true)
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
@@ -348,6 +430,9 @@ func TestNavigationIntoClosedSectionScrollsCombinedViewport(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 12})
 
+	// Default-facet PRs (no CI/reviews/mergeable info) classify as
+	// MarkerRed — actionable — so all 15 land in the Actionable section and
+	// the Non-actionable section renders empty.
 	openPRs := make([]git.PR, 15)
 	for i := range openPRs {
 		openPRs[i] = git.PR{Number: i + 1, Title: "Open PR", UpdatedAt: time.Now()}
@@ -357,9 +442,12 @@ func TestNavigationIntoClosedSectionScrollsCombinedViewport(t *testing.T) {
 	})
 
 	viewportH := m.viewportH()
-	openLines := len(openPRs) * 2
-	if viewportH >= openLines {
-		t.Fatalf("test requires a viewport shorter than the open list (%d lines), got viewportH %d", openLines, viewportH)
+	// Actionable header (1) + 2 lines/row + spacer/header (2) + Non-actionable
+	// empty-state (1) — see issues/02-split-actionable-non-actionable.md.
+	actionableRowsEnd := 1 + len(openPRs)*2
+	openSectionLines := actionableRowsEnd + 2 + 1
+	if viewportH >= openSectionLines {
+		t.Fatalf("test requires a viewport shorter than the open section (%d lines), got viewportH %d", openSectionLines, viewportH)
 	}
 
 	for range len(openPRs) - 1 {
@@ -368,7 +456,7 @@ func TestNavigationIntoClosedSectionScrollsCombinedViewport(t *testing.T) {
 	if m.list.Selected() != len(openPRs)-1 {
 		t.Fatalf("expected selection on last open row (%d), got %d", len(openPRs)-1, m.list.Selected())
 	}
-	wantOffset := openLines - viewportH
+	wantOffset := actionableRowsEnd - viewportH
 	if got := m.scrollOffset; got != wantOffset {
 		t.Fatalf("expected viewport scrolled to keep the last open row visible (offset %d), got %d", wantOffset, got)
 	}
@@ -377,7 +465,7 @@ func TestNavigationIntoClosedSectionScrollsCombinedViewport(t *testing.T) {
 	if m.list.Selected() != len(openPRs) {
 		t.Fatalf("expected selection on first closed row (%d), got %d", len(openPRs), m.list.Selected())
 	}
-	closedRowEndLine := openLines + 2 + 1 // spacer + header, then the one closed row
+	closedRowEndLine := openSectionLines + 2 + 1 // spacer + header, then the one closed row
 	wantOffset = closedRowEndLine - viewportH
 	if got := m.scrollOffset; got != wantOffset {
 		t.Fatalf("expected viewport scrolled to keep the closed row visible (offset %d), got %d", wantOffset, got)

@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.22.2 - 2026-07-21
+
+- PRs tab: Open PRs are now split into Actionable and Non-actionable sections, each with a count and empty state, so PRs needing your attention stand out.
+- PRs tab: Open and Closed PR sections now scroll together as a single unified viewport with a scrollbar, instead of the Closed section always rendering in full below.
+
 ## v0.22.1 - 2026-07-21
 
 - Added a PR comments popup: press `c` on any open PR to view issue comments and reviews with timestamps.
