@@ -60,6 +60,13 @@ func (m Model) Init() tea.Cmd {
 	return m.cmdLoad()
 }
 
+// OnPageActivated triggers a non-blocking background refetch every time the
+// PRs tab is switched into, independent of the git-mutation reload gate
+// (which this tab intentionally does not implement — see AutoReload absence).
+func (m Model) OnPageActivated() tea.Cmd {
+	return m.cmdLoad()
+}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.help.IsOpen {
 		if _, ok := msg.(tea.KeyPressMsg); ok {

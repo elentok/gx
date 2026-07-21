@@ -3,14 +3,17 @@ package prs
 import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/notify"
 )
 
 const (
-	bindingPRsHelp keys.BindingID = "help"
-	bindingPRsBack keys.BindingID = "back"
-	bindingPRsDown keys.BindingID = "down"
-	bindingPRsUp   keys.BindingID = "up"
-	bindingPRsOpen keys.BindingID = "open"
+	bindingPRsHelp        keys.BindingID = "help"
+	bindingPRsBack        keys.BindingID = "back"
+	bindingPRsDown        keys.BindingID = "down"
+	bindingPRsUp          keys.BindingID = "up"
+	bindingPRsOpen        keys.BindingID = "open"
+	bindingPRsRefresh     keys.BindingID = "refresh"
+	bindingPRsRefreshMenu keys.BindingID = "refresh-menu"
 )
 
 // newPRsManager builds the key manager for the PRs tab.
@@ -25,6 +28,8 @@ func newPRsManager() keys.Manager {
 		{ID: bindingPRsUp, Seq: []string{"up"}, Categories: []string{}, Title: ""},
 		{ID: bindingPRsOpen, Seq: []string{"enter"}, Categories: []string{"Navigation"}, Title: "open in browser"},
 		{ID: bindingPRsOpen, Seq: []string{"o"}, Categories: []string{}, Title: ""},
+		{ID: bindingPRsRefresh, Seq: []string{"R"}, Categories: []string{"Other"}, Title: "refresh"},
+		{ID: bindingPRsRefreshMenu, Seq: []string{"m", "r"}, Categories: []string{"Global"}, Title: "refresh"},
 	})
 }
 
@@ -45,6 +50,8 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model,
 		return m, nil
 	case bindingPRsOpen:
 		return m, m.cmdOpenSelected()
+	case bindingPRsRefresh, bindingPRsRefreshMenu:
+		return m, tea.Batch(notify.Success("refreshed"), m.cmdLoad())
 	}
 	return m, nil
 }

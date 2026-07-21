@@ -230,6 +230,35 @@ func TestQuestionMarkOpensHelpOverlay(t *testing.T) {
 	}
 }
 
+func TestRKeyTriggersRefresh(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'R', Text: "R"})
+	if cmd == nil {
+		t.Fatal("expected a refresh cmd from R")
+	}
+}
+
+func TestRefreshMenuChordTriggersRefresh(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+
+	m = sendModel(m, tea.KeyPressMsg{Code: 'm', Text: "m"})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
+	if cmd == nil {
+		t.Fatal("expected a refresh cmd from m r")
+	}
+}
+
+func TestOnPageActivatedTriggersRefetch(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	cmd := m.OnPageActivated()
+	if cmd == nil {
+		t.Fatal("expected OnPageActivated to return a refetch cmd")
+	}
+}
+
 func TestQKeyReturnsBackCmd(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
