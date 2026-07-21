@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.22.3 - 2026-07-21
+
+- Terminal: herdr splits/tabs now use the documented `pane split`/`pane run` flow instead of `agent start`, fixing launches that relied on undocumented behavior.
+
 ## v0.22.2 - 2026-07-21
 
 - PRs tab: Open PRs are now split into Actionable and Non-actionable sections, each with a count and empty state, so PRs needing your attention stand out.
