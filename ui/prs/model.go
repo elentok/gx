@@ -205,88 +205,20 @@ type lineRange struct {
 	start, end int
 }
 
-// openLineCount returns the number of lines openListLines would render,
-// without doing the actual (width-dependent) rendering — used to locate
-// where the closed section starts in line space.
-func (m Model) openLineCount() int {
-	if !m.openLoaded {
-		return 1
-	}
-	if m.err != nil {
-		return len(m.errorLines(m.err))
-	}
-	if len(m.prs) == 0 {
-		return 1
-	}
-	return 1 + m.actionableContentLineCount() + 2 + m.nonActionableContentLineCount()
-}
-
-// actionableContentLineCount is the line height of the Actionable section's
-// body (below its header): either its empty-state line or two lines per row.
-func (m Model) actionableContentLineCount() int {
-	if n := m.actionableCount(); n > 0 {
-		return n * 2
-	}
-	return 1
-}
-
-// nonActionableContentLineCount is the line height of the Non-actionable
-// section's body (below its header): either its empty-state line or two
-// lines per row.
-func (m Model) nonActionableContentLineCount() int {
-	if n := len(m.prs) - m.actionableCount(); n > 0 {
-		return n * 2
-	}
-	return 1
-}
-
-// itemLineRange returns the line span of combined item i. Open-PR rows sit
-// under an Actionable header (1 line) and, once that section's rows/empty
-// state end, a 2-line spacer/header before the Non-actionable rows; the
-// closed section follows with its own 2-line spacer/header, then one line
-// per closed PR — see issues/02-split-actionable-non-actionable.md.
-func (m Model) itemLineRange(i int) lineRange {
-	if i < len(m.prs) {
-		n := m.actionableCount()
-		if i < n {
-			start := 1 + i*2
-			return lineRange{start, start + 2}
-		}
-		nonActionableStart := 1 + m.actionableContentLineCount() + 2
-		start := nonActionableStart + (i-n)*2
-		return lineRange{start, start + 2}
-	}
-	start := m.openLineCount() + 2 + (i - len(m.prs))
-	return lineRange{start, start + 1}
-}
-
-// totalLineCount is the full unwindowed content height: the open section
-// plus the 2-line spacer/header plus the closed section.
-func (m Model) totalLineCount() int {
-	return m.openLineCount() + 2 + m.closedLineCount()
-}
-
-func (m Model) closedLineCount() int {
-	if !m.closedLoaded {
-		return 1
-	}
-	if len(m.closedPRs) == 0 {
-		return 1
-	}
-	return len(m.closedPRs)
-}
-
 // ensureSelectionVisible adjusts scrollOffset minimally so the selected
 // item's full line range stays on screen, then clamps it to the content's
 // bounds — the single-viewport analogue of ui/list.Model.EnsureSelectionVisible,
 // but line-based since open rows (2 lines) and closed rows (1 line) differ in
-// height.
+// height. Line positions come from combinedContent (view.go), the same
+// computation that renders the content, so a layout change there can't
+// silently desync the scroll math.
 func (m Model) ensureSelectionVisible() Model {
 	viewportH := m.viewportH()
-	total := m.totalLineCount()
+	lines, ranges := m.combinedContent()
+	total := len(lines)
 
-	if sel := m.list.Selected(); sel >= 0 && sel < m.totalItems() {
-		r := m.itemLineRange(sel)
+	if sel := m.list.Selected(); sel >= 0 && sel < len(ranges) {
+		r := ranges[sel]
 		if r.start < m.scrollOffset {
 			m.scrollOffset = r.start
 		}

@@ -59,13 +59,30 @@ func repoColumn(allRepos bool, repo string) string {
 // 2-wide marker column above it (mirrors ui/log's subjectIndentNoGraph).
 const facetIndent = "  "
 
-// visibleLines renders the PRs tab's full content (open rows, then the
-// closed section) as one continuous list, windows it to a single line-based
+// combinedContent renders the PRs tab's full content (open rows, then the
+// closed section) as one continuous list, alongside each combined item's
+// [start, end) line span within that list. It is the single source of truth
+// for line positions: view.go's visibleLines windows the lines for display,
+// and model.go's ensureSelectionVisible derives scroll offsets from the
+// ranges, instead of each maintaining its own parallel arithmetic.
+func (m Model) combinedContent() (lines []string, ranges []lineRange) {
+	openLines, openRanges := m.openListLines()
+	closedLines, closedRanges := m.closedSectionLines()
+
+	lines = append(openLines, closedLines...)
+	ranges = append(ranges, openRanges...)
+	base := len(openLines)
+	for _, r := range closedRanges {
+		ranges = append(ranges, lineRange{r.start + base, r.end + base})
+	}
+	return lines, ranges
+}
+
+// visibleLines windows combinedContent's lines to a single line-based
 // viewport at m.scrollOffset, and appends a scrollbar gutter alongside it —
 // see issues/01-unify-scrollable-viewport.md.
 func (m Model) visibleLines() []string {
-	lines := m.openListLines()
-	lines = append(lines, m.closedSectionLines()...)
+	lines, _ := m.combinedContent()
 
 	viewportH := m.viewportH()
 	total := len(lines)
@@ -103,36 +120,47 @@ func (m Model) appendScrollbar(lines []string, padW, height, total, offset int) 
 	return out
 }
 
+// appendRanged appends rendered's lines to lines and records their combined
+// span as a new lineRange in ranges — the shape shared by every loop that
+// renders one item's (possibly multi-line) row and tracks where it landed.
+func appendRanged(lines []string, ranges []lineRange, rendered ...string) ([]string, []lineRange) {
+	start := len(lines)
+	lines = append(lines, rendered...)
+	return lines, append(ranges, lineRange{start, len(lines)})
+}
+
 // openListLines renders the open-PR list's loading/error/empty states in
 // full (unwindowed), or — once loaded with PRs present — splits it into
 // Actionable and Non-actionable sections (see
-// issues/02-split-actionable-non-actionable.md). Windowing to the single
-// combined viewport happens in visibleLines. The two top-level sections
-// (open/closed) load concurrently (issues/09-load-time-batched-fetch.md).
-func (m Model) openListLines() []string {
+// issues/02-split-actionable-non-actionable.md), alongside each open PR's
+// line span (indexed the same as m.prs). Windowing to the single combined
+// viewport happens in visibleLines. The two top-level sections (open/closed)
+// load concurrently (issues/09-load-time-batched-fetch.md).
+func (m Model) openListLines() (lines []string, ranges []lineRange) {
 	if !m.openLoaded {
-		return []string{ui.StyleMuted.Render("loading…")}
+		return []string{ui.StyleMuted.Render("loading…")}, nil
 	}
 	if m.err != nil {
-		return m.errorLines(m.err)
+		return m.errorLines(m.err), nil
 	}
 	if len(m.prs) == 0 {
 		if m.anyPRs {
-			return []string{ui.StyleMuted.Render("no open PRs")}
+			return []string{ui.StyleMuted.Render("no open PRs")}, nil
 		}
-		return []string{ui.StyleMuted.Render("no PRs found")}
+		return []string{ui.StyleMuted.Render("no PRs found")}, nil
 	}
 
 	innerW := max(1, m.width-4)
 	sel := m.list.Selected()
 	n := m.actionableCount()
 
-	lines := []string{sectionHeaderStyle.Render(fmt.Sprintf("── Actionable (%d) ──", n))}
+	lines = []string{sectionHeaderStyle.Render(fmt.Sprintf("── Actionable (%d) ──", n))}
+	ranges = make([]lineRange, 0, len(m.prs))
 	if n == 0 {
 		lines = append(lines, ui.StyleMuted.Render("no actionable PRs"))
 	} else {
 		for i := range n {
-			lines = append(lines, m.renderRow(m.prs[i], i == sel, innerW)...)
+			lines, ranges = appendRanged(lines, ranges, m.renderRow(m.prs[i], i == sel, innerW)...)
 		}
 	}
 
@@ -142,33 +170,35 @@ func (m Model) openListLines() []string {
 		lines = append(lines, ui.StyleMuted.Render("no non-actionable PRs"))
 	} else {
 		for i := n; i < len(m.prs); i++ {
-			lines = append(lines, m.renderRow(m.prs[i], i == sel, innerW)...)
+			lines, ranges = appendRanged(lines, ranges, m.renderRow(m.prs[i], i == sel, innerW)...)
 		}
 	}
-	return lines
+	return lines, ranges
 }
 
 // closedSectionLines renders the "Closed (last 2 weeks)" section: a header
 // followed by one line per recently-closed PR (marker, title, closed date —
-// no facets), or a muted empty state when there are none. Renders
-// unconditionally once loaded, independent of the open-PR list's own
-// state (empty or erroring).
-func (m Model) closedSectionLines() []string {
-	lines := []string{"", sectionHeaderStyle.Render("── Closed (last 2 weeks) ──")}
+// no facets), or a muted empty state when there are none, alongside each
+// closed PR's line span (indexed the same as m.closedPRs, relative to this
+// section's own lines). Renders unconditionally once loaded, independent of
+// the open-PR list's own state (empty or erroring).
+func (m Model) closedSectionLines() (lines []string, ranges []lineRange) {
+	lines = []string{"", sectionHeaderStyle.Render("── Closed (last 2 weeks) ──")}
 	if !m.closedLoaded {
-		return append(lines, ui.StyleMuted.Render("loading…"))
+		return append(lines, ui.StyleMuted.Render("loading…")), nil
 	}
 	if len(m.closedPRs) == 0 {
-		return append(lines, ui.StyleMuted.Render("no recently closed PRs"))
+		return append(lines, ui.StyleMuted.Render("no recently closed PRs")), nil
 	}
 
 	innerW := max(1, m.width-4)
 	sel := m.list.Selected()
 	base := len(m.prs)
+	ranges = make([]lineRange, 0, len(m.closedPRs))
 	for i, pr := range m.closedPRs {
-		lines = append(lines, m.renderClosedRow(pr, base+i == sel, innerW))
+		lines, ranges = appendRanged(lines, ranges, m.renderClosedRow(pr, base+i == sel, innerW))
 	}
-	return lines
+	return lines, ranges
 }
 
 func (m Model) renderClosedRow(pr git.ClosedPR, selected bool, width int) string {
