@@ -65,14 +65,17 @@ type gotoPRMsg struct {
 
 // navigateSelection moves the selection by delta across the combined
 // open+closed list. Scroll-viewport math only ever applies to the open
-// section (closed rows always render in full below it), so
-// EnsureSelectionVisible is skipped once the selection lands on a closed
-// row — see issues/10-closed-pr-selectable.md.
+// section (closed rows always render in full below it, never scrolling on
+// their own — see issues/10-closed-pr-selectable.md), so
+// EnsureSelectionVisible is always called against the open list's own
+// bounds (len(m.prs), visibleH) regardless of where the selection landed:
+// once the selection is past the open list, EnsureSelectionVisible's own
+// offset clamp (capped at len(m.prs)-visibleH) pins the viewport to the
+// open list's last page rather than leaving it wherever it happened to be
+// — see issues/14-open-list-scroll-into-closed.md.
 func (m Model) navigateSelection(delta int) Model {
 	m.list.SetSelected(m.list.Selected()+delta, m.totalItems())
-	if m.list.Selected() < len(m.prs) {
-		m.list.EnsureSelectionVisible(len(m.prs), m.visibleH())
-	}
+	m.list.EnsureSelectionVisible(len(m.prs), m.visibleH())
 	return m
 }
 

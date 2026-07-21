@@ -339,6 +339,48 @@ func TestNavigationMovesSelectionIntoClosedSection(t *testing.T) {
 	}
 }
 
+func TestNavigationIntoClosedSectionScrollsOpenListToLastPage(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+
+	openPRs := make([]git.PR, 15)
+	for i := range openPRs {
+		openPRs[i] = git.PR{Number: i + 1, Title: "Open PR", UpdatedAt: time.Now()}
+	}
+	m = loadPRs(m, openPRs, true, nil, []git.ClosedPR{
+		{Number: 100, Title: "Closed one", State: "MERGED", ClosedAt: time.Now()},
+	})
+
+	visibleH := m.visibleH()
+	if visibleH >= len(openPRs) {
+		t.Fatalf("test requires an open list longer than visibleH (%d), got %d rows", visibleH, len(openPRs))
+	}
+
+	for range len(openPRs) - 1 {
+		m = sendModel(m, tea.KeyPressMsg{Code: 'j', Text: "j"})
+	}
+	if m.list.Selected() != len(openPRs)-1 {
+		t.Fatalf("expected selection on last open row (%d), got %d", len(openPRs)-1, m.list.Selected())
+	}
+
+	m = sendModel(m, tea.KeyPressMsg{Code: 'j', Text: "j"})
+	if m.list.Selected() != len(openPRs) {
+		t.Fatalf("expected selection on first closed row (%d), got %d", len(openPRs), m.list.Selected())
+	}
+	wantOffset := len(openPRs) - visibleH
+	if got := m.list.Offset(); got != wantOffset {
+		t.Fatalf("expected open viewport scrolled to its last page (offset %d), got %d", wantOffset, got)
+	}
+
+	m = sendModel(m, tea.KeyPressMsg{Code: 'k', Text: "k"})
+	if m.list.Selected() != len(openPRs)-1 {
+		t.Fatalf("expected selection back on last open row, got %d", m.list.Selected())
+	}
+	if got := m.list.Offset(); got != wantOffset {
+		t.Fatalf("expected open viewport to stay on its last page (offset %d), got %d", wantOffset, got)
+	}
+}
+
 func TestOpenSelectedReturnsClosedURLCmd(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
