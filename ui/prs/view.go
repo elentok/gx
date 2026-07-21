@@ -28,11 +28,11 @@ var (
 	markerBlockedStyle = lipgloss.NewStyle().Foreground(ui.ColorRed)
 	markerWaitingStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
 
-	sectionHeaderStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
-	closedMergedStyle        = lipgloss.NewStyle().Foreground(ui.ColorGreen)
-	closedUnmergedStyle      = lipgloss.NewStyle().Foreground(ui.ColorRed).Faint(true)
-	closedTitleStyle         = lipgloss.NewStyle().Foreground(ui.ColorText)
-	closedDateStyle          = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Italic(true)
+	sectionHeaderStyle  = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
+	closedMergedStyle   = lipgloss.NewStyle().Foreground(ui.ColorGreen)
+	closedUnmergedStyle = lipgloss.NewStyle().Foreground(ui.ColorRed).Faint(true)
+	closedTitleStyle    = lipgloss.NewStyle().Foreground(ui.ColorText)
+	closedDateStyle     = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Italic(true)
 
 	prsRepoStyle = lipgloss.NewStyle().Foreground(ui.ColorTeal)
 )
@@ -247,10 +247,6 @@ func padAndHighlight(line string, width int, selected bool) string {
 	return line
 }
 
-// renderRow renders one PR as two physical lines: the subject line (marker,
-// number, draft badge, title, age) and an indented facet line below it
-// (CI/approval/mergeable/comment icons), each truncated/padded to width and
-// background-styled uniformly so a selection highlight covers the full row.
 // errorLines renders a tailored inline message for gh's two most common
 // failure modes, falling back to gh's raw wrapped message for everything
 // else (network, rate limit, no GitHub remote, ...).
@@ -273,6 +269,10 @@ func (m Model) errorLines(err error) []string {
 	return []string{ui.StyleWarning.Render("error: " + err.Error())}
 }
 
+// renderRow renders one PR as two physical lines: the subject line (marker,
+// number, draft badge, title, age) and an indented facet line below it
+// (CI/approval/mergeable/comment icons), each truncated/padded to width and
+// background-styled uniformly so a selection highlight covers the full row.
 func (m Model) renderRow(pr git.PR, selected bool, width int) []string {
 	facets := pr.Facets()
 	rawLines := []string{

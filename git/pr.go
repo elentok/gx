@@ -692,7 +692,7 @@ type prCommentsEnvelope struct {
 					Nodes []struct {
 						Author    struct{ Login string } `json:"author"`
 						Body      string                 `json:"body"`
-						CreatedAt time.Time               `json:"createdAt"`
+						CreatedAt time.Time              `json:"createdAt"`
 					} `json:"nodes"`
 				} `json:"comments"`
 				Reviews struct {
