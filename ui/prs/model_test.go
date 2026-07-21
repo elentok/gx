@@ -132,6 +132,69 @@ func TestModelRendersGHUnauthenticatedError(t *testing.T) {
 	}
 }
 
+func TestModelRendersClosedPRSection(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = sendModel(m, prsLoadedMsg{closedPRs: []git.ClosedPR{
+		{Number: 5, Title: "Merged fix", State: "MERGED", ClosedAt: time.Now()},
+		{Number: 6, Title: "Abandoned idea", State: "CLOSED", ClosedAt: time.Now()},
+	}})
+
+	content := m.View().Content
+	if !strings.Contains(content, "Closed (last 2 weeks)") {
+		t.Fatalf("expected closed-PR section header, got:\n%s", content)
+	}
+	if !strings.Contains(content, "Merged fix") || !strings.Contains(content, "Abandoned idea") {
+		t.Fatalf("expected closed PR titles, got:\n%s", content)
+	}
+}
+
+func TestModelRendersClosedSectionEmptyState(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = sendModel(m, prsLoadedMsg{anyPRs: true})
+
+	content := m.View().Content
+	if !strings.Contains(content, "no recently closed PRs") {
+		t.Fatalf("expected closed-PR empty state, got:\n%s", content)
+	}
+}
+
+func TestModelRendersClosedSectionWhenOpenListEmpty(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = sendModel(m, prsLoadedMsg{closedPRs: []git.ClosedPR{
+		{Number: 5, Title: "Merged fix", State: "MERGED", ClosedAt: time.Now()},
+	}})
+
+	content := m.View().Content
+	if !strings.Contains(content, "no PRs found") {
+		t.Fatalf("expected open-list empty state, got:\n%s", content)
+	}
+	if !strings.Contains(content, "Merged fix") {
+		t.Fatalf("expected closed section to render alongside empty open list, got:\n%s", content)
+	}
+}
+
+func TestModelRendersClosedSectionWhenOpenListErrors(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = sendModel(m, prsLoadedMsg{
+		err: errBoom,
+		closedPRs: []git.ClosedPR{
+			{Number: 5, Title: "Merged fix", State: "MERGED", ClosedAt: time.Now()},
+		},
+	})
+
+	content := m.View().Content
+	if !strings.Contains(content, "boom") {
+		t.Fatalf("expected open-list error, got:\n%s", content)
+	}
+	if !strings.Contains(content, "Merged fix") {
+		t.Fatalf("expected closed section to render alongside erroring open list, got:\n%s", content)
+	}
+}
+
 func TestOpenSelectedReturnsOpenURLCmd(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})

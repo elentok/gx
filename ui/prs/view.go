@@ -26,6 +26,12 @@ var (
 	markerReadyStyle   = lipgloss.NewStyle().Foreground(ui.ColorGreen)
 	markerBlockedStyle = lipgloss.NewStyle().Foreground(ui.ColorRed)
 	markerWaitingStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
+
+	closedSectionHeaderStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
+	closedMergedStyle        = lipgloss.NewStyle().Foreground(ui.ColorGreen)
+	closedUnmergedStyle      = lipgloss.NewStyle().Foreground(ui.ColorRed).Faint(true)
+	closedTitleStyle         = lipgloss.NewStyle().Foreground(ui.ColorText)
+	closedDateStyle          = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Italic(true)
 )
 
 // facetIndent lines the facet line up under the row's title, matching the
@@ -36,6 +42,16 @@ func (m Model) visibleLines() []string {
 	if !m.loaded {
 		return []string{ui.StyleMuted.Render("loading…")}
 	}
+
+	lines := m.openListLines()
+	lines = append(lines, m.closedSectionLines()...)
+	return lines
+}
+
+// openListLines renders the open-PR list's loading/error/empty/row states.
+// Rendering the closed section is independent of this — it always renders
+// below regardless of the open list's own state (see closedSectionLines).
+func (m Model) openListLines() []string {
 	if m.err != nil {
 		return m.errorLines(m.err)
 	}
@@ -55,6 +71,51 @@ func (m Model) visibleLines() []string {
 		lines = append(lines, m.renderRow(m.prs[i], i == sel, innerW)...)
 	}
 	return lines
+}
+
+// closedSectionLines renders the "Closed (last 2 weeks)" section: a header
+// followed by one line per recently-closed PR (marker, title, closed date —
+// no facets), or a muted empty state when there are none. Renders
+// unconditionally once loaded, independent of the open-PR list's own
+// state (empty or erroring).
+func (m Model) closedSectionLines() []string {
+	lines := []string{"", closedSectionHeaderStyle.Render("── Closed (last 2 weeks) ──")}
+	if len(m.closedPRs) == 0 {
+		return append(lines, ui.StyleMuted.Render("no recently closed PRs"))
+	}
+
+	innerW := max(1, m.width-4)
+	for _, pr := range m.closedPRs {
+		lines = append(lines, m.renderClosedRow(pr, innerW))
+	}
+	return lines
+}
+
+func (m Model) renderClosedRow(pr git.ClosedPR, width int) string {
+	icons := ui.Icons(m.settings.UseNerdFontIcons)
+
+	marker := icons.Check
+	markerStyle := closedMergedStyle
+	if !pr.IsMerged() {
+		marker = icons.Close
+		markerStyle = closedUnmergedStyle
+	}
+	markerCol := ui.RenderFixedColumns([]ui.FixedColumn{{Text: marker, Width: 2, Style: markerStyle}})
+
+	date := closedDateStyle.Render(ui.RelativeTimeCompact(pr.ClosedAt))
+
+	markerW := ansi.StringWidth(markerCol)
+	dateW := ansi.StringWidth(date)
+	gap := 1
+
+	titleW := max(1, width-markerW-gap-dateW)
+	title := ansi.Truncate(closedTitleStyle.Render(pr.Title), titleW, "…")
+	titleActualW := ansi.StringWidth(title)
+	if titleActualW < titleW {
+		title += strings.Repeat(" ", titleW-titleActualW)
+	}
+
+	return markerCol + title + " " + date
 }
 
 // renderRow renders one PR as two physical lines: the subject line (marker,

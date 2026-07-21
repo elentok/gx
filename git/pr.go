@@ -208,6 +208,74 @@ func markerSortRank(m Marker) int {
 	}
 }
 
+// prClosedListFields is the field set fetched for each recently-closed PR:
+// enough to render a marker, title, and closed date with no facets.
+const prClosedListFields = "number,title,state,mergedAt,closedAt,url"
+
+// closedPRWindow bounds how far back ListClosedPRs looks for recently-closed
+// PRs.
+const closedPRWindow = 14 * 24 * time.Hour
+
+// ClosedPR represents one recently-closed outgoing GitHub pull request
+// (merged or closed-unmerged), rendered with no facets.
+type ClosedPR struct {
+	Number   int       `json:"number"`
+	Title    string    `json:"title"`
+	State    string    `json:"state"`
+	MergedAt time.Time `json:"mergedAt"`
+	ClosedAt time.Time `json:"closedAt"`
+	URL      string    `json:"url"`
+}
+
+// IsMerged reports whether the PR was merged rather than closed-unmerged.
+func (pr ClosedPR) IsMerged() bool {
+	return pr.State == "MERGED"
+}
+
+// ListClosedPRs returns the current user's outgoing PRs closed (merged or
+// closed-unmerged) in the last two weeks in the repo at dir, most recently
+// closed first.
+func ListClosedPRs(dir string) ([]ClosedPR, error) {
+	cutoff := time.Now().Add(-closedPRWindow).Format("2006-01-02")
+	out, err := runGH(dir, []string{
+		"pr", "list",
+		"--state", "closed",
+		"--search", "closed:>" + cutoff,
+		"--limit", "100",
+		"--author", "@me",
+		"--json", prClosedListFields,
+	})
+	if err != nil {
+		return nil, classifyPRListError(err)
+	}
+	prs, err := parseClosedPRList(out)
+	if err != nil {
+		return nil, err
+	}
+	sortClosedPRs(prs)
+	return prs, nil
+}
+
+// sortClosedPRs orders prs by closed date, most recent first.
+func sortClosedPRs(prs []ClosedPR) {
+	sort.Slice(prs, func(i, j int) bool {
+		return prs[i].ClosedAt.After(prs[j].ClosedAt)
+	})
+}
+
+// parseClosedPRList decodes the JSON array produced by
+// `gh pr list --state closed ...`.
+func parseClosedPRList(jsonOut string) ([]ClosedPR, error) {
+	var prs []ClosedPR
+	if strings.TrimSpace(jsonOut) == "" {
+		return prs, nil
+	}
+	if err := json.Unmarshal([]byte(jsonOut), &prs); err != nil {
+		return nil, fmt.Errorf("parsing gh pr list --state closed output: %w", err)
+	}
+	return prs, nil
+}
+
 // PRListErrorKind classifies a gh pr list failure so callers can render
 // tailored inline messages without re-parsing gh's output themselves.
 type PRListErrorKind int

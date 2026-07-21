@@ -8,17 +8,23 @@ import (
 )
 
 type prsLoadedMsg struct {
-	prs    []git.PR
-	anyPRs bool
-	err    error
+	prs       []git.PR
+	anyPRs    bool
+	err       error
+	closedPRs []git.ClosedPR
 }
 
 func (m Model) cmdLoad() tea.Cmd {
 	worktreeRoot := m.worktreeRoot
 	return func() tea.Msg {
+		// The closed-PR section is independent of the open-PR pipeline (no
+		// facets, no actionable marker), so a closed-fetch failure is treated
+		// as "no recently-closed PRs" rather than surfacing its own error UI.
+		closedPRs, _ := git.ListClosedPRs(worktreeRoot)
+
 		prs, err := git.ListOpenPRs(worktreeRoot)
 		if err != nil {
-			return prsLoadedMsg{err: err}
+			return prsLoadedMsg{err: err, closedPRs: closedPRs}
 		}
 		anyPRs := len(prs) > 0
 		if !anyPRs {
@@ -31,7 +37,7 @@ func (m Model) cmdLoad() tea.Cmd {
 				anyPRs = true
 			}
 		}
-		return prsLoadedMsg{prs: prs, anyPRs: anyPRs}
+		return prsLoadedMsg{prs: prs, anyPRs: anyPRs, closedPRs: closedPRs}
 	}
 }
 
