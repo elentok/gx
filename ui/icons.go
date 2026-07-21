@@ -2,70 +2,94 @@ package ui
 
 // IconSet provides semantic icon names with nerd-font and plain fallbacks.
 type IconSet struct {
-	Check        string
-	Close        string
-	Dash         string
-	Branch       string
-	Worktree     string
-	FolderClosed string
-	FolderOpen   string
-	FileModified string
-	FileAdded    string
-	FileDeleted  string
-	FileRenamed  string
-	FileSymlink  string
-	Ahead        string
-	Behind       string
-	Search       string
-	Partial      string
-	Staged       string
-	Warning      string
-	Info         string
+	Check         string
+	Close         string
+	Dash          string
+	Branch        string
+	Worktree      string
+	FolderClosed  string
+	FolderOpen    string
+	FileModified  string
+	FileAdded     string
+	FileDeleted   string
+	FileRenamed   string
+	FileSymlink   string
+	Ahead         string
+	Behind        string
+	Search        string
+	Partial       string
+	Staged        string
+	Warning       string
+	Info          string
+	Dot           string
+	Ellipsis      string
+	CIRunning     string
+	Commented     string
+	Comment       string
+	MarkerReady   string
+	MarkerBlocked string
+	MarkerWaiting string
 }
 
 func Icons(useNerdFont bool) IconSet {
 	if !useNerdFont {
 		return IconSet{
-			Check:        "✓",
-			Close:        "✗",
-			Dash:         "-",
-			Branch:       "branch",
-			Worktree:     "Worktree",
-			FolderClosed: "▸",
-			FolderOpen:   "▾",
-			FileModified: "M",
-			FileAdded:    "N",
-			FileDeleted:  "D",
-			FileRenamed:  "R",
-			FileSymlink:  "L",
-			Ahead:        "ahead",
-			Behind:       "behind",
-			Search:       "*",
-			Partial:      "+",
-			Staged:       "✓",
-			Warning:      "⚠",
-			Info:         "i",
+			Check:         "✓",
+			Close:         "✗",
+			Dash:          "-",
+			Branch:        "branch",
+			Worktree:      "Worktree",
+			FolderClosed:  "▸",
+			FolderOpen:    "▾",
+			FileModified:  "M",
+			FileAdded:     "N",
+			FileDeleted:   "D",
+			FileRenamed:   "R",
+			FileSymlink:   "L",
+			Ahead:         "ahead",
+			Behind:        "behind",
+			Search:        "*",
+			Partial:       "+",
+			Staged:        "✓",
+			Warning:       "⚠",
+			Info:          "i",
+			Dot:           "·",
+			Ellipsis:      "...",
+			CIRunning:     "⟳",
+			Commented:     "o",
+			Comment:       "c",
+			MarkerReady:   "*",
+			MarkerBlocked: "!",
+			MarkerWaiting: "-",
 		}
 	}
 	return IconSet{
-		Check:        "",
-		Close:        "󰅙",
-		Dash:         "—",
-		Branch:       "",
-		Worktree:     "󰙅",
-		FolderClosed: "",
-		FolderOpen:   "",
-		FileModified: "",
-		FileAdded:    "",
-		FileDeleted:  "",
-		FileRenamed:  "󰁔",
-		FileSymlink:  "󰌷",
-		Ahead:        "",
-		Behind:       "",
-		Search:       "󰍉",
-		Partial:      "",
-		Staged:       "",
-		Warning:      "",
-		Info:         "",
+		Check:         "",
+		Close:         "󰅙",
+		Dash:          "—",
+		Branch:        "",
+		Worktree:      "󰙅",
+		FolderClosed:  "",
+		FolderOpen:    "",
+		FileModified:  "",
+		FileAdded:     "",
+		FileDeleted:   "",
+		FileRenamed:   "󰁔",
+		FileSymlink:   "󰌷",
+		Ahead:         "",
+		Behind:        "",
+		Search:        "󰍉",
+		Partial:       "",
+		Staged:        "",
+		Warning:       "",
+		Info:          "",
+		Dot:           "·",
+		Ellipsis:      "…",
+		CIRunning:     "⟳",
+		Commented:     "◐",
+		Comment:       "󰆈",
+		MarkerReady:   "●",
+		MarkerBlocked: "●",
+		MarkerWaiting: "○",
 	}
 }

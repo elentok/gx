@@ -122,9 +122,11 @@ func (m Model) buildMainContent() string {
 	return lipgloss.JoinVertical(lipgloss.Left, panel, prsFooter())
 }
 
-// visibleH returns how many PR rows fit in the panel body.
+// visibleH returns how many PR rows fit in the panel body. Rows render as
+// two physical lines (subject + facet line), so this halves the available
+// height.
 func (m Model) visibleH() int {
-	return max(1, m.height-3)
+	return max(1, (m.height-3)/2)
 }
 
 func prsFooter() string {

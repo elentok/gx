@@ -54,6 +54,40 @@ func TestModelRendersPRRows(t *testing.T) {
 	}
 }
 
+func TestModelRendersFacetsAndMarker(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = sendModel(m, prsLoadedMsg{prs: []git.PR{
+		{
+			Number:            12,
+			Title:             "Add widget",
+			UpdatedAt:         time.Now(),
+			StatusCheckRollup: []git.PRStatusCheck{{Status: "COMPLETED", Conclusion: "SUCCESS"}},
+			ReviewDecision:    "APPROVED",
+			Mergeable:         "MERGEABLE",
+			Reviews:           []git.PRReview{{Body: "lgtm"}},
+		},
+	}})
+
+	content := m.View().Content
+	if !strings.Contains(content, "1c") {
+		t.Fatalf("expected comment count facet, got:\n%s", content)
+	}
+}
+
+func TestModelRendersMergeConflictFacet(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = sendModel(m, prsLoadedMsg{prs: []git.PR{
+		{Number: 12, Title: "Add widget", UpdatedAt: time.Now(), Mergeable: "CONFLICTING"},
+	}})
+
+	content := m.View().Content
+	if !strings.Contains(content, "⚠") {
+		t.Fatalf("expected conflict marker facet, got:\n%s", content)
+	}
+}
+
 func TestModelRendersLoadError(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
