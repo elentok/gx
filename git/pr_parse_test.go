@@ -2,6 +2,9 @@ package git
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
+	"os/exec"
 	"testing"
 	"time"
 )
@@ -155,6 +158,44 @@ func TestSortPRs(t *testing.T) {
 			t.Fatalf("expected order %v, got %v", want, got)
 		}
 	}
+}
+
+func TestClassifyPRListError(t *testing.T) {
+	t.Run("nil", func(t *testing.T) {
+		if err := classifyPRListError(nil); err != nil {
+			t.Fatalf("expected nil, got %v", err)
+		}
+	})
+
+	t.Run("gh not installed", func(t *testing.T) {
+		notFoundErr := fmt.Errorf("gh pr list: %w", &exec.Error{Name: "gh", Err: exec.ErrNotFound})
+		err := classifyPRListError(notFoundErr)
+		var prErr *PRListError
+		if !errors.As(err, &prErr) || prErr.Kind != PRListErrorGHNotInstalled {
+			t.Fatalf("expected PRListErrorGHNotInstalled, got %v", err)
+		}
+	})
+
+	t.Run("gh unauthenticated", func(t *testing.T) {
+		runErr := &RunError{Stderr: "To get started with GitHub CLI, please run:  gh auth login"}
+		err := classifyPRListError(runErr)
+		var prErr *PRListError
+		if !errors.As(err, &prErr) || prErr.Kind != PRListErrorUnauthenticated {
+			t.Fatalf("expected PRListErrorUnauthenticated, got %v", err)
+		}
+	})
+
+	t.Run("generic failure", func(t *testing.T) {
+		runErr := &RunError{Stderr: "connection reset by peer"}
+		err := classifyPRListError(runErr)
+		var prErr *PRListError
+		if !errors.As(err, &prErr) || prErr.Kind != PRListErrorGeneric {
+			t.Fatalf("expected PRListErrorGeneric, got %v", err)
+		}
+		if err.Error() != runErr.Error() {
+			t.Fatalf("expected raw wrapped message %q, got %q", runErr.Error(), err.Error())
+		}
+	})
 }
 
 func TestMarker(t *testing.T) {

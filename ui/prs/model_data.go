@@ -8,15 +8,30 @@ import (
 )
 
 type prsLoadedMsg struct {
-	prs []git.PR
-	err error
+	prs    []git.PR
+	anyPRs bool
+	err    error
 }
 
 func (m Model) cmdLoad() tea.Cmd {
 	worktreeRoot := m.worktreeRoot
 	return func() tea.Msg {
 		prs, err := git.ListOpenPRs(worktreeRoot)
-		return prsLoadedMsg{prs: prs, err: err}
+		if err != nil {
+			return prsLoadedMsg{err: err}
+		}
+		anyPRs := len(prs) > 0
+		if !anyPRs {
+			// If the probe itself fails (transient network blip, rate limit),
+			// default to the less alarming "no open PRs" rather than falsely
+			// claiming the user has no PRs at all.
+			var probeErr error
+			anyPRs, probeErr = git.AnyPRsExist(worktreeRoot)
+			if probeErr != nil {
+				anyPRs = true
+			}
+		}
+		return prsLoadedMsg{prs: prs, anyPRs: anyPRs}
 	}
 }
 

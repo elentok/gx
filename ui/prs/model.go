@@ -26,6 +26,7 @@ type Model struct {
 	loaded bool
 	err    error
 	prs    []git.PR
+	anyPRs bool
 	list   list.Model
 
 	keys keys.Manager
@@ -78,6 +79,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loaded = true
 		m.err = msg.err
 		m.prs = msg.prs
+		m.anyPRs = msg.anyPRs
 		m.list.SetSelected(m.list.Selected(), len(m.prs))
 		return m, nil
 

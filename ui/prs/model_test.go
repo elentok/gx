@@ -26,14 +26,25 @@ func TestModelRendersLoadingPlaceholder(t *testing.T) {
 	}
 }
 
-func TestModelRendersEmptyPlaceholder(t *testing.T) {
+func TestModelRendersNoPRsFoundPlaceholder(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
 	m = sendModel(m, prsLoadedMsg{})
 
 	content := m.View().Content
-	if !strings.Contains(content, "no PRs") {
-		t.Fatalf("expected placeholder content, got:\n%s", content)
+	if !strings.Contains(content, "no PRs found") {
+		t.Fatalf("expected 'no PRs found' placeholder, got:\n%s", content)
+	}
+}
+
+func TestModelRendersNoOpenPRsPlaceholder(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = sendModel(m, prsLoadedMsg{anyPRs: true})
+
+	content := m.View().Content
+	if !strings.Contains(content, "no open PRs") {
+		t.Fatalf("expected 'no open PRs' placeholder, got:\n%s", content)
 	}
 }
 
@@ -94,8 +105,30 @@ func TestModelRendersLoadError(t *testing.T) {
 	m = sendModel(m, prsLoadedMsg{err: errBoom})
 
 	content := m.View().Content
-	if !strings.Contains(content, "error") {
-		t.Fatalf("expected error content, got:\n%s", content)
+	if !strings.Contains(content, "error") || !strings.Contains(content, "boom") {
+		t.Fatalf("expected raw wrapped error content, got:\n%s", content)
+	}
+}
+
+func TestModelRendersGHNotInstalledError(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = sendModel(m, prsLoadedMsg{err: &git.PRListError{Kind: git.PRListErrorGHNotInstalled, Err: errBoom}})
+
+	content := m.View().Content
+	if !strings.Contains(content, "gh not found") || !strings.Contains(content, "install") {
+		t.Fatalf("expected gh-not-installed hint, got:\n%s", content)
+	}
+}
+
+func TestModelRendersGHUnauthenticatedError(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = sendModel(m, prsLoadedMsg{err: &git.PRListError{Kind: git.PRListErrorUnauthenticated, Err: errBoom}})
+
+	content := m.View().Content
+	if !strings.Contains(content, "not authenticated") || !strings.Contains(content, "gh auth login") {
+		t.Fatalf("expected gh-unauthenticated hint, got:\n%s", content)
 	}
 }
 

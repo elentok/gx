@@ -3,6 +3,7 @@ package git
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"sort"
@@ -207,6 +208,46 @@ func markerSortRank(m Marker) int {
 	}
 }
 
+// PRListErrorKind classifies a gh pr list failure so callers can render
+// tailored inline messages without re-parsing gh's output themselves.
+type PRListErrorKind int
+
+const (
+	PRListErrorGeneric PRListErrorKind = iota
+	PRListErrorGHNotInstalled
+	PRListErrorUnauthenticated
+)
+
+// PRListError wraps a gh pr list/related failure with a classified kind.
+type PRListError struct {
+	Kind PRListErrorKind
+	Err  error
+}
+
+func (e *PRListError) Error() string { return e.Err.Error() }
+func (e *PRListError) Unwrap() error { return e.Err }
+
+// classifyPRListError distinguishes "gh not installed" and "gh
+// unauthenticated" from gh's other failure modes (network, rate limit, no
+// GitHub remote, ...), which fall back to gh's raw wrapped message.
+func classifyPRListError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, exec.ErrNotFound) {
+		return &PRListError{Kind: PRListErrorGHNotInstalled, Err: err}
+	}
+	var runErr *RunError
+	if errors.As(err, &runErr) && isGHAuthFailure(runErr.Stderr) {
+		return &PRListError{Kind: PRListErrorUnauthenticated, Err: err}
+	}
+	return &PRListError{Kind: PRListErrorGeneric, Err: err}
+}
+
+func isGHAuthFailure(stderr string) bool {
+	return strings.Contains(strings.ToLower(stderr), "gh auth login")
+}
+
 // ListOpenPRs returns the current user's outgoing open PRs in the repo at
 // dir: actionable PRs first (green group, then red group), each group
 // most-recently-updated first, followed by non-actionable PRs, also
@@ -218,7 +259,7 @@ func ListOpenPRs(dir string) ([]PR, error) {
 		"--json", prListFields,
 	})
 	if err != nil {
-		return nil, err
+		return nil, classifyPRListError(err)
 	}
 	prs, err := parsePRList(out)
 	if err != nil {
@@ -226,6 +267,24 @@ func ListOpenPRs(dir string) ([]PR, error) {
 	}
 	sortPRs(prs)
 	return prs, nil
+}
+
+// AnyPRsExist reports whether the user has any PRs at all (open or closed)
+// in the repo at dir. Used to distinguish "no open PRs" from "no PRs found"
+// when the open-PR list comes back empty.
+func AnyPRsExist(dir string) (bool, error) {
+	out, err := runGH(dir, []string{
+		"pr", "list",
+		"--author", "@me",
+		"--state", "all",
+		"--limit", "1",
+		"--json", "number",
+	})
+	if err != nil {
+		return false, classifyPRListError(err)
+	}
+	out = strings.TrimSpace(out)
+	return out != "" && out != "[]", nil
 }
 
 // sortPRs orders prs actionable-first (green group, then red group), each

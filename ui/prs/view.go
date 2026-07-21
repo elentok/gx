@@ -1,6 +1,7 @@
 package prs
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 
@@ -36,10 +37,13 @@ func (m Model) visibleLines() []string {
 		return []string{ui.StyleMuted.Render("loading…")}
 	}
 	if m.err != nil {
-		return []string{ui.StyleWarning.Render("error: " + m.err.Error())}
+		return m.errorLines(m.err)
 	}
 	if len(m.prs) == 0 {
-		return []string{ui.StyleMuted.Render("no PRs")}
+		if m.anyPRs {
+			return []string{ui.StyleMuted.Render("no open PRs")}
+		}
+		return []string{ui.StyleMuted.Render("no PRs found")}
 	}
 
 	innerW := max(1, m.width-4)
@@ -57,6 +61,28 @@ func (m Model) visibleLines() []string {
 // number, draft badge, title, age) and an indented facet line below it
 // (CI/approval/mergeable/comment icons), each truncated/padded to width and
 // background-styled uniformly so a selection highlight covers the full row.
+// errorLines renders a tailored inline message for gh's two most common
+// failure modes, falling back to gh's raw wrapped message for everything
+// else (network, rate limit, no GitHub remote, ...).
+func (m Model) errorLines(err error) []string {
+	var prErr *git.PRListError
+	if errors.As(err, &prErr) {
+		switch prErr.Kind {
+		case git.PRListErrorGHNotInstalled:
+			return []string{
+				ui.StyleWarning.Render("gh not found"),
+				ui.StyleMuted.Render("install: https://cli.github.com"),
+			}
+		case git.PRListErrorUnauthenticated:
+			return []string{
+				ui.StyleWarning.Render("gh is not authenticated"),
+				ui.StyleMuted.Render("run: gh auth login"),
+			}
+		}
+	}
+	return []string{ui.StyleWarning.Render("error: " + err.Error())}
+}
+
 func (m Model) renderRow(pr git.PR, selected bool, width int) []string {
 	facets := pr.Facets()
 	rawLines := []string{
