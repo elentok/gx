@@ -227,11 +227,11 @@ func markerPushState(icons ui.IconSet, marker git.Marker) ui.PushState {
 func renderCIFacet(icons ui.IconSet, state git.CIState) string {
 	switch state {
 	case git.CIRunning:
-		return facetPendingStyle.Render(icons.CIRunning)
+		return facetPendingStyle.Render(icons.CIRunning + " checking")
 	case git.CIFailed:
-		return facetFailedStyle.Render(icons.Close)
+		return facetFailedStyle.Render(icons.Close + " failing")
 	case git.CIPassed:
-		return facetPassedStyle.Render(icons.Check)
+		return facetPassedStyle.Render(icons.Check + " passing")
 	default:
 		return facetNoneStyle.Render(icons.Dot)
 	}
@@ -240,22 +240,22 @@ func renderCIFacet(icons ui.IconSet, state git.CIState) string {
 func renderApprovalFacet(icons ui.IconSet, state git.ApprovalState) string {
 	switch state {
 	case git.ApprovalApproved:
-		return facetPassedStyle.Render(icons.Check)
+		return facetPassedStyle.Render(icons.Check + " approved")
 	case git.ApprovalChangesRequested:
-		return facetFailedStyle.Render(icons.Close)
+		return facetFailedStyle.Render(icons.Close + " changes requested")
 	case git.ApprovalCommentedOnly:
-		return facetPendingStyle.Render(icons.Commented)
+		return facetPendingStyle.Render(icons.Commented + " commented")
 	default:
-		return facetNoneStyle.Render(icons.Dot)
+		return facetNoneStyle.Render(icons.Dot + " review needed")
 	}
 }
 
 func renderMergeableFacet(icons ui.IconSet, state git.MergeableState) string {
 	switch state {
 	case git.MergeableConflicting:
-		return facetConflictStyle.Render(icons.Warning)
+		return facetConflictStyle.Render(icons.Warning + " conflicts")
 	case git.MergeableChecking:
-		return facetCheckingStyle.Render(icons.Ellipsis)
+		return facetCheckingStyle.Render(icons.Ellipsis + " checking")
 	default:
 		return ""
 	}
