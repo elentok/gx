@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/navstate"
 	"github.com/elentok/gx/ui/notify"
+	prsui "github.com/elentok/gx/ui/prs"
 	"github.com/elentok/gx/ui/reloadgate"
 	stashlistui "github.com/elentok/gx/ui/stashlist"
 	statusui "github.com/elentok/gx/ui/status"
@@ -189,6 +190,11 @@ func (m Model) newHistoryEntry(viewState nav.ViewState) historyEntry {
 		return historyEntry{
 			viewState: viewState,
 			model:     stashlistui.NewModel(viewState.WorktreeRoot, s, keys.New(Bindings())),
+		}
+	case nav.TabPRs:
+		return historyEntry{
+			viewState: viewState,
+			model:     prsui.NewModel(viewState.WorktreeRoot, s, keys.New(Bindings())),
 		}
 	case nav.TabWorktrees:
 		fallthrough

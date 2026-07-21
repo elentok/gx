@@ -60,6 +60,25 @@ func TestExecute_LogDispatchesToRunLog(t *testing.T) {
 	}
 }
 
+func TestExecute_PRsDispatchesToRunPRs(t *testing.T) {
+	called := 0
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+		runPRs: func() error {
+			called++
+			return nil
+		},
+	}
+
+	if err := execute([]string{"prs"}, d); err != nil {
+		t.Fatalf("execute prs: %v", err)
+	}
+	if called != 1 {
+		t.Fatalf("runPRs called %d times, want 1", called)
+	}
+}
+
 func TestExecute_WorktreeAbsPath(t *testing.T) {
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	var stdout bytes.Buffer

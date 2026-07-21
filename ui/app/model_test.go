@@ -303,6 +303,33 @@ func TestNumberKeysSwitchTabsGlobally(t *testing.T) {
 	if m.navState.ActiveTab() != nav.TabStash {
 		t.Fatalf("expected 4 to switch to stash, got %q", m.navState.ActiveTab())
 	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '5', Text: "5"})
+	m = updated.(Model)
+	if m.navState.ActiveTab() != nav.TabPRs {
+		t.Fatalf("expected 5 to switch to prs, got %q", m.navState.ActiveTab())
+	}
+}
+
+func TestGPMnemonicSwitchesToPRsTab(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'p', Text: "p"})
+	m = updated.(Model)
+	if m.navState.ActiveTab() != nav.TabPRs {
+		t.Fatalf("expected gp to switch to prs, got %q", m.navState.ActiveTab())
+	}
 }
 
 func TestNumberKeysDoNotSwitchTabsWhenInputFocused(t *testing.T) {
@@ -487,6 +514,38 @@ func TestInitialStashRouteUsesStashTab(t *testing.T) {
 	}
 	if len(m.history) != 0 {
 		t.Fatalf("expected empty stack for initial stash view state, got %d", len(m.history))
+	}
+}
+
+func TestPRsTabIsFirstClass(t *testing.T) {
+	if got := navstate.ResolveTabID(nav.TabPRs); got != nav.TabPRs {
+		t.Fatalf("expected prs to map to itself, got %q", got)
+	}
+}
+
+func TestInitialPRsRouteUsesPRsTab(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabPRs, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	if got := m.activePage().viewState.Tab; got != nav.TabPRs {
+		t.Fatalf("expected active page prs, got %q", got)
+	}
+	if m.navState.ActiveTab() != nav.TabPRs {
+		t.Fatalf("expected active tab prs, got %q", m.navState.ActiveTab())
+	}
+	if m.navState.LiveTab() != nav.TabPRs {
+		t.Fatalf("expected live tab prs, got %q", m.navState.LiveTab())
+	}
+	if len(m.history) != 0 {
+		t.Fatalf("expected empty stack for initial prs view state, got %d", len(m.history))
 	}
 }
 
