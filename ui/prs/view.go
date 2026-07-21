@@ -58,16 +58,54 @@ func repoColumn(allRepos bool, repo string) string {
 // 2-wide marker column above it (mirrors ui/log's subjectIndentNoGraph).
 const facetIndent = "  "
 
+// visibleLines renders the PRs tab's full content (open rows, then the
+// closed section) as one continuous list, windows it to a single line-based
+// viewport at m.scrollOffset, and appends a scrollbar gutter alongside it —
+// see issues/01-unify-scrollable-viewport.md.
 func (m Model) visibleLines() []string {
 	lines := m.openListLines()
 	lines = append(lines, m.closedSectionLines()...)
-	return lines
+
+	viewportH := m.viewportH()
+	total := len(lines)
+	start := min(m.scrollOffset, total)
+	end := min(start+viewportH, total)
+	windowed := lines[start:end]
+	for len(windowed) < viewportH {
+		windowed = append(windowed, "")
+	}
+
+	padW := max(1, m.width-4)
+	return m.appendScrollbar(windowed, padW, viewportH, total, m.scrollOffset)
 }
 
-// openListLines renders the open-PR list's loading/error/empty/row states.
-// Rendering the closed section is independent of this — it always renders
-// below regardless of the open list's own state (see closedSectionLines),
-// and the two sections load concurrently (issues/09-load-time-batched-fetch.md).
+// appendScrollbar right-aligns a 2-column gutter (" " + glyph) onto each of
+// the viewport's rows, padding shorter rows out to padW first so every glyph
+// lands in the same column — mirrors ui/diffview's and ui/filetree's
+// appendScrollbar. The gutter renders blank when content fits without
+// scrolling.
+func (m Model) appendScrollbar(lines []string, padW, height, total, offset int) []string {
+	bar := ui.RenderScrollbar(height, total, height, offset)
+	var barLines []string
+	if bar != "" {
+		barLines = strings.Split(bar, "\n")
+	}
+	out := make([]string, len(lines))
+	for i, line := range lines {
+		b := " "
+		if i < len(barLines) {
+			b = barLines[i]
+		}
+		pad := max(0, padW-ansi.StringWidth(line))
+		out[i] = line + strings.Repeat(" ", pad) + " " + b
+	}
+	return out
+}
+
+// openListLines renders the open-PR list's loading/error/empty/row states in
+// full (unwindowed) — windowing to the single combined viewport happens in
+// visibleLines. The two sections load concurrently
+// (issues/09-load-time-batched-fetch.md).
 func (m Model) openListLines() []string {
 	if !m.openLoaded {
 		return []string{ui.StyleMuted.Render("loading…")}
@@ -83,12 +121,11 @@ func (m Model) openListLines() []string {
 	}
 
 	innerW := max(1, m.width-4)
-	start, end := m.list.VisibleRange(len(m.prs), m.visibleH())
 	sel := m.list.Selected()
 
-	lines := make([]string, 0, (end-start)*2)
-	for i := start; i < end; i++ {
-		lines = append(lines, m.renderRow(m.prs[i], i == sel, innerW)...)
+	lines := make([]string, 0, len(m.prs)*2)
+	for i, pr := range m.prs {
+		lines = append(lines, m.renderRow(pr, i == sel, innerW)...)
 	}
 	return lines
 }

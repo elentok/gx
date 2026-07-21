@@ -339,9 +339,14 @@ func TestNavigationMovesSelectionIntoClosedSection(t *testing.T) {
 	}
 }
 
-func TestNavigationIntoClosedSectionScrollsOpenListToLastPage(t *testing.T) {
+// TestNavigationIntoClosedSectionScrollsCombinedViewport locks in the
+// single-scroll-offset viewport (issues/01-unify-scrollable-viewport.md):
+// scrolling down through the open list and into the closed section moves one
+// shared line-based offset, always just enough to keep the selected row
+// on screen.
+func TestNavigationIntoClosedSectionScrollsCombinedViewport(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
-	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 12})
 
 	openPRs := make([]git.PR, 15)
 	for i := range openPRs {
@@ -351,9 +356,10 @@ func TestNavigationIntoClosedSectionScrollsOpenListToLastPage(t *testing.T) {
 		{Number: 100, Title: "Closed one", State: "MERGED", ClosedAt: time.Now()},
 	})
 
-	visibleH := m.visibleH()
-	if visibleH >= len(openPRs) {
-		t.Fatalf("test requires an open list longer than visibleH (%d), got %d rows", visibleH, len(openPRs))
+	viewportH := m.viewportH()
+	openLines := len(openPRs) * 2
+	if viewportH >= openLines {
+		t.Fatalf("test requires a viewport shorter than the open list (%d lines), got viewportH %d", openLines, viewportH)
 	}
 
 	for range len(openPRs) - 1 {
@@ -362,22 +368,30 @@ func TestNavigationIntoClosedSectionScrollsOpenListToLastPage(t *testing.T) {
 	if m.list.Selected() != len(openPRs)-1 {
 		t.Fatalf("expected selection on last open row (%d), got %d", len(openPRs)-1, m.list.Selected())
 	}
+	wantOffset := openLines - viewportH
+	if got := m.scrollOffset; got != wantOffset {
+		t.Fatalf("expected viewport scrolled to keep the last open row visible (offset %d), got %d", wantOffset, got)
+	}
 
 	m = sendModel(m, tea.KeyPressMsg{Code: 'j', Text: "j"})
 	if m.list.Selected() != len(openPRs) {
 		t.Fatalf("expected selection on first closed row (%d), got %d", len(openPRs), m.list.Selected())
 	}
-	wantOffset := len(openPRs) - visibleH
-	if got := m.list.Offset(); got != wantOffset {
-		t.Fatalf("expected open viewport scrolled to its last page (offset %d), got %d", wantOffset, got)
+	closedRowEndLine := openLines + 2 + 1 // spacer + header, then the one closed row
+	wantOffset = closedRowEndLine - viewportH
+	if got := m.scrollOffset; got != wantOffset {
+		t.Fatalf("expected viewport scrolled to keep the closed row visible (offset %d), got %d", wantOffset, got)
 	}
 
 	m = sendModel(m, tea.KeyPressMsg{Code: 'k', Text: "k"})
 	if m.list.Selected() != len(openPRs)-1 {
 		t.Fatalf("expected selection back on last open row, got %d", m.list.Selected())
 	}
-	if got := m.list.Offset(); got != wantOffset {
-		t.Fatalf("expected open viewport to stay on its last page (offset %d), got %d", wantOffset, got)
+	// The last open row's line range already sits inside the current viewport
+	// (which was scrolled to reveal the closed row below it), so moving back
+	// up doesn't need to scroll further.
+	if got := m.scrollOffset; got != wantOffset {
+		t.Fatalf("expected viewport offset unchanged (%d), got %d", wantOffset, got)
 	}
 }
 

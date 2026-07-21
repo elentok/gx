@@ -30,6 +30,7 @@ type Model struct {
 	anyPRs       bool
 	closedPRs    []git.ClosedPR
 	list         list.Model
+	scrollOffset int
 
 	allRepos bool
 
@@ -104,7 +105,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.help, _ = m.help.Update(msg)
-		return m, nil
+		return m.ensureSelectionVisible(), nil
 
 	case openPRsLoadedMsg:
 		m.openLoaded = true
@@ -112,13 +113,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.prs = msg.prs
 		m.anyPRs = msg.anyPRs
 		m.list.SetSelected(m.list.Selected(), m.totalItems())
-		return m, nil
+		return m.ensureSelectionVisible(), nil
 
 	case closedPRsLoadedMsg:
 		m.closedLoaded = true
 		m.closedPRs = msg.closedPRs
 		m.list.SetSelected(m.list.Selected(), m.totalItems())
-		return m, nil
+		return m.ensureSelectionVisible(), nil
 
 	case gotoPRMsg:
 		return m.handleGotoPR(msg)
@@ -168,21 +169,93 @@ func (m Model) buildMainContent() string {
 	return lipgloss.JoinVertical(lipgloss.Left, panel, prsFooter())
 }
 
-// visibleH returns how many PR rows fit in the panel body. Rows render as
-// two physical lines (subject + facet line), so this halves the available
-// height.
-func (m Model) visibleH() int {
-	return max(1, (m.height-3)/2)
+// viewportH returns how many content lines fit in the panel body, matching
+// RenderPanel's own bodyH computation (panelHeight - 1 header row, no
+// padding rows in this panel) so the line-based scroll window lines up
+// exactly with what RenderPanel will display.
+func (m Model) viewportH() int {
+	panelHeight := max(1, m.height-1)
+	return max(0, panelHeight-1)
 }
 
 // totalItems is the size of the combined navigable list: open-PR rows
-// followed by closed-PR rows (see issues/10-closed-pr-selectable.md). Closed
-// rows always render in full below the open list rather than scrolling
-// within visibleH, so scroll-viewport math (EnsureSelectionVisible/
-// VisibleRange) stays scoped to len(m.prs) — only the selection's clamp
-// range widens to cover both sections.
+// followed by closed-PR rows (see issues/10-closed-pr-selectable.md).
 func (m Model) totalItems() int {
 	return len(m.prs) + len(m.closedPRs)
+}
+
+// lineRange is a selectable item's [start, end) line span within the
+// unwindowed combined content (open rows, then the closed section).
+type lineRange struct {
+	start, end int
+}
+
+// openLineCount returns the number of lines openListLines would render,
+// without doing the actual (width-dependent) rendering — used to locate
+// where the closed section starts in line space.
+func (m Model) openLineCount() int {
+	if !m.openLoaded {
+		return 1
+	}
+	if m.err != nil {
+		return len(m.errorLines(m.err))
+	}
+	if len(m.prs) == 0 {
+		return 1
+	}
+	return len(m.prs) * 2
+}
+
+// itemLineRange returns the line span of combined item i: open-PR rows
+// render as two lines each starting at line 0, followed by a 2-line spacer
+// and closed-section header, then one line per closed PR.
+func (m Model) itemLineRange(i int) lineRange {
+	if i < len(m.prs) {
+		start := i * 2
+		return lineRange{start, start + 2}
+	}
+	start := m.openLineCount() + 2 + (i - len(m.prs))
+	return lineRange{start, start + 1}
+}
+
+// totalLineCount is the full unwindowed content height: the open section
+// plus the 2-line spacer/header plus the closed section.
+func (m Model) totalLineCount() int {
+	return m.openLineCount() + 2 + m.closedLineCount()
+}
+
+func (m Model) closedLineCount() int {
+	if !m.closedLoaded {
+		return 1
+	}
+	if len(m.closedPRs) == 0 {
+		return 1
+	}
+	return len(m.closedPRs)
+}
+
+// ensureSelectionVisible adjusts scrollOffset minimally so the selected
+// item's full line range stays on screen, then clamps it to the content's
+// bounds — the single-viewport analogue of ui/list.Model.EnsureSelectionVisible,
+// but line-based since open rows (2 lines) and closed rows (1 line) differ in
+// height.
+func (m Model) ensureSelectionVisible() Model {
+	viewportH := m.viewportH()
+	total := m.totalLineCount()
+
+	if sel := m.list.Selected(); sel >= 0 && sel < m.totalItems() {
+		r := m.itemLineRange(sel)
+		if r.start < m.scrollOffset {
+			m.scrollOffset = r.start
+		}
+		if viewportH > 0 && r.end > m.scrollOffset+viewportH {
+			m.scrollOffset = r.end - viewportH
+		}
+	}
+
+	maxOffset := max(0, total-viewportH)
+	m.scrollOffset = max(0, min(m.scrollOffset, maxOffset))
+	return m
 }
 
 func prsFooter() string {
