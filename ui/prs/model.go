@@ -99,12 +99,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = msg.err
 		m.prs = msg.prs
 		m.anyPRs = msg.anyPRs
-		m.list.SetSelected(m.list.Selected(), len(m.prs))
+		m.list.SetSelected(m.list.Selected(), m.totalItems())
 		return m, nil
 
 	case closedPRsLoadedMsg:
 		m.closedLoaded = true
 		m.closedPRs = msg.closedPRs
+		m.list.SetSelected(m.list.Selected(), m.totalItems())
 		return m, nil
 
 	case gotoPRMsg:
@@ -157,6 +158,16 @@ func (m Model) buildMainContent() string {
 // height.
 func (m Model) visibleH() int {
 	return max(1, (m.height-3)/2)
+}
+
+// totalItems is the size of the combined navigable list: open-PR rows
+// followed by closed-PR rows (see issues/10-closed-pr-selectable.md). Closed
+// rows always render in full below the open list rather than scrolling
+// within visibleH, so scroll-viewport math (EnsureSelectionVisible/
+// VisibleRange) stays scoped to len(m.prs) — only the selection's clamp
+// range widens to cover both sections.
+func (m Model) totalItems() int {
+	return len(m.prs) + len(m.closedPRs)
 }
 
 func prsFooter() string {

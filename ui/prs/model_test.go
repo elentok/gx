@@ -249,6 +249,62 @@ func TestOpenSelectedReturnsOpenURLCmd(t *testing.T) {
 	}
 }
 
+func TestNavigationMovesSelectionIntoClosedSection(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = loadPRs(m, []git.PR{
+		{Number: 1, Title: "Open one", URL: "https://example.com/pull/1", UpdatedAt: time.Now()},
+	}, true, nil, []git.ClosedPR{
+		{Number: 2, Title: "Closed one", URL: "https://example.com/pull/2", State: "MERGED", ClosedAt: time.Now()},
+		{Number: 3, Title: "Closed two", URL: "https://example.com/pull/3", State: "MERGED", ClosedAt: time.Now()},
+	})
+
+	m = sendModel(m, tea.KeyPressMsg{Code: 'j', Text: "j"})
+	if m.list.Selected() != 1 {
+		t.Fatalf("expected selection to move onto first closed row (index 1), got %d", m.list.Selected())
+	}
+
+	m = sendModel(m, tea.KeyPressMsg{Code: 'j', Text: "j"})
+	if m.list.Selected() != 2 {
+		t.Fatalf("expected selection to move onto second closed row (index 2), got %d", m.list.Selected())
+	}
+
+	// Clamped at the end of the combined list.
+	m = sendModel(m, tea.KeyPressMsg{Code: 'j', Text: "j"})
+	if m.list.Selected() != 2 {
+		t.Fatalf("expected selection to stay clamped at index 2, got %d", m.list.Selected())
+	}
+
+	m = sendModel(m, tea.KeyPressMsg{Code: 'k', Text: "k"})
+	if m.list.Selected() != 1 {
+		t.Fatalf("expected selection to move back up to index 1, got %d", m.list.Selected())
+	}
+}
+
+func TestOpenSelectedReturnsClosedURLCmd(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = loadPRs(m, []git.PR{
+		{Number: 1, Title: "Open one", URL: "https://example.com/pull/1", UpdatedAt: time.Now()},
+	}, true, nil, []git.ClosedPR{
+		{Number: 2, Title: "Closed one", URL: "https://example.com/pull/2", State: "MERGED", ClosedAt: time.Now()},
+	})
+
+	m = sendModel(m, tea.KeyPressMsg{Code: 'j', Text: "j"})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("expected a cmd from enter on a closed row")
+	}
+	msg := cmd()
+	goto_, ok := msg.(gotoPRMsg)
+	if !ok {
+		t.Fatalf("expected gotoPRMsg, got %T", msg)
+	}
+	if goto_.url != "https://example.com/pull/2" {
+		t.Fatalf("expected closed PR's URL, got %q", goto_.url)
+	}
+}
+
 func TestQuestionMarkOpensHelpOverlay(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})

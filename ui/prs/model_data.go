@@ -63,12 +63,30 @@ type gotoPRMsg struct {
 	url string
 }
 
+// navigateSelection moves the selection by delta across the combined
+// open+closed list. Scroll-viewport math only ever applies to the open
+// section (closed rows always render in full below it), so
+// EnsureSelectionVisible is skipped once the selection lands on a closed
+// row — see issues/10-closed-pr-selectable.md.
+func (m Model) navigateSelection(delta int) Model {
+	m.list.SetSelected(m.list.Selected()+delta, m.totalItems())
+	if m.list.Selected() < len(m.prs) {
+		m.list.EnsureSelectionVisible(len(m.prs), m.visibleH())
+	}
+	return m
+}
+
 func (m Model) cmdOpenSelected() tea.Cmd {
 	sel := m.list.Selected()
-	if sel < 0 || sel >= len(m.prs) {
+	if sel < 0 || sel >= m.totalItems() {
 		return nil
 	}
-	url := m.prs[sel].URL
+	var url string
+	if sel < len(m.prs) {
+		url = m.prs[sel].URL
+	} else {
+		url = m.closedPRs[sel-len(m.prs)].URL
+	}
 	return func() tea.Msg { return gotoPRMsg{url: url} }
 }
 

@@ -3,10 +3,23 @@ package prs
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 )
+
+func TestRenderClosedRow_SelectedDiffersFromUnselected(t *testing.T) {
+	m := Model{}
+	pr := git.ClosedPR{Number: 5, Title: "Merged fix", State: "MERGED", ClosedAt: time.Now()}
+
+	unselected := m.renderClosedRow(pr, false, 40)
+	selected := m.renderClosedRow(pr, true, 40)
+
+	if unselected == selected {
+		t.Fatal("expected selected closed row to render differently than unselected")
+	}
+}
 
 func TestRenderCIFacet_Labels(t *testing.T) {
 	icons := ui.Icons(false)

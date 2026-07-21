@@ -45,11 +45,9 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model,
 	case bindingPRsBack:
 		return m, nil
 	case bindingPRsDown:
-		m.list.Navigate(1, len(m.prs), m.visibleH())
-		return m, nil
+		return m.navigateSelection(1), nil
 	case bindingPRsUp:
-		m.list.Navigate(-1, len(m.prs), m.visibleH())
-		return m, nil
+		return m.navigateSelection(-1), nil
 	case bindingPRsOpen:
 		return m, m.cmdOpenSelected()
 	case bindingPRsRefresh, bindingPRsRefreshMenu:

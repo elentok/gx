@@ -88,13 +88,15 @@ func (m Model) closedSectionLines() []string {
 	}
 
 	innerW := max(1, m.width-4)
-	for _, pr := range m.closedPRs {
-		lines = append(lines, m.renderClosedRow(pr, innerW))
+	sel := m.list.Selected()
+	base := len(m.prs)
+	for i, pr := range m.closedPRs {
+		lines = append(lines, m.renderClosedRow(pr, base+i == sel, innerW))
 	}
 	return lines
 }
 
-func (m Model) renderClosedRow(pr git.ClosedPR, width int) string {
+func (m Model) renderClosedRow(pr git.ClosedPR, selected bool, width int) string {
 	icons := ui.Icons(m.settings.UseNerdFontIcons)
 
 	marker := icons.Check
@@ -118,7 +120,24 @@ func (m Model) renderClosedRow(pr git.ClosedPR, width int) string {
 		title += strings.Repeat(" ", titleW-titleActualW)
 	}
 
-	return markerCol + title + " " + date
+	line := markerCol + title + " " + date
+	return padAndHighlight(line, width, selected)
+}
+
+// padAndHighlight truncates/pads line to width and, if selected, applies the
+// row-highlight style — the common shape shared by renderRow's two lines and
+// renderClosedRow's single line, so a selection highlight always covers the
+// full row.
+func padAndHighlight(line string, width int, selected bool) string {
+	line = ansi.Truncate(line, width, "…")
+	lineW := ansi.StringWidth(line)
+	if lineW < width {
+		line += strings.Repeat(" ", width-lineW)
+	}
+	if selected {
+		line = ui.RenderRowHighlight(line)
+	}
+	return line
 }
 
 // renderRow renders one PR as two physical lines: the subject line (marker,
@@ -156,15 +175,7 @@ func (m Model) renderRow(pr git.PR, selected bool, width int) []string {
 
 	lines := make([]string, len(rawLines))
 	for i, line := range rawLines {
-		line = ansi.Truncate(line, width, "…")
-		lineW := ansi.StringWidth(line)
-		if lineW < width {
-			line += strings.Repeat(" ", width-lineW)
-		}
-		if selected {
-			line = ui.RenderRowHighlight(line)
-		}
-		lines[i] = line
+		lines[i] = padAndHighlight(line, width, selected)
 	}
 	return lines
 }
