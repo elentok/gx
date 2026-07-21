@@ -2,10 +2,58 @@ package git
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os/exec"
+	"sort"
 	"strings"
+	"time"
 )
+
+// prListFields is the full facet field set fetched for each PR, even though
+// only a subset is decoded today — keeping the call shape stable means later
+// facet work (CI/review/mergeable/comment rendering) doesn't need to change it.
+const prListFields = "number,title,url,isDraft,updatedAt,statusCheckRollup,reviewDecision,reviews,mergeable,comments"
+
+// PR represents one outgoing GitHub pull request.
+type PR struct {
+	Number    int       `json:"number"`
+	Title     string    `json:"title"`
+	URL       string    `json:"url"`
+	IsDraft   bool      `json:"isDraft"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// ListOpenPRs returns the current user's outgoing open PRs in the repo at
+// dir, sorted most-recently-updated first.
+func ListOpenPRs(dir string) ([]PR, error) {
+	out, err := runGH(dir, []string{
+		"pr", "list",
+		"--author", "@me",
+		"--json", prListFields,
+	})
+	if err != nil {
+		return nil, err
+	}
+	prs, err := parsePRList(out)
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(prs, func(i, j int) bool { return prs[i].UpdatedAt.After(prs[j].UpdatedAt) })
+	return prs, nil
+}
+
+// parsePRList decodes the JSON array produced by `gh pr list --json ...`.
+func parsePRList(jsonOut string) ([]PR, error) {
+	var prs []PR
+	if strings.TrimSpace(jsonOut) == "" {
+		return prs, nil
+	}
+	if err := json.Unmarshal([]byte(jsonOut), &prs); err != nil {
+		return nil, fmt.Errorf("parsing gh pr list output: %w", err)
+	}
+	return prs, nil
+}
 
 // BranchPRURL returns the GitHub PR URL for the current branch in worktreeRoot.
 // Uses `gh pr view` which returns an error if no open PR exists.

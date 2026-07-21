@@ -5,9 +5,11 @@ package prs
 import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/nav"
 )
 
@@ -20,6 +22,11 @@ type Model struct {
 
 	width  int
 	height int
+
+	loaded bool
+	err    error
+	prs    []git.PR
+	list   list.Model
 
 	keys keys.Manager
 	help help.Model
@@ -48,7 +55,7 @@ func (m Model) ModalOpen() bool { return m.help.IsOpen }
 func (m Model) InputFocused() bool { return m.help.InputFocused() }
 
 func (m Model) Init() tea.Cmd {
-	return nil
+	return m.cmdLoad()
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -66,6 +73,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.help, _ = m.help.Update(msg)
 		return m, nil
+
+	case prsLoadedMsg:
+		m.loaded = true
+		m.err = msg.err
+		m.prs = msg.prs
+		m.list.SetSelected(m.list.Selected(), len(m.prs))
+		return m, nil
+
+	case gotoPRMsg:
+		return m.handleGotoPR(msg)
 
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
@@ -98,12 +115,16 @@ func (m Model) View() tea.View {
 }
 
 func (m Model) buildMainContent() string {
-	lines := []string{ui.StyleMuted.Render("no PRs")}
 	panelHeight := max(1, m.height-1)
 	panel := ui.RenderPanel(ui.PanelOptionsFor(
-		m.width, panelHeight, "PRs", "", lines, true, prsTitleColor, prsTitleColor, false,
+		m.width, panelHeight, "PRs", "", m.visibleLines(), true, prsTitleColor, prsTitleColor, false,
 	))
 	return lipgloss.JoinVertical(lipgloss.Left, panel, prsFooter())
+}
+
+// visibleH returns how many PR rows fit in the panel body.
+func (m Model) visibleH() int {
+	return max(1, m.height-3)
 }
 
 func prsFooter() string {
