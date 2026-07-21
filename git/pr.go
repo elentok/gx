@@ -7,14 +7,10 @@ import (
 	"fmt"
 	"os/exec"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
-
-// prListFields is the field set fetched for each PR: identity/display fields
-// plus the raw facet inputs needed to derive CI/approval/mergeable/comment
-// state and the actionable marker.
-const prListFields = "number,title,url,isDraft,updatedAt,statusCheckRollup,reviewDecision,reviews,mergeable,comments,reviewRequests"
 
 // PR represents one outgoing GitHub pull request.
 type PR struct {
@@ -24,9 +20,10 @@ type PR struct {
 	IsDraft   bool      `json:"isDraft"`
 	UpdatedAt time.Time `json:"updatedAt"`
 
-	// Repo is the owning repo ("owner/name"), populated only by the
-	// --all-repos GraphQL fetch (listOpenPRsAllRepos) — the current-repo
-	// fetch leaves it empty since the repo is already implied by context.
+	// Repo is the owning repo ("owner/name"), always populated by the
+	// GraphQL search query ListOpenPRs runs (see issues/12 and
+	// issues/13-comments-popup.md, which fetches a single PR's comments by
+	// repo+number and needs this regardless of scope).
 	Repo string `json:"-"`
 
 	Mergeable         string            `json:"mergeable"`
@@ -348,35 +345,22 @@ func isGHAuthFailure(stderr string) bool {
 // ListOpenPRs returns the current user's outgoing open PRs: actionable PRs
 // first (green group, then red group), each group most-recently-updated
 // first, followed by non-actionable PRs, also most-recently-updated first.
-// When allRepos is false the search is scoped to the repo at dir; when true
-// it spans every repo the user has open PRs in.
+// When allRepos is false the search is scoped to the repo at dir via a
+// repo: qualifier; when true it spans every repo the user has open PRs in.
+// Always goes through the GraphQL search query (see
+// issues/12-all-mode-graphql-migration.md) rather than `gh pr list`, so the
+// comment-count facet never costs a full comment-body fetch (see
+// issues/13-comments-popup.md).
 func ListOpenPRs(dir string, allRepos bool) ([]PR, error) {
-	if allRepos {
-		return listOpenPRsAllRepos(dir)
+	searchQuery := "is:pr author:@me is:open"
+	if !allRepos {
+		repo, err := currentRepoNameWithOwner(dir)
+		if err != nil {
+			return nil, classifyPRListError(err)
+		}
+		searchQuery += " repo:" + repo
 	}
-	out, err := runGH(dir, []string{
-		"pr", "list",
-		"--author", "@me",
-		"--json", prListFields,
-	})
-	if err != nil {
-		return nil, classifyPRListError(err)
-	}
-	prs, err := parsePRList(out)
-	if err != nil {
-		return nil, err
-	}
-	sortPRs(prs)
-	return prs, nil
-}
-
-// listOpenPRsAllRepos fetches every repo's open PRs — including the facet
-// fields (statusCheckRollup, reviewDecision, reviews, mergeable,
-// reviewRequests) — in a single GraphQL search query (see
-// issues/12-all-mode-graphql-migration.md), rather than a repo-discovery
-// search plus one `gh pr list` call per repo.
-func listOpenPRsAllRepos(dir string) ([]PR, error) {
-	nodes, err := runGraphQLPRSearch[prSearchNode](dir, openPRsSearchQuery, "is:pr author:@me is:open")
+	nodes, err := runGraphQLPRSearch[prSearchNode](dir, openPRsSearchQuery, searchQuery)
 	if err != nil {
 		return nil, err
 	}
@@ -386,6 +370,13 @@ func listOpenPRsAllRepos(dir string) ([]PR, error) {
 	}
 	sortPRs(prs)
 	return prs, nil
+}
+
+// currentRepoNameWithOwner resolves the "owner/name" of the repo at dir.
+// GraphQL search has no notion of "current directory", so scoping
+// ListOpenPRs's search query to a single repo needs this explicit qualifier.
+func currentRepoNameWithOwner(dir string) (string, error) {
+	return runGH(dir, []string{"repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"})
 }
 
 // runGHSearchPRs runs `gh search prs --author @me --json <jsonFields>` with
@@ -569,36 +560,57 @@ func (n closedPRSearchNode) toClosedPR() ClosedPR {
 // gh api graphql returns for both openPRsSearchQuery and
 // closedPRsSearchQuery.
 type graphQLSearchEnvelope[T any] struct {
-	Errors []struct {
-		Message string `json:"message"`
-	} `json:"errors"`
-	Data struct {
+	Errors graphQLErrors `json:"errors"`
+	Data   struct {
 		Search struct {
 			Nodes []T `json:"nodes"`
 		} `json:"search"`
 	} `json:"data"`
 }
 
-// runGraphQLPRSearch runs `gh api graphql` with the given query and
+// graphQLErrors is the `errors` array `gh api graphql` responses carry
+// alongside (or instead of) `data`, shared by every envelope shape so the
+// "any errors? report the first one" check isn't repeated per envelope.
+type graphQLErrors []struct {
+	Message string `json:"message"`
+}
+
+func (e graphQLErrors) err() error {
+	if len(e) == 0 {
+		return nil
+	}
+	return fmt.Errorf("gh api graphql: %s", e[0].Message)
+}
+
+// runGraphQLRequest runs `gh api graphql` with the given query plus extra
+// `-f`/`-F` flag args (e.g. `"-f", "searchQuery=..."` or `"-F",
+// "number=5"`), decoding the JSON response into target. Shared by
+// runGraphQLPRSearch and FetchPRComments so the "shell out to gh, then
+// decode" mechanics aren't duplicated per query shape.
+func runGraphQLRequest(dir, query string, extraArgs []string, target any) error {
+	args := append([]string{"api", "graphql", "-f", "query=" + query}, extraArgs...)
+	out, err := runGH(dir, args)
+	if err != nil {
+		return classifyPRListError(err)
+	}
+	if err := json.Unmarshal([]byte(out), target); err != nil {
+		return fmt.Errorf("parsing gh api graphql response: %w", err)
+	}
+	return nil
+}
+
+// runGraphQLPRSearch runs a search-shaped GraphQL query with the given
 // $searchQuery variable, decoding the resulting nodes as T (either
 // prSearchNode or closedPRSearchNode). Shared by listOpenPRsAllRepos and
 // listClosedPRsAllRepos so the "one GraphQL search query, across every repo"
 // shape isn't duplicated for each PR kind.
 func runGraphQLPRSearch[T any](dir, query, searchQuery string) ([]T, error) {
-	out, err := runGH(dir, []string{
-		"api", "graphql",
-		"-f", "query=" + query,
-		"-f", "searchQuery=" + searchQuery,
-	})
-	if err != nil {
-		return nil, classifyPRListError(err)
-	}
 	var envelope graphQLSearchEnvelope[T]
-	if err := json.Unmarshal([]byte(out), &envelope); err != nil {
-		return nil, fmt.Errorf("parsing gh api graphql response: %w", err)
+	if err := runGraphQLRequest(dir, query, []string{"-f", "searchQuery=" + searchQuery}, &envelope); err != nil {
+		return nil, err
 	}
-	if len(envelope.Errors) > 0 {
-		return nil, fmt.Errorf("gh api graphql: %s", envelope.Errors[0].Message)
+	if err := envelope.Errors.err(); err != nil {
+		return nil, err
 	}
 	return envelope.Data.Search.Nodes, nil
 }
@@ -643,16 +655,101 @@ func sortPRs(prs []PR) {
 	})
 }
 
-// parsePRList decodes the JSON array produced by `gh pr list --json ...`.
-func parsePRList(jsonOut string) ([]PR, error) {
-	var prs []PR
-	if strings.TrimSpace(jsonOut) == "" {
-		return prs, nil
+// PRComment is one entry in a PR's comment timeline shown in the comments
+// popup (issues/13-comments-popup.md): either an issue comment or a
+// non-empty review-summary body, unified so both render the same way.
+type PRComment struct {
+	Author    string
+	Body      string
+	CreatedAt time.Time
+}
+
+// prCommentsQuery fetches a single PR's issue comments and review bodies
+// directly by repo+number (not via search, since the caller already knows
+// exactly which PR it wants) — reuses the `gh api graphql` calling
+// convention runGraphQLPRSearch introduced in issues/12 rather than adding a
+// second gh-shelling mechanism.
+const prCommentsQuery = `
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      comments(first: 100) {
+        nodes { author { login } body createdAt }
+      }
+      reviews(first: 100) {
+        nodes { author { login } body submittedAt }
+      }
+    }
+  }
+}`
+
+type prCommentsEnvelope struct {
+	Errors graphQLErrors `json:"errors"`
+	Data   struct {
+		Repository struct {
+			PullRequest struct {
+				Comments struct {
+					Nodes []struct {
+						Author    struct{ Login string } `json:"author"`
+						Body      string                 `json:"body"`
+						CreatedAt time.Time               `json:"createdAt"`
+					} `json:"nodes"`
+				} `json:"comments"`
+				Reviews struct {
+					Nodes []struct {
+						Author      struct{ Login string } `json:"author"`
+						Body        string                 `json:"body"`
+						SubmittedAt time.Time              `json:"submittedAt"`
+					} `json:"nodes"`
+				} `json:"reviews"`
+			} `json:"pullRequest"`
+		} `json:"repository"`
+	} `json:"data"`
+}
+
+// FetchPRComments fetches the full comment timeline for one PR — its issue
+// comments plus any non-empty review-summary bodies — sorted chronologically
+// (oldest first). Called on demand only for the PR whose comments popup is
+// open, never for every row up front.
+func FetchPRComments(dir, repo string, number int) ([]PRComment, error) {
+	owner, name, ok := strings.Cut(repo, "/")
+	if !ok {
+		return nil, fmt.Errorf("FetchPRComments: invalid repo %q, expected owner/name", repo)
 	}
-	if err := json.Unmarshal([]byte(jsonOut), &prs); err != nil {
-		return nil, fmt.Errorf("parsing gh pr list output: %w", err)
+	extraArgs := []string{
+		"-f", "owner=" + owner,
+		"-f", "name=" + name,
+		"-F", "number=" + strconv.Itoa(number),
 	}
-	return prs, nil
+	var envelope prCommentsEnvelope
+	if err := runGraphQLRequest(dir, prCommentsQuery, extraArgs, &envelope); err != nil {
+		return nil, err
+	}
+	return commentsFromEnvelope(envelope)
+}
+
+// commentsFromEnvelope converts a decoded prCommentsEnvelope into a
+// chronologically sorted (oldest first) comment timeline: issue comments
+// plus any non-empty review-summary bodies, empty ones dropped.
+func commentsFromEnvelope(envelope prCommentsEnvelope) ([]PRComment, error) {
+	if err := envelope.Errors.err(); err != nil {
+		return nil, err
+	}
+	pr := envelope.Data.Repository.PullRequest
+	comments := make([]PRComment, 0, len(pr.Comments.Nodes)+len(pr.Reviews.Nodes))
+	for _, c := range pr.Comments.Nodes {
+		comments = append(comments, PRComment{Author: c.Author.Login, Body: c.Body, CreatedAt: c.CreatedAt})
+	}
+	for _, r := range pr.Reviews.Nodes {
+		if strings.TrimSpace(r.Body) == "" {
+			continue
+		}
+		comments = append(comments, PRComment{Author: r.Author.Login, Body: r.Body, CreatedAt: r.SubmittedAt})
+	}
+	sort.Slice(comments, func(i, j int) bool {
+		return comments[i].CreatedAt.Before(comments[j].CreatedAt)
+	})
+	return comments, nil
 }
 
 // BranchPRURL returns the GitHub PR URL for the current branch in worktreeRoot.

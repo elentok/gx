@@ -96,3 +96,28 @@ func (m Model) handleGotoPR(msg gotoPRMsg) (Model, tea.Cmd) {
 	}
 	return m, ui.CmdOpenURL(msg.url)
 }
+
+type commentsLoadedMsg struct {
+	comments []git.PRComment
+	err      error
+}
+
+// cmdOpenComments opens the comments popup for the selected row's on-demand
+// comment fetch. A no-op when the selection is on a closed row (or invalid)
+// — see issues/13-comments-popup.md.
+func (m *Model) cmdOpenComments() tea.Cmd {
+	sel := m.list.Selected()
+	if sel < 0 || sel >= len(m.prs) {
+		return nil
+	}
+	pr := m.prs[sel]
+	m.comments.open(m.width)
+
+	worktreeRoot := m.worktreeRoot
+	repo := pr.Repo
+	number := pr.Number
+	return func() tea.Msg {
+		comments, err := git.FetchPRComments(worktreeRoot, repo, number)
+		return commentsLoadedMsg{comments: comments, err: err}
+	}
+}

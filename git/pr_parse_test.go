@@ -9,47 +9,6 @@ import (
 	"time"
 )
 
-func TestParsePRList_Empty(t *testing.T) {
-	prs, err := parsePRList("[]")
-	if err != nil {
-		t.Fatalf("parsePRList: %v", err)
-	}
-	if len(prs) != 0 {
-		t.Fatalf("expected no PRs, got %d", len(prs))
-	}
-}
-
-func TestParsePRList_BlankOutput(t *testing.T) {
-	prs, err := parsePRList("")
-	if err != nil {
-		t.Fatalf("parsePRList: %v", err)
-	}
-	if len(prs) != 0 {
-		t.Fatalf("expected no PRs, got %d", len(prs))
-	}
-}
-
-func TestParsePRList_DecodesFields(t *testing.T) {
-	out := `[{"number":42,"title":"Fix the thing","url":"https://github.com/o/r/pull/42","isDraft":true,"updatedAt":"2026-07-20T10:00:00Z"}]`
-	prs, err := parsePRList(out)
-	if err != nil {
-		t.Fatalf("parsePRList: %v", err)
-	}
-	if len(prs) != 1 {
-		t.Fatalf("expected 1 PR, got %d", len(prs))
-	}
-	pr := prs[0]
-	if pr.Number != 42 || pr.Title != "Fix the thing" || pr.URL != "https://github.com/o/r/pull/42" || !pr.IsDraft {
-		t.Fatalf("unexpected PR: %+v", pr)
-	}
-}
-
-func TestParsePRList_InvalidJSON(t *testing.T) {
-	if _, err := parsePRList("not json"); err == nil {
-		t.Fatal("expected error for invalid JSON")
-	}
-}
-
 func TestCIState(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -363,6 +322,62 @@ func TestClosedPRSearchNode_ToClosedPR(t *testing.T) {
 	}
 	if pr.Repo != "o/r" {
 		t.Fatalf("expected repo o/r, got %q", pr.Repo)
+	}
+}
+
+func TestCommentsFromEnvelope_MergesAndSortsChronologically(t *testing.T) {
+	body := `{
+		"data": {
+			"repository": {
+				"pullRequest": {
+					"comments": {
+						"nodes": [
+							{"author": {"login": "alice"}, "body": "second", "createdAt": "2026-07-20T12:00:00Z"}
+						]
+					},
+					"reviews": {
+						"nodes": [
+							{"author": {"login": "bob"}, "body": "first", "submittedAt": "2026-07-20T10:00:00Z"},
+							{"author": {"login": "carol"}, "body": "   ", "submittedAt": "2026-07-20T11:00:00Z"}
+						]
+					}
+				}
+			}
+		}
+	}`
+	var envelope prCommentsEnvelope
+	if err := json.Unmarshal([]byte(body), &envelope); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	comments, err := commentsFromEnvelope(envelope)
+	if err != nil {
+		t.Fatalf("commentsFromEnvelope: %v", err)
+	}
+	if len(comments) != 2 {
+		t.Fatalf("expected 2 comments (empty review body dropped), got %d: %+v", len(comments), comments)
+	}
+	if comments[0].Author != "bob" || comments[0].Body != "first" {
+		t.Fatalf("expected bob's review first (earliest), got %+v", comments[0])
+	}
+	if comments[1].Author != "alice" || comments[1].Body != "second" {
+		t.Fatalf("expected alice's comment second (latest), got %+v", comments[1])
+	}
+}
+
+func TestCommentsFromEnvelope_Errors(t *testing.T) {
+	body := `{"data":null,"errors":[{"message":"boom"}]}`
+	var envelope prCommentsEnvelope
+	if err := json.Unmarshal([]byte(body), &envelope); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if _, err := commentsFromEnvelope(envelope); err == nil {
+		t.Fatal("expected error for gh api graphql error response")
+	}
+}
+
+func TestFetchPRComments_InvalidRepo(t *testing.T) {
+	if _, err := FetchPRComments("/repo", "not-a-repo", 1); err == nil {
+		t.Fatal("expected error for repo missing owner/name separator")
 	}
 }
 

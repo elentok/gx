@@ -33,8 +33,9 @@ type Model struct {
 
 	allRepos bool
 
-	keys keys.Manager
-	help help.Model
+	keys     keys.Manager
+	help     help.Model
+	comments commentsPopup
 }
 
 func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager) Model {
@@ -63,7 +64,7 @@ func (m Model) KeyManager() keys.Manager {
 
 func (m Model) IsSplit() bool { return false }
 
-func (m Model) ModalOpen() bool { return m.help.IsOpen }
+func (m Model) ModalOpen() bool { return m.help.IsOpen || m.comments.isOpen }
 
 func (m Model) InputFocused() bool { return m.help.InputFocused() }
 
@@ -84,6 +85,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var cmd tea.Cmd
 			m.help, cmd = m.help.Update(msg)
 			return m, cmd
+		}
+	}
+
+	if m.comments.isOpen {
+		switch msg := msg.(type) {
+		case tea.KeyPressMsg:
+			m.comments.handleKey(msg)
+			return m, nil
+		case commentsLoadedMsg:
+			m.comments.loaded(msg.comments, msg.err)
+			return m, nil
 		}
 	}
 
@@ -137,6 +149,9 @@ func (m Model) View() tea.View {
 	out := m.buildMainContent()
 	if m.help.IsOpen {
 		out = ui.OverlayCenter(out, m.help.View(), m.width, m.height)
+	}
+	if m.comments.isOpen {
+		out = ui.OverlayCenter(out, m.comments.view(), m.width, m.height)
 	}
 	return ui.NewMainView(out)
 }

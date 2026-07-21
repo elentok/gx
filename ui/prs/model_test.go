@@ -381,6 +381,84 @@ func TestQuestionMarkOpensHelpOverlay(t *testing.T) {
 	}
 }
 
+func TestCKeyOnOpenPROpensCommentsPopupAndFetches(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = loadPRs(m, []git.PR{
+		{Number: 12, Title: "Add widget", Repo: "acme/widgets", UpdatedAt: time.Now()},
+	}, true, nil, nil)
+
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+	if cmd == nil {
+		t.Fatal("expected a fetch cmd from c on an open PR")
+	}
+	m = sendModel(m, tea.KeyPressMsg{Code: 'c', Text: "c"})
+	if !m.comments.isOpen || !m.comments.loading {
+		t.Fatal("expected comments popup open and loading immediately after c")
+	}
+
+	now := time.Now()
+	m = sendModel(m, commentsLoadedMsg{comments: []git.PRComment{
+		{Author: "alice", Body: "looks good", CreatedAt: now},
+	}})
+	if m.comments.loading {
+		t.Fatal("expected loading to clear once comments arrive")
+	}
+
+	content := m.View().Content
+	if !strings.Contains(content, "Comments") || !strings.Contains(content, "alice") || !strings.Contains(content, "looks good") {
+		t.Fatalf("expected popup with author and body, got:\n%s", content)
+	}
+}
+
+func TestCKeyOnClosedPRIsNoOp(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = loadPRs(m, nil, false, nil, []git.ClosedPR{
+		{Number: 5, Title: "Merged fix", State: "MERGED", ClosedAt: time.Now()},
+	})
+	m = m.navigateSelection(1) // move onto the closed row
+
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+	if cmd != nil {
+		t.Fatal("expected no cmd from c on a closed PR row")
+	}
+	m = sendModel(m, tea.KeyPressMsg{Code: 'c', Text: "c"})
+	if m.comments.isOpen {
+		t.Fatal("expected comments popup to stay closed for a closed-PR row")
+	}
+}
+
+func TestCommentsPopupDismissesViaEscQEnter(t *testing.T) {
+	for _, key := range []string{"esc", "q", "enter"} {
+		t.Run(key, func(t *testing.T) {
+			m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+			m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+			m = loadPRs(m, []git.PR{
+				{Number: 12, Title: "Add widget", Repo: "acme/widgets", UpdatedAt: time.Now()},
+			}, true, nil, nil)
+			m = sendModel(m, tea.KeyPressMsg{Code: 'c', Text: "c"})
+			if !m.comments.isOpen {
+				t.Fatal("expected popup open before dismiss")
+			}
+
+			var code rune
+			switch key {
+			case "esc":
+				code = tea.KeyEscape
+			case "enter":
+				code = tea.KeyEnter
+			default:
+				code = 'q'
+			}
+			m = sendModel(m, tea.KeyPressMsg{Code: code, Text: key})
+			if m.comments.isOpen {
+				t.Fatalf("expected popup closed after %q", key)
+			}
+		})
+	}
+}
+
 func TestRKeyTriggersRefresh(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
