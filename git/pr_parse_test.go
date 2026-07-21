@@ -263,6 +263,134 @@ func TestClassifyPRListError(t *testing.T) {
 	})
 }
 
+func TestGraphQLRollupToChecks(t *testing.T) {
+	cases := []struct {
+		state string
+		want  CIState
+	}{
+		{"", CINone},
+		{"SUCCESS", CIPassed},
+		{"FAILURE", CIFailed},
+		{"ERROR", CIFailed},
+		{"PENDING", CIRunning},
+		{"EXPECTED", CIRunning},
+	}
+	for _, c := range cases {
+		t.Run(c.state, func(t *testing.T) {
+			pr := PR{StatusCheckRollup: graphQLRollupToChecks(c.state)}
+			if got := pr.CIState(); got != c.want {
+				t.Errorf("state=%q: expected %v, got %v", c.state, c.want, got)
+			}
+		})
+	}
+}
+
+func TestPRSearchNode_ToPR(t *testing.T) {
+	const body = `{
+		"number": 42,
+		"title": "Fix the thing",
+		"url": "https://github.com/o/r/pull/42",
+		"isDraft": true,
+		"updatedAt": "2026-07-20T10:00:00Z",
+		"mergeable": "MERGEABLE",
+		"reviewDecision": "APPROVED",
+		"repository": {"name": "r", "owner": {"login": "o"}},
+		"commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": "SUCCESS"}}}]},
+		"reviews": {"nodes": [{"state": "APPROVED", "body": "lgtm"}]},
+		"comments": {"totalCount": 2},
+		"reviewRequests": {"totalCount": 1}
+	}`
+	var node prSearchNode
+	if err := json.Unmarshal([]byte(body), &node); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	pr := node.toPR()
+
+	if pr.Number != 42 || pr.Title != "Fix the thing" || pr.URL != "https://github.com/o/r/pull/42" || !pr.IsDraft {
+		t.Fatalf("unexpected identity fields: %+v", pr)
+	}
+	if pr.Repo != "o/r" {
+		t.Fatalf("expected repo o/r, got %q", pr.Repo)
+	}
+	if pr.Mergeable != "MERGEABLE" || pr.ReviewDecision != "APPROVED" {
+		t.Fatalf("unexpected facet inputs: %+v", pr)
+	}
+	if pr.CIState() != CIPassed {
+		t.Fatalf("expected CIPassed, got %v", pr.CIState())
+	}
+	if len(pr.Reviews) != 1 || pr.Reviews[0].State != "APPROVED" || pr.Reviews[0].Body != "lgtm" {
+		t.Fatalf("unexpected reviews: %+v", pr.Reviews)
+	}
+	if pr.CommentCount() != 3 {
+		t.Fatalf("expected comment count 3 (2 comments + 1 non-empty review body), got %d", pr.CommentCount())
+	}
+	if _, reviewersRequested := pr.ApprovalState(); reviewersRequested {
+		t.Fatalf("expected reviewersRequested false when already approved")
+	}
+	if len(pr.ReviewRequests) != 1 {
+		t.Fatalf("expected 1 review request, got %d", len(pr.ReviewRequests))
+	}
+}
+
+func TestPRSearchNode_ToPR_NoCommits(t *testing.T) {
+	var node prSearchNode
+	if err := json.Unmarshal([]byte(`{"number": 1, "commits": {"nodes": []}}`), &node); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	pr := node.toPR()
+	if pr.CIState() != CINone {
+		t.Fatalf("expected CINone with no commits, got %v", pr.CIState())
+	}
+}
+
+func TestClosedPRSearchNode_ToClosedPR(t *testing.T) {
+	const body = `{
+		"number": 7,
+		"title": "Fix flake",
+		"url": "https://github.com/o/r/pull/7",
+		"state": "MERGED",
+		"mergedAt": "2026-07-19T10:00:00Z",
+		"closedAt": "2026-07-19T10:00:00Z",
+		"repository": {"name": "r", "owner": {"login": "o"}}
+	}`
+	var node closedPRSearchNode
+	if err := json.Unmarshal([]byte(body), &node); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	pr := node.toClosedPR()
+	if pr.Number != 7 || pr.Title != "Fix flake" || pr.URL != "https://github.com/o/r/pull/7" || !pr.IsMerged() {
+		t.Fatalf("unexpected closed PR: %+v", pr)
+	}
+	if pr.Repo != "o/r" {
+		t.Fatalf("expected repo o/r, got %q", pr.Repo)
+	}
+}
+
+func TestGraphQLSearchEnvelope_ParsesNodes(t *testing.T) {
+	body := `{"data":{"search":{"nodes":[{"number":1},{"number":2}]}}}`
+	var envelope graphQLSearchEnvelope[prSearchNode]
+	if err := json.Unmarshal([]byte(body), &envelope); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(envelope.Data.Search.Nodes) != 2 {
+		t.Fatalf("expected 2 nodes, got %d", len(envelope.Data.Search.Nodes))
+	}
+	if len(envelope.Errors) != 0 {
+		t.Fatalf("expected no errors, got %+v", envelope.Errors)
+	}
+}
+
+func TestGraphQLSearchEnvelope_ParsesErrors(t *testing.T) {
+	body := `{"data":null,"errors":[{"message":"boom"}]}`
+	var envelope graphQLSearchEnvelope[prSearchNode]
+	if err := json.Unmarshal([]byte(body), &envelope); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(envelope.Errors) != 1 || envelope.Errors[0].Message != "boom" {
+		t.Fatalf("expected 1 error 'boom', got %+v", envelope.Errors)
+	}
+}
+
 func TestMarker(t *testing.T) {
 	cases := []struct {
 		name   string

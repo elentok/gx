@@ -24,6 +24,11 @@ type PR struct {
 	IsDraft   bool      `json:"isDraft"`
 	UpdatedAt time.Time `json:"updatedAt"`
 
+	// Repo is the owning repo ("owner/name"), populated only by the
+	// --all-repos GraphQL fetch (listOpenPRsAllRepos) — the current-repo
+	// fetch leaves it empty since the repo is already implied by context.
+	Repo string `json:"-"`
+
 	Mergeable         string            `json:"mergeable"`
 	ReviewDecision    string            `json:"reviewDecision"`
 	StatusCheckRollup []PRStatusCheck   `json:"statusCheckRollup"`
@@ -225,6 +230,10 @@ type ClosedPR struct {
 	MergedAt time.Time `json:"mergedAt"`
 	ClosedAt time.Time `json:"closedAt"`
 	URL      string    `json:"url"`
+
+	// Repo is the owning repo ("owner/name"), populated only by the
+	// --all-repos GraphQL fetch (listClosedPRsAllRepos).
+	Repo string `json:"-"`
 }
 
 // IsMerged reports whether the PR was merged rather than closed-unmerged.
@@ -260,51 +269,20 @@ func ListClosedPRs(dir string, allRepos bool) ([]ClosedPR, error) {
 	return prs, nil
 }
 
-// listClosedPRsAllRepos discovers the repos the user has recently-closed PRs
-// in via a single cross-repo search, then re-fetches each repo's closed PRs
-// with the full field set via `gh pr list` (the search API doesn't expose
-// enough fields to render the closed-PR row, only enough to locate repos).
+// listClosedPRsAllRepos fetches every repo's recently-closed PRs in a single
+// GraphQL search query (see issues/12-all-mode-graphql-migration.md), rather
+// than a repo-discovery search plus one `gh pr list` call per repo.
 func listClosedPRsAllRepos(dir, cutoff string) ([]ClosedPR, error) {
-	repos, err := searchPRRepos(dir, "--state", "closed", "--closed", ">"+cutoff)
+	nodes, err := runGraphQLPRSearch[closedPRSearchNode](dir, closedPRsSearchQuery, "is:pr author:@me is:closed closed:>"+cutoff)
 	if err != nil {
 		return nil, err
 	}
-	all, err := fetchPerRepo(repos, func(repo string) ([]ClosedPR, error) {
-		out, err := runGH(dir, []string{
-			"pr", "list",
-			"--repo", repo,
-			"--state", "closed",
-			"--search", "closed:>" + cutoff,
-			"--limit", "100",
-			"--author", "@me",
-			"--json", prClosedListFields,
-		})
-		if err != nil {
-			return nil, classifyPRListError(err)
-		}
-		return parseClosedPRList(out)
-	})
-	if err != nil {
-		return nil, err
+	prs := make([]ClosedPR, len(nodes))
+	for i, n := range nodes {
+		prs[i] = n.toClosedPR()
 	}
-	sortClosedPRs(all)
-	return all, nil
-}
-
-// fetchPerRepo runs fetch once per repo and concatenates the results,
-// shared by listOpenPRsAllRepos and listClosedPRsAllRepos so the "one
-// gh pr list call per discovered repo, merge the results" shape isn't
-// duplicated for each PR kind.
-func fetchPerRepo[T any](repos []string, fetch func(repo string) ([]T, error)) ([]T, error) {
-	var all []T
-	for _, repo := range repos {
-		items, err := fetch(repo)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, items...)
-	}
-	return all, nil
+	sortClosedPRs(prs)
+	return prs, nil
 }
 
 // sortClosedPRs orders prs by closed date, most recent first.
@@ -392,46 +370,28 @@ func ListOpenPRs(dir string, allRepos bool) ([]PR, error) {
 	return prs, nil
 }
 
-// listOpenPRsAllRepos discovers the repos the user has open PRs in via a
-// single cross-repo search, then re-fetches each repo's open PRs with the
-// full field set via `gh pr list` (the search API doesn't expose the facet
-// fields — statusCheckRollup, reviewDecision, reviews, mergeable,
-// reviewRequests — only enough to locate repos).
+// listOpenPRsAllRepos fetches every repo's open PRs — including the facet
+// fields (statusCheckRollup, reviewDecision, reviews, mergeable,
+// reviewRequests) — in a single GraphQL search query (see
+// issues/12-all-mode-graphql-migration.md), rather than a repo-discovery
+// search plus one `gh pr list` call per repo.
 func listOpenPRsAllRepos(dir string) ([]PR, error) {
-	repos, err := searchPRRepos(dir, "--state", "open")
+	nodes, err := runGraphQLPRSearch[prSearchNode](dir, openPRsSearchQuery, "is:pr author:@me is:open")
 	if err != nil {
 		return nil, err
 	}
-	all, err := fetchPerRepo(repos, func(repo string) ([]PR, error) {
-		out, err := runGH(dir, []string{
-			"pr", "list",
-			"--repo", repo,
-			"--author", "@me",
-			"--json", prListFields,
-		})
-		if err != nil {
-			return nil, classifyPRListError(err)
-		}
-		return parsePRList(out)
-	})
-	if err != nil {
-		return nil, err
+	prs := make([]PR, len(nodes))
+	for i, n := range nodes {
+		prs[i] = n.toPR()
 	}
-	sortPRs(all)
-	return all, nil
-}
-
-// searchRepoResult is the minimal shape needed from `gh search prs` to
-// discover which repos to re-query for full-fidelity data.
-type searchRepoResult struct {
-	Repository struct {
-		NameWithOwner string `json:"nameWithOwner"`
-	} `json:"repository"`
+	sortPRs(prs)
+	return prs, nil
 }
 
 // runGHSearchPRs runs `gh search prs --author @me --json <jsonFields>` with
-// the given extra filter args, the shared entry point for every cross-repo
-// PR search (repo discovery and the all-repos existence probe alike).
+// the given extra filter args. Used only by the all-repos existence probe
+// (AnyPRsExist) — the full open/closed fetches go through
+// runGraphQLPRSearch instead.
 func runGHSearchPRs(dir, jsonFields string, extraArgs ...string) (string, error) {
 	args := append([]string{
 		"search", "prs",
@@ -446,32 +406,201 @@ func runGHSearchPRs(dir, jsonFields string, extraArgs ...string) (string, error)
 	return out, nil
 }
 
-// searchPRRepos returns the deduped set of repos (owner/name) containing PRs
-// authored by the current user matching the given `gh search prs` filters.
-func searchPRRepos(dir string, extraArgs ...string) ([]string, error) {
-	out, err := runGHSearchPRs(dir, "repository", extraArgs...)
+// openPRsSearchQuery fetches every field needed to render an open-PR row and
+// derive its facets in one shot: identity fields, the CI rollup state for
+// the tip commit, mergeability, review decision/bodies, and comment/
+// review-request counts.
+const openPRsSearchQuery = `
+query($searchQuery: String!) {
+  search(query: $searchQuery, type: ISSUE, first: 100) {
+    nodes {
+      ... on PullRequest {
+        number
+        title
+        url
+        isDraft
+        updatedAt
+        mergeable
+        reviewDecision
+        repository { name owner { login } }
+        commits(last: 1) {
+          nodes { commit { statusCheckRollup { state } } }
+        }
+        reviews(last: 50) { nodes { state body } }
+        comments { totalCount }
+        reviewRequests { totalCount }
+      }
+    }
+  }
+}`
+
+// closedPRsSearchQuery fetches only what a closed-PR row needs (no facets).
+const closedPRsSearchQuery = `
+query($searchQuery: String!) {
+  search(query: $searchQuery, type: ISSUE, first: 100) {
+    nodes {
+      ... on PullRequest {
+        number
+        title
+        url
+        state
+        mergedAt
+        closedAt
+        repository { name owner { login } }
+      }
+    }
+  }
+}`
+
+// prSearchRepo is the repository identity shape shared by both search node
+// types.
+type prSearchRepo struct {
+	Name  string `json:"name"`
+	Owner struct {
+		Login string `json:"login"`
+	} `json:"owner"`
+}
+
+func (r prSearchRepo) nameWithOwner() string {
+	return r.Owner.Login + "/" + r.Name
+}
+
+// prSearchNode is the shape of one `... on PullRequest` node returned by
+// openPRsSearchQuery.
+type prSearchNode struct {
+	Number         int          `json:"number"`
+	Title          string       `json:"title"`
+	URL            string       `json:"url"`
+	IsDraft        bool         `json:"isDraft"`
+	UpdatedAt      time.Time    `json:"updatedAt"`
+	Mergeable      string       `json:"mergeable"`
+	ReviewDecision string       `json:"reviewDecision"`
+	Repository     prSearchRepo `json:"repository"`
+	Commits        struct {
+		Nodes []struct {
+			Commit struct {
+				StatusCheckRollup *struct {
+					State string `json:"state"`
+				} `json:"statusCheckRollup"`
+			} `json:"commit"`
+		} `json:"nodes"`
+	} `json:"commits"`
+	Reviews struct {
+		Nodes []PRReview `json:"nodes"`
+	} `json:"reviews"`
+	Comments struct {
+		TotalCount int `json:"totalCount"`
+	} `json:"comments"`
+	ReviewRequests struct {
+		TotalCount int `json:"totalCount"`
+	} `json:"reviewRequests"`
+}
+
+// toPR converts the GraphQL node into a PR with facet-equivalent data. The
+// tip commit's single rolled-up CI state is expanded into a synthetic
+// one-element StatusCheckRollup so PR.CIState() classifies it the same way
+// it would the REST API's per-check array; comment/review-request counts
+// become placeholder slices of the right length since only their length is
+// ever read.
+func (n prSearchNode) toPR() PR {
+	var rollupState string
+	if len(n.Commits.Nodes) > 0 && n.Commits.Nodes[0].Commit.StatusCheckRollup != nil {
+		rollupState = n.Commits.Nodes[0].Commit.StatusCheckRollup.State
+	}
+	return PR{
+		Number:            n.Number,
+		Title:             n.Title,
+		URL:               n.URL,
+		IsDraft:           n.IsDraft,
+		UpdatedAt:         n.UpdatedAt,
+		Repo:              n.Repository.nameWithOwner(),
+		Mergeable:         n.Mergeable,
+		ReviewDecision:    n.ReviewDecision,
+		StatusCheckRollup: graphQLRollupToChecks(rollupState),
+		Reviews:           n.Reviews.Nodes,
+		Comments:          make([]json.RawMessage, n.Comments.TotalCount),
+		ReviewRequests:    make([]json.RawMessage, n.ReviewRequests.TotalCount),
+	}
+}
+
+// graphQLRollupToChecks maps GraphQL's single rolled-up commit
+// statusCheckRollup.state onto the synthetic one-element PRStatusCheck slice
+// PR.CIState() expects, preserving CINone/CIFailed/CIRunning/CIPassed
+// classification without needing the individual per-check array the REST
+// API returns.
+func graphQLRollupToChecks(state string) []PRStatusCheck {
+	switch state {
+	case "":
+		return nil
+	case "SUCCESS":
+		return []PRStatusCheck{{Status: "COMPLETED", Conclusion: "SUCCESS"}}
+	case "FAILURE", "ERROR":
+		return []PRStatusCheck{{Status: "COMPLETED", Conclusion: "FAILURE"}}
+	default: // PENDING, EXPECTED
+		return []PRStatusCheck{{Status: "IN_PROGRESS"}}
+	}
+}
+
+// closedPRSearchNode is the shape of one `... on PullRequest` node returned
+// by closedPRsSearchQuery.
+type closedPRSearchNode struct {
+	Number     int          `json:"number"`
+	Title      string       `json:"title"`
+	URL        string       `json:"url"`
+	State      string       `json:"state"`
+	MergedAt   time.Time    `json:"mergedAt"`
+	ClosedAt   time.Time    `json:"closedAt"`
+	Repository prSearchRepo `json:"repository"`
+}
+
+func (n closedPRSearchNode) toClosedPR() ClosedPR {
+	return ClosedPR{
+		Number:   n.Number,
+		Title:    n.Title,
+		State:    n.State,
+		MergedAt: n.MergedAt,
+		ClosedAt: n.ClosedAt,
+		URL:      n.URL,
+		Repo:     n.Repository.nameWithOwner(),
+	}
+}
+
+// graphQLSearchEnvelope is the `{"data":{"search":{"nodes":[...]}}}` shape
+// gh api graphql returns for both openPRsSearchQuery and
+// closedPRsSearchQuery.
+type graphQLSearchEnvelope[T any] struct {
+	Errors []struct {
+		Message string `json:"message"`
+	} `json:"errors"`
+	Data struct {
+		Search struct {
+			Nodes []T `json:"nodes"`
+		} `json:"search"`
+	} `json:"data"`
+}
+
+// runGraphQLPRSearch runs `gh api graphql` with the given query and
+// $searchQuery variable, decoding the resulting nodes as T (either
+// prSearchNode or closedPRSearchNode). Shared by listOpenPRsAllRepos and
+// listClosedPRsAllRepos so the "one GraphQL search query, across every repo"
+// shape isn't duplicated for each PR kind.
+func runGraphQLPRSearch[T any](dir, query, searchQuery string) ([]T, error) {
+	out, err := runGH(dir, []string{
+		"api", "graphql",
+		"-f", "query=" + query,
+		"-f", "searchQuery=" + searchQuery,
+	})
 	if err != nil {
-		return nil, err
+		return nil, classifyPRListError(err)
 	}
-	var results []searchRepoResult
-	out = strings.TrimSpace(out)
-	if out == "" {
-		return nil, nil
+	var envelope graphQLSearchEnvelope[T]
+	if err := json.Unmarshal([]byte(out), &envelope); err != nil {
+		return nil, fmt.Errorf("parsing gh api graphql response: %w", err)
 	}
-	if err := json.Unmarshal([]byte(out), &results); err != nil {
-		return nil, fmt.Errorf("parsing gh search prs output: %w", err)
+	if len(envelope.Errors) > 0 {
+		return nil, fmt.Errorf("gh api graphql: %s", envelope.Errors[0].Message)
 	}
-	seen := make(map[string]bool)
-	var repos []string
-	for _, r := range results {
-		name := r.Repository.NameWithOwner
-		if name == "" || seen[name] {
-			continue
-		}
-		seen[name] = true
-		repos = append(repos, name)
-	}
-	return repos, nil
+	return envelope.Data.Search.Nodes, nil
 }
 
 // AnyPRsExist reports whether the user has any PRs at all (open or closed),
