@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.22.0 - 2026-07-21
+
+- Added a PRs tab: shows your outgoing open PRs with CI/approval/mergeable/comment-count facets, an actionable-first sort, and a recently-closed section (last 2 weeks). Supports manual refresh (R / m-r), auto-refresh on tab switch, and an `--all` flag / `a` key to scope across every repo instead of just the current one.
+- Fixed a flaky `TestStageE2E_PushActionWithConfirm` test.
+
 ## v0.21.2 - 2026-07-20
 
 - Fixed a herdr split/commit bug where a leftover pane from a prior launch (e.g. a failed `git commit` kept open by `gx run`) collided with the next launch's fixed agent name, causing `agent name gx is already used` errors. Each herdr agent launch now gets a unique name.
