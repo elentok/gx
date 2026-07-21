@@ -5,11 +5,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui"
@@ -30,15 +27,6 @@ const (
 
 // osExecutable is a seam so tests can exercise the gx-path fallback.
 var osExecutable = os.Executable
-
-// herdrAgentSuffix is a seam so tests get deterministic agent names. herdr
-// requires agent names to be unique among live agents, so each `agent start`
-// gets a fresh suffix — otherwise a still-open pane from a prior launch (e.g.
-// one `gx run` kept open after a failed command) collides with the next
-// launch's name and herdr rejects it with "agent name ... is already used".
-var herdrAgentSuffix = func() string {
-	return strconv.FormatInt(time.Now().UnixNano(), 36)
-}
 
 // runCommand runs an external command and returns its combined output and exit
 // error. It is a seam so tests can assert the exact tmux/kitty argument vectors
@@ -212,65 +200,103 @@ func launchSplit(worktreeRoot string, terminal ui.Terminal, splitType SplitType,
 		}
 		return "kitty", err
 	case ui.TerminalHerdr:
-		// `herdr agent start` is documented for launching coding agents, but
-		// `pane split`/`tab create` (the commands meant for ordinary programs)
-		// don't accept a program to exec — they only open a pane running an
-		// interactive shell, which `pane run` then has to type a command line
-		// into. That adds a visible delay waiting for the shell (and its
-		// prompt) to finish starting up before it can process input. `agent
-		// start` directly execs the given argv (same as tmux split-window/kitty
-		// @ launch) and, when the process exits cleanly, closes the pane
-		// automatically — so it's used here for any program, not just agents.
-		name := filepath.Base(program) + "-" + herdrAgentSuffix()
-		herdrArgs := []string{"agent", "start", name}
+		// herdr panes always run an interactive shell — there's no split
+		// command that execs a program directly (unlike tmux split-window or
+		// kitty @ launch). So splitting opens a shell pane, then `pane run`
+		// types the command line into it and presses Enter, same as the
+		// documented agent-launch flow (see herdr's SKILL.md "Run an ordinary
+		// command in another pane").
+		var paneID string
+		var err error
 		switch splitType {
 		case HSplit:
 			// HSplit (vim :split, stacked) maps to herdr's "down" split.
-			herdrArgs = append(herdrArgs, "--cwd", worktreeRoot, "--split", "down")
+			paneID, err = herdrPaneSplit(worktreeRoot, "down")
 		case VSplit:
 			// VSplit (vim :vsplit, side-by-side) maps to herdr's "right" split.
-			herdrArgs = append(herdrArgs, "--cwd", worktreeRoot, "--split", "right")
+			paneID, err = herdrPaneSplit(worktreeRoot, "right")
 		case Tab:
-			tabID, err := herdrTabCreate(worktreeRoot)
-			if err != nil {
-				return "herdr", err
-			}
-			herdrArgs = append(herdrArgs, "--tab", tabID)
+			paneID, err = herdrTabCreate(worktreeRoot)
 		}
-		herdrArgs = append(herdrArgs, "--focus", "--")
-		herdrArgs = append(herdrArgs, program)
-		herdrArgs = append(herdrArgs, args...)
-		out, err := runCommand("herdr", herdrArgs...)
 		if err != nil {
-			err = fmt.Errorf("$ herdr %s\n\n%w\n\n%s", strings.Join(herdrArgs, " "), err, strings.TrimSpace(string(out)))
+			return "herdr", err
 		}
+		err = herdrPaneRun(paneID, program, args)
 		return "herdr", err
 	}
 	return "", fmt.Errorf("split not supported for terminal %v", terminal)
 }
 
-// herdrTabCreate creates a new herdr tab rooted at worktreeRoot and returns
-// its tab id, for use with `herdr agent start --tab <id>` (herdr's
-// tab-create step doesn't accept a program to launch, unlike tmux
-// new-window/kitty --type=tab).
+// herdrPaneSplit splits the calling herdr pane (via --current, i.e.
+// $HERDR_PANE_ID) in the given direction ("right"/"down"), focuses the new
+// pane, and returns its pane id.
+func herdrPaneSplit(worktreeRoot, direction string) (string, error) {
+	splitArgs := []string{"pane", "split", "--current", "--direction", direction, "--cwd", worktreeRoot, "--focus"}
+	out, err := runCommand("herdr", splitArgs...)
+	if err != nil {
+		return "", fmt.Errorf("$ herdr %s\n\n%w\n\n%s", strings.Join(splitArgs, " "), err, strings.TrimSpace(string(out)))
+	}
+	var resp struct {
+		Result struct {
+			Pane struct {
+				PaneID string `json:"pane_id"`
+			} `json:"pane"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(out, &resp); err != nil {
+		return "", fmt.Errorf("parsing herdr pane split output: %w", err)
+	}
+	if resp.Result.Pane.PaneID == "" {
+		return "", fmt.Errorf("herdr pane split returned no pane id: %s", strings.TrimSpace(string(out)))
+	}
+	return resp.Result.Pane.PaneID, nil
+}
+
+// herdrTabCreate creates a new herdr tab rooted at worktreeRoot, focuses it,
+// and returns the pane id of its root pane.
 func herdrTabCreate(worktreeRoot string) (string, error) {
-	tabArgs := []string{"tab", "create", "--cwd", worktreeRoot}
+	tabArgs := []string{"tab", "create", "--cwd", worktreeRoot, "--focus"}
 	out, err := runCommand("herdr", tabArgs...)
 	if err != nil {
 		return "", fmt.Errorf("$ herdr %s\n\n%w\n\n%s", strings.Join(tabArgs, " "), err, strings.TrimSpace(string(out)))
 	}
 	var resp struct {
 		Result struct {
-			Tab struct {
-				TabID string `json:"tab_id"`
-			} `json:"tab"`
+			RootPane struct {
+				PaneID string `json:"pane_id"`
+			} `json:"root_pane"`
 		} `json:"result"`
 	}
 	if err := json.Unmarshal(out, &resp); err != nil {
 		return "", fmt.Errorf("parsing herdr tab create output: %w", err)
 	}
-	if resp.Result.Tab.TabID == "" {
-		return "", fmt.Errorf("herdr tab create returned no tab id: %s", strings.TrimSpace(string(out)))
+	if resp.Result.RootPane.PaneID == "" {
+		return "", fmt.Errorf("herdr tab create returned no pane id: %s", strings.TrimSpace(string(out)))
 	}
-	return resp.Result.Tab.TabID, nil
+	return resp.Result.RootPane.PaneID, nil
+}
+
+// herdrPaneRun types program (with args) as a command line into paneID's
+// shell and presses Enter, then appends `; exit` so the pane closes once the
+// command finishes — matching tmux split-window/kitty @ launch, which exec
+// the program directly and close the pane on exit.
+func herdrPaneRun(paneID, program string, args []string) error {
+	tokens := make([]string, 0, len(args)+1)
+	tokens = append(tokens, shellQuote(program))
+	for _, arg := range args {
+		tokens = append(tokens, shellQuote(arg))
+	}
+	cmdLine := strings.Join(tokens, " ") + "; exit"
+	runArgs := []string{"pane", "run", paneID, cmdLine}
+	out, err := runCommand("herdr", runArgs...)
+	if err != nil {
+		return fmt.Errorf("$ herdr %s\n\n%w\n\n%s", strings.Join(runArgs, " "), err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// shellQuote wraps s in single quotes for safe use as one token in a shell
+// command line, escaping any single quotes it contains.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
