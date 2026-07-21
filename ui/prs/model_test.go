@@ -16,6 +16,46 @@ func sendModel(m Model, msg tea.Msg) Model {
 	return updated.(Model)
 }
 
+// loadPRs delivers both the open- and closed-PR fetch results as the
+// separate messages the concurrent load pipeline actually produces (see
+// issues/09-load-time-batched-fetch.md), keeping call sites below as terse as
+// the old single-message form.
+func loadPRs(m Model, prs []git.PR, anyPRs bool, err error, closedPRs []git.ClosedPR) Model {
+	m = sendModel(m, openPRsLoadedMsg{prs: prs, anyPRs: anyPRs, err: err})
+	m = sendModel(m, closedPRsLoadedMsg{closedPRs: closedPRs})
+	return m
+}
+
+// resolveMsgs recursively runs cmd (unwrapping any nested tea.BatchMsg) and
+// returns every leaf message it produces, so a test can assert a refresh path
+// actually reloads both sections rather than just returning "some cmd".
+func resolveMsgs(cmd tea.Cmd) []tea.Msg {
+	if cmd == nil {
+		return nil
+	}
+	msg := cmd()
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		var msgs []tea.Msg
+		for _, sub := range batch {
+			msgs = append(msgs, resolveMsgs(sub)...)
+		}
+		return msgs
+	}
+	return []tea.Msg{msg}
+}
+
+func containsMsgTypes(msgs []tea.Msg) (sawOpen, sawClosed bool) {
+	for _, msg := range msgs {
+		switch msg.(type) {
+		case openPRsLoadedMsg:
+			sawOpen = true
+		case closedPRsLoadedMsg:
+			sawClosed = true
+		}
+	}
+	return sawOpen, sawClosed
+}
+
 func TestModelRendersLoadingPlaceholder(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
@@ -29,7 +69,7 @@ func TestModelRendersLoadingPlaceholder(t *testing.T) {
 func TestModelRendersNoPRsFoundPlaceholder(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = sendModel(m, prsLoadedMsg{})
+	m = loadPRs(m, nil, false, nil, nil)
 
 	content := m.View().Content
 	if !strings.Contains(content, "no PRs found") {
@@ -40,7 +80,7 @@ func TestModelRendersNoPRsFoundPlaceholder(t *testing.T) {
 func TestModelRendersNoOpenPRsPlaceholder(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = sendModel(m, prsLoadedMsg{anyPRs: true})
+	m = loadPRs(m, nil, true, nil, nil)
 
 	content := m.View().Content
 	if !strings.Contains(content, "no open PRs") {
@@ -51,10 +91,10 @@ func TestModelRendersNoOpenPRsPlaceholder(t *testing.T) {
 func TestModelRendersPRRows(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = sendModel(m, prsLoadedMsg{prs: []git.PR{
+	m = loadPRs(m, []git.PR{
 		{Number: 12, Title: "Add widget", UpdatedAt: time.Now()},
 		{Number: 34, Title: "Draft feature", IsDraft: true, UpdatedAt: time.Now()},
-	}})
+	}, true, nil, nil)
 
 	content := m.View().Content
 	if !strings.Contains(content, "#12") || !strings.Contains(content, "Add widget") {
@@ -68,7 +108,7 @@ func TestModelRendersPRRows(t *testing.T) {
 func TestModelRendersFacetsAndMarker(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = sendModel(m, prsLoadedMsg{prs: []git.PR{
+	m = loadPRs(m, []git.PR{
 		{
 			Number:            12,
 			Title:             "Add widget",
@@ -78,7 +118,7 @@ func TestModelRendersFacetsAndMarker(t *testing.T) {
 			Mergeable:         "MERGEABLE",
 			Reviews:           []git.PRReview{{Body: "lgtm"}},
 		},
-	}})
+	}, true, nil, nil)
 
 	content := m.View().Content
 	if !strings.Contains(content, "1c") {
@@ -89,9 +129,9 @@ func TestModelRendersFacetsAndMarker(t *testing.T) {
 func TestModelRendersMergeConflictFacet(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = sendModel(m, prsLoadedMsg{prs: []git.PR{
+	m = loadPRs(m, []git.PR{
 		{Number: 12, Title: "Add widget", UpdatedAt: time.Now(), Mergeable: "CONFLICTING"},
-	}})
+	}, true, nil, nil)
 
 	content := m.View().Content
 	if !strings.Contains(content, "⚠") {
@@ -102,7 +142,7 @@ func TestModelRendersMergeConflictFacet(t *testing.T) {
 func TestModelRendersLoadError(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = sendModel(m, prsLoadedMsg{err: errBoom})
+	m = loadPRs(m, nil, false, errBoom, nil)
 
 	content := m.View().Content
 	if !strings.Contains(content, "error") || !strings.Contains(content, "boom") {
@@ -113,7 +153,7 @@ func TestModelRendersLoadError(t *testing.T) {
 func TestModelRendersGHNotInstalledError(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = sendModel(m, prsLoadedMsg{err: &git.PRListError{Kind: git.PRListErrorGHNotInstalled, Err: errBoom}})
+	m = loadPRs(m, nil, false, &git.PRListError{Kind: git.PRListErrorGHNotInstalled, Err: errBoom}, nil)
 
 	content := m.View().Content
 	if !strings.Contains(content, "gh not found") || !strings.Contains(content, "install") {
@@ -124,7 +164,7 @@ func TestModelRendersGHNotInstalledError(t *testing.T) {
 func TestModelRendersGHUnauthenticatedError(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = sendModel(m, prsLoadedMsg{err: &git.PRListError{Kind: git.PRListErrorUnauthenticated, Err: errBoom}})
+	m = loadPRs(m, nil, false, &git.PRListError{Kind: git.PRListErrorUnauthenticated, Err: errBoom}, nil)
 
 	content := m.View().Content
 	if !strings.Contains(content, "not authenticated") || !strings.Contains(content, "gh auth login") {
@@ -135,10 +175,10 @@ func TestModelRendersGHUnauthenticatedError(t *testing.T) {
 func TestModelRendersClosedPRSection(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = sendModel(m, prsLoadedMsg{closedPRs: []git.ClosedPR{
+	m = loadPRs(m, nil, false, nil, []git.ClosedPR{
 		{Number: 5, Title: "Merged fix", State: "MERGED", ClosedAt: time.Now()},
 		{Number: 6, Title: "Abandoned idea", State: "CLOSED", ClosedAt: time.Now()},
-	}})
+	})
 
 	content := m.View().Content
 	if !strings.Contains(content, "Closed (last 2 weeks)") {
@@ -152,7 +192,7 @@ func TestModelRendersClosedPRSection(t *testing.T) {
 func TestModelRendersClosedSectionEmptyState(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = sendModel(m, prsLoadedMsg{anyPRs: true})
+	m = loadPRs(m, nil, true, nil, nil)
 
 	content := m.View().Content
 	if !strings.Contains(content, "no recently closed PRs") {
@@ -163,9 +203,9 @@ func TestModelRendersClosedSectionEmptyState(t *testing.T) {
 func TestModelRendersClosedSectionWhenOpenListEmpty(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = sendModel(m, prsLoadedMsg{closedPRs: []git.ClosedPR{
+	m = loadPRs(m, nil, false, nil, []git.ClosedPR{
 		{Number: 5, Title: "Merged fix", State: "MERGED", ClosedAt: time.Now()},
-	}})
+	})
 
 	content := m.View().Content
 	if !strings.Contains(content, "no PRs found") {
@@ -179,11 +219,8 @@ func TestModelRendersClosedSectionWhenOpenListEmpty(t *testing.T) {
 func TestModelRendersClosedSectionWhenOpenListErrors(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = sendModel(m, prsLoadedMsg{
-		err: errBoom,
-		closedPRs: []git.ClosedPR{
-			{Number: 5, Title: "Merged fix", State: "MERGED", ClosedAt: time.Now()},
-		},
+	m = loadPRs(m, nil, false, errBoom, []git.ClosedPR{
+		{Number: 5, Title: "Merged fix", State: "MERGED", ClosedAt: time.Now()},
 	})
 
 	content := m.View().Content
@@ -198,9 +235,9 @@ func TestModelRendersClosedSectionWhenOpenListErrors(t *testing.T) {
 func TestOpenSelectedReturnsOpenURLCmd(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = sendModel(m, prsLoadedMsg{prs: []git.PR{
+	m = loadPRs(m, []git.PR{
 		{Number: 12, Title: "Add widget", URL: "https://example.com/pull/12", UpdatedAt: time.Now()},
-	}})
+	}, true, nil, nil)
 
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
@@ -238,6 +275,10 @@ func TestRKeyTriggersRefresh(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected a refresh cmd from R")
 	}
+	sawOpen, sawClosed := containsMsgTypes(resolveMsgs(cmd))
+	if !sawOpen || !sawClosed {
+		t.Fatalf("expected R to refresh both sections, sawOpen=%v sawClosed=%v", sawOpen, sawClosed)
+	}
 }
 
 func TestAKeyTogglesAllReposScopeAndTriggersRefetch(t *testing.T) {
@@ -251,6 +292,10 @@ func TestAKeyTogglesAllReposScopeAndTriggersRefetch(t *testing.T) {
 	m = updated.(Model)
 	if cmd == nil {
 		t.Fatal("expected a refetch cmd from a")
+	}
+	sawOpen, sawClosed := containsMsgTypes(resolveMsgs(cmd))
+	if !sawOpen || !sawClosed {
+		t.Fatalf("expected toggling all-repos to refresh both sections, sawOpen=%v sawClosed=%v", sawOpen, sawClosed)
 	}
 	if !m.allRepos {
 		t.Fatal("expected allRepos true after pressing a")
@@ -284,6 +329,10 @@ func TestRefreshMenuChordTriggersRefresh(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected a refresh cmd from m r")
 	}
+	sawOpen, sawClosed := containsMsgTypes(resolveMsgs(cmd))
+	if !sawOpen || !sawClosed {
+		t.Fatalf("expected m r to refresh both sections, sawOpen=%v sawClosed=%v", sawOpen, sawClosed)
+	}
 }
 
 func TestOnPageActivatedTriggersRefetch(t *testing.T) {
@@ -291,6 +340,80 @@ func TestOnPageActivatedTriggersRefetch(t *testing.T) {
 	cmd := m.OnPageActivated()
 	if cmd == nil {
 		t.Fatal("expected OnPageActivated to return a refetch cmd")
+	}
+	sawOpen, sawClosed := containsMsgTypes(resolveMsgs(cmd))
+	if !sawOpen || !sawClosed {
+		t.Fatalf("expected tab-switch-in to refresh both sections, sawOpen=%v sawClosed=%v", sawOpen, sawClosed)
+	}
+}
+
+// TestInitBatchesOpenAndClosedLoad locks in that the two fetches run
+// concurrently (via tea.Batch) rather than one waiting on the other — see
+// issues/09-load-time-batched-fetch.md.
+func TestInitBatchesOpenAndClosedLoad(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	cmd := m.Init()
+	if cmd == nil {
+		t.Fatal("expected Init to return a cmd")
+	}
+
+	batch, ok := cmd().(tea.BatchMsg)
+	if !ok {
+		t.Fatalf("expected Init cmd to produce a tea.BatchMsg, got %T", cmd())
+	}
+	if len(batch) != 2 {
+		t.Fatalf("expected 2 batched cmds, got %d", len(batch))
+	}
+
+	var sawOpen, sawClosed bool
+	for _, sub := range batch {
+		switch sub().(type) {
+		case openPRsLoadedMsg:
+			sawOpen = true
+		case closedPRsLoadedMsg:
+			sawClosed = true
+		}
+	}
+	if !sawOpen || !sawClosed {
+		t.Fatalf("expected batch to include both open and closed load cmds, sawOpen=%v sawClosed=%v", sawOpen, sawClosed)
+	}
+}
+
+// TestOpenSectionRendersBeforeClosedFetchCompletes verifies the open-PR rows
+// render as soon as their own fetch completes, without waiting on the
+// closed-PR fetch (issues/09-load-time-batched-fetch.md).
+func TestOpenSectionRendersBeforeClosedFetchCompletes(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = sendModel(m, openPRsLoadedMsg{prs: []git.PR{
+		{Number: 12, Title: "Add widget", UpdatedAt: time.Now()},
+	}, anyPRs: true})
+
+	content := m.View().Content
+	if !strings.Contains(content, "#12") || !strings.Contains(content, "Add widget") {
+		t.Fatalf("expected open PR row to render without closed fetch, got:\n%s", content)
+	}
+	if !strings.Contains(content, "loading") {
+		t.Fatalf("expected closed section to still show loading, got:\n%s", content)
+	}
+}
+
+// TestClosedSectionRendersBeforeOpenFetchCompletes verifies the closed-PR
+// section populates independently, even when the open-PR fetch hasn't
+// completed yet (issues/09-load-time-batched-fetch.md).
+func TestClosedSectionRendersBeforeOpenFetchCompletes(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = sendModel(m, closedPRsLoadedMsg{closedPRs: []git.ClosedPR{
+		{Number: 5, Title: "Merged fix", State: "MERGED", ClosedAt: time.Now()},
+	}})
+
+	content := m.View().Content
+	if !strings.Contains(content, "Merged fix") {
+		t.Fatalf("expected closed PR row to render without open fetch, got:\n%s", content)
+	}
+	if !strings.Contains(content, "loading") {
+		t.Fatalf("expected open list to still show loading, got:\n%s", content)
 	}
 }
 

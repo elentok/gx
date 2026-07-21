@@ -7,25 +7,30 @@ import (
 	"github.com/elentok/gx/ui/notify"
 )
 
-type prsLoadedMsg struct {
-	prs       []git.PR
-	anyPRs    bool
-	err       error
+type openPRsLoadedMsg struct {
+	prs    []git.PR
+	anyPRs bool
+	err    error
+}
+
+type closedPRsLoadedMsg struct {
 	closedPRs []git.ClosedPR
 }
 
+// cmdLoad kicks off the open-PR and closed-PR fetches concurrently, each
+// completing (and rendering) independently of the other — see
+// issues/09-load-time-batched-fetch.md.
 func (m Model) cmdLoad() tea.Cmd {
+	return tea.Batch(m.cmdLoadOpen(), m.cmdLoadClosed())
+}
+
+func (m Model) cmdLoadOpen() tea.Cmd {
 	worktreeRoot := m.worktreeRoot
 	allRepos := m.allRepos
 	return func() tea.Msg {
-		// The closed-PR section is independent of the open-PR pipeline (no
-		// facets, no actionable marker), so a closed-fetch failure is treated
-		// as "no recently-closed PRs" rather than surfacing its own error UI.
-		closedPRs, _ := git.ListClosedPRs(worktreeRoot, allRepos)
-
 		prs, err := git.ListOpenPRs(worktreeRoot, allRepos)
 		if err != nil {
-			return prsLoadedMsg{err: err, closedPRs: closedPRs}
+			return openPRsLoadedMsg{err: err}
 		}
 		anyPRs := len(prs) > 0
 		if !anyPRs {
@@ -38,7 +43,19 @@ func (m Model) cmdLoad() tea.Cmd {
 				anyPRs = true
 			}
 		}
-		return prsLoadedMsg{prs: prs, anyPRs: anyPRs, closedPRs: closedPRs}
+		return openPRsLoadedMsg{prs: prs, anyPRs: anyPRs}
+	}
+}
+
+func (m Model) cmdLoadClosed() tea.Cmd {
+	worktreeRoot := m.worktreeRoot
+	allRepos := m.allRepos
+	return func() tea.Msg {
+		// The closed-PR section is independent of the open-PR pipeline (no
+		// facets, no actionable marker), so a closed-fetch failure is treated
+		// as "no recently-closed PRs" rather than surfacing its own error UI.
+		closedPRs, _ := git.ListClosedPRs(worktreeRoot, allRepos)
+		return closedPRsLoadedMsg{closedPRs: closedPRs}
 	}
 }
 

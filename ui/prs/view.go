@@ -39,10 +39,6 @@ var (
 const facetIndent = "  "
 
 func (m Model) visibleLines() []string {
-	if !m.loaded {
-		return []string{ui.StyleMuted.Render("loading…")}
-	}
-
 	lines := m.openListLines()
 	lines = append(lines, m.closedSectionLines()...)
 	return lines
@@ -50,8 +46,12 @@ func (m Model) visibleLines() []string {
 
 // openListLines renders the open-PR list's loading/error/empty/row states.
 // Rendering the closed section is independent of this — it always renders
-// below regardless of the open list's own state (see closedSectionLines).
+// below regardless of the open list's own state (see closedSectionLines),
+// and the two sections load concurrently (issues/09-load-time-batched-fetch.md).
 func (m Model) openListLines() []string {
+	if !m.openLoaded {
+		return []string{ui.StyleMuted.Render("loading…")}
+	}
 	if m.err != nil {
 		return m.errorLines(m.err)
 	}
@@ -80,6 +80,9 @@ func (m Model) openListLines() []string {
 // state (empty or erroring).
 func (m Model) closedSectionLines() []string {
 	lines := []string{"", closedSectionHeaderStyle.Render("── Closed (last 2 weeks) ──")}
+	if !m.closedLoaded {
+		return append(lines, ui.StyleMuted.Render("loading…"))
+	}
 	if len(m.closedPRs) == 0 {
 		return append(lines, ui.StyleMuted.Render("no recently closed PRs"))
 	}
