@@ -105,6 +105,51 @@ func TestModelRendersPRRows(t *testing.T) {
 	}
 }
 
+func TestModelRendersRepoNameInAllReposMode(t *testing.T) {
+	m := NewModelWithScope("/repo", ui.Settings{}, keys.Manager{}, true)
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = loadPRs(m, []git.PR{
+		{Number: 12, Title: "Add widget", UpdatedAt: time.Now(), Repo: "acme/widgets"},
+	}, true, nil, nil)
+
+	content := m.View().Content
+	if !strings.Contains(content, "widgets") {
+		t.Fatalf("expected repo short name 'widgets' before #12, got:\n%s", content)
+	}
+	if strings.Contains(content, "acme/widgets") {
+		t.Fatalf("expected only the short repo name (no owner), got:\n%s", content)
+	}
+}
+
+func TestModelTruncatesLongRepoName(t *testing.T) {
+	m := NewModelWithScope("/repo", ui.Settings{}, keys.Manager{}, true)
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = loadPRs(m, []git.PR{
+		{Number: 12, Title: "Add widget", UpdatedAt: time.Now(), Repo: "acme/a-very-long-repository-name-indeed"},
+	}, true, nil, nil)
+
+	content := m.View().Content
+	if !strings.Contains(content, "…") {
+		t.Fatalf("expected long repo name to be truncated with an ellipsis, got:\n%s", content)
+	}
+	if strings.Contains(content, "a-very-long-repository-name-indeed") {
+		t.Fatalf("expected long repo name to be truncated, got full name in:\n%s", content)
+	}
+}
+
+func TestModelOmitsRepoNameInCurrentRepoMode(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = loadPRs(m, []git.PR{
+		{Number: 12, Title: "Add widget", UpdatedAt: time.Now()},
+	}, true, nil, nil)
+
+	content := m.View().Content
+	if strings.Contains(content, "widgets") {
+		t.Fatalf("expected no repo name in current-repo mode, got:\n%s", content)
+	}
+}
+
 func TestModelRendersFacetsAndMarker(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
@@ -186,6 +231,19 @@ func TestModelRendersClosedPRSection(t *testing.T) {
 	}
 	if !strings.Contains(content, "Merged fix") || !strings.Contains(content, "Abandoned idea") {
 		t.Fatalf("expected closed PR titles, got:\n%s", content)
+	}
+}
+
+func TestModelRendersRepoNameOnClosedRowsInAllReposMode(t *testing.T) {
+	m := NewModelWithScope("/repo", ui.Settings{}, keys.Manager{}, true)
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = loadPRs(m, nil, false, nil, []git.ClosedPR{
+		{Number: 5, Title: "Merged fix", State: "MERGED", ClosedAt: time.Now(), Repo: "acme/widgets"},
+	})
+
+	content := m.View().Content
+	if !strings.Contains(content, "widgets") {
+		t.Fatalf("expected repo short name 'widgets' on closed row, got:\n%s", content)
 	}
 }
 

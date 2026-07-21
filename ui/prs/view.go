@@ -32,7 +32,27 @@ var (
 	closedUnmergedStyle      = lipgloss.NewStyle().Foreground(ui.ColorRed).Faint(true)
 	closedTitleStyle         = lipgloss.NewStyle().Foreground(ui.ColorText)
 	closedDateStyle          = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Italic(true)
+
+	prsRepoStyle = lipgloss.NewStyle().Foreground(ui.ColorTeal)
 )
+
+// maxRepoNameWidth caps how much row width the --all-mode repo-name column
+// can take, so one long repo name can't crowd out the title.
+const maxRepoNameWidth = 16
+
+// repoColumn renders the "repo " prefix shown before the number/title in
+// --all mode (empty otherwise), truncated to maxRepoNameWidth.
+func repoColumn(allRepos bool, repo string) string {
+	if !allRepos || repo == "" {
+		return ""
+	}
+	name := repo
+	if idx := strings.LastIndex(repo, "/"); idx != -1 {
+		name = repo[idx+1:]
+	}
+	name = ansi.Truncate(name, maxRepoNameWidth, "…")
+	return prsRepoStyle.Render(name) + " "
+}
 
 // facetIndent lines the facet line up under the row's title, matching the
 // 2-wide marker column above it (mirrors ui/log's subjectIndentNoGraph).
@@ -107,20 +127,22 @@ func (m Model) renderClosedRow(pr git.ClosedPR, selected bool, width int) string
 	}
 	markerCol := ui.RenderFixedColumns([]ui.FixedColumn{{Text: marker, Width: 2, Style: markerStyle}})
 
+	repo := repoColumn(m.allRepos, pr.Repo)
 	date := closedDateStyle.Render(ui.RelativeTimeCompact(pr.ClosedAt))
 
 	markerW := ansi.StringWidth(markerCol)
+	repoW := ansi.StringWidth(repo)
 	dateW := ansi.StringWidth(date)
 	gap := 1
 
-	titleW := max(1, width-markerW-gap-dateW)
+	titleW := max(1, width-markerW-repoW-gap-dateW)
 	title := ansi.Truncate(closedTitleStyle.Render(pr.Title), titleW, "…")
 	titleActualW := ansi.StringWidth(title)
 	if titleActualW < titleW {
 		title += strings.Repeat(" ", titleW-titleActualW)
 	}
 
-	line := markerCol + title + " " + date
+	line := markerCol + repo + title + " " + date
 	return padAndHighlight(line, width, selected)
 }
 
@@ -185,6 +207,7 @@ func (m Model) renderSubjectLine(pr git.PR, facets git.Facets, width int) string
 	markerState := markerPushState(icons, facets.Marker())
 	marker := ui.RenderFixedColumns([]ui.FixedColumn{{Text: markerState.Icon, Width: 2, Style: markerState.Style}})
 
+	repo := repoColumn(m.allRepos, pr.Repo)
 	number := prsNumberStyle.Render("#" + strconv.Itoa(pr.Number))
 	age := prsAgeStyle.Render(ui.RelativeTimeCompact(pr.UpdatedAt))
 
@@ -194,19 +217,20 @@ func (m Model) renderSubjectLine(pr git.PR, facets git.Facets, width int) string
 	}
 
 	markerW := ansi.StringWidth(marker)
+	repoW := ansi.StringWidth(repo)
 	numberW := ansi.StringWidth(number)
 	ageW := ansi.StringWidth(age)
 	draftW := ansi.StringWidth(draft)
 	gap := 1
 
-	titleW := max(1, width-markerW-numberW-gap-draftW-gap-ageW)
+	titleW := max(1, width-markerW-repoW-numberW-gap-draftW-gap-ageW)
 	title := ansi.Truncate(prsTitleStyle.Render(pr.Title), titleW, "…")
 	titleActualW := ansi.StringWidth(title)
 	if titleActualW < titleW {
 		title += strings.Repeat(" ", titleW-titleActualW)
 	}
 
-	return marker + number + " " + draft + title + " " + age
+	return marker + repo + number + " " + draft + title + " " + age
 }
 
 func (m Model) renderFacetLine(facets git.Facets) string {
