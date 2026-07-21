@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.22.1 - 2026-07-21
+
+- Added a PR comments popup: press `c` on any open PR to view issue comments and reviews with timestamps.
+- Closed PRs are now selectable and navigable in the same list as open PRs.
+- Added facet status text labels (CI, approval, mergeable states now show "passing"/"failing"/"checking", etc.).
+- In `--all` mode, repo name is now shown before the PR number for clarity.
+- Improved performance: open and closed PRs now fetch concurrently, and `--all` mode uses a single GraphQL query instead of per-repo calls.
+- Fixed scroll behavior when navigating from the open to the closed PRs section.
+
 ## v0.22.0 - 2026-07-21
 
 - Added a PRs tab: shows your outgoing open PRs with CI/approval/mergeable/comment-count facets, an actionable-first sort, and a recently-closed section (last 2 weeks). Supports manual refresh (R / m-r), auto-refresh on tab switch, and an `--all` flag / `a` key to scope across every repo instead of just the current one.
