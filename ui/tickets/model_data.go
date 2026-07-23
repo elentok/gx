@@ -34,20 +34,41 @@ type row struct {
 
 func (r row) isEpic() bool { return r.ticketIdx < 0 }
 
-// visibleRows flattens the loaded epics into the tab's rendered row order.
-// No collapse/expand yet (ticket 04) — every epic's tickets render
-// immediately after their epic, grouped by rendered status (unblocked →
-// blocked → needs-info → done → error) and ticket number ascending within
-// each group, so actionable work sorts to the top.
+// visibleRows flattens the loaded epics into the tab's rendered row order:
+// every epic row, followed by its tickets (grouped by rendered status —
+// unblocked → blocked → needs-info → done → error, ticket number ascending
+// within each group) unless the epic is collapsed, in which case its
+// tickets are excluded entirely and navigation moves past the epic directly
+// to the next visible row.
 func (m Model) visibleRows() []row {
 	var rows []row
 	for epicIdx, epic := range m.epics {
 		rows = append(rows, row{epicIdx: epicIdx, ticketIdx: -1})
+		if m.isCollapsed(epic) {
+			continue
+		}
 		for _, ticketIdx := range sortedTicketIndexes(epic) {
 			rows = append(rows, row{epicIdx: epicIdx, ticketIdx: ticketIdx})
 		}
 	}
 	return rows
+}
+
+func (m Model) isCollapsed(epic tickets.Epic) bool {
+	return m.collapsedEpics[epic.Path]
+}
+
+// defaultCollapsedEpics computes the initial per-epic collapse state: an
+// epic where every ticket is done starts collapsed; every other epic
+// (including a zero-ticket epic) starts expanded.
+func defaultCollapsedEpics(epics []tickets.Epic) map[string]bool {
+	collapsed := make(map[string]bool, len(epics))
+	for _, epic := range epics {
+		if epic.AllDone() {
+			collapsed[epic.Path] = true
+		}
+	}
+	return collapsed
 }
 
 // sortedTicketIndexes orders epic.Tickets' indexes by rendered-status group,

@@ -21,7 +21,7 @@ import (
 type Model struct {
 	worktreeRoot string
 	settings     ui.Settings
-	keyManager   keys.Manager
+	keys         keys.Manager // this tab's own navigation/collapse bindings
 
 	width  int
 	height int
@@ -29,18 +29,24 @@ type Model struct {
 
 	loaded bool
 	epics  []tickets.Epic
+
+	selected       int
+	collapsedEpics map[string]bool
 }
 
-// NewModel creates a new tickets tab model.
+// NewModel creates a new tickets tab model. extraKeys (the app-wide global
+// bindings) isn't used yet — it'll feed a help modal once one exists for
+// this tab, mirroring ui/prs's NewModelWithScope.
 func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager) Model {
+	_ = extraKeys
 	return Model{
 		worktreeRoot: worktreeRoot,
 		settings:     settings,
-		keyManager:   extraKeys,
+		keys:         newTicketsManager(),
 	}
 }
 
-func (m Model) KeyManager() keys.Manager { return m.keyManager }
+func (m Model) KeyManager() keys.Manager { return m.keys }
 
 func (m Model) Init() tea.Cmd {
 	return m.cmdLoad()
@@ -57,12 +63,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case epicsLoadedMsg:
 		m.loaded = true
 		m.epics = msg.epics
+		m.collapsedEpics = defaultCollapsedEpics(msg.epics)
+		m.clampSelected()
 		if msg.err != nil {
 			return m, notify.Error("load .scratch/: " + msg.err.Error())
 		}
 		return m, nil
+
+	case tea.KeyPressMsg:
+		return m.handleKey(msg)
 	}
 	return m, nil
+}
+
+// clampSelected keeps the selection within the current visible-row range,
+// e.g. after a collapse hides the rows below it.
+func (m *Model) clampSelected() {
+	n := len(m.visibleRows())
+	switch {
+	case n == 0:
+		m.selected = 0
+	case m.selected >= n:
+		m.selected = n - 1
+	case m.selected < 0:
+		m.selected = 0
+	}
 }
 
 func (m Model) scratchDir() string {

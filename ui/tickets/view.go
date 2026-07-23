@@ -22,9 +22,9 @@ var (
 	blockedBySuffixStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Italic(true)
 )
 
-// sidebarLines renders the flat epic/ticket tree: each epic's name +
-// (open/total) count, each ticket's status icon + title indented beneath it,
-// grouped per visibleRows. No collapse/expand behavior yet (ticket 04).
+// sidebarLines renders the flat epic/ticket tree: each epic's expand glyph +
+// name + (open/total) count, each ticket's status icon + title indented
+// beneath it, grouped and collapsed per visibleRows.
 func (m Model) sidebarLines() []string {
 	if !m.loaded {
 		return []string{ui.StyleDim.Render("  loading…")}
@@ -35,19 +35,36 @@ func (m Model) sidebarLines() []string {
 
 	rows := m.visibleRows()
 	lines := make([]string, 0, len(rows))
-	for _, r := range rows {
+	for i, r := range rows {
+		selected := i == m.selected
+		var line string
 		if r.isEpic() {
-			lines = append(lines, m.renderEpicRow(m.epics[r.epicIdx]))
+			line = m.renderEpicRow(m.epics[r.epicIdx])
 		} else {
 			epic := m.epics[r.epicIdx]
-			lines = append(lines, m.renderTicketRow(epic, epic.Tickets[r.ticketIdx]))
+			line = m.renderTicketRow(epic, epic.Tickets[r.ticketIdx])
 		}
+		if selected {
+			line = ui.RenderRowHighlight(line)
+		}
+		lines = append(lines, line)
 	}
 	return lines
 }
 
 func (m Model) renderEpicRow(epic tickets.Epic) string {
-	return fmt.Sprintf("  %s (%d/%d)", epic.Name, epic.OpenCount(), epic.TotalCount())
+	glyph := m.icons().FolderOpen
+	if m.isCollapsed(epic) {
+		glyph = m.icons().FolderClosed
+	}
+	line := fmt.Sprintf("  %s %s (%d/%d)", glyph, epic.Name, epic.OpenCount(), epic.TotalCount())
+	// Dimming tracks "every ticket done", not the current collapse toggle —
+	// a fully-done epic stays dimmed even if manually expanded, and a
+	// manually-collapsed in-progress epic doesn't borrow its dimming.
+	if epic.AllDone() {
+		line = ui.StyleDim.Render(line)
+	}
+	return line
 }
 
 func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket) string {

@@ -25,3 +25,13 @@ func (e Epic) OpenCount() int {
 	}
 	return open
 }
+
+// AllDone reports whether every one of the epic's tickets is done. A
+// zero-ticket epic is not considered "all done" — it starts expanded, not
+// collapsed, since "nothing here yet" is distinct from "everything closed".
+func (e Epic) AllDone() bool {
+	if len(e.Tickets) == 0 {
+		return false
+	}
+	return e.OpenCount() == 0
+}
