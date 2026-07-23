@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/ui/reloadgate"
 	stashlistui "github.com/elentok/gx/ui/stashlist"
 	statusui "github.com/elentok/gx/ui/status"
+	ticketsui "github.com/elentok/gx/ui/tickets"
 	"github.com/elentok/gx/ui/worktrees"
 )
 
@@ -195,6 +196,11 @@ func (m Model) newHistoryEntry(viewState nav.ViewState) historyEntry {
 		return historyEntry{
 			viewState: viewState,
 			model:     prsui.NewModelWithScope(viewState.WorktreeRoot, s, keys.New(Bindings()), viewState.AllRepos),
+		}
+	case nav.TabTickets:
+		return historyEntry{
+			viewState: viewState,
+			model:     ticketsui.NewModel(viewState.WorktreeRoot, s, keys.New(Bindings())),
 		}
 	case nav.TabWorktrees:
 		fallthrough

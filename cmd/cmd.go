@@ -42,6 +42,7 @@ type deps struct {
 	runShow              func(string) error
 	runStash             func() error
 	runPRs               func(allRepos bool) error
+	runTickets           func(allRepos bool) error
 	confirmForce         func(string) (bool, error)
 	choosePushDivergence func(io.Reader, io.Writer, *git.PushDivergence) (int, error)
 	initConfig           func() (string, error)
@@ -66,6 +67,7 @@ func defaultDeps() deps {
 		runShow:              runShow,
 		runStash:             runStash,
 		runPRs:               runPRs,
+		runTickets:           runTickets,
 		choosePushDivergence: choosePushDivergence,
 		initConfig:           config.Init,
 		loadConfig:           config.Load,
@@ -131,6 +133,7 @@ Run without a command to open the status UI.`,
 		newShowCmd(d),
 		newStashCmd(d),
 		newPRsCmd(d),
+		newTicketsCmd(d),
 		newConfigCmd(d),
 		newBumpCmd(d),
 		newStashifyCmd(d),
@@ -298,6 +301,21 @@ func newPRsCmd(d deps) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&allRepos, "all", false, "show outgoing PRs across all repos, not just the current one")
+	return cmd
+}
+
+func newTicketsCmd(d deps) *cobra.Command {
+	var allRepos bool
+	cmd := &cobra.Command{
+		Use:     "tickets",
+		Aliases: []string{"tk"},
+		Short:   "open the tickets UI",
+		Args:    cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return d.runTickets(allRepos)
+		},
+	}
+	cmd.Flags().BoolVar(&allRepos, "all", false, "show every worktree's .scratch/ tickets, not just the current one")
 	return cmd
 }
 
@@ -626,6 +644,43 @@ func runPRs(allRepos bool) error {
 	}
 	m := app.New(*repo, app.Settings{
 		InitialRoute:       nav.ViewState{Tab: nav.TabPRs, WorktreeRoot: root, AllRepos: allRepos},
+		ActiveWorktreePath: root,
+		Settings:           settingsFromConfig(cfg),
+	})
+	p := tea.NewProgram(m)
+	_, err = p.Run()
+	return err
+}
+
+func runTickets(allRepos bool) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	info, err := git.IdentifyDir(cwd)
+	if err != nil {
+		return err
+	}
+	if info.Repo.IsBare && info.WorktreeRoot == "" {
+		return fmt.Errorf("gx tickets must be run from a regular repo or linked worktree")
+	}
+
+	root, err := git.WorktreeRoot(cwd)
+	if err != nil {
+		return err
+	}
+	repo, err := git.FindRepo(root)
+	if err != nil {
+		return err
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	m := app.New(*repo, app.Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabTickets, WorktreeRoot: root, AllRepos: allRepos},
 		ActiveWorktreePath: root,
 		Settings:           settingsFromConfig(cfg),
 	})

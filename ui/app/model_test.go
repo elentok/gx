@@ -309,6 +309,33 @@ func TestNumberKeysSwitchTabsGlobally(t *testing.T) {
 	if m.navState.ActiveTab() != nav.TabPRs {
 		t.Fatalf("expected 5 to switch to prs, got %q", m.navState.ActiveTab())
 	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '6', Text: "6"})
+	m = updated.(Model)
+	if m.navState.ActiveTab() != nav.TabTickets {
+		t.Fatalf("expected 6 to switch to tickets, got %q", m.navState.ActiveTab())
+	}
+}
+
+func TestGTMnemonicSwitchesToTicketsTab(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+	m = updated.(Model)
+	if m.navState.ActiveTab() != nav.TabTickets {
+		t.Fatalf("expected gt to switch to tickets, got %q", m.navState.ActiveTab())
+	}
 }
 
 func TestGPMnemonicSwitchesToPRsTab(t *testing.T) {
@@ -546,6 +573,38 @@ func TestInitialPRsRouteUsesPRsTab(t *testing.T) {
 	}
 	if len(m.history) != 0 {
 		t.Fatalf("expected empty stack for initial prs view state, got %d", len(m.history))
+	}
+}
+
+func TestTicketsTabIsFirstClass(t *testing.T) {
+	if got := navstate.ResolveTabID(nav.TabTickets); got != nav.TabTickets {
+		t.Fatalf("expected tickets to map to itself, got %q", got)
+	}
+}
+
+func TestInitialTicketsRouteUsesTicketsTab(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabTickets, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	if got := m.activePage().viewState.Tab; got != nav.TabTickets {
+		t.Fatalf("expected active page tickets, got %q", got)
+	}
+	if m.navState.ActiveTab() != nav.TabTickets {
+		t.Fatalf("expected active tab tickets, got %q", m.navState.ActiveTab())
+	}
+	if m.navState.LiveTab() != nav.TabTickets {
+		t.Fatalf("expected live tab tickets, got %q", m.navState.LiveTab())
+	}
+	if len(m.history) != 0 {
+		t.Fatalf("expected empty stack for initial tickets view state, got %d", len(m.history))
 	}
 }
 

@@ -15,7 +15,7 @@ import (
 )
 
 func (m *Model) ensureLivePages() {
-	for _, kind := range []nav.TabID{nav.TabWorktrees, nav.TabLog, nav.TabStatus, nav.TabStash, nav.TabPRs} {
+	for _, kind := range []nav.TabID{nav.TabWorktrees, nav.TabLog, nav.TabStatus, nav.TabStash, nav.TabPRs, nav.TabTickets} {
 		if _, ok := m.livePageByTab[kind]; !ok {
 			m.livePageByTab[kind] = livePage{}
 		}
@@ -202,6 +202,9 @@ func (m Model) handleShellChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		case "p":
 			next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabPRs})
 			return next, cmd, true
+		case "t":
+			next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabTickets})
+			return next, cmd, true
 		case "esc":
 			return m, nil, true
 		default:
@@ -231,6 +234,9 @@ func (m Model) handleShellChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		return next, cmd, true
 	case "5":
 		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabPRs})
+		return next, cmd, true
+	case "6":
+		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabTickets})
 		return next, cmd, true
 	}
 	return m, nil, false
@@ -264,6 +270,7 @@ func (m Model) tabsView() string {
 		{label: "status", active: activeTab == nav.TabStatus},
 		{label: "stash", active: activeTab == nav.TabStash},
 		{label: "prs", active: activeTab == nav.TabPRs},
+		{label: "tickets", active: activeTab == nav.TabTickets},
 	}
 	parts := make([]string, 0, len(tabs))
 	for _, tab := range tabs {
@@ -286,7 +293,7 @@ func renderTab(tab tabSpec) string {
 }
 
 func orderedTabs() []nav.TabID {
-	return []nav.TabID{nav.TabWorktrees, nav.TabLog, nav.TabStatus, nav.TabStash, nav.TabPRs}
+	return []nav.TabID{nav.TabWorktrees, nav.TabLog, nav.TabStatus, nav.TabStash, nav.TabPRs, nav.TabTickets}
 }
 
 func (m Model) switchRelativeTab(delta int) (Model, tea.Cmd) {

@@ -249,6 +249,14 @@ func TestSwitchToPRsTabResetsAllRepos(t *testing.T) {
 	}
 }
 
+func TestSetInitialTabCarriesAllReposForTickets(t *testing.T) {
+	s := newState()
+	s.SetInitialTab(nav.ViewState{Tab: nav.TabTickets, AllRepos: true})
+	if !s.Active().AllRepos {
+		t.Fatal("expected SetInitialTab to carry AllRepos through for tickets")
+	}
+}
+
 func TestBackWithStackDepthTwoPopsToMiddleEntry(t *testing.T) {
 	s := newState()
 	s.SetInitialTab(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT})

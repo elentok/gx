@@ -10,6 +10,7 @@ const (
 	BindingGotoStatus   keys.BindingID = "app-goto-status-tab"
 	BindingGotoStash    keys.BindingID = "app-goto-stash-tab"
 	BindingGotoPRs      keys.BindingID = "app-goto-prs-tab"
+	BindingGotoTickets  keys.BindingID = "app-goto-tickets-tab"
 )
 
 func Bindings() []keys.Binding {
@@ -23,11 +24,13 @@ func Bindings() []keys.Binding {
 		{ID: BindingGotoStatus, Seq: []string{"3"}, Categories: []string{"App"}, Title: "status tab"},
 		{ID: BindingGotoStash, Seq: []string{"4"}, Categories: []string{"App"}, Title: "stash tab"},
 		{ID: BindingGotoPRs, Seq: []string{"5"}, Categories: []string{"App"}, Title: "PRs tab"},
+		{ID: BindingGotoTickets, Seq: []string{"6"}, Categories: []string{"App"}, Title: "tickets tab"},
 		{ID: BindingGotoWorktree, Seq: []string{"g", "w"}, Categories: []string{"App"}, Title: "worktrees tab"},
 		{ID: BindingGotoLog, Seq: []string{"g", "l"}, Categories: []string{"App"}, Title: "log tab"},
 		{ID: BindingGotoStatus, Seq: []string{"g", "s"}, Categories: []string{"App"}, Title: "status tab"},
 		{ID: BindingGotoStash, Seq: []string{"g", "S"}, Categories: []string{"App"}, Title: "stash tab"},
 		{ID: BindingGotoPRs, Seq: []string{"g", "p"}, Categories: []string{"App"}, Title: "PRs tab"},
+		{ID: BindingGotoTickets, Seq: []string{"g", "t"}, Categories: []string{"App"}, Title: "tickets tab"},
 	}
 }
 
@@ -43,5 +46,6 @@ func hintsForPrefix(prefix string) []keys.Binding {
 		{Seq: []string{"s"}, Title: "status tab"},
 		{Seq: []string{"S"}, Title: "stash tab"},
 		{Seq: []string{"p"}, Title: "PRs tab"},
+		{Seq: []string{"t"}, Title: "tickets tab"},
 	}
 }
