@@ -24,11 +24,12 @@ type Ticket struct {
 }
 
 var doneStatuses = map[string]bool{
-	"done":       true,
-	"resolved":   true,
-	"wontfix":    true,
-	"closed":     true,
-	"superseded": true,
+	"done":        true,
+	"resolved":    true,
+	"wontfix":     true,
+	"closed":      true,
+	"superseded":  true,
+	"implemented": true,
 }
 
 // IsDone reports whether the ticket's raw Status collapses into the "done"

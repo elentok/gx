@@ -4,10 +4,12 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/terminalrun"
 )
 
 const (
+	bindingTicketsBack        keys.BindingID = "back"
 	bindingTicketsDown        keys.BindingID = "down"
 	bindingTicketsUp          keys.BindingID = "up"
 	bindingTicketsCollapse    keys.BindingID = "collapse"
@@ -27,6 +29,7 @@ const (
 // toggles a selected epic row).
 func newTicketsManager() keys.Manager {
 	return keys.New([]keys.Binding{
+		{ID: bindingTicketsBack, Seq: []string{"q"}, Categories: []string{"Other"}, Title: "back"},
 		{ID: bindingTicketsDown, Seq: []string{"j"}, Categories: []string{"Navigation"}, Title: "down", Display: "↓/j"},
 		{ID: bindingTicketsDown, Seq: []string{"down"}, Categories: []string{}, Title: ""},
 		{ID: bindingTicketsUp, Seq: []string{"k"}, Categories: []string{"Navigation"}, Title: "up", Display: "↑/k"},
@@ -57,6 +60,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.jumpToCurrentMatch()
 		}
 		return m, cmd
+	}
+
+	if msg.String() == "q" {
+		return m, nav.Back()
 	}
 
 	match, consumed := m.keys.Process(msg)
@@ -117,12 +124,33 @@ func (m Model) selectedRow() (row, bool) {
 	return rows[m.selected], true
 }
 
+// collapseSelectedEpic handles "h"/"left": on an epic row it collapses the
+// epic (same as filetree); on a ticket row it instead jumps selection up to
+// the ticket's containing epic row, mirroring filetree's "collapse jumps to
+// parent" behavior for a leaf.
 func (m *Model) collapseSelectedEpic() {
 	r, ok := m.selectedRow()
-	if !ok || !r.isEpic() || m.isCollapsed(m.epics[r.epicIdx]) {
+	if !ok {
+		return
+	}
+	if !r.isEpic() {
+		m.jumpToEpic(r.epicIdx)
+		return
+	}
+	if m.isCollapsed(m.epics[r.epicIdx]) {
 		return
 	}
 	m.setCollapsed(r.epicIdx, true)
+}
+
+// jumpToEpic moves the selection to epicIdx's epic row within visibleRows().
+func (m *Model) jumpToEpic(epicIdx int) {
+	for i, r := range m.visibleRows() {
+		if r.isEpic() && r.epicIdx == epicIdx {
+			m.selected = i
+			return
+		}
+	}
 }
 
 func (m *Model) expandSelectedEpic() {

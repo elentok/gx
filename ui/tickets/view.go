@@ -116,7 +116,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) 
 	matched, current := m.searchMatch(rowIdx)
 	dim := m.search.HasQuery() && !matched
 
-	title := t.Title
+	title := fmt.Sprintf("%d %s", t.Number, t.Title)
 	titleStyle := lipgloss.NewStyle()
 	if matched {
 		title = search.Highlight(title, m.search.Query(), current)
