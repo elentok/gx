@@ -21,11 +21,17 @@ var (
 	statusErrorStyle     = lipgloss.NewStyle().Foreground(ui.ColorRed).Bold(true)
 
 	blockedBySuffixStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Italic(true)
+
+	sectionHeaderStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
 )
 
-// sidebarLines renders the flat epic/ticket tree: each epic's expand glyph +
-// name + (open/total) count, each ticket's status icon + title indented
-// beneath it, grouped and collapsed per visibleRows.
+// sidebarLines renders the flat epic/ticket tree under two headed sections —
+// "Open epics" then "Closed epics" (mirroring the PRs tab's Actionable/
+// Non-actionable split) — each epic's expand glyph + name + (open/total)
+// count, each ticket's status icon + title indented beneath it, grouped and
+// collapsed per visibleRows. Row highlighting/search indexing uses each
+// row's position in visibleRows() (i), unaffected by the header lines
+// interleaved for display only.
 func (m Model) sidebarLines() []string {
 	if !m.loaded {
 		return []string{ui.StyleDim.Render("  loading…")}
@@ -35,8 +41,43 @@ func (m Model) sidebarLines() []string {
 	}
 
 	rows := m.visibleRows()
-	lines := make([]string, 0, len(rows))
+	openIdxs, closedIdxs := splitEpicIndexesBySection(m.epics)
+	closedSet := make(map[int]bool, len(closedIdxs))
+	for _, idx := range closedIdxs {
+		closedSet[idx] = true
+	}
+	boundary := len(rows)
 	for i, r := range rows {
+		if closedSet[r.epicIdx] {
+			boundary = i
+			break
+		}
+	}
+
+	lines := make([]string, 0, len(rows)+4)
+	lines = append(lines, sectionHeaderStyle.Render(fmt.Sprintf("── Open epics (%d) ──", len(openIdxs))))
+	if len(openIdxs) == 0 {
+		lines = append(lines, ui.StyleMuted.Render("  no open epics"))
+	}
+	lines = m.appendRowLines(lines, rows[:boundary], 0)
+
+	lines = append(lines, "", sectionHeaderStyle.Render(fmt.Sprintf("── Closed epics (%d) ──", len(closedIdxs))))
+	if len(closedIdxs) == 0 {
+		lines = append(lines, ui.StyleMuted.Render("  no closed epics"))
+	}
+	lines = m.appendRowLines(lines, rows[boundary:], boundary)
+
+	return lines
+}
+
+// appendRowLines renders rows (a contiguous slice of visibleRows()) onto
+// lines, where startIdx is rows[0]'s position in the full visibleRows()
+// slice — needed so selection highlighting and search-match indexing (both
+// keyed by row position) stay correct despite the interleaved section
+// headers.
+func (m Model) appendRowLines(lines []string, rows []row, startIdx int) []string {
+	for offset, r := range rows {
+		i := startIdx + offset
 		selected := i == m.selected
 		var line string
 		if r.isEpic() {

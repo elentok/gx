@@ -42,14 +42,20 @@ type row struct {
 func (r row) isEpic() bool { return r.ticketIdx < 0 }
 
 // visibleRows flattens the loaded epics into the tab's rendered row order:
-// every epic row, followed by its tickets (grouped by rendered status —
-// unblocked → blocked → needs-info → done → error, ticket number ascending
-// within each group) unless the epic is collapsed, in which case its
-// tickets are excluded entirely and navigation moves past the epic directly
-// to the next visible row.
+// open epics (per splitEpicIndexesBySection) before closed ones, each epic
+// row followed by its tickets (grouped by rendered status — unblocked →
+// blocked → needs-info → done → error, ticket number ascending within each
+// group) unless the epic is collapsed, in which case its tickets are
+// excluded entirely and navigation moves past the epic directly to the next
+// visible row.
 func (m Model) visibleRows() []row {
 	var rows []row
-	for epicIdx, epic := range m.epics {
+	openIdxs, closedIdxs := splitEpicIndexesBySection(m.epics)
+	order := make([]int, 0, len(m.epics))
+	order = append(order, openIdxs...)
+	order = append(order, closedIdxs...)
+	for _, epicIdx := range order {
+		epic := m.epics[epicIdx]
 		rows = append(rows, row{epicIdx: epicIdx, ticketIdx: -1})
 		if m.isCollapsed(epic) {
 			continue
@@ -59,6 +65,23 @@ func (m Model) visibleRows() []row {
 		}
 	}
 	return rows
+}
+
+// splitEpicIndexesBySection splits m.epics' indexes into the "Open epics"
+// and "Closed epics" sections shown in the sidebar (mirroring the PRs tab's
+// Actionable/Non-actionable split): an epic is closed once every one of its
+// tickets is done (Epic.AllDone) — a zero-ticket epic is never closed, same
+// rule the default-collapse behavior already uses. Order within each group
+// follows m.epics' original (directory-scan) order.
+func splitEpicIndexesBySection(epics []tickets.Epic) (open, closed []int) {
+	for i, e := range epics {
+		if e.AllDone() {
+			closed = append(closed, i)
+		} else {
+			open = append(open, i)
+		}
+	}
+	return open, closed
 }
 
 func (m Model) isCollapsed(epic tickets.Epic) bool {

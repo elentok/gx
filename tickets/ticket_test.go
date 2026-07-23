@@ -2,6 +2,7 @@ package tickets
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -39,6 +40,31 @@ func TestParseTicket_MissingStatusDefaultsToOpen(t *testing.T) {
 	}
 	if ticket.IsDone() {
 		t.Error("ticket with missing Status should not be IsDone")
+	}
+}
+
+func TestParseTicket_BoldNonContiguousMetadata(t *testing.T) {
+	raw := "# 09 — Some ticket\n\n**What to build:** some prose paragraph that isn't metadata.\n\n" +
+		"**Blocked by:** 02 (parse & load).\n\n**Status:** done\n\n- [x] a checklist item\n"
+
+	ticket, err := ParseTicket(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ticket.Status != "done" {
+		t.Errorf("Status = %q, want %q", ticket.Status, "done")
+	}
+	if !ticket.IsDone() {
+		t.Error("expected ticket with bold '**Status:** done' to be IsDone")
+	}
+	if !reflect.DeepEqual(ticket.BlockedBy, []int{2}) {
+		t.Errorf("BlockedBy = %v, want [2]", ticket.BlockedBy)
+	}
+	if strings.Contains(ticket.Body, "Blocked by") || strings.Contains(ticket.Body, "Status") {
+		t.Errorf("expected metadata lines stripped from body, got: %q", ticket.Body)
+	}
+	if !strings.Contains(ticket.Body, "some prose paragraph") || !strings.Contains(ticket.Body, "a checklist item") {
+		t.Errorf("expected surrounding prose/checklist preserved in body, got: %q", ticket.Body)
 	}
 }
 

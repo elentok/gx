@@ -42,18 +42,24 @@ var metadataLineRe = regexp.MustCompile(`(?i)^(Type|Blocked by|Status):\s*(.*)$`
 
 var blockedByNumberRe = regexp.MustCompile(`\d+`)
 
-// ParseTicket parses a ticket file's raw text into leading metadata (Type:,
-// Blocked by:, Status:) plus the remaining raw markdown body. A missing
-// Status: line is the valid open/unclaimed default, not an error.
+// ParseTicket parses a ticket file's raw text into metadata (Type:,
+// Blocked by:, Status:) plus the remaining raw markdown body. Metadata lines
+// aren't required to be contiguous or lead the file — e.g. wayfinder-style
+// ticket templates interleave a `**Status:**` line among prose paragraphs
+// rather than stacking it at the very top — so every line is checked, with
+// `**bold**` markers stripped before matching so `**Status:** done` and
+// `Status: done` parse the same way. A missing Status: line is the valid
+// open/unclaimed default, not an error.
 func ParseTicket(raw string) (Ticket, error) {
 	var t Ticket
 
 	lines := strings.Split(raw, "\n")
-	i := 0
-	for ; i < len(lines); i++ {
-		m := metadataLineRe.FindStringSubmatch(lines[i])
+	bodyLines := make([]string, 0, len(lines))
+	for _, line := range lines {
+		m := metadataLineRe.FindStringSubmatch(strings.ReplaceAll(line, "**", ""))
 		if m == nil {
-			break
+			bodyLines = append(bodyLines, line)
+			continue
 		}
 		key := strings.ToLower(m[1])
 		value := strings.TrimSpace(m[2])
@@ -67,7 +73,7 @@ func ParseTicket(raw string) (Ticket, error) {
 		}
 	}
 
-	t.Body = strings.Join(lines[i:], "\n")
+	t.Body = strings.Join(bodyLines, "\n")
 	return t, nil
 }
 

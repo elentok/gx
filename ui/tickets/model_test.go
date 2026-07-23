@@ -204,6 +204,81 @@ func TestNewModel_ZeroTicketEpicStartsExpanded(t *testing.T) {
 	}
 }
 
+func TestNewModel_SplitsOpenAndClosedEpicSections(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "done-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
+	writeTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	content := m.View().Content
+	if !strings.Contains(content, "Open epics (1)") {
+		t.Fatalf("expected 'Open epics (1)' header, got:\n%s", content)
+	}
+	if !strings.Contains(content, "Closed epics (1)") {
+		t.Fatalf("expected 'Closed epics (1)' header, got:\n%s", content)
+	}
+	openIdx := strings.Index(content, "open-epic")
+	closedIdx := strings.Index(content, "done-epic")
+	openHeaderIdx := strings.Index(content, "Open epics (1)")
+	closedHeaderIdx := strings.Index(content, "Closed epics (1)")
+	if !(openHeaderIdx < openIdx && openIdx < closedHeaderIdx && closedHeaderIdx < closedIdx) {
+		t.Fatalf("expected order [open header, open-epic, closed header, done-epic], got:\n%s", content)
+	}
+}
+
+func TestNewModel_EmptySectionShowsMutedPlaceholder(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	content := m.View().Content
+	if !strings.Contains(content, "Closed epics (0)") || !strings.Contains(content, "no closed epics") {
+		t.Fatalf("expected empty Closed epics section placeholder, got:\n%s", content)
+	}
+}
+
+func TestModel_NavigationAndSelectionUnaffectedBySectionHeaders(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "done-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
+	writeTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	// Selection starts on the first row of visibleRows(), which is the
+	// open-epic (open epics render first) — not a header.
+	r, ok := m.selectedRow()
+	if !ok || !r.isEpic() || m.epics[r.epicIdx].Name != "open-epic" {
+		t.Fatalf("expected initial selection on open-epic, got row=%+v ok=%v", r, ok)
+	}
+
+	// open-epic isn't collapsed, so the next row down is its own ticket, then
+	// done-epic (collapsed by default) — neither a header line.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	r, ok = m.selectedRow()
+	if !ok || r.isEpic() {
+		t.Fatalf("expected selection on open-epic's ticket, got row=%+v ok=%v", r, ok)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	r, ok = m.selectedRow()
+	if !ok || !r.isEpic() || m.epics[r.epicIdx].Name != "done-epic" {
+		t.Fatalf("expected selection on done-epic after moving down twice, got row=%+v ok=%v", r, ok)
+	}
+}
+
 func TestModel_EnterTogglesEpicCollapse(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
