@@ -33,6 +33,17 @@ func newTicketsManager() keys.Manager {
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if nextSearch, cmd, result := m.search.Update(msg); result.Handled {
+		m.search = nextSearch
+		if result.QueryChanged {
+			m.recomputeSearchMatches()
+		}
+		if result.QueryChanged || result.CursorChanged {
+			m.jumpToCurrentMatch()
+		}
+		return m, cmd
+	}
+
 	match, consumed := m.keys.Process(msg)
 	if !consumed {
 		return m, nil
@@ -114,6 +125,11 @@ func (m *Model) setCollapsed(epicIdx int, collapsed bool) {
 		m.collapsedEpics[path] = true
 	} else {
 		delete(m.collapsedEpics, path)
+	}
+	// Collapsing/expanding reshuffles visibleRows(), which search matches
+	// index into by position — recompute so they stay aligned.
+	if m.search.HasQuery() {
+		m.recomputeSearchMatches()
 	}
 	m.clampSelected()
 }

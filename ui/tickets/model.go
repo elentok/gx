@@ -4,6 +4,7 @@
 package tickets
 
 import (
+	"fmt"
 	"path/filepath"
 
 	tea "charm.land/bubbletea/v2"
@@ -13,6 +14,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/search"
 )
 
 // Model is the top-level tickets tab model: an epic/ticket sidebar paired
@@ -32,6 +34,8 @@ type Model struct {
 
 	selected       int
 	collapsedEpics map[string]bool
+
+	search search.Model
 }
 
 // NewModel creates a new tickets tab model. extraKeys (the app-wide global
@@ -43,6 +47,7 @@ func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager)
 		worktreeRoot: worktreeRoot,
 		settings:     settings,
 		keys:         newTicketsManager(),
+		search:       search.NewModel(),
 	}
 }
 
@@ -98,7 +103,15 @@ func (m Model) View() tea.View {
 	if !m.ready {
 		return ui.NewMainView("\n  Initializing…")
 	}
-	return ui.NewMainView(m.normalView())
+	content := m.normalView()
+	if m.search.Mode() == search.SearchModeInput {
+		overlayW := m.searchOverlayWidth()
+		m.search.SetWidth(overlayW)
+		overlay := m.search.View()
+		y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
+		content = ui.OverlayBottomCenter(content, overlay, m.width, y)
+	}
+	return ui.NewMainView(content)
 }
 
 // normalView lays out the sidebar and preview panels side by side (or
@@ -108,8 +121,8 @@ func (m Model) normalView() string {
 	sidebarW, previewW := m.splitWidth()
 	h := m.contentHeight()
 
-	sidebarView := m.renderPanel(sidebarW, h, "Tickets", m.sidebarLines(), true, true)
-	previewView := m.renderPanel(previewW, h, "Preview", m.previewLines(m.previewInnerSize(previewW, h)), false, false)
+	sidebarView := m.renderPanel(sidebarW, h, "Tickets", m.searchMatchStatus(), m.sidebarLines(), true, true)
+	previewView := m.renderPanel(previewW, h, "Preview", "", m.previewLines(m.previewInnerSize(previewW, h)), false, false)
 
 	if m.useStackedLayout() {
 		seam := ui.RenderSeamRow(sidebarW, ui.SeamColor)
@@ -119,8 +132,23 @@ func (m Model) normalView() string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, sidebarView, seam, previewView)
 }
 
-func (m Model) renderPanel(width, height int, title string, lines []string, active, sidebar bool) string {
-	return ui.RenderPanel(ui.PanelOptionsFor(width, height, title, "", lines, active, ui.ColorBlue, nil, sidebar))
+func (m Model) renderPanel(width, height int, title, rightTitle string, lines []string, active, sidebar bool) string {
+	return ui.RenderPanel(ui.PanelOptionsFor(width, height, title, rightTitle, lines, active, ui.ColorBlue, nil, sidebar))
+}
+
+func (m Model) searchMatchStatus() string {
+	if m.search.HasQuery() && m.search.MatchesCount() > 0 {
+		return fmt.Sprintf("%d/%d matches", m.search.Cursor()+1, m.search.MatchesCount())
+	}
+	return ""
+}
+
+func (m Model) searchOverlayWidth() int {
+	max := m.width * 80 / 100
+	if search.DESIRED_WIDTH < max {
+		return search.DESIRED_WIDTH
+	}
+	return max
 }
 
 func (m Model) useStackedLayout() bool {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/search"
 )
 
 var (
@@ -42,7 +43,7 @@ func (m Model) sidebarLines() []string {
 			line = m.renderEpicRow(m.epics[r.epicIdx])
 		} else {
 			epic := m.epics[r.epicIdx]
-			line = m.renderTicketRow(epic, epic.Tickets[r.ticketIdx])
+			line = m.renderTicketRow(epic, epic.Tickets[r.ticketIdx], i)
 		}
 		if selected {
 			line = ui.RenderRowHighlight(line)
@@ -67,13 +68,31 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 	return line
 }
 
-func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket) string {
+func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) string {
 	status := epic.RenderedStatus(t)
 	icon, style := statusIconAndStyle(m.icons(), status)
 
-	line := "    " + style.Render(icon) + " " + t.Title
+	matched, current := m.searchMatch(rowIdx)
+	dim := m.search.HasQuery() && !matched
+
+	title := t.Title
+	titleStyle := lipgloss.NewStyle()
+	if matched {
+		title = search.Highlight(title, m.search.Query(), current)
+	} else if dim {
+		titleStyle = ui.StyleDim
+	}
+	if dim {
+		style = ui.StyleDim
+	}
+
+	line := "    " + style.Render(icon) + " " + titleStyle.Render(title)
 	if suffix := blockedBySuffix(epic, t, status); suffix != "" {
-		line += " " + blockedBySuffixStyle.Render(suffix)
+		suffixStyle := blockedBySuffixStyle
+		if dim {
+			suffixStyle = ui.StyleDim
+		}
+		line += " " + suffixStyle.Render(suffix)
 	}
 	return line
 }
