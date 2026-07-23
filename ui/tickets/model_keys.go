@@ -4,14 +4,20 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/terminalrun"
 )
 
 const (
-	bindingTicketsDown     keys.BindingID = "down"
-	bindingTicketsUp       keys.BindingID = "up"
-	bindingTicketsCollapse keys.BindingID = "collapse"
-	bindingTicketsExpand   keys.BindingID = "expand"
-	bindingTicketsToggle   keys.BindingID = "toggle"
+	bindingTicketsDown        keys.BindingID = "down"
+	bindingTicketsUp          keys.BindingID = "up"
+	bindingTicketsCollapse    keys.BindingID = "collapse"
+	bindingTicketsExpand      keys.BindingID = "expand"
+	bindingTicketsToggle      keys.BindingID = "toggle"
+	bindingTicketsEditInPlace keys.BindingID = "edit"
+	bindingTicketsEditHSplit  keys.BindingID = "edit-hsplit"
+	bindingTicketsEditVSplit  keys.BindingID = "edit-vsplit"
+	bindingTicketsEditTab     keys.BindingID = "edit-tab"
+	bindingTicketsCancelChord keys.BindingID = "cancel-chord"
 )
 
 // newTicketsManager builds the key manager for the tickets tab: plain
@@ -29,6 +35,13 @@ func newTicketsManager() keys.Manager {
 		{ID: bindingTicketsExpand, Seq: []string{"l"}, Categories: []string{"Navigation"}, Title: "expand epic", Display: "l/→"},
 		{ID: bindingTicketsExpand, Seq: []string{"right"}, Categories: []string{}, Title: ""},
 		{ID: bindingTicketsToggle, Seq: []string{"enter"}, Categories: []string{"Navigation"}, Title: "toggle epic"},
+		// e-prefix chords: edit the selected row's underlying file, reusing
+		// the same launch-mode plumbing every other tab's edit-chord uses.
+		{ID: bindingTicketsEditInPlace, Seq: []string{"e", "e"}, Categories: []string{"Navigation"}, Title: "edit file"},
+		{ID: bindingTicketsEditHSplit, Seq: []string{"e", "s"}, Categories: []string{"Navigation"}, Title: "edit file (split)"},
+		{ID: bindingTicketsEditVSplit, Seq: []string{"e", "v"}, Categories: []string{"Navigation"}, Title: "edit file (vsplit)"},
+		{ID: bindingTicketsEditTab, Seq: []string{"e", "t"}, Categories: []string{"Navigation"}, Title: "edit file (tab)"},
+		{ID: bindingTicketsCancelChord, Seq: []string{"e", "esc"}, Categories: []string{}, Title: ""},
 	})
 }
 
@@ -63,6 +76,16 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.expandSelectedEpic()
 	case bindingTicketsToggle:
 		m.toggleSelectedEpic()
+	case bindingTicketsEditInPlace:
+		return m, m.cmdEditSelectedFile(terminalrun.InPlace)
+	case bindingTicketsEditHSplit:
+		return m, m.cmdEditSelectedFile(terminalrun.HSplit)
+	case bindingTicketsEditVSplit:
+		return m, m.cmdEditSelectedFile(terminalrun.VSplit)
+	case bindingTicketsEditTab:
+		return m, m.cmdEditSelectedFile(terminalrun.Tab)
+	case bindingTicketsCancelChord:
+		return m, nil
 	}
 	return m, nil
 }

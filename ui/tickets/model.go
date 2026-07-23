@@ -75,6 +75,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case editFileFinishedMsg:
+		return m.handleEditFileFinished(msg)
+
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
