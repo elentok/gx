@@ -36,9 +36,9 @@ worktrees preview panel, the commit header). Contrast with a detail panel.
 
 **Sidebar** — a list panel shown alongside another panel (typically a detail panel), where navigating
 the list drives what the other panel shows. Focusable and selection-driving, unlike a preview panel.
-The four sidebars in this project: the commit list in the log view, the stash list in the stash
-view, the filetree in the status view, and the worktree list in the worktrees view (paired with its
-preview panel).
+The five sidebars in this project: the commit list in the log view, the stash list in the stash
+view, the filetree in the status view, the worktree list in the worktrees view (paired with its
+preview panel), and the epic/ticket tree in the tickets view (paired with its preview panel).
 
 **Sidebar mode** — the state a panel is in when it is rendered next to a detail or preview panel, as
 opposed to standalone (the only content on screen). A panel in sidebar mode is visually distinguished
@@ -96,6 +96,28 @@ branch. Rendered red with `󰃻`.
 
 **Remote-only** — the commit exists on the remote tracking branch but not on the local branch (fetch
 without pull). Rendered purple with `󰜮`.
+
+## Ticket States (Tickets View)
+
+**RenderedStatus** — the tickets tab's collapse of a ticket's raw `Status:` value (plus the
+tracker's triage-label vocabulary) into a small, fixed set of user-facing states, each with its own
+icon:
+
+- **Open** — unclaimed, nothing blocks picking it up. Covers a missing `Status:`, `needs-triage`,
+  and the `ready-for-agent`/`ready-for-human` triage labels, which don't distinguish who picks it up.
+- **Claimed** — raw `Status: claimed`.
+- **Blocked** — an overlay, not a raw status: applied whenever an open or claimed ticket has an
+  unresolved `Blocked by:` (a listed blocker number that isn't itself done, including a blocker
+  number with no matching ticket in the epic). Needs-info and done tickets keep their own state
+  regardless of `Blocked by:`.
+- **Needs-info** — raw `Status: needs-info`; stalled on someone providing more information.
+- **Done** — the ticket is complete.
+- **Error** — either the ticket file couldn't be read, or its raw `Status:` value doesn't match any
+  of the above; still selectable, and its raw markdown body still renders in the preview panel if
+  the file itself is readable.
+
+Within an epic, tickets group in this order: unblocked (open/claimed) → blocked → needs-info → done
+→ error, ticket number ascending within each group.
 
 ## Decorations and Badges (Log View)
 
