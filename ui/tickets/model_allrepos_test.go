@@ -35,17 +35,17 @@ func TestNewModelWithScope_AllReposAggregatesAcrossWorktrees(t *testing.T) {
 
 	content := m.View().Content
 	if !strings.Contains(content, "feature-a") {
-		t.Fatalf("expected feature-a worktree header, got:\n%s", content)
+		t.Fatalf("expected feature-a worktree tag, got:\n%s", content)
 	}
 	if !strings.Contains(content, "feature-b") {
-		t.Fatalf("expected feature-b worktree header, got:\n%s", content)
+		t.Fatalf("expected feature-b worktree tag, got:\n%s", content)
 	}
 	if !strings.Contains(content, "epic-a") || !strings.Contains(content, "epic-b") {
 		t.Fatalf("expected both epics rendered, got:\n%s", content)
 	}
 }
 
-func TestNewModelWithScope_AllReposNavigationSkipsWorktreeHeaders(t *testing.T) {
+func TestNewModelWithScope_AllReposNavigationCoversAllEpics(t *testing.T) {
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a", "feature-b")
 	wtA := filepath.Join(repoDir, "feature-a")
 	wtB := filepath.Join(repoDir, "feature-b")
@@ -59,8 +59,9 @@ func TestNewModelWithScope_AllReposNavigationSkipsWorktreeHeaders(t *testing.T) 
 	m = updated.(Model)
 
 	rows := m.visibleRows()
-	// 2 epics x (1 epic row + 1 ticket row) = 4 selectable rows; the two
-	// worktree header rows are rendered but not part of visibleRows().
+	// 2 epics x (1 epic row + 1 ticket row) = 4 selectable rows, interleaved
+	// into the tab's normal single Open/Closed grouping (no per-worktree
+	// header rows).
 	if len(rows) != 4 {
 		t.Fatalf("expected 4 selectable rows (2 epics + 2 tickets), got %d", len(rows))
 	}

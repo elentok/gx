@@ -34,10 +34,10 @@ type Model struct {
 
 	// allRepos is the `gx tickets --all` scope: epics are aggregated across
 	// every worktree of the repo (each tagged with Epic.WorktreeName) instead
-	// of just m.worktreeRoot's own `.scratch/`. worktreeNames holds the
-	// worktree display order used to group rows and render header lines.
-	allRepos      bool
-	worktreeNames []string
+	// of just m.worktreeRoot's own `.scratch/`, interleaved into the tab's
+	// normal single Open/Closed grouping with each epic row labeled by its
+	// worktree.
+	allRepos bool
 
 	selected       int
 	collapsedEpics map[string]bool
@@ -85,7 +85,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case epicsLoadedMsg:
 		m.loaded = true
 		m.epics = msg.epics
-		m.worktreeNames = msg.worktreeNames
 		m.collapsedEpics = defaultCollapsedEpics(msg.epics)
 		if m.search.HasQuery() {
 			m.recomputeSearchMatches()

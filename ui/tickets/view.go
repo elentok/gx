@@ -24,20 +24,20 @@ var (
 
 	sectionHeaderStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
 
-	// worktreeHeaderStyle renders --all mode's non-selectable per-worktree
-	// header row, one level above sectionHeaderStyle's Open/Closed headers.
-	worktreeHeaderStyle = lipgloss.NewStyle().Foreground(ui.ColorBlue).Bold(true)
+	// worktreeTagStyle renders --all mode's per-epic worktree label, appended
+	// after the epic's name/count.
+	worktreeTagStyle = lipgloss.NewStyle().Foreground(ui.ColorBlue)
 )
 
-// sidebarLines renders the epic/ticket tree grouped per epicGroups(): in the
-// single-worktree view that's one implicit group, so it's exactly two headed
-// sections — "Open epics" then "Closed epics" (mirroring the PRs tab's
-// Actionable/Non-actionable split); in --all mode each worktree gets its own
-// non-selectable header row followed by its own Open/Closed sections. Each
-// epic's expand glyph + name + (open/total) count, each ticket's status icon
-// + title indented beneath it, grouped and collapsed per visibleRows. Row
-// highlighting/search indexing uses each row's position in visibleRows()
-// (i), unaffected by the header lines interleaved for display only.
+// sidebarLines renders the epic/ticket tree as exactly two headed sections —
+// "Open epics" then "Closed epics" (mirroring the PRs tab's
+// Actionable/Non-actionable split), the same in --all mode as in the
+// single-worktree view: --all just interleaves every worktree's epics into
+// this one grouping, each epic row labeled with its worktree (renderEpicRow).
+// Each epic's expand glyph + name + (open/total) count, each ticket's status
+// icon + title indented beneath it, grouped and collapsed per visibleRows.
+// Row highlighting/search indexing uses each row's position in
+// visibleRows() (i).
 func (m Model) sidebarLines() []string {
 	if !m.loaded {
 		return []string{ui.StyleDim.Render("  loading…")}
@@ -46,34 +46,30 @@ func (m Model) sidebarLines() []string {
 		return []string{ui.StyleMuted.Render("  no .scratch/ directory found")}
 	}
 
+	idxs := make([]int, len(m.epics))
+	for i := range m.epics {
+		idxs[i] = i
+	}
+	openIdxs, closedIdxs := splitEpicIndexesBySection(m.epics, idxs)
+
 	var lines []string
 	i := 0 // running position within the full visibleRows() slice
-	for gi, g := range m.epicGroups() {
-		if g.worktreeName != "" {
-			if gi > 0 {
-				lines = append(lines, "")
-			}
-			lines = append(lines, worktreeHeaderStyle.Render("▸ "+g.worktreeName))
-		}
 
-		openIdxs, closedIdxs := splitEpicIndexesBySection(m.epics, g.epicIdxs)
-
-		lines = append(lines, sectionHeaderStyle.Render(fmt.Sprintf("── Open epics (%d) ──", len(openIdxs))))
-		if len(openIdxs) == 0 {
-			lines = append(lines, ui.StyleMuted.Render("  no open epics"))
-		}
-		openRows := m.rowsForEpicOrder(openIdxs)
-		lines = m.appendRowLines(lines, openRows, i)
-		i += len(openRows)
-
-		lines = append(lines, "", sectionHeaderStyle.Render(fmt.Sprintf("── Closed epics (%d) ──", len(closedIdxs))))
-		if len(closedIdxs) == 0 {
-			lines = append(lines, ui.StyleMuted.Render("  no closed epics"))
-		}
-		closedRows := m.rowsForEpicOrder(closedIdxs)
-		lines = m.appendRowLines(lines, closedRows, i)
-		i += len(closedRows)
+	lines = append(lines, sectionHeaderStyle.Render(fmt.Sprintf("── Open epics (%d) ──", len(openIdxs))))
+	if len(openIdxs) == 0 {
+		lines = append(lines, ui.StyleMuted.Render("  no open epics"))
 	}
+	openRows := m.rowsForEpicOrder(openIdxs)
+	lines = m.appendRowLines(lines, openRows, i)
+	i += len(openRows)
+
+	lines = append(lines, "", sectionHeaderStyle.Render(fmt.Sprintf("── Closed epics (%d) ──", len(closedIdxs))))
+	if len(closedIdxs) == 0 {
+		lines = append(lines, ui.StyleMuted.Render("  no closed epics"))
+	}
+	closedRows := m.rowsForEpicOrder(closedIdxs)
+	lines = m.appendRowLines(lines, closedRows, i)
+	i += len(closedRows)
 
 	return lines
 }
@@ -113,6 +109,9 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 	// manually-collapsed in-progress epic doesn't borrow its dimming.
 	if epic.AllDone() {
 		line = ui.StyleDim.Render(line)
+	}
+	if epic.WorktreeName != "" {
+		line += " " + worktreeTagStyle.Render("["+epic.WorktreeName+"]")
 	}
 	return line
 }

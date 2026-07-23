@@ -13,10 +13,7 @@ import (
 
 type epicsLoadedMsg struct {
 	epics []tickets.Epic
-	// worktreeNames is the ordered list of worktrees represented in epics,
-	// only populated in --all mode (nil in the single-worktree view).
-	worktreeNames []string
-	err           error
+	err   error
 }
 
 // cmdLoad reads the tab's `.scratch/` directory (or, in --all mode, every
@@ -36,8 +33,8 @@ func (m Model) cmdLoad() tea.Cmd {
 
 // cmdLoadAll aggregates `.scratch/` across every worktree of the repo (the
 // `gx tickets --all` scope): each worktree's epics are tagged with
-// Epic.WorktreeName and worktreeNames records the display order (git's
-// `worktree list` order) so rows can be grouped per worktree.
+// Epic.WorktreeName so each epic row can show which worktree it came from,
+// interleaved into the tab's normal single Open/Closed grouping.
 func (m Model) cmdLoadAll() tea.Cmd {
 	worktreeRoot := m.worktreeRoot
 	return func() tea.Msg {
@@ -51,7 +48,6 @@ func (m Model) cmdLoadAll() tea.Cmd {
 		}
 
 		var allEpics []tickets.Epic
-		names := make([]string, 0, len(worktrees))
 		for _, wt := range worktrees {
 			epics, loadErr := tickets.Load(filepath.Join(wt.Path, ".scratch"))
 			if loadErr != nil {
@@ -63,9 +59,8 @@ func (m Model) cmdLoadAll() tea.Cmd {
 				epics[i].WorktreeName = wt.Name
 			}
 			allEpics = append(allEpics, epics...)
-			names = append(names, wt.Name)
 		}
-		return epicsLoadedMsg{epics: allEpics, worktreeNames: names}
+		return epicsLoadedMsg{epics: allEpics}
 	}
 }
 
@@ -84,58 +79,25 @@ type row struct {
 
 func (r row) isEpic() bool { return r.ticketIdx < 0 }
 
-// epicGroup is one top-level group of epic indexes: a single implicit group
-// (worktreeName == "") in the single-worktree view, or one group per
-// worktree (in git's `worktree list` order) in --all mode — see
-// (Model).epicGroups.
-type epicGroup struct {
-	worktreeName string
-	epicIdxs     []int
-}
-
-// epicGroups partitions m.epics' indexes into the tab's top-level grouping:
-// in the single-worktree view it's one unnamed group holding every epic
-// (directory-scan order, matching pre-`--all` behavior exactly); in --all
-// mode it's one named group per worktree, in m.worktreeNames order, so rows
-// render as worktree (header) → epic → ticket.
-func (m Model) epicGroups() []epicGroup {
-	if !m.allRepos {
-		idxs := make([]int, len(m.epics))
-		for i := range m.epics {
-			idxs[i] = i
-		}
-		return []epicGroup{{epicIdxs: idxs}}
-	}
-
-	groups := make([]epicGroup, 0, len(m.worktreeNames))
-	for _, name := range m.worktreeNames {
-		var idxs []int
-		for i, e := range m.epics {
-			if e.WorktreeName == name {
-				idxs = append(idxs, i)
-			}
-		}
-		groups = append(groups, epicGroup{worktreeName: name, epicIdxs: idxs})
-	}
-	return groups
-}
-
 // visibleRows flattens the loaded epics into the tab's rendered row order:
-// each epicGroups() group in turn, open epics (per splitEpicIndexesBySection)
-// before closed ones, each epic row followed by its tickets (grouped by
-// rendered status — unblocked → blocked → needs-info → done → error, ticket
-// number ascending within each group) unless the epic is collapsed, in which
-// case its tickets are excluded entirely and navigation moves past the epic
-// directly to the next visible row. Worktree header rows themselves are not
-// part of this navigable list — see view.go's sidebarLines, which renders
-// them purely for display, interleaved around the same row positions.
+// open epics (per splitEpicIndexesBySection) before closed ones, each epic
+// row followed by its tickets (grouped by rendered status — unblocked →
+// blocked → needs-info → done → error, ticket number ascending within each
+// group) unless the epic is collapsed, in which case its tickets are
+// excluded entirely and navigation moves past the epic directly to the next
+// visible row. In --all mode epics from every worktree are interleaved into
+// this same single Open/Closed grouping (directory/worktree-load order),
+// each epic row additionally labeled with its Epic.WorktreeName — see
+// view.go's renderEpicRow.
 func (m Model) visibleRows() []row {
-	var rows []row
-	for _, g := range m.epicGroups() {
-		openIdxs, closedIdxs := splitEpicIndexesBySection(m.epics, g.epicIdxs)
-		rows = append(rows, m.rowsForEpicOrder(openIdxs)...)
-		rows = append(rows, m.rowsForEpicOrder(closedIdxs)...)
+	idxs := make([]int, len(m.epics))
+	for i := range m.epics {
+		idxs[i] = i
 	}
+	openIdxs, closedIdxs := splitEpicIndexesBySection(m.epics, idxs)
+	var rows []row
+	rows = append(rows, m.rowsForEpicOrder(openIdxs)...)
+	rows = append(rows, m.rowsForEpicOrder(closedIdxs)...)
 	return rows
 }
 
