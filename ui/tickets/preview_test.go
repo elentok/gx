@@ -72,9 +72,9 @@ func TestModel_PreviewBlockedBySuffixOmittedOnceResolved(t *testing.T) {
 	}
 }
 
-func TestModel_PreviewShowsPlaceholderForEpicRow(t *testing.T) {
+func TestModel_PreviewPlainEpicShowsHeaderOnly(t *testing.T) {
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nDistinctive ticket body.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -82,9 +82,34 @@ func TestModel_PreviewShowsPlaceholderForEpicRow(t *testing.T) {
 	m = updated.(Model)
 
 	// Default selection (row 0) is the epic row itself.
-	content := m.View().Content
-	if !strings.Contains(content, "no ticket selected") {
-		t.Fatalf("expected empty-preview placeholder while an epic row is selected, got:\n%s", content)
+	content := ansi.Strip(m.View().Content)
+	if !strings.Contains(content, "my-epic") || !strings.Contains(content, "(1/1)") {
+		t.Fatalf("expected epic name + open/total count in preview header, got:\n%s", content)
+	}
+	if strings.Contains(content, "[map]") {
+		t.Fatalf("expected no [map] badge for a plain epic, got:\n%s", content)
+	}
+	if strings.Contains(content, "Distinctive ticket body.") {
+		t.Fatalf("expected no ticket body in a plain epic's preview, got:\n%s", content)
+	}
+}
+
+func TestModel_PreviewMapEpicShowsMapBadgeAndBody(t *testing.T) {
+	root := t.TempDir()
+	writeMap(t, root, "wayfinder-epic", "# Wayfinder Map\n\nDistinctive map prose.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	// Default selection (row 0) is the epic row itself.
+	content := ansi.Strip(m.View().Content)
+	if !strings.Contains(content, "wayfinder-epic") || !strings.Contains(content, "[map]") || !strings.Contains(content, "(0/0)") {
+		t.Fatalf("expected epic name + [map] badge + open/total count in preview header, got:\n%s", content)
+	}
+	if !strings.Contains(content, "Distinctive map prose.") {
+		t.Fatalf("expected map.md body rendered in preview, got:\n%s", content)
 	}
 }
 

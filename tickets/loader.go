@@ -36,8 +36,9 @@ func loadEpic(scratchDir, name string) Epic {
 	epicPath := filepath.Join(scratchDir, name)
 	epic := Epic{Name: name, Path: epicPath}
 
-	if _, err := os.Stat(filepath.Join(epicPath, "map.md")); err == nil {
+	if raw, err := os.ReadFile(filepath.Join(epicPath, "map.md")); err == nil {
 		epic.IsMap = true
+		epic.MapBody = string(raw)
 	}
 
 	issuesDir := filepath.Join(epicPath, "issues")

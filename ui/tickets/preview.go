@@ -67,16 +67,21 @@ func (m Model) previewLines(width, height int) []string {
 	return lines
 }
 
-// previewContent builds the selected ticket's preview: a synthesized
-// header line (icon + number + title), a metadata line (rendered status,
-// type, unresolved blocked-by), a thin rule, then the ticket body rendered
-// verbatim through glamour. Selecting an epic row or nothing at all falls
-// back to the tab's empty-preview placeholder (a proper epic preview is
-// ticket 06's concern).
+// previewContent builds the selected row's preview. Nothing selected (e.g.
+// an empty `.scratch/`) falls back to the tab's empty-preview placeholder.
+// A ticket row gets a synthesized header line (icon + number + title), a
+// metadata line (rendered status, type, unresolved blocked-by), a thin
+// rule, then the ticket body rendered verbatim through glamour. An epic row
+// gets its own header (name + optional [map] badge + open/total count)
+// followed by its map.md body for a wayfinder-map epic, or nothing for a
+// plain one.
 func (m Model) previewContent(width int) string {
 	r, ok := m.selectedRow()
-	if !ok || r.isEpic() {
+	if !ok {
 		return ui.StyleDim.Render("  no ticket selected")
+	}
+	if r.isEpic() {
+		return previewEpicContent(m.epics[r.epicIdx], width)
 	}
 
 	epic := m.epics[r.epicIdx]
@@ -94,6 +99,34 @@ func (m Model) previewContent(width int) string {
 	b.WriteString("\n")
 	b.WriteString(renderTicketMarkdown(t.Body, width))
 	return b.String()
+}
+
+// previewEpicContent renders an epic row's preview: a header line, plus -
+// for a wayfinder-map epic only - a rule and its map.md body rendered
+// through the same glamour path as a ticket body. A plain epic (no map.md)
+// has no single representative file to preview, so it's header-only.
+func previewEpicContent(epic tickets.Epic, width int) string {
+	header := previewEpicHeaderLine(epic)
+	if !epic.IsMap {
+		return header
+	}
+
+	var b strings.Builder
+	b.WriteString(header)
+	b.WriteString("\n")
+	b.WriteString(previewRuleStyle.Render(strings.Repeat("─", max(width, 0))))
+	b.WriteString("\n")
+	b.WriteString(renderTicketMarkdown(epic.MapBody, width))
+	return b.String()
+}
+
+func previewEpicHeaderLine(epic tickets.Epic) string {
+	line := "  " + ui.StyleBold.Render(epic.Name)
+	if epic.IsMap {
+		line += " " + ui.StyleMuted.Render("[map]")
+	}
+	line += " " + ui.StyleMuted.Render(fmt.Sprintf("(%d/%d)", epic.OpenCount(), epic.TotalCount()))
+	return line
 }
 
 func previewHeaderLine(icons ui.IconSet, status tickets.RenderedStatus, t tickets.Ticket) string {

@@ -6,7 +6,8 @@ package tickets
 type Epic struct {
 	Name    string
 	Path    string
-	IsMap   bool // has a map.md (wayfinder map)
+	IsMap   bool   // has a map.md (wayfinder map)
+	MapBody string // map.md's raw content, only set when IsMap
 	Tickets []Ticket
 }
 
