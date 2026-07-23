@@ -108,10 +108,8 @@ func (m Model) normalView() string {
 	sidebarW, previewW := m.splitWidth()
 	h := m.contentHeight()
 
-	previewLines := []string{ui.StyleDim.Render("  no ticket selected")}
-
 	sidebarView := m.renderPanel(sidebarW, h, "Tickets", m.sidebarLines(), true, true)
-	previewView := m.renderPanel(previewW, h, "Preview", previewLines, false, false)
+	previewView := m.renderPanel(previewW, h, "Preview", m.previewLines(m.previewInnerSize(previewW, h)), false, false)
 
 	if m.useStackedLayout() {
 		seam := ui.RenderSeamRow(sidebarW, ui.SeamColor)

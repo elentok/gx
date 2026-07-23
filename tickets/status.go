@@ -88,6 +88,25 @@ func (e Epic) UnresolvedBlockers(t Ticket) []int {
 	return unresolved
 }
 
+// Word renders s as the status word shown in the ticket preview panel's
+// metadata line.
+func (s RenderedStatus) Word() string {
+	switch s {
+	case StatusOpen:
+		return "open"
+	case StatusClaimed:
+		return "claimed"
+	case StatusBlocked:
+		return "blocked"
+	case StatusNeedsInfo:
+		return "needs-info"
+	case StatusDone:
+		return "done"
+	default: // StatusError
+		return "error"
+	}
+}
+
 // GroupOrder returns s's sort rank for grouping tickets within an epic:
 // unblocked (open/claimed) → blocked → needs-info → done → error.
 func GroupOrder(s RenderedStatus) int {
