@@ -190,3 +190,43 @@ func TestModel_PreviewScrollbarAppearsOnlyWhenBodyOverflows(t *testing.T) {
 		t.Fatalf("expected a scrollbar thumb for an overflowing body, got:\n%s", longContent)
 	}
 }
+
+// TestModel_PreviewSearchHighlightsMatch guards against the preview search
+// only driving match-count/n-N navigation without visibly marking the
+// match: querying for text known to be in the glamour-rendered body must
+// wrap it in the search-highlight style, not just leave the plain text
+// untouched.
+func TestModel_PreviewSearchHighlightsMatch(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nSome distinctive body prose.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	if m.focus != focusPreview {
+		t.Fatalf("expected preview focus after enter on ticket row, got focus=%v", m.focus)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Text: "/"})
+	m = updated.(Model)
+	for _, r := range "prose" {
+		updated, _ = m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
+		m = updated.(Model)
+	}
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+
+	content := m.previewVP.GetContent()
+	if !strings.Contains(ansi.Strip(content), "distinctive body prose") {
+		t.Fatalf("expected body text still present in preview, got:\n%s", ansi.Strip(content))
+	}
+	if !strings.Contains(content, ui.StyleActiveSearchResult.Render("prose")) {
+		t.Fatalf("expected 'prose' wrapped in the active search-highlight style, got:\n%s", content)
+	}
+}

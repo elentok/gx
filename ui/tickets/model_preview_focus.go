@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/charmbracelet/x/ansi"
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/search"
 )
@@ -47,7 +48,11 @@ func (m *Model) syncPreviewViewport() {
 	selectionChanged := key != m.previewSelKey
 	m.previewSelKey = key
 
-	m.previewVP.SetContent(m.previewContent(contentW))
+	content := m.previewContent(contentW)
+	if m.previewSearch.HasQuery() {
+		content = m.highlightPreviewContent(content)
+	}
+	m.previewVP.SetContent(content)
 
 	if selectionChanged {
 		m.previewVP.GotoTop()
@@ -83,6 +88,103 @@ func (m *Model) recomputePreviewSearchMatches() {
 		}
 	}
 	m.previewSearch.SetMatches(matches)
+}
+
+// highlightPreviewContent wraps each search match in content (as built by
+// previewContent, before it's handed to the viewport) in the
+// search-highlight style. This must run on previewContent's own
+// word/run-level ANSI output, not on m.previewVP.View()'s further-processed
+// per-cell output — ansi.Cut mishandles heavily fragmented per-character
+// runs, corrupting the escape stream (see the preview-search-highlight fix).
+func (m Model) highlightPreviewContent(content string) string {
+	lines := strings.Split(content, "\n")
+	query := m.previewSearch.Query()
+	for i, line := range lines {
+		if matched, current := m.previewSearchMatch(i); matched {
+			lines[i] = highlightPreviewLine(line, query, current)
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// previewSearchMatch reports whether the preview content's line at absIdx
+// (its index into m.previewVP.GetContent(), not the currently visible
+// window) is a search match, and whether it's the match under the search
+// cursor (n/N target) — mirrors searchMatch's sidebar equivalent.
+func (m Model) previewSearchMatch(absIdx int) (matched, current bool) {
+	pos, ok := m.previewSearch.MatchPosByDataIndex(absIdx)
+	if !ok {
+		return false, false
+	}
+	return true, pos == m.previewSearch.Cursor()
+}
+
+// highlightPreviewLine wraps query's first match on an already
+// glamour-rendered (ANSI-styled) line in the search-highlight style. It
+// mirrors search.Highlight's byte-offset matching, but walks ANSI sequences
+// before rebuilding the line so it never splits an escape sequence. ANSI
+// styling inside the matched run is deliberately replaced by the overlay;
+// preserving it would let its resets cancel the search highlight.
+func highlightPreviewLine(line, query string, current bool) string {
+	plain := ansi.Strip(line)
+	lower := strings.ToLower(plain)
+	lq := strings.ToLower(query)
+	idx := strings.Index(lower, lq)
+	if idx < 0 {
+		return line
+	}
+	end := min(idx+len(query), len(plain))
+
+	style := ui.StyleSearchResult
+	if current {
+		style = ui.StyleActiveSearchResult
+	}
+
+	var prefix, matched, suffix strings.Builder
+	state := ansi.NormalState
+	plainOffset := 0
+	matchStarted := false
+	matchEnded := false
+	for rest := line; len(rest) > 0; {
+		seq, _, n, nextState := ansi.DecodeSequence(rest, state, nil)
+		if n == 0 {
+			// DecodeSequence only returns zero for malformed input. Copy its
+			// remaining bytes unchanged rather than risking an infinite loop.
+			suffix.WriteString(rest)
+			break
+		}
+		state = nextState
+		rest = rest[n:]
+
+		plainSeq := ansi.Strip(seq)
+		if plainSeq == "" {
+			switch {
+			case !matchStarted:
+				prefix.WriteString(seq)
+			case matchEnded:
+				suffix.WriteString(seq)
+			}
+			continue
+		}
+
+		seqStart := plainOffset
+		plainOffset += len(plainSeq)
+		if seqStart < end && plainOffset > idx {
+			matchStarted = true
+			matched.WriteString(plainSeq)
+			continue
+		}
+		if matchStarted {
+			matchEnded = true
+		}
+		if plainOffset <= idx {
+			prefix.WriteString(seq)
+		} else {
+			suffix.WriteString(seq)
+		}
+	}
+
+	return prefix.String() + style.Render(matched.String()) + suffix.String()
 }
 
 // jumpToCurrentPreviewMatch scrolls the preview viewport so the search
