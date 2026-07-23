@@ -75,6 +75,96 @@ func TestNewModel_ZeroEpicScratchDirRendersSameEmptyStateAsNoScratchDir(t *testi
 	}
 }
 
+func TestNewModel_TicketsGroupedByStatusWithinEpic(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-done-ticket.md", "Status: done\n\nBody.\n")
+	writeTicket(t, root, "my-epic", "02-open-ticket.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "my-epic", "03-needs-info-ticket.md", "Status: needs-info\n\nBody.\n")
+	writeTicket(t, root, "my-epic", "04-blocked-ticket.md", "Status: open\nBlocked by: 02\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	content := m.View().Content
+	wantOrder := []string{"Open ticket", "Blocked ticket", "Needs info ticket", "Done ticket"}
+	lastIdx := -1
+	for _, title := range wantOrder {
+		idx := strings.Index(content, title)
+		if idx == -1 {
+			t.Fatalf("expected %q in view, got:\n%s", title, content)
+		}
+		if idx < lastIdx {
+			t.Fatalf("expected %q to render after previous group, got:\n%s", title, content)
+		}
+		lastIdx = idx
+	}
+}
+
+func TestNewModel_BlockedTicketShowsUnresolvedBlockerSuffix(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-blocker-ticket.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "my-epic", "02-blocked-ticket.md", "Status: open\nBlocked by: 01\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	content := m.View().Content
+	if !strings.Contains(content, "(blocked by 1)") {
+		t.Fatalf("expected blocked-by suffix in view, got:\n%s", content)
+	}
+}
+
+func TestNewModel_NeedsInfoTicketShowsUnresolvedBlockerSuffix(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-blocker-ticket.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "my-epic", "02-needs-info-ticket.md", "Status: needs-info\nBlocked by: 01\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	content := m.View().Content
+	if !strings.Contains(content, "(blocked by 1)") {
+		t.Fatalf("expected blocked-by suffix on needs-info ticket, got:\n%s", content)
+	}
+}
+
+func TestNewModel_ResolvedBlockerDropsSuffixAndRegroups(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-blocker-ticket.md", "Status: done\n\nBody.\n")
+	writeTicket(t, root, "my-epic", "02-formerly-blocked-ticket.md", "Status: open\nBlocked by: 01\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	content := m.View().Content
+	if strings.Contains(content, "blocked by") {
+		t.Fatalf("expected no blocked-by suffix once blocker is done, got:\n%s", content)
+	}
+}
+
+func TestNewModel_UnrecognizedStatusRendersAsError(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-bogus-status-ticket.md", "Status: bogus-value\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	content := m.View().Content
+	if !strings.Contains(content, ui.Icons(false).TicketError) {
+		t.Fatalf("expected error icon %q in view, got:\n%s", ui.Icons(false).TicketError, content)
+	}
+}
+
 func writeTicket(t *testing.T, root, epic, filename, content string) {
 	t.Helper()
 	path := filepath.Join(root, ".scratch", epic, "issues", filename)

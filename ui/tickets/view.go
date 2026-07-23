@@ -2,14 +2,29 @@ package tickets
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+
+	"charm.land/lipgloss/v2"
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 )
 
+var (
+	statusOpenStyle      = lipgloss.NewStyle().Foreground(ui.ColorGreen)
+	statusClaimedStyle   = lipgloss.NewStyle().Foreground(ui.ColorBlue)
+	statusBlockedStyle   = lipgloss.NewStyle().Foreground(ui.ColorRed)
+	statusNeedsInfoStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow)
+	statusDoneStyle      = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
+	statusErrorStyle     = lipgloss.NewStyle().Foreground(ui.ColorRed).Bold(true)
+
+	blockedBySuffixStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Italic(true)
+)
+
 // sidebarLines renders the flat epic/ticket tree: each epic's name +
-// (open/total) count, each ticket's title indented beneath it. No status
-// icons, grouping, or collapse behavior yet (tickets 03/04).
+// (open/total) count, each ticket's status icon + title indented beneath it,
+// grouped per visibleRows. No collapse/expand behavior yet (ticket 04).
 func (m Model) sidebarLines() []string {
 	if !m.loaded {
 		return []string{ui.StyleDim.Render("  loading…")}
@@ -24,7 +39,8 @@ func (m Model) sidebarLines() []string {
 		if r.isEpic() {
 			lines = append(lines, m.renderEpicRow(m.epics[r.epicIdx]))
 		} else {
-			lines = append(lines, m.renderTicketRow(m.epics[r.epicIdx].Tickets[r.ticketIdx]))
+			epic := m.epics[r.epicIdx]
+			lines = append(lines, m.renderTicketRow(epic, epic.Tickets[r.ticketIdx]))
 		}
 	}
 	return lines
@@ -34,6 +50,54 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 	return fmt.Sprintf("  %s (%d/%d)", epic.Name, epic.OpenCount(), epic.TotalCount())
 }
 
-func (m Model) renderTicketRow(t tickets.Ticket) string {
-	return "    " + t.Title
+func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket) string {
+	status := epic.RenderedStatus(t)
+	icon, style := statusIconAndStyle(m.icons(), status)
+
+	line := "    " + style.Render(icon) + " " + t.Title
+	if suffix := blockedBySuffix(epic, t, status); suffix != "" {
+		line += " " + blockedBySuffixStyle.Render(suffix)
+	}
+	return line
+}
+
+func (m Model) icons() ui.IconSet {
+	return ui.Icons(m.settings.UseNerdFontIcons)
+}
+
+// statusIconAndStyle maps a ticket's rendered status to its dedicated glyph
+// and color, distinct from the PRs tab's facet icon set.
+func statusIconAndStyle(icons ui.IconSet, status tickets.RenderedStatus) (string, lipgloss.Style) {
+	switch status {
+	case tickets.StatusOpen:
+		return icons.TicketOpen, statusOpenStyle
+	case tickets.StatusClaimed:
+		return icons.TicketClaimed, statusClaimedStyle
+	case tickets.StatusBlocked:
+		return icons.TicketBlocked, statusBlockedStyle
+	case tickets.StatusNeedsInfo:
+		return icons.TicketNeedsInfo, statusNeedsInfoStyle
+	case tickets.StatusDone:
+		return icons.TicketDone, statusDoneStyle
+	default: // tickets.StatusError
+		return icons.TicketError, statusErrorStyle
+	}
+}
+
+// blockedBySuffix renders the "(blocked by NN[, NN...])" suffix for a
+// blocked/needs-info ticket, filtered to still-unresolved blockers. Empty
+// for any other status or once every blocker has resolved.
+func blockedBySuffix(epic tickets.Epic, t tickets.Ticket, status tickets.RenderedStatus) string {
+	if status != tickets.StatusBlocked && status != tickets.StatusNeedsInfo {
+		return ""
+	}
+	unresolved := epic.UnresolvedBlockers(t)
+	if len(unresolved) == 0 {
+		return ""
+	}
+	numbers := make([]string, len(unresolved))
+	for i, n := range unresolved {
+		numbers[i] = strconv.Itoa(n)
+	}
+	return fmt.Sprintf("(blocked by %s)", strings.Join(numbers, ", "))
 }
