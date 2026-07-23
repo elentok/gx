@@ -17,8 +17,13 @@ var (
 	statusClaimedStyle   = lipgloss.NewStyle().Foreground(ui.ColorBlue)
 	statusBlockedStyle   = lipgloss.NewStyle().Foreground(ui.ColorRed)
 	statusNeedsInfoStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow)
-	statusDoneStyle      = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
-	statusErrorStyle     = lipgloss.NewStyle().Foreground(ui.ColorRed).Bold(true)
+	// statusDoneStyle is deliberately dimmer than ui.StyleDim/StyleMuted
+	// (used elsewhere for transient states like search-fade or loading
+	// text): "done" is a permanent, low-priority state that should read as
+	// clearly less prominent than everything else in the row, not merely
+	// muted.
+	statusDoneStyle  = lipgloss.NewStyle().Foreground(ui.ColorOverlay).Faint(true)
+	statusErrorStyle = lipgloss.NewStyle().Foreground(ui.ColorRed).Bold(true)
 
 	blockedBySuffixStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Italic(true)
 
@@ -103,12 +108,12 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 	if m.isCollapsed(epic) {
 		glyph = m.icons().FolderClosed
 	}
-	line := fmt.Sprintf("  %s %s (%d/%d)", glyph, epic.Name, epic.OpenCount(), epic.TotalCount())
+	line := fmt.Sprintf("  %s %s (%d done / %d)", glyph, epic.Name, epic.DoneCount(), epic.TotalCount())
 	// Dimming tracks "every ticket done", not the current collapse toggle —
 	// a fully-done epic stays dimmed even if manually expanded, and a
 	// manually-collapsed in-progress epic doesn't borrow its dimming.
 	if epic.AllDone() {
-		line = ui.StyleDim.Render(line)
+		line = statusDoneStyle.Render(line)
 	}
 	if epic.WorktreeName != "" {
 		line += " " + worktreeTagStyle.Render("["+epic.WorktreeName+"]")
@@ -121,23 +126,26 @@ func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) 
 	icon, style := statusIconAndStyle(m.icons(), status)
 
 	matched, current := m.searchMatch(rowIdx)
-	dim := m.search.HasQuery() && !matched
+	searchDim := m.search.HasQuery() && !matched
+	doneDim := status == tickets.StatusDone
 
 	title := fmt.Sprintf("%d %s", t.Number, t.Title)
 	titleStyle := lipgloss.NewStyle()
 	if matched {
 		title = search.Highlight(title, m.search.Query(), current)
-	} else if dim {
+	} else if doneDim {
+		titleStyle = statusDoneStyle
+	} else if searchDim {
 		titleStyle = ui.StyleDim
 	}
-	if dim {
+	if searchDim {
 		style = ui.StyleDim
 	}
 
 	line := "    " + style.Render(icon) + " " + titleStyle.Render(title)
 	if suffix := blockedBySuffix(epic, t, status); suffix != "" {
 		suffixStyle := blockedBySuffixStyle
-		if dim {
+		if searchDim {
 			suffixStyle = ui.StyleDim
 		}
 		line += " " + suffixStyle.Render(suffix)

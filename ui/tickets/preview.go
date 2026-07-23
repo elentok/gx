@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"charm.land/bubbles/v2/viewport"
 	"charm.land/lipgloss/v2"
 
 	"github.com/elentok/gx/tickets"
@@ -40,14 +39,13 @@ func (m Model) previewInnerSize(previewW, h int) (width, height int) {
 // previewLines renders the preview panel's body for a width x height
 // content region (already excluding the panel's own padding/header, see
 // normalView): the synthesized header/metadata chrome plus the
-// glamour-rendered ticket body, scrolled through a viewport so the scroll
+// glamour-rendered ticket body, scrolled through m.previewVP (kept in sync
+// by syncPreviewViewport, see model_preview_focus.go) so the scroll
 // indicator's dimensions come from the same source as what's displayed
-// (mirrors ui/help's bodyWithScrollbar).
-func (m Model) previewLines(width, height int) []string {
-	contentW := max(width-previewScrollbarGutter, 1)
-
-	vp := viewport.New(viewport.WithWidth(contentW), viewport.WithHeight(height))
-	vp.SetContent(m.previewContent(contentW))
+// (mirrors ui/help's bodyWithScrollbar) and the scroll position persists
+// across renders instead of resetting to the top every frame.
+func (m Model) previewLines() []string {
+	vp := m.previewVP
 
 	body := strings.Split(vp.View(), "\n")
 	bar := ui.RenderScrollbar(vp.Height(), vp.TotalLineCount(), vp.VisibleLineCount(), vp.YOffset())
@@ -129,7 +127,7 @@ func previewEpicHeaderLine(epic tickets.Epic) string {
 	if epic.IsMap {
 		line += " " + ui.StyleMuted.Render("[map]")
 	}
-	line += " " + ui.StyleMuted.Render(fmt.Sprintf("(%d/%d)", epic.OpenCount(), epic.TotalCount()))
+	line += " " + ui.StyleMuted.Render(fmt.Sprintf("(%d done / %d)", epic.DoneCount(), epic.TotalCount()))
 	return line
 }
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
@@ -17,9 +18,20 @@ import (
 	"github.com/elentok/gx/ui/search"
 )
 
+// focusPane is which of the tickets tab's two panels currently receives key
+// input: the sidebar (row navigation/collapse) or the preview (scroll/
+// search over the selected row's rendered body).
+type focusPane int
+
+const (
+	focusSidebar focusPane = iota
+	focusPreview
+)
+
 // Model is the top-level tickets tab model: an epic/ticket sidebar paired
-// with a passive, selection-mirroring preview panel (not a focusable detail
-// panel — see CONTEXT.md's panel vocabulary).
+// with a focusable preview panel that mirrors the sidebar's selection (see
+// CONTEXT.md's panel vocabulary) — "l"/"enter" on a ticket row hands focus to
+// it for scrolling/searching its body; "h"/"left"/"esc" hands focus back.
 type Model struct {
 	worktreeRoot string
 	settings     ui.Settings
@@ -41,8 +53,19 @@ type Model struct {
 
 	selected       int
 	collapsedEpics map[string]bool
+	// scrollOffset is the sidebar's line-based scroll position (sidebarLines()
+	// is windowed to it in normalView), kept following m.selected by
+	// ensureSidebarVisible.
+	scrollOffset int
 
 	search search.Model
+
+	// focus, previewVP, previewSelKey and previewSearch back the preview
+	// panel's own focus/scroll/search state — see model_preview_focus.go.
+	focus         focusPane
+	previewVP     viewport.Model
+	previewSelKey string // identifies the previewed row, to reset scroll on selection change
+	previewSearch search.Model
 }
 
 // NewModel creates a new tickets tab model scoped to worktreeRoot's own
@@ -60,11 +83,13 @@ func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager)
 func NewModelWithScope(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager, allRepos bool) Model {
 	_ = extraKeys
 	return Model{
-		worktreeRoot: worktreeRoot,
-		settings:     settings,
-		keys:         newTicketsManager(),
-		search:       search.NewModel(),
-		allRepos:     allRepos,
+		worktreeRoot:  worktreeRoot,
+		settings:      settings,
+		keys:          newTicketsManager(),
+		search:        search.NewModel(),
+		previewSearch: search.NewModel(),
+		previewVP:     viewport.New(),
+		allRepos:      allRepos,
 	}
 }
 
@@ -74,12 +99,24 @@ func (m Model) Init() tea.Cmd {
 	return m.cmdLoad()
 }
 
+// Update delegates to updateInner then re-syncs the preview viewport
+// (content/size/scroll-reset-on-selection-change) against whatever the
+// message just changed, so every call site that can move the selection,
+// resize the panels, or reload data doesn't need to remember to do it itself.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	next, cmd := m.updateInner(msg)
+	nm := next.(Model)
+	nm.syncPreviewViewport()
+	return nm, cmd
+}
+
+func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		m.ready = true
+		m.ensureSidebarVisible()
 		return m, nil
 
 	case epicsLoadedMsg:
@@ -116,6 +153,81 @@ func (m *Model) clampSelected() {
 	case m.selected < 0:
 		m.selected = 0
 	}
+	m.ensureSidebarVisible()
+}
+
+// sidebarViewportHeight is the sidebar body's visible line count, matching
+// ui.RenderPanel's own bodyH math (PaddingY: 0, minus the header row) so the
+// windowing done here lines up with what RenderPanel actually paints.
+func (m Model) sidebarViewportHeight() int {
+	return max(m.contentHeight()-1, 0)
+}
+
+// sidebarLineForSelected returns the selected row's line index within
+// sidebarLines()'s output, accounting for the "── Open epics ──"/"── Closed
+// epics ──" section headers (and their "no … epics" placeholder lines)
+// interleaved before and between the open/closed row blocks. Every row is
+// exactly one rendered line, so this is a direct offset computation rather
+// than a full render.
+func (m Model) sidebarLineForSelected() (int, bool) {
+	if !m.loaded || len(m.epics) == 0 || m.selected < 0 {
+		return 0, false
+	}
+	idxs := make([]int, len(m.epics))
+	for i := range m.epics {
+		idxs[i] = i
+	}
+	openIdxs, closedIdxs := splitEpicIndexesBySection(m.epics, idxs)
+	openRows := m.rowsForEpicOrder(openIdxs)
+	closedRows := m.rowsForEpicOrder(closedIdxs)
+
+	line := 1 // "── Open epics (N) ──"
+	if len(openRows) == 0 {
+		line++ // "no open epics"
+	}
+	if m.selected < len(openRows) {
+		return line + m.selected, true
+	}
+	line += len(openRows)
+	line += 2 // blank separator + "── Closed epics (N) ──"
+	if len(closedRows) == 0 {
+		line++ // "no closed epics"
+	}
+	idx := m.selected - len(openRows)
+	if idx < 0 || idx >= len(closedRows) {
+		return 0, false
+	}
+	return line + idx, true
+}
+
+// ensureSidebarVisible adjusts scrollOffset minimally so the selected row's
+// line stays within the sidebar's visible window, then clamps it to the
+// content's bounds — called after every selection/collapse/resize change so
+// the cursor never scrolls off-screen (see notes on the tickets tab's
+// scroll-follows-cursor fix).
+func (m *Model) ensureSidebarVisible() {
+	viewportH := m.sidebarViewportHeight()
+	line, ok := m.sidebarLineForSelected()
+	if ok {
+		if line < m.scrollOffset {
+			m.scrollOffset = line
+		}
+		if viewportH > 0 && line >= m.scrollOffset+viewportH {
+			m.scrollOffset = line - viewportH + 1
+		}
+	}
+	total := len(m.sidebarLines())
+	maxOffset := max(0, total-viewportH)
+	m.scrollOffset = max(0, min(m.scrollOffset, maxOffset))
+}
+
+// sidebarVisibleLines windows sidebarLines() to a single viewportH-line
+// scroll position at m.scrollOffset.
+func (m Model) sidebarVisibleLines(viewportH int) []string {
+	lines := m.sidebarLines()
+	start := min(m.scrollOffset, len(lines))
+	end := min(start+viewportH, len(lines))
+	return lines[start:end]
 }
 
 func (m Model) scratchDir() string {
@@ -127,14 +239,27 @@ func (m Model) View() tea.View {
 		return ui.NewMainView("\n  Initializing…")
 	}
 	content := m.normalView()
-	if m.search.Mode() == search.SearchModeInput {
+	if activeSearch, ok := m.activeInputSearch(); ok {
 		overlayW := m.searchOverlayWidth()
-		m.search.SetWidth(overlayW)
-		overlay := m.search.View()
+		activeSearch.SetWidth(overlayW)
+		overlay := activeSearch.View()
 		y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
 		content = ui.OverlayBottomCenter(content, overlay, m.width, y)
 	}
 	return ui.NewMainView(content)
+}
+
+// activeInputSearch returns whichever of the sidebar's or preview's search
+// models is mid-input, since only one can be at a time (focus gates which
+// one a "/" keypress reaches).
+func (m Model) activeInputSearch() (search.Model, bool) {
+	if m.search.Mode() == search.SearchModeInput {
+		return m.search, true
+	}
+	if m.previewSearch.Mode() == search.SearchModeInput {
+		return m.previewSearch, true
+	}
+	return search.Model{}, false
 }
 
 // normalView lays out the sidebar and preview panels side by side (or
@@ -144,8 +269,8 @@ func (m Model) normalView() string {
 	sidebarW, previewW := m.splitWidth()
 	h := m.contentHeight()
 
-	sidebarView := m.renderPanel(sidebarW, h, "Tickets", m.searchMatchStatus(), m.sidebarLines(), true, true)
-	previewView := m.renderPanel(previewW, h, "Preview", "", m.previewLines(m.previewInnerSize(previewW, h)), false, false)
+	sidebarView := m.renderPanel(sidebarW, h, "Tickets", m.searchMatchStatus(), m.sidebarVisibleLines(m.sidebarViewportHeight()), m.focus == focusSidebar, true)
+	previewView := m.renderPanel(previewW, h, "Preview", m.previewMatchStatus(), m.previewLines(), m.focus == focusPreview, false)
 
 	if m.useStackedLayout() {
 		seam := ui.RenderSeamRow(sidebarW, ui.SeamColor)

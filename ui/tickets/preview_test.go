@@ -85,7 +85,7 @@ func TestModel_PreviewPlainEpicShowsHeaderOnly(t *testing.T) {
 
 	// Default selection (row 0) is the epic row itself.
 	content := ansi.Strip(m.View().Content)
-	if !strings.Contains(content, "my-epic") || !strings.Contains(content, "(1/1)") {
+	if !strings.Contains(content, "my-epic") || !strings.Contains(content, "(0 done / 1)") {
 		t.Fatalf("expected epic name + open/total count in preview header, got:\n%s", content)
 	}
 	if strings.Contains(content, "[map]") {
@@ -107,7 +107,7 @@ func TestModel_PreviewMapEpicShowsMapBadgeAndBody(t *testing.T) {
 
 	// Default selection (row 0) is the epic row itself.
 	content := ansi.Strip(m.View().Content)
-	if !strings.Contains(content, "wayfinder-epic") || !strings.Contains(content, "[map]") || !strings.Contains(content, "(0/0)") {
+	if !strings.Contains(content, "wayfinder-epic") || !strings.Contains(content, "[map]") || !strings.Contains(content, "(0 done / 0)") {
 		t.Fatalf("expected epic name + [map] badge + open/total count in preview header, got:\n%s", content)
 	}
 	if !strings.Contains(content, "Distinctive map prose.") {

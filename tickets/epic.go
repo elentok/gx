@@ -31,6 +31,11 @@ func (e Epic) OpenCount() int {
 	return open
 }
 
+// DoneCount is how many of the epic's tickets are done.
+func (e Epic) DoneCount() int {
+	return e.TotalCount() - e.OpenCount()
+}
+
 // AllDone reports whether every one of the epic's tickets is done. A
 // zero-ticket epic is not considered "all done" — it starts expanded, not
 // collapsed, since "nothing here yet" is distinct from "everything closed".

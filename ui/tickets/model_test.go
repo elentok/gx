@@ -51,8 +51,8 @@ func TestNewModel_RendersEpicsAndTicketsFromDisk(t *testing.T) {
 	m = updated.(Model)
 
 	content := m.View().Content
-	if !strings.Contains(content, "my-epic") || !strings.Contains(content, "(1/2)") {
-		t.Fatalf("expected epic row with name + (1/2) count, got:\n%s", content)
+	if !strings.Contains(content, "my-epic") || !strings.Contains(content, "(1 done / 2)") {
+		t.Fatalf("expected epic row with name + (1 done / 2) count, got:\n%s", content)
 	}
 	if !strings.Contains(content, "First ticket") || !strings.Contains(content, "Second ticket") {
 		t.Fatalf("expected ticket titles in view, got:\n%s", content)
@@ -279,7 +279,12 @@ func TestModel_NavigationAndSelectionUnaffectedBySectionHeaders(t *testing.T) {
 	}
 }
 
-func TestModel_EnterTogglesEpicCollapse(t *testing.T) {
+// TestModel_EnterOnExpandedEpicFocusesPreview covers the epic-row case of
+// "enter"/"l": since my-epic starts expanded, enter must not collapse it —
+// it should instead focus the preview panel, exactly like it does on a
+// ticket row. Collapsing an epic is "h"/left's job only (see
+// TestModel_HLCollapseAndExpandSelectedEpic).
+func TestModel_EnterOnExpandedEpicFocusesPreview(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 
@@ -289,19 +294,51 @@ func TestModel_EnterTogglesEpicCollapse(t *testing.T) {
 	m = updated.(Model)
 
 	if !strings.Contains(m.View().Content, "First ticket") {
-		t.Fatalf("expected ticket visible before collapse, got:\n%s", m.View().Content)
-	}
-
-	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	m = updated.(Model)
-	if strings.Contains(m.View().Content, "First ticket") {
-		t.Fatalf("expected ticket hidden after collapsing epic via enter, got:\n%s", m.View().Content)
+		t.Fatalf("expected ticket visible before enter, got:\n%s", m.View().Content)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
 	if !strings.Contains(m.View().Content, "First ticket") {
-		t.Fatalf("expected ticket visible again after re-toggling, got:\n%s", m.View().Content)
+		t.Fatalf("expected epic to stay expanded after enter, got:\n%s", m.View().Content)
+	}
+	if m.focus != focusPreview {
+		t.Fatalf("expected enter on already-expanded epic to focus preview, got focus=%v", m.focus)
+	}
+}
+
+// TestModel_EnterOnCollapsedEpicExpandsThenFocusesPreview covers the other
+// half: on a collapsed epic, the first enter expands it (staying on the
+// sidebar so the user can see what appeared); only a second enter, now that
+// it's expanded, focuses the preview panel.
+func TestModel_EnterOnCollapsedEpicExpandsThenFocusesPreview(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
+	m = updated.(Model)
+	if strings.Contains(m.View().Content, "First ticket") {
+		t.Fatalf("expected ticket hidden after 'h' collapse, got:\n%s", m.View().Content)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	if !strings.Contains(m.View().Content, "First ticket") {
+		t.Fatalf("expected first enter to expand the collapsed epic, got:\n%s", m.View().Content)
+	}
+	if m.focus != focusSidebar {
+		t.Fatalf("expected first enter on collapsed epic to keep sidebar focus, got focus=%v", m.focus)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	if m.focus != focusPreview {
+		t.Fatalf("expected second enter on now-expanded epic to focus preview, got focus=%v", m.focus)
 	}
 }
 
@@ -381,7 +418,7 @@ func TestModel_DimmingTracksAllDoneNotCollapseState(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	dimPrefix := strings.SplitN(ui.StyleDim.Render("PROBE"), "PROBE", 2)[0]
+	dimPrefix := strings.SplitN(statusDoneStyle.Render("PROBE"), "PROBE", 2)[0]
 
 	doneEpic := findEpic(t, m, "done-epic")
 	openEpic := findEpic(t, m, "open-epic")

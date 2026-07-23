@@ -106,7 +106,7 @@ func Icons(useNerdFont bool) IconSet {
 		MarkerBlocked: "●",
 		MarkerWaiting: "○",
 
-		TicketOpen:      "󰺕",
+		TicketOpen:      "○",
 		TicketClaimed:   "󰀄",
 		TicketBlocked:   "󰦞",
 		TicketNeedsInfo: "󰋗",

@@ -23,10 +23,13 @@ const (
 	bindingTicketsCancelChord keys.BindingID = "cancel-chord"
 )
 
-// newTicketsManager builds the key manager for the tickets tab: plain
-// up/down navigation plus ui/filetree's collapse/expand/toggle bindings,
-// reused rather than reinvented (h/left collapse, l/right expand, enter
-// toggles a selected epic row).
+// newTicketsManager builds the key manager for the sidebar's focus: plain
+// up/down navigation plus ui/filetree's collapse/expand bindings on an epic
+// row (h/left collapse; l/right/enter expand a collapsed epic, or focus the
+// preview panel if it's already expanded); on a ticket row, l/right/enter
+// always hand focus to the preview panel (see focusPreviewOrExpand) —
+// handlePreviewKey in model_preview_focus.go covers the preview panel's own
+// bindings once focused, since only one panel's keys are live at a time.
 func newTicketsManager() keys.Manager {
 	return keys.New([]keys.Binding{
 		{ID: bindingTicketsBack, Seq: []string{"q"}, Categories: []string{"Other"}, Title: "back"},
@@ -36,9 +39,9 @@ func newTicketsManager() keys.Manager {
 		{ID: bindingTicketsUp, Seq: []string{"up"}, Categories: []string{}, Title: ""},
 		{ID: bindingTicketsCollapse, Seq: []string{"h"}, Categories: []string{"Navigation"}, Title: "collapse epic", Display: "h/←"},
 		{ID: bindingTicketsCollapse, Seq: []string{"left"}, Categories: []string{}, Title: ""},
-		{ID: bindingTicketsExpand, Seq: []string{"l"}, Categories: []string{"Navigation"}, Title: "expand epic", Display: "l/→"},
+		{ID: bindingTicketsExpand, Seq: []string{"l"}, Categories: []string{"Navigation"}, Title: "expand epic / focus preview", Display: "l/→"},
 		{ID: bindingTicketsExpand, Seq: []string{"right"}, Categories: []string{}, Title: ""},
-		{ID: bindingTicketsToggle, Seq: []string{"enter"}, Categories: []string{"Navigation"}, Title: "toggle epic"},
+		{ID: bindingTicketsToggle, Seq: []string{"enter"}, Categories: []string{"Navigation"}, Title: "expand epic / focus preview"},
 		{ID: bindingTicketsRefresh, Seq: []string{"R"}, Categories: []string{"Navigation"}, Title: "refresh"},
 		// e-prefix chords: edit the selected row's underlying file, reusing
 		// the same launch-mode plumbing every other tab's edit-chord uses.
@@ -51,6 +54,10 @@ func newTicketsManager() keys.Manager {
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.focus == focusPreview {
+		return m.handlePreviewKey(msg)
+	}
+
 	if nextSearch, cmd, result := m.search.Update(msg); result.Handled {
 		m.search = nextSearch
 		if result.QueryChanged {
@@ -82,9 +89,15 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case bindingTicketsCollapse:
 		m.collapseSelectedEpic()
 	case bindingTicketsExpand:
+		if m.focusPreviewOrExpand() {
+			return m, nil
+		}
 		m.expandSelectedEpic()
 	case bindingTicketsToggle:
-		m.toggleSelectedEpic()
+		if m.focusPreviewOrExpand() {
+			return m, nil
+		}
+		m.expandSelectedEpic()
 	case bindingTicketsRefresh:
 		return m, m.cmdRefresh()
 	case bindingTicketsEditInPlace:
@@ -113,6 +126,7 @@ func (m *Model) moveSelection(delta int) {
 	if m.selected >= n {
 		m.selected = n - 1
 	}
+	m.ensureSidebarVisible()
 }
 
 // selectedRow returns the row currently under the selection, if any.
@@ -148,6 +162,7 @@ func (m *Model) jumpToEpic(epicIdx int) {
 	for i, r := range m.visibleRows() {
 		if r.isEpic() && r.epicIdx == epicIdx {
 			m.selected = i
+			m.ensureSidebarVisible()
 			return
 		}
 	}
@@ -159,14 +174,6 @@ func (m *Model) expandSelectedEpic() {
 		return
 	}
 	m.setCollapsed(r.epicIdx, false)
-}
-
-func (m *Model) toggleSelectedEpic() {
-	r, ok := m.selectedRow()
-	if !ok || !r.isEpic() {
-		return
-	}
-	m.setCollapsed(r.epicIdx, !m.isCollapsed(m.epics[r.epicIdx]))
 }
 
 // setCollapsed sets the collapse state for the epic at epicIdx and

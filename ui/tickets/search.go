@@ -39,6 +39,7 @@ func (m *Model) jumpToCurrentMatch() {
 	rows := m.visibleRows()
 	if match.DataIndex >= 0 && match.DataIndex < len(rows) {
 		m.selected = match.DataIndex
+		m.ensureSidebarVisible()
 	}
 }
 
