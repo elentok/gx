@@ -32,22 +32,39 @@ type Model struct {
 	loaded bool
 	epics  []tickets.Epic
 
+	// allRepos is the `gx tickets --all` scope: epics are aggregated across
+	// every worktree of the repo (each tagged with Epic.WorktreeName) instead
+	// of just m.worktreeRoot's own `.scratch/`. worktreeNames holds the
+	// worktree display order used to group rows and render header lines.
+	allRepos      bool
+	worktreeNames []string
+
 	selected       int
 	collapsedEpics map[string]bool
 
 	search search.Model
 }
 
-// NewModel creates a new tickets tab model. extraKeys (the app-wide global
-// bindings) isn't used yet — it'll feed a help modal once one exists for
-// this tab, mirroring ui/prs's NewModelWithScope.
+// NewModel creates a new tickets tab model scoped to worktreeRoot's own
+// `.scratch/`. extraKeys (the app-wide global bindings) isn't used yet —
+// it'll feed a help modal once one exists for this tab, mirroring ui/prs's
+// NewModelWithScope.
 func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager) Model {
+	return NewModelWithScope(worktreeRoot, settings, extraKeys, false)
+}
+
+// NewModelWithScope builds the tickets tab model with an initial scope:
+// allRepos true starts it already aggregating every worktree's `.scratch/`
+// (the `gx tickets --all` CLI entry point), false starts it scoped to just
+// worktreeRoot, mirroring ui/prs's NewModelWithScope.
+func NewModelWithScope(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager, allRepos bool) Model {
 	_ = extraKeys
 	return Model{
 		worktreeRoot: worktreeRoot,
 		settings:     settings,
 		keys:         newTicketsManager(),
 		search:       search.NewModel(),
+		allRepos:     allRepos,
 	}
 }
 
@@ -68,6 +85,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case epicsLoadedMsg:
 		m.loaded = true
 		m.epics = msg.epics
+		m.worktreeNames = msg.worktreeNames
 		m.collapsedEpics = defaultCollapsedEpics(msg.epics)
 		if m.search.HasQuery() {
 			m.recomputeSearchMatches()

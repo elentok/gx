@@ -9,6 +9,10 @@ type Epic struct {
 	IsMap   bool   // has a map.md (wayfinder map)
 	MapBody string // map.md's raw content, only set when IsMap
 	Tickets []Ticket
+
+	// WorktreeName is the owning worktree's directory name, set only in
+	// `gx tickets --all` aggregation (empty for the single-worktree view).
+	WorktreeName string
 }
 
 // TotalCount is the epic's total ticket count.

@@ -23,15 +23,21 @@ var (
 	blockedBySuffixStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Italic(true)
 
 	sectionHeaderStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
+
+	// worktreeHeaderStyle renders --all mode's non-selectable per-worktree
+	// header row, one level above sectionHeaderStyle's Open/Closed headers.
+	worktreeHeaderStyle = lipgloss.NewStyle().Foreground(ui.ColorBlue).Bold(true)
 )
 
-// sidebarLines renders the flat epic/ticket tree under two headed sections —
-// "Open epics" then "Closed epics" (mirroring the PRs tab's Actionable/
-// Non-actionable split) — each epic's expand glyph + name + (open/total)
-// count, each ticket's status icon + title indented beneath it, grouped and
-// collapsed per visibleRows. Row highlighting/search indexing uses each
-// row's position in visibleRows() (i), unaffected by the header lines
-// interleaved for display only.
+// sidebarLines renders the epic/ticket tree grouped per epicGroups(): in the
+// single-worktree view that's one implicit group, so it's exactly two headed
+// sections — "Open epics" then "Closed epics" (mirroring the PRs tab's
+// Actionable/Non-actionable split); in --all mode each worktree gets its own
+// non-selectable header row followed by its own Open/Closed sections. Each
+// epic's expand glyph + name + (open/total) count, each ticket's status icon
+// + title indented beneath it, grouped and collapsed per visibleRows. Row
+// highlighting/search indexing uses each row's position in visibleRows()
+// (i), unaffected by the header lines interleaved for display only.
 func (m Model) sidebarLines() []string {
 	if !m.loaded {
 		return []string{ui.StyleDim.Render("  loading…")}
@@ -40,32 +46,34 @@ func (m Model) sidebarLines() []string {
 		return []string{ui.StyleMuted.Render("  no .scratch/ directory found")}
 	}
 
-	rows := m.visibleRows()
-	openIdxs, closedIdxs := splitEpicIndexesBySection(m.epics)
-	closedSet := make(map[int]bool, len(closedIdxs))
-	for _, idx := range closedIdxs {
-		closedSet[idx] = true
-	}
-	boundary := len(rows)
-	for i, r := range rows {
-		if closedSet[r.epicIdx] {
-			boundary = i
-			break
+	var lines []string
+	i := 0 // running position within the full visibleRows() slice
+	for gi, g := range m.epicGroups() {
+		if g.worktreeName != "" {
+			if gi > 0 {
+				lines = append(lines, "")
+			}
+			lines = append(lines, worktreeHeaderStyle.Render("▸ "+g.worktreeName))
 		}
-	}
 
-	lines := make([]string, 0, len(rows)+4)
-	lines = append(lines, sectionHeaderStyle.Render(fmt.Sprintf("── Open epics (%d) ──", len(openIdxs))))
-	if len(openIdxs) == 0 {
-		lines = append(lines, ui.StyleMuted.Render("  no open epics"))
-	}
-	lines = m.appendRowLines(lines, rows[:boundary], 0)
+		openIdxs, closedIdxs := splitEpicIndexesBySection(m.epics, g.epicIdxs)
 
-	lines = append(lines, "", sectionHeaderStyle.Render(fmt.Sprintf("── Closed epics (%d) ──", len(closedIdxs))))
-	if len(closedIdxs) == 0 {
-		lines = append(lines, ui.StyleMuted.Render("  no closed epics"))
+		lines = append(lines, sectionHeaderStyle.Render(fmt.Sprintf("── Open epics (%d) ──", len(openIdxs))))
+		if len(openIdxs) == 0 {
+			lines = append(lines, ui.StyleMuted.Render("  no open epics"))
+		}
+		openRows := m.rowsForEpicOrder(openIdxs)
+		lines = m.appendRowLines(lines, openRows, i)
+		i += len(openRows)
+
+		lines = append(lines, "", sectionHeaderStyle.Render(fmt.Sprintf("── Closed epics (%d) ──", len(closedIdxs))))
+		if len(closedIdxs) == 0 {
+			lines = append(lines, ui.StyleMuted.Render("  no closed epics"))
+		}
+		closedRows := m.rowsForEpicOrder(closedIdxs)
+		lines = m.appendRowLines(lines, closedRows, i)
+		i += len(closedRows)
 	}
-	lines = m.appendRowLines(lines, rows[boundary:], boundary)
 
 	return lines
 }
