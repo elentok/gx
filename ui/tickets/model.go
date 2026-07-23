@@ -1,15 +1,18 @@
 // Package tickets implements the `gx tickets` tab: a sidebar+preview pairing
 // (the worktrees archetype per ADR 0009) over the repo's local `.scratch/`
-// issue tracker. This ticket only wires the tab shell and empty state; the
-// `.scratch/` tree isn't read yet.
+// issue tracker.
 package tickets
 
 import (
+	"path/filepath"
+
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/notify"
 )
 
 // Model is the top-level tickets tab model: an epic/ticket sidebar paired
@@ -23,6 +26,9 @@ type Model struct {
 	width  int
 	height int
 	ready  bool // true once the first WindowSizeMsg has been received
+
+	loaded bool
+	epics  []tickets.Epic
 }
 
 // NewModel creates a new tickets tab model.
@@ -37,7 +43,7 @@ func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager)
 func (m Model) KeyManager() keys.Manager { return m.keyManager }
 
 func (m Model) Init() tea.Cmd {
-	return nil
+	return m.cmdLoad()
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -47,8 +53,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.ready = true
 		return m, nil
+
+	case epicsLoadedMsg:
+		m.loaded = true
+		m.epics = msg.epics
+		if msg.err != nil {
+			return m, notify.Error("load .scratch/: " + msg.err.Error())
+		}
+		return m, nil
 	}
 	return m, nil
+}
+
+func (m Model) scratchDir() string {
+	return filepath.Join(m.worktreeRoot, ".scratch")
 }
 
 func (m Model) View() tea.View {
@@ -65,10 +83,9 @@ func (m Model) normalView() string {
 	sidebarW, previewW := m.splitWidth()
 	h := m.contentHeight()
 
-	sidebarLines := []string{ui.StyleMuted.Render("  no .scratch/ directory found")}
 	previewLines := []string{ui.StyleDim.Render("  no ticket selected")}
 
-	sidebarView := m.renderPanel(sidebarW, h, "Tickets", sidebarLines, true, true)
+	sidebarView := m.renderPanel(sidebarW, h, "Tickets", m.sidebarLines(), true, true)
 	previewView := m.renderPanel(previewW, h, "Preview", previewLines, false, false)
 
 	if m.useStackedLayout() {
