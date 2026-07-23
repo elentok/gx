@@ -107,6 +107,39 @@ func TestLoad_EpicWithNoIssuesDirHasZeroTickets(t *testing.T) {
 	}
 }
 
+func TestLoad_UnreadableTicketFileShowsErrorRow(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("running as root: unreadable-file permissions aren't enforced")
+	}
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "epic", "issues", "01-broken.md")
+	writeFile(t, path, "Status: open\n\nBody.\n")
+	if err := os.Chmod(path, 0000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(path, 0644) })
+
+	epics, err := Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(epics) != 1 || epics[0].TotalCount() != 1 {
+		t.Fatalf("expected 1 epic with 1 ticket, got %+v", epics)
+	}
+
+	tk := epics[0].Tickets[0]
+	if tk.Number != 1 {
+		t.Errorf("Number = %d, want 1", tk.Number)
+	}
+	if tk.Title != "Broken" {
+		t.Errorf("Title = %q, want %q", tk.Title, "Broken")
+	}
+	if tk.ReadErr == "" {
+		t.Error("expected ReadErr to be set for an unreadable ticket file")
+	}
+}
+
 func TestLoad_IgnoresNonTicketFilesInIssuesDir(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "epic", "issues", "01-a-ticket.md"), "Status: open\n")

@@ -59,6 +59,12 @@ func loadEpic(scratchDir, name string) Epic {
 		ticketPath := filepath.Join(issuesDir, issueEntry.Name())
 		raw, err := os.ReadFile(ticketPath)
 		if err != nil {
+			epic.Tickets = append(epic.Tickets, Ticket{
+				Number:  number,
+				Title:   title,
+				Path:    ticketPath,
+				ReadErr: err.Error(),
+			})
 			continue
 		}
 

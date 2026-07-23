@@ -21,6 +21,13 @@ type Ticket struct {
 	BlockedBy []int
 	Status    string // raw Status: value; "" means missing (valid open/unclaimed default)
 	Body      string // raw markdown after the leading metadata lines, unmodified
+
+	// ReadErr is set when the loader found the file (its name matched
+	// "NN-<slug>.md") but couldn't read its contents (I/O error). Non-empty
+	// means Type/BlockedBy/Status/Body are all zero-valued - there was no
+	// content to parse. Distinct from an unrecognized Status: value, which is
+	// a successfully-read file.
+	ReadErr string
 }
 
 var doneStatuses = map[string]bool{

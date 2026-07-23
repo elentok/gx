@@ -97,7 +97,11 @@ func (m Model) previewContent(width int) string {
 	b.WriteString("\n")
 	b.WriteString(previewRuleStyle.Render(strings.Repeat("─", max(width, 0))))
 	b.WriteString("\n")
-	b.WriteString(renderTicketMarkdown(t.Body, width))
+	if t.ReadErr != "" {
+		b.WriteString(statusErrorStyle.Render("  error reading ticket file: " + t.ReadErr))
+	} else {
+		b.WriteString(renderTicketMarkdown(t.Body, width))
+	}
 	return b.String()
 }
 

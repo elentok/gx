@@ -32,6 +32,14 @@ func TestEpic_RenderedStatus_BaseStates(t *testing.T) {
 	}
 }
 
+func TestEpic_RenderedStatus_ReadErrIsError(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{{Number: 1, Status: "open", ReadErr: "permission denied"}}}
+	got := epic.RenderedStatus(epic.Tickets[0])
+	if got != StatusError {
+		t.Errorf("RenderedStatus(ReadErr set) = %v, want StatusError", got)
+	}
+}
+
 func TestEpic_RenderedStatus_BlockedOverlaysOpenAndClaimed(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
 		{Number: 1, Status: "", BlockedBy: []int{2}},

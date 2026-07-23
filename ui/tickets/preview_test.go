@@ -1,6 +1,8 @@
 package tickets
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -110,6 +112,56 @@ func TestModel_PreviewMapEpicShowsMapBadgeAndBody(t *testing.T) {
 	}
 	if !strings.Contains(content, "Distinctive map prose.") {
 		t.Fatalf("expected map.md body rendered in preview, got:\n%s", content)
+	}
+}
+
+func TestModel_PreviewUnreadableTicketShowsErrorMessage(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("running as root: unreadable-file permissions aren't enforced")
+	}
+
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-broken.md", "Status: open\n\nBody.\n")
+	brokenPath := filepath.Join(root, ".scratch", "my-epic", "issues", "01-broken.md")
+	if err := os.Chmod(brokenPath, 0000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(brokenPath, 0644) })
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	// rows: [epic, ticket] - move down once to select the ticket.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+
+	content := ansi.Strip(m.View().Content)
+	if !strings.Contains(content, "error reading ticket file") {
+		t.Fatalf("expected I/O error message in preview, got:\n%s", content)
+	}
+}
+
+func TestModel_PreviewUnrecognizedStatusRendersBodyNormally(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-weird-ticket.md", "Status: bogus-value\n\nDistinctive body text.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	// rows: [epic, ticket] - move down once to select the ticket.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+
+	content := ansi.Strip(m.View().Content)
+	if !strings.Contains(content, "Distinctive body text.") {
+		t.Fatalf("expected ticket body rendered normally despite unrecognized status, got:\n%s", content)
+	}
+	if !strings.Contains(content, "error") {
+		t.Fatalf("expected rendered status word 'error' in preview, got:\n%s", content)
 	}
 }
 

@@ -39,6 +39,9 @@ var needsInfoStatuses = map[string]bool{
 // baseStatus classifies t's raw Status: value alone, before the Blocked by:
 // overlay (see Epic.RenderedStatus) is applied.
 func (t Ticket) baseStatus() RenderedStatus {
+	if t.ReadErr != "" {
+		return StatusError
+	}
 	status := strings.ToLower(strings.TrimSpace(t.Status))
 	switch {
 	case doneStatuses[status]:
