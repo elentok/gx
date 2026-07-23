@@ -6,6 +6,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/ui/notify"
 )
 
 type epicsLoadedMsg struct {
@@ -23,6 +24,12 @@ func (m Model) cmdLoad() tea.Cmd {
 		epics, err := tickets.Load(scratchDir)
 		return epicsLoadedMsg{epics: epics, err: err}
 	}
+}
+
+// cmdRefresh reloads .scratch/ from disk, matching every other tab's manual
+// refresh convention (`R`): a success notification alongside the reload.
+func (m Model) cmdRefresh() tea.Cmd {
+	return tea.Batch(notify.Success("refreshed"), m.cmdLoad())
 }
 
 // row is one flat, navigable line in the sidebar: either an epic header or

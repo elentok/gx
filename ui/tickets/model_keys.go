@@ -13,6 +13,7 @@ const (
 	bindingTicketsCollapse    keys.BindingID = "collapse"
 	bindingTicketsExpand      keys.BindingID = "expand"
 	bindingTicketsToggle      keys.BindingID = "toggle"
+	bindingTicketsRefresh     keys.BindingID = "refresh"
 	bindingTicketsEditInPlace keys.BindingID = "edit"
 	bindingTicketsEditHSplit  keys.BindingID = "edit-hsplit"
 	bindingTicketsEditVSplit  keys.BindingID = "edit-vsplit"
@@ -35,6 +36,7 @@ func newTicketsManager() keys.Manager {
 		{ID: bindingTicketsExpand, Seq: []string{"l"}, Categories: []string{"Navigation"}, Title: "expand epic", Display: "l/→"},
 		{ID: bindingTicketsExpand, Seq: []string{"right"}, Categories: []string{}, Title: ""},
 		{ID: bindingTicketsToggle, Seq: []string{"enter"}, Categories: []string{"Navigation"}, Title: "toggle epic"},
+		{ID: bindingTicketsRefresh, Seq: []string{"R"}, Categories: []string{"Navigation"}, Title: "refresh"},
 		// e-prefix chords: edit the selected row's underlying file, reusing
 		// the same launch-mode plumbing every other tab's edit-chord uses.
 		{ID: bindingTicketsEditInPlace, Seq: []string{"e", "e"}, Categories: []string{"Navigation"}, Title: "edit file"},
@@ -76,6 +78,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.expandSelectedEpic()
 	case bindingTicketsToggle:
 		m.toggleSelectedEpic()
+	case bindingTicketsRefresh:
+		return m, m.cmdRefresh()
 	case bindingTicketsEditInPlace:
 		return m, m.cmdEditSelectedFile(terminalrun.InPlace)
 	case bindingTicketsEditHSplit:

@@ -69,6 +69,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loaded = true
 		m.epics = msg.epics
 		m.collapsedEpics = defaultCollapsedEpics(msg.epics)
+		if m.search.HasQuery() {
+			m.recomputeSearchMatches()
+		}
 		m.clampSelected()
 		if msg.err != nil {
 			return m, notify.Error("load .scratch/: " + msg.err.Error())

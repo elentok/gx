@@ -326,6 +326,54 @@ func TestModel_DimmingTracksAllDoneNotCollapseState(t *testing.T) {
 	}
 }
 
+func TestModel_RRefreshesDataFromDisk(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	if strings.Contains(m.View().Content, "Second ticket") {
+		t.Fatalf("expected second ticket absent before it's written, got:\n%s", m.View().Content)
+	}
+
+	// Simulate an edit made outside gx (e.g. in $EDITOR): a new ticket file
+	// appears on disk after the tab already loaded.
+	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'R', Text: "R"})
+	m = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected a refresh cmd from pressing R")
+	}
+	m = deliverCmd(t, m, cmd)
+
+	if !strings.Contains(m.View().Content, "Second ticket") {
+		t.Fatalf("expected second ticket visible after R refresh, got:\n%s", m.View().Content)
+	}
+}
+
+// deliverCmd runs cmd (recursively unwrapping tea.BatchMsg) and feeds every
+// resulting message back through Update, mirroring what the bubbletea
+// runtime does for a batched command.
+func deliverCmd(t *testing.T, m Model, cmd tea.Cmd) Model {
+	t.Helper()
+	if cmd == nil {
+		return m
+	}
+	msg := cmd()
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		for _, c := range batch {
+			m = deliverCmd(t, m, c)
+		}
+		return m
+	}
+	updated, _ := m.Update(msg)
+	return updated.(Model)
+}
+
 func findEpic(t *testing.T, m Model, name string) tickets.Epic {
 	t.Helper()
 	return m.epics[indexOfEpic(t, m, name)]
