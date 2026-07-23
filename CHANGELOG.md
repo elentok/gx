@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.23.0 - 2026-07-23
+
+- Added a Tickets tab (`gx tickets` / `tk`) for browsing `.scratch/` epics and tickets, with status grouping, counts, ticket numbers, blocker indicators, and resilient metadata parsing.
+- Tickets: added Markdown previews rendered with Glamour, preview focus/scrolling, in-preview search highlighting, collapse/expand navigation, manual refresh, and edit shortcuts.
+- Tickets: added `--all` cross-worktree aggregation with worktree labels.
+- Updated dependencies, including Glamour, Go 1.25.8, Lipgloss 2.0.4, and `x/sys` 0.45.0.
+
 ## v0.22.3 - 2026-07-21
 
 - Terminal: herdr splits/tabs now use the documented `pane split`/`pane run` flow instead of `agent start`, fixing launches that relied on undocumented behavior.
