@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.23.1 - 2026-07-30
+
+- Status: fixed the filetree panel title overflowing horizontally when the branch name was long, and dropped the "vs {base-ref}" suffix from the title.
+
 ## v0.23.0 - 2026-07-23
 
 - Added a Tickets tab (`gx tickets` / `tk`) for browsing `.scratch/` epics and tickets, with status grouping, counts, ticket numbers, blocker indicators, and resilient metadata parsing.
