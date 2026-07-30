@@ -2,6 +2,7 @@ package status
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/elentok/gx/git"
@@ -83,9 +84,10 @@ func (m Model) renderLeftPane(width, height int) string {
 	return m.renderFiletreePane(width, maxInt(minFiletreePaneHeight, height))
 }
 
-func (m Model) filetreePaneTitle() string {
-	if summary := m.branchSummaryTitleSuffix(); summary != "" {
-		return "Changes in " + summary
+func (m Model) filetreePaneTitle(maxWidth int) string {
+	prefix := "Changes in "
+	if summary := m.branchSummaryTitleSuffix(maxWidth - ansi.StringWidth(prefix)); summary != "" {
+		return prefix + summary
 	}
 	return "Filetree"
 }
@@ -120,7 +122,7 @@ func (m Model) visibleStatusLines(width, height int) []string {
 }
 
 func (m Model) requiredFiletreePaneWidth(height int) int {
-	required := ansi.StringWidth(" " + m.filetreePaneTitle() + " ")
+	required := ansi.StringWidth(" " + m.filetreePaneTitle(math.MaxInt32) + " ")
 	icons := filetreePaneIconsFor(m.settings.UseNerdFontIcons)
 	if w := m.fileTreeModel.RequiredWidth(height, filetree.RenderOpts[git.StageFileStatus]{
 		AccentColor:      ui.ColorBlue,
@@ -161,7 +163,7 @@ func (m Model) renderFiletreePane(width, height int) string {
 		info = nil
 	}
 	lines := append(info, m.visibleStatusLines(width, contentHeight)...)
-	return m.renderFiletreePanelWithBorderTitle(width, height, m.filetreePaneTitle(), m.searchCounterForFiletreePane(), lines, m.focus == focusFiletree)
+	return m.renderFiletreePanelWithBorderTitle(width, height, m.filetreePaneTitle(width-2), m.searchCounterForFiletreePane(), lines, m.focus == focusFiletree)
 }
 
 // filetreeInnerHeight returns the number of file rows actually rendered
@@ -197,7 +199,7 @@ func (m Model) filetreeInfoLines() []string {
 	return []string{ui.StyleMuted.Faint(true).Render(icon + "worktree: " + name)}
 }
 
-func (m Model) branchSummaryTitleSuffix() string {
+func (m Model) branchSummaryTitleSuffix(maxWidth int) string {
 	if strings.TrimSpace(m.statusData.branchName) == "" {
 		return ""
 	}
@@ -205,12 +207,14 @@ func (m Model) branchSummaryTitleSuffix() string {
 	if m.settings.UseNerdFontIcons {
 		branchLabel = ""
 	}
-	out := branchLabel + " " + m.statusData.branchName + " " + m.branchSyncToken()
-	base := strings.TrimSpace(m.statusData.branchBaseRef)
-	if shouldShowBranchBaseRef(base) {
-		out += " · vs " + base
+	prefix := branchLabel + " "
+	suffix := " " + m.branchSyncToken()
+	name := m.statusData.branchName
+	available := maxWidth - ansi.StringWidth(prefix) - ansi.StringWidth(suffix)
+	if available > 0 && ansi.StringWidth(name) > available {
+		name = ansi.Truncate(name, available, "…")
 	}
-	return out
+	return prefix + name + suffix
 }
 
 func (m Model) branchSyncToken() string {
@@ -225,14 +229,6 @@ func (m Model) branchSyncToken() string {
 		return fmt.Sprintf("↑%d ↓%d", m.statusData.branchSync.Ahead, m.statusData.branchSync.Behind)
 	}
 	return "?"
-}
-
-func shouldShowBranchBaseRef(base string) bool {
-	base = strings.TrimSpace(base)
-	if base == "" {
-		return false
-	}
-	return base != "origin/main" && base != "origin/master"
 }
 
 func minInt(a, b int) int {

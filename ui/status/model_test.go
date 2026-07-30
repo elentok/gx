@@ -2,6 +2,8 @@ package status
 
 import (
 	"fmt"
+	"math"
+
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
@@ -620,7 +622,7 @@ func TestNewWithInitialPathSelectsFileAndKeepsFiletreeFocus(t *testing.T) {
 	}
 }
 
-func TestBranchSummaryTitleShowsBaseOnlyWhenNonDefault(t *testing.T) {
+func TestBranchSummaryTitleOmitsBaseRef(t *testing.T) {
 	t.Parallel()
 	m := Model{
 		settings: ui.Settings{UseNerdFontIcons: true},
@@ -630,12 +632,32 @@ func TestBranchSummaryTitleShowsBaseOnlyWhenNonDefault(t *testing.T) {
 			branchSync:    git.SyncStatus{Name: git.StatusBehind, Behind: 1},
 		},
 	}
-	line := m.branchSummaryTitleSuffix()
+	line := m.branchSummaryTitleSuffix(math.MaxInt32)
 	if !strings.Contains(line, " feature/x ↓1") {
 		t.Fatalf("unexpected title suffix: %q", line)
 	}
-	if !strings.Contains(line, "vs origin/release") {
-		t.Fatalf("expected non-default base ref in title suffix: %q", line)
+	if strings.Contains(line, "vs") {
+		t.Fatalf("expected base ref to no longer appear in title suffix: %q", line)
+	}
+}
+
+func TestBranchSummaryTitleTruncatesLongBranchNameWithEllipsis(t *testing.T) {
+	t.Parallel()
+	m := Model{
+		statusData: statusData{
+			branchName: "feature/some-extremely-verbose-branch-name-that-keeps-going",
+			branchSync: git.SyncStatus{Name: git.StatusBehind, Behind: 1},
+		},
+	}
+	line := m.branchSummaryTitleSuffix(30)
+	if !strings.Contains(line, "…") {
+		t.Fatalf("expected truncated branch name to use ellipsis, got %q", line)
+	}
+	if !strings.HasSuffix(line, "↓1") {
+		t.Fatalf("expected sync token to stay visible at the end, got %q", line)
+	}
+	if ansi.StringWidth(line) > 30 {
+		t.Fatalf("expected title suffix to fit within maxWidth, got %q (%d wide)", line, ansi.StringWidth(line))
 	}
 }
 
