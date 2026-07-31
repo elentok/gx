@@ -94,6 +94,16 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		CherryPickInProgress: func(dir string) (bool, error) {
 			return false, nil
 		},
+		AgentSendKeys: func(target string, keys ...string) error {
+			return nil
+		},
+		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
+			return 0, false, nil
+		},
+		ResumeSignaled: func(path string) (bool, error) {
+			return true, nil
+		},
+		Sleep: func(time.Duration) {},
 	}
 	return d, &promptsSlice, &removedSlice
 }

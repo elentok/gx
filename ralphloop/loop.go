@@ -3,15 +3,29 @@ package ralphloop
 import (
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
 
+// defaultScratchDir is the ticket tracker directory used when
+// RunOptions.ScratchDir (or Resume's scratchDir) is unset.
+const defaultScratchDir = ".scratch"
+
 // defaultMaxParallel is how many iterations run concurrently when
 // RunOptions.MaxParallel is unset.
 const defaultMaxParallel = 2
+
+// defaultSmartZone is the context-token ceiling used when
+// RunOptions.SmartZone is unset.
+const defaultSmartZone = 150_000
+
+// smartZonePollMs bounds each "wait for the agent to finish" poll tick, so a
+// running iteration's context occupancy is checked against --smart-zone at
+// roughly this cadence instead of only once the agent settles.
+const smartZonePollMs = 30_000
 
 // RunOptions configures a single `gx ralph-loop {epic-name}` invocation.
 type RunOptions struct {
@@ -20,6 +34,7 @@ type RunOptions struct {
 	ScratchDir  string // defaults to ".scratch"
 	RepoDir     string // repo root passed as the herdr workspace/worktree cwd
 	MaxParallel int    // defaults to defaultMaxParallel; how many iterations run concurrently
+	SmartZone   int    // defaults to defaultSmartZone; context-token ceiling before pausing an iteration
 }
 
 // Run drives every unblocked ticket in the named epic to completion, up to
@@ -34,11 +49,15 @@ type RunOptions struct {
 func Run(opts RunOptions, d Deps, out io.Writer) error {
 	scratchDir := opts.ScratchDir
 	if scratchDir == "" {
-		scratchDir = ".scratch"
+		scratchDir = defaultScratchDir
 	}
 	maxParallel := opts.MaxParallel
 	if maxParallel <= 0 {
 		maxParallel = defaultMaxParallel
+	}
+	smartZone := opts.SmartZone
+	if smartZone <= 0 {
+		smartZone = defaultSmartZone
 	}
 
 	initial, err := loadNamedEpic(scratchDir, opts.EpicName)
@@ -75,9 +94,19 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 	// ticket. featureMu guards the one operation that mutates the shared
 	// feature worktree's working directory (the cherry-pick landing a
 	// finished iteration's commits), so concurrent iterations never cherry-
-	// pick into it at the same time.
+	// pick into it at the same time. outMu guards out itself, since a paused
+	// iteration reports its pause/resume from its own goroutine.
 	var scheduleMu sync.Mutex
 	var featureMu sync.Mutex
+	var outMu sync.Mutex
+	report := func(format string, args ...any) {
+		outMu.Lock()
+		defer outMu.Unlock()
+		fmt.Fprintf(out, format, args...)
+	}
+
+	gate := newPauseGate()
+	resumePath := resumeSignalPath(scratchDir, opts.EpicName)
 
 	type outcome struct {
 		ticket tickets.Ticket
@@ -87,10 +116,15 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 
 	// claimNext claims and returns the next frontier ticket, or ok=false if
 	// none is available right now (every remaining ticket is blocked,
-	// already claimed by a running iteration, or the epic is done).
+	// already claimed by a running iteration, the loop is paused on a
+	// smart-zone breach, or the epic is done).
 	claimNext := func() (ticket tickets.Ticket, ok bool, err error) {
 		scheduleMu.Lock()
 		defer scheduleMu.Unlock()
+
+		if gate.isPaused() {
+			return tickets.Ticket{}, false, nil
+		}
 
 		epic, err := loadNamedEpic(scratchDir, opts.EpicName)
 		if err != nil {
@@ -110,13 +144,17 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 	launch := func(ticket tickets.Ticket) {
 		go func() {
 			err := runIteration(d, iterationParams{
-				WorkspaceID:     workspaceID,
-				RepoDir:         opts.RepoDir,
-				FeatureWorktree: featureWT.Path,
-				FeatureBranch:   opts.EpicName,
-				Skill:           opts.Skill,
-				Ticket:          ticket,
-				FeatureLock:     &featureMu,
+				WorkspaceID:      workspaceID,
+				RepoDir:          opts.RepoDir,
+				FeatureWorktree:  featureWT.Path,
+				FeatureBranch:    opts.EpicName,
+				Skill:            opts.Skill,
+				Ticket:           ticket,
+				FeatureLock:      &featureMu,
+				SmartZone:        smartZone,
+				Gate:             gate,
+				ResumeSignalPath: resumePath,
+				Report:           report,
 			})
 			results <- outcome{ticket: ticket, err: err}
 		}()
@@ -146,6 +184,9 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 		}
 
 		if active == 0 {
+			if gate.isPaused() {
+				return fmt.Errorf("epic %q paused with no running iterations left: %v", opts.EpicName, gate.snapshot())
+			}
 			return fmt.Errorf("epic %q has no unblocked tickets left but isn't all done; check for a stuck ticket", opts.EpicName)
 		}
 
@@ -159,11 +200,11 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 			return fmt.Errorf("ticket %02d: %w", r.ticket.Number, r.err)
 		}
 
-		fmt.Fprintf(out, "ticket %02d %q landed on %s\n", r.ticket.Number, r.ticket.Title, opts.EpicName)
+		report("ticket %02d %q landed on %s\n", r.ticket.Number, r.ticket.Title, opts.EpicName)
 		completed++
 	}
 
-	fmt.Fprintf(out, "ralph-loop %q complete: %d ticket(s) landed on %s\n", opts.EpicName, completed, opts.EpicName)
+	report("ralph-loop %q complete: %d ticket(s) landed on %s\n", opts.EpicName, completed, opts.EpicName)
 	return nil
 }
 
@@ -202,6 +243,36 @@ type iterationParams struct {
 	// commits onto it), so concurrently-running iterations never do so at
 	// the same time.
 	FeatureLock *sync.Mutex
+
+	// SmartZone is the context-token ceiling before an iteration (or its
+	// conflict-resolution agent) gets paused.
+	SmartZone int
+	// Gate is the pause/resume coordinator shared by every iteration in this
+	// Run call.
+	Gate *pauseGate
+	// ResumeSignalPath is where a paused iteration polls for `gx ralph-loop
+	// resume`.
+	ResumeSignalPath string
+	// Report writes a line to the loop's output, safe to call concurrently
+	// from any iteration's goroutine.
+	Report func(format string, args ...any)
+}
+
+// launchAndPromptParams builds the launchAndPrompt call for one pane in this
+// iteration (the iteration's own pane, or its conflict-resolution pane),
+// carrying over the smart-zone guardrail fields every pane in an iteration
+// shares.
+func (p iterationParams) launchAndPromptParams(label, pane, prompt, sessionCwd string) launchAndPromptParams {
+	return launchAndPromptParams{
+		Label:            label,
+		Pane:             pane,
+		Prompt:           prompt,
+		SessionCwd:       sessionCwd,
+		SmartZone:        p.SmartZone,
+		Gate:             p.Gate,
+		ResumeSignalPath: p.ResumeSignalPath,
+		Report:           p.Report,
+	}
 }
 
 // runIteration drives one ticket through the full iteration lifecycle:
@@ -231,11 +302,8 @@ func runIteration(d Deps, p iterationParams) error {
 	}
 
 	prompt := fmt.Sprintf("/%s %s", p.Skill, p.Ticket.Path)
-	if err := launchAndPrompt(d, launchAndPromptParams{
-		Label:  label,
-		Pane:   iterWT.PaneID,
-		Prompt: prompt,
-	}); err != nil {
+	launchParams := p.launchAndPromptParams(label, iterWT.PaneID, prompt, iterWT.Path)
+	if err := launchAndPrompt(d, launchParams); err != nil {
 		return err
 	}
 
@@ -324,12 +392,9 @@ func resolveCherryPickConflict(d Deps, p iterationParams) error {
 		return fmt.Errorf("creating conflict-resolution pane: %w", err)
 	}
 
-	if err := launchAndPrompt(d, launchAndPromptParams{
-		Label:           label,
-		Pane:            tab.RootPaneID,
-		Prompt:          "/resolving-merge-conflicts",
-		FinishTimeoutMs: conflictResolutionTimeoutMs,
-	}); err != nil {
+	launchParams := p.launchAndPromptParams(label, tab.RootPaneID, "/resolving-merge-conflicts", p.FeatureWorktree)
+	launchParams.FinishTimeoutMs = conflictResolutionTimeoutMs
+	if err := launchAndPrompt(d, launchParams); err != nil {
 		return fmt.Errorf("conflict-resolution agent %s did not finish (possibly stuck): %w", label, err)
 	}
 
@@ -346,17 +411,40 @@ type launchAndPromptParams struct {
 	// a stuck agent surfaces as a distinct error instead of blocking forever.
 	// Zero means wait indefinitely.
 	FinishTimeoutMs int
+
+	// SessionCwd is the cwd Pane's claude was launched in, i.e. where its
+	// Claude Code transcript is filed under ~/.claude/projects/<slug>/.
+	SessionCwd string
+	// SmartZone is the context-token ceiling before this agent gets paused.
+	SmartZone int
+	// Gate is the pause/resume coordinator shared across the whole Run call.
+	Gate *pauseGate
+	// ResumeSignalPath is where a paused agent polls for `gx ralph-loop
+	// resume`.
+	ResumeSignalPath string
+	// Report writes a line to the loop's output, safe to call concurrently.
+	Report func(format string, args ...any)
+}
+
+func (p launchAndPromptParams) report(format string, args ...any) {
+	if p.Report == nil {
+		return
+	}
+	p.Report(format, args...)
 }
 
 // launchAndPrompt runs the shared agent lifecycle protocol: launch claude in
 // Pane, wait for it to reach idle, send Prompt and wait for it to start
-// working, then wait for it to finish (idle or done).
+// working, then wait for it to finish (idle or done) — pausing the whole
+// loop via Gate if this agent's context occupancy breaches SmartZone before
+// it finishes.
 func launchAndPrompt(d Deps, p launchAndPromptParams) error {
-	if _, err := d.AgentStart(herdr.AgentStartOptions{
+	agent, err := d.AgentStart(herdr.AgentStartOptions{
 		Name: p.Label,
 		Kind: "claude",
 		Pane: p.Pane,
-	}); err != nil {
+	})
+	if err != nil {
 		return fmt.Errorf("launching claude: %w", err)
 	}
 
@@ -376,15 +464,73 @@ func launchAndPrompt(d Deps, p launchAndPromptParams) error {
 		return fmt.Errorf("sending initial prompt: %w", err)
 	}
 
-	if _, err := d.AgentWait(herdr.AgentWaitOptions{
-		Target:    p.Pane,
-		Until:     []string{"idle", "done"},
-		TimeoutMs: p.FinishTimeoutMs,
-	}); err != nil {
-		return fmt.Errorf("waiting for agent to finish: %w", err)
+	return waitForFinish(d, p, agent.AgentSession)
+}
+
+// waitForFinish polls Pane until it reaches idle or done, checking the
+// session's current context occupancy against SmartZone on every poll tick
+// that times out rather than settling. A breach interrupts the pane (Ctrl-C,
+// not killed), pauses the whole loop via Gate, and blocks here until a `gx
+// ralph-loop resume` signal arrives — at which point it re-enters this same
+// wait rather than assuming the pause fixed anything.
+func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
+	smartZone := p.SmartZone
+	if smartZone <= 0 {
+		smartZone = defaultSmartZone
 	}
 
-	return nil
+	elapsedMs := 0
+	for {
+		pollMs := smartZonePollMs
+		if p.FinishTimeoutMs > 0 {
+			remaining := p.FinishTimeoutMs - elapsedMs
+			if remaining <= 0 {
+				return fmt.Errorf("waiting for agent to finish: timed out after %dms", p.FinishTimeoutMs)
+			}
+			if remaining < pollMs {
+				pollMs = remaining
+			}
+		}
+
+		_, err := d.AgentWait(herdr.AgentWaitOptions{
+			Target:    p.Pane,
+			Until:     []string{"idle", "done"},
+			TimeoutMs: pollMs,
+		})
+		if err == nil {
+			return nil
+		}
+		if !isPollTimeout(err) {
+			return fmt.Errorf("waiting for agent to finish: %w", err)
+		}
+		elapsedMs += pollMs
+
+		if sessionID == "" {
+			continue // no session id to check a transcript against yet
+		}
+		occupancy, ok, occErr := d.ReadOccupancy(p.SessionCwd, sessionID)
+		if occErr != nil || !ok || occupancy <= smartZone {
+			continue
+		}
+
+		if err := d.AgentSendKeys(p.Pane, "ctrl-c"); err != nil {
+			return fmt.Errorf("interrupting %s after smart-zone breach: %w", p.Label, err)
+		}
+		reason := fmt.Sprintf("context occupancy %d exceeds --smart-zone %d", occupancy, smartZone)
+		p.Gate.pause(p.Label, reason)
+		p.report("paused %s: %s; run `gx ralph-loop resume` to continue\n", p.Label, reason)
+		p.Gate.waitForResume(d, p.ResumeSignalPath)
+		p.report("resumed %s\n", p.Label)
+		elapsedMs = 0
+	}
+}
+
+// isPollTimeout reports whether err looks like AgentWait's own
+// timeout-elapsed failure (herdr's "timed out waiting for agent status"),
+// as opposed to a genuine failure that should abort the loop instead of
+// looping back for another poll tick.
+func isPollTimeout(err error) bool {
+	return err != nil && strings.Contains(strings.ToLower(err.Error()), "timed out")
 }
 
 func iterLabel(ticketNumber int) string {

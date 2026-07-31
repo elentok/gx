@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -53,7 +54,38 @@ func SetStatus(path, value string) error {
 		lines = append(lines[:insertAt:insertAt], append(insertion, lines[insertAt:]...)...)
 	}
 
-	return os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0644)
+	return writeFileAtomic(path, []byte(strings.Join(lines, "\n")))
+}
+
+// writeFileAtomic replaces path's content via a same-directory temp file
+// plus rename, so a concurrent reader (the scheduler re-scanning the
+// frontier while another goroutine claims/completes a ticket) always sees
+// either the old or the new content in full, never a torn/truncated write
+// from an in-place os.WriteFile.
+func writeFileAtomic(path string, data []byte) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		os.Remove(tmpPath)
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+	if err := os.Chmod(tmpPath, 0644); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+	return nil
 }
 
 func formatStatusLine(value string, bold bool) string {
