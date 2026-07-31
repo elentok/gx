@@ -141,9 +141,9 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 		return ticket, true, nil
 	}
 
-	launch := func(ticket tickets.Ticket) {
+	launch := func(ticket tickets.Ticket, reattach bool) {
 		go func() {
-			err := runIteration(d, iterationParams{
+			params := iterationParams{
 				WorkspaceID:      workspaceID,
 				RepoDir:          opts.RepoDir,
 				FeatureWorktree:  featureWT.Path,
@@ -155,13 +155,29 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 				Gate:             gate,
 				ResumeSignalPath: resumePath,
 				Report:           report,
-			})
+			}
+			var err error
+			if reattach {
+				err = reattachIteration(d, params)
+			} else {
+				err = runIteration(d, params)
+			}
 			results <- outcome{ticket: ticket, err: err}
 		}()
 	}
 
 	completed := 0
 	active := 0
+
+	reattached, err := reconcile(d, workspaceID, *initial, report)
+	if err != nil {
+		return err
+	}
+	for _, ticket := range reattached {
+		launch(ticket, true)
+		active++
+	}
+
 	for {
 		epic, err := loadNamedEpic(scratchDir, opts.EpicName)
 		if err != nil {
@@ -179,7 +195,7 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 			if !ok {
 				break
 			}
-			launch(ticket)
+			launch(ticket, false)
 			active++
 		}
 
@@ -307,6 +323,54 @@ func runIteration(d Deps, p iterationParams) error {
 		return err
 	}
 
+	return finishIteration(d, p, iterWT, base, branch)
+}
+
+// reattachIteration resumes a ticket left `Status: claimed` by a prior
+// crashed/killed invocation whose iter-NN worktree/tab is still alive: it
+// reopens the existing worktree/tab (rather than creating a new one), skips
+// straight to re-entering the "wait for the agent to finish" step (no launch
+// or initial prompt — the agent may already be mid-turn or already done),
+// then continues through the same cherry-pick/mark-done/remove completion
+// path as a fresh iteration. The original base commit is recovered via
+// merge-base against the feature branch rather than the feature branch's
+// current tip, since the feature branch may have advanced past this
+// iteration's original branch point while the prior invocation was down.
+func reattachIteration(d Deps, p iterationParams) error {
+	label := iterLabel(p.Ticket.Number)
+	branch := iterBranch(p.Ticket.Number)
+
+	iterWT, err := d.WorktreeOpen(herdr.WorktreeOpenOptions{
+		WorkspaceID: p.WorkspaceID,
+		Cwd:         p.RepoDir,
+		Branch:      branch,
+		Label:       label,
+	})
+	if err != nil {
+		return fmt.Errorf("reopening iteration worktree: %w", err)
+	}
+
+	base, err := d.MergeBase(iterWT.Path, branch, p.FeatureBranch)
+	if err != nil {
+		return fmt.Errorf("resolving %s's original base: %w", branch, err)
+	}
+
+	// No AgentStart was made this invocation, so there's no fresh
+	// agent_session id to check smart-zone occupancy against; the reattached
+	// wait simply re-observes idle/done without that guardrail.
+	launchParams := p.launchAndPromptParams(label, iterWT.PaneID, "", iterWT.Path)
+	if err := waitForFinish(d, launchParams, ""); err != nil {
+		return fmt.Errorf("waiting for reattached agent %s to finish: %w", label, err)
+	}
+
+	return finishIteration(d, p, iterWT, base, branch)
+}
+
+// finishIteration lands a finished iteration's commits (or marks it
+// needs-info if it produced none), then removes its worktree on success —
+// the shared tail of both the fresh (runIteration) and reattached
+// (reattachIteration) iteration lifecycles.
+func finishIteration(d Deps, p iterationParams, iterWT herdr.Worktree, base, branch string) error {
 	ahead, err := d.CommitsAhead(iterWT.Path, base, branch)
 	if err != nil {
 		return fmt.Errorf("counting commits ahead of %s: %w", base, err)

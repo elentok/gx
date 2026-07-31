@@ -58,6 +58,19 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 				Branch:      opts.Branch,
 			}, nil
 		},
+		WorktreeOpen: func(opts herdr.WorktreeOpenOptions) (herdr.Worktree, error) {
+			wsID := "ws-" + opts.Branch
+			mu.Lock()
+			branchByWorkspace[wsID] = opts.Branch
+			mu.Unlock()
+			return herdr.Worktree{
+				WorkspaceID: wsID,
+				PaneID:      "pane-" + opts.Branch,
+				Path:        "/fake/" + opts.Branch,
+				Branch:      opts.Branch,
+				AlreadyOpen: true,
+			}, nil
+		},
 		WorktreeRemove: func(workspaceID string, force bool) error {
 			mu.Lock()
 			removedSlice = append(removedSlice, branchByWorkspace[workspaceID])
@@ -69,6 +82,9 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 				Tab:        herdr.Tab{Label: opts.Label, WorkspaceID: opts.WorkspaceID},
 				RootPaneID: "pane-" + opts.Label,
 			}, nil
+		},
+		TabList: func(workspaceID string) ([]herdr.Tab, error) {
+			return nil, nil
 		},
 		AgentStart: func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
 			return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle"}, nil
@@ -83,6 +99,9 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 		},
 		RevParse: func(dir, ref string) (string, error) {
+			return "deadbeef", nil
+		},
+		MergeBase: func(dir, refA, refB string) (string, error) {
 			return "deadbeef", nil
 		},
 		CommitsAhead: func(dir, fromExclusive, toRef string) (int, error) {

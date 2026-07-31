@@ -11,6 +11,15 @@ func RevParse(dir, ref string) (string, error) {
 	return out, err
 }
 
+// MergeBase returns the best common ancestor of refA and refB (git
+// merge-base). Unlike resolving a branch's tip at some point in time, this
+// stays correct even after refB has advanced past the point refA branched
+// from.
+func MergeBase(dir, refA, refB string) (string, error) {
+	out, _, err := run(dir, []string{"merge-base", refA, refB})
+	return out, err
+}
+
 // CommitsAhead returns how many commits toRef has that fromExclusive
 // doesn't (git rev-list --count fromExclusive..toRef) — zero means toRef has
 // landed nothing new since fromExclusive.

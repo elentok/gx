@@ -22,6 +22,35 @@ func TestRevParse(t *testing.T) {
 	}
 }
 
+func TestMergeBase_FindsCommonAncestorEvenAfterOtherRefAdvances(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+
+	base, err := git.RevParse(dir, "HEAD")
+	if err != nil {
+		t.Fatalf("RevParse: %v", err)
+	}
+
+	testutil.MustGitExported(t, dir, "checkout", "-b", "iter", base)
+	testutil.WriteFile(t, dir, "a.txt", "a\n")
+	testutil.CommitAll(t, dir, "add a")
+
+	// feature advances past base after iter branched off it, the way the
+	// shared feature branch does while other tickets land during a crashed
+	// invocation's downtime.
+	testutil.MustGitExported(t, dir, "checkout", "-b", "feature", base)
+	testutil.WriteFile(t, dir, "b.txt", "b\n")
+	testutil.CommitAll(t, dir, "add b")
+
+	got, err := git.MergeBase(dir, "iter", "feature")
+	if err != nil {
+		t.Fatalf("MergeBase: %v", err)
+	}
+	if got != base {
+		t.Errorf("MergeBase() = %q, want the original branch point %q", got, base)
+	}
+}
+
 func TestCherryPickRange_AppliesCommitsInOrder(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)

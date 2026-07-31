@@ -17,13 +17,16 @@ import (
 type Deps struct {
 	FindOrCreateWorkspace func(label, cwd string) (string, error)
 	WorktreeCreate        func(opts herdr.WorktreeCreateOptions) (herdr.Worktree, error)
+	WorktreeOpen          func(opts herdr.WorktreeOpenOptions) (herdr.Worktree, error)
 	WorktreeRemove        func(workspaceID string, force bool) error
 	TabCreate             func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error)
+	TabList               func(workspaceID string) ([]herdr.Tab, error)
 	AgentStart            func(opts herdr.AgentStartOptions) (herdr.Agent, error)
 	AgentPrompt           func(opts herdr.AgentPromptOptions) (herdr.Agent, error)
 	AgentWait             func(opts herdr.AgentWaitOptions) (herdr.Agent, error)
 	AgentSendKeys         func(target string, keys ...string) error
 	RevParse              func(dir, ref string) (string, error)
+	MergeBase             func(dir, refA, refB string) (string, error)
 	CommitsAhead          func(dir, fromExclusive, toRef string) (int, error)
 	CherryPickRange       func(dir, fromExclusive, toInclusive string) error
 	CherryPickInProgress  func(dir string) (bool, error)
@@ -44,13 +47,16 @@ func DefaultDeps() Deps {
 	return Deps{
 		FindOrCreateWorkspace: herdr.FindOrCreateWorkspace,
 		WorktreeCreate:        herdr.WorktreeCreate,
+		WorktreeOpen:          herdr.WorktreeOpen,
 		WorktreeRemove:        herdr.WorktreeRemove,
 		TabCreate:             herdr.TabCreate,
+		TabList:               herdr.TabList,
 		AgentStart:            herdr.AgentStart,
 		AgentPrompt:           herdr.AgentPrompt,
 		AgentWait:             herdr.AgentWait,
 		AgentSendKeys:         herdr.AgentSendKeys,
 		RevParse:              git.RevParse,
+		MergeBase:             git.MergeBase,
 		CommitsAhead:          git.CommitsAhead,
 		CherryPickRange:       git.CherryPickRange,
 		CherryPickInProgress:  git.CherryPickInProgress,
