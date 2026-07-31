@@ -37,6 +37,56 @@ func AgentPrompt(opts AgentPromptOptions) (Agent, error) {
 		args = append(args, "--timeout", strconv.Itoa(opts.TimeoutMs))
 	}
 
+	return runAgentJSON(args)
+}
+
+// AgentStartOptions are the arguments/flags for AgentStart.
+type AgentStartOptions struct {
+	Name      string
+	Kind      string // e.g. "claude"
+	Pane      string
+	TimeoutMs int
+}
+
+// AgentStart starts a supported interactive agent (e.g. claude) in an
+// existing pane via `herdr agent start`. The pane must already be at an
+// interactive shell prompt.
+func AgentStart(opts AgentStartOptions) (Agent, error) {
+	args := []string{"agent", "start", opts.Name, "--kind", opts.Kind, "--pane", opts.Pane}
+	if opts.TimeoutMs > 0 {
+		args = append(args, "--timeout", strconv.Itoa(opts.TimeoutMs))
+	}
+
+	return runAgentJSON(args)
+}
+
+// AgentWaitOptions are the arguments/flags for AgentWait.
+type AgentWaitOptions struct {
+	Target    string
+	Until     []string
+	TimeoutMs int
+}
+
+// AgentWait blocks until target reaches one of the requested states (or any
+// of idle/done/blocked if Until is empty) via `herdr agent wait`, without
+// submitting a prompt. Used to wait out an already-working agent's turn,
+// e.g. after AgentPrompt's own --wait only confirmed the turn started.
+func AgentWait(opts AgentWaitOptions) (Agent, error) {
+	args := []string{"agent", "wait", opts.Target}
+	for _, until := range opts.Until {
+		args = append(args, "--until", until)
+	}
+	if opts.TimeoutMs > 0 {
+		args = append(args, "--timeout", strconv.Itoa(opts.TimeoutMs))
+	}
+
+	return runAgentJSON(args)
+}
+
+// runAgentJSON runs a herdr command whose JSON result has a top-level
+// `agent` field of the AgentInfo shape (agent prompt/start/wait all do), and
+// parses it into an Agent.
+func runAgentJSON(args []string) (Agent, error) {
 	var result struct {
 		Agent struct {
 			PaneID       string `json:"pane_id"`
