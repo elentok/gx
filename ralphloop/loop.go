@@ -3,17 +3,23 @@ package ralphloop
 import (
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
 
+// defaultMaxParallel is how many iterations run concurrently when
+// RunOptions.MaxParallel is unset.
+const defaultMaxParallel = 2
+
 // RunOptions configures a single `gx ralph-loop {epic-name}` invocation.
 type RunOptions struct {
-	EpicName   string
-	Skill      string // slash-command skill each iteration invokes, e.g. "implement"
-	ScratchDir string // defaults to ".scratch"
-	RepoDir    string // repo root passed as the herdr workspace/worktree cwd
+	EpicName    string
+	Skill       string // slash-command skill each iteration invokes, e.g. "implement"
+	ScratchDir  string // defaults to ".scratch"
+	RepoDir     string // repo root passed as the herdr workspace/worktree cwd
+	MaxParallel int    // defaults to defaultMaxParallel; how many iterations run concurrently
 }
 
 // Run drives every unblocked ticket in the named epic to completion, one
@@ -27,6 +33,10 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 	scratchDir := opts.ScratchDir
 	if scratchDir == "" {
 		scratchDir = ".scratch"
+	}
+	maxParallel := opts.MaxParallel
+	if maxParallel <= 0 {
+		maxParallel = defaultMaxParallel
 	}
 
 	initial, err := loadNamedEpic(scratchDir, opts.EpicName)
@@ -58,38 +68,96 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 		return fmt.Errorf("creating feature worktree for branch %q: %w", opts.EpicName, err)
 	}
 
+	// scheduleMu guards reading the frontier and claiming a ticket, so two
+	// concurrently-running iterations never race each other onto the same
+	// ticket. featureMu guards the one operation that mutates the shared
+	// feature worktree's working directory (the cherry-pick landing a
+	// finished iteration's commits), so concurrent iterations never cherry-
+	// pick into it at the same time.
+	var scheduleMu sync.Mutex
+	var featureMu sync.Mutex
+
+	type outcome struct {
+		ticket tickets.Ticket
+		err    error
+	}
+	results := make(chan outcome)
+
+	// claimNext claims and returns the next frontier ticket, or ok=false if
+	// none is available right now (every remaining ticket is blocked,
+	// already claimed by a running iteration, or the epic is done).
+	claimNext := func() (ticket tickets.Ticket, ok bool, err error) {
+		scheduleMu.Lock()
+		defer scheduleMu.Unlock()
+
+		epic, err := loadNamedEpic(scratchDir, opts.EpicName)
+		if err != nil {
+			return tickets.Ticket{}, false, err
+		}
+		frontier := Frontier(*epic)
+		if len(frontier) == 0 {
+			return tickets.Ticket{}, false, nil
+		}
+		ticket = frontier[0]
+		if err := Claim(ticket.Path); err != nil {
+			return tickets.Ticket{}, false, fmt.Errorf("claiming ticket %d: %w", ticket.Number, err)
+		}
+		return ticket, true, nil
+	}
+
+	launch := func(ticket tickets.Ticket) {
+		go func() {
+			err := runIteration(d, iterationParams{
+				WorkspaceID:     workspaceID,
+				RepoDir:         opts.RepoDir,
+				FeatureWorktree: featureWT.Path,
+				FeatureBranch:   opts.EpicName,
+				Skill:           opts.Skill,
+				Ticket:          ticket,
+				FeatureLock:     &featureMu,
+			})
+			results <- outcome{ticket: ticket, err: err}
+		}()
+	}
+
 	completed := 0
+	active := 0
 	for {
 		epic, err := loadNamedEpic(scratchDir, opts.EpicName)
 		if err != nil {
 			return err
 		}
-		if epic.AllDone() {
+		if epic.AllDone() && active == 0 {
 			break
 		}
 
-		frontier := Frontier(*epic)
-		if len(frontier) == 0 {
+		for active < maxParallel {
+			ticket, ok, err := claimNext()
+			if err != nil {
+				return err
+			}
+			if !ok {
+				break
+			}
+			launch(ticket)
+			active++
+		}
+
+		if active == 0 {
 			return fmt.Errorf("epic %q has no unblocked tickets left but isn't all done; check for a stuck ticket", opts.EpicName)
 		}
-		ticket := frontier[0]
 
-		if err := Claim(ticket.Path); err != nil {
-			return fmt.Errorf("claiming ticket %d: %w", ticket.Number, err)
+		r := <-results
+		active--
+		if r.err != nil {
+			for active > 0 {
+				<-results
+				active--
+			}
+			return fmt.Errorf("ticket %02d: %w", r.ticket.Number, r.err)
 		}
 
-		if err := runIteration(d, iterationParams{
-			WorkspaceID:     workspaceID,
-			RepoDir:         opts.RepoDir,
-			FeatureWorktree: featureWT.Path,
-			FeatureBranch:   opts.EpicName,
-			Skill:           opts.Skill,
-			Ticket:          ticket,
-		}); err != nil {
-			return fmt.Errorf("ticket %02d: %w", ticket.Number, err)
-		}
-
-		fmt.Fprintf(out, "ticket %02d %q landed on %s\n", ticket.Number, ticket.Title, opts.EpicName)
+		fmt.Fprintf(out, "ticket %02d %q landed on %s\n", r.ticket.Number, r.ticket.Title, opts.EpicName)
 		completed++
 	}
 
@@ -105,6 +173,11 @@ type iterationParams struct {
 	FeatureBranch   string
 	Skill           string
 	Ticket          tickets.Ticket
+	// FeatureLock serializes the only step that mutates the shared feature
+	// worktree's working directory (cherry-picking a finished iteration's
+	// commits onto it), so concurrently-running iterations never do so at
+	// the same time.
+	FeatureLock *sync.Mutex
 }
 
 // runIteration drives one ticket through the full iteration lifecycle:
@@ -163,7 +236,10 @@ func runIteration(d Deps, p iterationParams) error {
 		return fmt.Errorf("waiting for agent to finish: %w", err)
 	}
 
-	if err := d.CherryPickRange(p.FeatureWorktree, base, branch); err != nil {
+	p.FeatureLock.Lock()
+	err = d.CherryPickRange(p.FeatureWorktree, base, branch)
+	p.FeatureLock.Unlock()
+	if err != nil {
 		return fmt.Errorf("cherry-picking onto %s: %w", p.FeatureBranch, err)
 	}
 

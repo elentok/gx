@@ -5,7 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/herdr"
 )
@@ -30,9 +32,12 @@ func writeEpic(t *testing.T, epicName string, tickets map[string]string) string 
 
 // fakeDeps returns a Deps wired to in-memory fakes plus a record of prompt
 // texts sent (in call order) and worktree branches removed, for assertions.
+// All fake operations are safe to call concurrently, since Run may run
+// multiple iterations in parallel.
 func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
-	prompts = &[]string{}
-	removedBranches = &[]string{}
+	var mu sync.Mutex
+	promptsSlice := []string{}
+	removedSlice := []string{}
 	branchByWorkspace := map[string]string{}
 
 	d = Deps{
@@ -41,7 +46,9 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		},
 		WorktreeCreate: func(opts herdr.WorktreeCreateOptions) (herdr.Worktree, error) {
 			wsID := "ws-" + opts.Branch
+			mu.Lock()
 			branchByWorkspace[wsID] = opts.Branch
+			mu.Unlock()
 			return herdr.Worktree{
 				WorkspaceID: wsID,
 				PaneID:      "pane-" + opts.Branch,
@@ -50,14 +57,18 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 			}, nil
 		},
 		WorktreeRemove: func(workspaceID string, force bool) error {
-			*removedBranches = append(*removedBranches, branchByWorkspace[workspaceID])
+			mu.Lock()
+			removedSlice = append(removedSlice, branchByWorkspace[workspaceID])
+			mu.Unlock()
 			return nil
 		},
 		AgentStart: func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
 			return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle"}, nil
 		},
 		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			*prompts = append(*prompts, opts.Text)
+			mu.Lock()
+			promptsSlice = append(promptsSlice, opts.Text)
+			mu.Unlock()
 			return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
 		},
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
@@ -70,7 +81,7 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 			return nil
 		},
 	}
-	return d, prompts, removedBranches
+	return d, &promptsSlice, &removedSlice
 }
 
 func TestRun_LinearChain_RunsTicketsInOrderAndLandsAll(t *testing.T) {
@@ -159,5 +170,119 @@ func TestRun_NoEpicFound_NoOpSummary(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "nothing to do") {
 		t.Errorf("summary output = %q, want a nothing-to-do message", out.String())
+	}
+}
+
+func TestRun_MaxParallelOne_RunsSerially(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "# A\n\n**Status:** open\n",
+		"02-b.md": "# B\n\n**Status:** open\n",
+		"03-c.md": "# C\n\n**Status:** open\n",
+	})
+	d, prompts, _ := fakeDeps()
+
+	var out bytes.Buffer
+	err := Run(RunOptions{
+		EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
+		MaxParallel: 1,
+	}, d, &out)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	wantOrder := []string{"01-a.md", "02-b.md", "03-c.md"}
+	if len(*prompts) != len(wantOrder) {
+		t.Fatalf("prompts = %v, want %d prompts", *prompts, len(wantOrder))
+	}
+	for i, name := range wantOrder {
+		if !strings.HasSuffix((*prompts)[i], name) {
+			t.Errorf("prompts[%d] = %q, want suffix %q (serial, ticket-number order)", i, (*prompts)[i], name)
+		}
+	}
+}
+
+// gatedAgentWait wraps a fakeDeps' AgentWait so that only the "wait for the
+// agent to finish" call (the one whose Until includes "done") blocks until
+// released, letting a test control exactly when each iteration completes and
+// observe how many run concurrently in between.
+func gatedAgentWait(next func(herdr.AgentWaitOptions) (herdr.Agent, error)) (
+	wait func(herdr.AgentWaitOptions) (herdr.Agent, error),
+	started <-chan string,
+	release func(pane string),
+) {
+	var mu sync.Mutex
+	gates := map[string]chan struct{}{}
+	startedCh := make(chan string, 16)
+
+	wait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+		isFinish := false
+		for _, u := range opts.Until {
+			if u == "done" {
+				isFinish = true
+			}
+		}
+		if !isFinish {
+			return next(opts)
+		}
+
+		gate := make(chan struct{})
+		mu.Lock()
+		gates[opts.Target] = gate
+		mu.Unlock()
+
+		startedCh <- opts.Target
+		<-gate
+		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+	}
+
+	release = func(pane string) {
+		mu.Lock()
+		gate := gates[pane]
+		mu.Unlock()
+		close(gate)
+	}
+
+	return wait, startedCh, release
+}
+
+func TestRun_MaxParallelTwo_RunsExactlyTwoConcurrentlyAndBackfills(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "# A\n\n**Status:** open\n",
+		"02-b.md": "# B\n\n**Status:** open\n",
+		"03-c.md": "# C\n\n**Status:** open\n",
+	})
+	d, _, removed := fakeDeps()
+	wait, started, release := gatedAgentWait(d.AgentWait)
+	d.AgentWait = wait
+
+	var out bytes.Buffer
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- Run(RunOptions{
+			EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
+			MaxParallel: 2,
+		}, d, &out)
+	}()
+
+	pane1 := <-started
+	pane2 := <-started
+
+	select {
+	case pane3 := <-started:
+		t.Fatalf("a third iteration started with only 2 slots and both full: %s", pane3)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	release(pane1)
+	pane3 := <-started // backfilled without waiting for pane2
+
+	release(pane2)
+	release(pane3)
+
+	if err := <-errCh; err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if len(*removed) != 3 {
+		t.Errorf("removed worktree branches = %v, want 3 entries", *removed)
 	}
 }
