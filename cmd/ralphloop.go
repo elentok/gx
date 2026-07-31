@@ -12,7 +12,7 @@ func newRalphLoopCmd(d deps) *cobra.Command {
 	var maxParallel int
 	cmd := &cobra.Command{
 		Use:   "ralph-loop <epic-name>",
-		Short: "drive Claude Code agents through a to-tickets epic, one iteration worktree at a time",
+		Short: "drive Claude Code agents through a to-tickets epic, up to --max-parallel at a time",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			return runRalphLoop(args[0], skill, maxParallel, d)

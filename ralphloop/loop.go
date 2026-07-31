@@ -22,13 +22,15 @@ type RunOptions struct {
 	MaxParallel int    // defaults to defaultMaxParallel; how many iterations run concurrently
 }
 
-// Run drives every unblocked ticket in the named epic to completion, one
-// iteration worktree at a time: create the iteration worktree, launch
-// claude, send the initial "/{skill} <ticket-path>" prompt, wait for it to
-// finish, cherry-pick its commits onto the feature branch, mark the ticket
-// done, and remove the iteration worktree. It exits once every ticket in the
-// epic reaches a done-family status, or immediately if the epic has none to
-// run.
+// Run drives every unblocked ticket in the named epic to completion, up to
+// MaxParallel running concurrently, each in its own iteration worktree:
+// create the iteration worktree, launch claude, send the initial
+// "/{skill} <ticket-path>" prompt, wait for it to finish, cherry-pick its
+// commits onto the feature branch, mark the ticket done, and remove the
+// iteration worktree. As soon as one iteration finishes, a freed slot is
+// backfilled with the next frontier ticket. It exits once every ticket in
+// the epic reaches a done-family status, or immediately if the epic has none
+// to run.
 func Run(opts RunOptions, d Deps, out io.Writer) error {
 	scratchDir := opts.ScratchDir
 	if scratchDir == "" {
