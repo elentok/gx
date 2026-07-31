@@ -77,4 +77,25 @@ func TestCherryPickRange_ConflictReturnsError(t *testing.T) {
 	if err := git.CherryPickRange(dir, base, tip); err == nil {
 		t.Fatal("CherryPickRange() error = nil, want conflict error")
 	}
+
+	inProgress, err := git.CherryPickInProgress(dir)
+	if err != nil {
+		t.Fatalf("CherryPickInProgress: %v", err)
+	}
+	if !inProgress {
+		t.Error("CherryPickInProgress() = false, want true while mid-conflict")
+	}
+}
+
+func TestCherryPickInProgress_FalseOutsideCherryPick(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+
+	inProgress, err := git.CherryPickInProgress(dir)
+	if err != nil {
+		t.Fatalf("CherryPickInProgress: %v", err)
+	}
+	if inProgress {
+		t.Error("CherryPickInProgress() = true, want false outside a cherry-pick")
+	}
 }

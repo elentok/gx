@@ -13,11 +13,13 @@ type Deps struct {
 	FindOrCreateWorkspace func(label, cwd string) (string, error)
 	WorktreeCreate        func(opts herdr.WorktreeCreateOptions) (herdr.Worktree, error)
 	WorktreeRemove        func(workspaceID string, force bool) error
+	TabCreate             func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error)
 	AgentStart            func(opts herdr.AgentStartOptions) (herdr.Agent, error)
 	AgentPrompt           func(opts herdr.AgentPromptOptions) (herdr.Agent, error)
 	AgentWait             func(opts herdr.AgentWaitOptions) (herdr.Agent, error)
 	RevParse              func(dir, ref string) (string, error)
 	CherryPickRange       func(dir, fromExclusive, toInclusive string) error
+	CherryPickInProgress  func(dir string) (bool, error)
 }
 
 // DefaultDeps wires Deps to the real herdr and git packages.
@@ -26,10 +28,12 @@ func DefaultDeps() Deps {
 		FindOrCreateWorkspace: herdr.FindOrCreateWorkspace,
 		WorktreeCreate:        herdr.WorktreeCreate,
 		WorktreeRemove:        herdr.WorktreeRemove,
+		TabCreate:             herdr.TabCreate,
 		AgentStart:            herdr.AgentStart,
 		AgentPrompt:           herdr.AgentPrompt,
 		AgentWait:             herdr.AgentWait,
 		RevParse:              git.RevParse,
 		CherryPickRange:       git.CherryPickRange,
+		CherryPickInProgress:  git.CherryPickInProgress,
 	}
 }

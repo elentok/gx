@@ -14,3 +14,16 @@ func CherryPickRange(dir, fromExclusive, toInclusive string) error {
 	_, _, err := run(dir, []string{"cherry-pick", fromExclusive + ".." + toInclusive})
 	return err
 }
+
+// CherryPickInProgress reports whether dir has a cherry-pick sequence
+// currently stopped on a conflict (CHERRY_PICK_HEAD present).
+func CherryPickInProgress(dir string) (bool, error) {
+	_, _, err := run(dir, []string{"rev-parse", "-q", "--verify", "CHERRY_PICK_HEAD"})
+	if err != nil {
+		if _, ok := err.(*RunError); ok {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}

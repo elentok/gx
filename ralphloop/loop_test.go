@@ -2,8 +2,10 @@ package ralphloop
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -62,6 +64,12 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 			mu.Unlock()
 			return nil
 		},
+		TabCreate: func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error) {
+			return herdr.CreatedTab{
+				Tab:        herdr.Tab{Label: opts.Label, WorkspaceID: opts.WorkspaceID},
+				RootPaneID: "pane-" + opts.Label,
+			}, nil
+		},
 		AgentStart: func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
 			return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle"}, nil
 		},
@@ -79,6 +87,9 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		},
 		CherryPickRange: func(dir, fromExclusive, toInclusive string) error {
 			return nil
+		},
+		CherryPickInProgress: func(dir string) (bool, error) {
+			return false, nil
 		},
 	}
 	return d, &promptsSlice, &removedSlice
@@ -244,6 +255,136 @@ func gatedAgentWait(next func(herdr.AgentWaitOptions) (herdr.Agent, error)) (
 
 	return wait, startedCh, release
 }
+
+func TestRun_CherryPickConflict_ResolvesInFeatureWorktreeThenCompletes(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "# A\n\n**Status:** open\n",
+	})
+	d, prompts, removed := fakeDeps()
+
+	var mu sync.Mutex
+	var picks int
+	var conflictPane, iterPane string
+	var conflictPaneRemovedBefore bool
+
+	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
+		mu.Lock()
+		defer mu.Unlock()
+		picks++
+		if picks == 1 {
+			return &fakeConflictErr{}
+		}
+		return nil
+	}
+
+	inProgress := true
+	d.CherryPickInProgress = func(dir string) (bool, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		return inProgress, nil
+	}
+
+	origTabCreate := d.TabCreate
+	d.TabCreate = func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error) {
+		mu.Lock()
+		conflictPane = "pane-" + opts.Label
+		mu.Unlock()
+		return origTabCreate(opts)
+	}
+
+	origAgentPrompt := d.AgentPrompt
+	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+		if opts.Text == "/resolving-merge-conflicts" {
+			mu.Lock()
+			inProgress = false // resolution "commits", ending the cherry-pick sequence
+			mu.Unlock()
+		} else {
+			mu.Lock()
+			iterPane = opts.Target
+			mu.Unlock()
+		}
+		return origAgentPrompt(opts)
+	}
+
+	origWorktreeRemove := d.WorktreeRemove
+	d.WorktreeRemove = func(workspaceID string, force bool) error {
+		mu.Lock()
+		if conflictPane == "" {
+			conflictPaneRemovedBefore = true
+		}
+		mu.Unlock()
+		return origWorktreeRemove(workspaceID, force)
+	}
+
+	var out bytes.Buffer
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if conflictPane == "" {
+		t.Fatal("expected a conflict-resolution pane to be created")
+	}
+	if conflictPane == iterPane {
+		t.Errorf("conflict-resolution pane %q must differ from the iteration pane %q (must run in the feature worktree)", conflictPane, iterPane)
+	}
+	if conflictPaneRemovedBefore {
+		t.Error("iteration worktree was removed before the conflict-resolution pane was created")
+	}
+
+	if !slices.Contains(*prompts, "/resolving-merge-conflicts") {
+		t.Errorf("prompts = %v, want a /resolving-merge-conflicts prompt", *prompts)
+	}
+
+	if len(*removed) != 1 {
+		t.Errorf("removed worktree branches = %v, want the iteration worktree removed after resolution", *removed)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw), "Status:** done") {
+		t.Errorf("ticket not marked done after conflict resolution:\n%s", raw)
+	}
+}
+
+func TestRun_CherryPickConflict_ResolutionNeverFinishes_SurfacesDistinctError(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "# A\n\n**Status:** open\n",
+	})
+	d, _, _ := fakeDeps()
+
+	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
+		return &fakeConflictErr{}
+	}
+	d.CherryPickInProgress = func(dir string) (bool, error) {
+		return true, nil // conflict never resolves
+	}
+	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+		isFinish := slices.Contains(opts.Until, "done")
+		isConflictPane := strings.HasPrefix(opts.Target, "pane-conflict-")
+		if isFinish && isConflictPane {
+			return herdr.Agent{}, errors.New("timeout waiting for agent")
+		}
+		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+	}
+
+	var out bytes.Buffer
+	err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out)
+	if err == nil {
+		t.Fatal("Run() error = nil, want an error surfacing the stuck conflict-resolution agent")
+	}
+	if !strings.Contains(err.Error(), "did not finish") {
+		t.Errorf("Run() error = %v, want it to call out the conflict-resolution agent not finishing", err)
+	}
+}
+
+// fakeConflictErr stands in for the *git.RunError CherryPickRange returns on
+// a real conflict; only its presence (not its type) matters to the loop,
+// which distinguishes conflicts from other errors via CherryPickInProgress.
+type fakeConflictErr struct{}
+
+func (e *fakeConflictErr) Error() string { return "cherry-pick conflict" }
 
 func TestRun_MaxParallelTwo_RunsExactlyTwoConcurrentlyAndBackfills(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{

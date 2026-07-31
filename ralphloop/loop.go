@@ -206,43 +206,20 @@ func runIteration(d Deps, p iterationParams) error {
 		return fmt.Errorf("creating iteration worktree: %w", err)
 	}
 
-	if _, err := d.AgentStart(herdr.AgentStartOptions{
-		Name: label,
-		Kind: "claude",
-		Pane: iterWT.PaneID,
-	}); err != nil {
-		return fmt.Errorf("launching claude: %w", err)
-	}
-
-	if _, err := d.AgentWait(herdr.AgentWaitOptions{
-		Target: iterWT.PaneID,
-		Until:  []string{"idle"},
-	}); err != nil {
-		return fmt.Errorf("waiting for claude to reach idle after launch: %w", err)
-	}
-
 	prompt := fmt.Sprintf("/%s %s", p.Skill, p.Ticket.Path)
-	if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
-		Target: iterWT.PaneID,
-		Text:   prompt,
-		Wait:   true,
-		Until:  []string{"working"},
+	if err := launchAndPrompt(d, launchAndPromptParams{
+		Label:  label,
+		Pane:   iterWT.PaneID,
+		Prompt: prompt,
 	}); err != nil {
-		return fmt.Errorf("sending initial prompt: %w", err)
-	}
-
-	if _, err := d.AgentWait(herdr.AgentWaitOptions{
-		Target: iterWT.PaneID,
-		Until:  []string{"idle", "done"},
-	}); err != nil {
-		return fmt.Errorf("waiting for agent to finish: %w", err)
+		return err
 	}
 
 	p.FeatureLock.Lock()
-	err = d.CherryPickRange(p.FeatureWorktree, base, branch)
+	err = cherryPickWithConflictResolution(d, p, base, branch)
 	p.FeatureLock.Unlock()
 	if err != nil {
-		return fmt.Errorf("cherry-picking onto %s: %w", p.FeatureBranch, err)
+		return err
 	}
 
 	if err := MarkDone(p.Ticket.Path); err != nil {
@@ -256,12 +233,132 @@ func runIteration(d Deps, p iterationParams) error {
 	return nil
 }
 
+// conflictResolutionTimeoutMs bounds how long a conflict-resolution agent may
+// run before it's treated as stuck, so a hung resolution surfaces as a
+// distinct, actionable error instead of hanging the whole loop forever.
+const conflictResolutionTimeoutMs = 30 * 60 * 1000
+
+// cherryPickWithConflictResolution cherry-picks base..branch onto
+// p.FeatureWorktree. On a conflict, it launches a fresh pane in the feature
+// worktree (where the conflict markers are, not the iteration worktree),
+// sends "/resolving-merge-conflicts", and waits for that agent to finish
+// before confirming the cherry-pick sequence completed.
+func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch string) error {
+	pickErr := d.CherryPickRange(p.FeatureWorktree, base, branch)
+	if pickErr == nil {
+		return nil
+	}
+
+	inProgress, err := d.CherryPickInProgress(p.FeatureWorktree)
+	if err != nil {
+		return fmt.Errorf("checking cherry-pick state onto %s: %w", p.FeatureBranch, err)
+	}
+	if !inProgress {
+		return fmt.Errorf("cherry-picking onto %s: %w", p.FeatureBranch, pickErr)
+	}
+
+	if err := resolveCherryPickConflict(d, p); err != nil {
+		return err
+	}
+
+	inProgress, err = d.CherryPickInProgress(p.FeatureWorktree)
+	if err != nil {
+		return fmt.Errorf("checking cherry-pick state onto %s after resolution: %w", p.FeatureBranch, err)
+	}
+	if inProgress {
+		return fmt.Errorf("cherry-pick onto %s still in progress after conflict-resolution agent finished", p.FeatureBranch)
+	}
+	return nil
+}
+
+// resolveCherryPickConflict launches a fresh pane in the feature worktree and
+// drives a "/resolving-merge-conflicts" agent to completion in it. The
+// iteration's own worktree/tab are untouched while this runs.
+func resolveCherryPickConflict(d Deps, p iterationParams) error {
+	label := conflictLabel(p.Ticket.Number)
+
+	tab, err := d.TabCreate(herdr.TabCreateOptions{
+		WorkspaceID: p.WorkspaceID,
+		Cwd:         p.FeatureWorktree,
+		Label:       label,
+	})
+	if err != nil {
+		return fmt.Errorf("creating conflict-resolution pane: %w", err)
+	}
+
+	if err := launchAndPrompt(d, launchAndPromptParams{
+		Label:           label,
+		Pane:            tab.RootPaneID,
+		Prompt:          "/resolving-merge-conflicts",
+		FinishTimeoutMs: conflictResolutionTimeoutMs,
+	}); err != nil {
+		return fmt.Errorf("conflict-resolution agent %s did not finish (possibly stuck): %w", label, err)
+	}
+
+	return nil
+}
+
+// launchAndPromptParams are the per-call inputs to launchAndPrompt.
+type launchAndPromptParams struct {
+	Label  string // agent name/tab label, used in error messages
+	Pane   string // pane id to launch claude in and send the prompt to
+	Prompt string // initial slash-command prompt text
+
+	// FinishTimeoutMs bounds the final "wait for the agent to finish" step, so
+	// a stuck agent surfaces as a distinct error instead of blocking forever.
+	// Zero means wait indefinitely.
+	FinishTimeoutMs int
+}
+
+// launchAndPrompt runs the shared agent lifecycle protocol: launch claude in
+// Pane, wait for it to reach idle, send Prompt and wait for it to start
+// working, then wait for it to finish (idle or done).
+func launchAndPrompt(d Deps, p launchAndPromptParams) error {
+	if _, err := d.AgentStart(herdr.AgentStartOptions{
+		Name: p.Label,
+		Kind: "claude",
+		Pane: p.Pane,
+	}); err != nil {
+		return fmt.Errorf("launching claude: %w", err)
+	}
+
+	if _, err := d.AgentWait(herdr.AgentWaitOptions{
+		Target: p.Pane,
+		Until:  []string{"idle"},
+	}); err != nil {
+		return fmt.Errorf("waiting for claude to reach idle after launch: %w", err)
+	}
+
+	if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
+		Target: p.Pane,
+		Text:   p.Prompt,
+		Wait:   true,
+		Until:  []string{"working"},
+	}); err != nil {
+		return fmt.Errorf("sending initial prompt: %w", err)
+	}
+
+	if _, err := d.AgentWait(herdr.AgentWaitOptions{
+		Target:    p.Pane,
+		Until:     []string{"idle", "done"},
+		TimeoutMs: p.FinishTimeoutMs,
+	}); err != nil {
+		return fmt.Errorf("waiting for agent to finish: %w", err)
+	}
+
+	return nil
+}
+
 func iterLabel(ticketNumber int) string {
 	return fmt.Sprintf("iter-%02d", ticketNumber)
 }
 
 func iterBranch(ticketNumber int) string {
 	return "ralph-loop/" + iterLabel(ticketNumber)
+}
+
+func conflictLabel(ticketNumber int) string {
+	return fmt.Sprintf("conflict-%02d", ticketNumber)
 }
 
 // loadNamedEpic loads scratchDir and returns the epic named name, or nil if
