@@ -85,6 +85,9 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		RevParse: func(dir, ref string) (string, error) {
 			return "deadbeef", nil
 		},
+		CommitsAhead: func(dir, fromExclusive, toRef string) (int, error) {
+			return 1, nil
+		},
 		CherryPickRange: func(dir, fromExclusive, toInclusive string) error {
 			return nil
 		},
@@ -385,6 +388,78 @@ func TestRun_CherryPickConflict_ResolutionNeverFinishes_SurfacesDistinctError(t 
 type fakeConflictErr struct{}
 
 func (e *fakeConflictErr) Error() string { return "cherry-pick conflict" }
+
+func TestRun_ZeroCommitIteration_MarksNeedsInfoAndLeavesWorktree(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "# A\n\n**Status:** open\n",
+	})
+	d, _, removed := fakeDeps()
+	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
+		return 0, nil
+	}
+
+	var out bytes.Buffer
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if len(*removed) != 0 {
+		t.Errorf("removed worktree branches = %v, want the zero-commit iteration's worktree left in place", *removed)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw), "Status:** needs-info") {
+		t.Errorf("ticket not marked needs-info after zero-commit iteration:\n%s", raw)
+	}
+	if strings.Contains(string(raw), "Status:** done") {
+		t.Errorf("ticket must not be marked done after a zero-commit iteration:\n%s", raw)
+	}
+}
+
+func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "# A\n\n**Status:** open\n",
+		"02-b.md": "# B\n\n**Status:** open\n",
+	})
+	d, _, removed := fakeDeps()
+	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
+		if strings.Contains(dir, "iter-01") {
+			return 0, nil
+		}
+		return 1, nil
+	}
+
+	var out bytes.Buffer
+	if err := Run(RunOptions{
+		EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
+		MaxParallel: 1,
+	}, d, &out); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if len(*removed) != 1 || (*removed)[0] != "ralph-loop/iter-02" {
+		t.Errorf("removed worktree branches = %v, want only iter-02 removed", *removed)
+	}
+
+	raw01, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw01), "Status:** needs-info") {
+		t.Errorf("ticket 01 not marked needs-info:\n%s", raw01)
+	}
+
+	raw02, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "02-b.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw02), "Status:** done") {
+		t.Errorf("ticket 02 not marked done:\n%s", raw02)
+	}
+}
 
 func TestRun_MaxParallelTwo_RunsExactlyTwoConcurrentlyAndBackfills(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{

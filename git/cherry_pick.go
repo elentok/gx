@@ -1,9 +1,29 @@
 package git
 
+import (
+	"fmt"
+	"strconv"
+)
+
 // RevParse resolves ref to its full commit hash in dir.
 func RevParse(dir, ref string) (string, error) {
 	out, _, err := run(dir, []string{"rev-parse", ref})
 	return out, err
+}
+
+// CommitsAhead returns how many commits toRef has that fromExclusive
+// doesn't (git rev-list --count fromExclusive..toRef) — zero means toRef has
+// landed nothing new since fromExclusive.
+func CommitsAhead(dir, fromExclusive, toRef string) (int, error) {
+	out, _, err := run(dir, []string{"rev-list", "--count", fromExclusive + ".." + toRef})
+	if err != nil {
+		return 0, err
+	}
+	n, err := strconv.Atoi(out)
+	if err != nil {
+		return 0, fmt.Errorf("invalid rev-list count %q: %w", out, err)
+	}
+	return n, nil
 }
 
 // CherryPickRange cherry-picks the commit range fromExclusive..toInclusive

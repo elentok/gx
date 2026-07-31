@@ -18,6 +18,7 @@ type Deps struct {
 	AgentPrompt           func(opts herdr.AgentPromptOptions) (herdr.Agent, error)
 	AgentWait             func(opts herdr.AgentWaitOptions) (herdr.Agent, error)
 	RevParse              func(dir, ref string) (string, error)
+	CommitsAhead          func(dir, fromExclusive, toRef string) (int, error)
 	CherryPickRange       func(dir, fromExclusive, toInclusive string) error
 	CherryPickInProgress  func(dir string) (bool, error)
 }
@@ -33,6 +34,7 @@ func DefaultDeps() Deps {
 		AgentPrompt:           herdr.AgentPrompt,
 		AgentWait:             herdr.AgentWait,
 		RevParse:              git.RevParse,
+		CommitsAhead:          git.CommitsAhead,
 		CherryPickRange:       git.CherryPickRange,
 		CherryPickInProgress:  git.CherryPickInProgress,
 	}

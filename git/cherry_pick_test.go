@@ -87,6 +87,47 @@ func TestCherryPickRange_ConflictReturnsError(t *testing.T) {
 	}
 }
 
+func TestCommitsAhead_CountsCommitsInRange(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+
+	base, err := git.RevParse(dir, "HEAD")
+	if err != nil {
+		t.Fatalf("RevParse: %v", err)
+	}
+
+	testutil.WriteFile(t, dir, "a.txt", "a\n")
+	testutil.CommitAll(t, dir, "add a")
+	testutil.WriteFile(t, dir, "b.txt", "b\n")
+	testutil.CommitAll(t, dir, "add b")
+
+	ahead, err := git.CommitsAhead(dir, base, "HEAD")
+	if err != nil {
+		t.Fatalf("CommitsAhead: %v", err)
+	}
+	if ahead != 2 {
+		t.Errorf("CommitsAhead() = %d, want 2", ahead)
+	}
+}
+
+func TestCommitsAhead_ZeroWhenNoNewCommits(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+
+	base, err := git.RevParse(dir, "HEAD")
+	if err != nil {
+		t.Fatalf("RevParse: %v", err)
+	}
+
+	ahead, err := git.CommitsAhead(dir, base, "HEAD")
+	if err != nil {
+		t.Fatalf("CommitsAhead: %v", err)
+	}
+	if ahead != 0 {
+		t.Errorf("CommitsAhead() = %d, want 0", ahead)
+	}
+}
+
 func TestCherryPickInProgress_FalseOutsideCherryPick(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)

@@ -49,7 +49,7 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 		fmt.Fprintf(out, "no tickets found for epic %q; nothing to do\n", opts.EpicName)
 		return nil
 	}
-	if initial.AllDone() {
+	if allSettled(*initial) {
 		fmt.Fprintf(out, "epic %q is already complete (%d/%d done)\n", opts.EpicName, initial.DoneCount(), initial.TotalCount())
 		return nil
 	}
@@ -129,7 +129,7 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		if epic.AllDone() && active == 0 {
+		if allSettled(*epic) && active == 0 {
 			break
 		}
 
@@ -167,6 +167,28 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 	return nil
 }
 
+// allSettled reports whether every ticket in e has reached a terminal state
+// from the loop's perspective: done, or needs-info (an iteration that
+// finished with no commits to land, left for inspection). Unlike
+// tickets.Epic.AllDone — which only tickets in the done family and is shared
+// with the tickets UI's collapse/expand rendering — needs-info counts as
+// terminal here too, so the loop can exit cleanly once every remaining
+// ticket is either landed or stuck needing a human, rather than looping
+// forever (Frontier already excludes needs-info from scheduling).
+func allSettled(e tickets.Epic) bool {
+	if len(e.Tickets) == 0 {
+		return false
+	}
+	for _, t := range e.Tickets {
+		switch e.RenderedStatus(t) {
+		case tickets.StatusDone, tickets.StatusNeedsInfo:
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 // iterationParams are the per-ticket inputs to runIteration.
 type iterationParams struct {
 	WorkspaceID     string
@@ -185,7 +207,9 @@ type iterationParams struct {
 // runIteration drives one ticket through the full iteration lifecycle:
 // create its worktree, launch and prompt the agent, wait for it to finish,
 // cherry-pick its commits onto the feature branch, mark the ticket done, and
-// remove the iteration worktree.
+// remove the iteration worktree. If the agent finishes without landing any
+// commits, the ticket is marked needs-info instead and the worktree/tab are
+// left in place for inspection.
 func runIteration(d Deps, p iterationParams) error {
 	label := iterLabel(p.Ticket.Number)
 	branch := iterBranch(p.Ticket.Number)
@@ -213,6 +237,20 @@ func runIteration(d Deps, p iterationParams) error {
 		Prompt: prompt,
 	}); err != nil {
 		return err
+	}
+
+	ahead, err := d.CommitsAhead(iterWT.Path, base, branch)
+	if err != nil {
+		return fmt.Errorf("counting commits ahead of %s: %w", base, err)
+	}
+	if ahead == 0 {
+		// The agent finished without landing any commits: leave the worktree/
+		// tab in place for inspection instead of silently marking done or
+		// retrying, and let the scheduler move on to other unblocked tickets.
+		if err := MarkNeedsInfo(p.Ticket.Path); err != nil {
+			return fmt.Errorf("marking ticket needs-info: %w", err)
+		}
+		return nil
 	}
 
 	p.FeatureLock.Lock()
