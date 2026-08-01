@@ -108,6 +108,9 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		IsAncestor: func(dir, ancestor, descendant string) (bool, error) {
 			return true, nil
 		},
+		PatchesApplied: func(dir, upstream, base, branch string) (bool, error) {
+			return false, nil
+		},
 		WorktreeExists: func(path string) (bool, error) {
 			return true, nil
 		},

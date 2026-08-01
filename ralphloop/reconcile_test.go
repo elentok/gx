@@ -439,6 +439,8 @@ func realGitDeps() Deps {
 	d.IsAncestor = git.IsAncestor
 	d.RevParse = git.RevParse
 	d.WorktreeExists = worktreeExists
+	d.MergeBase = git.MergeBase
+	d.PatchesApplied = git.PatchesApplied
 	return d
 }
 
@@ -511,6 +513,64 @@ func TestClassifyDoneTicket_RealRepo_NeverCherryPicked_Recoverable(t *testing.T)
 	}
 	if class != doneRecoverable {
 		t.Errorf("class = %v, want doneRecoverable", class)
+	}
+}
+
+// TestClassifyDoneTicket_RealRepo_RebasedAfterLanding_OK reproduces the
+// postmortem scenario that motivated the PatchesApplied fallback: a ticket
+// lands normally (cherry-picked, event recorded), but the feature branch is
+// later rebased onto a newer upstream, rewriting the landed commit's hash out
+// from under the recorded event's SHA — while the iteration branch (holding
+// the pre-rebase original) never got cleaned up. Without the fallback,
+// IsAncestor against the stale SHA reports false and the surviving iteration
+// branch would make this misclassify as doneRecoverable, re-cherry-picking
+// already-landed content onto the live feature worktree. PatchesApplied
+// should recognize the rebased commit as patch-equivalent and classify this
+// doneStaleCleanup instead — landed, just needs its leftover branch cleaned
+// up.
+func TestClassifyDoneTicket_RealRepo_RebasedAfterLanding_OK(t *testing.T) {
+	dir := testutil.TempRepo(t)
+	base, err := git.RevParse(dir, "HEAD")
+	if err != nil {
+		t.Fatalf("RevParse: %v", err)
+	}
+
+	testutil.MustGitExported(t, dir, "checkout", "-b", "ralph-loop/iter-03", base)
+	testutil.WriteFile(t, dir, "a.txt", "a\n")
+	testutil.CommitAll(t, dir, "add a")
+	iterTip, err := git.RevParse(dir, "HEAD")
+	if err != nil {
+		t.Fatalf("RevParse: %v", err)
+	}
+
+	testutil.MustGitExported(t, dir, "checkout", "main")
+	if err := git.CherryPickRange(dir, base, iterTip); err != nil {
+		t.Fatalf("CherryPickRange: %v", err)
+	}
+	landedSHA, err := git.RevParse(dir, "HEAD")
+	if err != nil {
+		t.Fatalf("RevParse: %v", err)
+	}
+
+	// Simulate an unrelated upstream advance, then rebase main onto it — this
+	// rewrites landedSHA to a new hash, exactly as happened to this repo's own
+	// ralphloop-tui-impl branch.
+	testutil.MustGitExported(t, dir, "checkout", "-b", "upstream", base)
+	testutil.WriteFile(t, dir, "upstream.txt", "u\n")
+	testutil.CommitAll(t, dir, "unrelated upstream change")
+	testutil.MustGitExported(t, dir, "checkout", "main")
+	testutil.MustGitExported(t, dir, "rebase", "upstream")
+
+	// ralph-loop/iter-03 was never cleaned up, still pointing at the
+	// pre-rebase original.
+	d := realGitDeps()
+	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: landedSHA}}
+	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: dir, WorktreeDir: "/fake/worktrees"}, "main", tickets.Ticket{Number: 3, Identifier: "03", Status: "done"}, events, map[string]bool{})
+	if err != nil {
+		t.Fatalf("classifyDoneTicket() error = %v", err)
+	}
+	if class != doneStaleCleanup {
+		t.Errorf("class = %v, want doneStaleCleanup — content already landed pre-rebase, just needs the leftover iteration branch cleaned up", class)
 	}
 }
 

@@ -271,14 +271,19 @@ const (
 //   - doneUnrecoverable: the commit is missing and no iteration branch is
 //     left to recover it from.
 //
-// Presence is checked against the SHA recorded on the ticket's most recent
-// cherry-picked event, not the iteration branch's own commits: CherryPickRange
-// creates fresh commits on the feature branch (different hashes than the
-// iteration branch's originals), so the iteration branch's tip is never
-// literally reachable from the feature branch even in the fully-landed case.
-// A done ticket with no recorded event (e.g. a run-log predating this check)
-// is treated the same as a missing commit, since there's nothing to verify
-// reachability against.
+// Presence is checked first against the SHA recorded on the ticket's most
+// recent cherry-picked event, not the iteration branch's own commits:
+// CherryPickRange creates fresh commits on the feature branch (different
+// hashes than the iteration branch's originals), so the iteration branch's
+// tip is never literally reachable from the feature branch even in the
+// fully-landed case. A done ticket with no recorded event (e.g. a run-log
+// predating this check) starts out treated the same as a missing commit.
+// Either way, if the iteration branch still exists, presence gets a second
+// look via PatchesApplied (patch-id, not hash) before concluding the commit
+// is really missing — the recorded SHA can also go stale harmlessly, e.g.
+// when the feature branch is rebased after landing it, and blindly trusting
+// that would misclassify already-landed work as doneRecoverable and
+// re-cherry-pick it onto the live feature worktree.
 func classifyDoneTicket(d Deps, paths reconcilePaths, featureBranch string, t tickets.Ticket, events []Event, live map[string]bool) (doneMismatchClass, error) {
 	landedSHA := latestCherryPickedSHA(events, t.Identifier)
 
@@ -293,6 +298,25 @@ func classifyDoneTicket(d Deps, paths reconcilePaths, featureBranch string, t ti
 
 	branch := iterBranch(t.Identifier)
 	hasBranch := branchExists(d, paths.FeatureWorktree, branch)
+
+	// A missing landedSHA doesn't only mean the commit never landed — it also
+	// happens harmlessly whenever featureBranch was rebased/amended after
+	// landing it (rewriting hashes) or the recording event itself was lost.
+	// Before treating that as a real gap, check whether the iteration
+	// branch's content already made it onto featureBranch under different
+	// hashes: falsely calling this doneRecoverable would re-cherry-pick
+	// already-landed commits straight onto the live feature worktree.
+	if !commitsPresent && hasBranch {
+		base, err := d.MergeBase(paths.FeatureWorktree, branch, featureBranch)
+		if err != nil {
+			return doneOK, fmt.Errorf("resolving merge-base for patch-equivalence check: %w", err)
+		}
+		applied, err := d.PatchesApplied(paths.FeatureWorktree, featureBranch, base, branch)
+		if err != nil {
+			return doneOK, fmt.Errorf("checking patch-equivalent landed commits: %w", err)
+		}
+		commitsPresent = applied
+	}
 
 	label := iterLabel(t.Identifier)
 	hasWorktree, err := d.WorktreeExists(filepath.Join(paths.WorktreeDir, label))

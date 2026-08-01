@@ -3,6 +3,7 @@ package git
 import (
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 // RevParse resolves ref to its full commit hash in dir.
@@ -58,6 +59,33 @@ func IsAncestor(dir, ancestor, descendant string) (bool, error) {
 func CherryPickRange(dir, fromExclusive, toInclusive string) error {
 	_, _, err := run(dir, []string{"cherry-pick", fromExclusive + ".." + toInclusive})
 	return err
+}
+
+// PatchesApplied reports whether every commit in base..branch already has a
+// patch-equivalent commit reachable from upstream (git cherry, which
+// compares patch-id rather than commit hash). Unlike IsAncestor, this stays
+// correct even after upstream was rebased/amended past the point where these
+// commits originally landed, since rebasing rewrites hashes but not patch
+// content. An empty range (branch has no commits ahead of base) reports
+// false — there's nothing to compare, so callers must treat that as
+// "unverified", not "confirmed landed".
+func PatchesApplied(dir, upstream, base, branch string) (bool, error) {
+	out, _, err := run(dir, []string{"cherry", upstream, branch, base})
+	if err != nil {
+		return false, err
+	}
+	found := false
+	for line := range strings.SplitSeq(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		found = true
+		if !strings.HasPrefix(line, "-") {
+			return false, nil
+		}
+	}
+	return found, nil
 }
 
 // CherryPickInProgress reports whether dir has a cherry-pick sequence

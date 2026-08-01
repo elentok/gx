@@ -52,6 +52,13 @@ type Deps struct {
 	// by startup reconciliation to confirm a done ticket's recorded landed
 	// commit (Event.SHA) is still on the feature branch.
 	IsAncestor func(dir, ancestor, descendant string) (bool, error)
+	// PatchesApplied reports whether a done ticket's iteration commits
+	// (base..branch) are already patch-equivalent to commits on the feature
+	// branch, used by startup reconciliation as a fallback when IsAncestor
+	// says a recorded landed commit isn't reachable — which also happens
+	// harmlessly whenever the feature branch was rebased after landing it,
+	// not just when the commit is genuinely missing.
+	PatchesApplied func(dir, upstream, base, branch string) (bool, error)
 	// WorktreeExists reports whether an iteration worktree still exists at
 	// path, used by startup reconciliation to detect leftover state a crash
 	// left uncleaned.
@@ -106,6 +113,7 @@ func DefaultDeps() Deps {
 		CherryPickRange:       git.CherryPickRange,
 		CherryPickInProgress:  git.CherryPickInProgress,
 		IsAncestor:            git.IsAncestor,
+		PatchesApplied:        git.PatchesApplied,
 		WorktreeExists:        worktreeExists,
 		InstallDeps:           InstallDependencies,
 		ReadOccupancy:         transcript.LastAssistantOccupancy,
