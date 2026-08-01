@@ -169,6 +169,39 @@ func TestPauseGate_ForceResume_UnknownLabelReturnsFalse(t *testing.T) {
 	}
 }
 
+// TestPauseGate_ForceResumeBeforePause_WaitForResumeReturnsImmediately covers
+// the race where ForceResume lands in the gap between a caller's pause() and
+// its own subsequent waitForResume() call (e.g. a TUI operator resuming the
+// instant it observes the pause). Without the len(reasons)==0 short-circuit
+// in waitForResume, that late arrival would make it the new leader for a
+// pause that no longer exists, polling forever for a resume signal that
+// already happened.
+func TestPauseGate_ForceResumeBeforePause_WaitForResumeReturnsImmediately(t *testing.T) {
+	g := NewGate()
+	g.pause("iter-01", "breach")
+
+	if !g.ForceResume("iter-01") {
+		t.Fatal("ForceResume(iter-01) = false, want true")
+	}
+
+	d := Deps{
+		ResumeSignaled: func(path string) (bool, error) { return false, nil },
+		Sleep:          func(time.Duration) {},
+	}
+
+	returned := make(chan struct{})
+	go func() {
+		g.waitForResume(d, "unused")
+		close(returned)
+	}()
+
+	select {
+	case <-returned:
+	case <-time.After(2 * time.Second):
+		t.Fatal("waitForResume() never returned even though the label was never actually paused")
+	}
+}
+
 func TestWaitForFinish_CodexContextBreachPausesAndResumes(t *testing.T) {
 	gate := NewGate()
 	var waits int
@@ -545,6 +578,121 @@ func TestRun_SmartZoneBreach_PausesResumesAndKeepsSchedulingCorrect(t *testing.T
 	resumeMu.Lock()
 	resumeAllowed = true
 	resumeMu.Unlock()
+
+	// iter-01 re-enters its wait step post-resume and finishes normally.
+	pane1 := <-started
+	release(pane1)
+
+	// Ticket 03 is now backfilled since the pause cleared.
+	pane3 := <-started
+	release(pane3)
+
+	if err := <-errCh; err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if len(*removed) != 3 {
+		t.Errorf("removed worktree branches = %v, want all 3 iterations removed", *removed)
+	}
+
+	if !strings.Contains(out.String(), "paused iter-01") {
+		t.Errorf("output = %q, want a paused report mentioning iter-01", out.String())
+	}
+	if !strings.Contains(out.String(), "resumed iter-01") {
+		t.Errorf("output = %q, want a resumed report mentioning iter-01", out.String())
+	}
+}
+
+// TestRun_SmartZoneBreach_ForceResumeViaGateWakesWithoutFileSignal drives a
+// full Run() through a smart-zone pause, exactly like
+// TestRun_SmartZoneBreach_PausesResumesAndKeepsSchedulingCorrect, but proves
+// the in-process resume path added in ticket 06a actually works end-to-end:
+// d.ResumeSignaled is hardcoded to always return false (so the file-signal
+// path can never be what unblocks the run) and d.Sleep is a no-op, yet
+// calling RunOptions.Gate.ForceResume directly from the test goroutine —
+// once it has observed the gate as paused — still wakes iter-01 and lets the
+// epic complete.
+func TestRun_SmartZoneBreach_ForceResumeViaGateWakesWithoutFileSignal(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "# A\n\n**Status:** open\n",
+		"02-b.md": "# B\n\n**Status:** open\n",
+		"03-c.md": "# C\n\n**Status:** open\n",
+	})
+	d, _, removed := fakeDeps()
+
+	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-" + opts.Pane}, nil
+	}
+
+	wait, started, release := gatedAgentWait(d.AgentWait)
+	var breachOnce sync.Once
+	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+		if slices.Contains(opts.Until, "done") && strings.Contains(opts.Target, "iter-01") {
+			breached := false
+			breachOnce.Do(func() { breached = true })
+			if breached {
+				return herdr.Agent{}, errors.New("timed out waiting for agent status")
+			}
+		}
+		return wait(opts)
+	}
+
+	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
+		if strings.Contains(cwd, "iter-01") {
+			return 999999, true, nil
+		}
+		return 0, false, nil
+	}
+
+	sendKeysCh := make(chan []string, 1)
+	d.AgentSendKeys = func(target string, keys ...string) error {
+		sendKeysCh <- keys
+		return nil
+	}
+
+	// Never true: only ForceResume, never a `gx ralph-loop resume` file
+	// signal, is allowed to unblock this run.
+	d.ResumeSignaled = func(path string) (bool, error) { return false, nil }
+	d.Sleep = func(time.Duration) {}
+
+	gate := NewGate()
+	var out bytes.Buffer
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- Run(RunOptions{
+			EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
+			MaxParallel: 2, Gate: gate,
+		}, d, NewTextEventSink(&out))
+	}()
+
+	// iter-01 and iter-02 both claimed and started (2 slots).
+	pane2 := <-started
+
+	keys := <-sendKeysCh
+	if len(keys) == 0 || keys[0] != "ctrl+c" {
+		t.Fatalf("AgentSendKeys keys = %v, want [ctrl+c]", keys)
+	}
+
+	// Wait for the gate to actually record iter-01 as paused before forcing
+	// resume, so ForceResume has something to clear rather than racing
+	// ahead of pause() (see
+	// TestPauseGate_ForceResumeBeforePause_WaitForResumeReturnsImmediately).
+	deadline := time.After(2 * time.Second)
+	for !gate.isPaused() {
+		select {
+		case <-deadline:
+			t.Fatal("gate never observed as paused")
+		default:
+			time.Sleep(time.Millisecond)
+		}
+	}
+
+	// iter-02 finishes normally while iter-01 stays paused.
+	release(pane2)
+
+	if !gate.ForceResume("iter-01") {
+		t.Fatal("ForceResume(iter-01) = false, want true")
+	}
 
 	// iter-01 re-enters its wait step post-resume and finishes normally.
 	pane1 := <-started

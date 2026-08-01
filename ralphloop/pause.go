@@ -63,6 +63,14 @@ func (g *Gate) snapshot() map[string]string {
 // at that moment, however many there are.
 func (g *Gate) waitForResume(d Deps, path string) {
 	g.mu.Lock()
+	if len(g.reasons) == 0 {
+		// Nothing is paused: a ForceResume already landed between the
+		// caller's pause() and this call (e.g. a TUI operator resuming the
+		// instant it observes the pause). Becoming the leader here would
+		// poll forever for a resume signal that already happened.
+		g.mu.Unlock()
+		return
+	}
 	myWake := g.wake
 	lead := !g.polling
 	if lead {
