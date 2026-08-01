@@ -222,7 +222,7 @@ func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsAttention(t *testing.T) {
 	d := Deps{
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
 			waits++
-			if waits == 1 {
+			if waits < 3 {
 				return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
 			}
 			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
@@ -259,6 +259,34 @@ func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsAttention(t *testing.T) {
 	}
 	if strings.Contains(string(raw), "needs-attention") {
 		t.Errorf("ticket status = %s, quota exhaustion must not become needs-attention", raw)
+	}
+}
+
+func TestWaitForFinish_CodexIgnoresClaudeTerminalRateLimitText(t *testing.T) {
+	var waits, prompts int
+	d := Deps{
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			waits++
+			if waits == 1 {
+				return herdr.Agent{}, errors.New("timed out waiting for agent status")
+			}
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentPrompt: func(herdr.AgentPromptOptions) (herdr.Agent, error) {
+			prompts++
+			return herdr.Agent{}, nil
+		},
+		ReadPaneRecent: func(string) (string, error) { return "Claude usage limit reached", nil },
+		Sleep:          func(time.Duration) {},
+	}
+
+	if err := waitForFinish(d, launchAndPromptParams{
+		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Gate: newPauseGate(),
+	}, "codex-session-1"); err != nil {
+		t.Fatalf("waitForFinish: %v", err)
+	}
+	if prompts != 0 {
+		t.Errorf("continue prompts = %d, want 0 from Claude terminal text", prompts)
 	}
 }
 

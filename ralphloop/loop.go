@@ -780,7 +780,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			}
 		}
 
-		if d.ReadPaneRecent != nil {
+		if p.Agent == AgentClaude && d.ReadPaneRecent != nil {
 			if text, rlErr := d.ReadPaneRecent(p.Pane); rlErr == nil {
 				if token, matched := detectRateLimit(text); matched {
 					reason := "rate limit detected"
@@ -840,6 +840,17 @@ func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, li
 	p.Gate.resumeLabel(p.Label)
 	p.report("resumed %s after Codex quota reset\n", p.Label)
 	p.logLifecycleEvent(eventResumed, sessionID)
+
+	agent, err := d.AgentWait(herdr.AgentWaitOptions{
+		Target: p.Pane,
+		Until:  []string{"idle", "done", "working", "blocked"},
+	})
+	if err != nil {
+		return fmt.Errorf("re-observing %s after Codex quota reset: %w", p.Label, err)
+	}
+	if agent.AgentStatus != "blocked" {
+		return nil
+	}
 
 	if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
 		Target: p.Pane,
