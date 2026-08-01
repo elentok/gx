@@ -46,6 +46,9 @@ type AgentStartOptions struct {
 	Kind      string // e.g. "claude"
 	Pane      string
 	TimeoutMs int
+	// AgentArgs are passed through to the underlying agent executable after
+	// `--`, e.g. []string{"--permission-mode", "auto"} for claude.
+	AgentArgs []string
 }
 
 // AgentStart starts a supported interactive agent (e.g. claude) in an
@@ -55,6 +58,10 @@ func AgentStart(opts AgentStartOptions) (Agent, error) {
 	args := []string{"agent", "start", opts.Name, "--kind", opts.Kind, "--pane", opts.Pane}
 	if opts.TimeoutMs > 0 {
 		args = append(args, "--timeout", strconv.Itoa(opts.TimeoutMs))
+	}
+	if len(opts.AgentArgs) > 0 {
+		args = append(args, "--")
+		args = append(args, opts.AgentArgs...)
 	}
 
 	return runAgentJSON(args)

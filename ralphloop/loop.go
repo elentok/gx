@@ -52,6 +52,14 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 	if scratchDir == "" {
 		scratchDir = defaultScratchDir
 	}
+	// scratchDir is gitignored, so it only exists in RepoDir's own checkout,
+	// not in the per-iteration worktrees agents run in. Resolve it to an
+	// absolute path under RepoDir so every ticket path threaded through it
+	// (the initial prompt, run-log, resume signal) resolves regardless of the
+	// agent pane's cwd.
+	if !filepath.IsAbs(scratchDir) {
+		scratchDir = filepath.Join(opts.RepoDir, scratchDir)
+	}
 	maxParallel := opts.MaxParallel
 	if maxParallel <= 0 {
 		maxParallel = defaultMaxParallel
@@ -603,9 +611,10 @@ func (p launchAndPromptParams) report(format string, args ...any) {
 // it finishes.
 func launchAndPrompt(d Deps, p launchAndPromptParams) (string, error) {
 	agent, err := d.AgentStart(herdr.AgentStartOptions{
-		Name: p.Label,
-		Kind: "claude",
-		Pane: p.Pane,
+		Name:      p.Label,
+		Kind:      "claude",
+		Pane:      p.Pane,
+		AgentArgs: []string{"--permission-mode", "auto"},
 	})
 	if err != nil {
 		return "", fmt.Errorf("launching claude: %w", err)
