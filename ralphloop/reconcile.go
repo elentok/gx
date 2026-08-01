@@ -100,7 +100,7 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 		return nil, fmt.Errorf("reading run log for done-ticket verification: %w", err)
 	}
 	for _, t := range epic.Tickets {
-		if !t.IsDone() {
+		if !t.IsDone() || t.IsSuperseded() {
 			continue
 		}
 		class, err := classifyDoneTicket(d, paths, epic.Name, t, events, live)
