@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"charm.land/bubbles/v2/viewport"
 	"charm.land/lipgloss/v2"
 
 	"github.com/elentok/gx/tickets"
@@ -29,8 +30,10 @@ const (
 
 // previewInnerSize returns the preview panel's usable content width/height
 // for a given outer panel size: width less the panel's own horizontal
-// padding, height less its header row.
-func (m Model) previewInnerSize(previewW, h int) (width, height int) {
+// padding, height less its header row. A free function (rather than a Model
+// method) so the flat ralph-loop TUI (see flat.go) can share it without a
+// tree-shaped Model of its own.
+func previewInnerSize(previewW, h int) (width, height int) {
 	width = max(previewW-2*previewPanelPaddingX, 1)
 	height = max(h-previewPanelHeaderRow, 1)
 	return
@@ -45,8 +48,13 @@ func (m Model) previewInnerSize(previewW, h int) (width, height int) {
 // (mirrors ui/help's bodyWithScrollbar) and the scroll position persists
 // across renders instead of resetting to the top every frame.
 func (m Model) previewLines() []string {
-	vp := m.previewVP
+	return renderViewportWithScrollbar(m.previewVP)
+}
 
+// renderViewportWithScrollbar pairs a viewport's currently visible lines
+// with its scroll indicator. Free function shared with the flat ralph-loop
+// TUI's own preview panel (see flat.go).
+func renderViewportWithScrollbar(vp viewport.Model) []string {
 	body := strings.Split(vp.View(), "\n")
 	bar := ui.RenderScrollbar(vp.Height(), vp.TotalLineCount(), vp.VisibleLineCount(), vp.YOffset())
 	if bar == "" {

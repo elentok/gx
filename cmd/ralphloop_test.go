@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/testutil"
 )
 
 func TestNewRalphLoopCmd_SkillFlagDefaultsToImplement(t *testing.T) {
@@ -86,6 +88,37 @@ func TestNewRalphLoopCmd_AgentFlagValidatesSupportedAgents(t *testing.T) {
 				t.Errorf("PreRunE() error = %v, want error=%v", err, tc.wantErr)
 			}
 		})
+	}
+}
+
+// TestRunRalphLoop_NonTerminalStdout_RunsHeadless confirms runRalphLoop's
+// isTerminalWriter gate (cmd/spinner.go) routes a non-terminal stdout (a
+// bytes.Buffer, same as CI/piped output) to the unchanged headless
+// ralphloop.Run path rather than trying to launch the standalone TUI, which
+// would hang waiting on a real terminal. An epic with no tickets makes
+// ralphloop.Run return immediately with its "nothing to do" message, so this
+// also confirms the headless writer is still wired to d.stdout.
+func TestRunRalphLoop_NonTerminalStdout_RunsHeadless(t *testing.T) {
+	dir := testutil.TempRepo(t)
+	if err := os.MkdirAll(filepath.Join(dir, ".scratch", "empty-epic", "issues"), 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	restoreWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("Chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(restoreWd) })
+
+	var out bytes.Buffer
+	d := deps{getwd: os.Getwd, stdout: &out}
+	if err := runRalphLoop("empty-epic", "claude", "implement", 2, 150_000, d); err != nil {
+		t.Fatalf("runRalphLoop() error = %v", err)
+	}
+	if !strings.Contains(out.String(), "no tickets found") {
+		t.Errorf("output = %q, want the headless no-tickets message", out.String())
 	}
 }
 

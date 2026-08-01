@@ -2,10 +2,15 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"path/filepath"
 
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ui/tickets"
 
 	"github.com/spf13/cobra"
 )
@@ -45,7 +50,7 @@ func runRalphLoop(epicName, agent, skill string, maxParallel, smartZone int, d d
 		return err
 	}
 
-	return ralphloop.Run(ralphloop.RunOptions{
+	opts := ralphloop.RunOptions{
 		EpicName: epicName,
 		Agent:    ralphloop.AgentKind(agent),
 		Skill:    skill,
@@ -58,7 +63,37 @@ func runRalphLoop(epicName, agent, skill string, maxParallel, smartZone int, d d
 		ScratchDir:  filepath.Join(cwd, ".scratch"),
 		MaxParallel: maxParallel,
 		SmartZone:   smartZone,
-	}, ralphloop.DefaultDeps(), ralphloop.NewTextEventSink(d.stdout))
+	}
+
+	if !isTerminalWriter(d.stdout) {
+		return ralphloop.Run(opts, ralphloop.DefaultDeps(), ralphloop.NewTextEventSink(d.stdout))
+	}
+	return runRalphLoopTUI(opts, cwd, d)
+}
+
+// runRalphLoopTUI launches the standalone ralph-loop TUI (mirroring
+// cmd/bump.go's own tea.NewProgram, rather than a tab registered in the main
+// gx app shell): the orchestrator loop runs in the background exactly as it
+// does headlessly, its text report discarded since nothing renders it yet
+// (see ticket 04's live orchestrator state), while the TUI polls
+// `.scratch/`'s Status: lines directly off disk to drive a flat, navigable,
+// previewable ticket list.
+func runRalphLoopTUI(opts ralphloop.RunOptions, worktreeRoot string, d deps) error {
+	go func() {
+		_ = ralphloop.Run(opts, ralphloop.DefaultDeps(), ralphloop.NewTextEventSink(io.Discard))
+	}()
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	settings := settingsFromConfig(cfg)
+	settings.EnableNavigation = false
+
+	m := tickets.NewFlatModel(worktreeRoot, opts.EpicName, settings)
+	p := tea.NewProgram(m, tea.WithInput(d.stdin), tea.WithOutput(d.stdout))
+	_, err = p.Run()
+	return err
 }
 
 func newRalphLoopResumeCmd(d deps) *cobra.Command {

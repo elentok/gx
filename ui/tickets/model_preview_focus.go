@@ -9,7 +9,6 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
-	"github.com/elentok/gx/ui/search"
 )
 
 // previewSelectionKey identifies which row's content the preview is
@@ -38,7 +37,7 @@ func (m *Model) syncPreviewViewport() {
 	}
 	_, previewW := m.splitWidth()
 	_, previewH := m.splitHeight(m.contentHeight())
-	width, height := m.previewInnerSize(previewW, previewH)
+	width, height := previewInnerSize(previewW, previewH)
 	contentW := max(width-previewScrollbarGutter, 1)
 
 	m.previewVP.SetWidth(contentW)
@@ -50,7 +49,7 @@ func (m *Model) syncPreviewViewport() {
 
 	content := m.previewContent(contentW)
 	if m.previewSearch.HasQuery() {
-		content = m.highlightPreviewContent(content)
+		content = highlightPreviewContent(content, m.previewSearch)
 	}
 	m.previewVP.SetContent(content)
 
@@ -63,60 +62,7 @@ func (m *Model) syncPreviewViewport() {
 // previewMatchStatus mirrors searchMatchStatus for the preview panel's own
 // search, shown as its panel's right-aligned header text.
 func (m Model) previewMatchStatus() string {
-	if m.previewSearch.HasQuery() && m.previewSearch.MatchesCount() > 0 {
-		return fmt.Sprintf("%d/%d matches", m.previewSearch.Cursor()+1, m.previewSearch.MatchesCount())
-	}
-	return ""
-}
-
-// recomputePreviewSearchMatches rebuilds the preview search's match set
-// against the viewport's current (already glamour-rendered) content lines:
-// case-insensitive substring over each line's plain text (ANSI stripped).
-// DataIndex doubles as the line index — the preview has no separate
-// "viewport row" concept the way the sidebar's row-based search does.
-func (m *Model) recomputePreviewSearchMatches() {
-	q := strings.ToLower(strings.TrimSpace(m.previewSearch.Query()))
-	if q == "" {
-		m.previewSearch.SetMatches(nil)
-		return
-	}
-	lines := strings.Split(m.previewVP.GetContent(), "\n")
-	matches := make([]search.Match, 0)
-	for i, line := range lines {
-		if strings.Contains(strings.ToLower(ansi.Strip(line)), q) {
-			matches = append(matches, search.Match{DataIndex: i})
-		}
-	}
-	m.previewSearch.SetMatches(matches)
-}
-
-// highlightPreviewContent wraps each search match in content (as built by
-// previewContent, before it's handed to the viewport) in the
-// search-highlight style. This must run on previewContent's own
-// word/run-level ANSI output, not on m.previewVP.View()'s further-processed
-// per-cell output — ansi.Cut mishandles heavily fragmented per-character
-// runs, corrupting the escape stream (see the preview-search-highlight fix).
-func (m Model) highlightPreviewContent(content string) string {
-	lines := strings.Split(content, "\n")
-	query := m.previewSearch.Query()
-	for i, line := range lines {
-		if matched, current := m.previewSearchMatch(i); matched {
-			lines[i] = highlightPreviewLine(line, query, current)
-		}
-	}
-	return strings.Join(lines, "\n")
-}
-
-// previewSearchMatch reports whether the preview content's line at absIdx
-// (its index into m.previewVP.GetContent(), not the currently visible
-// window) is a search match, and whether it's the match under the search
-// cursor (n/N target) — mirrors searchMatch's sidebar equivalent.
-func (m Model) previewSearchMatch(absIdx int) (matched, current bool) {
-	pos, ok := m.previewSearch.MatchPosByDataIndex(absIdx)
-	if !ok {
-		return false, false
-	}
-	return true, pos == m.previewSearch.Cursor()
+	return previewSearchMatchStatus(m.previewSearch)
 }
 
 // highlightPreviewLine wraps query's first match on an already
@@ -187,18 +133,6 @@ func highlightPreviewLine(line, query string, current bool) string {
 	return prefix.String() + style.Render(matched.String()) + suffix.String()
 }
 
-// jumpToCurrentPreviewMatch scrolls the preview viewport so the search
-// cursor's current match line is visible, centering it when the viewport is
-// tall enough to make that meaningful.
-func (m *Model) jumpToCurrentPreviewMatch() {
-	match, ok := m.previewSearch.Match(m.previewSearch.Cursor())
-	if !ok {
-		return
-	}
-	offset := match.DataIndex - m.previewVP.Height()/2
-	m.previewVP.SetYOffset(max(offset, 0))
-}
-
 // focusPreviewOrExpand implements "l"/"enter": on a ticket row, or on an
 // epic row that's already expanded, it hands focus to the preview panel to
 // scroll/search its body. On a collapsed epic row it instead reports false
@@ -223,14 +157,7 @@ func (m *Model) focusPreviewOrExpand() bool {
 // (j/k, up/down, pgup/pgdn, ctrl+u/d, etc. — see bubbles/viewport's
 // DefaultKeyMap).
 func (m Model) handlePreviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if nextSearch, cmd, result := m.previewSearch.Update(msg); result.Handled {
-		m.previewSearch = nextSearch
-		if result.QueryChanged {
-			m.recomputePreviewSearchMatches()
-		}
-		if result.QueryChanged || result.CursorChanged {
-			m.jumpToCurrentPreviewMatch()
-		}
+	if handled, cmd := updatePreviewSearchKey(msg, &m.previewVP, &m.previewSearch); handled {
 		return m, cmd
 	}
 
