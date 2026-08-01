@@ -31,6 +31,20 @@ const defaultSmartZone = 150_000
 // roughly this cadence instead of only once the agent settles.
 const smartZonePollMs = 30_000
 
+// finishDebounceMs is how long waitForFinish and finishIteration each pause
+// before re-checking a just-reached "finished" signal, and finishConfirmMs is
+// how long that recheck waits for the agent to prove it's still finished.
+// herdr's idle/done status reflects pane output settling, not a genuine
+// end-of-turn signal, so an agent that briefly stops producing output mid-turn
+// (e.g. between its last tool call and a commit) can look finished for an
+// instant. Without this debounce the loop would declare the iteration done,
+// mark it needs-info (no commits yet), and abandon the worktree/tab while the
+// agent went on to actually finish and commit — orphaning real, landed work.
+const (
+	finishDebounceMs = 3_000
+	finishConfirmMs  = 2_000
+)
+
 // AgentKind identifies the coding agent that drives an iteration.
 type AgentKind string
 
@@ -560,6 +574,19 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 		return fmt.Errorf("counting commits ahead of %s: %w", base, err)
 	}
 	if ahead == 0 {
+		// waitForFinish's own debounce (confirmFinished) already guards against
+		// herdr reporting the agent idle mid-turn, but a commit can still land
+		// in the gap between that confirmation and this check (e.g. a reattached
+		// iteration, which skips waitForFinish's launch-time debounce entirely).
+		// Recheck once more before giving up rather than orphaning a commit
+		// that lands moments later.
+		d.Sleep(finishDebounceMs * time.Millisecond)
+		ahead, err = d.CommitsAhead(path, base, branch)
+		if err != nil {
+			return fmt.Errorf("counting commits ahead of %s: %w", base, err)
+		}
+	}
+	if ahead == 0 {
 		// The agent finished without landing any commits: leave the worktree/
 		// tab in place for inspection instead of silently marking done or
 		// retrying, and let the scheduler move on to other unblocked tickets.
@@ -931,6 +958,17 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 				elapsedMs = 0
 				continue
 			}
+			confirmed, err := confirmFinished(d, p.Pane, until)
+			if err != nil {
+				return fmt.Errorf("confirming %s finished: %w", p.Label, err)
+			}
+			if !confirmed {
+				// The agent went back to work in the debounce window (see
+				// finishDebounceMs): this was a transient idle blip, not a real
+				// finish, so keep waiting instead of declaring victory early.
+				elapsedMs = 0
+				continue
+			}
 			p.logLifecycleEvent(p.FinishEvent, sessionID)
 			return nil
 		}
@@ -995,6 +1033,27 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 		p.logLifecycleEvent(eventResumed, sessionID)
 		elapsedMs = 0
 	}
+}
+
+// confirmFinished debounces a just-reached idle/done signal on pane: it
+// pauses finishDebounceMs, then re-polls for up to finishConfirmMs to see
+// whether the agent is still in one of until's finish states. A poll timeout
+// (the agent went back to "working" in the meantime) means the original
+// signal was a transient blip, not a real finish.
+func confirmFinished(d Deps, pane string, until []string) (bool, error) {
+	d.Sleep(finishDebounceMs * time.Millisecond)
+	_, err := d.AgentWait(herdr.AgentWaitOptions{
+		Target:    pane,
+		Until:     until,
+		TimeoutMs: finishConfirmMs,
+	})
+	if err == nil {
+		return true, nil
+	}
+	if isPollTimeout(err) {
+		return false, nil
+	}
+	return false, err
 }
 
 func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, limit codexsession.RateLimit) error {

@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -554,7 +555,11 @@ func TestRun_MaxParallelOne_RunsSerially(t *testing.T) {
 // gatedAgentWait wraps a fakeDeps' AgentWait so that only the "wait for the
 // agent to finish" call (the one whose Until includes "done") blocks until
 // released, letting a test control exactly when each iteration completes and
-// observe how many run concurrently in between.
+// observe how many run concurrently in between. waitForFinish's
+// confirmFinished re-polls the same pane once more (with the same Until list)
+// before treating it as genuinely finished, so a pane's gate — once created —
+// is reused (and returns immediately once released) rather than re-armed on
+// every call: only the first call per pane blocks and reports on started.
 func gatedAgentWait(next func(herdr.AgentWaitOptions) (herdr.Agent, error)) (
 	wait func(herdr.AgentWaitOptions) (herdr.Agent, error),
 	started <-chan string,
@@ -575,12 +580,17 @@ func gatedAgentWait(next func(herdr.AgentWaitOptions) (herdr.Agent, error)) (
 			return next(opts)
 		}
 
-		gate := make(chan struct{})
 		mu.Lock()
-		gates[opts.Target] = gate
+		gate, exists := gates[opts.Target]
+		if !exists {
+			gate = make(chan struct{})
+			gates[opts.Target] = gate
+		}
 		mu.Unlock()
 
-		startedCh <- opts.Target
+		if !exists {
+			startedCh <- opts.Target
+		}
 		<-gate
 		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 	}
@@ -822,6 +832,95 @@ func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {
 	}
 	if !strings.Contains(string(raw02), "Status:** done") {
 		t.Errorf("ticket 02 not marked done:\n%s", raw02)
+	}
+}
+
+// TestRun_TransientIdleBlip_DoesNotOrphanCommit reproduces the ticket-05
+// incident: herdr reported the agent idle for one poll, then it went back to
+// work and committed shortly after. waitForFinish's confirmFinished recheck
+// (loop.go) should catch that the first idle signal didn't hold and keep
+// waiting instead of the loop marking the ticket needs-info and abandoning a
+// worktree that was about to land a commit.
+func TestRun_TransientIdleBlip_DoesNotOrphanCommit(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "# A\n\n**Status:** open\n",
+	})
+	d, _, removed := fakeDeps()
+
+	var finishCalls int32
+	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+		if !slices.Contains(opts.Until, "done") {
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		}
+		if atomic.AddInt32(&finishCalls, 1) == 2 {
+			// The debounce recheck: the agent went back to work in the
+			// meantime, so this "confirm" poll should see it still busy.
+			return herdr.Agent{}, errors.New("timed out waiting for agent")
+		}
+		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+	}
+
+	var out bytes.Buffer
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if got := atomic.LoadInt32(&finishCalls); got < 3 {
+		t.Fatalf("AgentWait finish-poll calls = %d, want at least 3 (initial idle, failed confirm, real finish)", got)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw), "Status:** done") {
+		t.Errorf("ticket not marked done despite the agent finishing after the transient blip:\n%s", raw)
+	}
+	if strings.Contains(string(raw), "Status:** needs-info") {
+		t.Errorf("ticket wrongly marked needs-info from a transient idle blip:\n%s", raw)
+	}
+	if len(*removed) != 1 {
+		t.Errorf("removed worktree branches = %v, want the iteration's worktree removed", *removed)
+	}
+}
+
+// TestRun_CommitLandsDuringNeedsInfoRecheck_MarksDoneNotNeedsInfo covers
+// finishIteration's own recheck (loop.go): even after waitForFinish's
+// confirmFinished settles on "finished", a commit can still land in the
+// window before CommitsAhead is checked (e.g. a reattached iteration, which
+// skips waitForFinish's debounce). The recheck should catch it instead of
+// orphaning the ticket as needs-info.
+func TestRun_CommitLandsDuringNeedsInfoRecheck_MarksDoneNotNeedsInfo(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "# A\n\n**Status:** open\n",
+	})
+	d, _, removed := fakeDeps()
+
+	var calls int32
+	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
+		if atomic.AddInt32(&calls, 1) == 1 {
+			return 0, nil
+		}
+		return 1, nil
+	}
+
+	var out bytes.Buffer
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw), "Status:** done") {
+		t.Errorf("ticket not marked done after commit landed on recheck:\n%s", raw)
+	}
+	if strings.Contains(string(raw), "Status:** needs-info") {
+		t.Errorf("ticket wrongly marked needs-info despite commit landing on recheck:\n%s", raw)
+	}
+	if len(*removed) != 1 {
+		t.Errorf("removed worktree branches = %v, want the iteration's worktree removed", *removed)
 	}
 }
 
