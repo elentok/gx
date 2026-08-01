@@ -587,13 +587,36 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 // iteration's context-window occupancy and session id alongside Status when
 // sessionID is a live, fresh-iteration session (runIteration's case) and its
 // occupancy is available — a reattached close (sessionID == "") has no live
-// session to read occupancy from, and is covered instead by ticket 06a's
-// log-based backfill.
+// session of its own to read occupancy from, so it backfills from the
+// ticket's original iteration-started session in the run log instead.
 func markDoneStampingCloseMetadata(d Deps, p iterationParams, cwd, sessionID string) error {
 	if sessionID == "" {
-		return MarkDone(p.Ticket.Path)
+		return backfillDoneMetadata(d, p)
 	}
 	occupancy, ok, occErr := contextOccupancy(d, p.Agent, cwd, sessionID)
+	if occErr != nil || !ok {
+		return MarkDone(p.Ticket.Path)
+	}
+	return MarkDoneWithMetadata(p.Ticket.Path, occupancy, sessionID)
+}
+
+// backfillDoneMetadata handles a reattached ticket close: it looks up the
+// ticket's original iteration-started session from the run log (ticket 06a)
+// and stamps context-window/session from that session's own transcript,
+// rather than leaving the fields blank or attributing them to a fresh
+// session that didn't do the work. Falls back to a plain MarkDone whenever
+// no prior session can be found, or its occupancy can't be read — these
+// fields are a best-effort convenience, not required for a ticket to close.
+func backfillDoneMetadata(d Deps, p iterationParams) error {
+	events, ok, err := readEvents(p.ScratchDir, p.FeatureBranch)
+	if err != nil || !ok {
+		return MarkDone(p.Ticket.Path)
+	}
+	sessionID, sessionCwd, agent, ok := lastIterationSession(events, p.Ticket.Number)
+	if !ok {
+		return MarkDone(p.Ticket.Path)
+	}
+	occupancy, ok, occErr := contextOccupancy(d, agent, sessionCwd, sessionID)
 	if occErr != nil || !ok {
 		return MarkDone(p.Ticket.Path)
 	}

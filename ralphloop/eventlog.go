@@ -101,6 +101,26 @@ func logEvent(scratchDir, epicName string, ev Event) error {
 	return err
 }
 
+// lastIterationSession finds the most recent iteration-started event for
+// ticketNumber with a recorded AgentSession — the session id/cwd/agent to
+// backfill a reattached ticket close's metadata with (ticket 06a), since the
+// reattaching run never captured a fresh session of its own. Agent defaults
+// to AgentClaude for historical logs that omitted it (see Event.Agent).
+func lastIterationSession(events []Event, ticketNumber int) (agentSession, cwd string, agent AgentKind, ok bool) {
+	for i := len(events) - 1; i >= 0; i-- {
+		ev := events[i]
+		if ev.Ticket != ticketNumber || ev.Type != eventIterationStarted || ev.AgentSession == "" {
+			continue
+		}
+		agent = ev.Agent
+		if agent == "" {
+			agent = AgentClaude
+		}
+		return ev.AgentSession, ev.Cwd, agent, true
+	}
+	return "", "", "", false
+}
+
 // readEvents reads and parses every line of epicName's run-log.jsonl under
 // scratchDir, skipping malformed lines rather than failing the whole read
 // (a run-log written by a process killed mid-write may have a torn final

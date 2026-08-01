@@ -96,6 +96,48 @@ func TestReadEvents_SkipsMalformedTrailingLine(t *testing.T) {
 	}
 }
 
+func TestLastIterationSession_ReturnsMostRecentMatchingTicket(t *testing.T) {
+	events := []Event{
+		{Type: eventIterationStarted, Ticket: 1, Agent: AgentClaude, AgentSession: "sess-1a", Cwd: "/cwd-1a"},
+		{Type: eventIterationFinished, Ticket: 1},
+		{Type: eventNeedsInfo, Ticket: 1},
+		{Type: eventIterationStarted, Ticket: 1, Agent: AgentClaude, AgentSession: "sess-1b", Cwd: "/cwd-1b"},
+		{Type: eventIterationStarted, Ticket: 2, Agent: AgentClaude, AgentSession: "sess-2", Cwd: "/cwd-2"},
+	}
+
+	session, cwd, agent, ok := lastIterationSession(events, 1)
+	if !ok {
+		t.Fatal("ok = false, want true")
+	}
+	if session != "sess-1b" || cwd != "/cwd-1b" || agent != AgentClaude {
+		t.Errorf("got (session=%q, cwd=%q, agent=%q), want the most recent iteration-started for ticket 1 (sess-1b/cwd-1b)", session, cwd, agent)
+	}
+}
+
+func TestLastIterationSession_DefaultsAgentForHistoricalLogs(t *testing.T) {
+	events := []Event{
+		{Type: eventIterationStarted, Ticket: 1, AgentSession: "sess-1"},
+	}
+	_, _, agent, ok := lastIterationSession(events, 1)
+	if !ok {
+		t.Fatal("ok = false, want true")
+	}
+	if agent != AgentClaude {
+		t.Errorf("agent = %q, want AgentClaude default for an event with no recorded Agent", agent)
+	}
+}
+
+func TestLastIterationSession_NoMatch_OkFalse(t *testing.T) {
+	events := []Event{
+		{Type: eventIterationStarted, Ticket: 2, AgentSession: "sess-2"},
+		{Type: eventIterationStarted, Ticket: 1, AgentSession: ""},
+	}
+	_, _, _, ok := lastIterationSession(events, 1)
+	if ok {
+		t.Error("ok = true, want false when no matching event has a recorded session")
+	}
+}
+
 func TestLogEvent_ConcurrentAppends_NeverInterleave(t *testing.T) {
 	dir := t.TempDir()
 	var wg sync.WaitGroup

@@ -593,6 +593,88 @@ func TestRun_RestartWithClaimedTicketAlreadyIdle_SkipsWaitAndCherryPicks(t *test
 	}
 }
 
+// TestRun_ReattachedClose_BackfillsContextAndSessionFromRunLog exercises
+// ticket 06a: a reattached iteration has no live session id of its own this
+// run, so its close backfills Context window/Session from the ticket's
+// original iteration-started event in the run log instead of leaving them
+// blank.
+func TestRun_ReattachedClose_BackfillsContextAndSessionFromRunLog(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "# A\n\n**Status:** claimed\n",
+	})
+	if err := logEvent(scratchDir, "epic", Event{
+		Type:         eventIterationStarted,
+		Ticket:       1,
+		Agent:        AgentClaude,
+		AgentSession: "sess-original",
+		Cwd:          "/fake/worktrees/iter-01",
+	}); err != nil {
+		t.Fatalf("logEvent: %v", err)
+	}
+
+	d, _, _ := fakeDeps()
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
+		return []herdr.Tab{{TabID: "tab-iter-01", Label: "iter-01", WorkspaceID: workspaceID}}, nil
+	}
+	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
+		if cwd == "/fake/worktrees/iter-01" && sessionID == "sess-original" {
+			return 54321, true, nil
+		}
+		return 0, false, nil
+	}
+
+	var out strings.Builder
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	got := string(raw)
+	if !strings.Contains(got, "Status:** done") {
+		t.Errorf("reattached ticket not marked done:\n%s", got)
+	}
+	if !strings.Contains(got, "Context window:** 54321") {
+		t.Errorf("ticket missing backfilled context window field:\n%s", got)
+	}
+	if !strings.Contains(got, "Session:** sess-original") {
+		t.Errorf("ticket missing backfilled session field:\n%s", got)
+	}
+}
+
+// TestRun_ReattachedClose_NoPriorSessionInLog_OmitsMetadata verifies the
+// ticket 06a edge case: when the run log has no iteration-started event to
+// recover a session id from, the reattached close still marks the ticket
+// done, without writing a blank or wrong Context window/Session field.
+func TestRun_ReattachedClose_NoPriorSessionInLog_OmitsMetadata(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "# A\n\n**Status:** claimed\n",
+	})
+	d, _, _ := fakeDeps()
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
+		return []herdr.Tab{{TabID: "tab-iter-01", Label: "iter-01", WorkspaceID: workspaceID}}, nil
+	}
+
+	var out strings.Builder
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	got := string(raw)
+	if !strings.Contains(got, "Status:** done") {
+		t.Errorf("reattached ticket not marked done:\n%s", got)
+	}
+	if strings.Contains(got, "Context window:") || strings.Contains(got, "Session:") {
+		t.Errorf("ticket should omit metadata fields with no prior session in the run log, got:\n%s", got)
+	}
+}
+
 // TestReconcile_DoneTicketRecoverable_AutoRecherryPicksAndReports exercises
 // ticket 02: a done ticket classified doneRecoverable (its landed commit
 // missing from the feature branch, but its iteration branch still holds it)
