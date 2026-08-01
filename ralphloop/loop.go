@@ -197,7 +197,7 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 		}
 		ticket = frontier[0]
 		if err := Claim(ticket.Path); err != nil {
-			return tickets.Ticket{}, false, fmt.Errorf("claiming ticket %d: %w", ticket.Number, err)
+			return tickets.Ticket{}, false, fmt.Errorf("claiming ticket %s: %w", ticket.Identifier, err)
 		}
 		return ticket, true, nil
 	}
@@ -249,7 +249,7 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 	}
 	for _, ticket := range initial.Tickets {
 		if strings.EqualFold(strings.TrimSpace(ticket.Status), "needs-attention") {
-			gate.pause(iterLabel(ticket.Number), "needs operator attention")
+			gate.pause(iterLabel(ticket.Identifier), "needs operator attention")
 		}
 	}
 	for _, ticket := range reattached {
@@ -292,10 +292,10 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 				<-results
 				active--
 			}
-			return fmt.Errorf("ticket %02d: %w", r.ticket.Number, r.err)
+			return fmt.Errorf("ticket %s: %w", r.ticket.Identifier, r.err)
 		}
 
-		report("ticket %02d %q landed on %s\n", r.ticket.Number, r.ticket.Title, opts.EpicName)
+		report("ticket %s %q landed on %s\n", r.ticket.Identifier, r.ticket.Title, opts.EpicName)
 		completed++
 	}
 
@@ -388,7 +388,7 @@ func (p iterationParams) launchAndPromptParams(label, pane, tab, prompt, session
 		Gate:             p.Gate,
 		ResumeSignalPath: p.ResumeSignalPath,
 		Report:           p.Report,
-		Ticket:           p.Ticket.Number,
+		Ticket:           p.Ticket.Identifier,
 		TicketPath:       p.Ticket.Path,
 		ScratchDir:       p.ScratchDir,
 		EpicName:         p.FeatureBranch,
@@ -419,7 +419,7 @@ func (p iterationParams) logTicketEventReason(eventType, pane, tab, agentSession
 func (p iterationParams) logTicketEventSHA(eventType, pane, tab, agentSession, cwd, reason, sha string) {
 	_ = logEvent(p.ScratchDir, p.FeatureBranch, Event{
 		Type:         eventType,
-		Ticket:       p.Ticket.Number,
+		Ticket:       p.Ticket.Identifier,
 		Agent:        p.Agent,
 		Pane:         pane,
 		Tab:          tab,
@@ -437,8 +437,8 @@ func (p iterationParams) logTicketEventSHA(eventType, pane, tab, agentSession, c
 // commits, the ticket is marked needs-info instead and the worktree/tab are
 // left in place for inspection.
 func runIteration(d Deps, p iterationParams) error {
-	label := iterLabel(p.Ticket.Number)
-	branch := iterBranch(p.Ticket.Number)
+	label := iterLabel(p.Ticket.Identifier)
+	branch := iterBranch(p.Ticket.Identifier)
 	path := filepath.Join(p.WorktreeDir, label)
 
 	base, err := d.RevParse(p.FeatureWorktree, p.FeatureBranch)
@@ -492,8 +492,8 @@ func runIteration(d Deps, p iterationParams) error {
 // current tip, since the feature branch may have advanced past this
 // iteration's original branch point while the prior invocation was down.
 func reattachIteration(d Deps, p iterationParams) error {
-	label := iterLabel(p.Ticket.Number)
-	branch := iterBranch(p.Ticket.Number)
+	label := iterLabel(p.Ticket.Identifier)
+	branch := iterBranch(p.Ticket.Identifier)
 	path := filepath.Join(p.WorktreeDir, label)
 
 	tabs, err := d.TabList(p.WorkspaceID)
@@ -612,7 +612,7 @@ func backfillDoneMetadata(d Deps, p iterationParams) error {
 	if err != nil || !ok {
 		return MarkDone(p.Ticket.Path)
 	}
-	sessionID, sessionCwd, agent, ok := lastIterationSession(events, p.Ticket.Number)
+	sessionID, sessionCwd, agent, ok := lastIterationSession(events, p.Ticket.Identifier)
 	if !ok {
 		return MarkDone(p.Ticket.Path)
 	}
@@ -738,7 +738,7 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 // its agent session id. The iteration's own worktree/tab are untouched
 // while this runs.
 func resolveCherryPickConflict(d Deps, p iterationParams) (string, error) {
-	label := conflictLabel(p.Ticket.Number)
+	label := conflictLabel(p.Ticket.Identifier)
 
 	tab, err := d.TabCreate(herdr.TabCreateOptions{
 		WorkspaceID: p.WorkspaceID,
@@ -785,8 +785,10 @@ type launchAndPromptParams struct {
 	Report func(format string, args ...any)
 
 	// Ticket, TicketPath, ScratchDir, and EpicName locate the run-log.jsonl entries this
-	// call logs (see eventlog.go).
-	Ticket     int
+	// call logs (see eventlog.go). Ticket is the ticket's Identifier (not
+	// Number), so lettered split siblings sharing a Number are distinguishable
+	// in the run log.
+	Ticket     string
 	TicketPath string
 	ScratchDir string
 	EpicName   string
@@ -1122,16 +1124,20 @@ func isPollTimeout(err error) bool {
 	return err != nil && strings.Contains(strings.ToLower(err.Error()), "timed out")
 }
 
-func iterLabel(ticketNumber int) string {
-	return fmt.Sprintf("iter-%02d", ticketNumber)
+// iterLabel/iterBranch/conflictLabel key off a ticket's Identifier (the
+// filename's full "NN[letter]" prefix), not its Number, so that lettered
+// split siblings sharing the same Number (e.g. "04a"/"04b") get distinct
+// labels/branches/worktree paths instead of colliding on "iter-04".
+func iterLabel(identifier string) string {
+	return "iter-" + identifier
 }
 
-func iterBranch(ticketNumber int) string {
-	return "ralph-loop/" + iterLabel(ticketNumber)
+func iterBranch(identifier string) string {
+	return "ralph-loop/" + iterLabel(identifier)
 }
 
-func conflictLabel(ticketNumber int) string {
-	return fmt.Sprintf("conflict-%02d", ticketNumber)
+func conflictLabel(identifier string) string {
+	return "conflict-" + identifier
 }
 
 // loadNamedEpic loads scratchDir and returns the epic named name, or nil if

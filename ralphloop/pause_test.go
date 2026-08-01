@@ -188,7 +188,7 @@ func TestWaitForFinish_CodexBlockedMarksNeedsAttentionThenRecovers(t *testing.T)
 	}
 
 	if err := waitForFinish(d, launchAndPromptParams{
-		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Ticket: 1, TicketPath: ticketPath,
+		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
 		ScratchDir: scratchDir, EpicName: "epic", Gate: gate,
 	}, "codex-session-1"); err != nil {
 		t.Fatalf("waitForFinish: %v", err)
@@ -242,7 +242,7 @@ func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsAttention(t *testing.T) {
 	}
 
 	if err := waitForFinish(d, launchAndPromptParams{
-		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Ticket: 1, TicketPath: ticketPath,
+		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
 		Gate: gate,
 	}, "codex-session-1"); err != nil {
 		t.Fatalf("waitForFinish: %v", err)
@@ -313,7 +313,7 @@ func TestWaitForFinish_ManualAttentionRecheckKeepsBlockedTicketPaused(t *testing
 	}
 
 	if err := waitForFinish(d, launchAndPromptParams{
-		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Ticket: 1, TicketPath: ticketPath,
+		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
 		ScratchDir: scratchDir, EpicName: "epic", Gate: gate,
 		Report: func(format string, args ...any) { fmt.Fprintf(&reports, format, args...) },
 	}, "codex-session-1"); err != nil {
@@ -476,7 +476,7 @@ func TestRun_SmartZoneBreach_PausesResumesAndKeepsSchedulingCorrect(t *testing.T
 	}
 	sawPause := false
 	for _, ev := range midPauseEvents {
-		if ev.Type == eventPausedSmartZone && ev.Ticket == 1 {
+		if ev.Type == eventPausedSmartZone && ev.Ticket == "01" {
 			sawPause = true
 		}
 	}

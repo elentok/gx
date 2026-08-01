@@ -33,9 +33,12 @@ const (
 // events, or the install command run (empty if none matched) for
 // deps-installed events.
 type Event struct {
-	Time         time.Time `json:"time"`
-	Type         string    `json:"type"`
-	Ticket       int       `json:"ticket"`
+	Time time.Time `json:"time"`
+	Type string    `json:"type"`
+	// Ticket is the ticket's Identifier (the filename's full "NN[letter]"
+	// prefix), not its Number, so lettered split siblings sharing a Number
+	// (e.g. "04a"/"04b") remain distinguishable in the run log.
+	Ticket       string    `json:"ticket"`
 	Agent        AgentKind `json:"agent,omitempty"`
 	Pane         string    `json:"pane,omitempty"`
 	Tab          string    `json:"tab,omitempty"`
@@ -102,14 +105,16 @@ func logEvent(scratchDir, epicName string, ev Event) error {
 }
 
 // lastIterationSession finds the most recent iteration-started event for
-// ticketNumber with a recorded AgentSession — the session id/cwd/agent to
-// backfill a reattached ticket close's metadata with (ticket 06a), since the
-// reattaching run never captured a fresh session of its own. Agent defaults
-// to AgentClaude for historical logs that omitted it (see Event.Agent).
-func lastIterationSession(events []Event, ticketNumber int) (agentSession, cwd string, agent AgentKind, ok bool) {
+// identifier (a ticket's Identifier, not Number, so lettered split siblings
+// aren't cross-attributed) with a recorded AgentSession — the session
+// id/cwd/agent to backfill a reattached ticket close's metadata with (ticket
+// 06a), since the reattaching run never captured a fresh session of its own.
+// Agent defaults to AgentClaude for historical logs that omitted it (see
+// Event.Agent).
+func lastIterationSession(events []Event, identifier string) (agentSession, cwd string, agent AgentKind, ok bool) {
 	for i := len(events) - 1; i >= 0; i-- {
 		ev := events[i]
-		if ev.Ticket != ticketNumber || ev.Type != eventIterationStarted || ev.AgentSession == "" {
+		if ev.Ticket != identifier || ev.Type != eventIterationStarted || ev.AgentSession == "" {
 			continue
 		}
 		agent = ev.Agent

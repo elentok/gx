@@ -219,8 +219,8 @@ func TestRun_LogsLifecycleEvents_LinearChain(t *testing.T) {
 		if events[i].Type != want {
 			t.Errorf("events[%d].Type = %q, want %q", i, events[i].Type, want)
 		}
-		if events[i].Ticket != 1 {
-			t.Errorf("events[%d].Ticket = %d, want 1", i, events[i].Ticket)
+		if events[i].Ticket != "01" {
+			t.Errorf("events[%d].Ticket = %q, want %q", i, events[i].Ticket, "01")
 		}
 	}
 	wantSession := "sess-pane-iter-01"
@@ -331,7 +331,7 @@ func TestRun_LogsNeedsInfoEvent_OnZeroCommitIteration(t *testing.T) {
 	}
 	var needsInfo *Event
 	for i, ev := range events {
-		if ev.Type == eventNeedsInfo && ev.Ticket == 1 {
+		if ev.Type == eventNeedsInfo && ev.Ticket == "01" {
 			needsInfo = &events[i]
 		}
 		if ev.Type == eventCherryPicked {

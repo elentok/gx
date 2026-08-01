@@ -82,13 +82,13 @@ func TestReport_SingleTicket_PrintsOrderAndCost(t *testing.T) {
 		[3]any{"claude-sonnet-5", 2000, 5000},
 	)
 
-	if err := logEvent(scratchDir, "epic", Event{Time: start, Type: eventIterationStarted, Ticket: 1, AgentSession: "sess-1", Cwd: cwd}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Time: start, Type: eventIterationStarted, Ticket: "01", AgentSession: "sess-1", Cwd: cwd}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
-	if err := logEvent(scratchDir, "epic", Event{Time: start.Add(2 * time.Second), Type: eventIterationFinished, Ticket: 1, AgentSession: "sess-1", Cwd: cwd}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Time: start.Add(2 * time.Second), Type: eventIterationFinished, Ticket: "01", AgentSession: "sess-1", Cwd: cwd}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
-	if err := logEvent(scratchDir, "epic", Event{Time: start.Add(2 * time.Second), Type: eventCherryPicked, Ticket: 1}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Time: start.Add(2 * time.Second), Type: eventCherryPicked, Ticket: "01"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 
@@ -122,10 +122,10 @@ func TestReport_DepsInstalledEvent_PrintsCommand(t *testing.T) {
 	scratchDir := t.TempDir()
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
-	if err := logEvent(scratchDir, "epic", Event{Time: start, Type: eventDepsInstalled, Ticket: 1, Cwd: "/fake/iter-01", Reason: "npm ci"}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Time: start, Type: eventDepsInstalled, Ticket: "01", Cwd: "/fake/iter-01", Reason: "npm ci"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
-	if err := logEvent(scratchDir, "epic", Event{Time: start.Add(time.Second), Type: eventCherryPicked, Ticket: 1}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Time: start.Add(time.Second), Type: eventCherryPicked, Ticket: "01"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 
@@ -144,7 +144,7 @@ func TestReport_NoDepsInstalledEvent_OmitsDepsLine(t *testing.T) {
 	scratchDir := t.TempDir()
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
-	if err := logEvent(scratchDir, "epic", Event{Time: start, Type: eventCherryPicked, Ticket: 1}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Time: start, Type: eventCherryPicked, Ticket: "01"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 
@@ -164,10 +164,10 @@ func TestReport_CodexSessionPrintsDurationPeakContextTokensAndNoCost(t *testing.
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	writeFakeCodexSession(t, cwd, "codex-1", start)
 
-	if err := logEvent(scratchDir, "epic", Event{Time: start, Type: eventIterationStarted, Ticket: 1, Agent: AgentCodex, AgentSession: "codex-1", Cwd: cwd}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Time: start, Type: eventIterationStarted, Ticket: "01", Agent: AgentCodex, AgentSession: "codex-1", Cwd: cwd}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
-	if err := logEvent(scratchDir, "epic", Event{Time: start.Add(4 * time.Second), Type: eventIterationFinished, Ticket: 1, Agent: AgentCodex, AgentSession: "codex-1", Cwd: cwd}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Time: start.Add(4 * time.Second), Type: eventIterationFinished, Ticket: "01", Agent: AgentCodex, AgentSession: "codex-1", Cwd: cwd}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 
@@ -186,7 +186,7 @@ func TestReport_CodexSessionPrintsDurationPeakContextTokensAndNoCost(t *testing.
 func TestReport_CodexSessionMissingStillPrintsUnknownMetricsAndNoCost(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	scratchDir := t.TempDir()
-	if err := logEvent(scratchDir, "epic", Event{Type: eventIterationStarted, Ticket: 1, Agent: AgentCodex, AgentSession: "not-local", Cwd: "/fake/iter-01"}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Type: eventIterationStarted, Ticket: "01", Agent: AgentCodex, AgentSession: "not-local", Cwd: "/fake/iter-01"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 
@@ -215,10 +215,10 @@ func TestReport_MixedAgentsPreservesOrderConcurrencyAndClaudeCost(t *testing.T) 
 	events := []Event{
 		// Deliberately append the later event first: concurrent writers may
 		// acquire the run-log lock in a different order than their timestamps.
-		{Time: start.Add(time.Second), Type: eventIterationStarted, Ticket: 1, Agent: AgentClaude, AgentSession: "claude-1", Cwd: "/fake/iter-01"},
-		{Time: start, Type: eventIterationStarted, Ticket: 2, Agent: AgentCodex, AgentSession: "codex-2", Cwd: "/fake/iter-02"},
-		{Time: start.Add(4 * time.Second), Type: eventIterationFinished, Ticket: 2, Agent: AgentCodex, AgentSession: "codex-2", Cwd: "/fake/iter-02"},
-		{Time: start.Add(5 * time.Second), Type: eventIterationFinished, Ticket: 1, Agent: AgentClaude, AgentSession: "claude-1", Cwd: "/fake/iter-01"},
+		{Time: start.Add(time.Second), Type: eventIterationStarted, Ticket: "01", Agent: AgentClaude, AgentSession: "claude-1", Cwd: "/fake/iter-01"},
+		{Time: start, Type: eventIterationStarted, Ticket: "02", Agent: AgentCodex, AgentSession: "codex-2", Cwd: "/fake/iter-02"},
+		{Time: start.Add(4 * time.Second), Type: eventIterationFinished, Ticket: "02", Agent: AgentCodex, AgentSession: "codex-2", Cwd: "/fake/iter-02"},
+		{Time: start.Add(5 * time.Second), Type: eventIterationFinished, Ticket: "01", Agent: AgentClaude, AgentSession: "claude-1", Cwd: "/fake/iter-01"},
 	}
 	for _, event := range events {
 		if err := logEvent(scratchDir, "epic", event); err != nil {
@@ -262,23 +262,23 @@ func TestReport_OverlappingTickets_GroupedAsConcurrent(t *testing.T) {
 	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// Ticket 1: [0s, 10s]; Ticket 2: [5s, 15s] — overlaps ticket 1.
-	if err := logEvent(scratchDir, "epic", Event{Time: base, Type: eventIterationStarted, Ticket: 1}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Time: base, Type: eventIterationStarted, Ticket: "01"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
-	if err := logEvent(scratchDir, "epic", Event{Time: base.Add(5 * time.Second), Type: eventIterationStarted, Ticket: 2}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Time: base.Add(5 * time.Second), Type: eventIterationStarted, Ticket: "02"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
-	if err := logEvent(scratchDir, "epic", Event{Time: base.Add(10 * time.Second), Type: eventIterationFinished, Ticket: 1}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Time: base.Add(10 * time.Second), Type: eventIterationFinished, Ticket: "01"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
-	if err := logEvent(scratchDir, "epic", Event{Time: base.Add(15 * time.Second), Type: eventIterationFinished, Ticket: 2}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Time: base.Add(15 * time.Second), Type: eventIterationFinished, Ticket: "02"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 	// Ticket 3 runs entirely after both, no overlap.
-	if err := logEvent(scratchDir, "epic", Event{Time: base.Add(20 * time.Second), Type: eventIterationStarted, Ticket: 3}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Time: base.Add(20 * time.Second), Type: eventIterationStarted, Ticket: "03"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
-	if err := logEvent(scratchDir, "epic", Event{Time: base.Add(25 * time.Second), Type: eventIterationFinished, Ticket: 3}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Time: base.Add(25 * time.Second), Type: eventIterationFinished, Ticket: "03"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 
@@ -301,10 +301,10 @@ func TestReport_SessionTranscriptMissing_ShowsUnknownDurationNoError(t *testing.
 	t.Setenv("HOME", home)
 	scratchDir := t.TempDir()
 
-	if err := logEvent(scratchDir, "epic", Event{Type: eventIterationStarted, Ticket: 1, AgentSession: "sess-gone", Cwd: "/fake/iter-01"}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Type: eventIterationStarted, Ticket: "01", AgentSession: "sess-gone", Cwd: "/fake/iter-01"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
-	if err := logEvent(scratchDir, "epic", Event{Type: eventIterationFinished, Ticket: 1, AgentSession: "sess-gone", Cwd: "/fake/iter-01"}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Type: eventIterationFinished, Ticket: "01", AgentSession: "sess-gone", Cwd: "/fake/iter-01"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 
@@ -321,7 +321,7 @@ func TestReport_UsesTicketTitlesFromEpicWhenAvailable(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-first-ticket.md": "# First ticket\n\n**Status:** done\n",
 	})
-	if err := logEvent(scratchDir, "epic", Event{Type: eventIterationStarted, Ticket: 1}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Type: eventIterationStarted, Ticket: "01"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 

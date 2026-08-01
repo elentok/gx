@@ -143,6 +143,33 @@ func TestEpic_UnresolvedBlockers_NilWhenNoBlockedBy(t *testing.T) {
 	}
 }
 
+// TestEpic_UnresolvedBlockers_LetteredSplitRequiresAllSiblingsDone covers a
+// mid-flight split: "Blocked by:" text only ever carries a bare number
+// (parseBlockedBy strips letter suffixes), so "Blocked by: 03" can't name a
+// specific lettered sibling — it means the whole family sharing Number 3.
+// The superseded original (03) is closed as done immediately at split time,
+// well before its replacements (03a, 03b) land, so a blocker on "3" must
+// stay unresolved until every ticket sharing that Number is done, not just
+// the first one.
+func TestEpic_UnresolvedBlockers_LetteredSplitRequiresAllSiblingsDone(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, BlockedBy: []int{3}},
+		{Number: 3, Identifier: "03", Status: "done"}, // superseded original, closed at split time
+		{Number: 3, Identifier: "03a", Status: "done"},
+		{Number: 3, Identifier: "03b", Status: "open"}, // still in flight
+	}}
+	got := epic.UnresolvedBlockers(epic.Tickets[0])
+	if len(got) != 1 || got[0] != 3 {
+		t.Fatalf("UnresolvedBlockers = %v, want [3] while 03b is still open", got)
+	}
+
+	epic.Tickets[3].Status = "done"
+	got = epic.UnresolvedBlockers(epic.Tickets[0])
+	if got != nil {
+		t.Errorf("UnresolvedBlockers = %v, want nil once every ticket sharing Number 3 is done", got)
+	}
+}
+
 func TestGroupOrder_ActionableSortsFirstDoneSortsLast(t *testing.T) {
 	order := []RenderedStatus{StatusOpen, StatusClaimed, StatusBlocked, StatusNeedsInfo, StatusDone, StatusError}
 	for i := 1; i < len(order); i++ {

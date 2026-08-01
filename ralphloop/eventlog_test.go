@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,10 +13,10 @@ import (
 func TestLogEvent_AppendsOneJSONLinePerCall(t *testing.T) {
 	dir := t.TempDir()
 
-	if err := logEvent(dir, "epic", Event{Type: eventIterationStarted, Ticket: 1, Pane: "pane-1", Tab: "tab-1", AgentSession: "sess-1"}); err != nil {
+	if err := logEvent(dir, "epic", Event{Type: eventIterationStarted, Ticket: "01", Pane: "pane-1", Tab: "tab-1", AgentSession: "sess-1"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
-	if err := logEvent(dir, "epic", Event{Type: eventIterationFinished, Ticket: 1}); err != nil {
+	if err := logEvent(dir, "epic", Event{Type: eventIterationFinished, Ticket: "01"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 
@@ -38,7 +39,7 @@ func TestLogEvent_AppendsOneJSONLinePerCall(t *testing.T) {
 func TestLogEvent_FillsInTimeWhenZero(t *testing.T) {
 	dir := t.TempDir()
 	before := time.Now()
-	if err := logEvent(dir, "epic", Event{Type: eventNeedsInfo, Ticket: 2}); err != nil {
+	if err := logEvent(dir, "epic", Event{Type: eventNeedsInfo, Ticket: "02"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 	events, ok, err := readEvents(dir, "epic")
@@ -82,7 +83,7 @@ func TestReadEvents_SkipsMalformedTrailingLine(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	content := `{"type":"iteration-started","ticket":1}` + "\n" + `{"type":"iteration-fin` // torn last line
+	content := `{"type":"iteration-started","ticket":"01"}` + "\n" + `{"type":"iteration-fin` // torn last line
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
@@ -98,14 +99,14 @@ func TestReadEvents_SkipsMalformedTrailingLine(t *testing.T) {
 
 func TestLastIterationSession_ReturnsMostRecentMatchingTicket(t *testing.T) {
 	events := []Event{
-		{Type: eventIterationStarted, Ticket: 1, Agent: AgentClaude, AgentSession: "sess-1a", Cwd: "/cwd-1a"},
-		{Type: eventIterationFinished, Ticket: 1},
-		{Type: eventNeedsInfo, Ticket: 1},
-		{Type: eventIterationStarted, Ticket: 1, Agent: AgentClaude, AgentSession: "sess-1b", Cwd: "/cwd-1b"},
-		{Type: eventIterationStarted, Ticket: 2, Agent: AgentClaude, AgentSession: "sess-2", Cwd: "/cwd-2"},
+		{Type: eventIterationStarted, Ticket: "01", Agent: AgentClaude, AgentSession: "sess-1a", Cwd: "/cwd-1a"},
+		{Type: eventIterationFinished, Ticket: "01"},
+		{Type: eventNeedsInfo, Ticket: "01"},
+		{Type: eventIterationStarted, Ticket: "01", Agent: AgentClaude, AgentSession: "sess-1b", Cwd: "/cwd-1b"},
+		{Type: eventIterationStarted, Ticket: "02", Agent: AgentClaude, AgentSession: "sess-2", Cwd: "/cwd-2"},
 	}
 
-	session, cwd, agent, ok := lastIterationSession(events, 1)
+	session, cwd, agent, ok := lastIterationSession(events, "01")
 	if !ok {
 		t.Fatal("ok = false, want true")
 	}
@@ -116,9 +117,9 @@ func TestLastIterationSession_ReturnsMostRecentMatchingTicket(t *testing.T) {
 
 func TestLastIterationSession_DefaultsAgentForHistoricalLogs(t *testing.T) {
 	events := []Event{
-		{Type: eventIterationStarted, Ticket: 1, AgentSession: "sess-1"},
+		{Type: eventIterationStarted, Ticket: "01", AgentSession: "sess-1"},
 	}
-	_, _, agent, ok := lastIterationSession(events, 1)
+	_, _, agent, ok := lastIterationSession(events, "01")
 	if !ok {
 		t.Fatal("ok = false, want true")
 	}
@@ -129,10 +130,10 @@ func TestLastIterationSession_DefaultsAgentForHistoricalLogs(t *testing.T) {
 
 func TestLastIterationSession_NoMatch_OkFalse(t *testing.T) {
 	events := []Event{
-		{Type: eventIterationStarted, Ticket: 2, AgentSession: "sess-2"},
-		{Type: eventIterationStarted, Ticket: 1, AgentSession: ""},
+		{Type: eventIterationStarted, Ticket: "02", AgentSession: "sess-2"},
+		{Type: eventIterationStarted, Ticket: "01", AgentSession: ""},
 	}
-	_, _, _, ok := lastIterationSession(events, 1)
+	_, _, _, ok := lastIterationSession(events, "01")
 	if ok {
 		t.Error("ok = true, want false when no matching event has a recorded session")
 	}
@@ -145,7 +146,7 @@ func TestLogEvent_ConcurrentAppends_NeverInterleave(t *testing.T) {
 		wg.Add(1)
 		go func(n int) {
 			defer wg.Done()
-			_ = logEvent(dir, "epic", Event{Type: eventIterationStarted, Ticket: n})
+			_ = logEvent(dir, "epic", Event{Type: eventIterationStarted, Ticket: fmt.Sprintf("%02d", n)})
 		}(i)
 	}
 	wg.Wait()

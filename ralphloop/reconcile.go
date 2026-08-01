@@ -71,25 +71,25 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 	for _, t := range epic.Tickets {
 		status := strings.ToLower(strings.TrimSpace(t.Status))
 		if status == "needs-attention" {
-			if live[iterLabel(t.Number)] {
-				report("ticket %02d: reattaching to needs-attention iteration %s\n", t.Number, iterLabel(t.Number))
+			if live[iterLabel(t.Identifier)] {
+				report("ticket %s: reattaching to needs-attention iteration %s\n", t.Identifier, iterLabel(t.Identifier))
 				reattached = append(reattached, t)
 			} else {
-				report("ticket %02d still needs attention; no live iteration found\n", t.Number)
+				report("ticket %s still needs attention; no live iteration found\n", t.Identifier)
 			}
 			continue
 		}
 		if status != "claimed" {
 			continue
 		}
-		if !live[iterLabel(t.Number)] {
+		if !live[iterLabel(t.Identifier)] {
 			if err := SetStatus(t.Path, "open"); err != nil {
-				return nil, fmt.Errorf("reverting ticket %d to open: %w", t.Number, err)
+				return nil, fmt.Errorf("reverting ticket %s to open: %w", t.Identifier, err)
 			}
-			report("ticket %02d: no live iteration found on restart; reverted to open\n", t.Number)
+			report("ticket %s: no live iteration found on restart; reverted to open\n", t.Identifier)
 			continue
 		}
-		report("ticket %02d: reattaching to live iteration %s\n", t.Number, iterLabel(t.Number))
+		report("ticket %s: reattaching to live iteration %s\n", t.Identifier, iterLabel(t.Identifier))
 		reattached = append(reattached, t)
 	}
 
@@ -103,7 +103,7 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 		}
 		class, err := classifyDoneTicket(d, paths, epic.Name, t, events, live)
 		if err != nil {
-			return nil, fmt.Errorf("verifying done ticket %d: %w", t.Number, err)
+			return nil, fmt.Errorf("verifying done ticket %s: %w", t.Identifier, err)
 		}
 		switch class {
 		case doneOK:
@@ -111,18 +111,18 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 			// untouched.
 		case doneStaleCleanup:
 			if err := finishStaleCleanup(d, rp, t, tabs); err != nil {
-				return nil, fmt.Errorf("finishing interrupted cleanup for done ticket %d: %w", t.Number, err)
+				return nil, fmt.Errorf("finishing interrupted cleanup for done ticket %s: %w", t.Identifier, err)
 			}
-			report("ticket %02d: done and commits landed, but leftover iteration state was never cleaned up; finished the interrupted cleanup\n", t.Number)
+			report("ticket %s: done and commits landed, but leftover iteration state was never cleaned up; finished the interrupted cleanup\n", t.Identifier)
 		case doneRecoverable:
 			if err := repairRecoverableTicket(d, rp, epic.Name, t, tabs); err != nil {
-				return nil, fmt.Errorf("repairing done ticket %d: %w", t.Number, err)
+				return nil, fmt.Errorf("repairing done ticket %s: %w", t.Identifier, err)
 			}
 		case doneUnrecoverable:
 			if err := markDoneTicketUnrecoverable(paths, epic.Name, t); err != nil {
-				return nil, fmt.Errorf("flagging unrecoverable done ticket %d: %w", t.Number, err)
+				return nil, fmt.Errorf("flagging unrecoverable done ticket %s: %w", t.Identifier, err)
 			}
-			report("ticket %02d: done but commits missing from %s and no iteration branch left to recover them; marked needs-attention\n", t.Number, epic.Name)
+			report("ticket %s: done but commits missing from %s and no iteration branch left to recover them; marked needs-attention\n", t.Identifier, epic.Name)
 		}
 	}
 
@@ -143,8 +143,8 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 // ticket's job).
 func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t tickets.Ticket, tabs []herdr.Tab) error {
 	paths := rp.Paths
-	branch := iterBranch(t.Number)
-	label := iterLabel(t.Number)
+	branch := iterBranch(t.Identifier)
+	label := iterLabel(t.Identifier)
 	path := filepath.Join(paths.WorktreeDir, label)
 
 	base, err := d.MergeBase(paths.FeatureWorktree, branch, featureBranch)
@@ -171,11 +171,11 @@ func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t
 
 	landedSHA, err := landCherryPick(d, p, base, branch, "", "", "")
 	if err != nil {
-		return fmt.Errorf("re-cherry-picking ticket %d during startup repair: %w", t.Number, err)
+		return fmt.Errorf("re-cherry-picking ticket %s during startup repair: %w", t.Identifier, err)
 	}
 
 	p.logTicketEventSHA(eventCherryPicked, "", "", "", path, "", landedSHA)
-	rp.Report("ticket %02d: done but commits were missing from %s; auto re-cherry-picked from iteration branch %s and restored (%s)\n", t.Number, featureBranch, branch, landedSHA)
+	rp.Report("ticket %s: done but commits were missing from %s; auto re-cherry-picked from iteration branch %s and restored (%s)\n", t.Identifier, featureBranch, branch, landedSHA)
 
 	// Branch deletion is left to finishStaleCleanup/finishCleanup elsewhere:
 	// this repair just re-landed the commits, so the branch that held them
@@ -206,8 +206,8 @@ func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t
 // normal completion path.
 func finishStaleCleanup(d Deps, rp reconcileParams, t tickets.Ticket, tabs []herdr.Tab) error {
 	paths := rp.Paths
-	label := iterLabel(t.Number)
-	branch := iterBranch(t.Number)
+	label := iterLabel(t.Identifier)
+	branch := iterBranch(t.Identifier)
 	path := filepath.Join(paths.WorktreeDir, label)
 	tabID := tabIDForLabel(tabs, label)
 
@@ -233,11 +233,11 @@ func tabIDForLabel(tabs []herdr.Tab, label string) string {
 // than silently reverting the ticket to open (which would re-run it from
 // scratch without a human ever knowing the first run's result vanished).
 func markDoneTicketUnrecoverable(paths reconcilePaths, featureBranch string, t tickets.Ticket) error {
-	reason := fmt.Sprintf("done but commits missing from %s and iteration branch %s no longer exists to recover them", featureBranch, iterBranch(t.Number))
+	reason := fmt.Sprintf("done but commits missing from %s and iteration branch %s no longer exists to recover them", featureBranch, iterBranch(t.Identifier))
 	if err := MarkNeedsAttention(t.Path); err != nil {
 		return fmt.Errorf("marking ticket needs-attention: %w", err)
 	}
-	if err := logEvent(paths.ScratchDir, featureBranch, Event{Type: eventNeedsAttention, Ticket: t.Number, Reason: reason}); err != nil {
+	if err := logEvent(paths.ScratchDir, featureBranch, Event{Type: eventNeedsAttention, Ticket: t.Identifier, Reason: reason}); err != nil {
 		return fmt.Errorf("logging needs-attention event: %w", err)
 	}
 	return nil
@@ -278,7 +278,7 @@ const (
 // is treated the same as a missing commit, since there's nothing to verify
 // reachability against.
 func classifyDoneTicket(d Deps, paths reconcilePaths, featureBranch string, t tickets.Ticket, events []Event, live map[string]bool) (doneMismatchClass, error) {
-	landedSHA := latestCherryPickedSHA(events, t.Number)
+	landedSHA := latestCherryPickedSHA(events, t.Identifier)
 
 	commitsPresent := false
 	if landedSHA != "" {
@@ -289,10 +289,10 @@ func classifyDoneTicket(d Deps, paths reconcilePaths, featureBranch string, t ti
 		commitsPresent = present
 	}
 
-	branch := iterBranch(t.Number)
+	branch := iterBranch(t.Identifier)
 	hasBranch := branchExists(d, paths.FeatureWorktree, branch)
 
-	label := iterLabel(t.Number)
+	label := iterLabel(t.Identifier)
 	hasWorktree, err := d.WorktreeExists(filepath.Join(paths.WorktreeDir, label))
 	if err != nil {
 		return doneOK, fmt.Errorf("checking leftover worktree: %w", err)
@@ -313,12 +313,13 @@ func classifyDoneTicket(d Deps, paths reconcilePaths, featureBranch string, t ti
 }
 
 // latestCherryPickedSHA returns the SHA recorded on the most recent
-// cherry-picked event logged for ticketNumber, or "" if none was ever
-// logged.
-func latestCherryPickedSHA(events []Event, ticketNumber int) string {
+// cherry-picked event logged for identifier (a ticket's Identifier, not
+// Number, so lettered split siblings sharing a Number aren't
+// cross-attributed), or "" if none was ever logged.
+func latestCherryPickedSHA(events []Event, identifier string) string {
 	sha := ""
 	for _, ev := range events {
-		if ev.Type == eventCherryPicked && ev.Ticket == ticketNumber && ev.SHA != "" {
+		if ev.Type == eventCherryPicked && ev.Ticket == identifier && ev.SHA != "" {
 			sha = ev.SHA
 		}
 	}

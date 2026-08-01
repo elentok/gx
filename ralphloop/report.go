@@ -115,7 +115,7 @@ func readSessionStats(cwd, sessionID string) (sessionStats, error) {
 // events (order/window) and its session(s)' own transcripts
 // (duration/peak-context/cost).
 type ticketSummary struct {
-	number          int
+	identifier      string
 	title           string
 	windowStart     time.Time
 	windowEnd       time.Time
@@ -178,10 +178,10 @@ func Report(opts ReportOptions, out io.Writer) error {
 		return nil
 	}
 
-	titles := map[int]string{}
+	titles := map[string]string{}
 	if epic, epicErr := loadNamedEpic(scratchDir, opts.EpicName); epicErr == nil && epic != nil {
 		for _, t := range epic.Tickets {
-			titles[t.Number] = t.Title
+			titles[t.Identifier] = t.Title
 		}
 	}
 
@@ -189,17 +189,17 @@ func Report(opts ReportOptions, out io.Writer) error {
 	sessionsByTicket := ticketSessions(events)
 	depsByTicket := ticketDepsCommands(events)
 
-	summaries := make(map[int]*ticketSummary, len(order))
-	for _, n := range order {
-		w := windows[n]
-		s := &ticketSummary{number: n, title: titles[n], windowStart: w.start, windowEnd: w.end, depsCommand: depsByTicket[n]}
+	summaries := make(map[string]*ticketSummary, len(order))
+	for _, id := range order {
+		w := windows[id]
+		s := &ticketSummary{identifier: id, title: titles[id], windowStart: w.start, windowEnd: w.end, depsCommand: depsByTicket[id]}
 		// Summed, not spanned: a ticket's sessions (its main iteration agent,
 		// plus a conflict-resolution agent if one ran) never run concurrently
 		// with each other by construction — exactly one is active for a given
 		// ticket at a time — so summing each session's own span gives the same
 		// answer as a true elapsed-time span would, without needing to assume
 		// the sessions are contiguous.
-		for _, key := range sessionsByTicket[n] {
+		for _, key := range sessionsByTicket[id] {
 			s.hasCodex = s.hasCodex || key.agent == AgentCodex
 			s.hasClaude = s.hasClaude || key.agent == AgentClaude
 			stats, statsErr := readAgentSessionStats(key)
@@ -215,7 +215,7 @@ func Report(opts ReportOptions, out io.Writer) error {
 				s.peakOccupancy = stats.peakOccupancy
 			}
 		}
-		summaries[n] = s
+		summaries[id] = s
 	}
 
 	printReport(out, opts.EpicName, order, summaries, mergeOverlappingWindows(order, windows), events)
@@ -228,12 +228,12 @@ type ticketWindow struct {
 	start, end time.Time
 }
 
-// ticketOrderAndWindows returns every ticket number that appears in events,
-// in chronological order of its first event, plus each ticket's event
-// window.
-func ticketOrderAndWindows(events []Event) (order []int, windows map[int]ticketWindow) {
-	windows = map[int]ticketWindow{}
-	var firstSeen []int
+// ticketOrderAndWindows returns every ticket identifier that appears in
+// events, in chronological order of its first event, plus each ticket's
+// event window.
+func ticketOrderAndWindows(events []Event) (order []string, windows map[string]ticketWindow) {
+	windows = map[string]ticketWindow{}
+	var firstSeen []string
 	for _, ev := range events {
 		w, exists := windows[ev.Ticket]
 		if !exists {
@@ -256,9 +256,9 @@ func ticketOrderAndWindows(events []Event) (order []int, windows map[int]ticketW
 
 // ticketSessions returns, per ticket, every distinct (cwd, agent_session)
 // pair its events reference, in first-seen order.
-func ticketSessions(events []Event) map[int][]sessionKey {
-	out := map[int][]sessionKey{}
-	seen := map[int]map[sessionKey]bool{}
+func ticketSessions(events []Event) map[string][]sessionKey {
+	out := map[string][]sessionKey{}
+	seen := map[string]map[sessionKey]bool{}
 	for _, ev := range events {
 		if ev.AgentSession == "" {
 			continue
@@ -282,8 +282,8 @@ func ticketSessions(events []Event) map[int][]sessionKey {
 
 // ticketDepsCommands returns, per ticket, its deps-installed event's Reason
 // (the install command run, "" if none matched).
-func ticketDepsCommands(events []Event) map[int]string {
-	out := map[int]string{}
+func ticketDepsCommands(events []Event) map[string]string {
+	out := map[string]string{}
 	for _, ev := range events {
 		if ev.Type == eventDepsInstalled {
 			out[ev.Ticket] = ev.Reason
@@ -295,27 +295,27 @@ func ticketDepsCommands(events []Event) map[int]string {
 // mergeOverlappingWindows groups order's tickets into concurrency groups: a
 // maximal run of tickets whose windows form a connected overlap chain once
 // sorted by start time.
-func mergeOverlappingWindows(order []int, windows map[int]ticketWindow) [][]int {
-	sorted := make([]int, len(order))
+func mergeOverlappingWindows(order []string, windows map[string]ticketWindow) [][]string {
+	sorted := make([]string, len(order))
 	copy(sorted, order)
 	sort.SliceStable(sorted, func(i, j int) bool {
 		return windows[sorted[i]].start.Before(windows[sorted[j]].start)
 	})
 
-	var groups [][]int
-	var current []int
+	var groups [][]string
+	var current []string
 	var currentEnd time.Time
-	for _, n := range sorted {
-		w := windows[n]
+	for _, id := range sorted {
+		w := windows[id]
 		if len(current) == 0 || w.start.Before(currentEnd) {
-			current = append(current, n)
+			current = append(current, id)
 			if w.end.After(currentEnd) {
 				currentEnd = w.end
 			}
 			continue
 		}
 		groups = append(groups, current)
-		current = []int{n}
+		current = []string{id}
 		currentEnd = w.end
 	}
 	if len(current) > 0 {
@@ -326,17 +326,17 @@ func mergeOverlappingWindows(order []int, windows map[int]ticketWindow) [][]int 
 
 func ticketLabel(t *ticketSummary) string {
 	if t.title == "" {
-		return fmt.Sprintf("%02d", t.number)
+		return t.identifier
 	}
-	return fmt.Sprintf("%02d %s", t.number, t.title)
+	return fmt.Sprintf("%s %s", t.identifier, t.title)
 }
 
-func printReport(out io.Writer, epicName string, order []int, summaries map[int]*ticketSummary, groups [][]int, events []Event) {
+func printReport(out io.Writer, epicName string, order []string, summaries map[string]*ticketSummary, groups [][]string, events []Event) {
 	fmt.Fprintf(out, "gx ralph-loop report: %s\n\n", epicName)
 
 	fmt.Fprintln(out, "Task order:")
-	for _, n := range order {
-		fmt.Fprintf(out, "  %s\n", ticketLabel(summaries[n]))
+	for _, id := range order {
+		fmt.Fprintf(out, "  %s\n", ticketLabel(summaries[id]))
 	}
 
 	fmt.Fprintln(out, "\nConcurrency:")
@@ -346,8 +346,8 @@ func printReport(out io.Writer, epicName string, order []int, summaries map[int]
 			continue
 		}
 		var labels []string
-		for _, n := range group {
-			labels = append(labels, fmt.Sprintf("%02d", n))
+		for _, id := range group {
+			labels = append(labels, id)
 		}
 		fmt.Fprintf(out, "  %s\n", strings.Join(labels, " + "))
 	}
@@ -359,8 +359,8 @@ func printReport(out io.Writer, epicName string, order []int, summaries map[int]
 	var hasClaude bool
 	var totalPeak int
 	totalMetricsKnown := true
-	for _, n := range order {
-		s := summaries[n]
+	for _, id := range order {
+		s := summaries[id]
 		totalCost += s.cost
 		totalTokens += s.totalTokens
 		hasCodex = hasCodex || s.hasCodex

@@ -79,19 +79,33 @@ func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
 // UnresolvedBlockers returns t's Blocked by: numbers that are not yet done
 // within e, in Blocked by: order. A blocker number with no matching ticket
 // in e counts as unresolved (it can't be verified done).
+//
+// "Blocked by:" text only ever carries a bare number (parseBlockedBy strips
+// letter suffixes), so a "Blocked by: 04" reference can't distinguish a
+// split ticket's original from its lettered replacements (04, 04a, 04b all
+// share Number 4) — it means the whole family, and there's no way to name
+// just the replacements. A number counts as resolved only once every ticket
+// sharing it is done, not as soon as any one of them is — otherwise the
+// superseded original (closed immediately at split time, per to-tickets'
+// mid-flight-split convention) would resolve the blocker before its
+// replacements ever land. This relies on that convention holding (the
+// original does get marked done promptly); it isn't separately verified
+// here.
 func (e Epic) UnresolvedBlockers(t Ticket) []int {
 	if len(t.BlockedBy) == 0 {
 		return nil
 	}
-	done := make(map[int]bool, len(e.Tickets))
+	total := make(map[int]int, len(e.Tickets))
+	done := make(map[int]int, len(e.Tickets))
 	for _, other := range e.Tickets {
+		total[other.Number]++
 		if other.IsDone() {
-			done[other.Number] = true
+			done[other.Number]++
 		}
 	}
 	var unresolved []int
 	for _, n := range t.BlockedBy {
-		if !done[n] {
+		if total[n] == 0 || done[n] != total[n] {
 			unresolved = append(unresolved, n)
 		}
 	}
