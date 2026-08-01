@@ -752,6 +752,7 @@ const conflictResolutionTimeoutMs = 30 * 60 * 1000
 // cost/occupancy are counted too rather than silently dropped from the
 // report.
 func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, sessionID, pane, tab string) error {
+	p.Sink.CherryPickStarted(p.Ticket.Identifier)
 	pickErr := d.CherryPickRange(p.FeatureWorktree, base, branch)
 	if pickErr == nil {
 		return nil
@@ -765,6 +766,7 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 		return fmt.Errorf("cherry-picking onto %s: %w", p.FeatureBranch, pickErr)
 	}
 	p.logTicketEvent(eventConflictHit, pane, tab, sessionID, p.FeatureWorktree)
+	p.Sink.ConflictResolutionStarted(p.Ticket.Identifier)
 
 	resolutionSessionID, err := resolveCherryPickConflict(d, p)
 	if err != nil {

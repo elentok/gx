@@ -74,6 +74,14 @@ type EventSink interface {
 	// TranscriptLine reports one line of label's live agent transcript.
 	TranscriptLine(label, line string)
 
+	// CherryPickStarted reports that identifier's finished iteration is now
+	// being cherry-picked onto the feature branch.
+	CherryPickStarted(identifier string)
+	// ConflictResolutionStarted reports that identifier's cherry-pick hit a
+	// conflict and a resolution agent has launched in the feature worktree to
+	// fix it.
+	ConflictResolutionStarted(identifier string)
+
 	// TicketCleanupFinished reports that a done ticket's commits had already
 	// landed, but a crash left its worktree/tab/branch behind between marking
 	// it done and cleaning up right after — startup reconciliation just
@@ -110,6 +118,8 @@ func (noopEventSink) IterationPaused(label string, kind PauseKind, reason string
 func (noopEventSink) IterationResumed(label string, kind PauseKind)                  {}
 func (noopEventSink) IterationFinished(ticket tickets.Ticket, epicName string)       {}
 func (noopEventSink) TranscriptLine(label, line string)                              {}
+func (noopEventSink) CherryPickStarted(identifier string)                            {}
+func (noopEventSink) ConflictResolutionStarted(identifier string)                    {}
 func (noopEventSink) TicketCleanupFinished(identifier string)                        {}
 func (noopEventSink) TicketRecovered(identifier, epicName, branch, landedSHA string) {}
 func (noopEventSink) TicketUnrecoverable(identifier, epicName string)                {}
@@ -187,6 +197,10 @@ func (s *textEventSink) IterationFinished(ticket tickets.Ticket, epicName string
 }
 
 func (s *textEventSink) TranscriptLine(label, line string) {}
+
+func (s *textEventSink) CherryPickStarted(identifier string) {}
+
+func (s *textEventSink) ConflictResolutionStarted(identifier string) {}
 
 func (s *textEventSink) TicketCleanupFinished(identifier string) {
 	s.printf("ticket %s: done and commits landed, but leftover iteration state was never cleaned up; finished the interrupted cleanup\n", identifier)

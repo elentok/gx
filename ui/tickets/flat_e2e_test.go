@@ -156,6 +156,36 @@ func TestFlatTUI_LiveEventsDriveRowState(t *testing.T) {
 	}
 }
 
+// TestFlatTUI_LiveEventsDrivePhaseSuffix feeds CherryPickStarted/
+// ConflictResolutionStarted LiveEvents through WithLiveEvents and asserts
+// ticket 01's running row shows a phase-specific suffix instead of just the
+// tab label.
+func TestFlatTUI_LiveEventsDrivePhaseSuffix(t *testing.T) {
+	root := t.TempDir()
+	writeFlatTicket(t, root, "my-epic", "01-running-ticket.md", "Status: open\n\nFirst body.\n")
+
+	events := make(chan ralphloop.LiveEvent, 16)
+	m := tickets.NewFlatModel(root, "my-epic", ui.Settings{}).WithLiveEvents(events)
+	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(flatTermWidth, flatTermHeight))
+	defer tm.Quit()
+
+	waitForFlatText(t, tm, "Running ticket")
+
+	events <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Identifier: "01", Label: "iter-01"}
+	waitForFlatText(t, tm, "(implementing...)")
+
+	events <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventCherryPickStarted, Identifier: "01"}
+	waitForFlatText(t, tm, "(cherry-picking...)")
+
+	events <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventConflictResolutionStarted, Identifier: "01"}
+	waitForFlatText(t, tm, "(resolving conflicts...)")
+
+	frame := tm.CurrentFrame()
+	if !bytes.Contains(frame, []byte("iter-01")) {
+		t.Fatalf("expected the row to still show its tab label alongside the phase suffix, got:\n%s", frame)
+	}
+}
+
 // TestFlatTUI_LivePreviewMetadataAndTranscript feeds synthetic transcript-line
 // events (ticket 01's EventSink.TranscriptLine) through WithLiveEvents and
 // asserts ticket 04b's preview-pane additions: a running ticket's preview

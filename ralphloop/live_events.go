@@ -23,6 +23,8 @@ const (
 	LiveEventTicketRecovered
 	LiveEventTicketUnrecoverable
 	LiveEventEpicComplete
+	LiveEventCherryPickStarted
+	LiveEventConflictResolutionStarted
 )
 
 // LiveEvent captures one EventSink call for asynchronous delivery over a
@@ -133,4 +135,12 @@ func (s *ChannelEventSink) TicketUnrecoverable(identifier, epicName string) {
 
 func (s *ChannelEventSink) EpicComplete(epicName string, completed int) {
 	s.emit(LiveEvent{Kind: LiveEventEpicComplete, EpicName: epicName, Completed: completed})
+}
+
+func (s *ChannelEventSink) CherryPickStarted(identifier string) {
+	s.emit(LiveEvent{Kind: LiveEventCherryPickStarted, Identifier: identifier})
+}
+
+func (s *ChannelEventSink) ConflictResolutionStarted(identifier string) {
+	s.emit(LiveEvent{Kind: LiveEventConflictResolutionStarted, Identifier: identifier})
 }

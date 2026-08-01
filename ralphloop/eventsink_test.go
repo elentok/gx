@@ -63,6 +63,10 @@ func (s *recordingSink) TicketUnrecoverable(identifier, epicName string) {
 	s.record("TicketUnrecoverable")
 }
 func (s *recordingSink) EpicComplete(epicName string, completed int) { s.record("EpicComplete") }
+func (s *recordingSink) CherryPickStarted(identifier string)         { s.record("CherryPickStarted") }
+func (s *recordingSink) ConflictResolutionStarted(identifier string) {
+	s.record("ConflictResolutionStarted")
+}
 
 func TestRun_EventSink_EmitsLifecycleSequenceForASingleTicket(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
@@ -75,7 +79,7 @@ func TestRun_EventSink_EmitsLifecycleSequenceForASingleTicket(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	want := []string{"TicketClaimed", "IterationStarted", "IterationFinished", "EpicComplete"}
+	want := []string{"TicketClaimed", "IterationStarted", "CherryPickStarted", "IterationFinished", "EpicComplete"}
 	got := sink.snapshot()
 	if len(got) != len(want) {
 		t.Fatalf("events = %v, want %v", got, want)

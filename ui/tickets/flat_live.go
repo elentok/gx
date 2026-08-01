@@ -22,6 +22,32 @@ type liveTicketState struct {
 	label     string // iteration/tab label, e.g. "iter-04a"
 	pauseKind ralphloop.PauseKind
 	reason    string
+	phase     livePhase
+}
+
+// livePhase distinguishes what a running iteration is doing right now, so
+// renderLiveTicketRow can show a more specific row-suffix than a bare
+// spinner+label. Zero value (livePhaseImplementing) covers the whole span
+// from LiveEventIterationStarted until the agent's commits are cherry-picked
+// — the common case, so it needs no dedicated event to enter.
+type livePhase int
+
+const (
+	livePhaseImplementing livePhase = iota
+	livePhaseCherryPicking
+	livePhaseResolvingConflicts
+)
+
+// suffix returns p's row-suffix text, e.g. "(implementing...)".
+func (p livePhase) suffix() string {
+	switch p {
+	case livePhaseCherryPicking:
+		return "(cherry-picking...)"
+	case livePhaseResolvingConflicts:
+		return "(resolving conflicts...)"
+	default:
+		return "(implementing...)"
+	}
 }
 
 // flatTranscriptMaxLines bounds FlatModel.transcript's per-ticket tail so a
@@ -101,6 +127,18 @@ func (m FlatModel) applyLiveEvent(ev ralphloop.LiveEvent) {
 	case ralphloop.LiveEventTicketUnrecoverable:
 		m.live[ev.Identifier] = liveTicketState{
 			paused: true, pauseKind: ralphloop.PauseNeedsAttention, reason: "commits missing from epic; needs operator review",
+		}
+
+	case ralphloop.LiveEventCherryPickStarted:
+		if ls, ok := m.live[ev.Identifier]; ok {
+			ls.phase = livePhaseCherryPicking
+			m.live[ev.Identifier] = ls
+		}
+
+	case ralphloop.LiveEventConflictResolutionStarted:
+		if ls, ok := m.live[ev.Identifier]; ok {
+			ls.phase = livePhaseResolvingConflicts
+			m.live[ev.Identifier] = ls
 		}
 	}
 }
@@ -203,7 +241,11 @@ func (m FlatModel) renderLiveTicketRow(t tickets.Ticket, live liveTicketState) (
 
 	case live.running:
 		line := "  " + m.spinner.View() + " " + title
-		return appendBlockedBySuffix(line, live.label), true
+		suffix := live.phase.suffix()
+		if live.label != "" {
+			suffix = live.label + " " + suffix
+		}
+		return appendBlockedBySuffix(line, suffix), true
 
 	default:
 		return "", false
