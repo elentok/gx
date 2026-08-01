@@ -10,17 +10,21 @@ import (
 
 // PauseKind distinguishes why an iteration paused, since rendering (the
 // headless text sink today, a future TUI tomorrow) says something different
-// for each: a rate-limit pause clears itself on a timer, while a smart-zone
-// pause needs an operator to run `gx ralph-loop resume`.
+// for each: a rate-limit pause clears itself on a timer, while a
+// needs-attention pause needs a human at the agent's pane. A smart-zone
+// breach is deliberately not a PauseKind: recoverSmartZoneBreach never calls
+// Gate.pause (the scheduler keeps running other tickets throughout), so it
+// reports through SmartZoneCompactStarted/SmartZoneFinishingUp/
+// SmartZoneRecovered below instead — phase changes on a still-running
+// iteration, not a pause an operator could ever be asked to resume.
 type PauseKind string
 
 const (
 	PauseRateLimit PauseKind = "rate-limit"
-	PauseSmartZone PauseKind = "smart-zone"
 	// PauseNeedsAttention marks the operator-intervention pause
 	// waitForAttentionRecovery drives (Codex blocked on a permission/
 	// intervention prompt): mechanically it's paused through the same
-	// Gate as the other two kinds, but a renderer (see ticket 04a) treats
+	// Gate as PauseRateLimit, but a renderer (see ticket 04a) treats
 	// it as its own "needs attention" state rather than a generic pause,
 	// since it needs a human at the agent's pane rather than clearing itself
 	// or via `gx ralph-loop resume`.
@@ -82,6 +86,20 @@ type EventSink interface {
 	// fix it.
 	ConflictResolutionStarted(identifier string)
 
+	// SmartZoneCompactStarted reports that identifier's running iteration hit
+	// the --smart-zone ceiling and is being auto-compacted in place. This is a
+	// phase change on a still-running iteration, not a pause: the scheduler
+	// keeps claiming and running other tickets throughout.
+	SmartZoneCompactStarted(identifier string)
+	// SmartZoneFinishingUp reports that identifier's compaction finished and
+	// it's now being re-prompted to wrap up quickly.
+	SmartZoneFinishingUp(identifier string)
+	// SmartZoneRecovered reports that identifier's smart-zone recovery
+	// sequence is over (whether or not it actually completed cleanly — see
+	// recoverSmartZoneBreach), so a renderer can drop the compacting/
+	// finishing-up phase suffix and go back to its normal running rendering.
+	SmartZoneRecovered(identifier string)
+
 	// TicketCleanupFinished reports that a done ticket's commits had already
 	// landed, but a crash left its worktree/tab/branch behind between marking
 	// it done and cleaning up right after — startup reconciliation just
@@ -120,6 +138,9 @@ func (noopEventSink) IterationFinished(ticket tickets.Ticket, epicName string)  
 func (noopEventSink) TranscriptLine(label, line string)                              {}
 func (noopEventSink) CherryPickStarted(identifier string)                            {}
 func (noopEventSink) ConflictResolutionStarted(identifier string)                    {}
+func (noopEventSink) SmartZoneCompactStarted(identifier string)                      {}
+func (noopEventSink) SmartZoneFinishingUp(identifier string)                         {}
+func (noopEventSink) SmartZoneRecovered(identifier string)                           {}
 func (noopEventSink) TicketCleanupFinished(identifier string)                        {}
 func (noopEventSink) TicketRecovered(identifier, epicName, branch, landedSHA string) {}
 func (noopEventSink) TicketUnrecoverable(identifier, epicName string)                {}
@@ -176,8 +197,6 @@ func (s *textEventSink) IterationPaused(label string, kind PauseKind, reason str
 		s.printf("paused %s: %s; waiting for automatic reset\n", label, reason)
 	case PauseNeedsAttention:
 		s.printf("paused %s: %s\n", label, reason)
-	case PauseSmartZone:
-		s.printf("paused %s: %s; recovering onto a fresh worktree automatically\n", label, reason)
 	default:
 		s.printf("paused %s: %s; run `gx ralph-loop resume` to continue\n", label, reason)
 	}
@@ -189,8 +208,6 @@ func (s *textEventSink) IterationResumed(label string, kind PauseKind) {
 		s.printf("resumed %s after rate-limit reset\n", label)
 	case PauseNeedsAttention:
 		s.printf("resumed %s after operator intervention\n", label)
-	case PauseSmartZone:
-		s.printf("resumed %s after smart-zone auto-recovery\n", label)
 	default:
 		s.printf("resumed %s\n", label)
 	}
@@ -205,6 +222,16 @@ func (s *textEventSink) TranscriptLine(label, line string) {}
 func (s *textEventSink) CherryPickStarted(identifier string) {}
 
 func (s *textEventSink) ConflictResolutionStarted(identifier string) {}
+
+func (s *textEventSink) SmartZoneCompactStarted(identifier string) {
+	s.printf("ticket %s: context budget exceeded; compacting...\n", identifier)
+}
+
+func (s *textEventSink) SmartZoneFinishingUp(identifier string) {
+	s.printf("ticket %s: compacted; telling the agent to finish up...\n", identifier)
+}
+
+func (s *textEventSink) SmartZoneRecovered(identifier string) {}
 
 func (s *textEventSink) TicketCleanupFinished(identifier string) {
 	s.printf("ticket %s: done and commits landed, but leftover iteration state was never cleaned up; finished the interrupted cleanup\n", identifier)

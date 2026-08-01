@@ -22,6 +22,18 @@ const defaultScratchDir = ".scratch"
 // resort fallback searches for (Deps.TrailerCommitExists).
 const ticketTrailerKey = "Ralph-Loop-Ticket"
 
+// ticketTrailerValue builds ticketTrailerKey's value, scoped to epicName: a
+// bare ticket identifier repeats across every epic (each restarts numbering
+// from 01), and TrailerCommitExists searches the whole repo history, not just
+// commits under this epic. An unscoped value can match a same-numbered
+// ticket from a completely unrelated epic landed long ago, misreporting a
+// genuinely unlanded ticket as already present — classifyDoneTicket then
+// deletes its worktree/branch without ever cherry-picking it, discarding
+// real work.
+func ticketTrailerValue(epicName, identifier string) string {
+	return epicName + "/" + identifier
+}
+
 // defaultMaxParallel is how many iterations run concurrently when
 // RunOptions.MaxParallel is unset.
 const defaultMaxParallel = 2
@@ -568,7 +580,7 @@ func reattachIteration(d Deps, p iterationParams) error {
 			return fmt.Errorf("restoring ticket to claimed: %w", err)
 		}
 		p.Gate.ForceResume(label)
-		p.Sink.IterationResumed(label, PauseSmartZone)
+		p.Sink.IterationResumed(label, PauseNeedsAttention)
 		if p.Report != nil {
 			p.Report("resumed %s after restart recheck\n", label)
 		}
@@ -685,7 +697,7 @@ func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane, ta
 	if err := cherryPickWithConflictResolution(d, p, base, branch, sessionID, pane, tab); err != nil {
 		return "", err
 	}
-	if err := d.AppendTrailer(p.FeatureWorktree, ticketTrailerKey, p.Ticket.Identifier); err != nil {
+	if err := d.AppendTrailer(p.FeatureWorktree, ticketTrailerKey, ticketTrailerValue(p.FeatureBranch, p.Ticket.Identifier)); err != nil {
 		return "", fmt.Errorf("stamping ticket trailer on landed commit: %w", err)
 	}
 	landedSHA, err := d.RevParse(p.FeatureWorktree, "HEAD")
@@ -1071,23 +1083,47 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 	}
 }
 
+// smartZoneRecoveryTimeoutMs bounds each of recoverSmartZoneBreach's two
+// AgentPrompt calls. herdr's own --wait already fails fast (within ~5s) if it
+// never observes a state change after submission, but once it does observe
+// one it waits indefinitely for --until to match — and a submission that
+// never actually gets typed into the pane (observed in production: the
+// text only appears once something else, like an operator's own keypress,
+// nudges herdr's terminal-state detection) can wedge this call, and with it
+// this iteration's whole goroutine, forever. Bounding it here means a
+// persistent problem shows up as a repeated smart-zone breach on the same
+// ticket instead of a stuck loop.
+const smartZoneRecoveryTimeoutMs = 30_000
+
 // recoverSmartZoneBreach compacts the conversation and re-prompts the agent
-// to finish up after a smart-zone breach, mirroring recoverClaudeRateLimit's
-// pause/resume-event bracketing but deliberately never calling Gate.pause:
-// the scheduler keeps claiming and running other tickets while this
-// iteration recompacts.
+// to finish up after a smart-zone breach, deliberately never calling
+// Gate.pause: the scheduler keeps claiming and running other tickets while
+// this iteration recompacts. It reports progress through
+// SmartZoneCompactStarted/SmartZoneFinishingUp/SmartZoneRecovered rather than
+// IterationPaused/IterationResumed, since this is a phase change on a still-
+// running iteration, not something an operator could ever "resume" — see
+// PauseKind's own doc comment. Either AgentPrompt call timing out (see
+// smartZoneRecoveryTimeoutMs) is treated as best-effort and logged rather
+// than propagated as a hard error: crashing the whole Run() over a stuck
+// compaction would take down every other running iteration with it, and the
+// agent may well still finish on its own even without this nudge.
 func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason string, smartZone int) error {
-	p.sink().IterationPaused(p.Label, PauseSmartZone, reason)
+	p.sink().SmartZoneCompactStarted(p.Ticket)
 	p.logAgentEvent(eventPausedSmartZone, sessionID, reason)
 
 	if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
-		Target: p.Pane,
-		Text:   "/compact",
-		Wait:   true,
-		Until:  []string{"working"},
+		Target:    p.Pane,
+		Text:      "/compact",
+		Wait:      true,
+		Until:     []string{"working"},
+		TimeoutMs: smartZoneRecoveryTimeoutMs,
 	}); err != nil {
-		return fmt.Errorf("compacting %s after smart-zone breach: %w", p.Label, err)
+		p.sink().SmartZoneRecovered(p.Ticket)
+		p.logAgentEvent(eventSmartZoneRecoveryFailed, sessionID, fmt.Sprintf("compacting %s after smart-zone breach: %v", p.Label, err))
+		return nil
 	}
+
+	p.sink().SmartZoneFinishingUp(p.Ticket)
 
 	finishText := fmt.Sprintf(
 		"I stopped you because you exceeded %d tokens in the context window, I compacted the "+
@@ -1096,15 +1132,18 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 		smartZone,
 	)
 	if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
-		Target: p.Pane,
-		Text:   finishText,
-		Wait:   true,
-		Until:  []string{"working"},
+		Target:    p.Pane,
+		Text:      finishText,
+		Wait:      true,
+		Until:     []string{"working"},
+		TimeoutMs: smartZoneRecoveryTimeoutMs,
 	}); err != nil {
-		return fmt.Errorf("re-prompting %s after smart-zone compact: %w", p.Label, err)
+		p.sink().SmartZoneRecovered(p.Ticket)
+		p.logAgentEvent(eventSmartZoneRecoveryFailed, sessionID, fmt.Sprintf("re-prompting %s after smart-zone compact: %v", p.Label, err))
+		return nil
 	}
 
-	p.sink().IterationResumed(p.Label, PauseSmartZone)
+	p.sink().SmartZoneRecovered(p.Ticket)
 	p.logLifecycleEvent(eventResumed, sessionID)
 	return nil
 }

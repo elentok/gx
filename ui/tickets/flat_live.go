@@ -36,6 +36,8 @@ const (
 	livePhaseImplementing livePhase = iota
 	livePhaseCherryPicking
 	livePhaseResolvingConflicts
+	livePhaseCompacting
+	livePhaseFinishingUp
 )
 
 // suffix returns p's row-suffix text, e.g. "(implementing...)".
@@ -45,6 +47,10 @@ func (p livePhase) suffix() string {
 		return "(cherry-picking...)"
 	case livePhaseResolvingConflicts:
 		return "(resolving conflicts...)"
+	case livePhaseCompacting:
+		return "(compacting...)"
+	case livePhaseFinishingUp:
+		return "(telling the agent to finish up...)"
 	default:
 		return "(implementing...)"
 	}
@@ -138,6 +144,24 @@ func (m FlatModel) applyLiveEvent(ev ralphloop.LiveEvent) {
 	case ralphloop.LiveEventConflictResolutionStarted:
 		if ls, ok := m.live[ev.Identifier]; ok {
 			ls.phase = livePhaseResolvingConflicts
+			m.live[ev.Identifier] = ls
+		}
+
+	case ralphloop.LiveEventSmartZoneCompactStarted:
+		if ls, ok := m.live[ev.Identifier]; ok {
+			ls.phase = livePhaseCompacting
+			m.live[ev.Identifier] = ls
+		}
+
+	case ralphloop.LiveEventSmartZoneFinishingUp:
+		if ls, ok := m.live[ev.Identifier]; ok {
+			ls.phase = livePhaseFinishingUp
+			m.live[ev.Identifier] = ls
+		}
+
+	case ralphloop.LiveEventSmartZoneRecovered:
+		if ls, ok := m.live[ev.Identifier]; ok {
+			ls.phase = livePhaseImplementing
 			m.live[ev.Identifier] = ls
 		}
 	}

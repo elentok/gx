@@ -132,7 +132,7 @@ func TestFlatTUI_LiveEventsDriveRowState(t *testing.T) {
 	waitForFlatText(t, tm, "iter-02")
 	events <- ralphloop.LiveEvent{
 		Kind: ralphloop.LiveEventIterationPaused, Label: "iter-02",
-		PauseKind: ralphloop.PauseSmartZone, Reason: "context budget exceeded",
+		PauseKind: ralphloop.PauseRateLimit, Reason: "context budget exceeded",
 	}
 	waitForFlatText(t, tm, "context budget exceeded")
 
@@ -227,6 +227,46 @@ func TestFlatTUI_LiveEventsDrivePhaseSuffix(t *testing.T) {
 	if !bytes.Contains(frame, []byte("iter-01")) {
 		t.Fatalf("expected the row to still show its tab label alongside the phase suffix, got:\n%s", frame)
 	}
+}
+
+// TestFlatTUI_SmartZoneRecoveryDrivesPhaseSuffixNotPausedBanner covers the
+// fix for a smart-zone breach: it must render as a phase suffix on the still-
+// running row ("(compacting...)" / "(telling the agent to finish up...)"),
+// never as a paused badge or the "Ralph loop paused" banner, since the
+// scheduler is never actually blocked for this recovery path — and once
+// SmartZoneRecovered arrives, the suffix must revert to "(implementing...)"
+// rather than sticking on the last phase it saw.
+func TestFlatTUI_SmartZoneRecoveryDrivesPhaseSuffixNotPausedBanner(t *testing.T) {
+	root := t.TempDir()
+	writeFlatTicket(t, root, "my-epic", "01-running-ticket.md", "Status: open\n\nFirst body.\n")
+
+	events := make(chan ralphloop.LiveEvent, 16)
+	m := tickets.NewFlatModel(root, "my-epic", ui.Settings{}).WithLiveEvents(events)
+	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(flatTermWidth, flatTermHeight))
+	defer tm.Quit()
+
+	waitForFlatText(t, tm, "Running ticket")
+
+	events <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Identifier: "01", Label: "iter-01"}
+	waitForFlatText(t, tm, "(implementing...)")
+
+	events <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventSmartZoneCompactStarted, Identifier: "01"}
+	waitForFlatText(t, tm, "(compacting...)")
+	if bytes.Contains(tm.CurrentFrame(), []byte("Ralph loop paused")) {
+		t.Fatalf("expected no paused banner during smart-zone compaction, got:\n%s", tm.CurrentFrame())
+	}
+
+	events <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventSmartZoneFinishingUp, Identifier: "01"}
+	// The row column is narrower than the full suffix, so only its lead-in
+	// renders — this still proves the phase changed, without depending on the
+	// terminal's exact truncation point.
+	waitForFlatText(t, tm, "(telling the agent to finish up")
+	if bytes.Contains(tm.CurrentFrame(), []byte("Ralph loop paused")) {
+		t.Fatalf("expected no paused banner while telling the agent to finish up, got:\n%s", tm.CurrentFrame())
+	}
+
+	events <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventSmartZoneRecovered, Identifier: "01"}
+	waitForFlatText(t, tm, "(implementing...)")
 }
 
 // TestFlatTUI_LivePreviewMetadataAndTranscript feeds synthetic transcript-line
@@ -387,7 +427,7 @@ func TestFlatTUI_PausedAndAttentionBanner_AppearsAndDisappears(t *testing.T) {
 	waitForFlatText(t, tm, "iter-01")
 	events <- ralphloop.LiveEvent{
 		Kind: ralphloop.LiveEventIterationPaused, Label: "iter-01",
-		PauseKind: ralphloop.PauseSmartZone, Reason: "context budget exceeded",
+		PauseKind: ralphloop.PauseRateLimit, Reason: "context budget exceeded",
 	}
 	waitForFlatText(t, tm, "Ralph loop paused — context budget exceeded.")
 
@@ -452,7 +492,7 @@ func TestFlatTUI_ResumeConfirm_ConfirmAndCancel(t *testing.T) {
 	waitForFlatText(t, tm, "iter-01")
 	events <- ralphloop.LiveEvent{
 		Kind: ralphloop.LiveEventIterationPaused, Label: "iter-01",
-		PauseKind: ralphloop.PauseSmartZone, Reason: "context budget exceeded",
+		PauseKind: ralphloop.PauseRateLimit, Reason: "context budget exceeded",
 	}
 	waitForFlatText(t, tm, "context budget exceeded")
 

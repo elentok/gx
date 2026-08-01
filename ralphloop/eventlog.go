@@ -11,17 +11,18 @@ import (
 
 // Event type strings recorded in an epic's run-log.jsonl.
 const (
-	eventIterationStarted  = "iteration-started"
-	eventIterationFinished = "iteration-finished"
-	eventCherryPicked      = "cherry-picked"
-	eventConflictHit       = "conflict-hit"
-	eventConflictResolved  = "conflict-resolved"
-	eventPausedSmartZone   = "paused-smart-zone"
-	eventPausedRateLimit   = "paused-rate-limit"
-	eventResumed           = "resumed"
-	eventNeedsInfo         = "needs-info"
-	eventNeedsAttention    = "needs-attention"
-	eventDepsInstalled     = "deps-installed"
+	eventIterationStarted        = "iteration-started"
+	eventIterationFinished       = "iteration-finished"
+	eventCherryPicked            = "cherry-picked"
+	eventConflictHit             = "conflict-hit"
+	eventConflictResolved        = "conflict-resolved"
+	eventPausedSmartZone         = "paused-smart-zone"
+	eventSmartZoneRecoveryFailed = "smart-zone-recovery-failed"
+	eventPausedRateLimit         = "paused-rate-limit"
+	eventResumed                 = "resumed"
+	eventNeedsInfo               = "needs-info"
+	eventNeedsAttention          = "needs-attention"
+	eventDepsInstalled           = "deps-installed"
 )
 
 // Event is one line of an epic's run-log.jsonl: a single lifecycle

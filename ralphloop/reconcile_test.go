@@ -663,8 +663,10 @@ func TestClassifyDoneTicket_RealRepo_RebasedWithConflictResolution_OK(t *testing
 	if err := git.CherryPickRange(dir, base, iterTip); err != nil {
 		t.Fatalf("CherryPickRange: %v", err)
 	}
-	// landCherryPick always stamps the ticket trailer right after landing.
-	if err := git.AppendTrailer(dir, ticketTrailerKey, "03"); err != nil {
+	// landCherryPick always stamps the ticket trailer right after landing,
+	// scoped to the epic (see ticketTrailerValue) so a same-numbered ticket
+	// from an unrelated epic can never satisfy this lookup.
+	if err := git.AppendTrailer(dir, ticketTrailerKey, ticketTrailerValue("main", "03")); err != nil {
 		t.Fatalf("AppendTrailer: %v", err)
 	}
 	landedSHA, err := git.RevParse(dir, "HEAD")
@@ -704,6 +706,43 @@ func TestClassifyDoneTicket_RealRepo_RebasedWithConflictResolution_OK(t *testing
 	}
 	if class != doneOK {
 		t.Errorf("class = %v, want doneOK — trailer marker should recognize the rebased-and-reconflicted commit as landed", class)
+	}
+}
+
+// TestClassifyDoneTicket_RealRepo_TrailerScopedToEpic_NoCrossEpicFalsePositive
+// reproduces a real production incident: an unrelated, much earlier epic's
+// own ticket "05" landed and stamped a trailer, still reachable from main's
+// history (trailers never expire). This epic's own ticket "05" was never
+// cherry-picked at all — no run-log event, no surviving iteration branch. An
+// unscoped trailer value ("05") would collide across the two unrelated
+// epics, since ticket numbering restarts from 01 every epic; ticketTrailerValue
+// scopes the stamped/searched value to the epic name specifically so this
+// can't happen (this is exactly what happened in production to gx's own
+// tickets-ralph epic's ticket 05: classifyDoneTicket's trailer fallback
+// matched an unrelated older epic's same-numbered ticket, misclassified this
+// one doneOK, and its worktree/branch were deleted without ever landing).
+func TestClassifyDoneTicket_RealRepo_TrailerScopedToEpic_NoCrossEpicFalsePositive(t *testing.T) {
+	dir := testutil.TempRepo(t)
+
+	// An unrelated, older epic's own ticket "05" landed here long ago,
+	// stamped with the bare (pre-scoping) trailer value historical commits
+	// carry — still reachable from main.
+	testutil.WriteFile(t, dir, "unrelated.txt", "unrelated\n")
+	testutil.CommitAll(t, dir, "old-epic: unrelated ticket 05")
+	if err := git.AppendTrailer(dir, ticketTrailerKey, "05"); err != nil {
+		t.Fatalf("AppendTrailer: %v", err)
+	}
+
+	// This epic's own ticket "05" was never cherry-picked: no run-log event,
+	// and its iteration branch is already gone (e.g. cleaned up by an
+	// earlier, unrelated pass).
+	d := realGitDeps()
+	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: dir, WorktreeDir: "/fake/worktrees"}, "main", tickets.Ticket{Number: 5, Identifier: "05", Status: "done"}, nil, map[string]bool{})
+	if err != nil {
+		t.Fatalf("classifyDoneTicket() error = %v", err)
+	}
+	if class == doneOK || class == doneStaleCleanup {
+		t.Fatalf("class = %v, want doneRecoverable or doneUnrecoverable — must not treat an unrelated epic's same-numbered ticket's trailer as this ticket landed", class)
 	}
 }
 

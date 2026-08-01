@@ -67,6 +67,11 @@ func (s *recordingSink) CherryPickStarted(identifier string)         { s.record(
 func (s *recordingSink) ConflictResolutionStarted(identifier string) {
 	s.record("ConflictResolutionStarted")
 }
+func (s *recordingSink) SmartZoneCompactStarted(identifier string) {
+	s.record("SmartZoneCompactStarted")
+}
+func (s *recordingSink) SmartZoneFinishingUp(identifier string) { s.record("SmartZoneFinishingUp") }
+func (s *recordingSink) SmartZoneRecovered(identifier string)   { s.record("SmartZoneRecovered") }
 
 func TestRun_EventSink_EmitsLifecycleSequenceForASingleTicket(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
@@ -120,8 +125,9 @@ func TestNewTextEventSink_RendersSameTextAsBeforeTheEventSinkRefactor(t *testing
 	sink.TicketStillNeedsAttention("01")
 	sink.IterationPaused("iter-01", PauseRateLimit, "rate limit detected")
 	sink.IterationResumed("iter-01", PauseRateLimit)
-	sink.IterationPaused("iter-01", PauseSmartZone, "context occupancy 200000 exceeds --smart-zone 150000")
-	sink.IterationResumed("iter-01", PauseSmartZone)
+	sink.SmartZoneCompactStarted("01")
+	sink.SmartZoneFinishingUp("01")
+	sink.SmartZoneRecovered("01")
 	sink.IterationFinished(tickets.Ticket{Number: 1, Identifier: "01", Title: "First"}, "epic")
 	sink.TicketCleanupFinished("01")
 	sink.TicketRecovered("01", "epic", "ralph-loop/iter-01", "deadbeef")
@@ -141,8 +147,8 @@ func TestNewTextEventSink_RendersSameTextAsBeforeTheEventSinkRefactor(t *testing
 		"ticket 01 still needs attention; no live iteration found\n" +
 		"paused iter-01: rate limit detected; waiting for automatic reset\n" +
 		"resumed iter-01 after rate-limit reset\n" +
-		"paused iter-01: context occupancy 200000 exceeds --smart-zone 150000; recovering onto a fresh worktree automatically\n" +
-		"resumed iter-01 after smart-zone auto-recovery\n" +
+		"ticket 01: context budget exceeded; compacting...\n" +
+		"ticket 01: compacted; telling the agent to finish up...\n" +
 		"ticket 01 \"First\" landed on epic\n" +
 		"ticket 01: done and commits landed, but leftover iteration state was never cleaned up; finished the interrupted cleanup\n" +
 		"ticket 01: done but commits were missing from epic; auto re-cherry-picked from iteration branch ralph-loop/iter-01 and restored (deadbeef)\n" +

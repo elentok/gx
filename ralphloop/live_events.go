@@ -25,6 +25,9 @@ const (
 	LiveEventEpicComplete
 	LiveEventCherryPickStarted
 	LiveEventConflictResolutionStarted
+	LiveEventSmartZoneCompactStarted
+	LiveEventSmartZoneFinishingUp
+	LiveEventSmartZoneRecovered
 )
 
 // LiveEvent captures one EventSink call for asynchronous delivery over a
@@ -143,4 +146,16 @@ func (s *ChannelEventSink) CherryPickStarted(identifier string) {
 
 func (s *ChannelEventSink) ConflictResolutionStarted(identifier string) {
 	s.emit(LiveEvent{Kind: LiveEventConflictResolutionStarted, Identifier: identifier})
+}
+
+func (s *ChannelEventSink) SmartZoneCompactStarted(identifier string) {
+	s.emit(LiveEvent{Kind: LiveEventSmartZoneCompactStarted, Identifier: identifier})
+}
+
+func (s *ChannelEventSink) SmartZoneFinishingUp(identifier string) {
+	s.emit(LiveEvent{Kind: LiveEventSmartZoneFinishingUp, Identifier: identifier})
+}
+
+func (s *ChannelEventSink) SmartZoneRecovered(identifier string) {
+	s.emit(LiveEvent{Kind: LiveEventSmartZoneRecovered, Identifier: identifier})
 }

@@ -583,11 +583,11 @@ func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) 
 		t.Errorf("removed worktree branches = %v, want all 3 iterations removed", *removed)
 	}
 
-	if !strings.Contains(out.String(), "paused iter-01") {
-		t.Errorf("output = %q, want a paused report mentioning iter-01", out.String())
+	if !strings.Contains(out.String(), "ticket 01: context budget exceeded; compacting...") {
+		t.Errorf("output = %q, want a compacting report for ticket 01", out.String())
 	}
-	if !strings.Contains(out.String(), "resumed iter-01") {
-		t.Errorf("output = %q, want a resumed report mentioning iter-01", out.String())
+	if !strings.Contains(out.String(), "ticket 01: compacted; telling the agent to finish up...") {
+		t.Errorf("output = %q, want a finish-up report for ticket 01", out.String())
 	}
 }
 

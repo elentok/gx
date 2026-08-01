@@ -403,7 +403,7 @@ func classifyDoneTicket(d Deps, paths reconcilePaths, featureBranch string, t ti
 	// untouched — so it's checked directly against the ticket, independent of
 	// whether the iteration branch itself survived.
 	if !commitsPresent {
-		found, err := d.TrailerCommitExists(paths.FeatureWorktree, featureBranch, ticketTrailerKey, t.Identifier)
+		found, err := d.TrailerCommitExists(paths.FeatureWorktree, featureBranch, ticketTrailerKey, ticketTrailerValue(featureBranch, t.Identifier))
 		if err != nil {
 			return doneOK, fmt.Errorf("checking ticket trailer marker: %w", err)
 		}
