@@ -111,6 +111,15 @@ func (r *loopRegistry) isRunning() bool {
 	return r.running
 }
 
+// IsLoopRunning reports whether a ralph-loop launched from this process is
+// currently in flight, regardless of which worktree it targets. The app
+// shell (ticket 05) uses this to force the tickets tab into --all scope
+// while a loop is running, since the loop keeps going against its own
+// worktree even after the user navigates the worktree cursor elsewhere.
+func IsLoopRunning() bool {
+	return ralphLoopRegistry.isRunning()
+}
+
 // snapshot reports the currently-running epic, if any.
 func (r *loopRegistry) snapshot() (running bool, epicName string) {
 	r.mu.Lock()
