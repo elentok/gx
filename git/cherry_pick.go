@@ -88,6 +88,34 @@ func PatchesApplied(dir, upstream, base, branch string) (bool, error) {
 	return found, nil
 }
 
+// AppendTrailer amends HEAD's commit message to add a "key: value" trailer
+// line, leaving the tree/index untouched (RewordHead). Unlike a diff or
+// hash, a trailer survives a later rebase even when the commit is manually
+// re-resolved during a conflict (which changes its patch-id) — it's the
+// last-resort marker classifyDoneTicket falls back to once both hash- and
+// patch-id-based presence checks can no longer prove a ticket's landed
+// commit is still on the feature branch.
+func AppendTrailer(dir, key, value string) error {
+	msg, _, err := run(dir, []string{"log", "-1", "--format=%B", "HEAD"})
+	if err != nil {
+		return err
+	}
+	newMsg := strings.TrimRight(msg, "\n") + "\n\n" + key + ": " + value + "\n"
+	_, err = RewordHead(dir, newMsg)
+	return err
+}
+
+// TrailerCommitExists reports whether any commit reachable from ref carries
+// a "key: value" trailer line in its message (git log --grep), see
+// AppendTrailer.
+func TrailerCommitExists(dir, ref, key, value string) (bool, error) {
+	out, _, err := run(dir, []string{"log", "--format=%H", "--grep=^" + key + ": " + value + "$", ref})
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(out) != "", nil
+}
+
 // CherryPickInProgress reports whether dir has a cherry-pick sequence
 // currently stopped on a conflict (CHERRY_PICK_HEAD present).
 func CherryPickInProgress(dir string) (bool, error) {

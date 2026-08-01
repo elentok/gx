@@ -283,7 +283,12 @@ const (
 // is really missing — the recorded SHA can also go stale harmlessly, e.g.
 // when the feature branch is rebased after landing it, and blindly trusting
 // that would misclassify already-landed work as doneRecoverable and
-// re-cherry-pick it onto the live feature worktree.
+// re-cherry-pick it onto the live feature worktree. A third and final check,
+// TrailerCommitExists, runs regardless of whether the iteration branch
+// survived: it looks for the ticket-identifying trailer landCherryPick
+// stamps on every landed commit, the only signal that survives a rebase
+// where the commit was also manually re-resolved during a conflict — that
+// changes both its hash and its patch-id, but never its commit message.
 func classifyDoneTicket(d Deps, paths reconcilePaths, featureBranch string, t tickets.Ticket, events []Event, live map[string]bool) (doneMismatchClass, error) {
 	landedSHA := latestCherryPickedSHA(events, t.Identifier)
 
@@ -316,6 +321,21 @@ func classifyDoneTicket(d Deps, paths reconcilePaths, featureBranch string, t ti
 			return doneOK, fmt.Errorf("checking patch-equivalent landed commits: %w", err)
 		}
 		commitsPresent = applied
+	}
+
+	// Last resort: neither SHA reachability nor patch-id equivalence can
+	// survive a rebase where the landed commit was also manually re-resolved
+	// during a conflict, since that changes both its hash and its diff. The
+	// trailer landCherryPick stamps on every landed commit (Deps.AppendTrailer)
+	// has neither problem — commit messages ride along through a rebase
+	// untouched — so it's checked directly against the ticket, independent of
+	// whether the iteration branch itself survived.
+	if !commitsPresent {
+		found, err := d.TrailerCommitExists(paths.FeatureWorktree, featureBranch, ticketTrailerKey, t.Identifier)
+		if err != nil {
+			return doneOK, fmt.Errorf("checking ticket trailer marker: %w", err)
+		}
+		commitsPresent = found
 	}
 
 	label := iterLabel(t.Identifier)

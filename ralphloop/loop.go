@@ -17,6 +17,11 @@ import (
 // RunOptions.ScratchDir (or Resume's scratchDir) is unset.
 const defaultScratchDir = ".scratch"
 
+// ticketTrailerKey is the commit-message trailer landCherryPick stamps onto
+// every landed commit (see Deps.AppendTrailer) and classifyDoneTicket's last-
+// resort fallback searches for (Deps.TrailerCommitExists).
+const ticketTrailerKey = "Ralph-Loop-Ticket"
+
 // defaultMaxParallel is how many iterations run concurrently when
 // RunOptions.MaxParallel is unset.
 const defaultMaxParallel = 2
@@ -670,6 +675,9 @@ func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane, ta
 
 	if err := cherryPickWithConflictResolution(d, p, base, branch, sessionID, pane, tab); err != nil {
 		return "", err
+	}
+	if err := d.AppendTrailer(p.FeatureWorktree, ticketTrailerKey, p.Ticket.Identifier); err != nil {
+		return "", fmt.Errorf("stamping ticket trailer on landed commit: %w", err)
 	}
 	landedSHA, err := d.RevParse(p.FeatureWorktree, "HEAD")
 	if err != nil {

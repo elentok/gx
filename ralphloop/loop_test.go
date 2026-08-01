@@ -111,6 +111,12 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		PatchesApplied: func(dir, upstream, base, branch string) (bool, error) {
 			return false, nil
 		},
+		AppendTrailer: func(dir, key, value string) error {
+			return nil
+		},
+		TrailerCommitExists: func(dir, ref, key, value string) (bool, error) {
+			return false, nil
+		},
 		WorktreeExists: func(path string) (bool, error) {
 			return true, nil
 		},
