@@ -561,22 +561,9 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 		return nil
 	}
 
-	p.FeatureLock.Lock()
-	err = cherryPickWithConflictResolution(d, p, base, branch, sessionID, pane, tab)
-	var landedSHA string
-	var revErr error
-	if err == nil {
-		// Resolved while still holding FeatureLock, before another iteration's
-		// cherry-pick can advance the tip past this one's — otherwise the
-		// recorded SHA could belong to a different ticket entirely.
-		landedSHA, revErr = d.RevParse(p.FeatureWorktree, "HEAD")
-	}
-	p.FeatureLock.Unlock()
+	landedSHA, err := landCherryPick(d, p, base, branch, sessionID, pane, tab)
 	if err != nil {
 		return err
-	}
-	if revErr != nil {
-		return fmt.Errorf("resolving landed commit on %s: %w", p.FeatureBranch, revErr)
 	}
 	p.logTicketEventSHA(eventCherryPicked, pane, tab, sessionID, path, "", landedSHA)
 
@@ -584,14 +571,71 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 		return fmt.Errorf("marking ticket done: %w", err)
 	}
 
-	if err := d.RemoveWorktree(p.RepoDir, path, true); err != nil {
-		return fmt.Errorf("removing iteration worktree: %w", err)
+	return finishCleanup(d, p.RepoDir, p.FeatureWorktree, path, branch, tab)
+}
+
+// landCherryPick cherry-picks base..branch onto the feature branch (resolving
+// conflicts via cherryPickWithConflictResolution if any arise), then resolves
+// the SHA it landed at — the shared core of both a normal iteration's
+// completion (finishIteration) and a startup repair's re-cherry-pick
+// (repairRecoverableTicket). p.FeatureLock is held for the duration since
+// this mutates the shared feature worktree's working directory; the landed
+// SHA is resolved before releasing it, before another iteration's cherry-pick
+// can advance the tip past this one's — otherwise the recorded SHA could
+// belong to a different ticket entirely.
+func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane, tab string) (string, error) {
+	p.FeatureLock.Lock()
+	defer p.FeatureLock.Unlock()
+
+	if err := cherryPickWithConflictResolution(d, p, base, branch, sessionID, pane, tab); err != nil {
+		return "", err
 	}
-	if err := d.TabClose(tab); err != nil {
-		return fmt.Errorf("closing iteration tab: %w", err)
+	landedSHA, err := d.RevParse(p.FeatureWorktree, "HEAD")
+	if err != nil {
+		return "", fmt.Errorf("resolving landed commit on %s: %w", p.FeatureBranch, err)
+	}
+	return landedSHA, nil
+}
+
+// finishCleanup removes an iteration's now-redundant worktree, tab, and
+// branch. Each check is independent since callers run this against state left
+// in different shapes: a normal completion (worktree/tab/branch all just
+// created and definitely present), or a done ticket's leftover state found on
+// startup after a crash (any subset of the three may have survived — see
+// classifyDoneTicket's doneStaleCleanup). tabID is "" if no live tab was
+// found for this iteration.
+func finishCleanup(d Deps, repoDir, featureWorktree, path, branch, tabID string) error {
+	hasWorktree, err := d.WorktreeExists(path)
+	if err != nil {
+		return fmt.Errorf("checking iteration worktree: %w", err)
+	}
+	if hasWorktree {
+		if err := d.RemoveWorktree(repoDir, path, true); err != nil {
+			return fmt.Errorf("removing iteration worktree: %w", err)
+		}
+	}
+
+	if tabID != "" {
+		if err := d.TabClose(tabID); err != nil {
+			return fmt.Errorf("closing iteration tab: %w", err)
+		}
+	}
+
+	if branchExists(d, featureWorktree, branch) {
+		if err := d.DeleteBranch(repoDir, branch); err != nil {
+			return fmt.Errorf("deleting iteration branch %s: %w", branch, err)
+		}
 	}
 
 	return nil
+}
+
+// branchExists reports whether branch is a resolvable ref in dir's repo,
+// treating any RevParse error as "doesn't exist" — the same convention
+// classifyDoneTicket uses to check the iteration branch's presence.
+func branchExists(d Deps, dir, branch string) bool {
+	_, err := d.RevParse(dir, branch)
+	return err == nil
 }
 
 // conflictResolutionTimeoutMs bounds how long a conflict-resolution agent may

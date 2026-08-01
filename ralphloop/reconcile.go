@@ -110,7 +110,10 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 			// Commits landed, nothing left behind: the common case, left
 			// untouched.
 		case doneStaleCleanup:
-			report("ticket %02d: done and commits landed, but leftover iteration state was never cleaned up\n", t.Number)
+			if err := finishStaleCleanup(d, rp, t, tabs); err != nil {
+				return nil, fmt.Errorf("finishing interrupted cleanup for done ticket %d: %w", t.Number, err)
+			}
+			report("ticket %02d: done and commits landed, but leftover iteration state was never cleaned up; finished the interrupted cleanup\n", t.Number)
 		case doneRecoverable:
 			if err := repairRecoverableTicket(d, rp, epic.Name, t, tabs); err != nil {
 				return nil, fmt.Errorf("repairing done ticket %d: %w", t.Number, err)
@@ -166,31 +169,18 @@ func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t
 		Report:           rp.Report,
 	}
 
-	rp.FeatureLock.Lock()
-	err = cherryPickWithConflictResolution(d, p, base, branch, "", "", "")
-	var landedSHA string
-	var revErr error
-	if err == nil {
-		landedSHA, revErr = d.RevParse(paths.FeatureWorktree, "HEAD")
-	}
-	rp.FeatureLock.Unlock()
+	landedSHA, err := landCherryPick(d, p, base, branch, "", "", "")
 	if err != nil {
 		return fmt.Errorf("re-cherry-picking ticket %d during startup repair: %w", t.Number, err)
-	}
-	if revErr != nil {
-		return fmt.Errorf("resolving repaired commit on %s: %w", featureBranch, revErr)
 	}
 
 	p.logTicketEventSHA(eventCherryPicked, "", "", "", path, "", landedSHA)
 	rp.Report("ticket %02d: done but commits were missing from %s; auto re-cherry-picked from iteration branch %s and restored (%s)\n", t.Number, featureBranch, branch, landedSHA)
 
-	tabID := ""
-	for _, tab := range tabs {
-		if tab.Label == label {
-			tabID = tab.TabID
-			break
-		}
-	}
+	// Branch deletion is left to finishStaleCleanup/finishCleanup elsewhere:
+	// this repair just re-landed the commits, so the branch that held them
+	// stays until a later ticket cleans it up.
+	tabID := tabIDForLabel(tabs, label)
 	hasWorktree, err := d.WorktreeExists(path)
 	if err != nil {
 		return fmt.Errorf("checking leftover worktree during repair cleanup: %w", err)
@@ -207,6 +197,32 @@ func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t
 	}
 
 	return nil
+}
+
+// finishStaleCleanup completes an interrupted cleanup for a done ticket whose
+// commits already landed on the feature branch, but whose iteration
+// worktree/tab/branch survived a crash that landed between marking done and
+// the cleanup step right after it — the same tail finishIteration runs on the
+// normal completion path.
+func finishStaleCleanup(d Deps, rp reconcileParams, t tickets.Ticket, tabs []herdr.Tab) error {
+	paths := rp.Paths
+	label := iterLabel(t.Number)
+	branch := iterBranch(t.Number)
+	path := filepath.Join(paths.WorktreeDir, label)
+	tabID := tabIDForLabel(tabs, label)
+
+	return finishCleanup(d, paths.RepoDir, paths.FeatureWorktree, path, branch, tabID)
+}
+
+// tabIDForLabel finds the tab id of the live tab named label, or "" if none
+// is live.
+func tabIDForLabel(tabs []herdr.Tab, label string) string {
+	for _, tab := range tabs {
+		if tab.Label == label {
+			return tab.TabID
+		}
+	}
+	return ""
 }
 
 // markDoneTicketUnrecoverable flags a doneUnrecoverable ticket for a human to
@@ -274,8 +290,7 @@ func classifyDoneTicket(d Deps, paths reconcilePaths, featureBranch string, t ti
 	}
 
 	branch := iterBranch(t.Number)
-	_, revErr := d.RevParse(paths.FeatureWorktree, branch)
-	branchExists := revErr == nil
+	hasBranch := branchExists(d, paths.FeatureWorktree, branch)
 
 	label := iterLabel(t.Number)
 	hasWorktree, err := d.WorktreeExists(filepath.Join(paths.WorktreeDir, label))
@@ -283,14 +298,14 @@ func classifyDoneTicket(d Deps, paths reconcilePaths, featureBranch string, t ti
 		return doneOK, fmt.Errorf("checking leftover worktree: %w", err)
 	}
 
-	leftover := live[label] || hasWorktree || branchExists
+	leftover := live[label] || hasWorktree || hasBranch
 
 	switch {
 	case commitsPresent && !leftover:
 		return doneOK, nil
 	case commitsPresent:
 		return doneStaleCleanup, nil
-	case branchExists:
+	case hasBranch:
 		return doneRecoverable, nil
 	default:
 		return doneUnrecoverable, nil

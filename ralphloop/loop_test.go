@@ -62,6 +62,9 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 			mu.Unlock()
 			return nil
 		},
+		DeleteBranch: func(repoDir, branch string) error {
+			return nil
+		},
 		TabCreate: func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error) {
 			return herdr.CreatedTab{
 				Tab:        herdr.Tab{TabID: "tab-" + opts.Label, Label: opts.Label, WorkspaceID: opts.WorkspaceID},
@@ -105,7 +108,7 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 			return true, nil
 		},
 		WorktreeExists: func(path string) (bool, error) {
-			return false, nil
+			return true, nil
 		},
 		InstallDeps: func(path string) (string, error) {
 			return "", nil
@@ -162,6 +165,30 @@ func TestRun_LinearChain_RunsTicketsInOrderAndLandsAll(t *testing.T) {
 
 	if !strings.Contains(out.String(), "complete: 2 ticket(s)") {
 		t.Errorf("summary output = %q, want a completion summary mentioning 2 tickets", out.String())
+	}
+}
+
+// TestRun_IterationCompletion_DeletesIterationBranch exercises ticket 04's
+// AC that the normal same-run success path deletes a landed iteration's
+// now-redundant branch — something it never did before this ticket.
+func TestRun_IterationCompletion_DeletesIterationBranch(t *testing.T) {
+	scratchDir := writeEpic(t, "my-epic", map[string]string{
+		"01-first.md": "# First\n\n**Status:** open\n",
+	})
+	d, _, _ := fakeDeps()
+	var deletedBranches []string
+	d.DeleteBranch = func(repoDir, branch string) error {
+		deletedBranches = append(deletedBranches, branch)
+		return nil
+	}
+
+	var out bytes.Buffer
+	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if len(deletedBranches) != 1 || deletedBranches[0] != "ralph-loop/iter-01" {
+		t.Errorf("deletedBranches = %v, want [ralph-loop/iter-01]", deletedBranches)
 	}
 }
 

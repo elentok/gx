@@ -31,7 +31,11 @@ type Deps struct {
 	// worktree a prior invocation already created.
 	AddWorktree func(repoDir, path, branch, base string) error
 	// RemoveWorktree removes the git worktree checked out at path.
-	RemoveWorktree       func(repoDir, path string, force bool) error
+	RemoveWorktree func(repoDir, path string, force bool) error
+	// DeleteBranch force-deletes an iteration's now-redundant branch once its
+	// commits have landed on the feature branch (as different hashes, via
+	// cherry-pick — never merged, so a non-force delete would refuse it).
+	DeleteBranch         func(repoDir, branch string) error
 	TabCreate            func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error)
 	TabClose             func(tabID string) error
 	TabList              func(workspaceID string) ([]herdr.Tab, error)
@@ -88,6 +92,7 @@ func DefaultDeps() Deps {
 		WorktreeDir:           worktreeDir,
 		AddWorktree:           addWorktree,
 		RemoveWorktree:        removeWorktree,
+		DeleteBranch:          deleteBranch,
 		TabCreate:             herdr.TabCreate,
 		TabClose:              herdr.TabClose,
 		TabList:               herdr.TabList,
@@ -142,6 +147,15 @@ func removeWorktree(repoDir, path string, force bool) error {
 		return err
 	}
 	return git.RemoveWorktree(*repo, path, force)
+}
+
+// deleteBranch implements Deps.DeleteBranch against the real git package.
+func deleteBranch(repoDir, branch string) error {
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		return err
+	}
+	return git.DeleteLocalBranch(*repo, branch, true)
 }
 
 // worktreeExists implements Deps.WorktreeExists: whether an iteration

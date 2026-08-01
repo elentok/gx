@@ -699,3 +699,134 @@ func TestReconcile_DoneTicketRecoverable_CleansUpLeftoverWorktreeAndTab(t *testi
 		t.Errorf("closedTab = %q, want the leftover iter-03 tab closed", closedTab)
 	}
 }
+
+// TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup exercises
+// ticket 04: a done ticket classified doneStaleCleanup (commits already
+// landed, but a leftover worktree/tab/branch survived a crash between marking
+// done and the cleanup step right after it) gets that cleanup finished on
+// startup — worktree removed, tab closed, and its now-redundant branch
+// deleted.
+func TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"03-c.md": "# C\n\n**Status:** done\n",
+	})
+	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: 3, SHA: "abc123"}); err != nil {
+		t.Fatalf("logEvent: %v", err)
+	}
+	epics, err := tickets.Load(scratchDir)
+	if err != nil {
+		t.Fatalf("tickets.Load: %v", err)
+	}
+
+	d, _, _ := fakeDeps()
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
+		return []herdr.Tab{{TabID: "tab-iter-03", Label: "iter-03", WorkspaceID: workspaceID}}, nil
+	}
+	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return true, nil } // commits landed
+	d.WorktreeExists = func(path string) (bool, error) { return strings.Contains(path, "iter-03"), nil }
+	// d.RevParse defaults to returning "deadbeef" for any ref (fakeDeps), so the
+	// iteration branch is treated as still existing too.
+
+	var removedWorktree string
+	d.RemoveWorktree = func(repoDir, path string, force bool) error {
+		removedWorktree = path
+		return nil
+	}
+	var closedTab string
+	d.TabClose = func(tabID string) error {
+		closedTab = tabID
+		return nil
+	}
+	var deletedBranch string
+	d.DeleteBranch = func(repoDir, branch string) error {
+		deletedBranch = branch
+		return nil
+	}
+
+	var reports []string
+	_, err = reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees", RepoDir: "/fake/repo"}, func(format string, args ...any) {
+		reports = append(reports, fmt.Sprintf(format, args...))
+	}), epics[0])
+	if err != nil {
+		t.Fatalf("reconcile() error = %v", err)
+	}
+
+	if !strings.Contains(removedWorktree, "iter-03") {
+		t.Errorf("removedWorktree = %q, want the leftover iter-03 worktree removed", removedWorktree)
+	}
+	if closedTab != "tab-iter-03" {
+		t.Errorf("closedTab = %q, want the leftover iter-03 tab closed", closedTab)
+	}
+	if deletedBranch != "ralph-loop/iter-03" {
+		t.Errorf("deletedBranch = %q, want ralph-loop/iter-03 deleted", deletedBranch)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "03-c.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw), "Status:** done") {
+		t.Errorf("ticket status changed unexpectedly:\n%s", raw)
+	}
+
+	found := false
+	for _, r := range reports {
+		if strings.Contains(r, "ticket 03") && strings.Contains(r, "finished the interrupted cleanup") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("reports = %v, want a report line for the finished cleanup", reports)
+	}
+}
+
+// TestReconcile_DoneTicketFullyClean_NoOp verifies a done ticket with commits
+// landed and nothing left behind (doneOK) is untouched: no worktree/tab/
+// branch cleanup calls, no spurious report lines.
+func TestReconcile_DoneTicketFullyClean_NoOp(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"03-c.md": "# C\n\n**Status:** done\n",
+	})
+	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: 3, SHA: "abc123"}); err != nil {
+		t.Fatalf("logEvent: %v", err)
+	}
+	epics, err := tickets.Load(scratchDir)
+	if err != nil {
+		t.Fatalf("tickets.Load: %v", err)
+	}
+
+	d, _, _ := fakeDeps()
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) { return nil, nil }
+	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return true, nil }
+	d.WorktreeExists = func(path string) (bool, error) { return false, nil }
+	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") } // branch gone
+
+	cleanupCalled := false
+	d.RemoveWorktree = func(repoDir, path string, force bool) error {
+		cleanupCalled = true
+		return nil
+	}
+	d.TabClose = func(tabID string) error {
+		cleanupCalled = true
+		return nil
+	}
+	d.DeleteBranch = func(repoDir, branch string) error {
+		cleanupCalled = true
+		return nil
+	}
+
+	var reports []string
+	_, err = reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees", RepoDir: "/fake/repo"}, func(format string, args ...any) {
+		reports = append(reports, fmt.Sprintf(format, args...))
+	}), epics[0])
+	if err != nil {
+		t.Fatalf("reconcile() error = %v", err)
+	}
+
+	if cleanupCalled {
+		t.Error("a fully-clean done ticket must not trigger any worktree/tab/branch cleanup call")
+	}
+	if len(reports) != 0 {
+		t.Errorf("reports = %v, want no spurious log lines for a fully-clean done ticket", reports)
+	}
+}
