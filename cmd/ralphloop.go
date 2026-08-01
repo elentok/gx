@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"path/filepath"
 
 	tea "charm.land/bubbletea/v2"
@@ -74,13 +73,14 @@ func runRalphLoop(epicName, agent, skill string, maxParallel, smartZone int, d d
 // runRalphLoopTUI launches the standalone ralph-loop TUI (mirroring
 // cmd/bump.go's own tea.NewProgram, rather than a tab registered in the main
 // gx app shell): the orchestrator loop runs in the background exactly as it
-// does headlessly, its text report discarded since nothing renders it yet
-// (see ticket 04's live orchestrator state), while the TUI polls
-// `.scratch/`'s Status: lines directly off disk to drive a flat, navigable,
-// previewable ticket list.
+// does headlessly, its lifecycle events forwarded over a channel (see
+// ralphloop.ChannelEventSink) instead of rendered as text, driving the flat,
+// navigable, previewable ticket list's live spinner/paused/needs-attention
+// row state (ticket 04a) on top of `.scratch/`'s disk-polled Status: lines.
 func runRalphLoopTUI(opts ralphloop.RunOptions, worktreeRoot string, d deps) error {
+	sink := ralphloop.NewChannelEventSink()
 	go func() {
-		_ = ralphloop.Run(opts, ralphloop.DefaultDeps(), ralphloop.NewTextEventSink(io.Discard))
+		_ = ralphloop.Run(opts, ralphloop.DefaultDeps(), sink)
 	}()
 
 	cfg, err := config.Load()
@@ -90,7 +90,7 @@ func runRalphLoopTUI(opts ralphloop.RunOptions, worktreeRoot string, d deps) err
 	settings := settingsFromConfig(cfg)
 	settings.EnableNavigation = false
 
-	m := tickets.NewFlatModel(worktreeRoot, opts.EpicName, settings)
+	m := tickets.NewFlatModel(worktreeRoot, opts.EpicName, settings).WithLiveEvents(sink.Events())
 	p := tea.NewProgram(m, tea.WithInput(d.stdin), tea.WithOutput(d.stdout))
 	_, err = p.Run()
 	return err

@@ -25,6 +25,11 @@ var (
 	statusDoneStyle  = lipgloss.NewStyle().Foreground(ui.ColorOverlay).Faint(true)
 	statusErrorStyle = lipgloss.NewStyle().Foreground(ui.ColorRed).Bold(true)
 
+	// statusPausedStyle renders a live orchestrator pause (rate-limit/
+	// smart-zone — see ralph-loop's FlatModel), distinct from every disk-only
+	// status color above.
+	statusPausedStyle = lipgloss.NewStyle().Foreground(ui.ColorMauve)
+
 	blockedBySuffixStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Italic(true)
 
 	sectionHeaderStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)

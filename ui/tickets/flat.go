@@ -8,9 +8,11 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
@@ -59,26 +61,47 @@ type FlatModel struct {
 	previewVP     viewport.Model
 	previewSelKey string
 	previewSearch search.Model
+
+	// liveEvents is the orchestrator's live event stream (ticket 01's
+	// EventSink, forwarded over a channel — see ralphloop.ChannelEventSink),
+	// nil unless WithLiveEvents wired one up. live/labelIdentifier are the
+	// per-ticket state folded from it; see applyLiveEvent.
+	liveEvents      <-chan ralphloop.LiveEvent
+	live            map[string]liveTicketState
+	labelIdentifier map[string]string
+
+	spinner       spinner.Model
+	spinnerActive bool
 }
 
 // NewFlatModel builds the flat ralph-loop TUI model scoped to a single named
 // epic under worktreeRoot's `.scratch/`.
 func NewFlatModel(worktreeRoot, epicName string, settings ui.Settings) FlatModel {
+	sp := spinner.New()
+	sp.Spinner = spinner.Dot
+
 	return FlatModel{
-		worktreeRoot:  worktreeRoot,
-		epicName:      epicName,
-		settings:      settings,
-		keys:          newFlatTicketsManager(),
-		notify:        notify.New(settings.UseNerdFontIcons),
-		previewSearch: search.NewModel(),
-		previewVP:     viewport.New(),
+		worktreeRoot:    worktreeRoot,
+		epicName:        epicName,
+		settings:        settings,
+		keys:            newFlatTicketsManager(),
+		notify:          notify.New(settings.UseNerdFontIcons),
+		previewSearch:   search.NewModel(),
+		previewVP:       viewport.New(),
+		live:            map[string]liveTicketState{},
+		labelIdentifier: map[string]string{},
+		spinner:         sp,
 	}
 }
 
 func (m FlatModel) KeyManager() keys.Manager { return m.keys }
 
 func (m FlatModel) Init() tea.Cmd {
-	return tea.Batch(m.cmdLoad(), m.cmdTick())
+	cmds := []tea.Cmd{m.cmdLoad(), m.cmdTick()}
+	if m.liveEvents != nil {
+		cmds = append(cmds, cmdWaitLiveEvent(m.liveEvents))
+	}
+	return tea.Batch(cmds...)
 }
 
 type flatEpicLoadedMsg struct {
@@ -193,6 +216,26 @@ func (m FlatModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case flatTickMsg:
 		return m, tea.Batch(notifyCmd, m.cmdLoad(), m.cmdTick())
+
+	case flatLiveEventMsg:
+		if !msg.ok {
+			return m, notifyCmd
+		}
+		m.applyLiveEvent(msg.event)
+		m.spinnerActive = m.hasRunningLiveTicket()
+		cmds := []tea.Cmd{notifyCmd, cmdWaitLiveEvent(m.liveEvents)}
+		if m.spinnerActive {
+			cmds = append(cmds, m.spinner.Tick)
+		}
+		return m, tea.Batch(cmds...)
+
+	case spinner.TickMsg:
+		if !m.spinnerActive {
+			return m, notifyCmd
+		}
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
+		return m, tea.Batch(notifyCmd, cmd)
 
 	case editFileFinishedMsg:
 		next, cmd := m.handleEditFileFinished(msg)

@@ -825,12 +825,13 @@ type launchAndPromptParams struct {
 	// concurrently.
 	Sink EventSink
 	// Report writes a line to the loop's output, safe to call concurrently.
-	// Only the Codex quota-exhaustion and operator-intervention pause paths
-	// (recoverCodexRateLimit, waitForAttentionRecovery) still read this — the
+	// Only recoverCodexRateLimit's Codex quota-exhaustion path still reads
+	// this (waitForAttentionRecovery moved to Sink in ticket 04a, closing the
+	// gap that left operator-intervention pauses with no live event) — the
 	// rest of the package reports through Sink instead. Run itself has no
 	// legacy text sink to source one from, so it leaves this nil (report()
-	// below no-ops on a nil Report); tests exercising those two paths in
-	// isolation set it directly.
+	// below no-ops on a nil Report); tests exercising that path in isolation
+	// set it directly.
 	Report func(format string, args ...any)
 
 	// Ticket, TicketPath, ScratchDir, and EpicName locate the run-log.jsonl entries this
@@ -1137,7 +1138,7 @@ func waitForAttentionRecovery(d Deps, p launchAndPromptParams, sessionID string)
 		return fmt.Errorf("marking ticket needs-attention: %w", err)
 	}
 	p.Gate.pause(p.Label, reason)
-	p.report("paused %s: %s\n", p.Label, reason)
+	p.sink().IterationPaused(p.Label, PauseNeedsAttention, reason)
 	p.logAgentEvent(eventNeedsAttention, sessionID, reason)
 
 	for {
@@ -1151,7 +1152,7 @@ func waitForAttentionRecovery(d Deps, p launchAndPromptParams, sessionID string)
 				return fmt.Errorf("restoring ticket to claimed: %w", err)
 			}
 			p.Gate.resumeLabel(p.Label)
-			p.report("resumed %s after operator intervention\n", p.Label)
+			p.sink().IterationResumed(p.Label, PauseNeedsAttention)
 			p.logLifecycleEvent(eventResumed, sessionID)
 			return nil
 		}
@@ -1178,7 +1179,7 @@ func waitForAttentionRecovery(d Deps, p launchAndPromptParams, sessionID string)
 			return fmt.Errorf("restoring ticket to claimed: %w", err)
 		}
 		p.Gate.resumeLabel(p.Label)
-		p.report("resumed %s after manual recheck\n", p.Label)
+		p.sink().IterationResumed(p.Label, PauseNeedsAttention)
 		p.logLifecycleEvent(eventResumed, sessionID)
 		return nil
 	}

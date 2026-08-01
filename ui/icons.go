@@ -38,6 +38,11 @@ type IconSet struct {
 	TicketDone           string
 	TicketSuperseded     string
 	TicketError          string
+	// TicketPaused is a live ralph-loop orchestrator state (an iteration
+	// paused mid-run, e.g. smart-zone/rate-limit), distinct from
+	// TicketBlocked's ticket-graph "blocked by" state — see ui/tickets'
+	// statusIconAndStyle vs. ralph-loop's live row rendering.
+	TicketPaused string
 }
 
 func Icons(useNerdFont bool) IconSet {
@@ -79,6 +84,7 @@ func Icons(useNerdFont bool) IconSet {
 			TicketDone:           "d",
 			TicketSuperseded:     "s",
 			TicketError:          "!!",
+			TicketPaused:         "P",
 		}
 	}
 	return IconSet{
@@ -118,5 +124,6 @@ func Icons(useNerdFont bool) IconSet {
 		TicketDone:           "󰄬",
 		TicketSuperseded:     "󰃀",
 		TicketError:          "󰀪",
+		TicketPaused:         "",
 	}
 }

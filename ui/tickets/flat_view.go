@@ -84,6 +84,12 @@ func (m FlatModel) listLines() []string {
 }
 
 func (m FlatModel) renderFlatTicketRow(t tickets.Ticket) string {
+	if live, ok := m.live[t.Identifier]; ok {
+		if line, ok := m.renderLiveTicketRow(t, live); ok {
+			return line
+		}
+	}
+
 	status := m.epic.RenderedStatus(t)
 	icon, style := statusIconAndStyle(m.icons(), status)
 

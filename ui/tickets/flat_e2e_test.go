@@ -9,6 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/ralphloop"
 	teatest "github.com/elentok/gx/testutil/teatestv2"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/tickets"
@@ -100,6 +101,56 @@ func TestFlatTUI_RefreshAndQuit(t *testing.T) {
 
 	tm.Send(flatKeyRune('q'))
 	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
+}
+
+// TestFlatTUI_LiveEventsDriveRowState feeds synthetic ralphloop.LiveEvents
+// through WithLiveEvents and asserts each of ticket 04a's row states renders
+// distinctly: a running ticket's spinner+label, a paused ticket's badge+
+// reason, a needs-attention ticket's own badge+reason, and a done ticket's
+// unchanged (ticket 03) dimmed rendering.
+func TestFlatTUI_LiveEventsDriveRowState(t *testing.T) {
+	root := t.TempDir()
+	writeFlatTicket(t, root, "my-epic", "01-running-ticket.md", "Status: open\n\nFirst body.\n")
+	writeFlatTicket(t, root, "my-epic", "02-paused-ticket.md", "Status: open\n\nSecond body.\n")
+	writeFlatTicket(t, root, "my-epic", "03-attention-ticket.md", "Status: open\n\nThird body.\n")
+	writeFlatTicket(t, root, "my-epic", "04-done-ticket.md", "Status: done\n\nFourth body.\n")
+
+	events := make(chan ralphloop.LiveEvent, 16)
+	m := tickets.NewFlatModel(root, "my-epic", ui.Settings{}).WithLiveEvents(events)
+	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(flatTermWidth, flatTermHeight))
+	defer tm.Quit()
+
+	waitForFlatText(t, tm, "Running ticket")
+
+	events <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Identifier: "01", Label: "iter-01"}
+	waitForFlatText(t, tm, "iter-01")
+
+	events <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Identifier: "02", Label: "iter-02"}
+	waitForFlatText(t, tm, "iter-02")
+	events <- ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationPaused, Label: "iter-02",
+		PauseKind: ralphloop.PauseSmartZone, Reason: "context budget exceeded",
+	}
+	waitForFlatText(t, tm, "context budget exceeded")
+
+	events <- ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventTicketStillNeedsAttention, Identifier: "03",
+	}
+	waitForFlatText(t, tm, "no live iteration to reattach to")
+
+	frame := tm.CurrentFrame()
+	if !bytes.Contains(frame, []byte("iter-01")) {
+		t.Fatalf("expected running ticket's spinner row to still show its label, got:\n%s", frame)
+	}
+	if !bytes.Contains(frame, []byte("context budget exceeded")) {
+		t.Fatalf("expected paused ticket's reason to render, got:\n%s", frame)
+	}
+	if !bytes.Contains(frame, []byte("no live iteration to reattach to")) {
+		t.Fatalf("expected needs-attention ticket's reason to render, got:\n%s", frame)
+	}
+	if !bytes.Contains(frame, []byte("Done ticket")) {
+		t.Fatalf("expected the done ticket's title to still render, got:\n%s", frame)
+	}
 }
 
 func TestFlatTUI_EditChordCancels(t *testing.T) {

@@ -17,6 +17,14 @@ type PauseKind string
 const (
 	PauseRateLimit PauseKind = "rate-limit"
 	PauseSmartZone PauseKind = "smart-zone"
+	// PauseNeedsAttention marks the operator-intervention pause
+	// waitForAttentionRecovery drives (Codex blocked on a permission/
+	// intervention prompt): mechanically it's paused through the same
+	// pauseGate as the other two kinds, but a renderer (see ticket 04a) treats
+	// it as its own "needs attention" state rather than a generic pause,
+	// since it needs a human at the agent's pane rather than clearing itself
+	// or via `gx ralph-loop resume`.
+	PauseNeedsAttention PauseKind = "needs-attention"
 )
 
 // EventSink receives every orchestrator-lifecycle event a `gx ralph-loop`
@@ -153,19 +161,25 @@ func (s *textEventSink) TicketClaimed(ticket tickets.Ticket) {}
 func (s *textEventSink) IterationStarted(identifier string, label string) {}
 
 func (s *textEventSink) IterationPaused(label string, kind PauseKind, reason string) {
-	if kind == PauseRateLimit {
+	switch kind {
+	case PauseRateLimit:
 		s.printf("paused %s: %s; waiting for automatic reset\n", label, reason)
-		return
+	case PauseNeedsAttention:
+		s.printf("paused %s: %s\n", label, reason)
+	default:
+		s.printf("paused %s: %s; run `gx ralph-loop resume` to continue\n", label, reason)
 	}
-	s.printf("paused %s: %s; run `gx ralph-loop resume` to continue\n", label, reason)
 }
 
 func (s *textEventSink) IterationResumed(label string, kind PauseKind) {
-	if kind == PauseRateLimit {
+	switch kind {
+	case PauseRateLimit:
 		s.printf("resumed %s after rate-limit reset\n", label)
-		return
+	case PauseNeedsAttention:
+		s.printf("resumed %s after operator intervention\n", label)
+	default:
+		s.printf("resumed %s\n", label)
 	}
-	s.printf("resumed %s\n", label)
 }
 
 func (s *textEventSink) IterationFinished(ticket tickets.Ticket, epicName string) {
