@@ -100,7 +100,7 @@ func (m FlatModel) renderFlatTicketRow(t tickets.Ticket) string {
 	// styling.
 	if status != tickets.StatusSuperseded {
 		if live, ok := m.live[t.Identifier]; ok {
-			if line, ok := m.renderLiveTicketRow(t, live); ok {
+			if line, ok := renderLiveTicketRow(m.icons(), m.spinner, t, live); ok {
 				return line
 			}
 		}

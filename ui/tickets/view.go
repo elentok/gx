@@ -37,6 +37,12 @@ var (
 	// worktreeTagStyle renders --all mode's per-epic worktree label, appended
 	// after the epic's name/count.
 	worktreeTagStyle = lipgloss.NewStyle().Foreground(ui.ColorBlue)
+
+	// runningEpicBandColor distinguishes the running epic's rows from the
+	// rest of the list (ticket 02) — distinct from ui.ColorSurface, which
+	// RenderRowHighlight uses for the selection row, so a selected row within
+	// the running epic still reads as selected first.
+	runningEpicBandColor = ui.ColorSurface1
 )
 
 // sidebarLines renders the epic/ticket tree as exactly two headed sections —
@@ -102,10 +108,19 @@ func (m Model) appendRowLines(lines []string, rows []row, startIdx int) []string
 		}
 		if selected {
 			line = ui.RenderRowHighlight(line)
+		} else if m.rowInRunningEpic(r) {
+			line = ui.RenderRowWithBackground(line, runningEpicBandColor)
 		}
 		lines = append(lines, line)
 	}
 	return lines
+}
+
+// rowInRunningEpic reports whether r belongs to the epic currently running a
+// ralph-loop, so appendRowLines can band its rows distinctly from the rest
+// of the list.
+func (m Model) rowInRunningEpic(r row) bool {
+	return m.implementEpic != "" && m.epics[r.epicIdx].Name == m.implementEpic
 }
 
 func (m Model) renderEpicRow(epic tickets.Epic) string {
@@ -131,6 +146,17 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 
 func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) string {
 	status := epic.RenderedStatus(t)
+
+	// See flat_view.go's renderFlatTicketRow for why superseded always wins
+	// over a live entry.
+	if status != tickets.StatusSuperseded {
+		if live, ok := m.live[t.Identifier]; ok {
+			if line, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live); ok {
+				return line
+			}
+		}
+	}
+
 	icon, style := statusIconAndStyle(m.icons(), status)
 
 	matched, current := m.searchMatch(rowIdx)

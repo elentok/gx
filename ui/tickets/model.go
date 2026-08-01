@@ -12,6 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/confirm"
@@ -78,6 +79,17 @@ type Model struct {
 	confirm          confirm.Model
 	implementEpic    string
 	implementSpinner spinner.Model
+
+	// live/labelIdentifier are implementEpic's per-ticket orchestrator state,
+	// folded from liveEvents the same way FlatModel does (see flat_live.go's
+	// applyLiveEvent) — ticket 02 ports FlatModel's live rendering onto this
+	// tab's full multi-epic list. liveEvents is nil unless this Model instance
+	// is currently draining a run's event channel (see startLiveTracking);
+	// the channel itself is owned by ralphLoopRegistry so a Model rebuilt by a
+	// tab switch can pick the same run's stream back up.
+	live            map[string]liveTicketState
+	labelIdentifier map[string]string
+	liveEvents      <-chan ralphloop.LiveEvent
 }
 
 // NewModel creates a new tickets tab model scoped to worktreeRoot's own
@@ -106,6 +118,8 @@ func NewModelWithScope(worktreeRoot string, settings ui.Settings, extraKeys keys
 		allRepos:         allRepos,
 		confirm:          confirm.New(),
 		implementSpinner: sp,
+		live:             map[string]liveTicketState{},
+		labelIdentifier:  map[string]string{},
 	}
 }
 
@@ -172,6 +186,15 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, notify.Error(msg.err.Error())
 	case spinner.TickMsg:
 		return m.handleImplementSpinnerTick(msg)
+	case modelLiveEventMsg:
+		if !msg.ok || m.liveEvents == nil {
+			return m, nil
+		}
+		if msg.event.Kind == ralphloop.LiveEventIterationFinished {
+			ralphLoopRegistry.recordTicketFinished()
+		}
+		m.applyLiveEvent(msg.event)
+		return m, cmdWaitModelLiveEvent(m.liveEvents)
 	}
 	return m, nil
 }

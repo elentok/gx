@@ -3,11 +3,13 @@ package tickets
 import (
 	"fmt"
 
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/ui"
 )
 
 // liveTicketState is a ticket's in-memory-only orchestrator state — which
@@ -94,39 +96,53 @@ func cmdWaitLiveEvent(events <-chan ralphloop.LiveEvent) tea.Cmd {
 // mutating them through a value receiver is safe — only fields reassigned
 // wholesale need a pointer receiver, and this method never does that.
 func (m FlatModel) applyLiveEvent(ev ralphloop.LiveEvent) {
+	applyLiveEvent(m.live, m.labelIdentifier, m.transcript, ev)
+}
+
+// applyLiveEvent is the shared fold FlatModel and Model (ui/tickets' main
+// app tab, ticket 02) both use to turn one orchestrator LiveEvent into
+// live/labelIdentifier map updates — Model has no transcript tail, so callers
+// that don't track one pass a nil map (checked below; a nil map read is fine,
+// only the write needs guarding).
+func applyLiveEvent(live map[string]liveTicketState, labelIdentifier map[string]string, transcript map[string][]string, ev ralphloop.LiveEvent) {
 	switch ev.Kind {
 	case ralphloop.LiveEventIterationStarted, ralphloop.LiveEventTicketReattached:
-		m.labelIdentifier[ev.Label] = ev.Identifier
-		m.live[ev.Identifier] = liveTicketState{running: true, label: ev.Label}
+		labelIdentifier[ev.Label] = ev.Identifier
+		live[ev.Identifier] = liveTicketState{running: true, label: ev.Label}
 
 	case ralphloop.LiveEventIterationPaused:
-		if identifier, ok := m.labelIdentifier[ev.Label]; ok {
-			m.live[identifier] = liveTicketState{
+		if identifier, ok := labelIdentifier[ev.Label]; ok {
+			live[identifier] = liveTicketState{
 				paused: true, label: ev.Label, pauseKind: ev.PauseKind, reason: ev.Reason,
 			}
 		}
 
 	case ralphloop.LiveEventIterationResumed:
-		if identifier, ok := m.labelIdentifier[ev.Label]; ok {
-			m.live[identifier] = liveTicketState{running: true, label: ev.Label}
+		if identifier, ok := labelIdentifier[ev.Label]; ok {
+			live[identifier] = liveTicketState{running: true, label: ev.Label}
 		}
 
 	case ralphloop.LiveEventIterationFinished, ralphloop.LiveEventTicketReverted,
 		ralphloop.LiveEventTicketCleanupFinished, ralphloop.LiveEventTicketRecovered:
-		delete(m.live, ev.Identifier)
-		delete(m.transcript, ev.Identifier)
+		delete(live, ev.Identifier)
+		if transcript != nil {
+			delete(transcript, ev.Identifier)
+		}
 
 	case ralphloop.LiveEventTranscriptLine:
-		if identifier, ok := m.labelIdentifier[ev.Label]; ok {
-			lines := append(m.transcript[identifier], ev.Line)
+		if transcript == nil {
+			return
+		}
+		if identifier, ok := labelIdentifier[ev.Label]; ok {
+			lines := append(transcript[identifier], ev.Line)
 			if len(lines) > flatTranscriptMaxLines {
 				lines = lines[len(lines)-flatTranscriptMaxLines:]
 			}
-			m.transcript[identifier] = lines
+			transcript[identifier] = lines
 		}
 
 	case ralphloop.LiveEventTicketStillNeedsAttention:
-		m.live[ev.Identifier] = liveTicketState{
+		live[ev.Identifier] = liveTicketState{
 			paused: true, pauseKind: ralphloop.PauseNeedsAttention, reason: "no live iteration to reattach to",
 		}
 
@@ -134,20 +150,20 @@ func (m FlatModel) applyLiveEvent(ev ralphloop.LiveEvent) {
 		m.live[ev.Identifier] = liveTicketState{running: true}
 
 	case ralphloop.LiveEventTicketUnrecoverable:
-		m.live[ev.Identifier] = liveTicketState{
+		live[ev.Identifier] = liveTicketState{
 			paused: true, pauseKind: ralphloop.PauseNeedsAttention, reason: "commits missing from epic; needs operator review",
 		}
 
 	case ralphloop.LiveEventCherryPickStarted:
-		if ls, ok := m.live[ev.Identifier]; ok {
+		if ls, ok := live[ev.Identifier]; ok {
 			ls.phase = livePhaseCherryPicking
-			m.live[ev.Identifier] = ls
+			live[ev.Identifier] = ls
 		}
 
 	case ralphloop.LiveEventConflictResolutionStarted:
-		if ls, ok := m.live[ev.Identifier]; ok {
+		if ls, ok := live[ev.Identifier]; ok {
 			ls.phase = livePhaseResolvingConflicts
-			m.live[ev.Identifier] = ls
+			live[ev.Identifier] = ls
 		}
 
 	case ralphloop.LiveEventSmartZoneCompactStarted:
@@ -253,21 +269,22 @@ func appendBlockedBySuffix(line, suffix string) string {
 // instead of ticket 03's disk-only rendering, when live is running or
 // paused. ok is false if live has neither (the zero value, which shouldn't
 // reach here since callers only look live up on a present map entry, but
-// keeps this function total).
-func (m FlatModel) renderLiveTicketRow(t tickets.Ticket, live liveTicketState) (string, bool) {
+// keeps this function total). Shared by FlatModel and Model (ticket 02) —
+// icons/sp are the two bits of per-model UI state the rendering needs.
+func renderLiveTicketRow(icons ui.IconSet, sp spinner.Model, t tickets.Ticket, live liveTicketState) (string, bool) {
 	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
 
 	switch {
 	case live.paused && live.pauseKind == ralphloop.PauseNeedsAttention:
-		line := "  " + statusNeedsAttentionStyle.Render(m.icons().TicketNeedsAttention) + " " + title
+		line := "  " + statusNeedsAttentionStyle.Render(icons.TicketNeedsAttention) + " " + title
 		return appendBlockedBySuffix(line, live.reason), true
 
 	case live.paused:
-		line := "  " + statusPausedStyle.Render(m.icons().TicketPaused) + " " + title
+		line := "  " + statusPausedStyle.Render(icons.TicketPaused) + " " + title
 		return appendBlockedBySuffix(line, live.reason), true
 
 	case live.running:
-		line := "  " + m.spinner.View() + " " + title
+		line := "  " + sp.View() + " " + title
 		suffix := live.phase.suffix()
 		if live.label != "" {
 			suffix = live.label + " " + suffix
