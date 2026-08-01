@@ -315,26 +315,15 @@ func (m Model) splitWidth() (sidebarW, previewW int) {
 	return
 }
 
-// splitHeight divides a stacked tickets view between its selection-driving
-// list and preview, leaving the preview a usable minimum height. Wide views
-// remain a full-height side-by-side split.
+// splitHeight divides a stacked tickets view evenly between its selection-
+// driving list and preview. Wide views remain a full-height side-by-side split.
 func (m Model) splitHeight(total int) (sidebarH, previewH int) {
 	if !m.useStackedLayout() {
 		return total, total
 	}
 	total-- // seam row
-	const minPreviewH = 6
-	sidebarH = len(m.sidebarLines()) + 2
-	if sidebarH > total-minPreviewH {
-		sidebarH = total - minPreviewH
-	}
-	if sidebarH < 4 {
-		sidebarH = 4
-	}
+	sidebarH = total / 2
 	previewH = total - sidebarH
-	if previewH < 1 {
-		previewH = 1
-	}
 	return
 }
 
