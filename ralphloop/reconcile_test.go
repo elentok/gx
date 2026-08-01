@@ -46,6 +46,15 @@ func TestReconcile_ClaimedWithNoLiveTab_RevertsToOpen(t *testing.T) {
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
 		return nil, nil // no live tabs at all
 	}
+	// No iteration branch was ever created for this claim (it never got as
+	// far as running), so there's nothing to recover — only the plain revert
+	// applies.
+	d.RevParse = func(dir, ref string) (string, error) {
+		if ref == iterBranch("01") {
+			return "", fmt.Errorf("unknown revision")
+		}
+		return "deadbeef", nil
+	}
 
 	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(io.Discard)), epics[0])
 	if err != nil {
@@ -61,6 +70,51 @@ func TestReconcile_ClaimedWithNoLiveTab_RevertsToOpen(t *testing.T) {
 	}
 	if !strings.Contains(string(raw), "Status:** open") {
 		t.Errorf("ticket not reverted to open:\n%s", raw)
+	}
+}
+
+// TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_RecoversInstead covers
+// the crash/restart scenario reconcileOrphanedClaim exists for: a claimed
+// ticket's agent finished and committed to its iteration branch, but the
+// invocation went away before the normal finishIteration cherry-pick ran (no
+// live tab survives to reattach to). Reverting straight to open would leave
+// that branch orphaned, only for a fresh attempt to collide with it later —
+// so those unlanded commits must be landed here instead.
+func TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_RecoversInstead(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "# A\n\n**Status:** claimed\n",
+	})
+	epics, err := tickets.Load(scratchDir)
+	if err != nil {
+		t.Fatalf("tickets.Load: %v", err)
+	}
+
+	d, _, removed := fakeDeps()
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
+		return nil, nil // no live tabs at all
+	}
+	// Default fakeDeps RevParse/CommitsAhead already report the iteration
+	// branch as existing with commits ahead of base — simulating the
+	// finished-but-uncherry-picked branch left behind.
+
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(io.Discard)), epics[0])
+	if err != nil {
+		t.Fatalf("reconcile() error = %v", err)
+	}
+	if len(reattached) != 0 {
+		t.Fatalf("reattached = %v, want none (recovered synchronously, not launched)", reattached)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw), "Status:** done") {
+		t.Errorf("orphaned claim with unlanded commits not recovered to done:\n%s", raw)
+	}
+
+	if len(*removed) != 1 {
+		t.Errorf("removed worktrees = %v, want exactly one removal (cleanup only after landing the recovered commits)", *removed)
 	}
 }
 
@@ -665,6 +719,14 @@ func TestRun_RestartWithClaimedTicketButNoLiveTab_RerunsFromScratch(t *testing.T
 	d, prompts, _ := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
 		return nil, nil
+	}
+	// No iteration branch was ever created for this claim, so reconcile has
+	// nothing to recover — only the plain revert-then-rerun applies.
+	d.RevParse = func(dir, ref string) (string, error) {
+		if ref == iterBranch("01") {
+			return "", fmt.Errorf("unknown revision")
+		}
+		return "deadbeef", nil
 	}
 
 	var out strings.Builder
