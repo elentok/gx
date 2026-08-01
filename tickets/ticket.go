@@ -21,8 +21,12 @@ type Ticket struct {
 	Title      string
 	Path       string
 
-	Type      string
-	BlockedBy []int
+	Type string
+	// BlockedBy holds each "Blocked by:" token as written, e.g. "02" or
+	// "04a" (see parseBlockedBy). A bare-number token means the whole
+	// number family (Epic.UnresolvedBlockers); a lettered token names one
+	// specific sibling.
+	BlockedBy []string
 	Status    string // raw Status: value; "" means missing (valid open/unclaimed default)
 	Body      string // raw markdown after the leading metadata lines, unmodified
 
@@ -72,7 +76,7 @@ func (t Ticket) IsSuperseded() bool {
 
 var metadataLineRe = regexp.MustCompile(`(?i)^(Type|Blocked by|Status):\s*(.*)$`)
 
-var blockedByNumberRe = regexp.MustCompile(`\d+`)
+var blockedByTokenRe = regexp.MustCompile(`\d+[a-zA-Z]*`)
 
 // statusParentheticalRe strips a trailing parenthetical annotation from a
 // Status: value, e.g. "resolved (duplicate of #12)" -> "resolved", so the
@@ -126,20 +130,13 @@ func ParseTicket(raw string) (Ticket, error) {
 	return t, nil
 }
 
-// parseBlockedBy extracts ticket numbers from a "Blocked by:" value, e.g.
-// "02, 05" -> [2, 5]. A value with no digits (e.g. "-" or "None") yields nil.
-func parseBlockedBy(value string) []int {
-	matches := blockedByNumberRe.FindAllString(value, -1)
+// parseBlockedBy extracts ticket tokens from a "Blocked by:" value, e.g.
+// "02, 05" -> ["02", "05"], "04a" -> ["04a"]. A value with no digits (e.g.
+// "-" or "None") yields nil.
+func parseBlockedBy(value string) []string {
+	matches := blockedByTokenRe.FindAllString(value, -1)
 	if len(matches) == 0 {
 		return nil
 	}
-	nums := make([]int, 0, len(matches))
-	for _, m := range matches {
-		n, err := strconv.Atoi(m)
-		if err != nil {
-			continue
-		}
-		nums = append(nums, n)
-	}
-	return nums
+	return matches
 }

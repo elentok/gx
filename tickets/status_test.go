@@ -43,7 +43,7 @@ func TestEpic_RenderedStatus_ReadErrIsError(t *testing.T) {
 
 func TestEpic_RenderedStatus_BlockedOverlaysOpenAndClaimed(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
-		{Number: 1, Status: "", BlockedBy: []int{2}},
+		{Number: 1, Status: "", BlockedBy: []string{"2"}},
 		{Number: 2, Status: "open"},
 	}}
 	got := epic.RenderedStatus(epic.Tickets[0])
@@ -52,7 +52,7 @@ func TestEpic_RenderedStatus_BlockedOverlaysOpenAndClaimed(t *testing.T) {
 	}
 
 	claimedEpic := Epic{Tickets: []Ticket{
-		{Number: 1, Status: "claimed", BlockedBy: []int{2}},
+		{Number: 1, Status: "claimed", BlockedBy: []string{"2"}},
 		{Number: 2, Status: "open"},
 	}}
 	got = claimedEpic.RenderedStatus(claimedEpic.Tickets[0])
@@ -63,7 +63,7 @@ func TestEpic_RenderedStatus_BlockedOverlaysOpenAndClaimed(t *testing.T) {
 
 func TestEpic_RenderedStatus_ResolvedBlockerDropsOverlay(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
-		{Number: 1, Status: "open", BlockedBy: []int{2}},
+		{Number: 1, Status: "open", BlockedBy: []string{"2"}},
 		{Number: 2, Status: "done"},
 	}}
 	got := epic.RenderedStatus(epic.Tickets[0])
@@ -74,7 +74,7 @@ func TestEpic_RenderedStatus_ResolvedBlockerDropsOverlay(t *testing.T) {
 
 func TestEpic_RenderedStatus_NeedsInfoNotOverlaidByBlocked(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
-		{Number: 1, Status: "needs-info", BlockedBy: []int{2}},
+		{Number: 1, Status: "needs-info", BlockedBy: []string{"2"}},
 		{Number: 2, Status: "open"},
 	}}
 	got := epic.RenderedStatus(epic.Tickets[0])
@@ -85,7 +85,7 @@ func TestEpic_RenderedStatus_NeedsInfoNotOverlaidByBlocked(t *testing.T) {
 
 func TestEpic_RenderedStatus_NeedsAttentionNotOverlaidByBlocked(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
-		{Number: 1, Status: "needs-attention", BlockedBy: []int{2}},
+		{Number: 1, Status: "needs-attention", BlockedBy: []string{"2"}},
 		{Number: 2, Status: "open"},
 	}}
 	got := epic.RenderedStatus(epic.Tickets[0])
@@ -96,7 +96,7 @@ func TestEpic_RenderedStatus_NeedsAttentionNotOverlaidByBlocked(t *testing.T) {
 
 func TestEpic_RenderedStatus_DoneIgnoresBlockedBy(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
-		{Number: 1, Status: "done", BlockedBy: []int{2}},
+		{Number: 1, Status: "done", BlockedBy: []string{"2"}},
 		{Number: 2, Status: "open"},
 	}}
 	got := epic.RenderedStatus(epic.Tickets[0])
@@ -107,13 +107,13 @@ func TestEpic_RenderedStatus_DoneIgnoresBlockedBy(t *testing.T) {
 
 func TestEpic_UnresolvedBlockers(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
-		{Number: 1, BlockedBy: []int{2, 3, 4}},
+		{Number: 1, BlockedBy: []string{"2", "3", "4"}},
 		{Number: 2, Status: "done"},
 		{Number: 3, Status: "open"},
 		// 4 doesn't exist in the epic: treated as still unresolved.
 	}}
 	got := epic.UnresolvedBlockers(epic.Tickets[0])
-	want := []int{3, 4}
+	want := []string{"3", "4"}
 	if len(got) != len(want) {
 		t.Fatalf("UnresolvedBlockers = %v, want %v", got, want)
 	}
@@ -126,7 +126,7 @@ func TestEpic_UnresolvedBlockers(t *testing.T) {
 
 func TestEpic_UnresolvedBlockers_NoneWhenAllResolved(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
-		{Number: 1, BlockedBy: []int{2}},
+		{Number: 1, BlockedBy: []string{"2"}},
 		{Number: 2, Status: "resolved"},
 	}}
 	got := epic.UnresolvedBlockers(epic.Tickets[0])
@@ -153,13 +153,13 @@ func TestEpic_UnresolvedBlockers_NilWhenNoBlockedBy(t *testing.T) {
 // the first one.
 func TestEpic_UnresolvedBlockers_LetteredSplitRequiresAllSiblingsDone(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
-		{Number: 1, BlockedBy: []int{3}},
+		{Number: 1, BlockedBy: []string{"3"}},
 		{Number: 3, Identifier: "03", Status: "done"}, // superseded original, closed at split time
 		{Number: 3, Identifier: "03a", Status: "done"},
 		{Number: 3, Identifier: "03b", Status: "open"}, // still in flight
 	}}
 	got := epic.UnresolvedBlockers(epic.Tickets[0])
-	if len(got) != 1 || got[0] != 3 {
+	if len(got) != 1 || got[0] != "3" {
 		t.Fatalf("UnresolvedBlockers = %v, want [3] while 03b is still open", got)
 	}
 
@@ -167,6 +167,24 @@ func TestEpic_UnresolvedBlockers_LetteredSplitRequiresAllSiblingsDone(t *testing
 	got = epic.UnresolvedBlockers(epic.Tickets[0])
 	if got != nil {
 		t.Errorf("UnresolvedBlockers = %v, want nil once every ticket sharing Number 3 is done", got)
+	}
+}
+
+// TestEpic_UnresolvedBlockers_LetteredTokenNamesOneSibling covers the
+// opposite of the bare-number case above: "Blocked by: 03a" names one
+// specific split sibling, so it resolves as soon as that ticket alone is
+// done — it must not require its still-open siblings (03b) or the
+// superseded original (03) to finish too, unlike a bare "Blocked by: 3".
+func TestEpic_UnresolvedBlockers_LetteredTokenNamesOneSibling(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, BlockedBy: []string{"3a"}}, // no zero-padding, unlike Identifier "03a" below
+		{Number: 3, Identifier: "03", Status: "superseded"},
+		{Number: 3, Identifier: "03a", Status: "done"},
+		{Number: 3, Identifier: "03b", Status: "open"}, // still in flight, doesn't matter
+	}}
+	got := epic.UnresolvedBlockers(epic.Tickets[0])
+	if got != nil {
+		t.Errorf("UnresolvedBlockers = %v, want nil — 03a alone is done", got)
 	}
 }
 

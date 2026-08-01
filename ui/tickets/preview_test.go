@@ -61,7 +61,7 @@ func TestModel_PreviewBlockedBySuffixOmittedOnceResolved(t *testing.T) {
 	m = updated.(Model)
 
 	content := ansi.Strip(m.View().Content)
-	if !strings.Contains(content, "(blocked by 1)") {
+	if !strings.Contains(content, "(blocked by 01)") {
 		t.Fatalf("expected blocked-by suffix in preview, got:\n%s", content)
 	}
 

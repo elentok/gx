@@ -1,6 +1,9 @@
 package tickets
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 // RenderedStatus is the tickets tab's collapse of the tracker's raw Status:/
 // triage-label vocabulary into a small set of user-facing states, plus a
@@ -87,40 +90,72 @@ func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
 	return base
 }
 
-// UnresolvedBlockers returns t's Blocked by: numbers that are not yet done
-// within e, in Blocked by: order. A blocker number with no matching ticket
-// in e counts as unresolved (it can't be verified done).
-//
-// "Blocked by:" text only ever carries a bare number (parseBlockedBy strips
-// letter suffixes), so a "Blocked by: 04" reference can't distinguish a
-// split ticket's original from its lettered replacements (04, 04a, 04b all
-// share Number 4) — it means the whole family, and there's no way to name
-// just the replacements. A number counts as resolved only once every ticket
-// sharing it is done, not as soon as any one of them is — otherwise the
-// superseded original (closed immediately at split time, per to-tickets'
-// mid-flight-split convention) would resolve the blocker before its
-// replacements ever land. This relies on that convention holding (the
-// original does get marked done promptly); it isn't separately verified
-// here.
-func (e Epic) UnresolvedBlockers(t Ticket) []int {
+// UnresolvedBlockers returns t's Blocked by: tokens that are not yet done
+// within e, in Blocked by: order. A bare-number token (e.g. "04") means the
+// whole number family — it can't distinguish a split ticket's original from
+// its lettered replacements (04, 04a, 04b all share Number 4) — and counts
+// as resolved only once every ticket sharing that number is done, not as
+// soon as any one of them is: otherwise the superseded original (closed
+// immediately at split time, per to-tickets' mid-flight-split convention)
+// would resolve the blocker before its replacements ever land. A lettered
+// token (e.g. "04a") names one specific sibling and resolves as soon as
+// that ticket alone is done, independent of its siblings. Either way, a
+// blocker with no matching ticket in e counts as unresolved (it can't be
+// verified done).
+func (e Epic) UnresolvedBlockers(t Ticket) []string {
 	if len(t.BlockedBy) == 0 {
 		return nil
 	}
 	total := make(map[int]int, len(e.Tickets))
 	done := make(map[int]int, len(e.Tickets))
+	// Keyed by number+lowercased letter suffix rather than the raw
+	// Identifier string, so a token's zero-padding doesn't have to match
+	// the ticket file's exactly (e.g. "Blocked by: 4a" still finds "04a").
+	byNumberAndSuffix := make(map[string]Ticket, len(e.Tickets))
 	for _, other := range e.Tickets {
 		total[other.Number]++
 		if other.IsDone() {
 			done[other.Number]++
 		}
+		if other.Identifier != "" {
+			_, suffix := splitBlockedByToken(other.Identifier)
+			byNumberAndSuffix[siblingKey(other.Number, suffix)] = other
+		}
 	}
-	var unresolved []int
-	for _, n := range t.BlockedBy {
-		if total[n] == 0 || done[n] != total[n] {
-			unresolved = append(unresolved, n)
+	var unresolved []string
+	for _, token := range t.BlockedBy {
+		num, letters := splitBlockedByToken(token)
+		if letters != "" {
+			other, ok := byNumberAndSuffix[siblingKey(num, letters)]
+			if !ok || !other.IsDone() {
+				unresolved = append(unresolved, token)
+			}
+			continue
+		}
+		if total[num] == 0 || done[num] != total[num] {
+			unresolved = append(unresolved, token)
 		}
 	}
 	return unresolved
+}
+
+// splitBlockedByToken splits a parseBlockedBy token (e.g. "04a") into its
+// leading number and trailing letter suffix ("", for a bare number like
+// "04"). token is always digits-then-letters, per blockedByTokenRe.
+func splitBlockedByToken(token string) (number int, letters string) {
+	i := 0
+	for i < len(token) && token[i] >= '0' && token[i] <= '9' {
+		i++
+	}
+	number, _ = strconv.Atoi(token[:i])
+	return number, token[i:]
+}
+
+// siblingKey builds a lookup key from a ticket number and letter suffix,
+// case-insensitive, so a lettered "Blocked by:" token matches its ticket
+// regardless of zero-padding differences (see UnresolvedBlockers).
+func siblingKey(number int, letters string) string {
+	return strconv.Itoa(number) + strings.ToLower(letters)
 }
 
 // Word renders s as the status word shown in the ticket preview panel's

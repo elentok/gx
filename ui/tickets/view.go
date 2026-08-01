@@ -196,9 +196,5 @@ func blockedBySuffix(epic tickets.Epic, t tickets.Ticket, status tickets.Rendere
 	if len(unresolved) == 0 {
 		return ""
 	}
-	numbers := make([]string, len(unresolved))
-	for i, n := range unresolved {
-		numbers[i] = fmt.Sprint(n)
-	}
-	return fmt.Sprintf("(blocked by %s)", strings.Join(numbers, ", "))
+	return fmt.Sprintf("(blocked by %s)", strings.Join(unresolved, ", "))
 }

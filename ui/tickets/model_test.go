@@ -139,7 +139,7 @@ func TestNewModel_BlockedTicketShowsUnresolvedBlockerSuffix(t *testing.T) {
 	m = updated.(Model)
 
 	content := m.View().Content
-	if !strings.Contains(content, "(blocked by 1)") {
+	if !strings.Contains(content, "(blocked by 01)") {
 		t.Fatalf("expected blocked-by suffix in view, got:\n%s", content)
 	}
 }
@@ -155,7 +155,7 @@ func TestNewModel_NeedsInfoTicketShowsUnresolvedBlockerSuffix(t *testing.T) {
 	m = updated.(Model)
 
 	content := m.View().Content
-	if !strings.Contains(content, "(blocked by 1)") {
+	if !strings.Contains(content, "(blocked by 01)") {
 		t.Fatalf("expected blocked-by suffix on needs-info ticket, got:\n%s", content)
 	}
 }

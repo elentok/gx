@@ -16,8 +16,8 @@ func TestParseTicket_FullMetadata(t *testing.T) {
 	if ticket.Type != "prototype" {
 		t.Errorf("Type = %q, want %q", ticket.Type, "prototype")
 	}
-	if !reflect.DeepEqual(ticket.BlockedBy, []int{2, 5}) {
-		t.Errorf("BlockedBy = %v, want [2 5]", ticket.BlockedBy)
+	if !reflect.DeepEqual(ticket.BlockedBy, []string{"02", "05"}) {
+		t.Errorf("BlockedBy = %v, want [02 05]", ticket.BlockedBy)
 	}
 	if ticket.Status != "resolved" {
 		t.Errorf("Status = %q, want %q", ticket.Status, "resolved")
@@ -57,8 +57,8 @@ func TestParseTicket_BoldNonContiguousMetadata(t *testing.T) {
 	if !ticket.IsDone() {
 		t.Error("expected ticket with bold '**Status:** done' to be IsDone")
 	}
-	if !reflect.DeepEqual(ticket.BlockedBy, []int{2}) {
-		t.Errorf("BlockedBy = %v, want [2]", ticket.BlockedBy)
+	if !reflect.DeepEqual(ticket.BlockedBy, []string{"02"}) {
+		t.Errorf("BlockedBy = %v, want [02]", ticket.BlockedBy)
 	}
 	if strings.Contains(ticket.Body, "Blocked by") || strings.Contains(ticket.Body, "Status") {
 		t.Errorf("expected metadata lines stripped from body, got: %q", ticket.Body)

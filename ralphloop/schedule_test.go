@@ -24,7 +24,7 @@ func TestFrontier_MixedStatuses(t *testing.T) {
 
 func TestFrontier_PartiallyBlockedIsExcluded(t *testing.T) {
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
-		{Number: 1, BlockedBy: []int{2, 3}},
+		{Number: 1, BlockedBy: []string{"2", "3"}},
 		{Number: 2, Status: "done"},
 		{Number: 3, Status: "open"}, // still open, so 1 stays blocked
 	}}
@@ -65,8 +65,8 @@ func TestFrontier_BlockerChain(t *testing.T) {
 	// 1 <- 2 <- 3: only 1 is unblocked until each link resolves in turn.
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
 		{Number: 1, Status: "open"},
-		{Number: 2, Status: "open", BlockedBy: []int{1}},
-		{Number: 3, Status: "open", BlockedBy: []int{2}},
+		{Number: 2, Status: "open", BlockedBy: []string{"1"}},
+		{Number: 3, Status: "open", BlockedBy: []string{"2"}},
 	}}
 	assertNumbers(t, Frontier(epic), []int{1})
 
