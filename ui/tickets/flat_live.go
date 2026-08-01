@@ -23,6 +23,11 @@ type liveTicketState struct {
 	reason    string
 }
 
+// flatTranscriptMaxLines bounds FlatModel.transcript's per-ticket tail so a
+// long-running iteration's transcript doesn't grow unbounded in memory —
+// only the most recent lines matter for a "live tail" (ticket 04b).
+const flatTranscriptMaxLines = 200
+
 // WithLiveEvents wires events as FlatModel's live orchestrator event source.
 // Only cmd/ralphloop.go's production wiring calls this (see
 // runRalphLoopTUI); a FlatModel built without it (every existing test) keeps
@@ -76,6 +81,16 @@ func (m FlatModel) applyLiveEvent(ev ralphloop.LiveEvent) {
 	case ralphloop.LiveEventIterationFinished, ralphloop.LiveEventTicketReverted,
 		ralphloop.LiveEventTicketCleanupFinished, ralphloop.LiveEventTicketRecovered:
 		delete(m.live, ev.Identifier)
+		delete(m.transcript, ev.Identifier)
+
+	case ralphloop.LiveEventTranscriptLine:
+		if identifier, ok := m.labelIdentifier[ev.Label]; ok {
+			lines := append(m.transcript[identifier], ev.Line)
+			if len(lines) > flatTranscriptMaxLines {
+				lines = lines[len(lines)-flatTranscriptMaxLines:]
+			}
+			m.transcript[identifier] = lines
+		}
 
 	case ralphloop.LiveEventTicketStillNeedsAttention:
 		m.live[ev.Identifier] = liveTicketState{
@@ -89,6 +104,23 @@ func (m FlatModel) applyLiveEvent(ev ralphloop.LiveEvent) {
 	}
 }
 
+// liveStateForSelected returns the selected ticket's live orchestrator state,
+// ok only when it's running, paused, or needs-attention — the three states
+// ticket 04b's preview pane grows a metadata line/transcript tail for. A
+// done/open ticket (no live entry, or one already deleted on finish) reports
+// ok=false so the preview stays ticket 03's disk-only shape.
+func (m FlatModel) liveStateForSelected() (liveTicketState, bool) {
+	t, ok := m.selectedTicket()
+	if !ok {
+		return liveTicketState{}, false
+	}
+	live, ok := m.live[t.Identifier]
+	if !ok || (!live.running && !live.paused) {
+		return liveTicketState{}, false
+	}
+	return live, true
+}
+
 // hasRunningLiveTicket reports whether any ticket currently has a running
 // live iteration, gating whether the shared row spinner keeps ticking.
 func (m FlatModel) hasRunningLiveTicket() bool {
@@ -98,6 +130,17 @@ func (m FlatModel) hasRunningLiveTicket() bool {
 		}
 	}
 	return false
+}
+
+// appendBlockedBySuffix appends suffix to line in blockedBySuffixStyle,
+// shared by renderLiveTicketRow's three branches and previewLiveMetaLine
+// (flat_view.go) — both append a live ticket's label/reason the same way,
+// just onto different base lines.
+func appendBlockedBySuffix(line, suffix string) string {
+	if suffix == "" {
+		return line
+	}
+	return line + " " + blockedBySuffixStyle.Render(suffix)
 }
 
 // renderLiveTicketRow renders t's row from its live orchestrator state
@@ -111,24 +154,15 @@ func (m FlatModel) renderLiveTicketRow(t tickets.Ticket, live liveTicketState) (
 	switch {
 	case live.paused && live.pauseKind == ralphloop.PauseNeedsAttention:
 		line := "  " + statusNeedsAttentionStyle.Render(m.icons().TicketNeedsAttention) + " " + title
-		if live.reason != "" {
-			line += " " + blockedBySuffixStyle.Render(live.reason)
-		}
-		return line, true
+		return appendBlockedBySuffix(line, live.reason), true
 
 	case live.paused:
 		line := "  " + statusPausedStyle.Render(m.icons().TicketPaused) + " " + title
-		if live.reason != "" {
-			line += " " + blockedBySuffixStyle.Render(live.reason)
-		}
-		return line, true
+		return appendBlockedBySuffix(line, live.reason), true
 
 	case live.running:
 		line := "  " + m.spinner.View() + " " + title
-		if live.label != "" {
-			line += " " + blockedBySuffixStyle.Render(live.label)
-		}
-		return line, true
+		return appendBlockedBySuffix(line, live.label), true
 
 	default:
 		return "", false

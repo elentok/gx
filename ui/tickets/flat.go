@@ -70,6 +70,14 @@ type FlatModel struct {
 	live            map[string]liveTicketState
 	labelIdentifier map[string]string
 
+	// transcript holds each live ticket's transcript-line tail (ticket 01's
+	// EventSink.TranscriptLine, folded by identifier — see applyLiveEvent),
+	// bounded to flatTranscriptMaxLines. transcriptVP renders it with its own
+	// scroll/height budget, separate from previewVP's ticket-body viewport
+	// (see flat_preview.go).
+	transcript   map[string][]string
+	transcriptVP viewport.Model
+
 	spinner       spinner.Model
 	spinnerActive bool
 }
@@ -90,6 +98,8 @@ func NewFlatModel(worktreeRoot, epicName string, settings ui.Settings) FlatModel
 		previewVP:       viewport.New(),
 		live:            map[string]liveTicketState{},
 		labelIdentifier: map[string]string{},
+		transcript:      map[string][]string{},
+		transcriptVP:    viewport.New(),
 		spinner:         sp,
 	}
 }

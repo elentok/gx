@@ -122,6 +122,12 @@ func (m FlatModel) previewContent(width int) string {
 		b.WriteString("\n")
 		b.WriteString(meta)
 	}
+	if live, ok := m.liveStateForSelected(); ok {
+		if meta := previewLiveMetaLine(live); meta != "" {
+			b.WriteString("\n")
+			b.WriteString(meta)
+		}
+	}
 	b.WriteString("\n")
 	b.WriteString(previewRuleStyle.Render(strings.Repeat("─", max(width, 0))))
 	b.WriteString("\n")
@@ -133,6 +139,27 @@ func (m FlatModel) previewContent(width int) string {
 	return b.String()
 }
 
+// previewLiveMetaLine renders live's herdr tab id and pause/attention reason
+// as the preview pane's metadata line (ticket 04b) — the row-suffix
+// convention of renderLiveTicketRow (flat_live.go), reused here since both
+// read from the same liveTicketState.
+func previewLiveMetaLine(live liveTicketState) string {
+	if live.label == "" && live.reason == "" {
+		return ""
+	}
+	line := "  "
+	if live.label != "" {
+		line += ui.StyleMuted.Render("tab " + live.label)
+	}
+	return appendBlockedBySuffix(line, live.reason)
+}
+
 func (m FlatModel) previewLines() []string {
-	return renderViewportWithScrollbar(m.previewVP)
+	lines := renderViewportWithScrollbar(m.previewVP)
+	if _, ok := m.liveStateForSelected(); !ok {
+		return lines
+	}
+	lines = append(lines, previewRuleStyle.Render(strings.Repeat("─", max(m.previewVP.Width(), 0))))
+	lines = append(lines, renderViewportWithScrollbar(m.transcriptVP)...)
+	return lines
 }
