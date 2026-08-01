@@ -254,6 +254,72 @@ func TestRun_SkillFlag_OverridesPromptSkill(t *testing.T) {
 	}
 }
 
+func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		agent      AgentKind
+		wantKind   string
+		wantArgs   []string
+		wantPrefix string
+	}{
+		{
+			name:       "claude default",
+			wantKind:   "claude",
+			wantArgs:   []string{"--permission-mode", "auto"},
+			wantPrefix: "/implement ",
+		},
+		{
+			name:       "codex",
+			agent:      AgentCodex,
+			wantKind:   "codex",
+			wantArgs:   []string{"--sandbox", "workspace-write", "--ask-for-approval", "on-request"},
+			wantPrefix: "$implement ",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			scratchDir := writeEpic(t, "my-epic", map[string]string{
+				"01-first.md": "# First\n\n**Status:** open\n",
+			})
+			d, prompts, _ := fakeDeps()
+			var start herdr.AgentStartOptions
+			d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+				start = opts
+				return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle"}, nil
+			}
+
+			var out bytes.Buffer
+			err := Run(RunOptions{EpicName: "my-epic", Agent: tc.agent, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out)
+			if err != nil {
+				t.Fatalf("Run() error = %v", err)
+			}
+			if start.Kind != tc.wantKind {
+				t.Errorf("AgentStart Kind = %q, want %q", start.Kind, tc.wantKind)
+			}
+			if len(start.AgentArgs) < len(tc.wantArgs) || !slices.Equal(start.AgentArgs[:len(tc.wantArgs)], tc.wantArgs) {
+				t.Errorf("AgentStart AgentArgs = %v, want prefix %v", start.AgentArgs, tc.wantArgs)
+			}
+			if tc.agent == AgentCodex {
+				wantScratch := filepath.Join(scratchDir, "my-epic")
+				if !slices.Contains(start.AgentArgs, wantScratch) {
+					t.Errorf("AgentStart AgentArgs = %v, want epic scratch directory %q", start.AgentArgs, wantScratch)
+				}
+			}
+			wantPrompt := tc.wantPrefix + filepath.Join(scratchDir, "my-epic", "issues", "01-first.md")
+			if len(*prompts) != 1 || (*prompts)[0] != wantPrompt {
+				t.Errorf("prompts = %v, want %q", *prompts, wantPrompt)
+			}
+		})
+	}
+}
+
+func TestRun_InvalidAgent_ReturnsError(t *testing.T) {
+	var out bytes.Buffer
+	err := Run(RunOptions{Agent: "other"}, Deps{}, &out)
+	if err == nil || !strings.Contains(err.Error(), "must be claude or codex") {
+		t.Fatalf("Run() error = %v, want invalid-agent error", err)
+	}
+}
+
 func TestRun_ZeroOpenTickets_NoOpSummary(t *testing.T) {
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md": "# First\n\n**Status:** done\n",

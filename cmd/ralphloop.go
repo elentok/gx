@@ -11,18 +11,23 @@ import (
 )
 
 func newRalphLoopCmd(d deps) *cobra.Command {
+	var agent string
 	var skill string
 	var maxParallel int
 	var smartZone int
 	cmd := &cobra.Command{
 		Use:   "ralph-loop <epic-name>",
-		Short: "drive Claude Code agents through a to-tickets epic, up to --max-parallel at a time",
+		Short: "drive Claude Code or Codex agents through a to-tickets epic, up to --max-parallel at a time",
 		Args:  cobra.ExactArgs(1),
+		PreRunE: func(_ *cobra.Command, _ []string) error {
+			return ralphloop.ValidateAgentKind(ralphloop.AgentKind(agent))
+		},
 		RunE: func(_ *cobra.Command, args []string) error {
-			return runRalphLoop(args[0], skill, maxParallel, smartZone, d)
+			return runRalphLoop(args[0], agent, skill, maxParallel, smartZone, d)
 		},
 	}
-	cmd.Flags().StringVar(&skill, "skill", "implement", "skill invoked as the initial slash-command prompt in each iteration")
+	cmd.Flags().StringVar(&agent, "agent", "claude", "agent to run: claude or codex")
+	cmd.Flags().StringVar(&skill, "skill", "implement", "skill invoked as the initial prompt in each iteration")
 	cmd.Flags().IntVar(&maxParallel, "max-parallel", 2, "how many iterations run concurrently")
 	cmd.Flags().IntVar(&smartZone, "smart-zone", 150_000, "context-token ceiling before pausing an iteration")
 	cmd.AddCommand(newRalphLoopResumeCmd(d))
@@ -30,7 +35,7 @@ func newRalphLoopCmd(d deps) *cobra.Command {
 	return cmd
 }
 
-func runRalphLoop(epicName, skill string, maxParallel, smartZone int, d deps) error {
+func runRalphLoop(epicName, agent, skill string, maxParallel, smartZone int, d deps) error {
 	cwd, err := d.getwd()
 	if err != nil {
 		return err
@@ -42,6 +47,7 @@ func runRalphLoop(epicName, skill string, maxParallel, smartZone int, d deps) er
 
 	return ralphloop.Run(ralphloop.RunOptions{
 		EpicName: epicName,
+		Agent:    ralphloop.AgentKind(agent),
 		Skill:    skill,
 		RepoDir:  repo.Root,
 		// .scratch is gitignored, so it only exists in cwd's own checkout, not

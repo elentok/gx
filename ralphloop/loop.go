@@ -28,29 +28,87 @@ const defaultSmartZone = 150_000
 // roughly this cadence instead of only once the agent settles.
 const smartZonePollMs = 30_000
 
+// AgentKind identifies the coding agent that drives an iteration.
+type AgentKind string
+
+const (
+	AgentClaude AgentKind = "claude"
+	AgentCodex  AgentKind = "codex"
+)
+
+func (a AgentKind) valid() bool {
+	return a == AgentClaude || a == AgentCodex
+}
+
+// ValidateAgentKind reports whether agent names a supported iteration agent.
+func ValidateAgentKind(agent AgentKind) error {
+	if agent == "" {
+		return nil
+	}
+	if !agent.valid() {
+		return fmt.Errorf("invalid agent %q: must be claude or codex", agent)
+	}
+	return nil
+}
+
+func skillPrompt(agent AgentKind, skill, ticketPath string) string {
+	prefix := "/"
+	if agent == AgentCodex {
+		prefix = "$"
+	}
+	if ticketPath == "" {
+		return prefix + skill
+	}
+	return fmt.Sprintf("%s%s %s", prefix, skill, ticketPath)
+}
+
+func agentArgs(agent AgentKind, scratchDir, epicName string) []string {
+	if agent == AgentCodex {
+		return []string{
+			"--sandbox", "workspace-write",
+			"--ask-for-approval", "on-request",
+			"--add-dir", filepath.Join(scratchDir, epicName),
+		}
+	}
+	return []string{"--permission-mode", "auto"}
+}
+
 // RunOptions configures a single `gx ralph-loop {epic-name}` invocation.
 type RunOptions struct {
 	EpicName    string
-	Skill       string // slash-command skill each iteration invokes, e.g. "implement"
-	ScratchDir  string // defaults to ".scratch"
-	RepoDir     string // repo root passed as the herdr workspace/worktree cwd
-	MaxParallel int    // defaults to defaultMaxParallel; how many iterations run concurrently
-	SmartZone   int    // defaults to defaultSmartZone; context-token ceiling before pausing an iteration
+	Agent       AgentKind // defaults to AgentClaude
+	Skill       string    // skill each iteration invokes, e.g. "implement"
+	ScratchDir  string    // defaults to ".scratch"
+	RepoDir     string    // repo root passed as the herdr workspace/worktree cwd
+	MaxParallel int       // defaults to defaultMaxParallel; how many iterations run concurrently
+	SmartZone   int       // defaults to defaultSmartZone; context-token ceiling before pausing an iteration
 }
 
 // Run drives every unblocked ticket in the named epic to completion, up to
 // MaxParallel running concurrently, each in its own iteration worktree:
-// create the iteration worktree, launch claude, send the initial
-// "/{skill} <ticket-path>" prompt, wait for it to finish, cherry-pick its
+// create the iteration worktree, launch the selected agent, send its initial
+// skill prompt, wait for it to finish, cherry-pick its
 // commits onto the feature branch, mark the ticket done, and remove the
 // iteration worktree. As soon as one iteration finishes, a freed slot is
 // backfilled with the next frontier ticket. It exits once every ticket in
 // the epic reaches a done-family status, or immediately if the epic has none
 // to run.
 func Run(opts RunOptions, d Deps, out io.Writer) error {
+	agent := opts.Agent
+	if agent == "" {
+		agent = AgentClaude
+	}
+	if err := ValidateAgentKind(agent); err != nil {
+		return err
+	}
+
 	scratchDir := opts.ScratchDir
 	if scratchDir == "" {
 		scratchDir = defaultScratchDir
+	}
+	scratchDir, err := filepath.Abs(scratchDir)
+	if err != nil {
+		return fmt.Errorf("resolving scratch directory: %w", err)
 	}
 	maxParallel := opts.MaxParallel
 	if maxParallel <= 0 {
@@ -149,6 +207,7 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 				WorktreeDir:      wtDir,
 				FeatureWorktree:  featurePath,
 				FeatureBranch:    opts.EpicName,
+				Agent:            agent,
 				Skill:            opts.Skill,
 				Ticket:           ticket,
 				ScratchDir:       scratchDir,
@@ -260,6 +319,7 @@ type iterationParams struct {
 	WorktreeDir     string
 	FeatureWorktree string
 	FeatureBranch   string
+	Agent           AgentKind
 	Skill           string
 	Ticket          tickets.Ticket
 	// ScratchDir locates this run's run-log.jsonl (see eventlog.go);
@@ -297,6 +357,7 @@ type iterationParams struct {
 func (p iterationParams) launchAndPromptParams(label, pane, tab, prompt, sessionCwd, startEvent, finishEvent string) launchAndPromptParams {
 	return launchAndPromptParams{
 		Label:            label,
+		Agent:            p.Agent,
 		Pane:             pane,
 		Tab:              tab,
 		Prompt:           prompt,
@@ -357,7 +418,7 @@ func runIteration(d Deps, p iterationParams) error {
 		return fmt.Errorf("opening iteration tab: %w", err)
 	}
 
-	prompt := fmt.Sprintf("/%s %s", p.Skill, p.Ticket.Path)
+	prompt := skillPrompt(p.Agent, p.Skill, p.Ticket.Path)
 	launchParams := p.launchAndPromptParams(label, tab.RootPaneID, tab.TabID, prompt, path, eventIterationStarted, eventIterationFinished)
 	sessionID, err := launchAndPrompt(d, launchParams)
 	if err != nil {
@@ -513,7 +574,7 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 
 // resolveCherryPickConflict launches a fresh pane in the feature worktree and
 // drives a "/resolving-merge-conflicts" agent to completion in it, returning
-// its Claude Code session id. The iteration's own worktree/tab are untouched
+// its agent session id. The iteration's own worktree/tab are untouched
 // while this runs.
 func resolveCherryPickConflict(d Deps, p iterationParams) (string, error) {
 	label := conflictLabel(p.Ticket.Number)
@@ -527,7 +588,7 @@ func resolveCherryPickConflict(d Deps, p iterationParams) (string, error) {
 		return "", fmt.Errorf("creating conflict-resolution pane: %w", err)
 	}
 
-	launchParams := p.launchAndPromptParams(label, tab.RootPaneID, tab.TabID, "/resolving-merge-conflicts", p.FeatureWorktree, "", "")
+	launchParams := p.launchAndPromptParams(label, tab.RootPaneID, tab.TabID, skillPrompt(p.Agent, "resolving-merge-conflicts", ""), p.FeatureWorktree, "", "")
 	launchParams.FinishTimeoutMs = conflictResolutionTimeoutMs
 	sessionID, err := launchAndPrompt(d, launchParams)
 	if err != nil {
@@ -540,17 +601,17 @@ func resolveCherryPickConflict(d Deps, p iterationParams) (string, error) {
 // launchAndPromptParams are the per-call inputs to launchAndPrompt.
 type launchAndPromptParams struct {
 	Label  string // agent name/tab label, used in error messages
-	Pane   string // pane id to launch claude in and send the prompt to
+	Agent  AgentKind
+	Pane   string // pane id to launch the agent in and send the prompt to
 	Tab    string // tab id owning Pane, recorded on logged events
-	Prompt string // initial slash-command prompt text
+	Prompt string // initial skill prompt text
 
 	// FinishTimeoutMs bounds the final "wait for the agent to finish" step, so
 	// a stuck agent surfaces as a distinct error instead of blocking forever.
 	// Zero means wait indefinitely.
 	FinishTimeoutMs int
 
-	// SessionCwd is the cwd Pane's claude was launched in, i.e. where its
-	// Claude Code transcript is filed under ~/.claude/projects/<slug>/.
+	// SessionCwd is the cwd Pane's agent was launched in.
 	SessionCwd string
 	// SmartZone is the context-token ceiling before this agent gets paused.
 	SmartZone int
@@ -596,7 +657,7 @@ func (p launchAndPromptParams) report(format string, args ...any) {
 	p.Report(format, args...)
 }
 
-// launchAndPrompt runs the shared agent lifecycle protocol: launch claude in
+// launchAndPrompt runs the shared agent lifecycle protocol: launch the agent in
 // Pane, wait for it to reach idle, send Prompt and wait for it to start
 // working, then wait for it to finish (idle or done) — pausing the whole
 // loop via Gate if this agent's context occupancy breaches SmartZone before
@@ -604,12 +665,12 @@ func (p launchAndPromptParams) report(format string, args ...any) {
 func launchAndPrompt(d Deps, p launchAndPromptParams) (string, error) {
 	agent, err := d.AgentStart(herdr.AgentStartOptions{
 		Name:      p.Label,
-		Kind:      "claude",
+		Kind:      string(p.Agent),
 		Pane:      p.Pane,
-		AgentArgs: []string{"--permission-mode", "auto"},
+		AgentArgs: agentArgs(p.Agent, p.ScratchDir, p.EpicName),
 	})
 	if err != nil {
-		return "", fmt.Errorf("launching claude: %w", err)
+		return "", fmt.Errorf("launching %s: %w", p.Agent, err)
 	}
 	p.logLifecycleEvent(p.StartEvent, agent.AgentSession)
 
@@ -617,7 +678,7 @@ func launchAndPrompt(d Deps, p launchAndPromptParams) (string, error) {
 		Target: p.Pane,
 		Until:  []string{"idle"},
 	}); err != nil {
-		return "", fmt.Errorf("waiting for claude to reach idle after launch: %w", err)
+		return "", fmt.Errorf("waiting for %s to reach idle after launch: %w", p.Agent, err)
 	}
 
 	if _, err := d.AgentPrompt(herdr.AgentPromptOptions{

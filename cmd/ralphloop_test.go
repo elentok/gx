@@ -47,12 +47,45 @@ func TestRunRalphLoop_NotInGitRepo_ReturnsError(t *testing.T) {
 	nonRepoDir := t.TempDir()
 	d := deps{getwd: func() (string, error) { return nonRepoDir, nil }}
 
-	err := runRalphLoop("some-epic", "implement", 2, 150_000, d)
+	err := runRalphLoop("some-epic", "claude", "implement", 2, 150_000, d)
 	if err == nil {
 		t.Fatal("runRalphLoop() error = nil, want error outside a git repo")
 	}
 	if !strings.Contains(err.Error(), "no git repo found") {
 		t.Errorf("runRalphLoop() error = %v, want a no-git-repo error", err)
+	}
+}
+
+func TestNewRalphLoopCmd_AgentFlagDefaultsToClaude(t *testing.T) {
+	cmd := newRalphLoopCmd(deps{})
+	flag := cmd.Flags().Lookup("agent")
+	if flag == nil {
+		t.Fatal("missing --agent flag")
+	}
+	if flag.DefValue != "claude" {
+		t.Errorf("--agent default = %q, want %q", flag.DefValue, "claude")
+	}
+}
+
+func TestNewRalphLoopCmd_AgentFlagValidatesSupportedAgents(t *testing.T) {
+	for _, tc := range []struct {
+		agent   string
+		wantErr bool
+	}{
+		{agent: "claude"},
+		{agent: "codex"},
+		{agent: "other", wantErr: true},
+	} {
+		t.Run(tc.agent, func(t *testing.T) {
+			cmd := newRalphLoopCmd(deps{})
+			if err := cmd.Flags().Set("agent", tc.agent); err != nil {
+				t.Fatalf("setting --agent: %v", err)
+			}
+			err := cmd.PreRunE(cmd, []string{"epic"})
+			if (err != nil) != tc.wantErr {
+				t.Errorf("PreRunE() error = %v, want error=%v", err, tc.wantErr)
+			}
+		})
 	}
 }
 
