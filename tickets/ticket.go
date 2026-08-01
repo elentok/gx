@@ -64,6 +64,11 @@ var metadataLineRe = regexp.MustCompile(`(?i)^(Type|Blocked by|Status):\s*(.*)$`
 
 var blockedByNumberRe = regexp.MustCompile(`\d+`)
 
+// statusParentheticalRe strips a trailing parenthetical annotation from a
+// Status: value, e.g. "resolved (duplicate of #12)" -> "resolved", so the
+// status word alone still matches doneStatuses/openStatuses/etc.
+var statusParentheticalRe = regexp.MustCompile(`\s*\([^)]*\)\s*$`)
+
 // ParseTicket parses a ticket file's raw text into metadata (Type:,
 // Blocked by:, Status:) plus the remaining raw markdown body. Metadata lines
 // aren't required to be contiguous or lead the file — e.g. wayfinder-style
@@ -91,7 +96,7 @@ func ParseTicket(raw string) (Ticket, error) {
 		case "blocked by":
 			t.BlockedBy = parseBlockedBy(value)
 		case "status":
-			t.Status = value
+			t.Status = strings.TrimSpace(statusParentheticalRe.ReplaceAllString(value, ""))
 		}
 	}
 

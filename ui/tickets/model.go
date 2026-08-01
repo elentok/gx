@@ -310,7 +310,7 @@ func (m Model) splitWidth() (sidebarW, previewW int) {
 		return m.width, m.width
 	}
 	width := m.width - 1
-	sidebarW = int(float64(width) * 0.55)
+	sidebarW = width / 2
 	previewW = width - sidebarW
 	return
 }

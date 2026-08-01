@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.23.3 - 2026-08-01
+
+- Ralph loop startup recovery now finishes interrupted cleanup for completed tickets, including removing leftover iteration tabs, worktrees, and branches.
+- Ralph loop now marks completed tickets as `needs-attention` when their commits are missing from the feature branch and cannot be recovered, records the reason, and exits cleanly.
+- Tickets now recognize annotated statuses such as `resolved (dup of #12)` and use an even 50:50 sidebar/preview split in vertical layouts.
+
 ## v0.23.2 - 2026-08-01
 
 - Added `gx ralph-loop` to execute `.scratch` epic tickets with Claude or Codex, including dependency-aware scheduling, isolated iteration worktrees, configurable parallelism, automatic cherry-picking, and agent-assisted conflict resolution.
