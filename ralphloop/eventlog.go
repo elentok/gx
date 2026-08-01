@@ -20,14 +20,15 @@ const (
 	eventPausedRateLimit   = "paused-rate-limit"
 	eventResumed           = "resumed"
 	eventNeedsInfo         = "needs-info"
+	eventNeedsAttention    = "needs-attention"
 )
 
 // Event is one line of an epic's run-log.jsonl: a single lifecycle
 // occurrence, timestamped and attributed to the ticket/pane/tab it happened
 // on. AgentSession is empty for events not tied to a specific Claude Code
 // session (e.g. conflict-hit, which precedes the conflict-resolution
-// agent's own launch); Reason carries the pause reason for the two paused-*
-// event types.
+// agent's own launch); Reason carries the reason for pause and attention
+// events.
 type Event struct {
 	Time         time.Time `json:"time"`
 	Type         string    `json:"type"`

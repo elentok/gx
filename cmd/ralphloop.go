@@ -64,7 +64,7 @@ func runRalphLoop(epicName, agent, skill string, maxParallel, smartZone int, d d
 func newRalphLoopResumeCmd(d deps) *cobra.Command {
 	return &cobra.Command{
 		Use:   "resume <epic-name>",
-		Short: "wake a gx ralph-loop invocation blocked on a smart-zone pause",
+		Short: "recheck and resume a paused gx ralph-loop invocation",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			return runRalphLoopResume(args[0], d)

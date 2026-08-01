@@ -30,12 +30,13 @@ type IconSet struct {
 	MarkerBlocked string
 	MarkerWaiting string
 
-	TicketOpen      string
-	TicketClaimed   string
-	TicketBlocked   string
-	TicketNeedsInfo string
-	TicketDone      string
-	TicketError     string
+	TicketOpen           string
+	TicketClaimed        string
+	TicketBlocked        string
+	TicketNeedsInfo      string
+	TicketNeedsAttention string
+	TicketDone           string
+	TicketError          string
 }
 
 func Icons(useNerdFont bool) IconSet {
@@ -69,12 +70,13 @@ func Icons(useNerdFont bool) IconSet {
 			MarkerBlocked: "!",
 			MarkerWaiting: "-",
 
-			TicketOpen:      "o",
-			TicketClaimed:   "@",
-			TicketBlocked:   "x",
-			TicketNeedsInfo: "?",
-			TicketDone:      "d",
-			TicketError:     "!!",
+			TicketOpen:           "o",
+			TicketClaimed:        "@",
+			TicketBlocked:        "x",
+			TicketNeedsInfo:      "?",
+			TicketNeedsAttention: "!",
+			TicketDone:           "d",
+			TicketError:          "!!",
 		}
 	}
 	return IconSet{
@@ -106,11 +108,12 @@ func Icons(useNerdFont bool) IconSet {
 		MarkerBlocked: "●",
 		MarkerWaiting: "○",
 
-		TicketOpen:      "○",
-		TicketClaimed:   "󰀄",
-		TicketBlocked:   "󰦞",
-		TicketNeedsInfo: "󰋗",
-		TicketDone:      "󰄬",
-		TicketError:     "󰀪",
+		TicketOpen:           "○",
+		TicketClaimed:        "󰀄",
+		TicketBlocked:        "󰦞",
+		TicketNeedsInfo:      "󰋗",
+		TicketNeedsAttention: "󰀪",
+		TicketDone:           "󰄬",
+		TicketError:          "󰀪",
 	}
 }

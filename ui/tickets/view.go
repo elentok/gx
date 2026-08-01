@@ -12,10 +12,11 @@ import (
 )
 
 var (
-	statusOpenStyle      = lipgloss.NewStyle().Foreground(ui.ColorGreen)
-	statusClaimedStyle   = lipgloss.NewStyle().Foreground(ui.ColorBlue)
-	statusBlockedStyle   = lipgloss.NewStyle().Foreground(ui.ColorRed)
-	statusNeedsInfoStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow)
+	statusOpenStyle           = lipgloss.NewStyle().Foreground(ui.ColorGreen)
+	statusClaimedStyle        = lipgloss.NewStyle().Foreground(ui.ColorBlue)
+	statusBlockedStyle        = lipgloss.NewStyle().Foreground(ui.ColorRed)
+	statusNeedsInfoStyle      = lipgloss.NewStyle().Foreground(ui.ColorYellow)
+	statusNeedsAttentionStyle = lipgloss.NewStyle().Foreground(ui.ColorOrange)
 	// statusDoneStyle is deliberately dimmer than ui.StyleDim/StyleMuted
 	// (used elsewhere for transient states like search-fade or loading
 	// text): "done" is a permanent, low-priority state that should read as
@@ -168,6 +169,8 @@ func statusIconAndStyle(icons ui.IconSet, status tickets.RenderedStatus) (string
 		return icons.TicketBlocked, statusBlockedStyle
 	case tickets.StatusNeedsInfo:
 		return icons.TicketNeedsInfo, statusNeedsInfoStyle
+	case tickets.StatusNeedsAttention:
+		return icons.TicketNeedsAttention, statusNeedsAttentionStyle
 	case tickets.StatusDone:
 		return icons.TicketDone, statusDoneStyle
 	default: // tickets.StatusError

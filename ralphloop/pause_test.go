@@ -3,6 +3,7 @@ package ralphloop
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -154,6 +155,96 @@ func TestWaitForFinish_CodexContextBreachPausesAndResumes(t *testing.T) {
 	}
 	if gate.isPaused() {
 		t.Error("gate remains paused after the resume signal")
+	}
+}
+
+func TestWaitForFinish_CodexBlockedMarksNeedsAttentionThenRecovers(t *testing.T) {
+	ticketPath := writeTicket(t, "# Ticket\n\n**Status:** claimed\n")
+	scratchDir := t.TempDir()
+	gate := newPauseGate()
+	var waits int
+	var sawNeedsAttention bool
+	d := Deps{
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			waits++
+			switch waits {
+			case 1:
+				return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
+			case 2:
+				return herdr.Agent{}, errors.New("timed out waiting for agent status")
+			default:
+				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+			}
+		},
+		ResumeSignaled: func(string) (bool, error) {
+			raw, err := os.ReadFile(ticketPath)
+			if err == nil {
+				sawNeedsAttention = strings.Contains(string(raw), "needs-attention")
+			}
+			return false, nil
+		},
+		Sleep: func(time.Duration) {},
+	}
+
+	if err := waitForFinish(d, launchAndPromptParams{
+		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Ticket: 1, TicketPath: ticketPath,
+		ScratchDir: scratchDir, EpicName: "epic", Gate: gate,
+	}, "codex-session-1"); err != nil {
+		t.Fatalf("waitForFinish: %v", err)
+	}
+	if !sawNeedsAttention {
+		t.Error("ticket was not marked needs-attention while Codex was blocked")
+	}
+	if gate.isPaused() {
+		t.Error("gate remains paused after Codex recovered")
+	}
+	raw, err := os.ReadFile(ticketPath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw), "claimed") {
+		t.Errorf("ticket status = %s, want claimed after recovery", raw)
+	}
+	events, ok, err := readEvents(scratchDir, "epic")
+	if err != nil || !ok || len(events) < 2 {
+		t.Fatalf("readEvents() = %+v, ok=%v, err=%v", events, ok, err)
+	}
+	if events[0].Type != eventNeedsAttention || events[0].Pane != "pane-1" || events[0].Reason == "" {
+		t.Errorf("attention event = %+v, want pane and reason", events[0])
+	}
+}
+
+func TestWaitForFinish_ManualAttentionRecheckKeepsBlockedTicketPaused(t *testing.T) {
+	ticketPath := writeTicket(t, "# Ticket\n\n**Status:** claimed\n")
+	scratchDir := t.TempDir()
+	gate := newPauseGate()
+	var waits int
+	var reports strings.Builder
+	d := Deps{
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			waits++
+			switch waits {
+			case 1, 3:
+				return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
+			case 2:
+				return herdr.Agent{}, errors.New("timed out waiting for agent status")
+			default:
+				return herdr.Agent{PaneID: opts.Target, AgentStatus: "done"}, nil
+			}
+		},
+		ResumeSignaled: func(string) (bool, error) { return waits == 2, nil },
+		Sleep:          func(time.Duration) {},
+	}
+
+	if err := waitForFinish(d, launchAndPromptParams{
+		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Ticket: 1, TicketPath: ticketPath,
+		ScratchDir: scratchDir, EpicName: "epic", Gate: gate,
+		Report: func(format string, args ...any) { fmt.Fprintf(&reports, format, args...) },
+	}, "codex-session-1"); err != nil {
+		t.Fatalf("waitForFinish: %v", err)
+	}
+	if !strings.Contains(reports.String(), "still needs attention") {
+		t.Errorf("reports = %q, want blocked manual-recheck feedback", reports.String())
 	}
 }
 

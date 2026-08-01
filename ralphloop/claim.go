@@ -25,6 +25,11 @@ func MarkNeedsInfo(path string) error {
 	return SetStatus(path, "needs-info")
 }
 
+// MarkNeedsAttention writes "Status: needs-attention" into the ticket file.
+func MarkNeedsAttention(path string) error {
+	return SetStatus(path, "needs-attention")
+}
+
 // SetStatus rewrites (or adds) a ticket file's Status: line to value,
 // leaving the rest of the file's content byte-for-byte unchanged. It
 // recognizes both plain (`Status:`) and bold-markdown (`**Status:**`)

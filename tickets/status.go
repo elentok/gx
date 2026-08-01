@@ -4,7 +4,7 @@ import "strings"
 
 // RenderedStatus is the tickets tab's collapse of the tracker's raw Status:/
 // triage-label vocabulary into a small set of user-facing states, plus a
-// sixth "error" state for any value none of the others recognize.
+// seventh "error" state for any value none of the others recognize.
 type RenderedStatus int
 
 const (
@@ -12,6 +12,7 @@ const (
 	StatusClaimed
 	StatusBlocked
 	StatusNeedsInfo
+	StatusNeedsAttention
 	StatusDone
 	StatusError
 )
@@ -36,6 +37,10 @@ var needsInfoStatuses = map[string]bool{
 	"needs-info": true,
 }
 
+var needsAttentionStatuses = map[string]bool{
+	"needs-attention": true,
+}
+
 // baseStatus classifies t's raw Status: value alone, before the Blocked by:
 // overlay (see Epic.RenderedStatus) is applied.
 func (t Ticket) baseStatus() RenderedStatus {
@@ -50,6 +55,8 @@ func (t Ticket) baseStatus() RenderedStatus {
 		return StatusClaimed
 	case needsInfoStatuses[status]:
 		return StatusNeedsInfo
+	case needsAttentionStatuses[status]:
+		return StatusNeedsAttention
 	case openStatuses[status]:
 		return StatusOpen
 	default:
@@ -103,6 +110,8 @@ func (s RenderedStatus) Word() string {
 		return "blocked"
 	case StatusNeedsInfo:
 		return "needs-info"
+	case StatusNeedsAttention:
+		return "needs-attention"
 	case StatusDone:
 		return "done"
 	default: // StatusError
@@ -111,14 +120,14 @@ func (s RenderedStatus) Word() string {
 }
 
 // GroupOrder returns s's sort rank for grouping tickets within an epic:
-// unblocked (open/claimed) → blocked → needs-info → done → error.
+// unblocked (open/claimed) → blocked → needs-info/needs-attention → done → error.
 func GroupOrder(s RenderedStatus) int {
 	switch s {
 	case StatusOpen, StatusClaimed:
 		return 0
 	case StatusBlocked:
 		return 1
-	case StatusNeedsInfo:
+	case StatusNeedsInfo, StatusNeedsAttention:
 		return 2
 	case StatusDone:
 		return 3

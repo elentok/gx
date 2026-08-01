@@ -234,6 +234,11 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	for _, ticket := range initial.Tickets {
+		if strings.EqualFold(strings.TrimSpace(ticket.Status), "needs-attention") {
+			gate.pause(iterLabel(ticket.Number), "needs operator attention")
+		}
+	}
 	for _, ticket := range reattached {
 		launch(ticket, true)
 		active++
@@ -367,6 +372,7 @@ func (p iterationParams) launchAndPromptParams(label, pane, tab, prompt, session
 		ResumeSignalPath: p.ResumeSignalPath,
 		Report:           p.Report,
 		Ticket:           p.Ticket.Number,
+		TicketPath:       p.Ticket.Path,
 		ScratchDir:       p.ScratchDir,
 		EpicName:         p.FeatureBranch,
 		StartEvent:       startEvent,
@@ -474,6 +480,14 @@ func reattachIteration(d Deps, p iterationParams) error {
 	launchParams := p.launchAndPromptParams(label, label, tabID, "", path, "", eventIterationFinished)
 	if err := waitForFinish(d, launchParams, ""); err != nil {
 		return fmt.Errorf("waiting for reattached agent %s to finish: %w", label, err)
+	}
+	if strings.EqualFold(strings.TrimSpace(p.Ticket.Status), "needs-attention") {
+		if err := Claim(p.Ticket.Path); err != nil {
+			return fmt.Errorf("restoring ticket to claimed: %w", err)
+		}
+		p.Gate.resumeLabel(label)
+		p.Report("resumed %s after restart recheck\n", label)
+		launchParams.logLifecycleEvent(eventResumed, "")
 	}
 
 	return finishIteration(d, p, path, label, tabID, base, branch, "")
@@ -623,9 +637,10 @@ type launchAndPromptParams struct {
 	// Report writes a line to the loop's output, safe to call concurrently.
 	Report func(format string, args ...any)
 
-	// Ticket, ScratchDir, and EpicName locate the run-log.jsonl entries this
+	// Ticket, TicketPath, ScratchDir, and EpicName locate the run-log.jsonl entries this
 	// call logs (see eventlog.go).
 	Ticket     int
+	TicketPath string
 	ScratchDir string
 	EpicName   string
 	// StartEvent/FinishEvent are the run-log event types logged when the
@@ -721,12 +736,23 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			}
 		}
 
-		_, err := d.AgentWait(herdr.AgentWaitOptions{
+		until := []string{"idle", "done"}
+		if p.Agent == AgentCodex {
+			until = append(until, "blocked")
+		}
+		agent, err := d.AgentWait(herdr.AgentWaitOptions{
 			Target:    p.Pane,
-			Until:     []string{"idle", "done"},
+			Until:     until,
 			TimeoutMs: pollMs,
 		})
 		if err == nil {
+			if p.Agent == AgentCodex && agent.AgentStatus == "blocked" {
+				if err := waitForAttentionRecovery(d, p, sessionID); err != nil {
+					return err
+				}
+				elapsedMs = 0
+				continue
+			}
 			p.logLifecycleEvent(p.FinishEvent, sessionID)
 			return nil
 		}
@@ -780,6 +806,64 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 		p.report("resumed %s\n", p.Label)
 		p.logLifecycleEvent(eventResumed, sessionID)
 		elapsedMs = 0
+	}
+}
+
+// waitForAttentionRecovery makes a Codex permission/intervention request
+// durable while keeping its pane and worktree available. The scheduler stays
+// paused until the pane returns to idle/done; a resume signal merely asks for
+// an immediate recheck, so it cannot accidentally schedule work while Codex
+// remains blocked.
+func waitForAttentionRecovery(d Deps, p launchAndPromptParams, sessionID string) error {
+	const reason = "Codex is waiting for operator intervention"
+	if err := MarkNeedsAttention(p.TicketPath); err != nil {
+		return fmt.Errorf("marking ticket needs-attention: %w", err)
+	}
+	p.Gate.pause(p.Label, reason)
+	p.report("paused %s: %s\n", p.Label, reason)
+	_ = logEvent(p.ScratchDir, p.EpicName, Event{Type: eventNeedsAttention, Ticket: p.Ticket, Pane: p.Pane, Tab: p.Tab, AgentSession: sessionID, Cwd: p.SessionCwd, Reason: reason})
+
+	for {
+		agent, err := d.AgentWait(herdr.AgentWaitOptions{
+			Target:    p.Pane,
+			Until:     []string{"idle", "done"},
+			TimeoutMs: smartZonePollMs,
+		})
+		if err == nil && agent.AgentStatus != "blocked" {
+			if err := Claim(p.TicketPath); err != nil {
+				return fmt.Errorf("restoring ticket to claimed: %w", err)
+			}
+			p.Gate.resumeLabel(p.Label)
+			p.report("resumed %s after operator intervention\n", p.Label)
+			p.logLifecycleEvent(eventResumed, sessionID)
+			return nil
+		}
+		if err != nil && !isPollTimeout(err) {
+			return fmt.Errorf("rechecking blocked agent: %w", err)
+		}
+
+		signaled, signalErr := d.ResumeSignaled(p.ResumeSignalPath)
+		if signalErr != nil || !signaled {
+			continue
+		}
+		agent, err = d.AgentWait(herdr.AgentWaitOptions{
+			Target: p.Pane,
+			Until:  []string{"idle", "done", "blocked"},
+		})
+		if err != nil {
+			return fmt.Errorf("manually rechecking blocked agent: %w", err)
+		}
+		if agent.AgentStatus == "blocked" {
+			p.report("%s still needs attention\n", p.Label)
+			continue
+		}
+		if err := Claim(p.TicketPath); err != nil {
+			return fmt.Errorf("restoring ticket to claimed: %w", err)
+		}
+		p.Gate.resumeLabel(p.Label)
+		p.report("resumed %s after manual recheck\n", p.Label)
+		p.logLifecycleEvent(eventResumed, sessionID)
+		return nil
 	}
 }
 

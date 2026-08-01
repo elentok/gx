@@ -13,6 +13,7 @@ func TestEpic_RenderedStatus_BaseStates(t *testing.T) {
 		{"ready-for-human", StatusOpen},
 		{"claimed", StatusClaimed},
 		{"needs-info", StatusNeedsInfo},
+		{"needs-attention", StatusNeedsAttention},
 		{"needs-triage", StatusOpen},
 		{"done", StatusDone},
 		{"resolved", StatusDone},
@@ -79,6 +80,17 @@ func TestEpic_RenderedStatus_NeedsInfoNotOverlaidByBlocked(t *testing.T) {
 	got := epic.RenderedStatus(epic.Tickets[0])
 	if got != StatusNeedsInfo {
 		t.Errorf("RenderedStatus = %v, want StatusNeedsInfo (blocked overlay only applies to open/claimed)", got)
+	}
+}
+
+func TestEpic_RenderedStatus_NeedsAttentionNotOverlaidByBlocked(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, Status: "needs-attention", BlockedBy: []int{2}},
+		{Number: 2, Status: "open"},
+	}}
+	got := epic.RenderedStatus(epic.Tickets[0])
+	if got != StatusNeedsAttention {
+		t.Errorf("RenderedStatus = %v, want StatusNeedsAttention", got)
 	}
 }
 

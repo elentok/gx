@@ -108,16 +108,18 @@ icon:
 - **Claimed** — raw `Status: claimed`.
 - **Blocked** — an overlay, not a raw status: applied whenever an open or claimed ticket has an
   unresolved `Blocked by:` (a listed blocker number that isn't itself done, including a blocker
-  number with no matching ticket in the epic). Needs-info and done tickets keep their own state
-  regardless of `Blocked by:`.
+  number with no matching ticket in the epic). Needs-info, needs-attention, and done tickets keep
+  their own state regardless of `Blocked by:`.
 - **Needs-info** — raw `Status: needs-info`; stalled on someone providing more information.
+- **Needs-attention** — raw `Status: needs-attention`; an active Codex iteration is blocked on
+  operator intervention. It is actionable but never schedulable until the same pane recovers.
 - **Done** — the ticket is complete.
 - **Error** — either the ticket file couldn't be read, or its raw `Status:` value doesn't match any
   of the above; still selectable, and its raw markdown body still renders in the preview panel if
   the file itself is readable.
 
-Within an epic, tickets group in this order: unblocked (open/claimed) → blocked → needs-info → done
-→ error, ticket number ascending within each group.
+Within an epic, tickets group in this order: unblocked (open/claimed) → blocked → needs-info/
+needs-attention → done → error, ticket number ascending within each group.
 
 ## Decorations and Badges (Log View)
 

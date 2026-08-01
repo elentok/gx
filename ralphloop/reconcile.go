@@ -26,7 +26,17 @@ func reconcile(d Deps, workspaceID string, epic tickets.Epic, report func(string
 
 	var reattached []tickets.Ticket
 	for _, t := range epic.Tickets {
-		if !strings.EqualFold(strings.TrimSpace(t.Status), "claimed") {
+		status := strings.ToLower(strings.TrimSpace(t.Status))
+		if status == "needs-attention" {
+			if live[iterLabel(t.Number)] {
+				report("ticket %02d: reattaching to needs-attention iteration %s\n", t.Number, iterLabel(t.Number))
+				reattached = append(reattached, t)
+			} else {
+				report("ticket %02d still needs attention; no live iteration found\n", t.Number)
+			}
+			continue
+		}
+		if status != "claimed" {
 			continue
 		}
 		if !live[iterLabel(t.Number)] {
