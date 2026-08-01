@@ -576,11 +576,28 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 	}
 	p.logTicketEventSHA(eventCherryPicked, pane, tab, sessionID, path, "", landedSHA)
 
-	if err := MarkDone(p.Ticket.Path); err != nil {
+	if err := markDoneStampingCloseMetadata(d, p, path, sessionID); err != nil {
 		return fmt.Errorf("marking ticket done: %w", err)
 	}
 
 	return finishCleanup(d, p.RepoDir, p.FeatureWorktree, path, branch, tab)
+}
+
+// markDoneStampingCloseMetadata marks p.Ticket done, stamping the closing
+// iteration's context-window occupancy and session id alongside Status when
+// sessionID is a live, fresh-iteration session (runIteration's case) and its
+// occupancy is available — a reattached close (sessionID == "") has no live
+// session to read occupancy from, and is covered instead by ticket 06a's
+// log-based backfill.
+func markDoneStampingCloseMetadata(d Deps, p iterationParams, cwd, sessionID string) error {
+	if sessionID == "" {
+		return MarkDone(p.Ticket.Path)
+	}
+	occupancy, ok, occErr := contextOccupancy(d, p.Agent, cwd, sessionID)
+	if occErr != nil || !ok {
+		return MarkDone(p.Ticket.Path)
+	}
+	return MarkDoneWithMetadata(p.Ticket.Path, occupancy, sessionID)
 }
 
 // landCherryPick cherry-picks base..branch onto the feature branch (resolving

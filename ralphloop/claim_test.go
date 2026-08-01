@@ -104,6 +104,47 @@ func TestMarkDone_RewritesStatusLine(t *testing.T) {
 	}
 }
 
+func TestMarkDoneWithMetadata_InsertsContextWindowAndSessionAfterStatus(t *testing.T) {
+	path := writeTicket(t, "# Ticket\n\n**Status:** claimed\n\nBody.\n")
+	if err := MarkDoneWithMetadata(path, 42000, "sess-123"); err != nil {
+		t.Fatalf("MarkDoneWithMetadata: %v", err)
+	}
+	got := mustRead(t, path)
+	want := "# Ticket\n\n**Status:** done\n**Context window:** 42000\n**Session:** sess-123\n\nBody.\n"
+	if got != want {
+		t.Errorf("MarkDoneWithMetadata rewrote file as:\n%q\nwant:\n%q", got, want)
+	}
+}
+
+func TestMarkDoneWithMetadata_MatchesPlainStatusStyle(t *testing.T) {
+	path := writeTicket(t, "# Ticket\n\nStatus: claimed\n\nBody.\n")
+	if err := MarkDoneWithMetadata(path, 1000, "sess-1"); err != nil {
+		t.Fatalf("MarkDoneWithMetadata: %v", err)
+	}
+	got := mustRead(t, path)
+	want := "# Ticket\n\nStatus: done\nContext window: 1000\nSession: sess-1\n\nBody.\n"
+	if got != want {
+		t.Errorf("MarkDoneWithMetadata rewrote file as:\n%q\nwant:\n%q", got, want)
+	}
+}
+
+func TestMarkDoneWithMetadata_RoundTripsThroughParseTicket(t *testing.T) {
+	path := writeTicket(t, "# Ticket\n\n**Status:** claimed\n\nBody.\n")
+	if err := MarkDoneWithMetadata(path, 7, "sess-x"); err != nil {
+		t.Fatalf("MarkDoneWithMetadata: %v", err)
+	}
+	ticket, err := tickets.ParseTicket(mustRead(t, path))
+	if err != nil {
+		t.Fatalf("ParseTicket: %v", err)
+	}
+	if ticket.Status != "done" {
+		t.Errorf("Status = %q, want done", ticket.Status)
+	}
+	if !strings.Contains(ticket.Body, "Context window:** 7") || !strings.Contains(ticket.Body, "Session:** sess-x") {
+		t.Errorf("Body = %q, want it to still contain the new metadata lines (unparsed, unaffected)", ticket.Body)
+	}
+}
+
 func TestClaimThenMarkDone_RoundTripsThroughParseTicket(t *testing.T) {
 	path := writeTicket(t, "# Ticket\n\n**Blocked by:** None\n\nSome body.\n")
 

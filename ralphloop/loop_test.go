@@ -240,6 +240,74 @@ func TestRun_LogsLifecycleEvents_LinearChain(t *testing.T) {
 	}
 }
 
+// TestRun_FreshIteration_StampsContextWindowAndSessionOnDone verifies ticket
+// 06: a ticket marked done from a fresh (non-reattached) iteration, whose
+// session id and context occupancy are both known this run, gets those two
+// fields written into its file alongside Status: done.
+func TestRun_FreshIteration_StampsContextWindowAndSessionOnDone(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "# A\n\n**Status:** open\n",
+	})
+	d, _, _ := fakeDeps()
+	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-fresh-01"}, nil
+	}
+	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
+		return 12345, true, nil
+	}
+
+	var out bytes.Buffer
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	got := string(raw)
+	if !strings.Contains(got, "Status:** done") {
+		t.Errorf("ticket not marked done:\n%s", got)
+	}
+	if !strings.Contains(got, "Context window:** 12345") {
+		t.Errorf("ticket missing context window field:\n%s", got)
+	}
+	if !strings.Contains(got, "Session:** sess-fresh-01") {
+		t.Errorf("ticket missing session field:\n%s", got)
+	}
+}
+
+// TestRun_FreshIteration_OmitsMetadataWhenOccupancyUnavailable verifies that
+// a fresh iteration whose occupancy can't be read (ReadOccupancy's default
+// fake behavior in fakeDeps) still marks the ticket done, without writing
+// wrong/placeholder Context window or Session fields.
+func TestRun_FreshIteration_OmitsMetadataWhenOccupancyUnavailable(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "# A\n\n**Status:** open\n",
+	})
+	d, _, _ := fakeDeps()
+	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-fresh-01"}, nil
+	}
+
+	var out bytes.Buffer
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	got := string(raw)
+	if !strings.Contains(got, "Status:** done") {
+		t.Errorf("ticket not marked done:\n%s", got)
+	}
+	if strings.Contains(got, "Context window:") || strings.Contains(got, "Session:") {
+		t.Errorf("ticket should omit metadata fields when occupancy is unavailable, got:\n%s", got)
+	}
+}
+
 func TestRun_LogsNeedsInfoEvent_OnZeroCommitIteration(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "# A\n\n**Status:** open\n",

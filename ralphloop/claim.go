@@ -1,9 +1,11 @@
 package ralphloop
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -30,6 +32,50 @@ func MarkNeedsAttention(path string) error {
 	return SetStatus(path, "needs-attention")
 }
 
+// MarkDoneWithMetadata marks a ticket done and, right after the Status line,
+// records the closing iteration's final context-window occupancy and agent
+// session id, matching the Status line's plain/bold style. This lets a human
+// retroactively open the exact Claude Code session that produced the
+// ticket's work, without separate log correlation. Only meant for the case
+// where a fresh iteration's own session id is already in hand at close time
+// (see finishIteration) — a reattached close with no live session should
+// call MarkDone instead. Status and the two metadata lines land in a single
+// atomic write, so a concurrent reader never observes Status: done without
+// them. Requires an existing Status: line — every ticket reaching this point
+// was already claimed, so this is a precondition, not an edge case to
+// recover from.
+func MarkDoneWithMetadata(path string, contextWindow int, sessionID string) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(string(raw), "\n")
+
+	idx, bold := findStatusLine(lines)
+	if idx < 0 {
+		return fmt.Errorf("no Status: line found in %s", path)
+	}
+	lines[idx] = formatMetadataLine("Status", "done", bold)
+	lines = insertLines(lines, idx+1,
+		formatMetadataLine("Context window", strconv.Itoa(contextWindow), bold),
+		formatMetadataLine("Session", sessionID, bold),
+	)
+
+	return writeFileAtomic(path, []byte(strings.Join(lines, "\n")))
+}
+
+func formatMetadataLine(key, value string, bold bool) string {
+	if bold {
+		return fmt.Sprintf("**%s:** %s", key, value)
+	}
+	return fmt.Sprintf("%s: %s", key, value)
+}
+
+// insertLines splices new lines into lines starting at index at.
+func insertLines(lines []string, at int, new ...string) []string {
+	return append(lines[:at:at], append(new, lines[at:]...)...)
+}
+
 // SetStatus rewrites (or adds) a ticket file's Status: line to value,
 // leaving the rest of the file's content byte-for-byte unchanged. It
 // recognizes both plain (`Status:`) and bold-markdown (`**Status:**`)
@@ -46,17 +92,17 @@ func SetStatus(path, value string) error {
 	lines := strings.Split(string(raw), "\n")
 
 	if idx, bold := findStatusLine(lines); idx >= 0 {
-		lines[idx] = formatStatusLine(value, bold)
+		lines[idx] = formatMetadataLine("Status", value, bold)
 	} else {
 		insertAt, bold := findMetadataInsertPoint(lines)
-		insertion := []string{formatStatusLine(value, bold)}
+		insertion := []string{formatMetadataLine("Status", value, bold)}
 		if insertAt >= len(lines) || strings.TrimSpace(lines[insertAt]) != "" {
 			// Keep the file's blank-line-separated metadata style: only the
 			// no-metadata-at-all case (title directly followed by a blank
 			// line) skips this, since there's nothing to separate from yet.
 			insertion = append(insertion, "")
 		}
-		lines = append(lines[:insertAt:insertAt], append(insertion, lines[insertAt:]...)...)
+		lines = insertLines(lines, insertAt, insertion...)
 	}
 
 	return writeFileAtomic(path, []byte(strings.Join(lines, "\n")))
@@ -91,13 +137,6 @@ func writeFileAtomic(path string, data []byte) error {
 		return err
 	}
 	return nil
-}
-
-func formatStatusLine(value string, bold bool) string {
-	if bold {
-		return "**Status:** " + value
-	}
-	return "Status: " + value
 }
 
 // findStatusLine returns the index of lines' existing Status: line (-1 if
