@@ -38,7 +38,7 @@ type Ticket struct {
 // constructed outside the loader predate Identifier, so fall back to Number
 // for those callers.
 func (t Ticket) DisplayNumber() string {
-	if strings.Trim(t.Identifier, "0123456789") != "" {
+	if t.Identifier != "" {
 		return t.Identifier
 	}
 	return strconv.Itoa(t.Number)

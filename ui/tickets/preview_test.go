@@ -27,7 +27,7 @@ func TestModel_SelectingTicketShowsHeaderMetaAndBody(t *testing.T) {
 	m = updated.(Model)
 
 	content := ansi.Strip(m.View().Content)
-	if !strings.Contains(content, "#1 First ticket") {
+	if !strings.Contains(content, "#01 First ticket") {
 		t.Fatalf("expected header line with number+title in view, got:\n%s", content)
 	}
 	if !strings.Contains(content, "open") {

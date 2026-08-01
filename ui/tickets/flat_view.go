@@ -93,7 +93,7 @@ func (m FlatModel) renderFlatTicketRow(t tickets.Ticket) string {
 	status := m.epic.RenderedStatus(t)
 	icon, style := statusIconAndStyle(m.icons(), status)
 
-	title := fmt.Sprintf("%d %s", t.Number, t.Title)
+	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
 	titleStyle := lipgloss.NewStyle()
 	if status == tickets.StatusDone {
 		titleStyle = statusDoneStyle

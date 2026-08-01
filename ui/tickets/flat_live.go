@@ -106,7 +106,7 @@ func (m FlatModel) hasRunningLiveTicket() bool {
 // reach here since callers only look live up on a present map entry, but
 // keeps this function total).
 func (m FlatModel) renderLiveTicketRow(t tickets.Ticket, live liveTicketState) (string, bool) {
-	title := fmt.Sprintf("%d %s", t.Number, t.Title)
+	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
 
 	switch {
 	case live.paused && live.pauseKind == ralphloop.PauseNeedsAttention:
