@@ -69,6 +69,17 @@ var blockedByNumberRe = regexp.MustCompile(`\d+`)
 // status word alone still matches doneStatuses/openStatuses/etc.
 var statusParentheticalRe = regexp.MustCompile(`\s*\([^)]*\)\s*$`)
 
+// statusEmDashAnnotationRe strips a trailing em-dash annotation from a
+// Status: value, e.g. "superseded — split into 04a...md and 04b...md" ->
+// "superseded" (per to-tickets' mid-flight-split convention, see
+// UnresolvedBlockers). An em dash rather than a hyphen, so this can't
+// mis-strip a hyphenated status word like "ready-for-agent". The annotation
+// can run past the Status: line itself (metadataLineRe only captures the
+// first line), so this only strips what's actually on that line — the rest
+// falls through to the ticket body untouched, which is fine since it's
+// prose either way.
+var statusEmDashAnnotationRe = regexp.MustCompile(`\s*—.*$`)
+
 // ParseTicket parses a ticket file's raw text into metadata (Type:,
 // Blocked by:, Status:) plus the remaining raw markdown body. Metadata lines
 // aren't required to be contiguous or lead the file — e.g. wayfinder-style
@@ -96,6 +107,7 @@ func ParseTicket(raw string) (Ticket, error) {
 		case "blocked by":
 			t.BlockedBy = parseBlockedBy(value)
 		case "status":
+			value = statusEmDashAnnotationRe.ReplaceAllString(value, "")
 			t.Status = strings.TrimSpace(statusParentheticalRe.ReplaceAllString(value, ""))
 		}
 	}

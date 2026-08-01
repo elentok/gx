@@ -19,7 +19,7 @@ func TestEpic_RenderedStatus_BaseStates(t *testing.T) {
 		{"resolved", StatusDone},
 		{"wontfix", StatusDone},
 		{"closed", StatusDone},
-		{"superseded", StatusDone},
+		{"superseded", StatusSuperseded},
 		{"CLAIMED", StatusClaimed},
 		{"bogus-value", StatusError},
 	}

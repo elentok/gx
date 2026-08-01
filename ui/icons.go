@@ -36,6 +36,7 @@ type IconSet struct {
 	TicketNeedsInfo      string
 	TicketNeedsAttention string
 	TicketDone           string
+	TicketSuperseded     string
 	TicketError          string
 }
 
@@ -76,6 +77,7 @@ func Icons(useNerdFont bool) IconSet {
 			TicketNeedsInfo:      "?",
 			TicketNeedsAttention: "!",
 			TicketDone:           "d",
+			TicketSuperseded:     "s",
 			TicketError:          "!!",
 		}
 	}
@@ -114,6 +116,7 @@ func Icons(useNerdFont bool) IconSet {
 		TicketNeedsInfo:      "󰋗",
 		TicketNeedsAttention: "󰀪",
 		TicketDone:           "󰄬",
+		TicketSuperseded:     "󰃀",
 		TicketError:          "󰀪",
 	}
 }

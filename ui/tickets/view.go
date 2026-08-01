@@ -127,7 +127,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) 
 
 	matched, current := m.searchMatch(rowIdx)
 	searchDim := m.search.HasQuery() && !matched
-	doneDim := status == tickets.StatusDone
+	doneDim := status == tickets.StatusDone || status == tickets.StatusSuperseded
 
 	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
 	titleStyle := lipgloss.NewStyle()
@@ -173,6 +173,8 @@ func statusIconAndStyle(icons ui.IconSet, status tickets.RenderedStatus) (string
 		return icons.TicketNeedsAttention, statusNeedsAttentionStyle
 	case tickets.StatusDone:
 		return icons.TicketDone, statusDoneStyle
+	case tickets.StatusSuperseded:
+		return icons.TicketSuperseded, statusDoneStyle
 	default: // tickets.StatusError
 		return icons.TicketError, statusErrorStyle
 	}

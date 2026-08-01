@@ -14,6 +14,7 @@ const (
 	StatusNeedsInfo
 	StatusNeedsAttention
 	StatusDone
+	StatusSuperseded
 	StatusError
 )
 
@@ -41,6 +42,14 @@ var needsAttentionStatuses = map[string]bool{
 	"needs-attention": true,
 }
 
+// supersededStatuses covers a ticket closed by a mid-flight split (see
+// UnresolvedBlockers) rather than by landing work — IsDone/doneStatuses
+// still treats it as done for scheduling and blocker resolution, but the
+// tickets list renders it distinctly from a ticket that actually shipped.
+var supersededStatuses = map[string]bool{
+	"superseded": true,
+}
+
 // baseStatus classifies t's raw Status: value alone, before the Blocked by:
 // overlay (see Epic.RenderedStatus) is applied.
 func (t Ticket) baseStatus() RenderedStatus {
@@ -49,6 +58,8 @@ func (t Ticket) baseStatus() RenderedStatus {
 	}
 	status := strings.ToLower(strings.TrimSpace(t.Status))
 	switch {
+	case supersededStatuses[status]:
+		return StatusSuperseded
 	case doneStatuses[status]:
 		return StatusDone
 	case claimedStatuses[status]:
@@ -128,13 +139,15 @@ func (s RenderedStatus) Word() string {
 		return "needs-attention"
 	case StatusDone:
 		return "done"
+	case StatusSuperseded:
+		return "superseded"
 	default: // StatusError
 		return "error"
 	}
 }
 
 // GroupOrder returns s's sort rank for grouping tickets within an epic:
-// unblocked (open/claimed) → blocked → needs-info/needs-attention → done → error.
+// unblocked (open/claimed) → blocked → needs-info/needs-attention → done/superseded → error.
 func GroupOrder(s RenderedStatus) int {
 	switch s {
 	case StatusOpen, StatusClaimed:
@@ -143,7 +156,7 @@ func GroupOrder(s RenderedStatus) int {
 		return 1
 	case StatusNeedsInfo, StatusNeedsAttention:
 		return 2
-	case StatusDone:
+	case StatusDone, StatusSuperseded:
 		return 3
 	default: // StatusError
 		return 4
