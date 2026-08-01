@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/herdr"
 )
 
@@ -211,6 +212,53 @@ func TestWaitForFinish_CodexBlockedMarksNeedsAttentionThenRecovers(t *testing.T)
 	}
 	if events[0].Type != eventNeedsAttention || events[0].Pane != "pane-1" || events[0].Reason == "" {
 		t.Errorf("attention event = %+v, want pane and reason", events[0])
+	}
+}
+
+func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsAttention(t *testing.T) {
+	ticketPath := writeTicket(t, "# Ticket\n\n**Status:** claimed\n")
+	gate := newPauseGate()
+	var waits, prompts, quotaChecks int
+	d := Deps{
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			waits++
+			if waits == 1 {
+				return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
+			}
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentPrompt: func(herdr.AgentPromptOptions) (herdr.Agent, error) {
+			prompts++
+			return herdr.Agent{}, nil
+		},
+		ReadCodexRateLimit: func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
+			quotaChecks++
+			if quotaChecks > 1 {
+				return codexsession.RateLimit{}, false, nil
+			}
+			return codexsession.RateLimit{Quota: "primary", ResetAt: time.Now().Add(-time.Second)}, true, nil
+		},
+		Sleep: func(time.Duration) {},
+	}
+
+	if err := waitForFinish(d, launchAndPromptParams{
+		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Ticket: 1, TicketPath: ticketPath,
+		Gate: gate,
+	}, "codex-session-1"); err != nil {
+		t.Fatalf("waitForFinish: %v", err)
+	}
+	if prompts != 1 {
+		t.Errorf("continue prompts = %d, want 1", prompts)
+	}
+	if gate.isPaused() {
+		t.Error("gate remains paused after the Codex quota reset")
+	}
+	raw, err := os.ReadFile(ticketPath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if strings.Contains(string(raw), "needs-attention") {
+		t.Errorf("ticket status = %s, quota exhaustion must not become needs-attention", raw)
 	}
 }
 

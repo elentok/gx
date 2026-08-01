@@ -3,6 +3,8 @@ package ralphloop
 import (
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/codexsession"
 )
 
 func TestDetectRateLimit_MatchesKnownMessageVariants(t *testing.T) {
@@ -126,5 +128,44 @@ func TestWaitForRateLimitReset_UnparseableToken_PollsUntilMessageClears(t *testi
 	}
 	if slept != 3 {
 		t.Errorf("Sleep called %d times, want 3", slept)
+	}
+}
+
+func TestWaitForCodexRateLimitReset_MissingResetPollsUntilQuotaClears(t *testing.T) {
+	d := Deps{}
+	var sleeps []time.Duration
+	checks := 0
+	d.Sleep = func(duration time.Duration) { sleeps = append(sleeps, duration) }
+	d.ReadCodexRateLimit = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
+		checks++
+		return codexsession.RateLimit{}, checks == 1, nil
+	}
+
+	waitForCodexRateLimitReset(d, "/repo/iter-01", "session-1", codexsession.RateLimit{Quota: "primary"})
+
+	if len(sleeps) != 2 || sleeps[0] != rateLimitPollInterval || sleeps[1] != rateLimitPollInterval {
+		t.Errorf("sleeps = %v, want two %v polls", sleeps, rateLimitPollInterval)
+	}
+}
+
+func TestWaitForCodexRateLimitReset_SleepsPastResetThenReobserves(t *testing.T) {
+	d := Deps{}
+	var sleeps []time.Duration
+	checks := 0
+	d.Sleep = func(duration time.Duration) { sleeps = append(sleeps, duration) }
+	d.ReadCodexRateLimit = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
+		checks++
+		return codexsession.RateLimit{}, false, nil
+	}
+
+	waitForCodexRateLimitReset(d, "/repo/iter-01", "session-1", codexsession.RateLimit{
+		Quota: "secondary", ResetAt: time.Now().Add(2 * time.Second),
+	})
+
+	if len(sleeps) != 1 || sleeps[0] < rateLimitResetBuffer {
+		t.Errorf("sleeps = %v, want a sleep through the reset plus buffer", sleeps)
+	}
+	if checks != 1 {
+		t.Errorf("quota rechecks = %d, want 1 after reset", checks)
 	}
 }

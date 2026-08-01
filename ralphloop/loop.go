@@ -6,7 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
@@ -747,6 +749,13 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 		})
 		if err == nil {
 			if p.Agent == AgentCodex && agent.AgentStatus == "blocked" {
+				if limit, exhausted, limitErr := codexRateLimit(d, p.SessionCwd, sessionID); limitErr == nil && exhausted {
+					if err := recoverCodexRateLimit(d, p, sessionID, limit); err != nil {
+						return err
+					}
+					elapsedMs = 0
+					continue
+				}
 				if err := waitForAttentionRecovery(d, p, sessionID); err != nil {
 					return err
 				}
@@ -760,6 +769,16 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			return fmt.Errorf("waiting for agent to finish: %w", err)
 		}
 		elapsedMs += pollMs
+
+		if p.Agent == AgentCodex {
+			if limit, exhausted, limitErr := codexRateLimit(d, p.SessionCwd, sessionID); limitErr == nil && exhausted {
+				if err := recoverCodexRateLimit(d, p, sessionID, limit); err != nil {
+					return err
+				}
+				elapsedMs = 0
+				continue
+			}
+		}
 
 		if d.ReadPaneRecent != nil {
 			if text, rlErr := d.ReadPaneRecent(p.Pane); rlErr == nil {
@@ -807,6 +826,30 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 		p.logLifecycleEvent(eventResumed, sessionID)
 		elapsedMs = 0
 	}
+}
+
+func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, limit codexsession.RateLimit) error {
+	reason := fmt.Sprintf("Codex %s quota exhausted", limit.Quota)
+	if !limit.ResetAt.IsZero() {
+		reason += fmt.Sprintf(", resets %s", limit.ResetAt.UTC().Format(time.RFC3339))
+	}
+	p.Gate.pause(p.Label, reason)
+	p.report("paused %s: %s; waiting for automatic reset\n", p.Label, reason)
+	_ = logEvent(p.ScratchDir, p.EpicName, Event{Type: eventPausedRateLimit, Ticket: p.Ticket, Pane: p.Pane, Tab: p.Tab, AgentSession: sessionID, Cwd: p.SessionCwd, Reason: reason})
+	waitForCodexRateLimitReset(d, p.SessionCwd, sessionID, limit)
+	p.Gate.resumeLabel(p.Label)
+	p.report("resumed %s after Codex quota reset\n", p.Label)
+	p.logLifecycleEvent(eventResumed, sessionID)
+
+	if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
+		Target: p.Pane,
+		Text:   "continue",
+		Wait:   true,
+		Until:  []string{"working"},
+	}); err != nil {
+		return fmt.Errorf("re-prompting %s after Codex quota reset: %w", p.Label, err)
+	}
+	return nil
 }
 
 // waitForAttentionRecovery makes a Codex permission/intervention request
@@ -884,6 +927,13 @@ func contextOccupancy(d Deps, agent AgentKind, cwd, sessionID string) (int, bool
 		return 0, false, nil
 	}
 	return d.ReadOccupancy(cwd, sessionID)
+}
+
+func codexRateLimit(d Deps, cwd, sessionID string) (codexsession.RateLimit, bool, error) {
+	if sessionID == "" || d.ReadCodexRateLimit == nil {
+		return codexsession.RateLimit{}, false, nil
+	}
+	return d.ReadCodexRateLimit(cwd, sessionID)
 }
 
 // isPollTimeout reports whether err looks like AgentWait's own

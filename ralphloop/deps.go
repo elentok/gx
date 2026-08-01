@@ -49,6 +49,10 @@ type Deps struct {
 	// session launched in cwd, or ok=false until its local session data is
 	// complete enough to identify that worktree and session.
 	ReadCodexContext func(cwd, sessionID string) (tokens int, ok bool, err error)
+	// ReadCodexRateLimit returns an exhausted Codex quota for the session
+	// launched in cwd, or ok=false when its session data is incomplete or no
+	// quota is exhausted.
+	ReadCodexRateLimit func(cwd, sessionID string) (limit codexsession.RateLimit, ok bool, err error)
 	// ReadPaneRecent returns pane's recent terminal output, used to detect a
 	// Claude usage/session rate-limit message.
 	ReadPaneRecent func(pane string) (string, error)
@@ -80,6 +84,7 @@ func DefaultDeps() Deps {
 		CherryPickInProgress:  git.CherryPickInProgress,
 		ReadOccupancy:         transcript.LastAssistantOccupancy,
 		ReadCodexContext:      codexsession.LastContextTokens,
+		ReadCodexRateLimit:    codexsession.LastRateLimit,
 		ReadPaneRecent:        defaultReadPaneRecent,
 		ResumeSignaled:        defaultResumeSignaled,
 		Sleep:                 time.Sleep,

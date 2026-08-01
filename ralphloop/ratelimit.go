@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/herdr"
 )
 
@@ -92,6 +93,35 @@ func waitForRateLimitReset(d Deps, pane, token string) {
 			continue
 		}
 		if _, matched := detectRateLimit(text); !matched {
+			return
+		}
+	}
+}
+
+// waitForCodexRateLimitReset waits for the structured session reset time when
+// available. Missing or malformed reset data falls back to polling the same
+// session observer until it no longer reports an exhausted quota.
+func waitForCodexRateLimitReset(d Deps, cwd, sessionID string, limit codexsession.RateLimit) {
+	if !limit.ResetAt.IsZero() {
+		if wait := time.Until(limit.ResetAt); wait > 0 {
+			d.Sleep(wait + rateLimitResetBuffer)
+		}
+		if d.ReadCodexRateLimit == nil {
+			return
+		}
+		_, exhausted, err := d.ReadCodexRateLimit(cwd, sessionID)
+		if err == nil && !exhausted {
+			return
+		}
+	}
+
+	for {
+		d.Sleep(rateLimitPollInterval)
+		if d.ReadCodexRateLimit == nil {
+			return
+		}
+		_, exhausted, err := d.ReadCodexRateLimit(cwd, sessionID)
+		if err == nil && !exhausted {
 			return
 		}
 	}
