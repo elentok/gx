@@ -2,7 +2,6 @@ package tickets
 
 import (
 	"fmt"
-	"io"
 	"path/filepath"
 	"sync"
 	"time"
@@ -39,13 +38,18 @@ type loopRegistry struct {
 	mu       sync.Mutex
 	running  bool
 	epicName string
+	done     int
+	total    int
 }
 
 var ralphLoopRegistry = &loopRegistry{}
 
 // tryStart claims the registry for a new run against epicName, returning
-// false if one is already in flight.
-func (r *loopRegistry) tryStart(epicName string) bool {
+// false if one is already in flight. done/total seed the cross-tab overlay's
+// (ticket 06) progress count from the epic's on-disk state at launch time,
+// since the live-event stream itself never reports a ticket total — only
+// runImplementLoop's drain loop advancing done as tickets land afterward.
+func (r *loopRegistry) tryStart(epicName string, done, total int) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.running {
@@ -53,6 +57,8 @@ func (r *loopRegistry) tryStart(epicName string) bool {
 	}
 	r.running = true
 	r.epicName = epicName
+	r.done = done
+	r.total = total
 	return true
 }
 
@@ -61,6 +67,32 @@ func (r *loopRegistry) finish() {
 	defer r.mu.Unlock()
 	r.running = false
 	r.epicName = ""
+	r.done = 0
+	r.total = 0
+}
+
+// recordTicketFinished advances the progress count by one landed ticket; see
+// runImplementLoop's drain loop, which calls this on every
+// LiveEventIterationFinished. Guarded by running so a stray call after
+// finish() (the drain goroutine's stop channel races finish() by design,
+// see runImplementLoop) can't resurrect a stale count.
+func (r *loopRegistry) recordTicketFinished() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.running {
+		r.done++
+	}
+}
+
+// LoopStatus reports ralphLoopRegistry's current state for the app shell's
+// cross-tab status overlay (ticket 06), which polls it the same way this
+// package's own OnPageActivated/handleImplementPoll do rather than
+// subscribing directly, since the app shell only routes tea.Msgs to the
+// active page.
+func LoopStatus() (running bool, epicName string, done, total int) {
+	ralphLoopRegistry.mu.Lock()
+	defer ralphLoopRegistry.mu.Unlock()
+	return ralphLoopRegistry.running, ralphLoopRegistry.epicName, ralphLoopRegistry.done, ralphLoopRegistry.total
 }
 
 // CanQuit implements the app shell's quit-guard duck type (see
@@ -126,7 +158,7 @@ func (m Model) handleImplementKey() (tea.Model, tea.Cmd) {
 	epic := m.epics[r.epicIdx]
 	m.confirm = m.confirm.Open(confirm.Options{
 		Prompt:    fmt.Sprintf("Start implementing epic %q?", epic.Name),
-		AcceptCmd: m.cmdStartImplement(epic.Name),
+		AcceptCmd: m.cmdStartImplement(epic.Name, epic.DoneCount(), epic.TotalCount()),
 	})
 	return m, nil
 }
@@ -201,10 +233,10 @@ func (m Model) OnPageActivated() tea.Cmd {
 // to an absolute path for the same reason runRalphLoop does). The launch's
 // own transcript/lifecycle detail isn't rendered yet (ticket 02's job) — a
 // discarding text sink is enough to satisfy the EventSink contract here.
-func (m Model) cmdStartImplement(epicName string) tea.Cmd {
+func (m Model) cmdStartImplement(epicName string, done, total int) tea.Cmd {
 	worktreeRoot := m.worktreeRoot
 	return func() tea.Msg {
-		if !ralphLoopRegistry.tryStart(epicName) {
+		if !ralphLoopRegistry.tryStart(epicName, done, total) {
 			return implementFailedMsg{err: fmt.Errorf("a ralph-loop is already running")}
 		}
 		opts, err := buildImplementRunOptions(worktreeRoot, epicName)
@@ -212,11 +244,35 @@ func (m Model) cmdStartImplement(epicName string) tea.Cmd {
 			ralphLoopRegistry.finish()
 			return implementFailedMsg{err: err}
 		}
-		go func() {
-			defer ralphLoopRegistry.finish()
-			_ = ralphloop.Run(opts, ralphloop.DefaultDeps(), ralphloop.NewTextEventSink(io.Discard))
-		}()
+		go runImplementLoop(opts)
 		return implementStartedMsg{epicName: epicName}
+	}
+}
+
+// runImplementLoop drains ralphloop's live-event stream just enough to
+// advance ralphLoopRegistry's done count (LoopStatus, ticket 06's cross-tab
+// overlay reads it) — a select-based drain with an explicit stop channel,
+// since ChannelEventSink is never closed by ralphloop.Run itself and ranging
+// over its channel would leak the drain goroutine forever.
+func runImplementLoop(opts ralphloop.RunOptions) {
+	defer ralphLoopRegistry.finish()
+	sink := ralphloop.NewChannelEventSink()
+	stop := make(chan struct{})
+	go drainLiveEvents(sink.Events(), stop)
+	_ = ralphloop.Run(opts, ralphloop.DefaultDeps(), sink)
+	close(stop)
+}
+
+func drainLiveEvents(events <-chan ralphloop.LiveEvent, stop <-chan struct{}) {
+	for {
+		select {
+		case ev := <-events:
+			if ev.Kind == ralphloop.LiveEventIterationFinished {
+				ralphLoopRegistry.recordTicketFinished()
+			}
+		case <-stop:
+			return
+		}
 	}
 }
 
