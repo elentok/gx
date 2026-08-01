@@ -1,7 +1,9 @@
 package ralphloop
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,7 +20,7 @@ import (
 // the doneRecoverable repair path, wiring just enough (a fresh FeatureLock,
 // no gate/resume-signal needed since repair never pauses in these fixtures)
 // for reconcile to run.
-func testReconcileParams(workspaceID string, paths reconcilePaths, report func(string, ...any)) reconcileParams {
+func testReconcileParams(workspaceID string, paths reconcilePaths, sink EventSink) reconcileParams {
 	return reconcileParams{
 		WorkspaceID: workspaceID,
 		Paths:       paths,
@@ -26,7 +28,7 @@ func testReconcileParams(workspaceID string, paths reconcilePaths, report func(s
 		SmartZone:   defaultSmartZone,
 		Gate:        newPauseGate(),
 		FeatureLock: &sync.Mutex{},
-		Report:      report,
+		Sink:        sink,
 	}
 }
 
@@ -44,7 +46,7 @@ func TestReconcile_ClaimedWithNoLiveTab_RevertsToOpen(t *testing.T) {
 		return nil, nil // no live tabs at all
 	}
 
-	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, func(string, ...any) {}), epics[0])
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(io.Discard)), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -75,7 +77,7 @@ func TestReconcile_ClaimedWithLiveTab_ReturnsReattached(t *testing.T) {
 		return []herdr.Tab{{Label: "iter-01", WorkspaceID: workspaceID}}, nil
 	}
 
-	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, func(string, ...any) {}), epics[0])
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(io.Discard)), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -107,7 +109,7 @@ func TestReconcile_NeedsAttentionWithLiveTab_ReturnsReattached(t *testing.T) {
 		return []herdr.Tab{{TabID: "tab-iter-01", Label: "iter-01", WorkspaceID: workspaceID}}, nil
 	}
 
-	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, func(string, ...any) {}), epics[0])
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(io.Discard)), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -124,7 +126,7 @@ func TestRun_NeedsAttentionWithoutLiveTab_DoesNotScheduleOtherTickets(t *testing
 	d, prompts, _ := fakeDeps()
 	d.TabList = func(string) ([]herdr.Tab, error) { return nil, nil }
 
-	err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &strings.Builder{})
+	err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&strings.Builder{}))
 	if err == nil || !strings.Contains(err.Error(), "paused") {
 		t.Fatalf("Run() error = %v, want actionable paused error", err)
 	}
@@ -154,7 +156,7 @@ func TestRun_RestartedNeedsAttentionRecoversThenResumesScheduling(t *testing.T) 
 		return 1, nil
 	}
 
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &strings.Builder{}); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&strings.Builder{})); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 	if len(*prompts) != 1 || !strings.HasSuffix((*prompts)[0], "02-open.md") {
@@ -182,7 +184,7 @@ func TestReconcile_OpenAndDoneTicketsIgnored(t *testing.T) {
 		return nil, nil
 	}
 
-	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, func(string, ...any) {}), epics[0])
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(io.Discard)), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -378,10 +380,8 @@ func TestReconcile_DoneTicketUnrecoverable_MarkedNeedsAttention(t *testing.T) {
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
 
-	var reports []string
-	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, func(format string, args ...any) {
-		reports = append(reports, fmt.Sprintf(format, args...))
-	}), epics[0])
+	var out bytes.Buffer
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(&out)), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -397,6 +397,7 @@ func TestReconcile_DoneTicketUnrecoverable_MarkedNeedsAttention(t *testing.T) {
 		t.Errorf("ticket not marked needs-attention:\n%s", raw)
 	}
 
+	reports := strings.Split(out.String(), "\n")
 	found := false
 	for _, r := range reports {
 		if strings.Contains(r, "ticket 03") && strings.Contains(r, "no iteration branch left") {
@@ -528,7 +529,7 @@ func TestRun_RestartWithClaimedTicketButNoLiveTab_RerunsFromScratch(t *testing.T
 	}
 
 	var out strings.Builder
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -568,7 +569,7 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 	}
 
 	var out strings.Builder
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -614,7 +615,7 @@ func TestRun_RestartWithClaimedTicketAlreadyIdle_SkipsWaitAndCherryPicks(t *test
 	}
 
 	var out strings.Builder
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -679,7 +680,7 @@ func TestRun_ReattachedClose_BackfillsContextAndSessionFromRunLog(t *testing.T) 
 	}
 
 	var out strings.Builder
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -713,7 +714,7 @@ func TestRun_ReattachedClose_NoPriorSessionInLog_OmitsMetadata(t *testing.T) {
 	}
 
 	var out strings.Builder
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -759,10 +760,8 @@ func TestReconcile_DoneTicketRecoverable_AutoRecherryPicksAndReports(t *testing.
 		return nil
 	}
 
-	var reports []string
-	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, func(format string, args ...any) {
-		reports = append(reports, fmt.Sprintf(format, args...))
-	}), epics[0])
+	var out bytes.Buffer
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(&out)), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -773,6 +772,7 @@ func TestReconcile_DoneTicketRecoverable_AutoRecherryPicksAndReports(t *testing.
 		t.Fatalf("CherryPickRange calls = %v, want exactly one re-cherry-pick", picked)
 	}
 
+	reports := strings.Split(out.String(), "\n")
 	found := false
 	for _, r := range reports {
 		if strings.Contains(r, "ticket 03") && strings.Contains(r, "restored") {
@@ -835,7 +835,7 @@ func TestReconcile_DoneTicketRecoverable_ConflictGoesThroughResolutionPath(t *te
 		return origAgentPrompt(opts)
 	}
 
-	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, func(string, ...any) {}), epics[0])
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(io.Discard)), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -881,7 +881,7 @@ func TestReconcile_DoneTicketRecoverable_CleansUpLeftoverWorktreeAndTab(t *testi
 		return nil
 	}
 
-	_, err = reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees", RepoDir: "/fake/repo"}, func(string, ...any) {}), epics[0])
+	_, err = reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees", RepoDir: "/fake/repo"}, NewTextEventSink(io.Discard)), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -937,10 +937,8 @@ func TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup(t *testing.T) 
 		return nil
 	}
 
-	var reports []string
-	_, err = reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees", RepoDir: "/fake/repo"}, func(format string, args ...any) {
-		reports = append(reports, fmt.Sprintf(format, args...))
-	}), epics[0])
+	var out bytes.Buffer
+	_, err = reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees", RepoDir: "/fake/repo"}, NewTextEventSink(&out)), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -963,6 +961,7 @@ func TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup(t *testing.T) 
 		t.Errorf("ticket status changed unexpectedly:\n%s", raw)
 	}
 
+	reports := strings.Split(out.String(), "\n")
 	found := false
 	for _, r := range reports {
 		if strings.Contains(r, "ticket 03") && strings.Contains(r, "finished the interrupted cleanup") {
@@ -1009,10 +1008,8 @@ func TestReconcile_DoneTicketFullyClean_NoOp(t *testing.T) {
 		return nil
 	}
 
-	var reports []string
-	_, err = reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees", RepoDir: "/fake/repo"}, func(format string, args ...any) {
-		reports = append(reports, fmt.Sprintf(format, args...))
-	}), epics[0])
+	var out bytes.Buffer
+	_, err = reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees", RepoDir: "/fake/repo"}, NewTextEventSink(&out)), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -1020,7 +1017,7 @@ func TestReconcile_DoneTicketFullyClean_NoOp(t *testing.T) {
 	if cleanupCalled {
 		t.Error("a fully-clean done ticket must not trigger any worktree/tab/branch cleanup call")
 	}
-	if len(reports) != 0 {
-		t.Errorf("reports = %v, want no spurious log lines for a fully-clean done ticket", reports)
+	if out.Len() != 0 {
+		t.Errorf("output = %q, want no spurious log lines for a fully-clean done ticket", out.String())
 	}
 }

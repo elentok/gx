@@ -136,7 +136,7 @@ func TestRun_LinearChain_RunsTicketsInOrderAndLandsAll(t *testing.T) {
 	d, prompts, removed := fakeDeps()
 
 	var out bytes.Buffer
-	err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out)
+	err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out))
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
@@ -184,7 +184,7 @@ func TestRun_IterationCompletion_DeletesIterationBranch(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -203,7 +203,7 @@ func TestRun_LogsLifecycleEvents_LinearChain(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -258,7 +258,7 @@ func TestRun_FreshIteration_StampsContextWindowAndSessionOnDone(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -292,7 +292,7 @@ func TestRun_FreshIteration_OmitsMetadataWhenOccupancyUnavailable(t *testing.T) 
 	}
 
 	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -322,7 +322,7 @@ func TestRun_LogsNeedsInfoEvent_OnZeroCommitIteration(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -357,7 +357,7 @@ func TestRun_InstallDepsFailure_SurfacesAsRunErrorWithoutLaunchingAgent(t *testi
 	}
 
 	var out bytes.Buffer
-	err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out)
+	err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out))
 	if err == nil {
 		t.Fatal("Run() error = nil, want the install failure surfaced")
 	}
@@ -379,7 +379,7 @@ func TestRun_LogsDepsInstalledEventWithCommand(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -408,7 +408,7 @@ func TestRun_SkillFlag_OverridesPromptSkill(t *testing.T) {
 	d, prompts, _ := fakeDeps()
 
 	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "my-epic", Skill: "tdd", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+	if err := Run(RunOptions{EpicName: "my-epic", Skill: "tdd", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -451,7 +451,7 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 			}
 
 			var out bytes.Buffer
-			err := Run(RunOptions{EpicName: "my-epic", Agent: tc.agent, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out)
+			err := Run(RunOptions{EpicName: "my-epic", Agent: tc.agent, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out))
 			if err != nil {
 				t.Fatalf("Run() error = %v", err)
 			}
@@ -486,7 +486,7 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 
 func TestRun_InvalidAgent_ReturnsError(t *testing.T) {
 	var out bytes.Buffer
-	err := Run(RunOptions{Agent: "other"}, Deps{}, &out)
+	err := Run(RunOptions{Agent: "other"}, Deps{}, NewTextEventSink(&out))
 	if err == nil || !strings.Contains(err.Error(), "must be claude or codex") {
 		t.Fatalf("Run() error = %v, want invalid-agent error", err)
 	}
@@ -499,7 +499,7 @@ func TestRun_ZeroOpenTickets_NoOpSummary(t *testing.T) {
 	d, prompts, removed := fakeDeps()
 
 	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -516,7 +516,7 @@ func TestRun_NoEpicFound_NoOpSummary(t *testing.T) {
 	d, _, _ := fakeDeps()
 
 	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "missing-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+	if err := Run(RunOptions{EpicName: "missing-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 	if !strings.Contains(out.String(), "nothing to do") {
@@ -536,7 +536,7 @@ func TestRun_MaxParallelOne_RunsSerially(t *testing.T) {
 	err := Run(RunOptions{
 		EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
 		MaxParallel: 1,
-	}, d, &out)
+	}, d, NewTextEventSink(&out))
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
@@ -669,7 +669,7 @@ func TestRun_CherryPickConflict_ResolvesInFeatureWorktreeThenCompletes(t *testin
 	}
 
 	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -747,7 +747,7 @@ func TestRun_CherryPickConflict_ResolutionNeverFinishes_SurfacesDistinctError(t 
 	}
 
 	var out bytes.Buffer
-	err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out)
+	err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out))
 	if err == nil {
 		t.Fatal("Run() error = nil, want an error surfacing the stuck conflict-resolution agent")
 	}
@@ -773,7 +773,7 @@ func TestRun_ZeroCommitIteration_MarksNeedsInfoAndLeavesWorktree(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -810,7 +810,7 @@ func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {
 	if err := Run(RunOptions{
 		EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
 		MaxParallel: 1,
-	}, d, &out); err != nil {
+	}, d, NewTextEventSink(&out)); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -940,7 +940,7 @@ func TestRun_MaxParallelTwo_RunsExactlyTwoConcurrentlyAndBackfills(t *testing.T)
 		errCh <- Run(RunOptions{
 			EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
 			MaxParallel: 2,
-		}, d, &out)
+		}, d, NewTextEventSink(&out))
 	}()
 
 	pane1 := <-started

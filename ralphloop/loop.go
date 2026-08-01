@@ -2,7 +2,6 @@ package ralphloop
 
 import (
 	"fmt"
-	"io"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -110,7 +109,7 @@ type RunOptions struct {
 // backfilled with the next frontier ticket. It exits once every ticket in
 // the epic reaches a done-family status, or immediately if the epic has none
 // to run.
-func Run(opts RunOptions, d Deps, out io.Writer) error {
+func Run(opts RunOptions, d Deps, sink EventSink) error {
 	agent := opts.Agent
 	if agent == "" {
 		agent = AgentClaude
@@ -141,11 +140,11 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 		return err
 	}
 	if initial == nil || len(initial.Tickets) == 0 {
-		fmt.Fprintf(out, "no tickets found for epic %q; nothing to do\n", opts.EpicName)
+		sink.NoTicketsFound(opts.EpicName)
 		return nil
 	}
 	if allSettled(*initial) {
-		fmt.Fprintf(out, "epic %q is already complete (%d/%d done)\n", opts.EpicName, initial.DoneCount(), initial.TotalCount())
+		sink.AlreadyComplete(opts.EpicName, initial.DoneCount(), initial.TotalCount())
 		return nil
 	}
 
@@ -169,16 +168,11 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 	// ticket. featureMu guards the one operation that mutates the shared
 	// feature worktree's working directory (the cherry-pick landing a
 	// finished iteration's commits), so concurrent iterations never cherry-
-	// pick into it at the same time. outMu guards out itself, since a paused
-	// iteration reports its pause/resume from its own goroutine.
+	// pick into it at the same time. sink is safe for concurrent use on its
+	// own (see EventSink), since a paused iteration reports its pause/resume
+	// from its own goroutine.
 	var scheduleMu sync.Mutex
 	var featureMu sync.Mutex
-	var outMu sync.Mutex
-	report := func(format string, args ...any) {
-		outMu.Lock()
-		defer outMu.Unlock()
-		fmt.Fprintf(out, format, args...)
-	}
 
 	gate := newPauseGate()
 	resumePath := resumeSignalPath(scratchDir, opts.EpicName)
@@ -213,6 +207,7 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 		if err := Claim(ticket.Path); err != nil {
 			return tickets.Ticket{}, false, fmt.Errorf("claiming ticket %s: %w", ticket.Identifier, err)
 		}
+		sink.TicketClaimed(ticket)
 		return ticket, true, nil
 	}
 
@@ -232,7 +227,7 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 				SmartZone:        smartZone,
 				Gate:             gate,
 				ResumeSignalPath: resumePath,
-				Report:           report,
+				Sink:             sink,
 			}
 			var err error
 			if reattach {
@@ -256,7 +251,7 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 		Gate:             gate,
 		ResumeSignalPath: resumePath,
 		FeatureLock:      &featureMu,
-		Report:           report,
+		Sink:             sink,
 	}, *initial)
 	if err != nil {
 		return err
@@ -309,11 +304,11 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 			return fmt.Errorf("ticket %s: %w", r.ticket.Identifier, r.err)
 		}
 
-		report("ticket %s %q landed on %s\n", r.ticket.Identifier, r.ticket.Title, opts.EpicName)
+		sink.IterationFinished(r.ticket, opts.EpicName)
 		completed++
 	}
 
-	report("ralph-loop %q complete: %d ticket(s) landed on %s\n", opts.EpicName, completed, opts.EpicName)
+	sink.EpicComplete(opts.EpicName, completed)
 	return nil
 }
 
@@ -378,8 +373,13 @@ type iterationParams struct {
 	// ResumeSignalPath is where a paused iteration polls for `gx ralph-loop
 	// resume`.
 	ResumeSignalPath string
-	// Report writes a line to the loop's output, safe to call concurrently
-	// from any iteration's goroutine.
+	// Sink receives this Run call's lifecycle events, safe to call
+	// concurrently from any iteration's goroutine.
+	Sink EventSink
+	// Report writes a line to the loop's output, safe to call concurrently.
+	// Nil (a no-op) when driven through Run, which has no legacy text sink to
+	// source one from — see launchAndPromptParams.Report for why this
+	// package still carries the field forward instead of dropping it.
 	Report func(format string, args ...any)
 }
 
@@ -401,7 +401,7 @@ func (p iterationParams) launchAndPromptParams(label, pane, tab, prompt, session
 		SmartZone:        p.SmartZone,
 		Gate:             p.Gate,
 		ResumeSignalPath: p.ResumeSignalPath,
-		Report:           p.Report,
+		Sink:             p.Sink,
 		Ticket:           p.Ticket.Identifier,
 		TicketPath:       p.Ticket.Path,
 		ScratchDir:       p.ScratchDir,
@@ -542,7 +542,9 @@ func reattachIteration(d Deps, p iterationParams) error {
 		// the agent may have finished while the previous invocation was down,
 		// with no further status transition ever coming, so waitForFinish's
 		// AgentWait poll would have nothing new to observe.
-		p.Report("%s already finished at reattach; skipping wait\n", label)
+		if p.Report != nil {
+			p.Report("%s already finished at reattach; skipping wait\n", label)
+		}
 		launchParams.logLifecycleEvent(launchParams.FinishEvent, "")
 	} else if err := waitForFinish(d, launchParams, ""); err != nil {
 		return fmt.Errorf("waiting for reattached agent %s to finish: %w", label, err)
@@ -552,7 +554,10 @@ func reattachIteration(d Deps, p iterationParams) error {
 			return fmt.Errorf("restoring ticket to claimed: %w", err)
 		}
 		p.Gate.resumeLabel(label)
-		p.Report("resumed %s after restart recheck\n", label)
+		p.Sink.IterationResumed(label, PauseSmartZone)
+		if p.Report != nil {
+			p.Report("resumed %s after restart recheck\n", label)
+		}
 		launchParams.logLifecycleEvent(eventResumed, "")
 	}
 
@@ -808,7 +813,16 @@ type launchAndPromptParams struct {
 	// ResumeSignalPath is where a paused agent polls for `gx ralph-loop
 	// resume`.
 	ResumeSignalPath string
+	// Sink receives this Run call's lifecycle events, safe to call
+	// concurrently.
+	Sink EventSink
 	// Report writes a line to the loop's output, safe to call concurrently.
+	// Only the Codex quota-exhaustion and operator-intervention pause paths
+	// (recoverCodexRateLimit, waitForAttentionRecovery) still read this — the
+	// rest of the package reports through Sink instead. Run itself has no
+	// legacy text sink to source one from, so it leaves this nil (report()
+	// below no-ops on a nil Report); tests exercising those two paths in
+	// isolation set it directly.
 	Report func(format string, args ...any)
 
 	// Ticket, TicketPath, ScratchDir, and EpicName locate the run-log.jsonl entries this
@@ -854,6 +868,16 @@ func (p launchAndPromptParams) report(format string, args ...any) {
 	p.Report(format, args...)
 }
 
+// sink returns p.Sink, or a no-op EventSink when unset — tests that build a
+// launchAndPromptParams directly to exercise pause/resume plumbing in
+// isolation don't always wire one up.
+func (p launchAndPromptParams) sink() EventSink {
+	if p.Sink == nil {
+		return noopEventSink{}
+	}
+	return p.Sink
+}
+
 // launchAndPrompt runs the shared agent lifecycle protocol: launch the agent in
 // Pane, wait for it to reach idle, send Prompt and wait for it to start
 // working, then wait for it to finish (idle or done) — pausing the whole
@@ -870,6 +894,9 @@ func launchAndPrompt(d Deps, p launchAndPromptParams) (string, error) {
 		return "", fmt.Errorf("launching %s: %w", p.Agent, err)
 	}
 	p.logLifecycleEvent(p.StartEvent, agent.AgentSession)
+	if p.StartEvent != "" {
+		p.sink().IterationStarted(p.Ticket, p.Label)
+	}
 
 	if _, err := d.AgentWait(herdr.AgentWaitOptions{
 		Target: p.Pane,
@@ -995,11 +1022,11 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 						reason = fmt.Sprintf("rate limit detected, resets %s", token)
 					}
 					p.Gate.pause(p.Label, reason)
-					p.report("paused %s: %s; waiting for automatic reset\n", p.Label, reason)
+					p.sink().IterationPaused(p.Label, PauseRateLimit, reason)
 					p.logAgentEvent(eventPausedRateLimit, sessionID, reason)
 					waitForRateLimitReset(d, p.Pane, token)
 					p.Gate.resumeLabel(p.Label)
-					p.report("resumed %s after rate-limit reset\n", p.Label)
+					p.sink().IterationResumed(p.Label, PauseRateLimit)
 					p.logLifecycleEvent(eventResumed, sessionID)
 
 					if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
@@ -1026,10 +1053,10 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 		}
 		reason := fmt.Sprintf("context occupancy %d exceeds --smart-zone %d", occupancy, smartZone)
 		p.Gate.pause(p.Label, reason)
-		p.report("paused %s: %s; run `gx ralph-loop resume` to continue\n", p.Label, reason)
+		p.sink().IterationPaused(p.Label, PauseSmartZone, reason)
 		p.logAgentEvent(eventPausedSmartZone, sessionID, reason)
 		p.Gate.waitForResume(d, p.ResumeSignalPath)
-		p.report("resumed %s\n", p.Label)
+		p.sink().IterationResumed(p.Label, PauseSmartZone)
 		p.logLifecycleEvent(eventResumed, sessionID)
 		elapsedMs = 0
 	}

@@ -40,7 +40,9 @@ type reconcileParams struct {
 	Gate             *pauseGate
 	ResumeSignalPath string
 	FeatureLock      *sync.Mutex
-	Report           func(string, ...any)
+	// Sink receives this Run call's lifecycle events, safe to call
+	// concurrently.
+	Sink EventSink
 }
 
 // reconcile derives in-flight iteration state from ticket Status: plus live
@@ -57,7 +59,7 @@ type reconcileParams struct {
 // here, not repaired: that's later tickets' job.
 func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket, error) {
 	paths := rp.Paths
-	report := rp.Report
+	sink := rp.Sink
 	tabs, err := d.TabList(rp.WorkspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("listing tabs for crash/restart reconciliation: %w", err)
@@ -72,10 +74,10 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 		status := strings.ToLower(strings.TrimSpace(t.Status))
 		if status == "needs-attention" {
 			if live[iterLabel(t.Identifier)] {
-				report("ticket %s: reattaching to needs-attention iteration %s\n", t.Identifier, iterLabel(t.Identifier))
+				sink.TicketReattached(t.Identifier, iterLabel(t.Identifier))
 				reattached = append(reattached, t)
 			} else {
-				report("ticket %s still needs attention; no live iteration found\n", t.Identifier)
+				sink.TicketStillNeedsAttention(t.Identifier)
 			}
 			continue
 		}
@@ -86,10 +88,10 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 			if err := SetStatus(t.Path, "open"); err != nil {
 				return nil, fmt.Errorf("reverting ticket %s to open: %w", t.Identifier, err)
 			}
-			report("ticket %s: no live iteration found on restart; reverted to open\n", t.Identifier)
+			sink.TicketReverted(t.Identifier)
 			continue
 		}
-		report("ticket %s: reattaching to live iteration %s\n", t.Identifier, iterLabel(t.Identifier))
+		sink.TicketReattached(t.Identifier, iterLabel(t.Identifier))
 		reattached = append(reattached, t)
 	}
 
@@ -113,7 +115,7 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 			if err := finishStaleCleanup(d, rp, t, tabs); err != nil {
 				return nil, fmt.Errorf("finishing interrupted cleanup for done ticket %s: %w", t.Identifier, err)
 			}
-			report("ticket %s: done and commits landed, but leftover iteration state was never cleaned up; finished the interrupted cleanup\n", t.Identifier)
+			sink.TicketCleanupFinished(t.Identifier)
 		case doneRecoverable:
 			if err := repairRecoverableTicket(d, rp, epic.Name, t, tabs); err != nil {
 				return nil, fmt.Errorf("repairing done ticket %s: %w", t.Identifier, err)
@@ -122,7 +124,7 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 			if err := markDoneTicketUnrecoverable(paths, epic.Name, t); err != nil {
 				return nil, fmt.Errorf("flagging unrecoverable done ticket %s: %w", t.Identifier, err)
 			}
-			report("ticket %s: done but commits missing from %s and no iteration branch left to recover them; marked needs-attention\n", t.Identifier, epic.Name)
+			sink.TicketUnrecoverable(t.Identifier, epic.Name)
 		}
 	}
 
@@ -166,7 +168,7 @@ func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t
 		SmartZone:        rp.SmartZone,
 		Gate:             rp.Gate,
 		ResumeSignalPath: rp.ResumeSignalPath,
-		Report:           rp.Report,
+		Sink:             rp.Sink,
 	}
 
 	landedSHA, err := landCherryPick(d, p, base, branch, "", "", "")
@@ -175,7 +177,7 @@ func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t
 	}
 
 	p.logTicketEventSHA(eventCherryPicked, "", "", "", path, "", landedSHA)
-	rp.Report("ticket %s: done but commits were missing from %s; auto re-cherry-picked from iteration branch %s and restored (%s)\n", t.Identifier, featureBranch, branch, landedSHA)
+	rp.Sink.TicketRecovered(t.Identifier, featureBranch, branch, landedSHA)
 
 	// Branch deletion is left to finishStaleCleanup/finishCleanup elsewhere:
 	// this repair just re-landed the commits, so the branch that held them

@@ -58,7 +58,7 @@ func runRalphLoop(epicName, agent, skill string, maxParallel, smartZone int, d d
 		ScratchDir:  filepath.Join(cwd, ".scratch"),
 		MaxParallel: maxParallel,
 		SmartZone:   smartZone,
-	}, ralphloop.DefaultDeps(), d.stdout)
+	}, ralphloop.DefaultDeps(), ralphloop.NewTextEventSink(d.stdout))
 }
 
 func newRalphLoopResumeCmd(d deps) *cobra.Command {
