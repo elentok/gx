@@ -100,6 +100,12 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		CherryPickInProgress: func(dir string) (bool, error) {
 			return false, nil
 		},
+		IsAncestor: func(dir, ancestor, descendant string) (bool, error) {
+			return true, nil
+		},
+		WorktreeExists: func(path string) (bool, error) {
+			return false, nil
+		},
 		InstallDeps: func(path string) (string, error) {
 			return "", nil
 		},

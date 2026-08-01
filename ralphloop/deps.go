@@ -44,6 +44,14 @@ type Deps struct {
 	CommitsAhead         func(dir, fromExclusive, toRef string) (int, error)
 	CherryPickRange      func(dir, fromExclusive, toInclusive string) error
 	CherryPickInProgress func(dir string) (bool, error)
+	// IsAncestor reports whether ancestor is reachable from descendant, used
+	// by startup reconciliation to confirm a done ticket's recorded landed
+	// commit (Event.SHA) is still on the feature branch.
+	IsAncestor func(dir, ancestor, descendant string) (bool, error)
+	// WorktreeExists reports whether an iteration worktree still exists at
+	// path, used by startup reconciliation to detect leftover state a crash
+	// left uncleaned.
+	WorktreeExists func(path string) (bool, error)
 	// InstallDeps detects the package manager of a freshly created iteration
 	// worktree at path (from marker files at its root) and runs its
 	// non-interactive install/sync command before the agent is launched.
@@ -92,6 +100,8 @@ func DefaultDeps() Deps {
 		CommitsAhead:          git.CommitsAhead,
 		CherryPickRange:       git.CherryPickRange,
 		CherryPickInProgress:  git.CherryPickInProgress,
+		IsAncestor:            git.IsAncestor,
+		WorktreeExists:        worktreeExists,
 		InstallDeps:           InstallDependencies,
 		ReadOccupancy:         transcript.LastAssistantOccupancy,
 		ReadCodexContext:      codexsession.LastContextTokens,
@@ -132,6 +142,19 @@ func removeWorktree(repoDir, path string, force bool) error {
 		return err
 	}
 	return git.RemoveWorktree(*repo, path, force)
+}
+
+// worktreeExists implements Deps.WorktreeExists: whether an iteration
+// worktree directory still exists at path.
+func worktreeExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
 }
 
 // depsMarkers maps a package-manager marker file, checked in this order at

@@ -232,7 +232,7 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 	completed := 0
 	active := 0
 
-	reattached, err := reconcile(d, workspaceID, *initial, report)
+	reattached, err := reconcile(d, workspaceID, reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: featurePath, WorktreeDir: wtDir}, *initial, report)
 	if err != nil {
 		return err
 	}
@@ -395,6 +395,13 @@ func (p iterationParams) logTicketEvent(eventType, pane, tab, agentSession, cwd 
 // carry one (currently only deps-installed, whose Reason is the install
 // command run).
 func (p iterationParams) logTicketEventReason(eventType, pane, tab, agentSession, cwd, reason string) {
+	p.logTicketEventSHA(eventType, pane, tab, agentSession, cwd, reason, "")
+}
+
+// logTicketEventSHA is logTicketEventReason plus a SHA, for the
+// cherry-picked event — the feature branch's landed tip, recorded so startup
+// reconciliation can later confirm it's still reachable (see Event.SHA).
+func (p iterationParams) logTicketEventSHA(eventType, pane, tab, agentSession, cwd, reason, sha string) {
 	_ = logEvent(p.ScratchDir, p.FeatureBranch, Event{
 		Type:         eventType,
 		Ticket:       p.Ticket.Number,
@@ -402,6 +409,7 @@ func (p iterationParams) logTicketEventReason(eventType, pane, tab, agentSession
 		Pane:         pane,
 		Tab:          tab,
 		AgentSession: agentSession,
+		SHA:          sha,
 		Cwd:          cwd,
 		Reason:       reason,
 	})
@@ -541,11 +549,22 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 
 	p.FeatureLock.Lock()
 	err = cherryPickWithConflictResolution(d, p, base, branch, sessionID, pane, tab)
+	var landedSHA string
+	var revErr error
+	if err == nil {
+		// Resolved while still holding FeatureLock, before another iteration's
+		// cherry-pick can advance the tip past this one's — otherwise the
+		// recorded SHA could belong to a different ticket entirely.
+		landedSHA, revErr = d.RevParse(p.FeatureWorktree, "HEAD")
+	}
 	p.FeatureLock.Unlock()
 	if err != nil {
 		return err
 	}
-	p.logTicketEvent(eventCherryPicked, pane, tab, sessionID, path)
+	if revErr != nil {
+		return fmt.Errorf("resolving landed commit on %s: %w", p.FeatureBranch, revErr)
+	}
+	p.logTicketEventSHA(eventCherryPicked, pane, tab, sessionID, path, "", landedSHA)
 
 	if err := MarkDone(p.Ticket.Path); err != nil {
 		return fmt.Errorf("marking ticket done: %w", err)

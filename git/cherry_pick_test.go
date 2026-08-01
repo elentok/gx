@@ -157,6 +157,53 @@ func TestCommitsAhead_ZeroWhenNoNewCommits(t *testing.T) {
 	}
 }
 
+func TestIsAncestor_True(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+
+	base, err := git.RevParse(dir, "HEAD")
+	if err != nil {
+		t.Fatalf("RevParse: %v", err)
+	}
+	testutil.WriteFile(t, dir, "a.txt", "a\n")
+	testutil.CommitAll(t, dir, "add a")
+
+	ok, err := git.IsAncestor(dir, base, "HEAD")
+	if err != nil {
+		t.Fatalf("IsAncestor: %v", err)
+	}
+	if !ok {
+		t.Error("IsAncestor() = false, want true for a real ancestor")
+	}
+}
+
+func TestIsAncestor_False(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+
+	base, err := git.RevParse(dir, "HEAD")
+	if err != nil {
+		t.Fatalf("RevParse: %v", err)
+	}
+	testutil.MustGitExported(t, dir, "checkout", "-b", "other", base)
+	testutil.WriteFile(t, dir, "a.txt", "a\n")
+	testutil.CommitAll(t, dir, "add a")
+	other, err := git.RevParse(dir, "HEAD")
+	if err != nil {
+		t.Fatalf("RevParse: %v", err)
+	}
+
+	testutil.MustGitExported(t, dir, "checkout", "-b", "feature", base)
+
+	ok, err := git.IsAncestor(dir, other, "feature")
+	if err != nil {
+		t.Fatalf("IsAncestor: %v", err)
+	}
+	if ok {
+		t.Error("IsAncestor() = true, want false when the commit was never merged in")
+	}
+}
+
 func TestCherryPickInProgress_FalseOutsideCherryPick(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)

@@ -44,6 +44,13 @@ type Event struct {
 	// session-data lookup key alongside AgentSession.
 	Cwd    string `json:"cwd,omitempty"`
 	Reason string `json:"reason,omitempty"`
+	// SHA is the feature branch's tip commit right after a cherry-picked
+	// event landed a ticket's iteration. Recorded because CherryPickRange
+	// creates fresh commits (different hashes than the iteration branch's
+	// originals), so it's the only durable record startup reconciliation can
+	// check for reachability from the feature branch's later tip — the
+	// iteration branch itself isn't guaranteed to still exist by then.
+	SHA string `json:"sha,omitempty"`
 }
 
 // eventLogMu serializes appends across every goroutine in the process (each

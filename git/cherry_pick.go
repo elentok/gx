@@ -35,6 +35,22 @@ func CommitsAhead(dir, fromExclusive, toRef string) (int, error) {
 	return n, nil
 }
 
+// IsAncestor reports whether ancestor is an ancestor of (or equal to)
+// descendant (git merge-base --is-ancestor). Unlike MergeBase, it needs no
+// second call to compare a computed common ancestor back against a specific
+// commit — the common check behind confirming a commit that was cherry-
+// picked elsewhere is actually reachable from a branch's current tip.
+func IsAncestor(dir, ancestor, descendant string) (bool, error) {
+	_, _, err := run(dir, []string{"merge-base", "--is-ancestor", ancestor, descendant})
+	if err == nil {
+		return true, nil
+	}
+	if runErr, ok := err.(*RunError); ok && runErr.Code == 1 {
+		return false, nil
+	}
+	return false, err
+}
+
 // CherryPickRange cherry-picks the commit range fromExclusive..toInclusive
 // (in order) onto dir's current branch via `git cherry-pick`. On a conflict,
 // the returned error is a *RunError and dir is left mid-cherry-pick with
