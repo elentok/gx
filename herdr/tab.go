@@ -66,6 +66,17 @@ func TabList(workspaceID string) ([]Tab, error) {
 	return result.Tabs, nil
 }
 
+// TabFocus focuses tabID via `herdr tab focus`, returning the now-focused tab.
+func TabFocus(tabID string) (Tab, error) {
+	var result struct {
+		Tab Tab `json:"tab"`
+	}
+	if err := runJSON([]string{"tab", "focus", tabID}, &result); err != nil {
+		return Tab{}, err
+	}
+	return result.Tab, nil
+}
+
 // TabClose closes tabID via `herdr tab close`.
 func TabClose(tabID string) error {
 	_, err := run("tab", "close", tabID)

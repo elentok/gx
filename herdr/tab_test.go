@@ -98,3 +98,46 @@ func TestTabList_CommandError_Propagates(t *testing.T) {
 		t.Fatal("TabList() error = nil, want error")
 	}
 }
+
+func TestTabFocus_ParsesResult(t *testing.T) {
+	var gotArgs []string
+	withFakeCommand(t, func(args ...string) ([]byte, error) {
+		gotArgs = args
+		return []byte(`{"result":{
+			"type":"tab_focused",
+			"tab":{"tab_id":"wE:t9","workspace_id":"wE","number":9,"label":"iter-01","focused":true,"pane_count":1,"agent_status":"idle"}
+		}}`), nil
+	})
+	got, err := TabFocus("wE:t9")
+	if err != nil {
+		t.Fatalf("TabFocus() error = %v", err)
+	}
+	want := Tab{
+		TabID:       "wE:t9",
+		WorkspaceID: "wE",
+		Number:      9,
+		Label:       "iter-01",
+		Focused:     true,
+		PaneCount:   1,
+		AgentStatus: "idle",
+	}
+	if got != want {
+		t.Fatalf("TabFocus() = %+v, want %+v", got, want)
+	}
+	if strings.Join(gotArgs, " ") != "tab focus wE:t9" {
+		t.Fatalf("TabFocus() args = %v", gotArgs)
+	}
+}
+
+func TestTabFocus_TabNotFound_Propagates(t *testing.T) {
+	withFakeCommand(t, func(args ...string) ([]byte, error) {
+		return []byte(`{"error":{"type":"tab_not_found"}}`), errors.New("exit 1")
+	})
+	_, err := TabFocus("wE:t404")
+	if err == nil {
+		t.Fatal("TabFocus() error = nil, want error")
+	}
+	if !strings.Contains(err.Error(), "tab_not_found") {
+		t.Fatalf("TabFocus() error = %v, want to contain tab_not_found", err)
+	}
+}
