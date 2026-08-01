@@ -17,6 +17,7 @@ import (
 var (
 	bannerPausedStyle    = lipgloss.NewStyle().Bold(true).Foreground(ui.ColorMauve)
 	bannerAttentionStyle = lipgloss.NewStyle().Bold(true).Foreground(ui.ColorOrange)
+	epicDoneStyle        = lipgloss.NewStyle().Bold(true).Foreground(ui.ColorGreen)
 )
 
 // bannerLine returns the paused/needs-attention banner text for the first
@@ -61,11 +62,30 @@ func (m FlatModel) footerLineCount() int {
 	return 1
 }
 
+// epicStatusText is the persistent epic-completion indicator shown on the
+// footer's plain line ("Epic: N/M done" or "Epic complete"), visible
+// regardless of scroll position. "" before the epic has loaded/resolved, or
+// for a zero-ticket epic (still being scaffolded — not "all done", see
+// tickets.Epic.AllDone).
+func (m FlatModel) epicStatusText() string {
+	if !m.loaded || !m.found || m.epic.TotalCount() == 0 {
+		return ""
+	}
+	if m.epic.AllDone() {
+		return epicDoneStyle.Render("Epic complete")
+	}
+	return ui.StyleHint.Render(fmt.Sprintf("Epic: %d/%d done", m.epic.DoneCount(), m.epic.TotalCount()))
+}
+
 // footerView renders the bottom of the screen: the banner line, if either
 // live state is present, stacked above the plain keyhints line every other
-// ui tab uses (".ai/index.md": no keymaps on the statusbar, only "? help").
+// ui tab uses (".ai/index.md": no keymaps on the statusbar, only "? help"),
+// with the epic-status indicator folded into that same plain line.
 func (m FlatModel) footerView() string {
 	help := "  " + ui.StyleHint.Render("? help")
+	if epic := m.epicStatusText(); epic != "" {
+		help = "  " + epic + "   " + ui.StyleHint.Render("? help")
+	}
 	if banner := m.bannerLine(); banner != "" {
 		return lipgloss.JoinVertical(lipgloss.Left, "  "+banner, help)
 	}
