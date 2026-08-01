@@ -150,6 +150,7 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 				FeatureBranch:    opts.EpicName,
 				Skill:            opts.Skill,
 				Ticket:           ticket,
+				ScratchDir:       scratchDir,
 				FeatureLock:      &featureMu,
 				SmartZone:        smartZone,
 				Gate:             gate,
@@ -254,6 +255,11 @@ type iterationParams struct {
 	FeatureBranch   string
 	Skill           string
 	Ticket          tickets.Ticket
+	// ScratchDir locates this run's run-log.jsonl (see eventlog.go);
+	// logEvent no-ops if it's empty. The epic name half of that path is
+	// FeatureBranch, not a separate field — Run names the feature branch
+	// after the epic, so the two are always the same value.
+	ScratchDir string
 	// FeatureLock serializes the only step that mutates the shared feature
 	// worktree's working directory (cherry-picking a finished iteration's
 	// commits onto it), so concurrently-running iterations never do so at
@@ -277,18 +283,42 @@ type iterationParams struct {
 // launchAndPromptParams builds the launchAndPrompt call for one pane in this
 // iteration (the iteration's own pane, or its conflict-resolution pane),
 // carrying over the smart-zone guardrail fields every pane in an iteration
-// shares.
-func (p iterationParams) launchAndPromptParams(label, pane, prompt, sessionCwd string) launchAndPromptParams {
+// shares. startEvent/finishEvent name the run-log event types logged when
+// the agent starts/finishes (see eventlog.go); pass "" for either to skip
+// logging that transition (the conflict-resolution pane logs conflict-hit/
+// conflict-resolved itself instead, around the generic start/finish here).
+func (p iterationParams) launchAndPromptParams(label, pane, tab, prompt, sessionCwd, startEvent, finishEvent string) launchAndPromptParams {
 	return launchAndPromptParams{
 		Label:            label,
 		Pane:             pane,
+		Tab:              tab,
 		Prompt:           prompt,
 		SessionCwd:       sessionCwd,
 		SmartZone:        p.SmartZone,
 		Gate:             p.Gate,
 		ResumeSignalPath: p.ResumeSignalPath,
 		Report:           p.Report,
+		Ticket:           p.Ticket.Number,
+		ScratchDir:       p.ScratchDir,
+		EpicName:         p.FeatureBranch,
+		StartEvent:       startEvent,
+		FinishEvent:      finishEvent,
 	}
+}
+
+// logTicketEvent appends eventType to p's run-log with p's ticket number
+// plus the given pane/tab/session/cwd — the shared shape behind every event
+// this package logs outside launchAndPrompt's own generic start/finish pair
+// (needs-info, cherry-picked, conflict-hit, conflict-resolved).
+func (p iterationParams) logTicketEvent(eventType, pane, tab, agentSession, cwd string) {
+	_ = logEvent(p.ScratchDir, p.FeatureBranch, Event{
+		Type:         eventType,
+		Ticket:       p.Ticket.Number,
+		Pane:         pane,
+		Tab:          tab,
+		AgentSession: agentSession,
+		Cwd:          cwd,
+	})
 }
 
 // runIteration drives one ticket through the full iteration lifecycle:
@@ -318,12 +348,13 @@ func runIteration(d Deps, p iterationParams) error {
 	}
 
 	prompt := fmt.Sprintf("/%s %s", p.Skill, p.Ticket.Path)
-	launchParams := p.launchAndPromptParams(label, iterWT.PaneID, prompt, iterWT.Path)
-	if err := launchAndPrompt(d, launchParams); err != nil {
+	launchParams := p.launchAndPromptParams(label, iterWT.PaneID, iterWT.TabID, prompt, iterWT.Path, eventIterationStarted, eventIterationFinished)
+	sessionID, err := launchAndPrompt(d, launchParams)
+	if err != nil {
 		return err
 	}
 
-	return finishIteration(d, p, iterWT, base, branch)
+	return finishIteration(d, p, iterWT, base, branch, sessionID)
 }
 
 // reattachIteration resumes a ticket left `Status: claimed` by a prior
@@ -356,21 +387,26 @@ func reattachIteration(d Deps, p iterationParams) error {
 	}
 
 	// No AgentStart was made this invocation, so there's no fresh
-	// agent_session id to check smart-zone occupancy against; the reattached
-	// wait simply re-observes idle/done without that guardrail.
-	launchParams := p.launchAndPromptParams(label, iterWT.PaneID, "", iterWT.Path)
+	// agent_session id to check smart-zone occupancy against, or to attach to
+	// this ticket's later needs-info/cherry-picked events; the reattached
+	// wait simply re-observes idle/done without that guardrail. StartEvent is
+	// left empty for the same reason (no fresh launch happened here to log).
+	launchParams := p.launchAndPromptParams(label, iterWT.PaneID, iterWT.TabID, "", iterWT.Path, "", eventIterationFinished)
 	if err := waitForFinish(d, launchParams, ""); err != nil {
 		return fmt.Errorf("waiting for reattached agent %s to finish: %w", label, err)
 	}
 
-	return finishIteration(d, p, iterWT, base, branch)
+	return finishIteration(d, p, iterWT, base, branch, "")
 }
 
 // finishIteration lands a finished iteration's commits (or marks it
 // needs-info if it produced none), then removes its worktree on success —
 // the shared tail of both the fresh (runIteration) and reattached
-// (reattachIteration) iteration lifecycles.
-func finishIteration(d Deps, p iterationParams, iterWT herdr.Worktree, base, branch string) error {
+// (reattachIteration) iteration lifecycles. sessionID is the iteration
+// agent's Claude Code session (empty for a reattached iteration, which made
+// no fresh AgentStart call this invocation), attached to the needs-info/
+// cherry-picked events logged here.
+func finishIteration(d Deps, p iterationParams, iterWT herdr.Worktree, base, branch, sessionID string) error {
 	ahead, err := d.CommitsAhead(iterWT.Path, base, branch)
 	if err != nil {
 		return fmt.Errorf("counting commits ahead of %s: %w", base, err)
@@ -382,15 +418,17 @@ func finishIteration(d Deps, p iterationParams, iterWT herdr.Worktree, base, bra
 		if err := MarkNeedsInfo(p.Ticket.Path); err != nil {
 			return fmt.Errorf("marking ticket needs-info: %w", err)
 		}
+		p.logTicketEvent(eventNeedsInfo, iterWT.PaneID, iterWT.TabID, sessionID, iterWT.Path)
 		return nil
 	}
 
 	p.FeatureLock.Lock()
-	err = cherryPickWithConflictResolution(d, p, base, branch)
+	err = cherryPickWithConflictResolution(d, p, base, branch, sessionID, iterWT)
 	p.FeatureLock.Unlock()
 	if err != nil {
 		return err
 	}
+	p.logTicketEvent(eventCherryPicked, iterWT.PaneID, iterWT.TabID, sessionID, iterWT.Path)
 
 	if err := MarkDone(p.Ticket.Path); err != nil {
 		return fmt.Errorf("marking ticket done: %w", err)
@@ -412,8 +450,13 @@ const conflictResolutionTimeoutMs = 30 * 60 * 1000
 // p.FeatureWorktree. On a conflict, it launches a fresh pane in the feature
 // worktree (where the conflict markers are, not the iteration worktree),
 // sends "/resolving-merge-conflicts", and waits for that agent to finish
-// before confirming the cherry-pick sequence completed.
-func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch string) error {
+// before confirming the cherry-pick sequence completed. sessionID/iterWT
+// attach the iteration agent's own session to the conflict-hit event (the
+// resolution agent hasn't launched yet at that point); conflict-resolved is
+// instead attributed to the resolution agent's own distinct session, so its
+// cost/occupancy are counted too rather than silently dropped from the
+// report.
+func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, sessionID string, iterWT herdr.Worktree) error {
 	pickErr := d.CherryPickRange(p.FeatureWorktree, base, branch)
 	if pickErr == nil {
 		return nil
@@ -426,8 +469,10 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch st
 	if !inProgress {
 		return fmt.Errorf("cherry-picking onto %s: %w", p.FeatureBranch, pickErr)
 	}
+	p.logTicketEvent(eventConflictHit, iterWT.PaneID, iterWT.TabID, sessionID, iterWT.Path)
 
-	if err := resolveCherryPickConflict(d, p); err != nil {
+	resolutionSessionID, err := resolveCherryPickConflict(d, p)
+	if err != nil {
 		return err
 	}
 
@@ -438,13 +483,15 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch st
 	if inProgress {
 		return fmt.Errorf("cherry-pick onto %s still in progress after conflict-resolution agent finished", p.FeatureBranch)
 	}
+	p.logTicketEvent(eventConflictResolved, "", "", resolutionSessionID, p.FeatureWorktree)
 	return nil
 }
 
 // resolveCherryPickConflict launches a fresh pane in the feature worktree and
-// drives a "/resolving-merge-conflicts" agent to completion in it. The
-// iteration's own worktree/tab are untouched while this runs.
-func resolveCherryPickConflict(d Deps, p iterationParams) error {
+// drives a "/resolving-merge-conflicts" agent to completion in it, returning
+// its Claude Code session id. The iteration's own worktree/tab are untouched
+// while this runs.
+func resolveCherryPickConflict(d Deps, p iterationParams) (string, error) {
 	label := conflictLabel(p.Ticket.Number)
 
 	tab, err := d.TabCreate(herdr.TabCreateOptions{
@@ -453,22 +500,24 @@ func resolveCherryPickConflict(d Deps, p iterationParams) error {
 		Label:       label,
 	})
 	if err != nil {
-		return fmt.Errorf("creating conflict-resolution pane: %w", err)
+		return "", fmt.Errorf("creating conflict-resolution pane: %w", err)
 	}
 
-	launchParams := p.launchAndPromptParams(label, tab.RootPaneID, "/resolving-merge-conflicts", p.FeatureWorktree)
+	launchParams := p.launchAndPromptParams(label, tab.RootPaneID, tab.TabID, "/resolving-merge-conflicts", p.FeatureWorktree, "", "")
 	launchParams.FinishTimeoutMs = conflictResolutionTimeoutMs
-	if err := launchAndPrompt(d, launchParams); err != nil {
-		return fmt.Errorf("conflict-resolution agent %s did not finish (possibly stuck): %w", label, err)
+	sessionID, err := launchAndPrompt(d, launchParams)
+	if err != nil {
+		return "", fmt.Errorf("conflict-resolution agent %s did not finish (possibly stuck): %w", label, err)
 	}
 
-	return nil
+	return sessionID, nil
 }
 
 // launchAndPromptParams are the per-call inputs to launchAndPrompt.
 type launchAndPromptParams struct {
 	Label  string // agent name/tab label, used in error messages
 	Pane   string // pane id to launch claude in and send the prompt to
+	Tab    string // tab id owning Pane, recorded on logged events
 	Prompt string // initial slash-command prompt text
 
 	// FinishTimeoutMs bounds the final "wait for the agent to finish" step, so
@@ -488,6 +537,32 @@ type launchAndPromptParams struct {
 	ResumeSignalPath string
 	// Report writes a line to the loop's output, safe to call concurrently.
 	Report func(format string, args ...any)
+
+	// Ticket, ScratchDir, and EpicName locate the run-log.jsonl entries this
+	// call logs (see eventlog.go).
+	Ticket     int
+	ScratchDir string
+	EpicName   string
+	// StartEvent/FinishEvent are the run-log event types logged when the
+	// agent starts/finishes; "" skips logging that transition.
+	StartEvent  string
+	FinishEvent string
+}
+
+// logLifecycleEvent appends eventType to p's run-log with p's Ticket/Pane/
+// Tab, plus agentSession if known. A no-op if eventType is "".
+func (p launchAndPromptParams) logLifecycleEvent(eventType, agentSession string) {
+	if eventType == "" {
+		return
+	}
+	_ = logEvent(p.ScratchDir, p.EpicName, Event{
+		Type:         eventType,
+		Ticket:       p.Ticket,
+		Pane:         p.Pane,
+		Tab:          p.Tab,
+		AgentSession: agentSession,
+		Cwd:          p.SessionCwd,
+	})
 }
 
 func (p launchAndPromptParams) report(format string, args ...any) {
@@ -502,21 +577,22 @@ func (p launchAndPromptParams) report(format string, args ...any) {
 // working, then wait for it to finish (idle or done) — pausing the whole
 // loop via Gate if this agent's context occupancy breaches SmartZone before
 // it finishes.
-func launchAndPrompt(d Deps, p launchAndPromptParams) error {
+func launchAndPrompt(d Deps, p launchAndPromptParams) (string, error) {
 	agent, err := d.AgentStart(herdr.AgentStartOptions{
 		Name: p.Label,
 		Kind: "claude",
 		Pane: p.Pane,
 	})
 	if err != nil {
-		return fmt.Errorf("launching claude: %w", err)
+		return "", fmt.Errorf("launching claude: %w", err)
 	}
+	p.logLifecycleEvent(p.StartEvent, agent.AgentSession)
 
 	if _, err := d.AgentWait(herdr.AgentWaitOptions{
 		Target: p.Pane,
 		Until:  []string{"idle"},
 	}); err != nil {
-		return fmt.Errorf("waiting for claude to reach idle after launch: %w", err)
+		return "", fmt.Errorf("waiting for claude to reach idle after launch: %w", err)
 	}
 
 	if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
@@ -525,10 +601,13 @@ func launchAndPrompt(d Deps, p launchAndPromptParams) error {
 		Wait:   true,
 		Until:  []string{"working"},
 	}); err != nil {
-		return fmt.Errorf("sending initial prompt: %w", err)
+		return "", fmt.Errorf("sending initial prompt: %w", err)
 	}
 
-	return waitForFinish(d, p, agent.AgentSession)
+	if err := waitForFinish(d, p, agent.AgentSession); err != nil {
+		return "", err
+	}
+	return agent.AgentSession, nil
 }
 
 // waitForFinish polls Pane until it reaches idle or done, checking the
@@ -562,6 +641,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			TimeoutMs: pollMs,
 		})
 		if err == nil {
+			p.logLifecycleEvent(p.FinishEvent, sessionID)
 			return nil
 		}
 		if !isPollTimeout(err) {
@@ -578,9 +658,11 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 					}
 					p.Gate.pause(p.Label, reason)
 					p.report("paused %s: %s; waiting for automatic reset\n", p.Label, reason)
+					_ = logEvent(p.ScratchDir, p.EpicName, Event{Type: eventPausedRateLimit, Ticket: p.Ticket, Pane: p.Pane, Tab: p.Tab, AgentSession: sessionID, Cwd: p.SessionCwd, Reason: reason})
 					waitForRateLimitReset(d, p.Pane, token)
 					p.Gate.resumeLabel(p.Label)
 					p.report("resumed %s after rate-limit reset\n", p.Label)
+					p.logLifecycleEvent(eventResumed, sessionID)
 
 					if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
 						Target: p.Pane,
@@ -610,8 +692,10 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 		reason := fmt.Sprintf("context occupancy %d exceeds --smart-zone %d", occupancy, smartZone)
 		p.Gate.pause(p.Label, reason)
 		p.report("paused %s: %s; run `gx ralph-loop resume` to continue\n", p.Label, reason)
+		_ = logEvent(p.ScratchDir, p.EpicName, Event{Type: eventPausedSmartZone, Ticket: p.Ticket, Pane: p.Pane, Tab: p.Tab, AgentSession: sessionID, Cwd: p.SessionCwd, Reason: reason})
 		p.Gate.waitForResume(d, p.ResumeSignalPath)
 		p.report("resumed %s\n", p.Label)
+		p.logLifecycleEvent(eventResumed, sessionID)
 		elapsedMs = 0
 	}
 }

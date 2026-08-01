@@ -25,6 +25,7 @@ func newRalphLoopCmd(d deps) *cobra.Command {
 	cmd.Flags().IntVar(&maxParallel, "max-parallel", 2, "how many iterations run concurrently")
 	cmd.Flags().IntVar(&smartZone, "smart-zone", 150_000, "context-token ceiling before pausing an iteration")
 	cmd.AddCommand(newRalphLoopResumeCmd(d))
+	cmd.AddCommand(newRalphLoopReportCmd(d))
 	return cmd
 }
 
@@ -64,4 +65,19 @@ func runRalphLoopResume(epicName string, d deps) error {
 	}
 	fmt.Fprintf(d.stdout, "sent resume signal for epic %q\n", epicName)
 	return nil
+}
+
+func newRalphLoopReportCmd(d deps) *cobra.Command {
+	return &cobra.Command{
+		Use:   "report <epic-name>",
+		Short: "print an epic's chronological task order, concurrency, and per-ticket duration/context/cost",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			return runRalphLoopReport(args[0], d)
+		},
+	}
+}
+
+func runRalphLoopReport(epicName string, d deps) error {
+	return ralphloop.Report(ralphloop.ReportOptions{EpicName: epicName}, d.stdout)
 }

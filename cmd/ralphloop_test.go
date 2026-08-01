@@ -78,6 +78,38 @@ func TestNewRalphLoopCmd_HasResumeSubcommand(t *testing.T) {
 	}
 }
 
+func TestNewRalphLoopCmd_HasReportSubcommand(t *testing.T) {
+	cmd := newRalphLoopCmd(deps{})
+	report, _, err := cmd.Find([]string{"report", "some-epic"})
+	if err != nil {
+		t.Fatalf("Find(report) error = %v", err)
+	}
+	if report.Name() != "report" {
+		t.Errorf("Find(report) = %q, want the report subcommand", report.Name())
+	}
+}
+
+func TestRunRalphLoopReport_NoRunLog_PrintsNoOpMessage(t *testing.T) {
+	dir := t.TempDir()
+	restoreWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("Chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(restoreWd) })
+
+	var out bytes.Buffer
+	d := deps{stdout: &out}
+	if err := runRalphLoopReport("some-epic", d); err != nil {
+		t.Fatalf("runRalphLoopReport() error = %v", err)
+	}
+	if !strings.Contains(out.String(), "some-epic") {
+		t.Errorf("output = %q, want it to mention the epic name", out.String())
+	}
+}
+
 func TestRunRalphLoopResume_WritesSignalAndReportsIt(t *testing.T) {
 	dir := t.TempDir()
 	restoreWd, err := os.Getwd()

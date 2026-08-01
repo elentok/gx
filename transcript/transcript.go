@@ -5,10 +5,12 @@
 package transcript
 
 import (
+	"bufio"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // Usage is a single assistant turn's token accounting, as recorded in a
@@ -49,10 +51,12 @@ func Path(cwd, sessionID string) (string, error) {
 }
 
 // transcriptLine is the subset of a transcript JSONL line this package
-// reads: the assistant-turn usage fields.
+// reads: the assistant-turn usage fields, plus the line's own timestamp
+// (used by ReadAll to compute a session's wall-clock duration).
 type transcriptLine struct {
-	Type    string `json:"type"`
-	Message struct {
+	Type      string `json:"type"`
+	Timestamp string `json:"timestamp"`
+	Message   struct {
 		Model string `json:"model"`
 		Usage struct {
 			InputTokens              int `json:"input_tokens"`
@@ -157,4 +161,57 @@ func LastAssistantOccupancy(cwd, sessionID string) (occupancy int, ok bool, err 
 		return 0, ok, err
 	}
 	return usage.Occupancy(), true, nil
+}
+
+// Line is a single parsed transcript line, timestamped, carrying its
+// assistant-turn usage if it has one (the zero Usage otherwise). Unlike
+// LastAssistantUsage's tail-only read (built for cheap, frequent polling
+// against a long-running session), ReadAll parses the whole file, so it's
+// meant for one-off aggregate reporting (peak occupancy, total cost, session
+// span), not the live smart-zone guardrail.
+type Line struct {
+	Type      string
+	Timestamp time.Time
+	Usage     Usage
+}
+
+// ReadAll parses every line of the transcript at path in order, skipping
+// lines that are malformed JSON or lack a parseable timestamp (both
+// possible on a torn final line from a killed process) rather than failing
+// the whole read. ok is false if the file doesn't exist yet.
+func ReadAll(path string) (lines []Line, ok bool, err error) {
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
+	for scanner.Scan() {
+		raw := strings.TrimSpace(scanner.Text())
+		if raw == "" {
+			continue
+		}
+		var entry transcriptLine
+		if jsonErr := json.Unmarshal([]byte(raw), &entry); jsonErr != nil {
+			continue
+		}
+		ts, tsErr := time.Parse(time.RFC3339Nano, entry.Timestamp)
+		if tsErr != nil {
+			continue
+		}
+		lines = append(lines, Line{
+			Type:      entry.Type,
+			Timestamp: ts,
+			Usage:     usageFromLine(entry),
+		})
+	}
+	if scanErr := scanner.Err(); scanErr != nil {
+		return nil, false, scanErr
+	}
+	return lines, true, nil
 }

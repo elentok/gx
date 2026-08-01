@@ -53,6 +53,7 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 			mu.Unlock()
 			return herdr.Worktree{
 				WorkspaceID: wsID,
+				TabID:       "tab-" + opts.Branch,
 				PaneID:      "pane-" + opts.Branch,
 				Path:        "/fake/" + opts.Branch,
 				Branch:      opts.Branch,
@@ -65,6 +66,7 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 			mu.Unlock()
 			return herdr.Worktree{
 				WorkspaceID: wsID,
+				TabID:       "tab-" + opts.Branch,
 				PaneID:      "pane-" + opts.Branch,
 				Path:        "/fake/" + opts.Branch,
 				Branch:      opts.Branch,
@@ -165,6 +167,89 @@ func TestRun_LinearChain_RunsTicketsInOrderAndLandsAll(t *testing.T) {
 
 	if !strings.Contains(out.String(), "complete: 2 ticket(s)") {
 		t.Errorf("summary output = %q, want a completion summary mentioning 2 tickets", out.String())
+	}
+}
+
+func TestRun_LogsLifecycleEvents_LinearChain(t *testing.T) {
+	scratchDir := writeEpic(t, "my-epic", map[string]string{
+		"01-first.md": "# First\n\n**Status:** open\n",
+	})
+	d, _, _ := fakeDeps()
+	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-" + opts.Pane}, nil
+	}
+
+	var out bytes.Buffer
+	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	events, ok, err := readEvents(scratchDir, "my-epic")
+	if err != nil || !ok {
+		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+	}
+
+	wantTypes := []string{eventIterationStarted, eventIterationFinished, eventCherryPicked}
+	if len(events) != len(wantTypes) {
+		t.Fatalf("events = %+v, want %d events (%v)", events, len(wantTypes), wantTypes)
+	}
+	for i, want := range wantTypes {
+		if events[i].Type != want {
+			t.Errorf("events[%d].Type = %q, want %q", i, events[i].Type, want)
+		}
+		if events[i].Ticket != 1 {
+			t.Errorf("events[%d].Ticket = %d, want 1", i, events[i].Ticket)
+		}
+	}
+	wantSession := "sess-pane-ralph-loop/iter-01"
+	if events[0].AgentSession != wantSession {
+		t.Errorf("iteration-started AgentSession = %q, want the agent's session id", events[0].AgentSession)
+	}
+	// cherry-picked also carries the iteration agent's session/cwd, not just
+	// the start/finish pair, since the spec requires it on every event type.
+	if events[2].AgentSession != wantSession || events[2].Cwd == "" {
+		t.Errorf("cherry-picked event = %+v, want AgentSession=%q and a non-empty Cwd", events[2], wantSession)
+	}
+	if events[0].Pane == "" || events[0].Tab == "" {
+		t.Errorf("iteration-started event = %+v, want non-empty Pane/Tab", events[0])
+	}
+}
+
+func TestRun_LogsNeedsInfoEvent_OnZeroCommitIteration(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "# A\n\n**Status:** open\n",
+	})
+	d, _, _ := fakeDeps()
+	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
+		return 0, nil
+	}
+	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-" + opts.Pane}, nil
+	}
+
+	var out bytes.Buffer
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	events, ok, err := readEvents(scratchDir, "epic")
+	if err != nil || !ok {
+		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+	}
+	var needsInfo *Event
+	for i, ev := range events {
+		if ev.Type == eventNeedsInfo && ev.Ticket == 1 {
+			needsInfo = &events[i]
+		}
+		if ev.Type == eventCherryPicked {
+			t.Errorf("events = %+v, want no cherry-picked event for a zero-commit iteration", events)
+		}
+	}
+	if needsInfo == nil {
+		t.Fatalf("events = %+v, want a needs-info event for ticket 1", events)
+	}
+	if needsInfo.AgentSession == "" {
+		t.Errorf("needs-info event = %+v, want a non-empty AgentSession (the agent_session that produced zero commits)", needsInfo)
 	}
 }
 
@@ -293,6 +378,9 @@ func TestRun_CherryPickConflict_ResolvesInFeatureWorktreeThenCompletes(t *testin
 		"01-a.md": "# A\n\n**Status:** open\n",
 	})
 	d, prompts, removed := fakeDeps()
+	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-" + opts.Pane}, nil
+	}
 
 	var mu sync.Mutex
 	var picks int
@@ -377,6 +465,31 @@ func TestRun_CherryPickConflict_ResolvesInFeatureWorktreeThenCompletes(t *testin
 	}
 	if !strings.Contains(string(raw), "Status:** done") {
 		t.Errorf("ticket not marked done after conflict resolution:\n%s", raw)
+	}
+
+	events, ok, err := readEvents(scratchDir, "epic")
+	if err != nil || !ok {
+		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+	}
+	var gotTypes []string
+	var conflictHit, conflictResolved *Event
+	for i, ev := range events {
+		gotTypes = append(gotTypes, ev.Type)
+		switch ev.Type {
+		case eventConflictHit:
+			conflictHit = &events[i]
+		case eventConflictResolved:
+			conflictResolved = &events[i]
+		}
+	}
+	if conflictHit == nil || conflictResolved == nil {
+		t.Fatalf("event types = %v, want both %q and %q", gotTypes, eventConflictHit, eventConflictResolved)
+	}
+	if conflictHit.AgentSession == "" {
+		t.Errorf("conflict-hit event = %+v, want a non-empty AgentSession (the iteration agent's own session)", conflictHit)
+	}
+	if conflictResolved.AgentSession == "" || conflictResolved.AgentSession == conflictHit.AgentSession {
+		t.Errorf("conflict-resolved event = %+v, want a non-empty AgentSession distinct from conflict-hit's %q (the resolution agent's own session)", conflictResolved, conflictHit.AgentSession)
 	}
 }
 

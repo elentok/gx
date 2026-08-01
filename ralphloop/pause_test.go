@@ -253,6 +253,22 @@ func TestRun_SmartZoneBreach_PausesResumesAndKeepsSchedulingCorrect(t *testing.T
 		t.Fatalf("worktrees created while paused = %v, want exactly [epic, iter-01, iter-02] (no backfill until resumed)", createdSoFar)
 	}
 
+	// The run-log is readable and shows the pause while the run is still
+	// blocked mid-pause, not only after Run() eventually returns.
+	midPauseEvents, midPauseOK, midPauseErr := readEvents(scratchDir, "epic")
+	if midPauseErr != nil || !midPauseOK {
+		t.Fatalf("readEvents mid-pause: ok=%v err=%v", midPauseOK, midPauseErr)
+	}
+	sawPause := false
+	for _, ev := range midPauseEvents {
+		if ev.Type == eventPausedSmartZone && ev.Ticket == 1 {
+			sawPause = true
+		}
+	}
+	if !sawPause {
+		t.Errorf("mid-pause events = %+v, want a paused-smart-zone event for ticket 1", midPauseEvents)
+	}
+
 	resumeMu.Lock()
 	resumeAllowed = true
 	resumeMu.Unlock()

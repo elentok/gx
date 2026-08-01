@@ -127,6 +127,67 @@ func TestLastAssistantUsage_MissingFile_NotOKNoError(t *testing.T) {
 	}
 }
 
+func TestReadAll_ParsesEveryLineInOrder(t *testing.T) {
+	path := writeTranscript(t,
+		`{"type":"user","timestamp":"2026-01-01T00:00:00.000Z","message":{}}`,
+		`{"type":"assistant","timestamp":"2026-01-01T00:00:05.000Z","message":{"model":"claude-sonnet-5","usage":{"input_tokens":1,"cache_read_input_tokens":100,"output_tokens":50}}}`,
+		`{"type":"assistant","timestamp":"2026-01-01T00:00:10.000Z","message":{"model":"claude-opus-5","usage":{"input_tokens":2,"cache_read_input_tokens":200,"output_tokens":60}}}`,
+	)
+
+	lines, ok, err := ReadAll(path)
+	if err != nil {
+		t.Fatalf("ReadAll() error = %v", err)
+	}
+	if !ok {
+		t.Fatal("ReadAll() ok = false, want true")
+	}
+	if len(lines) != 3 {
+		t.Fatalf("got %d lines, want 3", len(lines))
+	}
+	if lines[0].Type != "user" || lines[1].Type != "assistant" || lines[2].Type != "assistant" {
+		t.Errorf("lines types = [%q %q %q], want [user assistant assistant]", lines[0].Type, lines[1].Type, lines[2].Type)
+	}
+	if lines[2].Usage.Model != "claude-opus-5" || lines[2].Usage.InputTokens != 2 {
+		t.Errorf("lines[2].Usage = %+v, want the third line's own usage fields", lines[2].Usage)
+	}
+	if !lines[2].Timestamp.After(lines[0].Timestamp) {
+		t.Errorf("lines[2].Timestamp = %v, want it after lines[0].Timestamp = %v", lines[2].Timestamp, lines[0].Timestamp)
+	}
+}
+
+func TestReadAll_SkipsMalformedAndUntimestampedLines(t *testing.T) {
+	path := writeTranscript(t,
+		`{"type":"assistant","timestamp":"2026-01-01T00:00:00.000Z","message":{"usage":{"input_tokens":1}}}`,
+		`not json at all`,
+		`{"type":"assistant","message":{"usage":{"input_tokens":2}}}`, // no timestamp field
+		`{"type":"assistant","timestamp":"2026-01-01T00:00:05.000Z","message":{"usage":{"input_tokens":3}}}`,
+	)
+
+	lines, ok, err := ReadAll(path)
+	if err != nil {
+		t.Fatalf("ReadAll() error = %v", err)
+	}
+	if !ok {
+		t.Fatal("ReadAll() ok = false, want true")
+	}
+	if len(lines) != 2 {
+		t.Fatalf("got %d lines, want 2 (malformed/untimestamped lines skipped): %+v", len(lines), lines)
+	}
+	if lines[0].Usage.InputTokens != 1 || lines[1].Usage.InputTokens != 3 {
+		t.Errorf("lines = %+v, want input_tokens [1 3]", lines)
+	}
+}
+
+func TestReadAll_MissingFile_NotOKNoError(t *testing.T) {
+	lines, ok, err := ReadAll(filepath.Join(t.TempDir(), "missing.jsonl"))
+	if err != nil {
+		t.Fatalf("ReadAll() error = %v, want nil for a missing file", err)
+	}
+	if ok || lines != nil {
+		t.Errorf("ReadAll() = (%v, %v), want (nil, false) for a missing file", lines, ok)
+	}
+}
+
 func TestUsage_Occupancy_SumsInputSideFieldsOnly(t *testing.T) {
 	u := Usage{InputTokens: 10, CacheReadInputTokens: 20000, CacheCreationInputTokens: 500, OutputTokens: 9999}
 	if got, want := u.Occupancy(), 10+20000+500; got != want {
