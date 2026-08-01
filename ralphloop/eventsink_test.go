@@ -141,8 +141,8 @@ func TestNewTextEventSink_RendersSameTextAsBeforeTheEventSinkRefactor(t *testing
 		"ticket 01 still needs attention; no live iteration found\n" +
 		"paused iter-01: rate limit detected; waiting for automatic reset\n" +
 		"resumed iter-01 after rate-limit reset\n" +
-		"paused iter-01: context occupancy 200000 exceeds --smart-zone 150000; run `gx ralph-loop resume` to continue\n" +
-		"resumed iter-01\n" +
+		"paused iter-01: context occupancy 200000 exceeds --smart-zone 150000; recovering onto a fresh worktree automatically\n" +
+		"resumed iter-01 after smart-zone auto-recovery\n" +
 		"ticket 01 \"First\" landed on epic\n" +
 		"ticket 01: done and commits landed, but leftover iteration state was never cleaned up; finished the interrupted cleanup\n" +
 		"ticket 01: done but commits were missing from epic; auto re-cherry-picked from iteration branch ralph-loop/iter-01 and restored (deadbeef)\n" +

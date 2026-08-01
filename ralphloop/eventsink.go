@@ -176,6 +176,8 @@ func (s *textEventSink) IterationPaused(label string, kind PauseKind, reason str
 		s.printf("paused %s: %s; waiting for automatic reset\n", label, reason)
 	case PauseNeedsAttention:
 		s.printf("paused %s: %s\n", label, reason)
+	case PauseSmartZone:
+		s.printf("paused %s: %s; recovering onto a fresh worktree automatically\n", label, reason)
 	default:
 		s.printf("paused %s: %s; run `gx ralph-loop resume` to continue\n", label, reason)
 	}
@@ -187,6 +189,8 @@ func (s *textEventSink) IterationResumed(label string, kind PauseKind) {
 		s.printf("resumed %s after rate-limit reset\n", label)
 	case PauseNeedsAttention:
 		s.printf("resumed %s after operator intervention\n", label)
+	case PauseSmartZone:
+		s.printf("resumed %s after smart-zone auto-recovery\n", label)
 	default:
 		s.printf("resumed %s\n", label)
 	}

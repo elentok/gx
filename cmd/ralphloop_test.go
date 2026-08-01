@@ -122,14 +122,14 @@ func TestRunRalphLoop_NonTerminalStdout_RunsHeadless(t *testing.T) {
 	}
 }
 
-func TestNewRalphLoopCmd_SmartZoneFlagDefaultsTo150000(t *testing.T) {
+func TestNewRalphLoopCmd_SmartZoneFlagDefaultsTo110000(t *testing.T) {
 	cmd := newRalphLoopCmd(deps{})
 	flag := cmd.Flags().Lookup("smart-zone")
 	if flag == nil {
 		t.Fatal("missing --smart-zone flag")
 	}
-	if flag.DefValue != "150000" {
-		t.Errorf("--smart-zone default = %q, want %q", flag.DefValue, "150000")
+	if flag.DefValue != "110000" {
+		t.Errorf("--smart-zone default = %q, want %q", flag.DefValue, "110000")
 	}
 }
 

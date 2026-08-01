@@ -33,7 +33,7 @@ func newRalphLoopCmd(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&agent, "agent", "claude", "agent to run: claude or codex")
 	cmd.Flags().StringVar(&skill, "skill", "implement", "skill invoked as the initial prompt in each iteration")
 	cmd.Flags().IntVar(&maxParallel, "max-parallel", 2, "how many iterations run concurrently")
-	cmd.Flags().IntVar(&smartZone, "smart-zone", 150_000, "context-token ceiling before pausing an iteration")
+	cmd.Flags().IntVar(&smartZone, "smart-zone", 110_000, "context-token ceiling before an iteration auto-recovers onto a fresh worktree")
 	cmd.AddCommand(newRalphLoopResumeCmd(d))
 	cmd.AddCommand(newRalphLoopReportCmd(d))
 	return cmd
