@@ -40,50 +40,35 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 	var mu sync.Mutex
 	promptsSlice := []string{}
 	removedSlice := []string{}
-	branchByWorkspace := map[string]string{}
+	branchByPath := map[string]string{}
 
 	d = Deps{
 		FindOrCreateWorkspace: func(label, cwd string) (string, error) {
 			return "ws1", nil
 		},
-		WorktreeCreate: func(opts herdr.WorktreeCreateOptions) (herdr.Worktree, error) {
-			wsID := "ws-" + opts.Branch
-			mu.Lock()
-			branchByWorkspace[wsID] = opts.Branch
-			mu.Unlock()
-			return herdr.Worktree{
-				WorkspaceID: wsID,
-				TabID:       "tab-" + opts.Branch,
-				PaneID:      "pane-" + opts.Branch,
-				Path:        "/fake/" + opts.Branch,
-				Branch:      opts.Branch,
-			}, nil
+		WorktreeDir: func(repoDir string) (string, error) {
+			return "/fake/worktrees", nil
 		},
-		WorktreeOpen: func(opts herdr.WorktreeOpenOptions) (herdr.Worktree, error) {
-			wsID := "ws-" + opts.Branch
+		AddWorktree: func(repoDir, path, branch, base string) error {
 			mu.Lock()
-			branchByWorkspace[wsID] = opts.Branch
+			branchByPath[path] = branch
 			mu.Unlock()
-			return herdr.Worktree{
-				WorkspaceID: wsID,
-				TabID:       "tab-" + opts.Branch,
-				PaneID:      "pane-" + opts.Branch,
-				Path:        "/fake/" + opts.Branch,
-				Branch:      opts.Branch,
-				AlreadyOpen: true,
-			}, nil
+			return nil
 		},
-		WorktreeRemove: func(workspaceID string, force bool) error {
+		RemoveWorktree: func(repoDir, path string, force bool) error {
 			mu.Lock()
-			removedSlice = append(removedSlice, branchByWorkspace[workspaceID])
+			removedSlice = append(removedSlice, branchByPath[path])
 			mu.Unlock()
 			return nil
 		},
 		TabCreate: func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error) {
 			return herdr.CreatedTab{
-				Tab:        herdr.Tab{Label: opts.Label, WorkspaceID: opts.WorkspaceID},
+				Tab:        herdr.Tab{TabID: "tab-" + opts.Label, Label: opts.Label, WorkspaceID: opts.WorkspaceID},
 				RootPaneID: "pane-" + opts.Label,
 			}, nil
+		},
+		TabClose: func(tabID string) error {
+			return nil
 		},
 		TabList: func(workspaceID string) ([]herdr.Tab, error) {
 			return nil, nil
@@ -201,7 +186,7 @@ func TestRun_LogsLifecycleEvents_LinearChain(t *testing.T) {
 			t.Errorf("events[%d].Ticket = %d, want 1", i, events[i].Ticket)
 		}
 	}
-	wantSession := "sess-pane-ralph-loop/iter-01"
+	wantSession := "sess-pane-iter-01"
 	if events[0].AgentSession != wantSession {
 		t.Errorf("iteration-started AgentSession = %q, want the agent's session id", events[0].AgentSession)
 	}
@@ -426,14 +411,14 @@ func TestRun_CherryPickConflict_ResolvesInFeatureWorktreeThenCompletes(t *testin
 		return origAgentPrompt(opts)
 	}
 
-	origWorktreeRemove := d.WorktreeRemove
-	d.WorktreeRemove = func(workspaceID string, force bool) error {
+	origRemoveWorktree := d.RemoveWorktree
+	d.RemoveWorktree = func(repoDir, path string, force bool) error {
 		mu.Lock()
 		if conflictPane == "" {
 			conflictPaneRemovedBefore = true
 		}
 		mu.Unlock()
-		return origWorktreeRemove(workspaceID, force)
+		return origRemoveWorktree(repoDir, path, force)
 	}
 
 	var out bytes.Buffer

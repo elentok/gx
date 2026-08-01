@@ -61,8 +61,11 @@ type WorktreeCreateOptions struct {
 // create`.
 func WorktreeCreate(opts WorktreeCreateOptions) (Worktree, error) {
 	args := []string{"worktree", "create"}
-	args = appendFlag(args, "--workspace", opts.WorkspaceID)
-	args = appendFlag(args, "--cwd", opts.Cwd)
+	if opts.WorkspaceID != "" {
+		args = appendFlag(args, "--workspace", opts.WorkspaceID)
+	} else {
+		args = appendFlag(args, "--cwd", opts.Cwd)
+	}
 	args = appendFlag(args, "--branch", opts.Branch)
 	args = appendFlag(args, "--base", opts.Base)
 	args = appendFlag(args, "--path", opts.Path)
@@ -91,8 +94,11 @@ type WorktreeOpenOptions struct {
 // WorktreeOpen opens an existing git worktree via `herdr worktree open`.
 func WorktreeOpen(opts WorktreeOpenOptions) (Worktree, error) {
 	args := []string{"worktree", "open"}
-	args = appendFlag(args, "--workspace", opts.WorkspaceID)
-	args = appendFlag(args, "--cwd", opts.Cwd)
+	if opts.WorkspaceID != "" {
+		args = appendFlag(args, "--workspace", opts.WorkspaceID)
+	} else {
+		args = appendFlag(args, "--cwd", opts.Cwd)
+	}
 	args = appendFlag(args, "--branch", opts.Branch)
 	args = appendFlag(args, "--path", opts.Path)
 	args = appendFlag(args, "--label", opts.Label)

@@ -41,10 +41,37 @@ func TestWorktreeCreate_ParsesResult(t *testing.T) {
 		t.Fatalf("WorktreeCreate() = %+v, want %+v", wt, want)
 	}
 	argLine := strings.Join(gotArgs, " ")
-	for _, want := range []string{"worktree create", "--workspace wE", "--cwd /repo", "--branch ralph-loop/iter-01", "--base feature", "--label iter-01", "--focus"} {
+	for _, want := range []string{"worktree create", "--workspace wE", "--branch ralph-loop/iter-01", "--base feature", "--label iter-01", "--focus"} {
 		if !strings.Contains(argLine, want) {
 			t.Errorf("args %q missing %q", argLine, want)
 		}
+	}
+	if strings.Contains(argLine, "--cwd") {
+		t.Errorf("args %q should not include --cwd when --workspace is set", argLine)
+	}
+}
+
+func TestWorktreeCreate_NoWorkspace_UsesCwd(t *testing.T) {
+	var gotArgs []string
+	withFakeCommand(t, func(args ...string) ([]byte, error) {
+		gotArgs = args
+		return []byte(`{"result":{
+			"type":"worktree_created",
+			"workspace":{"workspace_id":"w9"},
+			"tab":{"tab_id":"w9:t1"},
+			"root_pane":{"pane_id":"w9:p1"},
+			"worktree":{"path":"/repo/iter-01","branch":"ralph-loop/iter-01","label":"iter-01"}
+		}}`), nil
+	})
+	if _, err := WorktreeCreate(WorktreeCreateOptions{Cwd: "/repo", Branch: "ralph-loop/iter-01"}); err != nil {
+		t.Fatalf("WorktreeCreate() error = %v", err)
+	}
+	argLine := strings.Join(gotArgs, " ")
+	if !strings.Contains(argLine, "--cwd /repo") {
+		t.Errorf("args %q missing --cwd /repo", argLine)
+	}
+	if strings.Contains(argLine, "--workspace") {
+		t.Errorf("args %q should not include --workspace when WorkspaceID is empty", argLine)
 	}
 }
 

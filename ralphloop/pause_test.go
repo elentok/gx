@@ -164,12 +164,12 @@ func TestRun_SmartZoneBreach_PausesResumesAndKeepsSchedulingCorrect(t *testing.T
 
 	var mu sync.Mutex
 	var createdBranches []string
-	origWorktreeCreate := d.WorktreeCreate
-	d.WorktreeCreate = func(opts herdr.WorktreeCreateOptions) (herdr.Worktree, error) {
+	origAddWorktree := d.AddWorktree
+	d.AddWorktree = func(repoDir, path, branch, base string) error {
 		mu.Lock()
-		createdBranches = append(createdBranches, opts.Branch)
+		createdBranches = append(createdBranches, branch)
 		mu.Unlock()
-		return origWorktreeCreate(opts)
+		return origAddWorktree(repoDir, path, branch, base)
 	}
 
 	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
@@ -314,12 +314,12 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 
 	var mu sync.Mutex
 	var createdBranches []string
-	origWorktreeCreate := d.WorktreeCreate
-	d.WorktreeCreate = func(opts herdr.WorktreeCreateOptions) (herdr.Worktree, error) {
+	origAddWorktree := d.AddWorktree
+	d.AddWorktree = func(repoDir, path, branch, base string) error {
 		mu.Lock()
-		createdBranches = append(createdBranches, opts.Branch)
+		createdBranches = append(createdBranches, branch)
 		mu.Unlock()
-		return origWorktreeCreate(opts)
+		return origAddWorktree(repoDir, path, branch, base)
 	}
 
 	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {

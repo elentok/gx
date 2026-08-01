@@ -65,3 +65,9 @@ func TabList(workspaceID string) ([]Tab, error) {
 	}
 	return result.Tabs, nil
 }
+
+// TabClose closes tabID via `herdr tab close`.
+func TabClose(tabID string) error {
+	_, err := run("tab", "close", tabID)
+	return err
+}

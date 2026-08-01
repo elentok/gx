@@ -140,25 +140,16 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 	})
 	d, prompts, removed := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{Label: "iter-01", WorkspaceID: workspaceID}}, nil
+		return []herdr.Tab{{TabID: "tab-iter-01", Label: "iter-01", WorkspaceID: workspaceID}}, nil
 	}
 
 	var worktreeCreateCalledForIter bool
-	origCreate := d.WorktreeCreate
-	d.WorktreeCreate = func(opts herdr.WorktreeCreateOptions) (herdr.Worktree, error) {
-		if opts.Label == "iter-01" {
+	origAddWorktree := d.AddWorktree
+	d.AddWorktree = func(repoDir, path, branch, base string) error {
+		if strings.Contains(path, "iter-01") {
 			worktreeCreateCalledForIter = true
 		}
-		return origCreate(opts)
-	}
-
-	var worktreeOpenedForIter bool
-	origOpen := d.WorktreeOpen
-	d.WorktreeOpen = func(opts herdr.WorktreeOpenOptions) (herdr.Worktree, error) {
-		if opts.Label == "iter-01" {
-			worktreeOpenedForIter = true
-		}
-		return origOpen(opts)
+		return origAddWorktree(repoDir, path, branch, base)
 	}
 
 	var out strings.Builder
@@ -167,10 +158,7 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 	}
 
 	if worktreeCreateCalledForIter {
-		t.Error("a reattached iteration must reopen its worktree, not create a new one")
-	}
-	if !worktreeOpenedForIter {
-		t.Error("expected the reattached iteration's worktree to be reopened via WorktreeOpen")
+		t.Error("a reattached iteration must reuse its existing worktree, not create a new one")
 	}
 	if len(*prompts) != 0 {
 		t.Errorf("prompts = %v, want no initial prompt replayed for a reattached iteration", *prompts)

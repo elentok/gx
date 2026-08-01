@@ -3,6 +3,7 @@ package ralphloop
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -78,14 +79,13 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 		return fmt.Errorf("finding/creating herdr workspace %q: %w", opts.EpicName, err)
 	}
 
-	featureWT, err := d.WorktreeCreate(herdr.WorktreeCreateOptions{
-		WorkspaceID: workspaceID,
-		Cwd:         opts.RepoDir,
-		Branch:      opts.EpicName,
-		Label:       opts.EpicName,
-		Focus:       true,
-	})
+	wtDir, err := d.WorktreeDir(opts.RepoDir)
 	if err != nil {
+		return fmt.Errorf("resolving worktree directory for %q: %w", opts.RepoDir, err)
+	}
+
+	featurePath := filepath.Join(wtDir, opts.EpicName)
+	if err := d.AddWorktree(opts.RepoDir, featurePath, opts.EpicName, ""); err != nil {
 		return fmt.Errorf("creating feature worktree for branch %q: %w", opts.EpicName, err)
 	}
 
@@ -146,7 +146,8 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 			params := iterationParams{
 				WorkspaceID:      workspaceID,
 				RepoDir:          opts.RepoDir,
-				FeatureWorktree:  featureWT.Path,
+				WorktreeDir:      wtDir,
+				FeatureWorktree:  featurePath,
 				FeatureBranch:    opts.EpicName,
 				Skill:            opts.Skill,
 				Ticket:           ticket,
@@ -249,8 +250,14 @@ func allSettled(e tickets.Epic) bool {
 
 // iterationParams are the per-ticket inputs to runIteration.
 type iterationParams struct {
-	WorkspaceID     string
-	RepoDir         string
+	WorkspaceID string
+	RepoDir     string
+	// WorktreeDir is the directory this Run call's iteration worktrees live
+	// in (git.Repo.LinkedWorktreeDir for RepoDir's repo), resolved once in
+	// Run and threaded through so every iteration's path is
+	// filepath.Join(WorktreeDir, iterLabel(ticketNumber)) — deterministic,
+	// so a reattached iteration can recompute it without asking herdr.
+	WorktreeDir     string
 	FeatureWorktree string
 	FeatureBranch   string
 	Skill           string
@@ -330,58 +337,70 @@ func (p iterationParams) logTicketEvent(eventType, pane, tab, agentSession, cwd 
 func runIteration(d Deps, p iterationParams) error {
 	label := iterLabel(p.Ticket.Number)
 	branch := iterBranch(p.Ticket.Number)
+	path := filepath.Join(p.WorktreeDir, label)
 
 	base, err := d.RevParse(p.FeatureWorktree, p.FeatureBranch)
 	if err != nil {
 		return fmt.Errorf("resolving %s tip: %w", p.FeatureBranch, err)
 	}
 
-	iterWT, err := d.WorktreeCreate(herdr.WorktreeCreateOptions{
-		WorkspaceID: p.WorkspaceID,
-		Cwd:         p.RepoDir,
-		Branch:      branch,
-		Base:        p.FeatureBranch,
-		Label:       label,
-	})
-	if err != nil {
+	if err := d.AddWorktree(p.RepoDir, path, branch, base); err != nil {
 		return fmt.Errorf("creating iteration worktree: %w", err)
 	}
 
+	tab, err := d.TabCreate(herdr.TabCreateOptions{
+		WorkspaceID: p.WorkspaceID,
+		Cwd:         path,
+		Label:       label,
+	})
+	if err != nil {
+		return fmt.Errorf("opening iteration tab: %w", err)
+	}
+
 	prompt := fmt.Sprintf("/%s %s", p.Skill, p.Ticket.Path)
-	launchParams := p.launchAndPromptParams(label, iterWT.PaneID, iterWT.TabID, prompt, iterWT.Path, eventIterationStarted, eventIterationFinished)
+	launchParams := p.launchAndPromptParams(label, tab.RootPaneID, tab.TabID, prompt, path, eventIterationStarted, eventIterationFinished)
 	sessionID, err := launchAndPrompt(d, launchParams)
 	if err != nil {
 		return err
 	}
 
-	return finishIteration(d, p, iterWT, base, branch, sessionID)
+	return finishIteration(d, p, path, tab.RootPaneID, tab.TabID, base, branch, sessionID)
 }
 
 // reattachIteration resumes a ticket left `Status: claimed` by a prior
 // crashed/killed invocation whose iter-NN worktree/tab is still alive: it
-// reopens the existing worktree/tab (rather than creating a new one), skips
-// straight to re-entering the "wait for the agent to finish" step (no launch
-// or initial prompt — the agent may already be mid-turn or already done),
-// then continues through the same cherry-pick/mark-done/remove completion
-// path as a fresh iteration. The original base commit is recovered via
+// recomputes the worktree's deterministic path and finds its still-live tab
+// (rather than creating either), skips straight to re-entering the "wait for
+// the agent to finish" step (no launch or initial prompt — the agent may
+// already be mid-turn or already done), then continues through the same
+// cherry-pick/mark-done/remove completion path as a fresh iteration. The
+// tab's agent is targeted by name (the iteration label, which AgentStart
+// registered it under on the prior invocation) since no fresh AgentStart ran
+// here to hand back a pane id. The original base commit is recovered via
 // merge-base against the feature branch rather than the feature branch's
 // current tip, since the feature branch may have advanced past this
 // iteration's original branch point while the prior invocation was down.
 func reattachIteration(d Deps, p iterationParams) error {
 	label := iterLabel(p.Ticket.Number)
 	branch := iterBranch(p.Ticket.Number)
+	path := filepath.Join(p.WorktreeDir, label)
 
-	iterWT, err := d.WorktreeOpen(herdr.WorktreeOpenOptions{
-		WorkspaceID: p.WorkspaceID,
-		Cwd:         p.RepoDir,
-		Branch:      branch,
-		Label:       label,
-	})
+	tabs, err := d.TabList(p.WorkspaceID)
 	if err != nil {
-		return fmt.Errorf("reopening iteration worktree: %w", err)
+		return fmt.Errorf("finding live tab for reattached iteration %s: %w", label, err)
+	}
+	tabID := ""
+	for _, t := range tabs {
+		if t.Label == label {
+			tabID = t.TabID
+			break
+		}
+	}
+	if tabID == "" {
+		return fmt.Errorf("no live tab found for reattached iteration %s", label)
 	}
 
-	base, err := d.MergeBase(iterWT.Path, branch, p.FeatureBranch)
+	base, err := d.MergeBase(path, branch, p.FeatureBranch)
 	if err != nil {
 		return fmt.Errorf("resolving %s's original base: %w", branch, err)
 	}
@@ -391,23 +410,25 @@ func reattachIteration(d Deps, p iterationParams) error {
 	// this ticket's later needs-info/cherry-picked events; the reattached
 	// wait simply re-observes idle/done without that guardrail. StartEvent is
 	// left empty for the same reason (no fresh launch happened here to log).
-	launchParams := p.launchAndPromptParams(label, iterWT.PaneID, iterWT.TabID, "", iterWT.Path, "", eventIterationFinished)
+	launchParams := p.launchAndPromptParams(label, label, tabID, "", path, "", eventIterationFinished)
 	if err := waitForFinish(d, launchParams, ""); err != nil {
 		return fmt.Errorf("waiting for reattached agent %s to finish: %w", label, err)
 	}
 
-	return finishIteration(d, p, iterWT, base, branch, "")
+	return finishIteration(d, p, path, label, tabID, base, branch, "")
 }
 
 // finishIteration lands a finished iteration's commits (or marks it
-// needs-info if it produced none), then removes its worktree on success —
-// the shared tail of both the fresh (runIteration) and reattached
+// needs-info if it produced none), then removes its worktree/tab on success
+// — the shared tail of both the fresh (runIteration) and reattached
 // (reattachIteration) iteration lifecycles. sessionID is the iteration
 // agent's Claude Code session (empty for a reattached iteration, which made
 // no fresh AgentStart call this invocation), attached to the needs-info/
-// cherry-picked events logged here.
-func finishIteration(d Deps, p iterationParams, iterWT herdr.Worktree, base, branch, sessionID string) error {
-	ahead, err := d.CommitsAhead(iterWT.Path, base, branch)
+// cherry-picked events logged here. pane is either the iteration's real pane
+// id (fresh) or its agent name (reattached) — either is a valid herdr agent
+// target.
+func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, sessionID string) error {
+	ahead, err := d.CommitsAhead(path, base, branch)
 	if err != nil {
 		return fmt.Errorf("counting commits ahead of %s: %w", base, err)
 	}
@@ -418,24 +439,27 @@ func finishIteration(d Deps, p iterationParams, iterWT herdr.Worktree, base, bra
 		if err := MarkNeedsInfo(p.Ticket.Path); err != nil {
 			return fmt.Errorf("marking ticket needs-info: %w", err)
 		}
-		p.logTicketEvent(eventNeedsInfo, iterWT.PaneID, iterWT.TabID, sessionID, iterWT.Path)
+		p.logTicketEvent(eventNeedsInfo, pane, tab, sessionID, path)
 		return nil
 	}
 
 	p.FeatureLock.Lock()
-	err = cherryPickWithConflictResolution(d, p, base, branch, sessionID, iterWT)
+	err = cherryPickWithConflictResolution(d, p, base, branch, sessionID, pane, tab)
 	p.FeatureLock.Unlock()
 	if err != nil {
 		return err
 	}
-	p.logTicketEvent(eventCherryPicked, iterWT.PaneID, iterWT.TabID, sessionID, iterWT.Path)
+	p.logTicketEvent(eventCherryPicked, pane, tab, sessionID, path)
 
 	if err := MarkDone(p.Ticket.Path); err != nil {
 		return fmt.Errorf("marking ticket done: %w", err)
 	}
 
-	if err := d.WorktreeRemove(iterWT.WorkspaceID, true); err != nil {
+	if err := d.RemoveWorktree(p.RepoDir, path, true); err != nil {
 		return fmt.Errorf("removing iteration worktree: %w", err)
+	}
+	if err := d.TabClose(tab); err != nil {
+		return fmt.Errorf("closing iteration tab: %w", err)
 	}
 
 	return nil
@@ -450,13 +474,13 @@ const conflictResolutionTimeoutMs = 30 * 60 * 1000
 // p.FeatureWorktree. On a conflict, it launches a fresh pane in the feature
 // worktree (where the conflict markers are, not the iteration worktree),
 // sends "/resolving-merge-conflicts", and waits for that agent to finish
-// before confirming the cherry-pick sequence completed. sessionID/iterWT
+// before confirming the cherry-pick sequence completed. sessionID/pane/tab
 // attach the iteration agent's own session to the conflict-hit event (the
 // resolution agent hasn't launched yet at that point); conflict-resolved is
 // instead attributed to the resolution agent's own distinct session, so its
 // cost/occupancy are counted too rather than silently dropped from the
 // report.
-func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, sessionID string, iterWT herdr.Worktree) error {
+func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, sessionID, pane, tab string) error {
 	pickErr := d.CherryPickRange(p.FeatureWorktree, base, branch)
 	if pickErr == nil {
 		return nil
@@ -469,7 +493,7 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 	if !inProgress {
 		return fmt.Errorf("cherry-picking onto %s: %w", p.FeatureBranch, pickErr)
 	}
-	p.logTicketEvent(eventConflictHit, iterWT.PaneID, iterWT.TabID, sessionID, iterWT.Path)
+	p.logTicketEvent(eventConflictHit, pane, tab, sessionID, p.FeatureWorktree)
 
 	resolutionSessionID, err := resolveCherryPickConflict(d, p)
 	if err != nil {

@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"os"
 	"time"
 
 	"github.com/elentok/gx/git"
@@ -9,27 +10,35 @@ import (
 )
 
 // Deps are the external side-effecting operations the loop drives: herdr
-// socket-API calls, git cherry-picking, and the smart-zone guardrail's
-// transcript/pause-signal reads. DefaultDeps wires them to the real
-// herdr/git/transcript packages; tests substitute fakes so the
+// socket-API calls, git worktree/cherry-picking, and the smart-zone
+// guardrail's transcript/pause-signal reads. DefaultDeps wires them to the
+// real herdr/git/transcript packages; tests substitute fakes so the
 // orchestration in loop.go can run without a live herdr server, git
 // process, or real Claude Code transcripts.
 type Deps struct {
 	FindOrCreateWorkspace func(label, cwd string) (string, error)
-	WorktreeCreate        func(opts herdr.WorktreeCreateOptions) (herdr.Worktree, error)
-	WorktreeOpen          func(opts herdr.WorktreeOpenOptions) (herdr.Worktree, error)
-	WorktreeRemove        func(workspaceID string, force bool) error
-	TabCreate             func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error)
-	TabList               func(workspaceID string) ([]herdr.Tab, error)
-	AgentStart            func(opts herdr.AgentStartOptions) (herdr.Agent, error)
-	AgentPrompt           func(opts herdr.AgentPromptOptions) (herdr.Agent, error)
-	AgentWait             func(opts herdr.AgentWaitOptions) (herdr.Agent, error)
-	AgentSendKeys         func(target string, keys ...string) error
-	RevParse              func(dir, ref string) (string, error)
-	MergeBase             func(dir, refA, refB string) (string, error)
-	CommitsAhead          func(dir, fromExclusive, toRef string) (int, error)
-	CherryPickRange       func(dir, fromExclusive, toInclusive string) error
-	CherryPickInProgress  func(dir string) (bool, error)
+	// WorktreeDir returns the directory linked worktrees for repoDir's repo
+	// are created in (see git.Repo.LinkedWorktreeDir).
+	WorktreeDir func(repoDir string) (string, error)
+	// AddWorktree creates a plain git worktree at path on a new branch,
+	// starting at base (a ref or commit hash; "" for the repo's HEAD). A
+	// no-op if path already exists, so a resumed Run can call it again for a
+	// worktree a prior invocation already created.
+	AddWorktree func(repoDir, path, branch, base string) error
+	// RemoveWorktree removes the git worktree checked out at path.
+	RemoveWorktree       func(repoDir, path string, force bool) error
+	TabCreate            func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error)
+	TabClose             func(tabID string) error
+	TabList              func(workspaceID string) ([]herdr.Tab, error)
+	AgentStart           func(opts herdr.AgentStartOptions) (herdr.Agent, error)
+	AgentPrompt          func(opts herdr.AgentPromptOptions) (herdr.Agent, error)
+	AgentWait            func(opts herdr.AgentWaitOptions) (herdr.Agent, error)
+	AgentSendKeys        func(target string, keys ...string) error
+	RevParse             func(dir, ref string) (string, error)
+	MergeBase            func(dir, refA, refB string) (string, error)
+	CommitsAhead         func(dir, fromExclusive, toRef string) (int, error)
+	CherryPickRange      func(dir, fromExclusive, toInclusive string) error
+	CherryPickInProgress func(dir string) (bool, error)
 
 	// ReadOccupancy returns the current context occupancy for the Claude
 	// Code session launched in cwd, or ok=false if its transcript has no
@@ -49,10 +58,11 @@ type Deps struct {
 func DefaultDeps() Deps {
 	return Deps{
 		FindOrCreateWorkspace: herdr.FindOrCreateWorkspace,
-		WorktreeCreate:        herdr.WorktreeCreate,
-		WorktreeOpen:          herdr.WorktreeOpen,
-		WorktreeRemove:        herdr.WorktreeRemove,
+		WorktreeDir:           worktreeDir,
+		AddWorktree:           addWorktree,
+		RemoveWorktree:        removeWorktree,
 		TabCreate:             herdr.TabCreate,
+		TabClose:              herdr.TabClose,
 		TabList:               herdr.TabList,
 		AgentStart:            herdr.AgentStart,
 		AgentPrompt:           herdr.AgentPrompt,
@@ -68,4 +78,36 @@ func DefaultDeps() Deps {
 		ResumeSignaled:        defaultResumeSignaled,
 		Sleep:                 time.Sleep,
 	}
+}
+
+// worktreeDir implements Deps.WorktreeDir against the real git package.
+func worktreeDir(repoDir string) (string, error) {
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		return "", err
+	}
+	return repo.LinkedWorktreeDir(), nil
+}
+
+// addWorktree implements Deps.AddWorktree against the real git package.
+func addWorktree(repoDir, path, branch, base string) error {
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(path); err == nil {
+		// Already checked out, e.g. this Run is reconciling after a crash and
+		// a prior invocation already created it.
+		return nil
+	}
+	return git.AddWorktree(*repo, branch, path, base)
+}
+
+// removeWorktree implements Deps.RemoveWorktree against the real git package.
+func removeWorktree(repoDir, path string, force bool) error {
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		return err
+	}
+	return git.RemoveWorktree(*repo, path, force)
 }
