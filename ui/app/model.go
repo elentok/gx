@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	commitui "github.com/elentok/gx/ui/commit"
+	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/keys"
 	logui "github.com/elentok/gx/ui/log"
 	"github.com/elentok/gx/ui/nav"
@@ -50,9 +51,10 @@ type Model struct {
 	// history is the model side of the global deep-navigation stack.
 	// navState.State holds the parallel ViewState side.
 	history   []historyEntry
-	keyPrefix string
-	notify    notify.Model
-	gate      *reloadgate.ReloadGate
+	keyPrefix   string
+	notify      notify.Model
+	gate        *reloadgate.ReloadGate
+	quitConfirm confirm.Model
 }
 
 func New(repo git.Repo, settings Settings) Model {
@@ -63,6 +65,7 @@ func New(repo git.Repo, settings Settings) Model {
 		livePageByTab: make(map[nav.TabID]livePage),
 		notify:        notify.New(settings.UseNerdFontIcons),
 		gate:          reloadgate.New(),
+		quitConfirm:   confirm.New(),
 	}
 	if m.settings.InitialRoute.Tab == "" {
 		m.settings.InitialRoute = nav.ViewState{Tab: nav.TabWorktrees}
@@ -98,6 +101,9 @@ func (m Model) View() tea.View {
 		if len(hints) > 0 {
 			content = ui.OverlayBottomRight(content, ui.RenderChordOverlay(m.keyPrefix, hints), m.width, m.height)
 		}
+	}
+	if m.quitConfirm.IsOpen {
+		content = ui.OverlayCenter(content, m.quitConfirm.View(m.width), m.width, m.height)
 	}
 	if stack := m.notify.View(); stack != "" {
 		content = ui.OverlayTopRightMargin(content, stack, m.width, 1, 1)

@@ -2,6 +2,7 @@ package app
 
 import (
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
@@ -10,6 +11,15 @@ import (
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var notifyCmd tea.Cmd
 	m.notify, notifyCmd = m.notify.Update(msg)
+
+	if m.quitConfirm.IsOpen {
+		if key, ok := msg.(tea.KeyPressMsg); ok {
+			next, cmd, _ := m.quitConfirm.Update(key)
+			m.quitConfirm = next
+			return m, tea.Batch(notifyCmd, cmd)
+		}
+		return m, notifyCmd
+	}
 
 	if nav.IsRepoMutated(msg) {
 		m.gate.Mutated()
@@ -49,6 +59,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	if nav.IsBack(msg) {
 		return m.handleBack(notifyCmd)
+	}
+	if nav.IsForceQuit(msg) {
+		return m.attemptQuit(notifyCmd)
 	}
 
 	if size, ok := msg.(tea.WindowSizeMsg); ok {
@@ -96,13 +109,28 @@ func (m Model) handleOpen(vs nav.ViewState, notifyCmd tea.Cmd) (Model, tea.Cmd) 
 func (m Model) handleBack(notifyCmd tea.Cmd) (Model, tea.Cmd) {
 	_, quit := m.navState.Back()
 	if quit {
-		return m, tea.Batch(notifyCmd, tea.Quit)
+		return m.attemptQuit(notifyCmd)
 	}
 	popped := m.history[len(m.history)-1]
 	m.history = m.history[:len(m.history)-1]
 	m.restoreLogSelectionFromPoppedPage(popped)
 	return m, tea.Batch(notifyCmd, tea.ClearScreen, onPageDeactivatedCmd(popped.model), onPageActivatedCmd(m.activePage().model), m.resizeCurrentCmd())
 
+}
+
+// attemptQuit is the single place that decides whether gx actually exits:
+// handleBack reaches it after unwinding the nav stack to empty, and
+// nav.ForceQuit (ctrl+c) reaches it directly since ctrl+c bypasses the stack
+// entirely. See canQuit for the guard it applies.
+func (m Model) attemptQuit(notifyCmd tea.Cmd) (Model, tea.Cmd) {
+	if !m.canQuit() {
+		m.quitConfirm = m.quitConfirm.Open(confirm.Options{
+			Prompt:    "A ralph-loop is in progress — closing gx may leave the worktree mid-operation. Quit anyway?",
+			AcceptCmd: tea.Quit,
+		})
+		return m, notifyCmd
+	}
+	return m, tea.Batch(notifyCmd, tea.Quit)
 }
 
 func viewStateOf(model tea.Model) (nav.ViewState, bool) {

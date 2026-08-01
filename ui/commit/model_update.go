@@ -4,12 +4,16 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/imagediff"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/reword"
 )
 
 func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	// ctrl+c quits unconditionally even when a modal is open.
 	if kp, ok := msg.(tea.KeyPressMsg); ok && kp.String() == "ctrl+c" {
+		if m.settings.EnableNavigation {
+			return m, nav.ForceQuit()
+		}
 		return m, tea.Quit
 	}
 

@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/imagediff"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/search"
 
@@ -204,6 +205,9 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		if m.runningOpen && !m.runningDone && m.runningRunner != nil {
 			m.runningRunner.Cancel()
 			return m, notify.Info("cancel requested")
+		}
+		if m.settings.EnableNavigation {
+			return m, nav.ForceQuit()
 		}
 		return m, tea.Quit
 	}

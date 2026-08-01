@@ -73,6 +73,10 @@ type switchMsg struct {
 
 type backMsg struct{}
 
+// forceQuitMsg is ctrl+c's "quit right now, regardless of nav depth" signal —
+// distinct from backMsg, which unwinds the history stack one level at a time.
+type forceQuitMsg struct{}
+
 type viewStateChangedMsg struct {
 	ViewState ViewState
 }
@@ -115,6 +119,20 @@ func IsSwitch(msg tea.Msg) (ViewState, bool) {
 
 func IsBack(msg tea.Msg) bool {
 	_, ok := msg.(backMsg)
+	return ok
+}
+
+// ForceQuit signals ctrl+c's unconditional-quit intent, still subject to the
+// app shell's quit guard (see handleForceQuit) — the same guard handleBack
+// applies, but without unwinding the nav stack first.
+func ForceQuit() tea.Cmd {
+	return func() tea.Msg {
+		return forceQuitMsg{}
+	}
+}
+
+func IsForceQuit(msg tea.Msg) bool {
+	_, ok := msg.(forceQuitMsg)
 	return ok
 }
 

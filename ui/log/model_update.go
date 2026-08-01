@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/commit"
 	"github.com/elentok/gx/ui/imagediff"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/reword"
 
@@ -25,6 +26,9 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 
 	// ctrl+c quits unconditionally even when a modal is open.
 	if kp, ok := msg.(tea.KeyPressMsg); ok && kp.String() == "ctrl+c" {
+		if m.settings.EnableNavigation {
+			return m, nav.ForceQuit()
+		}
 		return m, tea.Quit
 	}
 
