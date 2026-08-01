@@ -303,20 +303,24 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 }
 
 // allSettled reports whether every ticket in e has reached a terminal state
-// from the loop's perspective: done, or needs-info (an iteration that
-// finished with no commits to land, left for inspection). Unlike
+// from the loop's perspective: done, needs-info (an iteration that finished
+// with no commits to land, left for inspection), or needs-attention (Codex
+// operator intervention, or a done ticket startup reconciliation found
+// unrecoverable — see markDoneTicketUnrecoverable). Unlike
 // tickets.Epic.AllDone — which only tickets in the done family and is shared
-// with the tickets UI's collapse/expand rendering — needs-info counts as
-// terminal here too, so the loop can exit cleanly once every remaining
-// ticket is either landed or stuck needing a human, rather than looping
-// forever (Frontier already excludes needs-info from scheduling).
+// with the tickets UI's collapse/expand rendering — these count as terminal
+// here too, so the loop can exit cleanly once every remaining ticket is
+// either landed or stuck needing a human, rather than looping forever
+// (Frontier already excludes both from scheduling). A needs-attention ticket
+// still tied to a live, running iteration keeps active above zero until that
+// iteration settles, so this doesn't race the gate-pause path in Run.
 func allSettled(e tickets.Epic) bool {
 	if len(e.Tickets) == 0 {
 		return false
 	}
 	for _, t := range e.Tickets {
 		switch e.RenderedStatus(t) {
-		case tickets.StatusDone, tickets.StatusNeedsInfo:
+		case tickets.StatusDone, tickets.StatusNeedsInfo, tickets.StatusNeedsAttention:
 		default:
 			return false
 		}

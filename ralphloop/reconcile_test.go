@@ -301,7 +301,12 @@ func TestClassifyDoneTicket_LiveTabCountsAsLeftover(t *testing.T) {
 // reconcile() entrypoint (not just classifyDoneTicket in isolation): a done
 // ticket whose landed commit went missing is reported, but reconcile doesn't
 // touch its status or the reattached list — repair is a later ticket's job.
-func TestReconcile_DoneTicketMismatch_ReportedNotRepaired(t *testing.T) {
+// TestReconcile_DoneTicketUnrecoverable_MarkedNeedsAttention exercises ticket
+// 03: a done ticket classified doneUnrecoverable (its landed commit missing
+// from the feature branch, no iteration branch left to recover it from) must
+// not be silently reverted to open or left marked done — it's flagged
+// needs-attention for a human to inspect, with a reason and a logged event.
+func TestReconcile_DoneTicketUnrecoverable_MarkedNeedsAttention(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"03-c.md": "# C\n\n**Status:** done\n",
 	})
@@ -333,8 +338,8 @@ func TestReconcile_DoneTicketMismatch_ReportedNotRepaired(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "Status:** done") {
-		t.Errorf("ticket status changed unexpectedly:\n%s", raw)
+	if !strings.Contains(string(raw), "Status:** needs-attention") {
+		t.Errorf("ticket not marked needs-attention:\n%s", raw)
 	}
 
 	found := false
@@ -345,6 +350,26 @@ func TestReconcile_DoneTicketMismatch_ReportedNotRepaired(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("reports = %v, want an unrecoverable-mismatch report for ticket 03", reports)
+	}
+
+	events, ok, err := readEvents(scratchDir, "epic")
+	if err != nil {
+		t.Fatalf("readEvents: %v", err)
+	}
+	if !ok {
+		t.Fatalf("readEvents: run log not found")
+	}
+	var attentionEvent *Event
+	for i := range events {
+		if events[i].Type == eventNeedsAttention && events[i].Ticket == 3 {
+			attentionEvent = &events[i]
+		}
+	}
+	if attentionEvent == nil {
+		t.Fatalf("events = %v, want a needs-attention event for ticket 3", events)
+	}
+	if attentionEvent.Reason == "" {
+		t.Errorf("needs-attention event has no reason")
 	}
 }
 

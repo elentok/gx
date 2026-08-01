@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/tickets"
 )
 
 // writeEpic builds a fixture epic directory under a fresh t.TempDir()'s
@@ -768,5 +769,30 @@ func TestRun_MaxParallelTwo_RunsExactlyTwoConcurrentlyAndBackfills(t *testing.T)
 	}
 	if len(*removed) != 3 {
 		t.Errorf("removed worktree branches = %v, want 3 entries", *removed)
+	}
+}
+
+// TestAllSettled_NeedsAttentionCountsAsTerminal exercises ticket 03's exit
+// requirement: a needs-attention ticket (whether Codex's own operator-
+// intervention path, or startup reconciliation's unrecoverable-done flag)
+// must not keep the loop spinning forever the way an open/claimed/blocked
+// ticket would.
+func TestAllSettled_NeedsAttentionCountsAsTerminal(t *testing.T) {
+	epic := tickets.Epic{Tickets: []tickets.Ticket{
+		{Number: 1, Status: "done"},
+		{Number: 2, Status: "needs-attention"},
+	}}
+	if !allSettled(epic) {
+		t.Errorf("allSettled() = false, want true when every ticket is done or needs-attention")
+	}
+}
+
+func TestAllSettled_OpenTicketNotSettled(t *testing.T) {
+	epic := tickets.Epic{Tickets: []tickets.Ticket{
+		{Number: 1, Status: "done"},
+		{Number: 2, Status: "open"},
+	}}
+	if allSettled(epic) {
+		t.Errorf("allSettled() = true, want false while ticket 2 is still open")
 	}
 }

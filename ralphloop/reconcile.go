@@ -116,7 +116,10 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 				return nil, fmt.Errorf("repairing done ticket %d: %w", t.Number, err)
 			}
 		case doneUnrecoverable:
-			report("ticket %02d: done but commits missing from %s and no iteration branch left to recover them\n", t.Number, epic.Name)
+			if err := markDoneTicketUnrecoverable(paths, epic.Name, t); err != nil {
+				return nil, fmt.Errorf("flagging unrecoverable done ticket %d: %w", t.Number, err)
+			}
+			report("ticket %02d: done but commits missing from %s and no iteration branch left to recover them; marked needs-attention\n", t.Number, epic.Name)
 		}
 	}
 
@@ -203,6 +206,24 @@ func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t
 		}
 	}
 
+	return nil
+}
+
+// markDoneTicketUnrecoverable flags a doneUnrecoverable ticket for a human to
+// inspect: its commits never landed on featureBranch and no iteration branch
+// survived to recover them from, so — unlike doneRecoverable — there's
+// nothing here to auto-repair. It reuses the same needs-attention
+// status/event machinery as Codex's own operator-intervention path rather
+// than silently reverting the ticket to open (which would re-run it from
+// scratch without a human ever knowing the first run's result vanished).
+func markDoneTicketUnrecoverable(paths reconcilePaths, featureBranch string, t tickets.Ticket) error {
+	reason := fmt.Sprintf("done but commits missing from %s and iteration branch %s no longer exists to recover them", featureBranch, iterBranch(t.Number))
+	if err := MarkNeedsAttention(t.Path); err != nil {
+		return fmt.Errorf("marking ticket needs-attention: %w", err)
+	}
+	if err := logEvent(paths.ScratchDir, featureBranch, Event{Type: eventNeedsAttention, Ticket: t.Number, Reason: reason}); err != nil {
+		return fmt.Errorf("logging needs-attention event: %w", err)
+	}
 	return nil
 }
 
