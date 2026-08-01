@@ -123,6 +123,9 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 	if epic.WorktreeName != "" {
 		line += " " + worktreeTagStyle.Render("["+epic.WorktreeName+"]")
 	}
+	if m.implementEpic == epic.Name {
+		line += " " + statusClaimedStyle.Render(m.implementSpinner.View()+" running")
+	}
 	return line
 }
 
