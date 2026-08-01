@@ -37,7 +37,7 @@ type reconcileParams struct {
 	Agent            AgentKind
 	Skill            string
 	SmartZone        int
-	Gate             *pauseGate
+	Gate             *Gate
 	ResumeSignalPath string
 	FeatureLock      *sync.Mutex
 	// Sink receives this Run call's lifecycle events, safe to call

@@ -20,7 +20,7 @@ const (
 	// PauseNeedsAttention marks the operator-intervention pause
 	// waitForAttentionRecovery drives (Codex blocked on a permission/
 	// intervention prompt): mechanically it's paused through the same
-	// pauseGate as the other two kinds, but a renderer (see ticket 04a) treats
+	// Gate as the other two kinds, but a renderer (see ticket 04a) treats
 	// it as its own "needs attention" state rather than a generic pause,
 	// since it needs a human at the agent's pane rather than clearing itself
 	// or via `gx ralph-loop resume`.

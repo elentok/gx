@@ -103,6 +103,12 @@ type RunOptions struct {
 	RepoDir     string    // repo root passed as the herdr workspace/worktree cwd
 	MaxParallel int       // defaults to defaultMaxParallel; how many iterations run concurrently
 	SmartZone   int       // defaults to defaultSmartZone; context-token ceiling before pausing an iteration
+	// Gate, if set, is used instead of a fresh one Run would otherwise create
+	// internally — the caller's way to keep a reference for in-process
+	// resume/recheck (Gate.ForceResume) once the loop is running, e.g. a TUI
+	// sharing this process with Run. Headless callers leave this nil and get
+	// today's behavior unchanged.
+	Gate *Gate
 }
 
 // Run drives every unblocked ticket in the named epic to completion, up to
@@ -179,7 +185,10 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	var scheduleMu sync.Mutex
 	var featureMu sync.Mutex
 
-	gate := newPauseGate()
+	gate := opts.Gate
+	if gate == nil {
+		gate = NewGate()
+	}
 	resumePath := resumeSignalPath(scratchDir, opts.EpicName)
 
 	type outcome struct {
@@ -374,7 +383,7 @@ type iterationParams struct {
 	SmartZone int
 	// Gate is the pause/resume coordinator shared by every iteration in this
 	// Run call.
-	Gate *pauseGate
+	Gate *Gate
 	// ResumeSignalPath is where a paused iteration polls for `gx ralph-loop
 	// resume`.
 	ResumeSignalPath string
@@ -558,7 +567,7 @@ func reattachIteration(d Deps, p iterationParams) error {
 		if err := Claim(p.Ticket.Path); err != nil {
 			return fmt.Errorf("restoring ticket to claimed: %w", err)
 		}
-		p.Gate.resumeLabel(label)
+		p.Gate.ForceResume(label)
 		p.Sink.IterationResumed(label, PauseSmartZone)
 		if p.Report != nil {
 			p.Report("resumed %s after restart recheck\n", label)
@@ -817,7 +826,7 @@ type launchAndPromptParams struct {
 	// SmartZone is the context-token ceiling before this agent gets paused.
 	SmartZone int
 	// Gate is the pause/resume coordinator shared across the whole Run call.
-	Gate *pauseGate
+	Gate *Gate
 	// ResumeSignalPath is where a paused agent polls for `gx ralph-loop
 	// resume`.
 	ResumeSignalPath string
@@ -1034,7 +1043,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 					p.sink().IterationPaused(p.Label, PauseRateLimit, reason)
 					p.logAgentEvent(eventPausedRateLimit, sessionID, reason)
 					waitForRateLimitReset(d, p.Pane, token)
-					p.Gate.resumeLabel(p.Label)
+					p.Gate.ForceResume(p.Label)
 					p.sink().IterationResumed(p.Label, PauseRateLimit)
 					p.logLifecycleEvent(eventResumed, sessionID)
 
@@ -1101,7 +1110,7 @@ func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, li
 	p.report("paused %s: %s; waiting for automatic reset\n", p.Label, reason)
 	p.logAgentEvent(eventPausedRateLimit, sessionID, reason)
 	waitForCodexRateLimitReset(d, p.SessionCwd, sessionID, limit)
-	p.Gate.resumeLabel(p.Label)
+	p.Gate.ForceResume(p.Label)
 	p.report("resumed %s after Codex quota reset\n", p.Label)
 	p.logLifecycleEvent(eventResumed, sessionID)
 
@@ -1151,7 +1160,7 @@ func waitForAttentionRecovery(d Deps, p launchAndPromptParams, sessionID string)
 			if err := Claim(p.TicketPath); err != nil {
 				return fmt.Errorf("restoring ticket to claimed: %w", err)
 			}
-			p.Gate.resumeLabel(p.Label)
+			p.Gate.ForceResume(p.Label)
 			p.sink().IterationResumed(p.Label, PauseNeedsAttention)
 			p.logLifecycleEvent(eventResumed, sessionID)
 			return nil
@@ -1178,7 +1187,7 @@ func waitForAttentionRecovery(d Deps, p launchAndPromptParams, sessionID string)
 		if err := Claim(p.TicketPath); err != nil {
 			return fmt.Errorf("restoring ticket to claimed: %w", err)
 		}
-		p.Gate.resumeLabel(p.Label)
+		p.Gate.ForceResume(p.Label)
 		p.sink().IterationResumed(p.Label, PauseNeedsAttention)
 		p.logLifecycleEvent(eventResumed, sessionID)
 		return nil

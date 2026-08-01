@@ -289,6 +289,59 @@ func TestFlatTUI_EnterSurfacesTabFocusError(t *testing.T) {
 	waitForFlatText(t, tm, "tab_not_found")
 }
 
+// TestFlatTUI_PausedAndAttentionBanner_AppearsAndDisappears covers ticket
+// 06a's banner: it appears above the plain "? help" footer with
+// state-specific copy for a smart-zone/rate-limit pause and for a
+// needs-attention pause, and disappears once its ticket's IterationResumed
+// event arrives (the same event waitForAttentionRecovery's automatic pane
+// recovery emits, with no operator action).
+func TestFlatTUI_PausedAndAttentionBanner_AppearsAndDisappears(t *testing.T) {
+	root := t.TempDir()
+	writeFlatTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nFirst body.\n")
+	writeFlatTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nSecond body.\n")
+
+	events := make(chan ralphloop.LiveEvent, 16)
+	m := tickets.NewFlatModel(root, "my-epic", ui.Settings{}).WithLiveEvents(events)
+	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(flatTermWidth, flatTermHeight))
+	defer tm.Quit()
+
+	waitForFlatText(t, tm, "? help")
+	if bytes.Contains(tm.CurrentFrame(), []byte("Ralph loop")) {
+		t.Fatalf("expected no banner before any pause, got:\n%s", tm.CurrentFrame())
+	}
+
+	events <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Identifier: "01", Label: "iter-01"}
+	waitForFlatText(t, tm, "iter-01")
+	events <- ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationPaused, Label: "iter-01",
+		PauseKind: ralphloop.PauseSmartZone, Reason: "context budget exceeded",
+	}
+	waitForFlatText(t, tm, "Ralph loop paused — context budget exceeded.")
+
+	events <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationResumed, Label: "iter-01"}
+	waitForFlatText(t, tm, "iter-01")
+	if bytes.Contains(tm.CurrentFrame(), []byte("Ralph loop paused")) {
+		t.Fatalf("expected the paused banner to disappear once iter-01 resumed, got:\n%s", tm.CurrentFrame())
+	}
+
+	events <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Identifier: "02", Label: "iter-02"}
+	waitForFlatText(t, tm, "iter-02")
+	events <- ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationPaused, Label: "iter-02",
+		PauseKind: ralphloop.PauseNeedsAttention, Reason: "Codex is waiting for operator intervention",
+	}
+	waitForFlatText(t, tm, "Ralph loop needs attention — Codex is waiting for operator intervention.")
+
+	// The pane recovering on its own (no operator action, no modal) resumes
+	// the iteration and clears the banner — mirroring waitForAttentionRecovery
+	// noticing the pane left "blocked" and emitting IterationResumed itself.
+	events <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationResumed, Label: "iter-02"}
+	waitForFlatText(t, tm, "iter-02")
+	if bytes.Contains(tm.CurrentFrame(), []byte("Ralph loop")) {
+		t.Fatalf("expected the needs-attention banner to disappear once iter-02's pane recovered, got:\n%s", tm.CurrentFrame())
+	}
+}
+
 func TestFlatTUI_EditChordCancels(t *testing.T) {
 	root := t.TempDir()
 	writeFlatTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")

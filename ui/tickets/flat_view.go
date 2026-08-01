@@ -46,12 +46,15 @@ func (m FlatModel) normalView() string {
 	listView := m.renderPanel(listW, h, m.titleLine(), "", m.listLines(), m.focus == flatFocusList, true)
 	previewView := m.renderPanel(previewW, h, "Preview", m.previewMatchStatus(), m.previewLines(), m.focus == flatFocusPreview, false)
 
+	var body string
 	if m.flatUseStackedLayout() {
 		seam := ui.RenderSeamRow(listW, ui.SeamColor)
-		return lipgloss.JoinVertical(lipgloss.Left, listView, seam, previewView)
+		body = lipgloss.JoinVertical(lipgloss.Left, listView, seam, previewView)
+	} else {
+		seam := ui.RenderSeamColumn(h, ui.SeamColor)
+		body = lipgloss.JoinHorizontal(lipgloss.Top, listView, seam, previewView)
 	}
-	seam := ui.RenderSeamColumn(h, ui.SeamColor)
-	return lipgloss.JoinHorizontal(lipgloss.Top, listView, seam, previewView)
+	return lipgloss.JoinVertical(lipgloss.Left, body, m.footerView())
 }
 
 func (m FlatModel) renderPanel(width, height int, title, rightTitle string, lines []string, active, sidebar bool) string {

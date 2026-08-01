@@ -17,14 +17,14 @@ import (
 )
 
 func TestPauseGate_NotPausedInitially(t *testing.T) {
-	g := newPauseGate()
+	g := NewGate()
 	if g.isPaused() {
 		t.Error("isPaused() = true for a fresh gate, want false")
 	}
 }
 
 func TestPauseGate_PauseMarksPausedAndRecordsReason(t *testing.T) {
-	g := newPauseGate()
+	g := NewGate()
 	g.pause("iter-01", "context occupancy breach")
 
 	if !g.isPaused() {
@@ -36,7 +36,7 @@ func TestPauseGate_PauseMarksPausedAndRecordsReason(t *testing.T) {
 }
 
 func TestPauseGate_MultiplePausedIterations_AllStayPausedUntilOneResumeSignal(t *testing.T) {
-	g := newPauseGate()
+	g := NewGate()
 	g.pause("iter-01", "breach one")
 	g.pause("iter-02", "breach two")
 
@@ -74,7 +74,7 @@ func TestPauseGate_MultiplePausedIterations_AllStayPausedUntilOneResumeSignal(t 
 }
 
 func TestPauseGate_WaitForResume_BlocksUntilSignaled(t *testing.T) {
-	g := newPauseGate()
+	g := NewGate()
 	g.pause("iter-01", "breach")
 
 	var mu sync.Mutex
@@ -111,8 +111,66 @@ func TestPauseGate_WaitForResume_BlocksUntilSignaled(t *testing.T) {
 	}
 }
 
+// TestPauseGate_ForceResume_WakesWaiterWithoutWaitingForSleep is the
+// in-process control path's whole point: unlike a `gx ralph-loop resume`
+// file signal, which the leader only notices on its next resumePollInterval
+// tick, ForceResume must release a waiter immediately — even mid-tick, with
+// Sleep still blocked and ResumeSignaled still reporting false.
+func TestPauseGate_ForceResume_WakesWaiterWithoutWaitingForSleep(t *testing.T) {
+	g := NewGate()
+	g.pause("iter-01", "breach")
+
+	sleepStarted := make(chan struct{})
+	sleepBlock := make(chan struct{})
+	d := Deps{
+		ResumeSignaled: func(path string) (bool, error) { return false, nil },
+		Sleep: func(time.Duration) {
+			close(sleepStarted)
+			<-sleepBlock // never closed here: a real poll tick would still be blocked
+		},
+	}
+
+	returned := make(chan struct{})
+	go func() {
+		g.waitForResume(d, "unused")
+		close(returned)
+	}()
+
+	select {
+	case <-sleepStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("waitForResume() never reached its poll-interval sleep")
+	}
+
+	if wasPaused := g.ForceResume("iter-01"); !wasPaused {
+		t.Fatal("ForceResume(\"iter-01\") = false, want true: iter-01 was paused")
+	}
+
+	select {
+	case <-returned:
+	case <-time.After(2 * time.Second):
+		t.Fatal("waitForResume() did not return after ForceResume, even with Sleep still blocked")
+	}
+
+	if g.isPaused() {
+		t.Error("isPaused() = true after ForceResume, want false")
+	}
+}
+
+func TestPauseGate_ForceResume_UnknownLabelReturnsFalse(t *testing.T) {
+	g := NewGate()
+	g.pause("iter-01", "breach")
+
+	if g.ForceResume("iter-02") {
+		t.Error("ForceResume(unpaused label) = true, want false")
+	}
+	if !g.isPaused() {
+		t.Error("isPaused() = false after ForceResume of an unrelated label, want true: iter-01 is still paused")
+	}
+}
+
 func TestWaitForFinish_CodexContextBreachPausesAndResumes(t *testing.T) {
-	gate := newPauseGate()
+	gate := NewGate()
 	var waits int
 	var interrupted bool
 	var observedCwd, observedSession string
@@ -162,7 +220,7 @@ func TestWaitForFinish_CodexContextBreachPausesAndResumes(t *testing.T) {
 func TestWaitForFinish_CodexBlockedMarksNeedsAttentionThenRecovers(t *testing.T) {
 	ticketPath := writeTicket(t, "# Ticket\n\n**Status:** claimed\n")
 	scratchDir := t.TempDir()
-	gate := newPauseGate()
+	gate := NewGate()
 	var waits int
 	var sawNeedsAttention bool
 	d := Deps{
@@ -217,7 +275,7 @@ func TestWaitForFinish_CodexBlockedMarksNeedsAttentionThenRecovers(t *testing.T)
 
 func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsAttention(t *testing.T) {
 	ticketPath := writeTicket(t, "# Ticket\n\n**Status:** claimed\n")
-	gate := newPauseGate()
+	gate := NewGate()
 	var waits, prompts, quotaChecks int
 	d := Deps{
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
@@ -281,7 +339,7 @@ func TestWaitForFinish_CodexIgnoresClaudeTerminalRateLimitText(t *testing.T) {
 	}
 
 	if err := waitForFinish(d, launchAndPromptParams{
-		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Gate: newPauseGate(),
+		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Gate: NewGate(),
 	}, "codex-session-1"); err != nil {
 		t.Fatalf("waitForFinish: %v", err)
 	}
@@ -293,7 +351,7 @@ func TestWaitForFinish_CodexIgnoresClaudeTerminalRateLimitText(t *testing.T) {
 func TestWaitForFinish_ManualAttentionRecheckKeepsBlockedTicketPaused(t *testing.T) {
 	ticketPath := writeTicket(t, "# Ticket\n\n**Status:** claimed\n")
 	scratchDir := t.TempDir()
-	gate := newPauseGate()
+	gate := NewGate()
 	var waits int
 	var reports strings.Builder
 	d := Deps{

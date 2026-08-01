@@ -27,7 +27,7 @@ func testReconcileParams(workspaceID string, paths reconcilePaths, sink EventSin
 		Paths:       paths,
 		Agent:       AgentClaude,
 		SmartZone:   defaultSmartZone,
-		Gate:        newPauseGate(),
+		Gate:        NewGate(),
 		FeatureLock: &sync.Mutex{},
 		Sink:        sink,
 	}

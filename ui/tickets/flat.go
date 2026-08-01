@@ -327,7 +327,7 @@ func (m FlatModel) flatUseStackedLayout() bool {
 }
 
 func (m FlatModel) flatContentHeight() int {
-	h := m.height
+	h := m.height - m.footerLineCount()
 	if m.flatUseStackedLayout() {
 		h -= 1
 	}
