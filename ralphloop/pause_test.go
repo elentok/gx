@@ -202,11 +202,12 @@ func TestPauseGate_ForceResumeBeforePause_WaitForResumeReturnsImmediately(t *tes
 	}
 }
 
-func TestWaitForFinish_CodexContextBreachPausesAndResumes(t *testing.T) {
+func TestWaitForFinish_CodexContextBreachRecoversViaCompactAndFinishPrompt(t *testing.T) {
 	gate := NewGate()
 	var waits int
 	var interrupted bool
 	var observedCwd, observedSession string
+	var prompts []string
 	d := Deps{
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
 			waits++
@@ -219,11 +220,15 @@ func TestWaitForFinish_CodexContextBreachPausesAndResumes(t *testing.T) {
 			interrupted = slices.Equal(keys, []string{"ctrl+c"})
 			return nil
 		},
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			prompts = append(prompts, opts.Text)
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
+		},
 		ReadCodexContext: func(cwd, sessionID string) (int, bool, error) {
 			observedCwd, observedSession = cwd, sessionID
 			return 150001, true, nil
 		},
-		ResumeSignaled: func(path string) (bool, error) { return true, nil },
+		ResumeSignaled: func(path string) (bool, error) { return false, nil },
 		Sleep:          func(time.Duration) {},
 	}
 
@@ -245,8 +250,11 @@ func TestWaitForFinish_CodexContextBreachPausesAndResumes(t *testing.T) {
 	if observedCwd != "/repo/iter-01" || observedSession != "codex-session-1" {
 		t.Errorf("ReadCodexContext(%q, %q), want (/repo/iter-01, codex-session-1)", observedCwd, observedSession)
 	}
+	if len(prompts) != 2 || prompts[0] != "/compact" || !strings.Contains(prompts[1], "150000") {
+		t.Errorf("prompts = %v, want [/compact, <finish-up prompt mentioning 150000>]", prompts)
+	}
 	if gate.isPaused() {
-		t.Error("gate remains paused after the resume signal")
+		t.Error("gate.isPaused() = true, want smart-zone recovery to never pause the Gate")
 	}
 }
 
@@ -455,28 +463,19 @@ func TestResume_CreatesEpicDirIfMissing(t *testing.T) {
 	}
 }
 
-// TestRun_SmartZoneBreach_PausesResumesAndKeepsSchedulingCorrect drives a
-// full Run() through: iter-01 breaching the smart zone (Ctrl-C sent, ticket
-// stays claimed, no new ticket scheduled while paused, other running
-// iterations finish normally), a `gx ralph-loop resume` signal waking it,
-// and the loop then correctly backfilling and completing the epic.
-func TestRun_SmartZoneBreach_PausesResumesAndKeepsSchedulingCorrect(t *testing.T) {
+// TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler drives a full
+// Run() through: iter-01 breaching the smart zone (Ctrl-C sent, then a
+// `/compact` prompt, then a finish-up prompt mentioning the effective
+// --smart-zone value), while the scheduler never blocks on it — other
+// iterations keep running and backfilling — and the loop then correctly
+// completes the epic once iter-01 re-enters its wait step and finishes.
+func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "# A\n\n**Status:** open\n",
 		"02-b.md": "# B\n\n**Status:** open\n",
 		"03-c.md": "# C\n\n**Status:** open\n",
 	})
 	d, _, removed := fakeDeps()
-
-	var mu sync.Mutex
-	var createdBranches []string
-	origAddWorktree := d.AddWorktree
-	d.AddWorktree = func(repoDir, path, branch, base string) error {
-		mu.Lock()
-		createdBranches = append(createdBranches, branch)
-		mu.Unlock()
-		return origAddWorktree(repoDir, path, branch, base)
-	}
 
 	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
 		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-" + opts.Pane}, nil
@@ -508,17 +507,13 @@ func TestRun_SmartZoneBreach_PausesResumesAndKeepsSchedulingCorrect(t *testing.T
 		return nil
 	}
 
-	var resumeMu sync.Mutex
-	resumeAllowed := false
-	d.ResumeSignaled = func(path string) (bool, error) {
-		resumeMu.Lock()
-		defer resumeMu.Unlock()
-		if resumeAllowed {
-			resumeAllowed = false
-			return true, nil
-		}
-		return false, nil
+	promptCh := make(chan string, 8)
+	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+		promptCh <- opts.Text
+		return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
 	}
+
+	d.ResumeSignaled = func(path string) (bool, error) { return false, nil }
 	d.Sleep = func(time.Duration) {}
 
 	var out bytes.Buffer
@@ -530,12 +525,24 @@ func TestRun_SmartZoneBreach_PausesResumesAndKeepsSchedulingCorrect(t *testing.T
 		}, d, NewTextEventSink(&out))
 	}()
 
-	// iter-01 and iter-02 both claimed and started (2 slots).
-	pane2 := <-started
-
 	keys := <-sendKeysCh
 	if len(keys) == 0 || keys[0] != "ctrl+c" {
 		t.Fatalf("AgentSendKeys keys = %v, want [ctrl+c]", keys)
+	}
+
+	// Drain the two iterations' initial launch prompts (order not
+	// guaranteed) before the breach recovery's own /compact prompt shows up.
+	for {
+		if got := <-promptCh; got == "/compact" {
+			break
+		}
+	}
+	finishPrompt := <-promptCh
+	if !strings.Contains(finishPrompt, "110000") {
+		t.Errorf("finish-up prompt = %q, want it to mention the effective --smart-zone value 110000", finishPrompt)
+	}
+	if !strings.Contains(finishPrompt, "implement") {
+		t.Errorf("finish-up prompt = %q, want it to reference the implement skill", finishPrompt)
 	}
 
 	raw01, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
@@ -543,48 +550,29 @@ func TestRun_SmartZoneBreach_PausesResumesAndKeepsSchedulingCorrect(t *testing.T
 		t.Fatalf("ReadFile: %v", err)
 	}
 	if !strings.Contains(string(raw01), "Status:** claimed") {
-		t.Errorf("ticket 01 status = %s, want claimed (paused, not reverted or done) while paused", raw01)
+		t.Errorf("ticket 01 status = %s, want claimed while recovering", raw01)
 	}
 
-	// iter-02 finishes normally while iter-01 stays paused.
-	release(pane2)
-
-	// Give the scheduler a moment to (wrongly, if buggy) backfill a third
-	// ticket while still paused, then confirm it didn't.
-	time.Sleep(50 * time.Millisecond)
-	mu.Lock()
-	createdSoFar := slices.Clone(createdBranches)
-	mu.Unlock()
-	if len(createdSoFar) != 3 { // feature worktree + iter-01 + iter-02
-		t.Fatalf("worktrees created while paused = %v, want exactly [epic, iter-01, iter-02] (no backfill until resumed)", createdSoFar)
-	}
-
-	// The run-log is readable and shows the pause while the run is still
-	// blocked mid-pause, not only after Run() eventually returns.
-	midPauseEvents, midPauseOK, midPauseErr := readEvents(scratchDir, "epic")
-	if midPauseErr != nil || !midPauseOK {
-		t.Fatalf("readEvents mid-pause: ok=%v err=%v", midPauseOK, midPauseErr)
-	}
-	sawPause := false
-	for _, ev := range midPauseEvents {
-		if ev.Type == eventPausedSmartZone && ev.Ticket == "01" {
-			sawPause = true
+	// iter-01 and iter-02 both reach their gated wait (2 slots) — order
+	// between iter-02's ordinary registration and iter-01's post-recovery
+	// re-registration isn't guaranteed, since nothing blocks iter-01
+	// between the breach and re-entering the poll loop anymore.
+	var pane1, pane2 string
+	for range 2 {
+		p := <-started
+		if strings.Contains(p, "iter-01") {
+			pane1 = p
+		} else {
+			pane2 = p
 		}
 	}
-	if !sawPause {
-		t.Errorf("mid-pause events = %+v, want a paused-smart-zone event for ticket 1", midPauseEvents)
-	}
 
-	resumeMu.Lock()
-	resumeAllowed = true
-	resumeMu.Unlock()
-
-	// iter-01 re-enters its wait step post-resume and finishes normally.
-	pane1 := <-started
-	release(pane1)
-
-	// Ticket 03 is now backfilled since the pause cleared.
+	// iter-02 finishes and ticket 03 backfills immediately, even though
+	// iter-01 is still mid-recovery — proving the scheduler was never
+	// blocked by the smart-zone breach (no Gate.pause on this path).
+	release(pane2)
 	pane3 := <-started
+	release(pane1)
 	release(pane3)
 
 	if err := <-errCh; err != nil {
@@ -603,20 +591,15 @@ func TestRun_SmartZoneBreach_PausesResumesAndKeepsSchedulingCorrect(t *testing.T
 	}
 }
 
-// TestRun_SmartZoneBreach_ForceResumeViaGateWakesWithoutFileSignal drives a
-// full Run() through a smart-zone pause, exactly like
-// TestRun_SmartZoneBreach_PausesResumesAndKeepsSchedulingCorrect, but proves
-// the in-process resume path added in ticket 06a actually works end-to-end:
-// d.ResumeSignaled is hardcoded to always return false (so the file-signal
-// path can never be what unblocks the run) and d.Sleep is a no-op, yet
-// calling RunOptions.Gate.ForceResume directly from the test goroutine —
-// once it has observed the gate as paused — still wakes iter-01 and lets the
-// epic complete.
-func TestRun_SmartZoneBreach_ForceResumeViaGateWakesWithoutFileSignal(t *testing.T) {
+// TestRun_SmartZoneBreach_RepeatsWithNoRetryCap drives a full Run() through
+// iter-01 breaching the smart zone twice in a row before finally settling:
+// each breach fires its own Ctrl-C -> /compact -> finish-up cycle, and the
+// scheduler's Gate is never paused by either one, matching the "no retry
+// cap" and "Gate.isPaused() stays false throughout" requirements that
+// distinguish this recovery path from rate-limit/needs-attention pauses.
+func TestRun_SmartZoneBreach_RepeatsWithNoRetryCap(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "# A\n\n**Status:** open\n",
-		"02-b.md": "# B\n\n**Status:** open\n",
-		"03-c.md": "# C\n\n**Status:** open\n",
 	})
 	d, _, removed := fakeDeps()
 
@@ -625,12 +608,17 @@ func TestRun_SmartZoneBreach_ForceResumeViaGateWakesWithoutFileSignal(t *testing
 	}
 
 	wait, started, release := gatedAgentWait(d.AgentWait)
-	var breachOnce sync.Once
+	var breaches int
+	var breachMu sync.Mutex
 	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
 		if slices.Contains(opts.Until, "done") && strings.Contains(opts.Target, "iter-01") {
-			breached := false
-			breachOnce.Do(func() { breached = true })
-			if breached {
+			breachMu.Lock()
+			fire := breaches < 2
+			if fire {
+				breaches++
+			}
+			breachMu.Unlock()
+			if fire {
 				return herdr.Agent{}, errors.New("timed out waiting for agent status")
 			}
 		}
@@ -638,83 +626,63 @@ func TestRun_SmartZoneBreach_ForceResumeViaGateWakesWithoutFileSignal(t *testing
 	}
 
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
-		if strings.Contains(cwd, "iter-01") {
-			return 999999, true, nil
-		}
-		return 0, false, nil
+		return 999999, true, nil
 	}
 
-	sendKeysCh := make(chan []string, 1)
+	sendKeysCh := make(chan []string, 8)
 	d.AgentSendKeys = func(target string, keys ...string) error {
 		sendKeysCh <- keys
 		return nil
 	}
 
-	// Never true: only ForceResume, never a `gx ralph-loop resume` file
-	// signal, is allowed to unblock this run.
+	promptCh := make(chan string, 8)
+	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+		promptCh <- opts.Text
+		return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
+	}
+
+	gate := NewGate()
 	d.ResumeSignaled = func(path string) (bool, error) { return false, nil }
 	d.Sleep = func(time.Duration) {}
 
-	gate := NewGate()
 	var out bytes.Buffer
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- Run(RunOptions{
 			EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
-			MaxParallel: 2, Gate: gate,
+			MaxParallel: 1, Gate: gate,
 		}, d, NewTextEventSink(&out))
 	}()
 
-	// iter-01 and iter-02 both claimed and started (2 slots).
-	pane2 := <-started
-
-	keys := <-sendKeysCh
-	if len(keys) == 0 || keys[0] != "ctrl+c" {
-		t.Fatalf("AgentSendKeys keys = %v, want [ctrl+c]", keys)
-	}
-
-	// Wait for the gate to actually record iter-01 as paused before forcing
-	// resume, so ForceResume has something to clear rather than racing
-	// ahead of pause() (see
-	// TestPauseGate_ForceResumeBeforePause_WaitForResumeReturnsImmediately).
-	deadline := time.After(2 * time.Second)
-	for !gate.isPaused() {
-		select {
-		case <-deadline:
-			t.Fatal("gate never observed as paused")
-		default:
-			time.Sleep(time.Millisecond)
+	for i := range 2 {
+		keys := <-sendKeysCh
+		if len(keys) == 0 || keys[0] != "ctrl+c" {
+			t.Fatalf("breach %d: AgentSendKeys keys = %v, want [ctrl+c]", i, keys)
+		}
+		// Drain the iteration's own initial launch prompt (only present
+		// ahead of the very first breach) before the recovery's /compact.
+		for {
+			if got := <-promptCh; got == "/compact" {
+				break
+			}
+		}
+		if got := <-promptCh; !strings.Contains(got, "110000") {
+			t.Fatalf("breach %d: finish-up prompt = %q, want it to mention 110000", i, got)
+		}
+		if gate.isPaused() {
+			t.Fatalf("breach %d: gate.isPaused() = true, want the scheduler never blocked by smart-zone recovery", i)
 		}
 	}
 
-	// iter-02 finishes normally while iter-01 stays paused.
-	release(pane2)
-
-	if !gate.ForceResume("iter-01") {
-		t.Fatal("ForceResume(iter-01) = false, want true")
-	}
-
-	// iter-01 re-enters its wait step post-resume and finishes normally.
 	pane1 := <-started
 	release(pane1)
-
-	// Ticket 03 is now backfilled since the pause cleared.
-	pane3 := <-started
-	release(pane3)
 
 	if err := <-errCh; err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	if len(*removed) != 3 {
-		t.Errorf("removed worktree branches = %v, want all 3 iterations removed", *removed)
-	}
-
-	if !strings.Contains(out.String(), "paused iter-01") {
-		t.Errorf("output = %q, want a paused report mentioning iter-01", out.String())
-	}
-	if !strings.Contains(out.String(), "resumed iter-01") {
-		t.Errorf("output = %q, want a resumed report mentioning iter-01", out.String())
+	if len(*removed) != 1 {
+		t.Errorf("removed worktree branches = %v, want the single iteration removed", *removed)
 	}
 }
 

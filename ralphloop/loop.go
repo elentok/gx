@@ -28,7 +28,7 @@ const defaultMaxParallel = 2
 
 // defaultSmartZone is the context-token ceiling used when
 // RunOptions.SmartZone is unset.
-const defaultSmartZone = 150_000
+const defaultSmartZone = 110_000
 
 // smartZonePollMs bounds each "wait for the agent to finish" poll tick, so a
 // running iteration's context occupancy is checked against --smart-zone at
@@ -958,10 +958,11 @@ func alreadyFinished(status string) bool {
 
 // waitForFinish polls Pane until it reaches idle or done, checking the
 // session's current context occupancy against SmartZone on every poll tick
-// that times out rather than settling. A breach interrupts the pane (Ctrl-C,
-// not killed), pauses the whole loop via Gate, and blocks here until a `gx
-// ralph-loop resume` signal arrives — at which point it re-enters this same
-// wait rather than assuming the pause fixed anything.
+// that times out rather than settling. A breach interrupts the pane
+// (Ctrl-C, not killed), then auto-recovers via recoverSmartZoneBreach
+// (compact + finish-up re-prompt) and falls back into normal polling —
+// unlike rate-limit/needs-attention pauses, this never blocks the
+// scheduler via Gate.pause.
 func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 	smartZone := p.SmartZone
 	if smartZone <= 0 {
@@ -1063,14 +1064,49 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			return fmt.Errorf("interrupting %s after smart-zone breach: %w", p.Label, err)
 		}
 		reason := fmt.Sprintf("context occupancy %d exceeds --smart-zone %d", occupancy, smartZone)
-		p.Gate.pause(p.Label, reason)
-		p.sink().IterationPaused(p.Label, PauseSmartZone, reason)
-		p.logAgentEvent(eventPausedSmartZone, sessionID, reason)
-		p.Gate.waitForResume(d, p.ResumeSignalPath)
-		p.sink().IterationResumed(p.Label, PauseSmartZone)
-		p.logLifecycleEvent(eventResumed, sessionID)
+		if err := recoverSmartZoneBreach(d, p, sessionID, reason, smartZone); err != nil {
+			return err
+		}
 		elapsedMs = 0
 	}
+}
+
+// recoverSmartZoneBreach compacts the conversation and re-prompts the agent
+// to finish up after a smart-zone breach, mirroring recoverClaudeRateLimit's
+// pause/resume-event bracketing but deliberately never calling Gate.pause:
+// the scheduler keeps claiming and running other tickets while this
+// iteration recompacts.
+func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason string, smartZone int) error {
+	p.sink().IterationPaused(p.Label, PauseSmartZone, reason)
+	p.logAgentEvent(eventPausedSmartZone, sessionID, reason)
+
+	if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
+		Target: p.Pane,
+		Text:   "/compact",
+		Wait:   true,
+		Until:  []string{"working"},
+	}); err != nil {
+		return fmt.Errorf("compacting %s after smart-zone breach: %w", p.Label, err)
+	}
+
+	finishText := fmt.Sprintf(
+		"I stopped you because you exceeded %d tokens in the context window, I compacted the "+
+			"conversation, please finish up quickly, if needed follow the instructions in the "+
+			"`implement` skill and create follow up tickets",
+		smartZone,
+	)
+	if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
+		Target: p.Pane,
+		Text:   finishText,
+		Wait:   true,
+		Until:  []string{"working"},
+	}); err != nil {
+		return fmt.Errorf("re-prompting %s after smart-zone compact: %w", p.Label, err)
+	}
+
+	p.sink().IterationResumed(p.Label, PauseSmartZone)
+	p.logLifecycleEvent(eventResumed, sessionID)
+	return nil
 }
 
 // confirmFinished debounces a just-reached idle/done signal on pane: it
