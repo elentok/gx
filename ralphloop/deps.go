@@ -4,6 +4,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/transcript"
@@ -44,6 +45,10 @@ type Deps struct {
 	// Code session launched in cwd, or ok=false if its transcript has no
 	// assistant turn yet.
 	ReadOccupancy func(cwd, sessionID string) (occupancy int, ok bool, err error)
+	// ReadCodexContext returns the latest context-token count for the Codex
+	// session launched in cwd, or ok=false until its local session data is
+	// complete enough to identify that worktree and session.
+	ReadCodexContext func(cwd, sessionID string) (tokens int, ok bool, err error)
 	// ReadPaneRecent returns pane's recent terminal output, used to detect a
 	// Claude usage/session rate-limit message.
 	ReadPaneRecent func(pane string) (string, error)
@@ -74,6 +79,7 @@ func DefaultDeps() Deps {
 		CherryPickRange:       git.CherryPickRange,
 		CherryPickInProgress:  git.CherryPickInProgress,
 		ReadOccupancy:         transcript.LastAssistantOccupancy,
+		ReadCodexContext:      codexsession.LastContextTokens,
 		ReadPaneRecent:        defaultReadPaneRecent,
 		ResumeSignaled:        defaultResumeSignaled,
 		Sleep:                 time.Sleep,

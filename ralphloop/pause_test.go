@@ -109,6 +109,54 @@ func TestPauseGate_WaitForResume_BlocksUntilSignaled(t *testing.T) {
 	}
 }
 
+func TestWaitForFinish_CodexContextBreachPausesAndResumes(t *testing.T) {
+	gate := newPauseGate()
+	var waits int
+	var interrupted bool
+	var observedCwd, observedSession string
+	d := Deps{
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			waits++
+			if waits == 1 {
+				return herdr.Agent{}, errors.New("timed out waiting for agent status")
+			}
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentSendKeys: func(target string, keys ...string) error {
+			interrupted = slices.Equal(keys, []string{"ctrl-c"})
+			return nil
+		},
+		ReadCodexContext: func(cwd, sessionID string) (int, bool, error) {
+			observedCwd, observedSession = cwd, sessionID
+			return 150001, true, nil
+		},
+		ResumeSignaled: func(path string) (bool, error) { return true, nil },
+		Sleep:          func(time.Duration) {},
+	}
+
+	err := waitForFinish(d, launchAndPromptParams{
+		Label:            "iter-01",
+		Agent:            AgentCodex,
+		Pane:             "pane-1",
+		SessionCwd:       "/repo/iter-01",
+		SmartZone:        150000,
+		Gate:             gate,
+		ResumeSignalPath: "unused",
+	}, "codex-session-1")
+	if err != nil {
+		t.Fatalf("waitForFinish: %v", err)
+	}
+	if !interrupted {
+		t.Error("AgentSendKeys did not interrupt the Codex pane with ctrl-c")
+	}
+	if observedCwd != "/repo/iter-01" || observedSession != "codex-session-1" {
+		t.Errorf("ReadCodexContext(%q, %q), want (/repo/iter-01, codex-session-1)", observedCwd, observedSession)
+	}
+	if gate.isPaused() {
+		t.Error("gate remains paused after the resume signal")
+	}
+}
+
 func TestResume_WritesSignalFile_ConsumedOnceByDefaultResumeSignaled(t *testing.T) {
 	scratchDir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(scratchDir, "my-epic"), 0755); err != nil {

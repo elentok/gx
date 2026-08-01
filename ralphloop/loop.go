@@ -764,10 +764,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			}
 		}
 
-		if sessionID == "" {
-			continue // no session id to check a transcript against yet
-		}
-		occupancy, ok, occErr := d.ReadOccupancy(p.SessionCwd, sessionID)
+		occupancy, ok, occErr := contextOccupancy(d, p.Agent, p.SessionCwd, sessionID)
 		if occErr != nil || !ok || occupancy <= smartZone {
 			continue
 		}
@@ -784,6 +781,25 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 		p.logLifecycleEvent(eventResumed, sessionID)
 		elapsedMs = 0
 	}
+}
+
+// contextOccupancy reads the selected agent's own local session data. A
+// missing observer is treated like incomplete session data, keeping the
+// running iteration alive instead of falsely pausing it.
+func contextOccupancy(d Deps, agent AgentKind, cwd, sessionID string) (int, bool, error) {
+	if sessionID == "" {
+		return 0, false, nil
+	}
+	if agent == AgentCodex {
+		if d.ReadCodexContext == nil {
+			return 0, false, nil
+		}
+		return d.ReadCodexContext(cwd, sessionID)
+	}
+	if d.ReadOccupancy == nil {
+		return 0, false, nil
+	}
+	return d.ReadOccupancy(cwd, sessionID)
 }
 
 // isPollTimeout reports whether err looks like AgentWait's own
