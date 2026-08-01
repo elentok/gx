@@ -101,7 +101,11 @@ func TestNewModel_ZeroEpicScratchDirRendersSameEmptyStateAsNoScratchDir(t *testi
 	}
 }
 
-func TestNewModel_TicketsGroupedByStatusWithinEpic(t *testing.T) {
+// TestNewModel_TicketsInPlanOrderWithinEpic guards against re-grouping
+// tickets by rendered status: they render in plan order (ticket number
+// ascending) so a ticket never jumps position once it's done, regardless of
+// status — see sortedTicketIndexes.
+func TestNewModel_TicketsInPlanOrderWithinEpic(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-done-ticket.md", "Status: done\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "02-open-ticket.md", "Status: open\n\nBody.\n")
@@ -114,7 +118,7 @@ func TestNewModel_TicketsGroupedByStatusWithinEpic(t *testing.T) {
 	m = updated.(Model)
 
 	content := m.View().Content
-	wantOrder := []string{"Open ticket", "Blocked ticket", "Needs info ticket", "Done ticket"}
+	wantOrder := []string{"Done ticket", "Open ticket", "Needs info ticket", "Blocked ticket"}
 	lastIdx := -1
 	for _, title := range wantOrder {
 		idx := strings.Index(content, title)
@@ -122,7 +126,7 @@ func TestNewModel_TicketsGroupedByStatusWithinEpic(t *testing.T) {
 			t.Fatalf("expected %q in view, got:\n%s", title, content)
 		}
 		if idx < lastIdx {
-			t.Fatalf("expected %q to render after previous group, got:\n%s", title, content)
+			t.Fatalf("expected %q to render in plan (ticket number) order, got:\n%s", title, content)
 		}
 		lastIdx = idx
 	}

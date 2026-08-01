@@ -180,20 +180,3 @@ func (s RenderedStatus) Word() string {
 		return "error"
 	}
 }
-
-// GroupOrder returns s's sort rank for grouping tickets within an epic:
-// unblocked (open/claimed) → blocked → needs-info/needs-attention → done/superseded → error.
-func GroupOrder(s RenderedStatus) int {
-	switch s {
-	case StatusOpen, StatusClaimed:
-		return 0
-	case StatusBlocked:
-		return 1
-	case StatusNeedsInfo, StatusNeedsAttention:
-		return 2
-	case StatusDone, StatusSuperseded:
-		return 3
-	default: // StatusError
-		return 4
-	}
-}

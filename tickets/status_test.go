@@ -187,15 +187,3 @@ func TestEpic_UnresolvedBlockers_LetteredTokenNamesOneSibling(t *testing.T) {
 		t.Errorf("UnresolvedBlockers = %v, want nil — 03a alone is done", got)
 	}
 }
-
-func TestGroupOrder_ActionableSortsFirstDoneSortsLast(t *testing.T) {
-	order := []RenderedStatus{StatusOpen, StatusClaimed, StatusBlocked, StatusNeedsInfo, StatusDone, StatusError}
-	for i := 1; i < len(order); i++ {
-		if GroupOrder(order[i-1]) > GroupOrder(order[i]) {
-			t.Errorf("GroupOrder(%v) > GroupOrder(%v), want non-decreasing order", order[i-1], order[i])
-		}
-	}
-	if GroupOrder(StatusOpen) != GroupOrder(StatusClaimed) {
-		t.Errorf("open and claimed should share a group, got %d vs %d", GroupOrder(StatusOpen), GroupOrder(StatusClaimed))
-	}
-}

@@ -81,14 +81,13 @@ func (r row) isEpic() bool { return r.ticketIdx < 0 }
 
 // visibleRows flattens the loaded epics into the tab's rendered row order:
 // open epics (per splitEpicIndexesBySection) before closed ones, each epic
-// row followed by its tickets (grouped by rendered status — unblocked →
-// blocked → needs-info → done → error, ticket number ascending within each
-// group) unless the epic is collapsed, in which case its tickets are
-// excluded entirely and navigation moves past the epic directly to the next
-// visible row. In --all mode epics from every worktree are interleaved into
-// this same single Open/Closed grouping (directory/worktree-load order),
-// each epic row additionally labeled with its Epic.WorktreeName — see
-// view.go's renderEpicRow.
+// row followed by its tickets in plan order (ticket number ascending, see
+// sortedTicketIndexes) unless the epic is collapsed, in which case its
+// tickets are excluded entirely and navigation moves past the epic directly
+// to the next visible row. In --all mode epics from every worktree are
+// interleaved into this same single Open/Closed grouping (directory/worktree-
+// load order), each epic row additionally labeled with its Epic.WorktreeName
+// — see view.go's renderEpicRow.
 func (m Model) visibleRows() []row {
 	idxs := make([]int, len(m.epics))
 	for i := range m.epics {
@@ -152,8 +151,12 @@ func defaultCollapsedEpics(epics []tickets.Epic) map[string]bool {
 	return collapsed
 }
 
-// sortedTicketIndexes orders epic.Tickets' indexes by rendered-status group,
-// then ticket number ascending within each group.
+// sortedTicketIndexes orders epic.Tickets' indexes in plan order — ticket
+// number ascending, so the list reads as the epic's intended order of
+// execution and a ticket (done, superseded, or otherwise) never jumps out of
+// its place once it finishes. Lettered siblings sharing a Number (e.g. 04,
+// 04a, 04b) tie-break on DisplayNumber, so the original sorts before its
+// replacements in filename order.
 func sortedTicketIndexes(epic tickets.Epic) []int {
 	indexes := make([]int, len(epic.Tickets))
 	for i := range indexes {
@@ -161,10 +164,6 @@ func sortedTicketIndexes(epic tickets.Epic) []int {
 	}
 	sort.SliceStable(indexes, func(i, j int) bool {
 		a, b := epic.Tickets[indexes[i]], epic.Tickets[indexes[j]]
-		groupA, groupB := tickets.GroupOrder(epic.RenderedStatus(a)), tickets.GroupOrder(epic.RenderedStatus(b))
-		if groupA != groupB {
-			return groupA < groupB
-		}
 		if a.Number != b.Number {
 			return a.Number < b.Number
 		}

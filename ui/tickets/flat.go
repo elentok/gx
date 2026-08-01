@@ -166,19 +166,21 @@ func (m FlatModel) cmdTick() tea.Cmd {
 	})
 }
 
-// sortedTickets orders epic.Tickets the same way ui/tickets' sidebar does:
-// by rendered-status group (unblocked → blocked → needs-info → done →
-// error), ticket number ascending within each group.
+// sortedTickets orders epic.Tickets in plan order — ticket number ascending
+// — so the list reads as the epic's intended order of execution and a
+// ticket (done, superseded, or otherwise) never jumps out of its place once
+// it finishes. Lettered siblings sharing a Number (e.g. 04, 04a, 04b)
+// tie-break on DisplayNumber, so the original sorts before its replacements
+// in filename order.
 func sortedTickets(epic tickets.Epic) []tickets.Ticket {
 	ordered := make([]tickets.Ticket, len(epic.Tickets))
 	copy(ordered, epic.Tickets)
 	sort.SliceStable(ordered, func(i, j int) bool {
 		a, b := ordered[i], ordered[j]
-		groupA, groupB := tickets.GroupOrder(epic.RenderedStatus(a)), tickets.GroupOrder(epic.RenderedStatus(b))
-		if groupA != groupB {
-			return groupA < groupB
+		if a.Number != b.Number {
+			return a.Number < b.Number
 		}
-		return a.Number < b.Number
+		return a.DisplayNumber() < b.DisplayNumber()
 	})
 	return ordered
 }

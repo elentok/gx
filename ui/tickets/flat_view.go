@@ -101,7 +101,7 @@ func (m FlatModel) renderFlatTicketRow(t tickets.Ticket) string {
 
 	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
 	titleStyle := lipgloss.NewStyle()
-	if status == tickets.StatusDone {
+	if status == tickets.StatusDone || status == tickets.StatusSuperseded {
 		titleStyle = statusDoneStyle
 	}
 
