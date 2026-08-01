@@ -118,6 +118,45 @@ func TestReport_SingleTicket_PrintsOrderAndCost(t *testing.T) {
 	}
 }
 
+func TestReport_DepsInstalledEvent_PrintsCommand(t *testing.T) {
+	scratchDir := t.TempDir()
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	if err := logEvent(scratchDir, "epic", Event{Time: start, Type: eventDepsInstalled, Ticket: 1, Cwd: "/fake/iter-01", Reason: "npm ci"}); err != nil {
+		t.Fatalf("logEvent: %v", err)
+	}
+	if err := logEvent(scratchDir, "epic", Event{Time: start.Add(time.Second), Type: eventCherryPicked, Ticket: 1}); err != nil {
+		t.Fatalf("logEvent: %v", err)
+	}
+
+	var out bytes.Buffer
+	if err := Report(ReportOptions{EpicName: "epic", ScratchDir: scratchDir}, &out); err != nil {
+		t.Fatalf("Report() error = %v", err)
+	}
+	text := out.String()
+
+	if !strings.Contains(text, "deps: npm ci") {
+		t.Errorf("output = %q, want a deps: npm ci line for ticket 1", text)
+	}
+}
+
+func TestReport_NoDepsInstalledEvent_OmitsDepsLine(t *testing.T) {
+	scratchDir := t.TempDir()
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	if err := logEvent(scratchDir, "epic", Event{Time: start, Type: eventCherryPicked, Ticket: 1}); err != nil {
+		t.Fatalf("logEvent: %v", err)
+	}
+
+	var out bytes.Buffer
+	if err := Report(ReportOptions{EpicName: "epic", ScratchDir: scratchDir}, &out); err != nil {
+		t.Fatalf("Report() error = %v", err)
+	}
+	if strings.Contains(out.String(), "deps:") {
+		t.Errorf("output = %q, want no deps: line when no deps-installed event was logged", out.String())
+	}
+}
+
 func TestReport_CodexSessionPrintsDurationPeakContextTokensAndNoCost(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	scratchDir := t.TempDir()

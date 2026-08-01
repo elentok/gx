@@ -1,7 +1,11 @@
 package ralphloop
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/elentok/gx/codexsession"
@@ -40,6 +44,12 @@ type Deps struct {
 	CommitsAhead         func(dir, fromExclusive, toRef string) (int, error)
 	CherryPickRange      func(dir, fromExclusive, toInclusive string) error
 	CherryPickInProgress func(dir string) (bool, error)
+	// InstallDeps detects the package manager of a freshly created iteration
+	// worktree at path (from marker files at its root) and runs its
+	// non-interactive install/sync command before the agent is launched.
+	// command is the command run, joined with spaces ("" if no marker
+	// matched, which is a silent no-op rather than an error).
+	InstallDeps func(path string) (command string, err error)
 
 	// ReadOccupancy returns the current context occupancy for the Claude
 	// Code session launched in cwd, or ok=false if its transcript has no
@@ -82,6 +92,7 @@ func DefaultDeps() Deps {
 		CommitsAhead:          git.CommitsAhead,
 		CherryPickRange:       git.CherryPickRange,
 		CherryPickInProgress:  git.CherryPickInProgress,
+		InstallDeps:           InstallDependencies,
 		ReadOccupancy:         transcript.LastAssistantOccupancy,
 		ReadCodexContext:      codexsession.LastContextTokens,
 		ReadCodexRateLimit:    codexsession.LastRateLimit,
@@ -121,4 +132,41 @@ func removeWorktree(repoDir, path string, force bool) error {
 		return err
 	}
 	return git.RemoveWorktree(*repo, path, force)
+}
+
+// depsMarkers maps a package-manager marker file, checked in this order at
+// an iteration worktree's root, to its non-interactive install/sync command.
+// go.mod is deliberately not listed: go build/go test populate the module
+// cache lazily on first use, so a separate `go mod download` step ahead of
+// the agent's own turn buys nothing.
+var depsMarkers = []struct {
+	marker  string
+	command []string
+}{
+	{"package-lock.json", []string{"npm", "ci"}},
+	{"pnpm-lock.yaml", []string{"pnpm", "install", "--frozen-lockfile"}},
+	{"yarn.lock", []string{"yarn", "install", "--frozen-lockfile"}},
+	{"poetry.lock", []string{"poetry", "install"}},
+	{"uv.lock", []string{"uv", "sync"}},
+}
+
+// InstallDependencies implements Deps.InstallDeps: it detects path's package
+// manager from depsMarkers and runs its install/sync command with path as
+// its working directory. No marker matching is a silent no-op (command ""),
+// since not every worktree is a package-managed project.
+func InstallDependencies(path string) (command string, err error) {
+	for _, dm := range depsMarkers {
+		if _, statErr := os.Stat(filepath.Join(path, dm.marker)); statErr != nil {
+			continue
+		}
+		command = strings.Join(dm.command, " ")
+		cmd := exec.Command(dm.command[0], dm.command[1:]...)
+		cmd.Dir = path
+		out, runErr := cmd.CombinedOutput()
+		if runErr != nil {
+			return command, fmt.Errorf("running %q in %s: %w\n%s", command, path, runErr, out)
+		}
+		return command, nil
+	}
+	return "", nil
 }

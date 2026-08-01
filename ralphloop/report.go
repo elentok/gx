@@ -127,6 +127,10 @@ type ticketSummary struct {
 	hasClaude       bool
 	haveSessionData bool
 	metricsMissing  bool
+	// depsCommand is the install command run in this ticket's iteration
+	// worktree, from its deps-installed event's Reason ("" if no command
+	// matched or no such event was logged, e.g. logs predating this field).
+	depsCommand string
 }
 
 // sessionKey identifies one agent session an event referenced.
@@ -183,11 +187,12 @@ func Report(opts ReportOptions, out io.Writer) error {
 
 	order, windows := ticketOrderAndWindows(events)
 	sessionsByTicket := ticketSessions(events)
+	depsByTicket := ticketDepsCommands(events)
 
 	summaries := make(map[int]*ticketSummary, len(order))
 	for _, n := range order {
 		w := windows[n]
-		s := &ticketSummary{number: n, title: titles[n], windowStart: w.start, windowEnd: w.end}
+		s := &ticketSummary{number: n, title: titles[n], windowStart: w.start, windowEnd: w.end, depsCommand: depsByTicket[n]}
 		// Summed, not spanned: a ticket's sessions (its main iteration agent,
 		// plus a conflict-resolution agent if one ran) never run concurrently
 		// with each other by construction — exactly one is active for a given
@@ -271,6 +276,18 @@ func ticketSessions(events []Event) map[int][]sessionKey {
 		}
 		seen[ev.Ticket][key] = true
 		out[ev.Ticket] = append(out[ev.Ticket], key)
+	}
+	return out
+}
+
+// ticketDepsCommands returns, per ticket, its deps-installed event's Reason
+// (the install command run, "" if none matched).
+func ticketDepsCommands(events []Event) map[int]string {
+	out := map[int]string{}
+	for _, ev := range events {
+		if ev.Type == eventDepsInstalled {
+			out[ev.Ticket] = ev.Reason
+		}
 	}
 	return out
 }
@@ -368,6 +385,9 @@ func printReport(out io.Writer, epicName string, order []int, summaries map[int]
 		}
 		fmt.Fprintf(out, "  %-40s duration=%-10s peak-context=%-8s tokens=%-8s cost=%s\n",
 			ticketLabel(s), duration, peakContext, tokens, reportCost(s.cost, s.hasClaude, s.hasCodex))
+		if s.depsCommand != "" {
+			fmt.Fprintf(out, "      deps: %s\n", s.depsCommand)
+		}
 	}
 
 	epicStart, epicEnd := events[0].Time, events[0].Time

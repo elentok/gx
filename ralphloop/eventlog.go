@@ -21,6 +21,7 @@ const (
 	eventResumed           = "resumed"
 	eventNeedsInfo         = "needs-info"
 	eventNeedsAttention    = "needs-attention"
+	eventDepsInstalled     = "deps-installed"
 )
 
 // Event is one line of an epic's run-log.jsonl: a single lifecycle
@@ -28,7 +29,9 @@ const (
 // on. AgentSession is empty for events not tied to a specific agent session
 // (e.g. conflict-hit, which precedes the conflict-resolution agent's own
 // launch). Agent is omitted by historical logs and defaults to Claude when
-// reports read them. Reason carries the reason for pause and attention events.
+// reports read them. Reason carries the reason for pause and attention
+// events, or the install command run (empty if none matched) for
+// deps-installed events.
 type Event struct {
 	Time         time.Time `json:"time"`
 	Type         string    `json:"type"`

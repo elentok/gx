@@ -100,6 +100,9 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		CherryPickInProgress: func(dir string) (bool, error) {
 			return false, nil
 		},
+		InstallDeps: func(path string) (string, error) {
+			return "", nil
+		},
 		AgentSendKeys: func(target string, keys ...string) error {
 			return nil
 		},
@@ -174,7 +177,7 @@ func TestRun_LogsLifecycleEvents_LinearChain(t *testing.T) {
 		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
 	}
 
-	wantTypes := []string{eventIterationStarted, eventIterationFinished, eventCherryPicked}
+	wantTypes := []string{eventDepsInstalled, eventIterationStarted, eventIterationFinished, eventCherryPicked}
 	if len(events) != len(wantTypes) {
 		t.Fatalf("events = %+v, want %d events (%v)", events, len(wantTypes), wantTypes)
 	}
@@ -187,16 +190,19 @@ func TestRun_LogsLifecycleEvents_LinearChain(t *testing.T) {
 		}
 	}
 	wantSession := "sess-pane-iter-01"
-	if events[0].AgentSession != wantSession {
-		t.Errorf("iteration-started AgentSession = %q, want the agent's session id", events[0].AgentSession)
+	if events[1].AgentSession != wantSession {
+		t.Errorf("iteration-started AgentSession = %q, want the agent's session id", events[1].AgentSession)
 	}
 	// cherry-picked also carries the iteration agent's session/cwd, not just
 	// the start/finish pair, since the spec requires it on every event type.
-	if events[2].AgentSession != wantSession || events[2].Cwd == "" {
-		t.Errorf("cherry-picked event = %+v, want AgentSession=%q and a non-empty Cwd", events[2], wantSession)
+	if events[3].AgentSession != wantSession || events[3].Cwd == "" {
+		t.Errorf("cherry-picked event = %+v, want AgentSession=%q and a non-empty Cwd", events[3], wantSession)
 	}
-	if events[0].Pane == "" || events[0].Tab == "" {
-		t.Errorf("iteration-started event = %+v, want non-empty Pane/Tab", events[0])
+	if events[1].Pane == "" || events[1].Tab == "" {
+		t.Errorf("iteration-started event = %+v, want non-empty Pane/Tab", events[1])
+	}
+	if events[0].Cwd == "" {
+		t.Errorf("deps-installed event = %+v, want non-empty Cwd", events[0])
 	}
 }
 
@@ -235,6 +241,60 @@ func TestRun_LogsNeedsInfoEvent_OnZeroCommitIteration(t *testing.T) {
 	}
 	if needsInfo.AgentSession == "" {
 		t.Errorf("needs-info event = %+v, want a non-empty AgentSession (the agent_session that produced zero commits)", needsInfo)
+	}
+}
+
+func TestRun_InstallDepsFailure_SurfacesAsRunErrorWithoutLaunchingAgent(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "# A\n\n**Status:** open\n",
+	})
+	d, prompts, _ := fakeDeps()
+	d.InstallDeps = func(path string) (string, error) {
+		return "npm ci", errors.New("npm ci: exit status 1")
+	}
+
+	var out bytes.Buffer
+	err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out)
+	if err == nil {
+		t.Fatal("Run() error = nil, want the install failure surfaced")
+	}
+	if !strings.Contains(err.Error(), "npm ci") {
+		t.Errorf("Run() error = %v, want it to mention the failed install command", err)
+	}
+	if len(*prompts) != 0 {
+		t.Errorf("prompts = %v, want no agent launched after a failed dependency install", *prompts)
+	}
+}
+
+func TestRun_LogsDepsInstalledEventWithCommand(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "# A\n\n**Status:** open\n",
+	})
+	d, _, _ := fakeDeps()
+	d.InstallDeps = func(path string) (string, error) {
+		return "npm ci", nil
+	}
+
+	var out bytes.Buffer
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	events, ok, err := readEvents(scratchDir, "epic")
+	if err != nil || !ok {
+		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+	}
+	var found *Event
+	for i, ev := range events {
+		if ev.Type == eventDepsInstalled {
+			found = &events[i]
+		}
+	}
+	if found == nil {
+		t.Fatalf("events = %+v, want a deps-installed event", events)
+	}
+	if found.Reason != "npm ci" {
+		t.Errorf("deps-installed event Reason = %q, want the command run", found.Reason)
 	}
 }
 

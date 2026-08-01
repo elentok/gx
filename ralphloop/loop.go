@@ -385,8 +385,16 @@ func (p iterationParams) launchAndPromptParams(label, pane, tab, prompt, session
 // logTicketEvent appends eventType to p's run-log with p's ticket number
 // plus the given pane/tab/session/cwd — the shared shape behind every event
 // this package logs outside launchAndPrompt's own generic start/finish pair
-// (needs-info, cherry-picked, conflict-hit, conflict-resolved).
+// (needs-info, cherry-picked, conflict-hit, conflict-resolved,
+// deps-installed).
 func (p iterationParams) logTicketEvent(eventType, pane, tab, agentSession, cwd string) {
+	p.logTicketEventReason(eventType, pane, tab, agentSession, cwd, "")
+}
+
+// logTicketEventReason is logTicketEvent plus a Reason, for events that
+// carry one (currently only deps-installed, whose Reason is the install
+// command run).
+func (p iterationParams) logTicketEventReason(eventType, pane, tab, agentSession, cwd, reason string) {
 	_ = logEvent(p.ScratchDir, p.FeatureBranch, Event{
 		Type:         eventType,
 		Ticket:       p.Ticket.Number,
@@ -395,6 +403,7 @@ func (p iterationParams) logTicketEvent(eventType, pane, tab, agentSession, cwd 
 		Tab:          tab,
 		AgentSession: agentSession,
 		Cwd:          cwd,
+		Reason:       reason,
 	})
 }
 
@@ -417,6 +426,15 @@ func runIteration(d Deps, p iterationParams) error {
 	if err := d.AddWorktree(p.RepoDir, path, branch, base); err != nil {
 		return fmt.Errorf("creating iteration worktree: %w", err)
 	}
+
+	// Runs synchronously here, before the agent's tab/session exist, so an
+	// install failure surfaces as an iteration-lifecycle error immediately
+	// rather than eating into the agent's own turn or smart-zone budget.
+	command, err := d.InstallDeps(path)
+	if err != nil {
+		return fmt.Errorf("installing dependencies in %s: %w", path, err)
+	}
+	p.logTicketEventReason(eventDepsInstalled, "", "", "", path, command)
 
 	tab, err := d.TabCreate(herdr.TabCreateOptions{
 		WorkspaceID: p.WorkspaceID,
