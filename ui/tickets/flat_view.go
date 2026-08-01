@@ -90,13 +90,22 @@ func (m FlatModel) listLines() []string {
 }
 
 func (m FlatModel) renderFlatTicketRow(t tickets.Ticket) string {
-	if live, ok := m.live[t.Identifier]; ok {
-		if line, ok := m.renderLiveTicketRow(t, live); ok {
-			return line
+	status := m.epic.RenderedStatus(t)
+
+	// A superseded ticket is a terminal disk state that always wins over a
+	// live orchestrator entry: reconcile.go deliberately skips superseded
+	// tickets when clearing m.live (see reconcile.go:102-105), so a stale
+	// paused/needs-attention entry can otherwise outlive the supersession and
+	// render this row via the live branch below, which never applies dim
+	// styling.
+	if status != tickets.StatusSuperseded {
+		if live, ok := m.live[t.Identifier]; ok {
+			if line, ok := m.renderLiveTicketRow(t, live); ok {
+				return line
+			}
 		}
 	}
 
-	status := m.epic.RenderedStatus(t)
 	icon, style := statusIconAndStyle(m.icons(), status)
 
 	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)

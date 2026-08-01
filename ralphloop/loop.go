@@ -1005,6 +1005,26 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 				elapsedMs = 0
 				continue
 			}
+
+			// Claude has no structured "rate limited" status of its own: a
+			// real hit just looks like the pane going idle, same as an
+			// ordinary finish. So check for the rate-limit message here,
+			// once the pane has actually stopped — not on every poll tick
+			// while it's still working, which is what caused false alarms
+			// from stale "approaching the limit" mentions still visible in
+			// scrollback mid-turn.
+			if p.Agent == AgentClaude && d.ReadPaneRecent != nil {
+				if text, rlErr := d.ReadPaneRecent(p.Pane); rlErr == nil {
+					if token, matched := detectRateLimit(text); matched {
+						if err := recoverClaudeRateLimit(d, p, sessionID, token); err != nil {
+							return err
+						}
+						elapsedMs = 0
+						continue
+					}
+				}
+			}
+
 			confirmed, err := confirmFinished(d, p.Pane, until)
 			if err != nil {
 				return fmt.Errorf("confirming %s finished: %w", p.Label, err)
@@ -1031,35 +1051,6 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 				}
 				elapsedMs = 0
 				continue
-			}
-		}
-
-		if p.Agent == AgentClaude && d.ReadPaneRecent != nil {
-			if text, rlErr := d.ReadPaneRecent(p.Pane); rlErr == nil {
-				if token, matched := detectRateLimit(text); matched {
-					reason := "rate limit detected"
-					if token != "" {
-						reason = fmt.Sprintf("rate limit detected, resets %s", token)
-					}
-					p.Gate.pause(p.Label, reason)
-					p.sink().IterationPaused(p.Label, PauseRateLimit, reason)
-					p.logAgentEvent(eventPausedRateLimit, sessionID, reason)
-					waitForRateLimitReset(d, p.Pane, token)
-					p.Gate.ForceResume(p.Label)
-					p.sink().IterationResumed(p.Label, PauseRateLimit)
-					p.logLifecycleEvent(eventResumed, sessionID)
-
-					if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
-						Target: p.Pane,
-						Text:   "continue",
-						Wait:   true,
-						Until:  []string{"working"},
-					}); err != nil {
-						return fmt.Errorf("re-prompting %s after rate-limit reset: %w", p.Label, err)
-					}
-					elapsedMs = 0
-					continue
-				}
 			}
 		}
 
@@ -1101,6 +1092,34 @@ func confirmFinished(d Deps, pane string, until []string) (bool, error) {
 		return false, nil
 	}
 	return false, err
+}
+
+// recoverClaudeRateLimit pauses label for display, waits out the rate limit
+// via waitForClaudeRateLimitReset (racing the reset deadline against a
+// resume request rather than blocking through it), then resumes and
+// re-prompts the agent to continue.
+func recoverClaudeRateLimit(d Deps, p launchAndPromptParams, sessionID, token string) error {
+	reason := "rate limit detected"
+	if token != "" {
+		reason = fmt.Sprintf("rate limit detected, resets %s", token)
+	}
+	p.Gate.pause(p.Label, reason)
+	p.sink().IterationPaused(p.Label, PauseRateLimit, reason)
+	p.logAgentEvent(eventPausedRateLimit, sessionID, reason)
+	waitForClaudeRateLimitReset(d, p.Gate, p.Label, p.ResumeSignalPath, p.Pane, token)
+	p.Gate.ForceResume(p.Label)
+	p.sink().IterationResumed(p.Label, PauseRateLimit)
+	p.logLifecycleEvent(eventResumed, sessionID)
+
+	if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
+		Target: p.Pane,
+		Text:   "continue",
+		Wait:   true,
+		Until:  []string{"working"},
+	}); err != nil {
+		return fmt.Errorf("re-prompting %s after rate-limit reset: %w", p.Label, err)
+	}
+	return nil
 }
 
 func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, limit codexsession.RateLimit) error {

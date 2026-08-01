@@ -100,6 +100,9 @@ type Deps struct {
 	ResumeSignaled func(path string) (bool, error)
 	// Sleep is how a paused loop waits between ResumeSignaled polls.
 	Sleep func(time.Duration)
+	// Now returns the current time, injectable so a rate-limit reset
+	// deadline can be tested without a real wall-clock wait.
+	Now func() time.Time
 }
 
 // DefaultDeps wires Deps to the real herdr, git, and transcript packages.
@@ -134,6 +137,7 @@ func DefaultDeps() Deps {
 		ReadPaneRecent:        defaultReadPaneRecent,
 		ResumeSignaled:        defaultResumeSignaled,
 		Sleep:                 time.Sleep,
+		Now:                   time.Now,
 	}
 }
 

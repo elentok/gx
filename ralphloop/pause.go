@@ -45,6 +45,17 @@ func (g *Gate) isPaused() bool {
 	return len(g.reasons) > 0
 }
 
+// isLabelPaused reports whether label specifically is still paused, letting
+// a caller notice an in-process ForceResume (e.g. from the TUI) without
+// waiting on the shared wake channel — see waitForClaudeRateLimitReset,
+// which also races a reset deadline.
+func (g *Gate) isLabelPaused(label string) bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	_, paused := g.reasons[label]
+	return paused
+}
+
 // snapshot returns a copy of every currently-paused iteration's reason, for
 // reporting.
 func (g *Gate) snapshot() map[string]string {

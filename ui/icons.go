@@ -124,6 +124,6 @@ func Icons(useNerdFont bool) IconSet {
 		TicketDone:           "󰄬",
 		TicketSuperseded:     "󰃀",
 		TicketError:          "󰀪",
-		TicketPaused:         "",
+		TicketPaused:         "󰏥",
 	}
 }

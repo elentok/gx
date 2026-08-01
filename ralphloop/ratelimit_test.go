@@ -94,24 +94,42 @@ func TestSecondsUntilReset_UnparseableToken_ReturnsNotOK(t *testing.T) {
 	}
 }
 
-func TestWaitForRateLimitReset_ParseableToken_SleepsThroughReset(t *testing.T) {
-	var slept []time.Duration
+func TestWaitForClaudeRateLimitReset_ParseableToken_ReturnsOnceDeadlinePasses(t *testing.T) {
+	g := NewGate()
+	g.pause("t1", "rate limit detected, resets 3pm")
+
+	base := time.Date(2026, 8, 1, 9, 0, 0, 0, time.UTC)
+	current := base
+	slept := 0
 	d := Deps{
-		Sleep: func(d time.Duration) { slept = append(slept, d) },
+		Sleep: func(time.Duration) {
+			slept++
+			current = current.Add(rateLimitPollInterval)
+		},
+		Now:            func() time.Time { return current },
+		ResumeSignaled: func(string) (bool, error) { return false, nil },
 	}
 
-	waitForRateLimitReset(d, "pane-1", "3pm")
+	waitForClaudeRateLimitReset(d, g, "t1", "/resume-signal", "pane-1", "9:05am")
 
-	if len(slept) != 1 {
-		t.Fatalf("Sleep called %d times, want exactly 1 (no fallback polling needed)", len(slept))
+	if slept == 0 {
+		t.Errorf("Sleep never called, want at least one poll before the deadline check")
 	}
 }
 
-func TestWaitForRateLimitReset_UnparseableToken_PollsUntilMessageClears(t *testing.T) {
-	var slept int
+func TestWaitForClaudeRateLimitReset_UnparseableToken_PollsUntilMessageClears(t *testing.T) {
+	g := NewGate()
+	g.pause("t1", "rate limit detected")
+
+	current := time.Date(2026, 8, 1, 9, 0, 0, 0, time.UTC)
 	calls := 0
 	d := Deps{
-		Sleep: func(time.Duration) { slept++ },
+		// Advance wall-clock time on each Sleep so the coarse
+		// rateLimitPollInterval text-recheck cadence is actually reached
+		// without a real sleep.
+		Sleep:          func(time.Duration) { current = current.Add(rateLimitPollInterval) },
+		Now:            func() time.Time { return current },
+		ResumeSignaled: func(string) (bool, error) { return false, nil },
 		ReadPaneRecent: func(pane string) (string, error) {
 			calls++
 			if calls < 3 {
@@ -121,14 +139,38 @@ func TestWaitForRateLimitReset_UnparseableToken_PollsUntilMessageClears(t *testi
 		},
 	}
 
-	waitForRateLimitReset(d, "pane-1", "")
+	waitForClaudeRateLimitReset(d, g, "t1", "/resume-signal", "pane-1", "")
 
 	if calls != 3 {
 		t.Errorf("ReadPaneRecent called %d times, want 3 (poll until message clears)", calls)
 	}
-	if slept != 3 {
-		t.Errorf("Sleep called %d times, want 3", slept)
+}
+
+func TestWaitForClaudeRateLimitReset_ResumeSignal_ReturnsImmediately(t *testing.T) {
+	g := NewGate()
+	g.pause("t1", "rate limit detected")
+
+	d := Deps{
+		Sleep:          func(time.Duration) { t.Fatal("should not sleep: resume signal already present") },
+		ResumeSignaled: func(string) (bool, error) { return true, nil },
+		Now:            time.Now,
 	}
+
+	waitForClaudeRateLimitReset(d, g, "t1", "/resume-signal", "pane-1", "3pm")
+}
+
+func TestWaitForClaudeRateLimitReset_ForceResumed_ReturnsImmediately(t *testing.T) {
+	g := NewGate()
+	g.pause("t1", "rate limit detected")
+	g.ForceResume("t1")
+
+	d := Deps{
+		Sleep:          func(time.Duration) { t.Fatal("should not sleep: already force-resumed") },
+		ResumeSignaled: func(string) (bool, error) { return false, nil },
+		Now:            time.Now,
+	}
+
+	waitForClaudeRateLimitReset(d, g, "t1", "/resume-signal", "pane-1", "3pm")
 }
 
 func TestWaitForCodexRateLimitReset_MissingResetPollsUntilQuotaClears(t *testing.T) {

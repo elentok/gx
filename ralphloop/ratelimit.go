@@ -73,28 +73,47 @@ func defaultReadPaneRecent(pane string) (string, error) {
 	return herdr.AgentRead(pane, herdr.AgentReadOptions{Source: "recent-unwrapped"})
 }
 
-// waitForRateLimitReset blocks until pane's rate limit has (probably)
-// cleared: if token parsed to a reset time, it sleeps straight through to
-// just past it; otherwise it polls pane's recent output at
-// rateLimitPollInterval until the rate-limit message is no longer present.
-func waitForRateLimitReset(d Deps, pane, token string) {
-	if wait, ok := secondsUntilReset(token, time.Now()); ok {
-		d.Sleep(wait + rateLimitResetBuffer)
-		return
+// waitForClaudeRateLimitReset blocks label's iteration until whichever comes
+// first: the rate limit has (probably) cleared, or a resume is requested —
+// either the file signal a headless `gx ralph-loop resume` writes, or an
+// in-process Gate.ForceResume (e.g. the TUI). It polls at resumePollInterval
+// so a resume is noticed quickly, rather than sleeping through the whole
+// reset window the way a plain wait would.
+//
+// Clearing itself is checked at a coarser cadence: if token parsed to a
+// reset time, once that time (plus buffer) has passed; otherwise by
+// re-reading pane's recent output every rateLimitPollInterval until the
+// rate-limit message is no longer present.
+func waitForClaudeRateLimitReset(d Deps, g *Gate, label, resumeSignalPath, pane, token string) {
+	deadline, hasDeadline := time.Time{}, false
+	if wait, ok := secondsUntilReset(token, d.Now()); ok {
+		deadline, hasDeadline = d.Now().Add(wait+rateLimitResetBuffer), true
 	}
+	lastTextCheck := d.Now()
 
 	for {
-		d.Sleep(rateLimitPollInterval)
-		if d.ReadPaneRecent == nil {
+		if !g.isLabelPaused(label) {
 			return
 		}
-		text, err := d.ReadPaneRecent(pane)
-		if err != nil {
-			continue
-		}
-		if _, matched := detectRateLimit(text); !matched {
+		if signaled, err := d.ResumeSignaled(resumeSignalPath); err == nil && signaled {
 			return
 		}
+
+		now := d.Now()
+		if hasDeadline {
+			if !now.Before(deadline) {
+				return
+			}
+		} else if d.ReadPaneRecent != nil && now.Sub(lastTextCheck) >= rateLimitPollInterval {
+			lastTextCheck = now
+			if text, err := d.ReadPaneRecent(pane); err == nil {
+				if _, matched := detectRateLimit(text); !matched {
+					return
+				}
+			}
+		}
+
+		d.Sleep(resumePollInterval)
 	}
 }
 

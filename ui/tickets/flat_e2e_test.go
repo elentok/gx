@@ -156,6 +156,49 @@ func TestFlatTUI_LiveEventsDriveRowState(t *testing.T) {
 	}
 }
 
+// TestFlatTUI_SupersededTicketIgnoresStaleLiveEntry covers ticket 03: a
+// needs-attention ticket that becomes superseded on disk (a mid-flight
+// split) leaves its LiveEventTicketStillNeedsAttention entry in m.live,
+// since reconcile.go deliberately skips superseded tickets when clearing
+// live state (reconcile.go:102-105). The row must still render via the
+// disk-only (dimmed) path instead of the stale paused/needs-attention badge.
+func TestFlatTUI_SupersededTicketIgnoresStaleLiveEntry(t *testing.T) {
+	root := t.TempDir()
+	writeFlatTicket(t, root, "my-epic", "01-superseded-ticket.md", "Status: superseded\n\nFirst body.\n")
+	writeFlatTicket(t, root, "my-epic", "02-running-ticket.md", "Status: open\n\nSecond body.\n")
+
+	events := make(chan ralphloop.LiveEvent, 16)
+	m := tickets.NewFlatModel(root, "my-epic", ui.Settings{}).WithLiveEvents(events)
+	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(flatTermWidth, flatTermHeight))
+	defer tm.Quit()
+
+	waitForFlatText(t, tm, "Superseded ticket")
+
+	events <- ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventTicketStillNeedsAttention, Identifier: "01",
+	}
+	// A second, unrelated event lands after the first in the single-threaded
+	// update loop, so waiting for its confirmatory text also guarantees the
+	// first event has already been folded into m.live.
+	events <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Identifier: "02", Label: "iter-02"}
+	waitForFlatText(t, tm, "iter-02")
+
+	frame := tm.CurrentFrame()
+	var rowLine []byte
+	for line := range bytes.SplitSeq(frame, []byte("\n")) {
+		if bytes.Contains(line, []byte("Superseded ticket")) {
+			rowLine = line
+			break
+		}
+	}
+	if rowLine == nil {
+		t.Fatalf("expected to find the superseded ticket's row, got:\n%s", frame)
+	}
+	if bytes.Contains(rowLine, []byte("reattach")) {
+		t.Fatalf("expected the superseded ticket's row to ignore its stale needs-attention entry, got row:\n%s", rowLine)
+	}
+}
+
 // TestFlatTUI_LiveEventsDrivePhaseSuffix feeds CherryPickStarted/
 // ConflictResolutionStarted LiveEvents through WithLiveEvents and asserts
 // ticket 01's running row shows a phase-specific suffix instead of just the
