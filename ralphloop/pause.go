@@ -91,6 +91,28 @@ func (g *pauseGate) waitForResume(d Deps, path string) {
 	close(myWake)
 }
 
+// resumeLabel clears label's own pause without disturbing any other
+// iteration's, for a pause that resumes on its own schedule (e.g. a
+// rate-limit reset) rather than via a shared external resume signal. If no
+// iteration is paused afterward, it also releases any goroutine still
+// blocked in waitForResume, matching that method's own group-wake-on-clear
+// behavior.
+func (g *pauseGate) resumeLabel(label string) {
+	g.mu.Lock()
+	delete(g.reasons, label)
+	var wake chan struct{}
+	if len(g.reasons) == 0 {
+		wake = g.wake
+		g.wake = make(chan struct{})
+		g.polling = false
+	}
+	g.mu.Unlock()
+
+	if wake != nil {
+		close(wake)
+	}
+}
+
 // resumeSignalPath is where Resume writes its wake signal for a blocked
 // `gx ralph-loop {epicName}` invocation, and where that invocation polls
 // for it.

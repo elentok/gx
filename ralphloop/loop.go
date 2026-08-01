@@ -569,6 +569,33 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 		}
 		elapsedMs += pollMs
 
+		if d.ReadPaneRecent != nil {
+			if text, rlErr := d.ReadPaneRecent(p.Pane); rlErr == nil {
+				if token, matched := detectRateLimit(text); matched {
+					reason := "rate limit detected"
+					if token != "" {
+						reason = fmt.Sprintf("rate limit detected, resets %s", token)
+					}
+					p.Gate.pause(p.Label, reason)
+					p.report("paused %s: %s; waiting for automatic reset\n", p.Label, reason)
+					waitForRateLimitReset(d, p.Pane, token)
+					p.Gate.resumeLabel(p.Label)
+					p.report("resumed %s after rate-limit reset\n", p.Label)
+
+					if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
+						Target: p.Pane,
+						Text:   "continue",
+						Wait:   true,
+						Until:  []string{"working"},
+					}); err != nil {
+						return fmt.Errorf("re-prompting %s after rate-limit reset: %w", p.Label, err)
+					}
+					elapsedMs = 0
+					continue
+				}
+			}
+		}
+
 		if sessionID == "" {
 			continue // no session id to check a transcript against yet
 		}

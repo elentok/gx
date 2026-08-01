@@ -35,6 +35,9 @@ type Deps struct {
 	// Code session launched in cwd, or ok=false if its transcript has no
 	// assistant turn yet.
 	ReadOccupancy func(cwd, sessionID string) (occupancy int, ok bool, err error)
+	// ReadPaneRecent returns pane's recent terminal output, used to detect a
+	// Claude usage/session rate-limit message.
+	ReadPaneRecent func(pane string) (string, error)
 	// ResumeSignaled reports (and atomically consumes) whether a `gx
 	// ralph-loop resume` signal is waiting at path.
 	ResumeSignaled func(path string) (bool, error)
@@ -61,6 +64,7 @@ func DefaultDeps() Deps {
 		CherryPickRange:       git.CherryPickRange,
 		CherryPickInProgress:  git.CherryPickInProgress,
 		ReadOccupancy:         transcript.LastAssistantOccupancy,
+		ReadPaneRecent:        defaultReadPaneRecent,
 		ResumeSignaled:        defaultResumeSignaled,
 		Sleep:                 time.Sleep,
 	}
