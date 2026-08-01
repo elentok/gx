@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
@@ -40,9 +41,15 @@ func runRalphLoop(epicName, skill string, maxParallel, smartZone int, d deps) er
 	}
 
 	return ralphloop.Run(ralphloop.RunOptions{
-		EpicName:    epicName,
-		Skill:       skill,
-		RepoDir:     repo.Root,
+		EpicName: epicName,
+		Skill:    skill,
+		RepoDir:  repo.Root,
+		// .scratch is gitignored, so it only exists in cwd's own checkout, not
+		// in the per-iteration worktrees agents run in. Resolving it here to an
+		// absolute path (rather than leaving it relative for Run's default)
+		// means every ticket path threaded through it — the initial prompt,
+		// run-log, resume signal — resolves regardless of the agent pane's cwd.
+		ScratchDir:  filepath.Join(cwd, ".scratch"),
 		MaxParallel: maxParallel,
 		SmartZone:   smartZone,
 	}, ralphloop.DefaultDeps(), d.stdout)
