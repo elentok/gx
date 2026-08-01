@@ -390,6 +390,7 @@ func (p iterationParams) logTicketEvent(eventType, pane, tab, agentSession, cwd 
 	_ = logEvent(p.ScratchDir, p.FeatureBranch, Event{
 		Type:         eventType,
 		Ticket:       p.Ticket.Number,
+		Agent:        p.Agent,
 		Pane:         pane,
 		Tab:          tab,
 		AgentSession: agentSession,
@@ -657,13 +658,19 @@ func (p launchAndPromptParams) logLifecycleEvent(eventType, agentSession string)
 	if eventType == "" {
 		return
 	}
+	p.logAgentEvent(eventType, agentSession, "")
+}
+
+func (p launchAndPromptParams) logAgentEvent(eventType, agentSession, reason string) {
 	_ = logEvent(p.ScratchDir, p.EpicName, Event{
 		Type:         eventType,
 		Ticket:       p.Ticket,
+		Agent:        p.Agent,
 		Pane:         p.Pane,
 		Tab:          p.Tab,
 		AgentSession: agentSession,
 		Cwd:          p.SessionCwd,
+		Reason:       reason,
 	})
 }
 
@@ -789,7 +796,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 					}
 					p.Gate.pause(p.Label, reason)
 					p.report("paused %s: %s; waiting for automatic reset\n", p.Label, reason)
-					_ = logEvent(p.ScratchDir, p.EpicName, Event{Type: eventPausedRateLimit, Ticket: p.Ticket, Pane: p.Pane, Tab: p.Tab, AgentSession: sessionID, Cwd: p.SessionCwd, Reason: reason})
+					p.logAgentEvent(eventPausedRateLimit, sessionID, reason)
 					waitForRateLimitReset(d, p.Pane, token)
 					p.Gate.resumeLabel(p.Label)
 					p.report("resumed %s after rate-limit reset\n", p.Label)
@@ -820,7 +827,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 		reason := fmt.Sprintf("context occupancy %d exceeds --smart-zone %d", occupancy, smartZone)
 		p.Gate.pause(p.Label, reason)
 		p.report("paused %s: %s; run `gx ralph-loop resume` to continue\n", p.Label, reason)
-		_ = logEvent(p.ScratchDir, p.EpicName, Event{Type: eventPausedSmartZone, Ticket: p.Ticket, Pane: p.Pane, Tab: p.Tab, AgentSession: sessionID, Cwd: p.SessionCwd, Reason: reason})
+		p.logAgentEvent(eventPausedSmartZone, sessionID, reason)
 		p.Gate.waitForResume(d, p.ResumeSignalPath)
 		p.report("resumed %s\n", p.Label)
 		p.logLifecycleEvent(eventResumed, sessionID)
@@ -835,7 +842,7 @@ func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, li
 	}
 	p.Gate.pause(p.Label, reason)
 	p.report("paused %s: %s; waiting for automatic reset\n", p.Label, reason)
-	_ = logEvent(p.ScratchDir, p.EpicName, Event{Type: eventPausedRateLimit, Ticket: p.Ticket, Pane: p.Pane, Tab: p.Tab, AgentSession: sessionID, Cwd: p.SessionCwd, Reason: reason})
+	p.logAgentEvent(eventPausedRateLimit, sessionID, reason)
 	waitForCodexRateLimitReset(d, p.SessionCwd, sessionID, limit)
 	p.Gate.resumeLabel(p.Label)
 	p.report("resumed %s after Codex quota reset\n", p.Label)
@@ -875,7 +882,7 @@ func waitForAttentionRecovery(d Deps, p launchAndPromptParams, sessionID string)
 	}
 	p.Gate.pause(p.Label, reason)
 	p.report("paused %s: %s\n", p.Label, reason)
-	_ = logEvent(p.ScratchDir, p.EpicName, Event{Type: eventNeedsAttention, Ticket: p.Ticket, Pane: p.Pane, Tab: p.Tab, AgentSession: sessionID, Cwd: p.SessionCwd, Reason: reason})
+	p.logAgentEvent(eventNeedsAttention, sessionID, reason)
 
 	for {
 		agent, err := d.AgentWait(herdr.AgentWaitOptions{

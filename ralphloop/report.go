@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -68,6 +69,7 @@ func turnCost(u transcript.Usage) float64 {
 // own model).
 type sessionStats struct {
 	peakOccupancy int
+	totalTokens   int
 	cost          float64
 	start, end    time.Time
 	ok            bool // false if the transcript couldn't be read/found
@@ -119,14 +121,36 @@ type ticketSummary struct {
 	windowEnd       time.Time
 	duration        time.Duration
 	peakOccupancy   int
+	totalTokens     int
 	cost            float64
+	hasCodex        bool
+	hasClaude       bool
 	haveSessionData bool
+	metricsMissing  bool
 }
 
-// sessionKey identifies one Claude Code session an event referenced.
+// sessionKey identifies one agent session an event referenced.
 type sessionKey struct {
+	agent     AgentKind
 	cwd       string
 	sessionID string
+}
+
+func readAgentSessionStats(key sessionKey) (sessionStats, error) {
+	if key.agent != AgentCodex {
+		return readSessionStats(key.cwd, key.sessionID)
+	}
+	stats, ok, err := codexsession.ReadStats(key.cwd, key.sessionID)
+	if err != nil || !ok {
+		return sessionStats{}, err
+	}
+	return sessionStats{
+		start:         stats.Start,
+		end:           stats.End,
+		peakOccupancy: stats.PeakContext,
+		totalTokens:   stats.TotalTokens,
+		ok:            true,
+	}, nil
 }
 
 // Report reads opts.EpicName's run-log.jsonl under opts.ScratchDir and
@@ -171,13 +195,17 @@ func Report(opts ReportOptions, out io.Writer) error {
 		// answer as a true elapsed-time span would, without needing to assume
 		// the sessions are contiguous.
 		for _, key := range sessionsByTicket[n] {
-			stats, statsErr := readSessionStats(key.cwd, key.sessionID)
+			s.hasCodex = s.hasCodex || key.agent == AgentCodex
+			s.hasClaude = s.hasClaude || key.agent == AgentClaude
+			stats, statsErr := readAgentSessionStats(key)
 			if statsErr != nil || !stats.ok {
+				s.metricsMissing = true
 				continue
 			}
 			s.haveSessionData = true
 			s.duration += stats.end.Sub(stats.start)
 			s.cost += stats.cost
+			s.totalTokens += stats.totalTokens
 			if stats.peakOccupancy > s.peakOccupancy {
 				s.peakOccupancy = stats.peakOccupancy
 			}
@@ -215,6 +243,9 @@ func ticketOrderAndWindows(events []Event) (order []int, windows map[int]ticketW
 		}
 		windows[ev.Ticket] = w
 	}
+	sort.SliceStable(firstSeen, func(i, j int) bool {
+		return windows[firstSeen[i]].start.Before(windows[firstSeen[j]].start)
+	})
 	return firstSeen, windows
 }
 
@@ -227,7 +258,11 @@ func ticketSessions(events []Event) map[int][]sessionKey {
 		if ev.AgentSession == "" {
 			continue
 		}
-		key := sessionKey{cwd: ev.Cwd, sessionID: ev.AgentSession}
+		agent := ev.Agent
+		if agent == "" {
+			agent = AgentClaude
+		}
+		key := sessionKey{agent: agent, cwd: ev.Cwd, sessionID: ev.AgentSession}
 		if seen[ev.Ticket] == nil {
 			seen[ev.Ticket] = map[sessionKey]bool{}
 		}
@@ -302,15 +337,37 @@ func printReport(out io.Writer, epicName string, order []int, summaries map[int]
 
 	fmt.Fprintln(out, "\nPer-ticket:")
 	var totalCost float64
+	var totalTokens int
+	var hasCodex bool
+	var hasClaude bool
+	var totalPeak int
+	totalMetricsKnown := true
 	for _, n := range order {
 		s := summaries[n]
 		totalCost += s.cost
-		duration := "unknown"
-		if s.haveSessionData {
-			duration = s.duration.Round(time.Second).String()
+		totalTokens += s.totalTokens
+		hasCodex = hasCodex || s.hasCodex
+		hasClaude = hasClaude || s.hasClaude
+		metricsKnown := s.haveSessionData && !s.metricsMissing
+		totalMetricsKnown = totalMetricsKnown && metricsKnown
+		if s.peakOccupancy > totalPeak {
+			totalPeak = s.peakOccupancy
 		}
-		fmt.Fprintf(out, "  %-40s duration=%-10s peak-context=%-8d cost=$%.4f\n",
-			ticketLabel(s), duration, s.peakOccupancy, s.cost)
+		duration := "unknown"
+		peakContext := "unknown"
+		if metricsKnown {
+			duration = s.duration.Round(time.Second).String()
+			peakContext = fmt.Sprint(s.peakOccupancy)
+		}
+		tokens := "n/a"
+		if s.hasCodex {
+			tokens = "unknown"
+			if metricsKnown {
+				tokens = fmt.Sprint(s.totalTokens)
+			}
+		}
+		fmt.Fprintf(out, "  %-40s duration=%-10s peak-context=%-8s tokens=%-8s cost=%s\n",
+			ticketLabel(s), duration, peakContext, tokens, reportCost(s.cost, s.hasClaude, s.hasCodex))
 	}
 
 	epicStart, epicEnd := events[0].Time, events[0].Time
@@ -322,5 +379,28 @@ func printReport(out io.Writer, epicName string, order []int, summaries map[int]
 			epicEnd = ev.Time
 		}
 	}
-	fmt.Fprintf(out, "\nTotal: duration=%s cost=$%.4f\n", epicEnd.Sub(epicStart).Round(time.Second), totalCost)
+	totalPeakText := "unknown"
+	if totalMetricsKnown {
+		totalPeakText = fmt.Sprint(totalPeak)
+	}
+	totalTokensText := "n/a"
+	if hasCodex {
+		totalTokensText = "unknown"
+		if totalMetricsKnown {
+			totalTokensText = fmt.Sprint(totalTokens)
+		}
+	}
+	fmt.Fprintf(out, "\nTotal: duration=%s peak-context=%s tokens=%s cost=%s\n",
+		epicEnd.Sub(epicStart).Round(time.Second), totalPeakText, totalTokensText, reportCost(totalCost, hasClaude, hasCodex))
+}
+
+func reportCost(cost float64, hasClaude, hasCodex bool) string {
+	if !hasClaude && hasCodex {
+		return "n/a"
+	}
+	value := fmt.Sprintf("$%.4f", cost)
+	if hasCodex {
+		return value + " + n/a"
+	}
+	return value
 }

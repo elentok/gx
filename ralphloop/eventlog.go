@@ -25,20 +25,20 @@ const (
 
 // Event is one line of an epic's run-log.jsonl: a single lifecycle
 // occurrence, timestamped and attributed to the ticket/pane/tab it happened
-// on. AgentSession is empty for events not tied to a specific Claude Code
-// session (e.g. conflict-hit, which precedes the conflict-resolution
-// agent's own launch); Reason carries the reason for pause and attention
-// events.
+// on. AgentSession is empty for events not tied to a specific agent session
+// (e.g. conflict-hit, which precedes the conflict-resolution agent's own
+// launch). Agent is omitted by historical logs and defaults to Claude when
+// reports read them. Reason carries the reason for pause and attention events.
 type Event struct {
 	Time         time.Time `json:"time"`
 	Type         string    `json:"type"`
 	Ticket       int       `json:"ticket"`
+	Agent        AgentKind `json:"agent,omitempty"`
 	Pane         string    `json:"pane,omitempty"`
 	Tab          string    `json:"tab,omitempty"`
 	AgentSession string    `json:"agent_session,omitempty"`
-	// Cwd is the directory the agent_session's claude was launched in —
-	// the transcript lookup key alongside AgentSession (see
-	// transcript.Path) — set whenever AgentSession is.
+	// Cwd is the directory the agent session was launched in and is the local
+	// session-data lookup key alongside AgentSession.
 	Cwd    string `json:"cwd,omitempty"`
 	Reason string `json:"reason,omitempty"`
 }

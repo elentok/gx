@@ -39,6 +39,26 @@ func writeFakeTranscript(t *testing.T, cwd, sessionID string, start time.Time, t
 	}
 }
 
+func writeFakeCodexSession(t *testing.T, cwd, sessionID string, start time.Time) {
+	t.Helper()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("UserHomeDir: %v", err)
+	}
+	path := filepath.Join(home, ".codex", "sessions", "2026", "01", "01", "rollout-"+sessionID+".jsonl")
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	contents := `{"timestamp":"` + start.UTC().Format(time.RFC3339Nano) + `","type":"session_meta","payload":{"id":"` + sessionID + `","cwd":"` + cwd + `"}}
+{"timestamp":"` + start.Add(time.Second).UTC().Format(time.RFC3339Nano) + `","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":6000,"cached_input_tokens":1000,"output_tokens":400,"reasoning_output_tokens":100,"total_tokens":6400},"last_token_usage":{"input_tokens":3000}}}}
+{"timestamp":"` + start.Add(3*time.Second).UTC().Format(time.RFC3339Nano) + `","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":10000,"cached_input_tokens":2500,"output_tokens":500,"reasoning_output_tokens":150,"total_tokens":10500},"last_token_usage":{"input_tokens":4500}}}}
+{"timestamp":"` + start.Add(4*time.Second).UTC().Format(time.RFC3339Nano) + `","type":"event_msg","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":50,"resets_at":1786170140}}}}
+`
+	if err := os.WriteFile(path, []byte(contents), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+}
+
 func TestReport_NoRunLog_PrintsNoOpMessage(t *testing.T) {
 	dir := t.TempDir()
 	var out bytes.Buffer
@@ -95,6 +115,106 @@ func TestReport_SingleTicket_PrintsOrderAndCost(t *testing.T) {
 	}
 	if !strings.Contains(text, "Total:") {
 		t.Errorf("output = %q, want a Total: summary line", text)
+	}
+}
+
+func TestReport_CodexSessionPrintsDurationPeakContextTokensAndNoCost(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	scratchDir := t.TempDir()
+	cwd := "/fake/iter-01"
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	writeFakeCodexSession(t, cwd, "codex-1", start)
+
+	if err := logEvent(scratchDir, "epic", Event{Time: start, Type: eventIterationStarted, Ticket: 1, Agent: AgentCodex, AgentSession: "codex-1", Cwd: cwd}); err != nil {
+		t.Fatalf("logEvent: %v", err)
+	}
+	if err := logEvent(scratchDir, "epic", Event{Time: start.Add(4 * time.Second), Type: eventIterationFinished, Ticket: 1, Agent: AgentCodex, AgentSession: "codex-1", Cwd: cwd}); err != nil {
+		t.Fatalf("logEvent: %v", err)
+	}
+
+	var out bytes.Buffer
+	if err := Report(ReportOptions{EpicName: "epic", ScratchDir: scratchDir}, &out); err != nil {
+		t.Fatalf("Report() error = %v", err)
+	}
+	text := out.String()
+	for _, want := range []string{"duration=4s", "peak-context=4500", "tokens=10500", "cost=n/a"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("output = %q, want %q", text, want)
+		}
+	}
+}
+
+func TestReport_CodexSessionMissingStillPrintsUnknownMetricsAndNoCost(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	scratchDir := t.TempDir()
+	if err := logEvent(scratchDir, "epic", Event{Type: eventIterationStarted, Ticket: 1, Agent: AgentCodex, AgentSession: "not-local", Cwd: "/fake/iter-01"}); err != nil {
+		t.Fatalf("logEvent: %v", err)
+	}
+
+	var out bytes.Buffer
+	if err := Report(ReportOptions{EpicName: "epic", ScratchDir: scratchDir}, &out); err != nil {
+		t.Fatalf("Report() error = %v", err)
+	}
+	text := out.String()
+	for _, want := range []string{"duration=unknown", "peak-context=unknown", "tokens=unknown", "cost=n/a"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("output = %q, want %q", text, want)
+		}
+	}
+}
+
+func TestReport_MixedAgentsPreservesOrderConcurrencyAndClaudeCost(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	scratchDir := t.TempDir()
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	writeFakeCodexSession(t, "/fake/iter-02", "codex-2", start)
+	writeFakeTranscript(t, "/fake/iter-01", "claude-1", start.Add(time.Second),
+		[3]any{"claude-sonnet-5", 1000, 0},
+		[3]any{"claude-sonnet-5", 2000, 5000},
+	)
+
+	events := []Event{
+		// Deliberately append the later event first: concurrent writers may
+		// acquire the run-log lock in a different order than their timestamps.
+		{Time: start.Add(time.Second), Type: eventIterationStarted, Ticket: 1, Agent: AgentClaude, AgentSession: "claude-1", Cwd: "/fake/iter-01"},
+		{Time: start, Type: eventIterationStarted, Ticket: 2, Agent: AgentCodex, AgentSession: "codex-2", Cwd: "/fake/iter-02"},
+		{Time: start.Add(4 * time.Second), Type: eventIterationFinished, Ticket: 2, Agent: AgentCodex, AgentSession: "codex-2", Cwd: "/fake/iter-02"},
+		{Time: start.Add(5 * time.Second), Type: eventIterationFinished, Ticket: 1, Agent: AgentClaude, AgentSession: "claude-1", Cwd: "/fake/iter-01"},
+	}
+	for _, event := range events {
+		if err := logEvent(scratchDir, "epic", event); err != nil {
+			t.Fatalf("logEvent: %v", err)
+		}
+	}
+
+	var out bytes.Buffer
+	if err := Report(ReportOptions{EpicName: "epic", ScratchDir: scratchDir}, &out); err != nil {
+		t.Fatalf("Report() error = %v", err)
+	}
+	text := out.String()
+	if !strings.Contains(text, "Task order:\n  02\n  01") {
+		t.Errorf("output = %q, want Codex ticket 02 before Claude ticket 01", text)
+	}
+	if !strings.Contains(text, "02 + 01") {
+		t.Errorf("output = %q, want mixed-agent concurrency group", text)
+	}
+	var claudeRow, codexRow string
+	for line := range strings.SplitSeq(text, "\n") {
+		if strings.Contains(line, "duration=") && strings.HasPrefix(strings.TrimSpace(line), "01") {
+			claudeRow = line
+		}
+		if strings.Contains(line, "duration=") && strings.HasPrefix(strings.TrimSpace(line), "02") {
+			codexRow = line
+		}
+	}
+	if !strings.Contains(claudeRow, "cost=$0.0108") {
+		t.Errorf("Claude row = %q, want existing Claude cost", claudeRow)
+	}
+	if !strings.Contains(codexRow, "tokens=10500") || !strings.Contains(codexRow, "cost=n/a") {
+		t.Errorf("Codex row = %q, want Codex tokens and n/a cost", codexRow)
+	}
+	if !strings.Contains(text, "Total: duration=5s peak-context=7000 tokens=10500 cost=$0.0108 + n/a") {
+		t.Errorf("output = %q, want mixed epic totals", text)
 	}
 }
 
