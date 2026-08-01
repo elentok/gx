@@ -2,7 +2,6 @@ package tickets
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -129,7 +128,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) 
 	searchDim := m.search.HasQuery() && !matched
 	doneDim := status == tickets.StatusDone
 
-	title := fmt.Sprintf("%d %s", t.Number, t.Title)
+	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
 	titleStyle := lipgloss.NewStyle()
 	if matched {
 		title = search.Highlight(title, m.search.Query(), current)
@@ -189,7 +188,7 @@ func blockedBySuffix(epic tickets.Epic, t tickets.Ticket, status tickets.Rendere
 	}
 	numbers := make([]string, len(unresolved))
 	for i, n := range unresolved {
-		numbers[i] = strconv.Itoa(n)
+		numbers[i] = fmt.Sprint(n)
 	}
 	return fmt.Sprintf("(blocked by %s)", strings.Join(numbers, ", "))
 }

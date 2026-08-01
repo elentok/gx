@@ -160,7 +160,8 @@ func (m *Model) clampSelected() {
 // ui.RenderPanel's own bodyH math (PaddingY: 0, minus the header row) so the
 // windowing done here lines up with what RenderPanel actually paints.
 func (m Model) sidebarViewportHeight() int {
-	return max(m.contentHeight()-1, 0)
+	sidebarH, _ := m.splitHeight(m.contentHeight())
+	return max(sidebarH-1, 0)
 }
 
 // sidebarLineForSelected returns the selected row's line index within
@@ -268,15 +269,16 @@ func (m Model) activeInputSearch() (search.Model, bool) {
 func (m Model) normalView() string {
 	sidebarW, previewW := m.splitWidth()
 	h := m.contentHeight()
+	sidebarH, previewH := m.splitHeight(h)
 
-	sidebarView := m.renderPanel(sidebarW, h, "Tickets", m.searchMatchStatus(), m.sidebarVisibleLines(m.sidebarViewportHeight()), m.focus == focusSidebar, true)
-	previewView := m.renderPanel(previewW, h, "Preview", m.previewMatchStatus(), m.previewLines(), m.focus == focusPreview, false)
+	sidebarView := m.renderPanel(sidebarW, sidebarH, "Tickets", m.searchMatchStatus(), m.sidebarVisibleLines(m.sidebarViewportHeight()), m.focus == focusSidebar, true)
+	previewView := m.renderPanel(previewW, previewH, "Preview", m.previewMatchStatus(), m.previewLines(), m.focus == focusPreview, false)
 
 	if m.useStackedLayout() {
 		seam := ui.RenderSeamRow(sidebarW, ui.SeamColor)
 		return lipgloss.JoinVertical(lipgloss.Left, sidebarView, seam, previewView)
 	}
-	seam := ui.RenderSeamColumn(h, ui.SeamColor)
+	seam := ui.RenderSeamColumn(sidebarH, ui.SeamColor)
 	return lipgloss.JoinHorizontal(lipgloss.Top, sidebarView, seam, previewView)
 }
 
@@ -313,11 +315,31 @@ func (m Model) splitWidth() (sidebarW, previewW int) {
 	return
 }
 
+// splitHeight divides a stacked tickets view between its selection-driving
+// list and preview, leaving the preview a usable minimum height. Wide views
+// remain a full-height side-by-side split.
+func (m Model) splitHeight(total int) (sidebarH, previewH int) {
+	if !m.useStackedLayout() {
+		return total, total
+	}
+	total-- // seam row
+	const minPreviewH = 6
+	sidebarH = len(m.sidebarLines()) + 2
+	if sidebarH > total-minPreviewH {
+		sidebarH = total - minPreviewH
+	}
+	if sidebarH < 4 {
+		sidebarH = 4
+	}
+	previewH = total - sidebarH
+	if previewH < 1 {
+		previewH = 1
+	}
+	return
+}
+
 func (m Model) contentHeight() int {
 	h := m.height
-	if m.useStackedLayout() {
-		h -= 1
-	}
 	if h < 4 {
 		return 4
 	}

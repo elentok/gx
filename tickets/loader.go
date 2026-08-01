@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-var ticketFilenameRe = regexp.MustCompile(`^(\d+)-(.+)\.md$`)
+var ticketFilenameRe = regexp.MustCompile(`^(\d+)([[:alpha:]]*)-(.+)\.md$`)
 
 // Load reads a `.scratch/` directory from real disk into its epics/tickets.
 // A missing directory is not an error: it returns a nil/empty slice, which
@@ -51,7 +51,7 @@ func loadEpic(scratchDir, name string) Epic {
 		if issueEntry.IsDir() {
 			continue
 		}
-		number, title, ok := parseTicketFilename(issueEntry.Name())
+		number, identifier, title, ok := parseTicketFilename(issueEntry.Name())
 		if !ok {
 			continue
 		}
@@ -60,16 +60,18 @@ func loadEpic(scratchDir, name string) Epic {
 		raw, err := os.ReadFile(ticketPath)
 		if err != nil {
 			epic.Tickets = append(epic.Tickets, Ticket{
-				Number:  number,
-				Title:   title,
-				Path:    ticketPath,
-				ReadErr: err.Error(),
+				Number:     number,
+				Identifier: identifier,
+				Title:      title,
+				Path:       ticketPath,
+				ReadErr:    err.Error(),
 			})
 			continue
 		}
 
 		ticket, _ := ParseTicket(string(raw))
 		ticket.Number = number
+		ticket.Identifier = identifier
 		ticket.Title = title
 		ticket.Path = ticketPath
 		epic.Tickets = append(epic.Tickets, ticket)
@@ -78,18 +80,20 @@ func loadEpic(scratchDir, name string) Epic {
 	return epic
 }
 
-// parseTicketFilename splits a "NN-<slug>.md" filename into its ticket
-// number and a humanized title derived from the slug.
-func parseTicketFilename(filename string) (number int, title string, ok bool) {
+// parseTicketFilename splits a "NN[suffix]-<slug>.md" filename into its
+// numeric sort key, full identifier, and a humanized title. The optional
+// alphabetic suffix supports wayfinder's split tickets (for example 10a).
+func parseTicketFilename(filename string) (number int, identifier, title string, ok bool) {
 	m := ticketFilenameRe.FindStringSubmatch(filename)
 	if m == nil {
-		return 0, "", false
+		return 0, "", "", false
 	}
 	number, err := strconv.Atoi(m[1])
 	if err != nil {
-		return 0, "", false
+		return 0, "", "", false
 	}
-	return number, humanizeSlug(m[2]), true
+	identifier = m[1] + m[2]
+	return number, identifier, humanizeSlug(m[3]), true
 }
 
 func humanizeSlug(slug string) string {

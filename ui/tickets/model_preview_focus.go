@@ -37,8 +37,8 @@ func (m *Model) syncPreviewViewport() {
 		return
 	}
 	_, previewW := m.splitWidth()
-	h := m.contentHeight()
-	width, height := m.previewInnerSize(previewW, h)
+	_, previewH := m.splitHeight(m.contentHeight())
+	width, height := m.previewInnerSize(previewW, previewH)
 	contentW := max(width-previewScrollbarGutter, 1)
 
 	m.previewVP.SetWidth(contentW)

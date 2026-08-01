@@ -133,7 +133,7 @@ func previewEpicHeaderLine(epic tickets.Epic) string {
 
 func previewHeaderLine(icons ui.IconSet, status tickets.RenderedStatus, t tickets.Ticket) string {
 	icon, style := statusIconAndStyle(icons, status)
-	return "  " + style.Render(icon) + " " + ui.StyleBold.Render(fmt.Sprintf("#%d %s", t.Number, t.Title))
+	return "  " + style.Render(icon) + " " + ui.StyleBold.Render(fmt.Sprintf("#%s %s", t.DisplayNumber(), t.Title))
 }
 
 func previewMetaLine(epic tickets.Epic, t tickets.Ticket, status tickets.RenderedStatus) string {

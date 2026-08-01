@@ -59,6 +59,31 @@ func TestNewModel_RendersEpicsAndTicketsFromDisk(t *testing.T) {
 	}
 }
 
+func TestNewModel_RendersAlphabeticallySuffixedTicketNumber(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "10a-split-ticket.md", "Status: open\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	if !strings.Contains(m.View().Content, "10a Split ticket") {
+		t.Fatalf("expected suffixed ticket identifier in view, got:\n%s", m.View().Content)
+	}
+}
+
+func TestModel_StackedLayoutSplitsAvailableHeight(t *testing.T) {
+	m := Model{width: 80, height: 30}
+	sidebarH, previewH := m.splitHeight(m.contentHeight())
+	if sidebarH+previewH != 29 { // 30 minus the seam row
+		t.Errorf("sidebarH(%d) + previewH(%d) != 29", sidebarH, previewH)
+	}
+	if sidebarH < 4 || previewH < 1 {
+		t.Errorf("invalid stacked heights: sidebar=%d preview=%d", sidebarH, previewH)
+	}
+}
+
 func TestNewModel_ZeroEpicScratchDirRendersSameEmptyStateAsNoScratchDir(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".scratch"), 0755); err != nil {

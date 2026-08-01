@@ -3,6 +3,7 @@ package tickets
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -151,5 +152,25 @@ func TestLoad_IgnoresNonTicketFilesInIssuesDir(t *testing.T) {
 	}
 	if epics[0].TotalCount() != 1 {
 		t.Fatalf("expected 1 ticket (README.md ignored), got %d", epics[0].TotalCount())
+	}
+}
+
+func TestLoad_DiscoversAlphabeticallySuffixedTicketNumbers(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"10a-first.md", "10b-second.md", "10c-third.md"} {
+		writeFile(t, filepath.Join(dir, "epic", "issues", name), "Status: open\n")
+	}
+
+	epics, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(epics) != 1 || len(epics[0].Tickets) != 3 {
+		t.Fatalf("expected 3 suffixed tickets, got %+v", epics)
+	}
+	got := []string{epics[0].Tickets[0].DisplayNumber(), epics[0].Tickets[1].DisplayNumber(), epics[0].Tickets[2].DisplayNumber()}
+	want := []string{"10a", "10b", "10c"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ticket identifiers = %v, want %v", got, want)
 	}
 }

@@ -13,9 +13,13 @@ import (
 // Path are filled in by the loader from the filename/path, not by ParseTicket
 // (which only ever sees the file's raw text).
 type Ticket struct {
-	Number int
-	Title  string
-	Path   string
+	// Number is the numeric portion of the ticket identifier, retained for
+	// scheduler ordering and legacy callers. Identifier is the full filename
+	// prefix, so tickets such as 10a and 10b remain distinct in the UI.
+	Number     int
+	Identifier string
+	Title      string
+	Path       string
 
 	Type      string
 	BlockedBy []int
@@ -28,6 +32,16 @@ type Ticket struct {
 	// content to parse. Distinct from an unrecognized Status: value, which is
 	// a successfully-read file.
 	ReadErr string
+}
+
+// DisplayNumber returns the filename's complete ticket identifier. Tickets
+// constructed outside the loader predate Identifier, so fall back to Number
+// for those callers.
+func (t Ticket) DisplayNumber() string {
+	if strings.Trim(t.Identifier, "0123456789") != "" {
+		return t.Identifier
+	}
+	return strconv.Itoa(t.Number)
 }
 
 var doneStatuses = map[string]bool{

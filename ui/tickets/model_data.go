@@ -165,7 +165,10 @@ func sortedTicketIndexes(epic tickets.Epic) []int {
 		if groupA != groupB {
 			return groupA < groupB
 		}
-		return a.Number < b.Number
+		if a.Number != b.Number {
+			return a.Number < b.Number
+		}
+		return a.DisplayNumber() < b.DisplayNumber()
 	})
 	return indexes
 }
