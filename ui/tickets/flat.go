@@ -12,6 +12,7 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
@@ -78,6 +79,10 @@ type FlatModel struct {
 	transcript   map[string][]string
 	transcriptVP viewport.Model
 
+	// tabFocus is herdr.TabFocus by default; tests substitute a fake to avoid
+	// shelling out to a real herdr binary (see WithTabFocus).
+	tabFocus func(tabID string) (herdr.Tab, error)
+
 	spinner       spinner.Model
 	spinnerActive bool
 }
@@ -100,6 +105,7 @@ func NewFlatModel(worktreeRoot, epicName string, settings ui.Settings) FlatModel
 		labelIdentifier: map[string]string{},
 		transcript:      map[string][]string{},
 		transcriptVP:    viewport.New(),
+		tabFocus:        herdr.TabFocus,
 		spinner:         sp,
 	}
 }
@@ -250,6 +256,12 @@ func (m FlatModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case editFileFinishedMsg:
 		next, cmd := m.handleEditFileFinished(msg)
 		return next, tea.Batch(notifyCmd, cmd)
+
+	case flatTabFocusResultMsg:
+		if msg.err != nil {
+			return m, tea.Batch(notifyCmd, notify.Error("focus tab: "+msg.err.Error()))
+		}
+		return m, notifyCmd
 
 	case tea.KeyPressMsg:
 		next, cmd := m.handleFlatKey(msg)

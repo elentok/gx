@@ -2,13 +2,16 @@ package tickets_test
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	teatest "github.com/elentok/gx/testutil/teatestv2"
 	"github.com/elentok/gx/ui"
@@ -194,6 +197,96 @@ func TestFlatTUI_LivePreviewMetadataAndTranscript(t *testing.T) {
 	if bytes.Contains(frame, []byte("transcriptlinemarker")) {
 		t.Fatalf("expected done ticket's preview to have no transcript tail, got:\n%s", frame)
 	}
+}
+
+// TestFlatTUI_EnterJumpsToLiveTabOrNoOps covers ticket 05's `enter` binding:
+// it calls herdr.TabFocus with the live ticket's tab label and never
+// touches focus/preview, and it's a silent no-op for a ticket with no live
+// tab (here, a done ticket that never got a LiveEvent).
+func TestFlatTUI_EnterJumpsToLiveTabOrNoOps(t *testing.T) {
+	root := t.TempDir()
+	writeFlatTicket(t, root, "my-epic", "01-running-ticket.md", "Status: open\n\nFirstbodymarker\n")
+	writeFlatTicket(t, root, "my-epic", "02-done-ticket.md", "Status: done\n\nSecondbodymarker\n")
+
+	var mu sync.Mutex
+	var focusedTabIDs []string
+	fakeTabFocus := func(tabID string) (herdr.Tab, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		focusedTabIDs = append(focusedTabIDs, tabID)
+		return herdr.Tab{TabID: tabID, Focused: true}, nil
+	}
+	getFocusedTabIDs := func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]string(nil), focusedTabIDs...)
+	}
+
+	events := make(chan ralphloop.LiveEvent, 16)
+	m := tickets.NewFlatModel(root, "my-epic", ui.Settings{}).
+		WithLiveEvents(events).
+		WithTabFocus(fakeTabFocus)
+	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(flatTermWidth, flatTermHeight))
+	defer tm.Quit()
+
+	waitForFlatText(t, tm, "Running ticket")
+
+	events <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Identifier: "01", Label: "iter-01"}
+	waitForFlatText(t, tm, "iter-01")
+
+	// Select the done ticket (no live tab): enter must no-op, never calling
+	// TabFocus and never switching focus to the preview pane.
+	tm.Send(flatKeyRune('j'))
+	waitForFlatText(t, tm, "Secondbodymarker")
+	tm.Send(flatKeySpecial(tea.KeyEnter))
+
+	// If enter had switched focus to the preview pane, "k" would scroll the
+	// viewport instead of moving the list selection, and the preview would
+	// still show the done ticket's body. It shows the running ticket's body
+	// instead, proving list nav (and thus list focus) survived enter.
+	tm.Send(flatKeyRune('k'))
+	waitForFlatText(t, tm, "Firstbodymarker")
+
+	if got := getFocusedTabIDs(); len(got) != 0 {
+		t.Fatalf("focusedTabIDs = %v, want none after no-op enter", got)
+	}
+
+	// Now on the running ticket: enter jumps to its live tab.
+	tm.Send(flatKeySpecial(tea.KeyEnter))
+
+	teatest.WaitFor(t, tm.Output(), func([]byte) bool {
+		return len(getFocusedTabIDs()) > 0
+	}, teatest.WithDuration(flatWait))
+
+	if got := getFocusedTabIDs(); len(got) != 1 || got[0] != "iter-01" {
+		t.Fatalf("focusedTabIDs = %v, want [iter-01]", got)
+	}
+}
+
+// TestFlatTUI_EnterSurfacesTabFocusError covers the tab_not_found case: a
+// live ticket's tab closed between the row rendering and enter being
+// pressed, and the error is toasted rather than crashing the TUI.
+func TestFlatTUI_EnterSurfacesTabFocusError(t *testing.T) {
+	root := t.TempDir()
+	writeFlatTicket(t, root, "my-epic", "01-running-ticket.md", "Status: open\n\nFirst body.\n")
+
+	fakeTabFocus := func(tabID string) (herdr.Tab, error) {
+		return herdr.Tab{}, errors.New("tab_not_found")
+	}
+
+	events := make(chan ralphloop.LiveEvent, 16)
+	m := tickets.NewFlatModel(root, "my-epic", ui.Settings{}).
+		WithLiveEvents(events).
+		WithTabFocus(fakeTabFocus)
+	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(flatTermWidth, flatTermHeight))
+	defer tm.Quit()
+
+	waitForFlatText(t, tm, "Running ticket")
+	events <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Identifier: "01", Label: "iter-01"}
+	waitForFlatText(t, tm, "iter-01")
+
+	tm.Send(flatKeySpecial(tea.KeyEnter))
+	waitForFlatText(t, tm, "tab_not_found")
 }
 
 func TestFlatTUI_EditChordCancels(t *testing.T) {

@@ -5,6 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
@@ -119,6 +120,46 @@ func (m FlatModel) liveStateForSelected() (liveTicketState, bool) {
 		return liveTicketState{}, false
 	}
 	return live, true
+}
+
+// WithTabFocus overrides the herdr.TabFocus call FlatModel makes on `enter`
+// (ticket 05). Only tests use this, to avoid shelling out to a real herdr
+// binary; production wiring (cmd/ralphloop.go) leaves NewFlatModel's default
+// (herdr.TabFocus) in place.
+func (m FlatModel) WithTabFocus(fn func(tabID string) (herdr.Tab, error)) FlatModel {
+	m.tabFocus = fn
+	return m
+}
+
+// flatTabFocusResultMsg carries the result of a cmdFocusTab call. err is
+// non-nil when herdr.TabFocus failed (e.g. tab_not_found because the tab
+// closed between the row rendering its label and enter being pressed); the
+// only thing FlatModel does with it is surface it as a toast, not treat it as
+// fatal.
+type flatTabFocusResultMsg struct {
+	err error
+}
+
+// cmdFocusTab calls m.tabFocus(tabID), jumping the herdr session to that
+// ticket's live pane (ticket 05's `enter` binding).
+func (m FlatModel) cmdFocusTab(tabID string) tea.Cmd {
+	focus := m.tabFocus
+	return func() tea.Msg {
+		_, err := focus(tabID)
+		return flatTabFocusResultMsg{err: err}
+	}
+}
+
+// liveTabID returns identifier's live herdr tab id (its label) and whether
+// one exists: identifier must have a running or paused liveTicketState with
+// a non-empty label, which excludes the needs-attention pause kinds that
+// have no live iteration to reattach to (see applyLiveEvent).
+func (m FlatModel) liveTabID(identifier string) (string, bool) {
+	ls, ok := m.live[identifier]
+	if !ok || !(ls.running || ls.paused) || ls.label == "" {
+		return "", false
+	}
+	return ls.label, true
 }
 
 // hasRunningLiveTicket reports whether any ticket currently has a running

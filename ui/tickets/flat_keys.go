@@ -20,7 +20,7 @@ func newFlatTicketsManager() keys.Manager {
 		{ID: bindingTicketsUp, Seq: []string{"up"}, Categories: []string{}, Title: ""},
 		{ID: bindingTicketsExpand, Seq: []string{"l"}, Categories: []string{"Navigation"}, Title: "focus preview", Display: "l/→"},
 		{ID: bindingTicketsExpand, Seq: []string{"right"}, Categories: []string{}, Title: ""},
-		{ID: bindingTicketsToggle, Seq: []string{"enter"}, Categories: []string{"Navigation"}, Title: "focus preview"},
+		{ID: bindingTicketsToggle, Seq: []string{"enter"}, Categories: []string{"Navigation"}, Title: "jump to herdr pane"},
 		{ID: bindingTicketsRefresh, Seq: []string{"R"}, Categories: []string{"Navigation"}, Title: "refresh"},
 		{ID: bindingTicketsEditInPlace, Seq: []string{"e", "e"}, Categories: []string{"Navigation"}, Title: "edit file"},
 		{ID: bindingTicketsEditHSplit, Seq: []string{"e", "s"}, Categories: []string{"Navigation"}, Title: "edit file (split)"},
@@ -52,9 +52,15 @@ func (m FlatModel) handleFlatKey(msg tea.KeyPressMsg) (FlatModel, tea.Cmd) {
 		m.moveSelection(1)
 	case bindingTicketsUp:
 		m.moveSelection(-1)
-	case bindingTicketsExpand, bindingTicketsToggle:
+	case bindingTicketsExpand:
 		if _, ok := m.selectedTicket(); ok {
 			m.focus = flatFocusPreview
+		}
+	case bindingTicketsToggle:
+		if t, ok := m.selectedTicket(); ok {
+			if tabID, ok := m.liveTabID(t.Identifier); ok {
+				return m, m.cmdFocusTab(tabID)
+			}
 		}
 	case bindingTicketsRefresh:
 		return m, m.cmdRefresh()
