@@ -79,6 +79,8 @@ func runRalphLoop(epicName, agent, skill string, maxParallel, smartZone int, d d
 // row state (ticket 04a) on top of `.scratch/`'s disk-polled Status: lines.
 func runRalphLoopTUI(opts ralphloop.RunOptions, worktreeRoot string, d deps) error {
 	sink := ralphloop.NewChannelEventSink()
+	gate := ralphloop.NewGate()
+	opts.Gate = gate
 	go func() {
 		_ = ralphloop.Run(opts, ralphloop.DefaultDeps(), sink)
 	}()
@@ -90,7 +92,9 @@ func runRalphLoopTUI(opts ralphloop.RunOptions, worktreeRoot string, d deps) err
 	settings := settingsFromConfig(cfg)
 	settings.EnableNavigation = false
 
-	m := tickets.NewFlatModel(worktreeRoot, opts.EpicName, settings).WithLiveEvents(sink.Events())
+	m := tickets.NewFlatModel(worktreeRoot, opts.EpicName, settings).
+		WithLiveEvents(sink.Events()).
+		WithResumeControl(gate.ForceResume)
 	p := tea.NewProgram(m, tea.WithInput(d.stdin), tea.WithOutput(d.stdout))
 	_, err = p.Run()
 	return err

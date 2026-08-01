@@ -83,6 +83,11 @@ type FlatModel struct {
 	// shelling out to a real herdr binary (see WithTabFocus).
 	tabFocus func(tabID string) (herdr.Tab, error)
 
+	// resumeConfirm is ticket 06b's confirm modal for `r`; resumeControl is
+	// nil unless WithResumeControl wired one (see flat_resume.go).
+	resumeConfirm resumeConfirmState
+	resumeControl func(label string) bool
+
 	spinner       spinner.Model
 	spinnerActive bool
 }
@@ -264,6 +269,10 @@ func (m FlatModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, notifyCmd
 
 	case tea.KeyPressMsg:
+		if m.resumeConfirm.isOpen() {
+			next, cmd := m.handleResumeConfirmUpdate(msg)
+			return next, tea.Batch(notifyCmd, cmd)
+		}
 		next, cmd := m.handleFlatKey(msg)
 		return next, tea.Batch(notifyCmd, cmd)
 	}

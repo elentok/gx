@@ -21,6 +21,7 @@ func newFlatTicketsManager() keys.Manager {
 		{ID: bindingTicketsExpand, Seq: []string{"l"}, Categories: []string{"Navigation"}, Title: "focus preview", Display: "l/→"},
 		{ID: bindingTicketsExpand, Seq: []string{"right"}, Categories: []string{}, Title: ""},
 		{ID: bindingTicketsToggle, Seq: []string{"enter"}, Categories: []string{"Navigation"}, Title: "jump to herdr pane"},
+		{ID: bindingTicketsResume, Seq: []string{"r"}, Categories: []string{"Navigation"}, Title: "resume/recheck"},
 		{ID: bindingTicketsRefresh, Seq: []string{"R"}, Categories: []string{"Navigation"}, Title: "refresh"},
 		{ID: bindingTicketsEditInPlace, Seq: []string{"e", "e"}, Categories: []string{"Navigation"}, Title: "edit file"},
 		{ID: bindingTicketsEditHSplit, Seq: []string{"e", "s"}, Categories: []string{"Navigation"}, Title: "edit file (split)"},
@@ -61,6 +62,10 @@ func (m FlatModel) handleFlatKey(msg tea.KeyPressMsg) (FlatModel, tea.Cmd) {
 			if tabID, ok := m.liveTabID(t.Identifier); ok {
 				return m, m.cmdFocusTab(tabID)
 			}
+		}
+	case bindingTicketsResume:
+		if t, ok := m.selectedTicket(); ok {
+			m, _ = m.openResumeConfirm(t.Identifier)
 		}
 	case bindingTicketsRefresh:
 		return m, m.cmdRefresh()

@@ -342,6 +342,96 @@ func TestFlatTUI_PausedAndAttentionBanner_AppearsAndDisappears(t *testing.T) {
 	}
 }
 
+// TestFlatTUI_ResumeConfirm_ConfirmAndCancel covers ticket 06b's `r` binding:
+// on a paused row it opens a resume confirm whose `y`/enter calls the wired
+// resume-control function with that ticket's live label; on a needs-attention
+// row it opens a recheck confirm the same way. `n`/esc/q on either just
+// closes the modal without calling anything.
+func TestFlatTUI_ResumeConfirm_ConfirmAndCancel(t *testing.T) {
+	root := t.TempDir()
+	writeFlatTicket(t, root, "my-epic", "01-paused-ticket.md", "Status: open\n\nFirst body.\n")
+	writeFlatTicket(t, root, "my-epic", "02-attention-ticket.md", "Status: open\n\nSecond body.\n")
+
+	var mu sync.Mutex
+	var calledLabels []string
+	fakeResumeControl := func(label string) bool {
+		mu.Lock()
+		defer mu.Unlock()
+		calledLabels = append(calledLabels, label)
+		return true
+	}
+	getCalledLabels := func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]string(nil), calledLabels...)
+	}
+
+	events := make(chan ralphloop.LiveEvent, 16)
+	m := tickets.NewFlatModel(root, "my-epic", ui.Settings{}).
+		WithLiveEvents(events).
+		WithResumeControl(fakeResumeControl)
+	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(flatTermWidth, flatTermHeight))
+	defer tm.Quit()
+
+	waitForFlatText(t, tm, "Paused ticket")
+
+	events <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Identifier: "01", Label: "iter-01"}
+	waitForFlatText(t, tm, "iter-01")
+	events <- ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationPaused, Label: "iter-01",
+		PauseKind: ralphloop.PauseSmartZone, Reason: "context budget exceeded",
+	}
+	waitForFlatText(t, tm, "context budget exceeded")
+
+	// `r` on the paused row (still selected) opens the resume confirm; `n`
+	// cancels it without calling resumeControl.
+	tm.Send(flatKeyRune('r'))
+	waitForFlatText(t, tm, "Resume this ticket?")
+	tm.Send(flatKeyRune('n'))
+	waitForFlatText(t, tm, "context budget exceeded")
+	if got := getCalledLabels(); len(got) != 0 {
+		t.Fatalf("resumeControl calls after cancel = %v, want none", got)
+	}
+
+	// Confirming with `y` calls resumeControl with the paused ticket's label.
+	tm.Send(flatKeyRune('r'))
+	waitForFlatText(t, tm, "Resume this ticket?")
+	tm.Send(flatKeyRune('y'))
+
+	waitForFlatText(t, tm, "resumed")
+	if got := getCalledLabels(); len(got) != 1 || got[0] != "iter-01" {
+		t.Fatalf("resumeControl calls = %v, want [iter-01]", got)
+	}
+
+	// Select the needs-attention ticket: `r` opens a recheck confirm instead.
+	tm.Send(flatKeyRune('j'))
+	waitForFlatText(t, tm, "Attention ticket")
+	events <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Identifier: "02", Label: "iter-02"}
+	waitForFlatText(t, tm, "iter-02")
+	events <- ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationPaused, Label: "iter-02",
+		PauseKind: ralphloop.PauseNeedsAttention, Reason: "Codex is waiting for operator intervention",
+	}
+	waitForFlatText(t, tm, "Codex is waiting for operator intervention")
+
+	tm.Send(flatKeyRune('r'))
+	waitForFlatText(t, tm, "Re-check this ticket?")
+	tm.Send(flatKeySpecial(tea.KeyEsc))
+	waitForFlatText(t, tm, "Codex is waiting for operator intervention")
+	if got := getCalledLabels(); len(got) != 1 {
+		t.Fatalf("resumeControl calls after esc on recheck = %v, want still just [iter-01]", got)
+	}
+
+	tm.Send(flatKeyRune('r'))
+	waitForFlatText(t, tm, "Re-check this ticket?")
+	tm.Send(flatKeySpecial(tea.KeyEnter))
+
+	waitForFlatText(t, tm, "rechecked")
+	if got := getCalledLabels(); len(got) != 2 || got[1] != "iter-02" {
+		t.Fatalf("resumeControl calls = %v, want [iter-01 iter-02]", got)
+	}
+}
+
 func TestFlatTUI_EditChordCancels(t *testing.T) {
 	root := t.TempDir()
 	writeFlatTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")

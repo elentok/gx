@@ -17,6 +17,9 @@ func (m FlatModel) View() tea.View {
 		return ui.NewMainView("\n  Initializing…")
 	}
 	content := m.normalView()
+	if m.resumeConfirm.isOpen() {
+		content = ui.OverlayCenter(content, m.resumeConfirmView(), m.width, m.height)
+	}
 	if m.previewSearch.Mode() == search.SearchModeInput {
 		overlayW := m.searchOverlayWidth()
 		s := m.previewSearch

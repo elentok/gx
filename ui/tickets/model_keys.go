@@ -15,6 +15,7 @@ const (
 	bindingTicketsCollapse    keys.BindingID = "collapse"
 	bindingTicketsExpand      keys.BindingID = "expand"
 	bindingTicketsToggle      keys.BindingID = "toggle"
+	bindingTicketsResume      keys.BindingID = "resume"
 	bindingTicketsRefresh     keys.BindingID = "refresh"
 	bindingTicketsEditInPlace keys.BindingID = "edit"
 	bindingTicketsEditHSplit  keys.BindingID = "edit-hsplit"
