@@ -839,7 +839,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			continue
 		}
 
-		if err := d.AgentSendKeys(p.Pane, "ctrl-c"); err != nil {
+		if err := d.AgentSendKeys(p.Pane, "ctrl+c"); err != nil {
 			return fmt.Errorf("interrupting %s after smart-zone breach: %w", p.Label, err)
 		}
 		reason := fmt.Sprintf("context occupancy %d exceeds --smart-zone %d", occupancy, smartZone)

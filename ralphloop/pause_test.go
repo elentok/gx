@@ -125,7 +125,7 @@ func TestWaitForFinish_CodexContextBreachPausesAndResumes(t *testing.T) {
 			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 		},
 		AgentSendKeys: func(target string, keys ...string) error {
-			interrupted = slices.Equal(keys, []string{"ctrl-c"})
+			interrupted = slices.Equal(keys, []string{"ctrl+c"})
 			return nil
 		},
 		ReadCodexContext: func(cwd, sessionID string) (int, bool, error) {
@@ -443,8 +443,8 @@ func TestRun_SmartZoneBreach_PausesResumesAndKeepsSchedulingCorrect(t *testing.T
 	pane2 := <-started
 
 	keys := <-sendKeysCh
-	if len(keys) == 0 || keys[0] != "ctrl-c" {
-		t.Fatalf("AgentSendKeys keys = %v, want [ctrl-c]", keys)
+	if len(keys) == 0 || keys[0] != "ctrl+c" {
+		t.Fatalf("AgentSendKeys keys = %v, want [ctrl+c]", keys)
 	}
 
 	raw01, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
