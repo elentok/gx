@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -499,16 +500,17 @@ func reattachIteration(d Deps, p iterationParams) error {
 	if err != nil {
 		return fmt.Errorf("finding live tab for reattached iteration %s: %w", label, err)
 	}
-	tabID := ""
+	var tab herdr.Tab
 	for _, t := range tabs {
 		if t.Label == label {
-			tabID = t.TabID
+			tab = t
 			break
 		}
 	}
-	if tabID == "" {
+	if tab.TabID == "" {
 		return fmt.Errorf("no live tab found for reattached iteration %s", label)
 	}
+	tabID := tab.TabID
 
 	base, err := d.MergeBase(path, branch, p.FeatureBranch)
 	if err != nil {
@@ -521,7 +523,14 @@ func reattachIteration(d Deps, p iterationParams) error {
 	// wait simply re-observes idle/done without that guardrail. StartEvent is
 	// left empty for the same reason (no fresh launch happened here to log).
 	launchParams := p.launchAndPromptParams(label, label, tabID, "", path, "", eventIterationFinished)
-	if err := waitForFinish(d, launchParams, ""); err != nil {
+	if alreadyFinished(tab.AgentStatus) {
+		// tab's status came from TabList just above, taken at reattach time —
+		// the agent may have finished while the previous invocation was down,
+		// with no further status transition ever coming, so waitForFinish's
+		// AgentWait poll would have nothing new to observe.
+		p.Report("%s already finished at reattach; skipping wait\n", label)
+		launchParams.logLifecycleEvent(launchParams.FinishEvent, "")
+	} else if err := waitForFinish(d, launchParams, ""); err != nil {
 		return fmt.Errorf("waiting for reattached agent %s to finish: %w", label, err)
 	}
 	if strings.EqualFold(strings.TrimSpace(p.Ticket.Status), "needs-attention") {
@@ -815,6 +824,22 @@ func launchAndPrompt(d Deps, p launchAndPromptParams) (string, error) {
 	return agent.AgentSession, nil
 }
 
+// plainFinishStates are the herdr agent_status values that mean "the agent's
+// turn is over" for every agent kind. waitForFinish appends "blocked" to
+// these for Codex, which needs its own rate-limit/attention-recovery handling
+// rather than being treated as finished.
+var plainFinishStates = []string{"idle", "done"}
+
+// alreadyFinished reports whether status (a herdr tab's current agent_status,
+// e.g. from TabList) already matches one of waitForFinish's plain-completion
+// target states. "blocked" is deliberately excluded even though waitForFinish
+// treats it as a Codex finish state too — a pane already sitting blocked at
+// reattach still needs waitForFinish's rate-limit/attention-recovery
+// handling, not a bare skip.
+func alreadyFinished(status string) bool {
+	return slices.Contains(plainFinishStates, status)
+}
+
 // waitForFinish polls Pane until it reaches idle or done, checking the
 // session's current context occupancy against SmartZone on every poll tick
 // that times out rather than settling. A breach interrupts the pane (Ctrl-C,
@@ -840,7 +865,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			}
 		}
 
-		until := []string{"idle", "done"}
+		until := append([]string{}, plainFinishStates...)
 		if p.Agent == AgentCodex {
 			until = append(until, "blocked")
 		}

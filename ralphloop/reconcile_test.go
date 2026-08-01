@@ -536,6 +536,63 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 	}
 }
 
+// TestRun_RestartWithClaimedTicketAlreadyIdle_SkipsWaitAndCherryPicks
+// verifies ticket 05: when a reattached iteration's pane already shows
+// idle/done in TabList at reattach time (the agent finished while the
+// previous invocation was down), the reattach proceeds straight to
+// cherry-pick without ever polling AgentWait — a pane already sitting idle
+// with no further status transition coming would otherwise wait out every
+// poll timeout forever.
+func TestRun_RestartWithClaimedTicketAlreadyIdle_SkipsWaitAndCherryPicks(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "# A\n\n**Status:** claimed\n",
+	})
+	d, _, removed := fakeDeps()
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
+		return []herdr.Tab{{TabID: "tab-iter-01", Label: "iter-01", WorkspaceID: workspaceID, AgentStatus: "idle"}}, nil
+	}
+
+	var agentWaitCalls int
+	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+		agentWaitCalls++
+		return herdr.Agent{AgentStatus: "idle"}, nil
+	}
+
+	var out strings.Builder
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &out); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if agentWaitCalls != 0 {
+		t.Errorf("AgentWait calls = %d, want 0 for a pane already idle at reattach", agentWaitCalls)
+	}
+	if len(*removed) != 1 {
+		t.Errorf("removed worktree branches = %v, want the reattached iteration's worktree removed on completion", *removed)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw), "Status:** done") {
+		t.Errorf("reattached ticket not marked done:\n%s", raw)
+	}
+
+	events, _, err := readEvents(scratchDir, "epic")
+	if err != nil {
+		t.Fatalf("readEvents: %v", err)
+	}
+	foundFinish := false
+	for _, e := range events {
+		if e.Type == eventIterationFinished && e.Ticket == 1 {
+			foundFinish = true
+		}
+	}
+	if !foundFinish {
+		t.Errorf("events = %v, want an %s event logged for ticket 1 despite skipping the wait", events, eventIterationFinished)
+	}
+}
+
 // TestReconcile_DoneTicketRecoverable_AutoRecherryPicksAndReports exercises
 // ticket 02: a done ticket classified doneRecoverable (its landed commit
 // missing from the feature branch, but its iteration branch still holds it)
