@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.23.2 - 2026-08-01
+
+- Added `gx ralph-loop` to execute `.scratch` epic tickets with Claude or Codex, including dependency-aware scheduling, isolated iteration worktrees, configurable parallelism, automatic cherry-picking, and agent-assisted conflict resolution.
+- Ralph loop now guards agent context usage, pauses and resumes safely, recovers from Claude rate limits and Codex quota exhaustion, and marks stalled or zero-commit Codex work as needing attention.
+- Added crash and startup recovery that reattaches live iterations, reopens abandoned tickets, verifies completed work remains on the feature branch, and restores recoverable missing commits.
+- Added `gx ralph-loop report` and append-only lifecycle logs with task order, concurrency, duration, context usage, and Claude cost; Codex runs provide equivalent usage reporting without cost.
+- Fresh iteration worktrees now install npm, pnpm, Yarn, Poetry, or uv dependencies before launching agents.
+- Tickets now support suffixed numbers such as `10a` and a vertical split layout.
+- Fixed Ralph loop worktree and tab topology, `.scratch` path resolution, and smart-zone Ctrl-C interruption.
+
 ## v0.23.1 - 2026-07-30
 
 - Status: fixed the filetree panel title overflowing horizontally when the branch name was long, and dropped the "vs {base-ref}" suffix from the title.
