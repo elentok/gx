@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"sync"
 
+	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -18,6 +20,27 @@ type reconcilePaths struct {
 	ScratchDir      string
 	FeatureWorktree string
 	WorktreeDir     string
+	// RepoDir is only needed to repair a doneRecoverable ticket (removing its
+	// leftover worktree), so it's left unset in tests that never reach that
+	// path.
+	RepoDir string
+}
+
+// reconcileParams bundles reconcile's fixed-for-the-run inputs: the
+// workspace/paths every classification needs, plus everything a startup
+// repair of a doneRecoverable ticket needs to drive the same
+// iterationParams-shaped cherry-pick-with-conflict-resolution path a fresh
+// iteration uses (see repairRecoverableTicket).
+type reconcileParams struct {
+	WorkspaceID      string
+	Paths            reconcilePaths
+	Agent            AgentKind
+	Skill            string
+	SmartZone        int
+	Gate             *pauseGate
+	ResumeSignalPath string
+	FeatureLock      *sync.Mutex
+	Report           func(string, ...any)
 }
 
 // reconcile derives in-flight iteration state from ticket Status: plus live
@@ -32,8 +55,10 @@ type reconcilePaths struct {
 // silently drift from what's actually landed, since it lives in a file
 // independent of which worktree touches it. Mismatches are only reported
 // here, not repaired: that's later tickets' job.
-func reconcile(d Deps, workspaceID string, paths reconcilePaths, epic tickets.Epic, report func(string, ...any)) ([]tickets.Ticket, error) {
-	tabs, err := d.TabList(workspaceID)
+func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket, error) {
+	paths := rp.Paths
+	report := rp.Report
+	tabs, err := d.TabList(rp.WorkspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("listing tabs for crash/restart reconciliation: %w", err)
 	}
@@ -87,13 +112,98 @@ func reconcile(d Deps, workspaceID string, paths reconcilePaths, epic tickets.Ep
 		case doneStaleCleanup:
 			report("ticket %02d: done and commits landed, but leftover iteration state was never cleaned up\n", t.Number)
 		case doneRecoverable:
-			report("ticket %02d: done but commits missing from %s; iteration branch %s still has them\n", t.Number, epic.Name, iterBranch(t.Number))
+			if err := repairRecoverableTicket(d, rp, epic.Name, t, tabs); err != nil {
+				return nil, fmt.Errorf("repairing done ticket %d: %w", t.Number, err)
+			}
 		case doneUnrecoverable:
 			report("ticket %02d: done but commits missing from %s and no iteration branch left to recover them\n", t.Number, epic.Name)
 		}
 	}
 
 	return reattached, nil
+}
+
+// repairRecoverableTicket re-lands a doneRecoverable ticket's commits: a
+// prior crash left it marked done with its commits missing from the feature
+// branch, but its iteration branch still holds them. It resolves the same
+// base commit reattachIteration would (merge-base against the feature
+// branch's current tip, since the tip may have advanced past this ticket's
+// original branch point while the crashed run was down), then re-runs it
+// through the exact cherry-pick-plus-conflict-resolution path a normal
+// iteration's first cherry-pick uses — no separate repair-specific conflict
+// handling. On success it logs the same cherry-picked event a normal
+// iteration would, reports what was restored, and finishes whatever cleanup
+// the crash left undone (leftover worktree/tab; branch deletion is a later
+// ticket's job).
+func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t tickets.Ticket, tabs []herdr.Tab) error {
+	paths := rp.Paths
+	branch := iterBranch(t.Number)
+	label := iterLabel(t.Number)
+	path := filepath.Join(paths.WorktreeDir, label)
+
+	base, err := d.MergeBase(paths.FeatureWorktree, branch, featureBranch)
+	if err != nil {
+		return fmt.Errorf("resolving %s's base for repair: %w", branch, err)
+	}
+
+	p := iterationParams{
+		WorkspaceID:      rp.WorkspaceID,
+		RepoDir:          paths.RepoDir,
+		WorktreeDir:      paths.WorktreeDir,
+		FeatureWorktree:  paths.FeatureWorktree,
+		FeatureBranch:    featureBranch,
+		Agent:            rp.Agent,
+		Skill:            rp.Skill,
+		Ticket:           t,
+		ScratchDir:       paths.ScratchDir,
+		FeatureLock:      rp.FeatureLock,
+		SmartZone:        rp.SmartZone,
+		Gate:             rp.Gate,
+		ResumeSignalPath: rp.ResumeSignalPath,
+		Report:           rp.Report,
+	}
+
+	rp.FeatureLock.Lock()
+	err = cherryPickWithConflictResolution(d, p, base, branch, "", "", "")
+	var landedSHA string
+	var revErr error
+	if err == nil {
+		landedSHA, revErr = d.RevParse(paths.FeatureWorktree, "HEAD")
+	}
+	rp.FeatureLock.Unlock()
+	if err != nil {
+		return fmt.Errorf("re-cherry-picking ticket %d during startup repair: %w", t.Number, err)
+	}
+	if revErr != nil {
+		return fmt.Errorf("resolving repaired commit on %s: %w", featureBranch, revErr)
+	}
+
+	p.logTicketEventSHA(eventCherryPicked, "", "", "", path, "", landedSHA)
+	rp.Report("ticket %02d: done but commits were missing from %s; auto re-cherry-picked from iteration branch %s and restored (%s)\n", t.Number, featureBranch, branch, landedSHA)
+
+	tabID := ""
+	for _, tab := range tabs {
+		if tab.Label == label {
+			tabID = tab.TabID
+			break
+		}
+	}
+	hasWorktree, err := d.WorktreeExists(path)
+	if err != nil {
+		return fmt.Errorf("checking leftover worktree during repair cleanup: %w", err)
+	}
+	if hasWorktree {
+		if err := d.RemoveWorktree(paths.RepoDir, path, true); err != nil {
+			return fmt.Errorf("removing repaired iteration worktree: %w", err)
+		}
+	}
+	if tabID != "" {
+		if err := d.TabClose(tabID); err != nil {
+			return fmt.Errorf("closing repaired iteration tab: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // doneMismatchClass is how a done ticket's recorded landed commit compares

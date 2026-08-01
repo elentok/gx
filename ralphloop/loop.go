@@ -232,7 +232,17 @@ func Run(opts RunOptions, d Deps, out io.Writer) error {
 	completed := 0
 	active := 0
 
-	reattached, err := reconcile(d, workspaceID, reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: featurePath, WorktreeDir: wtDir}, *initial, report)
+	reattached, err := reconcile(d, reconcileParams{
+		WorkspaceID:      workspaceID,
+		Paths:            reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: featurePath, WorktreeDir: wtDir, RepoDir: opts.RepoDir},
+		Agent:            agent,
+		Skill:            opts.Skill,
+		SmartZone:        smartZone,
+		Gate:             gate,
+		ResumeSignalPath: resumePath,
+		FeatureLock:      &featureMu,
+		Report:           report,
+	}, *initial)
 	if err != nil {
 		return err
 	}

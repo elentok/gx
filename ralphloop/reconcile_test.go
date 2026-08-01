@@ -14,6 +14,22 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
+// testReconcileParams builds a reconcileParams for tests that don't exercise
+// the doneRecoverable repair path, wiring just enough (a fresh FeatureLock,
+// no gate/resume-signal needed since repair never pauses in these fixtures)
+// for reconcile to run.
+func testReconcileParams(workspaceID string, paths reconcilePaths, report func(string, ...any)) reconcileParams {
+	return reconcileParams{
+		WorkspaceID: workspaceID,
+		Paths:       paths,
+		Agent:       AgentClaude,
+		SmartZone:   defaultSmartZone,
+		Gate:        newPauseGate(),
+		FeatureLock: &sync.Mutex{},
+		Report:      report,
+	}
+}
+
 func TestReconcile_ClaimedWithNoLiveTab_RevertsToOpen(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "# A\n\n**Status:** claimed\n",
@@ -28,7 +44,7 @@ func TestReconcile_ClaimedWithNoLiveTab_RevertsToOpen(t *testing.T) {
 		return nil, nil // no live tabs at all
 	}
 
-	reattached, err := reconcile(d, "ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, epics[0], func(string, ...any) {})
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, func(string, ...any) {}), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -59,7 +75,7 @@ func TestReconcile_ClaimedWithLiveTab_ReturnsReattached(t *testing.T) {
 		return []herdr.Tab{{Label: "iter-01", WorkspaceID: workspaceID}}, nil
 	}
 
-	reattached, err := reconcile(d, "ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, epics[0], func(string, ...any) {})
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, func(string, ...any) {}), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -91,7 +107,7 @@ func TestReconcile_NeedsAttentionWithLiveTab_ReturnsReattached(t *testing.T) {
 		return []herdr.Tab{{TabID: "tab-iter-01", Label: "iter-01", WorkspaceID: workspaceID}}, nil
 	}
 
-	reattached, err := reconcile(d, "ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, epics[0], func(string, ...any) {})
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, func(string, ...any) {}), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -166,7 +182,7 @@ func TestReconcile_OpenAndDoneTicketsIgnored(t *testing.T) {
 		return nil, nil
 	}
 
-	reattached, err := reconcile(d, "ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, epics[0], func(string, ...any) {})
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, func(string, ...any) {}), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -303,9 +319,9 @@ func TestReconcile_DoneTicketMismatch_ReportedNotRepaired(t *testing.T) {
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
 
 	var reports []string
-	reattached, err := reconcile(d, "ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, epics[0], func(format string, args ...any) {
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, func(format string, args ...any) {
 		reports = append(reports, fmt.Sprintf(format, args...))
-	})
+	}), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -492,5 +508,169 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 	}
 	if !strings.Contains(string(raw), "Status:** done") {
 		t.Errorf("reattached ticket not marked done:\n%s", raw)
+	}
+}
+
+// TestReconcile_DoneTicketRecoverable_AutoRecherryPicksAndReports exercises
+// ticket 02: a done ticket classified doneRecoverable (its landed commit
+// missing from the feature branch, but its iteration branch still holds it)
+// gets re-cherry-picked automatically, with a cherry-picked event logged and
+// a report line naming what was restored.
+func TestReconcile_DoneTicketRecoverable_AutoRecherryPicksAndReports(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"03-c.md": "# C\n\n**Status:** done\n",
+	})
+	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: 3, SHA: "abc123"}); err != nil {
+		t.Fatalf("logEvent: %v", err)
+	}
+	epics, err := tickets.Load(scratchDir)
+	if err != nil {
+		t.Fatalf("tickets.Load: %v", err)
+	}
+
+	d, _, _ := fakeDeps()
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) { return nil, nil }
+	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil } // landed SHA missing
+	// d.RevParse defaults to returning "deadbeef" for any ref (fakeDeps), so
+	// the iteration branch is treated as still existing.
+
+	var picked []string
+	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
+		picked = append(picked, fromExclusive+".."+toInclusive)
+		return nil
+	}
+
+	var reports []string
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, func(format string, args ...any) {
+		reports = append(reports, fmt.Sprintf(format, args...))
+	}), epics[0])
+	if err != nil {
+		t.Fatalf("reconcile() error = %v", err)
+	}
+	if len(reattached) != 0 {
+		t.Errorf("reattached = %v, want none for a done ticket", reattached)
+	}
+	if len(picked) != 1 {
+		t.Fatalf("CherryPickRange calls = %v, want exactly one re-cherry-pick", picked)
+	}
+
+	found := false
+	for _, r := range reports {
+		if strings.Contains(r, "ticket 03") && strings.Contains(r, "restored") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("reports = %v, want a report line naming ticket 03 as restored", reports)
+	}
+
+	events, _, err := readEvents(scratchDir, "epic")
+	if err != nil {
+		t.Fatalf("readEvents: %v", err)
+	}
+	sawRepairCherryPick := false
+	for _, ev := range events {
+		if ev.Type == eventCherryPicked && ev.Ticket == 3 && ev.SHA == "deadbeef" {
+			sawRepairCherryPick = true
+		}
+	}
+	if !sawRepairCherryPick {
+		t.Errorf("events = %v, want a cherry-picked event logged for the repair", events)
+	}
+}
+
+// TestReconcile_DoneTicketRecoverable_ConflictGoesThroughResolutionPath
+// verifies the repair's re-cherry-pick reuses the exact same conflict-
+// resolution path (launching a "/resolving-merge-conflicts" agent in the
+// feature worktree) a normal iteration's first cherry-pick uses, rather than
+// a separate repair-specific conflict handler.
+func TestReconcile_DoneTicketRecoverable_ConflictGoesThroughResolutionPath(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"03-c.md": "# C\n\n**Status:** done\n",
+	})
+	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: 3, SHA: "abc123"}); err != nil {
+		t.Fatalf("logEvent: %v", err)
+	}
+	epics, err := tickets.Load(scratchDir)
+	if err != nil {
+		t.Fatalf("tickets.Load: %v", err)
+	}
+
+	d, _, _ := fakeDeps()
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) { return nil, nil }
+	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
+
+	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
+		return &fakeConflictErr{}
+	}
+	inProgress := true
+	d.CherryPickInProgress = func(dir string) (bool, error) { return inProgress, nil }
+
+	var resolutionPrompted bool
+	origAgentPrompt := d.AgentPrompt
+	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+		if opts.Text == "/resolving-merge-conflicts" {
+			resolutionPrompted = true
+			inProgress = false
+		}
+		return origAgentPrompt(opts)
+	}
+
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, func(string, ...any) {}), epics[0])
+	if err != nil {
+		t.Fatalf("reconcile() error = %v", err)
+	}
+	if len(reattached) != 0 {
+		t.Errorf("reattached = %v, want none for a done ticket", reattached)
+	}
+	if !resolutionPrompted {
+		t.Error("expected a /resolving-merge-conflicts agent to be prompted on cherry-pick conflict during repair")
+	}
+}
+
+// TestReconcile_DoneTicketRecoverable_CleansUpLeftoverWorktreeAndTab verifies
+// that once a doneRecoverable ticket's commits are repaired, its leftover
+// iteration worktree/tab (if the crash left any behind) are removed/closed —
+// branch deletion is left to a later ticket.
+func TestReconcile_DoneTicketRecoverable_CleansUpLeftoverWorktreeAndTab(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"03-c.md": "# C\n\n**Status:** done\n",
+	})
+	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: 3, SHA: "abc123"}); err != nil {
+		t.Fatalf("logEvent: %v", err)
+	}
+	epics, err := tickets.Load(scratchDir)
+	if err != nil {
+		t.Fatalf("tickets.Load: %v", err)
+	}
+
+	d, _, _ := fakeDeps()
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
+		return []herdr.Tab{{TabID: "tab-iter-03", Label: "iter-03", WorkspaceID: workspaceID}}, nil
+	}
+	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
+	d.WorktreeExists = func(path string) (bool, error) { return strings.Contains(path, "iter-03"), nil }
+
+	var removedWorktree string
+	d.RemoveWorktree = func(repoDir, path string, force bool) error {
+		removedWorktree = path
+		return nil
+	}
+	var closedTab string
+	d.TabClose = func(tabID string) error {
+		closedTab = tabID
+		return nil
+	}
+
+	_, err = reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees", RepoDir: "/fake/repo"}, func(string, ...any) {}), epics[0])
+	if err != nil {
+		t.Fatalf("reconcile() error = %v", err)
+	}
+
+	if !strings.Contains(removedWorktree, "iter-03") {
+		t.Errorf("removedWorktree = %q, want the leftover iter-03 worktree removed", removedWorktree)
+	}
+	if closedTab != "tab-iter-03" {
+		t.Errorf("closedTab = %q, want the leftover iter-03 tab closed", closedTab)
 	}
 }
