@@ -356,7 +356,7 @@ func TestRun_LogsNeedsInfoEvent_OnZeroCommitIteration(t *testing.T) {
 	}
 }
 
-func TestRun_InstallDepsFailure_SurfacesAsRunErrorWithoutLaunchingAgent(t *testing.T) {
+func TestRun_InstallDepsFailure_MarksNeedsAttentionWithoutLaunchingAgentOrAbortingRun(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "# A\n\n**Status:** open\n",
 	})
@@ -366,15 +366,19 @@ func TestRun_InstallDepsFailure_SurfacesAsRunErrorWithoutLaunchingAgent(t *testi
 	}
 
 	var out bytes.Buffer
-	err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out))
-	if err == nil {
-		t.Fatal("Run() error = nil, want the install failure surfaced")
-	}
-	if !strings.Contains(err.Error(), "npm ci") {
-		t.Errorf("Run() error = %v, want it to mention the failed install command", err)
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+		t.Fatalf("Run() error = %v, want a failed iteration to mark needs-attention rather than abort the run", err)
 	}
 	if len(*prompts) != 0 {
 		t.Errorf("prompts = %v, want no agent launched after a failed dependency install", *prompts)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw), "Status:** needs-attention") {
+		t.Errorf("ticket file = %q, want Status: needs-attention after the install failure", raw)
 	}
 }
 
@@ -734,7 +738,7 @@ func TestRun_CherryPickConflict_ResolvesInFeatureWorktreeThenCompletes(t *testin
 	}
 }
 
-func TestRun_CherryPickConflict_ResolutionNeverFinishes_SurfacesDistinctError(t *testing.T) {
+func TestRun_CherryPickConflict_ResolutionNeverFinishes_MarksNeedsAttentionWithoutAbortingRun(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "# A\n\n**Status:** open\n",
 	})
@@ -756,12 +760,16 @@ func TestRun_CherryPickConflict_ResolutionNeverFinishes_SurfacesDistinctError(t 
 	}
 
 	var out bytes.Buffer
-	err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out))
-	if err == nil {
-		t.Fatal("Run() error = nil, want an error surfacing the stuck conflict-resolution agent")
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+		t.Fatalf("Run() error = %v, want a stuck conflict-resolution agent to mark needs-attention rather than abort the run", err)
 	}
-	if !strings.Contains(err.Error(), "did not finish") {
-		t.Errorf("Run() error = %v, want it to call out the conflict-resolution agent not finishing", err)
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw), "Status:** needs-attention") {
+		t.Errorf("ticket file = %q, want Status: needs-attention after the stuck conflict resolution", raw)
 	}
 }
 

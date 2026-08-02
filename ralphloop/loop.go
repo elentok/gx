@@ -323,11 +323,20 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		r := <-results
 		active--
 		if r.err != nil {
-			for active > 0 {
-				<-results
-				active--
+			// A single iteration erroring out (a herdr/git hiccup, an
+			// unexpected agent-wait failure, ...) shouldn't take down the
+			// whole epic's run — that leaves every other in-flight ticket's
+			// live-event stream dead too, with no way to recover short of
+			// restarting the loop. Flag just this ticket needs-attention
+			// (terminal per allSettled, excluded from future claims) and
+			// keep scheduling the rest.
+			reason := r.err.Error()
+			label := iterLabel(r.ticket.Identifier)
+			if markErr := MarkNeedsAttention(r.ticket.Path); markErr != nil {
+				reason = fmt.Sprintf("%s (also failed marking needs-attention: %v)", reason, markErr)
 			}
-			return fmt.Errorf("ticket %s: %w", r.ticket.Identifier, r.err)
+			sink.IterationPaused(label, PauseNeedsAttention, reason)
+			continue
 		}
 
 		sink.IterationFinished(r.ticket, opts.EpicName)

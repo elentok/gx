@@ -108,7 +108,7 @@ type Deps struct {
 // DefaultDeps wires Deps to the real herdr, git, and transcript packages.
 func DefaultDeps() Deps {
 	return Deps{
-		FindOrCreateWorkspace: herdr.FindOrCreateWorkspace,
+		FindOrCreateWorkspace: herdr.EnsureWorkspace,
 		WorktreeDir:           worktreeDir,
 		AddWorktree:           addWorktree,
 		RemoveWorktree:        removeWorktree,

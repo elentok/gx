@@ -45,3 +45,28 @@ func FindOrCreateWorkspace(label, cwd string) (string, error) {
 	}
 	return result.Workspace.WorkspaceID, nil
 }
+
+// EnsureWorkspace returns the id of the herdr workspace labeled label,
+// creating one rooted at cwd if none exists yet — without focusing it either
+// way. Used by callers (e.g. a ralph-loop run launched from an already-
+// visible gx TUI) that want the workspace to exist but don't want the
+// running session yanked over to it.
+func EnsureWorkspace(label, cwd string) (string, error) {
+	id, err := FindWorkspace(label)
+	if err != nil {
+		return "", err
+	}
+	if id != "" {
+		return id, nil
+	}
+
+	var result struct {
+		Workspace struct {
+			WorkspaceID string `json:"workspace_id"`
+		} `json:"workspace"`
+	}
+	if err := runJSON([]string{"workspace", "create", "--cwd", cwd, "--label", label}, &result); err != nil {
+		return "", err
+	}
+	return result.Workspace.WorkspaceID, nil
+}
