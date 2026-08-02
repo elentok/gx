@@ -147,7 +147,7 @@ func applyLiveEvent(live map[string]liveTicketState, labelIdentifier map[string]
 		}
 
 	case ralphloop.LiveEventTicketRecovering:
-		m.live[ev.Identifier] = liveTicketState{running: true}
+		live[ev.Identifier] = liveTicketState{running: true}
 
 	case ralphloop.LiveEventTicketUnrecoverable:
 		live[ev.Identifier] = liveTicketState{
@@ -167,21 +167,21 @@ func applyLiveEvent(live map[string]liveTicketState, labelIdentifier map[string]
 		}
 
 	case ralphloop.LiveEventSmartZoneCompactStarted:
-		if ls, ok := m.live[ev.Identifier]; ok {
+		if ls, ok := live[ev.Identifier]; ok {
 			ls.phase = livePhaseCompacting
-			m.live[ev.Identifier] = ls
+			live[ev.Identifier] = ls
 		}
 
 	case ralphloop.LiveEventSmartZoneFinishingUp:
-		if ls, ok := m.live[ev.Identifier]; ok {
+		if ls, ok := live[ev.Identifier]; ok {
 			ls.phase = livePhaseFinishingUp
-			m.live[ev.Identifier] = ls
+			live[ev.Identifier] = ls
 		}
 
 	case ralphloop.LiveEventSmartZoneRecovered:
-		if ls, ok := m.live[ev.Identifier]; ok {
+		if ls, ok := live[ev.Identifier]; ok {
 			ls.phase = livePhaseImplementing
-			m.live[ev.Identifier] = ls
+			live[ev.Identifier] = ls
 		}
 	}
 }
