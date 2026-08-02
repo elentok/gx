@@ -1,0 +1,208 @@
+package git
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os/exec"
+	"testing"
+)
+
+func TestClassifyPRListError(t *testing.T) {
+	t.Run("nil", func(t *testing.T) {
+		if err := classifyPRListError(nil); err != nil {
+			t.Fatalf("expected nil, got %v", err)
+		}
+	})
+
+	t.Run("gh not installed", func(t *testing.T) {
+		notFoundErr := fmt.Errorf("gh pr list: %w", &exec.Error{Name: "gh", Err: exec.ErrNotFound})
+		err := classifyPRListError(notFoundErr)
+		var prErr *PRListError
+		if !errors.As(err, &prErr) || prErr.Kind != PRListErrorGHNotInstalled {
+			t.Fatalf("expected PRListErrorGHNotInstalled, got %v", err)
+		}
+	})
+
+	t.Run("gh unauthenticated", func(t *testing.T) {
+		runErr := &RunError{Stderr: "To get started with GitHub CLI, please run:  gh auth login"}
+		err := classifyPRListError(runErr)
+		var prErr *PRListError
+		if !errors.As(err, &prErr) || prErr.Kind != PRListErrorUnauthenticated {
+			t.Fatalf("expected PRListErrorUnauthenticated, got %v", err)
+		}
+	})
+
+	t.Run("generic failure", func(t *testing.T) {
+		runErr := &RunError{Stderr: "connection reset by peer"}
+		err := classifyPRListError(runErr)
+		var prErr *PRListError
+		if !errors.As(err, &prErr) || prErr.Kind != PRListErrorGeneric {
+			t.Fatalf("expected PRListErrorGeneric, got %v", err)
+		}
+		if err.Error() != runErr.Error() {
+			t.Fatalf("expected raw wrapped message %q, got %q", runErr.Error(), err.Error())
+		}
+	})
+}
+
+func TestGraphQLRollupToChecks(t *testing.T) {
+	cases := []struct {
+		state string
+		want  CIState
+	}{
+		{"", CINone},
+		{"SUCCESS", CIPassed},
+		{"FAILURE", CIFailed},
+		{"ERROR", CIFailed},
+		{"PENDING", CIRunning},
+		{"EXPECTED", CIRunning},
+	}
+	for _, c := range cases {
+		t.Run(c.state, func(t *testing.T) {
+			pr := PR{StatusCheckRollup: graphQLRollupToChecks(c.state)}
+			if got := pr.CIState(); got != c.want {
+				t.Errorf("state=%q: expected %v, got %v", c.state, c.want, got)
+			}
+		})
+	}
+}
+
+func TestPRSearchNode_ToPR(t *testing.T) {
+	const body = `{
+		"number": 42,
+		"title": "Fix the thing",
+		"url": "https://github.com/o/r/pull/42",
+		"isDraft": true,
+		"updatedAt": "2026-07-20T10:00:00Z",
+		"mergeable": "MERGEABLE",
+		"reviewDecision": "APPROVED",
+		"repository": {"name": "r", "owner": {"login": "o"}},
+		"commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": "SUCCESS"}}}]},
+		"reviews": {"nodes": [{"state": "APPROVED", "body": "lgtm"}]},
+		"comments": {"totalCount": 2},
+		"reviewRequests": {"totalCount": 1}
+	}`
+	var node prSearchNode
+	if err := json.Unmarshal([]byte(body), &node); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	pr := node.toPR()
+
+	if pr.Number != 42 || pr.Title != "Fix the thing" || pr.URL != "https://github.com/o/r/pull/42" || !pr.IsDraft {
+		t.Fatalf("unexpected identity fields: %+v", pr)
+	}
+	if pr.Repo != "o/r" {
+		t.Fatalf("expected repo o/r, got %q", pr.Repo)
+	}
+	if pr.Mergeable != "MERGEABLE" || pr.ReviewDecision != "APPROVED" {
+		t.Fatalf("unexpected facet inputs: %+v", pr)
+	}
+	if pr.CIState() != CIPassed {
+		t.Fatalf("expected CIPassed, got %v", pr.CIState())
+	}
+	if len(pr.Reviews) != 1 || pr.Reviews[0].State != "APPROVED" || pr.Reviews[0].Body != "lgtm" {
+		t.Fatalf("unexpected reviews: %+v", pr.Reviews)
+	}
+	if pr.CommentCount() != 3 {
+		t.Fatalf("expected comment count 3 (2 comments + 1 non-empty review body), got %d", pr.CommentCount())
+	}
+	if _, reviewersRequested := pr.ApprovalState(); reviewersRequested {
+		t.Fatalf("expected reviewersRequested false when already approved")
+	}
+	if len(pr.ReviewRequests) != 1 {
+		t.Fatalf("expected 1 review request, got %d", len(pr.ReviewRequests))
+	}
+}
+
+func TestPRSearchNode_ToPR_NoCommits(t *testing.T) {
+	var node prSearchNode
+	if err := json.Unmarshal([]byte(`{"number": 1, "commits": {"nodes": []}}`), &node); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	pr := node.toPR()
+	if pr.CIState() != CINone {
+		t.Fatalf("expected CINone with no commits, got %v", pr.CIState())
+	}
+}
+
+func TestCommentsFromEnvelope_MergesAndSortsChronologically(t *testing.T) {
+	body := `{
+		"data": {
+			"repository": {
+				"pullRequest": {
+					"comments": {
+						"nodes": [
+							{"author": {"login": "alice"}, "body": "second", "createdAt": "2026-07-20T12:00:00Z"}
+						]
+					},
+					"reviews": {
+						"nodes": [
+							{"author": {"login": "bob"}, "body": "first", "submittedAt": "2026-07-20T10:00:00Z"},
+							{"author": {"login": "carol"}, "body": "   ", "submittedAt": "2026-07-20T11:00:00Z"}
+						]
+					}
+				}
+			}
+		}
+	}`
+	var envelope prCommentsEnvelope
+	if err := json.Unmarshal([]byte(body), &envelope); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	comments, err := commentsFromEnvelope(envelope)
+	if err != nil {
+		t.Fatalf("commentsFromEnvelope: %v", err)
+	}
+	if len(comments) != 2 {
+		t.Fatalf("expected 2 comments (empty review body dropped), got %d: %+v", len(comments), comments)
+	}
+	if comments[0].Author != "bob" || comments[0].Body != "first" {
+		t.Fatalf("expected bob's review first (earliest), got %+v", comments[0])
+	}
+	if comments[1].Author != "alice" || comments[1].Body != "second" {
+		t.Fatalf("expected alice's comment second (latest), got %+v", comments[1])
+	}
+}
+
+func TestCommentsFromEnvelope_Errors(t *testing.T) {
+	body := `{"data":null,"errors":[{"message":"boom"}]}`
+	var envelope prCommentsEnvelope
+	if err := json.Unmarshal([]byte(body), &envelope); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if _, err := commentsFromEnvelope(envelope); err == nil {
+		t.Fatal("expected error for gh api graphql error response")
+	}
+}
+
+func TestFetchPRComments_InvalidRepo(t *testing.T) {
+	if _, err := FetchPRComments("/repo", "not-a-repo", 1); err == nil {
+		t.Fatal("expected error for repo missing owner/name separator")
+	}
+}
+
+func TestGraphQLSearchEnvelope_ParsesNodes(t *testing.T) {
+	body := `{"data":{"search":{"nodes":[{"number":1},{"number":2}]}}}`
+	var envelope graphQLSearchEnvelope[prSearchNode]
+	if err := json.Unmarshal([]byte(body), &envelope); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(envelope.Data.Search.Nodes) != 2 {
+		t.Fatalf("expected 2 nodes, got %d", len(envelope.Data.Search.Nodes))
+	}
+	if len(envelope.Errors) != 0 {
+		t.Fatalf("expected no errors, got %+v", envelope.Errors)
+	}
+}
+
+func TestGraphQLSearchEnvelope_ParsesErrors(t *testing.T) {
+	body := `{"data":null,"errors":[{"message":"boom"}]}`
+	var envelope graphQLSearchEnvelope[prSearchNode]
+	if err := json.Unmarshal([]byte(body), &envelope); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(envelope.Errors) != 1 || envelope.Errors[0].Message != "boom" {
+		t.Fatalf("expected 1 error 'boom', got %+v", envelope.Errors)
+	}
+}
