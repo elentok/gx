@@ -59,16 +59,13 @@ type Deps struct {
 	// harmlessly whenever the feature branch was rebased after landing it,
 	// not just when the commit is genuinely missing.
 	PatchesApplied func(dir, upstream, base, branch string) (bool, error)
-	// AppendTrailer amends HEAD's commit message to add a ticket-identifying
-	// trailer, stamped onto every landed cherry-pick so classifyDoneTicket can
-	// still find it later even if a subsequent rebase-plus-manual-conflict-
+	// AppendTrailers amends HEAD's commit message to add one or more
+	// ticket-identifying/metrics trailers in a single amend, stamped onto
+	// every landed cherry-pick so classifyDoneTicket can still find the
+	// ticket trailer later even if a subsequent rebase-plus-manual-conflict-
 	// resolution changes the commit's hash and patch-id both.
-	AppendTrailer func(dir, key, value string) error
-	// AppendTrailers is AppendTrailer's multi-trailer form, used by
-	// landCherryPick to stamp Ralph-Loop-Ticket alongside the metrics
-	// trailers in a single amend rather than one per trailer.
 	AppendTrailers func(dir string, trailers ...git.Trailer) error
-	// TrailerCommitExists reports whether a commit stamped by AppendTrailer is
+	// TrailerCommitExists reports whether a commit stamped by AppendTrailers is
 	// still reachable from ref, used by startup reconciliation as the final
 	// fallback once IsAncestor and PatchesApplied both fail to place a done
 	// ticket's landed commit.
@@ -131,7 +128,6 @@ func DefaultDeps() Deps {
 		CherryPickInProgress:  git.CherryPickInProgress,
 		IsAncestor:            git.IsAncestor,
 		PatchesApplied:        git.PatchesApplied,
-		AppendTrailer:         git.AppendTrailer,
 		AppendTrailers:        git.AppendTrailers,
 		TrailerCommitExists:   git.TrailerCommitExists,
 		WorktreeExists:        worktreeExists,

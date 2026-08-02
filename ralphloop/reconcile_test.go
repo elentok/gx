@@ -538,7 +538,7 @@ func realGitDeps() Deps {
 	d.WorktreeExists = worktreeExists
 	d.MergeBase = git.MergeBase
 	d.PatchesApplied = git.PatchesApplied
-	d.AppendTrailer = git.AppendTrailer
+	d.AppendTrailers = git.AppendTrailers
 	d.TrailerCommitExists = git.TrailerCommitExists
 	return d
 }

@@ -117,8 +117,8 @@ func readSessionStats(cwd, sessionID string) (sessionStats, error) {
 // readAgentSessionStats call `gx ralph-loop report` uses, just invoked at
 // land-time instead of report-time — and, if its stats are available, writes
 // its peak context occupancy and wall-clock duration into ticketPath's
-// actual_context_window/elapsed_time frontmatter fields, returning the same
-// two values (ok=false) so landCherryPick can stamp them onto the landed
+// actual_context_window/elapsed_time frontmatter fields, also returning the
+// same two values (ok=true) so landCherryPick can stamp them onto the landed
 // commit's trailers too, matching what's in the frontmatter. A no-op
 // (ok=false, not an error) when sessionID is empty or the transcript can't be
 // read yet: a repair/reattached landing (see reconcile.go) has no fresh

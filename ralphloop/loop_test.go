@@ -115,9 +115,6 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		PatchesApplied: func(dir, upstream, base, branch string) (bool, error) {
 			return false, nil
 		},
-		AppendTrailer: func(dir, key, value string) error {
-			return nil
-		},
 		AppendTrailers: func(dir string, trailers ...git.Trailer) error {
 			return nil
 		},
