@@ -41,6 +41,17 @@ type loopRegistry struct {
 	done     int
 	total    int
 	sink     *ralphloop.ChannelEventSink
+	// lastErrEpic/lastErr carry the most recently finished run's error (nil on
+	// success) past finish() clearing running/epicName, so handleImplementPoll
+	// and handleImplementSync — which only learn a run ended once running flips
+	// back to false — can still tell success from failure and surface it,
+	// instead of ralphloop.Run's error being silently discarded (as it
+	// previously was at the cmdStartImplement call site: a ticket left
+	// Status: claimed by a failed launch, e.g. an iteration-branch name
+	// collision on AddWorktree, used to get reported as a plain "finished"
+	// toast with no indication anything went wrong).
+	lastErrEpic string
+	lastErr     error
 }
 
 var ralphLoopRegistry = &loopRegistry{}
@@ -65,7 +76,7 @@ func (r *loopRegistry) tryStart(epicName string, done, total int) (*ralphloop.Ch
 	return r.sink, true
 }
 
-func (r *loopRegistry) finish() {
+func (r *loopRegistry) finish(epicName string, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.running = false
@@ -73,6 +84,22 @@ func (r *loopRegistry) finish() {
 	r.done = 0
 	r.total = 0
 	r.sink = nil
+	r.lastErrEpic = epicName
+	r.lastErr = err
+}
+
+// takeLastError reports (and clears) the error the most recent run against
+// epicName finished with, so a poll/sync handler only surfaces it once.
+func (r *loopRegistry) takeLastError(epicName string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.lastErrEpic != epicName {
+		return nil
+	}
+	err := r.lastErr
+	r.lastErrEpic = ""
+	r.lastErr = nil
+	return err
 }
 
 // recordTicketFinished advances the progress count by one landed ticket; see
@@ -196,14 +223,24 @@ func (m Model) handleImplementStarted(msg implementStartedMsg) (tea.Model, tea.C
 
 // handleImplementPoll re-checks ralphLoopRegistry; once epicName's run has
 // left the registry, it's done (ralphloop.Run always calls registry.finish()
-// before returning, success or failure alike — ticket 01 only needs "it's
-// done", not pass/fail detail).
+// before returning, success or failure alike) — takeLastError distinguishes
+// the two so a launch failure (e.g. a ticket left stuck Status: claimed) is
+// reported instead of a misleadingly plain "finished".
 func (m Model) handleImplementPoll(msg implementPollMsg) (tea.Model, tea.Cmd) {
 	if running, epicName, _ := ralphLoopRegistry.snapshot(); running && epicName == msg.epicName {
 		return m, cmdPollImplement(msg.epicName)
 	}
 	m.clearLiveTracking()
-	return m, tea.Batch(notify.Info(fmt.Sprintf("ralph-loop finished for epic %q", msg.epicName)), m.cmdLoad())
+	return m, tea.Batch(implementFinishedNotifyCmd(msg.epicName), m.cmdLoad())
+}
+
+// implementFinishedNotifyCmd reports epicName's just-finished run: an error
+// toast if ralphloop.Run returned one, otherwise the plain completion toast.
+func implementFinishedNotifyCmd(epicName string) tea.Cmd {
+	if err := ralphLoopRegistry.takeLastError(epicName); err != nil {
+		return notify.Error(fmt.Sprintf("ralph-loop failed for epic %q: %v", epicName, err))
+	}
+	return notify.Info(fmt.Sprintf("ralph-loop finished for epic %q", epicName))
 }
 
 // handleImplementSync answers OnPageActivated's resync Cmd: it reconciles
@@ -223,7 +260,7 @@ func (m Model) handleImplementSync(msg implementSyncMsg) (tea.Model, tea.Cmd) {
 	}
 	finished := m.implementEpic
 	m.clearLiveTracking()
-	return m, tea.Batch(notify.Info(fmt.Sprintf("ralph-loop finished for epic %q", finished)), m.cmdLoad())
+	return m, tea.Batch(implementFinishedNotifyCmd(finished), m.cmdLoad())
 }
 
 func (m Model) handleImplementSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
@@ -266,12 +303,12 @@ func (m Model) cmdStartImplement(epicName string, done, total int) tea.Cmd {
 		}
 		opts, err := buildImplementRunOptions(worktreeRoot, epicName)
 		if err != nil {
-			ralphLoopRegistry.finish()
+			ralphLoopRegistry.finish(epicName, nil)
 			return implementFailedMsg{err: err}
 		}
 		go func() {
-			defer ralphLoopRegistry.finish()
-			_ = ralphloop.Run(opts, ralphloop.DefaultDeps(), sink)
+			err := ralphloop.Run(opts, ralphloop.DefaultDeps(), sink)
+			ralphLoopRegistry.finish(epicName, err)
 		}()
 		return implementStartedMsg{epicName: epicName, events: sink.Events()}
 	}

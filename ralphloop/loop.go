@@ -478,7 +478,7 @@ func (p iterationParams) logTicketEventSHA(eventType, pane, tab, agentSession, c
 // left in place for inspection.
 func runIteration(d Deps, p iterationParams) error {
 	label := iterLabel(p.Ticket.Identifier)
-	branch := iterBranch(p.Ticket.Identifier)
+	branch := iterBranch(p.FeatureBranch, p.Ticket.Identifier)
 	path := filepath.Join(p.WorktreeDir, label)
 
 	base, err := d.RevParse(p.FeatureWorktree, p.FeatureBranch)
@@ -533,7 +533,7 @@ func runIteration(d Deps, p iterationParams) error {
 // iteration's original branch point while the prior invocation was down.
 func reattachIteration(d Deps, p iterationParams) error {
 	label := iterLabel(p.Ticket.Identifier)
-	branch := iterBranch(p.Ticket.Identifier)
+	branch := iterBranch(p.FeatureBranch, p.Ticket.Identifier)
 	path := filepath.Join(p.WorktreeDir, label)
 
 	tabs, err := d.TabList(p.WorkspaceID)
@@ -1332,8 +1332,13 @@ func iterLabel(identifier string) string {
 	return "iter-" + identifier
 }
 
-func iterBranch(identifier string) string {
-	return "ralph-loop/" + iterLabel(identifier)
+// iterBranch is scoped by epicName (unlike iterLabel, which is only ever
+// compared within one epic's own herdr workspace) because git branches live
+// in the one shared bare repo across every worktree: two epics that happen
+// to reuse the same ticket identifier (e.g. an auto-split "06b") would
+// otherwise collide on the same branch name and fail AddWorktree.
+func iterBranch(epicName, identifier string) string {
+	return "ralph-loop/" + epicName + "/" + iterLabel(identifier)
 }
 
 func conflictLabel(identifier string) string {

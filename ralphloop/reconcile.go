@@ -111,7 +111,7 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 			// Commits landed, nothing left behind: the common case, left
 			// untouched.
 		case doneStaleCleanup:
-			if err := finishStaleCleanup(d, rp, t, tabs); err != nil {
+			if err := finishStaleCleanup(d, rp, epic.Name, t, tabs); err != nil {
 				return nil, fmt.Errorf("finishing interrupted cleanup for done ticket %s: %w", t.Identifier, err)
 			}
 			sink.TicketCleanupFinished(t.Identifier)
@@ -145,7 +145,7 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 // revert-to-open.
 func reconcileOrphanedClaim(d Deps, rp reconcileParams, featureBranch string, t tickets.Ticket, tabs []herdr.Tab) error {
 	paths := rp.Paths
-	branch := iterBranch(t.Identifier)
+	branch := iterBranch(featureBranch, t.Identifier)
 	label := iterLabel(t.Identifier)
 	path := filepath.Join(paths.WorktreeDir, label)
 
@@ -223,7 +223,7 @@ func reconcileOrphanedClaim(d Deps, rp reconcileParams, featureBranch string, t 
 // ticket's job).
 func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t tickets.Ticket, tabs []herdr.Tab) error {
 	paths := rp.Paths
-	branch := iterBranch(t.Identifier)
+	branch := iterBranch(featureBranch, t.Identifier)
 	label := iterLabel(t.Identifier)
 	path := filepath.Join(paths.WorktreeDir, label)
 
@@ -290,10 +290,10 @@ func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t
 // worktree/tab/branch survived a crash that landed between marking done and
 // the cleanup step right after it — the same tail finishIteration runs on the
 // normal completion path.
-func finishStaleCleanup(d Deps, rp reconcileParams, t tickets.Ticket, tabs []herdr.Tab) error {
+func finishStaleCleanup(d Deps, rp reconcileParams, featureBranch string, t tickets.Ticket, tabs []herdr.Tab) error {
 	paths := rp.Paths
 	label := iterLabel(t.Identifier)
-	branch := iterBranch(t.Identifier)
+	branch := iterBranch(featureBranch, t.Identifier)
 	path := filepath.Join(paths.WorktreeDir, label)
 	tabID := tabIDForLabel(tabs, label)
 
@@ -319,7 +319,7 @@ func tabIDForLabel(tabs []herdr.Tab, label string) string {
 // than silently reverting the ticket to open (which would re-run it from
 // scratch without a human ever knowing the first run's result vanished).
 func markDoneTicketUnrecoverable(paths reconcilePaths, featureBranch string, t tickets.Ticket) error {
-	reason := fmt.Sprintf("done but commits missing from %s and iteration branch %s no longer exists to recover them", featureBranch, iterBranch(t.Identifier))
+	reason := fmt.Sprintf("done but commits missing from %s and iteration branch %s no longer exists to recover them", featureBranch, iterBranch(featureBranch, t.Identifier))
 	if err := MarkNeedsAttention(t.Path); err != nil {
 		return fmt.Errorf("marking ticket needs-attention: %w", err)
 	}
@@ -385,7 +385,7 @@ func classifyDoneTicket(d Deps, paths reconcilePaths, featureBranch string, t ti
 		commitsPresent = present
 	}
 
-	branch := iterBranch(t.Identifier)
+	branch := iterBranch(featureBranch, t.Identifier)
 	hasBranch := branchExists(d, paths.FeatureWorktree, branch)
 
 	// A missing landedSHA doesn't only mean the commit never landed — it also

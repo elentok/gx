@@ -50,7 +50,7 @@ func TestReconcile_ClaimedWithNoLiveTab_RevertsToOpen(t *testing.T) {
 	// far as running), so there's nothing to recover — only the plain revert
 	// applies.
 	d.RevParse = func(dir, ref string) (string, error) {
-		if ref == iterBranch("01") {
+		if ref == iterBranch("epic", "01") {
 			return "", fmt.Errorf("unknown revision")
 		}
 		return "deadbeef", nil
@@ -388,8 +388,8 @@ func TestIterLabelIterBranch_DistinctForLetteredSiblingsSharingNumber(t *testing
 	if iterLabel(a.Identifier) == iterLabel(b.Identifier) {
 		t.Errorf("iterLabel(%q) == iterLabel(%q) = %q, want distinct labels for siblings sharing Number 4", a.Identifier, b.Identifier, iterLabel(a.Identifier))
 	}
-	if iterBranch(a.Identifier) == iterBranch(b.Identifier) {
-		t.Errorf("iterBranch(%q) == iterBranch(%q) = %q, want distinct branches for siblings sharing Number 4", a.Identifier, b.Identifier, iterBranch(a.Identifier))
+	if iterBranch("epic", a.Identifier) == iterBranch("epic", b.Identifier) {
+		t.Errorf("iterBranch(%q) == iterBranch(%q) = %q, want distinct branches for siblings sharing Number 4", a.Identifier, b.Identifier, iterBranch("epic", a.Identifier))
 	}
 }
 
@@ -556,7 +556,7 @@ func TestClassifyDoneTicket_RealRepo_CommitLandedAndCleanedUp_OK(t *testing.T) {
 		t.Fatalf("RevParse: %v", err)
 	}
 
-	testutil.MustGitExported(t, dir, "checkout", "-b", "ralph-loop/iter-03", base)
+	testutil.MustGitExported(t, dir, "checkout", "-b", "ralph-loop/main/iter-03", base)
 	testutil.WriteFile(t, dir, "a.txt", "a\n")
 	testutil.CommitAll(t, dir, "add a")
 	iterTip, err := git.RevParse(dir, "HEAD")
@@ -573,7 +573,7 @@ func TestClassifyDoneTicket_RealRepo_CommitLandedAndCleanedUp_OK(t *testing.T) {
 		t.Fatalf("RevParse: %v", err)
 	}
 
-	testutil.MustGitExported(t, dir, "branch", "-D", "ralph-loop/iter-03")
+	testutil.MustGitExported(t, dir, "branch", "-D", "ralph-loop/main/iter-03")
 
 	d := realGitDeps()
 	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: landedSHA}}
@@ -598,7 +598,7 @@ func TestClassifyDoneTicket_RealRepo_NeverCherryPicked_Recoverable(t *testing.T)
 		t.Fatalf("RevParse: %v", err)
 	}
 
-	testutil.MustGitExported(t, dir, "checkout", "-b", "ralph-loop/iter-03", base)
+	testutil.MustGitExported(t, dir, "checkout", "-b", "ralph-loop/main/iter-03", base)
 	testutil.WriteFile(t, dir, "a.txt", "a\n")
 	testutil.CommitAll(t, dir, "add a")
 
@@ -633,7 +633,7 @@ func TestClassifyDoneTicket_RealRepo_RebasedAfterLanding_OK(t *testing.T) {
 		t.Fatalf("RevParse: %v", err)
 	}
 
-	testutil.MustGitExported(t, dir, "checkout", "-b", "ralph-loop/iter-03", base)
+	testutil.MustGitExported(t, dir, "checkout", "-b", "ralph-loop/main/iter-03", base)
 	testutil.WriteFile(t, dir, "a.txt", "a\n")
 	testutil.CommitAll(t, dir, "add a")
 	iterTip, err := git.RevParse(dir, "HEAD")
@@ -692,7 +692,7 @@ func TestClassifyDoneTicket_RealRepo_RebasedWithConflictResolution_OK(t *testing
 		t.Fatalf("RevParse: %v", err)
 	}
 
-	testutil.MustGitExported(t, dir, "checkout", "-b", "ralph-loop/iter-03", base)
+	testutil.MustGitExported(t, dir, "checkout", "-b", "ralph-loop/main/iter-03", base)
 	testutil.WriteFile(t, dir, "a.txt", "iteration content\n")
 	testutil.CommitAll(t, dir, "add a")
 	iterTip, err := git.RevParse(dir, "HEAD")
@@ -737,7 +737,7 @@ func TestClassifyDoneTicket_RealRepo_RebasedWithConflictResolution_OK(t *testing
 	}
 
 	// The iteration branch is already cleaned up by this point.
-	testutil.MustGitExported(t, dir, "branch", "-D", "ralph-loop/iter-03")
+	testutil.MustGitExported(t, dir, "branch", "-D", "ralph-loop/main/iter-03")
 
 	d := realGitDeps()
 	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: landedSHA}}
@@ -803,7 +803,7 @@ func TestRun_RestartWithClaimedTicketButNoLiveTab_RerunsFromScratch(t *testing.T
 	// No iteration branch was ever created for this claim, so reconcile has
 	// nothing to recover — only the plain revert-then-rerun applies.
 	d.RevParse = func(dir, ref string) (string, error) {
-		if ref == iterBranch("01") {
+		if ref == iterBranch("epic", "01") {
 			return "", fmt.Errorf("unknown revision")
 		}
 		return "deadbeef", nil
@@ -1278,8 +1278,8 @@ func TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup(t *testing.T) 
 	if closedTab != "tab-iter-03" {
 		t.Errorf("closedTab = %q, want the leftover iter-03 tab closed", closedTab)
 	}
-	if deletedBranch != "ralph-loop/iter-03" {
-		t.Errorf("deletedBranch = %q, want ralph-loop/iter-03 deleted", deletedBranch)
+	if deletedBranch != "ralph-loop/epic/iter-03" {
+		t.Errorf("deletedBranch = %q, want ralph-loop/epic/iter-03 deleted", deletedBranch)
 	}
 
 	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "03-c.md"))
