@@ -38,11 +38,12 @@ var (
 	// after the epic's name/count.
 	worktreeTagStyle = lipgloss.NewStyle().Foreground(ui.ColorBlue)
 
-	// runningEpicBandColor distinguishes the running epic's rows from the
-	// rest of the list (ticket 02) — distinct from ui.ColorSurface, which
+	// runningEpicGutterColor distinguishes the running epic's rows from the
+	// rest of the list (ticket 02) via a left-edge gutter bar rather than a
+	// full-row background wash — distinct from ui.ColorSurface, which
 	// RenderRowHighlight uses for the selection row, so a selected row within
 	// the running epic still reads as selected first.
-	runningEpicBandColor = ui.ColorSurface1
+	runningEpicGutterColor = ui.ColorBlue
 )
 
 // sidebarLines renders the epic/ticket tree as exactly two headed sections —
@@ -109,7 +110,7 @@ func (m Model) appendRowLines(lines []string, rows []row, startIdx int) []string
 		if selected {
 			line = ui.RenderRowHighlight(line)
 		} else if m.rowInRunningEpic(r) {
-			line = ui.RenderRowWithBackground(line, runningEpicBandColor)
+			line = ui.RenderGutterBar(line, runningEpicGutterColor)
 		}
 		lines = append(lines, line)
 	}

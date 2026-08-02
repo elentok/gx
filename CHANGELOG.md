@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.24.0 - 2026-08-02
+
+- Added ralph-loop integration into the Tickets tab: live progress and phase highlighting for running tickets, pause/resume controls with confirm modals, an epic-completion banner, and a quit warning while a loop is running — replacing the standalone `gx ralph-loop` command.
+- Ralph loop now scopes iteration branches and ticket trailers per epic, auto-recovers smart-zone breaches and unlanded commits on orphaned claims instead of blocking, and surfaces run errors in the TUI.
+- Tickets now sort by plan order instead of rendered-status group, preserve zero-padding and letter suffixes in display numbers, detect superseded status, and support a lettered `Blocked-by` token naming one split sibling.
+- Fixed a resume/wait race in ralph-loop, debounced finish detection to avoid orphaning late commits, and improved reconciliation of done tickets across rebased commits.
+
 ## v0.23.3 - 2026-08-01
 
 - Ralph loop startup recovery now finishes interrupted cleanup for completed tickets, including removing leftover iteration tabs, worktrees, and branches.

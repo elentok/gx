@@ -2,9 +2,11 @@ package tickets
 
 import (
 	"fmt"
+	"image/color"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
@@ -55,6 +57,25 @@ func (p livePhase) suffix() string {
 		return "(telling the agent to finish up...)"
 	default:
 		return "(implementing...)"
+	}
+}
+
+// color returns p's accent color, so a running row's spinner distinguishes
+// what the iteration is doing right now at a glance rather than relying
+// solely on the text suffix (which reads as the same dim italic for every
+// phase).
+func (p livePhase) color() color.Color {
+	switch p {
+	case livePhaseCherryPicking:
+		return ui.ColorTeal
+	case livePhaseResolvingConflicts:
+		return ui.ColorRed
+	case livePhaseCompacting:
+		return ui.ColorYellow
+	case livePhaseFinishingUp:
+		return ui.ColorOrange
+	default:
+		return ui.ColorBlue
 	}
 }
 
@@ -284,7 +305,8 @@ func renderLiveTicketRow(icons ui.IconSet, sp spinner.Model, t tickets.Ticket, l
 		return appendBlockedBySuffix(line, live.reason), true
 
 	case live.running:
-		line := "  " + sp.View() + " " + title
+		spinnerView := lipgloss.NewStyle().Foreground(live.phase.color()).Render(sp.View())
+		line := "  " + spinnerView + " " + title
 		suffix := live.phase.suffix()
 		if live.label != "" {
 			suffix = live.label + " " + suffix
