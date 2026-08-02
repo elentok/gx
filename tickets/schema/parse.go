@@ -63,7 +63,7 @@ func extractTicketTokens(value string) []string {
 	return ticketTokenRe.FindAllString(trailingAnnotationRe.ReplaceAllString(value, ""), -1)
 }
 
-var firstTokenRe = regexp.MustCompile(`^\S+`)
+var firstWordRe = regexp.MustCompile(`^\S+`)
 
 // parseOldFormat maps a legacy bold-line ticket file onto the new Ticket
 // struct: tickets.ParseTicket already extracts Type/Blocked by/Status, and
@@ -98,7 +98,7 @@ func parseOldFormat(raw, path string) Ticket {
 		case "split":
 			t.Split = stringsToIDs(extractTicketTokens(value))
 		case "code-review fixes":
-			t.CodeReviewFixes = firstTokenRe.FindString(value)
+			t.CodeReviewFixes = firstWordRe.FindString(value)
 		case "context window":
 			if n, err := strconv.Atoi(strings.TrimSpace(value)); err == nil {
 				t.ActualContextWindow = n
