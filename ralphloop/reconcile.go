@@ -176,6 +176,12 @@ func reconcileOrphanedClaim(d Deps, rp reconcileParams, featureBranch string, t 
 				Sink:             rp.Sink,
 			}
 
+			// Seed a live row so landCherryPick's CherryPickStarted/
+			// ConflictResolutionStarted events below have a live entry to
+			// update — without this, the tickets tab shows nothing while
+			// this recovery cherry-pick runs.
+			rp.Sink.TicketRecovering(t.Identifier)
+
 			landedSHA, err := landCherryPick(d, p, base, branch, "", "", "")
 			if err != nil {
 				return fmt.Errorf("re-cherry-picking orphaned claim %s: %w", t.Identifier, err)
@@ -242,6 +248,12 @@ func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t
 		ResumeSignalPath: rp.ResumeSignalPath,
 		Sink:             rp.Sink,
 	}
+
+	// Seed a live row so landCherryPick's CherryPickStarted/
+	// ConflictResolutionStarted events below have a live entry to update —
+	// without this, the tickets tab shows a done ticket's stale disk status
+	// while this repair runs.
+	rp.Sink.TicketRecovering(t.Identifier)
 
 	landedSHA, err := landCherryPick(d, p, base, branch, "", "", "")
 	if err != nil {

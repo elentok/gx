@@ -101,7 +101,12 @@ func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
 // token (e.g. "04a") names one specific sibling and resolves as soon as
 // that ticket alone is done, independent of its siblings. Either way, a
 // blocker with no matching ticket in e counts as unresolved (it can't be
-// verified done).
+// verified done). t itself is excluded from the family it's checking: a
+// ticket that merely shares its family's leading number (e.g. 06b, a
+// follow-up ticket to 06, not a lettered replacement created by splitting
+// 06) must not be required to finish itself before its own "Blocked by: 06"
+// can resolve — that can never happen, since t is still open for the
+// duration of this very check.
 func (e Epic) UnresolvedBlockers(t Ticket) []string {
 	if len(t.BlockedBy) == 0 {
 		return nil
@@ -113,6 +118,9 @@ func (e Epic) UnresolvedBlockers(t Ticket) []string {
 	// the ticket file's exactly (e.g. "Blocked by: 4a" still finds "04a").
 	byNumberAndSuffix := make(map[string]Ticket, len(e.Tickets))
 	for _, other := range e.Tickets {
+		if other.Number == t.Number && other.Identifier == t.Identifier {
+			continue
+		}
 		total[other.Number]++
 		if other.IsDone() {
 			done[other.Number]++

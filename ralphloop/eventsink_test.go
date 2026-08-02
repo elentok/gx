@@ -56,6 +56,9 @@ func (s *recordingSink) TranscriptLine(label, line string) { s.record("Transcrip
 func (s *recordingSink) TicketCleanupFinished(identifier string) {
 	s.record("TicketCleanupFinished")
 }
+func (s *recordingSink) TicketRecovering(identifier string) {
+	s.record("TicketRecovering")
+}
 func (s *recordingSink) TicketRecovered(identifier, epicName, branch, landedSHA string) {
 	s.record("TicketRecovered")
 }

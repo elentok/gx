@@ -78,6 +78,15 @@ var metadataLineRe = regexp.MustCompile(`(?i)^(Type|Blocked by|Status):\s*(.*)$`
 
 var blockedByTokenRe = regexp.MustCompile(`\d+[a-zA-Z]*`)
 
+// blockedByParentheticalRe strips a trailing parenthetical annotation from a
+// Blocked by: value, e.g. "06 (`tickets.LoopStatus()` must exist — it does,
+// as of 06's commit)" -> "06 ", so digit-like tokens mentioned only in the
+// prose explanation (e.g. "06's commit") aren't mistaken for a second
+// blocker. Uses a greedy `.*` (rather than `[^)]*` like statusParentheticalRe)
+// so it strips from the first "(" through the line's final ")" even when the
+// annotation contains nested parens, e.g. "LoopStatus()".
+var blockedByParentheticalRe = regexp.MustCompile(`\s*\(.*\)\s*$`)
+
 // statusParentheticalRe strips a trailing parenthetical annotation from a
 // Status: value, e.g. "resolved (duplicate of #12)" -> "resolved", so the
 // status word alone still matches doneStatuses/openStatuses/etc.
@@ -132,8 +141,14 @@ func ParseTicket(raw string) (Ticket, error) {
 
 // parseBlockedBy extracts ticket tokens from a "Blocked by:" value, e.g.
 // "02, 05" -> ["02", "05"], "04a" -> ["04a"]. A value with no digits (e.g.
-// "-" or "None") yields nil.
+// "-" or "None") yields nil. Trailing prose annotations (a parenthetical
+// explanation or an em-dash aside, mirroring the Status: conventions above)
+// are stripped first so digit-like tokens mentioned only in the explanation
+// — e.g. "06's commit" or a markdown link's filename — aren't mistaken for
+// additional blockers.
 func parseBlockedBy(value string) []string {
+	value = blockedByParentheticalRe.ReplaceAllString(value, "")
+	value = statusEmDashAnnotationRe.ReplaceAllString(value, "")
 	matches := blockedByTokenRe.FindAllString(value, -1)
 	if len(matches) == 0 {
 		return nil

@@ -20,6 +20,7 @@ const (
 	LiveEventIterationFinished
 	LiveEventTranscriptLine
 	LiveEventTicketCleanupFinished
+	LiveEventTicketRecovering
 	LiveEventTicketRecovered
 	LiveEventTicketUnrecoverable
 	LiveEventEpicComplete
@@ -126,6 +127,10 @@ func (s *ChannelEventSink) TranscriptLine(label, line string) {
 
 func (s *ChannelEventSink) TicketCleanupFinished(identifier string) {
 	s.emit(LiveEvent{Kind: LiveEventTicketCleanupFinished, Identifier: identifier})
+}
+
+func (s *ChannelEventSink) TicketRecovering(identifier string) {
+	s.emit(LiveEvent{Kind: LiveEventTicketRecovering, Identifier: identifier})
 }
 
 func (s *ChannelEventSink) TicketRecovered(identifier, epicName, branch, landedSHA string) {

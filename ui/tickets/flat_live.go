@@ -130,6 +130,9 @@ func (m FlatModel) applyLiveEvent(ev ralphloop.LiveEvent) {
 			paused: true, pauseKind: ralphloop.PauseNeedsAttention, reason: "no live iteration to reattach to",
 		}
 
+	case ralphloop.LiveEventTicketRecovering:
+		m.live[ev.Identifier] = liveTicketState{running: true}
+
 	case ralphloop.LiveEventTicketUnrecoverable:
 		m.live[ev.Identifier] = liveTicketState{
 			paused: true, pauseKind: ralphloop.PauseNeedsAttention, reason: "commits missing from epic; needs operator review",

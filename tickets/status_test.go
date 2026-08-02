@@ -143,6 +143,23 @@ func TestEpic_UnresolvedBlockers_NilWhenNoBlockedBy(t *testing.T) {
 	}
 }
 
+// TestEpic_UnresolvedBlockers_SelfExcludedFromOwnFamily covers a follow-up
+// ticket (06b) that merely shares its prerequisite's leading number (06),
+// rather than being one of 06's lettered split replacements. Its own
+// "Blocked by: 06" must resolve once 06 itself is done, without also
+// requiring 06b — the very ticket being checked, necessarily still open for
+// the duration of this check — to finish first.
+func TestEpic_UnresolvedBlockers_SelfExcludedFromOwnFamily(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{
+		{Number: 6, Identifier: "06", Status: "done"},
+		{Number: 6, Identifier: "06b", BlockedBy: []string{"06"}, Status: "open"},
+	}}
+	got := epic.UnresolvedBlockers(epic.Tickets[1])
+	if got != nil {
+		t.Errorf("UnresolvedBlockers = %v, want nil once 06 is done, regardless of 06b's own status", got)
+	}
+}
+
 // TestEpic_UnresolvedBlockers_LetteredSplitRequiresAllSiblingsDone covers a
 // mid-flight split: "Blocked by:" text only ever carries a bare number
 // (parseBlockedBy strips letter suffixes), so "Blocked by: 03" can't name a

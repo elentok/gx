@@ -105,6 +105,14 @@ type EventSink interface {
 	// it done and cleaning up right after — startup reconciliation just
 	// finished that interrupted cleanup.
 	TicketCleanupFinished(identifier string)
+	// TicketRecovering reports that startup reconciliation is about to
+	// re-cherry-pick identifier's commits from a surviving iteration branch
+	// (a doneRecoverable ticket, or an orphaned claim with unlanded commits)
+	// — fired before the CherryPickStarted/ConflictResolutionStarted events
+	// that follow, so a renderer has a live row to update: unlike a normal
+	// iteration, there's no LiveEventIterationStarted/TicketReattached ahead
+	// of this recovery to seed one.
+	TicketRecovering(identifier string)
 	// TicketRecovered reports that a done ticket's commits were missing from
 	// epicName (a crash landed between cherry-pick and marking done) but its
 	// iteration branch still held them, so startup reconciliation
@@ -142,6 +150,7 @@ func (noopEventSink) SmartZoneCompactStarted(identifier string)                 
 func (noopEventSink) SmartZoneFinishingUp(identifier string)                         {}
 func (noopEventSink) SmartZoneRecovered(identifier string)                           {}
 func (noopEventSink) TicketCleanupFinished(identifier string)                        {}
+func (noopEventSink) TicketRecovering(identifier string)                             {}
 func (noopEventSink) TicketRecovered(identifier, epicName, branch, landedSHA string) {}
 func (noopEventSink) TicketUnrecoverable(identifier, epicName string)                {}
 func (noopEventSink) EpicComplete(epicName string, completed int)                    {}
@@ -236,6 +245,8 @@ func (s *textEventSink) SmartZoneRecovered(identifier string) {}
 func (s *textEventSink) TicketCleanupFinished(identifier string) {
 	s.printf("ticket %s: done and commits landed, but leftover iteration state was never cleaned up; finished the interrupted cleanup\n", identifier)
 }
+
+func (s *textEventSink) TicketRecovering(identifier string) {}
 
 func (s *textEventSink) TicketRecovered(identifier, epicName, branch, landedSHA string) {
 	s.printf("ticket %s: done but commits were missing from %s; auto re-cherry-picked from iteration branch %s and restored (%s)\n", identifier, epicName, branch, landedSHA)

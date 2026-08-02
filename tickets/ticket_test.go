@@ -96,6 +96,30 @@ func TestParseTicket_BlockedByNoneOrDash(t *testing.T) {
 	}
 }
 
+func TestParseTicket_BlockedByParentheticalWithDigits(t *testing.T) {
+	raw := "**Blocked by:** 06 (`tickets.LoopStatus()` must exist — it does, as of 06's commit)\n"
+
+	ticket, err := ParseTicket(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !reflect.DeepEqual(ticket.BlockedBy, []string{"06"}) {
+		t.Errorf("BlockedBy = %v, want [06]", ticket.BlockedBy)
+	}
+}
+
+func TestParseTicket_BlockedByEmDashLinkAnnotation(t *testing.T) {
+	raw := "Blocked by: none — amends [07](07-pause-resume-and-crash-restart.md)'s smart-zone-breach handling.\n"
+
+	ticket, err := ParseTicket(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ticket.BlockedBy != nil {
+		t.Errorf("BlockedBy = %v, want nil", ticket.BlockedBy)
+	}
+}
+
 func TestTicket_IsDone(t *testing.T) {
 	doneValues := []string{"done", "resolved", "wontfix", "closed", "superseded", "Done", "RESOLVED"}
 	for _, v := range doneValues {

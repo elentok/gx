@@ -118,6 +118,47 @@ func TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_RecoversInstead(t *tes
 	}
 }
 
+// TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_ReportsRecoveringBeforeCherryPick
+// covers the same UI gap as the doneRecoverable case above, but for an
+// orphaned claim's synchronous re-cherry-pick: TicketRecovering must fire
+// before CherryPickStarted so a renderer has a live row to update instead of
+// showing nothing while the recovery runs.
+func TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_ReportsRecoveringBeforeCherryPick(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "# A\n\n**Status:** claimed\n",
+	})
+	epics, err := tickets.Load(scratchDir)
+	if err != nil {
+		t.Fatalf("tickets.Load: %v", err)
+	}
+
+	d, _, _ := fakeDeps()
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) { return nil, nil }
+
+	sink := &recordingSink{}
+	_, err = reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, sink), epics[0])
+	if err != nil {
+		t.Fatalf("reconcile() error = %v", err)
+	}
+
+	calls := sink.snapshot()
+	recoveringIdx, cherryPickIdx := -1, -1
+	for i, c := range calls {
+		if c == "TicketRecovering" {
+			recoveringIdx = i
+		}
+		if c == "CherryPickStarted" {
+			cherryPickIdx = i
+		}
+	}
+	if recoveringIdx == -1 {
+		t.Fatalf("calls = %v, want TicketRecovering to fire before the orphaned claim's cherry-pick", calls)
+	}
+	if cherryPickIdx != -1 && recoveringIdx > cherryPickIdx {
+		t.Errorf("calls = %v, want TicketRecovering before CherryPickStarted", calls)
+	}
+}
+
 func TestReconcile_ClaimedWithLiveTab_ReturnsReattached(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "# A\n\n**Status:** claimed\n",
@@ -1035,6 +1076,54 @@ func TestReconcile_DoneTicketRecoverable_AutoRecherryPicksAndReports(t *testing.
 	}
 	if !sawRepairCherryPick {
 		t.Errorf("events = %v, want a cherry-picked event logged for the repair", events)
+	}
+}
+
+// TestReconcile_DoneTicketRecoverable_ReportsRecoveringBeforeCherryPick
+// covers a UI bug: unlike a normal iteration (LiveEventIterationStarted
+// seeds a live row before CherryPickStarted), a startup repair went straight
+// to CherryPickStarted/ConflictResolutionStarted with no live row to update,
+// so the tickets tab showed nothing (not even a spinner) while a done
+// ticket's commits were being re-landed. TicketRecovering must fire first so
+// a renderer has something to attach the cherry-pick phase to.
+func TestReconcile_DoneTicketRecoverable_ReportsRecoveringBeforeCherryPick(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"03-c.md": "# C\n\n**Status:** done\n",
+	})
+	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
+		t.Fatalf("logEvent: %v", err)
+	}
+	epics, err := tickets.Load(scratchDir)
+	if err != nil {
+		t.Fatalf("tickets.Load: %v", err)
+	}
+
+	d, _, _ := fakeDeps()
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) { return nil, nil }
+	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
+	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error { return nil }
+
+	sink := &recordingSink{}
+	_, err = reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, sink), epics[0])
+	if err != nil {
+		t.Fatalf("reconcile() error = %v", err)
+	}
+
+	calls := sink.snapshot()
+	recoveringIdx, cherryPickIdx := -1, -1
+	for i, c := range calls {
+		if c == "TicketRecovering" {
+			recoveringIdx = i
+		}
+		if c == "CherryPickStarted" {
+			cherryPickIdx = i
+		}
+	}
+	if recoveringIdx == -1 {
+		t.Fatalf("calls = %v, want TicketRecovering to fire before the repair's cherry-pick", calls)
+	}
+	if cherryPickIdx != -1 && recoveringIdx > cherryPickIdx {
+		t.Errorf("calls = %v, want TicketRecovering before CherryPickStarted", calls)
 	}
 }
 
