@@ -14,6 +14,7 @@ import (
 
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // writeEpic builds a fixture epic directory under a fresh t.TempDir()'s
@@ -315,6 +316,61 @@ func TestRun_FreshIteration_OmitsMetadataWhenOccupancyUnavailable(t *testing.T) 
 	}
 	if strings.Contains(got, "Context window:") || strings.Contains(got, "Session:") {
 		t.Errorf("ticket should omit metadata fields when occupancy is unavailable, got:\n%s", got)
+	}
+}
+
+// TestLandCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmatter
+// verifies ticket 05a: landCherryPick reads the landing session's own
+// transcript (report.go's sessionStats source, the same one `gx ralph-loop
+// report` reads) and writes its peak context occupancy and wall-clock
+// duration into the landed ticket's actual_context_window/elapsed_time
+// frontmatter fields.
+func TestLandCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmatter(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+	})
+	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
+
+	sessionID := "sess-land-01"
+	cwd := filepath.Join("/fake/worktrees", iterLabel("01"))
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	writeFakeTranscript(t, cwd, sessionID, start,
+		[3]any{"claude-sonnet-5", 1000, 0},
+		[3]any{"claude-sonnet-5", 2000, 5000},
+	)
+
+	d, _, _ := fakeDeps()
+	p := iterationParams{
+		WorktreeDir:     "/fake/worktrees",
+		FeatureWorktree: "/fake/feature",
+		FeatureBranch:   "epic",
+		Agent:           AgentClaude,
+		Ticket:          tickets.Ticket{Identifier: "01", Path: ticketPath},
+		ScratchDir:      scratchDir,
+		FeatureLock:     &sync.Mutex{},
+		Sink:            NewTextEventSink(&bytes.Buffer{}),
+	}
+
+	if _, err := landCherryPick(d, p, "base", "branch", sessionID, "pane", "tab"); err != nil {
+		t.Fatalf("landCherryPick() error = %v", err)
+	}
+
+	raw, err := os.ReadFile(ticketPath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	ticket, err := schema.ParseTicketFromRaw(string(raw), ticketPath)
+	if err != nil {
+		t.Fatalf("ParseTicketFromRaw: %v", err)
+	}
+	if ticket.ActualContextWindow == 0 {
+		t.Errorf("ActualContextWindow = 0, want non-zero:\n%s", raw)
+	}
+	if ticket.ElapsedTime == 0 {
+		t.Errorf("ElapsedTime = 0, want non-zero:\n%s", raw)
 	}
 }
 

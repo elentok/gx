@@ -3,11 +3,13 @@ package ralphloop
 import (
 	"fmt"
 	"io"
+	"os"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/elentok/gx/codexsession"
+	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -109,6 +111,47 @@ func readSessionStats(cwd, sessionID string) (sessionStats, error) {
 		stats.cost += turnCost(l.Usage)
 	}
 	return stats, nil
+}
+
+// writeLandedMetrics reads sessionID's own transcript — the same
+// readAgentSessionStats call `gx ralph-loop report` uses, just invoked at
+// land-time instead of report-time — and, if its stats are available, writes
+// its peak context occupancy and wall-clock duration into ticketPath's
+// actual_context_window/elapsed_time frontmatter fields. A no-op (not an
+// error) when sessionID is empty or the transcript can't be read yet: a
+// repair/reattached landing (see reconcile.go) has no fresh session of its
+// own to read, and these metrics are a landing-time convenience, not a
+// precondition for the cherry-pick itself to succeed.
+func writeLandedMetrics(agent AgentKind, cwd, sessionID, ticketPath string) error {
+	stats, err := readAgentSessionStats(sessionKey{agent: agent, cwd: cwd, sessionID: sessionID})
+	if err != nil || !stats.ok {
+		return nil
+	}
+	elapsedSeconds := int(stats.end.Sub(stats.start).Seconds())
+	return writeTicketMetrics(ticketPath, stats.peakOccupancy, elapsedSeconds)
+}
+
+// writeTicketMetrics rewrites ticketPath's frontmatter with contextWindow/
+// elapsedSeconds in actual_context_window/elapsed_time, round-tripping
+// through schema's typed parse/marshal so every other field and the
+// markdown body are carried through unchanged.
+func writeTicketMetrics(ticketPath string, contextWindow, elapsedSeconds int) error {
+	raw, err := os.ReadFile(ticketPath)
+	if err != nil {
+		return err
+	}
+	t, err := schema.ParseTicketFromRaw(string(raw), ticketPath)
+	if err != nil {
+		return err
+	}
+	t.ActualContextWindow = contextWindow
+	t.ElapsedTime = elapsedSeconds
+
+	out, err := schema.MarshalTicket(t, schema.ParseBody(string(raw)))
+	if err != nil {
+		return err
+	}
+	return writeFileAtomic(ticketPath, out)
 }
 
 // ticketSummary is one ticket's report figures, joined from its run-log

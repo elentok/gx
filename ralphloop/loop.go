@@ -698,7 +698,10 @@ func backfillDoneMetadata(d Deps, p iterationParams) error {
 // this mutates the shared feature worktree's working directory; the landed
 // SHA is resolved before releasing it, before another iteration's cherry-pick
 // can advance the tip past this one's — otherwise the recorded SHA could
-// belong to a different ticket entirely.
+// belong to a different ticket entirely. Once the SHA is resolved, it also
+// writes the landing iteration's session metrics (actual_context_window,
+// elapsed_time) into the ticket's frontmatter via writeLandedMetrics — see
+// that func for why a missing session is a no-op rather than a failure here.
 func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane, tab string) (string, error) {
 	p.FeatureLock.Lock()
 	defer p.FeatureLock.Unlock()
@@ -713,6 +716,12 @@ func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane, ta
 	if err != nil {
 		return "", fmt.Errorf("resolving landed commit on %s: %w", p.FeatureBranch, err)
 	}
+
+	iterationCwd := filepath.Join(p.WorktreeDir, iterLabel(p.Ticket.Identifier))
+	if err := writeLandedMetrics(p.Agent, iterationCwd, sessionID, p.Ticket.Path); err != nil {
+		return "", fmt.Errorf("writing landed metrics for ticket %s: %w", p.Ticket.Identifier, err)
+	}
+
 	return landedSHA, nil
 }
 
