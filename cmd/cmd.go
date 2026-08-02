@@ -316,6 +316,14 @@ func newTicketsCmd(d deps) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&allRepos, "all", false, "show every worktree's .scratch/ tickets, not just the current one")
+	cmd.AddCommand(&cobra.Command{
+		Use:   "validate <path>",
+		Short: "validate a ticket file's frontmatter",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			return runTicketsValidate(args[0], c.OutOrStdout())
+		},
+	})
 	return cmd
 }
 

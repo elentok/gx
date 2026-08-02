@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/elentok/gx/tickets/schema"
 )
 
 var ticketFilenameRe = regexp.MustCompile(`^(\d+)([[:alpha:]]*)-(.+)\.md$`)
@@ -57,23 +59,31 @@ func loadEpic(scratchDir, name string) Epic {
 		}
 
 		ticketPath := filepath.Join(issuesDir, issueEntry.Name())
+		ticket := Ticket{
+			Number:     number,
+			Identifier: identifier,
+			Title:      title,
+			Path:       ticketPath,
+		}
+
 		raw, err := os.ReadFile(ticketPath)
 		if err != nil {
-			epic.Tickets = append(epic.Tickets, Ticket{
-				Number:     number,
-				Identifier: identifier,
-				Title:      title,
-				Path:       ticketPath,
-				ReadErr:    err.Error(),
-			})
+			ticket.ReadErr = err.Error()
+			epic.Tickets = append(epic.Tickets, ticket)
 			continue
 		}
 
-		ticket, _ := ParseTicket(string(raw))
-		ticket.Number = number
-		ticket.Identifier = identifier
-		ticket.Title = title
-		ticket.Path = ticketPath
+		parsed, err := schema.ParseTicketFromRaw(string(raw), ticketPath)
+		if err != nil {
+			ticket.ReadErr = err.Error()
+			epic.Tickets = append(epic.Tickets, ticket)
+			continue
+		}
+
+		ticket.Type = string(parsed.Type)
+		ticket.BlockedBy = idsToStrings(parsed.BlockedBy)
+		ticket.Status = string(parsed.Status)
+		ticket.Body = schema.ParseBody(string(raw))
 		epic.Tickets = append(epic.Tickets, ticket)
 	}
 
@@ -102,4 +112,18 @@ func humanizeSlug(slug string) string {
 		return title
 	}
 	return strings.ToUpper(title[:1]) + title[1:]
+}
+
+// idsToStrings lowers schema.TicketIDs to plain strings for tickets.Ticket's
+// BlockedBy field, which predates the schema package and is read directly by
+// ralphloop/ui call sites that don't know about schema.TicketID.
+func idsToStrings(ids []schema.TicketID) []string {
+	if len(ids) == 0 {
+		return nil
+	}
+	out := make([]string, len(ids))
+	for i, id := range ids {
+		out[i] = string(id)
+	}
+	return out
 }

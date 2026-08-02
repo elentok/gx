@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/internal/legacyparse"
 	"gopkg.in/yaml.v3"
 )
 
@@ -23,9 +23,16 @@ func ParseTicket(path string) (Ticket, error) {
 		return Ticket{}, fmt.Errorf("reading ticket file %s: %w", path, err)
 	}
 
-	yamlPart, _, hasFM := splitFrontmatter(string(raw))
+	return ParseTicketFromRaw(string(raw), path)
+}
+
+// ParseTicketFromRaw is ParseTicket's logic over an already-read file, for
+// callers (e.g. tickets.Load) that need to derive both the typed Ticket and
+// the raw body (via ParseBody) from one read.
+func ParseTicketFromRaw(raw, path string) (Ticket, error) {
+	yamlPart, _, hasFM := splitFrontmatter(raw)
 	if !hasFM {
-		return parseOldFormat(string(raw), path), nil
+		return parseOldFormat(raw, path), nil
 	}
 
 	var wire ticketYAML
@@ -38,6 +45,19 @@ func ParseTicket(path string) (Ticket, error) {
 		return Ticket{}, fmt.Errorf("invalid ticket %s: %w", path, err)
 	}
 	return t, nil
+}
+
+// ParseBody returns raw's markdown body: the content after the frontmatter
+// block for a new-format ticket, or legacyparse.Parse's metadata-stripped
+// body for an old-format one (schema.Ticket has no Body field of its own —
+// see ticket.go's package doc — so this stays a standalone helper alongside
+// ParseTicketFromRaw rather than a field on the returned Ticket).
+func ParseBody(raw string) string {
+	_, body, hasFM := splitFrontmatter(raw)
+	if hasFM {
+		return body
+	}
+	return legacyparse.Parse(raw).Body
 }
 
 // filenameIDRe pulls the ticket ID off a "NN[a]-slug.md" filename, mirroring
@@ -66,7 +86,7 @@ func extractTicketTokens(value string) []string {
 var firstWordRe = regexp.MustCompile(`^\S+`)
 
 // parseOldFormat maps a legacy bold-line ticket file onto the new Ticket
-// struct: tickets.ParseTicket already extracts Type/Blocked by/Status, and
+// struct: legacyparse.Parse already extracts Type/Blocked by/Status, and
 // this adds the fields it doesn't cover (Split, Code-review fixes, Context
 // window -> ActualContextWindow, Following-up -> SplitFrom), per the
 // field-name mapping in ticket 01b. The ticket ID isn't part of any
@@ -78,7 +98,7 @@ var firstWordRe = regexp.MustCompile(`^\S+`)
 // legacy format but not the new enum), and migration ticket 03 is what
 // reconciles that, not this fallback path.
 func parseOldFormat(raw, path string) Ticket {
-	legacy, _ := tickets.ParseTicket(raw)
+	legacy := legacyparse.Parse(raw)
 
 	t := Ticket{
 		ID:        deriveIDFromFilename(path),
