@@ -88,6 +88,12 @@ func PatchesApplied(dir, upstream, base, branch string) (bool, error) {
 	return found, nil
 }
 
+// Trailer is one "key: value" commit-message trailer line, see
+// AppendTrailers.
+type Trailer struct {
+	Key, Value string
+}
+
 // AppendTrailer amends HEAD's commit message to add a "key: value" trailer
 // line, leaving the tree/index untouched (RewordHead). Unlike a diff or
 // hash, a trailer survives a later rebase even when the commit is manually
@@ -96,12 +102,28 @@ func PatchesApplied(dir, upstream, base, branch string) (bool, error) {
 // patch-id-based presence checks can no longer prove a ticket's landed
 // commit is still on the feature branch.
 func AppendTrailer(dir, key, value string) error {
+	return AppendTrailers(dir, Trailer{Key: key, Value: value})
+}
+
+// AppendTrailers amends HEAD's commit message to add one or more "key:
+// value" trailer lines in a single rewrite, rather than one amend per
+// trailer — see AppendTrailer for why a trailer survives what a diff/hash
+// can't.
+func AppendTrailers(dir string, trailers ...Trailer) error {
 	msg, _, err := run(dir, []string{"log", "-1", "--format=%B", "HEAD"})
 	if err != nil {
 		return err
 	}
-	newMsg := strings.TrimRight(msg, "\n") + "\n\n" + key + ": " + value + "\n"
-	_, err = RewordHead(dir, newMsg)
+	var b strings.Builder
+	b.WriteString(strings.TrimRight(msg, "\n"))
+	b.WriteString("\n\n")
+	for _, t := range trailers {
+		b.WriteString(t.Key)
+		b.WriteString(": ")
+		b.WriteString(t.Value)
+		b.WriteString("\n")
+	}
+	_, err = RewordHead(dir, b.String())
 	return err
 }
 

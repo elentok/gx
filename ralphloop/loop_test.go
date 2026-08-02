@@ -6,13 +6,16 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -113,6 +116,9 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 			return false, nil
 		},
 		AppendTrailer: func(dir, key, value string) error {
+			return nil
+		},
+		AppendTrailers: func(dir string, trailers ...git.Trailer) error {
 			return nil
 		},
 		TrailerCommitExists: func(dir, ref, key, value string) (bool, error) {
@@ -405,6 +411,77 @@ func TestLandCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmatt
 	}
 	if ticket.ElapsedTime == 0 {
 		t.Errorf("ElapsedTime = 0, want non-zero:\n%s", raw)
+	}
+}
+
+// TestLandCherryPick_StampsTokensAndElapsedTrailers verifies ticket 05b:
+// alongside the existing Ralph-Loop-Ticket trailer, landCherryPick stamps
+// Ralph-Loop-Tokens/Ralph-Loop-Elapsed trailers whose values match what
+// writeLandedMetrics wrote to the ticket's frontmatter, all in the landed
+// commit's message via a single Deps.AppendTrailers call.
+func TestLandCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+	})
+	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
+
+	sessionID := "sess-land-01"
+	cwd := filepath.Join("/fake/worktrees", iterLabel("01"))
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	writeFakeTranscript(t, cwd, sessionID, start,
+		[3]any{"claude-sonnet-5", 1000, 0},
+		[3]any{"claude-sonnet-5", 2000, 5000},
+	)
+
+	repoDir := testutil.TempRepo(t)
+
+	d, _, _ := fakeDeps()
+	d.AppendTrailers = git.AppendTrailers
+	d.RevParse = git.RevParse
+
+	p := iterationParams{
+		WorktreeDir:     "/fake/worktrees",
+		FeatureWorktree: repoDir,
+		FeatureBranch:   "epic",
+		Agent:           AgentClaude,
+		Ticket:          tickets.Ticket{Identifier: "01", Path: ticketPath},
+		ScratchDir:      scratchDir,
+		FeatureLock:     &sync.Mutex{},
+		Sink:            NewTextEventSink(&bytes.Buffer{}),
+	}
+
+	if _, err := landCherryPick(d, p, "base", "branch", sessionID, "pane", "tab"); err != nil {
+		t.Fatalf("landCherryPick() error = %v", err)
+	}
+
+	raw, err := os.ReadFile(ticketPath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	ticket, err := schema.ParseTicketFromRaw(string(raw), ticketPath)
+	if err != nil {
+		t.Fatalf("ParseTicketFromRaw: %v", err)
+	}
+
+	wantTokens := strconv.Itoa(ticket.ActualContextWindow)
+	wantElapsed := strconv.Itoa(ticket.ElapsedTime) + "s"
+	if found, err := git.TrailerCommitExists(repoDir, "HEAD", tokensTrailerKey, wantTokens); err != nil {
+		t.Fatalf("TrailerCommitExists(%s): %v", tokensTrailerKey, err)
+	} else if !found {
+		t.Errorf("landed commit missing %s: %s trailer", tokensTrailerKey, wantTokens)
+	}
+	if found, err := git.TrailerCommitExists(repoDir, "HEAD", elapsedTrailerKey, wantElapsed); err != nil {
+		t.Fatalf("TrailerCommitExists(%s): %v", elapsedTrailerKey, err)
+	} else if !found {
+		t.Errorf("landed commit missing %s: %s trailer", elapsedTrailerKey, wantElapsed)
+	}
+	if found, err := git.TrailerCommitExists(repoDir, "HEAD", ticketTrailerKey, ticketTrailerValue("epic", "01")); err != nil {
+		t.Fatalf("TrailerCommitExists(%s): %v", ticketTrailerKey, err)
+	} else if !found {
+		t.Errorf("landed commit missing %s trailer", ticketTrailerKey)
 	}
 }
 

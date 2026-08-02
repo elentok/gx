@@ -64,6 +64,10 @@ type Deps struct {
 	// still find it later even if a subsequent rebase-plus-manual-conflict-
 	// resolution changes the commit's hash and patch-id both.
 	AppendTrailer func(dir, key, value string) error
+	// AppendTrailers is AppendTrailer's multi-trailer form, used by
+	// landCherryPick to stamp Ralph-Loop-Ticket alongside the metrics
+	// trailers in a single amend rather than one per trailer.
+	AppendTrailers func(dir string, trailers ...git.Trailer) error
 	// TrailerCommitExists reports whether a commit stamped by AppendTrailer is
 	// still reachable from ref, used by startup reconciliation as the final
 	// fallback once IsAncestor and PatchesApplied both fail to place a done
@@ -128,6 +132,7 @@ func DefaultDeps() Deps {
 		IsAncestor:            git.IsAncestor,
 		PatchesApplied:        git.PatchesApplied,
 		AppendTrailer:         git.AppendTrailer,
+		AppendTrailers:        git.AppendTrailers,
 		TrailerCommitExists:   git.TrailerCommitExists,
 		WorktreeExists:        worktreeExists,
 		InstallDeps:           InstallDependencies,

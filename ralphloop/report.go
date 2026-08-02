@@ -117,18 +117,23 @@ func readSessionStats(cwd, sessionID string) (sessionStats, error) {
 // readAgentSessionStats call `gx ralph-loop report` uses, just invoked at
 // land-time instead of report-time — and, if its stats are available, writes
 // its peak context occupancy and wall-clock duration into ticketPath's
-// actual_context_window/elapsed_time frontmatter fields. A no-op (not an
-// error) when sessionID is empty or the transcript can't be read yet: a
-// repair/reattached landing (see reconcile.go) has no fresh session of its
-// own to read, and these metrics are a landing-time convenience, not a
-// precondition for the cherry-pick itself to succeed.
-func writeLandedMetrics(agent AgentKind, cwd, sessionID, ticketPath string) error {
+// actual_context_window/elapsed_time frontmatter fields, returning the same
+// two values (ok=false) so landCherryPick can stamp them onto the landed
+// commit's trailers too, matching what's in the frontmatter. A no-op
+// (ok=false, not an error) when sessionID is empty or the transcript can't be
+// read yet: a repair/reattached landing (see reconcile.go) has no fresh
+// session of its own to read, and these metrics are a landing-time
+// convenience, not a precondition for the cherry-pick itself to succeed.
+func writeLandedMetrics(agent AgentKind, cwd, sessionID, ticketPath string) (contextWindow, elapsedSeconds int, ok bool, err error) {
 	stats, err := readAgentSessionStats(sessionKey{agent: agent, cwd: cwd, sessionID: sessionID})
 	if err != nil || !stats.ok {
-		return nil
+		return 0, 0, false, nil
 	}
-	elapsedSeconds := int(stats.end.Sub(stats.start).Seconds())
-	return writeTicketMetrics(ticketPath, stats.peakOccupancy, elapsedSeconds)
+	elapsedSeconds = int(stats.end.Sub(stats.start).Seconds())
+	if err := writeTicketMetrics(ticketPath, stats.peakOccupancy, elapsedSeconds); err != nil {
+		return 0, 0, false, err
+	}
+	return stats.peakOccupancy, elapsedSeconds, true, nil
 }
 
 // writeTicketMetrics rewrites ticketPath's frontmatter with contextWindow/

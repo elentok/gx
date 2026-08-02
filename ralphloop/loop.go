@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/elentok/gx/codexsession"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
@@ -21,6 +23,16 @@ const defaultScratchDir = ".scratch"
 // every landed commit (see Deps.AppendTrailer) and classifyDoneTicket's last-
 // resort fallback searches for (Deps.TrailerCommitExists).
 const ticketTrailerKey = "Ralph-Loop-Ticket"
+
+// tokensTrailerKey and elapsedTrailerKey are the commit-message trailers
+// landCherryPick stamps alongside ticketTrailerKey whenever the landing
+// session's own metrics are available (see writeLandedMetrics) — the same
+// actual_context_window/elapsed_time values written to the ticket's
+// frontmatter, surfaced on the landed commit too.
+const (
+	tokensTrailerKey  = "Ralph-Loop-Tokens"
+	elapsedTrailerKey = "Ralph-Loop-Elapsed"
+)
 
 // ticketTrailerValue builds ticketTrailerKey's value, scoped to epicName: a
 // bare ticket identifier repeats across every epic (each restarts numbering
@@ -698,10 +710,12 @@ func backfillDoneMetadata(d Deps, p iterationParams) error {
 // this mutates the shared feature worktree's working directory; the landed
 // SHA is resolved before releasing it, before another iteration's cherry-pick
 // can advance the tip past this one's — otherwise the recorded SHA could
-// belong to a different ticket entirely. Once the SHA is resolved, it also
-// writes the landing iteration's session metrics (actual_context_window,
-// elapsed_time) into the ticket's frontmatter via writeLandedMetrics — see
-// that func for why a missing session is a no-op rather than a failure here.
+// belong to a different ticket entirely. Before resolving the SHA, it writes
+// the landing iteration's session metrics (actual_context_window,
+// elapsed_time) into the ticket's frontmatter via writeLandedMetrics, then
+// stamps ticketTrailerKey and — when those metrics were available — the same
+// values onto tokensTrailerKey/elapsedTrailerKey, all in a single amend
+// (Deps.AppendTrailers) rather than one amend per trailer.
 func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane, tab string) (string, error) {
 	p.FeatureLock.Lock()
 	defer p.FeatureLock.Unlock()
@@ -709,17 +723,27 @@ func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane, ta
 	if err := cherryPickWithConflictResolution(d, p, base, branch, sessionID, pane, tab); err != nil {
 		return "", err
 	}
-	if err := d.AppendTrailer(p.FeatureWorktree, ticketTrailerKey, ticketTrailerValue(p.FeatureBranch, p.Ticket.Identifier)); err != nil {
-		return "", fmt.Errorf("stamping ticket trailer on landed commit: %w", err)
+
+	iterationCwd := filepath.Join(p.WorktreeDir, iterLabel(p.Ticket.Identifier))
+	contextWindow, elapsedSeconds, hasMetrics, err := writeLandedMetrics(p.Agent, iterationCwd, sessionID, p.Ticket.Path)
+	if err != nil {
+		return "", fmt.Errorf("writing landed metrics for ticket %s: %w", p.Ticket.Identifier, err)
 	}
+
+	trailers := []git.Trailer{{Key: ticketTrailerKey, Value: ticketTrailerValue(p.FeatureBranch, p.Ticket.Identifier)}}
+	if hasMetrics {
+		trailers = append(trailers,
+			git.Trailer{Key: tokensTrailerKey, Value: strconv.Itoa(contextWindow)},
+			git.Trailer{Key: elapsedTrailerKey, Value: strconv.Itoa(elapsedSeconds) + "s"},
+		)
+	}
+	if err := d.AppendTrailers(p.FeatureWorktree, trailers...); err != nil {
+		return "", fmt.Errorf("stamping trailers on landed commit: %w", err)
+	}
+
 	landedSHA, err := d.RevParse(p.FeatureWorktree, "HEAD")
 	if err != nil {
 		return "", fmt.Errorf("resolving landed commit on %s: %w", p.FeatureBranch, err)
-	}
-
-	iterationCwd := filepath.Join(p.WorktreeDir, iterLabel(p.Ticket.Identifier))
-	if err := writeLandedMetrics(p.Agent, iterationCwd, sessionID, p.Ticket.Path); err != nil {
-		return "", fmt.Errorf("writing landed metrics for ticket %s: %w", p.Ticket.Identifier, err)
 	}
 
 	return landedSHA, nil
