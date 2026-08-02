@@ -50,9 +50,10 @@ type Model struct {
 	livePageByTab map[nav.TabID]livePage
 	// history is the model side of the global deep-navigation stack.
 	// navState.State holds the parallel ViewState side.
-	history   []historyEntry
+	history     []historyEntry
 	keyPrefix   string
 	notify      notify.Model
+	loopStatus  loopStatusOverlay
 	gate        *reloadgate.ReloadGate
 	quitConfirm confirm.Model
 }
@@ -64,6 +65,7 @@ func New(repo git.Repo, settings Settings) Model {
 		navState:      navstate.NewState(settings.ActiveWorktreePath),
 		livePageByTab: make(map[nav.TabID]livePage),
 		notify:        notify.New(settings.UseNerdFontIcons),
+		loopStatus:    newLoopStatusOverlay(),
 		gate:          reloadgate.New(),
 		quitConfirm:   confirm.New(),
 	}
@@ -81,7 +83,7 @@ func New(repo git.Repo, settings Settings) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return m.activePage().model.Init()
+	return tea.Batch(m.activePage().model.Init(), m.loopStatus.Init())
 }
 
 func (m Model) View() tea.View {
@@ -107,6 +109,9 @@ func (m Model) View() tea.View {
 	}
 	if stack := m.notify.View(); stack != "" {
 		content = ui.OverlayTopRightMargin(content, stack, m.width, 1, 1)
+	}
+	if status := m.loopStatus.View(); status != "" {
+		content = ui.OverlayTopLeftMargin(content, status, 1, 1)
 	}
 
 	v := tea.NewView(content)

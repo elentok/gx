@@ -53,6 +53,11 @@ func OverlayTopRightMargin(bg, fg string, screenW, marginX, marginY int) string 
 	return PlaceOverlay(bg, fg, x, marginY)
 }
 
+// OverlayTopLeftMargin places fg against the top-left corner with explicit margins.
+func OverlayTopLeftMargin(bg, fg string, marginX, marginY int) string {
+	return PlaceOverlay(bg, fg, marginX, marginY)
+}
+
 func PlaceOverlay(bg, fg string, x, y int) string {
 	bgLines := strings.Split(bg, "\n")
 	fgLines := strings.Split(fg, "\n")

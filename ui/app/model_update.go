@@ -9,8 +9,13 @@ import (
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// notifyCmd carries every overlay's cmd (not just notify.Model's) through
+	// each return point below, since only one variable needs threading.
 	var notifyCmd tea.Cmd
 	m.notify, notifyCmd = m.notify.Update(msg)
+	var loopStatusCmd tea.Cmd
+	m.loopStatus, loopStatusCmd = m.loopStatus.Update(msg)
+	notifyCmd = tea.Batch(notifyCmd, loopStatusCmd)
 
 	if m.quitConfirm.IsOpen {
 		if key, ok := msg.(tea.KeyPressMsg); ok {
