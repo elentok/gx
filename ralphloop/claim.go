@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/elentok/gx/tickets/schema"
 )
 
 var statusLineRe = regexp.MustCompile(`(?i)^Status:\s*(.*)$`)
@@ -43,13 +45,33 @@ func MarkNeedsAttention(path string) error {
 // atomic write, so a concurrent reader never observes Status: done without
 // them. Requires an existing Status: line — every ticket reaching this point
 // was already claimed, so this is a precondition, not an edge case to
-// recover from.
+// recover from. For a frontmatter-format ticket, the session id isn't
+// written (the spec drops that field from frontmatter) and contextWindow
+// lands in actual_context_window — see the schema.HasFrontmatter branch
+// below.
 func MarkDoneWithMetadata(path string, contextWindow int, sessionID string) error {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
-	lines := strings.Split(string(raw), "\n")
+	rawStr := string(raw)
+
+	if schema.HasFrontmatter(rawStr) {
+		// contextWindow lands in actual_context_window — per
+		// .scratch/ticket-frontmatter/spec.md, that field unifies and
+		// replaces the old Context window: line, which already recorded
+		// the same contextOccupancy-at-close measurement. The spec drops
+		// the old Session: field from frontmatter entirely (the
+		// iteration's session id is already durably recorded in
+		// run-log.jsonl via logTicketEvent), so sessionID isn't written
+		// here.
+		return updateFrontmatterTicket(path, rawStr, func(t *schema.Ticket) {
+			t.Status = schema.StatusDone
+			t.ActualContextWindow = contextWindow
+		})
+	}
+
+	lines := strings.Split(rawStr, "\n")
 
 	idx, bold := findStatusLine(lines)
 	if idx < 0 {
@@ -62,6 +84,25 @@ func MarkDoneWithMetadata(path string, contextWindow int, sessionID string) erro
 	)
 
 	return writeFileAtomic(path, []byte(strings.Join(lines, "\n")))
+}
+
+// updateFrontmatterTicket is the shared round-trip behind every
+// frontmatter-format status writer below: parse raw via schema's typed
+// parser, let mutate apply the caller's field changes, then marshal and
+// write back atomically. Centralizing this keeps every writer's YAML block
+// valid, rather than each one line-splicing its own edit into it.
+func updateFrontmatterTicket(path, raw string, mutate func(*schema.Ticket)) error {
+	t, err := schema.ParseTicketFromRaw(raw, path)
+	if err != nil {
+		return err
+	}
+	mutate(&t)
+
+	out, err := schema.MarshalTicket(t, schema.ParseBody(raw))
+	if err != nil {
+		return err
+	}
+	return writeFileAtomic(path, out)
 }
 
 func formatMetadataLine(key, value string, bold bool) string {
@@ -89,7 +130,15 @@ func SetStatus(path, value string) error {
 	if err != nil {
 		return err
 	}
-	lines := strings.Split(string(raw), "\n")
+	rawStr := string(raw)
+
+	if schema.HasFrontmatter(rawStr) {
+		return updateFrontmatterTicket(path, rawStr, func(t *schema.Ticket) {
+			t.Status = schema.Status(value)
+		})
+	}
+
+	lines := strings.Split(rawStr, "\n")
 
 	if idx, bold := findStatusLine(lines); idx >= 0 {
 		lines[idx] = formatMetadataLine("Status", value, bold)

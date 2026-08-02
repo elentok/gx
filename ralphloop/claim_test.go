@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 func writeTicket(t *testing.T, content string) string {
@@ -177,6 +178,95 @@ func TestClaimThenMarkDone_RoundTripsThroughParseTicket(t *testing.T) {
 func TestClaim_MissingFileReturnsError(t *testing.T) {
 	if err := Claim(filepath.Join(t.TempDir(), "does-not-exist.md")); err == nil {
 		t.Error("Claim(missing file) = nil error, want error")
+	}
+}
+
+// TestClaim_FrontmatterTicket_RoundTripsThroughSchema verifies ticket 07:
+// Claim on a frontmatter-format ticket rewrites status via
+// schema.ParseTicketFromRaw/MarshalTicket rather than line-splicing, so the
+// YAML block stays valid (rather than gaining a stray capitalized "Status:"
+// line that no longer matches the "status" key).
+func TestClaim_FrontmatterTicket_RoundTripsThroughSchema(t *testing.T) {
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Ticket\n\nBody.\n")
+	if err := Claim(path); err != nil {
+		t.Fatalf("Claim: %v", err)
+	}
+
+	raw := mustRead(t, path)
+	ticket, err := schema.ParseTicketFromRaw(raw, path)
+	if err != nil {
+		t.Fatalf("ParseTicketFromRaw: %v (raw=%q)", err, raw)
+	}
+	if ticket.Status != schema.StatusClaimed {
+		t.Errorf("Status = %q, want claimed", ticket.Status)
+	}
+	if !strings.Contains(raw, "Body.") {
+		t.Errorf("body content lost:\n%s", raw)
+	}
+}
+
+// TestMarkDoneWithMetadata_FrontmatterTicket_WritesActualContextWindow
+// verifies ticket 07's fix for the corruption described in its issue: a
+// frontmatter ticket already carrying actual_context_window/elapsed_time
+// (as ticket 05a's landCherryPick writes) stays valid and gx-tickets-validate
+// -passing after MarkDoneWithMetadata, with status: done and
+// actual_context_window updated in place — not spliced as stray Context
+// window:/Session: lines inside the YAML block.
+func TestMarkDoneWithMetadata_FrontmatterTicket_WritesActualContextWindow(t *testing.T) {
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\ntype: task\nactual_context_window: 500\nelapsed_time: 10\n---\n# Ticket\n\nBody.\n")
+	if err := MarkDoneWithMetadata(path, 42000, "sess-123"); err != nil {
+		t.Fatalf("MarkDoneWithMetadata: %v", err)
+	}
+
+	raw := mustRead(t, path)
+	ticket, err := schema.ParseTicketFromRaw(raw, path)
+	if err != nil {
+		t.Fatalf("ParseTicketFromRaw: %v (raw=%q)", err, raw)
+	}
+	if err := schema.Validate(ticket); err != nil {
+		t.Errorf("Validate: %v", err)
+	}
+	if ticket.Status != schema.StatusDone {
+		t.Errorf("Status = %q, want done", ticket.Status)
+	}
+	if ticket.ActualContextWindow != 42000 {
+		t.Errorf("ActualContextWindow = %d, want 42000", ticket.ActualContextWindow)
+	}
+	if ticket.ElapsedTime != 10 {
+		t.Errorf("ElapsedTime = %d, want 10 (untouched)", ticket.ElapsedTime)
+	}
+	if !strings.Contains(raw, "Body.") {
+		t.Errorf("body content lost:\n%s", raw)
+	}
+}
+
+// TestClaimThenMarkDone_FrontmatterTicket_RoundTripsThroughSchema exercises
+// the same claim -> done sequence as
+// TestClaimThenMarkDone_RoundTripsThroughParseTicket, but for a
+// frontmatter-format ticket.
+func TestClaimThenMarkDone_FrontmatterTicket_RoundTripsThroughSchema(t *testing.T) {
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Ticket\n\nBody.\n")
+
+	if err := Claim(path); err != nil {
+		t.Fatalf("Claim: %v", err)
+	}
+	ticket, err := schema.ParseTicketFromRaw(mustRead(t, path), path)
+	if err != nil {
+		t.Fatalf("ParseTicketFromRaw: %v", err)
+	}
+	if ticket.Status != schema.StatusClaimed {
+		t.Errorf("after Claim, Status = %q, want claimed", ticket.Status)
+	}
+
+	if err := MarkDone(path); err != nil {
+		t.Fatalf("MarkDone: %v", err)
+	}
+	ticket, err = schema.ParseTicketFromRaw(mustRead(t, path), path)
+	if err != nil {
+		t.Fatalf("ParseTicketFromRaw: %v", err)
+	}
+	if ticket.Status != schema.StatusDone {
+		t.Errorf("after MarkDone, Status = %q, want done", ticket.Status)
 	}
 }
 

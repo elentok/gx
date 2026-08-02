@@ -111,6 +111,16 @@ func splitFrontmatter(raw string) (yamlPart, body string, hasFM bool) {
 	return "", raw, false
 }
 
+// HasFrontmatter reports whether raw opens with a "---" delimited YAML
+// frontmatter block, the same detection ParseTicketFromRaw uses to choose
+// between the frontmatter and legacy bold-line parse paths. Exported for
+// callers (e.g. ralphloop's status writers) that need to pick their own
+// write strategy before calling ParseTicketFromRaw/MarshalTicket.
+func HasFrontmatter(raw string) bool {
+	_, _, hasFM := splitFrontmatter(raw)
+	return hasFM
+}
+
 // MarshalTicket writes t back out as a "---" delimited YAML frontmatter
 // block followed by body, unchanged, the same shape ParseTicket reads.
 func MarshalTicket(t Ticket, body string) ([]byte, error) {

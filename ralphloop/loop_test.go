@@ -288,6 +288,51 @@ func TestRun_FreshIteration_StampsContextWindowAndSessionOnDone(t *testing.T) {
 	}
 }
 
+// TestRun_FreshIteration_FrontmatterTicket_EndsWithValidFrontmatter verifies
+// ticket 07: a frontmatter-format ticket landed via the real finishIteration
+// path (landCherryPick's writeLandedMetrics, then
+// markDoneStampingCloseMetadata's MarkDoneWithMetadata, both writing into the
+// same ticket file in one run) ends up with valid, gx-tickets-validate
+// -passing frontmatter — status: done, and actual_context_window set from
+// the closing occupancy — rather than a corrupted YAML block from the old
+// line-splicing writer.
+func TestRun_FreshIteration_FrontmatterTicket_EndsWithValidFrontmatter(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+	})
+	d, _, _ := fakeDeps()
+	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-fresh-01"}, nil
+	}
+	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
+		return 12345, true, nil
+	}
+
+	var out bytes.Buffer
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
+	raw, err := os.ReadFile(ticketPath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	ticket, err := schema.ParseTicketFromRaw(string(raw), ticketPath)
+	if err != nil {
+		t.Fatalf("ParseTicketFromRaw: %v (raw=%q)", err, raw)
+	}
+	if err := schema.Validate(ticket); err != nil {
+		t.Errorf("Validate: %v (raw=%q)", err, raw)
+	}
+	if ticket.Status != schema.StatusDone {
+		t.Errorf("Status = %q, want done", ticket.Status)
+	}
+	if ticket.ActualContextWindow != 12345 {
+		t.Errorf("ActualContextWindow = %d, want 12345", ticket.ActualContextWindow)
+	}
+}
+
 // TestRun_FreshIteration_OmitsMetadataWhenOccupancyUnavailable verifies that
 // a fresh iteration whose occupancy can't be read (ReadOccupancy's default
 // fake behavior in fakeDeps) still marks the ticket done, without writing
