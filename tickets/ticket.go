@@ -6,17 +6,15 @@ package tickets
 import (
 	"strconv"
 	"strings"
-
-	"github.com/elentok/gx/tickets/internal/legacyparse"
 )
 
 // Ticket is one parsed `<epic>/issues/NN-<slug>.md` file. Number, Title, and
-// Path are filled in by the loader from the filename/path, not by ParseTicket
-// (which only ever sees the file's raw text).
+// Path are filled in by the loader from the filename/path; the rest comes
+// from parsing the file's frontmatter (see tickets/schema.ParseTicketFromRaw).
 type Ticket struct {
-	// Number is the numeric portion of the ticket identifier, retained for
-	// scheduler ordering and legacy callers. Identifier is the full filename
-	// prefix, so tickets such as 10a and 10b remain distinct in the UI.
+	// Number is the numeric portion of the ticket identifier, used for
+	// scheduler ordering. Identifier is the full filename prefix, so tickets
+	// such as 10a and 10b remain distinct in the UI.
 	Number     int
 	Identifier string
 	Title      string
@@ -73,18 +71,4 @@ func (t Ticket) IsDone() bool {
 // commits to land in the first place.
 func (t Ticket) IsSuperseded() bool {
 	return supersededStatuses[strings.ToLower(strings.TrimSpace(t.Status))]
-}
-
-// ParseTicket parses a ticket file's raw text into metadata (Type:,
-// Blocked by:, Status:) plus the remaining raw markdown body, via
-// legacyparse.Parse (shared with tickets/schema's old-format fallback so the
-// two packages can't drift on what counts as a metadata line).
-func ParseTicket(raw string) (Ticket, error) {
-	f := legacyparse.Parse(raw)
-	return Ticket{
-		Type:      f.Type,
-		BlockedBy: f.BlockedBy,
-		Status:    f.Status,
-		Body:      f.Body,
-	}, nil
 }

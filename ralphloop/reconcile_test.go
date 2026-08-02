@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // testReconcileParams builds a reconcileParams for tests that don't exercise
@@ -35,7 +36,7 @@ func testReconcileParams(workspaceID string, paths reconcilePaths, sink EventSin
 
 func TestReconcile_ClaimedWithNoLiveTab_RevertsToOpen(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** claimed\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -68,7 +69,7 @@ func TestReconcile_ClaimedWithNoLiveTab_RevertsToOpen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "Status:** open") {
+	if !strings.Contains(string(raw), "status: open") {
 		t.Errorf("ticket not reverted to open:\n%s", raw)
 	}
 }
@@ -82,7 +83,7 @@ func TestReconcile_ClaimedWithNoLiveTab_RevertsToOpen(t *testing.T) {
 // so those unlanded commits must be landed here instead.
 func TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_RecoversInstead(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** claimed\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -109,7 +110,7 @@ func TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_RecoversInstead(t *tes
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "Status:** done") {
+	if !strings.Contains(string(raw), "status: done") {
 		t.Errorf("orphaned claim with unlanded commits not recovered to done:\n%s", raw)
 	}
 
@@ -125,7 +126,7 @@ func TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_RecoversInstead(t *tes
 // showing nothing while the recovery runs.
 func TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_ReportsRecoveringBeforeCherryPick(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** claimed\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -161,7 +162,7 @@ func TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_ReportsRecoveringBefor
 
 func TestReconcile_ClaimedWithLiveTab_ReturnsReattached(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** claimed\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -187,14 +188,14 @@ func TestReconcile_ClaimedWithLiveTab_ReturnsReattached(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "Status:** claimed") {
+	if !strings.Contains(string(raw), "status: claimed") {
 		t.Errorf("ticket status changed unexpectedly:\n%s", raw)
 	}
 }
 
 func TestReconcile_NeedsAttentionWithLiveTab_ReturnsReattached(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** needs-attention\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: needs-attention\ntype: task\n---\n# A\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -216,8 +217,8 @@ func TestReconcile_NeedsAttentionWithLiveTab_ReturnsReattached(t *testing.T) {
 
 func TestRun_NeedsAttentionWithoutLiveTab_DoesNotScheduleOtherTickets(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-attention.md": "# Attention\n\n**Status:** needs-attention\n",
-		"02-open.md":      "# Open\n\n**Status:** open\n",
+		"01-attention.md": "---\nid: \"01\"\nstatus: needs-attention\ntype: task\n---\n# Attention\n",
+		"02-open.md":      "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Open\n",
 	})
 	d, prompts, _ := fakeDeps()
 	d.TabList = func(string) ([]herdr.Tab, error) { return nil, nil }
@@ -233,8 +234,8 @@ func TestRun_NeedsAttentionWithoutLiveTab_DoesNotScheduleOtherTickets(t *testing
 
 func TestRun_RestartedNeedsAttentionRecoversThenResumesScheduling(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-attention.md": "# Attention\n\n**Status:** needs-attention\n",
-		"02-open.md":      "# Open\n\n**Status:** open\n",
+		"01-attention.md": "---\nid: \"01\"\nstatus: needs-attention\ntype: task\n---\n# Attention\n",
+		"02-open.md":      "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Open\n",
 	})
 	d, prompts, _ := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
@@ -267,8 +268,8 @@ func TestRun_RestartedNeedsAttentionRecoversThenResumesScheduling(t *testing.T) 
 
 func TestReconcile_OpenAndDoneTicketsIgnored(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** open\n",
-		"02-b.md": "# B\n\n**Status:** done\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: done\ntype: task\n---\n# B\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -461,7 +462,7 @@ func TestClassifyDoneTicket_LiveTabCountsAsLeftover(t *testing.T) {
 // needs-attention for a human to inspect, with a reason and a logged event.
 func TestReconcile_DoneTicketUnrecoverable_MarkedNeedsAttention(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"03-c.md": "# C\n\n**Status:** done\n",
+		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
 	})
 	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
@@ -489,7 +490,7 @@ func TestReconcile_DoneTicketUnrecoverable_MarkedNeedsAttention(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "Status:** needs-attention") {
+	if !strings.Contains(string(raw), "status: needs-attention") {
 		t.Errorf("ticket not marked needs-attention:\n%s", raw)
 	}
 
@@ -794,7 +795,7 @@ func TestClassifyDoneTicket_RealRepo_TrailerScopedToEpic_NoCrossEpicFalsePositiv
 // scheduling.
 func TestRun_RestartWithClaimedTicketButNoLiveTab_RerunsFromScratch(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** claimed\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})
 	d, prompts, _ := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
@@ -822,7 +823,7 @@ func TestRun_RestartWithClaimedTicketButNoLiveTab_RerunsFromScratch(t *testing.T
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "Status:** done") {
+	if !strings.Contains(string(raw), "status: done") {
 		t.Errorf("ticket not landed after restart:\n%s", raw)
 	}
 }
@@ -833,7 +834,7 @@ func TestRun_RestartWithClaimedTicketButNoLiveTab_RerunsFromScratch(t *testing.T
 // replayed) and driven through to completion.
 func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** claimed\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})
 	d, prompts, removed := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
@@ -868,7 +869,7 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "Status:** done") {
+	if !strings.Contains(string(raw), "status: done") {
 		t.Errorf("reattached ticket not marked done:\n%s", raw)
 	}
 }
@@ -882,7 +883,7 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 // poll timeout forever.
 func TestRun_RestartWithClaimedTicketAlreadyIdle_SkipsWaitAndCherryPicks(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** claimed\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})
 	d, _, removed := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
@@ -911,7 +912,7 @@ func TestRun_RestartWithClaimedTicketAlreadyIdle_SkipsWaitAndCherryPicks(t *test
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "Status:** done") {
+	if !strings.Contains(string(raw), "status: done") {
 		t.Errorf("reattached ticket not marked done:\n%s", raw)
 	}
 
@@ -930,14 +931,14 @@ func TestRun_RestartWithClaimedTicketAlreadyIdle_SkipsWaitAndCherryPicks(t *test
 	}
 }
 
-// TestRun_ReattachedClose_BackfillsContextAndSessionFromRunLog exercises
-// ticket 06a: a reattached iteration has no live session id of its own this
-// run, so its close backfills Context window/Session from the ticket's
-// original iteration-started event in the run log instead of leaving them
+// TestRun_ReattachedClose_BackfillsContextFromRunLog exercises ticket 06a: a
+// reattached iteration has no live session id of its own this run, so its
+// close backfills actual_context_window from the ticket's original
+// iteration-started event's session in the run log instead of leaving it
 // blank.
-func TestRun_ReattachedClose_BackfillsContextAndSessionFromRunLog(t *testing.T) {
+func TestRun_ReattachedClose_BackfillsContextFromRunLog(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** claimed\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})
 	if err := logEvent(scratchDir, "epic", Event{
 		Type:         eventIterationStarted,
@@ -965,29 +966,22 @@ func TestRun_ReattachedClose_BackfillsContextAndSessionFromRunLog(t *testing.T) 
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
+	got := mustParse(t, filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if got.Status != schema.StatusDone {
+		t.Errorf("Status = %q, want done", got.Status)
 	}
-	got := string(raw)
-	if !strings.Contains(got, "Status:** done") {
-		t.Errorf("reattached ticket not marked done:\n%s", got)
-	}
-	if !strings.Contains(got, "Context window:** 54321") {
-		t.Errorf("ticket missing backfilled context window field:\n%s", got)
-	}
-	if !strings.Contains(got, "Session:** sess-original") {
-		t.Errorf("ticket missing backfilled session field:\n%s", got)
+	if got.ActualContextWindow != 54321 {
+		t.Errorf("ActualContextWindow = %d, want 54321 (backfilled)", got.ActualContextWindow)
 	}
 }
 
 // TestRun_ReattachedClose_NoPriorSessionInLog_OmitsMetadata verifies the
 // ticket 06a edge case: when the run log has no iteration-started event to
 // recover a session id from, the reattached close still marks the ticket
-// done, without writing a blank or wrong Context window/Session field.
+// done, without writing a wrong/placeholder actual_context_window.
 func TestRun_ReattachedClose_NoPriorSessionInLog_OmitsMetadata(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** claimed\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
@@ -999,16 +993,12 @@ func TestRun_ReattachedClose_NoPriorSessionInLog_OmitsMetadata(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
+	got := mustParse(t, filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if got.Status != schema.StatusDone {
+		t.Errorf("Status = %q, want done", got.Status)
 	}
-	got := string(raw)
-	if !strings.Contains(got, "Status:** done") {
-		t.Errorf("reattached ticket not marked done:\n%s", got)
-	}
-	if strings.Contains(got, "Context window:") || strings.Contains(got, "Session:") {
-		t.Errorf("ticket should omit metadata fields with no prior session in the run log, got:\n%s", got)
+	if got.ActualContextWindow != 0 {
+		t.Errorf("ActualContextWindow = %d, want 0 (no prior session to backfill from)", got.ActualContextWindow)
 	}
 }
 
@@ -1019,7 +1009,7 @@ func TestRun_ReattachedClose_NoPriorSessionInLog_OmitsMetadata(t *testing.T) {
 // a report line naming what was restored.
 func TestReconcile_DoneTicketRecoverable_AutoRecherryPicksAndReports(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"03-c.md": "# C\n\n**Status:** done\n",
+		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
 	})
 	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
@@ -1088,7 +1078,7 @@ func TestReconcile_DoneTicketRecoverable_AutoRecherryPicksAndReports(t *testing.
 // a renderer has something to attach the cherry-pick phase to.
 func TestReconcile_DoneTicketRecoverable_ReportsRecoveringBeforeCherryPick(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"03-c.md": "# C\n\n**Status:** done\n",
+		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
 	})
 	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
@@ -1134,7 +1124,7 @@ func TestReconcile_DoneTicketRecoverable_ReportsRecoveringBeforeCherryPick(t *te
 // a separate repair-specific conflict handler.
 func TestReconcile_DoneTicketRecoverable_ConflictGoesThroughResolutionPath(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"03-c.md": "# C\n\n**Status:** done\n",
+		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
 	})
 	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
@@ -1182,7 +1172,7 @@ func TestReconcile_DoneTicketRecoverable_ConflictGoesThroughResolutionPath(t *te
 // branch deletion is left to a later ticket.
 func TestReconcile_DoneTicketRecoverable_CleansUpLeftoverWorktreeAndTab(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"03-c.md": "# C\n\n**Status:** done\n",
+		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
 	})
 	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
@@ -1231,7 +1221,7 @@ func TestReconcile_DoneTicketRecoverable_CleansUpLeftoverWorktreeAndTab(t *testi
 // deleted.
 func TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"03-c.md": "# C\n\n**Status:** done\n",
+		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
 	})
 	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
@@ -1286,7 +1276,7 @@ func TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup(t *testing.T) 
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "Status:** done") {
+	if !strings.Contains(string(raw), "status: done") {
 		t.Errorf("ticket status changed unexpectedly:\n%s", raw)
 	}
 
@@ -1307,7 +1297,7 @@ func TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup(t *testing.T) 
 // branch cleanup calls, no spurious report lines.
 func TestReconcile_DoneTicketFullyClean_NoOp(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"03-c.md": "# C\n\n**Status:** done\n",
+		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
 	})
 	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
 		t.Fatalf("logEvent: %v", err)

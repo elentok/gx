@@ -30,7 +30,7 @@ func writeFlatTicket(t *testing.T, root, epic, filename, content string) {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(tickets.LegacyTicketToFrontmatter(filename, content)), 0644); err != nil {
 		t.Fatal(err)
 	}
 }

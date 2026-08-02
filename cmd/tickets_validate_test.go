@@ -15,7 +15,7 @@ func writeTicketFile(t *testing.T, path, content string) {
 	}
 }
 
-func TestExecute_TicketsValidate_ValidOldFormat(t *testing.T) {
+func TestExecute_TicketsValidate_OldFormatMissingFrontmatterFails(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "01-a-ticket.md")
 	writeTicketFile(t, path, "Status: open\n\nBody.\n")
@@ -23,11 +23,12 @@ func TestExecute_TicketsValidate_ValidOldFormat(t *testing.T) {
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
 
-	if err := execute([]string{"tickets", "validate", path}, d); err != nil {
-		t.Fatalf("execute tickets validate: %v", err)
+	err := execute([]string{"tickets", "validate", path}, d)
+	if err == nil {
+		t.Fatal("expected error for a file with no frontmatter block, got nil")
 	}
-	if !strings.Contains(stdout.String(), path) {
-		t.Errorf("stdout = %q, want it to mention %q", stdout.String(), path)
+	if !strings.Contains(err.Error(), "frontmatter") {
+		t.Errorf("error = %q, want it to mention the missing frontmatter block", err.Error())
 	}
 }
 

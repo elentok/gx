@@ -93,9 +93,8 @@ func idsToStrings(ids []TicketID) []string {
 var frontmatterDelimRe = regexp.MustCompile(`^---\s*$`)
 
 // splitFrontmatter looks for a "---" delimited YAML block at the very start
-// of raw. hasFM is false whenever raw doesn't open with such a block (the
-// old-format case), in which case yamlPart is empty and body is raw
-// unchanged.
+// of raw. hasFM is false whenever raw doesn't open with such a block, in
+// which case yamlPart is empty and body is raw unchanged.
 func splitFrontmatter(raw string) (yamlPart, body string, hasFM bool) {
 	lines := strings.Split(raw, "\n")
 	if len(lines) == 0 || !frontmatterDelimRe.MatchString(lines[0]) {

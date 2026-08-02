@@ -101,12 +101,12 @@ func TestFrontier_AgainstFixtureEpicDirectory(t *testing.T) {
 	}
 
 	files := map[string]string{
-		"01-first.md":       "# First\n\n**Status:** open\n",
-		"02-second.md":      "# Second\n\n**Blocked by:** 01\n\n**Status:** open\n",
-		"03-third.md":       "# Third\n\nNo status line at all.\n",
-		"04-fourth.md":      "# Fourth\n\n**Status:** claimed\n",
-		"05-fifth.md":       "# Fifth\n\n**Status:** done\n",
-		"06-blocked-off.md": "# Blocked off\n\n**Blocked by:** 04\n\n**Status:** open\n",
+		"01-first.md":       "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
+		"02-second.md":      "---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# Second\n",
+		"03-third.md":       "---\nid: \"03\"\nstatus: open\ntype: task\n---\n# Third\n",
+		"04-fourth.md":      "---\nid: \"04\"\nstatus: claimed\ntype: task\n---\n# Fourth\n",
+		"05-fifth.md":       "---\nid: \"05\"\nstatus: done\ntype: task\n---\n# Fifth\n",
+		"06-blocked-off.md": "---\nid: \"06\"\nstatus: open\ntype: task\nblocked_by: [\"04\"]\n---\n# Blocked off\n",
 	}
 	for name, content := range files {
 		if err := os.WriteFile(filepath.Join(issuesDir, name), []byte(content), 0644); err != nil {
@@ -123,9 +123,9 @@ func TestFrontier_AgainstFixtureEpicDirectory(t *testing.T) {
 	}
 
 	got := Frontier(epics[0])
-	// 02 stays blocked (its blocker 01 is open, not done); 03 has no Status:
-	// line (valid open default); 04/claimed, 05/done, and 06 (blocked on the
-	// claimed 04) are all excluded.
+	// 02 stays blocked (its blocker 01 is open, not done); 03 is open with no
+	// blockers; 04/claimed, 05/done, and 06 (blocked on the claimed 04) are
+	// all excluded.
 	assertNumbers(t, got, []int{1, 3})
 }
 

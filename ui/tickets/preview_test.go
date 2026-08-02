@@ -143,7 +143,7 @@ func TestModel_PreviewUnreadableTicketShowsErrorMessage(t *testing.T) {
 	}
 }
 
-func TestModel_PreviewUnrecognizedStatusRendersBodyNormally(t *testing.T) {
+func TestModel_PreviewUnrecognizedStatusShowsReadError(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-weird-ticket.md", "Status: bogus-value\n\nDistinctive body text.\n")
 
@@ -157,11 +157,8 @@ func TestModel_PreviewUnrecognizedStatusRendersBodyNormally(t *testing.T) {
 	m = updated.(Model)
 
 	content := ansi.Strip(m.View().Content)
-	if !strings.Contains(content, "Distinctive body text.") {
-		t.Fatalf("expected ticket body rendered normally despite unrecognized status, got:\n%s", content)
-	}
-	if !strings.Contains(content, "error") {
-		t.Fatalf("expected rendered status word 'error' in preview, got:\n%s", content)
+	if !strings.Contains(content, "error reading ticket file") {
+		t.Fatalf("expected a read-error message in preview for an unrecognized status, got:\n%s", content)
 	}
 }
 

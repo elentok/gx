@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -198,7 +199,7 @@ func TestNewModel_UnrecognizedStatusRendersAsError(t *testing.T) {
 func TestNewModel_FullyDoneEpicStartsCollapsedAndDimmed(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "done-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
-	writeTicket(t, root, "done-epic", "02-second-ticket.md", "Status: resolved\n\nBody.\n")
+	writeTicket(t, root, "done-epic", "02-second-ticket.md", "Status: done\n\nBody.\n")
 	writeTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
@@ -537,9 +538,55 @@ func writeTicket(t *testing.T, root, epic, filename, content string) {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(LegacyTicketToFrontmatter(filename, content)), 0644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// LegacyTicketToFrontmatter converts this package's many pre-existing test
+// fixtures (plain "Status: x\nBlocked by: y, z\n\nBody" lines, predating
+// ticket 04's retirement of old-format parsing) into a minimal valid
+// frontmatter ticket, deriving id from filename so blocked_by
+// cross-references between fixture tickets keep resolving. Exported (despite
+// living in a _test.go file, so it never ships in production builds) so the
+// tickets_test black-box package can share it instead of duplicating it.
+func LegacyTicketToFrontmatter(filename, content string) string {
+	id := filename
+	if idx := strings.Index(id, "-"); idx >= 0 {
+		id = id[:idx]
+	}
+
+	status, typ := "open", "task"
+	var blockedBy []string
+	lines := strings.Split(content, "\n")
+	bodyStart := 0
+	for _, line := range lines {
+		matched := true
+		switch {
+		case strings.HasPrefix(line, "Status: "):
+			status = strings.TrimPrefix(line, "Status: ")
+		case strings.HasPrefix(line, "Blocked by: "):
+			blockedBy = strings.Split(strings.TrimPrefix(line, "Blocked by: "), ", ")
+		case strings.HasPrefix(line, "Type: "):
+			typ = strings.TrimPrefix(line, "Type: ")
+		default:
+			matched = false
+		}
+		if !matched {
+			break
+		}
+		bodyStart++
+	}
+	body := strings.TrimPrefix(strings.Join(lines[bodyStart:], "\n"), "\n")
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "---\nid: %q\nstatus: %s\ntype: %s\n", id, status, typ)
+	if len(blockedBy) > 0 {
+		fmt.Fprintf(&b, "blocked_by: [\"%s\"]\n", strings.Join(blockedBy, "\", \""))
+	}
+	b.WriteString("---\n")
+	b.WriteString(body)
+	return b.String()
 }
 
 func writeMap(t *testing.T, root, epic, content string) {

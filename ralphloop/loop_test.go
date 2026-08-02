@@ -140,8 +140,8 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 
 func TestRun_LinearChain_RunsTicketsInOrderAndLandsAll(t *testing.T) {
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md":  "# First\n\n**Status:** open\n",
-		"02-second.md": "# Second\n\n**Blocked by:** 01\n\n**Status:** open\n",
+		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
+		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# Second\n",
 	})
 	d, prompts, removed := fakeDeps()
 
@@ -169,7 +169,7 @@ func TestRun_LinearChain_RunsTicketsInOrderAndLandsAll(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ReadFile %s: %v", name, err)
 		}
-		if !strings.Contains(string(raw), "Status:** done") {
+		if !strings.Contains(string(raw), "status: done") {
 			t.Errorf("%s not marked done:\n%s", name, raw)
 		}
 	}
@@ -184,7 +184,7 @@ func TestRun_LinearChain_RunsTicketsInOrderAndLandsAll(t *testing.T) {
 // now-redundant branch — something it never did before this ticket.
 func TestRun_IterationCompletion_DeletesIterationBranch(t *testing.T) {
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md": "# First\n\n**Status:** open\n",
+		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 	})
 	d, _, _ := fakeDeps()
 	var deletedBranches []string
@@ -205,7 +205,7 @@ func TestRun_IterationCompletion_DeletesIterationBranch(t *testing.T) {
 
 func TestRun_LogsLifecycleEvents_LinearChain(t *testing.T) {
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md": "# First\n\n**Status:** open\n",
+		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 	})
 	d, _, _ := fakeDeps()
 	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
@@ -251,13 +251,13 @@ func TestRun_LogsLifecycleEvents_LinearChain(t *testing.T) {
 	}
 }
 
-// TestRun_FreshIteration_StampsContextWindowAndSessionOnDone verifies ticket
-// 06: a ticket marked done from a fresh (non-reattached) iteration, whose
-// session id and context occupancy are both known this run, gets those two
-// fields written into its file alongside Status: done.
-func TestRun_FreshIteration_StampsContextWindowAndSessionOnDone(t *testing.T) {
+// TestRun_FreshIteration_StampsContextWindowOnDone verifies ticket 06: a
+// ticket marked done from a fresh (non-reattached) iteration, whose context
+// occupancy is known this run, gets it written into its frontmatter's
+// actual_context_window field alongside status: done.
+func TestRun_FreshIteration_StampsContextWindowOnDone(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** open\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
@@ -272,19 +272,12 @@ func TestRun_FreshIteration_StampsContextWindowAndSessionOnDone(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
+	got := mustParse(t, filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if got.Status != schema.StatusDone {
+		t.Errorf("Status = %q, want done", got.Status)
 	}
-	got := string(raw)
-	if !strings.Contains(got, "Status:** done") {
-		t.Errorf("ticket not marked done:\n%s", got)
-	}
-	if !strings.Contains(got, "Context window:** 12345") {
-		t.Errorf("ticket missing context window field:\n%s", got)
-	}
-	if !strings.Contains(got, "Session:** sess-fresh-01") {
-		t.Errorf("ticket missing session field:\n%s", got)
+	if got.ActualContextWindow != 12345 {
+		t.Errorf("ActualContextWindow = %d, want 12345", got.ActualContextWindow)
 	}
 }
 
@@ -333,13 +326,13 @@ func TestRun_FreshIteration_FrontmatterTicket_EndsWithValidFrontmatter(t *testin
 	}
 }
 
-// TestRun_FreshIteration_OmitsMetadataWhenOccupancyUnavailable verifies that
-// a fresh iteration whose occupancy can't be read (ReadOccupancy's default
-// fake behavior in fakeDeps) still marks the ticket done, without writing
-// wrong/placeholder Context window or Session fields.
-func TestRun_FreshIteration_OmitsMetadataWhenOccupancyUnavailable(t *testing.T) {
+// TestRun_FreshIteration_OmitsContextWindowWhenOccupancyUnavailable verifies
+// that a fresh iteration whose occupancy can't be read (ReadOccupancy's
+// default fake behavior in fakeDeps) still marks the ticket done, without
+// writing a wrong/placeholder actual_context_window.
+func TestRun_FreshIteration_OmitsContextWindowWhenOccupancyUnavailable(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** open\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
@@ -351,16 +344,12 @@ func TestRun_FreshIteration_OmitsMetadataWhenOccupancyUnavailable(t *testing.T) 
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
+	got := mustParse(t, filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if got.Status != schema.StatusDone {
+		t.Errorf("Status = %q, want done", got.Status)
 	}
-	got := string(raw)
-	if !strings.Contains(got, "Status:** done") {
-		t.Errorf("ticket not marked done:\n%s", got)
-	}
-	if strings.Contains(got, "Context window:") || strings.Contains(got, "Session:") {
-		t.Errorf("ticket should omit metadata fields when occupancy is unavailable, got:\n%s", got)
+	if got.ActualContextWindow != 0 {
+		t.Errorf("ActualContextWindow = %d, want 0 (unavailable)", got.ActualContextWindow)
 	}
 }
 
@@ -421,7 +410,7 @@ func TestLandCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmatt
 
 func TestRun_LogsNeedsInfoEvent_OnZeroCommitIteration(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** open\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
@@ -459,7 +448,7 @@ func TestRun_LogsNeedsInfoEvent_OnZeroCommitIteration(t *testing.T) {
 
 func TestRun_InstallDepsFailure_MarksNeedsAttentionWithoutLaunchingAgentOrAbortingRun(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** open\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
 	d, prompts, _ := fakeDeps()
 	d.InstallDeps = func(path string) (string, error) {
@@ -478,14 +467,14 @@ func TestRun_InstallDepsFailure_MarksNeedsAttentionWithoutLaunchingAgentOrAborti
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "Status:** needs-attention") {
+	if !strings.Contains(string(raw), "status: needs-attention") {
 		t.Errorf("ticket file = %q, want Status: needs-attention after the install failure", raw)
 	}
 }
 
 func TestRun_LogsDepsInstalledEventWithCommand(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** open\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 	d.InstallDeps = func(path string) (string, error) {
@@ -517,7 +506,7 @@ func TestRun_LogsDepsInstalledEventWithCommand(t *testing.T) {
 
 func TestRun_SkillFlag_OverridesPromptSkill(t *testing.T) {
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md": "# First\n\n**Status:** open\n",
+		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 	})
 	d, prompts, _ := fakeDeps()
 
@@ -555,7 +544,7 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			scratchDir := writeEpic(t, "my-epic", map[string]string{
-				"01-first.md": "# First\n\n**Status:** open\n",
+				"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 			})
 			d, prompts, _ := fakeDeps()
 			var start herdr.AgentStartOptions
@@ -608,7 +597,7 @@ func TestRun_InvalidAgent_ReturnsError(t *testing.T) {
 
 func TestRun_ZeroOpenTickets_NoOpSummary(t *testing.T) {
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md": "# First\n\n**Status:** done\n",
+		"01-first.md": "---\nid: \"01\"\nstatus: done\ntype: task\n---\n# First\n",
 	})
 	d, prompts, removed := fakeDeps()
 
@@ -640,9 +629,9 @@ func TestRun_NoEpicFound_NoOpSummary(t *testing.T) {
 
 func TestRun_MaxParallelOne_RunsSerially(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** open\n",
-		"02-b.md": "# B\n\n**Status:** open\n",
-		"03-c.md": "# C\n\n**Status:** open\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
+		"03-c.md": "---\nid: \"03\"\nstatus: open\ntype: task\n---\n# C\n",
 	})
 	d, prompts, _ := fakeDeps()
 
@@ -721,7 +710,7 @@ func gatedAgentWait(next func(herdr.AgentWaitOptions) (herdr.Agent, error)) (
 
 func TestRun_CherryPickConflict_ResolvesInFeatureWorktreeThenCompletes(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** open\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
 	d, prompts, removed := fakeDeps()
 	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
@@ -809,7 +798,7 @@ func TestRun_CherryPickConflict_ResolvesInFeatureWorktreeThenCompletes(t *testin
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "Status:** done") {
+	if !strings.Contains(string(raw), "status: done") {
 		t.Errorf("ticket not marked done after conflict resolution:\n%s", raw)
 	}
 
@@ -841,7 +830,7 @@ func TestRun_CherryPickConflict_ResolvesInFeatureWorktreeThenCompletes(t *testin
 
 func TestRun_CherryPickConflict_ResolutionNeverFinishes_MarksNeedsAttentionWithoutAbortingRun(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** open\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 
@@ -869,7 +858,7 @@ func TestRun_CherryPickConflict_ResolutionNeverFinishes_MarksNeedsAttentionWitho
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "Status:** needs-attention") {
+	if !strings.Contains(string(raw), "status: needs-attention") {
 		t.Errorf("ticket file = %q, want Status: needs-attention after the stuck conflict resolution", raw)
 	}
 }
@@ -883,7 +872,7 @@ func (e *fakeConflictErr) Error() string { return "cherry-pick conflict" }
 
 func TestRun_ZeroCommitIteration_MarksNeedsInfoAndLeavesWorktree(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** open\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
 	d, _, removed := fakeDeps()
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
@@ -903,18 +892,18 @@ func TestRun_ZeroCommitIteration_MarksNeedsInfoAndLeavesWorktree(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "Status:** needs-info") {
+	if !strings.Contains(string(raw), "status: needs-info") {
 		t.Errorf("ticket not marked needs-info after zero-commit iteration:\n%s", raw)
 	}
-	if strings.Contains(string(raw), "Status:** done") {
+	if strings.Contains(string(raw), "status: done") {
 		t.Errorf("ticket must not be marked done after a zero-commit iteration:\n%s", raw)
 	}
 }
 
 func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** open\n",
-		"02-b.md": "# B\n\n**Status:** open\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
 	})
 	d, _, removed := fakeDeps()
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
@@ -940,7 +929,7 @@ func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw01), "Status:** needs-info") {
+	if !strings.Contains(string(raw01), "status: needs-info") {
 		t.Errorf("ticket 01 not marked needs-info:\n%s", raw01)
 	}
 
@@ -948,7 +937,7 @@ func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw02), "Status:** done") {
+	if !strings.Contains(string(raw02), "status: done") {
 		t.Errorf("ticket 02 not marked done:\n%s", raw02)
 	}
 }
@@ -961,7 +950,7 @@ func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {
 // worktree that was about to land a commit.
 func TestRun_TransientIdleBlip_DoesNotOrphanCommit(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** open\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
 	d, _, removed := fakeDeps()
 
@@ -991,10 +980,10 @@ func TestRun_TransientIdleBlip_DoesNotOrphanCommit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "Status:** done") {
+	if !strings.Contains(string(raw), "status: done") {
 		t.Errorf("ticket not marked done despite the agent finishing after the transient blip:\n%s", raw)
 	}
-	if strings.Contains(string(raw), "Status:** needs-info") {
+	if strings.Contains(string(raw), "status: needs-info") {
 		t.Errorf("ticket wrongly marked needs-info from a transient idle blip:\n%s", raw)
 	}
 	if len(*removed) != 1 {
@@ -1010,7 +999,7 @@ func TestRun_TransientIdleBlip_DoesNotOrphanCommit(t *testing.T) {
 // orphaning the ticket as needs-info.
 func TestRun_CommitLandsDuringNeedsInfoRecheck_MarksDoneNotNeedsInfo(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** open\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
 	d, _, removed := fakeDeps()
 
@@ -1031,10 +1020,10 @@ func TestRun_CommitLandsDuringNeedsInfoRecheck_MarksDoneNotNeedsInfo(t *testing.
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "Status:** done") {
+	if !strings.Contains(string(raw), "status: done") {
 		t.Errorf("ticket not marked done after commit landed on recheck:\n%s", raw)
 	}
-	if strings.Contains(string(raw), "Status:** needs-info") {
+	if strings.Contains(string(raw), "status: needs-info") {
 		t.Errorf("ticket wrongly marked needs-info despite commit landing on recheck:\n%s", raw)
 	}
 	if len(*removed) != 1 {
@@ -1044,9 +1033,9 @@ func TestRun_CommitLandsDuringNeedsInfoRecheck_MarksDoneNotNeedsInfo(t *testing.
 
 func TestRun_MaxParallelTwo_RunsExactlyTwoConcurrentlyAndBackfills(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** open\n",
-		"02-b.md": "# B\n\n**Status:** open\n",
-		"03-c.md": "# C\n\n**Status:** open\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
+		"03-c.md": "---\nid: \"03\"\nstatus: open\ntype: task\n---\n# C\n",
 	})
 	d, _, removed := fakeDeps()
 	wait, started, release := gatedAgentWait(d.AgentWait)

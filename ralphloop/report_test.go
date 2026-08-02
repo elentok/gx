@@ -319,7 +319,7 @@ func TestReport_SessionTranscriptMissing_ShowsUnknownDurationNoError(t *testing.
 
 func TestReport_UsesTicketTitlesFromEpicWhenAvailable(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-first-ticket.md": "# First ticket\n\n**Status:** done\n",
+		"01-first-ticket.md": "---\nid: \"01\"\nstatus: done\ntype: task\n---\n# First ticket\n",
 	})
 	if err := logEvent(scratchDir, "epic", Event{Type: eventIterationStarted, Ticket: "01"}); err != nil {
 		t.Fatalf("logEvent: %v", err)

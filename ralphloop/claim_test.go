@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -21,6 +20,13 @@ func writeTicket(t *testing.T, content string) string {
 	return path
 }
 
+// writeFrontmatterTicket writes a minimal valid ticket file with the given
+// status and returns its path.
+func writeFrontmatterTicket(t *testing.T, status string) string {
+	t.Helper()
+	return writeTicket(t, "---\nid: \"01\"\nstatus: "+status+"\ntype: task\n---\n# Ticket\n\nBody text.\n")
+}
+
 func mustRead(t *testing.T, path string) string {
 	t.Helper()
 	raw, err := os.ReadFile(path)
@@ -30,148 +36,83 @@ func mustRead(t *testing.T, path string) string {
 	return string(raw)
 }
 
-func TestClaim_RewritesExistingPlainStatusLine(t *testing.T) {
-	path := writeTicket(t, "# Ticket\n\n**Blocked by:** None\n\nStatus: open\n\nSome body text.\n")
+func mustParse(t *testing.T, path string) schema.Ticket {
+	t.Helper()
+	ticket, err := schema.ParseTicket(path)
+	if err != nil {
+		t.Fatalf("schema.ParseTicket: %v", err)
+	}
+	return ticket
+}
+
+func TestClaim_RewritesStatus(t *testing.T) {
+	path := writeFrontmatterTicket(t, "open")
 	if err := Claim(path); err != nil {
 		t.Fatalf("Claim: %v", err)
 	}
-	got := mustRead(t, path)
-	want := "# Ticket\n\n**Blocked by:** None\n\nStatus: claimed\n\nSome body text.\n"
-	if got != want {
-		t.Errorf("Claim rewrote file as:\n%q\nwant:\n%q", got, want)
+	if got := mustParse(t, path).Status; got != schema.StatusClaimed {
+		t.Errorf("Status = %q, want %q", got, schema.StatusClaimed)
 	}
 }
 
-func TestClaim_RewritesExistingBoldStatusLine(t *testing.T) {
-	path := writeTicket(t, "# Ticket\n\n**Blocked by:** None\n\n**Status:** open\n\nSome body text.\n")
-	if err := Claim(path); err != nil {
-		t.Fatalf("Claim: %v", err)
-	}
-	got := mustRead(t, path)
-	want := "# Ticket\n\n**Blocked by:** None\n\n**Status:** claimed\n\nSome body text.\n"
-	if got != want {
-		t.Errorf("Claim rewrote file as:\n%q\nwant:\n%q", got, want)
-	}
-}
-
-func TestClaim_PreservesRestOfFileByteForByte(t *testing.T) {
-	original := "# Ticket\n\n**Type:** task\n\n**Blocked by:** 02, 03\n\n**Status:** open\n\n" +
-		"- [ ] some criterion\n- [ ] another **bold** criterion\n\nTrailing prose with `code` and weird\tformatting.\n"
+func TestClaim_PreservesOtherFrontmatterFieldsAndBody(t *testing.T) {
+	original := "---\nid: \"01\"\nstatus: open\nblocked_by: [\"02\", \"03\"]\ntype: task\n---\n" +
+		"# Ticket\n\n- [ ] some criterion\n- [ ] another **bold** criterion\n\nTrailing prose with `code`.\n"
 	path := writeTicket(t, original)
 	if err := Claim(path); err != nil {
 		t.Fatalf("Claim: %v", err)
 	}
-	got := mustRead(t, path)
-	want := "# Ticket\n\n**Type:** task\n\n**Blocked by:** 02, 03\n\n**Status:** claimed\n\n" +
-		"- [ ] some criterion\n- [ ] another **bold** criterion\n\nTrailing prose with `code` and weird\tformatting.\n"
-	if got != want {
-		t.Errorf("Claim rewrote file as:\n%q\nwant:\n%q", got, want)
+	got := mustParse(t, path)
+	if got.Status != schema.StatusClaimed {
+		t.Errorf("Status = %q, want %q", got.Status, schema.StatusClaimed)
+	}
+	if want := []schema.TicketID{"02", "03"}; len(got.BlockedBy) != 2 || got.BlockedBy[0] != want[0] || got.BlockedBy[1] != want[1] {
+		t.Errorf("BlockedBy = %v, want %v", got.BlockedBy, want)
+	}
+	if body := schema.ParseBody(mustRead(t, path)); !strings.Contains(body, "some criterion") || !strings.Contains(body, "Trailing prose") {
+		t.Errorf("body = %q, want original body content preserved", body)
 	}
 }
 
-func TestClaim_AddsStatusLineAfterLastMetadataLine(t *testing.T) {
-	path := writeTicket(t, "# Ticket\n\n**Type:** task\n\n**Blocked by:** None\n\nSome body text.\n")
-	if err := Claim(path); err != nil {
-		t.Fatalf("Claim: %v", err)
-	}
-	got := mustRead(t, path)
-	want := "# Ticket\n\n**Type:** task\n\n**Blocked by:** None\n\n**Status:** claimed\n\nSome body text.\n"
-	if got != want {
-		t.Errorf("Claim rewrote file as:\n%q\nwant:\n%q", got, want)
-	}
-}
-
-func TestClaim_AddsStatusLineWhenNoMetadataAtAll(t *testing.T) {
-	path := writeTicket(t, "# Ticket\n\nJust a body, no metadata lines.\n")
-	if err := Claim(path); err != nil {
-		t.Fatalf("Claim: %v", err)
-	}
-	got := mustRead(t, path)
-	want := "# Ticket\n\nStatus: claimed\n\nJust a body, no metadata lines.\n"
-	if got != want {
-		t.Errorf("Claim rewrote file as:\n%q\nwant:\n%q", got, want)
-	}
-}
-
-func TestMarkDone_RewritesStatusLine(t *testing.T) {
-	path := writeTicket(t, "# Ticket\n\n**Status:** claimed\n\nBody.\n")
+func TestMarkDone_RewritesStatus(t *testing.T) {
+	path := writeFrontmatterTicket(t, "claimed")
 	if err := MarkDone(path); err != nil {
 		t.Fatalf("MarkDone: %v", err)
 	}
-	got := mustRead(t, path)
-	want := "# Ticket\n\n**Status:** done\n\nBody.\n"
-	if got != want {
-		t.Errorf("MarkDone rewrote file as:\n%q\nwant:\n%q", got, want)
+	if got := mustParse(t, path).Status; got != schema.StatusDone {
+		t.Errorf("Status = %q, want %q", got, schema.StatusDone)
 	}
 }
 
-func TestMarkDoneWithMetadata_InsertsContextWindowAndSessionAfterStatus(t *testing.T) {
-	path := writeTicket(t, "# Ticket\n\n**Status:** claimed\n\nBody.\n")
+func TestMarkDoneWithMetadata_SetsStatusAndActualContextWindow(t *testing.T) {
+	path := writeFrontmatterTicket(t, "claimed")
 	if err := MarkDoneWithMetadata(path, 42000, "sess-123"); err != nil {
 		t.Fatalf("MarkDoneWithMetadata: %v", err)
 	}
-	got := mustRead(t, path)
-	want := "# Ticket\n\n**Status:** done\n**Context window:** 42000\n**Session:** sess-123\n\nBody.\n"
-	if got != want {
-		t.Errorf("MarkDoneWithMetadata rewrote file as:\n%q\nwant:\n%q", got, want)
+	got := mustParse(t, path)
+	if got.Status != schema.StatusDone {
+		t.Errorf("Status = %q, want %q", got.Status, schema.StatusDone)
+	}
+	if got.ActualContextWindow != 42000 {
+		t.Errorf("ActualContextWindow = %d, want 42000", got.ActualContextWindow)
 	}
 }
 
-func TestMarkDoneWithMetadata_MatchesPlainStatusStyle(t *testing.T) {
-	path := writeTicket(t, "# Ticket\n\nStatus: claimed\n\nBody.\n")
-	if err := MarkDoneWithMetadata(path, 1000, "sess-1"); err != nil {
-		t.Fatalf("MarkDoneWithMetadata: %v", err)
-	}
-	got := mustRead(t, path)
-	want := "# Ticket\n\nStatus: done\nContext window: 1000\nSession: sess-1\n\nBody.\n"
-	if got != want {
-		t.Errorf("MarkDoneWithMetadata rewrote file as:\n%q\nwant:\n%q", got, want)
-	}
-}
-
-func TestMarkDoneWithMetadata_RoundTripsThroughParseTicket(t *testing.T) {
-	path := writeTicket(t, "# Ticket\n\n**Status:** claimed\n\nBody.\n")
-	if err := MarkDoneWithMetadata(path, 7, "sess-x"); err != nil {
-		t.Fatalf("MarkDoneWithMetadata: %v", err)
-	}
-	ticket, err := tickets.ParseTicket(mustRead(t, path))
-	if err != nil {
-		t.Fatalf("ParseTicket: %v", err)
-	}
-	if ticket.Status != "done" {
-		t.Errorf("Status = %q, want done", ticket.Status)
-	}
-	if !strings.Contains(ticket.Body, "Context window:** 7") || !strings.Contains(ticket.Body, "Session:** sess-x") {
-		t.Errorf("Body = %q, want it to still contain the new metadata lines (unparsed, unaffected)", ticket.Body)
-	}
-}
-
-func TestClaimThenMarkDone_RoundTripsThroughParseTicket(t *testing.T) {
-	path := writeTicket(t, "# Ticket\n\n**Blocked by:** None\n\nSome body.\n")
+func TestClaimThenMarkDone_UpdatesStatus(t *testing.T) {
+	path := writeFrontmatterTicket(t, "open")
 
 	if err := Claim(path); err != nil {
 		t.Fatalf("Claim: %v", err)
 	}
-	ticket, err := tickets.ParseTicket(mustRead(t, path))
-	if err != nil {
-		t.Fatalf("ParseTicket: %v", err)
-	}
-	if ticket.Status != "claimed" {
-		t.Errorf("after Claim, Status = %q, want claimed", ticket.Status)
+	if got := mustParse(t, path).Status; got != schema.StatusClaimed {
+		t.Errorf("after Claim, Status = %q, want %q", got, schema.StatusClaimed)
 	}
 
 	if err := MarkDone(path); err != nil {
 		t.Fatalf("MarkDone: %v", err)
 	}
-	ticket, err = tickets.ParseTicket(mustRead(t, path))
-	if err != nil {
-		t.Fatalf("ParseTicket: %v", err)
-	}
-	if ticket.Status != "done" {
-		t.Errorf("after MarkDone, Status = %q, want done", ticket.Status)
-	}
-	if !ticket.IsDone() {
-		t.Errorf("after MarkDone, IsDone() = false, want true")
+	if got := mustParse(t, path).Status; got != schema.StatusDone {
+		t.Errorf("after MarkDone, Status = %q, want %q", got, schema.StatusDone)
 	}
 }
 
@@ -270,15 +211,26 @@ func TestClaimThenMarkDone_FrontmatterTicket_RoundTripsThroughSchema(t *testing.
 	}
 }
 
+// TestClaim_NoFrontmatterReturnsError verifies ticket 04: with the old
+// bold-line-regex format retired, a ticket file with no YAML frontmatter is
+// no longer a valid ticket at all, so Claim must return an error rather than
+// silently line-splicing a Status: line into it.
+func TestClaim_NoFrontmatterReturnsError(t *testing.T) {
+	path := writeTicket(t, "# Ticket\n\nJust a body, no frontmatter.\n")
+	if err := Claim(path); err == nil {
+		t.Error("Claim(file with no frontmatter) = nil error, want error")
+	}
+}
+
 // TestSetStatus_ConcurrentWritesAndReads_NeverExposesATornFile guards
 // against a real race the scheduler hits under --max-parallel: one
-// goroutine rewriting a ticket's Status: line (Claim/MarkDone) while
+// goroutine rewriting a ticket's status field (Claim/MarkDone) while
 // another (the frontier scan) reads the same file. An in-place os.WriteFile
 // truncates before it writes, so a concurrent reader can observe an empty
 // or partial file; SetStatus must instead write via a temp file plus
 // rename so every read sees a complete, valid ticket.
 func TestSetStatus_ConcurrentWritesAndReads_NeverExposesATornFile(t *testing.T) {
-	path := writeTicket(t, "# Ticket\n\n**Status:** open\n\nSome body text.\n")
+	path := writeFrontmatterTicket(t, "open")
 
 	var wg sync.WaitGroup
 	stop := make(chan struct{})
@@ -314,7 +266,7 @@ func TestSetStatus_ConcurrentWritesAndReads_NeverExposesATornFile(t *testing.T) 
 				if err != nil {
 					continue // a rename mid-open is a valid miss, not a torn read
 				}
-				if len(raw) == 0 || !strings.Contains(string(raw), "Some body text.") {
+				if len(raw) == 0 || !strings.Contains(string(raw), "Body text.") {
 					select {
 					case readErrs <- string(raw):
 					default:

@@ -143,85 +143,15 @@ body
 	}
 }
 
-func TestParseTicket_OldFormatFallback_QuitWarning(t *testing.T) {
-	got, err := ParseTicket("testdata/03-quit-warning.md")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+func TestParseTicket_NoFrontmatterFailsValidation(t *testing.T) {
+	content := "# A ticket with no frontmatter\n\nJust prose.\n"
+	path := writeTemp(t, "no-frontmatter.md", content)
 
-	if got.ID != "03" {
-		t.Errorf("ID = %q, want %q", got.ID, "03")
+	_, err := ParseTicket(path)
+	if err == nil {
+		t.Fatal("expected error for a file with no frontmatter block, got nil")
 	}
-	if got.Status != StatusDone {
-		t.Errorf("Status = %q, want %q", got.Status, StatusDone)
-	}
-	if !reflect.DeepEqual(got.BlockedBy, []TicketID{"01"}) {
-		t.Errorf("BlockedBy = %v, want [01]", got.BlockedBy)
-	}
-	if got.ActualContextWindow != 135265 {
-		t.Errorf("ActualContextWindow = %d, want 135265", got.ActualContextWindow)
-	}
-	if got.CodeReviewFixes != "inline" {
-		t.Errorf("CodeReviewFixes = %q, want %q", got.CodeReviewFixes, "inline")
-	}
-}
-
-func TestParseTicket_OldFormatFallback_PersistentStatusOverlay(t *testing.T) {
-	got, err := ParseTicket("testdata/06-persistent-status-overlay.md")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if got.ID != "06" {
-		t.Errorf("ID = %q, want %q", got.ID, "06")
-	}
-	if got.Status != StatusDone {
-		t.Errorf("Status = %q, want %q", got.Status, StatusDone)
-	}
-	if !reflect.DeepEqual(got.BlockedBy, []TicketID{"01"}) {
-		t.Errorf("BlockedBy = %v, want [01]", got.BlockedBy)
-	}
-	if !reflect.DeepEqual(got.Split, []TicketID{"06b"}) {
-		t.Errorf("Split = %v, want [06b]", got.Split)
-	}
-	if got.ActualContextWindow != 61905 {
-		t.Errorf("ActualContextWindow = %d, want 61905", got.ActualContextWindow)
-	}
-	if got.CodeReviewFixes != "none" {
-		t.Errorf("CodeReviewFixes = %q, want %q", got.CodeReviewFixes, "none")
-	}
-}
-
-func TestParseTicket_OldFormatFallback_FollowingUpMapsToSplitFrom(t *testing.T) {
-	content := `**Status:** open
-**Blocked by:** 01
-Following-up: 04
-
-Body prose.
-`
-	path := writeTemp(t, "04b-followup.md", content)
-
-	got, err := ParseTicket(path)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if got.SplitFrom == nil || *got.SplitFrom != "04" {
-		t.Errorf("SplitFrom = %v, want pointer to 04", got.SplitFrom)
-	}
-}
-
-func TestParseTicket_OldFormatFallback_NoFrontmatterDoesNotRunValidate(t *testing.T) {
-	// Missing Status: (old format's valid open/unclaimed default) would fail
-	// the new Status enum's Validate, but the old-format fallback must not
-	// error on it.
-	content := "# A ticket with no metadata lines\n\nJust prose.\n"
-	path := writeTemp(t, "no-metadata.md", content)
-
-	got, err := ParseTicket(path)
-	if err != nil {
-		t.Fatalf("unexpected error for old-format file with no Status:: %v", err)
-	}
-	if got.Status != "" {
-		t.Errorf("Status = %q, want empty (no Status: line)", got.Status)
+	if !strings.Contains(err.Error(), "frontmatter") {
+		t.Errorf("error %q does not mention the missing frontmatter block", err.Error())
 	}
 }

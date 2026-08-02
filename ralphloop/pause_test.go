@@ -259,7 +259,7 @@ func TestWaitForFinish_CodexContextBreachRecoversViaCompactAndFinishPrompt(t *te
 }
 
 func TestWaitForFinish_CodexBlockedMarksNeedsAttentionThenRecovers(t *testing.T) {
-	ticketPath := writeTicket(t, "# Ticket\n\n**Status:** claimed\n")
+	ticketPath := writeFrontmatterTicket(t, "claimed")
 	scratchDir := t.TempDir()
 	gate := NewGate()
 	var waits int
@@ -315,7 +315,7 @@ func TestWaitForFinish_CodexBlockedMarksNeedsAttentionThenRecovers(t *testing.T)
 }
 
 func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsAttention(t *testing.T) {
-	ticketPath := writeTicket(t, "# Ticket\n\n**Status:** claimed\n")
+	ticketPath := writeFrontmatterTicket(t, "claimed")
 	gate := NewGate()
 	var waits, prompts, quotaChecks int
 	d := Deps{
@@ -390,7 +390,7 @@ func TestWaitForFinish_CodexIgnoresClaudeTerminalRateLimitText(t *testing.T) {
 }
 
 func TestWaitForFinish_ManualAttentionRecheckKeepsBlockedTicketPaused(t *testing.T) {
-	ticketPath := writeTicket(t, "# Ticket\n\n**Status:** claimed\n")
+	ticketPath := writeFrontmatterTicket(t, "claimed")
 	scratchDir := t.TempDir()
 	gate := NewGate()
 	var waits int
@@ -471,9 +471,9 @@ func TestResume_CreatesEpicDirIfMissing(t *testing.T) {
 // completes the epic once iter-01 re-enters its wait step and finishes.
 func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** open\n",
-		"02-b.md": "# B\n\n**Status:** open\n",
-		"03-c.md": "# C\n\n**Status:** open\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
+		"03-c.md": "---\nid: \"03\"\nstatus: open\ntype: task\n---\n# C\n",
 	})
 	d, _, removed := fakeDeps()
 
@@ -549,7 +549,7 @@ func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) 
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw01), "Status:** claimed") {
+	if !strings.Contains(string(raw01), "status: claimed") {
 		t.Errorf("ticket 01 status = %s, want claimed while recovering", raw01)
 	}
 
@@ -599,7 +599,7 @@ func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) 
 // distinguish this recovery path from rate-limit/needs-attention pauses.
 func TestRun_SmartZoneBreach_RepeatsWithNoRetryCap(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** open\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
 	d, _, removed := fakeDeps()
 
@@ -695,9 +695,9 @@ func TestRun_SmartZoneBreach_RepeatsWithNoRetryCap(t *testing.T) {
 // resuming normal scheduling.
 func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** open\n",
-		"02-b.md": "# B\n\n**Status:** open\n",
-		"03-c.md": "# C\n\n**Status:** open\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
+		"03-c.md": "---\nid: \"03\"\nstatus: open\ntype: task\n---\n# C\n",
 	})
 	d, prompts, removed := fakeDeps()
 
@@ -796,7 +796,7 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw01), "Status:** claimed") {
+	if !strings.Contains(string(raw01), "status: claimed") {
 		t.Errorf("ticket 01 status = %s, want claimed (paused, not reverted or done) while paused", raw01)
 	}
 

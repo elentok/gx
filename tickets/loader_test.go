@@ -40,8 +40,10 @@ func TestLoad_EmptyScratchDirReturnsEmpty(t *testing.T) {
 
 func TestLoad_DiscoversEpicsAndTickets(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "my-epic", "issues", "01-first-ticket.md"), "Status: done\n\nBody.\n")
-	writeFile(t, filepath.Join(dir, "my-epic", "issues", "02-second-ticket.md"), "Type: task\n\nBody.\n")
+	writeFile(t, filepath.Join(dir, "my-epic", "issues", "01-first-ticket.md"),
+		"---\nid: \"01\"\nstatus: done\ntype: task\n---\nBody.\n")
+	writeFile(t, filepath.Join(dir, "my-epic", "issues", "02-second-ticket.md"),
+		"---\nid: \"02\"\nstatus: open\ntype: task\n---\nBody.\n")
 
 	epics, err := Load(dir)
 	if err != nil {
@@ -143,7 +145,8 @@ func TestLoad_UnreadableTicketFileShowsErrorRow(t *testing.T) {
 
 func TestLoad_IgnoresNonTicketFilesInIssuesDir(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "epic", "issues", "01-a-ticket.md"), "Status: open\n")
+	writeFile(t, filepath.Join(dir, "epic", "issues", "01-a-ticket.md"),
+		"---\nid: \"01\"\nstatus: open\ntype: task\n---\n")
 	writeFile(t, filepath.Join(dir, "epic", "issues", "README.md"), "not a ticket\n")
 
 	epics, err := Load(dir)
@@ -158,7 +161,9 @@ func TestLoad_IgnoresNonTicketFilesInIssuesDir(t *testing.T) {
 func TestLoad_DiscoversAlphabeticallySuffixedTicketNumbers(t *testing.T) {
 	dir := t.TempDir()
 	for _, name := range []string{"10a-first.md", "10b-second.md", "10c-third.md"} {
-		writeFile(t, filepath.Join(dir, "epic", "issues", name), "Status: open\n")
+		id := name[:3]
+		writeFile(t, filepath.Join(dir, "epic", "issues", name),
+			"---\nid: \""+id+"\"\nstatus: open\ntype: task\n---\n")
 	}
 
 	epics, err := Load(dir)

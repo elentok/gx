@@ -78,7 +78,7 @@ func (s *recordingSink) SmartZoneRecovered(identifier string)   { s.record("Smar
 
 func TestRun_EventSink_EmitsLifecycleSequenceForASingleTicket(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "# A\n\n**Status:** open\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 
