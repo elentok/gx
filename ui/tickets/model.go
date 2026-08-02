@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/notify"
@@ -70,15 +71,17 @@ type Model struct {
 	previewSelKey string // identifies the previewed row, to reset scroll on selection change
 	previewSearch search.Model
 
-	// confirm, implementEpic and implementSpinner back the "i"-triggered
-	// ralph-loop launch (see implement.go): implementEpic is the name of the
-	// epic this tab's own launch is running, "" when none — the process-wide
+	// implementAgentMenu, confirm, implementEpic and implementSpinner back the
+	// "i"-triggered ralph-loop launch (see implement.go): implementEpic is the
+	// name of the epic this tab's own launch is running, "" when none — the process-wide
 	// "is anything running" check goes through ralphLoopRegistry instead,
 	// since that must hold even if this Model gets rebuilt mid-run (e.g. a
 	// worktree-context switch).
-	confirm          confirm.Model
-	implementEpic    string
-	implementSpinner spinner.Model
+	implementAgentMenuOpen bool
+	implementAgentMenu     components.MenuState
+	confirm                confirm.Model
+	implementEpic          string
+	implementSpinner       spinner.Model
 
 	// live/labelIdentifier are implementEpic's per-ticket orchestrator state,
 	// folded from liveEvents the same way FlatModel does (see flat_live.go's
@@ -109,26 +112,27 @@ func NewModelWithScope(worktreeRoot string, settings ui.Settings, extraKeys keys
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
 	return Model{
-		worktreeRoot:     worktreeRoot,
-		settings:         settings,
-		keys:             newTicketsManager(),
-		search:           search.NewModel(),
-		previewSearch:    search.NewModel(),
-		previewVP:        viewport.New(),
-		allRepos:         allRepos,
-		confirm:          confirm.New(),
-		implementSpinner: sp,
-		live:             map[string]liveTicketState{},
-		labelIdentifier:  map[string]string{},
+		worktreeRoot:       worktreeRoot,
+		settings:           settings,
+		keys:               newTicketsManager(),
+		search:             search.NewModel(),
+		previewSearch:      search.NewModel(),
+		previewVP:          viewport.New(),
+		allRepos:           allRepos,
+		confirm:            confirm.New(),
+		implementAgentMenu: newImplementAgentMenu(),
+		implementSpinner:   sp,
+		live:               map[string]liveTicketState{},
+		labelIdentifier:    map[string]string{},
 	}
 }
 
 func (m Model) KeyManager() keys.Manager { return m.keys }
 
-// ModalOpen reports whether the tab's confirm dialog is open, so the app
+// ModalOpen reports whether one of the tab's launch dialogs is open, so the app
 // shell (see ui/app's modalOpener duck-type) blocks tab-switch keys and
 // routes them here instead while it's up.
-func (m Model) ModalOpen() bool { return m.confirm.IsOpen }
+func (m Model) ModalOpen() bool { return m.implementAgentMenuOpen || m.confirm.IsOpen }
 
 func (m Model) Init() tea.Cmd {
 	return m.cmdLoad()
@@ -171,6 +175,9 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleEditFileFinished(msg)
 
 	case tea.KeyPressMsg:
+		if m.implementAgentMenuOpen {
+			return m.handleImplementAgentMenuKey(msg)
+		}
 		if m.confirm.IsOpen {
 			return m.handleConfirmUpdate(msg)
 		}
@@ -298,7 +305,9 @@ func (m Model) View() tea.View {
 		return ui.NewMainView("\n  Initializing…")
 	}
 	content := m.normalView()
-	if m.confirm.IsOpen {
+	if m.implementAgentMenuOpen {
+		content = ui.OverlayCenter(content, m.implementAgentMenuView(), m.width, m.height)
+	} else if m.confirm.IsOpen {
 		content = ui.OverlayCenter(content, m.confirm.View(m.width), m.width, m.height)
 	}
 	if activeSearch, ok := m.activeInputSearch(); ok {

@@ -54,12 +54,40 @@ func TestTicketsTUI_ImplementTriggerLaunchesAndCompletes(t *testing.T) {
 	waitForTicketsText(t, tm, "my-epic")
 
 	tm.Send(tea.KeyPressMsg{Code: 'i', Text: "i"})
+	waitForTicketsText(t, tm, "Choose the agent for epic")
+	frame := tm.CurrentFrame()
+	if !bytes.Contains(frame, []byte("Claude")) || !bytes.Contains(frame, []byte("Codex")) {
+		t.Fatalf("agent menu missing Claude or Codex: %s", frame)
+	}
+
+	tm.Send(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	waitForTicketsText(t, tm, "Start implementing epic")
+	if frame := tm.CurrentFrame(); !bytes.Contains(frame, []byte("with Claude")) {
+		t.Fatalf("Claude confirmation missing selected agent: %s", frame)
+	}
 
 	tm.Send(tea.KeyPressMsg{Code: 'y', Text: "y"})
 	waitForTicketsText(t, tm, "running")
 
 	waitForRunningIndicatorGone(t, tm)
+}
+
+func TestTicketsTUI_ImplementAgentMenuCodexShortcut(t *testing.T) {
+	root := testutil.TempRepo(t)
+	if err := os.MkdirAll(filepath.Join(root, ".scratch", "my-epic", "issues"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	m := tickets.NewModel(root, ui.Settings{}, keys.New(nil))
+	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(120, 40))
+	defer tm.Quit()
+
+	waitForTicketsText(t, tm, "my-epic")
+	tm.Send(tea.KeyPressMsg{Code: 'i', Text: "i"})
+	waitForTicketsText(t, tm, "Choose the agent for epic")
+
+	tm.Send(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	waitForTicketsText(t, tm, "with Codex")
 }
 
 func waitForTicketsText(t *testing.T, tm *teatest.TestModel, text string) {

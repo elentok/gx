@@ -11,6 +11,8 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/notify"
 )
@@ -190,9 +192,19 @@ type implementFailedMsg struct {
 	err error
 }
 
+func newImplementAgentMenu() components.MenuState {
+	return components.MenuState{
+		Items: []components.MenuItem{
+			{Label: "l  Claude", Value: string(ralphloop.AgentClaude)},
+			{Label: "o  Codex", Value: string(ralphloop.AgentCodex)},
+		},
+		Cursor: 0,
+	}
+}
+
 // bindingTicketsImplement (below in model_keys.go's manager) triggers
 // handleImplementKey, gated to epic rows only: pressing "i" on a ticket row
-// or with nothing selected is a no-op.
+// or with nothing selected is a no-op. Claude is selected by default.
 func (m Model) handleImplementKey() (tea.Model, tea.Cmd) {
 	r, ok := m.selectedRow()
 	if !ok || !r.isEpic() {
@@ -201,12 +213,72 @@ func (m Model) handleImplementKey() (tea.Model, tea.Cmd) {
 	if ralphLoopRegistry.isRunning() {
 		return m, notify.Info("a ralph-loop is already running")
 	}
+	m.implementAgentMenu = newImplementAgentMenu()
+	m.implementAgentMenuOpen = true
+	return m, nil
+}
+
+func (m Model) handleImplementAgentMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "l":
+		return m.openImplementConfirm(ralphloop.AgentClaude)
+	case "o":
+		return m.openImplementConfirm(ralphloop.AgentCodex)
+	}
+
+	next, decided, accepted, handled := components.UpdateMenu(msg, m.implementAgentMenu)
+	if !handled {
+		return m, nil
+	}
+	m.implementAgentMenu = next
+	if !decided {
+		return m, nil
+	}
+	if !accepted {
+		m.implementAgentMenuOpen = false
+		return m, nil
+	}
+	agent := ralphloop.AgentKind(m.implementAgentMenu.Items[m.implementAgentMenu.Cursor].Value)
+	return m.openImplementConfirm(agent)
+}
+
+func (m Model) openImplementConfirm(agent ralphloop.AgentKind) (tea.Model, tea.Cmd) {
+	m.implementAgentMenuOpen = false
+	r, ok := m.selectedRow()
+	if !ok || !r.isEpic() {
+		return m, nil
+	}
 	epic := m.epics[r.epicIdx]
 	m.confirm = m.confirm.Open(confirm.Options{
-		Prompt:    fmt.Sprintf("Start implementing epic %q?", epic.Name),
-		AcceptCmd: m.cmdStartImplement(epic.Name, epic.DoneCount(), epic.TotalCount()),
+		Prompt:    fmt.Sprintf("Start implementing epic %q with %s?", epic.Name, agentDisplayName(agent)),
+		AcceptCmd: m.cmdStartImplement(epic.Name, agent, epic.DoneCount(), epic.TotalCount()),
 	})
 	return m, nil
+}
+
+func (m Model) implementAgentMenuView() string {
+	prompt := "Choose the agent for this ralph-loop:"
+	if r, ok := m.selectedRow(); ok && r.isEpic() {
+		prompt = fmt.Sprintf("Choose the agent for epic %q:", m.epics[r.epicIdx].Name)
+	}
+	return components.RenderMenuModal(
+		"Implement Epic",
+		prompt,
+		m.implementAgentMenu,
+		"",
+		ui.ColorBorder,
+		ui.ColorBlue,
+		ui.ColorSubtle,
+		ui.ColorText,
+		48,
+	)
+}
+
+func agentDisplayName(agent ralphloop.AgentKind) string {
+	if agent == ralphloop.AgentCodex {
+		return "Codex"
+	}
+	return "Claude"
 }
 
 func (m Model) handleConfirmUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -294,14 +366,14 @@ func (m Model) OnPageActivated() tea.Cmd {
 // both renders live state (ticket 02) and calls recordTicketFinished (ticket
 // 06) — a second, independent drain here would race that one for events off
 // the same channel.
-func (m Model) cmdStartImplement(epicName string, done, total int) tea.Cmd {
+func (m Model) cmdStartImplement(epicName string, agent ralphloop.AgentKind, done, total int) tea.Cmd {
 	worktreeRoot := m.worktreeRoot
 	return func() tea.Msg {
 		sink, ok := ralphLoopRegistry.tryStart(epicName, done, total)
 		if !ok {
 			return implementFailedMsg{err: fmt.Errorf("a ralph-loop is already running")}
 		}
-		opts, err := buildImplementRunOptions(worktreeRoot, epicName)
+		opts, err := buildImplementRunOptions(worktreeRoot, epicName, agent)
 		if err != nil {
 			ralphLoopRegistry.finish(epicName, nil)
 			return implementFailedMsg{err: err}
@@ -322,14 +394,14 @@ func cmdPollImplement(epicName string) tea.Cmd {
 	})
 }
 
-func buildImplementRunOptions(worktreeRoot, epicName string) (ralphloop.RunOptions, error) {
+func buildImplementRunOptions(worktreeRoot, epicName string, agent ralphloop.AgentKind) (ralphloop.RunOptions, error) {
 	repo, err := git.FindRepo(worktreeRoot)
 	if err != nil {
 		return ralphloop.RunOptions{}, err
 	}
 	return ralphloop.RunOptions{
 		EpicName:    epicName,
-		Agent:       ralphloop.AgentClaude,
+		Agent:       agent,
 		Skill:       "implement",
 		RepoDir:     repo.Root,
 		ScratchDir:  filepath.Join(worktreeRoot, ".scratch"),

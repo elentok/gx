@@ -8,10 +8,33 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 )
+
+func TestImplementAgentMenuDefaultsToClaude(t *testing.T) {
+	menu := newImplementAgentMenu()
+	if menu.Cursor != 0 {
+		t.Fatalf("cursor = %d, want 0", menu.Cursor)
+	}
+	if got := menu.Items[menu.Cursor].Value; got != string(ralphloop.AgentClaude) {
+		t.Fatalf("default agent = %q, want %q", got, ralphloop.AgentClaude)
+	}
+}
+
+func TestBuildImplementRunOptionsUsesSelectedAgent(t *testing.T) {
+	root := testutil.TempRepo(t)
+	opts, err := buildImplementRunOptions(root, "my-epic", ralphloop.AgentCodex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opts.Agent != ralphloop.AgentCodex {
+		t.Fatalf("agent = %q, want %q", opts.Agent, ralphloop.AgentCodex)
+	}
+}
 
 func TestNewModel_RendersEmptyStateWithNoScratchDir(t *testing.T) {
 	m := NewModel(t.TempDir(), ui.Settings{}, keys.New(nil))
