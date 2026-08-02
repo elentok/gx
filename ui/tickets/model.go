@@ -274,12 +274,23 @@ func (m Model) normalView() string {
 	sidebarView := m.renderPanel(sidebarW, sidebarH, "Tickets", m.searchMatchStatus(), m.sidebarVisibleLines(m.sidebarViewportHeight()), m.focus == focusSidebar, true)
 	previewView := m.renderPanel(previewW, previewH, "Preview", m.previewMatchStatus(), m.previewLines(), m.focus == focusPreview, false)
 
+	var body string
 	if m.useStackedLayout() {
 		seam := ui.RenderSeamRow(sidebarW, ui.SeamColor)
-		return lipgloss.JoinVertical(lipgloss.Left, sidebarView, seam, previewView)
+		body = lipgloss.JoinVertical(lipgloss.Left, sidebarView, seam, previewView)
+	} else {
+		seam := ui.RenderSeamColumn(sidebarH, ui.SeamColor)
+		body = lipgloss.JoinHorizontal(lipgloss.Top, sidebarView, seam, previewView)
 	}
-	seam := ui.RenderSeamColumn(sidebarH, ui.SeamColor)
-	return lipgloss.JoinHorizontal(lipgloss.Top, sidebarView, seam, previewView)
+	return lipgloss.JoinVertical(lipgloss.Left, body, m.footerView())
+}
+
+// footerView reserves the plain keyhints line every other ui tab uses
+// (".ai/index.md": no keymaps on the statusbar, only "? help"), so the
+// app shell's tab bar has a dedicated row to merge into instead of
+// overwriting the panels' own bottom border row.
+func (m Model) footerView() string {
+	return "  " + ui.StyleHint.Render("? help")
 }
 
 func (m Model) renderPanel(width, height int, title, rightTitle string, lines []string, active, sidebar bool) string {
@@ -328,7 +339,7 @@ func (m Model) splitHeight(total int) (sidebarH, previewH int) {
 }
 
 func (m Model) contentHeight() int {
-	h := m.height
+	h := m.height - 1 // reserve the footer's keyhints line
 	if h < 4 {
 		return 4
 	}

@@ -76,11 +76,11 @@ func TestNewModel_RendersAlphabeticallySuffixedTicketNumber(t *testing.T) {
 func TestModel_StackedLayoutSplitsAvailableHeightEvenly(t *testing.T) {
 	m := Model{width: 80, height: 30}
 	sidebarH, previewH := m.splitHeight(m.contentHeight())
-	if sidebarH+previewH != 29 { // 30 minus the seam row
-		t.Errorf("sidebarH(%d) + previewH(%d) != 29", sidebarH, previewH)
+	if sidebarH+previewH != 28 { // 30 minus the footer line minus the seam row
+		t.Errorf("sidebarH(%d) + previewH(%d) != 28", sidebarH, previewH)
 	}
-	if sidebarH != 14 || previewH != 15 {
-		t.Errorf("stacked heights = (%d, %d), want (14, 15)", sidebarH, previewH)
+	if sidebarH != 14 || previewH != 14 {
+		t.Errorf("stacked heights = (%d, %d), want (14, 14)", sidebarH, previewH)
 	}
 }
 
