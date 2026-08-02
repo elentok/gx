@@ -118,7 +118,7 @@ func DefaultDeps() Deps {
 		TabClose:              herdr.TabClose,
 		TabList:               herdr.TabList,
 		AgentStart:            herdr.AgentStart,
-		AgentPrompt:           herdr.AgentPrompt,
+		AgentPrompt:           promptWithNudge(herdr.AgentPrompt, herdr.AgentSendKeys, herdr.AgentWait),
 		AgentWait:             herdr.AgentWait,
 		AgentSendKeys:         herdr.AgentSendKeys,
 		RevParse:              git.RevParse,
@@ -139,6 +139,46 @@ func DefaultDeps() Deps {
 		ResumeSignaled:        defaultResumeSignaled,
 		Sleep:                 time.Sleep,
 		Now:                   time.Now,
+	}
+}
+
+// promptNudgeGraceMs bounds each of promptWithNudge's submit/re-wait attempts.
+// promptMaxNudges caps how many bare-Enter nudges it sends before giving up
+// and returning the underlying poll-timeout error.
+const (
+	promptNudgeGraceMs = 4_000
+	promptMaxNudges    = 2
+)
+
+// promptWithNudge wraps herdr's AgentPrompt/AgentSendKeys/AgentWait to work
+// around a submission that never actually gets typed into the pane (observed
+// in production: the text only appears once something else, like an
+// operator's own keypress, nudges herdr's terminal-state detection). It
+// submits with a short grace timeout, and if the agent never reaches one of
+// the caller's Until states in that window, sends a bare Enter keypress and
+// re-waits, retrying up to promptMaxNudges times before returning the
+// underlying poll-timeout error.
+func promptWithNudge(
+	prompt func(herdr.AgentPromptOptions) (herdr.Agent, error),
+	sendKeys func(target string, keys ...string) error,
+	wait func(herdr.AgentWaitOptions) (herdr.Agent, error),
+) func(herdr.AgentPromptOptions) (herdr.Agent, error) {
+	return func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+		grace := opts
+		grace.TimeoutMs = promptNudgeGraceMs
+
+		agent, err := prompt(grace)
+		for attempt := 0; isPollTimeout(err) && attempt < promptMaxNudges; attempt++ {
+			if nudgeErr := sendKeys(opts.Target, "enter"); nudgeErr != nil {
+				return herdr.Agent{}, fmt.Errorf("nudging stuck submission: %w", nudgeErr)
+			}
+			agent, err = wait(herdr.AgentWaitOptions{
+				Target:    opts.Target,
+				Until:     opts.Until,
+				TimeoutMs: promptNudgeGraceMs,
+			})
+		}
+		return agent, err
 	}
 }
 
