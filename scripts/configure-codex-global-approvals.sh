@@ -7,7 +7,8 @@ readonly RULES_MARKER="# Managed by configure-codex-global-approvals.sh"
 function usage() {
 	echo "Usage: $0 [--codex-home DIR] [--gopls-server NAME]"
 	echo ""
-	echo "Globally allows git add/commit/diff/status/log and auto-approves all"
+	echo "Globally allows git add/commit/diff/status/log, all git cherry-pick calls,"
+	echo "and GIT_EDITOR=true git cherry-pick --continue; it also auto-approves all"
 	echo "tools exposed by an existing gopls or gopls-mcp Codex MCP server."
 }
 
@@ -74,6 +75,30 @@ prefix_rule(
         "git push",
         "git reset --hard",
     ],
+)
+
+prefix_rule(
+    pattern = ["git", "cherry-pick"],
+    decision = "allow",
+    justification = "User-approved Git cherry-pick operations",
+    match = [
+        "git cherry-pick a1b2c3d",
+        "git cherry-pick --continue",
+        "git cherry-pick --abort",
+    ],
+    not_match = ["git merge feature"],
+)
+
+# An environment assignment makes the command opaque to Codex command splitting,
+# so allow only this exact shell payload across common POSIX shell paths.
+prefix_rule(
+    pattern = [
+        ["bash", "/bin/bash", "/usr/bin/bash", "zsh", "/bin/zsh", "/usr/bin/zsh", "sh", "/bin/sh", "/usr/bin/sh"],
+        ["-lc", "-c"],
+        "GIT_EDITOR=true git cherry-pick --continue",
+    ],
+    decision = "allow",
+    justification = "User-approved non-interactive continuation of an in-progress Git cherry-pick",
 )
 RULES
 	chmod 600 "$temp_file"
