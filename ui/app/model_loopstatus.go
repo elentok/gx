@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
@@ -19,15 +20,14 @@ const loopStatusPollInterval = 300 * time.Millisecond
 type loopStatusTickMsg struct{}
 
 // loopStatusOverlay renders a cross-tab "Implementing {epic} (ticket X/Y)..."
-// indicator, mirroring ui/notify.Model's spinner pattern, so a ralph-loop
-// launched from the tickets tab stays visible while the user is on another
-// tab (worktrees, log, status, stash, PRs).
+// line per currently-running epic (ticket 05: ralphLoopRegistry now allows
+// more than one), mirroring ui/notify.Model's spinner pattern, so a
+// ralph-loop launched from the tickets tab stays visible while the user is on
+// another tab (worktrees, log, status, stash, PRs).
 type loopStatusOverlay struct {
-	spinner  spinner.Model
-	running  bool
-	epicName string
-	done     int
-	total    int
+	spinner spinner.Model
+	running bool
+	epics   []ticketsui.EpicProgress
 }
 
 func newLoopStatusOverlay() loopStatusOverlay {
@@ -44,7 +44,8 @@ func (m loopStatusOverlay) Update(msg tea.Msg) (loopStatusOverlay, tea.Cmd) {
 	switch v := msg.(type) {
 	case loopStatusTickMsg:
 		wasRunning := m.running
-		m.running, m.epicName, m.done, m.total = ticketsui.LoopStatus()
+		m.epics = ticketsui.LoopStatusAll()
+		m.running = len(m.epics) > 0
 		cmds := []tea.Cmd{m.cmdPoll()}
 		if m.running && !wasRunning {
 			cmds = append(cmds, m.spinner.Tick)
@@ -65,7 +66,11 @@ func (m loopStatusOverlay) View() string {
 	if !m.running {
 		return ""
 	}
-	return fmt.Sprintf("%s Implementing %s (ticket %d/%d)...", m.spinner.View(), m.epicName, m.done, m.total)
+	lines := make([]string, len(m.epics))
+	for i, epic := range m.epics {
+		lines[i] = fmt.Sprintf("%s Implementing %s (ticket %d/%d)...", m.spinner.View(), epic.Name, epic.Done, epic.Total)
+	}
+	return strings.Join(lines, "\n")
 }
 
 func (m loopStatusOverlay) cmdPoll() tea.Cmd {

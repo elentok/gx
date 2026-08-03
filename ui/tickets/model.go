@@ -78,26 +78,36 @@ type Model struct {
 
 	// implementAgentMenu, confirm, implementEpic and implementSpinner back the
 	// "i"-triggered ralph-loop launch (see implement.go): implementEpic is the
-	// name of the epic this tab's own launch is running, "" when none — the process-wide
-	// "is anything running" check goes through ralphLoopRegistry instead,
-	// since that must hold even if this Model gets rebuilt mid-run (e.g. a
-	// worktree-context switch).
+	// name of the epic this tab's own launch (re)started tracking most
+	// recently, "" when none — the process-wide "is anything running" check
+	// goes through ralphLoopRegistry instead, since that must hold even if
+	// this Model gets rebuilt mid-run (e.g. a worktree-context switch).
+	// implementingEpics is the actual set this Model is live-tracking (ticket
+	// 05): with ralphLoopRegistry now allowing more than one epic in flight
+	// process-wide (ticket 03), a resync (OnPageActivated) can hand this
+	// Model a second epic's event stream alongside its own launch, so
+	// gutter-highlighting/live-row rendering has to check set membership
+	// rather than equality against one name.
 	implementAgentMenuOpen bool
 	implementAgentMenu     components.MenuState
 	confirm                confirm.Model
 	implementEpic          string
+	implementingEpics      map[string]bool
 	implementSpinner       spinner.Model
 
-	// live/labelIdentifier are implementEpic's per-ticket orchestrator state,
-	// folded from liveEvents the same way FlatModel does (see flat_live.go's
-	// applyLiveEvent) — ticket 02 ports FlatModel's live rendering onto this
-	// tab's full multi-epic list. liveEvents is nil unless this Model instance
-	// is currently draining a run's event channel (see startLiveTracking);
-	// the channel itself is owned by ralphLoopRegistry so a Model rebuilt by a
-	// tab switch can pick the same run's stream back up.
-	live            map[string]liveTicketState
-	labelIdentifier map[string]string
-	liveEvents      <-chan ralphloop.LiveEvent
+	// live/labelIdentifier are keyed by epic name first, then by ticket
+	// identifier/label the same way FlatModel's flat versions are folded (see
+	// flat_live.go's applyLiveEvent) — ticket 02 ports FlatModel's live
+	// rendering onto this tab's full multi-epic list. Nesting by epic name
+	// (ticket 05) keeps two concurrently-running epics from colliding on the
+	// same bare ticket identifier/label, since numbering restarts at 01 in
+	// every epic. liveEvents mirrors this, keyed by epic name, and is only
+	// populated for epics this Model instance is currently draining; the
+	// channels themselves are owned by ralphLoopRegistry so a Model rebuilt by
+	// a tab switch can pick the same run's stream back up.
+	live            map[string]map[string]liveTicketState
+	labelIdentifier map[string]map[string]string
+	liveEvents      map[string]<-chan ralphloop.LiveEvent
 }
 
 // NewModel creates a new tickets tab model scoped to worktreeRoot's own
@@ -126,9 +136,11 @@ func NewModelWithScope(worktreeRoot string, settings ui.Settings, extraKeys keys
 		allRepos:           allRepos,
 		confirm:            confirm.New(),
 		implementAgentMenu: newImplementAgentMenu(),
+		implementingEpics:  map[string]bool{},
 		implementSpinner:   sp,
-		live:               map[string]liveTicketState{},
-		labelIdentifier:    map[string]string{},
+		live:               map[string]map[string]liveTicketState{},
+		labelIdentifier:    map[string]map[string]string{},
+		liveEvents:         map[string]<-chan ralphloop.LiveEvent{},
 	}
 }
 
@@ -203,14 +215,15 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case spinner.TickMsg:
 		return m.handleImplementSpinnerTick(msg)
 	case modelLiveEventMsg:
-		if !msg.ok || m.liveEvents == nil {
+		events, tracking := m.liveEvents[msg.epicName]
+		if !msg.ok || !tracking {
 			return m, nil
 		}
 		if msg.event.Kind == ralphloop.LiveEventIterationFinished {
-			ralphLoopRegistry.recordTicketFinished(m.implementEpic)
+			ralphLoopRegistry.recordTicketFinished(msg.epicName)
 		}
-		m.applyLiveEvent(msg.event)
-		return m, cmdWaitModelLiveEvent(m.liveEvents)
+		m.applyLiveEvent(msg.epicName, msg.event)
+		return m, cmdWaitModelLiveEvent(msg.epicName, events)
 	}
 	return m, nil
 }

@@ -95,3 +95,52 @@ func TestModel_LiveEventDoesNotLeakAcrossEpicsWithSameTicketIdentifier(t *testin
 		t.Fatalf("expected other-epic's ticket to keep its disk-based title, got:\n%s", content)
 	}
 }
+
+// TestModel_LiveEventsScopedPerEpicWithConcurrentSameNumberedTickets extends
+// the guard above to the case ticket 03's registry now allows: two epics
+// actually running *at the same time* (not just one running epic next to an
+// untouched other), both with a live iteration on their own ticket "01". Each
+// must render its own running suffix without leaking onto the other, since
+// m.live is now nested by epic name rather than keyed by bare identifier.
+func TestModel_LiveEventsScopedPerEpicWithConcurrentSameNumberedTickets(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "epic-a", "01-first-ticket.md", "Status: claimed\n\nBody.\n")
+	writeTicket(t, root, "epic-b", "01-first-ticket.md", "Status: claimed\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	eventsA := make(chan ralphloop.LiveEvent, 4)
+	m.implementEpic = "epic-a"
+	liveCmdA := m.startLiveTracking(eventsA)
+	if liveCmdA == nil {
+		t.Fatalf("expected startLiveTracking to return a Cmd for epic-a")
+	}
+
+	eventsB := make(chan ralphloop.LiveEvent, 4)
+	m.implementEpic = "epic-b"
+	liveCmdB := m.startLiveTracking(eventsB)
+	if liveCmdB == nil {
+		t.Fatalf("expected startLiveTracking to return a Cmd for epic-b")
+	}
+
+	eventsA <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Label: "iter-01a", Identifier: "01"}
+	msgA := liveCmdA().(modelLiveEventMsg)
+	updated, _ = m.Update(msgA)
+	m = updated.(Model)
+
+	eventsB <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Label: "iter-01b", Identifier: "01"}
+	msgB := liveCmdB().(modelLiveEventMsg)
+	updated, _ = m.Update(msgB)
+	m = updated.(Model)
+
+	content := m.View().Content
+	if strings.Count(content, "implementing...") != 2 {
+		t.Fatalf("expected both epics' ticket 01 rows running independently, got:\n%s", content)
+	}
+	if !strings.Contains(content, "iter-01a") || !strings.Contains(content, "iter-01b") {
+		t.Fatalf("expected each epic's own live label preserved, got:\n%s", content)
+	}
+}

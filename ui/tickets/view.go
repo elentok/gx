@@ -128,11 +128,12 @@ func (m Model) appendRowLines(lines []string, rows []row, startIdx int) []string
 	return lines
 }
 
-// rowInRunningEpic reports whether r belongs to the epic currently running a
-// ralph-loop, so appendRowLines can band its rows distinctly from the rest
-// of the list.
+// rowInRunningEpic reports whether r belongs to one of the epics this Model
+// is currently live-tracking a ralph-loop for (ticket 05: more than one can
+// be running at once), so appendRowLines can band its rows distinctly from
+// the rest of the list.
 func (m Model) rowInRunningEpic(r row) bool {
-	return m.implementEpic != "" && m.epics[r.epicIdx].Name == m.implementEpic
+	return m.implementingEpics[m.epics[r.epicIdx].Name]
 }
 
 func (m Model) renderEpicRow(epic tickets.Epic) string {
@@ -150,7 +151,7 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 	if epic.WorktreeName != "" {
 		line += " " + worktreeTagStyle.Render("["+epic.WorktreeName+"]")
 	}
-	if m.implementEpic == epic.Name {
+	if m.implementingEpics[epic.Name] {
 		line += " " + statusClaimedStyle.Render(m.implementSpinner.View()+" running")
 	}
 	return line
@@ -164,14 +165,14 @@ func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) 
 	status := epic.RenderedStatus(t)
 
 	// See flat_view.go's renderFlatTicketRow for why superseded always wins
-	// over a live entry. m.live is keyed by bare ticket identifier, which
-	// repeats across epics (each restarts numbering from 01) — gating on
-	// epic.Name == m.implementEpic keeps a live entry from another epic's
-	// same-numbered ticket (e.g. two epics' own "02") from also rendering as
-	// running here, since only one epic's ralph-loop run ever populates
-	// m.live at a time (see Model.live's doc comment).
-	if status != tickets.StatusSuperseded && epic.Name == m.implementEpic {
-		if live, ok := m.live[t.Identifier]; ok {
+	// over a live entry. m.live is nested by epic name (ticket 05) precisely
+	// because bare ticket identifiers repeat across epics (each restarts
+	// numbering from 01) — gating on m.implementingEpics[epic.Name] and
+	// looking the ticket up within that epic's own inner map keeps a
+	// concurrently-running epic's same-numbered ticket (e.g. two epics' own
+	// "02") from cross-rendering as running here.
+	if status != tickets.StatusSuperseded && m.implementingEpics[epic.Name] {
+		if live, ok := m.live[epic.Name][t.Identifier]; ok {
 			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live); ok {
 				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens)
 				return []string{"  " + base, m.renderTicketMetricsLine(joinNonEmpty(" ", suffix, metrics), false)}
