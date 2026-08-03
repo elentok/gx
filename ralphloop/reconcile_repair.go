@@ -119,7 +119,7 @@ func tabIDForLabel(tabs []herdr.Tab, label string) string {
 // scratch without a human ever knowing the first run's result vanished).
 func markDoneTicketUnrecoverable(paths reconcilePaths, featureBranch string, t tickets.Ticket) error {
 	reason := fmt.Sprintf("done but commits missing from %s and iteration branch %s no longer exists to recover them", featureBranch, iterBranch(featureBranch, t.Identifier))
-	if err := MarkNeedsAttention(t.Path); err != nil {
+	if err := MarkNeedsAttentionWithReason(t.Path, reason); err != nil {
 		return fmt.Errorf("marking ticket needs-attention: %w", err)
 	}
 	if err := logEvent(paths.ScratchDir, featureBranch, Event{Type: eventNeedsAttention, Ticket: t.Identifier, Reason: reason}); err != nil {

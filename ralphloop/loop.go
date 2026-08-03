@@ -319,7 +319,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			// keep scheduling the rest.
 			reason := r.err.Error()
 			label := iterLabel(r.ticket.Identifier)
-			if markErr := MarkNeedsAttention(r.ticket.Path); markErr != nil {
+			if markErr := MarkNeedsAttentionWithReason(r.ticket.Path, reason); markErr != nil {
 				reason = fmt.Sprintf("%s (also failed marking needs-attention: %v)", reason, markErr)
 			}
 			sink.IterationPaused(label, PauseNeedsAttention, reason)

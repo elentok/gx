@@ -313,7 +313,7 @@ func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, li
 // remains blocked.
 func waitForAttentionRecovery(d Deps, p launchAndPromptParams, sessionID string) error {
 	const reason = "Codex is waiting for operator intervention"
-	if err := MarkNeedsAttention(p.TicketPath); err != nil {
+	if err := MarkNeedsAttentionWithReason(p.TicketPath, reason); err != nil {
 		return fmt.Errorf("marking ticket needs-attention: %w", err)
 	}
 	p.Gate.pause(p.Label, reason)

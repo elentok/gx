@@ -23,9 +23,15 @@ func MarkNeedsInfo(path string) error {
 	return SetStatus(path, "needs-info")
 }
 
-// MarkNeedsAttention writes status: needs-attention into the ticket file.
-func MarkNeedsAttention(path string) error {
-	return SetStatus(path, "needs-attention")
+// MarkNeedsAttentionWithReason writes status: needs-attention into the
+// ticket file and appends reason to the ticket's body under a "## Needs
+// Attention" heading, so the full failure is readable by opening the ticket
+// file even when the live UI's status subtext truncates it.
+func MarkNeedsAttentionWithReason(path, reason string) error {
+	return updateTicketWithBody(path, func(t *schema.Ticket, body *string) {
+		t.Status = schema.StatusNeedsAttention
+		*body += fmt.Sprintf("\n## Needs Attention\n\n%s\n", reason)
+	})
 }
 
 // MarkDoneWithMetadata marks a ticket done and records the closing
@@ -59,6 +65,15 @@ func SetStatus(path, value string) error {
 // claims/completes a ticket) always sees either the old or the new content
 // in full, never a torn/truncated write from an in-place os.WriteFile.
 func updateTicket(path string, mutate func(*schema.Ticket)) error {
+	return updateTicketWithBody(path, func(t *schema.Ticket, _ *string) {
+		mutate(t)
+	})
+}
+
+// updateTicketWithBody is updateTicket's variant for mutations that also
+// need to rewrite the ticket's markdown body (e.g. appending a note),
+// leaving the same atomic-write/torn-read guarantees.
+func updateTicketWithBody(path string, mutate func(*schema.Ticket, *string)) error {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -70,7 +85,7 @@ func updateTicket(path string, mutate func(*schema.Ticket)) error {
 	}
 	body := schema.ParseBody(string(raw))
 
-	mutate(&t)
+	mutate(&t, &body)
 
 	out, err := schema.MarshalTicket(t, body)
 	if err != nil {

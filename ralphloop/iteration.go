@@ -147,16 +147,16 @@ func reattachIteration(d Deps, p iterationParams) error {
 // target.
 func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, sessionID string) error {
 	ahead, err := d.CommitsAhead(path, base, branch)
-	if err != nil {
-		return fmt.Errorf("counting commits ahead of %s: %w", base, err)
-	}
-	if ahead == 0 {
+	if err != nil || ahead == 0 {
 		// waitForFinish's own debounce (confirmFinished) already guards against
 		// herdr reporting the agent idle mid-turn, but a commit can still land
 		// in the gap between that confirmation and this check (e.g. a reattached
 		// iteration, which skips waitForFinish's launch-time debounce entirely).
-		// Recheck once more before giving up rather than orphaning a commit
-		// that lands moments later.
+		// The count can also fail transiently right after the pane exits (e.g.
+		// a worktree/ref momentarily unresolvable during concurrent reconcile
+		// activity) even though the agent's work already landed. Recheck once
+		// more before giving up rather than orphaning a commit — or stranding
+		// an otherwise-finished ticket — on a one-off blip.
 		d.Sleep(finishDebounceMs * time.Millisecond)
 		ahead, err = d.CommitsAhead(path, base, branch)
 		if err != nil {
