@@ -444,7 +444,7 @@ func waitForEpicToFinish(t *testing.T, epicName string) {
 	t.Helper()
 	deadline := time.Now().Add(time.Second)
 	for time.Now().Before(deadline) {
-		if running, name := ralphLoopRegistry.snapshot(epicName); !running || name != epicName {
+		if !ralphLoopRegistry.isRunningEpic(epicName) {
 			return
 		}
 		time.Sleep(time.Millisecond)

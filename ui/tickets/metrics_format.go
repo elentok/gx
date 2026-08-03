@@ -1,0 +1,37 @@
+package tickets
+
+import "fmt"
+
+// formatTokenCount abbreviates tokens for a row's metrics line: plain below
+// 1000, "45.2k tok" below 1,000,000, "1.2M tok" at or above.
+func formatTokenCount(tokens int) string {
+	switch {
+	case tokens >= 1_000_000:
+		return fmt.Sprintf("%.1fM tok", float64(tokens)/1_000_000)
+	case tokens >= 1000:
+		return fmt.Sprintf("%.1fk tok", float64(tokens)/1000)
+	default:
+		return fmt.Sprintf("%d tok", tokens)
+	}
+}
+
+// formatElapsed renders seconds as "12m34s"/"1h05m" — no space between value
+// and unit, seconds dropped past an hour. Below a full minute it renders as
+// a bare "Ns" (e.g. "0s"), rather than "0m00s", so the 0/0 "never stamped"
+// sentinel still reads cleanly.
+func formatElapsed(seconds int) string {
+	if seconds < 0 {
+		seconds = 0
+	}
+	h := seconds / 3600
+	m := (seconds % 3600) / 60
+	s := seconds % 60
+	switch {
+	case h > 0:
+		return fmt.Sprintf("%dh%02dm", h, m)
+	case m > 0:
+		return fmt.Sprintf("%dm%02ds", m, s)
+	default:
+		return fmt.Sprintf("%ds", s)
+	}
+}

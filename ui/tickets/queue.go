@@ -128,7 +128,7 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmdPollImplement(msg.epicName)
 	case implementPollMsg:
 		m.syncRunSnapshot(msg.epicName)
-		if running, epicName := ralphLoopRegistry.snapshot(msg.epicName); running && epicName == msg.epicName {
+		if ralphLoopRegistry.isRunningEpic(msg.epicName) {
 			return m, cmdPollImplement(msg.epicName)
 		}
 		delete(m.runningEpics, msg.epicName)

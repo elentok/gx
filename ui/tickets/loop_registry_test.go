@@ -214,14 +214,6 @@ func TestFinishTracksEachEpicsErrorIndependently(t *testing.T) {
 	if err := r.lastError("epic-b"); !errors.Is(err, wantErr) {
 		t.Fatalf("second lastError(epic-b) = %v, want %v", err, wantErr)
 	}
-	r.acknowledgeLastError("epic-b")
-	if err := r.lastError("epic-b"); err != nil {
-		t.Fatalf("lastError(epic-b) after acknowledgement = %v, want nil", err)
-	}
-	snapshot, _ := r.runSnapshot("epic-b")
-	if snapshot.FinalError != "" || snapshot.State != RunStateFailed {
-		t.Fatalf("snapshot after acknowledgement = %#v", snapshot)
-	}
 }
 
 func TestIsRunningReflectsAnyEpic(t *testing.T) {
@@ -248,26 +240,26 @@ func TestIsRunningReflectsAnyEpic(t *testing.T) {
 	}
 }
 
-func TestSnapshotPrefersRequestedEpic(t *testing.T) {
+func TestIsRunningEpicReflectsThatEpicOnly(t *testing.T) {
 	r := newLoopRegistry(2)
 	r.tryStart("epic-a", 1, 5)
 	r.tryStart("epic-b", 2, 3)
 
-	running, epicName := r.snapshot("epic-b")
-	if !running || epicName != "epic-b" {
-		t.Fatalf("snapshot(epic-b) = (%v, %q), want (true, epic-b)", running, epicName)
+	if !r.isRunningEpic("epic-b") {
+		t.Fatal("isRunningEpic(epic-b): want true")
 	}
 
 	r.finish("epic-b", nil)
-	running, epicName = r.snapshot("epic-b")
-	if !running || epicName != "epic-a" {
-		t.Fatalf("snapshot(epic-b) after it finished = (%v, %q), want fallback (true, epic-a)", running, epicName)
+	if r.isRunningEpic("epic-b") {
+		t.Fatal("isRunningEpic(epic-b) after it finished: want false")
+	}
+	if !r.isRunningEpic("epic-a") {
+		t.Fatal("isRunningEpic(epic-a) still running: want true")
 	}
 
 	r.finish("epic-a", nil)
-	running, _ = r.snapshot("epic-b")
-	if running {
-		t.Fatal("snapshot with nothing running: want false")
+	if r.isRunningEpic("epic-a") {
+		t.Fatal("isRunningEpic(epic-a) after it finished: want false")
 	}
 }
 

@@ -40,24 +40,3 @@ func TestFormatElapsed(t *testing.T) {
 		}
 	}
 }
-
-func TestFormatMetricsLine(t *testing.T) {
-	if got, want := formatMetricsLine(754, 45200), "12m34s · 45.2k tok"; got != want {
-		t.Errorf("formatMetricsLine(754, 45200) = %q, want %q", got, want)
-	}
-	if got, want := formatMetricsLine(0, 0), "0s · 0 tok"; got != want {
-		t.Errorf("formatMetricsLine(0, 0) = %q, want %q", got, want)
-	}
-}
-
-func TestJoinNonEmpty(t *testing.T) {
-	if got, want := joinNonEmpty(" ", "", "b"), "b"; got != want {
-		t.Errorf("joinNonEmpty with empty a = %q, want %q", got, want)
-	}
-	if got, want := joinNonEmpty(" ", "a", ""), "a"; got != want {
-		t.Errorf("joinNonEmpty with empty b = %q, want %q", got, want)
-	}
-	if got, want := joinNonEmpty(" ", "a", "b"), "a b"; got != want {
-		t.Errorf("joinNonEmpty(a, b) = %q, want %q", got, want)
-	}
-}

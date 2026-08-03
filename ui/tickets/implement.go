@@ -319,31 +319,6 @@ func (r *loopRegistry) lastError(epicName string) error {
 	return r.lastErr[epicName]
 }
 
-func (r *loopRegistry) acknowledgeLastError(epicName string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	delete(r.lastErr, epicName)
-	if run := r.snapshots[epicName]; run != nil {
-		run.finalError = ""
-	}
-}
-
-// anyRunLocked deterministically picks one running epic (the
-// lexicographically smallest name) — callers must hold r.mu. Used where a
-// caller has no epic of its own to prefer (LoopStatus, and snapshot's
-// fallback for a Model rebuilt without knowing which epic it was watching).
-// With more than one epic running, this picks *an* epic, not necessarily the
-// caller's — the ticket 05 UI work makes the app multi-epic-display-aware;
-// today's callers only ever cared about "the" single run.
-func (r *loopRegistry) anyRunLocked() (epicName string, run *epicRun) {
-	for name, candidate := range r.runs {
-		if run == nil || name < epicName {
-			epicName, run = name, candidate
-		}
-	}
-	return epicName, run
-}
-
 // EpicProgress reports one running epic's name and landed/total ticket count,
 // for LoopStatusAll's cross-tab overlay listing (ticket 05).
 type EpicProgress struct {
@@ -409,21 +384,13 @@ func IsLoopRunning() bool {
 	return ralphLoopRegistry.isRunning()
 }
 
-// snapshot prefers the requested epic and falls back to another active run so
-// a rebuilt view can recover registry state without accessing its stream.
-func (r *loopRegistry) snapshot(preferredEpic string) (running bool, epicName string) {
+// isRunningEpic reports whether epicName has a run in flight, so a poll loop
+// knows to keep going without accessing the run's stream directly.
+func (r *loopRegistry) isRunningEpic(epicName string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	run, ok := r.runs[preferredEpic]
-	if ok {
-		epicName = preferredEpic
-	} else {
-		epicName, run = r.anyRunLocked()
-	}
-	if run == nil {
-		return false, ""
-	}
-	return true, epicName
+	_, ok := r.runs[epicName]
+	return ok
 }
 
 // runningEpicNames reports every epic currently mid-run, sorted by name, so a
@@ -576,7 +543,7 @@ func (m Model) handleImplementStarted(msg implementStartedMsg) (tea.Model, tea.C
 // handleImplementPoll projects active registry state and reloads disk state
 // after completion. Errors remain in the registry for every observer.
 func (m Model) handleImplementPoll(msg implementPollMsg) (tea.Model, tea.Cmd) {
-	if running, epicName := ralphLoopRegistry.snapshot(msg.epicName); running && epicName == msg.epicName {
+	if ralphLoopRegistry.isRunningEpic(msg.epicName) {
 		m.syncRunSnapshot(msg.epicName)
 		return m, cmdPollImplement(msg.epicName)
 	}
