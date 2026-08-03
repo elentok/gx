@@ -209,7 +209,7 @@ func (p launchAndPromptParams) sink() EventSink {
 // loop via Gate if this agent's context occupancy breaches SmartZone before
 // it finishes.
 func launchAndPrompt(d Deps, p launchAndPromptParams) (string, error) {
-	agent, err := d.AgentStart(herdr.AgentStartOptions{
+	startedAgent, err := d.AgentStart(herdr.AgentStartOptions{
 		Name:      p.Label,
 		Kind:      string(p.Agent),
 		Pane:      p.Pane,
@@ -217,11 +217,6 @@ func launchAndPrompt(d Deps, p launchAndPromptParams) (string, error) {
 	})
 	if err != nil {
 		return "", fmt.Errorf("launching %s: %w", p.Agent, err)
-	}
-	p.logLifecycleEvent(p.StartEvent, agent.AgentSession)
-	if p.StartEvent != "" {
-		p.sink().IterationStarted(p.Ticket, p.Label, p.SessionCwd, agent.AgentSession)
-		emitContextOccupancy(d, p.sink(), p.Agent, p.Ticket, p.SessionCwd, agent.AgentSession)
 	}
 
 	if _, err := d.AgentWait(herdr.AgentWaitOptions{
@@ -231,19 +226,34 @@ func launchAndPrompt(d Deps, p launchAndPromptParams) (string, error) {
 		return "", fmt.Errorf("waiting for %s to reach idle after launch: %w", p.Agent, err)
 	}
 
-	if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
+	promptedAgent, err := d.AgentPrompt(herdr.AgentPromptOptions{
 		Target: p.Pane,
 		Text:   p.Prompt,
 		Wait:   true,
 		Until:  []string{"working"},
-	}); err != nil {
+	})
+	if err != nil {
 		return "", fmt.Errorf("sending initial prompt: %w", err)
 	}
 
-	if err := waitForFinish(d, p, agent.AgentSession); err != nil {
+	// Claude normally exposes its native session ID at process startup, while
+	// Codex creates/discovers its rollout only after the first prompt begins.
+	// Prefer the post-prompt value when present, retaining the startup value as
+	// a fallback for agents whose prompt response omits agent_session.
+	sessionID := startedAgent.AgentSession
+	if promptedAgent.AgentSession != "" {
+		sessionID = promptedAgent.AgentSession
+	}
+	p.logLifecycleEvent(p.StartEvent, sessionID)
+	if p.StartEvent != "" {
+		p.sink().IterationStarted(p.Ticket, p.Label, p.SessionCwd, sessionID)
+		emitContextOccupancy(d, p.sink(), p.Agent, p.Ticket, p.SessionCwd, sessionID)
+	}
+
+	if err := waitForFinish(d, p, sessionID); err != nil {
 		return "", err
 	}
-	return agent.AgentSession, nil
+	return sessionID, nil
 }
 
 // plainFinishStates are the herdr agent_status values that mean "the agent's

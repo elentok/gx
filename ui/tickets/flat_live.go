@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -229,21 +230,23 @@ func applyLiveEvent(live map[string]liveTicketState, labelIdentifier map[string]
 }
 
 // resolveStartedAt resolves cwd/sessionID (carried on IterationStarted/
-// TicketReattached) to the session transcript's first-line timestamp — the
-// true iteration start, which survives a TicketReattached (UI restart
+// TicketReattached) to the agent session's first timestamp — the true
+// iteration start, which survives a TicketReattached (UI restart
 // mid-iteration) correctly instead of resetting to zero the way a plain
-// time.Now()-at-start capture would. Returns the zero time.Time if the
-// transcript can't be resolved yet (e.g. not written out on disk).
+// time.Now()-at-start capture would. Claude stores this in its transcript;
+// Codex stores it in the matching rollout's session_meta line. Returns the
+// zero time.Time if neither session source can be resolved yet.
 func resolveStartedAt(cwd, sessionID string) time.Time {
-	path, err := transcript.Path(cwd, sessionID)
-	if err != nil {
-		return time.Time{}
+	if path, err := transcript.Path(cwd, sessionID); err == nil {
+		if startedAt, ok, err := transcript.FirstLineTimestamp(path); err == nil && ok {
+			return startedAt
+		}
 	}
-	startedAt, ok, err := transcript.FirstLineTimestamp(path)
+	stats, ok, err := codexsession.ReadStats(cwd, sessionID)
 	if err != nil || !ok {
 		return time.Time{}
 	}
-	return startedAt
+	return stats.Start
 }
 
 // liveStateForSelected returns the selected ticket's live orchestrator state,

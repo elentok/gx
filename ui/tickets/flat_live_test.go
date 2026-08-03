@@ -29,6 +29,22 @@ func writeFakeTranscript(t *testing.T, cwd, sessionID string, start time.Time) {
 	}
 }
 
+func writeFakeCodexSession(t *testing.T, cwd, sessionID string, start time.Time) {
+	t.Helper()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("UserHomeDir: %v", err)
+	}
+	path := filepath.Join(home, ".codex", "sessions", "2026", "01", "01", "rollout-"+sessionID+".jsonl")
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	line := `{"timestamp":"` + start.UTC().Format(time.RFC3339Nano) + `","type":"session_meta","payload":{"id":"` + sessionID + `","cwd":"` + cwd + `"}}` + "\n"
+	if err := os.WriteFile(path, []byte(line), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+}
+
 func TestApplyLiveEvent_IterationStarted_PopulatesStartedAt(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	cwd := "/fake/iter-01"
@@ -51,6 +67,23 @@ func TestApplyLiveEvent_IterationStarted_PopulatesStartedAt(t *testing.T) {
 	}
 	if got.tokens != 0 {
 		t.Errorf("tokens = %d, want 0 (no ContextOccupancy event yet)", got.tokens)
+	}
+}
+
+func TestApplyLiveEvent_CodexIterationStarted_PopulatesStartedAt(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	cwd := "/fake/iter-09"
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	writeFakeCodexSession(t, cwd, "codex-session-1", start)
+
+	live := map[string]liveTicketState{}
+	applyLiveEvent(live, map[string]string{}, nil, ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationStarted, Identifier: "09", Label: "iter-09",
+		Cwd: cwd, SessionID: "codex-session-1",
+	})
+
+	if got := live["09"].startedAt; !got.Equal(start) {
+		t.Errorf("startedAt = %v, want %v", got, start)
 	}
 }
 

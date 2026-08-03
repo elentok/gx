@@ -64,6 +64,61 @@ func TestLaunchAndPrompt_IterationStartedCarriesCwdAndSessionIDPlusImmediateOccu
 	}
 }
 
+// Codex does not expose its native session ID when the interactive process is
+// first started. Herdr discovers it after the first prompt begins working, so
+// launchAndPrompt must adopt the AgentPrompt result rather than carrying the
+// empty AgentStart session through monitoring, logging, and landing.
+func TestLaunchAndPrompt_CodexAdoptsSessionIDFromInitialPrompt(t *testing.T) {
+	var startedSessionID string
+	var observedSessionID string
+	sink := &recordingSinkWithArgs{
+		occupancySink: &occupancySink{},
+		onIterationStarted: func(_, _, _, sessionID string) {
+			startedSessionID = sessionID
+		},
+	}
+
+	d := Deps{
+		AgentStart: func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+			return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle"}, nil
+		},
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "working", AgentSession: "codex-session-1"}, nil
+		},
+		ReadCodexContext: func(_, sessionID string) (int, bool, error) {
+			observedSessionID = sessionID
+			return 4200, true, nil
+		},
+		Sleep: func(time.Duration) {},
+	}
+
+	sessionID, err := launchAndPrompt(d, launchAndPromptParams{
+		Label:      "iter-09",
+		Agent:      AgentCodex,
+		Pane:       "pane-9",
+		Prompt:     "go",
+		SessionCwd: "/repo/iter-09",
+		Ticket:     "09",
+		StartEvent: eventIterationStarted,
+		Sink:       sink,
+	})
+	if err != nil {
+		t.Fatalf("launchAndPrompt: %v", err)
+	}
+	if sessionID != "codex-session-1" {
+		t.Fatalf("sessionID = %q, want codex-session-1", sessionID)
+	}
+	if startedSessionID != "codex-session-1" {
+		t.Errorf("IterationStarted sessionID = %q, want codex-session-1", startedSessionID)
+	}
+	if observedSessionID != "codex-session-1" {
+		t.Errorf("ReadCodexContext sessionID = %q, want codex-session-1", observedSessionID)
+	}
+}
+
 // recordingSinkWithArgs embeds occupancySink (itself embedding
 // noopEventSink) and additionally hooks IterationStarted, for tests that
 // need both start-time signals asserted together.
