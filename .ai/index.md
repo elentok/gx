@@ -4,7 +4,8 @@
 
 ### Issue tracker
 
-Issues live as local markdown files under `.scratch/`. See `docs/agents/issue-tracker.md`.
+Issues live as local markdown files under `.scratch/`. See
+`~/.dotfiles/core/ai/skills/setup-elentok-skills/issue-tracker-local.md`.
 
 ### Domain docs
 

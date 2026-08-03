@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.24.1 - 2026-08-02
+
+- Tickets now use typed YAML frontmatter with schema validation, including a new `gx tickets validate <path>` command; legacy bold-line ticket parsing has been retired.
+- Added a Claude/Codex agent picker when launching an epic's ralph-loop from the Tickets tab, with Claude remaining the default.
+- Ralph loop now records actual context-window and elapsed-time metrics in landed ticket frontmatter and commit trailers.
+- Fixed ralph-loop status and metadata updates corrupting ticket frontmatter.
+- Ralph loop now marks only a failed iteration as needing attention and continues scheduling the remaining tickets.
+- Fixed ticket-launched ralph-loops unexpectedly changing the user's active herdr workspace and stalled agent prompts needing an external keypress before submission.
+- Added `gopkg.in/yaml.v3` v3.0.1.
+
 ## v0.24.0 - 2026-08-02
 
 - Added ralph-loop integration into the Tickets tab: live progress and phase highlighting for running tickets, pause/resume controls with confirm modals, an epic-completion banner, and a quit warning while a loop is running — replacing the standalone `gx ralph-loop` command.
