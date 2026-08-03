@@ -51,10 +51,12 @@ func Path(cwd, sessionID string) (string, error) {
 }
 
 // transcriptLine is the subset of a transcript JSONL line this package
-// reads: the assistant-turn usage fields, plus the line's own timestamp
-// (used by ReadAll to compute a session's wall-clock duration).
+// reads: the assistant-turn usage fields, a system-line's compaction-boundary
+// marker, plus the line's own timestamp (used by ReadAll to compute a
+// session's wall-clock duration).
 type transcriptLine struct {
 	Type      string `json:"type"`
+	Subtype   string `json:"subtype"`
 	Timestamp string `json:"timestamp"`
 	Message   struct {
 		Model string `json:"model"`
@@ -65,7 +67,17 @@ type transcriptLine struct {
 			CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
 		} `json:"usage"`
 	} `json:"message"`
+	CompactMetadata struct {
+		Trigger string `json:"trigger"`
+	} `json:"compactMetadata"`
 }
+
+// compactBoundarySubtype is the subtype value Claude Code writes on the
+// type:"system" line it appends whenever a compaction happens (see
+// .scratch/ralph-tickets-visibility/issues/04-compaction-detection-research.md),
+// whether triggered by an explicit "/compact" or fired automatically on its
+// own context ceiling.
+const compactBoundarySubtype = "compact_boundary"
 
 // initialTailBytes is how much of a transcript's tail LastAssistantUsage
 // reads on its first pass. It doubles on each subsequent pass (still
@@ -224,15 +236,25 @@ func Elapsed(cwd, sessionID string) (time.Duration, bool, error) {
 }
 
 // Line is a single parsed transcript line, timestamped, carrying its
-// assistant-turn usage if it has one (the zero Usage otherwise). Unlike
+// assistant-turn usage if it has one (the zero Usage otherwise), and its
+// compaction-boundary marker if it's a system line reporting one (Subtype
+// == "compact_boundary", CompactTrigger "manual" or "auto"). Unlike
 // LastAssistantUsage's tail-only read (built for cheap, frequent polling
 // against a long-running session), ReadAll parses the whole file, so it's
 // meant for one-off aggregate reporting (peak occupancy, total cost, session
-// span), not the live smart-zone guardrail.
+// span, compaction count), not the live smart-zone guardrail.
 type Line struct {
-	Type      string
-	Timestamp time.Time
-	Usage     Usage
+	Type           string
+	Subtype        string
+	CompactTrigger string
+	Timestamp      time.Time
+	Usage          Usage
+}
+
+// IsCompactBoundary reports whether l is Claude Code's own marker line for a
+// compaction that just happened.
+func (l Line) IsCompactBoundary() bool {
+	return l.Type == "system" && l.Subtype == compactBoundarySubtype
 }
 
 // ReadAll parses every line of the transcript at path in order, skipping
@@ -265,13 +287,45 @@ func ReadAll(path string) (lines []Line, ok bool, err error) {
 			continue
 		}
 		lines = append(lines, Line{
-			Type:      entry.Type,
-			Timestamp: ts,
-			Usage:     usageFromLine(entry),
+			Type:           entry.Type,
+			Subtype:        entry.Subtype,
+			CompactTrigger: entry.CompactMetadata.Trigger,
+			Timestamp:      ts,
+			Usage:          usageFromLine(entry),
 		})
 	}
 	if scanErr := scanner.Err(); scanErr != nil {
 		return nil, false, scanErr
 	}
 	return lines, true, nil
+}
+
+// CountCompactions counts how many of lines are a compaction-boundary marker
+// (see Line.IsCompactBoundary) — gx-triggered and Claude Code's own
+// auto-compaction both count, since both write the same marker line and
+// aren't reliably distinguishable from each other via CompactTrigger alone
+// (a human typing "/compact" also lands "manual").
+func CountCompactions(lines []Line) int {
+	n := 0
+	for _, l := range lines {
+		if l.IsCompactBoundary() {
+			n++
+		}
+	}
+	return n
+}
+
+// Compactions is a convenience wrapper combining Path, ReadAll, and
+// CountCompactions: it returns how many compaction boundaries the session
+// launched in cwd hit, or ok=false if its transcript can't be found yet.
+func Compactions(cwd, sessionID string) (count int, ok bool, err error) {
+	path, err := Path(cwd, sessionID)
+	if err != nil {
+		return 0, false, err
+	}
+	lines, ok, err := ReadAll(path)
+	if err != nil || !ok {
+		return 0, ok, err
+	}
+	return CountCompactions(lines), true, nil
 }

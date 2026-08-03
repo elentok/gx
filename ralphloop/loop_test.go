@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // writeEpic builds a fixture epic directory under a fresh t.TempDir()'s
@@ -243,6 +244,69 @@ func TestRun_LogsLifecycleEvents_LinearChain(t *testing.T) {
 	}
 	if events[0].Cwd == "" {
 		t.Errorf("deps-installed event = %+v, want non-empty Cwd", events[0])
+	}
+}
+
+// TestRun_FreshIteration_StampsCompactionsOnDone verifies ticket 04: a
+// ticket marked done from a fresh iteration whose transcript recorded
+// compaction boundaries gets that count written into its frontmatter's
+// compactions field alongside status: done.
+func TestRun_FreshIteration_StampsCompactionsOnDone(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+	})
+	d, _, _ := fakeDeps()
+	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-fresh-01"}, nil
+	}
+	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
+		return 12345, true, nil
+	}
+	d.ReadCompactions = func(cwd, sessionID string) (int, bool, error) {
+		return 3, true, nil
+	}
+
+	var out bytes.Buffer
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	got := mustParse(t, filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if got.Status != schema.StatusDone {
+		t.Errorf("Status = %q, want done", got.Status)
+	}
+	if got.Compactions != 3 {
+		t.Errorf("Compactions = %d, want 3", got.Compactions)
+	}
+}
+
+// TestRun_FreshIteration_OmitsCompactionsWhenUnavailable verifies that a
+// fresh iteration whose compaction count can't be read (ReadCompactions'
+// default fake behavior in fakeDeps, which leaves it nil) still marks the
+// ticket done, without writing a wrong/placeholder compactions count.
+func TestRun_FreshIteration_OmitsCompactionsWhenUnavailable(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+	})
+	d, _, _ := fakeDeps()
+	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-fresh-01"}, nil
+	}
+	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
+		return 12345, true, nil
+	}
+
+	var out bytes.Buffer
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	got := mustParse(t, filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if got.Status != schema.StatusDone {
+		t.Errorf("Status = %q, want done", got.Status)
+	}
+	if got.Compactions != 0 {
+		t.Errorf("Compactions = %d, want 0 (unavailable)", got.Compactions)
 	}
 }
 

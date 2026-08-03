@@ -86,7 +86,7 @@ func TestMarkDone_RewritesStatus(t *testing.T) {
 
 func TestMarkDoneWithMetadata_SetsStatusAndActualContextWindow(t *testing.T) {
 	path := writeFrontmatterTicket(t, "claimed")
-	if err := MarkDoneWithMetadata(path, 42000, "sess-123"); err != nil {
+	if err := MarkDoneWithMetadata(path, 42000, 2, "sess-123"); err != nil {
 		t.Fatalf("MarkDoneWithMetadata: %v", err)
 	}
 	got := mustParse(t, path)
@@ -95,6 +95,9 @@ func TestMarkDoneWithMetadata_SetsStatusAndActualContextWindow(t *testing.T) {
 	}
 	if got.ActualContextWindow != 42000 {
 		t.Errorf("ActualContextWindow = %d, want 42000", got.ActualContextWindow)
+	}
+	if got.Compactions != 2 {
+		t.Errorf("Compactions = %d, want 2", got.Compactions)
 	}
 }
 
@@ -155,7 +158,7 @@ func TestClaim_FrontmatterTicket_RoundTripsThroughSchema(t *testing.T) {
 // window:/Session: lines inside the YAML block.
 func TestMarkDoneWithMetadata_FrontmatterTicket_WritesActualContextWindow(t *testing.T) {
 	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\ntype: task\nactual_context_window: 500\nelapsed_time: 10\n---\n# Ticket\n\nBody.\n")
-	if err := MarkDoneWithMetadata(path, 42000, "sess-123"); err != nil {
+	if err := MarkDoneWithMetadata(path, 42000, 0, "sess-123"); err != nil {
 		t.Fatalf("MarkDoneWithMetadata: %v", err)
 	}
 

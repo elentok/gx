@@ -107,6 +107,7 @@ type Ticket struct {
 	ExpectedContextWindow int
 	ActualContextWindow   int
 	ElapsedTime           int
+	Compactions           int
 }
 
 // Validate checks a populated Ticket for well-formedness: a valid id, a
@@ -137,6 +138,9 @@ func Validate(t Ticket) error {
 	}
 	if t.ElapsedTime < 0 {
 		errs = append(errs, fmt.Errorf("elapsed_time: must be non-negative, got %d", t.ElapsedTime))
+	}
+	if t.Compactions < 0 {
+		errs = append(errs, fmt.Errorf("compactions: must be non-negative, got %d", t.Compactions))
 	}
 	for _, b := range t.BlockedBy {
 		if b == t.ID {

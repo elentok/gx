@@ -80,6 +80,10 @@ type Deps struct {
 	// Code session launched in cwd, or ok=false if its transcript has no
 	// assistant turn yet.
 	ReadOccupancy func(cwd, sessionID string) (occupancy int, ok bool, err error)
+	// ReadCompactions returns how many compaction boundaries the Claude Code
+	// session launched in cwd hit, or ok=false if its transcript can't be
+	// found yet.
+	ReadCompactions func(cwd, sessionID string) (count int, ok bool, err error)
 	// ReadCodexContext returns the latest context-token count for the Codex
 	// session launched in cwd, or ok=false until its local session data is
 	// complete enough to identify that worktree and session.
@@ -127,6 +131,7 @@ func DefaultDeps() Deps {
 		WorktreeExists:        worktreeExists,
 		InstallDeps:           InstallDependencies,
 		ReadOccupancy:         transcript.LastAssistantOccupancy,
+		ReadCompactions:       transcript.Compactions,
 		ReadCodexContext:      codexsession.LastContextTokens,
 		ReadCodexRateLimit:    codexsession.LastRateLimit,
 		ReadPaneRecent:        defaultReadPaneRecent,

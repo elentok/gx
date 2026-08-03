@@ -200,7 +200,8 @@ func markDoneStampingCloseMetadata(d Deps, p iterationParams, cwd, sessionID str
 	if occErr != nil || !ok {
 		return MarkDone(p.Ticket.Path)
 	}
-	return MarkDoneWithMetadata(p.Ticket.Path, occupancy, sessionID)
+	compactions, _, _ := sessionCompactions(d, p.Agent, cwd, sessionID)
+	return MarkDoneWithMetadata(p.Ticket.Path, occupancy, compactions, sessionID)
 }
 
 // backfillDoneMetadata handles a reattached ticket close: it looks up the
@@ -223,7 +224,8 @@ func backfillDoneMetadata(d Deps, p iterationParams) error {
 	if occErr != nil || !ok {
 		return MarkDone(p.Ticket.Path)
 	}
-	return MarkDoneWithMetadata(p.Ticket.Path, occupancy, sessionID)
+	compactions, _, _ := sessionCompactions(d, agent, sessionCwd, sessionID)
+	return MarkDoneWithMetadata(p.Ticket.Path, occupancy, compactions, sessionID)
 }
 
 // landCherryPick cherry-picks base..branch onto the feature branch (resolving

@@ -35,17 +35,18 @@ func MarkNeedsAttentionWithReason(path, reason string) error {
 }
 
 // MarkDoneWithMetadata marks a ticket done and records the closing
-// iteration's final context-window occupancy in the frontmatter's
-// actual_context_window field. sessionID is accepted for caller
-// compatibility but no longer persisted: per
+// iteration's final context-window occupancy and compaction count in the
+// frontmatter's actual_context_window/compactions fields. sessionID is
+// accepted for caller compatibility but no longer persisted: per
 // .scratch/ticket-frontmatter/spec.md, the Session field is dropped from
-// frontmatter entirely (not validated or read by code). status and
-// actual_context_window land in a single atomic write, so a concurrent
-// reader never observes one without the other.
-func MarkDoneWithMetadata(path string, contextWindow int, sessionID string) error {
+// frontmatter entirely (not validated or read by code). status,
+// actual_context_window, and compactions land in a single atomic write, so a
+// concurrent reader never observes one without the others.
+func MarkDoneWithMetadata(path string, contextWindow, compactions int, sessionID string) error {
 	return updateTicket(path, func(t *schema.Ticket) {
 		t.Status = schema.StatusDone
 		t.ActualContextWindow = contextWindow
+		t.Compactions = compactions
 	})
 }
 

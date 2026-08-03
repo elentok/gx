@@ -189,6 +189,94 @@ func TestReadAll_MissingFile_NotOKNoError(t *testing.T) {
 	}
 }
 
+func TestCountCompactions_MixedTriggers(t *testing.T) {
+	path := writeTranscript(t,
+		`{"type":"user","timestamp":"2026-01-01T00:00:00.000Z","message":{}}`,
+		`{"type":"system","subtype":"compact_boundary","timestamp":"2026-01-01T00:00:01.000Z","compactMetadata":{"trigger":"manual"}}`,
+		`{"type":"assistant","timestamp":"2026-01-01T00:00:02.000Z","message":{"usage":{"input_tokens":1}}}`,
+		`{"type":"system","subtype":"compact_boundary","timestamp":"2026-01-01T00:00:03.000Z","compactMetadata":{"trigger":"auto"}}`,
+	)
+
+	lines, ok, err := ReadAll(path)
+	if err != nil {
+		t.Fatalf("ReadAll() error = %v", err)
+	}
+	if !ok {
+		t.Fatal("ReadAll() ok = false, want true")
+	}
+	if got := CountCompactions(lines); got != 2 {
+		t.Errorf("CountCompactions() = %d, want 2", got)
+	}
+
+	var triggers []string
+	for _, l := range lines {
+		if l.IsCompactBoundary() {
+			triggers = append(triggers, l.CompactTrigger)
+		}
+	}
+	if want := []string{"manual", "auto"}; !strings.EqualFold(strings.Join(triggers, ","), strings.Join(want, ",")) {
+		t.Errorf("triggers = %v, want %v", triggers, want)
+	}
+}
+
+func TestCountCompactions_NoCompactionLines_Zero(t *testing.T) {
+	path := writeTranscript(t,
+		`{"type":"user","timestamp":"2026-01-01T00:00:00.000Z","message":{}}`,
+		`{"type":"assistant","timestamp":"2026-01-01T00:00:01.000Z","message":{"usage":{"input_tokens":1}}}`,
+	)
+
+	lines, ok, err := ReadAll(path)
+	if err != nil {
+		t.Fatalf("ReadAll() error = %v", err)
+	}
+	if !ok {
+		t.Fatal("ReadAll() ok = false, want true")
+	}
+	if got := CountCompactions(lines); got != 0 {
+		t.Errorf("CountCompactions() = %d, want 0", got)
+	}
+}
+
+func TestCompactions_ReadsThroughPath(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	cwd := "/repo/worktree"
+	slugDir := filepath.Join(dir, ".claude", "projects", Slugify(cwd))
+	if err := os.MkdirAll(slugDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	sessionPath := filepath.Join(slugDir, "sess-1.jsonl")
+	content := strings.Join([]string{
+		`{"type":"system","subtype":"compact_boundary","timestamp":"2026-01-01T00:00:00.000Z","compactMetadata":{"trigger":"manual"}}`,
+		`{"type":"assistant","timestamp":"2026-01-01T00:00:01.000Z","message":{"usage":{"input_tokens":1}}}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(sessionPath, []byte(content), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	count, ok, err := Compactions(cwd, "sess-1")
+	if err != nil {
+		t.Fatalf("Compactions() error = %v", err)
+	}
+	if !ok {
+		t.Fatal("Compactions() ok = false, want true")
+	}
+	if count != 1 {
+		t.Errorf("Compactions() = %d, want 1", count)
+	}
+}
+
+func TestCompactions_MissingFile_NotOKNoError(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	count, ok, err := Compactions("/repo/worktree", "missing-session")
+	if err != nil {
+		t.Fatalf("Compactions() error = %v, want nil for a missing file", err)
+	}
+	if ok || count != 0 {
+		t.Errorf("Compactions() = (%d, %v), want (0, false) for a missing file", count, ok)
+	}
+}
+
 func TestUsage_Occupancy_SumsInputSideFieldsOnly(t *testing.T) {
 	u := Usage{InputTokens: 10, CacheReadInputTokens: 20000, CacheCreationInputTokens: 500, OutputTokens: 9999}
 	if got, want := u.Occupancy(), 10+20000+500; got != want {

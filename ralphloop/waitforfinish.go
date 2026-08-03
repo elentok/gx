@@ -401,6 +401,19 @@ func emitContextOccupancy(d Deps, sink EventSink, agent AgentKind, identifier, c
 	sink.ContextOccupancy(identifier, occupancy)
 }
 
+// sessionCompactions reads how many compaction boundaries the selected
+// agent's transcript recorded. Codex sessions have no equivalent local
+// signal today, so a Codex agent always reports ok=false rather than
+// guessing; a missing observer or read failure is likewise treated as
+// "unknown" (count 0, omitted from frontmatter) rather than blocking the
+// ticket close it's stamped alongside.
+func sessionCompactions(d Deps, agent AgentKind, cwd, sessionID string) (int, bool, error) {
+	if sessionID == "" || agent == AgentCodex || d.ReadCompactions == nil {
+		return 0, false, nil
+	}
+	return d.ReadCompactions(cwd, sessionID)
+}
+
 func codexRateLimit(d Deps, cwd, sessionID string) (codexsession.RateLimit, bool, error) {
 	if sessionID == "" || d.ReadCodexRateLimit == nil {
 		return codexsession.RateLimit{}, false, nil
