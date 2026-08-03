@@ -34,8 +34,12 @@ type liveTicketState struct {
 	// timestamp (resolved from IterationStarted/TicketReattached's
 	// Cwd+SessionID), so elapsed time keeps climbing across a
 	// pause/resume instead of resetting. Zero if the transcript couldn't
-	// be resolved yet.
-	startedAt time.Time
+	// be resolved yet. sessionCwd/sessionID retain the lookup key so the UI's
+	// normal poll cycle can retry when the agent writes its session data just
+	// after the start event arrives.
+	startedAt  time.Time
+	sessionCwd string
+	sessionID  string
 	// tokens is the last LiveEventContextOccupancy reading for this
 	// ticket — frozen (not zeroed) while paused, since the underlying
 	// session's context hasn't changed.
@@ -142,7 +146,10 @@ func applyLiveEvent(live map[string]liveTicketState, labelIdentifier map[string]
 	switch ev.Kind {
 	case ralphloop.LiveEventIterationStarted, ralphloop.LiveEventTicketReattached:
 		labelIdentifier[ev.Label] = ev.Identifier
-		live[ev.Identifier] = liveTicketState{running: true, label: ev.Label, startedAt: resolveStartedAt(ev.Cwd, ev.SessionID)}
+		live[ev.Identifier] = liveTicketState{
+			running: true, label: ev.Label, startedAt: resolveStartedAt(ev.Cwd, ev.SessionID),
+			sessionCwd: ev.Cwd, sessionID: ev.SessionID,
+		}
 
 	case ralphloop.LiveEventIterationPaused:
 		if identifier, ok := labelIdentifier[ev.Label]; ok {
@@ -150,13 +157,17 @@ func applyLiveEvent(live map[string]liveTicketState, labelIdentifier map[string]
 			live[identifier] = liveTicketState{
 				paused: true, label: ev.Label, pauseKind: ev.PauseKind, reason: ev.Reason,
 				startedAt: prev.startedAt, tokens: prev.tokens,
+				sessionCwd: prev.sessionCwd, sessionID: prev.sessionID,
 			}
 		}
 
 	case ralphloop.LiveEventIterationResumed:
 		if identifier, ok := labelIdentifier[ev.Label]; ok {
 			prev := live[identifier]
-			live[identifier] = liveTicketState{running: true, label: ev.Label, startedAt: prev.startedAt, tokens: prev.tokens}
+			live[identifier] = liveTicketState{
+				running: true, label: ev.Label, startedAt: prev.startedAt, tokens: prev.tokens,
+				sessionCwd: prev.sessionCwd, sessionID: prev.sessionID,
+			}
 		}
 
 	case ralphloop.LiveEventIterationFinished, ralphloop.LiveEventTicketReverted,
@@ -247,6 +258,23 @@ func resolveStartedAt(cwd, sessionID string) time.Time {
 		return time.Time{}
 	}
 	return stats.Start
+}
+
+// refreshLiveStartedAt retries session timestamp discovery for start events
+// that raced the agent's transcript/rollout being written. Once resolved, a
+// timestamp is immutable and no further filesystem lookup is needed.
+func refreshLiveStartedAt(live map[string]liveTicketState) {
+	for identifier, state := range live {
+		if !state.startedAt.IsZero() || state.sessionCwd == "" || state.sessionID == "" {
+			continue
+		}
+		startedAt := resolveStartedAt(state.sessionCwd, state.sessionID)
+		if startedAt.IsZero() {
+			continue
+		}
+		state.startedAt = startedAt
+		live[identifier] = state
+	}
 }
 
 // liveStateForSelected returns the selected ticket's live orchestrator state,

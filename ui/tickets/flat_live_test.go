@@ -87,6 +87,29 @@ func TestApplyLiveEvent_CodexIterationStarted_PopulatesStartedAt(t *testing.T) {
 	}
 }
 
+func TestRefreshLiveStartedAt_ResolvesCodexRolloutWrittenAfterStartEvent(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	cwd := "/fake/iter-09"
+	sessionID := "codex-session-late"
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	live := map[string]liveTicketState{}
+	applyLiveEvent(live, map[string]string{}, nil, ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationStarted, Identifier: "09", Label: "iter-09",
+		Cwd: cwd, SessionID: sessionID,
+	})
+	if got := live["09"].startedAt; !got.IsZero() {
+		t.Fatalf("startedAt before rollout exists = %v, want zero", got)
+	}
+
+	writeFakeCodexSession(t, cwd, sessionID, start)
+	refreshLiveStartedAt(live)
+
+	if got := live["09"].startedAt; !got.Equal(start) {
+		t.Errorf("startedAt after rollout appears = %v, want %v", got, start)
+	}
+}
+
 func TestApplyLiveEvent_ContextOccupancy_UpdatesTokens(t *testing.T) {
 	live := map[string]liveTicketState{
 		"01": {running: true, label: "iter-01"},

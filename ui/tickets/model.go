@@ -186,6 +186,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case implementStartedMsg:
 		return m.handleImplementStarted(msg)
 	case implementPollMsg:
+		refreshLiveStartedAt(m.live)
 		return m.handleImplementPoll(msg)
 	case implementSyncMsg:
 		return m.handleImplementSync(msg)

@@ -278,6 +278,7 @@ func (m FlatModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, notifyCmd
 
 	case flatTickMsg:
+		refreshLiveStartedAt(m.live)
 		return m, tea.Batch(notifyCmd, m.cmdLoad(), m.cmdTick())
 
 	case flatLiveEventMsg:
