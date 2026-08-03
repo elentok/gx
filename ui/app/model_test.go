@@ -315,6 +315,12 @@ func TestNumberKeysSwitchTabsGlobally(t *testing.T) {
 	if m.navState.ActiveTab() != nav.TabTickets {
 		t.Fatalf("expected 6 to switch to tickets, got %q", m.navState.ActiveTab())
 	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '7', Text: "7"})
+	m = updated.(Model)
+	if m.navState.ActiveTab() != nav.TabQueue {
+		t.Fatalf("expected 7 to switch to queue, got %q", m.navState.ActiveTab())
+	}
 }
 
 func TestGTMnemonicSwitchesToTicketsTab(t *testing.T) {
@@ -335,6 +341,27 @@ func TestGTMnemonicSwitchesToTicketsTab(t *testing.T) {
 	m = updated.(Model)
 	if m.navState.ActiveTab() != nav.TabTickets {
 		t.Fatalf("expected gt to switch to tickets, got %q", m.navState.ActiveTab())
+	}
+}
+
+func TestGQMnemonicSwitchesToQueueTab(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
+	m = updated.(Model)
+	if m.navState.ActiveTab() != nav.TabQueue {
+		t.Fatalf("expected gq to switch to queue, got %q", m.navState.ActiveTab())
 	}
 }
 

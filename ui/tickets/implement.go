@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/confirm"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 )
 
@@ -265,20 +266,22 @@ func newImplementAgentMenu() components.MenuState {
 	}
 }
 
-// bindingTicketsImplement (below in model_keys.go's manager) triggers
-// handleImplementKey, gated to epic rows only: pressing "i" on a ticket row
-// or with nothing selected is a no-op. Claude is selected by default.
+// handleImplementKey confirms the checked selection before opening its plan.
 func (m Model) handleImplementKey() (tea.Model, tea.Cmd) {
-	r, ok := m.selectedRow()
-	if !ok || !r.isEpic() {
-		return m, nil
+	if len(m.checked) == 0 {
+		return m, notify.Info("check at least one ticket to build an execution plan")
 	}
-	if ralphLoopRegistry.isRunning() {
-		return m, notify.Info("a ralph-loop is already running")
-	}
-	m.implementAgentMenu = newImplementAgentMenu()
-	m.implementAgentMenuOpen = true
+	worktreeRoot := m.worktreeRoot
+	count := len(m.checked)
+	m.confirm = m.confirm.Open(confirm.Options{
+		Prompt:    fmt.Sprintf("Open the execution plan for %d checked ticket(s)?", count),
+		AcceptCmd: cmdOpenQueueTab(worktreeRoot),
+	})
 	return m, nil
+}
+
+func cmdOpenQueueTab(worktreeRoot string) tea.Cmd {
+	return nav.Switch(nav.ViewState{Tab: nav.TabQueue, WorktreeRoot: worktreeRoot})
 }
 
 func (m Model) handleImplementAgentMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -469,7 +472,7 @@ func buildImplementRunOptions(worktreeRoot, epicName string, agent ralphloop.Age
 		Skill:       "implement",
 		RepoDir:     repo.Root,
 		ScratchDir:  filepath.Join(worktreeRoot, ".scratch"),
-		MaxParallel: 2,
+		MaxParallel: queuePlanMaxParallel,
 		SmartZone:   150_000,
 	}, nil
 }

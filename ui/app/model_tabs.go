@@ -15,7 +15,7 @@ import (
 )
 
 func (m *Model) ensureLivePages() {
-	for _, kind := range []nav.TabID{nav.TabWorktrees, nav.TabLog, nav.TabStatus, nav.TabStash, nav.TabPRs, nav.TabTickets} {
+	for _, kind := range []nav.TabID{nav.TabWorktrees, nav.TabLog, nav.TabStatus, nav.TabStash, nav.TabPRs, nav.TabTickets, nav.TabQueue} {
 		if _, ok := m.livePageByTab[kind]; !ok {
 			m.livePageByTab[kind] = livePage{}
 		}
@@ -205,6 +205,9 @@ func (m Model) handleShellChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		case "t":
 			next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabTickets})
 			return next, cmd, true
+		case "q":
+			next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabQueue})
+			return next, cmd, true
 		case "esc":
 			return m, nil, true
 		default:
@@ -238,10 +241,12 @@ func (m Model) handleShellChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	case "6":
 		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabTickets})
 		return next, cmd, true
+	case "7":
+		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabQueue})
+		return next, cmd, true
 	}
 	return m, nil, false
 }
-
 
 func replayKeys(model tea.Model, msgs ...tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
@@ -271,6 +276,7 @@ func (m Model) tabsView() string {
 		{label: "stash", active: activeTab == nav.TabStash},
 		{label: "prs", active: activeTab == nav.TabPRs},
 		{label: "tickets", active: activeTab == nav.TabTickets},
+		{label: "queue", active: activeTab == nav.TabQueue},
 	}
 	parts := make([]string, 0, len(tabs))
 	for _, tab := range tabs {
@@ -293,7 +299,7 @@ func renderTab(tab tabSpec) string {
 }
 
 func orderedTabs() []nav.TabID {
-	return []nav.TabID{nav.TabWorktrees, nav.TabLog, nav.TabStatus, nav.TabStash, nav.TabPRs, nav.TabTickets}
+	return []nav.TabID{nav.TabWorktrees, nav.TabLog, nav.TabStatus, nav.TabStash, nav.TabPRs, nav.TabTickets, nav.TabQueue}
 }
 
 func (m Model) switchRelativeTab(delta int) (Model, tea.Cmd) {

@@ -11,6 +11,7 @@ const (
 	TabStash     TabID = "stash"
 	TabPRs       TabID = "prs"
 	TabTickets   TabID = "tickets"
+	TabQueue     TabID = "queue"
 )
 
 type ViewState struct {

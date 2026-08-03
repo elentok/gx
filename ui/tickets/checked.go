@@ -25,6 +25,15 @@ func (m Model) isChecked(path string) bool {
 	return m.checked[path]
 }
 
+// WithCheckedSet lets the shell share selection across cached tab models.
+func (m Model) WithCheckedSet(checked map[string]bool) Model {
+	if checked == nil {
+		checked = map[string]bool{}
+	}
+	m.checked = checked
+	return m
+}
+
 // handleToggleCheck answers "space" on the selected row: toggling an epic
 // row checks/unchecks all of its tickets; toggling a ticket row checks/
 // unchecks it alone, unless checking it would leave an unresolved blocker

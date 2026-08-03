@@ -182,6 +182,19 @@ func TestResolveTabIDStashIsFirstClass(t *testing.T) {
 	}
 }
 
+func TestQueueTabUsesDefaultWorktree(t *testing.T) {
+	s := newState()
+	s.SetInitialTab(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT})
+
+	got := s.Switch(nav.ViewState{Tab: nav.TabQueue})
+	if got.WorktreeRoot != defaultWT {
+		t.Fatalf("expected queue WorktreeRoot %q, got %q", defaultWT, got.WorktreeRoot)
+	}
+	if navstate.ResolveTabID(nav.TabQueue) != nav.TabQueue {
+		t.Fatal("expected queue to resolve as a first-class tab")
+	}
+}
+
 func TestResolveTabIDCommitAbsent(t *testing.T) {
 	if got := navstate.ResolveTabID(nav.TabID("commit")); got != nav.TabWorktrees {
 		t.Fatalf("expected unknown commit tab to resolve to worktrees, got %q", got)

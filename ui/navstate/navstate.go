@@ -47,7 +47,7 @@ func (s *State) TabViewStateForViewContext(ctx nav.ViewContext) nav.ViewState {
 	case nav.TabLog:
 		tabViewState.WorktreeRoot = ctx.WorktreeRoot
 		tabViewState.Ref = ctx.Ref
-	case nav.TabStatus, nav.TabStash, nav.TabPRs, nav.TabTickets:
+	case nav.TabStatus, nav.TabStash, nav.TabPRs, nav.TabTickets, nav.TabQueue:
 		tabViewState.WorktreeRoot = ctx.WorktreeRoot
 		tabViewState.InitialPath = ctx.InitialPath
 	}
@@ -166,7 +166,7 @@ func (s *State) initMissingTabs() {
 // ResolveTabID maps unknown tab IDs to the default (TabWorktrees).
 func ResolveTabID(kind nav.TabID) nav.TabID {
 	switch kind {
-	case nav.TabWorktrees, nav.TabLog, nav.TabStatus, nav.TabStash, nav.TabPRs, nav.TabTickets:
+	case nav.TabWorktrees, nav.TabLog, nav.TabStatus, nav.TabStash, nav.TabPRs, nav.TabTickets, nav.TabQueue:
 		return kind
 	default:
 		return nav.TabWorktrees
