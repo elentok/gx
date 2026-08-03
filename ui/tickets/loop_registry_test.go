@@ -2,10 +2,148 @@ package tickets
 
 import (
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/elentok/gx/ralphloop"
 )
+
+func TestRunSnapshotsAreDeterministicAndIndependent(t *testing.T) {
+	r := newLoopRegistry(2)
+	r.tryStart("epic-b", 2, 4)
+	r.tryStart("epic-a", 1, 3)
+	r.reduceLiveEvent("epic-b", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationStarted, Identifier: "01", Label: "iter-b",
+	})
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationStarted, Identifier: "01", Label: "iter-a",
+	})
+
+	all := r.runSnapshots()
+	if len(all) != 2 || all[0].EpicName != "epic-a" || all[1].EpicName != "epic-b" {
+		t.Fatalf("runSnapshots() names = %#v, want epic-a then epic-b", all)
+	}
+	if all[0].Tickets["01"].Label != "iter-a" || all[1].Tickets["01"].Label != "iter-b" {
+		t.Fatalf("overlapping ticket identifiers were not isolated: %#v", all)
+	}
+
+	one, ok := r.runSnapshot("epic-a")
+	if !ok {
+		t.Fatal("runSnapshot(epic-a): want snapshot")
+	}
+	one.Tickets["01"] = RunTicketSnapshot{Label: "mutated"}
+	again, _ := r.runSnapshot("epic-a")
+	if again.Tickets["01"].Label != "iter-a" {
+		t.Fatalf("caller mutation changed registry snapshot: %#v", again.Tickets["01"])
+	}
+}
+
+func TestReduceLiveEventCapturesProgressContextAndPause(t *testing.T) {
+	r := newLoopRegistry(1)
+	r.tryStart("epic-a", 1, 3)
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationStarted, Identifier: "01", Label: "iter-01",
+	})
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventContextOccupancy, Identifier: "01", Tokens: 42_000,
+	})
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationPaused, Label: "iter-01",
+		PauseKind: ralphloop.PauseNeedsAttention, Reason: "permission required",
+	})
+
+	snapshot, ok := r.runSnapshot("epic-a")
+	if !ok {
+		t.Fatal("runSnapshot(epic-a): want snapshot")
+	}
+	if snapshot.State != RunStateRunning || snapshot.Done != 1 || snapshot.Total != 3 || snapshot.ContextTokens != 42_000 || !snapshot.Paused {
+		t.Fatalf("run snapshot = %#v", snapshot)
+	}
+	ticket := snapshot.Tickets["01"]
+	if !ticket.Paused || ticket.PauseKind != ralphloop.PauseNeedsAttention || ticket.PauseReason != "permission required" || ticket.ContextTokens != 42_000 {
+		t.Fatalf("ticket snapshot = %#v", ticket)
+	}
+}
+
+func TestReduceLiveEventCompletesTicketProgress(t *testing.T) {
+	r := newLoopRegistry(1)
+	r.tryStart("epic-a", 1, 3)
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationStarted, Identifier: "01", Label: "iter-01",
+	})
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationPaused, Label: "iter-01",
+	})
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationResumed, Label: "iter-01",
+	})
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationFinished, Identifier: "01",
+	})
+
+	snapshot, _ := r.runSnapshot("epic-a")
+	if snapshot.Done != 2 || snapshot.Paused || !snapshot.Tickets["01"].Completed {
+		t.Fatalf("snapshot after ticket completion = %#v", snapshot)
+	}
+}
+
+func TestFinishPreservesCompletionAndFailureSnapshots(t *testing.T) {
+	r := newLoopRegistry(2)
+	r.tryStart("epic-a", 1, 1)
+	r.tryStart("epic-b", 0, 1)
+	r.finish("epic-a", nil)
+	r.finish("epic-b", errors.New("agent failed"))
+	r.pause()
+
+	succeeded, ok := r.runSnapshot("epic-a")
+	if !ok || succeeded.State != RunStateCompleted || succeeded.Paused || succeeded.FinalError != "" {
+		t.Fatalf("successful snapshot = %#v, %v", succeeded, ok)
+	}
+	failed, ok := r.runSnapshot("epic-b")
+	if !ok || failed.State != RunStateFailed || failed.FinalError != "agent failed" {
+		t.Fatalf("failed snapshot = %#v, %v", failed, ok)
+	}
+}
+
+func TestRunSnapshotsAllowConcurrentReductionAndReads(t *testing.T) {
+	r := newLoopRegistry(1)
+	r.tryStart("epic-a", 0, 1)
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationStarted, Identifier: "01", Label: "iter-01",
+	})
+
+	var wg sync.WaitGroup
+	for i := range 100 {
+		wg.Add(2)
+		go func(tokens int) {
+			defer wg.Done()
+			r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+				Kind: ralphloop.LiveEventContextOccupancy, Identifier: "01", Tokens: tokens,
+			})
+		}(i)
+		go func() {
+			defer wg.Done()
+			r.runSnapshots()
+		}()
+	}
+	wg.Wait()
+	if _, ok := r.runSnapshot("epic-a"); !ok {
+		t.Fatal("runSnapshot(epic-a): want snapshot after concurrent access")
+	}
+}
+
+func TestReduceLiveEventCapturesEpicCompletion(t *testing.T) {
+	r := newLoopRegistry(1)
+	r.tryStart("epic-a", 2, 3)
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventEpicComplete, Completed: 3,
+	})
+
+	snapshot, _ := r.runSnapshot("epic-a")
+	if snapshot.State != RunStateCompleted || snapshot.Done != 3 {
+		t.Fatalf("snapshot after epic completion = %#v", snapshot)
+	}
+}
 
 func TestTryStartSameEpicTwiceFails(t *testing.T) {
 	r := newLoopRegistry(2)

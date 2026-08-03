@@ -40,6 +40,39 @@ type epicRun struct {
 	done, total int
 	sink        *ralphloop.ChannelEventSink
 	gate        *ralphloop.Gate
+	state       RunState
+	finalError  string
+	tickets     map[string]RunTicketSnapshot
+}
+
+type RunState string
+
+const (
+	RunStateRunning   RunState = "running"
+	RunStateCompleted RunState = "completed"
+	RunStateFailed    RunState = "failed"
+)
+
+type RunTicketSnapshot struct {
+	Identifier    string
+	Label         string
+	Running       bool
+	Paused        bool
+	Completed     bool
+	PauseKind     ralphloop.PauseKind
+	PauseReason   string
+	ContextTokens int
+}
+
+type RunSnapshot struct {
+	EpicName      string
+	State         RunState
+	Done          int
+	Total         int
+	ContextTokens int
+	Paused        bool
+	FinalError    string
+	Tickets       map[string]RunTicketSnapshot
 }
 
 // loopRegistry enforces "an epic may not have two ralph-loops running at
@@ -56,6 +89,7 @@ type loopRegistry struct {
 	mu            sync.Mutex
 	maxConcurrent int
 	runs          map[string]*epicRun
+	snapshots     map[string]*epicRun
 	paused        bool
 	// lastErr carries each finished run's error (nil on success) past
 	// finish() removing it from runs, keyed by epicName so two epics
@@ -75,6 +109,7 @@ func newLoopRegistry(maxConcurrent int) *loopRegistry {
 	return &loopRegistry{
 		maxConcurrent: maxConcurrent,
 		runs:          map[string]*epicRun{},
+		snapshots:     map[string]*epicRun{},
 		lastErr:       map[string]error{},
 	}
 }
@@ -103,8 +138,121 @@ func (r *loopRegistry) tryStart(epicName string, done, total int) (*ralphloop.Ch
 		return nil, false
 	}
 	sink := ralphloop.NewChannelEventSink()
-	r.runs[epicName] = &epicRun{done: done, total: total, sink: sink, gate: ralphloop.NewGate()}
+	run := &epicRun{
+		done: done, total: total, sink: sink, gate: ralphloop.NewGate(),
+		state: RunStateRunning, tickets: map[string]RunTicketSnapshot{},
+	}
+	r.runs[epicName] = run
+	r.snapshots[epicName] = run
 	return sink, true
+}
+
+func (r *loopRegistry) reduceLiveEvent(epicName string, event ralphloop.LiveEvent) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	run := r.snapshots[epicName]
+	if run == nil {
+		return
+	}
+	switch event.Kind {
+	case ralphloop.LiveEventIterationStarted, ralphloop.LiveEventTicketReattached:
+		run.tickets[event.Identifier] = RunTicketSnapshot{
+			Identifier: event.Identifier,
+			Label:      event.Label,
+			Running:    true,
+		}
+	case ralphloop.LiveEventContextOccupancy:
+		ticket, ok := run.tickets[event.Identifier]
+		if ok {
+			ticket.ContextTokens = event.Tokens
+			run.tickets[event.Identifier] = ticket
+		}
+	case ralphloop.LiveEventIterationPaused:
+		for identifier, ticket := range run.tickets {
+			if ticket.Label != event.Label {
+				continue
+			}
+			ticket.Running = false
+			ticket.Paused = true
+			ticket.PauseKind = event.PauseKind
+			ticket.PauseReason = event.Reason
+			run.tickets[identifier] = ticket
+			break
+		}
+	case ralphloop.LiveEventIterationResumed:
+		for identifier, ticket := range run.tickets {
+			if ticket.Label != event.Label {
+				continue
+			}
+			ticket.Running = true
+			ticket.Paused = false
+			ticket.PauseKind = ""
+			ticket.PauseReason = ""
+			run.tickets[identifier] = ticket
+			break
+		}
+	case ralphloop.LiveEventIterationFinished:
+		ticket, ok := run.tickets[event.Identifier]
+		if ok {
+			ticket.Running = false
+			ticket.Paused = false
+			ticket.Completed = true
+			ticket.PauseKind = ""
+			ticket.PauseReason = ""
+			ticket.ContextTokens = 0
+			run.tickets[event.Identifier] = ticket
+			run.done++
+		}
+	case ralphloop.LiveEventEpicComplete:
+		run.done = event.Completed
+		run.state = RunStateCompleted
+	}
+}
+
+func (r *loopRegistry) runSnapshot(epicName string) (RunSnapshot, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	run := r.snapshots[epicName]
+	if run == nil {
+		return RunSnapshot{}, false
+	}
+	return copyRunSnapshot(epicName, run, r.paused), true
+}
+
+func (r *loopRegistry) runSnapshots() []RunSnapshot {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	names := make([]string, 0, len(r.snapshots))
+	for name := range r.snapshots {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	snapshots := make([]RunSnapshot, len(names))
+	for i, name := range names {
+		snapshots[i] = copyRunSnapshot(name, r.snapshots[name], r.paused)
+	}
+	return snapshots
+}
+
+func copyRunSnapshot(epicName string, run *epicRun, queuePaused bool) RunSnapshot {
+	tickets := make(map[string]RunTicketSnapshot, len(run.tickets))
+	contextTokens := 0
+	paused := queuePaused && run.state == RunStateRunning
+	for identifier, ticket := range run.tickets {
+		tickets[identifier] = ticket
+		contextTokens += ticket.ContextTokens
+		paused = paused || ticket.Paused
+	}
+	return RunSnapshot{
+		EpicName:      epicName,
+		State:         run.state,
+		Done:          run.done,
+		Total:         run.total,
+		ContextTokens: contextTokens,
+		Paused:        paused,
+		FinalError:    run.finalError,
+		Tickets:       tickets,
+	}
 }
 
 func (r *loopRegistry) gateFor(epicName string) *ralphloop.Gate {
@@ -143,6 +291,13 @@ func (r *loopRegistry) isPaused() bool {
 func (r *loopRegistry) finish(epicName string, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if run := r.runs[epicName]; run != nil {
+		run.state = RunStateCompleted
+		if err != nil {
+			run.state = RunStateFailed
+			run.finalError = err.Error()
+		}
+	}
 	delete(r.runs, epicName)
 	r.lastErr[epicName] = err
 }
