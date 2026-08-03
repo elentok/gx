@@ -4,9 +4,12 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
 )
 
@@ -72,6 +75,75 @@ func TestQueueModelIncludesSelectionsAddedAfterLoad(t *testing.T) {
 	checked[path] = true
 	if content := m.View().Content; !strings.Contains(content, "Later") {
 		t.Fatalf("expected cached Queue model to include a later shared selection:\n%s", content)
+	}
+}
+
+func TestQueueModelEnterChoosesAgentAndStartsOneEpicSubset(t *testing.T) {
+	root := testutil.TempRepo(t)
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "alpha", "03-unchecked.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "beta", "01-other.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "01-first.md"):  true,
+		ticketPath(root, "alpha", "02-second.md"): true,
+		ticketPath(root, "beta", "01-other.md"):   true,
+	}
+
+	previousRun := runRalphLoop
+	previousRegistry := ralphLoopRegistry
+	runOptions := make(chan ralphloop.RunOptions, 1)
+	releaseRun := make(chan struct{})
+	runReturned := make(chan struct{})
+	runRalphLoop = func(opts ralphloop.RunOptions, _ ralphloop.Deps, _ ralphloop.EventSink) error {
+		runOptions <- opts
+		<-releaseRun
+		close(runReturned)
+		return nil
+	}
+	ralphLoopRegistry = newLoopRegistry(defaultMaxConcurrentEpics)
+	t.Cleanup(func() {
+		close(releaseRun)
+		select {
+		case <-runReturned:
+		case <-time.After(time.Second):
+		}
+		deadline := time.Now().Add(time.Second)
+		for ralphLoopRegistry.isRunning() && time.Now().Before(deadline) {
+			time.Sleep(time.Millisecond)
+		}
+		runRalphLoop = previousRun
+		ralphLoopRegistry = previousRegistry
+	})
+
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(QueueModel)
+	if content := m.View().Content; !strings.Contains(content, "Choose the agent") {
+		t.Fatalf("expected Enter to open the agent picker:\n%s", content)
+	}
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	m = updated.(QueueModel)
+	if cmd == nil {
+		t.Fatal("expected choosing Codex to start execution")
+	}
+	updated, _ = m.Update(cmd())
+	m = updated.(QueueModel)
+	if content := m.View().Content; !strings.Contains(content, "Running alpha with Codex") {
+		t.Fatalf("expected running banner after kickoff:\n%s", content)
+	}
+
+	select {
+	case opts := <-runOptions:
+		if opts.EpicName != "alpha" || opts.Agent != ralphloop.AgentCodex {
+			t.Fatalf("unexpected run target: epic=%q agent=%q", opts.EpicName, opts.Agent)
+		}
+		if strings.Join(opts.TicketIDs, ",") != "01,02" {
+			t.Fatalf("expected checked alpha subset [01 02], got %v", opts.TicketIDs)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for ralph-loop kickoff")
 	}
 }
 

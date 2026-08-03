@@ -3,12 +3,16 @@ package tickets
 import (
 	"fmt"
 	"path/filepath"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/notify"
 )
 
 // Keep plan waves aligned with the concurrency used when the plan executes.
@@ -29,13 +33,23 @@ type QueueModel struct {
 	candidates    map[string]bool
 
 	selected int
+
+	implementAgentMenuOpen bool
+	implementAgentMenu     components.MenuState
+	runningEpic            string
+	runningAgent           ralphloop.AgentKind
 }
 
 func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string]bool) QueueModel {
 	if checked == nil {
 		checked = map[string]bool{}
 	}
-	return QueueModel{worktreeRoot: worktreeRoot, settings: settings, checked: checked}
+	return QueueModel{
+		worktreeRoot:       worktreeRoot,
+		settings:           settings,
+		checked:            checked,
+		implementAgentMenu: newImplementAgentMenu(),
+	}
 }
 
 func (m QueueModel) Init() tea.Cmd {
@@ -71,6 +85,18 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.clampSelected()
 		return m, nil
+	case implementStartedMsg:
+		m.runningEpic = msg.epicName
+		return m, tea.Batch(cmdPollImplement(msg.epicName), cmdDrainQueueEvents(msg.epicName, msg.events))
+	case implementPollMsg:
+		if running, epicName, _ := ralphLoopRegistry.snapshot(msg.epicName); running && epicName == msg.epicName {
+			return m, cmdPollImplement(msg.epicName)
+		}
+		m.runningEpic = ""
+		return m, implementFinishedNotifyCmd(msg.epicName)
+	case implementFailedMsg:
+		m.runningEpic = ""
+		return m, notify.Error(msg.err.Error())
 	case tea.KeyPressMsg:
 		return m.handleQueueKey(msg)
 	}
@@ -78,6 +104,9 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.implementAgentMenuOpen {
+		return m.handleQueueAgentMenuKey(msg)
+	}
 	switch msg.String() {
 	case "q", "esc":
 		return m, nav.Back()
@@ -89,8 +118,96 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.cmdLoadQueue()
 	case " ", "space":
 		m.toggleSelected()
+	case "enter":
+		if m.runningEpic == "" {
+			if _, _, _, ok := m.firstCheckedEpic(); ok {
+				m.implementAgentMenu = newImplementAgentMenu()
+				m.implementAgentMenuOpen = true
+			}
+		}
 	}
 	return m, nil
+}
+
+func (m QueueModel) handleQueueAgentMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "l":
+		return m.startCheckedEpic(ralphloop.AgentClaude)
+	case "o":
+		return m.startCheckedEpic(ralphloop.AgentCodex)
+	}
+
+	next, decided, accepted, handled := components.UpdateMenu(msg, m.implementAgentMenu)
+	if !handled {
+		return m, nil
+	}
+	m.implementAgentMenu = next
+	if !decided {
+		return m, nil
+	}
+	if !accepted {
+		m.implementAgentMenuOpen = false
+		return m, nil
+	}
+	agent := ralphloop.AgentKind(m.implementAgentMenu.Items[m.implementAgentMenu.Cursor].Value)
+	return m.startCheckedEpic(agent)
+}
+
+func (m QueueModel) startCheckedEpic(agent ralphloop.AgentKind) (tea.Model, tea.Cmd) {
+	epic, ticketIDs, done, ok := m.firstCheckedEpic()
+	if !ok {
+		m.implementAgentMenuOpen = false
+		return m, nil
+	}
+	m.implementAgentMenuOpen = false
+	m.runningAgent = agent
+	return m, cmdStartImplement(m.worktreeRoot, epic.Name, agent, done, len(ticketIDs), ticketIDs)
+}
+
+func (m QueueModel) firstCheckedEpic() (tickets.Epic, []string, int, bool) {
+	for _, epic := range m.epics {
+		var ticketIDs []string
+		done := 0
+		for _, idx := range sortedTicketIndexes(epic) {
+			ticket := epic.Tickets[idx]
+			if !m.checked[ticket.Path] {
+				continue
+			}
+			ticketIDs = append(ticketIDs, ticket.Identifier)
+			if epic.RenderedStatus(ticket) == tickets.StatusDone {
+				done++
+			}
+		}
+		if len(ticketIDs) > 0 {
+			return epic, ticketIDs, done, true
+		}
+	}
+	return tickets.Epic{}, nil, 0, false
+}
+
+type queueEventsDrainedMsg struct{}
+
+func cmdDrainQueueEvents(epicName string, events <-chan ralphloop.LiveEvent) tea.Cmd {
+	return func() tea.Msg {
+		ticker := time.NewTicker(implementPollInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case event, ok := <-events:
+				if !ok {
+					return queueEventsDrainedMsg{}
+				}
+				if event.Kind == ralphloop.LiveEventIterationFinished {
+					ralphLoopRegistry.recordTicketFinished(epicName)
+				}
+			case <-ticker.C:
+				running, runningEpic, _ := ralphLoopRegistry.snapshot(epicName)
+				if !running || runningEpic != epicName {
+					return queueEventsDrainedMsg{}
+				}
+			}
+		}
+	}
 }
 
 func (m *QueueModel) moveSelection(delta int) {
@@ -204,6 +321,13 @@ func (m QueueModel) View() tea.View {
 	if !m.ready {
 		return ui.NewMainView("\n  Initializing…")
 	}
+	if m.implementAgentMenuOpen {
+		epic, _, _, _ := m.firstCheckedEpic()
+		return ui.NewMainView(renderImplementAgentMenu(
+			fmt.Sprintf("Choose the agent for epic %q:", epic.Name),
+			m.implementAgentMenu,
+		))
+	}
 	lines := m.queueLines()
 	height := max(m.height-1, 1)
 	return ui.NewMainView(ui.RenderPanel(ui.PanelOptionsFor(
@@ -216,7 +340,11 @@ func (m QueueModel) queueLines() []string {
 		return []string{ui.StyleDim.Render("  loading…")}
 	}
 
-	lines := []string{"  " + ui.StyleHint.Render(queueBanner), ""}
+	banner := queueBanner
+	if m.runningEpic != "" {
+		banner = fmt.Sprintf("Running %s with %s", m.runningEpic, agentDisplayName(m.runningAgent))
+	}
+	lines := []string{"  " + ui.StyleHint.Render(banner), ""}
 
 	rows := m.rows()
 	if len(rows) == 0 {

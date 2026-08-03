@@ -79,6 +79,8 @@ func newLoopRegistry(maxConcurrent int) *loopRegistry {
 
 var ralphLoopRegistry = newLoopRegistry(defaultMaxConcurrentEpics)
 
+var runRalphLoop = ralphloop.Run
+
 // tryStart claims the registry for a new run against epicName, returning the
 // sink to feed ralphloop.Run and false->true ok if epicName already has a
 // run in flight or the registry is already at maxConcurrent. done/total seed
@@ -327,10 +329,14 @@ func (m Model) implementAgentMenuView() string {
 	if r, ok := m.selectedRow(); ok && r.isEpic() {
 		prompt = fmt.Sprintf("Choose the agent for epic %q:", m.epics[r.epicIdx].Name)
 	}
+	return renderImplementAgentMenu(prompt, m.implementAgentMenu)
+}
+
+func renderImplementAgentMenu(prompt string, menu components.MenuState) string {
 	return components.RenderMenuModal(
 		"Implement Epic",
 		prompt,
-		m.implementAgentMenu,
+		menu,
 		"",
 		ui.ColorBorder,
 		ui.ColorBlue,
@@ -434,19 +440,28 @@ func (m Model) OnPageActivated() tea.Cmd {
 // 06) — a second, independent drain here would race that one for events off
 // the same channel.
 func (m Model) cmdStartImplement(epicName string, agent ralphloop.AgentKind, done, total int) tea.Cmd {
-	worktreeRoot := m.worktreeRoot
+	return cmdStartImplement(m.worktreeRoot, epicName, agent, done, total, nil)
+}
+
+func cmdStartImplement(
+	worktreeRoot string,
+	epicName string,
+	agent ralphloop.AgentKind,
+	done, total int,
+	ticketIDs []string,
+) tea.Cmd {
 	return func() tea.Msg {
 		sink, ok := ralphLoopRegistry.tryStart(epicName, done, total)
 		if !ok {
 			return implementFailedMsg{err: fmt.Errorf("a ralph-loop is already running")}
 		}
-		opts, err := buildImplementRunOptions(worktreeRoot, epicName, agent)
+		opts, err := buildImplementRunOptionsForTickets(worktreeRoot, epicName, agent, ticketIDs)
 		if err != nil {
 			ralphLoopRegistry.finish(epicName, nil)
 			return implementFailedMsg{err: err}
 		}
 		go func() {
-			err := ralphloop.Run(opts, ralphloop.DefaultDeps(), sink)
+			err := runRalphLoop(opts, ralphloop.DefaultDeps(), sink)
 			ralphLoopRegistry.finish(epicName, err)
 		}()
 		return implementStartedMsg{epicName: epicName, events: sink.Events()}
@@ -462,6 +477,14 @@ func cmdPollImplement(epicName string) tea.Cmd {
 }
 
 func buildImplementRunOptions(worktreeRoot, epicName string, agent ralphloop.AgentKind) (ralphloop.RunOptions, error) {
+	return buildImplementRunOptionsForTickets(worktreeRoot, epicName, agent, nil)
+}
+
+func buildImplementRunOptionsForTickets(
+	worktreeRoot, epicName string,
+	agent ralphloop.AgentKind,
+	ticketIDs []string,
+) (ralphloop.RunOptions, error) {
 	repo, err := git.FindRepo(worktreeRoot)
 	if err != nil {
 		return ralphloop.RunOptions{}, err
@@ -474,5 +497,6 @@ func buildImplementRunOptions(worktreeRoot, epicName string, agent ralphloop.Age
 		ScratchDir:  filepath.Join(worktreeRoot, ".scratch"),
 		MaxParallel: queuePlanMaxParallel,
 		SmartZone:   150_000,
+		TicketIDs:   ticketIDs,
 	}, nil
 }
