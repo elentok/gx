@@ -19,6 +19,7 @@ func TestWaitForFinish_CodexContextBreachRecoversViaCompactAndFinishPrompt(t *te
 	var interrupted bool
 	var observedCwd, observedSession string
 	var prompts []string
+	var promptUntils [][]string
 	d := Deps{
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
 			waits++
@@ -33,6 +34,7 @@ func TestWaitForFinish_CodexContextBreachRecoversViaCompactAndFinishPrompt(t *te
 		},
 		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
 			prompts = append(prompts, opts.Text)
+			promptUntils = append(promptUntils, opts.Until)
 			return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
 		},
 		ReadCodexContext: func(cwd, sessionID string) (int, bool, error) {
@@ -63,6 +65,10 @@ func TestWaitForFinish_CodexContextBreachRecoversViaCompactAndFinishPrompt(t *te
 	}
 	if len(prompts) != 2 || prompts[0] != "/compact" || !strings.Contains(prompts[1], "150000") {
 		t.Errorf("prompts = %v, want [/compact, <finish-up prompt mentioning 150000>]", prompts)
+	}
+	if len(promptUntils) != 2 || !slices.Equal(promptUntils[0], plainFinishStates) {
+		t.Errorf("/compact Until = %v, want %v (must wait for compaction to finish, not just start, "+
+			"or the finish-up prompt lands mid-compaction and cancels it)", promptUntils, plainFinishStates)
 	}
 	if gate.isPaused() {
 		t.Error("gate.isPaused() = true, want smart-zone recovery to never pause the Gate")

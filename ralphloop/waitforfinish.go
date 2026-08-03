@@ -143,8 +143,8 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 	}
 }
 
-// smartZoneRecoveryTimeoutMs bounds each of recoverSmartZoneBreach's two
-// AgentPrompt calls. herdr's own --wait already fails fast (within ~5s) if it
+// smartZoneRecoveryTimeoutMs bounds recoverSmartZoneBreach's finish-up
+// AgentPrompt call. herdr's own --wait already fails fast (within ~5s) if it
 // never observes a state change after submission, but once it does observe
 // one it waits indefinitely for --until to match — and a submission that
 // never actually gets typed into the pane (observed in production: the
@@ -154,6 +154,12 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 // persistent problem shows up as a repeated smart-zone breach on the same
 // ticket instead of a stuck loop.
 const smartZoneRecoveryTimeoutMs = 30_000
+
+// smartZoneCompactTimeoutMs bounds recoverSmartZoneBreach's wait for the
+// "/compact" command itself to finish (pane back to idle/done), as opposed
+// to merely starting (pane reaching "working"). Compacting a near-full
+// context can take minutes, well past smartZoneRecoveryTimeoutMs.
+const smartZoneCompactTimeoutMs = 300_000
 
 // recoverSmartZoneBreach compacts the conversation and re-prompts the agent
 // to finish up after a smart-zone breach, deliberately never calling
@@ -167,6 +173,14 @@ const smartZoneRecoveryTimeoutMs = 30_000
 // than propagated as a hard error: crashing the whole Run() over a stuck
 // compaction would take down every other running iteration with it, and the
 // agent may well still finish on its own even without this nudge.
+//
+// The "/compact" prompt waits for the pane to reach idle/done — i.e. for the
+// compaction to actually finish, not merely start — before the finish-up
+// prompt is sent. Waiting only for "working" let the finish-up text land
+// mid-compaction and get swallowed as fresh input, canceling the compaction
+// (observed in production as "Compaction canceled."); the caller's smart-zone
+// check would then still see the old, uncompacted occupancy and re-trigger
+// another breach, repeating the cycle.
 func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason string, smartZone int) error {
 	p.sink().SmartZoneCompactStarted(p.Ticket)
 	p.logAgentEvent(eventPausedSmartZone, sessionID, reason)
@@ -175,8 +189,8 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 		Target:    p.Pane,
 		Text:      "/compact",
 		Wait:      true,
-		Until:     []string{"working"},
-		TimeoutMs: smartZoneRecoveryTimeoutMs,
+		Until:     plainFinishStates,
+		TimeoutMs: smartZoneCompactTimeoutMs,
 	}); err != nil {
 		p.sink().SmartZoneRecovered(p.Ticket)
 		p.logAgentEvent(eventSmartZoneRecoveryFailed, sessionID, fmt.Sprintf("compacting %s after smart-zone breach: %v", p.Label, err))
