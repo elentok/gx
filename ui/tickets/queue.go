@@ -424,64 +424,66 @@ type queueRow struct {
 }
 
 func (m QueueModel) rows() []queueRow {
+	rows, _ := m.rowsAndPlanErrors()
+	return rows
+}
+
+// rowsAndPlanErrors renders every candidate ticket as scope-planned waves,
+// using the same canonical planner (ralphloop.PlanWaves over a
+// ralphloop.RunScope) the runner itself claims tickets from — so a wave can
+// never show a ticket as immediately runnable when Run would actually reject
+// it for an unresolved dependency (ticket 24). An epic whose candidates
+// contain a dependency cycle, or a blocker outside the selection that will
+// never resolve, can't be planned into waves at all; its tickets still fall
+// through into one flat row per ticket (in ticket-number order) so they stay
+// visible and toggleable, with the planner's error surfaced separately by
+// name in planErrs for queueLines to render instead of a misleading wave.
+func (m QueueModel) rowsAndPlanErrors() ([]queueRow, map[string]error) {
 	for path := range m.checked {
 		m.candidates[path] = true
 	}
 	var out []queueRow
+	planErrs := make(map[string]error)
 	for _, epic := range m.epics {
-		for waveIndex, wave := range buildEpicWaves(epic, m.candidates, queuePlanMaxParallel) {
+		waves, err := epicWaves(epic, m.candidates, queuePlanMaxParallel)
+		if err != nil {
+			planErrs[epic.Name] = err
+			for _, idx := range sortedTicketIndexes(epic) {
+				t := epic.Tickets[idx]
+				if m.candidates[t.Path] {
+					out = append(out, queueRow{epicName: epic.Name, ticket: t, wave: 0, waveSize: 1})
+				}
+			}
+			continue
+		}
+		for waveIndex, wave := range waves {
 			for _, t := range wave {
 				out = append(out, queueRow{epicName: epic.Name, ticket: t, wave: waveIndex, waveSize: len(wave)})
 			}
 		}
 	}
-	return out
+	return out, planErrs
 }
 
-// buildEpicWaves orders selected tickets while ignoring dependencies outside the plan.
-func buildEpicWaves(epic tickets.Epic, checked map[string]bool, maxParallel int) [][]tickets.Ticket {
-	var pending []tickets.Ticket
+// epicWaves resolves candidates (the checked-ticket paths within epic) into a
+// ralphloop.RunScope and hands off to ralphloop.PlanWaves, the same planner
+// Run uses to claim tickets — see rowsAndPlanErrors.
+func epicWaves(epic tickets.Epic, candidates map[string]bool, maxParallel int) ([][]tickets.Ticket, error) {
+	var ids []string
 	for _, idx := range sortedTicketIndexes(epic) {
 		t := epic.Tickets[idx]
-		if checked[t.Path] {
-			pending = append(pending, t)
+		if candidates[t.Path] {
+			ids = append(ids, t.DisplayNumber())
 		}
 	}
-	if len(pending) == 0 {
-		return nil
+	if len(ids) == 0 {
+		return nil, nil
 	}
-
-	assigned := make(map[string]bool, len(pending))
-	var waves [][]tickets.Ticket
-	for len(pending) > 0 {
-		var wave, next []tickets.Ticket
-		for _, t := range pending {
-			if len(wave) < maxParallel && blockersSatisfied(epic, t, checked, assigned) {
-				wave = append(wave, t)
-			} else {
-				next = append(next, t)
-			}
-		}
-		if len(wave) == 0 {
-			// Malformed cycles remain visible without implying parallel safety.
-			wave, next = pending[:1], pending[1:]
-		}
-		waves = append(waves, wave)
-		for _, t := range wave {
-			assigned[t.Path] = true
-		}
-		pending = next
+	scope, err := ralphloop.ResolveRunScope(epic, ids)
+	if err != nil {
+		return nil, err
 	}
-	return waves
-}
-
-func blockersSatisfied(epic tickets.Epic, t tickets.Ticket, checked, assigned map[string]bool) bool {
-	for _, b := range epic.BlockingTickets(t) {
-		if checked[b.Path] && !assigned[b.Path] {
-			return false
-		}
-	}
-	return true
+	return ralphloop.PlanWaves(epic, scope, maxParallel)
 }
 
 func (m QueueModel) View() tea.View {
@@ -597,7 +599,7 @@ func (m QueueModel) queueLines() []string {
 	banner := m.executionBanner()
 	lines := []string{"  " + ui.StyleHint.Render(banner), ""}
 
-	rows := m.rows()
+	rows, planErrs := m.rowsAndPlanErrors()
 	if len(rows) == 0 {
 		lines = append(lines, ui.StyleMuted.Render("  no tickets checked — check tickets in the Tickets tab to build a plan"))
 		return lines
@@ -612,6 +614,9 @@ func (m QueueModel) queueLines() []string {
 			epicName = r.epicName
 			previousWave = -1
 			lines = append(lines, "", sectionHeaderStyle.Render("── "+epicName+" ──"))
+			if err, ok := planErrs[epicName]; ok {
+				lines = append(lines, statusErrorStyle.Render("    "+err.Error()))
+			}
 		}
 		if previousWave >= 0 && r.wave != previousWave {
 			lines = append(lines, ui.StyleDim.Render("    then"))

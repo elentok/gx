@@ -46,6 +46,51 @@ func TestQueueModelRendersDependencyAwareEpicPlan(t *testing.T) {
 	}
 }
 
+func TestQueueModelNeverShowsATicketRunnableWhenOutOfScopeBlockerIsUnmet(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-foundation.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "alpha", "02-dependent.md", "Status: open\nBlocked by: 01\n\nBody.\n")
+
+	// Only the dependent ticket is checked — its blocker never got selected,
+	// and it isn't done, so ralph-loop's own scheduler would never claim it
+	// either (ralphloop.RunScope.Frontier resolves blockers epic-wide).
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "02-dependent.md"): true,
+	}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	content := m.View().Content
+
+	if strings.Contains(content, "parallel") || strings.Contains(content, "then") {
+		t.Fatalf("expected no runnable wave for a ticket whose out-of-scope blocker is unmet:\n%s", content)
+	}
+	if !strings.Contains(content, "Dependent") {
+		t.Fatalf("expected the checked ticket to remain visible for toggling:\n%s", content)
+	}
+	if !strings.Contains(content, "no unblocked tickets") {
+		t.Fatalf("expected an actionable plan error instead of a misleading wave:\n%s", content)
+	}
+}
+
+func TestQueueModelSurfacesActionableErrorForDependencyCycle(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\nBlocked by: 02\n\nBody.\n")
+	writeTicket(t, root, "alpha", "02-second.md", "Status: open\nBlocked by: 01\n\nBody.\n")
+
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "01-first.md"): true,
+		ticketPath(root, "alpha", "02-second.md"): true,
+	}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	content := m.View().Content
+
+	if !strings.Contains(content, "no unblocked tickets") {
+		t.Fatalf("expected an actionable cycle error:\n%s", content)
+	}
+	if !strings.Contains(content, "First") || !strings.Contains(content, "Second") {
+		t.Fatalf("expected both cyclic tickets to remain visible for toggling:\n%s", content)
+	}
+}
+
 func TestQueueModelBannerWhileRunningAggregatesCheckedEpics(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-done.md", "Status: done\n\nBody.\n")
