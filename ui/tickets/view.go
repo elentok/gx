@@ -100,19 +100,21 @@ func (m Model) appendRowLines(lines []string, rows []row, startIdx int) []string
 	for offset, r := range rows {
 		i := startIdx + offset
 		selected := i == m.selected
-		var line string
+		var rowLines []string
 		if r.isEpic() {
-			line = m.renderEpicRow(m.epics[r.epicIdx])
+			rowLines = []string{m.renderEpicRow(m.epics[r.epicIdx])}
 		} else {
 			epic := m.epics[r.epicIdx]
-			line = m.renderTicketRow(epic, epic.Tickets[r.ticketIdx], i)
+			rowLines = m.renderTicketRow(epic, epic.Tickets[r.ticketIdx], i)
 		}
-		if selected {
-			line = ui.RenderRowHighlight(line)
-		} else if m.rowInRunningEpic(r) {
-			line = ui.RenderGutterBar(line, runningEpicGutterColor)
+		for i, line := range rowLines {
+			if selected {
+				rowLines[i] = ui.RenderRowHighlight(line)
+			} else if m.rowInRunningEpic(r) {
+				rowLines[i] = ui.RenderGutterBar(line, runningEpicGutterColor)
+			}
 		}
-		lines = append(lines, line)
+		lines = append(lines, rowLines...)
 	}
 	return lines
 }
@@ -145,7 +147,11 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 	return line
 }
 
-func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) string {
+// renderTicketRow renders one physical line for a ticket that has never run,
+// and two for a live or done ticket. The second line carries the same
+// elapsed/token metrics as the former standalone ralph-loop view; live rows
+// also move their phase or pause reason there so the title line stays clean.
+func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) []string {
 	status := epic.RenderedStatus(t)
 
 	// See flat_view.go's renderFlatTicketRow for why superseded always wins
@@ -158,7 +164,8 @@ func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) 
 	if status != tickets.StatusSuperseded && epic.Name == m.implementEpic {
 		if live, ok := m.live[t.Identifier]; ok {
 			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live); ok {
-				return appendBlockedBySuffix(base, suffix)
+				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens)
+				return []string{"  " + base, m.renderTicketMetricsLine(joinNonEmpty(" ", suffix, metrics), false)}
 			}
 		}
 	}
@@ -190,7 +197,20 @@ func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) 
 		}
 		line += " " + suffixStyle.Render(suffix)
 	}
-	return line
+	if status != tickets.StatusDone {
+		return []string{line}
+	}
+	metrics := formatMetricsLine(t.ElapsedTime, t.ActualContextWindow)
+	return []string{line, m.renderTicketMetricsLine(metrics, searchDim)}
+}
+
+// renderTicketMetricsLine aligns a ticket's second line beneath its title in
+// the tree (two spaces deeper than the flat view's metrics indentation).
+func (m Model) renderTicketMetricsLine(text string, searchDim bool) string {
+	if searchDim {
+		return "      " + ui.StyleDim.Render(text)
+	}
+	return "  " + renderMetricsLine(text)
 }
 
 func (m Model) icons() ui.IconSet {

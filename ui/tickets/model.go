@@ -229,15 +229,13 @@ func (m Model) sidebarViewportHeight() int {
 	return max(sidebarH-1, 0)
 }
 
-// sidebarLineForSelected returns the selected row's line index within
-// sidebarLines()'s output, accounting for the "── Open epics ──"/"── Closed
-// epics ──" section headers (and their "no … epics" placeholder lines)
-// interleaved before and between the open/closed row blocks. Every row is
-// exactly one rendered line, so this is a direct offset computation rather
-// than a full render.
-func (m Model) sidebarLineForSelected() (int, bool) {
+// sidebarLineForSelected returns the selected row's line index and physical
+// height within sidebarLines()'s output, accounting for the "── Open epics
+// ──"/"── Closed epics ──" section headers (and their "no … epics"
+// placeholder lines) interleaved before and between the row blocks.
+func (m Model) sidebarLineForSelected() (line, height int, ok bool) {
 	if !m.loaded || len(m.epics) == 0 || m.selected < 0 {
-		return 0, false
+		return 0, 0, false
 	}
 	idxs := make([]int, len(m.epics))
 	for i := range m.epics {
@@ -247,23 +245,59 @@ func (m Model) sidebarLineForSelected() (int, bool) {
 	openRows := m.rowsForEpicOrder(openIdxs)
 	closedRows := m.rowsForEpicOrder(closedIdxs)
 
-	line := 1 // "── Open epics (N) ──"
+	line = 1 // "── Open epics (N) ──"
 	if len(openRows) == 0 {
 		line++ // "no open epics"
 	}
 	if m.selected < len(openRows) {
-		return line + m.selected, true
+		return m.sidebarLineInRows(line, openRows, m.selected)
 	}
-	line += len(openRows)
+	line += m.renderedRowsHeight(openRows)
 	line += 2 // blank separator + "── Closed epics (N) ──"
 	if len(closedRows) == 0 {
 		line++ // "no closed epics"
 	}
 	idx := m.selected - len(openRows)
 	if idx < 0 || idx >= len(closedRows) {
-		return 0, false
+		return 0, 0, false
 	}
-	return line + idx, true
+	return m.sidebarLineInRows(line, closedRows, idx)
+}
+
+func (m Model) sidebarLineInRows(line int, rows []row, selected int) (int, int, bool) {
+	line += m.renderedRowsHeight(rows[:selected])
+	return line, m.renderedRowHeight(rows[selected]), true
+}
+
+func (m Model) renderedRowsHeight(rows []row) int {
+	height := 0
+	for _, r := range rows {
+		height += m.renderedRowHeight(r)
+	}
+	return height
+}
+
+func (m Model) renderedRowHeight(r row) int {
+	if r.isEpic() {
+		return 1
+	}
+	epic := m.epics[r.epicIdx]
+	t := epic.Tickets[r.ticketIdx]
+	status := epic.RenderedStatus(t)
+	if status == tickets.StatusDone {
+		return 2
+	}
+	if status == tickets.StatusSuperseded || epic.Name != m.implementEpic {
+		return 1
+	}
+	live, ok := m.live[t.Identifier]
+	if !ok {
+		return 1
+	}
+	if live.running || live.paused {
+		return 2
+	}
+	return 1
 }
 
 // ensureSidebarVisible adjusts scrollOffset minimally so the selected row's
@@ -273,13 +307,14 @@ func (m Model) sidebarLineForSelected() (int, bool) {
 // scroll-follows-cursor fix).
 func (m *Model) ensureSidebarVisible() {
 	viewportH := m.sidebarViewportHeight()
-	line, ok := m.sidebarLineForSelected()
+	line, rowHeight, ok := m.sidebarLineForSelected()
 	if ok {
 		if line < m.scrollOffset {
 			m.scrollOffset = line
 		}
-		if viewportH > 0 && line >= m.scrollOffset+viewportH {
-			m.scrollOffset = line - viewportH + 1
+		lastLine := line + rowHeight - 1
+		if viewportH > 0 && lastLine >= m.scrollOffset+viewportH {
+			m.scrollOffset = lastLine - viewportH + 1
 		}
 	}
 	total := len(m.sidebarLines())
