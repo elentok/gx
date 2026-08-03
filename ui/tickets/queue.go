@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -24,10 +23,14 @@ const queueBanner = "This is the execution plan, press Enter to start"
 
 // QueueModel renders a checked selection as dependency-aware epic waves.
 type QueueModel struct {
-	worktreeRoot string
-	settings     ui.Settings
-	checked      map[string]bool
-	checkOrder   map[string]uint64
+	executionStartedAt time.Time
+	liveContextTokens  map[string]int
+	completedTickets   map[string]bool
+	now                func() time.Time
+	worktreeRoot       string
+	settings           ui.Settings
+	checked            map[string]bool
+	checkOrder         map[string]uint64
 
 	width, height int
 	ready         bool
@@ -53,6 +56,9 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 		checkOrder = orders[0]
 	}
 	return QueueModel{
+		liveContextTokens:  map[string]int{},
+		completedTickets:   map[string]bool{},
+		now:                time.Now,
 		worktreeRoot:       worktreeRoot,
 		settings:           settings,
 		checked:            checked,
@@ -96,8 +102,22 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.clampSelected()
 		return m, nil
 	case implementStartedMsg:
+		if m.executionStartedAt.IsZero() {
+			m.executionStartedAt = m.now()
+		}
 		m.runningEpics[msg.epicName] = true
 		return m, tea.Batch(cmdPollImplement(msg.epicName), cmdDrainQueueEvents(msg.epicName, msg.events))
+	case queueLiveEventMsg:
+		switch msg.event.Kind {
+		case ralphloop.LiveEventContextOccupancy:
+			key := msg.epicName + "/" + msg.event.Identifier
+			m.liveContextTokens[key] = msg.event.Tokens
+		case ralphloop.LiveEventIterationFinished:
+			ralphLoopRegistry.recordTicketFinished(msg.epicName)
+			key := msg.epicName + "/" + msg.event.Identifier
+			m.completedTickets[key] = true
+		}
+		return m, cmdDrainQueueEvents(msg.epicName, msg.events)
 	case implementPollMsg:
 		if running, epicName, _ := ralphLoopRegistry.snapshot(msg.epicName); running && epicName == msg.epicName {
 			return m, cmdPollImplement(msg.epicName)
@@ -239,28 +259,21 @@ func (m *QueueModel) startAvailableEpics() tea.Cmd {
 	}
 }
 
+type queueLiveEventMsg struct {
+	epicName string
+	event    ralphloop.LiveEvent
+	events   <-chan ralphloop.LiveEvent
+}
+
 type queueEventsDrainedMsg struct{}
 
 func cmdDrainQueueEvents(epicName string, events <-chan ralphloop.LiveEvent) tea.Cmd {
 	return func() tea.Msg {
-		ticker := time.NewTicker(implementPollInterval)
-		defer ticker.Stop()
-		for {
-			select {
-			case event, ok := <-events:
-				if !ok {
-					return queueEventsDrainedMsg{}
-				}
-				if event.Kind == ralphloop.LiveEventIterationFinished {
-					ralphLoopRegistry.recordTicketFinished(epicName)
-				}
-			case <-ticker.C:
-				running, runningEpic, _ := ralphLoopRegistry.snapshot(epicName)
-				if !running || runningEpic != epicName {
-					return queueEventsDrainedMsg{}
-				}
-			}
+		event, ok := <-events
+		if !ok {
+			return queueEventsDrainedMsg{}
 		}
+		return queueLiveEventMsg{epicName: epicName, event: event, events: events}
 	}
 }
 
@@ -389,20 +402,47 @@ func (m QueueModel) View() tea.View {
 	)))
 }
 
+func (m QueueModel) executionBanner() string {
+	if len(m.runningEpics) == 0 {
+		return queueBanner
+	}
+
+	done, total := m.checkedProgress()
+	elapsed := int(m.now().Sub(m.executionStartedAt).Seconds())
+	tokens := 0
+	for _, current := range m.liveContextTokens {
+		tokens += current
+	}
+	return fmt.Sprintf(
+		"status: implementing (%d of %d done), elapsed: %s, context windows: %s",
+		done, total, formatElapsed(elapsed), formatTokenCount(tokens),
+	)
+}
+
+func (m QueueModel) checkedProgress() (int, int) {
+	done := 0
+	total := 0
+	for _, epic := range m.epics {
+		for _, ticket := range epic.Tickets {
+			if !m.checked[ticket.Path] {
+				continue
+			}
+			total++
+			key := epic.Name + "/" + ticket.Identifier
+			if epic.RenderedStatus(ticket) == tickets.StatusDone || m.completedTickets[key] {
+				done++
+			}
+		}
+	}
+	return done, total
+}
+
 func (m QueueModel) queueLines() []string {
 	if !m.loaded {
 		return []string{ui.StyleDim.Render("  loading…")}
 	}
 
-	banner := queueBanner
-	if len(m.runningEpics) > 0 {
-		names := make([]string, 0, len(m.runningEpics))
-		for name := range m.runningEpics {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-		banner = fmt.Sprintf("Running %s with %s", strings.Join(names, ", "), agentDisplayName(m.runningAgent))
-	}
+	banner := m.executionBanner()
 	lines := []string{"  " + ui.StyleHint.Render(banner), ""}
 
 	rows := m.rows()

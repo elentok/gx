@@ -45,6 +45,31 @@ func TestQueueModelRendersDependencyAwareEpicPlan(t *testing.T) {
 	}
 }
 
+func TestQueueModelBannerWhileRunningAggregatesCheckedEpics(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-done.md", "Status: done\n\nBody.\n")
+	writeTicket(t, root, "alpha", "02-running.md", "Status: claimed\n\nBody.\n")
+	writeTicket(t, root, "beta", "01-running.md", "Status: claimed\n\nBody.\n")
+
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "01-done.md"):    true,
+		ticketPath(root, "alpha", "02-running.md"): true,
+		ticketPath(root, "beta", "01-running.md"):  true,
+	}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	now := time.Date(2026, time.August, 3, 12, 0, 0, 0, time.UTC)
+	m.executionStartedAt = now.Add(-time.Hour - 3*time.Minute)
+	m.now = func() time.Time { return now }
+	m.runningEpics = map[string]bool{"alpha": true, "beta": true}
+	m.liveContextTokens = map[string]int{"alpha/02": 7000, "beta/01": 5000}
+
+	content := m.View().Content
+	want := "status: implementing (1 of 3 done), elapsed: 1h03m, context windows: 12.0k tok"
+	if !strings.Contains(content, want) {
+		t.Fatalf("running banner missing %q:\n%s", want, content)
+	}
+}
+
 func TestQueueModelSpaceTogglesSharedCheckedSet(t *testing.T) {
 	root := t.TempDir()
 	name := "01-first.md"
