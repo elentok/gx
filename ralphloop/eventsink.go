@@ -53,8 +53,11 @@ type EventSink interface {
 	TicketReverted(identifier string)
 	// TicketReattached reports that a ticket left `Status: claimed` or
 	// `Status: needs-attention` by a prior invocation still has a live
-	// iteration, being resumed under label.
-	TicketReattached(identifier string, label string)
+	// iteration, being resumed under label. cwd/sessionID (best-effort,
+	// recovered from the run log's last iteration-started event; empty if
+	// none found) let a consumer resolve the session's transcript itself, so
+	// elapsed time survives a reattach instead of resetting to zero.
+	TicketReattached(identifier string, label string, cwd string, sessionID string)
 	// TicketStillNeedsAttention reports that a needs-attention ticket has no
 	// live iteration to reattach to — it stays needs-attention for a human to
 	// inspect, unlike a claimed ticket in the same spot (see TicketReverted).
@@ -65,8 +68,10 @@ type EventSink interface {
 	TicketClaimed(ticket tickets.Ticket)
 	// IterationStarted reports that label's agent has launched and been sent
 	// its initial prompt. identifier is the ticket's Identifier (see
-	// TicketReverted).
-	IterationStarted(identifier string, label string)
+	// TicketReverted). cwd/sessionID let a consumer resolve the session's
+	// transcript itself (transcript.Path) to compute elapsed time from its
+	// first line's timestamp, rather than stamping "now" client-side.
+	IterationStarted(identifier string, label string, cwd string, sessionID string)
 	// IterationPaused reports that label paused for reason, of the given
 	// kind.
 	IterationPaused(label string, kind PauseKind, reason string)
@@ -77,6 +82,12 @@ type EventSink interface {
 	IterationFinished(ticket tickets.Ticket, epicName string)
 	// TranscriptLine reports one line of label's live agent transcript.
 	TranscriptLine(label, line string)
+	// ContextOccupancy reports identifier's current context-window token
+	// occupancy, emitted from waitForFinish's existing 30s smart-zone poll
+	// (no dedicated poll loop of its own) plus once immediately at
+	// IterationStarted/TicketReattached time, so a consumer never shows a
+	// misleading "0 tok" for up to 30s after starting/reattaching.
+	ContextOccupancy(identifier string, tokens int)
 
 	// CherryPickStarted reports that identifier's finished iteration is now
 	// being cherry-picked onto the feature branch.
@@ -133,17 +144,18 @@ type EventSink interface {
 // tests exercising pause/resume plumbing) without wiring up a real sink.
 type noopEventSink struct{}
 
-func (noopEventSink) NoTicketsFound(epicName string)                                 {}
-func (noopEventSink) AlreadyComplete(epicName string, done, total int)               {}
-func (noopEventSink) TicketReverted(identifier string)                               {}
-func (noopEventSink) TicketReattached(identifier string, label string)               {}
-func (noopEventSink) TicketStillNeedsAttention(identifier string)                    {}
-func (noopEventSink) TicketClaimed(ticket tickets.Ticket)                            {}
-func (noopEventSink) IterationStarted(identifier string, label string)               {}
-func (noopEventSink) IterationPaused(label string, kind PauseKind, reason string)    {}
-func (noopEventSink) IterationResumed(label string, kind PauseKind)                  {}
-func (noopEventSink) IterationFinished(ticket tickets.Ticket, epicName string)       {}
-func (noopEventSink) TranscriptLine(label, line string)                              {}
+func (noopEventSink) NoTicketsFound(epicName string)                              {}
+func (noopEventSink) AlreadyComplete(epicName string, done, total int)            {}
+func (noopEventSink) TicketReverted(identifier string)                            {}
+func (noopEventSink) TicketReattached(identifier, label, cwd, sessionID string)   {}
+func (noopEventSink) TicketStillNeedsAttention(identifier string)                 {}
+func (noopEventSink) TicketClaimed(ticket tickets.Ticket)                         {}
+func (noopEventSink) IterationStarted(identifier, label, cwd, sessionID string)   {}
+func (noopEventSink) IterationPaused(label string, kind PauseKind, reason string) {}
+func (noopEventSink) IterationResumed(label string, kind PauseKind)               {}
+func (noopEventSink) IterationFinished(ticket tickets.Ticket, epicName string)    {}
+func (noopEventSink) TranscriptLine(label, line string)                           {}
+func (noopEventSink) ContextOccupancy(identifier string, tokens int)              {}
 func (noopEventSink) CherryPickStarted(identifier string)                            {}
 func (noopEventSink) ConflictResolutionStarted(identifier string)                    {}
 func (noopEventSink) SmartZoneCompactStarted(identifier string)                      {}
@@ -188,7 +200,7 @@ func (s *textEventSink) TicketReverted(identifier string) {
 	s.printf("ticket %s: no live iteration found on restart; reverted to open\n", identifier)
 }
 
-func (s *textEventSink) TicketReattached(identifier string, label string) {
+func (s *textEventSink) TicketReattached(identifier, label, cwd, sessionID string) {
 	s.printf("ticket %s: reattaching to live iteration %s\n", identifier, label)
 }
 
@@ -198,7 +210,7 @@ func (s *textEventSink) TicketStillNeedsAttention(identifier string) {
 
 func (s *textEventSink) TicketClaimed(ticket tickets.Ticket) {}
 
-func (s *textEventSink) IterationStarted(identifier string, label string) {}
+func (s *textEventSink) IterationStarted(identifier, label, cwd, sessionID string) {}
 
 func (s *textEventSink) IterationPaused(label string, kind PauseKind, reason string) {
 	switch kind {
@@ -227,6 +239,8 @@ func (s *textEventSink) IterationFinished(ticket tickets.Ticket, epicName string
 }
 
 func (s *textEventSink) TranscriptLine(label, line string) {}
+
+func (s *textEventSink) ContextOccupancy(identifier string, tokens int) {}
 
 func (s *textEventSink) CherryPickStarted(identifier string) {}
 

@@ -35,14 +35,14 @@ func (s *recordingSink) AlreadyComplete(epicName string, done, total int) {
 	s.record("AlreadyComplete")
 }
 func (s *recordingSink) TicketReverted(identifier string) { s.record("TicketReverted") }
-func (s *recordingSink) TicketReattached(identifier string, label string) {
+func (s *recordingSink) TicketReattached(identifier, label, cwd, sessionID string) {
 	s.record("TicketReattached")
 }
 func (s *recordingSink) TicketStillNeedsAttention(identifier string) {
 	s.record("TicketStillNeedsAttention")
 }
 func (s *recordingSink) TicketClaimed(ticket tickets.Ticket) { s.record("TicketClaimed") }
-func (s *recordingSink) IterationStarted(identifier string, label string) {
+func (s *recordingSink) IterationStarted(identifier, label, cwd, sessionID string) {
 	s.record("IterationStarted")
 }
 func (s *recordingSink) IterationPaused(label string, kind PauseKind, reason string) {
@@ -53,6 +53,9 @@ func (s *recordingSink) IterationFinished(ticket tickets.Ticket, epicName string
 	s.record("IterationFinished")
 }
 func (s *recordingSink) TranscriptLine(label, line string) { s.record("TranscriptLine") }
+func (s *recordingSink) ContextOccupancy(identifier string, tokens int) {
+	s.record("ContextOccupancy")
+}
 func (s *recordingSink) TicketCleanupFinished(identifier string) {
 	s.record("TicketCleanupFinished")
 }
@@ -124,7 +127,7 @@ func TestNewTextEventSink_RendersSameTextAsBeforeTheEventSinkRefactor(t *testing
 	sink.NoTicketsFound("epic")
 	sink.AlreadyComplete("epic", 2, 2)
 	sink.TicketReverted("01")
-	sink.TicketReattached("01", "iter-01")
+	sink.TicketReattached("01", "iter-01", "/repo/iter-01", "sess-1")
 	sink.TicketStillNeedsAttention("01")
 	sink.IterationPaused("iter-01", PauseRateLimit, "rate limit detected")
 	sink.IterationResumed("iter-01", PauseRateLimit)
@@ -139,7 +142,8 @@ func TestNewTextEventSink_RendersSameTextAsBeforeTheEventSinkRefactor(t *testing
 
 	// These no-op in the headless CLI: no line should be printed for them.
 	sink.TicketClaimed(tickets.Ticket{Number: 1})
-	sink.IterationStarted("01", "iter-01")
+	sink.IterationStarted("01", "iter-01", "/repo/iter-01", "sess-1")
+	sink.ContextOccupancy("01", 12345)
 	sink.TranscriptLine("iter-01", "some transcript text")
 
 	want := "" +

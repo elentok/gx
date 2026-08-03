@@ -220,7 +220,8 @@ func launchAndPrompt(d Deps, p launchAndPromptParams) (string, error) {
 	}
 	p.logLifecycleEvent(p.StartEvent, agent.AgentSession)
 	if p.StartEvent != "" {
-		p.sink().IterationStarted(p.Ticket, p.Label)
+		p.sink().IterationStarted(p.Ticket, p.Label, p.SessionCwd, agent.AgentSession)
+		emitContextOccupancy(d, p.sink(), p.Agent, p.Ticket, p.SessionCwd, agent.AgentSession)
 	}
 
 	if _, err := d.AgentWait(herdr.AgentWaitOptions{

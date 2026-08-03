@@ -128,6 +128,9 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 		}
 
 		occupancy, ok, occErr := contextOccupancy(d, p.Agent, p.SessionCwd, sessionID)
+		if occErr == nil && ok {
+			p.sink().ContextOccupancy(p.Ticket, occupancy)
+		}
 		if occErr != nil || !ok || occupancy <= smartZone {
 			continue
 		}
@@ -381,6 +384,21 @@ func contextOccupancy(d Deps, agent AgentKind, cwd, sessionID string) (int, bool
 		return 0, false, nil
 	}
 	return d.ReadOccupancy(cwd, sessionID)
+}
+
+// emitContextOccupancy reads cwd/sessionID's current context occupancy and,
+// if available, reports it via sink — the one extra immediate read
+// IterationStarted/TicketReattached each trigger (see EventSink.
+// ContextOccupancy) so a consumer never shows a misleading "0 tok" for up to
+// smartZonePollMs after starting/reattaching. A missing/unreadable occupancy
+// (occErr != nil or !ok, e.g. no session id yet) is silently skipped rather
+// than emitting a misleading zero.
+func emitContextOccupancy(d Deps, sink EventSink, agent AgentKind, identifier, cwd, sessionID string) {
+	occupancy, ok, err := contextOccupancy(d, agent, cwd, sessionID)
+	if err != nil || !ok {
+		return
+	}
+	sink.ContextOccupancy(identifier, occupancy)
 }
 
 func codexRateLimit(d Deps, cwd, sessionID string) (codexsession.RateLimit, bool, error) {

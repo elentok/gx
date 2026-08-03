@@ -6,6 +6,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -72,6 +73,59 @@ func TestWaitForFinish_CodexContextBreachRecoversViaCompactAndFinishPrompt(t *te
 	}
 	if gate.isPaused() {
 		t.Error("gate.isPaused() = true, want smart-zone recovery to never pause the Gate")
+	}
+}
+
+// occupancySink is a minimal EventSink test double that only records
+// ContextOccupancy calls, embedding noopEventSink for the rest.
+type occupancySink struct {
+	noopEventSink
+	mu    sync.Mutex
+	calls []occupancyCall
+}
+
+type occupancyCall struct {
+	identifier string
+	tokens     int
+}
+
+func (s *occupancySink) ContextOccupancy(identifier string, tokens int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.calls = append(s.calls, occupancyCall{identifier: identifier, tokens: tokens})
+}
+
+func TestWaitForFinish_EmitsContextOccupancyOnEachPollTimeout(t *testing.T) {
+	var waits int
+	sink := &occupancySink{}
+	d := Deps{
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			waits++
+			if waits <= 2 {
+				return herdr.Agent{}, errors.New("timed out waiting for agent status")
+			}
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
+			return 1000 * waits, true, nil
+		},
+		Sleep: func(time.Duration) {},
+	}
+
+	err := waitForFinish(d, launchAndPromptParams{
+		Label: "iter-01", Agent: AgentClaude, Pane: "pane-1", Ticket: "01",
+		SessionCwd: "/repo/iter-01", SmartZone: 1_000_000, Gate: NewGate(), Sink: sink,
+	}, "sess-1")
+	if err != nil {
+		t.Fatalf("waitForFinish: %v", err)
+	}
+	if len(sink.calls) != 2 {
+		t.Fatalf("ContextOccupancy calls = %+v, want 2 (one per poll timeout)", sink.calls)
+	}
+	for i, c := range sink.calls {
+		if c.identifier != "01" {
+			t.Errorf("call %d identifier = %q, want 01", i, c.identifier)
+		}
 	}
 }
 

@@ -29,6 +29,7 @@ const (
 	LiveEventSmartZoneCompactStarted
 	LiveEventSmartZoneFinishingUp
 	LiveEventSmartZoneRecovered
+	LiveEventContextOccupancy
 )
 
 // LiveEvent captures one EventSink call for asynchronous delivery over a
@@ -51,6 +52,14 @@ type LiveEvent struct {
 	Completed  int
 	Branch     string
 	LandedSHA  string
+	// Cwd/SessionID (IterationStarted/TicketReattached only) let a consumer
+	// resolve the session's transcript itself (transcript.Path) to compute
+	// elapsed time from its first line's timestamp.
+	Cwd       string
+	SessionID string
+	// Tokens (ContextOccupancy only) is the session's current context-window
+	// token occupancy.
+	Tokens int
 }
 
 // ChannelEventSink implements EventSink by forwarding every call as a
@@ -93,8 +102,8 @@ func (s *ChannelEventSink) TicketReverted(identifier string) {
 	s.emit(LiveEvent{Kind: LiveEventTicketReverted, Identifier: identifier})
 }
 
-func (s *ChannelEventSink) TicketReattached(identifier string, label string) {
-	s.emit(LiveEvent{Kind: LiveEventTicketReattached, Identifier: identifier, Label: label})
+func (s *ChannelEventSink) TicketReattached(identifier, label, cwd, sessionID string) {
+	s.emit(LiveEvent{Kind: LiveEventTicketReattached, Identifier: identifier, Label: label, Cwd: cwd, SessionID: sessionID})
 }
 
 func (s *ChannelEventSink) TicketStillNeedsAttention(identifier string) {
@@ -105,8 +114,8 @@ func (s *ChannelEventSink) TicketClaimed(ticket tickets.Ticket) {
 	s.emit(LiveEvent{Kind: LiveEventTicketClaimed, Identifier: ticket.Identifier, Ticket: ticket})
 }
 
-func (s *ChannelEventSink) IterationStarted(identifier string, label string) {
-	s.emit(LiveEvent{Kind: LiveEventIterationStarted, Identifier: identifier, Label: label})
+func (s *ChannelEventSink) IterationStarted(identifier, label, cwd, sessionID string) {
+	s.emit(LiveEvent{Kind: LiveEventIterationStarted, Identifier: identifier, Label: label, Cwd: cwd, SessionID: sessionID})
 }
 
 func (s *ChannelEventSink) IterationPaused(label string, kind PauseKind, reason string) {
@@ -163,4 +172,8 @@ func (s *ChannelEventSink) SmartZoneFinishingUp(identifier string) {
 
 func (s *ChannelEventSink) SmartZoneRecovered(identifier string) {
 	s.emit(LiveEvent{Kind: LiveEventSmartZoneRecovered, Identifier: identifier})
+}
+
+func (s *ChannelEventSink) ContextOccupancy(identifier string, tokens int) {
+	s.emit(LiveEvent{Kind: LiveEventContextOccupancy, Identifier: identifier, Tokens: tokens})
 }

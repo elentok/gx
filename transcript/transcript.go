@@ -163,6 +163,66 @@ func LastAssistantOccupancy(cwd, sessionID string) (occupancy int, ok bool, err 
 	return usage.Occupancy(), true, nil
 }
 
+// FirstLineTimestamp returns the timestamp of the first parseable line in
+// the transcript at path — a forward scan that stops as soon as one is
+// found, unlike ReadAll's whole-file parse, since a caller computing elapsed
+// time (time.Now() minus this) only needs the earliest line. ok is false if
+// the file doesn't exist yet or has no parseable timestamped line.
+func FirstLineTimestamp(path string) (time.Time, bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return time.Time{}, false, nil
+		}
+		return time.Time{}, false, err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
+	for scanner.Scan() {
+		raw := strings.TrimSpace(scanner.Text())
+		if raw == "" {
+			continue
+		}
+		var entry transcriptLine
+		if jsonErr := json.Unmarshal([]byte(raw), &entry); jsonErr != nil {
+			continue
+		}
+		ts, tsErr := time.Parse(time.RFC3339Nano, entry.Timestamp)
+		if tsErr != nil {
+			continue
+		}
+		return ts, true, nil
+	}
+	if scanErr := scanner.Err(); scanErr != nil {
+		return time.Time{}, false, scanErr
+	}
+	return time.Time{}, false, nil
+}
+
+// Elapsed returns time.Now() minus the session's transcript's first-line
+// timestamp — the same first-line-to-now approach ralphloop's
+// readSessionStats uses for a landed session's elapsed_time, so a
+// still-running session's elapsed figure is computed consistently, and
+// survives a UI restart mid-iteration (a plain time.Now()-at-start capture
+// has no way to recover the iteration's true age after a reattach). ok is
+// false if cwd/sessionID is empty or the transcript can't be read yet.
+func Elapsed(cwd, sessionID string) (time.Duration, bool, error) {
+	if cwd == "" || sessionID == "" {
+		return 0, false, nil
+	}
+	path, err := Path(cwd, sessionID)
+	if err != nil {
+		return 0, false, err
+	}
+	start, ok, err := FirstLineTimestamp(path)
+	if err != nil || !ok {
+		return 0, ok, err
+	}
+	return time.Since(start), true, nil
+}
+
 // Line is a single parsed transcript line, timestamped, carrying its
 // assistant-turn usage if it has one (the zero Usage otherwise). Unlike
 // LastAssistantUsage's tail-only read (built for cheap, frequent polling

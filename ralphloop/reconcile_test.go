@@ -188,6 +188,70 @@ func TestReconcile_ClaimedWithLiveTab_ReturnsReattached(t *testing.T) {
 	}
 }
 
+// reattachSink embeds occupancySink (noopEventSink underneath) and
+// additionally hooks TicketReattached, for asserting the cwd/sessionID it
+// carries plus the immediate ContextOccupancy read it triggers.
+type reattachSink struct {
+	*occupancySink
+	onTicketReattached func(identifier, label, cwd, sessionID string)
+}
+
+func (s *reattachSink) TicketReattached(identifier, label, cwd, sessionID string) {
+	if s.onTicketReattached != nil {
+		s.onTicketReattached(identifier, label, cwd, sessionID)
+	}
+}
+
+// TestReconcile_ClaimedWithLiveTab_TicketReattachedCarriesCwdAndSessionIDPlusImmediateOccupancy
+// covers ticket 02's reattach-time requirements: TicketReattached must carry
+// the cwd/sessionID recovered from the run log's last iteration-started
+// event, and trigger one immediate ContextOccupancy read/emit — the same two
+// signals launchAndPrompt fires at fresh-start time (see launch_test.go),
+// but sourced from the run log instead of a just-launched agent.Session.
+func TestReconcile_ClaimedWithLiveTab_TicketReattachedCarriesCwdAndSessionIDPlusImmediateOccupancy(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+	})
+	if err := logEvent(scratchDir, "epic", Event{
+		Type: eventIterationStarted, Ticket: "01", Agent: AgentClaude,
+		AgentSession: "sess-1", Cwd: "/repo/iter-01",
+	}); err != nil {
+		t.Fatalf("logEvent: %v", err)
+	}
+	epics, err := tickets.Load(scratchDir)
+	if err != nil {
+		t.Fatalf("tickets.Load: %v", err)
+	}
+
+	d, _, _ := fakeDeps()
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
+		return []herdr.Tab{{Label: "iter-01", WorkspaceID: workspaceID}}, nil
+	}
+	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
+		return 4200, true, nil
+	}
+
+	var reattached struct{ identifier, label, cwd, sessionID string }
+	sink := &reattachSink{
+		occupancySink: &occupancySink{},
+		onTicketReattached: func(identifier, label, cwd, sessionID string) {
+			reattached.identifier, reattached.label, reattached.cwd, reattached.sessionID = identifier, label, cwd, sessionID
+		},
+	}
+
+	_, err = reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, sink), epics[0])
+	if err != nil {
+		t.Fatalf("reconcile() error = %v", err)
+	}
+
+	if reattached.identifier != "01" || reattached.label != "iter-01" || reattached.cwd != "/repo/iter-01" || reattached.sessionID != "sess-1" {
+		t.Errorf("TicketReattached args = %+v, want {01 iter-01 /repo/iter-01 sess-1}", reattached)
+	}
+	if len(sink.occupancySink.calls) != 1 || sink.occupancySink.calls[0].identifier != "01" || sink.occupancySink.calls[0].tokens != 4200 {
+		t.Errorf("ContextOccupancy calls = %+v, want one {01 4200} for the immediate reattach-time read", sink.occupancySink.calls)
+	}
+}
+
 func TestReconcile_NeedsAttentionWithLiveTab_ReturnsReattached(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: needs-attention\ntype: task\n---\n# A\n",

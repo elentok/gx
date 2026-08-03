@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestSlugify_ReplacesSlashesAndDots(t *testing.T) {
@@ -192,6 +193,93 @@ func TestUsage_Occupancy_SumsInputSideFieldsOnly(t *testing.T) {
 	u := Usage{InputTokens: 10, CacheReadInputTokens: 20000, CacheCreationInputTokens: 500, OutputTokens: 9999}
 	if got, want := u.Occupancy(), 10+20000+500; got != want {
 		t.Errorf("Occupancy() = %d, want %d (excluding OutputTokens)", got, want)
+	}
+}
+
+func TestFirstLineTimestamp_ReturnsEarliestParseableLine(t *testing.T) {
+	path := writeTranscript(t,
+		`{"type":"user","timestamp":"2026-01-01T00:00:00.000Z","message":{}}`,
+		`{"type":"assistant","timestamp":"2026-01-01T00:00:05.000Z","message":{}}`,
+	)
+
+	ts, ok, err := FirstLineTimestamp(path)
+	if err != nil {
+		t.Fatalf("FirstLineTimestamp() error = %v", err)
+	}
+	if !ok {
+		t.Fatal("FirstLineTimestamp() ok = false, want true")
+	}
+	want := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	if !ts.Equal(want) {
+		t.Errorf("FirstLineTimestamp() = %v, want %v", ts, want)
+	}
+}
+
+func TestFirstLineTimestamp_SkipsMalformedAndUntimestampedLeadingLines(t *testing.T) {
+	path := writeTranscript(t,
+		`not json at all`,
+		`{"type":"user","message":{}}`, // no timestamp field
+		`{"type":"assistant","timestamp":"2026-01-01T00:00:05.000Z","message":{}}`,
+	)
+
+	ts, ok, err := FirstLineTimestamp(path)
+	if err != nil {
+		t.Fatalf("FirstLineTimestamp() error = %v", err)
+	}
+	if !ok {
+		t.Fatal("FirstLineTimestamp() ok = false, want true")
+	}
+	want := time.Date(2026, 1, 1, 0, 0, 5, 0, time.UTC)
+	if !ts.Equal(want) {
+		t.Errorf("FirstLineTimestamp() = %v, want %v", ts, want)
+	}
+}
+
+func TestFirstLineTimestamp_MissingFile_NotOKNoError(t *testing.T) {
+	ts, ok, err := FirstLineTimestamp(filepath.Join(t.TempDir(), "missing.jsonl"))
+	if err != nil {
+		t.Fatalf("FirstLineTimestamp() error = %v, want nil for a missing file", err)
+	}
+	if ok || !ts.IsZero() {
+		t.Errorf("FirstLineTimestamp() = (%v, %v), want (zero, false) for a missing file", ts, ok)
+	}
+}
+
+func TestElapsed_ComputesNowMinusFirstLineTimestamp(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	cwd := "/repo/worktree"
+	slugDir := filepath.Join(dir, ".claude", "projects", Slugify(cwd))
+	if err := os.MkdirAll(slugDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	start := time.Now().Add(-5 * time.Minute).UTC()
+	sessionPath := filepath.Join(slugDir, "sess-1.jsonl")
+	line := `{"type":"assistant","timestamp":"` + start.Format(time.RFC3339Nano) + `","message":{}}` + "\n"
+	if err := os.WriteFile(sessionPath, []byte(line), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	elapsed, ok, err := Elapsed(cwd, "sess-1")
+	if err != nil {
+		t.Fatalf("Elapsed() error = %v", err)
+	}
+	if !ok {
+		t.Fatal("Elapsed() ok = false, want true")
+	}
+	if elapsed < 5*time.Minute || elapsed > 6*time.Minute {
+		t.Errorf("Elapsed() = %v, want approximately 5m", elapsed)
+	}
+}
+
+func TestElapsed_EmptyCwdOrSessionID_NotOKNoError(t *testing.T) {
+	elapsed, ok, err := Elapsed("", "sess-1")
+	if err != nil || ok || elapsed != 0 {
+		t.Errorf("Elapsed(\"\", ...) = (%v, %v, %v), want (0, false, nil)", elapsed, ok, err)
+	}
+	elapsed, ok, err = Elapsed("/repo/worktree", "")
+	if err != nil || ok || elapsed != 0 {
+		t.Errorf("Elapsed(..., \"\") = (%v, %v, %v), want (0, false, nil)", elapsed, ok, err)
 	}
 }
 

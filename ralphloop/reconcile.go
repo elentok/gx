@@ -67,12 +67,25 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 		live[iterationKey(epic.Name, tab.Label)] = true
 	}
 
+	events, _, err := readEvents(paths.ScratchDir, epic.Name)
+	if err != nil {
+		return nil, fmt.Errorf("reading run log for done-ticket verification: %w", err)
+	}
+
+	reattach := func(t tickets.Ticket) {
+		sessionID, cwd, agent, ok := lastIterationSession(events, t.Identifier)
+		sink.TicketReattached(t.Identifier, iterLabel(t.Identifier), cwd, sessionID)
+		if ok {
+			emitContextOccupancy(d, sink, agent, t.Identifier, cwd, sessionID)
+		}
+	}
+
 	var reattached []tickets.Ticket
 	for _, t := range epic.Tickets {
 		status := strings.ToLower(strings.TrimSpace(t.Status))
 		if status == "needs-attention" {
 			if live[iterationKey(epic.Name, iterLabel(t.Identifier))] {
-				sink.TicketReattached(t.Identifier, iterLabel(t.Identifier))
+				reattach(t)
 				reattached = append(reattached, t)
 			} else {
 				sink.TicketStillNeedsAttention(t.Identifier)
@@ -88,13 +101,8 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 			}
 			continue
 		}
-		sink.TicketReattached(t.Identifier, iterLabel(t.Identifier))
+		reattach(t)
 		reattached = append(reattached, t)
-	}
-
-	events, _, err := readEvents(paths.ScratchDir, epic.Name)
-	if err != nil {
-		return nil, fmt.Errorf("reading run log for done-ticket verification: %w", err)
 	}
 	for _, t := range epic.Tickets {
 		if !t.IsDone() || t.IsSuperseded() {
