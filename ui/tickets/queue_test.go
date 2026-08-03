@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -67,6 +68,39 @@ func TestQueueModelBannerWhileRunningAggregatesCheckedEpics(t *testing.T) {
 	want := "status: implementing (1 of 3 done), elapsed: 1h03m, context windows: 12.0k tok"
 	if !strings.Contains(content, want) {
 		t.Fatalf("running banner missing %q:\n%s", want, content)
+	}
+}
+
+func TestQueueModelBannerWhenCompletedAggregatesLandedTicketMetrics(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: claimed\n\nBody.\n")
+	writeTicket(t, root, "alpha", "02-second.md", "Status: claimed\n\nBody.\n")
+	writeTicket(t, root, "beta", "01-third.md", "Status: claimed\n\nBody.\n")
+
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "01-first.md"):  true,
+		ticketPath(root, "alpha", "02-second.md"): true,
+		ticketPath(root, "beta", "01-third.md"):   true,
+	}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	now := time.Date(2026, time.August, 3, 12, 0, 0, 0, time.UTC)
+	m.executionStartedAt = now.Add(-time.Hour - 3*time.Minute)
+	m.now = func() time.Time { return now }
+	m.runningEpics = map[string]bool{"beta": true}
+	m.executionTickets = map[string]bool{"alpha/01": true, "alpha/02": true, "beta/01": true}
+
+	writeRawQueueTicket(t, root, "alpha", "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: task\nactual_context_window: 12000\n---\n\nBody.\n")
+	writeRawQueueTicket(t, root, "alpha", "02-second.md", "---\nid: \"02\"\nstatus: done\ntype: task\nactual_context_window: 7000\n---\n\nBody.\n")
+	writeRawQueueTicket(t, root, "beta", "01-third.md", "---\nid: \"01\"\nstatus: done\ntype: task\nactual_context_window: 5000\n---\n\nBody.\n")
+
+	updated, cmd := m.Update(implementPollMsg{epicName: "beta"})
+	m = deliverQueueCommands(t, updated.(QueueModel), cmd)
+
+	content := m.View().Content
+	want := "status: done, took 1h03m, context windows: total 24.0k tok, avg 8.0k tok, max 12.0k tok"
+	if !strings.Contains(content, want) {
+		done, total := m.completedExecutionProgress()
+		t.Fatalf("completion banner missing %q (completed=%v, progress=%d/%d):\n%s", want, m.executionCompletedAt, done, total, content)
 	}
 }
 
@@ -310,4 +344,11 @@ func loadQueueModel(t *testing.T, m QueueModel) QueueModel {
 
 func ticketPath(root, epic, name string) string {
 	return filepath.Join(root, ".scratch", epic, "issues", name)
+}
+
+func writeRawQueueTicket(t *testing.T, root, epic, name, content string) {
+	t.Helper()
+	if err := os.WriteFile(ticketPath(root, epic, name), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
 }

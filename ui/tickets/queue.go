@@ -23,14 +23,16 @@ const queueBanner = "This is the execution plan, press Enter to start"
 
 // QueueModel renders a checked selection as dependency-aware epic waves.
 type QueueModel struct {
-	executionStartedAt time.Time
-	liveContextTokens  map[string]int
-	completedTickets   map[string]bool
-	now                func() time.Time
-	worktreeRoot       string
-	settings           ui.Settings
-	checked            map[string]bool
-	checkOrder         map[string]uint64
+	executionStartedAt   time.Time
+	executionCompletedAt time.Time
+	executionTickets     map[string]bool
+	liveContextTokens    map[string]int
+	completedTickets     map[string]bool
+	now                  func() time.Time
+	worktreeRoot         string
+	settings             ui.Settings
+	checked              map[string]bool
+	checkOrder           map[string]uint64
 
 	width, height int
 	ready         bool
@@ -57,6 +59,7 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 		checkOrder = orders[0]
 	}
 	return QueueModel{
+		executionTickets:   map[string]bool{},
 		liveContextTokens:  map[string]int{},
 		completedTickets:   map[string]bool{},
 		now:                time.Now,
@@ -125,7 +128,13 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmdPollImplement(msg.epicName)
 		}
 		delete(m.runningEpics, msg.epicName)
-		return m, tea.Batch(implementFinishedNotifyCmd(msg.epicName), m.startAvailableEpics())
+		executionComplete := !m.executionStartedAt.IsZero() && len(m.runningEpics) == 0 && len(m.pendingEpics) == 0
+		startCmd := m.startAvailableEpics()
+		if executionComplete {
+			m.executionCompletedAt = m.now()
+			return m, tea.Batch(implementFinishedNotifyCmd(msg.epicName), startCmd, m.cmdLoadQueue())
+		}
+		return m, tea.Batch(implementFinishedNotifyCmd(msg.epicName), startCmd)
 	case implementFailedMsg:
 		return m, notify.Error(msg.err.Error())
 	case tea.KeyPressMsg:
@@ -200,6 +209,16 @@ func (m QueueModel) startCheckedEpic(agent ralphloop.AgentKind) (tea.Model, tea.
 		return m, nil
 	}
 	m.implementAgentMenuOpen = false
+	m.executionStartedAt = time.Time{}
+	m.executionCompletedAt = time.Time{}
+	m.executionTickets = map[string]bool{}
+	for _, plan := range m.pendingEpics {
+		for _, ticketID := range plan.ticketIDs {
+			m.executionTickets[plan.epic.Name+"/"+ticketID] = true
+		}
+	}
+	m.liveContextTokens = map[string]int{}
+	m.completedTickets = map[string]bool{}
 	m.runningAgent = agent
 	return m, m.startAvailableEpics()
 }
@@ -414,6 +433,17 @@ func (m QueueModel) View() tea.View {
 }
 
 func (m QueueModel) executionBanner() string {
+	if !m.executionCompletedAt.IsZero() {
+		done, totalTickets := m.completedExecutionProgress()
+		if totalTickets > 0 && done == totalTickets {
+			total, average, maximum := m.completedContextMetrics()
+			elapsed := int(m.executionCompletedAt.Sub(m.executionStartedAt).Seconds())
+			return fmt.Sprintf(
+				"status: done, took %s, context windows: total %s, avg %s, max %s",
+				formatElapsed(elapsed), formatTokenCount(total), formatTokenCount(average), formatTokenCount(maximum),
+			)
+		}
+	}
 	if m.paused {
 		return "Queue paused — in-flight iterations will finish"
 	}
@@ -431,6 +461,39 @@ func (m QueueModel) executionBanner() string {
 		"status: implementing (%d of %d done), elapsed: %s, context windows: %s",
 		done, total, formatElapsed(elapsed), formatTokenCount(tokens),
 	)
+}
+
+func (m QueueModel) completedContextMetrics() (total, average, maximum int) {
+	count := 0
+	for _, epic := range m.epics {
+		for _, ticket := range epic.Tickets {
+			if !m.executionTickets[epic.Name+"/"+ticket.Identifier] {
+				continue
+			}
+			count++
+			total += ticket.ActualContextWindow
+			maximum = max(maximum, ticket.ActualContextWindow)
+		}
+	}
+	if count > 0 {
+		average = total / count
+	}
+	return total, average, maximum
+}
+
+func (m QueueModel) completedExecutionProgress() (done, total int) {
+	for _, epic := range m.epics {
+		for _, ticket := range epic.Tickets {
+			if !m.executionTickets[epic.Name+"/"+ticket.Identifier] {
+				continue
+			}
+			total++
+			if epic.RenderedStatus(ticket) == tickets.StatusDone {
+				done++
+			}
+		}
+	}
+	return done, total
 }
 
 func (m QueueModel) checkedProgress() (int, int) {
