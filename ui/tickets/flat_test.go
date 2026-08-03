@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/elentok/gx/tickets"
@@ -47,6 +48,28 @@ func TestSortedTickets_LetteredSiblingsFollowOriginalInFilenameOrder(t *testing.
 		}
 	}
 }
+
+// TestUpdate_FlatLandedLoadedMsg_SuccessAndFailure covers ticket 08's wiring:
+// a successful ralphloop.LandedTickets result populates the map and flips
+// landedOK true, while a failed one (e.g. a transient git error) clears both
+// rather than falling back to an empty "nothing landed" map.
+func TestUpdate_FlatLandedLoadedMsg_SuccessAndFailure(t *testing.T) {
+	m := FlatModel{}
+
+	next, _ := m.Update(flatLandedLoadedMsg{landed: map[string]bool{"01": true}})
+	nm := next.(FlatModel)
+	if !nm.landedOK || !nm.landed["01"] {
+		t.Fatalf("expected landedOK=true and landed[01]=true, got landedOK=%v landed=%v", nm.landedOK, nm.landed)
+	}
+
+	next, _ = nm.Update(flatLandedLoadedMsg{err: errTestLandedFailed})
+	nm = next.(FlatModel)
+	if nm.landedOK || nm.landed != nil {
+		t.Fatalf("expected landedOK=false and landed=nil after a failed check, got landedOK=%v landed=%v", nm.landedOK, nm.landed)
+	}
+}
+
+var errTestLandedFailed = fmt.Errorf("landed check failed")
 
 func identifiers(ts []tickets.Ticket) []string {
 	ids := make([]string, len(ts))

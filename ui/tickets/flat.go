@@ -71,6 +71,15 @@ type FlatModel struct {
 	live            map[string]liveTicketState
 	labelIdentifier map[string]string
 
+	// landed is ticket 03's ralphloop.LandedTickets result (identifier ->
+	// landed), computed once per epic load/manual refresh — never on the 2s
+	// flatTickMsg tick, since it shells out to git. landedOK is false until a
+	// LandedTickets call has succeeded at least once this session; a done
+	// ticket's segment reads "landed?" while landedOK is false, distinct from
+	// a genuinely-absent identifier ("⚠ not landed") once it's true.
+	landed   map[string]bool
+	landedOK bool
+
 	// transcript holds each live ticket's transcript-line tail (ticket 01's
 	// EventSink.TranscriptLine, folded by identifier — see applyLiveEvent),
 	// bounded to flatTranscriptMaxLines. transcriptVP renders it with its own
@@ -118,7 +127,7 @@ func NewFlatModel(worktreeRoot, epicName string, settings ui.Settings) FlatModel
 func (m FlatModel) KeyManager() keys.Manager { return m.keys }
 
 func (m FlatModel) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.cmdLoad(), m.cmdTick()}
+	cmds := []tea.Cmd{m.cmdLoad(), m.cmdLoadLanded(), m.cmdTick()}
 	if m.liveEvents != nil {
 		cmds = append(cmds, cmdWaitLiveEvent(m.liveEvents))
 	}
@@ -129,6 +138,15 @@ type flatEpicLoadedMsg struct {
 	epic  tickets.Epic
 	found bool
 	err   error
+}
+
+// flatLandedLoadedMsg carries a ralphloop.LandedTickets result back from
+// cmdLoadLanded. A non-nil err means the check itself couldn't run (git
+// error, missing feature branch) — handled by leaving landedOK false rather
+// than treating it as "nothing landed".
+type flatLandedLoadedMsg struct {
+	landed map[string]bool
+	err    error
 }
 
 type flatTickMsg struct{}
@@ -157,7 +175,19 @@ func (m FlatModel) cmdLoad() tea.Cmd {
 // cmdRefresh reloads .scratch/ on demand (the "R" binding), matching every
 // other tab's manual refresh convention with a success toast.
 func (m FlatModel) cmdRefresh() tea.Cmd {
-	return tea.Batch(notify.Success("refreshed"), m.cmdLoad())
+	return tea.Batch(notify.Success("refreshed"), m.cmdLoad(), m.cmdLoadLanded())
+}
+
+// cmdLoadLanded recomputes ticket 03's landed-tickets map (one git shell-out)
+// eagerly on load/manual refresh — deliberately not part of cmdTick's 2s
+// disk-poll, since rendering must never trigger a git call (see FlatModel.landed).
+func (m FlatModel) cmdLoadLanded() tea.Cmd {
+	dir := m.worktreeRoot
+	epicName := m.epicName
+	return func() tea.Msg {
+		landed, err := ralphloop.LandedTickets(dir, epicName)
+		return flatLandedLoadedMsg{landed: landed, err: err}
+	}
 }
 
 func (m FlatModel) cmdTick() tea.Cmd {
@@ -235,6 +265,16 @@ func (m FlatModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			return m, tea.Batch(notifyCmd, notify.Error("load .scratch/: "+msg.err.Error()))
 		}
+		return m, notifyCmd
+
+	case flatLandedLoadedMsg:
+		if msg.err != nil {
+			m.landed = nil
+			m.landedOK = false
+			return m, notifyCmd
+		}
+		m.landed = msg.landed
+		m.landedOK = true
 		return m, notifyCmd
 
 	case flatTickMsg:

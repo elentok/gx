@@ -117,6 +117,57 @@ func TestRenderFlatTicketRow_Paused_TwoLinesWithReasonAndFrozenTokens(t *testing
 	}
 }
 
+func TestRenderFlatTicketRow_Done_LandedPresentRendersLanded(t *testing.T) {
+	epic := tickets.Epic{Tickets: []tickets.Ticket{
+		{Identifier: "01", Title: "Done ticket", Status: "done", ElapsedTime: 754, ActualContextWindow: 45200},
+	}}
+	m := newFlatModelForRowTests(epic)
+	m.landedOK = true
+	m.landed = map[string]bool{"01": true}
+
+	rows := m.renderFlatTicketRow(epic.Tickets[0])
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 lines, got %d: %#v", len(rows), rows)
+	}
+	if !strings.Contains(rows[1], "landed") || strings.Contains(rows[1], "not landed") {
+		t.Errorf("expected line 2 to show plain 'landed', got %q", rows[1])
+	}
+}
+
+func TestRenderFlatTicketRow_Done_LandedAbsentRendersNotLanded(t *testing.T) {
+	epic := tickets.Epic{Tickets: []tickets.Ticket{
+		{Identifier: "01", Title: "Done ticket", Status: "done", ElapsedTime: 754, ActualContextWindow: 45200},
+	}}
+	m := newFlatModelForRowTests(epic)
+	m.landedOK = true
+	m.landed = map[string]bool{}
+
+	rows := m.renderFlatTicketRow(epic.Tickets[0])
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 lines, got %d: %#v", len(rows), rows)
+	}
+	if !strings.Contains(rows[1], "not landed") {
+		t.Errorf("expected line 2 to show 'not landed', got %q", rows[1])
+	}
+}
+
+func TestRenderFlatTicketRow_Done_LandedUnavailableRendersLandedQuestionMark(t *testing.T) {
+	epic := tickets.Epic{Tickets: []tickets.Ticket{
+		{Identifier: "01", Title: "Done ticket", Status: "done", ElapsedTime: 754, ActualContextWindow: 45200},
+	}}
+	m := newFlatModelForRowTests(epic)
+	m.landedOK = false
+	m.landed = nil
+
+	rows := m.renderFlatTicketRow(epic.Tickets[0])
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 lines, got %d: %#v", len(rows), rows)
+	}
+	if !strings.Contains(rows[1], "landed?") {
+		t.Errorf("expected line 2 to show 'landed?', got %q", rows[1])
+	}
+}
+
 func TestListLines_FlattensTwoLineRowsAndHighlightsBoth(t *testing.T) {
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
 		{Identifier: "01", Title: "Open ticket", Status: "open"},

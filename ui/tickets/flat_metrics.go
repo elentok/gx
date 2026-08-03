@@ -89,3 +89,32 @@ func joinNonEmpty(sep, a, b string) string {
 func renderMetricsLine(text string) string {
 	return metricsLineIndent + metricsLineStyle.Render(text)
 }
+
+// landedSegmentText renders ticket 03's landed-check outcome for a done
+// ticket's metrics line third segment: "landed" (ok, present — the expected
+// case) plain, "⚠ not landed" (ok, absent — a genuine anomaly) flagged as
+// warn so the caller can pop it in the existing attention style, and
+// "landed?" (check unavailable) dim like the rest of the line, since an
+// inconclusive check is not itself an anomaly.
+func landedSegmentText(icons ui.IconSet, ok, present bool) (text string, warn bool) {
+	switch {
+	case !ok:
+		return "landed?", false
+	case present:
+		return "landed", false
+	default:
+		return icons.Warning + " not landed", true
+	}
+}
+
+// renderMetricsLineWithLanded appends landed's segment to base (already
+// composed elapsed/token figures), keeping the middle-dot separator in the
+// line's normal dim/italic style even when the segment itself pops in the
+// warning style.
+func renderMetricsLineWithLanded(base string, icons ui.IconSet, ok, present bool) string {
+	text, warn := landedSegmentText(icons, ok, present)
+	if !warn {
+		return renderMetricsLine(base + " · " + text)
+	}
+	return metricsLineIndent + metricsLineStyle.Render(base+" · ") + statusNeedsAttentionStyle.Render(text)
+}

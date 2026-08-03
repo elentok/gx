@@ -151,7 +151,8 @@ func (m FlatModel) ticketMetricsLine(t tickets.Ticket, status tickets.RenderedSt
 	if status != tickets.StatusDone {
 		return ""
 	}
-	return renderMetricsLine(formatMetricsLine(t.ElapsedTime, t.ActualContextWindow))
+	base := formatMetricsLine(t.ElapsedTime, t.ActualContextWindow)
+	return renderMetricsLineWithLanded(base, m.icons(), m.landedOK, m.landed[t.Identifier])
 }
 
 // previewContent builds the selected ticket's preview, mirroring
