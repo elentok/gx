@@ -38,7 +38,7 @@ func withQueueStateDir(t *testing.T) string {
 func TestLoadQueueStateMissingFileReturnsEmpty(t *testing.T) {
 	withQueueStateDir(t)
 
-	got := loadQueueState()
+	got, _ := loadQueueState()
 	if len(got) != 0 {
 		t.Fatalf("expected empty queue state, got %v", got)
 	}
@@ -54,7 +54,7 @@ func TestLoadQueueStateCorruptFileReturnsEmpty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := loadQueueState()
+	got, _ := loadQueueState()
 	if len(got) != 0 {
 		t.Fatalf("expected empty queue state for corrupt file, got %v", got)
 	}
@@ -67,11 +67,15 @@ func TestSaveQueueStateRoundTrips(t *testing.T) {
 		"/repo/.scratch/epic/issues/01.md": queueStatusRunning,
 		"/repo/.scratch/epic/issues/02.md": queueStatusDone,
 	}
-	if err := saveQueueState(items); err != nil {
+	checkOrder := map[string]uint64{
+		"/repo/.scratch/epic/issues/01.md": 2,
+		"/repo/.scratch/epic/issues/02.md": 1,
+	}
+	if err := saveQueueState(items, checkOrder); err != nil {
 		t.Fatalf("saveQueueState: %v", err)
 	}
 
-	got := loadQueueState()
+	got, gotOrder := loadQueueState()
 	if len(got) != 2 {
 		t.Fatalf("got %d items, want 2: %v", len(got), got)
 	}
@@ -80,6 +84,9 @@ func TestSaveQueueStateRoundTrips(t *testing.T) {
 	}
 	if got["/repo/.scratch/epic/issues/02.md"] != queueStatusDone {
 		t.Fatalf("status = %v, want done", got["/repo/.scratch/epic/issues/02.md"])
+	}
+	if gotOrder["/repo/.scratch/epic/issues/01.md"] != 2 || gotOrder["/repo/.scratch/epic/issues/02.md"] != 1 {
+		t.Fatalf("check order = %v, want persisted ordinals", gotOrder)
 	}
 }
 
@@ -99,7 +106,7 @@ func TestModel_CheckingTicketPersistsPendingStatus(t *testing.T) {
 	updated, _ = m.Update(spacePress())
 	m = updated.(Model)
 
-	got := loadQueueState()
+	got, _ := loadQueueState()
 	if got[ticket.Path] != queueStatusPending {
 		t.Fatalf("persisted status = %v, want pending", got[ticket.Path])
 	}
@@ -123,7 +130,7 @@ func TestModel_UncheckingTicketRemovesPersistedStatus(t *testing.T) {
 	updated, _ = m.Update(spacePress())
 	m = updated.(Model)
 
-	got := loadQueueState()
+	got, _ := loadQueueState()
 	if _, ok := got[ticket.Path]; ok {
 		t.Fatalf("expected ticket removed from persisted state after uncheck, got %v", got)
 	}

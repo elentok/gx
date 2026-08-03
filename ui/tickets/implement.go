@@ -197,6 +197,12 @@ func (r *loopRegistry) isRunning() bool {
 	return len(r.runs) > 0
 }
 
+func (r *loopRegistry) availableSlots() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return max(r.maxConcurrent-len(r.runs), 0)
+}
+
 // IsLoopRunning reports whether a ralph-loop launched from this process is
 // currently in flight for any epic, regardless of which worktree it
 // targets. The app shell (ticket 05) uses this to force the tickets tab

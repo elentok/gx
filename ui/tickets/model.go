@@ -6,6 +6,7 @@ package tickets
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/viewport"
@@ -62,6 +63,9 @@ type Model struct {
 	// reload's re-sorting/index-shuffling. Later tickets (06, 07, 09, 11) read
 	// this set; this one only has to keep it correct and visible.
 	checked map[string]bool
+	// checkOrder records when each path joined checked. The map is shared by
+	// cached Tickets and Queue models just like checked.
+	checkOrder map[string]uint64
 	// queueStatus mirrors checked's keys with each ticket's queue-run status
 	// (ticket 11): pending as soon as it's checked, then running/done/errored
 	// as execution wiring (tickets 08/09/12) progresses it. Persisted to disk
@@ -132,7 +136,16 @@ func NewModelWithScope(worktreeRoot string, settings ui.Settings, extraKeys keys
 	_ = extraKeys
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
-	queueStatus := loadQueueState()
+	queueStatus, checkOrder := loadQueueState()
+	if !allRepos {
+		scratchPrefix := filepath.Join(worktreeRoot, ".scratch") + string(filepath.Separator)
+		for path := range queueStatus {
+			if !strings.HasPrefix(path, scratchPrefix) {
+				delete(queueStatus, path)
+				delete(checkOrder, path)
+			}
+		}
+	}
 	checked := make(map[string]bool, len(queueStatus))
 	for path := range queueStatus {
 		checked[path] = true
@@ -153,6 +166,7 @@ func NewModelWithScope(worktreeRoot string, settings ui.Settings, extraKeys keys
 		labelIdentifier:    map[string]map[string]string{},
 		liveEvents:         map[string]<-chan ralphloop.LiveEvent{},
 		checked:            checked,
+		checkOrder:         checkOrder,
 		queueStatus:        queueStatus,
 	}
 }
@@ -190,7 +204,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case epicsLoadedMsg:
 		before := len(m.checked)
-		autoCheckSplitChildren(m.epics, msg.epics, m.checked, m.queueStatus)
+		autoCheckSplitChildren(m.epics, msg.epics, m.checked, m.checkOrder, m.queueStatus)
 		if len(m.checked) != before {
 			m.persistQueueState()
 		}

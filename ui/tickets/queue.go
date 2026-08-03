@@ -3,6 +3,8 @@ package tickets
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -25,6 +27,7 @@ type QueueModel struct {
 	worktreeRoot string
 	settings     ui.Settings
 	checked      map[string]bool
+	checkOrder   map[string]uint64
 
 	width, height int
 	ready         bool
@@ -36,19 +39,26 @@ type QueueModel struct {
 
 	implementAgentMenuOpen bool
 	implementAgentMenu     components.MenuState
-	runningEpic            string
+	pendingEpics           []checkedEpicPlan
+	runningEpics           map[string]bool
 	runningAgent           ralphloop.AgentKind
 }
 
-func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string]bool) QueueModel {
+func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string]bool, orders ...map[string]uint64) QueueModel {
 	if checked == nil {
 		checked = map[string]bool{}
+	}
+	checkOrder := map[string]uint64{}
+	if len(orders) > 0 && orders[0] != nil {
+		checkOrder = orders[0]
 	}
 	return QueueModel{
 		worktreeRoot:       worktreeRoot,
 		settings:           settings,
 		checked:            checked,
+		checkOrder:         checkOrder,
 		implementAgentMenu: newImplementAgentMenu(),
+		runningEpics:       map[string]bool{},
 	}
 }
 
@@ -86,16 +96,15 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.clampSelected()
 		return m, nil
 	case implementStartedMsg:
-		m.runningEpic = msg.epicName
+		m.runningEpics[msg.epicName] = true
 		return m, tea.Batch(cmdPollImplement(msg.epicName), cmdDrainQueueEvents(msg.epicName, msg.events))
 	case implementPollMsg:
 		if running, epicName, _ := ralphLoopRegistry.snapshot(msg.epicName); running && epicName == msg.epicName {
 			return m, cmdPollImplement(msg.epicName)
 		}
-		m.runningEpic = ""
-		return m, implementFinishedNotifyCmd(msg.epicName)
+		delete(m.runningEpics, msg.epicName)
+		return m, tea.Batch(implementFinishedNotifyCmd(msg.epicName), m.startAvailableEpics())
 	case implementFailedMsg:
-		m.runningEpic = ""
 		return m, notify.Error(msg.err.Error())
 	case tea.KeyPressMsg:
 		return m.handleQueueKey(msg)
@@ -119,8 +128,8 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case " ", "space":
 		m.toggleSelected()
 	case "enter":
-		if m.runningEpic == "" {
-			if _, _, _, ok := m.firstCheckedEpic(); ok {
+		if len(m.runningEpics) == 0 && len(m.pendingEpics) == 0 {
+			if len(m.checkedEpicPlans()) > 0 {
 				m.implementAgentMenu = newImplementAgentMenu()
 				m.implementAgentMenuOpen = true
 			}
@@ -154,20 +163,31 @@ func (m QueueModel) handleQueueAgentMenuKey(msg tea.KeyPressMsg) (tea.Model, tea
 }
 
 func (m QueueModel) startCheckedEpic(agent ralphloop.AgentKind) (tea.Model, tea.Cmd) {
-	epic, ticketIDs, done, ok := m.firstCheckedEpic()
-	if !ok {
+	m.pendingEpics = m.checkedEpicPlans()
+	if len(m.pendingEpics) == 0 {
 		m.implementAgentMenuOpen = false
 		return m, nil
 	}
 	m.implementAgentMenuOpen = false
 	m.runningAgent = agent
-	return m, cmdStartImplement(m.worktreeRoot, epic.Name, agent, done, len(ticketIDs), ticketIDs)
+	return m, m.startAvailableEpics()
 }
 
-func (m QueueModel) firstCheckedEpic() (tickets.Epic, []string, int, bool) {
+type checkedEpicPlan struct {
+	epic      tickets.Epic
+	ticketIDs []string
+	done      int
+	ordinal   uint64
+	ordered   bool
+}
+
+func (m QueueModel) checkedEpicPlans() []checkedEpicPlan {
+	plans := make([]checkedEpicPlan, 0, len(m.epics))
 	for _, epic := range m.epics {
 		var ticketIDs []string
 		done := 0
+		var ordinal uint64
+		ordered := false
 		for _, idx := range sortedTicketIndexes(epic) {
 			ticket := epic.Tickets[idx]
 			if !m.checked[ticket.Path] {
@@ -177,12 +197,46 @@ func (m QueueModel) firstCheckedEpic() (tickets.Epic, []string, int, bool) {
 			if epic.RenderedStatus(ticket) == tickets.StatusDone {
 				done++
 			}
+			if checkedAt, ok := m.checkOrder[ticket.Path]; ok && (!ordered || checkedAt < ordinal) {
+				ordinal, ordered = checkedAt, true
+			}
 		}
 		if len(ticketIDs) > 0 {
-			return epic, ticketIDs, done, true
+			plans = append(plans, checkedEpicPlan{epic: epic, ticketIDs: ticketIDs, done: done, ordinal: ordinal, ordered: ordered})
 		}
 	}
-	return tickets.Epic{}, nil, 0, false
+	sort.SliceStable(plans, func(i, j int) bool {
+		if plans[i].ordered != plans[j].ordered {
+			return plans[i].ordered
+		}
+		if plans[i].ordered && plans[i].ordinal != plans[j].ordinal {
+			return plans[i].ordinal < plans[j].ordinal
+		}
+		return plans[i].epic.Name < plans[j].epic.Name
+	})
+	return plans
+}
+
+func (m *QueueModel) startAvailableEpics() tea.Cmd {
+	count := min(ralphLoopRegistry.availableSlots(), len(m.pendingEpics))
+	cmds := make([]tea.Cmd, 0, count)
+	for _, plan := range m.pendingEpics[:count] {
+		cmds = append(cmds, cmdStartImplement(
+			m.worktreeRoot, plan.epic.Name, m.runningAgent, plan.done, len(plan.ticketIDs), plan.ticketIDs,
+		))
+	}
+	m.pendingEpics = m.pendingEpics[count:]
+	if len(cmds) == 1 {
+		return cmds[0]
+	}
+	return func() tea.Msg {
+		messages := make(tea.BatchMsg, 0, len(cmds))
+		for _, cmd := range cmds {
+			msg := cmd()
+			messages = append(messages, func() tea.Msg { return msg })
+		}
+		return messages
+	}
 }
 
 type queueEventsDrainedMsg struct{}
@@ -243,10 +297,10 @@ func (m *QueueModel) toggleSelected() {
 	}
 	path := rows[m.selected].ticket.Path
 	if m.checked[path] {
-		delete(m.checked, path)
+		markUnchecked(m.checked, m.checkOrder, path)
 		return
 	}
-	m.checked[path] = true
+	markChecked(m.checked, m.checkOrder, path)
 }
 
 type queueRow struct {
@@ -322,9 +376,9 @@ func (m QueueModel) View() tea.View {
 		return ui.NewMainView("\n  Initializing…")
 	}
 	if m.implementAgentMenuOpen {
-		epic, _, _, _ := m.firstCheckedEpic()
+		plans := m.checkedEpicPlans()
 		return ui.NewMainView(renderImplementAgentMenu(
-			fmt.Sprintf("Choose the agent for epic %q:", epic.Name),
+			fmt.Sprintf("Choose the agent for %d checked epic(s):", len(plans)),
 			m.implementAgentMenu,
 		))
 	}
@@ -341,8 +395,13 @@ func (m QueueModel) queueLines() []string {
 	}
 
 	banner := queueBanner
-	if m.runningEpic != "" {
-		banner = fmt.Sprintf("Running %s with %s", m.runningEpic, agentDisplayName(m.runningAgent))
+	if len(m.runningEpics) > 0 {
+		names := make([]string, 0, len(m.runningEpics))
+		for name := range m.runningEpics {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		banner = fmt.Sprintf("Running %s with %s", strings.Join(names, ", "), agentDisplayName(m.runningAgent))
 	}
 	lines := []string{"  " + ui.StyleHint.Render(banner), ""}
 

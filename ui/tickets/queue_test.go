@@ -3,6 +3,7 @@ package tickets
 import (
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -101,7 +102,7 @@ func TestQueueModelEnterChoosesAgentAndStartsOneEpicSubset(t *testing.T) {
 		close(runReturned)
 		return nil
 	}
-	ralphLoopRegistry = newLoopRegistry(defaultMaxConcurrentEpics)
+	ralphLoopRegistry = newLoopRegistry(1)
 	t.Cleanup(func() {
 		close(releaseRun)
 		select {
@@ -130,8 +131,8 @@ func TestQueueModelEnterChoosesAgentAndStartsOneEpicSubset(t *testing.T) {
 	}
 	updated, _ = m.Update(cmd())
 	m = updated.(QueueModel)
-	if content := m.View().Content; !strings.Contains(content, "Running alpha with Codex") {
-		t.Fatalf("expected running banner after kickoff:\n%s", content)
+	if !m.runningEpics["alpha"] {
+		t.Fatalf("expected alpha running after kickoff, got %v", m.runningEpics)
 	}
 
 	select {
@@ -145,6 +146,121 @@ func TestQueueModelEnterChoosesAgentAndStartsOneEpicSubset(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for ralph-loop kickoff")
 	}
+}
+
+func TestQueueModelSchedulesCheckedEpicsInCheckOrderAndBackfillsAtCap(t *testing.T) {
+	root := testutil.TempRepo(t)
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "beta", "01-first.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "gamma", "01-first.md", "Status: open\n\nBody.\n")
+	alpha := ticketPath(root, "alpha", "01-first.md")
+	beta := ticketPath(root, "beta", "01-first.md")
+	gamma := ticketPath(root, "gamma", "01-first.md")
+	checked := map[string]bool{alpha: true, beta: true, gamma: true}
+	checkOrder := map[string]uint64{gamma: 1, alpha: 2, beta: 3}
+
+	previousRun := runRalphLoop
+	previousRegistry := ralphLoopRegistry
+	starts := make(chan string, 3)
+	releases := map[string]chan struct{}{
+		"alpha": make(chan struct{}),
+		"beta":  make(chan struct{}),
+		"gamma": make(chan struct{}),
+	}
+	var mu sync.Mutex
+	active, maxActive := 0, 0
+	runRalphLoop = func(opts ralphloop.RunOptions, _ ralphloop.Deps, _ ralphloop.EventSink) error {
+		mu.Lock()
+		active++
+		maxActive = max(maxActive, active)
+		mu.Unlock()
+		starts <- opts.EpicName
+		<-releases[opts.EpicName]
+		mu.Lock()
+		active--
+		mu.Unlock()
+		return nil
+	}
+	ralphLoopRegistry = newLoopRegistry(2)
+	t.Cleanup(func() {
+		for _, release := range releases {
+			select {
+			case <-release:
+			default:
+				close(release)
+			}
+		}
+		deadline := time.Now().Add(time.Second)
+		for ralphLoopRegistry.isRunning() && time.Now().Before(deadline) {
+			time.Sleep(time.Millisecond)
+		}
+		runRalphLoop = previousRun
+		ralphLoopRegistry = previousRegistry
+	})
+
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, checkOrder))
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(QueueModel)
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	m = updated.(QueueModel)
+	m = deliverQueueCommands(t, m, cmd)
+
+	if first, second := <-starts, <-starts; first != "gamma" || second != "alpha" {
+		t.Fatalf("start order = [%s %s], want [gamma alpha]", first, second)
+	}
+	select {
+	case name := <-starts:
+		t.Fatalf("epic %q started before a slot was free", name)
+	default:
+	}
+
+	close(releases["gamma"])
+	waitForEpicToFinish(t, "gamma")
+	updated, cmd = m.Update(implementPollMsg{epicName: "gamma"})
+	m = updated.(QueueModel)
+	m = deliverQueueCommands(t, m, cmd)
+	select {
+	case name := <-starts:
+		if name != "beta" {
+			t.Fatalf("backfill epic = %q, want beta", name)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for beta to backfill gamma's slot")
+	}
+	mu.Lock()
+	gotMaxActive := maxActive
+	mu.Unlock()
+	if gotMaxActive != 2 {
+		t.Fatalf("maximum concurrent epics = %d, want 2", gotMaxActive)
+	}
+}
+
+func deliverQueueCommands(t *testing.T, m QueueModel, cmd tea.Cmd) QueueModel {
+	t.Helper()
+	if cmd == nil {
+		return m
+	}
+	msg := cmd()
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		for _, nested := range batch {
+			m = deliverQueueCommands(t, m, nested)
+		}
+		return m
+	}
+	updated, _ := m.Update(msg)
+	return updated.(QueueModel)
+}
+
+func waitForEpicToFinish(t *testing.T, epicName string) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		if running, name, _ := ralphLoopRegistry.snapshot(epicName); !running || name != epicName {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for epic %q to finish", epicName)
 }
 
 func loadQueueModel(t *testing.T, m QueueModel) QueueModel {

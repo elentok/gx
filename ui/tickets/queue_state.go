@@ -41,27 +41,31 @@ func queueStateFilePath() (string, error) {
 // persistedQueueState is the on-disk shape: keyed by Ticket.Path, the same
 // key Model.checked/Model.queueStatus use in memory.
 type persistedQueueState struct {
-	Items map[string]queueItemStatus `json:"items"`
+	Items      map[string]queueItemStatus `json:"items"`
+	CheckOrder map[string]uint64          `json:"check_order,omitempty"`
 }
 
 // loadQueueState reads the persisted queue state. A missing or corrupt file
 // falls back to an empty queue rather than surfacing a startup error — the
 // queue is recoverable bookkeeping (the user can just re-check tickets), not
 // worth blocking startup over.
-func loadQueueState() map[string]queueItemStatus {
+func loadQueueState() (map[string]queueItemStatus, map[string]uint64) {
 	path, err := queueStateFilePath()
 	if err != nil {
-		return map[string]queueItemStatus{}
+		return map[string]queueItemStatus{}, map[string]uint64{}
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return map[string]queueItemStatus{}
+		return map[string]queueItemStatus{}, map[string]uint64{}
 	}
 	var state persistedQueueState
 	if err := json.Unmarshal(data, &state); err != nil || state.Items == nil {
-		return map[string]queueItemStatus{}
+		return map[string]queueItemStatus{}, map[string]uint64{}
 	}
-	return state.Items
+	if state.CheckOrder == nil {
+		state.CheckOrder = map[string]uint64{}
+	}
+	return state.Items, state.CheckOrder
 }
 
 // persistQueueState best-effort saves m.queueStatus to disk. A save failure
@@ -69,7 +73,7 @@ func loadQueueState() map[string]queueItemStatus {
 // interrupting a checkbox toggle over a disk-write error would be worse than
 // silently retrying on the next mutation.
 func (m Model) persistQueueState() {
-	_ = saveQueueState(m.queueStatus)
+	_ = saveQueueState(m.queueStatus, m.checkOrder)
 }
 
 // setQueueItemStatus updates a checked ticket's queue status and persists
@@ -89,7 +93,7 @@ func (m *Model) setQueueItemStatus(path string, status queueItemStatus) {
 
 // saveQueueState writes the checked set and its per-item status to disk, so
 // the next startup's loadQueueState sees this exact state.
-func saveQueueState(items map[string]queueItemStatus) error {
+func saveQueueState(items map[string]queueItemStatus, checkOrder map[string]uint64) error {
 	path, err := queueStateFilePath()
 	if err != nil {
 		return err
@@ -97,7 +101,7 @@ func saveQueueState(items map[string]queueItemStatus) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
 	}
-	b, err := json.MarshalIndent(persistedQueueState{Items: items}, "", "  ")
+	b, err := json.MarshalIndent(persistedQueueState{Items: items, CheckOrder: checkOrder}, "", "  ")
 	if err != nil {
 		return err
 	}

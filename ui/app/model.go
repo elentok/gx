@@ -59,6 +59,7 @@ type Model struct {
 
 	// The shell owns selection so independently cached tabs observe the same map.
 	checkedTickets map[string]bool
+	checkedOrder   map[string]uint64
 }
 
 func New(repo git.Repo, settings Settings) Model {
@@ -72,6 +73,7 @@ func New(repo git.Repo, settings Settings) Model {
 		gate:           reloadgate.New(),
 		quitConfirm:    confirm.New(),
 		checkedTickets: map[string]bool{},
+		checkedOrder:   map[string]uint64{},
 	}
 	if m.settings.InitialRoute.Tab == "" {
 		m.settings.InitialRoute = nav.ViewState{Tab: nav.TabWorktrees}
@@ -216,12 +218,12 @@ func (m Model) newHistoryEntry(viewState nav.ViewState) historyEntry {
 		allRepos := viewState.AllRepos || m.explicitAllTickets() || isTicketsLoopRunning()
 		return historyEntry{
 			viewState: viewState,
-			model:     ticketsui.NewModelWithScope(viewState.WorktreeRoot, s, keys.New(Bindings()), allRepos).WithCheckedSet(m.checkedTickets),
+			model:     ticketsui.NewModelWithScope(viewState.WorktreeRoot, s, keys.New(Bindings()), allRepos).WithCheckedState(m.checkedTickets, m.checkedOrder),
 		}
 	case nav.TabQueue:
 		return historyEntry{
 			viewState: viewState,
-			model:     ticketsui.NewQueueModel(viewState.WorktreeRoot, s, m.checkedTickets),
+			model:     ticketsui.NewQueueModel(viewState.WorktreeRoot, s, m.checkedTickets, m.checkedOrder),
 		}
 	case nav.TabWorktrees:
 		fallthrough
