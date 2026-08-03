@@ -158,6 +158,43 @@ func TestLoad_IgnoresNonTicketFilesInIssuesDir(t *testing.T) {
 	}
 }
 
+func TestLoad_SurfacesSplitAndSplitFrom(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "epic", "issues", "03-original.md"),
+		"---\nid: \"03\"\nstatus: done\ntype: task\nsplit: [\"03a\", \"03b\"]\n---\n")
+	writeFile(t, filepath.Join(dir, "epic", "issues", "03a-first-half.md"),
+		"---\nid: \"03a\"\nstatus: open\ntype: task\nsplit_from: \"03\"\n---\n")
+
+	epics, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(epics) != 1 || len(epics[0].Tickets) != 2 {
+		t.Fatalf("expected 1 epic with 2 tickets, got %+v", epics)
+	}
+
+	byIdentifier := map[string]Ticket{}
+	for _, tk := range epics[0].Tickets {
+		byIdentifier[tk.Identifier] = tk
+	}
+
+	original := byIdentifier["03"]
+	if !reflect.DeepEqual(original.Split, []string{"03a", "03b"}) {
+		t.Errorf("original.Split = %v, want [03a 03b]", original.Split)
+	}
+	if original.SplitFrom != nil {
+		t.Errorf("original.SplitFrom = %v, want nil", original.SplitFrom)
+	}
+
+	child := byIdentifier["03a"]
+	if child.SplitFrom == nil || *child.SplitFrom != "03" {
+		t.Errorf("child.SplitFrom = %v, want \"03\"", child.SplitFrom)
+	}
+	if child.Split != nil {
+		t.Errorf("child.Split = %v, want nil", child.Split)
+	}
+}
+
 func TestLoad_DiscoversAlphabeticallySuffixedTicketNumbers(t *testing.T) {
 	dir := t.TempDir()
 	for _, name := range []string{"10a-first.md", "10b-second.md", "10c-third.md"} {

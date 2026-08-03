@@ -26,6 +26,13 @@ type Ticket struct {
 	// number family (Epic.UnresolvedBlockers); a lettered token names one
 	// specific sibling.
 	BlockedBy []string
+	// Split holds the IDs of the tickets this one was split into (mid-flight
+	// split, see .ai's to-tickets skill); SplitFrom is the reverse edge, the
+	// ID of the ticket this one was split off from. At most one of a
+	// ticket's Split/SplitFrom is meaningfully populated in practice, but
+	// both are carried since schema.Ticket allows either.
+	Split     []string
+	SplitFrom *string
 	Status    string // raw Status: value; "" means missing (valid open/unclaimed default)
 	Body      string // raw markdown after the leading metadata lines, unmodified
 

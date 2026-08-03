@@ -82,6 +82,8 @@ func loadEpic(scratchDir, name string) Epic {
 
 		ticket.Type = string(parsed.Type)
 		ticket.BlockedBy = idsToStrings(parsed.BlockedBy)
+		ticket.Split = idsToStrings(parsed.Split)
+		ticket.SplitFrom = idToStringPtr(parsed.SplitFrom)
 		ticket.Status = string(parsed.Status)
 		ticket.Body = schema.ParseBody(string(raw))
 		ticket.ActualContextWindow = parsed.ActualContextWindow
@@ -128,4 +130,14 @@ func idsToStrings(ids []schema.TicketID) []string {
 		out[i] = string(id)
 	}
 	return out
+}
+
+// idToStringPtr lowers an optional schema.TicketID to a plain *string, for
+// tickets.Ticket's SplitFrom field (see idsToStrings).
+func idToStringPtr(id *schema.TicketID) *string {
+	if id == nil {
+		return nil
+	}
+	s := string(*id)
+	return &s
 }
