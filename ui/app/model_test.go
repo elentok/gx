@@ -10,9 +10,32 @@ import (
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/navstate"
 	stashlistui "github.com/elentok/gx/ui/stashlist"
+	ticketsui "github.com/elentok/gx/ui/tickets"
 
 	tea "charm.land/bubbletea/v2"
 )
+
+func TestQueueStoreLoadsOnceBeforeInitialPage(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := ticketsui.LoadQueueStore()
+	previous := loadQueueStore
+	loads := 0
+	loadQueueStore = func() *ticketsui.QueueStore { loads++; return store }
+	t.Cleanup(func() { loadQueueStore = previous })
+
+	m := New(*repo, Settings{InitialRoute: nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir}, ActiveWorktreePath: repoDir})
+	if loads != 1 {
+		t.Fatalf("startup loads = %d, want 1", loads)
+	}
+	m.Update(nav.Switch(nav.ViewState{Tab: nav.TabTickets, WorktreeRoot: repoDir})())
+	if loads != 1 {
+		t.Fatalf("loads after constructing tickets page = %d, want 1", loads)
+	}
+}
 
 // inputFocusedStub is a page stub that reports InputFocused=true.
 type inputFocusedStub struct{}

@@ -72,6 +72,7 @@ type Model struct {
 	// alongside checked (see queue_state.go) so a restart restores both the
 	// selection and its last-known progress instead of starting empty.
 	queueStatus map[string]queueItemStatus
+	queueStore  *QueueStore
 	// scrollOffset is the sidebar's line-based scroll position (sidebarLines()
 	// is windowed to it in normalView), kept following m.selected by
 	// ensureSidebarVisible.
@@ -133,10 +134,15 @@ func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager)
 // (the `gx tickets --all` CLI entry point), false starts it scoped to just
 // worktreeRoot, mirroring ui/prs's NewModelWithScope.
 func NewModelWithScope(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager, allRepos bool) Model {
+	return NewModelWithScopeAndStore(worktreeRoot, settings, extraKeys, allRepos, LoadQueueStore())
+}
+
+func NewModelWithScopeAndStore(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager, allRepos bool, store *QueueStore) Model {
 	_ = extraKeys
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
-	queueStatus, checkOrder := loadQueueState()
+	snapshot := store.Snapshot()
+	queueStatus, checkOrder := snapshot.Status, snapshot.Order
 	if !allRepos {
 		scratchPrefix := filepath.Join(worktreeRoot, ".scratch") + string(filepath.Separator)
 		for path := range queueStatus {
@@ -168,6 +174,7 @@ func NewModelWithScope(worktreeRoot string, settings ui.Settings, extraKeys keys
 		checked:            checked,
 		checkOrder:         checkOrder,
 		queueStatus:        queueStatus,
+		queueStore:         store,
 	}
 }
 
@@ -206,7 +213,9 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		before := len(m.checked)
 		autoCheckSplitChildren(m.epics, msg.epics, m.checked, m.checkOrder, m.queueStatus)
 		if len(m.checked) != before {
-			m.persistQueueState()
+			if err := m.persistQueueState(); err != nil {
+				return m, notify.Error("save queue: " + err.Error())
+			}
 		}
 		m.loaded = true
 		m.epics = msg.epics

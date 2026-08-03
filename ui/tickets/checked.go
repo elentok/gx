@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/confirm"
+	"github.com/elentok/gx/ui/notify"
 )
 
 // checkAddConfirmedMsg carries a blocked-confirmation modal's acceptance
@@ -49,6 +50,19 @@ func (m Model) WithCheckedState(checked map[string]bool, checkOrder map[string]u
 	return m
 }
 
+// WithQueueStore makes the application-owned store authoritative for this page.
+func (m Model) WithQueueStore(store *QueueStore) Model {
+	if store == nil {
+		return m
+	}
+	snapshot := store.Snapshot()
+	m.queueStore = store
+	m.checked = snapshot.Checked
+	m.checkOrder = snapshot.Order
+	m.queueStatus = snapshot.Status
+	return m
+}
+
 func nextCheckOrdinal(checkOrder map[string]uint64) uint64 {
 	var next uint64 = 1
 	for _, ordinal := range checkOrder {
@@ -83,7 +97,9 @@ func (m Model) handleToggleCheck() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if r.isEpic() {
-		m.toggleEpicChecked(r.epicIdx)
+		if err := m.toggleEpicChecked(r.epicIdx); err != nil {
+			return m, notify.Error("save queue: " + err.Error())
+		}
 		return m, nil
 	}
 	return m.toggleTicketChecked(r.epicIdx, r.ticketIdx)
@@ -92,10 +108,10 @@ func (m Model) handleToggleCheck() (tea.Model, tea.Cmd) {
 // toggleEpicChecked checks every ticket in the epic at epicIdx if any is
 // currently unchecked, otherwise unchecks them all — standard "select all"
 // checkbox-group behavior. A zero-ticket epic is a no-op either way.
-func (m *Model) toggleEpicChecked(epicIdx int) {
+func (m *Model) toggleEpicChecked(epicIdx int) error {
 	epic := m.epics[epicIdx]
 	if len(epic.Tickets) == 0 {
-		return
+		return nil
 	}
 	if m.checked == nil {
 		m.checked = map[string]bool{}
@@ -124,7 +140,7 @@ func (m *Model) toggleEpicChecked(epicIdx int) {
 			}
 		}
 	}
-	m.persistQueueState()
+	return m.persistQueueState()
 }
 
 // toggleTicketChecked toggles the ticket at (epicIdx, ticketIdx). Unchecking
@@ -138,7 +154,9 @@ func (m Model) toggleTicketChecked(epicIdx, ticketIdx int) (tea.Model, tea.Cmd) 
 	if m.checked[t.Path] {
 		markUnchecked(m.checked, m.checkOrder, t.Path)
 		delete(m.queueStatus, t.Path)
-		m.persistQueueState()
+		if err := m.persistQueueState(); err != nil {
+			return m, notify.Error("save queue: " + err.Error())
+		}
 		return m, nil
 	}
 
@@ -155,7 +173,9 @@ func (m Model) toggleTicketChecked(epicIdx, ticketIdx int) (tea.Model, tea.Cmd) 
 		}
 		markChecked(m.checked, m.checkOrder, t.Path)
 		m.queueStatus[t.Path] = queueStatusPending
-		m.persistQueueState()
+		if err := m.persistQueueState(); err != nil {
+			return m, notify.Error("save queue: " + err.Error())
+		}
 		return m, nil
 	}
 
@@ -202,7 +222,9 @@ func (m Model) handleCheckAddConfirmed(msg checkAddConfirmedMsg) (tea.Model, tea
 		markChecked(m.checked, m.checkOrder, path)
 		m.queueStatus[path] = queueStatusPending
 	}
-	m.persistQueueState()
+	if err := m.persistQueueState(); err != nil {
+		return m, notify.Error("save queue: " + err.Error())
+	}
 	return m, nil
 }
 

@@ -33,6 +33,7 @@ type QueueModel struct {
 	settings             ui.Settings
 	checked              map[string]bool
 	checkOrder           map[string]uint64
+	queueStore           *QueueStore
 
 	width, height int
 	ready         bool
@@ -73,6 +74,13 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 	}
 }
 
+func NewQueueModelWithStore(worktreeRoot string, settings ui.Settings, store *QueueStore) QueueModel {
+	snapshot := store.Snapshot()
+	m := NewQueueModel(worktreeRoot, settings, snapshot.Checked, snapshot.Order)
+	m.queueStore = store
+	return m
+}
+
 func (m QueueModel) Init() tea.Cmd {
 	return m.cmdLoadQueue()
 }
@@ -91,6 +99,11 @@ func (m QueueModel) cmdLoadQueue() tea.Cmd {
 }
 
 func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.queueStore != nil {
+		snapshot := m.queueStore.Snapshot()
+		m.checked = snapshot.Checked
+		m.checkOrder = snapshot.Order
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -415,6 +428,11 @@ func blockersSatisfied(epic tickets.Epic, t tickets.Ticket, checked, assigned ma
 }
 
 func (m QueueModel) View() tea.View {
+	if m.queueStore != nil {
+		snapshot := m.queueStore.Snapshot()
+		m.checked = snapshot.Checked
+		m.checkOrder = snapshot.Order
+	}
 	if !m.ready {
 		return ui.NewMainView("\n  Initializing…")
 	}

@@ -3,6 +3,7 @@ package tickets
 import (
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -10,6 +11,71 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 )
+
+func TestQueueStoreRoundTripAndSnapshotIsolation(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "queue.json")
+	store := loadQueueStoreAt(path)
+	for i, status := range []queueItemStatus{queueStatusPending, queueStatusRunning, queueStatusDone, queueStatusErrored} {
+		item := string(rune('a' + i))
+		if err := store.Check(item); err != nil {
+			t.Fatal(err)
+		}
+		if err := store.SetStatus(item, status); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	reloaded := loadQueueStoreAt(path)
+	snapshot := reloaded.Snapshot()
+	if len(snapshot.Status) != 4 || snapshot.Status["d"] != queueStatusErrored {
+		t.Fatalf("snapshot = %#v", snapshot)
+	}
+	snapshot.Status["a"] = queueStatusDone
+	delete(snapshot.Checked, "b")
+	again := reloaded.Snapshot()
+	if again.Status["a"] != queueStatusPending || !again.Checked["b"] {
+		t.Fatalf("caller mutated store: %#v", again)
+	}
+}
+
+func TestQueueStoreConcurrentSnapshots(t *testing.T) {
+	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
+	if err := store.Check("ticket"); err != nil {
+		t.Fatal(err)
+	}
+	var wg sync.WaitGroup
+	for range 20 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range 100 {
+				_ = store.Snapshot()
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+func TestQueueStoreFailedWriteDoesNotPublishMutation(t *testing.T) {
+	path := t.TempDir()
+	store := loadQueueStoreAt(path)
+	if err := store.Check("ticket"); err == nil {
+		t.Fatal("expected write failure")
+	}
+	if store.Snapshot().Checked["ticket"] {
+		t.Fatal("failed mutation became visible")
+	}
+}
+
+func TestQueueStoreIncompleteStateFallsBackWhole(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "queue.json")
+	if err := os.WriteFile(path, []byte(`{"items":{"ticket":"running"}}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot := loadQueueStoreAt(path).Snapshot(); len(snapshot.Checked) != 0 || len(snapshot.Order) != 0 {
+		t.Fatalf("partially loaded state: %#v", snapshot)
+	}
+}
 
 // TestMain points queueStateDirFn at a scratch directory for the whole
 // package's test binary, so every test that exercises checked-set mutations

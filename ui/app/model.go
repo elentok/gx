@@ -57,23 +57,22 @@ type Model struct {
 	gate        *reloadgate.ReloadGate
 	quitConfirm confirm.Model
 
-	// The shell owns selection so independently cached tabs observe the same map.
-	checkedTickets map[string]bool
-	checkedOrder   map[string]uint64
+	queueStore *ticketsui.QueueStore
 }
+
+var loadQueueStore = ticketsui.LoadQueueStore
 
 func New(repo git.Repo, settings Settings) Model {
 	m := Model{
-		repo:           repo,
-		settings:       settings,
-		navState:       navstate.NewState(settings.ActiveWorktreePath),
-		livePageByTab:  make(map[nav.TabID]livePage),
-		notify:         notify.New(settings.UseNerdFontIcons),
-		loopStatus:     newLoopStatusOverlay(),
-		gate:           reloadgate.New(),
-		quitConfirm:    confirm.New(),
-		checkedTickets: map[string]bool{},
-		checkedOrder:   map[string]uint64{},
+		repo:          repo,
+		settings:      settings,
+		navState:      navstate.NewState(settings.ActiveWorktreePath),
+		livePageByTab: make(map[nav.TabID]livePage),
+		notify:        notify.New(settings.UseNerdFontIcons),
+		loopStatus:    newLoopStatusOverlay(),
+		gate:          reloadgate.New(),
+		quitConfirm:   confirm.New(),
+		queueStore:    loadQueueStore(),
 	}
 	if m.settings.InitialRoute.Tab == "" {
 		m.settings.InitialRoute = nav.ViewState{Tab: nav.TabWorktrees}
@@ -218,12 +217,12 @@ func (m Model) newHistoryEntry(viewState nav.ViewState) historyEntry {
 		allRepos := viewState.AllRepos || m.explicitAllTickets() || isTicketsLoopRunning()
 		return historyEntry{
 			viewState: viewState,
-			model:     ticketsui.NewModelWithScope(viewState.WorktreeRoot, s, keys.New(Bindings()), allRepos).WithCheckedState(m.checkedTickets, m.checkedOrder),
+			model:     ticketsui.NewModelWithScopeAndStore(viewState.WorktreeRoot, s, keys.New(Bindings()), allRepos, m.queueStore),
 		}
 	case nav.TabQueue:
 		return historyEntry{
 			viewState: viewState,
-			model:     ticketsui.NewQueueModel(viewState.WorktreeRoot, s, m.checkedTickets, m.checkedOrder),
+			model:     ticketsui.NewQueueModelWithStore(viewState.WorktreeRoot, s, m.queueStore),
 		}
 	case nav.TabWorktrees:
 		fallthrough
