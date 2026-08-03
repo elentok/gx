@@ -157,8 +157,8 @@ func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) 
 	// m.live at a time (see Model.live's doc comment).
 	if status != tickets.StatusSuperseded && epic.Name == m.implementEpic {
 		if live, ok := m.live[t.Identifier]; ok {
-			if line, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live); ok {
-				return line
+			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live); ok {
+				return appendBlockedBySuffix(base, suffix)
 			}
 		}
 	}

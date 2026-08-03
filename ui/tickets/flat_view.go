@@ -78,18 +78,28 @@ func (m FlatModel) listLines() []string {
 	if len(m.ordered) == 0 {
 		return []string{ui.StyleMuted.Render("  no tickets")}
 	}
-	lines := make([]string, len(m.ordered))
+	var lines []string
 	for i, t := range m.ordered {
-		line := m.renderFlatTicketRow(t)
+		rows := m.renderFlatTicketRow(t)
 		if i == m.selected {
-			line = ui.RenderRowHighlight(line)
+			for j, row := range rows {
+				rows[j] = ui.RenderRowHighlight(row)
+			}
 		}
-		lines[i] = line
+		lines = append(lines, rows...)
 	}
 	return lines
 }
 
-func (m FlatModel) renderFlatTicketRow(t tickets.Ticket) string {
+// renderFlatTicketRow renders t's row, one line for a ticket that's never
+// run (open/claimed/blocked/needs-info/error — no elapsed-time/token data to
+// show), two lines for a ticket that has: a live running/paused/needs-
+// attention entry, or a done ticket's landed metrics. The two-line decision
+// is status-based, not data-presence-based — a done ticket whose metrics
+// were never stamped (the 0/0 sentinel, e.g. a repair/reattach landing)
+// still gets a second line reading "0s · 0 tok" rather than falling back to
+// one line.
+func (m FlatModel) renderFlatTicketRow(t tickets.Ticket) []string {
 	status := m.epic.RenderedStatus(t)
 
 	// A superseded ticket is a terminal disk state that always wins over a
@@ -100,8 +110,9 @@ func (m FlatModel) renderFlatTicketRow(t tickets.Ticket) string {
 	// styling.
 	if status != tickets.StatusSuperseded {
 		if live, ok := m.live[t.Identifier]; ok {
-			if line, ok := renderLiveTicketRow(m.icons(), m.spinner, t, live); ok {
-				return line
+			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.spinner, t, live); ok {
+				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens)
+				return []string{base, renderMetricsLine(joinNonEmpty(" ", suffix, metrics))}
 			}
 		}
 	}
@@ -118,7 +129,12 @@ func (m FlatModel) renderFlatTicketRow(t tickets.Ticket) string {
 	if suffix := blockedBySuffix(m.epic, t, status); suffix != "" {
 		line += " " + blockedBySuffixStyle.Render(suffix)
 	}
-	return line
+
+	if status != tickets.StatusDone {
+		return []string{line}
+	}
+	metrics := formatMetricsLine(t.ElapsedTime, t.ActualContextWindow)
+	return []string{line, renderMetricsLine(metrics)}
 }
 
 // previewContent builds the selected ticket's preview, mirroring

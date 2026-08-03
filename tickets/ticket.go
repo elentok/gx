@@ -29,6 +29,14 @@ type Ticket struct {
 	Status    string // raw Status: value; "" means missing (valid open/unclaimed default)
 	Body      string // raw markdown after the leading metadata lines, unmodified
 
+	// ActualContextWindow and ElapsedTime are the landing-time metrics
+	// ralphloop/report_metrics.go's writeLandedMetrics stamps into a done
+	// ticket's frontmatter. Both zero for a ticket that's never run, or one
+	// landed before metrics existed (report.go's readSessionStats found
+	// nothing to stamp).
+	ActualContextWindow int
+	ElapsedTime         int
+
 	// ReadErr is set when the loader found the file (its name matched
 	// "NN-<slug>.md") but couldn't read its contents (I/O error). Non-empty
 	// means Type/BlockedBy/Status/Body are all zero-valued - there was no

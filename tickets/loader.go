@@ -84,6 +84,8 @@ func loadEpic(scratchDir, name string) Epic {
 		ticket.BlockedBy = idsToStrings(parsed.BlockedBy)
 		ticket.Status = string(parsed.Status)
 		ticket.Body = schema.ParseBody(string(raw))
+		ticket.ActualContextWindow = parsed.ActualContextWindow
+		ticket.ElapsedTime = parsed.ElapsedTime
 		epic.Tickets = append(epic.Tickets, ticket)
 	}
 

@@ -329,30 +329,35 @@ func appendBlockedBySuffix(line, suffix string) string {
 // instead of ticket 03's disk-only rendering, when live is running or
 // paused. ok is false if live has neither (the zero value, which shouldn't
 // reach here since callers only look live up on a present map entry, but
-// keeps this function total). Shared by FlatModel and Model (ticket 02) —
-// icons/sp are the two bits of per-model UI state the rendering needs.
-func renderLiveTicketRow(icons ui.IconSet, sp spinner.Model, t tickets.Ticket, live liveTicketState) (string, bool) {
+// keeps this function total). base is the bare icon/spinner+title; suffix is
+// the phase/label text (running) or pause reason (paused/needs-attention),
+// returned separately rather than composed onto one line so each caller can
+// place it where it needs to: Model's sidebar (appendBlockedBySuffix, one
+// line, unchanged) vs. FlatModel's two-line row, which also mixes in the
+// run's live metrics (flat_view.go's renderFlatTicketRow) — icons/sp are the
+// two bits of per-model UI state the rendering needs.
+func renderLiveTicketRow(icons ui.IconSet, sp spinner.Model, t tickets.Ticket, live liveTicketState) (base, suffix string, ok bool) {
 	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
 
 	switch {
 	case live.paused && live.pauseKind == ralphloop.PauseNeedsAttention:
-		line := "  " + statusNeedsAttentionStyle.Render(icons.TicketNeedsAttention) + " " + title
-		return appendBlockedBySuffix(line, live.reason), true
+		base = "  " + statusNeedsAttentionStyle.Render(icons.TicketNeedsAttention) + " " + title
+		return base, live.reason, true
 
 	case live.paused:
-		line := "  " + statusPausedStyle.Render(icons.TicketPaused) + " " + title
-		return appendBlockedBySuffix(line, live.reason), true
+		base = "  " + statusPausedStyle.Render(icons.TicketPaused) + " " + title
+		return base, live.reason, true
 
 	case live.running:
 		spinnerView := lipgloss.NewStyle().Foreground(live.phase.color()).Render(sp.View())
-		line := "  " + spinnerView + " " + title
-		suffix := live.phase.suffix()
+		base = "  " + spinnerView + " " + title
+		suffix = live.phase.suffix()
 		if live.label != "" {
 			suffix = live.label + " " + suffix
 		}
-		return appendBlockedBySuffix(line, suffix), true
+		return base, suffix, true
 
 	default:
-		return "", false
+		return "", "", false
 	}
 }
