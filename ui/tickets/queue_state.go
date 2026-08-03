@@ -96,25 +96,48 @@ func (s *QueueStore) Snapshot() QueueSnapshot {
 	return QueueSnapshot{Checked: checked, Order: cloneOrder(s.state.CheckOrder), Status: cloneStatus(s.state.Items)}
 }
 
+func (s *QueueStore) IsChecked(path string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	_, ok := s.state.Items[path]
+	return ok
+}
+
 func (s *QueueStore) Check(path string) error {
+	return s.SetChecked([]string{path}, true)
+}
+
+func (s *QueueStore) SetChecked(paths []string, checked bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, ok := s.state.Items[path]; ok {
+	next := s.cloneStateLocked()
+	changed := false
+	for _, path := range paths {
+		_, exists := next.Items[path]
+		if checked {
+			if exists {
+				continue
+			}
+			next.Items[path] = queueStatusPending
+			next.CheckOrder[path] = nextCheckOrdinal(next.CheckOrder)
+			changed = true
+			continue
+		}
+		if !exists {
+			continue
+		}
+		delete(next.Items, path)
+		delete(next.CheckOrder, path)
+		changed = true
+	}
+	if !changed {
 		return nil
 	}
-	next := s.cloneStateLocked()
-	next.Items[path] = queueStatusPending
-	next.CheckOrder[path] = nextCheckOrdinal(next.CheckOrder)
 	return s.commitLocked(next)
 }
 
 func (s *QueueStore) Uncheck(path string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	next := s.cloneStateLocked()
-	delete(next.Items, path)
-	delete(next.CheckOrder, path)
-	return s.commitLocked(next)
+	return s.SetChecked([]string{path}, false)
 }
 
 func (s *QueueStore) SetStatus(path string, status queueItemStatus) error {
@@ -201,6 +224,16 @@ func (m Model) persistQueueState() error {
 // calls as a run proceeds a ticket from pending through running to
 // done/errored. A no-op if path isn't currently checked.
 func (m *Model) setQueueItemStatus(path string, status queueItemStatus) error {
+	if m.queueStore != nil {
+		if !m.queueStore.IsChecked(path) {
+			return nil
+		}
+		if err := m.queueStore.SetStatus(path, status); err != nil {
+			return err
+		}
+		m.refreshQueueSnapshot()
+		return nil
+	}
 	if !m.checked[path] {
 		return nil
 	}

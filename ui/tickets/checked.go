@@ -23,6 +23,9 @@ type checkAddConfirmedMsg struct {
 
 // isChecked reports whether the ticket at path is in the checked set.
 func (m Model) isChecked(path string) bool {
+	if m.queueStore != nil {
+		return m.queueStore.IsChecked(path)
+	}
 	return m.checked[path]
 }
 
@@ -61,6 +64,47 @@ func (m Model) WithQueueStore(store *QueueStore) Model {
 	m.checkOrder = snapshot.Order
 	m.queueStatus = snapshot.Status
 	return m
+}
+
+func (m *Model) setPathsChecked(paths []string, checked bool) error {
+	if m.queueStore != nil {
+		if err := m.queueStore.SetChecked(paths, checked); err != nil {
+			return err
+		}
+		m.refreshQueueSnapshot()
+		return nil
+	}
+	if m.checked == nil {
+		m.checked = map[string]bool{}
+	}
+	if m.checkOrder == nil {
+		m.checkOrder = map[string]uint64{}
+	}
+	if m.queueStatus == nil {
+		m.queueStatus = map[string]queueItemStatus{}
+	}
+	for _, path := range paths {
+		if checked {
+			markChecked(m.checked, m.checkOrder, path)
+			if _, ok := m.queueStatus[path]; !ok {
+				m.queueStatus[path] = queueStatusPending
+			}
+			continue
+		}
+		markUnchecked(m.checked, m.checkOrder, path)
+		delete(m.queueStatus, path)
+	}
+	return m.persistQueueState()
+}
+
+func (m *Model) refreshQueueSnapshot() {
+	if m.queueStore == nil {
+		return
+	}
+	snapshot := m.queueStore.Snapshot()
+	m.checked = snapshot.Checked
+	m.checkOrder = snapshot.Order
+	m.queueStatus = snapshot.Status
 }
 
 func nextCheckOrdinal(checkOrder map[string]uint64) uint64 {
@@ -113,34 +157,15 @@ func (m *Model) toggleEpicChecked(epicIdx int) error {
 	if len(epic.Tickets) == 0 {
 		return nil
 	}
-	if m.checked == nil {
-		m.checked = map[string]bool{}
-	}
-	if m.checkOrder == nil {
-		m.checkOrder = map[string]uint64{}
-	}
-	if m.queueStatus == nil {
-		m.queueStatus = map[string]queueItemStatus{}
-	}
 	allChecked := true
+	paths := make([]string, 0, len(epic.Tickets))
 	for _, t := range epic.Tickets {
-		if !m.checked[t.Path] {
+		paths = append(paths, t.Path)
+		if !m.isChecked(t.Path) {
 			allChecked = false
-			break
 		}
 	}
-	for _, t := range epic.Tickets {
-		if allChecked {
-			markUnchecked(m.checked, m.checkOrder, t.Path)
-			delete(m.queueStatus, t.Path)
-		} else {
-			markChecked(m.checked, m.checkOrder, t.Path)
-			if _, ok := m.queueStatus[t.Path]; !ok {
-				m.queueStatus[t.Path] = queueStatusPending
-			}
-		}
-	}
-	return m.persistQueueState()
+	return m.setPathsChecked(paths, !allChecked)
 }
 
 // toggleTicketChecked toggles the ticket at (epicIdx, ticketIdx). Unchecking
@@ -151,10 +176,8 @@ func (m *Model) toggleEpicChecked(epicIdx int) error {
 func (m Model) toggleTicketChecked(epicIdx, ticketIdx int) (tea.Model, tea.Cmd) {
 	epic := m.epics[epicIdx]
 	t := epic.Tickets[ticketIdx]
-	if m.checked[t.Path] {
-		markUnchecked(m.checked, m.checkOrder, t.Path)
-		delete(m.queueStatus, t.Path)
-		if err := m.persistQueueState(); err != nil {
+	if m.isChecked(t.Path) {
+		if err := m.setPathsChecked([]string{t.Path}, false); err != nil {
 			return m, notify.Error("save queue: " + err.Error())
 		}
 		return m, nil
@@ -162,18 +185,7 @@ func (m Model) toggleTicketChecked(epicIdx, ticketIdx int) (tea.Model, tea.Cmd) 
 
 	blockers := epic.BlockingTickets(t)
 	if len(blockers) == 0 {
-		if m.checked == nil {
-			m.checked = map[string]bool{}
-		}
-		if m.checkOrder == nil {
-			m.checkOrder = map[string]uint64{}
-		}
-		if m.queueStatus == nil {
-			m.queueStatus = map[string]queueItemStatus{}
-		}
-		markChecked(m.checked, m.checkOrder, t.Path)
-		m.queueStatus[t.Path] = queueStatusPending
-		if err := m.persistQueueState(); err != nil {
+		if err := m.setPathsChecked([]string{t.Path}, true); err != nil {
 			return m, notify.Error("save queue: " + err.Error())
 		}
 		return m, nil
@@ -207,22 +219,10 @@ func cmdConfirmCheckAdd(ticketPath string, blockerPaths []string) tea.Cmd {
 // handleCheckAddConfirmed applies checkAddConfirmedMsg: the ticket plus every
 // one of its blockers join the checked set.
 func (m Model) handleCheckAddConfirmed(msg checkAddConfirmedMsg) (tea.Model, tea.Cmd) {
-	if m.checked == nil {
-		m.checked = map[string]bool{}
-	}
-	if m.checkOrder == nil {
-		m.checkOrder = map[string]uint64{}
-	}
-	if m.queueStatus == nil {
-		m.queueStatus = map[string]queueItemStatus{}
-	}
-	markChecked(m.checked, m.checkOrder, msg.ticketPath)
-	m.queueStatus[msg.ticketPath] = queueStatusPending
-	for _, path := range msg.blockerPaths {
-		markChecked(m.checked, m.checkOrder, path)
-		m.queueStatus[path] = queueStatusPending
-	}
-	if err := m.persistQueueState(); err != nil {
+	paths := make([]string, 0, len(msg.blockerPaths)+1)
+	paths = append(paths, msg.ticketPath)
+	paths = append(paths, msg.blockerPaths...)
+	if err := m.setPathsChecked(paths, true); err != nil {
 		return m, notify.Error("save queue: " + err.Error())
 	}
 	return m, nil
@@ -236,7 +236,10 @@ func (m Model) handleCheckAddConfirmed(msg checkAddConfirmedMsg) (tea.Model, tea
 // toggleTicketChecked's blocked-ticket confirmation. A ticket that isn't
 // itself checked splitting is a no-op: only a split of already-checked work
 // needs its continuation auto-added.
-func autoCheckSplitChildren(oldEpics, newEpics []tickets.Epic, checked map[string]bool, checkOrder map[string]uint64, queueStatus map[string]queueItemStatus) {
+func autoCheckSplitChildren(oldEpics, newEpics []tickets.Epic, store *QueueStore) error {
+	if store == nil {
+		return nil
+	}
 	oldByPath := make(map[string]tickets.Ticket)
 	for _, epic := range oldEpics {
 		for _, t := range epic.Tickets {
@@ -244,24 +247,21 @@ func autoCheckSplitChildren(oldEpics, newEpics []tickets.Epic, checked map[strin
 		}
 	}
 
+	var childPaths []string
 	for _, epic := range newEpics {
 		for _, nt := range epic.Tickets {
 			old, ok := oldByPath[nt.Path]
-			if !ok || !checked[old.Path] {
+			if !ok || !store.IsChecked(old.Path) {
 				continue
 			}
 			for _, childID := range newSplitEntries(old.Split, nt.Split) {
 				if child, ok := findTicketByIdentifier(epic, childID); ok {
-					markChecked(checked, checkOrder, child.Path)
-					if queueStatus != nil {
-						if _, ok := queueStatus[child.Path]; !ok {
-							queueStatus[child.Path] = queueStatusPending
-						}
-					}
+					childPaths = append(childPaths, child.Path)
 				}
 			}
 		}
 	}
+	return store.SetChecked(childPaths, true)
 }
 
 // newSplitEntries returns the entries present in newSplit but not oldSplit,
@@ -299,7 +299,7 @@ func (m Model) epicChecked(epic tickets.Epic) bool {
 		return false
 	}
 	for _, t := range epic.Tickets {
-		if !m.checked[t.Path] {
+		if !m.isChecked(t.Path) {
 			return false
 		}
 	}

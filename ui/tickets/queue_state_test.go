@@ -67,6 +67,49 @@ func TestQueueStoreFailedWriteDoesNotPublishMutation(t *testing.T) {
 	}
 }
 
+func TestQueueStoreSetCheckedPreservesUnrelatedEntries(t *testing.T) {
+	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
+	if err := store.Check("keep"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetStatus("keep", queueStatusRunning); err != nil {
+		t.Fatal(err)
+	}
+	before := store.Snapshot()
+
+	if err := store.SetChecked([]string{"ticket", "blocker"}, true); err != nil {
+		t.Fatal(err)
+	}
+	afterAdd := store.Snapshot()
+	if afterAdd.Status["keep"] != queueStatusRunning || afterAdd.Order["keep"] != before.Order["keep"] {
+		t.Fatalf("unrelated entry changed: before=%#v after=%#v", before, afterAdd)
+	}
+	if afterAdd.Status["ticket"] != queueStatusPending || afterAdd.Status["blocker"] != queueStatusPending {
+		t.Fatalf("batch additions = %#v", afterAdd)
+	}
+	if afterAdd.Order["ticket"] >= afterAdd.Order["blocker"] {
+		t.Fatalf("batch chronology = %#v", afterAdd.Order)
+	}
+
+	if err := store.SetChecked([]string{"ticket", "blocker"}, false); err != nil {
+		t.Fatal(err)
+	}
+	afterRemove := store.Snapshot()
+	if len(afterRemove.Checked) != 1 || !afterRemove.Checked["keep"] || afterRemove.Status["keep"] != queueStatusRunning {
+		t.Fatalf("batch removal dropped unrelated entry: %#v", afterRemove)
+	}
+}
+
+func TestQueueStoreSetCheckedFailedWritePublishesNothing(t *testing.T) {
+	store := loadQueueStoreAt(t.TempDir())
+	if err := store.SetChecked([]string{"ticket", "blocker"}, true); err == nil {
+		t.Fatal("expected write failure")
+	}
+	if snapshot := store.Snapshot(); len(snapshot.Checked) != 0 {
+		t.Fatalf("failed batch became visible: %#v", snapshot)
+	}
+}
+
 func TestQueueStoreIncompleteStateFallsBackWhole(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "queue.json")
 	if err := os.WriteFile(path, []byte(`{"items":{"ticket":"running"}}`), 0644); err != nil {

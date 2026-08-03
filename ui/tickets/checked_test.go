@@ -325,3 +325,84 @@ func TestModel_CheckedRowsRenderDistinctMarker(t *testing.T) {
 		t.Fatalf("expected checked glyph in view, got:\n%s", checkedContent)
 	}
 }
+
+func TestModel_CachedModelsRenderSelectionFromSharedQueueStore(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	store := loadQueueStoreAt(t.TempDir() + "/queue.json")
+
+	first := NewModelWithScopeAndStore(root, ui.Settings{}, keys.New(nil), false, store)
+	first = deliverLoad(t, first)
+	updated, _ := first.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	first = updated.(Model)
+	updated, _ = first.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	first = updated.(Model)
+
+	cached := NewModelWithScopeAndStore(root, ui.Settings{}, keys.New(nil), false, store)
+	cached = deliverLoad(t, cached)
+	updated, _ = cached.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	cached = updated.(Model)
+
+	ticket := first.epics[0].Tickets[0]
+	updated, _ = first.Update(spacePress())
+	first = updated.(Model)
+
+	if !cached.isChecked(ticket.Path) {
+		t.Fatal("cached model did not observe shared ticket selection")
+	}
+	if !cached.epicChecked(cached.epics[0]) {
+		t.Fatal("cached model did not observe shared epic selection")
+	}
+}
+
+func TestModel_BlockedConfirmationFailureKeepsPriorQueue(t *testing.T) {
+	store := loadQueueStoreAt(t.TempDir() + "/queue.json")
+	if err := store.Check("keep"); err != nil {
+		t.Fatal(err)
+	}
+	store.path = t.TempDir()
+	m := Model{queueStore: store}
+
+	updated, cmd := m.handleCheckAddConfirmed(checkAddConfirmedMsg{
+		ticketPath:   "ticket",
+		blockerPaths: []string{"blocker-a", "blocker-b"},
+	})
+	if cmd == nil {
+		t.Fatal("expected save failure notification")
+	}
+	m = updated.(Model)
+	snapshot := m.queueStore.Snapshot()
+	if len(snapshot.Checked) != 1 || !snapshot.Checked["keep"] {
+		t.Fatalf("failed confirmation changed queue: %#v", snapshot)
+	}
+}
+
+func TestModel_WorktreeScopedTogglePreservesOtherWorktreeEntry(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	store := loadQueueStoreAt(t.TempDir() + "/queue.json")
+	otherPath := t.TempDir() + "/.scratch/other/issues/01-other.md"
+	if err := store.Check(otherPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetStatus(otherPath, queueStatusDone); err != nil {
+		t.Fatal(err)
+	}
+
+	m := NewModelWithScopeAndStore(root, ui.Settings{}, keys.New(nil), false, store)
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	updated, _ = m.Update(spacePress())
+	m = updated.(Model)
+
+	snapshot := store.Snapshot()
+	if snapshot.Status[otherPath] != queueStatusDone {
+		t.Fatalf("scoped toggle changed other worktree entry: %#v", snapshot)
+	}
+	if !snapshot.Checked[m.epics[0].Tickets[0].Path] {
+		t.Fatalf("scoped ticket was not added: %#v", snapshot)
+	}
+}

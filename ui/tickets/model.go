@@ -210,13 +210,10 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case epicsLoadedMsg:
-		before := len(m.checked)
-		autoCheckSplitChildren(m.epics, msg.epics, m.checked, m.checkOrder, m.queueStatus)
-		if len(m.checked) != before {
-			if err := m.persistQueueState(); err != nil {
-				return m, notify.Error("save queue: " + err.Error())
-			}
+		if err := autoCheckSplitChildren(m.epics, msg.epics, m.queueStore); err != nil {
+			return m, notify.Error("save queue: " + err.Error())
 		}
+		m.refreshQueueSnapshot()
 		m.loaded = true
 		m.epics = msg.epics
 		m.collapsedEpics = defaultCollapsedEpics(msg.epics)
