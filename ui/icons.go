@@ -30,6 +30,11 @@ type IconSet struct {
 	MarkerBlocked string
 	MarkerWaiting string
 
+	// CheckboxChecked/CheckboxUnchecked render the tickets tab's execution-
+	// queue selection marker (ticket 04) on epic/ticket rows.
+	CheckboxChecked   string
+	CheckboxUnchecked string
+
 	TicketOpen           string
 	TicketClaimed        string
 	TicketBlocked        string
@@ -76,6 +81,9 @@ func Icons(useNerdFont bool) IconSet {
 			MarkerBlocked: "!",
 			MarkerWaiting: "-",
 
+			CheckboxChecked:   "[x]",
+			CheckboxUnchecked: "[ ]",
+
 			TicketOpen:           "o",
 			TicketClaimed:        "@",
 			TicketBlocked:        "x",
@@ -115,6 +123,9 @@ func Icons(useNerdFont bool) IconSet {
 		MarkerReady:   "●",
 		MarkerBlocked: "●",
 		MarkerWaiting: "○",
+
+		CheckboxChecked:   "󰄲",
+		CheckboxUnchecked: "󰄱",
 
 		TicketOpen:           "○",
 		TicketClaimed:        "󰀄",

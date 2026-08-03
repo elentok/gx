@@ -23,6 +23,7 @@ const (
 	bindingTicketsEditTab     keys.BindingID = "edit-tab"
 	bindingTicketsCancelChord keys.BindingID = "cancel-chord"
 	bindingTicketsImplement   keys.BindingID = "implement"
+	bindingTicketsToggleCheck keys.BindingID = "toggle-check"
 )
 
 // newTicketsManager builds the key manager for the sidebar's focus: plain
@@ -53,6 +54,7 @@ func newTicketsManager() keys.Manager {
 		{ID: bindingTicketsEditTab, Seq: []string{"e", "t"}, Categories: []string{"Navigation"}, Title: "edit file (tab)"},
 		{ID: bindingTicketsCancelChord, Seq: []string{"e", "esc"}, Categories: []string{}, Title: ""},
 		{ID: bindingTicketsImplement, Seq: []string{"i"}, Categories: []string{"Navigation"}, Title: "implement epic"},
+		{ID: bindingTicketsToggleCheck, Seq: []string{"space"}, Categories: []string{"Navigation"}, Title: "check/uncheck"},
 	})
 }
 
@@ -115,6 +117,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case bindingTicketsImplement:
 		return m.handleImplementKey()
+	case bindingTicketsToggleCheck:
+		return m.handleToggleCheck()
 	}
 	return m, nil
 }

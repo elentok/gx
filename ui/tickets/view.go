@@ -44,6 +44,15 @@ var (
 	// RenderRowHighlight uses for the selection row, so a selected row within
 	// the running epic still reads as selected first.
 	runningEpicGutterColor = ui.ColorBlue
+
+	// checkedGlyphStyle/uncheckedGlyphStyle render the execution queue's
+	// checkbox marker (ticket 04), distinct from every status color so a
+	// checked row reads the same regardless of its ticket status.
+	// uncheckedGlyphStyle deliberately isn't ui.StyleDim/StyleMuted — those are
+	// reserved for the search-non-match/done-row dim treatment elsewhere in
+	// this file, which must stay independent of a row's checked state.
+	checkedGlyphStyle   = lipgloss.NewStyle().Foreground(ui.ColorGreen)
+	uncheckedGlyphStyle = lipgloss.NewStyle().Foreground(ui.ColorOverlay)
 )
 
 // sidebarLines renders the epic/ticket tree as exactly two headed sections —
@@ -131,7 +140,7 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 	if m.isCollapsed(epic) {
 		glyph = m.icons().FolderClosed
 	}
-	line := fmt.Sprintf("  %s %s (%d done / %d)", glyph, epic.Name, epic.DoneCount(), epic.TotalCount())
+	line := fmt.Sprintf("  %s %s %s (%d done / %d)", m.checkboxGlyph(m.epicChecked(epic)), glyph, epic.Name, epic.DoneCount(), epic.TotalCount())
 	// Dimming tracks "every ticket done", not the current collapse toggle —
 	// a fully-done epic stays dimmed even if manually expanded, and a
 	// manually-collapsed in-progress epic doesn't borrow its dimming.
@@ -189,7 +198,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) 
 		style = ui.StyleDim
 	}
 
-	line := "    " + style.Render(icon) + " " + titleStyle.Render(title)
+	line := "    " + m.checkboxGlyph(m.isChecked(t.Path)) + " " + style.Render(icon) + " " + titleStyle.Render(title)
 	if suffix := blockedBySuffix(epic, t, status); suffix != "" {
 		suffixStyle := blockedBySuffixStyle
 		if searchDim {
@@ -211,6 +220,15 @@ func (m Model) renderTicketMetricsLine(text string, searchDim bool) string {
 		return "      " + ui.StyleDim.Render(text)
 	}
 	return "  " + renderMetricsLine(text)
+}
+
+// checkboxGlyph renders the execution-queue checkbox marker for a checked or
+// unchecked row (ticket 04's visible selection state).
+func (m Model) checkboxGlyph(checked bool) string {
+	if checked {
+		return checkedGlyphStyle.Render(m.icons().CheckboxChecked)
+	}
+	return uncheckedGlyphStyle.Render(m.icons().CheckboxUnchecked)
 }
 
 func (m Model) icons() ui.IconSet {

@@ -147,6 +147,54 @@ func (e Epic) UnresolvedBlockers(t Ticket) []string {
 	return unresolved
 }
 
+// BlockingTickets resolves t's UnresolvedBlockers tokens to the concrete
+// Ticket entries within e they refer to, for surfacing identifier+title (the
+// tickets tab's blocked-selection confirmation modal, ticket 04). A lettered
+// token (e.g. "03a") resolves to that one sibling; a bare-number token (e.g.
+// "3") can resolve to several not-yet-done siblings sharing that number, same
+// family semantics as UnresolvedBlockers. Nil once every blocker has
+// resolved.
+func (e Epic) BlockingTickets(t Ticket) []Ticket {
+	unresolved := e.UnresolvedBlockers(t)
+	if len(unresolved) == 0 {
+		return nil
+	}
+	byNumber := make(map[int][]Ticket, len(e.Tickets))
+	byNumberAndSuffix := make(map[string]Ticket, len(e.Tickets))
+	for _, other := range e.Tickets {
+		if other.Number == t.Number && other.Identifier == t.Identifier {
+			continue
+		}
+		byNumber[other.Number] = append(byNumber[other.Number], other)
+		if other.Identifier != "" {
+			_, suffix := splitBlockedByToken(other.Identifier)
+			byNumberAndSuffix[siblingKey(other.Number, suffix)] = other
+		}
+	}
+	var result []Ticket
+	seen := map[string]bool{}
+	for _, token := range unresolved {
+		num, letters := splitBlockedByToken(token)
+		if letters != "" {
+			if other, ok := byNumberAndSuffix[siblingKey(num, letters)]; ok && !seen[siblingKey(other.Number, letters)] {
+				seen[siblingKey(other.Number, letters)] = true
+				result = append(result, other)
+			}
+			continue
+		}
+		for _, other := range byNumber[num] {
+			_, otherLetters := splitBlockedByToken(other.Identifier)
+			key := siblingKey(other.Number, otherLetters)
+			if other.IsDone() || seen[key] {
+				continue
+			}
+			seen[key] = true
+			result = append(result, other)
+		}
+	}
+	return result
+}
+
 // splitBlockedByToken splits a parseBlockedBy token (e.g. "04a") into its
 // leading number and trailing letter suffix ("", for a bare number like
 // "04"). token is always digits-then-letters, per blockedByTokenRe.

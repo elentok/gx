@@ -204,3 +204,56 @@ func TestEpic_UnresolvedBlockers_LetteredTokenNamesOneSibling(t *testing.T) {
 		t.Errorf("UnresolvedBlockers = %v, want nil — 03a alone is done", got)
 	}
 }
+
+func TestEpic_BlockingTickets_ResolvesTokensToTicketsForModal(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, Identifier: "01", BlockedBy: []string{"2", "3"}},
+		{Number: 2, Identifier: "02", Title: "Second ticket", Status: "open"},
+		{Number: 3, Identifier: "03", Title: "Third ticket", Status: "claimed"},
+	}}
+	got := epic.BlockingTickets(epic.Tickets[0])
+	if len(got) != 2 || got[0].Identifier != "02" || got[1].Identifier != "03" {
+		t.Fatalf("BlockingTickets = %+v, want [02 Second ticket, 03 Third ticket]", got)
+	}
+}
+
+func TestEpic_BlockingTickets_NilWhenNothingUnresolved(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, BlockedBy: []string{"2"}},
+		{Number: 2, Status: "done"},
+	}}
+	if got := epic.BlockingTickets(epic.Tickets[0]); got != nil {
+		t.Errorf("BlockingTickets = %v, want nil", got)
+	}
+}
+
+// TestEpic_BlockingTickets_BareNumberResolvesEveryNotYetDoneSibling covers a
+// mid-flight split blocker (see UnresolvedBlockers' bare-number family
+// semantics): "Blocked by: 3" should surface every one of 3's not-yet-done
+// siblings, not just the superseded original, so confirming the modal adds
+// them all to the checked set.
+func TestEpic_BlockingTickets_BareNumberResolvesEveryNotYetDoneSibling(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, BlockedBy: []string{"3"}},
+		{Number: 3, Identifier: "03", Title: "Original", Status: "done"},
+		{Number: 3, Identifier: "03a", Title: "Split A", Status: "done"},
+		{Number: 3, Identifier: "03b", Title: "Split B", Status: "open"},
+	}}
+	got := epic.BlockingTickets(epic.Tickets[0])
+	if len(got) != 1 || got[0].Identifier != "03b" {
+		t.Fatalf("BlockingTickets = %+v, want [03b Split B]", got)
+	}
+}
+
+func TestEpic_BlockingTickets_LetteredTokenResolvesOnlyThatSibling(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, BlockedBy: []string{"3a"}},
+		{Number: 3, Identifier: "03", Status: "superseded"},
+		{Number: 3, Identifier: "03a", Title: "Split A", Status: "open"},
+		{Number: 3, Identifier: "03b", Title: "Split B", Status: "open"},
+	}}
+	got := epic.BlockingTickets(epic.Tickets[0])
+	if len(got) != 1 || got[0].Identifier != "03a" {
+		t.Fatalf("BlockingTickets = %+v, want [03a Split A]", got)
+	}
+}

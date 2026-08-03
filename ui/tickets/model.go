@@ -57,6 +57,11 @@ type Model struct {
 
 	selected       int
 	collapsedEpics map[string]bool
+	// checked is the execution queue's seed selection (ticket 04): tickets the
+	// user has marked for a future run, keyed by Ticket.Path so it survives a
+	// reload's re-sorting/index-shuffling. Later tickets (06, 07, 09, 11) read
+	// this set; this one only has to keep it correct and visible.
+	checked map[string]bool
 	// scrollOffset is the sidebar's line-based scroll position (sidebarLines()
 	// is windowed to it in normalView), kept following m.selected by
 	// ensureSidebarVisible.
@@ -173,6 +178,9 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case editFileFinishedMsg:
 		return m.handleEditFileFinished(msg)
+
+	case checkAddConfirmedMsg:
+		return m.handleCheckAddConfirmed(msg)
 
 	case tea.KeyPressMsg:
 		if m.implementAgentMenuOpen {
