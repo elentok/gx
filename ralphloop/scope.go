@@ -65,6 +65,34 @@ func (s RunScope) AllSettled(epic tickets.Epic) bool {
 	return found == len(s.ticketIDs)
 }
 
+// TotalCount is how many of epic's tickets belong to the scope.
+func (s RunScope) TotalCount(epic tickets.Epic) int {
+	if s.wholeEpic {
+		return epic.TotalCount()
+	}
+	total := 0
+	for _, ticket := range epic.Tickets {
+		if s.Contains(ticket) {
+			total++
+		}
+	}
+	return total
+}
+
+// DoneCount is how many of the scope's tickets are done.
+func (s RunScope) DoneCount(epic tickets.Epic) int {
+	if s.wholeEpic {
+		return epic.DoneCount()
+	}
+	done := 0
+	for _, ticket := range epic.Tickets {
+		if s.Contains(ticket) && ticket.IsDone() {
+			done++
+		}
+	}
+	return done
+}
+
 // Frontier keeps dependency resolution epic-wide: selecting a dependent
 // ticket does not silently waive an unselected blocker.
 func (s RunScope) Frontier(epic tickets.Epic) []tickets.Ticket {

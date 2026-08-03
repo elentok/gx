@@ -164,7 +164,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		return err
 	}
 	if scope.AllSettled(*initial) {
-		sink.AlreadyComplete(opts.EpicName, initial.DoneCount(), initial.TotalCount())
+		sink.AlreadyComplete(opts.EpicName, scope.DoneCount(*initial), scope.TotalCount(*initial))
 		return nil
 	}
 
@@ -280,12 +280,13 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		ResumeSignalPath: resumePath,
 		FeatureLock:      &featureMu,
 		Sink:             sink,
+		Scope:            scope,
 	}, *initial)
 	if err != nil {
 		return err
 	}
 	for _, ticket := range initial.Tickets {
-		if strings.EqualFold(strings.TrimSpace(ticket.Status), "needs-attention") {
+		if scope.Contains(ticket) && strings.EqualFold(strings.TrimSpace(ticket.Status), "needs-attention") {
 			gate.pause(iterLabel(ticket.Identifier), "needs operator attention")
 		}
 	}

@@ -41,6 +41,12 @@ type reconcileParams struct {
 	// Sink receives this Run call's lifecycle events, safe to call
 	// concurrently.
 	Sink EventSink
+	// Scope restricts which tickets reconcile reattaches or reports on — a
+	// ticket outside it belongs to a different (or not yet started) run and
+	// is left untouched, whatever its Status. Callers running the whole
+	// epic pass ResolveRunScope's wholeEpic result, not the zero value (see
+	// RunScope.Contains).
+	Scope RunScope
 }
 
 // reconcile derives in-flight iteration state from ticket Status: plus live
@@ -82,6 +88,12 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 
 	var reattached []tickets.Ticket
 	for _, t := range epic.Tickets {
+		if !rp.Scope.Contains(t) {
+			// Belongs to a different (or not yet requested) run — leave its
+			// claim/needs-attention state exactly as found rather than
+			// reattaching, reverting, or reporting on it here.
+			continue
+		}
 		status := strings.ToLower(strings.TrimSpace(t.Status))
 		if status == "needs-attention" {
 			if live[iterationKey(epic.Name, iterLabel(t.Identifier))] {

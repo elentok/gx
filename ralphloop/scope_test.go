@@ -45,6 +45,43 @@ func TestResolveRunScope_RejectsUnknownIdentifier(t *testing.T) {
 	}
 }
 
+func TestRunScope_DoneAndTotalCount_AreScopedNotEpicWide(t *testing.T) {
+	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
+		{Number: 1, Identifier: "01", Status: "done"},
+		{Number: 2, Identifier: "02", Status: "open"},
+		{Number: 3, Identifier: "03", Status: "done"},
+	}}
+
+	scope, err := ResolveRunScope(epic, []string{"01", "02"})
+	if err != nil {
+		t.Fatalf("ResolveRunScope() error = %v", err)
+	}
+	if got := scope.TotalCount(epic); got != 2 {
+		t.Errorf("TotalCount() = %d, want 2 (epic-wide total is 3)", got)
+	}
+	if got := scope.DoneCount(epic); got != 1 {
+		t.Errorf("DoneCount() = %d, want 1 (epic-wide done is 2)", got)
+	}
+}
+
+func TestRunScope_DoneAndTotalCount_WholeEpicMatchesEpicMethods(t *testing.T) {
+	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
+		{Number: 1, Identifier: "01", Status: "done"},
+		{Number: 2, Identifier: "02", Status: "open"},
+	}}
+
+	scope, err := ResolveRunScope(epic, nil)
+	if err != nil {
+		t.Fatalf("ResolveRunScope() error = %v", err)
+	}
+	if got := scope.TotalCount(epic); got != epic.TotalCount() {
+		t.Errorf("TotalCount() = %d, want %d", got, epic.TotalCount())
+	}
+	if got := scope.DoneCount(epic); got != epic.DoneCount() {
+		t.Errorf("DoneCount() = %d, want %d", got, epic.DoneCount())
+	}
+}
+
 func TestResolveRunScope_RejectsDuplicateIdentifier(t *testing.T) {
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01"},

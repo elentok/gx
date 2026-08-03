@@ -26,6 +26,7 @@ func testReconcileParams(workspaceID string, paths reconcilePaths, sink EventSin
 		Gate:        NewGate(),
 		FeatureLock: &sync.Mutex{},
 		Sink:        sink,
+		Scope:       RunScope{wholeEpic: true},
 	}
 }
 
@@ -271,6 +272,73 @@ func TestReconcile_NeedsAttentionWithLiveTab_ReturnsReattached(t *testing.T) {
 	}
 	if len(reattached) != 1 || reattached[0].Number != 1 {
 		t.Fatalf("reattached = %v, want needs-attention ticket 01", reattached)
+	}
+}
+
+// TestReconcile_ClaimedWithLiveTabOutsideScope_NotReattached covers ticket
+// 23's requirement that reconcile only reattaches iterations belonging to
+// the requested run scope — a claimed ticket with a live tab left outside
+// the scope belongs to a different (or not-yet-started) run and must be
+// left exactly as found rather than reattached.
+func TestReconcile_ClaimedWithLiveTabOutsideScope_NotReattached(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+	})
+	epics, err := tickets.Load(scratchDir)
+	if err != nil {
+		t.Fatalf("tickets.Load: %v", err)
+	}
+
+	d, _, _ := fakeDeps()
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
+		return []herdr.Tab{{Label: "iter-01", WorkspaceID: workspaceID}}, nil
+	}
+
+	rp := testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(io.Discard))
+	// A scope that requested only ticket 99 — ticket 01 is outside it.
+	rp.Scope = RunScope{ticketIDs: map[string]struct{}{"99": {}}}
+
+	reattached, err := reconcile(d, rp, epics[0])
+	if err != nil {
+		t.Fatalf("reconcile() error = %v", err)
+	}
+	if len(reattached) != 0 {
+		t.Fatalf("reattached = %v, want none (ticket 01 is outside the scope)", reattached)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: claimed") {
+		t.Errorf("out-of-scope ticket status changed unexpectedly:\n%s", raw)
+	}
+}
+
+// TestReconcile_NeedsAttentionOutsideScope_NotReattached is the
+// needs-attention counterpart of the claimed case above.
+func TestReconcile_NeedsAttentionOutsideScope_NotReattached(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: needs-attention\ntype: task\n---\n# A\n",
+	})
+	epics, err := tickets.Load(scratchDir)
+	if err != nil {
+		t.Fatalf("tickets.Load: %v", err)
+	}
+	d, _, _ := fakeDeps()
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
+		return []herdr.Tab{{TabID: "tab-iter-01", Label: "iter-01", WorkspaceID: workspaceID}}, nil
+	}
+
+	rp := testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(io.Discard))
+	rp.Scope = RunScope{ticketIDs: map[string]struct{}{"99": {}}}
+
+	reattached, err := reconcile(d, rp, epics[0])
+	if err != nil {
+		t.Fatalf("reconcile() error = %v", err)
+	}
+	if len(reattached) != 0 {
+		t.Fatalf("reattached = %v, want none (needs-attention ticket 01 is outside the scope)", reattached)
 	}
 }
 

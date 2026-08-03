@@ -481,3 +481,67 @@ func TestRun_TicketSubset_CompletesWithoutTouchingTicketsOutsideSubset(t *testin
 		t.Errorf("03-third.md = %q, want it left open (outside the subset)", raw)
 	}
 }
+
+// TestRun_NeedsAttentionOutsideSubset_DoesNotPauseRun covers ticket 23's
+// requirement: a needs-attention ticket left outside the requested subset
+// must not gate-pause scheduling of the tickets the caller actually asked
+// for.
+func TestRun_NeedsAttentionOutsideSubset_DoesNotPauseRun(t *testing.T) {
+	scratchDir := writeEpic(t, "my-epic", map[string]string{
+		"01-first.md":  "---\nid: \"01\"\nstatus: needs-attention\ntype: task\n---\n# First\n",
+		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
+	})
+	d, prompts, _ := fakeDeps()
+
+	var out bytes.Buffer
+	err := Run(RunOptions{
+		EpicName:   "my-epic",
+		Skill:      "implement",
+		ScratchDir: scratchDir,
+		RepoDir:    "/fake/repo",
+		TicketIDs:  []string{"02"},
+	}, d, NewTextEventSink(&out))
+	if err != nil {
+		t.Fatalf("Run() error = %v, want the unselected needs-attention ticket 01 to not block scheduling ticket 02", err)
+	}
+
+	wantPrompt := "/implement " + filepath.Join(scratchDir, "my-epic", "issues", "02-second.md")
+	if len(*prompts) != 1 || (*prompts)[0] != wantPrompt {
+		t.Fatalf("prompts = %v, want [%q]", *prompts, wantPrompt)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "my-epic", "issues", "02-second.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: done") {
+		t.Errorf("ticket 02 not marked done:\n%s", raw)
+	}
+}
+
+// TestRun_NeedsAttentionInsideSubset_StillPausesRun covers the flip side of
+// the above: a needs-attention ticket the caller did select keeps its
+// existing safety behavior — it still gate-pauses the run rather than
+// letting scheduling of the rest of the subset proceed silently.
+func TestRun_NeedsAttentionInsideSubset_StillPausesRun(t *testing.T) {
+	scratchDir := writeEpic(t, "my-epic", map[string]string{
+		"01-first.md":  "---\nid: \"01\"\nstatus: needs-attention\ntype: task\n---\n# First\n",
+		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
+	})
+	d, prompts, _ := fakeDeps()
+
+	var out bytes.Buffer
+	err := Run(RunOptions{
+		EpicName:   "my-epic",
+		Skill:      "implement",
+		ScratchDir: scratchDir,
+		RepoDir:    "/fake/repo",
+		TicketIDs:  []string{"01", "02"},
+	}, d, NewTextEventSink(&out))
+	if err == nil {
+		t.Fatalf("Run() error = nil, want the selected needs-attention ticket 01 to still pause scheduling of ticket 02")
+	}
+	if len(*prompts) != 0 {
+		t.Fatalf("prompts = %v, want none (ticket 02 must never launch while the gate is paused)", *prompts)
+	}
+}
