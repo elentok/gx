@@ -149,8 +149,13 @@ func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) 
 	status := epic.RenderedStatus(t)
 
 	// See flat_view.go's renderFlatTicketRow for why superseded always wins
-	// over a live entry.
-	if status != tickets.StatusSuperseded {
+	// over a live entry. m.live is keyed by bare ticket identifier, which
+	// repeats across epics (each restarts numbering from 01) — gating on
+	// epic.Name == m.implementEpic keeps a live entry from another epic's
+	// same-numbered ticket (e.g. two epics' own "02") from also rendering as
+	// running here, since only one epic's ralph-loop run ever populates
+	// m.live at a time (see Model.live's doc comment).
+	if status != tickets.StatusSuperseded && epic.Name == m.implementEpic {
 		if live, ok := m.live[t.Identifier]; ok {
 			if line, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live); ok {
 				return line

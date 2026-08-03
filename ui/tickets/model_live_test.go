@@ -58,3 +58,40 @@ func TestModel_LiveEventsHighlightRunningEpicInFullList(t *testing.T) {
 
 	_ = cmd
 }
+
+// TestModel_LiveEventDoesNotLeakAcrossEpicsWithSameTicketIdentifier guards
+// against m.live's cross-epic collision: since ticket numbering restarts at
+// 01 in every epic, an IterationStarted event for running-epic's ticket "01"
+// must not also render as running on other-epic's own unrelated ticket "01",
+// which never had any live event fired for it.
+func TestModel_LiveEventDoesNotLeakAcrossEpicsWithSameTicketIdentifier(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "running-epic", "01-first-ticket.md", "Status: claimed\n\nBody.\n")
+	writeTicket(t, root, "other-epic", "01-unrelated-ticket.md", "Status: open\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	m.implementEpic = "running-epic"
+
+	events := make(chan ralphloop.LiveEvent, 4)
+	liveCmd := m.startLiveTracking(events)
+	if liveCmd == nil {
+		t.Fatalf("expected startLiveTracking to return a Cmd")
+	}
+
+	events <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Label: "iter-01", Identifier: "01"}
+	msg := liveCmd().(modelLiveEventMsg)
+	updated, _ = m.Update(msg)
+	m = updated.(Model)
+
+	content := m.View().Content
+	if strings.Count(content, "implementing...") != 1 {
+		t.Fatalf("expected exactly one running ticket row, got:\n%s", content)
+	}
+	if !strings.Contains(content, "Unrelated ticket") {
+		t.Fatalf("expected other-epic's ticket to keep its disk-based title, got:\n%s", content)
+	}
+}
