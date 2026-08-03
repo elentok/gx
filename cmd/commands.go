@@ -188,6 +188,16 @@ func newTicketsCmd(d deps) *cobra.Command {
 			return runTicketsValidate(args[0], c.OutOrStdout())
 		},
 	})
+	cmd.AddCommand(newTicketsSetCmd())
+	cmd.AddCommand(&cobra.Command{
+		Use:   "schema",
+		Short: "print the ticket frontmatter schema (settable and read-only fields)",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			_, err := fmt.Fprint(c.OutOrStdout(), ticketsSchemaText)
+			return err
+		},
+	})
 	return cmd
 }
 
