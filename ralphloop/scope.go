@@ -56,9 +56,7 @@ func (s RunScope) AllSettled(epic tickets.Epic) bool {
 			continue
 		}
 		found++
-		switch epic.RenderedStatus(ticket) {
-		case tickets.StatusDone, tickets.StatusNeedsInfo, tickets.StatusNeedsAttention:
-		default:
+		if !isSettledStatus(epic.RenderedStatus(ticket)) {
 			return false
 		}
 	}

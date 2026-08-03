@@ -371,13 +371,23 @@ func allSettled(e tickets.Epic) bool {
 		return false
 	}
 	for _, t := range e.Tickets {
-		switch e.RenderedStatus(t) {
-		case tickets.StatusDone, tickets.StatusNeedsInfo, tickets.StatusNeedsAttention:
-		default:
+		if !isSettledStatus(e.RenderedStatus(t)) {
 			return false
 		}
 	}
 	return true
+}
+
+// isSettledStatus reports whether a rendered status counts as terminal from
+// the loop's perspective — shared by allSettled and RunScope.AllSettled so
+// the done/needs-info/needs-attention set is defined in exactly one place.
+func isSettledStatus(status tickets.RenderedStatus) bool {
+	switch status {
+	case tickets.StatusDone, tickets.StatusNeedsInfo, tickets.StatusNeedsAttention:
+		return true
+	default:
+		return false
+	}
 }
 
 // loadNamedEpic loads scratchDir and returns the epic named name, or nil if

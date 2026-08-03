@@ -545,3 +545,96 @@ func TestRun_NeedsAttentionInsideSubset_StillPausesRun(t *testing.T) {
 		t.Fatalf("prompts = %v, want none (ticket 02 must never launch while the gate is paused)", *prompts)
 	}
 }
+
+// TestRun_SelectingBlockedTicketThenEditingBlockersRunsCorrectMultiWave is
+// ticket 25's end-to-end regression: a user selects a blocked ticket (the
+// Tickets tab's checked.go cascades in its blocker automatically, so the
+// requested subset here starts as [01 02]), then edits the ticket's Blocked
+// by: list before ever running it. PlanWaves — the same canonical planner
+// Queue previews — and Run must agree at every step: while 02 still has an
+// unresolved blocker outside the requested subset (03, added by the edit and
+// never selected), neither may treat it as runnable; once the edit is
+// reverted, both must agree on the resulting two-wave shape, and 03 — never
+// selected — must stay untouched throughout.
+func TestRun_SelectingBlockedTicketThenEditingBlockersRunsCorrectMultiWave(t *testing.T) {
+	scratchDir := writeEpic(t, "my-epic", map[string]string{
+		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
+		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# Second\n",
+		"03-third.md":  "---\nid: \"03\"\nstatus: open\ntype: task\n---\n# Third\n",
+	})
+	requested := []string{"01", "02"} // mirrors checked.go's blocker cascade at selection time, before 03 ever enters the picture
+
+	ticketPath := filepath.Join(scratchDir, "my-epic", "issues", "02-second.md")
+	planFor := func() ([][]tickets.Ticket, error) {
+		epic, err := loadNamedEpic(scratchDir, "my-epic")
+		if err != nil || epic == nil {
+			t.Fatalf("loadNamedEpic: err=%v epic=%v", err, epic)
+		}
+		scope, err := ResolveRunScope(*epic, requested)
+		if err != nil {
+			t.Fatalf("ResolveRunScope: %v", err)
+		}
+		return PlanWaves(*epic, scope, 2)
+	}
+
+	// Edit 02's blockers to require 03 too — a dependency this run's
+	// selection never picked up. The plan must surface this as stuck, not a
+	// misleading runnable wave, once 01 lands.
+	if err := os.WriteFile(ticketPath, []byte("---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01\", \"03\"]\n---\n# Second\n"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	if _, err := planFor(); err == nil {
+		t.Fatalf("PlanWaves() error = nil, want a stuck-plan error while 02 needs unselected blocker 03")
+	}
+
+	// Edit again, dropping the unselected blocker — the plan should now
+	// resolve into the two waves 01's-then-02's chain always implied.
+	if err := os.WriteFile(ticketPath, []byte("---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# Second\n"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	waves, err := planFor()
+	if err != nil {
+		t.Fatalf("PlanWaves() error = %v", err)
+	}
+	if len(waves) != 2 || len(waves[0]) != 1 || waves[0][0].DisplayNumber() != "01" || len(waves[1]) != 1 || waves[1][0].DisplayNumber() != "02" {
+		t.Fatalf("PlanWaves() = %v, want [[01] [02]]", waves)
+	}
+
+	d, prompts, _ := fakeDeps()
+	var out bytes.Buffer
+	if err := Run(RunOptions{
+		EpicName:   "my-epic",
+		Skill:      "implement",
+		ScratchDir: scratchDir,
+		RepoDir:    "/fake/repo",
+		TicketIDs:  requested,
+	}, d, NewTextEventSink(&out)); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	wantPrompts := []string{
+		"/implement " + filepath.Join(scratchDir, "my-epic", "issues", "01-first.md"),
+		"/implement " + ticketPath,
+	}
+	if len(*prompts) != 2 || (*prompts)[0] != wantPrompts[0] || (*prompts)[1] != wantPrompts[1] {
+		t.Fatalf("prompts = %v, want %v — the exact membership and order PlanWaves showed", *prompts, wantPrompts)
+	}
+
+	for _, name := range []string{"01-first.md", "02-second.md"} {
+		raw, err := os.ReadFile(filepath.Join(scratchDir, "my-epic", "issues", name))
+		if err != nil {
+			t.Fatalf("ReadFile %s: %v", name, err)
+		}
+		if !strings.Contains(string(raw), "status: done") {
+			t.Errorf("%s not marked done:\n%s", name, raw)
+		}
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "my-epic", "issues", "03-third.md"))
+	if err != nil {
+		t.Fatalf("ReadFile 03-third.md: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: open") {
+		t.Errorf("03-third.md = %q, want it left untouched (never selected)", raw)
+	}
+}

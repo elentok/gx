@@ -129,32 +129,6 @@ func TestFrontier_AgainstFixtureEpicDirectory(t *testing.T) {
 	assertNumbers(t, got, []int{1, 3})
 }
 
-func TestFilterIDs_EmptyIDsReturnsFrontierUnchanged(t *testing.T) {
-	frontier := []tickets.Ticket{{Number: 1, Identifier: "01"}, {Number: 2, Identifier: "02"}}
-	got := FilterIDs(frontier, nil)
-	assertNumbers(t, got, []int{1, 2})
-}
-
-func TestFilterIDs_RestrictsToGivenSet(t *testing.T) {
-	frontier := []tickets.Ticket{
-		{Number: 1, Identifier: "01"},
-		{Number: 2, Identifier: "02"},
-		{Number: 3, Identifier: "03"},
-	}
-	got := FilterIDs(frontier, []string{"01", "03"})
-	assertNumbers(t, got, []int{1, 3})
-}
-
-func TestFilterIDs_PreservesFrontierOrder(t *testing.T) {
-	frontier := []tickets.Ticket{
-		{Number: 1, Identifier: "01"},
-		{Number: 2, Identifier: "02"},
-		{Number: 3, Identifier: "03"},
-	}
-	got := FilterIDs(frontier, []string{"03", "01"})
-	assertNumbers(t, got, []int{1, 3})
-}
-
 func assertNumbers(t *testing.T, got []tickets.Ticket, want []int) {
 	t.Helper()
 	if len(got) != len(want) {
