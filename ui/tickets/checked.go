@@ -129,6 +129,64 @@ func (m Model) handleCheckAddConfirmed(msg checkAddConfirmedMsg) (tea.Model, tea
 	return m, nil
 }
 
+// autoCheckSplitChildren compares oldEpics (this Model's epics before a
+// reload) against newEpics (the reload's result): for every checked ticket
+// whose Split field gained new entries since oldEpics — a mid-flight split,
+// per implement/SKILL.md's convention — the newly-appeared sibling(s) join
+// checked automatically, no confirmation modal (ticket 06), unlike
+// toggleTicketChecked's blocked-ticket confirmation. A ticket that isn't
+// itself checked splitting is a no-op: only a split of already-checked work
+// needs its continuation auto-added.
+func autoCheckSplitChildren(oldEpics, newEpics []tickets.Epic, checked map[string]bool) {
+	oldByPath := make(map[string]tickets.Ticket)
+	for _, epic := range oldEpics {
+		for _, t := range epic.Tickets {
+			oldByPath[t.Path] = t
+		}
+	}
+
+	for _, epic := range newEpics {
+		for _, nt := range epic.Tickets {
+			old, ok := oldByPath[nt.Path]
+			if !ok || !checked[old.Path] {
+				continue
+			}
+			for _, childID := range newSplitEntries(old.Split, nt.Split) {
+				if child, ok := findTicketByIdentifier(epic, childID); ok {
+					checked[child.Path] = true
+				}
+			}
+		}
+	}
+}
+
+// newSplitEntries returns the entries present in newSplit but not oldSplit,
+// i.e. the sibling IDs a ticket's Split field gained since it was last seen.
+func newSplitEntries(oldSplit, newSplit []string) []string {
+	seen := make(map[string]bool, len(oldSplit))
+	for _, id := range oldSplit {
+		seen[id] = true
+	}
+	var added []string
+	for _, id := range newSplit {
+		if !seen[id] {
+			added = append(added, id)
+		}
+	}
+	return added
+}
+
+// findTicketByIdentifier looks up a ticket within epic by its Identifier
+// (e.g. "06a"), used to resolve a newly-observed split ID to its ticket.Path.
+func findTicketByIdentifier(epic tickets.Epic, identifier string) (tickets.Ticket, bool) {
+	for _, t := range epic.Tickets {
+		if t.Identifier == identifier {
+			return t, true
+		}
+	}
+	return tickets.Ticket{}, false
+}
+
 // epicChecked reports whether every ticket in epic is currently checked
 // (used to render the epic row's own checkbox glyph). A zero-ticket epic
 // renders unchecked.

@@ -176,6 +176,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case epicsLoadedMsg:
+		autoCheckSplitChildren(m.epics, msg.epics, m.checked)
 		m.loaded = true
 		m.epics = msg.epics
 		m.collapsedEpics = defaultCollapsedEpics(msg.epics)

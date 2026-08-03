@@ -1,14 +1,41 @@
 package tickets
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 )
+
+// writeFrontmatterTicket writes a ticket file with real frontmatter fields
+// (id/status/split/split_from), unlike writeTicket's LegacyTicketToFrontmatter
+// conversion which doesn't carry split/split_from.
+func writeFrontmatterTicket(t *testing.T, root, epic, filename, id, status string, split []string, splitFrom string) {
+	t.Helper()
+	path := filepath.Join(root, ".scratch", epic, "issues", filename)
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatal(err)
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "---\nid: %q\nstatus: %s\ntype: task\n", id, status)
+	if len(split) > 0 {
+		fmt.Fprintf(&b, "split: [\"%s\"]\n", strings.Join(split, "\", \""))
+	}
+	if splitFrom != "" {
+		fmt.Fprintf(&b, "split_from: %q\n", splitFrom)
+	}
+	b.WriteString("---\nBody.\n")
+	if err := os.WriteFile(path, []byte(b.String()), 0644); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func spacePress() tea.KeyPressMsg {
 	return tea.KeyPressMsg{Code: tea.KeySpace, Text: " "}
@@ -197,6 +224,80 @@ func TestModel_CancelingBlockedModalLeavesCheckedSetUnchanged(t *testing.T) {
 	}
 	if m.isChecked(blockerTicket.Path) {
 		t.Fatalf("expected blocker ticket to stay unchecked after canceling")
+	}
+}
+
+func TestModel_MidRunSplitAutoChecksNewSibling(t *testing.T) {
+	root := t.TempDir()
+	writeFrontmatterTicket(t, root, "my-epic", "01-first-ticket.md", "01", "claimed", nil, "")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	ticket := m.epics[0].Tickets[0]
+
+	updated, _ = m.Update(spacePress())
+	m = updated.(Model)
+	if !m.isChecked(ticket.Path) {
+		t.Fatalf("expected ticket checked before simulating the split")
+	}
+
+	// Simulate a mid-run split: the parent's `split` frontmatter gains an
+	// entry and the new sibling ticket appears on disk, exactly as
+	// implement/SKILL.md's split convention writes it.
+	writeFrontmatterTicket(t, root, "my-epic", "01-first-ticket.md", "01", "claimed", []string{"01a"}, "")
+	writeFrontmatterTicket(t, root, "my-epic", "01a-first-ticket-cont.md", "01a", "open", nil, "01")
+
+	m = deliverLoad(t, m)
+
+	if m.confirm.IsOpen {
+		t.Fatalf("expected no confirmation modal for an auto-checked split child")
+	}
+	var sibling tickets.Ticket
+	found := false
+	for _, tk := range m.epics[0].Tickets {
+		if tk.Identifier == "01a" {
+			sibling, found = tk, true
+		}
+	}
+	if !found {
+		t.Fatalf("expected sibling ticket 01a to be loaded")
+	}
+	if !m.isChecked(sibling.Path) {
+		t.Fatalf("expected split sibling ticket auto-checked")
+	}
+}
+
+func TestModel_SplitOnUncheckedTicketDoesNotAutoCheckSibling(t *testing.T) {
+	root := t.TempDir()
+	writeFrontmatterTicket(t, root, "my-epic", "01-first-ticket.md", "01", "claimed", nil, "")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	writeFrontmatterTicket(t, root, "my-epic", "01-first-ticket.md", "01", "claimed", []string{"01a"}, "")
+	writeFrontmatterTicket(t, root, "my-epic", "01a-first-ticket-cont.md", "01a", "open", nil, "01")
+
+	m = deliverLoad(t, m)
+
+	var sibling tickets.Ticket
+	found := false
+	for _, tk := range m.epics[0].Tickets {
+		if tk.Identifier == "01a" {
+			sibling, found = tk, true
+		}
+	}
+	if !found {
+		t.Fatalf("expected sibling ticket 01a to be loaded")
+	}
+	if m.isChecked(sibling.Path) {
+		t.Fatalf("expected split sibling to stay unchecked when the parent was never checked")
 	}
 }
 
