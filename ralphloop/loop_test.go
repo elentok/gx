@@ -481,34 +481,3 @@ func TestRun_TicketSubset_CompletesWithoutTouchingTicketsOutsideSubset(t *testin
 		t.Errorf("03-third.md = %q, want it left open (outside the subset)", raw)
 	}
 }
-
-func TestSettledScope_EmptyIDsFallsBackToAllSettled(t *testing.T) {
-	epic := tickets.Epic{Tickets: []tickets.Ticket{
-		{Number: 1, Status: "done"},
-		{Number: 2, Status: "open"},
-	}}
-	if settledScope(epic, nil) {
-		t.Errorf("settledScope(nil) = true, want false while ticket 2 is still open")
-	}
-}
-
-func TestSettledScope_SubsetDoneIgnoresOtherOpenTickets(t *testing.T) {
-	epic := tickets.Epic{Tickets: []tickets.Ticket{
-		{Number: 1, Identifier: "01", Status: "done"},
-		{Number: 2, Identifier: "02", Status: "done"},
-		{Number: 3, Identifier: "03", Status: "open"},
-	}}
-	if !settledScope(epic, []string{"01", "02"}) {
-		t.Errorf("settledScope(subset) = false, want true once every subset ticket is done, regardless of ticket 03")
-	}
-}
-
-func TestSettledScope_SubsetNotYetDone(t *testing.T) {
-	epic := tickets.Epic{Tickets: []tickets.Ticket{
-		{Number: 1, Identifier: "01", Status: "done"},
-		{Number: 2, Identifier: "02", Status: "open"},
-	}}
-	if settledScope(epic, []string{"01", "02"}) {
-		t.Errorf("settledScope(subset) = true, want false while ticket 02 is still open")
-	}
-}

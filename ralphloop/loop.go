@@ -3,7 +3,6 @@ package ralphloop
 import (
 	"fmt"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 
@@ -160,7 +159,11 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		sink.NoTicketsFound(opts.EpicName)
 		return nil
 	}
-	if settledScope(*initial, opts.TicketIDs) {
+	scope, err := ResolveRunScope(*initial, opts.TicketIDs)
+	if err != nil {
+		return err
+	}
+	if scope.AllSettled(*initial) {
 		sink.AlreadyComplete(opts.EpicName, initial.DoneCount(), initial.TotalCount())
 		return nil
 	}
@@ -216,7 +219,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			if err != nil {
 				return err
 			}
-			frontier := FilterIDs(Frontier(*epic), opts.TicketIDs)
+			frontier := scope.Frontier(*epic)
 			if len(frontier) == 0 {
 				return nil
 			}
@@ -296,7 +299,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		if err != nil {
 			return err
 		}
-		if settledScope(*epic, opts.TicketIDs) && active == 0 {
+		if scope.AllSettled(*epic) && active == 0 {
 			break
 		}
 
@@ -374,30 +377,6 @@ func allSettled(e tickets.Epic) bool {
 		}
 	}
 	return true
-}
-
-// settledScope reports whether the scope Run is watching — the subset named
-// by ids, or the whole epic when ids is empty — has reached allSettled's
-// terminal state. A ticket outside ids doesn't block completion: Run exits
-// once the caller's requested tickets are done even if other epic tickets
-// remain open.
-func settledScope(e tickets.Epic, ids []string) bool {
-	if len(ids) == 0 {
-		return allSettled(e)
-	}
-	found := 0
-	for _, t := range e.Tickets {
-		if !slices.Contains(ids, t.DisplayNumber()) {
-			continue
-		}
-		found++
-		switch e.RenderedStatus(t) {
-		case tickets.StatusDone, tickets.StatusNeedsInfo, tickets.StatusNeedsAttention:
-		default:
-			return false
-		}
-	}
-	return found > 0
 }
 
 // loadNamedEpic loads scratchDir and returns the epic named name, or nil if
