@@ -110,9 +110,8 @@ func (m FlatModel) renderFlatTicketRow(t tickets.Ticket) []string {
 	// styling.
 	if status != tickets.StatusSuperseded {
 		if live, ok := m.live[t.Identifier]; ok {
-			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.spinner, t, live); ok {
-				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens)
-				return []string{base, renderMetricsLine(joinNonEmpty(" ", suffix, metrics))}
+			if base, _, ok := renderLiveTicketRow(m.icons(), m.spinner, t, live); ok {
+				return []string{base, m.ticketMetricsLine(t, status)}
 			}
 		}
 	}
@@ -133,8 +132,26 @@ func (m FlatModel) renderFlatTicketRow(t tickets.Ticket) []string {
 	if status != tickets.StatusDone {
 		return []string{line}
 	}
-	metrics := formatMetricsLine(t.ElapsedTime, t.ActualContextWindow)
-	return []string{line, renderMetricsLine(metrics)}
+	return []string{line, m.ticketMetricsLine(t, status)}
+}
+
+// ticketMetricsLine renders t's rendered/styled line-2 metrics text (empty
+// for a never-run ticket) — the single source both renderFlatTicketRow's
+// list row and previewContent's preview-panel line pull from, per ticket 07,
+// so the two always agree.
+func (m FlatModel) ticketMetricsLine(t tickets.Ticket, status tickets.RenderedStatus) string {
+	if status != tickets.StatusSuperseded {
+		if live, ok := m.live[t.Identifier]; ok {
+			if _, suffix, ok := renderLiveTicketRow(m.icons(), m.spinner, t, live); ok {
+				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens)
+				return renderMetricsLine(joinNonEmpty(" ", suffix, metrics))
+			}
+		}
+	}
+	if status != tickets.StatusDone {
+		return ""
+	}
+	return renderMetricsLine(formatMetricsLine(t.ElapsedTime, t.ActualContextWindow))
 }
 
 // previewContent builds the selected ticket's preview, mirroring
@@ -158,6 +175,10 @@ func (m FlatModel) previewContent(width int) string {
 			b.WriteString("\n")
 			b.WriteString(meta)
 		}
+	}
+	if metrics := m.ticketMetricsLine(t, status); metrics != "" {
+		b.WriteString("\n")
+		b.WriteString(metrics)
 	}
 	b.WriteString("\n")
 	b.WriteString(previewRuleStyle.Render(strings.Repeat("─", max(width, 0))))
