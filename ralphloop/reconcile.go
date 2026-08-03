@@ -104,11 +104,29 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 		reattach(t)
 		reattached = append(reattached, t)
 	}
+
+	// Computed once per run (not per ticket) and threaded into every
+	// classifyDoneTicket call below — a real perf win over the one
+	// TrailerCommitExists shell-out per done ticket this replaced. Only
+	// attempted when there's at least one done ticket to check, so most runs
+	// (nothing done yet) skip the git call entirely. A failure here (e.g. a
+	// transient git error) degrades to an empty map rather than aborting
+	// reconcile: classifyDoneTicket's trailer-based fallback simply
+	// contributes nothing that run, while IsAncestor/PatchesApplied still
+	// resolve the common cases.
+	var landed map[string]bool
+	for _, t := range epic.Tickets {
+		if t.IsDone() && !t.IsSuperseded() {
+			landed, _ = LandedTickets(paths.FeatureWorktree, epic.Name)
+			break
+		}
+	}
+
 	for _, t := range epic.Tickets {
 		if !t.IsDone() || t.IsSuperseded() {
 			continue
 		}
-		class, err := classifyDoneTicket(d, paths, epic.Name, t, events, live)
+		class, err := classifyDoneTicket(d, paths, epic.Name, t, events, live, landed)
 		if err != nil {
 			return nil, fmt.Errorf("verifying done ticket %s: %w", t.Identifier, err)
 		}

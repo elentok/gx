@@ -27,7 +27,7 @@ func TestClassifyDoneTicket_CommitLandedNoLeftover_OK(t *testing.T) {
 	d.WorktreeExists = func(path string) (bool, error) { return false, nil }
 	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}}
 
-	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, events, map[string]bool{})
+	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, events, map[string]bool{}, map[string]bool{})
 	if err != nil {
 		t.Fatalf("classifyDoneTicket() error = %v", err)
 	}
@@ -43,7 +43,7 @@ func TestClassifyDoneTicket_CommitLandedButBranchLeftover_StaleCleanup(t *testin
 	d.WorktreeExists = func(path string) (bool, error) { return false, nil }
 	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}}
 
-	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, events, map[string]bool{})
+	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, events, map[string]bool{}, map[string]bool{})
 	if err != nil {
 		t.Fatalf("classifyDoneTicket() error = %v", err)
 	}
@@ -59,7 +59,7 @@ func TestClassifyDoneTicket_CommitMissingBranchStillHasIt_Recoverable(t *testing
 	d.WorktreeExists = func(path string) (bool, error) { return false, nil }
 	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}}
 
-	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, events, map[string]bool{})
+	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, events, map[string]bool{}, map[string]bool{})
 	if err != nil {
 		t.Fatalf("classifyDoneTicket() error = %v", err)
 	}
@@ -75,7 +75,7 @@ func TestClassifyDoneTicket_CommitMissingNoBranch_Unrecoverable(t *testing.T) {
 	d.WorktreeExists = func(path string) (bool, error) { return false, nil }
 	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}}
 
-	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, events, map[string]bool{})
+	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, events, map[string]bool{}, map[string]bool{})
 	if err != nil {
 		t.Fatalf("classifyDoneTicket() error = %v", err)
 	}
@@ -93,7 +93,7 @@ func TestClassifyDoneTicket_NoRecordedEvent_TreatedAsMissing(t *testing.T) {
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
 	d.WorktreeExists = func(path string) (bool, error) { return false, nil }
 
-	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, nil, map[string]bool{})
+	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, nil, map[string]bool{}, map[string]bool{})
 	if err != nil {
 		t.Fatalf("classifyDoneTicket() error = %v", err)
 	}
@@ -140,7 +140,7 @@ func TestClassifyDoneTicket_LetteredSiblingsShareNumber_NotCrossAttributed(t *te
 	}
 	paths := reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}
 
-	classA, err := classifyDoneTicket(d, paths, "epic", tickets.Ticket{Number: 4, Identifier: "04a", Status: "done"}, events, map[string]bool{})
+	classA, err := classifyDoneTicket(d, paths, "epic", tickets.Ticket{Number: 4, Identifier: "04a", Status: "done"}, events, map[string]bool{}, map[string]bool{})
 	if err != nil {
 		t.Fatalf("classifyDoneTicket(04a) error = %v", err)
 	}
@@ -148,7 +148,7 @@ func TestClassifyDoneTicket_LetteredSiblingsShareNumber_NotCrossAttributed(t *te
 		t.Errorf("classA = %v, want doneOK for 04a's own landed commit", classA)
 	}
 
-	classB, err := classifyDoneTicket(d, paths, "epic", tickets.Ticket{Number: 4, Identifier: "04b", Status: "done"}, events, map[string]bool{})
+	classB, err := classifyDoneTicket(d, paths, "epic", tickets.Ticket{Number: 4, Identifier: "04b", Status: "done"}, events, map[string]bool{}, map[string]bool{})
 	if err != nil {
 		t.Fatalf("classifyDoneTicket(04b) error = %v", err)
 	}
@@ -164,7 +164,7 @@ func TestClassifyDoneTicket_LiveTabCountsAsLeftover(t *testing.T) {
 	d.WorktreeExists = func(path string) (bool, error) { return false, nil }
 	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}}
 
-	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, events, map[string]bool{iterationKey("epic", iterLabel("03")): true})
+	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, events, map[string]bool{iterationKey("epic", iterLabel("03")): true}, map[string]bool{})
 	if err != nil {
 		t.Fatalf("classifyDoneTicket() error = %v", err)
 	}

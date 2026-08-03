@@ -138,6 +138,31 @@ func TrailerCommitExists(dir, ref, key, value string) (bool, error) {
 	return strings.TrimSpace(out) != "", nil
 }
 
+// TrailerMap parses every commit reachable from ref for a key trailer (git
+// log --format='%H %(trailers:key=...,valueonly)') into a value→SHA map — a
+// single shell-out replacing what would otherwise be one TrailerCommitExists
+// call per value being looked up. A commit with no such trailer contributes
+// nothing (the placeholder expands to an empty string, trimmed away here).
+func TrailerMap(dir, ref, key string) (map[string]string, error) {
+	out, _, err := run(dir, []string{"log", "--format=%H %(trailers:key=" + key + ",valueonly)", ref})
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string]string)
+	for line := range strings.SplitSeq(out, "\n") {
+		sha, value, found := strings.Cut(line, " ")
+		if !found {
+			continue
+		}
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		result[value] = sha
+	}
+	return result, nil
+}
+
 // CherryPickInProgress reports whether dir has a cherry-pick sequence
 // currently stopped on a conflict (CHERRY_PICK_HEAD present).
 func CherryPickInProgress(dir string) (bool, error) {

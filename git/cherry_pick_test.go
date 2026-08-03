@@ -204,6 +204,46 @@ func TestIsAncestor_False(t *testing.T) {
 	}
 }
 
+func TestTrailerMap_ParsesValueToSHA(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+
+	testutil.WriteFile(t, dir, "a.txt", "a\n")
+	testutil.CommitAll(t, dir, "add a")
+	if err := git.AppendTrailer(dir, "Ralph-Loop-Ticket", "epic/01"); err != nil {
+		t.Fatalf("AppendTrailer: %v", err)
+	}
+	stamped, err := git.RevParse(dir, "HEAD")
+	if err != nil {
+		t.Fatalf("RevParse: %v", err)
+	}
+
+	testutil.WriteFile(t, dir, "b.txt", "b\n")
+	testutil.CommitAll(t, dir, "add b (no trailer)")
+
+	got, err := git.TrailerMap(dir, "HEAD", "Ralph-Loop-Ticket")
+	if err != nil {
+		t.Fatalf("TrailerMap: %v", err)
+	}
+	want := map[string]string{"epic/01": stamped}
+	if len(got) != len(want) || got["epic/01"] != want["epic/01"] {
+		t.Errorf("TrailerMap() = %v, want %v", got, want)
+	}
+}
+
+func TestTrailerMap_NoMatchingTrailers_EmptyMap(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+
+	got, err := git.TrailerMap(dir, "HEAD", "Ralph-Loop-Ticket")
+	if err != nil {
+		t.Fatalf("TrailerMap: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("TrailerMap() = %v, want empty map", got)
+	}
+}
+
 func TestCherryPickInProgress_FalseOutsideCherryPick(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)

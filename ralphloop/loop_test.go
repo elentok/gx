@@ -113,9 +113,6 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		AppendTrailers: func(dir string, trailers ...git.Trailer) error {
 			return nil
 		},
-		TrailerCommitExists: func(dir, ref, key, value string) (bool, error) {
-			return false, nil
-		},
 		WorktreeExists: func(path string) (bool, error) {
 			return true, nil
 		},

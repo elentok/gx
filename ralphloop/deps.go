@@ -65,11 +65,6 @@ type Deps struct {
 	// ticket trailer later even if a subsequent rebase-plus-manual-conflict-
 	// resolution changes the commit's hash and patch-id both.
 	AppendTrailers func(dir string, trailers ...git.Trailer) error
-	// TrailerCommitExists reports whether a commit stamped by AppendTrailers is
-	// still reachable from ref, used by startup reconciliation as the final
-	// fallback once IsAncestor and PatchesApplied both fail to place a done
-	// ticket's landed commit.
-	TrailerCommitExists func(dir, ref, key, value string) (bool, error)
 	// WorktreeExists reports whether an iteration worktree still exists at
 	// path, used by startup reconciliation to detect leftover state a crash
 	// left uncleaned.
@@ -129,7 +124,6 @@ func DefaultDeps() Deps {
 		IsAncestor:            git.IsAncestor,
 		PatchesApplied:        git.PatchesApplied,
 		AppendTrailers:        git.AppendTrailers,
-		TrailerCommitExists:   git.TrailerCommitExists,
 		WorktreeExists:        worktreeExists,
 		InstallDeps:           InstallDependencies,
 		ReadOccupancy:         transcript.LastAssistantOccupancy,

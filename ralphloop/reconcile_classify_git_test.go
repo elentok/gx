@@ -23,7 +23,6 @@ func realGitDeps() Deps {
 	d.MergeBase = git.MergeBase
 	d.PatchesApplied = git.PatchesApplied
 	d.AppendTrailers = git.AppendTrailers
-	d.TrailerCommitExists = git.TrailerCommitExists
 	return d
 }
 
@@ -62,7 +61,7 @@ func TestClassifyDoneTicket_RealRepo_CommitLandedAndCleanedUp_OK(t *testing.T) {
 
 	d := realGitDeps()
 	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: landedSHA}}
-	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: dir, WorktreeDir: "/fake/worktrees"}, "main", tickets.Ticket{Number: 3, Identifier: "03", Status: "done"}, events, map[string]bool{})
+	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: dir, WorktreeDir: "/fake/worktrees"}, "main", tickets.Ticket{Number: 3, Identifier: "03", Status: "done"}, events, map[string]bool{}, map[string]bool{})
 	if err != nil {
 		t.Fatalf("classifyDoneTicket() error = %v", err)
 	}
@@ -90,7 +89,7 @@ func TestClassifyDoneTicket_RealRepo_NeverCherryPicked_Recoverable(t *testing.T)
 	testutil.MustGitExported(t, dir, "checkout", "main")
 
 	d := realGitDeps()
-	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: dir, WorktreeDir: "/fake/worktrees"}, "main", tickets.Ticket{Number: 3, Identifier: "03", Status: "done"}, nil, map[string]bool{})
+	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: dir, WorktreeDir: "/fake/worktrees"}, "main", tickets.Ticket{Number: 3, Identifier: "03", Status: "done"}, nil, map[string]bool{}, map[string]bool{})
 	if err != nil {
 		t.Fatalf("classifyDoneTicket() error = %v", err)
 	}
@@ -148,7 +147,7 @@ func TestClassifyDoneTicket_RealRepo_RebasedAfterLanding_OK(t *testing.T) {
 	// pre-rebase original.
 	d := realGitDeps()
 	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: landedSHA}}
-	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: dir, WorktreeDir: "/fake/worktrees"}, "main", tickets.Ticket{Number: 3, Identifier: "03", Status: "done"}, events, map[string]bool{})
+	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: dir, WorktreeDir: "/fake/worktrees"}, "main", tickets.Ticket{Number: 3, Identifier: "03", Status: "done"}, events, map[string]bool{}, map[string]bool{})
 	if err != nil {
 		t.Fatalf("classifyDoneTicket() error = %v", err)
 	}
@@ -226,7 +225,11 @@ func TestClassifyDoneTicket_RealRepo_RebasedWithConflictResolution_OK(t *testing
 
 	d := realGitDeps()
 	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: landedSHA}}
-	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: dir, WorktreeDir: "/fake/worktrees"}, "main", tickets.Ticket{Number: 3, Identifier: "03", Status: "done"}, events, map[string]bool{})
+	landed, err := LandedTickets(dir, "main")
+	if err != nil {
+		t.Fatalf("LandedTickets: %v", err)
+	}
+	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: dir, WorktreeDir: "/fake/worktrees"}, "main", tickets.Ticket{Number: 3, Identifier: "03", Status: "done"}, events, map[string]bool{}, landed)
 	if err != nil {
 		t.Fatalf("classifyDoneTicket() error = %v", err)
 	}
@@ -263,7 +266,7 @@ func TestClassifyDoneTicket_RealRepo_TrailerScopedToEpic_NoCrossEpicFalsePositiv
 	// and its iteration branch is already gone (e.g. cleaned up by an
 	// earlier, unrelated pass).
 	d := realGitDeps()
-	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: dir, WorktreeDir: "/fake/worktrees"}, "main", tickets.Ticket{Number: 5, Identifier: "05", Status: "done"}, nil, map[string]bool{})
+	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: dir, WorktreeDir: "/fake/worktrees"}, "main", tickets.Ticket{Number: 5, Identifier: "05", Status: "done"}, nil, map[string]bool{}, map[string]bool{})
 	if err != nil {
 		t.Fatalf("classifyDoneTicket() error = %v", err)
 	}
