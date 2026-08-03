@@ -124,20 +124,11 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.executionStartedAt = m.now()
 		}
 		m.runningEpics[msg.epicName] = true
-		return m, tea.Batch(cmdPollImplement(msg.epicName), cmdDrainQueueEvents(msg.epicName, msg.events))
-	case queueLiveEventMsg:
-		switch msg.event.Kind {
-		case ralphloop.LiveEventContextOccupancy:
-			key := msg.epicName + "/" + msg.event.Identifier
-			m.liveContextTokens[key] = msg.event.Tokens
-		case ralphloop.LiveEventIterationFinished:
-			ralphLoopRegistry.recordTicketFinished(msg.epicName)
-			key := msg.epicName + "/" + msg.event.Identifier
-			m.completedTickets[key] = true
-		}
-		return m, cmdDrainQueueEvents(msg.epicName, msg.events)
+		m.syncRunSnapshot(msg.epicName)
+		return m, cmdPollImplement(msg.epicName)
 	case implementPollMsg:
-		if running, epicName, _ := ralphLoopRegistry.snapshot(msg.epicName); running && epicName == msg.epicName {
+		m.syncRunSnapshot(msg.epicName)
+		if running, epicName := ralphLoopRegistry.snapshot(msg.epicName); running && epicName == msg.epicName {
 			return m, cmdPollImplement(msg.epicName)
 		}
 		delete(m.runningEpics, msg.epicName)
@@ -154,6 +145,20 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleQueueKey(msg)
 	}
 	return m, nil
+}
+
+func (m *QueueModel) syncRunSnapshot(epicName string) {
+	snapshot, ok := ralphLoopRegistry.runSnapshot(epicName)
+	if !ok {
+		return
+	}
+	for identifier, ticket := range snapshot.Tickets {
+		key := epicName + "/" + identifier
+		m.liveContextTokens[key] = ticket.ContextTokens
+		if ticket.Completed {
+			m.completedTickets[key] = true
+		}
+	}
 }
 
 func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -299,24 +304,6 @@ func (m *QueueModel) startAvailableEpics() tea.Cmd {
 			messages = append(messages, func() tea.Msg { return msg })
 		}
 		return messages
-	}
-}
-
-type queueLiveEventMsg struct {
-	epicName string
-	event    ralphloop.LiveEvent
-	events   <-chan ralphloop.LiveEvent
-}
-
-type queueEventsDrainedMsg struct{}
-
-func cmdDrainQueueEvents(epicName string, events <-chan ralphloop.LiveEvent) tea.Cmd {
-	return func() tea.Msg {
-		event, ok := <-events
-		if !ok {
-			return queueEventsDrainedMsg{}
-		}
-		return queueLiveEventMsg{epicName: epicName, event: event, events: events}
 	}
 }
 

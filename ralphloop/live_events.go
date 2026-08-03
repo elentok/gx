@@ -86,6 +86,11 @@ func (s *ChannelEventSink) Events() <-chan LiveEvent {
 	return s.events
 }
 
+// Close marks producer completion so the owner of Events can finish draining.
+func (s *ChannelEventSink) Close() {
+	close(s.events)
+}
+
 func (s *ChannelEventSink) emit(ev LiveEvent) {
 	s.events <- ev
 }

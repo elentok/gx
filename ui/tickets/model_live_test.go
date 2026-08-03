@@ -10,12 +10,6 @@ import (
 	"github.com/elentok/gx/ui/keys"
 )
 
-// TestModel_LiveEventsHighlightRunningEpicInFullList feeds synthetic
-// ralphloop.LiveEvents through Model's channel-reader path (ticket 02) and
-// asserts the running epic's ticket picks up live phase-suffix rendering
-// while embedded in the full multi-epic sidebar, that finishing the run
-// reverts it to disk-based rendering, and that a tab-switch rebuild
-// (OnPageActivated) doesn't lose the in-flight state.
 func TestModel_LiveEventsHighlightRunningEpicInFullList(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: claimed\n\nBody.\n")
@@ -25,20 +19,18 @@ func TestModel_LiveEventsHighlightRunningEpicInFullList(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	m.implementEpic = "my-epic"
-
-	events := make(chan ralphloop.LiveEvent, 4)
-	liveCmd := m.startLiveTracking(events)
-	if liveCmd == nil {
-		t.Fatalf("expected startLiveTracking to return a Cmd")
-	}
-
 	identifier := m.epics[0].Tickets[0].Identifier
-	events <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Label: "iter-01", Identifier: identifier}
-
-	msg := liveCmd().(modelLiveEventMsg)
-	updated, cmd := m.Update(msg)
-	m = updated.(Model)
+	r := newLoopRegistry(1)
+	r.tryStart("my-epic", 0, 1)
+	r.reduceLiveEvent("my-epic", ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Label: "iter-01", Identifier: identifier})
+	previous := ralphLoopRegistry
+	ralphLoopRegistry = r
+	t.Cleanup(func() {
+		r.finish("my-epic", nil)
+		ralphLoopRegistry = previous
+	})
+	m.implementEpic = "my-epic"
+	m.syncRunSnapshot("my-epic")
 
 	content := m.View().Content
 	if !strings.Contains(content, "iter-01") || !strings.Contains(content, "implementing...") {
@@ -55,15 +47,8 @@ func TestModel_LiveEventsHighlightRunningEpicInFullList(t *testing.T) {
 	if !strings.Contains(content, "First ticket") {
 		t.Fatalf("expected disk-based ticket title after run finished, got:\n%s", content)
 	}
-
-	_ = cmd
 }
 
-// TestModel_LiveEventDoesNotLeakAcrossEpicsWithSameTicketIdentifier guards
-// against m.live's cross-epic collision: since ticket numbering restarts at
-// 01 in every epic, an IterationStarted event for running-epic's ticket "01"
-// must not also render as running on other-epic's own unrelated ticket "01",
-// which never had any live event fired for it.
 func TestModel_LiveEventDoesNotLeakAcrossEpicsWithSameTicketIdentifier(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "running-epic", "01-first-ticket.md", "Status: claimed\n\nBody.\n")
@@ -74,18 +59,17 @@ func TestModel_LiveEventDoesNotLeakAcrossEpicsWithSameTicketIdentifier(t *testin
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
+	r := newLoopRegistry(1)
+	r.tryStart("running-epic", 0, 1)
+	r.reduceLiveEvent("running-epic", ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Label: "iter-01", Identifier: "01"})
+	previous := ralphLoopRegistry
+	ralphLoopRegistry = r
+	t.Cleanup(func() {
+		r.finish("running-epic", nil)
+		ralphLoopRegistry = previous
+	})
 	m.implementEpic = "running-epic"
-
-	events := make(chan ralphloop.LiveEvent, 4)
-	liveCmd := m.startLiveTracking(events)
-	if liveCmd == nil {
-		t.Fatalf("expected startLiveTracking to return a Cmd")
-	}
-
-	events <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Label: "iter-01", Identifier: "01"}
-	msg := liveCmd().(modelLiveEventMsg)
-	updated, _ = m.Update(msg)
-	m = updated.(Model)
+	m.syncRunSnapshot("running-epic")
 
 	content := m.View().Content
 	if strings.Count(content, "implementing...") != 1 {
@@ -96,12 +80,6 @@ func TestModel_LiveEventDoesNotLeakAcrossEpicsWithSameTicketIdentifier(t *testin
 	}
 }
 
-// TestModel_LiveEventsScopedPerEpicWithConcurrentSameNumberedTickets extends
-// the guard above to the case ticket 03's registry now allows: two epics
-// actually running *at the same time* (not just one running epic next to an
-// untouched other), both with a live iteration on their own ticket "01". Each
-// must render its own running suffix without leaking onto the other, since
-// m.live is now nested by epic name rather than keyed by bare identifier.
 func TestModel_LiveEventsScopedPerEpicWithConcurrentSameNumberedTickets(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "epic-a", "01-first-ticket.md", "Status: claimed\n\nBody.\n")
@@ -112,29 +90,20 @@ func TestModel_LiveEventsScopedPerEpicWithConcurrentSameNumberedTickets(t *testi
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	eventsA := make(chan ralphloop.LiveEvent, 4)
-	m.implementEpic = "epic-a"
-	liveCmdA := m.startLiveTracking(eventsA)
-	if liveCmdA == nil {
-		t.Fatalf("expected startLiveTracking to return a Cmd for epic-a")
-	}
-
-	eventsB := make(chan ralphloop.LiveEvent, 4)
-	m.implementEpic = "epic-b"
-	liveCmdB := m.startLiveTracking(eventsB)
-	if liveCmdB == nil {
-		t.Fatalf("expected startLiveTracking to return a Cmd for epic-b")
-	}
-
-	eventsA <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Label: "iter-01a", Identifier: "01"}
-	msgA := liveCmdA().(modelLiveEventMsg)
-	updated, _ = m.Update(msgA)
-	m = updated.(Model)
-
-	eventsB <- ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Label: "iter-01b", Identifier: "01"}
-	msgB := liveCmdB().(modelLiveEventMsg)
-	updated, _ = m.Update(msgB)
-	m = updated.(Model)
+	r := newLoopRegistry(2)
+	r.tryStart("epic-a", 0, 1)
+	r.tryStart("epic-b", 0, 1)
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Label: "iter-01a", Identifier: "01"})
+	r.reduceLiveEvent("epic-b", ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Label: "iter-01b", Identifier: "01"})
+	previous := ralphLoopRegistry
+	ralphLoopRegistry = r
+	t.Cleanup(func() {
+		r.finish("epic-a", nil)
+		r.finish("epic-b", nil)
+		ralphLoopRegistry = previous
+	})
+	m.syncRunSnapshot("epic-a")
+	m.syncRunSnapshot("epic-b")
 
 	content := m.View().Content
 	if strings.Count(content, "implementing...") != 2 {

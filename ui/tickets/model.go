@@ -13,7 +13,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
@@ -106,19 +105,10 @@ type Model struct {
 	implementingEpics      map[string]bool
 	implementSpinner       spinner.Model
 
-	// live/labelIdentifier are keyed by epic name first, then by ticket
-	// identifier/label the same way FlatModel's flat versions are folded (see
-	// flat_live.go's applyLiveEvent) — ticket 02 ports FlatModel's live
-	// rendering onto this tab's full multi-epic list. Nesting by epic name
-	// (ticket 05) keeps two concurrently-running epics from colliding on the
-	// same bare ticket identifier/label, since numbering restarts at 01 in
-	// every epic. liveEvents mirrors this, keyed by epic name, and is only
-	// populated for epics this Model instance is currently draining; the
-	// channels themselves are owned by ralphLoopRegistry so a Model rebuilt by
-	// a tab switch can pick the same run's stream back up.
+	// Live state is projected from registry snapshots and scoped by epic before
+	// ticket identity so concurrent epics cannot collide.
 	live            map[string]map[string]liveTicketState
 	labelIdentifier map[string]map[string]string
-	liveEvents      map[string]<-chan ralphloop.LiveEvent
 }
 
 // NewModel creates a new tickets tab model scoped to worktreeRoot's own
@@ -170,7 +160,6 @@ func NewModelWithScopeAndStore(worktreeRoot string, settings ui.Settings, extraK
 		implementSpinner:   sp,
 		live:               map[string]map[string]liveTicketState{},
 		labelIdentifier:    map[string]map[string]string{},
-		liveEvents:         map[string]<-chan ralphloop.LiveEvent{},
 		checked:            checked,
 		checkOrder:         checkOrder,
 		queueStatus:        queueStatus,
@@ -252,16 +241,6 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, notify.Error(msg.err.Error())
 	case spinner.TickMsg:
 		return m.handleImplementSpinnerTick(msg)
-	case modelLiveEventMsg:
-		events, tracking := m.liveEvents[msg.epicName]
-		if !msg.ok || !tracking {
-			return m, nil
-		}
-		if msg.event.Kind == ralphloop.LiveEventIterationFinished {
-			ralphLoopRegistry.recordTicketFinished(msg.epicName)
-		}
-		m.applyLiveEvent(msg.epicName, msg.event)
-		return m, cmdWaitModelLiveEvent(msg.epicName, events)
 	}
 	return m, nil
 }

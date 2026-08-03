@@ -37,6 +37,7 @@ const defaultMaxConcurrentEpics = 2
 
 // epicRun is one epic's in-flight ralph-loop state.
 type epicRun struct {
+	drainDone   chan struct{}
 	done, total int
 	sink        *ralphloop.ChannelEventSink
 	gate        *ralphloop.Gate
@@ -91,17 +92,8 @@ type loopRegistry struct {
 	runs          map[string]*epicRun
 	snapshots     map[string]*epicRun
 	paused        bool
-	// lastErr carries each finished run's error (nil on success) past
-	// finish() removing it from runs, keyed by epicName so two epics
-	// finishing close together can't clobber each other's result before
-	// handleImplementPoll/handleImplementSync — which only learn a run ended
-	// once it leaves runs — get a chance to take it. A present-but-nil entry
-	// means "finished successfully, not yet taken"; absent means "nothing to
-	// report". Without this, ralphloop.Run's error would be silently
-	// discarded (as it previously was at the cmdStartImplement call site: a
-	// ticket left Status: claimed by a failed launch, e.g. an
-	// iteration-branch name collision on AddWorktree, used to get reported
-	// as a plain "finished" toast with no indication anything went wrong).
+	// Errors survive run removal so every observer sees the failure until an
+	// explicit acknowledgement clears it.
 	lastErr map[string]error
 }
 
@@ -118,13 +110,8 @@ var ralphLoopRegistry = newLoopRegistry(defaultMaxConcurrentEpics)
 
 var runRalphLoop = ralphloop.Run
 
-// tryStart claims the registry for a new run against epicName, returning the
-// sink to feed ralphloop.Run and false->true ok if epicName already has a
-// run in flight or the registry is already at maxConcurrent. done/total seed
-// the cross-tab overlay's (ticket 06) progress count from the epic's
-// on-disk state at launch time, since the live-event stream itself never
-// reports a ticket total — only the Model's live-event drain
-// (modelLiveEventMsg, model.go) advances done as tickets land afterward.
+// tryStart claims an epic slot and starts the stream drain before returning
+// the producer sink. Snapshots, rather than the channel, are shared with views.
 func (r *loopRegistry) tryStart(epicName string, done, total int) (*ralphloop.ChannelEventSink, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -139,11 +126,18 @@ func (r *loopRegistry) tryStart(epicName string, done, total int) (*ralphloop.Ch
 	}
 	sink := ralphloop.NewChannelEventSink()
 	run := &epicRun{
-		done: done, total: total, sink: sink, gate: ralphloop.NewGate(),
+		drainDone: make(chan struct{}),
+		done:      done, total: total, sink: sink, gate: ralphloop.NewGate(),
 		state: RunStateRunning, tickets: map[string]RunTicketSnapshot{},
 	}
 	r.runs[epicName] = run
 	r.snapshots[epicName] = run
+	go func() {
+		defer close(run.drainDone)
+		for event := range sink.Events() {
+			r.reduceLiveEvent(epicName, event)
+		}
+	}()
 	return sink, true
 }
 
@@ -290,41 +284,43 @@ func (r *loopRegistry) isPaused() bool {
 
 func (r *loopRegistry) finish(epicName string, err error) {
 	r.mu.Lock()
+	run := r.runs[epicName]
+	r.mu.Unlock()
+	if run != nil && run.sink != nil {
+		run.sink.Close()
+		<-run.drainDone
+	}
+
+	r.mu.Lock()
 	defer r.mu.Unlock()
-	if run := r.runs[epicName]; run != nil {
+	if run != nil {
 		run.state = RunStateCompleted
 		if err != nil {
 			run.state = RunStateFailed
 			run.finalError = err.Error()
 		}
+		run.sink = nil
 	}
 	delete(r.runs, epicName)
-	r.lastErr[epicName] = err
-}
-
-// takeLastError reports (and clears) the error the most recent run against
-// epicName finished with, so a poll/sync handler only surfaces it once.
-func (r *loopRegistry) takeLastError(epicName string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	err, ok := r.lastErr[epicName]
-	if !ok {
-		return nil
+	if err != nil {
+		r.lastErr[epicName] = err
+	} else {
+		delete(r.lastErr, epicName)
 	}
-	delete(r.lastErr, epicName)
-	return err
 }
 
-// recordTicketFinished advances epicName's progress count by one landed
-// ticket; see model.go's modelLiveEventMsg handling, which calls this on
-// every LiveEventIterationFinished as it drains that epic's live-event
-// channel. A no-op if epicName isn't currently running, so a stray call
-// after finish() can't resurrect a stale count.
-func (r *loopRegistry) recordTicketFinished(epicName string) {
+func (r *loopRegistry) lastError(epicName string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if run, ok := r.runs[epicName]; ok {
-		run.done++
+	return r.lastErr[epicName]
+}
+
+func (r *loopRegistry) acknowledgeLastError(epicName string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.lastErr, epicName)
+	if run := r.snapshots[epicName]; run != nil {
+		run.finalError = ""
 	}
 }
 
@@ -409,12 +405,9 @@ func IsLoopRunning() bool {
 	return ralphLoopRegistry.isRunning()
 }
 
-// snapshot reports preferredEpic's live state if it's running; otherwise it
-// falls back to anyRunLocked so a Model rebuilt mid-run (e.g. by a
-// worktree-context switch, before it's learned which epic it was watching —
-// see Model.implementEpic) can still recover *a* running epic's state.
-// events is nil when no run is reported.
-func (r *loopRegistry) snapshot(preferredEpic string) (running bool, epicName string, events <-chan ralphloop.LiveEvent) {
+// snapshot prefers the requested epic and falls back to another active run so
+// a rebuilt view can recover registry state without accessing its stream.
+func (r *loopRegistry) snapshot(preferredEpic string) (running bool, epicName string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	run, ok := r.runs[preferredEpic]
@@ -424,19 +417,15 @@ func (r *loopRegistry) snapshot(preferredEpic string) (running bool, epicName st
 		epicName, run = r.anyRunLocked()
 	}
 	if run == nil {
-		return false, "", nil
+		return false, ""
 	}
-	if run.sink != nil {
-		events = run.sink.Events()
-	}
-	return true, epicName, events
+	return true, epicName
 }
 
 // implementStartedMsg reports that a ralph-loop launch was accepted and its
 // background goroutine is now running.
 type implementStartedMsg struct {
 	epicName string
-	events   <-chan ralphloop.LiveEvent
 }
 
 // implementPollMsg drives the poll loop started by implementStartedMsg/
@@ -451,7 +440,6 @@ type implementPollMsg struct {
 type implementSyncMsg struct {
 	running  bool
 	epicName string
-	events   <-chan ralphloop.LiveEvent
 }
 
 // implementFailedMsg reports that a launch never made it to a background
@@ -563,17 +551,15 @@ func (m Model) handleConfirmUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleImplementStarted(msg implementStartedMsg) (tea.Model, tea.Cmd) {
 	m.implementEpic = msg.epicName
-	liveCmd := m.startLiveTracking(msg.events)
-	return m, tea.Batch(m.implementSpinner.Tick, cmdPollImplement(msg.epicName), liveCmd)
+	m.syncRunSnapshot(msg.epicName)
+	return m, tea.Batch(m.implementSpinner.Tick, cmdPollImplement(msg.epicName))
 }
 
-// handleImplementPoll re-checks ralphLoopRegistry; once epicName's run has
-// left the registry, it's done (ralphloop.Run always calls registry.finish()
-// before returning, success or failure alike) — takeLastError distinguishes
-// the two so a launch failure (e.g. a ticket left stuck Status: claimed) is
-// reported instead of a misleadingly plain "finished".
+// handleImplementPoll projects active registry state and reloads disk state
+// after completion. Errors remain in the registry for every observer.
 func (m Model) handleImplementPoll(msg implementPollMsg) (tea.Model, tea.Cmd) {
-	if running, epicName, _ := ralphLoopRegistry.snapshot(msg.epicName); running && epicName == msg.epicName {
+	if running, epicName := ralphLoopRegistry.snapshot(msg.epicName); running && epicName == msg.epicName {
+		m.syncRunSnapshot(msg.epicName)
 		return m, cmdPollImplement(msg.epicName)
 	}
 	m.clearLiveTrackingFor(msg.epicName)
@@ -583,7 +569,7 @@ func (m Model) handleImplementPoll(msg implementPollMsg) (tea.Model, tea.Cmd) {
 // implementFinishedNotifyCmd reports epicName's just-finished run: an error
 // toast if ralphloop.Run returned one, otherwise the plain completion toast.
 func implementFinishedNotifyCmd(epicName string) tea.Cmd {
-	if err := ralphLoopRegistry.takeLastError(epicName); err != nil {
+	if err := ralphLoopRegistry.lastError(epicName); err != nil {
 		return notify.Error(fmt.Sprintf("ralph-loop failed for epic %q: %v", epicName, err))
 	}
 	return notify.Info(fmt.Sprintf("ralph-loop finished for epic %q", epicName))
@@ -598,8 +584,8 @@ func implementFinishedNotifyCmd(epicName string) tea.Cmd {
 func (m Model) handleImplementSync(msg implementSyncMsg) (tea.Model, tea.Cmd) {
 	if msg.running {
 		m.implementEpic = msg.epicName
-		liveCmd := m.startLiveTracking(msg.events)
-		return m, tea.Batch(m.implementSpinner.Tick, cmdPollImplement(msg.epicName), liveCmd)
+		m.syncRunSnapshot(msg.epicName)
+		return m, tea.Batch(m.implementSpinner.Tick, cmdPollImplement(msg.epicName))
 	}
 	if m.implementEpic == "" {
 		return m, nil
@@ -626,21 +612,13 @@ func (m Model) handleImplementSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.C
 func (m Model) OnPageActivated() tea.Cmd {
 	implementEpic := m.implementEpic
 	return func() tea.Msg {
-		running, epicName, events := ralphLoopRegistry.snapshot(implementEpic)
-		return implementSyncMsg{running: running, epicName: epicName, events: events}
+		running, epicName := ralphLoopRegistry.snapshot(implementEpic)
+		return implementSyncMsg{running: running, epicName: epicName}
 	}
 }
 
-// cmdStartImplement claims ralphLoopRegistry and launches ralphloop.Run as a
-// background goroutine against epicName, porting the RunOptions assembly
-// cmd/ralphloop.go's runRalphLoop uses for the headless `gx ralph-loop`
-// command (agent/skill/maxParallel/smartZone defaults, ScratchDir resolved
-// to an absolute path for the same reason runRalphLoop does). registry.sink
-// is the run's only event consumer route: the launched Model drains it via
-// implementStartedMsg.events (model.go's modelLiveEventMsg handling), which
-// both renders live state (ticket 02) and calls recordTicketFinished (ticket
-// 06) — a second, independent drain here would race that one for events off
-// the same channel.
+// cmdStartImplement launches the producer while the registry owns the sole
+// event consumer and publishes durable snapshots to presentation models.
 func (m Model) cmdStartImplement(epicName string, agent ralphloop.AgentKind, done, total int) tea.Cmd {
 	return cmdStartImplement(m.worktreeRoot, epicName, agent, done, total, nil)
 }
@@ -659,7 +637,7 @@ func cmdStartImplement(
 		}
 		opts, err := buildImplementRunOptionsForTickets(worktreeRoot, epicName, agent, ticketIDs)
 		if err != nil {
-			ralphLoopRegistry.finish(epicName, nil)
+			ralphLoopRegistry.finish(epicName, err)
 			return implementFailedMsg{err: err}
 		}
 		opts.Gate = ralphLoopRegistry.gateFor(epicName)
@@ -667,7 +645,7 @@ func cmdStartImplement(
 			err := runRalphLoop(opts, ralphloop.DefaultDeps(), sink)
 			ralphLoopRegistry.finish(epicName, err)
 		}()
-		return implementStartedMsg{epicName: epicName, events: sink.Events()}
+		return implementStartedMsg{epicName: epicName}
 	}
 }
 

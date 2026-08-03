@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/tickets"
 )
 
 func TestRunSnapshotsAreDeterministicAndIndependent(t *testing.T) {
@@ -204,15 +205,22 @@ func TestFinishTracksEachEpicsErrorIndependently(t *testing.T) {
 	r.finish("epic-a", nil)
 	r.finish("epic-b", wantErr)
 
-	if err := r.takeLastError("epic-a"); err != nil {
-		t.Fatalf("takeLastError(epic-a) = %v, want nil", err)
+	if err := r.lastError("epic-a"); err != nil {
+		t.Fatalf("lastError(epic-a) = %v, want nil", err)
 	}
-	if err := r.takeLastError("epic-b"); !errors.Is(err, wantErr) {
-		t.Fatalf("takeLastError(epic-b) = %v, want %v", err, wantErr)
+	if err := r.lastError("epic-b"); !errors.Is(err, wantErr) {
+		t.Fatalf("lastError(epic-b) = %v, want %v", err, wantErr)
 	}
-	// Taken once already; a second take reports nothing further.
-	if err := r.takeLastError("epic-b"); err != nil {
-		t.Fatalf("second takeLastError(epic-b) = %v, want nil", err)
+	if err := r.lastError("epic-b"); !errors.Is(err, wantErr) {
+		t.Fatalf("second lastError(epic-b) = %v, want %v", err, wantErr)
+	}
+	r.acknowledgeLastError("epic-b")
+	if err := r.lastError("epic-b"); err != nil {
+		t.Fatalf("lastError(epic-b) after acknowledgement = %v, want nil", err)
+	}
+	snapshot, _ := r.runSnapshot("epic-b")
+	if snapshot.FinalError != "" || snapshot.State != RunStateFailed {
+		t.Fatalf("snapshot after acknowledgement = %#v", snapshot)
 	}
 }
 
@@ -245,21 +253,21 @@ func TestSnapshotPrefersRequestedEpic(t *testing.T) {
 	r.tryStart("epic-a", 1, 5)
 	r.tryStart("epic-b", 2, 3)
 
-	running, epicName, _ := r.snapshot("epic-b")
+	running, epicName := r.snapshot("epic-b")
 	if !running || epicName != "epic-b" {
 		t.Fatalf("snapshot(epic-b) = (%v, %q), want (true, epic-b)", running, epicName)
 	}
 
 	r.finish("epic-b", nil)
-	running, epicName, _ = r.snapshot("epic-b")
+	running, epicName = r.snapshot("epic-b")
 	if !running || epicName != "epic-a" {
 		t.Fatalf("snapshot(epic-b) after it finished = (%v, %q), want fallback (true, epic-a)", running, epicName)
 	}
 
 	r.finish("epic-a", nil)
-	running, _, events := r.snapshot("epic-b")
-	if running || events != nil {
-		t.Fatalf("snapshot with nothing running: want (false, nil events)")
+	running, _ = r.snapshot("epic-b")
+	if running {
+		t.Fatal("snapshot with nothing running: want false")
 	}
 }
 
@@ -287,5 +295,57 @@ func TestPauseStopsAllRunGatesAndNewStartsUntilResume(t *testing.T) {
 	r.resume()
 	if r.runs["epic-a"].gate.ForceResume(ralphloop.QueuePauseLabel) || r.runs["epic-b"].gate.ForceResume(ralphloop.QueuePauseLabel) {
 		t.Fatal("resume left a running epic's claim gate paused")
+	}
+}
+
+func TestRegistryDrainsRunEventsBeforeFinish(t *testing.T) {
+	r := newLoopRegistry(1)
+	sink, ok := r.tryStart("epic-a", 0, 1)
+	if !ok {
+		t.Fatal("tryStart epic-a: want ok")
+	}
+	sink.IterationStarted("01", "iter-01", "", "")
+	sink.ContextOccupancy("01", 42)
+	sink.IterationFinished(tickets.Ticket{Identifier: "01"}, "epic-a")
+
+	r.finish("epic-a", nil)
+
+	snapshot, ok := r.runSnapshot("epic-a")
+	if !ok || snapshot.Done != 1 || !snapshot.Tickets["01"].Completed {
+		t.Fatalf("snapshot after finish = %#v, %v", snapshot, ok)
+	}
+	if r.snapshots["epic-a"].sink != nil {
+		t.Fatal("finish retained event sink")
+	}
+}
+
+func TestRegistryDrainsEpicsIndependently(t *testing.T) {
+	r := newLoopRegistry(2)
+	sinkA, _ := r.tryStart("epic-a", 0, 1)
+	sinkB, _ := r.tryStart("epic-b", 0, 1)
+	sinkA.IterationStarted("01", "iter-a", "", "")
+	sinkB.IterationStarted("01", "iter-b", "", "")
+	sinkA.ContextOccupancy("01", 11)
+	sinkB.ContextOccupancy("01", 22)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		r.finish("epic-a", nil)
+	}()
+	go func() {
+		defer wg.Done()
+		r.finish("epic-b", nil)
+	}()
+	wg.Wait()
+
+	snapshotA, _ := r.runSnapshot("epic-a")
+	snapshotB, _ := r.runSnapshot("epic-b")
+	if snapshotA.Tickets["01"].Label != "iter-a" || snapshotA.ContextTokens != 11 {
+		t.Fatalf("epic-a snapshot = %#v", snapshotA)
+	}
+	if snapshotB.Tickets["01"].Label != "iter-b" || snapshotB.ContextTokens != 22 {
+		t.Fatalf("epic-b snapshot = %#v", snapshotB)
 	}
 }
