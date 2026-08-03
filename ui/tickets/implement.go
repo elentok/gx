@@ -28,66 +28,81 @@ import (
 // "is it still running" first.
 const implementPollInterval = 300 * time.Millisecond
 
-// loopRegistry enforces "only one ralph-loop may run at a time per gx
-// process" (ticket 01's acceptance criterion), which has to hold across
-// every tickets.Model instance in the process — not just the one that
-// launched it, since a worktree-context switch rebuilds the Model but the
-// background loop keeps running. A package-level singleton, guarded by a
-// mutex since the launching goroutine and the finishing goroutine both touch
-// it, is the simplest thing that's still correct if this process ever hosts
-// more than one tickets.Model (e.g. --all mode).
-type loopRegistry struct {
-	mu       sync.Mutex
-	running  bool
-	epicName string
-	done     int
-	total    int
-	sink     *ralphloop.ChannelEventSink
-	// lastErrEpic/lastErr carry the most recently finished run's error (nil on
-	// success) past finish() clearing running/epicName, so handleImplementPoll
-	// and handleImplementSync — which only learn a run ended once running flips
-	// back to false — can still tell success from failure and surface it,
-	// instead of ralphloop.Run's error being silently discarded (as it
-	// previously was at the cmdStartImplement call site: a ticket left
-	// Status: claimed by a failed launch, e.g. an iteration-branch name
-	// collision on AddWorktree, used to get reported as a plain "finished"
-	// toast with no indication anything went wrong).
-	lastErrEpic string
-	lastErr     error
+// defaultMaxConcurrentEpics caps how many epics ralphLoopRegistry lets run at
+// once (ticket 03's acceptance criterion) — configurable via newLoopRegistry
+// so tests can exercise a small cap without spinning up that many goroutines.
+const defaultMaxConcurrentEpics = 2
+
+// epicRun is one epic's in-flight ralph-loop state.
+type epicRun struct {
+	done, total int
+	sink        *ralphloop.ChannelEventSink
 }
 
-var ralphLoopRegistry = &loopRegistry{}
+// loopRegistry enforces "an epic may not have two ralph-loops running at
+// once, and at most maxConcurrent epics may run at once" per gx process
+// (ticket 01's original single-epic version of this, capacity-lifted by
+// ticket 03), which has to hold across every tickets.Model instance in the
+// process — not just the one that launched a given run, since a
+// worktree-context switch rebuilds the Model but the background loop keeps
+// running. A package-level singleton, guarded by a mutex since the launching
+// goroutine and the finishing goroutine both touch it, is the simplest thing
+// that's still correct if this process ever hosts more than one
+// tickets.Model (e.g. --all mode).
+type loopRegistry struct {
+	mu            sync.Mutex
+	maxConcurrent int
+	runs          map[string]*epicRun
+	// lastErr carries each finished run's error (nil on success) past
+	// finish() removing it from runs, keyed by epicName so two epics
+	// finishing close together can't clobber each other's result before
+	// handleImplementPoll/handleImplementSync — which only learn a run ended
+	// once it leaves runs — get a chance to take it. A present-but-nil entry
+	// means "finished successfully, not yet taken"; absent means "nothing to
+	// report". Without this, ralphloop.Run's error would be silently
+	// discarded (as it previously was at the cmdStartImplement call site: a
+	// ticket left Status: claimed by a failed launch, e.g. an
+	// iteration-branch name collision on AddWorktree, used to get reported
+	// as a plain "finished" toast with no indication anything went wrong).
+	lastErr map[string]error
+}
+
+func newLoopRegistry(maxConcurrent int) *loopRegistry {
+	return &loopRegistry{
+		maxConcurrent: maxConcurrent,
+		runs:          map[string]*epicRun{},
+		lastErr:       map[string]error{},
+	}
+}
+
+var ralphLoopRegistry = newLoopRegistry(defaultMaxConcurrentEpics)
 
 // tryStart claims the registry for a new run against epicName, returning the
-// sink to feed ralphloop.Run and false->true ok if one is already in flight.
-// done/total seed the cross-tab overlay's (ticket 06) progress count from the
-// epic's on-disk state at launch time, since the live-event stream itself
-// never reports a ticket total — only the Model's live-event drain
+// sink to feed ralphloop.Run and false->true ok if epicName already has a
+// run in flight or the registry is already at maxConcurrent. done/total seed
+// the cross-tab overlay's (ticket 06) progress count from the epic's
+// on-disk state at launch time, since the live-event stream itself never
+// reports a ticket total — only the Model's live-event drain
 // (modelLiveEventMsg, model.go) advances done as tickets land afterward.
 func (r *loopRegistry) tryStart(epicName string, done, total int) (*ralphloop.ChannelEventSink, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.running {
+	if _, exists := r.runs[epicName]; exists {
 		return nil, false
 	}
-	r.running = true
-	r.epicName = epicName
-	r.done = done
-	r.total = total
-	r.sink = ralphloop.NewChannelEventSink()
-	return r.sink, true
+	if len(r.runs) >= r.maxConcurrent {
+		return nil, false
+	}
+	sink := ralphloop.NewChannelEventSink()
+	r.runs[epicName] = &epicRun{done: done, total: total, sink: sink}
+	return sink, true
 }
 
 func (r *loopRegistry) finish(epicName string, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.running = false
-	r.epicName = ""
-	r.done = 0
-	r.total = 0
-	r.sink = nil
-	r.lastErrEpic = epicName
-	r.lastErr = err
+	delete(r.runs, epicName)
+	r.lastErr[epicName] = err
 }
 
 // takeLastError reports (and clears) the error the most recent run against
@@ -95,73 +110,106 @@ func (r *loopRegistry) finish(epicName string, err error) {
 func (r *loopRegistry) takeLastError(epicName string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.lastErrEpic != epicName {
+	err, ok := r.lastErr[epicName]
+	if !ok {
 		return nil
 	}
-	err := r.lastErr
-	r.lastErrEpic = ""
-	r.lastErr = nil
+	delete(r.lastErr, epicName)
 	return err
 }
 
-// recordTicketFinished advances the progress count by one landed ticket; see
-// model.go's modelLiveEventMsg handling, which calls this on every
-// LiveEventIterationFinished as it drains the registry's live-event channel.
-// Guarded by running so a stray call after finish() can't resurrect a stale
-// count.
-func (r *loopRegistry) recordTicketFinished() {
+// recordTicketFinished advances epicName's progress count by one landed
+// ticket; see model.go's modelLiveEventMsg handling, which calls this on
+// every LiveEventIterationFinished as it drains that epic's live-event
+// channel. A no-op if epicName isn't currently running, so a stray call
+// after finish() can't resurrect a stale count.
+func (r *loopRegistry) recordTicketFinished(epicName string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.running {
-		r.done++
+	if run, ok := r.runs[epicName]; ok {
+		run.done++
 	}
 }
 
-// LoopStatus reports ralphLoopRegistry's current state for the app shell's
-// cross-tab status overlay (ticket 06), which polls it the same way this
-// package's own OnPageActivated/handleImplementPoll do rather than
-// subscribing directly, since the app shell only routes tea.Msgs to the
-// active page.
+// anyRunLocked deterministically picks one running epic (the
+// lexicographically smallest name) — callers must hold r.mu. Used where a
+// caller has no epic of its own to prefer (LoopStatus, and snapshot's
+// fallback for a Model rebuilt without knowing which epic it was watching).
+// With more than one epic running, this picks *an* epic, not necessarily the
+// caller's — the ticket 05 UI work makes the app multi-epic-display-aware;
+// today's callers only ever cared about "the" single run.
+func (r *loopRegistry) anyRunLocked() (epicName string, run *epicRun) {
+	for name, candidate := range r.runs {
+		if run == nil || name < epicName {
+			epicName, run = name, candidate
+		}
+	}
+	return epicName, run
+}
+
+// LoopStatus reports one currently-running epic's state (see anyRunLocked)
+// for the app shell's cross-tab status overlay (ticket 06), which polls it
+// the same way this package's own OnPageActivated/handleImplementPoll do
+// rather than subscribing directly, since the app shell only routes
+// tea.Msgs to the active page.
 func LoopStatus() (running bool, epicName string, done, total int) {
 	ralphLoopRegistry.mu.Lock()
 	defer ralphLoopRegistry.mu.Unlock()
-	return ralphLoopRegistry.running, ralphLoopRegistry.epicName, ralphLoopRegistry.done, ralphLoopRegistry.total
+	epicName, run := ralphLoopRegistry.anyRunLocked()
+	if run == nil {
+		return false, "", 0, 0
+	}
+	return true, epicName, run.done, run.total
 }
 
 // CanQuit implements the app shell's quit-guard duck type (see
-// ui/app/model_quit.go): it blocks quitting gx while this process has a
-// ralph-loop in flight, since an interrupted loop can leave the worktree
-// mid-cherry-pick. This is warn-then-allow, not a hard block — reconcile.go
-// recovers an interrupted loop on the next run, so there's no correctness
-// reason to prevent quitting outright.
+// ui/app/model_quit.go): it blocks quitting gx while this process has any
+// epic's ralph-loop in flight, since an interrupted loop can leave the
+// worktree mid-cherry-pick. This is warn-then-allow, not a hard block —
+// reconcile.go recovers an interrupted loop on the next run, so there's no
+// correctness reason to prevent quitting outright.
 func (m Model) CanQuit() bool {
 	return !ralphLoopRegistry.isRunning()
 }
 
+// isRunning reports whether any epic currently has a run in flight.
 func (r *loopRegistry) isRunning() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.running
+	return len(r.runs) > 0
 }
 
 // IsLoopRunning reports whether a ralph-loop launched from this process is
-// currently in flight, regardless of which worktree it targets. The app
-// shell (ticket 05) uses this to force the tickets tab into --all scope
-// while a loop is running, since the loop keeps going against its own
-// worktree even after the user navigates the worktree cursor elsewhere.
+// currently in flight for any epic, regardless of which worktree it
+// targets. The app shell (ticket 05) uses this to force the tickets tab
+// into --all scope while a loop is running, since the loop keeps going
+// against its own worktree even after the user navigates the worktree
+// cursor elsewhere.
 func IsLoopRunning() bool {
 	return ralphLoopRegistry.isRunning()
 }
 
-// snapshot reports the currently-running epic and its live event stream, if
-// any — events is nil when no run is in flight.
-func (r *loopRegistry) snapshot() (running bool, epicName string, events <-chan ralphloop.LiveEvent) {
+// snapshot reports preferredEpic's live state if it's running; otherwise it
+// falls back to anyRunLocked so a Model rebuilt mid-run (e.g. by a
+// worktree-context switch, before it's learned which epic it was watching —
+// see Model.implementEpic) can still recover *a* running epic's state.
+// events is nil when no run is reported.
+func (r *loopRegistry) snapshot(preferredEpic string) (running bool, epicName string, events <-chan ralphloop.LiveEvent) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.sink != nil {
-		events = r.sink.Events()
+	run, ok := r.runs[preferredEpic]
+	if ok {
+		epicName = preferredEpic
+	} else {
+		epicName, run = r.anyRunLocked()
 	}
-	return r.running, r.epicName, events
+	if run == nil {
+		return false, "", nil
+	}
+	if run.sink != nil {
+		events = run.sink.Events()
+	}
+	return true, epicName, events
 }
 
 // implementStartedMsg reports that a ralph-loop launch was accepted and its
@@ -299,7 +347,7 @@ func (m Model) handleImplementStarted(msg implementStartedMsg) (tea.Model, tea.C
 // the two so a launch failure (e.g. a ticket left stuck Status: claimed) is
 // reported instead of a misleadingly plain "finished".
 func (m Model) handleImplementPoll(msg implementPollMsg) (tea.Model, tea.Cmd) {
-	if running, epicName, _ := ralphLoopRegistry.snapshot(); running && epicName == msg.epicName {
+	if running, epicName, _ := ralphLoopRegistry.snapshot(msg.epicName); running && epicName == msg.epicName {
 		return m, cmdPollImplement(msg.epicName)
 	}
 	m.clearLiveTracking()
@@ -350,8 +398,9 @@ func (m Model) handleImplementSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.C
 // Model up with ralphLoopRegistry, since it may have missed a completion
 // message that arrived while another tab was active.
 func (m Model) OnPageActivated() tea.Cmd {
+	implementEpic := m.implementEpic
 	return func() tea.Msg {
-		running, epicName, events := ralphLoopRegistry.snapshot()
+		running, epicName, events := ralphLoopRegistry.snapshot(implementEpic)
 		return implementSyncMsg{running: running, epicName: epicName, events: events}
 	}
 }

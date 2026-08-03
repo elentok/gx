@@ -10,18 +10,12 @@ package tickets
 func SetLoopStatusForTest(epicName string, done, total int) {
 	ralphLoopRegistry.mu.Lock()
 	defer ralphLoopRegistry.mu.Unlock()
-	ralphLoopRegistry.running = true
-	ralphLoopRegistry.epicName = epicName
-	ralphLoopRegistry.done = done
-	ralphLoopRegistry.total = total
+	ralphLoopRegistry.runs[epicName] = &epicRun{done: done, total: total}
 }
 
 // ClearLoopStatusForTest resets ralphLoopRegistry back to idle.
 func ClearLoopStatusForTest() {
 	ralphLoopRegistry.mu.Lock()
 	defer ralphLoopRegistry.mu.Unlock()
-	ralphLoopRegistry.running = false
-	ralphLoopRegistry.epicName = ""
-	ralphLoopRegistry.done = 0
-	ralphLoopRegistry.total = 0
+	ralphLoopRegistry.runs = map[string]*epicRun{}
 }

@@ -199,7 +199,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if msg.event.Kind == ralphloop.LiveEventIterationFinished {
-			ralphLoopRegistry.recordTicketFinished()
+			ralphLoopRegistry.recordTicketFinished(m.implementEpic)
 		}
 		m.applyLiveEvent(msg.event)
 		return m, cmdWaitModelLiveEvent(m.liveEvents)
