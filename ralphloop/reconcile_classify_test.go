@@ -164,7 +164,7 @@ func TestClassifyDoneTicket_LiveTabCountsAsLeftover(t *testing.T) {
 	d.WorktreeExists = func(path string) (bool, error) { return false, nil }
 	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}}
 
-	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, events, map[string]bool{iterLabel("03"): true})
+	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, events, map[string]bool{iterationKey("epic", iterLabel("03")): true})
 	if err != nil {
 		t.Fatalf("classifyDoneTicket() error = %v", err)
 	}

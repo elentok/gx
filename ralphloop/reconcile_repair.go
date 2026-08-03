@@ -2,7 +2,6 @@ package ralphloop
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
@@ -24,7 +23,7 @@ func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t
 	paths := rp.Paths
 	branch := iterBranch(featureBranch, t.Identifier)
 	label := iterLabel(t.Identifier)
-	path := filepath.Join(paths.WorktreeDir, label)
+	path := iterationWorktreePath(paths.WorktreeDir, featureBranch, t.Identifier)
 
 	base, err := d.MergeBase(paths.FeatureWorktree, branch, featureBranch)
 	if err != nil {
@@ -93,7 +92,7 @@ func finishStaleCleanup(d Deps, rp reconcileParams, featureBranch string, t tick
 	paths := rp.Paths
 	label := iterLabel(t.Identifier)
 	branch := iterBranch(featureBranch, t.Identifier)
-	path := filepath.Join(paths.WorktreeDir, label)
+	path := iterationWorktreePath(paths.WorktreeDir, featureBranch, t.Identifier)
 	tabID := tabIDForLabel(tabs, label)
 
 	return finishCleanup(d, paths.RepoDir, paths.FeatureWorktree, path, branch, tabID)

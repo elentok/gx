@@ -64,14 +64,14 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 	}
 	live := make(map[string]bool, len(tabs))
 	for _, tab := range tabs {
-		live[tab.Label] = true
+		live[iterationKey(epic.Name, tab.Label)] = true
 	}
 
 	var reattached []tickets.Ticket
 	for _, t := range epic.Tickets {
 		status := strings.ToLower(strings.TrimSpace(t.Status))
 		if status == "needs-attention" {
-			if live[iterLabel(t.Identifier)] {
+			if live[iterationKey(epic.Name, iterLabel(t.Identifier))] {
 				sink.TicketReattached(t.Identifier, iterLabel(t.Identifier))
 				reattached = append(reattached, t)
 			} else {
@@ -82,7 +82,7 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 		if status != "claimed" {
 			continue
 		}
-		if !live[iterLabel(t.Identifier)] {
+		if !live[iterationKey(epic.Name, iterLabel(t.Identifier))] {
 			if err := reconcileOrphanedClaim(d, rp, epic.Name, t, tabs); err != nil {
 				return nil, fmt.Errorf("reconciling orphaned claim %s: %w", t.Identifier, err)
 			}

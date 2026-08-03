@@ -2,7 +2,6 @@ package ralphloop
 
 import (
 	"fmt"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -25,7 +24,7 @@ const conflictResolutionTimeoutMs = 30 * 60 * 1000
 func runIteration(d Deps, p iterationParams) error {
 	label := iterLabel(p.Ticket.Identifier)
 	branch := iterBranch(p.FeatureBranch, p.Ticket.Identifier)
-	path := filepath.Join(p.WorktreeDir, label)
+	path := iterationWorktreePath(p.WorktreeDir, p.FeatureBranch, p.Ticket.Identifier)
 
 	base, err := d.RevParse(p.FeatureWorktree, p.FeatureBranch)
 	if err != nil {
@@ -80,7 +79,7 @@ func runIteration(d Deps, p iterationParams) error {
 func reattachIteration(d Deps, p iterationParams) error {
 	label := iterLabel(p.Ticket.Identifier)
 	branch := iterBranch(p.FeatureBranch, p.Ticket.Identifier)
-	path := filepath.Join(p.WorktreeDir, label)
+	path := iterationWorktreePath(p.WorktreeDir, p.FeatureBranch, p.Ticket.Identifier)
 
 	tabs, err := d.TabList(p.WorkspaceID)
 	if err != nil {
@@ -249,7 +248,7 @@ func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane, ta
 		return "", err
 	}
 
-	iterationCwd := filepath.Join(p.WorktreeDir, iterLabel(p.Ticket.Identifier))
+	iterationCwd := iterationWorktreePath(p.WorktreeDir, p.FeatureBranch, p.Ticket.Identifier)
 	contextWindow, elapsedSeconds, hasMetrics, err := writeLandedMetrics(p.Agent, iterationCwd, sessionID, p.Ticket.Path)
 	if err != nil {
 		return "", fmt.Errorf("writing landed metrics for ticket %s: %w", p.Ticket.Identifier, err)

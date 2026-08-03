@@ -2,7 +2,6 @@ package ralphloop
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/elentok/gx/tickets"
 )
@@ -101,12 +100,12 @@ func classifyDoneTicket(d Deps, paths reconcilePaths, featureBranch string, t ti
 	}
 
 	label := iterLabel(t.Identifier)
-	hasWorktree, err := d.WorktreeExists(filepath.Join(paths.WorktreeDir, label))
+	hasWorktree, err := d.WorktreeExists(iterationWorktreePath(paths.WorktreeDir, featureBranch, t.Identifier))
 	if err != nil {
 		return doneOK, fmt.Errorf("checking leftover worktree: %w", err)
 	}
 
-	leftover := live[label] || hasWorktree || hasBranch
+	leftover := live[iterationKey(featureBranch, label)] || hasWorktree || hasBranch
 
 	switch {
 	case commitsPresent && !leftover:

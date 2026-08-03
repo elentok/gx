@@ -2,7 +2,6 @@ package ralphloop
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
@@ -25,7 +24,7 @@ func reconcileOrphanedClaim(d Deps, rp reconcileParams, featureBranch string, t 
 	paths := rp.Paths
 	branch := iterBranch(featureBranch, t.Identifier)
 	label := iterLabel(t.Identifier)
-	path := filepath.Join(paths.WorktreeDir, label)
+	path := iterationWorktreePath(paths.WorktreeDir, featureBranch, t.Identifier)
 
 	if branchExists(d, paths.FeatureWorktree, branch) {
 		base, err := d.MergeBase(paths.FeatureWorktree, branch, featureBranch)

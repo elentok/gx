@@ -134,7 +134,7 @@ func TestLandCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmatt
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 
 	sessionID := "sess-land-01"
-	cwd := filepath.Join("/fake/worktrees", iterLabel("01"))
+	cwd := iterationWorktreePath("/fake/worktrees", "epic", "01")
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	writeFakeTranscript(t, cwd, sessionID, start,
 		[3]any{"claude-sonnet-5", 1000, 0},
@@ -188,7 +188,7 @@ func TestLandCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 
 	sessionID := "sess-land-01"
-	cwd := filepath.Join("/fake/worktrees", iterLabel("01"))
+	cwd := iterationWorktreePath("/fake/worktrees", "epic", "01")
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	writeFakeTranscript(t, cwd, sessionID, start,
 		[3]any{"claude-sonnet-5", 1000, 0},
