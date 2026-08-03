@@ -80,6 +80,69 @@ func TestModel_LiveEventDoesNotLeakAcrossEpicsWithSameTicketIdentifier(t *testin
 	}
 }
 
+func TestModel_OnPageActivatedRecoversTwoConcurrentEpicRuns(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "epic-a", "01-first-ticket.md", "Status: claimed\n\nBody.\n")
+	writeTicket(t, root, "epic-b", "01-first-ticket.md", "Status: claimed\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	r := newLoopRegistry(2)
+	r.tryStart("epic-a", 0, 1)
+	r.tryStart("epic-b", 0, 1)
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Label: "iter-01a", Identifier: "01"})
+	r.reduceLiveEvent("epic-b", ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Label: "iter-01b", Identifier: "01"})
+	previous := ralphLoopRegistry
+	ralphLoopRegistry = r
+	t.Cleanup(func() {
+		r.finish("epic-a", nil)
+		r.finish("epic-b", nil)
+		ralphLoopRegistry = previous
+	})
+
+	// Reactivating the tab (as a tab switch away and back would do) must
+	// recover both concurrently running epics from the registry's snapshots
+	// alone — this Model instance never launched either of them.
+	cmd := m.OnPageActivated()
+	if cmd == nil {
+		t.Fatal("OnPageActivated: want a resync cmd with two epics running")
+	}
+	updated, _ = m.Update(cmd())
+	m = updated.(Model)
+
+	if !m.implementingEpics["epic-a"] || !m.implementingEpics["epic-b"] {
+		t.Fatalf("implementingEpics after reactivation = %#v, want both epics tracked", m.implementingEpics)
+	}
+	content := m.View().Content
+	if strings.Count(content, "implementing...") != 2 {
+		t.Fatalf("expected both epics' ticket 01 rows running after reactivation, got:\n%s", content)
+	}
+	if !strings.Contains(content, "iter-01a") || !strings.Contains(content, "iter-01b") {
+		t.Fatalf("expected each epic's own live label preserved after reactivation, got:\n%s", content)
+	}
+
+	// One epic finishes while the tab is (hypothetically) backgrounded again;
+	// the next reactivation must notice epic-a alone finished without losing
+	// epic-b's still-running progress.
+	r.finish("epic-a", nil)
+	cmd = m.OnPageActivated()
+	if cmd == nil {
+		t.Fatal("OnPageActivated: want a resync cmd after epic-a finished")
+	}
+	updated, _ = m.Update(cmd())
+	m = updated.(Model)
+
+	if m.implementingEpics["epic-a"] {
+		t.Fatalf("implementingEpics after epic-a finished = %#v, want epic-a cleared", m.implementingEpics)
+	}
+	if !m.implementingEpics["epic-b"] {
+		t.Fatalf("implementingEpics after epic-a finished = %#v, want epic-b still tracked", m.implementingEpics)
+	}
+}
+
 func TestModel_LiveEventsScopedPerEpicWithConcurrentSameNumberedTickets(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "epic-a", "01-first-ticket.md", "Status: claimed\n\nBody.\n")

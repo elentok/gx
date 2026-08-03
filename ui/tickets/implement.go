@@ -422,6 +422,20 @@ func (r *loopRegistry) snapshot(preferredEpic string) (running bool, epicName st
 	return true, epicName
 }
 
+// runningEpicNames reports every epic currently mid-run, sorted by name, so a
+// reactivated tab can fan out over all of them instead of recovering just one
+// (see OnPageActivated).
+func (r *loopRegistry) runningEpicNames() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	names := make([]string, 0, len(r.runs))
+	for name := range r.runs {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
 // implementStartedMsg reports that a ralph-loop launch was accepted and its
 // background goroutine is now running.
 type implementStartedMsg struct {
@@ -434,12 +448,12 @@ type implementPollMsg struct {
 	epicName string
 }
 
-// implementSyncMsg reports ralphLoopRegistry's state as observed when this
-// tab (re)gained focus (see OnPageActivated), so a Model that missed the
-// completion message while another tab was active can catch up.
+// implementSyncMsg reports every epic ralphLoopRegistry has running, as
+// observed when this tab (re)gained focus (see OnPageActivated), so a Model
+// that missed completion messages for one or more epics while another tab was
+// active can catch up on all of them at once.
 type implementSyncMsg struct {
-	running  bool
-	epicName string
+	runningEpics []string
 }
 
 // implementFailedMsg reports that a launch never made it to a background
@@ -576,23 +590,44 @@ func implementFinishedNotifyCmd(epicName string) tea.Cmd {
 }
 
 // handleImplementSync answers OnPageActivated's resync Cmd: it reconciles
-// this Model's implementEpic against ralphLoopRegistry's live state, which
-// may have changed while this tab was in the background (a plain tea.Msg
-// sent to a backgrounded page is dropped by the app shell, so the model that
-// launched a run can't rely on ever seeing its own completion message if the
-// user switched away in the meantime).
+// every epic this Model was tracking against ralphLoopRegistry's live state,
+// which may have changed while this tab was in the background (a plain
+// tea.Msg sent to a backgrounded page is dropped by the app shell, so the
+// model that launched a run can't rely on ever seeing its own completion
+// message if the user switched away in the meantime) — and it also starts
+// tracking any epic that's running but that this Model instance never saw
+// start, e.g. one launched before this Model was rebuilt by a tab switch.
 func (m Model) handleImplementSync(msg implementSyncMsg) (tea.Model, tea.Cmd) {
-	if msg.running {
-		m.implementEpic = msg.epicName
-		m.syncRunSnapshot(msg.epicName)
-		return m, tea.Batch(m.implementSpinner.Tick, cmdPollImplement(msg.epicName))
+	running := make(map[string]bool, len(msg.runningEpics))
+	var cmds []tea.Cmd
+	for _, epicName := range msg.runningEpics {
+		running[epicName] = true
+		m.syncRunSnapshot(epicName)
+		cmds = append(cmds, cmdPollImplement(epicName))
 	}
-	if m.implementEpic == "" {
+	if len(msg.runningEpics) > 0 {
+		cmds = append(cmds, m.implementSpinner.Tick)
+	}
+
+	finished := make([]string, 0, len(m.implementingEpics))
+	for epicName := range m.implementingEpics {
+		if !running[epicName] {
+			finished = append(finished, epicName)
+		}
+	}
+	sort.Strings(finished)
+	for _, epicName := range finished {
+		m.clearLiveTrackingFor(epicName)
+		cmds = append(cmds, implementFinishedNotifyCmd(epicName))
+	}
+	if len(finished) > 0 {
+		cmds = append(cmds, m.cmdLoad())
+	}
+
+	if len(cmds) == 0 {
 		return m, nil
 	}
-	finished := m.implementEpic
-	m.clearLiveTracking()
-	return m, tea.Batch(implementFinishedNotifyCmd(finished), m.cmdLoad())
+	return m, tea.Batch(cmds...)
 }
 
 func (m Model) handleImplementSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
@@ -606,14 +641,15 @@ func (m Model) handleImplementSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.C
 
 // OnPageActivated implements the app shell's pageActivationAware duck-type
 // (see ui/app/model_tabs.go), firing every time this tab (re)gains focus —
-// including the very first time. It fires an implementSyncMsg to catch this
-// Model up with ralphLoopRegistry, since it may have missed a completion
-// message that arrived while another tab was active.
+// including the very first time. It fires an implementSyncMsg listing every
+// epic ralphLoopRegistry currently has running, so this Model can recover
+// every running epic's live state deterministically — including a completion
+// it missed, or an epic it never even saw start — without opening an event
+// reader of its own or depending on messages that arrived while another tab
+// was active.
 func (m Model) OnPageActivated() tea.Cmd {
-	implementEpic := m.implementEpic
 	return func() tea.Msg {
-		running, epicName := ralphLoopRegistry.snapshot(implementEpic)
-		return implementSyncMsg{running: running, epicName: epicName}
+		return implementSyncMsg{runningEpics: ralphLoopRegistry.runningEpicNames()}
 	}
 }
 
