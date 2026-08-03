@@ -62,6 +62,12 @@ type Model struct {
 	// reload's re-sorting/index-shuffling. Later tickets (06, 07, 09, 11) read
 	// this set; this one only has to keep it correct and visible.
 	checked map[string]bool
+	// queueStatus mirrors checked's keys with each ticket's queue-run status
+	// (ticket 11): pending as soon as it's checked, then running/done/errored
+	// as execution wiring (tickets 08/09/12) progresses it. Persisted to disk
+	// alongside checked (see queue_state.go) so a restart restores both the
+	// selection and its last-known progress instead of starting empty.
+	queueStatus map[string]queueItemStatus
 	// scrollOffset is the sidebar's line-based scroll position (sidebarLines()
 	// is windowed to it in normalView), kept following m.selected by
 	// ensureSidebarVisible.
@@ -126,6 +132,11 @@ func NewModelWithScope(worktreeRoot string, settings ui.Settings, extraKeys keys
 	_ = extraKeys
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
+	queueStatus := loadQueueState()
+	checked := make(map[string]bool, len(queueStatus))
+	for path := range queueStatus {
+		checked[path] = true
+	}
 	return Model{
 		worktreeRoot:       worktreeRoot,
 		settings:           settings,
@@ -141,6 +152,8 @@ func NewModelWithScope(worktreeRoot string, settings ui.Settings, extraKeys keys
 		live:               map[string]map[string]liveTicketState{},
 		labelIdentifier:    map[string]map[string]string{},
 		liveEvents:         map[string]<-chan ralphloop.LiveEvent{},
+		checked:            checked,
+		queueStatus:        queueStatus,
 	}
 }
 
@@ -176,7 +189,11 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case epicsLoadedMsg:
-		autoCheckSplitChildren(m.epics, msg.epics, m.checked)
+		before := len(m.checked)
+		autoCheckSplitChildren(m.epics, msg.epics, m.checked, m.queueStatus)
+		if len(m.checked) != before {
+			m.persistQueueState()
+		}
 		m.loaded = true
 		m.epics = msg.epics
 		m.collapsedEpics = defaultCollapsedEpics(msg.epics)

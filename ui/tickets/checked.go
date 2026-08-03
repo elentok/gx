@@ -53,6 +53,9 @@ func (m *Model) toggleEpicChecked(epicIdx int) {
 	if m.checked == nil {
 		m.checked = map[string]bool{}
 	}
+	if m.queueStatus == nil {
+		m.queueStatus = map[string]queueItemStatus{}
+	}
 	allChecked := true
 	for _, t := range epic.Tickets {
 		if !m.checked[t.Path] {
@@ -63,10 +66,15 @@ func (m *Model) toggleEpicChecked(epicIdx int) {
 	for _, t := range epic.Tickets {
 		if allChecked {
 			delete(m.checked, t.Path)
+			delete(m.queueStatus, t.Path)
 		} else {
 			m.checked[t.Path] = true
+			if _, ok := m.queueStatus[t.Path]; !ok {
+				m.queueStatus[t.Path] = queueStatusPending
+			}
 		}
 	}
+	m.persistQueueState()
 }
 
 // toggleTicketChecked toggles the ticket at (epicIdx, ticketIdx). Unchecking
@@ -79,6 +87,8 @@ func (m Model) toggleTicketChecked(epicIdx, ticketIdx int) (tea.Model, tea.Cmd) 
 	t := epic.Tickets[ticketIdx]
 	if m.checked[t.Path] {
 		delete(m.checked, t.Path)
+		delete(m.queueStatus, t.Path)
+		m.persistQueueState()
 		return m, nil
 	}
 
@@ -87,7 +97,12 @@ func (m Model) toggleTicketChecked(epicIdx, ticketIdx int) (tea.Model, tea.Cmd) 
 		if m.checked == nil {
 			m.checked = map[string]bool{}
 		}
+		if m.queueStatus == nil {
+			m.queueStatus = map[string]queueItemStatus{}
+		}
 		m.checked[t.Path] = true
+		m.queueStatus[t.Path] = queueStatusPending
+		m.persistQueueState()
 		return m, nil
 	}
 
@@ -122,10 +137,16 @@ func (m Model) handleCheckAddConfirmed(msg checkAddConfirmedMsg) (tea.Model, tea
 	if m.checked == nil {
 		m.checked = map[string]bool{}
 	}
+	if m.queueStatus == nil {
+		m.queueStatus = map[string]queueItemStatus{}
+	}
 	m.checked[msg.ticketPath] = true
+	m.queueStatus[msg.ticketPath] = queueStatusPending
 	for _, path := range msg.blockerPaths {
 		m.checked[path] = true
+		m.queueStatus[path] = queueStatusPending
 	}
+	m.persistQueueState()
 	return m, nil
 }
 
@@ -137,7 +158,7 @@ func (m Model) handleCheckAddConfirmed(msg checkAddConfirmedMsg) (tea.Model, tea
 // toggleTicketChecked's blocked-ticket confirmation. A ticket that isn't
 // itself checked splitting is a no-op: only a split of already-checked work
 // needs its continuation auto-added.
-func autoCheckSplitChildren(oldEpics, newEpics []tickets.Epic, checked map[string]bool) {
+func autoCheckSplitChildren(oldEpics, newEpics []tickets.Epic, checked map[string]bool, queueStatus map[string]queueItemStatus) {
 	oldByPath := make(map[string]tickets.Ticket)
 	for _, epic := range oldEpics {
 		for _, t := range epic.Tickets {
@@ -154,6 +175,11 @@ func autoCheckSplitChildren(oldEpics, newEpics []tickets.Epic, checked map[strin
 			for _, childID := range newSplitEntries(old.Split, nt.Split) {
 				if child, ok := findTicketByIdentifier(epic, childID); ok {
 					checked[child.Path] = true
+					if queueStatus != nil {
+						if _, ok := queueStatus[child.Path]; !ok {
+							queueStatus[child.Path] = queueStatusPending
+						}
+					}
 				}
 			}
 		}
