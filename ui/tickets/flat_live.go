@@ -3,6 +3,7 @@ package tickets
 import (
 	"fmt"
 	"image/color"
+	"time"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
@@ -11,6 +12,7 @@ import (
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/transcript"
 	"github.com/elentok/gx/ui"
 )
 
@@ -27,6 +29,16 @@ type liveTicketState struct {
 	pauseKind ralphloop.PauseKind
 	reason    string
 	phase     livePhase
+	// startedAt is the iteration's session transcript's first-line
+	// timestamp (resolved from IterationStarted/TicketReattached's
+	// Cwd+SessionID), so elapsed time keeps climbing across a
+	// pause/resume instead of resetting. Zero if the transcript couldn't
+	// be resolved yet.
+	startedAt time.Time
+	// tokens is the last LiveEventContextOccupancy reading for this
+	// ticket — frozen (not zeroed) while paused, since the underlying
+	// session's context hasn't changed.
+	tokens int
 }
 
 // livePhase distinguishes what a running iteration is doing right now, so
@@ -129,18 +141,21 @@ func applyLiveEvent(live map[string]liveTicketState, labelIdentifier map[string]
 	switch ev.Kind {
 	case ralphloop.LiveEventIterationStarted, ralphloop.LiveEventTicketReattached:
 		labelIdentifier[ev.Label] = ev.Identifier
-		live[ev.Identifier] = liveTicketState{running: true, label: ev.Label}
+		live[ev.Identifier] = liveTicketState{running: true, label: ev.Label, startedAt: resolveStartedAt(ev.Cwd, ev.SessionID)}
 
 	case ralphloop.LiveEventIterationPaused:
 		if identifier, ok := labelIdentifier[ev.Label]; ok {
+			prev := live[identifier]
 			live[identifier] = liveTicketState{
 				paused: true, label: ev.Label, pauseKind: ev.PauseKind, reason: ev.Reason,
+				startedAt: prev.startedAt, tokens: prev.tokens,
 			}
 		}
 
 	case ralphloop.LiveEventIterationResumed:
 		if identifier, ok := labelIdentifier[ev.Label]; ok {
-			live[identifier] = liveTicketState{running: true, label: ev.Label}
+			prev := live[identifier]
+			live[identifier] = liveTicketState{running: true, label: ev.Label, startedAt: prev.startedAt, tokens: prev.tokens}
 		}
 
 	case ralphloop.LiveEventIterationFinished, ralphloop.LiveEventTicketReverted,
@@ -204,7 +219,31 @@ func applyLiveEvent(live map[string]liveTicketState, labelIdentifier map[string]
 			ls.phase = livePhaseImplementing
 			live[ev.Identifier] = ls
 		}
+
+	case ralphloop.LiveEventContextOccupancy:
+		if ls, ok := live[ev.Identifier]; ok {
+			ls.tokens = ev.Tokens
+			live[ev.Identifier] = ls
+		}
 	}
+}
+
+// resolveStartedAt resolves cwd/sessionID (carried on IterationStarted/
+// TicketReattached) to the session transcript's first-line timestamp — the
+// true iteration start, which survives a TicketReattached (UI restart
+// mid-iteration) correctly instead of resetting to zero the way a plain
+// time.Now()-at-start capture would. Returns the zero time.Time if the
+// transcript can't be resolved yet (e.g. not written out on disk).
+func resolveStartedAt(cwd, sessionID string) time.Time {
+	path, err := transcript.Path(cwd, sessionID)
+	if err != nil {
+		return time.Time{}
+	}
+	startedAt, ok, err := transcript.FirstLineTimestamp(path)
+	if err != nil || !ok {
+		return time.Time{}
+	}
+	return startedAt
 }
 
 // liveStateForSelected returns the selected ticket's live orchestrator state,
