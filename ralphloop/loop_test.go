@@ -430,3 +430,85 @@ func TestAllSettled_OpenTicketNotSettled(t *testing.T) {
 		t.Errorf("allSettled() = true, want false while ticket 2 is still open")
 	}
 }
+
+// TestRun_TicketSubset_CompletesWithoutTouchingTicketsOutsideSubset covers
+// ticket 02's requirement: a caller-supplied RunOptions.TicketIDs subset of a
+// larger epic runs and lands only those tickets, and Run exits once they're
+// done even though a third, unblocked epic ticket is left open.
+func TestRun_TicketSubset_CompletesWithoutTouchingTicketsOutsideSubset(t *testing.T) {
+	scratchDir := writeEpic(t, "my-epic", map[string]string{
+		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
+		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
+		"03-third.md":  "---\nid: \"03\"\nstatus: open\ntype: task\n---\n# Third\n",
+	})
+	d, prompts, _ := fakeDeps()
+
+	var out bytes.Buffer
+	err := Run(RunOptions{
+		EpicName:   "my-epic",
+		Skill:      "implement",
+		ScratchDir: scratchDir,
+		RepoDir:    "/fake/repo",
+		TicketIDs:  []string{"01", "02"},
+	}, d, NewTextEventSink(&out))
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	wantPrompts := []string{
+		"/implement " + filepath.Join(scratchDir, "my-epic", "issues", "01-first.md"),
+		"/implement " + filepath.Join(scratchDir, "my-epic", "issues", "02-second.md"),
+	}
+	if len(*prompts) != 2 || (*prompts)[0] != wantPrompts[0] || (*prompts)[1] != wantPrompts[1] {
+		t.Fatalf("prompts = %v, want %v (ticket 03 must never be launched)", *prompts, wantPrompts)
+	}
+
+	for _, name := range []string{"01-first.md", "02-second.md"} {
+		raw, err := os.ReadFile(filepath.Join(scratchDir, "my-epic", "issues", name))
+		if err != nil {
+			t.Fatalf("ReadFile %s: %v", name, err)
+		}
+		if !strings.Contains(string(raw), "status: done") {
+			t.Errorf("%s not marked done:\n%s", name, raw)
+		}
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "my-epic", "issues", "03-third.md"))
+	if err != nil {
+		t.Fatalf("ReadFile 03-third.md: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: open") {
+		t.Errorf("03-third.md = %q, want it left open (outside the subset)", raw)
+	}
+}
+
+func TestSettledScope_EmptyIDsFallsBackToAllSettled(t *testing.T) {
+	epic := tickets.Epic{Tickets: []tickets.Ticket{
+		{Number: 1, Status: "done"},
+		{Number: 2, Status: "open"},
+	}}
+	if settledScope(epic, nil) {
+		t.Errorf("settledScope(nil) = true, want false while ticket 2 is still open")
+	}
+}
+
+func TestSettledScope_SubsetDoneIgnoresOtherOpenTickets(t *testing.T) {
+	epic := tickets.Epic{Tickets: []tickets.Ticket{
+		{Number: 1, Identifier: "01", Status: "done"},
+		{Number: 2, Identifier: "02", Status: "done"},
+		{Number: 3, Identifier: "03", Status: "open"},
+	}}
+	if !settledScope(epic, []string{"01", "02"}) {
+		t.Errorf("settledScope(subset) = false, want true once every subset ticket is done, regardless of ticket 03")
+	}
+}
+
+func TestSettledScope_SubsetNotYetDone(t *testing.T) {
+	epic := tickets.Epic{Tickets: []tickets.Ticket{
+		{Number: 1, Identifier: "01", Status: "done"},
+		{Number: 2, Identifier: "02", Status: "open"},
+	}}
+	if settledScope(epic, []string{"01", "02"}) {
+		t.Errorf("settledScope(subset) = true, want false while ticket 02 is still open")
+	}
+}

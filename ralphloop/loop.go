@@ -3,6 +3,7 @@ package ralphloop
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 
@@ -102,6 +103,12 @@ type RunOptions struct {
 	RepoDir     string    // repo root passed as the herdr workspace/worktree cwd
 	MaxParallel int       // defaults to defaultMaxParallel; how many iterations run concurrently
 	SmartZone   int       // defaults to defaultSmartZone; context-token ceiling before pausing an iteration
+	// TicketIDs, if set, restricts scheduling to just these ticket
+	// identifiers (see tickets.Ticket.DisplayNumber) within the epic — Run
+	// exits once every one of them is done, independent of any other open
+	// ticket the epic may still have. Unset means the whole epic, unchanged
+	// from before this field existed.
+	TicketIDs []string
 	// Gate, if set, is used instead of a fresh one Run would otherwise create
 	// internally — the caller's way to keep a reference for in-process
 	// resume/recheck (Gate.ForceResume) once the loop is running, e.g. a TUI
@@ -153,7 +160,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		sink.NoTicketsFound(opts.EpicName)
 		return nil
 	}
-	if allSettled(*initial) {
+	if settledScope(*initial, opts.TicketIDs) {
 		sink.AlreadyComplete(opts.EpicName, initial.DoneCount(), initial.TotalCount())
 		return nil
 	}
@@ -212,7 +219,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		if err != nil {
 			return tickets.Ticket{}, false, err
 		}
-		frontier := Frontier(*epic)
+		frontier := FilterIDs(Frontier(*epic), opts.TicketIDs)
 		if len(frontier) == 0 {
 			return tickets.Ticket{}, false, nil
 		}
@@ -284,7 +291,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		if err != nil {
 			return err
 		}
-		if allSettled(*epic) && active == 0 {
+		if settledScope(*epic, opts.TicketIDs) && active == 0 {
 			break
 		}
 
@@ -358,6 +365,30 @@ func allSettled(e tickets.Epic) bool {
 		}
 	}
 	return true
+}
+
+// settledScope reports whether the scope Run is watching — the subset named
+// by ids, or the whole epic when ids is empty — has reached allSettled's
+// terminal state. A ticket outside ids doesn't block completion: Run exits
+// once the caller's requested tickets are done even if other epic tickets
+// remain open.
+func settledScope(e tickets.Epic, ids []string) bool {
+	if len(ids) == 0 {
+		return allSettled(e)
+	}
+	found := 0
+	for _, t := range e.Tickets {
+		if !slices.Contains(ids, t.DisplayNumber()) {
+			continue
+		}
+		found++
+		switch e.RenderedStatus(t) {
+		case tickets.StatusDone, tickets.StatusNeedsInfo, tickets.StatusNeedsAttention:
+		default:
+			return false
+		}
+	}
+	return found > 0
 }
 
 // loadNamedEpic loads scratchDir and returns the epic named name, or nil if
