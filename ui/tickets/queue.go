@@ -141,10 +141,80 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(implementFinishedNotifyCmd(msg.epicName), startCmd)
 	case implementFailedMsg:
 		return m, notify.Error(msg.err.Error())
+	case queueSyncMsg:
+		return m.handleQueueSync(msg)
 	case tea.KeyPressMsg:
 		return m.handleQueueKey(msg)
 	}
 	return m, nil
+}
+
+// queueSyncMsg reports ralphLoopRegistry's full state as observed when the
+// Queue tab (re)gains focus. A poll chain's tea.Msg is dropped by the app
+// shell while this tab is backgrounded (see implementPollInterval's doc
+// comment), which would otherwise strand m.runningEpics/m.pendingEpics on
+// whatever they were the moment focus left — including never noticing a slot
+// freed up for backfill. OnPageActivated re-derives everything this tab needs
+// from the registry's durable snapshots instead of trusting the messages that
+// arrived while it was away.
+type queueSyncMsg struct {
+	snapshots []RunSnapshot
+	paused    bool
+}
+
+// OnPageActivated implements the app shell's pageActivationAware duck-type
+// (see ui/app/model_tabs.go): every time the Queue tab (re)gains focus,
+// including the very first time, it re-syncs from the registry.
+func (m QueueModel) OnPageActivated() tea.Cmd {
+	return func() tea.Msg {
+		return queueSyncMsg{snapshots: ralphLoopRegistry.runSnapshots(), paused: ralphLoopRegistry.isPaused()}
+	}
+}
+
+func (m QueueModel) handleQueueSync(msg queueSyncMsg) (tea.Model, tea.Cmd) {
+	m.paused = msg.paused
+	byName := make(map[string]RunSnapshot, len(msg.snapshots))
+	for _, s := range msg.snapshots {
+		byName[s.EpicName] = s
+	}
+	var cmds []tea.Cmd
+	for _, plan := range m.checkedEpicPlans() {
+		name := plan.epic.Name
+		snapshot, ok := byName[name]
+		if !ok {
+			continue
+		}
+		m.syncRunSnapshot(name)
+		if !snapshot.StartedAt.IsZero() && (m.executionStartedAt.IsZero() || snapshot.StartedAt.Before(m.executionStartedAt)) {
+			m.executionStartedAt = snapshot.StartedAt
+		}
+		wasRunning := m.runningEpics[name]
+		if snapshot.State == RunStateRunning {
+			m.runningEpics[name] = true
+			cmds = append(cmds, cmdPollImplement(name))
+			continue
+		}
+		delete(m.runningEpics, name)
+		if wasRunning {
+			cmds = append(cmds, implementFinishedNotifyCmd(name))
+		}
+	}
+	if len(m.executionTickets) == 0 {
+		for _, plan := range m.checkedEpicPlans() {
+			if _, ok := byName[plan.epic.Name]; !ok {
+				continue
+			}
+			for _, ticketID := range plan.ticketIDs {
+				m.executionTickets[plan.epic.Name+"/"+ticketID] = true
+			}
+		}
+	}
+	cmds = append(cmds, m.startAvailableEpics())
+	if !m.executionStartedAt.IsZero() && m.executionCompletedAt.IsZero() && len(m.runningEpics) == 0 && len(m.pendingEpics) == 0 {
+		m.executionCompletedAt = m.now()
+		cmds = append(cmds, m.cmdLoadQueue())
+	}
+	return m, tea.Batch(cmds...)
 }
 
 func (m *QueueModel) syncRunSnapshot(epicName string) {

@@ -305,6 +305,125 @@ func TestQueueModelSchedulesCheckedEpicsInCheckOrderAndBackfillsAtCap(t *testing
 	}
 }
 
+func TestQueueModelReactivationRecoversTwoConcurrentEpicsFromRegistry(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: claimed\n\nBody.\n")
+	writeTicket(t, root, "beta", "01-first.md", "Status: claimed\n\nBody.\n")
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "01-first.md"): true,
+		ticketPath(root, "beta", "01-first.md"):  true,
+	}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+
+	r := newLoopRegistry(2)
+	r.tryStart("alpha", 0, 1)
+	r.tryStart("beta", 0, 1)
+	r.reduceLiveEvent("alpha", ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Label: "iter-01", Identifier: "01"})
+	r.reduceLiveEvent("beta", ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Label: "iter-01", Identifier: "01"})
+	r.reduceLiveEvent("alpha", ralphloop.LiveEvent{Kind: ralphloop.LiveEventContextOccupancy, Identifier: "01", Tokens: 4000})
+	r.reduceLiveEvent("beta", ralphloop.LiveEvent{Kind: ralphloop.LiveEventContextOccupancy, Identifier: "01", Tokens: 6000})
+	previous := ralphLoopRegistry
+	ralphLoopRegistry = r
+	t.Cleanup(func() {
+		r.finish("alpha", nil)
+		r.finish("beta", nil)
+		ralphLoopRegistry = previous
+	})
+
+	// This model never received implementStartedMsg for either epic — as if
+	// both runs were launched while the Queue tab was backgrounded elsewhere.
+	// OnPageActivated must recover both from the registry's snapshots alone.
+	updated, _ := m.Update(m.OnPageActivated()())
+	m = updated.(QueueModel)
+
+	if !m.runningEpics["alpha"] || !m.runningEpics["beta"] {
+		t.Fatalf("expected both epics reflected as running from registry snapshots, got %v", m.runningEpics)
+	}
+	content := m.View().Content
+	if !strings.Contains(content, "implementing (0 of 2 done)") {
+		t.Fatalf("expected aggregated progress across both concurrent epics:\n%s", content)
+	}
+	if !strings.Contains(content, "10.0k tok") {
+		t.Fatalf("expected context tokens aggregated across both concurrent epics:\n%s", content)
+	}
+}
+
+func TestQueueModelReactivationBackfillsPendingEpicAfterMissedCompletion(t *testing.T) {
+	root := testutil.TempRepo(t)
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "beta", "01-first.md", "Status: open\n\nBody.\n")
+	alpha := ticketPath(root, "alpha", "01-first.md")
+	beta := ticketPath(root, "beta", "01-first.md")
+	checked := map[string]bool{alpha: true, beta: true}
+	checkOrder := map[string]uint64{alpha: 1, beta: 2}
+
+	previousRun := runRalphLoop
+	previousRegistry := ralphLoopRegistry
+	starts := make(chan string, 2)
+	releases := map[string]chan struct{}{
+		"alpha": make(chan struct{}),
+		"beta":  make(chan struct{}),
+	}
+	runRalphLoop = func(opts ralphloop.RunOptions, _ ralphloop.Deps, _ ralphloop.EventSink) error {
+		starts <- opts.EpicName
+		<-releases[opts.EpicName]
+		return nil
+	}
+	ralphLoopRegistry = newLoopRegistry(1) // one slot: beta must wait for alpha
+	t.Cleanup(func() {
+		for _, release := range releases {
+			select {
+			case <-release:
+			default:
+				close(release)
+			}
+		}
+		deadline := time.Now().Add(time.Second)
+		for ralphLoopRegistry.isRunning() && time.Now().Before(deadline) {
+			time.Sleep(time.Millisecond)
+		}
+		runRalphLoop = previousRun
+		ralphLoopRegistry = previousRegistry
+	})
+
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, checkOrder))
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(QueueModel)
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	m = updated.(QueueModel)
+	m = deliverQueueCommands(t, m, cmd)
+
+	if got := <-starts; got != "alpha" {
+		t.Fatalf("expected alpha to start first, got %q", got)
+	}
+
+	// Simulate the tab being backgrounded from here on: alpha finishes but no
+	// implementPollMsg is ever delivered to this model instance (the app
+	// shell would drop it since another tab was active).
+	close(releases["alpha"])
+	waitForEpicToFinish(t, "alpha")
+
+	select {
+	case name := <-starts:
+		t.Fatalf("epic %q backfilled before reactivation", name)
+	default:
+	}
+
+	updated, syncCmd := m.Update(m.OnPageActivated()())
+	m = updated.(QueueModel)
+	m = deliverQueueCommands(t, m, syncCmd)
+
+	select {
+	case name := <-starts:
+		if name != "beta" {
+			t.Fatalf("backfill epic = %q, want beta", name)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for beta to backfill alpha's slot after reactivation")
+	}
+	close(releases["beta"])
+}
+
 func deliverQueueCommands(t *testing.T, m QueueModel, cmd tea.Cmd) QueueModel {
 	t.Helper()
 	if cmd == nil {

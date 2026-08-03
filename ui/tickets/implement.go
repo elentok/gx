@@ -44,6 +44,7 @@ type epicRun struct {
 	state       RunState
 	finalError  string
 	tickets     map[string]RunTicketSnapshot
+	startedAt   time.Time
 }
 
 type RunState string
@@ -74,6 +75,7 @@ type RunSnapshot struct {
 	Paused        bool
 	FinalError    string
 	Tickets       map[string]RunTicketSnapshot
+	StartedAt     time.Time
 }
 
 // loopRegistry enforces "an epic may not have two ralph-loops running at
@@ -129,6 +131,7 @@ func (r *loopRegistry) tryStart(epicName string, done, total int) (*ralphloop.Ch
 		drainDone: make(chan struct{}),
 		done:      done, total: total, sink: sink, gate: ralphloop.NewGate(),
 		state: RunStateRunning, tickets: map[string]RunTicketSnapshot{},
+		startedAt: time.Now(),
 	}
 	r.runs[epicName] = run
 	r.snapshots[epicName] = run
@@ -246,6 +249,7 @@ func copyRunSnapshot(epicName string, run *epicRun, queuePaused bool) RunSnapsho
 		Paused:        paused,
 		FinalError:    run.finalError,
 		Tickets:       tickets,
+		StartedAt:     run.startedAt,
 	}
 }
 
