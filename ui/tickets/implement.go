@@ -39,6 +39,7 @@ const defaultMaxConcurrentEpics = 2
 type epicRun struct {
 	done, total int
 	sink        *ralphloop.ChannelEventSink
+	gate        *ralphloop.Gate
 }
 
 // loopRegistry enforces "an epic may not have two ralph-loops running at
@@ -55,6 +56,7 @@ type loopRegistry struct {
 	mu            sync.Mutex
 	maxConcurrent int
 	runs          map[string]*epicRun
+	paused        bool
 	// lastErr carries each finished run's error (nil on success) past
 	// finish() removing it from runs, keyed by epicName so two epics
 	// finishing close together can't clobber each other's result before
@@ -91,6 +93,9 @@ var runRalphLoop = ralphloop.Run
 func (r *loopRegistry) tryStart(epicName string, done, total int) (*ralphloop.ChannelEventSink, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.paused {
+		return nil, false
+	}
 	if _, exists := r.runs[epicName]; exists {
 		return nil, false
 	}
@@ -98,8 +103,41 @@ func (r *loopRegistry) tryStart(epicName string, done, total int) (*ralphloop.Ch
 		return nil, false
 	}
 	sink := ralphloop.NewChannelEventSink()
-	r.runs[epicName] = &epicRun{done: done, total: total, sink: sink}
+	r.runs[epicName] = &epicRun{done: done, total: total, sink: sink, gate: ralphloop.NewGate()}
 	return sink, true
+}
+
+func (r *loopRegistry) gateFor(epicName string) *ralphloop.Gate {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if run := r.runs[epicName]; run != nil {
+		return run.gate
+	}
+	return nil
+}
+
+func (r *loopRegistry) pause() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.paused = true
+	for _, run := range r.runs {
+		run.gate.Pause(ralphloop.QueuePauseLabel, "queue paused")
+	}
+}
+
+func (r *loopRegistry) resume() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.paused = false
+	for _, run := range r.runs {
+		run.gate.ForceResume(ralphloop.QueuePauseLabel)
+	}
+}
+
+func (r *loopRegistry) isPaused() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.paused
 }
 
 func (r *loopRegistry) finish(epicName string, err error) {
@@ -200,6 +238,9 @@ func (r *loopRegistry) isRunning() bool {
 func (r *loopRegistry) availableSlots() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.paused {
+		return 0
+	}
 	return max(r.maxConcurrent-len(r.runs), 0)
 }
 
@@ -466,6 +507,7 @@ func cmdStartImplement(
 			ralphLoopRegistry.finish(epicName, nil)
 			return implementFailedMsg{err: err}
 		}
+		opts.Gate = ralphLoopRegistry.gateFor(epicName)
 		go func() {
 			err := runRalphLoop(opts, ralphloop.DefaultDeps(), sink)
 			ralphLoopRegistry.finish(epicName, err)

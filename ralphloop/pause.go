@@ -12,6 +12,9 @@ import (
 // signal file while paused.
 const resumePollInterval = 2 * time.Second
 
+// QueuePauseLabel identifies the in-process pause controlled by the Queue UI.
+const QueuePauseLabel = "queue"
+
 // Gate coordinates the smart-zone pause/resume protocol shared by every
 // iteration running under a single `gx ralph-loop` invocation. Any iteration
 // can pause the whole loop (stop new scheduling; block the process in
@@ -29,6 +32,12 @@ func NewGate() *Gate {
 	return &Gate{reasons: map[string]string{}, wake: make(chan struct{})}
 }
 
+// Pause stops this Gate from admitting new claims while allowing work that
+// already passed the claim boundary to finish normally.
+func (g *Gate) Pause(label, reason string) {
+	g.pause(label, reason)
+}
+
 // pause records label as paused for reason, leaving any other already-paused
 // iteration untouched.
 func (g *Gate) pause(label, reason string) {
@@ -43,6 +52,18 @@ func (g *Gate) isPaused() bool {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	return len(g.reasons) > 0
+}
+
+// claimIfRunning serializes the pause transition with the complete claim.
+// Pause therefore cannot return while a claim admitted before it is still
+// being recorded on disk.
+func (g *Gate) claimIfRunning(claim func() error) (bool, error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if len(g.reasons) > 0 {
+		return false, nil
+	}
+	return true, claim()
 }
 
 // isLabelPaused reports whether label specifically is still paused, letting

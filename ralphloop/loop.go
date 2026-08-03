@@ -211,21 +211,26 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		scheduleMu.Lock()
 		defer scheduleMu.Unlock()
 
-		if gate.isPaused() {
-			return tickets.Ticket{}, false, nil
-		}
-
-		epic, err := loadNamedEpic(scratchDir, opts.EpicName)
+		admitted, err := gate.claimIfRunning(func() error {
+			epic, err := loadNamedEpic(scratchDir, opts.EpicName)
+			if err != nil {
+				return err
+			}
+			frontier := FilterIDs(Frontier(*epic), opts.TicketIDs)
+			if len(frontier) == 0 {
+				return nil
+			}
+			ticket = frontier[0]
+			if err := Claim(ticket.Path); err != nil {
+				return fmt.Errorf("claiming ticket %s: %w", ticket.Identifier, err)
+			}
+			return nil
+		})
 		if err != nil {
 			return tickets.Ticket{}, false, err
 		}
-		frontier := FilterIDs(Frontier(*epic), opts.TicketIDs)
-		if len(frontier) == 0 {
+		if !admitted || ticket.Path == "" {
 			return tickets.Ticket{}, false, nil
-		}
-		ticket = frontier[0]
-		if err := Claim(ticket.Path); err != nil {
-			return tickets.Ticket{}, false, fmt.Errorf("claiming ticket %s: %w", ticket.Identifier, err)
 		}
 		sink.TicketClaimed(ticket)
 		return ticket, true, nil
@@ -308,6 +313,10 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		}
 
 		if active == 0 {
+			if gate.isLabelPaused(QueuePauseLabel) {
+				gate.waitForResume(d, resumePath)
+				continue
+			}
 			if gate.isPaused() {
 				return fmt.Errorf("epic %q paused with no running iterations left: %v", opts.EpicName, gate.snapshot())
 			}

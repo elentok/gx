@@ -239,9 +239,20 @@ func TestQueueModelSchedulesCheckedEpicsInCheckOrderAndBackfillsAtCap(t *testing
 	default:
 	}
 
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'p', Text: "p"})
+	m = updated.(QueueModel)
 	close(releases["gamma"])
 	waitForEpicToFinish(t, "gamma")
 	updated, cmd = m.Update(implementPollMsg{epicName: "gamma"})
+	m = updated.(QueueModel)
+	m = deliverQueueCommands(t, m, cmd)
+	select {
+	case name := <-starts:
+		t.Fatalf("epic %q backfilled while the queue was paused", name)
+	default:
+	}
+
+	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'p', Text: "p"})
 	m = updated.(QueueModel)
 	m = deliverQueueCommands(t, m, cmd)
 	select {

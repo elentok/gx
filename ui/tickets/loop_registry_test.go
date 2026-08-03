@@ -3,6 +3,8 @@ package tickets
 import (
 	"errors"
 	"testing"
+
+	"github.com/elentok/gx/ralphloop"
 )
 
 func TestTryStartSameEpicTwiceFails(t *testing.T) {
@@ -120,5 +122,32 @@ func TestSnapshotPrefersRequestedEpic(t *testing.T) {
 	running, _, events := r.snapshot("epic-b")
 	if running || events != nil {
 		t.Fatalf("snapshot with nothing running: want (false, nil events)")
+	}
+}
+
+func TestPauseStopsAllRunGatesAndNewStartsUntilResume(t *testing.T) {
+	r := newLoopRegistry(2)
+	if _, ok := r.tryStart("epic-a", 0, 2); !ok {
+		t.Fatal("tryStart epic-a: want ok")
+	}
+	if _, ok := r.tryStart("epic-b", 0, 2); !ok {
+		t.Fatal("tryStart epic-b: want ok")
+	}
+
+	r.pause()
+	if !r.runs["epic-a"].gate.ForceResume(ralphloop.QueuePauseLabel) || !r.runs["epic-b"].gate.ForceResume(ralphloop.QueuePauseLabel) {
+		t.Fatal("pause did not close every running epic's claim gate")
+	}
+	r.pause()
+	if slots := r.availableSlots(); slots != 0 {
+		t.Fatalf("availableSlots while paused = %d, want 0", slots)
+	}
+	if _, ok := r.tryStart("epic-c", 0, 1); ok {
+		t.Fatal("tryStart epic-c while paused: want !ok")
+	}
+
+	r.resume()
+	if r.runs["epic-a"].gate.ForceResume(ralphloop.QueuePauseLabel) || r.runs["epic-b"].gate.ForceResume(ralphloop.QueuePauseLabel) {
+		t.Fatal("resume left a running epic's claim gate paused")
 	}
 }

@@ -171,3 +171,47 @@ func TestRun_MaxParallelTwo_RunsExactlyTwoConcurrentlyAndBackfills(t *testing.T)
 		t.Errorf("removed worktree branches = %v, want 3 entries", *removed)
 	}
 }
+
+func TestRun_PauseLetsInFlightFinishAndResumesScheduling(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
+	})
+	d, _, _ := fakeDeps()
+	wait, started, release := gatedAgentWait(d.AgentWait)
+	d.AgentWait = wait
+	d.ResumeSignaled = func(string) (bool, error) { return false, nil }
+	d.Sleep = func(time.Duration) { time.Sleep(time.Millisecond) }
+	gate := NewGate()
+
+	var out bytes.Buffer
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- Run(RunOptions{
+			EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
+			MaxParallel: 1, Gate: gate,
+		}, d, NewTextEventSink(&out))
+	}()
+
+	first := <-started
+	gate.Pause(QueuePauseLabel, "queue paused")
+	release(first)
+
+	select {
+	case pane := <-started:
+		t.Fatalf("iteration %q started while the queue was paused", pane)
+	case err := <-errCh:
+		t.Fatalf("Run() exited while paused: %v", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	if !gate.ForceResume(QueuePauseLabel) {
+		t.Fatal("expected queue pause to be active")
+	}
+	second := <-started
+	release(second)
+
+	if err := <-errCh; err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+}

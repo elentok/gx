@@ -45,6 +45,7 @@ type QueueModel struct {
 	pendingEpics           []checkedEpicPlan
 	runningEpics           map[string]bool
 	runningAgent           ralphloop.AgentKind
+	paused                 bool
 }
 
 func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string]bool, orders ...map[string]uint64) QueueModel {
@@ -65,6 +66,7 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 		checkOrder:         checkOrder,
 		implementAgentMenu: newImplementAgentMenu(),
 		runningEpics:       map[string]bool{},
+		paused:             ralphLoopRegistry.isPaused(),
 	}
 }
 
@@ -145,6 +147,15 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.moveSelection(-1)
 	case "R":
 		return m, m.cmdLoadQueue()
+	case "p":
+		if m.paused {
+			ralphLoopRegistry.resume()
+			m.paused = false
+			return m, tea.Batch(notify.Success("queue resumed"), m.startAvailableEpics())
+		}
+		ralphLoopRegistry.pause()
+		m.paused = true
+		return m, notify.Info("queue paused")
 	case " ", "space":
 		m.toggleSelected()
 	case "enter":
@@ -403,6 +414,9 @@ func (m QueueModel) View() tea.View {
 }
 
 func (m QueueModel) executionBanner() string {
+	if m.paused {
+		return "Queue paused — in-flight iterations will finish"
+	}
 	if len(m.runningEpics) == 0 {
 		return queueBanner
 	}
