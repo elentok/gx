@@ -603,7 +603,7 @@ func (m *QueueModel) startAvailableEpics() tea.Cmd {
 	for _, plan := range m.pendingEpics[:count] {
 		cmds = append(cmds, cmdStartImplement(
 			m.worktreeRoot, plan.epic.Name, m.runningAgent, plan.done, len(plan.ticketIDs),
-			m.settings.MaxConcurrentTicketsPerEpic(), plan.ticketIDs,
+			m.settings.MaxConcurrentTicketsPerEpic(), plan.ticketIDs, m.settings.Notifications.Telegram,
 		))
 	}
 	m.pendingEpics = m.pendingEpics[count:]

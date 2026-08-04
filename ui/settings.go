@@ -15,6 +15,7 @@ type Settings struct {
 	NameAliases      map[string]string // used by the worktrees view
 	LogConfig        config.LogConfig
 	ExecutionQueue   config.ExecutionQueueConfig
+	Notifications    config.NotificationsConfig
 }
 
 // MaxConcurrentTicketsPerEpic returns the configured per-epic ticket limit.

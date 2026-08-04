@@ -304,6 +304,7 @@ func settingsFromConfig(cfg config.Config) ui.Settings {
 		NameAliases:      cfg.NameAliases,
 		LogConfig:        cfg.Log,
 		ExecutionQueue:   cfg.ExecutionQueue,
+		Notifications:    cfg.Notifications,
 	}
 }
 

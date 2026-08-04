@@ -10,6 +10,7 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ui"
@@ -683,7 +684,7 @@ func (m Model) OnPageActivated() tea.Cmd {
 func (m Model) cmdStartImplement(epicName string, agent ralphloop.AgentKind, done, total int) tea.Cmd {
 	return cmdStartImplement(
 		m.worktreeRoot, epicName, agent, done, total,
-		m.settings.MaxConcurrentTicketsPerEpic(), nil,
+		m.settings.MaxConcurrentTicketsPerEpic(), nil, m.settings.Notifications.Telegram,
 	)
 }
 
@@ -694,6 +695,7 @@ func cmdStartImplement(
 	done, total int,
 	maxParallel int,
 	ticketIDs []string,
+	telegram config.TelegramConfig,
 ) tea.Cmd {
 	return func() tea.Msg {
 		sink, ok := ralphLoopRegistry.tryStart(epicName, done, total)
@@ -706,8 +708,12 @@ func cmdStartImplement(
 			return implementFailedMsg{err: err}
 		}
 		opts.Gate = ralphLoopRegistry.gateFor(epicName)
+		var runSink ralphloop.EventSink = sink
+		if telegram.BotToken != "" {
+			runSink = ralphloop.NewTelegramEventSink(sink, telegram.BotToken, telegram.ChatID)
+		}
 		go func() {
-			err := runRalphLoop(opts, ralphloop.DefaultDeps(), sink)
+			err := runRalphLoop(opts, ralphloop.DefaultDeps(), runSink)
 			ralphLoopRegistry.finish(epicName, err)
 		}()
 		return implementStartedMsg{epicName: epicName}
