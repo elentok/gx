@@ -29,11 +29,11 @@ func Uninstall(manifestPath string, force ForcePolicy) error {
 		preserved := false
 		for _, root := range m.AgentRoots {
 			target := filepath.Join(root, f.Path)
-			currentHash, err := hashIfExists(target)
+			currentIdentity, err := identityIfExists(target, m.Mode)
 			if err != nil {
 				return fmt.Errorf("inspect %s: %w", target, err)
 			}
-			ownership := Decide(PathHashes{Installed: f.Hash, Current: currentHash}, m.Mode)
+			ownership := Decide(PathHashes{Installed: managedIdentity(f), Current: currentIdentity}, m.Mode)
 			if ownership == OwnershipAbsent {
 				continue
 			}

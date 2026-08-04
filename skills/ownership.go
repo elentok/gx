@@ -76,6 +76,42 @@ func Decide(hashes PathHashes, mode InstallMode) Ownership {
 	}
 }
 
+// installOwnership classifies a single install target given what the
+// manifest previously recorded for it (prevIdentity), what's on disk now
+// (currentIdentity), and what this install is about to write
+// (sourceIdentity).
+//
+// Under ModeManagedCopy it defers to Decide: safe to overwrite as long as
+// disk content matches what was last installed there, regardless of
+// whether the new source content differs (that's just a version upgrade).
+//
+// Under ModeSymlink the safety question is different: relinking a path to
+// a *different* target is a materially riskier action than upgrading
+// bytes, so the check compares disk against the *new* source target rather
+// than the prior manifest record. A path already linked at the intended
+// target is unchanged and always safe (idempotent re-run from the same
+// checkout); linked anywhere else - including where a prior install of
+// this same path left it, e.g. a different checkout's copy of this skill -
+// requires force. That's what stops a symlink install run from a second
+// checkout from silently retargeting links a first checkout created.
+func installOwnership(prevIdentity, currentIdentity, sourceIdentity string, mode InstallMode) Ownership {
+	if mode != ModeSymlink {
+		return Decide(PathHashes{Installed: prevIdentity, Current: currentIdentity}, mode)
+	}
+	owned := prevIdentity != ""
+	exists := currentIdentity != ""
+	switch {
+	case !exists:
+		return OwnershipAbsent
+	case currentIdentity == sourceIdentity:
+		return OwnershipUnchanged
+	case !owned:
+		return OwnershipUnrelatedCollision
+	default:
+		return OwnershipWrongSymlinkTarget
+	}
+}
+
 // Evaluate classifies every path mentioned in installedHashes or
 // currentHashes - the union of what the manifest owns and what exists on
 // disk - under mode.

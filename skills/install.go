@@ -27,6 +27,17 @@ type InstallRequest struct {
 	Files []SourceFile
 	// Force authorizes overwriting specific conflicting paths.
 	Force ForcePolicy
+	// Mode selects how files are placed on disk. The zero value is
+	// ModeManagedCopy.
+	Mode InstallMode
+}
+
+// effectiveMode returns r.Mode, defaulting to ModeManagedCopy when unset.
+func (r InstallRequest) effectiveMode() InstallMode {
+	if r.Mode == "" {
+		return ModeManagedCopy
+	}
+	return r.Mode
 }
 
 // ConflictError reports the paths an install or uninstall refused to
@@ -51,33 +62,35 @@ func (e *ConflictError) Error() string {
 // encountered while copying: the manifest is only written after every file
 // has been copied to every agent root.
 func Install(manifestPath string, req InstallRequest) error {
+	mode := req.effectiveMode()
+
 	prev, err := Load(manifestPath)
 	if err != nil && !errors.Is(err, ErrNotExist) {
 		return fmt.Errorf("load existing manifest: %w", err)
 	}
-	prevHashes := make(map[string]string, len(prev.Files))
+	prevIdentities := make(map[string]string, len(prev.Files))
 	for _, f := range prev.Files {
-		prevHashes[f.Path] = f.Hash
+		prevIdentities[f.Path] = managedIdentity(f)
 	}
 
-	sourceHashes := make(map[string]string, len(req.Files))
+	sourceIdentities := make(map[string]string, len(req.Files))
 	for _, f := range req.Files {
-		h, err := hashFile(f.AbsPath)
+		id, err := sourceFileIdentity(f, mode)
 		if err != nil {
-			return fmt.Errorf("hash source file %s: %w", f.AbsPath, err)
+			return fmt.Errorf("inspect source file %s: %w", f.AbsPath, err)
 		}
-		sourceHashes[f.RelPath] = h
+		sourceIdentities[f.RelPath] = id
 	}
 
 	conflicts := map[string]Ownership{}
 	for _, root := range req.AgentRoots {
 		for _, f := range req.Files {
 			target := filepath.Join(root, f.RelPath)
-			currentHash, err := hashIfExists(target)
+			currentIdentity, err := identityIfExists(target, mode)
 			if err != nil {
 				return fmt.Errorf("inspect %s: %w", target, err)
 			}
-			ownership := Decide(PathHashes{Installed: prevHashes[f.RelPath], Current: currentHash}, ModeManagedCopy)
+			ownership := installOwnership(prevIdentities[f.RelPath], currentIdentity, sourceIdentities[f.RelPath], mode)
 			if !AllowWrite(ownership, f.RelPath, req.Force) {
 				conflicts[f.RelPath] = ownership
 			}
@@ -93,7 +106,7 @@ func Install(manifestPath string, req InstallRequest) error {
 		}
 		for _, f := range req.Files {
 			target := filepath.Join(root, f.RelPath)
-			if err := copyFile(f.AbsPath, target); err != nil {
+			if err := placeFile(f.AbsPath, target, mode); err != nil {
 				return fmt.Errorf("install %s: %w", target, err)
 			}
 		}
@@ -101,10 +114,16 @@ func Install(manifestPath string, req InstallRequest) error {
 
 	files := make([]ManagedFile, 0, len(req.Files))
 	for _, f := range req.Files {
-		files = append(files, ManagedFile{Path: f.RelPath, Hash: sourceHashes[f.RelPath]})
+		mf := ManagedFile{Path: f.RelPath}
+		if mode == ModeSymlink {
+			mf.LinkTarget = sourceIdentities[f.RelPath]
+		} else {
+			mf.Hash = sourceIdentities[f.RelPath]
+		}
+		files = append(files, mf)
 	}
 	newManifest := Manifest{
-		Mode:       ModeManagedCopy,
+		Mode:       mode,
 		Source:     req.Source,
 		AgentRoots: req.AgentRoots,
 		Files:      files,

@@ -75,6 +75,31 @@ path to override), or `removed`. A conflict aborts the whole install, so re-runn
 install` after a `gx` upgrade is the way to refresh the bundle: unaffected files report `skipped`,
 changed ones report `updated`.
 
+### Development mode
+
+Working from a gx source checkout, `--dev` symlinks this directory's files into both agents'
+discovery roots instead of installing embedded copies, so an edit under `skills/**` shows up to both
+agents immediately, without rerunning `gx skills install`:
+
+```sh
+go run . skills install --dev    # symlink this checkout's skill files
+```
+
+`--dev` resolves the git repository containing the current working directory (not the `gx` binary's
+own location), so it works the same from a nested subdirectory or a linked worktree, and it refuses
+to change anything if that repository doesn't contain gx's skill bundle. Re-running it from the same
+checkout is idempotent (`skipped`); running it from a *different* gx checkout reports every path
+`conflicted` rather than silently retargeting the existing symlinks — pass `--force` with each path to
+relink to the new checkout.
+
+To go back to a production install of gx's embedded, released skills, run `gx skills install` (no
+`--dev`) and pass `--force` with each path it reports as `conflicted` — switching *out* of dev mode is
+a mode change like any other and needs the same explicit confirmation:
+
+```sh
+gx skills install --force README.md --force gx-implement/SKILL.md ...   # one --force per reported conflict
+```
+
 ## Layout
 
 ```

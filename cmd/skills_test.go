@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/skills"
+	"github.com/elentok/gx/testutil"
 )
 
 // fakeSkillsDeps builds a deps whose skills roots and manifest path are fake
@@ -29,6 +30,39 @@ func fakeSkillsDeps(t *testing.T, stdout *bytes.Buffer) deps {
 			return manifestPath, nil
 		},
 	}
+}
+
+// fakeSkillsDevDeps is fakeSkillsDeps with getwd faked to cwd, the seam
+// runSkillsInstallDev uses to resolve the invoking git checkout.
+func fakeSkillsDevDeps(t *testing.T, stdout *bytes.Buffer, cwd string) deps {
+	t.Helper()
+	d := fakeSkillsDeps(t, stdout)
+	d.getwd = func() (string, error) { return cwd, nil }
+	return d
+}
+
+// writeDevBundle writes a fake copy of gx's skill bundle - the same
+// relative layout Bundle embeds - under root/skills/, so dev-mode install
+// tests can point resolveDevRoot at an isolated temp checkout instead of
+// depending on this repo's real skills/ directory. Returns root's skills/
+// directory.
+func writeDevBundle(t *testing.T, root string) string {
+	t.Helper()
+	rels, err := skills.BundleFiles()
+	if err != nil {
+		t.Fatalf("BundleFiles: %v", err)
+	}
+	bundleDir := filepath.Join(root, "skills")
+	for _, rel := range rels {
+		abs := filepath.Join(bundleDir, rel)
+		if err := os.MkdirAll(filepath.Dir(abs), 0755); err != nil {
+			t.Fatalf("MkdirAll: %v", err)
+		}
+		if err := os.WriteFile(abs, []byte("dev content: "+rel), 0644); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+	}
+	return bundleDir
 }
 
 func agentRootsOf(t *testing.T, d deps) (claude, codex string) {
@@ -211,5 +245,172 @@ func TestExecute_SkillsUninstall_PreservesLocallyModifiedFileAsConflicted(t *tes
 	}
 	if !strings.Contains(stdout.String(), "conflicted") {
 		t.Errorf("expected output to report the preserved file as conflicted, got: %q", stdout.String())
+	}
+}
+
+func TestExecute_SkillsInstallDev_SymlinksCurrentCheckoutIntoBothAgentRoots(t *testing.T) {
+	var stdout bytes.Buffer
+	repo := testutil.TempRepo(t)
+	bundleDir := writeDevBundle(t, repo)
+	d := fakeSkillsDevDeps(t, &stdout, repo)
+	claudeRoot, codexRoot := agentRootsOf(t, d)
+
+	if err := execute([]string{"skills", "install", "--dev"}, d); err != nil {
+		t.Fatalf("execute skills install --dev: %v", err)
+	}
+
+	for _, root := range []string{claudeRoot, codexRoot} {
+		linkPath := filepath.Join(root, "gx-implement", "SKILL.md")
+		target, err := os.Readlink(linkPath)
+		if err != nil {
+			t.Fatalf("Readlink(%s): %v", linkPath, err)
+		}
+		want := filepath.Join(bundleDir, "gx-implement", "SKILL.md")
+		if target != want {
+			t.Errorf("symlink target = %q, want %q", target, want)
+		}
+	}
+
+	out := stdout.String()
+	if !strings.Contains(out, "installed") {
+		t.Errorf("expected output to report installed targets, got: %q", out)
+	}
+}
+
+func TestExecute_SkillsInstallDev_ResolvesGitRootFromNestedWorkingDirectory(t *testing.T) {
+	var stdout bytes.Buffer
+	repo := testutil.TempRepo(t)
+	bundleDir := writeDevBundle(t, repo)
+	nested := filepath.Join(repo, "cmd", "sub")
+	testutil.Mkdir(t, nested)
+	d := fakeSkillsDevDeps(t, &stdout, nested)
+	claudeRoot, _ := agentRootsOf(t, d)
+
+	if err := execute([]string{"skills", "install", "--dev"}, d); err != nil {
+		t.Fatalf("execute skills install --dev: %v", err)
+	}
+
+	linkPath := filepath.Join(claudeRoot, "README.md")
+	target, err := os.Readlink(linkPath)
+	if err != nil {
+		t.Fatalf("Readlink(%s): %v", linkPath, err)
+	}
+	if target != filepath.Join(bundleDir, "README.md") {
+		t.Errorf("symlink target = %q, want repo root's bundle (%q)", target, bundleDir)
+	}
+}
+
+func TestExecute_SkillsInstallDev_ResolvesLinkedWorktreeRootNotBareRoot(t *testing.T) {
+	var stdout bytes.Buffer
+	bareRepo := testutil.TempBareRepoWithWorktrees(t, "feature")
+	wtDir := filepath.Join(bareRepo, "feature")
+	bundleDir := writeDevBundle(t, wtDir)
+	d := fakeSkillsDevDeps(t, &stdout, wtDir)
+	claudeRoot, _ := agentRootsOf(t, d)
+
+	if err := execute([]string{"skills", "install", "--dev"}, d); err != nil {
+		t.Fatalf("execute skills install --dev: %v", err)
+	}
+
+	linkPath := filepath.Join(claudeRoot, "README.md")
+	target, err := os.Readlink(linkPath)
+	if err != nil {
+		t.Fatalf("Readlink(%s): %v", linkPath, err)
+	}
+	if target != filepath.Join(bundleDir, "README.md") {
+		t.Errorf("symlink target = %q, want the worktree's bundle (%q), not the bare repo's", target, bundleDir)
+	}
+}
+
+func TestExecute_SkillsInstallDev_ReinstallFromSameCheckoutIsIdempotent(t *testing.T) {
+	var stdout bytes.Buffer
+	repo := testutil.TempRepo(t)
+	writeDevBundle(t, repo)
+	d := fakeSkillsDevDeps(t, &stdout, repo)
+
+	if err := execute([]string{"skills", "install", "--dev"}, d); err != nil {
+		t.Fatalf("first install --dev: %v", err)
+	}
+
+	stdout.Reset()
+	if err := execute([]string{"skills", "install", "--dev"}, d); err != nil {
+		t.Fatalf("second install --dev: %v", err)
+	}
+
+	out := stdout.String()
+	if !strings.Contains(out, "skipped") {
+		t.Errorf("expected reinstall to report skipped targets, got: %q", out)
+	}
+	if strings.Contains(out, "conflicted") {
+		t.Errorf("expected idempotent reinstall to report no conflicts, got: %q", out)
+	}
+}
+
+func TestExecute_SkillsInstallDev_DifferentCheckoutDetectsChangedLinkTargetInsteadOfRetargeting(t *testing.T) {
+	var stdout bytes.Buffer
+	repoA := testutil.TempRepo(t)
+	bundleDirA := writeDevBundle(t, repoA)
+	dA := fakeSkillsDevDeps(t, &stdout, repoA)
+	claudeRoot, _ := agentRootsOf(t, dA)
+
+	if err := execute([]string{"skills", "install", "--dev"}, dA); err != nil {
+		t.Fatalf("install from repoA: %v", err)
+	}
+
+	repoB := testutil.TempRepo(t)
+	writeDevBundle(t, repoB)
+	dB := dA
+	dB.getwd = func() (string, error) { return repoB, nil }
+
+	stdout.Reset()
+	err := execute([]string{"skills", "install", "--dev"}, dB)
+	if err == nil {
+		t.Fatal("expected error installing --dev from a different checkout without --force")
+	}
+	if !strings.Contains(stdout.String(), "conflicted") {
+		t.Errorf("expected output to report conflicted targets, got: %q", stdout.String())
+	}
+
+	linkPath := filepath.Join(claudeRoot, "README.md")
+	target, err := os.Readlink(linkPath)
+	if err != nil {
+		t.Fatalf("Readlink(%s): %v", linkPath, err)
+	}
+	if target != filepath.Join(bundleDirA, "README.md") {
+		t.Errorf("expected symlink to remain pointed at repoA, got %q", target)
+	}
+}
+
+func TestExecute_SkillsInstall_SwitchingBetweenProdAndDevRequiresForce(t *testing.T) {
+	var stdout bytes.Buffer
+	repo := testutil.TempRepo(t)
+	writeDevBundle(t, repo)
+	d := fakeSkillsDevDeps(t, &stdout, repo)
+
+	if err := execute([]string{"skills", "install"}, d); err != nil {
+		t.Fatalf("prod install: %v", err)
+	}
+
+	stdout.Reset()
+	err := execute([]string{"skills", "install", "--dev"}, d)
+	if err == nil {
+		t.Fatal("expected switching to --dev without --force to conflict")
+	}
+	if !strings.Contains(stdout.String(), "conflicted") {
+		t.Errorf("expected conflicted output, got: %q", stdout.String())
+	}
+}
+
+func TestExecute_SkillsInstallDev_RefusesCheckoutMissingBundle(t *testing.T) {
+	var stdout bytes.Buffer
+	repo := testutil.TempRepo(t) // no skills/ directory written
+	d := fakeSkillsDevDeps(t, &stdout, repo)
+
+	if err := execute([]string{"skills", "install", "--dev"}, d); err == nil {
+		t.Fatal("expected error for checkout missing gx's skill bundle")
+	}
+	manifestPath, _ := d.skillsManifestPath()
+	if _, err := skills.Load(manifestPath); err == nil {
+		t.Error("expected no manifest to be written for a refused dev install")
 	}
 }

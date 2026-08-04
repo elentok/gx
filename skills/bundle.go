@@ -70,3 +70,30 @@ func ExtractBundle(dir string) ([]SourceFile, error) {
 	}
 	return sources, nil
 }
+
+// DevSourceFiles returns a SourceFile per Bundle entry, pointing at root's
+// on-disk skill bundle (its "skills/" directory) instead of the embedded
+// copy - the source `gx skills install --dev` links to, so edits under a
+// contributor's checkout show up immediately.
+//
+// It fails without returning any files if root's skills/ directory is
+// missing any file Bundle embeds, so a checkout that isn't gx's own source
+// tree (or one that's missing files) is refused before any installation
+// change is made.
+func DevSourceFiles(root string) ([]SourceFile, error) {
+	rels, err := BundleFiles()
+	if err != nil {
+		return nil, err
+	}
+
+	bundleDir := filepath.Join(root, "skills")
+	sources := make([]SourceFile, 0, len(rels))
+	for _, rel := range rels {
+		abs := filepath.Join(bundleDir, rel)
+		if _, err := os.Stat(abs); err != nil {
+			return nil, fmt.Errorf("%s doesn't contain gx's skill bundle (missing skills/%s): %w", root, rel, err)
+		}
+		sources = append(sources, SourceFile{RelPath: rel, AbsPath: abs})
+	}
+	return sources, nil
+}

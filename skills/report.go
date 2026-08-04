@@ -36,37 +36,39 @@ func (t Target) RootRelPath() string {
 // classification Install itself performs - so a caller can report what
 // Install would do before, or in place of, actually doing it.
 func Plan(manifestPath string, req InstallRequest) ([]Target, error) {
+	mode := req.effectiveMode()
+
 	prev, err := Load(manifestPath)
 	if err != nil && !errors.Is(err, ErrNotExist) {
 		return nil, fmt.Errorf("load existing manifest: %w", err)
 	}
-	prevHashes := make(map[string]string, len(prev.Files))
+	prevIdentities := make(map[string]string, len(prev.Files))
 	for _, f := range prev.Files {
-		prevHashes[f.Path] = f.Hash
+		prevIdentities[f.Path] = managedIdentity(f)
 	}
 
-	sourceHashes := make(map[string]string, len(req.Files))
+	sourceIdentities := make(map[string]string, len(req.Files))
 	for _, f := range req.Files {
-		h, err := hashFile(f.AbsPath)
+		id, err := sourceFileIdentity(f, mode)
 		if err != nil {
-			return nil, fmt.Errorf("hash source file %s: %w", f.AbsPath, err)
+			return nil, fmt.Errorf("inspect source file %s: %w", f.AbsPath, err)
 		}
-		sourceHashes[f.RelPath] = h
+		sourceIdentities[f.RelPath] = id
 	}
 
 	var targets []Target
 	for _, root := range req.AgentRoots {
 		for _, f := range req.Files {
 			target := filepath.Join(root, f.RelPath)
-			currentHash, err := hashIfExists(target)
+			currentIdentity, err := identityIfExists(target, mode)
 			if err != nil {
 				return nil, fmt.Errorf("inspect %s: %w", target, err)
 			}
-			ownership := Decide(PathHashes{Installed: prevHashes[f.RelPath], Current: currentHash}, ModeManagedCopy)
+			ownership := installOwnership(prevIdentities[f.RelPath], currentIdentity, sourceIdentities[f.RelPath], mode)
 			targets = append(targets, Target{
 				Root:   root,
 				Path:   f.RelPath,
-				Status: installStatus(ownership, sourceHashes[f.RelPath], currentHash, req.Force, f.RelPath),
+				Status: installStatus(ownership, sourceIdentities[f.RelPath], currentIdentity, req.Force, f.RelPath),
 			})
 		}
 	}
@@ -100,11 +102,11 @@ func PlanUninstall(manifestPath string, force ForcePolicy) ([]Target, error) {
 	for _, f := range m.Files {
 		for _, root := range m.AgentRoots {
 			target := filepath.Join(root, f.Path)
-			currentHash, err := hashIfExists(target)
+			currentIdentity, err := identityIfExists(target, m.Mode)
 			if err != nil {
 				return nil, fmt.Errorf("inspect %s: %w", target, err)
 			}
-			ownership := Decide(PathHashes{Installed: f.Hash, Current: currentHash}, m.Mode)
+			ownership := Decide(PathHashes{Installed: managedIdentity(f), Current: currentIdentity}, m.Mode)
 			if ownership == OwnershipAbsent {
 				continue
 			}
