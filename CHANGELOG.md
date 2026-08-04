@@ -4,6 +4,7 @@
 
 - Added a durable execution queue for selecting tickets or epics, automatically including blockers and split children, and running scoped work across multiple epics concurrently while preserving progress across restarts.
 - Added queue pause/resume controls, dependency-aware execution waves, live progress and context metrics, completion summaries, and recovery when returning to the Tickets or Queue tabs.
+- Execution queue concurrency is now configurable with `execution-queue.max-concurrent-tickets-per-epic` and `execution-queue.max-concurrent-epics`.
 - Tickets now use typed YAML frontmatter with validation and atomic sparse updates through the new `gx tickets validate`, `gx tickets set`, and `gx tickets schema` commands; legacy bold-line parsing has been retired.
 - Ticket rows and previews now show live or landed elapsed time, context-window usage, compaction counts, and cherry-pick landing status.
 - Added a Claude/Codex agent picker when launching ticket execution, and improved Codex session attribution so live and landed metrics are recorded correctly.

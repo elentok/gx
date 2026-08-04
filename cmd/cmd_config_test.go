@@ -78,9 +78,26 @@ func TestExecute_ConfigDefaults_PrintsJSON(t *testing.T) {
 	if !strings.Contains(out, "use-nerdfont-icons") {
 		t.Fatalf("expected config key in output, got: %q", out)
 	}
+	if !strings.Contains(out, "max-concurrent-tickets-per-epic") || !strings.Contains(out, "max-concurrent-epics") {
+		t.Fatalf("expected execution queue config keys in output, got: %q", out)
+	}
 	var v map[string]any
 	if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &v); err != nil {
 		t.Fatalf("output is not valid JSON: %v\n%s", err, out)
+	}
+}
+
+func TestSettingsFromConfigIncludesExecutionQueueLimits(t *testing.T) {
+	cfg := config.Default()
+	cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic = 3
+	cfg.ExecutionQueue.MaxConcurrentEpics = 4
+
+	settings := settingsFromConfig(cfg)
+	if got := settings.MaxConcurrentTicketsPerEpic(); got != 3 {
+		t.Fatalf("MaxConcurrentTicketsPerEpic() = %d, want 3", got)
+	}
+	if got := settings.MaxConcurrentEpics(); got != 4 {
+		t.Fatalf("MaxConcurrentEpics() = %d, want 4", got)
 	}
 }
 

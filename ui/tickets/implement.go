@@ -30,11 +30,6 @@ import (
 // "is it still running" first.
 const implementPollInterval = 300 * time.Millisecond
 
-// defaultMaxConcurrentEpics caps how many epics ralphLoopRegistry lets run at
-// once (ticket 03's acceptance criterion) — configurable via newLoopRegistry
-// so tests can exercise a small cap without spinning up that many goroutines.
-const defaultMaxConcurrentEpics = 2
-
 // epicRun is one epic's in-flight ralph-loop state.
 type epicRun struct {
 	drainDone   chan struct{}
@@ -108,7 +103,19 @@ func newLoopRegistry(maxConcurrent int) *loopRegistry {
 	}
 }
 
-var ralphLoopRegistry = newLoopRegistry(defaultMaxConcurrentEpics)
+var ralphLoopRegistry = newLoopRegistry(ui.Settings{}.MaxConcurrentEpics())
+
+// ConfigureMaxConcurrentEpics updates the process-wide execution queue cap.
+// Existing runs are left alone; a lower cap only delays subsequent starts.
+func ConfigureMaxConcurrentEpics(maxConcurrent int) {
+	ralphLoopRegistry.setMaxConcurrent(maxConcurrent)
+}
+
+func (r *loopRegistry) setMaxConcurrent(maxConcurrent int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.maxConcurrent = max(maxConcurrent, 1)
+}
 
 var runRalphLoop = ralphloop.Run
 
@@ -627,7 +634,10 @@ func (m Model) OnPageActivated() tea.Cmd {
 // cmdStartImplement launches the producer while the registry owns the sole
 // event consumer and publishes durable snapshots to presentation models.
 func (m Model) cmdStartImplement(epicName string, agent ralphloop.AgentKind, done, total int) tea.Cmd {
-	return cmdStartImplement(m.worktreeRoot, epicName, agent, done, total, nil)
+	return cmdStartImplement(
+		m.worktreeRoot, epicName, agent, done, total,
+		m.settings.MaxConcurrentTicketsPerEpic(), nil,
+	)
 }
 
 func cmdStartImplement(
@@ -635,6 +645,7 @@ func cmdStartImplement(
 	epicName string,
 	agent ralphloop.AgentKind,
 	done, total int,
+	maxParallel int,
 	ticketIDs []string,
 ) tea.Cmd {
 	return func() tea.Msg {
@@ -642,7 +653,7 @@ func cmdStartImplement(
 		if !ok {
 			return implementFailedMsg{err: fmt.Errorf("a ralph-loop is already running")}
 		}
-		opts, err := buildImplementRunOptionsForTickets(worktreeRoot, epicName, agent, ticketIDs)
+		opts, err := buildImplementRunOptionsForTickets(worktreeRoot, epicName, agent, maxParallel, ticketIDs)
 		if err != nil {
 			ralphLoopRegistry.finish(epicName, err)
 			return implementFailedMsg{err: err}
@@ -665,12 +676,16 @@ func cmdPollImplement(epicName string) tea.Cmd {
 }
 
 func buildImplementRunOptions(worktreeRoot, epicName string, agent ralphloop.AgentKind) (ralphloop.RunOptions, error) {
-	return buildImplementRunOptionsForTickets(worktreeRoot, epicName, agent, nil)
+	return buildImplementRunOptionsForTickets(
+		worktreeRoot, epicName, agent,
+		ui.Settings{}.MaxConcurrentTicketsPerEpic(), nil,
+	)
 }
 
 func buildImplementRunOptionsForTickets(
 	worktreeRoot, epicName string,
 	agent ralphloop.AgentKind,
+	maxParallel int,
 	ticketIDs []string,
 ) (ralphloop.RunOptions, error) {
 	repo, err := git.FindRepo(worktreeRoot)
@@ -683,7 +698,7 @@ func buildImplementRunOptionsForTickets(
 		Skill:       "implement",
 		RepoDir:     repo.Root,
 		ScratchDir:  filepath.Join(worktreeRoot, ".scratch"),
-		MaxParallel: queuePlanMaxParallel,
+		MaxParallel: max(maxParallel, 1),
 		SmartZone:   150_000,
 		TicketIDs:   ticketIDs,
 	}, nil

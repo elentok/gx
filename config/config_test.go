@@ -40,6 +40,60 @@ func TestLoadMissingUsesDefaults(t *testing.T) {
 	if cfg.StageDiffContextLines != 1 {
 		t.Fatalf("StageDiffContextLines = %d, want 1", cfg.StageDiffContextLines)
 	}
+	if cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic != 2 || cfg.ExecutionQueue.MaxConcurrentEpics != 2 {
+		t.Fatalf("ExecutionQueue = %+v, want both limits to default to 2", cfg.ExecutionQueue)
+	}
+}
+
+func TestLoadExecutionQueueConfigPreservesUnspecifiedDefault(t *testing.T) {
+	tmp := t.TempDir()
+	prev := userConfigDirFn
+	userConfigDirFn = func() (string, error) { return tmp, nil }
+	t.Cleanup(func() { userConfigDirFn = prev })
+
+	dir := filepath.Join(tmp, "gx")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	path := filepath.Join(dir, "config.json")
+	if err := os.WriteFile(path, []byte(`{"execution-queue":{"max-concurrent-tickets-per-epic":4}}`), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic != 4 {
+		t.Fatalf("MaxConcurrentTicketsPerEpic = %d, want 4", cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic)
+	}
+	if cfg.ExecutionQueue.MaxConcurrentEpics != 2 {
+		t.Fatalf("MaxConcurrentEpics = %d, want default 2", cfg.ExecutionQueue.MaxConcurrentEpics)
+	}
+}
+
+func TestLoadExecutionQueueConfigClampsLimitsToOne(t *testing.T) {
+	tmp := t.TempDir()
+	prev := userConfigDirFn
+	userConfigDirFn = func() (string, error) { return tmp, nil }
+	t.Cleanup(func() { userConfigDirFn = prev })
+
+	dir := filepath.Join(tmp, "gx")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	path := filepath.Join(dir, "config.json")
+	if err := os.WriteFile(path, []byte(`{"execution-queue":{"max-concurrent-tickets-per-epic":0,"max-concurrent-epics":-3}}`), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic != 1 || cfg.ExecutionQueue.MaxConcurrentEpics != 1 {
+		t.Fatalf("ExecutionQueue = %+v, want both limits clamped to 1", cfg.ExecutionQueue)
+	}
 }
 
 func TestLoadParsesUseNerdFontIcons(t *testing.T) {

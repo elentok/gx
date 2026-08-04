@@ -13,13 +13,14 @@ const SchemaURL = "https://raw.githubusercontent.com/elentok/gx/main/docs/config
 
 // Config is gx's user configuration.
 type Config struct {
-	Schema                string            `json:"$schema,omitempty"`
-	UseNerdFontIcons      bool              `json:"use-nerdfont-icons"`
-	ImageDiffs            bool              `json:"image-diffs"`
-	StageDiffContextLines int               `json:"stage-diff-context-lines"`
-	InputModalBottom      InputModalBottom  `json:"input-modal-bottom"`
-	NameAliases           map[string]string `json:"name-aliases,omitempty"`
-	Log                   LogConfig         `json:"log,omitempty"`
+	Schema                string               `json:"$schema,omitempty"`
+	UseNerdFontIcons      bool                 `json:"use-nerdfont-icons"`
+	ImageDiffs            bool                 `json:"image-diffs"`
+	StageDiffContextLines int                  `json:"stage-diff-context-lines"`
+	InputModalBottom      InputModalBottom     `json:"input-modal-bottom"`
+	NameAliases           map[string]string    `json:"name-aliases,omitempty"`
+	Log                   LogConfig            `json:"log,omitempty"`
+	ExecutionQueue        ExecutionQueueConfig `json:"execution-queue"`
 }
 
 // Default returns the default configuration.
@@ -30,6 +31,7 @@ func Default() Config {
 		StageDiffContextLines: 1,
 		InputModalBottom:      DefaultInputModalBottom(),
 		Log:                   DefaultLogConfig(),
+		ExecutionQueue:        DefaultExecutionQueueConfig(),
 	}
 }
 
@@ -65,6 +67,10 @@ func Load() (Config, error) {
 		InputModalBottom      *InputModalBottom `json:"input-modal-bottom"`
 		NameAliases           map[string]string `json:"name-aliases"`
 		Log                   *LogConfig        `json:"log"`
+		ExecutionQueue        *struct {
+			MaxConcurrentTicketsPerEpic *int `json:"max-concurrent-tickets-per-epic"`
+			MaxConcurrentEpics          *int `json:"max-concurrent-epics"`
+		} `json:"execution-queue"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return cfg, fmt.Errorf("parse config %s: %w", path, err)
@@ -93,6 +99,14 @@ func Load() (Config, error) {
 		}
 		if raw.Log.HideRefs != nil {
 			cfg.Log.HideRefs = raw.Log.HideRefs
+		}
+	}
+	if raw.ExecutionQueue != nil {
+		if raw.ExecutionQueue.MaxConcurrentTicketsPerEpic != nil {
+			cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic = clampExecutionQueueLimit(*raw.ExecutionQueue.MaxConcurrentTicketsPerEpic)
+		}
+		if raw.ExecutionQueue.MaxConcurrentEpics != nil {
+			cfg.ExecutionQueue.MaxConcurrentEpics = clampExecutionQueueLimit(*raw.ExecutionQueue.MaxConcurrentEpics)
 		}
 	}
 

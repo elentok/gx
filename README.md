@@ -241,6 +241,8 @@ Optional config file at `~/.config/gx/config.json` (run `gx config edit` to open
 | `stage-diff-context-lines` | integer (0–20)                  | `1`       | Number of context lines shown around each diff hunk in the staging view.                                                                                                                     |
 | `input-modal-bottom`       | integer \| `"N%"` \| `"center"` | `"5%"`    | Vertical position of text-input overlays. An integer is a fixed line count from the bottom; a percentage string (e.g. `"10%"`) is relative to screen height; `"center"` centers the overlay. |
 | `name-aliases`             | object                          | `{}`      | Map of exact worktree full-names to display aliases, applied before the normal dash-segment compression.                                                                                     |
+| `execution-queue.max-concurrent-tickets-per-epic` | integer (≥1) | `2` | Maximum tickets that may run concurrently within one epic. |
+| `execution-queue.max-concurrent-epics` | integer (≥1) | `2` | Maximum epics that may run concurrently in this `gx` process. |
 | `log.important-refs`       | array                           | see below | Rules for highlighting important refs in the log view. Refs matching a rule get a bright colored badge and are sorted to the front; all others get a dim surface badge.                      |
 | `log.hide-refs`            | array of strings                | `[]`      | Regular expressions matched against full ref names. Matching refs are hidden from the log view entirely. Takes priority over `important-refs`.                                               |
 
@@ -272,6 +274,10 @@ Example config:
   "$schema": "https://raw.githubusercontent.com/elentok/gx/main/docs/config-schema.json",
   "use-nerdfont-icons": true,
   "stage-diff-context-lines": 3,
+  "execution-queue": {
+    "max-concurrent-tickets-per-epic": 2,
+    "max-concurrent-epics": 2
+  },
   "log": {
     "important-refs": [
       {

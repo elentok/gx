@@ -54,6 +54,29 @@
       },
       "default": {}
     },
+    "execution-queue": {
+      "type": "object",
+      "description": "Execution queue concurrency limits.",
+      "additionalProperties": false,
+      "properties": {
+        "max-concurrent-tickets-per-epic": {
+          "type": "integer",
+          "description": "Maximum tickets that may run concurrently within one epic. Default: 2.",
+          "minimum": 1,
+          "default": 2
+        },
+        "max-concurrent-epics": {
+          "type": "integer",
+          "description": "Maximum epics that may run concurrently in this gx process. Default: 2.",
+          "minimum": 1,
+          "default": 2
+        }
+      },
+      "default": {
+        "max-concurrent-tickets-per-epic": 2,
+        "max-concurrent-epics": 2
+      }
+    },
     "log": {
       "type": "object",
       "description": "Log view display settings.",

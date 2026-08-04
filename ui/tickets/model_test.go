@@ -36,6 +36,17 @@ func TestBuildImplementRunOptionsUsesSelectedAgent(t *testing.T) {
 	}
 }
 
+func TestBuildImplementRunOptionsUsesConfiguredTicketConcurrency(t *testing.T) {
+	root := testutil.TempRepo(t)
+	opts, err := buildImplementRunOptionsForTickets(root, "my-epic", ralphloop.AgentCodex, 5, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opts.MaxParallel != 5 {
+		t.Fatalf("MaxParallel = %d, want 5", opts.MaxParallel)
+	}
+}
+
 func TestNewModel_RendersEmptyStateWithNoScratchDir(t *testing.T) {
 	m := NewModel(t.TempDir(), ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)

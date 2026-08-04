@@ -39,6 +39,21 @@ func TestRunSnapshotsAreDeterministicAndIndependent(t *testing.T) {
 	}
 }
 
+func TestLoopRegistryConcurrencyCanBeReconfigured(t *testing.T) {
+	r := newLoopRegistry(2)
+	if _, ok := r.tryStart("epic-a", 0, 1); !ok {
+		t.Fatal("starting epic-a: want success")
+	}
+	r.setMaxConcurrent(1)
+	if _, ok := r.tryStart("epic-b", 0, 1); ok {
+		t.Fatal("starting epic-b above reconfigured cap: want rejection")
+	}
+	r.setMaxConcurrent(3)
+	if _, ok := r.tryStart("epic-b", 0, 1); !ok {
+		t.Fatal("starting epic-b after raising cap: want success")
+	}
+}
+
 func TestReduceLiveEventCapturesProgressContextAndPause(t *testing.T) {
 	r := newLoopRegistry(1)
 	r.tryStart("epic-a", 1, 3)

@@ -19,9 +19,6 @@ import (
 	"github.com/elentok/gx/ui/notify"
 )
 
-// Keep plan waves aligned with the concurrency used when the plan executes.
-const queuePlanMaxParallel = 2
-
 const queueBanner = "This is the execution plan, press Enter to start"
 
 // QueueModel renders a checked selection as dependency-aware epic waves.
@@ -523,7 +520,8 @@ func (m *QueueModel) startAvailableEpics() tea.Cmd {
 	cmds := make([]tea.Cmd, 0, count)
 	for _, plan := range m.pendingEpics[:count] {
 		cmds = append(cmds, cmdStartImplement(
-			m.worktreeRoot, plan.epic.Name, m.runningAgent, plan.done, len(plan.ticketIDs), plan.ticketIDs,
+			m.worktreeRoot, plan.epic.Name, m.runningAgent, plan.done, len(plan.ticketIDs),
+			m.settings.MaxConcurrentTicketsPerEpic(), plan.ticketIDs,
 		))
 	}
 	m.pendingEpics = m.pendingEpics[count:]
@@ -643,7 +641,7 @@ func (m QueueModel) rowsAndPlanErrors() ([]queueRow, map[string]error) {
 	var out []queueRow
 	planErrs := make(map[string]error)
 	for _, epic := range m.epics {
-		if _, err := epicWaves(epic, m.candidates, queuePlanMaxParallel); err != nil {
+		if _, err := epicWaves(epic, m.candidates, m.settings.MaxConcurrentTicketsPerEpic()); err != nil {
 			planErrs[epic.Name] = err
 		}
 		for _, idx := range sortedTicketIndexes(epic) {

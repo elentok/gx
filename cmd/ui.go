@@ -303,6 +303,7 @@ func settingsFromConfig(cfg config.Config) ui.Settings {
 		DiffContextLines: cfg.StageDiffContextLines,
 		NameAliases:      cfg.NameAliases,
 		LogConfig:        cfg.Log,
+		ExecutionQueue:   cfg.ExecutionQueue,
 	}
 }
 
