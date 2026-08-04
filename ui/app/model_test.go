@@ -45,6 +45,38 @@ func (s *inputFocusedStub) Update(tea.Msg) (tea.Model, tea.Cmd) { return s, nil 
 func (s *inputFocusedStub) View() tea.View                      { return tea.NewView("stub") }
 func (s *inputFocusedStub) InputFocused() bool                  { return true }
 
+// TestTicketsSearchDigitTypesIntoQueryNotTabSwitch covers ticket 14's fix:
+// once "/" opens the Tickets tab's search box, a digit key must type into
+// the query rather than being intercepted by the shell's digit-based
+// tab-jump mnemonics (handleShellChordKey) before it ever reaches the tab.
+func TestTicketsSearchDigitTypesIntoQueryNotTabSwitch(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabTickets, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '1', Text: "1"})
+	m = updated.(Model)
+
+	if m.navState.ActiveTab() != nav.TabTickets {
+		t.Fatalf("expected tab to stay on tickets when search input is active, got %q", m.navState.ActiveTab())
+	}
+	content := ansi.Strip(m.View().Content)
+	if !strings.Contains(content, "Search") || !strings.Contains(content, "1") {
+		t.Fatalf("expected the digit to be typed into the open search query, got:\n%s", content)
+	}
+}
+
 // lifecycleSpy records OnPageActivated / OnPageDeactivated call counts.
 type lifecycleSpy struct {
 	activated   int

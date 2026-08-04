@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/search"
 )
 
 func TestQueueModelRendersFlatDependencyOrderedEpicPlan(t *testing.T) {
@@ -914,7 +915,7 @@ func TestRenderQueueTicketRow_CommitlessSuffix(t *testing.T) {
 		{Identifier: "01", Title: "Open ticket", Status: "open", Commitless: true},
 	}}
 
-	lines := m.renderQueueTicketRow(epic, epic.Tickets[0])
+	lines := m.renderQueueTicketRow(epic, epic.Tickets[0], 0)
 	if !strings.Contains(lines[0], "Open ticket (commitless)") {
 		t.Fatalf("title line = %q, want title followed by \" (commitless)\"", lines[0])
 	}
@@ -926,7 +927,7 @@ func TestRenderQueueTicketRow_DoneMetricsLineMatchesTitleColor(t *testing.T) {
 		{Identifier: "01", Title: "Done ticket", Status: "done", ElapsedTime: 5, ActualContextWindow: 100},
 	}}
 
-	lines := m.renderQueueTicketRow(epic, epic.Tickets[0])
+	lines := m.renderQueueTicketRow(epic, epic.Tickets[0], 0)
 	wantMetrics := renderRowMetricsLine(formatMetricsLine(5, 100), statusDoneStyle)
 	if lines[1] != wantMetrics {
 		t.Fatalf("metrics line = %q, want %q", lines[1], wantMetrics)
@@ -1003,5 +1004,122 @@ func writeRawQueueTicket(t *testing.T, root, epic, name, content string) {
 	t.Helper()
 	if err := os.WriteFile(ticketPath(root, epic, name), []byte(content), 0644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestQueueSearch_SlashEntersInputMode(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	m = updated.(QueueModel)
+
+	if m.search.Mode() != search.SearchModeInput {
+		t.Fatalf("expected search input mode after '/', got mode=%v", m.search.Mode())
+	}
+}
+
+func TestQueueSearch_TypedCharactersFilterAndHighlight(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "01-first.md"):  true,
+		ticketPath(root, "alpha", "02-second.md"): true,
+	}
+
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+
+	for _, r := range "/first" {
+		updated, _ := m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
+		m = updated.(QueueModel)
+	}
+
+	if m.search.MatchesCount() != 1 {
+		t.Fatalf("expected exactly one match for %q, got %d", "first", m.search.MatchesCount())
+	}
+
+	dimPrefix := strings.SplitN(ui.StyleDim.Render("PROBE"), "PROBE", 2)[0]
+	rows := m.rows()
+	matchedLine := m.renderQueueTicketRow(rows[0].epic, rows[0].ticket, 0)[0]
+	nonMatchedLine := m.renderQueueTicketRow(rows[1].epic, rows[1].ticket, 1)[0]
+	if strings.Contains(matchedLine, dimPrefix) {
+		t.Fatalf("expected matching row undimmed, got: %q", matchedLine)
+	}
+	if !strings.Contains(nonMatchedLine, dimPrefix) {
+		t.Fatalf("expected non-matching row dimmed while searching, got: %q", nonMatchedLine)
+	}
+}
+
+func TestQueueSearch_EscExitsSearchMode(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	m = updated.(QueueModel)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
+	m = updated.(QueueModel)
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	m = updated.(QueueModel)
+
+	if m.search.Mode() != search.SearchModeNone {
+		t.Fatalf("expected esc to fully clear search mode, got %v", m.search.Mode())
+	}
+	if m.search.HasQuery() {
+		t.Fatalf("expected esc to clear the query")
+	}
+}
+
+func TestQueueSearch_EnterExitsInputButKeepsResults(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+
+	for _, r := range "/first" {
+		updated, _ := m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
+		m = updated.(QueueModel)
+	}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(QueueModel)
+
+	if m.search.Mode() == search.SearchModeInput {
+		t.Fatalf("expected enter to leave input mode")
+	}
+	if m.search.MatchesCount() == 0 {
+		t.Fatalf("expected matches to persist after enter")
+	}
+}
+
+// TestQueueSearch_DigitsTypeIntoQueryNotBoundKeys covers this Queue tab's
+// digit-routing counterpart to the Tickets tab fix (ticket 14): while search
+// input is active, digit keys must type into the query rather than falling
+// through to any of handleQueueKey's own bindings.
+func TestQueueSearch_DigitsTypeIntoQueryNotBoundKeys(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	m = updated.(QueueModel)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '1', Text: "1"})
+	m = updated.(QueueModel)
+
+	if m.search.Query() != "1" {
+		t.Fatalf("expected digit to type into the search query, got query=%q", m.search.Query())
+	}
+	if !m.InputFocused() {
+		t.Fatalf("expected InputFocused()=true while search input is active")
 	}
 }

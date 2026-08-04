@@ -154,6 +154,14 @@ func NewModelWithScopeAndStore(worktreeRoot string, settings ui.Settings, extraK
 
 func (m Model) KeyManager() keys.Manager { return m.keys }
 
+// InputFocused reports whether either search box is mid-input, so the app
+// shell's digit-based tab-jump mnemonics (see ui/app's inputFocuser
+// duck-type) stay routed to the search query instead of switching tabs.
+func (m Model) InputFocused() bool {
+	_, ok := m.activeInputSearch()
+	return ok
+}
+
 // ModalOpen reports whether one of the tab's launch dialogs is open, so the app
 // shell (see ui/app's modalOpener duck-type) blocks tab-switch keys and
 // routes them here instead while it's up.

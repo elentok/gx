@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
@@ -18,6 +19,7 @@ import (
 	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/search"
 )
 
 const queueBanner = "This is the execution plan, press Enter to start"
@@ -88,6 +90,10 @@ type QueueModel struct {
 	runningAgent           ralphloop.AgentKind
 	paused                 bool
 
+	// search backs "/"-triggered filtering over rows(), mirroring the Tickets
+	// tab's own m.search (see ui/tickets/search.go).
+	search search.Model
+
 	// confirm backs the "C"/"c" clear keymaps and the "x" cascade-delete keymap
 	// (handleQueueKey) — the Queue tab is read-only for selection (ticket 08),
 	// so this is the only modal this tab opens outside the agent-picker menu.
@@ -120,6 +126,7 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 		runningEpics:       map[string]bool{},
 		paused:             ralphLoopRegistry.isPaused(),
 		confirm:            confirm.New(),
+		search:             search.NewModel(),
 	}
 }
 
@@ -133,6 +140,13 @@ func NewQueueModelWithStore(worktreeRoot string, settings ui.Settings, store *Qu
 
 func (m QueueModel) Init() tea.Cmd {
 	return m.cmdLoadQueue()
+}
+
+// InputFocused reports whether the search box is mid-input, so the app
+// shell's digit-based tab-jump mnemonics (see ui/app's inputFocuser
+// duck-type) stay routed to the search query instead of switching tabs.
+func (m QueueModel) InputFocused() bool {
+	return m.search.Mode() == search.SearchModeInput
 }
 
 type queueEpicsLoadedMsg struct {
@@ -168,6 +182,9 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.candidates = make(map[string]bool, len(m.checked))
 		for path := range m.checked {
 			m.candidates[path] = true
+		}
+		if m.search.HasQuery() {
+			m.recomputeQueueSearchMatches()
 		}
 		m.clampSelected()
 		return m, nil
@@ -207,6 +224,16 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		if m.confirm.IsOpen {
 			return m.handleQueueConfirmUpdate(msg)
+		}
+		if nextSearch, cmd, result := m.search.Update(msg); result.Handled {
+			m.search = nextSearch
+			if result.QueryChanged {
+				m.recomputeQueueSearchMatches()
+			}
+			if result.QueryChanged || result.CursorChanged {
+				m.jumpToCurrentQueueMatch()
+			}
+			return m, cmd
 		}
 		return m.handleQueueKey(msg)
 	case tea.MouseClickMsg:
@@ -601,6 +628,50 @@ func (m *QueueModel) startAvailableEpics() tea.Cmd {
 	}
 }
 
+// recomputeQueueSearchMatches rebuilds the match set against the current
+// rows() order: case-insensitive substring over each ticket's title,
+// mirroring the Tickets tab's recomputeSearchMatches (search.go).
+func (m *QueueModel) recomputeQueueSearchMatches() {
+	q := strings.ToLower(strings.TrimSpace(m.search.Query()))
+	if q == "" {
+		m.search.SetMatches(nil)
+		return
+	}
+
+	rows := m.rows()
+	matches := make([]search.Match, 0)
+	for i, r := range rows {
+		if strings.Contains(strings.ToLower(r.ticket.Title), q) {
+			matches = append(matches, search.Match{DataIndex: i})
+		}
+	}
+	m.search.SetMatches(matches)
+}
+
+// jumpToCurrentQueueMatch moves the selection to the search cursor's current
+// match, mirroring the Tickets tab's jumpToCurrentMatch (search.go).
+func (m *QueueModel) jumpToCurrentQueueMatch() {
+	match, ok := m.search.Match(m.search.Cursor())
+	if !ok {
+		return
+	}
+	rows := m.rows()
+	if match.DataIndex >= 0 && match.DataIndex < len(rows) {
+		m.selected = match.DataIndex
+		m.ensureQueueVisible()
+	}
+}
+
+// queueSearchMatch reports whether the row at idx is a search match, and
+// whether it's the match currently under the search cursor (n/N target).
+func (m QueueModel) queueSearchMatch(idx int) (matched, current bool) {
+	pos, ok := m.search.MatchPosByDataIndex(idx)
+	if !ok {
+		return false, false
+	}
+	return true, pos == m.search.Cursor()
+}
+
 func (m *QueueModel) moveSelection(delta int) {
 	rows := m.rows()
 	if len(rows) == 0 {
@@ -833,7 +904,23 @@ func (m QueueModel) View() tea.View {
 	if m.confirm.IsOpen {
 		content = ui.OverlayCenter(content, m.confirm.View(m.width), m.width, m.height)
 	}
+	if m.search.Mode() == search.SearchModeInput {
+		overlayW := m.searchOverlayWidth()
+		activeSearch := m.search
+		activeSearch.SetWidth(overlayW)
+		overlay := activeSearch.View()
+		y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
+		content = ui.OverlayBottomCenter(content, overlay, m.width, y)
+	}
 	return ui.NewMainView(content)
+}
+
+func (m QueueModel) searchOverlayWidth() int {
+	max := m.width * 80 / 100
+	if search.DESIRED_WIDTH < max {
+		return search.DESIRED_WIDTH
+	}
+	return max
 }
 
 // queueVisibleLines windows queueLines() to a single viewportH-line scroll
@@ -978,7 +1065,7 @@ func (m QueueModel) buildQueueLines() (lines []string, offsets []int, heights []
 			}
 		}
 		offsets = append(offsets, len(lines))
-		rowLines := m.renderQueueTicketRow(r.epic, r.ticket)
+		rowLines := m.renderQueueTicketRow(r.epic, r.ticket, i)
 		if i == m.selected {
 			for li, line := range rowLines {
 				rowLines[li] = ui.RenderRowHighlight(line)
@@ -1070,7 +1157,7 @@ func epicContextMetrics(epic tickets.Epic) (avg, maximum, compacts int) {
 // currently running, and two for a live or done ticket — the same two-line
 // status presentation as the Tickets tab's renderTicketRow (view.go), so the
 // Queue tab shows identical per-ticket status (ticket 25).
-func (m QueueModel) renderQueueTicketRow(epic tickets.Epic, t tickets.Ticket) []string {
+func (m QueueModel) renderQueueTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) []string {
 	status := epic.RenderedStatus(t)
 
 	if status != tickets.StatusSuperseded && m.runningEpics[epic.Name] {
@@ -1083,18 +1170,33 @@ func (m QueueModel) renderQueueTicketRow(epic tickets.Epic, t tickets.Ticket) []
 	}
 
 	icon, style := statusIconAndStyle(m.icons(), status)
+
+	matched, current := m.queueSearchMatch(rowIdx)
+	searchDim := m.search.HasQuery() && !matched
+
 	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
 	if t.Commitless {
 		title += " (commitless)"
 	}
 	titleStyle := lipgloss.NewStyle()
-	if status == tickets.StatusDone || status == tickets.StatusSuperseded {
+	if matched {
+		title = search.Highlight(title, m.search.Query(), current)
+	} else if status == tickets.StatusDone || status == tickets.StatusSuperseded {
 		titleStyle = statusDoneStyle
+	} else if searchDim {
+		titleStyle = ui.StyleDim
+	}
+	if searchDim {
+		style = ui.StyleDim
 	}
 
 	line := "  " + style.Render(icon) + " " + titleStyle.Render(title)
 	if suffix := blockedBySuffix(epic, t, status); suffix != "" {
-		line += " " + blockedBySuffixStyle.Render(suffix)
+		suffixStyle := blockedBySuffixStyle
+		if searchDim {
+			suffixStyle = ui.StyleDim
+		}
+		line += " " + suffixStyle.Render(suffix)
 	}
 	if status != tickets.StatusDone {
 		return []string{line}
