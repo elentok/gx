@@ -16,6 +16,11 @@ var (
 	ColorDeepBg   = lipgloss.Color("#11111a")
 	ColorText     = lipgloss.Color("#cdd6f4")
 	ColorSubtle   = lipgloss.Color("#a6adc8")
+	// ColorSubtleLight is a higher-contrast alternative to ColorSubtle for
+	// dim/muted text that needs to stay readable on both light and dark
+	// terminal themes (ticket 02) — lighter/less desaturated than ColorSubtle
+	// while still reading as secondary next to ColorText.
+	ColorSubtleLight = lipgloss.Color("#bac2de")
 	ColorOverlay  = lipgloss.Color("#6c7086")
 	ColorBlue     = lipgloss.Color("#89b4fa")
 	ColorGreen    = lipgloss.Color("#a6e3a1")

@@ -863,13 +863,16 @@ func (m QueueModel) renderQueueTicketRow(epic tickets.Epic, t tickets.Ticket) []
 		if live, ok := m.live[epic.Name][t.Identifier]; ok {
 			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live); ok {
 				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens)
-				return []string{"  " + base, renderRowMetricsLine(joinNonEmpty(" ", suffix, metrics))}
+				return []string{"  " + base, renderRowMetricsLine(joinNonEmpty(" ", suffix, metrics), metricsLineStyle)}
 			}
 		}
 	}
 
 	icon, style := statusIconAndStyle(m.icons(), status)
 	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
+	if t.Commitless {
+		title += " (commitless)"
+	}
 	titleStyle := lipgloss.NewStyle()
 	if status == tickets.StatusDone || status == tickets.StatusSuperseded {
 		titleStyle = statusDoneStyle
@@ -883,7 +886,7 @@ func (m QueueModel) renderQueueTicketRow(epic tickets.Epic, t tickets.Ticket) []
 		return []string{line}
 	}
 	metrics := formatMetricsLine(t.ElapsedTime, t.ActualContextWindow)
-	return []string{line, renderRowMetricsLine(metrics)}
+	return []string{line, renderRowMetricsLine(metrics, style)}
 }
 
 func (m QueueModel) icons() ui.IconSet {

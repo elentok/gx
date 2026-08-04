@@ -13,9 +13,11 @@ import (
 // regardless of icon glyph.
 const metricsLineIndent = "    "
 
-// metricsLineStyle renders a row's second line dim+italic, distinguishing it
-// from the title line above it.
-var metricsLineStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Italic(true)
+// metricsLineStyle renders a live row's second line dim+italic, distinguishing
+// it from the title line above it. Disk-status rows instead color their
+// second line to match the first line's status style (ticket 02) — see
+// renderRowMetricsLine.
+var metricsLineStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtleLight).Italic(true)
 
 // formatTokenCount abbreviates tokens for a row's metrics line: plain below
 // 1000, "45.2k tok" below 1,000,000, "1.2M tok" at or above.
@@ -72,16 +74,17 @@ func joinNonEmpty(sep, a, b string) string {
 }
 
 // renderMetricsLine renders text (a row's line-2 content, already composed
-// from whatever suffix/reason/figures apply) indented and styled under its
-// title line.
-func renderMetricsLine(text string) string {
-	return metricsLineIndent + metricsLineStyle.Render(text)
+// from whatever suffix/reason/figures apply) indented and italicized under
+// its title line, in style's foreground — the same status style as the row's
+// first-line icon/text, so the two lines read as one visual unit (ticket 02).
+func renderMetricsLine(text string, style lipgloss.Style) string {
+	return metricsLineIndent + style.Italic(true).Render(text)
 }
 
 // renderRowMetricsLine indents text two columns deeper than renderMetricsLine
 // alone, aligning a row's line-2 under its title text after the "  " + icon
 // lead-in — shared by the Tickets tab's tree rows (Model.renderTicketRow) and
 // the Queue tab's flat rows (renderQueueTicketRow) so both read identically.
-func renderRowMetricsLine(text string) string {
-	return "  " + renderMetricsLine(text)
+func renderRowMetricsLine(text string, style lipgloss.Style) string {
+	return "  " + renderMetricsLine(text, style)
 }

@@ -12,11 +12,14 @@ import (
 )
 
 var (
-	statusOpenStyle           = lipgloss.NewStyle().Foreground(ui.ColorGreen)
-	statusClaimedStyle        = lipgloss.NewStyle().Foreground(ui.ColorBlue)
+	// statusOpenStyle deliberately has no Foreground override (ticket 02):
+	// open is the default/no-signal state, so it renders in the terminal's
+	// own default foreground rather than drawing the eye with a color.
+	statusOpenStyle           = lipgloss.NewStyle()
+	statusClaimedStyle        = lipgloss.NewStyle().Foreground(ui.ColorOrange)
 	statusBlockedStyle        = lipgloss.NewStyle().Foreground(ui.ColorRed)
 	statusNeedsInfoStyle      = lipgloss.NewStyle().Foreground(ui.ColorYellow)
-	statusNeedsAttentionStyle = lipgloss.NewStyle().Foreground(ui.ColorOrange)
+	statusNeedsAttentionStyle = lipgloss.NewStyle().Foreground(ui.ColorRed)
 	// statusDoneStyle is deliberately dimmer than ui.StyleDim/StyleMuted
 	// (used elsewhere for transient states like search-fade or loading
 	// text): "done" is a permanent, low-priority state that should read as
@@ -30,7 +33,7 @@ var (
 	// status color above.
 	statusPausedStyle = lipgloss.NewStyle().Foreground(ui.ColorMauve)
 
-	blockedBySuffixStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Italic(true)
+	blockedBySuffixStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtleLight).Italic(true)
 
 	sectionHeaderStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
 
@@ -175,7 +178,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) 
 		if live, ok := m.live[epic.Name][t.Identifier]; ok {
 			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live); ok {
 				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens)
-				return []string{"  " + base, m.renderTicketMetricsLine(joinNonEmpty(" ", suffix, metrics), false)}
+				return []string{"  " + base, m.renderTicketMetricsLine(joinNonEmpty(" ", suffix, metrics), metricsLineStyle, false)}
 			}
 		}
 	}
@@ -187,6 +190,9 @@ func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) 
 	doneDim := status == tickets.StatusDone || status == tickets.StatusSuperseded
 
 	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
+	if t.Commitless {
+		title += " (commitless)"
+	}
 	titleStyle := lipgloss.NewStyle()
 	if matched {
 		title = search.Highlight(title, m.search.Query(), current)
@@ -211,16 +217,18 @@ func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) 
 		return []string{line}
 	}
 	metrics := formatMetricsLine(t.ElapsedTime, t.ActualContextWindow)
-	return []string{line, m.renderTicketMetricsLine(metrics, searchDim)}
+	return []string{line, m.renderTicketMetricsLine(metrics, style, searchDim)}
 }
 
 // renderTicketMetricsLine aligns a ticket's second line beneath its title in
-// the tree (two spaces deeper than the flat view's metrics indentation).
-func (m Model) renderTicketMetricsLine(text string, searchDim bool) string {
+// the tree (two spaces deeper than the flat view's metrics indentation),
+// colored to match style — the same status style used for the row's first
+// line (ticket 02) — unless search-dimmed.
+func (m Model) renderTicketMetricsLine(text string, style lipgloss.Style, searchDim bool) string {
 	if searchDim {
 		return "      " + ui.StyleDim.Render(text)
 	}
-	return renderRowMetricsLine(text)
+	return renderRowMetricsLine(text, style)
 }
 
 // checkboxGlyph renders the execution-queue checkbox marker for a checked or

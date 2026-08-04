@@ -14,6 +14,7 @@ import (
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 )
@@ -837,6 +838,31 @@ func TestQueueModelShowsSameTwoLineStatusAsTicketsTab(t *testing.T) {
 	}
 	if !strings.Contains(content, "12.0k tok") || !strings.Contains(content, "12m34s") {
 		t.Fatalf("expected the done ticket's elapsed/tokens metrics line:\n%s", content)
+	}
+}
+
+func TestRenderQueueTicketRow_CommitlessSuffix(t *testing.T) {
+	var m QueueModel
+	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
+		{Identifier: "01", Title: "Open ticket", Status: "open", Commitless: true},
+	}}
+
+	lines := m.renderQueueTicketRow(epic, epic.Tickets[0])
+	if !strings.Contains(lines[0], "Open ticket (commitless)") {
+		t.Fatalf("title line = %q, want title followed by \" (commitless)\"", lines[0])
+	}
+}
+
+func TestRenderQueueTicketRow_DoneMetricsLineMatchesTitleColor(t *testing.T) {
+	var m QueueModel
+	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
+		{Identifier: "01", Title: "Done ticket", Status: "done", ElapsedTime: 5, ActualContextWindow: 100},
+	}}
+
+	lines := m.renderQueueTicketRow(epic, epic.Tickets[0])
+	wantMetrics := renderRowMetricsLine(formatMetricsLine(5, 100), statusDoneStyle)
+	if lines[1] != wantMetrics {
+		t.Fatalf("metrics line = %q, want %q", lines[1], wantMetrics)
 	}
 }
 
