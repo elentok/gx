@@ -23,6 +23,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.quitConfirm = next
 			return m, tea.Batch(notifyCmd, cmd)
 		}
+		if click, ok := msg.(tea.MouseClickMsg); ok {
+			next, cmd, _ := m.quitConfirm.UpdateMouse(click, m.width, m.width, m.height)
+			m.quitConfirm = next
+			return m, tea.Batch(notifyCmd, cmd)
+		}
 		return m, notifyCmd
 	}
 

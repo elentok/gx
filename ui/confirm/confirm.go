@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/ui/notify"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // Options configures a confirm modal.
@@ -60,23 +61,53 @@ func (m Model) Open(opts Options) Model {
 	return m
 }
 
-// Update handles key events while the modal is open.
+// Update handles key and mouse-click events while the modal is open.
 // Returns the updated model, a command to run, and a Result.
+//
+// Mouse clicks are hit-tested in the modal's own coordinate frame, i.e. the
+// same frame View() renders into (row/col 0 = the modal's top-left corner).
+// Callers placing the modal on screen via ui.OverlayCenter must translate an
+// absolute mouse position into that frame first - see UpdateMouse.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, Result) {
-	keyMsg, ok := msg.(tea.KeyPressMsg)
-	if !ok {
-		return m, nil, Result{}
-	}
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		nextYes, decided, accepted, handled := components.UpdateConfirm(msg, m.yes)
+		if !handled {
+			return m, nil, Result{}
+		}
+		m.yes = nextYes
+		if !decided {
+			return m, nil, Result{}
+		}
+		return m.decide(accepted)
 
-	nextYes, decided, accepted, handled := components.UpdateConfirm(keyMsg, m.yes)
-	if !handled {
-		return m, nil, Result{}
+	case tea.MouseClickMsg:
+		if msg.Button != tea.MouseLeft {
+			return m, nil, Result{}
+		}
+		bounds := components.LocateConfirmButtons(m.opts.prompt, m.opts.items...)
+		switch bounds.HitTest(msg.X, msg.Y) {
+		case "yes":
+			return m.decide(true)
+		case "no":
+			return m.decide(false)
+		}
 	}
-	m.yes = nextYes
-	if !decided {
-		return m, nil, Result{}
-	}
+	return m, nil, Result{}
+}
 
+// UpdateMouse translates an absolute-screen mouse message into the modal's
+// local coordinate frame - matching where the caller placed View(width) via
+// ui.OverlayCenter(_, _, screenW, screenH) - and forwards it to Update.
+func (m Model) UpdateMouse(msg tea.MouseClickMsg, width, screenW, screenH int) (Model, tea.Cmd, Result) {
+	view := m.View(width)
+	ox, oy := ui.OverlayCenterOrigin(lipgloss.Width(view), lipgloss.Height(view), screenW, screenH)
+	msg.X -= ox
+	msg.Y -= oy
+	return m.Update(msg)
+}
+
+func (m Model) decide(accepted bool) (Model, tea.Cmd, Result) {
 	m.IsOpen = false
 	if accepted {
 		return m, m.opts.acceptCmd, Result{

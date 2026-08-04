@@ -215,6 +215,11 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m.handleKey(msg)
 
+	case tea.MouseClickMsg:
+		if m.confirm.IsOpen {
+			return m.handleConfirmMouseUpdate(msg)
+		}
+
 	case implementStartedMsg:
 		return m.handleImplementStarted(msg)
 	case implementPollMsg:

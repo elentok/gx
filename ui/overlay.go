@@ -8,17 +8,23 @@ import (
 )
 
 func OverlayCenter(bg, fg string, screenW, screenH int) string {
-	fgW := lipgloss.Width(fg)
-	fgH := lipgloss.Height(fg)
-	x := (screenW - fgW) / 2
-	y := (screenH - fgH) / 2
+	x, y := OverlayCenterOrigin(lipgloss.Width(fg), lipgloss.Height(fg), screenW, screenH)
+	return PlaceOverlay(bg, fg, x, y)
+}
+
+// OverlayCenterOrigin returns the top-left position OverlayCenter would place
+// fg at, so callers can translate absolute screen coordinates (e.g. a mouse
+// click) into fg-local ones.
+func OverlayCenterOrigin(fgW, fgH, screenW, screenH int) (x, y int) {
+	x = (screenW - fgW) / 2
+	y = (screenH - fgH) / 2
 	if x < 0 {
 		x = 0
 	}
 	if y < 0 {
 		y = 0
 	}
-	return PlaceOverlay(bg, fg, x, y)
+	return x, y
 }
 
 // OverlayBottomCenter places fg horizontally centered at the given y coordinate.

@@ -55,6 +55,11 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 			return m.updateSearchMatches()
 		}
 
+	case tea.MouseClickMsg:
+		if m.confirm.IsOpen {
+			return m.handleConfirmMouseUpdate(msg)
+		}
+
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
 			if m.settings.EnableNavigation {

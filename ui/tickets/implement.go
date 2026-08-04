@@ -541,6 +541,12 @@ func (m Model) handleConfirmUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+func (m Model) handleConfirmMouseUpdate(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
+	next, cmd, _ := m.confirm.UpdateMouse(msg, m.width, m.width, m.height)
+	m.confirm = next
+	return m, cmd
+}
+
 func (m Model) handleImplementStarted(msg implementStartedMsg) (tea.Model, tea.Cmd) {
 	m.implementEpic = msg.epicName
 	m.syncRunSnapshot(msg.epicName)

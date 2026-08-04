@@ -47,6 +47,15 @@ func (m Model) enterConfirmDefaultYes(prompt string, cmd tea.Cmd, spinnerLabel s
 
 func (m Model) handleConfirmUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd, result := m.confirm.Update(msg)
+	return m.applyConfirmResult(next, cmd, result)
+}
+
+func (m Model) handleConfirmMouseUpdate(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
+	next, cmd, result := m.confirm.UpdateMouse(msg, 0, m.width, m.height)
+	return m.applyConfirmResult(next, cmd, result)
+}
+
+func (m Model) applyConfirmResult(next confirm.Model, cmd tea.Cmd, result confirm.Result) (tea.Model, tea.Cmd) {
 	m.confirm = next
 	if result.Done {
 		m.mode = modeNormal

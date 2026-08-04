@@ -96,6 +96,44 @@ func TestRenderConfirmModalIncludesPrompt(t *testing.T) {
 	}
 }
 
+func TestLocateConfirmButtonsMatchesRenderedModal(t *testing.T) {
+	prompt := "Delete this ticket?"
+	r := RenderConfirmModal(
+		prompt,
+		true,
+		lipgloss.Color("240"),
+		lipgloss.Color("2"),
+		lipgloss.Color("1"),
+		lipgloss.Color("8"),
+		60,
+	)
+	lines := strings.Split(r, "\n")
+	bounds := LocateConfirmButtons(prompt)
+	if bounds.Row < 0 || bounds.Row >= len(lines) {
+		t.Fatalf("bounds.Row=%d out of range (0..%d)", bounds.Row, len(lines)-1)
+	}
+	row := lines[bounds.Row]
+
+	yes := strings.TrimSpace(ansi.Strip(ansi.Cut(row, bounds.YesX0, bounds.YesX1)))
+	if yes != "Yes" {
+		t.Fatalf("expected Yes at [%d,%d) on row %d, got %q: %q", bounds.YesX0, bounds.YesX1, bounds.Row, yes, ansi.Strip(row))
+	}
+	no := strings.TrimSpace(ansi.Strip(ansi.Cut(row, bounds.NoX0, bounds.NoX1)))
+	if no != "No" {
+		t.Fatalf("expected No at [%d,%d) on row %d, got %q: %q", bounds.NoX0, bounds.NoX1, bounds.Row, no, ansi.Strip(row))
+	}
+
+	if got := bounds.HitTest(bounds.YesX0, bounds.Row); got != "yes" {
+		t.Errorf("HitTest on Yes bounds = %q, want yes", got)
+	}
+	if got := bounds.HitTest(bounds.NoX0, bounds.Row); got != "no" {
+		t.Errorf("HitTest on No bounds = %q, want no", got)
+	}
+	if got := bounds.HitTest(0, 0); got != "" {
+		t.Errorf("HitTest outside buttons = %q, want empty", got)
+	}
+}
+
 func TestRenderConfirmModalCapsWidthRegardlessOfScreenWidth(t *testing.T) {
 	r := RenderConfirmModal(
 		"Prompt?",

@@ -8,6 +8,7 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // UpdateConfirm applies standard yes/no confirm key handling.
@@ -82,4 +83,50 @@ func clampConfirmWidth(width int) int {
 		return ConfirmModalMinWidth
 	}
 	return width
+}
+
+// ConfirmButtonBounds locates the Yes/No buttons within a confirm modal's own
+// rendered coordinate frame (as returned by RenderConfirmModal), so a mouse
+// click can be hit-tested against them without re-deriving the modal's
+// border/padding layout.
+type ConfirmButtonBounds struct {
+	Row          int
+	YesX0, YesX1 int
+	NoX0, NoX1   int
+}
+
+// LocateConfirmButtons computes where the Yes/No buttons land in the modal
+// frame RenderConfirmModal produces for the same prompt/items. The row/column
+// offsets mirror RenderModalFrame's layout (1-line top border, then a single
+// default padding column) and RenderConfirmChoices' fixed "  Yes   No"
+// spacing, so they're derived here rather than duplicated as constants.
+func LocateConfirmButtons(prompt string, items ...string) ConfirmButtonBounds {
+	body := RenderConfirmContent(prompt, true, false, items...)
+	row := len(strings.Split(body, "\n")) // choices is body's last line; +1 for the top border
+
+	const colOffset = 2 // border char + default padding column
+	yesW := ansi.StringWidth(ui.RenderButton("Yes", true, false))
+	noW := ansi.StringWidth(ui.RenderButton("No", false, false))
+
+	yesX0 := colOffset + 2 // "  " prefix in RenderConfirmChoices
+	yesX1 := yesX0 + yesW
+	noX0 := yesX1 + 3 // "   " separator in RenderConfirmChoices
+	noX1 := noX0 + noW
+
+	return ConfirmButtonBounds{Row: row, YesX0: yesX0, YesX1: yesX1, NoX0: noX0, NoX1: noX1}
+}
+
+// HitTest returns "yes" or "no" for the button under x,y, or "" if neither
+// contains it.
+func (b ConfirmButtonBounds) HitTest(x, y int) string {
+	if y != b.Row {
+		return ""
+	}
+	if x >= b.YesX0 && x < b.YesX1 {
+		return "yes"
+	}
+	if x >= b.NoX0 && x < b.NoX1 {
+		return "no"
+	}
+	return ""
 }

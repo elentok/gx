@@ -3,7 +3,11 @@ package confirm
 import (
 	"testing"
 
+	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/components"
+
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 func TestConfirmNew(t *testing.T) {
@@ -77,5 +81,61 @@ func TestConfirmNonKeyMsg(t *testing.T) {
 	_, _, result := m.Update("not-a-key")
 	if result.Done {
 		t.Error("expected not Done for non-key msg")
+	}
+}
+
+func TestConfirmMouseClickYes(t *testing.T) {
+	m := New()
+	m = m.Open(Options{Prompt: "Continue?", DefaultYes: false})
+	bounds := components.LocateConfirmButtons("Continue?")
+
+	_, _, result := m.Update(tea.MouseClickMsg{
+		X: bounds.YesX0, Y: bounds.Row, Button: tea.MouseLeft,
+	})
+	if !result.Done || !result.Accepted {
+		t.Fatalf("expected clicking Yes to accept, got %+v", result)
+	}
+}
+
+func TestConfirmMouseClickNo(t *testing.T) {
+	m := New()
+	m = m.Open(Options{Prompt: "Continue?", DefaultYes: true})
+	bounds := components.LocateConfirmButtons("Continue?")
+
+	next, _, result := m.Update(tea.MouseClickMsg{
+		X: bounds.NoX0, Y: bounds.Row, Button: tea.MouseLeft,
+	})
+	if !result.Done || result.Accepted {
+		t.Fatalf("expected clicking No to reject, got %+v", result)
+	}
+	if next.IsOpen {
+		t.Error("expected IsOpen=false after clicking No")
+	}
+}
+
+func TestConfirmMouseClickOutsideButtons(t *testing.T) {
+	m := New()
+	m = m.Open(Options{Prompt: "Continue?", DefaultYes: true})
+
+	_, _, result := m.Update(tea.MouseClickMsg{X: 0, Y: 0, Button: tea.MouseLeft})
+	if result.Done {
+		t.Error("expected no action for a click outside any button")
+	}
+}
+
+func TestConfirmUpdateMouseTranslatesScreenCoords(t *testing.T) {
+	m := New()
+	m = m.Open(Options{Prompt: "Continue?", DefaultYes: false})
+
+	const width, screenW, screenH = 60, 100, 20
+	view := m.View(width)
+	ox, oy := ui.OverlayCenterOrigin(lipgloss.Width(view), lipgloss.Height(view), screenW, screenH)
+	bounds := components.LocateConfirmButtons("Continue?")
+
+	_, _, result := m.UpdateMouse(tea.MouseClickMsg{
+		X: ox + bounds.YesX0, Y: oy + bounds.Row, Button: tea.MouseLeft,
+	}, width, screenW, screenH)
+	if !result.Done || !result.Accepted {
+		t.Fatalf("expected clicking Yes at translated screen coords to accept, got %+v", result)
 	}
 }
