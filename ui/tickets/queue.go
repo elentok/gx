@@ -79,6 +79,10 @@ type QueueModel struct {
 	loaded        bool
 	epics         []tickets.Epic
 	candidates    map[string]bool
+	// autoRefreshStarted guards cmdAutoRefresh's self-perpetuating poll loop
+	// (auto_refresh.go) against being started more than once per QueueModel
+	// instance, mirroring Model.autoRefreshStarted.
+	autoRefreshStarted bool
 
 	selected     int
 	scrollOffset int
@@ -177,6 +181,15 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ensureQueueVisible()
 		return m, nil
 	case queueEpicsLoadedMsg:
+		if err := autoCheckSplitChildren(m.epics, msg.epics, m.queueStore); err != nil {
+			return m, notify.Error("save queue: " + err.Error())
+		}
+		if m.queueStore != nil {
+			snapshot := m.queueStore.Snapshot()
+			m.checked = snapshot.Checked
+			m.checkOrder = snapshot.Order
+			m.queueStatus = snapshot.Status
+		}
 		m.loaded = true
 		m.epics = msg.epics
 		m.candidates = make(map[string]bool, len(m.checked))
@@ -187,7 +200,15 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.recomputeQueueSearchMatches()
 		}
 		m.clampSelected()
-		return m, nil
+		var autoRefreshCmd tea.Cmd
+		if !m.autoRefreshStarted {
+			m.autoRefreshStarted = true
+			autoRefreshCmd = cmdAutoRefresh()
+		}
+		return m, autoRefreshCmd
+
+	case autoRefreshMsg:
+		return m, tea.Batch(m.cmdLoadQueue(), cmdAutoRefresh())
 	case implementStartedMsg:
 		if m.executionStartedAt.IsZero() {
 			m.executionStartedAt = m.now()

@@ -46,6 +46,11 @@ type Model struct {
 
 	loaded bool
 	epics  []tickets.Epic
+	// autoRefreshStarted guards cmdAutoRefresh's self-perpetuating poll loop
+	// (auto_refresh.go) against being started more than once per Model
+	// instance — every epicsLoadedMsg, including ones the loop itself
+	// produces, would otherwise spawn another parallel chain.
+	autoRefreshStarted bool
 
 	// allWorktrees is the `gx tickets --all` scope: epics are aggregated across
 	// every worktree of the repo (each tagged with Epic.WorktreeName) instead
@@ -203,10 +208,18 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.recomputeSearchMatches()
 		}
 		m.clampSelected()
-		if msg.err != nil {
-			return m, notify.Error("load .scratch/: " + msg.err.Error())
+		var autoRefreshCmd tea.Cmd
+		if !m.autoRefreshStarted {
+			m.autoRefreshStarted = true
+			autoRefreshCmd = cmdAutoRefresh()
 		}
-		return m, nil
+		if msg.err != nil {
+			return m, tea.Batch(notify.Error("load .scratch/: "+msg.err.Error()), autoRefreshCmd)
+		}
+		return m, autoRefreshCmd
+
+	case autoRefreshMsg:
+		return m, tea.Batch(m.cmdLoad(), cmdAutoRefresh())
 
 	case editFileFinishedMsg:
 		return m.handleEditFileFinished(msg)
