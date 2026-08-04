@@ -105,6 +105,9 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		CherryPickInProgress: func(dir string) (bool, error) {
 			return false, nil
 		},
+		AbortCherryPick: func(dir string) error {
+			return nil
+		},
 		IsAncestor: func(dir, ancestor, descendant string) (bool, error) {
 			return true, nil
 		},

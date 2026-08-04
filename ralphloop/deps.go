@@ -49,6 +49,9 @@ type Deps struct {
 	CommitsAhead         func(dir, fromExclusive, toRef string) (int, error)
 	CherryPickRange      func(dir, fromExclusive, toInclusive string) error
 	CherryPickInProgress func(dir string) (bool, error)
+	// AbortCherryPick clears sequencer state in the shared feature worktree;
+	// the durable source iteration branch is unaffected.
+	AbortCherryPick func(dir string) error
 	// IsAncestor reports whether ancestor is reachable from descendant, used
 	// by startup reconciliation to confirm a done ticket's recorded landed
 	// commit (Event.SHA) is still on the feature branch.
@@ -126,6 +129,7 @@ func DefaultDeps() Deps {
 		CommitsAhead:          git.CommitsAhead,
 		CherryPickRange:       git.CherryPickRange,
 		CherryPickInProgress:  git.CherryPickInProgress,
+		AbortCherryPick:       git.AbortCherryPick,
 		IsAncestor:            git.IsAncestor,
 		PatchesApplied:        git.PatchesApplied,
 		AppendTrailers:        git.AppendTrailers,

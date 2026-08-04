@@ -61,6 +61,14 @@ func CherryPickRange(dir, fromExclusive, toInclusive string) error {
 	return err
 }
 
+// AbortCherryPick abandons the cherry-pick currently in progress in dir and
+// restores the worktree to its pre-cherry-pick state. The source iteration
+// branch remains untouched, so its commits can be landed again safely.
+func AbortCherryPick(dir string) error {
+	_, _, err := run(dir, []string{"cherry-pick", "--abort"})
+	return err
+}
+
 // PatchesApplied reports whether every commit in base..branch already has a
 // patch-equivalent commit reachable from upstream (git cherry, which
 // compares patch-id rather than commit hash). Unlike IsAncestor, this stays
@@ -164,7 +172,7 @@ func TrailerMap(dir, ref, key string) (map[string]string, error) {
 }
 
 // CherryPickInProgress reports whether dir has a cherry-pick sequence
-// currently stopped on a conflict (CHERRY_PICK_HEAD present).
+// currently stopped on a conflict or empty commit (CHERRY_PICK_HEAD present).
 func CherryPickInProgress(dir string) (bool, error) {
 	_, _, err := run(dir, []string{"rev-parse", "-q", "--verify", "CHERRY_PICK_HEAD"})
 	if err != nil {

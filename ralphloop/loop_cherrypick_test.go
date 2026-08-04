@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 )
 
@@ -80,18 +81,19 @@ func TestRun_CherryPickConflict_ResolvesInFeatureWorktreeThenCompletes(t *testin
 	var picks int
 	var conflictPane, iterPane string
 	var conflictPaneRemovedBefore bool
+	inProgress := false
 
 	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
 		mu.Lock()
 		defer mu.Unlock()
 		picks++
 		if picks == 1 {
+			inProgress = true
 			return &fakeConflictErr{}
 		}
 		return nil
 	}
 
-	inProgress := true
 	d.CherryPickInProgress = func(dir string) (bool, error) {
 		mu.Lock()
 		defer mu.Unlock()
@@ -184,6 +186,114 @@ func TestRun_CherryPickConflict_ResolvesInFeatureWorktreeThenCompletes(t *testin
 	}
 	if conflictResolved.AgentSession == "" || conflictResolved.AgentSession == conflictHit.AgentSession {
 		t.Errorf("conflict-resolved event = %+v, want a non-empty AgentSession distinct from conflict-hit's %q (the resolution agent's own session)", conflictResolved, conflictHit.AgentSession)
+	}
+}
+
+func TestRun_AlreadyAppliedIteration_CompletesWithoutCherryPickOrResolver(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+	})
+	d, prompts, _ := fakeDeps()
+	d.PatchesApplied = func(dir, upstream, base, branch string) (bool, error) {
+		return true, nil
+	}
+	var picks, trailerWrites int
+	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
+		picks++
+		return nil
+	}
+	d.AppendTrailers = func(dir string, trailers ...git.Trailer) error {
+		trailerWrites++
+		return nil
+	}
+
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if picks != 0 {
+		t.Errorf("CherryPickRange calls = %d, want 0 for already-applied patch", picks)
+	}
+	if trailerWrites != 0 {
+		t.Errorf("AppendTrailers calls = %d, want 0 when no commit was created", trailerWrites)
+	}
+	if slices.Contains(*prompts, "/resolving-merge-conflicts") {
+		t.Errorf("prompts = %v, want no conflict resolver for already-applied patch", *prompts)
+	}
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: done") {
+		t.Errorf("ticket not marked done:\n%s", raw)
+	}
+}
+
+func TestRun_StaleCherryPick_IsAbortedBeforeLandingCurrentTicket(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+	})
+	d, _, _ := fakeDeps()
+	stale := true
+	var aborts, picks int
+	d.CherryPickInProgress = func(dir string) (bool, error) { return stale, nil }
+	d.AbortCherryPick = func(dir string) error {
+		aborts++
+		stale = false
+		return nil
+	}
+	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
+		if stale {
+			t.Fatal("CherryPickRange called before stale state was aborted")
+		}
+		picks++
+		return nil
+	}
+
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if aborts != 1 || picks != 1 {
+		t.Errorf("aborts=%d picks=%d, want 1 and 1", aborts, picks)
+	}
+}
+
+func TestRun_UnfinishedConflict_IsAbortedBeforeNextTicketLands(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
+	})
+	d, _, _ := fakeDeps()
+	active := false
+	var aborts int
+	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
+		if strings.HasSuffix(toInclusive, "iter-01") {
+			active = true
+			return &fakeConflictErr{}
+		}
+		if active {
+			t.Fatal("ticket 02 inherited ticket 01's cherry-pick")
+		}
+		return nil
+	}
+	d.CherryPickInProgress = func(dir string) (bool, error) { return active, nil }
+	d.AbortCherryPick = func(dir string) error {
+		aborts++
+		active = false
+		return nil
+	}
+
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo", MaxParallel: 1}, d, noopEventSink{}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if aborts != 1 {
+		t.Errorf("AbortCherryPick calls = %d, want 1", aborts)
+	}
+	raw02, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "02-b.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw02), "status: done") {
+		t.Errorf("ticket 02 not marked done after ticket 01 cleanup:\n%s", raw02)
 	}
 }
 

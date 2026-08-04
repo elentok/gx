@@ -116,6 +116,48 @@ func TestCherryPickRange_ConflictReturnsError(t *testing.T) {
 	}
 }
 
+func TestAbortCherryPick_ClearsConflictAndRestoresHead(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepoWithConflictSetup(t)
+
+	base, err := git.RevParse(dir, "HEAD~1")
+	if err != nil {
+		t.Fatalf("RevParse base: %v", err)
+	}
+	tip, err := git.RevParse(dir, "HEAD")
+	if err != nil {
+		t.Fatalf("RevParse tip: %v", err)
+	}
+	testutil.MustGitExported(t, dir, "checkout", "-b", "feature", base)
+	testutil.WriteFile(t, dir, "a.txt", "line from feature\n")
+	testutil.CommitAll(t, dir, "feature change")
+	featureHead, err := git.RevParse(dir, "HEAD")
+	if err != nil {
+		t.Fatalf("RevParse feature: %v", err)
+	}
+
+	if err := git.CherryPickRange(dir, base, tip); err == nil {
+		t.Fatal("CherryPickRange() error = nil, want conflict error")
+	}
+	if err := git.AbortCherryPick(dir); err != nil {
+		t.Fatalf("AbortCherryPick: %v", err)
+	}
+	inProgress, err := git.CherryPickInProgress(dir)
+	if err != nil {
+		t.Fatalf("CherryPickInProgress: %v", err)
+	}
+	if inProgress {
+		t.Error("CherryPickInProgress() = true after abort")
+	}
+	gotHead, err := git.RevParse(dir, "HEAD")
+	if err != nil {
+		t.Fatalf("RevParse after abort: %v", err)
+	}
+	if gotHead != featureHead {
+		t.Errorf("HEAD after abort = %s, want %s", gotHead, featureHead)
+	}
+}
+
 func TestCommitsAhead_CountsCommitsInRange(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)

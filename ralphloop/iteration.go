@@ -246,8 +246,16 @@ func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane, ta
 	p.FeatureLock.Lock()
 	defer p.FeatureLock.Unlock()
 
-	if err := cherryPickWithConflictResolution(d, p, base, branch, sessionID, pane, tab); err != nil {
+	picked, err := cherryPickWithConflictResolution(d, p, base, branch, sessionID, pane, tab)
+	if err != nil {
 		return "", err
+	}
+	if !picked {
+		landedSHA, err := d.RevParse(p.FeatureWorktree, "HEAD")
+		if err != nil {
+			return "", fmt.Errorf("resolving already-applied commit on %s: %w", p.FeatureBranch, err)
+		}
+		return landedSHA, nil
 	}
 
 	iterationCwd := iterationWorktreePath(p.WorktreeDir, p.FeatureBranch, p.Ticket.Identifier)
@@ -326,44 +334,89 @@ func branchExists(d Deps, dir, branch string) bool {
 // instead attributed to the resolution agent's own distinct session, so its
 // cost/occupancy are counted too rather than silently dropped from the
 // report.
-func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, sessionID, pane, tab string) error {
+func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, sessionID, pane, tab string) (picked bool, resultErr error) {
 	p.Sink.CherryPickStarted(p.Ticket.Identifier)
-	pickErr := d.CherryPickRange(p.FeatureWorktree, base, branch)
-	if pickErr == nil {
-		return nil
-	}
 
+	// A previous invocation may have died after starting a cherry-pick but
+	// before recording its outcome. Never let the next ticket inherit or
+	// resolve that operation as its own: its iteration branch is durable, so
+	// aborting here is lossless and lets reconciliation retry it explicitly.
 	inProgress, err := d.CherryPickInProgress(p.FeatureWorktree)
 	if err != nil {
-		return fmt.Errorf("checking cherry-pick state onto %s: %w", p.FeatureBranch, err)
+		return false, fmt.Errorf("checking for stale cherry-pick onto %s: %w", p.FeatureBranch, err)
+	}
+	if inProgress {
+		if err := d.AbortCherryPick(p.FeatureWorktree); err != nil {
+			return false, fmt.Errorf("aborting stale cherry-pick onto %s: %w", p.FeatureBranch, err)
+		}
+	}
+
+	// Concurrent work can make an iteration's entire patch redundant before
+	// it lands. Git stops that as an empty cherry-pick and leaves sequencer
+	// state behind, so recognize the safe no-op before touching the worktree.
+	applied, err := d.PatchesApplied(p.FeatureWorktree, p.FeatureBranch, base, branch)
+	if err != nil {
+		return false, fmt.Errorf("checking whether ticket %s is already applied: %w", p.Ticket.Identifier, err)
+	}
+	if applied {
+		return false, nil
+	}
+
+	pickErr := d.CherryPickRange(p.FeatureWorktree, base, branch)
+	if pickErr == nil {
+		return true, nil
+	}
+
+	inProgress, err = d.CherryPickInProgress(p.FeatureWorktree)
+	if err != nil {
+		return false, fmt.Errorf("checking cherry-pick state onto %s: %w", p.FeatureBranch, err)
 	}
 	if !inProgress {
-		return fmt.Errorf("cherry-picking onto %s: %w", p.FeatureBranch, pickErr)
+		return false, fmt.Errorf("cherry-picking onto %s: %w", p.FeatureBranch, pickErr)
 	}
+	// This call now owns the active sequencer state. Always clean it before
+	// FeatureLock is released on failure, otherwise later tickets can mistake
+	// this ticket's CHERRY_PICK_HEAD for their own conflict.
+	defer func() {
+		if resultErr == nil {
+			return
+		}
+		active, checkErr := d.CherryPickInProgress(p.FeatureWorktree)
+		if checkErr != nil {
+			resultErr = fmt.Errorf("%w (also failed checking cherry-pick cleanup: %v)", resultErr, checkErr)
+			return
+		}
+		if !active {
+			return
+		}
+		if abortErr := d.AbortCherryPick(p.FeatureWorktree); abortErr != nil {
+			resultErr = fmt.Errorf("%w (also failed aborting owned cherry-pick: %v)", resultErr, abortErr)
+		}
+	}()
 	p.logTicketEvent(eventConflictHit, pane, tab, sessionID, p.FeatureWorktree)
 	p.Sink.ConflictResolutionStarted(p.Ticket.Identifier)
 
 	resolutionSessionID, err := resolveCherryPickConflict(d, p)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	inProgress, err = d.CherryPickInProgress(p.FeatureWorktree)
 	if err != nil {
-		return fmt.Errorf("checking cherry-pick state onto %s after resolution: %w", p.FeatureBranch, err)
+		return false, fmt.Errorf("checking cherry-pick state onto %s after resolution: %w", p.FeatureBranch, err)
 	}
 	if inProgress {
-		return fmt.Errorf("cherry-pick onto %s still in progress after conflict-resolution agent finished", p.FeatureBranch)
+		return false, fmt.Errorf("cherry-pick onto %s still in progress after conflict-resolution agent finished", p.FeatureBranch)
 	}
 	p.logTicketEvent(eventConflictResolved, "", "", resolutionSessionID, p.FeatureWorktree)
-	return nil
+	return true, nil
 }
 
 // resolveCherryPickConflict launches a fresh pane in the feature worktree and
 // drives a "/resolving-merge-conflicts" agent to completion in it, returning
 // its agent session id. The iteration's own worktree/tab are untouched
 // while this runs.
-func resolveCherryPickConflict(d Deps, p iterationParams) (string, error) {
+func resolveCherryPickConflict(d Deps, p iterationParams) (sessionID string, resultErr error) {
 	label := conflictLabel(p.Ticket.Identifier)
 
 	tab, err := d.TabCreate(herdr.TabCreateOptions{
@@ -374,10 +427,19 @@ func resolveCherryPickConflict(d Deps, p iterationParams) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("creating conflict-resolution pane: %w", err)
 	}
+	defer func() {
+		if closeErr := d.TabClose(tab.TabID); closeErr != nil {
+			if resultErr != nil {
+				resultErr = fmt.Errorf("%w (also failed closing conflict-resolution tab: %v)", resultErr, closeErr)
+			} else {
+				resultErr = fmt.Errorf("closing conflict-resolution tab: %w", closeErr)
+			}
+		}
+	}()
 
 	launchParams := p.launchAndPromptParams(label, tab.RootPaneID, tab.TabID, skillPrompt(p.Agent, "resolving-merge-conflicts", ""), p.FeatureWorktree, "", "")
 	launchParams.FinishTimeoutMs = conflictResolutionTimeoutMs
-	sessionID, err := launchAndPrompt(d, launchParams)
+	sessionID, err = launchAndPrompt(d, launchParams)
 	if err != nil {
 		return "", fmt.Errorf("conflict-resolution agent %s did not finish (possibly stuck): %w", label, err)
 	}
