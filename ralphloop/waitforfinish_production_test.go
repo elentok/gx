@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -212,6 +213,238 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 	}
 	if sawFailed {
 		t.Error("smart-zone-recovery-failed event emitted, want none")
+	}
+
+	// No send-keys (Enter or another Ctrl-C) dispatched once compaction is
+	// known to be running, i.e. after the /compact submit call.
+	var compactionRunning bool
+	for _, e := range s.Trace() {
+		if len(e.Argv) > 3 && e.Argv[0] == "agent" && e.Argv[1] == "prompt" && e.Argv[3] == "/compact" {
+			compactionRunning = true
+			continue
+		}
+		if compactionRunning && len(e.Argv) >= 2 && e.Argv[0] == "agent" && e.Argv[1] == "send-keys" {
+			t.Errorf("send-keys dispatched after compaction started: %v", e.Argv)
+		}
+	}
+}
+
+// compactBoundaryConfirmTick is the "agent wait" dispatch count (counting
+// only compact-completion polls, i.e. those whose --until includes
+// "blocked" — see waitforfinish.go's compactStates) at which this test's
+// fake transport finally writes the transcript's compaction-boundary line.
+// Each such dispatch models one smartZonePollMs (30s) tick, and
+// waitForCompactionSignal's loop is entered with startElapsedMs already at
+// one tick (see recoverSmartZoneBreach), so the Nth dispatch corresponds to
+// N*smartZonePollMs of elapsed virtual time: 16 ticks lands completion at
+// 480s (8 minutes) — comfortably past smartZoneCompactTimeoutMs (5 minutes,
+// tick 10) where the transcript check first engages, and comfortably short
+// of smartZoneCompactExtendedTimeoutMs (10 minutes, tick 20) where an
+// unconfirmed compact would be reported as a genuine failure.
+const compactBoundaryConfirmTick = 16
+
+// appendCompactBoundaryLine appends a minimal Claude Code compact_boundary
+// system line to the transcript at cwd/sessionID, indistinguishable from a
+// real compaction's completion marker to transcript.Compactions.
+func appendCompactBoundaryLine(t *testing.T, cwd, sessionID string) {
+	t.Helper()
+	path, err := transcript.Path(cwd, sessionID)
+	if err != nil {
+		t.Fatalf("transcript.Path: %v", err)
+	}
+	line := map[string]any{
+		"type":            "system",
+		"subtype":         "compact_boundary",
+		"timestamp":       time.Unix(0, 0).UTC().Format(time.RFC3339Nano),
+		"compactMetadata": map[string]any{"trigger": "manual"},
+	}
+	b, err := json.Marshal(line)
+	if err != nil {
+		t.Fatalf("marshal compact boundary line: %v", err)
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		t.Fatalf("open transcript for append: %v", err)
+	}
+	defer f.Close()
+	if _, err := f.Write(append(b, '\n')); err != nil {
+		t.Fatalf("append compact boundary line: %v", err)
+	}
+}
+
+// TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression proves
+// ticket 19's fix: a "/compact" that genuinely takes longer than
+// smartZoneCompactTimeoutMs (5 minutes) — here, 8 minutes — but eventually
+// completes must not be misreported as a failed recovery. It's a sibling of
+// TestWaitForFinish_ProductionSlowCompactRegression above, sharing the same
+// fake-transport/virtual-time pattern through real dependency wiring
+// (DefaultDeps with only Sleep/Now swapped), but where that test's fake
+// "/compact" resolves the completion wait synchronously on submission (the
+// pane flips to "idle" the instant "/compact" is typed, so the real herdr
+// wait call it makes never actually observes a pending state), this test's
+// pane deliberately never reports the compact as finished — a herdr
+// pane-status observation gap, per waitForCompactionSignal's doc comment —
+// and only the transcript's compaction-boundary line, appended after
+// compactBoundaryConfirmTick polls, ever confirms completion. Against
+// pre-ticket-19 code (no transcript fallback), the pane-status wait alone
+// would time out at the 5-minute mark and this scenario would be reported as
+// a failed recovery; against the fix, it's confirmed successful instead.
+func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T) {
+	const pane = "pane-1"
+	const smartZone = 100
+	cwd := "/repo/iter-06"
+	sessionID := "sess-06"
+
+	s := herdrfake.NewState(t)
+
+	var mu sync.Mutex
+	status := "working" // agent starts mid-turn, already over smartZone
+	var compactCalls, ctrlCCalls, enterCalls, compactWaitTicks int
+	var boundaryWritten bool
+	var promptOrder []string
+
+	s.Register("agent", "prompt", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		target, text := argv[2], argv[3]
+		mu.Lock()
+		defer mu.Unlock()
+		var respond string
+		switch {
+		case text == "/compact":
+			compactCalls++
+			promptOrder = append(promptOrder, "/compact")
+			// Deliberately does NOT flip status to "idle": the pane never
+			// confirms the compact finishing, so only the transcript can.
+			respond = "working"
+		case strings.Contains(text, "please finish up quickly"):
+			promptOrder = append(promptOrder, "finish-up")
+			respond = "working"
+			status = "done"
+		default:
+			respond = "working"
+			status = "working"
+		}
+		return agentResult(target, respond)
+	})
+
+	s.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		target := argv[2]
+		until := parseUntil(argv[3:])
+		mu.Lock()
+		defer mu.Unlock()
+		if slices.Contains(until, "blocked") {
+			// A compact-completion poll (see compactStates in
+			// waitforfinish.go): the pane never reports completion, so
+			// every one of these times out. Once enough ticks have passed,
+			// the transcript is updated as a side effect, still without
+			// ever making this call itself succeed.
+			compactWaitTicks++
+			if compactWaitTicks >= compactBoundaryConfirmTick && !boundaryWritten {
+				boundaryWritten = true
+				mu.Unlock()
+				appendCompactBoundaryLine(t, cwd, sessionID)
+				mu.Lock()
+			}
+			return nil, herdrfake.Identities{}, fmt.Errorf("timed out waiting for agent status")
+		}
+		cur := status
+		if len(until) == 0 || slices.Contains(until, cur) {
+			return agentResult(target, cur)
+		}
+		return nil, herdrfake.Identities{}, fmt.Errorf("timed out waiting for agent status")
+	})
+
+	s.Register("agent", "send-keys", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		target := argv[2]
+		mu.Lock()
+		for _, k := range argv[3:] {
+			switch k {
+			case "ctrl+c":
+				ctrlCCalls++
+			case "enter":
+				enterCalls++
+			}
+		}
+		cur := status
+		mu.Unlock()
+		return agentResult(target, cur)
+	})
+
+	s.Register("agent", "read", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		return "", herdrfake.Identities{}, nil
+	})
+
+	herdrfake.StartState(t, s)
+
+	t.Setenv("HOME", t.TempDir())
+	writeOccupancyTranscript(t, cwd, sessionID, smartZone+100)
+
+	// Models the whole scenario's ~8 real minutes of compaction without
+	// sleeping for them.
+	s.AdvanceVirtualTime(8 * time.Minute)
+
+	scratchDir := t.TempDir()
+	deps := DefaultDeps()
+	deps.Sleep = func(time.Duration) {}
+	deps.Now = func() time.Time { return time.Unix(0, 0) }
+
+	err := waitForFinish(deps, launchAndPromptParams{
+		Label:      "iter-06",
+		Agent:      AgentClaude,
+		Pane:       pane,
+		SessionCwd: cwd,
+		SmartZone:  smartZone,
+		Gate:       NewGate(),
+		Ticket:     "06",
+		ScratchDir: scratchDir,
+		EpicName:   "epic",
+	}, sessionID)
+	if err != nil {
+		t.Fatalf("waitForFinish: %v", err)
+	}
+
+	if compactCalls != 1 {
+		t.Errorf("compact prompts = %d, want exactly 1", compactCalls)
+	}
+	if ctrlCCalls != 1 {
+		t.Errorf("ctrl+c sends = %d, want exactly 1", ctrlCCalls)
+	}
+	if enterCalls != 0 {
+		t.Errorf("enter nudges = %d, want 0 (a stray Enter cancels an in-progress compaction)", enterCalls)
+	}
+	wantOrder := []string{"/compact", "finish-up"}
+	if !slices.Equal(promptOrder, wantOrder) {
+		t.Errorf("promptOrder = %v, want %v (finish-up must follow compact completion)", promptOrder, wantOrder)
+	}
+	if got := s.VirtualTime(); got < 8*time.Minute {
+		t.Errorf("VirtualTime() = %s, want >= 8m (scenario must advance virtual time, not sleep)", got)
+	}
+	if !boundaryWritten {
+		t.Fatal("test bug: compact boundary line was never written")
+	}
+
+	events, ok, err := readEvents(scratchDir, "epic")
+	if err != nil || !ok {
+		t.Fatalf("readEvents() ok=%v err=%v", ok, err)
+	}
+	var sawResumed, sawFailed, sawWaitExpired bool
+	for _, e := range events {
+		switch e.Type {
+		case eventResumed:
+			sawResumed = true
+		case eventSmartZoneRecoveryFailed:
+			sawFailed = true
+		case eventSmartZoneWaitExpired:
+			sawWaitExpired = true
+		}
+	}
+	if !sawResumed {
+		t.Error("missing resumed event after smart-zone recovery")
+	}
+	if sawFailed {
+		t.Error("smart-zone-recovery-failed event emitted, want none — a merely slow but successful compact must not be misreported as a failed recovery")
+	}
+	if !sawWaitExpired {
+		t.Error("missing smart-zone-wait-expired event — the transcript's compaction-boundary signal, not the pane status, should have confirmed this compact")
 	}
 
 	// No send-keys (Enter or another Ctrl-C) dispatched once compaction is
