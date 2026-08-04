@@ -39,6 +39,30 @@ func TestModel_SidebarScrollbarAppearsOnlyWhenListOverflows(t *testing.T) {
 	}
 }
 
+func TestModel_MouseWheelScrollsSidebarWithoutMovingSelection(t *testing.T) {
+	root := t.TempDir()
+	for i := 1; i <= 60; i++ {
+		writeTicket(t, root, "epic", fmt.Sprintf("%02d-ticket.md", i), "Status: open\n\nBody.\n")
+	}
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 20})
+	m = updated.(Model)
+
+	before := m.scrollOffset
+	selected := m.selected
+	updated, _ = m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	m = updated.(Model)
+
+	if m.scrollOffset <= before {
+		t.Fatalf("expected mouse wheel down to increase scroll offset from %d, got %d", before, m.scrollOffset)
+	}
+	if m.selected != selected {
+		t.Fatalf("expected mouse wheel to leave selection at %d, got %d", selected, m.selected)
+	}
+}
+
 func TestQueueModel_ScrollbarAppearsOnlyWhenListOverflows(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "epic", "01-only-ticket.md", "Status: open\n\nBody.\n")

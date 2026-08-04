@@ -241,6 +241,9 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleConfirmMouseUpdate(msg)
 		}
 
+	case tea.MouseWheelMsg:
+		return m.handleSidebarMouseWheel(msg)
+
 	case implementStartedMsg:
 		return m.handleImplementStarted(msg)
 	case implementPollMsg:
@@ -369,6 +372,27 @@ func (m *Model) ensureSidebarVisible() {
 	total := len(m.sidebarLines())
 	maxOffset := max(0, total-viewportH)
 	m.scrollOffset = max(0, min(m.scrollOffset, maxOffset))
+}
+
+// handleSidebarMouseWheel scrolls the sidebar viewport without moving
+// selection, mirroring QueueModel.handleQueueMouseWheel.
+func (m Model) handleSidebarMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
+	mouse := msg.Mouse()
+	dir := 0
+	switch mouse.Button {
+	case tea.MouseWheelDown:
+		dir = 1
+	case tea.MouseWheelUp:
+		dir = -1
+	default:
+		return m, nil
+	}
+	m.scrollOffset += dir * 3
+	total := len(m.sidebarLines())
+	viewportH := m.sidebarViewportHeight()
+	maxOffset := max(0, total-viewportH)
+	m.scrollOffset = max(0, min(m.scrollOffset, maxOffset))
+	return m, nil
 }
 
 // sidebarVisibleLines windows sidebarLines() to a single viewportH-line
