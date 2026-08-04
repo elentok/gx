@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.24.3 - 2026-08-04
+
+- Added `gx skills install`/`uninstall`, embedding gx's canonical skill bundle (including new `gx-to-tickets`, `gx-tdd`, `gx-implement`, and `gx-resolving-merge-conflicts` skills) and installing managed copies into Claude's and Codex's skill roots.
+- Added `gx skills install --dev`, symlinking a checkout's skill files into both agents' discovery roots so source edits show up immediately.
+- Added `gx agent context-window`, a provider-neutral command that reports the active Claude or Codex session's current context occupancy.
+- Ralph loop now defaults to the `gx-implement`/`gx-resolving-merge-conflicts` skills instead of `/implement`, with a raised default smart-zone ceiling.
+- Fixed iteration worktrees being nested inside their epic's own worktree, which could make git operations see live iterations as foreign content.
+- Improved ralph-loop durability: context exhaustion, quota polling/backfill, launch preflight, reattach guardrails, and post-claim launch-failure recovery, with new Claude/Codex recovery end-to-end tests.
+
 ## v0.24.1 - 2026-08-04
 
 - Added a durable execution queue for selecting tickets or epics, automatically including blockers and split children, and running scoped work across multiple epics concurrently while preserving progress across restarts.
