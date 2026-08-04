@@ -266,7 +266,7 @@ func TestRun_UnfinishedConflict_IsAbortedBeforeNextTicketLands(t *testing.T) {
 	active := false
 	var aborts int
 	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
-		if strings.HasSuffix(toInclusive, "iter-01") {
+		if strings.HasSuffix(toInclusive, "epic-item-01") {
 			active = true
 			return &fakeConflictErr{}
 		}
@@ -376,7 +376,7 @@ func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {
 	})
 	d, _, removed := fakeDeps()
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
-		if strings.Contains(dir, "iter-01") {
+		if strings.Contains(dir, "epic-item-01") {
 			return 0, nil
 		}
 		return 1, nil
@@ -390,7 +390,7 @@ func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	if len(*removed) != 1 || (*removed)[0] != "ralph-loop/epic/iter-02" {
+	if len(*removed) != 1 || (*removed)[0] != "ralph-loop/epic-item-02" {
 		t.Errorf("removed worktree branches = %v, want only iter-02 removed", *removed)
 	}
 

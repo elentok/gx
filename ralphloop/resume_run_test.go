@@ -86,7 +86,7 @@ func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) 
 	}
 
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
-		if strings.Contains(cwd, "iter-01") {
+		if strings.Contains(cwd, "epic-item-01") {
 			return 999999, true, nil
 		}
 		return 0, false, nil

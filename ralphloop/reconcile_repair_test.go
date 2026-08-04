@@ -198,7 +198,7 @@ func TestReconcile_DoneTicketRecoverable_CleansUpLeftoverWorktreeAndTab(t *testi
 		return []herdr.Tab{{TabID: "tab-iter-03", Label: "iter-03", WorkspaceID: workspaceID}}, nil
 	}
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
-	d.WorktreeExists = func(path string) (bool, error) { return strings.Contains(path, "iter-03"), nil }
+	d.WorktreeExists = func(path string) (bool, error) { return strings.Contains(path, "item-03"), nil }
 
 	var removedWorktree string
 	d.RemoveWorktree = func(repoDir, path string, force bool) error {
@@ -216,8 +216,8 @@ func TestReconcile_DoneTicketRecoverable_CleansUpLeftoverWorktreeAndTab(t *testi
 		t.Fatalf("reconcile() error = %v", err)
 	}
 
-	if !strings.Contains(removedWorktree, "iter-03") {
-		t.Errorf("removedWorktree = %q, want the leftover iter-03 worktree removed", removedWorktree)
+	if !strings.Contains(removedWorktree, "item-03") {
+		t.Errorf("removedWorktree = %q, want the leftover item-03 worktree removed", removedWorktree)
 	}
 	if closedTab != "tab-iter-03" {
 		t.Errorf("closedTab = %q, want the leftover iter-03 tab closed", closedTab)
@@ -247,7 +247,7 @@ func TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup(t *testing.T) 
 		return []herdr.Tab{{TabID: "tab-iter-03", Label: "iter-03", WorkspaceID: workspaceID}}, nil
 	}
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return true, nil } // commits landed
-	d.WorktreeExists = func(path string) (bool, error) { return strings.Contains(path, "iter-03"), nil }
+	d.WorktreeExists = func(path string) (bool, error) { return strings.Contains(path, "item-03"), nil }
 	// d.RevParse defaults to returning "deadbeef" for any ref (fakeDeps), so the
 	// iteration branch is treated as still existing too.
 
@@ -273,14 +273,14 @@ func TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup(t *testing.T) 
 		t.Fatalf("reconcile() error = %v", err)
 	}
 
-	if !strings.Contains(removedWorktree, "iter-03") {
-		t.Errorf("removedWorktree = %q, want the leftover iter-03 worktree removed", removedWorktree)
+	if !strings.Contains(removedWorktree, "item-03") {
+		t.Errorf("removedWorktree = %q, want the leftover item-03 worktree removed", removedWorktree)
 	}
 	if closedTab != "tab-iter-03" {
 		t.Errorf("closedTab = %q, want the leftover iter-03 tab closed", closedTab)
 	}
-	if deletedBranch != "ralph-loop/epic/iter-03" {
-		t.Errorf("deletedBranch = %q, want ralph-loop/epic/iter-03 deleted", deletedBranch)
+	if deletedBranch != "ralph-loop/epic-item-03" {
+		t.Errorf("deletedBranch = %q, want ralph-loop/epic-item-03 deleted", deletedBranch)
 	}
 
 	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "03-c.md"))

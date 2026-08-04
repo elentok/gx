@@ -40,7 +40,7 @@ func TestClassifyDoneTicket_RealRepo_CommitLandedAndCleanedUp_OK(t *testing.T) {
 		t.Fatalf("RevParse: %v", err)
 	}
 
-	testutil.MustGitExported(t, dir, "checkout", "-b", "ralph-loop/main/iter-03", base)
+	testutil.MustGitExported(t, dir, "checkout", "-b", "ralph-loop/main-item-03", base)
 	testutil.WriteFile(t, dir, "a.txt", "a\n")
 	testutil.CommitAll(t, dir, "add a")
 	iterTip, err := git.RevParse(dir, "HEAD")
@@ -57,7 +57,7 @@ func TestClassifyDoneTicket_RealRepo_CommitLandedAndCleanedUp_OK(t *testing.T) {
 		t.Fatalf("RevParse: %v", err)
 	}
 
-	testutil.MustGitExported(t, dir, "branch", "-D", "ralph-loop/main/iter-03")
+	testutil.MustGitExported(t, dir, "branch", "-D", "ralph-loop/main-item-03")
 
 	d := realGitDeps()
 	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: landedSHA}}
@@ -82,7 +82,7 @@ func TestClassifyDoneTicket_RealRepo_NeverCherryPicked_Recoverable(t *testing.T)
 		t.Fatalf("RevParse: %v", err)
 	}
 
-	testutil.MustGitExported(t, dir, "checkout", "-b", "ralph-loop/main/iter-03", base)
+	testutil.MustGitExported(t, dir, "checkout", "-b", "ralph-loop/main-item-03", base)
 	testutil.WriteFile(t, dir, "a.txt", "a\n")
 	testutil.CommitAll(t, dir, "add a")
 
@@ -117,7 +117,7 @@ func TestClassifyDoneTicket_RealRepo_RebasedAfterLanding_OK(t *testing.T) {
 		t.Fatalf("RevParse: %v", err)
 	}
 
-	testutil.MustGitExported(t, dir, "checkout", "-b", "ralph-loop/main/iter-03", base)
+	testutil.MustGitExported(t, dir, "checkout", "-b", "ralph-loop/main-item-03", base)
 	testutil.WriteFile(t, dir, "a.txt", "a\n")
 	testutil.CommitAll(t, dir, "add a")
 	iterTip, err := git.RevParse(dir, "HEAD")
@@ -176,7 +176,7 @@ func TestClassifyDoneTicket_RealRepo_RebasedWithConflictResolution_OK(t *testing
 		t.Fatalf("RevParse: %v", err)
 	}
 
-	testutil.MustGitExported(t, dir, "checkout", "-b", "ralph-loop/main/iter-03", base)
+	testutil.MustGitExported(t, dir, "checkout", "-b", "ralph-loop/main-item-03", base)
 	testutil.WriteFile(t, dir, "a.txt", "iteration content\n")
 	testutil.CommitAll(t, dir, "add a")
 	iterTip, err := git.RevParse(dir, "HEAD")
@@ -221,7 +221,7 @@ func TestClassifyDoneTicket_RealRepo_RebasedWithConflictResolution_OK(t *testing
 	}
 
 	// The iteration branch is already cleaned up by this point.
-	testutil.MustGitExported(t, dir, "branch", "-D", "ralph-loop/main/iter-03")
+	testutil.MustGitExported(t, dir, "branch", "-D", "ralph-loop/main-item-03")
 
 	d := realGitDeps()
 	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: landedSHA}}

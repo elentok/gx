@@ -10,13 +10,25 @@ func iterLabel(identifier string) string {
 	return "iter-" + identifier
 }
 
+// iterItemName scopes an iteration by epicName as a single flat path/branch
+// segment ("{epic}-item-{id}") rather than "{epic}/iter-{id}", so an
+// iteration's worktree never lands as a subdirectory of the epic's own
+// feature worktree (which lives at "{epic}") and its branch never nests
+// under the epic's own branch (named plain "{epic}").
+func iterItemName(epicName, identifier string) string {
+	return epicName + "-item-" + identifier
+}
+
 // iterationWorktreePath returns an iteration's on-disk worktree path, scoped
 // by epicName. worktreeDir is shared across every epic running against the
 // same repo (unlike the herdr workspace, which is already one-per-epic), so
 // without this two epics that both happen to use the same iteration number
-// (e.g. two "iter-04"s) would collide on the same directory.
+// (e.g. two "iter-04"s) would collide on the same directory. It's a sibling
+// of worktreeDir/epicName (the feature worktree), not nested inside it: git
+// operations (status/clean/add) run in the feature worktree must never see
+// live iteration worktrees as foreign content within its own tree.
 func iterationWorktreePath(worktreeDir, epicName, identifier string) string {
-	return filepath.Join(worktreeDir, epicName, iterLabel(identifier))
+	return filepath.Join(worktreeDir, iterItemName(epicName, identifier))
 }
 
 // iterationKey scopes an iteration label by epic name for use as a
@@ -32,7 +44,7 @@ func iterationKey(epicName, label string) string {
 // to reuse the same ticket identifier (e.g. an auto-split "06b") would
 // otherwise collide on the same branch name and fail AddWorktree.
 func iterBranch(epicName, identifier string) string {
-	return "ralph-loop/" + epicName + "/" + iterLabel(identifier)
+	return "ralph-loop/" + iterItemName(epicName, identifier)
 }
 
 func conflictLabel(identifier string) string {

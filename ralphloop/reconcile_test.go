@@ -371,7 +371,7 @@ func TestRun_RestartedNeedsAttentionRecoversThenResumesScheduling(t *testing.T) 
 	var mu sync.Mutex
 	sawClaimed := false
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
-		if strings.Contains(dir, "iter-01") {
+		if strings.Contains(dir, "epic-item-01") {
 			raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-attention.md"))
 			mu.Lock()
 			sawClaimed = err == nil && strings.Contains(string(raw), "claimed")

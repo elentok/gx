@@ -159,7 +159,7 @@ func TestRun_LinearChain_RunsTicketsInOrderAndLandsAll(t *testing.T) {
 		t.Fatalf("prompts = %v, want %v", *prompts, wantPrompts)
 	}
 
-	wantBranches := []string{"ralph-loop/my-epic/iter-01", "ralph-loop/my-epic/iter-02"}
+	wantBranches := []string{"ralph-loop/my-epic-item-01", "ralph-loop/my-epic-item-02"}
 	if len(*removed) != 2 || (*removed)[0] != wantBranches[0] || (*removed)[1] != wantBranches[1] {
 		t.Fatalf("removed worktree branches = %v, want %v", *removed, wantBranches)
 	}
@@ -198,8 +198,8 @@ func TestRun_IterationCompletion_DeletesIterationBranch(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	if len(deletedBranches) != 1 || deletedBranches[0] != "ralph-loop/my-epic/iter-01" {
-		t.Errorf("deletedBranches = %v, want [ralph-loop/my-epic/iter-01]", deletedBranches)
+	if len(deletedBranches) != 1 || deletedBranches[0] != "ralph-loop/my-epic-item-01" {
+		t.Errorf("deletedBranches = %v, want [ralph-loop/my-epic-item-01]", deletedBranches)
 	}
 }
 

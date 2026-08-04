@@ -70,7 +70,7 @@ func TestRun_TwoEpicsSameIterationNumber_DontCollideOnWorktreePath(t *testing.T)
 	defer mu.Unlock()
 	var iterPaths []string
 	for _, p := range addedPaths {
-		if strings.Contains(p, "iter-04") {
+		if strings.Contains(p, "item-04") {
 			iterPaths = append(iterPaths, p)
 		}
 	}
