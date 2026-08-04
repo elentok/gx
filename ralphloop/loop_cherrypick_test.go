@@ -110,7 +110,7 @@ func TestRun_CherryPickConflict_ResolvesInFeatureWorktreeThenCompletes(t *testin
 
 	origAgentPrompt := d.AgentPrompt
 	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		if opts.Text == "/resolving-merge-conflicts" {
+		if opts.Text == "/gx-resolving-merge-conflicts" {
 			mu.Lock()
 			inProgress = false // resolution "commits", ending the cherry-pick sequence
 			mu.Unlock()
@@ -147,8 +147,8 @@ func TestRun_CherryPickConflict_ResolvesInFeatureWorktreeThenCompletes(t *testin
 		t.Error("iteration worktree was removed before the conflict-resolution pane was created")
 	}
 
-	if !slices.Contains(*prompts, "/resolving-merge-conflicts") {
-		t.Errorf("prompts = %v, want a /resolving-merge-conflicts prompt", *prompts)
+	if !slices.Contains(*prompts, "/gx-resolving-merge-conflicts") {
+		t.Errorf("prompts = %v, want a /gx-resolving-merge-conflicts prompt", *prompts)
 	}
 
 	if len(*removed) != 1 {
@@ -216,7 +216,7 @@ func TestRun_AlreadyAppliedIteration_CompletesWithoutCherryPickOrResolver(t *tes
 	if trailerWrites != 0 {
 		t.Errorf("AppendTrailers calls = %d, want 0 when no commit was created", trailerWrites)
 	}
-	if slices.Contains(*prompts, "/resolving-merge-conflicts") {
+	if slices.Contains(*prompts, "/gx-resolving-merge-conflicts") {
 		t.Errorf("prompts = %v, want no conflict resolver for already-applied patch", *prompts)
 	}
 	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))

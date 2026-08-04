@@ -129,8 +129,8 @@ func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) 
 		}
 	}
 	finishPrompt := <-promptCh
-	if !strings.Contains(finishPrompt, "110000") {
-		t.Errorf("finish-up prompt = %q, want it to mention the effective --smart-zone value 110000", finishPrompt)
+	if !strings.Contains(finishPrompt, "130000") {
+		t.Errorf("finish-up prompt = %q, want it to mention the effective --smart-zone value 130000", finishPrompt)
 	}
 	if !strings.Contains(finishPrompt, "implement") {
 		t.Errorf("finish-up prompt = %q, want it to reference the implement skill", finishPrompt)
@@ -257,8 +257,8 @@ func TestRun_SmartZoneBreach_RepeatsWithNoRetryCap(t *testing.T) {
 				break
 			}
 		}
-		if got := <-promptCh; !strings.Contains(got, "110000") {
-			t.Fatalf("breach %d: finish-up prompt = %q, want it to mention 110000", i, got)
+		if got := <-promptCh; !strings.Contains(got, "130000") {
+			t.Fatalf("breach %d: finish-up prompt = %q, want it to mention 130000", i, got)
 		}
 		if gate.isPaused() {
 			t.Fatalf("breach %d: gate.isPaused() = true, want the scheduler never blocked by smart-zone recovery", i)

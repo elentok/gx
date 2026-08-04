@@ -45,8 +45,14 @@ func ticketTrailerValue(epicName, identifier string) string {
 const defaultMaxParallel = 2
 
 // defaultSmartZone is the context-token ceiling used when
-// RunOptions.SmartZone is unset.
-const defaultSmartZone = 110_000
+// RunOptions.SmartZone is unset. It backstops the gx-implement skill's own
+// proactive 90K split threshold, so a session that misses that threshold
+// still gets paused before it runs away.
+const defaultSmartZone = 130_000
+
+// defaultWorkerSkill is the skill each iteration invokes when
+// RunOptions.Skill is unset.
+const defaultWorkerSkill = "gx-implement"
 
 // AgentKind identifies the coding agent that drives an iteration.
 type AgentKind string
@@ -97,7 +103,7 @@ func agentArgs(agent AgentKind, scratchDir, epicName string) []string {
 type RunOptions struct {
 	EpicName    string
 	Agent       AgentKind // defaults to AgentClaude
-	Skill       string    // skill each iteration invokes, e.g. "implement"
+	Skill       string    // skill each iteration invokes; defaults to defaultWorkerSkill ("gx-implement") when unset
 	ScratchDir  string    // defaults to ".scratch"
 	RepoDir     string    // repo root passed as the herdr workspace/worktree cwd
 	MaxParallel int       // defaults to defaultMaxParallel; how many iterations run concurrently
@@ -150,6 +156,10 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	if smartZone <= 0 {
 		smartZone = defaultSmartZone
 	}
+	skill := opts.Skill
+	if skill == "" {
+		skill = defaultWorkerSkill
+	}
 
 	initial, err := loadNamedEpic(scratchDir, opts.EpicName)
 	if err != nil {
@@ -172,9 +182,9 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			return fmt.Errorf("preflighting %s launch environment: %w", agent, err)
 		}
 	}
-	if opts.Skill != "" && d.VerifySkill != nil {
-		if err := d.VerifySkill(agent, opts.Skill); err != nil {
-			return fmt.Errorf("preflighting %s skill %q: %w", agent, opts.Skill, err)
+	if d.VerifySkill != nil {
+		if err := d.VerifySkill(agent, skill); err != nil {
+			return fmt.Errorf("preflighting %s skill %q: %w", agent, skill, err)
 		}
 	}
 
@@ -258,7 +268,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 				FeatureWorktree:  featurePath,
 				FeatureBranch:    opts.EpicName,
 				Agent:            agent,
-				Skill:            opts.Skill,
+				Skill:            skill,
 				Ticket:           ticket,
 				ScratchDir:       scratchDir,
 				FeatureLock:      &featureMu,
@@ -284,7 +294,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		WorkspaceID:      workspaceID,
 		Paths:            reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: featurePath, WorktreeDir: wtDir, RepoDir: opts.RepoDir},
 		Agent:            agent,
-		Skill:            opts.Skill,
+		Skill:            skill,
 		SmartZone:        smartZone,
 		Gate:             gate,
 		ResumeSignalPath: resumePath,

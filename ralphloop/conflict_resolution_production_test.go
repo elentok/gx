@@ -106,12 +106,12 @@ func (r *conflictResolver) handleAgentRead(_ *herdrfake.State, argv []string) (a
 }
 
 // handlePrompt is the resolver's core: on the production
-// "/resolving-merge-conflicts" prompt, it validates its own preconditions
+// "/gx-resolving-merge-conflicts" prompt, it validates its own preconditions
 // then performs the real conflict resolution against argv[2]'s pane cwd.
 // Anything else fails immediately rather than producing a default response.
 func (r *conflictResolver) handlePrompt(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
 	target, text := argv[2], argv[3]
-	if text != "/resolving-merge-conflicts" {
+	if text != "/gx-resolving-merge-conflicts" {
 		return nil, herdrfake.Identities{}, fmt.Errorf("conflict resolver received unexpected prompt %q", text)
 	}
 
@@ -231,7 +231,7 @@ func gitSubject(t *testing.T, dir, ref string) string {
 // stand-in — against a real git repo with a genuine cherry-pick conflict,
 // resolved through the same herdr tab-create/agent-start/agent-wait/
 // agent-prompt protocol production Ralph-loop uses, reaching a fake
-// "/resolving-merge-conflicts" agent through a process-boundary fake herdr
+// "/gx-resolving-merge-conflicts" agent through a process-boundary fake herdr
 // executable (testutil/herdrfake) instead of a mocked Deps field.
 func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 	dir := testutil.TempRepo(t)
@@ -359,7 +359,7 @@ func TestConflictResolverHandlePrompt_WrongCwd_FailsImmediately(t *testing.T) {
 	resolver := newConflictResolver(t, expected, "sess", "resolved\n")
 	resolver.paneCwd["pane-x"] = wrong
 
-	_, _, err := resolver.handlePrompt(nil, []string{"agent", "prompt", "pane-x", "/resolving-merge-conflicts"})
+	_, _, err := resolver.handlePrompt(nil, []string{"agent", "prompt", "pane-x", "/gx-resolving-merge-conflicts"})
 	if err == nil {
 		t.Fatal("handlePrompt() error = nil, want a wrong-cwd failure")
 	}
@@ -373,7 +373,7 @@ func TestConflictResolverHandlePrompt_NoCherryPickInProgress_FailsImmediately(t 
 	resolver := newConflictResolver(t, dir, "sess", "resolved\n")
 	resolver.paneCwd["pane-x"] = dir
 
-	_, _, err := resolver.handlePrompt(nil, []string{"agent", "prompt", "pane-x", "/resolving-merge-conflicts"})
+	_, _, err := resolver.handlePrompt(nil, []string{"agent", "prompt", "pane-x", "/gx-resolving-merge-conflicts"})
 	if err == nil {
 		t.Fatal("handlePrompt() error = nil, want a missing-cherry-pick-state failure")
 	}

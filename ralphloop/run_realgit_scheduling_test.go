@@ -348,7 +348,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 			sess := session[pane]
 			cwd := paneCwd[pane]
 			mu.Unlock()
-			if text == "/resolving-merge-conflicts" {
+			if text == "/gx-resolving-merge-conflicts" {
 				mu.Lock()
 				conflictResolutionSessionID = sess
 				mu.Unlock()

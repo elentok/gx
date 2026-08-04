@@ -352,7 +352,7 @@ func branchExists(d Deps, dir, branch string) bool {
 // cherryPickWithConflictResolution cherry-picks base..branch onto
 // p.FeatureWorktree. On a conflict, it launches a fresh pane in the feature
 // worktree (where the conflict markers are, not the iteration worktree),
-// sends "/resolving-merge-conflicts", and waits for that agent to finish
+// sends "/gx-resolving-merge-conflicts", and waits for that agent to finish
 // before confirming the cherry-pick sequence completed. sessionID/pane/tab
 // attach the iteration agent's own session to the conflict-hit event (the
 // resolution agent hasn't launched yet at that point). On resolution it
@@ -436,7 +436,7 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 }
 
 // resolveCherryPickConflict launches a fresh pane in the feature worktree and
-// drives a "/resolving-merge-conflicts" agent to completion in it, returning
+// drives a "/gx-resolving-merge-conflicts" agent to completion in it, returning
 // its agent session id. The iteration's own worktree/tab are untouched
 // while this runs.
 func resolveCherryPickConflict(d Deps, p iterationParams) (sessionID string, resultErr error) {
@@ -460,7 +460,7 @@ func resolveCherryPickConflict(d Deps, p iterationParams) (sessionID string, res
 		}
 	}()
 
-	launchParams := p.launchAndPromptParams(label, tab.RootPaneID, tab.TabID, skillPrompt(p.Agent, "resolving-merge-conflicts", ""), p.FeatureWorktree, "", "")
+	launchParams := p.launchAndPromptParams(label, tab.RootPaneID, tab.TabID, skillPrompt(p.Agent, "gx-resolving-merge-conflicts", ""), p.FeatureWorktree, "", "")
 	launchParams.FinishTimeoutMs = conflictResolutionTimeoutMs
 	sessionID, err = launchAndPrompt(d, launchParams)
 	if err != nil {

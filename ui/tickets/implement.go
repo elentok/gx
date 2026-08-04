@@ -695,11 +695,9 @@ func buildImplementRunOptionsForTickets(
 	return ralphloop.RunOptions{
 		EpicName:    epicName,
 		Agent:       agent,
-		Skill:       "implement",
 		RepoDir:     repo.Root,
 		ScratchDir:  filepath.Join(worktreeRoot, ".scratch"),
 		MaxParallel: max(maxParallel, 1),
-		SmartZone:   150_000,
 		TicketIDs:   ticketIDs,
 	}, nil
 }

@@ -130,7 +130,7 @@ func TestReconcile_DoneTicketRecoverable_ReportsRecoveringBeforeCherryPick(t *te
 
 // TestReconcile_DoneTicketRecoverable_ConflictGoesThroughResolutionPath
 // verifies the repair's re-cherry-pick reuses the exact same conflict-
-// resolution path (launching a "/resolving-merge-conflicts" agent in the
+// resolution path (launching a "/gx-resolving-merge-conflicts" agent in the
 // feature worktree) a normal iteration's first cherry-pick uses, rather than
 // a separate repair-specific conflict handler.
 func TestReconcile_DoneTicketRecoverable_ConflictGoesThroughResolutionPath(t *testing.T) {
@@ -158,7 +158,7 @@ func TestReconcile_DoneTicketRecoverable_ConflictGoesThroughResolutionPath(t *te
 	var resolutionPrompted bool
 	origAgentPrompt := d.AgentPrompt
 	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		if opts.Text == "/resolving-merge-conflicts" {
+		if opts.Text == "/gx-resolving-merge-conflicts" {
 			resolutionPrompted = true
 			inProgress = false
 		}
@@ -173,7 +173,7 @@ func TestReconcile_DoneTicketRecoverable_ConflictGoesThroughResolutionPath(t *te
 		t.Errorf("reattached = %v, want none for a done ticket", reattached)
 	}
 	if !resolutionPrompted {
-		t.Error("expected a /resolving-merge-conflicts agent to be prompted on cherry-pick conflict during repair")
+		t.Error("expected a /gx-resolving-merge-conflicts agent to be prompted on cherry-pick conflict during repair")
 	}
 }
 
