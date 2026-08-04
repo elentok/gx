@@ -23,84 +23,18 @@ type checkAddConfirmedMsg struct {
 
 // isChecked reports whether the ticket at path is in the checked set.
 func (m Model) isChecked(path string) bool {
-	if m.queueStore != nil {
-		return m.queueStore.IsChecked(path)
-	}
-	return m.checked[path]
-}
-
-// WithCheckedSet lets the shell share selection across cached tab models.
-func (m Model) WithCheckedSet(checked map[string]bool) Model {
-	return m.WithCheckedState(checked, m.checkOrder)
-}
-
-// WithCheckedState lets the shell share selection and its chronology across cached tab models.
-func (m Model) WithCheckedState(checked map[string]bool, checkOrder map[string]uint64) Model {
-	if checked == nil {
-		checked = map[string]bool{}
-	}
-	if checkOrder == nil {
-		checkOrder = map[string]uint64{}
-	}
-	for path := range m.checked {
-		checked[path] = true
-		if ordinal, ok := m.checkOrder[path]; ok {
-			checkOrder[path] = ordinal
-		}
-	}
-	m.checked = checked
-	m.checkOrder = checkOrder
-	return m
-}
-
-// WithQueueStore makes the application-owned store authoritative for this page.
-func (m Model) WithQueueStore(store *QueueStore) Model {
-	if store == nil {
-		return m
-	}
-	snapshot := store.Snapshot()
-	m.queueStore = store
-	m.checked = snapshot.Checked
-	m.checkOrder = snapshot.Order
-	m.queueStatus = snapshot.Status
-	return m
+	return m.queueStore.IsChecked(path)
 }
 
 func (m *Model) setPathsChecked(paths []string, checked bool) error {
-	if m.queueStore != nil {
-		if err := m.queueStore.SetChecked(paths, checked); err != nil {
-			return err
-		}
-		m.refreshQueueSnapshot()
-		return nil
+	if err := m.queueStore.SetChecked(paths, checked); err != nil {
+		return err
 	}
-	if m.checked == nil {
-		m.checked = map[string]bool{}
-	}
-	if m.checkOrder == nil {
-		m.checkOrder = map[string]uint64{}
-	}
-	if m.queueStatus == nil {
-		m.queueStatus = map[string]queueItemStatus{}
-	}
-	for _, path := range paths {
-		if checked {
-			markChecked(m.checked, m.checkOrder, path)
-			if _, ok := m.queueStatus[path]; !ok {
-				m.queueStatus[path] = queueStatusPending
-			}
-			continue
-		}
-		markUnchecked(m.checked, m.checkOrder, path)
-		delete(m.queueStatus, path)
-	}
-	return m.persistQueueState()
+	m.refreshQueueSnapshot()
+	return nil
 }
 
 func (m *Model) refreshQueueSnapshot() {
-	if m.queueStore == nil {
-		return
-	}
 	snapshot := m.queueStore.Snapshot()
 	m.checked = snapshot.Checked
 	m.checkOrder = snapshot.Order

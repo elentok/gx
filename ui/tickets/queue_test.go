@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/keys"
 )
 
 func TestQueueModelRendersDependencyAwareEpicPlan(t *testing.T) {
@@ -731,6 +732,82 @@ func TestQueueModelMidRunSelectionChangeDoesNotRewriteProgressTotals(t *testing.
 	}
 
 	close(release)
+}
+
+// TestQueueModelRestoresAllStatusesAsInitialTab simulates a restart landing
+// directly on Queue (ticket 21): a QueueStore pre-populated with every status
+// (as a prior process session would have left it) must be fully reflected in
+// a freshly constructed QueueModel with no prior Tickets-tab visit.
+func TestQueueModelRestoresAllStatusesAsInitialTab(t *testing.T) {
+	root := testutil.TempRepo(t)
+	writeTicket(t, root, "alpha", "01-pending.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "alpha", "02-running.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "alpha", "03-done.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "alpha", "04-errored.md", "Status: open\n\nBody.\n")
+	pending := ticketPath(root, "alpha", "01-pending.md")
+	running := ticketPath(root, "alpha", "02-running.md")
+	done := ticketPath(root, "alpha", "03-done.md")
+	errored := ticketPath(root, "alpha", "04-errored.md")
+
+	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
+	for path, status := range map[string]queueItemStatus{
+		pending: queueStatusPending,
+		running: queueStatusRunning,
+		done:    queueStatusDone,
+		errored: queueStatusErrored,
+	} {
+		if err := store.Check(path); err != nil {
+			t.Fatal(err)
+		}
+		if err := store.SetStatus(path, status); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	m := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, store))
+
+	for path, want := range map[string]queueItemStatus{
+		pending: queueStatusPending,
+		running: queueStatusRunning,
+		done:    queueStatusDone,
+		errored: queueStatusErrored,
+	} {
+		if !m.checked[path] {
+			t.Fatalf("expected %s checked after restart", path)
+		}
+		if got := m.queueStatus[path]; got != want {
+			t.Fatalf("status for %s = %v, want %v", path, got, want)
+		}
+	}
+}
+
+// TestTicketsAndQueueMatchAfterRestartRegardlessOfNavigationOrder covers the
+// "identical state in either navigation order" acceptance criterion: both
+// tabs read the same QueueStore, so a Tickets-first-then-Queue construction
+// and a Queue-first-then-Tickets construction must agree.
+func TestTicketsAndQueueMatchAfterRestartRegardlessOfNavigationOrder(t *testing.T) {
+	root := testutil.TempRepo(t)
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	path := ticketPath(root, "alpha", "01-first.md")
+
+	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
+	if err := store.Check(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetStatus(path, queueStatusDone); err != nil {
+		t.Fatal(err)
+	}
+
+	queueFirst := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, store))
+	ticketsModel := NewModelWithScopeAndStore(root, ui.Settings{}, keys.New(nil), false, store)
+	ticketsModel = deliverLoad(t, ticketsModel)
+
+	if queueFirst.checked[path] != ticketsModel.isChecked(path) {
+		t.Fatalf("checked mismatch: queue=%v tickets=%v", queueFirst.checked[path], ticketsModel.isChecked(path))
+	}
+	if queueFirst.queueStatus[path] != ticketsModel.queueStatus[path] {
+		t.Fatalf("status mismatch: queue=%v tickets=%v", queueFirst.queueStatus[path], ticketsModel.queueStatus[path])
+	}
 }
 
 func ticketPath(root, epic, name string) string {

@@ -144,61 +144,6 @@ func withQueueStateDir(t *testing.T) string {
 	return tmp
 }
 
-func TestLoadQueueStateMissingFileReturnsEmpty(t *testing.T) {
-	withQueueStateDir(t)
-
-	got, _ := loadQueueState()
-	if len(got) != 0 {
-		t.Fatalf("expected empty queue state, got %v", got)
-	}
-}
-
-func TestLoadQueueStateCorruptFileReturnsEmpty(t *testing.T) {
-	tmp := withQueueStateDir(t)
-	dir := filepath.Join(tmp, "gx")
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "queue-state.json"), []byte("not json"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	got, _ := loadQueueState()
-	if len(got) != 0 {
-		t.Fatalf("expected empty queue state for corrupt file, got %v", got)
-	}
-}
-
-func TestSaveQueueStateRoundTrips(t *testing.T) {
-	withQueueStateDir(t)
-
-	items := map[string]queueItemStatus{
-		"/repo/.scratch/epic/issues/01.md": queueStatusRunning,
-		"/repo/.scratch/epic/issues/02.md": queueStatusDone,
-	}
-	checkOrder := map[string]uint64{
-		"/repo/.scratch/epic/issues/01.md": 2,
-		"/repo/.scratch/epic/issues/02.md": 1,
-	}
-	if err := saveQueueState(items, checkOrder); err != nil {
-		t.Fatalf("saveQueueState: %v", err)
-	}
-
-	got, gotOrder := loadQueueState()
-	if len(got) != 2 {
-		t.Fatalf("got %d items, want 2: %v", len(got), got)
-	}
-	if got["/repo/.scratch/epic/issues/01.md"] != queueStatusRunning {
-		t.Fatalf("status = %v, want running", got["/repo/.scratch/epic/issues/01.md"])
-	}
-	if got["/repo/.scratch/epic/issues/02.md"] != queueStatusDone {
-		t.Fatalf("status = %v, want done", got["/repo/.scratch/epic/issues/02.md"])
-	}
-	if gotOrder["/repo/.scratch/epic/issues/01.md"] != 2 || gotOrder["/repo/.scratch/epic/issues/02.md"] != 1 {
-		t.Fatalf("check order = %v, want persisted ordinals", gotOrder)
-	}
-}
-
 func TestModel_CheckingTicketPersistsPendingStatus(t *testing.T) {
 	withQueueStateDir(t)
 	root := t.TempDir()
@@ -215,7 +160,7 @@ func TestModel_CheckingTicketPersistsPendingStatus(t *testing.T) {
 	updated, _ = m.Update(spacePress())
 	m = updated.(Model)
 
-	got, _ := loadQueueState()
+	got := LoadQueueStore().Snapshot().Status
 	if got[ticket.Path] != queueStatusPending {
 		t.Fatalf("persisted status = %v, want pending", got[ticket.Path])
 	}
@@ -239,7 +184,7 @@ func TestModel_UncheckingTicketRemovesPersistedStatus(t *testing.T) {
 	updated, _ = m.Update(spacePress())
 	m = updated.(Model)
 
-	got, _ := loadQueueState()
+	got := LoadQueueStore().Snapshot().Status
 	if _, ok := got[ticket.Path]; ok {
 		t.Fatalf("expected ticket removed from persisted state after uncheck, got %v", got)
 	}
@@ -260,7 +205,9 @@ func TestModel_RestoresCheckedSetAndStatusOnStartup(t *testing.T) {
 
 	updated, _ = m.Update(spacePress())
 	m = updated.(Model)
-	m.setQueueItemStatus(ticket.Path, queueStatusDone)
+	if err := m.queueStore.SetStatus(ticket.Path, queueStatusDone); err != nil {
+		t.Fatal(err)
+	}
 
 	// Simulate a restart: a fresh Model built against the same worktree/config dir.
 	restarted := NewModel(root, ui.Settings{}, keys.New(nil))
