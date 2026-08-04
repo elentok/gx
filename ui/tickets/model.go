@@ -47,12 +47,12 @@ type Model struct {
 	loaded bool
 	epics  []tickets.Epic
 
-	// allRepos is the `gx tickets --all` scope: epics are aggregated across
+	// allWorktrees is the `gx tickets --all` scope: epics are aggregated across
 	// every worktree of the repo (each tagged with Epic.WorktreeName) instead
 	// of just m.worktreeRoot's own `.scratch/`, interleaved into the tab's
 	// normal single Open/Closed grouping with each epic row labeled by its
 	// worktree.
-	allRepos bool
+	allWorktrees bool
 
 	selected       int
 	collapsedEpics map[string]bool
@@ -119,18 +119,18 @@ func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager)
 }
 
 // NewModelWithScope builds the tickets tab model with an initial scope:
-// allRepos true starts it already aggregating every worktree's `.scratch/`
+// allWorktrees true starts it already aggregating every worktree's `.scratch/`
 // (the `gx tickets --all` CLI entry point), false starts it scoped to just
 // worktreeRoot, mirroring ui/prs's NewModelWithScope.
-func NewModelWithScope(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager, allRepos bool) Model {
-	return NewModelWithScopeAndStore(worktreeRoot, settings, extraKeys, allRepos, LoadQueueStore())
+func NewModelWithScope(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager, allWorktrees bool) Model {
+	return NewModelWithScopeAndStore(worktreeRoot, settings, extraKeys, allWorktrees, LoadQueueStore())
 }
 
-func NewModelWithScopeAndStore(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager, allRepos bool, store *QueueStore) Model {
+func NewModelWithScopeAndStore(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager, allWorktrees bool, store *QueueStore) Model {
 	_ = extraKeys
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
-	queueStatus, checkOrder, checked := scopedQueueSnapshot(store, worktreeRoot, allRepos)
+	queueStatus, checkOrder, checked := scopedQueueSnapshot(store, worktreeRoot, allWorktrees)
 	return Model{
 		worktreeRoot:       worktreeRoot,
 		settings:           settings,
@@ -138,7 +138,7 @@ func NewModelWithScopeAndStore(worktreeRoot string, settings ui.Settings, extraK
 		search:             search.NewModel(),
 		previewSearch:      search.NewModel(),
 		previewVP:          viewport.New(),
-		allRepos:           allRepos,
+		allWorktrees:       allWorktrees,
 		confirm:            confirm.New(),
 		implementAgentMenu: newImplementAgentMenu(),
 		implementingEpics:  map[string]bool{},

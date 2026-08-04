@@ -21,7 +21,7 @@ type epicsLoadedMsg struct {
 // (tickets.Load reports it as zero epics), so it renders the same empty
 // state as an absent `.scratch/`.
 func (m Model) cmdLoad() tea.Cmd {
-	if m.allRepos {
+	if m.allWorktrees {
 		return m.cmdLoadAll()
 	}
 	scratchDir := m.scratchDir()

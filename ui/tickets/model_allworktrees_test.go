@@ -20,7 +20,7 @@ func writeTicketAt(t *testing.T, worktreeRoot, epic, filename, content string) {
 	writeTicket(t, worktreeRoot, epic, filename, content)
 }
 
-func TestNewModelWithScope_AllReposAggregatesAcrossWorktrees(t *testing.T) {
+func TestNewModelWithScope_AllWorktreesAggregatesAcrossWorktrees(t *testing.T) {
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a", "feature-b")
 	wtA := filepath.Join(repoDir, "feature-a")
 	wtB := filepath.Join(repoDir, "feature-b")
@@ -45,7 +45,7 @@ func TestNewModelWithScope_AllReposAggregatesAcrossWorktrees(t *testing.T) {
 	}
 }
 
-func TestNewModelWithScope_AllReposNavigationCoversAllEpics(t *testing.T) {
+func TestNewModelWithScope_AllWorktreesNavigationCoversAllEpics(t *testing.T) {
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a", "feature-b")
 	wtA := filepath.Join(repoDir, "feature-a")
 	wtB := filepath.Join(repoDir, "feature-b")

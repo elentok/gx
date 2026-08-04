@@ -214,10 +214,10 @@ func (m Model) newHistoryEntry(viewState nav.ViewState) historyEntry {
 			model:     prsui.NewModelWithScope(viewState.WorktreeRoot, s, keys.New(Bindings()), viewState.AllRepos),
 		}
 	case nav.TabTickets:
-		allRepos := viewState.AllRepos || m.explicitAllTickets() || isTicketsLoopRunning()
+		allWorktrees := viewState.AllRepos || m.explicitAllTickets() || isTicketsLoopRunning()
 		return historyEntry{
 			viewState: viewState,
-			model:     ticketsui.NewModelWithScopeAndStore(viewState.WorktreeRoot, s, keys.New(Bindings()), allRepos, m.queueStore),
+			model:     ticketsui.NewModelWithScopeAndStore(viewState.WorktreeRoot, s, keys.New(Bindings()), allWorktrees, m.queueStore),
 		}
 	case nav.TabQueue:
 		return historyEntry{
