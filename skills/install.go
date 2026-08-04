@@ -1,7 +1,6 @@
 package skills
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -53,61 +52,44 @@ func (e *ConflictError) Error() string {
 
 // Install installs or upgrades a skill's managed-copy files into every
 // AgentRoot in req, recording the result in the manifest at manifestPath.
+// It returns the same per-target classification Plan would have produced -
+// classified once, via classifyInstall, and reused for both the writes and
+// the returned report - so a caller never needs a separate Plan call just
+// to report what Install did.
 //
 // A path whose on-disk content is locally modified, or that holds content
 // unrelated to any prior install of this skill, is left untouched unless
 // req.Force explicitly authorizes it; Install then writes nothing at all
-// and returns a *ConflictError, so a refused install never leaves behind a
-// manifest claiming it succeeded. The same holds for any other failure
-// encountered while copying: the manifest is only written after every file
-// has been copied to every agent root.
-func Install(manifestPath string, req InstallRequest) error {
+// and returns the classification alongside a *ConflictError, so a refused
+// install never leaves behind a manifest claiming it succeeded. The same
+// holds for any other failure encountered while copying: the manifest is
+// only written after every file has been copied to every agent root.
+func Install(manifestPath string, req InstallRequest) ([]Target, error) {
 	mode := req.effectiveMode()
 
-	prev, err := Load(manifestPath)
-	if err != nil && !errors.Is(err, ErrNotExist) {
-		return fmt.Errorf("load existing manifest: %w", err)
-	}
-	prevIdentities := make(map[string]string, len(prev.Files))
-	for _, f := range prev.Files {
-		prevIdentities[f.Path] = managedIdentity(f)
-	}
-
-	sourceIdentities := make(map[string]string, len(req.Files))
-	for _, f := range req.Files {
-		id, err := sourceFileIdentity(f, mode)
-		if err != nil {
-			return fmt.Errorf("inspect source file %s: %w", f.AbsPath, err)
-		}
-		sourceIdentities[f.RelPath] = id
+	targets, sourceIdentities, err := classifyInstall(manifestPath, req)
+	if err != nil {
+		return nil, err
 	}
 
 	conflicts := map[string]Ownership{}
-	for _, root := range req.AgentRoots {
-		for _, f := range req.Files {
-			target := filepath.Join(root, f.RelPath)
-			currentIdentity, err := identityIfExists(target, mode)
-			if err != nil {
-				return fmt.Errorf("inspect %s: %w", target, err)
-			}
-			ownership := installOwnership(prevIdentities[f.RelPath], currentIdentity, sourceIdentities[f.RelPath], mode)
-			if !AllowWrite(ownership, f.RelPath, req.Force) {
-				conflicts[f.RelPath] = ownership
-			}
+	for _, t := range targets {
+		if t.Status == StatusConflicted {
+			conflicts[t.Path] = t.Ownership
 		}
 	}
 	if len(conflicts) > 0 {
-		return &ConflictError{Conflicts: conflicts}
+		return targets, &ConflictError{Conflicts: conflicts}
 	}
 
 	for _, root := range req.AgentRoots {
 		if err := os.MkdirAll(root, 0755); err != nil {
-			return fmt.Errorf("create agent root %s: %w", root, err)
+			return targets, fmt.Errorf("create agent root %s: %w", root, err)
 		}
 		for _, f := range req.Files {
 			target := filepath.Join(root, f.RelPath)
 			if err := placeFile(f.AbsPath, target, mode); err != nil {
-				return fmt.Errorf("install %s: %w", target, err)
+				return targets, fmt.Errorf("install %s: %w", target, err)
 			}
 		}
 	}
@@ -129,7 +111,7 @@ func Install(manifestPath string, req InstallRequest) error {
 		Files:      files,
 	}
 	if err := Save(manifestPath, newManifest); err != nil {
-		return fmt.Errorf("save manifest: %w", err)
+		return targets, fmt.Errorf("save manifest: %w", err)
 	}
-	return nil
+	return targets, nil
 }

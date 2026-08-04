@@ -38,7 +38,7 @@ func TestInstallCreatesAgentRootsAndCopiesFiles(t *testing.T) {
 		writeSourceFile(t, srcDir, "scripts/run.sh", "echo hi"),
 	}
 
-	err := Install(manifestPath, InstallRequest{
+	_, err := Install(manifestPath, InstallRequest{
 		Source:     "example/skill",
 		AgentRoots: []string{root},
 		Files:      files,
@@ -74,10 +74,10 @@ func TestReinstallingUnchangedContentIsIdempotent(t *testing.T) {
 	files := []SourceFile{writeSourceFile(t, srcDir, "SKILL.md", "hello")}
 	req := InstallRequest{Source: "example/skill", AgentRoots: []string{root}, Files: files}
 
-	if err := Install(manifestPath, req); err != nil {
+	if _, err := Install(manifestPath, req); err != nil {
 		t.Fatalf("first Install: %v", err)
 	}
-	if err := Install(manifestPath, req); err != nil {
+	if _, err := Install(manifestPath, req); err != nil {
 		t.Fatalf("second Install: %v", err)
 	}
 
@@ -92,14 +92,14 @@ func TestUpgradeReplacesContentMatchingPriorManifest(t *testing.T) {
 	manifestPath := filepath.Join(t.TempDir(), "skill.json")
 
 	original := writeSourceFile(t, srcDir, "SKILL.md", "v1")
-	if err := Install(manifestPath, InstallRequest{
+	if _, err := Install(manifestPath, InstallRequest{
 		Source: "example/skill", AgentRoots: []string{root}, Files: []SourceFile{original},
 	}); err != nil {
 		t.Fatalf("initial Install: %v", err)
 	}
 
 	upgraded := writeSourceFile(t, srcDir, "SKILL.md", "v2")
-	if err := Install(manifestPath, InstallRequest{
+	if _, err := Install(manifestPath, InstallRequest{
 		Source: "example/skill", AgentRoots: []string{root}, Files: []SourceFile{upgraded},
 	}); err != nil {
 		t.Fatalf("upgrade Install: %v", err)
@@ -116,7 +116,7 @@ func TestInstallRefusesLocallyModifiedContent(t *testing.T) {
 	manifestPath := filepath.Join(t.TempDir(), "skill.json")
 
 	original := writeSourceFile(t, srcDir, "SKILL.md", "v1")
-	if err := Install(manifestPath, InstallRequest{
+	if _, err := Install(manifestPath, InstallRequest{
 		Source: "example/skill", AgentRoots: []string{root}, Files: []SourceFile{original},
 	}); err != nil {
 		t.Fatalf("initial Install: %v", err)
@@ -127,7 +127,7 @@ func TestInstallRefusesLocallyModifiedContent(t *testing.T) {
 	}
 
 	upgraded := writeSourceFile(t, srcDir, "SKILL.md", "v2")
-	err := Install(manifestPath, InstallRequest{
+	_, err := Install(manifestPath, InstallRequest{
 		Source: "example/skill", AgentRoots: []string{root}, Files: []SourceFile{upgraded},
 	})
 	var conflictErr *ConflictError
@@ -152,7 +152,7 @@ func TestInstallRefusesUnrelatedCollision(t *testing.T) {
 	}
 
 	files := []SourceFile{writeSourceFile(t, srcDir, "SKILL.md", "hello")}
-	err := Install(manifestPath, InstallRequest{Source: "example/skill", AgentRoots: []string{root}, Files: files})
+	_, err := Install(manifestPath, InstallRequest{Source: "example/skill", AgentRoots: []string{root}, Files: files})
 
 	var conflictErr *ConflictError
 	if !errors.As(err, &conflictErr) {
@@ -179,7 +179,7 @@ func TestForcedInstallReplacesExplicitConflictOnly(t *testing.T) {
 		writeSourceFile(t, srcDir, "SKILL.md", "hello"),
 		writeSourceFile(t, srcDir, "unrelated.md", "gx wants this now"),
 	}
-	err := Install(manifestPath, InstallRequest{
+	_, err := Install(manifestPath, InstallRequest{
 		Source:     "example/skill",
 		AgentRoots: []string{root},
 		Files:      files,
@@ -203,7 +203,7 @@ func TestInstallSymlinkModeLinksToSourceAndRecordsLinkTarget(t *testing.T) {
 	manifestPath := filepath.Join(t.TempDir(), "skill.json")
 
 	src := writeSourceFile(t, srcDir, "SKILL.md", "hello")
-	err := Install(manifestPath, InstallRequest{
+	_, err := Install(manifestPath, InstallRequest{
 		Source:     "dev checkout",
 		AgentRoots: []string{root},
 		Files:      []SourceFile{src},
@@ -242,10 +242,10 @@ func TestInstallSymlinkModeReinstallFromSameSourceIsIdempotent(t *testing.T) {
 	src := writeSourceFile(t, srcDir, "SKILL.md", "hello")
 	req := InstallRequest{Source: "dev checkout", AgentRoots: []string{root}, Files: []SourceFile{src}, Mode: ModeSymlink}
 
-	if err := Install(manifestPath, req); err != nil {
+	if _, err := Install(manifestPath, req); err != nil {
 		t.Fatalf("first Install: %v", err)
 	}
-	if err := Install(manifestPath, req); err != nil {
+	if _, err := Install(manifestPath, req); err != nil {
 		t.Fatalf("second Install: %v", err)
 	}
 
@@ -265,14 +265,14 @@ func TestInstallSymlinkModeFromDifferentSourceRefusesToRetarget(t *testing.T) {
 	manifestPath := filepath.Join(t.TempDir(), "skill.json")
 
 	srcA := writeSourceFile(t, srcDirA, "SKILL.md", "hello")
-	if err := Install(manifestPath, InstallRequest{
+	if _, err := Install(manifestPath, InstallRequest{
 		Source: "checkout A", AgentRoots: []string{root}, Files: []SourceFile{srcA}, Mode: ModeSymlink,
 	}); err != nil {
 		t.Fatalf("initial Install: %v", err)
 	}
 
 	srcB := writeSourceFile(t, srcDirB, "SKILL.md", "hello")
-	err := Install(manifestPath, InstallRequest{
+	_, err := Install(manifestPath, InstallRequest{
 		Source: "checkout B", AgentRoots: []string{root}, Files: []SourceFile{srcB}, Mode: ModeSymlink,
 	})
 	var conflictErr *ConflictError
@@ -298,13 +298,13 @@ func TestInstallSwitchingModesRequiresForce(t *testing.T) {
 	manifestPath := filepath.Join(t.TempDir(), "skill.json")
 
 	src := writeSourceFile(t, srcDir, "SKILL.md", "hello")
-	if err := Install(manifestPath, InstallRequest{
+	if _, err := Install(manifestPath, InstallRequest{
 		Source: "example/skill", AgentRoots: []string{root}, Files: []SourceFile{src},
 	}); err != nil {
 		t.Fatalf("managed-copy Install: %v", err)
 	}
 
-	err := Install(manifestPath, InstallRequest{
+	_, err := Install(manifestPath, InstallRequest{
 		Source: "dev checkout", AgentRoots: []string{root}, Files: []SourceFile{src}, Mode: ModeSymlink,
 	})
 	var conflictErr *ConflictError
@@ -312,7 +312,7 @@ func TestInstallSwitchingModesRequiresForce(t *testing.T) {
 		t.Fatalf("Install err = %v, want *ConflictError switching managed-copy -> symlink", err)
 	}
 
-	if err := Install(manifestPath, InstallRequest{
+	if _, err := Install(manifestPath, InstallRequest{
 		Source: "dev checkout", AgentRoots: []string{root}, Files: []SourceFile{src}, Mode: ModeSymlink,
 		Force: NewForcePolicy("SKILL.md"),
 	}); err != nil {
@@ -322,7 +322,7 @@ func TestInstallSwitchingModesRequiresForce(t *testing.T) {
 		t.Fatalf("expected SKILL.md to become a symlink after forced switch: %v", err)
 	}
 
-	err = Install(manifestPath, InstallRequest{
+	_, err = Install(manifestPath, InstallRequest{
 		Source: "example/skill", AgentRoots: []string{root}, Files: []SourceFile{src},
 	})
 	if !errors.As(err, &conflictErr) {
@@ -342,7 +342,7 @@ func TestInstallFailureDoesNotPublishManifest(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chmod(badRoot, 0755) })
 
 	files := []SourceFile{writeSourceFile(t, srcDir, "scripts/run.sh", "echo hi")}
-	err := Install(manifestPath, InstallRequest{
+	_, err := Install(manifestPath, InstallRequest{
 		Source:     "example/skill",
 		AgentRoots: []string{goodRoot, badRoot},
 		Files:      files,

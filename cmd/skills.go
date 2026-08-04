@@ -116,8 +116,8 @@ func resolveDevRoot(dir string) (string, error) {
 	return info.Repo.Root, nil
 }
 
-// installSkills plans and runs a single skill install, reporting per-target
-// results and turning a conflict into an actionable error message.
+// installSkills runs a single skill install, reporting per-target results
+// and turning a conflict into an actionable error message.
 func installSkills(d deps, force []string, out io.Writer, source string, sources []skills.SourceFile, mode skills.InstallMode) error {
 	roots, err := d.skillsAgentRoots()
 	if err != nil {
@@ -136,13 +136,8 @@ func installSkills(d deps, force []string, out io.Writer, source string, sources
 		Mode:       mode,
 	}
 
-	plan, err := skills.Plan(manifestPath, req)
-	if err != nil {
-		return err
-	}
-
-	installErr := skills.Install(manifestPath, req)
-	printTargetReport(out, plan, installErr == nil)
+	targets, installErr := skills.Install(manifestPath, req)
+	printTargetReport(out, targets, installErr == nil)
 
 	var conflictErr *skills.ConflictError
 	if errors.As(installErr, &conflictErr) {
@@ -154,8 +149,8 @@ func installSkills(d deps, force []string, out io.Writer, source string, sources
 // runSkillsUninstall removes gx's canonical skill bundle's manifest-owned
 // files, reporting each target as removed or conflicted (preserved because
 // it's locally modified and force didn't authorize its removal). Uninstall
-// never aborts on conflict - see skills.Uninstall - so the plan computed here
-// always matches what actually happened.
+// never aborts on conflict, so the targets it returns always match what
+// actually happened.
 func runSkillsUninstall(d deps, force []string, out io.Writer) error {
 	manifestPath, err := d.skillsManifestPath()
 	if err != nil {
@@ -163,7 +158,7 @@ func runSkillsUninstall(d deps, force []string, out io.Writer) error {
 	}
 	forcePolicy := skills.NewForcePolicy(force...)
 
-	plan, err := skills.PlanUninstall(manifestPath, forcePolicy)
+	targets, err := skills.Uninstall(manifestPath, forcePolicy)
 	if errors.Is(err, skills.ErrNotExist) {
 		fmt.Fprintln(out, "gx's skill bundle is not installed")
 		return nil
@@ -171,11 +166,7 @@ func runSkillsUninstall(d deps, force []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-
-	if err := skills.Uninstall(manifestPath, forcePolicy); err != nil {
-		return err
-	}
-	printTargetReport(out, plan, true)
+	printTargetReport(out, targets, true)
 	return nil
 }
 

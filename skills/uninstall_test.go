@@ -13,11 +13,11 @@ func TestUninstallRemovesManifestOwnedPathsAndManifest(t *testing.T) {
 	manifestPath := filepath.Join(t.TempDir(), "skill.json")
 
 	files := []SourceFile{writeSourceFile(t, srcDir, "SKILL.md", "hello")}
-	if err := Install(manifestPath, InstallRequest{Source: "example/skill", AgentRoots: []string{root}, Files: files}); err != nil {
+	if _, err := Install(manifestPath, InstallRequest{Source: "example/skill", AgentRoots: []string{root}, Files: files}); err != nil {
 		t.Fatalf("Install: %v", err)
 	}
 
-	if err := Uninstall(manifestPath, ForcePolicy{}); err != nil {
+	if _, err := Uninstall(manifestPath, ForcePolicy{}); err != nil {
 		t.Fatalf("Uninstall: %v", err)
 	}
 
@@ -35,7 +35,7 @@ func TestUninstallPreservesUnrelatedFilesAndDirectories(t *testing.T) {
 	manifestPath := filepath.Join(t.TempDir(), "skill.json")
 
 	files := []SourceFile{writeSourceFile(t, srcDir, "managed/SKILL.md", "hello")}
-	if err := Install(manifestPath, InstallRequest{Source: "example/skill", AgentRoots: []string{root}, Files: files}); err != nil {
+	if _, err := Install(manifestPath, InstallRequest{Source: "example/skill", AgentRoots: []string{root}, Files: files}); err != nil {
 		t.Fatalf("Install: %v", err)
 	}
 
@@ -45,7 +45,7 @@ func TestUninstallPreservesUnrelatedFilesAndDirectories(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	if err := Uninstall(manifestPath, ForcePolicy{}); err != nil {
+	if _, err := Uninstall(manifestPath, ForcePolicy{}); err != nil {
 		t.Fatalf("Uninstall: %v", err)
 	}
 
@@ -66,7 +66,7 @@ func TestUninstallPreservesLocallyModifiedFilesWithoutForce(t *testing.T) {
 		writeSourceFile(t, srcDir, "SKILL.md", "hello"),
 		writeSourceFile(t, srcDir, "scripts/run.sh", "echo hi"),
 	}
-	if err := Install(manifestPath, InstallRequest{Source: "example/skill", AgentRoots: []string{root}, Files: files}); err != nil {
+	if _, err := Install(manifestPath, InstallRequest{Source: "example/skill", AgentRoots: []string{root}, Files: files}); err != nil {
 		t.Fatalf("Install: %v", err)
 	}
 
@@ -75,7 +75,7 @@ func TestUninstallPreservesLocallyModifiedFilesWithoutForce(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	if err := Uninstall(manifestPath, ForcePolicy{}); err != nil {
+	if _, err := Uninstall(manifestPath, ForcePolicy{}); err != nil {
 		t.Fatalf("Uninstall: %v", err)
 	}
 
@@ -101,7 +101,7 @@ func TestUninstallForceRemovesModifiedFiles(t *testing.T) {
 	manifestPath := filepath.Join(t.TempDir(), "skill.json")
 
 	files := []SourceFile{writeSourceFile(t, srcDir, "SKILL.md", "hello")}
-	if err := Install(manifestPath, InstallRequest{Source: "example/skill", AgentRoots: []string{root}, Files: files}); err != nil {
+	if _, err := Install(manifestPath, InstallRequest{Source: "example/skill", AgentRoots: []string{root}, Files: files}); err != nil {
 		t.Fatalf("Install: %v", err)
 	}
 
@@ -110,7 +110,7 @@ func TestUninstallForceRemovesModifiedFiles(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	if err := Uninstall(manifestPath, NewForcePolicy("SKILL.md")); err != nil {
+	if _, err := Uninstall(manifestPath, NewForcePolicy("SKILL.md")); err != nil {
 		t.Fatalf("Uninstall: %v", err)
 	}
 
@@ -125,7 +125,7 @@ func TestUninstallForceRemovesModifiedFiles(t *testing.T) {
 func TestUninstallOnMissingManifestReturnsErrNotExist(t *testing.T) {
 	manifestPath := filepath.Join(t.TempDir(), "missing.json")
 
-	err := Uninstall(manifestPath, ForcePolicy{})
+	_, err := Uninstall(manifestPath, ForcePolicy{})
 	if !errors.Is(err, ErrNotExist) {
 		t.Fatalf("Uninstall err = %v, want ErrNotExist", err)
 	}

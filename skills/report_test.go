@@ -25,7 +25,7 @@ func TestPlanReportsInstalledUpdatedSkippedAndConflicted(t *testing.T) {
 	unchanged := writeSourceFile(t, srcDir, "unchanged.md", "same")
 	toUpgrade := writeSourceFile(t, srcDir, "upgrade.md", "v1")
 	req := InstallRequest{Source: "example/skill", AgentRoots: []string{root}, Files: []SourceFile{unchanged, toUpgrade}}
-	if err := Install(manifestPath, req); err != nil {
+	if _, err := Install(manifestPath, req); err != nil {
 		t.Fatalf("initial Install: %v", err)
 	}
 
@@ -82,7 +82,7 @@ func TestPlanUninstallReportsRemovedAndConflicted(t *testing.T) {
 		writeSourceFile(t, srcDir, "clean.md", "hello"),
 		writeSourceFile(t, srcDir, "SKILL.md", "hello"),
 	}
-	if err := Install(manifestPath, InstallRequest{Source: "example/skill", AgentRoots: []string{root}, Files: files}); err != nil {
+	if _, err := Install(manifestPath, InstallRequest{Source: "example/skill", AgentRoots: []string{root}, Files: files}); err != nil {
 		t.Fatalf("Install: %v", err)
 	}
 

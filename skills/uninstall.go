@@ -8,7 +8,10 @@ import (
 
 // Uninstall removes a skill's manifest-owned files from every agent root
 // recorded in the manifest at manifestPath, then removes the manifest
-// itself.
+// itself. It returns the same per-target classification PlanUninstall would
+// have produced - classified once, via classifyUninstall, and reused for
+// both the removals and the returned report - so a caller never needs a
+// separate PlanUninstall call just to report what Uninstall did.
 //
 // A managed file whose on-disk content is locally modified is preserved
 // rather than removed unless force explicitly authorizes its path; any
@@ -18,48 +21,48 @@ import (
 // it owns has either been removed or explicitly preserved - a failure
 // midway leaves the manifest describing the pre-uninstall state rather
 // than claiming an incomplete uninstall succeeded.
-func Uninstall(manifestPath string, force ForcePolicy) error {
-	m, err := Load(manifestPath)
+func Uninstall(manifestPath string, force ForcePolicy) ([]Target, error) {
+	targets, m, err := classifyUninstall(manifestPath, force)
 	if err != nil {
-		return fmt.Errorf("load manifest: %w", err)
+		return nil, err
+	}
+
+	preservedPaths := map[string]bool{}
+	for _, t := range targets {
+		if t.Status != StatusConflicted {
+			continue
+		}
+		preservedPaths[t.Path] = true
 	}
 
 	remaining := make([]ManagedFile, 0, len(m.Files))
 	for _, f := range m.Files {
-		preserved := false
-		for _, root := range m.AgentRoots {
-			target := filepath.Join(root, f.Path)
-			currentIdentity, err := identityIfExists(target, m.Mode)
-			if err != nil {
-				return fmt.Errorf("inspect %s: %w", target, err)
-			}
-			ownership := Decide(PathHashes{Installed: managedIdentity(f), Current: currentIdentity}, m.Mode)
-			if ownership == OwnershipAbsent {
-				continue
-			}
-			if !AllowWrite(ownership, f.Path, force) {
-				preserved = true
-				continue
-			}
-			if err := os.Remove(target); err != nil && !os.IsNotExist(err) {
-				return fmt.Errorf("remove %s: %w", target, err)
-			}
-		}
-		if preserved {
+		if preservedPaths[f.Path] {
 			remaining = append(remaining, f)
+			continue
+		}
+	}
+
+	for _, t := range targets {
+		if t.Status != StatusRemoved {
+			continue
+		}
+		target := filepath.Join(t.Root, t.Path)
+		if err := os.Remove(target); err != nil && !os.IsNotExist(err) {
+			return targets, fmt.Errorf("remove %s: %w", target, err)
 		}
 	}
 
 	if len(remaining) == 0 {
 		if err := os.Remove(manifestPath); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("remove manifest: %w", err)
+			return targets, fmt.Errorf("remove manifest: %w", err)
 		}
-		return nil
+		return targets, nil
 	}
 
 	m.Files = remaining
 	if err := Save(manifestPath, m); err != nil {
-		return fmt.Errorf("save manifest: %w", err)
+		return targets, fmt.Errorf("save manifest: %w", err)
 	}
-	return nil
+	return targets, nil
 }
