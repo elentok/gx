@@ -404,7 +404,9 @@ func (m Model) normalView() string {
 	h := m.contentHeight()
 	sidebarH, previewH := m.splitHeight(h)
 
-	sidebarView := m.renderPanel(sidebarW, sidebarH, "Tickets", m.searchMatchStatus(), m.sidebarVisibleLines(m.sidebarViewportHeight()), m.focus == focusSidebar, true)
+	sidebarViewportH := m.sidebarViewportHeight()
+	sidebarBody := ui.AppendScrollbar(m.sidebarVisibleLines(sidebarViewportH), sidebarW-2, len(m.sidebarLines()), sidebarViewportH, m.scrollOffset)
+	sidebarView := m.renderPanel(sidebarW, sidebarH, "Tickets", m.searchMatchStatus(), sidebarBody, m.focus == focusSidebar, true)
 	previewView := m.renderPanel(previewW, previewH, "Preview", m.previewMatchStatus(), m.previewLines(), m.focus == focusPreview, false)
 
 	var body string

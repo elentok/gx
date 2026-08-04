@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // Scrollbar glyphs: both thumb and track are thin vertical lines - a heavy
@@ -68,4 +69,35 @@ func RenderScrollbar(height, total, visible, offset int) string {
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+// ScrollbarGutter is the width a caller must reserve to the right of its
+// content for AppendScrollbar's " " + bar column (mirrors the preview pane's
+// own previewScrollbarGutter).
+const ScrollbarGutter = 2
+
+// AppendScrollbar pairs a windowed slice of already-visible content lines
+// with a scroll indicator sized from the full scrollable region (total,
+// visible, offset - see RenderScrollbar), truncating/padding each line to
+// contentWidth-ScrollbarGutter so the appended " "+bar column lands at a
+// fixed column instead of drifting with each line's own length. Returns
+// lines unchanged when the content fits (RenderScrollbar returns "").
+func AppendScrollbar(lines []string, contentWidth, total, visible, offset int) []string {
+	bar := RenderScrollbar(len(lines), total, visible, offset)
+	if bar == "" {
+		return lines
+	}
+	barLines := strings.Split(bar, "\n")
+	textWidth := max(contentWidth-ScrollbarGutter, 0)
+	out := make([]string, len(lines))
+	for i, line := range lines {
+		text := ansi.Truncate(line, textWidth, "")
+		text += strings.Repeat(" ", max(0, textWidth-ansi.StringWidth(text)))
+		barSeg := ""
+		if i < len(barLines) {
+			barSeg = barLines[i]
+		}
+		out[i] = text + " " + barSeg
+	}
+	return out
 }

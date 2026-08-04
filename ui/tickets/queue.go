@@ -824,7 +824,8 @@ func (m QueueModel) View() tea.View {
 			m.implementAgentMenu,
 		))
 	}
-	lines := m.queueVisibleLines(m.queueViewportHeight())
+	viewportH := m.queueViewportHeight()
+	lines := ui.AppendScrollbar(m.queueVisibleLines(viewportH), m.width-2, len(m.queueLines()), viewportH, m.scrollOffset)
 	height := max(m.height-1, 1)
 	content := ui.RenderPanel(ui.PanelOptionsFor(
 		m.width, height, "Queue", "", lines, true, ui.ColorBlue, nil, false,
