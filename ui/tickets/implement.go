@@ -450,18 +450,59 @@ func newImplementAgentMenu() components.MenuState {
 	}
 }
 
-// handleImplementKey confirms the checked selection before opening its plan.
+// handleImplementKey applies the checked selection to the queue. With no
+// ralph-loop active (ticket 11), it replaces the not-yet-started queue
+// entries with the checked selection directly and switches to the Queue tab
+// — no confirmation, since nothing running/done is at risk. With a loop
+// active, ticket 12 gates this behind a confirmation instead.
 func (m Model) handleImplementKey() (tea.Model, tea.Cmd) {
 	if len(m.checked) == 0 {
 		return m, notify.Info("check at least one ticket to build an execution plan")
 	}
 	worktreeRoot := m.worktreeRoot
+	if !IsLoopRunning() {
+		if err := m.replaceQueuedSelection(); err != nil {
+			return m, notify.Error("save queue: " + err.Error())
+		}
+		return m, cmdOpenQueueTab(worktreeRoot)
+	}
 	count := len(m.checked)
 	m.confirm = m.confirm.Open(confirm.Options{
 		Prompt:    fmt.Sprintf("Open the execution plan for %d checked ticket(s)?", count),
 		AcceptCmd: cmdOpenQueueTab(worktreeRoot),
 	})
 	return m, nil
+}
+
+// replaceQueuedSelection applies ticket 11's "i" replace logic: within this
+// tab's own worktree scope (mirroring scopedQueueSnapshot), every pending
+// (not-yet-started) queue entry is dropped and replaced by the current
+// checked selection. Running/done/errored entries — and anything outside
+// scope, which this tab can't see to safely decide about — are left exactly
+// as they are, whether or not they're still checked.
+func (m *Model) replaceQueuedSelection() error {
+	snapshot := m.queueStore.Snapshot()
+	next := make(map[string]queueItemStatus, len(snapshot.Status))
+	order := make(map[string]uint64, len(snapshot.Order))
+	for path, status := range snapshot.Status {
+		if status == queueStatusPending && m.inScope(path) {
+			continue
+		}
+		next[path] = status
+		order[path] = snapshot.Order[path]
+	}
+	for path := range m.checked {
+		if _, exists := next[path]; exists {
+			continue
+		}
+		next[path] = queueStatusPending
+		order[path] = m.checkOrder[path]
+	}
+	if err := m.queueStore.Replace(next, order); err != nil {
+		return err
+	}
+	m.refreshQueueSnapshot()
+	return nil
 }
 
 func cmdOpenQueueTab(worktreeRoot string) tea.Cmd {

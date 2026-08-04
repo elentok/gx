@@ -40,9 +40,9 @@ func TestTicketsConfirmOpensQueueWithSharedSelection(t *testing.T) {
 	tm.Send(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	tm.Send(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
 	tm.Send(tea.KeyPressMsg{Code: 'i', Text: "i"})
-	waitForAppText(t, tm, "Open the execution plan")
 
-	tm.Send(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	// Ticket 11: with no ralph-loop running, "i" applies the selection and
+	// switches to the Queue tab directly, no confirmation.
 	waitForAppText(t, tm, "This is the execution plan")
 	waitForAppText(t, tm, "First")
 }

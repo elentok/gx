@@ -49,9 +49,8 @@ func scopedQueueSnapshot(store *QueueStore, worktreeRoot string, allWorktrees bo
 	snapshot := store.Snapshot()
 	queueStatus, checkOrder = snapshot.Status, snapshot.Order
 	if !allWorktrees {
-		scratchPrefix := filepath.Join(worktreeRoot, ".scratch") + string(filepath.Separator)
 		for path := range queueStatus {
-			if !strings.HasPrefix(path, scratchPrefix) {
+			if !inWorktreeScope(path, worktreeRoot, allWorktrees) {
 				delete(queueStatus, path)
 				delete(checkOrder, path)
 			}
@@ -62,6 +61,24 @@ func scopedQueueSnapshot(store *QueueStore, worktreeRoot string, allWorktrees bo
 		checked[path] = true
 	}
 	return queueStatus, checkOrder, checked
+}
+
+// inWorktreeScope reports whether path is inside worktreeRoot's own
+// `.scratch/`, or allWorktrees is set — shared by scopedQueueSnapshot and
+// Model.inScope so both apply the same cross-worktree boundary.
+func inWorktreeScope(path, worktreeRoot string, allWorktrees bool) bool {
+	if allWorktrees {
+		return true
+	}
+	scratchPrefix := filepath.Join(worktreeRoot, ".scratch") + string(filepath.Separator)
+	return strings.HasPrefix(path, scratchPrefix)
+}
+
+// inScope reports whether path is within this Model's own worktree scope
+// (see scopedQueueSnapshot) — used by replaceQueuedSelection (implement.go)
+// to avoid touching another worktree's queue entries it can't see.
+func (m Model) inScope(path string) bool {
+	return inWorktreeScope(path, m.worktreeRoot, m.allWorktrees)
 }
 
 func nextCheckOrdinal(checkOrder map[string]uint64) uint64 {
