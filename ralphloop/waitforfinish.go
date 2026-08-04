@@ -190,8 +190,20 @@ const smartZoneRecoveryTimeoutMs = 30_000
 // smartZoneCompactTimeoutMs bounds recoverSmartZoneBreach's wait for the
 // "/compact" command itself to finish (pane back to idle/done), as opposed
 // to merely starting (pane reaching "working"). Compacting a near-full
-// context can take minutes, well past smartZoneRecoveryTimeoutMs.
+// context can take minutes, well past smartZoneRecoveryTimeoutMs. Once this
+// elapses without the pane confirming completion, waitForCompactionSignal
+// starts consulting the transcript's compaction-boundary signal on every
+// further poll tick (see smartZoneCompactExtendedTimeoutMs) instead of
+// declaring failure immediately — a herdr pane-status observation gap is not
+// the same thing as compaction actually being stuck.
 const smartZoneCompactTimeoutMs = 300_000
+
+// smartZoneCompactExtendedTimeoutMs is the outer bound recoverSmartZoneBreach
+// gives a compact that's past smartZoneCompactTimeoutMs but whose transcript
+// keeps showing no new compaction-boundary line either — i.e. neither signal
+// has confirmed completion. Only once this elapses is the compact treated as
+// a genuine, not merely slow, failure.
+const smartZoneCompactExtendedTimeoutMs = 600_000
 
 // recoverSmartZoneBreach compacts the conversation and re-prompts the agent
 // to finish up after a smart-zone breach, deliberately never calling
@@ -220,9 +232,18 @@ const smartZoneCompactTimeoutMs = 300_000
 // recoverOrFailCodexContextExhaustion) need that distinction; the plain
 // proactive smart-zone breach caller still treats both outcomes the same way
 // and ignores it.
+//
+// The compact-completion wait polls in smartZonePollMs ticks (via
+// waitForCompactionSignal) rather than blocking on one long AgentPrompt/
+// AgentWait call, so a pane-status wait that times out past
+// smartZoneCompactTimeoutMs can still be confirmed successful from the
+// transcript's compaction-boundary signal instead of being misreported as a
+// failure — see waitForCompactionSignal's doc comment.
 func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason string, smartZone int) (bool, error) {
 	p.sink().SmartZoneCompactStarted(p.Ticket)
 	p.logAgentEvent(eventPausedSmartZone, sessionID, reason)
+
+	baselineCompactions, haveBaseline, _ := sessionCompactions(d, p.Agent, p.SessionCwd, sessionID)
 
 	compactStates := append(append([]string{}, plainFinishStates...), "blocked")
 	agent, err := d.AgentPrompt(herdr.AgentPromptOptions{
@@ -230,8 +251,12 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 		Text:      "/compact",
 		Wait:      true,
 		Until:     compactStates,
-		TimeoutMs: smartZoneCompactTimeoutMs,
+		TimeoutMs: smartZonePollMs,
 	})
+	expired := false
+	if err != nil && isPollTimeout(err) {
+		agent, expired, err = waitForCompactionSignal(d, p, sessionID, compactStates, smartZonePollMs, baselineCompactions, haveBaseline)
+	}
 	if err == nil && agent.AgentStatus == "blocked" {
 		_, err = d.AgentWait(herdr.AgentWaitOptions{
 			Target:    p.Pane,
@@ -242,14 +267,20 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 			_, err = d.AgentWait(herdr.AgentWaitOptions{
 				Target:    p.Pane,
 				Until:     plainFinishStates,
-				TimeoutMs: smartZoneCompactTimeoutMs,
+				TimeoutMs: smartZonePollMs,
 			})
+			if err != nil && isPollTimeout(err) {
+				_, expired, err = waitForCompactionSignal(d, p, sessionID, plainFinishStates, smartZonePollMs, baselineCompactions, haveBaseline)
+			}
 		}
 	}
 	if err != nil {
 		p.sink().SmartZoneRecovered(p.Ticket)
 		p.logAgentEvent(eventSmartZoneRecoveryFailed, sessionID, fmt.Sprintf("compacting %s after smart-zone breach: %v", p.Label, err))
 		return false, nil
+	}
+	if expired {
+		p.logAgentEvent(eventSmartZoneWaitExpired, sessionID, fmt.Sprintf("compact wait for %s expired but the transcript confirmed compaction completed", p.Label))
 	}
 
 	p.sink().SmartZoneFinishingUp(p.Ticket)
@@ -275,6 +306,52 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 	p.sink().SmartZoneRecovered(p.Ticket)
 	p.logLifecycleEvent(eventResumed, sessionID)
 	return true, nil
+}
+
+// waitForCompactionSignal polls Pane in smartZonePollMs ticks for one of
+// until's states instead of blocking on a single long AgentWait call, so a
+// still-genuinely-running compact isn't indistinguishable from a stuck one
+// just because herdr's own pane-status wait timed out. startElapsedMs is the
+// time already spent by the caller's own first poll tick before handing off
+// here. Once total elapsed time passes smartZoneCompactTimeoutMs, each
+// further tick that also times out additionally checks the transcript's
+// compaction-boundary count (via sessionCompactions): a count higher than
+// baselineCompactions means compaction actually completed since "/compact"
+// was submitted, even though the pane-status wait never observed it — that's
+// reported as success (transcriptConfirmed=true) rather than a failure. Only
+// once smartZoneCompactExtendedTimeoutMs elapses with neither signal showing
+// completion is the pane's timeout error returned as a genuine failure.
+func waitForCompactionSignal(
+	d Deps, p launchAndPromptParams, sessionID string,
+	until []string, startElapsedMs int,
+	baselineCompactions int, haveBaseline bool,
+) (agent herdr.Agent, transcriptConfirmed bool, err error) {
+	elapsedMs := startElapsedMs
+	for {
+		agent, err = d.AgentWait(herdr.AgentWaitOptions{
+			Target:    p.Pane,
+			Until:     until,
+			TimeoutMs: smartZonePollMs,
+		})
+		if err == nil {
+			return agent, false, nil
+		}
+		if !isPollTimeout(err) {
+			return agent, false, err
+		}
+		elapsedMs += smartZonePollMs
+
+		if haveBaseline && elapsedMs >= smartZoneCompactTimeoutMs {
+			count, ok, readErr := sessionCompactions(d, p.Agent, p.SessionCwd, sessionID)
+			if readErr == nil && ok && count > baselineCompactions {
+				return agent, true, nil
+			}
+		}
+
+		if elapsedMs >= smartZoneCompactExtendedTimeoutMs {
+			return agent, false, err
+		}
+	}
 }
 
 // confirmFinished debounces a just-reached idle/done signal on pane: it

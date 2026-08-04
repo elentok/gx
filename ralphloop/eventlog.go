@@ -18,6 +18,13 @@ const (
 	eventConflictResolved        = "conflict-resolved"
 	eventPausedSmartZone         = "paused-smart-zone"
 	eventSmartZoneRecoveryFailed = "smart-zone-recovery-failed"
+	// eventSmartZoneWaitExpired marks a compact-recovery wait that expired
+	// past smartZoneCompactTimeoutMs without herdr's pane-status wait ever
+	// confirming completion, but where the transcript's compaction-boundary
+	// signal showed compaction actually finished anyway — a slower-than-usual
+	// compact, not a failure, and deliberately distinct from
+	// eventSmartZoneRecoveryFailed so it isn't misread as one.
+	eventSmartZoneWaitExpired = "smart-zone-wait-expired"
 	eventPausedRateLimit         = "paused-rate-limit"
 	eventResumed                 = "resumed"
 	eventNeedsInfo               = "needs-info"

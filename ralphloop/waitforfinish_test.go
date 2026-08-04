@@ -324,6 +324,146 @@ func TestWaitForFinish_CodexContextBreachRecoversThroughBlockedCompactConfirmati
 	}
 }
 
+// TestRecoverSmartZoneBreach_TranscriptConfirmsLateCompaction verifies the
+// gap from research ticket 05: herdr's pane-status wait for "/compact" can
+// keep timing out past smartZoneCompactTimeoutMs even though the compact is
+// genuinely still running, not stuck. Once the transcript's compaction-
+// boundary count rises above its pre-compact baseline, recovery must treat
+// that as success (and finish up) instead of reporting a failure.
+func TestRecoverSmartZoneBreach_TranscriptConfirmsLateCompaction(t *testing.T) {
+	scratchDir := t.TempDir()
+	var waits, prompts int
+	var compactionCount int
+	d := Deps{
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			waits++
+			// Ticks past smartZoneCompactTimeoutMs (past the 10th
+			// smartZonePollMs-sized tick) before the transcript records the
+			// compaction finishing, so recovery must stop polling on its own
+			// rather than needing the pane to ever confirm completion.
+			if waits == 11 {
+				compactionCount = 1
+			}
+			return herdr.Agent{}, errors.New("timed out waiting for agent status")
+		},
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			prompts++
+			if opts.Text == "/compact" {
+				return herdr.Agent{}, errors.New("timed out waiting for agent status")
+			}
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
+		},
+		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
+			return compactionCount, true, nil
+		},
+		Sleep: func(time.Duration) {},
+	}
+
+	p := launchAndPromptParams{
+		Label:      "iter-19",
+		Agent:      AgentClaude,
+		Pane:       "pane-1",
+		Ticket:     "19",
+		SessionCwd: "/repo/iter-19",
+		ScratchDir: scratchDir,
+		EpicName:   "epic",
+	}
+
+	recovered, err := recoverSmartZoneBreach(d, p, "sess-19", "smart-zone breach", 100)
+	if err != nil {
+		t.Fatalf("recoverSmartZoneBreach: %v", err)
+	}
+	if !recovered {
+		t.Fatal("recoverSmartZoneBreach returned recovered=false, want true once the transcript confirms compaction completed")
+	}
+	if prompts != 2 {
+		t.Errorf("prompts sent = %d, want 2 (/compact, then finish-up)", prompts)
+	}
+
+	events, ok, err := readEvents(scratchDir, "epic")
+	if err != nil || !ok {
+		t.Fatalf("readEvents() ok=%v err=%v", ok, err)
+	}
+	var sawFailed, sawExpired, sawResumed bool
+	for _, e := range events {
+		switch e.Type {
+		case eventSmartZoneRecoveryFailed:
+			sawFailed = true
+		case eventSmartZoneWaitExpired:
+			sawExpired = true
+		case eventResumed:
+			sawResumed = true
+		}
+	}
+	if sawFailed {
+		t.Error("smart-zone-recovery-failed event emitted for a compact that merely ran long, want none")
+	}
+	if !sawExpired {
+		t.Error("missing smart-zone-wait-expired event distinguishing the expired-but-completed case")
+	}
+	if !sawResumed {
+		t.Error("missing resumed event after transcript-confirmed recovery")
+	}
+}
+
+// TestRecoverSmartZoneBreach_GenuineStuckCompactFailsAfterExtendedWait
+// verifies the other half of the same gap: when neither herdr's pane status
+// nor the transcript's compaction-boundary count ever show completion, the
+// wait must eventually give up (at smartZoneCompactExtendedTimeoutMs) and
+// report a genuine failure, not poll forever.
+func TestRecoverSmartZoneBreach_GenuineStuckCompactFailsAfterExtendedWait(t *testing.T) {
+	scratchDir := t.TempDir()
+	var prompts int
+	d := Deps{
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			return herdr.Agent{}, errors.New("timed out waiting for agent status")
+		},
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			prompts++
+			return herdr.Agent{}, errors.New("timed out waiting for agent status")
+		},
+		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
+			return 0, true, nil
+		},
+		Sleep: func(time.Duration) {},
+	}
+
+	p := launchAndPromptParams{
+		Label:      "iter-19",
+		Agent:      AgentClaude,
+		Pane:       "pane-1",
+		Ticket:     "19",
+		SessionCwd: "/repo/iter-19",
+		ScratchDir: scratchDir,
+		EpicName:   "epic",
+	}
+
+	recovered, err := recoverSmartZoneBreach(d, p, "sess-19", "smart-zone breach", 100)
+	if err != nil {
+		t.Fatalf("recoverSmartZoneBreach: %v", err)
+	}
+	if recovered {
+		t.Fatal("recoverSmartZoneBreach returned recovered=true, want false: compaction never completed on either signal")
+	}
+	if prompts != 1 {
+		t.Errorf("prompts sent = %d, want 1 (/compact only, no finish-up after failure)", prompts)
+	}
+
+	events, ok, err := readEvents(scratchDir, "epic")
+	if err != nil || !ok {
+		t.Fatalf("readEvents() ok=%v err=%v", ok, err)
+	}
+	var sawFailed bool
+	for _, e := range events {
+		if e.Type == eventSmartZoneRecoveryFailed {
+			sawFailed = true
+		}
+	}
+	if !sawFailed {
+		t.Error("missing smart-zone-recovery-failed event for a genuinely stuck compact")
+	}
+}
+
 // occupancySink is a minimal EventSink test double that only records
 // ContextOccupancy calls, embedding noopEventSink for the rest.
 type occupancySink struct {
