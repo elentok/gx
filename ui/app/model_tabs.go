@@ -329,12 +329,12 @@ func (m Model) tabHitAt(x, y int) (nav.TabID, bool) {
 	return "", false
 }
 
-func orderedTabs() []nav.TabID {
-	return []nav.TabID{nav.TabWorktrees, nav.TabLog, nav.TabStatus, nav.TabStash, nav.TabPRs, nav.TabTickets, nav.TabQueue}
-}
-
 func (m Model) switchRelativeTab(delta int) (Model, tea.Cmd) {
-	tabs := orderedTabs()
+	specs := m.tabSpecs()
+	tabs := make([]nav.TabID, len(specs))
+	for i, spec := range specs {
+		tabs[i] = spec.id
+	}
 	idx := 0
 	activeTab := m.navState.ActiveTab()
 	for i, kind := range tabs {
