@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -461,11 +462,28 @@ func resolveCherryPickConflict(d Deps, p iterationParams) (sessionID string, res
 		return "", fmt.Errorf("creating conflict-resolution pane: %w", err)
 	}
 	defer func() {
-		if closeErr := d.TabClose(tab.TabID); closeErr != nil {
+		closeErr := d.TabClose(tab.TabID)
+		if closeErr != nil {
 			if resultErr != nil {
 				resultErr = fmt.Errorf("%w (also failed closing conflict-resolution tab: %v)", resultErr, closeErr)
 			} else {
 				resultErr = fmt.Errorf("closing conflict-resolution tab: %w", closeErr)
+			}
+			return
+		}
+		// herdr's tab-close call can report success without the tab actually
+		// disappearing (upstream bug, see .scratch/tickets-queue-polish/issues/
+		// 04-conflict-resolution-tab-not-closing.md) — check for it so a false
+		// success doesn't silently leak a tab, without turning it into a hard
+		// failure that would take the whole ticket down over one leaked pane.
+		tabs, listErr := d.TabList(p.WorkspaceID)
+		if listErr != nil {
+			return
+		}
+		for _, t := range tabs {
+			if t.TabID == tab.TabID {
+				log.Printf("conflict-resolution tab %s reported closed but is still present in tab list", tab.TabID)
+				break
 			}
 		}
 	}()

@@ -3,6 +3,7 @@ package ralphloop
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -345,6 +346,26 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 		}
 	}
 
+	// The conflict-resolution tab must actually be closed once the resolution
+	// agent finishes — this is the coverage gap flagged by
+	// .scratch/tickets-queue-polish/issues/04-conflict-resolution-tab-not-closing.md:
+	// today's suite never asserted this call happened at all, so a regression
+	// that silently dropped it would have gone unnoticed.
+	wantTabID := "tab-" + conflictLabel(p.Ticket.Identifier)
+	var closeArgv []string
+	for _, e := range trace {
+		if len(e.Argv) >= 2 && e.Argv[0]+" "+e.Argv[1] == "tab close" {
+			closeArgv = e.Argv
+			break
+		}
+	}
+	if closeArgv == nil {
+		t.Fatalf("traced commands = %v, want a %q call for tab %q", verbs, "tab close", wantTabID)
+	}
+	if len(closeArgv) < 3 || closeArgv[2] != wantTabID {
+		t.Errorf("tab close argv = %v, want tab id %q", closeArgv, wantTabID)
+	}
+
 	// Nothing beyond tab-create/agent-start/agent-wait/agent-prompt/agent-read
 	// is registered, so any other command against this same coordinator fails
 	// immediately instead of silently no-op'ing.
@@ -390,5 +411,48 @@ func TestConflictResolverHandlePrompt_UnexpectedPrompt_FailsImmediately(t *testi
 	_, _, err := resolver.handlePrompt(nil, []string{"agent", "prompt", "pane-x", "/some-other-skill"})
 	if err == nil {
 		t.Fatal("handlePrompt() error = nil, want failure for an unrecognized prompt")
+	}
+}
+
+// TestResolveCherryPickConflict_TabStillPresentAfterClose_LogsWarningNotError
+// covers the false-success case from
+// .scratch/tickets-queue-polish/issues/04-conflict-resolution-tab-not-closing.md:
+// herdr's tab-close call can report success without the tab actually
+// disappearing. The cleanup path in resolveCherryPickConflict must notice
+// (via a follow-up tab-list check) and log a warning, not fail the overall
+// operation.
+func TestResolveCherryPickConflict_TabStillPresentAfterClose_LogsWarningNotError(t *testing.T) {
+	d, _, _ := fakeDeps()
+	var closedTabID string
+	d.TabClose = func(tabID string) error {
+		closedTabID = tabID
+		return nil // reports success even though TabList below still lists it
+	}
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
+		return []herdr.Tab{{TabID: closedTabID, WorkspaceID: workspaceID}}, nil
+	}
+
+	var out bytes.Buffer
+	p := iterationParams{
+		WorkspaceID:     "ws-1",
+		FeatureWorktree: t.TempDir(),
+		FeatureBranch:   "main",
+		Agent:           AgentClaude,
+		Ticket:          tickets.Ticket{Identifier: "03"},
+		SmartZone:       1_000_000,
+		Gate:            NewGate(),
+		Sink:            NewTextEventSink(&out),
+	}
+
+	var logBuf bytes.Buffer
+	log.SetOutput(&logBuf)
+	defer log.SetOutput(os.Stderr)
+
+	if _, err := resolveCherryPickConflict(d, p); err != nil {
+		t.Fatalf("resolveCherryPickConflict() error = %v, want nil (a false-success tab-close warns, it doesn't fail the operation)", err)
+	}
+
+	if !strings.Contains(logBuf.String(), closedTabID) {
+		t.Errorf("log output = %q, want a warning naming the still-present tab %q", logBuf.String(), closedTabID)
 	}
 }
