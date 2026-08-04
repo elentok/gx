@@ -74,14 +74,6 @@ func nextCheckOrdinal(checkOrder map[string]uint64) uint64 {
 	return next
 }
 
-func markChecked(checked map[string]bool, checkOrder map[string]uint64, path string) {
-	if checked[path] {
-		return
-	}
-	checked[path] = true
-	checkOrder[path] = nextCheckOrdinal(checkOrder)
-}
-
 func markUnchecked(checked map[string]bool, checkOrder map[string]uint64, path string) {
 	delete(checked, path)
 	delete(checkOrder, path)

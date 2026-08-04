@@ -156,23 +156,90 @@ func TestQueueModelBannerWhenCompletedAggregatesLandedTicketMetrics(t *testing.T
 	}
 }
 
-func TestQueueModelSpaceTogglesSharedCheckedSet(t *testing.T) {
+// TestQueueModelRowsRenderWithNoCheckbox covers ticket 08: the Queue tab is
+// read-only for selection, so its rows must not render a checkbox glyph
+// (checking/selecting only happens in the Tickets tab).
+func TestQueueModelRowsRenderWithNoCheckbox(t *testing.T) {
 	root := t.TempDir()
 	name := "01-first.md"
 	writeTicket(t, root, "alpha", name, "Status: open\n\nBody.\n")
-	path := ticketPath(root, "alpha", name)
-	checked := map[string]bool{path: true}
+	checked := map[string]bool{ticketPath(root, "alpha", name): true}
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
 
-	updated, _ := m.Update(spacePress())
+	content := m.View().Content
+	icons := ui.Icons(false)
+	if strings.Contains(content, icons.CheckboxChecked) || strings.Contains(content, icons.CheckboxUnchecked) {
+		t.Fatalf("expected no checkbox glyph in Queue tab rows:\n%s", content)
+	}
+}
+
+// TestQueueModelClearAllRequiresConfirmation covers ticket 08's "C" keymap:
+// pressing it opens a confirmation, and only accepting it clears every
+// queued ticket.
+func TestQueueModelClearAllRequiresConfirmation(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "beta", "01-first.md", "Status: open\n\nBody.\n")
+	alpha := ticketPath(root, "alpha", "01-first.md")
+	beta := ticketPath(root, "beta", "01-first.md")
+	checked := map[string]bool{alpha: true, beta: true}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'C', Text: "C"})
 	m = updated.(QueueModel)
-	if checked[path] {
-		t.Fatal("expected Queue uncheck to update the shared checked set")
+	if !m.confirm.IsOpen {
+		t.Fatal("expected \"C\" to open a confirmation before clearing")
+	}
+	if !checked[alpha] || !checked[beta] {
+		t.Fatal("expected nothing cleared before the confirmation is accepted")
 	}
 
-	updated, _ = m.Update(spacePress())
-	if !checked[path] {
-		t.Fatal("expected Queue recheck to update the shared checked set")
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	m = updated.(QueueModel)
+	m = deliverQueueCommands(t, m, cmd)
+	if checked[alpha] || checked[beta] {
+		t.Fatal("expected accepting the confirmation to clear every queued ticket")
+	}
+}
+
+// TestQueueModelClearCompleteRequiresConfirmation covers ticket 08's "c"
+// keymap: only done tickets (and epics left with nothing visible) are
+// cleared, after confirmation.
+func TestQueueModelClearCompleteRequiresConfirmation(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-open.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "alpha", "02-done.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "beta", "01-done.md", "Status: open\n\nBody.\n")
+	writeRawQueueTicket(t, root, "alpha", "02-done.md", "---\nid: \"02\"\nstatus: done\ntype: task\n---\n\nBody.\n")
+	writeRawQueueTicket(t, root, "beta", "01-done.md", "---\nid: \"01\"\nstatus: done\ntype: task\n---\n\nBody.\n")
+	open := ticketPath(root, "alpha", "01-open.md")
+	alphaDone := ticketPath(root, "alpha", "02-done.md")
+	betaDone := ticketPath(root, "beta", "01-done.md")
+	checked := map[string]bool{open: true, alphaDone: true, betaDone: true}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+	m = updated.(QueueModel)
+	if !m.confirm.IsOpen {
+		t.Fatal("expected \"c\" to open a confirmation before clearing")
+	}
+	if !checked[alphaDone] || !checked[betaDone] {
+		t.Fatal("expected nothing cleared before the confirmation is accepted")
+	}
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	m = updated.(QueueModel)
+	m = deliverQueueCommands(t, m, cmd)
+	if checked[alphaDone] || checked[betaDone] {
+		t.Fatal("expected accepting the confirmation to clear done tickets")
+	}
+	if !checked[open] {
+		t.Fatal("expected non-done tickets to remain checked")
+	}
+
+	content := m.View().Content
+	if strings.Contains(content, "beta") {
+		t.Fatalf("expected beta epic to disappear once its only ticket cleared:\n%s", content)
 	}
 }
 

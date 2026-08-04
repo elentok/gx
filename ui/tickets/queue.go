@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
@@ -86,6 +87,11 @@ type QueueModel struct {
 	runningEpics           map[string]bool
 	runningAgent           ralphloop.AgentKind
 	paused                 bool
+
+	// confirm backs the "C"/"c" clear keymaps (handleQueueKey) — the Queue tab
+	// is read-only for selection (ticket 08), so this is the only modal this
+	// tab opens outside the agent-picker menu.
+	confirm confirm.Model
 }
 
 func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string]bool, orders ...map[string]uint64) QueueModel {
@@ -113,6 +119,7 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 		implementAgentMenu: newImplementAgentMenu(),
 		runningEpics:       map[string]bool{},
 		paused:             ralphLoopRegistry.isPaused(),
+		confirm:            confirm.New(),
 	}
 }
 
@@ -195,7 +202,12 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleQueueSpinnerTick(msg)
 	case tea.MouseWheelMsg:
 		return m.handleQueueMouseWheel(msg)
+	case queueClearConfirmedMsg:
+		return m.handleQueueClearConfirmed(msg)
 	case tea.KeyPressMsg:
+		if m.confirm.IsOpen {
+			return m.handleQueueConfirmUpdate(msg)
+		}
 		return m.handleQueueKey(msg)
 	}
 	return m, nil
@@ -431,8 +443,20 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		ralphLoopRegistry.pause()
 		m.paused = true
 		return m, notify.Info("queue paused")
-	case " ", "space":
-		m.toggleSelected()
+	case "C":
+		if paths := m.checkedPaths(); len(paths) > 0 {
+			m.confirm = m.confirm.Open(confirm.Options{
+				Prompt:    fmt.Sprintf("Clear all %d queued ticket(s)?", len(paths)),
+				AcceptCmd: cmdConfirmQueueClear(paths),
+			})
+		}
+	case "c":
+		if paths := m.doneCheckedPaths(); len(paths) > 0 {
+			m.confirm = m.confirm.Open(confirm.Options{
+				Prompt:    fmt.Sprintf("Clear %d completed ticket(s) from the queue?", len(paths)),
+				AcceptCmd: cmdConfirmQueueClear(paths),
+			})
+		}
 	case "enter":
 		if len(m.runningEpics) == 0 && len(m.pendingEpics) == 0 {
 			if len(m.checkedEpicPlans()) > 0 {
@@ -619,17 +643,92 @@ func (m *QueueModel) clampScrollOffset() {
 	m.scrollOffset = max(0, min(m.scrollOffset, maxOffset))
 }
 
-func (m *QueueModel) toggleSelected() {
-	rows := m.rows()
-	if m.selected < 0 || m.selected >= len(rows) {
-		return
+// checkedPaths lists every currently checked ticket path, for the "C" clear
+// keymap's confirmation prompt and its accepted clear-all.
+func (m QueueModel) checkedPaths() []string {
+	paths := make([]string, 0, len(m.checked))
+	for path := range m.checked {
+		paths = append(paths, path)
 	}
-	path := rows[m.selected].ticket.Path
-	if m.checked[path] {
+	return paths
+}
+
+// doneCheckedPaths lists every checked ticket path whose status renders as
+// done, for the "c" clear-complete keymap — a ticket counts as done either
+// through its file's own Status: frontmatter or the queue's durable
+// queueStatusDone (mirroring checkedProgress's same OR, so a just-finished
+// run counts before the ticket file's frontmatter catches up).
+func (m QueueModel) doneCheckedPaths() []string {
+	var paths []string
+	for _, epic := range m.epics {
+		for _, t := range epic.Tickets {
+			if !m.checked[t.Path] {
+				continue
+			}
+			if epic.RenderedStatus(t) == tickets.StatusDone || m.queueStatus[t.Path] == queueStatusDone {
+				paths = append(paths, t.Path)
+			}
+		}
+	}
+	return paths
+}
+
+// queueClearConfirmedMsg carries the "C"/"c" clear keymaps' confirmation
+// acceptance: paths is the set captured when the modal opened (mirroring
+// checkAddConfirmedMsg's same capture-at-open-time approach in checked.go).
+type queueClearConfirmedMsg struct {
+	paths []string
+}
+
+func cmdConfirmQueueClear(paths []string) tea.Cmd {
+	return func() tea.Msg {
+		return queueClearConfirmedMsg{paths: paths}
+	}
+}
+
+func (m QueueModel) handleQueueConfirmUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
+	next, cmd, _ := m.confirm.Update(msg)
+	m.confirm = next
+	return m, cmd
+}
+
+// handleQueueClearConfirmed applies queueClearConfirmedMsg: every path is
+// unchecked, causing any epic left with no checked tickets to drop out of
+// rowsAndPlanErrors' output with no further bookkeeping (see its doc
+// comment).
+func (m QueueModel) handleQueueClearConfirmed(msg queueClearConfirmedMsg) (tea.Model, tea.Cmd) {
+	if err := m.clearCheckedPaths(msg.paths); err != nil {
+		return m, notify.Error("save queue: " + err.Error())
+	}
+	m.clampSelected()
+	return m, nil
+}
+
+func (m *QueueModel) clearCheckedPaths(paths []string) error {
+	if len(paths) == 0 {
+		return nil
+	}
+	// Also drop each path from m.candidates: rowsAndPlanErrors only ever grows
+	// candidates from m.checked (so a row a user unchecked via the Tickets tab
+	// stays visible for re-toggling), which would otherwise leave a cleared
+	// ticket's row (and its epic, if it was the last one) rendered forever.
+	for _, path := range paths {
+		delete(m.candidates, path)
+	}
+	if m.queueStore != nil {
+		if err := m.queueStore.SetChecked(paths, false); err != nil {
+			return err
+		}
+		snapshot := m.queueStore.Snapshot()
+		m.checked = snapshot.Checked
+		m.checkOrder = snapshot.Order
+		m.queueStatus = snapshot.Status
+		return nil
+	}
+	for _, path := range paths {
 		markUnchecked(m.checked, m.checkOrder, path)
-		return
 	}
-	markChecked(m.checked, m.checkOrder, path)
+	return nil
 }
 
 type queueRow struct {
@@ -713,9 +812,13 @@ func (m QueueModel) View() tea.View {
 	}
 	lines := m.queueVisibleLines(m.queueViewportHeight())
 	height := max(m.height-1, 1)
-	return ui.NewMainView(ui.RenderPanel(ui.PanelOptionsFor(
+	content := ui.RenderPanel(ui.PanelOptionsFor(
 		m.width, height, "Queue", "", lines, true, ui.ColorBlue, nil, false,
-	)))
+	))
+	if m.confirm.IsOpen {
+		content = ui.OverlayCenter(content, m.confirm.View(m.width), m.width, m.height)
+	}
+	return ui.NewMainView(content)
 }
 
 // queueVisibleLines windows queueLines() to a single viewportH-line scroll
@@ -974,7 +1077,7 @@ func (m QueueModel) renderQueueTicketRow(epic tickets.Epic, t tickets.Ticket) []
 		titleStyle = statusDoneStyle
 	}
 
-	line := "  " + m.checkboxGlyph(m.checked[t.Path]) + " " + style.Render(icon) + " " + titleStyle.Render(title)
+	line := "  " + style.Render(icon) + " " + titleStyle.Render(title)
 	if suffix := blockedBySuffix(epic, t, status); suffix != "" {
 		line += " " + blockedBySuffixStyle.Render(suffix)
 	}
@@ -987,12 +1090,4 @@ func (m QueueModel) renderQueueTicketRow(epic tickets.Epic, t tickets.Ticket) []
 
 func (m QueueModel) icons() ui.IconSet {
 	return ui.Icons(m.settings.UseNerdFontIcons)
-}
-
-func (m QueueModel) checkboxGlyph(checked bool) string {
-	icons := m.icons()
-	if checked {
-		return checkedGlyphStyle.Render(icons.CheckboxChecked)
-	}
-	return uncheckedGlyphStyle.Render(icons.CheckboxUnchecked)
 }
