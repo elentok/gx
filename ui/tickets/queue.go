@@ -389,20 +389,10 @@ func (m *QueueModel) syncRunSnapshot(epicName string) {
 	if m.live == nil {
 		m.live = map[string]map[string]liveTicketState{}
 	}
-	live := make(map[string]liveTicketState, len(snapshot.Tickets))
+	live := projectLiveTickets(snapshot)
 	for identifier, ticket := range snapshot.Tickets {
 		key := epicName + "/" + identifier
 		m.liveContextTokens[key] = ticket.ContextTokens
-		live[identifier] = liveTicketState{
-			running:   ticket.Running,
-			paused:    ticket.Paused,
-			label:     ticket.Label,
-			pauseKind: ticket.PauseKind,
-			reason:    ticket.PauseReason,
-			phase:     livePhaseImplementing,
-			tokens:    ticket.ContextTokens,
-			startedAt: snapshot.StartedAt,
-		}
 		if ticket.Completed {
 			if path, ok := m.ticketPathFor(epicName, identifier); ok {
 				m.setItemStatus(path, queueStatusDone)

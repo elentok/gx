@@ -37,6 +37,29 @@ type liveTicketState struct {
 	tokens int
 }
 
+// projectLiveTickets turns a run snapshot into per-ticket live state
+// (running/paused, phase, tokens, startedAt) — the one projection both tabs'
+// syncRunSnapshot methods call, so a field added to RunTicketSnapshot only
+// needs wiring into liveTicketState once. Ticket 21: this used to be two
+// hand-duplicated copies (Model.syncRunSnapshot, QueueModel.syncRunSnapshot)
+// that had already drifted out of sync once.
+func projectLiveTickets(snapshot RunSnapshot) map[string]liveTicketState {
+	live := make(map[string]liveTicketState, len(snapshot.Tickets))
+	for identifier, ticket := range snapshot.Tickets {
+		live[identifier] = liveTicketState{
+			running:   ticket.Running,
+			paused:    ticket.Paused,
+			label:     ticket.Label,
+			pauseKind: ticket.PauseKind,
+			reason:    ticket.PauseReason,
+			phase:     livePhaseImplementing,
+			tokens:    ticket.ContextTokens,
+			startedAt: snapshot.StartedAt,
+		}
+	}
+	return live
+}
+
 // liveElapsedSeconds computes a running/paused ticket's elapsed time from
 // live.startedAt (the epic run's start time), so it keeps climbing across
 // renders without a UI-side stopwatch. Zero if startedAt hasn't been set.

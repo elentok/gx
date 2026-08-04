@@ -13,19 +13,9 @@ func (m *Model) syncRunSnapshot(epicName string) {
 	if m.labelIdentifier == nil {
 		m.labelIdentifier = map[string]map[string]string{}
 	}
-	live := make(map[string]liveTicketState, len(snapshot.Tickets))
+	live := projectLiveTickets(snapshot)
 	labels := make(map[string]string, len(snapshot.Tickets))
 	for identifier, ticket := range snapshot.Tickets {
-		live[identifier] = liveTicketState{
-			running:   ticket.Running,
-			paused:    ticket.Paused,
-			label:     ticket.Label,
-			pauseKind: ticket.PauseKind,
-			reason:    ticket.PauseReason,
-			phase:     livePhaseImplementing,
-			tokens:    ticket.ContextTokens,
-			startedAt: snapshot.StartedAt,
-		}
 		labels[ticket.Label] = identifier
 	}
 	m.live[epicName] = live
