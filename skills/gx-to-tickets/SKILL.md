@@ -89,6 +89,19 @@ once no caller remains, in a ticket blocked by every migrate batch. When even th
 green alone, keep the sequence but let them share an integration branch that all block a final
 integrate-and-verify ticket — green is promised only there.
 
+**Explore/implement split for foreseeably-wide test/e2e changes.** If a ticket touches test or e2e
+coverage and it's foreseeable in advance that implementing it requires reading a lot of files first
+(e.g. surveying an existing test suite's conventions, fixtures, and helpers across many files before
+writing new cases), split it into two tickets instead of one, blocked in sequence:
+
+1. **Explore**: read the necessary files and write the findings — conventions, fixtures, helpers,
+   the concrete approach — into this ticket's own body (its answer/notes), with no implementation.
+2. **Implement**: blocked by the explore ticket. Read its findings and implement from those notes
+   instead of re-exploring from scratch.
+
+This keeps each ticket within budget and avoids one session paying for both wide exploration and
+implementation.
+
 ### 4. Declare each ticket's test seams
 
 Every ticket must declare its **approved public test seams** under a `## Test seams` heading — the
