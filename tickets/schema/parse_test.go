@@ -126,6 +126,29 @@ func TestParseTicket_CommitlessRoundTrip(t *testing.T) {
 	}
 }
 
+func TestParseTicket_RoundTrip_SessionIDs(t *testing.T) {
+	orig := Ticket{
+		ID:         "04b",
+		Status:     StatusClaimed,
+		Type:       TypeTask,
+		SessionIDs: []string{"sess-1", "sess-2", "sess-3"},
+	}
+
+	marshaled, err := MarshalTicket(orig, "body\n")
+	if err != nil {
+		t.Fatalf("MarshalTicket: %v", err)
+	}
+
+	path := writeTemp(t, "04b-sessions.md", string(marshaled))
+	got, err := ParseTicket(path)
+	if err != nil {
+		t.Fatalf("re-parse: %v", err)
+	}
+	if !reflect.DeepEqual(orig, got) {
+		t.Fatalf("round trip mismatch: original %+v, got %+v", orig, got)
+	}
+}
+
 func TestParseTicket_MalformedFrontmatterYAML(t *testing.T) {
 	content := `---
 id: "04b"

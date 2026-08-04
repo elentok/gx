@@ -32,6 +32,12 @@ func TestRun_RestartWithClaimedTicketButNoLiveTab_RerunsFromScratch(t *testing.T
 		}
 		return "deadbeef", nil
 	}
+	origAgentPrompt := d.AgentPrompt
+	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+		agent, err := origAgentPrompt(opts)
+		agent.AgentSession = "session-fresh-01"
+		return agent, err
+	}
 
 	var out strings.Builder
 	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
@@ -48,6 +54,14 @@ func TestRun_RestartWithClaimedTicketButNoLiveTab_RerunsFromScratch(t *testing.T
 	}
 	if !strings.Contains(string(raw), "status: done") {
 		t.Errorf("ticket not landed after restart:\n%s", raw)
+	}
+
+	ticket, err := schema.ParseTicket(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatalf("schema.ParseTicket: %v", err)
+	}
+	if want := []string{"session-fresh-01"}; len(ticket.SessionIDs) != 1 || ticket.SessionIDs[0] != want[0] {
+		t.Errorf("SessionIDs = %v, want %v", ticket.SessionIDs, want)
 	}
 }
 
@@ -94,6 +108,14 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 	}
 	if !strings.Contains(string(raw), "status: done") {
 		t.Errorf("reattached ticket not marked done:\n%s", raw)
+	}
+
+	ticket, err := schema.ParseTicket(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatalf("schema.ParseTicket: %v", err)
+	}
+	if want := []string{"session-iter-01"}; len(ticket.SessionIDs) != 1 || ticket.SessionIDs[0] != want[0] {
+		t.Errorf("SessionIDs = %v, want %v (reattach appends the live agent's session)", ticket.SessionIDs, want)
 	}
 
 	events, _, err := readEvents(scratchDir, "epic")

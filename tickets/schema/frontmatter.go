@@ -26,6 +26,7 @@ type ticketYAML struct {
 	ElapsedTime           int      `yaml:"elapsed_time,omitempty"`
 	Compactions           int      `yaml:"compactions,omitempty"`
 	Commitless            bool     `yaml:"commitless,omitempty"`
+	SessionIDs            []string `yaml:"session_ids,omitempty"`
 }
 
 func (w ticketYAML) toTicket() Ticket {
@@ -41,6 +42,7 @@ func (w ticketYAML) toTicket() Ticket {
 		ElapsedTime:           w.ElapsedTime,
 		Compactions:           w.Compactions,
 		Commitless:            w.Commitless,
+		SessionIDs:            copyStrings(w.SessionIDs),
 	}
 	if w.SplitFrom != "" {
 		id := TicketID(w.SplitFrom)
@@ -62,6 +64,7 @@ func ticketToYAML(t Ticket) ticketYAML {
 		ElapsedTime:           t.ElapsedTime,
 		Compactions:           t.Compactions,
 		Commitless:            t.Commitless,
+		SessionIDs:            copyStrings(t.SessionIDs),
 	}
 	if t.SplitFrom != nil {
 		w.SplitFrom = string(*t.SplitFrom)
@@ -78,6 +81,19 @@ func stringsToIDs(vals []string) []TicketID {
 		ids[i] = TicketID(v)
 	}
 	return ids
+}
+
+// copyStrings returns a defensive copy of vals, or nil for an empty/nil
+// slice — matching stringsToIDs/idsToStrings's nil-when-empty convention so
+// an unset session_ids field round-trips through Ticket without becoming a
+// non-nil empty slice.
+func copyStrings(vals []string) []string {
+	if len(vals) == 0 {
+		return nil
+	}
+	out := make([]string, len(vals))
+	copy(out, vals)
+	return out
 }
 
 func idsToStrings(ids []TicketID) []string {

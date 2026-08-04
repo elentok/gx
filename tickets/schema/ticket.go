@@ -108,6 +108,12 @@ type Ticket struct {
 	ActualContextWindow   int
 	ElapsedTime           int
 	Compactions           int
+	// SessionIDs accumulates the native session id of every claude/codex
+	// instance ever launched or reattached for this ticket, oldest first —
+	// distinct from the dropped single-value Session field (see
+	// MarkDoneWithMetadata's doc comment) in that it appends across
+	// reattaches/resumes rather than being overwritten by the latest one.
+	SessionIDs []string
 	// Commitless declares that a zero-commit iteration finish is intentional
 	// for this ticket (e.g. the agent decided no code change was warranted)
 	// rather than a stalled/crashed agent. ralph-loop's finishIteration

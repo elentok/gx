@@ -63,6 +63,11 @@ func runIteration(d Deps, p iterationParams) error {
 	if err != nil {
 		return err
 	}
+	if sessionID != "" {
+		if err := AppendSessionID(p.Ticket.Path, sessionID); err != nil {
+			return fmt.Errorf("appending session id for ticket %s: %w", p.Ticket.Identifier, err)
+		}
+	}
 
 	return finishIteration(d, p, path, tab.RootPaneID, tab.TabID, base, branch, sessionID)
 }
@@ -109,6 +114,11 @@ func reattachIteration(d Deps, p iterationParams) error {
 		}
 		if !verified {
 			return fmt.Errorf("live Codex session %s for reattached iteration %s does not match rollout metadata for cwd %s", agent.AgentSession, label, path)
+		}
+	}
+	if agent.AgentSession != "" {
+		if err := AppendSessionID(p.Ticket.Path, agent.AgentSession); err != nil {
+			return fmt.Errorf("appending session id for reattached ticket %s: %w", p.Ticket.Identifier, err)
 		}
 	}
 

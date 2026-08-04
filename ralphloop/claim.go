@@ -50,6 +50,18 @@ func MarkDoneWithMetadata(path string, contextWindow, compactions int, sessionID
 	})
 }
 
+// AppendSessionID appends sessionID to the ticket's session_ids frontmatter
+// list, leaving every existing entry untouched — every fresh launch or
+// reattach gets its own entry so a ticket resumed across multiple agent
+// sessions keeps all of them available for retrospect, unlike the
+// single-value Session field MarkDoneWithMetadata's doc comment describes as
+// dropped.
+func AppendSessionID(path, sessionID string) error {
+	return updateTicket(path, func(t *schema.Ticket) {
+		t.SessionIDs = append(t.SessionIDs, sessionID)
+	})
+}
+
 // SetStatus rewrites (or, if the ticket's status is unset, sets for the
 // first time) a ticket file's frontmatter status field to value, leaving
 // the rest of the file - other frontmatter fields and the body - unchanged.

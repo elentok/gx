@@ -101,6 +101,33 @@ func TestMarkDoneWithMetadata_SetsStatusAndActualContextWindow(t *testing.T) {
 	}
 }
 
+func TestAppendSessionID_AppendsWithoutOverwriting(t *testing.T) {
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\ntype: task\nsession_ids: [\"sess-1\"]\n---\n# Ticket\n\nBody.\n")
+
+	if err := AppendSessionID(path, "sess-2"); err != nil {
+		t.Fatalf("AppendSessionID: %v", err)
+	}
+
+	got := mustParse(t, path)
+	want := []string{"sess-1", "sess-2"}
+	if len(got.SessionIDs) != len(want) || got.SessionIDs[0] != want[0] || got.SessionIDs[1] != want[1] {
+		t.Errorf("SessionIDs = %v, want %v", got.SessionIDs, want)
+	}
+}
+
+func TestAppendSessionID_FirstEntryOnUnsetField(t *testing.T) {
+	path := writeFrontmatterTicket(t, "claimed")
+
+	if err := AppendSessionID(path, "sess-1"); err != nil {
+		t.Fatalf("AppendSessionID: %v", err)
+	}
+
+	got := mustParse(t, path)
+	if want := []string{"sess-1"}; len(got.SessionIDs) != 1 || got.SessionIDs[0] != want[0] {
+		t.Errorf("SessionIDs = %v, want %v", got.SessionIDs, want)
+	}
+}
+
 func TestClaimThenMarkDone_UpdatesStatus(t *testing.T) {
 	path := writeFrontmatterTicket(t, "open")
 
