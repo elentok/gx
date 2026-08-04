@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -462,7 +463,12 @@ func TestRun_TicketSubset_CompletesWithoutTouchingTicketsOutsideSubset(t *testin
 		"/implement " + filepath.Join(scratchDir, "my-epic", "issues", "01-first.md"),
 		"/implement " + filepath.Join(scratchDir, "my-epic", "issues", "02-second.md"),
 	}
-	if len(*prompts) != 2 || (*prompts)[0] != wantPrompts[0] || (*prompts)[1] != wantPrompts[1] {
+	// 01 and 02 have no blocked_by relation, so they run concurrently
+	// (defaultMaxParallel) and can finish in either order.
+	gotPrompts := append([]string(nil), *prompts...)
+	sort.Strings(gotPrompts)
+	sort.Strings(wantPrompts)
+	if len(gotPrompts) != 2 || gotPrompts[0] != wantPrompts[0] || gotPrompts[1] != wantPrompts[1] {
 		t.Fatalf("prompts = %v, want %v (ticket 03 must never be launched)", *prompts, wantPrompts)
 	}
 
