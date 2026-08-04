@@ -19,6 +19,17 @@ import (
 // iteration, not a pause an operator could ever be asked to resume.
 type PauseKind string
 
+// IterationStats carries the data IterationFinished needs beyond the ticket
+// and epic name: the landed iteration's own metrics plus the epic's live
+// progress counts, grouped into one type rather than five loose ints.
+type IterationStats struct {
+	ElapsedSeconds    int
+	PeakContextTokens int
+	InProgress        int
+	Completed         int
+	Total             int
+}
+
 const (
 	PauseRateLimit PauseKind = "rate-limit"
 	// PauseNeedsAttention marks the operator-intervention pause
@@ -78,8 +89,9 @@ type EventSink interface {
 	// IterationResumed reports that label resumed from a kind pause.
 	IterationResumed(label string, kind PauseKind)
 	// IterationFinished reports that ticket's iteration landed its commits on
-	// epicName.
-	IterationFinished(ticket tickets.Ticket, epicName string)
+	// epicName, along with stats about the landed iteration and the epic's
+	// live progress.
+	IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats)
 	// TranscriptLine reports one line of label's live agent transcript.
 	TranscriptLine(label, line string)
 	// ContextOccupancy reports identifier's current context-window token
@@ -135,8 +147,9 @@ type EventSink interface {
 	TicketUnrecoverable(identifier, epicName string)
 
 	// EpicComplete reports that every ticket in epicName reached a terminal
-	// state, with completed tickets landed by this Run call.
-	EpicComplete(epicName string, completed int)
+	// state, with completed tickets landed by this Run call, after
+	// elapsedSeconds of total wall-clock run time.
+	EpicComplete(epicName string, completed int, elapsedSeconds int)
 }
 
 // noopEventSink implements EventSink with every method a no-op, used
@@ -153,7 +166,8 @@ func (noopEventSink) TicketClaimed(ticket tickets.Ticket)                       
 func (noopEventSink) IterationStarted(identifier, label, cwd, sessionID string)   {}
 func (noopEventSink) IterationPaused(label string, kind PauseKind, reason string) {}
 func (noopEventSink) IterationResumed(label string, kind PauseKind)               {}
-func (noopEventSink) IterationFinished(ticket tickets.Ticket, epicName string)    {}
+func (noopEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
+}
 func (noopEventSink) TranscriptLine(label, line string)                           {}
 func (noopEventSink) ContextOccupancy(identifier string, tokens int)              {}
 func (noopEventSink) CherryPickStarted(identifier string)                            {}
@@ -165,7 +179,7 @@ func (noopEventSink) TicketCleanupFinished(identifier string)                   
 func (noopEventSink) TicketRecovering(identifier string)                             {}
 func (noopEventSink) TicketRecovered(identifier, epicName, branch, landedSHA string) {}
 func (noopEventSink) TicketUnrecoverable(identifier, epicName string)                {}
-func (noopEventSink) EpicComplete(epicName string, completed int)                    {}
+func (noopEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {}
 
 // textEventSink implements EventSink by rendering each event as the same
 // text line(s) `gx ralph-loop` has always printed for it, for the headless
@@ -234,7 +248,7 @@ func (s *textEventSink) IterationResumed(label string, kind PauseKind) {
 	}
 }
 
-func (s *textEventSink) IterationFinished(ticket tickets.Ticket, epicName string) {
+func (s *textEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
 	s.printf("ticket %s %q landed on %s\n", ticket.Identifier, ticket.Title, epicName)
 }
 
@@ -270,6 +284,6 @@ func (s *textEventSink) TicketUnrecoverable(identifier, epicName string) {
 	s.printf("ticket %s: done but commits missing from %s and no iteration branch left to recover them; marked needs-attention\n", identifier, epicName)
 }
 
-func (s *textEventSink) EpicComplete(epicName string, completed int) {
+func (s *textEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {
 	s.printf("ralph-loop %q complete: %d ticket(s) landed on %s\n", epicName, completed, epicName)
 }

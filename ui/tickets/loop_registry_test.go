@@ -313,7 +313,7 @@ func TestRegistryDrainsRunEventsBeforeFinish(t *testing.T) {
 	}
 	sink.IterationStarted("01", "iter-01", "", "")
 	sink.ContextOccupancy("01", 42)
-	sink.IterationFinished(tickets.Ticket{Identifier: "01"}, "epic-a")
+	sink.IterationFinished(tickets.Ticket{Identifier: "01"}, "epic-a", ralphloop.IterationStats{})
 
 	r.finish("epic-a", nil)
 

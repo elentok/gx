@@ -60,6 +60,12 @@ type LiveEvent struct {
 	// Tokens (ContextOccupancy only) is the session's current context-window
 	// token occupancy.
 	Tokens int
+	// Stats (IterationFinished only) carries the landed iteration's metrics
+	// and the epic's live progress counts.
+	Stats IterationStats
+	// ElapsedSeconds (EpicComplete only) is the run's total wall-clock
+	// duration.
+	ElapsedSeconds int
 }
 
 // ChannelEventSink implements EventSink by forwarding every call as a
@@ -131,8 +137,8 @@ func (s *ChannelEventSink) IterationResumed(label string, kind PauseKind) {
 	s.emit(LiveEvent{Kind: LiveEventIterationResumed, Label: label, PauseKind: kind})
 }
 
-func (s *ChannelEventSink) IterationFinished(ticket tickets.Ticket, epicName string) {
-	s.emit(LiveEvent{Kind: LiveEventIterationFinished, Identifier: ticket.Identifier, Ticket: ticket, EpicName: epicName})
+func (s *ChannelEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
+	s.emit(LiveEvent{Kind: LiveEventIterationFinished, Identifier: ticket.Identifier, Ticket: ticket, EpicName: epicName, Stats: stats})
 }
 
 func (s *ChannelEventSink) TranscriptLine(label, line string) {
@@ -155,8 +161,8 @@ func (s *ChannelEventSink) TicketUnrecoverable(identifier, epicName string) {
 	s.emit(LiveEvent{Kind: LiveEventTicketUnrecoverable, Identifier: identifier, EpicName: epicName})
 }
 
-func (s *ChannelEventSink) EpicComplete(epicName string, completed int) {
-	s.emit(LiveEvent{Kind: LiveEventEpicComplete, EpicName: epicName, Completed: completed})
+func (s *ChannelEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {
+	s.emit(LiveEvent{Kind: LiveEventEpicComplete, EpicName: epicName, Completed: completed, ElapsedSeconds: elapsedSeconds})
 }
 
 func (s *ChannelEventSink) CherryPickStarted(identifier string) {

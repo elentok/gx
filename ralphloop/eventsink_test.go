@@ -12,8 +12,10 @@ import (
 // a slice, for asserting the exact event sequence a Run call produces
 // (rather than only the text a textEventSink renders from it).
 type recordingSink struct {
-	mu    sync.Mutex
-	calls []string
+	mu                     sync.Mutex
+	calls                  []string
+	lastIterationStats     IterationStats
+	lastEpicElapsedSeconds int
 }
 
 func (s *recordingSink) record(name string) {
@@ -49,7 +51,10 @@ func (s *recordingSink) IterationPaused(label string, kind PauseKind, reason str
 	s.record("IterationPaused")
 }
 func (s *recordingSink) IterationResumed(label string, kind PauseKind) { s.record("IterationResumed") }
-func (s *recordingSink) IterationFinished(ticket tickets.Ticket, epicName string) {
+func (s *recordingSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
+	s.mu.Lock()
+	s.lastIterationStats = stats
+	s.mu.Unlock()
 	s.record("IterationFinished")
 }
 func (s *recordingSink) TranscriptLine(label, line string) { s.record("TranscriptLine") }
@@ -68,7 +73,12 @@ func (s *recordingSink) TicketRecovered(identifier, epicName, branch, landedSHA 
 func (s *recordingSink) TicketUnrecoverable(identifier, epicName string) {
 	s.record("TicketUnrecoverable")
 }
-func (s *recordingSink) EpicComplete(epicName string, completed int) { s.record("EpicComplete") }
+func (s *recordingSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {
+	s.mu.Lock()
+	s.lastEpicElapsedSeconds = elapsedSeconds
+	s.mu.Unlock()
+	s.record("EpicComplete")
+}
 func (s *recordingSink) CherryPickStarted(identifier string)         { s.record("CherryPickStarted") }
 func (s *recordingSink) ConflictResolutionStarted(identifier string) {
 	s.record("ConflictResolutionStarted")
@@ -99,6 +109,21 @@ func TestRun_EventSink_EmitsLifecycleSequenceForASingleTicket(t *testing.T) {
 		if got[i] != w {
 			t.Errorf("events[%d] = %q, want %q (full sequence %v)", i, got[i], w, got)
 		}
+	}
+}
+
+func TestRecordingSink_CapturesIterationFinishedStatsAndEpicCompleteElapsedSeconds(t *testing.T) {
+	sink := &recordingSink{}
+
+	stats := IterationStats{ElapsedSeconds: 42, PeakContextTokens: 12345, InProgress: 2, Completed: 3, Total: 5}
+	sink.IterationFinished(tickets.Ticket{Identifier: "01"}, "epic", stats)
+	if sink.lastIterationStats != stats {
+		t.Errorf("lastIterationStats = %+v, want %+v", sink.lastIterationStats, stats)
+	}
+
+	sink.EpicComplete("epic", 5, 300)
+	if sink.lastEpicElapsedSeconds != 300 {
+		t.Errorf("lastEpicElapsedSeconds = %d, want 300", sink.lastEpicElapsedSeconds)
 	}
 }
 
@@ -134,11 +159,11 @@ func TestNewTextEventSink_RendersSameTextAsBeforeTheEventSinkRefactor(t *testing
 	sink.SmartZoneCompactStarted("01")
 	sink.SmartZoneFinishingUp("01")
 	sink.SmartZoneRecovered("01")
-	sink.IterationFinished(tickets.Ticket{Number: 1, Identifier: "01", Title: "First"}, "epic")
+	sink.IterationFinished(tickets.Ticket{Number: 1, Identifier: "01", Title: "First"}, "epic", IterationStats{})
 	sink.TicketCleanupFinished("01")
 	sink.TicketRecovered("01", "epic", "ralph-loop/iter-01", "deadbeef")
 	sink.TicketUnrecoverable("01", "epic")
-	sink.EpicComplete("epic", 1)
+	sink.EpicComplete("epic", 1, 0)
 
 	// These no-op in the headless CLI: no line should be printed for them.
 	sink.TicketClaimed(tickets.Ticket{Number: 1})

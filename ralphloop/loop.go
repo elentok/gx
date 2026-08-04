@@ -366,11 +366,11 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			continue
 		}
 
-		sink.IterationFinished(r.ticket, opts.EpicName)
+		sink.IterationFinished(r.ticket, opts.EpicName, IterationStats{})
 		completed++
 	}
 
-	sink.EpicComplete(opts.EpicName, completed)
+	sink.EpicComplete(opts.EpicName, completed, 0)
 	return nil
 }
 

@@ -15,7 +15,7 @@ func TestChannelEventSink_ForwardsCallsAsLiveEvents(t *testing.T) {
 	s.IterationStarted("04a", "iter-04a", "/repo/iter-04a", "sess-1")
 	s.IterationPaused("iter-04a", PauseNeedsAttention, "Codex is waiting for operator intervention")
 	s.IterationResumed("iter-04a", PauseNeedsAttention)
-	s.IterationFinished(tickets.Ticket{Identifier: "04a"}, "my-epic")
+	s.IterationFinished(tickets.Ticket{Identifier: "04a"}, "my-epic", IterationStats{})
 	s.TicketReattached("04a", "iter-04a", "/repo/iter-04a", "sess-1")
 	s.ContextOccupancy("04a", 12345)
 
