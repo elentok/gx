@@ -4,9 +4,11 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/herdr"
 )
@@ -134,6 +136,28 @@ func TestInstallDependencies_CommandFails_ReturnsError(t *testing.T) {
 // pollTimeoutErr matches isPollTimeout's "timed out" substring check.
 var pollTimeoutErr = errors.New("timed out waiting for state")
 
+// fixedNow returns a clock that never advances, for tests where elapsed
+// time isn't under test.
+func fixedNow() func() time.Time {
+	t := time.Now()
+	return func() time.Time { return t }
+}
+
+// stepNow returns a clock that advances by each of steps on successive
+// calls (the first call returns the base instant unmodified), for tests
+// asserting how promptWithNudge divides a deadline across its phases.
+func stepNow(steps ...time.Duration) func() time.Time {
+	t := time.Now()
+	calls := 0
+	return func() time.Time {
+		if calls > 0 && calls-1 < len(steps) {
+			t = t.Add(steps[calls-1])
+		}
+		calls++
+		return t
+	}
+}
+
 func TestPromptWithNudge_SucceedsWithoutTimeout_NeverNudges(t *testing.T) {
 	var promptCalls, sendKeysCalls, waitCalls int
 	prompt := func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
@@ -152,7 +176,7 @@ func TestPromptWithNudge_SucceedsWithoutTimeout_NeverNudges(t *testing.T) {
 		return herdr.Agent{}, nil
 	}
 
-	agent, err := promptWithNudge(prompt, sendKeys, wait)(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(prompt, sendKeys, wait, fixedNow())(herdr.AgentPromptOptions{
 		Target: "pane-1",
 		Text:   "hello",
 		Wait:   true,
@@ -187,7 +211,7 @@ func TestPromptWithNudge_TimesOutThenNudgeSucceeds(t *testing.T) {
 		return herdr.Agent{AgentStatus: "working"}, nil
 	}
 
-	agent, err := promptWithNudge(prompt, sendKeys, wait)(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(prompt, sendKeys, wait, fixedNow())(herdr.AgentPromptOptions{
 		Target: "pane-1",
 		Text:   "hello",
 		Wait:   true,
@@ -222,7 +246,7 @@ func TestPromptWithNudge_ExhaustsNudges_ReturnsTimeoutError(t *testing.T) {
 		return herdr.Agent{}, pollTimeoutErr
 	}
 
-	_, err := promptWithNudge(prompt, sendKeys, wait)(herdr.AgentPromptOptions{
+	_, err := promptWithNudge(prompt, sendKeys, wait, fixedNow())(herdr.AgentPromptOptions{
 		Target: "pane-1",
 		Text:   "hello",
 		Wait:   true,
@@ -257,7 +281,7 @@ func TestPromptWithNudge_FastCompletionBeforeWorking_ReturnsSuccessImmediately(t
 		return herdr.Agent{}, nil
 	}
 
-	agent, err := promptWithNudge(prompt, sendKeys, wait)(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(prompt, sendKeys, wait, fixedNow())(herdr.AgentPromptOptions{
 		Target:    "pane-1",
 		Text:      "hello",
 		Wait:      true,
@@ -296,7 +320,7 @@ func TestPromptWithNudge_StartConfirmed_WaitsForCompletionWithCallersTimeout(t *
 		return herdr.Agent{AgentStatus: "done"}, nil
 	}
 
-	agent, err := promptWithNudge(prompt, sendKeys, wait)(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(prompt, sendKeys, wait, fixedNow())(herdr.AgentPromptOptions{
 		Target:    "pane-1",
 		Text:      "/compact",
 		Wait:      true,
@@ -338,7 +362,7 @@ func TestPromptWithNudge_SendKeysFails_ReturnsErrorImmediately(t *testing.T) {
 		return herdr.Agent{}, nil
 	}
 
-	_, err := promptWithNudge(prompt, sendKeys, wait)(herdr.AgentPromptOptions{
+	_, err := promptWithNudge(prompt, sendKeys, wait, fixedNow())(herdr.AgentPromptOptions{
 		Target: "pane-1",
 		Text:   "hello",
 		Wait:   true,
@@ -349,5 +373,126 @@ func TestPromptWithNudge_SendKeysFails_ReturnsErrorImmediately(t *testing.T) {
 	}
 	if waitCalls != 0 {
 		t.Errorf("waitCalls = %d, want 0 (should not wait after a failed nudge)", waitCalls)
+	}
+}
+
+func TestPromptWithNudge_SlowStart_CompletionGetsRemainingBudget(t *testing.T) {
+	promptAttempts := 0
+	prompt := func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+		promptAttempts++
+		return herdr.Agent{}, pollTimeoutErr
+	}
+	sendKeys := func(target string, keys ...string) error {
+		return nil
+	}
+	var completionWaitOpts herdr.AgentWaitOptions
+	var completionWaitCalls, nudgeWaitCalls int
+	wait := func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+		if slices.Contains(opts.Until, "working") {
+			nudgeWaitCalls++
+			return herdr.Agent{AgentStatus: "working"}, nil
+		}
+		completionWaitCalls++
+		completionWaitOpts = opts
+		return herdr.Agent{AgentStatus: "done"}, nil
+	}
+
+	// 3s elapses between the deadline being captured and the first
+	// start/nudge attempt (simulating a slow submit); the clock holds
+	// steady after that.
+	agent, err := promptWithNudge(prompt, sendKeys, wait, stepNow(3_000*time.Millisecond))(herdr.AgentPromptOptions{
+		Target:    "pane-1",
+		Text:      "/compact",
+		Wait:      true,
+		Until:     []string{"idle", "done"},
+		TimeoutMs: 10_000,
+	})
+	if err != nil {
+		t.Fatalf("promptWithNudge() error = %v", err)
+	}
+	if agent.AgentStatus != "done" {
+		t.Errorf("agent.AgentStatus = %q, want %q", agent.AgentStatus, "done")
+	}
+	if promptAttempts != 1 {
+		t.Errorf("promptAttempts = %d, want 1 (the prompt is submitted exactly once)", promptAttempts)
+	}
+	if nudgeWaitCalls != 1 {
+		t.Errorf("nudgeWaitCalls = %d, want 1", nudgeWaitCalls)
+	}
+	if completionWaitCalls != 1 {
+		t.Fatalf("completion wait calls = %d, want 1", completionWaitCalls)
+	}
+	if completionWaitOpts.TimeoutMs != 7_000 {
+		t.Errorf("completion wait TimeoutMs = %d, want 7000 (the original 10000ms minus the 3000ms already spent on start)", completionWaitOpts.TimeoutMs)
+	}
+}
+
+func TestPromptWithNudge_CompletionDeadlineAlreadyExpired_ReturnsTimeoutWithoutWaiting(t *testing.T) {
+	prompt := func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+		return herdr.Agent{AgentStatus: "working"}, nil
+	}
+	sendKeys := func(target string, keys ...string) error {
+		t.Fatal("sendKeys should not be called: start succeeded on the first attempt")
+		return nil
+	}
+	waitCalls := 0
+	wait := func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+		waitCalls++
+		return herdr.Agent{}, nil
+	}
+
+	// 1s elapses before the start attempt, then a further 5s before the
+	// completion-budget check, exhausting the caller's 5s deadline.
+	_, err := promptWithNudge(prompt, sendKeys, wait, stepNow(1_000*time.Millisecond, 5_000*time.Millisecond))(herdr.AgentPromptOptions{
+		Target:    "pane-1",
+		Text:      "/compact",
+		Wait:      true,
+		Until:     []string{"idle", "done"},
+		TimeoutMs: 5_000,
+	})
+	if !isPollTimeout(err) {
+		t.Fatalf("promptWithNudge() error = %v, want a poll-timeout error reporting the overall deadline", err)
+	}
+	if waitCalls != 0 {
+		t.Errorf("waitCalls = %d, want 0 (an already-expired deadline must not wait, unbounded or otherwise)", waitCalls)
+	}
+}
+
+func TestPromptWithNudge_ZeroTimeout_BoundedStartThenUnlimitedCompletion(t *testing.T) {
+	prompt := func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+		if opts.TimeoutMs != promptNudgeGraceMs {
+			t.Errorf("prompt TimeoutMs = %d, want the bounded grace window %d even with no caller deadline", opts.TimeoutMs, promptNudgeGraceMs)
+		}
+		return herdr.Agent{AgentStatus: "working"}, nil
+	}
+	sendKeys := func(target string, keys ...string) error {
+		return nil
+	}
+	var completionWaitOpts herdr.AgentWaitOptions
+	completionWaitCalls := 0
+	wait := func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+		completionWaitCalls++
+		completionWaitOpts = opts
+		return herdr.Agent{AgentStatus: "done"}, nil
+	}
+
+	agent, err := promptWithNudge(prompt, sendKeys, wait, fixedNow())(herdr.AgentPromptOptions{
+		Target:    "pane-1",
+		Text:      "/compact",
+		Wait:      true,
+		Until:     []string{"idle", "done"},
+		TimeoutMs: 0,
+	})
+	if err != nil {
+		t.Fatalf("promptWithNudge() error = %v", err)
+	}
+	if agent.AgentStatus != "done" {
+		t.Errorf("agent.AgentStatus = %q, want %q", agent.AgentStatus, "done")
+	}
+	if completionWaitCalls != 1 {
+		t.Fatalf("completion wait calls = %d, want 1", completionWaitCalls)
+	}
+	if completionWaitOpts.TimeoutMs != 0 {
+		t.Errorf("completion wait TimeoutMs = %d, want 0 (unlimited: a zero caller timeout means no deadline)", completionWaitOpts.TimeoutMs)
 	}
 }

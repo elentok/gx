@@ -118,7 +118,7 @@ func DefaultDeps() Deps {
 		TabClose:              herdr.TabClose,
 		TabList:               herdr.TabList,
 		AgentStart:            herdr.AgentStart,
-		AgentPrompt:           promptWithNudge(herdr.AgentPrompt, herdr.AgentSendKeys, herdr.AgentWait),
+		AgentPrompt:           promptWithNudge(herdr.AgentPrompt, herdr.AgentSendKeys, herdr.AgentWait, time.Now),
 		AgentWait:             herdr.AgentWait,
 		AgentSendKeys:         herdr.AgentSendKeys,
 		RevParse:              git.RevParse,
@@ -164,17 +164,23 @@ const (
 // before returning the underlying poll-timeout error — the prompt itself is
 // never resubmitted, only nudged.
 //
-// Once start is confirmed, a caller-requested final state observed already
-// (the fast-completion case above) returns immediately. Otherwise only
-// "working" was observed, so the caller's actual completion is still ahead:
-// this waits for it separately, with the caller's own Until/TimeoutMs
-// (unlike the grace window above) so a slow completion — e.g. "/compact",
-// which can take minutes — gets the time it asked for instead of being
-// mistaken for a stuck submission and nudged mid-completion.
+// Once "working" is observed, start/nudge handling is done: this enters a
+// completion phase that only waits (never nudges or resubmits) for one of
+// opts.Until's caller-requested final states. Both phases are billed
+// against a single deadline computed from opts.TimeoutMs at entry — the
+// grace window each start/nudge attempt gets shrinks as that budget is
+// spent, and completion is handed whatever's left, so a slow completion —
+// e.g. "/compact", which can take minutes — gets the remainder of the
+// caller's own timeout instead of the fixed grace window, and an
+// already-expired deadline is reported as a timeout instead of silently
+// becoming an unbounded wait. opts.TimeoutMs <= 0 means no deadline at all:
+// start/nudge attempts still use the fixed grace window (bounded), but
+// completion then waits with no timeout (unlimited).
 func promptWithNudge(
 	prompt func(herdr.AgentPromptOptions) (herdr.Agent, error),
 	sendKeys func(target string, keys ...string) error,
 	wait func(herdr.AgentWaitOptions) (herdr.Agent, error),
+	now func() time.Time,
 ) func(herdr.AgentPromptOptions) (herdr.Agent, error) {
 	return func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
 		if !opts.Wait {
@@ -186,19 +192,50 @@ func promptWithNudge(
 			startUntil = append([]string{"working"}, startUntil...)
 		}
 
+		hasDeadline := opts.TimeoutMs > 0
+		var deadline time.Time
+		if hasDeadline {
+			deadline = now().Add(time.Duration(opts.TimeoutMs) * time.Millisecond)
+		}
+
+		// budgetMs returns the timeout for the next start/nudge attempt,
+		// the fixed grace window capped to what remains of the caller's
+		// deadline. ok is false once that deadline has already passed.
+		budgetMs := func() (ms int, ok bool) {
+			if !hasDeadline {
+				return promptNudgeGraceMs, true
+			}
+			remaining := deadline.Sub(now())
+			if remaining <= 0 {
+				return 0, false
+			}
+			if remaining > promptNudgeGraceMs*time.Millisecond {
+				return promptNudgeGraceMs, true
+			}
+			return max(1, int(remaining/time.Millisecond)), true
+		}
+
+		graceMs, ok := budgetMs()
+		if !ok {
+			return herdr.Agent{}, fmt.Errorf("timed out waiting for agent to start: overall deadline exceeded")
+		}
 		submit := opts
 		submit.Until = startUntil
-		submit.TimeoutMs = promptNudgeGraceMs
+		submit.TimeoutMs = graceMs
 
 		agent, err := prompt(submit)
 		for attempt := 0; isPollTimeout(err) && attempt < promptMaxNudges; attempt++ {
+			graceMs, ok := budgetMs()
+			if !ok {
+				break
+			}
 			if nudgeErr := sendKeys(opts.Target, "enter"); nudgeErr != nil {
 				return herdr.Agent{}, fmt.Errorf("nudging stuck submission: %w", nudgeErr)
 			}
 			agent, err = wait(herdr.AgentWaitOptions{
 				Target:    opts.Target,
 				Until:     startUntil,
-				TimeoutMs: promptNudgeGraceMs,
+				TimeoutMs: graceMs,
 			})
 		}
 		if err != nil {
@@ -209,10 +246,19 @@ func promptWithNudge(
 			return agent, nil
 		}
 
+		completionTimeoutMs := 0
+		if hasDeadline {
+			remaining := deadline.Sub(now())
+			if remaining <= 0 {
+				return agent, fmt.Errorf("timed out waiting for completion: overall deadline exceeded")
+			}
+			completionTimeoutMs = max(1, int(remaining/time.Millisecond))
+		}
+
 		return wait(herdr.AgentWaitOptions{
 			Target:    opts.Target,
 			Until:     opts.Until,
-			TimeoutMs: opts.TimeoutMs,
+			TimeoutMs: completionTimeoutMs,
 		})
 	}
 }
