@@ -150,6 +150,43 @@ func TestModel_CheckingBlockedTicketOpensConfirmModal(t *testing.T) {
 	}
 }
 
+func TestModel_CheckingTicketWithAlreadyCheckedBlockersSkipsConfirm(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\nBlocked by: 01\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	// Check the blocker first (row 1: first-ticket).
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	updated, _ = m.Update(spacePress())
+	m = updated.(Model)
+
+	// Move onto the blocked ticket (row 2: second-ticket) and check it.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+
+	r, ok := m.selectedRow()
+	if !ok || r.isEpic() {
+		t.Fatalf("expected selection on second-ticket, got row=%+v ok=%v", r, ok)
+	}
+	blockedTicket := m.epics[r.epicIdx].Tickets[r.ticketIdx]
+
+	updated, _ = m.Update(spacePress())
+	m = updated.(Model)
+
+	if m.confirm.IsOpen {
+		t.Fatalf("expected no confirmation modal when blocker is already checked")
+	}
+	if !m.isChecked(blockedTicket.Path) {
+		t.Fatalf("expected ticket checked directly since its blocker was already checked")
+	}
+}
+
 func TestModel_ConfirmingBlockedModalChecksTicketAndBlockers(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")

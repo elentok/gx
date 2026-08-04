@@ -121,7 +121,10 @@ func (m *Model) toggleEpicChecked(epicIdx int) error {
 // is always immediate. Checking a ticket with unresolved blockers
 // (Epic.BlockingTickets) instead opens a confirmation modal rather than
 // checking it outright — accepting adds the ticket plus its blockers
-// (checkAddConfirmedMsg), canceling leaves the checked set unchanged.
+// (checkAddConfirmedMsg), canceling leaves the checked set unchanged. A
+// blocker already in the checked set needs no confirmation, since adding it
+// again is a no-op — only blockers that would actually change the checked
+// set gate the prompt.
 func (m Model) toggleTicketChecked(epicIdx, ticketIdx int) (tea.Model, tea.Cmd) {
 	epic := m.epics[epicIdx]
 	t := epic.Tickets[ticketIdx]
@@ -132,7 +135,12 @@ func (m Model) toggleTicketChecked(epicIdx, ticketIdx int) (tea.Model, tea.Cmd) 
 		return m, nil
 	}
 
-	blockers := epic.BlockingTickets(t)
+	var blockers []tickets.Ticket
+	for _, b := range epic.BlockingTickets(t) {
+		if !m.isChecked(b.Path) {
+			blockers = append(blockers, b)
+		}
+	}
 	if len(blockers) == 0 {
 		if err := m.setPathsChecked([]string{t.Path}, true); err != nil {
 			return m, notify.Error("save queue: " + err.Error())
