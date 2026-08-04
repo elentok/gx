@@ -230,6 +230,19 @@ gx completion fish | source            # current session
 gx completion zsh > ~/.zsh/_gx         # persist
 ```
 
+Install (or refresh, after upgrading `gx`) gx's built-in agent skill bundle for Claude and Codex:
+
+```sh
+gx skills install                            # install/upgrade for both agents
+gx skills install --force <relative-path>    # replace a specific detected conflict
+gx skills uninstall                          # remove gx's managed copies
+gx skills uninstall --force <relative-path>  # remove a specific locally-modified file
+```
+
+Each target is reported as `installed`, `updated`, `skipped` (already up to date), `conflicted`
+(locally modified or unrelated content is left untouched — pass `--force <relative-path>` to
+override), or `removed`. See [skills/README.md](skills/README.md) for what's in the bundle.
+
 ## Configuration
 
 Optional config file at `~/.config/gx/config.json` (run `gx config edit` to open it).

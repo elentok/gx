@@ -39,12 +39,33 @@ tickets is a deliberate, explicitly-invoked action, never something the model sh
 own reading of a conversation. `gx-tdd` carries no such flag, also matching upstream: it's fine for
 the model to reach for TDD guidance on its own when a task calls for it.
 
-Codex has no equivalent auto-invocation concept — a Codex custom prompt (`~/.codex/prompts/<skill>.md`)
-is only ever run by explicit `/name` invocation, never launched by the model on its own. That's
-already at least as restrictive as `disable-model-invocation: true`, so both skills preserve their
-intended policy under Codex without any extra metadata: `gx-to-tickets`'s explicit-only intent holds
-as-is, and `gx-tdd`'s "the model may reach for it" intent is satisfied whenever the calling skill
-(e.g. `gx-implement`) explicitly invokes it.
+Codex has no equivalent auto-invocation concept — a Codex custom prompt is only ever run by explicit
+`/name` invocation, never launched by the model on its own. That's already at least as restrictive as
+`disable-model-invocation: true`, so both skills preserve their intended policy under Codex without
+any extra metadata: `gx-to-tickets`'s explicit-only intent holds as-is, and `gx-tdd`'s "the model may
+reach for it" intent is satisfied whenever the calling skill (e.g. `gx-implement`) explicitly invokes
+it.
+
+## Installation
+
+This directory is embedded in the `gx` binary at compile time (`bundle.go`), so a release, Homebrew,
+`go install`, or locally built `gx` all ship the identical bundle. `gx skills install` copies it as
+managed files into both Claude's and Codex's user skill roots — `~/.claude/skills` and
+`~/.codex/prompts` — under the same relative layout this directory has, so every relative reference
+(like `../local-tracker.md`) resolves identically under both agents:
+
+```sh
+gx skills install                            # install/upgrade for both agents
+gx skills install --force <relative-path>    # replace a specific detected conflict
+gx skills uninstall                          # remove gx's managed copies
+gx skills uninstall --force <relative-path>  # remove a specific locally-modified file
+```
+
+Each target is reported as `installed`, `updated`, `skipped` (already up to date), `conflicted`
+(left untouched — locally modified or unrelated content occupies that path; pass `--force` with the
+path to override), or `removed`. A conflict aborts the whole install, so re-running `gx skills
+install` after a `gx` upgrade is the way to refresh the bundle: unaffected files report `skipped`,
+changed ones report `updated`.
 
 ## Layout
 

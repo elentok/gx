@@ -1,15 +1,15 @@
 // Package skills holds gx's canonical, installable skill bundle (see
 // README.md) and validates it: metadata, invocation policy, relative
 // references between bundle files, and a representative generated ticket
-// against gx's real ticket validator. Ticket 05 embeds this directory's
-// non-Go files into the gx binary; this package has no non-test .go file of
-// its own yet.
+// against gx's real ticket validator. bundle.go embeds this directory's
+// non-Go files into the gx binary.
 package skills
 
 import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"testing"
 
@@ -32,6 +32,29 @@ func TestBundleRequiredFilesPresent(t *testing.T) {
 	for _, rel := range requiredFiles {
 		if _, err := os.Stat(rel); err != nil {
 			t.Errorf("required bundle file %s: %v", rel, err)
+		}
+	}
+}
+
+// TestEmbeddedBundleContainsRequiredFiles verifies the embedded bundle
+// boundary (Bundle, via BundleFiles) - not just the files on disk - carries
+// every canonical runtime file, so a release/Homebrew/go-install/local build
+// all ship the same content.
+func TestEmbeddedBundleContainsRequiredFiles(t *testing.T) {
+	got, err := BundleFiles()
+	if err != nil {
+		t.Fatalf("BundleFiles: %v", err)
+	}
+	want := append([]string{}, requiredFiles...)
+	sort.Strings(want)
+	sort.Strings(got)
+	if len(got) != len(want) {
+		t.Fatalf("BundleFiles() = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("BundleFiles() = %v, want %v", got, want)
+			break
 		}
 	}
 }
@@ -69,15 +92,6 @@ func parseFrontmatter(t *testing.T, raw string) skillFrontmatter {
 		t.Fatalf("parsing frontmatter: %v", err)
 	}
 	return fm
-}
-
-func readFile(t *testing.T, path string) string {
-	t.Helper()
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("reading %s: %v", path, err)
-	}
-	return string(raw)
 }
 
 // wantInvocationPolicy is each skill's expected disable-model-invocation

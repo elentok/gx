@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"io"
 	"os"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/transcript"
 
 	"github.com/spf13/cobra"
@@ -42,6 +44,8 @@ type deps struct {
 	readClaudeOccupancy  func(cwd, sessionID string) (occupancy int, ok bool, err error)
 	verifyCodexSession   func(cwd, sessionID string) (ok bool, err error)
 	readCodexContext     func(cwd, sessionID string) (tokens int, ok bool, err error)
+	skillsAgentRoots     func() ([]string, error)
+	skillsManifestPath   func() (string, error)
 }
 
 func defaultDeps() deps {
@@ -69,7 +73,24 @@ func defaultDeps() deps {
 		readClaudeOccupancy:  transcript.LastAssistantOccupancy,
 		verifyCodexSession:   codexsession.VerifyIdentity,
 		readCodexContext:     codexsession.LastContextTokens,
+		skillsAgentRoots:     defaultSkillsAgentRoots,
+		skillsManifestPath:   defaultSkillsManifestPath,
 	}
+}
+
+// defaultSkillsAgentRoots resolves gx's canonical skill bundle's two install
+// targets under the real user's home directory: Claude Code's user skill
+// discovery root and Codex's user custom-prompt discovery root.
+func defaultSkillsAgentRoots() ([]string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("resolve user home dir: %w", err)
+	}
+	return []string{skills.ClaudeSkillsRoot(home), skills.CodexSkillsRoot(home)}, nil
+}
+
+func defaultSkillsManifestPath() (string, error) {
+	return skills.ManifestPath(skills.BundleID)
 }
 
 // Execute runs gx with the provided arguments.
@@ -131,6 +152,7 @@ Run without a command to open the status UI.`,
 		newStashCmd(d),
 		newPRsCmd(d),
 		newTicketsCmd(d),
+		newSkillsCmd(d),
 		newConfigCmd(d),
 		newBumpCmd(d),
 		newStashifyCmd(d),
