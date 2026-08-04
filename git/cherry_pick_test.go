@@ -1,7 +1,9 @@
 package git_test
 
 import (
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -283,6 +285,57 @@ func TestTrailerMap_NoMatchingTrailers_EmptyMap(t *testing.T) {
 	}
 	if len(got) != 0 {
 		t.Errorf("TrailerMap() = %v, want empty map", got)
+	}
+}
+
+// TestCherryPickInProgress_TrueWithSequencerLeftoverButNoHead reproduces a
+// state seen in production: something removes CHERRY_PICK_HEAD (e.g. a
+// prior --abort that didn't run to completion) but leaves
+// .git/sequencer/todo behind. Git itself still refuses a new cherry-pick in
+// that state, so CherryPickInProgress must too, or callers wrongly skip the
+// abort and every subsequent cherry-pick fails with "already in progress".
+func TestCherryPickInProgress_TrueWithSequencerLeftoverButNoHead(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepoWithConflictSetup(t)
+
+	base, err := git.RevParse(dir, "HEAD~1")
+	if err != nil {
+		t.Fatalf("RevParse: %v", err)
+	}
+	tip, err := git.RevParse(dir, "HEAD")
+	if err != nil {
+		t.Fatalf("RevParse: %v", err)
+	}
+	testutil.MustGitExported(t, dir, "checkout", "-b", "feature", base)
+	testutil.WriteFile(t, dir, "a.txt", "line from feature\n")
+	testutil.CommitAll(t, dir, "feature change")
+
+	if err := git.CherryPickRange(dir, base, tip); err == nil {
+		t.Fatal("CherryPickRange() error = nil, want conflict error")
+	}
+
+	// Simulate an interrupted abort: CHERRY_PICK_HEAD is gone, but the
+	// sequencer directory (todo/head/abort-safety) survives.
+	if err := os.Remove(filepath.Join(dir, ".git", "CHERRY_PICK_HEAD")); err != nil {
+		t.Fatalf("removing CHERRY_PICK_HEAD: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".git", "sequencer", "todo")); err != nil {
+		t.Fatalf("sequencer/todo missing before test even begins: %v", err)
+	}
+
+	inProgress, err := git.CherryPickInProgress(dir)
+	if err != nil {
+		t.Fatalf("CherryPickInProgress: %v", err)
+	}
+	if !inProgress {
+		t.Error("CherryPickInProgress() = false, want true when sequencer/todo survives without CHERRY_PICK_HEAD")
+	}
+
+	if err := git.AbortCherryPick(dir); err != nil {
+		t.Fatalf("AbortCherryPick: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".git", "sequencer")); !os.IsNotExist(err) {
+		t.Errorf("sequencer dir still present after AbortCherryPick, stat err = %v", err)
 	}
 }
 

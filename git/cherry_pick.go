@@ -2,6 +2,8 @@ package git
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -172,14 +174,32 @@ func TrailerMap(dir, ref, key string) (map[string]string, error) {
 }
 
 // CherryPickInProgress reports whether dir has a cherry-pick sequence
-// currently stopped on a conflict or empty commit (CHERRY_PICK_HEAD present).
+// currently stopped on a conflict or empty commit. This checks both
+// CHERRY_PICK_HEAD and the on-disk sequencer directory: an abort that didn't
+// run to completion (or was interrupted) can clear CHERRY_PICK_HEAD while
+// leaving sequencer/todo behind, and git itself still refuses to start a new
+// cherry-pick in that state ("cherry-pick is already in progress") even
+// though a CHERRY_PICK_HEAD-only check reports nothing in progress.
 func CherryPickInProgress(dir string) (bool, error) {
 	_, _, err := run(dir, []string{"rev-parse", "-q", "--verify", "CHERRY_PICK_HEAD"})
-	if err != nil {
-		if _, ok := err.(*RunError); ok {
-			return false, nil
-		}
+	if err == nil {
+		return true, nil
+	}
+	if _, ok := err.(*RunError); !ok {
 		return false, err
 	}
-	return true, nil
+
+	gitDir, _, err := run(dir, []string{"rev-parse", "--git-dir"})
+	if err != nil {
+		return false, err
+	}
+	if !filepath.IsAbs(gitDir) {
+		gitDir = filepath.Join(dir, gitDir)
+	}
+	if _, err := os.Stat(filepath.Join(gitDir, "sequencer", "todo")); err == nil {
+		return true, nil
+	} else if !os.IsNotExist(err) {
+		return false, err
+	}
+	return false, nil
 }
