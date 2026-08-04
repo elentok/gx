@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -149,35 +150,70 @@ const (
 	promptMaxNudges    = 2
 )
 
-// promptWithNudge wraps herdr's AgentPrompt/AgentSendKeys/AgentWait to work
-// around a submission that never actually gets typed into the pane (observed
-// in production: the text only appears once something else, like an
-// operator's own keypress, nudges herdr's terminal-state detection). It
-// submits with a short grace timeout, and if the agent never reaches one of
-// the caller's Until states in that window, sends a bare Enter keypress and
-// re-waits, retrying up to promptMaxNudges times before returning the
-// underlying poll-timeout error.
+// promptWithNudge wraps herdr's AgentPrompt/AgentSendKeys/AgentWait to submit
+// opts.Text exactly once while working around a submission that never
+// actually gets typed into the pane (observed in production: the text only
+// appears once something else, like an operator's own keypress, nudges
+// herdr's terminal-state detection).
+//
+// It first detects *start*, not completion: it submits with a short grace
+// timeout, waiting for either "working" or any of the caller's own Until
+// states (a completion so fast it's observed before "working" ever is). If
+// neither is observed in that window, it sends a bare Enter keypress and
+// re-waits for the same start states, retrying up to promptMaxNudges times
+// before returning the underlying poll-timeout error — the prompt itself is
+// never resubmitted, only nudged.
+//
+// Once start is confirmed, a caller-requested final state observed already
+// (the fast-completion case above) returns immediately. Otherwise only
+// "working" was observed, so the caller's actual completion is still ahead:
+// this waits for it separately, with the caller's own Until/TimeoutMs
+// (unlike the grace window above) so a slow completion — e.g. "/compact",
+// which can take minutes — gets the time it asked for instead of being
+// mistaken for a stuck submission and nudged mid-completion.
 func promptWithNudge(
 	prompt func(herdr.AgentPromptOptions) (herdr.Agent, error),
 	sendKeys func(target string, keys ...string) error,
 	wait func(herdr.AgentWaitOptions) (herdr.Agent, error),
 ) func(herdr.AgentPromptOptions) (herdr.Agent, error) {
 	return func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		grace := opts
-		grace.TimeoutMs = promptNudgeGraceMs
+		if !opts.Wait {
+			return prompt(opts)
+		}
 
-		agent, err := prompt(grace)
+		startUntil := opts.Until
+		if !slices.Contains(startUntil, "working") {
+			startUntil = append([]string{"working"}, startUntil...)
+		}
+
+		submit := opts
+		submit.Until = startUntil
+		submit.TimeoutMs = promptNudgeGraceMs
+
+		agent, err := prompt(submit)
 		for attempt := 0; isPollTimeout(err) && attempt < promptMaxNudges; attempt++ {
 			if nudgeErr := sendKeys(opts.Target, "enter"); nudgeErr != nil {
 				return herdr.Agent{}, fmt.Errorf("nudging stuck submission: %w", nudgeErr)
 			}
 			agent, err = wait(herdr.AgentWaitOptions{
 				Target:    opts.Target,
-				Until:     opts.Until,
+				Until:     startUntil,
 				TimeoutMs: promptNudgeGraceMs,
 			})
 		}
-		return agent, err
+		if err != nil {
+			return agent, err
+		}
+
+		if slices.Contains(opts.Until, agent.AgentStatus) {
+			return agent, nil
+		}
+
+		return wait(herdr.AgentWaitOptions{
+			Target:    opts.Target,
+			Until:     opts.Until,
+			TimeoutMs: opts.TimeoutMs,
+		})
 	}
 }
 

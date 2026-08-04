@@ -239,6 +239,90 @@ func TestPromptWithNudge_ExhaustsNudges_ReturnsTimeoutError(t *testing.T) {
 	}
 }
 
+func TestPromptWithNudge_FastCompletionBeforeWorking_ReturnsSuccessImmediately(t *testing.T) {
+	var promptCalls, sendKeysCalls, waitCalls int
+	prompt := func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+		promptCalls++
+		if len(opts.Until) != 3 || opts.Until[0] != "working" || opts.Until[1] != "idle" || opts.Until[2] != "done" {
+			t.Errorf("prompt Until = %v, want [working idle done] (start detection accepts either)", opts.Until)
+		}
+		return herdr.Agent{AgentStatus: "done"}, nil
+	}
+	sendKeys := func(target string, keys ...string) error {
+		sendKeysCalls++
+		return nil
+	}
+	wait := func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+		waitCalls++
+		return herdr.Agent{}, nil
+	}
+
+	agent, err := promptWithNudge(prompt, sendKeys, wait)(herdr.AgentPromptOptions{
+		Target:    "pane-1",
+		Text:      "hello",
+		Wait:      true,
+		Until:     []string{"idle", "done"},
+		TimeoutMs: 300_000,
+	})
+	if err != nil {
+		t.Fatalf("promptWithNudge() error = %v", err)
+	}
+	if agent.AgentStatus != "done" {
+		t.Errorf("agent.AgentStatus = %q, want %q", agent.AgentStatus, "done")
+	}
+	if promptCalls != 1 || sendKeysCalls != 0 || waitCalls != 0 {
+		t.Errorf("promptCalls=%d sendKeysCalls=%d waitCalls=%d, want 1/0/0 (a final state observed before working returns immediately)", promptCalls, sendKeysCalls, waitCalls)
+	}
+}
+
+func TestPromptWithNudge_StartConfirmed_WaitsForCompletionWithCallersTimeout(t *testing.T) {
+	var promptCalls int
+	var completionWaitOpts herdr.AgentWaitOptions
+	var completionWaitCalls int
+	prompt := func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+		promptCalls++
+		if opts.TimeoutMs != promptNudgeGraceMs {
+			t.Errorf("prompt TimeoutMs = %d, want the short grace window %d, not the caller's completion timeout", opts.TimeoutMs, promptNudgeGraceMs)
+		}
+		return herdr.Agent{AgentStatus: "working"}, nil
+	}
+	sendKeys := func(target string, keys ...string) error {
+		t.Fatal("sendKeys should not be called: start was observed within the grace window")
+		return nil
+	}
+	wait := func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+		completionWaitCalls++
+		completionWaitOpts = opts
+		return herdr.Agent{AgentStatus: "done"}, nil
+	}
+
+	agent, err := promptWithNudge(prompt, sendKeys, wait)(herdr.AgentPromptOptions{
+		Target:    "pane-1",
+		Text:      "/compact",
+		Wait:      true,
+		Until:     []string{"idle", "done"},
+		TimeoutMs: 300_000,
+	})
+	if err != nil {
+		t.Fatalf("promptWithNudge() error = %v", err)
+	}
+	if agent.AgentStatus != "done" {
+		t.Errorf("agent.AgentStatus = %q, want %q", agent.AgentStatus, "done")
+	}
+	if promptCalls != 1 {
+		t.Errorf("promptCalls = %d, want 1 (the prompt is submitted exactly once)", promptCalls)
+	}
+	if completionWaitCalls != 1 {
+		t.Fatalf("completion wait calls = %d, want 1", completionWaitCalls)
+	}
+	if completionWaitOpts.TimeoutMs != 300_000 {
+		t.Errorf("completion wait TimeoutMs = %d, want the caller's own 300000ms, not clobbered by the start-detection grace window", completionWaitOpts.TimeoutMs)
+	}
+	if len(completionWaitOpts.Until) != 2 || completionWaitOpts.Until[0] != "idle" || completionWaitOpts.Until[1] != "done" {
+		t.Errorf("completion wait Until = %v, want [idle done]", completionWaitOpts.Until)
+	}
+}
+
 func TestPromptWithNudge_SendKeysFails_ReturnsErrorImmediately(t *testing.T) {
 	sendKeysErr := errors.New("pane not found")
 	var waitCalls int
