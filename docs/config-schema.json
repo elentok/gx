@@ -113,6 +113,40 @@
           "default": []
         }
       }
+    },
+    "notifications": {
+      "type": "object",
+      "description": "External notification integrations.",
+      "additionalProperties": false,
+      "properties": {
+        "telegram": {
+          "type": "object",
+          "description": "Telegram bot credentials for sending notifications. An empty bot-token disables Telegram notifications.",
+          "additionalProperties": false,
+          "properties": {
+            "bot-token": {
+              "type": "string",
+              "description": "Telegram bot token. Default: empty (disabled).",
+              "default": ""
+            },
+            "chat-id": {
+              "type": "string",
+              "description": "Telegram chat id to send notifications to. Default: empty.",
+              "default": ""
+            }
+          },
+          "default": {
+            "bot-token": "",
+            "chat-id": ""
+          }
+        }
+      },
+      "default": {
+        "telegram": {
+          "bot-token": "",
+          "chat-id": ""
+        }
+      }
     }
   }
 }

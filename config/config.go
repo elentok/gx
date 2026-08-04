@@ -21,6 +21,7 @@ type Config struct {
 	NameAliases           map[string]string    `json:"name-aliases,omitempty"`
 	Log                   LogConfig            `json:"log,omitempty"`
 	ExecutionQueue        ExecutionQueueConfig `json:"execution-queue"`
+	Notifications         NotificationsConfig  `json:"notifications"`
 }
 
 // Default returns the default configuration.
@@ -32,6 +33,7 @@ func Default() Config {
 		InputModalBottom:      DefaultInputModalBottom(),
 		Log:                   DefaultLogConfig(),
 		ExecutionQueue:        DefaultExecutionQueueConfig(),
+		Notifications:         DefaultNotificationsConfig(),
 	}
 }
 
@@ -71,6 +73,12 @@ func Load() (Config, error) {
 			MaxConcurrentTicketsPerEpic *int `json:"max-concurrent-tickets-per-epic"`
 			MaxConcurrentEpics          *int `json:"max-concurrent-epics"`
 		} `json:"execution-queue"`
+		Notifications *struct {
+			Telegram *struct {
+				BotToken *string `json:"bot-token"`
+				ChatID   *string `json:"chat-id"`
+			} `json:"telegram"`
+		} `json:"notifications"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return cfg, fmt.Errorf("parse config %s: %w", path, err)
@@ -107,6 +115,14 @@ func Load() (Config, error) {
 		}
 		if raw.ExecutionQueue.MaxConcurrentEpics != nil {
 			cfg.ExecutionQueue.MaxConcurrentEpics = clampExecutionQueueLimit(*raw.ExecutionQueue.MaxConcurrentEpics)
+		}
+	}
+	if raw.Notifications != nil && raw.Notifications.Telegram != nil {
+		if raw.Notifications.Telegram.BotToken != nil {
+			cfg.Notifications.Telegram.BotToken = *raw.Notifications.Telegram.BotToken
+		}
+		if raw.Notifications.Telegram.ChatID != nil {
+			cfg.Notifications.Telegram.ChatID = *raw.Notifications.Telegram.ChatID
 		}
 	}
 
