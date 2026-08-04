@@ -5,8 +5,10 @@ import (
 	"os"
 
 	"github.com/elentok/gx/cli/confirm"
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/transcript"
 
 	"github.com/spf13/cobra"
 )
@@ -37,6 +39,9 @@ type deps struct {
 	loadConfig           func() (config.Config, error)
 	getenv               func(string) string
 	runEditor            func(editor, path string, in io.Reader, out, err io.Writer) error
+	readClaudeOccupancy  func(cwd, sessionID string) (occupancy int, ok bool, err error)
+	verifyCodexSession   func(cwd, sessionID string) (ok bool, err error)
+	readCodexContext     func(cwd, sessionID string) (tokens int, ok bool, err error)
 }
 
 func defaultDeps() deps {
@@ -61,6 +66,9 @@ func defaultDeps() deps {
 		loadConfig:           config.Load,
 		getenv:               os.Getenv,
 		runEditor:            runEditorCommand,
+		readClaudeOccupancy:  transcript.LastAssistantOccupancy,
+		verifyCodexSession:   codexsession.VerifyIdentity,
+		readCodexContext:     codexsession.LastContextTokens,
 	}
 }
 
@@ -114,6 +122,7 @@ Run without a command to open the status UI.`,
 	root.SetVersionTemplate("gx {{.Version}}\n")
 
 	root.AddCommand(
+		newAgentCmd(d),
 		newWorktreesCmd(d),
 		newPushCmd(d),
 		newStatusCmd(d),
