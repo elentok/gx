@@ -463,21 +463,14 @@ func (m *Model) ensureSidebarVisible() {
 // handleSidebarMouseWheel scrolls the sidebar viewport without moving
 // selection, mirroring QueueModel.handleQueueMouseWheel.
 func (m Model) handleSidebarMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
-	mouse := msg.Mouse()
-	dir := 0
-	switch mouse.Button {
-	case tea.MouseWheelDown:
-		dir = 1
-	case tea.MouseWheelUp:
-		dir = -1
-	default:
+	dir, ok := ui.WheelDirection(msg)
+	if !ok {
 		return m, nil
 	}
-	m.scrollOffset += dir * 3
+	m.scrollOffset += dir * ui.WheelScrollLines
 	total := len(m.sidebarLines())
 	viewportH := m.sidebarViewportHeight()
-	maxOffset := max(0, total-viewportH)
-	m.scrollOffset = max(0, min(m.scrollOffset, maxOffset))
+	m.scrollOffset = ui.ClampScrollOffset(m.scrollOffset, total, viewportH)
 	return m, nil
 }
 

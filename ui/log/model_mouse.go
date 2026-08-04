@@ -2,22 +2,18 @@ package log
 
 import (
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/elentok/gx/ui"
 )
 
 func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 	if m.help.IsOpen || m.amendConfirm.IsOpen {
 		return m, nil
 	}
-	mouse := msg.Mouse()
-	dir := 0
-	switch mouse.Button {
-	case tea.MouseWheelDown:
-		dir = 1
-	case tea.MouseWheelUp:
-		dir = -1
-	default:
+	dir, ok := ui.WheelDirection(msg)
+	if !ok {
 		return m, nil
 	}
-	m.listPanel = m.listPanel.ScrollViewport(dir * 3)
+	m.listPanel = m.listPanel.ScrollViewport(dir * ui.WheelScrollLines)
 	return m, nil
 }
