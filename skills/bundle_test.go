@@ -26,6 +26,8 @@ var requiredFiles = []string{
 	"gx-tdd/SKILL.md",
 	"gx-tdd/tests.md",
 	"gx-tdd/mocking.md",
+	"gx-implement/SKILL.md",
+	"gx-resolving-merge-conflicts/SKILL.md",
 }
 
 func TestBundleRequiredFilesPresent(t *testing.T) {
@@ -95,12 +97,16 @@ func parseFrontmatter(t *testing.T, raw string) skillFrontmatter {
 }
 
 // wantInvocationPolicy is each skill's expected disable-model-invocation
-// value, per README.md's "Invocation policy" section: gx-to-tickets is
-// explicit-invoke only (ticket breakdown should never trigger on the model's
-// own reading of a conversation); gx-tdd is left model-invocable.
+// value, per README.md's "Invocation policy" section: gx-to-tickets and
+// gx-implement are explicit-invoke only (breaking work into tickets, and
+// claiming/implementing one, should never trigger on the model's own reading
+// of a conversation); gx-tdd and gx-resolving-merge-conflicts are left
+// model-invocable.
 var wantInvocationPolicy = map[string]bool{
-	"gx-to-tickets": true,
-	"gx-tdd":        false,
+	"gx-to-tickets":                true,
+	"gx-tdd":                       false,
+	"gx-implement":                 true,
+	"gx-resolving-merge-conflicts": false,
 }
 
 func TestSkillMetadataAndInvocationPolicy(t *testing.T) {

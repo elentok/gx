@@ -5,12 +5,13 @@ into both Claude's and Codex's user skill/prompt roots (see the `gx skills` comm
 
 ## Origin
 
-`gx-to-tickets` and `gx-tdd` are gx-specific adaptations of two skills from
-[Matt Pocock's skills repo](https://github.com/mattpocock/skills):
-`skills/engineering/to-tickets/SKILL.md` and `skills/engineering/tdd/SKILL.md`. They're inlined
-here, rather than fetched at install time, for the same reason the personal dotfiles skill tree
-inlines its own copies: security and ease-of-deployment — no network fetch during an unattended
-ralph-loop run.
+`gx-to-tickets`, `gx-tdd`, `gx-implement`, and `gx-resolving-merge-conflicts` are gx-specific
+adaptations of four skills from [Matt Pocock's skills repo](https://github.com/mattpocock/skills):
+`skills/engineering/to-tickets/SKILL.md`, `skills/engineering/tdd/SKILL.md`,
+`skills/engineering/implement/SKILL.md`, and
+`skills/engineering/resolving-merge-conflicts/SKILL.md`. They're inlined here, rather than fetched
+at install time, for the same reason the personal dotfiles skill tree inlines its own copies:
+security and ease-of-deployment — no network fetch during an unattended ralph-loop run.
 
 ## gx-specific adaptations
 
@@ -30,21 +31,28 @@ Linear, ...) selected by a separate setup step. gx's bundle drops both assumptio
   answer. A ticket authored before this convention existed may still proceed, but only when a
   minimal seam is unambiguous from its acceptance criteria; anything requiring real judgment stops
   the ticket at `needs-info` instead of guessing.
+- **Context occupancy is inspected through gx, not by hand.** Upstream `implement` tails the raw
+  session transcript JSONL and sums token fields to check context occupancy — a Claude-only,
+  format-coupled trick. `gx-implement` calls `gx agent context-window` instead, which works
+  identically under Claude and Codex and fails closed (any read/detection failure counts as
+  over-budget) rather than guessing.
 
 ## Invocation policy
 
-Both skills carry `name`/`description` frontmatter Claude Code reads to render the skill picker.
-`gx-to-tickets` sets `disable-model-invocation: true`, matching its upstream: breaking work into
-tickets is a deliberate, explicitly-invoked action, never something the model should trigger on its
-own reading of a conversation. `gx-tdd` carries no such flag, also matching upstream: it's fine for
-the model to reach for TDD guidance on its own when a task calls for it.
+All four skills carry `name`/`description` frontmatter Claude Code reads to render the skill
+picker. `gx-to-tickets` and `gx-implement` set `disable-model-invocation: true`, matching their
+upstream: breaking work into tickets, and claiming/implementing one, are deliberate,
+explicitly-invoked actions, never something the model should trigger on its own reading of a
+conversation. `gx-tdd` and `gx-resolving-merge-conflicts` carry no such flag, also matching
+upstream: it's fine for the model to reach for TDD guidance or merge-conflict resolution on its own
+when a task calls for it.
 
 Codex has no equivalent auto-invocation concept — a Codex custom prompt is only ever run by explicit
 `/name` invocation, never launched by the model on its own. That's already at least as restrictive as
-`disable-model-invocation: true`, so both skills preserve their intended policy under Codex without
-any extra metadata: `gx-to-tickets`'s explicit-only intent holds as-is, and `gx-tdd`'s "the model may
-reach for it" intent is satisfied whenever the calling skill (e.g. `gx-implement`) explicitly invokes
-it.
+`disable-model-invocation: true`, so all four skills preserve their intended policy under Codex
+without any extra metadata: `gx-to-tickets`'s and `gx-implement`'s explicit-only intent holds as-is,
+and `gx-tdd`'s and `gx-resolving-merge-conflicts`' "the model may reach for it" intent is satisfied
+whenever the calling skill (e.g. `gx-implement` invoking `gx-tdd`) explicitly invokes it.
 
 ## Installation
 
@@ -79,6 +87,10 @@ skills/
     SKILL.md
     tests.md
     mocking.md
+  gx-implement/
+    SKILL.md
+  gx-resolving-merge-conflicts/
+    SKILL.md
 ```
 
 Every skill references `local-tracker.md` with a relative path (`../local-tracker.md`), so it must

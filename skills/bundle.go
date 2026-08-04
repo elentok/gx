@@ -13,7 +13,7 @@ import (
 // installation method (release, Homebrew, go install, local build) ships the
 // same content.
 //
-//go:embed README.md local-tracker.md gx-to-tickets gx-tdd
+//go:embed README.md local-tracker.md gx-to-tickets gx-tdd gx-implement gx-resolving-merge-conflicts
 var Bundle embed.FS
 
 // BundleID identifies gx's canonical skill bundle in the manifest store
