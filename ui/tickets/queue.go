@@ -88,9 +88,9 @@ type QueueModel struct {
 	runningAgent           ralphloop.AgentKind
 	paused                 bool
 
-	// confirm backs the "C"/"c" clear keymaps (handleQueueKey) — the Queue tab
-	// is read-only for selection (ticket 08), so this is the only modal this
-	// tab opens outside the agent-picker menu.
+	// confirm backs the "C"/"c" clear keymaps and the "x" cascade-delete keymap
+	// (handleQueueKey) — the Queue tab is read-only for selection (ticket 08),
+	// so this is the only modal this tab opens outside the agent-picker menu.
 	confirm confirm.Model
 }
 
@@ -209,8 +209,26 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleQueueConfirmUpdate(msg)
 		}
 		return m.handleQueueKey(msg)
+	case tea.MouseClickMsg:
+		if m.confirm.IsOpen {
+			return m.handleQueueConfirmMouseUpdate(msg)
+		}
+	case cascadeDeleteConfirmedMsg:
+		return m.handleCascadeDeleteConfirmed(msg)
 	}
 	return m, nil
+}
+
+func (m QueueModel) handleQueueConfirmUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
+	next, cmd, _ := m.confirm.Update(msg)
+	m.confirm = next
+	return m, cmd
+}
+
+func (m QueueModel) handleQueueConfirmMouseUpdate(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
+	next, cmd, _ := m.confirm.UpdateMouse(msg, m.width, m.width, m.height)
+	m.confirm = next
+	return m, cmd
 }
 
 func (m QueueModel) handleQueueSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
@@ -457,6 +475,8 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				AcceptCmd: cmdConfirmQueueClear(paths),
 			})
 		}
+	case "x":
+		return m.handleQueueDeleteKey()
 	case "enter":
 		if len(m.runningEpics) == 0 && len(m.pendingEpics) == 0 {
 			if len(m.checkedEpicPlans()) > 0 {
@@ -684,12 +704,6 @@ func cmdConfirmQueueClear(paths []string) tea.Cmd {
 	return func() tea.Msg {
 		return queueClearConfirmedMsg{paths: paths}
 	}
-}
-
-func (m QueueModel) handleQueueConfirmUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
-	next, cmd, _ := m.confirm.Update(msg)
-	m.confirm = next
-	return m, cmd
 }
 
 // handleQueueClearConfirmed applies queueClearConfirmedMsg: every path is
