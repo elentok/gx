@@ -95,3 +95,21 @@ func TestRenderConfirmModalIncludesPrompt(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderConfirmModalCapsWidthRegardlessOfScreenWidth(t *testing.T) {
+	r := RenderConfirmModal(
+		"Prompt?",
+		true,
+		lipgloss.Color("240"),
+		lipgloss.Color("2"),
+		lipgloss.Color("1"),
+		lipgloss.Color("8"),
+		300,
+	)
+	lines := strings.Split(r, "\n")
+	for i, line := range lines {
+		if got := ansi.StringWidth(line); got > ConfirmModalMaxWidth {
+			t.Fatalf("line %d width = %d, want <= %d: %q", i, got, ConfirmModalMaxWidth, line)
+		}
+	}
+}

@@ -55,12 +55,31 @@ func RenderConfirmContent(prompt string, yes bool, nerd bool, items ...string) s
 	return sb.String()
 }
 
+// ConfirmModalMinWidth and ConfirmModalMaxWidth bound every confirmation
+// dialog's rendered width regardless of what a caller passes in: confirm.Model
+// forwards the raw screen width, and without a cap here the dialog would scale
+// to span the whole terminal instead of reading as a small centered box.
+const (
+	ConfirmModalMinWidth = 56
+	ConfirmModalMaxWidth = 72
+)
+
 func RenderConfirmModal(prompt string, yes bool, borderColor, yesColor, noColor, subtleColor color.Color, width int, items ...string) string {
 	return ui.RenderModalFrame(ui.ModalFrameOptions{
 		Body:        RenderConfirmContent(prompt, yes, false, items...),
 		Hint:        ConfirmHint,
-		Width:       width,
+		Width:       clampConfirmWidth(width),
 		BorderColor: borderColor,
 		HintColor:   subtleColor,
 	})
+}
+
+func clampConfirmWidth(width int) int {
+	if width <= 0 || width > ConfirmModalMaxWidth {
+		return ConfirmModalMaxWidth
+	}
+	if width < ConfirmModalMinWidth {
+		return ConfirmModalMinWidth
+	}
+	return width
 }

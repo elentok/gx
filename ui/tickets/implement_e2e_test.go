@@ -4,14 +4,17 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/testutil"
 	teatest "github.com/elentok/gx/testutil/teatestv2"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets"
 )
@@ -59,6 +62,41 @@ func TestTicketsTUI_ImplementKeyOpensPlanConfirm(t *testing.T) {
 
 	if bytes.Contains(tm.CurrentFrame(), []byte("Choose the agent")) {
 		t.Fatalf("expected confirm modal, not the agent picker: %s", tm.CurrentFrame())
+	}
+}
+
+func TestTicketsTUI_PlanConfirmDoesNotSpanFullTerminalWidth(t *testing.T) {
+	root := testutil.TempRepo(t)
+	if err := os.MkdirAll(filepath.Join(root, ".scratch", "my-epic", "issues"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".scratch", "my-epic", "issues", "01-first.md"), []byte("Status: open\n\nBody.\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := tickets.NewModel(root, ui.Settings{}, keys.New(nil))
+	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(220, 40))
+	defer tm.Quit()
+
+	waitForTicketsText(t, tm, "my-epic")
+
+	tm.Send(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	tm.Send(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
+
+	tm.Send(tea.KeyPressMsg{Code: 'i', Text: "i"})
+	waitForTicketsText(t, tm, "Open the execution plan for 1 checked ticket")
+
+	frame := ansi.Strip(string(tm.CurrentFrame()))
+	borders := regexp.MustCompile(`╭─+╮`).FindAllString(frame, -1)
+	found := false
+	for _, b := range borders {
+		if got := len([]rune(b)); got <= components.ConfirmModalMaxWidth {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected a confirm modal border at or below width %d, got borders: %v", components.ConfirmModalMaxWidth, borders)
 	}
 }
 
