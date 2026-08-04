@@ -268,18 +268,9 @@ func (m Model) newLivePage(viewState nav.ViewState) livePage {
 }
 
 func (m Model) tabsView() string {
-	activeTab := m.navState.ActiveTab()
-	tabs := []tabSpec{
-		{label: "worktrees", active: activeTab == nav.TabWorktrees},
-		{label: "log", active: activeTab == nav.TabLog},
-		{label: "status", active: activeTab == nav.TabStatus},
-		{label: "stash", active: activeTab == nav.TabStash},
-		{label: "prs", active: activeTab == nav.TabPRs},
-		{label: "tickets", active: activeTab == nav.TabTickets},
-		{label: "queue", active: activeTab == nav.TabQueue},
-	}
-	parts := make([]string, 0, len(tabs))
-	for _, tab := range tabs {
+	specs := m.tabSpecs()
+	parts := make([]string, 0, len(specs))
+	for _, tab := range specs {
 		parts = append(parts, renderTab(tab))
 	}
 
@@ -287,8 +278,24 @@ func (m Model) tabsView() string {
 }
 
 type tabSpec struct {
+	id     nav.TabID
 	label  string
 	active bool
+}
+
+// tabSpecs is the single source of truth for tab order/labels, shared by
+// tabsView (rendering) and tabHitAt (click hit-testing) so they can't drift.
+func (m Model) tabSpecs() []tabSpec {
+	activeTab := m.navState.ActiveTab()
+	return []tabSpec{
+		{id: nav.TabWorktrees, label: "worktrees", active: activeTab == nav.TabWorktrees},
+		{id: nav.TabLog, label: "log", active: activeTab == nav.TabLog},
+		{id: nav.TabStatus, label: "status", active: activeTab == nav.TabStatus},
+		{id: nav.TabStash, label: "stash", active: activeTab == nav.TabStash},
+		{id: nav.TabPRs, label: "prs", active: activeTab == nav.TabPRs},
+		{id: nav.TabTickets, label: "tickets", active: activeTab == nav.TabTickets},
+		{id: nav.TabQueue, label: "queue", active: activeTab == nav.TabQueue},
+	}
 }
 
 func renderTab(tab tabSpec) string {
@@ -296,6 +303,30 @@ func renderTab(tab tabSpec) string {
 		return ui.RenderBadge(tab.label, ui.BadgeVariantOrange, true, false)
 	}
 	return ui.RenderBadge(tab.label, ui.BadgeVariantSurface, true, false)
+}
+
+// tabHitAt reports which tab (if any) occupies screen coordinate (x, y),
+// recomputing the same left-to-right layout injectTabsIntoFooter renders
+// every frame — tabs always start at column 0 of the footer's last line, so
+// no state needs to survive between render and click. A tab whose full label
+// is truncated off-screen at the current width is not reported as a hit.
+func (m Model) tabHitAt(x, y int) (nav.TabID, bool) {
+	if m.width <= 0 || y != m.height-1 {
+		return "", false
+	}
+	pos := 0
+	for _, spec := range m.tabSpecs() {
+		w := ansi.StringWidth(renderTab(spec))
+		end := pos + w
+		if end > m.width {
+			return "", false
+		}
+		if x >= pos && x < end {
+			return spec.id, true
+		}
+		pos = end + 1 // account for the single-space separator
+	}
+	return "", false
 }
 
 func orderedTabs() []nav.TabID {

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/git"
@@ -8,7 +9,31 @@ import (
 	"github.com/elentok/gx/ui/nav"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
+
+// findButtonCoords locates the on-screen (x, y) of the given quit-confirm
+// button text (" Yes " or " No ") using the same centering math
+// ui.OverlayCenter applies in Model.View, so the click lands where the
+// button is actually rendered rather than a hardcoded guess.
+func findButtonCoords(t *testing.T, m Model, button string) (x, y int) {
+	t.Helper()
+	view := m.quitConfirm.View(m.width)
+	fgW := lipgloss.Width(view)
+	fgH := lipgloss.Height(view)
+	ox := max((m.width-fgW)/2, 0)
+	oy := max((m.height-fgH)/2, 0)
+	for row, line := range strings.Split(view, "\n") {
+		plain := ansi.Strip(line)
+		if before, _, found := strings.Cut(plain, button); found {
+			col := ansi.StringWidth(before)
+			return ox + col + ansi.StringWidth(button)/2, oy + row
+		}
+	}
+	t.Fatalf("could not find button %q in rendered quit-confirm modal:\n%s", button, ansi.Strip(view))
+	return 0, 0
+}
 
 // quitBlockingStub is a page stub whose CanQuit() reports a loop in progress.
 type quitBlockingStub struct{ canQuit bool }
@@ -100,6 +125,59 @@ func TestQuitConfirmAcceptQuits(t *testing.T) {
 	}
 	if _, ok := cmd().(tea.QuitMsg); !ok {
 		t.Fatalf("expected quit msg after confirming")
+	}
+}
+
+func TestClickQuitConfirmYesQuits(t *testing.T) {
+	m := newAppWithQuitGuard(t, false)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	updated, _ = m.Update(nav.Back()())
+	m = updated.(Model)
+	if !m.quitConfirm.IsOpen {
+		t.Fatalf("expected quit confirm dialog to be open")
+	}
+
+	x, y := findButtonCoords(t, m, " Yes ")
+	updated, cmd := m.Update(tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	m = updated.(Model)
+
+	if m.quitConfirm.IsOpen {
+		t.Fatalf("expected quit confirm dialog to be closed after clicking Yes")
+	}
+	if cmd == nil {
+		t.Fatalf("expected quit cmd")
+	}
+	if _, ok := cmd().(tea.QuitMsg); !ok {
+		t.Fatalf("expected quit msg after clicking Yes")
+	}
+}
+
+func TestClickQuitConfirmNoCancels(t *testing.T) {
+	m := newAppWithQuitGuard(t, false)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	updated, _ = m.Update(nav.Back()())
+	m = updated.(Model)
+	if !m.quitConfirm.IsOpen {
+		t.Fatalf("expected quit confirm dialog to be open")
+	}
+
+	x, y := findButtonCoords(t, m, " No ")
+	updated, cmd := m.Update(tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	m = updated.(Model)
+
+	if m.quitConfirm.IsOpen {
+		t.Fatalf("expected quit confirm dialog to be closed after clicking No")
+	}
+	if cmd != nil {
+		if msg := cmd(); msg != nil {
+			if _, ok := msg.(tea.QuitMsg); ok {
+				t.Fatalf("expected no quit msg after clicking No")
+			}
+		}
 	}
 }
 

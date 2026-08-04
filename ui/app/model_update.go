@@ -31,6 +31,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, notifyCmd
 	}
 
+	if click, ok := msg.(tea.MouseClickMsg); ok {
+		mouse := click.Mouse()
+		if mouse.Button == tea.MouseLeft {
+			if id, hit := m.tabHitAt(mouse.X, mouse.Y); hit {
+				next, cmd := m.switchTab(nav.ViewState{Tab: id})
+				return next, tea.Batch(notifyCmd, cmd)
+			}
+		}
+	}
+
 	if nav.IsRepoMutated(msg) {
 		m.gate.Mutated()
 		// Trust-the-self-reload invariant: the page that emitted RepoMutated

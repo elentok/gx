@@ -1,12 +1,15 @@
 package confirm
 
 import (
+	"strings"
+
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/notify"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // Options configures a confirm modal.
@@ -85,12 +88,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, Result) {
 		if msg.Button != tea.MouseLeft {
 			return m, nil, Result{}
 		}
-		bounds := components.LocateConfirmButtons(m.opts.prompt, m.opts.items...)
-		switch bounds.HitTest(msg.X, msg.Y) {
-		case "yes":
-			return m.decide(true)
-		case "no":
-			return m.decide(false)
+		if accepted, hit := m.hitTest(m.View(0), msg.X, msg.Y); hit {
+			return m.decide(accepted)
 		}
 	}
 	return m, nil, Result{}
@@ -98,13 +97,50 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, Result) {
 
 // UpdateMouse translates an absolute-screen mouse message into the modal's
 // local coordinate frame - matching where the caller placed View(width) via
-// ui.OverlayCenter(_, _, screenW, screenH) - and forwards it to Update.
+// ui.OverlayCenter(_, _, screenW, screenH) - and hit-tests it there.
 func (m Model) UpdateMouse(msg tea.MouseClickMsg, width, screenW, screenH int) (Model, tea.Cmd, Result) {
+	if msg.Button != tea.MouseLeft {
+		return m, nil, Result{}
+	}
 	view := m.View(width)
 	ox, oy := ui.OverlayCenterOrigin(lipgloss.Width(view), lipgloss.Height(view), screenW, screenH)
-	msg.X -= ox
-	msg.Y -= oy
-	return m.Update(msg)
+	if accepted, hit := m.hitTest(view, msg.X-ox, msg.Y-oy); hit {
+		return m.decide(accepted)
+	}
+	return m, nil, Result{}
+}
+
+// hitTest reports which button (if any) is under the local-frame coordinate
+// (x, y) in view, an already-rendered View() output. It searches the
+// rendered text for the literal padded button labels rather than tracking
+// bounds separately, since the body's line count shifts with prompt wrapping
+// at different widths and duplicating that layout math would drift out of
+// sync.
+func (m Model) hitTest(view string, x, y int) (accepted bool, hit bool) {
+	lines := strings.Split(view, "\n")
+	if y < 0 || y >= len(lines) {
+		return false, false
+	}
+	plain := ansi.Strip(lines[y])
+	if col, width, ok := findButtonColumn(plain, " Yes "); ok && x >= col && x < col+width {
+		return true, true
+	}
+	if col, width, ok := findButtonColumn(plain, " No "); ok && x >= col && x < col+width {
+		return false, true
+	}
+	return false, false
+}
+
+// findButtonColumn locates label's display column within plain (an
+// ansi.Strip'd line), using rune-display width rather than a byte offset -
+// the leading border/padding characters may be multi-byte, so a byte index
+// would drift from the terminal column a real mouse click reports.
+func findButtonColumn(plain, label string) (col, width int, ok bool) {
+	before, _, found := strings.Cut(plain, label)
+	if !found {
+		return 0, 0, false
+	}
+	return ansi.StringWidth(before), ansi.StringWidth(label), true
 }
 
 func (m Model) decide(accepted bool) (Model, tea.Cmd, Result) {
