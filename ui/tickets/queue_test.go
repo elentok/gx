@@ -11,6 +11,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/testutil"
@@ -577,7 +578,7 @@ func loadQueueModel(t *testing.T, m QueueModel) QueueModel {
 	msg := m.Init()()
 	updated, _ := m.Update(msg)
 	m = updated.(QueueModel)
-	updated, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	updated, _ = m.Update(tea.WindowSizeMsg{Width: 220, Height: 40})
 	return updated.(QueueModel)
 }
 
@@ -993,6 +994,29 @@ func TestQueueModelScrollsWithKeysAndMouse(t *testing.T) {
 	m = updated.(QueueModel)
 	if m.scrollOffset <= before {
 		t.Fatalf("expected mouse wheel down to increase scroll offset from %d, got %d", before, m.scrollOffset)
+	}
+}
+
+// TestQueueModelShowsPreviewPaneForSelectedTicket covers ticket 15's core
+// acceptance criterion: the Queue tab, previously a single full-width list
+// with no preview at all, now shows the same shared preview pane
+// (renderTicketPreview) as the Tickets tab for whichever row is selected.
+func TestQueueModelShowsPreviewPaneForSelectedTicket(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\nType: task\n\nDistinctive queue-preview body.\n")
+
+	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+
+	content := ansi.Strip(m.View().Content)
+	if !strings.Contains(content, "Preview") {
+		t.Fatalf("expected a Preview panel title in the Queue tab, got:\n%s", content)
+	}
+	if !strings.Contains(content, "Distinctive queue-preview body.") {
+		t.Fatalf("expected the selected ticket's body rendered in the preview pane, got:\n%s", content)
+	}
+	if !strings.Contains(content, "Status: open") {
+		t.Fatalf("expected prettified frontmatter in the Queue tab's preview pane, got:\n%s", content)
 	}
 }
 

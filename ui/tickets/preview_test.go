@@ -13,7 +13,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 )
 
-func TestModel_SelectingTicketShowsHeaderMetaAndBody(t *testing.T) {
+func TestModel_SelectingTicketShowsFrontmatterAndBodyNoHeader(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Type: task\nStatus: open\n\n## Heading\n\nSome distinctive body prose.\n")
 
@@ -27,20 +27,47 @@ func TestModel_SelectingTicketShowsHeaderMetaAndBody(t *testing.T) {
 	m = updated.(Model)
 
 	content := ansi.Strip(m.View().Content)
-	if !strings.Contains(content, "#01 First ticket") {
-		t.Fatalf("expected header line with number+title in view, got:\n%s", content)
+	if strings.Contains(content, "#01 First ticket") {
+		t.Fatalf("expected the old header line gone from the preview, got:\n%s", content)
 	}
-	if !strings.Contains(content, "open") {
-		t.Fatalf("expected rendered status word in view, got:\n%s", content)
+	if !strings.Contains(content, "Status: open") {
+		t.Fatalf("expected prettified 'Status:' frontmatter line in view, got:\n%s", content)
 	}
-	if !strings.Contains(content, "task") {
-		t.Fatalf("expected ticket type in view, got:\n%s", content)
+	if !strings.Contains(content, "Type: task") {
+		t.Fatalf("expected prettified 'Type:' frontmatter line in view, got:\n%s", content)
 	}
 	if !strings.Contains(content, "Some distinctive body prose.") {
 		t.Fatalf("expected glamour-rendered body text in view, got:\n%s", content)
 	}
 	if !strings.Contains(content, "## Heading") {
 		t.Fatalf("expected heading markdown rendered (not stripped) in view, got:\n%s", content)
+	}
+}
+
+// TestModel_PreviewFrontmatterUsesPrettifiedFieldLabels covers the
+// blocked_by/actual_context_window prettification example from the shared
+// preview pane ticket: "blocked_by" -> "Blocked by" (default transform) and
+// "actual_context_window" -> "Context window" (an explicit override, since
+// the default transform would read "Actual context window").
+func TestModel_PreviewFrontmatterUsesPrettifiedFieldLabels(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-blocker.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "my-epic", "02-blocked.md", "Status: open\nBlocked by: 01\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	// rows: [epic, 01-blocker, 02-blocked] - move down twice to select 02.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+
+	content := ansi.Strip(m.View().Content)
+	if !strings.Contains(content, "Blocked by: 01") {
+		t.Fatalf("expected prettified 'Blocked by:' frontmatter line in view, got:\n%s", content)
 	}
 }
 

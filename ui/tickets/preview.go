@@ -74,13 +74,11 @@ func renderViewportWithScrollbar(vp viewport.Model) []string {
 }
 
 // previewContent builds the selected row's preview. Nothing selected (e.g.
-// an empty `.scratch/`) falls back to the tab's empty-preview placeholder.
-// A ticket row gets a synthesized header line (icon + number + title), a
-// metadata line (rendered status, type, unresolved blocked-by), a thin
-// rule, then the ticket body rendered verbatim through glamour. An epic row
-// gets its own header (name + optional [map] badge + open/total count)
-// followed by its map.md body for a wayfinder-map epic, or nothing for a
-// plain one.
+// an empty `.scratch/`) falls back to the tab's empty-preview placeholder. A
+// ticket row is rendered by renderTicketPreview, shared with the Queue tab's
+// own preview pane (see queue_preview.go). An epic row gets its own header
+// (name + optional [map] badge + open/total count) followed by its map.md
+// body for a wayfinder-map epic, or nothing for a plain one.
 func (m Model) previewContent(width int) string {
 	r, ok := m.selectedRow()
 	if !ok {
@@ -92,14 +90,20 @@ func (m Model) previewContent(width int) string {
 
 	epic := m.epics[r.epicIdx]
 	t := epic.Tickets[r.ticketIdx]
+	return renderTicketPreview(epic, t, width)
+}
+
+// renderTicketPreview builds one ticket row's preview: its formatted
+// frontmatter block (renderFrontmatterBlock), a thin rule, then the ticket
+// body rendered verbatim through glamour (or a read-error message). Shared
+// verbatim by the Tickets tab (previewContent above) and the Queue tab
+// (queue_preview.go) so both tabs' previews stay identical rather than
+// drifting into two similar-but-slightly-different implementations.
+func renderTicketPreview(epic tickets.Epic, t tickets.Ticket, width int) string {
 	status := epic.RenderedStatus(t)
 
 	var b strings.Builder
-	b.WriteString(previewHeaderLine(m.icons(), status, t))
-	if meta := previewMetaLine(epic, t, status); meta != "" {
-		b.WriteString("\n")
-		b.WriteString(meta)
-	}
+	b.WriteString(renderFrontmatterBlock(t, status))
 	b.WriteString("\n")
 	b.WriteString(previewRuleStyle.Render(strings.Repeat("─", max(width, 0))))
 	b.WriteString("\n")
@@ -139,18 +143,3 @@ func previewEpicHeaderLine(epic tickets.Epic) string {
 	return line
 }
 
-func previewHeaderLine(icons ui.IconSet, status tickets.RenderedStatus, t tickets.Ticket) string {
-	icon, style := statusIconAndStyle(icons, status)
-	return "  " + style.Render(icon) + " " + ui.StyleBold.Render(fmt.Sprintf("#%s %s", t.DisplayNumber(), t.Title))
-}
-
-func previewMetaLine(epic tickets.Epic, t tickets.Ticket, status tickets.RenderedStatus) string {
-	parts := []string{ui.StyleMuted.Render(status.Word())}
-	if t.Type != "" {
-		parts = append(parts, ui.StyleMuted.Render(t.Type))
-	}
-	if suffix := blockedBySuffix(epic, t, status); suffix != "" {
-		parts = append(parts, blockedBySuffixStyle.Render(suffix))
-	}
-	return "  " + strings.Join(parts, "  ")
-}

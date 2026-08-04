@@ -723,10 +723,14 @@ func (m *QueueModel) clampSelected() {
 
 // queueViewportHeight is the queue panel's visible body line count, matching
 // ui.RenderPanel's own bodyH math (PaddingY: 0, minus the header row) — see
-// View()'s Height argument — so the windowing done here lines up with what
-// RenderPanel actually paints.
+// View()'s split sizing — so the windowing done here lines up with what
+// RenderPanel actually paints. Splits its height the same way View() does
+// (splitPanelHeight), since a stacked (narrow-terminal) layout shares the
+// available height with the preview pane below it.
 func (m QueueModel) queueViewportHeight() int {
-	return max(m.height-2, 0)
+	height := max(m.height-1, 1)
+	sidebarH, _ := splitPanelHeight(m.width, height)
+	return max(sidebarH-1, 0)
 }
 
 // ensureQueueVisible adjusts scrollOffset minimally so the selected row's
@@ -919,9 +923,25 @@ func (m QueueModel) View() tea.View {
 	viewportH := m.queueViewportHeight()
 	lines := ui.AppendScrollbar(m.queueVisibleLines(viewportH), m.width-2, len(m.queueLines()), viewportH, m.scrollOffset)
 	height := max(m.height-1, 1)
-	content := ui.RenderPanel(ui.PanelOptionsFor(
-		m.width, height, "Queue", "", lines, true, ui.ColorBlue, nil, false,
+	sidebarW, previewW := splitPanelWidth(m.width)
+	sidebarH, previewH := splitPanelHeight(m.width, height)
+
+	queueView := ui.RenderPanel(ui.PanelOptionsFor(
+		sidebarW, sidebarH, "Queue", "", lines, true, ui.ColorBlue, nil, true,
 	))
+	previewView := ui.RenderPanel(ui.PanelOptionsFor(
+		previewW, previewH, "Preview", "", m.queuePreviewLines(previewW, previewH), false, ui.ColorBlue, nil, false,
+	))
+
+	var content string
+	if useStackedLayout(m.width) {
+		seam := ui.RenderSeamRow(sidebarW, ui.SeamColor)
+		content = lipgloss.JoinVertical(lipgloss.Left, queueView, seam, previewView)
+	} else {
+		seam := ui.RenderSeamColumn(sidebarH, ui.SeamColor)
+		content = lipgloss.JoinHorizontal(lipgloss.Top, queueView, seam, previewView)
+	}
+
 	if m.confirm.IsOpen {
 		content = ui.OverlayCenter(content, m.confirm.View(m.width), m.width, m.height)
 	}

@@ -469,23 +469,40 @@ func (m Model) searchOverlayWidth() int {
 }
 
 func (m Model) useStackedLayout() bool {
-	return m.width <= 100
+	return useStackedLayout(m.width)
 }
 
 func (m Model) splitWidth() (sidebarW, previewW int) {
-	if m.useStackedLayout() {
-		return m.width, m.width
-	}
-	width := m.width - 1
-	sidebarW = width / 2
-	previewW = width - sidebarW
-	return
+	return splitPanelWidth(m.width)
 }
 
 // splitHeight divides a stacked tickets view evenly between its selection-
 // driving list and preview. Wide views remain a full-height side-by-side split.
 func (m Model) splitHeight(total int) (sidebarH, previewH int) {
-	if !m.useStackedLayout() {
+	return splitPanelHeight(m.width, total)
+}
+
+// useStackedLayout, splitPanelWidth and splitPanelHeight are free functions
+// (rather than Model methods) so the Queue tab's own list+preview split
+// (queue_preview.go) can share the exact same layout math instead of
+// re-deriving it - both tabs' panels should size identically at a given
+// terminal width.
+func useStackedLayout(width int) bool {
+	return width <= 100
+}
+
+func splitPanelWidth(width int) (sidebarW, previewW int) {
+	if useStackedLayout(width) {
+		return width, width
+	}
+	w := width - 1
+	sidebarW = w / 2
+	previewW = w - sidebarW
+	return
+}
+
+func splitPanelHeight(width, total int) (sidebarH, previewH int) {
+	if !useStackedLayout(width) {
 		return total, total
 	}
 	total-- // seam row
