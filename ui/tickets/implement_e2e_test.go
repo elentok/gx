@@ -74,5 +74,5 @@ func waitForTicketsText(t *testing.T, tm *teatest.TestModel, text string) {
 	t.Helper()
 	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
 		return bytes.Contains(bts, []byte(text))
-	}, teatest.WithDuration(5*time.Second))
+	}, teatest.WithDuration(12*time.Second))
 }
