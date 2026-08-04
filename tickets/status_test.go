@@ -205,6 +205,26 @@ func TestEpic_UnresolvedBlockers_LetteredTokenNamesOneSibling(t *testing.T) {
 	}
 }
 
+// TestEpic_UnresolvedBlockers_SplitSiblingsDontBlockEachOther covers 05's
+// real-world split: both 05b and 05c inherit "Blocked by: 05" from the
+// split, and share Number 5 with each other. Without excluding split
+// siblings from the family count, each would need the other done too,
+// deadlocking them against each other despite 05 itself being done.
+func TestEpic_UnresolvedBlockers_SplitSiblingsDontBlockEachOther(t *testing.T) {
+	original := "05"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 5, Identifier: "05", Status: "done", Split: []string{"05b", "05c"}},
+		{Number: 5, Identifier: "05b", BlockedBy: []string{"05"}, SplitFrom: &original, Status: "ready-for-agent"},
+		{Number: 5, Identifier: "05c", BlockedBy: []string{"05"}, SplitFrom: &original, Status: "ready-for-agent"},
+	}}
+	if got := epic.UnresolvedBlockers(epic.Tickets[1]); got != nil {
+		t.Errorf("UnresolvedBlockers(05b) = %v, want nil since 05 is done", got)
+	}
+	if got := epic.UnresolvedBlockers(epic.Tickets[2]); got != nil {
+		t.Errorf("UnresolvedBlockers(05c) = %v, want nil since 05 is done", got)
+	}
+}
+
 func TestEpic_BlockingTickets_ResolvesTokensToTicketsForModal(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
 		{Number: 1, Identifier: "01", BlockedBy: []string{"2", "3"}},

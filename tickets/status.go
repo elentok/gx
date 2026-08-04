@@ -106,7 +106,15 @@ func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
 // follow-up ticket to 06, not a lettered replacement created by splitting
 // 06) must not be required to finish itself before its own "Blocked by: 06"
 // can resolve — that can never happen, since t is still open for the
-// duration of this very check.
+// duration of this very check. t's own split siblings (SplitFrom pointing
+// at the same original, e.g. 05b and 05c both split from 05) are excluded
+// from the family too, for the same reason generalized to a sibling rather
+// than t alone: a split tool carries the original's "Blocked by:" onto
+// every replacement, so 05b and 05c each inherit "Blocked by: 05" — without
+// this exclusion, resolving 05b's blocker would wait on 05c also being
+// done (and vice versa) purely because they share Number 5, deadlocking two
+// tickets against each other even though the ticket they actually name (05)
+// is done.
 func (e Epic) UnresolvedBlockers(t Ticket) []string {
 	if len(t.BlockedBy) == 0 {
 		return nil
@@ -121,13 +129,16 @@ func (e Epic) UnresolvedBlockers(t Ticket) []string {
 		if other.Number == t.Number && other.Identifier == t.Identifier {
 			continue
 		}
-		total[other.Number]++
-		if other.IsDone() {
-			done[other.Number]++
-		}
 		if other.Identifier != "" {
 			_, suffix := splitBlockedByToken(other.Identifier)
 			byNumberAndSuffix[siblingKey(other.Number, suffix)] = other
+		}
+		if isSplitSibling(t, other) {
+			continue
+		}
+		total[other.Number]++
+		if other.IsDone() {
+			done[other.Number]++
 		}
 	}
 	var unresolved []string
@@ -193,6 +204,13 @@ func (e Epic) BlockingTickets(t Ticket) []Ticket {
 		}
 	}
 	return result
+}
+
+// isSplitSibling reports whether t and other are both replacements from the
+// same mid-flight split (SplitFrom pointing at the same original ticket),
+// e.g. 05b and 05c both split from 05. See UnresolvedBlockers.
+func isSplitSibling(t, other Ticket) bool {
+	return t.SplitFrom != nil && other.SplitFrom != nil && *t.SplitFrom == *other.SplitFrom
 }
 
 // splitBlockedByToken splits a parseBlockedBy token (e.g. "04a") into its
