@@ -77,3 +77,11 @@ func joinNonEmpty(sep, a, b string) string {
 func renderMetricsLine(text string) string {
 	return metricsLineIndent + metricsLineStyle.Render(text)
 }
+
+// renderRowMetricsLine indents text two columns deeper than renderMetricsLine
+// alone, aligning a row's line-2 under its title text after the "  " + icon
+// lead-in — shared by the Tickets tab's tree rows (Model.renderTicketRow) and
+// the Queue tab's flat rows (renderQueueTicketRow) so both read identically.
+func renderRowMetricsLine(text string) string {
+	return "  " + renderMetricsLine(text)
+}

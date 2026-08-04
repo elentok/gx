@@ -1,13 +1,16 @@
 # Changelog
 
-## v0.24.1 - 2026-08-02
+## v0.24.1 - 2026-08-04
 
-- Tickets now use typed YAML frontmatter with schema validation, including a new `gx tickets validate <path>` command; legacy bold-line ticket parsing has been retired.
-- Added a Claude/Codex agent picker when launching an epic's ralph-loop from the Tickets tab, with Claude remaining the default.
-- Ralph loop now records actual context-window and elapsed-time metrics in landed ticket frontmatter and commit trailers.
-- Fixed ralph-loop status and metadata updates corrupting ticket frontmatter.
-- Ralph loop now marks only a failed iteration as needing attention and continues scheduling the remaining tickets.
-- Fixed ticket-launched ralph-loops unexpectedly changing the user's active herdr workspace and stalled agent prompts needing an external keypress before submission.
+- Added a durable execution queue for selecting tickets or epics, automatically including blockers and split children, and running scoped work across multiple epics concurrently while preserving progress across restarts.
+- Added queue pause/resume controls, dependency-aware execution waves, live progress and context metrics, completion summaries, and recovery when returning to the Tickets or Queue tabs.
+- Tickets now use typed YAML frontmatter with validation and atomic sparse updates through the new `gx tickets validate`, `gx tickets set`, and `gx tickets schema` commands; legacy bold-line parsing has been retired.
+- Ticket rows and previews now show live or landed elapsed time, context-window usage, compaction counts, and cherry-pick landing status.
+- Added a Claude/Codex agent picker when launching ticket execution, and improved Codex session attribution so live and landed metrics are recorded correctly.
+- Ralph loop now records elapsed and context metrics in ticket frontmatter and commit trailers, scopes worktrees and live state per epic, and supports running selected ticket subsets.
+- Fixed slow `/compact` operations being interrupted or repeatedly submitted while retaining safe nudging for genuinely stalled prompts.
+- Fixed isolated iteration failures aborting the entire run, transient commits-ahead errors stranding completed work, externally landed tickets being misclassified, and failure reasons disappearing from ticket files.
+- Fixed concurrent epic state collisions, stale queue state leaking across worktrees, running-epic state being lost after tab switches, and broken live-row metrics after a rebase.
 - Added `gopkg.in/yaml.v3` v3.0.1.
 
 ## v0.24.0 - 2026-08-02

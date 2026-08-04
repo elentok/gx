@@ -2,6 +2,7 @@ package tickets
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,7 +18,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 )
 
-func TestQueueModelRendersDependencyAwareEpicPlan(t *testing.T) {
+func TestQueueModelRendersFlatDependencyOrderedEpicPlan(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-foundation.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-dependent.md", "Status: open\nBlocked by: 01\n\nBody.\n")
@@ -35,16 +36,18 @@ func TestQueueModelRendersDependencyAwareEpicPlan(t *testing.T) {
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
 	content := m.View().Content
 
-	alpha := strings.Index(content, "alpha")
-	parallel := strings.Index(content, "parallel")
-	then := strings.Index(content, "then")
-	dependent := strings.Index(content, "Dependent")
-	beta := strings.Index(content, "beta")
-	if alpha < 0 || parallel < alpha || then < parallel || dependent < then || beta < dependent {
-		t.Fatalf("expected parallel wave, sequential dependency, and epic grouping in order:\n%s", content)
+	if strings.Contains(content, "parallel") || strings.Contains(content, "then") {
+		t.Fatalf("expected a flat ticket-number-ordered list, not wave grouping:\n%s", content)
 	}
-	if strings.Count(content, "parallel") != 2 {
-		t.Fatalf("expected available capacity to produce two parallel clusters, got:\n%s", content)
+
+	alpha := strings.Index(content, "alpha")
+	foundation := strings.Index(content, "Foundation")
+	dependent := strings.Index(content, "Dependent")
+	independent3 := strings.Index(content, "03")
+	independent4 := strings.Index(content, "04")
+	beta := strings.Index(content, "beta")
+	if alpha < 0 || foundation < alpha || dependent < foundation || independent3 < dependent || independent4 < independent3 || beta < independent4 {
+		t.Fatalf("expected ticket-number order within alpha, then epic grouping into beta:\n%s", content)
 	}
 }
 
@@ -79,7 +82,7 @@ func TestQueueModelSurfacesActionableErrorForDependencyCycle(t *testing.T) {
 	writeTicket(t, root, "alpha", "02-second.md", "Status: open\nBlocked by: 01\n\nBody.\n")
 
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-first.md"): true,
+		ticketPath(root, "alpha", "01-first.md"):  true,
 		ticketPath(root, "alpha", "02-second.md"): true,
 	}
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
@@ -807,6 +810,95 @@ func TestTicketsAndQueueMatchAfterRestartRegardlessOfNavigationOrder(t *testing.
 	}
 	if queueFirst.queueStatus[path] != ticketsModel.queueStatus[path] {
 		t.Fatalf("status mismatch: queue=%v tickets=%v", queueFirst.queueStatus[path], ticketsModel.queueStatus[path])
+	}
+}
+
+// TestQueueModelShowsSameTwoLineStatusAsTicketsTab covers ticket 25's first
+// request: the Queue tab must show each ticket's status icon, blocked-by
+// suffix, and (for a landed ticket) the same elapsed/tokens metrics line the
+// Tickets tab renders (view.go's renderTicketRow), not just a bare checkbox
+// and title.
+func TestQueueModelShowsSameTwoLineStatusAsTicketsTab(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-foundation.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "alpha", "02-dependent.md", "Status: open\nBlocked by: 01\n\nBody.\n")
+	writeRawQueueTicket(t, root, "alpha", "03-done.md", "---\nid: \"03\"\nstatus: done\ntype: task\nactual_context_window: 12000\nelapsed_time: 754\n---\n\nDone.\n")
+
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "01-foundation.md"): true,
+		ticketPath(root, "alpha", "02-dependent.md"):  true,
+		ticketPath(root, "alpha", "03-done.md"):       true,
+	}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	content := m.View().Content
+
+	if !strings.Contains(content, "(blocked by 01)") {
+		t.Fatalf("expected blocked-by suffix for the dependent ticket:\n%s", content)
+	}
+	if !strings.Contains(content, "12.0k tok") || !strings.Contains(content, "12m34s") {
+		t.Fatalf("expected the done ticket's elapsed/tokens metrics line:\n%s", content)
+	}
+}
+
+// TestQueueModelScrollsWithKeysAndMouse covers ticket 25's third request: the
+// Queue tab must scroll (keyboard, including ctrl+d/ctrl+u, and mouse wheel)
+// once its content overflows the visible viewport — previously it had no
+// scroll offset at all, so content past the panel's height was simply
+// unreachable.
+func TestQueueModelScrollsWithKeysAndMouse(t *testing.T) {
+	root := t.TempDir()
+	for i := 1; i <= 40; i++ {
+		writeTicket(t, root, "alpha", fmt.Sprintf("%02d-ticket.md", i), "Status: open\n\nBody.\n")
+	}
+	checked := map[string]bool{}
+	for i := 1; i <= 40; i++ {
+		checked[ticketPath(root, "alpha", fmt.Sprintf("%02d-ticket.md", i))] = true
+	}
+
+	m := NewQueueModel(root, ui.Settings{}, checked)
+	msg := m.Init()()
+	updated, _ := m.Update(msg)
+	m = updated.(QueueModel)
+	updated, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 10})
+	m = updated.(QueueModel)
+
+	if m.scrollOffset != 0 {
+		t.Fatalf("expected no initial scroll, got offset %d", m.scrollOffset)
+	}
+
+	// ctrl+d pages the selection (and viewport) down, twice so there's slack
+	// for ctrl+u to give back — a single page-down can land the selection
+	// exactly at the viewport's top line, which a lone page-up wouldn't need
+	// to scroll further for (it'd already be visible).
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
+	m = updated.(QueueModel)
+	if m.scrollOffset == 0 {
+		t.Fatalf("expected ctrl+d to scroll the viewport down, got offset %d", m.scrollOffset)
+	}
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
+	m = updated.(QueueModel)
+	afterPageDown := m.scrollOffset
+
+	// ctrl+u pages back up — repeated past the top so the selection (and so
+	// the viewport, via ensureQueueVisible) actually has to move rather than
+	// staying put because the target row was already in view.
+	for range 3 {
+		updated, _ = m.Update(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
+		m = updated.(QueueModel)
+	}
+	if m.selected != 0 {
+		t.Fatalf("expected ctrl+u to page the selection back to the top, got %d", m.selected)
+	}
+	if m.scrollOffset >= afterPageDown {
+		t.Fatalf("expected ctrl+u to scroll the viewport back up from %d, got %d", afterPageDown, m.scrollOffset)
+	}
+
+	// Mouse wheel scrolls the viewport without needing a key press.
+	before := m.scrollOffset
+	updated, _ = m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	m = updated.(QueueModel)
+	if m.scrollOffset <= before {
+		t.Fatalf("expected mouse wheel down to increase scroll offset from %d, got %d", before, m.scrollOffset)
 	}
 }
 

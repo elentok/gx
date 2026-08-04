@@ -6,12 +6,15 @@ import (
 	"sort"
 	"time"
 
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 )
@@ -45,6 +48,12 @@ type QueueModel struct {
 	// doesn't duplicate completion into its own bookkeeping (ticket 20).
 	queueStatus map[string]queueItemStatus
 	queueStore  *QueueStore
+	// live mirrors Model.live (model_live.go): epicName -> ticket identifier
+	// -> in-memory orchestrator state, synced from the registry alongside
+	// queueStatus so the Queue tab's rows can render the same running/paused
+	// spinner+phase presentation as the Tickets tab (renderLiveTicketRow).
+	live             map[string]map[string]liveTicketState
+	implementSpinner spinner.Model
 
 	width, height int
 	ready         bool
@@ -52,7 +61,8 @@ type QueueModel struct {
 	epics         []tickets.Epic
 	candidates    map[string]bool
 
-	selected int
+	selected     int
+	scrollOffset int
 
 	implementAgentMenuOpen bool
 	implementAgentMenu     components.MenuState
@@ -70,6 +80,8 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 	if len(orders) > 0 && orders[0] != nil {
 		checkOrder = orders[0]
 	}
+	sp := spinner.New()
+	sp.Spinner = spinner.Dot
 	return QueueModel{
 		executionTickets:   map[string]bool{},
 		liveContextTokens:  map[string]int{},
@@ -80,6 +92,8 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 		checked:            checked,
 		checkOrder:         checkOrder,
 		queueStatus:        map[string]queueItemStatus{},
+		live:               map[string]map[string]liveTicketState{},
+		implementSpinner:   sp,
 		implementAgentMenu: newImplementAgentMenu(),
 		runningEpics:       map[string]bool{},
 		paused:             ralphLoopRegistry.isPaused(),
@@ -123,6 +137,7 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.ready = true
+		m.ensureQueueVisible()
 		return m, nil
 	case queueEpicsLoadedMsg:
 		m.loaded = true
@@ -140,7 +155,7 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.runningEpics[msg.epicName] = true
 		m.markEpicTicketsRunning(msg.epicName)
 		m.syncRunSnapshot(msg.epicName)
-		return m, cmdPollImplement(msg.epicName)
+		return m, tea.Batch(cmdPollImplement(msg.epicName), m.implementSpinner.Tick)
 	case implementPollMsg:
 		m.syncRunSnapshot(msg.epicName)
 		if ralphLoopRegistry.isRunningEpic(msg.epicName) {
@@ -148,6 +163,7 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.finalizeEpicTicketStatus(msg.epicName)
 		delete(m.runningEpics, msg.epicName)
+		delete(m.live, msg.epicName)
 		executionComplete := !m.executionStartedAt.IsZero() && len(m.runningEpics) == 0 && len(m.pendingEpics) == 0
 		startCmd := m.startAvailableEpics()
 		if executionComplete {
@@ -159,9 +175,40 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, notify.Error(msg.err.Error())
 	case queueSyncMsg:
 		return m.handleQueueSync(msg)
+	case spinner.TickMsg:
+		return m.handleQueueSpinnerTick(msg)
+	case tea.MouseWheelMsg:
+		return m.handleQueueMouseWheel(msg)
 	case tea.KeyPressMsg:
 		return m.handleQueueKey(msg)
 	}
+	return m, nil
+}
+
+func (m QueueModel) handleQueueSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
+	if len(m.runningEpics) == 0 {
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.implementSpinner, cmd = m.implementSpinner.Update(msg)
+	return m, cmd
+}
+
+// handleQueueMouseWheel scrolls the queue viewport without moving selection,
+// mirroring ui/log's handleMouseWheel.
+func (m QueueModel) handleQueueMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
+	mouse := msg.Mouse()
+	dir := 0
+	switch mouse.Button {
+	case tea.MouseWheelDown:
+		dir = 1
+	case tea.MouseWheelUp:
+		dir = -1
+	default:
+		return m, nil
+	}
+	m.scrollOffset += dir * 3
+	m.clampScrollOffset()
 	return m, nil
 }
 
@@ -212,10 +259,14 @@ func (m QueueModel) handleQueueSync(msg queueSyncMsg) (tea.Model, tea.Cmd) {
 			continue
 		}
 		delete(m.runningEpics, name)
+		delete(m.live, name)
 		if wasRunning {
 			m.finalizeEpicTicketStatus(name)
 			cmds = append(cmds, implementFinishedNotifyCmd(name))
 		}
+	}
+	if len(m.runningEpics) > 0 {
+		cmds = append(cmds, m.implementSpinner.Tick)
 	}
 	if len(m.executionTickets) == 0 {
 		for _, plan := range m.checkedEpicPlans() {
@@ -241,15 +292,30 @@ func (m *QueueModel) syncRunSnapshot(epicName string) {
 	if !ok {
 		return
 	}
+	if m.live == nil {
+		m.live = map[string]map[string]liveTicketState{}
+	}
+	live := make(map[string]liveTicketState, len(snapshot.Tickets))
 	for identifier, ticket := range snapshot.Tickets {
 		key := epicName + "/" + identifier
 		m.liveContextTokens[key] = ticket.ContextTokens
+		live[identifier] = liveTicketState{
+			running:   ticket.Running,
+			paused:    ticket.Paused,
+			label:     ticket.Label,
+			pauseKind: ticket.PauseKind,
+			reason:    ticket.PauseReason,
+			phase:     livePhaseImplementing,
+			tokens:    ticket.ContextTokens,
+			startedAt: snapshot.StartedAt,
+		}
 		if ticket.Completed {
 			if path, ok := m.ticketPathFor(epicName, identifier); ok {
 				m.setItemStatus(path, queueStatusDone)
 			}
 		}
 	}
+	m.live[epicName] = live
 }
 
 // ticketPathFor resolves an epicName/identifier pair (the registry's
@@ -334,6 +400,10 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.moveSelection(1)
 	case "k", "up":
 		m.moveSelection(-1)
+	case "ctrl+d":
+		m.moveSelection(list.DefaultScroll)
+	case "ctrl+u":
+		m.moveSelection(-list.DefaultScroll)
 	case "R":
 		return m, m.cmdLoadQueue()
 	case "p":
@@ -482,6 +552,7 @@ func (m *QueueModel) moveSelection(delta int) {
 	if m.selected >= len(rows) {
 		m.selected = len(rows) - 1
 	}
+	m.ensureQueueVisible()
 }
 
 func (m *QueueModel) clampSelected() {
@@ -494,6 +565,41 @@ func (m *QueueModel) clampSelected() {
 	case m.selected < 0:
 		m.selected = 0
 	}
+	m.ensureQueueVisible()
+}
+
+// queueViewportHeight is the queue panel's visible body line count, matching
+// ui.RenderPanel's own bodyH math (PaddingY: 0, minus the header row) — see
+// View()'s Height argument — so the windowing done here lines up with what
+// RenderPanel actually paints.
+func (m QueueModel) queueViewportHeight() int {
+	return max(m.height-2, 0)
+}
+
+// ensureQueueVisible adjusts scrollOffset minimally so the selected row's
+// lines stay within the queue panel's visible window, mirroring the Tickets
+// tab's ensureSidebarVisible (model.go) — needed because a row can be one or
+// two physical lines depending on its live/done status.
+func (m *QueueModel) ensureQueueVisible() {
+	viewportH := m.queueViewportHeight()
+	line, rowHeight, ok := m.queueLineForSelected()
+	if ok {
+		if line < m.scrollOffset {
+			m.scrollOffset = line
+		}
+		lastLine := line + rowHeight - 1
+		if viewportH > 0 && lastLine >= m.scrollOffset+viewportH {
+			m.scrollOffset = lastLine - viewportH + 1
+		}
+	}
+	m.clampScrollOffset()
+}
+
+func (m *QueueModel) clampScrollOffset() {
+	total := len(m.queueLines())
+	viewportH := m.queueViewportHeight()
+	maxOffset := max(0, total-viewportH)
+	m.scrollOffset = max(0, min(m.scrollOffset, maxOffset))
 }
 
 func (m *QueueModel) toggleSelected() {
@@ -510,10 +616,8 @@ func (m *QueueModel) toggleSelected() {
 }
 
 type queueRow struct {
-	epicName string
-	ticket   tickets.Ticket
-	wave     int
-	waveSize int
+	epic   tickets.Epic
+	ticket tickets.Ticket
 }
 
 func (m QueueModel) rows() []queueRow {
@@ -521,16 +625,17 @@ func (m QueueModel) rows() []queueRow {
 	return rows
 }
 
-// rowsAndPlanErrors renders every candidate ticket as scope-planned waves,
-// using the same canonical planner (ralphloop.PlanWaves over a
-// ralphloop.RunScope) the runner itself claims tickets from — so a wave can
-// never show a ticket as immediately runnable when Run would actually reject
-// it for an unresolved dependency (ticket 24). An epic whose candidates
-// contain a dependency cycle, or a blocker outside the selection that will
-// never resolve, can't be planned into waves at all; its tickets still fall
-// through into one flat row per ticket (in ticket-number order) so they stay
-// visible and toggleable, with the planner's error surfaced separately by
-// name in planErrs for queueLines to render instead of a misleading wave.
+// rowsAndPlanErrors lists every candidate ticket per epic in plan order —
+// ticket-number order (sortedTicketIndexes), which follows each ticket's
+// blocked_by chain, so the topmost open ticket in an epic is always the next
+// one ralph-loop would actually claim — rather than batching them into
+// synchronized "parallel"/"then" waves (ticket 25: that grouping read as a
+// hard concurrency contract the runner didn't actually enforce). A plan
+// validation still runs per epic via the same canonical planner
+// (ralphloop.PlanWaves over a ralphloop.RunScope) the runner itself claims
+// tickets from, so a dependency cycle or a blocker outside the selection that
+// will never resolve is still caught — surfaced by name in planErrs for
+// queueLines to render as an actionable error instead of a misleading plan.
 func (m QueueModel) rowsAndPlanErrors() ([]queueRow, map[string]error) {
 	for path := range m.checked {
 		m.candidates[path] = true
@@ -538,20 +643,13 @@ func (m QueueModel) rowsAndPlanErrors() ([]queueRow, map[string]error) {
 	var out []queueRow
 	planErrs := make(map[string]error)
 	for _, epic := range m.epics {
-		waves, err := epicWaves(epic, m.candidates, queuePlanMaxParallel)
-		if err != nil {
+		if _, err := epicWaves(epic, m.candidates, queuePlanMaxParallel); err != nil {
 			planErrs[epic.Name] = err
-			for _, idx := range sortedTicketIndexes(epic) {
-				t := epic.Tickets[idx]
-				if m.candidates[t.Path] {
-					out = append(out, queueRow{epicName: epic.Name, ticket: t, wave: 0, waveSize: 1})
-				}
-			}
-			continue
 		}
-		for waveIndex, wave := range waves {
-			for _, t := range wave {
-				out = append(out, queueRow{epicName: epic.Name, ticket: t, wave: waveIndex, waveSize: len(wave)})
+		for _, idx := range sortedTicketIndexes(epic) {
+			t := epic.Tickets[idx]
+			if m.candidates[t.Path] {
+				out = append(out, queueRow{epic: epic, ticket: t})
 			}
 		}
 	}
@@ -596,11 +694,20 @@ func (m QueueModel) View() tea.View {
 			m.implementAgentMenu,
 		))
 	}
-	lines := m.queueLines()
+	lines := m.queueVisibleLines(m.queueViewportHeight())
 	height := max(m.height-1, 1)
 	return ui.NewMainView(ui.RenderPanel(ui.PanelOptionsFor(
 		m.width, height, "Queue", "", lines, true, ui.ColorBlue, nil, false,
 	)))
+}
+
+// queueVisibleLines windows queueLines() to a single viewportH-line scroll
+// position at m.scrollOffset, mirroring Model.sidebarVisibleLines.
+func (m QueueModel) queueVisibleLines(viewportH int) []string {
+	lines := m.queueLines()
+	start := min(m.scrollOffset, len(lines))
+	end := min(start+viewportH, len(lines))
+	return lines[start:end]
 }
 
 func (m QueueModel) executionBanner() string {
@@ -689,56 +796,104 @@ func (m QueueModel) checkedProgress() (int, int) {
 }
 
 func (m QueueModel) queueLines() []string {
+	lines, _, _ := m.buildQueueLines()
+	return lines
+}
+
+// queueLineForSelected returns the selected row's line index and physical
+// height within queueLines()'s output, mirroring Model.sidebarLineForSelected
+// — needed since a row is one or two physical lines depending on its
+// live/done status (renderQueueTicketRow).
+func (m QueueModel) queueLineForSelected() (line, height int, ok bool) {
+	_, offsets, heights := m.buildQueueLines()
+	if m.selected < 0 || m.selected >= len(offsets) {
+		return 0, 0, false
+	}
+	return offsets[m.selected], heights[m.selected], true
+}
+
+// buildQueueLines renders every candidate ticket, grouped by epic and
+// ordered in plan order (rowsAndPlanErrors), as the same two-line status rows
+// the Tickets tab renders for its own tickets (renderQueueTicketRow) — no
+// "parallel"/"then" wave grouping (ticket 25). offsets/heights are aligned to
+// rowsAndPlanErrors' row order so selection/scroll math can find any row's
+// position in lines without re-deriving the rendering.
+func (m QueueModel) buildQueueLines() (lines []string, offsets []int, heights []int) {
 	if !m.loaded {
-		return []string{ui.StyleDim.Render("  loading…")}
+		return []string{ui.StyleDim.Render("  loading…")}, nil, nil
 	}
 
 	banner := m.executionBanner()
-	lines := []string{"  " + ui.StyleHint.Render(banner), ""}
+	lines = []string{"  " + ui.StyleHint.Render(banner), ""}
 
 	rows, planErrs := m.rowsAndPlanErrors()
 	if len(rows) == 0 {
 		lines = append(lines, ui.StyleMuted.Render("  no tickets checked — check tickets in the Tickets tab to build a plan"))
-		return lines
+		return lines, nil, nil
 	}
 
-	i := 0
 	epicName := ""
-	previousWave := -1
-	for i < len(rows) {
-		r := rows[i]
-		if r.epicName != epicName {
-			epicName = r.epicName
-			previousWave = -1
+	for i, r := range rows {
+		if r.epic.Name != epicName {
+			epicName = r.epic.Name
 			lines = append(lines, "", sectionHeaderStyle.Render("── "+epicName+" ──"))
 			if err, ok := planErrs[epicName]; ok {
 				lines = append(lines, statusErrorStyle.Render("    "+err.Error()))
 			}
 		}
-		if previousWave >= 0 && r.wave != previousWave {
-			lines = append(lines, ui.StyleDim.Render("    then"))
+		offsets = append(offsets, len(lines))
+		rowLines := m.renderQueueTicketRow(r.epic, r.ticket)
+		if i == m.selected {
+			for li, line := range rowLines {
+				rowLines[li] = ui.RenderRowHighlight(line)
+			}
 		}
-		if r.waveSize > 1 && r.wave != previousWave {
-			lines = append(lines, fmt.Sprintf("    %s (%d):", statusClaimedStyle.Render("parallel"), r.waveSize))
-		}
-		indent := "    "
-		if r.waveSize > 1 {
-			indent = "      "
-		}
-		selected := i == m.selected
-		line := fmt.Sprintf("%s%s %s %s", indent, m.checkboxGlyph(m.checked[r.ticket.Path]), r.ticket.DisplayNumber(), r.ticket.Title)
-		if selected {
-			line = ui.RenderRowHighlight(line)
-		}
-		lines = append(lines, line)
-		previousWave = r.wave
-		i++
+		lines = append(lines, rowLines...)
+		heights = append(heights, len(rowLines))
 	}
-	return lines
+	return lines, offsets, heights
+}
+
+// renderQueueTicketRow renders one physical line for a ticket that isn't
+// currently running, and two for a live or done ticket — the same two-line
+// status presentation as the Tickets tab's renderTicketRow (view.go), so the
+// Queue tab shows identical per-ticket status (ticket 25).
+func (m QueueModel) renderQueueTicketRow(epic tickets.Epic, t tickets.Ticket) []string {
+	status := epic.RenderedStatus(t)
+
+	if status != tickets.StatusSuperseded && m.runningEpics[epic.Name] {
+		if live, ok := m.live[epic.Name][t.Identifier]; ok {
+			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live); ok {
+				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens)
+				return []string{"  " + base, renderRowMetricsLine(joinNonEmpty(" ", suffix, metrics))}
+			}
+		}
+	}
+
+	icon, style := statusIconAndStyle(m.icons(), status)
+	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
+	titleStyle := lipgloss.NewStyle()
+	if status == tickets.StatusDone || status == tickets.StatusSuperseded {
+		titleStyle = statusDoneStyle
+	}
+
+	line := "    " + m.checkboxGlyph(m.checked[t.Path]) + " " + style.Render(icon) + " " + titleStyle.Render(title)
+	if suffix := blockedBySuffix(epic, t, status); suffix != "" {
+		line += " " + blockedBySuffixStyle.Render(suffix)
+	}
+	if status != tickets.StatusDone {
+		return []string{line}
+	}
+	metrics := formatMetricsLine(t.ElapsedTime, t.ActualContextWindow)
+	return []string{line, renderRowMetricsLine(metrics)}
+}
+
+func (m QueueModel) icons() ui.IconSet {
+	return ui.Icons(m.settings.UseNerdFontIcons)
 }
 
 func (m QueueModel) checkboxGlyph(checked bool) string {
-	icons := ui.Icons(m.settings.UseNerdFontIcons)
+	icons := m.icons()
 	if checked {
 		return checkedGlyphStyle.Render(icons.CheckboxChecked)
 	}

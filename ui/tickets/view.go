@@ -152,7 +152,7 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 		line += " " + worktreeTagStyle.Render("["+epic.WorktreeName+"]")
 	}
 	if m.implementingEpics[epic.Name] {
-		line += " " + statusClaimedStyle.Render(m.implementSpinner.View()+" running")
+		line += " " + statusClaimedStyle.Render(strings.TrimRight(m.implementSpinner.View(), " ")+" running")
 	}
 	return line
 }
@@ -220,7 +220,7 @@ func (m Model) renderTicketMetricsLine(text string, searchDim bool) string {
 	if searchDim {
 		return "      " + ui.StyleDim.Render(text)
 	}
-	return "  " + renderMetricsLine(text)
+	return renderRowMetricsLine(text)
 }
 
 // checkboxGlyph renders the execution-queue checkbox marker for a checked or

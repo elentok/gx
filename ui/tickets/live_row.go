@@ -3,6 +3,7 @@ package tickets
 import (
 	"fmt"
 	"image/color"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
@@ -126,7 +127,9 @@ func renderLiveTicketRow(icons ui.IconSet, sp spinner.Model, t tickets.Ticket, l
 		return base, live.reason, true
 
 	case live.running:
-		spinnerView := lipgloss.NewStyle().Foreground(live.phase.color()).Render(sp.View())
+		// spinner.Dot's frames each carry a trailing space; strip it so the
+		// icon column stays single-width and aligned with the other status glyphs.
+		spinnerView := lipgloss.NewStyle().Foreground(live.phase.color()).Render(strings.TrimRight(sp.View(), " "))
 		base = "  " + spinnerView + " " + title
 		suffix = live.phase.suffix()
 		if live.label != "" {
