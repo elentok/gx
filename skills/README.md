@@ -1,0 +1,64 @@
+# gx skill bundle
+
+This directory is gx's canonical, installable skill bundle: the content `gx skills install` copies
+into both Claude's and Codex's user skill/prompt roots (see the `gx skills` command once it ships).
+
+## Origin
+
+`gx-to-tickets` and `gx-tdd` are gx-specific adaptations of two skills from
+[Matt Pocock's skills repo](https://github.com/mattpocock/skills):
+`skills/engineering/to-tickets/SKILL.md` and `skills/engineering/tdd/SKILL.md`. They're inlined
+here, rather than fetched at install time, for the same reason the personal dotfiles skill tree
+inlines its own copies: security and ease-of-deployment — no network fetch during an unattended
+ralph-loop run.
+
+## gx-specific adaptations
+
+The upstream skills assume a human operator and a choice of issue tracker (local files, GitHub,
+Linear, ...) selected by a separate setup step. gx's bundle drops both assumptions:
+
+- **Tracker is fixed, not selected.** gx only ever writes gx's local markdown tracker (see
+  [local-tracker.md](local-tracker.md)) — through `gx tickets` subcommands, not hand-edited YAML.
+  There's no provider-selection step and no dependency on a personal dotfiles skill tree, setup
+  workflow, or triage-label mapping file: `local-tracker.md` is the complete, self-contained
+  contract.
+- **Seams are decided in the ticket, not live.** Upstream `tdd` asks a human "what's the public
+  interface, and which seams should we test?" at the start of every cycle. gx-to-tickets instead
+  requires every generated ticket to declare its approved test seams up front (an explicit `none`
+  with rationale when no automated seam applies), and gx-tdd consumes those declared seams — so the
+  red/green loop runs unattended under ralph-loop without stalling on a question nobody's there to
+  answer. A ticket authored before this convention existed may still proceed, but only when a
+  minimal seam is unambiguous from its acceptance criteria; anything requiring real judgment stops
+  the ticket at `needs-info` instead of guessing.
+
+## Invocation policy
+
+Both skills carry `name`/`description` frontmatter Claude Code reads to render the skill picker.
+`gx-to-tickets` sets `disable-model-invocation: true`, matching its upstream: breaking work into
+tickets is a deliberate, explicitly-invoked action, never something the model should trigger on its
+own reading of a conversation. `gx-tdd` carries no such flag, also matching upstream: it's fine for
+the model to reach for TDD guidance on its own when a task calls for it.
+
+Codex has no equivalent auto-invocation concept — a Codex custom prompt (`~/.codex/prompts/<skill>.md`)
+is only ever run by explicit `/name` invocation, never launched by the model on its own. That's
+already at least as restrictive as `disable-model-invocation: true`, so both skills preserve their
+intended policy under Codex without any extra metadata: `gx-to-tickets`'s explicit-only intent holds
+as-is, and `gx-tdd`'s "the model may reach for it" intent is satisfied whenever the calling skill
+(e.g. `gx-implement`) explicitly invokes it.
+
+## Layout
+
+```
+skills/
+  README.md          — this file
+  local-tracker.md    — the shared local ticket tracker contract
+  gx-to-tickets/
+    SKILL.md
+  gx-tdd/
+    SKILL.md
+    tests.md
+    mocking.md
+```
+
+Every skill references `local-tracker.md` with a relative path (`../local-tracker.md`), so it must
+be installed alongside the skill directories, at the bundle root, for those references to resolve.
