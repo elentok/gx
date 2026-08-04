@@ -879,18 +879,26 @@ func (m QueueModel) rows() []queueRow {
 // will never resolve is still caught — surfaced by name in planErrs for
 // queueLines to render as an actionable error instead of a misleading plan.
 func (m QueueModel) rowsAndPlanErrors() ([]queueRow, map[string]error) {
+	candidates := m.candidates
+	if candidates == nil {
+		// Before queueEpicsLoadedMsg arrives, m.candidates hasn't been
+		// initialized yet, but bubbletea can still call View (and thus this)
+		// on the initial render. Fall back to a scratch map rather than
+		// writing into the nil m.candidates.
+		candidates = make(map[string]bool, len(m.checked))
+	}
 	for path := range m.checked {
-		m.candidates[path] = true
+		candidates[path] = true
 	}
 	var out []queueRow
 	planErrs := make(map[string]error)
 	for _, epic := range m.epics {
-		if _, err := epicWaves(epic, m.candidates, m.settings.MaxConcurrentTicketsPerEpic()); err != nil {
+		if _, err := epicWaves(epic, candidates, m.settings.MaxConcurrentTicketsPerEpic()); err != nil {
 			planErrs[epic.Name] = err
 		}
 		for _, idx := range sortedTicketIndexes(epic) {
 			t := epic.Tickets[idx]
-			if m.candidates[t.Path] {
+			if candidates[t.Path] {
 				out = append(out, queueRow{epic: epic, ticket: t})
 			}
 		}
