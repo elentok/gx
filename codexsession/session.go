@@ -76,6 +76,27 @@ func LastContextTokens(cwd, sessionID string) (tokens int, ok bool, err error) {
 	return tokens, found, nil
 }
 
+// VerifyIdentity reports whether Codex has rollout metadata for sessionID
+// launched in cwd. Token events are not required because a live session may
+// not have produced its first response yet.
+func VerifyIdentity(cwd, sessionID string) (ok bool, err error) {
+	if cwd == "" || sessionID == "" {
+		return false, nil
+	}
+	err = walkSessionFiles(sessionID, func(path string) error {
+		matching, readErr := readIdentity(path, cwd, sessionID)
+		if readErr != nil {
+			return readErr
+		}
+		ok = ok || matching
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+	return ok, nil
+}
+
 // LastRateLimit returns the latest exhausted primary or secondary quota for
 // sessionID launched in cwd. Missing, partial, malformed, and non-exhausted
 // session data return ok=false.
@@ -100,12 +121,23 @@ func LastRateLimit(cwd, sessionID string) (limit RateLimit, ok bool, err error) 
 	return limit, ok, nil
 }
 
-func walkSessionFiles(sessionID string, visit func(path string) error) error {
+func codexHome() (string, error) {
+	if home := os.Getenv("CODEX_HOME"); home != "" {
+		return home, nil
+	}
 	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".codex"), nil
+}
+
+func walkSessionFiles(sessionID string, visit func(path string) error) error {
+	home, err := codexHome()
 	if err != nil {
 		return err
 	}
-	sessionsDir := filepath.Join(home, ".codex", "sessions")
+	sessionsDir := filepath.Join(home, "sessions")
 	err = filepath.WalkDir(sessionsDir, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -219,6 +251,27 @@ func readContextTokens(path, cwd, sessionID string) (tokens int, ok bool, err er
 		return 0, false, err
 	}
 	return tokens, ok, nil
+}
+
+func readIdentity(path, cwd, sessionID string) (bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
+	for scanner.Scan() {
+		var line sessionLine
+		if json.Unmarshal(scanner.Bytes(), &line) == nil && line.Type == "session_meta" && line.Payload.ID == sessionID && line.Payload.Cwd == cwd {
+			return true, nil
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return false, err
+	}
+	return false, nil
 }
 
 func readRateLimit(path, cwd, sessionID string) (limit RateLimit, ok bool, err error) {

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -69,8 +70,11 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 		return nil, fmt.Errorf("listing tabs for crash/restart reconciliation: %w", err)
 	}
 	live := make(map[string]bool, len(tabs))
+	liveTabs := make(map[string]herdr.Tab, len(tabs))
 	for _, tab := range tabs {
-		live[iterationKey(epic.Name, tab.Label)] = true
+		key := iterationKey(epic.Name, tab.Label)
+		live[key] = true
+		liveTabs[key] = tab
 	}
 
 	events, _, err := readEvents(paths.ScratchDir, epic.Name)
@@ -79,10 +83,23 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 	}
 
 	reattach := func(t tickets.Ticket) {
-		sessionID, cwd, agent, ok := lastIterationSession(events, t.Identifier)
-		sink.TicketReattached(t.Identifier, iterLabel(t.Identifier), cwd, sessionID)
-		if ok {
-			emitContextOccupancy(d, sink, agent, t.Identifier, cwd, sessionID)
+		label := iterLabel(t.Identifier)
+		cwd := iterationWorktreePath(paths.WorktreeDir, epic.Name, t.Identifier)
+		tab := liveTabs[iterationKey(epic.Name, label)]
+		agentState, agentErr := d.AgentGet(label)
+		sessionID := ""
+		if agentErr == nil && agentState.PaneID != "" && agentState.TabID == tab.TabID && agentState.WorkspaceID == rp.WorkspaceID {
+			sessionID = agentState.AgentSession
+			if rp.Agent == AgentCodex {
+				verified, verifyErr := d.VerifyCodexSession(cwd, sessionID)
+				if verifyErr != nil || !verified {
+					sessionID = ""
+				}
+			}
+		}
+		sink.TicketReattached(t.Identifier, label, cwd, sessionID)
+		if sessionID != "" {
+			emitContextOccupancy(d, sink, rp.Agent, t.Identifier, cwd, sessionID)
 		}
 	}
 

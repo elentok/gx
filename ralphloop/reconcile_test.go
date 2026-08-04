@@ -203,13 +203,7 @@ func (s *reattachSink) TicketReattached(identifier, label, cwd, sessionID string
 	}
 }
 
-// TestReconcile_ClaimedWithLiveTab_TicketReattachedCarriesCwdAndSessionIDPlusImmediateOccupancy
-// covers ticket 02's reattach-time requirements: TicketReattached must carry
-// the cwd/sessionID recovered from the run log's last iteration-started
-// event, and trigger one immediate ContextOccupancy read/emit — the same two
-// signals launchAndPrompt fires at fresh-start time (see launch_test.go),
-// but sourced from the run log instead of a just-launched agent.Session.
-func TestReconcile_ClaimedWithLiveTab_TicketReattachedCarriesCwdAndSessionIDPlusImmediateOccupancy(t *testing.T) {
+func TestReconcile_ClaimedWithLiveTab_TicketReattachedCarriesLiveSessionIdentity(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})
@@ -226,7 +220,7 @@ func TestReconcile_ClaimedWithLiveTab_TicketReattachedCarriesCwdAndSessionIDPlus
 
 	d, _, _ := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{Label: "iter-01", WorkspaceID: workspaceID}}, nil
+		return []herdr.Tab{{TabID: "tab-iter-01", Label: "iter-01", WorkspaceID: workspaceID}}, nil
 	}
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
 		return 4200, true, nil
@@ -245,8 +239,8 @@ func TestReconcile_ClaimedWithLiveTab_TicketReattachedCarriesCwdAndSessionIDPlus
 		t.Fatalf("reconcile() error = %v", err)
 	}
 
-	if reattached.identifier != "01" || reattached.label != "iter-01" || reattached.cwd != "/repo/iter-01" || reattached.sessionID != "sess-1" {
-		t.Errorf("TicketReattached args = %+v, want {01 iter-01 /repo/iter-01 sess-1}", reattached)
+	if reattached.identifier != "01" || reattached.label != "iter-01" || reattached.cwd != "/fake/worktrees/epic-item-01" || reattached.sessionID != "session-iter-01" {
+		t.Errorf("TicketReattached args = %+v, want live Herdr cwd/session identity", reattached)
 	}
 	if len(sink.occupancySink.calls) != 1 || sink.occupancySink.calls[0].identifier != "01" || sink.occupancySink.calls[0].tokens != 4200 {
 		t.Errorf("ContextOccupancy calls = %+v, want one {01 4200} for the immediate reattach-time read", sink.occupancySink.calls)
@@ -380,7 +374,7 @@ func TestRun_RestartedNeedsAttentionRecoversThenResumesScheduling(t *testing.T) 
 		return 1, nil
 	}
 
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&strings.Builder{})); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&strings.Builder{})); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 	if len(*prompts) != 1 || !strings.HasSuffix((*prompts)[0], "02-open.md") {
@@ -390,6 +384,20 @@ func TestRun_RestartedNeedsAttentionRecoversThenResumesScheduling(t *testing.T) 
 	defer mu.Unlock()
 	if !sawClaimed {
 		t.Error("recovered ticket was not restored to claimed before completion")
+	}
+	events, _, err := readEvents(scratchDir, "epic")
+	if err != nil {
+		t.Fatalf("readEvents: %v", err)
+	}
+	foundResumed := false
+	for _, event := range events {
+		if event.Type == eventResumed && event.Ticket == "01" && (event.Pane != "pane-iter-01" || event.Tab != "tab-iter-01" || event.Cwd != "/fake/worktrees/epic-item-01" || event.AgentSession != "session-iter-01") {
+			t.Errorf("resumed attribution = %+v, want original pane/tab/cwd/session", event)
+		}
+		foundResumed = foundResumed || event.Type == eventResumed && event.Ticket == "01"
+	}
+	if !foundResumed {
+		t.Errorf("events = %v, want resumed event for reattached ticket", events)
 	}
 }
 

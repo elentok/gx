@@ -65,7 +65,11 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 		})
 		if err == nil {
 			if p.Agent == AgentCodex && agent.AgentStatus == "blocked" {
-				if limit, exhausted, limitErr := codexRateLimit(d, p.SessionCwd, sessionID); limitErr == nil && exhausted {
+				limit, exhausted, limitErr := codexRateLimit(d, p.SessionCwd, sessionID, p.Pane)
+				if limitErr != nil {
+					return fmt.Errorf("detecting %s Codex quota: %w", p.Label, limitErr)
+				}
+				if exhausted {
 					if err := recoverCodexRateLimit(d, p, sessionID, limit); err != nil {
 						return err
 					}
@@ -86,6 +90,17 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			// while it's still working, which is what caused false alarms
 			// from stale "approaching the limit" mentions still visible in
 			// scrollback mid-turn.
+			if p.Agent == AgentCodex {
+				recovered, recoveryErr := recoverCodexContextExhaustion(d, p, sessionID, smartZone)
+				if recoveryErr != nil {
+					return recoveryErr
+				}
+				if recovered {
+					elapsedMs = 0
+					continue
+				}
+			}
+
 			if p.Agent == AgentClaude && d.ReadPaneRecent != nil {
 				if text, rlErr := d.ReadPaneRecent(p.Pane); rlErr == nil {
 					if token, matched := detectRateLimit(text); matched {
@@ -118,8 +133,22 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 		elapsedMs += pollMs
 
 		if p.Agent == AgentCodex {
-			if limit, exhausted, limitErr := codexRateLimit(d, p.SessionCwd, sessionID); limitErr == nil && exhausted {
+			limit, exhausted, evidence, checkErr := codexQuotaOrContextExhaustion(d, p.SessionCwd, sessionID, p.Pane)
+			if checkErr != nil {
+				return fmt.Errorf("detecting %s Codex quota: %w", p.Label, checkErr)
+			}
+			if exhausted {
 				if err := recoverCodexRateLimit(d, p, sessionID, limit); err != nil {
+					return err
+				}
+				elapsedMs = 0
+				continue
+			}
+			if evidence != "" {
+				if err := d.AgentSendKeys(p.Pane, "ctrl+c"); err != nil {
+					return fmt.Errorf("interrupting %s after Codex context exhaustion: %w", p.Label, err)
+				}
+				if err := recoverOrFailCodexContextExhaustion(d, p, sessionID, evidence, smartZone); err != nil {
 					return err
 				}
 				elapsedMs = 0
@@ -139,7 +168,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			return fmt.Errorf("interrupting %s after smart-zone breach: %w", p.Label, err)
 		}
 		reason := fmt.Sprintf("context occupancy %d exceeds --smart-zone %d", occupancy, smartZone)
-		if err := recoverSmartZoneBreach(d, p, sessionID, reason, smartZone); err != nil {
+		if _, err := recoverSmartZoneBreach(d, p, sessionID, reason, smartZone); err != nil {
 			return err
 		}
 		elapsedMs = 0
@@ -179,25 +208,48 @@ const smartZoneCompactTimeoutMs = 300_000
 //
 // The "/compact" prompt waits for the pane to reach idle/done — i.e. for the
 // compaction to actually finish, not merely start — before the finish-up
-// prompt is sent. Waiting only for "working" let the finish-up text land
-// mid-compaction and get swallowed as fresh input, canceling the compaction
-// (observed in production as "Compaction canceled."); the caller's smart-zone
-// check would then still see the old, uncompacted occupancy and re-trigger
-// another breach, repeating the cycle.
-func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason string, smartZone int) error {
+// prompt is sent. Codex may first report blocked while waiting for compact
+// confirmation; that state belongs to this flow, so recovery observes the
+// confirmation and compaction transitions passively instead of treating them
+// as operator intervention. Waiting only for "working" let the finish-up text
+// land mid-compaction and get swallowed as fresh input, canceling compaction.
+// recoverSmartZoneBreach's bool return reports whether the compact/finish-up
+// contract actually completed (true) or was abandoned as best-effort after
+// one of its two failure branches (false) — callers that must not silently
+// treat a failed recovery as a normal finish (see
+// recoverOrFailCodexContextExhaustion) need that distinction; the plain
+// proactive smart-zone breach caller still treats both outcomes the same way
+// and ignores it.
+func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason string, smartZone int) (bool, error) {
 	p.sink().SmartZoneCompactStarted(p.Ticket)
 	p.logAgentEvent(eventPausedSmartZone, sessionID, reason)
 
-	if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
+	compactStates := append(append([]string{}, plainFinishStates...), "blocked")
+	agent, err := d.AgentPrompt(herdr.AgentPromptOptions{
 		Target:    p.Pane,
 		Text:      "/compact",
 		Wait:      true,
-		Until:     plainFinishStates,
+		Until:     compactStates,
 		TimeoutMs: smartZoneCompactTimeoutMs,
-	}); err != nil {
+	})
+	if err == nil && agent.AgentStatus == "blocked" {
+		_, err = d.AgentWait(herdr.AgentWaitOptions{
+			Target:    p.Pane,
+			Until:     []string{"working"},
+			TimeoutMs: smartZoneCompactTimeoutMs,
+		})
+		if err == nil {
+			_, err = d.AgentWait(herdr.AgentWaitOptions{
+				Target:    p.Pane,
+				Until:     plainFinishStates,
+				TimeoutMs: smartZoneCompactTimeoutMs,
+			})
+		}
+	}
+	if err != nil {
 		p.sink().SmartZoneRecovered(p.Ticket)
 		p.logAgentEvent(eventSmartZoneRecoveryFailed, sessionID, fmt.Sprintf("compacting %s after smart-zone breach: %v", p.Label, err))
-		return nil
+		return false, nil
 	}
 
 	p.sink().SmartZoneFinishingUp(p.Ticket)
@@ -217,12 +269,12 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 	}); err != nil {
 		p.sink().SmartZoneRecovered(p.Ticket)
 		p.logAgentEvent(eventSmartZoneRecoveryFailed, sessionID, fmt.Sprintf("re-prompting %s after smart-zone compact: %v", p.Label, err))
-		return nil
+		return false, nil
 	}
 
 	p.sink().SmartZoneRecovered(p.Ticket)
 	p.logLifecycleEvent(eventResumed, sessionID)
-	return nil
+	return true, nil
 }
 
 // confirmFinished debounces a just-reached idle/done signal on pane: it
@@ -280,11 +332,11 @@ func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, li
 		reason += fmt.Sprintf(", resets %s", limit.ResetAt.UTC().Format(time.RFC3339))
 	}
 	p.Gate.pause(p.Label, reason)
-	p.report("paused %s: %s; waiting for automatic reset\n", p.Label, reason)
+	p.sink().IterationPaused(p.Label, PauseRateLimit, reason)
 	p.logAgentEvent(eventPausedRateLimit, sessionID, reason)
 	waitForCodexRateLimitReset(d, p.SessionCwd, sessionID, limit)
 	p.Gate.ForceResume(p.Label)
-	p.report("resumed %s after Codex quota reset\n", p.Label)
+	p.sink().IterationResumed(p.Label, PauseRateLimit)
 	p.logLifecycleEvent(eventResumed, sessionID)
 
 	agent, err := d.AgentWait(herdr.AgentWaitOptions{
@@ -414,11 +466,117 @@ func sessionCompactions(d Deps, agent AgentKind, cwd, sessionID string) (int, bo
 	return d.ReadCompactions(cwd, sessionID)
 }
 
-func codexRateLimit(d Deps, cwd, sessionID string) (codexsession.RateLimit, bool, error) {
-	if sessionID == "" || d.ReadCodexRateLimit == nil {
+func codexRateLimit(d Deps, cwd, sessionID, pane string) (codexsession.RateLimit, bool, error) {
+	if sessionID != "" && d.ReadCodexRateLimit != nil {
+		limit, exhausted, err := d.ReadCodexRateLimit(cwd, sessionID)
+		if err != nil || exhausted {
+			return limit, exhausted, err
+		}
+	}
+	if d.ReadPaneRecent == nil {
 		return codexsession.RateLimit{}, false, nil
 	}
-	return d.ReadCodexRateLimit(cwd, sessionID)
+	text, err := d.ReadPaneRecent(pane)
+	if err != nil {
+		return codexsession.RateLimit{}, false, err
+	}
+	now := time.Now()
+	if d.Now != nil {
+		now = d.Now()
+	}
+	limit, matched := detectCodexRateLimit(text, now)
+	return limit, matched, nil
+}
+
+// codexQuotaOrContextExhaustion classifies a single ReadPaneRecent snapshot
+// as a quota exhaustion or a context-window exhaustion, reading the pane at
+// most once — unlike calling codexRateLimit and detectCodexContextExhaustion
+// separately, which would each read the pane independently and risk missing
+// a transient banner that clears between the two reads.
+func codexQuotaOrContextExhaustion(d Deps, cwd, sessionID, pane string) (limit codexsession.RateLimit, exhausted bool, evidence string, err error) {
+	if sessionID != "" && d.ReadCodexRateLimit != nil {
+		limit, exhausted, err = d.ReadCodexRateLimit(cwd, sessionID)
+		if err != nil || exhausted {
+			return limit, exhausted, "", err
+		}
+	}
+	if d.ReadPaneRecent == nil {
+		return codexsession.RateLimit{}, false, "", nil
+	}
+	text, err := d.ReadPaneRecent(pane)
+	if err != nil {
+		return codexsession.RateLimit{}, false, "", err
+	}
+	now := time.Now()
+	if d.Now != nil {
+		now = d.Now()
+	}
+	if quotaLimit, matched := detectCodexRateLimit(text, now); matched {
+		return quotaLimit, true, "", nil
+	}
+	evidence, _ = detectCodexContextExhaustion(text)
+	return codexsession.RateLimit{}, false, evidence, nil
+}
+
+func detectCodexContextExhaustion(text string) (string, bool) {
+	for _, line := range strings.Split(text, "\n") {
+		evidence := strings.TrimSpace(line)
+		lower := strings.ToLower(evidence)
+		structuredCode := strings.Contains(lower, `"code"`) && strings.Contains(lower, "context_length_exceeded")
+		streamFailure := strings.Contains(lower, "stream disconnected before completion") &&
+			strings.Contains(lower, "your input exceeds the context window of this model")
+		terminalFailure := strings.HasPrefix(strings.TrimLeft(lower, "■⚠️ \t"), "codex ran out of room in the model's context window")
+		if structuredCode || streamFailure || terminalFailure {
+			return evidence, true
+		}
+	}
+	return "", false
+}
+
+func recoverCodexContextExhaustion(d Deps, p launchAndPromptParams, sessionID string, smartZone int) (bool, error) {
+	if d.ReadPaneRecent == nil {
+		return false, nil
+	}
+	text, err := d.ReadPaneRecent(p.Pane)
+	if err != nil {
+		return false, nil
+	}
+	evidence, exhausted := detectCodexContextExhaustion(text)
+	if !exhausted {
+		return false, nil
+	}
+	if err := d.AgentSendKeys(p.Pane, "ctrl+c"); err != nil {
+		return false, fmt.Errorf("interrupting %s after Codex context exhaustion: %w", p.Label, err)
+	}
+	if err := recoverOrFailCodexContextExhaustion(d, p, sessionID, evidence, smartZone); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// recoverOrFailCodexContextExhaustion runs the compact/finish-up contract for
+// a classified native Codex context exhaustion and turns an incomplete
+// recovery into a durable, actionable error instead of letting the caller
+// fall back into ordinary polling. Without this, a recovery whose /compact or
+// finish-up prompt never lands (the agent's context is already too far gone
+// to process either) leaves the pane sitting idle post-interrupt with no
+// further evidence of what happened — waitForFinish would then read that as
+// a plain finish, and finishIteration would mark it done (if a stray commit
+// happened to land) or generic needs-info (if not), losing the exhaustion
+// reason entirely. Returning an error here instead routes through the same
+// path every other iteration-level failure takes (see Run's per-result
+// handling in loop.go), which marks the ticket needs-attention with this
+// specific reason and leaves its worktree/tab for inspection.
+func recoverOrFailCodexContextExhaustion(d Deps, p launchAndPromptParams, sessionID, evidence string, smartZone int) error {
+	reason := fmt.Sprintf("Codex context exhaustion detected: %s", evidence)
+	recovered, err := recoverSmartZoneBreach(d, p, sessionID, reason, smartZone)
+	if err != nil {
+		return err
+	}
+	if !recovered {
+		return fmt.Errorf("Codex context exhaustion recovery failed for %s: %s", p.Label, evidence)
+	}
+	return nil
 }
 
 // isPollTimeout reports whether err looks like AgentWait's own

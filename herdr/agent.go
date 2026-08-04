@@ -74,6 +74,12 @@ type AgentWaitOptions struct {
 	TimeoutMs int
 }
 
+// AgentGet returns the current state of an existing agent without waiting for
+// a transition or submitting another prompt.
+func AgentGet(target string) (Agent, error) {
+	return runAgentJSON([]string{"agent", "get", target})
+}
+
 // AgentWait blocks until target reaches one of the requested states (or any
 // of idle/done/blocked if Until is empty) via `herdr agent wait`, without
 // submitting a prompt. Used to wait out an already-working agent's turn,

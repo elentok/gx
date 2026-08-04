@@ -167,6 +167,16 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		sink.AlreadyComplete(opts.EpicName, scope.DoneCount(*initial), scope.TotalCount(*initial))
 		return nil
 	}
+	if agent == AgentCodex && d.PreflightAgent != nil {
+		if err := d.PreflightAgent(agent); err != nil {
+			return fmt.Errorf("preflighting %s launch environment: %w", agent, err)
+		}
+	}
+	if opts.Skill != "" && d.VerifySkill != nil {
+		if err := d.VerifySkill(agent, opts.Skill); err != nil {
+			return fmt.Errorf("preflighting %s skill %q: %w", agent, opts.Skill, err)
+		}
+	}
 
 	workspaceID, err := d.FindOrCreateWorkspace(opts.EpicName, opts.RepoDir)
 	if err != nil {

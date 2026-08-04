@@ -29,6 +29,78 @@ func stubBin(t *testing.T, name string, logPath string, exitCode int) {
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
+func TestVerifySkillWith(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		agent    AgentKind
+		skill    string
+		statErr  error
+		homeErr  error
+		wantErr  string
+		wantPath string
+	}{
+		{
+			name:  "claude skill installed",
+			agent: AgentClaude,
+			skill: "implement",
+		},
+		{
+			name:     "claude skill missing",
+			agent:    AgentClaude,
+			skill:    "implement",
+			statErr:  os.ErrNotExist,
+			wantErr:  `skill "implement" not found`,
+			wantPath: filepath.Join("home", ".claude", "skills", "implement", "SKILL.md"),
+		},
+		{
+			name:  "codex prompt installed",
+			agent: AgentCodex,
+			skill: "implement",
+		},
+		{
+			name:     "codex prompt missing",
+			agent:    AgentCodex,
+			skill:    "implement",
+			statErr:  os.ErrNotExist,
+			wantErr:  `skill "implement" not found`,
+			wantPath: filepath.Join("home", ".codex", "prompts", "implement.md"),
+		},
+		{
+			name:    "home directory unresolvable",
+			agent:   AgentClaude,
+			skill:   "implement",
+			homeErr: errors.New("no home"),
+			wantErr: "resolving home directory",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var statPath string
+			err := verifySkillWith(tc.agent, tc.skill,
+				func() (string, error) { return "home", tc.homeErr },
+				func(path string) (os.FileInfo, error) {
+					statPath = path
+					if tc.statErr != nil {
+						return nil, tc.statErr
+					}
+					return nil, nil
+				},
+			)
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Fatalf("verifySkillWith() error = %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("verifySkillWith() error = %v, want containing %q", err, tc.wantErr)
+			}
+			if tc.wantPath != "" && statPath != tc.wantPath {
+				t.Errorf("stat path = %q, want %q", statPath, tc.wantPath)
+			}
+		})
+	}
+}
+
 func TestInstallDependencies_NoMarker_SkipsSilently(t *testing.T) {
 	dir := t.TempDir()
 

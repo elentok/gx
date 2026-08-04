@@ -1,0 +1,178 @@
+package herdrfake
+
+import (
+	"testing"
+	"time"
+
+	"github.com/elentok/gx/transcript"
+)
+
+const compactTestSmartZone = 100
+
+// newTestClaudeCompact wires a ClaudeCompact against a fresh $HOME and a
+// virtual clock the test advances explicitly (never a real sleep).
+func newTestClaudeCompact(t *testing.T) (*ClaudeCompact, *time.Duration) {
+	t.Helper()
+	t.Setenv("HOME", t.TempDir())
+
+	var virtualTime time.Duration
+	c := NewClaudeCompact(t, "/repo/iter-c", "sess-c", func() time.Duration { return virtualTime }, compactTestSmartZone)
+	return c, &virtualTime
+}
+
+func TestClaudeCompact_InitialTranscriptStartsAboveSmartZone(t *testing.T) {
+	c, _ := newTestClaudeCompact(t)
+
+	occupancy, ok, err := transcript.LastAssistantOccupancy("/repo/iter-c", "sess-c")
+	if err != nil || !ok {
+		t.Fatalf("LastAssistantOccupancy: ok=%v err=%v", ok, err)
+	}
+	if occupancy <= compactTestSmartZone {
+		t.Errorf("initial occupancy = %d, want > smartZone (%d)", occupancy, compactTestSmartZone)
+	}
+	_ = c
+}
+
+func TestClaudeCompact_StatusStaysWorkingUntilExactlyCompactDuration(t *testing.T) {
+	c, virtualTime := newTestClaudeCompact(t)
+
+	if err := c.StartCompact(); err != nil {
+		t.Fatalf("StartCompact: %v", err)
+	}
+
+	*virtualTime = (CompactDurationMs - 1) * time.Millisecond
+	if status, err := c.Status(); err != nil || status != "working" {
+		t.Fatalf("Status() at duration-1ms = %q, err=%v, want working", status, err)
+	}
+
+	*virtualTime = CompactDurationMs * time.Millisecond
+	status, err := c.Status()
+	if err != nil {
+		t.Fatalf("Status(): %v", err)
+	}
+	if status != "idle" {
+		t.Fatalf("Status() at exactly CompactDurationMs = %q, want idle", status)
+	}
+}
+
+func TestClaudeCompact_CompletionAppendsOneBoundaryAndLowOccupancyTurn(t *testing.T) {
+	c, virtualTime := newTestClaudeCompact(t)
+
+	if err := c.StartCompact(); err != nil {
+		t.Fatalf("StartCompact: %v", err)
+	}
+	*virtualTime = CompactDurationMs * time.Millisecond
+	if _, err := c.Status(); err != nil {
+		t.Fatalf("Status(): %v", err)
+	}
+	// A second poll after completion must not append another boundary.
+	if _, err := c.Status(); err != nil {
+		t.Fatalf("Status() (second poll): %v", err)
+	}
+
+	lines, ok, err := transcript.ReadAll(c.Path())
+	if err != nil || !ok {
+		t.Fatalf("ReadAll: ok=%v err=%v", ok, err)
+	}
+	if got := transcript.CountCompactions(lines); got != 1 {
+		t.Errorf("CountCompactions = %d, want exactly 1", got)
+	}
+
+	occupancy, ok, err := transcript.LastAssistantOccupancy("/repo/iter-c", "sess-c")
+	if err != nil || !ok {
+		t.Fatalf("LastAssistantOccupancy: ok=%v err=%v", ok, err)
+	}
+	if occupancy >= compactTestSmartZone {
+		t.Errorf("post-compact occupancy = %d, want < smartZone (%d)", occupancy, compactTestSmartZone)
+	}
+}
+
+func TestClaudeCompact_FinishUpRejectedBeforeBoundaryExists(t *testing.T) {
+	c, virtualTime := newTestClaudeCompact(t)
+
+	if err := c.AcceptFinishUp(); err == nil {
+		t.Error("AcceptFinishUp() before any compaction = nil, want error")
+	}
+
+	if err := c.StartCompact(); err != nil {
+		t.Fatalf("StartCompact: %v", err)
+	}
+	*virtualTime = (CompactDurationMs - 1) * time.Millisecond
+	if _, err := c.Status(); err != nil {
+		t.Fatalf("Status(): %v", err)
+	}
+	if err := c.AcceptFinishUp(); err == nil {
+		t.Error("AcceptFinishUp() mid-compaction = nil, want error")
+	}
+
+	*virtualTime = CompactDurationMs * time.Millisecond
+	if _, err := c.Status(); err != nil {
+		t.Fatalf("Status(): %v", err)
+	}
+	if err := c.AcceptFinishUp(); err != nil {
+		t.Errorf("AcceptFinishUp() after boundary = %v, want nil", err)
+	}
+}
+
+func TestClaudeCompact_SecondCtrlCOrEnterDuringActiveCompactionFailsImmediately(t *testing.T) {
+	c, virtualTime := newTestClaudeCompact(t)
+
+	// The first Ctrl-C (interrupting the agent before "/compact" is
+	// submitted) must still be accepted.
+	if err := c.SendKey("ctrl+c"); err != nil {
+		t.Errorf("SendKey(ctrl+c) before StartCompact = %v, want nil", err)
+	}
+
+	if err := c.StartCompact(); err != nil {
+		t.Fatalf("StartCompact: %v", err)
+	}
+	*virtualTime = (CompactDurationMs / 2) * time.Millisecond
+
+	if err := c.SendKey("ctrl+c"); err == nil {
+		t.Error("SendKey(ctrl+c) during active compaction = nil, want error")
+	}
+	if err := c.SendKey("enter"); err == nil {
+		t.Error("SendKey(enter) during active compaction = nil, want error")
+	}
+
+	*virtualTime = CompactDurationMs * time.Millisecond
+	if _, err := c.Status(); err != nil {
+		t.Fatalf("Status(): %v", err)
+	}
+	if err := c.SendKey("enter"); err != nil {
+		t.Errorf("SendKey(enter) after compaction completed = %v, want nil", err)
+	}
+}
+
+func TestClaudeCompact_TranscriptTimestampsAndUsageAreDeterministic(t *testing.T) {
+	run := func() []transcript.Line {
+		c, virtualTime := newTestClaudeCompact(t)
+		if err := c.StartCompact(); err != nil {
+			t.Fatalf("StartCompact: %v", err)
+		}
+		*virtualTime = CompactDurationMs * time.Millisecond
+		if _, err := c.Status(); err != nil {
+			t.Fatalf("Status(): %v", err)
+		}
+		lines, ok, err := transcript.ReadAll(c.Path())
+		if err != nil || !ok {
+			t.Fatalf("ReadAll: ok=%v err=%v", ok, err)
+		}
+		return lines
+	}
+
+	first := run()
+	second := run()
+
+	if len(first) != len(second) {
+		t.Fatalf("line count differs across runs: %d vs %d", len(first), len(second))
+	}
+	for i := range first {
+		if !first[i].Timestamp.Equal(second[i].Timestamp) {
+			t.Errorf("line %d timestamp differs across runs: %v vs %v", i, first[i].Timestamp, second[i].Timestamp)
+		}
+		if first[i].Usage != second[i].Usage {
+			t.Errorf("line %d usage differs across runs: %+v vs %+v", i, first[i].Usage, second[i].Usage)
+		}
+	}
+}

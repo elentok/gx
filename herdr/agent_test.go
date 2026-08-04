@@ -147,6 +147,31 @@ func TestAgentWait_BuildsArgsAndParses(t *testing.T) {
 	}
 }
 
+func TestAgentGet_BuildsArgsAndParsesLiveSession(t *testing.T) {
+	var gotArgs []string
+	withFakeCommand(t, func(args ...string) ([]byte, error) {
+		gotArgs = args
+		return []byte(`{"result":{
+			"type":"agent_info",
+			"agent":{
+				"pane_id":"wE:p1","workspace_id":"wE","tab_id":"wE:t9","agent_status":"working",
+				"agent_session":{"source":"herdr:codex","agent":"codex","kind":"id","value":"session-1"}
+			}
+		}}`), nil
+	})
+
+	agent, err := AgentGet("iter-01")
+	if err != nil {
+		t.Fatalf("AgentGet() error = %v", err)
+	}
+	if agent.PaneID != "wE:p1" || agent.TabID != "wE:t9" || agent.WorkspaceID != "wE" || agent.AgentStatus != "working" || agent.AgentSession != "session-1" {
+		t.Errorf("AgentGet() = %+v, want live pane/tab/workspace/status/session attribution", agent)
+	}
+	if got := strings.Join(gotArgs, " "); got != "agent get iter-01" {
+		t.Errorf("args = %q, want %q", got, "agent get iter-01")
+	}
+}
+
 func TestAgentWait_CommandError_Propagates(t *testing.T) {
 	withFakeCommand(t, func(args ...string) ([]byte, error) {
 		return []byte("boom"), errors.New("exit 1")

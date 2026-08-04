@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -22,6 +23,15 @@ import (
 // orchestration in loop.go can run without a live herdr server, git
 // process, or real Claude Code transcripts.
 type Deps struct {
+	// PreflightAgent verifies that the selected agent can be launched before
+	// the loop creates Herdr state or claims a ticket.
+	PreflightAgent func(agent AgentKind) error
+	// VerifySkill confirms opts.Skill is installed for agent before the loop
+	// creates Herdr state or claims a ticket — like PreflightAgent, a missing
+	// skill is otherwise only discovered mid-iteration, after the ticket is
+	// already claimed and the agent has been prompted with a skill invocation
+	// it can't resolve.
+	VerifySkill           func(agent AgentKind, skill string) error
 	FindOrCreateWorkspace func(label, cwd string) (string, error)
 	// WorktreeDir returns the directory linked worktrees for repoDir's repo
 	// are created in (see git.Repo.LinkedWorktreeDir).
@@ -42,6 +52,7 @@ type Deps struct {
 	TabList              func(workspaceID string) ([]herdr.Tab, error)
 	AgentStart           func(opts herdr.AgentStartOptions) (herdr.Agent, error)
 	AgentPrompt          func(opts herdr.AgentPromptOptions) (herdr.Agent, error)
+	AgentGet             func(target string) (herdr.Agent, error)
 	AgentWait            func(opts herdr.AgentWaitOptions) (herdr.Agent, error)
 	AgentSendKeys        func(target string, keys ...string) error
 	RevParse             func(dir, ref string) (string, error)
@@ -92,6 +103,8 @@ type Deps struct {
 	// session launched in cwd, or ok=false until its local session data is
 	// complete enough to identify that worktree and session.
 	ReadCodexContext func(cwd, sessionID string) (tokens int, ok bool, err error)
+	// VerifyCodexSession confirms that sessionID's rollout metadata belongs to cwd.
+	VerifyCodexSession func(cwd, sessionID string) (ok bool, err error)
 	// ReadCodexRateLimit returns an exhausted Codex quota for the session
 	// launched in cwd, or ok=false when its session data is incomplete or no
 	// quota is exhausted.
@@ -112,6 +125,10 @@ type Deps struct {
 // DefaultDeps wires Deps to the real herdr, git, and transcript packages.
 func DefaultDeps() Deps {
 	return Deps{
+		PreflightAgent:        preflightAgent,
+		VerifySkill:           verifySkill,
+		AgentGet:              herdr.AgentGet,
+		VerifyCodexSession:    codexsession.VerifyIdentity,
 		FindOrCreateWorkspace: herdr.EnsureWorkspace,
 		WorktreeDir:           worktreeDir,
 		AddWorktree:           addWorktree,
@@ -144,6 +161,101 @@ func DefaultDeps() Deps {
 		Sleep:                 time.Sleep,
 		Now:                   time.Now,
 	}
+}
+
+func preflightAgent(agent AgentKind) error {
+	return preflightAgentWith(
+		agent,
+		exec.LookPath,
+		func(name string, args ...string) ([]byte, error) {
+			return exec.Command(name, args...).CombinedOutput()
+		},
+	)
+}
+
+func preflightAgentWith(
+	agent AgentKind,
+	lookPath func(string) (string, error),
+	commandOutput func(string, ...string) ([]byte, error),
+) error {
+	if agent != AgentCodex {
+		return nil
+	}
+	codexPath, err := lookPath("codex")
+	if err != nil {
+		return errors.New("codex executable not found in PATH; install Codex or add it to PATH")
+	}
+	loginStatus, statusErr := commandOutput(codexPath, "login", "status")
+	if isCodexUnauthenticated(string(loginStatus)) {
+		return errors.New("codex is not authenticated; run `codex login`")
+	}
+	if statusErr != nil {
+		return fmt.Errorf("could not verify Codex authentication: %w", statusErr)
+	}
+
+	herdrPath, err := lookPath("herdr")
+	if err != nil {
+		return errors.New("Herdr executable not found in PATH; install or upgrade Herdr with Codex integration")
+	}
+	help, err := commandOutput(herdrPath, "agent", "start", "--help")
+	if err != nil {
+		return fmt.Errorf("could not verify Herdr Codex integration; upgrade Herdr: %w", err)
+	}
+
+	const valuesPrefix = "[possible values:"
+	start := strings.Index(string(help), valuesPrefix)
+	if start >= 0 {
+		values := string(help)[start+len(valuesPrefix):]
+		if end := strings.IndexByte(values, ']'); end >= 0 {
+			for _, value := range strings.Split(values[:end], ",") {
+				if strings.TrimSpace(value) == string(AgentCodex) {
+					return nil
+				}
+			}
+		}
+	}
+	return errors.New("installed Herdr does not support Codex agents; upgrade Herdr")
+}
+
+// isCodexUnauthenticated reports whether codex login status's output
+// indicates Codex has no valid credentials — distinct from the executable
+// simply being missing (a lookPath failure) or Herdr's Codex integration
+// being missing/incompatible (a herdrPath/help-output failure), both checked
+// separately above so an operator sees the actual cause instead of a single
+// generic "Codex launch failed".
+func isCodexUnauthenticated(output string) bool {
+	lower := strings.ToLower(output)
+	return strings.Contains(lower, "not logged in") || strings.Contains(lower, "not authenticated")
+}
+
+// verifySkill implements Deps.VerifySkill against the real filesystem.
+func verifySkill(agent AgentKind, skill string) error {
+	return verifySkillWith(agent, skill, os.UserHomeDir, os.Stat)
+}
+
+// verifySkillWith confirms skill is installed where agent resolves its
+// "/skill"/"$skill" invocation from: Claude Code skills live under
+// ~/.claude/skills/<skill>/SKILL.md, Codex custom prompts under
+// ~/.codex/prompts/<skill>.md. lookPath/commandOutput-style injected
+// userHomeDir/stat keep this testable without touching the real filesystem.
+func verifySkillWith(
+	agent AgentKind,
+	skill string,
+	userHomeDir func() (string, error),
+	stat func(string) (os.FileInfo, error),
+) error {
+	home, err := userHomeDir()
+	if err != nil {
+		return fmt.Errorf("resolving home directory to verify skill %q: %w", skill, err)
+	}
+	path := filepath.Join(home, ".claude", "skills", skill, "SKILL.md")
+	if agent == AgentCodex {
+		path = filepath.Join(home, ".codex", "prompts", skill+".md")
+	}
+	if _, err := stat(path); err != nil {
+		return fmt.Errorf("skill %q not found at %s; install it or pass a different --skill", skill, path)
+	}
+	return nil
 }
 
 // promptNudgeGraceMs bounds each of promptWithNudge's submit/re-wait attempts.

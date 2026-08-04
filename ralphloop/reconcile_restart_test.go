@@ -67,14 +67,14 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 	var worktreeCreateCalledForIter bool
 	origAddWorktree := d.AddWorktree
 	d.AddWorktree = func(repoDir, path, branch, base string) error {
-		if strings.Contains(path, "iter-01") {
+		if strings.Contains(path, "epic-item-01") {
 			worktreeCreateCalledForIter = true
 		}
 		return origAddWorktree(repoDir, path, branch, base)
 	}
 
 	var out strings.Builder
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -95,6 +95,21 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 	if !strings.Contains(string(raw), "status: done") {
 		t.Errorf("reattached ticket not marked done:\n%s", raw)
 	}
+
+	events, _, err := readEvents(scratchDir, "epic")
+	if err != nil {
+		t.Fatalf("readEvents: %v", err)
+	}
+	foundFinish := false
+	for _, event := range events {
+		if event.Type == eventIterationFinished && (event.Pane != "pane-iter-01" || event.Tab != "tab-iter-01" || event.Cwd != "/fake/worktrees/epic-item-01" || event.AgentSession != "session-iter-01") {
+			t.Errorf("iteration-finished attribution = %+v, want original pane/tab/cwd/session", event)
+		}
+		foundFinish = foundFinish || event.Type == eventIterationFinished
+	}
+	if !foundFinish {
+		t.Errorf("events = %v, want iteration-finished", events)
+	}
 }
 
 // TestRun_RestartWithClaimedTicketAlreadyIdle_SkipsWaitAndCherryPicks
@@ -112,6 +127,9 @@ func TestRun_RestartWithClaimedTicketAlreadyIdle_SkipsWaitAndCherryPicks(t *test
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
 		return []herdr.Tab{{TabID: "tab-iter-01", Label: "iter-01", WorkspaceID: workspaceID, AgentStatus: "idle"}}, nil
 	}
+	d.AgentGet = func(string) (herdr.Agent, error) {
+		return herdr.Agent{PaneID: "pane-iter-01", WorkspaceID: "ws1", TabID: "tab-iter-01", AgentStatus: "idle", AgentSession: "session-iter-01"}, nil
+	}
 
 	var agentWaitCalls int
 	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
@@ -120,7 +138,7 @@ func TestRun_RestartWithClaimedTicketAlreadyIdle_SkipsWaitAndCherryPicks(t *test
 	}
 
 	var out strings.Builder
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -154,12 +172,50 @@ func TestRun_RestartWithClaimedTicketAlreadyIdle_SkipsWaitAndCherryPicks(t *test
 	}
 }
 
-// TestRun_ReattachedClose_BackfillsContextFromRunLog exercises ticket 06a: a
-// reattached iteration has no live session id of its own this run, so its
-// close backfills actual_context_window from the ticket's original
-// iteration-started event's session in the run log instead of leaving it
-// blank.
-func TestRun_ReattachedClose_BackfillsContextFromRunLog(t *testing.T) {
+func TestRun_ReattachedCodexSessionIdentityFailureStopsSafely(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		agent    herdr.Agent
+		verified bool
+		wantErr  string
+	}{
+		{name: "missing session", agent: herdr.Agent{PaneID: "pane-iter-01", WorkspaceID: "ws1", TabID: "tab-iter-01", AgentStatus: "working"}, wantErr: "missing live Codex session"},
+		{name: "mismatched rollout", agent: herdr.Agent{PaneID: "pane-iter-01", WorkspaceID: "ws1", TabID: "tab-iter-01", AgentStatus: "working", AgentSession: "wrong-session"}, wantErr: "does not match rollout metadata"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			scratchDir := writeEpic(t, "epic", map[string]string{
+				"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+			})
+			d, prompts, removed := fakeDeps()
+			d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
+				return []herdr.Tab{{TabID: "tab-iter-01", Label: "iter-01", WorkspaceID: workspaceID}}, nil
+			}
+			d.AgentGet = func(string) (herdr.Agent, error) { return tc.agent, nil }
+			d.VerifyCodexSession = func(cwd, sessionID string) (bool, error) { return tc.verified, nil }
+			var starts int
+			d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+				starts++
+				return herdr.Agent{}, nil
+			}
+
+			if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&strings.Builder{})); err != nil {
+				t.Fatalf("Run() error = %v", err)
+			}
+			raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+			if err != nil {
+				t.Fatalf("ReadFile: %v", err)
+			}
+			if !strings.Contains(string(raw), "status: needs-attention") || !strings.Contains(string(raw), tc.wantErr) {
+				t.Errorf("ticket after failed reattach:\n%s\nwant needs-attention with %q", raw, tc.wantErr)
+			}
+			if starts != 0 || len(*prompts) != 0 || len(*removed) != 0 {
+				t.Errorf("side effects: starts=%d prompts=%v removed=%v, want none", starts, *prompts, *removed)
+			}
+		})
+	}
+}
+
+func TestRun_ReattachedCloseUsesLiveSessionInsteadOfStaleRunLog(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})
@@ -177,8 +233,11 @@ func TestRun_ReattachedClose_BackfillsContextFromRunLog(t *testing.T) {
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
 		return []herdr.Tab{{TabID: "tab-iter-01", Label: "iter-01", WorkspaceID: workspaceID}}, nil
 	}
+	d.AgentGet = func(string) (herdr.Agent, error) {
+		return herdr.Agent{PaneID: "pane-iter-01", WorkspaceID: "ws1", TabID: "tab-iter-01", AgentStatus: "working", AgentSession: "sess-live"}, nil
+	}
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
-		if cwd == "/fake/worktrees/iter-01" && sessionID == "sess-original" {
+		if cwd == "/fake/worktrees/epic-item-01" && sessionID == "sess-live" {
 			return 54321, true, nil
 		}
 		return 0, false, nil
@@ -194,7 +253,7 @@ func TestRun_ReattachedClose_BackfillsContextFromRunLog(t *testing.T) {
 		t.Errorf("Status = %q, want done", got.Status)
 	}
 	if got.ActualContextWindow != 54321 {
-		t.Errorf("ActualContextWindow = %d, want 54321 (backfilled)", got.ActualContextWindow)
+		t.Errorf("ActualContextWindow = %d, want 54321 from the live session", got.ActualContextWindow)
 	}
 }
 

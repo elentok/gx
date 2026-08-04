@@ -67,19 +67,11 @@ func runIteration(d Deps, p iterationParams) error {
 	return finishIteration(d, p, path, tab.RootPaneID, tab.TabID, base, branch, sessionID)
 }
 
-// reattachIteration resumes a ticket left `Status: claimed` by a prior
-// crashed/killed invocation whose iter-NN worktree/tab is still alive: it
-// recomputes the worktree's deterministic path and finds its still-live tab
-// (rather than creating either), skips straight to re-entering the "wait for
-// the agent to finish" step (no launch or initial prompt — the agent may
-// already be mid-turn or already done), then continues through the same
-// cherry-pick/mark-done/remove completion path as a fresh iteration. The
-// tab's agent is targeted by name (the iteration label, which AgentStart
-// registered it under on the prior invocation) since no fresh AgentStart ran
-// here to hand back a pane id. The original base commit is recovered via
-// merge-base against the feature branch rather than the feature branch's
-// current tip, since the feature branch may have advanced past this
-// iteration's original branch point while the prior invocation was down.
+// reattachIteration resumes a claimed ticket whose worktree, tab, and agent
+// survived a prior invocation. The stable iteration label locates the live
+// agent, while its recovered pane and native session identity drive the
+// remaining wait, lifecycle logging, and completion work. Codex sessions are
+// accepted only when their rollout metadata belongs to this worktree.
 func reattachIteration(d Deps, p iterationParams) error {
 	label := iterLabel(p.Ticket.Identifier)
 	branch := iterBranch(p.FeatureBranch, p.Ticket.Identifier)
@@ -100,28 +92,42 @@ func reattachIteration(d Deps, p iterationParams) error {
 		return fmt.Errorf("no live tab found for reattached iteration %s", label)
 	}
 	tabID := tab.TabID
+	agent, err := d.AgentGet(label)
+	if err != nil {
+		return fmt.Errorf("reading live agent state for reattached iteration %s: %w", label, err)
+	}
+	if agent.PaneID == "" || agent.TabID != tabID || agent.WorkspaceID != p.WorkspaceID {
+		return fmt.Errorf("live agent state for reattached iteration %s does not match workspace %s and tab %s", label, p.WorkspaceID, tabID)
+	}
+	if p.Agent == AgentCodex {
+		if agent.AgentSession == "" {
+			return fmt.Errorf("missing live Codex session for reattached iteration %s; keep the tab open and retry after Herdr reports its session", label)
+		}
+		verified, verifyErr := d.VerifyCodexSession(path, agent.AgentSession)
+		if verifyErr != nil {
+			return fmt.Errorf("verifying live Codex session %s for reattached iteration %s: %w", agent.AgentSession, label, verifyErr)
+		}
+		if !verified {
+			return fmt.Errorf("live Codex session %s for reattached iteration %s does not match rollout metadata for cwd %s", agent.AgentSession, label, path)
+		}
+	}
 
 	base, err := d.MergeBase(path, branch, p.FeatureBranch)
 	if err != nil {
 		return fmt.Errorf("resolving %s's original base: %w", branch, err)
 	}
 
-	// No AgentStart was made this invocation, so there's no fresh
-	// agent_session id to check smart-zone occupancy against, or to attach to
-	// this ticket's later needs-info/cherry-picked events; the reattached
-	// wait simply re-observes idle/done without that guardrail. StartEvent is
-	// left empty for the same reason (no fresh launch happened here to log).
-	launchParams := p.launchAndPromptParams(label, label, tabID, "", path, "", eventIterationFinished)
-	if alreadyFinished(tab.AgentStatus) {
-		// tab's status came from TabList just above, taken at reattach time —
-		// the agent may have finished while the previous invocation was down,
-		// with no further status transition ever coming, so waitForFinish's
-		// AgentWait poll would have nothing new to observe.
+	// StartEvent remains empty because reattachment must not imply a fresh
+	// launch; all later events use the recovered native session identity.
+	launchParams := p.launchAndPromptParams(label, agent.PaneID, tabID, "", path, "", eventIterationFinished)
+	if alreadyFinished(agent.AgentStatus) {
+		// An agent that finished while the loop was down has no future state
+		// transition for AgentWait to observe.
 		if p.Report != nil {
 			p.Report("%s already finished at reattach; skipping wait\n", label)
 		}
-		launchParams.logLifecycleEvent(launchParams.FinishEvent, "")
-	} else if err := waitForFinish(d, launchParams, ""); err != nil {
+		launchParams.logLifecycleEvent(launchParams.FinishEvent, agent.AgentSession)
+	} else if err := waitForFinish(d, launchParams, agent.AgentSession); err != nil {
 		return fmt.Errorf("waiting for reattached agent %s to finish: %w", label, err)
 	}
 	if strings.EqualFold(strings.TrimSpace(p.Ticket.Status), "needs-attention") {
@@ -133,21 +139,16 @@ func reattachIteration(d Deps, p iterationParams) error {
 		if p.Report != nil {
 			p.Report("resumed %s after restart recheck\n", label)
 		}
-		launchParams.logLifecycleEvent(eventResumed, "")
+		launchParams.logLifecycleEvent(eventResumed, agent.AgentSession)
 	}
 
-	return finishIteration(d, p, path, label, tabID, base, branch, "")
+	return finishIteration(d, p, path, agent.PaneID, tabID, base, branch, agent.AgentSession)
 }
 
 // finishIteration lands a finished iteration's commits (or marks it
-// needs-info if it produced none), then removes its worktree/tab on success
-// — the shared tail of both the fresh (runIteration) and reattached
-// (reattachIteration) iteration lifecycles. sessionID is the iteration
-// agent's Claude Code session (empty for a reattached iteration, which made
-// no fresh AgentStart call this invocation), attached to the needs-info/
-// cherry-picked events logged here. pane is either the iteration's real pane
-// id (fresh) or its agent name (reattached) — either is a valid herdr agent
-// target.
+// needs-info if it produced none), then removes its worktree/tab on success.
+// Fresh and reattached iterations both carry their native session and pane
+// identity through this shared completion path.
 func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, sessionID string) error {
 	ahead, err := d.CommitsAhead(path, base, branch)
 	if err != nil || ahead == 0 {
@@ -267,7 +268,7 @@ func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane, ta
 	p.FeatureLock.Lock()
 	defer p.FeatureLock.Unlock()
 
-	picked, err := cherryPickWithConflictResolution(d, p, base, branch, sessionID, pane, tab)
+	picked, resolutionSessionID, err := cherryPickWithConflictResolution(d, p, base, branch, sessionID, pane, tab)
 	if err != nil {
 		return "", err
 	}
@@ -299,6 +300,9 @@ func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane, ta
 	landedSHA, err := d.RevParse(p.FeatureWorktree, "HEAD")
 	if err != nil {
 		return "", fmt.Errorf("resolving landed commit on %s: %w", p.FeatureBranch, err)
+	}
+	if resolutionSessionID != "" {
+		p.logTicketEventSHA(eventConflictResolved, "", "", resolutionSessionID, p.FeatureWorktree, "", landedSHA)
 	}
 
 	return landedSHA, nil
@@ -351,11 +355,10 @@ func branchExists(d Deps, dir, branch string) bool {
 // sends "/resolving-merge-conflicts", and waits for that agent to finish
 // before confirming the cherry-pick sequence completed. sessionID/pane/tab
 // attach the iteration agent's own session to the conflict-hit event (the
-// resolution agent hasn't launched yet at that point); conflict-resolved is
-// instead attributed to the resolution agent's own distinct session, so its
-// cost/occupancy are counted too rather than silently dropped from the
-// report.
-func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, sessionID, pane, tab string) (picked bool, resultErr error) {
+// resolution agent hasn't launched yet at that point). On resolution it
+// returns that agent's distinct session so landCherryPick can emit
+// conflict-resolved with the final post-trailer SHA.
+func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, sessionID, pane, tab string) (picked bool, resolutionSessionID string, resultErr error) {
 	p.Sink.CherryPickStarted(p.Ticket.Identifier)
 
 	// A previous invocation may have died after starting a cherry-pick but
@@ -364,11 +367,11 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 	// aborting here is lossless and lets reconciliation retry it explicitly.
 	inProgress, err := d.CherryPickInProgress(p.FeatureWorktree)
 	if err != nil {
-		return false, fmt.Errorf("checking for stale cherry-pick onto %s: %w", p.FeatureBranch, err)
+		return false, "", fmt.Errorf("checking for stale cherry-pick onto %s: %w", p.FeatureBranch, err)
 	}
 	if inProgress {
 		if err := d.AbortCherryPick(p.FeatureWorktree); err != nil {
-			return false, fmt.Errorf("aborting stale cherry-pick onto %s: %w", p.FeatureBranch, err)
+			return false, "", fmt.Errorf("aborting stale cherry-pick onto %s: %w", p.FeatureBranch, err)
 		}
 	}
 
@@ -377,23 +380,23 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 	// state behind, so recognize the safe no-op before touching the worktree.
 	applied, err := d.PatchesApplied(p.FeatureWorktree, p.FeatureBranch, base, branch)
 	if err != nil {
-		return false, fmt.Errorf("checking whether ticket %s is already applied: %w", p.Ticket.Identifier, err)
+		return false, "", fmt.Errorf("checking whether ticket %s is already applied: %w", p.Ticket.Identifier, err)
 	}
 	if applied {
-		return false, nil
+		return false, "", nil
 	}
 
 	pickErr := d.CherryPickRange(p.FeatureWorktree, base, branch)
 	if pickErr == nil {
-		return true, nil
+		return true, "", nil
 	}
 
 	inProgress, err = d.CherryPickInProgress(p.FeatureWorktree)
 	if err != nil {
-		return false, fmt.Errorf("checking cherry-pick state onto %s: %w", p.FeatureBranch, err)
+		return false, "", fmt.Errorf("checking cherry-pick state onto %s: %w", p.FeatureBranch, err)
 	}
 	if !inProgress {
-		return false, fmt.Errorf("cherry-picking onto %s: %w", p.FeatureBranch, pickErr)
+		return false, "", fmt.Errorf("cherry-picking onto %s: %w", p.FeatureBranch, pickErr)
 	}
 	// This call now owns the active sequencer state. Always clean it before
 	// FeatureLock is released on failure, otherwise later tickets can mistake
@@ -417,20 +420,19 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 	p.logTicketEvent(eventConflictHit, pane, tab, sessionID, p.FeatureWorktree)
 	p.Sink.ConflictResolutionStarted(p.Ticket.Identifier)
 
-	resolutionSessionID, err := resolveCherryPickConflict(d, p)
+	resolutionSessionID, err = resolveCherryPickConflict(d, p)
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
 
 	inProgress, err = d.CherryPickInProgress(p.FeatureWorktree)
 	if err != nil {
-		return false, fmt.Errorf("checking cherry-pick state onto %s after resolution: %w", p.FeatureBranch, err)
+		return false, "", fmt.Errorf("checking cherry-pick state onto %s after resolution: %w", p.FeatureBranch, err)
 	}
 	if inProgress {
-		return false, fmt.Errorf("cherry-pick onto %s still in progress after conflict-resolution agent finished", p.FeatureBranch)
+		return false, "", fmt.Errorf("cherry-pick onto %s still in progress after conflict-resolution agent finished", p.FeatureBranch)
 	}
-	p.logTicketEvent(eventConflictResolved, "", "", resolutionSessionID, p.FeatureWorktree)
-	return true, nil
+	return true, resolutionSessionID, nil
 }
 
 // resolveCherryPickConflict launches a fresh pane in the feature worktree and

@@ -46,6 +46,12 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 	branchByPath := map[string]string{}
 
 	d = Deps{
+		AgentGet: func(target string) (herdr.Agent, error) {
+			return herdr.Agent{PaneID: "pane-" + target, WorkspaceID: "ws1", TabID: "tab-" + target, AgentStatus: "working", AgentSession: "session-" + target}, nil
+		},
+		VerifyCodexSession: func(cwd, sessionID string) (bool, error) {
+			return true, nil
+		},
 		FindOrCreateWorkspace: func(label, cwd string) (string, error) {
 			return "ws1", nil
 		},
@@ -134,6 +140,7 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 			return true, nil
 		},
 		Sleep: func(time.Duration) {},
+		Now:   time.Now,
 	}
 	return d, &promptsSlice, &removedSlice
 }

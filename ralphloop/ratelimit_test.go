@@ -58,6 +58,59 @@ func TestDetectRateLimit_DoesNotMatchIncidentalMentions(t *testing.T) {
 	}
 }
 
+func TestDetectCodexRateLimit_ClassifiesKnownMessages(t *testing.T) {
+	now := time.Date(2026, 8, 4, 9, 0, 0, 0, time.UTC)
+	cases := []struct {
+		name      string
+		text      string
+		wantReset time.Time
+	}{
+		{
+			name:      "absolute reset timestamp",
+			text:      "  ■ You've hit your usage limit. Upgrade to Pro or try again at Aug 5, 2026 3:06 PM.",
+			wantReset: time.Date(2026, 8, 5, 15, 6, 0, 0, time.UTC),
+		},
+		{
+			name:      "relative reset duration",
+			text:      "You've hit your usage limit. Try again in 2 hours 33 minutes 12 seconds.",
+			wantReset: now.Add(2*time.Hour + 33*time.Minute + 12*time.Second),
+		},
+		{
+			name: "reset omitted",
+			text: "You've hit your usage limit.",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			limit, matched := detectCodexRateLimit(tc.text, now)
+			if !matched {
+				t.Fatalf("detectCodexRateLimit(%q) matched = false, want true", tc.text)
+			}
+			if limit.Quota != "usage" {
+				t.Errorf("quota = %q, want usage", limit.Quota)
+			}
+			if !limit.ResetAt.Equal(tc.wantReset) {
+				t.Errorf("reset = %v, want %v", limit.ResetAt, tc.wantReset)
+			}
+		})
+	}
+}
+
+func TestDetectCodexRateLimit_RejectsBlockedAndIncidentalText(t *testing.T) {
+	for _, text := range []string{
+		"",
+		"blocked: waiting for your permission to run this command",
+		"rate limit reached while calling a test server",
+		"We should detect You've hit your usage limit. in pane output",
+		"Claude usage limit reached",
+	} {
+		if _, matched := detectCodexRateLimit(text, time.Now()); matched {
+			t.Errorf("detectCodexRateLimit(%q) matched = true, want false", text)
+		}
+	}
+}
+
 func TestSecondsUntilReset_ParsesClockTimeRollingToNextDayIfPassed(t *testing.T) {
 	now := time.Date(2026, 8, 1, 9, 0, 0, 0, time.UTC)
 
@@ -190,8 +243,35 @@ func TestWaitForCodexRateLimitReset_MissingResetPollsUntilQuotaClears(t *testing
 	}
 }
 
-func TestWaitForCodexRateLimitReset_SleepsPastResetThenReobserves(t *testing.T) {
+func TestWaitForCodexRateLimitReset_MissingResetAt_NeverClears_BoundedThenReturns(t *testing.T) {
 	d := Deps{}
+	checks := 0
+	d.Sleep = func(time.Duration) {}
+	d.ReadCodexRateLimit = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
+		checks++
+		return codexsession.RateLimit{}, true, nil
+	}
+
+	done := make(chan struct{})
+	go func() {
+		waitForCodexRateLimitReset(d, "/repo/iter-01", "session-1", codexsession.RateLimit{Quota: "primary"})
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("waitForCodexRateLimitReset never returned: an unchanging exhausted snapshot polled indefinitely")
+	}
+
+	if checks != codexRateLimitMaxRepolls {
+		t.Errorf("quota rechecks = %d, want %d (bounded)", checks, codexRateLimitMaxRepolls)
+	}
+}
+
+func TestWaitForCodexRateLimitReset_SleepsPastResetThenReobserves(t *testing.T) {
+	base := time.Date(2026, 8, 1, 9, 0, 0, 0, time.UTC)
+	d := Deps{Now: func() time.Time { return base }}
 	var sleeps []time.Duration
 	checks := 0
 	d.Sleep = func(duration time.Duration) { sleeps = append(sleeps, duration) }
@@ -201,7 +281,7 @@ func TestWaitForCodexRateLimitReset_SleepsPastResetThenReobserves(t *testing.T) 
 	}
 
 	waitForCodexRateLimitReset(d, "/repo/iter-01", "session-1", codexsession.RateLimit{
-		Quota: "secondary", ResetAt: time.Now().Add(2 * time.Second),
+		Quota: "secondary", ResetAt: base.Add(2 * time.Second),
 	})
 
 	if len(sleeps) != 1 || sleeps[0] < rateLimitResetBuffer {
@@ -209,5 +289,55 @@ func TestWaitForCodexRateLimitReset_SleepsPastResetThenReobserves(t *testing.T) 
 	}
 	if checks != 1 {
 		t.Errorf("quota rechecks = %d, want 1 after reset", checks)
+	}
+}
+
+func TestWaitForCodexRateLimitReset_StaleResetAt_NoWaitAndBoundedRepolls(t *testing.T) {
+	base := time.Date(2026, 8, 1, 9, 0, 0, 0, time.UTC)
+	d := Deps{Now: func() time.Time { return base }}
+	var sleeps []time.Duration
+	checks := 0
+	d.Sleep = func(duration time.Duration) { sleeps = append(sleeps, duration) }
+	d.ReadCodexRateLimit = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
+		checks++
+		return codexsession.RateLimit{}, true, nil
+	}
+
+	// ResetAt is already in the past relative to the deterministic clock —
+	// an immutable pre-reset record from a deadline that already passed.
+	waitForCodexRateLimitReset(d, "/repo/iter-01", "session-1", codexsession.RateLimit{
+		Quota: "secondary", ResetAt: base.Add(-time.Hour),
+	})
+
+	if len(sleeps) != codexRateLimitMaxRepolls {
+		t.Errorf("sleeps = %v, want %d bounded repoll sleeps and no deadline wait", sleeps, codexRateLimitMaxRepolls)
+	}
+	// One check right after the (already-past) deadline, plus the bounded
+	// repoll loop.
+	if checks != codexRateLimitMaxRepolls+1 {
+		t.Errorf("quota rechecks = %d, want %d", checks, codexRateLimitMaxRepolls+1)
+	}
+}
+
+func TestWaitForCodexRateLimitReset_ClearedRightAfterDeadline_ReturnsWithoutRepolling(t *testing.T) {
+	base := time.Date(2026, 8, 1, 9, 0, 0, 0, time.UTC)
+	d := Deps{Now: func() time.Time { return base }}
+	var sleeps []time.Duration
+	checks := 0
+	d.Sleep = func(duration time.Duration) { sleeps = append(sleeps, duration) }
+	d.ReadCodexRateLimit = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
+		checks++
+		return codexsession.RateLimit{}, false, nil
+	}
+
+	waitForCodexRateLimitReset(d, "/repo/iter-01", "session-1", codexsession.RateLimit{
+		Quota: "secondary", ResetAt: base.Add(-time.Hour),
+	})
+
+	if len(sleeps) != 0 {
+		t.Errorf("sleeps = %v, want none: reset already passed and quota cleared on first recheck", sleeps)
+	}
+	if checks != 1 {
+		t.Errorf("quota rechecks = %d, want 1", checks)
 	}
 }

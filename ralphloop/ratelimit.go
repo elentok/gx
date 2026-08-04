@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -29,6 +30,14 @@ var rateLimitMessagePattern = regexp.MustCompile(`(?i)(hit|reached|reset)[^.]{0,
 // time token, e.g. "10:10am".
 var resetTimeTokenPattern = regexp.MustCompile(`(?i)[0-9]{1,2}(:[0-9]{2})?\s*[ap]m`)
 
+var (
+	codexQuotaLinePattern     = regexp.MustCompile(`(?i)^you(?:('|’)ve| have) hit your usage limit(?:[.!]|$)`)
+	codexAbsoluteResetPattern = regexp.MustCompile(`(?i)(?:try again|resets?) at\s+([a-z]+\s+[0-9]{1,2}(?:st|nd|rd|th)?,\s+[0-9]{4}\s+[0-9]{1,2}(?::[0-9]{2})?\s*[ap]m|[0-9]{1,2}(?::[0-9]{2})?\s*[ap]m)`)
+	codexRelativeResetPattern = regexp.MustCompile(`(?i)try again in\s+([^.]*)`)
+	codexRelativePartPattern  = regexp.MustCompile(`(?i)([0-9]+)\s*(day|hour|minute|second)s?`)
+	codexOrdinalPattern       = regexp.MustCompile(`(?i)([0-9]{1,2})(?:st|nd|rd|th)`)
+)
+
 // detectRateLimit reports whether text contains a Claude usage/session
 // rate-limit message and, if so, the reset-time token embedded in it (empty
 // if the message didn't include one).
@@ -37,6 +46,66 @@ func detectRateLimit(text string) (token string, matched bool) {
 		return "", false
 	}
 	return resetTimeTokenPattern.FindString(text), true
+}
+
+func detectCodexRateLimit(text string, now time.Time) (codexsession.RateLimit, bool) {
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(line), "│┆>*•■🖐"))
+		if !codexQuotaLinePattern.MatchString(line) {
+			continue
+		}
+
+		return codexsession.RateLimit{
+			Quota:   "usage",
+			ResetAt: codexQuotaResetAt(line, now),
+		}, true
+	}
+	return codexsession.RateLimit{}, false
+}
+
+func codexQuotaResetAt(line string, now time.Time) time.Time {
+	if match := codexAbsoluteResetPattern.FindStringSubmatch(line); len(match) == 2 {
+		token := codexOrdinalPattern.ReplaceAllString(match[1], "$1")
+		for _, layout := range []string{
+			"Jan 2, 2006 3:04 PM",
+			"Jan 2, 2006 3 PM",
+			"January 2, 2006 3:04 PM",
+			"January 2, 2006 3 PM",
+		} {
+			if reset, err := time.ParseInLocation(layout, token, time.UTC); err == nil {
+				return reset
+			}
+		}
+		if duration, ok := secondsUntilReset(token, now); ok {
+			return now.Add(duration)
+		}
+	}
+
+	match := codexRelativeResetPattern.FindStringSubmatch(line)
+	if len(match) != 2 {
+		return time.Time{}
+	}
+	var duration time.Duration
+	for _, part := range codexRelativePartPattern.FindAllStringSubmatch(match[1], -1) {
+		value, err := strconv.Atoi(part[1])
+		if err != nil {
+			return time.Time{}
+		}
+		switch strings.ToLower(part[2]) {
+		case "day":
+			duration += time.Duration(value) * 24 * time.Hour
+		case "hour":
+			duration += time.Duration(value) * time.Hour
+		case "minute":
+			duration += time.Duration(value) * time.Minute
+		case "second":
+			duration += time.Duration(value) * time.Second
+		}
+	}
+	if duration <= 0 {
+		return time.Time{}
+	}
+	return now.Add(duration)
 }
 
 // secondsUntilReset parses token (a bare clock time, e.g. "10:10am" or
@@ -117,13 +186,27 @@ func waitForClaudeRateLimitReset(d Deps, g *Gate, label, resumeSignalPath, pane,
 	}
 }
 
+// codexRateLimitMaxRepolls caps how many times waitForCodexRateLimitReset
+// re-checks Codex's own quota snapshot for a still-"exhausted" result — past
+// the reset deadline, or (with no deadline at all) on the fallback poll —
+// before giving up and returning control to the caller. The rollout record
+// Codex wrote before hitting its limit is immutable until Codex actually
+// makes a new request, so an unchanged "exhausted" snapshot would otherwise
+// poll d.ReadCodexRateLimit forever and never release the pause; the caller
+// (recoverCodexRateLimit) re-observes the pane directly once this returns.
+const codexRateLimitMaxRepolls = 3
+
 // waitForCodexRateLimitReset waits for the structured session reset time when
-// available. Missing or malformed reset data falls back to polling the same
-// session observer until it no longer reports an exhausted quota.
+// available, using the deadline plus rateLimitResetBuffer as the boundary for
+// trying Codex again — never blocking past it. Missing or malformed reset
+// data falls back to polling the same session observer instead. Either way,
+// a quota snapshot that keeps reporting "exhausted" is re-checked at most
+// codexRateLimitMaxRepolls times before this returns regardless, so a stale
+// pre-reset record can't hold the pause open indefinitely.
 func waitForCodexRateLimitReset(d Deps, cwd, sessionID string, limit codexsession.RateLimit) {
 	if !limit.ResetAt.IsZero() {
-		if wait := time.Until(limit.ResetAt); wait > 0 {
-			d.Sleep(wait + rateLimitResetBuffer)
+		if wait := limit.ResetAt.Add(rateLimitResetBuffer).Sub(d.Now()); wait > 0 {
+			d.Sleep(wait)
 		}
 		if d.ReadCodexRateLimit == nil {
 			return
@@ -134,7 +217,7 @@ func waitForCodexRateLimitReset(d Deps, cwd, sessionID string, limit codexsessio
 		}
 	}
 
-	for {
+	for range codexRateLimitMaxRepolls {
 		d.Sleep(rateLimitPollInterval)
 		if d.ReadCodexRateLimit == nil {
 			return
