@@ -16,6 +16,17 @@ type recordingSink struct {
 	calls                  []string
 	lastIterationStats     IterationStats
 	lastEpicElapsedSeconds int
+	// iterationStatsByTicket records every IterationFinished call's stats
+	// keyed by ticket identifier, for scenarios (unlike
+	// lastIterationStats) that need to inspect more than the most recent
+	// call, e.g. asserting a scripted scheduling scenario's per-ticket
+	// progress counts.
+	iterationStatsByTicket map[string]IterationStats
+	// onIterationFinished, if set, runs synchronously after recording each
+	// IterationFinished call, letting a test unblock a still-running
+	// iteration's fake AgentWait exactly once this ticket's stats have been
+	// captured, deterministically rather than via a polling loop.
+	onIterationFinished func(ticket tickets.Ticket)
 }
 
 func (s *recordingSink) record(name string) {
@@ -54,8 +65,16 @@ func (s *recordingSink) IterationResumed(label string, kind PauseKind) { s.recor
 func (s *recordingSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
 	s.mu.Lock()
 	s.lastIterationStats = stats
+	if s.iterationStatsByTicket == nil {
+		s.iterationStatsByTicket = map[string]IterationStats{}
+	}
+	s.iterationStatsByTicket[ticket.Identifier] = stats
+	hook := s.onIterationFinished
 	s.mu.Unlock()
 	s.record("IterationFinished")
+	if hook != nil {
+		hook(ticket)
+	}
 }
 func (s *recordingSink) TranscriptLine(label, line string) { s.record("TranscriptLine") }
 func (s *recordingSink) ContextOccupancy(identifier string, tokens int) {

@@ -139,6 +139,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	if err := ValidateAgentKind(agent); err != nil {
 		return err
 	}
+	runStart := d.Now()
 
 	scratchDir := opts.ScratchDir
 	if scratchDir == "" {
@@ -173,8 +174,9 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	if err != nil {
 		return err
 	}
+	total := scope.TotalCount(*initial)
 	if scope.AllSettled(*initial) {
-		sink.AlreadyComplete(opts.EpicName, scope.DoneCount(*initial), scope.TotalCount(*initial))
+		sink.AlreadyComplete(opts.EpicName, scope.DoneCount(*initial), total)
 		return nil
 	}
 	if agent == AgentCodex && d.PreflightAgent != nil {
@@ -366,11 +368,33 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			continue
 		}
 
-		sink.IterationFinished(r.ticket, opts.EpicName, IterationStats{})
+		// landCherryPick has already written elapsed/context metrics into the
+		// ticket's own frontmatter by the time results yields this outcome
+		// (see writeLandedMetrics), so re-parsing off disk here is simpler
+		// than threading a return value up through runIteration/finishIteration.
+		landedTicket := r.ticket
+		if landedEpic, err := loadNamedEpic(scratchDir, opts.EpicName); err != nil {
+			return err
+		} else if landedEpic != nil {
+			for _, t := range landedEpic.Tickets {
+				if t.Identifier == r.ticket.Identifier {
+					landedTicket = t
+					break
+				}
+			}
+		}
+
 		completed++
+		sink.IterationFinished(landedTicket, opts.EpicName, IterationStats{
+			ElapsedSeconds:    landedTicket.ElapsedTime,
+			PeakContextTokens: landedTicket.ActualContextWindow,
+			InProgress:        active,
+			Completed:         completed,
+			Total:             total,
+		})
 	}
 
-	sink.EpicComplete(opts.EpicName, completed, 0)
+	sink.EpicComplete(opts.EpicName, completed, int(d.Now().Sub(runStart).Seconds()))
 	return nil
 }
 
