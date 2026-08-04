@@ -43,6 +43,9 @@ type Ticket struct {
 	// nothing to stamp).
 	ActualContextWindow int
 	ElapsedTime         int
+	// Compactions mirrors schema.Ticket.Compactions: how many compaction
+	// boundaries the landing iteration's session crossed.
+	Compactions int
 
 	// Commitless mirrors schema.Ticket.Commitless: true means a zero-commit
 	// iteration finish is intentional for this ticket, not a stalled agent.
