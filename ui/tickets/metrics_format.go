@@ -1,6 +1,21 @@
 package tickets
 
-import "fmt"
+import (
+	"fmt"
+
+	"charm.land/lipgloss/v2"
+
+	"github.com/elentok/gx/ui"
+)
+
+// metricsLineIndent aligns a row's second line under its first line's title
+// text (after the "  " + icon + " " lead-in), the same indentation width
+// regardless of icon glyph.
+const metricsLineIndent = "    "
+
+// metricsLineStyle renders a row's second line dim+italic, distinguishing it
+// from the title line above it.
+var metricsLineStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Italic(true)
 
 // formatTokenCount abbreviates tokens for a row's metrics line: plain below
 // 1000, "45.2k tok" below 1,000,000, "1.2M tok" at or above.
@@ -34,4 +49,31 @@ func formatElapsed(seconds int) string {
 	default:
 		return fmt.Sprintf("%ds", s)
 	}
+}
+
+// formatMetricsLine joins elapsed/tokens into a row's line-2 figures, e.g.
+// "12m34s · 45.2k tok".
+func formatMetricsLine(elapsedSeconds, tokens int) string {
+	return formatElapsed(elapsedSeconds) + " · " + formatTokenCount(tokens)
+}
+
+// joinNonEmpty joins a and b with sep, skipping either side if empty — a
+// live row's line-2 composition, where a live row's suffix (phase/label or
+// pause reason) is sometimes absent.
+func joinNonEmpty(sep, a, b string) string {
+	switch {
+	case a == "":
+		return b
+	case b == "":
+		return a
+	default:
+		return a + sep + b
+	}
+}
+
+// renderMetricsLine renders text (a row's line-2 content, already composed
+// from whatever suffix/reason/figures apply) indented and styled under its
+// title line.
+func renderMetricsLine(text string) string {
+	return metricsLineIndent + metricsLineStyle.Render(text)
 }

@@ -47,12 +47,14 @@ func TestRenderTicketRow_DoneHasMetricsLine(t *testing.T) {
 func TestRenderTicketRow_LiveHasSuffixAndMetricsLine(t *testing.T) {
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{{Identifier: "01", Title: "Running ticket", Status: "claimed"}}}
 	m := newModelForTicketRowTests(epic)
-	m.implementEpic = epic.Name
-	m.live["01"] = liveTicketState{
-		running:   true,
-		label:     "iter-01",
-		startedAt: time.Now().Add(-754 * time.Second),
-		tokens:    45_200,
+	m.implementingEpics = map[string]bool{epic.Name: true}
+	m.live[epic.Name] = map[string]liveTicketState{
+		"01": {
+			running:   true,
+			label:     "iter-01",
+			startedAt: time.Now().Add(-754 * time.Second),
+			tokens:    45_200,
+		},
 	}
 
 	lines := m.renderTicketRow(epic, epic.Tickets[0], 1)
@@ -72,13 +74,15 @@ func TestRenderTicketRow_LiveHasSuffixAndMetricsLine(t *testing.T) {
 func TestRenderTicketRow_PausedHasReasonAndMetricsLine(t *testing.T) {
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{{Identifier: "01", Title: "Paused ticket", Status: "claimed"}}}
 	m := newModelForTicketRowTests(epic)
-	m.implementEpic = epic.Name
-	m.live["01"] = liveTicketState{
-		paused:    true,
-		pauseKind: ralphloop.PauseRateLimit,
-		reason:    "context budget exceeded",
-		startedAt: time.Now().Add(-3900 * time.Second),
-		tokens:    1_200_000,
+	m.implementingEpics = map[string]bool{epic.Name: true}
+	m.live[epic.Name] = map[string]liveTicketState{
+		"01": {
+			paused:    true,
+			pauseKind: ralphloop.PauseRateLimit,
+			reason:    "context budget exceeded",
+			startedAt: time.Now().Add(-3900 * time.Second),
+			tokens:    1_200_000,
+		},
 	}
 
 	lines := m.renderTicketRow(epic, epic.Tickets[0], 1)

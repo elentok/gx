@@ -218,7 +218,6 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case implementStartedMsg:
 		return m.handleImplementStarted(msg)
 	case implementPollMsg:
-		refreshLiveStartedAt(m.live)
 		return m.handleImplementPoll(msg)
 	case implementSyncMsg:
 		return m.handleImplementSync(msg)
@@ -311,10 +310,10 @@ func (m Model) renderedRowHeight(r row) int {
 	if status == tickets.StatusDone {
 		return 2
 	}
-	if status == tickets.StatusSuperseded || epic.Name != m.implementEpic {
+	if status == tickets.StatusSuperseded || !m.implementingEpics[epic.Name] {
 		return 1
 	}
-	live, ok := m.live[t.Identifier]
+	live, ok := m.live[epic.Name][t.Identifier]
 	if !ok {
 		return 1
 	}

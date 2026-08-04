@@ -26,14 +26,24 @@ type liveTicketState struct {
 	pauseKind ralphloop.PauseKind
 	reason    string
 	phase     livePhase
-	// startedAt is the iteration's session transcript's first-line
-	// timestamp, so elapsed time keeps climbing across a pause/resume
-	// instead of resetting. Zero if not resolved.
+	// startedAt is the epic run's start time (RunSnapshot.StartedAt), shared
+	// by every ticket in that run, so elapsed time keeps climbing across a
+	// pause/resume instead of resetting. Zero if the run hasn't started.
 	startedAt time.Time
 	// tokens is the last context-occupancy reading for this ticket —
 	// frozen (not zeroed) while paused, since the underlying session's
 	// context hasn't changed.
 	tokens int
+}
+
+// liveElapsedSeconds computes a running/paused ticket's elapsed time from
+// live.startedAt (the epic run's start time), so it keeps climbing across
+// renders without a UI-side stopwatch. Zero if startedAt hasn't been set.
+func liveElapsedSeconds(live liveTicketState) int {
+	if live.startedAt.IsZero() {
+		return 0
+	}
+	return int(time.Since(live.startedAt).Seconds())
 }
 
 // livePhase distinguishes what a running iteration is doing right now, so

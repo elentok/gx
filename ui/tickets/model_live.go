@@ -24,6 +24,7 @@ func (m *Model) syncRunSnapshot(epicName string) {
 			reason:    ticket.PauseReason,
 			phase:     livePhaseImplementing,
 			tokens:    ticket.ContextTokens,
+			startedAt: snapshot.StartedAt,
 		}
 		labels[ticket.Label] = identifier
 	}
