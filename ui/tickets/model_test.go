@@ -343,6 +343,64 @@ func TestModel_NavigationAndSelectionUnaffectedBySectionHeaders(t *testing.T) {
 	}
 }
 
+// TestModel_MouseClickSelectsSidebarRowOnly covers ticket 05c: clicking a
+// row in the Tickets tab's sidebar must select it (like arrowing there) and
+// do nothing else — no checkbox toggle, no confirm modal.
+func TestModel_MouseClickSelectsSidebarRowOnly(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	// Navigate to the second ticket row (epic header, then its two tickets)
+	// so we can read the line its click needs to land on.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	if m.selected != 2 {
+		t.Fatalf("expected selection at row 2 after two downs, got %d", m.selected)
+	}
+	line, _, ok := m.sidebarLineForSelected()
+	if !ok {
+		t.Fatalf("expected a line for the selected row")
+	}
+	checkedBefore := len(m.checked)
+
+	m.selected = 0
+	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, X: 0, Y: line + 1})
+	m = updated.(Model)
+	if m.selected != 2 {
+		t.Fatalf("expected click to select row 2, got %d", m.selected)
+	}
+	if m.confirm.IsOpen {
+		t.Fatalf("expected click-to-select to not open the confirm modal")
+	}
+	if len(m.checked) != checkedBefore {
+		t.Fatalf("expected click-to-select to leave checked state untouched, before=%d after=%d", checkedBefore, len(m.checked))
+	}
+
+	// A click landing on the preview panel (past the sidebar's width) is a no-op.
+	sidebarW, _ := m.splitWidth()
+	m.selected = 0
+	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, X: sidebarW, Y: line + 1})
+	m = updated.(Model)
+	if m.selected != 0 {
+		t.Fatalf("expected click on the preview panel to leave selection at row 0, got %d", m.selected)
+	}
+
+	// A non-left click must not move the selection either.
+	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseRight, X: 0, Y: line + 1})
+	m = updated.(Model)
+	if m.selected != 0 {
+		t.Fatalf("expected non-left click to leave selection at row 0, got %d", m.selected)
+	}
+}
+
 // TestModel_EnterOnExpandedEpicFocusesPreview covers the epic-row case of
 // "enter"/"l": since my-epic starts expanded, enter must not collapse it —
 // it should instead focus the preview panel, exactly like it does on a

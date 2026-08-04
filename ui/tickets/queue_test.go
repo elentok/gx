@@ -1020,6 +1020,55 @@ func TestQueueModelShowsPreviewPaneForSelectedTicket(t *testing.T) {
 	}
 }
 
+// TestQueueModelMouseClickSelectsRowOnly covers ticket 05c: clicking a row
+// in the Queue tab must select it (like arrowing there) and do nothing else
+// — no confirm modal, no other side effect.
+func TestQueueModelMouseClickSelectsRowOnly(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "alpha", "03-third.md", "Status: open\n\nBody.\n")
+
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "01-first.md"):  true,
+		ticketPath(root, "alpha", "02-second.md"): true,
+		ticketPath(root, "alpha", "03-third.md"):  true,
+	}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	if m.selected != 0 {
+		t.Fatalf("expected initial selection at row 0, got %d", m.selected)
+	}
+
+	_, offsets, _ := m.buildQueueLines()
+	if len(offsets) != 3 {
+		t.Fatalf("expected 3 row offsets, got %d: %v", len(offsets), offsets)
+	}
+
+	// Click on the third row (bodyLine = mouse.Y-1, no scroll offset).
+	updated, _ := m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, Y: offsets[2] + 1})
+	m = updated.(QueueModel)
+	if m.selected != 2 {
+		t.Fatalf("expected click to select row 2, got %d", m.selected)
+	}
+	if m.confirm.IsOpen {
+		t.Fatalf("expected click-to-select to not open the confirm modal")
+	}
+
+	// A non-left click must not move the selection.
+	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseRight, Y: offsets[0] + 1})
+	m = updated.(QueueModel)
+	if m.selected != 2 {
+		t.Fatalf("expected non-left click to leave selection at row 2, got %d", m.selected)
+	}
+
+	// A click above the body (row -1) must not crash or change selection.
+	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, Y: 0})
+	m = updated.(QueueModel)
+	if m.selected != 2 {
+		t.Fatalf("expected out-of-bounds click to leave selection at row 2, got %d", m.selected)
+	}
+}
+
 func ticketPath(root, epic, name string) string {
 	return filepath.Join(root, ".scratch", epic, "issues", name)
 }

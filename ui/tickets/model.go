@@ -237,9 +237,16 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKey(msg)
 
 	case tea.MouseClickMsg:
+		if m.implementAgentMenuOpen {
+			return m, nil
+		}
 		if m.confirm.IsOpen {
 			return m.handleConfirmMouseUpdate(msg)
 		}
+		if _, ok := m.activeInputSearch(); ok {
+			return m, nil
+		}
+		return m.handleSidebarMouseClick(msg)
 
 	case tea.MouseWheelMsg:
 		return m.handleSidebarMouseWheel(msg)
@@ -319,6 +326,85 @@ func (m Model) sidebarLineForSelected() (line, height int, ok bool) {
 func (m Model) sidebarLineInRows(line int, rows []row, selected int) (int, int, bool) {
 	line += m.renderedRowsHeight(rows[:selected])
 	return line, m.renderedRowHeight(rows[selected]), true
+}
+
+// sidebarRowForLine returns the visibleRows() index whose rendered lines
+// contain targetLine (sidebarLines()' line-numbering), the inverse of
+// sidebarLineForSelected.
+func (m Model) sidebarRowForLine(targetLine int) (int, bool) {
+	if !m.loaded || len(m.epics) == 0 {
+		return 0, false
+	}
+	idxs := make([]int, len(m.epics))
+	for i := range m.epics {
+		idxs[i] = i
+	}
+	openIdxs, closedIdxs := splitEpicIndexesBySection(m.epics, idxs)
+	openRows := m.rowsForEpicOrder(openIdxs)
+	closedRows := m.rowsForEpicOrder(closedIdxs)
+
+	line := 1 // "── Open epics (N) ──"
+	if len(openRows) == 0 {
+		line++
+	}
+	if idx, ok := rowAtLine(m, line, openRows, targetLine); ok {
+		return idx, true
+	}
+	line += m.renderedRowsHeight(openRows)
+	line += 2 // blank separator + "── Closed epics (N) ──"
+	if len(closedRows) == 0 {
+		line++
+	}
+	if idx, ok := rowAtLine(m, line, closedRows, targetLine); ok {
+		return len(openRows) + idx, true
+	}
+	return 0, false
+}
+
+func rowAtLine(m Model, startLine int, rows []row, targetLine int) (int, bool) {
+	line := startLine
+	for i, r := range rows {
+		h := m.renderedRowHeight(r)
+		if targetLine >= line && targetLine < line+h {
+			return i, true
+		}
+		line += h
+	}
+	return 0, false
+}
+
+// handleSidebarMouseClick selects the sidebar row under a left click,
+// mirroring arrow-key navigation with no secondary action (no checkbox
+// toggle, no confirm). Clicks landing outside the sidebar panel's bounds
+// (e.g. on the preview panel) are a no-op.
+func (m Model) handleSidebarMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
+	mouse := msg.Mouse()
+	if mouse.Button != tea.MouseLeft {
+		return m, nil
+	}
+	sidebarW, _ := m.splitWidth()
+	sidebarH, _ := m.splitHeight(m.contentHeight())
+	if m.useStackedLayout() {
+		if mouse.Y < 0 || mouse.Y >= sidebarH {
+			return m, nil
+		}
+	} else {
+		if mouse.X < 0 || mouse.X >= sidebarW || mouse.Y < 0 || mouse.Y >= m.contentHeight() {
+			return m, nil
+		}
+	}
+	bodyLine := mouse.Y - 1
+	if bodyLine < 0 {
+		return m, nil
+	}
+	targetLine := bodyLine + m.scrollOffset
+	idx, ok := m.sidebarRowForLine(targetLine)
+	if !ok {
+		return m, nil
+	}
+	m.selected = idx
+	m.ensureSidebarVisible()
+	return m, nil
 }
 
 func (m Model) renderedRowsHeight(rows []row) int {

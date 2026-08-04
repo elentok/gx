@@ -261,6 +261,7 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.confirm.IsOpen {
 			return m.handleQueueConfirmMouseUpdate(msg)
 		}
+		return m.handleQueueMouseClick(msg)
 	case cascadeDeleteConfirmedMsg:
 		return m.handleCascadeDeleteConfirmed(msg)
 	}
@@ -303,6 +304,31 @@ func (m QueueModel) handleQueueMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea
 	}
 	m.scrollOffset += dir * 3
 	m.clampScrollOffset()
+	return m, nil
+}
+
+// handleQueueMouseClick selects the row under the click without triggering
+// any secondary action (no confirm, no checkbox toggle) — the Queue panel
+// renders full-width with no header above it, so only Y needs bounds
+// checking.
+func (m QueueModel) handleQueueMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
+	mouse := msg.Mouse()
+	if mouse.Button != tea.MouseLeft {
+		return m, nil
+	}
+	bodyLine := mouse.Y - 1
+	if bodyLine < 0 {
+		return m, nil
+	}
+	line := bodyLine + m.scrollOffset
+	_, offsets, heights := m.buildQueueLines()
+	for i, offset := range offsets {
+		if line >= offset && line < offset+heights[i] {
+			m.selected = i
+			m.ensureQueueVisible()
+			return m, nil
+		}
+	}
 	return m, nil
 }
 
