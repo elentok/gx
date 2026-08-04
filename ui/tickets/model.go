@@ -6,7 +6,6 @@ package tickets
 import (
 	"fmt"
 	"path/filepath"
-	"strings"
 
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/viewport"
@@ -131,21 +130,7 @@ func NewModelWithScopeAndStore(worktreeRoot string, settings ui.Settings, extraK
 	_ = extraKeys
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
-	snapshot := store.Snapshot()
-	queueStatus, checkOrder := snapshot.Status, snapshot.Order
-	if !allRepos {
-		scratchPrefix := filepath.Join(worktreeRoot, ".scratch") + string(filepath.Separator)
-		for path := range queueStatus {
-			if !strings.HasPrefix(path, scratchPrefix) {
-				delete(queueStatus, path)
-				delete(checkOrder, path)
-			}
-		}
-	}
-	checked := make(map[string]bool, len(queueStatus))
-	for path := range queueStatus {
-		checked[path] = true
-	}
+	queueStatus, checkOrder, checked := scopedQueueSnapshot(store, worktreeRoot, allRepos)
 	return Model{
 		worktreeRoot:       worktreeRoot,
 		settings:           settings,

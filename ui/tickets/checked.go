@@ -2,6 +2,7 @@ package tickets
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -35,10 +36,32 @@ func (m *Model) setPathsChecked(paths []string, checked bool) error {
 }
 
 func (m *Model) refreshQueueSnapshot() {
-	snapshot := m.queueStore.Snapshot()
-	m.checked = snapshot.Checked
-	m.checkOrder = snapshot.Order
-	m.queueStatus = snapshot.Status
+	m.queueStatus, m.checkOrder, m.checked = scopedQueueSnapshot(m.queueStore, m.worktreeRoot, m.allRepos)
+}
+
+// scopedQueueSnapshot reads store's snapshot and, unless allRepos is set,
+// filters it down to paths under worktreeRoot's own `.scratch/` — the queue
+// store persists checked/queued paths globally across every worktree ever
+// used, so every read of it must re-apply this scope or a ticket checked in
+// one worktree leaks into another's checked count (and confirmation
+// prompts) without ever appearing as a checked row there.
+func scopedQueueSnapshot(store *QueueStore, worktreeRoot string, allRepos bool) (queueStatus map[string]queueItemStatus, checkOrder map[string]uint64, checked map[string]bool) {
+	snapshot := store.Snapshot()
+	queueStatus, checkOrder = snapshot.Status, snapshot.Order
+	if !allRepos {
+		scratchPrefix := filepath.Join(worktreeRoot, ".scratch") + string(filepath.Separator)
+		for path := range queueStatus {
+			if !strings.HasPrefix(path, scratchPrefix) {
+				delete(queueStatus, path)
+				delete(checkOrder, path)
+			}
+		}
+	}
+	checked = make(map[string]bool, len(queueStatus))
+	for path := range queueStatus {
+		checked[path] = true
+	}
+	return queueStatus, checkOrder, checked
 }
 
 func nextCheckOrdinal(checkOrder map[string]uint64) uint64 {
