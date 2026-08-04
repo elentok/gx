@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
@@ -23,25 +22,6 @@ import (
 )
 
 const queueBanner = "This is the execution plan, press Enter to start"
-
-var (
-	// epicHeaderStyle highlights the Queue tab's per-epic header name in the
-	// same blue used elsewhere in this UI's palette (statusClaimedStyle,
-	// worktreeTagStyle), rather than sectionHeaderStyle's neutral divider
-	// color.
-	epicHeaderStyle = lipgloss.NewStyle().Foreground(ui.ColorBlue).Bold(true)
-
-	// epicStatusDoneStyle colors an epic header's status line green once
-	// every ticket is done.
-	epicStatusDoneStyle = lipgloss.NewStyle().Foreground(ui.ColorGreen)
-
-	// epicStatusProblemStyle colors an epic header's status line yellow when
-	// any of its tickets is needs-info/needs-attention/error-classed.
-	// "In progress, clean" deliberately falls through to the default/no-color
-	// treatment instead (ticket 02's same open=no-color choice), so it
-	// doesn't read as an alarm state.
-	epicStatusProblemStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow)
-)
 
 // QueueModel renders a checked selection as dependency-aware epic waves.
 type QueueModel struct {
@@ -144,13 +124,6 @@ func NewQueueModelWithStore(worktreeRoot string, settings ui.Settings, store *Qu
 
 func (m QueueModel) Init() tea.Cmd {
 	return m.cmdLoadQueue()
-}
-
-// InputFocused reports whether the search box is mid-input, so the app
-// shell's digit-based tab-jump mnemonics (see ui/app's inputFocuser
-// duck-type) stay routed to the search query instead of switching tabs.
-func (m QueueModel) InputFocused() bool {
-	return m.search.Mode() == search.SearchModeInput
 }
 
 type queueEpicsLoadedMsg struct {
@@ -266,18 +239,6 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleCascadeDeleteConfirmed(msg)
 	}
 	return m, nil
-}
-
-func (m QueueModel) handleQueueConfirmUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
-	next, cmd, _ := m.confirm.Update(msg)
-	m.confirm = next
-	return m, cmd
-}
-
-func (m QueueModel) handleQueueConfirmMouseUpdate(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
-	next, cmd, _ := m.confirm.UpdateMouse(msg, m.width, m.width, m.height)
-	m.confirm = next
-	return m, cmd
 }
 
 func (m QueueModel) handleQueueSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
@@ -659,50 +620,6 @@ func (m *QueueModel) startAvailableEpics() tea.Cmd {
 	}
 }
 
-// recomputeQueueSearchMatches rebuilds the match set against the current
-// rows() order: case-insensitive substring over each ticket's title,
-// mirroring the Tickets tab's recomputeSearchMatches (search.go).
-func (m *QueueModel) recomputeQueueSearchMatches() {
-	q := strings.ToLower(strings.TrimSpace(m.search.Query()))
-	if q == "" {
-		m.search.SetMatches(nil)
-		return
-	}
-
-	rows := m.rows()
-	matches := make([]search.Match, 0)
-	for i, r := range rows {
-		if strings.Contains(strings.ToLower(r.ticket.Title), q) {
-			matches = append(matches, search.Match{DataIndex: i})
-		}
-	}
-	m.search.SetMatches(matches)
-}
-
-// jumpToCurrentQueueMatch moves the selection to the search cursor's current
-// match, mirroring the Tickets tab's jumpToCurrentMatch (search.go).
-func (m *QueueModel) jumpToCurrentQueueMatch() {
-	match, ok := m.search.Match(m.search.Cursor())
-	if !ok {
-		return
-	}
-	rows := m.rows()
-	if match.DataIndex >= 0 && match.DataIndex < len(rows) {
-		m.selected = match.DataIndex
-		m.ensureQueueVisible()
-	}
-}
-
-// queueSearchMatch reports whether the row at idx is a search match, and
-// whether it's the match currently under the search cursor (n/N target).
-func (m QueueModel) queueSearchMatch(idx int) (matched, current bool) {
-	pos, ok := m.search.MatchPosByDataIndex(idx)
-	if !ok {
-		return false, false
-	}
-	return true, pos == m.search.Cursor()
-}
-
 func (m *QueueModel) moveSelection(delta int) {
 	rows := m.rows()
 	if len(rows) == 0 {
@@ -768,158 +685,6 @@ func (m *QueueModel) clampScrollOffset() {
 	m.scrollOffset = ui.ClampScrollOffset(m.scrollOffset, total, viewportH)
 }
 
-// checkedPaths lists every currently checked ticket path, for the "C" clear
-// keymap's confirmation prompt and its accepted clear-all.
-func (m QueueModel) checkedPaths() []string {
-	paths := make([]string, 0, len(m.checked))
-	for path := range m.checked {
-		paths = append(paths, path)
-	}
-	return paths
-}
-
-// doneCheckedPaths lists every checked ticket path whose status renders as
-// done, for the "c" clear-complete keymap — a ticket counts as done either
-// through its file's own Status: frontmatter or the queue's durable
-// queueStatusDone (mirroring checkedProgress's same OR, so a just-finished
-// run counts before the ticket file's frontmatter catches up).
-func (m QueueModel) doneCheckedPaths() []string {
-	var paths []string
-	for _, epic := range m.epics {
-		for _, t := range epic.Tickets {
-			if !m.checked[t.Path] {
-				continue
-			}
-			if epic.RenderedStatus(t) == tickets.StatusDone || m.queueStatus[t.Path] == queueStatusDone {
-				paths = append(paths, t.Path)
-			}
-		}
-	}
-	return paths
-}
-
-// queueClearConfirmedMsg carries the "C"/"c" clear keymaps' confirmation
-// acceptance: paths is the set captured when the modal opened (mirroring
-// checkAddConfirmedMsg's same capture-at-open-time approach in checked.go).
-type queueClearConfirmedMsg struct {
-	paths []string
-}
-
-func cmdConfirmQueueClear(paths []string) tea.Cmd {
-	return func() tea.Msg {
-		return queueClearConfirmedMsg{paths: paths}
-	}
-}
-
-// handleQueueClearConfirmed applies queueClearConfirmedMsg: every path is
-// unchecked, causing any epic left with no checked tickets to drop out of
-// rowsAndPlanErrors' output with no further bookkeeping (see its doc
-// comment).
-func (m QueueModel) handleQueueClearConfirmed(msg queueClearConfirmedMsg) (tea.Model, tea.Cmd) {
-	if err := m.clearCheckedPaths(msg.paths); err != nil {
-		return m, notify.Error("save queue: " + err.Error())
-	}
-	m.clampSelected()
-	return m, nil
-}
-
-func (m *QueueModel) clearCheckedPaths(paths []string) error {
-	if len(paths) == 0 {
-		return nil
-	}
-	// Also drop each path from m.candidates: rowsAndPlanErrors only ever grows
-	// candidates from m.checked (so a row a user unchecked via the Tickets tab
-	// stays visible for re-toggling), which would otherwise leave a cleared
-	// ticket's row (and its epic, if it was the last one) rendered forever.
-	for _, path := range paths {
-		delete(m.candidates, path)
-	}
-	if m.queueStore != nil {
-		if err := m.queueStore.SetChecked(paths, false); err != nil {
-			return err
-		}
-		snapshot := m.queueStore.Snapshot()
-		m.checked = snapshot.Checked
-		m.checkOrder = snapshot.Order
-		m.queueStatus = snapshot.Status
-		return nil
-	}
-	for _, path := range paths {
-		markUnchecked(m.checked, m.checkOrder, path)
-	}
-	return nil
-}
-
-type queueRow struct {
-	epic   tickets.Epic
-	ticket tickets.Ticket
-}
-
-func (m QueueModel) rows() []queueRow {
-	rows, _ := m.rowsAndPlanErrors()
-	return rows
-}
-
-// rowsAndPlanErrors lists every candidate ticket per epic in plan order —
-// ticket-number order (sortedTicketIndexes), which follows each ticket's
-// blocked_by chain, so the topmost open ticket in an epic is always the next
-// one ralph-loop would actually claim — rather than batching them into
-// synchronized "parallel"/"then" waves (ticket 25: that grouping read as a
-// hard concurrency contract the runner didn't actually enforce). A plan
-// validation still runs per epic via the same canonical planner
-// (ralphloop.PlanWaves over a ralphloop.RunScope) the runner itself claims
-// tickets from, so a dependency cycle or a blocker outside the selection that
-// will never resolve is still caught — surfaced by name in planErrs for
-// queueLines to render as an actionable error instead of a misleading plan.
-func (m QueueModel) rowsAndPlanErrors() ([]queueRow, map[string]error) {
-	candidates := m.candidates
-	if candidates == nil {
-		// Before queueEpicsLoadedMsg arrives, m.candidates hasn't been
-		// initialized yet, but bubbletea can still call View (and thus this)
-		// on the initial render. Fall back to a scratch map rather than
-		// writing into the nil m.candidates.
-		candidates = make(map[string]bool, len(m.checked))
-	}
-	for path := range m.checked {
-		candidates[path] = true
-	}
-	var out []queueRow
-	planErrs := make(map[string]error)
-	for _, epic := range m.epics {
-		if _, err := epicWaves(epic, candidates, m.settings.MaxConcurrentTicketsPerEpic()); err != nil {
-			planErrs[epic.Name] = err
-		}
-		for _, idx := range sortedTicketIndexes(epic) {
-			t := epic.Tickets[idx]
-			if candidates[t.Path] {
-				out = append(out, queueRow{epic: epic, ticket: t})
-			}
-		}
-	}
-	return out, planErrs
-}
-
-// epicWaves resolves candidates (the checked-ticket paths within epic) into a
-// ralphloop.RunScope and hands off to ralphloop.PlanWaves, the same planner
-// Run uses to claim tickets — see rowsAndPlanErrors.
-func epicWaves(epic tickets.Epic, candidates map[string]bool, maxParallel int) ([][]tickets.Ticket, error) {
-	var ids []string
-	for _, idx := range sortedTicketIndexes(epic) {
-		t := epic.Tickets[idx]
-		if candidates[t.Path] {
-			ids = append(ids, t.DisplayNumber())
-		}
-	}
-	if len(ids) == 0 {
-		return nil, nil
-	}
-	scope, err := ralphloop.ResolveRunScope(epic, ids)
-	if err != nil {
-		return nil, err
-	}
-	return ralphloop.PlanWaves(epic, scope, maxParallel)
-}
-
 func (m QueueModel) View() tea.View {
 	if m.queueStore != nil {
 		snapshot := m.queueStore.Snapshot()
@@ -971,14 +736,6 @@ func (m QueueModel) View() tea.View {
 		content = ui.OverlayBottomCenter(content, overlay, m.width, y)
 	}
 	return ui.NewMainView(content)
-}
-
-func (m QueueModel) searchOverlayWidth() int {
-	max := m.width * 80 / 100
-	if search.DESIRED_WIDTH < max {
-		return search.DESIRED_WIDTH
-	}
-	return max
 }
 
 // queueVisibleLines windows queueLines() to a single viewportH-line scroll
@@ -1133,82 +890,6 @@ func (m QueueModel) buildQueueLines() (lines []string, offsets []int, heights []
 		heights = append(heights, len(rowLines))
 	}
 	return lines, offsets, heights
-}
-
-// epicHeaderLines renders the Queue tab's per-epic header as two lines: a
-// status line (an icon + status text, colored per epicStatusLine) and a
-// context-window line (avg/max token usage plus a compact count across the
-// epic's tickets). Both lines carry the same 2-char indent as the list rows
-// beneath them (ticket 03) rather than the header widening to the list's old
-// 4-char indent.
-func (m QueueModel) epicHeaderLines(epic tickets.Epic) []string {
-	icon, text, style := epicStatusLine(m.icons(), epic)
-	statusLine := "  " + epicHeaderStyle.Render(epic.Name) + " " + style.Render(icon+" "+text)
-
-	avg, maximum, compacts := epicContextMetrics(epic)
-	contextLine := "  " + metricsLineStyle.Render(fmt.Sprintf(
-		"Context window: avg %s, max %s (%d compacts)",
-		formatTokenCount(avg), formatTokenCount(maximum), compacts,
-	))
-	return []string{statusLine, contextLine}
-}
-
-// epicStatusLine picks an epic header's status-line icon, text, and color:
-// green "took <elapsed>" once every ticket is done, yellow flagging any
-// needs-info/needs-attention/error-classed ticket, or the default/no-color
-// treatment otherwise.
-func epicStatusLine(icons ui.IconSet, epic tickets.Epic) (icon, text string, style lipgloss.Style) {
-	switch {
-	case epic.AllDone():
-		return icons.TicketDone, "took " + formatElapsed(epicElapsedSeconds(epic)), epicStatusDoneStyle
-	case epicHasProblem(epic):
-		return icons.Warning, fmt.Sprintf("%d of %d done", epic.DoneCount(), epic.TotalCount()), epicStatusProblemStyle
-	default:
-		return icons.Dot, fmt.Sprintf("%d of %d done", epic.DoneCount(), epic.TotalCount()), lipgloss.NewStyle()
-	}
-}
-
-// epicElapsedSeconds sums the epic's tickets' landed ElapsedTime, for the
-// header status line's "took <elapsed>" once the epic is fully done.
-func epicElapsedSeconds(epic tickets.Epic) int {
-	total := 0
-	for _, t := range epic.Tickets {
-		total += t.ElapsedTime
-	}
-	return total
-}
-
-// epicHasProblem reports whether any of the epic's tickets renders as
-// needs-info/needs-attention/error — the header status line's yellow trigger.
-func epicHasProblem(epic tickets.Epic) bool {
-	for _, t := range epic.Tickets {
-		switch epic.RenderedStatus(t) {
-		case tickets.StatusNeedsInfo, tickets.StatusNeedsAttention, tickets.StatusError:
-			return true
-		}
-	}
-	return false
-}
-
-// epicContextMetrics computes the header's context-window line figures:
-// avg/max landed context window across tickets that have landed one, plus
-// the epic's total compaction count.
-func epicContextMetrics(epic tickets.Epic) (avg, maximum, compacts int) {
-	total := 0
-	count := 0
-	for _, t := range epic.Tickets {
-		compacts += t.Compactions
-		if t.ActualContextWindow == 0 {
-			continue
-		}
-		total += t.ActualContextWindow
-		maximum = max(maximum, t.ActualContextWindow)
-		count++
-	}
-	if count > 0 {
-		avg = total / count
-	}
-	return avg, maximum, compacts
 }
 
 // renderQueueTicketRow renders one physical line for a ticket that isn't
