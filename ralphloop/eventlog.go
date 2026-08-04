@@ -21,6 +21,7 @@ const (
 	eventPausedRateLimit         = "paused-rate-limit"
 	eventResumed                 = "resumed"
 	eventNeedsInfo               = "needs-info"
+	eventCommitless              = "commitless"
 	eventNeedsAttention          = "needs-attention"
 	eventDepsInstalled           = "deps-installed"
 )

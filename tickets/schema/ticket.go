@@ -108,6 +108,14 @@ type Ticket struct {
 	ActualContextWindow   int
 	ElapsedTime           int
 	Compactions           int
+	// Commitless declares that a zero-commit iteration finish is intentional
+	// for this ticket (e.g. the agent decided no code change was warranted)
+	// rather than a stalled/crashed agent. ralph-loop's finishIteration
+	// checks it before marking a zero-commit ticket needs-info, and startup
+	// reconciliation's classifyDoneTicket skips its landed-commit
+	// verification for a done ticket with this set, the same way it already
+	// does for StatusSuperseded.
+	Commitless bool
 }
 
 // Validate checks a populated Ticket for well-formedness: a valid id, a

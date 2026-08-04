@@ -105,6 +105,27 @@ func TestParseTicket_RoundTrip_SplitFrom(t *testing.T) {
 	}
 }
 
+func TestParseTicket_CommitlessRoundTrip(t *testing.T) {
+	content := "---\nid: \"04b\"\nstatus: done\ntype: task\ncommitless: true\n---\nbody\n"
+	path := writeTemp(t, "04b-commitless.md", content)
+
+	got, err := ParseTicket(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !got.Commitless {
+		t.Fatalf("ParseTicket() Commitless = false, want true")
+	}
+
+	marshaled, err := MarshalTicket(got, "body\n")
+	if err != nil {
+		t.Fatalf("MarshalTicket: %v", err)
+	}
+	if !strings.Contains(string(marshaled), "commitless: true") {
+		t.Errorf("marshaled ticket = %q, want commitless: true written back", string(marshaled))
+	}
+}
+
 func TestParseTicket_MalformedFrontmatterYAML(t *testing.T) {
 	content := `---
 id: "04b"

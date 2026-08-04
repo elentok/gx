@@ -352,6 +352,69 @@ func TestRun_LogsNeedsInfoEvent_OnZeroCommitIteration(t *testing.T) {
 	}
 }
 
+// TestRun_HonorsCommitlessFlag_SkipsNeedsInfo exercises the escape hatch from
+// the zero-commit path above: if the agent itself sets commitless: true
+// (alongside moving status off "claimed") before finishing, that's an
+// intentional zero-commit finish (e.g. exploration concluded no code change
+// was warranted), not a stalled agent — the ticket must not be forced back to
+// needs-info, and its worktree/tab get cleaned up like a normal completion.
+func TestRun_HonorsCommitlessFlag_SkipsNeedsInfo(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+	})
+	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
+
+	d, _, removedBranches := fakeDeps()
+	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
+		return 0, nil
+	}
+	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+		// Simulate the agent calling `gx tickets set --status done
+		// --commitless true` on itself before going idle with no commit.
+		if err := updateTicket(ticketPath, func(tk *schema.Ticket) {
+			tk.Status = schema.StatusDone
+			tk.Commitless = true
+		}); err != nil {
+			t.Fatalf("simulating agent self-report: %v", err)
+		}
+		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-" + opts.Pane}, nil
+	}
+
+	var out bytes.Buffer
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	events, ok, err := readEvents(scratchDir, "epic")
+	if err != nil || !ok {
+		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+	}
+	var commitless *Event
+	for i, ev := range events {
+		if ev.Type == eventCommitless && ev.Ticket == "01" {
+			commitless = &events[i]
+		}
+		if ev.Type == eventNeedsInfo {
+			t.Errorf("events = %+v, want no needs-info event for a declared-commitless iteration", events)
+		}
+	}
+	if commitless == nil {
+		t.Fatalf("events = %+v, want a commitless event for ticket 01", events)
+	}
+
+	raw, err := os.ReadFile(ticketPath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: done") {
+		t.Errorf("ticket file = %q, want status: done (agent-set status preserved)", raw)
+	}
+
+	if len(*removedBranches) == 0 {
+		t.Errorf("removedBranches = %v, want the iteration worktree cleaned up like a normal completion", *removedBranches)
+	}
+}
+
 func TestRun_InstallDepsFailure_MarksNeedsAttentionWithoutLaunchingAgentOrAbortingRun(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",

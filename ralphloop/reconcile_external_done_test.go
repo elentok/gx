@@ -97,6 +97,43 @@ func TestReconcile_DoneTicketWithNoProvenance_FlaggedNeedsAttentionNotSilently(t
 	}
 }
 
+// TestReconcile_CommitlessDoneTicket_NotFlaggedUnrecoverable is the
+// commitless counterpart to TestReconcile_DoneTicketWithNoProvenance_
+// FlaggedNeedsAttentionNotSilently above: a done ticket with commitless: true
+// has no landed commit by design, so classifyDoneTicket's verification must
+// be skipped for it entirely rather than flagging it needs-attention for
+// having no provenance.
+func TestReconcile_CommitlessDoneTicket_NotFlaggedUnrecoverable(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\ncommitless: true\n---\n# C\n",
+	})
+	epics, err := tickets.Load(scratchDir)
+	if err != nil {
+		t.Fatalf("tickets.Load: %v", err)
+	}
+
+	d, _, _ := fakeDeps()
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) { return nil, nil }
+	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
+	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
+
+	var out bytes.Buffer
+	if _, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(&out)), epics[0]); err != nil {
+		t.Fatalf("reconcile() error = %v", err)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "03-c.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if strings.Contains(string(raw), "status: needs-attention") {
+		t.Errorf("commitless done ticket was flagged needs-attention, want its no-commit verification skipped entirely:\n%s", raw)
+	}
+	if !strings.Contains(string(raw), "status: done") {
+		t.Errorf("commitless done ticket's status changed unexpectedly:\n%s", raw)
+	}
+}
+
 // TestClassifyDoneTicket_BackfilledCherryPickEvent_RecognizedAsLanded is the
 // recovery path for a ticket flagged needs-attention per the test above,
 // once a human/auditing agent has confirmed its commit really is on the

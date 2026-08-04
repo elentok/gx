@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // conflictResolutionTimeoutMs bounds how long a conflict-resolution agent may
@@ -20,7 +21,10 @@ const conflictResolutionTimeoutMs = 30 * 60 * 1000
 // cherry-pick its commits onto the feature branch, mark the ticket done, and
 // remove the iteration worktree. If the agent finishes without landing any
 // commits, the ticket is marked needs-info instead and the worktree/tab are
-// left in place for inspection.
+// left in place for inspection — unless the agent itself declared the
+// zero-commit finish intentional (ticket frontmatter's commitless field, set
+// via `gx tickets set --commitless true` alongside a non-claimed status), in
+// which case the worktree/tab are cleaned up normally with no commit landed.
 func runIteration(d Deps, p iterationParams) error {
 	label := iterLabel(p.Ticket.Identifier)
 	branch := iterBranch(p.FeatureBranch, p.Ticket.Identifier)
@@ -163,6 +167,23 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 		}
 	}
 	if ahead == 0 {
+		// Re-read the ticket's current frontmatter rather than trusting
+		// p.Ticket (populated once at claim time, before the agent ran): the
+		// agent may have called `gx tickets set --commitless true` on itself
+		// during this iteration to declare the zero-commit finish
+		// intentional. Only honored alongside a status the agent also moved
+		// off "claimed" — a commitless ticket still sitting at claimed can't
+		// be told apart from one that simply forgot, so it falls through to
+		// the needs-info path below like any other zero-commit finish.
+		current, err := schema.ParseTicket(p.Ticket.Path)
+		if err != nil {
+			return fmt.Errorf("reading ticket %s for commitless check: %w", p.Ticket.Path, err)
+		}
+		if current.Commitless && current.Status != schema.StatusClaimed {
+			p.logTicketEvent(eventCommitless, pane, tab, sessionID, path)
+			return finishCleanup(d, p.RepoDir, p.FeatureWorktree, path, branch, tab)
+		}
+
 		// The agent finished without landing any commits: leave the worktree/
 		// tab in place for inspection instead of silently marking done or
 		// retrying, and let the scheduler move on to other unblocked tickets.

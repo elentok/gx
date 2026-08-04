@@ -25,6 +25,7 @@ type ticketYAML struct {
 	ActualContextWindow   int      `yaml:"actual_context_window,omitempty"`
 	ElapsedTime           int      `yaml:"elapsed_time,omitempty"`
 	Compactions           int      `yaml:"compactions,omitempty"`
+	Commitless            bool     `yaml:"commitless,omitempty"`
 }
 
 func (w ticketYAML) toTicket() Ticket {
@@ -39,6 +40,7 @@ func (w ticketYAML) toTicket() Ticket {
 		ActualContextWindow:   w.ActualContextWindow,
 		ElapsedTime:           w.ElapsedTime,
 		Compactions:           w.Compactions,
+		Commitless:            w.Commitless,
 	}
 	if w.SplitFrom != "" {
 		id := TicketID(w.SplitFrom)
@@ -59,6 +61,7 @@ func ticketToYAML(t Ticket) ticketYAML {
 		ActualContextWindow:   t.ActualContextWindow,
 		ElapsedTime:           t.ElapsedTime,
 		Compactions:           t.Compactions,
+		Commitless:            t.Commitless,
 	}
 	if t.SplitFrom != nil {
 		w.SplitFrom = string(*t.SplitFrom)

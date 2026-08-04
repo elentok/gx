@@ -23,6 +23,10 @@ const ticketsSchemaText = `Settable fields:
   type (enum, --type): task, research, prototype, grilling
   code_review_fixes (string, --code-review-fixes): none, inline, or ticket:<id>
   expected_context_window (non-negative int, --expected-context-window)
+  commitless (bool, --commitless): true/false. Set true when you intentionally finish an
+    iteration with no commit (e.g. exploration concluded no code change was warranted) —
+    pair it with a status that doesn't leave the ticket claimed (done, superseded,
+    ready-for-human, needs-triage), or it's still treated as an unresolved iteration.
 
 Read-only fields (gx-managed, not settable via ` + "`set`" + `):
   id — ticket identity, fixed at creation
@@ -39,6 +43,7 @@ func newTicketsSetCmd() *cobra.Command {
 		ticketType            string
 		codeReviewFixes       string
 		expectedContextWindow string
+		commitless            string
 	)
 
 	cmd := &cobra.Command{
@@ -57,6 +62,7 @@ func newTicketsSetCmd() *cobra.Command {
 	cmd.Flags().StringVar(&ticketType, "type", "", "set the type field")
 	cmd.Flags().StringVar(&codeReviewFixes, "code-review-fixes", "", "set code_review_fixes")
 	cmd.Flags().StringVar(&expectedContextWindow, "expected-context-window", "", "set expected_context_window")
+	cmd.Flags().StringVar(&commitless, "commitless", "", "set commitless (true/false)")
 
 	return cmd
 }
@@ -88,6 +94,10 @@ var ticketSetFields = []ticketSetField{
 	{"expected-context-window", "expected_context_window", func(t *schema.Ticket, v string) {
 		n, _ := strconv.Atoi(v)
 		t.ExpectedContextWindow = n
+	}},
+	{"commitless", "commitless", func(t *schema.Ticket, v string) {
+		b, _ := strconv.ParseBool(v)
+		t.Commitless = b
 	}},
 }
 

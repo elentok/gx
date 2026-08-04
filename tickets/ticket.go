@@ -44,6 +44,10 @@ type Ticket struct {
 	ActualContextWindow int
 	ElapsedTime         int
 
+	// Commitless mirrors schema.Ticket.Commitless: true means a zero-commit
+	// iteration finish is intentional for this ticket, not a stalled agent.
+	Commitless bool
+
 	// ReadErr is set when the loader found the file (its name matched
 	// "NN-<slug>.md") but couldn't read its contents (I/O error). Non-empty
 	// means Type/BlockedBy/Status/Body are all zero-valued - there was no

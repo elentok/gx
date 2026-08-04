@@ -15,6 +15,14 @@ func validTicket() Ticket {
 	}
 }
 
+func TestValidate_CommitlessIsValidRegardlessOfValue(t *testing.T) {
+	tk := validTicket()
+	tk.Commitless = true
+	if err := Validate(tk); err != nil {
+		t.Fatalf("unexpected error for commitless=true: %v", err)
+	}
+}
+
 func TestTicketID_Valid(t *testing.T) {
 	tests := []struct {
 		id   TicketID
