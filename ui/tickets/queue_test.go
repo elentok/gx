@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -107,6 +108,7 @@ func TestQueueModelBannerWhileRunningAggregatesCheckedEpics(t *testing.T) {
 	m.executionStartedAt = now.Add(-time.Hour - 3*time.Minute)
 	m.now = func() time.Time { return now }
 	m.runningEpics = map[string]bool{"alpha": true, "beta": true}
+	m.executionTickets = map[string]bool{"alpha/01": true, "alpha/02": true, "beta/01": true}
 	m.liveContextTokens = map[string]int{"alpha/02": 7000, "beta/01": 5000}
 
 	content := m.View().Content
@@ -504,6 +506,231 @@ func loadQueueModel(t *testing.T, m QueueModel) QueueModel {
 	m = updated.(QueueModel)
 	updated, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	return updated.(QueueModel)
+}
+
+func TestQueueModelPersistsRunningThenDoneStatusThroughStore(t *testing.T) {
+	root := testutil.TempRepo(t)
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	path := ticketPath(root, "alpha", "01-first.md")
+
+	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
+	if err := store.Check(path); err != nil {
+		t.Fatal(err)
+	}
+
+	previousRun := runRalphLoop
+	previousRegistry := ralphLoopRegistry
+	started := make(chan ralphloop.EventSink, 1)
+	release := make(chan struct{})
+	runRalphLoop = func(_ ralphloop.RunOptions, _ ralphloop.Deps, sink ralphloop.EventSink) error {
+		started <- sink
+		<-release
+		return nil
+	}
+	ralphLoopRegistry = newLoopRegistry(1)
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+		deadline := time.Now().Add(time.Second)
+		for ralphLoopRegistry.isRunning() && time.Now().Before(deadline) {
+			time.Sleep(time.Millisecond)
+		}
+		runRalphLoop = previousRun
+		ralphLoopRegistry = previousRegistry
+	})
+
+	m := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, store))
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(QueueModel)
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	m = updated.(QueueModel)
+	m = deliverQueueCommands(t, m, cmd)
+
+	sink := <-started
+	if got := store.Snapshot().Status[path]; got != queueStatusRunning {
+		t.Fatalf("status after start = %v, want running", got)
+	}
+
+	ticket := m.epics[0].Tickets[0]
+	sink.IterationStarted(ticket.Identifier, "iter-01", "", "")
+	sink.IterationFinished(ticket, "alpha")
+	close(release)
+	waitForEpicToFinish(t, "alpha")
+
+	updated, cmd = m.Update(implementPollMsg{epicName: "alpha"})
+	m = deliverQueueCommands(t, updated.(QueueModel), cmd)
+
+	if got := store.Snapshot().Status[path]; got != queueStatusDone {
+		t.Fatalf("status after completion = %v, want done", got)
+	}
+}
+
+func TestQueueModelPersistsErroredStatusOnFailure(t *testing.T) {
+	root := testutil.TempRepo(t)
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	path := ticketPath(root, "alpha", "01-first.md")
+
+	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
+	if err := store.Check(path); err != nil {
+		t.Fatal(err)
+	}
+
+	previousRun := runRalphLoop
+	previousRegistry := ralphLoopRegistry
+	release := make(chan struct{})
+	runRalphLoop = func(_ ralphloop.RunOptions, _ ralphloop.Deps, _ ralphloop.EventSink) error {
+		<-release
+		return errors.New("boom")
+	}
+	ralphLoopRegistry = newLoopRegistry(1)
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+		deadline := time.Now().Add(time.Second)
+		for ralphLoopRegistry.isRunning() && time.Now().Before(deadline) {
+			time.Sleep(time.Millisecond)
+		}
+		runRalphLoop = previousRun
+		ralphLoopRegistry = previousRegistry
+	})
+
+	m := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, store))
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(QueueModel)
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	m = updated.(QueueModel)
+	m = deliverQueueCommands(t, m, cmd)
+
+	if got := store.Snapshot().Status[path]; got != queueStatusRunning {
+		t.Fatalf("status after start = %v, want running", got)
+	}
+
+	close(release)
+	waitForEpicToFinish(t, "alpha")
+
+	updated, cmd = m.Update(implementPollMsg{epicName: "alpha"})
+	m = deliverQueueCommands(t, updated.(QueueModel), cmd)
+
+	if got := store.Snapshot().Status[path]; got != queueStatusErrored {
+		t.Fatalf("status after failure = %v, want errored", got)
+	}
+}
+
+func TestQueueModelPauseDoesNotRewriteRunningStatus(t *testing.T) {
+	root := testutil.TempRepo(t)
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	path := ticketPath(root, "alpha", "01-first.md")
+
+	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
+	if err := store.Check(path); err != nil {
+		t.Fatal(err)
+	}
+
+	previousRun := runRalphLoop
+	previousRegistry := ralphLoopRegistry
+	release := make(chan struct{})
+	runRalphLoop = func(_ ralphloop.RunOptions, _ ralphloop.Deps, _ ralphloop.EventSink) error {
+		<-release
+		return nil
+	}
+	ralphLoopRegistry = newLoopRegistry(1)
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+		deadline := time.Now().Add(time.Second)
+		for ralphLoopRegistry.isRunning() && time.Now().Before(deadline) {
+			time.Sleep(time.Millisecond)
+		}
+		runRalphLoop = previousRun
+		ralphLoopRegistry = previousRegistry
+	})
+
+	m := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, store))
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(QueueModel)
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	m = updated.(QueueModel)
+	m = deliverQueueCommands(t, m, cmd)
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'p', Text: "p"})
+	m = updated.(QueueModel)
+	if !strings.Contains(m.View().Content, "Queue paused") {
+		t.Fatalf("expected paused banner:\n%s", m.View().Content)
+	}
+	if got := store.Snapshot().Status[path]; got != queueStatusRunning {
+		t.Fatalf("status while paused = %v, want running (unchanged)", got)
+	}
+
+	close(release)
+}
+
+func TestQueueModelMidRunSelectionChangeDoesNotRewriteProgressTotals(t *testing.T) {
+	root := testutil.TempRepo(t)
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "beta", "01-later.md", "Status: open\n\nBody.\n")
+	alpha1 := ticketPath(root, "alpha", "01-first.md")
+	alpha2 := ticketPath(root, "alpha", "02-second.md")
+
+	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
+	if err := store.SetChecked([]string{alpha1, alpha2}, true); err != nil {
+		t.Fatal(err)
+	}
+
+	previousRun := runRalphLoop
+	previousRegistry := ralphLoopRegistry
+	release := make(chan struct{})
+	runRalphLoop = func(_ ralphloop.RunOptions, _ ralphloop.Deps, _ ralphloop.EventSink) error {
+		<-release
+		return nil
+	}
+	ralphLoopRegistry = newLoopRegistry(1)
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+		deadline := time.Now().Add(time.Second)
+		for ralphLoopRegistry.isRunning() && time.Now().Before(deadline) {
+			time.Sleep(time.Millisecond)
+		}
+		runRalphLoop = previousRun
+		ralphLoopRegistry = previousRegistry
+	})
+
+	m := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, store))
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(QueueModel)
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	m = updated.(QueueModel)
+	m = deliverQueueCommands(t, m, cmd)
+
+	if done, total := m.checkedProgress(); total != 2 {
+		t.Fatalf("progress before selection change = %d/%d, want total 2", done, total)
+	}
+
+	beta1 := ticketPath(root, "beta", "01-later.md")
+	if err := store.Check(beta1); err != nil {
+		t.Fatal(err)
+	}
+	updated, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(QueueModel)
+
+	if done, total := m.checkedProgress(); total != 2 {
+		t.Fatalf("progress after adding a future selection = %d/%d, want total still 2", done, total)
+	}
+
+	close(release)
 }
 
 func ticketPath(root, epic, name string) string {

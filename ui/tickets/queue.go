@@ -25,15 +25,26 @@ const queueBanner = "This is the execution plan, press Enter to start"
 type QueueModel struct {
 	executionStartedAt   time.Time
 	executionCompletedAt time.Time
-	executionTickets     map[string]bool
-	liveContextTokens    map[string]int
-	completedTickets     map[string]bool
-	now                  func() time.Time
-	worktreeRoot         string
-	settings             ui.Settings
-	checked              map[string]bool
-	checkOrder           map[string]uint64
-	queueStore           *QueueStore
+	// executionTickets is this run's captured ticket scope (epicName/identifier
+	// keys), fixed at kickoff so progress totals don't shift if the checked
+	// selection is edited while the run is active (ticket 20).
+	executionTickets  map[string]bool
+	liveContextTokens map[string]int
+	// runTicketIDs is each running epic's captured ticket-ID subset, fixed at
+	// kickoff alongside executionTickets — the lifecycle-status transitions
+	// (running/done/errored) below are driven from this rather than
+	// re-deriving from the live checked set.
+	runTicketIDs map[string][]string
+	now          func() time.Time
+	worktreeRoot string
+	settings     ui.Settings
+	checked      map[string]bool
+	checkOrder   map[string]uint64
+	// queueStatus mirrors m.checked's keys with each ticket's durable
+	// lifecycle status (queue_state.go), read from queueStore so rendering
+	// doesn't duplicate completion into its own bookkeeping (ticket 20).
+	queueStatus map[string]queueItemStatus
+	queueStore  *QueueStore
 
 	width, height int
 	ready         bool
@@ -62,12 +73,13 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 	return QueueModel{
 		executionTickets:   map[string]bool{},
 		liveContextTokens:  map[string]int{},
-		completedTickets:   map[string]bool{},
+		runTicketIDs:       map[string][]string{},
 		now:                time.Now,
 		worktreeRoot:       worktreeRoot,
 		settings:           settings,
 		checked:            checked,
 		checkOrder:         checkOrder,
+		queueStatus:        map[string]queueItemStatus{},
 		implementAgentMenu: newImplementAgentMenu(),
 		runningEpics:       map[string]bool{},
 		paused:             ralphLoopRegistry.isPaused(),
@@ -78,6 +90,7 @@ func NewQueueModelWithStore(worktreeRoot string, settings ui.Settings, store *Qu
 	snapshot := store.Snapshot()
 	m := NewQueueModel(worktreeRoot, settings, snapshot.Checked, snapshot.Order)
 	m.queueStore = store
+	m.queueStatus = snapshot.Status
 	return m
 }
 
@@ -103,6 +116,7 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		snapshot := m.queueStore.Snapshot()
 		m.checked = snapshot.Checked
 		m.checkOrder = snapshot.Order
+		m.queueStatus = snapshot.Status
 	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -124,6 +138,7 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.executionStartedAt = m.now()
 		}
 		m.runningEpics[msg.epicName] = true
+		m.markEpicTicketsRunning(msg.epicName)
 		m.syncRunSnapshot(msg.epicName)
 		return m, cmdPollImplement(msg.epicName)
 	case implementPollMsg:
@@ -131,6 +146,7 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if ralphLoopRegistry.isRunningEpic(msg.epicName) {
 			return m, cmdPollImplement(msg.epicName)
 		}
+		m.finalizeEpicTicketStatus(msg.epicName)
 		delete(m.runningEpics, msg.epicName)
 		executionComplete := !m.executionStartedAt.IsZero() && len(m.runningEpics) == 0 && len(m.pendingEpics) == 0
 		startCmd := m.startAvailableEpics()
@@ -191,11 +207,13 @@ func (m QueueModel) handleQueueSync(msg queueSyncMsg) (tea.Model, tea.Cmd) {
 		wasRunning := m.runningEpics[name]
 		if snapshot.State == RunStateRunning {
 			m.runningEpics[name] = true
+			m.markEpicTicketsRunning(name)
 			cmds = append(cmds, cmdPollImplement(name))
 			continue
 		}
 		delete(m.runningEpics, name)
 		if wasRunning {
+			m.finalizeEpicTicketStatus(name)
 			cmds = append(cmds, implementFinishedNotifyCmd(name))
 		}
 	}
@@ -204,6 +222,7 @@ func (m QueueModel) handleQueueSync(msg queueSyncMsg) (tea.Model, tea.Cmd) {
 			if _, ok := byName[plan.epic.Name]; !ok {
 				continue
 			}
+			m.runTicketIDs[plan.epic.Name] = append([]string(nil), plan.ticketIDs...)
 			for _, ticketID := range plan.ticketIDs {
 				m.executionTickets[plan.epic.Name+"/"+ticketID] = true
 			}
@@ -226,7 +245,80 @@ func (m *QueueModel) syncRunSnapshot(epicName string) {
 		key := epicName + "/" + identifier
 		m.liveContextTokens[key] = ticket.ContextTokens
 		if ticket.Completed {
-			m.completedTickets[key] = true
+			if path, ok := m.ticketPathFor(epicName, identifier); ok {
+				m.setItemStatus(path, queueStatusDone)
+			}
+		}
+	}
+}
+
+// ticketPathFor resolves an epicName/identifier pair (the registry's
+// addressing scheme) to the ticket's file path (the queue store's key).
+func (m QueueModel) ticketPathFor(epicName, identifier string) (string, bool) {
+	for _, epic := range m.epics {
+		if epic.Name != epicName {
+			continue
+		}
+		for _, t := range epic.Tickets {
+			if t.Identifier == identifier {
+				return t.Path, true
+			}
+		}
+	}
+	return "", false
+}
+
+// setItemStatus records path's durable lifecycle status, through queueStore
+// when one is wired (persisting it) or into m.queueStatus directly otherwise
+// (mirroring Model.setQueueItemStatus's store/local fallback).
+func (m *QueueModel) setItemStatus(path string, status queueItemStatus) {
+	if path == "" {
+		return
+	}
+	if m.queueStore != nil {
+		if err := m.queueStore.SetStatus(path, status); err != nil {
+			return
+		}
+		m.queueStatus = m.queueStore.Snapshot().Status
+		return
+	}
+	if m.queueStatus == nil {
+		m.queueStatus = map[string]queueItemStatus{}
+	}
+	m.queueStatus[path] = status
+}
+
+// markEpicTicketsRunning transitions epicName's captured ticket subset
+// (m.runTicketIDs, fixed at kickoff) to running as its ralph-loop starts.
+func (m *QueueModel) markEpicTicketsRunning(epicName string) {
+	for _, identifier := range m.runTicketIDs[epicName] {
+		if path, ok := m.ticketPathFor(epicName, identifier); ok {
+			m.setItemStatus(path, queueStatusRunning)
+		}
+	}
+}
+
+// finalizeEpicTicketStatus settles epicName's captured ticket subset once its
+// run has stopped: a ticket the registry marked completed lands on done,
+// otherwise on errored if the run ended with an error (registry.finish keeps
+// the epic's final snapshot around, see loopRegistry.finish's doc comment) —
+// left untouched otherwise, e.g. a ticket the concurrency cap never started.
+func (m *QueueModel) finalizeEpicTicketStatus(epicName string) {
+	snapshot, ok := ralphLoopRegistry.runSnapshot(epicName)
+	for _, identifier := range m.runTicketIDs[epicName] {
+		path, pathOK := m.ticketPathFor(epicName, identifier)
+		if !pathOK {
+			continue
+		}
+		if !ok {
+			continue
+		}
+		if ticket, tok := snapshot.Tickets[identifier]; tok && ticket.Completed {
+			m.setItemStatus(path, queueStatusDone)
+			continue
+		}
+		if snapshot.FinalError != "" {
+			m.setItemStatus(path, queueStatusErrored)
 		}
 	}
 }
@@ -300,13 +392,14 @@ func (m QueueModel) startCheckedEpic(agent ralphloop.AgentKind) (tea.Model, tea.
 	m.executionStartedAt = time.Time{}
 	m.executionCompletedAt = time.Time{}
 	m.executionTickets = map[string]bool{}
+	m.runTicketIDs = map[string][]string{}
 	for _, plan := range m.pendingEpics {
+		m.runTicketIDs[plan.epic.Name] = append([]string(nil), plan.ticketIDs...)
 		for _, ticketID := range plan.ticketIDs {
 			m.executionTickets[plan.epic.Name+"/"+ticketID] = true
 		}
 	}
 	m.liveContextTokens = map[string]int{}
-	m.completedTickets = map[string]bool{}
 	m.runningAgent = agent
 	return m, m.startAvailableEpics()
 }
@@ -491,6 +584,7 @@ func (m QueueModel) View() tea.View {
 		snapshot := m.queueStore.Snapshot()
 		m.checked = snapshot.Checked
 		m.checkOrder = snapshot.Order
+		m.queueStatus = snapshot.Status
 	}
 	if !m.ready {
 		return ui.NewMainView("\n  Initializing…")
@@ -573,17 +667,20 @@ func (m QueueModel) completedExecutionProgress() (done, total int) {
 	return done, total
 }
 
+// checkedProgress reports the active run's done/total ticket counts, scoped
+// to m.executionTickets — the run's captured selection at kickoff — rather
+// than the live m.checked set, so editing the checked selection while a run
+// is active doesn't rewrite that run's progress totals (ticket 20).
 func (m QueueModel) checkedProgress() (int, int) {
 	done := 0
 	total := 0
 	for _, epic := range m.epics {
 		for _, ticket := range epic.Tickets {
-			if !m.checked[ticket.Path] {
+			if !m.executionTickets[epic.Name+"/"+ticket.Identifier] {
 				continue
 			}
 			total++
-			key := epic.Name + "/" + ticket.Identifier
-			if epic.RenderedStatus(ticket) == tickets.StatusDone || m.completedTickets[key] {
+			if epic.RenderedStatus(ticket) == tickets.StatusDone || m.queueStatus[ticket.Path] == queueStatusDone {
 				done++
 			}
 		}
