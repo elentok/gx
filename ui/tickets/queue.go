@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/confirm"
+	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
@@ -89,11 +90,10 @@ type QueueModel struct {
 	// not visibility) and independent of epicWaves' plan validation, which
 	// must keep considering hidden-but-still-queued tickets.
 	hideComplete bool
-	// queuePendingT tracks whether "t" was just pressed, awaiting the "c" that
-	// completes the tc chord above — queue.go doesn't otherwise use
-	// ui/keys.Manager, so this hand-rolled single-key lookahead avoids pulling
-	// in the full chord manager for one binding.
-	queuePendingT bool
+	// keys dispatches the "tc" chord above through ui/keys.Manager so a key
+	// typed right after an unconsumed "t" falls through to its own normal
+	// action instead of being swallowed (ticket 16).
+	keys keys.Manager
 }
 
 func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string]bool, orders ...map[string]uint64) QueueModel {
@@ -123,6 +123,7 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 		paused:             ralphLoopRegistry.isPaused(),
 		confirm:            confirm.New(),
 		search:             search.NewModel(),
+		keys:               newQueueKeysManager(),
 	}
 }
 
@@ -466,22 +467,35 @@ func (m *QueueModel) finalizeEpicTicketStatus(epicName string) {
 	}
 }
 
+// bindingQueueToggleHideDone is the Queue tab's "tc" chord (ticket 09),
+// dispatched through keys.Manager so a key typed right after an unconsumed
+// "t" falls through to its own normal action instead of being swallowed
+// (ticket 16).
+const bindingQueueToggleHideDone keys.BindingID = "toggle-hide-done"
+
+func newQueueKeysManager() keys.Manager {
+	return keys.New([]keys.Binding{
+		{ID: bindingQueueToggleHideDone, Seq: []string{"t", "c"}, Categories: []string{"Navigation"}, Title: "hide completed"},
+	})
+}
+
 func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.implementAgentMenuOpen {
 		return m.handleQueueAgentMenuKey(msg)
 	}
-	if m.queuePendingT {
-		m.queuePendingT = false
-		if msg.String() == "c" {
+	match, consumed := m.keys.Process(msg)
+	if consumed {
+		if match == nil {
+			return m, nil // chord in progress
+		}
+		switch match.ID {
+		case bindingQueueToggleHideDone:
 			m.hideComplete = !m.hideComplete
 			m.clampSelected()
 		}
 		return m, nil
 	}
 	switch msg.String() {
-	case "t":
-		m.queuePendingT = true
-		return m, nil
 	case "q", "esc":
 		return m, nav.Back()
 	case "j", "down":

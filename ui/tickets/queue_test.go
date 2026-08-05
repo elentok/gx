@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/search"
 )
 
@@ -350,19 +351,38 @@ func TestQueueModelTChordDoesNotCollideWithClearKeymaps(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-done.md", "Status: open\n\nBody.\n")
 	writeRawQueueTicket(t, root, "alpha", "01-done.md", "---\nid: \"01\"\nstatus: done\ntype: task\n---\n\nBody.\n")
+	writeTicket(t, root, "alpha", "02-open.md", "Status: open\n\nBody.\n")
 	done := ticketPath(root, "alpha", "01-done.md")
-	checked := map[string]bool{done: true}
+	open := ticketPath(root, "alpha", "02-open.md")
+	checked := map[string]bool{done: true, open: true}
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
 
+	if m.selected != 0 {
+		t.Fatalf("expected initial selection at row 0, got %d", m.selected)
+	}
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updated.(QueueModel)
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(QueueModel)
+	if m.selected != 1 {
+		t.Fatalf("expected \"t\",\"j\" to still move the selection down, got %d", m.selected)
+	}
+	if m.hideComplete {
+		t.Fatal("expected \"t\" followed by an unrelated key not to toggle hideComplete")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+	m = updated.(QueueModel)
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
 	m = updated.(QueueModel)
 	if m.hideComplete {
 		t.Fatal("expected \"t\" followed by an unrelated key not to toggle hideComplete")
 	}
 	if m.confirm.IsOpen {
 		t.Fatal("expected \"t\",\"q\" not to open any confirmation")
+	}
+	if cmd == nil || !nav.IsBack(cmd()) {
+		t.Fatal("expected \"t\",\"q\" to still trigger \"q\"'s own nav.Back() action")
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
