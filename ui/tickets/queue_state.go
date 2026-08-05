@@ -59,7 +59,7 @@ func queueStateFilePath() (string, error) {
 // queueing flow onto it without another storage-layer change.
 type persistedQueueState struct {
 	Items      map[string]queueItemStatus `json:"items"`
-	CheckOrder map[string]uint64          `json:"check_order,omitempty"`
+	CheckOrder map[string]uint64          `json:"check_order"`
 
 	Checked          map[string]bool   `json:"checked"`
 	TicketCheckOrder map[string]uint64 `json:"ticket_check_order,omitempty"`

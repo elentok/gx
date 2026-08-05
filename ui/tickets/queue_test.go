@@ -991,13 +991,20 @@ func TestQueueModelRestoresAllStatusesAsInitialTab(t *testing.T) {
 func TestTicketsAndQueueMatchAfterRestartRegardlessOfNavigationOrder(t *testing.T) {
 	root := testutil.TempRepo(t)
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	path := ticketPath(root, "alpha", "01-first.md")
+	queuedPath := ticketPath(root, "alpha", "01-first.md")
 
 	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
-	if err := store.Check(path); err != nil {
+	if err := store.Check(queuedPath); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.SetStatus(path, queueStatusDone); err != nil {
+	if err := store.SetStatus(queuedPath, queueStatusDone); err != nil {
+		t.Fatal(err)
+	}
+	// checkedPath exercises the independent Tickets-tab checked set (ticket
+	// 15's decoupling): it's checked without being queued, so it must not
+	// show up in queueFirst.checked (queue membership) at all.
+	checkedPath := ticketPath(root, "alpha", "01-first.md") + "-checked-only"
+	if err := store.SetTicketChecked([]string{checkedPath}, true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1005,11 +1012,18 @@ func TestTicketsAndQueueMatchAfterRestartRegardlessOfNavigationOrder(t *testing.
 	ticketsModel := NewModelWithScopeAndStore(root, ui.Settings{}, keys.New(nil), false, store)
 	ticketsModel = deliverLoad(t, ticketsModel)
 
-	if queueFirst.checked[path] != ticketsModel.isChecked(path) {
-		t.Fatalf("checked mismatch: queue=%v tickets=%v", queueFirst.checked[path], ticketsModel.isChecked(path))
+	_, ticketsQueued := ticketsModel.queueStatus[queuedPath]
+	if queueFirst.checked[queuedPath] != ticketsQueued {
+		t.Fatalf("queued mismatch: queue=%v tickets=%v", queueFirst.checked[queuedPath], ticketsQueued)
 	}
-	if queueFirst.queueStatus[path] != ticketsModel.queueStatus[path] {
-		t.Fatalf("status mismatch: queue=%v tickets=%v", queueFirst.queueStatus[path], ticketsModel.queueStatus[path])
+	if queueFirst.queueStatus[queuedPath] != ticketsModel.queueStatus[queuedPath] {
+		t.Fatalf("status mismatch: queue=%v tickets=%v", queueFirst.queueStatus[queuedPath], ticketsModel.queueStatus[queuedPath])
+	}
+	if queueFirst.checked[checkedPath] {
+		t.Fatalf("checked-only ticket must not appear as queued: %#v", queueFirst.checked)
+	}
+	if !ticketsModel.isChecked(checkedPath) {
+		t.Fatalf("expected checked-only ticket to be checked on the Tickets tab")
 	}
 }
 

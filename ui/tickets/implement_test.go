@@ -65,6 +65,19 @@ func TestModel_ImplementKeyWithNoActiveLoopReplacesPendingSelection(t *testing.T
 	if got := status[newSelection]; got != queueStatusPending {
 		t.Fatalf("new selection entry status = %v, want pending", got)
 	}
+
+	if len(m.checked) != 0 {
+		t.Fatalf("checked set = %v, want empty after queueing (ticket 15)", m.checked)
+	}
+	snapshot := store.Snapshot()
+	if len(snapshot.TicketChecked) != 0 {
+		t.Fatalf("store TicketChecked = %v, want empty after queueing", snapshot.TicketChecked)
+	}
+	for _, p := range []string{running, done, newSelection} {
+		if _, ok := snapshot.Status[p]; !ok {
+			t.Fatalf("queue status missing %q after checked-set clear", p)
+		}
+	}
 }
 
 // TestModel_ImplementKeyLeavesOtherWorktreeEntriesUntouched covers

@@ -66,19 +66,20 @@ type Model struct {
 	// rendering. Epic done/total header counts read epic.Tickets directly
 	// (renderEpicRow), so they're unaffected by this filter.
 	hideDone bool
-	// checked is the execution queue's seed selection (ticket 04): tickets the
-	// user has marked for a future run, keyed by Ticket.Path so it survives a
-	// reload's re-sorting/index-shuffling. Later tickets (06, 07, 09, 11) read
-	// this set; this one only has to keep it correct and visible.
+	// checked is the Tickets tab's own selection (ticket 04), independent of
+	// queue membership since ticket 15's decoupling (ticket 13's design):
+	// tickets the user has marked with "space", keyed by Ticket.Path so it
+	// survives a reload's re-sorting/index-shuffling. Pressing "i"
+	// (handleImplementKey) pushes this set into the queue and clears it.
 	checked map[string]bool
-	// checkOrder records when each path joined checked. The map is shared by
-	// cached Tickets and Queue models just like checked.
+	// checkOrder records when each path joined checked.
 	checkOrder map[string]uint64
-	// queueStatus mirrors checked's keys with each ticket's queue-run status
-	// (ticket 11): pending as soon as it's checked, then running/done/errored
-	// as execution wiring (tickets 08/09/12) progresses it. Persisted to disk
-	// alongside checked (see queue_state.go) so a restart restores both the
-	// selection and its last-known progress instead of starting empty.
+	// queueStatus is each queued ticket's queue-run status (ticket 11):
+	// pending as soon as it's queued, then running/done/errored as execution
+	// wiring (tickets 08/09/12) progresses it. Persisted to disk (see
+	// queue_state.go) so a restart restores both queue membership and its
+	// last-known progress instead of starting empty. Independent of checked
+	// since ticket 15 — a ticket can be queued without being checked.
 	queueStatus map[string]queueItemStatus
 	queueStore  *QueueStore
 	// scrollOffset is the sidebar's line-based scroll position (sidebarLines()

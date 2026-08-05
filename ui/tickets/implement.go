@@ -482,7 +482,10 @@ func (m Model) handleImplementKey() (tea.Model, tea.Cmd) {
 // (not-yet-started) queue entry is dropped and replaced by the current
 // checked selection. Running/done/errored entries — and anything outside
 // scope, which this tab can't see to safely decide about — are left exactly
-// as they are, whether or not they're still checked.
+// as they are, whether or not they're still checked. Ticket 15's
+// EnqueueAndClearChecked also clears every just-queued path from the
+// Tickets tab's independent checked set in the same atomic write, so the
+// checkboxes visually reset the moment their tickets are queued.
 func (m *Model) replaceQueuedSelection() error {
 	snapshot := m.queueStore.Snapshot()
 	next := make(map[string]queueItemStatus, len(snapshot.Status))
@@ -494,14 +497,16 @@ func (m *Model) replaceQueuedSelection() error {
 		next[path] = status
 		order[path] = snapshot.Order[path]
 	}
+	clearedPaths := make([]string, 0, len(m.checked))
 	for path := range m.checked {
+		clearedPaths = append(clearedPaths, path)
 		if _, exists := next[path]; exists {
 			continue
 		}
 		next[path] = queueStatusPending
 		order[path] = m.checkOrder[path]
 	}
-	if err := m.queueStore.Replace(next, order); err != nil {
+	if err := m.queueStore.EnqueueAndClearChecked(next, order, clearedPaths); err != nil {
 		return err
 	}
 	m.refreshQueueSnapshot()

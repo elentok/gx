@@ -22,13 +22,15 @@ type checkAddConfirmedMsg struct {
 	blockerPaths []string
 }
 
-// isChecked reports whether the ticket at path is in the checked set.
+// isChecked reports whether the ticket at path is in the Tickets tab's
+// independent checked set (ticket 13's decoupled design) — separate from
+// queue membership.
 func (m Model) isChecked(path string) bool {
-	return m.queueStore.IsChecked(path)
+	return m.queueStore.IsTicketChecked(path)
 }
 
 func (m *Model) setPathsChecked(paths []string, checked bool) error {
-	if err := m.queueStore.SetChecked(paths, checked); err != nil {
+	if err := m.queueStore.SetTicketChecked(paths, checked); err != nil {
 		return err
 	}
 	m.refreshQueueSnapshot()
@@ -44,21 +46,25 @@ func (m *Model) refreshQueueSnapshot() {
 // store persists checked/queued paths globally across every worktree ever
 // used, so every read of it must re-apply this scope or a ticket checked in
 // one worktree leaks into another's checked count (and confirmation
-// prompts) without ever appearing as a checked row there.
+// prompts) without ever appearing as a checked row there. queueStatus (queue
+// membership) and checked/checkOrder (the independent Tickets-tab checked
+// set, ticket 13's decoupled design) are scoped independently since a ticket
+// can be checked without being queued, and vice versa.
 func scopedQueueSnapshot(store *QueueStore, worktreeRoot string, allWorktrees bool) (queueStatus map[string]queueItemStatus, checkOrder map[string]uint64, checked map[string]bool) {
 	snapshot := store.Snapshot()
-	queueStatus, checkOrder = snapshot.Status, snapshot.Order
+	queueStatus, checked, checkOrder = snapshot.Status, snapshot.TicketChecked, snapshot.TicketCheckOrder
 	if !allWorktrees {
 		for path := range queueStatus {
 			if !inWorktreeScope(path, worktreeRoot, allWorktrees) {
 				delete(queueStatus, path)
+			}
+		}
+		for path := range checked {
+			if !inWorktreeScope(path, worktreeRoot, allWorktrees) {
+				delete(checked, path)
 				delete(checkOrder, path)
 			}
 		}
-	}
-	checked = make(map[string]bool, len(queueStatus))
-	for path := range queueStatus {
-		checked[path] = true
 	}
 	return queueStatus, checkOrder, checked
 }
@@ -206,14 +212,33 @@ func (m Model) handleCheckAddConfirmed(msg checkAddConfirmedMsg) (tea.Model, tea
 // reload) against newEpics (the reload's result): for every checked ticket
 // whose Split field gained new entries since oldEpics — a mid-flight split,
 // per implement/SKILL.md's convention — the newly-appeared sibling(s) join
-// checked automatically, no confirmation modal (ticket 06), unlike
-// toggleTicketChecked's blocked-ticket confirmation. A ticket that isn't
-// itself checked splitting is a no-op: only a split of already-checked work
-// needs its continuation auto-added.
+// the Tickets tab's independent checked set automatically, no confirmation
+// modal (ticket 06), unlike toggleTicketChecked's blocked-ticket
+// confirmation. A ticket that isn't itself checked splitting is a no-op:
+// only a split of already-checked work needs its continuation auto-added.
 func autoCheckSplitChildren(oldEpics, newEpics []tickets.Epic, store *QueueStore) error {
 	if store == nil {
 		return nil
 	}
+	return applySplitChildren(oldEpics, newEpics, store.IsTicketChecked, store.SetTicketChecked)
+}
+
+// autoQueueSplitChildren mirrors autoCheckSplitChildren for the Queue tab's
+// own membership concept (Items) instead of the Tickets tab's independent
+// checked set: a ticket already queued whose Split field gains new entries
+// has its new sibling(s) queued automatically.
+func autoQueueSplitChildren(oldEpics, newEpics []tickets.Epic, store *QueueStore) error {
+	if store == nil {
+		return nil
+	}
+	return applySplitChildren(oldEpics, newEpics, store.IsChecked, store.SetChecked)
+}
+
+// applySplitChildren is the shared traversal behind autoCheckSplitChildren
+// and autoQueueSplitChildren: isMember/setMember let each caller apply it to
+// its own independent membership set (see QueueStore's decoupled checked/
+// queued API).
+func applySplitChildren(oldEpics, newEpics []tickets.Epic, isMember func(string) bool, setMember func([]string, bool) error) error {
 	oldByPath := make(map[string]tickets.Ticket)
 	for _, epic := range oldEpics {
 		for _, t := range epic.Tickets {
@@ -225,7 +250,7 @@ func autoCheckSplitChildren(oldEpics, newEpics []tickets.Epic, store *QueueStore
 	for _, epic := range newEpics {
 		for _, nt := range epic.Tickets {
 			old, ok := oldByPath[nt.Path]
-			if !ok || !store.IsChecked(old.Path) {
+			if !ok || !isMember(old.Path) {
 				continue
 			}
 			for _, childID := range newSplitEntries(old.Split, nt.Split) {
@@ -235,7 +260,7 @@ func autoCheckSplitChildren(oldEpics, newEpics []tickets.Epic, store *QueueStore
 			}
 		}
 	}
-	return store.SetChecked(childPaths, true)
+	return setMember(childPaths, true)
 }
 
 // newSplitEntries returns the entries present in newSplit but not oldSplit,

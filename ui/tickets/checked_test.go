@@ -394,7 +394,7 @@ func TestModel_CachedModelsRenderSelectionFromSharedQueueStore(t *testing.T) {
 
 func TestModel_BlockedConfirmationFailureKeepsPriorQueue(t *testing.T) {
 	store := loadQueueStoreAt(t.TempDir() + "/queue.json")
-	if err := store.Check("keep"); err != nil {
+	if err := store.SetTicketChecked([]string{"keep"}, true); err != nil {
 		t.Fatal(err)
 	}
 	store.path = t.TempDir()
@@ -409,8 +409,8 @@ func TestModel_BlockedConfirmationFailureKeepsPriorQueue(t *testing.T) {
 	}
 	m = updated.(Model)
 	snapshot := m.queueStore.Snapshot()
-	if len(snapshot.Checked) != 1 || !snapshot.Checked["keep"] {
-		t.Fatalf("failed confirmation changed queue: %#v", snapshot)
+	if len(snapshot.TicketChecked) != 1 || !snapshot.TicketChecked["keep"] {
+		t.Fatalf("failed confirmation changed checked set: %#v", snapshot)
 	}
 }
 
@@ -439,7 +439,7 @@ func TestModel_WorktreeScopedTogglePreservesOtherWorktreeEntry(t *testing.T) {
 	if snapshot.Status[otherPath] != queueStatusDone {
 		t.Fatalf("scoped toggle changed other worktree entry: %#v", snapshot)
 	}
-	if !snapshot.Checked[m.epics[0].Tickets[0].Path] {
+	if !snapshot.TicketChecked[m.epics[0].Tickets[0].Path] {
 		t.Fatalf("scoped ticket was not added: %#v", snapshot)
 	}
 }
