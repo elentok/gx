@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.25.0 - 2026-08-05
+
+- Decoupled the Tickets tab's checked state from the Queue tab's queue state, so checking tickets and queuing them are independent actions that stay in sync end-to-end.
+- Added a `tc` chord to hide completed/done tickets on both the Tickets and Queue tabs.
+- Added `ctrl+d`/`ctrl+u` half-page paging to the Tickets tab sidebar.
+- Queue tab rows now follow dependency-wave order, and epic completion duration renders consistently on both tabs.
+- Added epic `started_at`/`completed_at` timing and per-ticket `StartedAt` for live elapsed-time display.
+- Moved the commit header into a toggleable popup instead of always showing inline.
+- Fixed the Queue tab's `tc` chord swallowing the following key when it didn't match, and fixed a data-loss bug where an empty `CheckOrder` field was silently discarded as a corrupt/legacy file.
+- Fixed a doubled indent prefix on live ticket rows.
+- Preserved manual epic-collapse state across ticket reloads.
+- ralph-loop now serializes git worktree add/remove across iterations to avoid races.
+- Lowered the `gx-to-tickets` split threshold to 70K and added an estimated context window to the quiz step.
+
 ## v0.24.4 - 2026-08-05
 
 - Added Telegram notifications for ralph-loop iteration and epic-completion events, wired to real ticket counts and elapsed-time metrics.
