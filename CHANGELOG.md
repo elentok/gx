@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.24.4 - 2026-08-05
+
+- Added Telegram notifications for ralph-loop iteration and epic-completion events, wired to real ticket counts and elapsed-time metrics.
+- Redesigned the Queue tab: scrollbars, search, mouse-wheel scroll, row-click selection, direct-replace on `i`, and single-ticket cascade delete.
+- Added mouse click support and width capping to confirmation dialogs across tabs.
+- Improved compact-recovery polling and added a shared ticket preview pane plus explore/implement split policy.
+- Ticket lists now auto-refresh on status change and split; tickets track multiple agent sessions via a new `session_ids` frontmatter field.
+- Fixed the Queue tab scrollbar rendering past the panel width and a nil-map panic in the queue view before load.
+- Fixed a blocker-family bug where bare-number blockers wrongly matched split siblings.
+
 ## v0.24.3 - 2026-08-04
 
 - Added `gx skills install`/`uninstall`, embedding gx's canonical skill bundle (including new `gx-to-tickets`, `gx-tdd`, `gx-implement`, and `gx-resolving-merge-conflicts` skills) and installing managed copies into Claude's and Codex's skill roots.
