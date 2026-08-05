@@ -40,17 +40,64 @@ func TestQueueModelRendersFlatDependencyOrderedEpicPlan(t *testing.T) {
 	content := m.View().Content
 
 	if strings.Contains(content, "parallel") || strings.Contains(content, "then") {
-		t.Fatalf("expected a flat ticket-number-ordered list, not wave grouping:\n%s", content)
+		t.Fatalf("expected a flat dependency-ordered list, not wave grouping:\n%s", content)
 	}
 
+	// maxParallel caps each wave: with the default cap, 01/03/04 (all
+	// unblocked) don't all fit in wave 1, so 04 spills into wave 2 alongside
+	// 02 (only just unblocked once 01 lands) — still ticket-number order
+	// within each wave, and 02's row still lands after its blocker 01's.
 	alpha := strings.Index(content, "alpha")
 	foundation := strings.Index(content, "Foundation")
-	dependent := strings.Index(content, "Dependent")
 	independent3 := strings.Index(content, "03")
+	dependent := strings.Index(content, "Dependent")
 	independent4 := strings.Index(content, "04")
 	beta := strings.Index(content, "beta")
-	if alpha < 0 || foundation < alpha || dependent < foundation || independent3 < dependent || independent4 < independent3 || beta < independent4 {
-		t.Fatalf("expected ticket-number order within alpha, then epic grouping into beta:\n%s", content)
+	if alpha < 0 || foundation < alpha || independent3 < foundation || dependent < independent3 || independent4 < dependent || beta < independent4 {
+		t.Fatalf("expected blockers-before-dependents order within alpha, then epic grouping into beta:\n%s", content)
+	}
+}
+
+// TestQueueModelOrdersRowsByDependencyNotTicketNumber covers ticket 11: the
+// Queue tab's row order must reflect actual execution order (blockers before
+// dependents via ralphloop.PlanWaves), not plain ticket-number order — even
+// when the blocker has a higher ticket number than its dependent.
+func TestQueueModelOrdersRowsByDependencyNotTicketNumber(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "20-dependent.md", "Status: open\nBlocked by: 50\n\nBody.\n")
+	writeTicket(t, root, "alpha", "50-blocker.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "alpha", "60-unrelated.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "alpha", "10-unrelated.md", "Status: open\n\nBody.\n")
+
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "20-dependent.md"): true,
+		ticketPath(root, "alpha", "50-blocker.md"):   true,
+		ticketPath(root, "alpha", "60-unrelated.md"): true,
+		ticketPath(root, "alpha", "10-unrelated.md"): true,
+	}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	rows := m.rows()
+	if len(rows) != 4 {
+		t.Fatalf("expected 4 rows, got %d: %+v", len(rows), rows)
+	}
+
+	indexOf := func(id string) int {
+		for i, r := range rows {
+			if r.ticket.Identifier == id {
+				return i
+			}
+		}
+		t.Fatalf("ticket %q missing from rows: %+v", id, rows)
+		return -1
+	}
+
+	// Wave 1 (no unmet blocker): 10, 50, 60, tiebroken by ticket number.
+	// Wave 2 (unblocked once 50 lands): 20.
+	if got := []int{indexOf("10"), indexOf("50"), indexOf("60")}; got[0] > got[1] || got[1] > got[2] {
+		t.Fatalf("expected wave-1 tickets 10,50,60 in ticket-number order, got indexes %v", got)
+	}
+	if indexOf("20") < indexOf("50") {
+		t.Fatalf("expected blocker 50's row before its dependent 20's row, got rows %+v", rows)
 	}
 }
 

@@ -41,14 +41,11 @@ func (m QueueModel) rowsAndPlanErrors() ([]queueRow, map[string]error) {
 	var out []queueRow
 	planErrs := make(map[string]error)
 	for _, epic := range m.epics {
-		if _, err := epicWaves(epic, candidates, m.settings.MaxConcurrentTicketsPerEpic()); err != nil {
+		waves, err := epicWaves(epic, candidates, m.settings.MaxConcurrentTicketsPerEpic())
+		if err != nil {
 			planErrs[epic.Name] = err
 		}
-		for _, idx := range sortedTicketIndexes(epic) {
-			t := epic.Tickets[idx]
-			if !candidates[t.Path] {
-				continue
-			}
+		for _, t := range epicRowOrder(epic, waves, candidates) {
 			if m.hideComplete && epic.RenderedStatus(t) == tickets.StatusDone {
 				continue
 			}
@@ -56,6 +53,29 @@ func (m QueueModel) rowsAndPlanErrors() ([]queueRow, map[string]error) {
 		}
 	}
 	return out, planErrs
+}
+
+// epicRowOrder flattens waves (blockers before dependents, ties in ticket
+// number order per PlanWaves) into the epic's Queue row order. When waves is
+// nil — epicWaves errored, e.g. a dependency cycle — it falls back to plain
+// ticket-number order so the epic's candidates still render instead of
+// vanishing from the list.
+func epicRowOrder(epic tickets.Epic, waves [][]tickets.Ticket, candidates map[string]bool) []tickets.Ticket {
+	if waves == nil {
+		var fallback []tickets.Ticket
+		for _, idx := range sortedTicketIndexes(epic) {
+			t := epic.Tickets[idx]
+			if candidates[t.Path] {
+				fallback = append(fallback, t)
+			}
+		}
+		return fallback
+	}
+	var out []tickets.Ticket
+	for _, wave := range waves {
+		out = append(out, wave...)
+	}
+	return out
 }
 
 // epicWaves resolves candidates (the checked-ticket paths within epic) into a
