@@ -176,6 +176,11 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	}
 	total := scope.TotalCount(*initial)
 	if scope.AllSettled(*initial) {
+		if allSettled(*initial) {
+			if err := tickets.StampEpicCompleted(scratchDir, opts.EpicName, d.Now()); err != nil {
+				return fmt.Errorf("stamping epic %q completed_at: %w", opts.EpicName, err)
+			}
+		}
 		sink.AlreadyComplete(opts.EpicName, scope.DoneCount(*initial), total)
 		return nil
 	}
@@ -253,6 +258,12 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			if err := Claim(ticket.Path); err != nil {
 				return fmt.Errorf("claiming ticket %s: %w", ticket.Identifier, err)
 			}
+			// StampEpicStarted is idempotent (see its doc comment), so calling
+			// it on every claim — not just the epic's very first — is safe;
+			// it only ever writes started_at once.
+			if err := tickets.StampEpicStarted(scratchDir, opts.EpicName, d.Now()); err != nil {
+				return fmt.Errorf("stamping epic %q started_at: %w", opts.EpicName, err)
+			}
 			return nil
 		})
 		if err != nil {
@@ -329,6 +340,11 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			return err
 		}
 		if scope.AllSettled(*epic) && active == 0 {
+			if allSettled(*epic) {
+				if err := tickets.StampEpicCompleted(scratchDir, opts.EpicName, d.Now()); err != nil {
+					return fmt.Errorf("stamping epic %q completed_at: %w", opts.EpicName, err)
+				}
+			}
 			break
 		}
 

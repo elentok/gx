@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -155,6 +156,97 @@ func loadEpicTiming(epicPath string) (startedAt, completedAt time.Time) {
 		completedAt = *wire.CompletedAt
 	}
 	return startedAt, completedAt
+}
+
+// StampEpicStarted writes started_at into scratchDir/epicName's epic.yaml
+// sidecar, creating both the directory and file if needed. It is idempotent:
+// if started_at is already set, it leaves the file untouched, so calling it
+// on every ticket claim — not just the epic's first — never overwrites an
+// already-recorded start time across a resumed or reattached run.
+func StampEpicStarted(scratchDir, epicName string, now time.Time) error {
+	return stampEpicTiming(scratchDir, epicName, func(wire *epicYAML) bool {
+		if wire.StartedAt != nil {
+			return false
+		}
+		wire.StartedAt = &now
+		return true
+	})
+}
+
+// StampEpicCompleted writes completed_at into scratchDir/epicName's
+// epic.yaml sidecar. It is idempotent the same way StampEpicStarted is: a
+// completed_at already on disk is left alone, so completion is only ever
+// recorded once, at genuine completion.
+func StampEpicCompleted(scratchDir, epicName string, now time.Time) error {
+	return stampEpicTiming(scratchDir, epicName, func(wire *epicYAML) bool {
+		if wire.CompletedAt != nil {
+			return false
+		}
+		wire.CompletedAt = &now
+		return true
+	})
+}
+
+// stampEpicTiming reads scratchDir/epicName's epic.yaml sidecar (if any),
+// hands it to mutate, and writes it back only when mutate reports a change —
+// the shared idempotency check both StampEpicStarted and StampEpicCompleted
+// rely on.
+func stampEpicTiming(scratchDir, epicName string, mutate func(*epicYAML) bool) error {
+	epicPath := filepath.Join(scratchDir, epicName)
+	yamlPath := filepath.Join(epicPath, "epic.yaml")
+
+	var wire epicYAML
+	if raw, err := os.ReadFile(yamlPath); err == nil {
+		if err := yaml.Unmarshal(raw, &wire); err != nil {
+			return fmt.Errorf("parsing %s: %w", yamlPath, err)
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+
+	if !mutate(&wire) {
+		return nil
+	}
+
+	out, err := yaml.Marshal(wire)
+	if err != nil {
+		return fmt.Errorf("marshaling %s: %w", yamlPath, err)
+	}
+	if err := os.MkdirAll(epicPath, 0755); err != nil {
+		return err
+	}
+	return writeEpicYAMLAtomic(yamlPath, out)
+}
+
+// writeEpicYAMLAtomic replaces path's content via a same-directory temp file
+// plus rename, so a concurrent reader never observes a torn/truncated write.
+// Duplicated from ralphloop's/schema's writeFileAtomic (a ~15-line helper)
+// rather than exported cross-package, per
+// .scratch/ralph-tickets-visibility/issues/02-tickets-set-cli.md's Answer.
+func writeEpicYAMLAtomic(path string, data []byte) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		os.Remove(tmpPath)
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+	if err := os.Chmod(tmpPath, 0644); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+	return nil
 }
 
 // idsToStrings lowers schema.TicketIDs to plain strings for tickets.Ticket's
