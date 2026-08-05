@@ -138,12 +138,20 @@ func (m Model) isCollapsed(epic tickets.Epic) bool {
 	return m.collapsedEpics[epic.Path]
 }
 
-// defaultCollapsedEpics computes the initial per-epic collapse state: an
-// epic where every ticket is done starts collapsed; every other epic
+// defaultCollapsedEpics computes the per-epic collapse state for epics,
+// preserving any entry already present in existing (e.g. a user's manual
+// toggle) and only filling in a default for epic paths not yet in existing:
+// an epic where every ticket is done starts collapsed; every other epic
 // (including a zero-ticket epic) starts expanded.
-func defaultCollapsedEpics(epics []tickets.Epic) map[string]bool {
+func defaultCollapsedEpics(epics []tickets.Epic, existing map[string]bool) map[string]bool {
 	collapsed := make(map[string]bool, len(epics))
 	for _, epic := range epics {
+		if v, ok := existing[epic.Path]; ok {
+			if v {
+				collapsed[epic.Path] = true
+			}
+			continue
+		}
 		if epic.AllDone() {
 			collapsed[epic.Path] = true
 		}

@@ -203,7 +203,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refreshQueueSnapshot()
 		m.loaded = true
 		m.epics = msg.epics
-		m.collapsedEpics = defaultCollapsedEpics(msg.epics)
+		m.collapsedEpics = defaultCollapsedEpics(msg.epics, m.collapsedEpics)
 		if m.search.HasQuery() {
 			m.recomputeSearchMatches()
 		}

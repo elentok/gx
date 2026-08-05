@@ -250,6 +250,38 @@ func TestNewModel_FullyDoneEpicStartsCollapsedAndDimmed(t *testing.T) {
 	}
 }
 
+func TestModel_EpicsLoadedMsgPreservesManualCollapseToggle(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	// Manually collapse open-epic, which defaults to expanded.
+	m.setCollapsed(indexOfEpic(t, m, "open-epic"), true)
+	if !m.isCollapsed(findEpic(t, m, "open-epic")) {
+		t.Fatalf("expected open-epic collapsed after manual toggle")
+	}
+
+	// A new epic appears (simulating the auto-refresh poll picking up fresh
+	// disk state) — it should get its correct default while the manual
+	// toggle above survives.
+	writeTicket(t, root, "new-done-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
+
+	msg := m.cmdLoad()()
+	updated, _ = m.Update(msg)
+	m = updated.(Model)
+
+	if !m.isCollapsed(findEpic(t, m, "open-epic")) {
+		t.Fatalf("expected manually-collapsed open-epic to stay collapsed after epicsLoadedMsg")
+	}
+	if !m.isCollapsed(findEpic(t, m, "new-done-epic")) {
+		t.Fatalf("expected new fully-done epic to default to collapsed")
+	}
+}
+
 func TestNewModel_ZeroTicketEpicStartsExpanded(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".scratch", "empty-epic", "issues"), 0755); err != nil {
