@@ -1,5 +1,5 @@
 // Package skills holds gx's canonical, installable skill bundle (see
-// README.md) and validates it: metadata, invocation policy, relative
+// gx.md) and validates it: metadata, invocation policy, relative
 // references between bundle files, and a representative generated ticket
 // against gx's real ticket validator. bundle.go embeds this directory's
 // non-Go files into the gx binary.
@@ -20,8 +20,8 @@ import (
 // requiredFiles are every file the bundle's relative references and the
 // README's layout diagram promise exist.
 var requiredFiles = []string{
-	"README.md",
-	"local-tracker.md",
+	"gx.md",
+	"gx-local-tracker.md",
 	"gx-to-tickets/SKILL.md",
 	"gx-tdd/SKILL.md",
 	"gx-tdd/tests.md",
@@ -63,7 +63,7 @@ func TestEmbeddedBundleContainsRequiredFiles(t *testing.T) {
 
 // skillFrontmatter is the subset of SKILL.md frontmatter this test cares
 // about: the metadata Claude's skill picker reads, and the invocation-policy
-// flag (see README.md's "Invocation policy" section).
+// flag (see gx.md's "Invocation policy" section).
 type skillFrontmatter struct {
 	Name                   string `yaml:"name"`
 	Description            string `yaml:"description"`
@@ -72,7 +72,7 @@ type skillFrontmatter struct {
 
 // parseFrontmatter extracts and unmarshals the "---" delimited YAML block at
 // the top of a skill/ticket file, mirroring tickets/schema's own frontmatter
-// convention (see local-tracker.md).
+// convention (see gx-local-tracker.md).
 func parseFrontmatter(t *testing.T, raw string) skillFrontmatter {
 	t.Helper()
 	lines := strings.Split(raw, "\n")
@@ -97,7 +97,7 @@ func parseFrontmatter(t *testing.T, raw string) skillFrontmatter {
 }
 
 // wantInvocationPolicy is each skill's expected disable-model-invocation
-// value, per README.md's "Invocation policy" section: gx-to-tickets and
+// value, per gx.md's "Invocation policy" section: gx-to-tickets and
 // gx-implement are explicit-invoke only (breaking work into tickets, and
 // claiming/implementing one, should never trigger on the model's own reading
 // of a conversation); gx-tdd and gx-resolving-merge-conflicts are left
@@ -128,7 +128,7 @@ func TestSkillMetadataAndInvocationPolicy(t *testing.T) {
 }
 
 // relativeLinkRe finds markdown links to a relative .md file, e.g.
-// "[local-tracker.md](../local-tracker.md)" — not an http(s) link.
+// "[gx-local-tracker.md](../gx-local-tracker.md)" — not an http(s) link.
 var relativeLinkRe = regexp.MustCompile(`\]\(([^)]+\.md)\)`)
 
 func TestRelativeReferencesResolve(t *testing.T) {

@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 # gx Implement
 
-Implement a ticket from gx's local markdown tracker (see [local-tracker.md](../local-tracker.md)).
+Implement a ticket from gx's local markdown tracker (see [gx-local-tracker.md](../gx-local-tracker.md)).
 
 If given a directory of tickets rather than a single ticket, work the **frontier**: the
 lowest-numbered ticket that is unblocked (every ticket in its `blocked_by` is `done`) and unclaimed.
@@ -70,7 +70,7 @@ When either trigger fires:
    trigger fired during exploration/design), there's nothing to make green; skip to step 2 and carry
    the design reasoning forward as notes instead of a diff.
 2. **Commit.**
-3. **Create the follow-up ticket(s)**, following [local-tracker.md](../local-tracker.md)'s
+3. **Create the follow-up ticket(s)**, following [gx-local-tracker.md](../gx-local-tracker.md)'s
    mid-flight-split numbering, blocking-edge, and `split_from` conventions, and gx-to-tickets'
    estimation method. This chain is uncapped — each split narrows what's left, so it's
    self-limiting. Move any not-yet-finished acceptance criteria off the original ticket onto the new

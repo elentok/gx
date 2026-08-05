@@ -39,7 +39,7 @@ means agreed in the ticket, not negotiated live:
   function returning X" has exactly one seam). If picking the seam requires a judgment call — several
   plausible boundaries, or the acceptance criteria don't pin down what's observable — that's material
   ambiguity: stop and set the ticket to `needs-info` (see
-  [local-tracker.md](../local-tracker.md)) rather than guessing.
+  [gx-local-tracker.md](../gx-local-tracker.md)) rather than guessing.
 - **A live human is present** (not running under ralph-loop) — you may still ask "What's the public
   interface, and which seams should we test?" if the ticket's declared seams seem wrong or
   incomplete, and update the ticket with the corrected seams before writing tests against them.

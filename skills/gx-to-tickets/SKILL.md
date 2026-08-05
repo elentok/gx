@@ -10,7 +10,7 @@ disable-model-invocation: true
 
 Break a plan, spec, or conversation into a set of **tickets** — tracer-bullet vertical slices, each
 declaring the tickets that **block** it — published to gx's local markdown tracker. See
-[local-tracker.md](../local-tracker.md) for the full layout, frontmatter, and CLI contract; this
+[gx-local-tracker.md](../gx-local-tracker.md) for the full layout, frontmatter, and CLI contract; this
 skill only covers how to break work up and what to put in each ticket.
 
 Estimate the amount of tokens that will be needed for the implementation of each ticket; if a ticket
@@ -143,7 +143,7 @@ Write one file per ticket under `.scratch/<epic-slug>/issues/<NN>-<slug>.md`, nu
 dependency order (blockers first). Each file's `blocked_by` lists the ticket IDs it depends on. Use
 the per-ticket template below — one ticket per file, never a single combined file.
 
-Work the **frontier** (see [local-tracker.md](../local-tracker.md)): any ticket whose blockers are
+Work the **frontier** (see [gx-local-tracker.md](../gx-local-tracker.md)): any ticket whose blockers are
 all done. For a purely linear chain that means top to bottom.
 
 Do NOT close or modify any parent/source ticket this epic was generated from.
@@ -153,7 +153,7 @@ error and re-validate until it passes — do not publish a ticket that fails val
 
 Tickets can also be split off **mid-flight**, by `gx-implement`, when a ticket outgrows its budget
 while in progress — same template, same publishing mechanics, just triggered from inside a running
-session instead of upfront here. See [local-tracker.md](../local-tracker.md)'s mid-flight splitting
+session instead of upfront here. See [gx-local-tracker.md](../gx-local-tracker.md)'s mid-flight splitting
 section for the numbering, blocking-edge, and `split`/`split_from` mechanics.
 
 <ticket-template>
@@ -189,7 +189,7 @@ implementation list.
 
 ### Frontmatter fields
 
-See [local-tracker.md](../local-tracker.md) for the full field reference. New tickets are published
+See [gx-local-tracker.md](../gx-local-tracker.md) for the full field reference. New tickets are published
 as `ready-for-agent` unless instructed otherwise, with `blocked_by: []` when nothing gates them.
 
 Avoid specific file paths or code snippets in the body — they go stale fast. Exception: if a

@@ -8,12 +8,12 @@ import (
 	"path/filepath"
 )
 
-// Bundle is gx's canonical, installable skill bundle (see README.md),
+// Bundle is gx's canonical, installable skill bundle (see gx.md),
 // embedded into the gx binary at compile time so every production
 // installation method (release, Homebrew, go install, local build) ships the
 // same content.
 //
-//go:embed README.md local-tracker.md gx-to-tickets gx-tdd gx-implement gx-resolving-merge-conflicts
+//go:embed gx.md gx-local-tracker.md gx-to-tickets gx-tdd gx-implement gx-resolving-merge-conflicts
 var Bundle embed.FS
 
 // BundleID identifies gx's canonical skill bundle in the manifest store

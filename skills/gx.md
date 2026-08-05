@@ -19,9 +19,9 @@ The upstream skills assume a human operator and a choice of issue tracker (local
 Linear, ...) selected by a separate setup step. gx's bundle drops both assumptions:
 
 - **Tracker is fixed, not selected.** gx only ever writes gx's local markdown tracker (see
-  [local-tracker.md](local-tracker.md)) — through `gx tickets` subcommands, not hand-edited YAML.
-  There's no provider-selection step and no dependency on a personal dotfiles skill tree, setup
-  workflow, or triage-label mapping file: `local-tracker.md` is the complete, self-contained
+  [gx-local-tracker.md](gx-local-tracker.md)) — through `gx tickets` subcommands, not hand-edited
+  YAML. There's no provider-selection step and no dependency on a personal dotfiles skill tree,
+  setup workflow, or triage-label mapping file: `gx-local-tracker.md` is the complete, self-contained
   contract.
 - **Seams are decided in the ticket, not live.** Upstream `tdd` asks a human "what's the public
   interface, and which seams should we test?" at the start of every cycle. gx-to-tickets instead
@@ -60,7 +60,7 @@ This directory is embedded in the `gx` binary at compile time (`bundle.go`), so 
 `go install`, or locally built `gx` all ship the identical bundle. `gx skills install` copies it as
 managed files into both Claude's and Codex's user skill roots — `~/.claude/skills` and
 `~/.codex/prompts` — under the same relative layout this directory has, so every relative reference
-(like `../local-tracker.md`) resolves identically under both agents:
+(like `../gx-local-tracker.md`) resolves identically under both agents:
 
 ```sh
 gx skills install                            # install/upgrade for both agents
@@ -97,15 +97,15 @@ To go back to a production install of gx's embedded, released skills, run `gx sk
 a mode change like any other and needs the same explicit confirmation:
 
 ```sh
-gx skills install --force README.md --force gx-implement/SKILL.md ...   # one --force per reported conflict
+gx skills install --force gx.md --force gx-implement/SKILL.md ...   # one --force per reported conflict
 ```
 
 ## Layout
 
 ```
 skills/
-  README.md          — this file
-  local-tracker.md    — the shared local ticket tracker contract
+  gx.md                — this file
+  gx-local-tracker.md  — the shared local ticket tracker contract
   gx-to-tickets/
     SKILL.md
   gx-tdd/
@@ -118,5 +118,6 @@ skills/
     SKILL.md
 ```
 
-Every skill references `local-tracker.md` with a relative path (`../local-tracker.md`), so it must
-be installed alongside the skill directories, at the bundle root, for those references to resolve.
+Every skill references `gx-local-tracker.md` with a relative path (`../gx-local-tracker.md`), so it
+must be installed alongside the skill directories, at the bundle root, for those references to
+resolve.

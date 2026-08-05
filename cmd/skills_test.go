@@ -84,7 +84,7 @@ func TestExecute_SkillsInstall_CopiesBundleIntoBothAgentRoots(t *testing.T) {
 	}
 
 	for _, root := range []string{claudeRoot, codexRoot} {
-		for _, rel := range []string{"README.md", "local-tracker.md", "gx-to-tickets/SKILL.md", "gx-tdd/SKILL.md", "gx-tdd/tests.md", "gx-tdd/mocking.md"} {
+		for _, rel := range []string{"gx.md", "gx-local-tracker.md", "gx-to-tickets/SKILL.md", "gx-tdd/SKILL.md", "gx-tdd/tests.md", "gx-tdd/mocking.md"} {
 			if _, err := os.Stat(filepath.Join(root, rel)); err != nil {
 				t.Errorf("expected %s under %s: %v", rel, root, err)
 			}
@@ -95,7 +95,7 @@ func TestExecute_SkillsInstall_CopiesBundleIntoBothAgentRoots(t *testing.T) {
 	if !strings.Contains(out, "installed") {
 		t.Errorf("expected output to report installed targets, got: %q", out)
 	}
-	if !strings.Contains(out, "README.md") {
+	if !strings.Contains(out, "gx.md") {
 		t.Errorf("expected output to name installed files, got: %q", out)
 	}
 }
@@ -130,7 +130,7 @@ func TestExecute_SkillsInstall_ConflictedPathBlocksInstallAndReportsConflict(t *
 	if err := os.MkdirAll(claudeRoot, 0755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(claudeRoot, "README.md"), []byte("not gx's"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(claudeRoot, "gx.md"), []byte("not gx's"), 0644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
@@ -142,7 +142,7 @@ func TestExecute_SkillsInstall_ConflictedPathBlocksInstallAndReportsConflict(t *
 		t.Errorf("expected output to report conflicted target, got: %q", stdout.String())
 	}
 
-	got, readErr := os.ReadFile(filepath.Join(claudeRoot, "README.md"))
+	got, readErr := os.ReadFile(filepath.Join(claudeRoot, "gx.md"))
 	if readErr != nil {
 		t.Fatalf("ReadFile: %v", readErr)
 	}
@@ -159,15 +159,15 @@ func TestExecute_SkillsInstall_ForceOverridesConflict(t *testing.T) {
 	if err := os.MkdirAll(claudeRoot, 0755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(claudeRoot, "README.md"), []byte("not gx's"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(claudeRoot, "gx.md"), []byte("not gx's"), 0644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	if err := execute([]string{"skills", "install", "--force", "README.md"}, d); err != nil {
+	if err := execute([]string{"skills", "install", "--force", "gx.md"}, d); err != nil {
 		t.Fatalf("execute skills install --force: %v", err)
 	}
 
-	got, err := os.ReadFile(filepath.Join(claudeRoot, "README.md"))
+	got, err := os.ReadFile(filepath.Join(claudeRoot, "gx.md"))
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
@@ -203,8 +203,8 @@ func TestExecute_SkillsUninstall_RemovesInstalledBundle(t *testing.T) {
 	}
 
 	for _, root := range []string{claudeRoot, codexRoot} {
-		if _, err := os.Stat(filepath.Join(root, "README.md")); !os.IsNotExist(err) {
-			t.Errorf("expected README.md removed from %s: err = %v", root, err)
+		if _, err := os.Stat(filepath.Join(root, "gx.md")); !os.IsNotExist(err) {
+			t.Errorf("expected gx.md removed from %s: err = %v", root, err)
 		}
 	}
 
@@ -227,7 +227,7 @@ func TestExecute_SkillsUninstall_PreservesLocallyModifiedFileAsConflicted(t *tes
 	if err := execute([]string{"skills", "install"}, d); err != nil {
 		t.Fatalf("install: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(claudeRoot, "README.md"), []byte("locally edited"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(claudeRoot, "gx.md"), []byte("locally edited"), 0644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
@@ -236,12 +236,12 @@ func TestExecute_SkillsUninstall_PreservesLocallyModifiedFileAsConflicted(t *tes
 		t.Fatalf("execute skills uninstall: %v", err)
 	}
 
-	got, err := os.ReadFile(filepath.Join(claudeRoot, "README.md"))
+	got, err := os.ReadFile(filepath.Join(claudeRoot, "gx.md"))
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
 	if string(got) != "locally edited" {
-		t.Errorf("expected locally modified README.md preserved, got: %q", got)
+		t.Errorf("expected locally modified gx.md preserved, got: %q", got)
 	}
 	if !strings.Contains(stdout.String(), "conflicted") {
 		t.Errorf("expected output to report the preserved file as conflicted, got: %q", stdout.String())
@@ -290,12 +290,12 @@ func TestExecute_SkillsInstallDev_ResolvesGitRootFromNestedWorkingDirectory(t *t
 		t.Fatalf("execute skills install --dev: %v", err)
 	}
 
-	linkPath := filepath.Join(claudeRoot, "README.md")
+	linkPath := filepath.Join(claudeRoot, "gx.md")
 	target, err := os.Readlink(linkPath)
 	if err != nil {
 		t.Fatalf("Readlink(%s): %v", linkPath, err)
 	}
-	if target != filepath.Join(bundleDir, "README.md") {
+	if target != filepath.Join(bundleDir, "gx.md") {
 		t.Errorf("symlink target = %q, want repo root's bundle (%q)", target, bundleDir)
 	}
 }
@@ -312,12 +312,12 @@ func TestExecute_SkillsInstallDev_ResolvesLinkedWorktreeRootNotBareRoot(t *testi
 		t.Fatalf("execute skills install --dev: %v", err)
 	}
 
-	linkPath := filepath.Join(claudeRoot, "README.md")
+	linkPath := filepath.Join(claudeRoot, "gx.md")
 	target, err := os.Readlink(linkPath)
 	if err != nil {
 		t.Fatalf("Readlink(%s): %v", linkPath, err)
 	}
-	if target != filepath.Join(bundleDir, "README.md") {
+	if target != filepath.Join(bundleDir, "gx.md") {
 		t.Errorf("symlink target = %q, want the worktree's bundle (%q), not the bare repo's", target, bundleDir)
 	}
 }
@@ -371,12 +371,12 @@ func TestExecute_SkillsInstallDev_DifferentCheckoutDetectsChangedLinkTargetInste
 		t.Errorf("expected output to report conflicted targets, got: %q", stdout.String())
 	}
 
-	linkPath := filepath.Join(claudeRoot, "README.md")
+	linkPath := filepath.Join(claudeRoot, "gx.md")
 	target, err := os.Readlink(linkPath)
 	if err != nil {
 		t.Fatalf("Readlink(%s): %v", linkPath, err)
 	}
-	if target != filepath.Join(bundleDirA, "README.md") {
+	if target != filepath.Join(bundleDirA, "gx.md") {
 		t.Errorf("expected symlink to remain pointed at repoA, got %q", target)
 	}
 }
