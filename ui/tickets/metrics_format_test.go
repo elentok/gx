@@ -1,6 +1,9 @@
 package tickets
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestFormatTokenCount(t *testing.T) {
 	cases := []struct {
@@ -37,6 +40,28 @@ func TestFormatElapsed(t *testing.T) {
 	for _, c := range cases {
 		if got := formatElapsed(c.seconds); got != c.want {
 			t.Errorf("formatElapsed(%d) = %q, want %q", c.seconds, got, c.want)
+		}
+	}
+}
+
+func TestFormatDuration(t *testing.T) {
+	cases := []struct {
+		d    time.Duration
+		want string
+	}{
+		{0, "0m"},
+		{5 * time.Minute, "5m"},
+		{59 * time.Minute, "59m"},
+		{time.Hour, "1h 0m"},
+		{2*time.Hour + 15*time.Minute, "2h 15m"},
+		{23*time.Hour + 59*time.Minute, "23h 59m"},
+		{24 * time.Hour, "1d 0h"},
+		{26*time.Hour + 5*time.Minute, "1d 2h"},
+		{3*24*time.Hour + 4*time.Hour, "3d 4h"},
+	}
+	for _, c := range cases {
+		if got := formatDuration(c.d); got != c.want {
+			t.Errorf("formatDuration(%v) = %q, want %q", c.d, got, c.want)
 		}
 	}
 }

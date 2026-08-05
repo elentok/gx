@@ -3,6 +3,7 @@ package tickets
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/charmbracelet/x/ansi"
 
@@ -40,6 +41,28 @@ func TestEpicStatusLineColorsByEpicState(t *testing.T) {
 	icon, _, style = epicStatusLine(icons, clean)
 	if style.Render(icon) != icon {
 		t.Fatalf("in-progress-clean epic: expected the default/no-color treatment, got styled output %q", style.Render(icon))
+	}
+}
+
+func TestEpicStatusLinePrefersCompletionTimestampsOverElapsedSum(t *testing.T) {
+	icons := ui.Icons(false)
+	started := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+	completed := started.Add(3*time.Hour + 30*time.Minute)
+
+	withTimestamps := tickets.Epic{
+		Tickets:     []tickets.Ticket{{Identifier: "01", Status: "done", ElapsedTime: 754}},
+		StartedAt:   started,
+		CompletedAt: completed,
+	}
+	_, text, _ := epicStatusLine(icons, withTimestamps)
+	if !strings.Contains(text, "took 3h 30m") {
+		t.Fatalf("epic with completion timestamps: got text=%q, want it to contain %q", text, "took 3h 30m")
+	}
+
+	withoutTimestamps := tickets.Epic{Tickets: []tickets.Ticket{{Identifier: "01", Status: "done", ElapsedTime: 754}}}
+	_, text, _ = epicStatusLine(icons, withoutTimestamps)
+	if !strings.Contains(text, "took 12m34s") {
+		t.Fatalf("epic without completion timestamps: got text=%q, want it to contain %q", text, "took 12m34s")
 	}
 }
 

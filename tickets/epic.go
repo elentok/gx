@@ -44,6 +44,16 @@ func (e Epic) DoneCount() int {
 	return e.TotalCount() - e.OpenCount()
 }
 
+// CompletionDuration returns the epic's wall-clock span from epic.yaml's
+// started_at to completed_at, and whether both are set — an epic missing
+// either (not yet done, or predating this feature) reports ok=false.
+func (e Epic) CompletionDuration() (duration time.Duration, ok bool) {
+	if e.StartedAt.IsZero() || e.CompletedAt.IsZero() {
+		return 0, false
+	}
+	return e.CompletedAt.Sub(e.StartedAt), true
+}
+
 // AllDone reports whether every one of the epic's tickets is done. A
 // zero-ticket epic is not considered "all done" — it starts expanded, not
 // collapsed, since "nothing here yet" is distinct from "everything closed".

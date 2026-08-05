@@ -53,7 +53,11 @@ func (m QueueModel) epicHeaderLines(epic tickets.Epic) []string {
 func epicStatusLine(icons ui.IconSet, epic tickets.Epic) (icon, text string, style lipgloss.Style) {
 	switch {
 	case epic.AllDone():
-		return icons.TicketDone, "took " + formatElapsed(epicElapsedSeconds(epic)), epicStatusDoneStyle
+		text := "took " + formatElapsed(epicElapsedSeconds(epic))
+		if dur, ok := epic.CompletionDuration(); ok {
+			text = "took " + formatDuration(dur)
+		}
+		return icons.TicketDone, text, epicStatusDoneStyle
 	case epicHasProblem(epic):
 		return icons.Warning, fmt.Sprintf("%d of %d done", epic.DoneCount(), epic.TotalCount()), epicStatusProblemStyle
 	default:

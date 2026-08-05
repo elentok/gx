@@ -2,6 +2,7 @@ package tickets
 
 import (
 	"fmt"
+	"time"
 
 	"charm.land/lipgloss/v2"
 
@@ -50,6 +51,27 @@ func formatElapsed(seconds int) string {
 		return fmt.Sprintf("%dm%02ds", m, s)
 	default:
 		return fmt.Sprintf("%ds", s)
+	}
+}
+
+// formatDuration renders a wall-clock span (epic.yaml's started_at ->
+// completed_at) as "Xh Ym"/"Xd Yh"/"Xm" — distinct from formatElapsed's
+// per-ticket "12m34s" seconds precision, since a duration spanning idle time
+// between ticket runs has no meaningful seconds component. Days roll over
+// past 24h and hours roll over past 60m so each unit stays natural to read
+// (no "26h05m", no "0h05m").
+func formatDuration(d time.Duration) string {
+	totalMinutes := max(int(d.Round(time.Minute).Minutes()), 0)
+	days := totalMinutes / (24 * 60)
+	hours := (totalMinutes / 60) % 24
+	minutes := totalMinutes % 60
+	switch {
+	case days > 0:
+		return fmt.Sprintf("%dd %dh", days, hours)
+	case hours > 0:
+		return fmt.Sprintf("%dh %dm", hours, minutes)
+	default:
+		return fmt.Sprintf("%dm", minutes)
 	}
 }
 

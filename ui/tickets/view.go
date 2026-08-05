@@ -151,6 +151,9 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 	if epic.AllDone() {
 		line = statusDoneStyle.Render(line)
 	}
+	if dur, ok := epic.CompletionDuration(); ok {
+		line += " took " + formatDuration(dur)
+	}
 	if epic.WorktreeName != "" {
 		line += " " + worktreeTagStyle.Render("["+epic.WorktreeName+"]")
 	}

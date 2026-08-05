@@ -198,6 +198,23 @@ func TestRenderTicketRow_DoneMetricsLineMatchesTitleColor(t *testing.T) {
 	}
 }
 
+func TestRenderEpicRow_ShowsDurationOnlyWhenBothTimestampsSet(t *testing.T) {
+	started := time.Now().Add(-(2*time.Hour + 15*time.Minute))
+	completed := time.Now()
+
+	both := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{{Identifier: "01", Status: "done"}}, StartedAt: started, CompletedAt: completed}
+	m := newModelForTicketRowTests(both)
+	if line := m.renderEpicRow(both); !strings.Contains(line, "took 2h 15m") {
+		t.Fatalf("both timestamps set: line = %q, want it to contain %q", line, "took 2h 15m")
+	}
+
+	missing := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{{Identifier: "01", Status: "done"}}, StartedAt: started}
+	m = newModelForTicketRowTests(missing)
+	if line := m.renderEpicRow(missing); strings.Contains(line, "took") {
+		t.Fatalf("missing completed_at: line = %q, want no duration text", line)
+	}
+}
+
 func TestSidebarLinesHighlightsBothLinesOfSelectedTicket(t *testing.T) {
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 		{Identifier: "01", Title: "Done ticket", Status: "done", ElapsedTime: 5, ActualContextWindow: 100},
