@@ -178,7 +178,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) 
 		if live, ok := m.live[epic.Name][t.Identifier]; ok {
 			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live); ok {
 				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens)
-				return []string{"  " + base, m.renderTicketMetricsLine(joinNonEmpty(" ", suffix, metrics), metricsLineStyle, false)}
+				return []string{base, m.renderTicketMetricsLine(joinNonEmpty(" ", suffix, metrics), metricsLineStyle, false)}
 			}
 		}
 	}

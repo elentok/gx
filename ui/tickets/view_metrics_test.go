@@ -73,6 +73,31 @@ func TestRenderTicketRow_LiveHasSuffixAndMetricsLine(t *testing.T) {
 	}
 }
 
+// TestRenderTicketRow_LiveRowIndentNotDoubled covers ticket 10:
+// renderLiveTicketRow already prefixes its output with 2 spaces, so
+// renderTicketRow must not add its own on top or a running/paused row ends
+// up indented 4 spaces instead of 2 (the Tickets tab's non-live rows carry
+// an extra checkbox column, tracked separately by tickets 13/15, so the
+// live row's baseline indent is compared against renderLiveTicketRow's own
+// 2-space prefix rather than a non-live row directly).
+func TestRenderTicketRow_LiveRowIndentNotDoubled(t *testing.T) {
+	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{{Identifier: "01", Title: "Running ticket", Status: "claimed"}}}
+	m := newModelForTicketRowTests(epic)
+	m.implementingEpics = map[string]bool{epic.Name: true}
+	live := liveTicketState{running: true, label: "iter-01"}
+	m.live[epic.Name] = map[string]liveTicketState{"01": live}
+
+	lines := m.renderTicketRow(epic, epic.Tickets[0], 0)
+
+	wantBase, _, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, epic.Tickets[0], live)
+	if !ok {
+		t.Fatalf("renderLiveTicketRow() ok = false, want true")
+	}
+	if lines[0] != wantBase {
+		t.Fatalf("live row title line = %q, want renderLiveTicketRow's own output %q (no extra caller prefix)", lines[0], wantBase)
+	}
+}
+
 func TestRenderTicketRow_PausedHasReasonAndMetricsLine(t *testing.T) {
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{{Identifier: "01", Title: "Paused ticket", Status: "claimed"}}}
 	m := newModelForTicketRowTests(epic)

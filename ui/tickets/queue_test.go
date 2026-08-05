@@ -1005,6 +1005,35 @@ func TestRenderQueueTicketRow_CommitlessSuffix(t *testing.T) {
 	}
 }
 
+func leadingWhitespace(s string) string {
+	return s[:len(s)-len(strings.TrimLeft(s, " "))]
+}
+
+// TestRenderQueueTicketRow_LiveRowIndentMatchesNormalRow covers ticket 10:
+// renderLiveTicketRow already prefixes its output with 2 spaces, so the
+// caller must not add its own on top or a running row ends up indented 4
+// spaces instead of 2.
+func TestRenderQueueTicketRow_LiveRowIndentMatchesNormalRow(t *testing.T) {
+	var m QueueModel
+	m.runningEpics = map[string]bool{"epic": true}
+	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
+		{Identifier: "01", Title: "Normal ticket", Status: "open"},
+		{Identifier: "02", Title: "Running ticket", Status: "claimed"},
+	}}
+	m.live = map[string]map[string]liveTicketState{
+		"epic": {"02": {running: true, label: "iter-01"}},
+	}
+
+	normalLine := m.renderQueueTicketRow(epic, epic.Tickets[0], 0)[0]
+	liveLine := m.renderQueueTicketRow(epic, epic.Tickets[1], 1)[0]
+
+	normalIndent := leadingWhitespace(ansi.Strip(normalLine))
+	liveIndent := leadingWhitespace(ansi.Strip(liveLine))
+	if liveIndent != normalIndent {
+		t.Fatalf("live row indent = %q, want %q (matching normal row): live=%q normal=%q", liveIndent, normalIndent, liveLine, normalLine)
+	}
+}
+
 func TestRenderQueueTicketRow_DoneMetricsLineMatchesTitleColor(t *testing.T) {
 	var m QueueModel
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{

@@ -926,7 +926,7 @@ func (m QueueModel) renderQueueTicketRow(epic tickets.Epic, t tickets.Ticket, ro
 		if live, ok := m.live[epic.Name][t.Identifier]; ok {
 			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live); ok {
 				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens)
-				return []string{"  " + base, renderRowMetricsLine(joinNonEmpty(" ", suffix, metrics), metricsLineStyle)}
+				return []string{base, renderRowMetricsLine(joinNonEmpty(" ", suffix, metrics), metricsLineStyle)}
 			}
 		}
 	}
