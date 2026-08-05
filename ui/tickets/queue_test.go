@@ -245,6 +245,89 @@ func TestQueueModelClearCompleteRequiresConfirmation(t *testing.T) {
 	}
 }
 
+// TestQueueModelHideCompleteToggleHidesDoneTicketsButKeepsPlanValidation
+// covers ticket 09: "tc" hides StatusDone rows from rows()/View() without
+// affecting epicWaves' plan validation (which must keep treating the hidden
+// ticket as queued), and toggling "tc" again restores it.
+func TestQueueModelHideCompleteToggleHidesDoneTicketsButKeepsPlanValidation(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "alpha", "02-second.md", "Status: open\nBlocked by: 01\n\nBody.\n")
+	writeRawQueueTicket(t, root, "alpha", "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: task\n---\n\nBody.\n")
+	first := ticketPath(root, "alpha", "01-first.md")
+	second := ticketPath(root, "alpha", "02-second.md")
+	checked := map[string]bool{first: true, second: true}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+
+	if content := m.View().Content; !strings.Contains(content, "First") {
+		t.Fatalf("expected done ticket visible by default:\n%s", content)
+	}
+	if len(m.rows()) != 2 {
+		t.Fatalf("expected both tickets in rows() by default, got %d", len(m.rows()))
+	}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+	m = updated.(QueueModel)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+	m = updated.(QueueModel)
+
+	rows := m.rows()
+	if len(rows) != 1 || rows[0].ticket.Path != second {
+		t.Fatalf("expected only the non-done ticket in rows() after tc, got %+v", rows)
+	}
+	content := m.View().Content
+	if strings.Contains(content, "First") {
+		t.Fatalf("expected done ticket hidden after tc:\n%s", content)
+	}
+	if !strings.Contains(content, "Second") {
+		t.Fatalf("expected non-done ticket still visible after tc:\n%s", content)
+	}
+	if strings.Contains(content, "no unblocked tickets") {
+		t.Fatalf("expected plan validation to still see the hidden-but-queued blocker:\n%s", content)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+	m = updated.(QueueModel)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+	m = updated.(QueueModel)
+	if len(m.rows()) != 2 {
+		t.Fatalf("expected tc toggled again to restore both tickets, got %d", len(m.rows()))
+	}
+}
+
+// TestQueueModelTChordDoesNotCollideWithClearKeymaps covers ticket 09: the
+// "t"-prefix chord swallows its second key without triggering "c"'s clear
+// behavior, and plain "c"/"C" (with no preceding "t") still open their clear
+// confirmations unaffected.
+func TestQueueModelTChordDoesNotCollideWithClearKeymaps(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-done.md", "Status: open\n\nBody.\n")
+	writeRawQueueTicket(t, root, "alpha", "01-done.md", "---\nid: \"01\"\nstatus: done\ntype: task\n---\n\nBody.\n")
+	done := ticketPath(root, "alpha", "01-done.md")
+	checked := map[string]bool{done: true}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+	m = updated.(QueueModel)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
+	m = updated.(QueueModel)
+	if m.hideComplete {
+		t.Fatal("expected \"t\" followed by an unrelated key not to toggle hideComplete")
+	}
+	if m.confirm.IsOpen {
+		t.Fatal("expected \"t\",\"q\" not to open any confirmation")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+	m = updated.(QueueModel)
+	if !m.confirm.IsOpen {
+		t.Fatal("expected plain \"c\" (no preceding \"t\") to still open the clear-complete confirmation")
+	}
+	if m.hideComplete {
+		t.Fatal("expected plain \"c\" not to toggle hideComplete")
+	}
+}
+
 func TestQueueModelIncludesSelectionsAddedAfterLoad(t *testing.T) {
 	root := t.TempDir()
 	name := "01-later.md"

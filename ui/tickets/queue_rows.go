@@ -46,9 +46,13 @@ func (m QueueModel) rowsAndPlanErrors() ([]queueRow, map[string]error) {
 		}
 		for _, idx := range sortedTicketIndexes(epic) {
 			t := epic.Tickets[idx]
-			if candidates[t.Path] {
-				out = append(out, queueRow{epic: epic, ticket: t})
+			if !candidates[t.Path] {
+				continue
 			}
+			if m.hideComplete && epic.RenderedStatus(t) == tickets.StatusDone {
+				continue
+			}
+			out = append(out, queueRow{epic: epic, ticket: t})
 		}
 	}
 	return out, planErrs

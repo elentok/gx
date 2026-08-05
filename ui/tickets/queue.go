@@ -82,6 +82,18 @@ type QueueModel struct {
 	// (handleQueueKey) — the Queue tab is read-only for selection (ticket 08),
 	// so this is the only modal this tab opens outside the agent-picker menu.
 	confirm confirm.Model
+
+	// hideComplete backs the "tc" chord (ticket 09): when true, rows()/
+	// rowsAndPlanErrors() omit StatusDone tickets from the rendered row list,
+	// independent of the "c"/"C" clear keymaps (which mutate the queue store,
+	// not visibility) and independent of epicWaves' plan validation, which
+	// must keep considering hidden-but-still-queued tickets.
+	hideComplete bool
+	// queuePendingT tracks whether "t" was just pressed, awaiting the "c" that
+	// completes the tc chord above — queue.go doesn't otherwise use
+	// ui/keys.Manager, so this hand-rolled single-key lookahead avoids pulling
+	// in the full chord manager for one binding.
+	queuePendingT bool
 }
 
 func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string]bool, orders ...map[string]uint64) QueueModel {
@@ -458,7 +470,18 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.implementAgentMenuOpen {
 		return m.handleQueueAgentMenuKey(msg)
 	}
+	if m.queuePendingT {
+		m.queuePendingT = false
+		if msg.String() == "c" {
+			m.hideComplete = !m.hideComplete
+			m.clampSelected()
+		}
+		return m, nil
+	}
 	switch msg.String() {
+	case "t":
+		m.queuePendingT = true
+		return m, nil
 	case "q", "esc":
 		return m, nav.Back()
 	case "j", "down":
