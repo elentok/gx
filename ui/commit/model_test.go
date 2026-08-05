@@ -83,6 +83,11 @@ func TestBToggleBody(t *testing.T) {
 	m.ready = true
 	m.width = 80
 	m.height = 20
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'i', Text: "i"})
+	m = updated.(Model)
+	if !m.focusHeader {
+		t.Fatalf("expected i to open the commit info popup")
+	}
 	view := ansi.Strip(m.View().Content)
 	if strings.Contains(view, "body hidden") {
 		t.Fatalf("expected collapsed view without body-hidden hint")
@@ -180,6 +185,52 @@ func TestEscLeavesDiffFocusBeforeBackingOut(t *testing.T) {
 	}
 	if m.focusDiff {
 		t.Fatalf("expected esc to leave diff focus")
+	}
+}
+
+func TestHeaderInfoPopupTogglesAndReclaimsSpace(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.CommitAll(t, repo, "popup-subject")
+
+	m := newTestModel(repo, "HEAD")
+	m.ready = true
+	m.width = 100
+	m.height = 24
+	m.syncDiffViewport()
+
+	closedView := ansi.Strip(m.View().Content)
+	if strings.Contains(closedView, "popup-subject") {
+		t.Fatalf("expected subject hidden while popup is closed")
+	}
+	_, closedContentH := m.layoutHeights()
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'i', Text: "i"})
+	m = updated.(Model)
+	if !m.focusHeader {
+		t.Fatalf("expected i to open the commit info popup")
+	}
+	openView := ansi.Strip(m.View().Content)
+	if !strings.Contains(openView, "popup-subject") {
+		t.Fatalf("expected subject visible while popup is open, got:\n%s", openView)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	m = updated.(Model)
+	if m.focusHeader {
+		t.Fatalf("expected esc to close the popup")
+	}
+	_, reclaimedContentH := m.layoutHeights()
+	if reclaimedContentH != closedContentH {
+		t.Fatalf("expected content height unaffected by popup, got %d want %d", reclaimedContentH, closedContentH)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'i', Text: "i"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
+	m = updated.(Model)
+	if m.focusHeader {
+		t.Fatalf("expected q to close the popup")
 	}
 }
 
@@ -737,19 +788,21 @@ func TestHeaderViewportMaxRowsAndScrollMarkers(t *testing.T) {
 	m.width = 100
 	m.height = 24
 
-	bodyH, _ := m.layoutHeights()
-	if got := bodyH - 2; got != 9 {
+	if got := m.headerViewportRowsCount(); got != 9 {
 		t.Fatalf("expected header viewport rows capped at 9 (50%% of height=24), got %d", got)
 	}
-	view := ansi.Strip(m.View().Content)
-	if !strings.Contains(view, "↓") && !strings.Contains(view, "") {
-		t.Fatalf("expected bottom overflow marker at top of header scroll")
-	}
-
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
 	m = updated.(Model)
+	if !m.focusHeader {
+		t.Fatalf("expected second tab to open the header popup")
+	}
+
+	view := ansi.Strip(m.View().Content)
+	if !strings.Contains(view, "↓") && !strings.Contains(view, "") {
+		t.Fatalf("expected bottom overflow marker at top of header scroll")
+	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'J', Text: "J", ShiftedCode: 'J'})
 	m = updated.(Model)

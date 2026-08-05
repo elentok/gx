@@ -34,13 +34,10 @@ func (m Model) View() tea.View {
 		return ui.NewMainView("\n  Error: " + m.err.Error())
 	}
 
-	bodyH, contentH := m.layoutHeights()
-	headerRows := max(1, bodyH-2)
-	body := m.renderHeaderPane(headerRows, bodyH)
+	_, contentH := m.layoutHeights()
 	content := m.contentView(contentH)
 	footer := m.footerView()
-	seam := ui.RenderSeamRow(max(20, m.width), ui.SeamColor)
-	out := lipgloss.JoinVertical(lipgloss.Left, body, seam, content, footer)
+	out := lipgloss.JoinVertical(lipgloss.Left, content, footer)
 	if prefix := m.keys.Prefix(); len(prefix) > 0 {
 		hints := ui.ChordBindingsFromHints(m.keys.ChordHints())
 		if len(hints) > 0 {
@@ -55,6 +52,9 @@ func (m Model) View() tea.View {
 	}
 	if m.help.IsOpen {
 		out = ui.OverlayCenter(out, m.help.View(), m.width, m.height)
+	}
+	if m.focusHeader {
+		out = ui.OverlayCenter(out, m.renderHeaderPopup(), m.width, m.height)
 	}
 	return ui.NewMainView(out)
 }
@@ -159,18 +159,35 @@ func (m Model) headerTitle() string {
 	return "Commit"
 }
 
-func (m Model) renderHeaderPane(headerRows, bodyH int) string {
-	width := max(20, m.width)
+// renderHeaderPopup renders the commit header (subject/meta/badges/expanded
+// body) as a standalone popup panel; the caller centers it via
+// ui.OverlayCenter when the popup is open (m.focusHeader).
+func (m Model) renderHeaderPopup() string {
+	width := m.headerPopupWidth()
+	height := m.headerPopupHeight()
 	title := m.headerTitle()
 	rightTitle := m.headerRightTitle()
-	lines := m.visibleHeaderLines(headerRows)
+	lines := m.visibleHeaderLines(max(1, height-2))
 	active := m.isContainerFocused() && m.focusHeader
 	titleColor := m.headerPaneTitleColor()
 	accent := color.Color(nil)
 	if active {
 		accent = titleColor
 	}
-	return ui.RenderPanel(ui.PanelOptionsFor(width, bodyH, title, rightTitle, lines, active, titleColor, accent, false))
+	return ui.RenderPanel(ui.PanelOptionsFor(width, height, title, rightTitle, lines, active, titleColor, accent, false))
+}
+
+func (m Model) headerPopupWidth() int {
+	return max(20, m.width-4)
+}
+
+// headerPopupHeight caps the popup at half the available body height (mirroring
+// the space this header pane used to reserve when it rendered inline), so a
+// long commit body scrolls inside the popup instead of covering the screen.
+func (m Model) headerPopupHeight() int {
+	maxBody := max(1, (m.height-2)/2)
+	natural := len(m.headerLines()) + 2
+	return min(maxBody, natural)
 }
 
 func (m Model) headerPaneTitleColor() color.Color {
@@ -251,19 +268,19 @@ func (m Model) narrowPaneHeights(contentH int) (filesH, diffH int) {
 	return filesH, diffH
 }
 
+// layoutHeights returns the content area's height. bodyH is always 0: the
+// commit header no longer reserves inline layout space (it renders as a
+// popup instead, see renderHeaderPopup), so diff/file-tree get the full body
+// height. The two-value shape is kept because mouse hit-testing and the
+// image-diff overlay (model_mouse.go, image_diff.go) use bodyH as the row
+// offset where the content area begins.
 func (m Model) layoutHeights() (bodyH, contentH int) {
-	available := max(2, m.height-1) // reserve one line for footer
-	available = max(2, available-1) // reserve one line for the header/content seam
-	maxBody := max(1, available/2)
-	naturalBody := max(1, len(m.headerLines())) + 2
-	bodyH = min(maxBody, naturalBody)
-	contentH = max(1, available-bodyH)
-	return bodyH, contentH
+	contentH = max(1, m.height-1) // reserve one line for footer
+	return 0, contentH
 }
 
 func (m Model) headerViewportRowsCount() int {
-	bodyH, _ := m.layoutHeights()
-	return max(1, bodyH-2)
+	return max(1, m.headerPopupHeight()-2)
 }
 
 func (m Model) visibleHeaderLines(viewportRows int) []string {

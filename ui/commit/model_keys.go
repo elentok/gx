@@ -13,6 +13,7 @@ const (
 	bindingHelp        keys.BindingID = "help"
 	bindingQuit        keys.BindingID = "quit"
 	bindingTab         keys.BindingID = "tab"
+	bindingHeaderInfo  keys.BindingID = "header-info"
 	bindingExpandBody  keys.BindingID = "expand-body"
 	bindingDown        keys.BindingID = "down"
 	bindingUp          keys.BindingID = "up"
@@ -56,6 +57,7 @@ func newCommitManager() keys.Manager {
 		{ID: bindingQuit, Seq: []string{"q"}, Categories: []string{"Global"}, Title: "back / exit pane", Display: "q/esc"},
 		{ID: bindingQuit, Seq: []string{"esc"}, Categories: []string{}, Title: ""},
 		{ID: bindingTab, Seq: []string{"tab"}, Categories: []string{"Global"}, Title: "cycle pane"},
+		{ID: bindingHeaderInfo, Seq: []string{"i"}, Categories: []string{"Header"}, Title: "toggle commit info popup"},
 		{ID: bindingExpandBody, Seq: []string{"b"}, Categories: []string{"Header"}, Title: "toggle commit body"},
 		{ID: bindingDown, Seq: []string{"j"}, Categories: []string{"Navigation"}, Title: "down"},
 		{ID: bindingDown, Seq: []string{"down"}, Categories: []string{}, Title: ""},
@@ -121,6 +123,10 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		m.help.Open(m.width, m.height)
 		return m, nil
 	case bindingQuit:
+		if m.focusHeader {
+			m.focusHeader = false
+			return m, nil
+		}
 		if m.focusDiff && m.diffModel.Search().IsActive() {
 			m.diffModel.Search().DismissAndClear()
 			return m, nil
@@ -137,13 +143,17 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 			m.focusDiff = false
 			return m, nil
 		}
-		if m.focusHeader {
-			m.focusHeader = false
-			return m, nil
-		}
 		return m, nav.Back()
 	case bindingTab:
 		return m.handleTabFocusCycle()
+	case bindingHeaderInfo:
+		if m.focusHeader {
+			m.focusHeader = false
+		} else {
+			m.focusHeader = true
+			m.focusDiff = false
+		}
+		return m, nil
 	case bindingExpandBody:
 		m.bodyExpanded = !m.bodyExpanded
 		m.scrollHeader(0)

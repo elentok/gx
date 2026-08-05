@@ -128,7 +128,12 @@ func TestAmendE2E_NonHEAD_FromCommitView(t *testing.T) {
 	tm := startCommitTUI(t, repoDir, middleHashBefore)
 
 	// Wait for commit view to load showing the middle commit's files
-	waitForCommitE2ETexts(t, tm, commitE2ELoadWait, "middle", "a.txt")
+	waitForCommitE2EText(t, tm, "a.txt", commitE2ELoadWait)
+
+	// Open the commit-info popup to confirm the right commit's subject loaded.
+	tm.Send(commitE2EKeyRune('i'))
+	waitForCommitE2EText(t, tm, "middle", commitE2ELoadWait)
+	tm.Send(commitE2EKeyRune('i'))
 
 	tm.Send(commitE2EKeyRune('A'))
 
@@ -193,7 +198,12 @@ func TestAmendE2E_HEAD_FromCommitView(t *testing.T) {
 	tm := startCommitTUI(t, repoDir, "HEAD")
 
 	// Wait for commit view to load
-	waitForCommitE2ETexts(t, tm, commitE2ELoadWait, "tip", "c.txt")
+	waitForCommitE2EText(t, tm, "c.txt", commitE2ELoadWait)
+
+	// Open the commit-info popup to confirm the right commit's subject loaded.
+	tm.Send(commitE2EKeyRune('i'))
+	waitForCommitE2EText(t, tm, "tip", commitE2ELoadWait)
+	tm.Send(commitE2EKeyRune('i'))
 
 	tm.Send(commitE2EKeyRune('A'))
 
@@ -264,7 +274,7 @@ func TestNarrowFiletreeSelectionStaysVisible_E2E(t *testing.T) {
 	// Narrow terminal (width < 90) triggers the stacked/portrait files+diff layout.
 	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(60, 24))
 
-	waitForCommitE2ETexts(t, tm, commitE2ELoadWait, "change all", "file001.txt")
+	waitForCommitE2EText(t, tm, "file001.txt", commitE2ELoadWait)
 
 	// Move the selection past the bottom of the files pane.
 	for range fileCount + 5 {
