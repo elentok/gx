@@ -14,7 +14,7 @@ declaring the tickets that **block** it — published to gx's local markdown tra
 skill only covers how to break work up and what to put in each ticket.
 
 Estimate the amount of tokens that will be needed for the implementation of each ticket; if a ticket
-will need more than 130K tokens, split it.
+will need more than 70K tokens, split it.
 
 When estimating, budget for the whole session, not just the diff size. A ticket that only adds ~150
 lines can still blow the budget once you add:
@@ -122,6 +122,9 @@ Present the proposed breakdown as a numbered list. For each ticket, show:
 - **Blocked by**: which other tickets (if any) must complete first
 - **What it delivers**: the end-to-end behaviour this ticket makes work
 - **Test seams**: the seams from step 4
+- **Estimated context window**: the token estimate behind step 3's split decision — always shown, not
+  just when a ticket is borderline, so the user can judge granularity against the same number that
+  drove the split
 
 Ask the user:
 
