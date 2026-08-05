@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"sync"
@@ -117,6 +118,108 @@ func TestQueueStoreIncompleteStateFallsBackWhole(t *testing.T) {
 	}
 	if snapshot := loadQueueStoreAt(path).Snapshot(); len(snapshot.Checked) != 0 || len(snapshot.Order) != 0 {
 		t.Fatalf("partially loaded state: %#v", snapshot)
+	}
+}
+
+// TestQueueStoreTicketCheckedIsIndependentOfQueued exercises ticket 14's
+// decoupled API: SetTicketChecked/IsTicketChecked never touch queue
+// membership, and SetQueued/EnqueueAndClearChecked never touch the
+// independent checked set except where clearedPaths says to.
+func TestQueueStoreTicketCheckedIsIndependentOfQueued(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "queue.json")
+	store := loadQueueStoreAt(path)
+
+	if err := store.SetTicketChecked([]string{"a", "b"}, true); err != nil {
+		t.Fatal(err)
+	}
+	if !store.IsTicketChecked("a") || store.IsQueued("a") {
+		t.Fatalf("checking a ticket must not queue it: checked=%v queued=%v", store.IsTicketChecked("a"), store.IsQueued("a"))
+	}
+
+	if err := store.SetQueued([]string{"a"}, true); err != nil {
+		t.Fatal(err)
+	}
+	if !store.IsQueued("a") || !store.IsTicketChecked("a") || !store.IsTicketChecked("b") {
+		t.Fatalf("queueing a ticket must not clear the independent checked set")
+	}
+
+	reloaded := loadQueueStoreAt(path)
+	snapshot := reloaded.Snapshot()
+	if !snapshot.TicketChecked["a"] || !snapshot.TicketChecked["b"] || !snapshot.Checked["a"] {
+		t.Fatalf("independent checked set did not round-trip: %#v", snapshot)
+	}
+}
+
+// TestQueueStoreEnqueueAndClearChecked exercises the atomic transfer method
+// ticket 15's replaceQueuedSelection is designed to use: it replaces queue
+// membership wholesale and clears exactly clearedPaths from the checked set,
+// leaving any other checked entry untouched.
+func TestQueueStoreEnqueueAndClearChecked(t *testing.T) {
+	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
+	if err := store.SetTicketChecked([]string{"a", "b", "keep-checked"}, true); err != nil {
+		t.Fatal(err)
+	}
+
+	queued := map[string]queueItemStatus{"a": queueStatusPending, "b": queueStatusPending}
+	order := map[string]uint64{"a": 1, "b": 2}
+	if err := store.EnqueueAndClearChecked(queued, order, []string{"a", "b"}); err != nil {
+		t.Fatal(err)
+	}
+
+	snapshot := store.Snapshot()
+	if snapshot.Status["a"] != queueStatusPending || snapshot.Status["b"] != queueStatusPending {
+		t.Fatalf("enqueued paths not reflected in queue status: %#v", snapshot.Status)
+	}
+	if snapshot.TicketChecked["a"] || snapshot.TicketChecked["b"] {
+		t.Fatalf("cleared paths still checked: %#v", snapshot.TicketChecked)
+	}
+	if !snapshot.TicketChecked["keep-checked"] {
+		t.Fatalf("unrelated checked entry was cleared: %#v", snapshot.TicketChecked)
+	}
+}
+
+// TestQueueStoreMigratesLegacyItemsIntoIndependentCheckedSet asserts ticket
+// 13's migration design: a pre-decoupling queue-state.json (no "checked"
+// key) has every one of its Items entries treated as both checked and
+// queued on first load, since the old format never distinguished the two.
+func TestQueueStoreMigratesLegacyItemsIntoIndependentCheckedSet(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "queue.json")
+	legacy := `{"items":{"a":"pending","b":"done"},"check_order":{"a":1,"b":2}}`
+	if err := os.WriteFile(path, []byte(legacy), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	store := loadQueueStoreAt(path)
+	snapshot := store.Snapshot()
+	if snapshot.Status["a"] != queueStatusPending || snapshot.Status["b"] != queueStatusDone {
+		t.Fatalf("legacy queue status lost: %#v", snapshot.Status)
+	}
+	if snapshot.Order["a"] != 1 || snapshot.Order["b"] != 2 {
+		t.Fatalf("legacy check_order lost: %#v", snapshot.Order)
+	}
+	if !snapshot.TicketChecked["a"] || !snapshot.TicketChecked["b"] {
+		t.Fatalf("legacy items not migrated into independent checked set: %#v", snapshot.TicketChecked)
+	}
+	if snapshot.TicketCheckOrder["a"] != 1 || snapshot.TicketCheckOrder["b"] != 2 {
+		t.Fatalf("legacy check_order not migrated into independent check order: %#v", snapshot.TicketCheckOrder)
+	}
+
+	if err := store.SetTicketChecked([]string{"a"}, false); err != nil {
+		t.Fatal(err)
+	}
+	reread, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var onDisk persistedQueueState
+	if err := json.Unmarshal(reread, &onDisk); err != nil {
+		t.Fatal(err)
+	}
+	if onDisk.Checked["a"] || !onDisk.Checked["b"] {
+		t.Fatalf("post-migration write did not persist the independent checked shape: %#v", onDisk)
+	}
+	if onDisk.Items["a"] != queueStatusPending || onDisk.Items["b"] != queueStatusDone {
+		t.Fatalf("post-migration write lost queue membership: %#v", onDisk.Items)
 	}
 }
 
