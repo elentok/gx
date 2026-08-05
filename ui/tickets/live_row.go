@@ -27,9 +27,10 @@ type liveTicketState struct {
 	pauseKind ralphloop.PauseKind
 	reason    string
 	phase     livePhase
-	// startedAt is the epic run's start time (RunSnapshot.StartedAt), shared
-	// by every ticket in that run, so elapsed time keeps climbing across a
-	// pause/resume instead of resetting. Zero if the run hasn't started.
+	// startedAt is this ticket's own start time (RunTicketSnapshot.StartedAt),
+	// stamped when its iteration begins, so elapsed time keeps climbing across
+	// a pause/resume instead of resetting, and doesn't conflate two tickets in
+	// the same run. Zero if the ticket hasn't started.
 	startedAt time.Time
 	// tokens is the last context-occupancy reading for this ticket —
 	// frozen (not zeroed) while paused, since the underlying session's
@@ -54,14 +55,14 @@ func projectLiveTickets(snapshot RunSnapshot) map[string]liveTicketState {
 			reason:    ticket.PauseReason,
 			phase:     livePhaseImplementing,
 			tokens:    ticket.ContextTokens,
-			startedAt: snapshot.StartedAt,
+			startedAt: ticket.StartedAt,
 		}
 	}
 	return live
 }
 
 // liveElapsedSeconds computes a running/paused ticket's elapsed time from
-// live.startedAt (the epic run's start time), so it keeps climbing across
+// live.startedAt (that ticket's own start time), so it keeps climbing across
 // renders without a UI-side stopwatch. Zero if startedAt hasn't been set.
 func liveElapsedSeconds(live liveTicketState) int {
 	if live.startedAt.IsZero() {

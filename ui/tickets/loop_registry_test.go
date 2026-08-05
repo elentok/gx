@@ -81,6 +81,31 @@ func TestReduceLiveEventCapturesProgressContextAndPause(t *testing.T) {
 	}
 }
 
+func TestReduceLiveEventStampsPerTicketStartedAt(t *testing.T) {
+	r := newLoopRegistry(1)
+	r.tryStart("epic-a", 0, 2)
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationStarted, Identifier: "01", Label: "iter-01",
+	})
+	first, _ := r.runSnapshot("epic-a")
+	firstStartedAt := first.Tickets["01"].StartedAt
+	if firstStartedAt.IsZero() {
+		t.Fatal("ticket 01 StartedAt: want non-zero after its own iteration started")
+	}
+
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationStarted, Identifier: "02", Label: "iter-02",
+	})
+	second, _ := r.runSnapshot("epic-a")
+	if second.Tickets["01"].StartedAt != firstStartedAt {
+		t.Fatalf("ticket 01 StartedAt changed after a different ticket started: got %v, want %v",
+			second.Tickets["01"].StartedAt, firstStartedAt)
+	}
+	if second.Tickets["02"].StartedAt.IsZero() {
+		t.Fatal("ticket 02 StartedAt: want non-zero after its own iteration started")
+	}
+}
+
 func TestReduceLiveEventCompletesTicketProgress(t *testing.T) {
 	r := newLoopRegistry(1)
 	r.tryStart("epic-a", 1, 3)

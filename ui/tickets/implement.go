@@ -60,6 +60,7 @@ type RunTicketSnapshot struct {
 	PauseKind     ralphloop.PauseKind
 	PauseReason   string
 	ContextTokens int
+	StartedAt     time.Time
 }
 
 type RunSnapshot struct {
@@ -165,6 +166,7 @@ func (r *loopRegistry) reduceLiveEvent(epicName string, event ralphloop.LiveEven
 			Identifier: event.Identifier,
 			Label:      event.Label,
 			Running:    true,
+			StartedAt:  time.Now(),
 		}
 	case ralphloop.LiveEventContextOccupancy:
 		ticket, ok := run.tickets[event.Identifier]

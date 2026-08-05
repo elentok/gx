@@ -121,11 +121,14 @@ func TestCrossTabLiveMetricsRenderSameFiguresFromSharedProjection(t *testing.T) 
 
 	r := newLoopRegistry(1)
 	r.tryStart("epic-a", 0, 1)
-	// Backdate the run's start so elapsed time renders as a real nonzero
-	// duration ("2m03s") instead of racing the clock for a nonzero "0s"/"1s".
-	r.runs["epic-a"].startedAt = time.Now().Add(-123 * time.Second)
 	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Label: "iter-01a", Identifier: "01"})
 	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{Kind: ralphloop.LiveEventContextOccupancy, Identifier: "01", Tokens: 4200})
+	// Backdate the ticket's own start so elapsed time renders as a real
+	// nonzero duration ("2m03s") instead of racing the clock for a nonzero
+	// "0s"/"1s".
+	ticket := r.runs["epic-a"].tickets["01"]
+	ticket.StartedAt = time.Now().Add(-123 * time.Second)
+	r.runs["epic-a"].tickets["01"] = ticket
 	previous := ralphLoopRegistry
 	ralphLoopRegistry = r
 	t.Cleanup(func() {
