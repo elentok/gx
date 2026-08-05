@@ -4,6 +4,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/terminalrun"
 )
@@ -12,6 +13,8 @@ const (
 	bindingTicketsBack           keys.BindingID = "back"
 	bindingTicketsDown           keys.BindingID = "down"
 	bindingTicketsUp             keys.BindingID = "up"
+	bindingTicketsPageDown       keys.BindingID = "page-down"
+	bindingTicketsPageUp         keys.BindingID = "page-up"
 	bindingTicketsCollapse       keys.BindingID = "collapse"
 	bindingTicketsExpand         keys.BindingID = "expand"
 	bindingTicketsToggle         keys.BindingID = "toggle"
@@ -41,6 +44,8 @@ func newTicketsManager() keys.Manager {
 		{ID: bindingTicketsDown, Seq: []string{"down"}, Categories: []string{}, Title: ""},
 		{ID: bindingTicketsUp, Seq: []string{"k"}, Categories: []string{"Navigation"}, Title: "up", Display: "↑/k"},
 		{ID: bindingTicketsUp, Seq: []string{"up"}, Categories: []string{}, Title: ""},
+		{ID: bindingTicketsPageDown, Seq: []string{"ctrl+d"}, Categories: []string{"Navigation"}, Title: "page down"},
+		{ID: bindingTicketsPageUp, Seq: []string{"ctrl+u"}, Categories: []string{"Navigation"}, Title: "page up"},
 		{ID: bindingTicketsCollapse, Seq: []string{"h"}, Categories: []string{"Navigation"}, Title: "collapse epic", Display: "h/←"},
 		{ID: bindingTicketsCollapse, Seq: []string{"left"}, Categories: []string{}, Title: ""},
 		{ID: bindingTicketsExpand, Seq: []string{"l"}, Categories: []string{"Navigation"}, Title: "expand epic / focus preview", Display: "l/→"},
@@ -93,6 +98,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.moveSelection(1)
 	case bindingTicketsUp:
 		m.moveSelection(-1)
+	case bindingTicketsPageDown:
+		m.moveSelection(list.DefaultScroll)
+	case bindingTicketsPageUp:
+		m.moveSelection(-list.DefaultScroll)
 	case bindingTicketsCollapse:
 		m.collapseSelectedEpic()
 	case bindingTicketsExpand:

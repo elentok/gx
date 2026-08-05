@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/list"
 )
 
 func TestModel_SidebarScrollbarAppearsOnlyWhenListOverflows(t *testing.T) {
@@ -60,6 +61,43 @@ func TestModel_MouseWheelScrollsSidebarWithoutMovingSelection(t *testing.T) {
 	}
 	if m.selected != selected {
 		t.Fatalf("expected mouse wheel to leave selection at %d, got %d", selected, m.selected)
+	}
+}
+
+// TestModel_CtrlDCtrlUPagesSidebar mirrors the Queue tab's ctrl+d/ctrl+u
+// paging test — both tabs must page by list.DefaultScroll rows.
+func TestModel_CtrlDCtrlUPagesSidebar(t *testing.T) {
+	root := t.TempDir()
+	for i := 1; i <= 40; i++ {
+		writeTicket(t, root, "epic", fmt.Sprintf("%02d-ticket.md", i), "Status: open\n\nBody.\n")
+	}
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 10})
+	m = updated.(Model)
+
+	if m.selected != 0 {
+		t.Fatalf("expected initial selection at 0, got %d", m.selected)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
+	m = updated.(Model)
+	if m.selected != list.DefaultScroll {
+		t.Fatalf("expected ctrl+d to move selection by %d, got %d", list.DefaultScroll, m.selected)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
+	m = updated.(Model)
+	if m.selected != 0 {
+		t.Fatalf("expected ctrl+u to move selection back to 0, got %d", m.selected)
+	}
+
+	// Clamps at the top: ctrl+u past the start stays at 0.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
+	m = updated.(Model)
+	if m.selected != 0 {
+		t.Fatalf("expected ctrl+u to clamp at 0, got %d", m.selected)
 	}
 }
 
