@@ -61,6 +61,11 @@ type Model struct {
 
 	selected       int
 	collapsedEpics map[string]bool
+	// hideDone is the "tc" chord's toggle (ticket 08): when set, done tickets
+	// are excluded from visibleRows()/sidebarLines() navigation and
+	// rendering. Epic done/total header counts read epic.Tickets directly
+	// (renderEpicRow), so they're unaffected by this filter.
+	hideDone bool
 	// checked is the execution queue's seed selection (ticket 04): tickets the
 	// user has marked for a future run, keyed by Ticket.Path so it survives a
 	// reload's re-sorting/index-shuffling. Later tickets (06, 07, 09, 11) read

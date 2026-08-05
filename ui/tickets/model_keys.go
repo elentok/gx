@@ -9,21 +9,22 @@ import (
 )
 
 const (
-	bindingTicketsBack        keys.BindingID = "back"
-	bindingTicketsDown        keys.BindingID = "down"
-	bindingTicketsUp          keys.BindingID = "up"
-	bindingTicketsCollapse    keys.BindingID = "collapse"
-	bindingTicketsExpand      keys.BindingID = "expand"
-	bindingTicketsToggle      keys.BindingID = "toggle"
-	bindingTicketsResume      keys.BindingID = "resume"
-	bindingTicketsRefresh     keys.BindingID = "refresh"
-	bindingTicketsEditInPlace keys.BindingID = "edit"
-	bindingTicketsEditHSplit  keys.BindingID = "edit-hsplit"
-	bindingTicketsEditVSplit  keys.BindingID = "edit-vsplit"
-	bindingTicketsEditTab     keys.BindingID = "edit-tab"
-	bindingTicketsCancelChord keys.BindingID = "cancel-chord"
-	bindingTicketsImplement   keys.BindingID = "implement"
-	bindingTicketsToggleCheck keys.BindingID = "toggle-check"
+	bindingTicketsBack           keys.BindingID = "back"
+	bindingTicketsDown           keys.BindingID = "down"
+	bindingTicketsUp             keys.BindingID = "up"
+	bindingTicketsCollapse       keys.BindingID = "collapse"
+	bindingTicketsExpand         keys.BindingID = "expand"
+	bindingTicketsToggle         keys.BindingID = "toggle"
+	bindingTicketsResume         keys.BindingID = "resume"
+	bindingTicketsRefresh        keys.BindingID = "refresh"
+	bindingTicketsEditInPlace    keys.BindingID = "edit"
+	bindingTicketsEditHSplit     keys.BindingID = "edit-hsplit"
+	bindingTicketsEditVSplit     keys.BindingID = "edit-vsplit"
+	bindingTicketsEditTab        keys.BindingID = "edit-tab"
+	bindingTicketsCancelChord    keys.BindingID = "cancel-chord"
+	bindingTicketsImplement      keys.BindingID = "implement"
+	bindingTicketsToggleCheck    keys.BindingID = "toggle-check"
+	bindingTicketsToggleHideDone keys.BindingID = "toggle-hide-done"
 )
 
 // newTicketsManager builds the key manager for the sidebar's focus: plain
@@ -55,6 +56,7 @@ func newTicketsManager() keys.Manager {
 		{ID: bindingTicketsCancelChord, Seq: []string{"e", "esc"}, Categories: []string{}, Title: ""},
 		{ID: bindingTicketsImplement, Seq: []string{"i"}, Categories: []string{"Navigation"}, Title: "implement epic"},
 		{ID: bindingTicketsToggleCheck, Seq: []string{"space"}, Categories: []string{"Navigation"}, Title: "check/uncheck"},
+		{ID: bindingTicketsToggleHideDone, Seq: []string{"t", "c"}, Categories: []string{"Navigation"}, Title: "hide completed"},
 	})
 }
 
@@ -119,8 +121,21 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handleImplementKey()
 	case bindingTicketsToggleCheck:
 		return m.handleToggleCheck()
+	case bindingTicketsToggleHideDone:
+		m.toggleHideDone()
 	}
 	return m, nil
+}
+
+// toggleHideDone flips the "tc" hide-complete filter and re-clamps
+// selection, since hiding done tickets can shrink visibleRows() out from
+// under the current cursor position.
+func (m *Model) toggleHideDone() {
+	m.hideDone = !m.hideDone
+	if m.search.HasQuery() {
+		m.recomputeSearchMatches()
+	}
+	m.clampSelected()
 }
 
 func (m *Model) moveSelection(delta int) {

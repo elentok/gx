@@ -101,7 +101,10 @@ func (m Model) visibleRows() []row {
 }
 
 // rowsForEpicOrder expands an ordered slice of epic indexes into their rows:
-// each epic row followed by its (sorted) ticket rows, unless collapsed.
+// each epic row followed by its (sorted) ticket rows, unless collapsed. With
+// m.hideDone set (the "tc" chord), tickets whose RenderedStatus is
+// StatusDone are left out of that ticket-row expansion — the epic row itself
+// always renders, even if every one of its tickets is hidden this way.
 func (m Model) rowsForEpicOrder(order []int) []row {
 	var rows []row
 	for _, epicIdx := range order {
@@ -111,6 +114,9 @@ func (m Model) rowsForEpicOrder(order []int) []row {
 			continue
 		}
 		for _, ticketIdx := range sortedTicketIndexes(epic) {
+			if m.hideDone && epic.RenderedStatus(epic.Tickets[ticketIdx]) == tickets.StatusDone {
+				continue
+			}
 			rows = append(rows, row{epicIdx: epicIdx, ticketIdx: ticketIdx})
 		}
 	}
