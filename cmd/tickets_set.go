@@ -14,7 +14,9 @@ import (
 // .scratch/ralph-tickets-visibility/issues/02-tickets-set-cli.md's Answer:
 // plain text an agent skill can quote directly as instructions, not a format
 // meant to be parsed programmatically.
-const ticketsSchemaText = `Settable fields:
+const ticketsSchemaText = `Ticket frontmatter fields:
+
+Settable fields:
   status (enum, --status): open, claimed, ready-for-agent, ready-for-human, needs-triage,
     needs-info, needs-attention, done, superseded
   blocked_by (comma-separated ticket IDs, --blocked-by): e.g. 01,03
@@ -32,6 +34,14 @@ Read-only fields (gx-managed, not settable via ` + "`set`" + `):
   id — ticket identity, fixed at creation
   actual_context_window — stamped by ralphloop at land time
   elapsed_time — stamped by ralphloop at land time
+
+Epic frontmatter fields:
+
+An epic's optional ` + "`.scratch/<epic>/epic.yaml`" + ` sidecar file holds epic-level timing,
+distinct from any ticket's own frontmatter. Both fields are gx-managed, not settable via
+` + "`tickets set`" + `, and an epic with no epic.yaml yet has both unset.
+  started_at (RFC3339 timestamp) — when work on the epic began
+  completed_at (RFC3339 timestamp) — when the epic's last ticket landed
 `
 
 func newTicketsSetCmd() *cobra.Command {

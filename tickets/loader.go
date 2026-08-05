@@ -6,8 +6,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/elentok/gx/tickets/schema"
+	"gopkg.in/yaml.v3"
 )
 
 var ticketFilenameRe = regexp.MustCompile(`^(\d+)([[:alpha:]]*)-(.+)\.md$`)
@@ -42,6 +44,8 @@ func loadEpic(scratchDir, name string) Epic {
 		epic.IsMap = true
 		epic.MapBody = string(raw)
 	}
+
+	epic.StartedAt, epic.CompletedAt = loadEpicTiming(epicPath)
 
 	issuesDir := filepath.Join(epicPath, "issues")
 	issueEntries, err := os.ReadDir(issuesDir)
@@ -118,6 +122,39 @@ func humanizeSlug(slug string) string {
 		return title
 	}
 	return strings.ToUpper(title[:1]) + title[1:]
+}
+
+// epicYAML is the on-disk shape of an epic's optional `epic.yaml` sidecar
+// file (see loadEpicTiming). Both fields are optional: an epic with no
+// epic.yaml, or one that omits a field, leaves the corresponding Epic
+// timestamp zero-valued rather than erroring.
+type epicYAML struct {
+	StartedAt   *time.Time `yaml:"started_at,omitempty"`
+	CompletedAt *time.Time `yaml:"completed_at,omitempty"`
+}
+
+// loadEpicTiming reads epicPath's epic.yaml sidecar, if present, for the
+// epic's started_at/completed_at timestamps. A missing or unparsable file is
+// not an error here — it just leaves both timestamps zero, the same as an
+// epic with no timing data recorded yet.
+func loadEpicTiming(epicPath string) (startedAt, completedAt time.Time) {
+	raw, err := os.ReadFile(filepath.Join(epicPath, "epic.yaml"))
+	if err != nil {
+		return time.Time{}, time.Time{}
+	}
+
+	var wire epicYAML
+	if err := yaml.Unmarshal(raw, &wire); err != nil {
+		return time.Time{}, time.Time{}
+	}
+
+	if wire.StartedAt != nil {
+		startedAt = *wire.StartedAt
+	}
+	if wire.CompletedAt != nil {
+		completedAt = *wire.CompletedAt
+	}
+	return startedAt, completedAt
 }
 
 // idsToStrings lowers schema.TicketIDs to plain strings for tickets.Ticket's

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func writeFile(t *testing.T, path, content string) {
@@ -192,6 +193,50 @@ func TestLoad_SurfacesSplitAndSplitFrom(t *testing.T) {
 	}
 	if child.Split != nil {
 		t.Errorf("child.Split = %v, want nil", child.Split)
+	}
+}
+
+func TestLoad_EpicYAMLRoundTripsTimestamps(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "timed-epic", "epic.yaml"),
+		"started_at: 2026-01-02T03:04:05Z\ncompleted_at: 2026-01-03T04:05:06Z\n")
+
+	epics, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(epics) != 1 {
+		t.Fatalf("expected 1 epic, got %d", len(epics))
+	}
+
+	wantStarted := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	wantCompleted := time.Date(2026, 1, 3, 4, 5, 6, 0, time.UTC)
+	if !epics[0].StartedAt.Equal(wantStarted) {
+		t.Errorf("StartedAt = %v, want %v", epics[0].StartedAt, wantStarted)
+	}
+	if !epics[0].CompletedAt.Equal(wantCompleted) {
+		t.Errorf("CompletedAt = %v, want %v", epics[0].CompletedAt, wantCompleted)
+	}
+}
+
+func TestLoad_EpicWithNoEpicYAMLLeavesTimestampsZero(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "untimed-epic"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	epics, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(epics) != 1 {
+		t.Fatalf("expected 1 epic, got %d", len(epics))
+	}
+	if !epics[0].StartedAt.IsZero() {
+		t.Errorf("StartedAt = %v, want zero", epics[0].StartedAt)
+	}
+	if !epics[0].CompletedAt.IsZero() {
+		t.Errorf("CompletedAt = %v, want zero", epics[0].CompletedAt)
 	}
 }
 

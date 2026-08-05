@@ -1,5 +1,7 @@
 package tickets
 
+import "time"
+
 // Epic is one immediate subdirectory of `.scratch/`. Discovery is dumb: an
 // epic is counted regardless of which files exist inside it (spec.md,
 // map.md, only issues/, or nothing yet).
@@ -9,6 +11,12 @@ type Epic struct {
 	IsMap   bool   // has a map.md (wayfinder map)
 	MapBody string // map.md's raw content, only set when IsMap
 	Tickets []Ticket
+
+	// StartedAt and CompletedAt come from the epic's optional epic.yaml
+	// sidecar file (see loadEpicTiming). Zero when the epic has no
+	// epic.yaml yet, or the file doesn't set that field.
+	StartedAt   time.Time
+	CompletedAt time.Time
 
 	// WorktreeName is the owning worktree's directory name, set only in
 	// `gx tickets --all` aggregation (empty for the single-worktree view).

@@ -8,6 +8,21 @@ import (
 	"testing"
 )
 
+func TestTicketsSchemaText_HasTicketAndEpicSections(t *testing.T) {
+	if !strings.Contains(ticketsSchemaText, "Ticket frontmatter fields:") {
+		t.Error("schema text missing \"Ticket frontmatter fields:\" section")
+	}
+	if !strings.Contains(ticketsSchemaText, "Epic frontmatter fields:") {
+		t.Error("schema text missing \"Epic frontmatter fields:\" section")
+	}
+	if !strings.Contains(ticketsSchemaText, "started_at") {
+		t.Error("schema text missing started_at")
+	}
+	if !strings.Contains(ticketsSchemaText, "completed_at") {
+		t.Error("schema text missing completed_at")
+	}
+}
+
 func TestExecute_TicketsSet_MultiFieldSuccess(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
