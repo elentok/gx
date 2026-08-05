@@ -41,6 +41,7 @@ func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t
 		Ticket:           t,
 		ScratchDir:       paths.ScratchDir,
 		FeatureLock:      rp.FeatureLock,
+		WorktreeLock:     rp.WorktreeLock,
 		SmartZone:        rp.SmartZone,
 		Gate:             rp.Gate,
 		ResumeSignalPath: rp.ResumeSignalPath,
@@ -70,7 +71,10 @@ func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t
 		return fmt.Errorf("checking leftover worktree during repair cleanup: %w", err)
 	}
 	if hasWorktree {
-		if err := d.RemoveWorktree(paths.RepoDir, path, true); err != nil {
+		rp.WorktreeLock.Lock()
+		err := d.RemoveWorktree(paths.RepoDir, path, true)
+		rp.WorktreeLock.Unlock()
+		if err != nil {
 			return fmt.Errorf("removing repaired iteration worktree: %w", err)
 		}
 	}
@@ -95,7 +99,7 @@ func finishStaleCleanup(d Deps, rp reconcileParams, featureBranch string, t tick
 	path := iterationWorktreePath(paths.WorktreeDir, featureBranch, t.Identifier)
 	tabID := tabIDForLabel(tabs, label)
 
-	return finishCleanup(d, paths.RepoDir, paths.FeatureWorktree, path, branch, tabID)
+	return finishCleanup(d, rp.WorktreeLock, paths.RepoDir, paths.FeatureWorktree, path, branch, tabID)
 }
 
 // tabIDForLabel finds the tab id of the live tab named label, or "" if none

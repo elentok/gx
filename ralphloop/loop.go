@@ -210,11 +210,15 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	// ticket. featureMu guards the one operation that mutates the shared
 	// feature worktree's working directory (the cherry-pick landing a
 	// finished iteration's commits), so concurrent iterations never cherry-
-	// pick into it at the same time. sink is safe for concurrent use on its
-	// own (see EventSink), since a paused iteration reports its pause/resume
-	// from its own goroutine.
+	// pick into it at the same time. worktreeMu guards every `git worktree
+	// add`/`git worktree remove` against RepoDir, since git's own worktree
+	// administrative files aren't safe under concurrent add/remove on the
+	// same repo. sink is safe for concurrent use on its own (see EventSink),
+	// since a paused iteration reports its pause/resume from its own
+	// goroutine.
 	var scheduleMu sync.Mutex
 	var featureMu sync.Mutex
+	var worktreeMu sync.Mutex
 
 	gate := opts.Gate
 	if gate == nil {
@@ -274,6 +278,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 				Ticket:           ticket,
 				ScratchDir:       scratchDir,
 				FeatureLock:      &featureMu,
+				WorktreeLock:     &worktreeMu,
 				SmartZone:        smartZone,
 				Gate:             gate,
 				ResumeSignalPath: resumePath,
@@ -301,6 +306,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		Gate:             gate,
 		ResumeSignalPath: resumePath,
 		FeatureLock:      &featureMu,
+		WorktreeLock:     &worktreeMu,
 		Sink:             sink,
 		Scope:            scope,
 	}, *initial)

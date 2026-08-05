@@ -19,14 +19,15 @@ import (
 // for reconcile to run.
 func testReconcileParams(workspaceID string, paths reconcilePaths, sink EventSink) reconcileParams {
 	return reconcileParams{
-		WorkspaceID: workspaceID,
-		Paths:       paths,
-		Agent:       AgentClaude,
-		SmartZone:   defaultSmartZone,
-		Gate:        NewGate(),
-		FeatureLock: &sync.Mutex{},
-		Sink:        sink,
-		Scope:       RunScope{wholeEpic: true},
+		WorkspaceID:  workspaceID,
+		Paths:        paths,
+		Agent:        AgentClaude,
+		SmartZone:    defaultSmartZone,
+		Gate:         NewGate(),
+		FeatureLock:  &sync.Mutex{},
+		WorktreeLock: &sync.Mutex{},
+		Sink:         sink,
+		Scope:        RunScope{wholeEpic: true},
 	}
 }
 

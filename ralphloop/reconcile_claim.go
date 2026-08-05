@@ -47,6 +47,7 @@ func reconcileOrphanedClaim(d Deps, rp reconcileParams, featureBranch string, t 
 				Ticket:           t,
 				ScratchDir:       paths.ScratchDir,
 				FeatureLock:      rp.FeatureLock,
+				WorktreeLock:     rp.WorktreeLock,
 				SmartZone:        rp.SmartZone,
 				Gate:             rp.Gate,
 				ResumeSignalPath: rp.ResumeSignalPath,
@@ -70,7 +71,7 @@ func reconcileOrphanedClaim(d Deps, rp reconcileParams, featureBranch string, t 
 			}
 
 			tabID := tabIDForLabel(tabs, label)
-			if err := finishCleanup(d, paths.RepoDir, paths.FeatureWorktree, path, branch, tabID); err != nil {
+			if err := finishCleanup(d, rp.WorktreeLock, paths.RepoDir, paths.FeatureWorktree, path, branch, tabID); err != nil {
 				return fmt.Errorf("cleaning up orphaned claim %s: %w", t.Identifier, err)
 			}
 

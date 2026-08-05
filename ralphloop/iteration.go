@@ -5,6 +5,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/elentok/gx/git"
@@ -36,7 +37,10 @@ func runIteration(d Deps, p iterationParams) error {
 		return fmt.Errorf("resolving %s tip: %w", p.FeatureBranch, err)
 	}
 
-	if err := d.AddWorktree(p.RepoDir, path, branch, base); err != nil {
+	p.WorktreeLock.Lock()
+	err = d.AddWorktree(p.RepoDir, path, branch, base)
+	p.WorktreeLock.Unlock()
+	if err != nil {
 		return fmt.Errorf("creating iteration worktree: %w", err)
 	}
 
@@ -193,7 +197,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 		}
 		if current.Commitless && current.Status != schema.StatusClaimed {
 			p.logTicketEvent(eventCommitless, pane, tab, sessionID, path)
-			return finishCleanup(d, p.RepoDir, p.FeatureWorktree, path, branch, tab)
+			return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, tab)
 		}
 
 		// The agent finished without landing any commits: leave the worktree/
@@ -216,7 +220,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 		return fmt.Errorf("marking ticket done: %w", err)
 	}
 
-	return finishCleanup(d, p.RepoDir, p.FeatureWorktree, path, branch, tab)
+	return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, tab)
 }
 
 // markDoneStampingCloseMetadata marks p.Ticket done, stamping the closing
@@ -326,13 +330,16 @@ func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane, ta
 // startup after a crash (any subset of the three may have survived — see
 // classifyDoneTicket's doneStaleCleanup). tabID is "" if no live tab was
 // found for this iteration.
-func finishCleanup(d Deps, repoDir, featureWorktree, path, branch, tabID string) error {
+func finishCleanup(d Deps, worktreeLock *sync.Mutex, repoDir, featureWorktree, path, branch, tabID string) error {
 	hasWorktree, err := d.WorktreeExists(path)
 	if err != nil {
 		return fmt.Errorf("checking iteration worktree: %w", err)
 	}
 	if hasWorktree {
-		if err := d.RemoveWorktree(repoDir, path, true); err != nil {
+		worktreeLock.Lock()
+		err := d.RemoveWorktree(repoDir, path, true)
+		worktreeLock.Unlock()
+		if err != nil {
 			return fmt.Errorf("removing iteration worktree: %w", err)
 		}
 	}

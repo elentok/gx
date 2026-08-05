@@ -34,6 +34,13 @@ type iterationParams struct {
 	// commits onto it), so concurrently-running iterations never do so at
 	// the same time.
 	FeatureLock *sync.Mutex
+	// WorktreeLock serializes every `git worktree add`/`git worktree remove`
+	// against RepoDir: git's own worktree administrative files (.git/
+	// worktrees/<name>/) aren't safe under concurrent add/remove calls on the
+	// same repo, so without this two iterations creating/removing their
+	// worktrees at once can corrupt each other's metadata (seen in CI as
+	// "failed to read .git/worktrees/<name>/commondir: Success").
+	WorktreeLock *sync.Mutex
 
 	// SmartZone is the context-token ceiling before an iteration (or its
 	// conflict-resolution agent) gets paused.
