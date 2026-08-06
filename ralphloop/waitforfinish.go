@@ -292,6 +292,18 @@ func confirmCompactSubmittedWithRetry(d Deps, pane string) error {
 // smartZoneCompactTimeoutMs can still be confirmed successful from the
 // transcript's compaction-boundary signal instead of being misreported as a
 // failure — see waitForCompactionSignal's doc comment.
+//
+// Neither AgentPrompt call below reads the pane back to confirm "/compact" or
+// the finish-up text was actually submitted before treating the wait as
+// meaningful. That's safe only because every call here passes Wait: true:
+// herdr's own --wait (as of 0.8.0) captures a state_change_seq baseline at
+// submission and refuses to match Until against anything until that sequence
+// actually advances, so a prompt sitting typed-but-unsubmitted in the pane
+// (herdr's `agent prompt` sends the trailing Enter from a task delayed up to
+// 300ms after returning, see herdr's AGENT_PROMPT_SUBMIT_DELAY) can't be
+// mistaken for a state that predates it. This is herdr behavior, not
+// something gx enforces — an AgentPrompt call added here without Wait: true
+// would reintroduce the race this comment is warning about.
 func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason string, smartZone int) (bool, error) {
 	p.sink().SmartZoneCompactStarted(p.Ticket)
 	p.logAgentEvent(eventPausedSmartZone, sessionID, reason)

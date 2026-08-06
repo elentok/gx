@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.25.1 - 2026-08-06
+
+- Fixed `RunScope.Contains` to walk the `SplitFrom` chain, so a mid-run split's descendant tickets are recognized in scope without a fresh ralph-loop invocation.
+- Added a once-per-process restart-recovery scan that surfaces recoverable epics as progress notifications on the Tickets tab's first activation.
+- Fixed a `/compact` prompt-submission race where the finish-up prompt could land concatenated with a not-yet-submitted `/compact`.
+- Fixed `confirmCompactSubmittedWithRetry` burning its retry budget by pacing on sleep instead of agent-status polling.
+- Mirrored the checkbox prefix into live ticket rows and removed the unused epic-gutter marker code.
+
 ## v0.25.0 - 2026-08-05
 
 - Decoupled the Tickets tab's checked state from the Queue tab's queue state, so checking tickets and queuing them are independent actions that stay in sync end-to-end.
