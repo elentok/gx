@@ -265,6 +265,11 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleSidebarMouseClick(msg)
 
 	case tea.MouseWheelMsg:
+		if m.focus == focusPreview {
+			var cmd tea.Cmd
+			m.previewVP, cmd = m.previewVP.Update(msg)
+			return m, cmd
+		}
 		return m.handleSidebarMouseWheel(msg)
 
 	case implementStartedMsg:
@@ -393,11 +398,17 @@ func rowAtLine(m Model, startLine int, rows []row, targetLine int) (int, bool) {
 
 // handleSidebarMouseClick selects the sidebar row under a left click,
 // mirroring arrow-key navigation with no secondary action (no checkbox
-// toggle, no confirm). Clicks landing outside the sidebar panel's bounds
-// (e.g. on the preview panel) are a no-op.
+// toggle, no confirm). A click inside the preview panel's bounds instead
+// hands focus to it (wheel events then scroll the preview, see
+// updateInner's MouseWheelMsg case), without changing the sidebar
+// selection.
 func (m Model) handleSidebarMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	mouse := msg.Mouse()
 	if mouse.Button != tea.MouseLeft {
+		return m, nil
+	}
+	if px, py, pw, ph := m.previewRect(); mouse.X >= px && mouse.X < px+pw && mouse.Y >= py && mouse.Y < py+ph {
+		m.focus = focusPreview
 		return m, nil
 	}
 	sidebarW, _ := m.splitWidth()
@@ -420,6 +431,7 @@ func (m Model) handleSidebarMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cm
 	if !ok {
 		return m, nil
 	}
+	m.focus = focusSidebar
 	m.selected = idx
 	m.ensureSidebarVisible()
 	return m, nil
@@ -630,6 +642,19 @@ func splitPanelHeight(width, total int) (sidebarH, previewH int) {
 	sidebarH = total / 2
 	previewH = total - sidebarH
 	return
+}
+
+// previewRect returns the preview panel's absolute on-screen bounds,
+// mirroring normalView's layout math so mouse hit-testing (click-to-focus,
+// wheel routing) stays in sync with what's actually rendered.
+func (m Model) previewRect() (x, y, w, h int) {
+	sidebarW, previewW := m.splitWidth()
+	contentH := m.contentHeight()
+	sidebarH, previewH := m.splitHeight(contentH)
+	if m.useStackedLayout() {
+		return 0, sidebarH + 1, previewW, previewH
+	}
+	return sidebarW + 1, 0, previewW, previewH
 }
 
 func (m Model) contentHeight() int {

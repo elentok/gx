@@ -104,6 +104,41 @@ func (m Model) IsListFocused() bool { return m.focus == focusList }
 // IsDetailFocused reports whether the detail panel has keyboard focus.
 func (m Model) IsDetailFocused() bool { return m.focus == focusDetail }
 
+// SetDetailFocused sets the split view's focus target directly, e.g. from a
+// mouse click landing on the detail pane (see HandleMouseClick) rather than
+// the "enter"/"esc" key handling in handleKey.
+func (m Model) SetDetailFocused(focused bool) Model {
+	if focused {
+		m.focus = focusDetail
+	} else {
+		m.focus = focusList
+	}
+	return m
+}
+
+// HandleMouseClick focuses whichever panel a left click lands in, hit-testing
+// against DetailOrigin/DetailSize (detail) and ListSize (list). Only applies
+// in split mode - collapsed shows just the list, and fullscreen already
+// shows only the focused panel, so there's nothing for a click to switch. A
+// click outside both panels' bounds is a no-op.
+func (m Model) HandleMouseClick(msg tea.MouseClickMsg) Model {
+	mouse := msg.Mouse()
+	if mouse.Button != tea.MouseLeft || m.vis != visModeSplit {
+		return m
+	}
+	if col, row, visible := m.DetailOrigin(); visible {
+		dw, dh := m.DetailSize()
+		if mouse.X >= col && mouse.X < col+dw && mouse.Y >= row && mouse.Y < row+dh {
+			return m.SetDetailFocused(true)
+		}
+	}
+	lw, lh := m.ListSize()
+	if mouse.X >= 0 && mouse.X < lw && mouse.Y >= 0 && mouse.Y < lh {
+		return m.SetDetailFocused(false)
+	}
+	return m
+}
+
 // HasChord reports whether the split view is waiting for the second key of a
 // multi-key shortcut (e.g. the "t" in "to"). The containing model should
 // route the next key to the split view when this returns true.

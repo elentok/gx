@@ -97,6 +97,8 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		updated, detailCmd := m.commitDetail.Update(msg)
 		m.commitDetail = updated.(commit.Model)
 		return m, detailCmd
+	case tea.MouseClickMsg:
+		return m.handleMouseClick(msg)
 	case tea.MouseWheelMsg:
 		return m.handleMouseWheel(msg)
 	case gotoPRMsg:

@@ -336,6 +336,79 @@ func TestDetailOriginFullscreenDetail(t *testing.T) {
 	}
 }
 
+// --- SetDetailFocused / HandleMouseClick ---
+
+func TestSetDetailFocusedTrue(t *testing.T) {
+	t.Parallel()
+	m := newTestModel(200, 50)
+	m.vis = visModeSplit
+	m.focus = focusList
+	m = m.SetDetailFocused(true)
+	if !m.IsDetailFocused() {
+		t.Fatal("expected detail focused after SetDetailFocused(true)")
+	}
+}
+
+func TestSetDetailFocusedFalse(t *testing.T) {
+	t.Parallel()
+	m := newTestModel(200, 50)
+	m.vis = visModeSplit
+	m.focus = focusDetail
+	m = m.SetDetailFocused(false)
+	if !m.IsListFocused() {
+		t.Fatal("expected list focused after SetDetailFocused(false)")
+	}
+}
+
+func TestHandleMouseClickInsideDetailFocusesDetail(t *testing.T) {
+	t.Parallel()
+	m := newTestModel(200, 50)
+	m.vis = visModeSplit
+	m.focus = focusList
+	col, _, visible := m.DetailOrigin()
+	if !visible {
+		t.Fatal("expected detail visible in split")
+	}
+	m = m.HandleMouseClick(tea.MouseClickMsg{X: col + 1, Y: 0, Button: tea.MouseLeft})
+	if !m.IsDetailFocused() {
+		t.Fatal("expected detail focused after click inside detail bounds")
+	}
+}
+
+func TestHandleMouseClickInsideListFocusesList(t *testing.T) {
+	t.Parallel()
+	m := newTestModel(200, 50)
+	m.vis = visModeSplit
+	m.focus = focusDetail
+	m = m.HandleMouseClick(tea.MouseClickMsg{X: 0, Y: 0, Button: tea.MouseLeft})
+	if !m.IsListFocused() {
+		t.Fatal("expected list focused after click inside list bounds")
+	}
+}
+
+func TestHandleMouseClickIgnoredWhenCollapsed(t *testing.T) {
+	t.Parallel()
+	m := newTestModel(200, 50)
+	m.vis = visModeCollapsed
+	m.focus = focusList
+	m = m.HandleMouseClick(tea.MouseClickMsg{X: 150, Y: 0, Button: tea.MouseLeft})
+	if !m.IsListFocused() {
+		t.Fatal("expected no focus change while collapsed")
+	}
+}
+
+func TestHandleMouseClickIgnoresNonLeftButton(t *testing.T) {
+	t.Parallel()
+	m := newTestModel(200, 50)
+	m.vis = visModeSplit
+	m.focus = focusList
+	col, _, _ := m.DetailOrigin()
+	m = m.HandleMouseClick(tea.MouseClickMsg{X: col + 1, Y: 0, Button: tea.MouseRight})
+	if !m.IsListFocused() {
+		t.Fatal("expected no focus change on a non-left click")
+	}
+}
+
 // --- Auto-orientation threshold ---
 
 func TestAutoOrientationHorizontalAtWidth99(t *testing.T) {
