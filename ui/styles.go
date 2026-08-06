@@ -95,19 +95,6 @@ func RenderRowWithBackground(text string, bg color.Color) string {
 	return bgSeq + text + "\x1b[0m"
 }
 
-// RenderGutterBar prepends a colored vertical bar to text, replacing its
-// leading space (if any) so the bar doesn't shift the row's other columns
-// out of alignment. Used instead of a full-row background wash for "this row
-// belongs to a live/active group" cues that need to stay legible without
-// recoloring everything underneath.
-func RenderGutterBar(text string, barColor color.Color) string {
-	bar := lipgloss.NewStyle().Foreground(barColor).Render("▍")
-	if strings.HasPrefix(text, " ") {
-		return bar + text[1:]
-	}
-	return bar + text
-}
-
 func backgroundANSI(c color.Color) string {
 	nrgba := color.NRGBAModel.Convert(c).(color.NRGBA)
 	return fmt.Sprintf("\x1b[48;2;%d;%d;%dm", nrgba.R, nrgba.G, nrgba.B)

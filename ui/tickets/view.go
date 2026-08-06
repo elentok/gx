@@ -41,13 +41,6 @@ var (
 	// after the epic's name/count.
 	worktreeTagStyle = lipgloss.NewStyle().Foreground(ui.ColorBlue)
 
-	// runningEpicGutterColor distinguishes the running epic's rows from the
-	// rest of the list (ticket 02) via a left-edge gutter bar rather than a
-	// full-row background wash — distinct from ui.ColorSurface, which
-	// RenderRowHighlight uses for the selection row, so a selected row within
-	// the running epic still reads as selected first.
-	runningEpicGutterColor = ui.ColorBlue
-
 	// checkedGlyphStyle/uncheckedGlyphStyle render the execution queue's
 	// checkbox marker (ticket 04), distinct from every status color so a
 	// checked row reads the same regardless of its ticket status.
@@ -122,21 +115,11 @@ func (m Model) appendRowLines(lines []string, rows []row, startIdx int) []string
 		for i, line := range rowLines {
 			if selected {
 				rowLines[i] = ui.RenderRowHighlight(line)
-			} else if m.rowInRunningEpic(r) {
-				rowLines[i] = ui.RenderGutterBar(line, runningEpicGutterColor)
 			}
 		}
 		lines = append(lines, rowLines...)
 	}
 	return lines
-}
-
-// rowInRunningEpic reports whether r belongs to one of the epics this Model
-// is currently live-tracking a ralph-loop for (ticket 05: more than one can
-// be running at once), so appendRowLines can band its rows distinctly from
-// the rest of the list.
-func (m Model) rowInRunningEpic(r row) bool {
-	return m.implementingEpics[m.epics[r.epicIdx].Name]
 }
 
 func (m Model) renderEpicRow(epic tickets.Epic) string {
@@ -179,7 +162,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) 
 	// "02") from cross-rendering as running here.
 	if status != tickets.StatusSuperseded && m.implementingEpics[epic.Name] {
 		if live, ok := m.live[epic.Name][t.Identifier]; ok {
-			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live); ok {
+			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live, "    "+m.checkboxGlyph(m.isChecked(t.Path))+" "); ok {
 				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens)
 				return []string{base, m.renderTicketMetricsLine(joinNonEmpty(" ", suffix, metrics), metricsLineStyle, false)}
 			}

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -73,13 +74,11 @@ func TestRenderTicketRow_LiveHasSuffixAndMetricsLine(t *testing.T) {
 	}
 }
 
-// TestRenderTicketRow_LiveRowIndentNotDoubled covers ticket 10:
-// renderLiveTicketRow already prefixes its output with 2 spaces, so
-// renderTicketRow must not add its own on top or a running/paused row ends
-// up indented 4 spaces instead of 2 (the Tickets tab's non-live rows carry
-// an extra checkbox column, tracked separately by tickets 13/15, so the
-// live row's baseline indent is compared against renderLiveTicketRow's own
-// 2-space prefix rather than a non-live row directly).
+// TestRenderTicketRow_LiveRowIndentNotDoubled covers ticket 10 (and ticket
+// 02's checkbox-prefix mirroring): renderTicketRow must pass its own
+// checkbox prefix into renderLiveTicketRow rather than adding one on top of
+// a hardcoded prefix, so a live row's indent matches its non-live siblings'
+// checkbox column exactly.
 func TestRenderTicketRow_LiveRowIndentNotDoubled(t *testing.T) {
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{{Identifier: "01", Title: "Running ticket", Status: "claimed"}}}
 	m := newModelForTicketRowTests(epic)
@@ -89,12 +88,36 @@ func TestRenderTicketRow_LiveRowIndentNotDoubled(t *testing.T) {
 
 	lines := m.renderTicketRow(epic, epic.Tickets[0], 0)
 
-	wantBase, _, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, epic.Tickets[0], live)
+	wantPrefix := "    " + m.checkboxGlyph(m.isChecked(epic.Tickets[0].Path)) + " "
+	wantBase, _, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, epic.Tickets[0], live, wantPrefix)
 	if !ok {
 		t.Fatalf("renderLiveTicketRow() ok = false, want true")
 	}
 	if lines[0] != wantBase {
 		t.Fatalf("live row title line = %q, want renderLiveTicketRow's own output %q (no extra caller prefix)", lines[0], wantBase)
+	}
+}
+
+// TestRenderTicketRow_LiveRowIndentMatchesNonLiveSibling covers ticket 02:
+// the Tickets tab's checkbox column (4 spaces + checkbox + space) must be
+// mirrored into the live-row path, so a running ticket's row indent matches
+// its non-running siblings' instead of falling back to a bare 2-space prefix.
+func TestRenderTicketRow_LiveRowIndentMatchesNonLiveSibling(t *testing.T) {
+	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
+		{Identifier: "01", Title: "Normal ticket", Status: "open"},
+		{Identifier: "02", Title: "Running ticket", Status: "claimed"},
+	}}
+	m := newModelForTicketRowTests(epic)
+	m.implementingEpics = map[string]bool{epic.Name: true}
+	m.live[epic.Name] = map[string]liveTicketState{"02": {running: true, label: "iter-01"}}
+
+	normalLine := m.renderTicketRow(epic, epic.Tickets[0], 0)[0]
+	liveLine := m.renderTicketRow(epic, epic.Tickets[1], 1)[0]
+
+	normalIndent := leadingWhitespace(ansi.Strip(normalLine))
+	liveIndent := leadingWhitespace(ansi.Strip(liveLine))
+	if liveIndent != normalIndent {
+		t.Fatalf("live row indent = %q, want %q (matching non-live sibling): live=%q normal=%q", liveIndent, normalIndent, liveLine, normalLine)
 	}
 }
 

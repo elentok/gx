@@ -137,24 +137,27 @@ func appendBlockedBySuffix(line, suffix string) string {
 // reach here since callers only look live up on a present map entry, but
 // keeps this function total). base is the bare icon/spinner+title; suffix is
 // the phase/label text (running) or pause reason (paused/needs-attention),
-// returned separately so the caller can place it where it needs to.
-func renderLiveTicketRow(icons ui.IconSet, sp spinner.Model, t tickets.Ticket, live liveTicketState) (base, suffix string, ok bool) {
+// returned separately so the caller can place it where it needs to. prefix is
+// the caller's own leading-column indent (e.g. the Tickets tab's checkbox
+// column vs. the Queue tab's bare indent), so a live row's indent matches its
+// tab's non-live rows rather than a value hardcoded here.
+func renderLiveTicketRow(icons ui.IconSet, sp spinner.Model, t tickets.Ticket, live liveTicketState, prefix string) (base, suffix string, ok bool) {
 	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
 
 	switch {
 	case live.paused && live.pauseKind == ralphloop.PauseNeedsAttention:
-		base = "  " + statusNeedsAttentionStyle.Render(icons.TicketNeedsAttention) + " " + title
+		base = prefix + statusNeedsAttentionStyle.Render(icons.TicketNeedsAttention) + " " + title
 		return base, live.reason, true
 
 	case live.paused:
-		base = "  " + statusPausedStyle.Render(icons.TicketPaused) + " " + title
+		base = prefix + statusPausedStyle.Render(icons.TicketPaused) + " " + title
 		return base, live.reason, true
 
 	case live.running:
 		// spinner.Dot's frames each carry a trailing space; strip it so the
 		// icon column stays single-width and aligned with the other status glyphs.
 		spinnerView := lipgloss.NewStyle().Foreground(live.phase.color()).Render(strings.TrimRight(sp.View(), " "))
-		base = "  " + spinnerView + " " + title
+		base = prefix + spinnerView + " " + title
 		suffix = live.phase.suffix()
 		if live.label != "" {
 			suffix = live.label + " " + suffix
