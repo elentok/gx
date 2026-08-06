@@ -69,11 +69,17 @@ func (m Model) selectedEditTarget() (path string, ok bool, warning string) {
 }
 
 func (m Model) handleEditFileFinished(msg editFileFinishedMsg) (Model, tea.Cmd) {
+	return m, editFileFinishedCmd(msg)
+}
+
+// editFileFinishedCmd is shared by the Tickets tab's Model.handleEditFileFinished
+// and the Queue tab's QueueModel.handleEditFileFinished, which react identically.
+func editFileFinishedCmd(msg editFileFinishedMsg) tea.Cmd {
 	if msg.err != nil {
-		return m, notify.Error("edit failed: " + msg.err.Error())
+		return notify.Error("edit failed: " + msg.err.Error())
 	}
 	if msg.splitApp != "" {
-		return m, notify.Info("opened " + msg.splitApp + " split: editor")
+		return notify.Info("opened " + msg.splitApp + " split: editor")
 	}
-	return m, nil
+	return nil
 }

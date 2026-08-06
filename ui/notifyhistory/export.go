@@ -16,12 +16,12 @@ import (
 
 var invalidFilenameChars = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
 
-func (m Model) export() (Model, tea.Cmd, Result) {
+func (m Model) export() (Model, tea.Cmd) {
 	path, err := writeExport(m.visibleEntries(), m.repoName, m.worktreeName)
 	if err != nil {
-		return m, notify.Error("export notifications: " + err.Error()), Result{}
+		return m, notify.Error("export notifications: " + err.Error())
 	}
-	return m, notify.Success("exported to " + path), Result{}
+	return m, notify.Success("exported to " + path)
 }
 
 func writeExport(entries []notifylog.Entry, repoName, worktreeName string) (string, error) {

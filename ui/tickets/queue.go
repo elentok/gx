@@ -691,15 +691,8 @@ func (m QueueModel) cmdEditSelectedFile(splitType terminalrun.SplitType) tea.Cmd
 	return editTicketFile(m.worktreeRoot, m.settings, rows[m.selected].ticket.Path, splitType)
 }
 
-// handleEditFileFinished mirrors the Tickets tab's Model.handleEditFileFinished.
 func (m QueueModel) handleEditFileFinished(msg editFileFinishedMsg) (QueueModel, tea.Cmd) {
-	if msg.err != nil {
-		return m, notify.Error("edit failed: " + msg.err.Error())
-	}
-	if msg.splitApp != "" {
-		return m, notify.Info("opened " + msg.splitApp + " split: editor")
-	}
-	return m, nil
+	return m, editFileFinishedCmd(msg)
 }
 
 func (m *QueueModel) moveSelection(delta int) {

@@ -40,7 +40,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if m.notifyHistory.IsOpen {
 		if key, ok := msg.(tea.KeyPressMsg); ok {
-			next, cmd, _ := m.notifyHistory.Update(key)
+			next, cmd := m.notifyHistory.Update(key)
 			m.notifyHistory = next
 			return m, tea.Batch(notifyCmd, cmd)
 		}

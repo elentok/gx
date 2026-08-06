@@ -76,10 +76,7 @@ func keyMsg(r rune) tea.KeyPressMsg {
 
 func TestUpdateKey_EscCloses(t *testing.T) {
 	m := New().Open(sampleEntries(), "repo", "wt")
-	next, _, result := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
-	if !result.Closed {
-		t.Fatal("expected Result.Closed=true on esc")
-	}
+	next, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	if next.IsOpen {
 		t.Fatal("expected IsOpen=false after esc")
 	}
@@ -87,10 +84,7 @@ func TestUpdateKey_EscCloses(t *testing.T) {
 
 func TestUpdateKey_QCloses(t *testing.T) {
 	m := New().Open(sampleEntries(), "repo", "wt")
-	next, _, result := m.Update(keyMsg('q'))
-	if !result.Closed {
-		t.Fatal("expected Result.Closed=true on q")
-	}
+	next, _ := m.Update(keyMsg('q'))
 	if next.IsOpen {
 		t.Fatal("expected IsOpen=false after q")
 	}
@@ -98,9 +92,9 @@ func TestUpdateKey_QCloses(t *testing.T) {
 
 func TestUpdateKey_SlashStartsSearchInput(t *testing.T) {
 	m := New().Open(sampleEntries(), "repo", "wt")
-	next, _, result := m.Update(keyMsg('/'))
-	if result.Closed {
-		t.Fatal("expected Result.Closed=false on /")
+	next, _ := m.Update(keyMsg('/'))
+	if !next.IsOpen {
+		t.Fatal("expected IsOpen=true on /")
 	}
 	if !next.search.InputFocused() {
 		t.Fatal("expected search input to be focused after /")
@@ -109,12 +103,12 @@ func TestUpdateKey_SlashStartsSearchInput(t *testing.T) {
 
 func TestUpdateKey_SearchFiltersVisibleEntries(t *testing.T) {
 	m := New().Open(sampleEntries(), "repo", "wt")
-	m, _, _ = m.Update(keyMsg('/'))
-	m, _, _ = m.Update(keyMsg('t'))
-	m, _, _ = m.Update(keyMsg('h'))
-	m, _, _ = m.Update(keyMsg('i'))
-	m, _, _ = m.Update(keyMsg('r'))
-	m, _, _ = m.Update(keyMsg('d'))
+	m, _ = m.Update(keyMsg('/'))
+	m, _ = m.Update(keyMsg('t'))
+	m, _ = m.Update(keyMsg('h'))
+	m, _ = m.Update(keyMsg('i'))
+	m, _ = m.Update(keyMsg('r'))
+	m, _ = m.Update(keyMsg('d'))
 
 	visible := m.visibleEntries()
 	if len(visible) != 1 {
@@ -128,8 +122,8 @@ func TestUpdateKey_SearchFiltersVisibleEntries(t *testing.T) {
 func TestUpdateKey_SearchQueryChangeResetsScroll(t *testing.T) {
 	m := New().Open(sampleEntries(), "repo", "wt")
 	m.scroll = 2
-	m, _, _ = m.Update(keyMsg('/'))
-	m, _, _ = m.Update(keyMsg('t'))
+	m, _ = m.Update(keyMsg('/'))
+	m, _ = m.Update(keyMsg('t'))
 	if m.scroll != 0 {
 		t.Fatalf("scroll = %d, want reset to 0 on query change", m.scroll)
 	}
@@ -146,19 +140,19 @@ func TestVisibleEntries_NoQueryReturnsAll(t *testing.T) {
 
 func TestUpdateKey_PendingWResetsOnUnrelatedKey(t *testing.T) {
 	m := New().Open(sampleEntries(), "repo", "wt")
-	m, _, _ = m.Update(keyMsg('w'))
+	m, _ = m.Update(keyMsg('w'))
 	if !m.pendingW {
 		t.Fatal("expected pendingW=true after first w")
 	}
-	m, cmd, result := m.Update(keyMsg('x'))
+	m, cmd := m.Update(keyMsg('x'))
 	if m.pendingW {
 		t.Fatal("expected pendingW=false after unrelated key")
 	}
 	if cmd != nil {
 		t.Fatal("expected no export cmd for w followed by unrelated key")
 	}
-	if result.Closed {
-		t.Fatal("expected Result.Closed=false")
+	if !m.IsOpen {
+		t.Fatal("expected IsOpen=true after unrelated key")
 	}
 }
 

@@ -49,31 +49,24 @@ func (m Model) Close() Model {
 	return m
 }
 
-// Result reports what happened during Update, since the app shell needs to
-// know when to stop routing keys/mice here (Closed) but Model itself always
-// carries the authoritative IsOpen state.
-type Result struct {
-	Closed bool
-}
-
-func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, Result) {
+func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	if key, ok := msg.(tea.KeyPressMsg); ok {
 		return m.updateKey(key)
 	}
-	return m, nil, Result{}
+	return m, nil
 }
 
-func (m Model) updateKey(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
+func (m Model) updateKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if nextSearch, cmd, result := m.search.Update(msg); result.Handled {
 		m.search = nextSearch
 		if result.QueryChanged {
 			m.recomputeSearchMatches()
 			m.scroll = 0
 		}
-		return m, cmd, Result{}
+		return m, cmd
 	}
 	if m.search.InputFocused() {
-		return m, nil, Result{}
+		return m, nil
 	}
 
 	key := msg.String()
@@ -82,31 +75,31 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 		if key == "w" {
 			return m.export()
 		}
-		return m, nil, Result{}
+		return m, nil
 	}
 
 	switch key {
 	case "esc", "q":
-		return m.Close(), nil, Result{Closed: true}
+		return m.Close(), nil
 	case "w":
 		m.pendingW = true
-		return m, nil, Result{}
+		return m, nil
 	case "j", "down":
 		// Upper-bounded against the visible body height at render time
 		// (renderFrame), since screen size isn't known here.
 		m.scroll = min(m.scroll+1, len(m.visibleEntries()))
-		return m, nil, Result{}
+		return m, nil
 	case "k", "up":
 		m.scroll = max(m.scroll-1, 0)
-		return m, nil, Result{}
+		return m, nil
 	case "g":
 		m.scroll = 0
-		return m, nil, Result{}
+		return m, nil
 	case "G":
 		m.scroll = len(m.visibleEntries())
-		return m, nil, Result{}
+		return m, nil
 	}
-	return m, nil, Result{}
+	return m, nil
 }
 
 func clampScroll(offset, total, visible int) int {

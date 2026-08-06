@@ -70,21 +70,21 @@ func TestUpdateKey_WWExportsVisibleEntries(t *testing.T) {
 	m := New().Open(sampleEntries(), "repo", "wt")
 	// Filter down to a single entry before exporting, so the export must
 	// respect the filtered set, not the full entry list.
-	m, _, _ = m.Update(keyMsg('/'))
-	m, _, _ = m.Update(keyMsg('t'))
-	m, _, _ = m.Update(keyMsg('h'))
-	m, _, _ = m.Update(keyMsg('i'))
-	m, _, _ = m.Update(keyMsg('r'))
-	m, _, _ = m.Update(keyMsg('d'))
+	m, _ = m.Update(keyMsg('/'))
+	m, _ = m.Update(keyMsg('t'))
+	m, _ = m.Update(keyMsg('h'))
+	m, _ = m.Update(keyMsg('i'))
+	m, _ = m.Update(keyMsg('r'))
+	m, _ = m.Update(keyMsg('d'))
 	// Dismiss search input mode (keeping the filtered results) so subsequent
 	// keys are routed to the ww chord instead of the search text box.
-	m, _, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
-	m, cmd, _ := m.Update(keyMsg('w'))
+	m, cmd := m.Update(keyMsg('w'))
 	if cmd != nil {
 		t.Fatal("expected no cmd after first w of the chord")
 	}
-	m, cmd, _ = m.Update(keyMsg('w'))
+	m, cmd = m.Update(keyMsg('w'))
 	if cmd == nil {
 		t.Fatal("expected export cmd after ww")
 	}
@@ -131,8 +131,8 @@ func TestExport_ErrorWhenCacheDirCannotBeCreated(t *testing.T) {
 	t.Setenv("HOME", home)
 
 	m := New().Open(sampleEntries(), "repo", "wt")
-	m, _, _ = m.Update(keyMsg('w'))
-	_, cmd, _ := m.Update(keyMsg('w'))
+	m, _ = m.Update(keyMsg('w'))
+	_, cmd := m.Update(keyMsg('w'))
 	if cmd == nil {
 		t.Fatal("expected error cmd when cache dir cannot be created")
 	}
