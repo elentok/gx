@@ -1,6 +1,8 @@
 package config
 
 import (
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 )
@@ -23,6 +25,15 @@ func MigrateDir() error {
 		return nil
 	}
 	return migrateDir(filepath.Join(legacyBase, "gx"), filepath.Join(newBase, "gx"))
+}
+
+// WarnOnMigrateFailure runs MigrateDir and, if it fails, writes a non-fatal
+// warning to w instead of returning the error - callers should proceed with
+// startup regardless of migration outcome.
+func WarnOnMigrateFailure(w io.Writer) {
+	if err := MigrateDir(); err != nil {
+		fmt.Fprintf(w, "warning: failed to migrate config directory: %v\n", err)
+	}
 }
 
 // migrateDir moves oldPath to newPath. It's a no-op if oldPath doesn't

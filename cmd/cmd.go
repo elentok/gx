@@ -49,7 +49,6 @@ type deps struct {
 }
 
 func defaultDeps() deps {
-	_ = config.MigrateDir()
 	cfg, _ := config.Load()
 	return deps{
 		stdin:  os.Stdin,
@@ -96,6 +95,7 @@ func defaultSkillsManifestPath() (string, error) {
 
 // Execute runs gx with the provided arguments.
 func Execute(args []string) error {
+	config.WarnOnMigrateFailure(os.Stderr)
 	return execute(args, defaultDeps())
 }
 
