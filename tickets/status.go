@@ -44,6 +44,11 @@ var needsAttentionStatuses = map[string]bool{
 	"needs-attention": true,
 }
 
+// typeCodeReview mirrors schema.TypeCodeReview's on-disk value. tickets.Ticket
+// carries Type as a plain string (it predates the schema package), so the
+// comparison is against the literal rather than the typed constant.
+const typeCodeReview = "code-review"
+
 // baseStatus classifies t's raw Status: value alone, before the Blocked by:
 // overlay (see Epic.RenderedStatus) is applied.
 func (t Ticket) baseStatus() RenderedStatus {
@@ -70,81 +75,140 @@ func (t Ticket) baseStatus() RenderedStatus {
 // RenderedStatus computes t's rendered status within e: t's base status,
 // overlaid with "blocked" when t has an unresolved Blocked by: and its base
 // status is open or claimed (needs-info and done tickets keep their own
-// state regardless of Blocked by:).
+// state regardless of Blocked by:). A type: code-review ticket uses a
+// different overlay in place of Blocked by: (see hasOtherOpenTicket) — it
+// deliberately carries no explicit Blocked by: list, so there's nothing for
+// UnresolvedBlockers to check.
 func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
 	base := t.baseStatus()
-	if (base == StatusOpen || base == StatusClaimed) && len(e.UnresolvedBlockers(t)) > 0 {
+	if base != StatusOpen && base != StatusClaimed {
+		return base
+	}
+	if t.Type == typeCodeReview {
+		if e.hasOtherOpenTicket(t) {
+			return StatusBlocked
+		}
+		return base
+	}
+	if len(e.UnresolvedBlockers(t)) > 0 {
 		return StatusBlocked
 	}
 	return base
 }
 
-// UnresolvedBlockers returns t's Blocked by: tokens that are not yet done
-// within e, in Blocked by: order. A bare-number token (e.g. "04") means the
-// whole number family — it can't distinguish a split ticket's original from
-// its lettered replacements (04, 04a, 04b all share Number 4) — and counts
-// as resolved only once every ticket sharing that number is done, not as
-// soon as any one of them is: otherwise the superseded original (closed
-// immediately at split time, per to-tickets' mid-flight-split convention)
-// would resolve the blocker before its replacements ever land. A lettered
-// token (e.g. "04a") names one specific sibling and resolves as soon as
-// that ticket alone is done, independent of its siblings. Either way, a
-// blocker with no matching ticket in e counts as unresolved (it can't be
-// verified done). t itself is excluded from the family it's checking: a
-// ticket that merely shares its family's leading number (e.g. 06b, a
-// follow-up ticket to 06, not a lettered replacement created by splitting
-// 06) must not be required to finish itself before its own "Blocked by: 06"
-// can resolve — that can never happen, since t is still open for the
-// duration of this very check. t's own split siblings (Parent pointing
-// at the same original, e.g. 05b and 05c both split from 05) are excluded
-// from the family too, for the same reason generalized to a sibling rather
-// than t alone: a split tool carries the original's "Blocked by:" onto
-// every replacement, so 05b and 05c each inherit "Blocked by: 05" — without
-// this exclusion, resolving 05b's blocker would wait on 05c also being
-// done (and vice versa) purely because they share Number 5, deadlocking two
-// tickets against each other even though the ticket they actually name (05)
-// is done.
-func (e Epic) UnresolvedBlockers(t Ticket) []string {
-	if len(t.BlockedBy) == 0 {
-		return nil
-	}
-	total := make(map[int]int, len(e.Tickets))
-	done := make(map[int]int, len(e.Tickets))
-	// Keyed by number+lowercased letter suffix rather than the raw
-	// Identifier string, so a token's zero-padding doesn't have to match
-	// the ticket file's exactly (e.g. "Blocked by: 4a" still finds "04a").
-	byNumberAndSuffix := make(map[string]Ticket, len(e.Tickets))
+// hasOtherOpenTicket reports whether e has any ticket, other than t itself,
+// that isn't done — the eligibility gate for a type: code-review ticket
+// (RenderedStatus), which reviews the whole epic and so must wait for every
+// other ticket in it, independent of its own (empty) Blocked by:.
+func (e Epic) hasOtherOpenTicket(t Ticket) bool {
 	for _, other := range e.Tickets {
 		if other.Number == t.Number && other.Identifier == t.Identifier {
 			continue
 		}
-		if other.Identifier != "" {
-			_, suffix := splitBlockedByToken(other.Identifier)
-			byNumberAndSuffix[siblingKey(other.Number, suffix)] = other
-		}
-		if isSplitSibling(t, other) {
-			continue
-		}
-		total[other.Number]++
-		if other.IsDone() {
-			done[other.Number]++
+		if !other.IsDone() {
+			return true
 		}
 	}
+	return false
+}
+
+// UnresolvedBlockers returns t's Blocked by: tokens that are not yet done
+// within e, in Blocked by: order. Each token, bare-number ("04") or lettered
+// ("04a"), now names exactly one ticket in e: Children/Parent (03) make a
+// split's children a direct, walkable edge, so a bare-number token no longer
+// has to stand in for a whole number family the way it did when 04, 04a, 04b
+// were only ever linked by sharing Number 4. The resolution check is
+// Epic.FullyDone of that one named ticket, which recurses into its own
+// Children — so a downstream ticket blocked on a since-split ticket still
+// waits for every one of its (recursively split) children, without that
+// ticket's Blocked by: list ever needing hand-editing when a blocker splits
+// mid-flight. A blocker with no matching ticket in e counts as unresolved
+// (it can't be verified done).
+func (e Epic) UnresolvedBlockers(t Ticket) []string {
+	if len(t.BlockedBy) == 0 {
+		return nil
+	}
+	byNumberAndSuffix := e.byNumberAndSuffix()
+	// A split's children inherit the original's Blocked by: token (e.g. 05b
+	// and 05c both carry "Blocked by: 05" after 05 splits), so t and its own
+	// split siblings must not be required to finish as part of resolving
+	// t's own inherited blocker — that can never happen, since t is still
+	// open for the duration of this very check. See isSelfOrSplitSibling.
+	exclude := func(other Ticket) bool { return isSelfOrSplitSibling(t, other) }
 	var unresolved []string
 	for _, token := range t.BlockedBy {
 		num, letters := splitBlockedByToken(token)
-		if letters != "" {
-			other, ok := byNumberAndSuffix[siblingKey(num, letters)]
-			if !ok || !other.IsDone() {
-				unresolved = append(unresolved, token)
-			}
-			continue
-		}
-		if total[num] == 0 || done[num] != total[num] {
+		other, ok := byNumberAndSuffix[siblingKey(num, letters)]
+		if !ok || !e.fullyDone(other, byNumberAndSuffix, exclude, map[string]bool{}) {
 			unresolved = append(unresolved, token)
 		}
 	}
 	return unresolved
+}
+
+// isSelfOrSplitSibling reports whether other is t itself, or a split sibling
+// of t (Parent pointing at the same original ticket, e.g. 05b and 05c both
+// split from 05). See UnresolvedBlockers.
+func isSelfOrSplitSibling(t, other Ticket) bool {
+	if other.Number == t.Number && other.Identifier == t.Identifier {
+		return true
+	}
+	return t.Parent != nil && other.Parent != nil && *t.Parent == *other.Parent
+}
+
+// byNumberAndSuffix indexes e.Tickets by number+lowercased letter suffix
+// (see siblingKey), so a Blocked by: token's zero-padding doesn't have to
+// match the ticket file's exactly (e.g. "Blocked by: 4a" still finds "04a"),
+// and a childless-suffix ticket (Identifier "04", or unset in test fixtures)
+// is still found by a bare-number token.
+func (e Epic) byNumberAndSuffix() map[string]Ticket {
+	index := make(map[string]Ticket, len(e.Tickets))
+	for _, t := range e.Tickets {
+		_, suffix := splitBlockedByToken(t.Identifier)
+		index[siblingKey(t.Number, suffix)] = t
+	}
+	return index
+}
+
+// FullyDone reports whether t's own status is done and every one of t's
+// Split (children) tickets is, recursively, fully done too — the check
+// UnresolvedBlockers uses in place of the plain Ticket.IsDone, so a
+// downstream ticket blocked on t doesn't unblock until t's whole subtree has
+// landed, not just t itself. Every other "is this ticket done" check
+// (claiming, frontier eligibility, re-run guards) keeps using Ticket.IsDone
+// unchanged — this is additive, specific to blocked-by resolution. Cycle-
+// guarded: a ticket already on the current recursion path is treated as
+// fully done rather than walked again, so a malformed Children/Parent loop
+// terminates instead of recursing forever.
+func (e Epic) FullyDone(t Ticket) bool {
+	return e.fullyDone(t, e.byNumberAndSuffix(), nil, map[string]bool{})
+}
+
+// fullyDone is FullyDone's recursive core, plus an optional exclude hook
+// (used by UnresolvedBlockers to skip t's own split family, see
+// isSelfOrSplitSibling): any ticket exclude reports true for is treated as
+// fully done without recursing into its children.
+func (e Epic) fullyDone(t Ticket, byNumberAndSuffix map[string]Ticket, exclude func(Ticket) bool, visiting map[string]bool) bool {
+	_, ownSuffix := splitBlockedByToken(t.Identifier)
+	key := siblingKey(t.Number, ownSuffix)
+	if visiting[key] {
+		return true
+	}
+	visiting[key] = true
+	if exclude != nil && exclude(t) {
+		return true
+	}
+	if !t.IsDone() {
+		return false
+	}
+	for _, childID := range t.Split {
+		num, letters := splitBlockedByToken(childID)
+		child, ok := byNumberAndSuffix[siblingKey(num, letters)]
+		if !ok || !e.fullyDone(child, byNumberAndSuffix, exclude, visiting) {
+			return false
+		}
+	}
+	return true
 }
 
 // BlockingTickets resolves t's UnresolvedBlockers tokens to the concrete
@@ -193,13 +257,6 @@ func (e Epic) BlockingTickets(t Ticket) []Ticket {
 		}
 	}
 	return result
-}
-
-// isSplitSibling reports whether t and other are both replacements from the
-// same mid-flight split (Parent pointing at the same original ticket),
-// e.g. 05b and 05c both split from 05. See UnresolvedBlockers.
-func isSplitSibling(t, other Ticket) bool {
-	return t.Parent != nil && other.Parent != nil && *t.Parent == *other.Parent
 }
 
 // splitBlockedByToken splits a parseBlockedBy token (e.g. "04a") into its

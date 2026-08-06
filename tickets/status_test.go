@@ -1,6 +1,9 @@
 package tickets
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestEpic_RenderedStatus_BaseStates(t *testing.T) {
 	cases := []struct {
@@ -160,19 +163,19 @@ func TestEpic_UnresolvedBlockers_SelfExcludedFromOwnFamily(t *testing.T) {
 }
 
 // TestEpic_UnresolvedBlockers_LetteredSplitRequiresAllSiblingsDone covers a
-// mid-flight split: "Blocked by:" text only ever carries a bare number
-// (parseBlockedBy strips letter suffixes), so "Blocked by: 03" can't name a
-// specific lettered sibling — it means the whole family sharing Number 3.
-// The original (03) is closed as done+commitless immediately at split time,
-// well before its replacements (03a, 03b) land, so a blocker on "3" must
-// stay unresolved until every ticket sharing that Number is done, not just
-// the first one.
+// mid-flight split: 03's Children (03a, 03b) are now a direct, walkable edge
+// (see Epic.FullyDone) rather than inferred from shared numbering. The
+// original (03) is closed as done+commitless immediately at split time, well
+// before its replacements (03a, 03b) land, so a blocker on the bare number
+// "3" must stay unresolved until every child recorded in 03's Split is done
+// too, not just 03 itself.
 func TestEpic_UnresolvedBlockers_LetteredSplitRequiresAllSiblingsDone(t *testing.T) {
+	original := "03"
 	epic := Epic{Tickets: []Ticket{
 		{Number: 1, BlockedBy: []string{"3"}},
-		{Number: 3, Identifier: "03", Status: "done", Commitless: true}, // original, closed at split time
-		{Number: 3, Identifier: "03a", Status: "done"},
-		{Number: 3, Identifier: "03b", Status: "open"}, // still in flight
+		{Number: 3, Identifier: "03", Status: "done", Commitless: true, Split: []string{"03a", "03b"}}, // original, closed at split time
+		{Number: 3, Identifier: "03a", Status: "done", Parent: &original},
+		{Number: 3, Identifier: "03b", Status: "open", Parent: &original}, // still in flight
 	}}
 	got := epic.UnresolvedBlockers(epic.Tickets[0])
 	if len(got) != 1 || got[0] != "3" {
@@ -182,7 +185,7 @@ func TestEpic_UnresolvedBlockers_LetteredSplitRequiresAllSiblingsDone(t *testing
 	epic.Tickets[3].Status = "done"
 	got = epic.UnresolvedBlockers(epic.Tickets[0])
 	if got != nil {
-		t.Errorf("UnresolvedBlockers = %v, want nil once every ticket sharing Number 3 is done", got)
+		t.Errorf("UnresolvedBlockers = %v, want nil once every child in 03's Split is done", got)
 	}
 }
 
@@ -247,16 +250,16 @@ func TestEpic_BlockingTickets_NilWhenNothingUnresolved(t *testing.T) {
 }
 
 // TestEpic_BlockingTickets_BareNumberResolvesEveryNotYetDoneSibling covers a
-// mid-flight split blocker (see UnresolvedBlockers' bare-number family
-// semantics): "Blocked by: 3" should surface every one of 3's not-yet-done
-// siblings, not just the original, so confirming the modal adds them all to
-// the checked set.
+// mid-flight split blocker (see Epic.FullyDone): "Blocked by: 3" should
+// surface every one of 03's not-yet-done Children, not just the original, so
+// confirming the modal adds them all to the checked set.
 func TestEpic_BlockingTickets_BareNumberResolvesEveryNotYetDoneSibling(t *testing.T) {
+	original := "03"
 	epic := Epic{Tickets: []Ticket{
 		{Number: 1, BlockedBy: []string{"3"}},
-		{Number: 3, Identifier: "03", Title: "Original", Status: "done"},
-		{Number: 3, Identifier: "03a", Title: "Split A", Status: "done"},
-		{Number: 3, Identifier: "03b", Title: "Split B", Status: "open"},
+		{Number: 3, Identifier: "03", Title: "Original", Status: "done", Split: []string{"03a", "03b"}},
+		{Number: 3, Identifier: "03a", Title: "Split A", Status: "done", Parent: &original},
+		{Number: 3, Identifier: "03b", Title: "Split B", Status: "open", Parent: &original},
 	}}
 	got := epic.BlockingTickets(epic.Tickets[0])
 	if len(got) != 1 || got[0].Identifier != "03b" {
@@ -274,5 +277,116 @@ func TestEpic_BlockingTickets_LetteredTokenResolvesOnlyThatSibling(t *testing.T)
 	got := epic.BlockingTickets(epic.Tickets[0])
 	if len(got) != 1 || got[0].Identifier != "03a" {
 		t.Fatalf("BlockingTickets = %+v, want [03a Split A]", got)
+	}
+}
+
+func TestEpic_FullyDone_ChildlessDoneTicketIsFullyDone(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{{Number: 1, Identifier: "01", Status: "done"}}}
+	if !epic.FullyDone(epic.Tickets[0]) {
+		t.Errorf("FullyDone = false, want true for a childless done ticket")
+	}
+}
+
+func TestEpic_FullyDone_NotDoneItselfIsNotFullyDone(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{{Number: 1, Identifier: "01", Status: "open"}}}
+	if epic.FullyDone(epic.Tickets[0]) {
+		t.Errorf("FullyDone = true, want false for a ticket whose own status isn't done")
+	}
+}
+
+func TestEpic_FullyDone_DoneWithUndoneChildIsNotFullyDone(t *testing.T) {
+	parent := "01"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, Identifier: "01", Status: "done", Split: []string{"01a"}},
+		{Number: 1, Identifier: "01a", Status: "open", Parent: &parent},
+	}}
+	if epic.FullyDone(epic.Tickets[0]) {
+		t.Errorf("FullyDone = true, want false: child 01a isn't done")
+	}
+}
+
+func TestEpic_FullyDone_DoneWithUndoneGrandchildIsNotFullyDone(t *testing.T) {
+	parent := "01"
+	child := "01a"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, Identifier: "01", Status: "done", Split: []string{"01a"}},
+		{Number: 1, Identifier: "01a", Status: "done", Parent: &parent, Split: []string{"01a-01"}},
+		{Number: 1, Identifier: "01a-01", Status: "open", Parent: &child},
+	}}
+	if epic.FullyDone(epic.Tickets[0]) {
+		t.Errorf("FullyDone = true, want false: grandchild 01a-01 isn't done despite 01 and 01a both being done")
+	}
+}
+
+func TestEpic_FullyDone_DoneWithFullyDoneChildIsFullyDone(t *testing.T) {
+	parent := "01"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, Identifier: "01", Status: "done", Split: []string{"01a"}},
+		{Number: 1, Identifier: "01a", Status: "done", Parent: &parent},
+	}}
+	if !epic.FullyDone(epic.Tickets[0]) {
+		t.Errorf("FullyDone = false, want true: 01 and its only child 01a are both done")
+	}
+}
+
+// TestEpic_FullyDone_CycleTerminates guards against a malformed
+// Children/Parent loop (e.g. hand-edited frontmatter) hanging or
+// stack-overflowing FullyDone's recursion — it must terminate one way or
+// another, regardless of which boolean it settles on.
+func TestEpic_FullyDone_CycleTerminates(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, Identifier: "01", Status: "done", Split: []string{"02"}},
+		{Number: 2, Identifier: "02", Status: "done", Split: []string{"01"}},
+	}}
+	done := make(chan bool, 1)
+	go func() { done <- epic.FullyDone(epic.Tickets[0]) }()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("FullyDone did not terminate on a Split/Parent cycle")
+	}
+}
+
+func TestEpic_RenderedStatus_CodeReviewBlockedWhileSiblingOpen(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{
+		{Number: 9, Identifier: "09", Type: typeCodeReview, Status: "open"},
+		{Number: 1, Identifier: "01", Status: "open"},
+	}}
+	got := epic.RenderedStatus(epic.Tickets[0])
+	if got != StatusBlocked {
+		t.Errorf("RenderedStatus(code-review) = %v, want StatusBlocked while 01 is still open", got)
+	}
+}
+
+func TestEpic_RenderedStatus_CodeReviewBlockedWhileSiblingClaimed(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{
+		{Number: 9, Identifier: "09", Type: typeCodeReview, Status: "open"},
+		{Number: 1, Identifier: "01", Status: "claimed"},
+	}}
+	got := epic.RenderedStatus(epic.Tickets[0])
+	if got != StatusBlocked {
+		t.Errorf("RenderedStatus(code-review) = %v, want StatusBlocked while 01 is still claimed", got)
+	}
+}
+
+func TestEpic_RenderedStatus_CodeReviewOpenOnceEverySiblingDone(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{
+		{Number: 9, Identifier: "09", Type: typeCodeReview, Status: "open"},
+		{Number: 1, Identifier: "01", Status: "done"},
+	}}
+	got := epic.RenderedStatus(epic.Tickets[0])
+	if got != StatusOpen {
+		t.Errorf("RenderedStatus(code-review) = %v, want StatusOpen once every other ticket is done", got)
+	}
+}
+
+func TestEpic_RenderedStatus_CodeReviewIgnoresOwnBlockedBy(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{
+		{Number: 9, Identifier: "09", Type: typeCodeReview, Status: "open", BlockedBy: []string{"1"}},
+		{Number: 1, Identifier: "01", Status: "done"},
+	}}
+	got := epic.RenderedStatus(epic.Tickets[0])
+	if got != StatusOpen {
+		t.Errorf("RenderedStatus(code-review) = %v, want StatusOpen: its own Blocked by: is irrelevant", got)
 	}
 }
