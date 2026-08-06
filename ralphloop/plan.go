@@ -34,7 +34,7 @@ func PlanWaves(epic tickets.Epic, scope RunScope, maxParallel int) ([][]tickets.
 
 	var remaining []tickets.Ticket
 	for _, t := range epic.Tickets {
-		if scope.Contains(t) {
+		if scope.Contains(t, epic) {
 			remaining = append(remaining, t)
 		}
 	}

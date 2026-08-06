@@ -18,13 +18,13 @@ func TestResolveRunScope_ValidSubsetOwnsMembership(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveRunScope() error = %v", err)
 	}
-	if !scope.Contains(epic.Tickets[0]) {
+	if !scope.Contains(epic.Tickets[0], epic) {
 		t.Errorf("scope.Contains(01) = false, want true")
 	}
-	if scope.Contains(epic.Tickets[1]) {
+	if scope.Contains(epic.Tickets[1], epic) {
 		t.Errorf("scope.Contains(02) = true, want false")
 	}
-	if !scope.Contains(epic.Tickets[2]) {
+	if !scope.Contains(epic.Tickets[2], epic) {
 		t.Errorf("scope.Contains(03) = false, want true")
 	}
 }
@@ -149,6 +149,50 @@ func TestRunScope_FrontierIncludesOnlySelectedTickets(t *testing.T) {
 	}
 }
 
+func TestRunScope_ContainsWalksSplitFromChain(t *testing.T) {
+	original := "03"
+	child := "03b"
+	grandchild := "03b2"
+	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
+		{Number: 1, Identifier: "01"},
+		{Number: 3, Identifier: original},
+		{Number: 3, Identifier: child, SplitFrom: &original},
+		{Number: 3, Identifier: grandchild, SplitFrom: &child},
+		{Number: 9, Identifier: "09"},
+	}}
+	scope, err := ResolveRunScope(epic, []string{"03"})
+	if err != nil {
+		t.Fatalf("ResolveRunScope() error = %v", err)
+	}
+
+	if !scope.Contains(epic.Tickets[2], epic) {
+		t.Errorf("scope.Contains(03b) = false, want true (one SplitFrom hop from 03)")
+	}
+	if !scope.Contains(epic.Tickets[3], epic) {
+		t.Errorf("scope.Contains(03b2) = false, want true (two SplitFrom hops from 03)")
+	}
+	if scope.Contains(epic.Tickets[4], epic) {
+		t.Errorf("scope.Contains(09) = true, want false (no SplitFrom chain to a requested ticket)")
+	}
+}
+
+func TestRunScope_AllSettled_DescendantTicketsDontTripSanityCheck(t *testing.T) {
+	original := "01"
+	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
+		{Number: 1, Identifier: "01", Status: "done"},
+		{Number: 1, Identifier: "01b", SplitFrom: &original, Status: "done"},
+		{Number: 1, Identifier: "01c", SplitFrom: &original, Status: "done"},
+	}}
+	scope, err := ResolveRunScope(epic, []string{"01"})
+	if err != nil {
+		t.Fatalf("ResolveRunScope() error = %v", err)
+	}
+
+	if !scope.AllSettled(epic) {
+		t.Errorf("scope.AllSettled() = false, want true once the requested ticket and its split descendants are all settled")
+	}
+}
+
 func TestRunScope_UnsetRequestPreservesWholeEpicBehavior(t *testing.T) {
 	initial := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "done"},
@@ -162,7 +206,7 @@ func TestRunScope_UnsetRequestPreservesWholeEpicBehavior(t *testing.T) {
 		{Number: 1, Identifier: "01", Status: "done"},
 		{Number: 2, Identifier: "02", Status: "open"},
 	}}
-	if !scope.Contains(reloaded.Tickets[1]) {
+	if !scope.Contains(reloaded.Tickets[1], reloaded) {
 		t.Errorf("scope.Contains(new ticket) = false, want true for whole-epic scope")
 	}
 	if scope.AllSettled(reloaded) {

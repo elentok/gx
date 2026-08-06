@@ -110,7 +110,7 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 
 	var reattached []tickets.Ticket
 	for _, t := range epic.Tickets {
-		if !rp.Scope.Contains(t) {
+		if !rp.Scope.Contains(t, epic) {
 			// Belongs to a different (or not yet requested) run — leave its
 			// claim/needs-attention state exactly as found rather than
 			// reattaching, reverting, or reporting on it here.

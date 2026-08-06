@@ -325,7 +325,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		return err
 	}
 	for _, ticket := range initial.Tickets {
-		if scope.Contains(ticket) && strings.EqualFold(strings.TrimSpace(ticket.Status), "needs-attention") {
+		if scope.Contains(ticket, *initial) && strings.EqualFold(strings.TrimSpace(ticket.Status), "needs-attention") {
 			gate.pause(iterLabel(ticket.Identifier), "needs operator attention")
 		}
 	}
