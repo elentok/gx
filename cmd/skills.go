@@ -23,20 +23,27 @@ func newSkillsCmd(d deps) *cobra.Command {
 
 func newSkillsInstallCmd(d deps) *cobra.Command {
 	var force []string
+	var forceAll bool
 	var dev bool
 	cmd := &cobra.Command{
 		Use:   "install",
 		Short: "install gx's canonical skill bundle for Claude and Codex",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			if dev {
-				return runSkillsInstallDev(d, force, c.OutOrStdout())
+			policy := skills.NewForcePolicy(force...)
+			if forceAll {
+				policy = skills.ForceAll()
 			}
-			return runSkillsInstall(d, force, c.OutOrStdout())
+			if dev {
+				return runSkillsInstallDev(d, policy, c.OutOrStdout())
+			}
+			return runSkillsInstall(d, policy, c.OutOrStdout())
 		},
 	}
 	cmd.Flags().StringSliceVar(&force, "force", nil,
 		"bundle-relative path(s) to force-overwrite despite a detected conflict")
+	cmd.Flags().BoolVar(&forceAll, "force-all", false,
+		"force-overwrite every conflicting path")
 	cmd.Flags().BoolVar(&dev, "dev", false,
 		"symlink the current checkout's skill files instead of installing embedded copies")
 	return cmd
@@ -63,7 +70,7 @@ func newSkillsUninstallCmd(d deps) *cobra.Command {
 // (already up to date), or conflicted. A conflict aborts the entire install
 // (see skills.Install), so every non-conflicted target is reported skipped
 // rather than the status it would have received on a clean run.
-func runSkillsInstall(d deps, force []string, out io.Writer) error {
+func runSkillsInstall(d deps, force skills.ForcePolicy, out io.Writer) error {
 	tmpDir, err := os.MkdirTemp("", "gx-skills-bundle-*")
 	if err != nil {
 		return fmt.Errorf("create scratch dir for bundle extraction: %w", err)
@@ -85,7 +92,7 @@ func runSkillsInstall(d deps, force []string, out io.Writer) error {
 // from the running binary's location, so it works the same from a nested
 // subdirectory or a linked worktree; runSkillsInstallDev refuses to change
 // anything if that repository doesn't contain gx's skill bundle.
-func runSkillsInstallDev(d deps, force []string, out io.Writer) error {
+func runSkillsInstallDev(d deps, force skills.ForcePolicy, out io.Writer) error {
 	cwd, err := d.getwd()
 	if err != nil {
 		return fmt.Errorf("resolve working directory: %w", err)
@@ -118,7 +125,7 @@ func resolveDevRoot(dir string) (string, error) {
 
 // installSkills runs a single skill install, reporting per-target results
 // and turning a conflict into an actionable error message.
-func installSkills(d deps, force []string, out io.Writer, source string, sources []skills.SourceFile, mode skills.InstallMode) error {
+func installSkills(d deps, force skills.ForcePolicy, out io.Writer, source string, sources []skills.SourceFile, mode skills.InstallMode) error {
 	roots, err := d.skillsAgentRoots()
 	if err != nil {
 		return err
@@ -132,7 +139,7 @@ func installSkills(d deps, force []string, out io.Writer, source string, sources
 		Source:     source,
 		AgentRoots: roots,
 		Files:      sources,
-		Force:      skills.NewForcePolicy(force...),
+		Force:      force,
 		Mode:       mode,
 	}
 
@@ -141,7 +148,7 @@ func installSkills(d deps, force []string, out io.Writer, source string, sources
 
 	var conflictErr *skills.ConflictError
 	if errors.As(installErr, &conflictErr) {
-		return fmt.Errorf("%w; rerun with --force <path> for each conflicted path to override", installErr)
+		return fmt.Errorf("%w; rerun with --force <path> for each conflicted path, or --force-all to override every conflict", installErr)
 	}
 	return installErr
 }

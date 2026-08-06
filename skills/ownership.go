@@ -134,10 +134,12 @@ func Evaluate(installedHashes, currentHashes map[string]string, mode InstallMode
 
 // ForcePolicy authorizes overwriting or removing specific paths that would
 // otherwise be refused because they're locally modified, unrelated, or
-// point at the wrong symlink target. Each path must be named explicitly, so
-// force can't turn into a broad deletion.
+// point at the wrong symlink target. Each path must be named explicitly
+// unless the policy is built with ForceAll, so a plain force list can't turn
+// into a broad deletion by accident.
 type ForcePolicy struct {
 	paths map[string]bool
+	all   bool
 }
 
 // NewForcePolicy builds a ForcePolicy that authorizes exactly the given
@@ -150,9 +152,14 @@ func NewForcePolicy(paths ...string) ForcePolicy {
 	return ForcePolicy{paths: m}
 }
 
+// ForceAll builds a ForcePolicy that authorizes every path.
+func ForceAll() ForcePolicy {
+	return ForcePolicy{all: true}
+}
+
 // Allows reports whether force authorizes writing to path.
 func (f ForcePolicy) Allows(path string) bool {
-	return f.paths[path]
+	return f.all || f.paths[path]
 }
 
 // AllowWrite reports whether it's safe to write to path given its ownership
