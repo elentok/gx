@@ -28,7 +28,13 @@ func (m Model) cmdEditSelectedFile(splitType terminalrun.SplitType) tea.Cmd {
 	if !ok {
 		return notify.Warning(warning)
 	}
+	return editTicketFile(m.worktreeRoot, m.settings, target, splitType)
+}
 
+// editTicketFile launches $EDITOR on path via the given split mode, shared by
+// every tab with an edit-file chord (Tickets, Queue) so the launched command
+// is identical regardless of which tab's model calls it.
+func editTicketFile(worktreeRoot string, settings ui.Settings, path string, splitType terminalrun.SplitType) tea.Cmd {
 	editor := strings.TrimSpace(os.Getenv("EDITOR"))
 	if editor == "" {
 		return notify.Warning("$EDITOR is not set")
@@ -38,8 +44,8 @@ func (m Model) cmdEditSelectedFile(splitType terminalrun.SplitType) tea.Cmd {
 		return notify.Warning("$EDITOR is empty")
 	}
 
-	args := ui.EditorLaunchArgs(parts[0], parts[1:], target, 0)
-	return terminalrun.CommandWithSplit(m.worktreeRoot, m.settings.Terminal, splitType, parts[0], args, func(err error, splitApp string) tea.Msg {
+	args := ui.EditorLaunchArgs(parts[0], parts[1:], path, 0)
+	return terminalrun.CommandWithSplit(worktreeRoot, settings.Terminal, splitType, parts[0], args, func(err error, splitApp string) tea.Msg {
 		return editFileFinishedMsg{err: err, splitApp: splitApp}
 	})
 }

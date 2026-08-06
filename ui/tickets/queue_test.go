@@ -1389,3 +1389,68 @@ func TestQueueSearch_DigitsTypeIntoQueryNotBoundKeys(t *testing.T) {
 		t.Fatalf("expected InputFocused()=true while search input is active")
 	}
 }
+
+func TestQueueEditChordLaunchesEditorOnSelectedTicket(t *testing.T) {
+	t.Setenv("EDITOR", "true")
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+
+	chords := []struct {
+		name   string
+		second string
+	}{
+		{"ee (in place)", "e"},
+		{"es (split)", "s"},
+		{"ev (vsplit)", "v"},
+		{"et (tab)", "t"},
+	}
+
+	for _, tt := range chords {
+		t.Run(tt.name, func(t *testing.T) {
+			m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+
+			updated, _ := m.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})
+			m = updated.(QueueModel)
+			updated, cmd := m.Update(tea.KeyPressMsg{Text: tt.second})
+			m = updated.(QueueModel)
+			if cmd == nil {
+				t.Fatalf("expected e%s to launch an editor command", tt.second)
+			}
+
+			// handleEditFileFinished completes the round trip the same way
+			// regardless of how the launch itself resolved (in-place exec,
+			// split, or a "not supported" warning for this test's plain
+			// terminal setting) — the acceptance criterion is that the
+			// finished-edit message routes back into QueueModel without a
+			// type-assertion panic.
+			updated, _ = m.Update(editFileFinishedMsg{})
+			m = updated.(QueueModel)
+		})
+	}
+}
+
+func TestQueueEditChordCancelsOnEsc(t *testing.T) {
+	t.Setenv("EDITOR", "true")
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})
+	m = updated.(QueueModel)
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	m = updated.(QueueModel)
+	if cmd != nil {
+		t.Fatalf("expected e-esc to cancel the chord without launching a command")
+	}
+
+	// A follow-up "esc" (outside a chord) still navigates back, confirming the
+	// cancel didn't leave the chord's prefix stuck mid-sequence.
+	updated, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	m = updated.(QueueModel)
+	if cmd == nil {
+		t.Fatalf("expected plain esc after cancel to navigate back")
+	}
+}

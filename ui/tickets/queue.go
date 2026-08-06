@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/terminalrun"
 )
 
 const queueBanner = "This is the execution plan, press Enter to start"
@@ -228,6 +229,8 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleQueueMouseWheel(msg)
 	case queueClearConfirmedMsg:
 		return m.handleQueueClearConfirmed(msg)
+	case editFileFinishedMsg:
+		return m.handleEditFileFinished(msg)
 	case tea.KeyPressMsg:
 		if m.confirm.IsOpen {
 			return m.handleQueueConfirmUpdate(msg)
@@ -473,9 +476,25 @@ func (m *QueueModel) finalizeEpicTicketStatus(epicName string) {
 // (ticket 16).
 const bindingQueueToggleHideDone keys.BindingID = "toggle-hide-done"
 
+// e-prefix chords: edit the selected ticket's underlying file, mirroring the
+// Tickets tab's own edit-file chord (model_keys.go) via the shared
+// editTicketFile helper (model_runtime.go).
+const (
+	bindingQueueEditInPlace keys.BindingID = "edit"
+	bindingQueueEditHSplit  keys.BindingID = "edit-hsplit"
+	bindingQueueEditVSplit  keys.BindingID = "edit-vsplit"
+	bindingQueueEditTab     keys.BindingID = "edit-tab"
+	bindingQueueCancelChord keys.BindingID = "cancel-chord"
+)
+
 func newQueueKeysManager() keys.Manager {
 	return keys.New([]keys.Binding{
 		{ID: bindingQueueToggleHideDone, Seq: []string{"t", "c"}, Categories: []string{"Navigation"}, Title: "hide completed"},
+		{ID: bindingQueueEditInPlace, Seq: []string{"e", "e"}, Categories: []string{"Navigation"}, Title: "edit file"},
+		{ID: bindingQueueEditHSplit, Seq: []string{"e", "s"}, Categories: []string{"Navigation"}, Title: "edit file (split)"},
+		{ID: bindingQueueEditVSplit, Seq: []string{"e", "v"}, Categories: []string{"Navigation"}, Title: "edit file (vsplit)"},
+		{ID: bindingQueueEditTab, Seq: []string{"e", "t"}, Categories: []string{"Navigation"}, Title: "edit file (tab)"},
+		{ID: bindingQueueCancelChord, Seq: []string{"e", "esc"}, Categories: []string{}, Title: ""},
 	})
 }
 
@@ -492,6 +511,16 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case bindingQueueToggleHideDone:
 			m.hideComplete = !m.hideComplete
 			m.clampSelected()
+		case bindingQueueEditInPlace:
+			return m, m.cmdEditSelectedFile(terminalrun.InPlace)
+		case bindingQueueEditHSplit:
+			return m, m.cmdEditSelectedFile(terminalrun.HSplit)
+		case bindingQueueEditVSplit:
+			return m, m.cmdEditSelectedFile(terminalrun.VSplit)
+		case bindingQueueEditTab:
+			return m, m.cmdEditSelectedFile(terminalrun.Tab)
+		case bindingQueueCancelChord:
+			return m, nil
 		}
 		return m, nil
 	}
@@ -655,6 +684,28 @@ func (m *QueueModel) startAvailableEpics() tea.Cmd {
 		}
 		return messages
 	}
+}
+
+// cmdEditSelectedFile opens the selected row's ticket file for editing,
+// mirroring the Tickets tab's Model.cmdEditSelectedFile — the Queue tab only
+// ever selects tickets (no epic rows), so there's no map.md case to handle.
+func (m QueueModel) cmdEditSelectedFile(splitType terminalrun.SplitType) tea.Cmd {
+	rows := m.rows()
+	if m.selected < 0 || m.selected >= len(rows) {
+		return notify.Warning("nothing selected")
+	}
+	return editTicketFile(m.worktreeRoot, m.settings, rows[m.selected].ticket.Path, splitType)
+}
+
+// handleEditFileFinished mirrors the Tickets tab's Model.handleEditFileFinished.
+func (m QueueModel) handleEditFileFinished(msg editFileFinishedMsg) (QueueModel, tea.Cmd) {
+	if msg.err != nil {
+		return m, notify.Error("edit failed: " + msg.err.Error())
+	}
+	if msg.splitApp != "" {
+		return m, notify.Info("opened " + msg.splitApp + " split: editor")
+	}
+	return m, nil
 }
 
 func (m *QueueModel) moveSelection(delta int) {
