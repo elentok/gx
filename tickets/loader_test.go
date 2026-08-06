@@ -159,7 +159,7 @@ func TestLoad_IgnoresNonTicketFilesInIssuesDir(t *testing.T) {
 	}
 }
 
-func TestLoad_SurfacesSplitAndSplitFrom(t *testing.T) {
+func TestLoad_SurfacesSplitAndParent(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "epic", "issues", "03-original.md"),
 		"---\nid: \"03\"\nstatus: done\ntype: task\nsplit: [\"03a\", \"03b\"]\n---\n")
@@ -183,13 +183,13 @@ func TestLoad_SurfacesSplitAndSplitFrom(t *testing.T) {
 	if !reflect.DeepEqual(original.Split, []string{"03a", "03b"}) {
 		t.Errorf("original.Split = %v, want [03a 03b]", original.Split)
 	}
-	if original.SplitFrom != nil {
-		t.Errorf("original.SplitFrom = %v, want nil", original.SplitFrom)
+	if original.Parent != nil {
+		t.Errorf("original.Parent = %v, want nil", original.Parent)
 	}
 
 	child := byIdentifier["03a"]
-	if child.SplitFrom == nil || *child.SplitFrom != "03" {
-		t.Errorf("child.SplitFrom = %v, want \"03\"", child.SplitFrom)
+	if child.Parent == nil || *child.Parent != "03" {
+		t.Errorf("child.Parent = %v, want \"03\"", child.Parent)
 	}
 	if child.Split != nil {
 		t.Errorf("child.Split = %v, want nil", child.Split)

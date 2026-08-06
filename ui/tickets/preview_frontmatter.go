@@ -64,8 +64,8 @@ func ticketFrontmatterFields(t tickets.Ticket, status tickets.RenderedStatus) []
 	add("type", t.Type)
 	add("blocked_by", strings.Join(t.BlockedBy, ", "))
 	add("split", strings.Join(t.Split, ", "))
-	if t.SplitFrom != nil {
-		add("split_from", *t.SplitFrom)
+	if t.Parent != nil {
+		add("split_from", *t.Parent)
 	}
 	if t.ActualContextWindow > 0 {
 		add("actual_context_window", formatTokenCount(t.ActualContextWindow))

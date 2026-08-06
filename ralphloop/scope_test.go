@@ -149,15 +149,15 @@ func TestRunScope_FrontierIncludesOnlySelectedTickets(t *testing.T) {
 	}
 }
 
-func TestRunScope_ContainsWalksSplitFromChain(t *testing.T) {
+func TestRunScope_ContainsWalksParentChain(t *testing.T) {
 	original := "03"
 	child := "03b"
 	grandchild := "03b2"
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01"},
 		{Number: 3, Identifier: original},
-		{Number: 3, Identifier: child, SplitFrom: &original},
-		{Number: 3, Identifier: grandchild, SplitFrom: &child},
+		{Number: 3, Identifier: child, Parent: &original},
+		{Number: 3, Identifier: grandchild, Parent: &child},
 		{Number: 9, Identifier: "09"},
 	}}
 	scope, err := ResolveRunScope(epic, []string{"03"})
@@ -166,13 +166,13 @@ func TestRunScope_ContainsWalksSplitFromChain(t *testing.T) {
 	}
 
 	if !scope.Contains(epic.Tickets[2], epic) {
-		t.Errorf("scope.Contains(03b) = false, want true (one SplitFrom hop from 03)")
+		t.Errorf("scope.Contains(03b) = false, want true (one Parent hop from 03)")
 	}
 	if !scope.Contains(epic.Tickets[3], epic) {
-		t.Errorf("scope.Contains(03b2) = false, want true (two SplitFrom hops from 03)")
+		t.Errorf("scope.Contains(03b2) = false, want true (two Parent hops from 03)")
 	}
 	if scope.Contains(epic.Tickets[4], epic) {
-		t.Errorf("scope.Contains(09) = true, want false (no SplitFrom chain to a requested ticket)")
+		t.Errorf("scope.Contains(09) = true, want false (no Parent chain to a requested ticket)")
 	}
 }
 
@@ -180,8 +180,8 @@ func TestRunScope_AllSettled_DescendantTicketsDontTripSanityCheck(t *testing.T) 
 	original := "01"
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "done"},
-		{Number: 1, Identifier: "01b", SplitFrom: &original, Status: "done"},
-		{Number: 1, Identifier: "01c", SplitFrom: &original, Status: "done"},
+		{Number: 1, Identifier: "01b", Parent: &original, Status: "done"},
+		{Number: 1, Identifier: "01c", Parent: &original, Status: "done"},
 	}}
 	scope, err := ResolveRunScope(epic, []string{"01"})
 	if err != nil {

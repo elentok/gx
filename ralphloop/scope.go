@@ -38,7 +38,7 @@ func ResolveRunScope(epic tickets.Epic, requestedIDs []string) (RunScope, error)
 }
 
 // Contains reports whether ticket is in scope: either directly requested, or
-// reached from a requested ticket by walking one or more SplitFrom hops (a
+// reached from a requested ticket by walking one or more Parent hops (a
 // mid-run split's descendant is in scope dynamically, without requiring the
 // original request to have named it upfront).
 func (s RunScope) Contains(ticket tickets.Ticket, epic tickets.Epic) bool {
@@ -58,10 +58,10 @@ func (s RunScope) containsChain(ticket tickets.Ticket, epic tickets.Epic, visite
 	if _, ok := s.ticketIDs[id]; ok {
 		return true
 	}
-	if ticket.SplitFrom == nil {
+	if ticket.Parent == nil {
 		return false
 	}
-	parent, ok := findTicketByID(epic, *ticket.SplitFrom)
+	parent, ok := findTicketByID(epic, *ticket.Parent)
 	if !ok {
 		return false
 	}
@@ -80,7 +80,7 @@ func findTicketByID(epic tickets.Epic, id string) (tickets.Ticket, bool) {
 // AllSettled reports whether every originally-requested ticket has reached a
 // terminal status. It counts against foundRequested (only tickets from the
 // original request), not the scope's full membership - dynamically
-// discovered SplitFrom descendants are also required to be settled below,
+// discovered Parent descendants are also required to be settled below,
 // but their presence must not trip the requested-count sanity check.
 func (s RunScope) AllSettled(epic tickets.Epic) bool {
 	if s.wholeEpic {

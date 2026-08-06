@@ -214,8 +214,8 @@ func TestEpic_UnresolvedBlockers_SplitSiblingsDontBlockEachOther(t *testing.T) {
 	original := "05"
 	epic := Epic{Tickets: []Ticket{
 		{Number: 5, Identifier: "05", Status: "done", Split: []string{"05b", "05c"}},
-		{Number: 5, Identifier: "05b", BlockedBy: []string{"05"}, SplitFrom: &original, Status: "ready-for-agent"},
-		{Number: 5, Identifier: "05c", BlockedBy: []string{"05"}, SplitFrom: &original, Status: "ready-for-agent"},
+		{Number: 5, Identifier: "05b", BlockedBy: []string{"05"}, Parent: &original, Status: "ready-for-agent"},
+		{Number: 5, Identifier: "05c", BlockedBy: []string{"05"}, Parent: &original, Status: "ready-for-agent"},
 	}}
 	if got := epic.UnresolvedBlockers(epic.Tickets[1]); got != nil {
 		t.Errorf("UnresolvedBlockers(05b) = %v, want nil since 05 is done", got)

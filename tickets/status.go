@@ -106,7 +106,7 @@ func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
 // follow-up ticket to 06, not a lettered replacement created by splitting
 // 06) must not be required to finish itself before its own "Blocked by: 06"
 // can resolve — that can never happen, since t is still open for the
-// duration of this very check. t's own split siblings (SplitFrom pointing
+// duration of this very check. t's own split siblings (Parent pointing
 // at the same original, e.g. 05b and 05c both split from 05) are excluded
 // from the family too, for the same reason generalized to a sibling rather
 // than t alone: a split tool carries the original's "Blocked by:" onto
@@ -207,10 +207,10 @@ func (e Epic) BlockingTickets(t Ticket) []Ticket {
 }
 
 // isSplitSibling reports whether t and other are both replacements from the
-// same mid-flight split (SplitFrom pointing at the same original ticket),
+// same mid-flight split (Parent pointing at the same original ticket),
 // e.g. 05b and 05c both split from 05. See UnresolvedBlockers.
 func isSplitSibling(t, other Ticket) bool {
-	return t.SplitFrom != nil && other.SplitFrom != nil && *t.SplitFrom == *other.SplitFrom
+	return t.Parent != nil && other.Parent != nil && *t.Parent == *other.Parent
 }
 
 // splitBlockedByToken splits a parseBlockedBy token (e.g. "04a") into its
