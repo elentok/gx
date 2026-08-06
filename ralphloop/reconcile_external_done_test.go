@@ -176,6 +176,48 @@ func TestReconcile_GrillingAndPrototypeDoneTickets_NotFlaggedUnrecoverable(t *te
 	}
 }
 
+// TestReconcile_OutOfScopeDoneTicket_NotVerified covers the bug reported
+// live: a queue run scoped to a handful of tickets (e.g. via the Queue UI's
+// checked selection) still swept every done ticket in the whole epic for
+// landed-commit verification, flagging unrelated done tickets the run never
+// touched needs-attention. Scope now gates this loop the same way it already
+// gated claim/needs-attention reattachment above.
+func TestReconcile_OutOfScopeDoneTicket_NotVerified(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: done\ntype: task\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
+	})
+	epics, err := tickets.Load(scratchDir)
+	if err != nil {
+		t.Fatalf("tickets.Load: %v", err)
+	}
+	epic := epics[0]
+
+	scope, err := ResolveRunScope(epic, []string{"02"})
+	if err != nil {
+		t.Fatalf("ResolveRunScope: %v", err)
+	}
+
+	d, _, _ := fakeDeps()
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) { return nil, nil }
+	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
+	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
+
+	params := testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(&bytes.Buffer{}))
+	params.Scope = scope
+	if _, err := reconcile(d, params, epic); err != nil {
+		t.Fatalf("reconcile() error = %v", err)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if strings.Contains(string(raw), "status: needs-attention") {
+		t.Errorf("out-of-scope done ticket 01 was verified and flagged needs-attention, want it left untouched:\n%s", raw)
+	}
+}
+
 // TestClassifyDoneTicket_BackfilledCherryPickEvent_RecognizedAsLanded is the
 // recovery path for a ticket flagged needs-attention per the test above,
 // once a human/auditing agent has confirmed its commit really is on the

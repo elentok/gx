@@ -157,6 +157,13 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 	}
 
 	for _, t := range epic.Tickets {
+		if !rp.Scope.Contains(t, epic) {
+			// Belongs to a different (or not yet requested) run — same
+			// out-of-scope skip as the claim/needs-attention loop above, so a
+			// scoped run never rewrites a done ticket's status outside what it
+			// was asked to touch.
+			continue
+		}
 		// A commitless done ticket (see schema.Ticket.Commitless) never had a
 		// commit to land in the first place — verifying it the same way as
 		// t.IsSuperseded() is skipped here, for the same reason.
