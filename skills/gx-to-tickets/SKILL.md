@@ -154,7 +154,11 @@ error and re-validate until it passes — do not publish a ticket that fails val
 Tickets can also be split off **mid-flight**, by `gx-implement`, when a ticket outgrows its budget
 while in progress — same template, same publishing mechanics, just triggered from inside a running
 session instead of upfront here. See [gx-local-tracker.md](../gx-local-tracker.md)'s mid-flight splitting
-section for the numbering, blocking-edge, and `split`/`split_from` mechanics.
+section for the numbering, blocking-edge, and `children`/`parent` mechanics.
+
+If the breakdown appends a trailing `type: code-review` ticket, first check whether the target epic
+already has one among its published issues. If it does, skip the append — don't publish a second
+one — unless the user has explicitly asked for another.
 
 <ticket-template>
 
@@ -162,7 +166,7 @@ section for the numbering, blocking-edge, and `split`/`split_from` mechanics.
 id: "&lt;NN&gt;"
 status: ready-for-agent
 blocked_by: []
-split: []
+children: []
 type: task
 expected_context_window: 20000
 ---
