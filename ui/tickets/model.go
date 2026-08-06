@@ -267,6 +267,8 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, notify.Error(msg.err.Error())
 	case spinner.TickMsg:
 		return m.handleImplementSpinnerTick(msg)
+	case reattachSignalsMsg:
+		return m.handleReattachSignals(msg)
 	}
 	return m, nil
 }

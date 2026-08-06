@@ -49,8 +49,7 @@ func TestCrossTabSwitchingDuringTwoLiveRunsStaysConsistent(t *testing.T) {
 	// Neither tm nor qm ever received an implementStartedMsg for either
 	// epic — as if both runs were launched, and both switches below
 	// happened, entirely while each tab was backgrounded.
-	updated, _ = tm.Update(tm.OnPageActivated()())
-	tm = updated.(Model)
+	tm = deliverCmd(t, tm, tm.OnPageActivated())
 	if content := tm.View().Content; strings.Count(content, "implementing...") != 2 {
 		t.Fatalf("Tickets after switch-in: want both epics running, got:\n%s", content)
 	}
@@ -68,8 +67,7 @@ func TestCrossTabSwitchingDuringTwoLiveRunsStaysConsistent(t *testing.T) {
 	r.finish("epic-a", wantErr)
 	r.reduceLiveEvent("epic-b", ralphloop.LiveEvent{Kind: ralphloop.LiveEventContextOccupancy, Identifier: "01", Tokens: 4000})
 
-	updated, _ = tm.Update(tm.OnPageActivated()())
-	tm = updated.(Model)
+	tm = deliverCmd(t, tm, tm.OnPageActivated())
 	if tm.implementingEpics["epic-a"] {
 		t.Fatalf("Tickets after epic-a failed: want epic-a cleared, got %#v", tm.implementingEpics)
 	}
@@ -183,8 +181,7 @@ func TestCrossTabLiveMetricsRenderSameFiguresFromSharedProjection(t *testing.T) 
 		ralphLoopRegistry = previous
 	})
 
-	updated, _ = tm.Update(tm.OnPageActivated()())
-	tm = updated.(Model)
+	tm = deliverCmd(t, tm, tm.OnPageActivated())
 	ticketsContent := tm.View().Content
 	if !strings.Contains(ticketsContent, "2m03s") || !strings.Contains(ticketsContent, "4.2k tok") {
 		t.Fatalf("Tickets tab: want rendered elapsed %q and tokens %q, got:\n%s", "2m03s", "4.2k tok", ticketsContent)

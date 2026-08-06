@@ -33,6 +33,11 @@ type Deps struct {
 	// it can't resolve.
 	VerifySkill           func(agent AgentKind, skill string) error
 	FindOrCreateWorkspace func(label, cwd string) (string, error)
+	// FindWorkspace looks up an epic's herdr workspace without creating one,
+	// used by the restart-recovery reattach scan (see ScanForReattachable),
+	// which must never bring a workspace into existence just to discover it
+	// doesn't have one.
+	FindWorkspace func(label string) (string, error)
 	// WorktreeDir returns the directory linked worktrees for repoDir's repo
 	// are created in (see git.Repo.LinkedWorktreeDir).
 	WorktreeDir func(repoDir string) (string, error)
@@ -134,6 +139,7 @@ func DefaultDeps() Deps {
 		AgentGet:              herdr.AgentGet,
 		VerifyCodexSession:    codexsession.VerifyIdentity,
 		FindOrCreateWorkspace: herdr.EnsureWorkspace,
+		FindWorkspace:         herdr.FindWorkspace,
 		WorktreeDir:           worktreeDir,
 		AddWorktree:           addWorktree,
 		RemoveWorktree:        removeWorktree,

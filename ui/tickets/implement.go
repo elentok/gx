@@ -681,9 +681,10 @@ func (m Model) handleImplementSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.C
 // reader of its own or depending on messages that arrived while another tab
 // was active.
 func (m Model) OnPageActivated() tea.Cmd {
-	return func() tea.Msg {
+	syncCmd := func() tea.Msg {
 		return implementSyncMsg{runningEpics: ralphLoopRegistry.runningEpicNames()}
 	}
+	return tea.Batch(syncCmd, m.cmdReattachScan())
 }
 
 // cmdStartImplement launches the producer while the registry owns the sole

@@ -110,8 +110,7 @@ func TestModel_OnPageActivatedRecoversTwoConcurrentEpicRuns(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("OnPageActivated: want a resync cmd with two epics running")
 	}
-	updated, _ = m.Update(cmd())
-	m = updated.(Model)
+	m = deliverCmd(t, m, cmd)
 
 	if !m.implementingEpics["epic-a"] || !m.implementingEpics["epic-b"] {
 		t.Fatalf("implementingEpics after reactivation = %#v, want both epics tracked", m.implementingEpics)
@@ -132,8 +131,7 @@ func TestModel_OnPageActivatedRecoversTwoConcurrentEpicRuns(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("OnPageActivated: want a resync cmd after epic-a finished")
 	}
-	updated, _ = m.Update(cmd())
-	m = updated.(Model)
+	m = deliverCmd(t, m, cmd)
 
 	if m.implementingEpics["epic-a"] {
 		t.Fatalf("implementingEpics after epic-a finished = %#v, want epic-a cleared", m.implementingEpics)
