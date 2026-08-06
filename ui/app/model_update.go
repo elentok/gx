@@ -44,7 +44,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.notifyHistory = next
 			return m, tea.Batch(notifyCmd, cmd)
 		}
-		return m, notifyCmd
+		if _, ok := msg.(tea.MouseMsg); ok {
+			return m, notifyCmd
+		}
+		// Everything else (ticks, window-size, ...) falls through to the
+		// normal page-update path below, exactly as if the modal were closed,
+		// so background polling loops keep rearming themselves.
 	}
 
 	if click, ok := msg.(tea.MouseClickMsg); ok {
