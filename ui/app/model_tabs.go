@@ -1,6 +1,7 @@
 package app
 
 import (
+	"path/filepath"
 	"strings"
 	"unicode"
 
@@ -31,6 +32,20 @@ func (m Model) switchTab(viewState nav.ViewState) (Model, tea.Cmd) {
 	prev := m.navState.Active()
 	tabVS := m.navState.Switch(viewState)
 	return m.applySwitch(tabVS, prev)
+}
+
+// openNotifyHistory opens the "g n" notification-history modal over a
+// snapshot of notifylog's current entries, matching switchTab's rule that
+// deep page modals (e.g. the tickets tab's launch dialogs) must close first.
+func (m Model) openNotifyHistory() (Model, tea.Cmd) {
+	type modalOpener interface{ ModalOpen() bool }
+	if mo, ok := m.activePage().model.(modalOpener); ok && mo.ModalOpen() {
+		return m, notify.Info("close the modal first")
+	}
+	repoName := filepath.Base(m.repo.LinkedWorktreeDir())
+	worktreeName := filepath.Base(m.settings.ActiveWorktreePath)
+	m.notifyHistory = m.notifyHistory.Open(m.notifyLog.Entries(), repoName, worktreeName)
+	return m, nil
 }
 
 func (m Model) applySwitch(tabVS, prevVS nav.ViewState) (Model, tea.Cmd) {
@@ -207,6 +222,9 @@ func (m Model) handleShellChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 			return next, cmd, true
 		case "q":
 			next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabQueue})
+			return next, cmd, true
+		case "n":
+			next, cmd := m.openNotifyHistory()
 			return next, cmd, true
 		case "esc":
 			return m, nil, true

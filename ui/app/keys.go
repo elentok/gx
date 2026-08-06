@@ -3,14 +3,15 @@ package app
 import "github.com/elentok/gx/ui/keys"
 
 const (
-	BindingPrevTab      keys.BindingID = "app-prev-tab"
-	BindingNextTab      keys.BindingID = "app-next-tab"
-	BindingGotoWorktree keys.BindingID = "app-goto-worktrees-tab"
-	BindingGotoLog      keys.BindingID = "app-goto-log-tab"
-	BindingGotoStatus   keys.BindingID = "app-goto-status-tab"
-	BindingGotoStash    keys.BindingID = "app-goto-stash-tab"
-	BindingGotoPRs      keys.BindingID = "app-goto-prs-tab"
-	BindingGotoTickets  keys.BindingID = "app-goto-tickets-tab"
+	BindingPrevTab       keys.BindingID = "app-prev-tab"
+	BindingNextTab       keys.BindingID = "app-next-tab"
+	BindingGotoWorktree  keys.BindingID = "app-goto-worktrees-tab"
+	BindingGotoLog       keys.BindingID = "app-goto-log-tab"
+	BindingGotoStatus    keys.BindingID = "app-goto-status-tab"
+	BindingGotoStash     keys.BindingID = "app-goto-stash-tab"
+	BindingGotoPRs       keys.BindingID = "app-goto-prs-tab"
+	BindingGotoTickets   keys.BindingID = "app-goto-tickets-tab"
+	BindingNotifyHistory keys.BindingID = "app-notify-history"
 )
 
 func Bindings() []keys.Binding {
@@ -31,6 +32,7 @@ func Bindings() []keys.Binding {
 		{ID: BindingGotoStash, Seq: []string{"g", "S"}, Categories: []string{"App"}, Title: "stash tab"},
 		{ID: BindingGotoPRs, Seq: []string{"g", "p"}, Categories: []string{"App"}, Title: "PRs tab"},
 		{ID: BindingGotoTickets, Seq: []string{"g", "t"}, Categories: []string{"App"}, Title: "tickets tab"},
+		{ID: BindingNotifyHistory, Seq: []string{"g", "n"}, Categories: []string{"App"}, Title: "notification history"},
 	}
 }
 
@@ -47,5 +49,6 @@ func hintsForPrefix(prefix string) []keys.Binding {
 		{Seq: []string{"S"}, Title: "stash tab"},
 		{Seq: []string{"p"}, Title: "PRs tab"},
 		{Seq: []string{"t"}, Title: "tickets tab"},
+		{Seq: []string{"n"}, Title: "notification history"},
 	}
 }

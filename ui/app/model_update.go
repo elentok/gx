@@ -38,6 +38,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, notifyCmd
 	}
 
+	if m.notifyHistory.IsOpen {
+		if key, ok := msg.(tea.KeyPressMsg); ok {
+			next, cmd, _ := m.notifyHistory.Update(key)
+			m.notifyHistory = next
+			return m, tea.Batch(notifyCmd, cmd)
+		}
+		return m, notifyCmd
+	}
+
 	if click, ok := msg.(tea.MouseClickMsg); ok {
 		mouse := click.Mouse()
 		if mouse.Button == tea.MouseLeft {
