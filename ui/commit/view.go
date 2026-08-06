@@ -170,11 +170,10 @@ func (m Model) renderHeaderPopup() string {
 	lines := m.visibleHeaderLines(max(1, height-2))
 	active := m.isContainerFocused() && m.focusHeader
 	titleColor := m.headerPaneTitleColor()
-	accent := color.Color(nil)
-	if active {
-		accent = titleColor
-	}
-	return ui.RenderPanel(ui.PanelOptionsFor(width, height, title, rightTitle, lines, active, titleColor, accent, false))
+	return ui.RenderPanelFrame(ui.PanelFrameOptions{
+		Width: width, Height: height, Title: title, RightTitle: rightTitle, Lines: lines,
+		BorderColor: m.headerPaneBorderColor(), TitleColor: titleColor, TitleBold: active,
+	})
 }
 
 func (m Model) headerPopupWidth() int {

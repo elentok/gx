@@ -85,6 +85,9 @@ func (m Model) View() tea.View {
 	if m.help.IsOpen {
 		out = ui.OverlayCenter(out, m.help.View(), m.width, m.height)
 	}
+	if m.commitInfoOpen {
+		out = ui.OverlayCenter(out, m.renderCommitInfoPopup(), m.width, m.height)
+	}
 	return ui.NewMainView(out)
 }
 

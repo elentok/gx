@@ -71,6 +71,13 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	if m.reword.IsOpen {
 		return m.handleRewordRunningUpdate(msg)
 	}
+	// Delegate key events to the commit-info popup while it's open, so esc/i
+	// close it instead of falling through to list navigation.
+	if m.commitInfoOpen {
+		if _, ok := msg.(tea.KeyPressMsg); ok {
+			return m.handleCommitInfoKey(msg)
+		}
+	}
 
 	// Delegate output modal keys.
 	if m.output.IsOpen {
@@ -109,6 +116,8 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		return m.handleWorktreeStatus(msg)
 	case rewordDetailsMsg:
 		return m.handleRewordDetails(msg)
+	case commitInfoMsg:
+		return m.handleCommitInfo(msg)
 	case reword.EditorFinishedMsg:
 		return m.handleRewordEditorDone(msg.Err)
 	case rebaseFinishedMsg:

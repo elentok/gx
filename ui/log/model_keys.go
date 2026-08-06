@@ -38,6 +38,7 @@ const (
 	bindingGotoPR            keys.BindingID = "goto-pr"
 	bindingToggleGraph       keys.BindingID = "toggle-graph"
 	bindingToggleOrientation keys.BindingID = "toggle-orientation"
+	bindingHeaderInfo        keys.BindingID = "header-info"
 )
 
 func newLogManager() keys.Manager {
@@ -83,6 +84,8 @@ func newLogManager() keys.Manager {
 		{ID: bindingToggleGraph, Seq: []string{"t", "g"}, Categories: []string{"Other"}, Title: "toggle graph"},
 		{ID: bindingToggleOrientation, Seq: []string{"t", "o"}, Categories: []string{"Other"}, Title: "toggle split orientation"},
 		{ID: bindingCancel, Seq: []string{"t", "esc"}, Categories: []string{}, Title: ""},
+
+		{ID: bindingHeaderInfo, Seq: []string{"i"}, Categories: []string{"Actions"}, Title: "commit info popup"},
 
 		{ID: bindingYankHash, Seq: []string{"y", "h"}, Categories: []string{"Yank"}, Title: "yank commit hash"},
 		{ID: bindingYankSubject, Seq: []string{"y", "s"}, Categories: []string{"Yank"}, Title: "yank commit subject"},
@@ -165,6 +168,8 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, nil
 	case bindingReword:
 		return m, m.cmdFetchRewordDetails()
+	case bindingHeaderInfo:
+		return m, m.cmdFetchCommitInfo()
 	case bindingPageDown:
 		prevRef := m.SelectedRef()
 		m.listPanel = m.listPanel.ScrollPage(list.DefaultScroll)

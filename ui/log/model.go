@@ -76,6 +76,9 @@ type Model struct {
 
 	reword reword.Model
 
+	commitInfoOpen    bool
+	commitInfoDetails git.CommitDetails
+
 	pendingFocusSubject string
 	pendingFocusRef     string
 	flashSubject        string
@@ -160,7 +163,7 @@ func (m Model) InputFocused() bool {
 
 func (m Model) ModalOpen() bool {
 	return m.amendConfirm.IsOpen || m.bump.IsOpen || m.push.IsOpen || m.pull.IsOpen ||
-		m.reword.IsOpen || m.output.IsOpen
+		m.reword.IsOpen || m.output.IsOpen || m.commitInfoOpen
 }
 
 func normalizedRef(ref string) string {

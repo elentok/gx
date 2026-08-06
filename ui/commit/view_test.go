@@ -221,6 +221,19 @@ func TestContainerFocusDisablesCommitPaneActiveStyling(t *testing.T) {
 	}
 }
 
+func TestRenderHeaderPopup_HasBorder(t *testing.T) {
+	m := Model{
+		ready: true, width: 80, height: 30,
+		details: git.CommitDetails{FullHash: "abc123", Hash: "abc123", Subject: "a subject", AuthorName: "Jane"},
+	}
+	m.focusHeader = true
+	out := m.renderHeaderPopup()
+	if !strings.Contains(out, "╭") || !strings.Contains(out, "╮") ||
+		!strings.Contains(out, "╰") || !strings.Contains(out, "╯") {
+		t.Errorf("expected bordered popup output, got:\n%s", out)
+	}
+}
+
 func TestView_FiletreeSearchOverlayAppearsInView(t *testing.T) {
 	m := Model{ready: true, width: 100, height: 20, commitSidebarState: commitSidebarState{fileTreeModel: filetree.NewModel[git.CommitFile]()}}
 	m.fileTreeModel.Search().Start("files")
