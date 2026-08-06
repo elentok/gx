@@ -15,6 +15,10 @@ lowest-numbered ticket that is unblocked (every ticket in its `blocked_by` is `d
 Implement exactly that one ticket, then stop — do not continue on to the next ticket in the same
 run, even if it's now unblocked.
 
+If the frontier ticket's `type` is `code-review`, stop reading this document and follow the
+[gx-code-review](../gx-code-review/SKILL.md) skill instead — it reviews the epic and opens follow-up
+tickets rather than implementing anything itself.
+
 Before starting work on the ticket you're about to claim, run `gx tickets validate <path>` on it. If
 it fails, stop and fix the ticket's frontmatter (or hand it back) before doing anything else — do
 not begin implementation against a ticket that fails validation.
