@@ -55,6 +55,10 @@ type Deps struct {
 	AgentGet             func(target string) (herdr.Agent, error)
 	AgentWait            func(opts herdr.AgentWaitOptions) (herdr.Agent, error)
 	AgentSendKeys        func(target string, keys ...string) error
+	// AgentRead reads pane's terminal output, used to confirm a submitted
+	// prompt has actually rendered rather than still sitting unsubmitted (see
+	// confirmCompactSubmitted).
+	AgentRead            func(target string, opts herdr.AgentReadOptions) (string, error)
 	RevParse             func(dir, ref string) (string, error)
 	MergeBase            func(dir, refA, refB string) (string, error)
 	CommitsAhead         func(dir, fromExclusive, toRef string) (int, error)
@@ -141,6 +145,7 @@ func DefaultDeps() Deps {
 		AgentPrompt:           promptWithNudge(herdr.AgentPrompt, herdr.AgentSendKeys, herdr.AgentWait, time.Now),
 		AgentWait:             herdr.AgentWait,
 		AgentSendKeys:         herdr.AgentSendKeys,
+		AgentRead:             herdr.AgentRead,
 		RevParse:              git.RevParse,
 		MergeBase:             git.MergeBase,
 		CommitsAhead:          git.CommitsAhead,

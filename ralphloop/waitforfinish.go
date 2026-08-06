@@ -205,6 +205,61 @@ const smartZoneCompactTimeoutMs = 300_000
 // a genuine, not merely slow, failure.
 const smartZoneCompactExtendedTimeoutMs = 600_000
 
+// smartZoneCompactSubmitPollMs is the tick size for confirmCompactSubmitted's
+// retry loop; smartZoneCompactSubmitTimeoutMs is its total budget. herdr's
+// idle/done sample can be taken before Enter's effect has rendered "/compact"
+// as submitted in the pane, so a completion signal alone doesn't mean the
+// finish-up prompt is safe to send — it can still land concatenated with an
+// unsubmitted "/compact". Each tick re-polls via the existing AgentWait
+// (bounded to smartZoneCompactSubmitPollMs, so a poll timeout doubles as the
+// pause before rechecking) rather than sending a fresh keypress: a blind
+// Enter here risks canceling a genuine in-progress compaction.
+const (
+	smartZoneCompactSubmitPollMs    = 5_000
+	smartZoneCompactSubmitTimeoutMs = 30_000
+)
+
+// confirmCompactSubmitted reports whether "/compact" has actually rendered as
+// submitted in pane, by reading its trailing line via AgentRead. A trailing
+// line still reading "/compact" means Enter's effect on the pane hasn't
+// rendered yet.
+func confirmCompactSubmitted(d Deps, pane string) (bool, error) {
+	out, err := d.AgentRead(pane, herdr.AgentReadOptions{Source: "recent-unwrapped"})
+	if err != nil {
+		return false, err
+	}
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	trailing := strings.TrimSpace(lines[len(lines)-1])
+	return trailing != "/compact", nil
+}
+
+// confirmCompactSubmittedWithRetry gates entry into recoverSmartZoneBreach's
+// finish-up phase behind confirmCompactSubmitted, bounded to
+// smartZoneCompactSubmitTimeoutMs total. It never sends a nudge keypress or
+// resubmits "/compact" — only re-polls via AgentWait to give the pane a
+// chance to render the submission.
+func confirmCompactSubmittedWithRetry(d Deps, pane string) error {
+	elapsedMs := 0
+	for {
+		submitted, err := confirmCompactSubmitted(d, pane)
+		if err != nil {
+			return err
+		}
+		if submitted {
+			return nil
+		}
+		if elapsedMs >= smartZoneCompactSubmitTimeoutMs {
+			return fmt.Errorf("/compact still unsubmitted in pane after %ds", smartZoneCompactSubmitTimeoutMs/1000)
+		}
+		d.AgentWait(herdr.AgentWaitOptions{
+			Target:    pane,
+			Until:     []string{"working"},
+			TimeoutMs: smartZoneCompactSubmitPollMs,
+		})
+		elapsedMs += smartZoneCompactSubmitPollMs
+	}
+}
+
 // recoverSmartZoneBreach compacts the conversation and re-prompts the agent
 // to finish up after a smart-zone breach, deliberately never calling
 // Gate.pause: the scheduler keeps claiming and running other tickets while
@@ -281,6 +336,12 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 	}
 	if expired {
 		p.logAgentEvent(eventSmartZoneWaitExpired, sessionID, fmt.Sprintf("compact wait for %s expired but the transcript confirmed compaction completed", p.Label))
+	}
+
+	if err := confirmCompactSubmittedWithRetry(d, p.Pane); err != nil {
+		p.sink().SmartZoneRecovered(p.Ticket)
+		p.logAgentEvent(eventSmartZoneRecoveryFailed, sessionID, fmt.Sprintf("confirming /compact submitted for %s: %v", p.Label, err))
+		return false, nil
 	}
 
 	p.sink().SmartZoneFinishingUp(p.Ticket)

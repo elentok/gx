@@ -48,6 +48,9 @@ func TestWaitForFinish_CodexNativeContextFailureRecoversDespiteStaleOccupancy(t 
 		ReadCodexContext: func(string, string) (int, bool, error) {
 			return 1_000, true, nil
 		},
+		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+			return "compaction complete", nil
+		},
 		Sleep: func(time.Duration) {},
 	}
 
@@ -96,6 +99,9 @@ func TestWaitForFinish_CodexNativeContextFailureDetectedWhenSettled(t *testing.T
 				return `Error running remote compact task: {"error":{"code":"context_length_exceeded"}}`, nil
 			}
 			return "", nil
+		},
+		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+			return "compaction complete", nil
 		},
 		Sleep: func(time.Duration) {},
 	}
@@ -276,6 +282,9 @@ func TestWaitForFinish_CodexContextBreachRecoversThroughBlockedCompactConfirmati
 			observedCwd, observedSession = cwd, sessionID
 			return 150001, true, nil
 		},
+		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+			return "compaction complete", nil
+		},
 		ResumeSignaled: func(path string) (bool, error) { return false, nil },
 		Sleep:          func(time.Duration) {},
 	}
@@ -355,6 +364,9 @@ func TestRecoverSmartZoneBreach_TranscriptConfirmsLateCompaction(t *testing.T) {
 		},
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 			return compactionCount, true, nil
+		},
+		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+			return "compaction complete", nil
 		},
 		Sleep: func(time.Duration) {},
 	}
@@ -461,6 +473,163 @@ func TestRecoverSmartZoneBreach_GenuineStuckCompactFailsAfterExtendedWait(t *tes
 	}
 	if !sawFailed {
 		t.Error("missing smart-zone-recovery-failed event for a genuinely stuck compact")
+	}
+}
+
+func TestConfirmCompactSubmitted(t *testing.T) {
+	t.Run("trailing /compact line reports not yet submitted", func(t *testing.T) {
+		d := Deps{
+			AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+				return "some earlier output\n/compact", nil
+			},
+		}
+		submitted, err := confirmCompactSubmitted(d, "pane-1")
+		if err != nil {
+			t.Fatalf("confirmCompactSubmitted: %v", err)
+		}
+		if submitted {
+			t.Error("submitted = true, want false while /compact is still the trailing line")
+		}
+	})
+
+	t.Run("rendered output past /compact reports submitted", func(t *testing.T) {
+		d := Deps{
+			AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+				return "/compact\nCompacting conversation...\nworking", nil
+			},
+		}
+		submitted, err := confirmCompactSubmitted(d, "pane-1")
+		if err != nil {
+			t.Fatalf("confirmCompactSubmitted: %v", err)
+		}
+		if !submitted {
+			t.Error("submitted = false, want true once the pane has rendered past /compact")
+		}
+	})
+}
+
+// TestRecoverSmartZoneBreach_FinishUpGatedOnCompactSubmitConfirmation verifies
+// the prompt-submission race from research ticket 03: a compact-completion
+// signal sampled before Enter's effect has rendered "/compact" as submitted
+// must not let the finish-up prompt go out on top of it. The finish-up
+// prompt must wait until confirmCompactSubmitted confirms.
+func TestRecoverSmartZoneBreach_FinishUpGatedOnCompactSubmitConfirmation(t *testing.T) {
+	scratchDir := t.TempDir()
+	var prompts []string
+	var sentKeys [][]string
+	var reads int
+	d := Deps{
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			prompts = append(prompts, opts.Text)
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentSendKeys: func(target string, keys ...string) error {
+			sentKeys = append(sentKeys, keys)
+			return nil
+		},
+		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+			reads++
+			if reads <= 2 {
+				return "/compact", nil
+			}
+			return "/compact\nCompacting conversation...", nil
+		},
+		Sleep: func(time.Duration) {},
+	}
+
+	p := launchAndPromptParams{
+		Label:      "iter-19",
+		Agent:      AgentClaude,
+		Pane:       "pane-1",
+		Ticket:     "19",
+		SessionCwd: "/repo/iter-19",
+		ScratchDir: scratchDir,
+		EpicName:   "epic",
+	}
+
+	recovered, err := recoverSmartZoneBreach(d, p, "sess-19", "smart-zone breach", 100)
+	if err != nil {
+		t.Fatalf("recoverSmartZoneBreach: %v", err)
+	}
+	if !recovered {
+		t.Fatal("recoverSmartZoneBreach returned recovered=false, want true once submission is confirmed")
+	}
+	if len(prompts) != 2 || prompts[0] != "/compact" {
+		t.Errorf("prompts = %v, want [/compact, finish-up]", prompts)
+	}
+	if reads < 3 {
+		t.Errorf("AgentRead calls = %d, want at least 3 (unsubmitted polls before confirmation)", reads)
+	}
+	if len(sentKeys) != 0 {
+		t.Errorf("AgentSendKeys calls = %v, want none: the gate must never nudge or resubmit", sentKeys)
+	}
+}
+
+// TestRecoverSmartZoneBreach_FinishUpGateGivesUpAfterTimeout verifies the
+// gate's bound: if the pane never renders /compact as submitted, the retry
+// loop gives up after smartZoneCompactSubmitTimeoutMs without ever nudging or
+// resubmitting, and no finish-up prompt is sent.
+func TestRecoverSmartZoneBreach_FinishUpGateGivesUpAfterTimeout(t *testing.T) {
+	scratchDir := t.TempDir()
+	var prompts []string
+	var sentKeys [][]string
+	d := Deps{
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			prompts = append(prompts, opts.Text)
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentSendKeys: func(target string, keys ...string) error {
+			sentKeys = append(sentKeys, keys)
+			return nil
+		},
+		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+			return "/compact", nil
+		},
+		Sleep: func(time.Duration) {},
+	}
+
+	p := launchAndPromptParams{
+		Label:      "iter-19",
+		Agent:      AgentClaude,
+		Pane:       "pane-1",
+		Ticket:     "19",
+		SessionCwd: "/repo/iter-19",
+		ScratchDir: scratchDir,
+		EpicName:   "epic",
+	}
+
+	recovered, err := recoverSmartZoneBreach(d, p, "sess-19", "smart-zone breach", 100)
+	if err != nil {
+		t.Fatalf("recoverSmartZoneBreach: %v", err)
+	}
+	if recovered {
+		t.Fatal("recoverSmartZoneBreach returned recovered=true, want false: /compact never confirmed submitted")
+	}
+	if len(prompts) != 1 || prompts[0] != "/compact" {
+		t.Errorf("prompts = %v, want [/compact] only, no finish-up", prompts)
+	}
+	if len(sentKeys) != 0 {
+		t.Errorf("AgentSendKeys calls = %v, want none: the gate must never nudge or resubmit", sentKeys)
+	}
+
+	events, ok, err := readEvents(scratchDir, "epic")
+	if err != nil || !ok {
+		t.Fatalf("readEvents() ok=%v err=%v", ok, err)
+	}
+	var sawFailed bool
+	for _, e := range events {
+		if e.Type == eventSmartZoneRecoveryFailed {
+			sawFailed = true
+		}
+	}
+	if !sawFailed {
+		t.Error("missing smart-zone-recovery-failed event when submission never confirms")
 	}
 }
 

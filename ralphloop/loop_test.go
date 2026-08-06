@@ -97,6 +97,9 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
 			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 		},
+		AgentRead: func(target string, opts herdr.AgentReadOptions) (string, error) {
+			return "compaction complete", nil
+		},
 		RevParse: func(dir, ref string) (string, error) {
 			return "deadbeef", nil
 		},
