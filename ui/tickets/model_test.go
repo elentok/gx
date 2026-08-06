@@ -15,6 +15,21 @@ import (
 	"github.com/elentok/gx/ui/keys"
 )
 
+func TestTicketProgressSpinnerHasEightFramesAtDocumentedCodepoints(t *testing.T) {
+	want := []string{
+		"\U000F0A9E", "\U000F0A9F", "\U000F0AA0", "\U000F0AA1",
+		"\U000F0AA2", "\U000F0AA3", "\U000F0AA4", "\U000F0AA5",
+	}
+	if len(TicketProgressSpinner.Frames) != 8 {
+		t.Fatalf("expected 8 frames, got %d", len(TicketProgressSpinner.Frames))
+	}
+	for i, frame := range want {
+		if TicketProgressSpinner.Frames[i] != frame {
+			t.Errorf("frame %d: got %q, want %q", i, TicketProgressSpinner.Frames[i], frame)
+		}
+	}
+}
+
 func TestImplementAgentMenuDefaultsToClaude(t *testing.T) {
 	menu := newImplementAgentMenu()
 	if menu.Cursor != 0 {

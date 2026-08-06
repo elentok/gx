@@ -31,6 +31,16 @@ const (
 	focusPreview
 )
 
+// TicketProgressSpinner is the circle-slice pie-fill spinner shared by the
+// Tickets tab and Queue tab to indicate an in-progress ticket.
+var TicketProgressSpinner = spinner.Spinner{
+	Frames: []string{
+		"\U000F0A9E", "\U000F0A9F", "\U000F0AA0", "\U000F0AA1",
+		"\U000F0AA2", "\U000F0AA3", "\U000F0AA4", "\U000F0AA5",
+	},
+	FPS: spinner.Dot.FPS,
+}
+
 // Model is the top-level tickets tab model: an epic/ticket sidebar paired
 // with a focusable preview panel that mirrors the sidebar's selection (see
 // CONTEXT.md's panel vocabulary) — "l"/"enter" on a ticket row hands focus to
@@ -140,7 +150,7 @@ func NewModelWithScope(worktreeRoot string, settings ui.Settings, extraKeys keys
 func NewModelWithScopeAndStore(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager, allWorktrees bool, store *QueueStore) Model {
 	_ = extraKeys
 	sp := spinner.New()
-	sp.Spinner = spinner.Dot
+	sp.Spinner = TicketProgressSpinner
 	queueStatus, checkOrder, checked := scopedQueueSnapshot(store, worktreeRoot, allWorktrees)
 	return Model{
 		worktreeRoot:       worktreeRoot,

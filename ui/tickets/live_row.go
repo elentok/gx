@@ -154,8 +154,9 @@ func renderLiveTicketRow(icons ui.IconSet, sp spinner.Model, t tickets.Ticket, l
 		return base, live.reason, true
 
 	case live.running:
-		// spinner.Dot's frames each carry a trailing space; strip it so the
-		// icon column stays single-width and aligned with the other status glyphs.
+		// TrimRight guards against any spinner whose frames carry trailing
+		// whitespace, keeping the icon column single-width and aligned with
+		// the other status glyphs.
 		spinnerView := lipgloss.NewStyle().Foreground(live.phase.color()).Render(strings.TrimRight(sp.View(), " "))
 		base = prefix + spinnerView + " " + title
 		suffix = live.phase.suffix()

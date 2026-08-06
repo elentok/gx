@@ -105,7 +105,7 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 		checkOrder = orders[0]
 	}
 	sp := spinner.New()
-	sp.Spinner = spinner.Dot
+	sp.Spinner = TicketProgressSpinner
 	return QueueModel{
 		executionTickets:   map[string]bool{},
 		liveContextTokens:  map[string]int{},
