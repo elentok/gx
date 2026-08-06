@@ -113,5 +113,8 @@ claimed`. Set a terminal status plus `commitless: true` in one call, e.g.
 `needs-info` for a human to check.
 
 Commit your work to the current branch. Start every commit subject with
-`{epic}/{ticket id}: `, substituting the epic directory name and the ticket's frontmatter `id`
-(for example, `ralph-loop/03: Add smart-zone observability`).
+`{epic}/{ticket id}: `, substituting the `.scratch/<epic>/` directory name (not the branch name,
+which is always namespaced under a literal `ralph-loop/` prefix regardless of epic — see
+[gx-local-tracker.md](../gx-local-tracker.md)) and the ticket's frontmatter `id` (for example, if
+the epic directory is `.scratch/widget-queue-fixes/`, a commit for ticket `03` starts with
+`widget-queue-fixes/03: Add smart-zone observability`).
