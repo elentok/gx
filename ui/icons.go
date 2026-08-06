@@ -127,14 +127,14 @@ func Icons(useNerdFont bool) IconSet {
 		CheckboxChecked:   "󰄲",
 		CheckboxUnchecked: "󰄱",
 
-		TicketOpen:           "○",
-		TicketClaimed:        "󰀄",
-		TicketBlocked:        "󰦞",
-		TicketNeedsInfo:      "󰋗",
-		TicketNeedsAttention: "󰀪",
-		TicketDone:           "󰄬",
-		TicketSuperseded:     "󰃀",
-		TicketError:          "󰀪",
-		TicketPaused:         "󰏥",
+		TicketOpen:           "",
+		TicketClaimed:        "",
+		TicketBlocked:        "",
+		TicketNeedsInfo:      "",
+		TicketNeedsAttention: "",
+		TicketDone:           "",
+		TicketSuperseded:     "",
+		TicketError:          "",
+		TicketPaused:         "",
 	}
 }
