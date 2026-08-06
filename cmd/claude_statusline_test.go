@@ -1,0 +1,267 @@
+package cmd
+
+import (
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/ui"
+)
+
+func TestRunClaudeStatusline_ValidInput(t *testing.T) {
+	out := &strings.Builder{}
+	d := deps{
+		stdin:  strings.NewReader(`{"context_window":{"total_input_tokens":1234,"used_percentage":51.2},"rate_limits":{"five_hour":{"used_percentage":11.4},"seven_day":{"used_percentage":72.8}},"model":{"display_name":"Claude Sonnet"}}`),
+		stdout: out,
+		getwd:  func() (string, error) { return t.TempDir(), nil },
+	}
+
+	if err := runClaudeStatusline(d, false, false); err != nil {
+		t.Fatalf("runClaudeStatusline returned error: %v", err)
+	}
+
+	got := out.String()
+	for _, want := range []string{"Claude Sonnet", "1.2k", "51%", "11% of 5h", "73% of weekly"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("output missing %q: %q", want, got)
+		}
+	}
+}
+
+func TestRunClaudeStatusline_TokensBelowThreshold(t *testing.T) {
+	out := &strings.Builder{}
+	d := deps{
+		stdin:  strings.NewReader(`{"context_window":{"total_input_tokens":999,"used_percentage":1},"rate_limits":{"five_hour":{"used_percentage":2},"seven_day":{"used_percentage":3}},"model":{"display_name":"Claude"}}`),
+		stdout: out,
+		getwd:  func() (string, error) { return t.TempDir(), nil },
+	}
+
+	if err := runClaudeStatusline(d, false, false); err != nil {
+		t.Fatalf("runClaudeStatusline returned error: %v", err)
+	}
+	if !strings.Contains(out.String(), "999") {
+		t.Fatalf("unexpected output: %q", out.String())
+	}
+}
+
+func TestRunClaudeStatusline_InvalidFields(t *testing.T) {
+	out := &strings.Builder{}
+	d := deps{
+		stdin:  strings.NewReader(`{"context_window":{"total_input_tokens":"NaN?","used_percentage":"oops"},"rate_limits":{"five_hour":{},"seven_day":{"used_percentage":88}},"model":{"display_name":9}}`),
+		stdout: out,
+		getwd:  func() (string, error) { return t.TempDir(), nil },
+	}
+
+	if err := runClaudeStatusline(d, false, false); err != nil {
+		t.Fatalf("runClaudeStatusline returned error: %v", err)
+	}
+
+	got := out.String()
+	for _, want := range []string{
+		"model missing/invalid: 9",
+		`tokens missing/invalid: "NaN?"`,
+		`context missing/invalid: "oops"`,
+		"88% of weekly",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("output missing %q: %q", want, got)
+		}
+	}
+	if strings.Contains(got, "5h missing/invalid") || strings.Contains(got, "weekly missing/invalid") {
+		t.Fatalf("expected missing 5h/weekly values to be hidden, got %q", got)
+	}
+}
+
+func TestRunClaudeStatusline_RejectsNonFiniteNumbers(t *testing.T) {
+	out := &strings.Builder{}
+	d := deps{
+		stdin:  strings.NewReader(`{"context_window":{"total_input_tokens":"NaN","used_percentage":"Infinity"},"rate_limits":{"five_hour":{"used_percentage":10},"seven_day":{"used_percentage":20}},"model":{"display_name":"Claude"}}`),
+		stdout: out,
+		getwd:  func() (string, error) { return t.TempDir(), nil },
+	}
+
+	if err := runClaudeStatusline(d, false, false); err != nil {
+		t.Fatalf("runClaudeStatusline returned error: %v", err)
+	}
+
+	got := out.String()
+	for _, want := range []string{
+		`tokens missing/invalid: "NaN"`,
+		`context missing/invalid: "Infinity"`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("output missing %q: %q", want, got)
+		}
+	}
+}
+
+func TestRunClaudeStatusline_SilentSkipsInvalid(t *testing.T) {
+	out := &strings.Builder{}
+	d := deps{
+		stdin:  strings.NewReader(`{"context_window":{"total_input_tokens":"bad"},"rate_limits":{"five_hour":{"used_percentage":10}},"model":{"display_name":"Claude"}}`),
+		stdout: out,
+		getwd:  func() (string, error) { return t.TempDir(), nil },
+	}
+
+	if err := runClaudeStatusline(d, true, false); err != nil {
+		t.Fatalf("runClaudeStatusline returned error: %v", err)
+	}
+
+	got := out.String()
+	if strings.Contains(got, "missing/invalid") {
+		t.Fatalf("unexpected placeholder in silent output: %q", got)
+	}
+	for _, want := range []string{"Claude", "10% of 5h"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("output missing %q: %q", want, got)
+		}
+	}
+}
+
+func TestRunClaudeStatusline_MalformedJSON(t *testing.T) {
+	out := &strings.Builder{}
+	d := deps{
+		stdin:  strings.NewReader(`{"model":`),
+		stdout: out,
+		getwd:  func() (string, error) { return t.TempDir(), nil },
+	}
+
+	if err := runClaudeStatusline(d, false, false); err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(out.String(), "error: malformed JSON input") {
+		t.Fatalf("expected malformed JSON message, got %q", out.String())
+	}
+}
+
+func TestRunClaudeStatusline_Demo(t *testing.T) {
+	out := &strings.Builder{}
+	d := deps{
+		stdin:  strings.NewReader(`{"model":"ignored"}`),
+		stdout: out,
+		getwd:  func() (string, error) { return t.TempDir(), nil },
+	}
+
+	if err := runClaudeStatusline(d, false, true); err != nil {
+		t.Fatalf("runClaudeStatusline returned error: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 lines, got %d: %q", len(lines), out.String())
+	}
+	for _, line := range lines {
+		for _, want := range []string{"TheModel", "12% of 5h", "34% of weekly"} {
+			if !strings.Contains(line, want) {
+				t.Fatalf("line missing %q: %q", want, line)
+			}
+		}
+	}
+	for _, want := range []string{"50k", "85k", "120k", "10%", "30%", "60%", "🙂", "🤔", "🥵"} {
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("demo output missing %q: %q", want, out.String())
+		}
+	}
+}
+
+func TestTokenColorThresholds(t *testing.T) {
+	cases := []struct {
+		name   string
+		tokens float64
+		want   any
+	}{
+		{name: "green below 75k", tokens: 74999, want: ui.ColorGreen},
+		{name: "yellow at 75k", tokens: 75000, want: ui.ColorYellow},
+		{name: "yellow below 100k", tokens: 99999, want: ui.ColorYellow},
+		{name: "orange at 100k", tokens: 100000, want: ui.ColorOrange},
+		{name: "orange below 150k", tokens: 149999, want: ui.ColorOrange},
+		{name: "red at 150k", tokens: 150000, want: ui.ColorRed},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tokenColor(tc.tokens); got != tc.want {
+				t.Fatalf("expected %v, got %v", tc.want, got)
+			}
+		})
+	}
+}
+
+func TestContextProgressValue_RendersBar(t *testing.T) {
+	got := contextProgressValue(50, 1000)
+	if !strings.Contains(got, "■") && !strings.Contains(got, "·") {
+		t.Fatalf("expected a rendered progress bar, got %q", got)
+	}
+	if !strings.Contains(got, "50%") {
+		t.Fatalf("expected the percentage text, got %q", got)
+	}
+}
+
+func TestCurrentWorktreeSegment_PresentWhenBranchMatchesWorktree(t *testing.T) {
+	outer := testutil.TempDotBareRepoWithWorktrees(t, "feature-a")
+	d := deps{getwd: func() (string, error) { return filepath.Join(outer, "feature-a"), nil }}
+
+	got := currentWorktreeSegment(d)
+	if !strings.Contains(got, "feature-a") {
+		t.Fatalf("expected worktree name in segment, got %q", got)
+	}
+	if strings.Contains(got, " on ") {
+		t.Fatalf("expected no branch suffix when branch matches worktree name, got %q", got)
+	}
+}
+
+func TestCurrentWorktreeSegment_PresentWithBranchWhenDiffers(t *testing.T) {
+	outer := testutil.TempDotBareRepoWithWorktrees(t, "feature-b")
+	wtDir := filepath.Join(outer, "feature-b")
+	testutil.MustGitExported(t, wtDir, "checkout", "-b", "other-branch")
+
+	d := deps{getwd: func() (string, error) { return wtDir, nil }}
+
+	got := currentWorktreeSegment(d)
+	if !strings.Contains(got, "feature-b") || !strings.Contains(got, "other-branch") {
+		t.Fatalf("expected worktree and branch in segment, got %q", got)
+	}
+	if !strings.Contains(got, " on ") {
+		t.Fatalf("expected an \" on \" separator between worktree and branch, got %q", got)
+	}
+}
+
+func TestCurrentWorktreeSegment_OmittedOutsideGit(t *testing.T) {
+	d := deps{getwd: func() (string, error) { return t.TempDir(), nil }}
+
+	if got := currentWorktreeSegment(d); got != "" {
+		t.Fatalf("expected empty segment outside a git worktree, got %q", got)
+	}
+}
+
+func TestCurrentWorktreeSegment_TruncatesLongNames(t *testing.T) {
+	longName := "a-worktree-name-that-is-far-too-long-to-fit"
+	outer := testutil.TempDotBareRepoWithWorktrees(t, longName)
+	d := deps{getwd: func() (string, error) { return filepath.Join(outer, longName), nil }}
+
+	got := currentWorktreeSegment(d)
+	if !strings.Contains(got, "…") {
+		t.Fatalf("expected truncation ellipsis in segment, got %q", got)
+	}
+	if strings.Contains(got, longName) {
+		t.Fatalf("expected the long name to be truncated, got %q", got)
+	}
+}
+
+func TestRunClaudeStatusline_IncludesWorktreeSegment(t *testing.T) {
+	outer := testutil.TempDotBareRepoWithWorktrees(t, "feature-c")
+	out := &strings.Builder{}
+	d := deps{
+		stdin:  strings.NewReader(`{"model":{"display_name":"Claude"}}`),
+		stdout: out,
+		getwd:  func() (string, error) { return filepath.Join(outer, "feature-c"), nil },
+	}
+
+	if err := runClaudeStatusline(d, false, false); err != nil {
+		t.Fatalf("runClaudeStatusline returned error: %v", err)
+	}
+	if !strings.Contains(out.String(), "feature-c") {
+		t.Fatalf("expected worktree segment in output, got %q", out.String())
+	}
+}
