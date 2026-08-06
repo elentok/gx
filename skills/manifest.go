@@ -57,7 +57,19 @@ var (
 	ErrUnsupportedVersion = errors.New("manifest schema version is unsupported")
 )
 
-var userConfigDirFn = os.UserConfigDir
+// defaultUserConfigDir hardcodes ~/.config as gx's config base directory on
+// every platform, deliberately bypassing os.UserConfigDir's per-OS/XDG
+// resolution (e.g. ~/Library/Application Support on macOS, or
+// $XDG_CONFIG_HOME when set).
+func defaultUserConfigDir() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".config"), nil
+}
+
+var userConfigDirFn = defaultUserConfigDir
 
 // ManifestPath returns the manifest file path for the skill identified by
 // id, following gx's existing user configuration-directory convention

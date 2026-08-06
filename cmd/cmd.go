@@ -49,6 +49,7 @@ type deps struct {
 }
 
 func defaultDeps() deps {
+	_ = config.MigrateDir()
 	cfg, _ := config.Load()
 	return deps{
 		stdin:  os.Stdin,
