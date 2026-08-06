@@ -476,6 +476,124 @@ func TestRecoverSmartZoneBreach_GenuineStuckCompactFailsAfterExtendedWait(t *tes
 	}
 }
 
+// TestRecoverSmartZoneBreach_PrematureIdleFallsThroughToTranscriptCheck
+// verifies the fix for issue 03: an immediate (non-timeout) "/compact"
+// success is not trusted on its own when a compaction-count baseline is
+// available. If the transcript's compaction count hasn't advanced past
+// baseline yet, that idle/done report was premature and recovery must fall
+// through to waitForCompactionSignal instead of sending the finish-up
+// prompt right away.
+func TestRecoverSmartZoneBreach_PrematureIdleFallsThroughToTranscriptCheck(t *testing.T) {
+	scratchDir := t.TempDir()
+	var prompts []string
+	var waits int
+	var compactionCount int
+	d := Deps{
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			prompts = append(prompts, opts.Text)
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			waits++
+			if waits == 1 {
+				// The real compaction lands between the first and second poll
+				// tick of the fallthrough wait.
+				compactionCount = 1
+				return herdr.Agent{}, errors.New("timed out waiting for agent status")
+			}
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
+			return compactionCount, true, nil
+		},
+		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+			return "compaction complete", nil
+		},
+		Sleep: func(time.Duration) {},
+	}
+
+	p := launchAndPromptParams{
+		Label:      "iter-19",
+		Agent:      AgentClaude,
+		Pane:       "pane-1",
+		Ticket:     "19",
+		SessionCwd: "/repo/iter-19",
+		ScratchDir: scratchDir,
+		EpicName:   "epic",
+	}
+
+	recovered, err := recoverSmartZoneBreach(d, p, "sess-19", "smart-zone breach", 100)
+	if err != nil {
+		t.Fatalf("recoverSmartZoneBreach: %v", err)
+	}
+	if !recovered {
+		t.Fatal("recoverSmartZoneBreach returned recovered=false, want true once the transcript confirms compaction completed")
+	}
+	if waits == 0 {
+		t.Error("AgentWait never called, want the premature idle/done report to fall through to waitForCompactionSignal")
+	}
+	if len(prompts) != 2 || prompts[0] != "/compact" {
+		t.Errorf("prompts = %v, want [/compact, finish-up] with finish-up sent only after the fallthrough poll confirms compaction", prompts)
+	}
+}
+
+// TestRecoverSmartZoneBreach_ImmediateSuccessTrustedWhenAlreadyAdvanced
+// verifies the other half of issue 03's fix: when the compaction count has
+// already advanced past baseline by the time the immediate "/compact"
+// success comes back, that's a genuine completion and recovery proceeds
+// straight to the finish-up prompt with no extra polling.
+func TestRecoverSmartZoneBreach_ImmediateSuccessTrustedWhenAlreadyAdvanced(t *testing.T) {
+	scratchDir := t.TempDir()
+	var prompts []string
+	var waits int
+	var readCompactionsCalls int
+	d := Deps{
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			prompts = append(prompts, opts.Text)
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			waits++
+			return herdr.Agent{}, errors.New("timed out waiting for agent status")
+		},
+		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
+			readCompactionsCalls++
+			if readCompactionsCalls == 1 {
+				return 0, true, nil // baseline, taken before "/compact" is sent
+			}
+			return 1, true, nil // already advanced by the time the prompt returns
+		},
+		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+			return "compaction complete", nil
+		},
+		Sleep: func(time.Duration) {},
+	}
+
+	p := launchAndPromptParams{
+		Label:      "iter-19",
+		Agent:      AgentClaude,
+		Pane:       "pane-1",
+		Ticket:     "19",
+		SessionCwd: "/repo/iter-19",
+		ScratchDir: scratchDir,
+		EpicName:   "epic",
+	}
+
+	recovered, err := recoverSmartZoneBreach(d, p, "sess-19", "smart-zone breach", 100)
+	if err != nil {
+		t.Fatalf("recoverSmartZoneBreach: %v", err)
+	}
+	if !recovered {
+		t.Fatal("recoverSmartZoneBreach returned recovered=false, want true")
+	}
+	if waits != 0 {
+		t.Errorf("AgentWait calls = %d, want 0: a genuine immediate success must not fall through to extra polling", waits)
+	}
+	if len(prompts) != 2 || prompts[0] != "/compact" {
+		t.Errorf("prompts = %v, want [/compact, finish-up]", prompts)
+	}
+}
+
 func TestConfirmCompactSubmitted(t *testing.T) {
 	t.Run("trailing /compact line reports not yet submitted", func(t *testing.T) {
 		d := Deps{

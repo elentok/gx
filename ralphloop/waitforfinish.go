@@ -321,6 +321,14 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 	expired := false
 	if err != nil && isPollTimeout(err) {
 		agent, expired, err = waitForCompactionSignal(d, p, sessionID, compactStates, smartZonePollMs, baselineCompactions, haveBaseline)
+	} else if err == nil && haveBaseline {
+		count, ok, readErr := sessionCompactions(d, p.Agent, p.SessionCwd, sessionID)
+		if readErr == nil && ok && count <= baselineCompactions {
+			// herdr reported the pane back at idle/done, but the transcript
+			// shows no new compaction boundary yet: that's a premature
+			// idle/done report, not proof the compact actually finished.
+			agent, expired, err = waitForCompactionSignal(d, p, sessionID, compactStates, smartZonePollMs, baselineCompactions, haveBaseline)
+		}
 	}
 	if err == nil && agent.AgentStatus == "blocked" {
 		_, err = d.AgentWait(herdr.AgentWaitOptions{
