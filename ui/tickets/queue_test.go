@@ -103,6 +103,61 @@ func TestQueueModelOrdersRowsByDependencyNotTicketNumber(t *testing.T) {
 	}
 }
 
+// TestQueueModelNestsChildrenUnderParentAndCollapsesWithHL covers ticket 10's
+// acceptance criteria: a checked ticket's children (Parent/Children, ticket
+// 03) render nested underneath it in the Queue tab, and "h"/"l" collapse and
+// re-expand that nesting.
+func TestQueueModelNestsChildrenUnderParentAndCollapsesWithHL(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-parent.md", "Status: open\n\nBody.\n")
+	writeRawQueueTicket(t, root, "alpha", "02-child.md", "---\nid: \"02\"\nstatus: open\ntype: task\nparent: \"01\"\n---\n\nBody.\n")
+	writeTicket(t, root, "alpha", "03-other.md", "Status: open\n\nBody.\n")
+
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "01-parent.md"): true,
+		ticketPath(root, "alpha", "02-child.md"):  true,
+		ticketPath(root, "alpha", "03-other.md"):  true,
+	}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+
+	rows := m.rows()
+	if len(rows) != 3 {
+		t.Fatalf("expected 3 rows, got %d: %+v", len(rows), rows)
+	}
+	if rows[0].ticket.Identifier != "01" || rows[0].depth != 0 || !rows[0].hasChildren || !rows[0].expanded {
+		t.Fatalf("expected parent 01 at depth 0 with children, got %+v", rows[0])
+	}
+	if rows[1].ticket.Identifier != "02" || rows[1].depth != 1 {
+		t.Fatalf("expected child 02 nested at depth 1 right after its parent, got %+v", rows[1])
+	}
+	if rows[2].ticket.Identifier != "03" || rows[2].depth != 0 {
+		t.Fatalf("expected unrelated ticket 03 at depth 0, got %+v", rows[2])
+	}
+
+	content := m.View().Content
+	if !strings.Contains(content, "▾") {
+		t.Fatalf("expected an expanded-folder glyph for the parent row:\n%s", content)
+	}
+
+	// m.selected starts at 0 (the parent row): "h" collapses its children.
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
+	m = updated.(QueueModel)
+	rows = m.rows()
+	if len(rows) != 2 || rows[0].ticket.Identifier != "01" || rows[1].ticket.Identifier != "03" {
+		t.Fatalf("expected only 01 and 03 after collapsing 01's children, got %+v", rows)
+	}
+	if strings.Contains(m.View().Content, "Child") {
+		t.Fatalf("expected child ticket hidden after collapse:\n%s", m.View().Content)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+	m = updated.(QueueModel)
+	rows = m.rows()
+	if len(rows) != 3 {
+		t.Fatalf("expected \"l\" to re-expand and restore all 3 rows, got %d: %+v", len(rows), rows)
+	}
+}
+
 func TestQueueModelNeverShowsATicketRunnableWhenOutOfScopeBlockerIsUnmet(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-foundation.md", "Status: open\n\nBody.\n")
@@ -1165,7 +1220,7 @@ func TestRenderQueueTicketRow_CommitlessSuffix(t *testing.T) {
 		{Identifier: "01", Title: "Open ticket", Status: "open", Commitless: true},
 	}}
 
-	lines := m.renderQueueTicketRow(epic, epic.Tickets[0], 0)
+	lines := m.renderQueueTicketRow(queueRow{epic: epic, ticket: epic.Tickets[0]}, 0)
 	if !strings.Contains(lines[0], "Open ticket (commitless)") {
 		t.Fatalf("title line = %q, want title followed by \" (commitless)\"", lines[0])
 	}
@@ -1190,8 +1245,8 @@ func TestRenderQueueTicketRow_LiveRowIndentMatchesNormalRow(t *testing.T) {
 		"epic": {"02": {running: true, label: "iter-01"}},
 	}
 
-	normalLine := m.renderQueueTicketRow(epic, epic.Tickets[0], 0)[0]
-	liveLine := m.renderQueueTicketRow(epic, epic.Tickets[1], 1)[0]
+	normalLine := m.renderQueueTicketRow(queueRow{epic: epic, ticket: epic.Tickets[0]}, 0)[0]
+	liveLine := m.renderQueueTicketRow(queueRow{epic: epic, ticket: epic.Tickets[1]}, 1)[0]
 
 	normalIndent := leadingWhitespace(ansi.Strip(normalLine))
 	liveIndent := leadingWhitespace(ansi.Strip(liveLine))
@@ -1206,7 +1261,7 @@ func TestRenderQueueTicketRow_DoneMetricsLineMatchesTitleColor(t *testing.T) {
 		{Identifier: "01", Title: "Done ticket", Status: "done", ElapsedTime: 5, ActualContextWindow: 100},
 	}}
 
-	lines := m.renderQueueTicketRow(epic, epic.Tickets[0], 0)
+	lines := m.renderQueueTicketRow(queueRow{epic: epic, ticket: epic.Tickets[0]}, 0)
 	wantMetrics := renderRowMetricsLine(formatMetricsLine(5, 100), statusDoneStyle)
 	if lines[1] != wantMetrics {
 		t.Fatalf("metrics line = %q, want %q", lines[1], wantMetrics)
@@ -1395,8 +1450,8 @@ func TestQueueSearch_TypedCharactersFilterAndHighlight(t *testing.T) {
 
 	dimPrefix := strings.SplitN(ui.StyleDim.Render("PROBE"), "PROBE", 2)[0]
 	rows := m.rows()
-	matchedLine := m.renderQueueTicketRow(rows[0].epic, rows[0].ticket, 0)[0]
-	nonMatchedLine := m.renderQueueTicketRow(rows[1].epic, rows[1].ticket, 1)[0]
+	matchedLine := m.renderQueueTicketRow(rows[0], 0)[0]
+	nonMatchedLine := m.renderQueueTicketRow(rows[1], 1)[0]
 	if strings.Contains(matchedLine, dimPrefix) {
 		t.Fatalf("expected matching row undimmed, got: %q", matchedLine)
 	}

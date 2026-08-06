@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
@@ -92,6 +93,12 @@ type QueueModel struct {
 	// typed right after an unconsumed "t" falls through to its own normal
 	// action instead of being swallowed (ticket 16).
 	keys keys.Manager
+	// collapsedQueueTickets is the Queue tab's counterpart to the Tickets
+	// tab's collapsedTickets (ticket 09), keyed by Ticket.Path, true for a
+	// ticket whose children (Parent/Children, ticket 03) are hidden in
+	// rows()/rowsAndPlanErrors() (ticket 10). Every ticket with children
+	// starts expanded — no default-collapse pass.
+	collapsedQueueTickets map[string]bool
 }
 
 func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string]bool, orders ...map[string]uint64) QueueModel {
@@ -514,6 +521,10 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.moveSelection(1)
 	case "k", "up":
 		m.moveSelection(-1)
+	case "h", "left":
+		m.collapseSelectedQueueRow()
+	case "l", "right":
+		m.expandSelectedQueueRow()
 	case "ctrl+d":
 		m.moveSelection(list.DefaultScroll)
 	case "ctrl+u":
@@ -667,6 +678,74 @@ func (m *QueueModel) startAvailableEpics() tea.Cmd {
 		}
 		return messages
 	}
+}
+
+// collapseSelectedQueueRow handles "h"/"left": on a row with children that's
+// currently expanded it collapses that row's own children, mirroring the
+// Tickets tab's collapseSelectedEpic (ticket 09) one level down since the
+// Queue tab has no epic-level collapse of its own. On any other row (a leaf,
+// or one already collapsed) with a nested parent it jumps selection up to
+// that parent row instead.
+func (m *QueueModel) collapseSelectedQueueRow() {
+	rows := m.rows()
+	if m.selected < 0 || m.selected >= len(rows) {
+		return
+	}
+	r := rows[m.selected]
+	if r.hasChildren && r.expanded {
+		m.setCollapsedQueueTicket(r.ticket.Path, true)
+		return
+	}
+	if r.parentPath != "" {
+		m.jumpToQueueTicket(r.parentPath)
+	}
+}
+
+// expandSelectedQueueRow handles "l"/"right": on a collapsed row with
+// children it expands that row's own children, mirroring the Tickets tab's
+// expandSelectedEpic (ticket 09) one level down.
+func (m *QueueModel) expandSelectedQueueRow() {
+	rows := m.rows()
+	if m.selected < 0 || m.selected >= len(rows) {
+		return
+	}
+	r := rows[m.selected]
+	if r.hasChildren && !r.expanded {
+		m.setCollapsedQueueTicket(r.ticket.Path, false)
+	}
+}
+
+// jumpToQueueTicket moves the selection to the row for the ticket at path,
+// collapseSelectedQueueRow's counterpart to the Tickets tab's jumpToTicket.
+// The target is always present in rows(): a child row only ever appears once
+// every one of its ancestors is expanded.
+func (m *QueueModel) jumpToQueueTicket(path string) {
+	for i, r := range m.rows() {
+		if r.ticket.Path == path {
+			m.selected = i
+			m.ensureQueueVisible()
+			return
+		}
+	}
+}
+
+// setCollapsedQueueTicket is the Queue tab's counterpart to the Tickets
+// tab's setCollapsedTicket (ticket 09), keyed by Ticket.Path since it's read
+// from collapsedQueueTickets by ui/tree's entry-builder inside
+// queueRowsForEpic.
+func (m *QueueModel) setCollapsedQueueTicket(path string, collapsed bool) {
+	if m.collapsedQueueTickets == nil {
+		m.collapsedQueueTickets = map[string]bool{}
+	}
+	if collapsed {
+		m.collapsedQueueTickets[path] = true
+	} else {
+		delete(m.collapsedQueueTickets, path)
+	}
+	if m.search.HasQuery() {
+		m.recomputeQueueSearchMatches()
+	}
+	m.clampSelected()
 }
 
 func (m *QueueModel) moveSelection(delta int) {
@@ -881,7 +960,7 @@ func (m QueueModel) buildQueueLines() (lines []string, offsets []int, heights []
 			}
 		}
 		offsets = append(offsets, len(lines))
-		rowLines := m.renderQueueTicketRow(r.epic, r.ticket, i)
+		rowLines := m.renderQueueTicketRow(r, i)
 		if i == m.selected {
 			for li, line := range rowLines {
 				rowLines[li] = ui.RenderRowHighlight(line)
@@ -896,13 +975,19 @@ func (m QueueModel) buildQueueLines() (lines []string, offsets []int, heights []
 // renderQueueTicketRow renders one physical line for a ticket that isn't
 // currently running, and two for a live or done ticket — the same two-line
 // status presentation as the Tickets tab's renderTicketRow (view.go), so the
-// Queue tab shows identical per-ticket status (ticket 25).
-func (m QueueModel) renderQueueTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) []string {
+// Queue tab shows identical per-ticket status (ticket 25). r.depth indents a
+// nested ticket (Parent/Children, ticket 03) two extra spaces per level,
+// matching ui/tree's own indent unit and the Tickets tab's renderTicketRow
+// (ticket 09); a ticket with children gets the same folder-open/closed glyph
+// an epic row uses in the Tickets tab, reflecting r.expanded.
+func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) []string {
+	epic, t := r.epic, r.ticket
 	status := epic.RenderedStatus(t)
+	indent := "  " + strings.Repeat("  ", r.depth)
 
 	if m.runningEpics[epic.Name] {
 		if live, ok := m.live[epic.Name][t.Identifier]; ok {
-			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live, "  "); ok {
+			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live, indent); ok {
 				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens)
 				return []string{base, renderRowMetricsLine(joinNonEmpty(" ", suffix, metrics), metricsLineStyle)}
 			}
@@ -930,7 +1015,16 @@ func (m QueueModel) renderQueueTicketRow(epic tickets.Epic, t tickets.Ticket, ro
 		style = ui.StyleDim
 	}
 
-	line := "  " + style.Render(icon) + " " + titleStyle.Render(title)
+	fold := ""
+	if r.hasChildren {
+		glyph := m.icons().FolderOpen
+		if !r.expanded {
+			glyph = m.icons().FolderClosed
+		}
+		fold = glyph + " "
+	}
+
+	line := indent + fold + style.Render(icon) + " " + titleStyle.Render(title)
 	if suffix := blockedBySuffix(epic, t, status); suffix != "" {
 		suffixStyle := blockedBySuffixStyle
 		if searchDim {

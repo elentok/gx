@@ -3,11 +3,22 @@ package tickets
 import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/ui/tree"
 )
 
+// depth/hasChildren/expanded/parentPath mirror the Tickets tab's row (ticket
+// 09, model_data.go) one level down for the Queue tab's own row model: a
+// ticket nested under another ticket via Parent/Children (ticket 03).
+// parentPath is "" for a top-level row, keyed by Ticket.Path (globally
+// unique) rather than an epic.Tickets index since queueRow doesn't carry
+// one.
 type queueRow struct {
-	epic   tickets.Epic
-	ticket tickets.Ticket
+	epic        tickets.Epic
+	ticket      tickets.Ticket
+	depth       int
+	hasChildren bool
+	expanded    bool
+	parentPath  string
 }
 
 func (m QueueModel) rows() []queueRow {
@@ -45,14 +56,102 @@ func (m QueueModel) rowsAndPlanErrors() ([]queueRow, map[string]error) {
 		if err != nil {
 			planErrs[epic.Name] = err
 		}
-		for _, t := range epicRowOrder(epic, waves, candidates) {
-			if m.hideComplete && epic.RenderedStatus(t) == tickets.StatusDone {
-				continue
-			}
-			out = append(out, queueRow{epic: epic, ticket: t})
+		ordered := epicRowOrder(epic, waves, candidates)
+		if m.hideComplete {
+			ordered = filterDoneTickets(epic, ordered)
 		}
+		out = append(out, queueRowsForEpic(epic, ordered, m.collapsedQueueTickets)...)
 	}
 	return out, planErrs
+}
+
+// filterDoneTickets drops a done ticket from ordered before nesting
+// (queueRowsForEpic) rather than after, so a done parent doesn't strand its
+// children — nearestVisibleQueueAncestor reattaches them to the nearest
+// surviving ancestor instead of losing them.
+func filterDoneTickets(epic tickets.Epic, ordered []tickets.Ticket) []tickets.Ticket {
+	filtered := make([]tickets.Ticket, 0, len(ordered))
+	for _, t := range ordered {
+		if epic.RenderedStatus(t) == tickets.StatusDone {
+			continue
+		}
+		filtered = append(filtered, t)
+	}
+	return filtered
+}
+
+// queueRowsForEpic nests ordered (epicRowOrder's flattened plan-order ticket
+// list) under each ticket's Parent (ticket 03) via ui/tree's pure
+// entry-builder (ticket 02), mirroring the Tickets tab's ticketRows (ticket
+// 09) one level down. ordered is also the definition of "visible" here: a
+// ticket's parent counts as a nesting target only if it's also present in
+// ordered (still checked/planned, and not hideComplete-filtered), preserving
+// ordered's own plan order among roots and among each parent's children.
+func queueRowsForEpic(epic tickets.Epic, ordered []tickets.Ticket, collapsed map[string]bool) []queueRow {
+	visible := make(map[string]bool, len(ordered))
+	for _, t := range ordered {
+		visible[t.Path] = true
+	}
+
+	byIdentifier := make(map[string]tickets.Ticket, len(epic.Tickets))
+	for _, t := range epic.Tickets {
+		if t.Identifier != "" {
+			byIdentifier[t.Identifier] = t
+		}
+	}
+
+	parentOf := make(map[string]string, len(ordered))
+	childrenOf := make(map[string][]tickets.Ticket, len(ordered))
+	var roots []tickets.Ticket
+	for _, t := range ordered {
+		parentPath := nearestVisibleQueueAncestor(t, visible, byIdentifier)
+		parentOf[t.Path] = parentPath
+		if parentPath == "" {
+			roots = append(roots, t)
+		} else {
+			childrenOf[parentPath] = append(childrenOf[parentPath], t)
+		}
+	}
+
+	idFn := func(t tickets.Ticket) string { return t.Path }
+	childrenFn := func(t tickets.Ticket) []tickets.Ticket { return childrenOf[t.Path] }
+	entries := tree.BuildEntriesFromValues(roots, idFn, childrenFn, collapsed)
+
+	rows := make([]queueRow, len(entries))
+	for i, e := range entries {
+		rows[i] = queueRow{
+			epic:        epic,
+			ticket:      e.Value,
+			depth:       e.Depth,
+			hasChildren: e.HasChildren,
+			expanded:    e.Expanded,
+			parentPath:  parentOf[e.Value.Path],
+		}
+	}
+	return rows
+}
+
+// nearestVisibleQueueAncestor walks t's Parent chain (ticket 03's schema
+// field) up to the first ancestor present in visible, mirroring the Tickets
+// tab's nearestVisibleAncestor (ticket 09, model_data.go) — keyed by
+// Ticket.Path/Identifier rather than an epic.Tickets index since queueRow
+// doesn't carry one. Returns "" once the chain runs out, hits a Parent token
+// with no matching ticket in the epic, or would loop (guarded via seen).
+func nearestVisibleQueueAncestor(t tickets.Ticket, visible map[string]bool, byIdentifier map[string]tickets.Ticket) string {
+	seen := map[string]bool{t.Path: true}
+	cur := t
+	for cur.Parent != nil {
+		parent, ok := byIdentifier[*cur.Parent]
+		if !ok || seen[parent.Path] {
+			return ""
+		}
+		if visible[parent.Path] {
+			return parent.Path
+		}
+		seen[parent.Path] = true
+		cur = parent
+	}
+	return ""
 }
 
 // epicRowOrder flattens waves (blockers before dependents, ties in ticket
