@@ -26,7 +26,7 @@ func TestRenderTicketRow_NeverRunIsSingleLine(t *testing.T) {
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{{Identifier: "01", Title: "Open ticket", Status: "open"}}}
 	m := newModelForTicketRowTests(epic)
 
-	lines := m.renderTicketRow(epic, epic.Tickets[0], 1)
+	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)
 	if len(lines) != 1 {
 		t.Fatalf("renderTicketRow() returned %d lines, want 1: %#v", len(lines), lines)
 	}
@@ -38,7 +38,7 @@ func TestRenderTicketRow_DoneHasMetricsLine(t *testing.T) {
 	}}
 	m := newModelForTicketRowTests(epic)
 
-	lines := m.renderTicketRow(epic, epic.Tickets[0], 1)
+	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)
 	if len(lines) != 2 {
 		t.Fatalf("renderTicketRow() returned %d lines, want 2: %#v", len(lines), lines)
 	}
@@ -60,7 +60,7 @@ func TestRenderTicketRow_LiveHasSuffixAndMetricsLine(t *testing.T) {
 		},
 	}
 
-	lines := m.renderTicketRow(epic, epic.Tickets[0], 1)
+	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)
 	if len(lines) != 2 {
 		t.Fatalf("renderTicketRow() returned %d lines, want 2: %#v", len(lines), lines)
 	}
@@ -86,7 +86,7 @@ func TestRenderTicketRow_LiveRowIndentNotDoubled(t *testing.T) {
 	live := liveTicketState{running: true, label: "iter-01"}
 	m.live[epic.Name] = map[string]liveTicketState{"01": live}
 
-	lines := m.renderTicketRow(epic, epic.Tickets[0], 0)
+	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 0)
 
 	wantPrefix := "    " + m.checkboxGlyph(m.isChecked(epic.Tickets[0].Path)) + " "
 	wantBase, _, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, epic.Tickets[0], live, wantPrefix)
@@ -111,8 +111,8 @@ func TestRenderTicketRow_LiveRowIndentMatchesNonLiveSibling(t *testing.T) {
 	m.implementingEpics = map[string]bool{epic.Name: true}
 	m.live[epic.Name] = map[string]liveTicketState{"02": {running: true, label: "iter-01"}}
 
-	normalLine := m.renderTicketRow(epic, epic.Tickets[0], 0)[0]
-	liveLine := m.renderTicketRow(epic, epic.Tickets[1], 1)[0]
+	normalLine := m.renderTicketRow(epic, row{ticketIdx: 0}, 0)[0]
+	liveLine := m.renderTicketRow(epic, row{ticketIdx: 1}, 1)[0]
 
 	normalIndent := leadingWhitespace(ansi.Strip(normalLine))
 	liveIndent := leadingWhitespace(ansi.Strip(liveLine))
@@ -135,7 +135,7 @@ func TestRenderTicketRow_PausedHasReasonAndMetricsLine(t *testing.T) {
 		},
 	}
 
-	lines := m.renderTicketRow(epic, epic.Tickets[0], 1)
+	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)
 	if len(lines) != 2 {
 		t.Fatalf("renderTicketRow() returned %d lines, want 2: %#v", len(lines), lines)
 	}
@@ -202,7 +202,7 @@ func TestRenderTicketRow_CommitlessSuffix(t *testing.T) {
 	}}
 	m := newModelForTicketRowTests(epic)
 
-	lines := m.renderTicketRow(epic, epic.Tickets[0], 1)
+	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)
 	if !strings.Contains(lines[0], "Open ticket (commitless)") {
 		t.Fatalf("title line = %q, want title followed by \" (commitless)\"", lines[0])
 	}
@@ -214,7 +214,7 @@ func TestRenderTicketRow_DoneMetricsLineMatchesTitleColor(t *testing.T) {
 	}}
 	m := newModelForTicketRowTests(epic)
 
-	lines := m.renderTicketRow(epic, epic.Tickets[0], 1)
+	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)
 	wantMetrics := renderRowMetricsLine(formatMetricsLine(5, 100), statusDoneStyle)
 	if lines[1] != wantMetrics {
 		t.Fatalf("metrics line = %q, want %q", lines[1], wantMetrics)
@@ -247,7 +247,7 @@ func TestSidebarLinesHighlightsBothLinesOfSelectedTicket(t *testing.T) {
 	m.selected = 1 // epic is row 0; done ticket is row 1
 
 	lines := m.sidebarLines()
-	want := m.renderTicketRow(epic, epic.Tickets[0], 1)
+	want := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)
 	if len(lines) < 4 {
 		t.Fatalf("sidebarLines() returned too few lines: %#v", lines)
 	}

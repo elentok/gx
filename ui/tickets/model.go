@@ -75,6 +75,13 @@ type Model struct {
 
 	selected       int
 	collapsedEpics map[string]bool
+	// collapsedTickets is collapsedEpics' ticket-level counterpart (ticket
+	// 09): keyed by Ticket.Path (globally unique, unlike Identifier which
+	// restarts numbering per epic), true for a ticket whose children (Parent/
+	// Children, ticket 03) are hidden. Unlike collapsedEpics there's no
+	// default-collapse pass on load — every ticket with children starts
+	// expanded.
+	collapsedTickets map[string]bool
 	// hideDone is the "tc" chord's toggle (ticket 08): when set, done tickets
 	// are excluded from visibleRows()/sidebarLines() navigation and
 	// rendering. Epic done/total header counts read epic.Tickets directly

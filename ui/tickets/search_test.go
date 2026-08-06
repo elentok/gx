@@ -72,8 +72,8 @@ func TestSearch_NonMatchesAreDimmed(t *testing.T) {
 	dimPrefix := strings.SplitN(ui.StyleDim.Render("PROBE"), "PROBE", 2)[0]
 
 	epic := m.epics[0]
-	matchedLine := m.renderTicketRow(epic, epic.Tickets[0], 1)[0] // "first ticket" row
-	nonMatchedLine := m.renderTicketRow(epic, epic.Tickets[1], 2)[0]
+	matchedLine := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)[0] // "first ticket" row
+	nonMatchedLine := m.renderTicketRow(epic, row{ticketIdx: 1}, 2)[0]
 
 	if strings.Contains(matchedLine, dimPrefix) {
 		t.Fatalf("expected matching row undimmed, got: %q", matchedLine)

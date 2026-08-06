@@ -9,7 +9,14 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tree"
 )
+
+// noParentTicket is row.parentTicketIdx's sentinel for a ticket row that
+// isn't nested under another ticket (either a top-level ticket, or a nested
+// one whose containing ancestor was filtered out by hideDone — see
+// nearestVisibleAncestor).
+const noParentTicket = -1
 
 type epicsLoadedMsg struct {
 	epics []tickets.Epic
@@ -71,10 +78,22 @@ func (m Model) cmdRefresh() tea.Cmd {
 }
 
 // row is one flat, navigable line in the sidebar: either an epic header or
-// one of its tickets.
+// one of its tickets. depth/hasChildren/expanded/parentTicketIdx mirror
+// ui/tree's Entry (ticket 02) for a ticket row nested under another ticket
+// via Parent/Children (ticket 03): depth 0 is a ticket directly under the
+// epic, hasChildren/expanded drive the row's own collapse toggle (mirroring
+// collapsedEpics one level down, see collapseSelectedEpic/
+// expandSelectedEpic), and parentTicketIdx is the containing ticket's index
+// into epic.Tickets (noParentTicket for a top-level ticket), used to jump
+// selection to the nearest containing row on "h"/collapse. All four are
+// zero-valued (unused) on an epic row.
 type row struct {
-	epicIdx   int
-	ticketIdx int // -1 for an epic row
+	epicIdx         int
+	ticketIdx       int // -1 for an epic row
+	depth           int
+	hasChildren     bool
+	expanded        bool
+	parentTicketIdx int
 }
 
 func (r row) isEpic() bool { return r.ticketIdx < 0 }
@@ -109,18 +128,98 @@ func (m Model) rowsForEpicOrder(order []int) []row {
 	var rows []row
 	for _, epicIdx := range order {
 		epic := m.epics[epicIdx]
-		rows = append(rows, row{epicIdx: epicIdx, ticketIdx: -1})
+		rows = append(rows, row{epicIdx: epicIdx, ticketIdx: -1, parentTicketIdx: noParentTicket})
 		if m.isCollapsed(epic) {
 			continue
 		}
-		for _, ticketIdx := range sortedTicketIndexes(epic) {
-			if m.hideDone && epic.RenderedStatus(epic.Tickets[ticketIdx]) == tickets.StatusDone {
-				continue
-			}
-			rows = append(rows, row{epicIdx: epicIdx, ticketIdx: ticketIdx})
+		rows = append(rows, m.ticketRows(epicIdx, epic)...)
+	}
+	return rows
+}
+
+// ticketRows flattens epic's tickets (sortedTicketIndexes' plan order) into
+// depth-annotated rows, nesting each ticket under its Parent (ticket 03) via
+// ui/tree's pure entry-builder rather than re-deriving tree-flattening logic
+// here — arbitrary depth, e.g. a split-of-a-split nests two levels deep.
+// Collapsing a nested ticket (m.collapsedTickets) hides its descendants the
+// same way collapsedEpics hides an epic's tickets. With m.hideDone set, a
+// done ticket is dropped from the candidate set first (nearestVisibleAncestor
+// then reattaches any of its children to the nearest surviving ancestor, or
+// to the epic's top level, instead of losing them).
+func (m Model) ticketRows(epicIdx int, epic tickets.Epic) []row {
+	sorted := sortedTicketIndexes(epic)
+
+	visible := make(map[int]bool, len(sorted))
+	for _, idx := range sorted {
+		if m.hideDone && epic.RenderedStatus(epic.Tickets[idx]) == tickets.StatusDone {
+			continue
+		}
+		visible[idx] = true
+	}
+
+	byIdentifier := make(map[string]int, len(epic.Tickets))
+	for i, t := range epic.Tickets {
+		if t.Identifier != "" {
+			byIdentifier[t.Identifier] = i
+		}
+	}
+
+	parentOf := make(map[int]int, len(sorted))
+	childrenOf := make(map[int][]int, len(sorted))
+	var roots []int
+	for _, idx := range sorted {
+		if !visible[idx] {
+			continue
+		}
+		parentIdx := nearestVisibleAncestor(epic, idx, visible, byIdentifier)
+		parentOf[idx] = parentIdx
+		if parentIdx == noParentTicket {
+			roots = append(roots, idx)
+		} else {
+			childrenOf[parentIdx] = append(childrenOf[parentIdx], idx)
+		}
+	}
+
+	idFn := func(idx int) string { return epic.Tickets[idx].Path }
+	childrenFn := func(idx int) []int { return childrenOf[idx] }
+	entries := tree.BuildEntriesFromValues(roots, idFn, childrenFn, m.collapsedTickets)
+
+	rows := make([]row, len(entries))
+	for i, e := range entries {
+		rows[i] = row{
+			epicIdx:         epicIdx,
+			ticketIdx:       e.Value,
+			depth:           e.Depth,
+			hasChildren:     e.HasChildren,
+			expanded:        e.Expanded,
+			parentTicketIdx: parentOf[e.Value],
 		}
 	}
 	return rows
+}
+
+// nearestVisibleAncestor walks idx's Parent chain (ticket 03's schema field)
+// up to the first ancestor still present in visible, so a hideDone-filtered
+// parent doesn't strand its children — they nest one level further up
+// instead of vanishing along with it. Returns noParentTicket once the chain
+// runs out (or hits a Parent token with no matching ticket in the epic) or
+// on a cyclical chain (never expected in practice, guarded via seen so this
+// can't loop forever).
+func nearestVisibleAncestor(epic tickets.Epic, idx int, visible map[int]bool, byIdentifier map[string]int) int {
+	seen := map[int]bool{idx: true}
+	cur := epic.Tickets[idx]
+	for cur.Parent != nil {
+		parentIdx, ok := byIdentifier[*cur.Parent]
+		if !ok || seen[parentIdx] {
+			return noParentTicket
+		}
+		if visible[parentIdx] {
+			return parentIdx
+		}
+		seen[parentIdx] = true
+		cur = epic.Tickets[parentIdx]
+	}
+	return noParentTicket
 }
 
 // splitEpicIndexesBySection splits idxs (indexes into epics) into the "Open

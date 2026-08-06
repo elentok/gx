@@ -109,8 +109,7 @@ func (m Model) appendRowLines(lines []string, rows []row, startIdx int) []string
 		if r.isEpic() {
 			rowLines = []string{m.renderEpicRow(m.epics[r.epicIdx])}
 		} else {
-			epic := m.epics[r.epicIdx]
-			rowLines = m.renderTicketRow(epic, epic.Tickets[r.ticketIdx], i)
+			rowLines = m.renderTicketRow(m.epics[r.epicIdx], r, i)
 		}
 		for i, line := range rowLines {
 			if selected {
@@ -150,8 +149,14 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 // and two for a live or done ticket. The second line carries the same
 // elapsed/token metrics as the former standalone ralph-loop view; live rows
 // also move their phase or pause reason there so the title line stays clean.
-func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) []string {
+// r.depth indents a nested ticket (Parent/Children, ticket 03) two extra
+// spaces per level beneath the base indent, matching ui/tree's own indent
+// unit; a ticket with children gets the same folder-open/closed glyph an
+// epic row uses, reflecting r.expanded.
+func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
+	t := epic.Tickets[r.ticketIdx]
 	status := epic.RenderedStatus(t)
+	indent := "    " + strings.Repeat("  ", r.depth)
 
 	// m.live is nested by epic name (ticket 05) precisely because bare
 	// ticket identifiers repeat across epics (each restarts numbering from
@@ -161,7 +166,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) 
 	// cross-rendering as running here.
 	if m.implementingEpics[epic.Name] {
 		if live, ok := m.live[epic.Name][t.Identifier]; ok {
-			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live, "    "+m.checkboxGlyph(m.isChecked(t.Path))+" "); ok {
+			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live, indent+m.checkboxGlyph(m.isChecked(t.Path))+" "); ok {
 				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens)
 				return []string{base, m.renderTicketMetricsLine(joinNonEmpty(" ", suffix, metrics), metricsLineStyle, false)}
 			}
@@ -190,7 +195,16 @@ func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) 
 		style = ui.StyleDim
 	}
 
-	line := "    " + m.checkboxGlyph(m.isChecked(t.Path)) + " " + style.Render(icon) + " " + titleStyle.Render(title)
+	fold := ""
+	if r.hasChildren {
+		glyph := m.icons().FolderOpen
+		if !r.expanded {
+			glyph = m.icons().FolderClosed
+		}
+		fold = glyph + " "
+	}
+
+	line := indent + m.checkboxGlyph(m.isChecked(t.Path)) + " " + fold + style.Render(icon) + " " + titleStyle.Render(title)
 	if suffix := blockedBySuffix(epic, t, status); suffix != "" {
 		suffixStyle := blockedBySuffixStyle
 		if searchDim {

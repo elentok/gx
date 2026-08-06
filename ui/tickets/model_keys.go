@@ -172,22 +172,33 @@ func (m Model) selectedRow() (row, bool) {
 }
 
 // collapseSelectedEpic handles "h"/"left": on an epic row it collapses the
-// epic (same as filetree); on a ticket row it instead jumps selection up to
-// the ticket's containing epic row, mirroring filetree's "collapse jumps to
-// parent" behavior for a leaf.
+// epic (same as filetree); on an expanded ticket row with children (ticket
+// 09) it collapses that ticket's own children one level down, mirroring the
+// epic case; on any other ticket row (a leaf, or one already collapsed) it
+// jumps selection up to the row's nearest containing row — a parent ticket
+// row if nested, otherwise the epic row — mirroring filetree's "collapse
+// jumps to parent" behavior for a leaf.
 func (m *Model) collapseSelectedEpic() {
 	r, ok := m.selectedRow()
 	if !ok {
 		return
 	}
-	if !r.isEpic() {
-		m.jumpToEpic(r.epicIdx)
+	if r.isEpic() {
+		if m.isCollapsed(m.epics[r.epicIdx]) {
+			return
+		}
+		m.setCollapsed(r.epicIdx, true)
 		return
 	}
-	if m.isCollapsed(m.epics[r.epicIdx]) {
+	if r.hasChildren && r.expanded {
+		m.setCollapsedTicket(m.epics[r.epicIdx].Tickets[r.ticketIdx].Path, true)
 		return
 	}
-	m.setCollapsed(r.epicIdx, true)
+	if r.parentTicketIdx != noParentTicket {
+		m.jumpToTicket(r.epicIdx, r.parentTicketIdx)
+		return
+	}
+	m.jumpToEpic(r.epicIdx)
 }
 
 // jumpToEpic moves the selection to epicIdx's epic row within visibleRows().
@@ -201,12 +212,35 @@ func (m *Model) jumpToEpic(epicIdx int) {
 	}
 }
 
+// jumpToTicket moves the selection to (epicIdx, ticketIdx)'s ticket row
+// within visibleRows(), collapseSelectedEpic's nested-ticket counterpart to
+// jumpToEpic. The target is always visible: a child row only ever appears
+// once every one of its ancestors is expanded.
+func (m *Model) jumpToTicket(epicIdx, ticketIdx int) {
+	for i, r := range m.visibleRows() {
+		if !r.isEpic() && r.epicIdx == epicIdx && r.ticketIdx == ticketIdx {
+			m.selected = i
+			m.ensureSidebarVisible()
+			return
+		}
+	}
+}
+
 func (m *Model) expandSelectedEpic() {
 	r, ok := m.selectedRow()
-	if !ok || !r.isEpic() || !m.isCollapsed(m.epics[r.epicIdx]) {
+	if !ok {
 		return
 	}
-	m.setCollapsed(r.epicIdx, false)
+	if r.isEpic() {
+		if !m.isCollapsed(m.epics[r.epicIdx]) {
+			return
+		}
+		m.setCollapsed(r.epicIdx, false)
+		return
+	}
+	if r.hasChildren && !r.expanded {
+		m.setCollapsedTicket(m.epics[r.epicIdx].Tickets[r.ticketIdx].Path, false)
+	}
 }
 
 // setCollapsed sets the collapse state for the epic at epicIdx and
@@ -223,6 +257,24 @@ func (m *Model) setCollapsed(epicIdx int, collapsed bool) {
 	}
 	// Collapsing/expanding reshuffles visibleRows(), which search matches
 	// index into by position — recompute so they stay aligned.
+	if m.search.HasQuery() {
+		m.recomputeSearchMatches()
+	}
+	m.clampSelected()
+}
+
+// setCollapsedTicket is setCollapsed's ticket-level counterpart (ticket 09),
+// keyed by Ticket.Path rather than epic index/path since it's read from
+// collapsedTickets by ui/tree's entry-builder inside ticketRows.
+func (m *Model) setCollapsedTicket(path string, collapsed bool) {
+	if m.collapsedTickets == nil {
+		m.collapsedTickets = map[string]bool{}
+	}
+	if collapsed {
+		m.collapsedTickets[path] = true
+	} else {
+		delete(m.collapsedTickets, path)
+	}
 	if m.search.HasQuery() {
 		m.recomputeSearchMatches()
 	}
