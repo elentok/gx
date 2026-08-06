@@ -261,6 +261,18 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 		}
 	})
 
+	t.Run("idle but globally paused", func(t *testing.T) {
+		m := base
+		m.paused = true
+		m.executionTickets = map[string]bool{}
+		if got, want := m.queueHeaderTitle(), "Queue"; got != want {
+			t.Fatalf("title = %q, want %q", got, want)
+		}
+		if lines := m.queueHeaderBodyLines(); len(lines) != 0 {
+			t.Fatalf("body lines = %v, want none for an idle queue", lines)
+		}
+	})
+
 	t.Run("completed", func(t *testing.T) {
 		completedRoot := t.TempDir()
 		writeTicket(t, completedRoot, "alpha", "01-first.md", "Status: claimed\n\nBody.\n")

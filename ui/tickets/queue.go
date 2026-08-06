@@ -829,46 +829,79 @@ func (m QueueModel) queueVisibleLines(viewportH int) []string {
 	return lines[start:end]
 }
 
+// queueRunStateKind classifies the queue's run state for header rendering.
+// queueHeaderTitle and queueHeaderBodyLines both switch on the same
+// queueRunState() call so they can't independently re-derive (and silently
+// diverge on) what state the queue is in.
+type queueRunStateKind int
+
+const (
+	queueRunIdle queueRunStateKind = iota
+	queueRunRunning
+	queueRunPaused
+	queueRunCompleted
+)
+
+// queueRunState classifies the queue's current run state. Paused only wins
+// over idle once a run has actually captured a ticket scope
+// (m.checkedProgress total > 0) — m.paused alone can be set by the bare `p`
+// key with no run-state guard, so a queue that was never started must still
+// classify as idle even while globally paused.
+func (m QueueModel) queueRunState() queueRunStateKind {
+	if !m.executionCompletedAt.IsZero() {
+		done, total := m.completedExecutionProgress()
+		if total > 0 && done == total {
+			return queueRunCompleted
+		}
+	}
+	if m.paused {
+		if _, total := m.checkedProgress(); total > 0 {
+			return queueRunPaused
+		}
+	}
+	if len(m.runningEpics) > 0 {
+		return queueRunRunning
+	}
+	return queueRunIdle
+}
+
 // queueHeaderTitle and queueHeaderBodyLines together implement the Option B
 // header redesign (see .scratch/tickets-queue-batch3/issues/assets/08-header-prototype.md):
 // the title always encodes run state, and the body carries at most one
 // state-specific line instead of the old always-present banner row.
 func (m QueueModel) queueHeaderTitle() string {
-	if !m.executionCompletedAt.IsZero() {
-		done, totalTickets := m.completedExecutionProgress()
-		if totalTickets > 0 && done == totalTickets {
-			elapsed := int(m.executionCompletedAt.Sub(m.executionStartedAt).Seconds())
-			return fmt.Sprintf("Queue · done, took %s", formatElapsed(elapsed))
-		}
-	}
-	if m.paused {
+	switch m.queueRunState() {
+	case queueRunCompleted:
+		elapsed := int(m.executionCompletedAt.Sub(m.executionStartedAt).Seconds())
+		return fmt.Sprintf("Queue · done, took %s", formatElapsed(elapsed))
+	case queueRunPaused:
 		done, total := m.checkedProgress()
 		return fmt.Sprintf("Queue · paused (%d of %d done)", done, total)
-	}
-	if len(m.runningEpics) == 0 {
+	case queueRunRunning:
+		done, total := m.checkedProgress()
+		glyph := strings.TrimRight(m.implementSpinner.View(), " ")
+		return fmt.Sprintf("Queue · %d of %d done · %s implementing...", done, total, glyph)
+	default:
 		return "Queue"
 	}
-
-	done, total := m.checkedProgress()
-	glyph := strings.TrimRight(m.implementSpinner.View(), " ")
-	return fmt.Sprintf("Queue · %d of %d done · %s implementing...", done, total, glyph)
 }
 
 func (m QueueModel) queueHeaderBodyLines() []string {
-	if !m.executionCompletedAt.IsZero() {
-		done, totalTickets := m.completedExecutionProgress()
-		if totalTickets > 0 && done == totalTickets {
-			total, average, maximum := m.completedContextMetrics()
-			return []string{fmt.Sprintf(
-				"context windows: total %s, avg %s, max %s",
-				formatTokenCount(total), formatTokenCount(average), formatTokenCount(maximum),
-			)}
+	switch m.queueRunState() {
+	case queueRunCompleted:
+		total, average, maximum := m.completedContextMetrics()
+		return []string{fmt.Sprintf(
+			"context windows: total %s, avg %s, max %s",
+			formatTokenCount(total), formatTokenCount(average), formatTokenCount(maximum),
+		)}
+	case queueRunPaused:
+		if len(m.runningEpics) > 0 {
+			return []string{"Queue paused — in-flight iterations will finish"}
 		}
+		return nil
+	default:
+		return nil
 	}
-	if m.paused && len(m.runningEpics) > 0 {
-		return []string{"Queue paused — in-flight iterations will finish"}
-	}
-	return nil
 }
 
 func (m QueueModel) completedContextMetrics() (total, average, maximum int) {
