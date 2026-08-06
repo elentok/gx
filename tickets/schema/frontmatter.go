@@ -14,13 +14,17 @@ import (
 // from the typed in-memory representation (TicketID, Status, etc.) without
 // yaml struct tags leaking into schema's public API.
 type ticketYAML struct {
-	ID                    string   `yaml:"id"`
-	Status                string   `yaml:"status"`
-	BlockedBy             []string `yaml:"blocked_by,omitempty"`
+	ID        string   `yaml:"id"`
+	Status    string   `yaml:"status"`
+	BlockedBy []string `yaml:"blocked_by,omitempty"`
+	Children  []string `yaml:"children,omitempty"`
+	Parent    string   `yaml:"parent,omitempty"`
+	// Split/SplitFrom are the legacy spellings of Children/Parent — read-only
+	// compatibility for tickets already on disk (see toTicket). MarshalTicket
+	// never populates these: ticketToYAML only ever emits children/parent.
 	Split                 []string `yaml:"split,omitempty"`
 	SplitFrom             string   `yaml:"split_from,omitempty"`
 	Type                  string   `yaml:"type"`
-	CodeReviewFixes       string   `yaml:"code_review_fixes,omitempty"`
 	ExpectedContextWindow int      `yaml:"expected_context_window,omitempty"`
 	ActualContextWindow   int      `yaml:"actual_context_window,omitempty"`
 	ElapsedTime           int      `yaml:"elapsed_time,omitempty"`
@@ -30,13 +34,21 @@ type ticketYAML struct {
 }
 
 func (w ticketYAML) toTicket() Ticket {
+	children := w.Children
+	if len(children) == 0 {
+		children = w.Split
+	}
+	parent := w.Parent
+	if parent == "" {
+		parent = w.SplitFrom
+	}
+
 	t := Ticket{
 		ID:                    TicketID(w.ID),
 		Status:                Status(w.Status),
 		BlockedBy:             stringsToIDs(w.BlockedBy),
-		Split:                 stringsToIDs(w.Split),
+		Children:              stringsToIDs(children),
 		Type:                  TicketType(w.Type),
-		CodeReviewFixes:       w.CodeReviewFixes,
 		ExpectedContextWindow: w.ExpectedContextWindow,
 		ActualContextWindow:   w.ActualContextWindow,
 		ElapsedTime:           w.ElapsedTime,
@@ -44,9 +56,9 @@ func (w ticketYAML) toTicket() Ticket {
 		Commitless:            w.Commitless,
 		SessionIDs:            copyStrings(w.SessionIDs),
 	}
-	if w.SplitFrom != "" {
-		id := TicketID(w.SplitFrom)
-		t.SplitFrom = &id
+	if parent != "" {
+		id := TicketID(parent)
+		t.Parent = &id
 	}
 	return t
 }
@@ -56,9 +68,8 @@ func ticketToYAML(t Ticket) ticketYAML {
 		ID:                    string(t.ID),
 		Status:                string(t.Status),
 		BlockedBy:             idsToStrings(t.BlockedBy),
-		Split:                 idsToStrings(t.Split),
+		Children:              idsToStrings(t.Children),
 		Type:                  string(t.Type),
-		CodeReviewFixes:       t.CodeReviewFixes,
 		ExpectedContextWindow: t.ExpectedContextWindow,
 		ActualContextWindow:   t.ActualContextWindow,
 		ElapsedTime:           t.ElapsedTime,
@@ -66,8 +77,8 @@ func ticketToYAML(t Ticket) ticketYAML {
 		Commitless:            t.Commitless,
 		SessionIDs:            copyStrings(t.SessionIDs),
 	}
-	if t.SplitFrom != nil {
-		w.SplitFrom = string(*t.SplitFrom)
+	if t.Parent != nil {
+		w.Parent = string(*t.Parent)
 	}
 	return w
 }

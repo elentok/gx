@@ -65,17 +65,19 @@ func (s Status) Valid() bool {
 type TicketType string
 
 const (
-	TypeResearch  TicketType = "research"
-	TypeGrilling  TicketType = "grilling"
-	TypePrototype TicketType = "prototype"
-	TypeTask      TicketType = "task"
+	TypeResearch   TicketType = "research"
+	TypeGrilling   TicketType = "grilling"
+	TypePrototype  TicketType = "prototype"
+	TypeTask       TicketType = "task"
+	TypeCodeReview TicketType = "code-review"
 )
 
 var validTypes = map[TicketType]bool{
-	TypeResearch:  true,
-	TypeGrilling:  true,
-	TypePrototype: true,
-	TypeTask:      true,
+	TypeResearch:   true,
+	TypeGrilling:   true,
+	TypePrototype:  true,
+	TypeTask:       true,
+	TypeCodeReview: true,
 }
 
 // Valid reports whether t is one of the canonical type values.
@@ -83,27 +85,23 @@ func (t TicketType) Valid() bool {
 	return validTypes[t]
 }
 
-var codeReviewFixesRe = regexp.MustCompile(`^(none|inline|ticket:\d{2,}[a-z]?)$`)
-
-// validCodeReviewFixes reports whether v is a well-formed code_review_fixes
-// value: empty (unset, before code-review has run), "none", "inline", or
-// "ticket:<TicketID>".
-func validCodeReviewFixes(v string) bool {
-	return v == "" || codeReviewFixesRe.MatchString(v)
-}
-
 // Ticket is the in-memory, typed frontmatter of one ticket file's YAML
 // header (see .scratch/ticket-frontmatter/spec.md's Schema section). No
 // file I/O or YAML (de)serialization here — that's a later ticket in this
 // epic; this type is built and inspected directly in tests.
 type Ticket struct {
-	ID                    TicketID
-	Status                Status
-	BlockedBy             []TicketID
-	Split                 []TicketID
-	SplitFrom             *TicketID
+	ID        TicketID
+	Status    Status
+	BlockedBy []TicketID
+	// Children/Parent record the "this ticket produced other tickets"
+	// relationship: a mid-flight budget split, or a code-review ticket
+	// recording which fix tickets it opened. On disk this may be spelled
+	// either children/parent (current) or the legacy split/split_from
+	// (read-only compatibility — see ticketYAML.toTicket); every in-memory
+	// consumer only ever sees these two fields.
+	Children              []TicketID
+	Parent                *TicketID
 	Type                  TicketType
-	CodeReviewFixes       string
 	ExpectedContextWindow int
 	ActualContextWindow   int
 	ElapsedTime           int
@@ -138,10 +136,9 @@ func (t Ticket) IsCommitless() bool {
 }
 
 // Validate checks a populated Ticket for well-formedness: a valid id, a
-// valid status, a valid type, a valid code_review_fixes value, non-negative
-// numeric fields, and no blocked_by/split_from entry equal to the ticket's
-// own id. Every failing field is reported at once via errors.Join, rather
-// than stopping at the first.
+// valid status, a valid type, non-negative numeric fields, and no
+// blocked_by/parent entry equal to the ticket's own id. Every failing field
+// is reported at once via errors.Join, rather than stopping at the first.
 func Validate(t Ticket) error {
 	var errs []error
 
@@ -153,9 +150,6 @@ func Validate(t Ticket) error {
 	}
 	if !t.Type.Valid() {
 		errs = append(errs, fmt.Errorf("type: invalid type %q", t.Type))
-	}
-	if !validCodeReviewFixes(t.CodeReviewFixes) {
-		errs = append(errs, fmt.Errorf("code_review_fixes: invalid value %q", t.CodeReviewFixes))
 	}
 	if t.ExpectedContextWindow < 0 {
 		errs = append(errs, fmt.Errorf("expected_context_window: must be non-negative, got %d", t.ExpectedContextWindow))
@@ -175,8 +169,8 @@ func Validate(t Ticket) error {
 			break
 		}
 	}
-	if t.SplitFrom != nil && *t.SplitFrom == t.ID {
-		errs = append(errs, fmt.Errorf("split_from: self-reference %q", *t.SplitFrom))
+	if t.Parent != nil && *t.Parent == t.ID {
+		errs = append(errs, fmt.Errorf("parent: self-reference %q", *t.Parent))
 	}
 
 	return errors.Join(errs...)

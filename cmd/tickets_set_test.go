@@ -21,6 +21,15 @@ func TestTicketsSchemaText_HasTicketAndEpicSections(t *testing.T) {
 	if !strings.Contains(ticketsSchemaText, "completed_at") {
 		t.Error("schema text missing completed_at")
 	}
+	if !strings.Contains(ticketsSchemaText, "children") || !strings.Contains(ticketsSchemaText, "parent") {
+		t.Error("schema text missing children/parent")
+	}
+	if !strings.Contains(ticketsSchemaText, "code-review") {
+		t.Error("schema text missing code-review type")
+	}
+	if strings.Contains(ticketsSchemaText, "split_from") || strings.Contains(ticketsSchemaText, "--split") || strings.Contains(ticketsSchemaText, "code_review_fixes") {
+		t.Error("schema text should no longer describe split/split_from/code_review_fixes as settable")
+	}
 }
 
 func TestExecute_TicketsSet_MultiFieldSuccess(t *testing.T) {
@@ -48,6 +57,76 @@ func TestExecute_TicketsSet_MultiFieldSuccess(t *testing.T) {
 	}
 	if !strings.Contains(string(raw), `blocked_by:`) {
 		t.Errorf("ticket file = %q, want blocked_by written", string(raw))
+	}
+}
+
+func TestExecute_TicketsSet_ParentChildren(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "04b-ticket.md")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
+
+	var stdout bytes.Buffer
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+
+	err := execute([]string{"tickets", "set", path, "--parent=04", "--children=04c,04d"}, d)
+	if err != nil {
+		t.Fatalf("execute tickets set: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "parent=04") || !strings.Contains(stdout.String(), "children=04c,04d") {
+		t.Errorf("stdout = %q, want it to list parent/children", stdout.String())
+	}
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading ticket back: %v", err)
+	}
+	if !strings.Contains(string(raw), "parent: \"04\"") {
+		t.Errorf("ticket file = %q, want parent: \"04\"", string(raw))
+	}
+	if !strings.Contains(string(raw), "children:") {
+		t.Errorf("ticket file = %q, want children written", string(raw))
+	}
+}
+
+func TestExecute_TicketsSet_DeprecatedSplitAliasesWriteParentChildren(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "04b-ticket.md")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
+
+	var stdout bytes.Buffer
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+
+	err := execute([]string{"tickets", "set", path, "--split-from=04", "--split=04c,04d"}, d)
+	if err != nil {
+		t.Fatalf("execute tickets set: %v", err)
+	}
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading ticket back: %v", err)
+	}
+	if !strings.Contains(string(raw), "parent: \"04\"") {
+		t.Errorf("ticket file = %q, want parent: \"04\" from --split-from", string(raw))
+	}
+	if strings.Contains(string(raw), "split_from:") || strings.Contains(string(raw), "split:") {
+		t.Errorf("ticket file = %q, want no split/split_from keys written", string(raw))
+	}
+}
+
+func TestExecute_TicketsSet_CodeReviewFixesFlagRemoved(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "04b-ticket.md")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
+
+	var stdout bytes.Buffer
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+
+	err := execute([]string{"tickets", "set", path, "--code-review-fixes=none"}, d)
+	if err == nil {
+		t.Fatal("expected an unknown-flag error, got nil")
+	}
+	if !strings.Contains(err.Error(), "unknown flag") {
+		t.Errorf("error = %q, want it to mention unknown flag", err.Error())
 	}
 }
 

@@ -8,7 +8,6 @@ func validTicket() Ticket {
 		Status:                StatusReadyForAgent,
 		BlockedBy:             []TicketID{"01", "03"},
 		Type:                  TypeTask,
-		CodeReviewFixes:       "none",
 		ExpectedContextWindow: 20000,
 		ActualContextWindow:   45230,
 		ElapsedTime:           3612,
@@ -110,27 +109,11 @@ func TestValidate_BadType(t *testing.T) {
 	}
 }
 
-func TestValidate_BadCodeReviewFixes(t *testing.T) {
+func TestValidate_CodeReviewIsValidType(t *testing.T) {
 	tk := validTicket()
-	tk.CodeReviewFixes = "maybe"
-	if err := Validate(tk); err == nil {
-		t.Fatal("expected error for bad code_review_fixes, got nil")
-	}
-}
-
-func TestValidate_CodeReviewFixesTicketRef(t *testing.T) {
-	tk := validTicket()
-	tk.CodeReviewFixes = "ticket:05a"
+	tk.Type = TypeCodeReview
 	if err := Validate(tk); err != nil {
-		t.Fatalf("unexpected error for valid ticket: ref: %v", err)
-	}
-}
-
-func TestValidate_CodeReviewFixesEmptyIsUnset(t *testing.T) {
-	tk := validTicket()
-	tk.CodeReviewFixes = ""
-	if err := Validate(tk); err != nil {
-		t.Fatalf("unexpected error for unset code_review_fixes: %v", err)
+		t.Fatalf("unexpected error for type=code-review: %v", err)
 	}
 }
 
@@ -166,19 +149,19 @@ func TestValidate_SelfReferencingBlockedBy(t *testing.T) {
 	}
 }
 
-func TestValidate_SelfReferencingSplitFrom(t *testing.T) {
+func TestValidate_SelfReferencingParent(t *testing.T) {
 	tk := validTicket()
 	self := tk.ID
-	tk.SplitFrom = &self
+	tk.Parent = &self
 	if err := Validate(tk); err == nil {
-		t.Fatal("expected error for self-referencing split_from, got nil")
+		t.Fatal("expected error for self-referencing parent, got nil")
 	}
 }
 
-func TestValidate_NonSelfReferencingSplitFromIsValid(t *testing.T) {
+func TestValidate_NonSelfReferencingParentIsValid(t *testing.T) {
 	tk := validTicket()
 	parent := TicketID("04")
-	tk.SplitFrom = &parent
+	tk.Parent = &parent
 	if err := Validate(tk); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

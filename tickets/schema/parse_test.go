@@ -22,7 +22,6 @@ id: "04b"
 status: ready-for-agent
 blocked_by: ["01", "03"]
 type: task
-code_review_fixes: none
 expected_context_window: 20000
 actual_context_window: 45230
 elapsed_time: 3612
@@ -45,13 +44,30 @@ func TestParseTicket_NewFormat(t *testing.T) {
 		Status:                StatusReadyForAgent,
 		BlockedBy:             []TicketID{"01", "03"},
 		Type:                  TypeTask,
-		CodeReviewFixes:       "none",
 		ExpectedContextWindow: 20000,
 		ActualContextWindow:   45230,
 		ElapsedTime:           3612,
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ParseTicket() = %+v, want %+v", got, want)
+	}
+}
+
+func TestParseTicket_RetiredCodeReviewFixesKeyIsIgnored(t *testing.T) {
+	content := "---\nid: \"04b\"\nstatus: open\ntype: task\ncode_review_fixes: none\n---\nBody.\n"
+	path := writeTemp(t, "04b-retired-crf.md", content)
+
+	got, err := ParseTicket(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	marshaled, err := MarshalTicket(got, "Body.\n")
+	if err != nil {
+		t.Fatalf("MarshalTicket: %v", err)
+	}
+	if strings.Contains(string(marshaled), "code_review_fixes") {
+		t.Errorf("marshaled ticket = %q, want no code_review_fixes", string(marshaled))
 	}
 }
 
@@ -79,16 +95,15 @@ func TestParseTicket_RoundTrip(t *testing.T) {
 	}
 }
 
-func TestParseTicket_RoundTrip_SplitFrom(t *testing.T) {
+func TestParseTicket_RoundTrip_ParentChildren(t *testing.T) {
 	orig := Ticket{
-		ID:              "04b",
-		Status:          StatusClaimed,
-		Type:            TypeTask,
-		CodeReviewFixes: "",
+		ID:     "04b",
+		Status: StatusClaimed,
+		Type:   TypeTask,
 	}
 	parent := TicketID("04")
-	orig.SplitFrom = &parent
-	orig.Split = []TicketID{"04c", "04d"}
+	orig.Parent = &parent
+	orig.Children = []TicketID{"04c", "04d"}
 
 	marshaled, err := MarshalTicket(orig, "body\n")
 	if err != nil {
@@ -102,6 +117,39 @@ func TestParseTicket_RoundTrip_SplitFrom(t *testing.T) {
 	}
 	if !reflect.DeepEqual(orig, got) {
 		t.Fatalf("round trip mismatch: original %+v, got %+v", orig, got)
+	}
+}
+
+func TestParseTicket_LegacySplitFromKeysNormalizeToParentChildren(t *testing.T) {
+	content := "---\nid: \"04b\"\nstatus: claimed\ntype: task\nsplit: [\"04c\", \"04d\"]\nsplit_from: \"04\"\n---\nbody\n"
+	path := writeTemp(t, "04b-legacy-split.md", content)
+
+	got, err := ParseTicket(path)
+	if err != nil {
+		t.Fatalf("ParseTicket: %v", err)
+	}
+
+	wantParent := TicketID("04")
+	want := Ticket{
+		ID:       "04b",
+		Status:   StatusClaimed,
+		Type:     TypeTask,
+		Children: []TicketID{"04c", "04d"},
+		Parent:   &wantParent,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ParseTicket() = %+v, want %+v", got, want)
+	}
+
+	marshaled, err := MarshalTicket(got, "body\n")
+	if err != nil {
+		t.Fatalf("MarshalTicket: %v", err)
+	}
+	if strings.Contains(string(marshaled), "split:") || strings.Contains(string(marshaled), "split_from:") {
+		t.Errorf("marshaled ticket = %q, want no split/split_from keys", string(marshaled))
+	}
+	if !strings.Contains(string(marshaled), "children:") || !strings.Contains(string(marshaled), "parent:") {
+		t.Errorf("marshaled ticket = %q, want children/parent keys", string(marshaled))
 	}
 }
 
