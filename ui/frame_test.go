@@ -92,3 +92,32 @@ func TestRenderPanelFrameTruncatesLongBodyLines(t *testing.T) {
 		t.Fatalf("expected truncated body content to keep visible prefix, got %q", lines[1])
 	}
 }
+
+// TestRenderPanelTruncatesOverLongTitle covers ticket 05: RenderPanel's
+// title-line render path previously padded to contentW without truncating,
+// so an over-length title (e.g. a running Queue header at a narrow sidebar
+// width) would overflow the header row instead of being clipped like body
+// rows already are.
+func TestRenderPanelTruncatesOverLongTitle(t *testing.T) {
+	out := RenderPanel(PanelOptions{
+		Width:      10,
+		Height:     3,
+		Title:      "Queue · 3 of 8 done · implementing...",
+		Lines:      []string{"row"},
+		TitleColor: ColorBlue,
+		Background: ColorBase,
+	})
+
+	lines := strings.Split(out, "\n")
+	if len(lines) != 3 {
+		t.Fatalf("line count = %d, want 3: %q", len(lines), out)
+	}
+	for i, line := range lines {
+		if got := ansi.StringWidth(line); got != 10 {
+			t.Fatalf("line %d width = %d, want 10: %q", i, got, line)
+		}
+	}
+	if strings.Contains(lines[0], "implementing") {
+		t.Fatalf("expected title truncation within panel width, got %q", lines[0])
+	}
+}

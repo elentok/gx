@@ -242,6 +242,10 @@ func RenderPanel(opts PanelOptions) string {
 	}
 	titleW := ansi.StringWidth(titleSeg)
 	rightW := ansi.StringWidth(rightSeg)
+	if titleW+rightW > contentW {
+		titleSeg = ansi.Truncate(titleSeg, maxInt(0, contentW-rightW), "")
+		titleW = ansi.StringWidth(titleSeg)
+	}
 	gap := maxInt(0, contentW-titleW-rightW)
 	titleLine := titleSeg + lipgloss.NewStyle().Background(headerBg).Render(strings.Repeat(" ", gap)) + rightSeg
 

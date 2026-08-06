@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -164,12 +165,11 @@ func TestQueueModelBannerWhileRunningAggregatesCheckedEpics(t *testing.T) {
 	m.now = func() time.Time { return now }
 	m.runningEpics = map[string]bool{"alpha": true, "beta": true}
 	m.executionTickets = map[string]bool{"alpha/01": true, "alpha/02": true, "beta/01": true}
-	m.liveContextTokens = map[string]int{"alpha/02": 7000, "beta/01": 5000}
 
 	content := m.View().Content
-	want := "status: implementing (1 of 3 done), elapsed: 1h03m, context windows: 12.0k tok"
-	if !strings.Contains(content, want) {
-		t.Fatalf("running banner missing %q:\n%s", want, content)
+	want := "1 of 3 done"
+	if !strings.Contains(content, want) || !strings.Contains(content, "implementing...") {
+		t.Fatalf("running title missing %q and/or \"implementing...\":\n%s", want, content)
 	}
 }
 
@@ -199,11 +199,87 @@ func TestQueueModelBannerWhenCompletedAggregatesLandedTicketMetrics(t *testing.T
 	m = deliverQueueCommands(t, updated.(QueueModel), cmd)
 
 	content := m.View().Content
-	want := "status: done, took 1h03m, context windows: total 24.0k tok, avg 8.0k tok, max 12.0k tok"
-	if !strings.Contains(content, want) {
+	wantTitle := "Queue · done, took 1h03m"
+	wantBody := "context windows: total 24.0k tok, avg 8.0k tok, max 12.0k tok"
+	if !strings.Contains(content, wantTitle) || !strings.Contains(content, wantBody) {
 		done, total := m.completedExecutionProgress()
-		t.Fatalf("completion banner missing %q (completed=%v, progress=%d/%d):\n%s", want, m.executionCompletedAt, done, total, content)
+		t.Fatalf("completion header missing %q and/or %q (completed=%v, progress=%d/%d):\n%s", wantTitle, wantBody, m.executionCompletedAt, done, total, content)
 	}
+}
+
+// TestQueueHeaderStateMatchesPrototype covers ticket 05's Option B redesign
+// (.scratch/tickets-queue-batch3/issues/assets/08-header-prototype.md): the
+// title always encodes run state, and the body carries at most one
+// state-specific line — one assertion per state.
+func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+	base := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	base.executionTickets = map[string]bool{"alpha/01": true}
+
+	t.Run("not started", func(t *testing.T) {
+		m := base
+		if got, want := m.queueHeaderTitle(), "Queue"; got != want {
+			t.Fatalf("title = %q, want %q", got, want)
+		}
+		if lines := m.queueHeaderBodyLines(); len(lines) != 0 {
+			t.Fatalf("body lines = %v, want none", lines)
+		}
+	})
+
+	t.Run("running", func(t *testing.T) {
+		m := base
+		m.runningEpics = map[string]bool{"alpha": true}
+		got := m.queueHeaderTitle()
+		if !strings.HasPrefix(got, "Queue · 0 of 1 done · ") || !strings.HasSuffix(got, " implementing...") {
+			t.Fatalf("title = %q, want \"Queue · 0 of 1 done · <spinner> implementing...\"", got)
+		}
+		if lines := m.queueHeaderBodyLines(); len(lines) != 0 {
+			t.Fatalf("body lines = %v, want none while running", lines)
+		}
+	})
+
+	t.Run("paused with in-flight iterations", func(t *testing.T) {
+		m := base
+		m.paused = true
+		m.runningEpics = map[string]bool{"alpha": true}
+		if got, want := m.queueHeaderTitle(), "Queue · paused (0 of 1 done)"; got != want {
+			t.Fatalf("title = %q, want %q", got, want)
+		}
+		want := []string{"Queue paused — in-flight iterations will finish"}
+		if got := m.queueHeaderBodyLines(); !slices.Equal(got, want) {
+			t.Fatalf("body lines = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("paused with nothing in flight", func(t *testing.T) {
+		m := base
+		m.paused = true
+		if lines := m.queueHeaderBodyLines(); len(lines) != 0 {
+			t.Fatalf("body lines = %v, want none when runningEpics is empty", lines)
+		}
+	})
+
+	t.Run("completed", func(t *testing.T) {
+		completedRoot := t.TempDir()
+		writeTicket(t, completedRoot, "alpha", "01-first.md", "Status: claimed\n\nBody.\n")
+		writeRawQueueTicket(t, completedRoot, "alpha", "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: task\nactual_context_window: 12000\n---\n\nBody.\n")
+		checked := map[string]bool{ticketPath(completedRoot, "alpha", "01-first.md"): true}
+		m := loadQueueModel(t, NewQueueModel(completedRoot, ui.Settings{}, checked))
+		completedAt := time.Date(2026, time.August, 3, 12, 0, 0, 0, time.UTC)
+		m.executionStartedAt = completedAt.Add(-time.Hour - 3*time.Minute)
+		m.executionCompletedAt = completedAt
+		m.executionTickets = map[string]bool{"alpha/01": true}
+
+		if got, want := m.queueHeaderTitle(), "Queue · done, took 1h03m"; got != want {
+			t.Fatalf("title = %q, want %q", got, want)
+		}
+		want := []string{"context windows: total 12.0k tok, avg 12.0k tok, max 12.0k tok"}
+		if got := m.queueHeaderBodyLines(); !slices.Equal(got, want) {
+			t.Fatalf("body lines = %v, want %v", got, want)
+		}
+	})
 }
 
 // TestQueueModelRowsRenderWithNoCheckbox covers ticket 08: the Queue tab is
@@ -611,11 +687,8 @@ func TestQueueModelReactivationRecoversTwoConcurrentEpicsFromRegistry(t *testing
 		t.Fatalf("expected both epics reflected as running from registry snapshots, got %v", m.runningEpics)
 	}
 	content := m.View().Content
-	if !strings.Contains(content, "implementing (0 of 2 done)") {
+	if !strings.Contains(content, "0 of 2 done") {
 		t.Fatalf("expected aggregated progress across both concurrent epics:\n%s", content)
-	}
-	if !strings.Contains(content, "10.0k tok") {
-		t.Fatalf("expected context tokens aggregated across both concurrent epics:\n%s", content)
 	}
 }
 

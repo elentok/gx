@@ -43,7 +43,7 @@ func TestTicketsConfirmOpensQueueWithSharedSelection(t *testing.T) {
 
 	// Ticket 11: with no ralph-loop running, "i" applies the selection and
 	// switches to the Queue tab directly, no confirmation.
-	waitForAppText(t, tm, "This is the execution plan")
+	waitForAppText(t, tm, "Queue")
 	waitForAppText(t, tm, "First")
 }
 

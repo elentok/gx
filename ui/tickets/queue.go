@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
@@ -23,8 +24,6 @@ import (
 	"github.com/elentok/gx/ui/terminalrun"
 )
 
-const queueBanner = "This is the execution plan, press Enter to start"
-
 // QueueModel renders a checked selection as dependency-aware epic waves.
 type QueueModel struct {
 	executionStartedAt   time.Time
@@ -32,8 +31,7 @@ type QueueModel struct {
 	// executionTickets is this run's captured ticket scope (epicName/identifier
 	// keys), fixed at kickoff so progress totals don't shift if the checked
 	// selection is edited while the run is active (ticket 20).
-	executionTickets  map[string]bool
-	liveContextTokens map[string]int
+	executionTickets map[string]bool
 	// runTicketIDs is each running epic's captured ticket-ID subset, fixed at
 	// kickoff alongside executionTickets — the lifecycle-status transitions
 	// (running/done/errored) below are driven from this rather than
@@ -109,7 +107,6 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 	sp.Spinner = TicketProgressSpinner
 	return QueueModel{
 		executionTickets:   map[string]bool{},
-		liveContextTokens:  map[string]int{},
 		runTicketIDs:       map[string][]string{},
 		now:                time.Now,
 		worktreeRoot:       worktreeRoot,
@@ -388,8 +385,6 @@ func (m *QueueModel) syncRunSnapshot(epicName string) {
 	}
 	live := projectLiveTickets(snapshot)
 	for identifier, ticket := range snapshot.Tickets {
-		key := epicName + "/" + identifier
-		m.liveContextTokens[key] = ticket.ContextTokens
 		if ticket.Completed {
 			if path, ok := m.ticketPathFor(epicName, identifier); ok {
 				m.setItemStatus(path, queueStatusDone)
@@ -614,7 +609,6 @@ func (m QueueModel) startCheckedEpic(agent ralphloop.AgentKind) (tea.Model, tea.
 			m.executionTickets[plan.epic.Name+"/"+ticketID] = true
 		}
 	}
-	m.liveContextTokens = map[string]int{}
 	m.runningAgent = agent
 	return m, m.startAvailableEpics()
 }
@@ -797,7 +791,7 @@ func (m QueueModel) View() tea.View {
 	lines := ui.AppendScrollbar(m.queueVisibleLines(viewportH), sidebarW-2, len(m.queueLines()), viewportH, m.scrollOffset)
 
 	queueView := ui.RenderPanel(ui.PanelOptionsFor(
-		sidebarW, sidebarH, "Queue", "", lines, true, ui.ColorBlue, nil, true,
+		sidebarW, sidebarH, m.queueHeaderTitle(), "", lines, true, ui.ColorBlue, nil, true,
 	))
 	previewView := ui.RenderPanel(ui.PanelOptionsFor(
 		previewW, previewH, "Preview", "", m.queuePreviewLines(previewW, previewH), false, ui.ColorBlue, nil, false,
@@ -835,35 +829,46 @@ func (m QueueModel) queueVisibleLines(viewportH int) []string {
 	return lines[start:end]
 }
 
-func (m QueueModel) executionBanner() string {
+// queueHeaderTitle and queueHeaderBodyLines together implement the Option B
+// header redesign (see .scratch/tickets-queue-batch3/issues/assets/08-header-prototype.md):
+// the title always encodes run state, and the body carries at most one
+// state-specific line instead of the old always-present banner row.
+func (m QueueModel) queueHeaderTitle() string {
+	if !m.executionCompletedAt.IsZero() {
+		done, totalTickets := m.completedExecutionProgress()
+		if totalTickets > 0 && done == totalTickets {
+			elapsed := int(m.executionCompletedAt.Sub(m.executionStartedAt).Seconds())
+			return fmt.Sprintf("Queue · done, took %s", formatElapsed(elapsed))
+		}
+	}
+	if m.paused {
+		done, total := m.checkedProgress()
+		return fmt.Sprintf("Queue · paused (%d of %d done)", done, total)
+	}
+	if len(m.runningEpics) == 0 {
+		return "Queue"
+	}
+
+	done, total := m.checkedProgress()
+	glyph := strings.TrimRight(m.implementSpinner.View(), " ")
+	return fmt.Sprintf("Queue · %d of %d done · %s implementing...", done, total, glyph)
+}
+
+func (m QueueModel) queueHeaderBodyLines() []string {
 	if !m.executionCompletedAt.IsZero() {
 		done, totalTickets := m.completedExecutionProgress()
 		if totalTickets > 0 && done == totalTickets {
 			total, average, maximum := m.completedContextMetrics()
-			elapsed := int(m.executionCompletedAt.Sub(m.executionStartedAt).Seconds())
-			return fmt.Sprintf(
-				"status: done, took %s, context windows: total %s, avg %s, max %s",
-				formatElapsed(elapsed), formatTokenCount(total), formatTokenCount(average), formatTokenCount(maximum),
-			)
+			return []string{fmt.Sprintf(
+				"context windows: total %s, avg %s, max %s",
+				formatTokenCount(total), formatTokenCount(average), formatTokenCount(maximum),
+			)}
 		}
 	}
-	if m.paused {
-		return "Queue paused — in-flight iterations will finish"
+	if m.paused && len(m.runningEpics) > 0 {
+		return []string{"Queue paused — in-flight iterations will finish"}
 	}
-	if len(m.runningEpics) == 0 {
-		return queueBanner
-	}
-
-	done, total := m.checkedProgress()
-	elapsed := int(m.now().Sub(m.executionStartedAt).Seconds())
-	tokens := 0
-	for _, current := range m.liveContextTokens {
-		tokens += current
-	}
-	return fmt.Sprintf(
-		"status: implementing (%d of %d done), elapsed: %s, context windows: %s",
-		done, total, formatElapsed(elapsed), formatTokenCount(tokens),
-	)
+	return nil
 }
 
 func (m QueueModel) completedContextMetrics() (total, average, maximum int) {
@@ -948,8 +953,9 @@ func (m QueueModel) buildQueueLines() (lines []string, offsets []int, heights []
 		return []string{ui.StyleDim.Render("  loading…")}, nil, nil
 	}
 
-	banner := m.executionBanner()
-	lines = []string{"  " + ui.StyleHint.Render(banner), ""}
+	for _, line := range m.queueHeaderBodyLines() {
+		lines = append(lines, "  "+ui.StyleHint.Render(line))
+	}
 
 	rows, planErrs := m.rowsAndPlanErrors()
 	if len(rows) == 0 {
