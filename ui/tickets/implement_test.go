@@ -3,6 +3,8 @@ package tickets
 import (
 	"path/filepath"
 	"testing"
+
+	"github.com/elentok/gx/tickets"
 )
 
 // TestModel_ImplementKeyWithNoActiveLoopReplacesPendingSelection covers
@@ -112,5 +114,49 @@ func TestModel_ImplementKeyLeavesOtherWorktreeEntriesUntouched(t *testing.T) {
 	}
 	if got := status[newSelection]; got != queueStatusPending {
 		t.Fatalf("new selection entry status = %v, want pending", got)
+	}
+}
+
+// TestModel_ImplementKeyExcludesAlreadyDoneTickets covers ticket 05(b): a
+// checked selection that includes a ticket whose Epic.RenderedStatus is
+// already tickets.StatusDone must not be enqueued — it has nothing left to
+// implement — while the rest of the checked selection still queues normally.
+func TestModel_ImplementKeyExcludesAlreadyDoneTickets(t *testing.T) {
+	worktreeRoot := t.TempDir()
+	scratch := func(name string) string {
+		return filepath.Join(worktreeRoot, ".scratch", "alpha", "issues", name)
+	}
+	donePath := scratch("01-done.md")
+	openPath := scratch("02-open.md")
+
+	epic := tickets.Epic{
+		Name: "alpha",
+		Tickets: []tickets.Ticket{
+			{Number: 1, Identifier: "01", Path: donePath, Status: "done"},
+			{Number: 2, Identifier: "02", Path: openPath, Status: "open"},
+		},
+	}
+
+	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
+	m := Model{
+		worktreeRoot: worktreeRoot,
+		queueStore:   store,
+		epics:        []tickets.Epic{epic},
+		checked:      map[string]bool{donePath: true, openPath: true},
+		checkOrder:   map[string]uint64{donePath: 1, openPath: 2},
+	}
+
+	updated, _ := m.handleImplementKey()
+	m = updated.(Model)
+
+	status := store.Snapshot().Status
+	if _, ok := status[donePath]; ok {
+		t.Fatalf("done ticket should not have been enqueued, got status %v", status[donePath])
+	}
+	if got := status[openPath]; got != queueStatusPending {
+		t.Fatalf("open ticket status = %v, want pending", got)
+	}
+	if len(m.checked) != 0 {
+		t.Fatalf("checked set = %v, want empty after queueing", m.checked)
 	}
 }

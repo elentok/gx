@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/confirm"
@@ -500,6 +501,9 @@ func (m *Model) replaceQueuedSelection() error {
 	clearedPaths := make([]string, 0, len(m.checked))
 	for path := range m.checked {
 		clearedPaths = append(clearedPaths, path)
+		if m.isTicketDone(path) {
+			continue
+		}
 		if _, exists := next[path]; exists {
 			continue
 		}
@@ -511,6 +515,20 @@ func (m *Model) replaceQueuedSelection() error {
 	}
 	m.refreshQueueSnapshot()
 	return nil
+}
+
+// isTicketDone reports whether path's ticket is already tickets.StatusDone
+// within m.epics — a done ticket has nothing left to implement, so
+// replaceQueuedSelection excludes it from the checked selection it enqueues.
+func (m *Model) isTicketDone(path string) bool {
+	for _, epic := range m.epics {
+		for _, t := range epic.Tickets {
+			if t.Path == path {
+				return epic.RenderedStatus(t) == tickets.StatusDone
+			}
+		}
+	}
+	return false
 }
 
 func cmdOpenQueueTab(worktreeRoot string) tea.Cmd {
