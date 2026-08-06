@@ -54,6 +54,12 @@ func (m Model) handleConversationsKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) 
 		m.convList.ScrollPage(list.DefaultScroll, len(m.filteredConversations()), m.listHeight())
 	case "ctrl+u":
 		m.convList.ScrollPage(-list.DefaultScroll, len(m.filteredConversations()), m.listHeight())
+	case "enter":
+		return m, m.cmdExportAndEdit()
+	case "ctrl+r":
+		return m, m.cmdResumeConversation()
+	case "ctrl+y":
+		return m, m.cmdYankSessionID()
 	}
 	return m, nil
 }
@@ -81,6 +87,6 @@ func (m Model) viewConversations() string {
 	if m.convFilter.IsActive() {
 		top = m.convFilter.View() + "\n"
 	}
-	footer := "  " + ui.StyleHint.Render("/: filter  esc: back")
+	footer := "  " + ui.StyleHint.Render("/: filter  enter: export+edit  ctrl+r: resume  ctrl+y: yank id  esc: back")
 	return top + panel + "\n" + footer
 }

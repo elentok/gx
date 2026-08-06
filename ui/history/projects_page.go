@@ -61,6 +61,7 @@ func (m Model) enterConversations() (tea.Model, tea.Cmd) {
 	}
 	m.page = pageConversations
 	m.convProjectDir = items[sel].Dir
+	m.convProjectCwd = items[sel].Cwd
 	m.convFilter.Clear()
 	m.convList = list.Model{}
 	m.conversations = nil

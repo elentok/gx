@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/filter"
 	"github.com/elentok/gx/ui/list"
+	"github.com/elentok/gx/ui/notify"
 )
 
 // page identifies which of the two pages is active.
@@ -39,6 +40,14 @@ type Model struct {
 	page page
 	w, h int
 
+	// terminal is the detected terminal multiplexer/emulator, used by ctrl+r
+	// to pick how `claude --resume` is split-launched. Zero value
+	// (ui.TerminalPlain) in tests that don't set it, which makes CommandWithSplitBare
+	// report "split not supported" rather than launching anything real.
+	terminal ui.Terminal
+
+	notify notify.Model
+
 	// projects page
 	projects   []claudehistory.Project
 	projErr    error
@@ -47,6 +56,7 @@ type Model struct {
 
 	// conversations page
 	convProjectDir string
+	convProjectCwd string
 	conversations  []claudehistory.Conversation
 	convErr        error
 	convList       list.Model
@@ -62,6 +72,7 @@ func NewModel(root string, loadProjects ProjectLoader, loadConversations Convers
 		root:              root,
 		loadProjects:      loadProjects,
 		loadConversations: loadConversations,
+		notify:            notify.New(false),
 		projFilter:        filter.NewModel(),
 		convFilter:        filter.NewModel(),
 	}
@@ -96,29 +107,42 @@ func (m Model) cmdLoadConversations(dir string) tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var notifyCmd tea.Cmd
+	m.notify, notifyCmd = m.notify.Update(msg)
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
 		m.projFilter.SetWidth(m.w - 4)
 		m.convFilter.SetWidth(m.w - 4)
-		return m, nil
+		return m, notifyCmd
 
 	case projectsLoadedMsg:
 		m.projects = msg.projects
 		m.projErr = msg.err
 		m.projList.SetSelected(0, max(len(m.filteredProjects()), 1))
-		return m, nil
+		return m, notifyCmd
 
 	case conversationsLoadedMsg:
 		m.conversations = msg.conversations
 		m.convErr = msg.err
 		m.convList.SetSelected(0, max(len(m.filteredConversations()), 1))
-		return m, nil
+		return m, notifyCmd
+
+	case convExportedMsg:
+		return m.handleConvExported(msg, notifyCmd)
+
+	case editorFinishedMsg:
+		return m.handleEditorFinished(msg, notifyCmd)
+
+	case resumeFinishedMsg:
+		return m.handleResumeFinished(msg, notifyCmd)
 
 	case tea.KeyPressMsg:
-		return m.handleKey(msg)
+		next, cmd := m.handleKey(msg)
+		return next, tea.Batch(notifyCmd, cmd)
 	}
-	return m, nil
+	return m, notifyCmd
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -153,6 +177,9 @@ func (m Model) View() tea.View {
 		body = m.viewProjects()
 	case pageConversations:
 		body = m.viewConversations()
+	}
+	if stack := m.notify.View(); stack != "" {
+		body = ui.OverlayTopRightMargin(body, stack, m.w, 1, 1)
 	}
 	return ui.NewMainView(body)
 }
