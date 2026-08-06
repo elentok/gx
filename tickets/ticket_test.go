@@ -3,7 +3,7 @@ package tickets
 import "testing"
 
 func TestTicket_IsDone(t *testing.T) {
-	doneValues := []string{"done", "resolved", "wontfix", "closed", "superseded", "Done", "RESOLVED"}
+	doneValues := []string{"done", "resolved", "wontfix", "closed", "Done", "RESOLVED"}
 	for _, v := range doneValues {
 		ticket := Ticket{Status: v}
 		if !ticket.IsDone() {

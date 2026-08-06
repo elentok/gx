@@ -74,7 +74,6 @@ var doneStatuses = map[string]bool{
 	"resolved":    true,
 	"wontfix":     true,
 	"closed":      true,
-	"superseded":  true,
 	"implemented": true,
 }
 
@@ -83,14 +82,4 @@ var doneStatuses = map[string]bool{
 // status (open/claimed/blocked/needs-info/done) is a later concern.
 func (t Ticket) IsDone() bool {
 	return doneStatuses[strings.ToLower(strings.TrimSpace(t.Status))]
-}
-
-// IsSuperseded reports whether the ticket was closed by a mid-flight split
-// (see UnresolvedBlockers) rather than by landing work. It's part of the
-// IsDone family for scheduling/blocker-resolution purposes, but callers that
-// verify a done ticket's work actually landed (e.g. ralph-loop's startup
-// reconciliation) need to tell it apart: a superseded ticket never had
-// commits to land in the first place.
-func (t Ticket) IsSuperseded() bool {
-	return supersededStatuses[strings.ToLower(strings.TrimSpace(t.Status))]
 }

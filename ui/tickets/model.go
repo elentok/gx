@@ -459,7 +459,7 @@ func (m Model) renderedRowHeight(r row) int {
 	if status == tickets.StatusDone {
 		return 2
 	}
-	if status == tickets.StatusSuperseded || !m.implementingEpics[epic.Name] {
+	if !m.implementingEpics[epic.Name] {
 		return 1
 	}
 	live, ok := m.live[epic.Name][t.Identifier]

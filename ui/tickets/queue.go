@@ -900,7 +900,7 @@ func (m QueueModel) buildQueueLines() (lines []string, offsets []int, heights []
 func (m QueueModel) renderQueueTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) []string {
 	status := epic.RenderedStatus(t)
 
-	if status != tickets.StatusSuperseded && m.runningEpics[epic.Name] {
+	if m.runningEpics[epic.Name] {
 		if live, ok := m.live[epic.Name][t.Identifier]; ok {
 			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live, "  "); ok {
 				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens)
@@ -921,7 +921,7 @@ func (m QueueModel) renderQueueTicketRow(epic tickets.Epic, t tickets.Ticket, ro
 	titleStyle := lipgloss.NewStyle()
 	if matched {
 		title = search.Highlight(title, m.search.Query(), current)
-	} else if status == tickets.StatusDone || status == tickets.StatusSuperseded {
+	} else if status == tickets.StatusDone {
 		titleStyle = statusDoneStyle
 	} else if searchDim {
 		titleStyle = ui.StyleDim

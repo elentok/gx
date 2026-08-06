@@ -41,7 +41,6 @@ const (
 	StatusNeedsInfo      Status = "needs-info"
 	StatusNeedsAttention Status = "needs-attention"
 	StatusDone           Status = "done"
-	StatusSuperseded     Status = "superseded"
 )
 
 var validStatuses = map[Status]bool{
@@ -53,7 +52,6 @@ var validStatuses = map[Status]bool{
 	StatusNeedsInfo:      true,
 	StatusNeedsAttention: true,
 	StatusDone:           true,
-	StatusSuperseded:     true,
 }
 
 // Valid reports whether s is one of the canonical status values.
@@ -113,12 +111,12 @@ type Ticket struct {
 	// reattaches/resumes rather than being overwritten by the latest one.
 	SessionIDs []string
 	// Commitless declares that a zero-commit iteration finish is intentional
-	// for this ticket (e.g. the agent decided no code change was warranted)
-	// rather than a stalled/crashed agent. ralph-loop's finishIteration
-	// checks it before marking a zero-commit ticket needs-info, and startup
-	// reconciliation's classifyDoneTicket skips its landed-commit
-	// verification for a done ticket with this set, the same way it already
-	// does for StatusSuperseded. Prefer IsCommitless over reading this field
+	// for this ticket (e.g. the agent decided no code change was warranted,
+	// or a mid-flight split closed it with no work of its own) rather than a
+	// stalled/crashed agent. ralph-loop's finishIteration checks it before
+	// marking a zero-commit ticket needs-info, and startup reconciliation's
+	// classifyDoneTicket skips its landed-commit verification for a done
+	// ticket with this set. Prefer IsCommitless over reading this field
 	// directly — grilling/prototype tickets are commitless by type, without
 	// needing the flag set explicitly.
 	Commitless bool

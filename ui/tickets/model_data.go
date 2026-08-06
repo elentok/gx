@@ -167,8 +167,8 @@ func defaultCollapsedEpics(epics []tickets.Epic, existing map[string]bool) map[s
 
 // sortedTicketIndexes orders epic.Tickets' indexes in plan order — ticket
 // number ascending, so the list reads as the epic's intended order of
-// execution and a ticket (done, superseded, or otherwise) never jumps out of
-// its place once it finishes. Lettered siblings sharing a Number (e.g. 04,
+// execution and a ticket (done or otherwise) never jumps out of its place
+// once it finishes. Lettered siblings sharing a Number (e.g. 04,
 // 04a, 04b) tie-break on DisplayNumber, so the original sorts before its
 // replacements in filename order.
 func sortedTicketIndexes(epic tickets.Epic) []int {

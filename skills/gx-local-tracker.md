@@ -36,10 +36,10 @@ Fields:
 - **`id`** (string, required) — the ticket identifier, matching the filename prefix, e.g. `"04"` or
   `"04b"`. Fixed at creation.
 - **`status`** (enum) — one of `open`, `needs-triage`, `ready-for-agent`, `ready-for-human`,
-  `claimed`, `needs-info`, `needs-attention`, `done`, `superseded`. A missing `status:` is treated as
+  `claimed`, `needs-info`, `needs-attention`, `done`. A missing `status:` is treated as
   `open`. `open`, `needs-triage`, `ready-for-agent`, and `ready-for-human` are all unclaimed — none
   of them distinguish who is meant to pick the ticket up.
-- **`blocked_by`** (list of ticket IDs) — tickets that must be `done` (or `superseded`) before this
+- **`blocked_by`** (list of ticket IDs) — tickets that must be `done` before this
   one can start; omit or `[]` when there are none. A bare-number token (`"04"`) is resolved only once
   every ticket sharing that number (the original plus any lettered splits) is done. A lettered token
   (`"04a"`) names one specific sibling and resolves as soon as that ticket alone is done.
@@ -54,7 +54,7 @@ Fields:
   run, otherwise omitted.
 - **`commitless`** (bool) — set `true` when a ticket intentionally finishes an iteration with no
   commit (e.g. it turned out to need only a split, or the behavior already existed). Pair it with a
-  terminal status (`done`, `superseded`, or an unclaimed status) — otherwise the ticket still reads
+  terminal status (`done`, or an unclaimed status) — otherwise the ticket still reads
   as claimed-but-stalled.
 - **`actual_context_window`**, **`elapsed_time`** — read-only, gx-managed. Stamped automatically at
   landing time; never set these by hand.
@@ -91,11 +91,10 @@ should leave the ticket visibly claimed, not silently open, so a restart doesn't
 
 ## Resolution
 
-When a ticket's work lands, set a terminal status: `gx tickets set <path> --status done`. Other
-terminal outcomes:
+When a ticket's work lands, set a terminal status: `gx tickets set <path> --status done`. A ticket
+closed by a mid-flight split rather than by landing its own work (see below) is also `done`, with
+`commitless: true` since it never had commits of its own. Other terminal outcomes:
 
-- **`superseded`** — the ticket was closed by a mid-flight split rather than by landing its own
-  work (see below); it never had commits of its own.
 - **`needs-info`** — work is stalled on information only a human can supply. Leave a note in the
   ticket body explaining what's missing.
 - **`needs-attention`** — something needs human judgment before work can continue (e.g. a design
@@ -119,8 +118,8 @@ numbering and blocking conventions:
 4. Each new ticket's `split_from` frontmatter names the original, set at creation.
 5. The original ticket's `split` field is set to list the new ticket(s):
    `gx tickets set <path> --split <new-ticket-ids>`.
-6. The original is closed as `done` (if some of its work landed) or `superseded` (if none did),
-   with `commitless: true` if step 6 lands zero commits of the original's own.
+6. The original is closed as `done`, with `commitless: true` if step 6 lands zero commits of the
+   original's own.
 
 Any not-yet-finished acceptance criteria move off the original ticket onto the new one(s) — don't
 leave a criterion sitting on a ticket that's now closed.

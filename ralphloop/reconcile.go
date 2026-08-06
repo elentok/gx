@@ -150,7 +150,7 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 	// resolve the common cases.
 	var landed map[string]bool
 	for _, t := range epic.Tickets {
-		if t.IsDone() && !t.IsSuperseded() && !t.Commitless {
+		if t.IsDone() && !t.Commitless {
 			landed, _ = LandedTickets(paths.FeatureWorktree, epic.Name)
 			break
 		}
@@ -165,9 +165,8 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 			continue
 		}
 		// A commitless done ticket (see schema.Ticket.Commitless) never had a
-		// commit to land in the first place — verifying it the same way as
-		// t.IsSuperseded() is skipped here, for the same reason.
-		if !t.IsDone() || t.IsSuperseded() || t.Commitless {
+		// commit to land in the first place — verifying it is skipped here.
+		if !t.IsDone() || t.Commitless {
 			continue
 		}
 		class, err := classifyDoneTicket(d, paths, epic.Name, t, events, live, landed)

@@ -18,7 +18,7 @@ const ticketsSchemaText = `Ticket frontmatter fields:
 
 Settable fields:
   status (enum, --status): open, claimed, ready-for-agent, ready-for-human, needs-triage,
-    needs-info, needs-attention, done, superseded
+    needs-info, needs-attention, done
   blocked_by (comma-separated ticket IDs, --blocked-by): e.g. 01,03
   children (comma-separated ticket IDs, --children): tickets this one produced (a
     mid-flight split, or the fix tickets a code-review ticket opened)
@@ -27,8 +27,8 @@ Settable fields:
   expected_context_window (non-negative int, --expected-context-window)
   commitless (bool, --commitless): true/false. Set true when you intentionally finish an
     iteration with no commit (e.g. exploration concluded no code change was warranted) —
-    pair it with a status that doesn't leave the ticket claimed (done, superseded,
-    ready-for-human, needs-triage), or it's still treated as an unresolved iteration.
+    pair it with a status that doesn't leave the ticket claimed (done, ready-for-human,
+    needs-triage), or it's still treated as an unresolved iteration.
 
 Read-only fields (gx-managed, not settable via ` + "`set`" + `):
   id — ticket identity, fixed at creation

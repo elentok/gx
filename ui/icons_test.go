@@ -16,7 +16,6 @@ func TestIcons_TicketNerdFontCodepoints(t *testing.T) {
 		{"TicketBlocked", icons.TicketBlocked, '\uf28e'},
 		{"TicketDone", icons.TicketDone, '\uf00c'},
 		{"TicketError", icons.TicketError, '\uf057'},
-		{"TicketSuperseded", icons.TicketSuperseded, '\uf148'},
 		{"TicketPaused", icons.TicketPaused, '\uf28c'},
 	}
 	for _, c := range cases {

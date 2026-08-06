@@ -40,7 +40,7 @@ func TestFrontier_ClaimedAndDoneFamilyExcluded(t *testing.T) {
 		{Number: 3, Status: "resolved"},
 		{Number: 4, Status: "wontfix"},
 		{Number: 5, Status: "closed"},
-		{Number: 6, Status: "superseded"},
+		{Number: 6, Status: "done", Commitless: true},
 		{Number: 7, Status: "implemented"},
 		{Number: 8, Status: "needs-info"},
 		{Number: 9, Status: "open"},

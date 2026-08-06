@@ -153,14 +153,13 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) []string {
 	status := epic.RenderedStatus(t)
 
-	// See flat_view.go's renderFlatTicketRow for why superseded always wins
-	// over a live entry. m.live is nested by epic name (ticket 05) precisely
-	// because bare ticket identifiers repeat across epics (each restarts
-	// numbering from 01) — gating on m.implementingEpics[epic.Name] and
-	// looking the ticket up within that epic's own inner map keeps a
-	// concurrently-running epic's same-numbered ticket (e.g. two epics' own
-	// "02") from cross-rendering as running here.
-	if status != tickets.StatusSuperseded && m.implementingEpics[epic.Name] {
+	// m.live is nested by epic name (ticket 05) precisely because bare
+	// ticket identifiers repeat across epics (each restarts numbering from
+	// 01) — gating on m.implementingEpics[epic.Name] and looking the ticket
+	// up within that epic's own inner map keeps a concurrently-running
+	// epic's same-numbered ticket (e.g. two epics' own "02") from
+	// cross-rendering as running here.
+	if m.implementingEpics[epic.Name] {
 		if live, ok := m.live[epic.Name][t.Identifier]; ok {
 			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live, "    "+m.checkboxGlyph(m.isChecked(t.Path))+" "); ok {
 				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens)
@@ -173,7 +172,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, t tickets.Ticket, rowIdx int) 
 
 	matched, current := m.searchMatch(rowIdx)
 	searchDim := m.search.HasQuery() && !matched
-	doneDim := status == tickets.StatusDone || status == tickets.StatusSuperseded
+	doneDim := status == tickets.StatusDone
 
 	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
 	if t.Commitless {
@@ -246,8 +245,6 @@ func statusIconAndStyle(icons ui.IconSet, status tickets.RenderedStatus) (string
 		return icons.TicketNeedsAttention, statusNeedsAttentionStyle
 	case tickets.StatusDone:
 		return icons.TicketDone, statusDoneStyle
-	case tickets.StatusSuperseded:
-		return icons.TicketSuperseded, statusDoneStyle
 	default: // tickets.StatusError
 		return icons.TicketError, statusErrorStyle
 	}

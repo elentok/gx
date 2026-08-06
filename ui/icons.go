@@ -41,7 +41,6 @@ type IconSet struct {
 	TicketNeedsInfo      string
 	TicketNeedsAttention string
 	TicketDone           string
-	TicketSuperseded     string
 	TicketError          string
 	// TicketPaused is a live ralph-loop orchestrator state (an iteration
 	// paused mid-run, e.g. smart-zone/rate-limit), distinct from
@@ -90,7 +89,6 @@ func Icons(useNerdFont bool) IconSet {
 			TicketNeedsInfo:      "?",
 			TicketNeedsAttention: "!",
 			TicketDone:           "d",
-			TicketSuperseded:     "s",
 			TicketError:          "!!",
 			TicketPaused:         "P",
 		}
@@ -133,7 +131,6 @@ func Icons(useNerdFont bool) IconSet {
 		TicketNeedsInfo:      "",
 		TicketNeedsAttention: "",
 		TicketDone:           "",
-		TicketSuperseded:     "",
 		TicketError:          "",
 		TicketPaused:         "",
 	}

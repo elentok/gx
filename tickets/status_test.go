@@ -19,7 +19,6 @@ func TestEpic_RenderedStatus_BaseStates(t *testing.T) {
 		{"resolved", StatusDone},
 		{"wontfix", StatusDone},
 		{"closed", StatusDone},
-		{"superseded", StatusSuperseded},
 		{"CLAIMED", StatusClaimed},
 		{"bogus-value", StatusError},
 	}
@@ -164,14 +163,14 @@ func TestEpic_UnresolvedBlockers_SelfExcludedFromOwnFamily(t *testing.T) {
 // mid-flight split: "Blocked by:" text only ever carries a bare number
 // (parseBlockedBy strips letter suffixes), so "Blocked by: 03" can't name a
 // specific lettered sibling — it means the whole family sharing Number 3.
-// The superseded original (03) is closed as done immediately at split time,
+// The original (03) is closed as done+commitless immediately at split time,
 // well before its replacements (03a, 03b) land, so a blocker on "3" must
 // stay unresolved until every ticket sharing that Number is done, not just
 // the first one.
 func TestEpic_UnresolvedBlockers_LetteredSplitRequiresAllSiblingsDone(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
 		{Number: 1, BlockedBy: []string{"3"}},
-		{Number: 3, Identifier: "03", Status: "done"}, // superseded original, closed at split time
+		{Number: 3, Identifier: "03", Status: "done", Commitless: true}, // original, closed at split time
 		{Number: 3, Identifier: "03a", Status: "done"},
 		{Number: 3, Identifier: "03b", Status: "open"}, // still in flight
 	}}
@@ -191,11 +190,11 @@ func TestEpic_UnresolvedBlockers_LetteredSplitRequiresAllSiblingsDone(t *testing
 // opposite of the bare-number case above: "Blocked by: 03a" names one
 // specific split sibling, so it resolves as soon as that ticket alone is
 // done — it must not require its still-open siblings (03b) or the
-// superseded original (03) to finish too, unlike a bare "Blocked by: 3".
+// original (03) to finish too, unlike a bare "Blocked by: 3".
 func TestEpic_UnresolvedBlockers_LetteredTokenNamesOneSibling(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
 		{Number: 1, BlockedBy: []string{"3a"}}, // no zero-padding, unlike Identifier "03a" below
-		{Number: 3, Identifier: "03", Status: "superseded"},
+		{Number: 3, Identifier: "03", Status: "done", Commitless: true},
 		{Number: 3, Identifier: "03a", Status: "done"},
 		{Number: 3, Identifier: "03b", Status: "open"}, // still in flight, doesn't matter
 	}}
@@ -250,8 +249,8 @@ func TestEpic_BlockingTickets_NilWhenNothingUnresolved(t *testing.T) {
 // TestEpic_BlockingTickets_BareNumberResolvesEveryNotYetDoneSibling covers a
 // mid-flight split blocker (see UnresolvedBlockers' bare-number family
 // semantics): "Blocked by: 3" should surface every one of 3's not-yet-done
-// siblings, not just the superseded original, so confirming the modal adds
-// them all to the checked set.
+// siblings, not just the original, so confirming the modal adds them all to
+// the checked set.
 func TestEpic_BlockingTickets_BareNumberResolvesEveryNotYetDoneSibling(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
 		{Number: 1, BlockedBy: []string{"3"}},
@@ -268,7 +267,7 @@ func TestEpic_BlockingTickets_BareNumberResolvesEveryNotYetDoneSibling(t *testin
 func TestEpic_BlockingTickets_LetteredTokenResolvesOnlyThatSibling(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
 		{Number: 1, BlockedBy: []string{"3a"}},
-		{Number: 3, Identifier: "03", Status: "superseded"},
+		{Number: 3, Identifier: "03", Status: "done", Commitless: true},
 		{Number: 3, Identifier: "03a", Title: "Split A", Status: "open"},
 		{Number: 3, Identifier: "03b", Title: "Split B", Status: "open"},
 	}}
