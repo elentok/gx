@@ -15,13 +15,15 @@ import (
 	"github.com/elentok/gx/ui/keys"
 )
 
-func TestTicketProgressSpinnerHasEightFramesAtDocumentedCodepoints(t *testing.T) {
+func TestTicketProgressSpinnerFillsAndDrainsAtDocumentedCodepoints(t *testing.T) {
 	want := []string{
 		"\U000F0A9E", "\U000F0A9F", "\U000F0AA0", "\U000F0AA1",
 		"\U000F0AA2", "\U000F0AA3", "\U000F0AA4", "\U000F0AA5",
+		"\U000F0AA4", "\U000F0AA3", "\U000F0AA2", "\U000F0AA1",
+		"\U000F0AA0", "\U000F0A9F",
 	}
-	if len(TicketProgressSpinner.Frames) != 8 {
-		t.Fatalf("expected 8 frames, got %d", len(TicketProgressSpinner.Frames))
+	if len(TicketProgressSpinner.Frames) != len(want) {
+		t.Fatalf("expected %d frames, got %d", len(want), len(TicketProgressSpinner.Frames))
 	}
 	for i, frame := range want {
 		if TicketProgressSpinner.Frames[i] != frame {

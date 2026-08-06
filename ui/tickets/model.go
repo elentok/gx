@@ -32,11 +32,15 @@ const (
 )
 
 // TicketProgressSpinner is the circle-slice pie-fill spinner shared by the
-// Tickets tab and Queue tab to indicate an in-progress ticket.
+// Tickets tab and Queue tab to indicate an in-progress ticket. Frames
+// fill 1/8 to full then drain back down (rather than cutting straight from
+// full back to 1/8) so the loop point has no visible jump.
 var TicketProgressSpinner = spinner.Spinner{
 	Frames: []string{
 		"\U000F0A9E", "\U000F0A9F", "\U000F0AA0", "\U000F0AA1",
 		"\U000F0AA2", "\U000F0AA3", "\U000F0AA4", "\U000F0AA5",
+		"\U000F0AA4", "\U000F0AA3", "\U000F0AA2", "\U000F0AA1",
+		"\U000F0AA0", "\U000F0A9F",
 	},
 	FPS: spinner.Dot.FPS,
 }
