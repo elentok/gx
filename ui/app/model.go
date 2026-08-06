@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/navstate"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/notifylog"
 	prsui "github.com/elentok/gx/ui/prs"
 	"github.com/elentok/gx/ui/reloadgate"
 	stashlistui "github.com/elentok/gx/ui/stashlist"
@@ -53,6 +54,7 @@ type Model struct {
 	history     []historyEntry
 	keyPrefix   string
 	notify      notify.Model
+	notifyLog   *notifylog.Log
 	loopStatus  loopStatusOverlay
 	gate        *reloadgate.ReloadGate
 	quitConfirm confirm.Model
@@ -70,6 +72,7 @@ func New(repo git.Repo, settings Settings) Model {
 		navState:      navstate.NewState(settings.ActiveWorktreePath),
 		livePageByTab: make(map[nav.TabID]livePage),
 		notify:        notify.New(settings.UseNerdFontIcons),
+		notifyLog:     notifylog.New(),
 		loopStatus:    newLoopStatusOverlay(),
 		gate:          reloadgate.New(),
 		quitConfirm:   confirm.New(),

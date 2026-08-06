@@ -13,6 +13,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// each return point below, since only one variable needs threading.
 	var notifyCmd tea.Cmd
 	m.notify, notifyCmd = m.notify.Update(msg)
+	// Captured here, once, so no page/tab needs its own notifylog wiring.
+	switch v := msg.(type) {
+	case notify.NotifyMsg:
+		m.notifyLog.Append(v)
+	case notify.CloseMsg:
+		m.notifyLog.Close(v.ID)
+	}
 	var loopStatusCmd tea.Cmd
 	m.loopStatus, loopStatusCmd = m.loopStatus.Update(msg)
 	notifyCmd = tea.Batch(notifyCmd, loopStatusCmd)
