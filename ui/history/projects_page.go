@@ -49,6 +49,8 @@ func (m Model) handleProjectsKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.projList.ScrollPage(-list.DefaultScroll, len(m.filteredProjects()), m.listHeight())
 	case "enter":
 		return m.enterConversations()
+	case "ctrl+f":
+		return m.enterGrep()
 	}
 	return m, nil
 }

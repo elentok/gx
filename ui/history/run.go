@@ -11,7 +11,7 @@ import (
 // tree. It is a standalone program (not wired into gx's app/nav tab shell)
 // since Claude session history isn't scoped to the current git worktree.
 func Run() error {
-	m := NewModel("", claudehistory.ListProjects, claudehistory.ListConversations)
+	m := NewModel("", claudehistory.ListProjects, claudehistory.ListConversations, claudehistory.GrepTranscripts)
 	m.terminal = ui.DetectTerminal()
 	p := tea.NewProgram(m)
 	_, err := p.Run()

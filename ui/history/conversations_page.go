@@ -60,6 +60,8 @@ func (m Model) handleConversationsKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) 
 		return m, m.cmdResumeConversation()
 	case "ctrl+y":
 		return m, m.cmdYankSessionID()
+	case "ctrl+f":
+		return m.enterGrep()
 	}
 	return m, nil
 }

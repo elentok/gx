@@ -5,6 +5,8 @@
 package history
 
 import (
+	"time"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/claudehistory"
@@ -14,12 +16,21 @@ import (
 	"github.com/elentok/gx/ui/notify"
 )
 
-// page identifies which of the two pages is active.
+// page identifies which of the three pages is active.
 type page int
 
 const (
 	pageProjects page = iota
 	pageConversations
+	pageGrep
+)
+
+// grepScope selects which directories GrepTranscripts searches.
+type grepScope int
+
+const (
+	grepScopeProject grepScope = iota
+	grepScopeGlobal
 )
 
 // ProjectLoader loads the projects list. Production code uses
@@ -31,11 +42,20 @@ type ProjectLoader func(root string) ([]claudehistory.Project, error)
 // claudehistory.ListConversations; tests inject a fixture-returning func.
 type ConversationLoader func(dir string) ([]claudehistory.Conversation, error)
 
+// GrepFunc searches transcripts. Production code uses
+// claudehistory.GrepTranscripts; tests inject a fixture-returning func.
+type GrepFunc func(query string, dirs []string) ([]claudehistory.GrepResult, error)
+
+// grepDebounce is how long the grep page waits after the query stops
+// changing before it fires a search, mirroring blf's grepDebounceMsg.
+const grepDebounce = 100 * time.Millisecond
+
 // Model is the root bubbletea model for the history browser.
 type Model struct {
 	root              string
 	loadProjects      ProjectLoader
 	loadConversations ConversationLoader
+	grepFunc          GrepFunc
 
 	page page
 	w, h int
@@ -61,20 +81,35 @@ type Model struct {
 	convErr        error
 	convList       list.Model
 	convFilter     filter.Model
+
+	// grep page
+	grepFromPage     page
+	grepScope        grepScope
+	grepScopeProjDir string
+	grepQuery        string
+	grepSeq          int
+	grepRunning      bool
+	grepResults      []claudehistory.GrepResult
+	grepErr          error
+	rgNotFound       bool
+	grepList         list.Model
+	grepFilter       filter.Model
 }
 
 // NewModel builds the root model. root is the ~/.claude/projects directory
-// (empty defers to ListProjects' own default). loadProjects/loadConversations
-// are the data-loading funcs to use; Run wires in the real claudehistory
-// funcs, tests inject fixtures.
-func NewModel(root string, loadProjects ProjectLoader, loadConversations ConversationLoader) Model {
+// (empty defers to ListProjects' own default). loadProjects/loadConversations/
+// grepFunc are the data-loading funcs to use; Run wires in the real
+// claudehistory funcs, tests inject fixtures.
+func NewModel(root string, loadProjects ProjectLoader, loadConversations ConversationLoader, grepFunc GrepFunc) Model {
 	return Model{
 		root:              root,
 		loadProjects:      loadProjects,
 		loadConversations: loadConversations,
+		grepFunc:          grepFunc,
 		notify:            notify.New(false),
 		projFilter:        filter.NewModel(),
 		convFilter:        filter.NewModel(),
+		grepFilter:        filter.NewModel(),
 	}
 }
 
@@ -86,6 +121,20 @@ type projectsLoadedMsg struct {
 type conversationsLoadedMsg struct {
 	conversations []claudehistory.Conversation
 	err           error
+}
+
+// grepDebounceMsg fires grepDebounce after the query last changed; a stale
+// seq or a query that has since changed again is discarded (see
+// handleGrepDebounce), mirroring blf's grepSeq/grepDebounceMsg guard.
+type grepDebounceMsg struct {
+	seq   int
+	query string
+}
+
+type grepResultsMsg struct {
+	results []claudehistory.GrepResult
+	err     error
+	seq     int
 }
 
 func (m Model) Init() tea.Cmd {
@@ -115,6 +164,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.w, m.h = msg.Width, msg.Height
 		m.projFilter.SetWidth(m.w - 4)
 		m.convFilter.SetWidth(m.w - 4)
+		m.grepFilter.SetWidth(m.w - 4)
 		return m, notifyCmd
 
 	case projectsLoadedMsg:
@@ -138,6 +188,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case resumeFinishedMsg:
 		return m.handleResumeFinished(msg, notifyCmd)
 
+	case grepDebounceMsg:
+		return m.handleGrepDebounce(msg, notifyCmd)
+
+	case grepResultsMsg:
+		return m.handleGrepResults(msg, notifyCmd)
+
 	case tea.KeyPressMsg:
 		next, cmd := m.handleKey(msg)
 		return next, tea.Batch(notifyCmd, cmd)
@@ -151,6 +207,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handleProjectsKey(msg)
 	case pageConversations:
 		return m.handleConversationsKey(msg)
+	case pageGrep:
+		return m.handleGrepKey(msg)
 	}
 	return m, nil
 }
@@ -166,8 +224,24 @@ func (m Model) listHeight() int {
 		if m.convFilter.IsActive() {
 			h -= 2
 		}
+	case pageGrep:
+		h -= 2 // grep's filter box is always shown
+		h -= m.grepPreviewBoxHeight()
 	}
 	return max(h, 1)
+}
+
+// grepPreviewBoxHeight returns the total preview frame height (border
+// included) as a third of the available terminal height, clamped so both
+// the results list and the preview stay usable on small and large
+// terminals. Mirrors blf's grepPreviewBoxHeight.
+func (m Model) grepPreviewBoxHeight() int {
+	h := m.h / 3
+	h = min(max(h, 8), 20)
+	if m.h-h < 6 {
+		h = max(m.h-6, 3)
+	}
+	return h
 }
 
 func (m Model) View() tea.View {
@@ -177,6 +251,8 @@ func (m Model) View() tea.View {
 		body = m.viewProjects()
 	case pageConversations:
 		body = m.viewConversations()
+	case pageGrep:
+		body = m.viewGrep()
 	}
 	if stack := m.notify.View(); stack != "" {
 		body = ui.OverlayTopRightMargin(body, stack, m.w, 1, 1)

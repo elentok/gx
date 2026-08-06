@@ -33,8 +33,12 @@ func fixtureConversationLoader(dir string) ([]claudehistory.Conversation, error)
 	return fixtureConversations[dir], nil
 }
 
+func fixtureGrepFunc(query string, dirs []string) ([]claudehistory.GrepResult, error) {
+	return nil, nil
+}
+
 func newTestModel() Model {
-	m := NewModel("", fixtureProjectLoader, fixtureConversationLoader)
+	m := NewModel("", fixtureProjectLoader, fixtureConversationLoader, fixtureGrepFunc)
 	m, _ = update(m, tea.WindowSizeMsg{Width: 80, Height: 24})
 	m, _ = update(m, projectsLoadedMsg{projects: fixtureProjects})
 	return m
@@ -50,7 +54,7 @@ func press(m Model, key string) (Model, tea.Cmd) {
 }
 
 func TestInit_LoadsProjects(t *testing.T) {
-	m := NewModel("", fixtureProjectLoader, fixtureConversationLoader)
+	m := NewModel("", fixtureProjectLoader, fixtureConversationLoader, fixtureGrepFunc)
 	cmd := m.Init()
 	if cmd == nil {
 		t.Fatal("Init() returned nil cmd, want a load-projects cmd")
@@ -67,7 +71,7 @@ func TestInit_LoadsProjects(t *testing.T) {
 
 func TestInit_LoadError(t *testing.T) {
 	wantErr := errors.New("boom")
-	m := NewModel("", func(string) ([]claudehistory.Project, error) { return nil, wantErr }, fixtureConversationLoader)
+	m := NewModel("", func(string) ([]claudehistory.Project, error) { return nil, wantErr }, fixtureConversationLoader, fixtureGrepFunc)
 	m, _ = update(m, tea.WindowSizeMsg{Width: 80, Height: 24})
 	m, _ = update(m, projectsLoadedMsg{err: wantErr})
 	if m.projErr == nil {

@@ -75,13 +75,19 @@ func (m Model) cmdExportAndEdit() tea.Cmd {
 	if !ok {
 		return notify.Warning("no conversation selected")
 	}
+	return cmdExportAndEditPath(conv.Path)
+}
+
+// cmdExportAndEditPath is the path-generic core of cmdExportAndEdit, shared
+// with the grep page (cmdExportAndEditGrep) which targets a GrepResult's
+// file instead of a conversations-page row.
+func cmdExportAndEditPath(path string) tea.Cmd {
 	editor := resolveEditor()
 	parts := strings.Fields(editor)
 	if len(parts) == 0 {
 		return notify.Warning("$EDITOR is empty")
 	}
 	editorBin, editorArgs := parts[0], parts[1:]
-	path := conv.Path
 
 	return func() tea.Msg {
 		md, err := historyExportMarkdown(path)
@@ -136,8 +142,15 @@ func (m Model) cmdResumeConversation() tea.Cmd {
 	if conv.SessionID == "" {
 		return notify.Warning("conversation has no session id to resume")
 	}
-	program, args := resumeCommandArgs(conv.SessionID)
-	return terminalrun.CommandWithSplitBare(m.convProjectCwd, m.terminal, resumeSplitType, program, args, func(err error, splitApp string) tea.Msg {
+	return m.cmdResumeSession(conv.SessionID, m.convProjectCwd)
+}
+
+// cmdResumeSession is the session/cwd-generic core of cmdResumeConversation,
+// shared with the grep page (cmdResumeGrepResult) which resolves cwd from
+// the GrepResult's project instead of the conversations page's own state.
+func (m Model) cmdResumeSession(sessionID, cwd string) tea.Cmd {
+	program, args := resumeCommandArgs(sessionID)
+	return terminalrun.CommandWithSplitBare(cwd, m.terminal, resumeSplitType, program, args, func(err error, splitApp string) tea.Msg {
 		return resumeFinishedMsg{err: err, splitApp: splitApp}
 	})
 }
