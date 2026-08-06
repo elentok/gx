@@ -692,7 +692,7 @@ func (m Model) OnPageActivated() tea.Cmd {
 func (m Model) cmdStartImplement(epicName string, agent ralphloop.AgentKind, done, total int) tea.Cmd {
 	return cmdStartImplement(
 		m.worktreeRoot, epicName, agent, done, total,
-		m.settings.MaxConcurrentTicketsPerEpic(), nil, m.settings.Notifications.Telegram,
+		m.settings.MaxConcurrentTicketsPerEpic(), nil, m.settings.Notifications.Telegram, m.settings.ImplementSkill(),
 	)
 }
 
@@ -704,13 +704,14 @@ func cmdStartImplement(
 	maxParallel int,
 	ticketIDs []string,
 	telegram config.TelegramConfig,
+	skill string,
 ) tea.Cmd {
 	return func() tea.Msg {
 		sink, ok := ralphLoopRegistry.tryStart(epicName, done, total)
 		if !ok {
 			return implementFailedMsg{err: fmt.Errorf("a ralph-loop is already running")}
 		}
-		opts, err := buildImplementRunOptionsForTickets(worktreeRoot, epicName, agent, maxParallel, ticketIDs)
+		opts, err := buildImplementRunOptionsForTickets(worktreeRoot, epicName, agent, maxParallel, ticketIDs, skill)
 		if err != nil {
 			ralphLoopRegistry.finish(epicName, err)
 			return implementFailedMsg{err: err}
@@ -737,9 +738,10 @@ func cmdPollImplement(epicName string) tea.Cmd {
 }
 
 func buildImplementRunOptions(worktreeRoot, epicName string, agent ralphloop.AgentKind) (ralphloop.RunOptions, error) {
+	settings := ui.Settings{}
 	return buildImplementRunOptionsForTickets(
 		worktreeRoot, epicName, agent,
-		ui.Settings{}.MaxConcurrentTicketsPerEpic(), nil,
+		settings.MaxConcurrentTicketsPerEpic(), nil, settings.ImplementSkill(),
 	)
 }
 
@@ -748,6 +750,7 @@ func buildImplementRunOptionsForTickets(
 	agent ralphloop.AgentKind,
 	maxParallel int,
 	ticketIDs []string,
+	skill string,
 ) (ralphloop.RunOptions, error) {
 	repo, err := git.FindRepo(worktreeRoot)
 	if err != nil {
@@ -756,6 +759,7 @@ func buildImplementRunOptionsForTickets(
 	return ralphloop.RunOptions{
 		EpicName:    epicName,
 		Agent:       agent,
+		Skill:       skill,
 		RepoDir:     repo.Root,
 		ScratchDir:  filepath.Join(worktreeRoot, ".scratch"),
 		MaxParallel: max(maxParallel, 1),

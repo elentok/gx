@@ -46,6 +46,7 @@ type Config struct {
 	Log                   LogConfig            `json:"log,omitempty"`
 	ExecutionQueue        ExecutionQueueConfig `json:"execution-queue"`
 	Notifications         NotificationsConfig  `json:"notifications"`
+	Skills                SkillsConfig         `json:"skills"`
 }
 
 // Default returns the default configuration.
@@ -58,6 +59,7 @@ func Default() Config {
 		Log:                   DefaultLogConfig(),
 		ExecutionQueue:        DefaultExecutionQueueConfig(),
 		Notifications:         DefaultNotificationsConfig(),
+		Skills:                DefaultSkillsConfig(),
 	}
 }
 
@@ -103,6 +105,10 @@ func Load() (Config, error) {
 				ChatID   *string `json:"chat-id"`
 			} `json:"telegram"`
 		} `json:"notifications"`
+		Skills *struct {
+			Implement  *string  `json:"implement"`
+			CodeReview []string `json:"code-review"`
+		} `json:"skills"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return cfg, fmt.Errorf("parse config %s: %w", path, err)
@@ -147,6 +153,14 @@ func Load() (Config, error) {
 		}
 		if raw.Notifications.Telegram.ChatID != nil {
 			cfg.Notifications.Telegram.ChatID = *raw.Notifications.Telegram.ChatID
+		}
+	}
+	if raw.Skills != nil {
+		if raw.Skills.Implement != nil {
+			cfg.Skills.Implement = *raw.Skills.Implement
+		}
+		if raw.Skills.CodeReview != nil {
+			cfg.Skills.CodeReview = raw.Skills.CodeReview
 		}
 	}
 

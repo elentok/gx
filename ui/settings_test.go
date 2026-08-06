@@ -28,3 +28,17 @@ func TestExecutionQueueConcurrencyUsesConfiguredValues(t *testing.T) {
 		t.Fatalf("MaxConcurrentEpics() = %d, want 4", got)
 	}
 }
+
+func TestImplementSkillDefaults(t *testing.T) {
+	settings := Settings{}
+	if got := settings.ImplementSkill(); got != "gx-implement" {
+		t.Fatalf("ImplementSkill() = %q, want gx-implement", got)
+	}
+}
+
+func TestImplementSkillUsesConfiguredValue(t *testing.T) {
+	settings := Settings{Skills: config.SkillsConfig{Implement: "custom-implement"}}
+	if got := settings.ImplementSkill(); got != "custom-implement" {
+		t.Fatalf("ImplementSkill() = %q, want custom-implement", got)
+	}
+}

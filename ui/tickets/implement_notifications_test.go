@@ -34,7 +34,7 @@ func startAndCaptureSink(t *testing.T, telegram config.TelegramConfig) ralphloop
 		ralphLoopRegistry = previousRegistry
 	})
 
-	cmd := cmdStartImplement(root, "alpha", ralphloop.AgentClaude, 0, 1, 1, nil, telegram)
+	cmd := cmdStartImplement(root, "alpha", ralphloop.AgentClaude, 0, 1, 1, nil, telegram, "gx-implement")
 	if msg, ok := cmd().(implementFailedMsg); ok {
 		t.Fatalf("cmdStartImplement failed: %v", msg.err)
 	}

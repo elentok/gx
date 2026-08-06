@@ -16,6 +16,7 @@ type Settings struct {
 	LogConfig        config.LogConfig
 	ExecutionQueue   config.ExecutionQueueConfig
 	Notifications    config.NotificationsConfig
+	Skills           config.SkillsConfig
 }
 
 // MaxConcurrentTicketsPerEpic returns the configured per-epic ticket limit.
@@ -32,4 +33,12 @@ func (s Settings) MaxConcurrentEpics() int {
 		return config.DefaultExecutionQueueConfig().MaxConcurrentEpics
 	}
 	return s.ExecutionQueue.MaxConcurrentEpics
+}
+
+// ImplementSkill returns the configured ticket-implementation skill.
+func (s Settings) ImplementSkill() string {
+	if s.Skills.Implement == "" {
+		return config.DefaultSkillsConfig().Implement
+	}
+	return s.Skills.Implement
 }

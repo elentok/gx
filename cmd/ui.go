@@ -305,6 +305,7 @@ func settingsFromConfig(cfg config.Config) ui.Settings {
 		LogConfig:        cfg.Log,
 		ExecutionQueue:   cfg.ExecutionQueue,
 		Notifications:    cfg.Notifications,
+		Skills:           cfg.Skills,
 	}
 }
 

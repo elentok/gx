@@ -55,7 +55,7 @@ func TestBuildImplementRunOptionsUsesSelectedAgent(t *testing.T) {
 
 func TestBuildImplementRunOptionsUsesConfiguredTicketConcurrency(t *testing.T) {
 	root := testutil.TempRepo(t)
-	opts, err := buildImplementRunOptionsForTickets(root, "my-epic", ralphloop.AgentCodex, 5, nil)
+	opts, err := buildImplementRunOptionsForTickets(root, "my-epic", ralphloop.AgentCodex, 5, nil, "gx-implement")
 	if err != nil {
 		t.Fatal(err)
 	}
