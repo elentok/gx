@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/elentok/gx/config"
 )
 
 // queueItemStatus is a checked ticket's queue-run status (ticket 11),
@@ -24,22 +26,10 @@ const (
 	queueStatusErrored queueItemStatus = "errored"
 )
 
-// defaultUserConfigDir hardcodes ~/.config as gx's config base directory on
-// every platform, deliberately bypassing os.UserConfigDir's per-OS/XDG
-// resolution (e.g. ~/Library/Application Support on macOS, or
-// $XDG_CONFIG_HOME when set).
-func defaultUserConfigDir() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".config"), nil
-}
-
 // queueStateDirFn resolves the same base directory config.FilePath uses,
 // overridden in tests (see TestMain) so the package's test suite never
 // touches the real machine's config dir.
-var queueStateDirFn = defaultUserConfigDir
+var queueStateDirFn = config.UserConfigDir
 
 // queueStateFilePath returns the on-disk path for the persisted queue state,
 // mirroring config.FilePath's ~/.config/gx/ layout.

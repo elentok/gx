@@ -9,6 +9,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/notifylog"
 )
@@ -24,11 +25,11 @@ func (m Model) export() (Model, tea.Cmd, Result) {
 }
 
 func writeExport(entries []notifylog.Entry, repoName, worktreeName string) (string, error) {
-	home, err := os.UserHomeDir()
+	base, err := config.UserCacheDir()
 	if err != nil {
 		return "", err
 	}
-	cacheDir := filepath.Join(home, ".cache", "gx")
+	cacheDir := filepath.Join(base, "gx")
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		return "", err
 	}

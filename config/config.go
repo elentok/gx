@@ -7,11 +7,12 @@ import (
 	"path/filepath"
 )
 
-// defaultUserConfigDir hardcodes ~/.config as gx's config base directory on
-// every platform, deliberately bypassing os.UserConfigDir's per-OS/XDG
-// resolution (e.g. ~/Library/Application Support on macOS, or
-// $XDG_CONFIG_HOME when set).
-func defaultUserConfigDir() (string, error) {
+// UserConfigDir hardcodes ~/.config as gx's config base directory on every
+// platform, deliberately bypassing os.UserConfigDir's per-OS/XDG resolution
+// (e.g. ~/Library/Application Support on macOS, or $XDG_CONFIG_HOME when
+// set). It's the single source of truth other gx packages call into for
+// this decision.
+func UserConfigDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
@@ -19,7 +20,18 @@ func defaultUserConfigDir() (string, error) {
 	return filepath.Join(home, ".config"), nil
 }
 
-var userConfigDirFn = defaultUserConfigDir
+// UserCacheDir hardcodes ~/.cache as gx's cache base directory on every
+// platform, mirroring UserConfigDir's deliberate bypass of per-OS/XDG
+// resolution.
+func UserCacheDir() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".cache"), nil
+}
+
+var userConfigDirFn = UserConfigDir
 
 const SchemaURL = "https://raw.githubusercontent.com/elentok/gx/main/docs/config-schema.json"
 
