@@ -1,6 +1,8 @@
 package git
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -81,10 +83,58 @@ func MoveWorktree(repo Repo, from, to string) error {
 // starting at fromRef (branch name, tag, or commit hash). fromRef may be empty,
 // in which case git uses the current HEAD of the repo.
 func AddWorktree(repo Repo, newName, newPath, fromRef string) error {
+	if err := excludeWorktreeDir(repo); err != nil {
+		return err
+	}
 	args := []string{"worktree", "add", "-b", newName, newPath}
 	if fromRef != "" {
 		args = append(args, fromRef)
 	}
 	_, _, err := run(repo.Root, args)
+	return err
+}
+
+// excludeWorktreeDir makes sure the linked-worktree directory doesn't show up
+// as untracked clutter in `git status` for the primary checkout, by appending
+// an entry to .git/info/exclude (local-only, unlike .gitignore, so it isn't
+// forced on the user via a committed file). It's a no-op for bare repos,
+// where linked worktrees live outside Root and need no exclusion, and for
+// repos whose WorktreeDir isn't under Root at all.
+func excludeWorktreeDir(repo Repo) error {
+	if repo.IsBare {
+		return nil
+	}
+	wtDir := repo.LinkedWorktreeDir()
+	rel, err := filepath.Rel(repo.Root, wtDir)
+	if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+		return nil
+	}
+	entry := filepath.ToSlash(rel) + "/"
+
+	excludePath := filepath.Join(repo.Root, ".git", "info", "exclude")
+	data, err := os.ReadFile(excludePath)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	for line := range strings.SplitSeq(string(data), "\n") {
+		if strings.TrimSpace(line) == entry {
+			return nil
+		}
+	}
+
+	if err := os.MkdirAll(filepath.Dir(excludePath), 0755); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(excludePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	prefix := ""
+	if len(data) > 0 && !strings.HasSuffix(string(data), "\n") {
+		prefix = "\n"
+	}
+	_, err = f.WriteString(prefix + entry + "\n")
 	return err
 }

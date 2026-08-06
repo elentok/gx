@@ -88,9 +88,12 @@ func identifyWorktree(dir, gitDir string) (*DirInfo, error) {
 	gitDirName := filepath.Base(gitDir)
 
 	if gitDirName == ".git" {
-		// Regular (non-bare) repository
+		// Regular (non-bare) repository. Linked worktrees live under
+		// <Root>/.worktrees/ instead of directly under Root, so they don't
+		// clutter the primary checkout's own file listing.
+		worktreeDir := filepath.Join(topLevel, ".worktrees")
 		return &DirInfo{
-			Repo:           Repo{Root: topLevel, IsBare: false, MainBranch: detectMainBranch(topLevel)},
+			Repo:           Repo{Root: topLevel, WorktreeDir: worktreeDir, IsBare: false, MainBranch: detectMainBranch(topLevel)},
 			IsRepoRoot:     topLevel == dir,
 			IsWorktreeRoot: topLevel == dir,
 		}, nil

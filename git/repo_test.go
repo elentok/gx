@@ -22,6 +22,9 @@ func TestFindRepo_standardRepo(t *testing.T) {
 	if repo.IsBare {
 		t.Error("IsBare = true, want false")
 	}
+	if want := filepath.Join(dir, ".worktrees"); repo.LinkedWorktreeDir() != want {
+		t.Errorf("LinkedWorktreeDir = %q, want %q", repo.LinkedWorktreeDir(), want)
+	}
 }
 
 func TestFindRepo_standardRepo_subdir(t *testing.T) {

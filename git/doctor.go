@@ -42,7 +42,44 @@ func CheckRepo(repo Repo) ([]Issue, error) {
 		issues = append(issues, dotBareIssues...)
 	}
 
+	// Check 4: standard (non-bare) clones exclude .worktrees/ from git status
+	if !repo.IsBare {
+		if issue := checkWorktreesExclude(repo); issue != nil {
+			issues = append(issues, *issue)
+		}
+	}
+
 	return issues, nil
+}
+
+// checkWorktreesExclude reports whether the linked-worktree directory for a
+// standard clone is listed in .git/info/exclude, mirroring the .bare-trick
+// checks above. It only fires once .worktrees/ actually exists - an unused
+// repo that never created a worktree has nothing to hide from git status.
+func checkWorktreesExclude(repo Repo) *Issue {
+	wtDir := repo.LinkedWorktreeDir()
+	rel, err := filepath.Rel(repo.Root, wtDir)
+	if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+		return nil
+	}
+	if _, err := os.Stat(wtDir); os.IsNotExist(err) {
+		return nil
+	}
+	entry := filepath.ToSlash(rel) + "/"
+
+	excludePath := filepath.Join(repo.Root, ".git", "info", "exclude")
+	data, _ := os.ReadFile(excludePath)
+	for line := range strings.SplitSeq(string(data), "\n") {
+		if strings.TrimSpace(line) == entry {
+			return nil
+		}
+	}
+
+	return &Issue{
+		Description:    fmt.Sprintf("%s is not excluded from git status (missing %q in %s)", wtDir, entry, excludePath),
+		FixDescription: fmt.Sprintf("Add %q to %s", entry, excludePath),
+		fixFn:          func() error { return excludeWorktreeDir(repo) },
+	}
 }
 
 func checkDotBare(repo Repo) ([]Issue, error) {

@@ -1,10 +1,14 @@
 package git_test
 
 import (
+	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/testutil"
 )
 
 func TestListWorktrees_empty(t *testing.T) {
@@ -100,6 +104,53 @@ func TestAddWorktree(t *testing.T) {
 	}
 	if wts[0].Branch != "feature" {
 		t.Errorf("Branch = %q, want %q", wts[0].Branch, "feature")
+	}
+}
+
+func TestAddWorktree_standardRepo_underDotWorktrees(t *testing.T) {
+	t.Parallel()
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	newPath := filepath.Join(repo.LinkedWorktreeDir(), "feature")
+	if err := git.AddWorktree(*repo, "feature", newPath, "main"); err != nil {
+		t.Fatalf("AddWorktree: %v", err)
+	}
+
+	wantPath := filepath.Join(repoDir, ".worktrees", "feature")
+	if newPath != wantPath {
+		t.Fatalf("newPath = %q, want %q", newPath, wantPath)
+	}
+	if _, err := os.Stat(newPath); err != nil {
+		t.Errorf("worktree not created at %q: %v", newPath, err)
+	}
+
+	excludePath := filepath.Join(repoDir, ".git", "info", "exclude")
+	data, err := os.ReadFile(excludePath)
+	if err != nil {
+		t.Fatalf("reading %s: %v", excludePath, err)
+	}
+	found := false
+	for line := range strings.SplitSeq(string(data), "\n") {
+		if strings.TrimSpace(line) == ".worktrees/" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("%s does not contain %q, got: %q", excludePath, ".worktrees/", string(data))
+	}
+
+	cmd := exec.Command("git", "status", "--porcelain")
+	cmd.Dir = repoDir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("git status: %v", err)
+	}
+	if strings.Contains(string(out), ".worktrees") {
+		t.Errorf("git status shows .worktrees as untracked: %q", string(out))
 	}
 }
 

@@ -201,6 +201,86 @@ func TestCheckRepo_NoIssuesForRegularBareRepo(t *testing.T) {
 	}
 }
 
+func TestCheckRepo_NoIssuesForStandardRepoWithoutWorktrees(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(dir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	issues, err := git.CheckRepo(*repo)
+	if err != nil {
+		t.Fatalf("CheckRepo: %v", err)
+	}
+	for _, iss := range issues {
+		if strings.Contains(iss.Description, ".worktrees") {
+			t.Errorf("unexpected .worktrees issue for repo with no worktrees: %s", iss.Description)
+		}
+	}
+}
+
+func TestCheckRepo_NoIssuesForStandardRepoWithWorktree(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(dir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	newPath := filepath.Join(repo.LinkedWorktreeDir(), "feature")
+	if err := git.AddWorktree(*repo, "feature", newPath, repo.MainBranch); err != nil {
+		t.Fatalf("AddWorktree: %v", err)
+	}
+
+	issues, err := git.CheckRepo(*repo)
+	if err != nil {
+		t.Fatalf("CheckRepo: %v", err)
+	}
+	if len(issues) != 0 {
+		t.Fatalf("expected no issues, got %d: %v", len(issues), issues)
+	}
+}
+
+func TestCheckRepo_DetectsAndFixesMissingWorktreesExclude(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(dir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	newPath := filepath.Join(repo.LinkedWorktreeDir(), "feature")
+	if err := git.AddWorktree(*repo, "feature", newPath, repo.MainBranch); err != nil {
+		t.Fatalf("AddWorktree: %v", err)
+	}
+
+	excludePath := filepath.Join(dir, ".git", "info", "exclude")
+	if err := os.WriteFile(excludePath, []byte(""), 0644); err != nil {
+		t.Fatalf("clearing exclude file: %v", err)
+	}
+
+	issues, err := git.CheckRepo(*repo)
+	if err != nil {
+		t.Fatalf("CheckRepo: %v", err)
+	}
+	issue := findIssueAbout(t, issues, ".worktrees")
+	if !issue.CanFix() {
+		t.Fatal("expected CanFix=true for missing exclude entry")
+	}
+	if err := issue.Fix(); err != nil {
+		t.Fatalf("Fix: %v", err)
+	}
+
+	data, err := os.ReadFile(excludePath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(data), ".worktrees/") {
+		t.Errorf("exclude file = %q, want it to contain %q", string(data), ".worktrees/")
+	}
+}
+
 func TestCanFix(t *testing.T) {
 	t.Parallel()
 	outerDir, repo := setupDotBareRepo(t)

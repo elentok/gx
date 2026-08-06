@@ -85,6 +85,9 @@ func inferCloneDirFromURL(repoURL string) string {
 // an existing local branch, then falls back to creating a tracking branch from
 // remoteBranch (for freshly cloned bare repositories).
 func AddWorktreeFromRemote(repo Repo, worktreePath, branch, remoteBranch string) error {
+	if err := excludeWorktreeDir(repo); err != nil {
+		return err
+	}
 	if _, _, err := run(repo.Root, []string{"worktree", "add", worktreePath, branch}); err == nil {
 		return nil
 	}
