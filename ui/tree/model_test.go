@@ -1,0 +1,370 @@
+package tree
+
+import (
+	"image/color"
+	"strings"
+	"testing"
+
+	"github.com/charmbracelet/x/ansi"
+	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/search"
+
+	tea "charm.land/bubbletea/v2"
+)
+
+func TestModelUpdate_NavigationAndOpen(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{
+		{ID: "parent", HasChildren: true, Expanded: true},
+		{ID: "a", ParentID: "parent", Depth: 1, Value: 1},
+		{ID: "b", ParentID: "parent", Depth: 1, Value: 2},
+	})
+
+	next, _, result := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	if !result.Handled {
+		t.Fatal("expected j to be handled")
+	}
+	if next.SelectedIndex() != 1 {
+		t.Fatalf("selected=%d want=1", next.SelectedIndex())
+	}
+
+	next, _, result = next.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
+	if !result.Handled {
+		t.Fatal("expected k to be handled")
+	}
+	if next.SelectedIndex() != 0 {
+		t.Fatalf("selected=%d want=0", next.SelectedIndex())
+	}
+
+	next.SetSelectedIndex(1)
+	next, _, result = next.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+	if !result.Handled {
+		t.Fatal("expected l to be handled")
+	}
+	if !result.OpenSelected {
+		t.Fatal("expected OpenSelected result on childless node")
+	}
+}
+
+func TestModelUpdate_ExpandCollapse(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{
+		{ID: "parent", HasChildren: true, Expanded: true},
+		{ID: "a", ParentID: "parent", Depth: 1, Value: 1},
+	})
+
+	next, _, result := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
+	if !result.Handled {
+		t.Fatal("expected h to be handled")
+	}
+	if !result.RebuildRequested {
+		t.Fatal("expected RebuildRequested result for collapse")
+	}
+	if !next.CollapsedIDs()["parent"] {
+		t.Fatal("expected parent to be collapsed")
+	}
+
+	next.SetEntries([]Entry[int]{
+		{ID: "parent", HasChildren: true, Expanded: false},
+	})
+	next, _, result = next.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if !result.Handled {
+		t.Fatal("expected enter to be handled")
+	}
+	if !result.RebuildRequested {
+		t.Fatal("expected RebuildRequested result for enter toggle")
+	}
+	if next.CollapsedIDs()["parent"] {
+		t.Fatal("expected parent to be expanded")
+	}
+}
+
+func TestModelUpdate_LeftOnLeafMovesToParent(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{
+		{ID: "parent", HasChildren: true, Expanded: true, Depth: 0},
+		{ID: "a", ParentID: "parent", Value: 1, Depth: 1},
+	})
+	m.SetSelectedIndex(1)
+
+	next, _, result := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
+	if !result.Handled {
+		t.Fatal("expected h to be handled")
+	}
+	if next.SelectedIndex() != 0 {
+		t.Fatalf("selected=%d want=0", next.SelectedIndex())
+	}
+}
+
+func TestModelUpdate_RightOnExpandedNodeMovesToFirstChild(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{
+		{ID: "parent", HasChildren: true, Expanded: true, Depth: 0},
+		{ID: "nested", ParentID: "parent", HasChildren: true, Expanded: true, Depth: 1},
+		{ID: "a", ParentID: "parent", Value: 1, Depth: 1},
+	})
+	m.SetSelectedIndex(0)
+
+	next, _, result := m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+	if !result.Handled {
+		t.Fatal("expected l to be handled")
+	}
+	if !result.SelectionChanged {
+		t.Fatal("expected selection change")
+	}
+	if next.SelectedIndex() != 1 {
+		t.Fatalf("selected=%d want=1", next.SelectedIndex())
+	}
+}
+
+func TestModelUpdate_LeftOnNestedExpandedNodeCollapsesBeforeParent(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{
+		{ID: "top", HasChildren: true, Expanded: true},
+		{ID: "nested", ParentID: "top", HasChildren: true, Expanded: true, Depth: 1},
+		{ID: "a", ParentID: "nested", Value: 1, Depth: 2},
+	})
+	m.SetSelectedIndex(1) // nested
+
+	next, _, result := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
+	if !result.Handled {
+		t.Fatal("expected h to be handled")
+	}
+	if !result.RebuildRequested {
+		t.Fatal("expected rebuild request (collapse) before parent focus")
+	}
+	if next.SelectedIndex() != 1 {
+		t.Fatalf("expected selection to stay on nested node for collapse, got %d", next.SelectedIndex())
+	}
+	if !next.CollapsedIDs()["nested"] {
+		t.Fatal("expected nested node to be marked collapsed")
+	}
+}
+
+func TestModelAccessors(t *testing.T) {
+	m := NewModel[int]()
+	entries := []Entry[int]{
+		{ID: "parent", HasChildren: true, Expanded: true},
+		{ID: "a", ParentID: "parent", Value: 1},
+	}
+	m.SetEntries(entries)
+
+	if m.Init() != nil {
+		t.Error("Init() should return nil")
+	}
+	if len(m.Entries()) != 2 {
+		t.Errorf("Entries() len=%d want 2", len(m.Entries()))
+	}
+	if m.ScrollOffset() != 0 {
+		t.Errorf("ScrollOffset()=%d want 0", m.ScrollOffset())
+	}
+	m.SetVisibleHeight(10)
+	m.ScrollViewport(1)
+	m.ScrollPage(1)
+
+	m.SetCollapsedIDs(map[string]bool{"parent": true})
+	if !m.CollapsedIDs()["parent"] {
+		t.Error("expected collapsed id after SetCollapsedIDs")
+	}
+	if m.Keys() == nil {
+		t.Error("Keys() should not be nil")
+	}
+}
+
+func TestModelNodeOperations(t *testing.T) {
+	entries := []Entry[int]{
+		{ID: "top", HasChildren: true, Expanded: true, Depth: 0},
+		{ID: "a", ParentID: "top", Value: 1, Depth: 1},
+	}
+
+	t.Run("CollapseSelected", func(t *testing.T) {
+		m := NewModel[int]()
+		m.SetEntries(entries)
+		m.SetSelectedIndex(0)
+		if !m.CollapseSelected() {
+			t.Error("expected CollapseSelected=true on expanded node")
+		}
+	})
+
+	t.Run("ExpandSelected", func(t *testing.T) {
+		m := NewModel[int]()
+		m.SetEntries([]Entry[int]{
+			{ID: "top", HasChildren: true, Expanded: false, Depth: 0},
+		})
+		m.SetCollapsedIDs(map[string]bool{"top": true})
+		m.SetSelectedIndex(0)
+		if !m.ExpandSelected() {
+			t.Error("expected ExpandSelected=true on collapsed node")
+		}
+	})
+
+	t.Run("ToggleSelected_collapsed", func(t *testing.T) {
+		m := NewModel[int]()
+		m.SetEntries(entries)
+		m.SetSelectedIndex(0)
+		if !m.ToggleSelected() {
+			t.Error("expected ToggleSelected=true on expanded node")
+		}
+	})
+
+	t.Run("FocusParent", func(t *testing.T) {
+		m := NewModel[int]()
+		m.SetEntries(entries)
+		m.SetSelectedIndex(1)
+		if !m.FocusParent() {
+			t.Error("expected FocusParent=true when on child")
+		}
+		if m.SelectedIndex() != 0 {
+			t.Errorf("expected selection at parent (0), got %d", m.SelectedIndex())
+		}
+	})
+
+	t.Run("FocusParent_at_root", func(t *testing.T) {
+		m := NewModel[int]()
+		m.SetEntries(entries)
+		m.SetSelectedIndex(0)
+		if m.FocusParent() {
+			t.Error("expected FocusParent=false when already at root")
+		}
+	})
+}
+
+func TestModelUpdate_SearchStartAndQueryMsg(t *testing.T) {
+	m := NewModel[int]()
+
+	next, _, result := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	if !result.Handled {
+		t.Fatal("expected / to be handled")
+	}
+	if next.Search().Mode() != search.SearchModeInput {
+		t.Fatalf("mode=%v want input", next.Search().Mode())
+	}
+
+	next, cmd, result := next.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	if !result.Handled {
+		t.Fatal("expected a to be handled in search input")
+	}
+	if cmd == nil {
+		t.Fatal("expected search query updated cmd")
+	}
+
+	msg := cmd()
+	batch, ok := msg.(tea.BatchMsg)
+	if !ok {
+		t.Fatalf("unexpected cmd msg type %T", msg)
+	}
+
+	found := false
+	for _, batchCmd := range batch {
+		if queryMsg, ok := batchCmd().(search.SearchQueryUpdatedMsg); ok {
+			if queryMsg.Query != "a" {
+				t.Fatalf("query=%q want=a", queryMsg.Query)
+			}
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected SearchQueryUpdatedMsg in batch")
+	}
+}
+
+func TestModelSearchHelpers(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{{ID: "alpha"}, {ID: "beta"}})
+
+	label := func(entry Entry[int]) string { return entry.ID }
+	m.ApplyPassiveSearch("beta", label)
+	if m.Search().Query() != "beta" {
+		t.Fatalf("query=%q want beta", m.Search().Query())
+	}
+	if m.Search().MatchesCount() != 1 {
+		t.Fatalf("matches=%d want 1", m.Search().MatchesCount())
+	}
+	if !m.FocusCurrentSearchMatch() {
+		t.Fatal("expected current search match to move selection")
+	}
+	if m.SelectedIndex() != 1 {
+		t.Fatalf("selected=%d want 1", m.SelectedIndex())
+	}
+	matched, current := m.SearchMatch(1)
+	if !matched || !current {
+		t.Fatalf("SearchMatch(1) = (%v, %v), want (true, true)", matched, current)
+	}
+	matched, current = m.SearchMatch(0)
+	if matched || current {
+		t.Fatalf("SearchMatch(0) = (%v, %v), want (false, false)", matched, current)
+	}
+}
+
+func TestRenderLines_VisibleRangeOffset(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{{ID: "a"}, {ID: "b"}, {ID: "c"}})
+	m.SetVisibleHeight(1)
+	m.ScrollViewport(1)
+
+	lines := m.RenderLines(3, RenderOpts[int]{EmptyLine: "(empty)", AccentColor: color.White, Label: func(e Entry[int]) string { return e.ID }})
+	if len(lines) != 1 {
+		t.Fatalf("expected 1 visible line, got %d", len(lines))
+	}
+	if got := ansi.Strip(lines[0]); !strings.Contains(got, "b") {
+		t.Fatalf("visible line = %q, want visible entry containing %q", got, "b")
+	}
+}
+
+func TestRenderLines_EmptyUsesEmptyLine(t *testing.T) {
+	m := NewModel[int]()
+	lines := m.RenderLines(4, RenderOpts[int]{EmptyLine: "(empty)", AccentColor: color.White})
+	if len(lines) != 2 {
+		t.Fatalf("expected body height 2, got %d", len(lines))
+	}
+	if got := ansi.Strip(lines[0]); got != "(empty)  " {
+		t.Fatalf("lines[0] = %q, want %q", got, "(empty)  ")
+	}
+}
+
+func TestRenderLines_SelectedRowActiveHighlight(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{{ID: "selected"}})
+	lines := m.RenderLines(3, RenderOpts[int]{AccentColor: ui.ColorBlue, Active: true, Label: func(e Entry[int]) string { return e.ID }})
+	if len(lines) == 0 || lines[0] == ansi.Strip(lines[0]) {
+		t.Fatal("expected ANSI styling on selected active row")
+	}
+	if got := ansi.Strip(lines[0]); got != "▌selected  " {
+		t.Fatalf("stripped line = %q, want %q", got, "▌selected  ")
+	}
+}
+
+func TestRenderLines_SearchHighlightsCurrentMatch(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{{ID: "alpha"}})
+	label := func(e Entry[int]) string { return e.ID }
+	m.ApplyPassiveSearch("pha", label)
+	lines := m.RenderLines(3, RenderOpts[int]{AccentColor: color.White, Label: label})
+	if len(lines) == 0 || lines[0] == ansi.Strip(lines[0]) {
+		t.Fatal("expected search highlight styling")
+	}
+}
+
+func TestRequiredWidth_UsesRenderedLines(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{{ID: "wide-name"}})
+	label := func(e Entry[int]) string { return e.ID }
+	width := m.RequiredWidth(3, RenderOpts[int]{AccentColor: color.White, Label: label})
+	if width < len(" wide-name") {
+		t.Fatalf("required width too small: %d", width)
+	}
+}
+
+func TestRenderLines_DepthIndentsRows(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{
+		{ID: "parent", HasChildren: true, Expanded: true, Depth: 0},
+		{ID: "child", ParentID: "parent", Depth: 1},
+	})
+	label := func(e Entry[int]) string { return e.ID }
+	lines := m.RenderLines(4, RenderOpts[int]{AccentColor: color.White, Label: label})
+	if got := ansi.Strip(lines[1]); !strings.HasPrefix(got, "   child") {
+		t.Fatalf("child line = %q, want indented prefix", got)
+	}
+}
