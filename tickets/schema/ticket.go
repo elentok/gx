@@ -120,8 +120,21 @@ type Ticket struct {
 	// checks it before marking a zero-commit ticket needs-info, and startup
 	// reconciliation's classifyDoneTicket skips its landed-commit
 	// verification for a done ticket with this set, the same way it already
-	// does for StatusSuperseded.
+	// does for StatusSuperseded. Prefer IsCommitless over reading this field
+	// directly — grilling/prototype tickets are commitless by type, without
+	// needing the flag set explicitly.
 	Commitless bool
+}
+
+// IsCommitless reports whether t is exempt from landed-commit verification:
+// either explicitly flagged Commitless, or a type that never produces
+// commits in the first place. TypeGrilling tickets record a decision in
+// their own body; TypePrototype tickets explore in a throwaway iteration
+// worktree — neither lands a commit on the feature branch even when
+// finished correctly, so requiring one would misclassify every one of them
+// as a stalled/crashed agent.
+func (t Ticket) IsCommitless() bool {
+	return t.Commitless || t.Type == TypeGrilling || t.Type == TypePrototype
 }
 
 // Validate checks a populated Ticket for well-formedness: a valid id, a

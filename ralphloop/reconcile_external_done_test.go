@@ -134,6 +134,48 @@ func TestReconcile_CommitlessDoneTicket_NotFlaggedUnrecoverable(t *testing.T) {
 	}
 }
 
+// TestReconcile_GrillingAndPrototypeDoneTickets_NotFlaggedUnrecoverable is
+// the type-inferred counterpart to
+// TestReconcile_CommitlessDoneTicket_NotFlaggedUnrecoverable above:
+// grilling/prototype tickets never land a commit on the feature branch even
+// when finished correctly (a grilling ticket records its decision in its own
+// body; a prototype explores in a throwaway iteration worktree), so
+// schema.Ticket.IsCommitless treats them as commitless by type — no
+// per-ticket commitless: true needed.
+func TestReconcile_GrillingAndPrototypeDoneTickets_NotFlaggedUnrecoverable(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-g.md": "---\nid: \"01\"\nstatus: done\ntype: grilling\n---\n# G\n",
+		"02-p.md": "---\nid: \"02\"\nstatus: done\ntype: prototype\n---\n# P\n",
+	})
+	epics, err := tickets.Load(scratchDir)
+	if err != nil {
+		t.Fatalf("tickets.Load: %v", err)
+	}
+
+	d, _, _ := fakeDeps()
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) { return nil, nil }
+	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
+	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
+
+	var out bytes.Buffer
+	if _, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(&out)), epics[0]); err != nil {
+		t.Fatalf("reconcile() error = %v", err)
+	}
+
+	for _, name := range []string{"01-g.md", "02-p.md"} {
+		raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", name))
+		if err != nil {
+			t.Fatalf("ReadFile %s: %v", name, err)
+		}
+		if strings.Contains(string(raw), "status: needs-attention") {
+			t.Errorf("%s flagged needs-attention, want its no-commit verification skipped by type:\n%s", name, raw)
+		}
+		if !strings.Contains(string(raw), "status: done") {
+			t.Errorf("%s status changed unexpectedly:\n%s", name, raw)
+		}
+	}
+}
+
 // TestClassifyDoneTicket_BackfilledCherryPickEvent_RecognizedAsLanded is the
 // recovery path for a ticket flagged needs-attention per the test above,
 // once a human/auditing agent has confirmed its commit really is on the

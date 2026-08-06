@@ -195,7 +195,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 		if err != nil {
 			return fmt.Errorf("reading ticket %s for commitless check: %w", p.Ticket.Path, err)
 		}
-		if current.Commitless && current.Status != schema.StatusClaimed {
+		if current.IsCommitless() && current.Status != schema.StatusClaimed {
 			p.logTicketEvent(eventCommitless, pane, tab, sessionID, path)
 			return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, tab)
 		}

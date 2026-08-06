@@ -23,6 +23,27 @@ func TestValidate_CommitlessIsValidRegardlessOfValue(t *testing.T) {
 	}
 }
 
+func TestIsCommitless(t *testing.T) {
+	tests := []struct {
+		name string
+		tk   Ticket
+		want bool
+	}{
+		{"task, no flag", Ticket{Type: TypeTask}, false},
+		{"task, flagged", Ticket{Type: TypeTask, Commitless: true}, true},
+		{"grilling, no flag", Ticket{Type: TypeGrilling}, true},
+		{"prototype, no flag", Ticket{Type: TypePrototype}, true},
+		{"research, no flag", Ticket{Type: TypeResearch}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.tk.IsCommitless(); got != tt.want {
+				t.Errorf("IsCommitless() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestTicketID_Valid(t *testing.T) {
 	tests := []struct {
 		id   TicketID
