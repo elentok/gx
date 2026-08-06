@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.25.2 - 2026-08-06
+
+- Added a `g n` notification history modal: browse captured shell-notification events, filter with `/`-search, and export the visible entries to `~/.cache/gx/{timestamp}-{repo}-{worktree}.md`.
+- Redesigned the Queue panel header: the title now always encodes run state (not-started/running/paused/completed) with a matching spinner glyph, replacing the old fixed "Queue" label and always-present banner row.
+- Added click-to-focus for the Tickets preview and Log detail panes, so clicking inside either pane focuses it and routes wheel scroll there instead of the sidebar/list.
+- Added edit-file chords (`e e`/`e s`/`e v`/`e t`) to the Queue tab, matching the Tickets tab.
+- Refreshed the ticket status icon set to the FA outline family and replaced the ticket-progress spinner with a shared circle-slice pie-fill glyph.
+- Config, cache, and skill-manifest paths now resolve directly to `~/.config/gx`/`~/.cache/gx` instead of going through `os.UserConfigDir()` (which differs on macOS/XDG), with a one-time migration of existing state and a startup warning if migration fails.
+- Fixed the Queue header staying stuck on "idle" when the queue was globally paused, and extracted a shared run-state classifier.
+- Fixed self-rearming ticks and window-resize updates being dropped while the `g n` notification-history modal was open, which had stalled Queue tab polling and left the modal stale after a resize.
+
 ## v0.25.1 - 2026-08-06
 
 - Fixed `RunScope.Contains` to walk the `SplitFrom` chain, so a mid-run split's descendant tickets are recognized in scope without a fresh ralph-loop invocation.
