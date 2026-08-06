@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
@@ -471,17 +470,6 @@ func (m *QueueModel) finalizeEpicTicketStatus(epicName string) {
 // (ticket 16).
 const bindingQueueToggleHideDone keys.BindingID = "toggle-hide-done"
 
-// e-prefix chords: edit the selected ticket's underlying file, mirroring the
-// Tickets tab's own edit-file chord (model_keys.go) via the shared
-// editTicketFile helper (model_runtime.go).
-const (
-	bindingQueueEditInPlace keys.BindingID = "edit"
-	bindingQueueEditHSplit  keys.BindingID = "edit-hsplit"
-	bindingQueueEditVSplit  keys.BindingID = "edit-vsplit"
-	bindingQueueEditTab     keys.BindingID = "edit-tab"
-	bindingQueueCancelChord keys.BindingID = "cancel-chord"
-)
-
 func newQueueKeysManager() keys.Manager {
 	return keys.New([]keys.Binding{
 		{ID: bindingQueueToggleHideDone, Seq: []string{"t", "c"}, Categories: []string{"Navigation"}, Title: "hide completed"},
@@ -680,21 +668,6 @@ func (m *QueueModel) startAvailableEpics() tea.Cmd {
 	}
 }
 
-// cmdEditSelectedFile opens the selected row's ticket file for editing,
-// mirroring the Tickets tab's Model.cmdEditSelectedFile — the Queue tab only
-// ever selects tickets (no epic rows), so there's no map.md case to handle.
-func (m QueueModel) cmdEditSelectedFile(splitType terminalrun.SplitType) tea.Cmd {
-	rows := m.rows()
-	if m.selected < 0 || m.selected >= len(rows) {
-		return notify.Warning("nothing selected")
-	}
-	return editTicketFile(m.worktreeRoot, m.settings, rows[m.selected].ticket.Path, splitType)
-}
-
-func (m QueueModel) handleEditFileFinished(msg editFileFinishedMsg) (QueueModel, tea.Cmd) {
-	return m, editFileFinishedCmd(msg)
-}
-
 func (m *QueueModel) moveSelection(delta int) {
 	rows := m.rows()
 	if len(rows) == 0 {
@@ -820,99 +793,6 @@ func (m QueueModel) queueVisibleLines(viewportH int) []string {
 	start := min(m.scrollOffset, len(lines))
 	end := min(start+viewportH, len(lines))
 	return lines[start:end]
-}
-
-// queueRunStateKind classifies the queue's run state for header rendering.
-// queueHeaderTitle and queueHeaderBodyLines both switch on the same
-// queueRunState() call so they can't independently re-derive (and silently
-// diverge on) what state the queue is in.
-type queueRunStateKind int
-
-const (
-	queueRunIdle queueRunStateKind = iota
-	queueRunRunning
-	queueRunPaused
-	queueRunCompleted
-)
-
-// queueRunState classifies the queue's current run state. Paused only wins
-// over idle once a run has actually captured a ticket scope
-// (m.checkedProgress total > 0) — m.paused alone can be set by the bare `p`
-// key with no run-state guard, so a queue that was never started must still
-// classify as idle even while globally paused.
-func (m QueueModel) queueRunState() queueRunStateKind {
-	if !m.executionCompletedAt.IsZero() {
-		done, total := m.completedExecutionProgress()
-		if total > 0 && done == total {
-			return queueRunCompleted
-		}
-	}
-	if m.paused {
-		if _, total := m.checkedProgress(); total > 0 {
-			return queueRunPaused
-		}
-	}
-	if len(m.runningEpics) > 0 {
-		return queueRunRunning
-	}
-	return queueRunIdle
-}
-
-// queueHeaderTitle and queueHeaderBodyLines together implement the Option B
-// header redesign (see .scratch/tickets-queue-batch3/issues/assets/08-header-prototype.md):
-// the title always encodes run state, and the body carries at most one
-// state-specific line instead of the old always-present banner row.
-func (m QueueModel) queueHeaderTitle() string {
-	switch m.queueRunState() {
-	case queueRunCompleted:
-		elapsed := int(m.executionCompletedAt.Sub(m.executionStartedAt).Seconds())
-		return fmt.Sprintf("Queue · done, took %s", formatElapsed(elapsed))
-	case queueRunPaused:
-		done, total := m.checkedProgress()
-		return fmt.Sprintf("Queue · paused (%d of %d done)", done, total)
-	case queueRunRunning:
-		done, total := m.checkedProgress()
-		glyph := strings.TrimRight(m.implementSpinner.View(), " ")
-		return fmt.Sprintf("Queue · %d of %d done · %s implementing...", done, total, glyph)
-	default:
-		return "Queue"
-	}
-}
-
-func (m QueueModel) queueHeaderBodyLines() []string {
-	switch m.queueRunState() {
-	case queueRunCompleted:
-		total, average, maximum := m.completedContextMetrics()
-		return []string{fmt.Sprintf(
-			"context windows: total %s, avg %s, max %s",
-			formatTokenCount(total), formatTokenCount(average), formatTokenCount(maximum),
-		)}
-	case queueRunPaused:
-		if len(m.runningEpics) > 0 {
-			return []string{"Queue paused — in-flight iterations will finish"}
-		}
-		return nil
-	default:
-		return nil
-	}
-}
-
-func (m QueueModel) completedContextMetrics() (total, average, maximum int) {
-	count := 0
-	for _, epic := range m.epics {
-		for _, ticket := range epic.Tickets {
-			if !m.executionTickets[epic.Name+"/"+ticket.Identifier] {
-				continue
-			}
-			count++
-			total += ticket.ActualContextWindow
-			maximum = max(maximum, ticket.ActualContextWindow)
-		}
-	}
-	if count > 0 {
-		average = total / count
-	}
-	return total, average, maximum
 }
 
 func (m QueueModel) completedExecutionProgress() (done, total int) {
