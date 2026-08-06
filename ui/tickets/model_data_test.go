@@ -6,6 +6,33 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
+// TestDefaultCollapsedEpics_HonorsExplicitFalseOverAllDoneDefault covers the
+// seam that caused a manually-expanded done epic to snap shut on the next
+// auto-refresh poll: an explicit `false` in existing (user expanded it) must
+// win over the AllDone-implies-collapsed default, not just fall through as
+// if the epic had never been seen.
+func TestDefaultCollapsedEpics_HonorsExplicitFalseOverAllDoneDefault(t *testing.T) {
+	epics := []tickets.Epic{
+		{Path: "done-epic", Tickets: []tickets.Ticket{{Number: 1, Status: "done"}}},
+	}
+	existing := map[string]bool{"done-epic": false}
+
+	got := defaultCollapsedEpics(epics, existing)
+
+	if got["done-epic"] {
+		t.Fatalf("expected explicitly-expanded done epic to stay expanded, got collapsed=%v", got["done-epic"])
+	}
+
+	// The result must carry the explicit-false entry forward, not just honor
+	// it once: feeding got back in as the next reload's existing map (as
+	// model.go's epicsLoadedMsg handler does every auto-refresh tick) must
+	// still keep the epic expanded, not silently drop back to "unseen".
+	again := defaultCollapsedEpics(epics, got)
+	if again["done-epic"] {
+		t.Fatalf("expected explicit-expand to survive a second reload, got collapsed=%v", again["done-epic"])
+	}
+}
+
 // TestSortedTicketIndexes_PlanOrderIgnoresStatus mirrors
 // TestSortedTickets_PlanOrderIgnoresStatus (flat_test.go) for the sidebar's
 // own sort function: it orders purely by ticket number, not rendered-status

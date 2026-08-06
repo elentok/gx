@@ -252,9 +252,10 @@ func defaultCollapsedEpics(epics []tickets.Epic, existing map[string]bool) map[s
 	collapsed := make(map[string]bool, len(epics))
 	for _, epic := range epics {
 		if v, ok := existing[epic.Path]; ok {
-			if v {
-				collapsed[epic.Path] = true
-			}
+			// Preserve the entry itself, not just its value, so an explicit
+			// false (manually expanded) survives into the next reload's
+			// existing map instead of vanishing back to "unseen".
+			collapsed[epic.Path] = v
 			continue
 		}
 		if epic.AllDone() {

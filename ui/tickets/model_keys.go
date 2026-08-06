@@ -250,11 +250,10 @@ func (m *Model) setCollapsed(epicIdx int, collapsed bool) {
 	if m.collapsedEpics == nil {
 		m.collapsedEpics = map[string]bool{}
 	}
-	if collapsed {
-		m.collapsedEpics[path] = true
-	} else {
-		delete(m.collapsedEpics, path)
-	}
+	// An explicit false is stored (not deleted) so defaultCollapsedEpics can
+	// tell "user expanded this" apart from "never toggled" on the next
+	// auto-refresh reload — both would otherwise read as "key absent".
+	m.collapsedEpics[path] = collapsed
 	// Collapsing/expanding reshuffles visibleRows(), which search matches
 	// index into by position — recompute so they stay aligned.
 	if m.search.HasQuery() {
