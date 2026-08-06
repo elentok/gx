@@ -508,6 +508,44 @@ func TestConfirmCompactSubmitted(t *testing.T) {
 	})
 }
 
+// TestConfirmCompactSubmittedWithRetry_PacesWithSleep verifies the retry loop
+// paces itself via d.Sleep, not AgentWait: a sequence of not-yet-submitted
+// AgentRead results should drive exactly one Sleep call per retry, each of
+// smartZoneCompactSubmitPollMs, with no AgentWait call at all.
+func TestConfirmCompactSubmittedWithRetry_PacesWithSleep(t *testing.T) {
+	var reads int
+	var sleeps []time.Duration
+	d := Deps{
+		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+			reads++
+			if reads <= 3 {
+				return "/compact", nil
+			}
+			return "/compact\nCompacting conversation...", nil
+		},
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			t.Fatal("confirmCompactSubmittedWithRetry must not call AgentWait")
+			return herdr.Agent{}, nil
+		},
+		Sleep: func(d time.Duration) {
+			sleeps = append(sleeps, d)
+		},
+	}
+
+	if err := confirmCompactSubmittedWithRetry(d, "pane-1"); err != nil {
+		t.Fatalf("confirmCompactSubmittedWithRetry: %v", err)
+	}
+
+	wantSleeps := []time.Duration{
+		smartZoneCompactSubmitPollMs * time.Millisecond,
+		smartZoneCompactSubmitPollMs * time.Millisecond,
+		smartZoneCompactSubmitPollMs * time.Millisecond,
+	}
+	if !slices.Equal(sleeps, wantSleeps) {
+		t.Errorf("sleeps = %v, want %v", sleeps, wantSleeps)
+	}
+}
+
 // TestRecoverSmartZoneBreach_FinishUpGatedOnCompactSubmitConfirmation verifies
 // the prompt-submission race from research ticket 03: a compact-completion
 // signal sampled before Enter's effect has rendered "/compact" as submitted

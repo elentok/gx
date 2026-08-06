@@ -210,10 +210,12 @@ const smartZoneCompactExtendedTimeoutMs = 600_000
 // idle/done sample can be taken before Enter's effect has rendered "/compact"
 // as submitted in the pane, so a completion signal alone doesn't mean the
 // finish-up prompt is safe to send — it can still land concatenated with an
-// unsubmitted "/compact". Each tick re-polls via the existing AgentWait
-// (bounded to smartZoneCompactSubmitPollMs, so a poll timeout doubles as the
-// pause before rechecking) rather than sending a fresh keypress: a blind
-// Enter here risks canceling a genuine in-progress compaction.
+// unsubmitted "/compact". Each tick re-checks after a plain Sleep (not an
+// AgentWait — the pane's status is irrelevant to whether "/compact" has
+// rendered, and treating a "working" transition as a poll result would burn
+// through the retry budget in one tick instead of pacing it) rather than
+// sending a fresh keypress: a blind Enter here risks canceling a genuine
+// in-progress compaction.
 const (
 	smartZoneCompactSubmitPollMs    = 5_000
 	smartZoneCompactSubmitTimeoutMs = 30_000
@@ -236,8 +238,8 @@ func confirmCompactSubmitted(d Deps, pane string) (bool, error) {
 // confirmCompactSubmittedWithRetry gates entry into recoverSmartZoneBreach's
 // finish-up phase behind confirmCompactSubmitted, bounded to
 // smartZoneCompactSubmitTimeoutMs total. It never sends a nudge keypress or
-// resubmits "/compact" — only re-polls via AgentWait to give the pane a
-// chance to render the submission.
+// resubmits "/compact" — only sleeps between polls to give the pane a chance
+// to render the submission.
 func confirmCompactSubmittedWithRetry(d Deps, pane string) error {
 	elapsedMs := 0
 	for {
@@ -251,11 +253,7 @@ func confirmCompactSubmittedWithRetry(d Deps, pane string) error {
 		if elapsedMs >= smartZoneCompactSubmitTimeoutMs {
 			return fmt.Errorf("/compact still unsubmitted in pane after %ds", smartZoneCompactSubmitTimeoutMs/1000)
 		}
-		d.AgentWait(herdr.AgentWaitOptions{
-			Target:    pane,
-			Until:     []string{"working"},
-			TimeoutMs: smartZoneCompactSubmitPollMs,
-		})
+		d.Sleep(smartZoneCompactSubmitPollMs * time.Millisecond)
 		elapsedMs += smartZoneCompactSubmitPollMs
 	}
 }
