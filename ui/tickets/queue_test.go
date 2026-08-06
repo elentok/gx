@@ -593,8 +593,12 @@ func TestQueueModelEnterChoosesAgentAndStartsOneEpicSubset(t *testing.T) {
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(QueueModel)
-	if content := m.View().Content; !strings.Contains(content, "Choose the agent") {
+	content := m.View().Content
+	if !strings.Contains(content, "Choose the agent") {
 		t.Fatalf("expected Enter to open the agent picker:\n%s", content)
+	}
+	if !strings.Contains(content, "First") {
+		t.Fatalf("expected queue panel to remain visible behind the agent picker overlay:\n%s", content)
 	}
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})

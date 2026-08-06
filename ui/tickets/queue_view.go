@@ -22,13 +22,6 @@ func (m QueueModel) View() tea.View {
 	if !m.ready {
 		return ui.NewMainView("\n  Initializing…")
 	}
-	if m.implementAgentMenuOpen {
-		plans := m.checkedEpicPlans()
-		return ui.NewMainView(renderImplementAgentMenu(
-			fmt.Sprintf("Choose the agent for %d checked epic(s):", len(plans)),
-			m.implementAgentMenu,
-		))
-	}
 	viewportH := m.queueViewportHeight()
 	height := max(m.height-1, 1)
 	sidebarW, previewW := splitPanelWidth(m.width)
@@ -51,7 +44,14 @@ func (m QueueModel) View() tea.View {
 		content = lipgloss.JoinHorizontal(lipgloss.Top, queueView, seam, previewView)
 	}
 
-	if m.confirm.IsOpen {
+	if m.implementAgentMenuOpen {
+		plans := m.checkedEpicPlans()
+		menu := renderImplementAgentMenu(
+			fmt.Sprintf("Choose the agent for %d checked epic(s):", len(plans)),
+			m.implementAgentMenu,
+		)
+		content = ui.OverlayCenter(content, menu, m.width, m.height)
+	} else if m.confirm.IsOpen {
 		content = ui.OverlayCenter(content, m.confirm.View(m.width), m.width, m.height)
 	}
 	if m.search.Mode() == search.SearchModeInput {
