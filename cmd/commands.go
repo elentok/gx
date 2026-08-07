@@ -202,6 +202,18 @@ func newTicketsCmd(d deps) *cobra.Command {
 		},
 	})
 	cmd.AddCommand(&cobra.Command{
+		Use:   "epics",
+		Short: "print bare epic slugs under the current repo's .scratch root",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			cwd, err := d.getwd()
+			if err != nil {
+				return err
+			}
+			return runTicketsEpics(cwd, c.OutOrStdout())
+		},
+	})
+	cmd.AddCommand(&cobra.Command{
 		Use:   "schema",
 		Short: "print the ticket frontmatter schema (settable and read-only fields)",
 		Args:  cobra.NoArgs,
