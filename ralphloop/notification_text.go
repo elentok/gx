@@ -125,5 +125,6 @@ func (s mrkdwnStyle) epicCompleteText(epicName string, completed int, elapsedSec
 //
 //	If you can see this, notifications are working.
 func (s mrkdwnStyle) testMessageText() string {
-	return fmt.Sprintf("%s \U0001f514 *test notification*\n\nIf you can see this, notifications are working.", s.gxPrefix)
+	body := s.escape("If you can see this, notifications are working.")
+	return fmt.Sprintf("%s \U0001f514 *test notification*\n\n%s", s.gxPrefix, body)
 }
