@@ -26,7 +26,8 @@ stop and fix the ticket's frontmatter before doing anything else.
 
 ## 2. Resolve the epic diff
 
-- The epic directory is the ticket's `issues/` parent's parent: `.scratch/<epic-slug>/`.
+- The epic directory is the ticket's `issues/` parent's parent: `<root>/<epic-slug>/`. Derive it from
+  the claimed ticket's own path — don't reconstruct it via `gx tickets root` plus a guessed epic slug.
 - The epic's branch is the current branch (every ralph-loop worktree runs on a `ralph-loop/`-prefixed
   branch, one per epic — see gx-implement).
 - Capture the diff scope once, the same way `code-review` does it: `git merge-base main HEAD` for the

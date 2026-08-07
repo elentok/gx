@@ -140,7 +140,8 @@ what was decided.
 
 ### 6. Publish the tickets
 
-Write one file per ticket under `.scratch/<epic-slug>/issues/<NN>-<slug>.md`, numbered from `01` in
+Write one file per ticket under `$(gx tickets root)/<epic-slug>/issues/<NN>-<slug>.md` (see
+[gx-local-tracker.md](../gx-local-tracker.md) for how the root is resolved), numbered from `01` in
 dependency order (blockers first). Each file's `blocked_by` lists the ticket IDs it depends on. Use
 the per-ticket template below — one ticket per file, never a single combined file.
 

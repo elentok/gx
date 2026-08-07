@@ -32,9 +32,14 @@ substitute for it.
 
 ## Where state lives
 
-- **`.scratch/<epic-slug>/issues/*.md`** — the tickets themselves. Source of truth for status,
+Ticket state lives under the canonical root from `gx tickets root` — always resolve it first
+(`root=$(gx tickets root)`), even when you're already inside a worktree or a subdirectory; a
+bare-repo checkout with linked worktrees keeps one shared root at the bare repo's own path, not
+`.scratch/` at cwd. See gx-local-tracker.md.
+
+- **`<root>/<epic-slug>/issues/*.md`** — the tickets themselves. Source of truth for status,
   `blocked_by`, `parent`/`children`. See gx-local-tracker.md for the field reference.
-- **`.scratch/<epic-slug>/run-log.jsonl`** — the append-only scheduler/iteration event log
+- **`<root>/<epic-slug>/run-log.jsonl`** — the append-only scheduler/iteration event log
   (`ralphloop/eventlog.go`). One JSON line per event: `iteration-started`/`-finished`,
   `cherry-picked`, `conflict-hit`/`-resolved`, `paused-smart-zone`, `paused-rate-limit`,
   `needs-info`, `needs-attention`, `commitless`, `deps-installed`, and **`scheduler-scan`** — one
@@ -59,7 +64,7 @@ substitute for it.
 
 ## Where to start
 
-1. Identify the epic: `.scratch/<epic-slug>/`.
+1. Run `gx tickets root` to get `<root>`, then identify the epic: `<root>/<epic-slug>/`.
 2. Read `run-log.jsonl`, filtered to the ticket(s) in question. The most recent `scheduler-scan`
    entry's `scan` list gives every ticket's decision and reason as of that pass.
 3. Read the affected ticket's frontmatter directly and check it against gx-local-tracker.md's
@@ -86,9 +91,9 @@ to gotchas.md yourself. Don't re-explain what the linked commit/ticket already d
 
 This skill only diagnoses; it never edits code.
 
-- If there's an active epic in scope (`.scratch/<epic-slug>/`), publish the diagnosis as a
+- If there's an active epic in scope (`<root>/<epic-slug>/`), publish the diagnosis as a
   `type: research` ticket in that epic, following gx-local-tracker.md's template: what's wrong,
   the evidence (log lines, ticket IDs), and a suggested fix direction. A follow-up fix ticket can
   then `blocked_by` it.
-- If there's no epic in scope (a one-off question, nothing under `.scratch/`), report the
+- If there's no epic in scope (a one-off question, nothing under the tracker root), report the
   diagnosis directly instead of publishing anything.

@@ -8,9 +8,16 @@ authoritative.
 
 ## Layout
 
-- One feature/epic per directory: `.scratch/<epic-slug>/`
-- A spec or plan, if one exists, is `.scratch/<epic-slug>/spec.md`
-- Tickets are one file per ticket at `.scratch/<epic-slug>/issues/<NN>-<slug>.md`, numbered from
+- **Always resolve the root with `gx tickets root` before locating any ticket, epic, or spec file —
+  never assume `.scratch/` at cwd or repo root, even when you're already inside a worktree or a
+  subdirectory.** In a bare-repo checkout with linked worktrees, the canonical root lives at the bare
+  repo's own path, not any worktree's, and cwd may be several directories below it. `gx tickets root`
+  prints the canonical `.scratch` path with no decoration, so `root=$(gx tickets root)` is safe to run
+  from anywhere inside the repo. Every `<root>` below refers to this resolved path, not a literal
+  `.scratch/`.
+- One feature/epic per directory: `<root>/<epic-slug>/`
+- A spec or plan, if one exists, is `<root>/<epic-slug>/spec.md`
+- Tickets are one file per ticket at `<root>/<epic-slug>/issues/<NN>-<slug>.md`, numbered from
   `01` — never a single combined tickets file
 - A ticket **identifier** is the filename's numeric prefix, optionally followed by one lowercase
   letter: `04`, `04a`, `04b`. The letter marks a ticket created by a mid-flight split (see below); a
