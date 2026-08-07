@@ -75,9 +75,11 @@ func (m Model) handleToggleCheck() (tea.Model, tea.Cmd) {
 	return m.toggleTicketChecked(r.epicIdx, r.ticketIdx)
 }
 
-// toggleEpicChecked checks every ticket in the epic at epicIdx if any is
-// currently unchecked, otherwise unchecks them all — standard "select all"
-// checkbox-group behavior. A zero-ticket epic is a no-op either way.
+// toggleEpicChecked checks every non-done ticket in the epic at epicIdx if
+// any is currently unchecked, otherwise unchecks them all — standard
+// "select all" checkbox-group behavior, except a StatusDone ticket is never
+// added to the checked set (it has nothing left to queue). A zero-ticket or
+// all-done epic is a no-op either way.
 func (m *Model) toggleEpicChecked(epicIdx int) error {
 	epic := m.epics[epicIdx]
 	if len(epic.Tickets) == 0 {
@@ -86,16 +88,23 @@ func (m *Model) toggleEpicChecked(epicIdx int) error {
 	allChecked := true
 	paths := make([]string, 0, len(epic.Tickets))
 	for _, t := range epic.Tickets {
+		if epic.RenderedStatus(t) == tickets.StatusDone {
+			continue
+		}
 		paths = append(paths, t.Path)
 		if !m.isChecked(t.Path) {
 			allChecked = false
 		}
 	}
+	if len(paths) == 0 {
+		return nil
+	}
 	return m.setPathsChecked(paths, !allChecked)
 }
 
 // toggleTicketChecked toggles the ticket at (epicIdx, ticketIdx). Unchecking
-// is always immediate. Checking a ticket with unresolved blockers
+// is always immediate. Checking a StatusDone ticket is a no-op — it has
+// nothing left to queue. Checking a ticket with unresolved blockers
 // (Epic.BlockingTickets) instead opens a confirmation modal rather than
 // checking it outright — accepting adds the ticket plus its blockers
 // (checkAddConfirmedMsg), canceling leaves the checked set unchanged. A
@@ -109,6 +118,9 @@ func (m Model) toggleTicketChecked(epicIdx, ticketIdx int) (tea.Model, tea.Cmd) 
 		if err := m.setPathsChecked([]string{t.Path}, false); err != nil {
 			return m, notify.Error("save queue: " + err.Error())
 		}
+		return m, nil
+	}
+	if epic.RenderedStatus(t) == tickets.StatusDone {
 		return m, nil
 	}
 
@@ -244,17 +256,23 @@ func findTicketByIdentifier(epic tickets.Epic, identifier string) (tickets.Ticke
 	return tickets.Ticket{}, false
 }
 
-// epicChecked reports whether every ticket in epic is currently checked
-// (used to render the epic row's own checkbox glyph). A zero-ticket epic
-// renders unchecked.
+// epicChecked reports whether every non-done ticket in epic is currently
+// checked (used to render the epic row's own checkbox glyph) — a StatusDone
+// ticket can never be checked, so it's excluded from the check. A
+// zero-ticket or all-done epic renders unchecked.
 func (m Model) epicChecked(epic tickets.Epic) bool {
 	if len(epic.Tickets) == 0 {
 		return false
 	}
+	any := false
 	for _, t := range epic.Tickets {
+		if epic.RenderedStatus(t) == tickets.StatusDone {
+			continue
+		}
+		any = true
 		if !m.isChecked(t.Path) {
 			return false
 		}
 	}
-	return true
+	return any
 }

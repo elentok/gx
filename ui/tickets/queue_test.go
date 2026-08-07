@@ -737,6 +737,66 @@ func TestQueueModelEnterChoosesAgentAndStartsOneEpicSubset(t *testing.T) {
 	}
 }
 
+func TestQueueModelEnterStartsFullEligibleSelectionDynamic(t *testing.T) {
+	root := testutil.TempRepo(t)
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "alpha", "03-done.md", "Status: done\n\nBody.\n")
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "01-first.md"):  true,
+		ticketPath(root, "alpha", "02-second.md"): true,
+	}
+
+	previousRun := runRalphLoop
+	previousRegistry := ralphLoopRegistry
+	runOptions := make(chan ralphloop.RunOptions, 1)
+	releaseRun := make(chan struct{})
+	runReturned := make(chan struct{})
+	runRalphLoop = func(opts ralphloop.RunOptions, _ ralphloop.Deps, _ ralphloop.EventSink) error {
+		runOptions <- opts
+		<-releaseRun
+		close(runReturned)
+		return nil
+	}
+	ralphLoopRegistry = newLoopRegistry(1)
+	t.Cleanup(func() {
+		close(releaseRun)
+		select {
+		case <-runReturned:
+		case <-time.After(time.Second):
+		}
+		deadline := time.Now().Add(time.Second)
+		for ralphLoopRegistry.isRunning() && time.Now().Before(deadline) {
+			time.Sleep(time.Millisecond)
+		}
+		runRalphLoop = previousRun
+		ralphLoopRegistry = previousRegistry
+	})
+
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(QueueModel)
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	m = updated.(QueueModel)
+	if cmd == nil {
+		t.Fatal("expected choosing Codex to start execution")
+	}
+	updated, _ = m.Update(cmd())
+	m = updated.(QueueModel)
+
+	select {
+	case opts := <-runOptions:
+		if opts.EpicName != "alpha" || opts.Agent != ralphloop.AgentCodex {
+			t.Fatalf("unexpected run target: epic=%q agent=%q", opts.EpicName, opts.Agent)
+		}
+		if len(opts.TicketIDs) != 0 {
+			t.Fatalf("expected dynamic (empty) TicketIDs for full-eligible selection, got %v", opts.TicketIDs)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for ralph-loop kickoff")
+	}
+}
+
 func TestQueueModelSchedulesCheckedEpicsInCheckOrderAndBackfillsAtCap(t *testing.T) {
 	root := testutil.TempRepo(t)
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")

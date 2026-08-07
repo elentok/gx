@@ -106,6 +106,62 @@ func TestModel_SpaceOnEpicRowChecksAllTickets(t *testing.T) {
 	}
 }
 
+func TestModel_SpaceToggleOnDoneTicketIsNoOp(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
+	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	// Move onto the first (done) ticket row (row 0 is the epic).
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+
+	r, ok := m.selectedRow()
+	if !ok || r.isEpic() {
+		t.Fatalf("expected selection on ticket row, got row=%+v ok=%v", r, ok)
+	}
+	ticket := m.epics[r.epicIdx].Tickets[r.ticketIdx]
+	if ticket.Identifier != "01" {
+		t.Fatalf("expected selection on the done ticket 01, got %s", ticket.Identifier)
+	}
+
+	updated, _ = m.Update(spacePress())
+	m = updated.(Model)
+	if m.isChecked(ticket.Path) {
+		t.Fatalf("expected done ticket to remain unchecked after space")
+	}
+}
+
+func TestModel_SpaceOnEpicRowChecksOnlyNonDoneTickets(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
+	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	r, ok := m.selectedRow()
+	if !ok || !r.isEpic() {
+		t.Fatalf("expected initial selection on epic row, got row=%+v ok=%v", r, ok)
+	}
+	epic := m.epics[r.epicIdx]
+
+	updated, _ = m.Update(spacePress())
+	m = updated.(Model)
+	for _, ticket := range epic.Tickets {
+		wantChecked := epic.RenderedStatus(ticket) != tickets.StatusDone
+		if m.isChecked(ticket.Path) != wantChecked {
+			t.Fatalf("ticket %s checked=%v, want %v", ticket.Identifier, m.isChecked(ticket.Path), wantChecked)
+		}
+	}
+}
+
 func TestModel_CheckingBlockedTicketOpensConfirmModal(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")

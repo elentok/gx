@@ -683,11 +683,22 @@ func (m QueueModel) startCheckedEpic(agent ralphloop.AgentKind) (tea.Model, tea.
 }
 
 type checkedEpicPlan struct {
-	epic      tickets.Epic
+	epic tickets.Epic
+	// ticketIDs is the checked-set snapshot, always used for this Model's own
+	// progress accounting (executionTickets, runTicketIDs) regardless of
+	// dynamic.
 	ticketIDs []string
-	done      int
-	ordinal   uint64
-	ordered   bool
+	// dynamic reports whether ticketIDs covers every currently-eligible
+	// (non-done) ticket in epic, in which case startAvailableEpics launches
+	// with an empty RunOptions.TicketIDs so the run stays dynamic (rescans the
+	// epic on disk every claim, per ralphloop.ResolveRunScope) instead of
+	// freezing scope to this snapshot — matching the single-epic "i" launch
+	// path. A genuine subset (some eligible ticket deliberately left
+	// unchecked) still freezes to exactly ticketIDs.
+	dynamic bool
+	done    int
+	ordinal uint64
+	ordered bool
 }
 
 func (m QueueModel) checkedEpicPlans() []checkedEpicPlan {
@@ -695,10 +706,14 @@ func (m QueueModel) checkedEpicPlans() []checkedEpicPlan {
 	for _, epic := range m.epics {
 		var ticketIDs []string
 		done := 0
+		eligible := 0
 		var ordinal uint64
 		ordered := false
 		for _, idx := range sortedTicketIndexes(epic) {
 			ticket := epic.Tickets[idx]
+			if epic.RenderedStatus(ticket) != tickets.StatusDone {
+				eligible++
+			}
 			if !m.checked[ticket.Path] {
 				continue
 			}
@@ -711,7 +726,10 @@ func (m QueueModel) checkedEpicPlans() []checkedEpicPlan {
 			}
 		}
 		if len(ticketIDs) > 0 {
-			plans = append(plans, checkedEpicPlan{epic: epic, ticketIDs: ticketIDs, done: done, ordinal: ordinal, ordered: ordered})
+			plans = append(plans, checkedEpicPlan{
+				epic: epic, ticketIDs: ticketIDs, dynamic: len(ticketIDs) == eligible,
+				done: done, ordinal: ordinal, ordered: ordered,
+			})
 		}
 	}
 	sort.SliceStable(plans, func(i, j int) bool {
@@ -730,9 +748,13 @@ func (m *QueueModel) startAvailableEpics() tea.Cmd {
 	count := min(ralphLoopRegistry.availableSlots(), len(m.pendingEpics))
 	cmds := make([]tea.Cmd, 0, count)
 	for _, plan := range m.pendingEpics[:count] {
+		runTicketIDs := plan.ticketIDs
+		if plan.dynamic {
+			runTicketIDs = nil
+		}
 		cmds = append(cmds, cmdStartImplement(
 			m.worktreeRoot, plan.epic.Name, m.runningAgent, plan.done, len(plan.ticketIDs),
-			m.settings.MaxConcurrentTicketsPerEpic(), plan.ticketIDs, m.settings.Notifications,
+			m.settings.MaxConcurrentTicketsPerEpic(), runTicketIDs, m.settings.Notifications,
 			m.settings.ImplementSkill(),
 		))
 	}
