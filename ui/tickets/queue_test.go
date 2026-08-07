@@ -1173,7 +1173,7 @@ func TestTicketsAndQueueMatchAfterRestartRegardlessOfNavigationOrder(t *testing.
 	}
 
 	queueFirst := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, store))
-	ticketsModel := NewModelWithScopeAndStore(root, ui.Settings{}, keys.New(nil), false, store)
+	ticketsModel := NewModelWithStore(root, ui.Settings{}, keys.New(nil), store)
 	ticketsModel = deliverLoad(t, ticketsModel)
 
 	_, ticketsQueued := ticketsModel.queueStatus[queuedPath]

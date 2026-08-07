@@ -37,10 +37,6 @@ var (
 
 	sectionHeaderStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
 
-	// worktreeTagStyle renders --all mode's per-epic worktree label, appended
-	// after the epic's name/count.
-	worktreeTagStyle = lipgloss.NewStyle().Foreground(ui.ColorBlue)
-
 	// checkedGlyphStyle/uncheckedGlyphStyle render the execution queue's
 	// checkbox marker (ticket 04), distinct from every status color so a
 	// checked row reads the same regardless of its ticket status.
@@ -135,9 +131,6 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 	}
 	if dur, ok := epic.CompletionDuration(); ok {
 		line += " took " + formatDuration(dur)
-	}
-	if epic.WorktreeName != "" {
-		line += " " + worktreeTagStyle.Render("["+epic.WorktreeName+"]")
 	}
 	if m.implementingEpics[epic.Name] {
 		line += " " + statusClaimedStyle.Render(strings.TrimRight(m.implementSpinner.View(), " ")+" running")

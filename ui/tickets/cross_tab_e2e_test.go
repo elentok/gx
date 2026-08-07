@@ -114,7 +114,7 @@ func TestCrossTabCheckThenQueueResetsTicketsCheckboxWhileQueueTabKeepsEntries(t 
 
 	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
 
-	tm := NewModelWithScopeAndStore(root, ui.Settings{}, keys.New(nil), false, store)
+	tm := NewModelWithStore(root, ui.Settings{}, keys.New(nil), store)
 	tm = deliverLoad(t, tm)
 	updated, _ := tm.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	tm = updated.(Model)

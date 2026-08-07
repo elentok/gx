@@ -17,10 +17,6 @@ type Epic struct {
 	// epic.yaml yet, or the file doesn't set that field.
 	StartedAt   time.Time
 	CompletedAt time.Time
-
-	// WorktreeName is the owning worktree's directory name, set only in
-	// `gx tickets --all` aggregation (empty for the single-worktree view).
-	WorktreeName string
 }
 
 // TotalCount is the epic's total ticket count.

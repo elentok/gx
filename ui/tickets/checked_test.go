@@ -368,14 +368,14 @@ func TestModel_CachedModelsRenderSelectionFromSharedQueueStore(t *testing.T) {
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 	store := loadQueueStoreAt(t.TempDir() + "/queue.json")
 
-	first := NewModelWithScopeAndStore(root, ui.Settings{}, keys.New(nil), false, store)
+	first := NewModelWithStore(root, ui.Settings{}, keys.New(nil), store)
 	first = deliverLoad(t, first)
 	updated, _ := first.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	first = updated.(Model)
 	updated, _ = first.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	first = updated.(Model)
 
-	cached := NewModelWithScopeAndStore(root, ui.Settings{}, keys.New(nil), false, store)
+	cached := NewModelWithStore(root, ui.Settings{}, keys.New(nil), store)
 	cached = deliverLoad(t, cached)
 	updated, _ = cached.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	cached = updated.(Model)
@@ -411,35 +411,5 @@ func TestModel_BlockedConfirmationFailureKeepsPriorQueue(t *testing.T) {
 	snapshot := m.queueStore.Snapshot()
 	if len(snapshot.TicketChecked) != 1 || !snapshot.TicketChecked["keep"] {
 		t.Fatalf("failed confirmation changed checked set: %#v", snapshot)
-	}
-}
-
-func TestModel_WorktreeScopedTogglePreservesOtherWorktreeEntry(t *testing.T) {
-	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
-	store := loadQueueStoreAt(t.TempDir() + "/queue.json")
-	otherPath := t.TempDir() + "/.scratch/other/issues/01-other.md"
-	if err := store.Check(otherPath); err != nil {
-		t.Fatal(err)
-	}
-	if err := store.SetStatus(otherPath, queueStatusDone); err != nil {
-		t.Fatal(err)
-	}
-
-	m := NewModelWithScopeAndStore(root, ui.Settings{}, keys.New(nil), false, store)
-	m = deliverLoad(t, m)
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m = updated.(Model)
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
-	updated, _ = m.Update(spacePress())
-	m = updated.(Model)
-
-	snapshot := store.Snapshot()
-	if snapshot.Status[otherPath] != queueStatusDone {
-		t.Fatalf("scoped toggle changed other worktree entry: %#v", snapshot)
-	}
-	if !snapshot.TicketChecked[m.epics[0].Tickets[0].Path] {
-		t.Fatalf("scoped ticket was not added: %#v", snapshot)
 	}
 }

@@ -2,7 +2,6 @@ package tickets
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -38,53 +37,8 @@ func (m *Model) setPathsChecked(paths []string, checked bool) error {
 }
 
 func (m *Model) refreshQueueSnapshot() {
-	m.queueStatus, m.checkOrder, m.checked = scopedQueueSnapshot(m.queueStore, m.worktreeRoot, m.allWorktrees)
-}
-
-// scopedQueueSnapshot reads store's snapshot and, unless allWorktrees is set,
-// filters it down to paths under worktreeRoot's own `.scratch/` — the queue
-// store persists checked/queued paths globally across every worktree ever
-// used, so every read of it must re-apply this scope or a ticket checked in
-// one worktree leaks into another's checked count (and confirmation
-// prompts) without ever appearing as a checked row there. queueStatus (queue
-// membership) and checked/checkOrder (the independent Tickets-tab checked
-// set, ticket 13's decoupled design) are scoped independently since a ticket
-// can be checked without being queued, and vice versa.
-func scopedQueueSnapshot(store *QueueStore, worktreeRoot string, allWorktrees bool) (queueStatus map[string]queueItemStatus, checkOrder map[string]uint64, checked map[string]bool) {
-	snapshot := store.Snapshot()
-	queueStatus, checked, checkOrder = snapshot.Status, snapshot.TicketChecked, snapshot.TicketCheckOrder
-	if !allWorktrees {
-		for path := range queueStatus {
-			if !inWorktreeScope(path, worktreeRoot, allWorktrees) {
-				delete(queueStatus, path)
-			}
-		}
-		for path := range checked {
-			if !inWorktreeScope(path, worktreeRoot, allWorktrees) {
-				delete(checked, path)
-				delete(checkOrder, path)
-			}
-		}
-	}
-	return queueStatus, checkOrder, checked
-}
-
-// inWorktreeScope reports whether path is inside worktreeRoot's own
-// `.scratch/`, or allWorktrees is set — shared by scopedQueueSnapshot and
-// Model.inScope so both apply the same cross-worktree boundary.
-func inWorktreeScope(path, worktreeRoot string, allWorktrees bool) bool {
-	if allWorktrees {
-		return true
-	}
-	scratchPrefix := filepath.Join(worktreeRoot, ".scratch") + string(filepath.Separator)
-	return strings.HasPrefix(path, scratchPrefix)
-}
-
-// inScope reports whether path is within this Model's own worktree scope
-// (see scopedQueueSnapshot) — used by replaceQueuedSelection (implement.go)
-// to avoid touching another worktree's queue entries it can't see.
-func (m Model) inScope(path string) bool {
-	return inWorktreeScope(path, m.worktreeRoot, m.allWorktrees)
+	snapshot := m.queueStore.Snapshot()
+	m.queueStatus, m.checked, m.checkOrder = snapshot.Status, snapshot.TicketChecked, snapshot.TicketCheckOrder
 }
 
 func nextCheckOrdinal(checkOrder map[string]uint64) uint64 {

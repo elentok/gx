@@ -65,13 +65,6 @@ type Model struct {
 	// produces, would otherwise spawn another parallel chain.
 	autoRefreshStarted bool
 
-	// allWorktrees is the `gx tickets --all` scope: epics are aggregated across
-	// every worktree of the repo (each tagged with Epic.WorktreeName) instead
-	// of just m.worktreeRoot's own `.scratch/`, interleaved into the tab's
-	// normal single Open/Closed grouping with each epic row labeled by its
-	// worktree.
-	allWorktrees bool
-
 	selected       int
 	collapsedEpics map[string]bool
 	// collapsedTickets is collapsedEpics' ticket-level counterpart (ticket
@@ -141,41 +134,31 @@ type Model struct {
 
 // NewModel creates a new tickets tab model scoped to worktreeRoot's own
 // `.scratch/`. extraKeys (the app-wide global bindings) isn't used yet —
-// it'll feed a help modal once one exists for this tab, mirroring ui/prs's
-// NewModelWithScope.
+// it'll feed a help modal once one exists for this tab.
 func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager) Model {
-	return NewModelWithScope(worktreeRoot, settings, extraKeys, false)
+	return NewModelWithStore(worktreeRoot, settings, extraKeys, LoadQueueStore())
 }
 
-// NewModelWithScope builds the tickets tab model with an initial scope:
-// allWorktrees true starts it already aggregating every worktree's `.scratch/`
-// (the `gx tickets --all` CLI entry point), false starts it scoped to just
-// worktreeRoot, mirroring ui/prs's NewModelWithScope.
-func NewModelWithScope(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager, allWorktrees bool) Model {
-	return NewModelWithScopeAndStore(worktreeRoot, settings, extraKeys, allWorktrees, LoadQueueStore())
-}
-
-func NewModelWithScopeAndStore(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager, allWorktrees bool, store *QueueStore) Model {
+func NewModelWithStore(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager, store *QueueStore) Model {
 	_ = extraKeys
 	sp := spinner.New()
 	sp.Spinner = TicketProgressSpinner
-	queueStatus, checkOrder, checked := scopedQueueSnapshot(store, worktreeRoot, allWorktrees)
+	snapshot := store.Snapshot()
 	return Model{
 		worktreeRoot:       worktreeRoot,
 		settings:           settings,
 		keys:               newTicketsManager(),
 		search:             search.NewModel(),
 		previewFocus:       newPreviewFocus(),
-		allWorktrees:       allWorktrees,
 		confirm:            confirm.New(),
 		implementAgentMenu: newImplementAgentMenu(),
 		implementingEpics:  map[string]bool{},
 		implementSpinner:   sp,
 		live:               map[string]map[string]liveTicketState{},
 		labelIdentifier:    map[string]map[string]string{},
-		checked:            checked,
-		checkOrder:         checkOrder,
-		queueStatus:        queueStatus,
+		checked:            snapshot.TicketChecked,
+		checkOrder:         snapshot.TicketCheckOrder,
+		queueStatus:        snapshot.Status,
 		queueStore:         store,
 	}
 }

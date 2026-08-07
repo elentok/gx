@@ -478,12 +478,10 @@ func (m Model) handleImplementKey() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// replaceQueuedSelection applies ticket 11's "i" replace logic: within this
-// tab's own worktree scope (mirroring scopedQueueSnapshot), every pending
+// replaceQueuedSelection applies ticket 11's "i" replace logic: every pending
 // (not-yet-started) queue entry is dropped and replaced by the current
-// checked selection. Running/done/errored entries — and anything outside
-// scope, which this tab can't see to safely decide about — are left exactly
-// as they are, whether or not they're still checked. Ticket 15's
+// checked selection. Running/done/errored entries are left exactly as they
+// are, whether or not they're still checked. Ticket 15's
 // EnqueueAndClearChecked also clears every just-queued path from the
 // Tickets tab's independent checked set in the same atomic write, so the
 // checkboxes visually reset the moment their tickets are queued.
@@ -492,7 +490,7 @@ func (m *Model) replaceQueuedSelection() error {
 	next := make(map[string]queueItemStatus, len(snapshot.Status))
 	order := make(map[string]uint64, len(snapshot.Order))
 	for path, status := range snapshot.Status {
-		if status == queueStatusPending && m.inScope(path) {
+		if status == queueStatusPending {
 			continue
 		}
 		next[path] = status

@@ -224,10 +224,9 @@ func (m Model) newHistoryEntry(viewState nav.ViewState) historyEntry {
 			model:     prsui.NewModelWithScope(viewState.WorktreeRoot, s, keys.New(Bindings()), viewState.AllRepos),
 		}
 	case nav.TabTickets:
-		allWorktrees := viewState.AllRepos || m.explicitAllTickets() || isTicketsLoopRunning()
 		return historyEntry{
 			viewState: viewState,
-			model:     ticketsui.NewModelWithScopeAndStore(viewState.WorktreeRoot, s, keys.New(Bindings()), allWorktrees, m.queueStore),
+			model:     ticketsui.NewModelWithStore(viewState.WorktreeRoot, s, keys.New(Bindings()), m.queueStore),
 		}
 	case nav.TabQueue:
 		return historyEntry{
@@ -242,19 +241,6 @@ func (m Model) newHistoryEntry(viewState nav.ViewState) historyEntry {
 			model:     worktrees.NewWithSettings(m.repo, m.settings.ActiveWorktreePath, s),
 		}
 	}
-}
-
-// isTicketsLoopRunning is a var, not a direct call to ticketsui.IsLoopRunning,
-// so tests can simulate "loop active" deterministically instead of racing the
-// real background goroutine ticket 01's launch spawns.
-var isTicketsLoopRunning = ticketsui.IsLoopRunning
-
-// explicitAllTickets reports whether the user launched gx with
-// `gx tickets --all` themselves — the one durable record of that choice,
-// since navstate.Switch resets ViewState.AllRepos to false on every tab
-// switch (see navstate_test.go's TestSwitchToPRsTabResetsAllRepos).
-func (m Model) explicitAllTickets() bool {
-	return m.settings.InitialRoute.Tab == nav.TabTickets && m.settings.InitialRoute.AllRepos
 }
 
 func (m Model) childWindowSizeMsg() tea.WindowSizeMsg {

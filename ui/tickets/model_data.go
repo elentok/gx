@@ -1,12 +1,10 @@
 package tickets
 
 import (
-	"path/filepath"
 	"sort"
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tree"
@@ -23,51 +21,14 @@ type epicsLoadedMsg struct {
 	err   error
 }
 
-// cmdLoad reads the tab's `.scratch/` directory (or, in --all mode, every
-// worktree's) in the background. A missing directory is not an error
-// (tickets.Load reports it as zero epics), so it renders the same empty
-// state as an absent `.scratch/`.
+// cmdLoad reads the tab's `.scratch/` directory in the background. A missing
+// directory is not an error (tickets.Load reports it as zero epics), so it
+// renders the same empty state as an absent `.scratch/`.
 func (m Model) cmdLoad() tea.Cmd {
-	if m.allWorktrees {
-		return m.cmdLoadAll()
-	}
 	scratchDir := m.scratchDir()
 	return func() tea.Msg {
 		epics, err := tickets.Load(scratchDir)
 		return epicsLoadedMsg{epics: epics, err: err}
-	}
-}
-
-// cmdLoadAll aggregates `.scratch/` across every worktree of the repo (the
-// `gx tickets --all` scope): each worktree's epics are tagged with
-// Epic.WorktreeName so each epic row can show which worktree it came from,
-// interleaved into the tab's normal single Open/Closed grouping.
-func (m Model) cmdLoadAll() tea.Cmd {
-	worktreeRoot := m.worktreeRoot
-	return func() tea.Msg {
-		repo, err := git.FindRepo(worktreeRoot)
-		if err != nil {
-			return epicsLoadedMsg{err: err}
-		}
-		worktrees, err := git.ListWorktrees(*repo)
-		if err != nil {
-			return epicsLoadedMsg{err: err}
-		}
-
-		var allEpics []tickets.Epic
-		for _, wt := range worktrees {
-			epics, loadErr := tickets.Load(filepath.Join(wt.Path, ".scratch"))
-			if loadErr != nil {
-				// Best-effort aggregation: an unreadable worktree is dropped
-				// rather than failing the whole --all load.
-				continue
-			}
-			for i := range epics {
-				epics[i].WorktreeName = wt.Name
-			}
-			allEpics = append(allEpics, epics...)
-		}
-		return epicsLoadedMsg{epics: allEpics}
 	}
 }
 
@@ -103,10 +64,7 @@ func (r row) isEpic() bool { return r.ticketIdx < 0 }
 // row followed by its tickets in plan order (ticket number ascending, see
 // sortedTicketIndexes) unless the epic is collapsed, in which case its
 // tickets are excluded entirely and navigation moves past the epic directly
-// to the next visible row. In --all mode epics from every worktree are
-// interleaved into this same single Open/Closed grouping (directory/worktree-
-// load order), each epic row additionally labeled with its Epic.WorktreeName
-// — see view.go's renderEpicRow.
+// to the next visible row.
 func (m Model) visibleRows() []row {
 	idxs := make([]int, len(m.epics))
 	for i := range m.epics {

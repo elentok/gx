@@ -58,13 +58,11 @@ func TestExecute_PRsAllFlagDispatchesAllRepos(t *testing.T) {
 
 func TestExecute_TicketsDispatchesToRunTickets(t *testing.T) {
 	called := 0
-	var gotAllRepos bool
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
-		runTickets: func(allRepos bool) error {
+		runTickets: func() error {
 			called++
-			gotAllRepos = allRepos
 			return nil
 		},
 	}
@@ -75,33 +73,6 @@ func TestExecute_TicketsDispatchesToRunTickets(t *testing.T) {
 	if called != 1 {
 		t.Fatalf("runTickets called %d times, want 1", called)
 	}
-	if gotAllRepos {
-		t.Fatal("expected allRepos false without --all flag")
-	}
-}
-
-func TestExecute_TicketsAllFlagDispatchesAllRepos(t *testing.T) {
-	called := 0
-	var gotAllRepos bool
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		runTickets: func(allRepos bool) error {
-			called++
-			gotAllRepos = allRepos
-			return nil
-		},
-	}
-
-	if err := execute([]string{"tickets", "--all"}, d); err != nil {
-		t.Fatalf("execute tickets --all: %v", err)
-	}
-	if called != 1 {
-		t.Fatalf("runTickets called %d times, want 1", called)
-	}
-	if !gotAllRepos {
-		t.Fatal("expected allRepos true with --all flag")
-	}
 }
 
 func TestExecute_TicketsAliasTk(t *testing.T) {
@@ -109,7 +80,7 @@ func TestExecute_TicketsAliasTk(t *testing.T) {
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
-		runTickets: func(allRepos bool) error {
+		runTickets: func() error {
 			called++
 			return nil
 		},

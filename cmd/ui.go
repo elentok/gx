@@ -256,7 +256,7 @@ func runPRs(allRepos bool) error {
 	return err
 }
 
-func runTickets(allRepos bool) error {
+func runTickets() error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -284,7 +284,7 @@ func runTickets(allRepos bool) error {
 		return err
 	}
 	m := app.New(*repo, app.Settings{
-		InitialRoute:       nav.ViewState{Tab: nav.TabTickets, WorktreeRoot: root, AllRepos: allRepos},
+		InitialRoute:       nav.ViewState{Tab: nav.TabTickets, WorktreeRoot: root},
 		ActiveWorktreePath: root,
 		Settings:           settingsFromConfig(cfg),
 	})

@@ -82,41 +82,6 @@ func TestModel_ImplementKeyWithNoActiveLoopReplacesPendingSelection(t *testing.T
 	}
 }
 
-// TestModel_ImplementKeyLeavesOtherWorktreeEntriesUntouched covers
-// replaceQueuedSelection's scope boundary: a pending entry belonging to
-// another worktree isn't visible in this tab's checked selection, so it must
-// survive the replace rather than being dropped as "not part of the new
-// selection".
-func TestModel_ImplementKeyLeavesOtherWorktreeEntriesUntouched(t *testing.T) {
-	worktreeRoot := t.TempDir()
-	otherWorktreeRoot := t.TempDir()
-	otherPending := filepath.Join(otherWorktreeRoot, ".scratch", "alpha", "issues", "01-other.md")
-	newSelection := filepath.Join(worktreeRoot, ".scratch", "alpha", "issues", "02-new.md")
-
-	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
-	if err := store.Check(otherPending); err != nil {
-		t.Fatal(err)
-	}
-
-	m := Model{
-		worktreeRoot: worktreeRoot,
-		queueStore:   store,
-		checked:      map[string]bool{newSelection: true},
-		checkOrder:   map[string]uint64{newSelection: 1},
-	}
-
-	updated, _ := m.handleImplementKey()
-	m = updated.(Model)
-
-	status := store.Snapshot().Status
-	if got := status[otherPending]; got != queueStatusPending {
-		t.Fatalf("other worktree's pending entry status = %v, want untouched pending", got)
-	}
-	if got := status[newSelection]; got != queueStatusPending {
-		t.Fatalf("new selection entry status = %v, want pending", got)
-	}
-}
-
 // TestModel_ImplementKeyExcludesAlreadyDoneTickets covers ticket 05(b): a
 // checked selection that includes a ticket whose Epic.RenderedStatus is
 // already tickets.StatusDone must not be enqueued — it has nothing left to

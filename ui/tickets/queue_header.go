@@ -12,9 +12,8 @@ import (
 
 var (
 	// epicHeaderStyle highlights the Queue tab's per-epic header name in the
-	// same blue used elsewhere in this UI's palette (statusClaimedStyle,
-	// worktreeTagStyle), rather than sectionHeaderStyle's neutral divider
-	// color.
+	// same blue used elsewhere in this UI's palette (statusClaimedStyle),
+	// rather than sectionHeaderStyle's neutral divider color.
 	epicHeaderStyle = lipgloss.NewStyle().Foreground(ui.ColorBlue).Bold(true)
 
 	// epicStatusDoneStyle colors an epic header's status line green once

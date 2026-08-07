@@ -169,17 +169,15 @@ func newPRsCmd(d deps) *cobra.Command {
 }
 
 func newTicketsCmd(d deps) *cobra.Command {
-	var allRepos bool
 	cmd := &cobra.Command{
 		Use:     "tickets",
 		Aliases: []string{"tk"},
 		Short:   "open the tickets UI",
 		Args:    cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return d.runTickets(allRepos)
+			return d.runTickets()
 		},
 	}
-	cmd.Flags().BoolVar(&allRepos, "all", false, "show every worktree's .scratch/ tickets, not just the current one")
 	cmd.AddCommand(&cobra.Command{
 		Use:   "validate <path>",
 		Short: "validate a ticket file's frontmatter",

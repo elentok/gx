@@ -34,7 +34,7 @@ type deps struct {
 	runShow              func(string) error
 	runStash             func() error
 	runPRs               func(allRepos bool) error
-	runTickets           func(allRepos bool) error
+	runTickets           func() error
 	confirmForce         func(string) (bool, error)
 	choosePushDivergence func(io.Reader, io.Writer, *git.PushDivergence) (int, error)
 	initConfig           func() (string, error)
