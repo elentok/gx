@@ -31,8 +31,8 @@ const (
 )
 
 // newTicketsManager builds the key manager for the sidebar's focus: plain
-// up/down navigation plus ui/filetree's collapse/expand bindings on an epic
-// row (h/left collapse; l/right/enter expand a collapsed epic, or focus the
+// up/down navigation plus collapse/expand bindings on an epic row (h/left
+// collapse; l/right/enter expand a collapsed epic, or focus the
 // preview panel if it's already expanded); on a ticket row, l/right/enter
 // always hand focus to the preview panel (see focusPreviewOrExpand) —
 // handlePreviewKey in model_preview_focus.go covers the preview panel's own

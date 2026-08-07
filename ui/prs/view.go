@@ -99,9 +99,8 @@ func (m Model) visibleLines() []string {
 
 // appendScrollbar right-aligns a 2-column gutter (" " + glyph) onto each of
 // the viewport's rows, padding shorter rows out to padW first so every glyph
-// lands in the same column — mirrors ui/diffview's and ui/filetree's
-// appendScrollbar. The gutter renders blank when content fits without
-// scrolling.
+// lands in the same column — mirrors ui/diffview's appendScrollbar. The
+// gutter renders blank when content fits without scrolling.
 func (m Model) appendScrollbar(lines []string, padW, height, total, offset int) []string {
 	bar := ui.RenderScrollbar(height, total, height, offset)
 	var barLines []string

@@ -30,7 +30,7 @@ type Entry[T any] struct {
 }
 
 // Model owns tree list state (selection/scroll/search), reusing the same
-// generic ui/list, ui/search and ui/keys wiring ui/filetree's Model uses.
+// generic ui/list, ui/search and ui/keys wiring ui/commit and ui/status use.
 type Model[T any] struct {
 	entries   []Entry[T]
 	collapsed map[string]bool
