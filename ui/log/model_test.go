@@ -1122,8 +1122,8 @@ func TestEnterOnCommitRendersDetailContent(t *testing.T) {
 	if !strings.Contains(stripped, "a.txt") {
 		t.Errorf("expected 'a.txt' in view after opening commit detail, got:\n%s", stripped)
 	}
-	if !strings.Contains(stripped, "Commit") {
-		t.Errorf("expected 'Commit' header in view after opening commit detail, got:\n%s", stripped)
+	if !strings.Contains(stripped, "Files") {
+		t.Errorf("expected 'Files' pane in view after opening commit detail, got:\n%s", stripped)
 	}
 }
 

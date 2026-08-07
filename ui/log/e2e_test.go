@@ -347,8 +347,8 @@ func TestSplitViewPanelSwitchingE2E(t *testing.T) {
 
 	// Open the split detail panel on the selected commit.
 	tm.Send(logE2EKeySpecial(tea.KeyEnter))
-	// The detail panel renders with the "Commit" frame title.
-	waitForLogE2EText(t, tm, "Commit", logE2EActionWait)
+	// The detail panel renders with a "Files" frame title.
+	waitForLogE2EText(t, tm, "Files", logE2EActionWait)
 
 	// First esc: focus moves from detail back to the list; split stays open.
 	tm.Send(logE2EKeySpecial(tea.KeyEsc))
@@ -356,13 +356,13 @@ func TestSplitViewPanelSwitchingE2E(t *testing.T) {
 	// we know the model has processed the esc and the list has focus.
 	tm.Send(logE2EKeyRune('j'))
 	waitForCurrentFrameContaining(t, tm, "middle", logE2EActionWait)
-	if !bytes.Contains(tm.CurrentFrame(), []byte("Commit")) {
-		t.Fatal("expected 'Commit' panel still visible after first esc (should only defocus, not collapse)")
+	if !bytes.Contains(tm.CurrentFrame(), []byte("Files")) {
+		t.Fatal("expected 'Files' panel still visible after first esc (should only defocus, not collapse)")
 	}
 
 	// Second esc: collapses the split — the detail panel must disappear.
 	tm.Send(logE2EKeySpecial(tea.KeyEsc))
-	waitForCurrentFrameWithout(t, tm, "Commit", logE2EActionWait)
+	waitForCurrentFrameWithout(t, tm, "Files", logE2EActionWait)
 
 	logE2EQuit(t, tm)
 }

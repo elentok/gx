@@ -141,7 +141,7 @@ func TestLogEnterRendersCommitDetailThroughAppShell(t *testing.T) {
 	m = updated.(Model)
 
 	view := ansi.Strip(m.View().Content)
-	if !strings.Contains(view, "Commit") {
+	if !strings.Contains(view, "Files") {
 		t.Fatalf("expected commit detail through app shell, got:\n%s", view)
 	}
 	if !strings.Contains(view, "c.txt") {

@@ -67,13 +67,26 @@ func writeChildTicket(issuesDir, id, parentID string) error {
 	return os.WriteFile(filepath.Join(issuesDir, id+"-child.md"), []byte(content), 0644)
 }
 
+// linkedWorktreeDir resolves repoDir's linked-worktree directory (e.g.
+// "<repoDir>/.worktrees" for a standard clone) the same way Run resolves it
+// via Deps.WorktreeDir, so tests that need to predict an iteration worktree's
+// path agree with the loop's own path.
+func linkedWorktreeDir(t *testing.T, repoDir string) string {
+	t.Helper()
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo(%s): %v", repoDir, err)
+	}
+	return repo.LinkedWorktreeDir()
+}
+
 // subticketsFakeHerdr builds the herdr fake handler shared by both tests in
 // this file: every ticket's implement turn commits one file to its own
 // iteration worktree (via commitIterationWork, keyed by the full ticket
 // identifier so lettered children never collide with their parent or each
 // other), and onImplement runs once per ticket right after that commit - the
 // hook each test uses to write subticket files for a specific parent.
-func subticketsFakeHerdr(t *testing.T, repoDir, epicName string, onImplement func(id string)) (
+func subticketsFakeHerdr(t *testing.T, worktreeDir, epicName string, onImplement func(id string)) (
 	handler func([]string) ([]byte, int),
 	commitOrder func() []string,
 	openTabCount func() int,
@@ -133,7 +146,7 @@ func subticketsFakeHerdr(t *testing.T, repoDir, epicName string, onImplement fun
 			sess := session[pane]
 			mu.Unlock()
 			if id, ok := fullTicketIDFromImplementPrompt(text); ok {
-				dir := iterationWorktreePath(repoDir, epicName, id)
+				dir := iterationWorktreePath(worktreeDir, epicName, id)
 				if err := commitIterationWork(dir, id); err != nil {
 					t.Errorf("commitIterationWork(%s): %v", id, err)
 					return herdrfake.CommandError(err.Error())
@@ -198,7 +211,8 @@ func subticketsFakeHerdr(t *testing.T, repoDir, epicName string, onImplement fun
 func assertSubticketRunCompleted(t *testing.T, repoDir, epicName, scratchDir string, wantIDs []string, ticketFilenames map[string]string, openTabCount, closedTabCount func() int) {
 	t.Helper()
 
-	featurePath := filepath.Join(repoDir, epicName)
+	worktreeDir := linkedWorktreeDir(t, repoDir)
+	featurePath := filepath.Join(worktreeDir, epicName)
 	issuesDir := filepath.Join(scratchDir, epicName, "issues")
 
 	for _, id := range wantIDs {
@@ -212,7 +226,7 @@ func assertSubticketRunCompleted(t *testing.T, repoDir, epicName, scratchDir str
 	}
 
 	for _, id := range wantIDs {
-		path := iterationWorktreePath(repoDir, epicName, id)
+		path := iterationWorktreePath(worktreeDir, epicName, id)
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
 			t.Errorf("iteration worktree %s for ticket %s still exists, want removed", path, id)
 		}
@@ -268,7 +282,7 @@ func TestRun_ProductionRealGit_TicketCreatesSubtickets(t *testing.T) {
 		})
 	}
 
-	handler, commitOrder, openTabCount, closedTabCount := subticketsFakeHerdr(t, repoDir, epicName, onImplement)
+	handler, commitOrder, openTabCount, closedTabCount := subticketsFakeHerdr(t, linkedWorktreeDir(t, repoDir), epicName, onImplement)
 	herdrfake.Start(t, handler)
 
 	deps := DefaultDeps()
@@ -344,7 +358,7 @@ func TestRun_ProductionRealGit_CodeReviewTicketCreatesSubtickets(t *testing.T) {
 		})
 	}
 
-	handler, commitOrder, openTabCount, closedTabCount := subticketsFakeHerdr(t, repoDir, epicName, onImplement)
+	handler, commitOrder, openTabCount, closedTabCount := subticketsFakeHerdr(t, linkedWorktreeDir(t, repoDir), epicName, onImplement)
 	herdrfake.Start(t, handler)
 
 	deps := DefaultDeps()
