@@ -86,7 +86,7 @@ type Model struct {
 	// queue membership since ticket 15's decoupling (ticket 13's design):
 	// tickets the user has marked with "space", keyed by Ticket.Path so it
 	// survives a reload's re-sorting/index-shuffling. Pressing "i"
-	// (handleImplementKey) pushes this set into the queue and clears it.
+	// (handleReplaceQueueKey) pushes this set into the queue and clears it.
 	checked map[string]bool
 	// checkOrder records when each path joined checked.
 	checkOrder map[string]uint64

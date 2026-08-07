@@ -11,7 +11,7 @@ import (
 )
 
 // TestModel_ImplementKeyWithNoActiveLoopReplacesPendingSelection covers
-// ticket 11: with no ralph-loop running, "r" ("Replace queue", renamed from
+// ticket 10: with no ralph-loop running, "r" ("Replace queue", renamed from
 // "i" by ticket 10) replaces the queue's not-yet-started (pending) entries
 // with the current checked selection, directly and without a confirmation —
 // while running/done entries are left exactly as they are, whether or not
@@ -49,7 +49,7 @@ func TestModel_ImplementKeyWithNoActiveLoopReplacesPendingSelection(t *testing.T
 		checkOrder: map[string]uint64{running: 1, done: 2, newSelection: 3},
 	}
 
-	updated, cmd := m.handleImplementKey()
+	updated, cmd := m.handleReplaceQueueKey()
 	m = updated.(Model)
 	if cmd == nil {
 		t.Fatal("expected a tab-switch command, got nil")
@@ -115,7 +115,7 @@ func TestModel_ImplementKeyExcludesAlreadyDoneTickets(t *testing.T) {
 		checkOrder:   map[string]uint64{donePath: 1, openPath: 2},
 	}
 
-	updated, _ := m.handleImplementKey()
+	updated, _ := m.handleReplaceQueueKey()
 	m = updated.(Model)
 
 	status := store.Snapshot().Status
@@ -166,7 +166,7 @@ func TestModel_ImplementKeyDisabledWithLiveQueueAnywhere(t *testing.T) {
 		checkOrder:   map[string]uint64{newSelection: 1},
 	}
 
-	updated, cmd := m.handleImplementKey()
+	updated, cmd := m.handleReplaceQueueKey()
 	m = updated.(Model)
 	if cmd == nil {
 		t.Fatal("expected a notify command, got nil")

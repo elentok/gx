@@ -151,7 +151,7 @@ func TestQueueStoreTicketCheckedIsIndependentOfQueued(t *testing.T) {
 }
 
 // TestQueueStoreEnqueueAndClearChecked exercises the atomic transfer method
-// ticket 15's replaceQueuedSelection is designed to use: it replaces queue
+// ticket 10's replaceQueuedSelection is designed to use: it replaces queue
 // membership wholesale and clears exactly clearedPaths from the checked set,
 // leaving any other checked entry untouched.
 func TestQueueStoreEnqueueAndClearChecked(t *testing.T) {

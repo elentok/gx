@@ -573,7 +573,7 @@ func newImplementAgentMenu() components.MenuState {
 	}
 }
 
-// handleImplementKey applies ticket 10's "r" ("Replace queue") action: with
+// handleReplaceQueueKey applies ticket 10's "r" ("Replace queue") action: with
 // no ralph-loop live anywhere in this process, it replaces the not-yet-started
 // queue entries with the checked selection directly and switches to the
 // Queue tab — no confirmation, since nothing running/done is at risk. Once
@@ -581,7 +581,7 @@ func newImplementAgentMenu() components.MenuState {
 // work, so "r" is entirely disabled instead — process-wide, regardless of
 // which epic the checked tickets belong to — and the pending selection is
 // left untouched.
-func (m Model) handleImplementKey() (tea.Model, tea.Cmd) {
+func (m Model) handleReplaceQueueKey() (tea.Model, tea.Cmd) {
 	if IsLoopRunning() {
 		return m, notify.Info("Can't replace a live queue")
 	}
@@ -648,7 +648,7 @@ func cmdAddToLiveQueue(epicName string, ticketIDs []string) tea.Cmd {
 	}
 }
 
-// replaceQueuedSelection applies ticket 11's "i" replace logic: every pending
+// replaceQueuedSelection applies ticket 10's "r" replace logic: every pending
 // (not-yet-started) queue entry is dropped and replaced by the current
 // checked selection. Running/done/errored entries are left exactly as they
 // are, whether or not they're still checked. Ticket 15's

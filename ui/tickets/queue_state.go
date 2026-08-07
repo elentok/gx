@@ -273,7 +273,7 @@ func (s *QueueStore) SetTicketChecked(paths []string, checked bool) error {
 // membership (Items/CheckOrder) with (queued, queueOrder) and removes
 // clearedPaths from the independent Tickets-tab checked set, in a single
 // write. Atomicity matters here specifically because this is the one call
-// site (ticket 15's replaceQueuedSelection) that touches both concepts
+// site (ticket 10's replaceQueuedSelection) that touches both concepts
 // together — an interrupted write must never leave the queue updated with
 // the Tickets-tab checkboxes still showing the just-queued selection, or
 // vice versa.

@@ -26,7 +26,7 @@ const (
 	bindingTicketsEditVSplit     keys.BindingID = "edit-vsplit"
 	bindingTicketsEditTab        keys.BindingID = "edit-tab"
 	bindingTicketsCancelChord    keys.BindingID = "cancel-chord"
-	bindingTicketsImplement      keys.BindingID = "implement"
+	bindingTicketsReplaceQueue   keys.BindingID = "replace-queue"
 	bindingTicketsAddToQueue     keys.BindingID = "add-to-queue"
 	bindingTicketsToggleCheck    keys.BindingID = "toggle-check"
 	bindingTicketsToggleHideDone keys.BindingID = "toggle-hide-done"
@@ -65,7 +65,7 @@ func newTicketsManager() keys.Manager {
 		{ID: bindingTicketsEditVSplit, Seq: []string{"e", "v"}, Categories: []string{"Navigation"}, Title: "edit file (vsplit)"},
 		{ID: bindingTicketsEditTab, Seq: []string{"e", "t"}, Categories: []string{"Navigation"}, Title: "edit file (tab)"},
 		{ID: bindingTicketsCancelChord, Seq: []string{"e", "esc"}, Categories: []string{}, Title: ""},
-		{ID: bindingTicketsImplement, Seq: []string{"r"}, Categories: []string{"Navigation"}, Title: "replace queue"},
+		{ID: bindingTicketsReplaceQueue, Seq: []string{"r"}, Categories: []string{"Navigation"}, Title: "replace queue"},
 		{ID: bindingTicketsAddToQueue, Seq: []string{"a"}, Categories: []string{"Navigation"}, Title: "add to queue"},
 		{ID: bindingTicketsToggleCheck, Seq: []string{"space"}, Categories: []string{"Navigation"}, Title: "check/uncheck"},
 		{ID: bindingTicketsToggleHideDone, Seq: []string{"t", "c"}, Categories: []string{"Navigation"}, Title: "hide completed"},
@@ -139,8 +139,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.cmdEditSelectedFile(terminalrun.Tab)
 	case bindingTicketsCancelChord:
 		return m, nil
-	case bindingTicketsImplement:
-		return m.handleImplementKey()
+	case bindingTicketsReplaceQueue:
+		return m.handleReplaceQueueKey()
 	case bindingTicketsAddToQueue:
 		return m.handleAddToQueueKey()
 	case bindingTicketsToggleCheck:

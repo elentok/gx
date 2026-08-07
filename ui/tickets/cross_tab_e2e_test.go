@@ -128,7 +128,7 @@ func TestCrossTabCheckThenQueueResetsTicketsCheckboxWhileQueueTabKeepsEntries(t 
 		t.Fatalf("Tickets checked set before queueing = %v, want both tickets checked", tm.checked)
 	}
 
-	updated, _ = tm.handleImplementKey()
+	updated, _ = tm.handleReplaceQueueKey()
 	tm = updated.(Model)
 
 	if len(tm.checked) != 0 {
