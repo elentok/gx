@@ -12,6 +12,8 @@ import (
 	"github.com/elentok/gx/claudehistory"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/filter"
+	"github.com/elentok/gx/ui/help"
+	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/notify"
 )
@@ -67,6 +69,7 @@ type Model struct {
 	terminal ui.Terminal
 
 	notify notify.Model
+	help   help.Model
 
 	// projects page
 	projects   []claudehistory.Project
@@ -107,6 +110,7 @@ func NewModel(root string, loadProjects ProjectLoader, loadConversations Convers
 		loadConversations: loadConversations,
 		grepFunc:          grepFunc,
 		notify:            notify.New(false),
+		help:              help.NewModel(nil),
 		projFilter:        filter.NewModel(),
 		convFilter:        filter.NewModel(),
 		grepFilter:        filter.NewModel(),
@@ -165,6 +169,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.projFilter.SetWidth(m.w - 4)
 		m.convFilter.SetWidth(m.w - 4)
 		m.grepFilter.SetWidth(m.w - 4)
+		m.help, _ = m.help.Update(msg)
 		return m, notifyCmd
 
 	case projectsLoadedMsg:
@@ -202,6 +207,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.help.IsOpen {
+		var cmd tea.Cmd
+		m.help, cmd = m.help.Update(msg)
+		return m, cmd
+	}
 	switch m.page {
 	case pageProjects:
 		return m.handleProjectsKey(msg)
@@ -210,6 +220,30 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case pageGrep:
 		return m.handleGrepKey(msg)
 	}
+	return m, nil
+}
+
+// currentKeyManager returns the key manager describing the active page's real
+// bindings, used to drive both the '?' help overlay and (indirectly, via the
+// per-page footer hints) the inline hint strings.
+func (m Model) currentKeyManager() keys.Manager {
+	switch m.page {
+	case pageProjects:
+		return newProjectsManager()
+	case pageConversations:
+		return newConversationsManager()
+	case pageGrep:
+		return newGrepManager()
+	}
+	return keys.Manager{}
+}
+
+// openHelp opens the '?' help overlay, rebuilding its sections from the
+// active page's key manager so it always reflects the current page's real
+// bindings rather than a shared static list.
+func (m Model) openHelp() (tea.Model, tea.Cmd) {
+	m.help.KeySections = help.BuildSections(m.currentKeyManager())
+	m.help.Open(m.w, m.h)
 	return m, nil
 }
 
@@ -256,6 +290,9 @@ func (m Model) View() tea.View {
 	}
 	if stack := m.notify.View(); stack != "" {
 		body = ui.OverlayTopRightMargin(body, stack, m.w, 1, 1)
+	}
+	if m.help.IsOpen {
+		body = ui.OverlayCenter(body, m.help.View(), m.w, m.h)
 	}
 	return ui.NewMainView(body)
 }

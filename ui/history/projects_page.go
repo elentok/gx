@@ -3,6 +3,7 @@ package history
 import (
 	"strings"
 
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/claudehistory"
@@ -39,6 +40,8 @@ func (m Model) handleProjectsKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "ctrl+c", "q":
 		return m, tea.Quit
+	case "?":
+		return m.openHelp()
 	case "j", "down":
 		m.projList.Navigate(1, len(m.filteredProjects()), m.listHeight())
 	case "k", "up":
@@ -93,6 +96,17 @@ func (m Model) viewProjects() string {
 	if m.projFilter.IsActive() {
 		top = m.projFilter.View() + "\n"
 	}
-	footer := "  " + ui.StyleHint.Render("/: filter  enter: open  q: quit")
+	footer := "  " + projectsFooterHint()
 	return top + panel + "\n" + footer
+}
+
+// projectsFooterHint renders the projects page's footer hint from its real
+// key bindings, mirroring the conversations/grep pages' footer hints.
+func projectsFooterHint() string {
+	return ui.RenderInlineBindings(
+		key.NewBinding(key.WithHelp("/", "filter")),
+		key.NewBinding(key.WithHelp("enter", "open")),
+		key.NewBinding(key.WithHelp("q", "quit")),
+		key.NewBinding(key.WithHelp("?", "help")),
+	)
 }

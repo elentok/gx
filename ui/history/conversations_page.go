@@ -3,6 +3,7 @@ package history
 import (
 	"strings"
 
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/claudehistory"
@@ -39,6 +40,8 @@ func (m Model) handleConversationsKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) 
 	switch msg.String() {
 	case "ctrl+c":
 		return m, tea.Quit
+	case "?":
+		return m.openHelp()
 	case "esc":
 		if m.convFilter.IsActive() {
 			m.convFilter.Clear()
@@ -89,6 +92,19 @@ func (m Model) viewConversations() string {
 	if m.convFilter.IsActive() {
 		top = m.convFilter.View() + "\n"
 	}
-	footer := "  " + ui.StyleHint.Render("/: filter  enter: export+edit  ctrl+r: resume  ctrl+y: yank id  esc: back")
+	footer := "  " + conversationsFooterHint()
 	return top + panel + "\n" + footer
+}
+
+// conversationsFooterHint renders the conversations page's footer hint from
+// its real key bindings, mirroring the projects/grep pages' footer hints.
+func conversationsFooterHint() string {
+	return ui.RenderInlineBindings(
+		key.NewBinding(key.WithHelp("/", "filter")),
+		key.NewBinding(key.WithHelp("enter", "export+edit")),
+		key.NewBinding(key.WithHelp("ctrl+r", "resume")),
+		key.NewBinding(key.WithHelp("ctrl+y", "yank id")),
+		key.NewBinding(key.WithHelp("esc", "back")),
+		key.NewBinding(key.WithHelp("?", "help")),
+	)
 }

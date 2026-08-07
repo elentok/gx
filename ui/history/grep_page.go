@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/claudehistory"
@@ -48,12 +49,15 @@ func (m Model) handleGrepKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// since the filter is always focused on this page (Start() on entry, no
 	// "/" needed) and would otherwise swallow every keypress as typed text.
 	// Navigation therefore uses the arrow keys only (not j/k, which are
-	// ordinary query characters here).
+	// ordinary query characters here). "?" is reserved for the help overlay,
+	// so it can't be searched for literally.
 	switch msg.String() {
 	case "esc":
 		return m.exitGrep()
 	case "ctrl+c":
 		return m, tea.Quit
+	case "?":
+		return m.openHelp()
 	case "ctrl+g":
 		return m.toggleGrepScope()
 	case "enter":
@@ -196,8 +200,21 @@ func (m Model) viewGrep() string {
 	}
 	panel := ui.RenderPanel(ui.PanelOptionsFor(m.w, m.h-2-m.grepPreviewBoxHeight(), "Grep Transcripts", "scope: "+scopeLabel, lines, true, ui.ColorOrange, ui.ColorOrange, false))
 	top := m.grepFilter.View() + "\n"
-	footer := "  " + ui.StyleHint.Render("enter: export+edit  ctrl+r: resume  ctrl+y: yank id  ctrl+g: toggle scope  esc: back")
+	footer := "  " + grepFooterHint()
 	return top + panel + "\n" + m.viewGrepPreview() + "\n" + footer
+}
+
+// grepFooterHint renders the grep page's footer hint from its real key
+// bindings, mirroring the projects/conversations pages' footer hints.
+func grepFooterHint() string {
+	return ui.RenderInlineBindings(
+		key.NewBinding(key.WithHelp("enter", "export+edit")),
+		key.NewBinding(key.WithHelp("ctrl+r", "resume")),
+		key.NewBinding(key.WithHelp("ctrl+y", "yank id")),
+		key.NewBinding(key.WithHelp("ctrl+g", "toggle scope")),
+		key.NewBinding(key.WithHelp("esc", "back")),
+		key.NewBinding(key.WithHelp("?", "help")),
+	)
 }
 
 func grepEmptyMessage(m Model) string {
