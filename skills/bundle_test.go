@@ -28,6 +28,8 @@ var requiredFiles = []string{
 	"gx-tdd/mocking.md",
 	"gx-implement/SKILL.md",
 	"gx-resolving-merge-conflicts/SKILL.md",
+	"gx-investigate/SKILL.md",
+	"gx-investigate/gotchas.md",
 }
 
 func TestBundleRequiredFilesPresent(t *testing.T) {
@@ -100,13 +102,14 @@ func parseFrontmatter(t *testing.T, raw string) skillFrontmatter {
 // value, per gx.md's "Invocation policy" section: gx-to-tickets and
 // gx-implement are explicit-invoke only (breaking work into tickets, and
 // claiming/implementing one, should never trigger on the model's own reading
-// of a conversation); gx-tdd and gx-resolving-merge-conflicts are left
-// model-invocable.
+// of a conversation); gx-tdd, gx-resolving-merge-conflicts, and
+// gx-investigate are left model-invocable.
 var wantInvocationPolicy = map[string]bool{
 	"gx-to-tickets":                true,
 	"gx-tdd":                       false,
 	"gx-implement":                 true,
 	"gx-resolving-merge-conflicts": false,
+	"gx-investigate":               false,
 }
 
 func TestSkillMetadataAndInvocationPolicy(t *testing.T) {

@@ -39,13 +39,14 @@ Linear, ...) selected by a separate setup step. gx's bundle drops both assumptio
 
 ## Invocation policy
 
-All four skills carry `name`/`description` frontmatter Claude Code reads to render the skill
-picker. `gx-to-tickets` and `gx-implement` set `disable-model-invocation: true`, matching their
-upstream: breaking work into tickets, and claiming/implementing one, are deliberate,
-explicitly-invoked actions, never something the model should trigger on its own reading of a
-conversation. `gx-tdd` and `gx-resolving-merge-conflicts` carry no such flag, also matching
-upstream: it's fine for the model to reach for TDD guidance or merge-conflict resolution on its own
-when a task calls for it.
+All skills carry `name`/`description` frontmatter Claude Code reads to render the skill picker.
+`gx-to-tickets` and `gx-implement` set `disable-model-invocation: true`, matching their upstream:
+breaking work into tickets, and claiming/implementing one, are deliberate, explicitly-invoked
+actions, never something the model should trigger on its own reading of a conversation. `gx-tdd`
+and `gx-resolving-merge-conflicts` carry no such flag, also matching upstream: it's fine for the
+model to reach for TDD guidance or merge-conflict resolution on its own when a task calls for it.
+`gx-investigate` likewise carries no flag: a bug report should reflexively pull in ralph-loop's
+log/state inventory without a human having to name the skill.
 
 Codex has no equivalent auto-invocation concept — a Codex custom prompt is only ever run by explicit
 `/name` invocation, never launched by the model on its own. That's already at least as restrictive as
@@ -116,6 +117,9 @@ skills/
     SKILL.md
   gx-resolving-merge-conflicts/
     SKILL.md
+  gx-investigate/
+    SKILL.md
+    gotchas.md
 ```
 
 Every skill references `gx-local-tracker.md` with a relative path (`../gx-local-tracker.md`), so it
