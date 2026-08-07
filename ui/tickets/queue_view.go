@@ -32,7 +32,7 @@ func (m QueueModel) View() tea.View {
 		sidebarW, sidebarH, m.queueHeaderTitle(), "", lines, true, ui.ColorBlue, nil, true,
 	))
 	previewView := ui.RenderPanel(ui.PanelOptionsFor(
-		previewW, previewH, "Preview", "", m.queuePreviewLines(previewW, previewH), false, ui.ColorBlue, nil, false,
+		previewW, previewH, "Preview", m.previewMatchStatus(), m.previewLines(), false, ui.ColorBlue, nil, false,
 	))
 
 	var content string

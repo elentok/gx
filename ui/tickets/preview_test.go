@@ -215,6 +215,101 @@ func TestModel_PreviewScrollbarAppearsOnlyWhenBodyOverflows(t *testing.T) {
 	}
 }
 
+// TestModel_GAndGGJumpSidebarSelectionToLastAndFirstRow covers ticket 11's
+// "G"/"gg" bindings: they move the sidebar's own selection to the last/first
+// visible row, independent of the preview (which has its own "b" for
+// bottom).
+func TestModel_GAndGGJumpSidebarSelectionToLastAndFirstRow(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "epic", "01-first.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "epic", "02-second.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "epic", "03-third.md", "Status: open\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'G', Text: "G"})
+	m = updated.(Model)
+	last := len(m.visibleRows()) - 1
+	if last <= 0 {
+		t.Fatalf("expected more than one visible row in test setup, got %d", last+1)
+	}
+	if m.selected != last {
+		t.Fatalf("expected 'G' to select the last row (%d), got %d", last, m.selected)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	m = updated.(Model)
+	if m.selected != 0 {
+		t.Fatalf("expected 'gg' to select the first row (0), got %d", m.selected)
+	}
+}
+
+// TestModel_BJumpsPreviewToBottomFromListFocus covers ticket 11's "b"
+// binding: from the sidebar (list) focus it scrolls the preview to its
+// bottom without moving focus off the sidebar.
+func TestModel_BJumpsPreviewToBottomFromListFocus(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "epic", "01-ticket.md", "Status: open\n\nTOPMARKERXYZ\n\n"+strings.Repeat("Filler line of body text.\n\n", 80)+"BOTTOMMARKERXYZ\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'b', Text: "b"})
+	m = updated.(Model)
+	if m.focus != focusSidebar {
+		t.Fatalf("expected 'b' to leave focus on the sidebar, got focus=%v", m.focus)
+	}
+	content := ansi.Strip(m.previewVP.View())
+	if !strings.Contains(content, "BOTTOMMARKERXYZ") {
+		t.Fatalf("expected preview scrolled to bottom marker, got:\n%s", content)
+	}
+	if strings.Contains(content, "TOPMARKERXYZ") {
+		t.Fatalf("expected top marker scrolled out of view, got:\n%s", content)
+	}
+}
+
+// TestModel_BJumpsPreviewToBottomFromPreviewFocus covers the same "b"
+// binding from preview focus, overriding bubbles/viewport's own default "b"
+// (page up) — see handlePreviewKey.
+func TestModel_BJumpsPreviewToBottomFromPreviewFocus(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "epic", "01-ticket.md", "Status: open\n\nTOPMARKERXYZ\n\n"+strings.Repeat("Filler line of body text.\n\n", 80)+"BOTTOMMARKERXYZ\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	if m.focus != focusPreview {
+		t.Fatalf("expected preview focus after enter on ticket row, got focus=%v", m.focus)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'b', Text: "b"})
+	m = updated.(Model)
+	if m.focus != focusPreview {
+		t.Fatalf("expected 'b' to leave focus on the preview, got focus=%v", m.focus)
+	}
+	content := ansi.Strip(m.previewVP.View())
+	if !strings.Contains(content, "BOTTOMMARKERXYZ") {
+		t.Fatalf("expected preview scrolled to bottom marker, got:\n%s", content)
+	}
+	if strings.Contains(content, "TOPMARKERXYZ") {
+		t.Fatalf("expected top marker scrolled out of view, got:\n%s", content)
+	}
+}
+
 // TestModel_PreviewSearchHighlightsMatch guards against the preview search
 // only driving match-count/n-N navigation without visibly marking the
 // match: querying for text known to be in the glamour-rendered body must

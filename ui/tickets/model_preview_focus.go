@@ -136,9 +136,10 @@ func (m *Model) focusPreviewOrExpand() bool {
 
 // handlePreviewKey processes key input while the preview panel has focus:
 // its own search overlay, "h"/"left"/"esc" handing focus back to the
-// sidebar, and everything else delegated to the viewport's own scrolling
-// (j/k, up/down, pgup/pgdn, ctrl+u/d, etc. — see bubbles/viewport's
-// DefaultKeyMap).
+// sidebar, "b" jumping straight to the bottom (overriding the viewport's own
+// "b" default of a page-up — see bubbles/viewport's DefaultKeyMap), and
+// everything else delegated to the viewport's own scrolling (j/k, up/down,
+// pgup/pgdn, ctrl+u/d, etc.).
 func (m Model) handlePreviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if handled, cmd := m.previewFocus.updatePreviewKey(msg); handled {
 		return m, cmd
@@ -151,6 +152,9 @@ func (m Model) handlePreviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "h", "left", "esc":
 		m.focus = focusSidebar
+		return m, nil
+	case "b":
+		m.previewVP.GotoBottom()
 		return m, nil
 	}
 

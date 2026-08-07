@@ -1406,6 +1406,71 @@ func TestQueueModelMouseClickSelectsRowOnly(t *testing.T) {
 	}
 }
 
+// TestQueueModelPreviewScrollsPastTruncationPoint covers ticket 11: the
+// Queue tab's preview now wraps the shared previewFocus viewport instead of
+// truncating to the panel's visible height, so its bottom marker — well past
+// where the old truncate-only rendering would have cut off — is reachable by
+// scrolling ("b" jumps straight there since the Queue tab has no
+// focus-toggle of its own yet, ticket 12).
+func TestQueueModelPreviewScrollsPastTruncationPoint(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-ticket.md", "Status: open\n\nTOPMARKERXYZ\n\n"+strings.Repeat("Filler line of body text.\n\n", 80)+"BOTTOMMARKERXYZ\n")
+	checked := map[string]bool{ticketPath(root, "alpha", "01-ticket.md"): true}
+
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+
+	initial := ansi.Strip(m.previewVP.View())
+	if !strings.Contains(initial, "TOPMARKERXYZ") {
+		t.Fatalf("expected top marker visible before scrolling, got:\n%s", initial)
+	}
+	if strings.Contains(initial, "BOTTOMMARKERXYZ") {
+		t.Fatalf("expected bottom marker truncated out of the initial view, got:\n%s", initial)
+	}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'b', Text: "b"})
+	m = updated.(QueueModel)
+
+	scrolled := ansi.Strip(m.previewVP.View())
+	if !strings.Contains(scrolled, "BOTTOMMARKERXYZ") {
+		t.Fatalf("expected 'b' to scroll the preview down to the bottom marker, got:\n%s", scrolled)
+	}
+}
+
+// TestQueueModelGAndGGJumpSelectionToLastAndFirstRow covers ticket 11's
+// "G"/"gg" bindings on the Queue tab, mirroring the Tickets tab's own
+// TestModel_GAndGGJumpSidebarSelectionToLastAndFirstRow (preview_test.go).
+func TestQueueModelGAndGGJumpSelectionToLastAndFirstRow(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "alpha", "03-third.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "01-first.md"):  true,
+		ticketPath(root, "alpha", "02-second.md"): true,
+		ticketPath(root, "alpha", "03-third.md"):  true,
+	}
+
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'G', Text: "G"})
+	m = updated.(QueueModel)
+	last := len(m.rows()) - 1
+	if last <= 0 {
+		t.Fatalf("expected more than one row in test setup, got %d", last+1)
+	}
+	if m.selected != last {
+		t.Fatalf("expected 'G' to select the last row (%d), got %d", last, m.selected)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	m = updated.(QueueModel)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	m = updated.(QueueModel)
+	if m.selected != 0 {
+		t.Fatalf("expected 'gg' to select the first row (0), got %d", m.selected)
+	}
+}
+
 func ticketPath(root, epic, name string) string {
 	return filepath.Join(root, ".scratch", epic, "issues", name)
 }

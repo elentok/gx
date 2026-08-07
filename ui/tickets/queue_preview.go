@@ -1,8 +1,6 @@
 package tickets
 
 import (
-	"strings"
-
 	"github.com/elentok/gx/ui"
 )
 
@@ -29,19 +27,32 @@ func (m QueueModel) queuePreviewContent(width int) string {
 	return renderTicketPreview(row.epic, row.ticket, width)
 }
 
-// queuePreviewLines renders queuePreviewContent clipped to a previewW x
-// previewH panel: previewInnerSize accounts for the panel's own
-// padding/header row (shared with the Tickets tab's preview sizing, see
-// preview.go), and the result is truncated to the panel's visible height -
-// the Queue tab's preview has no independent scroll of its own (ticket 15
-// scopes it to "shows a preview pane", not scroll/search parity with the
-// Tickets tab).
-func (m QueueModel) queuePreviewLines(previewW, previewH int) []string {
-	width, height := previewInnerSize(previewW, previewH)
-	content := m.queuePreviewContent(width)
-	lines := strings.Split(content, "\n")
-	if len(lines) > height {
-		lines = lines[:height]
+// queuePreviewSelectionKey identifies which row the preview is currently
+// showing, mirroring Model.previewSelectionKey — used by
+// syncQueuePreviewViewport to tell "still previewing the same row" from
+// "selection moved" so it only resets scroll on the latter.
+func (m QueueModel) queuePreviewSelectionKey() string {
+	row, ok := m.selectedQueueRow()
+	if !ok {
+		return ""
 	}
-	return lines
+	return row.ticket.Path
+}
+
+// syncQueuePreviewViewport keeps the shared previewFocus's viewport size and
+// content aligned with the current layout/selection (ticket 11), mirroring
+// Model.syncPreviewViewport (model_preview_focus.go) — called after every
+// Update so the Queue tab's preview gets real scroll/search instead of the
+// old truncate-only rendering, even though (unlike Tickets) this tab has no
+// focus-toggle into it yet (ticket 12).
+func (m *QueueModel) syncQueuePreviewViewport() {
+	if !m.ready {
+		return
+	}
+	height := max(m.height-1, 1)
+	_, previewW := splitPanelWidth(m.width)
+	_, previewH := splitPanelHeight(m.width, height)
+	width, ht := previewInnerSize(previewW, previewH)
+	contentW := max(width-previewScrollbarGutter, 1)
+	m.previewFocus.Sync(contentW, ht, m.queuePreviewSelectionKey(), m.queuePreviewContent)
 }

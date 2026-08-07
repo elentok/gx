@@ -97,6 +97,14 @@ type QueueModel struct {
 	// rows()/rowsAndPlanErrors() (ticket 10). Every ticket with children
 	// starts expanded — no default-collapse pass.
 	collapsedQueueTickets map[string]bool
+
+	// previewFocus backs the preview panel's scroll/search machinery, shared
+	// with the Tickets tab (see preview_focus.go) — ticket 11 gives the Queue
+	// tab real scroll/search instead of the old truncate-only preview. Its
+	// promoted focus field goes unused here: this tab has no focus-toggle
+	// into its preview yet (ticket 12), so the list always retains focus and
+	// only "b" (bottom) reaches the preview directly (see handleQueueKey).
+	previewFocus
 }
 
 func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string]bool, orders ...map[string]uint64) QueueModel {
@@ -126,6 +134,7 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 		confirm:            confirm.New(),
 		search:             search.NewModel(),
 		keys:               newQueueKeysManager(),
+		previewFocus:       newPreviewFocus(),
 	}
 }
 
@@ -154,7 +163,18 @@ func (m QueueModel) cmdLoadQueue() tea.Cmd {
 	}
 }
 
+// Update delegates to updateInner then re-syncs the preview viewport,
+// mirroring the Tickets tab's own Update/syncPreviewViewport split (see
+// model.go) so every message that can move the selection, resize the
+// panels, or reload data doesn't need to remember to do it itself.
 func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	next, cmd := m.updateInner(msg)
+	nm := next.(QueueModel)
+	nm.syncQueuePreviewViewport()
+	return nm, cmd
+}
+
+func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.queueStore != nil {
 		snapshot := m.queueStore.Snapshot()
 		m.checked = snapshot.Checked
@@ -475,6 +495,11 @@ func (m *QueueModel) finalizeEpicTicketStatus(epicName string) {
 // (ticket 16).
 const bindingQueueToggleHideDone keys.BindingID = "toggle-hide-done"
 
+// bindingQueueSelectFirst is the "gg" chord (ticket 11), dispatched through
+// keys.Manager since it's a two-key sequence like bindingQueueToggleHideDone
+// above.
+const bindingQueueSelectFirst keys.BindingID = "select-first"
+
 func newQueueKeysManager() keys.Manager {
 	return keys.New([]keys.Binding{
 		{ID: bindingQueueToggleHideDone, Seq: []string{"t", "c"}, Categories: []string{"Navigation"}, Title: "hide completed"},
@@ -483,6 +508,7 @@ func newQueueKeysManager() keys.Manager {
 		{ID: bindingQueueEditVSplit, Seq: []string{"e", "v"}, Categories: []string{"Navigation"}, Title: "edit file (vsplit)"},
 		{ID: bindingQueueEditTab, Seq: []string{"e", "t"}, Categories: []string{"Navigation"}, Title: "edit file (tab)"},
 		{ID: bindingQueueCancelChord, Seq: []string{"e", "esc"}, Categories: []string{}, Title: ""},
+		{ID: bindingQueueSelectFirst, Seq: []string{"g", "g"}, Categories: []string{"Navigation"}, Title: "first row"},
 	})
 }
 
@@ -509,6 +535,8 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, m.cmdEditSelectedFile(terminalrun.Tab)
 		case bindingQueueCancelChord:
 			return m, nil
+		case bindingQueueSelectFirst:
+			m.selectFirstRow()
 		}
 		return m, nil
 	}
@@ -523,6 +551,10 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.collapseSelectedQueueRow()
 	case "l", "right":
 		m.expandSelectedQueueRow()
+	case "G":
+		m.selectLastRow()
+	case "b":
+		m.previewVP.GotoBottom()
 	case "ctrl+d":
 		m.moveSelection(list.DefaultScroll)
 	case "ctrl+u":
@@ -744,6 +776,26 @@ func (m *QueueModel) setCollapsedQueueTicket(path string, collapsed bool) {
 		m.recomputeQueueSearchMatches()
 	}
 	m.clampSelected()
+}
+
+// selectFirstRow/selectLastRow implement "gg"/"G": jump the queue selection
+// to the first/last row, mirroring the Tickets tab's own selectFirstRow/
+// selectLastRow (model_keys.go).
+func (m *QueueModel) selectFirstRow() {
+	if len(m.rows()) == 0 {
+		return
+	}
+	m.selected = 0
+	m.ensureQueueVisible()
+}
+
+func (m *QueueModel) selectLastRow() {
+	n := len(m.rows())
+	if n == 0 {
+		return
+	}
+	m.selected = n - 1
+	m.ensureQueueVisible()
 }
 
 func (m *QueueModel) moveSelection(delta int) {

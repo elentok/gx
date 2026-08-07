@@ -28,6 +28,9 @@ const (
 	bindingTicketsImplement      keys.BindingID = "implement"
 	bindingTicketsToggleCheck    keys.BindingID = "toggle-check"
 	bindingTicketsToggleHideDone keys.BindingID = "toggle-hide-done"
+	bindingTicketsSelectFirst    keys.BindingID = "select-first"
+	bindingTicketsSelectLast     keys.BindingID = "select-last"
+	bindingTicketsPreviewBottom  keys.BindingID = "preview-bottom"
 )
 
 // newTicketsManager builds the key manager for the sidebar's focus: plain
@@ -62,6 +65,9 @@ func newTicketsManager() keys.Manager {
 		{ID: bindingTicketsImplement, Seq: []string{"i"}, Categories: []string{"Navigation"}, Title: "implement epic"},
 		{ID: bindingTicketsToggleCheck, Seq: []string{"space"}, Categories: []string{"Navigation"}, Title: "check/uncheck"},
 		{ID: bindingTicketsToggleHideDone, Seq: []string{"t", "c"}, Categories: []string{"Navigation"}, Title: "hide completed"},
+		{ID: bindingTicketsSelectFirst, Seq: []string{"g", "g"}, Categories: []string{"Navigation"}, Title: "first row"},
+		{ID: bindingTicketsSelectLast, Seq: []string{"G"}, Categories: []string{"Navigation"}, Title: "last row"},
+		{ID: bindingTicketsPreviewBottom, Seq: []string{"b"}, Categories: []string{"Navigation"}, Title: "preview bottom"},
 	})
 }
 
@@ -132,8 +138,33 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handleToggleCheck()
 	case bindingTicketsToggleHideDone:
 		m.toggleHideDone()
+	case bindingTicketsSelectFirst:
+		m.selectFirstRow()
+	case bindingTicketsSelectLast:
+		m.selectLastRow()
+	case bindingTicketsPreviewBottom:
+		m.previewVP.GotoBottom()
 	}
 	return m, nil
+}
+
+// selectFirstRow/selectLastRow implement "gg"/"G": jump the sidebar
+// selection to the first/last visible row, leaving focus on the sidebar.
+func (m *Model) selectFirstRow() {
+	if len(m.visibleRows()) == 0 {
+		return
+	}
+	m.selected = 0
+	m.ensureSidebarVisible()
+}
+
+func (m *Model) selectLastRow() {
+	n := len(m.visibleRows())
+	if n == 0 {
+		return
+	}
+	m.selected = n - 1
+	m.ensureSidebarVisible()
 }
 
 // toggleHideDone flips the "tc" hide-complete filter and re-clamps
