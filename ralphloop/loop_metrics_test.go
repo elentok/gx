@@ -270,18 +270,18 @@ func TestRun_IterationFinishedAndEpicComplete_ReceiveRealMetrics(t *testing.T) {
 	}
 	release01 := make(chan struct{})
 	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		if strings.Contains(opts.Target, "iter-01") {
+		if strings.Contains(opts.Target, iterLabel("epic", "01")) {
 			<-release01
 		}
 		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 	}
 
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	writeFakeTranscript(t, iterationWorktreePath("/fake/worktrees", "epic", "01"), "sess-pane-iter-01", start,
+	writeFakeTranscript(t, iterationWorktreePath("/fake/worktrees", "epic", "01"), "sess-pane-"+iterLabel("epic", "01"), start,
 		[3]any{"claude-sonnet-5", 1000, 0},
 		[3]any{"claude-sonnet-5", 2000, 5000},
 	)
-	writeFakeTranscript(t, iterationWorktreePath("/fake/worktrees", "epic", "02"), "sess-pane-iter-02", start.Add(20*time.Second),
+	writeFakeTranscript(t, iterationWorktreePath("/fake/worktrees", "epic", "02"), "sess-pane-"+iterLabel("epic", "02"), start.Add(20*time.Second),
 		[3]any{"claude-sonnet-5", 3000, 0},
 		[3]any{"claude-sonnet-5", 4000, 9000},
 	)

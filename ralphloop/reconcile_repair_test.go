@@ -195,7 +195,7 @@ func TestReconcile_DoneTicketRecoverable_CleansUpLeftoverWorktreeAndTab(t *testi
 
 	d, _, _ := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-iter-03", Label: "iter-03", WorkspaceID: workspaceID}}, nil
+		return []herdr.Tab{{TabID: "tab-iter-03", Label: iterLabel("epic", "03"), WorkspaceID: workspaceID}}, nil
 	}
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.WorktreeExists = func(path string) (bool, error) { return strings.Contains(path, "item-03"), nil }
@@ -244,7 +244,7 @@ func TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup(t *testing.T) 
 
 	d, _, _ := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-iter-03", Label: "iter-03", WorkspaceID: workspaceID}}, nil
+		return []herdr.Tab{{TabID: "tab-iter-03", Label: iterLabel("epic", "03"), WorkspaceID: workspaceID}}, nil
 	}
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return true, nil } // commits landed
 	d.WorktreeExists = func(path string) (bool, error) { return strings.Contains(path, "item-03"), nil }

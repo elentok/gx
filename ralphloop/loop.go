@@ -342,7 +342,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	}
 	for _, ticket := range initial.Tickets {
 		if scope.Contains(ticket, *initial) && strings.EqualFold(strings.TrimSpace(ticket.Status), "needs-attention") {
-			gate.pause(iterLabel(ticket.Identifier), "needs operator attention")
+			gate.pause(iterLabel(opts.EpicName, ticket.Identifier), "needs operator attention")
 		}
 	}
 	for _, ticket := range reattached {
@@ -398,7 +398,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			// (terminal per allSettled, excluded from future claims) and
 			// keep scheduling the rest.
 			reason := r.err.Error()
-			label := iterLabel(r.ticket.Identifier)
+			label := iterLabel(opts.EpicName, r.ticket.Identifier)
 			if markErr := MarkNeedsAttentionWithReason(r.ticket.Path, reason); markErr != nil {
 				reason = fmt.Sprintf("%s (also failed marking needs-attention: %v)", reason, markErr)
 			}

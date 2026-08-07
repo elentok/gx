@@ -14,11 +14,11 @@ import (
 )
 
 // TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt drives a full
-// Run() through: iter-01's pane showing a Claude rate-limit message (no
+// Run() through: epic-iter-01's pane showing a Claude rate-limit message (no
 // Ctrl-C — unlike a smart-zone breach, the agent isn't interrupted, it's
 // already sitting blocked), the loop auto-pausing (no scheduling, other
 // iterations keep running) without any `gx ralph-loop resume` call, then
-// auto-detecting the reset, re-prompting iter-01's agent to continue, and
+// auto-detecting the reset, re-prompting epic-iter-01's agent to continue, and
 // resuming normal scheduling.
 func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
@@ -45,7 +45,7 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 	// A Claude rate-limit hit has no status of its own (see waitForFinish):
 	// the pane just goes idle, same as an ordinary finish, with the
 	// rate-limit message still sitting in its recent output. So the gated
-	// wait here resolves iter-01's "done" wait to idle exactly like any
+	// wait here resolves epic-iter-01's "done" wait to idle exactly like any
 	// other iteration's — release(pane) is what simulates that idle
 	// transition, whether it's a real finish or, as here, a rate limit.
 	wait, started, release := gatedAgentWait(d.AgentWait)
@@ -54,7 +54,7 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 	var rlMu sync.Mutex
 	rateLimitCleared := false
 	d.ReadPaneRecent = func(pane string) (string, error) {
-		if !strings.Contains(pane, "iter-01") {
+		if !strings.Contains(pane, "epic-iter-01") {
 			return "working on it", nil
 		}
 		rlMu.Lock()
@@ -99,18 +99,18 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 		}, d, NewTextEventSink(&out))
 	}()
 
-	// iter-01 and iter-02 both claimed and started (2 slots); either order.
+	// epic-iter-01 and epic-iter-02 both claimed and started (2 slots); either order.
 	var pane1, pane2 string
 	for range 2 {
 		p := <-started
-		if strings.Contains(p, "iter-01") {
+		if strings.Contains(p, "epic-iter-01") {
 			pane1 = p
 		} else {
 			pane2 = p
 		}
 	}
 
-	// iter-01's pane goes idle showing the rate-limit message.
+	// epic-iter-01's pane goes idle showing the rate-limit message.
 	release(pane1)
 
 	select {
@@ -127,7 +127,7 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 		t.Errorf("ticket 01 status = %s, want claimed (paused, not reverted or done) while paused", raw01)
 	}
 
-	// iter-02 finishes normally while iter-01 stays paused.
+	// epic-iter-02 finishes normally while epic-iter-01 stays paused.
 	release(pane2)
 
 	// Give the scheduler a moment to (wrongly, if buggy) backfill a third
@@ -136,15 +136,15 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 	mu.Lock()
 	createdSoFar := slices.Clone(createdBranches)
 	mu.Unlock()
-	if len(createdSoFar) != 3 { // feature worktree + iter-01 + iter-02
-		t.Fatalf("worktrees created while paused = %v, want exactly [epic, iter-01, iter-02] (no backfill until resumed)", createdSoFar)
+	if len(createdSoFar) != 3 { // feature worktree + epic-iter-01 + epic-iter-02
+		t.Fatalf("worktrees created while paused = %v, want exactly [epic, epic-iter-01, epic-iter-02] (no backfill until resumed)", createdSoFar)
 	}
 
 	rlMu.Lock()
 	rateLimitCleared = true
 	rlMu.Unlock()
 
-	// Ticket 03 is backfilled once iter-01's pause clears (its own gate was
+	// Ticket 03 is backfilled once epic-iter-01's pause clears (its own gate was
 	// already closed by the earlier release(pane1), so it re-observes idle
 	// and finishes without another release call).
 	pane3 := <-started
@@ -159,13 +159,13 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 	}
 
 	if !slices.Contains(*prompts, "continue") {
-		t.Errorf("prompts = %v, want a \"continue\" re-prompt sent to iter-01 after the rate-limit reset", *prompts)
+		t.Errorf("prompts = %v, want a \"continue\" re-prompt sent to epic-iter-01 after the rate-limit reset", *prompts)
 	}
 
-	if !strings.Contains(out.String(), "paused iter-01") {
-		t.Errorf("output = %q, want a paused report mentioning iter-01", out.String())
+	if !strings.Contains(out.String(), "paused epic-iter-01") {
+		t.Errorf("output = %q, want a paused report mentioning epic-iter-01", out.String())
 	}
-	if !strings.Contains(out.String(), "resumed iter-01") {
-		t.Errorf("output = %q, want a resumed report mentioning iter-01", out.String())
+	if !strings.Contains(out.String(), "resumed epic-iter-01") {
+		t.Errorf("output = %q, want a resumed report mentioning epic-iter-01", out.String())
 	}
 }

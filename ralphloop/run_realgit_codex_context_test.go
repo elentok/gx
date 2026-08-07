@@ -63,7 +63,7 @@ func TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp(t *testing.T
 			return nil, herdrfake.Identities{}, err
 		}
 		return map[string]any{
-			"tab":       map[string]any{"tab_id": "tab-01", "label": iterLabel("01"), "workspace_id": "ws1"},
+			"tab":       map[string]any{"tab_id": "tab-01", "label": iterLabel(epicName, "01"), "workspace_id": "ws1"},
 			"root_pane": map[string]any{"pane_id": "pane-01"},
 		}, herdrfake.Identities{WorkspaceID: "ws1", TabID: "tab-01", PaneID: "pane-01"}, nil
 	})
@@ -80,7 +80,7 @@ func TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp(t *testing.T
 
 	rollout := herdrfake.RegisterCodexRollout(t, s, herdrfake.CodexRolloutOptions{
 		Cwd: cwd, WorkspaceID: "ws1", TabID: "tab-01", PaneID: "pane-01",
-		AgentID: "agent-01", AgentName: iterLabel("01"),
+		AgentID: "agent-01", AgentName: iterLabel(epicName, "01"),
 		InitialUsage:   herdrfake.CodexUsage{ContextTokens: smartZone + 1, TotalTokens: smartZone + 5_000},
 		CompactedUsage: herdrfake.CodexUsage{ContextTokens: smartZone / 2, TotalTokens: smartZone + 20_000},
 		FinalUsage:     herdrfake.CodexUsage{ContextTokens: smartZone / 2, TotalTokens: smartZone + 25_000},
@@ -318,7 +318,7 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T
 	})
 	s.Register("tab", "create", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		return map[string]any{
-			"tab":       map[string]any{"tab_id": "tab-01", "label": iterLabel("01"), "workspace_id": "ws1"},
+			"tab":       map[string]any{"tab_id": "tab-01", "label": iterLabel(epicName, "01"), "workspace_id": "ws1"},
 			"root_pane": map[string]any{"pane_id": "pane-01"},
 		}, herdrfake.Identities{WorkspaceID: "ws1", TabID: "tab-01", PaneID: "pane-01"}, nil
 	})
@@ -499,7 +499,7 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 	})
 	s.Register("tab", "create", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		return map[string]any{
-			"tab":       map[string]any{"tab_id": "tab-01", "label": iterLabel("01"), "workspace_id": "ws1"},
+			"tab":       map[string]any{"tab_id": "tab-01", "label": iterLabel(epicName, "01"), "workspace_id": "ws1"},
 			"root_pane": map[string]any{"pane_id": "pane-01"},
 		}, herdrfake.Identities{WorkspaceID: "ws1", TabID: "tab-01", PaneID: "pane-01"}, nil
 	})

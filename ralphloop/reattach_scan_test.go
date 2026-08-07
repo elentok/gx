@@ -24,7 +24,7 @@ func TestScanForReattachable_ClaimedWithLiveTab_ProducesSignal(t *testing.T) {
 		return "", nil
 	}
 	tabList := func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{Label: "iter-01"}}, nil
+		return []herdr.Tab{{Label: iterLabel("epic", "01")}}, nil
 	}
 
 	signals, err := ScanForReattachable(findWorkspace, tabList, epics)
@@ -56,7 +56,7 @@ func TestScanForReattachable_NeedsAttentionWithLiveTab_ProducesSignal(t *testing
 
 	findWorkspace := func(label string) (string, error) { return "ws1", nil }
 	tabList := func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{Label: "iter-01"}}, nil
+		return []herdr.Tab{{Label: iterLabel("epic", "01")}}, nil
 	}
 
 	signals, err := ScanForReattachable(findWorkspace, tabList, epics)

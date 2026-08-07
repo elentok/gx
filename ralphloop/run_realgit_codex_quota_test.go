@@ -51,7 +51,7 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 	tab02Closed := make(chan struct{})
 	var tab02ClosedOnce sync.Once
 
-	pane01 := "pane-" + iterLabel("01")
+	pane01 := "pane-" + iterLabel(epicName, "01")
 	dir01 := iterationWorktreePath(wtDir, epicName, "01")
 
 	handler := func(argv []string) ([]byte, int) {
@@ -80,7 +80,7 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 			closedTabs[tabID] = true
 			delete(openTabs, tabID)
 			mu.Unlock()
-			if tabID == "tab-"+iterLabel("02") {
+			if tabID == "tab-"+iterLabel(epicName, "02") {
 				// Guaranteed-post-landing signal, same idiom as
 				// TestRun_ProductionRealGit_AThenBAndCConcurrently's bLanded:
 				// 02's tab only closes once finishCleanup runs, strictly after
@@ -334,8 +334,8 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 	dir01 := iterationWorktreePath(wtDir, epicName, "01")
 	dir02 := iterationWorktreePath(wtDir, epicName, "02")
 
-	pane01 := "pane-" + iterLabel("01")
-	pane02 := "pane-" + iterLabel("02")
+	pane01 := "pane-" + iterLabel(epicName, "01")
+	pane02 := "pane-" + iterLabel(epicName, "02")
 
 	const contextSessionID = "sess-context-flagship"
 	rolloutPath := filepath.Join(
@@ -383,7 +383,7 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 			mu.Lock()
 			openTabs[tabID] = true
 			mu.Unlock()
-			if label == iterLabel("01") {
+			if label == iterLabel(epicName, "01") {
 				// The context ticket's own work is already "done" by the time
 				// its tab exists — same idiom as
 				// TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp,
@@ -404,7 +404,7 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 			closedTabs[tabID] = true
 			delete(openTabs, tabID)
 			mu.Unlock()
-			if tabID == "tab-"+iterLabel("01") {
+			if tabID == "tab-"+iterLabel(epicName, "01") {
 				// Guaranteed-post-landing signal, same idiom as
 				// TestRun_ProductionRealGit_CodexQuotaBackfillRecovers'
 				// tab02Closed: 01's tab only closes once finishCleanup runs,

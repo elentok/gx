@@ -168,7 +168,7 @@ func TestReconcile_ClaimedWithLiveTab_ReturnsReattached(t *testing.T) {
 
 	d, _, _ := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{Label: "iter-01", WorkspaceID: workspaceID}}, nil
+		return []herdr.Tab{{Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
 	}
 
 	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(io.Discard)), epics[0])
@@ -210,7 +210,7 @@ func TestReconcile_ClaimedWithLiveTab_TicketReattachedCarriesLiveSessionIdentity
 	})
 	if err := logEvent(scratchDir, "epic", Event{
 		Type: eventIterationStarted, Ticket: "01", Agent: AgentClaude,
-		AgentSession: "sess-1", Cwd: "/repo/iter-01",
+		AgentSession: "sess-1", Cwd: "/repo/epic-iter-01",
 	}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
@@ -221,7 +221,7 @@ func TestReconcile_ClaimedWithLiveTab_TicketReattachedCarriesLiveSessionIdentity
 
 	d, _, _ := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-iter-01", Label: "iter-01", WorkspaceID: workspaceID}}, nil
+		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
 	}
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
 		return 4200, true, nil
@@ -240,7 +240,7 @@ func TestReconcile_ClaimedWithLiveTab_TicketReattachedCarriesLiveSessionIdentity
 		t.Fatalf("reconcile() error = %v", err)
 	}
 
-	if reattached.identifier != "01" || reattached.label != "iter-01" || reattached.cwd != "/fake/worktrees/epic-item-01" || reattached.sessionID != "session-iter-01" {
+	if reattached.identifier != "01" || reattached.label != "epic-iter-01" || reattached.cwd != "/fake/worktrees/epic-item-01" || reattached.sessionID != "session-epic-iter-01" {
 		t.Errorf("TicketReattached args = %+v, want live Herdr cwd/session identity", reattached)
 	}
 	if len(sink.occupancySink.calls) != 1 || sink.occupancySink.calls[0].identifier != "01" || sink.occupancySink.calls[0].tokens != 4200 {
@@ -258,7 +258,7 @@ func TestReconcile_NeedsAttentionWithLiveTab_ReturnsReattached(t *testing.T) {
 	}
 	d, _, _ := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-iter-01", Label: "iter-01", WorkspaceID: workspaceID}}, nil
+		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
 	}
 
 	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(io.Discard)), epics[0])
@@ -286,7 +286,7 @@ func TestReconcile_ClaimedWithLiveTabOutsideScope_NotReattached(t *testing.T) {
 
 	d, _, _ := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{Label: "iter-01", WorkspaceID: workspaceID}}, nil
+		return []herdr.Tab{{Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
 	}
 
 	rp := testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(io.Discard))
@@ -322,7 +322,7 @@ func TestReconcile_NeedsAttentionOutsideScope_NotReattached(t *testing.T) {
 	}
 	d, _, _ := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-iter-01", Label: "iter-01", WorkspaceID: workspaceID}}, nil
+		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
 	}
 
 	rp := testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(io.Discard))
@@ -361,7 +361,7 @@ func TestRun_RestartedNeedsAttentionRecoversThenResumesScheduling(t *testing.T) 
 	})
 	d, prompts, _ := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-iter-01", Label: "iter-01", WorkspaceID: workspaceID}}, nil
+		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
 	}
 	var mu sync.Mutex
 	sawClaimed := false
@@ -392,7 +392,7 @@ func TestRun_RestartedNeedsAttentionRecoversThenResumesScheduling(t *testing.T) 
 	}
 	foundResumed := false
 	for _, event := range events {
-		if event.Type == eventResumed && event.Ticket == "01" && (event.Pane != "pane-iter-01" || event.Tab != "tab-iter-01" || event.Cwd != "/fake/worktrees/epic-item-01" || event.AgentSession != "session-iter-01") {
+		if event.Type == eventResumed && event.Ticket == "01" && (event.Pane != "pane-epic-iter-01" || event.Tab != "tab-epic-iter-01" || event.Cwd != "/fake/worktrees/epic-item-01" || event.AgentSession != "session-epic-iter-01") {
 			t.Errorf("resumed attribution = %+v, want original pane/tab/cwd/session", event)
 		}
 		foundResumed = foundResumed || event.Type == eventResumed && event.Ticket == "01"

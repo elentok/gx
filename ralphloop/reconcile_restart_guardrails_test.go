@@ -25,7 +25,7 @@ func TestRun_ReattachedSmartZoneBreach_AutoRecoversThenLands(t *testing.T) {
 	})
 	d, _, removed := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-iter-01", Label: "iter-01", WorkspaceID: workspaceID, AgentStatus: "working"}}, nil
+		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID, AgentStatus: "working"}}, nil
 	}
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
 		if strings.Contains(cwd, "epic-item-01") {
@@ -87,7 +87,7 @@ func TestRun_ReattachedCodexQuota_StructuredRecoveryThenLands(t *testing.T) {
 	})
 	d, _, removed := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-iter-01", Label: "iter-01", WorkspaceID: workspaceID, AgentStatus: "working"}}, nil
+		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID, AgentStatus: "working"}}, nil
 	}
 	var waits int
 	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
@@ -143,7 +143,7 @@ func TestRun_ReattachedCodexQuota_PaneTextFallbackRecoversThenLands(t *testing.T
 	})
 	d, _, removed := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-iter-01", Label: "iter-01", WorkspaceID: workspaceID, AgentStatus: "working"}}, nil
+		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID, AgentStatus: "working"}}, nil
 	}
 	var waits int
 	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {

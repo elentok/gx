@@ -255,7 +255,7 @@ func TestRun_LogsLifecycleEvents_LinearChain(t *testing.T) {
 			t.Errorf("events[%d].Ticket = %q, want %q", i, events[i].Ticket, "01")
 		}
 	}
-	wantSession := "sess-pane-iter-01"
+	wantSession := "sess-pane-" + iterLabel("my-epic", "01")
 	if events[1].AgentSession != wantSession {
 		t.Errorf("iteration-started AgentSession = %q, want the agent's session id", events[1].AgentSession)
 	}

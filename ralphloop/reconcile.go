@@ -88,7 +88,7 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 	}
 
 	reattach := func(t tickets.Ticket) {
-		label := iterLabel(t.Identifier)
+		label := iterLabel(epic.Name, t.Identifier)
 		cwd := iterationWorktreePath(paths.WorktreeDir, epic.Name, t.Identifier)
 		tab := liveTabs[iterationKey(epic.Name, label)]
 		agentState, agentErr := d.AgentGet(label)
@@ -118,7 +118,7 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 		}
 		status := strings.ToLower(strings.TrimSpace(t.Status))
 		if status == "needs-attention" {
-			if live[iterationKey(epic.Name, iterLabel(t.Identifier))] {
+			if live[iterationKey(epic.Name, iterLabel(epic.Name, t.Identifier))] {
 				reattach(t)
 				reattached = append(reattached, t)
 			} else {
@@ -129,7 +129,7 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 		if status != "claimed" {
 			continue
 		}
-		if !live[iterationKey(epic.Name, iterLabel(t.Identifier))] {
+		if !live[iterationKey(epic.Name, iterLabel(epic.Name, t.Identifier))] {
 			if err := reconcileOrphanedClaim(d, rp, epic.Name, t, tabs); err != nil {
 				return nil, fmt.Errorf("reconciling orphaned claim %s: %w", t.Identifier, err)
 			}

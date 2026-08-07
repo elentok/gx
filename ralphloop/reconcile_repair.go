@@ -22,7 +22,7 @@ import (
 func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t tickets.Ticket, tabs []herdr.Tab) error {
 	paths := rp.Paths
 	branch := iterBranch(featureBranch, t.Identifier)
-	label := iterLabel(t.Identifier)
+	label := iterLabel(featureBranch, t.Identifier)
 	path := iterationWorktreePath(paths.WorktreeDir, featureBranch, t.Identifier)
 
 	base, err := d.MergeBase(paths.FeatureWorktree, branch, featureBranch)
@@ -94,7 +94,7 @@ func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t
 // normal completion path.
 func finishStaleCleanup(d Deps, rp reconcileParams, featureBranch string, t tickets.Ticket, tabs []herdr.Tab) error {
 	paths := rp.Paths
-	label := iterLabel(t.Identifier)
+	label := iterLabel(featureBranch, t.Identifier)
 	branch := iterBranch(featureBranch, t.Identifier)
 	path := iterationWorktreePath(paths.WorktreeDir, featureBranch, t.Identifier)
 	tabID := tabIDForLabel(tabs, label)

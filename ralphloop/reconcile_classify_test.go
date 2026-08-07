@@ -108,8 +108,8 @@ func TestClassifyDoneTicket_NoRecordedEvent_TreatedAsMissing(t *testing.T) {
 // Number, or lettered siblings would collide on the same worktree/branch.
 func TestIterLabelIterBranch_DistinctForLetteredSiblingsSharingNumber(t *testing.T) {
 	a, b := tickets.Ticket{Number: 4, Identifier: "04a"}, tickets.Ticket{Number: 4, Identifier: "04b"}
-	if iterLabel(a.Identifier) == iterLabel(b.Identifier) {
-		t.Errorf("iterLabel(%q) == iterLabel(%q) = %q, want distinct labels for siblings sharing Number 4", a.Identifier, b.Identifier, iterLabel(a.Identifier))
+	if iterLabel("epic", a.Identifier) == iterLabel("epic", b.Identifier) {
+		t.Errorf("iterLabel(%q) == iterLabel(%q) = %q, want distinct labels for siblings sharing Number 4", a.Identifier, b.Identifier, iterLabel("epic", a.Identifier))
 	}
 	if iterBranch("epic", a.Identifier) == iterBranch("epic", b.Identifier) {
 		t.Errorf("iterBranch(%q) == iterBranch(%q) = %q, want distinct branches for siblings sharing Number 4", a.Identifier, b.Identifier, iterBranch("epic", a.Identifier))
@@ -164,7 +164,7 @@ func TestClassifyDoneTicket_LiveTabCountsAsLeftover(t *testing.T) {
 	d.WorktreeExists = func(path string) (bool, error) { return false, nil }
 	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}}
 
-	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, events, map[string]bool{iterationKey("epic", iterLabel("03")): true}, map[string]bool{})
+	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, events, map[string]bool{iterationKey("epic", iterLabel("epic", "03")): true}, map[string]bool{})
 	if err != nil {
 		t.Fatalf("classifyDoneTicket() error = %v", err)
 	}

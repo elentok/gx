@@ -185,7 +185,7 @@ func TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsAttention(t *tes
 	tabClosed := 0
 	s.Register("tab", "create", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		return map[string]any{
-			"tab":       map[string]any{"tab_id": "tab-01", "label": iterLabel("01"), "workspace_id": "ws1"},
+			"tab":       map[string]any{"tab_id": "tab-01", "label": iterLabel(epicName, "01"), "workspace_id": "ws1"},
 			"root_pane": map[string]any{"pane_id": "pane-01"},
 		}, herdrfake.Identities{WorkspaceID: "ws1", TabID: "tab-01", PaneID: "pane-01"}, nil
 	})
@@ -331,7 +331,7 @@ func TestRun_ProductionRealGit_CodexRestartReattachesAndLandsOnce(t *testing.T) 
 	s.Register("tab", "create", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		tabOpen = true
 		return map[string]any{
-			"tab":       map[string]any{"tab_id": "tab-01", "label": iterLabel("01"), "workspace_id": "ws1"},
+			"tab":       map[string]any{"tab_id": "tab-01", "label": iterLabel(epicName, "01"), "workspace_id": "ws1"},
 			"root_pane": map[string]any{"pane_id": "pane-01"},
 		}, herdrfake.Identities{WorkspaceID: "ws1", TabID: "tab-01", PaneID: "pane-01"}, nil
 	})
@@ -345,7 +345,7 @@ func TestRun_ProductionRealGit_CodexRestartReattachesAndLandsOnce(t *testing.T) 
 			return map[string]any{"tabs": []any{}}, herdrfake.Identities{}, nil
 		}
 		return map[string]any{"tabs": []any{
-			map[string]any{"tab_id": "tab-01", "label": iterLabel("01"), "workspace_id": "ws1"},
+			map[string]any{"tab_id": "tab-01", "label": iterLabel(epicName, "01"), "workspace_id": "ws1"},
 		}}, herdrfake.Identities{}, nil
 	})
 	s.Register("agent", "start", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {

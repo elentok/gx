@@ -80,7 +80,7 @@ func TestRun_ProductionRealGit_AThenBAndCConcurrently(t *testing.T) {
 			closedTabs[tabID] = true
 			delete(openTabs, tabID)
 			mu.Unlock()
-			if tabID == "tab-"+iterLabel("02") {
+			if tabID == "tab-"+iterLabel(epicName, "02") {
 				// B's tab only closes once finishCleanup runs, i.e. strictly
 				// after B's commit has already landed on the feature branch
 				// (finishIteration cherry-picks before finishCleanup ever
@@ -265,12 +265,12 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 		if id == "03" {
 			continue
 		}
-		writeFakeTranscript(t, iterationWorktreePath(wtDir, epicName, id), "sess-"+iterLabel(id), transcriptStart,
+		writeFakeTranscript(t, iterationWorktreePath(wtDir, epicName, id), "sess-"+iterLabel(epicName, id), transcriptStart,
 			[3]any{"claude-sonnet-5", contract.tokens - 200, 0},
 			[3]any{"claude-sonnet-5", contract.tokens - 100, 100},
 		)
 	}
-	cCompact := herdrfake.NewClaudeCompact(t, iterationWorktreePath(wtDir, epicName, "03"), "sess-"+iterLabel("03"), func() time.Duration {
+	cCompact := herdrfake.NewClaudeCompact(t, iterationWorktreePath(wtDir, epicName, "03"), "sess-"+iterLabel(epicName, "03"), func() time.Duration {
 		mu.Lock()
 		defer mu.Unlock()
 		return virtualTime
@@ -325,10 +325,10 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 			// finishCleanup ever runs) — the point C's/D's own work must
 			// wait behind to make B-before-C and E-before-D guaranteed, not
 			// just racily likely.
-			if tabID == "tab-"+iterLabel("02") {
+			if tabID == "tab-"+iterLabel(epicName, "02") {
 				bLandedOnce.Do(func() { close(bLanded) })
 			}
-			if tabID == "tab-"+iterLabel("05") {
+			if tabID == "tab-"+iterLabel(epicName, "05") {
 				eLandedOnce.Do(func() { close(eLanded) })
 			}
 			return []byte(`{"result":null}`), 0
@@ -379,7 +379,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 				mu.Unlock()
 				return agentJSON(pane, "working", sess)
 			}
-			if pane == "pane-"+iterLabel("03") && text == "/compact" {
+			if pane == "pane-"+iterLabel(epicName, "03") && text == "/compact" {
 				mu.Lock()
 				compactCalls++
 				mu.Unlock()
@@ -405,7 +405,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 				}
 				return agentJSON(pane, "idle", sess)
 			}
-			if pane == "pane-"+iterLabel("03") && strings.HasPrefix(text, "I stopped you because") {
+			if pane == "pane-"+iterLabel(epicName, "03") && strings.HasPrefix(text, "I stopped you because") {
 				mu.Lock()
 				finishUpCalls++
 				mu.Unlock()
@@ -456,7 +456,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 
 		case "agent send-keys":
 			pane, key := argv[2], argv[3]
-			if pane == "pane-"+iterLabel("03") {
+			if pane == "pane-"+iterLabel(epicName, "03") {
 				mu.Lock()
 				ctrlCCalls++
 				mu.Unlock()
@@ -712,7 +712,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 		t.Error("B did not land while C was compacting")
 	}
 	for id := range contracts {
-		tabID := "tab-" + iterLabel(id)
+		tabID := "tab-" + iterLabel(epicName, id)
 		if closedTabs[tabID] != 1 {
 			t.Errorf("tab %s close count = %d, want exactly one", tabID, closedTabs[tabID])
 		}
@@ -792,7 +792,7 @@ func TestRun_ProductionRealGit_CodexCompactsThenCompletes(t *testing.T) {
 	})
 	s.Register("tab", "create", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		return map[string]any{
-			"tab":       map[string]any{"tab_id": "tab-01", "label": iterLabel("01"), "workspace_id": "ws1"},
+			"tab":       map[string]any{"tab_id": "tab-01", "label": iterLabel(epicName, "01"), "workspace_id": "ws1"},
 			"root_pane": map[string]any{"pane_id": "pane-01"},
 		}, herdrfake.Identities{WorkspaceID: "ws1", TabID: "tab-01", PaneID: "pane-01"}, nil
 	})

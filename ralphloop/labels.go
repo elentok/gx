@@ -6,8 +6,13 @@ import "path/filepath"
 // filename's full "NN[letter]" prefix), not its Number, so that lettered
 // split siblings sharing the same Number (e.g. "04a"/"04b") get distinct
 // labels/branches/worktree paths instead of colliding on "iter-04".
-func iterLabel(identifier string) string {
-	return "iter-" + identifier
+//
+// iterLabel is scoped by epicName, using the same flat "{epic}-..." form as
+// iterItemName, because this label is what's actually shown to the user
+// (herdr tab/pane names): two epics that each happen to reach iteration "06"
+// would otherwise be indistinguishable wherever the label surfaces.
+func iterLabel(epicName, identifier string) string {
+	return epicName + "-iter-" + identifier
 }
 
 // iterItemName scopes an iteration by epicName as a single flat path/branch

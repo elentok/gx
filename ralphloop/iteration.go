@@ -28,7 +28,7 @@ const conflictResolutionTimeoutMs = 30 * 60 * 1000
 // via `gx tickets set --commitless true` alongside a non-claimed status), in
 // which case the worktree/tab are cleaned up normally with no commit landed.
 func runIteration(d Deps, p iterationParams) error {
-	label := iterLabel(p.Ticket.Identifier)
+	label := iterLabel(p.FeatureBranch, p.Ticket.Identifier)
 	branch := iterBranch(p.FeatureBranch, p.Ticket.Identifier)
 	path := iterationWorktreePath(p.WorktreeDir, p.FeatureBranch, p.Ticket.Identifier)
 
@@ -83,7 +83,7 @@ func runIteration(d Deps, p iterationParams) error {
 // remaining wait, lifecycle logging, and completion work. Codex sessions are
 // accepted only when their rollout metadata belongs to this worktree.
 func reattachIteration(d Deps, p iterationParams) error {
-	label := iterLabel(p.Ticket.Identifier)
+	label := iterLabel(p.FeatureBranch, p.Ticket.Identifier)
 	branch := iterBranch(p.FeatureBranch, p.Ticket.Identifier)
 	path := iterationWorktreePath(p.WorktreeDir, p.FeatureBranch, p.Ticket.Identifier)
 

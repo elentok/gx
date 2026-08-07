@@ -97,7 +97,7 @@ func classifyDoneTicket(d Deps, paths reconcilePaths, featureBranch string, t ti
 		commitsPresent = landed[t.Identifier]
 	}
 
-	label := iterLabel(t.Identifier)
+	label := iterLabel(featureBranch, t.Identifier)
 	hasWorktree, err := d.WorktreeExists(iterationWorktreePath(paths.WorktreeDir, featureBranch, t.Identifier))
 	if err != nil {
 		return doneOK, fmt.Errorf("checking leftover worktree: %w", err)

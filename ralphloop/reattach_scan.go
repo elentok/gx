@@ -63,7 +63,7 @@ func ScanForReattachable(
 					live[iterationKey(epic.Name, tab.Label)] = true
 				}
 			}
-			if live[iterationKey(epic.Name, iterLabel(t.Identifier))] {
+			if live[iterationKey(epic.Name, iterLabel(epic.Name, t.Identifier))] {
 				signals = append(signals, ReattachSignal{EpicName: epic.Name, Ticket: t})
 			}
 		}

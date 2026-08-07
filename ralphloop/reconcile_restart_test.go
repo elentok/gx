@@ -75,7 +75,7 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 	})
 	d, prompts, removed := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-iter-01", Label: "iter-01", WorkspaceID: workspaceID}}, nil
+		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
 	}
 
 	var worktreeCreateCalledForIter bool
@@ -114,7 +114,7 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 	if err != nil {
 		t.Fatalf("schema.ParseTicket: %v", err)
 	}
-	if want := []string{"session-iter-01"}; len(ticket.SessionIDs) != 1 || ticket.SessionIDs[0] != want[0] {
+	if want := []string{"session-epic-iter-01"}; len(ticket.SessionIDs) != 1 || ticket.SessionIDs[0] != want[0] {
 		t.Errorf("SessionIDs = %v, want %v (reattach appends the live agent's session)", ticket.SessionIDs, want)
 	}
 
@@ -124,7 +124,7 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 	}
 	foundFinish := false
 	for _, event := range events {
-		if event.Type == eventIterationFinished && (event.Pane != "pane-iter-01" || event.Tab != "tab-iter-01" || event.Cwd != "/fake/worktrees/epic-item-01" || event.AgentSession != "session-iter-01") {
+		if event.Type == eventIterationFinished && (event.Pane != "pane-epic-iter-01" || event.Tab != "tab-epic-iter-01" || event.Cwd != "/fake/worktrees/epic-item-01" || event.AgentSession != "session-epic-iter-01") {
 			t.Errorf("iteration-finished attribution = %+v, want original pane/tab/cwd/session", event)
 		}
 		foundFinish = foundFinish || event.Type == eventIterationFinished
@@ -147,10 +147,10 @@ func TestRun_RestartWithClaimedTicketAlreadyIdle_SkipsWaitAndCherryPicks(t *test
 	})
 	d, _, removed := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-iter-01", Label: "iter-01", WorkspaceID: workspaceID, AgentStatus: "idle"}}, nil
+		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID, AgentStatus: "idle"}}, nil
 	}
 	d.AgentGet = func(string) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: "pane-iter-01", WorkspaceID: "ws1", TabID: "tab-iter-01", AgentStatus: "idle", AgentSession: "session-iter-01"}, nil
+		return herdr.Agent{PaneID: "pane-epic-iter-01", WorkspaceID: "ws1", TabID: "tab-epic-iter-01", AgentStatus: "idle", AgentSession: "session-epic-iter-01"}, nil
 	}
 
 	var agentWaitCalls int
@@ -201,8 +201,8 @@ func TestRun_ReattachedCodexSessionIdentityFailureStopsSafely(t *testing.T) {
 		verified bool
 		wantErr  string
 	}{
-		{name: "missing session", agent: herdr.Agent{PaneID: "pane-iter-01", WorkspaceID: "ws1", TabID: "tab-iter-01", AgentStatus: "working"}, wantErr: "missing live Codex session"},
-		{name: "mismatched rollout", agent: herdr.Agent{PaneID: "pane-iter-01", WorkspaceID: "ws1", TabID: "tab-iter-01", AgentStatus: "working", AgentSession: "wrong-session"}, wantErr: "does not match rollout metadata"},
+		{name: "missing session", agent: herdr.Agent{PaneID: "pane-epic-iter-01", WorkspaceID: "ws1", TabID: "tab-epic-iter-01", AgentStatus: "working"}, wantErr: "missing live Codex session"},
+		{name: "mismatched rollout", agent: herdr.Agent{PaneID: "pane-epic-iter-01", WorkspaceID: "ws1", TabID: "tab-epic-iter-01", AgentStatus: "working", AgentSession: "wrong-session"}, wantErr: "does not match rollout metadata"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			scratchDir := writeEpic(t, "epic", map[string]string{
@@ -210,7 +210,7 @@ func TestRun_ReattachedCodexSessionIdentityFailureStopsSafely(t *testing.T) {
 			})
 			d, prompts, removed := fakeDeps()
 			d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-				return []herdr.Tab{{TabID: "tab-iter-01", Label: "iter-01", WorkspaceID: workspaceID}}, nil
+				return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
 			}
 			d.AgentGet = func(string) (herdr.Agent, error) { return tc.agent, nil }
 			d.VerifyCodexSession = func(cwd, sessionID string) (bool, error) { return tc.verified, nil }
@@ -246,17 +246,17 @@ func TestRun_ReattachedCloseUsesLiveSessionInsteadOfStaleRunLog(t *testing.T) {
 		Ticket:       "01",
 		Agent:        AgentClaude,
 		AgentSession: "sess-original",
-		Cwd:          "/fake/worktrees/iter-01",
+		Cwd:          "/fake/worktrees/epic-iter-01",
 	}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 
 	d, _, _ := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-iter-01", Label: "iter-01", WorkspaceID: workspaceID}}, nil
+		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
 	}
 	d.AgentGet = func(string) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: "pane-iter-01", WorkspaceID: "ws1", TabID: "tab-iter-01", AgentStatus: "working", AgentSession: "sess-live"}, nil
+		return herdr.Agent{PaneID: "pane-epic-iter-01", WorkspaceID: "ws1", TabID: "tab-epic-iter-01", AgentStatus: "working", AgentSession: "sess-live"}, nil
 	}
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
 		if cwd == "/fake/worktrees/epic-item-01" && sessionID == "sess-live" {
@@ -289,7 +289,7 @@ func TestRun_ReattachedClose_NoPriorSessionInLog_OmitsMetadata(t *testing.T) {
 	})
 	d, _, _ := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-iter-01", Label: "iter-01", WorkspaceID: workspaceID}}, nil
+		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
 	}
 
 	var out strings.Builder

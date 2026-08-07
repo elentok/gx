@@ -23,7 +23,7 @@ import (
 func reconcileOrphanedClaim(d Deps, rp reconcileParams, featureBranch string, t tickets.Ticket, tabs []herdr.Tab) error {
 	paths := rp.Paths
 	branch := iterBranch(featureBranch, t.Identifier)
-	label := iterLabel(t.Identifier)
+	label := iterLabel(featureBranch, t.Identifier)
 	path := iterationWorktreePath(paths.WorktreeDir, featureBranch, t.Identifier)
 
 	if branchExists(d, paths.FeatureWorktree, branch) {

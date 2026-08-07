@@ -24,10 +24,23 @@ func TestIterationWorktreePath_ScopedByEpicName(t *testing.T) {
 // key: two epics using the same iteration label must not produce the same
 // key, or reconcile could mistake one epic's live tab for another's.
 func TestIterationKey_ScopedByEpicName(t *testing.T) {
-	keyA := iterationKey("epic-a", iterLabel("04"))
-	keyB := iterationKey("epic-b", iterLabel("04"))
+	keyA := iterationKey("epic-a", iterLabel("epic-a", "04"))
+	keyB := iterationKey("epic-b", iterLabel("epic-b", "04"))
 	if keyA == keyB {
 		t.Fatalf("iterationKey(epic-a, iter-04) = iterationKey(epic-b, iter-04) = %q, want distinct keys", keyA)
+	}
+}
+
+// TestIterLabel_ScopedByEpicName guards the displayed label itself: two
+// epics that both happen to reach the same iteration identifier (e.g. both
+// having a ticket "06") must produce visibly distinct labels, since this is
+// what's actually shown to the user (herdr tab/pane names), unlike
+// iterationKey which is only an internal map key.
+func TestIterLabel_ScopedByEpicName(t *testing.T) {
+	labelA := iterLabel("epic-a", "06")
+	labelB := iterLabel("epic-b", "06")
+	if labelA == labelB {
+		t.Fatalf("iterLabel(epic-a, 06) = iterLabel(epic-b, 06) = %q, want distinct labels", labelA)
 	}
 }
 
