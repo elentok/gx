@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -132,6 +134,86 @@ func TestExecute_ConfigShow_PropagatesError(t *testing.T) {
 		},
 	}
 	err := execute([]string{"config", "show"}, d)
+	if err == nil || !strings.Contains(err.Error(), "load failed") {
+		t.Fatalf("expected load error, got: %v", err)
+	}
+}
+
+func TestExecute_ConfigTestNotifications_NoneConfiguredPrintsNoticeAndSucceeds(t *testing.T) {
+	var stdout bytes.Buffer
+	d := deps{
+		stdout: &stdout,
+		stderr: bytes.NewBuffer(nil),
+		loadConfig: func() (config.Config, error) {
+			return config.Default(), nil
+		},
+	}
+	if err := execute([]string{"config", "test-notifications"}, d); err != nil {
+		t.Fatalf("execute config test-notifications: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "no notification service configured") {
+		t.Fatalf("expected notice about no configured service, got: %q", stdout.String())
+	}
+}
+
+func TestExecute_ConfigTestNotifications_SlackConfiguredSendsAndReportsSuccess(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	var stdout bytes.Buffer
+	d := deps{
+		stdout: &stdout,
+		stderr: bytes.NewBuffer(nil),
+		loadConfig: func() (config.Config, error) {
+			cfg := config.Default()
+			cfg.Notifications.Slack.WebhookURL = server.URL
+			return cfg, nil
+		},
+	}
+	if err := execute([]string{"config", "test-notifications"}, d); err != nil {
+		t.Fatalf("execute config test-notifications: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "slack: sent") {
+		t.Fatalf("expected slack success line, got: %q", stdout.String())
+	}
+}
+
+func TestExecute_ConfigTestNotifications_SlackFailureReportsErrorAndPropagates(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	var stdout, stderr bytes.Buffer
+	d := deps{
+		stdout: &stdout,
+		stderr: &stderr,
+		loadConfig: func() (config.Config, error) {
+			cfg := config.Default()
+			cfg.Notifications.Slack.WebhookURL = server.URL
+			return cfg, nil
+		},
+	}
+	err := execute([]string{"config", "test-notifications"}, d)
+	if err == nil {
+		t.Fatal("expected error when the notification send fails")
+	}
+	if !strings.Contains(stderr.String(), "slack: failed") {
+		t.Fatalf("expected slack failure line on stderr, got: %q", stderr.String())
+	}
+}
+
+func TestExecute_ConfigTestNotifications_PropagatesLoadConfigError(t *testing.T) {
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+		loadConfig: func() (config.Config, error) {
+			return config.Config{}, errors.New("load failed")
+		},
+	}
+	err := execute([]string{"config", "test-notifications"}, d)
 	if err == nil || !strings.Contains(err.Error(), "load failed") {
 		t.Fatalf("expected load error, got: %v", err)
 	}

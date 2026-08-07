@@ -139,12 +139,30 @@
             "bot-token": "",
             "chat-id": ""
           }
+        },
+        "slack": {
+          "type": "object",
+          "description": "Slack workflow webhook for sending notifications. An empty webhook-url disables Slack notifications.",
+          "additionalProperties": false,
+          "properties": {
+            "webhook-url": {
+              "type": "string",
+              "description": "Slack workflow webhook URL (accepts a single {\"text\": \"...\"} body). Default: empty (disabled).",
+              "default": ""
+            }
+          },
+          "default": {
+            "webhook-url": ""
+          }
         }
       },
       "default": {
         "telegram": {
           "bot-token": "",
           "chat-id": ""
+        },
+        "slack": {
+          "webhook-url": ""
         }
       }
     },

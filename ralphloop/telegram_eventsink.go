@@ -50,61 +50,81 @@ func newTelegramEventSink(inner EventSink, botToken, chatID, apiBaseURL string) 
 	}
 }
 
+// SendTelegramTestMessage synchronously sends a fixed test notification via
+// the Telegram Bot API and returns any error instead of swallowing it, for
+// callers like `gx config test-notifications` that need to report
+// success/failure directly — unlike the EventSink decorator's fire-and-forget
+// send.
+func SendTelegramTestMessage(botToken, chatID string) error {
+	return sendTelegramTestMessage(botToken, chatID, telegramAPIBaseURL)
+}
+
+func sendTelegramTestMessage(botToken, chatID, apiBaseURL string) error {
+	s := newTelegramEventSink(nil, botToken, chatID, apiBaseURL)
+	ctx, cancel := context.WithTimeout(context.Background(), telegramSendTimeout)
+	defer cancel()
+	return s.sendSync(ctx, telegramStyle.testMessageText())
+}
+
 func (s *telegramEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
 	s.EventSink.IterationFinished(ticket, epicName, stats)
-	remaining := stats.Total - stats.Completed
-	s.send(fmt.Sprintf(
-		"Ralph-loop: finished ticket %s/%s %s in %ds %dtok (%d tickets in progress, %d out of %d left)",
-		epicName, ticket.Identifier, ticket.Title, stats.ElapsedSeconds, stats.PeakContextTokens,
-		stats.InProgress, remaining, stats.Total,
-	))
+	s.send(telegramStyle.iterationFinishedText(ticket, epicName, stats))
 }
 
 func (s *telegramEventSink) IterationPaused(label string, kind PauseKind, reason string) {
 	s.EventSink.IterationPaused(label, kind, reason)
-	s.send(fmt.Sprintf("Ralph-loop: %s paused: %s", label, reason))
+	s.send(telegramStyle.iterationPausedText(label, kind, reason))
 }
 
 func (s *telegramEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {
 	s.EventSink.EpicComplete(epicName, completed, elapsedSeconds)
-	s.send(fmt.Sprintf("Ralph-loop: epic %s complete, %d ticket(s) landed in %ds", epicName, completed, elapsedSeconds))
+	s.send(telegramStyle.epicCompleteText(epicName, completed, elapsedSeconds))
 }
 
 // send POSTs text to the Telegram Bot API's sendMessage endpoint in its own
 // goroutine, so a slow or unreachable API never blocks the caller. Any
-// failure (marshal error, network error, timeout, non-2xx response) is
-// logged and otherwise swallowed — it never surfaces to the caller.
+// failure is logged and otherwise swallowed — it never surfaces to the
+// caller. See sendSync for the synchronous, error-returning core.
 func (s *telegramEventSink) send(text string) {
 	go func() {
-		payload, err := json.Marshal(map[string]string{
-			"chat_id": s.chatID,
-			"text":    text,
-		})
-		if err != nil {
-			logger.Debug("telegram: failed to marshal message: %v\n", err)
-			return
-		}
-
 		ctx, cancel := context.WithTimeout(context.Background(), telegramSendTimeout)
 		defer cancel()
-
-		endpoint := fmt.Sprintf("%s/bot%s/sendMessage", s.apiBaseURL, url.PathEscape(s.botToken))
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
-		if err != nil {
-			logger.Debug("telegram: failed to build request: %v\n", err)
-			return
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		resp, err := s.httpClient.Do(req)
-		if err != nil {
-			logger.Debug("telegram: send failed: %v\n", err)
-			return
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			logger.Debug("telegram: send failed with status %d\n", resp.StatusCode)
+		if err := s.sendSync(ctx, text); err != nil {
+			logger.Debug("telegram: %v\n", err)
 		}
 	}()
+}
+
+// sendSync POSTs text to the Telegram Bot API's sendMessage endpoint and
+// waits for the response, returning any failure (marshal error, network
+// error, non-2xx response) instead of swallowing it. text is expected to
+// already be MarkdownV2-escaped (see notification_text.go); parse_mode tells
+// Telegram to render its "*bold*" markers instead of showing them literally.
+func (s *telegramEventSink) sendSync(ctx context.Context, text string) error {
+	payload, err := json.Marshal(map[string]string{
+		"chat_id":    s.chatID,
+		"text":       text,
+		"parse_mode": "MarkdownV2",
+	})
+	if err != nil {
+		return fmt.Errorf("marshal message: %w", err)
+	}
+
+	endpoint := fmt.Sprintf("%s/bot%s/sendMessage", s.apiBaseURL, url.PathEscape(s.botToken))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("send: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("send failed with status %d", resp.StatusCode)
+	}
+	return nil
 }

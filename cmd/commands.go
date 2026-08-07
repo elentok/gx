@@ -231,6 +231,14 @@ func newConfigCmd(d deps) *cobra.Command {
 				return runConfigDefaults(d)
 			},
 		},
+		&cobra.Command{
+			Use:   "test-notifications",
+			Short: "send a test message to every configured notification service",
+			Args:  cobra.NoArgs,
+			RunE: func(_ *cobra.Command, _ []string) error {
+				return runConfigTestNotifications(d)
+			},
+		},
 	)
 	return cmd
 }

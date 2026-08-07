@@ -710,7 +710,7 @@ func (m Model) OnPageActivated() tea.Cmd {
 func (m Model) cmdStartImplement(epicName string, agent ralphloop.AgentKind, done, total int) tea.Cmd {
 	return cmdStartImplement(
 		m.worktreeRoot, epicName, agent, done, total,
-		m.settings.MaxConcurrentTicketsPerEpic(), nil, m.settings.Notifications.Telegram, m.settings.ImplementSkill(),
+		m.settings.MaxConcurrentTicketsPerEpic(), nil, m.settings.Notifications, m.settings.ImplementSkill(),
 	)
 }
 
@@ -721,7 +721,7 @@ func cmdStartImplement(
 	done, total int,
 	maxParallel int,
 	ticketIDs []string,
-	telegram config.TelegramConfig,
+	notifications config.NotificationsConfig,
 	skill string,
 ) tea.Cmd {
 	return func() tea.Msg {
@@ -736,8 +736,11 @@ func cmdStartImplement(
 		}
 		opts.Gate = ralphLoopRegistry.gateFor(epicName)
 		var runSink ralphloop.EventSink = sink
-		if telegram.BotToken != "" {
-			runSink = ralphloop.NewTelegramEventSink(sink, telegram.BotToken, telegram.ChatID)
+		if notifications.Telegram.BotToken != "" {
+			runSink = ralphloop.NewTelegramEventSink(runSink, notifications.Telegram.BotToken, notifications.Telegram.ChatID)
+		}
+		if notifications.Slack.WebhookURL != "" {
+			runSink = ralphloop.NewSlackEventSink(runSink, notifications.Slack.WebhookURL)
 		}
 		go func() {
 			err := runRalphLoop(opts, ralphloop.DefaultDeps(), runSink)

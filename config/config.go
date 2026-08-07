@@ -104,6 +104,9 @@ func Load() (Config, error) {
 				BotToken *string `json:"bot-token"`
 				ChatID   *string `json:"chat-id"`
 			} `json:"telegram"`
+			Slack *struct {
+				WebhookURL *string `json:"webhook-url"`
+			} `json:"slack"`
 		} `json:"notifications"`
 		Skills *struct {
 			Implement  *string  `json:"implement"`
@@ -153,6 +156,11 @@ func Load() (Config, error) {
 		}
 		if raw.Notifications.Telegram.ChatID != nil {
 			cfg.Notifications.Telegram.ChatID = *raw.Notifications.Telegram.ChatID
+		}
+	}
+	if raw.Notifications != nil && raw.Notifications.Slack != nil {
+		if raw.Notifications.Slack.WebhookURL != nil {
+			cfg.Notifications.Slack.WebhookURL = *raw.Notifications.Slack.WebhookURL
 		}
 	}
 	if raw.Skills != nil {

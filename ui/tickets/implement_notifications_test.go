@@ -8,9 +8,9 @@ import (
 	"github.com/elentok/gx/testutil"
 )
 
-// startAndCaptureSink drives cmdStartImplement with telegram, capturing the
-// EventSink runRalphLoop was actually called with.
-func startAndCaptureSink(t *testing.T, telegram config.TelegramConfig) ralphloop.EventSink {
+// startAndCaptureSink drives cmdStartImplement with notifications, capturing
+// the EventSink runRalphLoop was actually called with.
+func startAndCaptureSink(t *testing.T, notifications config.NotificationsConfig) ralphloop.EventSink {
 	t.Helper()
 	root := testutil.TempRepo(t)
 
@@ -34,7 +34,7 @@ func startAndCaptureSink(t *testing.T, telegram config.TelegramConfig) ralphloop
 		ralphLoopRegistry = previousRegistry
 	})
 
-	cmd := cmdStartImplement(root, "alpha", ralphloop.AgentClaude, 0, 1, 1, nil, telegram, "gx-implement")
+	cmd := cmdStartImplement(root, "alpha", ralphloop.AgentClaude, 0, 1, 1, nil, notifications, "gx-implement")
 	if msg, ok := cmd().(implementFailedMsg); ok {
 		t.Fatalf("cmdStartImplement failed: %v", msg.err)
 	}
@@ -43,15 +43,25 @@ func startAndCaptureSink(t *testing.T, telegram config.TelegramConfig) ralphloop
 }
 
 func TestCmdStartImplementWrapsSinkInTelegramDecoratorWhenBotTokenConfigured(t *testing.T) {
-	sink := startAndCaptureSink(t, config.TelegramConfig{BotToken: "tok", ChatID: "42"})
+	notifications := config.NotificationsConfig{Telegram: config.TelegramConfig{BotToken: "tok", ChatID: "42"}}
+	sink := startAndCaptureSink(t, notifications)
 
 	if _, ok := sink.(*ralphloop.ChannelEventSink); ok {
 		t.Fatalf("expected sink wrapped in telegram decorator, got the bare ChannelEventSink")
 	}
 }
 
-func TestCmdStartImplementUsesRealSinkDirectlyWhenNoBotTokenConfigured(t *testing.T) {
-	sink := startAndCaptureSink(t, config.TelegramConfig{})
+func TestCmdStartImplementWrapsSinkInSlackDecoratorWhenWebhookURLConfigured(t *testing.T) {
+	notifications := config.NotificationsConfig{Slack: config.SlackConfig{WebhookURL: "https://hooks.example.com/x"}}
+	sink := startAndCaptureSink(t, notifications)
+
+	if _, ok := sink.(*ralphloop.ChannelEventSink); ok {
+		t.Fatalf("expected sink wrapped in slack decorator, got the bare ChannelEventSink")
+	}
+}
+
+func TestCmdStartImplementUsesRealSinkDirectlyWhenNoNotificationsConfigured(t *testing.T) {
+	sink := startAndCaptureSink(t, config.NotificationsConfig{})
 
 	if _, ok := sink.(*ralphloop.ChannelEventSink); !ok {
 		t.Fatalf("expected the real sink unwrapped, got %T", sink)

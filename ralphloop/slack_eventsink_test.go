@@ -11,24 +11,21 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// telegramRequest captures one decoded call to the fake Telegram API's
-// sendMessage endpoint.
-type telegramRequest struct {
-	ChatID    string `json:"chat_id"`
-	Text      string `json:"text"`
-	ParseMode string `json:"parse_mode"`
+// slackRequest captures one decoded call to the fake Slack webhook.
+type slackRequest struct {
+	Text string `json:"text"`
 }
 
-// fakeTelegramServer starts an httptest.Server standing in for the Telegram
-// Bot API and returns it alongside a thread-safe accessor for the requests
+// fakeSlackServer starts an httptest.Server standing in for a Slack workflow
+// webhook and returns it alongside a thread-safe accessor for the requests
 // it received, since sends happen from their own goroutine.
-func fakeTelegramServer(t *testing.T, statusCode int) (*httptest.Server, func() []telegramRequest) {
+func fakeSlackServer(t *testing.T, statusCode int) (*httptest.Server, func() []slackRequest) {
 	t.Helper()
 	var mu sync.Mutex
-	var requests []telegramRequest
+	var requests []slackRequest
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var req telegramRequest
+		var req slackRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Errorf("failed to decode request body: %v", err)
 		}
@@ -39,18 +36,16 @@ func fakeTelegramServer(t *testing.T, statusCode int) (*httptest.Server, func() 
 	}))
 	t.Cleanup(server.Close)
 
-	return server, func() []telegramRequest {
+	return server, func() []slackRequest {
 		mu.Lock()
 		defer mu.Unlock()
-		out := make([]telegramRequest, len(requests))
+		out := make([]slackRequest, len(requests))
 		copy(out, requests)
 		return out
 	}
 }
 
-// waitForRequests polls (sends happen asynchronously) until want requests
-// have arrived or the timeout expires, returning whatever arrived.
-func waitForRequests(get func() []telegramRequest, want int) []telegramRequest {
+func waitForSlackRequests(get func() []slackRequest, want int) []slackRequest {
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
 		if got := get(); len(got) >= want {
@@ -61,38 +56,32 @@ func waitForRequests(get func() []telegramRequest, want int) []telegramRequest {
 	return get()
 }
 
-func TestTelegramEventSink_IterationFinished_SendsOneMessageAndForwards(t *testing.T) {
-	server, getRequests := fakeTelegramServer(t, http.StatusOK)
+func TestSlackEventSink_IterationFinished_SendsOneMessageAndForwards(t *testing.T) {
+	server, getRequests := fakeSlackServer(t, http.StatusOK)
 	inner := &recordingSink{}
-	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL)
+	sink := newSlackEventSink(inner, server.URL)
 
 	stats := IterationStats{ElapsedSeconds: 42, PeakContextTokens: 1234, InProgress: 2, Completed: 3, Total: 5}
-	sink.IterationFinished(tickets.Ticket{Identifier: "04", Title: "Telegram decorator"}, "epic", stats)
+	sink.IterationFinished(tickets.Ticket{Identifier: "04", Title: "Slack decorator"}, "epic", stats)
 
 	if got := inner.snapshot(); len(got) != 1 || got[0] != "IterationFinished" {
 		t.Errorf("inner events = %v, want [IterationFinished]", got)
 	}
 
-	reqs := waitForRequests(getRequests, 1)
+	reqs := waitForSlackRequests(getRequests, 1)
 	if len(reqs) != 1 {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
-	if reqs[0].ChatID != "chat-1" {
-		t.Errorf("chat_id = %q, want %q", reqs[0].ChatID, "chat-1")
-	}
-	if reqs[0].ParseMode != "MarkdownV2" {
-		t.Errorf("parse_mode = %q, want %q", reqs[0].ParseMode, "MarkdownV2")
-	}
-	want := telegramStyle.iterationFinishedText(tickets.Ticket{Identifier: "04", Title: "Telegram decorator"}, "epic", stats)
+	want := slackStyle.iterationFinishedText(tickets.Ticket{Identifier: "04", Title: "Slack decorator"}, "epic", stats)
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}
 }
 
-func TestTelegramEventSink_IterationPaused_SendsOneMessageAndForwards(t *testing.T) {
-	server, getRequests := fakeTelegramServer(t, http.StatusOK)
+func TestSlackEventSink_IterationPaused_SendsOneMessageAndForwards(t *testing.T) {
+	server, getRequests := fakeSlackServer(t, http.StatusOK)
 	inner := &recordingSink{}
-	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL)
+	sink := newSlackEventSink(inner, server.URL)
 
 	sink.IterationPaused("iter-04", PauseNeedsAttention, "agent blocked on permission prompt")
 
@@ -100,20 +89,20 @@ func TestTelegramEventSink_IterationPaused_SendsOneMessageAndForwards(t *testing
 		t.Errorf("inner events = %v, want [IterationPaused]", got)
 	}
 
-	reqs := waitForRequests(getRequests, 1)
+	reqs := waitForSlackRequests(getRequests, 1)
 	if len(reqs) != 1 {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
-	want := telegramStyle.iterationPausedText("iter-04", PauseNeedsAttention, "agent blocked on permission prompt")
+	want := slackStyle.iterationPausedText("iter-04", PauseNeedsAttention, "agent blocked on permission prompt")
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}
 }
 
-func TestTelegramEventSink_EpicComplete_SendsOneMessageAndForwards(t *testing.T) {
-	server, getRequests := fakeTelegramServer(t, http.StatusOK)
+func TestSlackEventSink_EpicComplete_SendsOneMessageAndForwards(t *testing.T) {
+	server, getRequests := fakeSlackServer(t, http.StatusOK)
 	inner := &recordingSink{}
-	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL)
+	sink := newSlackEventSink(inner, server.URL)
 
 	sink.EpicComplete("epic", 5, 300)
 
@@ -121,20 +110,20 @@ func TestTelegramEventSink_EpicComplete_SendsOneMessageAndForwards(t *testing.T)
 		t.Errorf("inner events = %v, want [EpicComplete]", got)
 	}
 
-	reqs := waitForRequests(getRequests, 1)
+	reqs := waitForSlackRequests(getRequests, 1)
 	if len(reqs) != 1 {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
-	want := telegramStyle.epicCompleteText("epic", 5, 300)
+	want := slackStyle.epicCompleteText("epic", 5, 300)
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}
 }
 
-func TestTelegramEventSink_OtherMethods_ForwardWithoutSendingAnyRequest(t *testing.T) {
-	server, getRequests := fakeTelegramServer(t, http.StatusOK)
+func TestSlackEventSink_OtherMethods_ForwardWithoutSendingAnyRequest(t *testing.T) {
+	server, getRequests := fakeSlackServer(t, http.StatusOK)
 	inner := &recordingSink{}
-	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL)
+	sink := newSlackEventSink(inner, server.URL)
 
 	sink.NoTicketsFound("epic")
 	sink.AlreadyComplete("epic", 1, 2)
@@ -180,10 +169,10 @@ func TestTelegramEventSink_OtherMethods_ForwardWithoutSendingAnyRequest(t *testi
 	}
 }
 
-func TestTelegramEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
-	server, getRequests := fakeTelegramServer(t, http.StatusInternalServerError)
+func TestSlackEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
+	server, getRequests := fakeSlackServer(t, http.StatusInternalServerError)
 	inner := &recordingSink{}
-	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL)
+	sink := newSlackEventSink(inner, server.URL)
 
 	start := time.Now()
 	sink.EpicComplete("epic", 1, 0)
@@ -191,16 +180,16 @@ func TestTelegramEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
 		t.Errorf("EpicComplete blocked for %s, want near-instant return", elapsed)
 	}
 
-	waitForRequests(getRequests, 1)
+	waitForSlackRequests(getRequests, 1)
 }
 
-func TestTelegramEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
+func TestSlackEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
 	inner := &recordingSink{}
 	// A closed server's URL is unreachable but still well-formed, which is
-	// what a broken/unreachable Telegram API looks like to the client.
+	// what a broken/unreachable Slack webhook looks like to the client.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	server.Close()
-	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL)
+	sink := newSlackEventSink(inner, server.URL)
 
 	start := time.Now()
 	sink.EpicComplete("epic", 1, 0)
@@ -213,31 +202,28 @@ func TestTelegramEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
 	}
 }
 
-func TestSendTelegramTestMessage_SendsSynchronouslyAndReturnsNilOnSuccess(t *testing.T) {
-	server, getRequests := fakeTelegramServer(t, http.StatusOK)
+func TestSendSlackTestMessage_SendsSynchronouslyAndReturnsNilOnSuccess(t *testing.T) {
+	server, getRequests := fakeSlackServer(t, http.StatusOK)
 
-	err := sendTelegramTestMessage("tok", "chat-1", server.URL)
+	err := SendSlackTestMessage(server.URL)
 	if err != nil {
-		t.Fatalf("sendTelegramTestMessage: %v", err)
+		t.Fatalf("SendSlackTestMessage: %v", err)
 	}
 
 	reqs := getRequests()
 	if len(reqs) != 1 {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
-	want := telegramStyle.testMessageText()
+	want := slackStyle.testMessageText()
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}
-	if reqs[0].ParseMode != "MarkdownV2" {
-		t.Errorf("parse_mode = %q, want %q", reqs[0].ParseMode, "MarkdownV2")
-	}
 }
 
-func TestSendTelegramTestMessage_ReturnsErrorOnFailingServer(t *testing.T) {
-	server, _ := fakeTelegramServer(t, http.StatusInternalServerError)
+func TestSendSlackTestMessage_ReturnsErrorOnFailingServer(t *testing.T) {
+	server, _ := fakeSlackServer(t, http.StatusInternalServerError)
 
-	if err := sendTelegramTestMessage("tok", "chat-1", server.URL); err == nil {
-		t.Fatal("sendTelegramTestMessage: want error, got nil")
+	if err := SendSlackTestMessage(server.URL); err == nil {
+		t.Fatal("SendSlackTestMessage: want error, got nil")
 	}
 }

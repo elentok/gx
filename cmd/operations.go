@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ui/menu"
 
 	humanize "github.com/dustin/go-humanize"
@@ -322,6 +323,49 @@ func runConfigDefaults(d deps) error {
 		return err
 	}
 	fmt.Fprintf(d.stdout, "%s\n", b)
+	return nil
+}
+
+// runConfigTestNotifications sends a fixed test message to every notification
+// service that has credentials configured, reporting each one's outcome as
+// it goes rather than failing fast, so a Slack success is still visible even
+// if Telegram is misconfigured.
+func runConfigTestNotifications(d deps) error {
+	cfg, err := d.loadConfig()
+	if err != nil {
+		return err
+	}
+
+	configured := 0
+	failed := 0
+
+	if cfg.Notifications.Telegram.BotToken != "" {
+		configured++
+		if err := ralphloop.SendTelegramTestMessage(cfg.Notifications.Telegram.BotToken, cfg.Notifications.Telegram.ChatID); err != nil {
+			failed++
+			fmt.Fprintf(d.stderr, "telegram: failed: %v\n", err)
+		} else {
+			fmt.Fprintf(d.stdout, "telegram: sent\n")
+		}
+	}
+
+	if cfg.Notifications.Slack.WebhookURL != "" {
+		configured++
+		if err := ralphloop.SendSlackTestMessage(cfg.Notifications.Slack.WebhookURL); err != nil {
+			failed++
+			fmt.Fprintf(d.stderr, "slack: failed: %v\n", err)
+		} else {
+			fmt.Fprintf(d.stdout, "slack: sent\n")
+		}
+	}
+
+	if configured == 0 {
+		fmt.Fprintf(d.stdout, "no notification service configured (see `gx config edit`)\n")
+		return nil
+	}
+	if failed > 0 {
+		return fmt.Errorf("%d of %d notification(s) failed to send", failed, configured)
+	}
 	return nil
 }
 
