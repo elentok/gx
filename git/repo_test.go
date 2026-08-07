@@ -109,6 +109,45 @@ func TestFindRepo_notARepo(t *testing.T) {
 	}
 }
 
+func TestScratchRoot_standardRepo(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	sub := filepath.Join(dir, "sub")
+	testutil.Mkdir(t, sub)
+
+	repo, err := git.FindRepo(sub)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+	if want := filepath.Join(dir, ".scratch"); repo.ScratchRoot() != want {
+		t.Errorf("ScratchRoot() = %q, want %q", repo.ScratchRoot(), want)
+	}
+}
+
+func TestScratchRoot_bareRepo(t *testing.T) {
+	t.Parallel()
+	outer := testutil.TempDotBareRepoWithWorktrees(t, "feature", "other")
+	wtDir := filepath.Join(outer, "feature")
+	otherWtDir := filepath.Join(outer, "other")
+
+	info, err := git.IdentifyDir(wtDir)
+	if err != nil {
+		t.Fatalf("IdentifyDir: %v", err)
+	}
+	want := filepath.Join(outer, ".bare", ".scratch")
+	if info.Repo.ScratchRoot() != want {
+		t.Errorf("ScratchRoot() = %q, want %q", info.Repo.ScratchRoot(), want)
+	}
+
+	otherInfo, err := git.IdentifyDir(otherWtDir)
+	if err != nil {
+		t.Fatalf("IdentifyDir: %v", err)
+	}
+	if otherInfo.Repo.ScratchRoot() != want {
+		t.Errorf("ScratchRoot() from other worktree = %q, want %q", otherInfo.Repo.ScratchRoot(), want)
+	}
+}
+
 func TestDetectMainBranch(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempBareRepo(t)

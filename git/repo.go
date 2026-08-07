@@ -24,6 +24,13 @@ func (r Repo) LinkedWorktreeDir() string {
 	return r.Root
 }
 
+// ScratchRoot returns the single canonical location of the local ticket
+// tracker's `.scratch` directory: Root/.scratch. For a bare-repo checkout
+// this is the bare git directory's own `.scratch`, not any linked worktree's.
+func (r Repo) ScratchRoot() string {
+	return filepath.Join(r.Root, ".scratch")
+}
+
 // DirInfo describes what kind of git context a directory is in.
 type DirInfo struct {
 	Repo           Repo
