@@ -1191,12 +1191,12 @@ func TestTicketsAndQueueMatchAfterRestartRegardlessOfNavigationOrder(t *testing.
 	}
 }
 
-// TestQueueModelShowsSameTwoLineStatusAsTicketsTab covers ticket 25's first
+// TestQueueModelShowsSameStatusAsTicketsTab covers ticket 25's first
 // request: the Queue tab must show each ticket's status icon, blocked-by
-// suffix, and (for a landed ticket) the same elapsed/tokens metrics line the
+// suffix, and (for a landed ticket) the same elapsed/tokens metrics the
 // Tickets tab renders (view.go's renderTicketRow), not just a bare checkbox
 // and title.
-func TestQueueModelShowsSameTwoLineStatusAsTicketsTab(t *testing.T) {
+func TestQueueModelShowsSameStatusAsTicketsTab(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-foundation.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-dependent.md", "Status: open\nBlocked by: 01\n\nBody.\n")
@@ -1266,9 +1266,9 @@ func TestRenderQueueTicketRow_DoneMetricsLineMatchesTitleColor(t *testing.T) {
 	}}
 
 	lines := m.renderQueueTicketRow(queueRow{epic: epic, ticket: epic.Tickets[0]}, 0)
-	wantMetrics := renderRowMetricsLine(formatMetricsLine(5, 100), statusDoneStyle)
-	if lines[1] != wantMetrics {
-		t.Fatalf("metrics line = %q, want %q", lines[1], wantMetrics)
+	wantSuffix := " " + statusDoneStyle.Italic(true).Render(formatMetricsLine(5, 100))
+	if !strings.HasSuffix(lines[0], wantSuffix) {
+		t.Fatalf("row line = %q, want it to end with %q", lines[0], wantSuffix)
 	}
 }
 

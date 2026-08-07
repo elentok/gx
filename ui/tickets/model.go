@@ -456,26 +456,9 @@ func (m Model) renderedRowsHeight(rows []row) int {
 	return height
 }
 
-func (m Model) renderedRowHeight(r row) int {
-	if r.isEpic() {
-		return 1
-	}
-	epic := m.epics[r.epicIdx]
-	t := epic.Tickets[r.ticketIdx]
-	status := epic.RenderedStatus(t)
-	if status == tickets.StatusDone {
-		return 2
-	}
-	if !m.implementingEpics[epic.Name] {
-		return 1
-	}
-	live, ok := m.live[epic.Name][t.Identifier]
-	if !ok {
-		return 1
-	}
-	if live.running || live.paused {
-		return 2
-	}
+// renderedRowHeight is always 1 (ticket 06 folded every row's elapsed/token
+// metrics onto its single title line).
+func (m Model) renderedRowHeight(_ row) int {
 	return 1
 }
 

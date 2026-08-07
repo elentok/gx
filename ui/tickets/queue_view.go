@@ -128,8 +128,8 @@ func (m QueueModel) queueLineForSelected() (line, height int, ok bool) {
 }
 
 // buildQueueLines renders every candidate ticket, grouped by epic and
-// ordered in plan order (rowsAndPlanErrors), as the same two-line status rows
-// the Tickets tab renders for its own tickets (renderQueueTicketRow) — no
+// ordered in plan order (rowsAndPlanErrors), as the same single-line status
+// rows the Tickets tab renders for its own tickets (renderQueueTicketRow) — no
 // "parallel"/"then" wave grouping (ticket 25). offsets/heights are aligned to
 // rowsAndPlanErrors' row order so selection/scroll math can find any row's
 // position in lines without re-deriving the rendering.
@@ -171,14 +171,14 @@ func (m QueueModel) buildQueueLines() (lines []string, offsets []int, heights []
 	return lines, offsets, heights
 }
 
-// renderQueueTicketRow renders one physical line for a ticket that isn't
-// currently running, and two for a live or done ticket — the same two-line
-// status presentation as the Tickets tab's renderTicketRow (view.go), so the
-// Queue tab shows identical per-ticket status (ticket 25). r.depth indents a
-// nested ticket (Parent/Children, ticket 03) two extra spaces per level,
-// matching ui/tree's own indent unit and the Tickets tab's renderTicketRow
-// (ticket 09); a ticket with children gets the same folder-open/closed glyph
-// an epic row uses in the Tickets tab, reflecting r.expanded.
+// renderQueueTicketRow renders one physical line for every ticket — the same
+// single-line status presentation as the Tickets tab's renderTicketRow
+// (view.go), so the Queue tab shows identical per-ticket status (ticket 25).
+// r.depth indents a nested ticket (Parent/Children, ticket 03) two extra
+// spaces per level, matching ui/tree's own indent unit and the Tickets tab's
+// renderTicketRow (ticket 09); a ticket with children gets the same
+// folder-open/closed glyph an epic row uses in the Tickets tab, reflecting
+// r.expanded.
 func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) []string {
 	epic, t := r.epic, r.ticket
 	status := epic.RenderedStatus(t)
@@ -188,7 +188,7 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) []string {
 		if live, ok := m.live[epic.Name][t.Identifier]; ok {
 			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live, indent); ok {
 				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens)
-				return []string{base, renderRowMetricsLine(joinNonEmpty(" ", suffix, metrics), metricsLineStyle)}
+				return []string{appendRowMetrics(base, joinNonEmpty(" ", suffix, metrics), metricsLineStyle)}
 			}
 		}
 	}
@@ -235,7 +235,7 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) []string {
 		return []string{line}
 	}
 	metrics := formatMetricsLine(t.ElapsedTime, t.ActualContextWindow)
-	return []string{line, renderRowMetricsLine(metrics, style)}
+	return []string{appendRowMetrics(line, metrics, style)}
 }
 
 func (m QueueModel) icons() ui.IconSet {

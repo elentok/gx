@@ -158,7 +158,10 @@ func TestCrossTabLiveMetricsRenderSameFiguresFromSharedProjection(t *testing.T) 
 
 	tm := NewModel(root, ui.Settings{}, keys.New(nil))
 	tm = deliverLoad(t, tm)
-	updated, _ := tm.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	// Wide enough that the sidebar panel's half-width column (ticket 06 folded
+	// the live suffix and elapsed/token metrics onto the title's own line) has
+	// room for the full combined text without truncating.
+	updated, _ := tm.Update(tea.WindowSizeMsg{Width: 220, Height: 40})
 	tm = updated.(Model)
 
 	qm := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, map[string]bool{

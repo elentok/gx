@@ -145,14 +145,13 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 	return line
 }
 
-// renderTicketRow renders one physical line for a ticket that has never run,
-// and two for a live or done ticket. The second line carries the same
-// elapsed/token metrics as the former standalone ralph-loop view; live rows
-// also move their phase or pause reason there so the title line stays clean.
-// r.depth indents a nested ticket (Parent/Children, ticket 03) two extra
-// spaces per level beneath the base indent, matching ui/tree's own indent
-// unit; a ticket with children gets the same folder-open/closed glyph an
-// epic row uses, reflecting r.expanded.
+// renderTicketRow renders one physical line for every ticket. A live or done
+// ticket's line ends with the same elapsed/token metrics as the former
+// standalone ralph-loop view, appended dim italic; live rows also append
+// their phase or pause reason there. r.depth indents a nested ticket
+// (Parent/Children, ticket 03) two extra spaces per level beneath the base
+// indent, matching ui/tree's own indent unit; a ticket with children gets the
+// same folder-open/closed glyph an epic row uses, reflecting r.expanded.
 func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 	t := epic.Tickets[r.ticketIdx]
 	status := epic.RenderedStatus(t)
@@ -168,7 +167,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 		if live, ok := m.live[epic.Name][t.Identifier]; ok {
 			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live, indent+m.checkboxGlyph(m.isChecked(t.Path))+" "); ok {
 				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens)
-				return []string{base, m.renderTicketMetricsLine(joinNonEmpty(" ", suffix, metrics), metricsLineStyle, false)}
+				return []string{appendRowMetrics(base, joinNonEmpty(" ", suffix, metrics), metricsLineStyle)}
 			}
 		}
 	}
@@ -216,18 +215,10 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 		return []string{line}
 	}
 	metrics := formatMetricsLine(t.ElapsedTime, t.ActualContextWindow)
-	return []string{line, m.renderTicketMetricsLine(metrics, style, searchDim)}
-}
-
-// renderTicketMetricsLine aligns a ticket's second line beneath its title in
-// the tree (two spaces deeper than the flat view's metrics indentation),
-// colored to match style — the same status style used for the row's first
-// line (ticket 02) — unless search-dimmed.
-func (m Model) renderTicketMetricsLine(text string, style lipgloss.Style, searchDim bool) string {
 	if searchDim {
-		return "      " + ui.StyleDim.Render(text)
+		return []string{appendRowMetrics(line, metrics, ui.StyleDim)}
 	}
-	return renderRowMetricsLine(text, style)
+	return []string{appendRowMetrics(line, metrics, style)}
 }
 
 // checkboxGlyph renders the execution-queue checkbox marker for a checked or

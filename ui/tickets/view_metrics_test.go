@@ -39,11 +39,11 @@ func TestRenderTicketRow_DoneHasMetricsLine(t *testing.T) {
 	m := newModelForTicketRowTests(epic)
 
 	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)
-	if len(lines) != 2 {
-		t.Fatalf("renderTicketRow() returned %d lines, want 2: %#v", len(lines), lines)
+	if len(lines) != 1 {
+		t.Fatalf("renderTicketRow() returned %d lines, want 1: %#v", len(lines), lines)
 	}
-	if !strings.Contains(lines[1], "12m34s") || !strings.Contains(lines[1], "45.2k tok") {
-		t.Fatalf("metrics line = %q, want elapsed time and tokens", lines[1])
+	if !strings.Contains(lines[0], "12m34s") || !strings.Contains(lines[0], "45.2k tok") {
+		t.Fatalf("row line = %q, want elapsed time and tokens", lines[0])
 	}
 }
 
@@ -61,15 +61,12 @@ func TestRenderTicketRow_LiveHasSuffixAndMetricsLine(t *testing.T) {
 	}
 
 	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)
-	if len(lines) != 2 {
-		t.Fatalf("renderTicketRow() returned %d lines, want 2: %#v", len(lines), lines)
-	}
-	if strings.Contains(lines[0], "iter-01") || strings.Contains(lines[0], "implementing") {
-		t.Errorf("title line contains live suffix: %q", lines[0])
+	if len(lines) != 1 {
+		t.Fatalf("renderTicketRow() returned %d lines, want 1: %#v", len(lines), lines)
 	}
 	for _, want := range []string{"iter-01", "implementing", "12m34s", "45.2k tok"} {
-		if !strings.Contains(lines[1], want) {
-			t.Errorf("metrics line = %q, want %q", lines[1], want)
+		if !strings.Contains(lines[0], want) {
+			t.Errorf("row line = %q, want %q", lines[0], want)
 		}
 	}
 }
@@ -93,8 +90,8 @@ func TestRenderTicketRow_LiveRowIndentNotDoubled(t *testing.T) {
 	if !ok {
 		t.Fatalf("renderLiveTicketRow() ok = false, want true")
 	}
-	if lines[0] != wantBase {
-		t.Fatalf("live row title line = %q, want renderLiveTicketRow's own output %q (no extra caller prefix)", lines[0], wantBase)
+	if !strings.HasPrefix(lines[0], wantBase) {
+		t.Fatalf("live row line = %q, want it to start with renderLiveTicketRow's own output %q (no extra caller prefix)", lines[0], wantBase)
 	}
 }
 
@@ -136,12 +133,12 @@ func TestRenderTicketRow_PausedHasReasonAndMetricsLine(t *testing.T) {
 	}
 
 	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)
-	if len(lines) != 2 {
-		t.Fatalf("renderTicketRow() returned %d lines, want 2: %#v", len(lines), lines)
+	if len(lines) != 1 {
+		t.Fatalf("renderTicketRow() returned %d lines, want 1: %#v", len(lines), lines)
 	}
 	for _, want := range []string{"context budget exceeded", "1h05m", "1.2M tok"} {
-		if !strings.Contains(lines[1], want) {
-			t.Errorf("metrics line = %q, want %q", lines[1], want)
+		if !strings.Contains(lines[0], want) {
+			t.Errorf("row line = %q, want %q", lines[0], want)
 		}
 	}
 }
@@ -152,14 +149,14 @@ func TestSidebarLineForSelectedCountsMetricsLines(t *testing.T) {
 		{Identifier: "02", Title: "Open ticket", Status: "open"},
 	}}
 	m := newModelForTicketRowTests(epic)
-	m.selected = 2 // epic row, two-line done row, then open row
+	m.selected = 2 // epic row, single-line done row, then open row
 
 	line, height, ok := m.sidebarLineForSelected()
 	if !ok {
 		t.Fatal("sidebarLineForSelected() ok = false")
 	}
-	if line != 4 || height != 1 {
-		t.Fatalf("sidebarLineForSelected() = (%d, %d), want (4, 1)", line, height)
+	if line != 3 || height != 1 {
+		t.Fatalf("sidebarLineForSelected() = (%d, %d), want (3, 1)", line, height)
 	}
 }
 
@@ -215,9 +212,9 @@ func TestRenderTicketRow_DoneMetricsLineMatchesTitleColor(t *testing.T) {
 	m := newModelForTicketRowTests(epic)
 
 	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)
-	wantMetrics := renderRowMetricsLine(formatMetricsLine(5, 100), statusDoneStyle)
-	if lines[1] != wantMetrics {
-		t.Fatalf("metrics line = %q, want %q", lines[1], wantMetrics)
+	wantSuffix := " " + statusDoneStyle.Italic(true).Render(formatMetricsLine(5, 100))
+	if !strings.HasSuffix(lines[0], wantSuffix) {
+		t.Fatalf("row line = %q, want it to end with %q", lines[0], wantSuffix)
 	}
 }
 
