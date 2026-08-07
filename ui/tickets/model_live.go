@@ -1,11 +1,19 @@
 package tickets
 
+import (
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/elentok/gx/ui/notify"
+)
+
 // syncRunSnapshot replaces presentation state atomically from the registry's
-// durable projection; it never reads the producer stream.
-func (m *Model) syncRunSnapshot(epicName string) {
+// durable projection; it never reads the producer stream. The returned cmd
+// closes any reattach-scan notification the registry queued up while this
+// tab wasn't polling (see epicRun.pendingNotifyCloses) — nil if none.
+func (m *Model) syncRunSnapshot(epicName string) tea.Cmd {
 	snapshot, ok := ralphLoopRegistry.runSnapshot(epicName)
 	if !ok {
-		return
+		return nil
 	}
 	if m.live == nil {
 		m.live = map[string]map[string]liveTicketState{}
@@ -24,6 +32,19 @@ func (m *Model) syncRunSnapshot(epicName string) {
 		m.implementingEpics = map[string]bool{}
 	}
 	m.implementingEpics[epicName] = snapshot.State == RunStateRunning
+	return closeNotifyCmd(ralphLoopRegistry.drainPendingNotifyCloses(epicName))
+}
+
+// closeNotifyCmd batches a notify.Close cmd per id, or nil if ids is empty.
+func closeNotifyCmd(ids []string) tea.Cmd {
+	if len(ids) == 0 {
+		return nil
+	}
+	cmds := make([]tea.Cmd, len(ids))
+	for i, id := range ids {
+		cmds[i] = notify.Close(id)
+	}
+	return tea.Batch(cmds...)
 }
 
 // clearLiveTracking resets m.implementEpic's live-orchestrator state — kept

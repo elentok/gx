@@ -76,11 +76,20 @@ func (m Model) handleReattachSignals(msg reattachSignalsMsg) (tea.Model, tea.Cmd
 	}
 	cmds := make([]tea.Cmd, 0, len(msg.signals)+1)
 	for _, s := range msg.signals {
-		id := "reattach-scan-" + s.EpicName + "-" + s.Ticket.Identifier
+		id := reattachNotifyID(s.EpicName, s.Ticket.Identifier)
 		cmds = append(cmds, notify.Progress(id, fmt.Sprintf(
 			"epic %q ticket %s: recoverable session detected", s.EpicName, s.Ticket.Identifier,
 		)))
 	}
 	cmds = append(cmds, cmdOpenQueueTab(m.worktreeRoot))
 	return m, tea.Batch(cmds...)
+}
+
+// reattachNotifyID is the notify.Progress/notify.Close id for a signaled
+// ticket's "recoverable session detected" notification — shared by
+// handleReattachSignals (which opens it) and loopRegistry.reduceLiveEvent
+// (which closes it once that ticket's session is actually reattached or
+// resumed), so the two ends can never drift out of sync.
+func reattachNotifyID(epicName, identifier string) string {
+	return "reattach-scan-" + epicName + "-" + identifier
 }

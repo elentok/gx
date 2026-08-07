@@ -227,12 +227,12 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.runningEpics[msg.epicName] = true
 		m.markEpicTicketsRunning(msg.epicName)
-		m.syncRunSnapshot(msg.epicName)
-		return m, tea.Batch(cmdPollImplement(msg.epicName), m.implementSpinner.Tick)
+		closeCmd := m.syncRunSnapshot(msg.epicName)
+		return m, tea.Batch(cmdPollImplement(msg.epicName), m.implementSpinner.Tick, closeCmd)
 	case implementPollMsg:
-		m.syncRunSnapshot(msg.epicName)
+		closeCmd := m.syncRunSnapshot(msg.epicName)
 		if ralphLoopRegistry.isRunningEpic(msg.epicName) {
-			return m, cmdPollImplement(msg.epicName)
+			return m, tea.Batch(cmdPollImplement(msg.epicName), closeCmd)
 		}
 		m.finalizeEpicTicketStatus(msg.epicName)
 		delete(m.runningEpics, msg.epicName)
@@ -376,7 +376,7 @@ func (m QueueModel) handleQueueSync(msg queueSyncMsg) (tea.Model, tea.Cmd) {
 		if !ok {
 			continue
 		}
-		m.syncRunSnapshot(name)
+		cmds = append(cmds, m.syncRunSnapshot(name))
 		if !snapshot.StartedAt.IsZero() && (m.executionStartedAt.IsZero() || snapshot.StartedAt.Before(m.executionStartedAt)) {
 			m.executionStartedAt = snapshot.StartedAt
 		}
@@ -416,10 +416,12 @@ func (m QueueModel) handleQueueSync(msg queueSyncMsg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m *QueueModel) syncRunSnapshot(epicName string) {
+// syncRunSnapshot mirrors Model.syncRunSnapshot (ui/tickets/model_live.go)
+// for the Queue tab's own poll loop; see closeNotifyCmd there.
+func (m *QueueModel) syncRunSnapshot(epicName string) tea.Cmd {
 	snapshot, ok := ralphLoopRegistry.runSnapshot(epicName)
 	if !ok {
-		return
+		return nil
 	}
 	if m.live == nil {
 		m.live = map[string]map[string]liveTicketState{}
@@ -433,6 +435,7 @@ func (m *QueueModel) syncRunSnapshot(epicName string) {
 		}
 	}
 	m.live[epicName] = live
+	return closeNotifyCmd(ralphLoopRegistry.drainPendingNotifyCloses(epicName))
 }
 
 // ticketPathFor resolves an epicName/identifier pair (the registry's

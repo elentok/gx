@@ -41,6 +41,11 @@ type epicRun struct {
 	finalError  string
 	tickets     map[string]RunTicketSnapshot
 	startedAt   time.Time
+	// pendingNotifyCloses queues reattach-scan notification ids to close,
+	// populated by reduceLiveEvent (running in the event-drain goroutine,
+	// which has no way to send a tea.Cmd itself) and drained into an actual
+	// notify.Close cmd by the next syncRunSnapshot poll on the active tab.
+	pendingNotifyCloses []string
 }
 
 type RunState string
@@ -168,6 +173,9 @@ func (r *loopRegistry) reduceLiveEvent(epicName string, event ralphloop.LiveEven
 			Running:    true,
 			StartedAt:  time.Now(),
 		}
+		if event.Kind == ralphloop.LiveEventTicketReattached {
+			run.pendingNotifyCloses = append(run.pendingNotifyCloses, reattachNotifyID(epicName, event.Identifier))
+		}
 	case ralphloop.LiveEventContextOccupancy:
 		ticket, ok := run.tickets[event.Identifier]
 		if ok {
@@ -196,6 +204,7 @@ func (r *loopRegistry) reduceLiveEvent(epicName string, event ralphloop.LiveEven
 			ticket.PauseKind = ""
 			ticket.PauseReason = ""
 			run.tickets[identifier] = ticket
+			run.pendingNotifyCloses = append(run.pendingNotifyCloses, reattachNotifyID(epicName, identifier))
 			break
 		}
 	case ralphloop.LiveEventIterationFinished:
@@ -224,6 +233,21 @@ func (r *loopRegistry) runSnapshot(epicName string) (RunSnapshot, bool) {
 		return RunSnapshot{}, false
 	}
 	return copyRunSnapshot(epicName, run, r.paused), true
+}
+
+// drainPendingNotifyCloses hands back and clears epicName's queued
+// reattach-scan notification ids (see epicRun.pendingNotifyCloses) so the
+// caller can turn them into notify.Close cmds exactly once.
+func (r *loopRegistry) drainPendingNotifyCloses(epicName string) []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	run := r.snapshots[epicName]
+	if run == nil || len(run.pendingNotifyCloses) == 0 {
+		return nil
+	}
+	ids := run.pendingNotifyCloses
+	run.pendingNotifyCloses = nil
+	return ids
 }
 
 func (r *loopRegistry) runSnapshots() []RunSnapshot {
@@ -613,16 +637,16 @@ func (m Model) handleConfirmMouseUpdate(msg tea.MouseClickMsg) (tea.Model, tea.C
 
 func (m Model) handleImplementStarted(msg implementStartedMsg) (tea.Model, tea.Cmd) {
 	m.implementEpic = msg.epicName
-	m.syncRunSnapshot(msg.epicName)
-	return m, tea.Batch(m.implementSpinner.Tick, cmdPollImplement(msg.epicName))
+	closeCmd := m.syncRunSnapshot(msg.epicName)
+	return m, tea.Batch(m.implementSpinner.Tick, cmdPollImplement(msg.epicName), closeCmd)
 }
 
 // handleImplementPoll projects active registry state and reloads disk state
 // after completion. Errors remain in the registry for every observer.
 func (m Model) handleImplementPoll(msg implementPollMsg) (tea.Model, tea.Cmd) {
 	if ralphLoopRegistry.isRunningEpic(msg.epicName) {
-		m.syncRunSnapshot(msg.epicName)
-		return m, cmdPollImplement(msg.epicName)
+		closeCmd := m.syncRunSnapshot(msg.epicName)
+		return m, tea.Batch(cmdPollImplement(msg.epicName), closeCmd)
 	}
 	m.clearLiveTrackingFor(msg.epicName)
 	return m, tea.Batch(implementFinishedNotifyCmd(msg.epicName), m.cmdLoad())
@@ -650,8 +674,7 @@ func (m Model) handleImplementSync(msg implementSyncMsg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	for _, epicName := range msg.runningEpics {
 		running[epicName] = true
-		m.syncRunSnapshot(epicName)
-		cmds = append(cmds, cmdPollImplement(epicName))
+		cmds = append(cmds, m.syncRunSnapshot(epicName), cmdPollImplement(epicName))
 	}
 	if len(msg.runningEpics) > 0 {
 		cmds = append(cmds, m.implementSpinner.Tick)

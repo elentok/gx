@@ -186,6 +186,73 @@ func TestReduceLiveEventCapturesEpicCompletion(t *testing.T) {
 	}
 }
 
+func TestDrainPendingNotifyClosesOnTicketReattached(t *testing.T) {
+	r := newLoopRegistry(1)
+	r.tryStart("epic-a", 0, 2)
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventTicketReattached, Identifier: "01", Label: "iter-01",
+	})
+
+	ids := r.drainPendingNotifyCloses("epic-a")
+	want := reattachNotifyID("epic-a", "01")
+	if len(ids) != 1 || ids[0] != want {
+		t.Fatalf("drainPendingNotifyCloses() = %#v, want [%q]", ids, want)
+	}
+
+	// A second drain finds nothing left to close.
+	if ids := r.drainPendingNotifyCloses("epic-a"); len(ids) != 0 {
+		t.Fatalf("drainPendingNotifyCloses() after drain = %#v, want empty", ids)
+	}
+}
+
+func TestDrainPendingNotifyClosesOnIterationResumed(t *testing.T) {
+	r := newLoopRegistry(1)
+	r.tryStart("epic-a", 0, 2)
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationStarted, Identifier: "01", Label: "iter-01",
+	})
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationPaused, Label: "iter-01",
+	})
+	if ids := r.drainPendingNotifyCloses("epic-a"); len(ids) != 0 {
+		t.Fatalf("drainPendingNotifyCloses() after pause = %#v, want empty (only resume closes)", ids)
+	}
+
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationResumed, Label: "iter-01",
+	})
+	ids := r.drainPendingNotifyCloses("epic-a")
+	want := reattachNotifyID("epic-a", "01")
+	if len(ids) != 1 || ids[0] != want {
+		t.Fatalf("drainPendingNotifyCloses() after resume = %#v, want [%q]", ids, want)
+	}
+}
+
+func TestDrainPendingNotifyClosesOnlyAffectsResumedTicket(t *testing.T) {
+	r := newLoopRegistry(1)
+	r.tryStart("epic-a", 0, 2)
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationStarted, Identifier: "01", Label: "iter-01",
+	})
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventTicketReattached, Identifier: "02", Label: "iter-02",
+	})
+	r.drainPendingNotifyCloses("epic-a") // clear the reattach-triggered close
+
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationPaused, Label: "iter-01",
+	})
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationResumed, Label: "iter-01",
+	})
+
+	ids := r.drainPendingNotifyCloses("epic-a")
+	want := reattachNotifyID("epic-a", "01")
+	if len(ids) != 1 || ids[0] != want {
+		t.Fatalf("drainPendingNotifyCloses() = %#v, want only ticket 01's id [%q] (ticket 02 untouched)", ids, want)
+	}
+}
+
 func TestTryStartSameEpicTwiceFails(t *testing.T) {
 	r := newLoopRegistry(2)
 

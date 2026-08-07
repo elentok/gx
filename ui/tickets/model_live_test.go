@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/notify"
 )
 
 func TestModel_LiveEventsHighlightRunningEpicInFullList(t *testing.T) {
@@ -46,6 +47,56 @@ func TestModel_LiveEventsHighlightRunningEpicInFullList(t *testing.T) {
 	}
 	if !strings.Contains(content, "First ticket") {
 		t.Fatalf("expected disk-based ticket title after run finished, got:\n%s", content)
+	}
+}
+
+// findCloseMsg recursively unwraps a (possibly batched) tea.Cmd looking for
+// a notify.CloseMsg with the given id.
+func findCloseMsg(cmd tea.Cmd, id string) bool {
+	if cmd == nil {
+		return false
+	}
+	msg := cmd()
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		for _, c := range batch {
+			if findCloseMsg(c, id) {
+				return true
+			}
+		}
+		return false
+	}
+	closeMsg, ok := msg.(notify.CloseMsg)
+	return ok && closeMsg.ID == id
+}
+
+func TestModel_SyncRunSnapshotClosesReattachNotificationOnTicketReattached(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: claimed\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+
+	identifier := m.epics[0].Tickets[0].Identifier
+	r := newLoopRegistry(1)
+	r.tryStart("my-epic", 0, 1)
+	r.reduceLiveEvent("my-epic", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventTicketReattached, Label: "iter-01", Identifier: identifier,
+	})
+	previous := ralphLoopRegistry
+	ralphLoopRegistry = r
+	t.Cleanup(func() {
+		r.finish("my-epic", nil)
+		ralphLoopRegistry = previous
+	})
+
+	cmd := m.syncRunSnapshot("my-epic")
+	if !findCloseMsg(cmd, reattachNotifyID("my-epic", identifier)) {
+		t.Fatalf("syncRunSnapshot: want notify.Close for %q among returned cmds", reattachNotifyID("my-epic", identifier))
+	}
+
+	// A second sync has nothing left to drain.
+	if cmd := m.syncRunSnapshot("my-epic"); findCloseMsg(cmd, reattachNotifyID("my-epic", identifier)) {
+		t.Fatal("syncRunSnapshot: want no further close after the pending id was already drained")
 	}
 }
 
