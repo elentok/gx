@@ -2,7 +2,6 @@ package tickets
 
 import (
 	"fmt"
-	"path/filepath"
 	"sort"
 	"sync"
 	"time"
@@ -780,7 +779,7 @@ func buildImplementRunOptionsForTickets(
 		Agent:       agent,
 		Skill:       skill,
 		RepoDir:     repo.Root,
-		ScratchDir:  filepath.Join(worktreeRoot, ".scratch"),
+		ScratchDir:  repo.ScratchRoot(),
 		MaxParallel: max(maxParallel, 1),
 		TicketIDs:   ticketIDs,
 	}, nil

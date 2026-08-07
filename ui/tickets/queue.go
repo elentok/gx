@@ -2,7 +2,6 @@ package tickets
 
 import (
 	"fmt"
-	"path/filepath"
 	"sort"
 	"time"
 
@@ -156,7 +155,7 @@ type queueEpicsLoadedMsg struct {
 }
 
 func (m QueueModel) cmdLoadQueue() tea.Cmd {
-	scratchDir := filepath.Join(m.worktreeRoot, ".scratch")
+	scratchDir := scratchDirFor(m.worktreeRoot)
 	return func() tea.Msg {
 		epics, err := tickets.Load(scratchDir)
 		return queueEpicsLoadedMsg{epics: epics, err: err}

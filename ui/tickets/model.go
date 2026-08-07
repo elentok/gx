@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
@@ -487,7 +488,20 @@ func (m Model) sidebarVisibleLines(viewportH int) []string {
 }
 
 func (m Model) scratchDir() string {
-	return filepath.Join(m.worktreeRoot, ".scratch")
+	return scratchDirFor(m.worktreeRoot)
+}
+
+// scratchDirFor resolves worktreeRoot's canonical `.scratch` via
+// Repo.ScratchRoot(), so a bare-repo checkout's linked worktrees all share
+// the same tracker regardless of which one a command runs from. Falls back
+// to the plain join when worktreeRoot isn't inside a git repo (e.g. test
+// fixtures that use a bare temp dir).
+func scratchDirFor(worktreeRoot string) string {
+	repo, err := git.FindRepo(worktreeRoot)
+	if err != nil {
+		return filepath.Join(worktreeRoot, ".scratch")
+	}
+	return repo.ScratchRoot()
 }
 
 func (m Model) View() tea.View {

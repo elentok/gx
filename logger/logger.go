@@ -6,20 +6,35 @@ import (
 	"path/filepath"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/elentok/gx/git"
 )
 
-const (
-	LOG_FILE = ".scratch/gx.log"
-)
+// logFile resolves gx.log's path via Repo.ScratchRoot(), so debug logging
+// lands in the canonical `.scratch` regardless of which linked worktree of a
+// bare-repo checkout the command was run from. Falls back to the old
+// cwd-relative path if the cwd isn't inside a git repo.
+func logFile() string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ".scratch/gx.log"
+	}
+	repo, err := git.FindRepo(cwd)
+	if err != nil {
+		return ".scratch/gx.log"
+	}
+	return filepath.Join(repo.ScratchRoot(), "gx.log")
+}
 
 func Debug(format string, args ...any) {
 	// if len(os.Getenv("DEBUG")) > 0 {
-	if err := os.MkdirAll(filepath.Dir(LOG_FILE), 0755); err != nil {
+	logFile := logFile()
+	if err := os.MkdirAll(filepath.Dir(logFile), 0755); err != nil {
 		fmt.Println("fatal (can't create log dir):", err)
 		os.Exit(1)
 	}
 
-	f, err := tea.LogToFile(LOG_FILE, "debug")
+	f, err := tea.LogToFile(logFile, "debug")
 	if err != nil {
 		fmt.Println("fatal (can't open log file):", err)
 		os.Exit(1)
