@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
@@ -13,11 +12,11 @@ import (
 // tickets.FoldStrayScratchDirs) and, if it fails, writes a non-fatal warning
 // to w instead of returning the error - like config.WarnOnMigrateFailure,
 // callers should proceed with startup regardless of the outcome. It's a
-// no-op outside a git repo, where there's nothing to fold. confirmFn is
-// deps.confirmForce, threaded through so tests can fake the interactive
-// prompt.
-func warnOnScratchFoldFailure(w io.Writer, confirmFn func(string) (bool, error)) {
-	cwd, err := os.Getwd()
+// no-op outside a git repo, where there's nothing to fold. getwd and
+// confirmFn are deps.getwd and deps.confirmForce, threaded through so tests
+// can fake the working directory and the interactive prompt.
+func warnOnScratchFoldFailure(w io.Writer, getwd func() (string, error), confirmFn func(string) (bool, error)) {
+	cwd, err := getwd()
 	if err != nil {
 		return
 	}

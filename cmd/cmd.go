@@ -97,7 +97,7 @@ func defaultSkillsManifestPath() (string, error) {
 func Execute(args []string) error {
 	config.WarnOnMigrateFailure(os.Stderr)
 	d := defaultDeps()
-	warnOnScratchFoldFailure(os.Stderr, d.confirmForce)
+	warnOnScratchFoldFailure(os.Stderr, d.getwd, d.confirmForce)
 	return execute(args, d)
 }
 
