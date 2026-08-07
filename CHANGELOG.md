@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.26.0 - 2026-08-07
+
+- Added ticket parent/child hierarchy: a collapsible tree in both the Tickets and Queue tabs, replacing the old `split`/`split_from` fields with `parent`/`children` (legacy keys still parsed) and walking `Parent` instead of `SplitFrom` for run-scope traversal.
+- Added a `gx-code-review` skill that runs parallel review subagents against an epic's diff and triages findings into tickets, plus a settings UI for configuring which implement/code-review skill each epic uses.
+- Added Claude history browsing tools: `gx claude history browse` (projects/conversations pages), `ctrl+f` grep search over transcripts with copy-to-clipboard, and per-conversation export/resume/yank actions.
+- Made the `gx-to-tickets` and `gx-investigate` skills model-invocable so they can be triggered from within code-review agents.
+- Added a generic collapsible outline tree component (`ui/tree`), reused from the file tree's list/search/key wiring.
+- Ported `gx claude statusline render`/`--install` commands.
+- Added scheduler-scan logging to ralph-loop's run-log.jsonl, recording each `claimNext` pass and its ticket dispositions.
+- Added `gx skills install --force-all` to force-reinstall every skill.
+- Folded ticket-row elapsed/token metrics onto the title line instead of a separate second line.
+- Changed `WorktreeDir` to default to `<Root>/.worktrees` for standard (non-bare) clones instead of `Root` itself.
+- Fixed the Queue tab's agent picker to render as a centered overlay instead of replacing the whole screen.
+- Fixed the commit-info popup to have a border matching other panels, with an `i` binding to open it from the Log tab's commit list.
+- Fixed `/compact` verification to cross-check the confirmation count before trusting an immediate success.
+- Fixed Queue replace to exclude already-done tickets from the selection.
+- Fixed expanded done epics re-collapsing after auto-refresh.
+- Fixed `recoverSmartZoneBreach`'s double-fallthrough logic and deduped worktree exclude-file handling between `worktree.go` and `doctor.go`.
+- Fixed ralph-loop's done-ticket verification to scope to the current run instead of the entire epic, and added e2e tests covering mid-run ticket splits for regular and code-review tickets.
+- Fixed grilling/prototype tickets to be treated as commitless by type, skipping the needs-attention flag.
+- Smoothed the ticket-progress spinner by draining before repeating, removing a visible jump.
+
 ## v0.25.2 - 2026-08-06
 
 - Added a `g n` notification history modal: browse captured shell-notification events, filter with `/`-search, and export the visible entries to `~/.cache/gx/{timestamp}-{repo}-{worktree}.md`.
