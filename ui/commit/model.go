@@ -7,9 +7,9 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
-	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/imagediff"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/tree"
 
 	"github.com/elentok/gx/ui/amend"
 	"github.com/elentok/gx/ui/help"
@@ -73,7 +73,7 @@ type commitDiffArea struct {
 
 type commitSidebarState struct {
 	files         []git.CommitFile
-	fileTreeModel filetree.Model[git.CommitFile]
+	fileTreeModel tree.Model[git.CommitFile]
 }
 
 func NewModel(worktreeRoot, ref, filterPath string, settings ui.Settings, extraKeys keys.Manager) Model {
@@ -90,7 +90,7 @@ func NewModel(worktreeRoot, ref, filterPath string, settings ui.Settings, extraK
 			diffContextLines: settings.DiffContextLines,
 		},
 		commitSidebarState: commitSidebarState{
-			fileTreeModel: filetree.NewModel[git.CommitFile](),
+			fileTreeModel: tree.NewModel[git.CommitFile](),
 		},
 		keys: newCommitManager(),
 		overlay: imagediff.NewOverlay(
@@ -178,13 +178,13 @@ func (m *Model) reload() {
 		m.headerOffset = 0
 		return
 	}
-	entries := filetree.BuildEntriesFromValues(
+	entries := tree.BuildEntriesFromPaths(
 		m.files,
 		func(file git.CommitFile) string { return file.Path },
-		m.fileTreeModel.CollapsedDirs(),
+		m.fileTreeModel.CollapsedIDs(),
 	)
 	m.fileTreeModel.SetEntries(entries)
-	if entry, ok := m.selectedCommitEntry(); !ok || entry.Kind != filetree.EntryFile {
+	if entry, ok := m.selectedCommitEntry(); !ok || entry.HasChildren {
 		m.selectFirstCommitFile()
 	}
 	m.applyFilterPathSearch()
@@ -216,7 +216,7 @@ func (m *Model) refreshDiff() {
 func (m *Model) selectFirstCommitFile() {
 	entries := m.fileTreeModel.Entries()
 	for i, entry := range entries {
-		if entry.Kind == filetree.EntryFile {
+		if !entry.HasChildren {
 			m.fileTreeModel.SetSelectedIndex(i)
 			return
 		}

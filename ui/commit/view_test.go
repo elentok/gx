@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/filetree"
+	"github.com/elentok/gx/ui/tree"
 )
 
 func TestIsMainOrMasterRef(t *testing.T) {
@@ -168,9 +168,9 @@ func TestHeaderLines_WithDecorations_WrapsBadgeWhenItDoesNotFit(t *testing.T) {
 }
 
 func TestVisibleFileLines_UsesCommitSpecificLabelAndMeta(t *testing.T) {
-	m := Model{settings: ui.Settings{}, commitSidebarState: commitSidebarState{fileTreeModel: filetree.NewModel[git.CommitFile]()}}
-	m.fileTreeModel.SetEntries([]filetree.Entry[git.CommitFile]{
-		{Kind: filetree.EntryFile, DisplayName: "new.go", Value: git.CommitFile{Path: "new.go", RenameFrom: "old.go", Status: "R "}},
+	m := Model{settings: ui.Settings{}, commitSidebarState: commitSidebarState{fileTreeModel: tree.NewModel[git.CommitFile]()}}
+	m.fileTreeModel.SetEntries([]tree.Entry[git.CommitFile]{
+		{DisplayName: "new.go", Value: git.CommitFile{Path: "new.go", RenameFrom: "old.go", Status: "R "}},
 	})
 
 	lines := m.visibleFileLines(30, 3)
@@ -183,9 +183,9 @@ func TestVisibleFileLines_UsesCommitSpecificLabelAndMeta(t *testing.T) {
 }
 
 func TestContainerFocusDisablesCommitPaneActiveStyling(t *testing.T) {
-	m := Model{settings: ui.Settings{}, commitSidebarState: commitSidebarState{fileTreeModel: filetree.NewModel[git.CommitFile]()}}
-	m.fileTreeModel.SetEntries([]filetree.Entry[git.CommitFile]{
-		{Kind: filetree.EntryFile, DisplayName: "selected.go", Value: git.CommitFile{Path: "selected.go", Status: "M "}},
+	m := Model{settings: ui.Settings{}, commitSidebarState: commitSidebarState{fileTreeModel: tree.NewModel[git.CommitFile]()}}
+	m.fileTreeModel.SetEntries([]tree.Entry[git.CommitFile]{
+		{DisplayName: "selected.go", Value: git.CommitFile{Path: "selected.go", Status: "M "}},
 	})
 
 	if m.filesPaneBorderColor() != ui.ColorOrange {
@@ -235,7 +235,7 @@ func TestRenderHeaderPopup_HasBorder(t *testing.T) {
 }
 
 func TestView_FiletreeSearchOverlayAppearsInView(t *testing.T) {
-	m := Model{ready: true, width: 100, height: 20, commitSidebarState: commitSidebarState{fileTreeModel: filetree.NewModel[git.CommitFile]()}}
+	m := Model{ready: true, width: 100, height: 20, commitSidebarState: commitSidebarState{fileTreeModel: tree.NewModel[git.CommitFile]()}}
 	m.fileTreeModel.Search().Start("files")
 	if got := ansi.Strip(m.View().Content); !strings.Contains(got, "files") {
 		t.Fatalf("expected filetree search overlay, got %q", got)
@@ -243,7 +243,7 @@ func TestView_FiletreeSearchOverlayAppearsInView(t *testing.T) {
 }
 
 func TestInputFocused_DiffSearchDelegatesIntoDiffModel(t *testing.T) {
-	m := Model{ready: true, width: 100, height: 20, commitSidebarState: commitSidebarState{fileTreeModel: filetree.NewModel[git.CommitFile]()}}
+	m := Model{ready: true, width: 100, height: 20, commitSidebarState: commitSidebarState{fileTreeModel: tree.NewModel[git.CommitFile]()}}
 	m.focusDiff = true
 	m.diffModel.Search().Start("diff")
 	if !m.InputFocused() {

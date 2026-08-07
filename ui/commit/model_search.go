@@ -2,15 +2,15 @@ package commit
 
 import (
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui/filetree"
+	"github.com/elentok/gx/ui/tree"
 )
 
 func (m Model) InputFocused() bool {
 	return m.fileTreeModel.Search().InputFocused() || m.diffModel.Search().InputFocused() || m.help.InputFocused()
 }
 
-func (m Model) fileEntrySearchText(entry filetree.Entry[git.CommitFile]) string {
-	if entry.Kind == filetree.EntryDir {
+func (m Model) fileEntrySearchText(entry tree.Entry[git.CommitFile]) string {
+	if entry.HasChildren {
 		return entry.DisplayName + "/"
 	}
 	if entry.Value.RenameFrom != "" {
@@ -18,4 +18,3 @@ func (m Model) fileEntrySearchText(entry filetree.Entry[git.CommitFile]) string 
 	}
 	return entry.Value.Path
 }
-

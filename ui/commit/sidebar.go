@@ -2,22 +2,22 @@ package commit
 
 import (
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/list"
+	"github.com/elentok/gx/ui/tree"
 )
 
-func (m Model) selectedCommitEntry() (filetree.Entry[git.CommitFile], bool) {
+func (m Model) selectedCommitEntry() (tree.Entry[git.CommitFile], bool) {
 	entries := m.fileTreeModel.Entries()
 	selected := m.fileTreeModel.SelectedIndex()
 	if selected < 0 || selected >= len(entries) {
-		return filetree.Entry[git.CommitFile]{}, false
+		return tree.Entry[git.CommitFile]{}, false
 	}
 	return entries[selected], true
 }
 
 func (m Model) selectedCommitFile() (git.CommitFile, bool) {
 	entry, ok := m.selectedCommitEntry()
-	if !ok || entry.Kind != filetree.EntryFile {
+	if !ok || entry.HasChildren {
 		return git.CommitFile{}, false
 	}
 	return entry.Value, true
@@ -62,10 +62,10 @@ func (m *Model) scrollSidebarPage(direction int) {
 }
 
 func (m *Model) rebuildCommitFiletree() {
-	entries := filetree.BuildEntriesFromValues(
+	entries := tree.BuildEntriesFromPaths(
 		m.files,
 		func(file git.CommitFile) string { return file.Path },
-		m.fileTreeModel.CollapsedDirs(),
+		m.fileTreeModel.CollapsedIDs(),
 	)
 	m.fileTreeModel.SetEntries(entries)
 }

@@ -2,10 +2,10 @@ package commit
 
 import (
 	tea "charm.land/bubbletea/v2"
-	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/imagediff"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/reword"
+	"github.com/elentok/gx/ui/tree"
 )
 
 func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
@@ -104,7 +104,7 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	} else if !m.focusHeader && (len(m.keys.Prefix()) == 0 || m.fileTreeModel.HasPendingChord()) {
 		var ftCmd tea.Cmd
-		var ftResult filetree.Result
+		var ftResult tree.Result
 		m.fileTreeModel, ftCmd, ftResult = m.fileTreeModel.Update(msg)
 		if ftResult.Handled {
 			if ftResult.SearchQueryChanged {

@@ -10,7 +10,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/diffview/diffcore"
-	"github.com/elentok/gx/ui/filetree"
+	"github.com/elentok/gx/ui/tree"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -467,25 +467,34 @@ func (m Model) requiredFilesPaneWidth(height int) int {
 	return required + 2 + 1
 }
 
-func (m Model) filetreeRenderOpts() filetree.RenderOpts[git.CommitFile] {
-	return filetree.RenderOpts[git.CommitFile]{
-		AccentColor:      ui.ColorOrange,
-		Active:           m.isContainerFocused() && !m.focusDiff && !m.focusHeader,
-		EmptyLine:        ui.StyleMuted.Render("no changed files"),
-		UseNerdFontIcons: m.settings.UseNerdFontIcons,
-		FileIcon: func(entry filetree.Entry[git.CommitFile]) string {
+func (m Model) filetreeRenderOpts() tree.RenderOpts[git.CommitFile] {
+	icons := ui.Icons(m.settings.UseNerdFontIcons)
+	return tree.RenderOpts[git.CommitFile]{
+		AccentColor: ui.ColorOrange,
+		Active:      m.isContainerFocused() && !m.focusDiff && !m.focusHeader,
+		EmptyLine:   ui.StyleMuted.Render("no changed files"),
+		Icon: func(entry tree.Entry[git.CommitFile]) string {
+			if entry.HasChildren {
+				if entry.Expanded {
+					return icons.FolderOpen
+				}
+				return icons.FolderClosed
+			}
 			return commitFileIcon(entry.Value, m.settings.UseNerdFontIcons)
 		},
-		FileLabel: func(entry filetree.Entry[git.CommitFile]) string {
+		Label: func(entry tree.Entry[git.CommitFile]) string {
+			if entry.HasChildren {
+				return entry.DisplayName + "/"
+			}
 			if entry.Value.RenameFrom != "" {
 				return entry.Value.RenameFrom + " -> " + entry.Value.Path
 			}
 			return entry.DisplayName
 		},
-		MetaText: func(entry filetree.Entry[git.CommitFile]) string {
+		MetaText: func(entry tree.Entry[git.CommitFile]) string {
 			return commitEntryMeta(entry, m.settings.UseNerdFontIcons)
 		},
-		RowColor: func(entry filetree.Entry[git.CommitFile]) string {
+		RowColor: func(entry tree.Entry[git.CommitFile]) string {
 			return commitEntryColor(entry)
 		},
 	}
@@ -544,11 +553,11 @@ func (m Model) isContainerFocused() bool {
 	return !m.inactive
 }
 
-func commitEntryMeta(entry filetree.Entry[git.CommitFile], useNerdFontIcons bool) string {
+func commitEntryMeta(entry tree.Entry[git.CommitFile], useNerdFontIcons bool) string {
 	if useNerdFontIcons {
 		return "  "
 	}
-	if entry.Kind == filetree.EntryDir {
+	if entry.HasChildren {
 		return "-"
 	}
 	status := strings.TrimSpace(entry.Value.Status)
@@ -561,8 +570,8 @@ func commitEntryMeta(entry filetree.Entry[git.CommitFile], useNerdFontIcons bool
 	return status
 }
 
-func commitEntryColor(entry filetree.Entry[git.CommitFile]) string {
-	if entry.Kind == filetree.EntryDir {
+func commitEntryColor(entry tree.Entry[git.CommitFile]) string {
+	if entry.HasChildren {
 		return "#cdd6f4"
 	}
 	switch {

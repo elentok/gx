@@ -11,7 +11,6 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
-	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	notifypkg "github.com/elentok/gx/ui/notify"
@@ -545,7 +544,7 @@ func TestInitialSelectionChoosesFirstFileOverDirectory(t *testing.T) {
 	if !ok {
 		t.Fatal("expected selected commit entry")
 	}
-	if entry.Kind != filetree.EntryFile {
+	if entry.HasChildren {
 		t.Fatalf("expected initial selection to choose file entry, got %#v", entry)
 	}
 	if len(m.diffModel.Data().ViewLines) == 0 {
@@ -673,8 +672,8 @@ func commitModelWithDir(t *testing.T) Model {
 	if len(entries) < 3 {
 		t.Fatalf("precondition: expected expanded dir + files, got %d entries", len(entries))
 	}
-	if entries[0].Kind != filetree.EntryDir || !entries[0].Expanded {
-		t.Fatalf("precondition: expected expanded dir row, got kind=%v expanded=%v", entries[0].Kind, entries[0].Expanded)
+	if !entries[0].HasChildren || !entries[0].Expanded {
+		t.Fatalf("precondition: expected expanded dir row, got hasChildren=%v expanded=%v", entries[0].HasChildren, entries[0].Expanded)
 	}
 	m.fileTreeModel.SetSelectedIndex(0)
 	return m
@@ -689,8 +688,8 @@ func TestLeftOnSelectedDirCollapsesCommitFiletreeDir(t *testing.T) {
 	if len(entries) != 1 {
 		t.Fatalf("expected collapsed tree with 1 dir row, got %d", len(entries))
 	}
-	if entries[0].Kind != filetree.EntryDir || entries[0].Expanded {
-		t.Fatalf("expected collapsed dir row, got kind=%v expanded=%v", entries[0].Kind, entries[0].Expanded)
+	if !entries[0].HasChildren || entries[0].Expanded {
+		t.Fatalf("expected collapsed dir row, got hasChildren=%v expanded=%v", entries[0].HasChildren, entries[0].Expanded)
 	}
 }
 
@@ -703,8 +702,8 @@ func TestEnterOnSelectedDirCollapsesCommitFiletreeDir(t *testing.T) {
 	if len(entries) != 1 {
 		t.Fatalf("expected collapsed tree with 1 dir row after enter, got %d", len(entries))
 	}
-	if entries[0].Kind != filetree.EntryDir || entries[0].Expanded {
-		t.Fatalf("expected collapsed dir row after enter, got kind=%v expanded=%v", entries[0].Kind, entries[0].Expanded)
+	if !entries[0].HasChildren || entries[0].Expanded {
+		t.Fatalf("expected collapsed dir row after enter, got hasChildren=%v expanded=%v", entries[0].HasChildren, entries[0].Expanded)
 	}
 }
 
@@ -726,8 +725,8 @@ func TestRightOnCollapsedDirExpandsCommitFiletreeDir(t *testing.T) {
 	if len(entries) < 3 {
 		t.Fatalf("expected expanded dir + files after l, got %d entries", len(entries))
 	}
-	if entries[0].Kind != filetree.EntryDir || !entries[0].Expanded {
-		t.Fatalf("expected expanded dir row after l, got kind=%v expanded=%v", entries[0].Kind, entries[0].Expanded)
+	if !entries[0].HasChildren || !entries[0].Expanded {
+		t.Fatalf("expected expanded dir row after l, got hasChildren=%v expanded=%v", entries[0].HasChildren, entries[0].Expanded)
 	}
 }
 
