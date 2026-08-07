@@ -3,10 +3,13 @@ package tickets
 import (
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/nav"
 )
 
 // withFakeReattachHerdr swaps reattachFindWorkspace/reattachTabList for the
@@ -104,6 +107,43 @@ func TestHandleReattachSignals_NoTicketOrProcessStateMutated(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("handleReattachSignals: want a notify cmd (the detect-only indicator)")
 	}
+}
+
+func TestHandleReattachSignals_SwitchesToQueueTab(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "epic", "01-first.md", "Status: claimed\n\nBody.\n")
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+
+	_, cmd := m.handleReattachSignals(reattachSignalsMsg{signals: []ralphloop.ReattachSignal{
+		{EpicName: "epic", Ticket: m.epics[0].Tickets[0]},
+	}})
+	if cmd == nil {
+		t.Fatal("handleReattachSignals: want a cmd when a signal is found")
+	}
+
+	if !batchContainsQueueSwitch(cmd) {
+		t.Fatal("handleReattachSignals: want a nav.Switch to TabQueue among the returned cmds")
+	}
+}
+
+// batchContainsQueueSwitch recursively unwraps a (possibly batched) tea.Cmd
+// looking for a nav.Switch message targeting TabQueue.
+func batchContainsQueueSwitch(cmd tea.Cmd) bool {
+	if cmd == nil {
+		return false
+	}
+	msg := cmd()
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		for _, c := range batch {
+			if batchContainsQueueSwitch(c) {
+				return true
+			}
+		}
+		return false
+	}
+	vs, ok := nav.IsSwitch(msg)
+	return ok && vs.Tab == nav.TabQueue
 }
 
 func TestHandleReattachSignals_NoSignals_NoOp(t *testing.T) {
