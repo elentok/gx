@@ -440,6 +440,22 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 		}
 	})
 
+	t.Run("foreign attach overrides state", func(t *testing.T) {
+		m := base
+		m.foreignAttachPID = 12345
+		if got, want := m.queueHeaderTitle(), "Queue · attached to gx pid 12345"; got != want {
+			t.Fatalf("title = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("no foreign attach uses normal state", func(t *testing.T) {
+		m := base
+		m.foreignAttachPID = 0
+		if got, want := m.queueHeaderTitle(), "Queue"; got != want {
+			t.Fatalf("title = %q, want %q", got, want)
+		}
+	})
+
 	t.Run("completed", func(t *testing.T) {
 		completedRoot := t.TempDir()
 		writeTicket(t, completedRoot, "alpha", "01-first.md", "Status: claimed\n\nBody.\n")

@@ -149,6 +149,9 @@ func (m QueueModel) queueRunState() queueRunStateKind {
 // the title always encodes run state, and the body carries at most one
 // state-specific line instead of the old always-present banner row.
 func (m QueueModel) queueHeaderTitle() string {
+	if m.foreignAttachPID != 0 {
+		return fmt.Sprintf("Queue · attached to gx pid %d", m.foreignAttachPID)
+	}
 	switch m.queueRunState() {
 	case queueRunCompleted:
 		elapsed := int(m.executionCompletedAt.Sub(m.executionStartedAt).Seconds())

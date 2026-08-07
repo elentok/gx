@@ -1589,3 +1589,34 @@ func TestE2E_InterruptedInitialLoad_ReloadsOnReturn(t *testing.T) {
 		t.Errorf("interrupted initial load → return: expected 1 AutoReload, got %d", counter.reloads)
 	}
 }
+
+// TestQueueTabLabelPlainWhenUnattached covers ticket 07: the Queue tab's
+// label only carries "(attached)" when this process holds the attach lock
+// (ticketsui.SelfAttached, exercised directly against true/false in the
+// tickets package) — absent that, tabSpecs must render the plain label even
+// though a Queue tab exists and is reachable.
+func TestQueueTabLabelPlainWhenUnattached(t *testing.T) {
+	if ticketsui.SelfAttached() {
+		t.Fatal("SelfAttached() = true at test start, want false (no lock acquired)")
+	}
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabQueue, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+
+	var queueLabel string
+	for _, spec := range m.tabSpecs() {
+		if spec.id == nav.TabQueue {
+			queueLabel = spec.label
+		}
+	}
+	if queueLabel != "queue" {
+		t.Fatalf("queue tab label = %q, want plain %q", queueLabel, "queue")
+	}
+}

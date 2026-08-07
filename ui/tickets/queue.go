@@ -71,6 +71,12 @@ type QueueModel struct {
 	runningEpics           map[string]bool
 	runningAgent           ralphloop.AgentKind
 	paused                 bool
+	// foreignAttachPID is the pid of a different process currently holding
+	// the per-repo attach lock (ticket 05), refreshed alongside the epics
+	// reload (cmdLoadQueue) since checking it shells out to `ps`. Zero when
+	// unattached or when this process itself holds the lock — see
+	// ForeignAttachPID.
+	foreignAttachPID int
 
 	// search backs "/"-triggered filtering over rows(), mirroring the Tickets
 	// tab's own m.search (see ui/tickets/search.go).
@@ -154,15 +160,16 @@ func (m QueueModel) Init() tea.Cmd {
 }
 
 type queueEpicsLoadedMsg struct {
-	epics []tickets.Epic
-	err   error
+	epics            []tickets.Epic
+	err              error
+	foreignAttachPID int
 }
 
 func (m QueueModel) cmdLoadQueue() tea.Cmd {
 	scratchDir := scratchDirFor(m.worktreeRoot)
 	return func() tea.Msg {
 		epics, err := tickets.Load(scratchDir)
-		return queueEpicsLoadedMsg{epics: epics, err: err}
+		return queueEpicsLoadedMsg{epics: epics, err: err, foreignAttachPID: ForeignAttachPID(scratchDir)}
 	}
 }
 
@@ -204,6 +211,7 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.loaded = true
 		m.epics = msg.epics
+		m.foreignAttachPID = msg.foreignAttachPID
 		m.candidates = make(map[string]bool, len(m.checked))
 		for path := range m.checked {
 			m.candidates[path] = true

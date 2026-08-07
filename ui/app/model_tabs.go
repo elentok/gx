@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/navstate"
 	"github.com/elentok/gx/ui/notify"
+	ticketsui "github.com/elentok/gx/ui/tickets"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -305,6 +306,10 @@ type tabSpec struct {
 // tabsView (rendering) and tabHitAt (click hit-testing) so they can't drift.
 func (m Model) tabSpecs() []tabSpec {
 	activeTab := m.navState.ActiveTab()
+	queueLabel := "queue"
+	if ticketsui.SelfAttached() {
+		queueLabel = "queue (attached)"
+	}
 	return []tabSpec{
 		{id: nav.TabWorktrees, label: "worktrees", active: activeTab == nav.TabWorktrees},
 		{id: nav.TabLog, label: "log", active: activeTab == nav.TabLog},
@@ -312,7 +317,7 @@ func (m Model) tabSpecs() []tabSpec {
 		{id: nav.TabStash, label: "stash", active: activeTab == nav.TabStash},
 		{id: nav.TabPRs, label: "prs", active: activeTab == nav.TabPRs},
 		{id: nav.TabTickets, label: "tickets", active: activeTab == nav.TabTickets},
-		{id: nav.TabQueue, label: "queue", active: activeTab == nav.TabQueue},
+		{id: nav.TabQueue, label: queueLabel, active: activeTab == nav.TabQueue},
 	}
 }
 

@@ -57,7 +57,6 @@ type Model struct {
 	notify        notify.Model
 	notifyLog     *notifylog.Log
 	notifyHistory notifyhistory.Model
-	loopStatus    loopStatusOverlay
 	gate          *reloadgate.ReloadGate
 	quitConfirm   confirm.Model
 
@@ -76,7 +75,6 @@ func New(repo git.Repo, settings Settings) Model {
 		notify:        notify.New(settings.UseNerdFontIcons),
 		notifyLog:     notifylog.New(),
 		notifyHistory: notifyhistory.New(),
-		loopStatus:    newLoopStatusOverlay(),
 		gate:          reloadgate.New(),
 		quitConfirm:   confirm.New(),
 		queueStore:    loadQueueStore(),
@@ -95,7 +93,7 @@ func New(repo git.Repo, settings Settings) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.activePage().model.Init(), m.loopStatus.Init())
+	return m.activePage().model.Init()
 }
 
 func (m Model) View() tea.View {
@@ -125,10 +123,6 @@ func (m Model) View() tea.View {
 	if stack := m.notify.View(); stack != "" {
 		content = ui.OverlayTopRightMargin(content, stack, m.width, 1, 1)
 	}
-	if status := m.loopStatus.View(); status != "" {
-		content = ui.OverlayTopLeftMargin(content, status, 1, 1)
-	}
-
 	v := tea.NewView(content)
 	v.AltScreen = true
 	v.MouseMode = child.MouseMode

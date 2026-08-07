@@ -20,10 +20,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case notify.CloseMsg:
 		m.notifyLog.Close(v.ID)
 	}
-	var loopStatusCmd tea.Cmd
-	m.loopStatus, loopStatusCmd = m.loopStatus.Update(msg)
-	notifyCmd = tea.Batch(notifyCmd, loopStatusCmd)
-
 	if m.quitConfirm.IsOpen {
 		if key, ok := msg.(tea.KeyPressMsg); ok {
 			next, cmd, _ := m.quitConfirm.Update(key)

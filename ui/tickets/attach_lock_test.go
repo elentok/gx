@@ -184,6 +184,63 @@ func TestTryStartFailsAndLeavesRegistryUntouchedWhenForeignAttached(t *testing.T
 	}
 }
 
+func TestSelfAttachedReflectsThisProcessOnly(t *testing.T) {
+	dir := t.TempDir()
+	withFakeProcessStartTime(t, map[int]string{os.Getpid(): "self-start-1"})
+
+	r := newLoopRegistry(2)
+	previous := ralphLoopRegistry
+	ralphLoopRegistry = r
+	t.Cleanup(func() { ralphLoopRegistry = previous })
+
+	if SelfAttached() {
+		t.Fatal("SelfAttached() = true before tryStart, want false")
+	}
+	if _, ok := r.tryStart("epic-a", 0, 1, dir); !ok {
+		t.Fatal("tryStart(epic-a): want success")
+	}
+	if !SelfAttached() {
+		t.Fatal("SelfAttached() = false while this process holds the lock, want true")
+	}
+	r.finish("epic-a", nil)
+	if SelfAttached() {
+		t.Fatal("SelfAttached() = true after finish released the lock, want false")
+	}
+}
+
+func TestForeignAttachPIDReportsLiveForeignHolderOnly(t *testing.T) {
+	dir := t.TempDir()
+	foreignPID := 424246
+	withFakeProcessStartTime(t, map[int]string{
+		os.Getpid(): "self-start-1",
+		foreignPID:  "foreign-start-1",
+	})
+
+	if got := ForeignAttachPID(dir); got != 0 {
+		t.Fatalf("ForeignAttachPID() = %d before any lock exists, want 0", got)
+	}
+
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeAttachLockFile(t, dir, attachLockInfo{PID: foreignPID, StartTime: "foreign-start-1"})
+	if got := ForeignAttachPID(dir); got != foreignPID {
+		t.Fatalf("ForeignAttachPID() = %d, want live foreign pid %d", got, foreignPID)
+	}
+
+	r := newLoopRegistry(2)
+	previous := ralphLoopRegistry
+	ralphLoopRegistry = r
+	t.Cleanup(func() { ralphLoopRegistry = previous })
+	selfDir := t.TempDir()
+	if _, ok := r.tryStart("epic-a", 0, 1, selfDir); !ok {
+		t.Fatal("tryStart(epic-a): want success")
+	}
+	if got := ForeignAttachPID(dir); got != 0 {
+		t.Fatalf("ForeignAttachPID() = %d while this process holds its own lock, want 0", got)
+	}
+}
+
 func TestFinishReleasesAttachLockOnlyWhenLastRunEnds(t *testing.T) {
 	dir := t.TempDir()
 	withFakeProcessStartTime(t, map[int]string{os.Getpid(): "self-start-1"})

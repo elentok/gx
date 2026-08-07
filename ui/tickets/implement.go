@@ -366,6 +366,41 @@ func (r *loopRegistry) isPaused() bool {
 	return r.paused
 }
 
+// holdsAttach reports whether this process currently holds the per-repo
+// attach lock (ticket 05), for SelfAttached's tab-label signal.
+func (r *loopRegistry) holdsAttach() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.attachCount > 0
+}
+
+// SelfAttached reports whether this process holds the per-repo attach lock —
+// the Queue tab label's "(attached)" suffix (ticket 07) is self-only and
+// never reflects a foreign process's attachment (surfaced separately via
+// ForeignAttachPID and ticket 05's hard-block error).
+func SelfAttached() bool {
+	return ralphLoopRegistry.holdsAttach()
+}
+
+// ForeignAttachPID reports the pid of a live foreign process currently
+// holding scratchDir's attach lock, or 0 when unattached, the lock is stale,
+// or this process itself holds it. It shells out to `ps` (via
+// attachLockIsStale) so callers should poll it on a refresh cadence rather
+// than call it on every render.
+func ForeignAttachPID(scratchDir string) int {
+	if ralphLoopRegistry.holdsAttach() {
+		return 0
+	}
+	info, err := readAttachLock(attachLockPath(scratchDir))
+	if err != nil {
+		return 0
+	}
+	if attachLockIsStale(info) {
+		return 0
+	}
+	return info.PID
+}
+
 func (r *loopRegistry) finish(epicName string, err error) {
 	r.mu.Lock()
 	run := r.runs[epicName]
@@ -415,35 +450,6 @@ func (r *loopRegistry) takeAttachError() error {
 	err := r.attachErr
 	r.attachErr = nil
 	return err
-}
-
-// EpicProgress reports one running epic's name and landed/total ticket count,
-// for LoopStatusAll's cross-tab overlay listing (ticket 05).
-type EpicProgress struct {
-	Name        string
-	Done, Total int
-}
-
-// LoopStatusAll reports every currently-running epic (ticket 05's
-// multi-epic-aware cross-tab status overlay, superseding the single-epic
-// LoopStatus), sorted by name for deterministic rendering order. It polls the
-// same way this package's own OnPageActivated/handleImplementPoll do rather
-// than subscribing directly, since the app shell only routes tea.Msgs to the
-// active page.
-func LoopStatusAll() []EpicProgress {
-	ralphLoopRegistry.mu.Lock()
-	defer ralphLoopRegistry.mu.Unlock()
-	names := make([]string, 0, len(ralphLoopRegistry.runs))
-	for name := range ralphLoopRegistry.runs {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	out := make([]EpicProgress, len(names))
-	for i, name := range names {
-		run := ralphLoopRegistry.runs[name]
-		out[i] = EpicProgress{Name: name, Done: run.done, Total: run.total}
-	}
-	return out
 }
 
 // CanQuit implements the app shell's quit-guard duck type (see
