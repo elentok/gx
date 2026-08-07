@@ -281,3 +281,42 @@ the previous unconditional reload-on-every-activation.
 **Manual reload** — a user-initiated reload via the `R` key (and status `m r`). Louder than
 auto-reload: it may reset scroll and flashes a "refreshed" notification. It is also the escape hatch
 for changes made _outside_ gx (external terminal git commands), which do not bump the repo epoch.
+
+## Queue and Attach Lifecycle (Queue Tab)
+
+**Queue** — the single, per-repo collection of checked/queued tickets across all epics
+(`QueueStore`, keyed off the repo's `.scratch` dir). One Queue per repo, not per epic.
+
+**Attach / Attached / Detach** — at most one gx process, repo-wide, may be Attached to the Queue at
+a time. A process attaches when its first epic run starts (`loopRegistry.tryStart` acquiring the
+attach lock while its internal `attachCount` is 0) and detaches when its last running epic run ends
+(`attachCount` returning to 0 in `loopRegistry.finish`). Attachment doesn't limit how many epics that
+one process runs concurrently — only the separate `maxConcurrent` slot cap does that. `SelfAttached`
+reports this process's own attachment for the Queue tab label's "(attached)" suffix.
+
+**Attach lock** — the on-disk record of the attached process, one per repo:
+`.scratch/queue-attach.json`, holding the holder's pid and process start time (so a reused pid after
+reboot isn't mistaken for the same process — see `attachLockIsStale`).
+
+**Foreign attachment** — the Queue is attached to a different gx process (`ForeignAttachPID` returns
+a nonzero pid). Hard-blocks starting a new epic run in this process with `"a ralph-loop is already
+running (attached by process %d)"`.
+
+**Epic run** — the per-epic ralph-loop execution (`loopRegistry.runs[epicName]`). Several can run
+concurrently inside whichever process holds the attachment, up to the concurrency slot cap.
+
+**Reattach / Reattach signal** — per-ticket detection that a specific ticket's session is still
+alive, checked via `ralphloop.ScanForReattachable`. A special case of Attach: it only fires when the
+Queue is Detached (`attachLockHeld` false) and at least one ticket is left `claimed`/
+`needs-attention`, and only proceeds after the user confirms the "Found a detached live queue…
+Reattach?" prompt (`handleDetachedLiveDetected`) — there is no silent auto-reattach.
+
+**Live** — the Queue (or a specific ticket) has at least one `claimed`/`needs-attention` ticket with
+a still-alive session, as found by a Reattach signal scan (`cmdCheckDetachedLive`'s `alive` count).
+
+**Replace queue** (`r`) / **Add to queue** (`a`) — the two queueing actions from the Tickets tab.
+Replace overwrites the not-yet-started (pending) queue selection with the checked tickets and jumps
+to the Queue tab; it is blocked process-wide ("Can't replace a live queue") while any epic run is
+live, regardless of which epic the checked tickets belong to. Add widens an already-running epic's
+frozen scope (`ralphloop.RunScope.Add`) with the checked tickets under that epic, after a
+confirmation naming the count — it requires the epic under the cursor to already have a live run.
