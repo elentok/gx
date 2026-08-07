@@ -52,8 +52,11 @@ type Result struct {
 
 // NewModel constructs a tree Model. extra bindings are appended to the base
 // tree bindings before constructing the internal keys.Manager, so a consumer
-// (e.g. ui/status's stage/discard bindings) can dispatch and appear in help
-// alongside the built-in tree bindings, with no separate interception logic.
+// (e.g. ui/status's stage/discard bindings) gets chord-matching and
+// help-screen registration for free. Dispatch is not automatic: the consumer
+// still needs its own interception logic (a switch on the matched binding ID)
+// to act on a matched extra binding — see ui/status/filetree_keys.go for the
+// reference shape.
 func NewModel[T any](extra ...keys.Binding) Model[T] {
 	bindings := make([]keys.Binding, 0, len(treeBindings)+len(extra))
 	bindings = append(bindings, treeBindings...)
