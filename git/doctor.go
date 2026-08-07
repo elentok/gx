@@ -58,21 +58,18 @@ func CheckRepo(repo Repo) ([]Issue, error) {
 // repo that never created a worktree has nothing to hide from git status.
 func checkWorktreesExclude(repo Repo) *Issue {
 	wtDir := repo.LinkedWorktreeDir()
-	rel, err := filepath.Rel(repo.Root, wtDir)
-	if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+	entry, ok := worktreeExcludeEntry(repo)
+	if !ok {
 		return nil
 	}
 	if _, err := os.Stat(wtDir); os.IsNotExist(err) {
 		return nil
 	}
-	entry := filepath.ToSlash(rel) + "/"
 
 	excludePath := filepath.Join(repo.Root, ".git", "info", "exclude")
-	data, _ := os.ReadFile(excludePath)
-	for line := range strings.SplitSeq(string(data), "\n") {
-		if strings.TrimSpace(line) == entry {
-			return nil
-		}
+	excluded, err := isPathExcluded(excludePath, entry)
+	if err != nil || excluded {
+		return nil
 	}
 
 	return &Issue{

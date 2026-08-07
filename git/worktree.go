@@ -94,32 +94,58 @@ func AddWorktree(repo Repo, newName, newPath, fromRef string) error {
 	return err
 }
 
-// excludeWorktreeDir makes sure the linked-worktree directory doesn't show up
-// as untracked clutter in `git status` for the primary checkout, by appending
-// an entry to .git/info/exclude (local-only, unlike .gitignore, so it isn't
-// forced on the user via a committed file). It's a no-op for bare repos,
-// where linked worktrees live outside Root and need no exclusion, and for
-// repos whose WorktreeDir isn't under Root at all.
-func excludeWorktreeDir(repo Repo) error {
+// worktreeExcludeEntry computes the .git/info/exclude entry for repo's
+// linked-worktree directory. It returns ok == false for bare repos, where
+// linked worktrees live outside Root and need no exclusion, and for repos
+// whose WorktreeDir isn't under Root at all.
+func worktreeExcludeEntry(repo Repo) (entry string, ok bool) {
 	if repo.IsBare {
-		return nil
+		return "", false
 	}
 	wtDir := repo.LinkedWorktreeDir()
 	rel, err := filepath.Rel(repo.Root, wtDir)
 	if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
-		return nil
+		return "", false
 	}
-	entry := filepath.ToSlash(rel) + "/"
+	return filepath.ToSlash(rel) + "/", true
+}
 
-	excludePath := filepath.Join(repo.Root, ".git", "info", "exclude")
+// isPathExcluded reports whether entry appears as an exact trimmed line in
+// the exclude file at excludePath.
+func isPathExcluded(excludePath, entry string) (bool, error) {
 	data, err := os.ReadFile(excludePath)
 	if err != nil && !os.IsNotExist(err) {
-		return err
+		return false, err
 	}
 	for line := range strings.SplitSeq(string(data), "\n") {
 		if strings.TrimSpace(line) == entry {
-			return nil
+			return true, nil
 		}
+	}
+	return false, nil
+}
+
+// excludeWorktreeDir makes sure the linked-worktree directory doesn't show up
+// as untracked clutter in `git status` for the primary checkout, by appending
+// an entry to .git/info/exclude (local-only, unlike .gitignore, so it isn't
+// forced on the user via a committed file).
+func excludeWorktreeDir(repo Repo) error {
+	entry, ok := worktreeExcludeEntry(repo)
+	if !ok {
+		return nil
+	}
+
+	excludePath := filepath.Join(repo.Root, ".git", "info", "exclude")
+	excluded, err := isPathExcluded(excludePath, entry)
+	if err != nil {
+		return err
+	}
+	if excluded {
+		return nil
+	}
+	data, err := os.ReadFile(excludePath)
+	if err != nil && !os.IsNotExist(err) {
+		return err
 	}
 
 	if err := os.MkdirAll(filepath.Dir(excludePath), 0755); err != nil {
