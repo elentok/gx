@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/elentok/gx/tickets"
@@ -191,6 +192,77 @@ func TestRunScope_AllSettled_DescendantTicketsDontTripSanityCheck(t *testing.T) 
 	if !scope.AllSettled(epic) {
 		t.Errorf("scope.AllSettled() = false, want true once the requested ticket and its split descendants are all settled")
 	}
+}
+
+func TestRunScope_AddMakesTicketImmediatelyClaimable(t *testing.T) {
+	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
+		{Number: 1, Identifier: "01", Status: "open"},
+		{Number: 2, Identifier: "02", Status: "open"},
+	}}
+	scope, err := ResolveRunScope(epic, []string{"01"})
+	if err != nil {
+		t.Fatalf("ResolveRunScope() error = %v", err)
+	}
+	if scope.Contains(epic.Tickets[1], epic) {
+		t.Fatalf("scope.Contains(02) = true before Add, want false")
+	}
+
+	scope.Add("02")
+
+	if !scope.Contains(epic.Tickets[1], epic) {
+		t.Errorf("scope.Contains(02) = false after Add, want true")
+	}
+	frontier := scope.Frontier(epic)
+	if len(frontier) != 2 {
+		t.Errorf("len(scope.Frontier()) = %d, want 2 after widening to include 02", len(frontier))
+	}
+}
+
+func TestRunScope_AddOnDynamicScopeIsNoop(t *testing.T) {
+	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
+		{Number: 1, Identifier: "01", Status: "open"},
+	}}
+	scope, err := ResolveRunScope(epic, nil)
+	if err != nil {
+		t.Fatalf("ResolveRunScope() error = %v", err)
+	}
+
+	scope.Add("99") // must not panic
+
+	if !scope.Contains(epic.Tickets[0], epic) {
+		t.Errorf("scope.Contains(01) = false, want true (dynamic scope stays unrestricted)")
+	}
+}
+
+func TestRunScope_AddIsRaceFreeAgainstConcurrentReads(t *testing.T) {
+	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
+		{Number: 1, Identifier: "01", Status: "open"},
+		{Number: 2, Identifier: "02", Status: "open"},
+	}}
+	scope, err := ResolveRunScope(epic, []string{"01"})
+	if err != nil {
+		t.Fatalf("ResolveRunScope() error = %v", err)
+	}
+
+	var wg sync.WaitGroup
+	stop := make(chan struct{})
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				scope.Frontier(epic)
+				scope.Contains(epic.Tickets[1], epic)
+			}
+		}
+	}()
+
+	scope.Add("02")
+	close(stop)
+	wg.Wait()
 }
 
 func TestRunScope_UnsetRequestPreservesWholeEpicBehavior(t *testing.T) {

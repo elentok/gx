@@ -291,7 +291,7 @@ func TestReconcile_ClaimedWithLiveTabOutsideScope_NotReattached(t *testing.T) {
 
 	rp := testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(io.Discard))
 	// A scope that requested only ticket 99 — ticket 01 is outside it.
-	rp.Scope = RunScope{ticketIDs: map[string]struct{}{"99": {}}}
+	rp.Scope = RunScope{data: &scopeData{ticketIDs: map[string]struct{}{"99": {}}}}
 
 	reattached, err := reconcile(d, rp, epics[0])
 	if err != nil {
@@ -326,7 +326,7 @@ func TestReconcile_NeedsAttentionOutsideScope_NotReattached(t *testing.T) {
 	}
 
 	rp := testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(io.Discard))
-	rp.Scope = RunScope{ticketIDs: map[string]struct{}{"99": {}}}
+	rp.Scope = RunScope{data: &scopeData{ticketIDs: map[string]struct{}{"99": {}}}}
 
 	reattached, err := reconcile(d, rp, epics[0])
 	if err != nil {

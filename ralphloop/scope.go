@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/elentok/gx/tickets"
 )
@@ -9,8 +10,18 @@ import (
 // RunScope keeps the caller's requested membership stable across epic reloads.
 // An empty request deliberately remains dynamic so whole-epic runs keep seeing
 // tickets added while the run is active.
+//
+// A frozen scope's ticket set lives behind data, a pointer shared by every
+// copy of the RunScope value: RunScope is passed and returned by value
+// throughout this package, so the mutex must live behind a pointer too, or
+// each copy would guard its own map instead of the one everyone reads.
 type RunScope struct {
 	wholeEpic bool
+	data      *scopeData
+}
+
+type scopeData struct {
+	mu        sync.RWMutex
 	ticketIDs map[string]struct{}
 }
 
@@ -34,7 +45,46 @@ func ResolveRunScope(epic tickets.Epic, requestedIDs []string) (RunScope, error)
 		}
 		ticketIDs[id] = struct{}{}
 	}
-	return RunScope{ticketIDs: ticketIDs}, nil
+	return RunScope{data: &scopeData{ticketIDs: ticketIDs}}, nil
+}
+
+// Add widens a frozen scope to also include ticketIDs, making each one
+// eligible for the next claim exactly as if it had been in the original
+// TicketIDs list at launch. Safe to call concurrently with Contains/Frontier
+// reads (and with other Add calls) on the same scope.
+//
+// A no-op on a dynamic (whole-epic) scope: that scope is already
+// unrestricted, so there's nothing to widen.
+func (s RunScope) Add(ticketIDs ...string) {
+	if s.wholeEpic || s.data == nil {
+		return
+	}
+	s.data.mu.Lock()
+	defer s.data.mu.Unlock()
+	for _, id := range ticketIDs {
+		s.data.ticketIDs[id] = struct{}{}
+	}
+}
+
+// containsID reports whether id is directly in the frozen scope's ticket set.
+func (s RunScope) containsID(id string) bool {
+	if s.data == nil {
+		return false
+	}
+	s.data.mu.RLock()
+	defer s.data.mu.RUnlock()
+	_, ok := s.data.ticketIDs[id]
+	return ok
+}
+
+// requestedCount is how many ticket IDs are directly in the frozen scope's set.
+func (s RunScope) requestedCount() int {
+	if s.data == nil {
+		return 0
+	}
+	s.data.mu.RLock()
+	defer s.data.mu.RUnlock()
+	return len(s.data.ticketIDs)
 }
 
 // Contains reports whether ticket is in scope: either directly requested, or
@@ -55,7 +105,7 @@ func (s RunScope) containsChain(ticket tickets.Ticket, epic tickets.Epic, visite
 	}
 	visited[id] = true
 
-	if _, ok := s.ticketIDs[id]; ok {
+	if s.containsID(id) {
 		return true
 	}
 	if ticket.Parent == nil {
@@ -92,14 +142,14 @@ func (s RunScope) AllSettled(epic tickets.Epic) bool {
 		if !s.Contains(ticket, epic) {
 			continue
 		}
-		if _, requested := s.ticketIDs[ticket.DisplayNumber()]; requested {
+		if s.containsID(ticket.DisplayNumber()) {
 			foundRequested++
 		}
 		if !isSettledStatus(epic.RenderedStatus(ticket)) {
 			return false
 		}
 	}
-	return foundRequested == len(s.ticketIDs)
+	return foundRequested == s.requestedCount()
 }
 
 // TotalCount is how many of epic's tickets belong to the scope.
