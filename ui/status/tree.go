@@ -2,7 +2,7 @@ package status
 
 import (
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui/filetree"
+	"github.com/elentok/gx/ui/tree"
 )
 
 type statusEntryKind int
@@ -37,33 +37,13 @@ func buildStatusEntries(files []git.StageFileStatus, collapsed map[string]bool) 
 	return entries
 }
 
-func buildStatusEntriesAndRows(files []git.StageFileStatus, collapsed map[string]bool) ([]statusEntry, []filetree.Entry[git.StageFileStatus]) {
-	entries := filetree.BuildEntriesFromValues(files, func(file git.StageFileStatus) string {
+func buildStatusEntriesAndRows(files []git.StageFileStatus, collapsed map[string]bool) ([]statusEntry, []tree.Entry[git.StageFileStatus]) {
+	entries := tree.BuildEntriesFromPaths(files, func(file git.StageFileStatus) string {
 		return file.Path
 	}, collapsed)
 	out := make([]statusEntry, 0, len(entries))
 	for _, row := range entries {
-		entry := statusEntry{
-			Path:        row.Path,
-			ParentPath:  row.ParentPath,
-			Depth:       row.Depth,
-			DisplayName: row.DisplayName,
-			Expanded:    row.Expanded,
-		}
-		if row.Kind == filetree.EntryDir {
-			entry.Kind = statusEntryDir
-			agg := aggregateStatusFiles(row.Leaves)
-			entry.HasStaged = agg.hasStaged
-			entry.HasUnstaged = agg.hasUnstaged
-			entry.HasOnlyUntracked = agg.onlyUntracked
-		} else {
-			entry.Kind = statusEntryFile
-			entry.File = row.Value
-			entry.HasStaged = row.Value.HasStagedChanges()
-			entry.HasUnstaged = row.Value.HasUnstagedChanges()
-			entry.HasOnlyUntracked = row.Value.IsUntracked()
-		}
-		out = append(out, entry)
+		out = append(out, statusEntryFromRow(row))
 	}
 	return out, entries
 }
@@ -88,15 +68,15 @@ func aggregateStatusFiles(files []git.StageFileStatus) aggregateStatus {
 	return agg
 }
 
-func statusEntryFromRow(row filetree.Entry[git.StageFileStatus]) statusEntry {
+func statusEntryFromRow(row tree.Entry[git.StageFileStatus]) statusEntry {
 	entry := statusEntry{
-		Path:        row.Path,
-		ParentPath:  row.ParentPath,
+		Path:        row.ID,
+		ParentPath:  row.ParentID,
 		Depth:       row.Depth,
 		DisplayName: row.DisplayName,
 		Expanded:    row.Expanded,
 	}
-	if row.Kind == filetree.EntryDir {
+	if row.HasChildren {
 		entry.Kind = statusEntryDir
 		agg := aggregateStatusFiles(row.Leaves)
 		entry.HasStaged = agg.hasStaged

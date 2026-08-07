@@ -114,7 +114,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 }
 
 func (m Model) handleFileTreeRebuildRequested() (Model, tea.Cmd) {
-	m.statusData.statusEntries, m.statusData.statusRows = buildStatusEntriesAndRows(m.statusData.files, m.fileTreeModel.CollapsedDirs())
+	m.statusData.statusEntries, m.statusData.statusRows = buildStatusEntriesAndRows(m.statusData.files, m.fileTreeModel.CollapsedIDs())
 	m.reconcileFileTreeFromStatusState()
 	return m, m.reloadDiffsForSelection()
 }

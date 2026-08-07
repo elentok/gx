@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/filetree"
+	"github.com/elentok/gx/ui/tree"
 )
 
 func TestBuildStatusEntries_CollapsibleDirectory(t *testing.T) {
@@ -78,10 +78,10 @@ func TestBuildStatusEntries_CompressesSingleChildDirectoryChains(t *testing.T) {
 }
 
 func TestVisibleStatusLines_UsesStatusSpecificLabelAndMeta(t *testing.T) {
-	m := Model{settings: ui.Settings{}, focus: focusFiletree, fileTreeModel: filetree.NewModel[git.StageFileStatus]()}
+	m := Model{settings: ui.Settings{}, focus: focusFiletree, fileTreeModel: tree.NewModel[git.StageFileStatus]()}
 	file := git.StageFileStatus{Path: "new.go", RenameFrom: "old.go", IndexStatus: 'R', WorktreeCode: ' '}
-	m.fileTreeModel.SetEntries([]filetree.Entry[git.StageFileStatus]{
-		{Kind: filetree.EntryFile, DisplayName: "new.go", Value: file},
+	m.fileTreeModel.SetEntries([]tree.Entry[git.StageFileStatus]{
+		{DisplayName: "new.go", Value: file},
 	})
 
 	lines := m.visibleStatusLines(30, 3)

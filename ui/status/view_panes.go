@@ -7,7 +7,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/filetree"
+	"github.com/elentok/gx/ui/tree"
 
 	"github.com/charmbracelet/x/ansi"
 )
@@ -94,58 +94,69 @@ func (m Model) filetreePaneTitle(maxWidth int) string {
 
 func (m Model) visibleStatusLines(width, height int) []string {
 	icons := filetreePaneIconsFor(m.settings.UseNerdFontIcons)
-	return m.fileTreeModel.RenderLines(height, filetree.RenderOpts[git.StageFileStatus]{
-		AccentColor:      ui.ColorBlue,
-		Active:           m.focus == focusFiletree,
-		Width:            width - 2,
-		EmptyLine:        ui.StyleMuted.Render("clean working tree"),
-		UseNerdFontIcons: m.settings.UseNerdFontIcons,
-		FileIcon: func(entry filetree.Entry[git.StageFileStatus]) string {
-			return statusFileIcon(entry.Value, isWorktreeSymlink(m.worktreeRoot, entry.Value.Path), icons)
-		},
-		FileLabel: func(entry filetree.Entry[git.StageFileStatus]) string {
-			if entry.Value.IsRenamed() && entry.Value.RenameFrom != "" {
-				return entry.Value.RenameFrom + " -> " + entry.Value.Path
-			}
-			return entry.DisplayName
-		},
-		MetaText: func(entry filetree.Entry[git.StageFileStatus]) string {
+	return m.fileTreeModel.RenderLines(height, tree.RenderOpts[git.StageFileStatus]{
+		AccentColor: ui.ColorBlue,
+		Active:      m.focus == focusFiletree,
+		Width:       width - 2,
+		EmptyLine:   ui.StyleMuted.Render("clean working tree"),
+		Icon:        m.statusTreeIcon(icons),
+		Label:       m.statusTreeLabel(),
+		MetaText: func(entry tree.Entry[git.StageFileStatus]) string {
 			return statusEntryMeta(statusEntryFromRow(entry), m.settings.UseNerdFontIcons, icons)
 		},
-		RowColor: func(entry filetree.Entry[git.StageFileStatus]) string {
+		RowColor: func(entry tree.Entry[git.StageFileStatus]) string {
 			return statusEntryColor(statusEntryFromRow(entry))
 		},
-		Faint: func(entry filetree.Entry[git.StageFileStatus]) bool {
-			return entry.Kind == filetree.EntryFile && isDeletedFileStatus(entry.Value)
+		Faint: func(entry tree.Entry[git.StageFileStatus]) bool {
+			return !entry.HasChildren && isDeletedFileStatus(entry.Value)
 		},
 	})
+}
+
+// statusTreeIcon renders a directory's expand/collapse folder glyph or a
+// file's change-kind glyph, replacing filetree's built-in EntryKind-based
+// folder icon now that ui/tree has no leaf-vs-directory split of its own.
+func (m Model) statusTreeIcon(icons filetreePaneIcons) func(entry tree.Entry[git.StageFileStatus]) string {
+	return func(entry tree.Entry[git.StageFileStatus]) string {
+		if entry.HasChildren {
+			if entry.Expanded {
+				return icons.folderOpen
+			}
+			return icons.folderClosed
+		}
+		return statusFileIcon(entry.Value, isWorktreeSymlink(m.worktreeRoot, entry.Value.Path), icons)
+	}
+}
+
+func (m Model) statusTreeLabel() func(entry tree.Entry[git.StageFileStatus]) string {
+	return func(entry tree.Entry[git.StageFileStatus]) string {
+		if entry.HasChildren {
+			return entry.DisplayName + "/"
+		}
+		if entry.Value.IsRenamed() && entry.Value.RenameFrom != "" {
+			return entry.Value.RenameFrom + " -> " + entry.Value.Path
+		}
+		return entry.DisplayName
+	}
 }
 
 func (m Model) requiredFiletreePaneWidth(height int) int {
 	required := ansi.StringWidth(" " + m.filetreePaneTitle(math.MaxInt32) + " ")
 	icons := filetreePaneIconsFor(m.settings.UseNerdFontIcons)
-	if w := m.fileTreeModel.RequiredWidth(height, filetree.RenderOpts[git.StageFileStatus]{
-		AccentColor:      ui.ColorBlue,
-		Active:           m.focus == focusFiletree,
-		EmptyLine:        ui.StyleMuted.Render("clean working tree"),
-		UseNerdFontIcons: m.settings.UseNerdFontIcons,
-		FileIcon: func(entry filetree.Entry[git.StageFileStatus]) string {
-			return statusFileIcon(entry.Value, isWorktreeSymlink(m.worktreeRoot, entry.Value.Path), icons)
-		},
-		FileLabel: func(entry filetree.Entry[git.StageFileStatus]) string {
-			if entry.Value.IsRenamed() && entry.Value.RenameFrom != "" {
-				return entry.Value.RenameFrom + " -> " + entry.Value.Path
-			}
-			return entry.DisplayName
-		},
-		MetaText: func(entry filetree.Entry[git.StageFileStatus]) string {
+	if w := m.fileTreeModel.RequiredWidth(height, tree.RenderOpts[git.StageFileStatus]{
+		AccentColor: ui.ColorBlue,
+		Active:      m.focus == focusFiletree,
+		EmptyLine:   ui.StyleMuted.Render("clean working tree"),
+		Icon:        m.statusTreeIcon(icons),
+		Label:       m.statusTreeLabel(),
+		MetaText: func(entry tree.Entry[git.StageFileStatus]) string {
 			return statusEntryMeta(statusEntryFromRow(entry), m.settings.UseNerdFontIcons, icons)
 		},
-		RowColor: func(entry filetree.Entry[git.StageFileStatus]) string {
+		RowColor: func(entry tree.Entry[git.StageFileStatus]) string {
 			return statusEntryColor(statusEntryFromRow(entry))
 		},
-		Faint: func(entry filetree.Entry[git.StageFileStatus]) bool {
-			return entry.Kind == filetree.EntryFile && isDeletedFileStatus(entry.Value)
+		Faint: func(entry tree.Entry[git.StageFileStatus]) bool {
+			return !entry.HasChildren && isDeletedFileStatus(entry.Value)
 		},
 	}); w > required {
 		required = w

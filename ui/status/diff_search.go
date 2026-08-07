@@ -5,8 +5,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/tree"
 )
 
 func (m Model) InputFocused() bool {
@@ -66,12 +66,12 @@ func (m *Model) syncSearchToInactivePane() {
 	inactive.Search().DismissAndKeepResults()
 }
 
-func (m Model) filetreeEntrySearchText(entry filetree.Entry[git.StageFileStatus]) string {
+func (m Model) filetreeEntrySearchText(entry tree.Entry[git.StageFileStatus]) string {
 	name := entry.DisplayName
-	if entry.Kind == filetree.EntryFile && entry.Value.IsRenamed() && entry.Value.RenameFrom != "" {
-		name = entry.Value.RenameFrom + " -> " + entry.Path
+	if !entry.HasChildren && entry.Value.IsRenamed() && entry.Value.RenameFrom != "" {
+		name = entry.Value.RenameFrom + " -> " + entry.ID
 	}
-	if entry.Kind == filetree.EntryDir {
+	if entry.HasChildren {
 		return name + "/"
 	}
 	return name

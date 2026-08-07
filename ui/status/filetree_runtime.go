@@ -6,7 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui/filetree"
+	"github.com/elentok/gx/ui/tree"
 )
 
 func (m Model) selectedFiletreeEntry() (statusEntry, bool) {
@@ -16,9 +16,9 @@ func (m Model) selectedFiletreeEntry() (statusEntry, bool) {
 	return m.statusData.statusEntries[m.statusData.listState.Selected()], true
 }
 
-func (m Model) selectedFiletreeRow() (filetree.Entry[git.StageFileStatus], bool) {
+func (m Model) selectedFiletreeRow() (tree.Entry[git.StageFileStatus], bool) {
 	if m.statusData.listState.Selected() < 0 || m.statusData.listState.Selected() >= len(m.statusData.statusRows) {
-		return filetree.Entry[git.StageFileStatus]{}, false
+		return tree.Entry[git.StageFileStatus]{}, false
 	}
 	return m.statusData.statusRows[m.statusData.listState.Selected()], true
 }
@@ -50,7 +50,7 @@ func (m *Model) reloadFileList(preservePath string) {
 	}
 	m.err = nil
 	m.statusData.files = files
-	m.statusData.statusEntries, m.statusData.statusRows = buildStatusEntriesAndRows(m.statusData.files, m.fileTreeModel.CollapsedDirs())
+	m.statusData.statusEntries, m.statusData.statusRows = buildStatusEntriesAndRows(m.statusData.files, m.fileTreeModel.CollapsedIDs())
 	m.reconcileFileTreeFromStatusState()
 	if m.fileTreeModel.Search().HasQuery() {
 		matches := m.computeSearchMatches(m.fileTreeModel.Search().Query())

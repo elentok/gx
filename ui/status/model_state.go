@@ -7,7 +7,6 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/bump"
-	"github.com/elentok/gx/ui/filetree"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/imagediff"
 	"github.com/elentok/gx/ui/keys"
@@ -17,6 +16,7 @@ import (
 	"github.com/elentok/gx/ui/push"
 	"github.com/elentok/gx/ui/stash"
 	"github.com/elentok/gx/ui/status/diffarea"
+	"github.com/elentok/gx/ui/tree"
 
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
@@ -36,7 +36,7 @@ type Model struct {
 	diffarea         diffarea.Model
 	diffContextLines int
 	statusData       statusData
-	fileTreeModel    filetree.Model[git.StageFileStatus]
+	fileTreeModel    tree.Model[git.StageFileStatus]
 
 	err            error
 	errorOpen      bool
@@ -87,7 +87,7 @@ type statusData struct {
 	branchBaseRef string
 	branchSync    git.SyncStatus
 	statusEntries []statusEntry
-	statusRows    []filetree.Entry[git.StageFileStatus]
+	statusRows    []tree.Entry[git.StageFileStatus]
 	listState     list.Model
 }
 
@@ -137,7 +137,7 @@ func NewModel(worktreeRoot string, isBareRepo bool, settings ui.Settings, initia
 	}
 	statusKeys := newStatusManager()
 	diffarreaModel := diffarea.NewModel(settings.UseNerdFontIcons)
-	fileTreeModel := filetree.NewModel[git.StageFileStatus]()
+	fileTreeModel := tree.NewModel[git.StageFileStatus](toggleStageBinding, discardBinding)
 	m := Model{
 		worktreeRoot:     worktreeRoot,
 		isBareRepo:       isBareRepo,

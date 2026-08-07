@@ -1,11 +1,24 @@
 package status
 
 import (
-	"github.com/elentok/gx/ui/filetree"
+	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/tree"
 
 	tea "charm.land/bubbletea/v2"
+)
+
+const (
+	bindingToggleStage keys.BindingID = "toggle-stage"
+	bindingDiscard     keys.BindingID = "discard"
+
+	filetreeCat = "Filetree"
+)
+
+var (
+	toggleStageBinding = keys.Binding{ID: bindingToggleStage, Seq: []string{"space"}, Categories: []string{filetreeCat}, Title: "toggle stage"}
+	discardBinding     = keys.Binding{ID: bindingDiscard, Seq: []string{"d"}, Categories: []string{filetreeCat}, Title: "discard"}
 )
 
 func (m Model) delegateToChild(msg tea.KeyPressMsg) (Model, tea.Cmd) {
@@ -28,21 +41,21 @@ func (m Model) delegateToFiletree(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 		if match != nil {
 			switch match.ID {
-			case filetree.BindingBack:
+			case tree.BindingBack:
 				if m.settings.EnableNavigation {
 					return m, nav.Back()
 				}
-			case filetree.BindingPageDown:
+			case tree.BindingPageDown:
 				if m.scrollFiletreePage(1) {
 					return m, m.scheduleDiffReload()
 				}
-			case filetree.BindingPageUp:
+			case tree.BindingPageUp:
 				if m.scrollFiletreePage(-1) {
 					return m, m.scheduleDiffReload()
 				}
-			case filetree.BindingToggleStage:
+			case bindingToggleStage:
 				return m, m.toggleStageStatusEntry()
-			case filetree.BindingDiscard:
+			case bindingDiscard:
 				m.openDiscardStatusConfirm()
 			}
 		}
