@@ -121,3 +121,13 @@ func readAttachLock(path string) (attachLockInfo, error) {
 func releaseAttachLock(scratchDir string) {
 	_ = os.Remove(attachLockPath(scratchDir))
 }
+
+// attachLockHeld reports whether scratchDir's attach lock is currently held
+// by a live process (self or foreign) — false means Detached.
+func attachLockHeld(scratchDir string) bool {
+	info, err := readAttachLock(attachLockPath(scratchDir))
+	if err != nil {
+		return false
+	}
+	return !attachLockIsStale(info)
+}

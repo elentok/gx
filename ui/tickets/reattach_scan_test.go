@@ -109,7 +109,7 @@ func TestHandleReattachSignals_NoTicketOrProcessStateMutated(t *testing.T) {
 	}
 }
 
-func TestHandleReattachSignals_SwitchesToQueueTab(t *testing.T) {
+func TestHandleReattachSignals_NeverSwitchesToQueueTab(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "epic", "01-first.md", "Status: claimed\n\nBody.\n")
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
@@ -122,8 +122,8 @@ func TestHandleReattachSignals_SwitchesToQueueTab(t *testing.T) {
 		t.Fatal("handleReattachSignals: want a cmd when a signal is found")
 	}
 
-	if !batchContainsQueueSwitch(cmd) {
-		t.Fatal("handleReattachSignals: want a nav.Switch to TabQueue among the returned cmds")
+	if batchContainsQueueSwitch(cmd) {
+		t.Fatal("handleReattachSignals: want no nav.Switch to TabQueue among the returned cmds")
 	}
 }
 

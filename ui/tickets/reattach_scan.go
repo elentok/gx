@@ -65,23 +65,21 @@ func (m Model) cmdReattachScan() tea.Cmd {
 
 // handleReattachSignals surfaces each detect-only ReattachSignal as a
 // persistent progress-style (spinner) notification, keyed so a ticket
-// already signaled doesn't duplicate, and switches the active tab to Queue
-// so the recoverable work is immediately visible rather than left for the
-// user to stumble onto. This is otherwise detect-only: no ticket state is
-// touched and nothing is auto-resumed, matching ScanForReattachable's own
-// contract.
+// already signaled doesn't duplicate. This is detect-only: no ticket state is
+// touched and nothing is auto-resumed or auto-navigated to, matching
+// ScanForReattachable's own contract — resuming happens only via the Queue
+// tab's Detached+Live confirmation (queue_reattach.go).
 func (m Model) handleReattachSignals(msg reattachSignalsMsg) (tea.Model, tea.Cmd) {
 	if len(msg.signals) == 0 {
 		return m, nil
 	}
-	cmds := make([]tea.Cmd, 0, len(msg.signals)+1)
+	cmds := make([]tea.Cmd, 0, len(msg.signals))
 	for _, s := range msg.signals {
 		id := reattachNotifyID(s.EpicName, s.Ticket.Identifier)
 		cmds = append(cmds, notify.Progress(id, fmt.Sprintf(
 			"epic %q ticket %s: recoverable session detected", s.EpicName, s.Ticket.Identifier,
 		)))
 	}
-	cmds = append(cmds, cmdOpenQueueTab(m.worktreeRoot))
 	return m, tea.Batch(cmds...)
 }
 

@@ -294,6 +294,10 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleQueueMouseClick(msg)
 	case cascadeDeleteConfirmedMsg:
 		return m.handleCascadeDeleteConfirmed(msg)
+	case queueDetachedLiveMsg:
+		return m.handleDetachedLiveDetected(msg)
+	case detachedLiveConfirmedMsg:
+		return m.handleDetachedLiveConfirmed(msg)
 	}
 	return m, nil
 }
@@ -421,6 +425,7 @@ func (m QueueModel) handleQueueSync(msg queueSyncMsg) (tea.Model, tea.Cmd) {
 		m.executionCompletedAt = m.now()
 		cmds = append(cmds, m.cmdLoadQueue())
 	}
+	cmds = append(cmds, cmdCheckDetachedLive(m.worktreeRoot))
 	return m, tea.Batch(cmds...)
 }
 
