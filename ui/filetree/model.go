@@ -1,3 +1,11 @@
+// Package filetree provides a collapsible file-tree UI component, split into
+// directory/file entries with sorting and single-child-chain collapsing.
+// Superseded by ui/tree, a more general ID/ParentID-keyed tree model without
+// the leaf-vs-directory split — the intended replacement, tracked under the
+// ui-tree-migration epic. ui/tree.Model has no consumers yet (its first two
+// call sites only reused its BuildEntriesFromValues, not the interactive
+// Model itself), so expect to shake out its API if you're the first to
+// migrate a call site onto it.
 package filetree
 
 import (
