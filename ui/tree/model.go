@@ -22,6 +22,11 @@ type Entry[T any] struct {
 	Value       T
 	HasChildren bool
 	Expanded    bool
+	// DisplayName is set by BuildEntriesFromPaths; BuildEntriesFromValues leaves it empty.
+	DisplayName string
+	// Leaves is every leaf value nested under this entry, collected recursively.
+	// Set by BuildEntriesFromPaths; BuildEntriesFromValues leaves it nil.
+	Leaves []T
 }
 
 // Model owns tree list state (selection/scroll/search), reusing the same
@@ -45,11 +50,18 @@ type Result struct {
 	SearchCursorChanged bool
 }
 
-func NewModel[T any]() Model[T] {
+// NewModel constructs a tree Model. extra bindings are appended to the base
+// tree bindings before constructing the internal keys.Manager, so a consumer
+// (e.g. ui/status's stage/discard bindings) can dispatch and appear in help
+// alongside the built-in tree bindings, with no separate interception logic.
+func NewModel[T any](extra ...keys.Binding) Model[T] {
+	bindings := make([]keys.Binding, 0, len(treeBindings)+len(extra))
+	bindings = append(bindings, treeBindings...)
+	bindings = append(bindings, extra...)
 	return Model[T]{
 		collapsed: map[string]bool{},
 		search:    search.NewModel(),
-		keys:      keys.New(treeBindings),
+		keys:      keys.New(bindings),
 	}
 }
 
@@ -268,6 +280,18 @@ func (m *Model[T]) CollapseSelected() bool {
 
 func (m *Model[T]) ExpandSelected() bool {
 	return expandSelected(m.entries, m.collapsed, m.list.Selected())
+}
+
+// MoveToAdjacentFile moves selection to the next (delta>0) or previous
+// (delta<0) leaf row, skipping directory rows (entries with HasChildren).
+// Returns false if there is no adjacent leaf in that direction.
+func (m *Model[T]) MoveToAdjacentFile(delta int) bool {
+	idx, ok := adjacentLeafIndex(m.entries, m.list.Selected(), delta)
+	if !ok {
+		return false
+	}
+	m.list.SetSelected(idx, len(m.entries))
+	return true
 }
 
 func (m *Model[T]) FocusParent() bool {

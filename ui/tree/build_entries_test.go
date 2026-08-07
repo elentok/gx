@@ -141,3 +141,89 @@ func TestBuildEntriesFromValues_OrderPreservingNotSorted(t *testing.T) {
 		t.Errorf("entries[2].ID = %q, want %q", entries[2].ID, "apple")
 	}
 }
+
+func TestBuildEntriesFromPaths_FlatFiles(t *testing.T) {
+	paths := []string{"b.txt", "a.txt", "c.txt"}
+	entries := BuildEntriesFromPaths(paths, func(s string) string { return s }, nil)
+	if len(entries) != 3 {
+		t.Fatalf("expected 3 entries, got %d", len(entries))
+	}
+	// sorted alphabetically: a.txt, b.txt, c.txt
+	if entries[0].ID != "a.txt" {
+		t.Errorf("entries[0].ID = %q, want 'a.txt'", entries[0].ID)
+	}
+}
+
+func TestBuildEntriesFromPaths_NestedDirs(t *testing.T) {
+	paths := []string{"src/main.go", "src/util.go", "README.md"}
+	entries := BuildEntriesFromPaths(paths, func(s string) string { return s }, nil)
+
+	// dirs come before files; expect src/ dir first, then README.md
+	if !entries[0].HasChildren {
+		t.Fatalf("expected first entry to be dir, got %+v", entries[0])
+	}
+	if entries[0].ID != "src" {
+		t.Errorf("dir id = %q, want 'src'", entries[0].ID)
+	}
+	// dir is expanded by default (not in collapsed map)
+	if !entries[0].Expanded {
+		t.Error("expected dir to be expanded by default")
+	}
+	// files inside dir
+	if len(entries) < 3 {
+		t.Fatalf("expected at least 3 entries (dir + 2 files), got %d", len(entries))
+	}
+}
+
+func TestBuildEntriesFromPaths_CollapsedDir(t *testing.T) {
+	paths := []string{"src/main.go", "src/util.go"}
+	collapsed := map[string]bool{"src": true}
+	entries := BuildEntriesFromPaths(paths, func(s string) string { return s }, collapsed)
+
+	// Only the dir entry, children hidden
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry (collapsed dir), got %d", len(entries))
+	}
+	if !entries[0].HasChildren {
+		t.Errorf("expected dir entry, got %+v", entries[0])
+	}
+	if entries[0].Expanded {
+		t.Error("expected dir to be collapsed")
+	}
+}
+
+func TestBuildEntriesFromPaths_CollapsedDirChain(t *testing.T) {
+	// a/b/file.txt - a and b are single-child dirs, should be collapsed into "a/b"
+	paths := []string{"a/b/file.txt"}
+	entries := BuildEntriesFromPaths(paths, func(s string) string { return s }, nil)
+
+	if len(entries) == 0 {
+		t.Fatal("expected entries")
+	}
+	if !entries[0].HasChildren {
+		t.Errorf("expected dir entry, got %+v", entries[0])
+	}
+	// DisplayName should be collapsed chain
+	if entries[0].DisplayName != "a/b" {
+		t.Errorf("expected collapsed dir name 'a/b', got %q", entries[0].DisplayName)
+	}
+}
+
+func TestBuildEntriesFromPaths_LeavesCollected(t *testing.T) {
+	paths := []string{"src/a.go", "src/b.go"}
+	entries := BuildEntriesFromPaths(paths, func(s string) string { return s }, nil)
+
+	var dirEntry *Entry[string]
+	for i := range entries {
+		if entries[i].HasChildren {
+			dirEntry = &entries[i]
+			break
+		}
+	}
+	if dirEntry == nil {
+		t.Fatal("no dir entry found")
+	}
+	if len(dirEntry.Leaves) != 2 {
+		t.Errorf("Leaves = %d, want 2", len(dirEntry.Leaves))
+	}
+}

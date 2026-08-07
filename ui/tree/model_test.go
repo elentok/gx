@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/search"
 
 	tea "charm.land/bubbletea/v2"
@@ -353,6 +354,63 @@ func TestRequiredWidth_UsesRenderedLines(t *testing.T) {
 	width := m.RequiredWidth(3, RenderOpts[int]{AccentColor: color.White, Label: label})
 	if width < len(" wide-name") {
 		t.Fatalf("required width too small: %d", width)
+	}
+}
+
+func TestMoveToAdjacentFile(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{
+		{ID: "dir", HasChildren: true, Expanded: true},
+		{ID: "dir/a.txt", ParentID: "dir", Value: 1},
+		{ID: "other", HasChildren: true, Expanded: true},
+		{ID: "other/b.txt", ParentID: "other", Value: 2},
+	})
+
+	m.SetSelectedIndex(1)
+	if ok := m.MoveToAdjacentFile(1); !ok {
+		t.Fatal("expected move down to adjacent file")
+	}
+	if m.SelectedIndex() != 3 {
+		t.Fatalf("selected=%d want=3", m.SelectedIndex())
+	}
+	if ok := m.MoveToAdjacentFile(1); ok {
+		t.Fatal("expected no move past last file")
+	}
+	if ok := m.MoveToAdjacentFile(-1); !ok {
+		t.Fatal("expected move up to previous file")
+	}
+	if m.SelectedIndex() != 1 {
+		t.Fatalf("selected=%d want=1", m.SelectedIndex())
+	}
+}
+
+func TestNewModel_ExtraBindings(t *testing.T) {
+	const bindingToggleStage keys.BindingID = "toggle-stage"
+	extra := keys.Binding{ID: bindingToggleStage, Seq: []string{"space"}, Categories: []string{"Status"}, Title: "toggle stage"}
+
+	m := NewModel[int](extra)
+
+	found := false
+	for _, b := range m.Keys().Bindings() {
+		if b.ID == bindingToggleStage {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected extra binding to appear in Keys().Bindings()")
+	}
+
+	match, consumed := m.Keys().Process(tea.KeyPressMsg{Code: ' ', Text: " "})
+	if !consumed || match == nil || match.ID != bindingToggleStage {
+		t.Fatalf("expected extra binding to be dispatched by Process, got match=%v consumed=%v", match, consumed)
+	}
+}
+
+func TestNewModel_NoExtraBindingsUnaffected(t *testing.T) {
+	m := NewModel[int]()
+	if len(m.Keys().Bindings()) != len(treeBindings) {
+		t.Fatalf("bindings=%d want=%d", len(m.Keys().Bindings()), len(treeBindings))
 	}
 }
 

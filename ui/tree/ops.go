@@ -16,6 +16,22 @@ func parentIndex[T any](entries []Entry[T], selected int) (int, bool) {
 	return 0, false
 }
 
+func adjacentLeafIndex[T any](entries []Entry[T], selected, delta int) (int, bool) {
+	if delta == 0 || len(entries) == 0 {
+		return 0, false
+	}
+	idx := selected
+	for {
+		idx += delta
+		if idx < 0 || idx >= len(entries) {
+			return 0, false
+		}
+		if !entries[idx].HasChildren {
+			return idx, true
+		}
+	}
+}
+
 func firstChildIndex[T any](entries []Entry[T], selected int) (int, bool) {
 	if selected < 0 || selected >= len(entries) {
 		return 0, false
