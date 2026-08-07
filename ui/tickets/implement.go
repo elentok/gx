@@ -46,6 +46,10 @@ type epicRun struct {
 	// which has no way to send a tea.Cmd itself) and drained into an actual
 	// notify.Close cmd by the next syncRunSnapshot poll on the active tab.
 	pendingNotifyCloses []string
+	// holdsAttach marks a run as one of the ones counted toward
+	// loopRegistry.attachCount, so finish only releases the attach lock once
+	// the run that actually incremented it ends.
+	holdsAttach bool
 }
 
 type RunState string
@@ -99,6 +103,17 @@ type loopRegistry struct {
 	// Errors survive run removal so every observer sees the failure until an
 	// explicit acknowledgement clears it.
 	lastErr map[string]error
+	// attachCount/attachScratchDir reference-count this process's hold on the
+	// per-repo attach lock (ticket 05): the lock is acquired once, on the
+	// first tryStart to pass a scratchDir while attachCount is 0, and
+	// released once attachCount drops back to 0 in finish.
+	attachCount      int
+	attachScratchDir string
+	// attachErr carries the reason the most recent tryStart was rejected by
+	// the attach lock specifically (as opposed to same-process double-start
+	// or capacity), for the caller to surface instead of the generic
+	// "already running" message. Cleared at the start of every tryStart.
+	attachErr error
 }
 
 func newLoopRegistry(maxConcurrent int) *loopRegistry {
@@ -128,9 +143,17 @@ var runRalphLoop = ralphloop.Run
 
 // tryStart claims an epic slot and starts the stream drain before returning
 // the producer sink. Snapshots, rather than the channel, are shared with views.
-func (r *loopRegistry) tryStart(epicName string, done, total int) (*ralphloop.ChannelEventSink, bool) {
+//
+// scratchDir is variadic-as-optional so the many pre-existing callers
+// (mostly tests exercising slot/pause/concurrency logic, not the attach
+// lock) don't need updating: passed, it's the repo's `.scratch` dir and
+// tryStart acquires ticket 05's per-repo attach lock the first time
+// attachCount is 0; omitted, the run skips attach-lock participation
+// entirely.
+func (r *loopRegistry) tryStart(epicName string, done, total int, scratchDir ...string) (*ralphloop.ChannelEventSink, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.attachErr = nil
 	if r.paused {
 		return nil, false
 	}
@@ -140,12 +163,35 @@ func (r *loopRegistry) tryStart(epicName string, done, total int) (*ralphloop.Ch
 	if len(r.runs) >= r.maxConcurrent {
 		return nil, false
 	}
+
+	dir := ""
+	if len(scratchDir) > 0 {
+		dir = scratchDir[0]
+	}
+	holdsAttach := false
+	if dir != "" {
+		if r.attachCount == 0 {
+			foreignPID, ok, err := acquireAttachLock(dir)
+			if err != nil {
+				r.attachErr = err
+				return nil, false
+			}
+			if !ok {
+				r.attachErr = fmt.Errorf("a ralph-loop is already running (attached by process %d)", foreignPID)
+				return nil, false
+			}
+			r.attachScratchDir = dir
+		}
+		r.attachCount++
+		holdsAttach = true
+	}
+
 	sink := ralphloop.NewChannelEventSink()
 	run := &epicRun{
 		drainDone: make(chan struct{}),
 		done:      done, total: total, sink: sink, gate: ralphloop.NewGate(),
 		state: RunStateRunning, tickets: map[string]RunTicketSnapshot{},
-		startedAt: time.Now(),
+		startedAt: time.Now(), holdsAttach: holdsAttach,
 	}
 	r.runs[epicName] = run
 	r.snapshots[epicName] = run
@@ -338,6 +384,14 @@ func (r *loopRegistry) finish(epicName string, err error) {
 			run.finalError = err.Error()
 		}
 		run.sink = nil
+		if run.holdsAttach {
+			r.attachCount--
+			if r.attachCount <= 0 {
+				releaseAttachLock(r.attachScratchDir)
+				r.attachCount = 0
+				r.attachScratchDir = ""
+			}
+		}
 	}
 	delete(r.runs, epicName)
 	if err != nil {
@@ -351,6 +405,16 @@ func (r *loopRegistry) lastError(epicName string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.lastErr[epicName]
+}
+
+// takeAttachError returns and clears the reason the most recent tryStart was
+// rejected by the attach lock, or nil if that rejection had another cause.
+func (r *loopRegistry) takeAttachError() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	err := r.attachErr
+	r.attachErr = nil
+	return err
 }
 
 // EpicProgress reports one running epic's name and landed/total ticket count,
@@ -745,8 +809,11 @@ func cmdStartImplement(
 	skill string,
 ) tea.Cmd {
 	return func() tea.Msg {
-		sink, ok := ralphLoopRegistry.tryStart(epicName, done, total)
+		sink, ok := ralphLoopRegistry.tryStart(epicName, done, total, scratchDirFor(worktreeRoot))
 		if !ok {
+			if attachErr := ralphLoopRegistry.takeAttachError(); attachErr != nil {
+				return implementFailedMsg{err: attachErr}
+			}
 			return implementFailedMsg{err: fmt.Errorf("a ralph-loop is already running")}
 		}
 		opts, err := buildImplementRunOptionsForTickets(worktreeRoot, epicName, agent, maxParallel, ticketIDs, skill)
