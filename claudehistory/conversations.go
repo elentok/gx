@@ -149,6 +149,14 @@ type transcriptLine struct {
 }
 
 func extractUserMessageText(rawMsg json.RawMessage) string {
+	return decodeMessageText(rawMsg, cleanUserText)
+}
+
+// decodeMessageText decodes message.content, which rg/Claude Code transcripts
+// encode as either a plain string or a list of content blocks, and returns
+// the first non-empty text run through postProcess. Shared by the assistant-
+// and user-text extractors, which differ only in postProcess.
+func decodeMessageText(rawMsg json.RawMessage, postProcess func(string) string) string {
 	if len(rawMsg) == 0 {
 		return ""
 	}
@@ -161,18 +169,22 @@ func extractUserMessageText(rawMsg json.RawMessage) string {
 
 	var s string
 	if err := json.Unmarshal(msg.Content, &s); err == nil {
-		return cleanUserText(s)
+		return postProcess(s)
 	}
 
 	var blocks []struct {
 		Type string `json:"type"`
 		Text string `json:"text"`
 	}
-	if err := json.Unmarshal(msg.Content, &blocks); err == nil {
-		for _, b := range blocks {
-			if b.Type == "text" && b.Text != "" {
-				return cleanUserText(b.Text)
-			}
+	if err := json.Unmarshal(msg.Content, &blocks); err != nil {
+		return ""
+	}
+	for _, b := range blocks {
+		if b.Type != "text" {
+			continue
+		}
+		if text := postProcess(b.Text); text != "" {
+			return text
 		}
 	}
 	return ""

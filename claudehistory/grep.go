@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os/exec"
 	"sort"
 	"strings"
@@ -15,6 +16,43 @@ import (
 // ErrRgNotFound is returned when rg (ripgrep) is not in PATH.
 var ErrRgNotFound = errors.New("ripgrep (rg) not found in PATH — brew install ripgrep")
 
+// RgError is returned when rg exits with a failure unrelated to "no matches"
+// (e.g. an invalid regex or an unreadable directory), and carries rg's own
+// stderr so the caller can show the real reason rather than a bare exit code.
+type RgError struct {
+	Args   []string
+	Stderr string
+	Code   int
+}
+
+func (e *RgError) Error() string {
+	if e.Stderr == "" {
+		return fmt.Sprintf("rg %s failed (exit %d)", strings.Join(e.Args, " "), e.Code)
+	}
+	return fmt.Sprintf("rg %s failed (exit %d): %s", strings.Join(e.Args, " "), e.Code, e.Stderr)
+}
+
+// runRg executes rg and reports its exit code and stderr alongside the
+// error, so callers can distinguish "no matches" from a real failure.
+// Overridden in tests to inject failures without a real rg process.
+var runRg = func(args []string) (stdout []byte, stderr string, exitCode int, err error) {
+	cmd := exec.Command("rg", args...)
+	var outBuf, errBuf bytes.Buffer
+	cmd.Stdout = &outBuf
+	cmd.Stderr = &errBuf
+	runErr := cmd.Run()
+	stdout = outBuf.Bytes()
+	stderr = strings.TrimSpace(errBuf.String())
+	if runErr == nil {
+		return stdout, stderr, 0, nil
+	}
+	var exitErr *exec.ExitError
+	if errors.As(runErr, &exitErr) {
+		return stdout, stderr, exitErr.ExitCode(), runErr
+	}
+	return stdout, stderr, -1, runErr
+}
+
 // GrepResult is one rg match decoded to a human-readable form.
 type GrepResult struct {
 	FilePath  string // path to the .jsonl file
@@ -22,7 +60,6 @@ type GrepResult struct {
 	SessionID string // session ID (from ConversationMeta)
 	ConvTitle string // conversation title (from ConversationMeta)
 	Snippet   string // decoded single-line snippet centered on the match
-	SnippetHL []int  // rune indices in Snippet for highlighting
 	Preview   string // full decoded message text for the preview pane
 }
 
@@ -35,12 +72,15 @@ func GrepTranscripts(query string, dirs []string) ([]GrepResult, error) {
 	}
 
 	args := append([]string{"--json", "-i", "-e", query}, dirs...)
-	out, err := exec.Command("rg", args...).Output()
+	out, stderr, exitCode, err := runRg(args)
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+		if exitCode == 1 {
 			return nil, nil // no matches
 		}
-		return nil, err
+		if exitCode < 0 {
+			return nil, err
+		}
+		return nil, &RgError{Args: args, Stderr: stderr, Code: exitCode}
 	}
 
 	type rawResult struct {
@@ -106,7 +146,7 @@ func GrepTranscripts(query string, dirs []string) ([]GrepResult, error) {
 
 	var results []GrepResult
 	for _, r := range rawResults {
-		snippet, hl, preview := GrepDecodeMatch([]byte(r.rawLine), query)
+		snippet, _, preview := GrepDecodeMatch([]byte(r.rawLine), query)
 		if snippet == "" {
 			continue
 		}
@@ -116,7 +156,6 @@ func GrepTranscripts(query string, dirs []string) ([]GrepResult, error) {
 			SessionID: convCache[r.filePath].SessionID,
 			ConvTitle: convCache[r.filePath].Title,
 			Snippet:   snippet,
-			SnippetHL: hl,
 			Preview:   preview,
 		})
 	}
@@ -218,32 +257,5 @@ func centerSnippet(text, query string) (snippet string, highlights []int) {
 
 // extractAssistantText extracts the first text block from an assistant message.
 func extractAssistantText(rawMsg json.RawMessage) string {
-	if len(rawMsg) == 0 {
-		return ""
-	}
-	var msg struct {
-		Content json.RawMessage `json:"content"`
-	}
-	if err := json.Unmarshal(rawMsg, &msg); err != nil || len(msg.Content) == 0 {
-		return ""
-	}
-
-	var s string
-	if err := json.Unmarshal(msg.Content, &s); err == nil {
-		return strings.TrimSpace(s)
-	}
-
-	var blocks []struct {
-		Type string `json:"type"`
-		Text string `json:"text"`
-	}
-	if err := json.Unmarshal(msg.Content, &blocks); err != nil {
-		return ""
-	}
-	for _, b := range blocks {
-		if b.Type == "text" && strings.TrimSpace(b.Text) != "" {
-			return strings.TrimSpace(b.Text)
-		}
-	}
-	return ""
+	return decodeMessageText(rawMsg, strings.TrimSpace)
 }

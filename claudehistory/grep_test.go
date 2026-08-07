@@ -1,6 +1,7 @@
 package claudehistory
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -149,6 +150,40 @@ func TestGrepDecodeMatchInvalidJSON(t *testing.T) {
 	}
 }
 
+// ---- decodeMessageText tests ----
+
+func TestDecodeMessageTextStringContent(t *testing.T) {
+	raw := json.RawMessage(`{"role":"user","content":"  hello world  "}`)
+	got := decodeMessageText(raw, strings.TrimSpace)
+	if got != "hello world" {
+		t.Errorf("got %q, want %q", got, "hello world")
+	}
+}
+
+func TestDecodeMessageTextBlockContent(t *testing.T) {
+	raw := json.RawMessage(`{"role":"assistant","content":[{"type":"tool_use","text":""},{"type":"text","text":"  block text  "}]}`)
+	got := decodeMessageText(raw, strings.TrimSpace)
+	if got != "block text" {
+		t.Errorf("got %q, want %q", got, "block text")
+	}
+}
+
+func TestDecodeMessageTextPostProcessApplied(t *testing.T) {
+	raw := json.RawMessage(`{"role":"user","content":"<command-message>run</command-message>actual text"}`)
+	got := decodeMessageText(raw, cleanUserText)
+	if got != "actual text" {
+		t.Errorf("got %q, want %q", got, "actual text")
+	}
+}
+
+func TestDecodeMessageTextNoPostProcess(t *testing.T) {
+	raw := json.RawMessage(`{"role":"assistant","content":"<command-message>run</command-message>actual text"}`)
+	got := decodeMessageText(raw, strings.TrimSpace)
+	if got != "<command-message>run</command-message>actual text" {
+		t.Errorf("expected cleanup hook not applied, got %q", got)
+	}
+}
+
 // ---- GrepTranscripts tests ----
 
 // grepFixtureDir creates a temp project dir with two .jsonl files.
@@ -236,6 +271,25 @@ func TestGrepTranscriptsRgAbsent(t *testing.T) {
 	_, err := GrepTranscripts("fibonacci", []string{dir})
 	if !errors.Is(err, ErrRgNotFound) {
 		t.Fatalf("expected ErrRgNotFound, got: %v", err)
+	}
+}
+
+func TestGrepTranscriptsSurfacesRgStderr(t *testing.T) {
+	requireRg(t)
+	dir := grepFixtureDir(t)
+
+	orig := runRg
+	runRg = func(args []string) ([]byte, string, int, error) {
+		return nil, "regex parse error: unclosed group", 2, errors.New("exit status 2")
+	}
+	defer func() { runRg = orig }()
+
+	_, err := GrepTranscripts("(", []string{dir})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "unclosed group") {
+		t.Errorf("expected error to include rg stderr detail, got: %v", err)
 	}
 }
 
