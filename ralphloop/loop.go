@@ -120,6 +120,13 @@ type RunOptions struct {
 	// sharing this process with Run. Headless callers leave this nil and get
 	// today's behavior unchanged.
 	Gate *Gate
+	// OnScopeResolved, if set, is called synchronously with the RunScope Run
+	// resolves from TicketIDs, before the ticket loop starts — the caller's
+	// way to keep a reference for later out-of-band widening (RunScope.Add),
+	// e.g. a TUI's "add to queue" action on an already-live run. Called under
+	// no lock of Run's own, so the callback is responsible for whatever
+	// synchronization it needs against its own state.
+	OnScopeResolved func(RunScope)
 }
 
 // Run drives every unblocked ticket in the named epic to completion, up to
@@ -173,6 +180,9 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	scope, err := ResolveRunScope(*initial, opts.TicketIDs)
 	if err != nil {
 		return err
+	}
+	if opts.OnScopeResolved != nil {
+		opts.OnScopeResolved(scope)
 	}
 	total := scope.TotalCount(*initial)
 	if scope.AllSettled(*initial) {

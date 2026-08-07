@@ -37,6 +37,10 @@ type epicRun struct {
 	done, total int
 	sink        *ralphloop.ChannelEventSink
 	gate        *ralphloop.Gate
+	// scope is written once, by RunOptions.OnScopeResolved shortly after the
+	// run starts (see cmdStartImplement) — until then it's the zero RunScope,
+	// on which Add is a documented no-op.
+	scope       ralphloop.RunScope
 	state       RunState
 	finalError  string
 	tickets     map[string]RunTicketSnapshot
@@ -342,6 +346,28 @@ func (r *loopRegistry) gateFor(epicName string) *ralphloop.Gate {
 	return nil
 }
 
+// setScope records epicName's resolved RunScope, called back from
+// RunOptions.OnScopeResolved once Run has loaded the epic and resolved it.
+func (r *loopRegistry) setScope(epicName string, scope ralphloop.RunScope) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if run := r.runs[epicName]; run != nil {
+		run.scope = scope
+	}
+}
+
+// scopeFor returns epicName's live RunScope, for "add to queue" (ticket 10)
+// to widen via RunScope.Add. ok is false once the epic is no longer running.
+func (r *loopRegistry) scopeFor(epicName string) (ralphloop.RunScope, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	run := r.runs[epicName]
+	if run == nil {
+		return ralphloop.RunScope{}, false
+	}
+	return run.scope, true
+}
+
 func (r *loopRegistry) pause() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -547,28 +573,79 @@ func newImplementAgentMenu() components.MenuState {
 	}
 }
 
-// handleImplementKey applies the checked selection to the queue. With no
-// ralph-loop active (ticket 11), it replaces the not-yet-started queue
-// entries with the checked selection directly and switches to the Queue tab
-// — no confirmation, since nothing running/done is at risk. With a loop
-// active, ticket 12 gates this behind a confirmation instead.
+// handleImplementKey applies ticket 10's "r" ("Replace queue") action: with
+// no ralph-loop live anywhere in this process, it replaces the not-yet-started
+// queue entries with the checked selection directly and switches to the
+// Queue tab — no confirmation, since nothing running/done is at risk. Once
+// any epic has a live run, replacing the queue risks stomping in-flight
+// work, so "r" is entirely disabled instead — process-wide, regardless of
+// which epic the checked tickets belong to — and the pending selection is
+// left untouched.
 func (m Model) handleImplementKey() (tea.Model, tea.Cmd) {
+	if IsLoopRunning() {
+		return m, notify.Info("Can't replace a live queue")
+	}
 	if len(m.checked) == 0 {
 		return m, notify.Info("check at least one ticket to build an execution plan")
 	}
 	worktreeRoot := m.worktreeRoot
-	if !IsLoopRunning() {
-		if err := m.replaceQueuedSelection(); err != nil {
-			return m, notify.Error("save queue: " + err.Error())
-		}
-		return m, cmdOpenQueueTab(worktreeRoot)
+	if err := m.replaceQueuedSelection(); err != nil {
+		return m, notify.Error("save queue: " + err.Error())
 	}
-	count := len(m.checked)
+	return m, cmdOpenQueueTab(worktreeRoot)
+}
+
+// handleAddToQueueKey applies ticket 10's "a" ("Add to queue") action: the
+// epic under the cursor must already have a live run, and the checked
+// tickets belonging to it are added to that run's scope after confirmation —
+// widening a frozen scope via ralphloop.RunScope.Add (ticket 09) so each
+// becomes claimable on the run's next iteration. Unlike "r", "a" always
+// confirms first, naming the count about to be added.
+func (m Model) handleAddToQueueKey() (tea.Model, tea.Cmd) {
+	r, ok := m.selectedRow()
+	if !ok {
+		return m, nil
+	}
+	epic := m.epics[r.epicIdx]
+	if !ralphLoopRegistry.isRunningEpic(epic.Name) {
+		return m, notify.Info(fmt.Sprintf("epic %q isn't running", epic.Name))
+	}
+	ticketIDs := checkedTicketIDsForEpic(epic, m.checked)
+	if len(ticketIDs) == 0 {
+		return m, notify.Info("check at least one ticket in the epic to add")
+	}
 	m.confirm = m.confirm.Open(confirm.Options{
-		Prompt:    fmt.Sprintf("Open the execution plan for %d checked ticket(s)?", count),
-		AcceptCmd: cmdOpenQueueTab(worktreeRoot),
+		Prompt:    fmt.Sprintf("Add %d ticket(s) to the live queue?", len(ticketIDs)),
+		AcceptCmd: cmdAddToLiveQueue(epic.Name, ticketIDs),
 	})
 	return m, nil
+}
+
+// checkedTicketIDsForEpic collects DisplayNumber identifiers (the form
+// ralphloop.RunScope.Add expects) for epic's checked, not-yet-done tickets —
+// a done ticket has nothing left to add to a live run's scope.
+func checkedTicketIDsForEpic(epic tickets.Epic, checked map[string]bool) []string {
+	var ids []string
+	for _, t := range epic.Tickets {
+		if !checked[t.Path] || epic.RenderedStatus(t) == tickets.StatusDone {
+			continue
+		}
+		ids = append(ids, t.DisplayNumber())
+	}
+	return ids
+}
+
+// cmdAddToLiveQueue widens epicName's live RunScope to include ticketIDs
+// once the "a" confirmation modal is accepted.
+func cmdAddToLiveQueue(epicName string, ticketIDs []string) tea.Cmd {
+	return func() tea.Msg {
+		scope, ok := ralphLoopRegistry.scopeFor(epicName)
+		if !ok {
+			return notify.Error(fmt.Sprintf("epic %q is no longer running", epicName))()
+		}
+		scope.Add(ticketIDs...)
+		return notify.Info(fmt.Sprintf("added %d ticket(s) to epic %q", len(ticketIDs), epicName))()
+	}
 }
 
 // replaceQueuedSelection applies ticket 11's "i" replace logic: every pending
@@ -828,6 +905,9 @@ func cmdStartImplement(
 			return implementFailedMsg{err: err}
 		}
 		opts.Gate = ralphLoopRegistry.gateFor(epicName)
+		opts.OnScopeResolved = func(scope ralphloop.RunScope) {
+			ralphLoopRegistry.setScope(epicName, scope)
+		}
 		var runSink ralphloop.EventSink = sink
 		if notifications.Telegram.BotToken != "" {
 			runSink = ralphloop.NewTelegramEventSink(runSink, notifications.Telegram.BotToken, notifications.Telegram.ChatID)

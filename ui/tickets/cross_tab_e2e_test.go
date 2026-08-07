@@ -99,7 +99,8 @@ func TestCrossTabSwitchingDuringTwoLiveRunsStaysConsistent(t *testing.T) {
 
 // TestCrossTabCheckThenQueueResetsTicketsCheckboxWhileQueueTabKeepsEntries
 // covers ticket 15's end-to-end flow: checking tickets in the Tickets tab,
-// then pressing "i" to queue them, must reset the Tickets tab's checkboxes
+// then pressing "r" ("Replace queue", renamed from "i" by ticket 10) to
+// queue them, must reset the Tickets tab's checkboxes
 // (the independent checked set) while the same tickets remain visible and
 // pending in the Queue tab — the two tabs share one QueueStore, so this
 // pins that the clear-on-queue write is actually observable cross-tab, not

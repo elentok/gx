@@ -28,7 +28,7 @@ func TestTicketsTUI_ImplementKeyNoopsWithNothingChecked(t *testing.T) {
 
 	waitForTicketsText(t, tm, "my-epic")
 
-	tm.Send(tea.KeyPressMsg{Code: 'i', Text: "i"})
+	tm.Send(tea.KeyPressMsg{Code: 'r', Text: "r"})
 
 	frame := tm.CurrentFrame()
 	if bytes.Contains(frame, []byte("Choose the agent")) || bytes.Contains(frame, []byte("Open the execution plan")) {
@@ -37,10 +37,10 @@ func TestTicketsTUI_ImplementKeyNoopsWithNothingChecked(t *testing.T) {
 }
 
 // TestTicketsTUI_ImplementKeyOpensQueueDirectlyWithNoActiveLoop covers ticket
-// 11: with no ralph-loop running, "i" no longer shows the "Open the execution
-// plan" confirmation this replaced — the tab-switch command it now returns
-// instead is verified separately at the Model level (implement_test.go),
-// since this isolated harness has no app shell to route it.
+// 10: with no ralph-loop running, "r" ("Replace queue", renamed from "i")
+// shows no confirmation — the tab-switch command it now returns instead is
+// verified separately at the Model level (implement_test.go), since this
+// isolated harness has no app shell to route it.
 func TestTicketsTUI_ImplementKeyOpensQueueDirectlyWithNoActiveLoop(t *testing.T) {
 	root := testutil.TempRepo(t)
 	if err := os.MkdirAll(filepath.Join(root, ".scratch", "my-epic", "issues"), 0755); err != nil {
@@ -59,7 +59,7 @@ func TestTicketsTUI_ImplementKeyOpensQueueDirectlyWithNoActiveLoop(t *testing.T)
 	tm.Send(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	tm.Send(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
 
-	tm.Send(tea.KeyPressMsg{Code: 'i', Text: "i"})
+	tm.Send(tea.KeyPressMsg{Code: 'r', Text: "r"})
 
 	frame := tm.CurrentFrame()
 	if bytes.Contains(frame, []byte("Open the execution plan")) {

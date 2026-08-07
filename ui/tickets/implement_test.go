@@ -2,16 +2,20 @@ package tickets
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/ui/notify"
 )
 
 // TestModel_ImplementKeyWithNoActiveLoopReplacesPendingSelection covers
-// ticket 11: with no ralph-loop running, "i" replaces the queue's
-// not-yet-started (pending) entries with the current checked selection,
-// directly and without a confirmation — while running/done entries are left
-// exactly as they are, whether or not they're still part of the selection.
+// ticket 11: with no ralph-loop running, "r" ("Replace queue", renamed from
+// "i" by ticket 10) replaces the queue's not-yet-started (pending) entries
+// with the current checked selection, directly and without a confirmation —
+// while running/done entries are left exactly as they are, whether or not
+// they're still part of the selection.
 func TestModel_ImplementKeyWithNoActiveLoopReplacesPendingSelection(t *testing.T) {
 	worktreeRoot := t.TempDir()
 	scratch := func(name string) string {
@@ -123,5 +127,201 @@ func TestModel_ImplementKeyExcludesAlreadyDoneTickets(t *testing.T) {
 	}
 	if len(m.checked) != 0 {
 		t.Fatalf("checked set = %v, want empty after queueing", m.checked)
+	}
+}
+
+// TestModel_ImplementKeyDisabledWithLiveQueueAnywhere covers ticket 10: "r"
+// is entirely disabled whenever any epic has a run in flight, process-wide —
+// even one unrelated to the checked selection's epic — showing "Can't
+// replace a live queue" instead of touching the pending selection.
+func TestModel_ImplementKeyDisabledWithLiveQueueAnywhere(t *testing.T) {
+	worktreeRoot := t.TempDir()
+	scratch := func(name string) string {
+		return filepath.Join(worktreeRoot, ".scratch", "alpha", "issues", name)
+	}
+	stalePending := scratch("03-stale.md")
+	newSelection := scratch("04-new.md")
+
+	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
+	if err := store.Check(stalePending); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetStatus(stalePending, queueStatusPending); err != nil {
+		t.Fatal(err)
+	}
+
+	r := newLoopRegistry(2)
+	r.tryStart("unrelated-epic", 0, 1)
+	previous := ralphLoopRegistry
+	ralphLoopRegistry = r
+	t.Cleanup(func() {
+		r.finish("unrelated-epic", nil)
+		ralphLoopRegistry = previous
+	})
+
+	m := Model{
+		worktreeRoot: worktreeRoot,
+		queueStore:   store,
+		checked:      map[string]bool{newSelection: true},
+		checkOrder:   map[string]uint64{newSelection: 1},
+	}
+
+	updated, cmd := m.handleImplementKey()
+	m = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected a notify command, got nil")
+	}
+	msg := cmd()
+	notifyMsg, ok := msg.(notify.NotifyMsg)
+	if !ok || notifyMsg.Message != "Can't replace a live queue" {
+		t.Fatalf("cmd() = %#v, want the disabled notification", msg)
+	}
+	if m.confirm.IsOpen {
+		t.Fatal("expected no confirmation while disabled")
+	}
+	if got := store.Snapshot().Status[stalePending]; got != queueStatusPending {
+		t.Fatalf("pending entry status = %v, want untouched pending", got)
+	}
+	if len(m.checked) != 1 || !m.checked[newSelection] {
+		t.Fatalf("checked set = %v, want untouched", m.checked)
+	}
+}
+
+// TestModel_AddToQueueKeyNotRunningEpic covers ticket 10: "a" against an
+// epic under the cursor that has no live run is a no-op with an info
+// notification, and never opens the confirmation modal.
+func TestModel_AddToQueueKeyNotRunningEpic(t *testing.T) {
+	epic := tickets.Epic{Name: "alpha", Tickets: []tickets.Ticket{
+		{Number: 1, Identifier: "01", Path: "/alpha/01.md", Status: "open"},
+	}}
+	m := Model{epics: []tickets.Epic{epic}, checked: map[string]bool{"/alpha/01.md": true}}
+
+	updated, cmd := m.handleAddToQueueKey()
+	m = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected a notify command, got nil")
+	}
+	msg := cmd()
+	notifyMsg, ok := msg.(notify.NotifyMsg)
+	if !ok || !strings.Contains(notifyMsg.Message, "isn't running") {
+		t.Fatalf("cmd() = %#v, want an \"isn't running\" notification", msg)
+	}
+	if m.confirm.IsOpen {
+		t.Fatal("expected no confirmation for a non-running epic")
+	}
+}
+
+// TestModel_AddToQueueKeyNothingChecked covers ticket 10: "a" against a
+// running epic with nothing checked from it is a no-op with an info
+// notification, and never opens the confirmation modal.
+func TestModel_AddToQueueKeyNothingChecked(t *testing.T) {
+	epic := tickets.Epic{Name: "alpha", Tickets: []tickets.Ticket{
+		{Number: 1, Identifier: "01", Path: "/alpha/01.md", Status: "open"},
+	}}
+	r := newLoopRegistry(1)
+	r.tryStart("alpha", 0, 1)
+	previous := ralphLoopRegistry
+	ralphLoopRegistry = r
+	t.Cleanup(func() {
+		r.finish("alpha", nil)
+		ralphLoopRegistry = previous
+	})
+
+	m := Model{epics: []tickets.Epic{epic}, checked: map[string]bool{}}
+
+	updated, cmd := m.handleAddToQueueKey()
+	m = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected a notify command, got nil")
+	}
+	msg := cmd()
+	notifyMsg, ok := msg.(notify.NotifyMsg)
+	if !ok || !strings.Contains(notifyMsg.Message, "check at least one ticket") {
+		t.Fatalf("cmd() = %#v, want a \"check at least one ticket\" notification", msg)
+	}
+	if m.confirm.IsOpen {
+		t.Fatal("expected no confirmation with nothing checked")
+	}
+}
+
+// TestModel_AddToQueueKeyOpensConfirmationWithCount covers ticket 10: "a"
+// against a running epic with checked tickets opens the confirmation naming
+// the checked count, and never widens the scope before it's accepted.
+func TestModel_AddToQueueKeyOpensConfirmationWithCount(t *testing.T) {
+	epic := tickets.Epic{Name: "alpha", Tickets: []tickets.Ticket{
+		{Number: 1, Identifier: "01", Path: "/alpha/01.md", Status: "open"},
+		{Number: 2, Identifier: "02", Path: "/alpha/02.md", Status: "open"},
+	}}
+	r := newLoopRegistry(1)
+	r.tryStart("alpha", 0, 1)
+	scope, err := ralphloop.ResolveRunScope(epic, []string{"01"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.setScope("alpha", scope)
+	previous := ralphLoopRegistry
+	ralphLoopRegistry = r
+	t.Cleanup(func() {
+		r.finish("alpha", nil)
+		ralphLoopRegistry = previous
+	})
+
+	m := Model{epics: []tickets.Epic{epic}, checked: map[string]bool{"/alpha/02.md": true}}
+
+	updated, cmd := m.handleAddToQueueKey()
+	m = updated.(Model)
+	if cmd != nil {
+		t.Fatal("expected no cmd until the confirmation is accepted")
+	}
+	if !m.confirm.IsOpen {
+		t.Fatal("expected the confirmation modal to open")
+	}
+	if !strings.Contains(m.confirm.View(80), "Add 1 ticket(s) to the live queue?") {
+		t.Fatalf("confirm view = %q, want it to name the checked count", m.confirm.View(80))
+	}
+	if scope.Contains(epic.Tickets[1], epic) {
+		t.Fatal("expected the scope untouched before the confirmation is accepted")
+	}
+}
+
+// TestCmdAddToLiveQueueWidensRunningScope covers ticket 10's core mechanism:
+// accepting "a"'s confirmation widens the targeted epic's live RunScope via
+// ralphloop.RunScope.Add (ticket 09), making the added ticket claimable.
+func TestCmdAddToLiveQueueWidensRunningScope(t *testing.T) {
+	epic := tickets.Epic{Name: "alpha", Tickets: []tickets.Ticket{
+		{Number: 1, Identifier: "01", Status: "open"},
+		{Number: 2, Identifier: "02", Status: "open"},
+	}}
+	r := newLoopRegistry(1)
+	r.tryStart("alpha", 0, 1)
+	scope, err := ralphloop.ResolveRunScope(epic, []string{"01"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.setScope("alpha", scope)
+	previous := ralphLoopRegistry
+	ralphLoopRegistry = r
+	t.Cleanup(func() {
+		r.finish("alpha", nil)
+		ralphLoopRegistry = previous
+	})
+
+	ticket02 := epic.Tickets[1]
+	if scope.Contains(ticket02, epic) {
+		t.Fatal("precondition: ticket 02 should not yet be in scope")
+	}
+
+	msg := cmdAddToLiveQueue("alpha", []string{"02"})()
+	notifyMsg, ok := msg.(notify.NotifyMsg)
+	if !ok || notifyMsg.Kind != notify.KindInfo {
+		t.Fatalf("cmdAddToLiveQueue msg = %#v, want an info notification", msg)
+	}
+
+	widened, ok := r.scopeFor("alpha")
+	if !ok {
+		t.Fatal("expected alpha still running")
+	}
+	if !widened.Contains(ticket02, epic) {
+		t.Fatal("expected ticket 02 to be in the widened scope after accepting")
 	}
 }

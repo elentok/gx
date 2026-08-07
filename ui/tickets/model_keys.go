@@ -27,6 +27,7 @@ const (
 	bindingTicketsEditTab        keys.BindingID = "edit-tab"
 	bindingTicketsCancelChord    keys.BindingID = "cancel-chord"
 	bindingTicketsImplement      keys.BindingID = "implement"
+	bindingTicketsAddToQueue     keys.BindingID = "add-to-queue"
 	bindingTicketsToggleCheck    keys.BindingID = "toggle-check"
 	bindingTicketsToggleHideDone keys.BindingID = "toggle-hide-done"
 	bindingTicketsSelectFirst    keys.BindingID = "select-first"
@@ -64,7 +65,8 @@ func newTicketsManager() keys.Manager {
 		{ID: bindingTicketsEditVSplit, Seq: []string{"e", "v"}, Categories: []string{"Navigation"}, Title: "edit file (vsplit)"},
 		{ID: bindingTicketsEditTab, Seq: []string{"e", "t"}, Categories: []string{"Navigation"}, Title: "edit file (tab)"},
 		{ID: bindingTicketsCancelChord, Seq: []string{"e", "esc"}, Categories: []string{}, Title: ""},
-		{ID: bindingTicketsImplement, Seq: []string{"i"}, Categories: []string{"Navigation"}, Title: "implement epic"},
+		{ID: bindingTicketsImplement, Seq: []string{"r"}, Categories: []string{"Navigation"}, Title: "replace queue"},
+		{ID: bindingTicketsAddToQueue, Seq: []string{"a"}, Categories: []string{"Navigation"}, Title: "add to queue"},
 		{ID: bindingTicketsToggleCheck, Seq: []string{"space"}, Categories: []string{"Navigation"}, Title: "check/uncheck"},
 		{ID: bindingTicketsToggleHideDone, Seq: []string{"t", "c"}, Categories: []string{"Navigation"}, Title: "hide completed"},
 		{ID: bindingTicketsSelectFirst, Seq: []string{"g", "g"}, Categories: []string{"Navigation"}, Title: "first row"},
@@ -139,6 +141,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case bindingTicketsImplement:
 		return m.handleImplementKey()
+	case bindingTicketsAddToQueue:
+		return m.handleAddToQueueKey()
 	case bindingTicketsToggleCheck:
 		return m.handleToggleCheck()
 	case bindingTicketsToggleHideDone:
