@@ -304,6 +304,25 @@ func confirmCompactSubmittedWithRetry(d Deps, pane string) error {
 // mistaken for a state that predates it. This is herdr behavior, not
 // something gx enforces — an AgentPrompt call added here without Wait: true
 // would reintroduce the race this comment is warning about.
+// compactSignalUnconfirmed reports whether the immediate "/compact"
+// AgentPrompt result (err) needs a fallthrough to waitForCompactionSignal
+// rather than being trusted as-is: either the prompt's own wait timed out, or
+// it returned success but the transcript's compaction-boundary count hasn't
+// advanced past baselineCompactions yet — a premature idle/done report, not
+// proof the compact actually finished. A re-fetch error is treated the same
+// as "no baseline to check against" (trust the immediate success), matching
+// the pre-extraction behavior this replaces.
+func compactSignalUnconfirmed(d Deps, p launchAndPromptParams, sessionID string, err error, baselineCompactions int, haveBaseline bool) bool {
+	if err != nil {
+		return isPollTimeout(err)
+	}
+	if !haveBaseline {
+		return false
+	}
+	count, ok, readErr := sessionCompactions(d, p.Agent, p.SessionCwd, sessionID)
+	return readErr == nil && ok && count <= baselineCompactions
+}
+
 func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason string, smartZone int) (bool, error) {
 	p.sink().SmartZoneCompactStarted(p.Ticket)
 	p.logAgentEvent(eventPausedSmartZone, sessionID, reason)
@@ -319,16 +338,8 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 		TimeoutMs: smartZonePollMs,
 	})
 	expired := false
-	if err != nil && isPollTimeout(err) {
+	if compactSignalUnconfirmed(d, p, sessionID, err, baselineCompactions, haveBaseline) {
 		agent, expired, err = waitForCompactionSignal(d, p, sessionID, compactStates, smartZonePollMs, baselineCompactions, haveBaseline)
-	} else if err == nil && haveBaseline {
-		count, ok, readErr := sessionCompactions(d, p.Agent, p.SessionCwd, sessionID)
-		if readErr == nil && ok && count <= baselineCompactions {
-			// herdr reported the pane back at idle/done, but the transcript
-			// shows no new compaction boundary yet: that's a premature
-			// idle/done report, not proof the compact actually finished.
-			agent, expired, err = waitForCompactionSignal(d, p, sessionID, compactStates, smartZonePollMs, baselineCompactions, haveBaseline)
-		}
 	}
 	if err == nil && agent.AgentStatus == "blocked" {
 		_, err = d.AgentWait(herdr.AgentWaitOptions{

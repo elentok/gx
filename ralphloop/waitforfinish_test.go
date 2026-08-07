@@ -594,6 +594,70 @@ func TestRecoverSmartZoneBreach_ImmediateSuccessTrustedWhenAlreadyAdvanced(t *te
 	}
 }
 
+func TestCompactSignalUnconfirmed(t *testing.T) {
+	p := launchAndPromptParams{Agent: AgentClaude, SessionCwd: "/repo/iter-19"}
+
+	t.Run("poll timeout is unconfirmed", func(t *testing.T) {
+		d := Deps{}
+		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", errors.New("timed out waiting for agent status"), 0, true)
+		if !unconfirmed {
+			t.Error("unconfirmed = false, want true: a poll timeout must always fall through")
+		}
+	})
+
+	t.Run("non-timeout error is confirmed (not re-polled here)", func(t *testing.T) {
+		d := Deps{}
+		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", errors.New("boom"), 0, true)
+		if unconfirmed {
+			t.Error("unconfirmed = true, want false: a genuine non-timeout error is handled by the caller, not waitForCompactionSignal")
+		}
+	})
+
+	t.Run("success with baseline not yet advanced is unconfirmed", func(t *testing.T) {
+		d := Deps{
+			ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
+				return 0, true, nil
+			},
+		}
+		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", nil, 0, true)
+		if !unconfirmed {
+			t.Error("unconfirmed = false, want true: transcript hasn't advanced past baseline yet")
+		}
+	})
+
+	t.Run("success with baseline already advanced is confirmed", func(t *testing.T) {
+		d := Deps{
+			ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
+				return 1, true, nil
+			},
+		}
+		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", nil, 0, true)
+		if unconfirmed {
+			t.Error("unconfirmed = true, want false: transcript already confirms compaction advanced")
+		}
+	})
+
+	t.Run("success with no baseline is confirmed", func(t *testing.T) {
+		d := Deps{}
+		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", nil, 0, false)
+		if unconfirmed {
+			t.Error("unconfirmed = true, want false: no baseline to check against, trust the immediate success")
+		}
+	})
+
+	t.Run("success with re-fetch error is confirmed (trusts immediate success)", func(t *testing.T) {
+		d := Deps{
+			ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
+				return 0, false, errors.New("read failed")
+			},
+		}
+		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", nil, 0, true)
+		if unconfirmed {
+			t.Error("unconfirmed = true, want false: a re-fetch error must not force a fallthrough")
+		}
+	})
+}
+
 func TestConfirmCompactSubmitted(t *testing.T) {
 	t.Run("trailing /compact line reports not yet submitted", func(t *testing.T) {
 		d := Deps{
