@@ -60,6 +60,8 @@ func (m Model) handleGrepKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.cmdExportAndEditGrep()
 	case "ctrl+r":
 		return m, m.cmdResumeGrepResult()
+	case "ctrl+y":
+		return m, m.cmdYankGrepSessionID()
 	case "down":
 		m.grepList.Navigate(1, len(m.grepResults), m.listHeight())
 		return m, nil
@@ -194,7 +196,7 @@ func (m Model) viewGrep() string {
 	}
 	panel := ui.RenderPanel(ui.PanelOptionsFor(m.w, m.h-2-m.grepPreviewBoxHeight(), "Grep Transcripts", "scope: "+scopeLabel, lines, true, ui.ColorOrange, ui.ColorOrange, false))
 	top := m.grepFilter.View() + "\n"
-	footer := "  " + ui.StyleHint.Render("enter: export+edit  ctrl+r: resume  ctrl+g: toggle scope  esc: back")
+	footer := "  " + ui.StyleHint.Render("enter: export+edit  ctrl+r: resume  ctrl+y: yank id  ctrl+g: toggle scope  esc: back")
 	return top + panel + "\n" + m.viewGrepPreview() + "\n" + footer
 }
 

@@ -49,6 +49,23 @@ func (m Model) cmdResumeGrepResult() tea.Cmd {
 	return m.cmdResumeSession(result.SessionID, cwd)
 }
 
+// cmdYankGrepSessionID copies the selected grep result's session id to the
+// clipboard, following ui/log/model_yank.go's clipboard-seam pattern (same as
+// ticket 11's cmdYankSessionID on the conversations page).
+func (m Model) cmdYankGrepSessionID() tea.Cmd {
+	result, ok := m.selectedGrepResult()
+	if !ok {
+		return notify.Warning("no grep result selected")
+	}
+	if result.SessionID == "" {
+		return notify.Warning("grep result has no session id to copy")
+	}
+	if err := historyClipboardWrite(result.SessionID); err != nil {
+		return notify.Error("clipboard copy failed: " + err.Error())
+	}
+	return notify.Info("copied session id: " + result.SessionID)
+}
+
 // projectCwdForFile returns the Cwd of the project containing filePath, by
 // matching filePath's parent directory against m.projects.
 func (m Model) projectCwdForFile(filePath string) (string, bool) {
