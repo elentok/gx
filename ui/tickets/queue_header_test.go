@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/keys"
 )
 
 func TestEpicStatusLineColorsByEpicState(t *testing.T) {
@@ -90,7 +91,7 @@ func TestQueueModelEpicHeaderRendersStatusAndContextLines(t *testing.T) {
 		ticketPath(root, "alpha", "01-first.md"):  true,
 		ticketPath(root, "alpha", "02-second.md"): true,
 	}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 	content := ansi.Strip(m.View().Content)
 
 	if !strings.Contains(content, "took 14m14s") {
@@ -105,7 +106,7 @@ func TestQueueModelListRowsIndentMatchesHeaderIndent(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
 	var headerLine, rowLine string
 	for _, line := range m.queueLines() {

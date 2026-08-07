@@ -33,7 +33,7 @@ func TestCrossTabSwitchingDuringTwoLiveRunsStaysConsistent(t *testing.T) {
 	updated, _ := tm.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	tm = updated.(Model)
 
-	qm := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	qm := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
 	r := newLoopRegistry(2)
 	r.tryStart("epic-a", 0, 1)
@@ -134,7 +134,7 @@ func TestCrossTabCheckThenQueueResetsTicketsCheckboxWhileQueueTabKeepsEntries(t 
 		t.Fatalf("Tickets checked set after queueing = %v, want empty", tm.checked)
 	}
 
-	qm := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, store))
+	qm := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, keys.Manager{}, store))
 	if content := qm.View().Content; !strings.Contains(content, "First") || !strings.Contains(content, "Second") {
 		t.Fatalf("Queue tab after queueing: want both tickets listed, got:\n%s", content)
 	}
@@ -166,7 +166,7 @@ func TestCrossTabLiveMetricsRenderSameFiguresFromSharedProjection(t *testing.T) 
 
 	qm := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, map[string]bool{
 		ticketPath(root, "epic-a", "01-first.md"): true,
-	}))
+	}, keys.Manager{}))
 
 	r := newLoopRegistry(1)
 	r.tryStart("epic-a", 0, 1)

@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/keys"
 )
 
 func xPress() tea.KeyPressMsg {
@@ -23,7 +24,7 @@ func TestQueueModel_XOpensConfirmModalListingFullCascade(t *testing.T) {
 		ticketPath(root, "alpha", "01-root.md"):      true,
 		ticketPath(root, "alpha", "02-dependent.md"): true,
 	}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 	m.selected = 0 // row 0 is the first ticket row (no epic header row in queue tab)
 
 	updated, _ := m.Update(xPress())
@@ -57,7 +58,7 @@ func TestQueueModel_XConfirmedDeletesCascadeAndClearsDoneSurvivor(t *testing.T) 
 		ticketPath(root, "alpha", "02-done-dependent.md"): true,
 		ticketPath(root, "alpha", "03-behind-done.md"):    true,
 	}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 	m.selected = 0
 
 	updated, _ := m.Update(xPress())

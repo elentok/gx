@@ -54,6 +54,9 @@ func (m QueueModel) View() tea.View {
 	} else if m.confirm.IsOpen {
 		content = ui.OverlayCenter(content, m.confirm.View(m.width), m.width, m.height)
 	}
+	if m.help.IsOpen {
+		content = ui.OverlayCenter(content, m.help.View(), m.width, m.height)
+	}
 	if m.search.Mode() == search.SearchModeInput {
 		overlayW := m.searchOverlayWidth()
 		activeSearch := m.search

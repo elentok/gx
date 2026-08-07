@@ -10,6 +10,7 @@ import (
 )
 
 const (
+	bindingTicketsHelp           keys.BindingID = "help"
 	bindingTicketsBack           keys.BindingID = "back"
 	bindingTicketsDown           keys.BindingID = "down"
 	bindingTicketsUp             keys.BindingID = "up"
@@ -42,6 +43,7 @@ const (
 // bindings once focused, since only one panel's keys are live at a time.
 func newTicketsManager() keys.Manager {
 	return keys.New([]keys.Binding{
+		{ID: bindingTicketsHelp, Seq: []string{"?"}, Categories: []string{"Other"}, Title: "help"},
 		{ID: bindingTicketsBack, Seq: []string{"q"}, Categories: []string{"Other"}, Title: "back"},
 		{ID: bindingTicketsDown, Seq: []string{"j"}, Categories: []string{"Navigation"}, Title: "down", Display: "↓/j"},
 		{ID: bindingTicketsDown, Seq: []string{"down"}, Categories: []string{}, Title: ""},
@@ -100,6 +102,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch match.ID {
+	case bindingTicketsHelp:
+		m.keys.Reset()
+		m.help.Open(m.width, m.height)
 	case bindingTicketsDown:
 		m.moveSelection(1)
 	case bindingTicketsUp:

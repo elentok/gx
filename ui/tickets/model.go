@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/confirm"
+	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/search"
@@ -53,6 +54,7 @@ type Model struct {
 	worktreeRoot string
 	settings     ui.Settings
 	keys         keys.Manager // this tab's own navigation/collapse bindings
+	help         help.Model
 
 	width  int
 	height int
@@ -134,21 +136,22 @@ type Model struct {
 }
 
 // NewModel creates a new tickets tab model scoped to worktreeRoot's own
-// `.scratch/`. extraKeys (the app-wide global bindings) isn't used yet —
-// it'll feed a help modal once one exists for this tab.
+// `.scratch/`. extraKeys (the app-wide global bindings) feeds the "?" help
+// modal alongside the tab's own bindings, mirroring ui/prs's NewModelWithScope.
 func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager) Model {
 	return NewModelWithStore(worktreeRoot, settings, extraKeys, LoadQueueStore())
 }
 
 func NewModelWithStore(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager, store *QueueStore) Model {
-	_ = extraKeys
 	sp := spinner.New()
 	sp.Spinner = TicketProgressSpinner
 	snapshot := store.Snapshot()
+	km := newTicketsManager()
 	return Model{
 		worktreeRoot:       worktreeRoot,
 		settings:           settings,
-		keys:               newTicketsManager(),
+		keys:               km,
+		help:               help.NewModel(help.BuildSections(km, extraKeys)),
 		search:             search.NewModel(),
 		previewFocus:       newPreviewFocus(),
 		confirm:            confirm.New(),
@@ -170,6 +173,9 @@ func (m Model) KeyManager() keys.Manager { return m.keys }
 // shell's digit-based tab-jump mnemonics (see ui/app's inputFocuser
 // duck-type) stay routed to the search query instead of switching tabs.
 func (m Model) InputFocused() bool {
+	if m.help.InputFocused() {
+		return true
+	}
 	_, ok := m.activeInputSearch()
 	return ok
 }
@@ -177,7 +183,7 @@ func (m Model) InputFocused() bool {
 // ModalOpen reports whether one of the tab's launch dialogs is open, so the app
 // shell (see ui/app's modalOpener duck-type) blocks tab-switch keys and
 // routes them here instead while it's up.
-func (m Model) ModalOpen() bool { return m.implementAgentMenuOpen || m.confirm.IsOpen }
+func (m Model) ModalOpen() bool { return m.help.IsOpen || m.implementAgentMenuOpen || m.confirm.IsOpen }
 
 func (m Model) Init() tea.Cmd {
 	return m.cmdLoad()
@@ -200,6 +206,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.ready = true
+		m.help, _ = m.help.Update(msg)
 		m.ensureSidebarVisible()
 		return m, nil
 
@@ -235,6 +242,11 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleCheckAddConfirmed(msg)
 
 	case tea.KeyPressMsg:
+		if m.help.IsOpen {
+			var cmd tea.Cmd
+			m.help, cmd = m.help.Update(msg)
+			return m, cmd
+		}
 		if m.implementAgentMenuOpen {
 			return m.handleImplementAgentMenuKey(msg)
 		}
@@ -513,6 +525,9 @@ func (m Model) View() tea.View {
 		content = ui.OverlayCenter(content, m.implementAgentMenuView(), m.width, m.height)
 	} else if m.confirm.IsOpen {
 		content = ui.OverlayCenter(content, m.confirm.View(m.width), m.width, m.height)
+	}
+	if m.help.IsOpen {
+		content = ui.OverlayCenter(content, m.help.View(), m.width, m.height)
 	}
 	if activeSearch, ok := m.activeInputSearch(); ok {
 		overlayW := m.searchOverlayWidth()

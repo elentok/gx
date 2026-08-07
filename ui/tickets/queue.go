@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/confirm"
+	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/nav"
@@ -90,6 +91,7 @@ type QueueModel struct {
 	// typed right after an unconsumed "t" falls through to its own normal
 	// action instead of being swallowed (ticket 16).
 	keys keys.Manager
+	help help.Model
 	// collapsedQueueTickets is the Queue tab's counterpart to the Tickets
 	// tab's collapsedTickets (ticket 09), keyed by Ticket.Path, true for a
 	// ticket whose children (Parent/Children, ticket 03) are hidden in
@@ -106,7 +108,7 @@ type QueueModel struct {
 	previewFocus
 }
 
-func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string]bool, orders ...map[string]uint64) QueueModel {
+func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string]bool, extraKeys keys.Manager, orders ...map[string]uint64) QueueModel {
 	if checked == nil {
 		checked = map[string]bool{}
 	}
@@ -116,6 +118,7 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 	}
 	sp := spinner.New()
 	sp.Spinner = TicketProgressSpinner
+	km := newQueueKeysManager()
 	return QueueModel{
 		executionTickets:   map[string]bool{},
 		runTicketIDs:       map[string][]string{},
@@ -132,14 +135,15 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 		paused:             ralphLoopRegistry.isPaused(),
 		confirm:            confirm.New(),
 		search:             search.NewModel(),
-		keys:               newQueueKeysManager(),
+		keys:               km,
+		help:               help.NewModel(help.BuildSections(km, extraKeys)),
 		previewFocus:       newPreviewFocus(),
 	}
 }
 
-func NewQueueModelWithStore(worktreeRoot string, settings ui.Settings, store *QueueStore) QueueModel {
+func NewQueueModelWithStore(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager, store *QueueStore) QueueModel {
 	snapshot := store.Snapshot()
-	m := NewQueueModel(worktreeRoot, settings, snapshot.Checked, snapshot.Order)
+	m := NewQueueModel(worktreeRoot, settings, snapshot.Checked, extraKeys, snapshot.Order)
 	m.queueStore = store
 	m.queueStatus = snapshot.Status
 	return m
@@ -185,6 +189,7 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.ready = true
+		m.help, _ = m.help.Update(msg)
 		m.ensureQueueVisible()
 		return m, nil
 	case queueEpicsLoadedMsg:
@@ -252,6 +257,11 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case editFileFinishedMsg:
 		return m.handleEditFileFinished(msg)
 	case tea.KeyPressMsg:
+		if m.help.IsOpen {
+			var cmd tea.Cmd
+			m.help, cmd = m.help.Update(msg)
+			return m, cmd
+		}
 		if m.confirm.IsOpen {
 			return m.handleQueueConfirmUpdate(msg)
 		}
@@ -507,8 +517,14 @@ const bindingQueueToggleHideDone keys.BindingID = "toggle-hide-done"
 // above.
 const bindingQueueSelectFirst keys.BindingID = "select-first"
 
+// bindingQueueHelp is the Queue tab's "?" chord, opening a help modal built
+// from this tab's own bindings plus the app-wide extraKeys — mirroring the
+// Tickets tab's bindingTicketsHelp.
+const bindingQueueHelp keys.BindingID = "help"
+
 func newQueueKeysManager() keys.Manager {
 	return keys.New([]keys.Binding{
+		{ID: bindingQueueHelp, Seq: []string{"?"}, Categories: []string{"Other"}, Title: "help"},
 		{ID: bindingQueueToggleHideDone, Seq: []string{"t", "c"}, Categories: []string{"Navigation"}, Title: "hide completed"},
 		{ID: bindingQueueEditInPlace, Seq: []string{"e", "e"}, Categories: []string{"Navigation"}, Title: "edit file"},
 		{ID: bindingQueueEditHSplit, Seq: []string{"e", "s"}, Categories: []string{"Navigation"}, Title: "edit file (split)"},
@@ -529,6 +545,9 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil // chord in progress
 		}
 		switch match.ID {
+		case bindingQueueHelp:
+			m.keys.Reset()
+			m.help.Open(m.width, m.height)
 		case bindingQueueToggleHideDone:
 			m.hideComplete = !m.hideComplete
 			m.clampSelected()

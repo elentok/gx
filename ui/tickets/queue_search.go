@@ -10,7 +10,14 @@ import (
 // shell's digit-based tab-jump mnemonics (see ui/app's inputFocuser
 // duck-type) stay routed to the search query instead of switching tabs.
 func (m QueueModel) InputFocused() bool {
-	return m.search.Mode() == search.SearchModeInput
+	return m.help.InputFocused() || m.search.Mode() == search.SearchModeInput
+}
+
+// ModalOpen reports whether one of the tab's dialogs is open, so the app
+// shell (see ui/app's modalOpener duck-type) blocks tab-switch keys and
+// routes them here instead while it's up.
+func (m QueueModel) ModalOpen() bool {
+	return m.help.IsOpen || m.implementAgentMenuOpen || m.confirm.IsOpen
 }
 
 // recomputeQueueSearchMatches rebuilds the match set against the current

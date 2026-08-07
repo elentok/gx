@@ -231,7 +231,7 @@ func (m Model) newHistoryEntry(viewState nav.ViewState) historyEntry {
 	case nav.TabQueue:
 		return historyEntry{
 			viewState: viewState,
-			model:     ticketsui.NewQueueModelWithStore(viewState.WorktreeRoot, s, m.queueStore),
+			model:     ticketsui.NewQueueModelWithStore(viewState.WorktreeRoot, s, keys.New(Bindings()), m.queueStore),
 		}
 	case nav.TabWorktrees:
 		fallthrough

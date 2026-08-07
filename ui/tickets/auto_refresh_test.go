@@ -58,7 +58,7 @@ func TestQueueModel_AutoRefreshesDataFromDiskWithoutManualReload(t *testing.T) {
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
 
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
 	// A ticket's status changes on disk (e.g. ralph-loop claims it) with no
 	// manual reload action from this tab.
@@ -89,7 +89,7 @@ func TestQueueModel_SplitInsertsChildrenAfterOriginalPosition(t *testing.T) {
 		}
 	}
 
-	m := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, store))
+	m := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, keys.Manager{}, store))
 
 	order := identifiersInOrder(t, m)
 	if got := strings.Join(order, ","); got != "01,02,03" {

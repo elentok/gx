@@ -38,7 +38,7 @@ func TestQueueModelRendersFlatDependencyOrderedEpicPlan(t *testing.T) {
 		ticketPath(root, "alpha", "04-independent.md"): true,
 		ticketPath(root, "beta", "01-other.md"):        true,
 	}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 	content := m.View().Content
 
 	if strings.Contains(content, "parallel") || strings.Contains(content, "then") {
@@ -77,7 +77,7 @@ func TestQueueModelOrdersRowsByDependencyNotTicketNumber(t *testing.T) {
 		ticketPath(root, "alpha", "60-unrelated.md"): true,
 		ticketPath(root, "alpha", "10-unrelated.md"): true,
 	}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 	rows := m.rows()
 	if len(rows) != 4 {
 		t.Fatalf("expected 4 rows, got %d: %+v", len(rows), rows)
@@ -118,7 +118,7 @@ func TestQueueModelNestsChildrenUnderParentAndCollapsesWithHL(t *testing.T) {
 		ticketPath(root, "alpha", "02-child.md"):  true,
 		ticketPath(root, "alpha", "03-other.md"):  true,
 	}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
 	rows := m.rows()
 	if len(rows) != 3 {
@@ -166,7 +166,7 @@ func TestQueueModelLOnLeafRowFocusesPreview(t *testing.T) {
 	writeTicket(t, root, "alpha", "01-solo.md", "Status: open\n\nBody.\n")
 
 	checked := map[string]bool{ticketPath(root, "alpha", "01-solo.md"): true}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(QueueModel)
 
@@ -197,7 +197,7 @@ func TestQueueModelEnterOnExpandedParentFocusesPreview(t *testing.T) {
 		ticketPath(root, "alpha", "01-parent.md"): true,
 		ticketPath(root, "alpha", "02-child.md"):  true,
 	}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(QueueModel)
 	m.runningEpics = map[string]bool{"already-running": true}
@@ -227,7 +227,7 @@ func TestQueueModelHLeftEscReturnFocusFromPreview(t *testing.T) {
 		{Code: tea.KeyLeft},
 		{Code: tea.KeyEsc},
 	} {
-		m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+		m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 		updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 		m = updated.(QueueModel)
 
@@ -256,7 +256,7 @@ func TestQueueModelEnterStillLaunchesCheckedQueueWhenActionable(t *testing.T) {
 	writeTicket(t, root, "alpha", "01-solo.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-solo.md"): true}
 
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(QueueModel)
 
@@ -281,7 +281,7 @@ func TestQueueModelNeverShowsATicketRunnableWhenOutOfScopeBlockerIsUnmet(t *test
 	checked := map[string]bool{
 		ticketPath(root, "alpha", "02-dependent.md"): true,
 	}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 	content := m.View().Content
 
 	if strings.Contains(content, "parallel") || strings.Contains(content, "then") {
@@ -304,7 +304,7 @@ func TestQueueModelSurfacesActionableErrorForDependencyCycle(t *testing.T) {
 		ticketPath(root, "alpha", "01-first.md"):  true,
 		ticketPath(root, "alpha", "02-second.md"): true,
 	}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 	content := m.View().Content
 
 	if !strings.Contains(content, "no unblocked tickets") {
@@ -326,7 +326,7 @@ func TestQueueModelBannerWhileRunningAggregatesCheckedEpics(t *testing.T) {
 		ticketPath(root, "alpha", "02-running.md"): true,
 		ticketPath(root, "beta", "01-running.md"):  true,
 	}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 	now := time.Date(2026, time.August, 3, 12, 0, 0, 0, time.UTC)
 	m.executionStartedAt = now.Add(-time.Hour - 3*time.Minute)
 	m.now = func() time.Time { return now }
@@ -351,7 +351,7 @@ func TestQueueModelBannerWhenCompletedAggregatesLandedTicketMetrics(t *testing.T
 		ticketPath(root, "alpha", "02-second.md"): true,
 		ticketPath(root, "beta", "01-third.md"):   true,
 	}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 	now := time.Date(2026, time.August, 3, 12, 0, 0, 0, time.UTC)
 	m.executionStartedAt = now.Add(-time.Hour - 3*time.Minute)
 	m.now = func() time.Time { return now }
@@ -382,7 +382,7 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
-	base := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	base := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 	base.executionTickets = map[string]bool{"alpha/01": true}
 
 	t.Run("not started", func(t *testing.T) {
@@ -445,7 +445,7 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 		writeTicket(t, completedRoot, "alpha", "01-first.md", "Status: claimed\n\nBody.\n")
 		writeRawQueueTicket(t, completedRoot, "alpha", "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: task\nactual_context_window: 12000\n---\n\nBody.\n")
 		checked := map[string]bool{ticketPath(completedRoot, "alpha", "01-first.md"): true}
-		m := loadQueueModel(t, NewQueueModel(completedRoot, ui.Settings{}, checked))
+		m := loadQueueModel(t, NewQueueModel(completedRoot, ui.Settings{}, checked, keys.Manager{}))
 		completedAt := time.Date(2026, time.August, 3, 12, 0, 0, 0, time.UTC)
 		m.executionStartedAt = completedAt.Add(-time.Hour - 3*time.Minute)
 		m.executionCompletedAt = completedAt
@@ -469,7 +469,7 @@ func TestQueueModelRowsRenderWithNoCheckbox(t *testing.T) {
 	name := "01-first.md"
 	writeTicket(t, root, "alpha", name, "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", name): true}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
 	content := m.View().Content
 	icons := ui.Icons(false)
@@ -488,7 +488,7 @@ func TestQueueModelClearAllRequiresConfirmation(t *testing.T) {
 	alpha := ticketPath(root, "alpha", "01-first.md")
 	beta := ticketPath(root, "beta", "01-first.md")
 	checked := map[string]bool{alpha: true, beta: true}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'C', Text: "C"})
 	m = updated.(QueueModel)
@@ -521,7 +521,7 @@ func TestQueueModelClearCompleteRequiresConfirmation(t *testing.T) {
 	alphaDone := ticketPath(root, "alpha", "02-done.md")
 	betaDone := ticketPath(root, "beta", "01-done.md")
 	checked := map[string]bool{open: true, alphaDone: true, betaDone: true}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
 	m = updated.(QueueModel)
@@ -560,7 +560,7 @@ func TestQueueModelHideCompleteToggleHidesDoneTicketsButKeepsPlanValidation(t *t
 	first := ticketPath(root, "alpha", "01-first.md")
 	second := ticketPath(root, "alpha", "02-second.md")
 	checked := map[string]bool{first: true, second: true}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
 	if content := m.View().Content; !strings.Contains(content, "First") {
 		t.Fatalf("expected done ticket visible by default:\n%s", content)
@@ -610,7 +610,7 @@ func TestQueueModelTChordDoesNotCollideWithClearKeymaps(t *testing.T) {
 	done := ticketPath(root, "alpha", "01-done.md")
 	open := ticketPath(root, "alpha", "02-open.md")
 	checked := map[string]bool{done: true, open: true}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
 	if m.selected != 0 {
 		t.Fatalf("expected initial selection at row 0, got %d", m.selected)
@@ -656,7 +656,7 @@ func TestQueueModelIncludesSelectionsAddedAfterLoad(t *testing.T) {
 	writeTicket(t, root, "alpha", name, "Status: open\n\nBody.\n")
 	path := ticketPath(root, "alpha", name)
 	checked := map[string]bool{}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
 	checked[path] = true
 	if content := m.View().Content; !strings.Contains(content, "Later") {
@@ -702,7 +702,7 @@ func TestQueueModelEnterChoosesAgentAndStartsOneEpicSubset(t *testing.T) {
 		ralphLoopRegistry = previousRegistry
 	})
 
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(QueueModel)
 	content := m.View().Content
@@ -787,7 +787,7 @@ func TestQueueModelSchedulesCheckedEpicsInCheckOrderAndBackfillsAtCap(t *testing
 		ralphLoopRegistry = previousRegistry
 	})
 
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, checkOrder))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}, checkOrder))
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(QueueModel)
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
@@ -843,7 +843,7 @@ func TestQueueModelReactivationRecoversTwoConcurrentEpicsFromRegistry(t *testing
 		ticketPath(root, "alpha", "01-first.md"): true,
 		ticketPath(root, "beta", "01-first.md"):  true,
 	}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
 	r := newLoopRegistry(2)
 	r.tryStart("alpha", 0, 1)
@@ -913,7 +913,7 @@ func TestQueueModelReactivationBackfillsPendingEpicAfterMissedCompletion(t *test
 		ralphLoopRegistry = previousRegistry
 	})
 
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, checkOrder))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}, checkOrder))
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(QueueModel)
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
@@ -1022,7 +1022,7 @@ func TestQueueModelPersistsRunningThenDoneStatusThroughStore(t *testing.T) {
 		ralphLoopRegistry = previousRegistry
 	})
 
-	m := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, store))
+	m := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, keys.Manager{}, store))
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(QueueModel)
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
@@ -1080,7 +1080,7 @@ func TestQueueModelPersistsErroredStatusOnFailure(t *testing.T) {
 		ralphLoopRegistry = previousRegistry
 	})
 
-	m := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, store))
+	m := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, keys.Manager{}, store))
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(QueueModel)
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
@@ -1134,7 +1134,7 @@ func TestQueueModelPauseDoesNotRewriteRunningStatus(t *testing.T) {
 		ralphLoopRegistry = previousRegistry
 	})
 
-	m := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, store))
+	m := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, keys.Manager{}, store))
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(QueueModel)
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
@@ -1188,7 +1188,7 @@ func TestQueueModelMidRunSelectionChangeDoesNotRewriteProgressTotals(t *testing.
 		ralphLoopRegistry = previousRegistry
 	})
 
-	m := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, store))
+	m := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, keys.Manager{}, store))
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(QueueModel)
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
@@ -1243,7 +1243,7 @@ func TestQueueModelRestoresAllStatusesAsInitialTab(t *testing.T) {
 		}
 	}
 
-	m := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, store))
+	m := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, keys.Manager{}, store))
 
 	for path, want := range map[string]queueItemStatus{
 		pending: queueStatusPending,
@@ -1284,7 +1284,7 @@ func TestTicketsAndQueueMatchAfterRestartRegardlessOfNavigationOrder(t *testing.
 		t.Fatal(err)
 	}
 
-	queueFirst := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, store))
+	queueFirst := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, keys.New(nil), store))
 	ticketsModel := NewModelWithStore(root, ui.Settings{}, keys.New(nil), store)
 	ticketsModel = deliverLoad(t, ticketsModel)
 
@@ -1319,7 +1319,7 @@ func TestQueueModelShowsSameStatusAsTicketsTab(t *testing.T) {
 		ticketPath(root, "alpha", "02-dependent.md"):  true,
 		ticketPath(root, "alpha", "03-done.md"):       true,
 	}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 	content := m.View().Content
 
 	if !strings.Contains(content, "(blocked by 01)") {
@@ -1399,7 +1399,7 @@ func TestQueueModelScrollsWithKeysAndMouse(t *testing.T) {
 		checked[ticketPath(root, "alpha", fmt.Sprintf("%02d-ticket.md", i))] = true
 	}
 
-	m := NewQueueModel(root, ui.Settings{}, checked)
+	m := NewQueueModel(root, ui.Settings{}, checked, keys.Manager{})
 	msg := m.Init()()
 	updated, _ := m.Update(msg)
 	m = updated.(QueueModel)
@@ -1455,7 +1455,7 @@ func TestQueueModelShowsPreviewPaneForSelectedTicket(t *testing.T) {
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\nType: task\n\nDistinctive queue-preview body.\n")
 
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
 	content := ansi.Strip(m.View().Content)
 	if !strings.Contains(content, "Preview") {
@@ -1483,7 +1483,7 @@ func TestQueueModelMouseClickSelectsRowOnly(t *testing.T) {
 		ticketPath(root, "alpha", "02-second.md"): true,
 		ticketPath(root, "alpha", "03-third.md"):  true,
 	}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 	if m.selected != 0 {
 		t.Fatalf("expected initial selection at row 0, got %d", m.selected)
 	}
@@ -1529,7 +1529,7 @@ func TestQueueModelPreviewScrollsPastTruncationPoint(t *testing.T) {
 	writeTicket(t, root, "alpha", "01-ticket.md", "Status: open\n\nTOPMARKERXYZ\n\n"+strings.Repeat("Filler line of body text.\n\n", 80)+"BOTTOMMARKERXYZ\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-ticket.md"): true}
 
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
 	initial := ansi.Strip(m.previewVP.View())
 	if !strings.Contains(initial, "TOPMARKERXYZ") {
@@ -1562,7 +1562,7 @@ func TestQueueModelGAndGGJumpSelectionToLastAndFirstRow(t *testing.T) {
 		ticketPath(root, "alpha", "03-third.md"):  true,
 	}
 
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	m = updated.(QueueModel)
@@ -1599,7 +1599,7 @@ func TestQueueSearch_SlashEntersInputMode(t *testing.T) {
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
 
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	m = updated.(QueueModel)
@@ -1618,7 +1618,7 @@ func TestQueueSearch_TypedCharactersFilterAndHighlight(t *testing.T) {
 		ticketPath(root, "alpha", "02-second.md"): true,
 	}
 
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
 	for _, r := range "/first" {
 		updated, _ := m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
@@ -1646,7 +1646,7 @@ func TestQueueSearch_EscExitsSearchMode(t *testing.T) {
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
 
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	m = updated.(QueueModel)
@@ -1669,7 +1669,7 @@ func TestQueueSearch_EnterExitsInputButKeepsResults(t *testing.T) {
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
 
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
 	for _, r := range "/first" {
 		updated, _ := m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
@@ -1696,7 +1696,7 @@ func TestQueueSearch_DigitsTypeIntoQueryNotBoundKeys(t *testing.T) {
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
 
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	m = updated.(QueueModel)
@@ -1729,7 +1729,7 @@ func TestQueueEditChordLaunchesEditorOnSelectedTicket(t *testing.T) {
 
 	for _, tt := range chords {
 		t.Run(tt.name, func(t *testing.T) {
-			m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+			m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
 			updated, _ := m.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})
 			m = updated.(QueueModel)
@@ -1757,7 +1757,7 @@ func TestQueueEditChordCancelsOnEsc(t *testing.T) {
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
 
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})
 	m = updated.(QueueModel)
