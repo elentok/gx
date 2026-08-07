@@ -169,6 +169,7 @@ func TestRun_ProductionRealGit_MissingSkillFailsBeforeClaim(t *testing.T) {
 func TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsAttention(t *testing.T) {
 	const epicName = "epic"
 	repoDir := testutil.TempRepo(t)
+	wtDir := testWorktreeDir(t, repoDir)
 	scratchDir := writeEpic(t, epicName, map[string]string{
 		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 	})
@@ -222,7 +223,7 @@ func TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsAttention(t *tes
 		t.Errorf("tab closed = %d, want 0 (launch failure leaves the tab in place)", tabClosed)
 	}
 
-	worktreePath := iterationWorktreePath(repoDir, epicName, "01")
+	worktreePath := iterationWorktreePath(wtDir, epicName, "01")
 	if _, err := os.Stat(worktreePath); err != nil {
 		t.Errorf("Stat(%q) = %v, want the iteration worktree left in place after launch failure", worktreePath, err)
 	}
@@ -282,6 +283,7 @@ func TestRun_ProductionRealGit_CodexRestartReattachesAndLandsOnce(t *testing.T) 
 		sessionID = "codex-session-01"
 	)
 	repoDir := testutil.TempRepo(t)
+	wtDir := testWorktreeDir(t, repoDir)
 	scratchDir := writeEpic(t, epicName, map[string]string{
 		"01-restart.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Restart\n",
 	})
@@ -289,7 +291,7 @@ func TestRun_ProductionRealGit_CodexRestartReattachesAndLandsOnce(t *testing.T) 
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("CODEX_HOME", "")
-	cwd := iterationWorktreePath(repoDir, epicName, "01")
+	cwd := iterationWorktreePath(wtDir, epicName, "01")
 	sessionPath := filepath.Join(home, ".codex", "sessions", "2026", "08", "04", "rollout-"+sessionID+".jsonl")
 	if err := os.MkdirAll(filepath.Dir(sessionPath), 0755); err != nil {
 		t.Fatalf("MkdirAll Codex session: %v", err)
@@ -523,7 +525,7 @@ func TestRun_ProductionRealGit_CodexRestartReattachesAndLandsOnce(t *testing.T) 
 
 	// Acceptance criterion: the final commit lands with all three
 	// Ralph-loop trailers, attributed to the one original session.
-	featurePath := filepath.Join(repoDir, epicName)
+	featurePath := filepath.Join(wtDir, epicName)
 	trailers, err := git.TrailerMap(featurePath, "HEAD", ticketTrailerKey)
 	if err != nil {
 		t.Fatalf("TrailerMap: %v", err)

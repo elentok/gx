@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
 
@@ -63,6 +64,20 @@ func commitIterationWork(dir, id string) error {
 		}
 	}
 	return nil
+}
+
+// testWorktreeDir resolves repoDir's linked-worktree directory the way
+// production code does (d.WorktreeDir -> LinkedWorktreeDir), so tests that
+// predict iteration/feature worktree paths agree with where Run actually
+// creates them (repoDir itself for .bare clones, repoDir/.worktrees for
+// standard clones).
+func testWorktreeDir(t *testing.T, repoDir string) string {
+	t.Helper()
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo(%s): %v", repoDir, err)
+	}
+	return repo.LinkedWorktreeDir()
 }
 
 // realGitFlagValue returns the value following the first occurrence of name in
@@ -261,7 +276,7 @@ func writeFakeExecutable(t *testing.T, name, body string) string {
 func assertNoLaunchTrace(t *testing.T, repoDir, epicName, scratchDir, ticketFilename string, out *bytes.Buffer) {
 	t.Helper()
 
-	if _, err := os.Stat(filepath.Join(repoDir, epicName)); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(testWorktreeDir(t, repoDir), epicName)); !os.IsNotExist(err) {
 		t.Errorf("feature worktree exists after launch failure, want none created: %v", err)
 	}
 

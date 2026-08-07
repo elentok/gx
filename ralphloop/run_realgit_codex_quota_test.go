@@ -32,6 +32,7 @@ import (
 func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 	const epicName = "epic"
 	repoDir := testutil.TempRepo(t)
+	wtDir := testWorktreeDir(t, repoDir)
 
 	scratchDir := writeEpic(t, epicName, map[string]string{
 		"01-quota.md":    "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Quota\n",
@@ -51,7 +52,7 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 	var tab02ClosedOnce sync.Once
 
 	pane01 := "pane-" + iterLabel("01")
-	dir01 := iterationWorktreePath(repoDir, epicName, "01")
+	dir01 := iterationWorktreePath(wtDir, epicName, "01")
 
 	handler := func(argv []string) ([]byte, int) {
 		if len(argv) < 2 {
@@ -114,7 +115,7 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 					mu.Unlock()
 					return agentJSON(pane, "working", sess)
 				}
-				dir := iterationWorktreePath(repoDir, epicName, id)
+				dir := iterationWorktreePath(wtDir, epicName, id)
 				if err := commitIterationWork(dir, id); err != nil {
 					t.Errorf("commitIterationWork(%s): %v", id, err)
 					return herdrfake.CommandError(err.Error())
@@ -221,7 +222,7 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 		t.Errorf("ReadCodexRateLimit calls = %d, want at least 4 (converging within codexRateLimitMaxRepolls)", rateLimitCalls)
 	}
 
-	featurePath := filepath.Join(repoDir, epicName)
+	featurePath := filepath.Join(wtDir, epicName)
 	trailers, err := git.TrailerMap(featurePath, "HEAD", ticketTrailerKey)
 	if err != nil {
 		t.Fatalf("TrailerMap: %v", err)
@@ -243,7 +244,7 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 	}
 
 	for _, id := range []string{"01", "02", "03"} {
-		path := iterationWorktreePath(repoDir, epicName, id)
+		path := iterationWorktreePath(wtDir, epicName, id)
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
 			t.Errorf("iteration worktree %s for ticket %s still exists, want removed", path, id)
 		}
@@ -319,6 +320,7 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 		smartZone = 150000
 	)
 	repoDir := testutil.TempRepo(t)
+	wtDir := testWorktreeDir(t, repoDir)
 	scratchDir := writeEpic(t, epicName, map[string]string{
 		"01-context.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Context\n",
 		"02-quota.md":    "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Quota\n",
@@ -329,8 +331,8 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 	codexHome := t.TempDir()
 	t.Setenv("CODEX_HOME", codexHome)
 
-	dir01 := iterationWorktreePath(repoDir, epicName, "01")
-	dir02 := iterationWorktreePath(repoDir, epicName, "02")
+	dir01 := iterationWorktreePath(wtDir, epicName, "01")
+	dir02 := iterationWorktreePath(wtDir, epicName, "02")
 
 	pane01 := "pane-" + iterLabel("01")
 	pane02 := "pane-" + iterLabel("02")
@@ -459,7 +461,7 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 					mu.Unlock()
 					return agentJSON(pane, "working", sess)
 				}
-				dir := iterationWorktreePath(repoDir, epicName, id)
+				dir := iterationWorktreePath(wtDir, epicName, id)
 				if err := commitIterationWork(dir, id); err != nil {
 					t.Errorf("commitIterationWork(%s): %v", id, err)
 					return herdrfake.CommandError(err.Error())
@@ -599,7 +601,7 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 		t.Errorf("compact phases = %v, want compact-started, finishing-up, recovered", phases)
 	}
 
-	featurePath := filepath.Join(repoDir, epicName)
+	featurePath := filepath.Join(wtDir, epicName)
 	trailers, err := git.TrailerMap(featurePath, "HEAD", ticketTrailerKey)
 	if err != nil {
 		t.Fatalf("TrailerMap: %v", err)
@@ -630,7 +632,7 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 	}
 
 	for _, id := range []string{"01", "02", "03"} {
-		path := iterationWorktreePath(repoDir, epicName, id)
+		path := iterationWorktreePath(wtDir, epicName, id)
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
 			t.Errorf("iteration worktree %s for ticket %s still exists, want removed", path, id)
 		}

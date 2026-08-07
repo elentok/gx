@@ -35,6 +35,7 @@ import (
 func TestRun_ProductionRealGit_AThenBAndCConcurrently(t *testing.T) {
 	const epicName = "epic"
 	repoDir := testutil.TempRepo(t)
+	wtDir := testWorktreeDir(t, repoDir)
 
 	scratchDir := writeEpic(t, epicName, map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
@@ -109,7 +110,7 @@ func TestRun_ProductionRealGit_AThenBAndCConcurrently(t *testing.T) {
 				if id == "03" {
 					<-bLanded
 				}
-				dir := iterationWorktreePath(repoDir, epicName, id)
+				dir := iterationWorktreePath(wtDir, epicName, id)
 				if err := commitIterationWork(dir, id); err != nil {
 					t.Errorf("commitIterationWork(%s): %v", id, err)
 					return herdrfake.CommandError(err.Error())
@@ -166,7 +167,7 @@ func TestRun_ProductionRealGit_AThenBAndCConcurrently(t *testing.T) {
 		t.Errorf("commitOrder = %v, want B (02) created before C (03)", commitOrder)
 	}
 
-	featurePath := filepath.Join(repoDir, epicName)
+	featurePath := filepath.Join(wtDir, epicName)
 	trailers, err := git.TrailerMap(featurePath, "HEAD", ticketTrailerKey)
 	if err != nil {
 		t.Fatalf("TrailerMap: %v", err)
@@ -195,7 +196,7 @@ func TestRun_ProductionRealGit_AThenBAndCConcurrently(t *testing.T) {
 	}
 
 	for _, id := range []string{"01", "02", "03"} {
-		path := iterationWorktreePath(repoDir, epicName, id)
+		path := iterationWorktreePath(wtDir, epicName, id)
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
 			t.Errorf("iteration worktree %s for ticket %s still exists, want removed", path, id)
 		}
@@ -226,7 +227,8 @@ func TestRun_ProductionRealGit_AThenBAndCConcurrently(t *testing.T) {
 func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 	const epicName = "epic"
 	repoDir := testutil.TempRepo(t)
-	featurePath := filepath.Join(repoDir, epicName)
+	wtDir := testWorktreeDir(t, repoDir)
+	featurePath := filepath.Join(wtDir, epicName)
 	type ticketContract struct {
 		filename      string
 		body          string
@@ -263,12 +265,12 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 		if id == "03" {
 			continue
 		}
-		writeFakeTranscript(t, iterationWorktreePath(repoDir, epicName, id), "sess-"+iterLabel(id), transcriptStart,
+		writeFakeTranscript(t, iterationWorktreePath(wtDir, epicName, id), "sess-"+iterLabel(id), transcriptStart,
 			[3]any{"claude-sonnet-5", contract.tokens - 200, 0},
 			[3]any{"claude-sonnet-5", contract.tokens - 100, 100},
 		)
 	}
-	cCompact := herdrfake.NewClaudeCompact(t, iterationWorktreePath(repoDir, epicName, "03"), "sess-"+iterLabel("03"), func() time.Duration {
+	cCompact := herdrfake.NewClaudeCompact(t, iterationWorktreePath(wtDir, epicName, "03"), "sess-"+iterLabel("03"), func() time.Duration {
 		mu.Lock()
 		defer mu.Unlock()
 		return virtualTime
@@ -429,7 +431,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 				if id == "05" {
 					<-dReady
 				}
-				dir := iterationWorktreePath(repoDir, epicName, id)
+				dir := iterationWorktreePath(wtDir, epicName, id)
 				if err := commitIterationWork(dir, id); err != nil {
 					t.Errorf("commitIterationWork(%s): %v", id, err)
 					return herdrfake.CommandError(err.Error())
@@ -685,7 +687,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 	}
 
 	for _, id := range []string{"01", "02", "03", "04", "05", "06"} {
-		path := iterationWorktreePath(repoDir, epicName, id)
+		path := iterationWorktreePath(wtDir, epicName, id)
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
 			t.Errorf("iteration worktree %s for ticket %s still exists, want removed", path, id)
 		}
@@ -730,6 +732,7 @@ func TestRun_ProductionRealGit_CodexCompactsThenCompletes(t *testing.T) {
 		sessionID = "codex-session-01"
 	)
 	repoDir := testutil.TempRepo(t)
+	wtDir := testWorktreeDir(t, repoDir)
 	scratchDir := writeEpic(t, epicName, map[string]string{
 		"01-compact.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Compact recovery\n",
 	})
@@ -737,7 +740,7 @@ func TestRun_ProductionRealGit_CodexCompactsThenCompletes(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("CODEX_HOME", "")
-	cwd := iterationWorktreePath(repoDir, epicName, "01")
+	cwd := iterationWorktreePath(wtDir, epicName, "01")
 	sessionPath := filepath.Join(home, ".codex", "sessions", "2026", "08", "04", "rollout-"+sessionID+".jsonl")
 	if err := os.MkdirAll(filepath.Dir(sessionPath), 0755); err != nil {
 		t.Fatalf("MkdirAll Codex session: %v", err)

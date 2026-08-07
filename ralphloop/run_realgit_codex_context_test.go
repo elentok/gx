@@ -37,6 +37,7 @@ func TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp(t *testing.T
 		smartZone = 150000
 	)
 	repoDir := testutil.TempRepo(t)
+	wtDir := testWorktreeDir(t, repoDir)
 	scratchDir := writeEpic(t, epicName, map[string]string{
 		"01-context.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Context recovery\n",
 	})
@@ -45,7 +46,7 @@ func TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp(t *testing.T
 	codexHome := t.TempDir()
 	t.Setenv("CODEX_HOME", codexHome)
 
-	cwd := iterationWorktreePath(repoDir, epicName, "01")
+	cwd := iterationWorktreePath(wtDir, epicName, "01")
 
 	s := herdrfake.NewState(t)
 	s.Register("workspace", "list", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
@@ -160,7 +161,7 @@ func TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp(t *testing.T
 
 	// Acceptance criterion: the implementation commit lands with all three
 	// Ralph-loop trailers.
-	featurePath := filepath.Join(repoDir, epicName)
+	featurePath := filepath.Join(wtDir, epicName)
 	trailers, err := git.TrailerMap(featurePath, "HEAD", ticketTrailerKey)
 	if err != nil {
 		t.Fatalf("TrailerMap: %v", err)
@@ -266,6 +267,7 @@ func codexNativeContextFixture(t *testing.T) (repoDir, scratchDir, ticketPath, c
 	const sessionID = "codex-session-31"
 
 	repoDir = testutil.TempRepo(t)
+	wtDir := testWorktreeDir(t, repoDir)
 	scratchDir = writeEpic(t, epicName, map[string]string{
 		"01-native.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Native context recovery\n",
 	})
@@ -273,7 +275,7 @@ func codexNativeContextFixture(t *testing.T) (repoDir, scratchDir, ticketPath, c
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("CODEX_HOME", "")
-	cwd = iterationWorktreePath(repoDir, epicName, "01")
+	cwd = iterationWorktreePath(wtDir, epicName, "01")
 	sessionPath := filepath.Join(home, ".codex", "sessions", "2026", "08", "04", "rollout-"+sessionID+".jsonl")
 	if err := os.MkdirAll(filepath.Dir(sessionPath), 0755); err != nil {
 		t.Fatalf("MkdirAll Codex session: %v", err)
@@ -482,6 +484,7 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 		evidence = "stream disconnected before completion: your input exceeds the context window of this model"
 	)
 	repoDir, scratchDir, ticketPath, _ := codexNativeContextFixture(t)
+	wtDir := testWorktreeDir(t, repoDir)
 
 	s := herdrfake.NewState(t)
 	phase := "starting"
@@ -635,11 +638,11 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 		t.Error("must not fall back to generic needs-info: that would lose the exhaustion reason")
 	}
 
-	path := iterationWorktreePath(repoDir, epicName, "01")
+	path := iterationWorktreePath(wtDir, epicName, "01")
 	if _, err := os.Stat(path); err != nil {
 		t.Errorf("iteration worktree removed (%v), want retained for inspection", err)
 	}
-	featurePath := filepath.Join(repoDir, epicName)
+	featurePath := filepath.Join(wtDir, epicName)
 	branch := iterBranch(epicName, "01")
 	if _, err := git.RevParse(featurePath, branch); err != nil {
 		t.Errorf("iteration branch removed (%v), want retained for inspection", err)
