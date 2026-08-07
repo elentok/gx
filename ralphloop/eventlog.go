@@ -25,13 +25,44 @@ const (
 	// compact, not a failure, and deliberately distinct from
 	// eventSmartZoneRecoveryFailed so it isn't misread as one.
 	eventSmartZoneWaitExpired = "smart-zone-wait-expired"
-	eventPausedRateLimit         = "paused-rate-limit"
-	eventResumed                 = "resumed"
-	eventNeedsInfo               = "needs-info"
-	eventCommitless              = "commitless"
-	eventNeedsAttention          = "needs-attention"
-	eventDepsInstalled           = "deps-installed"
+	eventPausedRateLimit      = "paused-rate-limit"
+	eventResumed              = "resumed"
+	eventNeedsInfo            = "needs-info"
+	eventCommitless           = "commitless"
+	eventNeedsAttention       = "needs-attention"
+	eventDepsInstalled        = "deps-installed"
+	// eventSchedulerScan marks one claimNext pass: every ticket the epic
+	// currently has, and why the scheduler did or didn't claim it. Added to
+	// debug tickets that appear queued (e.g. a code-review ticket's freshly
+	// published children) but never get picked up — the usual cause is a
+	// ticket falling outside the run's RunScope (see ScanDecision's
+	// "out-of-scope"), which the ticket-level events above never surface
+	// since they only ever fire for a ticket the scheduler already claimed.
+	eventSchedulerScan = "scheduler-scan"
 )
+
+// ScanDecision records one ticket's scheduling disposition for a single
+// scheduler-scan log line, in Epic.Tickets order — every ticket
+// loadNamedEpic returned at the moment claimNext evaluated the frontier, not
+// just the ones in scope or in the frontier, so a ticket that's silently
+// out-of-scope (the most common cause of "queued but never starts") still
+// shows up.
+type ScanDecision struct {
+	// Ticket is the ticket's Identifier (see Event.Ticket).
+	Ticket string `json:"ticket"`
+	// Status is the ticket's RenderedStatus (see tickets.RenderedStatus.Word).
+	Status string `json:"status"`
+	// Decision is one of: "claimed" (this pass claimed it), "frontier"
+	// (open/unblocked/in-scope but a different ticket was claimed instead,
+	// or maxParallel was already reached elsewhere in this Run call),
+	// "out-of-scope" (RunScope.Contains is false — e.g. a code-review
+	// ticket's child missing its own parent: back-edge), "blocked", or
+	// "settled" (already done/needs-info/needs-attention).
+	Decision string `json:"decision"`
+	// Reason elaborates Decision — e.g. UnresolvedBlockers's tokens for
+	// "blocked". Empty when Decision is self-explanatory.
+	Reason string `json:"reason,omitempty"`
+}
 
 // Event is one line of an epic's run-log.jsonl: a single lifecycle
 // occurrence, timestamped and attributed to the ticket/pane/tab it happened
@@ -63,6 +94,9 @@ type Event struct {
 	// check for reachability from the feature branch's later tip — the
 	// iteration branch itself isn't guaranteed to still exist by then.
 	SHA string `json:"sha,omitempty"`
+	// Scan (scheduler-scan events only) is every ticket's disposition for
+	// this claimNext pass — see ScanDecision.
+	Scan []ScanDecision `json:"scan,omitempty"`
 }
 
 // eventLogMu serializes appends across every goroutine in the process (each

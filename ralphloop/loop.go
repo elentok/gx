@@ -245,12 +245,15 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		scheduleMu.Lock()
 		defer scheduleMu.Unlock()
 
+		var scanned *tickets.Epic
+		var frontier []tickets.Ticket
 		admitted, err := gate.claimIfRunning(func() error {
 			epic, err := loadNamedEpic(scratchDir, opts.EpicName)
 			if err != nil {
 				return err
 			}
-			frontier := scope.Frontier(*epic)
+			scanned = epic
+			frontier = scope.Frontier(*epic)
 			if len(frontier) == 0 {
 				return nil
 			}
@@ -266,6 +269,19 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			}
 			return nil
 		})
+		// scanned is nil when the gate wasn't running (claimIfRunning never
+		// invoked the closure, e.g. paused) — nothing was actually scanned,
+		// so there's nothing useful to log.
+		if scanned != nil {
+			logErr := logEvent(scratchDir, opts.EpicName, Event{
+				Type:  eventSchedulerScan,
+				Agent: agent,
+				Scan:  scanDecisions(*scanned, scope, frontier, ticket),
+			})
+			if logErr != nil && err == nil {
+				err = fmt.Errorf("logging scheduler scan: %w", logErr)
+			}
+		}
 		if err != nil {
 			return tickets.Ticket{}, false, err
 		}
@@ -418,6 +434,40 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 
 	sink.EpicComplete(opts.EpicName, completed, int(d.Now().Sub(runStart).Seconds()))
 	return nil
+}
+
+// scanDecisions builds one claimNext pass's scheduler-scan log line: epic's
+// tickets, in file order, each labeled with why the scheduler did or didn't
+// claim it this pass. claimed is the zero-value Ticket when this pass found
+// nothing to claim.
+func scanDecisions(epic tickets.Epic, scope RunScope, frontier []tickets.Ticket, claimed tickets.Ticket) []ScanDecision {
+	inFrontier := make(map[string]bool, len(frontier))
+	for _, t := range frontier {
+		inFrontier[t.Path] = true
+	}
+
+	decisions := make([]ScanDecision, 0, len(epic.Tickets))
+	for _, t := range epic.Tickets {
+		status := epic.RenderedStatus(t)
+		d := ScanDecision{Ticket: t.Identifier, Status: status.Word()}
+		switch {
+		case claimed.Path != "" && t.Path == claimed.Path:
+			d.Decision = "claimed"
+		case !scope.Contains(t, epic):
+			d.Decision = "out-of-scope"
+		case isSettledStatus(status):
+			d.Decision = "settled"
+		case inFrontier[t.Path]:
+			d.Decision = "frontier"
+		case status == tickets.StatusBlocked:
+			d.Decision = "blocked"
+			d.Reason = strings.Join(epic.UnresolvedBlockers(t), ", ")
+		default:
+			d.Decision = "unclaimed"
+		}
+		decisions = append(decisions, d)
+	}
+	return decisions
 }
 
 // allSettled reports whether every ticket in e has reached a terminal state

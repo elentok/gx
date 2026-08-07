@@ -227,9 +227,20 @@ func TestRun_LogsLifecycleEvents_LinearChain(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	events, ok, err := readEvents(scratchDir, "my-epic")
+	rawEvents, ok, err := readEvents(scratchDir, "my-epic")
 	if err != nil || !ok {
 		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+	}
+	// scheduler-scan events are logged on every claimNext pass, interleaved
+	// with (and racing) the async iteration lifecycle below; this test is
+	// about that lifecycle's exact order, not the scheduler's own scanning,
+	// so exclude them here rather than pin down their nondeterministic count
+	// and position.
+	var events []Event
+	for _, ev := range rawEvents {
+		if ev.Type != eventSchedulerScan {
+			events = append(events, ev)
+		}
 	}
 
 	wantTypes := []string{eventDepsInstalled, eventIterationStarted, eventIterationFinished, eventCherryPicked}
@@ -258,6 +269,55 @@ func TestRun_LogsLifecycleEvents_LinearChain(t *testing.T) {
 	}
 	if events[0].Cwd == "" {
 		t.Errorf("deps-installed event = %+v, want non-empty Cwd", events[0])
+	}
+}
+
+// TestRun_SchedulerScan_LogsOutOfScopeTicket covers the case that motivated
+// eventSchedulerScan: a ticket present in the epic but outside the run's
+// RunScope (here, ticket 02 has no parent: pointing back into the requested
+// "01", so RunScope.Contains never picks it up) looks, from the Queue tab,
+// like it's just sitting there unclaimed — the scheduler-scan log line is
+// what lets that be told apart from "still blocked" or "already claimed
+// elsewhere".
+func TestRun_SchedulerScan_LogsOutOfScopeTicket(t *testing.T) {
+	scratchDir := writeEpic(t, "my-epic", map[string]string{
+		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
+		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
+	})
+	d, _, _ := fakeDeps()
+
+	var out bytes.Buffer
+	if err := Run(RunOptions{
+		EpicName:   "my-epic",
+		Skill:      "implement",
+		ScratchDir: scratchDir,
+		RepoDir:    "/fake/repo",
+		TicketIDs:  []string{"01"},
+	}, d, NewTextEventSink(&out)); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	events, ok, err := readEvents(scratchDir, "my-epic")
+	if err != nil || !ok {
+		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+	}
+
+	var found bool
+	for _, ev := range events {
+		if ev.Type != eventSchedulerScan {
+			continue
+		}
+		for _, d := range ev.Scan {
+			if d.Ticket == "02" {
+				found = true
+				if d.Decision != "out-of-scope" {
+					t.Errorf("ticket 02 scan decision = %q, want %q", d.Decision, "out-of-scope")
+				}
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("no scheduler-scan event scanned ticket 02; events = %+v", events)
 	}
 }
 
