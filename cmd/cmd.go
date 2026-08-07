@@ -96,7 +96,9 @@ func defaultSkillsManifestPath() (string, error) {
 // Execute runs gx with the provided arguments.
 func Execute(args []string) error {
 	config.WarnOnMigrateFailure(os.Stderr)
-	return execute(args, defaultDeps())
+	d := defaultDeps()
+	warnOnScratchFoldFailure(os.Stderr, d.confirmForce)
+	return execute(args, d)
 }
 
 // execute builds the cobra command tree from the given deps and runs it against
