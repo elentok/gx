@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 
 	"charm.land/bubbles/v2/spinner"
-	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
@@ -110,12 +109,10 @@ type Model struct {
 
 	search search.Model
 
-	// focus, previewVP, previewSelKey and previewSearch back the preview
-	// panel's own focus/scroll/search state — see model_preview_focus.go.
-	focus         focusPane
-	previewVP     viewport.Model
-	previewSelKey string // identifies the previewed row, to reset scroll on selection change
-	previewSearch search.Model
+	// previewFocus backs the preview panel's own focus/scroll/search state
+	// (see preview_focus.go and model_preview_focus.go); embedded so callers
+	// keep reading/writing its fields as m.focus, m.previewVP, etc.
+	previewFocus
 
 	// implementAgentMenu, confirm, implementEpic and implementSpinner back the
 	// "i"-triggered ralph-loop launch (see implement.go): implementEpic is the
@@ -168,8 +165,7 @@ func NewModelWithScopeAndStore(worktreeRoot string, settings ui.Settings, extraK
 		settings:           settings,
 		keys:               newTicketsManager(),
 		search:             search.NewModel(),
-		previewSearch:      search.NewModel(),
-		previewVP:          viewport.New(),
+		previewFocus:       newPreviewFocus(),
 		allWorktrees:       allWorktrees,
 		confirm:            confirm.New(),
 		implementAgentMenu: newImplementAgentMenu(),

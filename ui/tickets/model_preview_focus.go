@@ -40,29 +40,7 @@ func (m *Model) syncPreviewViewport() {
 	width, height := previewInnerSize(previewW, previewH)
 	contentW := max(width-previewScrollbarGutter, 1)
 
-	m.previewVP.SetWidth(contentW)
-	m.previewVP.SetHeight(height)
-
-	key := m.previewSelectionKey()
-	selectionChanged := key != m.previewSelKey
-	m.previewSelKey = key
-
-	content := m.previewContent(contentW)
-	if m.previewSearch.HasQuery() {
-		content = highlightPreviewContent(content, m.previewSearch)
-	}
-	m.previewVP.SetContent(content)
-
-	if selectionChanged {
-		m.previewVP.GotoTop()
-		m.previewSearch.SetMatches(nil)
-	}
-}
-
-// previewMatchStatus mirrors searchMatchStatus for the preview panel's own
-// search, shown as its panel's right-aligned header text.
-func (m Model) previewMatchStatus() string {
-	return previewSearchMatchStatus(m.previewSearch)
+	m.previewFocus.Sync(contentW, height, m.previewSelectionKey(), m.previewContent)
 }
 
 // highlightPreviewLine wraps query's first match on an already
@@ -162,7 +140,7 @@ func (m *Model) focusPreviewOrExpand() bool {
 // (j/k, up/down, pgup/pgdn, ctrl+u/d, etc. — see bubbles/viewport's
 // DefaultKeyMap).
 func (m Model) handlePreviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if handled, cmd := updatePreviewSearchKey(msg, &m.previewVP, &m.previewSearch); handled {
+	if handled, cmd := m.previewFocus.updatePreviewKey(msg); handled {
 		return m, cmd
 	}
 

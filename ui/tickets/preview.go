@@ -39,18 +39,6 @@ func previewInnerSize(previewW, h int) (width, height int) {
 	return
 }
 
-// previewLines renders the preview panel's body for a width x height
-// content region (already excluding the panel's own padding/header, see
-// normalView): the synthesized header/metadata chrome plus the
-// glamour-rendered ticket body, scrolled through m.previewVP (kept in sync
-// by syncPreviewViewport, see model_preview_focus.go) so the scroll
-// indicator's dimensions come from the same source as what's displayed
-// (mirrors ui/help's bodyWithScrollbar) and the scroll position persists
-// across renders instead of resetting to the top every frame.
-func (m Model) previewLines() []string {
-	return renderViewportWithScrollbar(m.previewVP)
-}
-
 // renderViewportWithScrollbar pairs a viewport's currently visible lines
 // with its scroll indicator. Free function shared with the flat ralph-loop
 // TUI's own preview panel (see flat.go).
@@ -142,4 +130,3 @@ func previewEpicHeaderLine(epic tickets.Epic) string {
 	line += " " + ui.StyleMuted.Render(fmt.Sprintf("(%d done / %d)", epic.DoneCount(), epic.TotalCount()))
 	return line
 }
-
