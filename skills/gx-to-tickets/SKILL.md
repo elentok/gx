@@ -3,15 +3,15 @@ name: gx-to-tickets
 description:
   Break a plan, spec, or the current conversation into a set of tracer-bullet tickets against gx's
   local markdown tracker, each declaring its blocking edges and its approved test seams.
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 # gx To Tickets
 
 Break a plan, spec, or conversation into a set of **tickets** — tracer-bullet vertical slices, each
 declaring the tickets that **block** it — published to gx's local markdown tracker. See
-[gx-local-tracker.md](../gx-local-tracker.md) for the full layout, frontmatter, and CLI contract; this
-skill only covers how to break work up and what to put in each ticket.
+[gx-local-tracker.md](../gx-local-tracker.md) for the full layout, frontmatter, and CLI contract;
+this skill only covers how to break work up and what to put in each ticket.
 
 Estimate the amount of tokens that will be needed for the implementation of each ticket; if a ticket
 will need more than 70K tokens, split it.
@@ -23,27 +23,28 @@ lines can still blow the budget once you add:
   existing file over ~300-400 lines (e.g. a central loop/dispatcher), count that file's size against
   the budget every time it's likely to be read (before editing, after review fixes, verification) —
   not once.
-- **The verify/code-review pass.** Verification and code review add their own findings + fix + re-run
-  cycles on top of the implementation itself; budget for at least one extra read+edit pass over any
-  large file the ticket touches.
-- **TDD iteration.** If the ticket will be built test-first, budget for multiple test-run cycles, not
-  a single build+test at the end.
+- **The verify/code-review pass.** Verification and code review add their own findings + fix +
+  re-run cycles on top of the implementation itself; budget for at least one extra read+edit pass
+  over any large file the ticket touches.
+- **TDD iteration.** If the ticket will be built test-first, budget for multiple test-run cycles,
+  not a single build+test at the end.
 - **Variant fan-out.** Count how many independent states/variants the acceptance criteria describe
   (e.g. three distinct row badges, or a list-view change plus a separate preview-pane change). Each
   variant typically needs its own wiring and its own test assertion — treat N independent variants
   the same as threading a large file N times, and split by variant group if N is more than a couple.
 
 Separate "the capability doesn't exist yet" from "something consumes a capability that now exists"
-into different tickets — a plumbing/infra ticket vs. a feature-on-top ticket. This applies whenever a
-ticket both builds a new capability and builds the thing that uses it, not only when a large
+into different tickets — a plumbing/infra ticket vs. a feature-on-top ticket. This applies whenever
+a ticket both builds a new capability and builds the thing that uses it, not only when a large
 pre-existing file is threaded twice (e.g. "add the data/plumbing" ticket vs. "add the user-facing
 command" ticket; or "add a new backend control path" vs. "add the UI that calls it").
 
-If tickets earlier in the same epic are already implemented, check their actual cost (`gx tickets
-schema`'s `actual_context_window`/`elapsed_time` fields, handoff notes, session logs) before
-finalizing later estimates. A cold estimate is a guess; an earlier sibling ticket's actual is real
-data about how this epic's tickets run in practice, and should recalibrate the rest of the split —
-including retroactively splitting a not-yet-started ticket that now looks oversized in light of it.
+If tickets earlier in the same epic are already implemented, check their actual cost
+(`gx tickets schema`'s `actual_context_window`/`elapsed_time` fields, handoff notes, session logs)
+before finalizing later estimates. A cold estimate is a guess; an earlier sibling ticket's actual is
+real data about how this epic's tickets run in practice, and should recalibrate the rest of the
+split — including retroactively splitting a not-yet-started ticket that now looks oversized in light
+of it.
 
 ## Process
 
@@ -122,9 +123,9 @@ Present the proposed breakdown as a numbered list. For each ticket, show:
 - **Blocked by**: which other tickets (if any) must complete first
 - **What it delivers**: the end-to-end behaviour this ticket makes work
 - **Test seams**: the seams from step 4
-- **Estimated context window**: the token estimate behind step 3's split decision — always shown, not
-  just when a ticket is borderline, so the user can judge granularity against the same number that
-  drove the split
+- **Estimated context window**: the token estimate behind step 3's split decision — always shown,
+  not just when a ticket is borderline, so the user can judge granularity against the same number
+  that drove the split
 
 Ask the user:
 
@@ -143,8 +144,8 @@ Write one file per ticket under `.scratch/<epic-slug>/issues/<NN>-<slug>.md`, nu
 dependency order (blockers first). Each file's `blocked_by` lists the ticket IDs it depends on. Use
 the per-ticket template below — one ticket per file, never a single combined file.
 
-Work the **frontier** (see [gx-local-tracker.md](../gx-local-tracker.md)): any ticket whose blockers are
-all done. For a purely linear chain that means top to bottom.
+Work the **frontier** (see [gx-local-tracker.md](../gx-local-tracker.md)): any ticket whose blockers
+are all done. For a purely linear chain that means top to bottom.
 
 Do NOT close or modify any parent/source ticket this epic was generated from.
 
@@ -153,23 +154,21 @@ error and re-validate until it passes — do not publish a ticket that fails val
 
 Tickets can also be split off **mid-flight**, by `gx-implement`, when a ticket outgrows its budget
 while in progress — same template, same publishing mechanics, just triggered from inside a running
-session instead of upfront here. See [gx-local-tracker.md](../gx-local-tracker.md)'s mid-flight splitting
-section for the numbering, blocking-edge, and `children`/`parent` mechanics.
+session instead of upfront here. See [gx-local-tracker.md](../gx-local-tracker.md)'s mid-flight
+splitting section for the numbering, blocking-edge, and `children`/`parent` mechanics.
 
 If the breakdown appends a trailing `type: code-review` ticket, first check whether the target epic
-already has one among its published issues. If it does, skip the append — don't publish a second
-one — unless the user has explicitly asked for another.
+already has one among its published issues. If it does, skip the append — don't publish a second one
+— unless the user has explicitly asked for another.
 
 <ticket-template>
 
 ---
-id: "&lt;NN&gt;"
-status: ready-for-agent
-blocked_by: []
-children: []
-type: task
+
+id: "&lt;NN&gt;" status: ready-for-agent blocked_by: [] children: [] type: task
 expected_context_window: 20000
 ---
+
 # &lt;NN&gt; — &lt;Ticket title&gt;
 
 ## What to build
@@ -193,8 +192,9 @@ implementation list.
 
 ### Frontmatter fields
 
-See [gx-local-tracker.md](../gx-local-tracker.md) for the full field reference. New tickets are published
-as `ready-for-agent` unless instructed otherwise, with `blocked_by: []` when nothing gates them.
+See [gx-local-tracker.md](../gx-local-tracker.md) for the full field reference. New tickets are
+published as `ready-for-agent` unless instructed otherwise, with `blocked_by: []` when nothing gates
+them.
 
 Avoid specific file paths or code snippets in the body — they go stale fast. Exception: if a
 prototype produced a snippet that encodes a decision more precisely than prose can (state machine,
