@@ -29,10 +29,10 @@ func (m QueueModel) View() tea.View {
 	lines := ui.AppendScrollbar(m.queueVisibleLines(viewportH), sidebarW-2, len(m.queueLines()), viewportH, m.scrollOffset)
 
 	queueView := ui.RenderPanel(ui.PanelOptionsFor(
-		sidebarW, sidebarH, m.queueHeaderTitle(), "", lines, true, ui.ColorBlue, nil, true,
+		sidebarW, sidebarH, m.queueHeaderTitle(), "", lines, m.focus == focusSidebar, ui.ColorBlue, nil, true,
 	))
 	previewView := ui.RenderPanel(ui.PanelOptionsFor(
-		previewW, previewH, "Preview", m.previewMatchStatus(), m.previewLines(), false, ui.ColorBlue, nil, false,
+		previewW, previewH, "Preview", m.previewMatchStatus(), m.previewLines(), m.focus == focusPreview, ui.ColorBlue, nil, false,
 	))
 
 	var content string

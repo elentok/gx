@@ -98,11 +98,11 @@ type QueueModel struct {
 	collapsedQueueTickets map[string]bool
 
 	// previewFocus backs the preview panel's scroll/search machinery, shared
-	// with the Tickets tab (see preview_focus.go) — ticket 11 gives the Queue
-	// tab real scroll/search instead of the old truncate-only preview. Its
-	// promoted focus field goes unused here: this tab has no focus-toggle
-	// into its preview yet (ticket 12), so the list always retains focus and
-	// only "b" (bottom) reaches the preview directly (see handleQueueKey).
+	// with the Tickets tab (see preview_focus.go) — ticket 11 gave the Queue
+	// tab real scroll/search instead of the old truncate-only preview, and
+	// ticket 12 wires its promoted focus field up to "l"/"right"/"enter" and
+	// "h"/"left"/"esc" (see queueFocusPreviewOrExpand/handleQueuePreviewKey in
+	// queue_preview.go), mirroring the Tickets tab's own focus-toggle.
 	previewFocus
 }
 
@@ -255,6 +255,9 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.confirm.IsOpen {
 			return m.handleQueueConfirmUpdate(msg)
 		}
+		if m.focus == focusPreview {
+			return m.handleQueuePreviewKey(msg)
+		}
 		if nextSearch, cmd, result := m.search.Update(msg); result.Handled {
 			m.search = nextSearch
 			if result.QueryChanged {
@@ -292,6 +295,11 @@ func (m QueueModel) handleQueueMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea
 	dir, ok := ui.WheelDirection(msg)
 	if !ok {
 		return m, nil
+	}
+	if m.focus == focusPreview {
+		var cmd tea.Cmd
+		m.previewVP, cmd = m.previewVP.Update(msg)
+		return m, cmd
 	}
 	m.scrollOffset += dir * ui.WheelScrollLines
 	m.clampScrollOffset()
@@ -549,6 +557,9 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "h", "left":
 		m.collapseSelectedQueueRow()
 	case "l", "right":
+		if m.queueFocusPreviewOrExpand() {
+			return m, nil
+		}
 		m.expandSelectedQueueRow()
 	case "G":
 		m.selectLastRow()
@@ -586,12 +597,20 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "x":
 		return m.handleQueueDeleteKey()
 	case "enter":
-		if len(m.runningEpics) == 0 && len(m.pendingEpics) == 0 {
-			if len(m.checkedEpicPlans()) > 0 {
-				m.implementAgentMenu = newImplementAgentMenu()
-				m.implementAgentMenuOpen = true
-			}
+		// "enter" launches the checked queue (existing behavior, unrelated to
+		// row selection) whenever that's actionable; only when it isn't —
+		// nothing checked, or a run's already in flight — does it fall back to
+		// the row focus-toggle "l"/"right" also drive (ticket 12), so the two
+		// meanings of "enter" never fight over the same press.
+		if len(m.runningEpics) == 0 && len(m.pendingEpics) == 0 && len(m.checkedEpicPlans()) > 0 {
+			m.implementAgentMenu = newImplementAgentMenu()
+			m.implementAgentMenuOpen = true
+			return m, nil
 		}
+		if m.queueFocusPreviewOrExpand() {
+			return m, nil
+		}
+		m.expandSelectedQueueRow()
 	}
 	return m, nil
 }

@@ -158,6 +158,118 @@ func TestQueueModelNestsChildrenUnderParentAndCollapsesWithHL(t *testing.T) {
 	}
 }
 
+// TestQueueModelLOnLeafRowFocusesPreview covers ticket 12: "l"/"right"/"enter"
+// on a leaf row (no children) hands focus straight to the preview panel,
+// mirroring Tickets' focusPreviewOrExpand.
+func TestQueueModelLOnLeafRowFocusesPreview(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-solo.md", "Status: open\n\nBody.\n")
+
+	checked := map[string]bool{ticketPath(root, "alpha", "01-solo.md"): true}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(QueueModel)
+
+	if m.focus != focusSidebar {
+		t.Fatalf("expected initial focus on the list, got focus=%v", m.focus)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+	m = updated.(QueueModel)
+	if m.focus != focusPreview {
+		t.Fatalf("expected \"l\" on a leaf row to focus the preview, got focus=%v", m.focus)
+	}
+}
+
+// TestQueueModelEnterOnExpandedParentFocusesPreview covers the parent-row
+// case: since the parent starts expanded, "enter" must not collapse it — it
+// focuses the preview instead, exactly like the leaf-row case above. A run is
+// already in flight (m.runningEpics) so enter's other job — launching the
+// checked queue — isn't actionable and falls through to the focus-toggle (see
+// TestQueueModelEnterStillLaunchesCheckedQueueWhenActionable for the
+// opposite, launch-wins case).
+func TestQueueModelEnterOnExpandedParentFocusesPreview(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-parent.md", "Status: open\n\nBody.\n")
+	writeRawQueueTicket(t, root, "alpha", "02-child.md", "---\nid: \"02\"\nstatus: open\ntype: task\nparent: \"01\"\n---\n\nBody.\n")
+
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "01-parent.md"): true,
+		ticketPath(root, "alpha", "02-child.md"):  true,
+	}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(QueueModel)
+	m.runningEpics = map[string]bool{"already-running": true}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(QueueModel)
+	if m.focus != focusPreview {
+		t.Fatalf("expected enter on already-expanded parent row to focus preview, got focus=%v", m.focus)
+	}
+	rows := m.rows()
+	if len(rows) != 2 {
+		t.Fatalf("expected parent to stay expanded (2 rows) after enter, got %d: %+v", len(rows), rows)
+	}
+}
+
+// TestQueueModelHLeftEscReturnFocusFromPreview covers "h"/"left"/"esc" handing
+// focus back to the list once the preview has it, mirroring Tickets'
+// handlePreviewKey — each key tested from a fresh preview-focused model so one
+// doesn't mask another's regression.
+func TestQueueModelHLeftEscReturnFocusFromPreview(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-solo.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{ticketPath(root, "alpha", "01-solo.md"): true}
+
+	for _, key := range []tea.KeyPressMsg{
+		{Code: 'h', Text: "h"},
+		{Code: tea.KeyLeft},
+		{Code: tea.KeyEsc},
+	} {
+		m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+		updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+		m = updated.(QueueModel)
+
+		updated, _ = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+		m = updated.(QueueModel)
+		if m.focus != focusPreview {
+			t.Fatalf("setup: expected \"l\" to focus preview, got focus=%v", m.focus)
+		}
+
+		updated, _ = m.Update(key)
+		m = updated.(QueueModel)
+		if m.focus != focusSidebar {
+			t.Fatalf("expected %+v to return focus to the list, got focus=%v", key, m.focus)
+		}
+	}
+}
+
+// TestQueueModelEnterStillLaunchesCheckedQueueWhenActionable covers the
+// enter-key precedence ticket 12 introduces: launching the checked queue
+// (enter's pre-existing job) still wins over the focus-toggle when there's
+// something actionable to launch, so the two meanings of "enter" don't fight
+// over the same keypress on the common case of a leaf row with a runnable
+// plan checked.
+func TestQueueModelEnterStillLaunchesCheckedQueueWhenActionable(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-solo.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{ticketPath(root, "alpha", "01-solo.md"): true}
+
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked))
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(QueueModel)
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(QueueModel)
+	if !m.implementAgentMenuOpen {
+		t.Fatalf("expected enter to open the implement-agent menu when a plan is checked and runnable")
+	}
+	if m.focus != focusSidebar {
+		t.Fatalf("expected focus to stay on the list when enter launches instead of toggling, got focus=%v", m.focus)
+	}
+}
+
 func TestQueueModelNeverShowsATicketRunnableWhenOutOfScopeBlockerIsUnmet(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-foundation.md", "Status: open\n\nBody.\n")
