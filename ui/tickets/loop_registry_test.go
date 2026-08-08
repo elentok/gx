@@ -426,6 +426,37 @@ func TestDrainPendingToastsOnEpicComplete(t *testing.T) {
 	}
 }
 
+func TestReduceLiveEventDrainComplete(t *testing.T) {
+	t.Parallel()
+	r := newLoopRegistry(1)
+	r.tryStart("epic-a", 0, 2)
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventDrainComplete, EpicName: "epic-a", Completed: 1, ElapsedSeconds: 90,
+	})
+
+	snap, ok := r.runSnapshot("epic-a")
+	if !ok {
+		t.Fatal("runSnapshot() ok = false, want true")
+	}
+	if snap.State != RunStateCompleted {
+		t.Errorf("run.State = %v, want RunStateCompleted", snap.State)
+	}
+	if snap.Done != 1 {
+		t.Errorf("run.Done = %d, want 1", snap.Done)
+	}
+
+	toasts := r.drainPendingToasts("epic-a")
+	if len(toasts) != 1 || toasts[0].Kind != notify.KindWarning {
+		t.Fatalf("drainPendingToasts() = %#v, want one warning toast", toasts)
+	}
+	if !strings.Contains(toasts[0].Message, "epic-a") || !strings.Contains(toasts[0].Message, "1m30s") {
+		t.Fatalf("toast message = %q, want epic name and elapsed time", toasts[0].Message)
+	}
+	if strings.Contains(toasts[0].Message, "complete") {
+		t.Fatalf("toast message = %q, wording should be drain-distinct from epic-complete toast", toasts[0].Message)
+	}
+}
+
 func TestDrainPendingToastsOnNeedsRepairPauseOnly(t *testing.T) {
 	t.Parallel()
 	r := newLoopRegistry(1)

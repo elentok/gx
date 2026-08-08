@@ -435,6 +435,13 @@ func (r *loopRegistry) reduceLiveEvent(epicName string, event ralphloop.LiveEven
 			Kind:    notify.KindSuccess,
 			Message: fmt.Sprintf("\U0001f389 epic %q complete (%s)", epicName, formatElapsed(event.ElapsedSeconds)),
 		})
+	case ralphloop.LiveEventDrainComplete:
+		run.done = event.Completed
+		run.state = RunStateCompleted
+		run.pendingToasts = append(run.pendingToasts, notify.NotifyMsg{
+			Kind:    notify.KindWarning,
+			Message: fmt.Sprintf("\U0001f6d1 epic %q drained: %d ticket(s) landed (%s)", epicName, event.Completed, formatElapsed(event.ElapsedSeconds)),
+		})
 	}
 }
 
