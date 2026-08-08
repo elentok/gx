@@ -1,12 +1,15 @@
 package ralphloop
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/elentok/gx/logger"
 )
 
 // Event type strings recorded in an epic's run-log.jsonl.
@@ -200,6 +203,27 @@ func logNotificationFailed(scratchDir, epicName, channel, notifyKind, reason str
 	_ = logEvent(scratchDir, epicName, Event{
 		Type: eventNotificationFailed, Channel: channel, NotifyKind: notifyKind, Reason: reason,
 	})
+}
+
+// sendNotification runs sendSync in its own goroutine, bounded by timeout, so
+// a slow or unreachable notification endpoint never blocks the caller — the
+// shared goroutine + log-outcome wrapper behind slackEventSink.send and
+// telegramEventSink.send, which were identical except for channel and the
+// sendSync call itself. Any failure is logged via gx's logger and otherwise
+// swallowed, but every attempt, success or failure, is also durably recorded
+// to run-log.jsonl via logNotificationSent/logNotificationFailed, tagged with
+// channel and notifyKind (the live event that triggered it).
+func sendNotification(scratchDir, epicName, channel, notifyKind string, timeout time.Duration, sendSync func(ctx context.Context) error) {
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		if err := sendSync(ctx); err != nil {
+			logger.Debug("%s: %v\n", channel, err)
+			logNotificationFailed(scratchDir, epicName, channel, notifyKind, err.Error())
+			return
+		}
+		logNotificationSent(scratchDir, epicName, channel, notifyKind)
+	}()
 }
 
 // lastIterationSession finds the most recent iteration-started event for

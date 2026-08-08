@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/elentok/gx/logger"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -119,16 +118,9 @@ func (s *telegramEventSink) EpicComplete(epicName string, completed int, elapsed
 // checking a run would see. See sendSync for the synchronous, error-returning
 // core.
 func (s *telegramEventSink) send(text, notifyKind string) {
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), telegramSendTimeout)
-		defer cancel()
-		if err := s.sendSync(ctx, text); err != nil {
-			logger.Debug("telegram: %v\n", err)
-			logNotificationFailed(s.scratchDir, s.epicName, "telegram", notifyKind, err.Error())
-			return
-		}
-		logNotificationSent(s.scratchDir, s.epicName, "telegram", notifyKind)
-	}()
+	sendNotification(s.scratchDir, s.epicName, "telegram", notifyKind, telegramSendTimeout, func(ctx context.Context) error {
+		return s.sendSync(ctx, text)
+	})
 }
 
 // sendSync POSTs text to the Telegram Bot API's sendMessage endpoint and
