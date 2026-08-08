@@ -130,11 +130,17 @@ func (e Epic) UnresolvedBlockers(t Ticket) []string {
 	}
 	byNumberAndSuffix := e.byNumberAndSuffix()
 	// A split's children inherit the original's Blocked by: token (e.g. 05b
-	// and 05c both carry "Blocked by: 05" after 05 splits), so t and its own
-	// split siblings must not be required to finish as part of resolving
-	// t's own inherited blocker — that can never happen, since t is still
-	// open for the duration of this very check. See isSelfOrSplitSibling.
-	exclude := func(other Ticket) bool { return isSelfOrSplitSibling(t, other) }
+	// and 05c both carry "Blocked by: 05" after 05 splits), so once
+	// recursion has descended into a checked ticket's own Split list
+	// (viaSplit) t's own split siblings must not be required to finish as
+	// part of resolving t's own inherited blocker — that can never happen,
+	// since t is still open for the duration of this very check. That
+	// exclusion must not fire on the token's direct resolution target
+	// though (viaSplit false): a token naming one specific split sibling
+	// (e.g. 02c's "Blocked by: 02b") needs that sibling's real status
+	// checked, not a free pass for sharing t's Parent. See
+	// isSelfOrSplitSibling.
+	exclude := func(other Ticket, viaSplit bool) bool { return isSelfOrSplitSibling(t, other, viaSplit) }
 	var unresolved []string
 	for _, token := range t.BlockedBy {
 		num, letters := splitBlockedByToken(token)
@@ -146,14 +152,17 @@ func (e Epic) UnresolvedBlockers(t Ticket) []string {
 	return unresolved
 }
 
-// isSelfOrSplitSibling reports whether other is t itself, or a split sibling
-// of t (Parent pointing at the same original ticket, e.g. 05b and 05c both
-// split from 05). See UnresolvedBlockers.
-func isSelfOrSplitSibling(t, other Ticket) bool {
+// isSelfOrSplitSibling reports whether other is t itself (always excluded,
+// guarding a ticket pathologically Blocked by: its own id), or — only when
+// viaSplit reports the check was reached by recursing into a ticket's own
+// Split list rather than being a blocked_by token's direct resolution
+// target — a split sibling of t (Parent pointing at the same original
+// ticket, e.g. 05b and 05c both split from 05). See UnresolvedBlockers.
+func isSelfOrSplitSibling(t, other Ticket, viaSplit bool) bool {
 	if other.Number == t.Number && other.Identifier == t.Identifier {
 		return true
 	}
-	return t.Parent != nil && other.Parent != nil && *t.Parent == *other.Parent
+	return viaSplit && t.Parent != nil && other.Parent != nil && *t.Parent == *other.Parent
 }
 
 // byNumberAndSuffix indexes e.Tickets by number+lowercased letter suffix
@@ -187,15 +196,22 @@ func (e Epic) FullyDone(t Ticket) bool {
 // fullyDone is FullyDone's recursive core, plus an optional exclude hook
 // (used by UnresolvedBlockers to skip t's own split family, see
 // isSelfOrSplitSibling): any ticket exclude reports true for is treated as
-// fully done without recursing into its children.
-func (e Epic) fullyDone(t Ticket, byNumberAndSuffix map[string]Ticket, exclude func(Ticket) bool, visiting map[string]bool) bool {
+// fully done without recursing into its children. The initial call is not
+// "via split" — exclude sees that so it can tell UnresolvedBlockers' direct
+// blocked_by resolution target apart from a ticket reached while walking a
+// parent's own Split list.
+func (e Epic) fullyDone(t Ticket, byNumberAndSuffix map[string]Ticket, exclude func(Ticket, bool) bool, visiting map[string]bool) bool {
+	return e.fullyDoneVia(t, byNumberAndSuffix, exclude, visiting, false)
+}
+
+func (e Epic) fullyDoneVia(t Ticket, byNumberAndSuffix map[string]Ticket, exclude func(Ticket, bool) bool, visiting map[string]bool, viaSplit bool) bool {
 	_, ownSuffix := splitBlockedByToken(t.Identifier)
 	key := siblingKey(t.Number, ownSuffix)
 	if visiting[key] {
 		return true
 	}
 	visiting[key] = true
-	if exclude != nil && exclude(t) {
+	if exclude != nil && exclude(t, viaSplit) {
 		return true
 	}
 	if !t.IsDone() {
@@ -204,7 +220,7 @@ func (e Epic) fullyDone(t Ticket, byNumberAndSuffix map[string]Ticket, exclude f
 	for _, childID := range t.Split {
 		num, letters := splitBlockedByToken(childID)
 		child, ok := byNumberAndSuffix[siblingKey(num, letters)]
-		if !ok || !e.fullyDone(child, byNumberAndSuffix, exclude, visiting) {
+		if !ok || !e.fullyDoneVia(child, byNumberAndSuffix, exclude, visiting, true) {
 			return false
 		}
 	}

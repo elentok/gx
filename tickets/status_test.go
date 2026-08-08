@@ -227,6 +227,36 @@ func TestEpic_UnresolvedBlockers_SplitSiblingsDontBlockEachOther(t *testing.T) {
 	}
 }
 
+// TestEpic_UnresolvedBlockers_DirectSiblingTokenIsEnforced covers the
+// opposite of SplitSiblingsDontBlockEachOther above: 02c's "Blocked by: 02b"
+// names its split sibling 02b directly rather than their shared parent, so
+// isSelfOrSplitSibling's sibling-Parent exclusion (needed for the inherited-
+// token case) must not apply here — 02b's real status has to be checked.
+func TestEpic_UnresolvedBlockers_DirectSiblingTokenIsEnforced(t *testing.T) {
+	original := "02"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 2, Identifier: "02", Status: "done", Commitless: true, Split: []string{"02b", "02c"}},
+		{Number: 2, Identifier: "02b", Parent: &original, Status: "open"},
+		{Number: 2, Identifier: "02c", Parent: &original, BlockedBy: []string{"02b"}, Status: "open"},
+	}}
+	got := epic.UnresolvedBlockers(epic.Tickets[2])
+	if len(got) != 1 || got[0] != "02b" {
+		t.Fatalf("UnresolvedBlockers(02c) = %v, want [02b] while 02b is still open", got)
+	}
+	if status := epic.RenderedStatus(epic.Tickets[2]); status != StatusBlocked {
+		t.Errorf("RenderedStatus(02c) = %v, want StatusBlocked", status)
+	}
+
+	epic.Tickets[1].Status = "done"
+	got = epic.UnresolvedBlockers(epic.Tickets[2])
+	if got != nil {
+		t.Errorf("UnresolvedBlockers(02c) = %v, want nil once 02b is done", got)
+	}
+	if status := epic.RenderedStatus(epic.Tickets[2]); status != StatusOpen {
+		t.Errorf("RenderedStatus(02c) = %v, want StatusOpen once 02b is done", status)
+	}
+}
+
 func TestEpic_BlockingTickets_ResolvesTokensToTicketsForModal(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
 		{Number: 1, Identifier: "01", BlockedBy: []string{"2", "3"}},
