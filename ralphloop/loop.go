@@ -634,6 +634,17 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			break
 		}
 
+		// A drained gate never admits another claim (see
+		// Gate.claimIfRunning), so once its last in-flight iteration
+		// finishes there is nothing left this run will ever do — end here,
+		// through the same sink.EpicComplete call below that natural
+		// completion reaches, rather than falling into the "no unblocked
+		// tickets left" active==0 error path further down, which assumes an
+		// undrained run is stuck.
+		if gate.isDraining() && active == 0 {
+			break
+		}
+
 		if active == 0 {
 			acquirePermit()
 		}

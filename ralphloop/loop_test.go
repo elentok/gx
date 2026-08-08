@@ -766,6 +766,114 @@ func TestRun_TicketSubset_CompletesWithoutTouchingTicketsOutsideSubset(t *testin
 	}
 }
 
+// TestRun_Drain_WithInFlightTickets_FinishesInFlightThenEndsWithoutNewClaims
+// covers ticket 01a's core seam: draining a running epic must let every
+// already-in-flight ticket finish its full normal lifecycle, must never
+// claim a still-open ticket once draining starts, and must end the run
+// (Run returns nil, EpicComplete fires) once the last in-flight ticket
+// lands — even though ticket 03 is left open, so the ordinary
+// scope.AllSettled exit would never fire on its own.
+func TestRun_Drain_WithInFlightTickets_FinishesInFlightThenEndsWithoutNewClaims(t *testing.T) {
+	scratchDir := writeEpic(t, "my-epic", map[string]string{
+		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
+		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
+		"03-third.md":  "---\nid: \"03\"\nstatus: open\ntype: task\n---\n# Third\n",
+	})
+	d, prompts, _ := fakeDeps()
+
+	gate := NewGate()
+	var drainOnce sync.Once
+	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+		if strings.Contains(opts.Target, iterLabel("my-epic", "01")) {
+			drainOnce.Do(gate.Drain)
+		}
+		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+	}
+
+	sink := &recordingSink{}
+	err := Run(RunOptions{
+		EpicName:   "my-epic",
+		Skill:      "implement",
+		ScratchDir: scratchDir,
+		RepoDir:    "/fake/repo",
+		Gate:       gate,
+	}, d, sink)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	for _, p := range *prompts {
+		if strings.Contains(p, "03-third.md") {
+			t.Fatalf("prompts = %v, ticket 03 must never be claimed once draining starts", *prompts)
+		}
+	}
+
+	for _, name := range []string{"01-first.md", "02-second.md"} {
+		raw, err := os.ReadFile(filepath.Join(scratchDir, "my-epic", "issues", name))
+		if err != nil {
+			t.Fatalf("ReadFile %s: %v", name, err)
+		}
+		if !strings.Contains(string(raw), "status: done") {
+			t.Errorf("%s not marked done:\n%s", name, raw)
+		}
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "my-epic", "issues", "03-third.md"))
+	if err != nil {
+		t.Fatalf("ReadFile 03-third.md: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: open") {
+		t.Errorf("03-third.md = %q, want it left open (never claimed once draining)", raw)
+	}
+
+	calls := sink.snapshot()
+	if calls[len(calls)-1] != "EpicComplete" {
+		t.Fatalf("last sink call = %q, want EpicComplete (the same code point natural completion reaches)", calls[len(calls)-1])
+	}
+}
+
+// TestRun_Drain_ZeroInFlight_EndsImmediately covers ticket 01a's other seam:
+// draining an epic with nothing in flight ends the run immediately, without
+// ever claiming the ticket that's sitting open and unblocked.
+func TestRun_Drain_ZeroInFlight_EndsImmediately(t *testing.T) {
+	scratchDir := writeEpic(t, "my-epic", map[string]string{
+		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
+	})
+	d, prompts, _ := fakeDeps()
+
+	gate := NewGate()
+	gate.Drain()
+
+	sink := &recordingSink{}
+	err := Run(RunOptions{
+		EpicName:   "my-epic",
+		Skill:      "implement",
+		ScratchDir: scratchDir,
+		RepoDir:    "/fake/repo",
+		Gate:       gate,
+	}, d, sink)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if len(*prompts) != 0 {
+		t.Fatalf("prompts = %v, want none: draining with nothing in flight must never claim", *prompts)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "my-epic", "issues", "01-first.md"))
+	if err != nil {
+		t.Fatalf("ReadFile 01-first.md: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: open") {
+		t.Errorf("01-first.md = %q, want it left open (never claimed)", raw)
+	}
+
+	calls := sink.snapshot()
+	if len(calls) == 0 || calls[len(calls)-1] != "EpicComplete" {
+		t.Fatalf("sink calls = %v, want the run to end via EpicComplete immediately", calls)
+	}
+}
+
 // TestRun_ScopeWidenedMidRun_TotalGrowsWithIt is a regression test for the
 // notification total-count bug: total was captured once from the pre-run
 // scope snapshot, so a ticket added to a running epic's scope mid-run (via

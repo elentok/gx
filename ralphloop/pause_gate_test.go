@@ -28,6 +28,30 @@ func TestPauseGate_PauseMarksPausedAndRecordsReason(t *testing.T) {
 	}
 }
 
+func TestPauseGate_Drain_RefusesFutureClaimsWithoutRunningTheClaimFunc(t *testing.T) {
+	g := NewGate()
+	g.Drain()
+
+	if !g.isDraining() {
+		t.Error("isDraining() = false after Drain(), want true")
+	}
+
+	ran := false
+	admitted, err := g.claimIfRunning(func() error {
+		ran = true
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("claimIfRunning() error = %v", err)
+	}
+	if admitted {
+		t.Error("claimIfRunning() admitted = true after Drain(), want false")
+	}
+	if ran {
+		t.Error("claimIfRunning() ran the claim func after Drain(), want it skipped")
+	}
+}
+
 func TestPauseGate_MultiplePausedIterations_AllStayPausedUntilForceResumeClearsLast(t *testing.T) {
 	t.Parallel()
 	g := NewGate()

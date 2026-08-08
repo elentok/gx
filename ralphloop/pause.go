@@ -28,6 +28,7 @@ type Gate struct {
 	reasons  map[string]string // iteration label -> pause reason
 	wake     chan struct{}
 	parkWake chan struct{}
+	draining bool
 }
 
 func NewGate() *Gate {
@@ -48,6 +49,26 @@ func (g *Gate) pause(label, reason string) {
 	g.reasons[label] = reason
 }
 
+// Drain permanently stops this Gate from admitting new claims, without
+// interrupting any iteration already past the claim boundary — unlike
+// Pause, it never expects a ForceResume/resume-signal to arrive and clear
+// it. Once every currently in-flight iteration finishes (or immediately, if
+// none are in flight), Run's own active==0 check ends the run through the
+// same code path natural completion takes; isDraining is what that check
+// consults.
+func (g *Gate) Drain() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.draining = true
+}
+
+// isDraining reports whether Drain has been called on this Gate.
+func (g *Gate) isDraining() bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.draining
+}
+
 // isPaused reports whether any iteration is currently paused, meaning the
 // scheduler must not claim new tickets right now.
 func (g *Gate) isPaused() bool {
@@ -56,13 +77,13 @@ func (g *Gate) isPaused() bool {
 	return len(g.reasons) > 0
 }
 
-// claimIfRunning serializes the pause transition with the complete claim.
-// Pause therefore cannot return while a claim admitted before it is still
-// being recorded on disk.
+// claimIfRunning serializes the pause/drain transition with the complete
+// claim. Pause and Drain therefore cannot return while a claim admitted
+// before them is still being recorded on disk.
 func (g *Gate) claimIfRunning(claim func() error) (bool, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if len(g.reasons) > 0 {
+	if g.draining || len(g.reasons) > 0 {
 		return false, nil
 	}
 	return true, claim()
