@@ -147,3 +147,11 @@ being touched.
 
 Any not-yet-finished acceptance criteria move off the original ticket onto the new one(s) — don't
 leave a criterion sitting on a ticket that's now closed.
+
+**Once step 4/5 hand off (`children` set, original marked `done`), the original's agent must not
+write to a child ticket's file again for any reason.** Ticket files are shared, unlocked plain
+files, not per-worktree or git-tracked — a later raw write can land after the child's own
+independent iteration has already been claimed and launched, clobbering its `status` back to
+`open` and racing the scheduler into reclaiming/relaunching it under the same deterministic agent
+name (`agent_name_taken`). Once handoff happens, the original's job is done; any further changes
+belong on the child ticket, made by the child's own agent.

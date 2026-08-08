@@ -235,6 +235,21 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	var featureMu sync.Mutex
 	var worktreeMu sync.Mutex
 
+	// launched tracks every ticket identifier this Run call has already
+	// claimed and launched (fresh or reattached). claimNext consults it
+	// instead of trusting the ticket file's on-disk status alone: a still-
+	// running iteration's ticket file is a shared, unlocked plain file, and
+	// an unrelated writer (e.g. a parent split ticket's agent touching its
+	// child's file after handoff) can revert its status back to "open"
+	// mid-iteration. Without this guard, the next scheduler scan would see
+	// that revert and reclaim + relaunch the same ticket under its
+	// deterministic herdr agent name, colliding with the still-alive
+	// original (agent_name_taken). Only claimNext reads/writes this map, and
+	// only from Run's own goroutine (via the initial reattach loop below and
+	// the scheduling loop's own claimNext calls), so it needs no locking of
+	// its own.
+	launched := make(map[string]bool)
+
 	gate := opts.Gate
 	if gate == nil {
 		gate = NewGate()
@@ -264,13 +279,19 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			}
 			scanned = epic
 			frontier = scope.Frontier(*epic)
-			if len(frontier) == 0 {
+			for _, candidate := range frontier {
+				if !launched[candidate.Identifier] {
+					ticket = candidate
+					break
+				}
+			}
+			if ticket.Path == "" {
 				return nil
 			}
-			ticket = frontier[0]
 			if err := Claim(ticket.Path); err != nil {
 				return fmt.Errorf("claiming ticket %s: %w", ticket.Identifier, err)
 			}
+			launched[ticket.Identifier] = true
 			// StampEpicStarted is idempotent (see its doc comment), so calling
 			// it on every claim — not just the epic's very first — is safe;
 			// it only ever writes started_at once.
@@ -358,6 +379,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	for _, ticket := range reattached {
 		launch(ticket, true)
 		active++
+		launched[ticket.Identifier] = true
 	}
 
 	for {

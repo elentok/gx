@@ -119,6 +119,100 @@ func TestLaunchAndPrompt_CodexAdoptsSessionIDFromInitialPrompt(t *testing.T) {
 	}
 }
 
+// TestLaunchAndPrompt_AgentNameTakenByOwnWorktree_AttachesInsteadOfFailing is
+// a regression test for the iter-06b agent_name_taken incident's secondary
+// defense (fix 2, on top of claimNext's own launched-set de-dup in
+// loop.go): if AgentStart fails with agent_name_taken and the reported
+// candidate's cwd is this iteration's own SessionCwd, launchAndPrompt must
+// not hard-fail the ticket to needs-attention — it attaches to the live
+// pane (via AgentGet) and waits it out, without sending a second, redundant
+// initial prompt.
+func TestLaunchAndPrompt_AgentNameTakenByOwnWorktree_AttachesInsteadOfFailing(t *testing.T) {
+	var promptCalls int
+	var waitTargets []string
+	sink := &recordingSinkWithArgs{occupancySink: &occupancySink{}}
+
+	d := Deps{
+		AgentStart: func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+			return herdr.Agent{}, &herdr.AgentNameTakenError{
+				Message:      "agent name iter-01 is already used; candidates: cwd=/repo/iter-01 status=Working",
+				CandidateCwd: "/repo/iter-01",
+			}
+		},
+		AgentGet: func(target string) (herdr.Agent, error) {
+			if target != "iter-01" {
+				t.Errorf("AgentGet target = %q, want the agent label %q", target, "iter-01")
+			}
+			return herdr.Agent{PaneID: "live-pane", AgentStatus: "working", AgentSession: "sess-live"}, nil
+		},
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			waitTargets = append(waitTargets, opts.Target)
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			promptCalls++
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
+		},
+		Sleep: func(time.Duration) {},
+	}
+
+	sessionID, err := launchAndPrompt(d, launchAndPromptParams{
+		Label:      "iter-01",
+		Agent:      AgentClaude,
+		Pane:       "fresh-pane",
+		Prompt:     "go",
+		SessionCwd: "/repo/iter-01",
+		Ticket:     "01",
+		StartEvent: eventIterationStarted,
+		Sink:       sink,
+	})
+	if err != nil {
+		t.Fatalf("launchAndPrompt: %v", err)
+	}
+	if sessionID != "sess-live" {
+		t.Errorf("sessionID = %q, want the live agent's own session sess-live", sessionID)
+	}
+	if promptCalls != 0 {
+		t.Errorf("AgentPrompt calls = %d, want 0 (attaching must not re-send the initial prompt)", promptCalls)
+	}
+	for _, target := range waitTargets {
+		if target != "live-pane" {
+			t.Errorf("AgentWait target = %q, want the live pane %q, not the fresh pane we failed to launch in", target, "live-pane")
+		}
+	}
+}
+
+// TestLaunchAndPrompt_AgentNameTakenByUnrelatedWorktree_StillFails covers the
+// flip side: a candidate cwd that does NOT match this iteration's own
+// worktree is a genuine, unrelated name collision, not our own already-
+// running launch — it must still hard-fail rather than silently attaching to
+// someone else's pane.
+func TestLaunchAndPrompt_AgentNameTakenByUnrelatedWorktree_StillFails(t *testing.T) {
+	d := Deps{
+		AgentStart: func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+			return herdr.Agent{}, &herdr.AgentNameTakenError{
+				Message:      "agent name iter-01 is already used; candidates: cwd=/repo/some-other-worktree status=Working",
+				CandidateCwd: "/repo/some-other-worktree",
+			}
+		},
+		AgentGet: func(target string) (herdr.Agent, error) {
+			t.Fatalf("AgentGet called for an unrelated name collision, want a hard failure instead")
+			return herdr.Agent{}, nil
+		},
+	}
+
+	if _, err := launchAndPrompt(d, launchAndPromptParams{
+		Label:      "iter-01",
+		Agent:      AgentClaude,
+		Pane:       "fresh-pane",
+		Prompt:     "go",
+		SessionCwd: "/repo/iter-01",
+		Ticket:     "01",
+	}); err == nil {
+		t.Fatal("launchAndPrompt() error = nil, want a hard failure for an unrelated agent_name_taken collision")
+	}
+}
+
 // recordingSinkWithArgs embeds occupancySink (itself embedding
 // noopEventSink) and additionally hooks IterationStarted, for tests that
 // need both start-time signals asserted together.

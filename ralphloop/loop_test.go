@@ -688,6 +688,91 @@ func TestRun_NeedsAttentionInsideSubset_StillPausesRun(t *testing.T) {
 	}
 }
 
+// TestRun_ClaimNext_IgnoresExternalRevertOfAlreadyLaunchedTicket is a
+// regression test for the iter-06b agent_name_taken race: ticket files are
+// shared, unlocked plain files, and something outside this Run call (e.g. a
+// parent split ticket's agent still writing to its child's file after
+// handoff) can revert an already-claimed ticket's status back to "open"
+// mid-iteration. Without launched-set tracking in claimNext, the scheduler
+// scan triggered when a sibling ticket frees a slot would see that revert
+// and reclaim + relaunch the same ticket, calling AgentStart a second time
+// under its deterministic herdr agent name. Ticket 01 is held mid-iteration
+// (blocked in AgentPrompt) while ticket 02's AgentPrompt call simulates the
+// external clobber of 01's file, then ticket 02 runs to completion — freeing
+// a scheduling slot and triggering exactly the scan that must not reclaim
+// 01.
+func TestRun_ClaimNext_IgnoresExternalRevertOfAlreadyLaunchedTicket(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
+	})
+	ticket01Path := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
+
+	d, _, _ := fakeDeps()
+
+	label01 := "pane-" + iterLabel("epic", "01")
+	label02 := "pane-" + iterLabel("epic", "02")
+
+	var mu sync.Mutex
+	agentStartCalls := map[string]int{}
+	unblock01 := make(chan struct{})
+	var clobberOnce sync.Once
+
+	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+		mu.Lock()
+		agentStartCalls[opts.Pane]++
+		mu.Unlock()
+		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle"}, nil
+	}
+	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+		if opts.Target == label02 {
+			clobberOnce.Do(func() {
+				if err := os.WriteFile(ticket01Path, []byte("---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n"), 0644); err != nil {
+					t.Errorf("simulating external clobber of ticket 01: %v", err)
+				}
+			})
+		}
+		if opts.Target == label01 {
+			<-unblock01
+		}
+		return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
+	}
+	tabClosed02 := make(chan struct{})
+	var tabClosed02Once sync.Once
+	d.TabClose = func(tabID string) error {
+		if tabID == "tab-"+iterLabel("epic", "02") {
+			tabClosed02Once.Do(func() { close(tabClosed02) })
+		}
+		return nil
+	}
+
+	var out bytes.Buffer
+	runErr := make(chan error, 1)
+	go func() {
+		runErr <- Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out))
+	}()
+
+	select {
+	case <-tabClosed02:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for ticket 02 to finish")
+	}
+	// Give the scheduler scan that 02's finish triggers (the one that must
+	// not reclaim 01) time to run before releasing 01.
+	time.Sleep(50 * time.Millisecond)
+	close(unblock01)
+
+	if err := <-runErr; err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if agentStartCalls[label01] != 1 {
+		t.Errorf("AgentStart calls for ticket 01's pane = %d, want exactly 1 (claimNext must not re-claim a ticket it already launched, even after an external write reverted its on-disk status)", agentStartCalls[label01])
+	}
+}
+
 // TestRun_SelectingBlockedTicketThenEditingBlockersRunsCorrectMultiWave is
 // ticket 25's end-to-end regression: a user selects a blocked ticket (the
 // Tickets tab's checked.go cascades in its blocker automatically, so the

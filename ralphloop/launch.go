@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"sync"
@@ -223,7 +224,19 @@ func launchAndPrompt(d Deps, p launchAndPromptParams) (string, error) {
 		AgentArgs: agentArgs(p.Agent, p.ScratchDir, p.EpicName),
 	})
 	if err != nil {
-		return "", fmt.Errorf("launching %s: %w", p.Agent, err)
+		var nameTaken *herdr.AgentNameTakenError
+		if !errors.As(err, &nameTaken) || nameTaken.CandidateCwd == "" || nameTaken.CandidateCwd != p.SessionCwd {
+			return "", fmt.Errorf("launching %s: %w", p.Agent, err)
+		}
+		// The colliding pane's own cwd is this iteration's own worktree —
+		// almost certainly our own already-launched agent, not an unrelated
+		// name collision (claimNext's launched-set de-dup registry in
+		// loop.go should prevent this within one Run; this is belt-and-
+		// braces against any other path that still produces a double-launch,
+		// e.g. a second `gx ralph-loop` process racing the same ticket).
+		// Attach to the live pane instead of hard-failing the whole ticket
+		// to needs-attention.
+		return attachToLiveAgent(d, p)
 	}
 
 	if _, err := d.AgentWait(herdr.AgentWaitOptions{
@@ -257,6 +270,38 @@ func launchAndPrompt(d Deps, p launchAndPromptParams) (string, error) {
 		emitContextOccupancy(d, p.sink(), p.Agent, p.Ticket, p.SessionCwd, sessionID)
 	}
 
+	if err := waitForFinish(d, p, sessionID); err != nil {
+		return "", err
+	}
+	return sessionID, nil
+}
+
+// attachToLiveAgent is launchAndPrompt's fallback once AgentStart reports
+// agent_name_taken for what's judged to be our own already-running pane
+// (see the CandidateCwd check at its call site): rather than send a second,
+// redundant initial prompt into a pane that may already be mid-turn, it
+// reads the live agent's current state via AgentGet and waits it out from
+// there — mirroring reattachIteration's own already-running handling, but
+// staying inside launchAndPrompt so its caller doesn't need to special-case
+// this path.
+func attachToLiveAgent(d Deps, p launchAndPromptParams) (string, error) {
+	live, err := d.AgentGet(p.Label)
+	if err != nil {
+		return "", fmt.Errorf("launching %s: agent name %q already used by our own worktree %s, and reading its live state failed: %w", p.Agent, p.Label, p.SessionCwd, err)
+	}
+	p.Pane = live.PaneID
+	sessionID := live.AgentSession
+
+	p.logLifecycleEvent(p.StartEvent, sessionID)
+	if p.StartEvent != "" {
+		p.sink().IterationStarted(p.Ticket, p.Label, p.SessionCwd, sessionID)
+		emitContextOccupancy(d, p.sink(), p.Agent, p.Ticket, p.SessionCwd, sessionID)
+	}
+
+	if alreadyFinished(live.AgentStatus) {
+		p.logLifecycleEvent(p.FinishEvent, sessionID)
+		return sessionID, nil
+	}
 	if err := waitForFinish(d, p, sessionID); err != nil {
 		return "", err
 	}

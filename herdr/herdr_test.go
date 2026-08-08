@@ -81,6 +81,40 @@ func TestRunJSON_MalformedOutput_ReturnsError(t *testing.T) {
 	}
 }
 
+func TestRun_AgentNameTakenError_ParsesCodeAndCandidateCwd(t *testing.T) {
+	withFakeCommand(t, func(args ...string) ([]byte, error) {
+		return []byte(`{"error":{"code":"agent_name_taken","message":"agent name iter-06b is already used; candidates:\nterminal_id=term_6587c212a7704102 pane_id=w1K:pB workspace_id=w1K tab_id=w1K:tB\ncwd=/Users/david/dev/gx/bugs-03-item-06b status=Working"}}`), errors.New("exit 1")
+	})
+	_, err := run("agent", "start", "iter-06b")
+	if err == nil {
+		t.Fatal("run() error = nil, want error")
+	}
+	var nameTaken *AgentNameTakenError
+	if !errors.As(err, &nameTaken) {
+		t.Fatalf("run() error = %v, want an *AgentNameTakenError", err)
+	}
+	if nameTaken.CandidateCwd != "/Users/david/dev/gx/bugs-03-item-06b" {
+		t.Errorf("CandidateCwd = %q, want the candidate's cwd", nameTaken.CandidateCwd)
+	}
+	if !strings.Contains(nameTaken.Error(), "iter-06b") {
+		t.Errorf("Error() = %q, want it to mention the command context", nameTaken.Error())
+	}
+}
+
+func TestRun_OtherCLIError_NotAgentNameTaken(t *testing.T) {
+	withFakeCommand(t, func(args ...string) ([]byte, error) {
+		return []byte(`{"error":{"code":"pane_not_found","message":"no such pane"}}`), errors.New("exit 1")
+	})
+	_, err := run("agent", "start", "iter-01")
+	if err == nil {
+		t.Fatal("run() error = nil, want error")
+	}
+	var nameTaken *AgentNameTakenError
+	if errors.As(err, &nameTaken) {
+		t.Errorf("run() error = %v, want a plain error (not agent_name_taken)", err)
+	}
+}
+
 func TestAppendFlag(t *testing.T) {
 	got := appendFlag([]string{"a"}, "--flag", "")
 	if len(got) != 1 {
