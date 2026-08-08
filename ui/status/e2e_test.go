@@ -119,6 +119,7 @@ func gitOutputAllowFail(dir string, args ...string) (string, bool) {
 func setupRemoteAndClone(t *testing.T, initialBranch string) (remoteBare, cloneDir string) {
 	t.Helper()
 	src := filepath.Join(t.TempDir(), "src")
+	testutil.RetryRemoveAll(t, src)
 	mustRunGit(t, ".", "init", "--initial-branch="+initialBranch, src)
 	mustRunGit(t, src, "config", "gc.auto", "0")
 	mustRunGit(t, src, "config", "gc.autoDetach", "false")
@@ -129,9 +130,11 @@ func setupRemoteAndClone(t *testing.T, initialBranch string) (remoteBare, cloneD
 	mustRunGit(t, src, "commit", "-m", "initial")
 
 	remoteBare = filepath.Join(t.TempDir(), "origin.git")
+	testutil.RetryRemoveAll(t, remoteBare)
 	mustRunGit(t, ".", "clone", "--bare", src, remoteBare)
 
 	cloneDir = filepath.Join(t.TempDir(), "clone")
+	testutil.RetryRemoveAll(t, cloneDir)
 	mustRunGit(t, ".", "clone", remoteBare, cloneDir)
 	mustRunGit(t, cloneDir, "config", "gc.auto", "0")
 	mustRunGit(t, cloneDir, "config", "gc.autoDetach", "false")
@@ -604,6 +607,7 @@ func TestStageE2E_PushActionWithConfirm(t *testing.T) {
 func TestStageE2E_PullActionUpdatesWorktree(t *testing.T) {
 	remote, repoDir := setupRemoteAndClone(t, "main")
 	other := filepath.Join(t.TempDir(), "other")
+	testutil.RetryRemoveAll(t, other)
 	mustRunGit(t, ".", "clone", remote, other)
 	mustRunGit(t, other, "config", "gc.auto", "0")
 	mustRunGit(t, other, "config", "gc.autoDetach", "false")
@@ -641,6 +645,7 @@ func TestStageE2E_RebaseActionWithConfirm(t *testing.T) {
 	mustRunGit(t, repoDir, "commit", "-m", "feature work")
 
 	other := filepath.Join(t.TempDir(), "other")
+	testutil.RetryRemoveAll(t, other)
 	mustRunGit(t, ".", "clone", remote, other)
 	mustRunGit(t, other, "config", "gc.auto", "0")
 	mustRunGit(t, other, "config", "gc.autoDetach", "false")

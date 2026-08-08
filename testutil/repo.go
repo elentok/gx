@@ -19,21 +19,28 @@ func evalDir(t *testing.T, dir string) string {
 	return real
 }
 
-// TempRepo creates a regular git repo with one initial commit on "main".
-func TempRepo(t *testing.T) string {
+// RetryRemoveAll registers a cleanup that removes dir, retrying on failure.
+// Register it right after creating dir so it runs before t.TempDir()'s own
+// cleanup (t.Cleanup is LIFO). Retrying absorbs lingering background git
+// processes (e.g. a status/refresh command still writing under .git) or
+// macOS APFS races that cause os.RemoveAll to return ENOTEMPTY.
+func RetryRemoveAll(t *testing.T, dir string) {
 	t.Helper()
-	dir := evalDir(t, t.TempDir())
-	// Register a cleanup that removes the repo before t.TempDir's cleanup runs
-	// (t.Cleanup is LIFO). Retrying handles lingering git processes (e.g.
-	// receive-pack after a push) that are still writing to .git/objects.
 	t.Cleanup(func() {
-		for range 10 {
+		for range 40 {
 			if os.RemoveAll(dir) == nil {
 				return
 			}
 			time.Sleep(50 * time.Millisecond)
 		}
 	})
+}
+
+// TempRepo creates a regular git repo with one initial commit on "main".
+func TempRepo(t *testing.T) string {
+	t.Helper()
+	dir := evalDir(t, t.TempDir())
+	RetryRemoveAll(t, dir)
 	mustGit(t, dir, "init", "--initial-branch=main")
 	configUser(t, dir)
 	WriteFile(t, dir, "README.md", "# test")
@@ -51,17 +58,7 @@ func TempBareRepo(t *testing.T) string {
 	bare := evalDir(t, t.TempDir())
 	// Remove the empty TempDir so git clone can create it cleanly
 	os.RemoveAll(bare)
-	// Register a cleanup that removes the repo before t.TempDir's cleanup runs
-	// (t.Cleanup is LIFO). Retrying handles any lingering background git processes
-	// or macOS APFS races that cause os.RemoveAll to return ENOTEMPTY.
-	t.Cleanup(func() {
-		for range 10 {
-			if os.RemoveAll(bare) == nil {
-				return
-			}
-			time.Sleep(50 * time.Millisecond)
-		}
-	})
+	RetryRemoveAll(t, bare)
 	mustRun(t, ".", "git", "clone", "--bare", src, bare)
 	// Configure origin to populate refs/remotes/origin/* on fetch (bare clones
 	// use refs/heads/* by default), then fetch so remote tracking refs exist.
@@ -90,14 +87,7 @@ func TempBareRepoWithMainWorktreeAhead(t *testing.T, featureNames ...string) str
 	// Clone src as a bare repo (acquires both commits; local main = C2 = origin/main).
 	bare := evalDir(t, t.TempDir())
 	os.RemoveAll(bare)
-	t.Cleanup(func() {
-		for range 10 {
-			if os.RemoveAll(bare) == nil {
-				return
-			}
-			time.Sleep(50 * time.Millisecond)
-		}
-	})
+	RetryRemoveAll(t, bare)
 	mustRun(t, ".", "git", "clone", "--bare", src, bare)
 	mustGit(t, bare, "config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*")
 	mustGit(t, bare, "fetch", "origin")
@@ -151,16 +141,7 @@ func TempDotBareRepoWithWorktrees(t *testing.T, names ...string) string {
 	t.Helper()
 	src := TempRepo(t)
 	outer := evalDir(t, t.TempDir())
-	// Remove the outer repo before t.TempDir cleanup (LIFO) and retry to absorb
-	// transient macOS/APFS ENOTEMPTY races from lingering git filesystem activity.
-	t.Cleanup(func() {
-		for range 10 {
-			if os.RemoveAll(outer) == nil {
-				return
-			}
-			time.Sleep(50 * time.Millisecond)
-		}
-	})
+	RetryRemoveAll(t, outer)
 
 	bareDir := filepath.Join(outer, ".bare")
 	mustRun(t, ".", "git", "clone", "--bare", src, bareDir)
