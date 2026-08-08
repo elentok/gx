@@ -3,6 +3,7 @@ package tickets
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -191,31 +192,50 @@ func moveDir(from, to string) error {
 	return os.Rename(from, to)
 }
 
-// mergeDir unions from's entries into to, moving each entry that doesn't
-// already exist at the destination and leaving conflicting entries behind in
-// from. If anything is left behind, that's reported as an error rather than
-// silently dropped or overwritten.
+// mergeDir unions from's files into to, comparing recursively by relative
+// file path rather than top-level entry name (two epic dirs both have an
+// `issues/` subdirectory, so comparing entry names alone would flag that as
+// a conflict even when the files inside don't collide). It's all-or-nothing:
+// if any relative path collides anywhere in the tree, neither side is
+// touched and every colliding path is named in the returned error; otherwise
+// every file is moved over and the now-empty from tree is removed.
 func mergeDir(from, to string) error {
-	entries, err := os.ReadDir(from)
+	var relPaths []string
+	var colliding []string
+
+	err := filepath.WalkDir(from, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(from, path)
+		if err != nil {
+			return err
+		}
+		relPaths = append(relPaths, rel)
+		if _, err := os.Stat(filepath.Join(to, rel)); err == nil {
+			colliding = append(colliding, rel)
+		}
+		return nil
+	})
 	if err != nil {
 		return err
 	}
 
-	var leftover []string
-	for _, entry := range entries {
-		fromPath := filepath.Join(from, entry.Name())
-		toPath := filepath.Join(to, entry.Name())
-		if _, err := os.Stat(toPath); err == nil {
-			leftover = append(leftover, entry.Name())
-			continue
+	if len(colliding) > 0 {
+		return fmt.Errorf("%d path(s) already present at %s, left in place: %v", len(colliding), to, colliding)
+	}
+
+	for _, rel := range relPaths {
+		toPath := filepath.Join(to, rel)
+		if err := os.MkdirAll(filepath.Dir(toPath), 0755); err != nil {
+			return err
 		}
-		if err := os.Rename(fromPath, toPath); err != nil {
+		if err := os.Rename(filepath.Join(from, rel), toPath); err != nil {
 			return err
 		}
 	}
-
-	if len(leftover) > 0 {
-		return fmt.Errorf("%d entr(ies) already present at %s, left in place: %v", len(leftover), to, leftover)
-	}
-	return os.Remove(from)
+	return os.RemoveAll(from)
 }

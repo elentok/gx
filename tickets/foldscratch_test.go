@@ -247,6 +247,59 @@ func TestFoldStrayScratchDirsCollisionPromptsAndResolves(t *testing.T) {
 	assertNotExist(t, strayEpic)
 }
 
+func TestFoldStrayScratchDirsMergeRecursiveNoRealConflict(t *testing.T) {
+	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	strayEpic := filepath.Join(repoDir, "feature-a", ".scratch", "epic1")
+	mustMkdirAll(t, filepath.Join(strayEpic, "issues"))
+	mustWriteFile(t, filepath.Join(strayEpic, "issues", "02-ticket2.md"), "stray ticket")
+
+	canonicalEpic := filepath.Join(repo.ScratchRoot(), "epic1")
+	mustMkdirAll(t, filepath.Join(canonicalEpic, "issues"))
+	mustWriteFile(t, filepath.Join(canonicalEpic, "issues", "01-ticket.md"), "canonical ticket")
+
+	resolve := func(FoldAction) (CollisionResolution, error) { return ResolveMerge, nil }
+	if err := FoldStrayScratchDirs(*repo, resolve); err != nil {
+		t.Fatalf("FoldStrayScratchDirs: %v", err)
+	}
+
+	assertFileContent(t, filepath.Join(canonicalEpic, "issues", "01-ticket.md"), "canonical ticket")
+	assertFileContent(t, filepath.Join(canonicalEpic, "issues", "02-ticket2.md"), "stray ticket")
+	assertNotExist(t, strayEpic)
+}
+
+func TestFoldStrayScratchDirsMergeRealConflictLeavesBothTreesUntouched(t *testing.T) {
+	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	strayEpic := filepath.Join(repoDir, "feature-a", ".scratch", "epic1")
+	mustMkdirAll(t, filepath.Join(strayEpic, "issues"))
+	mustWriteFile(t, filepath.Join(strayEpic, "issues", "01-ticket.md"), "stray version")
+	mustWriteFile(t, filepath.Join(strayEpic, "issues", "02-ticket2.md"), "stray only")
+
+	canonicalEpic := filepath.Join(repo.ScratchRoot(), "epic1")
+	mustMkdirAll(t, filepath.Join(canonicalEpic, "issues"))
+	mustWriteFile(t, filepath.Join(canonicalEpic, "issues", "01-ticket.md"), "canonical version")
+
+	resolve := func(FoldAction) (CollisionResolution, error) { return ResolveMerge, nil }
+	if err := FoldStrayScratchDirs(*repo, resolve); err == nil {
+		t.Fatal("FoldStrayScratchDirs: want error on real conflict, got nil")
+	}
+
+	// All-or-nothing: even the non-colliding ticket must stay put on both sides.
+	assertFileContent(t, filepath.Join(strayEpic, "issues", "01-ticket.md"), "stray version")
+	assertFileContent(t, filepath.Join(strayEpic, "issues", "02-ticket2.md"), "stray only")
+	assertFileContent(t, filepath.Join(canonicalEpic, "issues", "01-ticket.md"), "canonical version")
+	assertNotExist(t, filepath.Join(canonicalEpic, "issues", "02-ticket2.md"))
+}
+
 func neverResolve(t *testing.T) ResolveCollision {
 	t.Helper()
 	return func(action FoldAction) (CollisionResolution, error) {
