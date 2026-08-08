@@ -37,6 +37,7 @@ type HousekeepingScan struct {
 // CleanupScanResult is the full `gx cleanup scan --json` payload.
 type CleanupScanResult struct {
 	Epics        []EpicScan       `json:"epics"`
+	Worktrees    []WorktreeScan   `json:"worktrees"`
 	Housekeeping HousekeepingScan `json:"housekeeping"`
 }
 
@@ -56,15 +57,22 @@ func runCleanupScan(cwd string, jsonOut bool, w io.Writer) error {
 	}
 
 	result := CleanupScanResult{Epics: []EpicScan{}}
+	activeEpics := []tickets.Epic{}
 	for _, epic := range epics {
 		if epic.Name == ".archive" {
 			continue
 		}
+		activeEpics = append(activeEpics, epic)
 		scan, err := scanEpic(repo, epic)
 		if err != nil {
 			return err
 		}
 		result.Epics = append(result.Epics, scan)
+	}
+
+	result.Worktrees, err = scanWorktrees(repo, activeEpics)
+	if err != nil {
+		return err
 	}
 
 	result.Housekeeping, err = scanHousekeeping(*info)
@@ -184,6 +192,27 @@ func printCleanupScanText(w io.Writer, result CleanupScanResult) {
 			}
 		}
 		fmt.Fprintf(w, "  %s: done=%t merged=%t %s\n", e.Name, e.AllDone, e.MergedToMain, codeReview)
+	}
+
+	fmt.Fprintln(w, "Worktrees:")
+	if len(result.Worktrees) == 0 {
+		fmt.Fprintln(w, "  (none)")
+	}
+	for _, ws := range result.Worktrees {
+		detail := ws.Kind
+		switch ws.Kind {
+		case "iteration":
+			detail = fmt.Sprintf("iteration epic=%s ticket=%s done=%t landed=%t", ws.Epic, ws.TicketID, ws.TicketDone, ws.Landed)
+		case "feature":
+			detail = fmt.Sprintf("feature epic=%s merged=%t", ws.Epic, ws.MergedToMain)
+		case "other":
+			detail = fmt.Sprintf("other merged=%t", ws.MergedToMain)
+		}
+		rec := ws.Recommendation
+		if rec == "" {
+			rec = "-"
+		}
+		fmt.Fprintf(w, "  %s: %s active=%t recommendation=%s\n", ws.Branch, detail, ws.Active, rec)
 	}
 
 	fmt.Fprintln(w, "Housekeeping:")

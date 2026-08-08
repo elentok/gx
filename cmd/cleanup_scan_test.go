@@ -10,7 +10,7 @@ import (
 	"github.com/elentok/gx/testutil"
 )
 
-func writeTicket(t *testing.T, dir, epic, filename, id, status, ticketType string) {
+func writeCleanupScanTicket(t *testing.T, dir, epic, filename, id, status, ticketType string) {
 	t.Helper()
 	path := filepath.Join(dir, ".scratch", epic, "issues", filename)
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
@@ -28,14 +28,14 @@ func TestExecute_CleanupScan_EpicsJSON(t *testing.T) {
 	// epic-done-merged-review-done: all tickets done, branch merged (no
 	// extra commits so it's trivially an ancestor of main), has a done
 	// code-review ticket.
-	writeTicket(t, dir, "epic-done-merged-review-done", "01-work.md", "01", "done", "task")
-	writeTicket(t, dir, "epic-done-merged-review-done", "02-review.md", "02", "done", "code-review")
+	writeCleanupScanTicket(t, dir, "epic-done-merged-review-done", "01-work.md", "01", "done", "task")
+	writeCleanupScanTicket(t, dir, "epic-done-merged-review-done", "02-review.md", "02", "done", "code-review")
 	testutil.MustGitExported(t, dir, "branch", "epic-done-merged-review-done")
 
 	// epic-done-unmerged-review-pending: all tickets done except the
 	// code-review ticket; branch has an unmerged commit.
-	writeTicket(t, dir, "epic-done-unmerged-review-pending", "01-work.md", "01", "done", "task")
-	writeTicket(t, dir, "epic-done-unmerged-review-pending", "02-review.md", "02", "ready-for-agent", "code-review")
+	writeCleanupScanTicket(t, dir, "epic-done-unmerged-review-pending", "01-work.md", "01", "done", "task")
+	writeCleanupScanTicket(t, dir, "epic-done-unmerged-review-pending", "02-review.md", "02", "ready-for-agent", "code-review")
 	// Stage and commit only unmerged.txt (not "git add ." / CommitAll) so the
 	// untracked .scratch ticket fixtures never get swept into the commit —
 	// committing them would delete them from disk on the checkout back to
@@ -47,7 +47,7 @@ func TestExecute_CleanupScan_EpicsJSON(t *testing.T) {
 	testutil.MustGitExported(t, dir, "checkout", "main")
 
 	// epic-open-no-review: has an open ticket and no code-review ticket at all.
-	writeTicket(t, dir, "epic-open-no-review", "01-work.md", "01", "open", "task")
+	writeCleanupScanTicket(t, dir, "epic-open-no-review", "01-work.md", "01", "open", "task")
 
 	var stdout bytes.Buffer
 	d := deps{
