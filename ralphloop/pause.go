@@ -69,6 +69,13 @@ func (g *Gate) isDraining() bool {
 	return g.draining
 }
 
+// IsDraining is isDraining, exported for callers outside this package (e.g.
+// ui/tickets' drain-then-replace combo tests) that need to observe whether
+// Drain landed without a package-internal accessor of their own.
+func (g *Gate) IsDraining() bool {
+	return g.isDraining()
+}
+
 // isPaused reports whether any iteration is currently paused, meaning the
 // scheduler must not claim new tickets right now.
 func (g *Gate) isPaused() bool {
