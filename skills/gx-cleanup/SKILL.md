@@ -3,8 +3,9 @@ name: gx-cleanup
 description:
   Scan this repo's epics and branches for cleanup opportunities (archivable done epics,
   mergeable done-but-unmerged epics, deletable landed branches/worktrees), investigate the
-  cases the deterministic scan can't resolve on its own, and present one confirmable plan.
-  Read-only — this half of the skill never archives, deletes, or merges anything itself.
+  cases the deterministic scan can't resolve on its own, present one confirmable plan, and
+  on confirm execute the safe half (archive, safe deletes, review-ticket stubs,
+  housekeeping). Merging is still dry-run only — that executes in a later invocation.
 disable-model-invocation: true
 ---
 
@@ -17,8 +18,10 @@ created for them long after they stop being useful: epics fully done and already
 fully done but never merged, and iteration/feature/other branches whose commits already landed
 elsewhere. `gx cleanup scan` classifies all of this deterministically from git and ticket state.
 This skill turns that classification into a report you can act on: it investigates the handful of
-cases the scan can't resolve on its own, then stops at a single confirm. Nothing is archived,
-deleted, or merged here — that's a separate, later skill invocation (see "Step 6" below).
+cases the scan can't resolve on its own, then stops at a single confirm. On confirm, the
+mechanically-safe actions — archiving, deleting cleanly-landed branches/worktrees, stamping out
+review-ticket stubs, and housekeeping — run immediately (see "Step 6" below). Merging is still not
+performed here: it's dry-run only, executed by a separate, later skill invocation.
 
 ## Step 1: scan
 
@@ -105,16 +108,27 @@ Build:
 
 Present the table plus the scratch file path and get one confirm covering the whole plan.
 
-## Step 6: dry-run output
+## Step 6: execute the safe half
 
-On confirm, print exactly what would run — nothing here executes it:
+On confirm, run the mechanically-safe actions below directly — no further per-item prompting. The
+ff-only-merge path (case-2.1 merge candidates and the "merge, skip review" pick for case-2.2) is
+**not** executed here: print those as dry-run only (`git merge --ff-only` / the rebase-then-merge
+sequence), same as before. That path executes in a later invocation of this skill.
 
-- `mv .scratch/<epic> .scratch/.archive/<epic>` for each done+merged archive
-- `git branch -d <branch>` and `git worktree remove <path>` for each safe delete
-- `gx tickets ensure-code-review <epic>` for each case-2.2 epic where you picked "add review
-  ticket"
-- `git merge --ff-only` (or the rebase-then-merge sequence) for each merge candidate
-- `git rm --cached <file>` / the missing `.gitignore` entry, if `housekeeping` flagged either
+- **Archive** (`all_done && merged_to_main` epics): `mv .scratch/<epic> .scratch/.archive/<epic>`
+  — a plain filesystem move, no git staging or commit, since `.scratch` is gitignored/untracked.
+- **Safe deletes** (branches/worktrees with `recommendation == "delete"`, or investigated as "safe
+  to delete" in Step 3): run `git branch -d <branch>`, then `git worktree remove <path>` if the
+  entry has a `path`. Never pass `--force` to either. If git refuses (not fully merged — the
+  scan's or an investigation's classification was wrong), stop for that item only: leave it as-is,
+  and add it to an end-of-run failure list with the equivalent force command
+  (`git branch -D <branch>` / `git worktree remove --force <path>`) printed for you to run
+  manually — never run the force command yourself.
+- **Case-2.2 "add review ticket" picks**: run `gx tickets ensure-code-review <epic>`, then flag
+  the epic as needs-review in the end-of-run report. Do not attempt to merge it in this run.
+- **Housekeeping**: if `housekeeping.TrackedFiles` is non-empty, `git rm --cached <file>` for each.
+  If `housekeeping.GitignoreHasScratch` is false, append a `.scratch/` entry to `.gitignore`.
 
-This ticket's scope ends here — actually running any of the above happens on a later invocation of
-this skill's execution half.
+Work through archive, safe-delete, case-2.2, then housekeeping, collecting failures as you go
+rather than stopping the whole run on the first one. End with a short report: what ran, what's
+still dry-run (the merge path), and the failure list with its manual force commands, if any.
