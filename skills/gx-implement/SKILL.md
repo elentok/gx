@@ -39,7 +39,7 @@ Before the first edit:
 If the ticket has an `expected_context_window` field, check your file list against it before
 editing - budgets come from the ticket's prose and routinely undercount (one 40K/two-file estimate
 became 19 files, ~500K). If your list is materially larger, **say so in one line and carry on**; the
-user may prefer a split.
+user may prefer a fork.
 
 Then, while working:
 
@@ -52,44 +52,44 @@ Then, while working:
 - **Delegate any survey wider than ~3 files** to a subagent - you keep the conclusion, not the file
   dumps.
 
-## Splitting when the ticket outgrows budget
+## Forking when the ticket outgrows budget
 
 Check the live budget at every natural checkpoint — after a subagent survey returns, after each file
 read above, and before starting a new seam. To check: run `gx agent context-window`, which prints
 the current session's context token count without either agent needing to know the other's
-transcript format. Trigger a split at **90K** — that leaves headroom under the 130K smart-zone
+transcript format. Trigger a fork at **90K** — that leaves headroom under the 130K smart-zone
 budget for growth the check can't see (mid-turn, between checkpoints). If the check itself fails
 (the command errors or can't identify the session), treat that as over-budget — fail toward
-splitting, not past it.
+forking, not past it.
 
-Also split, independent of token count, on a **kind-mismatch**: if mid-implementation you discover
+Also fork, independent of token count, on a **kind-mismatch**: if mid-implementation you discover
 the ticket actually needs new plumbing/infra the original ticket didn't scope for (not just an
 extension of existing logic), that's gx-to-tickets' plumbing/feature split showing up late, not a
-budget problem — split it the same way regardless of how much budget is left.
+budget problem — fork it the same way regardless of how much budget is left.
 
 When either trigger fires:
 
 1. **Finish the current thread to green.** Get to the nearest point where tests pass and the code
-   compiles/typechecks — don't split off a broken half-edit. If nothing's been coded yet (the
+   compiles/typechecks — don't fork off a broken half-edit. If nothing's been coded yet (the
    trigger fired during exploration/design), there's nothing to make green; skip to step 2 and carry
    the design reasoning forward as notes instead of a diff.
 2. **Commit.**
 3. **Create the follow-up ticket(s)**, following [gx-local-tracker.md](../gx-local-tracker.md)'s
-   mid-flight-split numbering, blocking-edge, and `split_from` conventions, and gx-to-tickets'
+   mid-flight-fork numbering, blocking-edge, and `parent` conventions, and gx-to-tickets'
    estimation method. Allocate each new ticket's ID with `gx tickets add <epic> --parent <original-id>
    --slug <descriptive-slug>` — it atomically picks the next free ID (safe against another
-   parallel iteration doing the same split at the same time) and writes the stub straight to
+   parallel iteration doing the same fork at the same time) and writes the stub straight to
    `<id>-<slug>.md`; `--slug` is required, so there's no separate rename step to remember. This
-   chain is uncapped — each split narrows what's left, so it's self-limiting. Move any
+   chain is uncapped — each fork narrows what's left, so it's self-limiting. Move any
    not-yet-finished acceptance criteria off the original ticket onto the new one(s). Do this
    **autonomously** — no pause for user approval; this exists to keep the outer loop unattended.
-4. **Close the original** as done, with `gx tickets set <path> --split 03b,03c` (comma-separated new
-   ticket IDs) and a body note of the token count from the last budget check (e.g.
+4. **Close the original** as done, with `gx tickets set <path> --children 03b,03c` (comma-separated
+   new ticket IDs) and a body note of the token count from the last budget check (e.g.
    `Tokens used: ~85K`) — so it can be matched against the ticket's `expected_context_window` later.
    (`actual_context_window` itself is gx-written at cherry-pick time, not by the agent.) If step 1
    had nothing to commit (design/exploration only, no diff), also pass `--commitless true`:
-   `gx tickets set <path> --split 03b,03c --commitless true`. Without it, ralph-loop's stalled-agent
-   detection flags the split original `needs-info` instead of leaving it `done`.
+   `gx tickets set <path> --children 03b,03c --commitless true`. Without it, ralph-loop's
+   stalled-agent detection flags the forked original `needs-info` instead of leaving it `done`.
 
 ## Comments: fewer, and no numbers in them
 
@@ -113,7 +113,7 @@ Once done, run `gx tickets set <path> --status done`. Code review runs separatel
 the epic, not per-ticket — do not invoke it from here.
 
 If you conclude this ticket needs **no commit** — e.g. exploration shows the behavior already
-exists, or the ticket only needed a split with no code changes of its own — do not leave `Status:
+exists, or the ticket only needed a fork with no code changes of its own — do not leave `Status:
 claimed`. Set a terminal status plus `commitless: true` in one call, e.g.
 `gx tickets set <path> --status done --commitless true`, explaining why in the ticket body. Without
 `commitless: true`, ralph-loop treats a zero-commit finish as a stalled agent and flags the ticket

@@ -19,14 +19,14 @@ re-deriving behavior from source alone.
 concurrently (default 2). Each ticket's status comes from its own `Status:`/`Blocked by:`
 frontmatter; `Frontier` filters to open, unblocked, unclaimed tickets, lowest number first, and
 `RunScope` narrows that further when the caller requested specific ticket IDs — walking each
-ticket's `Parent` chain so mid-run splits and code-review-spawned tickets stay in scope
+ticket's `Parent` chain so mid-run forks and code-review-spawned tickets stay in scope
 dynamically. Each scheduling pass claims a frontier ticket, launches an iteration (new git
 worktree, agent started via `herdr`, the `gx-implement` skill prompt sent), waits for completion
 or a pause condition (smart-zone context ceiling, rate limit), cherry-picks the resulting commits
 onto the epic's feature branch, and marks the ticket done. A freed slot is immediately backfilled
 from the frontier. `Run` exits once every ticket in scope reaches a done-family status.
 
-For the exact rules (statuses, blocking, frontier, mid-flight splits), treat
+For the exact rules (statuses, blocking, frontier, mid-flight forks), treat
 [gx-local-tracker.md](../gx-local-tracker.md) as authoritative — this section is background, not a
 substitute for it.
 

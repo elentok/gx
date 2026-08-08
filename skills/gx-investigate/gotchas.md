@@ -32,10 +32,10 @@ to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKI
 - **`gx tickets add --parent <id>` allocates the correct lettered ID but never writes `parent` into
   the new ticket's own frontmatter.** `cmd/tickets_add.go`'s `runTicketsAdd` only used `parent` to
   compute the new ID via `tickets.NextTicketID`; the stub `schema.Ticket{}` literal never set
-  `stub.Parent`, despite `gx-local-tracker.md`'s "Mid-flight splitting" section documenting this
-  command as the one that sets `parent` "at creation." Every split ticket created the documented
+  `stub.Parent`, despite `gx-local-tracker.md`'s "Mid-flight forking" section documenting this
+  command as the one that sets `parent` "at creation." Every forked ticket created the documented
   way silently lost its `parent` link — the same shape the code-review-scoping gotcha below already
-  flagged as scheduler/Queue-tab-invisible. Found live: `drain-queue`'s `02a1` (split off `02a` for
+  flagged as scheduler/Queue-tab-invisible. Found live: `drain-queue`'s `02a1` (forked off `02a` for
   deferred test coverage) had no `parent` field despite the agent running `gx tickets add
   drain-queue --parent 02a --slug ...` exactly as documented. Fixed by setting `stub.Parent` when
   `parent != ""` before marshaling (`cmd/tickets_add.go`), regression test
@@ -53,27 +53,27 @@ to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKI
   `notification-sent`, the one `epic-complete` send logged `notification-failed reason: "send
   failed with status 400"`. Slack is unaffected (`escapeSlackMrkdwn` doesn't touch parens). Fixed
   by dropping the literal parenthetical ("N tickets landed in..."), same commit as this entry.
-- **A ticket blocked_by its own split-parent can deadlock forever, even though the parent is
-  `done`.** When a ticket splits sequentially (X, then Y where Y is `blocked_by: [X]` and
+- **A ticket blocked_by its own fork-parent can deadlock forever, even though the parent is
+  `done`.** When a ticket forks sequentially (X, then Y where Y is `blocked_by: [X]` and
   `parent: X`), `tickets.Epic.fullyDone`'s recursion into `children` requires every entry in the
   *root* ticket's `children:` list to be done too. If the root's `children:` was written to list
   **both** X and Y directly (instead of just X, with Y nested under X's own `children:`), then
-  resolving "is root fully done" pulls in Y — and `isSelfOrSplitSibling`'s exclusion (keyed on
+  resolving "is root fully done" pulls in Y — and `isSelfOrForkSibling`'s exclusion (keyed on
   `Parent` equality to the ticket being resolved) doesn't catch this, because Y's `parent` is X,
   not root, so Y doesn't read as X's sibling. Net effect: X can never be considered to unblock
   anything until Y (which can't start until X finishes) is also done — a self-deadlock hiding
   behind a `blocked_by` token that looks resolved (the named ticket really is `done`). Found live
   in `drain-queue`'s `01`→`01a`→`01b` chain and `tickets-tree`'s `03b`→`03b1`→`03b2`,
-  `06b`→`06b1`→`06b2`, `06c`→`06c1`→`06c2` (four separate splits, same shape — this looks
+  `06b`→`06b1`→`06b2`, `06c`→`06c1`→`06c2` (four separate forks, same shape — this looks
   systemic to whatever produced these tickets, not a one-off typo). Inert copies of the same
   malformed shape (already-`done` chains, so harmless) also exist at `tickets-tree`'s
   `02d`→`02e` and `06`→`06c`. Two-part fix: (1) data — corrected the four live tickets'
-  `children:`/`parent:` to match (each root lists only its direct split; the intermediate ticket
+  `children:`/`parent:` to match (each root lists only its direct fork; the intermediate ticket
   lists the grandchild) via `gx tickets set <path> --children <id>`; (2) source —
-  `tickets/status.go`'s `isSelfOrSplitSibling` (renamed `isSelfOrSplitSiblingOrDescendant`) now
+  `tickets/status.go`'s `isSelfOrForkSibling` (renamed `isSelfOrForkSiblingOrDescendant`) now
   also excludes any ticket reached by walking `Parent` hops upward from the candidate to the
   ticket being resolved, not just same-`Parent` siblings, so this shape can't deadlock even if a
-  future split's `children:`/`parent:` end up mismatched the same way again. Regression test:
+  future fork's `children:`/`parent:` end up mismatched the same way again. Regression test:
   `TestEpic_UnresolvedBlockers_InheritedTokenNotBlockedByOwnDescendant` in
   `tickets/status_test.go`. Uncommitted as of this diagnosis — see `tickets/status.go` diff.
 - **Code-review-spawned tickets show up in the queue tree but never start.** `gx-code-review` set
@@ -93,7 +93,7 @@ to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKI
   `notifications-fix/issues/01-telegram-notification-failures-research.md` (retry fix) and
   `notifications-fix/issues/02-redact-bot-token-from-run-log.md` (token leak); neither fixed yet.
 - **Spurious "iterN paused" / `agent_name_taken` notification for a ticket that then finishes
-  fine.** A parent ticket doing a mid-flight split (e.g. `06` → `06b`) can still be actively
+  fine.** A parent ticket doing a mid-flight fork (e.g. `06` → `06b`) can still be actively
   authoring the child ticket's file (full-content `Write`, not `gx tickets set`) *after* the
   scheduler has already claimed and launched an independent iteration for that child — the
   child's own agent was already running under a live herdr session. The parent's plain-file
@@ -108,8 +108,8 @@ to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKI
   `Claim()`/`SetStatus()` vs. an agent's raw file `Write`) sharing one ticket file with no locking
   — is real and not yet fixed. Diagnosed via bugs-03 iter-06b/2026-08-08 run-log.jsonl (lines
   56–69); no fix ticket filed yet.
-- **A ticket `blocked_by` on a specific mid-flight-split sibling isn't actually enforced.**
-  `tickets/status.go`'s `UnresolvedBlockers`/`isSelfOrSplitSibling` excludes any candidate blocker
+- **A ticket `blocked_by` on a specific mid-flight-fork sibling isn't actually enforced.**
+  `tickets/status.go`'s `UnresolvedBlockers`/`isSelfOrForkSibling` excludes any candidate blocker
   sharing the checked ticket's `Parent` — meant to stop a ticket deadlocking on its own *inherited*
   parent-blocker token (e.g. `05b`/`05c` both carrying `Blocked by: 05`) — but the exclusion is
   keyed only on `Parent` equality, not on which token is being resolved, so it also swallows a

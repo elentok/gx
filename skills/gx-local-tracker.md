@@ -20,7 +20,7 @@ authoritative.
 - Tickets are one file per ticket at `<root>/<epic-slug>/issues/<NN>-<slug>.md`, numbered from
   `01` — never a single combined tickets file
 - A ticket **identifier** is the filename's numeric prefix, optionally followed by one lowercase
-  letter: `04`, `04a`, `04b`. The letter marks a ticket created by a mid-flight split (see below); a
+  letter: `04`, `04a`, `04b`. The letter marks a ticket created by a mid-flight fork (see below); a
   bare number is an originally-authored ticket.
 
 ## Frontmatter
@@ -52,19 +52,16 @@ Fields:
   below). A lettered token (`"04a"`) names one specific sibling and resolves the same way, via that
   sibling's own children. A `type: code-review` ticket carries no `blocked_by` at all; see its own
   frontier rule below.
-- **`children`** (list of ticket IDs) — the ticket(s) this one produced: a mid-flight split, or (for
+- **`children`** (list of ticket IDs) — the ticket(s) this one produced: a mid-flight fork, or (for
   a `type: code-review` ticket) the fix tickets it opened. `[]` if none.
 - **`parent`** (ticket ID) — the ticket this one was produced from. Omit entirely on a
   normally-authored ticket.
-- **`split`** / **`split_from`** — the legacy spellings of `children`/`parent`. Still accepted when
-  reading a ticket already on disk (for backward compatibility with tickets written before this
-  rename), but never written — every write emits `children`/`parent` only.
 - **`type`** (enum) — one of `task`, `research`, `prototype`, `grilling`, `code-review`. See
   `code-review` below.
 - **`expected_context_window`** (non-negative int) — the estimated tokens the implementation will
   occupy.
 - **`commitless`** (bool) — set `true` when a ticket intentionally finishes an iteration with no
-  commit (e.g. it turned out to need only a split, or the behavior already existed). Pair it with a
+  commit (e.g. it turned out to need only a fork, or the behavior already existed). Pair it with a
   terminal status (`done`, or an unclaimed status) — otherwise the ticket still reads
   as claimed-but-stalled.
 - **`actual_context_window`**, **`elapsed_time`** — read-only, gx-managed. Stamped automatically at
@@ -114,7 +111,7 @@ should leave the ticket visibly claimed, not silently open, so a restart doesn't
 ## Resolution
 
 When a ticket's work lands, set a terminal status: `gx tickets set <path> --status done`. A ticket
-closed by a mid-flight split rather than by landing its own work (see below) is also `done`, with
+closed by a mid-flight fork rather than by landing its own work (see below) is also `done`, with
 `commitless: true` since it never had commits of its own. Other terminal outcomes:
 
 - **`needs-info`** — work is stalled on information only a human can supply. Leave a note in the
@@ -125,16 +122,16 @@ closed by a mid-flight split rather than by landing its own work (see below) is 
 A ticket finished with zero commits must also set `commitless: true` in the same `set` call, or it
 reads as a stalled agent rather than an intentional no-op finish.
 
-## Mid-flight splitting
+## Mid-flight forking
 
-A ticket can be split while work is in progress, when it turns out to be larger than its budget or
-to mix a plumbing/infra concern with a feature-on-top concern. The split reuses this document's
+A ticket can be forked while work is in progress, when it turns out to be larger than its budget or
+to mix a plumbing/infra concern with a feature-on-top concern. The fork reuses this document's
 numbering and blocking conventions:
 
-1. New ticket(s) get a flat sibling number off the root ticket: `04` splits into `04b`, `04c`, ...
+1. New ticket(s) get a flat sibling number off the root ticket: `04` forks into `04b`, `04c`, ...
    (skip `a` if the original ticket's own number, unlettered, is still in use as its identifier).
    Allocate each ID with `gx tickets add <epic> --parent <original-id> --slug <descriptive-slug>`
-   rather than picking the number by hand — it's atomic against concurrent splits landing at the
+   rather than picking the number by hand — it's atomic against concurrent forks landing at the
    same time, and `--slug` (required) writes the stub straight to its final `<id>-<slug>.md`
    filename.
 2. Each new ticket's `blocked_by` includes the original ticket's id.
@@ -146,7 +143,7 @@ numbering and blocking conventions:
 
 Nothing downstream needs editing: a `blocked_by` token naming the original ticket resolves only once
 the original *and every one of its children, recursively* is done (see Frontier above), so a ticket
-already blocked on the pre-split original stays correctly blocked without its `blocked_by` list ever
+already blocked on the pre-fork original stays correctly blocked without its `blocked_by` list ever
 being touched.
 
 Any not-yet-finished acceptance criteria move off the original ticket onto the new one(s) — don't
