@@ -231,6 +231,24 @@ func newTicketsCmd(d deps) *cobra.Command {
 	return cmd
 }
 
+func newMergeCmd(d deps) *cobra.Command {
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:   "merge <branch>",
+		Short: "fast-forward-only merge a branch/worktree onto main (deterministic core)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			cwd, err := d.getwd()
+			if err != nil {
+				return err
+			}
+			return runMerge(cwd, args[0], jsonOut, c.OutOrStdout())
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
+	return cmd
+}
+
 func newCleanupCmd(d deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "cleanup",
