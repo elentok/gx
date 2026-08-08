@@ -231,6 +231,29 @@ func newTicketsCmd(d deps) *cobra.Command {
 	return cmd
 }
 
+func newCleanupCmd(d deps) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "cleanup",
+		Short: "epic/worktree housekeeping",
+	}
+	var jsonOut bool
+	scan := &cobra.Command{
+		Use:   "scan",
+		Short: "report epic done/merged/code-review status and repo housekeeping",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			cwd, err := d.getwd()
+			if err != nil {
+				return err
+			}
+			return runCleanupScan(cwd, jsonOut, c.OutOrStdout())
+		},
+	}
+	scan.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
+	cmd.AddCommand(scan)
+	return cmd
+}
+
 func newConfigCmd(d deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "config",
