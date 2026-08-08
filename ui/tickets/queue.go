@@ -874,7 +874,7 @@ func (m QueueModel) checkedEpicPlans() []checkedEpicPlan {
 
 // checkedEpicPlansFor is checkedEpicPlans' free-function body, shared with the
 // Tickets tab's drain-then-replace combo (handleDrainReplaceKey in
-// implement.go) so both callers build the same launch plan from whichever
+// drain_replace.go) so both callers build the same launch plan from whichever
 // checked/checkOrder pair they hold.
 func checkedEpicPlansFor(epics []tickets.Epic, checked map[string]bool, checkOrder map[string]uint64) []checkedEpicPlan {
 	plans := make([]checkedEpicPlan, 0, len(epics))

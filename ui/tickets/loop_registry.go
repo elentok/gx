@@ -14,19 +14,20 @@ import (
 
 // epicRun is one epic's in-flight ralph-loop state.
 type epicRun struct {
-	drainDone   chan struct{}
-	done, total int
-	sink        *ralphloop.ChannelEventSink
-	gate        *ralphloop.Gate
+	eventDrainDone chan struct{}
+	done, total    int
+	sink           *ralphloop.ChannelEventSink
+	gate           *ralphloop.Gate
 	// scope is written once, by RunOptions.OnScopeResolved shortly after the
 	// run starts (see cmdStartImplement) — until then it's the zero RunScope,
 	// on which Add is a documented no-op.
 	scope ralphloop.RunScope
 	// agent is written once, by setAgent right after tryStart succeeds in
 	// cmdStartImplement — it lets the drain-then-replace combo
-	// (handleDrainReplaceKey in implement.go) capture which agent is driving a
-	// live run and reuse it for the replacement run, since agentFor stops
-	// returning ok=true the moment finish() deletes the epic from r.runs.
+	// (handleDrainReplaceKey in drain_replace.go) capture which agent is
+	// driving a live run and reuse it for the replacement run, since agentFor
+	// stops returning ok=true the moment finish() deletes the epic from
+	// r.runs.
 	agent      ralphloop.AgentKind
 	state      RunState
 	finalError string
@@ -300,8 +301,8 @@ func (r *loopRegistry) tryStart(epicName string, done, total int, scratchDir ...
 
 	sink := ralphloop.NewChannelEventSink()
 	run := &epicRun{
-		drainDone: make(chan struct{}),
-		done:      done, total: total, sink: sink, gate: ralphloop.NewGate(),
+		eventDrainDone: make(chan struct{}),
+		done:           done, total: total, sink: sink, gate: ralphloop.NewGate(),
 		state: RunStateRunning, tickets: map[string]RunTicketSnapshot{},
 		startedAt: time.Now(), holdsAttach: holdsAttach, permitReserved: true,
 	}
@@ -309,7 +310,7 @@ func (r *loopRegistry) tryStart(epicName string, done, total int, scratchDir ...
 	r.runs[epicName] = run
 	r.snapshots[epicName] = run
 	go func() {
-		defer close(run.drainDone)
+		defer close(run.eventDrainDone)
 		for event := range sink.Events() {
 			r.reduceLiveEvent(epicName, event)
 		}
@@ -727,7 +728,7 @@ func (r *loopRegistry) finish(epicName string, err error) {
 	r.mu.Unlock()
 	if run != nil && run.sink != nil {
 		run.sink.Close()
-		<-run.drainDone
+		<-run.eventDrainDone
 	}
 	if run != nil && err != nil && run.failureNotifier != nil {
 		// Fired after the drain completes, from a reporter that was
