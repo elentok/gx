@@ -45,7 +45,9 @@ breaking work into tickets, and claiming/implementing one, are deliberate, expli
 actions, never something the model should trigger on its own reading of a conversation. `gx-cleanup`
 sets the same flag for the same reason: archiving epics and deleting/merging branches is
 deliberate, explicit-invoke-only housekeeping, never something to trigger on the model's own
-reading of a conversation. `gx-tdd` and `gx-resolving-merge-conflicts` carry no such flag, also
+reading of a conversation. `gx-merge` sets the same flag for the same reason: merging a branch onto
+main is deliberate, explicit-invoke-only, never something to trigger on the model's own reading of a
+conversation. `gx-tdd` and `gx-resolving-merge-conflicts` carry no such flag, also
 matching upstream: it's fine for the model to reach for TDD guidance or merge-conflict resolution
 on its own when a task calls for it. `gx-investigate` likewise carries no flag: a bug report should
 reflexively pull in ralph-loop's log/state inventory without a human having to name the skill.
