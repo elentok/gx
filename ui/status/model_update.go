@@ -311,7 +311,7 @@ func (m Model) handleCommitFinished(msg commitFinishedMsg) (Model, tea.Cmd) {
 	if msg.splitApp != "" {
 		return m, notify.Info("opened " + msg.splitApp + " split: git commit")
 	}
-	return m, tea.Batch(notify.Success("committed"), m.refresh(), statusRepoMutatedCmd())
+	return m, tea.Batch(notify.Success("committed"), m.refreshPreserveScroll(), statusRepoMutatedCmd())
 }
 
 func (m Model) handleLazygitLogFinished(msg lazygitLogFinishedMsg) (Model, tea.Cmd) {

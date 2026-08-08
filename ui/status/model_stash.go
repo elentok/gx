@@ -39,7 +39,7 @@ func (m Model) handleStashUpdate(msg tea.Msg) (Model, tea.Cmd) {
 		if result.StagedOnly {
 			label = "stashed staged changes"
 		}
-		return m, tea.Batch(notify.Success(label), m.refresh(), statusRepoMutatedCmd())
+		return m, tea.Batch(notify.Success(label), m.refreshPreserveScroll(), statusRepoMutatedCmd())
 	default:
 		return m, nil
 	}

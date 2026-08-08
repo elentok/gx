@@ -279,8 +279,9 @@ for it, it preserves maximum view state (e.g. status uses `refreshPreserveScroll
 the previous unconditional reload-on-every-activation.
 
 **Manual reload** — a user-initiated reload via the `R` key (and status `m r`). Louder than
-auto-reload: it may reset scroll and flashes a "refreshed" notification. It is also the escape hatch
-for changes made _outside_ gx (external terminal git commands), which do not bump the repo epoch.
+auto-reload only in that it flashes a "refreshed" notification; like auto-reload it preserves scroll
+position and expand/collapse state. It is also the escape hatch for changes made _outside_ gx
+(external terminal git commands), which do not bump the repo epoch.
 
 ## Queue and Attach Lifecycle (Queue Tab)
 

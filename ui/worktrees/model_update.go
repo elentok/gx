@@ -384,13 +384,24 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 			return m, nil
 		}
 		firstLoad := len(m.worktrees) == 0
+		var selectedPath string
+		if cursor := m.table.Cursor(); cursor >= 0 && cursor < len(m.worktrees) {
+			selectedPath = m.worktrees[cursor].Path
+		}
 		m.worktrees = sortedWorktrees(msg.worktrees, m.repo.MainBranch)
 		m.dirties = make(map[string]dirtyState)
 		m = m.resized()
 		m.table.SetRows(m.buildRows())
 
+		// First load has no prior selection to restore (selectedPath is
+		// empty), so it falls back to the worktree the user launched from;
+		// later reloads keep whatever the user had selected instead of
+		// snapping back to the launch worktree.
+		if selectedPath == "" {
+			selectedPath = m.activeWorktreePath
+		}
 		for i, wt := range m.worktrees {
-			if wt.Path == m.activeWorktreePath {
+			if wt.Path == selectedPath {
 				m.table.SetCursor(i)
 				break
 			}

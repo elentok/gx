@@ -153,7 +153,7 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (Model, tea
 	case bindingYankFilename:
 		return m, m.yankFilename()
 	case bindingRefreshMenu:
-		return m, tea.Batch(notify.Success("refreshed"), m.refresh())
+		return m, tea.Batch(notify.Success("refreshed"), m.refreshPreserveScroll())
 	case bindingCancelChord:
 		return m, nil
 	case bindingToggleSection:
@@ -164,7 +164,7 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (Model, tea
 	case bindingContextInc:
 		return m, m.adjustDiffContextLines(1)
 	case bindingRefresh:
-		return m, tea.Batch(notify.Success("refreshed"), m.refresh())
+		return m, tea.Batch(notify.Success("refreshed"), m.refreshPreserveScroll())
 	case bindingRenderMode:
 		return m, m.toggleRenderMode()
 	case bindingPull:
