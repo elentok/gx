@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -221,5 +223,61 @@ func TestLogNotificationSentAndFailed_RecordChannelAndTriggeringKind(t *testing.
 	}
 	if failed.Type != eventNotificationFailed || failed.Channel != "slack" || failed.NotifyKind != notifyKindIterationPaused || failed.Reason != "post failed: 500" {
 		t.Errorf("failed event = %#v", failed)
+	}
+}
+
+func TestSendNotification_FailsOnceThenSucceeds_LogsOneSentAndNoFailed(t *testing.T) {
+	dir := t.TempDir()
+	var attempts atomic.Int32
+	sendSync := func(ctx context.Context) error {
+		if attempts.Add(1) == 1 {
+			return errors.New("transient failure")
+		}
+		return nil
+	}
+
+	sendNotification(dir, "epic", "slack", notifyKindEpicComplete, time.Second, sendSync)
+
+	var events []Event
+	deadline := time.Now().Add(4 * time.Second)
+	for time.Now().Before(deadline) {
+		events, _, _ = readEvents(dir, "epic")
+		if len(events) > 0 {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if len(events) != 1 || events[0].Type != eventNotificationSent {
+		t.Fatalf("run-log events = %#v, want exactly one notification-sent", events)
+	}
+	if got := attempts.Load(); got != 2 {
+		t.Errorf("attempts = %d, want 2", got)
+	}
+}
+
+func TestSendNotification_FailsEveryAttempt_LogsOneFailed(t *testing.T) {
+	dir := t.TempDir()
+	var attempts atomic.Int32
+	sendSync := func(ctx context.Context) error {
+		attempts.Add(1)
+		return errors.New("permanent failure")
+	}
+
+	sendNotification(dir, "epic", "slack", notifyKindEpicComplete, time.Second, sendSync)
+
+	var events []Event
+	deadline := time.Now().Add(4 * time.Second)
+	for time.Now().Before(deadline) {
+		events, _, _ = readEvents(dir, "epic")
+		if len(events) > 0 {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if len(events) != 1 || events[0].Type != eventNotificationFailed {
+		t.Fatalf("run-log events = %#v, want exactly one notification-failed", events)
+	}
+	if got := attempts.Load(); got != 2 {
+		t.Errorf("attempts = %d, want 2", got)
 	}
 }

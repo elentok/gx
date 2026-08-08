@@ -13,8 +13,14 @@ import (
 )
 
 const (
-	telegramAPIBaseURL  = "https://api.telegram.org"
-	telegramSendTimeout = 10 * time.Second
+	telegramAPIBaseURL = "https://api.telegram.org"
+	// telegramSendTimeout bounds a single send attempt (both
+	// http.Client.Timeout and the request context.WithTimeout deadline).
+	// sendNotification retries once on failure, so the worst-case total is
+	// roughly this timeout, plus a fixed backoff, plus a second attempt at
+	// this timeout — kept short so that worst case stays close to a single
+	// 10s attempt rather than doubling it.
+	telegramSendTimeout = 5 * time.Second
 )
 
 // telegramEventSink decorates another EventSink: every call forwards to

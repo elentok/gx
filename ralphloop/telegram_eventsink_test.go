@@ -298,7 +298,9 @@ func TestTelegramEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 	sink.EpicComplete("epic", 1, 0)
 
 	var events []Event
-	deadline := time.Now().Add(2 * time.Second)
+	// 4s headroom: sendNotification retries once after notificationRetryBackoff
+	// (1.5s) before logging notification-failed.
+	deadline := time.Now().Add(4 * time.Second)
 	for time.Now().Before(deadline) {
 		events, _, _ = readEvents(dir, "epic")
 		if len(events) > 0 {
@@ -324,7 +326,9 @@ func TestTelegramEventSink_LogsNotificationFailedToRunLog_RedactsBotToken(t *tes
 	sink.EpicComplete("epic", 1, 0)
 
 	var events []Event
-	deadline := time.Now().Add(2 * time.Second)
+	// 4s headroom: sendNotification retries once after notificationRetryBackoff
+	// (1.5s) before logging notification-failed.
+	deadline := time.Now().Add(4 * time.Second)
 	for time.Now().Before(deadline) {
 		events, _, _ = readEvents(dir, "epic")
 		if len(events) > 0 {

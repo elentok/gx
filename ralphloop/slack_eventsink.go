@@ -11,7 +11,12 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-const slackSendTimeout = 10 * time.Second
+// slackSendTimeout bounds a single send attempt (both http.Client.Timeout
+// and the request context.WithTimeout deadline). sendNotification retries
+// once on failure, so the worst-case total is roughly this timeout, plus a
+// fixed backoff, plus a second attempt at this timeout — kept short so that
+// worst case stays close to a single 10s attempt rather than doubling it.
+const slackSendTimeout = 5 * time.Second
 
 // slackEventSink decorates another EventSink exactly like telegramEventSink:
 // every call forwards to inner unchanged first, and IterationFinished/

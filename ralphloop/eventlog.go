@@ -207,19 +207,41 @@ func logNotificationFailed(scratchDir, epicName, channel, notifyKind, reason str
 	})
 }
 
-// sendNotification runs sendSync in its own goroutine, bounded by timeout, so
-// a slow or unreachable notification endpoint never blocks the caller — the
-// shared goroutine + log-outcome wrapper behind slackEventSink.send and
-// telegramEventSink.send, which were identical except for channel and the
-// sendSync call itself. Any failure is logged via gx's logger and otherwise
-// swallowed, but every attempt, success or failure, is also durably recorded
-// to run-log.jsonl via logNotificationSent/logNotificationFailed, tagged with
+// notificationRetryBackoff is the fixed delay between the first and second
+// send attempt — long enough to ride out a brief network blip (the observed
+// failure was a ~3-minute stall, but transient blips are typically much
+// shorter) without materially adding to worst-case caller-visible latency.
+const notificationRetryBackoff = 1500 * time.Millisecond
+
+// sendNotification runs sendSync in its own goroutine, bounded by timeout per
+// attempt, so a slow or unreachable notification endpoint never blocks the
+// caller — the shared goroutine + log-outcome wrapper behind
+// slackEventSink.send and telegramEventSink.send, which were identical
+// except for channel and the sendSync call itself. It retries once after
+// notificationRetryBackoff before giving up: a single hung attempt (observed
+// hanging to the full per-attempt deadline) is a real stall, not evidence the
+// endpoint is unreachable, and the outage this guards against was
+// intermittent rather than sustained. Only the final outcome is logged —
+// intermediate attempt failures are not — so run-log.jsonl gets one line per
+// notification, not one per attempt. Any failure is logged via gx's logger
+// and otherwise swallowed, but the final outcome is also durably recorded to
+// run-log.jsonl via logNotificationSent/logNotificationFailed, tagged with
 // channel and notifyKind (the live event that triggered it).
 func sendNotification(scratchDir, epicName, channel, notifyKind string, timeout time.Duration, sendSync func(ctx context.Context) error) {
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		defer cancel()
-		if err := sendSync(ctx); err != nil {
+		attempt := func() error {
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			defer cancel()
+			return sendSync(ctx)
+		}
+
+		err := attempt()
+		if err != nil {
+			time.Sleep(notificationRetryBackoff)
+			err = attempt()
+		}
+
+		if err != nil {
 			err = sanitizeSendError(err)
 			logger.Debug("%s: %v\n", channel, err)
 			logNotificationFailed(scratchDir, epicName, channel, notifyKind, err.Error())
