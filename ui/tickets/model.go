@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/tree"
 )
 
 // focusPane is which of the tickets tab's two panels currently receives key
@@ -68,17 +69,13 @@ type Model struct {
 	// produces, would otherwise spawn another parallel chain.
 	autoRefreshStarted bool
 
-	selected       int
-	collapsedEpics map[string]bool
-	// collapsedTickets is collapsedEpics' ticket-level counterpart (ticket
-	// 09): keyed by Ticket.Path (globally unique, unlike Identifier which
-	// restarts numbering per epic), true for a ticket whose children (Parent/
-	// Children, ticket 03) are hidden. Unlike collapsedEpics there's no
-	// default-collapse pass on load — every ticket with children starts
-	// expanded.
-	collapsedTickets map[string]bool
+	// sidebarTree owns the sidebar's selection/scroll/collapse state (ticket
+	// 02e1): a tree.Model[sidebarNode] built from buildSidebarEntries,
+	// replacing the former m.selected/m.scrollOffset/m.collapsedEpics/
+	// m.collapsedTickets fields.
+	sidebarTree tree.Model[sidebarNode]
 	// hideDone is the "tc" chord's toggle (ticket 08): when set, done tickets
-	// are excluded from visibleRows()/sidebarLines() navigation and
+	// are excluded from buildSidebarEntries()/sidebarLines() navigation and
 	// rendering. Epic done/total header counts read epic.Tickets directly
 	// (renderEpicRow), so they're unaffected by this filter.
 	hideDone bool
@@ -98,10 +95,6 @@ type Model struct {
 	// since ticket 15 — a ticket can be queued without being checked.
 	queueStatus map[string]queueItemStatus
 	queueStore  *QueueStore
-	// scrollOffset is the sidebar's line-based scroll position (sidebarLines()
-	// is windowed to it in normalView), kept following m.selected by
-	// ensureSidebarVisible.
-	scrollOffset int
 
 	search search.Model
 
@@ -158,11 +151,13 @@ func NewModelWithStore(worktreeRoot string, settings ui.Settings, extraKeys keys
 	sp.Spinner = TicketProgressSpinner
 	snapshot := store.Snapshot()
 	km := newTicketsManager()
+	sidebarTree := tree.NewModel[sidebarNode]()
 	return Model{
 		worktreeRoot:       worktreeRoot,
 		settings:           settings,
 		keys:               km,
-		help:               help.NewModel(help.BuildSections(km, extraKeys)),
+		sidebarTree:        sidebarTree,
+		help:               help.NewModel(help.BuildSections(km, *sidebarTree.Keys(), extraKeys)),
 		search:             search.NewModel(),
 		previewFocus:       newPreviewFocus(),
 		confirm:            confirm.New(),
@@ -220,7 +215,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.ready = true
 		m.help, _ = m.help.Update(msg)
-		m.ensureSidebarVisible()
+		m.sidebarTree.SetVisibleHeight(m.sidebarViewportHeight())
 		return m, nil
 
 	case epicsLoadedMsg:
@@ -230,7 +225,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refreshQueueSnapshot()
 		m.loaded = true
 		m.epics = msg.epics
-		m.collapsedEpics = defaultCollapsedEpics(msg.epics, m.collapsedEpics)
+		m.sidebarTree.SetCollapsedIDs(defaultCollapsedEpics(msg.epics, m.sidebarTree.CollapsedIDs()))
 		if m.search.HasQuery() {
 			m.recomputeSearchMatches()
 		}
@@ -315,19 +310,11 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// clampSelected keeps the selection within the current visible-row range,
-// e.g. after a collapse hides the rows below it.
+// clampSelected rebuilds the sidebar tree's entries from the current
+// epics/hideDone/collapse state, e.g. after a collapse hides the rows below
+// the selection — SetEntries re-clamps selection to the new entry count.
 func (m *Model) clampSelected() {
-	n := len(m.visibleRows())
-	switch {
-	case n == 0:
-		m.selected = 0
-	case m.selected >= n:
-		m.selected = n - 1
-	case m.selected < 0:
-		m.selected = 0
-	}
-	m.ensureSidebarVisible()
+	m.sidebarTree.SetEntries(m.buildSidebarEntries())
 }
 
 // sidebarViewportHeight is the sidebar body's visible line count, matching
@@ -336,91 +323,6 @@ func (m *Model) clampSelected() {
 func (m Model) sidebarViewportHeight() int {
 	sidebarH, _ := m.splitHeight(m.contentHeight())
 	return max(sidebarH-1, 0)
-}
-
-// sidebarLineForSelected returns the selected row's line index and physical
-// height within sidebarLines()'s output, accounting for the "── Open epics
-// ──"/"── Closed epics ──" section headers (and their "no … epics"
-// placeholder lines) interleaved before and between the row blocks.
-func (m Model) sidebarLineForSelected() (line, height int, ok bool) {
-	if !m.loaded || len(m.epics) == 0 || m.selected < 0 {
-		return 0, 0, false
-	}
-	idxs := make([]int, len(m.epics))
-	for i := range m.epics {
-		idxs[i] = i
-	}
-	openIdxs, closedIdxs := splitEpicIndexesBySection(m.epics, idxs)
-	openRows := m.rowsForEpicOrder(openIdxs)
-	closedRows := m.rowsForEpicOrder(closedIdxs)
-
-	line = 1 // "── Open epics (N) ──"
-	if len(openRows) == 0 {
-		line++ // "no open epics"
-	}
-	if m.selected < len(openRows) {
-		return m.sidebarLineInRows(line, openRows, m.selected)
-	}
-	line += m.renderedRowsHeight(openRows)
-	line += 2 // blank separator + "── Closed epics (N) ──"
-	if len(closedRows) == 0 {
-		line++ // "no closed epics"
-	}
-	idx := m.selected - len(openRows)
-	if idx < 0 || idx >= len(closedRows) {
-		return 0, 0, false
-	}
-	return m.sidebarLineInRows(line, closedRows, idx)
-}
-
-func (m Model) sidebarLineInRows(line int, rows []row, selected int) (int, int, bool) {
-	line += m.renderedRowsHeight(rows[:selected])
-	return line, m.renderedRowHeight(rows[selected]), true
-}
-
-// sidebarRowForLine returns the visibleRows() index whose rendered lines
-// contain targetLine (sidebarLines()' line-numbering), the inverse of
-// sidebarLineForSelected.
-func (m Model) sidebarRowForLine(targetLine int) (int, bool) {
-	if !m.loaded || len(m.epics) == 0 {
-		return 0, false
-	}
-	idxs := make([]int, len(m.epics))
-	for i := range m.epics {
-		idxs[i] = i
-	}
-	openIdxs, closedIdxs := splitEpicIndexesBySection(m.epics, idxs)
-	openRows := m.rowsForEpicOrder(openIdxs)
-	closedRows := m.rowsForEpicOrder(closedIdxs)
-
-	line := 1 // "── Open epics (N) ──"
-	if len(openRows) == 0 {
-		line++
-	}
-	if idx, ok := rowAtLine(m, line, openRows, targetLine); ok {
-		return idx, true
-	}
-	line += m.renderedRowsHeight(openRows)
-	line += 2 // blank separator + "── Closed epics (N) ──"
-	if len(closedRows) == 0 {
-		line++
-	}
-	if idx, ok := rowAtLine(m, line, closedRows, targetLine); ok {
-		return len(openRows) + idx, true
-	}
-	return 0, false
-}
-
-func rowAtLine(m Model, startLine int, rows []row, targetLine int) (int, bool) {
-	line := startLine
-	for i, r := range rows {
-		h := m.renderedRowHeight(r)
-		if targetLine >= line && targetLine < line+h {
-			return i, true
-		}
-		line += h
-	}
-	return 0, false
 }
 
 // handleSidebarMouseClick selects the sidebar row under a left click,
@@ -452,51 +354,14 @@ func (m Model) handleSidebarMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cm
 	if bodyLine < 0 {
 		return m, nil
 	}
-	targetLine := bodyLine + m.scrollOffset
-	idx, ok := m.sidebarRowForLine(targetLine)
-	if !ok {
+	idx := m.sidebarTree.ScrollOffset() + bodyLine
+	if idx < 0 || idx >= len(m.sidebarTree.Entries()) {
 		return m, nil
 	}
 	m.focus = focusSidebar
-	m.selected = idx
-	m.ensureSidebarVisible()
+	m.sidebarTree.SetSelectedIndex(idx)
+	m.skipSectionHeader(1)
 	return m, nil
-}
-
-func (m Model) renderedRowsHeight(rows []row) int {
-	height := 0
-	for _, r := range rows {
-		height += m.renderedRowHeight(r)
-	}
-	return height
-}
-
-// renderedRowHeight is always 1 (ticket 06 folded every row's elapsed/token
-// metrics onto its single title line).
-func (m Model) renderedRowHeight(_ row) int {
-	return 1
-}
-
-// ensureSidebarVisible adjusts scrollOffset minimally so the selected row's
-// line stays within the sidebar's visible window, then clamps it to the
-// content's bounds — called after every selection/collapse/resize change so
-// the cursor never scrolls off-screen (see notes on the tickets tab's
-// scroll-follows-cursor fix).
-func (m *Model) ensureSidebarVisible() {
-	viewportH := m.sidebarViewportHeight()
-	line, rowHeight, ok := m.sidebarLineForSelected()
-	if ok {
-		if line < m.scrollOffset {
-			m.scrollOffset = line
-		}
-		lastLine := line + rowHeight - 1
-		if viewportH > 0 && lastLine >= m.scrollOffset+viewportH {
-			m.scrollOffset = lastLine - viewportH + 1
-		}
-	}
-	total := len(m.sidebarLines())
-	maxOffset := max(0, total-viewportH)
-	m.scrollOffset = max(0, min(m.scrollOffset, maxOffset))
 }
 
 // handleSidebarMouseWheel scrolls the sidebar viewport without moving
@@ -506,20 +371,8 @@ func (m Model) handleSidebarMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cm
 	if !ok {
 		return m, nil
 	}
-	m.scrollOffset += dir * ui.WheelScrollLines
-	total := len(m.sidebarLines())
-	viewportH := m.sidebarViewportHeight()
-	m.scrollOffset = ui.ClampScrollOffset(m.scrollOffset, total, viewportH)
+	m.sidebarTree.ScrollViewport(dir * ui.WheelScrollLines)
 	return m, nil
-}
-
-// sidebarVisibleLines windows sidebarLines() to a single viewportH-line
-// scroll position at m.scrollOffset.
-func (m Model) sidebarVisibleLines(viewportH int) []string {
-	lines := m.sidebarLines()
-	start := min(m.scrollOffset, len(lines))
-	end := min(start+viewportH, len(lines))
-	return lines[start:end]
 }
 
 func (m Model) scratchDir() string {
@@ -594,7 +447,10 @@ func (m Model) normalView() string {
 	sidebarH, previewH := m.splitHeight(h)
 
 	sidebarViewportH := m.sidebarViewportHeight()
-	sidebarBody := ui.AppendScrollbar(m.sidebarVisibleLines(sidebarViewportH), sidebarW-2, len(m.sidebarLines()), sidebarViewportH, m.scrollOffset)
+	allLines := m.sidebarLines()
+	offset := min(m.sidebarTree.ScrollOffset(), len(allLines))
+	end := min(offset+sidebarViewportH, len(allLines))
+	sidebarBody := ui.AppendScrollbar(allLines[offset:end], sidebarW-2, len(allLines), sidebarViewportH, offset)
 	sidebarView := m.renderPanel(sidebarW, sidebarH, "Tickets", m.searchMatchStatus(), sidebarBody, m.focus == focusSidebar, true)
 	previewView := m.renderPanel(previewW, previewH, "Preview", m.previewMatchStatus(), m.previewLines(), m.focus == focusPreview, false)
 

@@ -60,15 +60,14 @@ var (
 	uncheckedGlyphStyle = lipgloss.NewStyle().Foreground(ui.ColorOverlay)
 )
 
-// sidebarLines renders the epic/ticket tree as exactly two headed sections —
-// "Open epics" then "Closed epics" (mirroring the PRs tab's
+// sidebarLines renders m.sidebarTree.Entries() as exactly two headed
+// sections — "Open epics" then "Closed epics" (mirroring the PRs tab's
 // Actionable/Non-actionable split), the same in --all mode as in the
 // single-worktree view: --all just interleaves every worktree's epics into
 // this one grouping, each epic row labeled with its worktree (renderEpicRow).
 // Each epic's expand glyph + name + (open/total) count, each ticket's status
-// icon + title indented beneath it, grouped and collapsed per visibleRows.
-// Row highlighting/search indexing uses each row's position in
-// visibleRows() (i).
+// icon + title indented beneath it. Row highlighting/search indexing uses
+// each entry's position in m.sidebarTree.Entries() (i).
 func (m Model) sidebarLines() []string {
 	if !m.loaded {
 		return []string{ui.StyleDim.Render("  loading…")}
@@ -83,49 +82,37 @@ func (m Model) sidebarLines() []string {
 	}
 	openIdxs, closedIdxs := splitEpicIndexesBySection(m.epics, idxs)
 
+	selectedIdx := m.sidebarTree.SelectedIndex()
 	var lines []string
-	i := 0 // running position within the full visibleRows() slice
-
-	lines = append(lines, sectionHeaderStyle.Render(fmt.Sprintf("── Open epics (%d) ──", len(openIdxs))))
-	if len(openIdxs) == 0 {
-		lines = append(lines, ui.StyleMuted.Render("  no open epics"))
-	}
-	openRows := m.rowsForEpicOrder(openIdxs)
-	lines = m.appendRowLines(lines, openRows, i)
-	i += len(openRows)
-
-	lines = append(lines, "", sectionHeaderStyle.Render(fmt.Sprintf("── Closed epics (%d) ──", len(closedIdxs))))
-	if len(closedIdxs) == 0 {
-		lines = append(lines, ui.StyleMuted.Render("  no closed epics"))
-	}
-	closedRows := m.rowsForEpicOrder(closedIdxs)
-	lines = m.appendRowLines(lines, closedRows, i)
-	i += len(closedRows)
-
-	return lines
-}
-
-// appendRowLines renders rows (a contiguous slice of visibleRows()) onto
-// lines, where startIdx is rows[0]'s position in the full visibleRows()
-// slice — needed so selection highlighting and search-match indexing (both
-// keyed by row position) stay correct despite the interleaved section
-// headers.
-func (m Model) appendRowLines(lines []string, rows []row, startIdx int) []string {
-	for offset, r := range rows {
-		i := startIdx + offset
-		selected := i == m.selected
-		var rowLines []string
-		if r.isEpic() {
-			rowLines = []string{m.renderEpicRow(m.epics[r.epicIdx])}
-		} else {
-			rowLines = m.renderTicketRow(m.epics[r.epicIdx], r, i)
-		}
-		for i, line := range rowLines {
-			if selected {
-				rowLines[i] = ui.RenderRowHighlight(line)
+	for i, e := range m.sidebarTree.Entries() {
+		switch e.Value.kind {
+		case nodeSection:
+			label, n := "Open epics", len(openIdxs)
+			if e.Value.section == sectionClosed {
+				label, n = "Closed epics", len(closedIdxs)
+				lines = append(lines, "")
 			}
+			lines = append(lines, sectionHeaderStyle.Render(fmt.Sprintf("── %s (%d) ──", label, n)))
+			if n == 0 {
+				lines = append(lines, ui.StyleMuted.Render("  no "+strings.ToLower(label)))
+			}
+		case nodeEpic:
+			r, _ := rowFromEntry(e)
+			line := m.renderEpicRow(m.epics[r.epicIdx])
+			if i == selectedIdx {
+				line = ui.RenderRowHighlight(line)
+			}
+			lines = append(lines, line)
+		case nodeTicket:
+			r, _ := rowFromEntry(e)
+			rowLines := m.renderTicketRow(m.epics[r.epicIdx], r, i)
+			if i == selectedIdx {
+				for j, line := range rowLines {
+					rowLines[j] = ui.RenderRowHighlight(line)
+				}
+			}
+			lines = append(lines, rowLines...)
 		}
-		lines = append(lines, rowLines...)
 	}
 	return lines
 }
