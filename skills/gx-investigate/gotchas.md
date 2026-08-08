@@ -10,6 +10,16 @@ to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKI
   *child's own* `parent` field, so the new tickets stayed silently out-of-scope until directly
   requested. Fixed in `35c0d2e` (`ralphloop: log scheduler scans; fix review-ticket scoping`),
   `skills/gx-code-review/SKILL.md` step 7.
+- **Telegram notifications silently drop on any transient network blip, including epic-complete.**
+  `ralphloop/telegram_eventsink.go`'s `send` is one-shot, 10s timeout, zero retries
+  (`ralphloop/eventlog.go:216-227`) — a ~3min DNS/network stall reaching `api.telegram.org`
+  dropped 4 consecutive notifications (3 `iteration-finished` + the final `epic-complete`) in one
+  `gx-merge` run, confirmed via `notification-failed` "context deadline exceeded" entries in
+  `run-log.jsonl` with the send goroutine running to completion (ruling out the process-exit race
+  theory for that run). Also found: the failed-send `reason` string leaks the Telegram bot token
+  into `run-log.jsonl` verbatim (Go's `*url.Error` includes the request URL). See
+  `notifications-fix/issues/01-telegram-notification-failures-research.md` (retry fix) and
+  `notifications-fix/issues/02-redact-bot-token-from-run-log.md` (token leak); neither fixed yet.
 - **Spurious "iterN paused" / `agent_name_taken` notification for a ticket that then finishes
   fine.** A parent ticket doing a mid-flight split (e.g. `06` → `06b`) can still be actively
   authoring the child ticket's file (full-content `Write`, not `gx tickets set`) *after* the

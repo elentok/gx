@@ -3,7 +3,7 @@ name: gx-to-tickets
 description:
   Break a plan, spec, or the current conversation into a set of tracer-bullet tickets against gx's
   local markdown tracker, each declaring its blocking edges and its approved test seams.
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 # gx To Tickets
