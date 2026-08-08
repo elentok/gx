@@ -13,7 +13,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var ticketFilenameRe = regexp.MustCompile(`^(\d+)([[:alpha:]]*)-(.+)\.md$`)
+var ticketFilenameRe = regexp.MustCompile(`^(\d+)([[:alpha:]]?\d*)-(.+)\.md$`)
 
 // Load reads a `.scratch/` directory from real disk into its epics/tickets.
 // A missing directory is not an error: it returns a nil/empty slice, which
@@ -104,7 +104,9 @@ func loadEpic(scratchDir, name string) Epic {
 
 // parseTicketFilename splits a "NN[suffix]-<slug>.md" filename into its
 // numeric sort key, full identifier, and a humanized title. The optional
-// alphabetic suffix supports wayfinder's split tickets (for example 10a).
+// suffix supports wayfinder's split tickets (for example 10a) and, one
+// level deeper, a numeric child of a lettered split (10b1) — see
+// tickets.NextTicketID.
 func parseTicketFilename(filename string) (number int, identifier, title string, ok bool) {
 	m := ticketFilenameRe.FindStringSubmatch(filename)
 	if m == nil {

@@ -52,9 +52,12 @@ func TestTicketID_Valid(t *testing.T) {
 	}{
 		{"04", true},
 		{"06b", true},
+		{"12b1", true},
 		{"4", false},
 		{"4bb", false},
 		{"04-", false},
+		{"12ab", false},
+		{"12b1a", false},
 	}
 	for _, tt := range tests {
 		if got := tt.id.Valid(); got != tt.want {

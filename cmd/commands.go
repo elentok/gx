@@ -243,6 +243,32 @@ func newTicketsCmd(d deps) *cobra.Command {
 			return err
 		},
 	})
+	var addParent string
+	addCmd := &cobra.Command{
+		Use:   "add <epic>",
+		Short: "atomically allocate the next ticket ID and stamp out a stub file",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			cwd, err := d.getwd()
+			if err != nil {
+				return err
+			}
+			return runTicketsAdd(resolveEpicArg(args[0], cwd), addParent, c.OutOrStdout())
+		},
+		ValidArgsFunction: func(c *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			cwd, err := d.getwd()
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveError
+			}
+			names, err := completeEpicNames(cwd)
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveError
+			}
+			return names, cobra.ShellCompDirectiveNoFileComp
+		},
+	}
+	addCmd.Flags().StringVar(&addParent, "parent", "", "allocate a lettered child of this ticket ID (or, if parent is itself lettered, one numeric level past it)")
+	cmd.AddCommand(addCmd)
 	return cmd
 }
 

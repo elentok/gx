@@ -14,13 +14,17 @@ import (
 	"regexp"
 )
 
-// TicketID is a validated ticket identifier, e.g. "04" or "06b": two or more
-// digits with an optional single trailing lowercase letter. Real IDs are
-// zero-padded (hence the 2-digit minimum, stricter than the spec's literal
-// \d+[a-z]? — a bare "4" is not a real ID seen in practice).
+// TicketID is a validated ticket identifier, e.g. "04", "06b", or "06b1":
+// two or more digits, an optional single trailing lowercase letter, and —
+// only past that letter — optional trailing digits for one extra nesting
+// level (a numeric child of a lettered split, see tickets.NextTicketID).
+// Real IDs are zero-padded (hence the 2-digit minimum, stricter than the
+// spec's literal \d+[a-z]?\d* — a bare "4" is not a real ID seen in
+// practice). "06ab" (two letters) and "06b1a" (a letter after a digit
+// suffix) don't match: nesting stops one level past a lettered parent.
 type TicketID string
 
-var ticketIDRe = regexp.MustCompile(`^\d{2,}[a-z]?$`)
+var ticketIDRe = regexp.MustCompile(`^\d{2,}[a-z]?\d*$`)
 
 // Valid reports whether id matches the canonical ticket-identifier format.
 func (id TicketID) Valid() bool {

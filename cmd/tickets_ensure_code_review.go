@@ -61,11 +61,20 @@ func runTicketsEnsureCodeReview(epicPath string, w io.Writer) error {
 	scratchDir := filepath.Dir(epicPath)
 	epicName := filepath.Base(epicPath)
 
+	if info, err := os.Stat(epicPath); err != nil || !info.IsDir() {
+		return fmt.Errorf("epic not found: %s", epicPath)
+	}
+
+	unlock, err := tickets.LockEpic(epicPath)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
 		return fmt.Errorf("loading epics under %s: %w", scratchDir, err)
 	}
-
 	var epic *tickets.Epic
 	for i := range epics {
 		if epics[i].Name == epicName {
@@ -84,7 +93,10 @@ func runTicketsEnsureCodeReview(epicPath string, w io.Writer) error {
 		}
 	}
 
-	id := nextTicketID(epic.Tickets)
+	id, err := tickets.NextTicketID(*epic, "")
+	if err != nil {
+		return err
+	}
 	stubPath := filepath.Join(epicPath, "issues", fmt.Sprintf("%s-code-review.md", id))
 
 	stub := schema.Ticket{
@@ -116,18 +128,4 @@ func runTicketsEnsureCodeReview(epicPath string, w io.Writer) error {
 
 	fmt.Fprintf(w, "%s: created code-review stub\n", stubPath)
 	return nil
-}
-
-// nextTicketID returns the next sequential zero-padded ticket ID after the
-// highest Number among existing, following the epic's existing numbering
-// convention (see tickets/loader.go's ticketFilenameRe). A ticketless epic
-// starts at "01".
-func nextTicketID(existing []tickets.Ticket) string {
-	max := 0
-	for _, t := range existing {
-		if t.Number > max {
-			max = t.Number
-		}
-	}
-	return fmt.Sprintf("%02d", max+1)
 }
