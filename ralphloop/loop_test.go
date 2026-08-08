@@ -624,6 +624,74 @@ func TestRun_TicketSubset_CompletesWithoutTouchingTicketsOutsideSubset(t *testin
 	}
 }
 
+// TestRun_ScopeWidenedMidRun_TotalGrowsWithIt is a regression test for the
+// notification total-count bug: total was captured once from the pre-run
+// scope snapshot, so a ticket added to a running epic's scope mid-run (via
+// the TUI's 'a' key widening RunScope) was counted in Completed once it
+// landed but never grew Total to match, producing nonsensical stats like
+// Completed > Total. Ticket 01 is the only ticket originally in scope;
+// while its iteration is still running, its fake AgentWait call widens the
+// live scope to also include ticket 02 (simulating the TUI action), so by
+// the time ticket 01's IterationFinished fires, Total must already reflect
+// both tickets even though only one has landed.
+func TestRun_ScopeWidenedMidRun_TotalGrowsWithIt(t *testing.T) {
+	scratchDir := writeEpic(t, "my-epic", map[string]string{
+		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
+		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
+	})
+	d, _, _ := fakeDeps()
+
+	var scope RunScope
+	var widenOnce sync.Once
+	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+		if strings.Contains(opts.Target, iterLabel("my-epic", "01")) {
+			widenOnce.Do(func() { scope.Add("02") })
+		}
+		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+	}
+
+	sink := &recordingSink{}
+
+	err := Run(RunOptions{
+		EpicName:   "my-epic",
+		Skill:      "implement",
+		ScratchDir: scratchDir,
+		RepoDir:    "/fake/repo",
+		TicketIDs:  []string{"01"},
+		OnScopeResolved: func(s RunScope) {
+			scope = s
+		},
+	}, d, sink)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	firstStats, ok := sink.iterationStatsByTicket["01"]
+	if !ok {
+		t.Fatalf("no IterationFinished recorded for ticket 01")
+	}
+	if firstStats.Completed != 1 {
+		t.Errorf("ticket 01 stats.Completed = %d, want 1", firstStats.Completed)
+	}
+	if firstStats.Total != 2 {
+		t.Errorf("ticket 01 stats.Total = %d, want 2 (mid-run Add must grow Total before it lands)", firstStats.Total)
+	}
+	if firstStats.Completed > firstStats.Total {
+		t.Errorf("ticket 01 stats: Completed %d > Total %d", firstStats.Completed, firstStats.Total)
+	}
+
+	secondStats, ok := sink.iterationStatsByTicket["02"]
+	if !ok {
+		t.Fatalf("no IterationFinished recorded for ticket 02")
+	}
+	if secondStats.Completed != 2 {
+		t.Errorf("ticket 02 stats.Completed = %d, want 2", secondStats.Completed)
+	}
+	if secondStats.Total != 2 {
+		t.Errorf("ticket 02 stats.Total = %d, want 2", secondStats.Total)
+	}
+}
+
 // TestRun_NeedsAttentionOutsideSubset_DoesNotPauseRun covers ticket 23's
 // requirement: a needs-attention ticket left outside the requested subset
 // must not gate-pause scheduling of the tickets the caller actually asked

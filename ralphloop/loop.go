@@ -443,9 +443,11 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		// (see writeLandedMetrics), so re-parsing off disk here is simpler
 		// than threading a return value up through runIteration/finishIteration.
 		landedTicket := r.ticket
+		liveTotal := total
 		if landedEpic, err := loadNamedEpic(scratchDir, opts.EpicName); err != nil {
 			return err
 		} else if landedEpic != nil {
+			liveTotal = scope.TotalCount(*landedEpic)
 			for _, t := range landedEpic.Tickets {
 				if t.Identifier == r.ticket.Identifier {
 					landedTicket = t
@@ -460,7 +462,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			PeakContextTokens: landedTicket.ActualContextWindow,
 			InProgress:        active,
 			Completed:         completed,
-			Total:             total,
+			Total:             liveTotal,
 		})
 	}
 
