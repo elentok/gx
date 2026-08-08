@@ -21,7 +21,7 @@ Settable fields:
     needs-info, needs-attention, done
   blocked_by (comma-separated ticket IDs, --blocked-by): e.g. 01,03
   children (comma-separated ticket IDs, --children): tickets this one produced (a
-    mid-flight split, or the fix tickets a code-review ticket opened)
+    mid-flight fork, or the fix tickets a code-review ticket opened)
   parent (ticket ID, --parent): the ticket this one was produced from
   type (enum, --type): task, research, prototype, grilling, code-review
   expected_context_window (non-negative int, --expected-context-window)

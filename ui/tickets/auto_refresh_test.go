@@ -73,7 +73,7 @@ func TestQueueModel_AutoRefreshesDataFromDiskWithoutManualReload(t *testing.T) {
 	}
 }
 
-func TestQueueModel_SplitInsertsChildrenAfterOriginalPosition(t *testing.T) {
+func TestQueueModel_ForkInsertsChildrenAfterOriginalPosition(t *testing.T) {
 	root := t.TempDir()
 	writeFrontmatterTicket(t, root, "alpha", "01-x.md", "01", "claimed", nil, "")
 	writeFrontmatterTicket(t, root, "alpha", "02-y.md", "02", "open", nil, "")
@@ -96,7 +96,7 @@ func TestQueueModel_SplitInsertsChildrenAfterOriginalPosition(t *testing.T) {
 		t.Fatalf("expected initial queue order X,Y,Z, got %s", got)
 	}
 
-	// Simulate ticket 01 splitting mid-run into 01a/01b.
+	// Simulate ticket 01 forking mid-run into 01a/01b.
 	writeFrontmatterTicket(t, root, "alpha", "01-x.md", "01", "claimed", []string{"01a", "01b"}, "")
 	writeFrontmatterTicket(t, root, "alpha", "01a-x-cont.md", "01a", "open", nil, "01")
 	writeFrontmatterTicket(t, root, "alpha", "01b-x-cont2.md", "01b", "open", nil, "01")
@@ -106,7 +106,7 @@ func TestQueueModel_SplitInsertsChildrenAfterOriginalPosition(t *testing.T) {
 
 	order = identifiersInOrder(t, m)
 	if got := strings.Join(order, ","); got != "01,01a,01b,02,03" {
-		t.Fatalf("expected split children inserted right after 01 (01,01a,01b,02,03), got %s", got)
+		t.Fatalf("expected forked children inserted right after 01 (01,01a,01b,02,03), got %s", got)
 	}
 }
 

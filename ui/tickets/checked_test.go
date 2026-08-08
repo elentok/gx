@@ -15,9 +15,9 @@ import (
 )
 
 // writeFrontmatterTicket writes a ticket file with real frontmatter fields
-// (id/status/split/split_from), unlike writeTicket's LegacyTicketToFrontmatter
-// conversion which doesn't carry split/split_from.
-func writeFrontmatterTicket(t *testing.T, root, epic, filename, id, status string, split []string, splitFrom string) {
+// (id/status/children/parent), unlike writeTicket's LegacyTicketToFrontmatter
+// conversion which doesn't carry children/parent.
+func writeFrontmatterTicket(t *testing.T, root, epic, filename, id, status string, children []string, parent string) {
 	t.Helper()
 	path := filepath.Join(root, ".scratch", epic, "issues", filename)
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
@@ -25,11 +25,11 @@ func writeFrontmatterTicket(t *testing.T, root, epic, filename, id, status strin
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "---\nid: %q\nstatus: %s\ntype: task\n", id, status)
-	if len(split) > 0 {
-		fmt.Fprintf(&b, "split: [\"%s\"]\n", strings.Join(split, "\", \""))
+	if len(children) > 0 {
+		fmt.Fprintf(&b, "children: [\"%s\"]\n", strings.Join(children, "\", \""))
 	}
-	if splitFrom != "" {
-		fmt.Fprintf(&b, "split_from: %q\n", splitFrom)
+	if parent != "" {
+		fmt.Fprintf(&b, "parent: %q\n", parent)
 	}
 	b.WriteString("---\nBody.\n")
 	if err := os.WriteFile(path, []byte(b.String()), 0644); err != nil {
@@ -320,7 +320,7 @@ func TestModel_CancelingBlockedModalLeavesCheckedSetUnchanged(t *testing.T) {
 	}
 }
 
-func TestModel_MidRunSplitAutoChecksNewSibling(t *testing.T) {
+func TestModel_MidRunForkAutoChecksNewChild(t *testing.T) {
 	root := t.TempDir()
 	writeFrontmatterTicket(t, root, "my-epic", "01-first-ticket.md", "01", "claimed", nil, "")
 
@@ -336,36 +336,36 @@ func TestModel_MidRunSplitAutoChecksNewSibling(t *testing.T) {
 	updated, _ = m.Update(spacePress())
 	m = updated.(Model)
 	if !m.isChecked(ticket.Path) {
-		t.Fatalf("expected ticket checked before simulating the split")
+		t.Fatalf("expected ticket checked before simulating the fork")
 	}
 
-	// Simulate a mid-run split: the parent's `split` frontmatter gains an
-	// entry and the new sibling ticket appears on disk, exactly as
-	// implement/SKILL.md's split convention writes it.
+	// Simulate a mid-run fork: the parent's `children` frontmatter gains an
+	// entry and the new child ticket appears on disk, exactly as
+	// implement/SKILL.md's fork convention writes it.
 	writeFrontmatterTicket(t, root, "my-epic", "01-first-ticket.md", "01", "claimed", []string{"01a"}, "")
 	writeFrontmatterTicket(t, root, "my-epic", "01a-first-ticket-cont.md", "01a", "open", nil, "01")
 
 	m = deliverLoad(t, m)
 
 	if m.confirm.IsOpen {
-		t.Fatalf("expected no confirmation modal for an auto-checked split child")
+		t.Fatalf("expected no confirmation modal for an auto-checked forked child")
 	}
-	var sibling tickets.Ticket
+	var child tickets.Ticket
 	found := false
 	for _, tk := range m.epics[0].Tickets {
 		if tk.Identifier == "01a" {
-			sibling, found = tk, true
+			child, found = tk, true
 		}
 	}
 	if !found {
-		t.Fatalf("expected sibling ticket 01a to be loaded")
+		t.Fatalf("expected forked child ticket 01a to be loaded")
 	}
-	if !m.isChecked(sibling.Path) {
-		t.Fatalf("expected split sibling ticket auto-checked")
+	if !m.isChecked(child.Path) {
+		t.Fatalf("expected forked child ticket auto-checked")
 	}
 }
 
-func TestModel_SplitOnUncheckedTicketDoesNotAutoCheckSibling(t *testing.T) {
+func TestModel_ForkOnUncheckedTicketDoesNotAutoCheckChild(t *testing.T) {
 	root := t.TempDir()
 	writeFrontmatterTicket(t, root, "my-epic", "01-first-ticket.md", "01", "claimed", nil, "")
 
@@ -379,18 +379,18 @@ func TestModel_SplitOnUncheckedTicketDoesNotAutoCheckSibling(t *testing.T) {
 
 	m = deliverLoad(t, m)
 
-	var sibling tickets.Ticket
+	var child tickets.Ticket
 	found := false
 	for _, tk := range m.epics[0].Tickets {
 		if tk.Identifier == "01a" {
-			sibling, found = tk, true
+			child, found = tk, true
 		}
 	}
 	if !found {
-		t.Fatalf("expected sibling ticket 01a to be loaded")
+		t.Fatalf("expected forked child ticket 01a to be loaded")
 	}
-	if m.isChecked(sibling.Path) {
-		t.Fatalf("expected split sibling to stay unchecked when the parent was never checked")
+	if m.isChecked(child.Path) {
+		t.Fatalf("expected forked child to stay unchecked when the parent was never checked")
 	}
 }
 
