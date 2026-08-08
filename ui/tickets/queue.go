@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/terminalrun"
+	"github.com/elentok/gx/ui/tree"
 )
 
 // QueueModel renders a checked selection as dependency-aware epic waves.
@@ -62,8 +63,9 @@ type QueueModel struct {
 	// instance, mirroring Model.autoRefreshStarted.
 	autoRefreshStarted bool
 
-	selected     int
-	scrollOffset int
+	// queueTree owns the Queue tab's selection/scroll/collapse state
+	// (tree.Model[queueNode], see queue_rows.go's buildQueueEntries).
+	queueTree tree.Model[queueNode]
 
 	implementAgentMenuOpen bool
 	implementAgentMenu     components.MenuState
@@ -103,12 +105,6 @@ type QueueModel struct {
 	// action instead of being swallowed (ticket 16).
 	keys keys.Manager
 	help help.Model
-	// collapsedQueueTickets is the Queue tab's counterpart to the Tickets
-	// tab's collapsedTickets (ticket 09), keyed by Ticket.Path, true for a
-	// ticket whose children (Parent/Children, ticket 03) are hidden in
-	// rows()/rowsAndPlanErrors() (ticket 10). Every ticket with children
-	// starts expanded — no default-collapse pass.
-	collapsedQueueTickets map[string]bool
 
 	// previewFocus backs the preview panel's scroll/search machinery, shared
 	// with the Tickets tab (see preview_focus.go) — ticket 11 gave the Queue
@@ -130,6 +126,7 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 	sp := spinner.New()
 	sp.Spinner = TicketProgressSpinner
 	km := newQueueKeysManager()
+	queueTree := tree.NewModel[queueNode]()
 	return QueueModel{
 		executionTickets:   map[string]bool{},
 		runTicketIDs:       map[string][]string{},
@@ -147,7 +144,8 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 		confirm:            confirm.New(),
 		search:             search.NewModel(),
 		keys:               km,
-		help:               help.NewModel(help.BuildSections(km, extraKeys)),
+		queueTree:          queueTree,
+		help:               help.NewModel(help.BuildSections(km, *queueTree.Keys(), extraKeys)),
 		previewFocus:       newPreviewFocus(),
 	}
 }
@@ -202,7 +200,7 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.ready = true
 		m.help, _ = m.help.Update(msg)
-		m.ensureQueueVisible()
+		m.queueTree.SetVisibleHeight(m.queueViewportHeight())
 		return m, nil
 	case queueEpicsLoadedMsg:
 		if err := autoQueueForkedChildren(m.epics, msg.epics, m.queueStore); err != nil {
@@ -362,8 +360,7 @@ func (m QueueModel) handleQueueMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea
 		m.previewVP, cmd = m.previewVP.Update(msg)
 		return m, cmd
 	}
-	m.scrollOffset += dir * ui.WheelScrollLines
-	m.clampScrollOffset()
+	m.queueTree.ScrollViewport(dir * ui.WheelScrollLines)
 	return m, nil
 }
 
@@ -391,19 +388,11 @@ func (m QueueModel) handleQueueMouseClick(msg tea.MouseClickMsg) (tea.Model, tea
 	if m.previewFocus.clickToFocus(mouse, m.width, m.contentHeight()) {
 		return m, nil
 	}
-	bodyLine := mouse.Y - 1
+	bodyLine := mouse.Y - 1 - len(m.queueHeaderBodyLines())
 	if bodyLine < 0 {
 		return m, nil
 	}
-	line := bodyLine + m.scrollOffset
-	_, offsets, heights := m.buildQueueLines()
-	for i, offset := range offsets {
-		if line >= offset && line < offset+heights[i] {
-			m.selected = i
-			m.ensureQueueVisible()
-			return m, nil
-		}
-	}
+	m.queueTree.SetSelectedIndex(m.queueTree.ScrollOffset() + bodyLine)
 	return m, nil
 }
 
@@ -721,25 +710,12 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
 		return m, nav.Back()
-	case "j", "down":
-		m.moveSelection(1)
-	case "k", "up":
-		m.moveSelection(-1)
-	case "h", "left":
-		m.collapseSelectedQueueRow()
-	case "l", "right":
-		if m.queueFocusPreviewOrExpand() {
-			return m, nil
-		}
-		m.expandSelectedQueueRow()
 	case "G":
 		m.selectLastRow()
+		return m, nil
 	case "b":
 		m.previewVP.GotoBottom()
-	case "ctrl+d":
-		m.moveSelection(list.DefaultScroll)
-	case "ctrl+u":
-		m.moveSelection(-list.DefaultScroll)
+		return m, nil
 	case "R":
 		return m, m.cmdLoadQueue()
 	case "p":
@@ -758,6 +734,7 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				AcceptCmd: cmdConfirmQueueClear(paths),
 			})
 		}
+		return m, nil
 	case "c":
 		if paths := m.doneCheckedPaths(); len(paths) > 0 {
 			m.confirm = m.confirm.Open(confirm.Options{
@@ -765,6 +742,7 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				AcceptCmd: cmdConfirmQueueClear(paths),
 			})
 		}
+		return m, nil
 	case "x":
 		return m.handleQueueDeleteKey()
 	case "m":
@@ -789,12 +767,43 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.implementAgentMenuOpen = true
 			return m, nil
 		}
+	}
+
+	// "l"/"right"/"enter": queueFocusPreviewOrExpand (queue_preview.go)
+	// already implements the preview-vs-expand interception — on a leaf row,
+	// or a row with children that's already expanded, it hands focus to the
+	// preview panel; on a collapsed row with children it reports false so
+	// the press falls through to m.queueTree.Update below, which expands it
+	// via tree's own BindingExpand/BindingToggle. Mirrors 02e1's two-manager
+	// ordering for the Tickets-tab sidebar.
+	if s := msg.String(); s == "l" || s == "right" || s == "enter" {
 		if m.queueFocusPreviewOrExpand() {
 			return m, nil
 		}
-		m.expandSelectedQueueRow()
 	}
-	return m, nil
+
+	next, cmd, result := m.queueTree.Update(msg)
+	m.queueTree = next
+	if result.RebuildRequested {
+		m.clampSelected()
+		if m.search.HasQuery() {
+			m.recomputeQueueSearchMatches()
+		}
+	}
+	if result.OpenSelected {
+		m.focus = focusPreview
+	}
+	if !result.Handled {
+		if match, consumed := m.queueTree.Keys().Process(msg); consumed && match != nil {
+			switch match.ID {
+			case tree.BindingPageDown:
+				m.queueTree.ScrollPage(list.DefaultScroll)
+			case tree.BindingPageUp:
+				m.queueTree.ScrollPage(-list.DefaultScroll)
+			}
+		}
+	}
+	return m, cmd
 }
 
 func (m QueueModel) handleQueueAgentMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -932,120 +941,29 @@ func (m *QueueModel) startAvailableEpics() tea.Cmd {
 	}
 }
 
-// collapseSelectedQueueRow handles "h"/"left": on a row with children that's
-// currently expanded it collapses that row's own children, mirroring the
-// Tickets tab's collapseSelectedEpic (ticket 09) one level down since the
-// Queue tab has no epic-level collapse of its own. On any other row (a leaf,
-// or one already collapsed) with a nested parent it jumps selection up to
-// that parent row instead.
-func (m *QueueModel) collapseSelectedQueueRow() {
-	rows := m.rows()
-	if m.selected < 0 || m.selected >= len(rows) {
-		return
-	}
-	r := rows[m.selected]
-	if r.hasChildren && r.expanded {
-		m.setCollapsedQueueTicket(r.ticket.Path, true)
-		return
-	}
-	if r.parentPath != "" {
-		m.jumpToQueueTicket(r.parentPath)
-	}
-}
-
-// expandSelectedQueueRow handles "l"/"right": on a collapsed row with
-// children it expands that row's own children, mirroring the Tickets tab's
-// expandSelectedEpic (ticket 09) one level down.
-func (m *QueueModel) expandSelectedQueueRow() {
-	rows := m.rows()
-	if m.selected < 0 || m.selected >= len(rows) {
-		return
-	}
-	r := rows[m.selected]
-	if r.hasChildren && !r.expanded {
-		m.setCollapsedQueueTicket(r.ticket.Path, false)
-	}
-}
-
-// jumpToQueueTicket moves the selection to the row for the ticket at path,
-// collapseSelectedQueueRow's counterpart to the Tickets tab's jumpToTicket.
-// The target is always present in rows(): a child row only ever appears once
-// every one of its ancestors is expanded.
-func (m *QueueModel) jumpToQueueTicket(path string) {
-	for i, r := range m.rows() {
-		if r.ticket.Path == path {
-			m.selected = i
-			m.ensureQueueVisible()
-			return
-		}
-	}
-}
-
-// setCollapsedQueueTicket is the Queue tab's counterpart to the Tickets
-// tab's setCollapsedTicket (ticket 09), keyed by Ticket.Path since it's read
-// from collapsedQueueTickets by ui/tree's entry-builder inside
-// queueRowsForEpic.
-func (m *QueueModel) setCollapsedQueueTicket(path string, collapsed bool) {
-	if m.collapsedQueueTickets == nil {
-		m.collapsedQueueTickets = map[string]bool{}
-	}
-	if collapsed {
-		m.collapsedQueueTickets[path] = true
-	} else {
-		delete(m.collapsedQueueTickets, path)
-	}
-	if m.search.HasQuery() {
-		m.recomputeQueueSearchMatches()
-	}
-	m.clampSelected()
-}
-
 // selectFirstRow/selectLastRow implement "gg"/"G": jump the queue selection
 // to the first/last row, mirroring the Tickets tab's own selectFirstRow/
 // selectLastRow (model_keys.go).
 func (m *QueueModel) selectFirstRow() {
-	if len(m.rows()) == 0 {
+	if len(m.queueTree.Entries()) == 0 {
 		return
 	}
-	m.selected = 0
-	m.ensureQueueVisible()
+	m.queueTree.SetSelectedIndex(0)
 }
 
 func (m *QueueModel) selectLastRow() {
-	n := len(m.rows())
+	n := len(m.queueTree.Entries())
 	if n == 0 {
 		return
 	}
-	m.selected = n - 1
-	m.ensureQueueVisible()
+	m.queueTree.SetSelectedIndex(n - 1)
 }
 
-func (m *QueueModel) moveSelection(delta int) {
-	rows := m.rows()
-	if len(rows) == 0 {
-		return
-	}
-	m.selected += delta
-	if m.selected < 0 {
-		m.selected = 0
-	}
-	if m.selected >= len(rows) {
-		m.selected = len(rows) - 1
-	}
-	m.ensureQueueVisible()
-}
-
+// clampSelected rebuilds the queue tree's entries from the current
+// epics/hideComplete/collapse state — SetEntries re-clamps selection to the
+// new entry count.
 func (m *QueueModel) clampSelected() {
-	n := len(m.rows())
-	switch {
-	case n == 0:
-		m.selected = 0
-	case m.selected >= n:
-		m.selected = n - 1
-	case m.selected < 0:
-		m.selected = 0
-	}
-	m.ensureQueueVisible()
+	m.queueTree.SetEntries(m.buildQueueEntries())
 }
 
 // queueViewportHeight is the queue panel's visible body line count, matching
@@ -1057,29 +975,4 @@ func (m *QueueModel) clampSelected() {
 func (m QueueModel) queueViewportHeight() int {
 	sidebarH, _ := splitPanelHeight(m.width, m.contentHeight())
 	return max(sidebarH-1, 0)
-}
-
-// ensureQueueVisible adjusts scrollOffset minimally so the selected row's
-// lines stay within the queue panel's visible window, mirroring the Tickets
-// tab's ensureSidebarVisible (model.go) — needed because a row can be one or
-// two physical lines depending on its live/done status.
-func (m *QueueModel) ensureQueueVisible() {
-	viewportH := m.queueViewportHeight()
-	line, rowHeight, ok := m.queueLineForSelected()
-	if ok {
-		if line < m.scrollOffset {
-			m.scrollOffset = line
-		}
-		lastLine := line + rowHeight - 1
-		if viewportH > 0 && lastLine >= m.scrollOffset+viewportH {
-			m.scrollOffset = lastLine - viewportH + 1
-		}
-	}
-	m.clampScrollOffset()
-}
-
-func (m *QueueModel) clampScrollOffset() {
-	total := len(m.queueLines())
-	viewportH := m.queueViewportHeight()
-	m.scrollOffset = ui.ClampScrollOffset(m.scrollOffset, total, viewportH)
 }

@@ -60,9 +60,119 @@ func (m QueueModel) rowsAndPlanErrors() ([]queueRow, map[string]error) {
 		if m.hideComplete {
 			ordered = filterDoneTickets(epic, ordered)
 		}
-		out = append(out, queueRowsForEpic(epic, ordered, m.collapsedQueueTickets)...)
+		out = append(out, queueRowsForEpic(epic, ordered, m.queueTree.CollapsedIDs())...)
 	}
 	return out, planErrs
+}
+
+// queueNodeKind distinguishes the five row kinds the Queue tab's tree can
+// hold: a per-epic blank separator, its status/context-window header lines,
+// an optional plan-error line, and a ticket. tree.Model[T] has no notion of a
+// heterogeneous node — this sum type plus buildQueueEntries' idFn/childrenFn
+// is what makes one tree.Model[queueNode] stand in for buildQueueLines'
+// former hand-spliced header/blank/error strings interleaved with
+// queueRowsForEpic's ticket rows.
+type queueNodeKind int
+
+const (
+	nodeEpicSeparator queueNodeKind = iota // blank line before every epic
+	nodeEpicStatus                         // epic name + status icon/text (epicStatusLine)
+	nodeEpicContext                        // context-window metrics line
+	nodeEpicError                          // present only when planErrs[epic.Name] != nil
+	nodeQueueTicket                        // wraps a queueRow
+)
+
+// queueNode is ui/tree.Model[queueNode]'s value type. err is set only for
+// nodeEpicError, ticket only for nodeQueueTicket.
+type queueNode struct {
+	kind   queueNodeKind
+	epic   tickets.Epic
+	err    error
+	ticket queueRow
+}
+
+// buildQueueEntries flattens m.epics into the Queue tab's full tree.Entry
+// list: each epic with at least one candidate ticket contributes a blank
+// separator, its status/context-window header lines, an optional plan-error
+// line, and its own candidate tickets nested by Parent/Children — mirroring
+// buildSidebarEntries (model_data.go) one level down. Reuses
+// epicWaves/epicRowOrder/filterDoneTickets/nearestVisibleQueueAncestor
+// unchanged (rowsAndPlanErrors' own data-prep); only the final step —
+// wrapping ordered tickets into queueNode tree entries instead of []queueRow
+// via queueRowsForEpic — is new. Called on every
+// queueEpicsLoadedMsg/hideComplete toggle/collapse mutation via
+// clampSelected.
+func (m QueueModel) buildQueueEntries() []tree.Entry[queueNode] {
+	candidates := m.candidates
+	if candidates == nil {
+		candidates = make(map[string]bool, len(m.checked))
+	}
+	for path := range m.checked {
+		candidates[path] = true
+	}
+
+	var roots []queueNode
+	childrenOf := map[string][]queueNode{}
+
+	for _, epic := range m.epics {
+		waves, planErr := epicWaves(epic, candidates, m.settings.MaxConcurrentTicketsPerEpic())
+		ordered := epicRowOrder(epic, waves, candidates)
+		if m.hideComplete {
+			ordered = filterDoneTickets(epic, ordered)
+		}
+		if len(ordered) == 0 {
+			continue
+		}
+
+		roots = append(roots, queueNode{kind: nodeEpicSeparator, epic: epic})
+		roots = append(roots, queueNode{kind: nodeEpicStatus, epic: epic})
+		roots = append(roots, queueNode{kind: nodeEpicContext, epic: epic})
+		if planErr != nil {
+			roots = append(roots, queueNode{kind: nodeEpicError, epic: epic, err: planErr})
+		}
+
+		visible := make(map[string]bool, len(ordered))
+		for _, t := range ordered {
+			visible[t.Path] = true
+		}
+		byIdentifier := make(map[string]tickets.Ticket, len(epic.Tickets))
+		for _, t := range epic.Tickets {
+			if t.Identifier != "" {
+				byIdentifier[t.Identifier] = t
+			}
+		}
+		for _, t := range ordered {
+			node := queueNode{kind: nodeQueueTicket, epic: epic, ticket: queueRow{epic: epic, ticket: t}}
+			if parentPath := nearestVisibleQueueAncestor(t, visible, byIdentifier); parentPath != "" {
+				childrenOf[parentPath] = append(childrenOf[parentPath], node)
+			} else {
+				roots = append(roots, node)
+			}
+		}
+	}
+
+	idFn := func(n queueNode) string {
+		switch n.kind {
+		case nodeEpicSeparator:
+			return "epic:" + n.epic.Name + ":sep"
+		case nodeEpicStatus:
+			return "epic:" + n.epic.Name + ":status"
+		case nodeEpicContext:
+			return "epic:" + n.epic.Name + ":context"
+		case nodeEpicError:
+			return "epic:" + n.epic.Name + ":err"
+		default:
+			return n.ticket.ticket.Path
+		}
+	}
+	childrenFn := func(n queueNode) []queueNode {
+		if n.kind != nodeQueueTicket {
+			return nil
+		}
+		return childrenOf[n.ticket.ticket.Path]
+	}
+
+	return tree.BuildEntriesFromValues(roots, idFn, childrenFn, m.queueTree.CollapsedIDs())
 }
 
 // filterDoneTickets drops a done ticket from ordered before nesting
