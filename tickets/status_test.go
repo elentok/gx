@@ -162,6 +162,18 @@ func TestEpic_UnresolvedBlockers_SelfExcludedFromOwnFamily(t *testing.T) {
 	}
 }
 
+// TestEpic_UnresolvedBlockers_SelfBlockedResolves covers a ticket
+// pathologically Blocked by: its own identifier — it must resolve rather
+// than deadlock, since it can never become done while still being checked.
+func TestEpic_UnresolvedBlockers_SelfBlockedResolves(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, Identifier: "01", BlockedBy: []string{"1"}, Status: "open"},
+	}}
+	if got := epic.UnresolvedBlockers(epic.Tickets[0]); got != nil {
+		t.Errorf("UnresolvedBlockers = %v, want nil for a ticket blocked by its own identifier", got)
+	}
+}
+
 // TestEpic_UnresolvedBlockers_LetteredSplitRequiresAllSiblingsDone covers a
 // mid-flight split: 03's Children (03a, 03b) are now a direct, walkable edge
 // (see Epic.FullyDone) rather than inferred from shared numbering. The
