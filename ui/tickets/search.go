@@ -26,7 +26,12 @@ type ticketRef struct {
 func (m *Model) recomputeSearchMatches() {
 	q := strings.ToLower(strings.TrimSpace(m.search.Query()))
 	if q == "" {
-		m.sidebarTree.SetSearchMatches(nil)
+		m.search.SetMatches(nil)
+		// m.sidebarTree's own internal search.Model backs SearchMatch's
+		// per-row lookup (view.go's dim/highlight): its HasQuery() gates
+		// SearchMatch, so the query has to land there too, not just on the
+		// matches — SetPassiveResults sets both in one call.
+		m.sidebarTree.Search().SetPassiveResults("", nil)
 		return
 	}
 
@@ -41,7 +46,8 @@ func (m *Model) recomputeSearchMatches() {
 	}
 
 	if len(matchedRefs) == 0 {
-		m.sidebarTree.SetSearchMatches(nil)
+		m.search.SetMatches(nil)
+		m.sidebarTree.Search().SetPassiveResults("", nil)
 		return
 	}
 
@@ -63,7 +69,8 @@ func (m *Model) recomputeSearchMatches() {
 			matches = append(matches, search.Match{DataIndex: i})
 		}
 	}
-	m.sidebarTree.SetSearchMatches(matches)
+	m.search.SetMatches(matches)
+	m.sidebarTree.Search().SetPassiveResults(q, matches)
 }
 
 // jumpToCurrentMatch moves the selection to the search cursor's current

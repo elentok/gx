@@ -194,10 +194,22 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // in dir's direction (+1 down, -1 up) — section headers are real tree.Entry
 // rows (needed so BuildEntriesFromValues can size the section's child count)
 // but were never cursor-reachable in the pre-migration sidebarLines(), so
-// tree.Model's own navigation needs this nudge to preserve that.
+// tree.Model's own navigation needs this nudge to preserve that. If dir's
+// direction runs off the end of the entries while still on a header (e.g.
+// paging up lands back on entry 0, the open-epics header, with nowhere
+// further up to go), it retries the opposite direction — a header must never
+// end up selected, even at a list boundary.
 func (m *Model) skipSectionHeader(dir int) {
-	entries := m.sidebarTree.Entries()
-	idx := m.sidebarTree.SelectedIndex()
+	idx := skipSectionHeaderDir(m.sidebarTree.Entries(), m.sidebarTree.SelectedIndex(), dir)
+	if entries := m.sidebarTree.Entries(); idx >= 0 && idx < len(entries) && entries[idx].Value.kind == nodeSection {
+		idx = skipSectionHeaderDir(entries, idx, -dir)
+	}
+	if idx != m.sidebarTree.SelectedIndex() {
+		m.sidebarTree.SetSelectedIndex(idx)
+	}
+}
+
+func skipSectionHeaderDir(entries []tree.Entry[sidebarNode], idx, dir int) int {
 	for idx >= 0 && idx < len(entries) && entries[idx].Value.kind == nodeSection {
 		next := idx + dir
 		if next < 0 || next >= len(entries) {
@@ -205,9 +217,7 @@ func (m *Model) skipSectionHeader(dir int) {
 		}
 		idx = next
 	}
-	if idx != m.sidebarTree.SelectedIndex() {
-		m.sidebarTree.SetSelectedIndex(idx)
-	}
+	return idx
 }
 
 // selectFirstRow/selectLastRow implement "gg"/"G": jump the sidebar
@@ -242,9 +252,19 @@ func (m *Model) toggleHideDone() {
 
 // selectedRow returns the row currently under the selection, if any. A
 // nodeSection selection reports false (rowFromEntry) — kept off in practice
-// by skipSectionHeader.
+// by skipSectionHeader. A Model built without going through clampSelected
+// (e.g. a test constructing Model{epics: ...} directly, never routing it
+// through a WindowSizeMsg/epicsLoadedMsg) has an empty sidebarTree — that's
+// not "nothing selected", it's "entries were never built", so it falls back
+// to the first epic rather than reporting no selection at all.
 func (m Model) selectedRow() (row, bool) {
 	entries := m.sidebarTree.Entries()
+	if len(entries) == 0 {
+		if len(m.epics) == 0 {
+			return row{}, false
+		}
+		return row{epicIdx: 0, ticketIdx: -1}, true
+	}
 	idx := m.sidebarTree.SelectedIndex()
 	if idx < 0 || idx >= len(entries) {
 		return row{}, false

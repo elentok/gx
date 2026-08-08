@@ -313,8 +313,13 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 // clampSelected rebuilds the sidebar tree's entries from the current
 // epics/hideDone/collapse state, e.g. after a collapse hides the rows below
 // the selection — SetEntries re-clamps selection to the new entry count.
+// Section headers are real tree.Entry rows but were never cursor-reachable
+// pre-migration, so every rebuild (including the very first, off of
+// tree.NewModel's zero-value selection at index 0) nudges off one if the
+// rebuilt entries left the selection sitting on one.
 func (m *Model) clampSelected() {
 	m.sidebarTree.SetEntries(m.buildSidebarEntries())
+	m.skipSectionHeader(1)
 }
 
 // sidebarViewportHeight is the sidebar body's visible line count, matching

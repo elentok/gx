@@ -101,9 +101,10 @@ func (m *Model[T]) SetVisibleHeight(h int) {
 	m.visibleH = h
 }
 
-// ScrollViewport scrolls the viewport by delta rows, snapping selection into view.
+// ScrollViewport scrolls the viewport by delta rows without moving the
+// selection (e.g. a mouse wheel pans the list independently of the cursor).
 func (m *Model[T]) ScrollViewport(delta int) {
-	m.list.ScrollViewport(delta, len(m.entries), m.visibleH)
+	m.list.ScrollOffsetOnly(delta, len(m.entries), m.visibleH)
 }
 
 // ScrollPage moves selection and viewport together by delta (vim-style ctrl+d/u).

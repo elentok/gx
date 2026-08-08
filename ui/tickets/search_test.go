@@ -75,8 +75,10 @@ func TestSearch_NonMatchesAreDimmed(t *testing.T) {
 	dimPrefix := strings.SplitN(ui.StyleDim.Render("PROBE"), "PROBE", 2)[0]
 
 	epic := m.epics[0]
-	matchedLine := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)[0] // "first ticket" row
-	nonMatchedLine := m.renderTicketRow(epic, row{ticketIdx: 1}, 2)[0]
+	// Entries: 0 = "Open epics" section header, 1 = the epic, 2/3 = its two
+	// tickets — matching m.sidebarTree.Entries()' actual indices.
+	matchedLine := m.renderTicketRow(epic, row{ticketIdx: 0}, 2)[0] // "first ticket" row
+	nonMatchedLine := m.renderTicketRow(epic, row{ticketIdx: 1}, 3)[0]
 
 	if strings.Contains(matchedLine, dimPrefix) {
 		t.Fatalf("expected matching row undimmed, got: %q", matchedLine)

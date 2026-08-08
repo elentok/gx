@@ -76,6 +76,27 @@ func (m *Model) ScrollViewport(delta, total, visibleH int) {
 	}
 }
 
+// ScrollOffsetOnly scrolls the offset by delta (clamped to [0,
+// max(0,total-visibleH)]) without snapping the selection into view, unlike
+// ScrollViewport — for callers whose selection is deliberately decoupled from
+// the scroll offset (e.g. a mouse wheel that pans the list without moving
+// the cursor).
+func (m *Model) ScrollOffsetOnly(delta, total, visibleH int) {
+	maxOffset := total - visibleH
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+
+	newOffset := m.scrollOffset + delta
+	if newOffset < 0 {
+		newOffset = 0
+	}
+	if newOffset > maxOffset {
+		newOffset = maxOffset
+	}
+	m.scrollOffset = newOffset
+}
+
 // EnsureSelectionVisible adjusts the offset minimally to keep the selection
 // on screen (no centering).
 func (m *Model) EnsureSelectionVisible(total, visibleH int) {

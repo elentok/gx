@@ -80,27 +80,30 @@ func TestModel_CtrlDCtrlUPagesSidebar(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 10})
 	m = updated.(Model)
 
-	if m.sidebarTree.SelectedIndex() != 0 {
-		t.Fatalf("expected initial selection at 0, got %d", m.sidebarTree.SelectedIndex())
+	// Entry 0 is the "Open epics" section header, never cursor-reachable —
+	// initial selection lands on entry 1, the first epic.
+	if m.sidebarTree.SelectedIndex() != 1 {
+		t.Fatalf("expected initial selection at 1, got %d", m.sidebarTree.SelectedIndex())
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	m = updated.(Model)
-	if m.sidebarTree.SelectedIndex() != list.DefaultScroll {
+	if want := 1 + list.DefaultScroll; m.sidebarTree.SelectedIndex() != want {
 		t.Fatalf("expected ctrl+d to move selection by %d, got %d", list.DefaultScroll, m.sidebarTree.SelectedIndex())
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	m = updated.(Model)
-	if m.sidebarTree.SelectedIndex() != 0 {
-		t.Fatalf("expected ctrl+u to move selection back to 0, got %d", m.sidebarTree.SelectedIndex())
+	if m.sidebarTree.SelectedIndex() != 1 {
+		t.Fatalf("expected ctrl+u to move selection back to 1, got %d", m.sidebarTree.SelectedIndex())
 	}
 
-	// Clamps at the top: ctrl+u past the start stays at 0.
+	// Clamps at the top: ctrl+u past the start stays at entry 1 (the section
+	// header at 0 is skipped, not landed on).
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	m = updated.(Model)
-	if m.sidebarTree.SelectedIndex() != 0 {
-		t.Fatalf("expected ctrl+u to clamp at 0, got %d", m.sidebarTree.SelectedIndex())
+	if m.sidebarTree.SelectedIndex() != 1 {
+		t.Fatalf("expected ctrl+u to clamp at 1, got %d", m.sidebarTree.SelectedIndex())
 	}
 }
 
