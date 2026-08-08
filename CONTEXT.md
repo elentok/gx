@@ -235,6 +235,21 @@ Triggered by Esc, gated behind an "Abort push?" confirm modal (default No) to gu
 accidental keypress; if the command completes while that confirm is showing, completion wins and the
 abort becomes a no-op.
 
+## Merge onto Main
+
+**`gx merge <branch>`** — the deterministic core of merging a branch/worktree onto the repo's
+detected main branch. Resolves `<branch>` (a literal branch name, or a worktree-dir name looked up
+via `git.Worktree`) and the base branch, then attempts `git merge --ff-only`. Never rebases and
+never leaves the repo mid-operation — on non-fast-forward it reports `needs_rebase` plus the
+resolved `branch`/`base`/`worktree_path` and stops. See ADR 0015.
+
+**`gx-merge`** (the skill) — owns the judgment half: on `needs_rebase`, runs `git rebase <base>`
+against the target's worktree (or the bare branch if `worktree_path` is empty), invoking
+[gx-resolving-merge-conflicts](skills/gx-resolving-merge-conflicts/SKILL.md) on conflicts, pausing
+to show the rebased diff, running this repo's checks, then re-calling `gx merge` for the final
+ff-only merge. `gx-cleanup`'s ff-only-merge step calls into this same skill rather than duplicating
+the flow.
+
 ## Launching External Programs
 
 gx runs external programs (`$EDITOR`, the comment editor, `lazygit`, `git commit`) in one of two
