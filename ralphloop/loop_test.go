@@ -830,6 +830,22 @@ func TestRun_Drain_WithInFlightTickets_FinishesInFlightThenEndsWithoutNewClaims(
 	if calls[len(calls)-1] != "EpicComplete" {
 		t.Fatalf("last sink call = %q, want EpicComplete (the same code point natural completion reaches)", calls[len(calls)-1])
 	}
+	if n := countCalls(calls, "DrainComplete"); n != 1 {
+		t.Errorf("DrainComplete calls = %d, want exactly 1 (ticket 01b)", n)
+	}
+}
+
+// countCalls counts how many times name appears in calls, for asserting a
+// sink event fired an exact number of times rather than just "at least
+// once" or "last".
+func countCalls(calls []string, name string) int {
+	n := 0
+	for _, c := range calls {
+		if c == name {
+			n++
+		}
+	}
+	return n
 }
 
 // TestRun_Drain_ZeroInFlight_EndsImmediately covers ticket 01a's other seam:
@@ -871,6 +887,9 @@ func TestRun_Drain_ZeroInFlight_EndsImmediately(t *testing.T) {
 	calls := sink.snapshot()
 	if len(calls) == 0 || calls[len(calls)-1] != "EpicComplete" {
 		t.Fatalf("sink calls = %v, want the run to end via EpicComplete immediately", calls)
+	}
+	if n := countCalls(calls, "DrainComplete"); n != 1 {
+		t.Errorf("DrainComplete calls = %d, want exactly 1 (ticket 01b, immediate-drain case)", n)
 	}
 }
 

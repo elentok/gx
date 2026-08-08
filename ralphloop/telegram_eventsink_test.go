@@ -96,6 +96,40 @@ func TestTelegramEventSink_EpicComplete_PostsTelegramWireFormat(t *testing.T) {
 	}
 }
 
+// TestTelegramEventSink_DrainComplete_PostsTelegramWireFormat mirrors
+// TestTelegramEventSink_EpicComplete_PostsTelegramWireFormat for the
+// drain-queue epic's distinct end-of-drain notification.
+func TestTelegramEventSink_DrainComplete_PostsTelegramWireFormat(t *testing.T) {
+	t.Parallel()
+	server, getRequests := fakeTelegramServer(t, http.StatusOK)
+	inner := &recordingSink{}
+	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
+	defer sink.Close()
+	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
+
+	sink.DrainComplete("epic", 5, 300)
+	sink.flush()
+
+	if got := inner.snapshot(); len(got) != 1 || got[0] != "DrainComplete" {
+		t.Errorf("inner events = %v, want [DrainComplete]", got)
+	}
+
+	reqs := waitForRequests(getRequests, 1)
+	if len(reqs) != 1 {
+		t.Fatalf("requests = %v, want exactly 1", reqs)
+	}
+	if reqs[0].ChatID != "chat-1" {
+		t.Errorf("chat_id = %q, want %q", reqs[0].ChatID, "chat-1")
+	}
+	if reqs[0].ParseMode != "MarkdownV2" {
+		t.Errorf("parse_mode = %q, want %q", reqs[0].ParseMode, "MarkdownV2")
+	}
+	want := telegramStyle.drainCompleteText("epic", EpicCounts{}, 5, 300, 0).String()
+	if reqs[0].Text != want {
+		t.Errorf("text = %q, want %q", reqs[0].Text, want)
+	}
+}
+
 func TestTelegramEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

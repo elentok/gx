@@ -26,6 +26,7 @@ var chatMembershipVerdicts = map[string]bool{
 	"TicketNeedsHuman":  true,
 	"EpicParked":        true,
 	"EpicComplete":      true,
+	"DrainComplete":     true,
 	// EpicFailed is the one documented exception: it is a chat member, but
 	// no EventSink implementation dispatches it. It fires from the loop
 	// registry's EpicFailureReporter (epic_failure_reporter.go), which

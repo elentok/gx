@@ -640,8 +640,19 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		// through the same sink.EpicComplete call below that natural
 		// completion reaches, rather than falling into the "no unblocked
 		// tickets left" active==0 error path further down, which assumes an
-		// undrained run is stuck.
-		if gate.isDraining() && active == 0 {
+		// undrained run is stuck. landing == 0 is required alongside
+		// active == 0 (mirroring the ctx.Err() branch above) since a build
+		// can finish (active decremented) with its outcome still queued in
+		// landJobs, waiting on the land-queue worker's own goroutine —
+		// breaking on active == 0 alone would end the run before that last
+		// build's commits actually land, leaving it iteration_status:
+		// finished but never status: done. Report DrainComplete here,
+		// distinct from EpicComplete, since this branch is only reached when
+		// draining cut the run short of a naturally-settled epic (see
+		// DrainComplete's doc comment) — an operator away from the terminal
+		// needs to know the difference.
+		if gate.isDraining() && active == 0 && landing == 0 {
+			sink.DrainComplete(opts.EpicName, completed, int(d.Now().Sub(runStart).Seconds()))
 			break
 		}
 

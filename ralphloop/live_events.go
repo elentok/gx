@@ -24,6 +24,7 @@ const (
 	LiveEventTicketUnrecoverable
 	LiveEventEpicParked
 	LiveEventEpicComplete
+	LiveEventDrainComplete
 	LiveEventCherryPickStarted
 	LiveEventConflictResolutionStarted
 	LiveEventSmartZoneCompactStarted
@@ -171,6 +172,10 @@ func (s *ChannelEventSink) EpicParked(epicName string, stalled []StalledTicket) 
 
 func (s *ChannelEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {
 	s.emit(LiveEvent{Kind: LiveEventEpicComplete, EpicName: epicName, Completed: completed, ElapsedSeconds: elapsedSeconds})
+}
+
+func (s *ChannelEventSink) DrainComplete(epicName string, completed int, elapsedSeconds int) {
+	s.emit(LiveEvent{Kind: LiveEventDrainComplete, EpicName: epicName, Completed: completed, ElapsedSeconds: elapsedSeconds})
 }
 
 // EpicFailed is a no-op here: the registry records a run's failure after

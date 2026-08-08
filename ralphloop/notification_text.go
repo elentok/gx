@@ -236,6 +236,22 @@ func (s mrkdwnStyle) globallyMutedText(transport string) chatmarkup.Text {
 	return s.chatStyle.Message("\U0001f6ab", "globally muted", "", detail, s.gxPrefix)
 }
 
+// drainCompleteText renders the "drain complete" notification: the run
+// ended because it was told to drain (see Gate.Drain), not because the epic
+// naturally ran out of tickets — distinct from epicCompleteText so an
+// operator away from the terminal can tell the two apart. counts/totalCost
+// carry the same semantics as epicCompleteText's own.
+//
+//	🛑 *epic drained*
+//
+//	{counts line}
+//	{completed} ticket(s) landed in {elapsed} · {totalCost}
+//	[gx] {epic}
+func (s mrkdwnStyle) drainCompleteText(epicName string, counts EpicCounts, completed int, elapsedSeconds int, totalCost float64) chatmarkup.Text {
+	detail := fmt.Sprintf("%d ticket(s) landed in %s · %s", completed, formatDuration(elapsedSeconds), formatCost(totalCost))
+	return s.chatStyle.Message("\U0001f6d1", "epic drained", RenderCountsLine(counts), detail, s.identityLine(epicName, ""))
+}
+
 // testMessageText renders the fixed message `gx config test-notifications`
 // sends to confirm a configured service is actually reachable:
 //

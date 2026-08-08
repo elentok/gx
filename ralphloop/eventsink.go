@@ -180,6 +180,14 @@ type EventSink interface {
 	// completed tickets landed by this Run call, after elapsedSeconds of
 	// total wall-clock run time.
 	EpicComplete(epicName string, completed int, elapsedSeconds int)
+	// DrainComplete reports that epicName's run ended specifically because it
+	// was draining (see Gate.Drain) — whether that end was immediate
+	// (nothing in flight when Drain was called) or came after the last
+	// in-flight iteration finished. It fires once per drained run,
+	// immediately before the EpicComplete call every run's end reaches
+	// (drained or not), and never fires for an ordinary non-draining
+	// completion.
+	DrainComplete(epicName string, completed int, elapsedSeconds int)
 
 	// EpicFailed reports that epicName's Run call returned err. Unlike every
 	// other event here, this one is not fired from inside the run: by the
@@ -220,18 +228,19 @@ func (noopEventSink) IterationPaused(identifier, label string, kind PauseKind, r
 func (noopEventSink) IterationResumed(identifier, label string, kind PauseKind)               {}
 func (noopEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
 }
-func (noopEventSink) TranscriptLine(label, line string)                               {}
-func (noopEventSink) ContextOccupancy(identifier string, tokens int)                  {}
-func (noopEventSink) CherryPickStarted(identifier string)                             {}
-func (noopEventSink) ConflictResolutionStarted(identifier string)                     {}
-func (noopEventSink) SmartZoneCompactStarted(identifier string)                       {}
-func (noopEventSink) SmartZoneFinishingUp(identifier string)                          {}
-func (noopEventSink) SmartZoneRecovered(identifier string)                            {}
-func (noopEventSink) TicketCleanupFinished(identifier string)                         {}
-func (noopEventSink) TicketRecovering(identifier string)                              {}
-func (noopEventSink) TicketRecovered(identifier, epicName, branch, landedSHA string)  {}
-func (noopEventSink) TicketUnrecoverable(identifier, epicName string)                 {}
-func (noopEventSink) EpicParked(epicName string, stalled []StalledTicket)             {}
-func (noopEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {}
-func (noopEventSink) EpicFailed(epicName string, err error)                           {}
-func (noopEventSink) NotificationFailed(channel, reason string)                       {}
+func (noopEventSink) TranscriptLine(label, line string)                                {}
+func (noopEventSink) ContextOccupancy(identifier string, tokens int)                   {}
+func (noopEventSink) CherryPickStarted(identifier string)                              {}
+func (noopEventSink) ConflictResolutionStarted(identifier string)                      {}
+func (noopEventSink) SmartZoneCompactStarted(identifier string)                        {}
+func (noopEventSink) SmartZoneFinishingUp(identifier string)                           {}
+func (noopEventSink) SmartZoneRecovered(identifier string)                             {}
+func (noopEventSink) TicketCleanupFinished(identifier string)                          {}
+func (noopEventSink) TicketRecovering(identifier string)                               {}
+func (noopEventSink) TicketRecovered(identifier, epicName, branch, landedSHA string)   {}
+func (noopEventSink) TicketUnrecoverable(identifier, epicName string)                  {}
+func (noopEventSink) EpicParked(epicName string, stalled []StalledTicket)              {}
+func (noopEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int)  {}
+func (noopEventSink) EpicFailed(epicName string, err error)                            {}
+func (noopEventSink) NotificationFailed(channel, reason string)                        {}
+func (noopEventSink) DrainComplete(epicName string, completed int, elapsedSeconds int) {}

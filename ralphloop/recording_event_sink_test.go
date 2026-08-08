@@ -132,6 +132,10 @@ func (s *recordingEventSink) EpicComplete(epicName string, completed int, elapse
 	s.record(LiveEvent{Kind: LiveEventEpicComplete, EpicName: epicName, Completed: completed, ElapsedSeconds: elapsedSeconds})
 }
 
+func (s *recordingEventSink) DrainComplete(epicName string, completed int, elapsedSeconds int) {
+	s.record(LiveEvent{Kind: LiveEventDrainComplete, EpicName: epicName, Completed: completed, ElapsedSeconds: elapsedSeconds})
+}
+
 // EpicFailed is a no-op here, matching ChannelEventSink: by the time the
 // registry calls it, this sink has already been closed and drained (see
 // EventSink's doc comment on EpicFailed).

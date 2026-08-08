@@ -66,9 +66,9 @@ type sendResult struct {
 // IterationStarted, IterationPaused/IterationResumed (only for a
 // non-park pause kind — PauseNeedsRepair is the same outcome
 // TicketNeedsHuman already reports, and a park must produce exactly one
-// chat message), IterationFinished, TicketNeedsHuman, EpicParked, and
-// EpicComplete. Every other event is a pure pass-through to the embedded
-// EventSink.
+// chat message), IterationFinished, TicketNeedsHuman, EpicParked,
+// EpicComplete, and DrainComplete. Every other event is a pure pass-through
+// to the embedded EventSink.
 // ChatEventSink is the interface NewTelegramEventSink/NewSlackEventSink's
 // return value actually satisfies (both are declared to return the plainer
 // EventSink so callers not wired to chat can ignore it) — a named interface
@@ -535,6 +535,13 @@ func (s *chatEventSink) EpicComplete(epicName string, completed int, elapsedSeco
 	counts := loadEpicCounts(s.scratchDir, epicName)
 	totalCost := loadEpicTotalCost(s.scratchDir, epicName)
 	s.send(s.style.epicCompleteText(epicName, counts, completed, elapsedSeconds, totalCost), notifyKindEpicComplete, epicSource(epicName), "")
+}
+
+func (s *chatEventSink) DrainComplete(epicName string, completed int, elapsedSeconds int) {
+	s.EventSink.DrainComplete(epicName, completed, elapsedSeconds)
+	counts := loadEpicCounts(s.scratchDir, epicName)
+	totalCost := loadEpicTotalCost(s.scratchDir, epicName)
+	s.send(s.style.drainCompleteText(epicName, counts, completed, elapsedSeconds, totalCost), notifyKindDrainComplete, epicSource(epicName), "")
 }
 
 // send runs (eventType, source) through the budget/mute gate before
