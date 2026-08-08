@@ -1,8 +1,40 @@
 # gx-investigate gotchas
 
+- **A checked/queued epic silently drops out of cross-epic auto-promotion across a `gx` process
+  restart.** `MaxConcurrentEpics` (default 2, `ui/settings.go:31-35`) is meant to auto-start the
+  next queued epic the instant a running one finishes (`QueueModel.startAvailableEpics`,
+  `queue.go:824-850`, re-invoked from `implementPollMsg` on completion, `queue.go:252`), but
+  `m.pendingEpics` is process-local, in-memory-only state, populated exclusively by
+  `startCheckedEpic` (Enter key) or `handleDetachedLiveConfirmed`. If the `gx` TUI process
+  restarts (crash, reattach) after an epic was checked/queued but before its turn came up, the
+  new process's `pendingEpics` starts empty — `queue-state.json`'s `items` still durably marks
+  the epic's tickets `"pending"`, but nothing reconstructs `pendingEpics` from that on load.
+  `cmdCheckDetachedLive` (`queue_reattach.go`) only covers the *other* stranded case (a ticket
+  left `claimed`/`needs-attention` with a live herdr tab) — an epic that never got claimed at all
+  falls through both paths and sits forever, looking "queued" in the UI but never starting. Found
+  live: `tickets-tree` epic, ticket `03b1` (`ready-for-agent`, unblocked) never claimed after
+  `fork-term` finished and freed a slot, because the attached `gx` process had restarted in
+  between. Fixed by `requeueStrandedPendingEpics` (`ui/tickets/queue.go`, called from
+  `handleQueueSync`): re-derives a plan from the durable `checked` selection for any checked,
+  not-yet-running, not-fully-done epic with no claimed/needs-attention ticket, and appends it back
+  to `pendingEpics`. See `tickets-tree/issues/12-epic-runner-not-active-research.md`.
+
 Running list of previously-diagnosed gx/ralph-loop bugs, newest first. Append one line + a pointer
 to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKILL.md) gets fixed
 — don't re-explain what the linked commit/ticket already documents.
+
+- **`gx tickets add --parent <id>` allocates the correct lettered ID but never writes `parent` into
+  the new ticket's own frontmatter.** `cmd/tickets_add.go`'s `runTicketsAdd` only used `parent` to
+  compute the new ID via `tickets.NextTicketID`; the stub `schema.Ticket{}` literal never set
+  `stub.Parent`, despite `gx-local-tracker.md`'s "Mid-flight splitting" section documenting this
+  command as the one that sets `parent` "at creation." Every split ticket created the documented
+  way silently lost its `parent` link — the same shape the code-review-scoping gotcha below already
+  flagged as scheduler/Queue-tab-invisible. Found live: `drain-queue`'s `02a1` (split off `02a` for
+  deferred test coverage) had no `parent` field despite the agent running `gx tickets add
+  drain-queue --parent 02a --slug ...` exactly as documented. Fixed by setting `stub.Parent` when
+  `parent != ""` before marshaling (`cmd/tickets_add.go`), regression test
+  `TestRunTicketsAdd_WritesParentFrontmatter`; `02a1` backfilled via `gx tickets set --parent 02a`.
+  See `drain-queue/issues/04-tickets-add-parent-not-written-research.md`.
 
 - **Telegram epic-complete notifications always fail with HTTP 400; ticket-finished ones work
   fine.** `ralphloop/notification_text.go`'s `epicCompleteText` hardcodes a literal `(s)` (from "N

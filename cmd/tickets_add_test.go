@@ -91,6 +91,30 @@ func TestRunTicketsAdd_LetteredChild(t *testing.T) {
 	}
 }
 
+func TestRunTicketsAdd_WritesParentFrontmatter(t *testing.T) {
+	scratchDir := t.TempDir()
+	epicPath := filepath.Join(scratchDir, "widget-epic")
+	issuesDir := filepath.Join(epicPath, "issues")
+	if err := os.MkdirAll(issuesDir, 0755); err != nil {
+		t.Fatalf("mkdir issues: %v", err)
+	}
+	writeTicket(t, filepath.Join(issuesDir, "12-parent.md"), "12", "done", "task")
+
+	var stdout bytes.Buffer
+	if err := runTicketsAdd(epicPath, "12", "child-a", &stdout); err != nil {
+		t.Fatalf("runTicketsAdd: %v", err)
+	}
+	gotPath := strings.TrimSpace(stdout.String())
+
+	ticket, err := schema.ParseTicket(gotPath)
+	if err != nil {
+		t.Fatalf("stub ticket failed validation: %v", err)
+	}
+	if ticket.Parent == nil || *ticket.Parent != "12" {
+		t.Errorf("stub ticket parent = %v, want \"12\"", ticket.Parent)
+	}
+}
+
 func TestRunTicketsAdd_NumericLevelPastLetteredParent(t *testing.T) {
 	scratchDir := t.TempDir()
 	epicPath := filepath.Join(scratchDir, "widget-epic")

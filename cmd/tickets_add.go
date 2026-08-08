@@ -43,6 +43,10 @@ func runTicketsAdd(epicPath, parent, slug string, w io.Writer) error {
 		Status: schema.StatusOpen,
 		Type:   schema.TypeTask,
 	}
+	if parent != "" {
+		parentID := schema.TicketID(parent)
+		stub.Parent = &parentID
+	}
 	body := fmt.Sprintf(
 		"\n# %s\n\n## What to build\n\n\n## Test seams\n\n\n## Acceptance criteria\n\n- [ ] \n",
 		id,
