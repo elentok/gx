@@ -171,11 +171,13 @@ func cmdAddToLiveQueue(epicName string, ticketIDs []string) tea.Cmd {
 	}
 }
 
-// replaceQueuedSelection applies ticket 10's "r" replace logic: every pending
-// (not-yet-started) queue entry is dropped and replaced by the current
-// checked selection. Running/done/errored entries are left exactly as they
-// are, whether or not they're still checked. Ticket 15's
-// EnqueueAndClearChecked also clears every just-queued path from the
+// replaceQueuedSelection applies ticket 10's "r" replace logic, per bugs-06/03's
+// fix to the domain glossary's "Replace queue" entry: every pending
+// (not-yet-started) and done (already-finished) queue entry is dropped and
+// replaced by the current checked selection. Running/errored entries are left
+// exactly as they are, whether or not they're still checked, since a live
+// run's own state isn't something Replace should silently discard. Ticket
+// 15's EnqueueAndClearChecked also clears every just-queued path from the
 // Tickets tab's independent checked set in the same atomic write, so the
 // checkboxes visually reset the moment their tickets are queued.
 func (m *Model) replaceQueuedSelection() error {
@@ -183,7 +185,7 @@ func (m *Model) replaceQueuedSelection() error {
 	next := make(map[string]queueItemStatus, len(snapshot.Status))
 	order := make(map[string]uint64, len(snapshot.Order))
 	for path, status := range snapshot.Status {
-		if status == queueStatusPending {
+		if status == queueStatusPending || status == queueStatusDone {
 			continue
 		}
 		next[path] = status

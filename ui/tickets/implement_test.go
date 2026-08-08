@@ -11,12 +11,12 @@ import (
 )
 
 // TestModel_ImplementKeyReplacesPendingSelectionAfterConfirmation covers
-// bugs-05/03: "r" ("Replace queue") opens the same confirmation "a" already
-// goes through before touching anything; only once that's accepted
-// (handleReplaceQueueConfirmed) does it replace the queue's not-yet-started
-// (pending) entries with the current checked selection — while running/done
-// entries are left exactly as they are, whether or not they're still part of
-// the selection.
+// bugs-05/03 and its bugs-06/03 fix: "r" ("Replace queue") opens the same
+// confirmation "a" already goes through before touching anything; only once
+// that's accepted (handleReplaceQueueConfirmed) does it replace the queue's
+// not-yet-started (pending) and already-finished (done) entries with the
+// current checked selection — while running entries are left exactly as they
+// are, whether or not they're still part of the selection.
 func TestModel_ImplementKeyReplacesPendingSelectionAfterConfirmation(t *testing.T) {
 	worktreeRoot := t.TempDir()
 	scratch := func(name string) string {
@@ -43,11 +43,12 @@ func TestModel_ImplementKeyReplacesPendingSelectionAfterConfirmation(t *testing.
 	m := Model{
 		worktreeRoot: worktreeRoot,
 		queueStore:   store,
-		// The new checked selection: still includes the running/done tickets
-		// (they render checked regardless of status), drops the stale pending
-		// one, and adds a fresh pending one.
-		checked:    map[string]bool{running: true, done: true, newSelection: true},
-		checkOrder: map[string]uint64{running: 1, done: 2, newSelection: 3},
+		// The new checked selection: still includes the running ticket (it
+		// renders checked regardless of status), drops the stale pending one
+		// and the previously-done one from an earlier run, and adds a fresh
+		// pending one.
+		checked:    map[string]bool{running: true, newSelection: true},
+		checkOrder: map[string]uint64{running: 1, newSelection: 3},
 	}
 
 	updated, cmd := m.handleReplaceQueueKey()
@@ -70,8 +71,8 @@ func TestModel_ImplementKeyReplacesPendingSelectionAfterConfirmation(t *testing.
 	if got := status[running]; got != queueStatusRunning {
 		t.Fatalf("running entry status = %v, want untouched running", got)
 	}
-	if got := status[done]; got != queueStatusDone {
-		t.Fatalf("done entry status = %v, want untouched done", got)
+	if got, ok := status[done]; ok {
+		t.Fatalf("done entry should have been cleared by Replace, still present as %v", got)
 	}
 	if got, ok := status[stalePending]; ok {
 		t.Fatalf("stale pending entry should have been replaced, still present as %v", got)
@@ -87,7 +88,7 @@ func TestModel_ImplementKeyReplacesPendingSelectionAfterConfirmation(t *testing.
 	if len(snapshot.TicketChecked) != 0 {
 		t.Fatalf("store TicketChecked = %v, want empty after queueing", snapshot.TicketChecked)
 	}
-	for _, p := range []string{running, done, newSelection} {
+	for _, p := range []string{running, newSelection} {
 		if _, ok := snapshot.Status[p]; !ok {
 			t.Fatalf("queue status missing %q after checked-set clear", p)
 		}
