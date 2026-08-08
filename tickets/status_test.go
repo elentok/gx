@@ -149,7 +149,7 @@ func TestEpic_UnresolvedBlockers_NilWhenNoBlockedBy(t *testing.T) {
 
 // TestEpic_UnresolvedBlockers_SelfExcludedFromOwnFamily covers a follow-up
 // ticket (06b) that merely shares its prerequisite's leading number (06),
-// rather than being one of 06's lettered split replacements. Its own
+// rather than being one of 06's lettered fork replacements. Its own
 // "Blocked by: 06" must resolve once 06 itself is done, without also
 // requiring 06b — the very ticket being checked, necessarily still open for
 // the duration of this check — to finish first.
@@ -176,18 +176,18 @@ func TestEpic_UnresolvedBlockers_SelfBlockedResolves(t *testing.T) {
 	}
 }
 
-// TestEpic_UnresolvedBlockers_LetteredSplitRequiresAllSiblingsDone covers a
-// mid-flight split: 03's Children (03a, 03b) are now a direct, walkable edge
+// TestEpic_UnresolvedBlockers_LetteredForkRequiresAllSiblingsDone covers a
+// mid-flight fork: 03's Children (03a, 03b) are now a direct, walkable edge
 // (see Epic.FullyDone) rather than inferred from shared numbering. The
-// original (03) is closed as done+commitless immediately at split time, well
+// original (03) is closed as done+commitless immediately at fork time, well
 // before its replacements (03a, 03b) land, so a blocker on the bare number
-// "3" must stay unresolved until every child recorded in 03's Split is done
-// too, not just 03 itself.
-func TestEpic_UnresolvedBlockers_LetteredSplitRequiresAllSiblingsDone(t *testing.T) {
+// "3" must stay unresolved until every child recorded in 03's Children is
+// done too, not just 03 itself.
+func TestEpic_UnresolvedBlockers_LetteredForkRequiresAllSiblingsDone(t *testing.T) {
 	original := "03"
 	epic := Epic{Tickets: []Ticket{
 		{Number: 1, BlockedBy: []string{"3"}},
-		{Number: 3, Identifier: "03", Status: "done", Commitless: true, Split: []string{"03a", "03b"}}, // original, closed at split time
+		{Number: 3, Identifier: "03", Status: "done", Commitless: true, Children: []string{"03a", "03b"}}, // original, closed at fork time
 		{Number: 3, Identifier: "03a", Status: "done", Parent: &original},
 		{Number: 3, Identifier: "03b", Status: "open", Parent: &original}, // still in flight
 	}}
@@ -199,13 +199,13 @@ func TestEpic_UnresolvedBlockers_LetteredSplitRequiresAllSiblingsDone(t *testing
 	epic.Tickets[3].Status = "done"
 	got = epic.UnresolvedBlockers(epic.Tickets[0])
 	if got != nil {
-		t.Errorf("UnresolvedBlockers = %v, want nil once every child in 03's Split is done", got)
+		t.Errorf("UnresolvedBlockers = %v, want nil once every child in 03's Children is done", got)
 	}
 }
 
 // TestEpic_UnresolvedBlockers_LetteredTokenNamesOneSibling covers the
 // opposite of the bare-number case above: "Blocked by: 03a" names one
-// specific split sibling, so it resolves as soon as that ticket alone is
+// specific fork sibling, so it resolves as soon as that ticket alone is
 // done — it must not require its still-open siblings (03b) or the
 // original (03) to finish too, unlike a bare "Blocked by: 3".
 func TestEpic_UnresolvedBlockers_LetteredTokenNamesOneSibling(t *testing.T) {
@@ -221,15 +221,15 @@ func TestEpic_UnresolvedBlockers_LetteredTokenNamesOneSibling(t *testing.T) {
 	}
 }
 
-// TestEpic_UnresolvedBlockers_SplitSiblingsDontBlockEachOther covers 05's
-// real-world split: both 05b and 05c inherit "Blocked by: 05" from the
-// split, and share Number 5 with each other. Without excluding split
+// TestEpic_UnresolvedBlockers_ForkSiblingsDontBlockEachOther covers 05's
+// real-world fork: both 05b and 05c inherit "Blocked by: 05" from the
+// fork, and share Number 5 with each other. Without excluding fork
 // siblings from the family count, each would need the other done too,
 // deadlocking them against each other despite 05 itself being done.
-func TestEpic_UnresolvedBlockers_SplitSiblingsDontBlockEachOther(t *testing.T) {
+func TestEpic_UnresolvedBlockers_ForkSiblingsDontBlockEachOther(t *testing.T) {
 	original := "05"
 	epic := Epic{Tickets: []Ticket{
-		{Number: 5, Identifier: "05", Status: "done", Split: []string{"05b", "05c"}},
+		{Number: 5, Identifier: "05", Status: "done", Children: []string{"05b", "05c"}},
 		{Number: 5, Identifier: "05b", BlockedBy: []string{"05"}, Parent: &original, Status: "ready-for-agent"},
 		{Number: 5, Identifier: "05c", BlockedBy: []string{"05"}, Parent: &original, Status: "ready-for-agent"},
 	}}
@@ -242,9 +242,9 @@ func TestEpic_UnresolvedBlockers_SplitSiblingsDontBlockEachOther(t *testing.T) {
 }
 
 // TestEpic_UnresolvedBlockers_InheritedTokenNotBlockedByOwnDescendant covers
-// a sequential split: 01 splits into 01a, which itself later splits into
+// a sequential fork: 01 forks into 01a, which itself later forks into
 // 01b (01b's Parent is 01a, not 01, and 01b is blocked_by 01a). 01 lists
-// both 01a and 01b as Split children (gx-investigate's drain-queue/
+// both 01a and 01b as Children (gx-investigate's drain-queue/
 // tickets-tree finding: the root ticket's children can legitimately name a
 // grandchild this way). 01a's own inherited "Blocked by: 01" must not
 // require 01b — its own child — to be done first: 01b can't even start
@@ -254,7 +254,7 @@ func TestEpic_UnresolvedBlockers_InheritedTokenNotBlockedByOwnDescendant(t *test
 	root := "01"
 	mechanism := "01a"
 	epic := Epic{Tickets: []Ticket{
-		{Number: 1, Identifier: "01", Status: "done", Commitless: true, Split: []string{"01a", "01b"}},
+		{Number: 1, Identifier: "01", Status: "done", Commitless: true, Children: []string{"01a", "01b"}},
 		{Number: 1, Identifier: "01a", BlockedBy: []string{"01"}, Parent: &root, Status: "ready-for-agent"},
 		{Number: 1, Identifier: "01b", BlockedBy: []string{"01a"}, Parent: &mechanism, Status: "open"},
 	}}
@@ -271,14 +271,14 @@ func TestEpic_UnresolvedBlockers_InheritedTokenNotBlockedByOwnDescendant(t *test
 }
 
 // TestEpic_UnresolvedBlockers_DirectSiblingTokenIsEnforced covers the
-// opposite of SplitSiblingsDontBlockEachOther above: 02c's "Blocked by: 02b"
-// names its split sibling 02b directly rather than their shared parent, so
-// isSelfOrSplitSiblingOrDescendant's sibling-Parent exclusion (needed for the inherited-
+// opposite of ForkSiblingsDontBlockEachOther above: 02c's "Blocked by: 02b"
+// names its fork sibling 02b directly rather than their shared parent, so
+// isSelfOrForkSiblingOrDescendant's sibling-Parent exclusion (needed for the inherited-
 // token case) must not apply here — 02b's real status has to be checked.
 func TestEpic_UnresolvedBlockers_DirectSiblingTokenIsEnforced(t *testing.T) {
 	original := "02"
 	epic := Epic{Tickets: []Ticket{
-		{Number: 2, Identifier: "02", Status: "done", Commitless: true, Split: []string{"02b", "02c"}},
+		{Number: 2, Identifier: "02", Status: "done", Commitless: true, Children: []string{"02b", "02c"}},
 		{Number: 2, Identifier: "02b", Parent: &original, Status: "open"},
 		{Number: 2, Identifier: "02c", Parent: &original, BlockedBy: []string{"02b"}, Status: "open"},
 	}}
@@ -323,14 +323,14 @@ func TestEpic_BlockingTickets_NilWhenNothingUnresolved(t *testing.T) {
 }
 
 // TestEpic_BlockingTickets_BareNumberResolvesEveryNotYetDoneSibling covers a
-// mid-flight split blocker (see Epic.FullyDone): "Blocked by: 3" should
+// mid-flight fork blocker (see Epic.FullyDone): "Blocked by: 3" should
 // surface every one of 03's not-yet-done Children, not just the original, so
 // confirming the modal adds them all to the checked set.
 func TestEpic_BlockingTickets_BareNumberResolvesEveryNotYetDoneSibling(t *testing.T) {
 	original := "03"
 	epic := Epic{Tickets: []Ticket{
 		{Number: 1, BlockedBy: []string{"3"}},
-		{Number: 3, Identifier: "03", Title: "Original", Status: "done", Split: []string{"03a", "03b"}},
+		{Number: 3, Identifier: "03", Title: "Original", Status: "done", Children: []string{"03a", "03b"}},
 		{Number: 3, Identifier: "03a", Title: "Split A", Status: "done", Parent: &original},
 		{Number: 3, Identifier: "03b", Title: "Split B", Status: "open", Parent: &original},
 	}}
@@ -370,7 +370,7 @@ func TestEpic_FullyDone_NotDoneItselfIsNotFullyDone(t *testing.T) {
 func TestEpic_FullyDone_DoneWithUndoneChildIsNotFullyDone(t *testing.T) {
 	parent := "01"
 	epic := Epic{Tickets: []Ticket{
-		{Number: 1, Identifier: "01", Status: "done", Split: []string{"01a"}},
+		{Number: 1, Identifier: "01", Status: "done", Children: []string{"01a"}},
 		{Number: 1, Identifier: "01a", Status: "open", Parent: &parent},
 	}}
 	if epic.FullyDone(epic.Tickets[0]) {
@@ -382,8 +382,8 @@ func TestEpic_FullyDone_DoneWithUndoneGrandchildIsNotFullyDone(t *testing.T) {
 	parent := "01"
 	child := "01a"
 	epic := Epic{Tickets: []Ticket{
-		{Number: 1, Identifier: "01", Status: "done", Split: []string{"01a"}},
-		{Number: 1, Identifier: "01a", Status: "done", Parent: &parent, Split: []string{"01a-01"}},
+		{Number: 1, Identifier: "01", Status: "done", Children: []string{"01a"}},
+		{Number: 1, Identifier: "01a", Status: "done", Parent: &parent, Children: []string{"01a-01"}},
 		{Number: 1, Identifier: "01a-01", Status: "open", Parent: &child},
 	}}
 	if epic.FullyDone(epic.Tickets[0]) {
@@ -394,7 +394,7 @@ func TestEpic_FullyDone_DoneWithUndoneGrandchildIsNotFullyDone(t *testing.T) {
 func TestEpic_FullyDone_DoneWithFullyDoneChildIsFullyDone(t *testing.T) {
 	parent := "01"
 	epic := Epic{Tickets: []Ticket{
-		{Number: 1, Identifier: "01", Status: "done", Split: []string{"01a"}},
+		{Number: 1, Identifier: "01", Status: "done", Children: []string{"01a"}},
 		{Number: 1, Identifier: "01a", Status: "done", Parent: &parent},
 	}}
 	if !epic.FullyDone(epic.Tickets[0]) {
@@ -408,28 +408,28 @@ func TestEpic_FullyDone_DoneWithFullyDoneChildIsFullyDone(t *testing.T) {
 // another, regardless of which boolean it settles on.
 func TestEpic_FullyDone_CycleTerminates(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
-		{Number: 1, Identifier: "01", Status: "done", Split: []string{"02"}},
-		{Number: 2, Identifier: "02", Status: "done", Split: []string{"01"}},
+		{Number: 1, Identifier: "01", Status: "done", Children: []string{"02"}},
+		{Number: 2, Identifier: "02", Status: "done", Children: []string{"01"}},
 	}}
 	done := make(chan bool, 1)
 	go func() { done <- epic.FullyDone(epic.Tickets[0]) }()
 	select {
 	case <-done:
 	case <-time.After(2 * time.Second):
-		t.Fatal("FullyDone did not terminate on a Split/Parent cycle")
+		t.Fatal("FullyDone did not terminate on a Children/Parent cycle")
 	}
 }
 
-// TestIsSelfOrSplitSiblingOrDescendant exercises the exclude predicate
+// TestIsSelfOrForkSiblingOrDescendant exercises the exclude predicate
 // fullyDone's recursion uses directly, independent of UnresolvedBlockers'
 // higher-level scenarios above, so each edge (self, sibling, direct child,
 // grandchild, ancestor, unrelated) is pinned down on its own.
-func TestIsSelfOrSplitSiblingOrDescendant(t *testing.T) {
+func TestIsSelfOrForkSiblingOrDescendant(t *testing.T) {
 	root := "01"
 	mechanism := "01a"
 	notification := "01b"
 	epic := Epic{Tickets: []Ticket{
-		{Number: 1, Identifier: "01", Status: "done", Split: []string{"01a", "01b"}},
+		{Number: 1, Identifier: "01", Status: "done", Children: []string{"01a", "01b"}},
 		{Number: 1, Identifier: "01a", Parent: &root, Status: "ready-for-agent"},
 		{Number: 1, Identifier: "01b", Parent: &mechanism, Status: "open"},     // child of 01a
 		{Number: 1, Identifier: "01c", Parent: &root, Status: "open"},          // true sibling of 01a
@@ -453,14 +453,14 @@ func TestIsSelfOrSplitSiblingOrDescendant(t *testing.T) {
 		{"unrelated ticket, no Parent link at all", byID["02"], false},
 	}
 	for _, c := range cases {
-		if got := isSelfOrSplitSiblingOrDescendant(t01a, c.other, byNumberAndSuffix); got != c.want {
-			t.Errorf("isSelfOrSplitSiblingOrDescendant(01a, %s) = %v, want %v", c.other.Identifier, got, c.want)
+		if got := isSelfOrForkSiblingOrDescendant(t01a, c.other, byNumberAndSuffix); got != c.want {
+			t.Errorf("isSelfOrForkSiblingOrDescendant(01a, %s) = %v, want %v", c.other.Identifier, got, c.want)
 		}
 	}
 }
 
 // TestIsDescendantOf covers isDescendantOf on its own — the Parent-chain
-// walk isSelfOrSplitSiblingOrDescendant layers the sibling check on top of.
+// walk isSelfOrForkSiblingOrDescendant layers the sibling check on top of.
 func TestIsDescendantOf(t *testing.T) {
 	root := "01"
 	mid := "01a"

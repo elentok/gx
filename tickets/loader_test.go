@@ -177,7 +177,7 @@ func TestLoad_IgnoresNonTicketFilesInIssuesDir(t *testing.T) {
 	}
 }
 
-func TestLoad_SurfacesSplitAndParent(t *testing.T) {
+func TestLoad_SurfacesChildrenAndParent(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "epic", "issues", "03-original.md"),
 		"---\nid: \"03\"\nstatus: done\ntype: task\nchildren: [\"03a\", \"03b\"]\n---\n")
@@ -198,8 +198,8 @@ func TestLoad_SurfacesSplitAndParent(t *testing.T) {
 	}
 
 	original := byIdentifier["03"]
-	if !reflect.DeepEqual(original.Split, []string{"03a", "03b"}) {
-		t.Errorf("original.Split = %v, want [03a 03b]", original.Split)
+	if !reflect.DeepEqual(original.Children, []string{"03a", "03b"}) {
+		t.Errorf("original.Children = %v, want [03a 03b]", original.Children)
 	}
 	if original.Parent != nil {
 		t.Errorf("original.Parent = %v, want nil", original.Parent)
@@ -209,8 +209,8 @@ func TestLoad_SurfacesSplitAndParent(t *testing.T) {
 	if child.Parent == nil || *child.Parent != "03" {
 		t.Errorf("child.Parent = %v, want \"03\"", child.Parent)
 	}
-	if child.Split != nil {
-		t.Errorf("child.Split = %v, want nil", child.Split)
+	if child.Children != nil {
+		t.Errorf("child.Children = %v, want nil", child.Children)
 	}
 }
 

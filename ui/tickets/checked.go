@@ -174,37 +174,38 @@ func (m Model) handleCheckAddConfirmed(msg checkAddConfirmedMsg) (tea.Model, tea
 	return m, nil
 }
 
-// autoCheckSplitChildren compares oldEpics (this Model's epics before a
+// autoCheckForkedChildren compares oldEpics (this Model's epics before a
 // reload) against newEpics (the reload's result): for every checked ticket
-// whose Split field gained new entries since oldEpics — a mid-flight split,
-// per implement/SKILL.md's convention — the newly-appeared sibling(s) join
-// the Tickets tab's independent checked set automatically, no confirmation
-// modal (ticket 06), unlike toggleTicketChecked's blocked-ticket
-// confirmation. A ticket that isn't itself checked splitting is a no-op:
-// only a split of already-checked work needs its continuation auto-added.
-func autoCheckSplitChildren(oldEpics, newEpics []tickets.Epic, store *QueueStore) error {
+// whose Children field gained new entries since oldEpics — a mid-flight
+// fork, per implement/SKILL.md's convention — the newly-appeared sibling(s)
+// join the Tickets tab's independent checked set automatically, no
+// confirmation modal (ticket 06), unlike toggleTicketChecked's
+// blocked-ticket confirmation. A ticket that isn't itself checked forking is
+// a no-op: only a fork of already-checked work needs its continuation
+// auto-added.
+func autoCheckForkedChildren(oldEpics, newEpics []tickets.Epic, store *QueueStore) error {
 	if store == nil {
 		return nil
 	}
-	return applySplitChildren(oldEpics, newEpics, store.IsTicketChecked, store.SetTicketChecked)
+	return applyForkedChildren(oldEpics, newEpics, store.IsTicketChecked, store.SetTicketChecked)
 }
 
-// autoQueueSplitChildren mirrors autoCheckSplitChildren for the Queue tab's
-// own membership concept (Items) instead of the Tickets tab's independent
-// checked set: a ticket already queued whose Split field gains new entries
-// has its new sibling(s) queued automatically.
-func autoQueueSplitChildren(oldEpics, newEpics []tickets.Epic, store *QueueStore) error {
+// autoQueueForkedChildren mirrors autoCheckForkedChildren for the Queue
+// tab's own membership concept (Items) instead of the Tickets tab's
+// independent checked set: a ticket already queued whose Children field
+// gains new entries has its new sibling(s) queued automatically.
+func autoQueueForkedChildren(oldEpics, newEpics []tickets.Epic, store *QueueStore) error {
 	if store == nil {
 		return nil
 	}
-	return applySplitChildren(oldEpics, newEpics, store.IsChecked, store.SetChecked)
+	return applyForkedChildren(oldEpics, newEpics, store.IsChecked, store.SetChecked)
 }
 
-// applySplitChildren is the shared traversal behind autoCheckSplitChildren
-// and autoQueueSplitChildren: isMember/setMember let each caller apply it to
-// its own independent membership set (see QueueStore's decoupled checked/
-// queued API).
-func applySplitChildren(oldEpics, newEpics []tickets.Epic, isMember func(string) bool, setMember func([]string, bool) error) error {
+// applyForkedChildren is the shared traversal behind autoCheckForkedChildren
+// and autoQueueForkedChildren: isMember/setMember let each caller apply it
+// to its own independent membership set (see QueueStore's decoupled
+// checked/queued API).
+func applyForkedChildren(oldEpics, newEpics []tickets.Epic, isMember func(string) bool, setMember func([]string, bool) error) error {
 	oldByPath := make(map[string]tickets.Ticket)
 	for _, epic := range oldEpics {
 		for _, t := range epic.Tickets {
@@ -219,7 +220,7 @@ func applySplitChildren(oldEpics, newEpics []tickets.Epic, isMember func(string)
 			if !ok || !isMember(old.Path) {
 				continue
 			}
-			for _, childID := range newSplitEntries(old.Split, nt.Split) {
+			for _, childID := range newForkEntries(old.Children, nt.Children) {
 				if child, ok := findTicketByIdentifier(epic, childID); ok {
 					childPaths = append(childPaths, child.Path)
 				}
@@ -229,15 +230,16 @@ func applySplitChildren(oldEpics, newEpics []tickets.Epic, isMember func(string)
 	return setMember(childPaths, true)
 }
 
-// newSplitEntries returns the entries present in newSplit but not oldSplit,
-// i.e. the sibling IDs a ticket's Split field gained since it was last seen.
-func newSplitEntries(oldSplit, newSplit []string) []string {
-	seen := make(map[string]bool, len(oldSplit))
-	for _, id := range oldSplit {
+// newForkEntries returns the entries present in newChildren but not
+// oldChildren, i.e. the sibling IDs a ticket's Children field gained since
+// it was last seen.
+func newForkEntries(oldChildren, newChildren []string) []string {
+	seen := make(map[string]bool, len(oldChildren))
+	for _, id := range oldChildren {
 		seen[id] = true
 	}
 	var added []string
-	for _, id := range newSplit {
+	for _, id := range newChildren {
 		if !seen[id] {
 			added = append(added, id)
 		}
@@ -246,7 +248,7 @@ func newSplitEntries(oldSplit, newSplit []string) []string {
 }
 
 // findTicketByIdentifier looks up a ticket within epic by its Identifier
-// (e.g. "06a"), used to resolve a newly-observed split ID to its ticket.Path.
+// (e.g. "06a"), used to resolve a newly-observed fork ID to its ticket.Path.
 func findTicketByIdentifier(epic tickets.Epic, identifier string) (tickets.Ticket, bool) {
 	for _, t := range epic.Tickets {
 		if t.Identifier == identifier {

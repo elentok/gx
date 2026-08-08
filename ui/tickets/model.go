@@ -211,7 +211,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case epicsLoadedMsg:
-		if err := autoCheckSplitChildren(m.epics, msg.epics, m.queueStore); err != nil {
+		if err := autoCheckForkedChildren(m.epics, msg.epics, m.queueStore); err != nil {
 			return m, notify.Error("save queue: " + err.Error())
 		}
 		m.refreshQueueSnapshot()

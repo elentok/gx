@@ -200,7 +200,7 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ensureQueueVisible()
 		return m, nil
 	case queueEpicsLoadedMsg:
-		if err := autoQueueSplitChildren(m.epics, msg.epics, m.queueStore); err != nil {
+		if err := autoQueueForkedChildren(m.epics, msg.epics, m.queueStore); err != nil {
 			return m, notify.Error("save queue: " + err.Error())
 		}
 		if m.queueStore != nil {

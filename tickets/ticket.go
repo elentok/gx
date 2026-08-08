@@ -26,15 +26,16 @@ type Ticket struct {
 	// number family (Epic.UnresolvedBlockers); a lettered token names one
 	// specific sibling.
 	BlockedBy []string
-	// Split holds the IDs of the tickets this one was split into (mid-flight
-	// split, see .ai's to-tickets skill); Parent is the reverse edge, the
-	// ID of the ticket this one was split off from (schema.Ticket.Parent). At
-	// most one of a ticket's Split/Parent is meaningfully populated in
-	// practice, but both are carried since schema.Ticket allows either.
-	Split  []string
-	Parent *string
-	Status    string // raw Status: value; "" means missing (valid open/unclaimed default)
-	Body      string // raw markdown after the leading metadata lines, unmodified
+	// Children holds the IDs of the tickets this one was forked into
+	// (mid-flight fork, see .ai's to-tickets skill); Parent is the reverse
+	// edge, the ID of the ticket this one was forked off from
+	// (schema.Ticket.Parent). At most one of a ticket's Children/Parent is
+	// meaningfully populated in practice, but both are carried since
+	// schema.Ticket allows either.
+	Children []string
+	Parent   *string
+	Status   string // raw Status: value; "" means missing (valid open/unclaimed default)
+	Body     string // raw markdown after the leading metadata lines, unmodified
 
 	// ActualContextWindow and ElapsedTime are the landing-time metrics
 	// ralphloop/report_metrics.go's writeLandedMetrics stamps into a done
