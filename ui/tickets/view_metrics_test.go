@@ -85,7 +85,8 @@ func TestRenderTicketRow_LiveRowIndentNotDoubled(t *testing.T) {
 
 	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 0)
 
-	wantPrefix := "    " + m.checkboxGlyph(m.isChecked(epic.Tickets[0].Path)) + " "
+	fold := strings.Repeat(" ", lipgloss.Width(m.icons().FolderOpen)+1)
+	wantPrefix := "    " + m.checkboxGlyph(m.isChecked(epic.Tickets[0].Path)) + " " + fold
 	wantBase, _, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, epic.Tickets[0], live, wantPrefix)
 	if !ok {
 		t.Fatalf("renderLiveTicketRow() ok = false, want true")
@@ -232,6 +233,28 @@ func TestRenderEpicRow_ShowsDurationOnlyWhenBothTimestampsSet(t *testing.T) {
 	m = newModelForTicketRowTests(missing)
 	if line := m.renderEpicRow(missing); strings.Contains(line, "took") {
 		t.Fatalf("missing completed_at: line = %q, want no duration text", line)
+	}
+}
+
+// TestRenderTicketRow_IconColumnAlignsRegardlessOfChildren guards against the
+// icon column shifting left for a childless ticket (bugs-05/01): the fold
+// glyph slot must stay fixed-width whether or not the row actually has one.
+func TestRenderTicketRow_IconColumnAlignsRegardlessOfChildren(t *testing.T) {
+	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
+		{Identifier: "01", Title: "Parent ticket", Status: "open"},
+		{Identifier: "02", Title: "Leaf ticket", Status: "open"},
+	}}
+	m := newModelForTicketRowTests(epic)
+
+	withChildren := m.renderTicketRow(epic, row{ticketIdx: 0, hasChildren: true, expanded: true}, 1)[0]
+	childless := m.renderTicketRow(epic, row{ticketIdx: 1}, 2)[0]
+
+	iconOffset := func(line string) int {
+		stripped := ansi.Strip(line)
+		return lipgloss.Width(stripped[:strings.Index(stripped, m.icons().TicketOpen)])
+	}
+	if got, want := iconOffset(childless), iconOffset(withChildren); got != want {
+		t.Fatalf("childless ticket's icon column = %d, want %d (same as sibling with children)\nchildless: %q\nwithChildren: %q", got, want, childless, withChildren)
 	}
 }
 

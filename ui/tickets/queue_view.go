@@ -187,9 +187,22 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) []string {
 	status := epic.RenderedStatus(t)
 	indent := "  " + strings.Repeat("  ", r.depth)
 
+	// fold is computed before the live-row branch below so a running/paused
+	// ticket's icon column reserves the same fixed width as its disk-only
+	// rendering further down — otherwise a live row (which never shows a
+	// fold glyph itself) would sit two columns left of its sibling rows.
+	fold := strings.Repeat(" ", lipgloss.Width(m.icons().FolderOpen)+1)
+	if r.hasChildren {
+		glyph := m.icons().FolderOpen
+		if !r.expanded {
+			glyph = m.icons().FolderClosed
+		}
+		fold = glyph + " "
+	}
+
 	if m.runningEpics[epic.Name] {
 		if live, ok := m.live[epic.Name][t.Identifier]; ok {
-			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live, indent); ok {
+			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live, indent+fold); ok {
 				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens)
 				return []string{appendRowMetrics(base, joinNonEmpty(" ", suffix, metrics), metricsLineStyle)}
 			}
@@ -215,15 +228,6 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) []string {
 	}
 	if searchDim {
 		style = ui.StyleDim
-	}
-
-	fold := ""
-	if r.hasChildren {
-		glyph := m.icons().FolderOpen
-		if !r.expanded {
-			glyph = m.icons().FolderClosed
-		}
-		fold = glyph + " "
 	}
 
 	line := indent + fold + style.Render(icon) + " " + titleStyle.Render(title)

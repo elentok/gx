@@ -12,6 +12,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/ralphloop"
@@ -1415,6 +1416,28 @@ func TestRenderQueueTicketRow_CommitlessSuffix(t *testing.T) {
 	lines := m.renderQueueTicketRow(queueRow{epic: epic, ticket: epic.Tickets[0]}, 0)
 	if !strings.Contains(lines[0], "Open ticket (commitless)") {
 		t.Fatalf("title line = %q, want title followed by \" (commitless)\"", lines[0])
+	}
+}
+
+// TestRenderQueueTicketRow_IconColumnAlignsRegardlessOfChildren mirrors
+// TestRenderTicketRow_IconColumnAlignsRegardlessOfChildren (bugs-05/01) for
+// the Queue tab's own row renderer.
+func TestRenderQueueTicketRow_IconColumnAlignsRegardlessOfChildren(t *testing.T) {
+	var m QueueModel
+	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
+		{Identifier: "01", Title: "Parent ticket", Status: "open"},
+		{Identifier: "02", Title: "Leaf ticket", Status: "open"},
+	}}
+
+	withChildren := m.renderQueueTicketRow(queueRow{epic: epic, ticket: epic.Tickets[0], hasChildren: true, expanded: true}, 0)[0]
+	childless := m.renderQueueTicketRow(queueRow{epic: epic, ticket: epic.Tickets[1]}, 1)[0]
+
+	iconOffset := func(line string) int {
+		stripped := ansi.Strip(line)
+		return lipgloss.Width(stripped[:strings.Index(stripped, m.icons().TicketOpen)])
+	}
+	if got, want := iconOffset(childless), iconOffset(withChildren); got != want {
+		t.Fatalf("childless ticket's icon column = %d, want %d (same as sibling with children)\nchildless: %q\nwithChildren: %q", got, want, childless, withChildren)
 	}
 }
 

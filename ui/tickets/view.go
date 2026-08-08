@@ -150,6 +150,19 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 	status := epic.RenderedStatus(t)
 	indent := "    " + strings.Repeat("  ", r.depth)
 
+	// fold is computed before the live-row branch below so a running/paused
+	// ticket's icon column reserves the same fixed width as its disk-only
+	// rendering further down — otherwise a live row (which never shows a
+	// fold glyph itself) would sit two columns left of its sibling rows.
+	fold := strings.Repeat(" ", lipgloss.Width(m.icons().FolderOpen)+1)
+	if r.hasChildren {
+		glyph := m.icons().FolderOpen
+		if !r.expanded {
+			glyph = m.icons().FolderClosed
+		}
+		fold = glyph + " "
+	}
+
 	// m.live is nested by epic name (ticket 05) precisely because bare
 	// ticket identifiers repeat across epics (each restarts numbering from
 	// 01) — gating on m.implementingEpics[epic.Name] and looking the ticket
@@ -158,7 +171,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 	// cross-rendering as running here.
 	if m.implementingEpics[epic.Name] {
 		if live, ok := m.live[epic.Name][t.Identifier]; ok {
-			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live, indent+m.checkboxGlyph(m.isChecked(t.Path))+" "); ok {
+			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live, indent+m.checkboxGlyph(m.isChecked(t.Path))+" "+fold); ok {
 				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens)
 				return []string{appendRowMetrics(base, joinNonEmpty(" ", suffix, metrics), metricsLineStyle)}
 			}
@@ -185,15 +198,6 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 	}
 	if searchDim {
 		style = ui.StyleDim
-	}
-
-	fold := ""
-	if r.hasChildren {
-		glyph := m.icons().FolderOpen
-		if !r.expanded {
-			glyph = m.icons().FolderClosed
-		}
-		fold = glyph + " "
 	}
 
 	line := indent + m.checkboxGlyph(m.isChecked(t.Path)) + " " + fold + style.Render(icon) + " " + titleStyle.Render(title)
