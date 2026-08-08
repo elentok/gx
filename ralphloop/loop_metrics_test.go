@@ -387,3 +387,91 @@ func TestRun_LogsDepsInstalledEventWithCommand(t *testing.T) {
 		t.Errorf("deps-installed event Reason = %q, want the command run", found.Reason)
 	}
 }
+
+// TestStampCommitlessMetrics_FreshSession_WritesActualContextWindowAndElapsedTime
+// verifies ticket 04: the commitless branch of finishIteration reads its own
+// finishing session's stats, the same way landCherryPick's writeLandedMetrics
+// does for a committed finish, and stamps them into the ticket's frontmatter.
+func TestStampCommitlessMetrics_FreshSession_WritesActualContextWindowAndElapsedTime(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: done\ntype: code-review\ncommitless: true\n---\n# A\n",
+	})
+	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
+
+	sessionID := "sess-commitless-01"
+	cwd := iterationWorktreePath("/fake/worktrees", "epic", "01")
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	writeFakeTranscript(t, cwd, sessionID, start,
+		[3]any{"claude-sonnet-5", 1000, 0},
+		[3]any{"claude-sonnet-5", 2000, 5000},
+	)
+
+	p := iterationParams{
+		WorktreeDir: "/fake/worktrees",
+		Agent:       AgentClaude,
+		Ticket:      tickets.Ticket{Identifier: "01", Path: ticketPath},
+		ScratchDir:  scratchDir,
+	}
+
+	stampCommitlessMetrics(p, cwd, sessionID)
+
+	raw, err := os.ReadFile(ticketPath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	ticket, err := schema.ParseTicketFromRaw(string(raw), ticketPath)
+	if err != nil {
+		t.Fatalf("ParseTicketFromRaw: %v", err)
+	}
+	if ticket.ActualContextWindow == 0 {
+		t.Errorf("ActualContextWindow = 0, want non-zero:\n%s", raw)
+	}
+	if ticket.ElapsedTime == 0 {
+		t.Errorf("ElapsedTime = 0, want non-zero:\n%s", raw)
+	}
+}
+
+// TestStampCommitlessMetrics_NoDiscoverableSession_LeavesFieldsZeroWithoutError
+// verifies ticket 04's fallback: a commitless finish with no session to read
+// (no sessionID and no prior iteration-started event to backfill from)
+// leaves actual_context_window/elapsed_time at 0 rather than erroring.
+func TestStampCommitlessMetrics_NoDiscoverableSession_LeavesFieldsZeroWithoutError(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: done\ntype: code-review\ncommitless: true\n---\n# A\n",
+	})
+	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
+
+	p := iterationParams{
+		WorktreeDir:   "/fake/worktrees",
+		FeatureBranch: "epic",
+		Agent:         AgentClaude,
+		Ticket:        tickets.Ticket{Identifier: "01", Path: ticketPath},
+		ScratchDir:    scratchDir,
+	}
+
+	stampCommitlessMetrics(p, iterationWorktreePath("/fake/worktrees", "epic", "01"), "")
+
+	raw, err := os.ReadFile(ticketPath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	ticket, err := schema.ParseTicketFromRaw(string(raw), ticketPath)
+	if err != nil {
+		t.Fatalf("ParseTicketFromRaw: %v", err)
+	}
+	if ticket.ActualContextWindow != 0 {
+		t.Errorf("ActualContextWindow = %d, want 0 (no discoverable session)", ticket.ActualContextWindow)
+	}
+	if ticket.ElapsedTime != 0 {
+		t.Errorf("ElapsedTime = %d, want 0 (no discoverable session)", ticket.ElapsedTime)
+	}
+	if ticket.Status != schema.StatusDone {
+		t.Errorf("Status = %q, want done (finish still completes cleanly)", ticket.Status)
+	}
+}

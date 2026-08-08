@@ -196,6 +196,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 			return fmt.Errorf("reading ticket %s for commitless check: %w", p.Ticket.Path, err)
 		}
 		if current.IsCommitless() && current.Status != schema.StatusClaimed {
+			stampCommitlessMetrics(p, path, sessionID)
 			p.logTicketEvent(eventCommitless, pane, tab, sessionID, path)
 			return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, tab)
 		}
@@ -263,6 +264,31 @@ func backfillDoneMetadata(d Deps, p iterationParams) error {
 	}
 	compactions, _, _ := sessionCompactions(d, agent, sessionCwd, sessionID)
 	return MarkDoneWithMetadata(p.Ticket.Path, occupancy, compactions, sessionID)
+}
+
+// stampCommitlessMetrics writes actual_context_window/elapsed_time for a
+// commitless finish, the ahead==0 counterpart to landCherryPick's
+// writeLandedMetrics call on the committed path. A fresh iteration's own
+// sessionID is read directly; a reattached close (sessionID == "") recovers
+// its session the same way backfillDoneMetadata does. Metrics here are
+// best-effort — any failure to find or read a session leaves the fields at
+// their existing zero value rather than failing the finish, since the ticket
+// is already done and these fields are a display convenience, not a
+// precondition for closing it.
+func stampCommitlessMetrics(p iterationParams, cwd, sessionID string) {
+	if sessionID != "" {
+		writeLandedMetrics(p.Agent, cwd, sessionID, p.Ticket.Path)
+		return
+	}
+	events, ok, err := readEvents(p.ScratchDir, p.FeatureBranch)
+	if err != nil || !ok {
+		return
+	}
+	sid, sessionCwd, agent, ok := lastIterationSession(events, p.Ticket.Identifier)
+	if !ok {
+		return
+	}
+	writeLandedMetrics(agent, sessionCwd, sid, p.Ticket.Path)
 }
 
 // landCherryPick cherry-picks base..branch onto the feature branch (resolving
