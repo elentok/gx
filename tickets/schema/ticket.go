@@ -117,20 +117,23 @@ type Ticket struct {
 	// marking a zero-commit ticket needs-info, and startup reconciliation's
 	// classifyDoneTicket skips its landed-commit verification for a done
 	// ticket with this set. Prefer IsCommitless over reading this field
-	// directly — grilling/prototype tickets are commitless by type, without
-	// needing the flag set explicitly.
+	// directly — research/grilling/code-review tickets are commitless by
+	// type, without needing the flag set explicitly.
 	Commitless bool
 }
 
 // IsCommitless reports whether t is exempt from landed-commit verification:
 // either explicitly flagged Commitless, or a type that never produces
-// commits in the first place. TypeGrilling tickets record a decision in
-// their own body; TypePrototype tickets explore in a throwaway iteration
-// worktree — neither lands a commit on the feature branch even when
-// finished correctly, so requiring one would misclassify every one of them
-// as a stalled/crashed agent.
+// commits in the first place. TypeResearch and TypeGrilling tickets record
+// their deliverable in the ticket body itself; TypeCodeReview reviews the
+// epic rather than landing code of its own — none of the three lands a
+// commit on the feature branch even when finished correctly, so requiring
+// one would misclassify every one of them as a stalled/crashed agent.
+// TypePrototype is deliberately excluded: a prototype can legitimately land
+// a real spike/scaffold commit as its actual output, so it stays on the
+// crash-recovery path like TypeTask unless explicitly flagged.
 func (t Ticket) IsCommitless() bool {
-	return t.Commitless || t.Type == TypeGrilling || t.Type == TypePrototype
+	return t.Commitless || t.Type == TypeResearch || t.Type == TypeGrilling || t.Type == TypeCodeReview
 }
 
 // Validate checks a populated Ticket for well-formedness: a valid id, a
