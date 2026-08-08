@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/progress"
 	"charm.land/lipgloss/v2"
@@ -47,9 +48,11 @@ type statusLineData struct {
 	RateLimits struct {
 		FiveHour struct {
 			UsedPercentage json.RawMessage `json:"used_percentage"`
+			ResetsAt       json.RawMessage `json:"resets_at"`
 		} `json:"five_hour"`
 		SevenDay struct {
 			UsedPercentage json.RawMessage `json:"used_percentage"`
+			ResetsAt       json.RawMessage `json:"resets_at"`
 		} `json:"seven_day"`
 	} `json:"rate_limits"`
 	Model struct {
@@ -65,6 +68,9 @@ func runClaudeStatusline(d deps, silent, demo bool) error {
 	worktreeSeg := currentWorktreeSegment(d)
 
 	if demo {
+		now := time.Now()
+		fiveHourResetsAt := now.Add(2 * time.Hour)
+		weekResetsAt := now.AddDate(0, 0, 3)
 		for _, row := range []struct {
 			tokens  float64
 			percent int
@@ -73,7 +79,7 @@ func runClaudeStatusline(d deps, silent, demo bool) error {
 			{85000, 30},
 			{120000, 60},
 		} {
-			fmt.Fprintln(d.stdout, statusLineFromValues("TheModel", row.tokens, float64(row.percent), 12, 34, worktreeSeg))
+			fmt.Fprintln(d.stdout, statusLineFromValues("TheModel", row.tokens, float64(row.percent), 12, 34, fiveHourResetsAt, weekResetsAt, worktreeSeg))
 		}
 		return nil
 	}
@@ -97,8 +103,10 @@ func runClaudeStatusline(d deps, silent, demo bool) error {
 	// field (or a plan without weekly limits) shouldn't produce error segments.
 	fiveText := parseNumberField(payload.RateLimits.FiveHour.UsedPercentage, "5h", true, true)
 	weekText := parseNumberField(payload.RateLimits.SevenDay.UsedPercentage, "weekly", true, true)
+	fiveResetText := parseResetTimeField(payload.RateLimits.FiveHour.ResetsAt)
+	weekResetText := parseResetTimeField(payload.RateLimits.SevenDay.ResetsAt)
 
-	fmt.Fprintln(d.stdout, statusLineFromParts(rawTokens, modelText, tokensText, ctxText, fiveText, weekText, worktreeSeg))
+	fmt.Fprintln(d.stdout, statusLineFromParts(rawTokens, modelText, tokensText, ctxText, fiveText, weekText, fiveResetText, weekResetText, worktreeSeg))
 	return nil
 }
 
@@ -159,6 +167,31 @@ func parseContextProgressField(raw json.RawMessage, rawTokens float64, silent bo
 	return statusField{text: contextProgressValue(value, rawTokens)}
 }
 
+// parseResetTimeField parses a resets_at Unix-epoch-seconds field. It's
+// always silent (empty string on missing/invalid), matching how rate limits
+// are parsed elsewhere: a payload predating this field shouldn't error.
+func parseResetTimeField(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	value, ok := parseNumber(raw)
+	if !ok {
+		return ""
+	}
+	return formatResetTime(time.Unix(int64(value), 0))
+}
+
+// formatResetTime renders t as a local 24h time, prefixed with the
+// abbreviated weekday only when t falls on a different local date than now.
+func formatResetTime(t time.Time) string {
+	local := t.Local()
+	now := time.Now()
+	if local.Year() == now.Year() && local.YearDay() == now.YearDay() {
+		return local.Format("15:04")
+	}
+	return local.Format("Mon 15:04")
+}
+
 func parseNumber(raw json.RawMessage) (float64, bool) {
 	var num float64
 	if err := json.Unmarshal(raw, &num); err == nil {
@@ -180,7 +213,7 @@ func parseNumber(raw json.RawMessage) (float64, bool) {
 	return parsed, true
 }
 
-func statusLineFromValues(model string, tokens, contextPercent, fiveHourPercent, weekPercent float64, worktreeSeg string) string {
+func statusLineFromValues(model string, tokens, contextPercent, fiveHourPercent, weekPercent float64, fiveHourResetsAt, weekResetsAt time.Time, worktreeSeg string) string {
 	return statusLineFromParts(
 		tokens,
 		statusField{text: model},
@@ -188,11 +221,13 @@ func statusLineFromValues(model string, tokens, contextPercent, fiveHourPercent,
 		statusField{text: contextProgressValue(contextPercent, tokens)},
 		statusField{text: numberFromValue(fiveHourPercent, true)},
 		statusField{text: numberFromValue(weekPercent, true)},
+		formatResetTime(fiveHourResetsAt),
+		formatResetTime(weekResetsAt),
 		worktreeSeg,
 	)
 }
 
-func statusLineFromParts(rawTokens float64, model, tokens, ctx, five, week statusField, worktreeSeg string) string {
+func statusLineFromParts(rawTokens float64, model, tokens, ctx, five, week statusField, fiveReset, weekReset, worktreeSeg string) string {
 	parts := make([]string, 0, 4)
 	if model.text != "" {
 		parts = append(parts, styledValue(model, claudeModelStyle))
@@ -209,13 +244,21 @@ func statusLineFromParts(rawTokens float64, model, tokens, ctx, five, week statu
 		usageParts = append(usageParts, styledValue(ctx, claudePlainStyle))
 	}
 	if five.text != "" {
+		text := five.text + " of 5h"
+		if fiveReset != "" {
+			text += " (resets " + fiveReset + ")"
+		}
 		usageParts = append(usageParts, styledValue(
-			statusField{text: five.text + " of 5h", invalid: five.invalid}, claudePlainStyle,
+			statusField{text: text, invalid: five.invalid}, claudePlainStyle,
 		))
 	}
 	if week.text != "" {
+		text := week.text + " of weekly"
+		if weekReset != "" {
+			text += " (resets " + weekReset + ")"
+		}
 		usageParts = append(usageParts, styledValue(
-			statusField{text: week.text + " of weekly", invalid: week.invalid}, claudeFaintStyle,
+			statusField{text: text, invalid: week.invalid}, claudeFaintStyle,
 		))
 	}
 	if len(usageParts) > 0 {

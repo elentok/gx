@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
@@ -23,6 +25,58 @@ func TestRunClaudeStatusline_ValidInput(t *testing.T) {
 
 	got := out.String()
 	for _, want := range []string{"Claude Sonnet", "1.2k", "51%", "11% of 5h", "73% of weekly"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("output missing %q: %q", want, got)
+		}
+	}
+}
+
+func TestRunClaudeStatusline_RateLimitResets(t *testing.T) {
+	fiveHourReset := time.Now().Add(30 * time.Minute)
+	weekReset := time.Now().AddDate(0, 0, 3)
+
+	out := &strings.Builder{}
+	d := deps{
+		stdin: strings.NewReader(fmt.Sprintf(
+			`{"context_window":{"total_input_tokens":1234,"used_percentage":51.2},"rate_limits":{"five_hour":{"used_percentage":11.4,"resets_at":%d},"seven_day":{"used_percentage":72.8,"resets_at":%d}},"model":{"display_name":"Claude Sonnet"}}`,
+			fiveHourReset.Unix(), weekReset.Unix(),
+		)),
+		stdout: out,
+		getwd:  func() (string, error) { return t.TempDir(), nil },
+	}
+
+	if err := runClaudeStatusline(d, false, false); err != nil {
+		t.Fatalf("runClaudeStatusline returned error: %v", err)
+	}
+
+	got := out.String()
+	for _, want := range []string{
+		"resets " + fiveHourReset.Format("15:04"),
+		"resets " + weekReset.Format("Mon 15:04"),
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("output missing %q: %q", want, got)
+		}
+	}
+}
+
+func TestRunClaudeStatusline_MissingResetsAtDegradesSilently(t *testing.T) {
+	out := &strings.Builder{}
+	d := deps{
+		stdin:  strings.NewReader(`{"rate_limits":{"five_hour":{"used_percentage":11},"seven_day":{"used_percentage":72}},"model":{"display_name":"Claude"}}`),
+		stdout: out,
+		getwd:  func() (string, error) { return t.TempDir(), nil },
+	}
+
+	if err := runClaudeStatusline(d, false, false); err != nil {
+		t.Fatalf("runClaudeStatusline returned error: %v", err)
+	}
+
+	got := out.String()
+	if strings.Contains(got, "resets") {
+		t.Fatalf("expected no resets segment when resets_at absent, got %q", got)
+	}
+	for _, want := range []string{"11% of 5h", "72% of weekly"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("output missing %q: %q", want, got)
 		}
@@ -158,7 +212,7 @@ func TestRunClaudeStatusline_Demo(t *testing.T) {
 			}
 		}
 	}
-	for _, want := range []string{"50k", "85k", "120k", "10%", "30%", "60%", "🙂", "🤔", "🥵"} {
+	for _, want := range []string{"50k", "85k", "120k", "10%", "30%", "60%", "🙂", "🤔", "🥵", "resets "} {
 		if !strings.Contains(out.String(), want) {
 			t.Fatalf("demo output missing %q: %q", want, out.String())
 		}
