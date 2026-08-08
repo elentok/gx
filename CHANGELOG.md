@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.27.0 - 2026-08-08
+
+- Added a `gx cleanup` skill/command that scans worktrees and epics for housekeeping issues (stray branches, stale worktrees, missing code-review tickets) and can execute safe fast-forward-only merges and other fixes.
+- Added `gx notify`/`gx config test-notifications` commands to send/test notifications directly, and `gx tickets ensure-code-review` to guarantee an epic has a code-review ticket.
+- Added Slack notification support alongside the existing Telegram integration, including in-app toasts for epic-complete and iteration-paused events, both durably logged to the run log.
+- Added a `?` help modal to the Queue and Tickets tabs.
+- Added Queue tab preview-focus toggle and vim-style navigation (`G`/`gg` to jump to list start/end, `b` for preview bottom).
+- Added reattach detection for recoverable sessions, gated behind a Detached+Live confirmation instead of auto-navigating.
+- Renamed the "implement" queue actions to "Replace queue"/"Add to queue" to better match their behavior.
+- Statusline now shows Claude's 5h and weekly rate-limit reset times, and uses a dot separator instead of a vertical bar.
+- Commit-info popup now shows the full commit body, wrapped to fill the screen width.
+- Manual and self-triggered reloads now preserve scroll position and expand/collapse state instead of resetting them.
+- Queue tab now shows attachment status with an "(attached)" label and banner, and full-eligible Queue starts use a dynamic (rescan-on-disk) scope instead of a frozen ticket list.
+- Fixed the scratch-merge conflict check being top-level-only, which falsely flagged colliding epic directories even when their ticket files didn't actually collide; it's now recursive and all-or-nothing.
+- Fixed a duplicate-launch race (`agent_name_taken`) when a mid-flight ticket split's parent ticket was written to after its children were already claimed.
+- Fixed notify partial-send failures being reported twice.
+- Fixed the reattach-scan notification not closing when its session resumes.
+- Fixed Telegram test-notification bodies not escaping periods for MarkdownV2 compatibility.
+
 ## v0.26.0 - 2026-08-07
 
 - Added ticket parent/child hierarchy: a collapsible tree in both the Tickets and Queue tabs, replacing the old `split`/`split_from` fields with `parent`/`children` (legacy keys still parsed) and walking `Parent` instead of `SplitFrom` for run-scope traversal.
