@@ -58,33 +58,12 @@ func resolveEpicArg(arg, cwd string) string {
 // check-and-create logic.
 func runTicketsEnsureCodeReview(epicPath string, w io.Writer) error {
 	epicPath = filepath.Clean(epicPath)
-	scratchDir := filepath.Dir(epicPath)
-	epicName := filepath.Base(epicPath)
 
-	if info, err := os.Stat(epicPath); err != nil || !info.IsDir() {
-		return fmt.Errorf("epic not found: %s", epicPath)
-	}
-
-	unlock, err := tickets.LockEpic(epicPath)
+	epic, unlock, err := tickets.LoadLockedEpic(epicPath)
 	if err != nil {
 		return err
 	}
 	defer unlock()
-
-	epics, err := tickets.Load(scratchDir)
-	if err != nil {
-		return fmt.Errorf("loading epics under %s: %w", scratchDir, err)
-	}
-	var epic *tickets.Epic
-	for i := range epics {
-		if epics[i].Name == epicName {
-			epic = &epics[i]
-			break
-		}
-	}
-	if epic == nil {
-		return fmt.Errorf("epic not found: %s", epicPath)
-	}
 
 	for _, t := range epic.Tickets {
 		if t.Type == string(schema.TypeCodeReview) {
@@ -107,7 +86,7 @@ func runTicketsEnsureCodeReview(epicPath string, w io.Writer) error {
 	}
 	body := fmt.Sprintf(
 		"\n# %s — Code review: %s\n\n## What to review\n\n\n## Test seams\n\nnone — review ticket, opens fix tickets as `children` if it finds anything.\n\n## Acceptance criteria\n\n- [ ] Full epic reviewed for correctness and cross-ticket consistency\n- [ ] Any findings opened as child fix tickets\n",
-		id, epicName,
+		id, epic.Name,
 	)
 
 	out, err := schema.MarshalTicket(stub, body)

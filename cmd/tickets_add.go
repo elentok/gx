@@ -17,33 +17,12 @@ import (
 // file's path to w.
 func runTicketsAdd(epicPath, parent string, w io.Writer) error {
 	epicPath = filepath.Clean(epicPath)
-	scratchDir := filepath.Dir(epicPath)
-	epicName := filepath.Base(epicPath)
 
-	if info, err := os.Stat(epicPath); err != nil || !info.IsDir() {
-		return fmt.Errorf("epic not found: %s", epicPath)
-	}
-
-	unlock, err := tickets.LockEpic(epicPath)
+	epic, unlock, err := tickets.LoadLockedEpic(epicPath)
 	if err != nil {
 		return err
 	}
 	defer unlock()
-
-	epics, err := tickets.Load(scratchDir)
-	if err != nil {
-		return fmt.Errorf("loading epics under %s: %w", scratchDir, err)
-	}
-	var epic *tickets.Epic
-	for i := range epics {
-		if epics[i].Name == epicName {
-			epic = &epics[i]
-			break
-		}
-	}
-	if epic == nil {
-		return fmt.Errorf("epic not found: %s", epicPath)
-	}
 
 	id, err := tickets.NextTicketID(*epic, parent)
 	if err != nil {

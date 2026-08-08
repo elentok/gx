@@ -117,6 +117,62 @@ func TestNextTicketID_RejectsNestingPastLetteredNumericParent(t *testing.T) {
 	}
 }
 
+func TestLoadLockedEpic_ValidPath(t *testing.T) {
+	dir := t.TempDir()
+	epicPath := filepath.Join(dir, "my-epic")
+	writeFile(t, filepath.Join(epicPath, "issues", "01-first.md"),
+		"---\nid: \"01\"\nstatus: done\ntype: task\n---\n")
+
+	epic, unlock, err := LoadLockedEpic(epicPath)
+	if err != nil {
+		t.Fatalf("LoadLockedEpic: %v", err)
+	}
+	defer unlock()
+
+	if epic.Name != "my-epic" {
+		t.Errorf("epic.Name = %q, want %q", epic.Name, "my-epic")
+	}
+	if _, err := os.Stat(filepath.Join(epicPath, allocLockFileName)); err != nil {
+		t.Errorf("expected lock file to exist while held: %v", err)
+	}
+}
+
+func TestLoadLockedEpic_MissingPathReturnsErrorAndDoesNotLeaveLock(t *testing.T) {
+	dir := t.TempDir()
+	epicPath := filepath.Join(dir, "does-not-exist")
+
+	epic, unlock, err := LoadLockedEpic(epicPath)
+	if err == nil {
+		t.Fatal("expected error for missing epic path, got nil")
+	}
+	if epic != nil {
+		t.Errorf("expected nil epic on error, got %+v", epic)
+	}
+	if unlock != nil {
+		t.Error("expected nil unlock on error")
+	}
+	if _, statErr := os.Stat(filepath.Join(epicPath, allocLockFileName)); !os.IsNotExist(statErr) {
+		t.Errorf("expected no lock file left behind, stat err = %v", statErr)
+	}
+}
+
+func TestLoadLockedEpic_EmptyEpic(t *testing.T) {
+	dir := t.TempDir()
+	epicPath := filepath.Join(dir, "my-epic")
+	if err := os.MkdirAll(filepath.Join(epicPath, "issues"), 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	epic, unlock, err := LoadLockedEpic(epicPath)
+	if err != nil {
+		t.Fatalf("LoadLockedEpic: %v", err)
+	}
+	defer unlock()
+	if epic.Name != "my-epic" {
+		t.Errorf("epic.Name = %q, want %q", epic.Name, "my-epic")
+	}
+}
+
 func TestLockEpic_SerializesConcurrentAllocation(t *testing.T) {
 	dir := t.TempDir()
 	epicPath := filepath.Join(dir, "my-epic")

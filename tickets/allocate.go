@@ -43,6 +43,42 @@ func LockEpic(epicPath string) (unlock func(), err error) {
 	}
 }
 
+// LoadLockedEpic resolves epicPath (cleaned), acquires its LockEpic, loads
+// the epic set rooted at epicPath's parent directory, and returns the one
+// matching epicPath's base name — all under the lock, so the returned epic's
+// ticket list is safe to compute a new ticket ID against. On any error the
+// lock (if acquired) is released before returning, so the returned unlock is
+// always nil and safe to ignore in that case; callers should still defer
+// unlock() unconditionally when err is nil.
+func LoadLockedEpic(epicPath string) (epic *Epic, unlock func(), err error) {
+	epicPath = filepath.Clean(epicPath)
+	scratchDir := filepath.Dir(epicPath)
+	epicName := filepath.Base(epicPath)
+
+	if info, statErr := os.Stat(epicPath); statErr != nil || !info.IsDir() {
+		return nil, nil, fmt.Errorf("epic not found: %s", epicPath)
+	}
+
+	unlock, err = LockEpic(epicPath)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	epics, err := Load(scratchDir)
+	if err != nil {
+		unlock()
+		return nil, nil, fmt.Errorf("loading epics under %s: %w", scratchDir, err)
+	}
+	for i := range epics {
+		if epics[i].Name == epicName {
+			return &epics[i], unlock, nil
+		}
+	}
+
+	unlock()
+	return nil, nil, fmt.Errorf("epic not found: %s", epicPath)
+}
+
 // parentIDRe splits a parent ID argument into its digits, optional single
 // trailing letter, and — only past that letter — optional trailing digits,
 // mirroring schema.TicketID's shape.
