@@ -316,6 +316,64 @@ func TestQueueModelSurfacesActionableErrorForDependencyCycle(t *testing.T) {
 	}
 }
 
+// TestQueueModelPollSyncsExecutionTicketsToWidenedRunScope covers ticket 06:
+// a ticket added mid-run via "a" (cmdAddToLiveQueue, ralphloop.RunScope.Add)
+// must show up in the Queue tab's list/count instead of staying frozen to
+// m.executionTickets' kickoff snapshot.
+func TestQueueModelPollSyncsExecutionTicketsToWidenedRunScope(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: claimed\n\nBody.\n")
+	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
+
+	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+
+	var epic tickets.Epic
+	for _, e := range m.epics {
+		if e.Name == "alpha" {
+			epic = e
+		}
+	}
+
+	previousRegistry := ralphLoopRegistry
+	r := newLoopRegistry(1)
+	r.tryStart("alpha", 0, 1)
+	scope, err := ralphloop.ResolveRunScope(epic, []string{"01"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.setScope("alpha", scope)
+	ralphLoopRegistry = r
+	t.Cleanup(func() {
+		r.finish("alpha", nil)
+		ralphLoopRegistry = previousRegistry
+	})
+
+	m.runningEpics = map[string]bool{"alpha": true}
+	m.executionTickets = map[string]bool{"alpha/01": true}
+	m.runTicketIDs = map[string][]string{"alpha": {"01"}}
+
+	if done, total := m.checkedProgress(); total != 1 {
+		t.Fatalf("precondition: checkedProgress() = %d/%d, want total=1", done, total)
+	}
+
+	// Mid-run widening, mirroring cmdAddToLiveQueue's effect on the live scope.
+	scope.Add("02")
+
+	// syncExecutionScope runs synchronously inside Update, so the widened
+	// ticket is visible without following the returned poll/spinner commands
+	// (which would otherwise recurse for as long as "alpha" stays running).
+	updated, _ := m.Update(implementPollMsg{epicName: "alpha"})
+	m = updated.(QueueModel)
+
+	if !m.executionTickets["alpha/02"] {
+		t.Fatalf("executionTickets = %v, want alpha/02 added after the poll observes the widened scope", m.executionTickets)
+	}
+	if done, total := m.checkedProgress(); total != 2 {
+		t.Fatalf("checkedProgress() = %d/%d, want total=2 after the widened ticket is picked up", done, total)
+	}
+}
+
 func TestQueueModelBannerWhileRunningAggregatesCheckedEpics(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-done.md", "Status: done\n\nBody.\n")

@@ -238,6 +238,9 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		closeCmd := m.syncRunSnapshot(msg.epicName)
 		return m, tea.Batch(cmdPollImplement(msg.epicName), m.implementSpinner.Tick, closeCmd)
 	case implementPollMsg:
+		if snapshot, ok := ralphLoopRegistry.runSnapshot(msg.epicName); ok {
+			m.syncExecutionScope(msg.epicName, snapshot)
+		}
 		closeCmd := m.syncRunSnapshot(msg.epicName)
 		if ralphLoopRegistry.isRunningEpic(msg.epicName) {
 			return m, tea.Batch(cmdPollImplement(msg.epicName), closeCmd)
@@ -388,6 +391,17 @@ func (m QueueModel) handleQueueSync(msg queueSyncMsg) (tea.Model, tea.Cmd) {
 		if !ok {
 			continue
 		}
+		// Baseline: the checked selection this Model instance knows about,
+		// recorded even if it's reattaching to a run the registry never
+		// reported an OnScopeResolved callback for yet (e.g. right after
+		// tryStart). Idempotent — recordExecutionTicket dedups.
+		for _, ticketID := range plan.ticketIDs {
+			m.recordExecutionTicket(name, ticketID)
+		}
+		// Growth: widen to the run's live RunScope, so a ticket added mid-run
+		// via "a" (cmdAddToLiveQueue, ralphloop.RunScope.Add) is picked up
+		// without waiting for this Model's own checked selection to change.
+		m.syncExecutionScope(name, snapshot)
 		cmds = append(cmds, m.syncRunSnapshot(name))
 		if !snapshot.StartedAt.IsZero() && (m.executionStartedAt.IsZero() || snapshot.StartedAt.Before(m.executionStartedAt)) {
 			m.executionStartedAt = snapshot.StartedAt
@@ -408,17 +422,6 @@ func (m QueueModel) handleQueueSync(msg queueSyncMsg) (tea.Model, tea.Cmd) {
 	}
 	if len(m.runningEpics) > 0 {
 		cmds = append(cmds, m.implementSpinner.Tick)
-	}
-	if len(m.executionTickets) == 0 {
-		for _, plan := range m.checkedEpicPlans() {
-			if _, ok := byName[plan.epic.Name]; !ok {
-				continue
-			}
-			m.runTicketIDs[plan.epic.Name] = append([]string(nil), plan.ticketIDs...)
-			for _, ticketID := range plan.ticketIDs {
-				m.executionTickets[plan.epic.Name+"/"+ticketID] = true
-			}
-		}
 	}
 	cmds = append(cmds, m.startAvailableEpics())
 	if !m.executionStartedAt.IsZero() && m.executionCompletedAt.IsZero() && len(m.runningEpics) == 0 && len(m.pendingEpics) == 0 {
@@ -488,6 +491,49 @@ func (m *QueueModel) setItemStatus(path string, status queueItemStatus) {
 		m.queueStatus = map[string]queueItemStatus{}
 	}
 	m.queueStatus[path] = status
+}
+
+// syncExecutionScope widens m.executionTickets/m.runTicketIDs to match
+// epicName's live RunScope, so a ticket added mid-run via "a"
+// (cmdAddToLiveQueue in implement.go, which calls ralphloop.RunScope.Add)
+// appears in the Queue tab's list/count/header instead of staying frozen to
+// the kickoff snapshot (ticket 06). Only ever grows the set: a ticket already
+// recorded stays recorded.
+//
+// scopeFor returns ok=false once the registry's r.runs entry for epicName is
+// gone (loopRegistry.finish, run completed/failed) — the run's own
+// r.snapshots entry survives that, though (see loopRegistry doc comment), so
+// a Queue tab reattached after the run already finished falls back to
+// snapshot's captured ticket set instead of missing it entirely.
+func (m *QueueModel) syncExecutionScope(epicName string, snapshot RunSnapshot) {
+	if scope, ok := ralphLoopRegistry.scopeFor(epicName); ok {
+		for _, epic := range m.epics {
+			if epic.Name != epicName {
+				continue
+			}
+			for _, ticket := range epic.Tickets {
+				if scope.Contains(ticket, epic) {
+					m.recordExecutionTicket(epicName, ticket.Identifier)
+				}
+			}
+			return
+		}
+		return
+	}
+	for identifier := range snapshot.Tickets {
+		m.recordExecutionTicket(epicName, identifier)
+	}
+}
+
+// recordExecutionTicket adds epicName/identifier to m.executionTickets and
+// m.runTicketIDs if not already present.
+func (m *QueueModel) recordExecutionTicket(epicName, identifier string) {
+	key := epicName + "/" + identifier
+	if m.executionTickets[key] {
+		return
+	}
+	m.executionTickets[key] = true
+	m.runTicketIDs[epicName] = append(m.runTicketIDs[epicName], identifier)
 }
 
 // markEpicTicketsRunning transitions epicName's captured ticket subset
