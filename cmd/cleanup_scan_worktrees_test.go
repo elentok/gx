@@ -20,6 +20,18 @@ import (
 // repo's own control.
 func realDevRepoScan(t *testing.T) map[string]WorktreeScan {
 	t.Helper()
+	byBranch, _ := realDevRepoScanWithEpics(t)
+	return byBranch
+}
+
+// realDevRepoScanWithEpics is realDevRepoScan plus the loaded epic names, so
+// callers can tell a fixture epic that's been archived (tickets.Load excludes
+// `.archive/`, per its own doc comment) apart from one that's still live —
+// the branch can survive its epic's archival, which silently changes
+// scanWorktrees' classification (e.g. TicketDone/Kind) out from under a test
+// that only checked the branch was present.
+func realDevRepoScanWithEpics(t *testing.T) (map[string]WorktreeScan, []tickets.Epic) {
+	t.Helper()
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("os.Getwd: %v", err)
@@ -43,7 +55,7 @@ func realDevRepoScan(t *testing.T) map[string]WorktreeScan {
 	for _, s := range scans {
 		byBranch[s.Branch] = s
 	}
-	return byBranch
+	return byBranch, epics
 }
 
 func requireBranch(t *testing.T, byBranch map[string]WorktreeScan, branch string) WorktreeScan {
@@ -55,8 +67,23 @@ func requireBranch(t *testing.T, byBranch map[string]WorktreeScan, branch string
 	return scan
 }
 
+// requireEpic skips the test when epicName is no longer among this repo's
+// live (non-archived) epics, since scanWorktrees' TicketDone/Kind fixtures
+// depend on the epic being loaded, not just on the branch existing.
+func requireEpic(t *testing.T, epics []tickets.Epic, epicName string) {
+	t.Helper()
+	for _, e := range epics {
+		if e.Name == epicName {
+			return
+		}
+	}
+	t.Skipf("fixture epic %q not present in this repo's current (non-archived) state", epicName)
+}
+
 func TestScanWorktrees_RealRepo_CurrentPatternIterationBranch_LandedAndDone(t *testing.T) {
-	scan := requireBranch(t, realDevRepoScan(t), "ralph-loop/bugs-01-item-04")
+	byBranch, epics := realDevRepoScanWithEpics(t)
+	requireEpic(t, epics, "bugs-01")
+	scan := requireBranch(t, byBranch, "ralph-loop/bugs-01-item-04")
 
 	if scan.Kind != "iteration" {
 		t.Fatalf("Kind = %q, want iteration", scan.Kind)
@@ -73,7 +100,9 @@ func TestScanWorktrees_RealRepo_CurrentPatternIterationBranch_LandedAndDone(t *t
 }
 
 func TestScanWorktrees_RealRepo_LegacyPatternIterationBranch_LandedAndDone(t *testing.T) {
-	scan := requireBranch(t, realDevRepoScan(t), "ralph-loop/gx-tickets-set-retrofit/iter-01")
+	byBranch, epics := realDevRepoScanWithEpics(t)
+	requireEpic(t, epics, "gx-tickets-set-retrofit")
+	scan := requireBranch(t, byBranch, "ralph-loop/gx-tickets-set-retrofit/iter-01")
 
 	if scan.Kind != "iteration" {
 		t.Fatalf("Kind = %q, want iteration", scan.Kind)
@@ -90,7 +119,8 @@ func TestScanWorktrees_RealRepo_LegacyPatternIterationBranch_LandedAndDone(t *te
 }
 
 func TestScanWorktrees_RealRepo_FeatureBranch(t *testing.T) {
-	byBranch := realDevRepoScan(t)
+	byBranch, epics := realDevRepoScanWithEpics(t)
+	requireEpic(t, epics, "gx-cleanup")
 	scan := requireBranch(t, byBranch, "gx-cleanup")
 
 	if scan.Kind != "feature" {
