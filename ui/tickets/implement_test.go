@@ -10,13 +10,14 @@ import (
 	"github.com/elentok/gx/ui/notify"
 )
 
-// TestModel_ImplementKeyWithNoActiveLoopReplacesPendingSelection covers
-// ticket 10: with no ralph-loop running, "r" ("Replace queue", renamed from
-// "i" by ticket 10) replaces the queue's not-yet-started (pending) entries
-// with the current checked selection, directly and without a confirmation —
-// while running/done entries are left exactly as they are, whether or not
-// they're still part of the selection.
-func TestModel_ImplementKeyWithNoActiveLoopReplacesPendingSelection(t *testing.T) {
+// TestModel_ImplementKeyReplacesPendingSelectionAfterConfirmation covers
+// bugs-05/03: "r" ("Replace queue") opens the same confirmation "a" already
+// goes through before touching anything; only once that's accepted
+// (handleReplaceQueueConfirmed) does it replace the queue's not-yet-started
+// (pending) entries with the current checked selection — while running/done
+// entries are left exactly as they are, whether or not they're still part of
+// the selection.
+func TestModel_ImplementKeyReplacesPendingSelectionAfterConfirmation(t *testing.T) {
 	worktreeRoot := t.TempDir()
 	scratch := func(name string) string {
 		return filepath.Join(worktreeRoot, ".scratch", "alpha", "issues", name)
@@ -51,11 +52,18 @@ func TestModel_ImplementKeyWithNoActiveLoopReplacesPendingSelection(t *testing.T
 
 	updated, cmd := m.handleReplaceQueueKey()
 	m = updated.(Model)
+	if cmd != nil {
+		t.Fatal("expected no cmd until the confirmation is accepted")
+	}
+	if !m.confirm.IsOpen {
+		t.Fatal("expected the confirmation modal to open")
+	}
+
+	confirmedMsg := cmdConfirmReplaceQueue(m.worktreeRoot)()
+	updated, cmd = m.handleReplaceQueueConfirmed(confirmedMsg.(replaceQueueConfirmedMsg))
+	m = updated.(Model)
 	if cmd == nil {
 		t.Fatal("expected a tab-switch command, got nil")
-	}
-	if m.confirm.IsOpen {
-		t.Fatal("expected no confirmation with no active loop")
 	}
 
 	status := store.Snapshot().Status
@@ -117,6 +125,9 @@ func TestModel_ImplementKeyExcludesAlreadyDoneTickets(t *testing.T) {
 
 	updated, _ := m.handleReplaceQueueKey()
 	m = updated.(Model)
+	confirmedMsg := cmdConfirmReplaceQueue(m.worktreeRoot)()
+	updated, _ = m.handleReplaceQueueConfirmed(confirmedMsg.(replaceQueueConfirmedMsg))
+	m = updated.(Model)
 
 	status := store.Snapshot().Status
 	if _, ok := status[donePath]; ok {
@@ -130,25 +141,17 @@ func TestModel_ImplementKeyExcludesAlreadyDoneTickets(t *testing.T) {
 	}
 }
 
-// TestModel_ImplementKeyDisabledWithLiveQueueAnywhere covers ticket 10: "r"
-// is entirely disabled whenever any epic has a run in flight, process-wide —
-// even one unrelated to the checked selection's epic — showing "Can't
-// replace a live queue" instead of touching the pending selection.
-func TestModel_ImplementKeyDisabledWithLiveQueueAnywhere(t *testing.T) {
+// TestModel_ImplementKeyNotBlockedByUnrelatedRunningEpic covers bugs-05/03:
+// a live run on an epic other than the one under the cursor no longer blocks
+// "r" — only the cursor's own epic having a live run does. Pressing "r" here
+// opens the confirmation instead of showing "Can't replace a live queue".
+func TestModel_ImplementKeyNotBlockedByUnrelatedRunningEpic(t *testing.T) {
 	worktreeRoot := t.TempDir()
-	scratch := func(name string) string {
-		return filepath.Join(worktreeRoot, ".scratch", "alpha", "issues", name)
-	}
-	stalePending := scratch("03-stale.md")
-	newSelection := scratch("04-new.md")
+	epic := tickets.Epic{Name: "my-epic", Tickets: []tickets.Ticket{
+		{Number: 1, Identifier: "01", Status: "open"},
+	}}
 
 	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
-	if err := store.Check(stalePending); err != nil {
-		t.Fatal(err)
-	}
-	if err := store.SetStatus(stalePending, queueStatusPending); err != nil {
-		t.Fatal(err)
-	}
 
 	r := newLoopRegistry(2)
 	r.tryStart("unrelated-epic", 0, 1)
@@ -162,8 +165,58 @@ func TestModel_ImplementKeyDisabledWithLiveQueueAnywhere(t *testing.T) {
 	m := Model{
 		worktreeRoot: worktreeRoot,
 		queueStore:   store,
-		checked:      map[string]bool{newSelection: true},
-		checkOrder:   map[string]uint64{newSelection: 1},
+		epics:        []tickets.Epic{epic},
+		checked:      map[string]bool{"/my-epic/01.md": true},
+		checkOrder:   map[string]uint64{"/my-epic/01.md": 1},
+	}
+
+	updated, cmd := m.handleReplaceQueueKey()
+	m = updated.(Model)
+	if cmd != nil {
+		t.Fatal("expected no cmd until the confirmation is accepted")
+	}
+	if !m.confirm.IsOpen {
+		t.Fatal("expected the confirmation modal to open, cursor epic isn't the running one")
+	}
+}
+
+// TestModel_ImplementKeyBlockedWhenCursorEpicRunning covers bugs-05/03: "r"
+// is still blocked when the epic under the cursor itself has a live run,
+// showing "Can't replace a live queue" and never opening the confirmation.
+func TestModel_ImplementKeyBlockedWhenCursorEpicRunning(t *testing.T) {
+	worktreeRoot := t.TempDir()
+	scratch := func(name string) string {
+		return filepath.Join(worktreeRoot, ".scratch", "my-epic", "issues", name)
+	}
+	stalePending := scratch("03-stale.md")
+
+	epic := tickets.Epic{Name: "my-epic", Tickets: []tickets.Ticket{
+		{Number: 1, Identifier: "01", Status: "open"},
+	}}
+
+	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
+	if err := store.Check(stalePending); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetStatus(stalePending, queueStatusPending); err != nil {
+		t.Fatal(err)
+	}
+
+	r := newLoopRegistry(1)
+	r.tryStart("my-epic", 0, 1)
+	previous := ralphLoopRegistry
+	ralphLoopRegistry = r
+	t.Cleanup(func() {
+		r.finish("my-epic", nil)
+		ralphLoopRegistry = previous
+	})
+
+	m := Model{
+		worktreeRoot: worktreeRoot,
+		queueStore:   store,
+		epics:        []tickets.Epic{epic},
+		checked:      map[string]bool{"/my-epic/01.md": true},
+		checkOrder:   map[string]uint64{"/my-epic/01.md": 1},
 	}
 
 	updated, cmd := m.handleReplaceQueueKey()
@@ -182,7 +235,7 @@ func TestModel_ImplementKeyDisabledWithLiveQueueAnywhere(t *testing.T) {
 	if got := store.Snapshot().Status[stalePending]; got != queueStatusPending {
 		t.Fatalf("pending entry status = %v, want untouched pending", got)
 	}
-	if len(m.checked) != 1 || !m.checked[newSelection] {
+	if len(m.checked) != 1 || !m.checked["/my-epic/01.md"] {
 		t.Fatalf("checked set = %v, want untouched", m.checked)
 	}
 }

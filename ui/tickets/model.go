@@ -241,6 +241,9 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case checkAddConfirmedMsg:
 		return m.handleCheckAddConfirmed(msg)
 
+	case replaceQueueConfirmedMsg:
+		return m.handleReplaceQueueConfirmed(msg)
+
 	case tea.KeyPressMsg:
 		if m.help.IsOpen {
 			var cmd tea.Cmd

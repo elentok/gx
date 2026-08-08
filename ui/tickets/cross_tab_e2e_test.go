@@ -130,6 +130,12 @@ func TestCrossTabCheckThenQueueResetsTicketsCheckboxWhileQueueTabKeepsEntries(t 
 
 	updated, _ = tm.handleReplaceQueueKey()
 	tm = updated.(Model)
+	if !tm.confirm.IsOpen {
+		t.Fatal("expected the confirmation modal to open")
+	}
+	confirmedMsg := cmdConfirmReplaceQueue(tm.worktreeRoot)()
+	updated, _ = tm.handleReplaceQueueConfirmed(confirmedMsg.(replaceQueueConfirmedMsg))
+	tm = updated.(Model)
 
 	if len(tm.checked) != 0 {
 		t.Fatalf("Tickets checked set after queueing = %v, want empty", tm.checked)

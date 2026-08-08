@@ -515,16 +515,6 @@ func (r *loopRegistry) availableSlots() int {
 	return max(r.maxConcurrent-len(r.runs), 0)
 }
 
-// IsLoopRunning reports whether a ralph-loop launched from this process is
-// currently in flight for any epic, regardless of which worktree it
-// targets. The app shell (ticket 05) uses this to force the tickets tab
-// into --all scope while a loop is running, since the loop keeps going
-// against its own worktree even after the user navigates the worktree
-// cursor elsewhere.
-func IsLoopRunning() bool {
-	return ralphLoopRegistry.isRunning()
-}
-
 // isRunningEpic reports whether epicName has a run in flight, so a poll loop
 // knows to keep going without accessing the run's stream directly.
 func (r *loopRegistry) isRunningEpic(epicName string) bool {

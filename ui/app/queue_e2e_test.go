@@ -41,9 +41,11 @@ func TestTicketsConfirmOpensQueueWithSharedSelection(t *testing.T) {
 	tm.Send(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
 	tm.Send(tea.KeyPressMsg{Code: 'r', Text: "r"})
 
-	// Ticket 11: with no ralph-loop running, "r" ("Replace queue", renamed
-	// from "i" by ticket 10) applies the selection and switches to the Queue
-	// tab directly, no confirmation.
+	// bugs-05/03: "r" ("Replace queue") now opens the same confirmation "a"
+	// already goes through before touching the queue; accepting it applies
+	// the selection and switches to the Queue tab.
+	waitForAppText(t, tm, "Replace the queue")
+	tm.Send(tea.KeyPressMsg{Code: 'y', Text: "y"})
 	waitForAppText(t, tm, "Queue")
 	waitForAppText(t, tm, "First")
 }

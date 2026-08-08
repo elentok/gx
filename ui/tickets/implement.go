@@ -66,26 +66,56 @@ func newImplementAgentMenu() components.MenuState {
 	}
 }
 
-// handleReplaceQueueKey applies ticket 10's "r" ("Replace queue") action: with
-// no ralph-loop live anywhere in this process, it replaces the not-yet-started
-// queue entries with the checked selection directly and switches to the
-// Queue tab — no confirmation, since nothing running/done is at risk. Once
-// any epic has a live run, replacing the queue risks stomping in-flight
-// work, so "r" is entirely disabled instead — process-wide, regardless of
-// which epic the checked tickets belong to — and the pending selection is
-// left untouched.
+// handleReplaceQueueKey applies bugs-05/03's "r" ("Replace queue") action:
+// "r" is blocked only when the epic under the cursor itself has a live run —
+// a live run on some other epic no longer stops it, mirroring "a"'s
+// per-epic scoping (handleAddToQueueKey) instead of the old process-wide
+// IsLoopRunning() check. With no epic under the cursor there's nothing to
+// scope the guard to, so the check is simply skipped. Once past the guard,
+// "r" opens the same confirmation step "a" already goes through
+// (openImplementConfirm) before touching the queue, naming what's about to
+// happen; accepting it runs replaceQueuedSelection via
+// handleReplaceQueueConfirmed and switches to the Queue tab.
 func (m Model) handleReplaceQueueKey() (tea.Model, tea.Cmd) {
-	if IsLoopRunning() {
-		return m, notify.Info("Can't replace a live queue")
+	if r, ok := m.selectedRow(); ok {
+		epic := m.epics[r.epicIdx]
+		if ralphLoopRegistry.isRunningEpic(epic.Name) {
+			return m, notify.Info("Can't replace a live queue")
+		}
 	}
 	if len(m.checked) == 0 {
 		return m, notify.Info("check at least one ticket to build an execution plan")
 	}
-	worktreeRoot := m.worktreeRoot
+	m.confirm = m.confirm.Open(confirm.Options{
+		Prompt:    "Replace the queue with the checked selection?",
+		AcceptCmd: cmdConfirmReplaceQueue(m.worktreeRoot),
+	})
+	return m, nil
+}
+
+// replaceQueueConfirmedMsg carries "r"'s confirmation acceptance: worktreeRoot
+// is captured when the modal opened (mirroring checkAddConfirmedMsg's same
+// capture-at-open-time approach in checked.go) since the actual queue
+// mutation must run against the live Model, not the value m.confirm.Open
+// closed over.
+type replaceQueueConfirmedMsg struct {
+	worktreeRoot string
+}
+
+func cmdConfirmReplaceQueue(worktreeRoot string) tea.Cmd {
+	return func() tea.Msg {
+		return replaceQueueConfirmedMsg{worktreeRoot: worktreeRoot}
+	}
+}
+
+// handleReplaceQueueConfirmed applies replaceQueueConfirmedMsg: the queue's
+// not-yet-started entries are replaced with the checked selection, then the
+// app switches to the Queue tab.
+func (m Model) handleReplaceQueueConfirmed(msg replaceQueueConfirmedMsg) (tea.Model, tea.Cmd) {
 	if err := m.replaceQueuedSelection(); err != nil {
 		return m, notify.Error("save queue: " + err.Error())
 	}
-	return m, cmdOpenQueueTab(worktreeRoot)
+	return m, cmdOpenQueueTab(msg.worktreeRoot)
 }
 
 // handleAddToQueueKey applies ticket 10's "a" ("Add to queue") action: the
