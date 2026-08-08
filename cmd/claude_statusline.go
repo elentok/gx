@@ -25,7 +25,7 @@ var (
 	claudeWorktreeStyle = lipgloss.NewStyle().Foreground(ui.ColorMauve)
 	claudeBranchStyle   = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
 
-	claudeSeparator    = claudeFaintStyle.Render("│")
+	claudeSeparator    = claudeFaintStyle.Render("·")
 	claudeLeftBracket  = claudeFaintStyle.Render("[")
 	claudeRightBracket = claudeFaintStyle.Render("]")
 )
