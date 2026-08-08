@@ -331,10 +331,16 @@ func (m QueueModel) handleQueueMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea
 	return m, nil
 }
 
+// contentHeight returns the content height below the tab bar, mirroring
+// Model.contentHeight for the Queue tab's own layout.
+func (m QueueModel) contentHeight() int {
+	return max(m.height-1, 1)
+}
+
 // previewRect returns the preview panel's absolute on-screen bounds,
 // mirroring Model.previewRect for the Queue tab's own layout.
 func (m QueueModel) previewRect() (x, y, w, h int) {
-	return previewRect(m.width, max(m.height-1, 1))
+	return previewRect(m.width, m.contentHeight())
 }
 
 // handleQueueMouseClick selects the row under the click without triggering
@@ -346,7 +352,7 @@ func (m QueueModel) handleQueueMouseClick(msg tea.MouseClickMsg) (tea.Model, tea
 	if mouse.Button != tea.MouseLeft {
 		return m, nil
 	}
-	if m.previewFocus.clickToFocus(mouse, m.width, max(m.height-1, 1)) {
+	if m.previewFocus.clickToFocus(mouse, m.width, m.contentHeight()) {
 		return m, nil
 	}
 	bodyLine := mouse.Y - 1
@@ -966,8 +972,7 @@ func (m *QueueModel) clampSelected() {
 // (splitPanelHeight), since a stacked (narrow-terminal) layout shares the
 // available height with the preview pane below it.
 func (m QueueModel) queueViewportHeight() int {
-	height := max(m.height-1, 1)
-	sidebarH, _ := splitPanelHeight(m.width, height)
+	sidebarH, _ := splitPanelHeight(m.width, m.contentHeight())
 	return max(sidebarH-1, 0)
 }
 

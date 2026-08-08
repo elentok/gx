@@ -23,9 +23,8 @@ func (m QueueModel) View() tea.View {
 		return ui.NewMainView("\n  Initializing…")
 	}
 	viewportH := m.queueViewportHeight()
-	height := max(m.height-1, 1)
 	sidebarW, previewW := splitPanelWidth(m.width)
-	sidebarH, previewH := splitPanelHeight(m.width, height)
+	sidebarH, previewH := splitPanelHeight(m.width, m.contentHeight())
 	lines := ui.AppendScrollbar(m.queueVisibleLines(viewportH), sidebarW-2, len(m.queueLines()), viewportH, m.scrollOffset)
 
 	queueView := ui.RenderPanel(ui.PanelOptionsFor(
