@@ -40,24 +40,25 @@ Linear, ...) selected by a separate setup step. gx's bundle drops both assumptio
 ## Invocation policy
 
 All skills carry `name`/`description` frontmatter Claude Code reads to render the skill picker.
-`gx-to-tickets` and `gx-implement` set `disable-model-invocation: true`, matching their upstream:
-breaking work into tickets, and claiming/implementing one, are deliberate, explicitly-invoked
-actions, never something the model should trigger on its own reading of a conversation. `gx-cleanup`
-sets the same flag for the same reason: archiving epics and deleting/merging branches is
-deliberate, explicit-invoke-only housekeeping, never something to trigger on the model's own
-reading of a conversation. `gx-merge` sets the same flag for the same reason: merging a branch onto
-main is deliberate, explicit-invoke-only, never something to trigger on the model's own reading of a
-conversation. `gx-tdd` and `gx-resolving-merge-conflicts` carry no such flag, also
-matching upstream: it's fine for the model to reach for TDD guidance or merge-conflict resolution
-on its own when a task calls for it. `gx-investigate` likewise carries no flag: a bug report should
+`gx-implement` sets `disable-model-invocation: true`, matching its upstream: claiming/implementing a
+ticket is a deliberate, explicitly-invoked action, never something the model should trigger on its
+own reading of a conversation. `gx-cleanup` sets the same flag for the same reason: archiving epics
+and deleting/merging branches is deliberate, explicit-invoke-only housekeeping, never something to
+trigger on the model's own reading of a conversation. `gx-merge` sets the same flag for the same
+reason: merging a branch onto main is deliberate, explicit-invoke-only, never something to trigger on
+the model's own reading of a conversation. `gx-to-tickets`, `gx-tdd`, and
+`gx-resolving-merge-conflicts` carry no such flag: it's fine for the model to reach for
+ticket breakdown, TDD guidance, or merge-conflict resolution on its own when a task calls
+for it — e.g. a code-review ticket that needs to spin up follow-up tickets can invoke
+`gx-to-tickets` itself. `gx-investigate` likewise carries no flag: a bug report should
 reflexively pull in ralph-loop's log/state inventory without a human having to name the skill.
 
 Codex has no equivalent auto-invocation concept — a Codex custom prompt is only ever run by explicit
 `/name` invocation, never launched by the model on its own. That's already at least as restrictive as
-`disable-model-invocation: true`, so all four skills preserve their intended policy under Codex
-without any extra metadata: `gx-to-tickets`'s and `gx-implement`'s explicit-only intent holds as-is,
-and `gx-tdd`'s and `gx-resolving-merge-conflicts`' "the model may reach for it" intent is satisfied
-whenever the calling skill (e.g. `gx-implement` invoking `gx-tdd`) explicitly invokes it.
+`disable-model-invocation: true`, so `gx-implement`, `gx-cleanup`, and `gx-merge` preserve their
+intended policy under Codex without any extra metadata: their explicit-only intent holds as-is, and
+`gx-to-tickets`'s, `gx-tdd`'s, and `gx-resolving-merge-conflicts`' "the model may reach for it" intent
+is satisfied whenever the calling skill (e.g. `gx-implement` invoking `gx-tdd`) explicitly invokes it.
 
 ## Installation
 
