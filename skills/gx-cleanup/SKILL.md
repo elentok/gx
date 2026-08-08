@@ -87,6 +87,16 @@ Require it to return exactly one of:
 plus 1-2 sentences of evidence backing that call. A bare "needs more investigation" is not a valid
 answer — if a sub-agent returns one, send it back once telling it to commit to one of the three.
 
+**Guardrail — these sub-agents are read-only against shared git state.** They must never run a
+command that moves HEAD or a branch ref in a worktree they didn't create themselves — no
+`git reset`, `git checkout <branch>`, `git switch`, `git branch -D/-f`, etc. against `main` or any
+other shared/pre-existing worktree. Say so explicitly in every investigation prompt. For "does this
+apply cleanly" checks (cherry-pick/merge dry-runs), use `git merge-tree` — it computes the result
+without touching any working tree or HEAD, so there's nothing to leave dirty or forget to undo. If
+an agent genuinely needs a real working tree (e.g. to run a build/test after a hypothetical apply),
+spawn it with `isolation: "worktree"` on the `Agent` tool call instead of pointing it at an existing
+worktree — that gives it an auto-created, auto-cleaned-up worktree of its own.
+
 ## Step 4: two-way choice for case-2.2 epics
 
 For every case-2.2 epic (done, unmerged, no code-review ticket), ask: add a code-review ticket
