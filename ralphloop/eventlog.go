@@ -3,6 +3,8 @@ package ralphloop
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -218,12 +220,28 @@ func sendNotification(scratchDir, epicName, channel, notifyKind string, timeout 
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		if err := sendSync(ctx); err != nil {
+			err = sanitizeSendError(err)
 			logger.Debug("%s: %v\n", channel, err)
 			logNotificationFailed(scratchDir, epicName, channel, notifyKind, err.Error())
 			return
 		}
 		logNotificationSent(scratchDir, epicName, channel, notifyKind)
 	}()
+}
+
+// sanitizeSendError strips the request URL from a failed send's error before
+// it reaches logger.Debug or run-log.jsonl. telegramEventSink/slackEventSink
+// build that URL with the bot token/webhook secret embedded in the path, and
+// (*url.Error).Error() — what http.Client.Do returns on failure — includes
+// the full URL verbatim, so logging it as-is leaks the secret. The
+// underlying cause (timeout, connection refused, DNS failure, etc.) is kept
+// so the diagnostic value survives; only the URL is dropped.
+func sanitizeSendError(err error) error {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		return urlErr.Err
+	}
+	return err
 }
 
 // lastIterationSession finds the most recent iteration-started event for

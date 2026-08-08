@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -293,5 +294,34 @@ func TestSlackEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 	}
 	if len(events) != 1 || events[0].Type != eventNotificationFailed || events[0].Channel != "slack" || events[0].Reason == "" {
 		t.Fatalf("run-log events = %#v, want one notification-failed/slack with a non-empty reason", events)
+	}
+}
+
+func TestSlackEventSink_LogsNotificationFailedToRunLog_RedactsWebhookSecret(t *testing.T) {
+	dir := t.TempDir()
+	const secretPath = "T00/B00/super-secret-webhook-token"
+	// A closed server's URL is unreachable but well-formed, so http.Client.Do
+	// returns a *url.Error whose Error() embeds the full request URL —
+	// including the secret Slack webhook path segment.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	server.Close()
+	sink := newSlackEventSink(&recordingSink{}, server.URL+"/services/"+secretPath, dir, "epic")
+
+	sink.IterationPaused("iter-01", PauseNeedsAttention, "permission required")
+
+	var events []Event
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		events, _, _ = readEvents(dir, "epic")
+		if len(events) > 0 {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if len(events) != 1 || events[0].Type != eventNotificationFailed || events[0].Reason == "" {
+		t.Fatalf("run-log events = %#v, want one notification-failed with a non-empty reason", events)
+	}
+	if strings.Contains(events[0].Reason, secretPath) {
+		t.Errorf("Reason = %q, must not contain the webhook secret path", events[0].Reason)
 	}
 }

@@ -1,7 +1,9 @@
 package ralphloop
 
 import (
+	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -157,6 +159,28 @@ func TestLogEvent_ConcurrentAppends_NeverInterleave(t *testing.T) {
 	}
 	if len(events) != 20 {
 		t.Errorf("got %d events, want 20 (no interleaved/corrupted lines)", len(events))
+	}
+}
+
+func TestSanitizeSendError_StripsURLFromURLError(t *testing.T) {
+	underlying := errors.New("connection refused")
+	err := &url.Error{Op: "Post", URL: "https://api.telegram.org/botsecret-token-abc/sendMessage", Err: underlying}
+
+	got := sanitizeSendError(err)
+
+	if strings.Contains(got.Error(), "secret-token-abc") {
+		t.Errorf("sanitizeSendError(%v) = %q, must not contain the URL/token", err, got.Error())
+	}
+	if !errors.Is(got, underlying) {
+		t.Errorf("sanitizeSendError(%v) = %v, want it to still wrap the underlying cause %v", err, got, underlying)
+	}
+}
+
+func TestSanitizeSendError_LeavesNonURLErrorsUnchanged(t *testing.T) {
+	err := fmt.Errorf("send failed with status %d", 500)
+
+	if got := sanitizeSendError(err); got != err {
+		t.Errorf("sanitizeSendError(%v) = %v, want unchanged", err, got)
 	}
 }
 

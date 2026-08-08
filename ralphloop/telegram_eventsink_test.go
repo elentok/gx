@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -307,5 +308,34 @@ func TestTelegramEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 	}
 	if len(events) != 1 || events[0].Type != eventNotificationFailed || events[0].Channel != "telegram" || events[0].Reason == "" {
 		t.Fatalf("run-log events = %#v, want one notification-failed/telegram with a non-empty reason", events)
+	}
+}
+
+func TestTelegramEventSink_LogsNotificationFailedToRunLog_RedactsBotToken(t *testing.T) {
+	dir := t.TempDir()
+	const secretToken = "super-secret-bot-token-123"
+	// A closed server's URL is unreachable but well-formed, so http.Client.Do
+	// returns a *url.Error whose Error() embeds the full request URL —
+	// including the bot token baked into its path by sendSync's endpoint.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	server.Close()
+	sink := newTelegramEventSink(&recordingSink{}, secretToken, "chat-1", server.URL, dir, "epic")
+
+	sink.EpicComplete("epic", 1, 0)
+
+	var events []Event
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		events, _, _ = readEvents(dir, "epic")
+		if len(events) > 0 {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if len(events) != 1 || events[0].Type != eventNotificationFailed || events[0].Reason == "" {
+		t.Fatalf("run-log events = %#v, want one notification-failed with a non-empty reason", events)
+	}
+	if strings.Contains(events[0].Reason, secretToken) {
+		t.Errorf("Reason = %q, must not contain the bot token", events[0].Reason)
 	}
 }
