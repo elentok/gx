@@ -132,6 +132,73 @@ func TestSearch_EscFullyClears(t *testing.T) {
 	}
 }
 
+func TestSearch_MatchesTicketInsideCollapsedClosedEpic(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "closed-epic", "01-hidden-gem.md", "Status: done\n\nBody.\n")
+	writeTicket(t, root, "open-epic", "01-other.md", "Status: open\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	closedEpic := m.epics[0]
+	if !closedEpic.AllDone() {
+		t.Fatalf("expected closed-epic to be all-done in this fixture")
+	}
+	if !m.isCollapsed(closedEpic) {
+		t.Fatalf("expected closed epic to start collapsed by default")
+	}
+
+	m.search.Start("hidden gem")
+	m.recomputeSearchMatches()
+
+	if m.search.MatchesCount() != 1 {
+		t.Fatalf("expected one match for ticket inside collapsed epic, got %d", m.search.MatchesCount())
+	}
+	if m.isCollapsed(m.epics[0]) {
+		t.Fatalf("expected matching epic to auto-expand")
+	}
+
+	match, ok := m.search.Match(0)
+	if !ok {
+		t.Fatalf("expected a match at position 0")
+	}
+	rows := m.visibleRows()
+	if match.DataIndex < 0 || match.DataIndex >= len(rows) {
+		t.Fatalf("match DataIndex %d out of range of %d visible rows", match.DataIndex, len(rows))
+	}
+	r := rows[match.DataIndex]
+	if r.isEpic() || m.epics[r.epicIdx].Tickets[r.ticketIdx].Title != "Hidden gem" {
+		t.Fatalf("expected match to point at the hidden-gem ticket row, got row %+v", r)
+	}
+}
+
+func TestSearch_NoMatchLeavesCollapseStateUnchanged(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "closed-epic", "01-hidden-gem.md", "Status: done\n\nBody.\n")
+	writeTicket(t, root, "open-epic", "01-other.md", "Status: open\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	if !m.isCollapsed(m.epics[0]) {
+		t.Fatalf("expected closed epic to start collapsed by default")
+	}
+
+	m.search.Start("no-such-term")
+	m.recomputeSearchMatches()
+
+	if m.search.MatchesCount() != 0 {
+		t.Fatalf("expected zero matches, got %d", m.search.MatchesCount())
+	}
+	if !m.isCollapsed(m.epics[0]) {
+		t.Fatalf("expected non-matching search to leave collapse state unchanged")
+	}
+}
+
 func TestSearch_NAndShiftNCycleMatches(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-open-a.md", "Status: open\n\nBody.\n")

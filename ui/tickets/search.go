@@ -6,9 +6,21 @@ import (
 	"github.com/elentok/gx/ui/search"
 )
 
-// recomputeSearchMatches rebuilds the match set against the current
-// visibleRows() order: case-insensitive substring over each ticket's title
-// concatenated with its rendered status word. Epic header rows never match.
+// ticketRef identifies a ticket by its epic and position within that epic's
+// Tickets slice, independent of visibleRows()/collapse state.
+type ticketRef struct {
+	epicIdx   int
+	ticketIdx int
+}
+
+// recomputeSearchMatches matches against the underlying epic/ticket data
+// directly (m.epics), not visibleRows(), so a match inside a collapsed epic
+// (every closed epic starts collapsed, see defaultCollapsedEpics) is still
+// found: case-insensitive substring over each ticket's title concatenated
+// with its rendered status word. Any epic containing a match is auto-expanded
+// first so the match's eventual DataIndex (looked up post-expansion) lands on
+// a row that's actually rendered. Epic header rows never match. A query
+// matching nothing leaves collapse state untouched.
 func (m *Model) recomputeSearchMatches() {
 	q := strings.ToLower(strings.TrimSpace(m.search.Query()))
 	if q == "" {
@@ -16,13 +28,36 @@ func (m *Model) recomputeSearchMatches() {
 		return
 	}
 
-	rows := m.visibleRows()
-	matches := make([]search.Match, 0)
-	for i, r := range rows {
+	var matchedRefs []ticketRef
+	for epicIdx, epic := range m.epics {
+		for ticketIdx, t := range epic.Tickets {
+			text := strings.ToLower(t.Title + " " + epic.RenderedStatus(t).Word())
+			if strings.Contains(text, q) {
+				matchedRefs = append(matchedRefs, ticketRef{epicIdx: epicIdx, ticketIdx: ticketIdx})
+			}
+		}
+	}
+
+	if len(matchedRefs) == 0 {
+		m.search.SetMatches(nil)
+		return
+	}
+
+	if m.collapsedEpics == nil {
+		m.collapsedEpics = map[string]bool{}
+	}
+	wanted := make(map[ticketRef]bool, len(matchedRefs))
+	for _, ref := range matchedRefs {
+		wanted[ref] = true
+		m.collapsedEpics[m.epics[ref.epicIdx].Path] = false
+	}
+
+	matches := make([]search.Match, 0, len(matchedRefs))
+	for i, r := range m.visibleRows() {
 		if r.isEpic() {
 			continue
 		}
-		if strings.Contains(strings.ToLower(m.searchText(r)), q) {
+		if wanted[ticketRef{epicIdx: r.epicIdx, ticketIdx: r.ticketIdx}] {
 			matches = append(matches, search.Match{DataIndex: i})
 		}
 	}
@@ -41,12 +76,6 @@ func (m *Model) jumpToCurrentMatch() {
 		m.selected = match.DataIndex
 		m.ensureSidebarVisible()
 	}
-}
-
-func (m Model) searchText(r row) string {
-	epic := m.epics[r.epicIdx]
-	t := epic.Tickets[r.ticketIdx]
-	return t.Title + " " + epic.RenderedStatus(t).Word()
 }
 
 // searchMatch reports whether the visible row at idx is a search match, and
