@@ -1,8 +1,11 @@
 package log
 
 import (
+	"strings"
+
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 )
@@ -58,12 +61,9 @@ func (m Model) handleCommitInfoKey(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) renderCommitInfoPopup() string {
-	width := maxInt(20, m.width-4)
-	lines := commitInfoLines(m.commitInfoDetails)
-	height := len(lines) + 2
-	if maxH := maxInt(1, (m.height-2)/2); height > maxH {
-		height = maxH
-	}
+	width := maxInt(20, m.width-20)
+	height := maxInt(5, m.height-8)
+	lines := commitInfoLines(m.commitInfoDetails, width-2)
 	return ui.RenderPanelFrame(ui.PanelFrameOptions{
 		Width: width, Height: height, Title: "Commit",
 		RightTitle:  commitInfoMetaStyle.Render(m.commitInfoDetails.Date.Format("2006-01-02 15:04")),
@@ -72,9 +72,14 @@ func (m Model) renderCommitInfoPopup() string {
 	})
 }
 
-func commitInfoLines(details git.CommitDetails) []string {
+func commitInfoLines(details git.CommitDetails, contentWidth int) []string {
 	metaLine := commitInfoMetaStyle.Render(details.Hash) + " " +
 		commitInfoMetaStyle.Render(ui.RelativeTimeCompact(details.Date)) +
 		commitInfoMetaStyle.Render(" by ") + commitInfoMetaStyle.Render(details.AuthorName)
-	return []string{commitInfoSubjectStyle.Render(details.Subject), metaLine}
+	lines := []string{commitInfoSubjectStyle.Render(details.Subject), metaLine}
+	if body := strings.TrimSpace(details.Body); body != "" {
+		lines = append(lines, "")
+		lines = append(lines, strings.Split(ansi.Wordwrap(body, maxInt(1, contentWidth), ""), "\n")...)
+	}
+	return lines
 }
