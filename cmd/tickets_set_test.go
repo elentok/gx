@@ -88,7 +88,7 @@ func TestExecute_TicketsSet_ParentChildren(t *testing.T) {
 	}
 }
 
-func TestExecute_TicketsSet_DeprecatedSplitAliasesWriteParentChildren(t *testing.T) {
+func TestExecute_TicketsSet_SplitAliasFlagsRemoved(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
 	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
@@ -97,19 +97,11 @@ func TestExecute_TicketsSet_DeprecatedSplitAliasesWriteParentChildren(t *testing
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
 
 	err := execute([]string{"tickets", "set", path, "--split-from=04", "--split=04c,04d"}, d)
-	if err != nil {
-		t.Fatalf("execute tickets set: %v", err)
+	if err == nil {
+		t.Fatal("expected an unknown-flag error, got nil")
 	}
-
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("reading ticket back: %v", err)
-	}
-	if !strings.Contains(string(raw), "parent: \"04\"") {
-		t.Errorf("ticket file = %q, want parent: \"04\" from --split-from", string(raw))
-	}
-	if strings.Contains(string(raw), "split_from:") || strings.Contains(string(raw), "split:") {
-		t.Errorf("ticket file = %q, want no split/split_from keys written", string(raw))
+	if !strings.Contains(err.Error(), "unknown flag") {
+		t.Errorf("error = %q, want it to mention unknown flag", err.Error())
 	}
 }
 

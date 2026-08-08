@@ -97,10 +97,7 @@ type Ticket struct {
 	BlockedBy []TicketID
 	// Children/Parent record the "this ticket produced other tickets"
 	// relationship: a mid-flight budget split, or a code-review ticket
-	// recording which fix tickets it opened. On disk this may be spelled
-	// either children/parent (current) or the legacy split/split_from
-	// (read-only compatibility — see ticketYAML.toTicket); every in-memory
-	// consumer only ever sees these two fields.
+	// recording which fix tickets it opened.
 	Children              []TicketID
 	Parent                *TicketID
 	Type                  TicketType

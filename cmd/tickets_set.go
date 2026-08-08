@@ -50,8 +50,6 @@ func newTicketsSetCmd() *cobra.Command {
 		blockedBy             string
 		children              string
 		parent                string
-		split                 string
-		splitFrom             string
 		ticketType            string
 		expectedContextWindow string
 		commitless            string
@@ -70,8 +68,6 @@ func newTicketsSetCmd() *cobra.Command {
 	cmd.Flags().StringVar(&blockedBy, "blocked-by", "", "set blocked_by (comma-separated ticket IDs)")
 	cmd.Flags().StringVar(&children, "children", "", "set children (comma-separated ticket IDs)")
 	cmd.Flags().StringVar(&parent, "parent", "", "set parent")
-	cmd.Flags().StringVar(&split, "split", "", "deprecated alias for --children")
-	cmd.Flags().StringVar(&splitFrom, "split-from", "", "deprecated alias for --parent")
 	cmd.Flags().StringVar(&ticketType, "type", "", "set the type field")
 	cmd.Flags().StringVar(&expectedContextWindow, "expected-context-window", "", "set expected_context_window")
 	cmd.Flags().StringVar(&commitless, "commitless", "", "set commitless (true/false)")
@@ -94,10 +90,6 @@ var ticketSetFields = []ticketSetField{
 	{"blocked-by", "blocked_by", func(t *schema.Ticket, v string) { t.BlockedBy = parseCSVIDs(v) }},
 	{"children", "children", func(t *schema.Ticket, v string) { t.Children = parseCSVIDs(v) }},
 	{"parent", "parent", func(t *schema.Ticket, v string) { t.Parent = parseIDPtr(v) }},
-	// split/split-from are deprecated aliases for children/parent, writing
-	// into the same normalized fields rather than a separate code path.
-	{"split", "children", func(t *schema.Ticket, v string) { t.Children = parseCSVIDs(v) }},
-	{"split-from", "parent", func(t *schema.Ticket, v string) { t.Parent = parseIDPtr(v) }},
 	{"type", "type", func(t *schema.Ticket, v string) { t.Type = schema.TicketType(v) }},
 	{"expected-context-window", "expected_context_window", func(t *schema.Ticket, v string) {
 		n, _ := strconv.Atoi(v)

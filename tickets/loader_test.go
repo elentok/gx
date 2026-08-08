@@ -180,9 +180,9 @@ func TestLoad_IgnoresNonTicketFilesInIssuesDir(t *testing.T) {
 func TestLoad_SurfacesSplitAndParent(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "epic", "issues", "03-original.md"),
-		"---\nid: \"03\"\nstatus: done\ntype: task\nsplit: [\"03a\", \"03b\"]\n---\n")
+		"---\nid: \"03\"\nstatus: done\ntype: task\nchildren: [\"03a\", \"03b\"]\n---\n")
 	writeFile(t, filepath.Join(dir, "epic", "issues", "03a-first-half.md"),
-		"---\nid: \"03a\"\nstatus: open\ntype: task\nsplit_from: \"03\"\n---\n")
+		"---\nid: \"03a\"\nstatus: open\ntype: task\nparent: \"03\"\n---\n")
 
 	epics, err := Load(dir)
 	if err != nil {

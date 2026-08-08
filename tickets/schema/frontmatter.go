@@ -14,16 +14,11 @@ import (
 // from the typed in-memory representation (TicketID, Status, etc.) without
 // yaml struct tags leaking into schema's public API.
 type ticketYAML struct {
-	ID        string   `yaml:"id"`
-	Status    string   `yaml:"status"`
-	BlockedBy []string `yaml:"blocked_by,omitempty"`
-	Children  []string `yaml:"children,omitempty"`
-	Parent    string   `yaml:"parent,omitempty"`
-	// Split/SplitFrom are the legacy spellings of Children/Parent — read-only
-	// compatibility for tickets already on disk (see toTicket). MarshalTicket
-	// never populates these: ticketToYAML only ever emits children/parent.
-	Split                 []string `yaml:"split,omitempty"`
-	SplitFrom             string   `yaml:"split_from,omitempty"`
+	ID                    string   `yaml:"id"`
+	Status                string   `yaml:"status"`
+	BlockedBy             []string `yaml:"blocked_by,omitempty"`
+	Children              []string `yaml:"children,omitempty"`
+	Parent                string   `yaml:"parent,omitempty"`
 	Type                  string   `yaml:"type"`
 	ExpectedContextWindow int      `yaml:"expected_context_window,omitempty"`
 	ActualContextWindow   int      `yaml:"actual_context_window,omitempty"`
@@ -34,20 +29,11 @@ type ticketYAML struct {
 }
 
 func (w ticketYAML) toTicket() Ticket {
-	children := w.Children
-	if len(children) == 0 {
-		children = w.Split
-	}
-	parent := w.Parent
-	if parent == "" {
-		parent = w.SplitFrom
-	}
-
 	t := Ticket{
 		ID:                    TicketID(w.ID),
 		Status:                Status(w.Status),
 		BlockedBy:             stringsToIDs(w.BlockedBy),
-		Children:              stringsToIDs(children),
+		Children:              stringsToIDs(w.Children),
 		Type:                  TicketType(w.Type),
 		ExpectedContextWindow: w.ExpectedContextWindow,
 		ActualContextWindow:   w.ActualContextWindow,
@@ -56,8 +42,8 @@ func (w ticketYAML) toTicket() Ticket {
 		Commitless:            w.Commitless,
 		SessionIDs:            copyStrings(w.SessionIDs),
 	}
-	if parent != "" {
-		id := TicketID(parent)
+	if w.Parent != "" {
+		id := TicketID(w.Parent)
 		t.Parent = &id
 	}
 	return t
