@@ -266,7 +266,7 @@ func TestExecute_Notify_SlackConfiguredSendsAndReportsSuccess(t *testing.T) {
 	}
 }
 
-func TestExecute_Notify_SlackFailureReportsErrorAndPropagates(t *testing.T) {
+func TestExecute_Notify_SlackFailurePropagatesErrorWithoutDoubleReporting(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
@@ -286,8 +286,13 @@ func TestExecute_Notify_SlackFailureReportsErrorAndPropagates(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when the notification send fails")
 	}
-	if !strings.Contains(stderr.String(), "slack") {
-		t.Fatalf("expected slack failure mentioned on stderr, got: %q", stderr.String())
+	if !strings.Contains(err.Error(), "slack") {
+		t.Fatalf("expected slack failure mentioned in returned error, got: %v", err)
+	}
+	// cobra is configured with SilenceErrors, so runNotify must not also print the
+	// failure itself - the caller (main) reports the returned error exactly once.
+	if stderr.Len() != 0 {
+		t.Fatalf("expected runNotify not to write the failure to stderr itself, got: %q", stderr.String())
 	}
 }
 

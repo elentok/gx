@@ -380,9 +380,6 @@ func runNotify(text string, d deps) error {
 	}
 
 	sent, err := ralphloop.SendMessage(cfg.Notifications, text)
-	if err != nil {
-		fmt.Fprintf(d.stderr, "notify: %v\n", err)
-	}
 	if len(sent) == 0 {
 		if err == nil {
 			fmt.Fprintf(d.stdout, "no notification service configured (see `gx config edit`)\n")
