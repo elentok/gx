@@ -48,7 +48,9 @@ func TestModel_SpaceTogglesCheckedOnTicketRow(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// Move onto the ticket row (row 0 is the epic).
+	// Move onto the ticket row (row 0 is the section header, row 1 the epic).
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 
@@ -108,6 +110,10 @@ func TestModel_SpaceOnEpicRowChecksAllTickets(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
+	// Move off the initial section-header selection onto the epic row.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+
 	r, ok := m.selectedRow()
 	if !ok || !r.isEpic() {
 		t.Fatalf("expected initial selection on epic row, got row=%+v ok=%v", r, ok)
@@ -142,7 +148,10 @@ func TestModel_SpaceToggleOnDoneTicketIsNoOp(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// Move onto the first (done) ticket row (row 0 is the epic).
+	// Move onto the first (done) ticket row (row 0 is the section header,
+	// row 1 the epic).
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 
@@ -173,6 +182,10 @@ func TestModel_SpaceOnEpicRowChecksOnlyNonDoneTickets(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
+	// Move off the initial section-header selection onto the epic row.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+
 	r, ok := m.selectedRow()
 	if !ok || !r.isEpic() {
 		t.Fatalf("expected initial selection on epic row, got row=%+v ok=%v", r, ok)
@@ -200,7 +213,10 @@ func TestModel_CheckingBlockedTicketOpensConfirmModal(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// Rows: [epic, first-ticket, second-ticket]. Move to second-ticket.
+	// Rows: [section header, epic, first-ticket, second-ticket]. Move to
+	// second-ticket.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
@@ -245,13 +261,15 @@ func TestModel_CheckingTicketWithAlreadyCheckedBlockersSkipsConfirm(t *testing.T
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// Check the blocker first (row 1: first-ticket).
+	// Check the blocker first (row 2: first-ticket).
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 	updated, _ = m.Update(spacePress())
 	m = updated.(Model)
 
-	// Move onto the blocked ticket (row 2: second-ticket) and check it.
+	// Move onto the blocked ticket (row 3: second-ticket) and check it.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 
@@ -283,6 +301,8 @@ func TestModel_ConfirmingBlockedModalChecksTicketAndBlockers(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
@@ -325,6 +345,8 @@ func TestModel_CancelingBlockedModalLeavesCheckedSetUnchanged(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})

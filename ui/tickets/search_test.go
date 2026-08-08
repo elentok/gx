@@ -154,8 +154,11 @@ func TestSearch_MatchesTicketInsideCollapsedClosedEpic(t *testing.T) {
 	if !closedEpic.AllDone() {
 		t.Fatalf("expected closed-epic to be all-done in this fixture")
 	}
-	if !m.isCollapsed(closedEpic) {
-		t.Fatalf("expected closed epic to start collapsed by default")
+	// Per-epic collapse defaults moved to the Closed section as a whole (03a)
+	// — the epic itself starts expanded, but nested inside the collapsed
+	// Closed section root it stays unreachable until the section expands.
+	if !m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
+		t.Fatalf("expected Closed section to start collapsed by default")
 	}
 
 	m.search.Start("hidden gem")
@@ -164,8 +167,8 @@ func TestSearch_MatchesTicketInsideCollapsedClosedEpic(t *testing.T) {
 	if m.search.MatchesCount() != 1 {
 		t.Fatalf("expected one match for ticket inside collapsed epic, got %d", m.search.MatchesCount())
 	}
-	if m.isCollapsed(m.epics[0]) {
-		t.Fatalf("expected matching epic to auto-expand")
+	if m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
+		t.Fatalf("expected matching ticket's Closed section to auto-expand")
 	}
 
 	match, ok := m.search.Match(0)
@@ -193,8 +196,8 @@ func TestSearch_NoMatchLeavesCollapseStateUnchanged(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	if !m.isCollapsed(m.epics[0]) {
-		t.Fatalf("expected closed epic to start collapsed by default")
+	if !m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
+		t.Fatalf("expected Closed section to start collapsed by default")
 	}
 
 	m.search.Start("no-such-term")
@@ -203,7 +206,7 @@ func TestSearch_NoMatchLeavesCollapseStateUnchanged(t *testing.T) {
 	if m.search.MatchesCount() != 0 {
 		t.Fatalf("expected zero matches, got %d", m.search.MatchesCount())
 	}
-	if !m.isCollapsed(m.epics[0]) {
+	if !m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
 		t.Fatalf("expected non-matching search to leave collapse state unchanged")
 	}
 }

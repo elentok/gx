@@ -15,14 +15,14 @@ type ticketRef struct {
 
 // recomputeSearchMatches matches against the underlying epic/ticket data
 // directly (m.epics), not m.sidebarTree.Entries(), so a match inside a
-// collapsed epic (every closed epic starts collapsed, see
-// defaultCollapsedEpics) is still found: case-insensitive substring over
-// each ticket's title concatenated with its rendered status word. Any epic
-// containing a match is auto-expanded first (via m.sidebarTree's collapsed
-// IDs) so the match's eventual DataIndex (looked up post-expansion, post-
-// rebuild) lands on an entry that's actually rendered. Epic/section header
-// rows never match. A query matching nothing leaves collapse state
-// untouched.
+// collapsed epic or a collapsed Closed section (see defaultCollapsedSidebar)
+// is still found: case-insensitive substring over each ticket's title
+// concatenated with its rendered status word. Any epic containing a match is
+// auto-expanded first, along with its containing section (via
+// m.sidebarTree's collapsed IDs), so the match's eventual DataIndex (looked
+// up post-expansion, post-rebuild) lands on an entry that's actually
+// rendered. Epic/section header rows never match. A query matching nothing
+// leaves collapse state untouched.
 func (m *Model) recomputeSearchMatches() {
 	q := strings.ToLower(strings.TrimSpace(m.search.Query()))
 	if q == "" {
@@ -55,7 +55,13 @@ func (m *Model) recomputeSearchMatches() {
 	collapsed := m.sidebarTree.CollapsedIDs()
 	for _, ref := range matchedRefs {
 		wanted[ref] = true
-		collapsed[m.epics[ref.epicIdx].Path] = false
+		epic := m.epics[ref.epicIdx]
+		collapsed[epic.Path] = false
+		section := sectionOpen
+		if epic.AllDone() {
+			section = sectionClosed
+		}
+		collapsed[sidebarSectionID(section)] = false
 	}
 	m.sidebarTree.SetCollapsedIDs(collapsed)
 	m.sidebarTree.SetEntries(m.buildSidebarEntries())

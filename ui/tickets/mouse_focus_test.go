@@ -24,7 +24,10 @@ func TestModel_ClickInsidePreviewBoundsFocusesItAndRoutesWheel(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// rows: [epic, ticket] - move down once to select the long-bodied ticket.
+	// rows: [section header, epic, ticket] - move down twice to select the
+	// long-bodied ticket.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 
