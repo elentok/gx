@@ -100,7 +100,7 @@ func TestSlackStyleTicketNeedsInfoText_NoEscaping(t *testing.T) {
 
 func TestTelegramStyleEpicCompleteText(t *testing.T) {
 	got := telegramStyle.epicCompleteText("ui-tree-migration", 5, 492)
-	want := "\U0001f389 *epic complete: ui\\-tree\\-migration*\n\n5 ticket(s) landed in 8m12s"
+	want := "\U0001f389 *epic complete: ui\\-tree\\-migration*\n\n5 tickets landed in 8m12s"
 	if got != want {
 		t.Errorf("text = %q, want %q", got, want)
 	}

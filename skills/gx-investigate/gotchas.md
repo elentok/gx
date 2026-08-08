@@ -4,6 +4,17 @@ Running list of previously-diagnosed gx/ralph-loop bugs, newest first. Append on
 to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKILL.md) gets fixed
 — don't re-explain what the linked commit/ticket already documents.
 
+- **Telegram epic-complete notifications always fail with HTTP 400; ticket-finished ones work
+  fine.** `ralphloop/notification_text.go`'s `epicCompleteText` hardcodes a literal `(s)` (from "N
+  ticket(s) landed in...") straight into the MarkdownV2 text without routing it through
+  `s.escape`, unlike every other template in that file. `(`/`)` are reserved MarkdownV2 chars
+  (`telegramMarkdownV2SpecialChars`), so Telegram's `sendMessage` rejects the whole message with
+  400 every single time — this isn't the transient-network issue `notifications-fix/01`'s retry
+  fix addressed; retries don't help a deterministically-malformed message. Confirmed via
+  `.scratch/fork-term/run-log.jsonl`: the run's `iteration-finished` sends all logged
+  `notification-sent`, the one `epic-complete` send logged `notification-failed reason: "send
+  failed with status 400"`. Slack is unaffected (`escapeSlackMrkdwn` doesn't touch parens). Fixed
+  by dropping the literal parenthetical ("N tickets landed in..."), same commit as this entry.
 - **A ticket blocked_by its own split-parent can deadlock forever, even though the parent is
   `done`.** When a ticket splits sequentially (X, then Y where Y is `blocked_by: [X]` and
   `parent: X`), `tickets.Epic.fullyDone`'s recursion into `children` requires every entry in the

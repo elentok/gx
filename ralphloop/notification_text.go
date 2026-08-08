@@ -125,10 +125,10 @@ func (s mrkdwnStyle) ticketNeedsInfoText(identifier, epicName string) string {
 //
 //	🎉 *epic complete: {epicName}*
 //
-//	{completed} ticket(s) landed in {elapsed}
+//	{completed} tickets landed in {elapsed}
 func (s mrkdwnStyle) epicCompleteText(epicName string, completed int, elapsedSeconds int) string {
 	return fmt.Sprintf(
-		"\U0001f389 *epic complete: %s*\n\n%d ticket(s) landed in %s",
+		"\U0001f389 *epic complete: %s*\n\n%d tickets landed in %s",
 		s.escape(epicName), completed, formatDuration(elapsedSeconds),
 	)
 }
