@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.27.2 - 2026-08-08
+
+- Added an atomic `gx tickets add <epic>` command (filesystem-locked ID allocation, supports siblings, lettered children, and nested numbering past a lettered parent) and required a `--slug` flag so split-ticket stubs land with their real filename instead of a placeholder.
+- Added Slack/Telegram notifications when a ticket lands on `needs-info`, with a retry on failed sends and secrets redacted from the run log.
+- Added `gx ensure-code-review` support for a bare epic name, with live shell completion.
+- Queue tab: preview panel now focuses on click (enabling scroll/search there), execution tickets stay synced to a live RunScope, replace-queue (`r`) is scoped per-epic with a confirmation modal and now clears done entries too, and ticket rows reserve a fixed-width fold-glyph column.
+- Search now matches tickets inside collapsed epics; log-view search input no longer loses focus to the `t` key chord.
+- Fixed a deadlock in `fullyDone` when a ticket's split descendants (not just direct siblings) were still pending.
+- Fixed split-sibling blocking exclusion to scope correctly to inherited blockers.
+- Fixed commitless tickets (research/grilling/code-review, which now default to commitless) not stamping elapsed/context metrics.
+- Excluded dot-prefixed directories from ticket loading.
+- Made the `gx-to-tickets` skill model-invocable.
+
 ## v0.27.1 - 2026-08-08
 
 - Added a `gx merge <branch>` command (deterministic ff-only merge core) and a `gx-merge` skill that wraps it with rebase, conflict resolution, a review pause, and checks before retrying the merge; `gx cleanup`'s merge step now delegates to it instead of duplicating the logic.
