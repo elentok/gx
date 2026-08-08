@@ -36,3 +36,12 @@ to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKI
   `Claim()`/`SetStatus()` vs. an agent's raw file `Write`) sharing one ticket file with no locking
   — is real and not yet fixed. Diagnosed via bugs-03 iter-06b/2026-08-08 run-log.jsonl (lines
   56–69); no fix ticket filed yet.
+- **A ticket `blocked_by` on a specific mid-flight-split sibling isn't actually enforced.**
+  `tickets/status.go`'s `UnresolvedBlockers`/`isSelfOrSplitSibling` excludes any candidate blocker
+  sharing the checked ticket's `Parent` — meant to stop a ticket deadlocking on its own *inherited*
+  parent-blocker token (e.g. `05b`/`05c` both carrying `Blocked by: 05`) — but the exclusion is
+  keyed only on `Parent` equality, not on which token is being resolved, so it also swallows a
+  direct sibling dependency (`02c` declaring `blocked_by: [02b]`): `02b`'s real status is never
+  checked, `02c` reads as immediately unblocked. No scheduler-side race — `ralphloop.claimNext`
+  reloads fresh per claim. Diagnosed via `tickets-tree` epic, ticket `02c`'s `needs-info`; see
+  `tickets-tree/issues/08-blocked-by-split-sibling-not-enforced-research.md` (not fixed yet).

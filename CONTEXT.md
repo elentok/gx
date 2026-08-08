@@ -21,8 +21,9 @@ be shown faithfully (unsupported terminal, decode failure, oversized file, or us
 ADR 0010.
 
 **Detail panel** — an interactive, focusable panel that mirrors the currently selected list item and
-supports its own keyboard navigation (e.g. the commit detail shown beside the log and stash lists).
-The user can move focus into it and back out. Contrast with a preview panel.
+supports its own structural keyboard navigation (e.g. hunk/line navigation in the commit detail
+shown beside the log and stash lists). The user can move focus into it and back out. Contrast with a
+preview panel, whose focus only ever means scroll-and-search — never structural navigation.
 
 **Screen origin** — the absolute (column, row) of a panel's top-left cell on the terminal grid. A
 page that owns the whole screen has origin (0, 0); a detail panel composed into a split view does
@@ -30,9 +31,13 @@ not — it only learns its width/height, so its origin is injected by the contai
 layout (`splitview.DetailOrigin`). Required only by features that paint outside bubbletea's render
 loop at absolute coordinates — currently the image-diff kitty overlay (ADR 0010).
 
-**Preview panel** — a passive, non-focusable panel that renders a read-only summary of the current
-selection. The user never moves focus into it; it only reflects the selected item (e.g. the
-worktrees preview panel, the commit header). Contrast with a detail panel.
+**Preview panel** — a panel, paired with a sidebar, that renders a read-only summary of the sidebar's
+selected item (e.g. the worktrees preview panel, the tickets/queue preview panel). It never drives
+selection or structural navigation — the sidebar owns that — but it can be focused for scroll and
+in-panel search, distinguishing it from a plain read-only display. Clicking inside a preview panel's
+bounds, or moving focus into it explicitly, must give it focus so its scroll/search keys work; every
+sidebar+preview pairing owes its preview panel this same click-to-focus contract. Contrast with a
+detail panel, whose focus additionally supports structural navigation.
 
 **Sidebar** — a list panel shown alongside another panel (typically a detail panel), where navigating
 the list drives what the other panel shows. Focusable and selection-driving, unlike a preview panel.
@@ -68,6 +73,13 @@ where the goal is "show me only X." Owned by `ui/filter`, which carries only the
 input box and emits `FilterChangedMsg`; the host owns the matching predicate (e.g. help matches a
 binding's key _and_ title). Deliberately a separate component from **Search**, not an extension of
 it.
+
+**Chord dispatch priority** — the rule that a focused search or filter input must absorb every
+keypress before the chord-key manager ever sees it. Chords are multi-key bindings (e.g. `tg`
+toggle-graph, `to` toggle-orientation) recognized by a per-view chord manager; without this rule, a
+character typed into a search box that also happens to start a chord (e.g. typing `t` to search)
+gets swallowed by the chord manager instead of reaching the input. This is a priority ordering, not
+a mode switch — the input doesn't disable chords globally, it just always goes first while focused.
 
 ## Selection and Active Item
 
@@ -331,8 +343,10 @@ Reattach?" prompt (`handleDetachedLiveDetected`) — there is no silent auto-rea
 a still-alive session, as found by a Reattach signal scan (`cmdCheckDetachedLive`'s `alive` count).
 
 **Replace queue** (`r`) / **Add to queue** (`a`) — the two queueing actions from the Tickets tab.
-Replace overwrites the not-yet-started (pending) queue selection with the checked tickets and jumps
-to the Queue tab; it is blocked process-wide ("Can't replace a live queue") while any epic run is
-live, regardless of which epic the checked tickets belong to. Add widens an already-running epic's
-frozen scope (`ralphloop.RunScope.Add`) with the checked tickets under that epic, after a
-confirmation naming the count — it requires the epic under the cursor to already have a live run.
+Replace clears both the not-yet-started (pending) and already-finished (done) queue selection,
+replacing it with the checked tickets, then jumps to the Queue tab — a running or errored entry is
+left untouched (queue safety: a live run's own state isn't something Replace should silently
+discard). It is blocked process-wide ("Can't replace a live queue") while any epic run is live,
+regardless of which epic the checked tickets belong to. Add widens an already-running epic's frozen
+scope (`ralphloop.RunScope.Add`) with the checked tickets under that epic, after a confirmation
+naming the count — it requires the epic under the cursor to already have a live run.
