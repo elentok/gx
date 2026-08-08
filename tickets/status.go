@@ -134,12 +134,15 @@ func (e Epic) UnresolvedBlockers(t Ticket) []string {
 	// siblings, reached while walking a checked ticket's own Split list,
 	// must not be required to finish as part of resolving t's own inherited
 	// blocker — that can never happen, since t is still open for the
-	// duration of this very check. That exclusion must not fire on the
-	// token's direct resolution target though: a token naming one specific
-	// split sibling (e.g. 02c's "Blocked by: 02b") needs that sibling's real
-	// status checked, not a free pass for sharing t's Parent. See
-	// isSelfOrSplitSibling.
-	exclude := func(other Ticket) bool { return isSelfOrSplitSibling(t, other) }
+	// duration of this very check. The same is true of t's own further
+	// splits (e.g. 01a's inherited "Blocked by: 01" recursing into 01's
+	// children must not require 01a's own child 01b to be done first — 01b
+	// can't finish before 01a even starts). That exclusion must not fire on
+	// the token's direct resolution target though: a token naming one
+	// specific split sibling (e.g. 02c's "Blocked by: 02b") needs that
+	// sibling's real status checked, not a free pass for sharing t's
+	// Parent. See isSelfOrSplitSiblingOrDescendant.
+	exclude := func(other Ticket) bool { return isSelfOrSplitSiblingOrDescendant(t, other, byNumberAndSuffix) }
 	var unresolved []string
 	for _, token := range t.BlockedBy {
 		num, letters := splitBlockedByToken(token)
@@ -157,12 +160,43 @@ func (e Epic) UnresolvedBlockers(t Ticket) []string {
 	return unresolved
 }
 
-// isSelfOrSplitSibling reports whether other is a split sibling of t
-// (Parent pointing at the same original ticket, e.g. 05b and 05c both split
-// from 05) — the exclusion fullyDone applies while walking a ticket's own
-// Split list. See UnresolvedBlockers.
-func isSelfOrSplitSibling(t, other Ticket) bool {
-	return t.Parent != nil && other.Parent != nil && *t.Parent == *other.Parent
+// isSelfOrSplitSiblingOrDescendant reports whether other must be excluded
+// from t's own inherited-blocker resolution: other is t itself, a split
+// sibling (Parent pointing at the same original ticket, e.g. 05b and 05c
+// both split from 05), or a descendant of t reached by walking Parent hops
+// upward (t's own forward-split chain, e.g. 01a's child 01b) — the
+// exclusion fullyDone applies while walking a ticket's own Split list. See
+// UnresolvedBlockers.
+//
+// A descendant must be excluded for the same reason a sibling is: it's part
+// of t's own family, reached by construction only after t itself runs, so
+// requiring it done as a precondition for t's own blocker to resolve would
+// deadlock t against its own not-yet-created follow-on work.
+func isSelfOrSplitSiblingOrDescendant(t, other Ticket, byNumberAndSuffix map[string]Ticket) bool {
+	if t.Parent != nil && other.Parent != nil && *t.Parent == *other.Parent {
+		return true
+	}
+	return isDescendantOf(t, other, byNumberAndSuffix)
+}
+
+// isDescendantOf reports whether t is reached by walking other's own Parent
+// chain upward — i.e. other descends from t, directly or via further
+// splits. Guarded against a malformed Parent cycle by capping the walk at
+// one hop per ticket in the epic.
+func isDescendantOf(t, other Ticket, byNumberAndSuffix map[string]Ticket) bool {
+	current := other
+	for i := 0; i < len(byNumberAndSuffix)+1 && current.Parent != nil; i++ {
+		num, letters := splitBlockedByToken(*current.Parent)
+		parent, ok := byNumberAndSuffix[siblingKey(num, letters)]
+		if !ok {
+			return false
+		}
+		if parent.Number == t.Number && parent.Identifier == t.Identifier {
+			return true
+		}
+		current = parent
+	}
+	return false
 }
 
 // byNumberAndSuffix indexes e.Tickets by number+lowercased letter suffix
@@ -195,7 +229,7 @@ func (e Epic) FullyDone(t Ticket) bool {
 
 // fullyDone is FullyDone's recursive core, plus an optional exclude hook
 // (used by UnresolvedBlockers to skip t's own split family, see
-// isSelfOrSplitSibling): a child exclude reports true for is treated as
+// isSelfOrSplitSiblingOrDescendant): a child exclude reports true for is treated as
 // fully done without recursing into its own children. exclude only applies
 // to children reached by walking t's Split list, never to t itself — t's
 // own resolution as a blocked_by token's direct target is UnresolvedBlockers'

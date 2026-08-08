@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+func strPtr(s string) *string { return &s }
+
 func TestEpic_RenderedStatus_BaseStates(t *testing.T) {
 	cases := []struct {
 		status string
@@ -239,10 +241,39 @@ func TestEpic_UnresolvedBlockers_SplitSiblingsDontBlockEachOther(t *testing.T) {
 	}
 }
 
+// TestEpic_UnresolvedBlockers_InheritedTokenNotBlockedByOwnDescendant covers
+// a sequential split: 01 splits into 01a, which itself later splits into
+// 01b (01b's Parent is 01a, not 01, and 01b is blocked_by 01a). 01 lists
+// both 01a and 01b as Split children (gx-investigate's drain-queue/
+// tickets-tree finding: the root ticket's children can legitimately name a
+// grandchild this way). 01a's own inherited "Blocked by: 01" must not
+// require 01b — its own child — to be done first: 01b can't even start
+// before 01a does, so that would deadlock 01a against its own not-yet-begun
+// follow-on work.
+func TestEpic_UnresolvedBlockers_InheritedTokenNotBlockedByOwnDescendant(t *testing.T) {
+	root := "01"
+	mechanism := "01a"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, Identifier: "01", Status: "done", Commitless: true, Split: []string{"01a", "01b"}},
+		{Number: 1, Identifier: "01a", BlockedBy: []string{"01"}, Parent: &root, Status: "ready-for-agent"},
+		{Number: 1, Identifier: "01b", BlockedBy: []string{"01a"}, Parent: &mechanism, Status: "open"},
+	}}
+	if got := epic.UnresolvedBlockers(epic.Tickets[1]); got != nil {
+		t.Errorf("UnresolvedBlockers(01a) = %v, want nil since 01 is done and 01b is 01a's own not-yet-started child", got)
+	}
+	if status := epic.RenderedStatus(epic.Tickets[1]); status != StatusOpen {
+		t.Errorf("RenderedStatus(01a) = %v, want StatusOpen (ready-for-agent, unblocked)", status)
+	}
+	// 01b itself still correctly waits for 01a, its real direct blocker.
+	if got := epic.UnresolvedBlockers(epic.Tickets[2]); len(got) != 1 || got[0] != "01a" {
+		t.Errorf("UnresolvedBlockers(01b) = %v, want [01a] since 01a isn't done yet", got)
+	}
+}
+
 // TestEpic_UnresolvedBlockers_DirectSiblingTokenIsEnforced covers the
 // opposite of SplitSiblingsDontBlockEachOther above: 02c's "Blocked by: 02b"
 // names its split sibling 02b directly rather than their shared parent, so
-// isSelfOrSplitSibling's sibling-Parent exclusion (needed for the inherited-
+// isSelfOrSplitSiblingOrDescendant's sibling-Parent exclusion (needed for the inherited-
 // token case) must not apply here — 02b's real status has to be checked.
 func TestEpic_UnresolvedBlockers_DirectSiblingTokenIsEnforced(t *testing.T) {
 	original := "02"
@@ -387,6 +418,90 @@ func TestEpic_FullyDone_CycleTerminates(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("FullyDone did not terminate on a Split/Parent cycle")
 	}
+}
+
+// TestIsSelfOrSplitSiblingOrDescendant exercises the exclude predicate
+// fullyDone's recursion uses directly, independent of UnresolvedBlockers'
+// higher-level scenarios above, so each edge (self, sibling, direct child,
+// grandchild, ancestor, unrelated) is pinned down on its own.
+func TestIsSelfOrSplitSiblingOrDescendant(t *testing.T) {
+	root := "01"
+	mechanism := "01a"
+	notification := "01b"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, Identifier: "01", Status: "done", Split: []string{"01a", "01b"}},
+		{Number: 1, Identifier: "01a", Parent: &root, Status: "ready-for-agent"},
+		{Number: 1, Identifier: "01b", Parent: &mechanism, Status: "open"},     // child of 01a
+		{Number: 1, Identifier: "01c", Parent: &root, Status: "open"},          // true sibling of 01a
+		{Number: 1, Identifier: "01b1", Parent: &notification, Status: "open"}, // grandchild, via 01b
+		{Number: 2, Identifier: "02", Status: "open"},                          // unrelated ticket
+	}}
+	byID := ticketsByIdentifier(epic)
+	byNumberAndSuffix := epic.byNumberAndSuffix()
+	t01a := byID["01a"]
+
+	cases := []struct {
+		name  string
+		other Ticket
+		want  bool
+	}{
+		{"self", t01a, true},
+		{"true sibling (shared Parent)", byID["01c"], true},
+		{"direct child", byID["01b"], true},
+		{"grandchild reached via child", byID["01b1"], true},
+		{"own ancestor (root)", byID["01"], false},
+		{"unrelated ticket, no Parent link at all", byID["02"], false},
+	}
+	for _, c := range cases {
+		if got := isSelfOrSplitSiblingOrDescendant(t01a, c.other, byNumberAndSuffix); got != c.want {
+			t.Errorf("isSelfOrSplitSiblingOrDescendant(01a, %s) = %v, want %v", c.other.Identifier, got, c.want)
+		}
+	}
+}
+
+// TestIsDescendantOf covers isDescendantOf on its own — the Parent-chain
+// walk isSelfOrSplitSiblingOrDescendant layers the sibling check on top of.
+func TestIsDescendantOf(t *testing.T) {
+	root := "01"
+	mid := "01a"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, Identifier: "01", Status: "done"},
+		{Number: 1, Identifier: "01a", Parent: &root, Status: "done"},
+		{Number: 1, Identifier: "01b", Parent: &mid, Status: "open"},
+		{Number: 2, Identifier: "02", Status: "open"},
+		{Number: 3, Identifier: "03", Parent: strPtr("no-such-ticket"), Status: "open"},
+	}}
+	byID := ticketsByIdentifier(epic)
+	byNumberAndSuffix := epic.byNumberAndSuffix()
+	t01 := byID["01"]
+	t01a := byID["01a"]
+
+	if !isDescendantOf(t01, byID["01a"], byNumberAndSuffix) {
+		t.Error("isDescendantOf(01, 01a) = false, want true: 01a's Parent is 01")
+	}
+	if !isDescendantOf(t01, byID["01b"], byNumberAndSuffix) {
+		t.Error("isDescendantOf(01, 01b) = false, want true: 01b descends from 01 via 01a")
+	}
+	if isDescendantOf(t01a, byID["01"], byNumberAndSuffix) {
+		t.Error("isDescendantOf(01a, 01) = true, want false: 01 is 01a's ancestor, not its descendant")
+	}
+	if isDescendantOf(t01, byID["02"], byNumberAndSuffix) {
+		t.Error("isDescendantOf(01, 02) = true, want false: 02 has no Parent at all")
+	}
+	if isDescendantOf(t01, byID["03"], byNumberAndSuffix) {
+		t.Error("isDescendantOf(01, 03) = true, want false: 03's Parent token doesn't resolve to any ticket")
+	}
+}
+
+// ticketsByIdentifier indexes epic's tickets by their literal Identifier
+// string, for tests that want to grab a specific fixture ticket by name
+// without recomputing byNumberAndSuffix's zero-padding-insensitive key.
+func ticketsByIdentifier(epic Epic) map[string]Ticket {
+	byID := make(map[string]Ticket, len(epic.Tickets))
+	for _, ticket := range epic.Tickets {
+		byID[ticket.Identifier] = ticket
+	}
+	return byID
 }
 
 func TestEpic_RenderedStatus_CodeReviewBlockedWhileSiblingOpen(t *testing.T) {

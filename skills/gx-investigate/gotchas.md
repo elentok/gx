@@ -18,10 +18,15 @@ to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKI
   `06b`→`06b1`→`06b2`, `06c`→`06c1`→`06c2` (four separate splits, same shape — this looks
   systemic to whatever produced these tickets, not a one-off typo). Inert copies of the same
   malformed shape (already-`done` chains, so harmless) also exist at `tickets-tree`'s
-  `02d`→`02e` and `06`→`06c`. Fixed by correcting `children:`/`parent:` to match (each root lists
-  only its direct split; the intermediate ticket lists the grandchild) via
-  `gx tickets set <path> --children <id>` — no source fix applied yet for the authoring path that
-  produces this shape, or for `fullyDone`/`isSelfOrSplitSibling` failing to catch it defensively.
+  `02d`→`02e` and `06`→`06c`. Two-part fix: (1) data — corrected the four live tickets'
+  `children:`/`parent:` to match (each root lists only its direct split; the intermediate ticket
+  lists the grandchild) via `gx tickets set <path> --children <id>`; (2) source —
+  `tickets/status.go`'s `isSelfOrSplitSibling` (renamed `isSelfOrSplitSiblingOrDescendant`) now
+  also excludes any ticket reached by walking `Parent` hops upward from the candidate to the
+  ticket being resolved, not just same-`Parent` siblings, so this shape can't deadlock even if a
+  future split's `children:`/`parent:` end up mismatched the same way again. Regression test:
+  `TestEpic_UnresolvedBlockers_InheritedTokenNotBlockedByOwnDescendant` in
+  `tickets/status_test.go`. Uncommitted as of this diagnosis — see `tickets/status.go` diff.
 - **Code-review-spawned tickets show up in the queue tree but never start.** `gx-code-review` set
   `children` on the review ticket but never `parent` on the tickets it spawned; both
   `RunScope.Contains`/`containsChain` (scheduler scope) and the Queue tab's tree nesting walk the
