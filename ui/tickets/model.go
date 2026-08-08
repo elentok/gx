@@ -413,8 +413,7 @@ func (m Model) handleSidebarMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cm
 	if mouse.Button != tea.MouseLeft {
 		return m, nil
 	}
-	if px, py, pw, ph := m.previewRect(); mouse.X >= px && mouse.X < px+pw && mouse.Y >= py && mouse.Y < py+ph {
-		m.focus = focusPreview
+	if m.previewFocus.clickToFocus(mouse, m.width, m.contentHeight()) {
 		return m, nil
 	}
 	sidebarW, _ := m.splitWidth()
@@ -653,13 +652,7 @@ func splitPanelHeight(width, total int) (sidebarH, previewH int) {
 // mirroring normalView's layout math so mouse hit-testing (click-to-focus,
 // wheel routing) stays in sync with what's actually rendered.
 func (m Model) previewRect() (x, y, w, h int) {
-	sidebarW, previewW := m.splitWidth()
-	contentH := m.contentHeight()
-	sidebarH, previewH := m.splitHeight(contentH)
-	if m.useStackedLayout() {
-		return 0, sidebarH + 1, previewW, previewH
-	}
-	return sidebarW + 1, 0, previewW, previewH
+	return previewRect(m.width, m.contentHeight())
 }
 
 func (m Model) contentHeight() int {

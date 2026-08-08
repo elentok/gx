@@ -1675,6 +1675,29 @@ func TestQueueModelMouseClickSelectsRowOnly(t *testing.T) {
 	}
 }
 
+// TestQueueModelClickInsidePreviewBoundsFocusesIt covers ticket 01: a click
+// landing inside the Queue tab's preview panel bounds hands focus to it,
+// mirroring the Tickets tab's TestModel_ClickInsidePreviewBoundsFocusesItAndRoutesWheel
+// (mouse_focus_test.go) via the shared previewFocus.clickToFocus helper.
+func TestQueueModelClickInsidePreviewBoundsFocusesIt(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+	if m.focus != focusSidebar {
+		t.Fatalf("expected initial focus on sidebar, got focus=%v", m.focus)
+	}
+
+	px, py, _, _ := m.previewRect()
+	updated, _ := m.Update(tea.MouseClickMsg{X: px + 1, Y: py + 1, Button: tea.MouseLeft})
+	m = updated.(QueueModel)
+
+	if m.focus != focusPreview {
+		t.Fatalf("expected preview focus after click inside preview bounds, got focus=%v", m.focus)
+	}
+}
+
 // TestQueueModelPreviewScrollsPastTruncationPoint covers ticket 11: the
 // Queue tab's preview now wraps the shared previewFocus viewport instead of
 // truncating to the panel's visible height, so its bottom marker — well past

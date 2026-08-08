@@ -67,6 +67,34 @@ func (p previewFocus) previewLines() []string {
 	return renderViewportWithScrollbar(p.previewVP)
 }
 
+// previewRect returns the preview panel's absolute on-screen bounds for a
+// tab of the given width/contentHeight, computed from the same
+// splitPanelWidth/splitPanelHeight/useStackedLayout math each tab's View
+// uses to lay out its panels - so click hit-testing stays in sync with
+// what's actually rendered, in both tabs at once.
+func previewRect(width, contentHeight int) (x, y, w, h int) {
+	sidebarW, previewW := splitPanelWidth(width)
+	sidebarH, previewH := splitPanelHeight(width, contentHeight)
+	if useStackedLayout(width) {
+		return 0, sidebarH + 1, previewW, previewH
+	}
+	return sidebarW + 1, 0, previewW, previewH
+}
+
+// clickToFocus bounds-checks a mouse click against the preview panel's rect
+// (as returned by previewRect for the given width/contentHeight) and, when
+// the click lands inside it, hands focus to the preview pane. Returns
+// whether the click was handled this way, so the caller's own
+// row-under-click selection logic can skip running when it was.
+func (p *previewFocus) clickToFocus(mouse tea.Mouse, width, contentHeight int) bool {
+	px, py, pw, ph := previewRect(width, contentHeight)
+	if mouse.X >= px && mouse.X < px+pw && mouse.Y >= py && mouse.Y < py+ph {
+		p.focus = focusPreview
+		return true
+	}
+	return false
+}
+
 // updatePreviewKey routes a key through the preview's own search overlay,
 // when it's mid-input or navigating results. handled is false otherwise, so
 // the caller can interpret the key itself: a tab-specific quit key,

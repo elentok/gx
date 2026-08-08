@@ -331,13 +331,22 @@ func (m QueueModel) handleQueueMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea
 	return m, nil
 }
 
+// previewRect returns the preview panel's absolute on-screen bounds,
+// mirroring Model.previewRect for the Queue tab's own layout.
+func (m QueueModel) previewRect() (x, y, w, h int) {
+	return previewRect(m.width, max(m.height-1, 1))
+}
+
 // handleQueueMouseClick selects the row under the click without triggering
-// any secondary action (no confirm, no checkbox toggle) — the Queue panel
-// renders full-width with no header above it, so only Y needs bounds
-// checking.
+// any secondary action (no confirm, no checkbox toggle). A click inside the
+// preview panel's bounds instead hands focus to it (mirroring Model's
+// handleSidebarMouseClick), without changing the queue selection.
 func (m QueueModel) handleQueueMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	mouse := msg.Mouse()
 	if mouse.Button != tea.MouseLeft {
+		return m, nil
+	}
+	if m.previewFocus.clickToFocus(mouse, m.width, max(m.height-1, 1)) {
 		return m, nil
 	}
 	bodyLine := mouse.Y - 1
