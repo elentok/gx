@@ -139,24 +139,16 @@ code-review ticket) and case-2.2 epics where the Step 4 pick was "merge ff-only"
 in order. A rebase/conflict or check failure on one epic aborts only that epic's merge; report it
 and move on to the next.
 
-For each merge-candidate epic:
+For each merge-candidate epic, invoke the [gx-merge](../gx-merge/SKILL.md) skill inline — same
+conversation/context, not a detached sub-agent — with the epic's branch, and follow its steps as
+written, with one addition: when it reaches its own "pause for review" step, call `gx notify` with
+a short summary of the epic and what's pending review before pausing.
 
-1. Try `git merge --ff-only <epic-branch>` directly. If it succeeds, the epic is merged — record it
-   as done and move to the next epic. Git's own refusal on a non-fast-forward *is* the check for
-   whether a rebase is needed; don't pre-check ancestry yourself.
-2. If it fails (non-fast-forward), invoke the `gx-resolving-merge-conflicts` skill inline — same
-   conversation/context, not a detached sub-agent — to rebase the epic branch onto main and resolve
-   any conflicts.
-3. Once that skill finishes, call `gx notify` with a short summary of the epic and what's pending
-   review, then **pause and show the resolved diff** (the rebased branch vs main) before doing
-   anything further. Do not proceed to checks or the merge until you've reviewed it with the user.
-4. After the pause, run this repo's checks on the rebased branch — discover and run them the same
-   way `gx-resolving-merge-conflicts` does in its own "automated checks" step; don't hardcode a
-   specific check command here.
-   - Checks pass: do the `git merge --ff-only <epic-branch>` merge into main.
-   - Checks fail: abort this epic's merge — leave main untouched — and record the failure (with the
-     check output) for the end-of-run summary. Do not attempt to fix unrelated failures or force the
-     merge through.
+- `gx-merge` reports `"merged"` in its Step 1: the epic is merged — record it as done and move to
+  the next epic.
+- `gx-merge` aborts (a plain command error in its Step 1, or failed checks in its Step 4): leave
+  main untouched, record the failure (with any check output) for the end-of-run summary, and move
+  on to the next epic. Do not attempt to fix unrelated failures or force the merge through.
 
 Never push to a remote at any point in this step — pushing stays an explicit, separate action for
 the user.
