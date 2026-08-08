@@ -4,6 +4,24 @@ Running list of previously-diagnosed gx/ralph-loop bugs, newest first. Append on
 to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKILL.md) gets fixed
 — don't re-explain what the linked commit/ticket already documents.
 
+- **A ticket blocked_by its own split-parent can deadlock forever, even though the parent is
+  `done`.** When a ticket splits sequentially (X, then Y where Y is `blocked_by: [X]` and
+  `parent: X`), `tickets.Epic.fullyDone`'s recursion into `children` requires every entry in the
+  *root* ticket's `children:` list to be done too. If the root's `children:` was written to list
+  **both** X and Y directly (instead of just X, with Y nested under X's own `children:`), then
+  resolving "is root fully done" pulls in Y — and `isSelfOrSplitSibling`'s exclusion (keyed on
+  `Parent` equality to the ticket being resolved) doesn't catch this, because Y's `parent` is X,
+  not root, so Y doesn't read as X's sibling. Net effect: X can never be considered to unblock
+  anything until Y (which can't start until X finishes) is also done — a self-deadlock hiding
+  behind a `blocked_by` token that looks resolved (the named ticket really is `done`). Found live
+  in `drain-queue`'s `01`→`01a`→`01b` chain and `tickets-tree`'s `03b`→`03b1`→`03b2`,
+  `06b`→`06b1`→`06b2`, `06c`→`06c1`→`06c2` (four separate splits, same shape — this looks
+  systemic to whatever produced these tickets, not a one-off typo). Inert copies of the same
+  malformed shape (already-`done` chains, so harmless) also exist at `tickets-tree`'s
+  `02d`→`02e` and `06`→`06c`. Fixed by correcting `children:`/`parent:` to match (each root lists
+  only its direct split; the intermediate ticket lists the grandchild) via
+  `gx tickets set <path> --children <id>` — no source fix applied yet for the authoring path that
+  produces this shape, or for `fullyDone`/`isSelfOrSplitSibling` failing to catch it defensively.
 - **Code-review-spawned tickets show up in the queue tree but never start.** `gx-code-review` set
   `children` on the review ticket but never `parent` on the tickets it spawned; both
   `RunScope.Contains`/`containsChain` (scheduler scope) and the Queue tab's tree nesting walk the

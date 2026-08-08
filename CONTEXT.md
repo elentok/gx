@@ -133,6 +133,20 @@ icon:
 Within an epic, tickets group in this order: unblocked (open/claimed) → blocked → needs-info/
 needs-attention → done → error, ticket number ascending within each group.
 
+## Ticket Forking
+
+**Fork** — dividing a ticket into new sibling tickets mid-flight, when it turns out to be larger
+than its budget or mixes concerns that should land separately. _Avoid_: Split.
+
+**Children** — the ticket ID(s) a fork produced, or (separately) the fix tickets a code-review
+ticket opened. Frontmatter field `children`. _Avoid_: Split.
+
+**Parent** — the reverse edge: the ticket a forked ticket came from. Frontmatter field `parent`.
+_Avoid_: Split from.
+
+**Fork suffix** — the letter appended to the parent's number to name each forked child (`04` forks
+into `04a`, `04b`; one level deeper, `04b1`). _Avoid_: Split suffix.
+
 ## Decorations and Badges (Log View)
 
 **Decoration** — a git ref (local branch, remote branch, tag, or `HEAD`) that points directly at a
