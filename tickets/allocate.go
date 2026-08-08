@@ -91,10 +91,9 @@ var parentIDRe = regexp.MustCompile(`^(\d{2,})([a-z]?)(\d*)$`)
 //
 // parent == "": the next flat sibling number, e.g. "04" after "01".."03".
 // parent is a bare number (e.g. "12"): the next lettered child, "12a" then
-// "12b". parent is a lettered ID with no trailing digits (e.g. "12b"): one
-// extra numeric level, "12b1" then "12b2". parent already has trailing
-// digits past its letter (e.g. "12b1") is rejected — nesting stops one
-// level past a lettered parent.
+// "12b". parent has a letter (e.g. "12b" or, past its own trailing digits,
+// "12b1"): the next number under that letter, "12b1" then "12b2" — both
+// spellings of the same lettered ancestor converge on the same next ID.
 func NextTicketID(epic Epic, parent string) (string, error) {
 	if parent == "" {
 		max := 0
@@ -110,14 +109,7 @@ func NextTicketID(epic Epic, parent string) (string, error) {
 	if m == nil {
 		return "", fmt.Errorf("invalid parent ticket ID %q", parent)
 	}
-	digits, letter, trailingDigits := m[1], m[2], m[3]
-
-	if trailingDigits != "" {
-		return "", fmt.Errorf(
-			"parent %q is already one level past a lettered parent; nesting deeper isn't supported",
-			parent,
-		)
-	}
+	digits, letter := m[1], m[2]
 
 	if letter == "" {
 		return digits + string(nextLetter(epic.Tickets, digits)), nil

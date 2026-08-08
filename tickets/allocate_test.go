@@ -110,10 +110,33 @@ func TestNextTicketID_NumericLevelPastLetteredParent(t *testing.T) {
 	}
 }
 
-func TestNextTicketID_RejectsNestingPastLetteredNumericParent(t *testing.T) {
-	_, err := NextTicketID(Epic{}, "12b1")
-	if err == nil {
-		t.Fatal("expected error for parent=12b1 (already one level past a lettered parent), got nil")
+func TestNextTicketID_LetteredNumericParentAllocatesNextSibling(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "my-epic", "issues", "02e-parent.md"),
+		"---\nid: \"02e\"\nstatus: done\ntype: task\n---\n")
+	writeFile(t, filepath.Join(dir, "my-epic", "issues", "02e1-child.md"),
+		"---\nid: \"02e1\"\nstatus: done\ntype: task\n---\n")
+	writeFile(t, filepath.Join(dir, "my-epic", "issues", "02e2-child.md"),
+		"---\nid: \"02e2\"\nstatus: done\ntype: task\n---\n")
+	epics, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	id, err := NextTicketID(epics[0], "02e2")
+	if err != nil {
+		t.Fatalf("NextTicketID(parent=02e2): %v", err)
+	}
+	if id != "02e3" {
+		t.Errorf("NextTicketID(parent=02e2) = %q, want %q", id, "02e3")
+	}
+
+	id, err = NextTicketID(epics[0], "02e")
+	if err != nil {
+		t.Fatalf("NextTicketID(parent=02e): %v", err)
+	}
+	if id != "02e3" {
+		t.Errorf("NextTicketID(parent=02e) = %q, want %q", id, "02e3")
 	}
 }
 

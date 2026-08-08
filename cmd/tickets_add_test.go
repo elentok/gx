@@ -97,25 +97,22 @@ func TestRunTicketsAdd_NumericLevelPastLetteredParent(t *testing.T) {
 	}
 }
 
-func TestRunTicketsAdd_RejectsNestingPastLetteredNumericParent(t *testing.T) {
+func TestRunTicketsAdd_LetteredNumericParentAllocatesNextSibling(t *testing.T) {
 	scratchDir := t.TempDir()
 	epicPath := filepath.Join(scratchDir, "widget-epic")
 	issuesDir := filepath.Join(epicPath, "issues")
 	if err := os.MkdirAll(issuesDir, 0755); err != nil {
 		t.Fatalf("mkdir issues: %v", err)
 	}
+	writeTicket(t, filepath.Join(issuesDir, "12b1-child.md"), "12b1", "done", "task")
 
 	var stdout bytes.Buffer
-	err := runTicketsAdd(epicPath, "12b1", &stdout)
-	if err == nil {
-		t.Fatal("expected error for --parent=12b1, got nil")
+	if err := runTicketsAdd(epicPath, "12b1", &stdout); err != nil {
+		t.Fatalf("runTicketsAdd(parent=12b1): %v", err)
 	}
-	entries, readErr := os.ReadDir(issuesDir)
-	if readErr != nil {
-		t.Fatalf("read issues dir: %v", readErr)
-	}
-	if len(entries) != 0 {
-		t.Errorf("issues dir has %d entries, want 0 (no file created)", len(entries))
+	gotPath := strings.TrimSpace(stdout.String())
+	if gotPath != filepath.Join(issuesDir, "12b2-new-ticket.md") {
+		t.Fatalf("stdout = %q, want %q", gotPath, filepath.Join(issuesDir, "12b2-new-ticket.md"))
 	}
 }
 

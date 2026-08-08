@@ -11,8 +11,9 @@ import (
 )
 
 // runTicketsAdd atomically allocates the next ticket ID for epicPath (a
-// flat sibling with no parent, a lettered child of parent, or one numeric
-// level past a lettered parent — see tickets.NextTicketID) and writes a
+// flat sibling with no parent, a lettered child of parent, or the next
+// number under a lettered parent regardless of whether parent itself
+// already carries trailing digits — see tickets.NextTicketID) and writes a
 // minimal stub ticket file for the caller to fill in, printing the created
 // file's path to w.
 func runTicketsAdd(epicPath, parent string, w io.Writer) error {
