@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.27.1 - 2026-08-08
+
+- Added a `gx merge <branch>` command (deterministic ff-only merge core) and a `gx-merge` skill that wraps it with rebase, conflict resolution, a review pause, and checks before retrying the merge; `gx cleanup`'s merge step now delegates to it instead of duplicating the logic.
+- Fixed fast-forward detection to decide ancestry via `git merge-base --is-ancestor` instead of matching git's (locale-dependent) stderr text.
+- Fixed stale e2e test fixtures broken by recent refactors (ticket frontmatter, renamed queue key, epic-scoped tab labels).
+
 ## v0.27.0 - 2026-08-08
 
 - Added a `gx cleanup` skill/command that scans worktrees and epics for housekeeping issues (stray branches, stale worktrees, missing code-review tickets) and can execute safe fast-forward-only merges and other fixes.
