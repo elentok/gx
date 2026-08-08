@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.27.3 - 2026-08-09
+
+- Fixed `gx tickets add --parent <id>` not writing the `parent` frontmatter field into newly created tickets, so split tickets created the documented way silently lost their parent link.
+- Fixed Telegram epic-complete notifications always failing with an HTTP 400 error due to unescaped parentheses in the MarkdownV2 message text.
+- Fixed the Queue tab silently dropping a checked-but-not-yet-started epic from `MaxConcurrentEpics` auto-promotion whenever gx restarted before its turn came up; it now offers a "Resume?" confirmation on the next load instead.
+
 ## v0.27.2 - 2026-08-08
 
 - Added an atomic `gx tickets add <epic>` command (filesystem-locked ID allocation, supports siblings, lettered children, and nested numbering past a lettered parent) and required a `--slug` flag so split-ticket stubs land with their real filename instead of a placeholder.
