@@ -73,6 +73,12 @@ type EventSink interface {
 	// live iteration to reattach to — it stays needs-attention for a human to
 	// inspect, unlike a claimed ticket in the same spot (see TicketReverted).
 	TicketStillNeedsAttention(identifier string)
+	// TicketNeedsInfo reports that identifier on epicName was marked
+	// needs-info: its iteration finished with no commit and never declared
+	// itself commitless (MarkNeedsInfo, called from finishIteration) — the
+	// agent got stuck rather than merely paused, so this fires distinct from
+	// IterationPaused.
+	TicketNeedsInfo(identifier, epicName string)
 
 	// TicketClaimed reports that ticket was claimed off the frontier for a
 	// fresh iteration.
@@ -162,6 +168,7 @@ func (noopEventSink) AlreadyComplete(epicName string, done, total int)          
 func (noopEventSink) TicketReverted(identifier string)                            {}
 func (noopEventSink) TicketReattached(identifier, label, cwd, sessionID string)   {}
 func (noopEventSink) TicketStillNeedsAttention(identifier string)                 {}
+func (noopEventSink) TicketNeedsInfo(identifier, epicName string)                 {}
 func (noopEventSink) TicketClaimed(ticket tickets.Ticket)                         {}
 func (noopEventSink) IterationStarted(identifier, label, cwd, sessionID string)   {}
 func (noopEventSink) IterationPaused(label string, kind PauseKind, reason string) {}
@@ -220,6 +227,10 @@ func (s *textEventSink) TicketReattached(identifier, label, cwd, sessionID strin
 
 func (s *textEventSink) TicketStillNeedsAttention(identifier string) {
 	s.printf("ticket %s still needs attention; no live iteration found\n", identifier)
+}
+
+func (s *textEventSink) TicketNeedsInfo(identifier, epicName string) {
+	s.printf("ticket %s: no commits landed; marked needs-info\n", identifier)
 }
 
 func (s *textEventSink) TicketClaimed(ticket tickets.Ticket) {}

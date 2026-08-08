@@ -100,6 +100,30 @@ func TestSlackEventSink_IterationPaused_SendsOneMessageAndForwards(t *testing.T)
 	}
 }
 
+func TestSlackEventSink_TicketNeedsInfo_SendsOneMessageAndForwards(t *testing.T) {
+	server, getRequests := fakeSlackServer(t, http.StatusOK)
+	inner := &recordingSink{}
+	sink := newSlackEventSink(inner, server.URL, "", "")
+
+	sink.TicketNeedsInfo("04", "epic")
+
+	if got := inner.snapshot(); len(got) != 1 || got[0] != "TicketNeedsInfo" {
+		t.Errorf("inner events = %v, want [TicketNeedsInfo]", got)
+	}
+
+	reqs := waitForSlackRequests(getRequests, 1)
+	if len(reqs) != 1 {
+		t.Fatalf("requests = %v, want exactly 1", reqs)
+	}
+	want := slackStyle.ticketNeedsInfoText("04", "epic")
+	if reqs[0].Text != want {
+		t.Errorf("text = %q, want %q", reqs[0].Text, want)
+	}
+	if paused := slackStyle.iterationPausedText("epic/04", PauseNeedsAttention, "stuck"); reqs[0].Text == paused {
+		t.Errorf("needs-info text matched iteration-paused text: %q", reqs[0].Text)
+	}
+}
+
 func TestSlackEventSink_EpicComplete_SendsOneMessageAndForwards(t *testing.T) {
 	server, getRequests := fakeSlackServer(t, http.StatusOK)
 	inner := &recordingSink{}

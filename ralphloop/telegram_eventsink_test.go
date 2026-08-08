@@ -111,6 +111,30 @@ func TestTelegramEventSink_IterationPaused_SendsOneMessageAndForwards(t *testing
 	}
 }
 
+func TestTelegramEventSink_TicketNeedsInfo_SendsOneMessageAndForwards(t *testing.T) {
+	server, getRequests := fakeTelegramServer(t, http.StatusOK)
+	inner := &recordingSink{}
+	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
+
+	sink.TicketNeedsInfo("04", "epic")
+
+	if got := inner.snapshot(); len(got) != 1 || got[0] != "TicketNeedsInfo" {
+		t.Errorf("inner events = %v, want [TicketNeedsInfo]", got)
+	}
+
+	reqs := waitForRequests(getRequests, 1)
+	if len(reqs) != 1 {
+		t.Fatalf("requests = %v, want exactly 1", reqs)
+	}
+	want := telegramStyle.ticketNeedsInfoText("04", "epic")
+	if reqs[0].Text != want {
+		t.Errorf("text = %q, want %q", reqs[0].Text, want)
+	}
+	if paused := telegramStyle.iterationPausedText("epic/04", PauseNeedsAttention, "stuck"); reqs[0].Text == paused {
+		t.Errorf("needs-info text matched iteration-paused text: %q", reqs[0].Text)
+	}
+}
+
 func TestTelegramEventSink_EpicComplete_SendsOneMessageAndForwards(t *testing.T) {
 	server, getRequests := fakeTelegramServer(t, http.StatusOK)
 	inner := &recordingSink{}

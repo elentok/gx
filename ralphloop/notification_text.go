@@ -106,6 +106,21 @@ func (s mrkdwnStyle) iterationPausedText(label string, kind PauseKind, reason st
 	return fmt.Sprintf("%s *%s paused*\n\n%s", emoji, s.escape(label), s.escape(reason))
 }
 
+// ticketNeedsInfoText renders the "needs-info" notification: unlike
+// iterationPausedText's "still in progress, will resume/clear on its own",
+// this means the iteration is stuck and won't proceed without a human
+// looking at it — no commit landed and the agent never declared the
+// zero-commit finish intentional via `gx tickets set --commitless true`.
+//
+//	🆘 *{epic}/{ticket} needs info*
+//
+//	No commits landed; marked needs-info.
+func (s mrkdwnStyle) ticketNeedsInfoText(identifier, epicName string) string {
+	ref := s.escape(fmt.Sprintf("%s/%s", epicName, identifier))
+	body := s.escape("No commits landed; marked needs-info.")
+	return fmt.Sprintf("\U0001f198 *%s needs info*\n\n%s", ref, body)
+}
+
 // epicCompleteText renders the "epic complete" notification:
 //
 //	🎉 *epic complete: {epicName}*

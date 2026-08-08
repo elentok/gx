@@ -422,6 +422,31 @@ func TestRun_LogsNeedsInfoEvent_OnZeroCommitIteration(t *testing.T) {
 	}
 }
 
+func TestRun_EventSink_TicketNeedsInfo_OnZeroCommitIteration(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+	})
+	d, _, _ := fakeDeps()
+	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
+		return 0, nil
+	}
+	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-" + opts.Pane}, nil
+	}
+
+	sink := &recordingSink{}
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if len(sink.ticketNeedsInfoCalls) != 1 {
+		t.Fatalf("TicketNeedsInfo calls = %v, want exactly 1", sink.ticketNeedsInfoCalls)
+	}
+	if got := sink.ticketNeedsInfoCalls[0]; got[0] != "01" || got[1] != "epic" {
+		t.Errorf("TicketNeedsInfo call = %v, want [01 epic]", got)
+	}
+}
+
 // TestRun_HonorsCommitlessFlag_SkipsNeedsInfo exercises the escape hatch from
 // the zero-commit path above: if the agent itself sets commitless: true
 // (alongside moving status off "claimed") before finishing, that's an

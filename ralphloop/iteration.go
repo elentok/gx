@@ -208,6 +208,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 			return fmt.Errorf("marking ticket needs-info: %w", err)
 		}
 		p.logTicketEvent(eventNeedsInfo, pane, tab, sessionID, path)
+		p.Sink.TicketNeedsInfo(p.Ticket.Identifier, p.FeatureBranch)
 		return nil
 	}
 

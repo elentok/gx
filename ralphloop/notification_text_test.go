@@ -79,6 +79,25 @@ func TestTelegramStyleIterationPausedText_RateLimitUsesPauseEmoji(t *testing.T) 
 	}
 }
 
+func TestTelegramStyleTicketNeedsInfoText_DistinctFromIterationPausedText(t *testing.T) {
+	got := telegramStyle.ticketNeedsInfoText("04", "ui-tree-migration")
+	want := "\U0001f198 *ui\\-tree\\-migration/04 needs info*\n\nNo commits landed; marked needs\\-info\\."
+	if got != want {
+		t.Errorf("text = %q, want %q", got, want)
+	}
+	if paused := telegramStyle.iterationPausedText("ui-tree-migration/04", PauseNeedsAttention, "stuck"); got == paused {
+		t.Errorf("ticketNeedsInfoText matched iterationPausedText: %q", got)
+	}
+}
+
+func TestSlackStyleTicketNeedsInfoText_NoEscaping(t *testing.T) {
+	got := slackStyle.ticketNeedsInfoText("04", "ui-tree-migration")
+	want := "\U0001f198 *ui-tree-migration/04 needs info*\n\nNo commits landed; marked needs-info."
+	if got != want {
+		t.Errorf("text = %q, want %q", got, want)
+	}
+}
+
 func TestTelegramStyleEpicCompleteText(t *testing.T) {
 	got := telegramStyle.epicCompleteText("ui-tree-migration", 5, 492)
 	want := "\U0001f389 *epic complete: ui\\-tree\\-migration*\n\n5 ticket(s) landed in 8m12s"

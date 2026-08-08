@@ -27,6 +27,10 @@ type recordingSink struct {
 	// iteration's fake AgentWait exactly once this ticket's stats have been
 	// captured, deterministically rather than via a polling loop.
 	onIterationFinished func(ticket tickets.Ticket)
+	// ticketNeedsInfoCalls records every TicketNeedsInfo call's
+	// (identifier, epicName) pair, for asserting both the count and the
+	// identity a needs-info transition reports.
+	ticketNeedsInfoCalls [][2]string
 }
 
 func (s *recordingSink) record(name string) {
@@ -53,6 +57,12 @@ func (s *recordingSink) TicketReattached(identifier, label, cwd, sessionID strin
 }
 func (s *recordingSink) TicketStillNeedsAttention(identifier string) {
 	s.record("TicketStillNeedsAttention")
+}
+func (s *recordingSink) TicketNeedsInfo(identifier, epicName string) {
+	s.mu.Lock()
+	s.ticketNeedsInfoCalls = append(s.ticketNeedsInfoCalls, [2]string{identifier, epicName})
+	s.mu.Unlock()
+	s.record("TicketNeedsInfo")
 }
 func (s *recordingSink) TicketClaimed(ticket tickets.Ticket) { s.record("TicketClaimed") }
 func (s *recordingSink) IterationStarted(identifier, label, cwd, sessionID string) {
