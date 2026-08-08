@@ -227,3 +227,29 @@ func TestSendSlackTestMessage_ReturnsErrorOnFailingServer(t *testing.T) {
 		t.Fatal("SendSlackTestMessage: want error, got nil")
 	}
 }
+
+func TestSendSlackMessage_SendsGivenTextEscaped(t *testing.T) {
+	server, getRequests := fakeSlackServer(t, http.StatusOK)
+
+	err := SendSlackMessage(server.URL, "hello <world> & friends")
+	if err != nil {
+		t.Fatalf("SendSlackMessage: %v", err)
+	}
+
+	reqs := getRequests()
+	if len(reqs) != 1 {
+		t.Fatalf("requests = %v, want exactly 1", reqs)
+	}
+	want := slackStyle.escape("hello <world> & friends")
+	if reqs[0].Text != want {
+		t.Errorf("text = %q, want %q", reqs[0].Text, want)
+	}
+}
+
+func TestSendSlackMessage_ReturnsErrorOnFailingServer(t *testing.T) {
+	server, _ := fakeSlackServer(t, http.StatusInternalServerError)
+
+	if err := SendSlackMessage(server.URL, "hello"); err == nil {
+		t.Fatal("SendSlackMessage: want error, got nil")
+	}
+}

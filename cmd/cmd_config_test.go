@@ -219,6 +219,102 @@ func TestExecute_ConfigTestNotifications_PropagatesLoadConfigError(t *testing.T)
 	}
 }
 
+func TestExecute_Notify_NoneConfiguredPrintsNoticeAndSucceeds(t *testing.T) {
+	var stdout bytes.Buffer
+	d := deps{
+		stdout: &stdout,
+		stderr: bytes.NewBuffer(nil),
+		loadConfig: func() (config.Config, error) {
+			return config.Default(), nil
+		},
+	}
+	if err := execute([]string{"notify", "hello"}, d); err != nil {
+		t.Fatalf("execute notify: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "no notification service configured") {
+		t.Fatalf("expected notice about no configured service, got: %q", stdout.String())
+	}
+}
+
+func TestExecute_Notify_SlackConfiguredSendsAndReportsSuccess(t *testing.T) {
+	var gotBody string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	var stdout bytes.Buffer
+	d := deps{
+		stdout: &stdout,
+		stderr: bytes.NewBuffer(nil),
+		loadConfig: func() (config.Config, error) {
+			cfg := config.Default()
+			cfg.Notifications.Slack.WebhookURL = server.URL
+			return cfg, nil
+		},
+	}
+	if err := execute([]string{"notify", "hello there"}, d); err != nil {
+		t.Fatalf("execute notify: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "sent to: slack") {
+		t.Fatalf("expected slack success line, got: %q", stdout.String())
+	}
+	if !strings.Contains(gotBody, "hello there") {
+		t.Fatalf("expected message text in request body, got: %q", gotBody)
+	}
+}
+
+func TestExecute_Notify_SlackFailureReportsErrorAndPropagates(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	var stdout, stderr bytes.Buffer
+	d := deps{
+		stdout: &stdout,
+		stderr: &stderr,
+		loadConfig: func() (config.Config, error) {
+			cfg := config.Default()
+			cfg.Notifications.Slack.WebhookURL = server.URL
+			return cfg, nil
+		},
+	}
+	err := execute([]string{"notify", "hello"}, d)
+	if err == nil {
+		t.Fatal("expected error when the notification send fails")
+	}
+	if !strings.Contains(stderr.String(), "slack") {
+		t.Fatalf("expected slack failure mentioned on stderr, got: %q", stderr.String())
+	}
+}
+
+func TestExecute_Notify_PropagatesLoadConfigError(t *testing.T) {
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+		loadConfig: func() (config.Config, error) {
+			return config.Config{}, errors.New("load failed")
+		},
+	}
+	err := execute([]string{"notify", "hello"}, d)
+	if err == nil || !strings.Contains(err.Error(), "load failed") {
+		t.Fatalf("expected load error, got: %v", err)
+	}
+}
+
+func TestExecute_Notify_RequiresMessageArg(t *testing.T) {
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+	}
+	if err := execute([]string{"notify"}, d); err == nil {
+		t.Fatal("expected error when no message argument is given")
+	}
+}
+
 func TestRelativeDate_Zero(t *testing.T) {
 	got := relativeDate(time.Time{})
 	if got != "unknown time" {

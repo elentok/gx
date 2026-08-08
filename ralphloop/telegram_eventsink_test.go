@@ -241,3 +241,29 @@ func TestSendTelegramTestMessage_ReturnsErrorOnFailingServer(t *testing.T) {
 		t.Fatal("sendTelegramTestMessage: want error, got nil")
 	}
 }
+
+func TestSendTelegramMessage_SendsGivenTextEscaped(t *testing.T) {
+	server, getRequests := fakeTelegramServer(t, http.StatusOK)
+
+	err := sendTelegramMessage("tok", "chat-1", server.URL, "hello-world!")
+	if err != nil {
+		t.Fatalf("sendTelegramMessage: %v", err)
+	}
+
+	reqs := getRequests()
+	if len(reqs) != 1 {
+		t.Fatalf("requests = %v, want exactly 1", reqs)
+	}
+	want := telegramStyle.escape("hello-world!")
+	if reqs[0].Text != want {
+		t.Errorf("text = %q, want %q", reqs[0].Text, want)
+	}
+}
+
+func TestSendTelegramMessage_ReturnsErrorOnFailingServer(t *testing.T) {
+	server, _ := fakeTelegramServer(t, http.StatusInternalServerError)
+
+	if err := sendTelegramMessage("tok", "chat-1", server.URL, "hello"); err == nil {
+		t.Fatal("sendTelegramMessage: want error, got nil")
+	}
+}

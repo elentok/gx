@@ -369,6 +369,30 @@ func runConfigTestNotifications(d deps) error {
 	return nil
 }
 
+// runNotify sends text to every notification service configured in
+// ~/.config/gx/config.json (Telegram and/or Slack), no-op'ing per-service
+// when unconfigured — same as `gx config test-notifications`. It reports
+// which service(s) it sent to.
+func runNotify(text string, d deps) error {
+	cfg, err := d.loadConfig()
+	if err != nil {
+		return err
+	}
+
+	sent, err := ralphloop.SendMessage(cfg.Notifications, text)
+	if err != nil {
+		fmt.Fprintf(d.stderr, "notify: %v\n", err)
+	}
+	if len(sent) == 0 {
+		if err == nil {
+			fmt.Fprintf(d.stdout, "no notification service configured (see `gx config edit`)\n")
+		}
+		return err
+	}
+	fmt.Fprintf(d.stdout, "sent to: %s\n", strings.Join(sent, ", "))
+	return err
+}
+
 func runEditorCommand(editor, path string, in io.Reader, out, errOut io.Writer) error {
 	parts := strings.Fields(editor)
 	if len(parts) == 0 {

@@ -60,10 +60,30 @@ func SendTelegramTestMessage(botToken, chatID string) error {
 }
 
 func sendTelegramTestMessage(botToken, chatID, apiBaseURL string) error {
+	return sendTelegramRaw(botToken, chatID, apiBaseURL, telegramStyle.testMessageText())
+}
+
+// SendTelegramMessage synchronously sends arbitrary text via the Telegram Bot
+// API and returns any error instead of swallowing it, for callers like `gx
+// notify` that need to report success/failure directly — unlike the
+// EventSink decorator's fire-and-forget send. text is escaped for
+// MarkdownV2 here, so callers pass plain text.
+func SendTelegramMessage(botToken, chatID, text string) error {
+	return sendTelegramMessage(botToken, chatID, telegramAPIBaseURL, text)
+}
+
+func sendTelegramMessage(botToken, chatID, apiBaseURL, text string) error {
+	return sendTelegramRaw(botToken, chatID, apiBaseURL, telegramStyle.escape(text))
+}
+
+// sendTelegramRaw POSTs text to the Telegram Bot API as-is, without any
+// further escaping — callers are responsible for pre-escaping MarkdownV2
+// text (see notification_text.go).
+func sendTelegramRaw(botToken, chatID, apiBaseURL, text string) error {
 	s := newTelegramEventSink(nil, botToken, chatID, apiBaseURL)
 	ctx, cancel := context.WithTimeout(context.Background(), telegramSendTimeout)
 	defer cancel()
-	return s.sendSync(ctx, telegramStyle.testMessageText())
+	return s.sendSync(ctx, text)
 }
 
 func (s *telegramEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {

@@ -46,10 +46,23 @@ func newSlackEventSink(inner EventSink, webhookURL string) *slackEventSink {
 // like `gx config test-notifications` that need to report success/failure
 // directly — unlike the EventSink decorator's fire-and-forget send.
 func SendSlackTestMessage(webhookURL string) error {
+	return sendSlackMessageRaw(webhookURL, slackStyle.testMessageText())
+}
+
+// SendSlackMessage synchronously posts arbitrary text to the Slack webhook
+// and returns any error instead of swallowing it, for callers like `gx
+// notify` that need to report success/failure directly — unlike the
+// EventSink decorator's fire-and-forget send. text is escaped for Slack's
+// mrkdwn dialect here, so callers pass plain text.
+func SendSlackMessage(webhookURL, text string) error {
+	return sendSlackMessageRaw(webhookURL, slackStyle.escape(text))
+}
+
+func sendSlackMessageRaw(webhookURL, text string) error {
 	s := newSlackEventSink(nil, webhookURL)
 	ctx, cancel := context.WithTimeout(context.Background(), slackSendTimeout)
 	defer cancel()
-	return s.sendSync(ctx, slackStyle.testMessageText())
+	return s.sendSync(ctx, text)
 }
 
 func (s *slackEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {

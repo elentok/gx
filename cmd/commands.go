@@ -321,6 +321,17 @@ func newDoctorCmd(d deps) *cobra.Command {
 	}
 }
 
+func newNotifyCmd(d deps) *cobra.Command {
+	return &cobra.Command{
+		Use:   "notify <message>",
+		Short: "send a message via configured Telegram/Slack notifications",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			return runNotify(args[0], d)
+		},
+	}
+}
+
 func newVersionCmd(d deps) *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
