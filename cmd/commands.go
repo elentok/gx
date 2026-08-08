@@ -212,6 +212,14 @@ func newTicketsCmd(d deps) *cobra.Command {
 		},
 	})
 	cmd.AddCommand(&cobra.Command{
+		Use:   "ensure-code-review <epic>",
+		Short: "no-op if the epic has a code-review ticket, else stamp out a stub",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			return runTicketsEnsureCodeReview(args[0], c.OutOrStdout())
+		},
+	})
+	cmd.AddCommand(&cobra.Command{
 		Use:   "schema",
 		Short: "print the ticket frontmatter schema (settable and read-only fields)",
 		Args:  cobra.NoArgs,
