@@ -31,11 +31,20 @@ Branch it three ways on `status`:
 
 ## Step 2: rebase
 
-The result carries `branch`, `base`, and `worktree_path`. Run
-`git rebase <base>`:
+The result carries `branch`, `base`, and `worktree_path`. `git rebase`
+requires a working tree, so this step only runs when one is checked out for
+`branch`:
 
-- against `worktree_path`, if it's non-empty
-- otherwise against the bare `branch` ref (no worktree checked out for it)
+- **`worktree_path` is non-empty** — run `git rebase <base>` there, then
+  continue below.
+- **`worktree_path` is empty** — no worktree is checked out for `branch`, and
+  none may be created or checked out to run the rebase in: doing so risks
+  landing the rebase in main's own worktree, checking `branch` out there and
+  leaving main's checkout off main (violating ADR 0015's guarantee that this
+  flow never touches a worktree's current branch out from under it). Stop
+  here, report that `<branch>` has no worktree so `gx-merge` can't rebase it,
+  and leave main untouched. This case is currently unsupported — the caller
+  (e.g. `gx-cleanup`) needs to check out the branch in its own worktree first.
 
 If the rebase reports conflicts, invoke the
 [gx-resolving-merge-conflicts](../gx-resolving-merge-conflicts/SKILL.md)
