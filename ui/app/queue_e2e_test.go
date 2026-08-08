@@ -21,7 +21,7 @@ func TestTicketsConfirmOpensQueueWithSharedSelection(t *testing.T) {
 	if err := os.MkdirAll(issuesDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(issuesDir, "01-first.md"), []byte("Status: open\n\nBody.\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(issuesDir, "01-first.md"), []byte("---\nid: \"01\"\nstatus: open\ntype: task\n---\n\nBody.\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	repo, err := git.FindRepo(repoDir)
@@ -39,10 +39,11 @@ func TestTicketsConfirmOpensQueueWithSharedSelection(t *testing.T) {
 	waitForAppText(t, tm, "my-epic")
 	tm.Send(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	tm.Send(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
-	tm.Send(tea.KeyPressMsg{Code: 'i', Text: "i"})
+	tm.Send(tea.KeyPressMsg{Code: 'r', Text: "r"})
 
-	// Ticket 11: with no ralph-loop running, "i" applies the selection and
-	// switches to the Queue tab directly, no confirmation.
+	// Ticket 11: with no ralph-loop running, "r" ("Replace queue", renamed
+	// from "i" by ticket 10) applies the selection and switches to the Queue
+	// tab directly, no confirmation.
 	waitForAppText(t, tm, "Queue")
 	waitForAppText(t, tm, "First")
 }

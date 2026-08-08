@@ -36,7 +36,7 @@ func TestCmdReattachScan_FirstActivation_ScansAndSecondIsNoOp(t *testing.T) {
 		calls++
 		return "ws1", nil
 	}, func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{Label: "iter-01"}}, nil
+		return []herdr.Tab{{Label: "epic-iter-01"}}, nil
 	})
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
