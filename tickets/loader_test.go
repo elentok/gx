@@ -96,6 +96,24 @@ func TestLoad_EpicWithMapMdIsFlagged(t *testing.T) {
 	}
 }
 
+func TestLoad_ExcludesDotPrefixedDirectories(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "real-epic", "issues", "01-first-ticket.md"),
+		"---\nid: \"01\"\nstatus: open\ntype: task\n---\nBody.\n")
+	writeFile(t, filepath.Join(dir, ".archive", "old-epic", "issues", "01-old-ticket.md"),
+		"---\nid: \"01\"\nstatus: done\ntype: task\n---\nBody.\n")
+	writeFile(t, filepath.Join(dir, ".scratch-tmp", "issues", "01-tmp-ticket.md"),
+		"---\nid: \"01\"\nstatus: open\ntype: task\n---\nBody.\n")
+
+	epics, err := Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(epics) != 1 || epics[0].Name != "real-epic" {
+		t.Fatalf("expected only real-epic, got %+v", epics)
+	}
+}
+
 func TestLoad_EpicWithNoIssuesDirHasZeroTickets(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, "bare-epic"), 0755); err != nil {

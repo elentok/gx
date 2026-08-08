@@ -42,8 +42,9 @@ type CleanupScanResult struct {
 }
 
 // runCleanupScan resolves the current repo, classifies every epic under
-// .scratch (excluding .archive), computes the repo-wide housekeeping report,
-// and prints the result to w either as human-readable text or as JSON.
+// .scratch (tickets.Load already excludes .archive and other dot-prefixed
+// directories), computes the repo-wide housekeeping report, and prints the
+// result to w either as human-readable text or as JSON.
 func runCleanupScan(cwd string, jsonOut bool, w io.Writer) error {
 	info, err := git.IdentifyDir(cwd)
 	if err != nil {
@@ -59,9 +60,6 @@ func runCleanupScan(cwd string, jsonOut bool, w io.Writer) error {
 	result := CleanupScanResult{Epics: []EpicScan{}}
 	activeEpics := []tickets.Epic{}
 	for _, epic := range epics {
-		if epic.Name == ".archive" {
-			continue
-		}
 		activeEpics = append(activeEpics, epic)
 		scan, err := scanEpic(repo, epic)
 		if err != nil {

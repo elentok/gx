@@ -17,7 +17,8 @@ var ticketFilenameRe = regexp.MustCompile(`^(\d+)([[:alpha:]]*)-(.+)\.md$`)
 
 // Load reads a `.scratch/` directory from real disk into its epics/tickets.
 // A missing directory is not an error: it returns a nil/empty slice, which
-// renders the same empty state as a present-but-empty `.scratch/`.
+// renders the same empty state as a present-but-empty `.scratch/`. Any
+// dot-prefixed directory (e.g. `.archive`) is excluded from the result.
 func Load(scratchDir string) ([]Epic, error) {
 	entries, err := os.ReadDir(scratchDir)
 	if err != nil {
@@ -29,7 +30,7 @@ func Load(scratchDir string) ([]Epic, error) {
 
 	var epics []Epic
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
 		epics = append(epics, loadEpic(scratchDir, entry.Name()))
