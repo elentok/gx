@@ -185,6 +185,64 @@ func TestSearch_MatchesTicketInsideCollapsedClosedEpic(t *testing.T) {
 	}
 }
 
+func TestSearch_MatchExpandsBothManuallyCollapsedEpicAndClosedSection(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "closed-epic", "01-hidden-gem.md", "Status: done\n\nBody.\n")
+	writeTicket(t, root, "open-epic", "01-other.md", "Status: open\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	closedEpicIdx := -1
+	for i, e := range m.epics {
+		if e.AllDone() {
+			closedEpicIdx = i
+		}
+	}
+	if closedEpicIdx == -1 {
+		t.Fatalf("expected a closed epic in this fixture")
+	}
+	// The epic starts expanded by default (03a moved collapse defaults to the
+	// section); collapse it individually here so both it and its containing
+	// Closed section root are collapsed at once, matching the ticket's
+	// "closed, collapsed epic" scenario.
+	setCollapsedEpic(&m, closedEpicIdx, true)
+	if !m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
+		t.Fatalf("expected Closed section to start collapsed by default")
+	}
+	if !m.sidebarTree.CollapsedIDs()[m.epics[closedEpicIdx].Path] {
+		t.Fatalf("expected closed-epic to be individually collapsed")
+	}
+
+	m.search.Start("hidden gem")
+	m.recomputeSearchMatches()
+
+	if m.search.MatchesCount() != 1 {
+		t.Fatalf("expected one match for ticket inside doubly-collapsed epic, got %d", m.search.MatchesCount())
+	}
+	if m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
+		t.Fatalf("expected Closed section to auto-expand")
+	}
+	if m.sidebarTree.CollapsedIDs()[m.epics[closedEpicIdx].Path] {
+		t.Fatalf("expected the matching epic to auto-expand")
+	}
+
+	match, ok := m.search.Match(0)
+	if !ok {
+		t.Fatalf("expected a match at position 0")
+	}
+	entries := m.sidebarTree.Entries()
+	if match.DataIndex < 0 || match.DataIndex >= len(entries) {
+		t.Fatalf("match DataIndex %d out of range of %d sidebar entries", match.DataIndex, len(entries))
+	}
+	r, ok := rowFromEntry(entries[match.DataIndex])
+	if !ok || r.isEpic() || m.epics[r.epicIdx].Tickets[r.ticketIdx].Title != "Hidden gem" {
+		t.Fatalf("expected match to point at the hidden-gem ticket row, got row %+v ok=%v", r, ok)
+	}
+}
+
 func TestSearch_NoMatchLeavesCollapseStateUnchanged(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
