@@ -1074,6 +1074,40 @@ func TestToChordTogglesOrientation(t *testing.T) {
 	}
 }
 
+func TestTKeyWithSearchFocusedAppendsToQueryNotChord(t *testing.T) {
+	m := newTestModel()
+	m.width = 200
+	m.height = 40
+	m, _ = m.syncSplitSize()
+	m.search.Start("")
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+	m = updated.(Model)
+
+	if m.search.Query() != "t" {
+		t.Fatalf("expected search query %q, got %q", "t", m.search.Query())
+	}
+	if len(m.keys.Prefix()) != 0 {
+		t.Fatalf("expected no pending chord prefix, got %v", m.keys.Prefix())
+	}
+}
+
+func TestTChordStillWorksWhenSearchNotFocused(t *testing.T) {
+	m := newTestModel()
+	m.width = 200
+	m.height = 40
+	m, _ = m.syncSplitSize()
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	m = updated.(Model)
+
+	if m.split.EffectiveOrientation() != splitview.Horizontal {
+		t.Fatalf("expected Horizontal after 'to' at width 200, got %v", m.split.EffectiveOrientation())
+	}
+}
+
 func TestWorktreeStatusUpdatesRows(t *testing.T) {
 	m := newTestModel()
 	m.listPanel = m.listPanel.WithRows([]row{

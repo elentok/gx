@@ -189,7 +189,11 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		// continuation is swallowed here (rather than falling through to be
 		// reinterpreted as a fresh keystroke), matching how every other chord
 		// in this manager silently cancels on a bad second key.
-		if key == "t" || (logHasPrefix && logPrefix[0] == "t") {
+		//
+		// A focused search input takes priority over this bypass (chord dispatch
+		// priority convention, see domain glossary) so typing "t" to search
+		// doesn't get stolen as a chord prefix.
+		if !m.search.InputFocused() && (key == "t" || (logHasPrefix && logPrefix[0] == "t")) {
 			if match, _ := m.keys.Process(msg); match != nil {
 				return m.dispatchBinding(match.ID)
 			}
