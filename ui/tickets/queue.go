@@ -869,8 +869,16 @@ type checkedEpicPlan struct {
 }
 
 func (m QueueModel) checkedEpicPlans() []checkedEpicPlan {
-	plans := make([]checkedEpicPlan, 0, len(m.epics))
-	for _, epic := range m.epics {
+	return checkedEpicPlansFor(m.epics, m.checked, m.checkOrder)
+}
+
+// checkedEpicPlansFor is checkedEpicPlans' free-function body, shared with the
+// Tickets tab's drain-then-replace combo (handleDrainReplaceKey in
+// implement.go) so both callers build the same launch plan from whichever
+// checked/checkOrder pair they hold.
+func checkedEpicPlansFor(epics []tickets.Epic, checked map[string]bool, checkOrder map[string]uint64) []checkedEpicPlan {
+	plans := make([]checkedEpicPlan, 0, len(epics))
+	for _, epic := range epics {
 		var ticketIDs []string
 		done := 0
 		eligible := 0
@@ -881,14 +889,14 @@ func (m QueueModel) checkedEpicPlans() []checkedEpicPlan {
 			if epic.RenderedStatus(ticket) != tickets.StatusDone {
 				eligible++
 			}
-			if !m.checked[ticket.Path] {
+			if !checked[ticket.Path] {
 				continue
 			}
 			ticketIDs = append(ticketIDs, ticket.Identifier)
 			if epic.RenderedStatus(ticket) == tickets.StatusDone {
 				done++
 			}
-			if checkedAt, ok := m.checkOrder[ticket.Path]; ok && (!ordered || checkedAt < ordinal) {
+			if checkedAt, ok := checkOrder[ticket.Path]; ok && (!ordered || checkedAt < ordinal) {
 				ordinal, ordered = checkedAt, true
 			}
 		}

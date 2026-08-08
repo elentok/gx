@@ -459,6 +459,7 @@ func cmdStartImplement(
 			}
 			ralphLoopRegistry.setFailureNotifier(epicName, reporter)
 		}
+		ralphLoopRegistry.setAgent(epicName, agent)
 		opts, err := buildImplementRunOptionsForTickets(worktreeRoot, epicName, agent, maxParallel, ticketIDs, skill, agents)
 		if err != nil {
 			ralphLoopRegistry.finish(epicName, err)

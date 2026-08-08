@@ -20,6 +20,7 @@ const (
 	bindingTicketsCancelChord      keys.BindingID = "cancel-chord"
 	bindingTicketsReplaceQueue     keys.BindingID = "replace-queue"
 	bindingTicketsAddToQueue       keys.BindingID = "add-to-queue"
+	bindingTicketsDrainReplace     keys.BindingID = "drain-replace-queue"
 	bindingTicketsToggleCheck      keys.BindingID = "toggle-check"
 	bindingTicketsToggleHideDone   keys.BindingID = "toggle-hide-done"
 	bindingTicketsSelectFirst      keys.BindingID = "select-first"
@@ -48,6 +49,7 @@ func newTicketsManager() keys.Manager {
 		{ID: bindingTicketsCancelChord, Seq: []string{"e", "esc"}, Categories: []string{}, Title: ""},
 		{ID: bindingTicketsReplaceQueue, Seq: []string{"r"}, Categories: []string{"Navigation"}, Title: "replace queue"},
 		{ID: bindingTicketsAddToQueue, Seq: []string{"a"}, Categories: []string{"Navigation"}, Title: "add to queue"},
+		{ID: bindingTicketsDrainReplace, Seq: []string{"D"}, Categories: []string{"Navigation"}, Title: "drain & replace queue"},
 		{ID: bindingTicketsToggleCheck, Seq: []string{"space"}, Categories: []string{"Navigation"}, Title: "check/uncheck"},
 		{ID: bindingTicketsToggleHideDone, Seq: []string{"t", "c"}, Categories: []string{"Navigation"}, Title: "hide completed"},
 		{ID: bindingTicketsSelectFirst, Seq: []string{"g", "g"}, Categories: []string{"Navigation"}, Title: "first row"},
@@ -119,6 +121,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m.handleReplaceQueueKey()
 		case bindingTicketsAddToQueue:
 			return m.handleAddToQueueKey()
+		case bindingTicketsDrainReplace:
+			return m.handleDrainReplaceKey()
 		case bindingTicketsToggleCheck:
 			return m.handleToggleCheck()
 		case bindingTicketsToggleHideDone:

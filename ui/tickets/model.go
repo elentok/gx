@@ -262,6 +262,12 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case replaceQueueConfirmedMsg:
 		return m.handleReplaceQueueConfirmed(msg)
 
+	case drainReplaceConfirmedMsg:
+		return m.handleDrainReplaceConfirmed(msg)
+
+	case drainReplacePollMsg:
+		return m.handleDrainReplacePoll(msg)
+
 	case tea.KeyPressMsg:
 		if m.help.IsOpen {
 			var cmd tea.Cmd
