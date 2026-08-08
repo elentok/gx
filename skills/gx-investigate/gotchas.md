@@ -14,10 +14,16 @@
   falls through both paths and sits forever, looking "queued" in the UI but never starting. Found
   live: `tickets-tree` epic, ticket `03b1` (`ready-for-agent`, unblocked) never claimed after
   `fork-term` finished and freed a slot, because the attached `gx` process had restarted in
-  between. Fixed by `requeueStrandedPendingEpics` (`ui/tickets/queue.go`, called from
-  `handleQueueSync`): re-derives a plan from the durable `checked` selection for any checked,
-  not-yet-running, not-fully-done epic with no claimed/needs-attention ticket, and appends it back
-  to `pendingEpics`. See `tickets-tree/issues/12-epic-runner-not-active-research.md`.
+  between. Note: the durable `items` state can't distinguish "checked, Enter never pressed" from
+  "checked, was queued, restarted before its turn" — both look identical on disk — so silently
+  auto-requeuing on that signal alone is wrong (an earlier attempt at this fix did exactly that
+  and broke `TestQueueModelSchedulesCheckedEpicsInCheckOrderAndBackfillsAtCap` by auto-starting
+  epics the test hadn't pressed Enter for yet). Fixed instead by mirroring
+  `cmdCheckDetachedLive`'s own pattern: a new `cmdCheckStrandedPending`
+  (`ui/tickets/queue_reattach.go`), run once on the Queue tab's first load per process, surfaces
+  checked-but-unclaimed-and-not-running epics via the same kind of confirm dialog ("Resume?")
+  rather than resuming them silently; accepting re-derives the plan from the checked selection and
+  appends it to `pendingEpics`. See `tickets-tree/issues/12-epic-runner-not-active-research.md`.
 
 Running list of previously-diagnosed gx/ralph-loop bugs, newest first. Append one line + a pointer
 to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKILL.md) gets fixed

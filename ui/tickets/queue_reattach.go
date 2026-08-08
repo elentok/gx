@@ -132,3 +132,138 @@ func (m QueueModel) handleDetachedLiveConfirmed(msg detachedLiveConfirmedMsg) (t
 	}
 	return m, m.startAvailableEpics()
 }
+
+// queueStrandedPendingMsg names epics that were checked/queued in
+// queue-state.json (durable Items) before this gx process started, have no
+// live registry run and no claimed/needs-attention ticket (that combination
+// belongs to queueDetachedLiveMsg's confirmation instead), and so silently
+// fell out of MaxConcurrentEpics's auto-promotion queue — see
+// requeueMaybeStrandedEpics's doc comment for why this can't be resolved
+// without asking: "checked, not running" is indistinguishable on disk from
+// "checked, Enter not pressed yet."
+type queueStrandedPendingMsg struct {
+	epicNames []string
+}
+
+// cmdCheckStrandedPending scans this model's own checked selection (m.checked
+// — durable via the Queue tab's queueStore, see requeueMaybeStrandedEpics) for
+// epics eligible to be re-promoted. Called once, from queueEpicsLoadedMsg's
+// first load only (see its call site's comment) — every check afterward in
+// this process's lifetime reflects the user's own checking, not a restart, so
+// re-running the scan on every tab activation would nag mid-selection.
+func (m QueueModel) cmdCheckStrandedPending() tea.Cmd {
+	epics, checked, pendingEpics, runningEpics := m.epics, m.checked, m.pendingEpics, m.runningEpics
+	return func() tea.Msg {
+		names := requeueMaybeStrandedEpics(epics, checked, pendingEpics, runningEpics, byNameSnapshot())
+		if len(names) == 0 {
+			return nil
+		}
+		return queueStrandedPendingMsg{epicNames: names}
+	}
+}
+
+// requeueMaybeStrandedEpics finds every epic with at least one checked,
+// not-yet-done ticket that isn't already running or pending, and has no
+// claimed/needs-attention ticket of its own (that shape is
+// queueDetachedLiveMsg's — a live herdr pane may still be driving it, so it
+// gets an explicit "reattach?" instead of silently folding in here).
+//
+// This can't tell "checked, Enter never pressed" apart from "checked, Enter
+// was pressed, epic was waiting its turn in pendingEpics, then the gx process
+// restarted before its slot freed" — both leave identical durable state
+// (an Items entry, status "pending", no registry run). So this only reports
+// candidates; the caller must still confirm with the user before touching
+// m.pendingEpics (see handleStrandedPendingConfirmed), the same way
+// queueDetachedLiveMsg never resumes without asking.
+func requeueMaybeStrandedEpics(epics []tickets.Epic, checked map[string]bool, pendingEpics []checkedEpicPlan, runningEpics map[string]bool, byName map[string]RunSnapshot) []string {
+	alreadyPending := make(map[string]bool, len(pendingEpics))
+	for _, plan := range pendingEpics {
+		alreadyPending[plan.epic.Name] = true
+	}
+	var names []string
+	for _, epic := range epics {
+		if runningEpics[epic.Name] || alreadyPending[epic.Name] {
+			continue
+		}
+		if _, running := byName[epic.Name]; running {
+			continue
+		}
+		if epicHasInFlightTicket(epic) {
+			continue // claimed/needs-attention — queueDetachedLiveMsg owns this case
+		}
+		hasChecked, allDone := false, true
+		for _, ticket := range epic.Tickets {
+			if !checked[ticket.Path] {
+				continue
+			}
+			hasChecked = true
+			if epic.RenderedStatus(ticket) != tickets.StatusDone {
+				allDone = false
+			}
+		}
+		if hasChecked && !allDone {
+			names = append(names, epic.Name)
+		}
+	}
+	sort.Strings(names)
+	return names
+}
+
+// epicHasInFlightTicket reports whether epic has any ticket a live herdr
+// session might still be driving (claimed or needs-attention) — the same
+// condition cmdCheckDetachedLive scans for.
+func epicHasInFlightTicket(epic tickets.Epic) bool {
+	for _, ticket := range epic.Tickets {
+		switch epic.RenderedStatus(ticket) {
+		case tickets.StatusClaimed, tickets.StatusNeedsAttention:
+			return true
+		}
+	}
+	return false
+}
+
+// handleStrandedPendingDetected opens the confirmation dialog for
+// cmdCheckStrandedPending's result, unless a dialog is already open.
+func (m QueueModel) handleStrandedPendingDetected(msg queueStrandedPendingMsg) (tea.Model, tea.Cmd) {
+	if m.confirm.IsOpen {
+		return m, nil
+	}
+	m.confirm = m.confirm.Open(confirm.Options{
+		Prompt: fmt.Sprintf(
+			"Found %d epic(s) checked/queued before this gx process (re)started, never claimed. Resume?",
+			len(msg.epicNames),
+		),
+		AcceptCmd: cmdConfirmStrandedPending(msg.epicNames),
+	})
+	return m, nil
+}
+
+type strandedPendingConfirmedMsg struct {
+	epicNames []string
+}
+
+func cmdConfirmStrandedPending(epicNames []string) tea.Cmd {
+	return func() tea.Msg {
+		return strandedPendingConfirmedMsg{epicNames: epicNames}
+	}
+}
+
+// handleStrandedPendingConfirmed re-derives each named epic's plan from the
+// checked selection (not a full-epic dynamic plan like
+// handleDetachedLiveConfirmed's — only what was actually checked should
+// resume) and queues it the normal way.
+func (m QueueModel) handleStrandedPendingConfirmed(msg strandedPendingConfirmedMsg) (tea.Model, tea.Cmd) {
+	names := make(map[string]bool, len(msg.epicNames))
+	for _, name := range msg.epicNames {
+		names[name] = true
+	}
+	for _, plan := range m.checkedEpicPlans() {
+		if names[plan.epic.Name] {
+			m.pendingEpics = append(m.pendingEpics, plan)
+		}
+	}
+	if m.runningAgent == "" {
+		m.runningAgent = ralphloop.AgentClaude
+	}
+	return m, m.startAvailableEpics()
+}

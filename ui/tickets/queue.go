@@ -209,6 +209,7 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.checkOrder = snapshot.Order
 			m.queueStatus = snapshot.Status
 		}
+		firstLoad := !m.loaded
 		m.loaded = true
 		m.epics = msg.epics
 		m.foreignAttachPID = msg.foreignAttachPID
@@ -220,12 +221,24 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.recomputeQueueSearchMatches()
 		}
 		m.clampSelected()
-		var autoRefreshCmd tea.Cmd
+		var cmds []tea.Cmd
 		if !m.autoRefreshStarted {
 			m.autoRefreshStarted = true
-			autoRefreshCmd = cmdAutoRefresh()
+			cmds = append(cmds, cmdAutoRefresh())
 		}
-		return m, autoRefreshCmd
+		// The initial OnPageActivated (fired from the very same tab-switch
+		// batch that triggers this load, see applySwitch) can race ahead of
+		// this msg — it reads the registry synchronously while epics are
+		// still loading async, so cmdCheckStrandedPending would otherwise
+		// scan an empty m.epics. Re-run it here, now that epics are
+		// definitely loaded, but only on the first load — a checked epic
+		// legitimately sits "checked, not running" between being checked and
+		// the user pressing Enter, so this can't fire on every reload without
+		// nagging mid-selection.
+		if firstLoad {
+			cmds = append(cmds, m.cmdCheckStrandedPending())
+		}
+		return m, tea.Batch(cmds...)
 
 	case autoRefreshMsg:
 		return m, tea.Batch(m.cmdLoadQueue(), cmdAutoRefresh())
@@ -301,6 +314,10 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleDetachedLiveDetected(msg)
 	case detachedLiveConfirmedMsg:
 		return m.handleDetachedLiveConfirmed(msg)
+	case queueStrandedPendingMsg:
+		return m.handleStrandedPendingDetected(msg)
+	case strandedPendingConfirmedMsg:
+		return m.handleStrandedPendingConfirmed(msg)
 	}
 	return m, nil
 }
@@ -393,12 +410,22 @@ func (m QueueModel) OnPageActivated() tea.Cmd {
 	}
 }
 
-func (m QueueModel) handleQueueSync(msg queueSyncMsg) (tea.Model, tea.Cmd) {
-	m.paused = msg.paused
-	byName := make(map[string]RunSnapshot, len(msg.snapshots))
-	for _, s := range msg.snapshots {
+// byNameSnapshot indexes the loop registry's current run snapshots by epic
+// name, for callers (handleQueueSync, cmdCheckStrandedPending) that need to
+// know which epics the registry already considers running before deciding
+// what else to requeue.
+func byNameSnapshot() map[string]RunSnapshot {
+	snapshots := ralphLoopRegistry.runSnapshots()
+	byName := make(map[string]RunSnapshot, len(snapshots))
+	for _, s := range snapshots {
 		byName[s.EpicName] = s
 	}
+	return byName
+}
+
+func (m QueueModel) handleQueueSync(msg queueSyncMsg) (tea.Model, tea.Cmd) {
+	m.paused = msg.paused
+	byName := byNameSnapshot()
 	var cmds []tea.Cmd
 	for _, plan := range m.checkedEpicPlans() {
 		name := plan.epic.Name
