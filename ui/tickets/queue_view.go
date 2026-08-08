@@ -178,30 +178,26 @@ func (m QueueModel) buildQueueLines() (lines []string, offsets []int, heights []
 // (view.go), so the Queue tab shows identical per-ticket status (ticket 25).
 // r.depth indents a nested ticket (Parent/Children, ticket 03) two extra
 // spaces per level, matching ui/tree's own indent unit and the Tickets tab's
-// renderTicketRow (ticket 09); a ticket with children gets the same
-// folder-open/closed glyph an epic row uses in the Tickets tab, reflecting
-// r.expanded.
+// renderTicketRow (ticket 09); a ticket with children gets a small triangle
+// to the left of its icon, reflecting r.expanded, and a childless row has no
+// triangle and no reserved space in its place.
 func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) []string {
 	epic, t := r.epic, r.ticket
 	status := epic.RenderedStatus(t)
 	indent := "  " + strings.Repeat("  ", r.depth)
 
-	// fold is computed before the live-row branch below so a running/paused
-	// ticket's icon column reserves the same fixed width as its disk-only
-	// rendering further down — otherwise a live row (which never shows a
-	// fold glyph itself) would sit two columns left of its sibling rows.
-	fold := strings.Repeat(" ", lipgloss.Width(m.icons().FolderOpen)+1)
+	triangle := ""
 	if r.hasChildren {
-		glyph := m.icons().FolderOpen
+		glyph := m.icons().TriangleExpanded
 		if !r.expanded {
-			glyph = m.icons().FolderClosed
+			glyph = m.icons().TriangleCollapsed
 		}
-		fold = glyph + " "
+		triangle = glyph + " "
 	}
 
 	if m.runningEpics[epic.Name] {
 		if live, ok := m.live[epic.Name][t.Identifier]; ok {
-			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live, indent+fold); ok {
+			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live, indent+triangle); ok {
 				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens)
 				return []string{appendRowMetrics(base, joinNonEmpty(" ", suffix, metrics), metricsLineStyle)}
 			}
@@ -229,7 +225,7 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) []string {
 		style = ui.StyleDim
 	}
 
-	line := indent + fold + style.Render(icon) + " " + titleStyle.Render(title)
+	line := indent + triangle + style.Render(icon) + " " + titleStyle.Render(title)
 	if suffix := blockedBySuffix(epic, t, status); suffix != "" {
 		suffixStyle := blockedBySuffixStyle
 		if searchDim {

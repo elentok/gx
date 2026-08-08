@@ -85,8 +85,7 @@ func TestRenderTicketRow_LiveRowIndentNotDoubled(t *testing.T) {
 
 	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 0)
 
-	fold := strings.Repeat(" ", lipgloss.Width(m.icons().FolderOpen)+1)
-	wantPrefix := "    " + m.checkboxGlyph(m.isChecked(epic.Tickets[0].Path)) + " " + fold
+	wantPrefix := "    " + m.checkboxGlyph(m.isChecked(epic.Tickets[0].Path)) + " "
 	wantBase, _, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, epic.Tickets[0], live, wantPrefix)
 	if !ok {
 		t.Fatalf("renderLiveTicketRow() ok = false, want true")
@@ -236,10 +235,12 @@ func TestRenderEpicRow_ShowsDurationOnlyWhenBothTimestampsSet(t *testing.T) {
 	}
 }
 
-// TestRenderTicketRow_IconColumnAlignsRegardlessOfChildren guards against the
-// icon column shifting left for a childless ticket (bugs-05/01): the fold
-// glyph slot must stay fixed-width whether or not the row actually has one.
-func TestRenderTicketRow_IconColumnAlignsRegardlessOfChildren(t *testing.T) {
+// TestRenderTicketRow_IconColumnShiftsByTriangleWidthForChildren covers
+// ticket 10: a row with children renders a triangle left of its checkbox, so
+// its icon column sits one triangle-glyph-plus-space further right than a
+// childless sibling's, which reserves no space for a triangle it doesn't
+// show.
+func TestRenderTicketRow_IconColumnShiftsByTriangleWidthForChildren(t *testing.T) {
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 		{Identifier: "01", Title: "Parent ticket", Status: "open"},
 		{Identifier: "02", Title: "Leaf ticket", Status: "open"},
@@ -253,8 +254,12 @@ func TestRenderTicketRow_IconColumnAlignsRegardlessOfChildren(t *testing.T) {
 		stripped := ansi.Strip(line)
 		return lipgloss.Width(stripped[:strings.Index(stripped, m.icons().TicketOpen)])
 	}
-	if got, want := iconOffset(childless), iconOffset(withChildren); got != want {
-		t.Fatalf("childless ticket's icon column = %d, want %d (same as sibling with children)\nchildless: %q\nwithChildren: %q", got, want, childless, withChildren)
+	triangleWidth := lipgloss.Width(m.icons().TriangleExpanded) + 1
+	if got, want := iconOffset(withChildren), iconOffset(childless)+triangleWidth; got != want {
+		t.Fatalf("withChildren ticket's icon column = %d, want %d (childless offset %d + triangle width %d)\nchildless: %q\nwithChildren: %q", got, want, iconOffset(childless), triangleWidth, childless, withChildren)
+	}
+	if strings.Contains(ansi.Strip(childless), m.icons().TriangleExpanded) || strings.Contains(ansi.Strip(childless), m.icons().TriangleCollapsed) {
+		t.Fatalf("childless row unexpectedly contains a triangle glyph: %q", childless)
 	}
 }
 

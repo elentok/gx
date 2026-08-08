@@ -1477,10 +1477,10 @@ func TestRenderQueueTicketRow_CommitlessSuffix(t *testing.T) {
 	}
 }
 
-// TestRenderQueueTicketRow_IconColumnAlignsRegardlessOfChildren mirrors
-// TestRenderTicketRow_IconColumnAlignsRegardlessOfChildren (bugs-05/01) for
-// the Queue tab's own row renderer.
-func TestRenderQueueTicketRow_IconColumnAlignsRegardlessOfChildren(t *testing.T) {
+// TestRenderQueueTicketRow_IconColumnShiftsByTriangleWidthForChildren mirrors
+// TestRenderTicketRow_IconColumnShiftsByTriangleWidthForChildren (ticket 10)
+// for the Queue tab's own row renderer.
+func TestRenderQueueTicketRow_IconColumnShiftsByTriangleWidthForChildren(t *testing.T) {
 	var m QueueModel
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 		{Identifier: "01", Title: "Parent ticket", Status: "open"},
@@ -1494,8 +1494,12 @@ func TestRenderQueueTicketRow_IconColumnAlignsRegardlessOfChildren(t *testing.T)
 		stripped := ansi.Strip(line)
 		return lipgloss.Width(stripped[:strings.Index(stripped, m.icons().TicketOpen)])
 	}
-	if got, want := iconOffset(childless), iconOffset(withChildren); got != want {
-		t.Fatalf("childless ticket's icon column = %d, want %d (same as sibling with children)\nchildless: %q\nwithChildren: %q", got, want, childless, withChildren)
+	triangleWidth := lipgloss.Width(m.icons().TriangleExpanded) + 1
+	if got, want := iconOffset(withChildren), iconOffset(childless)+triangleWidth; got != want {
+		t.Fatalf("withChildren ticket's icon column = %d, want %d (childless offset %d + triangle width %d)\nchildless: %q\nwithChildren: %q", got, want, iconOffset(childless), triangleWidth, childless, withChildren)
+	}
+	if strings.Contains(ansi.Strip(childless), m.icons().TriangleExpanded) || strings.Contains(ansi.Strip(childless), m.icons().TriangleCollapsed) {
+		t.Fatalf("childless row unexpectedly contains a triangle glyph: %q", childless)
 	}
 }
 

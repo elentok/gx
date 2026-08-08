@@ -2,33 +2,39 @@ package ui
 
 // IconSet provides semantic icon names with nerd-font and plain fallbacks.
 type IconSet struct {
-	Check         string
-	Close         string
-	Dash          string
-	Branch        string
-	Worktree      string
-	FolderClosed  string
-	FolderOpen    string
-	FileModified  string
-	FileAdded     string
-	FileDeleted   string
-	FileRenamed   string
-	FileSymlink   string
-	Ahead         string
-	Behind        string
-	Search        string
-	Partial       string
-	Staged        string
-	Warning       string
-	Info          string
-	Dot           string
-	Ellipsis      string
-	CIRunning     string
-	Commented     string
-	Comment       string
-	MarkerReady   string
-	MarkerBlocked string
-	MarkerWaiting string
+	Check        string
+	Close        string
+	Dash         string
+	Branch       string
+	Worktree     string
+	FolderClosed string
+	FolderOpen   string
+	// TriangleCollapsed/TriangleExpanded mark a ticket/queue row with
+	// children (ticket 10) — plain Unicode triangles in both icon sets, not
+	// nerd-font glyphs, since they replace an in-row fold indicator rather
+	// than represent an actual directory.
+	TriangleCollapsed string
+	TriangleExpanded  string
+	FileModified      string
+	FileAdded         string
+	FileDeleted       string
+	FileRenamed       string
+	FileSymlink       string
+	Ahead             string
+	Behind            string
+	Search            string
+	Partial           string
+	Staged            string
+	Warning           string
+	Info              string
+	Dot               string
+	Ellipsis          string
+	CIRunning         string
+	Commented         string
+	Comment           string
+	MarkerReady       string
+	MarkerBlocked     string
+	MarkerWaiting     string
 
 	// CheckboxChecked/CheckboxUnchecked render the tickets tab's execution-
 	// queue selection marker (ticket 04) on epic/ticket rows.
@@ -52,33 +58,35 @@ type IconSet struct {
 func Icons(useNerdFont bool) IconSet {
 	if !useNerdFont {
 		return IconSet{
-			Check:         "✓",
-			Close:         "✗",
-			Dash:          "-",
-			Branch:        "branch",
-			Worktree:      "Worktree",
-			FolderClosed:  "▸",
-			FolderOpen:    "▾",
-			FileModified:  "M",
-			FileAdded:     "N",
-			FileDeleted:   "D",
-			FileRenamed:   "R",
-			FileSymlink:   "L",
-			Ahead:         "ahead",
-			Behind:        "behind",
-			Search:        "*",
-			Partial:       "+",
-			Staged:        "✓",
-			Warning:       "⚠",
-			Info:          "i",
-			Dot:           "·",
-			Ellipsis:      "...",
-			CIRunning:     "⟳",
-			Commented:     "o",
-			Comment:       "c",
-			MarkerReady:   "*",
-			MarkerBlocked: "!",
-			MarkerWaiting: "-",
+			Check:             "✓",
+			Close:             "✗",
+			Dash:              "-",
+			Branch:            "branch",
+			Worktree:          "Worktree",
+			FolderClosed:      "▸",
+			FolderOpen:        "▾",
+			TriangleCollapsed: "▸",
+			TriangleExpanded:  "▾",
+			FileModified:      "M",
+			FileAdded:         "N",
+			FileDeleted:       "D",
+			FileRenamed:       "R",
+			FileSymlink:       "L",
+			Ahead:             "ahead",
+			Behind:            "behind",
+			Search:            "*",
+			Partial:           "+",
+			Staged:            "✓",
+			Warning:           "⚠",
+			Info:              "i",
+			Dot:               "·",
+			Ellipsis:          "...",
+			CIRunning:         "⟳",
+			Commented:         "o",
+			Comment:           "c",
+			MarkerReady:       "*",
+			MarkerBlocked:     "!",
+			MarkerWaiting:     "-",
 
 			CheckboxChecked:   "[x]",
 			CheckboxUnchecked: "[ ]",
@@ -94,33 +102,35 @@ func Icons(useNerdFont bool) IconSet {
 		}
 	}
 	return IconSet{
-		Check:         "",
-		Close:         "󰅙",
-		Dash:          "—",
-		Branch:        "",
-		Worktree:      "󰙅",
-		FolderClosed:  "",
-		FolderOpen:    "",
-		FileModified:  "",
-		FileAdded:     "",
-		FileDeleted:   "",
-		FileRenamed:   "󰁔",
-		FileSymlink:   "󰌷",
-		Ahead:         "",
-		Behind:        "",
-		Search:        "󰍉",
-		Partial:       "",
-		Staged:        "",
-		Warning:       "",
-		Info:          "",
-		Dot:           "·",
-		Ellipsis:      "…",
-		CIRunning:     "⟳",
-		Commented:     "◐",
-		Comment:       "󰆈",
-		MarkerReady:   "●",
-		MarkerBlocked: "●",
-		MarkerWaiting: "○",
+		Check:             "",
+		Close:             "󰅙",
+		Dash:              "—",
+		Branch:            "",
+		Worktree:          "󰙅",
+		FolderClosed:      "",
+		FolderOpen:        "",
+		TriangleCollapsed: "▸",
+		TriangleExpanded:  "▾",
+		FileModified:      "",
+		FileAdded:         "",
+		FileDeleted:       "",
+		FileRenamed:       "󰁔",
+		FileSymlink:       "󰌷",
+		Ahead:             "",
+		Behind:            "",
+		Search:            "󰍉",
+		Partial:           "",
+		Staged:            "",
+		Warning:           "",
+		Info:              "",
+		Dot:               "·",
+		Ellipsis:          "…",
+		CIRunning:         "⟳",
+		Commented:         "◐",
+		Comment:           "󰆈",
+		MarkerReady:       "●",
+		MarkerBlocked:     "●",
+		MarkerWaiting:     "○",
 
 		CheckboxChecked:   "󰄲",
 		CheckboxUnchecked: "󰄱",
