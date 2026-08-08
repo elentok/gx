@@ -5,7 +5,7 @@ description:
   mergeable done-but-unmerged epics, deletable landed branches/worktrees), investigate the
   cases the deterministic scan can't resolve on its own, present one confirmable plan, and
   on confirm execute the safe half (archive, safe deletes, review-ticket stubs,
-  housekeeping). Merging is still dry-run only — that executes in a later invocation.
+  housekeeping) plus the ff-only merges, in the same run, off the same confirm.
 disable-model-invocation: true
 ---
 
@@ -20,8 +20,8 @@ elsewhere. `gx cleanup scan` classifies all of this deterministically from git a
 This skill turns that classification into a report you can act on: it investigates the handful of
 cases the scan can't resolve on its own, then stops at a single confirm. On confirm, the
 mechanically-safe actions — archiving, deleting cleanly-landed branches/worktrees, stamping out
-review-ticket stubs, and housekeeping — run immediately (see "Step 6" below). Merging is still not
-performed here: it's dry-run only, executed by a separate, later skill invocation.
+review-ticket stubs, and housekeeping — run immediately (see "Step 6" below), and the ff-only
+merge candidates run immediately after, in the same invocation (see "Step 7" below).
 
 ## Step 1: scan
 
@@ -112,8 +112,7 @@ Present the table plus the scratch file path and get one confirm covering the wh
 
 On confirm, run the mechanically-safe actions below directly — no further per-item prompting. The
 ff-only-merge path (case-2.1 merge candidates and the "merge, skip review" pick for case-2.2) is
-**not** executed here: print those as dry-run only (`git merge --ff-only` / the rebase-then-merge
-sequence), same as before. That path executes in a later invocation of this skill.
+**not** executed here — it's queued and executed next, in Step 7, off this same confirm.
 
 - **Archive** (`all_done && merged_to_main` epics): `mv .scratch/<epic> .scratch/.archive/<epic>`
   — a plain filesystem move, no git staging or commit, since `.scratch` is gitignored/untracked.
@@ -130,8 +129,8 @@ sequence), same as before. That path executes in a later invocation of this skil
   If `housekeeping.GitignoreHasScratch` is false, append a `.scratch/` entry to `.gitignore`.
 
 Work through archive, safe-delete, case-2.2, then housekeeping, collecting failures as you go
-rather than stopping the whole run on the first one. End with a short report: what ran, what's
-still dry-run (the merge path), and the failure list with its manual force commands, if any.
+rather than stopping the whole run on the first one. End with a short report: what ran, the failure
+list with its manual force commands (if any), then proceed to Step 7 to run the queued merges.
 
 ## Step 7: execute — ff-only merge path
 
@@ -164,4 +163,3 @@ the user.
 
 Once every queued epic has been processed, report an end-of-run summary: which epics merged
 cleanly, which needed a rebase (and merged after review), and which were aborted and why.
->>>>>>> 539a740 (gx-cleanup/07: Add execute FF-only-merge path to gx-cleanup skill)
