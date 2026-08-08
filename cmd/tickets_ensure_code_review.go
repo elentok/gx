@@ -6,9 +6,45 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
+
+// completeEpicNames lists the current epic directory names under cwd's repo,
+// read live off disk, for the ensure-code-review command's shell completion.
+func completeEpicNames(cwd string) ([]string, error) {
+	repo, err := git.FindRepo(cwd)
+	if err != nil {
+		return nil, err
+	}
+	epics, err := tickets.Load(repo.ScratchRoot())
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(epics))
+	for _, epic := range epics {
+		names = append(names, epic.Name)
+	}
+	return names, nil
+}
+
+// resolveEpicArg resolves the ensure-code-review command's single argument to
+// an epic path. arg is tried first as a bare epic name against the current
+// repo's default scratch root (`gx tickets root`); if that directory doesn't
+// exist, arg is returned unchanged so a full scratch-relative path (the
+// command's original argument form) still works.
+func resolveEpicArg(arg, cwd string) string {
+	repo, err := git.FindRepo(cwd)
+	if err != nil {
+		return arg
+	}
+	candidate := filepath.Join(repo.ScratchRoot(), arg)
+	if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+		return candidate
+	}
+	return arg
+}
 
 // runTicketsEnsureCodeReview checks whether epicPath already has a `type:
 // code-review` ticket among its published issues. If one exists, it's a

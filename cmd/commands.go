@@ -216,7 +216,22 @@ func newTicketsCmd(d deps) *cobra.Command {
 		Short: "no-op if the epic has a code-review ticket, else stamp out a stub",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runTicketsEnsureCodeReview(args[0], c.OutOrStdout())
+			cwd, err := d.getwd()
+			if err != nil {
+				return err
+			}
+			return runTicketsEnsureCodeReview(resolveEpicArg(args[0], cwd), c.OutOrStdout())
+		},
+		ValidArgsFunction: func(c *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			cwd, err := d.getwd()
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveError
+			}
+			names, err := completeEpicNames(cwd)
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveError
+			}
+			return names, cobra.ShellCompDirectiveNoFileComp
 		},
 	})
 	cmd.AddCommand(&cobra.Command{

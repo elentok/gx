@@ -7,8 +7,57 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets/schema"
 )
+
+func TestResolveEpicArg_BareNameAndFullPathResolveToSameEpic(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	epicDir := filepath.Join(repoDir, ".scratch", "widget-epic")
+	testutil.Mkdir(t, epicDir)
+
+	bareResolved := resolveEpicArg("widget-epic", repoDir)
+	fullResolved := resolveEpicArg(filepath.Join(".scratch", "widget-epic"), repoDir)
+
+	if bareResolved != epicDir {
+		t.Errorf("resolveEpicArg(bare name) = %q, want %q", bareResolved, epicDir)
+	}
+	if fullResolved != filepath.Join(".scratch", "widget-epic") {
+		t.Errorf("resolveEpicArg(full path) = %q, want it returned unchanged", fullResolved)
+	}
+}
+
+func TestResolveEpicArg_UnknownBareNameReturnedUnchanged(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+
+	resolved := resolveEpicArg("no-such-epic", repoDir)
+
+	if resolved != "no-such-epic" {
+		t.Errorf("resolveEpicArg(unknown name) = %q, want it returned unchanged", resolved)
+	}
+}
+
+func TestCompleteEpicNames_ListsEpicsExcludingDotDirectories(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+	testutil.Mkdir(t, filepath.Join(repoDir, ".scratch", "bugs-05"))
+	testutil.Mkdir(t, filepath.Join(repoDir, ".scratch", "widget-epic"))
+	testutil.Mkdir(t, filepath.Join(repoDir, ".scratch", ".archive"))
+
+	names, err := completeEpicNames(repoDir)
+	if err != nil {
+		t.Fatalf("completeEpicNames: %v", err)
+	}
+
+	want := map[string]bool{"bugs-05": true, "widget-epic": true}
+	if len(names) != len(want) {
+		t.Fatalf("names = %v, want exactly %v", names, want)
+	}
+	for _, name := range names {
+		if !want[name] {
+			t.Errorf("unexpected epic name %q in completion list", name)
+		}
+	}
+}
 
 func TestRunTicketsEnsureCodeReview_NoopWhenCodeReviewTicketExists(t *testing.T) {
 	scratchDir := t.TempDir()

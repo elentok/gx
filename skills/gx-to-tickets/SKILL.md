@@ -158,9 +158,10 @@ while in progress — same template, same publishing mechanics, just triggered f
 session instead of upfront here. See [gx-local-tracker.md](../gx-local-tracker.md)'s mid-flight
 splitting section for the numbering, blocking-edge, and `children`/`parent` mechanics.
 
-If the breakdown appends a trailing `type: code-review` ticket, first check whether the target epic
-already has one among its published issues. If it does, skip the append — don't publish a second one
-— unless the user has explicitly asked for another.
+If the breakdown appends a trailing `type: code-review` ticket, run
+`gx tickets ensure-code-review <epic-slug>` instead of publishing it by hand — it's a no-op if the
+epic already has a code-review ticket among its published issues, else it stamps out the stub. Skip
+running it only if the user has explicitly asked for a second code-review ticket.
 
 <ticket-template>
 
