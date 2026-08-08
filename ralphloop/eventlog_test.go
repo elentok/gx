@@ -159,3 +159,43 @@ func TestLogEvent_ConcurrentAppends_NeverInterleave(t *testing.T) {
 		t.Errorf("got %d events, want 20 (no interleaved/corrupted lines)", len(events))
 	}
 }
+
+func TestLogNotificationsConfigured_RecordsBooleansForBothChannels(t *testing.T) {
+	dir := t.TempDir()
+	if err := LogNotificationsConfigured(dir, "epic", true, false); err != nil {
+		t.Fatalf("LogNotificationsConfigured: %v", err)
+	}
+
+	events, ok, err := readEvents(dir, "epic")
+	if err != nil || !ok || len(events) != 1 {
+		t.Fatalf("readEvents: events=%#v ok=%v err=%v", events, ok, err)
+	}
+	ev := events[0]
+	if ev.Type != eventNotificationsConfigured {
+		t.Errorf("Type = %q, want %q", ev.Type, eventNotificationsConfigured)
+	}
+	if ev.Telegram == nil || *ev.Telegram != true {
+		t.Errorf("Telegram = %v, want true", ev.Telegram)
+	}
+	if ev.Slack == nil || *ev.Slack != false {
+		t.Errorf("Slack = %v, want false (recorded explicitly, not omitted)", ev.Slack)
+	}
+}
+
+func TestLogNotificationSentAndFailed_RecordChannelAndTriggeringKind(t *testing.T) {
+	dir := t.TempDir()
+	logNotificationSent(dir, "epic", "telegram", notifyKindEpicComplete)
+	logNotificationFailed(dir, "epic", "slack", notifyKindIterationPaused, "post failed: 500")
+
+	events, ok, err := readEvents(dir, "epic")
+	if err != nil || !ok || len(events) != 2 {
+		t.Fatalf("readEvents: events=%#v ok=%v err=%v", events, ok, err)
+	}
+	sent, failed := events[0], events[1]
+	if sent.Type != eventNotificationSent || sent.Channel != "telegram" || sent.NotifyKind != notifyKindEpicComplete {
+		t.Errorf("sent event = %#v", sent)
+	}
+	if failed.Type != eventNotificationFailed || failed.Channel != "slack" || failed.NotifyKind != notifyKindIterationPaused || failed.Reason != "post failed: 500" {
+		t.Errorf("failed event = %#v", failed)
+	}
+}

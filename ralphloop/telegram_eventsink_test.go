@@ -64,7 +64,7 @@ func waitForRequests(get func() []telegramRequest, want int) []telegramRequest {
 func TestTelegramEventSink_IterationFinished_SendsOneMessageAndForwards(t *testing.T) {
 	server, getRequests := fakeTelegramServer(t, http.StatusOK)
 	inner := &recordingSink{}
-	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL)
+	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
 
 	stats := IterationStats{ElapsedSeconds: 42, PeakContextTokens: 1234, InProgress: 2, Completed: 3, Total: 5}
 	sink.IterationFinished(tickets.Ticket{Identifier: "04", Title: "Telegram decorator"}, "epic", stats)
@@ -92,7 +92,7 @@ func TestTelegramEventSink_IterationFinished_SendsOneMessageAndForwards(t *testi
 func TestTelegramEventSink_IterationPaused_SendsOneMessageAndForwards(t *testing.T) {
 	server, getRequests := fakeTelegramServer(t, http.StatusOK)
 	inner := &recordingSink{}
-	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL)
+	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
 
 	sink.IterationPaused("iter-04", PauseNeedsAttention, "agent blocked on permission prompt")
 
@@ -113,7 +113,7 @@ func TestTelegramEventSink_IterationPaused_SendsOneMessageAndForwards(t *testing
 func TestTelegramEventSink_EpicComplete_SendsOneMessageAndForwards(t *testing.T) {
 	server, getRequests := fakeTelegramServer(t, http.StatusOK)
 	inner := &recordingSink{}
-	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL)
+	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
 
 	sink.EpicComplete("epic", 5, 300)
 
@@ -134,7 +134,7 @@ func TestTelegramEventSink_EpicComplete_SendsOneMessageAndForwards(t *testing.T)
 func TestTelegramEventSink_OtherMethods_ForwardWithoutSendingAnyRequest(t *testing.T) {
 	server, getRequests := fakeTelegramServer(t, http.StatusOK)
 	inner := &recordingSink{}
-	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL)
+	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
 
 	sink.NoTicketsFound("epic")
 	sink.AlreadyComplete("epic", 1, 2)
@@ -183,7 +183,7 @@ func TestTelegramEventSink_OtherMethods_ForwardWithoutSendingAnyRequest(t *testi
 func TestTelegramEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
 	server, getRequests := fakeTelegramServer(t, http.StatusInternalServerError)
 	inner := &recordingSink{}
-	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL)
+	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
 
 	start := time.Now()
 	sink.EpicComplete("epic", 1, 0)
@@ -200,7 +200,7 @@ func TestTelegramEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
 	// what a broken/unreachable Telegram API looks like to the client.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	server.Close()
-	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL)
+	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
 
 	start := time.Now()
 	sink.EpicComplete("epic", 1, 0)
@@ -265,5 +265,47 @@ func TestSendTelegramMessage_ReturnsErrorOnFailingServer(t *testing.T) {
 
 	if err := sendTelegramMessage("tok", "chat-1", server.URL, "hello"); err == nil {
 		t.Fatal("sendTelegramMessage: want error, got nil")
+	}
+}
+
+func TestTelegramEventSink_LogsNotificationSentToRunLog(t *testing.T) {
+	dir := t.TempDir()
+	server, _ := fakeTelegramServer(t, http.StatusOK)
+	sink := newTelegramEventSink(&recordingSink{}, "tok", "chat-1", server.URL, dir, "epic")
+
+	sink.EpicComplete("epic", 1, 0)
+
+	var events []Event
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		events, _, _ = readEvents(dir, "epic")
+		if len(events) > 0 {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if len(events) != 1 || events[0].Type != eventNotificationSent || events[0].Channel != "telegram" || events[0].NotifyKind != notifyKindEpicComplete {
+		t.Fatalf("run-log events = %#v, want one notification-sent/telegram/epic-complete", events)
+	}
+}
+
+func TestTelegramEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
+	dir := t.TempDir()
+	server, _ := fakeTelegramServer(t, http.StatusInternalServerError)
+	sink := newTelegramEventSink(&recordingSink{}, "tok", "chat-1", server.URL, dir, "epic")
+
+	sink.EpicComplete("epic", 1, 0)
+
+	var events []Event
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		events, _, _ = readEvents(dir, "epic")
+		if len(events) > 0 {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if len(events) != 1 || events[0].Type != eventNotificationFailed || events[0].Channel != "telegram" || events[0].Reason == "" {
+		t.Fatalf("run-log events = %#v, want one notification-failed/telegram with a non-empty reason", events)
 	}
 }

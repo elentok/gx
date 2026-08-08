@@ -29,24 +29,33 @@ type telegramEventSink struct {
 	chatID     string
 	apiBaseURL string
 	httpClient *http.Client
+	// scratchDir/epicName locate the run's run-log.jsonl for
+	// notification-sent/notification-failed logging (see eventlog.go); both
+	// empty is a valid no-op state (logEvent no-ops on empty scratchDir/
+	// epicName), used by SendTelegramTestMessage's standalone send.
+	scratchDir string
+	epicName   string
 }
 
 // NewTelegramEventSink returns an EventSink that wraps inner and additionally
 // sends a Telegram message via botToken/chatID for IterationFinished,
 // IterationPaused, and EpicComplete. Sends run in their own goroutine and
 // never return an error or block the caller: a failed send is logged via
-// gx's logger and otherwise swallowed.
-func NewTelegramEventSink(inner EventSink, botToken, chatID string) EventSink {
-	return newTelegramEventSink(inner, botToken, chatID, telegramAPIBaseURL)
+// gx's logger and, tagged with the triggering event, appended to
+// scratchDir/epicName's run-log.jsonl.
+func NewTelegramEventSink(inner EventSink, botToken, chatID, scratchDir, epicName string) EventSink {
+	return newTelegramEventSink(inner, botToken, chatID, telegramAPIBaseURL, scratchDir, epicName)
 }
 
-func newTelegramEventSink(inner EventSink, botToken, chatID, apiBaseURL string) *telegramEventSink {
+func newTelegramEventSink(inner EventSink, botToken, chatID, apiBaseURL, scratchDir, epicName string) *telegramEventSink {
 	return &telegramEventSink{
 		EventSink:  inner,
 		botToken:   botToken,
 		chatID:     chatID,
 		apiBaseURL: apiBaseURL,
 		httpClient: &http.Client{Timeout: telegramSendTimeout},
+		scratchDir: scratchDir,
+		epicName:   epicName,
 	}
 }
 
@@ -80,7 +89,7 @@ func sendTelegramMessage(botToken, chatID, apiBaseURL, text string) error {
 // further escaping — callers are responsible for pre-escaping MarkdownV2
 // text (see notification_text.go).
 func sendTelegramRaw(botToken, chatID, apiBaseURL, text string) error {
-	s := newTelegramEventSink(nil, botToken, chatID, apiBaseURL)
+	s := newTelegramEventSink(nil, botToken, chatID, apiBaseURL, "", "")
 	ctx, cancel := context.WithTimeout(context.Background(), telegramSendTimeout)
 	defer cancel()
 	return s.sendSync(ctx, text)
@@ -88,30 +97,37 @@ func sendTelegramRaw(botToken, chatID, apiBaseURL, text string) error {
 
 func (s *telegramEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
 	s.EventSink.IterationFinished(ticket, epicName, stats)
-	s.send(telegramStyle.iterationFinishedText(ticket, epicName, stats))
+	s.send(telegramStyle.iterationFinishedText(ticket, epicName, stats), notifyKindIterationFinished)
 }
 
 func (s *telegramEventSink) IterationPaused(label string, kind PauseKind, reason string) {
 	s.EventSink.IterationPaused(label, kind, reason)
-	s.send(telegramStyle.iterationPausedText(label, kind, reason))
+	s.send(telegramStyle.iterationPausedText(label, kind, reason), notifyKindIterationPaused)
 }
 
 func (s *telegramEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {
 	s.EventSink.EpicComplete(epicName, completed, elapsedSeconds)
-	s.send(telegramStyle.epicCompleteText(epicName, completed, elapsedSeconds))
+	s.send(telegramStyle.epicCompleteText(epicName, completed, elapsedSeconds), notifyKindEpicComplete)
 }
 
 // send POSTs text to the Telegram Bot API's sendMessage endpoint in its own
 // goroutine, so a slow or unreachable API never blocks the caller. Any
-// failure is logged and otherwise swallowed — it never surfaces to the
-// caller. See sendSync for the synchronous, error-returning core.
-func (s *telegramEventSink) send(text string) {
+// failure is logged via gx's logger and otherwise swallowed — it never
+// surfaces to the caller — but every attempt, success or failure, is also
+// durably recorded to run-log.jsonl tagged with notifyKind (the live event
+// that triggered it), since logger.Debug alone leaves no trace an operator
+// checking a run would see. See sendSync for the synchronous, error-returning
+// core.
+func (s *telegramEventSink) send(text, notifyKind string) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), telegramSendTimeout)
 		defer cancel()
 		if err := s.sendSync(ctx, text); err != nil {
 			logger.Debug("telegram: %v\n", err)
+			logNotificationFailed(s.scratchDir, s.epicName, "telegram", notifyKind, err.Error())
+			return
 		}
+		logNotificationSent(s.scratchDir, s.epicName, "telegram", notifyKind)
 	}()
 }
 

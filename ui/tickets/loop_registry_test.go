@@ -2,11 +2,13 @@ package tickets
 
 import (
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/ui/notify"
 )
 
 func TestRunSnapshotsAreDeterministicAndIndependent(t *testing.T) {
@@ -250,6 +252,50 @@ func TestDrainPendingNotifyClosesOnlyAffectsResumedTicket(t *testing.T) {
 	want := reattachNotifyID("epic-a", "01")
 	if len(ids) != 1 || ids[0] != want {
 		t.Fatalf("drainPendingNotifyCloses() = %#v, want only ticket 01's id [%q] (ticket 02 untouched)", ids, want)
+	}
+}
+
+func TestDrainPendingToastsOnEpicComplete(t *testing.T) {
+	r := newLoopRegistry(1)
+	r.tryStart("epic-a", 0, 2)
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventEpicComplete, EpicName: "epic-a", Completed: 2, ElapsedSeconds: 90,
+	})
+
+	toasts := r.drainPendingToasts("epic-a")
+	if len(toasts) != 1 || toasts[0].Kind != notify.KindSuccess {
+		t.Fatalf("drainPendingToasts() = %#v, want one success toast", toasts)
+	}
+	if !strings.Contains(toasts[0].Message, "epic-a") || !strings.Contains(toasts[0].Message, "1m30s") {
+		t.Fatalf("toast message = %q, want epic name and elapsed time", toasts[0].Message)
+	}
+
+	if toasts := r.drainPendingToasts("epic-a"); len(toasts) != 0 {
+		t.Fatalf("drainPendingToasts() after drain = %#v, want empty", toasts)
+	}
+}
+
+func TestDrainPendingToastsOnNeedsAttentionPauseOnly(t *testing.T) {
+	r := newLoopRegistry(1)
+	r.tryStart("epic-a", 0, 2)
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationPaused, Label: "iter-01",
+		PauseKind: ralphloop.PauseRateLimit, Reason: "rate limited",
+	})
+	if toasts := r.drainPendingToasts("epic-a"); len(toasts) != 0 {
+		t.Fatalf("drainPendingToasts() after rate-limit pause = %#v, want empty (needs-attention only)", toasts)
+	}
+
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationPaused, Label: "iter-01",
+		PauseKind: ralphloop.PauseNeedsAttention, Reason: "permission required",
+	})
+	toasts := r.drainPendingToasts("epic-a")
+	if len(toasts) != 1 || toasts[0].Kind != notify.KindWarning {
+		t.Fatalf("drainPendingToasts() after needs-attention pause = %#v, want one warning toast", toasts)
+	}
+	if !strings.Contains(toasts[0].Message, "iter-01") || !strings.Contains(toasts[0].Message, "permission required") {
+		t.Fatalf("toast message = %q, want label and reason", toasts[0].Message)
 	}
 }
 

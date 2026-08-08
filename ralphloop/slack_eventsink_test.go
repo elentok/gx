@@ -59,7 +59,7 @@ func waitForSlackRequests(get func() []slackRequest, want int) []slackRequest {
 func TestSlackEventSink_IterationFinished_SendsOneMessageAndForwards(t *testing.T) {
 	server, getRequests := fakeSlackServer(t, http.StatusOK)
 	inner := &recordingSink{}
-	sink := newSlackEventSink(inner, server.URL)
+	sink := newSlackEventSink(inner, server.URL, "", "")
 
 	stats := IterationStats{ElapsedSeconds: 42, PeakContextTokens: 1234, InProgress: 2, Completed: 3, Total: 5}
 	sink.IterationFinished(tickets.Ticket{Identifier: "04", Title: "Slack decorator"}, "epic", stats)
@@ -81,7 +81,7 @@ func TestSlackEventSink_IterationFinished_SendsOneMessageAndForwards(t *testing.
 func TestSlackEventSink_IterationPaused_SendsOneMessageAndForwards(t *testing.T) {
 	server, getRequests := fakeSlackServer(t, http.StatusOK)
 	inner := &recordingSink{}
-	sink := newSlackEventSink(inner, server.URL)
+	sink := newSlackEventSink(inner, server.URL, "", "")
 
 	sink.IterationPaused("iter-04", PauseNeedsAttention, "agent blocked on permission prompt")
 
@@ -102,7 +102,7 @@ func TestSlackEventSink_IterationPaused_SendsOneMessageAndForwards(t *testing.T)
 func TestSlackEventSink_EpicComplete_SendsOneMessageAndForwards(t *testing.T) {
 	server, getRequests := fakeSlackServer(t, http.StatusOK)
 	inner := &recordingSink{}
-	sink := newSlackEventSink(inner, server.URL)
+	sink := newSlackEventSink(inner, server.URL, "", "")
 
 	sink.EpicComplete("epic", 5, 300)
 
@@ -123,7 +123,7 @@ func TestSlackEventSink_EpicComplete_SendsOneMessageAndForwards(t *testing.T) {
 func TestSlackEventSink_OtherMethods_ForwardWithoutSendingAnyRequest(t *testing.T) {
 	server, getRequests := fakeSlackServer(t, http.StatusOK)
 	inner := &recordingSink{}
-	sink := newSlackEventSink(inner, server.URL)
+	sink := newSlackEventSink(inner, server.URL, "", "")
 
 	sink.NoTicketsFound("epic")
 	sink.AlreadyComplete("epic", 1, 2)
@@ -172,7 +172,7 @@ func TestSlackEventSink_OtherMethods_ForwardWithoutSendingAnyRequest(t *testing.
 func TestSlackEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
 	server, getRequests := fakeSlackServer(t, http.StatusInternalServerError)
 	inner := &recordingSink{}
-	sink := newSlackEventSink(inner, server.URL)
+	sink := newSlackEventSink(inner, server.URL, "", "")
 
 	start := time.Now()
 	sink.EpicComplete("epic", 1, 0)
@@ -189,7 +189,7 @@ func TestSlackEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
 	// what a broken/unreachable Slack webhook looks like to the client.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	server.Close()
-	sink := newSlackEventSink(inner, server.URL)
+	sink := newSlackEventSink(inner, server.URL, "", "")
 
 	start := time.Now()
 	sink.EpicComplete("epic", 1, 0)
@@ -251,5 +251,47 @@ func TestSendSlackMessage_ReturnsErrorOnFailingServer(t *testing.T) {
 
 	if err := SendSlackMessage(server.URL, "hello"); err == nil {
 		t.Fatal("SendSlackMessage: want error, got nil")
+	}
+}
+
+func TestSlackEventSink_LogsNotificationSentToRunLog(t *testing.T) {
+	dir := t.TempDir()
+	server, _ := fakeSlackServer(t, http.StatusOK)
+	sink := newSlackEventSink(&recordingSink{}, server.URL, dir, "epic")
+
+	sink.IterationPaused("iter-01", PauseNeedsAttention, "permission required")
+
+	var events []Event
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		events, _, _ = readEvents(dir, "epic")
+		if len(events) > 0 {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if len(events) != 1 || events[0].Type != eventNotificationSent || events[0].Channel != "slack" || events[0].NotifyKind != notifyKindIterationPaused {
+		t.Fatalf("run-log events = %#v, want one notification-sent/slack/iteration-paused", events)
+	}
+}
+
+func TestSlackEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
+	dir := t.TempDir()
+	server, _ := fakeSlackServer(t, http.StatusInternalServerError)
+	sink := newSlackEventSink(&recordingSink{}, server.URL, dir, "epic")
+
+	sink.IterationPaused("iter-01", PauseNeedsAttention, "permission required")
+
+	var events []Event
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		events, _, _ = readEvents(dir, "epic")
+		if len(events) > 0 {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if len(events) != 1 || events[0].Type != eventNotificationFailed || events[0].Channel != "slack" || events[0].Reason == "" {
+		t.Fatalf("run-log events = %#v, want one notification-failed/slack with a non-empty reason", events)
 	}
 }

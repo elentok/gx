@@ -32,7 +32,10 @@ func (m *Model) syncRunSnapshot(epicName string) tea.Cmd {
 		m.implementingEpics = map[string]bool{}
 	}
 	m.implementingEpics[epicName] = snapshot.State == RunStateRunning
-	return closeNotifyCmd(ralphLoopRegistry.drainPendingNotifyCloses(epicName))
+	return tea.Batch(
+		closeNotifyCmd(ralphLoopRegistry.drainPendingNotifyCloses(epicName)),
+		toastNotifyCmd(ralphLoopRegistry.drainPendingToasts(epicName)),
+	)
 }
 
 // closeNotifyCmd batches a notify.Close cmd per id, or nil if ids is empty.
@@ -43,6 +46,19 @@ func closeNotifyCmd(ids []string) tea.Cmd {
 	cmds := make([]tea.Cmd, len(ids))
 	for i, id := range ids {
 		cmds[i] = notify.Close(id)
+	}
+	return tea.Batch(cmds...)
+}
+
+// toastNotifyCmd batches a notify cmd per queued toast (see
+// epicRun.pendingToasts), or nil if toasts is empty.
+func toastNotifyCmd(toasts []notify.NotifyMsg) tea.Cmd {
+	if len(toasts) == 0 {
+		return nil
+	}
+	cmds := make([]tea.Cmd, len(toasts))
+	for i, msg := range toasts {
+		cmds[i] = func() tea.Msg { return msg }
 	}
 	return tea.Batch(cmds...)
 }

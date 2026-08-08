@@ -448,7 +448,10 @@ func (m *QueueModel) syncRunSnapshot(epicName string) tea.Cmd {
 		}
 	}
 	m.live[epicName] = live
-	return closeNotifyCmd(ralphLoopRegistry.drainPendingNotifyCloses(epicName))
+	return tea.Batch(
+		closeNotifyCmd(ralphLoopRegistry.drainPendingNotifyCloses(epicName)),
+		toastNotifyCmd(ralphLoopRegistry.drainPendingToasts(epicName)),
+	)
 }
 
 // ticketPathFor resolves an epicName/identifier pair (the registry's

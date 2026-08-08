@@ -39,6 +39,19 @@ const (
 	// "out-of-scope"), which the ticket-level events above never surface
 	// since they only ever fire for a ticket the scheduler already claimed.
 	eventSchedulerScan = "scheduler-scan"
+
+	eventNotificationsConfigured = "notifications-configured"
+	eventNotificationSent        = "notification-sent"
+	eventNotificationFailed      = "notification-failed"
+)
+
+// notifyKind* tag which live event triggered a notification-sent/
+// notification-failed line — distinct from the Type field (which is always
+// "notification-sent"/"notification-failed" itself).
+const (
+	notifyKindIterationFinished = "iteration-finished"
+	notifyKindIterationPaused   = "iteration-paused"
+	notifyKindEpicComplete      = "epic-complete"
 )
 
 // ScanDecision records one ticket's scheduling disposition for a single
@@ -97,6 +110,18 @@ type Event struct {
 	// Scan (scheduler-scan events only) is every ticket's disposition for
 	// this claimNext pass — see ScanDecision.
 	Scan []ScanDecision `json:"scan,omitempty"`
+	// Telegram/Slack (notifications-configured only) record whether each
+	// channel is active for this run — never the token/webhook values
+	// themselves. Pointers (rather than plain bool) so "false" still
+	// serializes explicitly instead of vanishing under omitempty.
+	Telegram *bool `json:"telegram,omitempty"`
+	Slack    *bool `json:"slack,omitempty"`
+	// Channel (notification-sent/notification-failed only) is which channel
+	// the attempt used: "telegram" or "slack".
+	Channel string `json:"channel,omitempty"`
+	// NotifyKind (notification-sent/notification-failed only) is the live
+	// event that triggered the send attempt — see notifyKind* consts.
+	NotifyKind string `json:"notify_kind,omitempty"`
 }
 
 // eventLogMu serializes appends across every goroutine in the process (each
@@ -145,6 +170,36 @@ func logEvent(scratchDir, epicName string, ev Event) error {
 	defer f.Close()
 	_, err = f.Write(data)
 	return err
+}
+
+// LogNotificationsConfigured records, once per epic run, which notification
+// channels are active — never the underlying bot token/webhook URL — so an
+// operator reading run-log.jsonl can tell a channel that was simply never
+// configured apart from one whose sends are silently failing (see
+// logNotificationSent/logNotificationFailed).
+func LogNotificationsConfigured(scratchDir, epicName string, telegram, slack bool) error {
+	return logEvent(scratchDir, epicName, Event{
+		Type:     eventNotificationsConfigured,
+		Telegram: &telegram,
+		Slack:    &slack,
+	})
+}
+
+// logNotificationSent/logNotificationFailed record one Telegram/Slack
+// delivery attempt from inside telegramEventSink/slackEventSink's send,
+// tagged with the channel and the live event that triggered it. Errors are
+// swallowed like every other logEvent call site here — a failure to log
+// shouldn't compound the failure it was trying to record.
+func logNotificationSent(scratchDir, epicName, channel, notifyKind string) {
+	_ = logEvent(scratchDir, epicName, Event{
+		Type: eventNotificationSent, Channel: channel, NotifyKind: notifyKind,
+	})
+}
+
+func logNotificationFailed(scratchDir, epicName, channel, notifyKind, reason string) {
+	_ = logEvent(scratchDir, epicName, Event{
+		Type: eventNotificationFailed, Channel: channel, NotifyKind: notifyKind, Reason: reason,
+	})
 }
 
 // lastIterationSession finds the most recent iteration-started event for

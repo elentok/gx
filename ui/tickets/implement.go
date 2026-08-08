@@ -50,6 +50,12 @@ type epicRun struct {
 	// which has no way to send a tea.Cmd itself) and drained into an actual
 	// notify.Close cmd by the next syncRunSnapshot poll on the active tab.
 	pendingNotifyCloses []string
+	// pendingToasts queues in-app toasts (epic-complete, needs-attention
+	// pause) the same way pendingNotifyCloses queues closes: reduceLiveEvent
+	// runs in the event-drain goroutine, which has no way to dispatch a
+	// tea.Cmd itself, so toasts wait here for the next syncRunSnapshot poll
+	// on the active tab to drain and dispatch them.
+	pendingToasts []notify.NotifyMsg
 	// holdsAttach marks a run as one of the ones counted toward
 	// loopRegistry.attachCount, so finish only releases the attach lock once
 	// the run that actually incremented it ends.
@@ -244,6 +250,12 @@ func (r *loopRegistry) reduceLiveEvent(epicName string, event ralphloop.LiveEven
 			run.tickets[identifier] = ticket
 			break
 		}
+		if event.PauseKind == ralphloop.PauseNeedsAttention {
+			run.pendingToasts = append(run.pendingToasts, notify.NotifyMsg{
+				Kind:    notify.KindWarning,
+				Message: fmt.Sprintf("\U0001f6d1 %s paused: %s", event.Label, event.Reason),
+			})
+		}
 	case ralphloop.LiveEventIterationResumed:
 		for identifier, ticket := range run.tickets {
 			if ticket.Label != event.Label {
@@ -272,6 +284,10 @@ func (r *loopRegistry) reduceLiveEvent(epicName string, event ralphloop.LiveEven
 	case ralphloop.LiveEventEpicComplete:
 		run.done = event.Completed
 		run.state = RunStateCompleted
+		run.pendingToasts = append(run.pendingToasts, notify.NotifyMsg{
+			Kind:    notify.KindSuccess,
+			Message: fmt.Sprintf("\U0001f389 epic %q complete (%s)", epicName, formatElapsed(event.ElapsedSeconds)),
+		})
 	}
 }
 
@@ -298,6 +314,21 @@ func (r *loopRegistry) drainPendingNotifyCloses(epicName string) []string {
 	ids := run.pendingNotifyCloses
 	run.pendingNotifyCloses = nil
 	return ids
+}
+
+// drainPendingToasts hands back and clears epicName's queued toasts (see
+// epicRun.pendingToasts) so the caller can turn them into notify cmds
+// exactly once.
+func (r *loopRegistry) drainPendingToasts(epicName string) []notify.NotifyMsg {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	run := r.snapshots[epicName]
+	if run == nil || len(run.pendingToasts) == 0 {
+		return nil
+	}
+	toasts := run.pendingToasts
+	run.pendingToasts = nil
+	return toasts
 }
 
 func (r *loopRegistry) runSnapshots() []RunSnapshot {
@@ -908,12 +939,16 @@ func cmdStartImplement(
 		opts.OnScopeResolved = func(scope ralphloop.RunScope) {
 			ralphLoopRegistry.setScope(epicName, scope)
 		}
+		_ = ralphloop.LogNotificationsConfigured(
+			opts.ScratchDir, epicName,
+			notifications.Telegram.BotToken != "", notifications.Slack.WebhookURL != "",
+		)
 		var runSink ralphloop.EventSink = sink
 		if notifications.Telegram.BotToken != "" {
-			runSink = ralphloop.NewTelegramEventSink(runSink, notifications.Telegram.BotToken, notifications.Telegram.ChatID)
+			runSink = ralphloop.NewTelegramEventSink(runSink, notifications.Telegram.BotToken, notifications.Telegram.ChatID, opts.ScratchDir, epicName)
 		}
 		if notifications.Slack.WebhookURL != "" {
-			runSink = ralphloop.NewSlackEventSink(runSink, notifications.Slack.WebhookURL)
+			runSink = ralphloop.NewSlackEventSink(runSink, notifications.Slack.WebhookURL, opts.ScratchDir, epicName)
 		}
 		go func() {
 			err := runRalphLoop(opts, ralphloop.DefaultDeps(), runSink)

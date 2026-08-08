@@ -21,6 +21,12 @@ type slackEventSink struct {
 	EventSink
 	webhookURL string
 	httpClient *http.Client
+	// scratchDir/epicName locate the run's run-log.jsonl for
+	// notification-sent/notification-failed logging (see eventlog.go); both
+	// empty is a valid no-op state (logEvent no-ops on empty scratchDir/
+	// epicName), used by SendSlackTestMessage's standalone send.
+	scratchDir string
+	epicName   string
 }
 
 // NewSlackEventSink returns an EventSink that wraps inner and additionally
@@ -28,16 +34,19 @@ type slackEventSink struct {
 // takes a single {"text": "..."} body — for IterationFinished,
 // IterationPaused, and EpicComplete. Sends run in their own goroutine and
 // never return an error or block the caller: a failed send is logged via
-// gx's logger and otherwise swallowed.
-func NewSlackEventSink(inner EventSink, webhookURL string) EventSink {
-	return newSlackEventSink(inner, webhookURL)
+// gx's logger and, tagged with the triggering event, appended to
+// scratchDir/epicName's run-log.jsonl.
+func NewSlackEventSink(inner EventSink, webhookURL, scratchDir, epicName string) EventSink {
+	return newSlackEventSink(inner, webhookURL, scratchDir, epicName)
 }
 
-func newSlackEventSink(inner EventSink, webhookURL string) *slackEventSink {
+func newSlackEventSink(inner EventSink, webhookURL, scratchDir, epicName string) *slackEventSink {
 	return &slackEventSink{
 		EventSink:  inner,
 		webhookURL: webhookURL,
 		httpClient: &http.Client{Timeout: slackSendTimeout},
+		scratchDir: scratchDir,
+		epicName:   epicName,
 	}
 }
 
@@ -59,7 +68,7 @@ func SendSlackMessage(webhookURL, text string) error {
 }
 
 func sendSlackMessageRaw(webhookURL, text string) error {
-	s := newSlackEventSink(nil, webhookURL)
+	s := newSlackEventSink(nil, webhookURL, "", "")
 	ctx, cancel := context.WithTimeout(context.Background(), slackSendTimeout)
 	defer cancel()
 	return s.sendSync(ctx, text)
@@ -67,30 +76,37 @@ func sendSlackMessageRaw(webhookURL, text string) error {
 
 func (s *slackEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
 	s.EventSink.IterationFinished(ticket, epicName, stats)
-	s.send(slackStyle.iterationFinishedText(ticket, epicName, stats))
+	s.send(slackStyle.iterationFinishedText(ticket, epicName, stats), notifyKindIterationFinished)
 }
 
 func (s *slackEventSink) IterationPaused(label string, kind PauseKind, reason string) {
 	s.EventSink.IterationPaused(label, kind, reason)
-	s.send(slackStyle.iterationPausedText(label, kind, reason))
+	s.send(slackStyle.iterationPausedText(label, kind, reason), notifyKindIterationPaused)
 }
 
 func (s *slackEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {
 	s.EventSink.EpicComplete(epicName, completed, elapsedSeconds)
-	s.send(slackStyle.epicCompleteText(epicName, completed, elapsedSeconds))
+	s.send(slackStyle.epicCompleteText(epicName, completed, elapsedSeconds), notifyKindEpicComplete)
 }
 
 // send POSTs {"text": text} to the Slack workflow webhook in its own
 // goroutine, so a slow or unreachable webhook never blocks the caller. Any
-// failure is logged and otherwise swallowed — it never surfaces to the
-// caller. See sendSync for the synchronous, error-returning core.
-func (s *slackEventSink) send(text string) {
+// failure is logged via gx's logger and otherwise swallowed — it never
+// surfaces to the caller — but every attempt, success or failure, is also
+// durably recorded to run-log.jsonl tagged with notifyKind (the live event
+// that triggered it), since logger.Debug alone leaves no trace an operator
+// checking a run would see. See sendSync for the synchronous, error-returning
+// core.
+func (s *slackEventSink) send(text, notifyKind string) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), slackSendTimeout)
 		defer cancel()
 		if err := s.sendSync(ctx, text); err != nil {
 			logger.Debug("slack: %v\n", err)
+			logNotificationFailed(s.scratchDir, s.epicName, "slack", notifyKind, err.Error())
+			return
 		}
+		logNotificationSent(s.scratchDir, s.epicName, "slack", notifyKind)
 	}()
 }
 
