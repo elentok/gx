@@ -23,11 +23,11 @@ func TestRunTicketsAdd_FlatSibling(t *testing.T) {
 	writeTicket(t, filepath.Join(issuesDir, "03-do-third-thing.md"), "03", "done", "task")
 
 	var stdout bytes.Buffer
-	if err := runTicketsAdd(epicPath, "", &stdout); err != nil {
+	if err := runTicketsAdd(epicPath, "", "do-fourth-thing", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd: %v", err)
 	}
 
-	wantPath := filepath.Join(issuesDir, "04-new-ticket.md")
+	wantPath := filepath.Join(issuesDir, "04-do-fourth-thing.md")
 	gotPath := strings.TrimSpace(stdout.String())
 	if gotPath != wantPath {
 		t.Fatalf("stdout = %q, want %q", gotPath, wantPath)
@@ -41,6 +41,28 @@ func TestRunTicketsAdd_FlatSibling(t *testing.T) {
 	}
 }
 
+func TestRunTicketsAdd_EmptySlugFails(t *testing.T) {
+	scratchDir := t.TempDir()
+	epicPath := filepath.Join(scratchDir, "widget-epic")
+	issuesDir := filepath.Join(epicPath, "issues")
+	if err := os.MkdirAll(issuesDir, 0755); err != nil {
+		t.Fatalf("mkdir issues: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	err := runTicketsAdd(epicPath, "", "", &stdout)
+	if err == nil {
+		t.Fatal("runTicketsAdd with empty slug: want error, got nil")
+	}
+	entries, readErr := os.ReadDir(issuesDir)
+	if readErr != nil {
+		t.Fatalf("read issues dir: %v", readErr)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("issues dir = %v, want empty (no stub written on validation failure)", entries)
+	}
+}
+
 func TestRunTicketsAdd_LetteredChild(t *testing.T) {
 	scratchDir := t.TempDir()
 	epicPath := filepath.Join(scratchDir, "widget-epic")
@@ -51,21 +73,21 @@ func TestRunTicketsAdd_LetteredChild(t *testing.T) {
 	writeTicket(t, filepath.Join(issuesDir, "12-parent.md"), "12", "done", "task")
 
 	var stdout bytes.Buffer
-	if err := runTicketsAdd(epicPath, "12", &stdout); err != nil {
+	if err := runTicketsAdd(epicPath, "12", "child-a", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd: %v", err)
 	}
 	firstPath := strings.TrimSpace(stdout.String())
-	if firstPath != filepath.Join(issuesDir, "12a-new-ticket.md") {
-		t.Fatalf("stdout = %q, want %q", firstPath, filepath.Join(issuesDir, "12a-new-ticket.md"))
+	if firstPath != filepath.Join(issuesDir, "12a-child-a.md") {
+		t.Fatalf("stdout = %q, want %q", firstPath, filepath.Join(issuesDir, "12a-child-a.md"))
 	}
 
 	stdout.Reset()
-	if err := runTicketsAdd(epicPath, "12", &stdout); err != nil {
+	if err := runTicketsAdd(epicPath, "12", "child-b", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd (second call): %v", err)
 	}
 	secondPath := strings.TrimSpace(stdout.String())
-	if secondPath != filepath.Join(issuesDir, "12b-new-ticket.md") {
-		t.Fatalf("stdout = %q, want %q", secondPath, filepath.Join(issuesDir, "12b-new-ticket.md"))
+	if secondPath != filepath.Join(issuesDir, "12b-child-b.md") {
+		t.Fatalf("stdout = %q, want %q", secondPath, filepath.Join(issuesDir, "12b-child-b.md"))
 	}
 }
 
@@ -79,21 +101,21 @@ func TestRunTicketsAdd_NumericLevelPastLetteredParent(t *testing.T) {
 	writeTicket(t, filepath.Join(issuesDir, "12b-child.md"), "12b", "done", "task")
 
 	var stdout bytes.Buffer
-	if err := runTicketsAdd(epicPath, "12b", &stdout); err != nil {
+	if err := runTicketsAdd(epicPath, "12b", "grandchild-1", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd: %v", err)
 	}
 	firstPath := strings.TrimSpace(stdout.String())
-	if firstPath != filepath.Join(issuesDir, "12b1-new-ticket.md") {
-		t.Fatalf("stdout = %q, want %q", firstPath, filepath.Join(issuesDir, "12b1-new-ticket.md"))
+	if firstPath != filepath.Join(issuesDir, "12b1-grandchild-1.md") {
+		t.Fatalf("stdout = %q, want %q", firstPath, filepath.Join(issuesDir, "12b1-grandchild-1.md"))
 	}
 
 	stdout.Reset()
-	if err := runTicketsAdd(epicPath, "12b", &stdout); err != nil {
+	if err := runTicketsAdd(epicPath, "12b", "grandchild-2", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd (second call): %v", err)
 	}
 	secondPath := strings.TrimSpace(stdout.String())
-	if secondPath != filepath.Join(issuesDir, "12b2-new-ticket.md") {
-		t.Fatalf("stdout = %q, want %q", secondPath, filepath.Join(issuesDir, "12b2-new-ticket.md"))
+	if secondPath != filepath.Join(issuesDir, "12b2-grandchild-2.md") {
+		t.Fatalf("stdout = %q, want %q", secondPath, filepath.Join(issuesDir, "12b2-grandchild-2.md"))
 	}
 }
 
@@ -107,12 +129,12 @@ func TestRunTicketsAdd_LetteredNumericParentAllocatesNextSibling(t *testing.T) {
 	writeTicket(t, filepath.Join(issuesDir, "12b1-child.md"), "12b1", "done", "task")
 
 	var stdout bytes.Buffer
-	if err := runTicketsAdd(epicPath, "12b1", &stdout); err != nil {
+	if err := runTicketsAdd(epicPath, "12b1", "sibling", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd(parent=12b1): %v", err)
 	}
 	gotPath := strings.TrimSpace(stdout.String())
-	if gotPath != filepath.Join(issuesDir, "12b2-new-ticket.md") {
-		t.Fatalf("stdout = %q, want %q", gotPath, filepath.Join(issuesDir, "12b2-new-ticket.md"))
+	if gotPath != filepath.Join(issuesDir, "12b2-sibling.md") {
+		t.Fatalf("stdout = %q, want %q", gotPath, filepath.Join(issuesDir, "12b2-sibling.md"))
 	}
 }
 
@@ -133,7 +155,7 @@ func TestRunTicketsAdd_ConcurrentCallsAllocateDistinctIDs(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			var buf bytes.Buffer
-			errs[i] = runTicketsAdd(epicPath, "", &buf)
+			errs[i] = runTicketsAdd(epicPath, "", "concurrent", &buf)
 			paths[i] = strings.TrimSpace(buf.String())
 		}(i)
 	}

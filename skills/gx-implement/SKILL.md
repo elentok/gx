@@ -76,10 +76,13 @@ When either trigger fires:
 2. **Commit.**
 3. **Create the follow-up ticket(s)**, following [gx-local-tracker.md](../gx-local-tracker.md)'s
    mid-flight-split numbering, blocking-edge, and `split_from` conventions, and gx-to-tickets'
-   estimation method. This chain is uncapped — each split narrows what's left, so it's
-   self-limiting. Move any not-yet-finished acceptance criteria off the original ticket onto the new
-   one(s). Do this **autonomously** — no pause for user approval; this exists to keep the outer loop
-   unattended.
+   estimation method. Allocate each new ticket's ID with `gx tickets add <epic> --parent <original-id>
+   --slug <descriptive-slug>` — it atomically picks the next free ID (safe against another
+   parallel iteration doing the same split at the same time) and writes the stub straight to
+   `<id>-<slug>.md`; `--slug` is required, so there's no separate rename step to remember. This
+   chain is uncapped — each split narrows what's left, so it's self-limiting. Move any
+   not-yet-finished acceptance criteria off the original ticket onto the new one(s). Do this
+   **autonomously** — no pause for user approval; this exists to keep the outer loop unattended.
 4. **Close the original** as done, with `gx tickets set <path> --split 03b,03c` (comma-separated new
    ticket IDs) and a body note of the token count from the last budget check (e.g.
    `Tokens used: ~85K`) — so it can be matched against the ticket's `expected_context_window` later.

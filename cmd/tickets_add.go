@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,8 +16,14 @@ import (
 // number under a lettered parent regardless of whether parent itself
 // already carries trailing digits — see tickets.NextTicketID) and writes a
 // minimal stub ticket file for the caller to fill in, printing the created
-// file's path to w.
-func runTicketsAdd(epicPath, parent string, w io.Writer) error {
+// file's path to w. slug must be non-empty — it becomes the stub's
+// filename suffix (<id>-<slug>.md), so the file lands with a real name
+// instead of a placeholder the caller has to remember to rename.
+func runTicketsAdd(epicPath, parent, slug string, w io.Writer) error {
+	if slug == "" {
+		return errors.New("slug is required")
+	}
+
 	epicPath = filepath.Clean(epicPath)
 
 	epic, unlock, err := tickets.LoadLockedEpic(epicPath)
@@ -30,7 +37,7 @@ func runTicketsAdd(epicPath, parent string, w io.Writer) error {
 		return err
 	}
 
-	stubPath := filepath.Join(epicPath, "issues", fmt.Sprintf("%s-new-ticket.md", id))
+	stubPath := filepath.Join(epicPath, "issues", fmt.Sprintf("%s-%s.md", id, slug))
 	stub := schema.Ticket{
 		ID:     schema.TicketID(id),
 		Status: schema.StatusOpen,

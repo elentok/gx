@@ -133,6 +133,10 @@ numbering and blocking conventions:
 
 1. New ticket(s) get a flat sibling number off the root ticket: `04` splits into `04b`, `04c`, ...
    (skip `a` if the original ticket's own number, unlettered, is still in use as its identifier).
+   Allocate each ID with `gx tickets add <epic> --parent <original-id> --slug <descriptive-slug>`
+   rather than picking the number by hand — it's atomic against concurrent splits landing at the
+   same time, and `--slug` (required) writes the stub straight to its final `<id>-<slug>.md`
+   filename.
 2. Each new ticket's `blocked_by` includes the original ticket's id.
 3. Each new ticket's `parent` frontmatter names the original, set at creation.
 4. The original ticket's `children` field is set to list the new ticket(s):

@@ -243,7 +243,7 @@ func newTicketsCmd(d deps) *cobra.Command {
 			return err
 		},
 	})
-	var addParent string
+	var addParent, addSlug string
 	addCmd := &cobra.Command{
 		Use:   "add <epic>",
 		Short: "atomically allocate the next ticket ID and stamp out a stub file",
@@ -253,7 +253,7 @@ func newTicketsCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runTicketsAdd(resolveEpicArg(args[0], cwd), addParent, c.OutOrStdout())
+			return runTicketsAdd(resolveEpicArg(args[0], cwd), addParent, addSlug, c.OutOrStdout())
 		},
 		ValidArgsFunction: func(c *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			cwd, err := d.getwd()
@@ -268,6 +268,7 @@ func newTicketsCmd(d deps) *cobra.Command {
 		},
 	}
 	addCmd.Flags().StringVar(&addParent, "parent", "", "allocate a lettered child of this ticket ID (or, if parent is itself lettered, one numeric level past it)")
+	addCmd.Flags().StringVar(&addSlug, "slug", "", "descriptive filename slug, e.g. \"wire-tree-model-selection\" (required; stub lands at <id>-<slug>.md)")
 	cmd.AddCommand(addCmd)
 	return cmd
 }
