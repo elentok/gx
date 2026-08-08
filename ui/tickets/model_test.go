@@ -906,41 +906,13 @@ func setCollapsedEpic(m *Model, epicIdx int, collapsed bool) {
 	m.clampSelected()
 }
 
-// selectedSidebarLine mirrors sidebarLines()' (view.go) header/placeholder
-// line counting to find which physical line the currently selected entry
-// renders on — the test-only replacement for the deleted
-// sidebarLineForSelected, now that every row is exactly 1 physical line.
+// selectedSidebarLine returns which physical line the currently selected
+// entry renders on. Every sidebar row (including the blank separator and
+// empty-section placeholder) is now a real tree.Entry, so this is exactly
+// the selected entry's index — no more header/placeholder line-counting.
 func selectedSidebarLine(t *testing.T, m Model) int {
 	t.Helper()
-	idxs := make([]int, len(m.epics))
-	for i := range m.epics {
-		idxs[i] = i
-	}
-	openIdxs, closedIdxs := splitEpicIndexesBySection(m.epics, idxs)
-	selectedIdx := m.sidebarTree.SelectedIndex()
-
-	line := 0
-	for i, e := range m.sidebarTree.Entries() {
-		if i == selectedIdx {
-			return line
-		}
-		switch e.Value.kind {
-		case nodeSection:
-			n := len(openIdxs)
-			if e.Value.section == sectionClosed {
-				n = len(closedIdxs)
-				line++ // blank line preceding the closed section header
-			}
-			line++
-			if n == 0 {
-				line++ // muted "no ... epics" placeholder
-			}
-		case nodeEpic, nodeTicket:
-			line++
-		}
-	}
-	t.Fatalf("selected index %d not found among sidebar entries", selectedIdx)
-	return -1
+	return m.sidebarTree.SelectedIndex()
 }
 
 // visibleRows mirrors the old m.visibleRows(): every cursor-reachable sidebar

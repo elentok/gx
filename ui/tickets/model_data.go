@@ -27,6 +27,8 @@ const (
 	nodeSection sidebarNodeKind = iota
 	nodeEpic
 	nodeTicket
+	nodeBlank // a blank separator row between the two section roots — always present, never selectable
+	nodeEmpty // "no open/closed epics" placeholder, child of a nodeSection with zero epics
 )
 
 // sidebarSection is which of the two section-header roots a sidebarNode
@@ -121,6 +123,7 @@ func (m Model) buildSidebarEntries() []tree.Entry[sidebarNode] {
 
 	roots := []sidebarNode{
 		{kind: nodeSection, section: sectionOpen, ticketIdx: -1},
+		{kind: nodeBlank, ticketIdx: -1},
 		{kind: nodeSection, section: sectionClosed, ticketIdx: -1},
 	}
 
@@ -131,6 +134,13 @@ func (m Model) buildSidebarEntries() []tree.Entry[sidebarNode] {
 				return "section:open"
 			}
 			return "section:closed"
+		case nodeBlank:
+			return "blank-separator"
+		case nodeEmpty:
+			if n.section == sectionOpen {
+				return "section:open:empty"
+			}
+			return "section:closed:empty"
 		case nodeEpic:
 			return m.epics[n.epicIdx].Path
 		default:
@@ -145,11 +155,16 @@ func (m Model) buildSidebarEntries() []tree.Entry[sidebarNode] {
 			if n.section == sectionClosed {
 				order = closedIdxs
 			}
+			if len(order) == 0 {
+				return []sidebarNode{{kind: nodeEmpty, section: n.section, ticketIdx: -1}}
+			}
 			children := make([]sidebarNode, len(order))
 			for i, epicIdx := range order {
 				children[i] = sidebarNode{kind: nodeEpic, epicIdx: epicIdx, ticketIdx: -1}
 			}
 			return children
+		case nodeBlank, nodeEmpty:
+			return nil
 		case nodeEpic:
 			roots := epicTree(n.epicIdx).roots
 			children := make([]sidebarNode, len(roots))

@@ -89,7 +89,7 @@ func TestRenderTicketRow_LiveRowIndentNotDoubled(t *testing.T) {
 
 	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 0)
 
-	wantPrefix := "    " + strings.Repeat(" ", triangleColumnWidth(m.icons())) + " " + m.checkboxGlyph(m.isChecked(epic.Tickets[0].Path)) + " "
+	wantPrefix := strings.Repeat(" ", triangleColumnWidth(m.icons())) + " " + m.checkboxGlyph(m.isChecked(epic.Tickets[0].Path)) + " "
 	wantBase, _, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, epic.Tickets[0], live, wantPrefix)
 	if !ok {
 		t.Fatalf("renderLiveTicketRow() ok = false, want true")
@@ -260,7 +260,7 @@ func TestRenderTicketRow_IconColumnAlignsRegardlessOfChildren(t *testing.T) {
 	}
 }
 
-func TestSidebarLinesHighlightsBothLinesOfSelectedTicket(t *testing.T) {
+func TestSidebarLinesHighlightsSelectedTicket(t *testing.T) {
 	t.Parallel()
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 		{Identifier: "01", Title: "Done ticket", Status: "done", ElapsedTime: 5, ActualContextWindow: 100},
@@ -269,15 +269,18 @@ func TestSidebarLinesHighlightsBothLinesOfSelectedTicket(t *testing.T) {
 	m := newModelForTicketRowTests(epic)
 	// Entries: section header (0), epic (1), done ticket (2), open ticket (3).
 	m.sidebarTree.SetSelectedIndex(2)
-
-	lines := m.sidebarLines()
-	want := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)
-	if len(lines) < 4 {
-		t.Fatalf("sidebarLines() returned too few lines: %#v", lines)
+	selectedLines := m.sidebarBody(20, 80)
+	if len(selectedLines) < 4 {
+		t.Fatalf("sidebarBody() returned too few lines: %#v", selectedLines)
 	}
-	for i := range want {
-		if lines[2+i] != ui.RenderRowHighlight(want[i]) {
-			t.Errorf("selected ticket line %d was not highlighted", i+1)
-		}
+
+	m.sidebarTree.SetSelectedIndex(3)
+	unselectedLines := m.sidebarBody(20, 80)
+
+	if !strings.Contains(ansi.Strip(selectedLines[2]), "Done ticket") {
+		t.Fatalf("selected line = %q, want it to contain the ticket title", selectedLines[2])
+	}
+	if selectedLines[2] == unselectedLines[2] {
+		t.Errorf("expected the selected ticket's rendered line to differ from its unselected rendering, got identical: %q", selectedLines[2])
 	}
 }

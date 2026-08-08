@@ -75,7 +75,7 @@ type Model struct {
 	// m.collapsedTickets fields.
 	sidebarTree tree.Model[sidebarNode]
 	// hideDone is the "tc" chord's toggle (ticket 08): when set, done tickets
-	// are excluded from buildSidebarEntries()/sidebarLines() navigation and
+	// are excluded from buildSidebarEntries()/sidebarBody() navigation and
 	// rendering. Epic done/total header counts read epic.Tickets directly
 	// (renderEpicRow), so they're unaffected by this filter.
 	hideDone bool
@@ -330,6 +330,27 @@ func (m Model) sidebarViewportHeight() int {
 	return max(sidebarH-1, 0)
 }
 
+// sidebarBody renders the sidebar panel's body lines. m.sidebarTree.Entries()
+// is only ever empty before the first epicsLoadedMsg arrives (the root list
+// is 3 fixed entries — 2 sections + 1 blank — regardless of len(m.epics),
+// once clampSelected has run at least once), so RenderOpts.EmptyLine covers
+// the pre-load "loading…" state on its own. It cannot reproduce the
+// zero-epics-after-load "no .scratch/ directory found" message though — that
+// would otherwise render as two real, empty section headers plus their
+// nodeEmpty placeholders, a different visual — so that state keeps its own
+// short-circuit ahead of the RenderLines call.
+func (m Model) sidebarBody(sidebarViewportH, width int) []string {
+	if m.loaded && len(m.epics) == 0 {
+		return []string{ui.StyleMuted.Render("  no .scratch/ directory found")}
+	}
+	// RenderLines' own height param is an outer-panel height, from which it
+	// subtracts 2 internally (see ui/tree/render.go) — the same convention
+	// ui/status and ui/commit's own tree.Model callers already rely on. +2
+	// here cancels that back out so it renders exactly sidebarViewportH body
+	// rows, matching what the (headerless) sidebar panel actually has room for.
+	return m.sidebarTree.RenderLines(sidebarViewportH+2, m.sidebarRenderOpts(width))
+}
+
 // handleSidebarMouseClick selects the sidebar row under a left click,
 // mirroring arrow-key navigation with no secondary action (no checkbox
 // toggle, no confirm). A click inside the preview panel's bounds instead
@@ -452,11 +473,7 @@ func (m Model) normalView() string {
 	sidebarH, previewH := m.splitHeight(h)
 
 	sidebarViewportH := m.sidebarViewportHeight()
-	allLines := m.sidebarLines()
-	offset := min(m.sidebarTree.ScrollOffset(), len(allLines))
-	end := min(offset+sidebarViewportH, len(allLines))
-	sidebarBody := ui.AppendScrollbar(allLines[offset:end], sidebarW-2, len(allLines), sidebarViewportH, offset)
-	sidebarView := m.renderPanel(sidebarW, sidebarH, "Tickets", m.searchMatchStatus(), sidebarBody, m.focus == focusSidebar, true)
+	sidebarView := m.renderPanel(sidebarW, sidebarH, "Tickets", m.searchMatchStatus(), m.sidebarBody(sidebarViewportH, sidebarW-2), m.focus == focusSidebar, true)
 	previewView := m.renderPanel(previewW, previewH, "Preview", m.previewMatchStatus(), m.previewLines(), m.focus == focusPreview, false)
 
 	var body string

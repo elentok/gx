@@ -193,7 +193,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // skipSectionHeader nudges the sidebar selection off a section-header entry
 // in dir's direction (+1 down, -1 up) — section headers are real tree.Entry
 // rows (needed so BuildEntriesFromValues can size the section's child count)
-// but were never cursor-reachable in the pre-migration sidebarLines(), so
+// but were never cursor-reachable in the pre-migration sidebarLines, so
 // tree.Model's own navigation needs this nudge to preserve that. If dir's
 // direction runs off the end of the entries while still on a header (e.g.
 // paging up lands back on entry 0, the open-epics header, with nowhere
@@ -201,7 +201,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // end up selected, even at a list boundary.
 func (m *Model) skipSectionHeader(dir int) {
 	idx := skipSectionHeaderDir(m.sidebarTree.Entries(), m.sidebarTree.SelectedIndex(), dir)
-	if entries := m.sidebarTree.Entries(); idx >= 0 && idx < len(entries) && entries[idx].Value.kind == nodeSection {
+	if entries := m.sidebarTree.Entries(); idx >= 0 && idx < len(entries) && isUnselectableSidebarRow(entries[idx].Value.kind) {
 		idx = skipSectionHeaderDir(entries, idx, -dir)
 	}
 	if idx != m.sidebarTree.SelectedIndex() {
@@ -210,7 +210,7 @@ func (m *Model) skipSectionHeader(dir int) {
 }
 
 func skipSectionHeaderDir(entries []tree.Entry[sidebarNode], idx, dir int) int {
-	for idx >= 0 && idx < len(entries) && entries[idx].Value.kind == nodeSection {
+	for idx >= 0 && idx < len(entries) && isUnselectableSidebarRow(entries[idx].Value.kind) {
 		next := idx + dir
 		if next < 0 || next >= len(entries) {
 			break
@@ -218,6 +218,13 @@ func skipSectionHeaderDir(entries []tree.Entry[sidebarNode], idx, dir int) int {
 		idx = next
 	}
 	return idx
+}
+
+// isUnselectableSidebarRow reports whether kind is a sidebar row that must
+// never end up as the cursor's selection: section headers, the blank
+// separator between the two sections, and an empty-section placeholder.
+func isUnselectableSidebarRow(kind sidebarNodeKind) bool {
+	return kind == nodeSection || kind == nodeBlank || kind == nodeEmpty
 }
 
 // selectFirstRow/selectLastRow implement "gg"/"G": jump the sidebar

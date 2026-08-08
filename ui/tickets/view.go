@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/tree"
 )
 
 var (
@@ -60,61 +61,56 @@ var (
 	uncheckedGlyphStyle = lipgloss.NewStyle().Foreground(ui.ColorOverlay)
 )
 
-// sidebarLines renders m.sidebarTree.Entries() as exactly two headed
-// sections — "Open epics" then "Closed epics" (mirroring the PRs tab's
-// Actionable/Non-actionable split), the same in --all mode as in the
-// single-worktree view: --all just interleaves every worktree's epics into
-// this one grouping, each epic row labeled with its worktree (renderEpicRow).
-// Each epic's expand glyph + name + (open/total) count, each ticket's status
-// icon + title indented beneath it. Row highlighting/search indexing uses
-// each entry's position in m.sidebarTree.Entries() (i).
-func (m Model) sidebarLines() []string {
-	if !m.loaded {
-		return []string{ui.StyleDim.Render("  loading…")}
-	}
-	if len(m.epics) == 0 {
-		return []string{ui.StyleMuted.Render("  no .scratch/ directory found")}
-	}
-
+// sidebarRenderOpts builds the tree.RenderOpts m.sidebarTree.RenderLines
+// renders through: every physical row (section header, blank separator,
+// empty-section placeholder, epic, ticket) is a real tree.Entry, dispatched
+// on entry.Value.kind by Label alone (Icon/MetaText/RowColor/Faint stay
+// nil — ticket 01's "Row rendering" spec). --all mode behaves the same as
+// single-worktree: it just interleaves every worktree's epics into this one
+// grouping, each epic row labeled with its worktree (renderEpicRow).
+func (m Model) sidebarRenderOpts(width int) tree.RenderOpts[sidebarNode] {
 	idxs := make([]int, len(m.epics))
 	for i := range m.epics {
 		idxs[i] = i
 	}
 	openIdxs, closedIdxs := splitEpicIndexesBySection(m.epics, idxs)
 
-	selectedIdx := m.sidebarTree.SelectedIndex()
-	var lines []string
-	for i, e := range m.sidebarTree.Entries() {
-		switch e.Value.kind {
-		case nodeSection:
-			label, n := "Open epics", len(openIdxs)
-			if e.Value.section == sectionClosed {
-				label, n = "Closed epics", len(closedIdxs)
-				lines = append(lines, "")
-			}
-			lines = append(lines, sectionHeaderStyle.Render(fmt.Sprintf("── %s (%d) ──", label, n)))
-			if n == 0 {
-				lines = append(lines, ui.StyleMuted.Render("  no "+strings.ToLower(label)))
-			}
-		case nodeEpic:
-			r, _ := rowFromEntry(e)
-			line := m.renderEpicRow(m.epics[r.epicIdx])
-			if i == selectedIdx {
-				line = ui.RenderRowHighlight(line)
-			}
-			lines = append(lines, line)
-		case nodeTicket:
-			r, _ := rowFromEntry(e)
-			rowLines := m.renderTicketRow(m.epics[r.epicIdx], r, i)
-			if i == selectedIdx {
-				for j, line := range rowLines {
-					rowLines[j] = ui.RenderRowHighlight(line)
-				}
-			}
-			lines = append(lines, rowLines...)
-		}
+	entries := m.sidebarTree.Entries()
+	idxByID := make(map[string]int, len(entries))
+	for i, e := range entries {
+		idxByID[e.ID] = i
 	}
-	return lines
+
+	return tree.RenderOpts[sidebarNode]{
+		AccentColor: ui.ColorBlue,
+		Active:      m.focus == focusSidebar,
+		Width:       width,
+		EmptyLine:   ui.StyleDim.Render("  loading…"),
+		Label: func(entry tree.Entry[sidebarNode]) string {
+			switch entry.Value.kind {
+			case nodeSection:
+				label, n := "Open epics", len(openIdxs)
+				if entry.Value.section == sectionClosed {
+					label, n = "Closed epics", len(closedIdxs)
+				}
+				return sectionHeaderStyle.Render(fmt.Sprintf("── %s (%d) ──", label, n))
+			case nodeEmpty:
+				label := "open epics"
+				if entry.Value.section == sectionClosed {
+					label = "closed epics"
+				}
+				return ui.StyleMuted.Render("no " + label)
+			case nodeBlank:
+				return ""
+			case nodeEpic:
+				r, _ := rowFromEntry(entry)
+				return m.renderEpicRow(m.epics[r.epicIdx])
+			default: // nodeTicket
+				r, _ := rowFromEntry(entry)
+				return m.renderTicketRow(m.epics[r.epicIdx], r, idxByID[entry.ID])[0]
+			}
+		},
+	}
 }
 
 func (m Model) renderEpicRow(epic tickets.Epic) string {
@@ -122,7 +118,7 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 	if m.isCollapsed(epic) {
 		glyph = m.icons().TriangleCollapsed
 	}
-	line := fmt.Sprintf("  %s %s %s (%d done / %d)", glyph, m.checkboxGlyph(m.epicChecked(epic)), epic.Name, epic.DoneCount(), epic.TotalCount())
+	line := fmt.Sprintf("%s %s %s (%d done / %d)", glyph, m.checkboxGlyph(m.epicChecked(epic)), epic.Name, epic.DoneCount(), epic.TotalCount())
 	// Dimming tracks "every ticket done", not the current collapse toggle —
 	// a fully-done epic stays dimmed even if manually expanded, and a
 	// manually-collapsed in-progress epic doesn't borrow its dimming.
@@ -138,21 +134,23 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 	return line
 }
 
-// renderTicketRow renders one physical line for every ticket. A live or done
+// renderTicketRow renders one physical line for every ticket, unindented —
+// ui/tree's renderEntry prepends the entry's own depth-based indent, so a
+// nested ticket (Parent/Children, ticket 03) needs no indent handling here.
+// The triangle column is reserved at a fixed width whether or not this row
+// has children (a childless row shows a blank in its place), so every row
+// at a given depth — siblings, and a row's own children one level in —
+// lines its checkbox up in the same column; only the triangle itself,
+// sitting left of the checkbox, reflects r.expanded. A live or done
 // ticket's line ends with the same elapsed/token metrics as the former
 // standalone ralph-loop view, appended dim italic; live rows also append
-// their phase or pause reason there. r.depth indents a nested ticket
-// (Parent/Children, ticket 03) two extra spaces per level beneath the base
-// indent, matching ui/tree's own indent unit. The triangle column is
-// reserved at a fixed width whether or not this row has children (a
-// childless row shows a blank in its place), so every row at a given depth
-// — siblings, and a row's own children one level in — lines its checkbox up
-// in the same column; only the triangle itself, sitting left of the
-// checkbox, reflects r.expanded.
+// their phase or pause reason there. Returns a single-element slice today
+// (every branch renders exactly one physical line); the []string return
+// keeps the multi-line-row seam open for a future ticket without another
+// signature change at every call site.
 func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 	t := epic.Tickets[r.ticketIdx]
 	status := epic.RenderedStatus(t)
-	indent := "    " + strings.Repeat("  ", r.depth)
 
 	triangle := strings.Repeat(" ", triangleColumnWidth(m.icons())) + " "
 	if r.hasChildren {
@@ -171,7 +169,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 	// cross-rendering as running here.
 	if m.implementingEpics[epic.Name] {
 		if live, ok := m.live[epic.Name][t.Identifier]; ok {
-			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live, indent+triangle+m.checkboxGlyph(m.isChecked(t.Path))+" "); ok {
+			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live, triangle+m.checkboxGlyph(m.isChecked(t.Path))+" "); ok {
 				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens, 0)
 				return []string{appendRowMetrics(base, joinNonEmpty(" ", suffix, metrics), metricsLineStyle)}
 			}
@@ -200,7 +198,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 		style = ui.StyleDim
 	}
 
-	line := indent + triangle + m.checkboxGlyph(m.isChecked(t.Path)) + " " + style.Render(icon)
+	line := triangle + m.checkboxGlyph(m.isChecked(t.Path)) + " " + style.Render(icon)
 	if ticketHasSuggestedActions(status, t) {
 		badgeStyle := suggestedActionBadgeStyle
 		if searchDim {
