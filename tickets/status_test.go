@@ -300,6 +300,41 @@ func TestEpic_UnresolvedBlockers_DirectSiblingTokenIsEnforced(t *testing.T) {
 	}
 }
 
+// TestEpic_UnresolvedBlockers_TransitiveThroughPrematurelyDoneForkPlaceholder
+// covers the tickets-tree bug: "06" forks into "06b" (Blocked by: 06) and
+// "06c" (Blocked by: 06b), both commitless placeholders born status: done at
+// fork time — before their own fork chains ("06b"->"06b1", "06c"->"06c1")
+// ever run. "06c1" (Blocked by: 06c) must stay blocked while "06b"'s own
+// declared blocker "06b1" is still open, even though "06c" itself already
+// reads as done — fullyDone must check a candidate blocker's own Blocked by:
+// list, not just its status field, or this false-unblocks immediately.
+func TestEpic_UnresolvedBlockers_TransitiveThroughPrematurelyDoneForkPlaceholder(t *testing.T) {
+	root := "06"
+	b := "06b"
+	c := "06c"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 6, Identifier: "06", Status: "done", Children: []string{"06b", "06c"}},
+		{Number: 6, Identifier: "06b", Parent: &root, BlockedBy: []string{"06"}, Status: "done", Commitless: true, Children: []string{"06b1"}},
+		{Number: 6, Identifier: "06b1", Parent: &b, BlockedBy: []string{"06b"}, Status: "open"},
+		{Number: 6, Identifier: "06c", Parent: &root, BlockedBy: []string{"06b"}, Status: "done", Commitless: true, Children: []string{"06c1"}},
+		{Number: 6, Identifier: "06c1", Parent: &c, BlockedBy: []string{"06c"}, Status: "open"},
+	}}
+	c1 := epic.Tickets[4]
+	got := epic.UnresolvedBlockers(c1)
+	if len(got) != 1 || got[0] != "06c" {
+		t.Fatalf("UnresolvedBlockers(06c1) = %v, want [06c] while 06b1 (06c's own blocker's child) is still open", got)
+	}
+	if status := epic.RenderedStatus(c1); status != StatusBlocked {
+		t.Errorf("RenderedStatus(06c1) = %v, want StatusBlocked", status)
+	}
+
+	epic.Tickets[2].Status = "done" // 06b1 finishes
+	got = epic.UnresolvedBlockers(c1)
+	if got != nil {
+		t.Errorf("UnresolvedBlockers(06c1) = %v, want nil once 06b1 is done", got)
+	}
+}
+
 func TestEpic_BlockingTickets_ResolvesTokensToTicketsForModal(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
 		{Number: 1, Identifier: "01", BlockedBy: []string{"2", "3"}},

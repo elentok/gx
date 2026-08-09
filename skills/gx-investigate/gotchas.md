@@ -1,5 +1,21 @@
 # gx-investigate gotchas
 
+- **A commitless mid-flight-fork placeholder's own `Blocked by:` was never enforced, letting its
+  whole fork chain start before the real blocker landed.** `tickets.Epic.fullyDone` (used by
+  `UnresolvedBlockers` to resolve whether a named blocker is really done) only checked
+  `t.IsDone()` + recursion into `t.Children` — it never checked whether `t` itself had unresolved
+  `Blocked by:`. A ticket created already `status: done` (a commitless split/fork bookkeeping
+  placeholder, e.g. `06c` forked off `06` with `Blocked by: [06b]`) never passes through
+  `claimNext`'s claim-time blocker check, so nothing ever verified its own declared blocker.
+  Anything blocked on that placeholder (e.g. `06c1`, `Blocked by: [06c]`) trusted `06c.status ==
+  done` at face value and started immediately. Found live in `tickets-tree`: `06c1` started within
+  200ms of `06b1` (`06b`'s own fork chain, which `06c` was supposed to wait on) — before `06b`'s
+  chain had done any real work. Fixed: `fullyDone` now also calls into the same
+  `unresolvedBlockers` walk for `t` itself (shared `visiting` cycle-guard across both), so a
+  blocker is only "fully done" once its own `Blocked by:` chain is genuinely resolved too, not
+  just its status field. Regression test:
+  `TestEpic_UnresolvedBlockers_TransitiveThroughPrematurelyDoneForkPlaceholder` in
+  `tickets/status_test.go`. See `tickets-tree/issues/13-epic-run-stalled-two-finished-iterations-undetected.md`.
 - **A checked/queued epic silently drops out of cross-epic auto-promotion across a `gx` process
   restart.** `MaxConcurrentEpics` (default 2, `ui/settings.go:31-35`) is meant to auto-start the
   next queued epic the instant a running one finishes (`QueueModel.startAvailableEpics`,

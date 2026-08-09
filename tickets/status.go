@@ -125,10 +125,17 @@ func (e Epic) hasOtherOpenTicket(t Ticket) bool {
 // mid-flight. A blocker with no matching ticket in e counts as unresolved
 // (it can't be verified done).
 func (e Epic) UnresolvedBlockers(t Ticket) []string {
+	return e.unresolvedBlockers(t, e.byNumberAndSuffix(), map[string]bool{})
+}
+
+// unresolvedBlockers is UnresolvedBlockers' recursive core: it takes a shared
+// byNumberAndSuffix index and visiting set so fullyDone can call back into it
+// (see below) to check a candidate blocker's own Blocked by: list, using the
+// same cycle guard across the whole walk instead of restarting one.
+func (e Epic) unresolvedBlockers(t Ticket, byNumberAndSuffix map[string]Ticket, visiting map[string]bool) []string {
 	if len(t.BlockedBy) == 0 {
 		return nil
 	}
-	byNumberAndSuffix := e.byNumberAndSuffix()
 	// A fork's children inherit the original's Blocked by: token (e.g. 05b
 	// and 05c both carry "Blocked by: 05" after 05 forks), so t's own fork
 	// siblings, reached while walking a checked ticket's own Children list,
@@ -153,7 +160,7 @@ func (e Epic) UnresolvedBlockers(t Ticket) []string {
 			// this very check.
 			continue
 		}
-		if !ok || !e.fullyDone(other, byNumberAndSuffix, exclude, map[string]bool{}) {
+		if !ok || !e.fullyDone(other, byNumberAndSuffix, exclude, visiting) {
 			unresolved = append(unresolved, token)
 		}
 	}
@@ -213,16 +220,29 @@ func (e Epic) byNumberAndSuffix() map[string]Ticket {
 	return index
 }
 
-// FullyDone reports whether t's own status is done and every one of t's
-// Children tickets is, recursively, fully done too — the check
-// UnresolvedBlockers uses in place of the plain Ticket.IsDone, so a
-// downstream ticket blocked on t doesn't unblock until t's whole subtree has
-// landed, not just t itself. Every other "is this ticket done" check
-// (claiming, frontier eligibility, re-run guards) keeps using Ticket.IsDone
-// unchanged — this is additive, specific to blocked-by resolution. Cycle-
-// guarded: a ticket already on the current recursion path is treated as
-// fully done rather than walked again, so a malformed Children/Parent loop
-// terminates instead of recursing forever.
+// FullyDone reports whether t's own status is done, t's own Blocked by: is
+// itself fully resolved, and every one of t's Children tickets is,
+// recursively, fully done too — the check UnresolvedBlockers uses in place
+// of the plain Ticket.IsDone, so a downstream ticket blocked on t doesn't
+// unblock until t's whole subtree has landed, not just t itself. Every other
+// "is this ticket done" check (claiming, frontier eligibility, re-run
+// guards) keeps using Ticket.IsDone unchanged — this is additive, specific
+// to blocked-by resolution. Cycle-guarded: a ticket already on the current
+// recursion path is treated as fully done rather than walked again, so a
+// malformed Children/Parent loop terminates instead of recursing forever.
+//
+// Checking t's own Blocked by: here (not just t.IsDone()) matters for a
+// ticket born already status: done without ever passing through the
+// scheduler's own claim-time blocker check — a commitless mid-flight-fork
+// placeholder (e.g. a "06c" split off "06", marked done at creation) never
+// goes through claimNext, so nothing else ever verifies its declared
+// Blocked by: was satisfied. Without this, a ticket blocked on that
+// placeholder (e.g. "06c1", Blocked by: "06c") would trust "06c" is done at
+// face value and start immediately, ignoring that "06c" was itself supposed
+// to wait on a still-in-progress fork family (e.g. "06b"→"06b1"→"06b2").
+// Found live in tickets-tree: "06c1" started within 200ms of "06b1", before
+// "06b"'s fork chain had done any work, because "06c"'s own Blocked by:
+// "06b" was never checked. See gx-investigate/gotchas.md.
 func (e Epic) FullyDone(t Ticket) bool {
 	return e.fullyDone(t, e.byNumberAndSuffix(), nil, map[string]bool{})
 }
@@ -242,6 +262,9 @@ func (e Epic) fullyDone(t Ticket, byNumberAndSuffix map[string]Ticket, exclude f
 	}
 	visiting[key] = true
 	if !t.IsDone() {
+		return false
+	}
+	if len(e.unresolvedBlockers(t, byNumberAndSuffix, visiting)) > 0 {
 		return false
 	}
 	for _, childID := range t.Children {
