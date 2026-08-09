@@ -99,10 +99,10 @@ func TestResolveRunScope_RejectsDuplicateIdentifier(t *testing.T) {
 	}
 }
 
-func TestRunScope_AllSettledForCompletedSubset(t *testing.T) {
+func TestRunScope_AllDoneForCompletedSubset(t *testing.T) {
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "done"},
-		{Number: 2, Identifier: "02", Status: "needs-info"},
+		{Number: 2, Identifier: "02", Status: "done"},
 		{Number: 3, Identifier: "03", Status: "open"},
 	}}
 	scope, err := ResolveRunScope(epic, []string{"01", "02"})
@@ -110,8 +110,26 @@ func TestRunScope_AllSettledForCompletedSubset(t *testing.T) {
 		t.Fatalf("ResolveRunScope() error = %v", err)
 	}
 
-	if !scope.AllSettled(epic) {
-		t.Errorf("scope.AllSettled() = false, want true for terminal subset")
+	if !scope.AllDone(epic) {
+		t.Errorf("scope.AllDone() = false, want true for a fully done subset")
+	}
+}
+
+// TestRunScope_AllDone_NeedsInfoSubsetIsNotDone covers ticket 08's inversion
+// at scope level: needs-info used to count as terminal and let a subset run
+// exit, and now must leave the run parked instead.
+func TestRunScope_AllDone_NeedsInfoSubsetIsNotDone(t *testing.T) {
+	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
+		{Number: 1, Identifier: "01", Status: "done"},
+		{Number: 2, Identifier: "02", Status: "needs-info"},
+	}}
+	scope, err := ResolveRunScope(epic, []string{"01", "02"})
+	if err != nil {
+		t.Fatalf("ResolveRunScope() error = %v", err)
+	}
+
+	if scope.AllDone(epic) {
+		t.Errorf("scope.AllDone() = true, want false while ticket 02 needs info")
 	}
 }
 
@@ -177,7 +195,7 @@ func TestRunScope_ContainsWalksParentChain(t *testing.T) {
 	}
 }
 
-func TestRunScope_AllSettled_DescendantTicketsDontTripSanityCheck(t *testing.T) {
+func TestRunScope_AllDone_DescendantTicketsDontTripSanityCheck(t *testing.T) {
 	original := "01"
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "done"},
@@ -189,8 +207,8 @@ func TestRunScope_AllSettled_DescendantTicketsDontTripSanityCheck(t *testing.T) 
 		t.Fatalf("ResolveRunScope() error = %v", err)
 	}
 
-	if !scope.AllSettled(epic) {
-		t.Errorf("scope.AllSettled() = false, want true once the requested ticket and its split descendants are all settled")
+	if !scope.AllDone(epic) {
+		t.Errorf("scope.AllDone() = false, want true once the requested ticket and its split descendants are all settled")
 	}
 }
 
@@ -281,8 +299,8 @@ func TestRunScope_UnsetRequestPreservesWholeEpicBehavior(t *testing.T) {
 	if !scope.Contains(reloaded.Tickets[1], reloaded) {
 		t.Errorf("scope.Contains(new ticket) = false, want true for whole-epic scope")
 	}
-	if scope.AllSettled(reloaded) {
-		t.Errorf("scope.AllSettled() = true, want false while new ticket is open")
+	if scope.AllDone(reloaded) {
+		t.Errorf("scope.AllDone() = true, want false while new ticket is open")
 	}
 	frontier := scope.Frontier(reloaded)
 	if len(frontier) != 1 || frontier[0].DisplayNumber() != "02" {

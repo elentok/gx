@@ -27,6 +27,10 @@ type recordingSink struct {
 	// iteration's fake AgentWait exactly once this ticket's stats have been
 	// captured, deterministically rather than via a polling loop.
 	onIterationFinished func(ticket tickets.Ticket)
+	// parkedStalled records the stalled-ticket list of every EpicParked
+	// call, so a test can assert both how many times a run parked and what
+	// it named as blocking each park.
+	parkedStalled [][]string
 	// ticketNeedsInfoCalls records every TicketNeedsInfo call's
 	// (identifier, epicName) pair, for asserting both the count and the
 	// identity a needs-info transition reports.
@@ -102,13 +106,19 @@ func (s *recordingSink) TicketRecovered(identifier, epicName, branch, landedSHA 
 func (s *recordingSink) TicketUnrecoverable(identifier, epicName string) {
 	s.record("TicketUnrecoverable")
 }
+func (s *recordingSink) EpicParked(epicName string, stalled []string) {
+	s.mu.Lock()
+	s.parkedStalled = append(s.parkedStalled, stalled)
+	s.mu.Unlock()
+	s.record("EpicParked")
+}
 func (s *recordingSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {
 	s.mu.Lock()
 	s.lastEpicElapsedSeconds = elapsedSeconds
 	s.mu.Unlock()
 	s.record("EpicComplete")
 }
-func (s *recordingSink) CherryPickStarted(identifier string)         { s.record("CherryPickStarted") }
+func (s *recordingSink) CherryPickStarted(identifier string) { s.record("CherryPickStarted") }
 func (s *recordingSink) ConflictResolutionStarted(identifier string) {
 	s.record("ConflictResolutionStarted")
 }

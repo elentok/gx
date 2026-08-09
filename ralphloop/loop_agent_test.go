@@ -217,7 +217,6 @@ func TestRun_CodexLaunchFailureAfterClaimNeedsAttention(t *testing.T) {
 	d.AgentStart = func(herdr.AgentStartOptions) (herdr.Agent, error) {
 		return herdr.Agent{}, errors.New("Herdr rejected Codex integration")
 	}
-
 	var out bytes.Buffer
 	if err := Run(RunOptions{
 		EpicName: "my-epic", Agent: AgentCodex, Skill: "implement",

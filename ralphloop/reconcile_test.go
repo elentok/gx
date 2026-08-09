@@ -337,7 +337,11 @@ func TestReconcile_NeedsAttentionOutsideScope_NotReattached(t *testing.T) {
 	}
 }
 
-func TestRun_NeedsAttentionWithoutLiveTab_DoesNotScheduleOtherTickets(t *testing.T) {
+// TestRun_NeedsAttentionWithoutLiveTab_SchedulesOtherTicketsThenParks covers
+// parking as a last resort: a needs-attention ticket with no live iteration
+// left to reattach to is human-clearable, so it must not hold up the open
+// ticket next to it — that one runs first, and only then does the run park.
+func TestRun_NeedsAttentionWithoutLiveTab_SchedulesOtherTicketsThenParks(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-attention.md": "---\nid: \"01\"\nstatus: needs-attention\ntype: task\n---\n# Attention\n",
 		"02-open.md":      "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Open\n",
@@ -345,12 +349,22 @@ func TestRun_NeedsAttentionWithoutLiveTab_DoesNotScheduleOtherTickets(t *testing
 	d, prompts, _ := fakeDeps()
 	d.TabList = func(string) ([]herdr.Tab, error) { return nil, nil }
 
-	err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&strings.Builder{}))
-	if err == nil || !strings.Contains(err.Error(), "paused") {
-		t.Fatalf("Run() error = %v, want actionable paused error", err)
+	sink := &recordingSink{}
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink); err != nil {
+		t.Fatalf("Run() error = %v, want nil (the run parks on ticket 01)", err)
 	}
-	if len(*prompts) != 0 {
-		t.Errorf("prompts = %v, want no new iteration while ticket needs attention", *prompts)
+	if len(*prompts) != 1 {
+		t.Errorf("prompts = %v, want ticket 02 run before the park", *prompts)
+	}
+	if len(sink.parkedStalled) != 1 || len(sink.parkedStalled[0]) != 1 || sink.parkedStalled[0][0] != "01" {
+		t.Errorf("EpicParked calls = %v, want one naming ticket 01", sink.parkedStalled)
+	}
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "02-open.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: done") {
+		t.Errorf("ticket 02 = %s, want it landed done before the park", raw)
 	}
 }
 

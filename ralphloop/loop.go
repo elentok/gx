@@ -185,8 +185,8 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		opts.OnScopeResolved(scope)
 	}
 	total := scope.TotalCount(*initial)
-	if scope.AllSettled(*initial) {
-		if allSettled(*initial) {
+	if scope.AllDone(*initial) {
+		if allDone(*initial) {
 			if err := tickets.StampEpicCompleted(scratchDir, opts.EpicName, d.Now()); err != nil {
 				return fmt.Errorf("stamping epic %q completed_at: %w", opts.EpicName, err)
 			}
@@ -235,8 +235,10 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	var featureMu sync.Mutex
 	var worktreeMu sync.Mutex
 
-	// launched tracks every ticket identifier this Run call has already
-	// claimed and launched (fresh or reattached). claimNext consults it
+	// launched tracks every ticket identifier this Run call currently has
+	// launched (fresh or reattached); an iteration that ends in a stalled
+	// status is removed again, so clearing that status by hand puts the
+	// ticket back in play for this same run. claimNext consults it
 	// instead of trusting the ticket file's on-disk status alone: a still-
 	// running iteration's ticket file is a shared, unlocked plain file, and
 	// an unrelated writer (e.g. a parent split ticket's agent touching its
@@ -244,10 +246,10 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	// mid-iteration. Without this guard, the next scheduler scan would see
 	// that revert and reclaim + relaunch the same ticket under its
 	// deterministic herdr agent name, colliding with the still-alive
-	// original (agent_name_taken). Only claimNext reads/writes this map, and
-	// only from Run's own goroutine (via the initial reattach loop below and
-	// the scheduling loop's own claimNext calls), so it needs no locking of
-	// its own.
+	// original (agent_name_taken). Every read and write happens on Run's own
+	// goroutine (the initial reattach loop below, claimNext, and the
+	// scheduling loop's own result handling), so it needs no locking of its
+	// own.
 	launched := make(map[string]bool)
 
 	gate := opts.Gate
@@ -371,24 +373,29 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	if err != nil {
 		return err
 	}
-	for _, ticket := range initial.Tickets {
-		if scope.Contains(ticket, *initial) && strings.EqualFold(strings.TrimSpace(ticket.Status), "needs-attention") {
-			gate.pause(iterLabel(opts.EpicName, ticket.Identifier), "needs operator attention")
-		}
-	}
+	// A ticket found needs-attention at startup deliberately does not pause
+	// the gate: it's human-clearable, so the run schedules every other
+	// runnable ticket first and only parks on it once nothing is runnable.
 	for _, ticket := range reattached {
 		launch(ticket, true)
 		active++
 		launched[ticket.Identifier] = true
 	}
 
+	// parked records that the run has already announced this park, so the
+	// poll loop below notifies once per park rather than once per tick. It
+	// resets the moment anything is running again, so a run that resumes and
+	// later parks on a different ticket announces that park too.
+	parked := false
+	parkPolls := 0
+
 	for {
 		epic, err := loadNamedEpic(scratchDir, opts.EpicName)
 		if err != nil {
 			return err
 		}
-		if scope.AllSettled(*epic) && active == 0 {
-			if allSettled(*epic) {
+		if scope.AllDone(*epic) && active == 0 {
+			if allDone(*epic) {
 				if err := tickets.StampEpicCompleted(scratchDir, opts.EpicName, d.Now()); err != nil {
 					return fmt.Errorf("stamping epic %q completed_at: %w", opts.EpicName, err)
 				}
@@ -409,15 +416,32 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		}
 
 		if active == 0 {
-			if gate.isLabelPaused(QueuePauseLabel) {
+			if gate.isPaused() {
+				// Nothing is left running to lift the pause from the inside,
+				// so block on the resume signal rather than returning: an
+				// exiting run takes its panes' recoverability with it.
 				gate.waitForResume(d, resumePath)
 				continue
 			}
-			if gate.isPaused() {
-				return fmt.Errorf("epic %q paused with no running iterations left: %v", opts.EpicName, gate.snapshot())
+			stalled := stalledTickets(*epic, scope)
+			if len(stalled) == 0 {
+				return fmt.Errorf("epic %q is deadlocked: no runnable tickets left, none done, and none a human could clear; check for a dependency cycle or a bad status", opts.EpicName)
 			}
-			return fmt.Errorf("epic %q has no unblocked tickets left but isn't all done; check for a stuck ticket", opts.EpicName)
+			if !parked {
+				sink.EpicParked(opts.EpicName, stalled)
+				parked = true
+			}
+			// No timeout: the notification has already fired, and the park
+			// ends when a human clears one of the stalled tickets, which the
+			// next pass picks up off disk.
+			d.Sleep(parkPollInterval)
+			parkPolls++
+			if d.maxParkPolls > 0 && parkPolls >= d.maxParkPolls {
+				break
+			}
+			continue
 		}
+		parked = false
 
 		r := <-results
 		active--
@@ -427,13 +451,14 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			// whole epic's run — that leaves every other in-flight ticket's
 			// live-event stream dead too, with no way to recover short of
 			// restarting the loop. Flag just this ticket needs-attention
-			// (terminal per allSettled, excluded from future claims) and
-			// keep scheduling the rest.
+			// (out of the frontier, so never reclaimed until a human clears
+			// it) and keep scheduling the rest.
 			reason := r.err.Error()
 			label := iterLabel(opts.EpicName, r.ticket.Identifier)
 			if markErr := MarkNeedsAttentionWithReason(r.ticket.Path, reason); markErr != nil {
 				reason = fmt.Sprintf("%s (also failed marking needs-attention: %v)", reason, markErr)
 			}
+			delete(launched, r.ticket.Identifier)
 			sink.IterationPaused(label, PauseNeedsAttention, reason)
 			continue
 		}
@@ -451,6 +476,13 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			for _, t := range landedEpic.Tickets {
 				if t.Identifier == r.ticket.Identifier {
 					landedTicket = t
+					// An iteration that ended stalled (needs-info, most
+					// commonly) is no longer launched, so a human clearing
+					// its status puts it back in the frontier for this run
+					// instead of only for the next one.
+					if isHumanClearable(*landedEpic, t) {
+						delete(launched, t.Identifier)
+					}
 					break
 				}
 			}
@@ -489,8 +521,10 @@ func scanDecisions(epic tickets.Epic, scope RunScope, frontier []tickets.Ticket,
 			d.Decision = "claimed"
 		case !scope.Contains(t, epic):
 			d.Decision = "out-of-scope"
-		case isSettledStatus(status):
-			d.Decision = "settled"
+		case status == tickets.StatusDone:
+			d.Decision = "done"
+		case isHumanClearable(epic, t):
+			d.Decision = "stalled"
 		case inFrontier[t.Path]:
 			d.Decision = "frontier"
 		case status == tickets.StatusBlocked:
@@ -504,40 +538,54 @@ func scanDecisions(epic tickets.Epic, scope RunScope, frontier []tickets.Ticket,
 	return decisions
 }
 
-// allSettled reports whether every ticket in e has reached a terminal state
-// from the loop's perspective: done, needs-info (an iteration that finished
-// with no commits to land, left for inspection), or needs-attention (Codex
-// operator intervention, or a done ticket startup reconciliation found
-// unrecoverable — see markDoneTicketUnrecoverable). Unlike
-// tickets.Epic.AllDone — which only tickets in the done family and is shared
-// with the tickets UI's collapse/expand rendering — these count as terminal
-// here too, so the loop can exit cleanly once every remaining ticket is
-// either landed or stuck needing a human, rather than looping forever
-// (Frontier already excludes both from scheduling). A needs-attention ticket
-// still tied to a live, running iteration keeps active above zero until that
-// iteration settles, so this doesn't race the gate-pause path in Run.
-func allSettled(e tickets.Epic) bool {
+// allDone reports whether every ticket in e is done — the run's one exit
+// condition. A stalled ticket (see isHumanClearable) is deliberately not an
+// exit condition: the run parks on it instead, so the agent's question is
+// still answerable in its own pane.
+func allDone(e tickets.Epic) bool {
 	if len(e.Tickets) == 0 {
 		return false
 	}
 	for _, t := range e.Tickets {
-		if !isSettledStatus(e.RenderedStatus(t)) {
+		if e.RenderedStatus(t) != tickets.StatusDone {
 			return false
 		}
 	}
 	return true
 }
 
-// isSettledStatus reports whether a rendered status counts as terminal from
-// the loop's perspective — shared by allSettled and RunScope.AllSettled so
-// the done/needs-info/needs-attention set is defined in exactly one place.
-func isSettledStatus(status tickets.RenderedStatus) bool {
-	switch status {
-	case tickets.StatusDone, tickets.StatusNeedsInfo, tickets.StatusNeedsAttention:
+// draftStatus is the raw ticket status meaning "allocated but not yet
+// written". It's matched off Ticket.Status rather than a RenderedStatus
+// constant so the loop's parking behavior holds both before and after the
+// status joins the schema's own enum.
+const draftStatus = "draft"
+
+// isHumanClearable reports whether t is stalled on a person rather than on
+// the run: needs-info (an iteration finished with no commits to land),
+// needs-attention (operator intervention, or a done ticket reconciliation
+// found unrecoverable — see markDoneTicketUnrecoverable), or draft (a stub
+// nobody has filled in yet). None of these ever appear in the frontier, so a
+// run with only these left has nothing to schedule — but a person can clear
+// any of them, which is what separates parking from a deadlock.
+func isHumanClearable(e tickets.Epic, t tickets.Ticket) bool {
+	switch e.RenderedStatus(t) {
+	case tickets.StatusNeedsInfo, tickets.StatusNeedsAttention:
 		return true
-	default:
-		return false
 	}
+	return strings.EqualFold(strings.TrimSpace(t.Status), draftStatus)
+}
+
+// stalledTickets lists the identifiers of every in-scope, human-clearable
+// ticket in e, in file order — what a park notification names as the thing
+// waiting on a person.
+func stalledTickets(e tickets.Epic, scope RunScope) []string {
+	var stalled []string
+	for _, t := range e.Tickets {
+		if scope.Contains(t, e) && isHumanClearable(e, t) {
+			stalled = append(stalled, t.Identifier)
+		}
+	}
+	return stalled
 }
 
 // loadNamedEpic loads scratchDir and returns the epic named name, or nil if

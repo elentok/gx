@@ -285,7 +285,7 @@ func TestRun_ProductionRealGit_TicketCreatesSubtickets(t *testing.T) {
 	handler, commitOrder, openTabCount, closedTabCount := subticketsFakeHerdr(t, linkedWorktreeDir(t, repoDir), epicName, onImplement)
 	herdrfake.Start(t, handler)
 
-	deps := DefaultDeps()
+	deps := testDeps()
 	deps.Sleep = func(time.Duration) {}
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 
@@ -361,7 +361,7 @@ func TestRun_ProductionRealGit_CodeReviewTicketCreatesSubtickets(t *testing.T) {
 	handler, commitOrder, openTabCount, closedTabCount := subticketsFakeHerdr(t, linkedWorktreeDir(t, repoDir), epicName, onImplement)
 	herdrfake.Start(t, handler)
 
-	deps := DefaultDeps()
+	deps := testDeps()
 	deps.Sleep = func(time.Duration) {}
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 

@@ -312,9 +312,11 @@ func TestRun_BackfilledProvenance_UnblocksDependentsAndCompletesEpic(t *testing.
 	}
 
 	var firstRun bytes.Buffer
-	err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&firstRun))
-	if err == nil {
-		t.Fatalf("Run() (before backfill) error = nil, want a stuck-epic error — ticket 02 has no landing evidence and must not be silently trusted")
+	// Ticket 02 is flagged needs-attention, which blocks ticket 03 and leaves
+	// nothing runnable: the run parks on the flag rather than trusting the
+	// unproven done, and waits for the backfill below.
+	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&firstRun)); err != nil {
+		t.Fatalf("Run() (before backfill) error = %v, want the run to park on ticket 02's flag", err)
 	}
 
 	raw, err := os.ReadFile(filepath.Join(scratchDir, "my-epic", "issues", "02-b.md"))

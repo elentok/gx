@@ -264,7 +264,7 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 	herdrfake.StartState(t, s)
 
 	scratchDir := t.TempDir()
-	d := DefaultDeps()
+	d := testDeps()
 	d.Sleep = func(time.Duration) {}
 	d.Now = func() time.Time { return time.Unix(0, 0) }
 

@@ -150,7 +150,7 @@ func TestRun_ProductionRealGit_AThenBAndCConcurrently(t *testing.T) {
 
 	herdrfake.Start(t, handler)
 
-	deps := DefaultDeps()
+	deps := testDeps()
 	deps.Sleep = func(time.Duration) {}
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 
@@ -479,7 +479,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 
 	herdrfake.Start(t, handler)
 
-	deps := DefaultDeps()
+	deps := testDeps()
 	deps.Sleep = func(time.Duration) {}
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	baseSHA, err := git.RevParse(repoDir, "HEAD")
@@ -885,7 +885,7 @@ func TestRun_ProductionRealGit_CodexCompactsThenCompletes(t *testing.T) {
 	})
 	herdrfake.StartState(t, s)
 
-	deps := DefaultDeps()
+	deps := testDeps()
 	deps.PreflightAgent = func(AgentKind) error { return nil }
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	deps.Sleep = func(time.Duration) {}

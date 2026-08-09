@@ -87,7 +87,7 @@ func TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp(t *testing.T
 	})
 	herdrfake.StartState(t, s)
 
-	deps := DefaultDeps()
+	deps := testDeps()
 	deps.PreflightAgent = func(AgentKind) error { return nil }
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	deps.Sleep = func(time.Duration) {}
@@ -394,7 +394,7 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T
 	})
 	herdrfake.StartState(t, s)
 
-	deps := DefaultDeps()
+	deps := testDeps()
 	deps.PreflightAgent = func(AgentKind) error { return nil }
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	deps.Sleep = func(time.Duration) {}
@@ -557,7 +557,7 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 	})
 	herdrfake.StartState(t, s)
 
-	deps := DefaultDeps()
+	deps := testDeps()
 	deps.PreflightAgent = func(AgentKind) error { return nil }
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	deps.Sleep = func(time.Duration) {}

@@ -159,7 +159,7 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 	s.AdvanceVirtualTime(3 * time.Minute)
 
 	scratchDir := t.TempDir()
-	deps := DefaultDeps()
+	deps := testDeps()
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
 
@@ -383,7 +383,7 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 	s.AdvanceVirtualTime(8 * time.Minute)
 
 	scratchDir := t.TempDir()
-	deps := DefaultDeps()
+	deps := testDeps()
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
 

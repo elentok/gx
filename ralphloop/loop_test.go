@@ -35,6 +35,15 @@ func writeEpic(t *testing.T, epicName string, tickets map[string]string) string 
 	return scratchDir
 }
 
+// testDeps is DefaultDeps for a test: real behavior everywhere except that a
+// run which parks gives up after one poll instead of waiting for a person who
+// will never arrive. Tests about parking itself set maxParkPolls back to 0.
+func testDeps() Deps {
+	d := DefaultDeps()
+	d.maxParkPolls = 1
+	return d
+}
+
 // fakeDeps returns a Deps wired to in-memory fakes plus a record of prompt
 // texts sent (in call order) and worktree branches removed, for assertions.
 // All fake operations are safe to call concurrently, since Run may run
@@ -144,6 +153,9 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		},
 		Sleep: func(time.Duration) {},
 		Now:   time.Now,
+		// One poll, so a run that parks still returns for the assertions;
+		// a test about the park itself raises or clears this itself.
+		maxParkPolls: 1,
 	}
 	return d, &promptsSlice, &removedSlice
 }
@@ -568,28 +580,36 @@ func TestRun_NoEpicFound_NoOpSummary(t *testing.T) {
 	}
 }
 
-// TestAllSettled_NeedsAttentionCountsAsTerminal exercises ticket 03's exit
-// requirement: a needs-attention ticket (whether Codex's own operator-
-// intervention path, or startup reconciliation's unrecoverable-done flag)
-// must not keep the loop spinning forever the way an open/claimed/blocked
-// ticket would.
-func TestAllSettled_NeedsAttentionCountsAsTerminal(t *testing.T) {
+// TestAllDone_NeedsAttentionIsNotComplete covers ticket 08's central
+// inversion: a needs-attention ticket used to count as terminal and end the
+// run, and now must not — the run parks on it instead.
+func TestAllDone_NeedsAttentionIsNotComplete(t *testing.T) {
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
 		{Number: 1, Status: "done"},
 		{Number: 2, Status: "needs-attention"},
 	}}
-	if !allSettled(epic) {
-		t.Errorf("allSettled() = false, want true when every ticket is done or needs-attention")
+	if allDone(epic) {
+		t.Errorf("allDone() = true, want false while ticket 2 needs attention")
 	}
 }
 
-func TestAllSettled_OpenTicketNotSettled(t *testing.T) {
+func TestAllDone_OpenTicketIsNotComplete(t *testing.T) {
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
 		{Number: 1, Status: "done"},
 		{Number: 2, Status: "open"},
 	}}
-	if allSettled(epic) {
-		t.Errorf("allSettled() = true, want false while ticket 2 is still open")
+	if allDone(epic) {
+		t.Errorf("allDone() = true, want false while ticket 2 is still open")
+	}
+}
+
+func TestAllDone_EveryTicketDone(t *testing.T) {
+	epic := tickets.Epic{Tickets: []tickets.Ticket{
+		{Number: 1, Status: "done"},
+		{Number: 2, Status: "done"},
+	}}
+	if !allDone(epic) {
+		t.Errorf("allDone() = false, want true when every ticket is done")
 	}
 }
 
@@ -770,30 +790,30 @@ func TestRun_NeedsAttentionOutsideSubset_DoesNotPauseRun(t *testing.T) {
 	}
 }
 
-// TestRun_NeedsAttentionInsideSubset_StillPausesRun covers the flip side of
-// the above: a needs-attention ticket the caller did select keeps its
-// existing safety behavior — it still gate-pauses the run rather than
-// letting scheduling of the rest of the subset proceed silently.
-func TestRun_NeedsAttentionInsideSubset_StillPausesRun(t *testing.T) {
+// TestRun_NeedsAttentionInsideSubset_RunsTheRestThenParks covers the flip
+// side of the above: a needs-attention ticket the caller did select no longer
+// stops the run outright. It's human-clearable, so the rest of the subset is
+// scheduled first and the run only parks once nothing else is runnable.
+func TestRun_NeedsAttentionInsideSubset_RunsTheRestThenParks(t *testing.T) {
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md":  "---\nid: \"01\"\nstatus: needs-attention\ntype: task\n---\n# First\n",
 		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
 	})
 	d, prompts, _ := fakeDeps()
 
-	var out bytes.Buffer
+	sink := &recordingSink{}
 	err := Run(RunOptions{
 		EpicName:   "my-epic",
 		Skill:      "implement",
 		ScratchDir: scratchDir,
 		RepoDir:    "/fake/repo",
 		TicketIDs:  []string{"01", "02"},
-	}, d, NewTextEventSink(&out))
-	if err == nil {
-		t.Fatalf("Run() error = nil, want the selected needs-attention ticket 01 to still pause scheduling of ticket 02")
+	}, d, sink)
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil (a stalled ticket parks, it doesn't fail the run)", err)
 	}
-	if len(*prompts) != 0 {
-		t.Fatalf("prompts = %v, want none (ticket 02 must never launch while the gate is paused)", *prompts)
+	if len(*prompts) == 0 {
+		t.Fatalf("prompts = %v, want ticket 02 launched rather than held behind ticket 01", *prompts)
 	}
 }
 

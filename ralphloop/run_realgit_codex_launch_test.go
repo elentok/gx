@@ -97,7 +97,7 @@ exit 1
 				})
 			}
 
-			deps := DefaultDeps()
+			deps := testDeps()
 			deps.Sleep = func(time.Duration) {}
 
 			var out bytes.Buffer
@@ -135,7 +135,7 @@ func TestRun_ProductionRealGit_MissingSkillFailsBeforeClaim(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
-	deps := DefaultDeps()
+	deps := testDeps()
 	deps.Sleep = func(time.Duration) {}
 
 	var out bytes.Buffer
@@ -203,7 +203,7 @@ func TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsAttention(t *tes
 	})
 	herdrfake.StartState(t, s)
 
-	deps := DefaultDeps()
+	deps := testDeps()
 	deps.PreflightAgent = func(AgentKind) error { return nil }
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	deps.Sleep = func(time.Duration) {}
@@ -425,7 +425,7 @@ func TestRun_ProductionRealGit_CodexRestartReattachesAndLandsOnce(t *testing.T) 
 		contextReads = append(contextReads, struct{ cwd, sessionID string }{cwd, sid})
 	}
 
-	d1 := DefaultDeps()
+	d1 := testDeps()
 	d1.PreflightAgent = func(AgentKind) error { return nil }
 	d1.VerifySkill = func(AgentKind, string) error { return nil }
 	d1.Sleep = func(time.Duration) {}
@@ -485,7 +485,7 @@ func TestRun_ProductionRealGit_CodexRestartReattachesAndLandsOnce(t *testing.T) 
 		t.Fatalf("phase after invocation 1 freeze = %q, want implementing", phase)
 	}
 
-	d2 := DefaultDeps()
+	d2 := testDeps()
 	d2.PreflightAgent = func(AgentKind) error { return nil }
 	d2.VerifySkill = func(AgentKind, string) error { return nil }
 	d2.Sleep = func(time.Duration) {}

@@ -3,6 +3,7 @@ package ralphloop
 import (
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 
 	"github.com/elentok/gx/tickets"
@@ -152,9 +153,15 @@ type EventSink interface {
 	// flagged needs-attention for a human to inspect.
 	TicketUnrecoverable(identifier, epicName string)
 
-	// EpicComplete reports that every ticket in epicName reached a terminal
-	// state, with completed tickets landed by this Run call, after
-	// elapsedSeconds of total wall-clock run time.
+	// EpicParked reports that epicName has no runnable work left and is
+	// waiting, without a timeout, on a person to clear one of the stalled
+	// tickets (identifiers, in file order). Unlike EpicComplete this is not
+	// the end of the run: the run keeps polling and carries on by itself once
+	// a status clears.
+	EpicParked(epicName string, stalled []string)
+	// EpicComplete reports that every ticket in epicName is done, with
+	// completed tickets landed by this Run call, after elapsedSeconds of
+	// total wall-clock run time.
 	EpicComplete(epicName string, completed int, elapsedSeconds int)
 }
 
@@ -175,17 +182,18 @@ func (noopEventSink) IterationPaused(label string, kind PauseKind, reason string
 func (noopEventSink) IterationResumed(label string, kind PauseKind)               {}
 func (noopEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
 }
-func (noopEventSink) TranscriptLine(label, line string)                           {}
-func (noopEventSink) ContextOccupancy(identifier string, tokens int)              {}
-func (noopEventSink) CherryPickStarted(identifier string)                            {}
-func (noopEventSink) ConflictResolutionStarted(identifier string)                    {}
-func (noopEventSink) SmartZoneCompactStarted(identifier string)                      {}
-func (noopEventSink) SmartZoneFinishingUp(identifier string)                         {}
-func (noopEventSink) SmartZoneRecovered(identifier string)                           {}
-func (noopEventSink) TicketCleanupFinished(identifier string)                        {}
-func (noopEventSink) TicketRecovering(identifier string)                             {}
-func (noopEventSink) TicketRecovered(identifier, epicName, branch, landedSHA string) {}
-func (noopEventSink) TicketUnrecoverable(identifier, epicName string)                {}
+func (noopEventSink) TranscriptLine(label, line string)                               {}
+func (noopEventSink) ContextOccupancy(identifier string, tokens int)                  {}
+func (noopEventSink) CherryPickStarted(identifier string)                             {}
+func (noopEventSink) ConflictResolutionStarted(identifier string)                     {}
+func (noopEventSink) SmartZoneCompactStarted(identifier string)                       {}
+func (noopEventSink) SmartZoneFinishingUp(identifier string)                          {}
+func (noopEventSink) SmartZoneRecovered(identifier string)                            {}
+func (noopEventSink) TicketCleanupFinished(identifier string)                         {}
+func (noopEventSink) TicketRecovering(identifier string)                              {}
+func (noopEventSink) TicketRecovered(identifier, epicName, branch, landedSHA string)  {}
+func (noopEventSink) TicketUnrecoverable(identifier, epicName string)                 {}
+func (noopEventSink) EpicParked(epicName string, stalled []string)                    {}
 func (noopEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {}
 
 // textEventSink implements EventSink by rendering each event as the same
@@ -293,6 +301,10 @@ func (s *textEventSink) TicketRecovered(identifier, epicName, branch, landedSHA 
 
 func (s *textEventSink) TicketUnrecoverable(identifier, epicName string) {
 	s.printf("ticket %s: done but commits missing from %s and no iteration branch left to recover them; marked needs-attention\n", identifier, epicName)
+}
+
+func (s *textEventSink) EpicParked(epicName string, stalled []string) {
+	s.printf("ralph-loop %q parked: nothing runnable left; waiting on %s\n", epicName, strings.Join(stalled, ", "))
 }
 
 func (s *textEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {

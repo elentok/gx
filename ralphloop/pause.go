@@ -12,6 +12,12 @@ import (
 // signal file while paused.
 const resumePollInterval = 2 * time.Second
 
+// parkPollInterval is how often a parked run (nothing runnable, something
+// human-clearable) re-reads the epic looking for a status a person has
+// cleared. Slower than resumePollInterval on purpose: every pass writes a
+// scheduler-scan line to the run log, and a park can last hours.
+const parkPollInterval = 30 * time.Second
+
 // QueuePauseLabel identifies the in-process pause controlled by the Queue UI.
 const QueuePauseLabel = "queue"
 

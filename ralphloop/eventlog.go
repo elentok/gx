@@ -57,6 +57,7 @@ const (
 	notifyKindIterationFinished = "iteration-finished"
 	notifyKindIterationPaused   = "iteration-paused"
 	notifyKindEpicComplete      = "epic-complete"
+	notifyKindEpicParked        = "epic-parked"
 	notifyKindTicketNeedsInfo   = "ticket-needs-info"
 )
 

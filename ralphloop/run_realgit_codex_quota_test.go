@@ -175,7 +175,7 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 
 	var rateLimitMu sync.Mutex
 	rateLimitCalls := 0
-	deps := DefaultDeps()
+	deps := testDeps()
 	deps.Sleep = func(time.Duration) {}
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	deps.PreflightAgent = func(AgentKind) error { return nil }
@@ -525,7 +525,7 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 
 	var rateLimitMu sync.Mutex
 	rateLimitCalls := 0
-	deps := DefaultDeps()
+	deps := testDeps()
 	deps.Sleep = func(time.Duration) {}
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	deps.PreflightAgent = func(AgentKind) error { return nil }

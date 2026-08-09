@@ -93,6 +93,11 @@ func (s *slackEventSink) TicketNeedsInfo(identifier, epicName string) {
 	s.send(slackStyle.ticketNeedsInfoText(identifier, epicName), notifyKindTicketNeedsInfo)
 }
 
+func (s *slackEventSink) EpicParked(epicName string, stalled []string) {
+	s.EventSink.EpicParked(epicName, stalled)
+	s.send(slackStyle.epicParkedText(epicName, stalled), notifyKindEpicParked)
+}
+
 func (s *slackEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {
 	s.EventSink.EpicComplete(epicName, completed, elapsedSeconds)
 	s.send(slackStyle.epicCompleteText(epicName, completed, elapsedSeconds), notifyKindEpicComplete)

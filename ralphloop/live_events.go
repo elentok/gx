@@ -24,6 +24,7 @@ const (
 	LiveEventTicketRecovering
 	LiveEventTicketRecovered
 	LiveEventTicketUnrecoverable
+	LiveEventEpicParked
 	LiveEventEpicComplete
 	LiveEventCherryPickStarted
 	LiveEventConflictResolutionStarted
@@ -67,6 +68,9 @@ type LiveEvent struct {
 	// ElapsedSeconds (EpicComplete only) is the run's total wall-clock
 	// duration.
 	ElapsedSeconds int
+	// Stalled (EpicParked only) names the human-clearable tickets the parked
+	// run is waiting on.
+	Stalled []string
 }
 
 // ChannelEventSink implements EventSink by forwarding every call as a
@@ -164,6 +168,10 @@ func (s *ChannelEventSink) TicketRecovered(identifier, epicName, branch, landedS
 
 func (s *ChannelEventSink) TicketUnrecoverable(identifier, epicName string) {
 	s.emit(LiveEvent{Kind: LiveEventTicketUnrecoverable, Identifier: identifier, EpicName: epicName})
+}
+
+func (s *ChannelEventSink) EpicParked(epicName string, stalled []string) {
+	s.emit(LiveEvent{Kind: LiveEventEpicParked, EpicName: epicName, Stalled: stalled})
 }
 
 func (s *ChannelEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {

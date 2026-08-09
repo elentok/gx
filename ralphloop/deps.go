@@ -51,15 +51,15 @@ type Deps struct {
 	// DeleteBranch force-deletes an iteration's now-redundant branch once its
 	// commits have landed on the feature branch (as different hashes, via
 	// cherry-pick — never merged, so a non-force delete would refuse it).
-	DeleteBranch         func(repoDir, branch string) error
-	TabCreate            func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error)
-	TabClose             func(tabID string) error
-	TabList              func(workspaceID string) ([]herdr.Tab, error)
-	AgentStart           func(opts herdr.AgentStartOptions) (herdr.Agent, error)
-	AgentPrompt          func(opts herdr.AgentPromptOptions) (herdr.Agent, error)
-	AgentGet             func(target string) (herdr.Agent, error)
-	AgentWait            func(opts herdr.AgentWaitOptions) (herdr.Agent, error)
-	AgentSendKeys        func(target string, keys ...string) error
+	DeleteBranch  func(repoDir, branch string) error
+	TabCreate     func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error)
+	TabClose      func(tabID string) error
+	TabList       func(workspaceID string) ([]herdr.Tab, error)
+	AgentStart    func(opts herdr.AgentStartOptions) (herdr.Agent, error)
+	AgentPrompt   func(opts herdr.AgentPromptOptions) (herdr.Agent, error)
+	AgentGet      func(target string) (herdr.Agent, error)
+	AgentWait     func(opts herdr.AgentWaitOptions) (herdr.Agent, error)
+	AgentSendKeys func(target string, keys ...string) error
 	// AgentRead reads pane's terminal output, used to confirm a submitted
 	// prompt has actually rendered rather than still sitting unsubmitted (see
 	// confirmCompactSubmitted).
@@ -129,6 +129,15 @@ type Deps struct {
 	// Now returns the current time, injectable so a rate-limit reset
 	// deadline can be tested without a real wall-clock wait.
 	Now func() time.Time
+
+	// maxParkPolls caps how many times a parked run polls before it returns
+	// normally. Zero means uncapped, which is what production wants: a run
+	// with nothing runnable and something a human could clear waits for that
+	// person however long it takes. It is unexported so only this package's
+	// tests can set it — most of them are about the stalled state a run
+	// leaves on disk, not about the park itself, and would otherwise wait
+	// forever for a human who never arrives.
+	maxParkPolls int
 }
 
 // DefaultDeps wires Deps to the real herdr, git, and transcript packages.

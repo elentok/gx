@@ -133,6 +133,20 @@ func (s mrkdwnStyle) epicCompleteText(epicName string, completed int, elapsedSec
 	)
 }
 
+// epicParkedText renders the "epic parked" notification — the run is still
+// alive (unlike epicCompleteText) with every pane recoverable, waiting on a
+// person to clear one of the named tickets:
+//
+//	🅿️ *epic parked: {epicName}*
+//
+//	Nothing runnable left; waiting on {stalled}
+func (s mrkdwnStyle) epicParkedText(epicName string, stalled []string) string {
+	return fmt.Sprintf(
+		"\U0001f17f️ *epic parked: %s*\n\n%s",
+		s.escape(epicName), s.escape("Nothing runnable left; waiting on "+strings.Join(stalled, ", ")),
+	)
+}
+
 // testMessageText renders the fixed message `gx config test-notifications`
 // sends to confirm a configured service is actually reachable:
 //

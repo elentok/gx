@@ -281,6 +281,8 @@ func TestRun_UnfinishedConflict_IsAbortedBeforeNextTicketLands(t *testing.T) {
 		active = false
 		return nil
 	}
+	// Ticket 01's conflict leaves it needs-attention, so this run ends parked
+	// on it (see testDeps) rather than exiting; ticket 02 still has to land.
 
 	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo", MaxParallel: 1}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -317,7 +319,6 @@ func TestRun_CherryPickConflict_ResolutionNeverFinishes_MarksNeedsAttentionWitho
 		}
 		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 	}
-
 	var out bytes.Buffer
 	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
 		t.Fatalf("Run() error = %v, want a stuck conflict-resolution agent to mark needs-attention rather than abort the run", err)

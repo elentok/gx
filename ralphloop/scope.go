@@ -127,14 +127,14 @@ func findTicketByID(epic tickets.Epic, id string) (tickets.Ticket, bool) {
 	return tickets.Ticket{}, false
 }
 
-// AllSettled reports whether every originally-requested ticket has reached a
-// terminal status. It counts against foundRequested (only tickets from the
-// original request), not the scope's full membership - dynamically
-// discovered Parent descendants are also required to be settled below,
-// but their presence must not trip the requested-count sanity check.
-func (s RunScope) AllSettled(epic tickets.Epic) bool {
+// AllDone reports whether every originally-requested ticket is done. It
+// counts against foundRequested (only tickets from the original request),
+// not the scope's full membership - dynamically discovered Parent
+// descendants are also required to be done below, but their presence must
+// not trip the requested-count sanity check.
+func (s RunScope) AllDone(epic tickets.Epic) bool {
 	if s.wholeEpic {
-		return allSettled(epic)
+		return allDone(epic)
 	}
 
 	foundRequested := 0
@@ -145,7 +145,7 @@ func (s RunScope) AllSettled(epic tickets.Epic) bool {
 		if s.containsID(ticket.DisplayNumber()) {
 			foundRequested++
 		}
-		if !isSettledStatus(epic.RenderedStatus(ticket)) {
+		if epic.RenderedStatus(ticket) != tickets.StatusDone {
 			return false
 		}
 	}
