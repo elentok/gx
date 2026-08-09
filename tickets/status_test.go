@@ -444,3 +444,46 @@ func TestEpic_RenderedStatus_CodeReviewIgnoresOwnBlockedBy(t *testing.T) {
 		t.Errorf("RenderedStatus(code-review) = %v, want StatusOpen: its own Blocked by: is irrelevant", got)
 	}
 }
+
+func TestEpic_RenderedStatus_CodeReviewBlockedByUnfinishedForkSubtree(t *testing.T) {
+	parent := "01"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 9, Identifier: "09", Type: typeCodeReview, Status: "open"},
+		{Number: 1, Identifier: "01", Status: "done"},
+		{Number: 1, Identifier: "01a", Status: "open", Parent: &parent},
+	}}
+	got := epic.RenderedStatus(epic.Tickets[0])
+	if got != StatusBlocked {
+		t.Errorf("RenderedStatus(code-review) = %v, want StatusBlocked: fork child 01a isn't done even though root 01 is", got)
+	}
+}
+
+func TestEpic_RenderedStatus_CodeReviewTicketsDontBlockEachOther(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{
+		{Number: 9, Identifier: "09", Type: typeCodeReview, Status: "open"},
+		{Number: 10, Identifier: "10", Type: typeCodeReview, Status: "open"},
+		{Number: 1, Identifier: "01", Status: "done"},
+	}}
+	got9 := epic.RenderedStatus(epic.Tickets[0])
+	if got9 != StatusOpen {
+		t.Errorf("RenderedStatus(09) = %v, want StatusOpen: a code-review ticket must not wait on another code-review ticket", got9)
+	}
+	got10 := epic.RenderedStatus(epic.Tickets[1])
+	if got10 != StatusOpen {
+		t.Errorf("RenderedStatus(10) = %v, want StatusOpen: a code-review ticket must not wait on another code-review ticket", got10)
+	}
+}
+
+func TestEpic_UnresolvedBlockers_CodeReviewExpansionNotWrittenToTicket(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{
+		{Number: 9, Identifier: "09", Type: typeCodeReview, Status: "open"},
+		{Number: 1, Identifier: "01", Status: "open"},
+	}}
+	reviewTicket := epic.Tickets[0]
+	if got := epic.UnresolvedBlockers(reviewTicket); len(got) == 0 {
+		t.Fatalf("UnresolvedBlockers(code-review) = empty, want the synthesized blocker for 01")
+	}
+	if len(reviewTicket.BlockedBy) != 0 {
+		t.Errorf("reviewTicket.BlockedBy = %v, want unchanged (empty): the expansion must not be written back to the ticket", reviewTicket.BlockedBy)
+	}
+}

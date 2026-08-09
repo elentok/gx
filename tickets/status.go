@@ -88,19 +88,12 @@ func (t Ticket) baseStatus() RenderedStatus {
 // RenderedStatus computes t's rendered status within e: t's base status,
 // overlaid with "blocked" when t has an unresolved Blocked by: and its base
 // status is open or claimed (needs-info and done tickets keep their own
-// state regardless of Blocked by:). A type: code-review ticket uses a
-// different overlay in place of Blocked by: (see hasOtherOpenTicket) — it
-// deliberately carries no explicit Blocked by: list, so there's nothing for
-// UnresolvedBlockers to check.
+// state regardless of Blocked by:). A type: code-review ticket's Blocked by:
+// is synthesized rather than read from its file (see effectiveBlockedBy),
+// but is otherwise resolved the same way as every other ticket's.
 func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
 	base := t.baseStatus()
 	if base != StatusOpen && base != StatusClaimed {
-		return base
-	}
-	if t.Type == typeCodeReview {
-		if e.hasOtherOpenTicket(t) {
-			return StatusBlocked
-		}
 		return base
 	}
 	if len(e.UnresolvedBlockers(t)) > 0 {
@@ -109,20 +102,33 @@ func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
 	return base
 }
 
-// hasOtherOpenTicket reports whether e has any ticket, other than t itself,
-// that isn't done — the eligibility gate for a type: code-review ticket
-// (RenderedStatus), which reviews the whole epic and so must wait for every
-// other ticket in it, independent of its own (empty) Blocked by:.
-func (e Epic) hasOtherOpenTicket(t Ticket) bool {
+// effectiveBlockedBy returns t's Blocked by: tokens for scheduling: for
+// every ticket type but code-review, t's literal, on-file BlockedBy. A
+// type: code-review ticket's tokens are synthesized here instead — one
+// lettered token per other non-code-review ticket in e, so the review waits
+// on the rest of the epic without ever writing a wall of ids into its own
+// file. This is a resolver-side view recomputed on every call: it is never
+// written back, so the preview panel keeps showing the literal frontmatter
+// (see ui/tickets' preview_frontmatter.go), and it is not frozen at claim
+// time — a ticket added or forked into the epic after the review was
+// claimed is picked up by the next call. Two code-review tickets never
+// block each other, since neither is included in the other's expansion.
+func (e Epic) effectiveBlockedBy(t Ticket) []string {
+	if t.Type != typeCodeReview {
+		return t.BlockedBy
+	}
+	var tokens []string
 	for _, other := range e.Tickets {
+		if other.Type == typeCodeReview {
+			continue
+		}
 		if other.Number == t.Number && other.Identifier == t.Identifier {
 			continue
 		}
-		if !other.IsDone() {
-			return true
-		}
+		_, suffix := splitBlockedByToken(other.Identifier)
+		tokens = append(tokens, siblingKey(other.Number, suffix))
 	}
-	return false
+	return tokens
 }
 
 // Blocking is the refactor's single predicate: t counts as blocking anything
@@ -160,13 +166,14 @@ func (e Epic) blocking(t Ticket, forkChildren map[string][]Ticket) bool {
 // (recursively forked) descendants. A blocker with no matching ticket in e
 // counts as unresolved (it can't be verified done).
 func (e Epic) UnresolvedBlockers(t Ticket) []string {
-	if len(t.BlockedBy) == 0 {
+	blockedBy := e.effectiveBlockedBy(t)
+	if len(blockedBy) == 0 {
 		return nil
 	}
 	byNumberAndSuffix := e.byNumberAndSuffix()
 	forkChildren := e.forkChildren()
 	var unresolved []string
-	for _, token := range t.BlockedBy {
+	for _, token := range blockedBy {
 		num, letters := splitBlockedByToken(token)
 		other, ok := byNumberAndSuffix[siblingKey(num, letters)]
 		if !ok || e.blocking(other, forkChildren) {

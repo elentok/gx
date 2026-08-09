@@ -322,7 +322,7 @@ func TestRun_ProductionRealGit_TicketCreatesSubtickets(t *testing.T) {
 // TestRun_ProductionRealGit_CodeReviewTicketCreatesSubtickets is ticket
 // creates-subtickets's sibling scenario: 02 is type: code-review (eligible
 // only once every other ticket in the epic is done, see
-// Epic.hasOtherOpenTicket) rather than a plain task. It stays blocked while
+// Epic.effectiveBlockedBy) rather than a plain task. It stays blocked while
 // 01 runs, becomes frontier once 01 lands, and then splits mid-run exactly
 // like a regular ticket - writing 02a/02b (parent: "02") after its own
 // commit. Run must still start those findings tickets and only then consider
