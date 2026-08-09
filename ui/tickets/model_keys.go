@@ -168,64 +168,22 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if result.OpenSelected {
 		m.focus = focusPreview
 	}
-	if result.SelectionChanged {
-		dir := 1
-		if s := msg.String(); s == "k" || s == "up" {
-			dir = -1
-		}
-		m.skipUnselectableRow(dir)
-	}
+	// BindingMoveDown/BindingMoveUp already self-skip non-selectable rows
+	// inside tree.Model.Update (see SetIsSelectable/SkipUnselectable) — no
+	// extra nudge needed here for j/k/up/down.
 	if !result.Handled {
 		if match, consumed := m.sidebarTree.Keys().Process(msg); consumed && match != nil {
 			switch match.ID {
 			case tree.BindingPageDown:
 				m.sidebarTree.ScrollPage(list.DefaultScroll)
-				m.skipUnselectableRow(1)
+				m.sidebarTree.SkipUnselectable(1)
 			case tree.BindingPageUp:
 				m.sidebarTree.ScrollPage(-list.DefaultScroll)
-				m.skipUnselectableRow(-1)
+				m.sidebarTree.SkipUnselectable(-1)
 			}
 		}
 	}
 	return m, cmd
-}
-
-// skipUnselectableRow nudges the sidebar selection off an unselectable entry
-// (the blank separator row, or an empty-section placeholder) in dir's
-// direction (+1 down, -1 up) — those rows are real tree.Entry rows (needed so
-// BuildEntriesFromValues can size the section's child count) but must never
-// hold the cursor. If dir's direction runs off the end of the entries while
-// still on an unselectable row (e.g. paging up lands back on entry 0 with
-// nowhere further up to go), it retries the opposite direction — an
-// unselectable row must never end up selected, even at a list boundary.
-func (m *Model) skipUnselectableRow(dir int) {
-	idx := skipUnselectableRowDir(m.sidebarTree.Entries(), m.sidebarTree.SelectedIndex(), dir)
-	if entries := m.sidebarTree.Entries(); idx >= 0 && idx < len(entries) && isUnselectableSidebarRow(entries[idx].Value.kind) {
-		idx = skipUnselectableRowDir(entries, idx, -dir)
-	}
-	if idx != m.sidebarTree.SelectedIndex() {
-		m.sidebarTree.SetSelectedIndex(idx)
-	}
-}
-
-func skipUnselectableRowDir(entries []tree.Entry[sidebarNode], idx, dir int) int {
-	for idx >= 0 && idx < len(entries) && isUnselectableSidebarRow(entries[idx].Value.kind) {
-		next := idx + dir
-		if next < 0 || next >= len(entries) {
-			break
-		}
-		idx = next
-	}
-	return idx
-}
-
-// isUnselectableSidebarRow reports whether kind is a sidebar row that must
-// never end up as the cursor's selection: the blank separator between the
-// two sections, and an empty-section placeholder. Section headers (nodeSection)
-// are real, cursor-reachable rows — collapsing/expanding a section is a
-// selectable action like any epic or ticket row.
-func isUnselectableSidebarRow(kind sidebarNodeKind) bool {
-	return kind == nodeBlank || kind == nodeEmpty
 }
 
 // selectFirstRow/selectLastRow implement "gg"/"G": jump the sidebar
@@ -235,7 +193,7 @@ func (m *Model) selectFirstRow() {
 		return
 	}
 	m.sidebarTree.SetSelectedIndex(0)
-	m.skipUnselectableRow(1)
+	m.sidebarTree.SkipUnselectable(1)
 }
 
 func (m *Model) selectLastRow() {
@@ -244,7 +202,7 @@ func (m *Model) selectLastRow() {
 		return
 	}
 	m.sidebarTree.SetSelectedIndex(n - 1)
-	m.skipUnselectableRow(-1)
+	m.sidebarTree.SkipUnselectable(-1)
 }
 
 // toggleHideDone flips the "tc" hide-complete filter and rebuilds the

@@ -152,6 +152,9 @@ func NewModelWithStore(worktreeRoot string, settings ui.Settings, extraKeys keys
 	snapshot := store.Snapshot()
 	km := newTicketsManager()
 	sidebarTree := tree.NewModel[sidebarNode]()
+	sidebarTree.SetIsSelectable(func(n sidebarNode) bool {
+		return n.kind != nodeBlank && n.kind != nodeEmpty
+	})
 	return Model{
 		worktreeRoot:       worktreeRoot,
 		settings:           settings,
@@ -319,7 +322,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 // nudges off one if the rebuilt entries left the selection sitting on one.
 func (m *Model) clampSelected() {
 	m.sidebarTree.SetEntries(m.buildSidebarEntries())
-	m.skipUnselectableRow(1)
+	m.sidebarTree.SkipUnselectable(1)
 }
 
 // sidebarViewportHeight is the sidebar body's visible line count, matching
@@ -386,7 +389,7 @@ func (m Model) handleSidebarMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cm
 	}
 	m.focus = focusSidebar
 	m.sidebarTree.SetSelectedIndex(idx)
-	m.skipUnselectableRow(1)
+	m.sidebarTree.SkipUnselectable(1)
 	return m, nil
 }
 

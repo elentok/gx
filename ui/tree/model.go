@@ -32,13 +32,66 @@ type Entry[T any] struct {
 // Model owns tree list state (selection/scroll/search), reusing the same
 // generic ui/list, ui/search and ui/keys wiring ui/commit and ui/status use.
 type Model[T any] struct {
-	entries   []Entry[T]
-	collapsed map[string]bool
-	list      list.Model
-	visibleH  int
+	entries      []Entry[T]
+	collapsed    map[string]bool
+	list         list.Model
+	visibleH     int
+	isSelectable IsSelectableFunc[T]
 
 	search search.Model
 	keys   keys.Manager
+}
+
+// IsSelectableFunc reports whether a value's row may hold the cursor
+// selection. Unset (nil, the default) means every entry is selectable —
+// consumers with decorative/non-leaf rows (blank separators, section
+// placeholders) opt in via SetIsSelectable and SkipUnselectable instead of
+// hand-rolling their own skip logic.
+type IsSelectableFunc[T any] func(T) bool
+
+// SetIsSelectable registers fn as the tree's selectability policy for
+// SkipUnselectable. Each consumer keeps its own policy (which node kinds
+// count as decorative); ui/tree only owns the generic skip mechanism.
+func (m *Model[T]) SetIsSelectable(fn IsSelectableFunc[T]) {
+	m.isSelectable = fn
+}
+
+func (m Model[T]) isEntrySelectable(idx int) bool {
+	if m.isSelectable == nil || idx < 0 || idx >= len(m.entries) {
+		return true
+	}
+	return m.isSelectable(m.entries[idx].Value)
+}
+
+// SkipUnselectable nudges the current selection off a non-selectable entry
+// (per SetIsSelectable) in dir's direction (+1 down, -1 up). If dir's
+// direction runs off the end of the entries while still on a non-selectable
+// row (e.g. paging up lands back on entry 0 with nowhere further up to go),
+// it retries the opposite direction — a non-selectable row must never end up
+// selected, even at a list boundary. A no-op if SetIsSelectable was never
+// called.
+func (m *Model[T]) SkipUnselectable(dir int) {
+	if m.isSelectable == nil {
+		return
+	}
+	idx := m.skipUnselectableDir(m.list.Selected(), dir)
+	if !m.isEntrySelectable(idx) {
+		idx = m.skipUnselectableDir(idx, -dir)
+	}
+	if idx != m.list.Selected() {
+		m.SetSelectedIndex(idx)
+	}
+}
+
+func (m Model[T]) skipUnselectableDir(idx, dir int) int {
+	for !m.isEntrySelectable(idx) {
+		next := idx + dir
+		if next < 0 || next >= len(m.entries) {
+			break
+		}
+		idx = next
+	}
+	return idx
 }
 
 type Result struct {
@@ -224,9 +277,11 @@ func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd, Result) {
 			switch match.ID {
 			case BindingMoveDown:
 				m.list.Navigate(+1, len(m.entries), m.visibleH)
+				m.SkipUnselectable(+1)
 				return m, nil, Result{Handled: true, SelectionChanged: m.list.Selected() != prevSelected}
 			case BindingMoveUp:
 				m.list.Navigate(-1, len(m.entries), m.visibleH)
+				m.SkipUnselectable(-1)
 				return m, nil, Result{Handled: true, SelectionChanged: m.list.Selected() != prevSelected}
 			case BindingCollapse:
 				if collapseSelected(m.entries, m.collapsed, m.list.Selected()) {

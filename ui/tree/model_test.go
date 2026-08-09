@@ -47,6 +47,56 @@ func TestModelUpdate_NavigationAndOpen(t *testing.T) {
 	}
 }
 
+// TestModelUpdate_SkipsUnselectableRows exercises the shared selectability
+// hook (SetIsSelectable/SkipUnselectable) that ui/tickets' sidebar migrated
+// its bespoke skipUnselectableRow mechanism onto: a value of 0 stands in for
+// a decorative row (e.g. a blank separator) that must never hold the cursor.
+func TestModelUpdate_SkipsUnselectableRows(t *testing.T) {
+	m := NewModel[int]()
+	m.SetIsSelectable(func(v int) bool { return v != 0 })
+	m.SetEntries([]Entry[int]{
+		{ID: "a", Value: 1},
+		{ID: "blank", Value: 0},
+		{ID: "b", Value: 2},
+	})
+
+	next, _, result := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	if !result.Handled {
+		t.Fatal("expected j to be handled")
+	}
+	if next.SelectedIndex() != 2 {
+		t.Fatalf("selected=%d want=2 (blank row at 1 skipped)", next.SelectedIndex())
+	}
+
+	next, _, result = next.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
+	if !result.Handled {
+		t.Fatal("expected k to be handled")
+	}
+	if next.SelectedIndex() != 0 {
+		t.Fatalf("selected=%d want=0 (blank row at 1 skipped)", next.SelectedIndex())
+	}
+}
+
+// TestSkipUnselectable_BoundaryRetriesOppositeDirection covers the case
+// where the selection is already sitting on a non-selectable row and the
+// requested direction runs off the end of the entries — SkipUnselectable
+// must retry the opposite direction rather than leaving the selection on a
+// non-selectable row.
+func TestSkipUnselectable_BoundaryRetriesOppositeDirection(t *testing.T) {
+	m := NewModel[int]()
+	m.SetIsSelectable(func(v int) bool { return v != 0 })
+	m.SetEntries([]Entry[int]{
+		{ID: "blank", Value: 0},
+		{ID: "a", Value: 1},
+	})
+	m.SetSelectedIndex(0)
+
+	m.SkipUnselectable(-1)
+	if m.SelectedIndex() != 1 {
+		t.Fatalf("selected=%d want=1 (retry opposite direction off the top boundary)", m.SelectedIndex())
+	}
+}
+
 func TestModelUpdate_ExpandCollapse(t *testing.T) {
 	m := NewModel[int]()
 	m.SetEntries([]Entry[int]{
