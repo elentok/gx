@@ -25,9 +25,11 @@ func (m QueueModel) ModalOpen() bool {
 // entry's title, mirroring the Tickets tab's recomputeSearchMatches
 // (search.go). Header/separator/error entries never match.
 func (m *QueueModel) recomputeQueueSearchMatches() {
-	q := strings.ToLower(strings.TrimSpace(m.search.Query()))
+	rawQuery := m.search.Query()
+	q := strings.ToLower(strings.TrimSpace(rawQuery))
 	if q == "" {
 		m.search.SetMatches(nil)
+		m.queueTree.Search().SetPassiveResults("", nil)
 		return
 	}
 
@@ -41,6 +43,11 @@ func (m *QueueModel) recomputeQueueSearchMatches() {
 		}
 	}
 	m.search.SetMatches(matches)
+	// renderQueueTicketRow dims via m.queueTree.SearchMatch, which reads the
+	// tree's own search state (including HasQuery, keyed off its own query
+	// string) — keep it in step with m.search or every row dims as a false
+	// non-match.
+	m.queueTree.Search().SetPassiveResults(rawQuery, matches)
 }
 
 // jumpToCurrentQueueMatch moves the selection to the search cursor's current

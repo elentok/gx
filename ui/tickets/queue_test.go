@@ -143,7 +143,8 @@ func TestQueueModelNestsChildrenUnderParentAndCollapsesWithHL(t *testing.T) {
 		t.Fatalf("expected an expanded-triangle glyph for the parent row:\n%s", content)
 	}
 
-	// m.queueTree.SelectedIndex() starts at 0 (the parent row): "h" collapses its children.
+	// Select the parent row (now behind the epic's header rows) before "h" collapses its children.
+	m = selectFirstQueueTicketRow(t, m)
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	m = updated.(QueueModel)
 	rows = m.rows()
@@ -1147,6 +1148,27 @@ func loadQueueModel(t *testing.T, m QueueModel) QueueModel {
 	return updated.(QueueModel)
 }
 
+// selectFirstQueueTicketRow moves the selection to the first nodeQueueTicket
+// entry, skipping the per-epic separator/status/context header rows that now
+// precede it. Several tests assumed SetSelectedIndex(0)/SelectedIndex()==0
+// landed on the first ticket row before buildQueueEntries started emitting
+// those headers.
+func selectFirstQueueTicketRow(t *testing.T, m QueueModel) QueueModel {
+	t.Helper()
+	for i, e := range m.queueTree.Entries() {
+		if e.Value.kind == nodeQueueTicket {
+			m.queueTree.SetSelectedIndex(i)
+			// syncQueuePreviewViewport normally runs inside Update; moving
+			// selection directly on queueTree bypasses that, so re-run it
+			// here to keep previewVP in sync with the new selection.
+			m.syncQueuePreviewViewport()
+			return m
+		}
+	}
+	t.Fatalf("expected at least one ticket row, found none")
+	return m
+}
+
 func TestQueueModelPersistsRunningThenDoneStatusThroughStore(t *testing.T) {
 	// not parallel-safe: reassigns the package-level ralphLoopRegistry/runRalphLoop singletons
 	root := testutil.TempRepo(t)
@@ -1655,6 +1677,7 @@ func TestQueueModelShowsPreviewPaneForSelectedTicket(t *testing.T) {
 
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+	m = selectFirstQueueTicketRow(t, m)
 
 	content := ansi.Strip(m.View().Content)
 	if !strings.Contains(content, "Preview") {
@@ -1768,6 +1791,7 @@ func TestQueueModelPreviewScrollsPastTruncationPoint(t *testing.T) {
 	checked := map[string]bool{ticketPath(root, "alpha", "01-ticket.md"): true}
 
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+	m = selectFirstQueueTicketRow(t, m)
 
 	initial := ansi.Strip(m.previewVP.View())
 	if !strings.Contains(initial, "TOPMARKERXYZ") {
@@ -1805,7 +1829,7 @@ func TestQueueModelGAndGGJumpSelectionToLastAndFirstRow(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	m = updated.(QueueModel)
-	last := len(m.rows()) - 1
+	last := len(m.queueTree.Entries()) - 1
 	if last <= 0 {
 		t.Fatalf("expected more than one row in test setup, got %d", last+1)
 	}
@@ -1872,8 +1896,17 @@ func TestQueueSearch_TypedCharactersFilterAndHighlight(t *testing.T) {
 
 	dimPrefix := strings.SplitN(ui.StyleDim.Render("PROBE"), "PROBE", 2)[0]
 	rows := m.rows()
-	matchedLine := m.renderQueueTicketRow(rows[0], 0)
-	nonMatchedLine := m.renderQueueTicketRow(rows[1], 1)
+	var ticketRows []int
+	for i, e := range m.queueTree.Entries() {
+		if e.Value.kind == nodeQueueTicket {
+			ticketRows = append(ticketRows, i)
+		}
+	}
+	if len(ticketRows) != 2 {
+		t.Fatalf("expected 2 ticket rows, got %d: %v", len(ticketRows), ticketRows)
+	}
+	matchedLine := m.renderQueueTicketRow(rows[0], ticketRows[0])
+	nonMatchedLine := m.renderQueueTicketRow(rows[1], ticketRows[1])
 	if strings.Contains(matchedLine, dimPrefix) {
 		t.Fatalf("expected matching row undimmed, got: %q", matchedLine)
 	}

@@ -26,7 +26,7 @@ func TestQueueModel_XOpensConfirmModalListingFullCascade(t *testing.T) {
 		ticketPath(root, "alpha", "02-dependent.md"): true,
 	}
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
-	m.queueTree.SetSelectedIndex(0) // row 0 is the first ticket row (no epic header row in queue tab)
+	m = selectFirstQueueTicketRow(t, m)
 
 	updated, _ := m.Update(xPress())
 	m = updated.(QueueModel)
@@ -61,7 +61,7 @@ func TestQueueModel_XConfirmedDeletesCascadeAndClearsDoneSurvivor(t *testing.T) 
 		ticketPath(root, "alpha", "03-behind-done.md"):    true,
 	}
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
-	m.queueTree.SetSelectedIndex(0)
+	m = selectFirstQueueTicketRow(t, m)
 
 	updated, _ := m.Update(xPress())
 	m = updated.(QueueModel)
