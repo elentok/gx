@@ -613,19 +613,19 @@ func TestAllDone_EveryTicketDone(t *testing.T) {
 	}
 }
 
-// TestAllSettled_WaitingForChildrenNotSettled covers ticket 05: a done
-// ticket whose fork subtree (Parent, ticket 03) is still open renders as
-// waiting-for-children, which must not count as terminal — otherwise the
-// loop (and StampEpicCompleted) would report an epic complete with unfinished
+// TestAllDone_WaitingForChildrenNotDone covers ticket 05: a done ticket whose
+// fork subtree (Parent, ticket 03) is still open renders as
+// waiting-for-children, which must not count as terminal — otherwise the loop
+// (and StampEpicCompleted) would report an epic complete with unfinished
 // forked work still inside it.
-func TestAllSettled_WaitingForChildrenNotSettled(t *testing.T) {
+func TestAllDone_WaitingForChildrenNotDone(t *testing.T) {
 	parent := "1"
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "done"},
 		{Number: 1, Identifier: "01a", Status: "open", Parent: &parent},
 	}}
-	if allSettled(epic) {
-		t.Errorf("allSettled() = true, want false: ticket 01 is waiting-for-children")
+	if allDone(epic) {
+		t.Errorf("allDone() = true, want false: ticket 01 is waiting-for-children")
 	}
 }
 
