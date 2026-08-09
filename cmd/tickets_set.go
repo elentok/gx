@@ -3,9 +3,11 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/spf13/cobra"
 )
@@ -53,6 +55,7 @@ func newTicketsSetCmd() *cobra.Command {
 		ticketType            string
 		expectedContextWindow string
 		commitless            string
+		force                 bool
 	)
 
 	cmd := &cobra.Command{
@@ -60,7 +63,7 @@ func newTicketsSetCmd() *cobra.Command {
 		Short: "validated, sparse frontmatter writes to a ticket file",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runTicketsSet(c, args[0], c.OutOrStdout())
+			return runTicketsSet(c, args[0], c.OutOrStdout(), c.ErrOrStderr())
 		},
 	}
 
@@ -71,6 +74,7 @@ func newTicketsSetCmd() *cobra.Command {
 	cmd.Flags().StringVar(&ticketType, "type", "", "set the type field")
 	cmd.Flags().StringVar(&expectedContextWindow, "expected-context-window", "", "set expected_context_window")
 	cmd.Flags().StringVar(&commitless, "commitless", "", "set commitless (true/false)")
+	cmd.Flags().BoolVar(&force, "force", false, "allow --status done despite unresolved blocked_by")
 
 	return cmd
 }
@@ -130,7 +134,17 @@ func parseCSVIDs(value string) []schema.TicketID {
 // runTicketsSet applies every flag actually passed on c to path's ticket via
 // schema.UpdateTicket, then prints a summary of just the fields changed this
 // call. Flags never passed leave their Ticket field exactly as parsed.
-func runTicketsSet(c *cobra.Command, path string, w io.Writer) error {
+func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer) error {
+	if c.Flags().Changed("status") {
+		status, _ := c.Flags().GetString("status")
+		if schema.Status(status) == schema.StatusDone {
+			force, _ := c.Flags().GetBool("force")
+			if err := checkBlockersBeforeDone(path, force, stderr); err != nil {
+				return err
+			}
+		}
+	}
+
 	var changed []string
 
 	err := schema.UpdateTicket(path, func(t *schema.Ticket) {
@@ -148,5 +162,63 @@ func runTicketsSet(c *cobra.Command, path string, w io.Writer) error {
 	}
 
 	fmt.Fprintf(w, "%s: updated (%s)\n", path, strings.Join(changed, ", "))
+	return nil
+}
+
+// checkBlockersBeforeDone refuses a --status done write for a ticket whose
+// own blocked_by isn't actually resolved, unless force is set — closing the
+// gap where an agent could mark a ticket done without ever going through the
+// scheduler's own claim-time blocker check (ralphloop's claimNext), which is
+// how a mid-flight-fork placeholder can be born already-done with an
+// unverified blocker (see gx-investigate/gotchas.md and
+// tickets/status.go's FullyDone doc comment). Only enforced for tickets
+// living under the tracker's <epic>/issues/<file>.md layout — anything else
+// (ad-hoc files) is left unchecked, since there's no epic to resolve
+// blockers against.
+func checkBlockersBeforeDone(path string, force bool, stderr io.Writer) error {
+	issuesDir := filepath.Dir(path)
+	if filepath.Base(issuesDir) != "issues" {
+		return nil
+	}
+	epicPath := filepath.Dir(issuesDir)
+
+	epic, unlock, err := tickets.LoadLockedEpic(epicPath)
+	if err != nil {
+		return fmt.Errorf("checking blockers before marking done: %w", err)
+	}
+	defer unlock()
+
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+
+	var target *tickets.Ticket
+	for i := range epic.Tickets {
+		if tp, err := filepath.Abs(epic.Tickets[i].Path); err == nil && tp == absPath {
+			target = &epic.Tickets[i]
+			break
+		}
+	}
+	if target == nil {
+		return nil
+	}
+
+	unresolved := epic.UnresolvedBlockers(*target)
+	if len(unresolved) == 0 {
+		return nil
+	}
+
+	if !force {
+		return fmt.Errorf(
+			"%s has unresolved blocked_by (%s); refusing to mark done without --force",
+			path, strings.Join(unresolved, ", "),
+		)
+	}
+
+	fmt.Fprintf(stderr,
+		"warning: %s forced done with unresolved blocked_by (%s) — anything blocked on it will trust this status without the blocker having actually finished\n",
+		path, strings.Join(unresolved, ", "),
+	)
 	return nil
 }

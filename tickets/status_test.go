@@ -273,8 +273,9 @@ func TestEpic_UnresolvedBlockers_InheritedTokenNotBlockedByOwnDescendant(t *test
 // TestEpic_UnresolvedBlockers_DirectSiblingTokenIsEnforced covers the
 // opposite of ForkSiblingsDontBlockEachOther above: 02c's "Blocked by: 02b"
 // names its fork sibling 02b directly rather than their shared parent, so
-// isSelfOrForkSiblingOrDescendant's sibling-Parent exclusion (needed for the inherited-
-// token case) must not apply here — 02b's real status has to be checked.
+// isForkSibling's shared-Parent exclusion (needed for the inherited-token
+// case, see unresolvedBlockers) must not apply here — 02b's real status has
+// to be checked.
 func TestEpic_UnresolvedBlockers_DirectSiblingTokenIsEnforced(t *testing.T) {
 	original := "02"
 	epic := Epic{Tickets: []Ticket{
@@ -332,6 +333,83 @@ func TestEpic_UnresolvedBlockers_TransitiveThroughPrematurelyDoneForkPlaceholder
 	got = epic.UnresolvedBlockers(c1)
 	if got != nil {
 		t.Errorf("UnresolvedBlockers(06c1) = %v, want nil once 06b1 is done", got)
+	}
+}
+
+// TestEpic_UnresolvedBlockers_MisparentedGrandchildStillEnforced covers the
+// gotchas.md-documented mistake live in tickets-tree four times: a ticket's
+// own Parent gets written as the fork root instead of its real direct
+// parent. 05b1 really is 05b's child (05b.Children lists it correctly), but
+// 05b1.Parent is mis-written as "05" — the same value 05c.Parent carries.
+// Before isForkSibling's exclusion was made conditional on an inherited
+// token, this made 05b1 look like 05c's own fork sibling and skipped it
+// entirely, so 05c (Blocked by: 05b, a direct target, not inherited) read
+// as unblocked while 05b1 was still open.
+func TestEpic_UnresolvedBlockers_MisparentedGrandchildStillEnforced(t *testing.T) {
+	root := "05"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 5, Identifier: "05", Status: "done", Commitless: true, Children: []string{"05b", "05c"}},
+		{Number: 5, Identifier: "05b", Parent: &root, Status: "done", Commitless: true, Children: []string{"05b1"}},
+		{Number: 5, Identifier: "05b1", Parent: &root, Status: "open"}, // mis-parented: should be "05b"
+		{Number: 5, Identifier: "05c", Parent: &root, BlockedBy: []string{"05b"}, Status: "open"},
+	}}
+	c := epic.Tickets[3]
+	got := epic.UnresolvedBlockers(c)
+	if len(got) != 1 || got[0] != "05b" {
+		t.Fatalf("UnresolvedBlockers(05c) = %v, want [05b]: 05b1 (05b's real child, mis-parented to root) is still open", got)
+	}
+
+	epic.Tickets[2].Status = "done" // 05b1 finishes
+	got = epic.UnresolvedBlockers(c)
+	if got != nil {
+		t.Errorf("UnresolvedBlockers(05c) = %v, want nil once 05b and 05b1 are both done", got)
+	}
+}
+
+// TestEpic_UnresolvedBlockers_MisparentedSelfDoesNotDeadlockOnOwnBlocker
+// covers the flip side of the mis-parenting above: 05c's own Parent is
+// mis-written as its direct blocker "05b" instead of the real fork root
+// "05". Deriving descendants from Parent (see childrenIndex) would
+// otherwise make 05c reachable as its own blocker's descendant — without
+// isSelfOrDescendant's unconditional (not inherited-token-gated) exclusion,
+// resolving 05c's own blocker would require 05c itself to be done first: a
+// permanent deadlock, since 05c can't finish before its own blocker
+// resolves.
+func TestEpic_UnresolvedBlockers_MisparentedSelfDoesNotDeadlockOnOwnBlocker(t *testing.T) {
+	blocker := "05b"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 5, Identifier: "05", Status: "done"},
+		{Number: 5, Identifier: "05b", Status: "done"},
+		{Number: 5, Identifier: "05c", Parent: &blocker, BlockedBy: []string{"05b"}, Status: "open"},
+	}}
+	c := epic.Tickets[2]
+	if got := epic.UnresolvedBlockers(c); got != nil {
+		t.Fatalf("UnresolvedBlockers(05c) = %v, want nil: 05b is done and 05c must be excluded from its own blocker's subtree check", got)
+	}
+}
+
+// TestEpic_UnresolvedBlockers_SharedOpenDescendantCheckedIndependently covers
+// the visiting-memo hazard fullyDone's defer-delete fix closes: "20d" is a
+// real, still-open child of two different blockers ("20p".Children and
+// "20q".Children both list it — a duplicate-bookkeeping slip, not a cycle).
+// A permanent (never-unwound) visiting flag would set visiting["20d"] = true
+// the instant fullyDone first descends into it while resolving "20t"'s first
+// token ("20p") — before even checking whether "20d" is actually done — and
+// then wrongly report "20d" as done when it's reached again resolving the
+// second token ("20q"), since visiting only guards the current recursion
+// path, not the whole call.
+func TestEpic_UnresolvedBlockers_SharedOpenDescendantCheckedIndependently(t *testing.T) {
+	root := "20"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 20, Identifier: "20", Status: "done", Children: []string{"20p", "20q"}},
+		{Number: 20, Identifier: "20p", Parent: &root, Status: "done", Children: []string{"20d"}},
+		{Number: 20, Identifier: "20q", Parent: &root, Status: "done", Children: []string{"20d"}},
+		{Number: 20, Identifier: "20d", Parent: &root, Status: "open"},
+		{Number: 20, Identifier: "20t", Parent: &root, BlockedBy: []string{"20p", "20q"}, Status: "open"},
+	}}
+	got := epic.UnresolvedBlockers(epic.Tickets[4])
+	if len(got) != 2 || got[0] != "20p" || got[1] != "20q" {
+		t.Fatalf("UnresolvedBlockers(20t) = %v, want [20p 20q]: 20d (their shared open child) must be re-checked resolving each token, not memoized true after the first", got)
 	}
 }
 
@@ -455,11 +533,11 @@ func TestEpic_FullyDone_CycleTerminates(t *testing.T) {
 	}
 }
 
-// TestIsSelfOrForkSiblingOrDescendant exercises the exclude predicate
-// fullyDone's recursion uses directly, independent of UnresolvedBlockers'
-// higher-level scenarios above, so each edge (self, sibling, direct child,
-// grandchild, ancestor, unrelated) is pinned down on its own.
-func TestIsSelfOrForkSiblingOrDescendant(t *testing.T) {
+// TestIsSelfOrDescendant exercises the unconditional half of fullyDone's
+// exclude predicate on its own — self, direct child, and grandchild must
+// always be excluded regardless of which kind of Blocked by: token is being
+// resolved; an ancestor or an unrelated ticket must not be.
+func TestIsSelfOrDescendant(t *testing.T) {
 	root := "01"
 	mechanism := "01a"
 	notification := "01b"
@@ -467,7 +545,7 @@ func TestIsSelfOrForkSiblingOrDescendant(t *testing.T) {
 		{Number: 1, Identifier: "01", Status: "done", Children: []string{"01a", "01b"}},
 		{Number: 1, Identifier: "01a", Parent: &root, Status: "ready-for-agent"},
 		{Number: 1, Identifier: "01b", Parent: &mechanism, Status: "open"},     // child of 01a
-		{Number: 1, Identifier: "01c", Parent: &root, Status: "open"},          // true sibling of 01a
+		{Number: 1, Identifier: "01c", Parent: &root, Status: "open"},          // true sibling of 01a, NOT a descendant
 		{Number: 1, Identifier: "01b1", Parent: &notification, Status: "open"}, // grandchild, via 01b
 		{Number: 2, Identifier: "02", Status: "open"},                          // unrelated ticket
 	}}
@@ -481,16 +559,43 @@ func TestIsSelfOrForkSiblingOrDescendant(t *testing.T) {
 		want  bool
 	}{
 		{"self", t01a, true},
-		{"true sibling (shared Parent)", byID["01c"], true},
 		{"direct child", byID["01b"], true},
 		{"grandchild reached via child", byID["01b1"], true},
+		{"fork sibling (shared Parent, not a descendant)", byID["01c"], false},
 		{"own ancestor (root)", byID["01"], false},
 		{"unrelated ticket, no Parent link at all", byID["02"], false},
 	}
 	for _, c := range cases {
-		if got := isSelfOrForkSiblingOrDescendant(t01a, c.other, byNumberAndSuffix); got != c.want {
-			t.Errorf("isSelfOrForkSiblingOrDescendant(01a, %s) = %v, want %v", c.other.Identifier, got, c.want)
+		if got := isSelfOrDescendant(t01a, c.other, byNumberAndSuffix); got != c.want {
+			t.Errorf("isSelfOrDescendant(01a, %s) = %v, want %v", c.other.Identifier, got, c.want)
 		}
+	}
+}
+
+// TestIsForkSibling exercises the conditional half of fullyDone's exclude
+// predicate: two tickets sharing a Parent are fork siblings regardless of
+// descent, but this alone must never decide exclusion — unresolvedBlockers
+// only applies it when the token being resolved is inherited from an
+// ancestor (see TestEpic_UnresolvedBlockers_DirectSiblingTokenIsEnforced and
+// TestEpic_UnresolvedBlockers_InheritedTokenExcludesDirectForkSibling below).
+func TestIsForkSibling(t *testing.T) {
+	root := "01"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, Identifier: "01", Status: "done"},
+		{Number: 1, Identifier: "01a", Parent: &root, Status: "open"},
+		{Number: 1, Identifier: "01b", Parent: &root, Status: "open"},
+		{Number: 2, Identifier: "02", Status: "open"},
+	}}
+	byID := ticketsByIdentifier(epic)
+
+	if !isForkSibling(byID["01a"], byID["01b"]) {
+		t.Error("isForkSibling(01a, 01b) = false, want true: both forked from 01")
+	}
+	if isForkSibling(byID["01a"], byID["01"]) {
+		t.Error("isForkSibling(01a, 01) = true, want false: 01 is 01a's Parent, not a shared-Parent sibling")
+	}
+	if isForkSibling(byID["01a"], byID["02"]) {
+		t.Error("isForkSibling(01a, 02) = true, want false: 02 has no Parent at all")
 	}
 }
 

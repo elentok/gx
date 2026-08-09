@@ -118,72 +118,88 @@ func (e Epic) hasOtherOpenTicket(t Ticket) bool {
 // fork's children a direct, walkable edge, so a bare-number token no longer
 // has to stand in for a whole number family the way it did when 04, 04a, 04b
 // were only ever linked by sharing Number 4. The resolution check is
-// Epic.FullyDone of that one named ticket, which recurses into its own
-// Children — so a downstream ticket blocked on a since-forked ticket still
-// waits for every one of its (recursively forked) children, without that
-// ticket's Blocked by: list ever needing hand-editing when a blocker forks
-// mid-flight. A blocker with no matching ticket in e counts as unresolved
-// (it can't be verified done).
+// Epic.FullyDone of that one named ticket, which recurses into its whole
+// descendant subtree — so a downstream ticket blocked on a since-forked
+// ticket still waits for every one of its (recursively forked) descendants,
+// without that ticket's Blocked by: list ever needing hand-editing when a
+// blocker forks mid-flight. A blocker with no matching ticket in e counts as
+// unresolved (it can't be verified done).
 func (e Epic) UnresolvedBlockers(t Ticket) []string {
-	return e.unresolvedBlockers(t, e.byNumberAndSuffix(), map[string]bool{})
+	return e.unresolvedBlockers(t, e.byNumberAndSuffix(), e.childrenIndex(), map[string]bool{})
 }
 
-// unresolvedBlockers is UnresolvedBlockers' recursive core: it takes a shared
-// byNumberAndSuffix index and visiting set so fullyDone can call back into it
-// (see below) to check a candidate blocker's own Blocked by: list, using the
-// same cycle guard across the whole walk instead of restarting one.
-func (e Epic) unresolvedBlockers(t Ticket, byNumberAndSuffix map[string]Ticket, visiting map[string]bool) []string {
+// unresolvedBlockers is UnresolvedBlockers' recursive core: it takes shared
+// byNumberAndSuffix/childrenIndex indexes and a visiting set so fullyDone can
+// call back into it (see below) to check a candidate blocker's own Blocked
+// by: list, using the same cycle guard across the whole walk instead of
+// restarting one.
+func (e Epic) unresolvedBlockers(t Ticket, byNumberAndSuffix map[string]Ticket, childrenIndex map[string][]Ticket, visiting map[string]bool) []string {
 	if len(t.BlockedBy) == 0 {
 		return nil
 	}
-	// A fork's children inherit the original's Blocked by: token (e.g. 05b
-	// and 05c both carry "Blocked by: 05" after 05 forks), so t's own fork
-	// siblings, reached while walking a checked ticket's own Children list,
-	// must not be required to finish as part of resolving t's own inherited
-	// blocker — that can never happen, since t is still open for the
-	// duration of this very check. The same is true of t's own further
-	// forks (e.g. 01a's inherited "Blocked by: 01" recursing into 01's
-	// children must not require 01a's own child 01b to be done first — 01b
-	// can't finish before 01a even starts). That exclusion must not fire on
-	// the token's direct resolution target though: a token naming one
-	// specific fork sibling (e.g. 02c's "Blocked by: 02b") needs that
-	// sibling's real status checked, not a free pass for sharing t's
-	// Parent. See isSelfOrForkSiblingOrDescendant.
-	exclude := func(other Ticket) bool { return isSelfOrForkSiblingOrDescendant(t, other, byNumberAndSuffix) }
 	var unresolved []string
 	for _, token := range t.BlockedBy {
 		num, letters := splitBlockedByToken(token)
 		other, ok := byNumberAndSuffix[siblingKey(num, letters)]
-		if ok && other.Number == t.Number && other.Identifier == t.Identifier {
+		if !ok {
+			unresolved = append(unresolved, token)
+			continue
+		}
+		if other.Number == t.Number && other.Identifier == t.Identifier {
 			// A ticket pathologically Blocked by: its own id would
 			// otherwise deadlock: it can never be done while still open for
 			// this very check.
 			continue
 		}
-		if !ok || !e.fullyDone(other, byNumberAndSuffix, exclude, visiting) {
+		// A fork's children inherit the original's Blocked by: token (e.g.
+		// 05b and 05c both carry "Blocked by: 05" after 05 forks) only when
+		// the token names an ancestor of t (other is reached by walking t's
+		// own Parent chain upward) — in that case t's own fork siblings and
+		// further forks, reached while walking other's descendant subtree,
+		// must not be required to finish first: that can never happen,
+		// since t is still open for the duration of this very check. This
+		// exclusion must NOT extend to a token naming a direct, non-ancestor
+		// blocker (e.g. 02c's "Blocked by: 02b") — that blocker's own real
+		// descendants need their status checked, not a free pass for
+		// incidentally sharing t's Parent (mis-parented data, see
+		// gx-investigate/gotchas.md, can otherwise make an unrelated
+		// blocker's own still-open child look like t's family). t itself,
+		// and t's own descendants, are excluded unconditionally either way
+		// — requiring t's own not-yet-created follow-on work to be done as
+		// a precondition for t's own blocker to resolve would deadlock t
+		// against itself regardless of which kind of token this is.
+		inherited := isDescendantOf(other, t, byNumberAndSuffix)
+		exclude := func(candidate Ticket) bool {
+			if isSelfOrDescendant(t, candidate, byNumberAndSuffix) {
+				return true
+			}
+			return inherited && isForkSibling(t, candidate)
+		}
+		if !e.fullyDone(other, byNumberAndSuffix, childrenIndex, exclude, visiting) {
 			unresolved = append(unresolved, token)
 		}
 	}
 	return unresolved
 }
 
-// isSelfOrForkSiblingOrDescendant reports whether other must be excluded
-// from t's own inherited-blocker resolution: other is t itself, a fork
-// sibling (Parent pointing at the same original ticket, e.g. 05b and 05c
-// both forked from 05), or a descendant of t reached by walking Parent hops
-// upward (t's own forward-fork chain, e.g. 01a's child 01b) — the
-// exclusion fullyDone applies while walking a ticket's own Children list.
-// See UnresolvedBlockers.
-//
-// A descendant must be excluded for the same reason a sibling is: it's part
-// of t's own family, reached by construction only after t itself runs, so
-// requiring it done as a precondition for t's own blocker to resolve would
-// deadlock t against its own not-yet-created follow-on work.
-func isSelfOrForkSiblingOrDescendant(t, other Ticket, byNumberAndSuffix map[string]Ticket) bool {
-	if t.Parent != nil && other.Parent != nil && *t.Parent == *other.Parent {
+// isSelfOrDescendant reports whether other is t itself, or a descendant of t
+// reached by walking Parent hops upward from other (t's own forward-fork
+// chain, e.g. 01a's child 01b) — excluded from t's own blocker resolution
+// unconditionally, regardless of whether the Blocked by: token being
+// resolved is inherited or names other directly. See unresolvedBlockers.
+func isSelfOrDescendant(t, other Ticket, byNumberAndSuffix map[string]Ticket) bool {
+	if other.Number == t.Number && other.Identifier == t.Identifier {
 		return true
 	}
 	return isDescendantOf(t, other, byNumberAndSuffix)
+}
+
+// isForkSibling reports whether t and other share a Parent (both forked
+// from the same original ticket, e.g. 05b and 05c both forked from 05).
+// Only excluded from a blocker's resolution when the Blocked by: token being
+// resolved is inherited from an ancestor — see unresolvedBlockers.
+func isForkSibling(t, other Ticket) bool {
+	return t.Parent != nil && other.Parent != nil && *t.Parent == *other.Parent
 }
 
 // isDescendantOf reports whether t is reached by walking other's own Parent
@@ -220,16 +236,40 @@ func (e Epic) byNumberAndSuffix() map[string]Ticket {
 	return index
 }
 
+// childrenIndex maps a ticket's siblingKey to every other ticket in e whose
+// Parent points at it — the reverse of Ticket.Parent, and what fullyDone
+// actually treats as authoritative for a ticket's descendants (see
+// FullyDone): Children is an agent-maintained list that a mid-flight fork
+// can easily forget or only partially update, while Parent is the field
+// `gx tickets add --parent` reliably writes on every fork. A missed
+// Children update would otherwise let fullyDone silently skip a real,
+// still-open subtree.
+func (e Epic) childrenIndex() map[string][]Ticket {
+	index := make(map[string][]Ticket)
+	for _, t := range e.Tickets {
+		if t.Parent == nil {
+			continue
+		}
+		num, letters := splitBlockedByToken(*t.Parent)
+		index[siblingKey(num, letters)] = append(index[siblingKey(num, letters)], t)
+	}
+	return index
+}
+
 // FullyDone reports whether t's own status is done, t's own Blocked by: is
-// itself fully resolved, and every one of t's Children tickets is,
+// itself fully resolved, and every one of t's descendants (t.Children, plus
+// any ticket whose Parent points back at t — see childrenIndex) is,
 // recursively, fully done too — the check UnresolvedBlockers uses in place
 // of the plain Ticket.IsDone, so a downstream ticket blocked on t doesn't
 // unblock until t's whole subtree has landed, not just t itself. Every other
 // "is this ticket done" check (claiming, frontier eligibility, re-run
 // guards) keeps using Ticket.IsDone unchanged — this is additive, specific
-// to blocked-by resolution. Cycle-guarded: a ticket already on the current
+// to blocked-by resolution. Cycle-guarded: a ticket currently on the active
 // recursion path is treated as fully done rather than walked again, so a
-// malformed Children/Parent loop terminates instead of recursing forever.
+// malformed Children/Parent loop terminates instead of recursing forever;
+// the guard unwinds once that path returns, so it doesn't wrongly memoize
+// across separate calls that may resolve the same ticket under a different
+// exclude scope (see unresolvedBlockers).
 //
 // Checking t's own Blocked by: here (not just t.IsDone()) matters for a
 // ticket born already status: done without ever passing through the
@@ -244,28 +284,42 @@ func (e Epic) byNumberAndSuffix() map[string]Ticket {
 // "06b"'s fork chain had done any work, because "06c"'s own Blocked by:
 // "06b" was never checked. See gx-investigate/gotchas.md.
 func (e Epic) FullyDone(t Ticket) bool {
-	return e.fullyDone(t, e.byNumberAndSuffix(), nil, map[string]bool{})
+	return e.fullyDone(t, e.byNumberAndSuffix(), e.childrenIndex(), nil, map[string]bool{})
 }
 
 // fullyDone is FullyDone's recursive core, plus an optional exclude hook
-// (used by UnresolvedBlockers to skip t's own fork family, see
-// isSelfOrForkSiblingOrDescendant): a child exclude reports true for is treated as
-// fully done without recursing into its own children. exclude only applies
-// to children reached by walking t's Children list, never to t itself — t's
-// own resolution as a blocked_by token's direct target is UnresolvedBlockers'
+// (used by unresolvedBlockers to skip t's own fork family, see
+// isSelfOrDescendant/isForkSibling): a child exclude reports true for is
+// treated as fully done without recursing into it. exclude only applies to
+// descendants reached by walking t's own subtree, never to t itself — t's
+// own resolution as a blocked_by token's direct target is unresolvedBlockers'
 // job, not this function's.
-func (e Epic) fullyDone(t Ticket, byNumberAndSuffix map[string]Ticket, exclude func(Ticket) bool, visiting map[string]bool) bool {
+func (e Epic) fullyDone(t Ticket, byNumberAndSuffix map[string]Ticket, childrenIndex map[string][]Ticket, exclude func(Ticket) bool, visiting map[string]bool) bool {
 	_, ownSuffix := splitBlockedByToken(t.Identifier)
 	key := siblingKey(t.Number, ownSuffix)
 	if visiting[key] {
 		return true
 	}
 	visiting[key] = true
+	defer delete(visiting, key)
 	if !t.IsDone() {
 		return false
 	}
-	if len(e.unresolvedBlockers(t, byNumberAndSuffix, visiting)) > 0 {
+	if len(e.unresolvedBlockers(t, byNumberAndSuffix, childrenIndex, visiting)) > 0 {
 		return false
+	}
+	seen := map[string]bool{}
+	walk := func(child Ticket) bool {
+		_, childSuffix := splitBlockedByToken(child.Identifier)
+		childKey := siblingKey(child.Number, childSuffix)
+		if seen[childKey] {
+			return true
+		}
+		seen[childKey] = true
+		if exclude != nil && exclude(child) {
+			return true
+		}
+		return e.fullyDone(child, byNumberAndSuffix, childrenIndex, exclude, visiting)
 	}
 	for _, childID := range t.Children {
 		num, letters := splitBlockedByToken(childID)
@@ -273,10 +327,12 @@ func (e Epic) fullyDone(t Ticket, byNumberAndSuffix map[string]Ticket, exclude f
 		if !ok {
 			return false
 		}
-		if exclude != nil && exclude(child) {
-			continue
+		if !walk(child) {
+			return false
 		}
-		if !e.fullyDone(child, byNumberAndSuffix, exclude, visiting) {
+	}
+	for _, child := range childrenIndex[key] {
+		if !walk(child) {
 			return false
 		}
 	}

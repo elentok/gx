@@ -187,6 +187,82 @@ func TestExecute_TicketsSet_Commitless(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsSet_StatusDoneRefusedWithUnresolvedBlocker(t *testing.T) {
+	epicPath := filepath.Join(t.TempDir(), "widget-epic")
+	issuesDir := filepath.Join(epicPath, "issues")
+	if err := os.MkdirAll(issuesDir, 0755); err != nil {
+		t.Fatalf("mkdir issues: %v", err)
+	}
+	blockerPath := filepath.Join(issuesDir, "01-blocker.md")
+	writeTicketFile(t, blockerPath, "---\nid: \"01\"\nstatus: open\ntype: task\n---\nBody.\n")
+	targetPath := filepath.Join(issuesDir, "02-target.md")
+	writeTicketFile(t, targetPath, "---\nid: \"02\"\nstatus: claimed\nblocked_by: [\"01\"]\ntype: task\n---\nBody.\n")
+
+	var stdout, stderr bytes.Buffer
+	d := deps{stdout: &stdout, stderr: &stderr}
+
+	err := execute([]string{"tickets", "set", targetPath, "--status=done"}, d)
+	if err == nil {
+		t.Fatal("expected an error, got nil")
+	}
+	if !strings.Contains(err.Error(), "unresolved blocked_by") || !strings.Contains(err.Error(), "01") {
+		t.Errorf("error = %q, want it to mention unresolved blocked_by (01)", err.Error())
+	}
+
+	raw, err := os.ReadFile(targetPath)
+	if err != nil {
+		t.Fatalf("reading ticket back: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: claimed") {
+		t.Errorf("ticket file changed despite refused write: %q", string(raw))
+	}
+}
+
+func TestExecute_TicketsSet_StatusDoneForcedWithUnresolvedBlockerWarns(t *testing.T) {
+	epicPath := filepath.Join(t.TempDir(), "widget-epic")
+	issuesDir := filepath.Join(epicPath, "issues")
+	if err := os.MkdirAll(issuesDir, 0755); err != nil {
+		t.Fatalf("mkdir issues: %v", err)
+	}
+	blockerPath := filepath.Join(issuesDir, "01-blocker.md")
+	writeTicketFile(t, blockerPath, "---\nid: \"01\"\nstatus: open\ntype: task\n---\nBody.\n")
+	targetPath := filepath.Join(issuesDir, "02-target.md")
+	writeTicketFile(t, targetPath, "---\nid: \"02\"\nstatus: claimed\nblocked_by: [\"01\"]\ntype: task\n---\nBody.\n")
+
+	var stdout, stderr bytes.Buffer
+	d := deps{stdout: &stdout, stderr: &stderr}
+
+	err := execute([]string{"tickets", "set", targetPath, "--status=done", "--force"}, d)
+	if err != nil {
+		t.Fatalf("execute tickets set --force: %v", err)
+	}
+	if !strings.Contains(stderr.String(), "warning") || !strings.Contains(stderr.String(), "01") {
+		t.Errorf("stderr = %q, want a warning mentioning the unresolved blocker (01)", stderr.String())
+	}
+
+	raw, err := os.ReadFile(targetPath)
+	if err != nil {
+		t.Fatalf("reading ticket back: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: done") {
+		t.Errorf("ticket file = %q, want status: done written despite forced unresolved blocker", string(raw))
+	}
+}
+
+func TestExecute_TicketsSet_StatusDoneUnaffectedByBlockerOutsideIssuesLayout(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "04b-ticket.md")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\nblocked_by: [\"01\"]\ntype: task\n---\nBody.\n")
+
+	var stdout, stderr bytes.Buffer
+	d := deps{stdout: &stdout, stderr: &stderr}
+
+	err := execute([]string{"tickets", "set", path, "--status=done"}, d)
+	if err != nil {
+		t.Fatalf("execute tickets set: %v, want no gate outside the <epic>/issues/ layout", err)
+	}
+}
+
 func TestExecute_TicketsSet_ClearingListField(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")

@@ -115,6 +115,41 @@ func TestRunTicketsAdd_WritesParentFrontmatter(t *testing.T) {
 	}
 }
 
+func TestRunTicketsAdd_BackfillsParentChildren(t *testing.T) {
+	scratchDir := t.TempDir()
+	epicPath := filepath.Join(scratchDir, "widget-epic")
+	issuesDir := filepath.Join(epicPath, "issues")
+	if err := os.MkdirAll(issuesDir, 0755); err != nil {
+		t.Fatalf("mkdir issues: %v", err)
+	}
+	writeTicket(t, filepath.Join(issuesDir, "12-parent.md"), "12", "done", "task")
+
+	var stdout bytes.Buffer
+	if err := runTicketsAdd(epicPath, "12", "child-a", &stdout); err != nil {
+		t.Fatalf("runTicketsAdd: %v", err)
+	}
+
+	parent, err := schema.ParseTicket(filepath.Join(issuesDir, "12-parent.md"))
+	if err != nil {
+		t.Fatalf("parsing parent ticket: %v", err)
+	}
+	if len(parent.Children) != 1 || parent.Children[0] != "12a" {
+		t.Fatalf("parent children = %v, want [12a]", parent.Children)
+	}
+
+	stdout.Reset()
+	if err := runTicketsAdd(epicPath, "12", "child-b", &stdout); err != nil {
+		t.Fatalf("runTicketsAdd (second call): %v", err)
+	}
+	parent, err = schema.ParseTicket(filepath.Join(issuesDir, "12-parent.md"))
+	if err != nil {
+		t.Fatalf("parsing parent ticket: %v", err)
+	}
+	if len(parent.Children) != 2 || parent.Children[0] != "12a" || parent.Children[1] != "12b" {
+		t.Fatalf("parent children = %v, want [12a 12b]", parent.Children)
+	}
+}
+
 func TestRunTicketsAdd_NumericLevelPastLetteredParent(t *testing.T) {
 	scratchDir := t.TempDir()
 	epicPath := filepath.Join(scratchDir, "widget-epic")

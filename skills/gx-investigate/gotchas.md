@@ -1,5 +1,34 @@
 # gx-investigate gotchas
 
+- **The mid-flight-fork placeholder fix above only closed one of three ways a `blocked_by` chain
+  could still start early.** Follow-up consult (Opus, read-only) on the same `06b`/`06c` incident
+  found: (1) `fullyDone`'s descendant walk trusted `t.Children`, a field `gx tickets add --parent`
+  never wrote to the parent — a missed/partial `gx tickets set --children` silently dropped a real
+  subtree from the check. (2) The fork-sibling exclusion (then `isSelfOrForkSiblingOrDescendant`,
+  keyed on shared `Parent`) discounted a blocker's own open child as "family" whenever mis-parented
+  data (a child's `Parent` written as the fork root instead of its direct parent — the exact shape
+  the earlier `01a`/`01b` deadlock entry below documents) made it share the blocked ticket's
+  `Parent`, even for a token naming a *direct*, non-inherited blocker. (3) The `visiting` cycle
+  guard was a permanent memo, never unwound, so re-checking the same ticket a second time within
+  one resolution (e.g. two `blocked_by` tokens sharing a descendant) could wrongly reuse a stale
+  `true`. Fixed together (splitting them risked shipping (1)'s wider descendant walk while (2)'s
+  exclusion still discarded exactly the descendants it exposed): `fullyDone` now derives
+  descendants from a `parent`-pointer reverse index (`Epic.childrenIndex`) in addition to
+  `Children`; `gx tickets add --parent` backfills the parent's `children` as a best-effort,
+  non-authoritative bonus write; the sibling exclusion (now `isForkSibling`) only fires for an
+  *inherited* (ancestor) token, while an unconditional `isSelfOrDescendant` check (self and t's own
+  descendants) still applies regardless — narrowing only the sibling half, never the
+  self/descendant half, is what stops a ticket from being required to wait on its own not-yet-run
+  follow-on work; `visiting` now unwinds via `defer delete` so it guards only the active recursion
+  path. Also added: `gx tickets set --status done` now refuses a ticket with unresolved
+  `blocked_by` unless `--force` is passed (with a stderr warning when forced) — closing the actual
+  write-time gap, since claim-time enforcement in `ralphloop/loop.go`'s `claimNext` was confirmed
+  already sound. Regression tests: `TestEpic_UnresolvedBlockers_MisparentedGrandchildStillEnforced`,
+  `TestEpic_UnresolvedBlockers_MisparentedSelfDoesNotDeadlockOnOwnBlocker`,
+  `TestEpic_UnresolvedBlockers_SharedOpenDescendantCheckedIndependently` (`tickets/status_test.go`);
+  `TestRunTicketsAdd_BackfillsParentChildren` (`cmd/tickets_add_test.go`);
+  `TestExecute_TicketsSet_StatusDoneRefusedWithUnresolvedBlocker`,
+  `TestExecute_TicketsSet_StatusDoneForcedWithUnresolvedBlockerWarns` (`cmd/tickets_set_test.go`).
 - **A commitless mid-flight-fork placeholder's own `Blocked by:` was never enforced, letting its
   whole fork chain start before the real blocker landed.** `tickets.Epic.fullyDone` (used by
   `UnresolvedBlockers` to resolve whether a named blocker is really done) only checked
