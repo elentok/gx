@@ -142,14 +142,16 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 // ticket's line ends with the same elapsed/token metrics as the former
 // standalone ralph-loop view, appended dim italic; live rows also append
 // their phase or pause reason there. r.depth indents a nested ticket
-// (Parent/Children, ticket 03) two extra spaces per level beneath the base
-// indent, matching ui/tree's own indent unit. A ticket with children gets a
-// small triangle to the left of its checkbox, reflecting r.expanded; a
-// childless row has no triangle and no reserved space in its place.
+// (Parent/Children, ticket 03) beneath the base indent by a step wider than
+// the triangle-reserved column below, so a hasChildren row's own triangle
+// can never absorb its children's depth indent and collapse them onto the
+// same column. A ticket with children gets a small triangle to the left of
+// its checkbox, reflecting r.expanded; a childless row has no triangle and
+// no reserved space in its place.
 func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 	t := epic.Tickets[r.ticketIdx]
 	status := epic.RenderedStatus(t)
-	indent := "    " + strings.Repeat("  ", r.depth)
+	indent := "    " + strings.Repeat("    ", r.depth)
 
 	triangle := ""
 	if r.hasChildren {
