@@ -14,46 +14,6 @@ import (
 	"github.com/elentok/gx/herdr"
 )
 
-func TestResume_WritesSignalFile_ConsumedOnceByDefaultResumeSignaled(t *testing.T) {
-	scratchDir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(scratchDir, "my-epic"), 0755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-
-	if err := Resume(scratchDir, "my-epic"); err != nil {
-		t.Fatalf("Resume() error = %v", err)
-	}
-
-	path := resumeSignalPath(scratchDir, "my-epic")
-	signaled, err := defaultResumeSignaled(path)
-	if err != nil {
-		t.Fatalf("defaultResumeSignaled() error = %v", err)
-	}
-	if !signaled {
-		t.Fatal("defaultResumeSignaled() = false right after Resume(), want true")
-	}
-
-	signaled, err = defaultResumeSignaled(path)
-	if err != nil {
-		t.Fatalf("defaultResumeSignaled() second call error = %v", err)
-	}
-	if signaled {
-		t.Error("defaultResumeSignaled() = true on second call, want false: the signal should be consumed, not re-fired")
-	}
-}
-
-func TestResume_CreatesEpicDirIfMissing(t *testing.T) {
-	scratchDir := t.TempDir()
-
-	if err := Resume(scratchDir, "brand-new-epic"); err != nil {
-		t.Fatalf("Resume() error = %v", err)
-	}
-
-	if _, err := os.Stat(resumeSignalPath(scratchDir, "brand-new-epic")); err != nil {
-		t.Errorf("resume signal file not created: %v", err)
-	}
-}
-
 // TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler drives a full
 // Run() through: iter-01 breaching the smart zone (Ctrl-C sent, then a
 // `/compact` prompt, then a finish-up prompt mentioning the effective
@@ -104,7 +64,6 @@ func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) 
 		return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
 	}
 
-	d.ResumeSignaled = func(path string) (bool, error) { return false, nil }
 	d.Sleep = func(time.Duration) {}
 
 	var out bytes.Buffer
@@ -233,7 +192,6 @@ func TestRun_SmartZoneBreach_RepeatsWithNoRetryCap(t *testing.T) {
 	}
 
 	gate := NewGate()
-	d.ResumeSignaled = func(path string) (bool, error) { return false, nil }
 	d.Sleep = func(time.Duration) {}
 
 	var out bytes.Buffer

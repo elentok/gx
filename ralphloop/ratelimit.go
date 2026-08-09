@@ -14,6 +14,10 @@ import (
 // when the reset time in its rate-limit message couldn't be parsed.
 const rateLimitPollInterval = 5 * time.Minute
 
+// resumePollInterval is how often waitForClaudeRateLimitReset re-checks
+// whether label is still paused while waiting out a rate limit.
+const resumePollInterval = 2 * time.Second
+
 // rateLimitResetBuffer is added past a successfully-parsed reset time so the
 // loop wakes just after the quota actually rolls over, not right at it.
 const rateLimitResetBuffer = 60 * time.Second
@@ -143,17 +147,16 @@ func defaultReadPaneRecent(pane string) (string, error) {
 }
 
 // waitForClaudeRateLimitReset blocks label's iteration until whichever comes
-// first: the rate limit has (probably) cleared, or a resume is requested —
-// either the file signal a headless `gx ralph-loop resume` writes, or an
-// in-process Gate.ForceResume (e.g. the TUI). It polls at resumePollInterval
-// so a resume is noticed quickly, rather than sleeping through the whole
-// reset window the way a plain wait would.
+// first: the rate limit has (probably) cleared, or an in-process
+// Gate.ForceResume (e.g. the TUI) resumes label. It polls at
+// resumePollInterval so a resume is noticed quickly, rather than sleeping
+// through the whole reset window the way a plain wait would.
 //
 // Clearing itself is checked at a coarser cadence: if token parsed to a
 // reset time, once that time (plus buffer) has passed; otherwise by
 // re-reading pane's recent output every rateLimitPollInterval until the
 // rate-limit message is no longer present.
-func waitForClaudeRateLimitReset(d Deps, g *Gate, label, resumeSignalPath, pane, token string) {
+func waitForClaudeRateLimitReset(d Deps, g *Gate, label, pane, token string) {
 	deadline, hasDeadline := time.Time{}, false
 	if wait, ok := secondsUntilReset(token, d.Now()); ok {
 		deadline, hasDeadline = d.Now().Add(wait+rateLimitResetBuffer), true
@@ -162,9 +165,6 @@ func waitForClaudeRateLimitReset(d Deps, g *Gate, label, resumeSignalPath, pane,
 
 	for {
 		if !g.isLabelPaused(label) {
-			return
-		}
-		if signaled, err := d.ResumeSignaled(resumeSignalPath); err == nil && signaled {
 			return
 		}
 

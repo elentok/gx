@@ -414,7 +414,6 @@ func TestRun_PauseLetsInFlightFinishAndResumesScheduling(t *testing.T) {
 	d, _, _ := fakeDeps()
 	wait, started, release := gatedAgentWait(d.AgentWait)
 	d.AgentWait = wait
-	d.ResumeSignaled = func(string) (bool, error) { return false, nil }
 	d.Sleep = func(time.Duration) { time.Sleep(time.Millisecond) }
 	gate := NewGate()
 

@@ -74,8 +74,7 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 	// No parseable reset time in "Claude usage limit reached", so the wait
 	// falls back to re-checking ReadPaneRecent every rateLimitPollInterval.
 	// Advance a fake clock on every Sleep so that cadence is actually
-	// reached without a real 5-minute wait, and force ResumeSignaled false
-	// so the pause only clears via that text recheck, not a spurious signal.
+	// reached without a real 5-minute wait.
 	var clockMu sync.Mutex
 	fakeNow := time.Now()
 	d.Sleep = func(time.Duration) {
@@ -88,7 +87,6 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 		defer clockMu.Unlock()
 		return fakeNow
 	}
-	d.ResumeSignaled = func(string) (bool, error) { return false, nil }
 
 	var out bytes.Buffer
 	errCh := make(chan error, 1)

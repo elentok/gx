@@ -148,9 +148,6 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
 			return 0, false, nil
 		},
-		ResumeSignaled: func(path string) (bool, error) {
-			return true, nil
-		},
 		Sleep: func(time.Duration) {},
 		Now:   time.Now,
 		// One poll, so a run that parks still returns for the assertions;

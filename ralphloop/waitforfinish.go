@@ -477,7 +477,7 @@ func recoverClaudeRateLimit(d Deps, p launchAndPromptParams, sessionID, token st
 	p.Gate.pause(p.Label, reason)
 	p.sink().IterationPaused(p.Label, PauseRateLimit, reason)
 	p.logAgentEvent(eventPausedRateLimit, sessionID, reason)
-	waitForClaudeRateLimitReset(d, p.Gate, p.Label, p.ResumeSignalPath, p.Pane, token)
+	waitForClaudeRateLimitReset(d, p.Gate, p.Label, p.Pane, token)
 	p.Gate.ForceResume(p.Label)
 	p.sink().IterationResumed(p.Label, PauseRateLimit)
 	p.logLifecycleEvent(eventResumed, sessionID)
@@ -530,9 +530,7 @@ func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, li
 
 // waitForAttentionRecovery makes a Codex permission/intervention request
 // durable while keeping its pane and worktree available. The scheduler stays
-// paused until the pane returns to idle/done; a resume signal merely asks for
-// an immediate recheck, so it cannot accidentally schedule work while Codex
-// remains blocked.
+// paused until the pane returns to idle/done.
 func waitForAttentionRecovery(d Deps, p launchAndPromptParams, sessionID string) error {
 	const reason = "Codex is waiting for operator intervention"
 	if err := MarkNeedsAttentionWithReason(p.TicketPath, reason); err != nil {
@@ -560,29 +558,6 @@ func waitForAttentionRecovery(d Deps, p launchAndPromptParams, sessionID string)
 		if err != nil && !isPollTimeout(err) {
 			return fmt.Errorf("rechecking blocked agent: %w", err)
 		}
-
-		signaled, signalErr := d.ResumeSignaled(p.ResumeSignalPath)
-		if signalErr != nil || !signaled {
-			continue
-		}
-		agent, err = d.AgentWait(herdr.AgentWaitOptions{
-			Target: p.Pane,
-			Until:  []string{"idle", "done", "blocked"},
-		})
-		if err != nil {
-			return fmt.Errorf("manually rechecking blocked agent: %w", err)
-		}
-		if agent.AgentStatus == "blocked" {
-			p.report("%s still needs attention\n", p.Label)
-			continue
-		}
-		if err := Claim(p.TicketPath); err != nil {
-			return fmt.Errorf("restoring ticket to claimed: %w", err)
-		}
-		p.Gate.ForceResume(p.Label)
-		p.sink().IterationResumed(p.Label, PauseNeedsAttention)
-		p.logLifecycleEvent(eventResumed, sessionID)
-		return nil
 	}
 }
 

@@ -121,10 +121,7 @@ type Deps struct {
 	// ReadPaneRecent returns pane's recent terminal output, used to detect a
 	// Claude usage/session rate-limit message.
 	ReadPaneRecent func(pane string) (string, error)
-	// ResumeSignaled reports (and atomically consumes) whether a `gx
-	// ralph-loop resume` signal is waiting at path.
-	ResumeSignaled func(path string) (bool, error)
-	// Sleep is how a paused loop waits between ResumeSignaled polls.
+	// Sleep is how a paused loop waits between poll checks.
 	Sleep func(time.Duration)
 	// Now returns the current time, injectable so a rate-limit reset
 	// deadline can be tested without a real wall-clock wait.
@@ -177,7 +174,6 @@ func DefaultDeps() Deps {
 		ReadCodexContext:      codexsession.LastContextTokens,
 		ReadCodexRateLimit:    codexsession.LastRateLimit,
 		ReadPaneRecent:        defaultReadPaneRecent,
-		ResumeSignaled:        defaultResumeSignaled,
 		Sleep:                 time.Sleep,
 		Now:                   time.Now,
 	}

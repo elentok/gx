@@ -37,21 +37,20 @@ func reconcileOrphanedClaim(d Deps, rp reconcileParams, featureBranch string, t 
 		}
 		if ahead > 0 {
 			p := iterationParams{
-				WorkspaceID:      rp.WorkspaceID,
-				RepoDir:          paths.RepoDir,
-				WorktreeDir:      paths.WorktreeDir,
-				FeatureWorktree:  paths.FeatureWorktree,
-				FeatureBranch:    featureBranch,
-				Agent:            rp.Agent,
-				Skill:            rp.Skill,
-				Ticket:           t,
-				ScratchDir:       paths.ScratchDir,
-				FeatureLock:      rp.FeatureLock,
-				WorktreeLock:     rp.WorktreeLock,
-				SmartZone:        rp.SmartZone,
-				Gate:             rp.Gate,
-				ResumeSignalPath: rp.ResumeSignalPath,
-				Sink:             rp.Sink,
+				WorkspaceID:     rp.WorkspaceID,
+				RepoDir:         paths.RepoDir,
+				WorktreeDir:     paths.WorktreeDir,
+				FeatureWorktree: paths.FeatureWorktree,
+				FeatureBranch:   featureBranch,
+				Agent:           rp.Agent,
+				Skill:           rp.Skill,
+				Ticket:          t,
+				ScratchDir:      paths.ScratchDir,
+				FeatureLock:     rp.FeatureLock,
+				WorktreeLock:    rp.WorktreeLock,
+				SmartZone:       rp.SmartZone,
+				Gate:            rp.Gate,
+				Sink:            rp.Sink,
 			}
 
 			// Seed a live row so landCherryPick's CherryPickStarted/

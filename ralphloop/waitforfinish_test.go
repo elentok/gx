@@ -2,7 +2,6 @@ package ralphloop
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"slices"
 	"strings"
@@ -285,20 +284,18 @@ func TestWaitForFinish_CodexContextBreachRecoversThroughBlockedCompactConfirmati
 		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
 			return "compaction complete", nil
 		},
-		ResumeSignaled: func(path string) (bool, error) { return false, nil },
-		Sleep:          func(time.Duration) {},
+		Sleep: func(time.Duration) {},
 	}
 
 	err := waitForFinish(d, launchAndPromptParams{
-		Label:            "iter-01",
-		Agent:            AgentCodex,
-		Pane:             "pane-1",
-		Ticket:           "01",
-		TicketPath:       ticketPath,
-		SessionCwd:       "/repo/iter-01",
-		SmartZone:        150000,
-		Gate:             gate,
-		ResumeSignalPath: "unused",
+		Label:      "iter-01",
+		Agent:      AgentCodex,
+		Pane:       "pane-1",
+		Ticket:     "01",
+		TicketPath: ticketPath,
+		SessionCwd: "/repo/iter-01",
+		SmartZone:  150000,
+		Gate:       gate,
 	}, "codex-session-1")
 	if err != nil {
 		t.Fatalf("waitForFinish: %v", err)
@@ -944,17 +941,14 @@ func TestWaitForFinish_CodexBlockedMarksNeedsAttentionThenRecovers(t *testing.T)
 			case 1:
 				return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
 			case 2:
+				raw, err := os.ReadFile(ticketPath)
+				if err == nil {
+					sawNeedsAttention = strings.Contains(string(raw), "needs-attention")
+				}
 				return herdr.Agent{}, errors.New("timed out waiting for agent status")
 			default:
 				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 			}
-		},
-		ResumeSignaled: func(string) (bool, error) {
-			raw, err := os.ReadFile(ticketPath)
-			if err == nil {
-				sawNeedsAttention = strings.Contains(string(raw), "needs-attention")
-			}
-			return false, nil
 		},
 		Sleep: func(time.Duration) {},
 	}
@@ -1269,39 +1263,5 @@ func TestWaitForFinish_CodexIgnoresClaudeTerminalRateLimitText(t *testing.T) {
 	}
 	if prompts != 0 {
 		t.Errorf("continue prompts = %d, want 0 from Claude terminal text", prompts)
-	}
-}
-
-func TestWaitForFinish_ManualAttentionRecheckKeepsBlockedTicketPaused(t *testing.T) {
-	ticketPath := writeFrontmatterTicket(t, "claimed")
-	scratchDir := t.TempDir()
-	gate := NewGate()
-	var waits int
-	var reports strings.Builder
-	d := Deps{
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			waits++
-			switch waits {
-			case 1, 3:
-				return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
-			case 2:
-				return herdr.Agent{}, errors.New("timed out waiting for agent status")
-			default:
-				return herdr.Agent{PaneID: opts.Target, AgentStatus: "done"}, nil
-			}
-		},
-		ResumeSignaled: func(string) (bool, error) { return waits == 2, nil },
-		Sleep:          func(time.Duration) {},
-	}
-
-	if err := waitForFinish(d, launchAndPromptParams{
-		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
-		ScratchDir: scratchDir, EpicName: "epic", Gate: gate,
-		Report: func(format string, args ...any) { fmt.Fprintf(&reports, format, args...) },
-	}, "codex-session-1"); err != nil {
-		t.Fatalf("waitForFinish: %v", err)
-	}
-	if !strings.Contains(reports.String(), "still needs attention") {
-		t.Errorf("reports = %q, want blocked manual-recheck feedback", reports.String())
 	}
 }

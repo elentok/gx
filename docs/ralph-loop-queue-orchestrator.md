@@ -229,7 +229,7 @@ Three distinct "something needs attention" mechanisms exist; only two of them us
 | Mechanism | Uses Gate? | Effect on rest of epic | Auto-clears? |
 |---|---|---|---|
 | **Rate limit** (`PauseRateLimit`) | yes | scheduler stops claiming; running iterations keep going to their own next pause point | yes, once the parsed/estimated reset time passes, or manual resume |
-| **Needs-attention** (`PauseNeedsAttention`) | yes | same — scheduler-wide stall | only via operator intervention + resume signal |
+| **Needs-attention** (`PauseNeedsAttention`) | yes | same — scheduler-wide stall | only via operator intervention |
 | **Smart-zone breach** (context ceiling) | **no** | only that one iteration pauses (Ctrl-C, compact, "finish up" re-prompt); other tickets keep being claimed and run normally | yes, automatic — it's a self-contained recovery loop, not a scheduler stall |
 
 ```mermaid
@@ -240,7 +240,7 @@ flowchart TD
     RL -- "reset time passed\nor resume" --> R
 
     R -- "Codex blocked,\nnon-rate-limit" --> NA[NeedsAttention\nGate paused]
-    NA -- "operator intervenes\n+ resume signal" --> R
+    NA -- "operator intervenes" --> R
 
     R -- "context occupancy\n> ceiling" --> SZ[SmartZoneRecovering\nGate NOT involved]
     SZ -- "compact +\nre-prompt succeeds" --> R
@@ -250,11 +250,10 @@ flowchart TD
 ```
 
 Gate mechanics: any iteration can call `pause(label, reason)` independently. While any label is
-paused, the scheduler refuses new claims — but the *first* iteration to wait becomes the poll
-"leader" (checking the resume-signal file every 2s); every other paused iteration just blocks on a
-shared channel and is released together the instant the leader observes resume. One resume clears
-every iteration paused at that moment. The Queue tab UI drives a dedicated `QueuePauseLabel`
-through the same mechanism for its own pause/resume button — in-process, no file polling needed.
+paused, the scheduler refuses new claims. Every paused iteration blocks on a shared channel and is
+released together the instant `ForceResume` clears the last paused label. Resume is entirely
+in-process (`Gate.ForceResume`) — there is no headless/file-based resume path. The Queue tab UI
+drives a dedicated `QueuePauseLabel` through the same mechanism for its own pause/resume button.
 
 **Notifications** (`ralphloop/notify.go`, `notification_text.go`): `EventSink` is the single
 interface every lifecycle event flows through. A Telegram/Slack sink wraps another sink, forwards

@@ -25,7 +25,7 @@ func TestPauseGate_PauseMarksPausedAndRecordsReason(t *testing.T) {
 	}
 }
 
-func TestPauseGate_MultiplePausedIterations_AllStayPausedUntilOneResumeSignal(t *testing.T) {
+func TestPauseGate_MultiplePausedIterations_AllStayPausedUntilForceResumeClearsLast(t *testing.T) {
 	g := NewGate()
 	g.pause("iter-01", "breach one")
 	g.pause("iter-02", "breach two")
@@ -34,15 +34,10 @@ func TestPauseGate_MultiplePausedIterations_AllStayPausedUntilOneResumeSignal(t 
 		t.Fatalf("snapshot() = %v, want both iterations recorded as paused", got)
 	}
 
-	d := Deps{
-		ResumeSignaled: func(path string) (bool, error) { return true, nil },
-		Sleep:          func(time.Duration) {},
-	}
-
 	var wg sync.WaitGroup
 	for range 2 {
 		wg.Go(func() {
-			g.waitForResume(d, "unused")
+			g.waitForResume()
 		})
 	}
 
@@ -54,6 +49,20 @@ func TestPauseGate_MultiplePausedIterations_AllStayPausedUntilOneResumeSignal(t 
 
 	select {
 	case <-done:
+		t.Fatal("waitForResume() returned before ForceResume cleared either label")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	g.ForceResume("iter-01")
+	select {
+	case <-done:
+		t.Fatal("waitForResume() returned while iter-02 is still paused")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	g.ForceResume("iter-02")
+	select {
+	case <-done:
 	case <-time.After(2 * time.Second):
 		t.Fatal("waitForResume() never returned for both waiters")
 	}
@@ -63,73 +72,20 @@ func TestPauseGate_MultiplePausedIterations_AllStayPausedUntilOneResumeSignal(t 
 	}
 }
 
-func TestPauseGate_WaitForResume_BlocksUntilSignaled(t *testing.T) {
+func TestPauseGate_ForceResume_WakesWaiterImmediately(t *testing.T) {
 	g := NewGate()
 	g.pause("iter-01", "breach")
 
-	var mu sync.Mutex
-	signaled := false
-	d := Deps{
-		ResumeSignaled: func(path string) (bool, error) {
-			mu.Lock()
-			defer mu.Unlock()
-			return signaled, nil
-		},
-		Sleep: func(time.Duration) {},
-	}
-
 	returned := make(chan struct{})
 	go func() {
-		g.waitForResume(d, "unused")
+		g.waitForResume()
 		close(returned)
 	}()
 
 	select {
 	case <-returned:
-		t.Fatal("waitForResume() returned before the signal was set")
+		t.Fatal("waitForResume() returned before ForceResume")
 	case <-time.After(50 * time.Millisecond):
-	}
-
-	mu.Lock()
-	signaled = true
-	mu.Unlock()
-
-	select {
-	case <-returned:
-	case <-time.After(2 * time.Second):
-		t.Fatal("waitForResume() never returned after the signal was set")
-	}
-}
-
-// TestPauseGate_ForceResume_WakesWaiterWithoutWaitingForSleep is the
-// in-process control path's whole point: unlike a `gx ralph-loop resume`
-// file signal, which the leader only notices on its next resumePollInterval
-// tick, ForceResume must release a waiter immediately — even mid-tick, with
-// Sleep still blocked and ResumeSignaled still reporting false.
-func TestPauseGate_ForceResume_WakesWaiterWithoutWaitingForSleep(t *testing.T) {
-	g := NewGate()
-	g.pause("iter-01", "breach")
-
-	sleepStarted := make(chan struct{})
-	sleepBlock := make(chan struct{})
-	d := Deps{
-		ResumeSignaled: func(path string) (bool, error) { return false, nil },
-		Sleep: func(time.Duration) {
-			close(sleepStarted)
-			<-sleepBlock // never closed here: a real poll tick would still be blocked
-		},
-	}
-
-	returned := make(chan struct{})
-	go func() {
-		g.waitForResume(d, "unused")
-		close(returned)
-	}()
-
-	select {
-	case <-sleepStarted:
-	case <-time.After(2 * time.Second):
-		t.Fatal("waitForResume() never reached its poll-interval sleep")
 	}
 
 	if wasPaused := g.ForceResume("iter-01"); !wasPaused {
@@ -139,7 +95,7 @@ func TestPauseGate_ForceResume_WakesWaiterWithoutWaitingForSleep(t *testing.T) {
 	select {
 	case <-returned:
 	case <-time.After(2 * time.Second):
-		t.Fatal("waitForResume() did not return after ForceResume, even with Sleep still blocked")
+		t.Fatal("waitForResume() did not return after ForceResume")
 	}
 
 	if g.isPaused() {
@@ -174,14 +130,9 @@ func TestPauseGate_ForceResumeBeforePause_WaitForResumeReturnsImmediately(t *tes
 		t.Fatal("ForceResume(iter-01) = false, want true")
 	}
 
-	d := Deps{
-		ResumeSignaled: func(path string) (bool, error) { return false, nil },
-		Sleep:          func(time.Duration) {},
-	}
-
 	returned := make(chan struct{})
 	go func() {
-		g.waitForResume(d, "unused")
+		g.waitForResume()
 		close(returned)
 	}()
 

@@ -49,9 +49,6 @@ type iterationParams struct {
 	// Gate is the pause/resume coordinator shared by every iteration in this
 	// Run call.
 	Gate *Gate
-	// ResumeSignalPath is where a paused iteration polls for `gx ralph-loop
-	// resume`.
-	ResumeSignalPath string
 	// Sink receives this Run call's lifecycle events, safe to call
 	// concurrently from any iteration's goroutine.
 	Sink EventSink
@@ -71,22 +68,21 @@ type iterationParams struct {
 // conflict-resolved itself instead, around the generic start/finish here).
 func (p iterationParams) launchAndPromptParams(label, pane, tab, prompt, sessionCwd, startEvent, finishEvent string) launchAndPromptParams {
 	return launchAndPromptParams{
-		Label:            label,
-		Agent:            p.Agent,
-		Pane:             pane,
-		Tab:              tab,
-		Prompt:           prompt,
-		SessionCwd:       sessionCwd,
-		SmartZone:        p.SmartZone,
-		Gate:             p.Gate,
-		ResumeSignalPath: p.ResumeSignalPath,
-		Sink:             p.Sink,
-		Ticket:           p.Ticket.Identifier,
-		TicketPath:       p.Ticket.Path,
-		ScratchDir:       p.ScratchDir,
-		EpicName:         p.FeatureBranch,
-		StartEvent:       startEvent,
-		FinishEvent:      finishEvent,
+		Label:       label,
+		Agent:       p.Agent,
+		Pane:        pane,
+		Tab:         tab,
+		Prompt:      prompt,
+		SessionCwd:  sessionCwd,
+		SmartZone:   p.SmartZone,
+		Gate:        p.Gate,
+		Sink:        p.Sink,
+		Ticket:      p.Ticket.Identifier,
+		TicketPath:  p.Ticket.Path,
+		ScratchDir:  p.ScratchDir,
+		EpicName:    p.FeatureBranch,
+		StartEvent:  startEvent,
+		FinishEvent: finishEvent,
 	}
 }
 
@@ -142,9 +138,6 @@ type launchAndPromptParams struct {
 	SmartZone int
 	// Gate is the pause/resume coordinator shared across the whole Run call.
 	Gate *Gate
-	// ResumeSignalPath is where a paused agent polls for `gx ralph-loop
-	// resume`.
-	ResumeSignalPath string
 	// Sink receives this Run call's lifecycle events, safe to call
 	// concurrently.
 	Sink EventSink

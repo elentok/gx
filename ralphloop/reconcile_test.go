@@ -15,8 +15,8 @@ import (
 
 // testReconcileParams builds a reconcileParams for tests that don't exercise
 // the doneRecoverable repair path, wiring just enough (a fresh FeatureLock,
-// no gate/resume-signal needed since repair never pauses in these fixtures)
-// for reconcile to run.
+// no gate needed since repair never pauses in these fixtures) for reconcile
+// to run.
 func testReconcileParams(workspaceID string, paths reconcilePaths, sink EventSink) reconcileParams {
 	return reconcileParams{
 		WorkspaceID:  workspaceID,

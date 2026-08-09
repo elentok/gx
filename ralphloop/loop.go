@@ -10,7 +10,7 @@ import (
 )
 
 // defaultScratchDir is the ticket tracker directory used when
-// RunOptions.ScratchDir (or Resume's scratchDir) is unset.
+// RunOptions.ScratchDir is unset.
 const defaultScratchDir = ".scratch"
 
 // ticketTrailerKey is the commit-message trailer landCherryPick stamps onto
@@ -276,7 +276,6 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	if gate == nil {
 		gate = NewGate()
 	}
-	resumePath := resumeSignalPath(scratchDir, opts.EpicName)
 
 	// permitHeld/acquirePermit/releasePermit track this Run's concurrency
 	// slot against opts.Permit: acquired before any claim while active==0,
@@ -378,21 +377,20 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	launch := func(ticket tickets.Ticket, reattach bool) {
 		go func() {
 			params := iterationParams{
-				WorkspaceID:      workspaceID,
-				RepoDir:          opts.RepoDir,
-				WorktreeDir:      wtDir,
-				FeatureWorktree:  featurePath,
-				FeatureBranch:    opts.EpicName,
-				Agent:            agent,
-				Skill:            skill,
-				Ticket:           ticket,
-				ScratchDir:       scratchDir,
-				FeatureLock:      &featureMu,
-				WorktreeLock:     &worktreeMu,
-				SmartZone:        smartZone,
-				Gate:             gate,
-				ResumeSignalPath: resumePath,
-				Sink:             sink,
+				WorkspaceID:     workspaceID,
+				RepoDir:         opts.RepoDir,
+				WorktreeDir:     wtDir,
+				FeatureWorktree: featurePath,
+				FeatureBranch:   opts.EpicName,
+				Agent:           agent,
+				Skill:           skill,
+				Ticket:          ticket,
+				ScratchDir:      scratchDir,
+				FeatureLock:     &featureMu,
+				WorktreeLock:    &worktreeMu,
+				SmartZone:       smartZone,
+				Gate:            gate,
+				Sink:            sink,
 			}
 			var err error
 			if reattach {
@@ -408,17 +406,16 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	active := 0
 
 	reattached, err := reconcile(d, reconcileParams{
-		WorkspaceID:      workspaceID,
-		Paths:            reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: featurePath, WorktreeDir: wtDir, RepoDir: opts.RepoDir},
-		Agent:            agent,
-		Skill:            skill,
-		SmartZone:        smartZone,
-		Gate:             gate,
-		ResumeSignalPath: resumePath,
-		FeatureLock:      &featureMu,
-		WorktreeLock:     &worktreeMu,
-		Sink:             sink,
-		Scope:            scope,
+		WorkspaceID:  workspaceID,
+		Paths:        reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: featurePath, WorktreeDir: wtDir, RepoDir: opts.RepoDir},
+		Agent:        agent,
+		Skill:        skill,
+		SmartZone:    smartZone,
+		Gate:         gate,
+		FeatureLock:  &featureMu,
+		WorktreeLock: &worktreeMu,
+		Sink:         sink,
+		Scope:        scope,
 	}, *initial)
 	if err != nil {
 		return err
@@ -476,9 +473,10 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			releasePermit()
 			if gate.isPaused() {
 				// Nothing is left running to lift the pause from the inside,
-				// so block on the resume signal rather than returning: an
-				// exiting run takes its panes' recoverability with it.
-				gate.waitForResume(d, resumePath)
+				// so block until an in-process ForceResume (e.g. the TUI)
+				// clears it rather than returning: an exiting run takes its
+				// panes' recoverability with it.
+				gate.waitForResume()
 				continue
 			}
 			stalled := stalledTickets(*epic, scope)

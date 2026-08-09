@@ -21,7 +21,6 @@ Building this in `blf` instead would mean duplicating all three. (Decision:
 
 ```
 gx ralph-loop {epic-name} [--skill implement] [--max-parallel 2] [--smart-zone 110000]
-gx ralph-loop resume {epic-name}
 gx ralph-loop report {epic-name}
 ```
 
