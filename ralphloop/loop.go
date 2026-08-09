@@ -127,6 +127,18 @@ type RunOptions struct {
 	// no lock of Run's own, so the callback is responsible for whatever
 	// synchronization it needs against its own state.
 	OnScopeResolved func(RunScope)
+	// Permit, if set, gates how many epics may hold an active concurrency
+	// slot at once — nil means no cap, today's unrestricted behavior.
+	Permit Permit
+}
+
+// Permit gates how many epics may hold an active concurrency slot at once —
+// distinct from RunOptions.MaxParallel, which bounds iterations within a
+// single epic. Acquire blocks until a slot is free; Release frees one this
+// same Run acquired. A nil Permit (RunOptions.Permit unset) means no cap.
+type Permit interface {
+	Acquire()
+	Release()
 }
 
 // Run drives every unblocked ticket in the named epic to completion, up to
@@ -266,6 +278,27 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	}
 	resumePath := resumeSignalPath(scratchDir, opts.EpicName)
 
+	// permitHeld/acquirePermit/releasePermit track this Run's concurrency
+	// slot against opts.Permit: acquired before any claim while active==0,
+	// released by the time Run returns. The defer is what makes that safe
+	// under every return path (deadlock error, mid-loop error,
+	// StampEpicCompleted failure, normal completion) without duplicating a
+	// release call at each one.
+	permitHeld := false
+	acquirePermit := func() {
+		if opts.Permit != nil && !permitHeld {
+			opts.Permit.Acquire()
+			permitHeld = true
+		}
+	}
+	releasePermit := func() {
+		if opts.Permit != nil && permitHeld {
+			opts.Permit.Release()
+			permitHeld = false
+		}
+	}
+	defer releasePermit()
+
 	type outcome struct {
 		ticket tickets.Ticket
 		err    error
@@ -393,6 +426,9 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	// A ticket found needs-attention at startup deliberately does not pause
 	// the gate: it's human-clearable, so the run schedules every other
 	// runnable ticket first and only parks on it once nothing is runnable.
+	if len(reattached) > 0 {
+		acquirePermit()
+	}
 	for _, ticket := range reattached {
 		launch(ticket, true)
 		active++
@@ -421,6 +457,9 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			break
 		}
 
+		if active == 0 {
+			acquirePermit()
+		}
 		for active < maxParallel {
 			ticket, reattach, ok, err := claimNext()
 			if err != nil {
@@ -434,6 +473,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		}
 
 		if active == 0 {
+			releasePermit()
 			if gate.isPaused() {
 				// Nothing is left running to lift the pause from the inside,
 				// so block on the resume signal rather than returning: an
