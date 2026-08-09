@@ -10,11 +10,12 @@ type IconSet struct {
 	FolderClosed string
 	FolderOpen   string
 	// TriangleCollapsed/TriangleExpanded mark a ticket/queue row with
-	// children (ticket 10) — plain Unicode triangles in both icon sets, not
-	// nerd-font glyphs, since they replace an in-row fold indicator rather
-	// than represent an actual directory. Collapsed points up and expanded
-	// points right, deliberately distinct from the epic row's own
-	// FolderClosed/FolderOpen glyphs.
+	// children (ticket 10), deliberately distinct from the epic row's own
+	// FolderClosed/FolderOpen glyphs. Collapsed points up and expanded points
+	// right. Sized full-width rather than the "small triangle" Unicode
+	// variants (▴/▸), which read as barely visible at normal terminal font
+	// sizes; the nerd-font set uses Codicon's own triangle_up/triangle_right
+	// glyphs for the same reason.
 	TriangleCollapsed string
 	TriangleExpanded  string
 	FileModified      string
@@ -67,8 +68,8 @@ func Icons(useNerdFont bool) IconSet {
 			Worktree:          "Worktree",
 			FolderClosed:      "▸",
 			FolderOpen:        "▾",
-			TriangleCollapsed: "▴",
-			TriangleExpanded:  "▸",
+			TriangleCollapsed: "▲",
+			TriangleExpanded:  "▶",
 			FileModified:      "M",
 			FileAdded:         "N",
 			FileDeleted:       "D",
@@ -111,8 +112,8 @@ func Icons(useNerdFont bool) IconSet {
 		Worktree:          "󰙅",
 		FolderClosed:      "",
 		FolderOpen:        "",
-		TriangleCollapsed: "▸",
-		TriangleExpanded:  "▾",
+		TriangleCollapsed: "",
+		TriangleExpanded:  "",
 		FileModified:      "",
 		FileAdded:         "",
 		FileDeleted:       "",

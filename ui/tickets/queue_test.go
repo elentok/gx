@@ -136,7 +136,7 @@ func TestQueueModelNestsChildrenUnderParentAndCollapsesWithHL(t *testing.T) {
 	}
 
 	content := m.View().Content
-	if !strings.Contains(content, "▸") {
+	if !strings.Contains(content, "▶") {
 		t.Fatalf("expected an expanded-triangle glyph for the parent row:\n%s", content)
 	}
 
