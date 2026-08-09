@@ -172,12 +172,17 @@ func TestStatusIconAndStyle_Colors(t *testing.T) {
 		{tickets.StatusNeedsInfo, statusNeedsInfoStyle},
 		{tickets.StatusDone, statusDoneStyle},
 		{tickets.StatusBlocked, statusBlockedStyle},
+		{tickets.StatusWaitingForChildren, statusWaitingForChildrenStyle},
 	}
 	for _, c := range cases {
 		_, style := statusIconAndStyle(icons, c.status)
 		if style.GetForeground() != c.want.GetForeground() {
 			t.Errorf("status %v: foreground = %v, want %v", c.status, style.GetForeground(), c.want.GetForeground())
 		}
+	}
+
+	if icon, _ := statusIconAndStyle(icons, tickets.StatusWaitingForChildren); icon != icons.TicketWaitingForChildren {
+		t.Errorf("StatusWaitingForChildren icon = %q, want icons.TicketWaitingForChildren %q", icon, icons.TicketWaitingForChildren)
 	}
 
 	// Open renders with no foreground override — the terminal's own default.

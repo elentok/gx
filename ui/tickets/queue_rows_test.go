@@ -61,11 +61,13 @@ func TestQueueRowsForEpic_NestsChildrenAtArbitraryDepthAndRespectsCollapse(t *te
 	}
 }
 
-// TestQueueRowsForEpic_FilteredParentReattachesChildrenToNearestAncestor
-// covers filterDoneTickets dropping a done parent before nesting: its child
-// reattaches to the epic's top level instead of being stranded, mirroring
-// the Tickets tab's nearestVisibleAncestor (ticket 09) hideDone behavior.
-func TestQueueRowsForEpic_FilteredParentReattachesChildrenToNearestAncestor(t *testing.T) {
+// TestQueueRowsForEpic_DoneParentWithOpenForkChildStaysVisible covers ticket
+// 05's waiting-for-children status: a done parent whose fork child (Parent:
+// ticket 03) is still open renders as StatusWaitingForChildren, not
+// StatusDone, so filterDoneTickets (hideDone) must not drop it — unlike the
+// old done-family collapse, the child stays nested under its still-live
+// parent instead of being reattached to the top level.
+func TestQueueRowsForEpic_DoneParentWithOpenForkChildStaysVisible(t *testing.T) {
 	parent01 := "01"
 	epic := tickets.Epic{Path: "epic", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Path: "01", Status: "done"},
@@ -74,10 +76,10 @@ func TestQueueRowsForEpic_FilteredParentReattachesChildrenToNearestAncestor(t *t
 	ordered := filterDoneTickets(epic, epic.Tickets)
 
 	rows := queueRowsForEpic(epic, ordered, nil)
-	if len(rows) != 1 || rows[0].ticket.Identifier != "02" {
-		t.Fatalf("expected only ticket 02 reattached to top level, got %+v", rows)
+	if len(rows) != 2 || rows[0].ticket.Identifier != "01" || rows[1].ticket.Identifier != "02" {
+		t.Fatalf("expected 01 (waiting-for-children) and nested 02, got %+v", rows)
 	}
-	if rows[0].depth != 0 || rows[0].parentPath != "" {
-		t.Fatalf("expected ticket 02 at depth 0 with no parent, got depth=%d parentPath=%q", rows[0].depth, rows[0].parentPath)
+	if rows[1].depth != 1 || rows[1].parentPath != "01" {
+		t.Fatalf("expected ticket 02 nested under 01 at depth 1, got depth=%d parentPath=%q", rows[1].depth, rows[1].parentPath)
 	}
 }

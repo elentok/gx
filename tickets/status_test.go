@@ -401,6 +401,41 @@ func TestEpic_Blocking_DoneWithFullyDoneForkSubtreeIsNotBlocking(t *testing.T) {
 	}
 }
 
+func TestEpic_RenderedStatus_DoneWithOpenForkChildIsWaitingForChildren(t *testing.T) {
+	parent := "01"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, Identifier: "01", Status: "done"},
+		{Number: 1, Identifier: "01a", Status: "open", Parent: &parent},
+	}}
+	got := epic.RenderedStatus(epic.Tickets[0])
+	if got != StatusWaitingForChildren {
+		t.Errorf("RenderedStatus = %v, want StatusWaitingForChildren while fork child 01a is still open", got)
+	}
+}
+
+func TestEpic_RenderedStatus_DoneWithFinishedForkSubtreeIsDone(t *testing.T) {
+	parent := "01"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, Identifier: "01", Status: "done"},
+		{Number: 1, Identifier: "01a", Status: "done", Parent: &parent},
+	}}
+	got := epic.RenderedStatus(epic.Tickets[0])
+	if got != StatusDone {
+		t.Errorf("RenderedStatus = %v, want StatusDone once fork child 01a is done too", got)
+	}
+}
+
+func TestEpic_RenderedStatus_WaitingForChildrenNotSettled(t *testing.T) {
+	parent := "01"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, Identifier: "01", Status: "done"},
+		{Number: 1, Identifier: "01a", Status: "open", Parent: &parent},
+	}}
+	if epic.AllDone() {
+		t.Errorf("AllDone = true, want false: 01 is waiting-for-children, not settled")
+	}
+}
+
 func TestEpic_RenderedStatus_CodeReviewBlockedWhileSiblingOpen(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
 		{Number: 9, Identifier: "09", Type: typeCodeReview, Status: "open"},

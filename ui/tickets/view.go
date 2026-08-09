@@ -15,7 +15,7 @@ var (
 	// statusOpenStyle deliberately has no Foreground override (ticket 02):
 	// open is the default/no-signal state, so it renders in the terminal's
 	// own default foreground rather than drawing the eye with a color.
-	statusOpenStyle           = lipgloss.NewStyle()
+	statusOpenStyle = lipgloss.NewStyle()
 	// statusDraftStyle reads as parked, not idle: a draft is outstanding work
 	// nobody can pick up, so it sits between open's default foreground and
 	// done's near-invisible dim.
@@ -24,6 +24,10 @@ var (
 	statusBlockedStyle        = lipgloss.NewStyle().Foreground(ui.ColorRed)
 	statusNeedsInfoStyle      = lipgloss.NewStyle().Foreground(ui.ColorYellow)
 	statusNeedsAttentionStyle = lipgloss.NewStyle().Foreground(ui.ColorRed)
+	// statusWaitingForChildrenStyle uses the same color family as claimed —
+	// this ticket's own work is finished, but the epic still has live work
+	// underneath it, so it reads as active rather than settled/dim like done.
+	statusWaitingForChildrenStyle = lipgloss.NewStyle().Foreground(ui.ColorOrange)
 	// statusDoneStyle is deliberately dimmer than ui.StyleDim/StyleMuted
 	// (used elsewhere for transient states like search-fade or loading
 	// text): "done" is a permanent, low-priority state that should read as
@@ -263,6 +267,8 @@ func statusIconAndStyle(icons ui.IconSet, status tickets.RenderedStatus) (string
 		return icons.TicketNeedsInfo, statusNeedsInfoStyle
 	case tickets.StatusNeedsAttention:
 		return icons.TicketNeedsAttention, statusNeedsAttentionStyle
+	case tickets.StatusWaitingForChildren:
+		return icons.TicketWaitingForChildren, statusWaitingForChildrenStyle
 	case tickets.StatusDone:
 		return icons.TicketDone, statusDoneStyle
 	default: // tickets.StatusError

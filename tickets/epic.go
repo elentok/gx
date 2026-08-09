@@ -24,11 +24,13 @@ func (e Epic) TotalCount() int {
 	return len(e.Tickets)
 }
 
-// OpenCount is how many of the epic's tickets are not done.
+// OpenCount is how many of the epic's tickets are not done — a ticket
+// rendering as waiting-for-children (see Epic.RenderedStatus) counts as open
+// here too, since its fork subtree is still outstanding work.
 func (e Epic) OpenCount() int {
 	open := 0
 	for _, t := range e.Tickets {
-		if !t.IsDone() {
+		if e.RenderedStatus(t) != StatusDone {
 			open++
 		}
 	}

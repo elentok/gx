@@ -50,8 +50,12 @@ type IconSet struct {
 	TicketBlocked        string
 	TicketNeedsInfo      string
 	TicketNeedsAttention string
-	TicketDone           string
-	TicketError          string
+	// TicketWaitingForChildren marks a ticket whose own Status: is done but
+	// whose fork subtree (see tickets.Epic.Blocking) still has live work —
+	// a computed overlay, distinct from TicketDone (see tickets.RenderedStatus).
+	TicketWaitingForChildren string
+	TicketDone               string
+	TicketError              string
 	// TicketPaused is a live ralph-loop orchestrator state (an iteration
 	// paused mid-run, e.g. smart-zone/rate-limit), distinct from
 	// TicketBlocked's ticket-graph "blocked by" state — see ui/tickets'
@@ -95,15 +99,16 @@ func Icons(useNerdFont bool) IconSet {
 			CheckboxChecked:   "[x]",
 			CheckboxUnchecked: "[ ]",
 
-			TicketDraft:          "~",
-			TicketOpen:           "o",
-			TicketClaimed:        "@",
-			TicketBlocked:        "x",
-			TicketNeedsInfo:      "?",
-			TicketNeedsAttention: "!",
-			TicketDone:           "d",
-			TicketError:          "!!",
-			TicketPaused:         "P",
+			TicketDraft:              "~",
+			TicketOpen:               "o",
+			TicketClaimed:            "@",
+			TicketBlocked:            "x",
+			TicketNeedsInfo:          "?",
+			TicketNeedsAttention:     "!",
+			TicketWaitingForChildren: "w",
+			TicketDone:               "d",
+			TicketError:              "!!",
+			TicketPaused:             "P",
 		}
 	}
 	return IconSet{
@@ -140,14 +145,15 @@ func Icons(useNerdFont bool) IconSet {
 		CheckboxChecked:   "󰄲",
 		CheckboxUnchecked: "󰄱",
 
-		TicketDraft:          "✎",
-		TicketOpen:           "",
-		TicketClaimed:        "",
-		TicketBlocked:        "",
-		TicketNeedsInfo:      "",
-		TicketNeedsAttention: "",
-		TicketDone:           "",
-		TicketError:          "",
-		TicketPaused:         "",
+		TicketDraft:              "✎",
+		TicketOpen:               "",
+		TicketClaimed:            "",
+		TicketBlocked:            "",
+		TicketNeedsInfo:          "",
+		TicketNeedsAttention:     "",
+		TicketWaitingForChildren: "⏳",
+		TicketDone:               "",
+		TicketError:              "",
+		TicketPaused:             "",
 	}
 }

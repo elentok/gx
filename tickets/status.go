@@ -23,6 +23,14 @@ const (
 	// epic's frontier, so no agent ever claims it) nor done (it still counts
 	// as outstanding work).
 	StatusDraft
+	// StatusWaitingForChildren is a computed overlay on top of StatusDone: t's
+	// own Status: is done, but its fork subtree (see Epic.Blocking) isn't. It
+	// is never written to disk — a ticket's Status: field means only "this
+	// ticket's own work is finished" (see ticket 03's commitless: true
+	// convention); whether the fork subtree it spawned is also finished is
+	// derived fresh from the graph on every render. Not settled: an epic
+	// containing one is not complete (see ralphloop.isSettledStatus).
+	StatusWaitingForChildren
 )
 
 // openStatuses covers raw Status: values meaning "unclaimed, nothing external
@@ -93,6 +101,9 @@ func (t Ticket) baseStatus() RenderedStatus {
 // but is otherwise resolved the same way as every other ticket's.
 func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
 	base := t.baseStatus()
+	if base == StatusDone && e.Blocking(t) {
+		return StatusWaitingForChildren
+	}
 	if base != StatusOpen && base != StatusClaimed {
 		return base
 	}
@@ -297,6 +308,8 @@ func (s RenderedStatus) Word() string {
 		return "done"
 	case StatusDraft:
 		return "draft"
+	case StatusWaitingForChildren:
+		return "waiting-for-children"
 	default: // StatusError
 		return "error"
 	}
