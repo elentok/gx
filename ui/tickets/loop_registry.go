@@ -104,15 +104,42 @@ type loopRegistry struct {
 	// or capacity), for the caller to surface instead of the generic
 	// "already running" message. Cleared at the start of every tryStart.
 	attachErr error
+	// activeCount/permitCond back Acquire/Release (ralphloop.Permit): the
+	// real cap enforcement point now that a parked run can hold a runs[]
+	// entry forever (ticket 08) without counting toward maxConcurrent.
+	activeCount int
+	permitCond  *sync.Cond
 }
 
 func newLoopRegistry(maxConcurrent int) *loopRegistry {
-	return &loopRegistry{
+	r := &loopRegistry{
 		maxConcurrent: maxConcurrent,
 		runs:          map[string]*epicRun{},
 		snapshots:     map[string]*epicRun{},
 		lastErr:       map[string]error{},
 	}
+	r.permitCond = sync.NewCond(&r.mu)
+	return r
+}
+
+// Acquire blocks until fewer than maxConcurrent epics currently hold a
+// permit, then takes one. Implements ralphloop.Permit for RunOptions.Permit.
+func (r *loopRegistry) Acquire() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for r.activeCount >= r.maxConcurrent {
+		r.permitCond.Wait()
+	}
+	r.activeCount++
+}
+
+// Release frees one permit this process previously acquired via Acquire,
+// waking any run currently blocked waiting for a slot.
+func (r *loopRegistry) Release() {
+	r.mu.Lock()
+	r.activeCount--
+	r.mu.Unlock()
+	r.permitCond.Broadcast()
 }
 
 var ralphLoopRegistry = newLoopRegistry(ui.Settings{}.MaxConcurrentEpics())
@@ -125,8 +152,9 @@ func ConfigureMaxConcurrentEpics(maxConcurrent int) {
 
 func (r *loopRegistry) setMaxConcurrent(maxConcurrent int) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	r.maxConcurrent = max(maxConcurrent, 1)
+	r.mu.Unlock()
+	r.permitCond.Broadcast()
 }
 
 var runRalphLoop = ralphloop.Run
@@ -148,9 +176,6 @@ func (r *loopRegistry) tryStart(epicName string, done, total int, scratchDir ...
 		return nil, false
 	}
 	if _, exists := r.runs[epicName]; exists {
-		return nil, false
-	}
-	if len(r.runs) >= r.maxConcurrent {
 		return nil, false
 	}
 
@@ -512,7 +537,7 @@ func (r *loopRegistry) availableSlots() int {
 	if r.paused {
 		return 0
 	}
-	return max(r.maxConcurrent-len(r.runs), 0)
+	return max(r.maxConcurrent-r.activeCount, 0)
 }
 
 // isRunningEpic reports whether epicName has a run in flight, so a poll loop

@@ -430,6 +430,7 @@ func cmdStartImplement(
 			return implementFailedMsg{err: err}
 		}
 		opts.Gate = ralphLoopRegistry.gateFor(epicName)
+		opts.Permit = ralphLoopRegistry
 		opts.OnScopeResolved = func(scope ralphloop.RunScope) {
 			ralphLoopRegistry.setScope(epicName, scope)
 		}

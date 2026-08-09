@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -43,16 +44,26 @@ func TestRunSnapshotsAreDeterministicAndIndependent(t *testing.T) {
 
 func TestLoopRegistryConcurrencyCanBeReconfigured(t *testing.T) {
 	r := newLoopRegistry(2)
-	if _, ok := r.tryStart("epic-a", 0, 1); !ok {
-		t.Fatal("starting epic-a: want success")
-	}
+	r.Acquire()
+	r.Acquire()
+
 	r.setMaxConcurrent(1)
-	if _, ok := r.tryStart("epic-b", 0, 1); ok {
-		t.Fatal("starting epic-b above reconfigured cap: want rejection")
+	blocked := make(chan struct{})
+	go func() {
+		r.Acquire()
+		close(blocked)
+	}()
+	select {
+	case <-blocked:
+		t.Fatal("Acquire above reconfigured cap: want it to block")
+	case <-time.After(20 * time.Millisecond):
 	}
+
 	r.setMaxConcurrent(3)
-	if _, ok := r.tryStart("epic-b", 0, 1); !ok {
-		t.Fatal("starting epic-b after raising cap: want success")
+	select {
+	case <-blocked:
+	case <-time.After(time.Second):
+		t.Fatal("Acquire after raising cap: want it to unblock")
 	}
 }
 
@@ -327,20 +338,111 @@ func TestTryStartDifferentEpicsUpToCapSucceed(t *testing.T) {
 func TestTryStartBeyondCapFailsUntilSlotFrees(t *testing.T) {
 	r := newLoopRegistry(2)
 
-	if _, ok := r.tryStart("epic-a", 0, 5); !ok {
-		t.Fatalf("tryStart epic-a: want ok")
-	}
-	if _, ok := r.tryStart("epic-b", 0, 3); !ok {
-		t.Fatalf("tryStart epic-b: want ok")
-	}
-	if _, ok := r.tryStart("epic-c", 0, 1); ok {
-		t.Fatalf("tryStart epic-c beyond cap: want !ok")
+	r.Acquire()
+	r.Acquire()
+
+	blocked := make(chan struct{})
+	go func() {
+		r.Acquire()
+		close(blocked)
+	}()
+	select {
+	case <-blocked:
+		t.Fatalf("Acquire beyond cap: want it to block")
+	case <-time.After(20 * time.Millisecond):
 	}
 
-	r.finish("epic-a", nil)
+	r.Release()
 
-	if _, ok := r.tryStart("epic-c", 0, 1); !ok {
-		t.Fatalf("tryStart epic-c after a slot freed: want ok")
+	select {
+	case <-blocked:
+	case <-time.After(time.Second):
+		t.Fatalf("Acquire after a slot freed: want it to unblock")
+	}
+}
+
+func TestParkedEpicDoesNotCountTowardCap(t *testing.T) {
+	r := newLoopRegistry(1)
+
+	r.Acquire()
+	if slots := r.availableSlots(); slots != 0 {
+		t.Fatalf("availableSlots while holding the only permit = %d, want 0", slots)
+	}
+
+	r.Release() // simulates a park: the epic is still in r.runs, but no longer holds a permit
+	if slots := r.availableSlots(); slots != 1 {
+		t.Fatalf("availableSlots after releasing (parking) = %d, want 1", slots)
+	}
+
+	if _, ok := r.tryStart("epic-other", 0, 1); !ok {
+		t.Fatal("tryStart for a different epic: want ok, tryStart no longer cap-gates")
+	}
+}
+
+func TestQueuedEpicStartsWhenRunningEpicParks(t *testing.T) {
+	r := newLoopRegistry(1)
+
+	r.Acquire()
+
+	blocked := make(chan struct{})
+	go func() {
+		r.Acquire()
+		close(blocked)
+	}()
+	select {
+	case <-blocked:
+		t.Fatal("second Acquire at cap 1: want it to block")
+	case <-time.After(20 * time.Millisecond):
+	}
+
+	r.Release() // first epic parks, freeing its permit
+
+	select {
+	case <-blocked:
+	case <-time.After(time.Second):
+		t.Fatal("second Acquire after first Release (park): want it to unblock")
+	}
+}
+
+func TestResumingEpicWaitsForPermitWhenCapIsFullThenProceeds(t *testing.T) {
+	r := newLoopRegistry(1)
+
+	r.Acquire()
+	r.Release() // "park"
+
+	firstDone := make(chan struct{})
+	secondDone := make(chan struct{})
+	go func() {
+		r.Acquire()
+		close(firstDone)
+	}()
+	go func() {
+		r.Acquire()
+		close(secondDone)
+	}()
+
+	var proceeded, blocked chan struct{}
+	select {
+	case <-firstDone:
+		proceeded, blocked = firstDone, secondDone
+	case <-secondDone:
+		proceeded, blocked = secondDone, firstDone
+	case <-time.After(time.Second):
+		t.Fatal("neither resuming epic's Acquire proceeded")
+	}
+	_ = proceeded
+
+	select {
+	case <-blocked:
+		t.Fatal("the second resuming epic's Acquire: want it still blocked")
+	case <-time.After(20 * time.Millisecond):
+	}
+
+	r.Release()
+	select {
+	case <-blocked:
+	case <-time.After(time.Second):
+		t.Fatal("the second resuming epic's Acquire after Release: want it to unblock")
 	}
 }
 
