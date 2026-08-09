@@ -23,6 +23,14 @@ func (m QueueModel) View() tea.View {
 	if !m.ready {
 		return ui.NewMainView("\n  Initializing…")
 	}
+	if m.loaded {
+		// m.checked is a map shared with the Tickets tab (and, with a
+		// queueStore, refreshed from its snapshot just above) — either can add
+		// a ticket to it between Update calls with no queueEpicsLoadedMsg/
+		// clampSelected in between, so the tree must be rebuilt on every render
+		// rather than only on the events clampSelected's own doc comment lists.
+		m.queueTree.SetEntries(m.buildQueueEntries())
+	}
 	sidebarW, previewW := splitPanelWidth(m.width)
 	sidebarH, previewH := splitPanelHeight(m.width, m.contentHeight())
 
@@ -155,10 +163,10 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 			case nodeEpicStatus:
 				parkedStalled, _ := ralphLoopRegistry.parkedStalledFor(entry.Value.epic.Name)
 				icon, text, style := epicStatusLine(m.icons(), entry.Value.epic, parkedStalled)
-				return "  " + epicHeaderStyle.Render(entry.Value.epic.Name) + " " + style.Render(icon+" "+text)
+				return " " + epicHeaderStyle.Render(entry.Value.epic.Name) + " " + style.Render(icon+" "+text)
 			case nodeEpicContext:
 				avg, maximum, compacts := epicContextMetrics(entry.Value.epic)
-				return "  " + metricsLineStyle.Render(fmt.Sprintf(
+				return " " + metricsLineStyle.Render(fmt.Sprintf(
 					"Context window: avg %s, max %s (%d compacts)",
 					formatTokenCount(avg), formatTokenCount(maximum), compacts,
 				))
@@ -196,7 +204,7 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 	epic, t := r.epic, r.ticket
 	status := epic.RenderedStatus(t)
-	indent := "  "
+	indent := " "
 
 	triangle := strings.Repeat(" ", triangleColumnWidth(m.icons())) + " "
 	if r.hasChildren {
@@ -283,7 +291,7 @@ func (m QueueModel) queueTicketReasonLine(r queueRow) (line string, ok bool) {
 		badgeWidth = lipgloss.Width(m.icons().SuggestedAction) + 1
 	}
 
-	indent := "  "
+	indent := " "
 	prefix := indent + strings.Repeat(" ", triangleWidth+lipgloss.Width(icon)+1+badgeWidth)
 	return prefix + blockedBySuffixStyle.Render(reason), true
 }

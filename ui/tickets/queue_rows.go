@@ -157,6 +157,29 @@ func (m QueueModel) buildQueueEntries() []tree.Entry[queueNode] {
 		}
 	}
 
+	// tree.BuildEntriesFromValues computes each Entry's own HasChildren/Expanded
+	// from childrenFn/collapsed, but that's only visible on the returned
+	// tree.Entry — nothing feeds it back into queueNode.ticket, which
+	// renderQueueTicketRow reads its fold triangle from (mirroring the
+	// sidebar's rowFromEntry, model_data.go, one level down). Populate it here,
+	// now that childrenOf is complete for every epic.
+	collapsed := m.queueTree.CollapsedIDs()
+	setFoldState := func(n *queueNode) {
+		if n.kind != nodeQueueTicket {
+			return
+		}
+		n.ticket.hasChildren = len(childrenOf[n.ticket.ticket.Path]) > 0
+		n.ticket.expanded = n.ticket.hasChildren && !collapsed[n.ticket.ticket.Path]
+	}
+	for i := range roots {
+		setFoldState(&roots[i])
+	}
+	for path := range childrenOf {
+		for i := range childrenOf[path] {
+			setFoldState(&childrenOf[path][i])
+		}
+	}
+
 	idFn := func(n queueNode) string {
 		switch n.kind {
 		case nodeEpicSeparator:
