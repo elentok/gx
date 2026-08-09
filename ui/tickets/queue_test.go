@@ -136,8 +136,8 @@ func TestQueueModelNestsChildrenUnderParentAndCollapsesWithHL(t *testing.T) {
 	}
 
 	content := m.View().Content
-	if !strings.Contains(content, "▾") {
-		t.Fatalf("expected an expanded-folder glyph for the parent row:\n%s", content)
+	if !strings.Contains(content, "▸") {
+		t.Fatalf("expected an expanded-triangle glyph for the parent row:\n%s", content)
 	}
 
 	// m.selected starts at 0 (the parent row): "h" collapses its children.
@@ -1477,10 +1477,12 @@ func TestRenderQueueTicketRow_CommitlessSuffix(t *testing.T) {
 	}
 }
 
-// TestRenderQueueTicketRow_IconColumnShiftsByTriangleWidthForChildren mirrors
-// TestRenderTicketRow_IconColumnShiftsByTriangleWidthForChildren (ticket 10)
-// for the Queue tab's own row renderer.
-func TestRenderQueueTicketRow_IconColumnShiftsByTriangleWidthForChildren(t *testing.T) {
+// TestRenderQueueTicketRow_IconColumnAlignsRegardlessOfChildren mirrors
+// TestRenderTicketRow_IconColumnAlignsRegardlessOfChildren (ticket 10) for
+// the Queue tab's own row renderer: same-depth siblings' icon columns must
+// line up whether or not each one has children, since the triangle column is
+// reserved at a fixed width for every row.
+func TestRenderQueueTicketRow_IconColumnAlignsRegardlessOfChildren(t *testing.T) {
 	var m QueueModel
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 		{Identifier: "01", Title: "Parent ticket", Status: "open"},
@@ -1494,9 +1496,8 @@ func TestRenderQueueTicketRow_IconColumnShiftsByTriangleWidthForChildren(t *test
 		stripped := ansi.Strip(line)
 		return lipgloss.Width(stripped[:strings.Index(stripped, m.icons().TicketOpen)])
 	}
-	triangleWidth := lipgloss.Width(m.icons().TriangleExpanded) + 1
-	if got, want := iconOffset(withChildren), iconOffset(childless)+triangleWidth; got != want {
-		t.Fatalf("withChildren ticket's icon column = %d, want %d (childless offset %d + triangle width %d)\nchildless: %q\nwithChildren: %q", got, want, iconOffset(childless), triangleWidth, childless, withChildren)
+	if got, want := iconOffset(withChildren), iconOffset(childless); got != want {
+		t.Fatalf("withChildren ticket's icon column = %d, want %d (same as childless sibling)\nchildless: %q\nwithChildren: %q", got, want, childless, withChildren)
 	}
 	if strings.Contains(ansi.Strip(childless), m.icons().TriangleExpanded) || strings.Contains(ansi.Strip(childless), m.icons().TriangleCollapsed) {
 		t.Fatalf("childless row unexpectedly contains a triangle glyph: %q", childless)

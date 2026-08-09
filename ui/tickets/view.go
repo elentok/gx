@@ -142,18 +142,19 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 // ticket's line ends with the same elapsed/token metrics as the former
 // standalone ralph-loop view, appended dim italic; live rows also append
 // their phase or pause reason there. r.depth indents a nested ticket
-// (Parent/Children, ticket 03) beneath the base indent by a step wider than
-// the triangle-reserved column below, so a hasChildren row's own triangle
-// can never absorb its children's depth indent and collapse them onto the
-// same column. A ticket with children gets a small triangle to the left of
-// its checkbox, reflecting r.expanded; a childless row has no triangle and
-// no reserved space in its place.
+// (Parent/Children, ticket 03) two extra spaces per level beneath the base
+// indent, matching ui/tree's own indent unit. The triangle column is
+// reserved at a fixed width whether or not this row has children (a
+// childless row shows a blank in its place), so every row at a given depth
+// — siblings, and a row's own children one level in — lines its checkbox up
+// in the same column; only the triangle itself, sitting left of the
+// checkbox, reflects r.expanded.
 func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 	t := epic.Tickets[r.ticketIdx]
 	status := epic.RenderedStatus(t)
-	indent := "    " + strings.Repeat("    ", r.depth)
+	indent := "    " + strings.Repeat("  ", r.depth)
 
-	triangle := ""
+	triangle := strings.Repeat(" ", triangleColumnWidth(m.icons())) + " "
 	if r.hasChildren {
 		glyph := m.icons().TriangleExpanded
 		if !r.expanded {
@@ -228,6 +229,18 @@ func (m Model) checkboxGlyph(checked bool) string {
 
 func (m Model) icons() ui.IconSet {
 	return ui.Icons(m.settings.UseNerdFontIcons)
+}
+
+// triangleColumnWidth is the fixed column width every row reserves for its
+// triangle glyph (ticket 10), so a childless row's blank placeholder lines
+// up with a sibling's actual triangle regardless of which collapse-state
+// glyph (up or right) is wider.
+func triangleColumnWidth(icons ui.IconSet) int {
+	w := lipgloss.Width(icons.TriangleExpanded)
+	if cw := lipgloss.Width(icons.TriangleCollapsed); cw > w {
+		w = cw
+	}
+	return w
 }
 
 // statusIconAndStyle maps a ticket's rendered status to its dedicated glyph

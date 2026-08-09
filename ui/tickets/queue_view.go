@@ -176,19 +176,18 @@ func (m QueueModel) buildQueueLines() (lines []string, offsets []int, heights []
 // renderQueueTicketRow renders one physical line for every ticket — the same
 // single-line status presentation as the Tickets tab's renderTicketRow
 // (view.go), so the Queue tab shows identical per-ticket status (ticket 25).
-// r.depth indents a nested ticket (Parent/Children, ticket 03) beneath the
-// base indent by a step wider than the triangle-reserved column below,
-// mirroring the Tickets tab's renderTicketRow (ticket 09/10) so a
-// hasChildren row's own triangle can never absorb its children's depth
-// indent and collapse them onto the same column; a ticket with children gets
-// a small triangle to the left of its icon, reflecting r.expanded, and a
-// childless row has no triangle and no reserved space in its place.
+// r.depth indents a nested ticket (Parent/Children, ticket 03) two extra
+// spaces per level, matching ui/tree's own indent unit and the Tickets tab's
+// renderTicketRow (ticket 09/10). The triangle column is reserved at a fixed
+// width whether or not this row has children (a childless row shows a blank
+// in its place), so every row at a given depth lines its icon up in the same
+// column; only the triangle itself reflects r.expanded.
 func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) []string {
 	epic, t := r.epic, r.ticket
 	status := epic.RenderedStatus(t)
-	indent := "  " + strings.Repeat("    ", r.depth)
+	indent := "  " + strings.Repeat("  ", r.depth)
 
-	triangle := ""
+	triangle := strings.Repeat(" ", triangleColumnWidth(m.icons())) + " "
 	if r.hasChildren {
 		glyph := m.icons().TriangleExpanded
 		if !r.expanded {

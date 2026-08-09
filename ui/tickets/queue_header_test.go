@@ -103,9 +103,10 @@ func TestQueueModelEpicHeaderRendersStatusAndContextLines(t *testing.T) {
 }
 
 // TestQueueModelListRowsIndentMatchesHeaderIndent covers ticket 03's header
-// indent and ticket 10's no-reservation-when-childless rule: a childless
-// row's pre-icon indent is exactly the 2-char header indent, with no reserved
-// slot for a triangle it doesn't show.
+// indent and ticket 10's fixed-width triangle-column reservation: a
+// childless row's pre-icon indent is the 2-char header indent plus the
+// reserved triangle-glyph slot (blank, since this leaf ticket shows no
+// triangle), not the header's bare 2-char indent.
 func TestQueueModelListRowsIndentMatchesHeaderIndent(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
@@ -127,7 +128,8 @@ func TestQueueModelListRowsIndentMatchesHeaderIndent(t *testing.T) {
 	}
 	headerIndent := len(headerLine) - len(strings.TrimLeft(headerLine, " "))
 	rowIndent := len(rowLine) - len(strings.TrimLeft(rowLine, " "))
-	if headerIndent != 2 || rowIndent != headerIndent {
-		t.Fatalf("got headerIndent=%d rowIndent=%d, want headerIndent=2 rowIndent=%d", headerIndent, rowIndent, 2)
+	triangleColumn := triangleColumnWidth(m.icons()) + 1
+	if headerIndent != 2 || rowIndent != headerIndent+triangleColumn {
+		t.Fatalf("got headerIndent=%d rowIndent=%d, want headerIndent=2 rowIndent=%d", headerIndent, rowIndent, 2+triangleColumn)
 	}
 }
