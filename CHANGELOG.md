@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.27.4 - 2026-08-09
+
+- Removed the deprecated `--split`/`--split-from` flags and legacy split terminology in favor of fork/children across tickets, tests, and skill docs.
+- Fixed `blocked_by` resolution to derive descendants from a parent-pointer reverse index (not just `Children`, which `gx tickets add` never backfilled) and to scope the fork-sibling exclusion to inherited blockers only, so a direct blocker's own open child can no longer be silently discounted.
+- `gx tickets add --parent` now best-effort backfills the parent's children at fork-creation time, and `gx tickets set --status done` now refuses when the ticket has unresolved `blocked_by` unless `--force`.
+- Fixed the tickets-tree triangle-left-of-checkbox indent column colliding with nested children's indent, restoring visible nesting at all depths.
+
 ## v0.27.3 - 2026-08-09
 
 - Fixed `gx tickets add --parent <id>` not writing the `parent` frontmatter field into newly created tickets, so split tickets created the documented way silently lost their parent link.
