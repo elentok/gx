@@ -220,15 +220,17 @@ func stampEpicTiming(scratchDir, epicName string, mutate func(*epicYAML) bool) e
 	if err := os.MkdirAll(epicPath, 0755); err != nil {
 		return err
 	}
-	return writeEpicYAMLAtomic(yamlPath, out)
+	return writeFileAtomic(yamlPath, out)
 }
 
-// writeEpicYAMLAtomic replaces path's content via a same-directory temp file
+// writeFileAtomic replaces path's content via a same-directory temp file
 // plus rename, so a concurrent reader never observes a torn/truncated write.
 // Duplicated from ralphloop's/schema's writeFileAtomic (a ~15-line helper)
 // rather than exported cross-package, per
 // .scratch/ralph-tickets-visibility/issues/02-tickets-set-cli.md's Answer.
-func writeEpicYAMLAtomic(path string, data []byte) error {
+// Shared within this package by both epic.yaml sidecar writes and
+// tickets/migrate.go's ticket-file rewrites.
+func writeFileAtomic(path string, data []byte) error {
 	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp-*")
 	if err != nil {
 		return err

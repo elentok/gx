@@ -188,6 +188,14 @@ func newTicketsCmd(d deps) *cobra.Command {
 	})
 	cmd.AddCommand(newTicketsSetCmd())
 	cmd.AddCommand(&cobra.Command{
+		Use:   "migrate <path>",
+		Short: "rewrite every ticket under a tracker root into the post-refactor frontmatter shape",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			return runTicketsMigrate(args[0], c.OutOrStdout())
+		},
+	})
+	cmd.AddCommand(&cobra.Command{
 		Use:   "root",
 		Short: "print the canonical .scratch root for the current repo",
 		Args:  cobra.NoArgs,

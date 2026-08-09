@@ -24,6 +24,21 @@ func ParseTicket(path string) (Ticket, error) {
 // callers (e.g. tickets.Load) that need to derive both the typed Ticket and
 // the raw body (via ParseBody) from one read.
 func ParseTicketFromRaw(raw, path string) (Ticket, error) {
+	t, err := ParseTicketRaw(raw, path)
+	if err != nil {
+		return Ticket{}, err
+	}
+	if err := Validate(t); err != nil {
+		return Ticket{}, fmt.Errorf("invalid ticket %s: %w", path, err)
+	}
+	return t, nil
+}
+
+// ParseTicketRaw is ParseTicketFromRaw without the trailing Validate call —
+// for a caller (`gx tickets migrate`) that must inspect and repair a ticket
+// exactly as it sits on disk, including a pre-refactor shape (e.g. a missing
+// status:) that would fail Validate before the repair ever runs.
+func ParseTicketRaw(raw, path string) (Ticket, error) {
 	yamlPart, _, hasFM := splitFrontmatter(raw)
 	if !hasFM {
 		return Ticket{}, fmt.Errorf("ticket %s has no frontmatter block: a \"---\" delimited YAML header is required", path)
@@ -34,11 +49,7 @@ func ParseTicketFromRaw(raw, path string) (Ticket, error) {
 		return Ticket{}, fmt.Errorf("parsing frontmatter in %s: %w", path, err)
 	}
 
-	t := wire.toTicket()
-	if err := Validate(t); err != nil {
-		return Ticket{}, fmt.Errorf("invalid ticket %s: %w", path, err)
-	}
-	return t, nil
+	return wire.toTicket(), nil
 }
 
 // ParseBody returns raw's markdown body: the content after the frontmatter
