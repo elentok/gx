@@ -41,6 +41,29 @@ func TestRunTicketsAdd_FlatSibling(t *testing.T) {
 	}
 }
 
+func TestRunTicketsAdd_WritesStatusDraft(t *testing.T) {
+	scratchDir := t.TempDir()
+	epicPath := filepath.Join(scratchDir, "widget-epic")
+	issuesDir := filepath.Join(epicPath, "issues")
+	if err := os.MkdirAll(issuesDir, 0755); err != nil {
+		t.Fatalf("mkdir issues: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	if err := runTicketsAdd(epicPath, "", "do-thing", &stdout); err != nil {
+		t.Fatalf("runTicketsAdd: %v", err)
+	}
+
+	gotPath := strings.TrimSpace(stdout.String())
+	ticket, err := schema.ParseTicket(gotPath)
+	if err != nil {
+		t.Fatalf("stub ticket failed validation: %v", err)
+	}
+	if ticket.Status != schema.StatusDraft {
+		t.Errorf("stub ticket status = %q, want %q", ticket.Status, schema.StatusDraft)
+	}
+}
+
 func TestRunTicketsAdd_EmptySlugFails(t *testing.T) {
 	scratchDir := t.TempDir()
 	epicPath := filepath.Join(scratchDir, "widget-epic")

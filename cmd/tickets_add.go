@@ -16,9 +16,13 @@ import (
 // number under a lettered parent regardless of whether parent itself
 // already carries trailing digits — see tickets.NextTicketID) and writes a
 // minimal stub ticket file for the caller to fill in, printing the created
-// file's path to w. slug must be non-empty — it becomes the stub's
-// filename suffix (<id>-<slug>.md), so the file lands with a real name
-// instead of a placeholder the caller has to remember to rename.
+// file's path to w. The stub is written status: draft — parked work that
+// never enters an epic's frontier — so a freshly allocated, still-empty
+// ticket can never be handed to an agent; `set --status open` is what
+// promotes it once the body has real content. slug must be non-empty — it
+// becomes the stub's filename suffix (<id>-<slug>.md), so the file lands
+// with a real name instead of a placeholder the caller has to remember to
+// rename.
 func runTicketsAdd(epicPath, parent, slug string, w io.Writer) error {
 	if slug == "" {
 		return errors.New("slug is required")
@@ -40,7 +44,7 @@ func runTicketsAdd(epicPath, parent, slug string, w io.Writer) error {
 	stubPath := filepath.Join(epicPath, "issues", fmt.Sprintf("%s-%s.md", id, slug))
 	stub := schema.Ticket{
 		ID:     schema.TicketID(id),
-		Status: schema.StatusOpen,
+		Status: schema.StatusDraft,
 		Type:   schema.TypeTask,
 	}
 	if parent != "" {

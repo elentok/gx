@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -146,6 +147,11 @@ func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer) error {
 				return err
 			}
 		}
+		if schema.Status(status) == schema.StatusOpen {
+			if err := checkBodyBeforeOpen(path); err != nil {
+				return err
+			}
+		}
 	}
 
 	if c.Flags().Changed("parent") {
@@ -241,6 +247,25 @@ func lockEpicForParentWrite(path, parentID string) (unlock func(), err error) {
 		return nil, fmt.Errorf("%s: rejecting --parent %s: %w", path, parentID, err)
 	}
 	return unlock, nil
+}
+
+// checkBodyBeforeOpen refuses a --status open write for a ticket whose body
+// is empty — the invariant "nothing schedulable is empty" is guarded here,
+// at the draft-to-open transition, rather than at rest: schema.Validate (and
+// so `gx tickets validate`) must keep accepting a body-less draft, since
+// `gx tickets add` writes draft and then validates its own stub before
+// returning.
+func checkBodyBeforeOpen(path string) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	body := schema.ParseBody(string(raw))
+	if strings.TrimSpace(body) == "" {
+		return fmt.Errorf("%s has an empty body; refusing to set status=open on a ticket with no content", path)
+	}
+	return nil
 }
 
 // checkBlockersBeforeDone refuses a --status done write for a ticket whose

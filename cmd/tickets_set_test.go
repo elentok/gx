@@ -263,6 +263,88 @@ func TestExecute_TicketsSet_StatusDoneUnaffectedByBlockerOutsideIssuesLayout(t *
 	}
 }
 
+func TestExecute_TicketsSet_StatusOpenRefusedWithEmptyBody(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "04b-ticket.md")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: draft\ntype: task\n---\n")
+
+	var stdout, stderr bytes.Buffer
+	d := deps{stdout: &stdout, stderr: &stderr}
+
+	err := execute([]string{"tickets", "set", path, "--status=open"}, d)
+	if err == nil {
+		t.Fatal("expected an error, got nil")
+	}
+	if !strings.Contains(err.Error(), "empty body") {
+		t.Errorf("error = %q, want it to mention the empty body", err.Error())
+	}
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading ticket back: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: draft") {
+		t.Errorf("ticket file changed despite refused write: %q", string(raw))
+	}
+}
+
+func TestExecute_TicketsSet_StatusOpenAcceptedWithBody(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "04b-ticket.md")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: draft\ntype: task\n---\nBody.\n")
+
+	var stdout bytes.Buffer
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+
+	err := execute([]string{"tickets", "set", path, "--status=open"}, d)
+	if err != nil {
+		t.Fatalf("execute tickets set: %v", err)
+	}
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading ticket back: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: open") {
+		t.Errorf("ticket file = %q, want status: open", string(raw))
+	}
+}
+
+func TestExecute_TicketsSet_NeedsAttentionToOpenAccepted(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "04b-ticket.md")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: needs-attention\ntype: task\n---\nBody.\n")
+
+	var stdout bytes.Buffer
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+
+	err := execute([]string{"tickets", "set", path, "--status=open"}, d)
+	if err != nil {
+		t.Fatalf("execute tickets set: %v, want needs-attention -> open to be accepted", err)
+	}
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading ticket back: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: open") {
+		t.Errorf("ticket file = %q, want status: open", string(raw))
+	}
+}
+
+func TestExecute_TicketsValidate_AcceptsBodylessDraft(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "04b-ticket.md")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: draft\ntype: task\n---\n")
+
+	var stdout bytes.Buffer
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+
+	if err := execute([]string{"tickets", "validate", path}, d); err != nil {
+		t.Fatalf("execute tickets validate: %v, want a body-less draft accepted", err)
+	}
+}
+
 func TestExecute_TicketsSet_ClearingListField(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
