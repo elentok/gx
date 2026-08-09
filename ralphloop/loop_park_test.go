@@ -1,12 +1,15 @@
 package ralphloop
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -161,6 +164,89 @@ func TestRun_StalledIteration_RegistryClearedAndRelaunched(t *testing.T) {
 	got := mustParse(t, path)
 	if got.Status != schema.StatusDone {
 		t.Errorf("final Status = %q, want done", got.Status)
+	}
+	if len(sink.parkedStalled) != 1 || len(sink.parkedStalled[0]) != 1 || sink.parkedStalled[0][0] != "01" {
+		t.Errorf("EpicParked calls = %v, want one naming ticket 01", sink.parkedStalled)
+	}
+}
+
+// TestRun_ClearedNeedsAttentionWithLiveIteration_ReattachesInsteadOfDoubleLaunching
+// covers ticket 09's core claim: iteration ownership decides resume, not the
+// ticket's status. Ticket 01's first launch errors out (a git hiccup) before
+// ever prompting, needs-attention with no goroutine left — but its herdr tab
+// is scripted to still be live once a human clears it back to open, so the
+// run must reattach rather than assume "open" means "never launched" and
+// double-launch a second iteration.
+func TestRun_ClearedNeedsAttentionWithLiveIteration_ReattachesInsteadOfDoubleLaunching(t *testing.T) {
+	scratchDir := writeEpic(t, "my-epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+	})
+	path := ticketPath(scratchDir, "my-epic", "01-a.md")
+	d, prompts, removed := fakeDeps()
+
+	var mu sync.Mutex
+	addWorktreeCalls := 0
+	origAddWorktree := d.AddWorktree
+	failedOnce := false
+	d.AddWorktree = func(repoDir, wtPath, branch, base string) error {
+		if !strings.Contains(wtPath, "my-epic-item-01") {
+			return origAddWorktree(repoDir, wtPath, branch, base)
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		addWorktreeCalls++
+		if !failedOnce {
+			failedOnce = true
+			return errors.New("simulated git hiccup")
+		}
+		return origAddWorktree(repoDir, wtPath, branch, base)
+	}
+
+	cleared := false
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if !cleared {
+			return nil, nil
+		}
+		return []herdr.Tab{{TabID: "tab-my-epic-iter-01", Label: "my-epic-iter-01", WorkspaceID: workspaceID}}, nil
+	}
+
+	sleepCalls := 0
+	d.Sleep = func(dur time.Duration) {
+		if dur != parkPollInterval {
+			return
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		sleepCalls++
+		if sleepCalls != 1 {
+			return
+		}
+		if err := SetStatus(path, "open"); err != nil {
+			t.Errorf("SetStatus: %v", err)
+		}
+		cleared = true
+	}
+	d.maxParkPolls = 0
+	sink := &recordingSink{}
+
+	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink); err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
+
+	if addWorktreeCalls != 1 {
+		t.Errorf("AddWorktree calls = %d, want 1 (a successful reattach reuses the live iteration instead of creating a second one)", addWorktreeCalls)
+	}
+	if len(*prompts) != 0 {
+		t.Errorf("prompts = %v, want none (the original launch errored before prompting, and reattach never replays it)", *prompts)
+	}
+	got := mustParse(t, path)
+	if got.Status != schema.StatusDone {
+		t.Errorf("final Status = %q, want done", got.Status)
+	}
+	if len(*removed) != 1 {
+		t.Errorf("removed worktree branches = %v, want exactly one removal", *removed)
 	}
 	if len(sink.parkedStalled) != 1 || len(sink.parkedStalled[0]) != 1 || sink.parkedStalled[0][0] != "01" {
 		t.Errorf("EpicParked calls = %v, want one naming ticket 01", sink.parkedStalled)

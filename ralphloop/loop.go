@@ -252,6 +252,14 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	// own.
 	launched := make(map[string]bool)
 
+	// everLaunched records every ticket identifier this Run call has ever
+	// handed to launch(), and — unlike launched — is never cleared. It's how
+	// claimNext tells a genuinely fresh frontier ticket apart from one that
+	// cleared out of a stalled status: only the latter might still have a
+	// live iteration worth reattaching to (see resumeReattachable), since a
+	// ticket this run never launched can't have one.
+	everLaunched := make(map[string]bool)
+
 	gate := opts.Gate
 	if gate == nil {
 		gate = NewGate()
@@ -268,7 +276,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	// none is available right now (every remaining ticket is blocked,
 	// already claimed by a running iteration, the loop is paused on a
 	// smart-zone breach, or the epic is done).
-	claimNext := func() (ticket tickets.Ticket, ok bool, err error) {
+	claimNext := func() (ticket tickets.Ticket, reattach bool, ok bool, err error) {
 		scheduleMu.Lock()
 		defer scheduleMu.Unlock()
 
@@ -290,10 +298,19 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			if ticket.Path == "" {
 				return nil
 			}
+			// A ticket this run previously launched and later dropped out of
+			// launched (a stalled outcome cleared by a person, see ticket 08)
+			// might still have a live iteration nobody tore down — its "open"
+			// status alone can't tell that apart from a ticket that never ran.
+			// Iteration ownership decides, not the status.
+			if everLaunched[ticket.Identifier] {
+				reattach = resumeReattachable(d, workspaceID, opts.EpicName, agent, wtDir, ticket)
+			}
 			if err := Claim(ticket.Path); err != nil {
 				return fmt.Errorf("claiming ticket %s: %w", ticket.Identifier, err)
 			}
 			launched[ticket.Identifier] = true
+			everLaunched[ticket.Identifier] = true
 			// StampEpicStarted is idempotent (see its doc comment), so calling
 			// it on every claim — not just the epic's very first — is safe;
 			// it only ever writes started_at once.
@@ -316,13 +333,13 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			}
 		}
 		if err != nil {
-			return tickets.Ticket{}, false, err
+			return tickets.Ticket{}, false, false, err
 		}
 		if !admitted || ticket.Path == "" {
-			return tickets.Ticket{}, false, nil
+			return tickets.Ticket{}, false, false, nil
 		}
 		sink.TicketClaimed(ticket)
-		return ticket, true, nil
+		return ticket, reattach, true, nil
 	}
 
 	launch := func(ticket tickets.Ticket, reattach bool) {
@@ -380,6 +397,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		launch(ticket, true)
 		active++
 		launched[ticket.Identifier] = true
+		everLaunched[ticket.Identifier] = true
 	}
 
 	// parked records that the run has already announced this park, so the
@@ -404,14 +422,14 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		}
 
 		for active < maxParallel {
-			ticket, ok, err := claimNext()
+			ticket, reattach, ok, err := claimNext()
 			if err != nil {
 				return err
 			}
 			if !ok {
 				break
 			}
-			launch(ticket, false)
+			launch(ticket, reattach)
 			active++
 		}
 
