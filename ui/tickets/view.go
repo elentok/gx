@@ -16,6 +16,10 @@ var (
 	// open is the default/no-signal state, so it renders in the terminal's
 	// own default foreground rather than drawing the eye with a color.
 	statusOpenStyle           = lipgloss.NewStyle()
+	// statusDraftStyle reads as parked, not idle: a draft is outstanding work
+	// nobody can pick up, so it sits between open's default foreground and
+	// done's near-invisible dim.
+	statusDraftStyle          = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
 	statusClaimedStyle        = lipgloss.NewStyle().Foreground(ui.ColorOrange)
 	statusBlockedStyle        = lipgloss.NewStyle().Foreground(ui.ColorRed)
 	statusNeedsInfoStyle      = lipgloss.NewStyle().Foreground(ui.ColorYellow)
@@ -247,6 +251,8 @@ func triangleColumnWidth(icons ui.IconSet) int {
 // and color, distinct from the PRs tab's facet icon set.
 func statusIconAndStyle(icons ui.IconSet, status tickets.RenderedStatus) (string, lipgloss.Style) {
 	switch status {
+	case tickets.StatusDraft:
+		return icons.TicketDraft, statusDraftStyle
 	case tickets.StatusOpen:
 		return icons.TicketOpen, statusOpenStyle
 	case tickets.StatusClaimed:

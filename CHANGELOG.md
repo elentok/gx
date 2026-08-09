@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Added a `draft` ticket status: accepted by the schema, `gx tickets set`, and `gx tickets validate`, rendered as its own state, and never offered to an agent (a draft ticket never enters an epic's frontier).
+- `parent` is now a validated graph edge: an epic never hands out a parent naming a ticket absent from the epic, or one closing a cycle — the loader drops such an edge and flags the ticket, `gx tickets validate` reports it, and `gx tickets set --parent` validates and writes under the epic's allocation lock so two concurrent re-parents can't jointly close a cycle.
+
 ## v0.27.4 - 2026-08-09
 
 - Removed the deprecated `--split`/`--split-from` flags and legacy split terminology in favor of fork/children across tickets, tests, and skill docs.

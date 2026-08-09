@@ -129,6 +129,26 @@ func TestFrontier_AgainstFixtureEpicDirectory(t *testing.T) {
 	assertNumbers(t, got, []int{1, 3})
 }
 
+func TestFrontier_DraftIsExcluded(t *testing.T) {
+	epic := tickets.Epic{Tickets: []tickets.Ticket{
+		{Number: 1, Status: "draft"},
+		{Number: 2, Status: "open"},
+	}}
+
+	assertNumbers(t, Frontier(epic), []int{2})
+}
+
+func TestFrontier_TicketBlockedOnDraftStaysBlocked(t *testing.T) {
+	epic := tickets.Epic{Tickets: []tickets.Ticket{
+		{Number: 1, Status: "draft"},
+		{Number: 2, Status: "open", BlockedBy: []string{"1"}},
+	}}
+
+	if got := Frontier(epic); len(got) != 0 {
+		t.Fatalf("Frontier() = %v, want empty: a draft blocker is not done", numbers(got))
+	}
+}
+
 func assertNumbers(t *testing.T, got []tickets.Ticket, want []int) {
 	t.Helper()
 	if len(got) != len(want) {

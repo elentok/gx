@@ -18,6 +18,11 @@ const (
 	StatusNeedsAttention
 	StatusDone
 	StatusError
+	// StatusDraft is a ticket its author has explicitly parked: written down,
+	// but not yet offered to anyone. It is neither open (never enters an
+	// epic's frontier, so no agent ever claims it) nor done (it still counts
+	// as outstanding work).
+	StatusDraft
 )
 
 // openStatuses covers raw Status: values meaning "unclaimed, nothing external
@@ -44,6 +49,12 @@ var needsAttentionStatuses = map[string]bool{
 	"needs-attention": true,
 }
 
+// draftStatuses covers raw values meaning the ticket is parked by its author
+// and must not be scheduled (see StatusDraft).
+var draftStatuses = map[string]bool{
+	"draft": true,
+}
+
 // typeCodeReview mirrors schema.TypeCodeReview's on-disk value. tickets.Ticket
 // carries Type as a plain string (it predates the schema package), so the
 // comparison is against the literal rather than the typed constant.
@@ -52,11 +63,13 @@ const typeCodeReview = "code-review"
 // baseStatus classifies t's raw Status: value alone, before the Blocked by:
 // overlay (see Epic.RenderedStatus) is applied.
 func (t Ticket) baseStatus() RenderedStatus {
-	if t.ReadErr != "" {
+	if t.ReadErr != "" || t.GraphErr != "" {
 		return StatusError
 	}
 	status := strings.ToLower(strings.TrimSpace(t.Status))
 	switch {
+	case draftStatuses[status]:
+		return StatusDraft
 	case doneStatuses[status]:
 		return StatusDone
 	case claimedStatuses[status]:
@@ -422,6 +435,8 @@ func (s RenderedStatus) Word() string {
 		return "needs-attention"
 	case StatusDone:
 		return "done"
+	case StatusDraft:
+		return "draft"
 	default: // StatusError
 		return "error"
 	}

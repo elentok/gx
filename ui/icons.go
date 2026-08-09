@@ -44,6 +44,7 @@ type IconSet struct {
 	CheckboxChecked   string
 	CheckboxUnchecked string
 
+	TicketDraft          string
 	TicketOpen           string
 	TicketClaimed        string
 	TicketBlocked        string
@@ -94,6 +95,7 @@ func Icons(useNerdFont bool) IconSet {
 			CheckboxChecked:   "[x]",
 			CheckboxUnchecked: "[ ]",
 
+			TicketDraft:          "~",
 			TicketOpen:           "o",
 			TicketClaimed:        "@",
 			TicketBlocked:        "x",
@@ -138,6 +140,7 @@ func Icons(useNerdFont bool) IconSet {
 		CheckboxChecked:   "󰄲",
 		CheckboxUnchecked: "󰄱",
 
+		TicketDraft:          "✎",
 		TicketOpen:           "",
 		TicketClaimed:        "",
 		TicketBlocked:        "",

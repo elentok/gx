@@ -2,6 +2,15 @@ package schema
 
 import "testing"
 
+func TestStatus_DraftIsValid(t *testing.T) {
+	if !StatusDraft.Valid() {
+		t.Error("draft is not accepted as a status")
+	}
+	if err := Validate(Ticket{ID: "01", Status: StatusDraft, Type: TypeTask}); err != nil {
+		t.Errorf("Validate() = %v, want nil for a draft ticket", err)
+	}
+}
+
 func validTicket() Ticket {
 	return Ticket{
 		ID:                    "04b",

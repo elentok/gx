@@ -19,12 +19,15 @@ import (
 const ticketsSchemaText = `Ticket frontmatter fields:
 
 Settable fields:
-  status (enum, --status): open, claimed, ready-for-agent, ready-for-human, needs-triage,
-    needs-info, needs-attention, done
+  status (enum, --status): draft, open, claimed, ready-for-agent, ready-for-human,
+    needs-triage, needs-info, needs-attention, done. draft is parked work: it never
+    enters an epic's frontier, so no agent is ever handed it.
   blocked_by (comma-separated ticket IDs, --blocked-by): e.g. 01,03
   children (comma-separated ticket IDs, --children): tickets this one produced (a
     mid-flight fork, or the fix tickets a code-review ticket opened)
-  parent (ticket ID, --parent): the ticket this one was produced from
+  parent (ticket ID, --parent): the ticket this one was produced from. Must name an
+    existing ticket in the same epic, and may not point into this ticket's own fork
+    subtree (that would make the fork graph cyclic) — both are rejected.
   type (enum, --type): task, research, prototype, grilling, code-review
   expected_context_window (non-negative int, --expected-context-window)
   commitless (bool, --commitless): true/false. Set true when you intentionally finish an
@@ -145,6 +148,21 @@ func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer) error {
 		}
 	}
 
+	if c.Flags().Changed("parent") {
+		parent, _ := c.Flags().GetString("parent")
+		unlock, err := lockEpicForParentWrite(path, parent)
+		if err != nil {
+			return err
+		}
+		if unlock != nil {
+			// Held across the write below on purpose: validating and
+			// releasing first would let two agents re-parenting at once each
+			// validate against their own snapshot and jointly close a cycle
+			// neither of them saw.
+			defer unlock()
+		}
+	}
+
 	var changed []string
 
 	err := schema.UpdateTicket(path, func(t *schema.Ticket) {
@@ -165,6 +183,66 @@ func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer) error {
 	return nil
 }
 
+// lockEpicForTicket loads the epic owning path under the epic's allocation
+// lock — the same lock `gx tickets add` takes to allocate ids — and returns
+// it alongside the loaded copy of path's own ticket. Only tickets living
+// under the tracker's <epic>/issues/<file>.md layout have an epic to load: for
+// anything else (ad-hoc files) every return value is nil, including the
+// error, and the caller skips its epic-wide check. target is nil when the epic
+// loaded but doesn't list path. The caller must call unlock (when non-nil),
+// and must keep holding it for as long as it needs the loaded graph to stay
+// authoritative.
+func lockEpicForTicket(path string) (epic *tickets.Epic, target *tickets.Ticket, unlock func(), err error) {
+	issuesDir := filepath.Dir(path)
+	if filepath.Base(issuesDir) != "issues" {
+		return nil, nil, nil, nil
+	}
+
+	epic, unlock, err = tickets.LoadLockedEpic(filepath.Dir(issuesDir))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		unlock()
+		return nil, nil, nil, err
+	}
+	for i := range epic.Tickets {
+		if tp, absErr := filepath.Abs(epic.Tickets[i].Path); absErr == nil && tp == absPath {
+			target = &epic.Tickets[i]
+			break
+		}
+	}
+	return epic, target, unlock, nil
+}
+
+// lockEpicForParentWrite validates the parent graph path's epic would have
+// once path's parent became parentID, and hands back the still-held epic lock
+// so the caller can write under it. A rejected edge returns an error with the
+// lock already released and nothing written.
+func lockEpicForParentWrite(path, parentID string) (unlock func(), err error) {
+	epic, target, unlock, err := lockEpicForTicket(path)
+	if err != nil {
+		return nil, fmt.Errorf("validating parent before writing: %w", err)
+	}
+	if target == nil {
+		return unlock, nil
+	}
+
+	if parentID == "" {
+		// Clearing a parent only ever removes an edge, so no graph it was
+		// part of can become invalid.
+		return unlock, nil
+	}
+	target.Parent = &parentID
+	if err := epic.ValidateParentGraph(); err != nil {
+		unlock()
+		return nil, fmt.Errorf("%s: rejecting --parent %s: %w", path, parentID, err)
+	}
+	return unlock, nil
+}
+
 // checkBlockersBeforeDone refuses a --status done write for a ticket whose
 // own blocked_by isn't actually resolved, unless force is set — closing the
 // gap where an agent could mark a ticket done without ever going through the
@@ -176,29 +254,12 @@ func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer) error {
 // (ad-hoc files) is left unchecked, since there's no epic to resolve
 // blockers against.
 func checkBlockersBeforeDone(path string, force bool, stderr io.Writer) error {
-	issuesDir := filepath.Dir(path)
-	if filepath.Base(issuesDir) != "issues" {
-		return nil
-	}
-	epicPath := filepath.Dir(issuesDir)
-
-	epic, unlock, err := tickets.LoadLockedEpic(epicPath)
+	epic, target, unlock, err := lockEpicForTicket(path)
 	if err != nil {
 		return fmt.Errorf("checking blockers before marking done: %w", err)
 	}
-	defer unlock()
-
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		return err
-	}
-
-	var target *tickets.Ticket
-	for i := range epic.Tickets {
-		if tp, err := filepath.Abs(epic.Tickets[i].Path); err == nil && tp == absPath {
-			target = &epic.Tickets[i]
-			break
-		}
+	if unlock != nil {
+		defer unlock()
 	}
 	if target == nil {
 		return nil

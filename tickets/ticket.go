@@ -58,6 +58,13 @@ type Ticket struct {
 	// content to parse. Distinct from an unrecognized Status: value, which is
 	// a successfully-read file.
 	ReadErr string
+
+	// GraphErr is set when the ticket parsed fine on its own but its Parent
+	// edge is invalid in the context of the whole epic — dangling, or closing
+	// a cycle (see Epic.ValidateParentGraph). The loader drops the edge and
+	// records the reason here; like ReadErr it renders as StatusError, but it
+	// stays a separate field because the file itself is readable and valid.
+	GraphErr string
 }
 
 // DisplayNumber returns the filename's complete ticket identifier. Tickets

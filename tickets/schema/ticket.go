@@ -37,6 +37,10 @@ func (id TicketID) Valid() bool {
 type Status string
 
 const (
+	// StatusDraft is written down but deliberately not offered to anyone: it
+	// never enters an epic's frontier and never renders as open (see
+	// tickets.StatusDraft).
+	StatusDraft          Status = "draft"
 	StatusOpen           Status = "open"
 	StatusNeedsTriage    Status = "needs-triage"
 	StatusReadyForAgent  Status = "ready-for-agent"
@@ -48,6 +52,7 @@ const (
 )
 
 var validStatuses = map[Status]bool{
+	StatusDraft:          true,
 	StatusOpen:           true,
 	StatusNeedsTriage:    true,
 	StatusReadyForAgent:  true,

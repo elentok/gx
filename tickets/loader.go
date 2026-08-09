@@ -99,6 +99,8 @@ func loadEpic(scratchDir, name string) Epic {
 		epic.Tickets = append(epic.Tickets, ticket)
 	}
 
+	epic.quarantineInvalidParents()
+
 	return epic
 }
 
