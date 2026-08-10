@@ -18,7 +18,7 @@ func TestEpicStatusLineColorsByEpicState(t *testing.T) {
 	done := tickets.Epic{Tickets: []tickets.Ticket{
 		{Identifier: "01", Status: "done", ElapsedTime: 754},
 	}}
-	icon, text, style := epicStatusLine(icons, done)
+	icon, text, style := epicStatusLine(icons, done, nil)
 	if !strings.Contains(text, "took 12m34s") {
 		t.Fatalf("done epic: got text=%q, want it to contain %q", text, "took 12m34s")
 	}
@@ -30,7 +30,7 @@ func TestEpicStatusLineColorsByEpicState(t *testing.T) {
 		{Identifier: "01", Status: "done"},
 		{Identifier: "02", Status: "needs-info"},
 	}}
-	icon, _, style = epicStatusLine(icons, problem)
+	icon, _, style = epicStatusLine(icons, problem, nil)
 	if style.Render(icon) != epicStatusProblemStyle.Render(icon) {
 		t.Fatalf("problem epic: status line not rendered in epicStatusProblemStyle (yellow)")
 	}
@@ -39,7 +39,7 @@ func TestEpicStatusLineColorsByEpicState(t *testing.T) {
 		{Identifier: "01", Status: "done"},
 		{Identifier: "02", Status: "open"},
 	}}
-	icon, _, style = epicStatusLine(icons, clean)
+	icon, _, style = epicStatusLine(icons, clean, nil)
 	if style.Render(icon) != icon {
 		t.Fatalf("in-progress-clean epic: expected the default/no-color treatment, got styled output %q", style.Render(icon))
 	}
@@ -55,13 +55,13 @@ func TestEpicStatusLinePrefersCompletionTimestampsOverElapsedSum(t *testing.T) {
 		StartedAt:   started,
 		CompletedAt: completed,
 	}
-	_, text, _ := epicStatusLine(icons, withTimestamps)
+	_, text, _ := epicStatusLine(icons, withTimestamps, nil)
 	if !strings.Contains(text, "took 3h 30m") {
 		t.Fatalf("epic with completion timestamps: got text=%q, want it to contain %q", text, "took 3h 30m")
 	}
 
 	withoutTimestamps := tickets.Epic{Tickets: []tickets.Ticket{{Identifier: "01", Status: "done", ElapsedTime: 754}}}
-	_, text, _ = epicStatusLine(icons, withoutTimestamps)
+	_, text, _ = epicStatusLine(icons, withoutTimestamps, nil)
 	if !strings.Contains(text, "took 12m34s") {
 		t.Fatalf("epic without completion timestamps: got text=%q, want it to contain %q", text, "took 12m34s")
 	}

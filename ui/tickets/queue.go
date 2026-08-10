@@ -69,7 +69,12 @@ type QueueModel struct {
 	implementAgentMenu     components.MenuState
 	pendingEpics           []checkedEpicPlan
 	runningEpics           map[string]bool
-	runningAgent           ralphloop.AgentKind
+	// parkedEpics tracks epics whose run is currently parked (RunStateParked)
+	// rather than running, keyed by epic name to its stalled tickets — kept
+	// distinct from runningEpics so the header can render parked separately
+	// from running/queued (see epicHeaderLines, queueRunState).
+	parkedEpics  map[string][]ralphloop.StalledTicket
+	runningAgent ralphloop.AgentKind
 	paused                 bool
 	// foreignAttachPID is the pid of a different process currently holding
 	// the per-repo attach lock (ticket 05), refreshed alongside the epics
@@ -138,6 +143,7 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 		implementSpinner:   sp,
 		implementAgentMenu: newImplementAgentMenu(),
 		runningEpics:       map[string]bool{},
+		parkedEpics:        map[string][]ralphloop.StalledTicket{},
 		paused:             ralphLoopRegistry.isPaused(),
 		confirm:            confirm.New(),
 		search:             search.NewModel(),
@@ -251,17 +257,25 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		closeCmd := m.syncRunSnapshot(msg.epicName)
 		return m, tea.Batch(cmdPollImplement(msg.epicName), m.implementSpinner.Tick, closeCmd)
 	case implementPollMsg:
-		if snapshot, ok := ralphLoopRegistry.runSnapshot(msg.epicName); ok {
+		snapshot, ok := ralphLoopRegistry.runSnapshot(msg.epicName)
+		if ok {
 			m.syncExecutionScope(msg.epicName, snapshot)
 		}
 		closeCmd := m.syncRunSnapshot(msg.epicName)
+		if ok && snapshot.Parked {
+			delete(m.runningEpics, msg.epicName)
+			m.parkedEpics[msg.epicName] = snapshot.StalledTickets
+			return m, tea.Batch(cmdPollImplement(msg.epicName), closeCmd)
+		}
+		delete(m.parkedEpics, msg.epicName)
 		if ralphLoopRegistry.isRunningEpic(msg.epicName) {
+			m.runningEpics[msg.epicName] = true
 			return m, tea.Batch(cmdPollImplement(msg.epicName), closeCmd)
 		}
 		m.finalizeEpicTicketStatus(msg.epicName)
 		delete(m.runningEpics, msg.epicName)
 		delete(m.live, msg.epicName)
-		executionComplete := !m.executionStartedAt.IsZero() && len(m.runningEpics) == 0 && len(m.pendingEpics) == 0
+		executionComplete := !m.executionStartedAt.IsZero() && len(m.runningEpics) == 0 && len(m.pendingEpics) == 0 && len(m.parkedEpics) == 0
 		startCmd := m.startAvailableEpics()
 		if executionComplete {
 			m.executionCompletedAt = m.now()
@@ -449,6 +463,13 @@ func (m QueueModel) handleQueueSync(msg queueSyncMsg) (tea.Model, tea.Cmd) {
 			m.executionStartedAt = snapshot.StartedAt
 		}
 		wasRunning := m.runningEpics[name]
+		if snapshot.Parked {
+			delete(m.runningEpics, name)
+			m.parkedEpics[name] = snapshot.StalledTickets
+			cmds = append(cmds, cmdPollImplement(name))
+			continue
+		}
+		delete(m.parkedEpics, name)
 		if snapshot.State == RunStateRunning {
 			m.runningEpics[name] = true
 			m.markEpicTicketsRunning(name)
@@ -466,7 +487,7 @@ func (m QueueModel) handleQueueSync(msg queueSyncMsg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, m.implementSpinner.Tick)
 	}
 	cmds = append(cmds, m.startAvailableEpics())
-	if !m.executionStartedAt.IsZero() && m.executionCompletedAt.IsZero() && len(m.runningEpics) == 0 && len(m.pendingEpics) == 0 {
+	if !m.executionStartedAt.IsZero() && m.executionCompletedAt.IsZero() && len(m.runningEpics) == 0 && len(m.pendingEpics) == 0 && len(m.parkedEpics) == 0 {
 		m.executionCompletedAt = m.now()
 		cmds = append(cmds, m.cmdLoadQueue())
 	}
@@ -723,6 +744,15 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "x":
 		return m.handleQueueDeleteKey()
 	case "enter":
+		// A parked row's "enter" wins over every other meaning below: it
+		// resumes that epic (cosmetic wake via Gate.WakeParked, not reattach)
+		// rather than launching the checked queue or toggling focus.
+		if rows := m.rows(); m.selected >= 0 && m.selected < len(rows) {
+			if _, parked := m.parkedEpics[rows[m.selected].epic.Name]; parked {
+				ralphLoopRegistry.resumeParked(rows[m.selected].epic.Name)
+				return m, nil
+			}
+		}
 		// "enter" launches the checked queue (existing behavior, unrelated to
 		// row selection) whenever that's actionable; only when it isn't —
 		// nothing checked, or a run's already in flight — does it fall back to

@@ -6,6 +6,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 )
@@ -26,6 +27,12 @@ var (
 	// treatment instead (ticket 02's same open=no-color choice), so it
 	// doesn't read as an alarm state.
 	epicStatusProblemStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow)
+
+	// epicStatusParkedStyle colors a parked epic's header status line
+	// distinctly from both the yellow "problem" and default "running" looks,
+	// so parked reads as its own state rather than an alarm or normal
+	// progress (see reduceLiveEvent's RunStateParked).
+	epicStatusParkedStyle = lipgloss.NewStyle().Foreground(ui.ColorMauve)
 )
 
 // epicHeaderLines renders the Queue tab's per-epic header as two lines: a
@@ -34,8 +41,8 @@ var (
 // epic's tickets). Both lines carry the same 2-char indent as the list rows
 // beneath them (ticket 03) rather than the header widening to the list's old
 // 4-char indent.
-func (m QueueModel) epicHeaderLines(epic tickets.Epic) []string {
-	icon, text, style := epicStatusLine(m.icons(), epic)
+func (m QueueModel) epicHeaderLines(epic tickets.Epic, parked []ralphloop.StalledTicket) []string {
+	icon, text, style := epicStatusLine(m.icons(), epic, parked)
 	statusLine := "  " + epicHeaderStyle.Render(epic.Name) + " " + style.Render(icon+" "+text)
 
 	avg, maximum, compacts := epicContextMetrics(epic)
@@ -50,8 +57,10 @@ func (m QueueModel) epicHeaderLines(epic tickets.Epic) []string {
 // green "took <elapsed>" once every ticket is done, yellow flagging any
 // needs-info/needs-attention/error-classed ticket, or the default/no-color
 // treatment otherwise.
-func epicStatusLine(icons ui.IconSet, epic tickets.Epic) (icon, text string, style lipgloss.Style) {
+func epicStatusLine(icons ui.IconSet, epic tickets.Epic, parked []ralphloop.StalledTicket) (icon, text string, style lipgloss.Style) {
 	switch {
+	case len(parked) > 0:
+		return icons.Warning, "parked — " + parkedStallText(parked), epicStatusParkedStyle
 	case epic.AllDone():
 		text := "took " + formatElapsed(epicElapsedSeconds(epic))
 		if dur, ok := epic.CompletionDuration(); ok {
@@ -63,6 +72,25 @@ func epicStatusLine(icons ui.IconSet, epic tickets.Epic) (icon, text string, sty
 	default:
 		return icons.Dot, fmt.Sprintf("%d of %d done", epic.DoneCount(), epic.TotalCount()), lipgloss.NewStyle()
 	}
+}
+
+// parkedStallText renders a parked epic's stall reason for the header status
+// line: "waiting on <id>[, <id>...]", with "(reattachable)" appended per
+// ticket for the ones whose prior iteration still owns a live herdr
+// tab/agent (StalledTicket.Reattachable — see resumeReattachable) — the "jump
+// to pane" acceptance criterion resolved as informational rendering, not a
+// new navigation action, since no jump-to-pane affordance exists anywhere in
+// this UI today (see ticket 11a4's "Open question").
+func parkedStallText(stalled []ralphloop.StalledTicket) string {
+	names := make([]string, len(stalled))
+	for i, s := range stalled {
+		name := s.Identifier
+		if s.Reattachable {
+			name += " (reattachable)"
+		}
+		names[i] = name
+	}
+	return "waiting on " + strings.Join(names, ", ")
 }
 
 // epicElapsedSeconds sums the epic's tickets' landed ElapsedTime, for the

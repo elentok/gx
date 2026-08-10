@@ -40,12 +40,16 @@ type epicRun struct {
 	// loopRegistry.attachCount, so finish only releases the attach lock once
 	// the run that actually incremented it ends.
 	holdsAttach bool
+	// parkedStalled is the human-clearable ticket list from the most recent
+	// LiveEventEpicParked, valid only while state == RunStateParked.
+	parkedStalled []ralphloop.StalledTicket
 }
 
 type RunState string
 
 const (
 	RunStateRunning   RunState = "running"
+	RunStateParked    RunState = "parked"
 	RunStateCompleted RunState = "completed"
 	RunStateFailed    RunState = "failed"
 )
@@ -72,6 +76,11 @@ type RunSnapshot struct {
 	FinalError    string
 	Tickets       map[string]RunTicketSnapshot
 	StartedAt     time.Time
+	// Parked and StalledTickets mirror epicRun.state == RunStateParked and
+	// its parkedStalled, for the Queue tab to render a parked epic distinctly
+	// from running/queued (see queue.go's parkedEpics).
+	Parked         bool
+	StalledTickets []ralphloop.StalledTicket
 }
 
 // loopRegistry enforces "an epic may not have two ralph-loops running at
@@ -228,6 +237,10 @@ func (r *loopRegistry) reduceLiveEvent(epicName string, event ralphloop.LiveEven
 	}
 	switch event.Kind {
 	case ralphloop.LiveEventIterationStarted, ralphloop.LiveEventTicketReattached:
+		if run.state == RunStateParked {
+			run.state = RunStateRunning
+			run.parkedStalled = nil
+		}
 		run.tickets[event.Identifier] = RunTicketSnapshot{
 			Identifier: event.Identifier,
 			Label:      event.Label,
@@ -286,6 +299,9 @@ func (r *loopRegistry) reduceLiveEvent(epicName string, event ralphloop.LiveEven
 			run.tickets[event.Identifier] = ticket
 			run.done++
 		}
+	case ralphloop.LiveEventEpicParked:
+		run.state = RunStateParked
+		run.parkedStalled = event.Stalled
 	case ralphloop.LiveEventEpicComplete:
 		run.done = event.Completed
 		run.state = RunStateCompleted
@@ -361,16 +377,33 @@ func copyRunSnapshot(epicName string, run *epicRun, queuePaused bool) RunSnapsho
 		paused = paused || ticket.Paused
 	}
 	return RunSnapshot{
-		EpicName:      epicName,
-		State:         run.state,
-		Done:          run.done,
-		Total:         run.total,
-		ContextTokens: contextTokens,
-		Paused:        paused,
-		FinalError:    run.finalError,
-		Tickets:       tickets,
-		StartedAt:     run.startedAt,
+		EpicName:       epicName,
+		State:          run.state,
+		Done:           run.done,
+		Total:          run.total,
+		ContextTokens:  contextTokens,
+		Paused:         paused,
+		FinalError:     run.finalError,
+		Tickets:        tickets,
+		StartedAt:      run.startedAt,
+		Parked:         run.state == RunStateParked,
+		StalledTickets: run.parkedStalled,
 	}
+}
+
+// resumeParked cosmetically wakes epicName's parked run (see
+// ralphloop.Gate.WakeParked) so its next poll pass rechecks the frontier
+// immediately instead of waiting out the current park interval. A no-op if
+// epicName isn't currently parked.
+func (r *loopRegistry) resumeParked(epicName string) {
+	r.mu.Lock()
+	run := r.runs[epicName]
+	parked := run != nil && run.state == RunStateParked
+	r.mu.Unlock()
+	if !parked {
+		return
+	}
+	run.gate.WakeParked()
 }
 
 func (r *loopRegistry) gateFor(epicName string) *ralphloop.Gate {
