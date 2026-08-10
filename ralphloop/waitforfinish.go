@@ -322,7 +322,7 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 	p.sink().SmartZoneCompactStarted(p.Ticket)
 	p.logAgentEvent(eventPausedSmartZone, sessionID, reason)
 
-	baseline := readCompactBoundaries(d, p.Agent, p.SessionCwd, sessionID)
+	baseline := &stickyBaseline{snapshot: readCompactBoundaries(d, p.Agent, p.SessionCwd, sessionID)}
 
 	compactStates := append(append([]string{}, plainFinishStates...), "blocked")
 	agent, err := d.AgentPrompt(herdr.AgentPromptOptions{
@@ -333,7 +333,7 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 		TimeoutMs: smartZonePollMs,
 	})
 	expired := false
-	if compactSignalUnconfirmed(d, p, sessionID, err, baseline) {
+	if compactSignalUnconfirmed(d, p, sessionID, err, baseline.snapshot) {
 		agent, expired, err = waitForCompactionSignal(d, p, sessionID, compactStates, smartZonePollMs, baseline)
 	}
 	// "blocked" is Codex's compact-confirmation state, and Codex is exactly the
@@ -462,6 +462,49 @@ func (s compactBoundarySnapshot) advancedPast(d Deps, p launchAndPromptParams, s
 	return now.state == compactBoundaryConfirmed && now.count > s.count
 }
 
+// stickyBaseline carries the compaction-boundary snapshot taken just before
+// "/compact" was submitted, plus the single retry the gate allows itself when
+// that first read came back unavailable. Without the retry, one transient
+// transcript read failure disables the gate for the whole recovery and
+// behavior silently reverts to the premature-finish-up bug the gate exists to
+// prevent.
+//
+// The retry is taken on the first gated tick and never repeated. The baseline
+// must approximate the boundary count at submission time, because the gate's
+// predicate is "count is greater than baseline": a baseline adopted after the
+// compaction boundary has already landed is permanently greater than or equal
+// to the count, so the gate can never open again. Re-reading on every tick
+// would therefore convert a transient read failure into a deadlock, reporting
+// a genuinely successful compaction as a give-up and driving the ticket to
+// needs-attention.
+type stickyBaseline struct {
+	snapshot compactBoundarySnapshot
+	// upgraded records that the one retry has been spent, whether or not it
+	// produced a usable count.
+	upgraded bool
+}
+
+// upgradeOnce retries an unavailable baseline read, at most once and only
+// while the recovery is still on its first gated tick. See stickyBaseline for
+// why a later retry is a deadlock rather than a second chance.
+func (b *stickyBaseline) upgradeOnce(d Deps, p launchAndPromptParams, sessionID string) {
+	if b.upgraded || b.snapshot.state != compactBoundaryUnavailable {
+		return
+	}
+	b.upgraded = true
+	if fresh := readCompactBoundaries(d, p.Agent, p.SessionCwd, sessionID); fresh.state == compactBoundaryConfirmed {
+		b.snapshot = fresh
+	}
+}
+
+func (b *stickyBaseline) gates() bool {
+	return b.snapshot.gates()
+}
+
+func (b *stickyBaseline) advancedPast(d Deps, p launchAndPromptParams, sessionID string) bool {
+	return b.snapshot.advancedPast(d, p, sessionID)
+}
+
 // compactSignalUnconfirmed reports whether the immediate "/compact"
 // AgentPrompt result (err) needs a fallthrough to waitForCompactionSignal
 // rather than being trusted as-is: either the prompt's own wait timed out, or
@@ -492,7 +535,11 @@ func compactSignalUnconfirmed(d Deps, p launchAndPromptParams, sessionID string,
 // prompt land as queued input and cancel the compaction outright. A pane-status
 // wait that keeps timing out past smartZoneCompactTimeoutMs is conversely still
 // reported as success (transcriptConfirmed=true) once the count advances, since
-// a herdr observation gap is not a stuck compaction.
+// a herdr observation gap is not a stuck compaction. A transcript that can't be
+// read at all right now proves nothing either way, so it holds the gate closed
+// and consumes the extended bound like any other unconfirmed tick. The first
+// tick here is also the one chance a baseline that was unreadable at submission
+// time gets to be adopted — see stickyBaseline.
 //
 // Only once smartZoneCompactExtendedTimeoutMs of accumulated time elapses with
 // neither signal showing completion does this give up: with the pane's own
@@ -503,10 +550,11 @@ func compactSignalUnconfirmed(d Deps, p launchAndPromptParams, sessionID string,
 func waitForCompactionSignal(
 	d Deps, p launchAndPromptParams, sessionID string,
 	until []string, startElapsedMs int,
-	baseline compactBoundarySnapshot,
+	baseline *stickyBaseline,
 ) (agent herdr.Agent, transcriptConfirmed bool, err error) {
 	elapsedMs := startElapsedMs
 	for {
+		baseline.upgradeOnce(d, p, sessionID)
 		agent, err = d.AgentWait(herdr.AgentWaitOptions{
 			Target:    p.Pane,
 			Until:     until,

@@ -1600,3 +1600,183 @@ func TestWaitForFinish_CodexIgnoresClaudeTerminalRateLimitText(t *testing.T) {
 		t.Errorf("continue prompts = %d, want 0 from Claude terminal text", prompts)
 	}
 }
+
+// stickyBaselineDeps is the premature-idle pane the sticky-baseline tests
+// share: "/compact" and every subsequent pane wait report idle immediately, so
+// the only thing that can ever end the recovery is the transcript.
+func stickyBaselineDeps(
+	prompts *[]string, sleeps *int,
+	readCompactions func(string, string) (int, bool, error),
+	onWait func(),
+) Deps {
+	return Deps{
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			*prompts = append(*prompts, opts.Text)
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			if onWait != nil {
+				onWait()
+			}
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		ReadCompactions: readCompactions,
+		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+			return "compaction complete", nil
+		},
+		Sleep: func(time.Duration) { *sleeps++ },
+	}
+}
+
+// TestRecoverSmartZoneBreach_UnavailableBaselineUpgradesOnFirstGatedTick
+// verifies the sticky baseline: a transcript read that fails at "/compact"
+// submission time must not disable the gate for the whole recovery. Retried on
+// the first gated tick and succeeding, the recovery goes on to behave exactly
+// as if the baseline had been readable all along.
+func TestRecoverSmartZoneBreach_UnavailableBaselineUpgradesOnFirstGatedTick(t *testing.T) {
+	var prompts []string
+	var sleeps, reads, waits int
+	compactionCount := 0
+	d := stickyBaselineDeps(&prompts, &sleeps,
+		func(string, string) (int, bool, error) {
+			reads++
+			if reads == 1 {
+				return 0, false, errors.New("transcript read failed")
+			}
+			return compactionCount, true, nil
+		},
+		func() {
+			waits++
+			if waits == 2 {
+				compactionCount = 1
+			}
+		},
+	)
+
+	recovered, err := recoverSmartZoneBreach(d, gatedBreachParams(t.TempDir()), "sess-19", "smart-zone breach", 100)
+	if err != nil {
+		t.Fatalf("recoverSmartZoneBreach: %v", err)
+	}
+	if !recovered {
+		t.Fatal("recoverSmartZoneBreach returned recovered=false, want true: the retried baseline is adopted and the compaction does land")
+	}
+	if len(prompts) != 2 || prompts[0] != "/compact" {
+		t.Errorf("prompts = %v, want [/compact, finish-up] once the adopted baseline is passed", prompts)
+	}
+	if sleeps == 0 {
+		t.Error("gated sleeps = 0, want the adopted baseline to hold the gate closed until the boundary advances")
+	}
+}
+
+// TestRecoverSmartZoneBreach_UnavailableBaselineIsNeverUpgradedAfterFirstTick
+// pins the invariant the retry is bounded by. Here the transcript only becomes
+// readable well after the compaction boundary has landed, so its count is
+// already past the true submission-time value. Adopting it then would make
+// "count is greater than baseline" unsatisfiable forever, and the deadlock
+// would surface as a successful compaction reported as a give-up. Recovery
+// must give up on the extended bound instead of opening the gate on that stale
+// comparison.
+func TestRecoverSmartZoneBreach_UnavailableBaselineIsNeverUpgradedAfterFirstTick(t *testing.T) {
+	var prompts []string
+	var sleeps, reads int
+	d := stickyBaselineDeps(&prompts, &sleeps,
+		func(string, string) (int, bool, error) {
+			reads++
+			if reads <= 2 { // the submission-time read and the one gated retry
+				return 0, false, errors.New("transcript read failed")
+			}
+			return 5, true, nil
+		},
+		nil,
+	)
+
+	recovered, err := recoverSmartZoneBreach(d, gatedBreachParams(t.TempDir()), "sess-19", "smart-zone breach", 100)
+	if !errors.Is(err, errCompactNeverConfirmed) {
+		t.Fatalf("recoverSmartZoneBreach error = %v, want one wrapping errCompactNeverConfirmed", err)
+	}
+	if recovered {
+		t.Error("recoverSmartZoneBreach returned recovered=true, want false: a late baseline is stale and can only deadlock the gate")
+	}
+	if len(prompts) != 1 || prompts[0] != "/compact" {
+		t.Errorf("prompts = %v, want [/compact] only: no finish-up prompt on a never-confirmed compaction", prompts)
+	}
+}
+
+// TestRecoverSmartZoneBreach_UnavailableReadsInLoopHoldGateClosed verifies
+// that transcript reads failing intermittently mid-recovery are treated as
+// "not yet", not as "no baseline, trust the pane" — that second reading is the
+// same silent-disable failure in a different disguise. A persistent read
+// problem must surface as an ordinary gated give-up, paced by the extended
+// bound.
+func TestRecoverSmartZoneBreach_UnavailableReadsInLoopHoldGateClosed(t *testing.T) {
+	var prompts []string
+	var sleeps, reads int
+	d := stickyBaselineDeps(&prompts, &sleeps,
+		func(string, string) (int, bool, error) {
+			reads++
+			if reads == 1 {
+				return 0, true, nil // a readable baseline, then the transcript goes flaky
+			}
+			if reads%2 == 0 {
+				return 0, false, errors.New("transcript read failed")
+			}
+			return 0, false, nil // exists-but-unreadable and not-yet-existing both hold
+		},
+		nil,
+	)
+
+	recovered, err := recoverSmartZoneBreach(d, gatedBreachParams(t.TempDir()), "sess-19", "smart-zone breach", 100)
+	if !errors.Is(err, errCompactNeverConfirmed) {
+		t.Fatalf("recoverSmartZoneBreach error = %v, want one wrapping errCompactNeverConfirmed", err)
+	}
+	if recovered {
+		t.Error("recoverSmartZoneBreach returned recovered=true, want false: an unreadable transcript confirms nothing")
+	}
+	if len(prompts) != 1 || prompts[0] != "/compact" {
+		t.Errorf("prompts = %v, want [/compact] only", prompts)
+	}
+	wantSleeps := smartZoneCompactExtendedTimeoutMs/smartZonePollMs - 1
+	if sleeps != wantSleeps {
+		t.Errorf("gated sleeps = %d, want %d: failed reads must consume the extended bound, not short-circuit it", sleeps, wantSleeps)
+	}
+}
+
+// TestRecoverSmartZoneBreach_MissingTranscriptVersusUnsupportedAgent
+// discriminates the two states that arrive as the same (0, false, nil) read.
+// A Claude transcript that doesn't exist yet is temporarily unavailable and
+// holds the gate closed; a Codex session has no boundary signal at all and
+// still fails open, never routed through the closed-gate policy.
+func TestRecoverSmartZoneBreach_MissingTranscriptVersusUnsupportedAgent(t *testing.T) {
+	missing := func(string, string) (int, bool, error) { return 0, false, nil }
+
+	t.Run("Claude transcript not written yet holds the gate closed", func(t *testing.T) {
+		var prompts []string
+		var sleeps int
+		d := stickyBaselineDeps(&prompts, &sleeps, missing, nil)
+		recovered, err := recoverSmartZoneBreach(d, gatedBreachParams(t.TempDir()), "sess-19", "smart-zone breach", 100)
+		if !errors.Is(err, errCompactNeverConfirmed) {
+			t.Fatalf("recoverSmartZoneBreach error = %v, want one wrapping errCompactNeverConfirmed", err)
+		}
+		if recovered || len(prompts) != 1 {
+			t.Errorf("recovered = %v, prompts = %v; want no finish-up prompt for an unavailable transcript", recovered, prompts)
+		}
+	})
+
+	t.Run("Codex has no boundary signal and fails open", func(t *testing.T) {
+		var prompts []string
+		var sleeps, waits int
+		d := stickyBaselineDeps(&prompts, &sleeps, missing, func() { waits++ })
+		p := gatedBreachParams(t.TempDir())
+		p.Agent = AgentCodex
+		recovered, err := recoverSmartZoneBreach(d, p, "sess-19", "smart-zone breach", 100)
+		if err != nil {
+			t.Fatalf("recoverSmartZoneBreach: %v", err)
+		}
+		if !recovered || len(prompts) != 2 {
+			t.Errorf("recovered = %v, prompts = %v; want the pre-gate behavior for an agent with no boundary signal", recovered, prompts)
+		}
+		if waits != 0 {
+			t.Errorf("AgentWait calls = %d, want 0: an unsupported agent never enters the gated wait", waits)
+		}
+	})
+}
