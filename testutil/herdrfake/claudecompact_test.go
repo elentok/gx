@@ -10,13 +10,15 @@ import (
 const compactTestSmartZone = 100
 
 // newTestClaudeCompact wires a ClaudeCompact against a fresh $HOME and a
-// virtual clock the test advances explicitly (never a real sleep).
-func newTestClaudeCompact(t *testing.T) (*ClaudeCompact, *time.Duration) {
+// virtual clock the test advances explicitly (never a real sleep). Options are
+// threaded through rather than set inside, so a test that wants non-default
+// pane behavior asks for it and every other test keeps the defaults.
+func newTestClaudeCompact(t *testing.T, opts ...ClaudeCompactOption) (*ClaudeCompact, *time.Duration) {
 	t.Helper()
 	t.Setenv("HOME", t.TempDir())
 
 	var virtualTime time.Duration
-	c := NewClaudeCompact(t, "/repo/iter-c", "sess-c", func() time.Duration { return virtualTime }, compactTestSmartZone)
+	c := NewClaudeCompact(t, "/repo/iter-c", "sess-c", func() time.Duration { return virtualTime }, compactTestSmartZone, opts...)
 	return c, &virtualTime
 }
 
@@ -56,7 +58,7 @@ func TestClaudeCompact_StatusStaysWorkingUntilExactlyCompactDuration(t *testing.
 }
 
 func TestClaudeCompact_CompletionAppendsOneBoundaryAndLowOccupancyTurn(t *testing.T) {
-	c, virtualTime := newTestClaudeCompact(t)
+	c, virtualTime := newTestClaudeCompact(t, WithPairedPostCompactionTurn())
 
 	if err := c.StartCompact(); err != nil {
 		t.Fatalf("StartCompact: %v", err)
@@ -84,6 +86,112 @@ func TestClaudeCompact_CompletionAppendsOneBoundaryAndLowOccupancyTurn(t *testin
 	}
 	if occupancy >= compactTestSmartZone {
 		t.Errorf("post-compact occupancy = %d, want < smartZone (%d)", occupancy, compactTestSmartZone)
+	}
+}
+
+func TestClaudeCompact_CompletionAppendsOnlyABoundaryByDefault(t *testing.T) {
+	c, virtualTime := newTestClaudeCompact(t)
+
+	if err := c.StartCompact(); err != nil {
+		t.Fatalf("StartCompact: %v", err)
+	}
+	*virtualTime = CompactDurationMs * time.Millisecond
+	if _, err := c.Status(); err != nil {
+		t.Fatalf("Status(): %v", err)
+	}
+
+	lines, ok, err := transcript.ReadAll(c.Path())
+	if err != nil || !ok {
+		t.Fatalf("ReadAll: ok=%v err=%v", ok, err)
+	}
+	if got := transcript.CountCompactions(lines); got != 1 {
+		t.Errorf("CountCompactions = %d, want exactly 1", got)
+	}
+	if len(lines) != 2 {
+		t.Fatalf("line count = %d, want 2 (seed turn + boundary)", len(lines))
+	}
+	if !lines[1].IsCompactBoundary() {
+		t.Errorf("last line = %+v, want the compact boundary", lines[1])
+	}
+
+	// No assistant turn follows the boundary, so the newest occupancy in the
+	// transcript is still the pre-compaction one — the real Claude Code shape.
+	occupancy, ok, err := transcript.LastAssistantOccupancy("/repo/iter-c", "sess-c")
+	if err != nil || !ok {
+		t.Fatalf("LastAssistantOccupancy: ok=%v err=%v", ok, err)
+	}
+	if occupancy <= compactTestSmartZone {
+		t.Errorf("post-compact occupancy = %d, want the stale above-smartZone (%d) value", occupancy, compactTestSmartZone)
+	}
+}
+
+func TestClaudeCompact_PrematureIdlePaneReportsIdleWhileCompactionRuns(t *testing.T) {
+	c, virtualTime := newTestClaudeCompact(t, WithPrematureIdlePane())
+
+	if err := c.StartCompact(); err != nil {
+		t.Fatalf("StartCompact: %v", err)
+	}
+
+	*virtualTime = (CompactDurationMs / 2) * time.Millisecond
+	if status, err := c.Status(); err != nil || status != "idle" {
+		t.Fatalf("Status() mid-compaction = %q, err=%v, want idle", status, err)
+	}
+
+	lines, ok, err := transcript.ReadAll(c.Path())
+	if err != nil || !ok {
+		t.Fatalf("ReadAll: ok=%v err=%v", ok, err)
+	}
+	if got := transcript.CountCompactions(lines); got != 0 {
+		t.Errorf("CountCompactions mid-compaction = %d, want 0", got)
+	}
+	if err := c.AcceptFinishUp(); err == nil {
+		t.Error("AcceptFinishUp() mid-compaction = nil, want error")
+	}
+
+	*virtualTime = CompactDurationMs * time.Millisecond
+	if status, err := c.Status(); err != nil || status != "idle" {
+		t.Fatalf("Status() at CompactDurationMs = %q, err=%v, want idle", status, err)
+	}
+
+	lines, ok, err = transcript.ReadAll(c.Path())
+	if err != nil || !ok {
+		t.Fatalf("ReadAll: ok=%v err=%v", ok, err)
+	}
+	if got := transcript.CountCompactions(lines); got != 1 {
+		t.Fatalf("CountCompactions after the deadline = %d, want exactly 1", got)
+	}
+	wantTS := claudeCompactEpoch.Add(CompactDurationMs * time.Millisecond)
+	if got := lines[len(lines)-1].Timestamp; !got.Equal(wantTS) {
+		t.Errorf("boundary timestamp = %v, want the virtual deadline %v", got, wantTS)
+	}
+}
+
+func TestClaudeCompact_PrematureIdlePaneStillWritesPairedTurnAtTheDeadline(t *testing.T) {
+	c, virtualTime := newTestClaudeCompact(t, WithPrematureIdlePane(), WithPairedPostCompactionTurn())
+
+	if err := c.StartCompact(); err != nil {
+		t.Fatalf("StartCompact: %v", err)
+	}
+	*virtualTime = CompactDurationMs * time.Millisecond
+	if _, err := c.Status(); err != nil {
+		t.Fatalf("Status(): %v", err)
+	}
+
+	lines, ok, err := transcript.ReadAll(c.Path())
+	if err != nil || !ok {
+		t.Fatalf("ReadAll: ok=%v err=%v", ok, err)
+	}
+	if len(lines) != 3 {
+		t.Fatalf("line count = %d, want 3 (seed turn + boundary + paired turn)", len(lines))
+	}
+	if !lines[1].IsCompactBoundary() {
+		t.Errorf("line 1 = %+v, want the boundary written before the paired turn", lines[1])
+	}
+	wantTS := claudeCompactEpoch.Add(CompactDurationMs * time.Millisecond)
+	for i, line := range lines[1:] {
+		if !line.Timestamp.Equal(wantTS) {
+			t.Errorf("completion line %d timestamp = %v, want the virtual deadline %v", i+1, line.Timestamp, wantTS)
+		}
 	}
 }
 

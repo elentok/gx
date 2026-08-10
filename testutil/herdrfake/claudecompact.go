@@ -66,9 +66,9 @@ type transcriptLine struct {
 // its "/compact" protocol: a valid transcript that starts above the
 // smart-zone threshold, a compaction that stays "working" for exactly
 // CompactDurationMs of virtual time, and completion recorded as one
-// compact_boundary system line followed by a low-occupancy assistant turn —
-// the same shape production transcript readers and smart-zone recovery
-// logic observe from a real Claude Code session.
+// compact_boundary system line — the same shape production transcript readers
+// and smart-zone recovery logic observe from a real Claude Code session. Both
+// departures from that shape are opt-in, via ClaudeCompactOption.
 //
 // ClaudeCompact reads its clock through virtualTime rather than owning one,
 // so it can be driven by a herdrfake.State's virtual clock (State.VirtualTime)
@@ -80,16 +80,43 @@ type ClaudeCompact struct {
 	sessionID   string
 	virtualTime func() time.Duration
 
+	prematureIdle bool
+	pairedTurn    bool
+
 	started         bool
 	boundaryWritten bool
 	startedAt       time.Duration
+}
+
+// ClaudeCompactOption configures a ClaudeCompact at construction. Both options
+// exist so a scenario can model a pane real Claude Code produces but the
+// honest default does not; neither changes the modeled compaction's duration
+// or the virtual deadline its completion lines are timed at.
+type ClaudeCompactOption func(*ClaudeCompact)
+
+// WithPrematureIdlePane models the iter-13c pane: Status reports "idle" from
+// the moment "/compact" is submitted, even though the compaction is still
+// running and its boundary is not yet written. Real Claude Code reported idle
+// seconds after "/compact" was submitted, so recovery logic that trusts pane
+// status alone declares the compaction finished while it is still going.
+func WithPrematureIdlePane() ClaudeCompactOption {
+	return func(c *ClaudeCompact) { c.prematureIdle = true }
+}
+
+// WithPairedPostCompactionTurn appends a low-occupancy assistant turn after
+// the boundary, modeling an agent that speaks immediately once compaction
+// finishes. Real Claude Code writes no such turn at the boundary — the context
+// is smaller but nothing says so until the agent's next turn — so this is
+// opt-in for scenarios that need a fresh occupancy reading to assert on.
+func WithPairedPostCompactionTurn() ClaudeCompactOption {
+	return func(c *ClaudeCompact) { c.pairedTurn = true }
 }
 
 // NewClaudeCompact creates the transcript file for a session launched in cwd
 // with sessionID, seeded with one assistant turn whose occupancy is above
 // smartZone — the "over-budget transcript" precondition smart-zone recovery
 // reacts to.
-func NewClaudeCompact(t testing.TB, cwd, sessionID string, virtualTime func() time.Duration, smartZone int) *ClaudeCompact {
+func NewClaudeCompact(t testing.TB, cwd, sessionID string, virtualTime func() time.Duration, smartZone int, opts ...ClaudeCompactOption) *ClaudeCompact {
 	t.Helper()
 
 	path, err := transcript.Path(cwd, sessionID)
@@ -101,6 +128,9 @@ func NewClaudeCompact(t testing.TB, cwd, sessionID string, virtualTime func() ti
 	}
 
 	c := &ClaudeCompact{path: path, sessionID: sessionID, virtualTime: virtualTime}
+	for _, opt := range opts {
+		opt(c)
+	}
 
 	if err := c.writeLine(assistantLine(sessionID, c.timestamp(), smartZone+compactAboveSmartZoneMargin)); err != nil {
 		t.Fatalf("herdrfake: write initial transcript: %v", err)
@@ -140,13 +170,15 @@ func (c *ClaudeCompact) activeLocked() bool {
 
 // Status reports the modeled agent's current status: "working" for the
 // first CompactDurationMs virtual milliseconds after StartCompact, then
-// "idle" from the moment that elapses onward. The first observation at or
-// past that deadline appends the completion transcript lines — one
-// compact_boundary system line and one low-occupancy assistant turn — timed
-// at exactly startedAt+CompactDurationMs regardless of how much later this
-// call happens to run, so completion timestamps stay tied to the virtual
-// deadline rather than poll timing. Before StartCompact has ever been
-// called, Status reports "idle".
+// "idle" from the moment that elapses onward — or, under
+// WithPrematureIdlePane, "idle" throughout. The first observation at or past
+// that deadline appends the completion transcript lines — one
+// compact_boundary system line, plus a low-occupancy assistant turn under
+// WithPairedPostCompactionTurn — timed at exactly
+// startedAt+CompactDurationMs regardless of how much later this call happens
+// to run, so completion timestamps stay tied to the virtual deadline rather
+// than poll timing. Before StartCompact has ever been called, Status reports
+// "idle".
 func (c *ClaudeCompact) Status() (string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -157,16 +189,24 @@ func (c *ClaudeCompact) Status() (string, error) {
 
 	elapsed := c.virtualTime() - c.startedAt
 	if elapsed < CompactDurationMs*time.Millisecond {
+		if c.prematureIdle {
+			return "idle", nil
+		}
 		return "working", nil
 	}
 
 	completedAt := c.startedAt + CompactDurationMs*time.Millisecond
 	ts := claudeCompactEpoch.Add(completedAt).Format(time.RFC3339Nano)
+	// Boundary first, paired turn second: a compaction that finished and an
+	// agent that then spoke. Both carry the deadline's timestamp, which is why
+	// readers distinguishing them must go by file order, not by timestamp.
 	if err := c.writeLine(boundaryLine(ts)); err != nil {
 		return "", err
 	}
-	if err := c.writeLine(assistantLine(c.sessionID, ts, compactLowOccupancy)); err != nil {
-		return "", err
+	if c.pairedTurn {
+		if err := c.writeLine(assistantLine(c.sessionID, ts, compactLowOccupancy)); err != nil {
+			return "", err
+		}
 	}
 	c.boundaryWritten = true
 

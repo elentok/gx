@@ -274,7 +274,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 		mu.Lock()
 		defer mu.Unlock()
 		return virtualTime
-	}, smartZone)
+	}, smartZone, herdrfake.WithPairedPostCompactionTurn())
 
 	status := map[string]string{}  // pane -> agent_status
 	session := map[string]string{} // pane -> agent session id
