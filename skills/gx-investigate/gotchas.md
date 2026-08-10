@@ -1,5 +1,24 @@
 # gx-investigate gotchas
 
+- **A smart-zone `/compact` gets cancelled by gx's own finish-up prompt when herdr reports the pane
+  idle/done during compaction.** `waitForCompactionSignal` (`ralphloop/waitforfinish.go`) returns
+  success on *any* non-error `AgentWait`, consulting the transcript's compaction-boundary count only
+  on a wait *timeout* past `smartZoneCompactTimeoutMs` (5 min) — so a prematurely-idle pane bypasses
+  the very signal `compactSignalUnconfirmed` had just used to prove compaction hadn't finished, and
+  the finish-up prompt lands as queued input that aborts the compaction. Found live:
+  `lifecycle-refactor` iter-13c — whole compact+finish-up contract completing in 4.5s, second breach
+  reporting identical occupancy (132603), exactly one `compact_boundary` in the session and it
+  belongs to the *second* `/compact`. Not fixed. See
+  `lifecycle-refactor/issues/15-smart-zone-compact-cancelled-by-finishup-prompt-research.md`.
+
+- **`agent_pane_busy` on `herdr agent start` puts a ticket into `needs-attention` with no
+  `iteration-started` logged at all.** `--pane` is herdr's own `RootPaneID` from `tab create`, not
+  allocated/pooled by gx (`ralphloop/iteration.go:56-66` → `herdr/tab.go:30-52` →
+  `launch.go:76,220-225`); two tickets launching concurrently under `MaxParallel` can race inside
+  herdr's own pane allocator (external binary, no gx-side mutex around the herdr CLI calls). Not a
+  gx-source bug; unstick by clearing the ticket back to `open` for the scheduler to reclaim. Found
+  live: `lifecycle-refactor` ticket `05`. See
+  `lifecycle-refactor/issues/14-ticket-05-needs-attention-herdr-pane-busy-research.md`.
 - **The mid-flight-fork placeholder fix above only closed one of three ways a `blocked_by` chain
   could still start early.** Follow-up consult (Opus, read-only) on the same `06b`/`06c` incident
   found: (1) `fullyDone`'s descendant walk trusted `t.Children`, a field `gx tickets add --parent`
