@@ -115,17 +115,23 @@ without pull). Rendered purple with `󰜮`.
 tracker's triage-label vocabulary) into a small, fixed set of user-facing states, each with its own
 icon:
 
-- **Open** — unclaimed, nothing blocks picking it up. Covers a missing `Status:`, `needs-triage`,
-  and the `ready-for-agent`/`ready-for-human` triage labels, which don't distinguish who picks it up.
+- **Draft** — raw `Status: draft`; the ticket exists but isn't ready to be worked. The state a
+  freshly allocated stub is born in; never schedulable.
+- **Open** — unclaimed and ready for whoever picks it up next. Covers a missing `Status:`.
 - **Claimed** — raw `Status: claimed`.
-- **Blocked** — an overlay, not a raw status: applied whenever an open or claimed ticket has an
-  unresolved `Blocked by:` (a listed blocker number that isn't itself done, including a blocker
-  number with no matching ticket in the epic). Needs-info, needs-attention, and done tickets keep
-  their own state regardless of `Blocked by:`.
-- **Needs-info** — raw `Status: needs-info`; stalled on someone providing more information.
-- **Needs-attention** — raw `Status: needs-attention`; an active Codex iteration is blocked on
-  operator intervention. It is actionable but never schedulable until the same pane recovers.
-- **Done** — the ticket is complete.
+- **Blocked** — an overlay, not a raw status: applied whenever an open or claimed ticket has a
+  blocker that is still **blocking** (see Ticket Dependencies). Needs-info, needs-attention, and
+  done tickets keep their own state regardless of `blocked_by`.
+- **Needs-info** — raw `Status: needs-info`; the *work* is stalled on a fact or decision only a
+  human has. Agent-authored. Says nothing about whether an iteration survives.
+- **Needs-attention** — raw `Status: needs-attention`; the *machinery* is stalled — a live pane
+  wants a keypress, a launch failed, or reconciliation found unrecoverable state.
+  Orchestrator-authored. Also says nothing about whether an iteration survives: of its three
+  producers, only the operator-attention gate leaves one. _Avoid_: treating it as "a pane is
+  alive" — see Reattach.
+- **Waiting for children** — a computed state, never stored: a forked ticket whose own work is
+  `done` but whose fork subtree isn't finished (see Ticket Forking).
+- **Done** — the ticket's own work is complete. Says nothing about its fork subtree.
 - **Error** — either the ticket file couldn't be read, or its raw `Status:` value doesn't match any
   of the above; still selectable, and its raw markdown body still renders in the preview panel if
   the file itself is readable.
@@ -133,19 +139,56 @@ icon:
 Within an epic, tickets group in this order: unblocked (open/claimed) → blocked → needs-info/
 needs-attention → done → error, ticket number ascending within each group.
 
+**Stalled** — a run-level state: an epic with no runnable work left, waiting on a human to clear a
+**human-clearable** ticket. A stalled epic parks rather than exiting, and releases its slot in the
+epic-level concurrency cap. _Avoid_: Paused (that's the operator-driven whole-queue toggle),
+Settled.
+
+**Human-clearable** — a ticket whose status a human can change to make the run progress:
+needs-info, needs-attention, or draft. Draft counts because an epic still being authored is waiting
+on a person, not broken.
+
+**Deadlocked** — a run-level state: an epic with no runnable work and nothing human-clearable
+either — a genuine dependency error, reported as a failure rather than parked on.
+
+**Reattach** — reconnecting a run to an iteration that is still live and owned. Run at startup for
+tickets found `claimed`, and again when a parked run resumes. Its result, not the ticket's status,
+decides how a stall resumes: reattached → `claimed`, the same iteration continues; not reattached →
+`open`, a fresh iteration is launched. A surviving herdr pane is *not* the same thing — a pane
+outlives its goroutine. _Avoid_: "has a pane".
+
 ## Ticket Forking
 
 **Fork** — dividing a ticket into new sibling tickets mid-flight, when it turns out to be larger
 than its budget or mixes concerns that should land separately. _Avoid_: Split.
 
-**Children** — the ticket ID(s) a fork produced, or (separately) the fix tickets a code-review
-ticket opened. Frontmatter field `children`. _Avoid_: Split.
+**Parent** — the ticket a forked ticket came from. Frontmatter field `parent`, written at creation,
+and the only structural edge a fork produces. _Avoid_: Split from.
 
-**Parent** — the reverse edge: the ticket a forked ticket came from. Frontmatter field `parent`.
-_Avoid_: Split from.
+**Children** — the tickets forked from a given ticket. A *derived* reverse index over `parent`, not
+a stored field. _Avoid_: Split, the `children` frontmatter field (removed).
+
+**Fork subtree** — a ticket together with everything reachable by following `parent` edges back to
+it. What `blocked_by` resolution actually asks about.
 
 **Fork suffix** — the letter appended to the parent's number to name each forked child (`04` forks
 into `04a`, `04b`; one level deeper, `04b1`). _Avoid_: Split suffix.
+
+## Ticket Dependencies
+
+**Blocker** — a ticket named in another ticket's `blocked_by` list.
+
+**Blocking** — a blocker is *blocking* until its own work is `done` **and** every ticket in its fork
+subtree is likewise no longer blocking. This is the only question `blocked_by` resolution asks, and
+it is the reason a ticket's own `done` is not enough to release its dependents. _Avoid_: Resolved,
+satisfied, fully-done.
+
+**Frontier** — the tickets an epic could hand to an agent right now: status `open`, with no blocker
+still blocking.
+
+**Fork inheritance** — a forked ticket inherits its parent's *position in the dependency graph* by
+carrying `parent`, and inherits none of its parent's `blocked_by` entries. A fork child's own
+`blocked_by` is empty unless it declares a genuine new dependency.
 
 ## Decorations and Badges (Log View)
 
