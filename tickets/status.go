@@ -28,8 +28,9 @@ const (
 	// is never written to disk — a ticket's Status: field means only "this
 	// ticket's own work is finished" (see ticket 03's commitless: true
 	// convention); whether the fork subtree it spawned is also finished is
-	// derived fresh from the graph on every render. Not settled: an epic
-	// containing one is not complete (see ralphloop.isSettledStatus).
+	// derived fresh from the graph on every render. Being distinct from
+	// StatusDone is what keeps an epic containing one from counting as
+	// complete, in both Epic.AllDone and ralphloop.allDone.
 	StatusWaitingForChildren
 )
 
