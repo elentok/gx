@@ -1,5 +1,9 @@
 # gx-investigate gotchas
 
+Running list of previously-diagnosed gx/ralph-loop bugs, newest first. Append one line + a pointer
+to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKILL.md) gets fixed
+— don't re-explain what the linked commit/ticket already documents.
+
 - **A smart-zone `/compact` gets cancelled by gx's own finish-up prompt when herdr reports the pane
   idle/done during compaction.** `waitForCompactionSignal` (`ralphloop/waitforfinish.go`) returns
   success on *any* non-error `AgentWait`, consulting the transcript's compaction-boundary count only
@@ -23,6 +27,30 @@ Older entries below describe a `children` frontmatter field that no longer exist
 are now derived from `parent` alone (see [gx-local-tracker.md](../gx-local-tracker.md)). They are
 kept as history of what the code did at the time, not as a description of today's schema.
 
+- **The `lifecycle-refactor` + `lifecycle-contract` epics made five of the bugs below
+  unrepresentable rather than fixed — read them as history, and don't port their defenses forward.**
+  The old model recorded a fork twice (`children` on the original, `parent` on the descendant) and
+  gave each fork child a `blocked_by` naming its own parent. Both writes are gone: `parent` on the
+  descendant is now the only structural edge, a fork child carries no `blocked_by` at all, and
+  blocking is one predicate — a ticket blocks while its own status isn't `done` or while any ticket
+  in its `parent`-derived fork subtree blocks. A ticket's `blocked_by` naming its own ancestor was
+  the only thing that made resolution self-referential, and every carve-out that existed to undo
+  that self-reference (the self/descendant exclusion, the fork-sibling exclusion, the ancestor walk,
+  the `exclude` hook, the `visiting` cycle guard, the `children`-based descendant walk) was deleted
+  with it; the parent graph is validated acyclic at `Epic` construction, so the recursion needs no
+  guard. Newest-first, the five that can no longer occur: (1) *a `blocked_by` on a specific fork
+  sibling isn't enforced* and (2) *`fullyDone`'s children walk / fork-sibling exclusion / permanent
+  `visiting` memo each start a chain early* — all three mechanisms deleted, and there is no stored
+  child list left to go stale against `parent`. (3) *A commitless fork placeholder's own
+  `blocked_by` was never enforced* and (4) *a ticket `blocked_by` its own fork-parent deadlocks
+  forever* — both need an inherited parent-naming token, which the protocol no longer writes and
+  `gx tickets migrate` strips. (5) *Code-review-spawned tickets appear in the queue tree but never
+  start* — that was `children` written without `parent`; with `children` gone there is no second
+  edge to write instead of the one the scheduler reads. Mis-parented data is now just a
+  differently-shaped acyclic graph, not a case the resolver defends against, so a `parent` that
+  points at the wrong ticket shows up as wrong nesting rather than as a silent deadlock. See
+  `lifecycle-refactor/issues/03-*.md` for the deleted tests and the reason each went, and
+  `lifecycle-contract/issues/01-*.md` for the schema contraction.
 - **The mid-flight-fork placeholder fix above only closed one of three ways a `blocked_by` chain
   could still start early.** Follow-up consult (Opus, read-only) on the same `06b`/`06c` incident
   found: (1) `fullyDone`'s descendant walk trusted the then-existing children list, a field
@@ -92,10 +120,6 @@ kept as history of what the code did at the time, not as a description of today'
   checked-but-unclaimed-and-not-running epics via the same kind of confirm dialog ("Resume?")
   rather than resuming them silently; accepting re-derives the plan from the checked selection and
   appends it to `pendingEpics`. See `tickets-tree/issues/12-epic-runner-not-active-research.md`.
-
-Running list of previously-diagnosed gx/ralph-loop bugs, newest first. Append one line + a pointer
-to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKILL.md) gets fixed
-— don't re-explain what the linked commit/ticket already documents.
 
 - **`gx tickets add --parent <id>` allocates the correct lettered ID but never writes `parent` into
   the new ticket's own frontmatter.** `cmd/tickets_add.go`'s `runTicketsAdd` only used `parent` to

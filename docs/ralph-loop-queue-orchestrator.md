@@ -19,7 +19,7 @@ Ticket Forking sections) this doc expands on.
 | Term | Meaning |
 |---|---|
 | **Epic** | A named unit of work: a directory `.scratch/<epic>/issues/*.md` of tickets, plus one shared **feature worktree/branch** checked out for the epic's lifetime. |
-| **Ticket** | One markdown file with frontmatter (`status`, `blocked_by`, `parent`, `children`, `type`, ...) describing one unit of agent work. |
+| **Ticket** | One markdown file with frontmatter (`status`, `blocked_by`, `parent`, `type`, ...) describing one unit of agent work. |
 | **Epic run** | One call to `ralphloop.Run(...)`, started by the Queue tab (`loopRegistry.tryStart`) when the user starts a queued epic. Drives every unblocked ticket in that epic (or a narrower `RunScope`) to completion, up to `MaxParallel` concurrently (default 2). |
 | **Iteration** | The lifecycle of one ticket being worked: its own worktree, branch, herdr tab, and agent session, from claim through landing (or a stall). |
 | **Iteration worktree/branch** | Per-ticket git worktree (`{worktreeDir}/{epic}-item-{identifier}`) on branch `ralph-loop/{epic}-item-{identifier}`, created fresh off the feature branch's current tip. |
@@ -28,11 +28,12 @@ Ticket Forking sections) this doc expands on.
 | **Frontier** | The set of tickets currently eligible to claim: `RenderedStatus == Open`, filtered to the run's `RunScope`. |
 | **RunScope** | Which tickets an epic run is allowed to claim — the whole epic, or a restricted `TicketIDs` set (e.g. Queue tab's "Add to queue"). Automatically widens to include any ticket reached by walking `parent`, so forked children are always in scope even if not named explicitly. |
 | **Settled** | A ticket whose `RenderedStatus` is `Done`, `NeedsInfo`, or `NeedsAttention` — terminal from the scheduler's point of view (it never retries a stuck ticket on its own). |
-| **Fork** | Splitting a ticket into sibling tickets mid-flight because it outgrew its budget or turned out to mix concerns. Produces `children`/`parent` frontmatter edges. _Not_ the same thing as a code-review ticket's `children` (see §5). |
+| **Fork** | Splitting a ticket into sibling tickets mid-flight because it outgrew its budget or turned out to mix concerns. Produces one `parent` edge per new ticket, written on the new ticket; nothing is recorded on the original. |
+| **Fork subtree** | A ticket plus every ticket reached by following `parent` reverse-edges down from it, at any depth. The unit `Blocking` recurses over: a `blocked_by` token resolves only once the named ticket's whole fork subtree is done. |
 | **Reconcile** | The pass that runs once at the start of every epic run, before scheduling starts, reconciling on-disk `status:` against live herdr sessions and git reality (crash recovery). |
 | **Gate** | The in-process pause/resume coordinator for one epic run. Something can be paused for rate-limit or needs-attention reasons; a smart-zone breach is handled differently and does **not** use the Gate (see §6). |
 | **Attach / Attached** | At most one `gx` process, repo-wide, may be "attached" to the Queue at a time — the process running the first live epic. Recorded in `.scratch/queue-attach.json` (pid + start time). |
-| **RenderedStatus** | The Queue/Tickets UI's collapse of raw `status:` + blocking overlay into: Open, Claimed, Blocked, Needs-info, Needs-attention, Done, Error. |
+| **RenderedStatus** | The Queue/Tickets UI's collapse of raw `status:` + graph-derived overlays into: Open, Claimed, Blocked, Needs-info, Needs-attention, Done, Draft, Waiting-for-children, Error. Blocked and Waiting-for-children are overlays — derived per render, never written to a file. |
 
 ## 2. The core loop
 
@@ -215,9 +216,9 @@ Key points:
   highest-tier model — it never edits anything. Its job is to de-duplicate, prioritize by actual
   impact (not vote count across reviewers), and issue an approve/reject/defer decision per
   finding with a one-line reason.
-- Only **approved** findings become new tickets, parented to the review ticket
-  (`children`/`parent` — same frontmatter fields as a fork, but semantically this is "fix tickets
-  a code-review ticket opened," not a mid-flight split).
+- Only **approved** findings become new tickets, parented to the review ticket (`parent` on the new
+  ticket — the same frontmatter edge as a fork, but semantically this is "fix tickets a code-review
+  ticket opened," not a mid-flight split).
 - The review ticket always closes `--commitless true` — it never produces code itself.
 
 ## 6. Pauses, rate limits, and notifications

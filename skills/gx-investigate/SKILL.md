@@ -38,7 +38,8 @@ bare-repo checkout with linked worktrees keeps one shared root at the bare repo'
 `.scratch/` at cwd. See gx-local-tracker.md.
 
 - **`<root>/<epic-slug>/issues/*.md`** — the tickets themselves. Source of truth for status,
-  `blocked_by`, `parent`/`children`. See gx-local-tracker.md for the field reference.
+  `blocked_by`, and `parent` (the only edge — fork subtrees are derived from it, never stored). See
+  gx-local-tracker.md for the field reference.
 - **`<root>/<epic-slug>/run-log.jsonl`** — the append-only scheduler/iteration event log
   (`ralphloop/eventlog.go`). One JSON line per event: `iteration-started`/`-finished`,
   `cherry-picked`, `conflict-hit`/`-resolved`, `paused-smart-zone`, `paused-rate-limit`,

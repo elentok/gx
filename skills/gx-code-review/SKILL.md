@@ -14,8 +14,9 @@ tickets. See [gx-local-tracker.md](../gx-local-tracker.md) for the `code-review`
 frontier rule — that rule is what gets this skill invoked at the right time (once every other ticket
 in the epic is `done`), via the normal queue. No bespoke triggering mechanism is needed here.
 
-This skill never edits code. Its only output is new tickets, plus its own ticket's body, `children`,
-and closing status.
+This skill never edits code. Its only output is new tickets — each one carrying `parent: <this
+ticket's id>`, the sole edge between them — plus its own ticket's body and closing status. Nothing
+about the tickets it opens is recorded on this ticket.
 
 Before starting, run `gx tickets validate <path>` on the ticket you're about to claim. If it fails,
 stop and fix the ticket's frontmatter before doing anything else.

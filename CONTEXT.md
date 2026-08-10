@@ -114,8 +114,9 @@ without pull). Rendered purple with `󰜮`.
 **RenderedStatus** — the tickets tab's collapse of a ticket's raw `Status:` value into a small,
 fixed set of user-facing states, each with its own icon:
 
-- **Draft** — raw `Status: draft`; the ticket exists but isn't ready to be worked. The state a
-  freshly allocated stub is born in; never schedulable.
+- **Draft** — raw `Status: draft`; work its author parked deliberately. Neither open (it never
+  enters the frontier, so no agent claims it) nor done (it still counts as outstanding). This is the
+  status `gx tickets add` stamps on a freshly allocated stub, until `set --status open` promotes it.
 - **Open** — raw `Status: open`: unclaimed, nothing blocks picking it up. `status` is required,
   so a ticket without one renders as **Error** rather than defaulting to open.
 - **Claimed** — raw `Status: claimed`.
@@ -129,9 +130,10 @@ fixed set of user-facing states, each with its own icon:
   Orchestrator-authored. Also says nothing about whether an iteration survives: of its three
   producers, only the operator-attention gate leaves one. _Avoid_: treating it as "a pane is
   alive" — see Reattach.
-- **Waiting for children** — a computed state, never stored: a forked ticket whose own work is
-  `done` but whose fork subtree isn't finished (see Ticket Forking).
 - **Done** — the ticket's own work is complete. Says nothing about its fork subtree.
+- **Waiting-for-children** — an overlay on Done, not a raw status: the ticket's own `Status:` is
+  done, but its fork subtree isn't. Derived from the graph on every render, never written to a file.
+  An epic containing one is not complete.
 - **Error** — either the ticket file couldn't be read, or its raw `Status:` value doesn't match any
   of the above; still selectable, and its raw markdown body still renders in the preview panel if
   the file itself is readable.
@@ -162,14 +164,14 @@ outlives its goroutine. _Avoid_: "has a pane".
 **Fork** — dividing a ticket into new sibling tickets mid-flight, when it turns out to be larger
 than its budget or mixes concerns that should land separately. _Avoid_: Split.
 
-**Parent** — the ticket a forked ticket came from. Frontmatter field `parent`, written at creation,
-and the only structural edge a fork produces. _Avoid_: Split from.
+**Parent** — the ticket a forked ticket came from, or the code-review ticket that opened a fix
+ticket. Frontmatter field `parent`, written on the descendant at creation. This is the only
+structural edge between tickets: nothing is recorded on the ticket being pointed at. _Avoid_: Split
+from, Children, the `children` frontmatter field (removed).
 
-**Children** — the tickets forked from a given ticket. A *derived* reverse index over `parent`, not
-a stored field. _Avoid_: Split, the `children` frontmatter field (removed).
-
-**Fork subtree** — a ticket together with everything reachable by following `parent` edges back to
-it. What `blocked_by` resolution actually asks about.
+**Fork subtree** — a ticket plus every ticket reached by following `parent` reverse-edges down from
+it, at any depth. Derived from `parent` alone; there is no stored child list. What `blocked_by`
+resolution actually asks about. _Avoid_: Children.
 
 **Fork suffix** — the letter appended to the parent's number to name each forked child (`04` forks
 into `04a`, `04b`; one level deeper, `04b1`). _Avoid_: Split suffix.

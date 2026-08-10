@@ -195,7 +195,14 @@ implementation list.
 ### Frontmatter fields
 
 See [gx-local-tracker.md](../gx-local-tracker.md) for the full field reference. New tickets are
-published as `open` unless instructed otherwise, with `blocked_by: []` when nothing gates them.
+published as `open` unless instructed otherwise, with `blocked_by: []` when nothing gates them —
+writing the file directly lands the body and the status in one write, so there's no window where an
+empty ticket is schedulable. If you allocate an ID with `gx tickets add` instead, its stub lands
+`draft`; fill in the body first, then `gx tickets set <path> --status open` to publish it.
+
+`parent` is only for descendants — a mid-flight fork or a code-review fix ticket — and is written on
+the descendant alone; a ticket published from a plan or spec has no `parent` and records nothing
+about the tickets that follow it.
 
 Avoid specific file paths or code snippets in the body — they go stale fast. Exception: if a
 prototype produced a snippet that encodes a decision more precisely than prose can (state machine,

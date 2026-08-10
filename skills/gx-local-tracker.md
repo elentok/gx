@@ -41,15 +41,20 @@ Fields:
 
 - **`id`** (string, required) — the ticket identifier, matching the filename prefix, e.g. `"04"` or
   `"04b"`. Fixed at creation.
-- **`status`** (enum, required) — one of `draft`, `open`, `claimed`, `needs-info`,
+- **`status`** (enum, required) — exactly one of `draft`, `open`, `claimed`, `needs-info`,
   `needs-attention`, `done`. There is no default: a ticket with no `status:` is rejected by the
-  loader rather than read as `open`, so a half-written file can never be handed to an agent.
-- **`blocked_by`** (list of ticket IDs) — tickets that must be `done` before this
-  one can start; omit or `[]` when there are none. A bare-number token (`"04"`) is resolved only once
-  every ticket sharing that number — its own descendants, recursively — is done too (see Frontier
-  below). A lettered token (`"04a"`) names one specific sibling and resolves the same way, via that
-  sibling's own descendants. A `type: code-review` ticket carries no `blocked_by` at all; see its own
-  frontier rule below.
+  loader rather than read as `open`, so a half-written file can never be handed to an agent. Only
+  `open` is schedulable — `draft` is work its author parked deliberately, neither offered to an agent
+  nor counted as finished. The UI also shows `blocked` and `waiting-for-children`, but those are
+  derived from the graph on every render and are never written to a file.
+- **`blocked_by`** (list of ticket IDs) — tickets that must be finished before this one can start;
+  omit or `[]` when there are none. Each token names exactly one ticket in the epic: a bare number
+  (`"04"`) names the ticket whose identifier has no letter suffix, a lettered token (`"04a"`) names
+  that one fork sibling. A token resolves once the ticket it names has stopped blocking — that
+  ticket's own status is `done` **and** every ticket in its fork subtree (its `parent` descendants,
+  recursively) is done too. A token naming no ticket in the epic never resolves, since nothing can
+  verify it. A `type: code-review` ticket carries no `blocked_by` at all; see its own frontier rule
+  below.
 - **`parent`** (ticket ID) — the ticket this one was produced from: a mid-flight fork names the
   ticket it forked off, and a fix ticket opened by a `type: code-review` ticket names that review
   ticket. This is the only fork edge — it lives on the descendant, and nothing is recorded on the
@@ -89,13 +94,29 @@ conversation history.
   Never hand-edit frontmatter YAML directly when a `set` flag exists for the field.
 - **Create a ticket**: write the file directly, following the frontmatter shape above and the
   per-ticket template your skill defines. Then validate it.
+- **Allocate an ID atomically**: `gx tickets add <epic> [--parent <id>] --slug <descriptive-slug>` —
+  picks the next free identifier under a filesystem lock (safe against a concurrent fork) and writes
+  the stub straight to `<id>-<slug>.md`.
+
+### From `draft` to `open`
+
+`gx tickets add` writes its stub `status: draft` on purpose: a freshly allocated ticket has an empty
+body, and `draft` never enters the frontier, so the window between allocating the ID and writing the
+real content can't hand an empty ticket to an agent. Promoting it is a deliberate, separate step —
+fill in the body first, then `gx tickets set <path> --status open`. That `set` call is the handoff:
+before it, the ticket belongs to its author; after it, the scheduler may claim it at any moment, so
+nothing about it should still be in flux. A ticket written directly as a file (rather than via
+`gx tickets add`) can be authored `open` in one write, since its body lands in the same write as its
+status.
 
 ## Frontier
 
 The **frontier** is the ticket to work next: the lowest-numbered ticket, across the epic's
-`issues/*.md` files, that is unblocked (every ticket named in its `blocked_by` is `done`, recursively
-through that ticket's own descendants — the tickets whose `parent` names it) and unclaimed (its status is one of the open statuses). Scan in
-filename numeric order; the first match wins.
+`issues/*.md` files, whose status is `open` and every one of whose `blocked_by` tokens has resolved
+(see the field reference above — a token resolves only once the ticket it names *and* that ticket's
+whole fork subtree are done). `open` is the only schedulable status: `draft`, `claimed`,
+`needs-info`, `needs-attention`, and `done` are all skipped. Scan in filename numeric order; the
+first match wins.
 
 A `type: code-review` ticket is exempt from the `blocked_by` check: it becomes eligible once every
 *other* ticket in the epic is `done`, regardless of its own (empty) `blocked_by` list.
@@ -120,32 +141,38 @@ closed by a mid-flight fork rather than by landing its own work (see below) is a
 A ticket finished with zero commits must also set `commitless: true` in the same `set` call, or it
 reads as a stalled agent rather than an intentional no-op finish.
 
+`status: done` means only "this ticket's own work is finished" — it says nothing about the tickets it
+forked off. A `done` ticket whose fork subtree still has unfinished work renders as
+`waiting-for-children`, keeps blocking anything that names it, and keeps its epic from counting as
+complete. That state is derived from the graph, never written, so closing a ticket that forked is
+always a plain `--status done`; the children carry the rest.
+
 ## Mid-flight forking
 
 A ticket can be forked while work is in progress, when it turns out to be larger than its budget or
-to mix a plumbing/infra concern with a feature-on-top concern. The fork reuses this document's
-numbering and blocking conventions:
+to mix a plumbing/infra concern with a feature-on-top concern. `parent` is the whole protocol:
 
 1. New ticket(s) get a flat sibling number off the root ticket: `04` forks into `04b`, `04c`, ...
    (skip `a` if the original ticket's own number, unlettered, is still in use as its identifier).
    Allocate each ID with `gx tickets add <epic> --parent <original-id> --slug <descriptive-slug>`
    rather than picking the number by hand — it's atomic against concurrent forks landing at the
-   same time, and `--slug` (required) writes the stub straight to its final `<id>-<slug>.md`
-   filename.
-2. Each new ticket's `blocked_by` includes the original ticket's id.
-3. Each new ticket's `parent` frontmatter names the original, set at creation. Nothing is recorded
-   on the original: `gx tickets add --parent` writes the only edge that matters.
-4. The original is closed as `done`, with `commitless: true` if it lands zero commits of its own.
+   same time, `--slug` (required) writes the stub straight to its final `<id>-<slug>.md` filename,
+   and `--parent` writes the child's `parent` frontmatter at creation.
+2. Fill in the new ticket's body, moving any not-yet-finished acceptance criteria off the original
+   onto it — don't leave a criterion sitting on a ticket that's about to close. Then promote it with
+   `gx tickets set <path> --status open`.
+3. The original is closed as `done`, with `commitless: true` if it lands zero commits of its own.
 
-Nothing downstream needs editing: a `blocked_by` token naming the original ticket resolves only once
-the original *and every one of its descendants, recursively* is done (see Frontier above), so a
-ticket already blocked on the pre-fork original stays correctly blocked without its `blocked_by`
-list ever being touched.
+Nothing else is written. In particular a fork child gets **no** `blocked_by` naming the original, and
+the original records nothing about what it forked. `parent` on the child is the only structural edge
+there is, and both the blocking predicate and the Queue tab's tree derive everything from it.
 
-Any not-yet-finished acceptance criteria move off the original ticket onto the new one(s) — don't
-leave a criterion sitting on a ticket that's now closed.
+Nothing downstream needs editing either. A `blocked_by` token naming the original resolves only once
+the original *and its whole fork subtree* are done (see Frontier above), so a ticket already blocked
+on the pre-fork original stays correctly blocked without its `blocked_by` list ever being touched —
+and a fork child, having no token of its own, is free to start immediately.
 
-**Once step 4 hands off (original marked `done`), the original's agent must not
+**Once step 3 hands off (original marked `done`), the original's agent must not
 write to a child ticket's file again for any reason.** Ticket files are shared, unlocked plain
 files, not per-worktree or git-tracked — a later raw write can land after the child's own
 independent iteration has already been claimed and launched, clobbering its `status` back to

@@ -75,11 +75,14 @@ When either trigger fires:
    the design reasoning forward as notes instead of a diff.
 2. **Commit.**
 3. **Create the follow-up ticket(s)**, following [gx-local-tracker.md](../gx-local-tracker.md)'s
-   mid-flight-fork numbering, blocking-edge, and `parent` conventions, and gx-to-tickets'
-   estimation method. Allocate each new ticket's ID with `gx tickets add <epic> --parent <original-id>
+   mid-flight-fork numbering and `parent` conventions, and gx-to-tickets' estimation method.
+   Allocate each new ticket's ID with `gx tickets add <epic> --parent <original-id>
    --slug <descriptive-slug>` — it atomically picks the next free ID (safe against another
-   parallel iteration doing the same fork at the same time) and writes the stub straight to
-   `<id>-<slug>.md`; `--slug` is required, so there's no separate rename step to remember. This
+   parallel iteration doing the same fork at the same time), writes the stub straight to
+   `<id>-<slug>.md` (`--slug` is required, so there's no separate rename step to remember), and
+   writes the child's `parent`, which is the only edge a fork produces: give the new ticket no
+   `blocked_by` naming the original, and record nothing about it on the original. The stub lands
+   `draft`; fill in its body, then `gx tickets set <new-path> --status open` to hand it over. This
    chain is uncapped — each fork narrows what's left, so it's self-limiting. Move any
    not-yet-finished acceptance criteria off the original ticket onto the new one(s). Do this
    **autonomously** — no pause for user approval; this exists to keep the outer loop unattended.
