@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 )
@@ -93,18 +94,46 @@ const initialTailBytes = 64 * 1024
 // doesn't exist at all — e.g. the agent hasn't written its first turn out
 // yet). Malformed lines are skipped rather than failing the read.
 func LastAssistantUsage(path string) (Usage, bool, error) {
+	var usage Usage
+	found := false
+	err := tailScan(path, func(lines []string) bool {
+		for _, raw := range slices.Backward(lines) {
+			entry, ok := parseLine(raw)
+			if !ok || entry.Type != "assistant" {
+				continue
+			}
+			usage, found = usageFromLine(entry), true
+			return true
+		}
+		return false
+	})
+	if err != nil {
+		return Usage{}, false, err
+	}
+	return usage, found, nil
+}
+
+// tailScan hands visit the tail of the transcript at path, split into lines
+// in file order, starting from a small window anchored at EOF and doubling
+// it (still anchored at EOF) until visit reports it has its answer or the
+// window covers the whole file. Each pass re-presents everything the
+// previous one saw, so a visit that needs to reason about several lines'
+// relative order can simply recompute from scratch. A missing file yields no
+// passes at all, leaving the caller's state untouched — every reader here
+// treats "not written yet" the same as "nothing found".
+func tailScan(path string, visit func(lines []string) bool) error {
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return Usage{}, false, nil
+			return nil
 		}
-		return Usage{}, false, err
+		return err
 	}
 	defer f.Close()
 
 	info, err := f.Stat()
 	if err != nil {
-		return Usage{}, false, err
+		return err
 	}
 	size := info.Size()
 
@@ -117,36 +146,34 @@ func LastAssistantUsage(path string) (Usage, bool, error) {
 
 		buf := make([]byte, readSize)
 		if _, err := f.ReadAt(buf, offset); err != nil {
-			return Usage{}, false, err
+			return err
 		}
 
 		lines := strings.Split(string(buf), "\n")
 		// Unless this read reached byte 0 of the file, lines[0] is a
 		// truncated continuation of a line that started before offset —
 		// skip it rather than risk parsing a partial line as valid JSON.
-		start := 0
 		if !atStart {
-			start = 1
+			lines = lines[1:]
 		}
-		for i := len(lines) - 1; i >= start; i-- {
-			line := strings.TrimSpace(lines[i])
-			if line == "" {
-				continue
-			}
-			var entry transcriptLine
-			if jsonErr := json.Unmarshal([]byte(line), &entry); jsonErr != nil {
-				continue
-			}
-			if entry.Type != "assistant" {
-				continue
-			}
-			return usageFromLine(entry), true, nil
-		}
-
-		if atStart {
-			return Usage{}, false, nil
+		if visit(lines) || atStart {
+			return nil
 		}
 	}
+}
+
+// parseLine parses one raw transcript line, reporting ok=false for blank or
+// malformed lines so callers can skip them rather than fail the read.
+func parseLine(raw string) (transcriptLine, bool) {
+	line := strings.TrimSpace(raw)
+	if line == "" {
+		return transcriptLine{}, false
+	}
+	var entry transcriptLine
+	if err := json.Unmarshal([]byte(line), &entry); err != nil {
+		return transcriptLine{}, false
+	}
+	return entry, true
 }
 
 func usageFromLine(line transcriptLine) Usage {
