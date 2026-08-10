@@ -350,9 +350,8 @@ func TestRun_NeedsAttentionWithoutLiveTab_SchedulesOtherTicketsThenParks(t *test
 	d.TabList = func(string) ([]herdr.Tab, error) { return nil, nil }
 
 	sink := &recordingSink{}
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink); err != nil {
-		t.Fatalf("Run() error = %v, want nil (the run parks on ticket 01)", err)
-	}
+	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
+
 	if len(*prompts) != 1 {
 		t.Errorf("prompts = %v, want ticket 02 run before the park", *prompts)
 	}

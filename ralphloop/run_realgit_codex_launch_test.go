@@ -209,12 +209,12 @@ func TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsAttention(t *tes
 	deps.Sleep = func(time.Duration) {}
 
 	var out bytes.Buffer
-	if err := Run(RunOptions{
+	// The failed launch leaves the epic's only ticket needs-attention, so the
+	// run parks on it.
+	runUntilParked(t, RunOptions{
 		EpicName: epicName, Agent: AgentCodex, Skill: "implement",
 		ScratchDir: scratchDir, RepoDir: repoDir,
-	}, deps, NewTextEventSink(&out)); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
+	}, deps, NewTextEventSink(&out))
 
 	if agentStartCalls != 1 {
 		t.Errorf("agent start calls = %d, want exactly 1", agentStartCalls)

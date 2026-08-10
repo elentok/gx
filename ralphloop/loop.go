@@ -438,7 +438,6 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	// resets the moment anything is running again, so a run that resumes and
 	// later parks on a different ticket announces that park too.
 	parked := false
-	parkPolls := 0
 
 	for {
 		epic, err := loadNamedEpic(scratchDir, opts.EpicName)
@@ -497,20 +496,10 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			// No timeout: the notification has already fired, and the park
 			// ends when a human clears one of the stalled tickets, which the
 			// next pass picks up off disk. gate.WakeParked() lets an operator
-			// cut the wait short cosmetically without touching this call's
-			// signature/duration, which several tests key off exactly.
-			sleepDone := make(chan struct{})
-			go func() {
-				d.Sleep(parkPollInterval)
-				close(sleepDone)
-			}()
+			// cut the wait short cosmetically.
 			select {
-			case <-sleepDone:
+			case <-d.ParkTimer(parkPollInterval):
 			case <-gate.ParkWake():
-			}
-			parkPolls++
-			if d.maxParkPolls > 0 && parkPolls >= d.maxParkPolls {
-				break
 			}
 			continue
 		}
@@ -627,12 +616,6 @@ func allDone(e tickets.Epic) bool {
 	return true
 }
 
-// draftStatus is the raw ticket status meaning "allocated but not yet
-// written". It's matched off Ticket.Status rather than a RenderedStatus
-// constant so the loop's parking behavior holds both before and after the
-// status joins the schema's own enum.
-const draftStatus = "draft"
-
 // isHumanClearable reports whether t is stalled on a person rather than on
 // the run: needs-info (an iteration finished with no commits to land),
 // needs-attention (operator intervention, or a done ticket reconciliation
@@ -642,10 +625,10 @@ const draftStatus = "draft"
 // any of them, which is what separates parking from a deadlock.
 func isHumanClearable(e tickets.Epic, t tickets.Ticket) bool {
 	switch e.RenderedStatus(t) {
-	case tickets.StatusNeedsInfo, tickets.StatusNeedsAttention:
+	case tickets.StatusNeedsInfo, tickets.StatusNeedsAttention, tickets.StatusDraft:
 		return true
 	}
-	return strings.EqualFold(strings.TrimSpace(t.Status), draftStatus)
+	return false
 }
 
 // stalledTickets lists every in-scope, human-clearable ticket in e, in file

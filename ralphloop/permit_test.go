@@ -36,15 +36,14 @@ func TestRun_NilPermit_BehavesUnrestricted(t *testing.T) {
 		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-info\ntype: task\n---\n# Stuck\n",
 	})
 	d, prompts, _ := fakeDeps()
-	sleep, sleeps := clearOnPark(t, ticketPath(scratchDir, "my-epic", "01-stuck.md"), "open")
-	d.Sleep = sleep
-	d.maxParkPolls = 0
+	parkTimer, polls := clearOnPark(t, ticketPath(scratchDir, "my-epic", "01-stuck.md"), "open")
+	d.ParkTimer = parkTimer
 
 	err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &recordingSink{})
 	if err != nil {
 		t.Fatalf("Run() error = %v, want nil (no Permit set, unrestricted behavior)", err)
 	}
-	if *sleeps == 0 {
+	if *polls == 0 {
 		t.Errorf("run never parked (no park poll), want it to park on the needs-info ticket")
 	}
 	if len(*prompts) != 1 {
@@ -62,9 +61,8 @@ func TestRun_Permit_AcquiredOnClaimReleasedOnPark(t *testing.T) {
 		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-info\ntype: task\n---\n# Stuck\n",
 	})
 	d, prompts, _ := fakeDeps()
-	sleep, sleeps := clearOnPark(t, ticketPath(scratchDir, "my-epic", "01-stuck.md"), "open")
-	d.Sleep = sleep
-	d.maxParkPolls = 0
+	parkTimer, polls := clearOnPark(t, ticketPath(scratchDir, "my-epic", "01-stuck.md"), "open")
+	d.ParkTimer = parkTimer
 
 	var mu sync.Mutex
 	held := false
@@ -95,7 +93,7 @@ func TestRun_Permit_AcquiredOnClaimReleasedOnPark(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run() error = %v, want nil (a stalled run parks, it doesn't error)", err)
 	}
-	if *sleeps == 0 {
+	if *polls == 0 {
 		t.Errorf("run never parked (no park poll)")
 	}
 	if len(*prompts) != 1 {
@@ -200,10 +198,11 @@ func TestRun_Permit_AcquiredBeforeReattachLaunch(t *testing.T) {
 		return origAgentWait(opts)
 	}
 
-	err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo", Permit: permit}, d, &recordingSink{})
-	if err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
+	// The reattached iteration ends stalled, so the run parks on it.
+	runUntilParked(t, RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo", Permit: permit}, d, &recordingSink{})
+
+	mu.Lock()
+	defer mu.Unlock()
 	if !acquired {
 		t.Errorf("Permit.Acquire was never called")
 	}

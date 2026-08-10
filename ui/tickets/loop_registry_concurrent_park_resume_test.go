@@ -81,25 +81,33 @@ func fakeParkResumeDeps() ralphloop.Deps {
 		ReadOccupancy:        func(cwd, sessionID string) (int, bool, error) { return 0, false, nil },
 		Sleep:                func(time.Duration) {},
 		Now:                  time.Now,
+		ParkTimer:            readyParkTimer,
 	}
 }
 
-// clearStatusOnFirstSleep returns a Deps.Sleep replacement that rewrites
-// ticketPath's status to newStatus the first time it's called — the loop's
-// only Sleep call site is its park poll (ralphloop/loop.go), so any call
-// here means the run just parked. Every park in this test is transient by
-// construction: there is no maxParkPolls seam reachable from this package
-// (see ralphloop.Deps' unexported maxParkPolls field), so a scripted clearing
-// hand is the only thing that ends the park.
-func clearStatusOnFirstSleep(t *testing.T, ticketPath, newStatus string) func(time.Duration) {
+// readyParkTimer is a ralphloop.Deps.ParkTimer that has already fired, so a
+// park in this test polls at full speed instead of on the wall clock.
+func readyParkTimer(time.Duration) <-chan time.Time {
+	ch := make(chan time.Time, 1)
+	ch <- time.Time{}
+	return ch
+}
+
+// clearStatusOnFirstPark returns a Deps.ParkTimer replacement that rewrites
+// ticketPath's status to newStatus on the first park poll — ParkTimer is only
+// consulted by the loop's park wait (ralphloop/loop.go), so any call here means
+// the run just parked. A park has no timeout, so this scripted clearing hand is
+// the only thing that ends it.
+func clearStatusOnFirstPark(t *testing.T, ticketPath, newStatus string) func(time.Duration) <-chan time.Time {
 	t.Helper()
 	var once sync.Once
-	return func(time.Duration) {
+	return func(dur time.Duration) <-chan time.Time {
 		once.Do(func() {
 			if err := ralphloop.SetStatus(ticketPath, newStatus); err != nil {
 				t.Errorf("SetStatus %s: %v", ticketPath, err)
 			}
 		})
+		return readyParkTimer(dur)
 	}
 }
 
@@ -181,7 +189,7 @@ func TestConcurrentParkResume_TwoEpicsAgainstCapOfOne(t *testing.T) {
 	var epic1RunningOnce sync.Once
 
 	deps1 := fakeParkResumeDeps()
-	deps1.Sleep = clearStatusOnFirstSleep(t, ticket1, "open")
+	deps1.ParkTimer = clearStatusOnFirstPark(t, ticket1, "open")
 	deps1.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
 		epic1RunningOnce.Do(func() { close(epic1Running) })
 		<-epic1Proceed
@@ -206,13 +214,14 @@ func TestConcurrentParkResume_TwoEpicsAgainstCapOfOne(t *testing.T) {
 	// might legitimately acquire first, which would make the "genuinely
 	// blocked" assertion below flaky rather than a real proof.
 	var epic2ClearOnce sync.Once
-	deps2.Sleep = func(time.Duration) {
+	deps2.ParkTimer = func(dur time.Duration) <-chan time.Time {
 		epic2ClearOnce.Do(func() {
 			<-epic1Running
 			if err := ralphloop.SetStatus(ticket2, "open"); err != nil {
 				t.Errorf("SetStatus %s: %v", ticket2, err)
 			}
 		})
+		return readyParkTimer(dur)
 	}
 	permit2 := &permitProbe{
 		real: registry, held: &sharedHeld, maxHeld: &sharedMaxHeld,

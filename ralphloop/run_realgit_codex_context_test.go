@@ -563,12 +563,12 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC) }
 	sink := &needsAttentionSink{}
-	if err := Run(RunOptions{
+	// The failed recovery leaves the epic's only ticket needs-attention, so
+	// the run parks on it.
+	runUntilParked(t, RunOptions{
 		EpicName: epicName, Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir,
 		RepoDir: repoDir, SmartZone: smartZone,
-	}, deps, sink); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
+	}, deps, sink)
 
 	if evidenceReads != 1 {
 		t.Errorf("evidenceReads = %d, want exactly 1", evidenceReads)

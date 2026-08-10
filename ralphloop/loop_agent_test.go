@@ -218,12 +218,12 @@ func TestRun_CodexLaunchFailureAfterClaimNeedsAttention(t *testing.T) {
 		return herdr.Agent{}, errors.New("Herdr rejected Codex integration")
 	}
 	var out bytes.Buffer
-	if err := Run(RunOptions{
+	// The failed launch leaves the epic's only ticket needs-attention, so the
+	// run parks on it rather than returning.
+	runUntilParked(t, RunOptions{
 		EpicName: "my-epic", Agent: AgentCodex, Skill: "implement",
 		ScratchDir: scratchDir, RepoDir: "/fake/repo",
-	}, d, NewTextEventSink(&out)); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
+	}, d, NewTextEventSink(&out))
 
 	ticketPath := filepath.Join(scratchDir, "my-epic", "issues", "01-first.md")
 	contents, err := os.ReadFile(ticketPath)

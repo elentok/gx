@@ -282,11 +282,9 @@ func TestRun_UnfinishedConflict_IsAbortedBeforeNextTicketLands(t *testing.T) {
 		return nil
 	}
 	// Ticket 01's conflict leaves it needs-attention, so this run ends parked
-	// on it (see testDeps) rather than exiting; ticket 02 still has to land.
+	// on it rather than exiting; ticket 02 still has to land first.
+	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo", MaxParallel: 1}, d, noopEventSink{})
 
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo", MaxParallel: 1}, d, noopEventSink{}); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
 	if aborts != 1 {
 		t.Errorf("AbortCherryPick calls = %d, want 1", aborts)
 	}
@@ -320,9 +318,9 @@ func TestRun_CherryPickConflict_ResolutionNeverFinishes_MarksNeedsAttentionWitho
 		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 	}
 	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
-		t.Fatalf("Run() error = %v, want a stuck conflict-resolution agent to mark needs-attention rather than abort the run", err)
-	}
+	// A stuck conflict resolution marks the ticket needs-attention rather than
+	// aborting the run, which leaves the epic parked on it.
+	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out))
 
 	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
 	if err != nil {
@@ -350,9 +348,9 @@ func TestRun_ZeroCommitIteration_MarksNeedsInfoAndLeavesWorktree(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
+	// The zero-commit iteration leaves its ticket needs-info, so the epic's
+	// only ticket is one a human must clear: the run parks on it.
+	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out))
 
 	if len(*removed) != 0 {
 		t.Errorf("removed worktree branches = %v, want the zero-commit iteration's worktree left in place", *removed)
@@ -384,12 +382,11 @@ func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := Run(RunOptions{
+	// Ticket 01 ends needs-info, so the run parks on it once 02 has landed.
+	runUntilParked(t, RunOptions{
 		EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
 		MaxParallel: 1,
-	}, d, NewTextEventSink(&out)); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
+	}, d, NewTextEventSink(&out))
 
 	if len(*removed) != 1 || (*removed)[0] != "ralph-loop/epic-item-02" {
 		t.Errorf("removed worktree branches = %v, want only iter-02 removed", *removed)

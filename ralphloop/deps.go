@@ -126,15 +126,12 @@ type Deps struct {
 	// Now returns the current time, injectable so a rate-limit reset
 	// deadline can be tested without a real wall-clock wait.
 	Now func() time.Time
-
-	// maxParkPolls caps how many times a parked run polls before it returns
-	// normally. Zero means uncapped, which is what production wants: a run
-	// with nothing runnable and something a human could clear waits for that
-	// person however long it takes. It is unexported so only this package's
-	// tests can set it — most of them are about the stalled state a run
-	// leaves on disk, not about the park itself, and would otherwise wait
-	// forever for a human who never arrives.
-	maxParkPolls int
+	// ParkTimer returns a channel that fires once the given duration has
+	// elapsed — one poll of a parked run's wait. It is a channel rather than
+	// a blocking sleep so the park can select on an operator's cosmetic wake
+	// at the same time without a goroutine per poll, and it is injectable so
+	// park tests drive polling with a timer that is ready immediately.
+	ParkTimer func(time.Duration) <-chan time.Time
 }
 
 // DefaultDeps wires Deps to the real herdr, git, and transcript packages.
@@ -176,6 +173,7 @@ func DefaultDeps() Deps {
 		ReadPaneRecent:        defaultReadPaneRecent,
 		Sleep:                 time.Sleep,
 		Now:                   time.Now,
+		ParkTimer:             time.After,
 	}
 }
 

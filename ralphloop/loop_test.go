@@ -36,12 +36,40 @@ func writeEpic(t *testing.T, epicName string, tickets map[string]string) string 
 }
 
 // testDeps is DefaultDeps for a test: real behavior everywhere except that a
-// run which parks gives up after one poll instead of waiting for a person who
-// will never arrive. Tests about parking itself set maxParkPolls back to 0.
+// park polls at full speed rather than on the wall clock, so a test that parks
+// unexpectedly surfaces as its own failure instead of a multi-minute wait.
 func testDeps() Deps {
 	d := DefaultDeps()
-	d.maxParkPolls = 1
+	d.ParkTimer = readyTimer
 	return d
+}
+
+// runUntilParked runs Run in the background and returns once it has parked —
+// the honest end of a test whose epic finishes on a human-clearable ticket
+// nobody clears. The run stays blocked in its park select (the timer it is
+// handed never fires), so it neither spins nor reports a terminal event, and
+// the close of the park signal orders everything Run wrote before parking
+// ahead of the caller's assertions.
+func runUntilParked(t *testing.T, opts RunOptions, d Deps, sink EventSink) {
+	t.Helper()
+	parked := make(chan struct{})
+	never := make(chan time.Time)
+	var once sync.Once
+	d.ParkTimer = func(time.Duration) <-chan time.Time {
+		once.Do(func() { close(parked) })
+		return never
+	}
+	done := make(chan error, 1)
+	go func() {
+		done <- Run(opts, d, sink)
+	}()
+	select {
+	case <-parked:
+	case err := <-done:
+		t.Fatalf("Run() returned %v, want it to park on a ticket only a human can clear", err)
+	case <-time.After(30 * time.Second):
+		t.Fatal("Run() never parked")
+	}
 }
 
 // fakeDeps returns a Deps wired to in-memory fakes plus a record of prompt
@@ -150,9 +178,9 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		},
 		Sleep: func(time.Duration) {},
 		Now:   time.Now,
-		// One poll, so a run that parks still returns for the assertions;
-		// a test about the park itself raises or clears this itself.
-		maxParkPolls: 1,
+		// A park polls at full speed; a test about the park itself replaces
+		// this with a timer that scripts the human clearing the block.
+		ParkTimer: readyTimer,
 	}
 	return d, &promptsSlice, &removedSlice
 }
@@ -406,9 +434,8 @@ func TestRun_LogsNeedsInfoEvent_OnZeroCommitIteration(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
+	// The needs-info ticket is the epic's only one, so the run parks on it.
+	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out))
 
 	events, ok, err := readEvents(scratchDir, "epic")
 	if err != nil || !ok {
@@ -444,9 +471,7 @@ func TestRun_EventSink_TicketNeedsInfo_OnZeroCommitIteration(t *testing.T) {
 	}
 
 	sink := &recordingSink{}
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
+	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
 
 	if len(sink.ticketNeedsInfoCalls) != 1 {
 		t.Fatalf("TicketNeedsInfo calls = %v, want exactly 1", sink.ticketNeedsInfoCalls)
@@ -529,9 +554,10 @@ func TestRun_InstallDepsFailure_MarksNeedsAttentionWithoutLaunchingAgentOrAborti
 	}
 
 	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
-		t.Fatalf("Run() error = %v, want a failed iteration to mark needs-attention rather than abort the run", err)
-	}
+	// A failed iteration marks needs-attention rather than aborting the run,
+	// which leaves the epic parked on its only ticket.
+	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out))
+
 	if len(*prompts) != 0 {
 		t.Errorf("prompts = %v, want no agent launched after a failed dependency install", *prompts)
 	}
@@ -799,16 +825,14 @@ func TestRun_NeedsAttentionInsideSubset_RunsTheRestThenParks(t *testing.T) {
 	d, prompts, _ := fakeDeps()
 
 	sink := &recordingSink{}
-	err := Run(RunOptions{
+	runUntilParked(t, RunOptions{
 		EpicName:   "my-epic",
 		Skill:      "implement",
 		ScratchDir: scratchDir,
 		RepoDir:    "/fake/repo",
 		TicketIDs:  []string{"01", "02"},
 	}, d, sink)
-	if err != nil {
-		t.Fatalf("Run() error = %v, want nil (a stalled ticket parks, it doesn't fail the run)", err)
-	}
+
 	if len(*prompts) == 0 {
 		t.Fatalf("prompts = %v, want ticket 02 launched rather than held behind ticket 01", *prompts)
 	}

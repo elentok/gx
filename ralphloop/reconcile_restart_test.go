@@ -220,9 +220,10 @@ func TestRun_ReattachedCodexSessionIdentityFailureStopsSafely(t *testing.T) {
 				return herdr.Agent{}, nil
 			}
 
-			if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&strings.Builder{})); err != nil {
-				t.Fatalf("Run() error = %v", err)
-			}
+			// The failed reattach leaves the epic's only ticket
+			// needs-attention, so the run parks on it.
+			runUntilParked(t, RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&strings.Builder{}))
+
 			raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
 			if err != nil {
 				t.Fatalf("ReadFile: %v", err)
