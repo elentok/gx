@@ -250,7 +250,13 @@ var errCompactNeverConfirmed = errors.New("compaction never confirmed by the tra
 const maxConsecutiveGatedGiveUps = 2
 
 // errCompactRecoveryExhausted marks an iteration abandoned because compaction
-// recovery kept giving up gated. It needs an operator, not another retry.
+// recovery kept giving up gated. It needs an operator, not another retry, which
+// is why it leaves waitForFinish as an error: that routes it through Run's
+// per-result handling (see loop.go), which persists the ticket
+// needs-attention with this error's text as the reason. Both this message and
+// the errCompactNeverConfirmed it wraps are load-bearing there — the operator
+// reading the ticket needs to know the agent's own /compact never completed,
+// not merely that some recovery failed.
 var errCompactRecoveryExhausted = errors.New("smart-zone compaction recovery exhausted")
 
 // smartZoneCompactSubmitPollMs is the tick size for confirmCompactSubmitted's
