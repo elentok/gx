@@ -81,10 +81,10 @@ type RunSnapshot struct {
 	FinalError    string
 	Tickets       map[string]RunTicketSnapshot
 	StartedAt     time.Time
-	// Parked and StalledTickets mirror epicRun.state == RunStateParked and
-	// its parkedStalled, for the Queue tab to render a parked epic distinctly
-	// from running/queued (see queue.go's parkedEpics).
-	Parked         bool
+	// StalledTickets mirrors epicRun.parkedStalled, meaningful only while
+	// State == RunStateParked — which is itself what the Queue tab reads to
+	// render a parked epic distinctly from running/queued (see
+	// loopRegistry.parkedEpics).
 	StalledTickets []ralphloop.StalledTicket
 }
 
@@ -456,9 +456,38 @@ func copyRunSnapshot(epicName string, run *epicRun, queuePaused bool) RunSnapsho
 		FinalError:     run.finalError,
 		Tickets:        tickets,
 		StartedAt:      run.startedAt,
-		Parked:         run.state == RunStateParked,
 		StalledTickets: run.parkedStalled,
 	}
+}
+
+// parkedEpics reports every epic whose run is currently parked, mapped to its
+// stalled tickets. The Queue tab derives its parked rendering and its
+// execution-complete predicate from this rather than mirroring park/unpark
+// events into a map of its own, so the run state stays the single source of
+// truth (ticket 13c).
+func (r *loopRegistry) parkedEpics() map[string][]ralphloop.StalledTicket {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	parked := map[string][]ralphloop.StalledTicket{}
+	for name, run := range r.snapshots {
+		if run.state == RunStateParked {
+			parked[name] = run.parkedStalled
+		}
+	}
+	return parked
+}
+
+// parkedStalledFor is parkedEpics for a single epic: ok reports whether
+// epicName's run is parked at all, separately from whether it has any stalled
+// tickets to name (a park event can carry none).
+func (r *loopRegistry) parkedStalledFor(epicName string) (stalled []ralphloop.StalledTicket, ok bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	run := r.snapshots[epicName]
+	if run == nil || run.state != RunStateParked {
+		return nil, false
+	}
+	return run.parkedStalled, true
 }
 
 // resumeParked cosmetically wakes epicName's parked run (see

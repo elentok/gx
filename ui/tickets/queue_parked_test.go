@@ -13,11 +13,33 @@ import (
 	"github.com/elentok/gx/ui/keys"
 )
 
+// installParkedRegistry swaps in a loop registry whose named epics are parked
+// on the given stalled tickets. The Queue tab derives parked-ness from run
+// snapshots (ticket 13c), so a parked epic is set up by driving the registry
+// rather than by writing model state.
+func installParkedRegistry(t *testing.T, parked map[string][]ralphloop.StalledTicket) *loopRegistry {
+	t.Helper()
+	r := newLoopRegistry(max(len(parked), 1))
+	for name, stalled := range parked {
+		r.tryStart(name, 0, 1)
+		r.reduceLiveEvent(name, ralphloop.LiveEvent{Kind: ralphloop.LiveEventEpicParked, Stalled: stalled})
+	}
+	previous := ralphLoopRegistry
+	ralphLoopRegistry = r
+	t.Cleanup(func() {
+		for name := range parked {
+			r.finish(name, nil)
+		}
+		ralphLoopRegistry = previous
+	})
+	return r
+}
+
 // TestQueueRunStateAndTitleReflectParkedEpics covers 11a5's queueRunState/
 // queueHeaderTitle parked-aware branches: parked wins over a concurrently
-// running epic (m.parkedEpics and m.runningEpics are independent per-epic
-// maps, per queueRunState's doc comment), and the title names the lowest
-// epic name's lowest ticket identifier deterministically.
+// running epic (park is tracked per run, independently of m.runningEpics, per
+// queueRunState's doc comment), and the title names the lowest epic name's
+// lowest ticket identifier deterministically.
 func TestQueueRunStateAndTitleReflectParkedEpics(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
@@ -28,8 +50,10 @@ func TestQueueRunStateAndTitleReflectParkedEpics(t *testing.T) {
 	}
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
-	m.parkedEpics["beta"] = []ralphloop.StalledTicket{{Identifier: "02"}}
-	m.parkedEpics["alpha"] = []ralphloop.StalledTicket{{Identifier: "01"}}
+	installParkedRegistry(t, map[string][]ralphloop.StalledTicket{
+		"beta":  {{Identifier: "02"}},
+		"alpha": {{Identifier: "01"}},
+	})
 	m.runningEpics["beta"] = true
 
 	if got := m.queueRunState(); got != queueRunParked {
@@ -70,7 +94,6 @@ func TestQueueModelEnterOnParkedRowResumesEvenWhenCheckedAndLaunchable(t *testin
 		r.finish("alpha", nil)
 		ralphLoopRegistry = previous
 	})
-	m.parkedEpics["alpha"] = []ralphloop.StalledTicket{{Identifier: "01"}}
 
 	wake := r.gateFor("alpha").ParkWake()
 
@@ -101,7 +124,7 @@ func TestQueueModelEnterOnNonParkedRowUnchanged(t *testing.T) {
 		ticketPath(root, "beta", "01-first.md"):  true,
 	}
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
-	m.parkedEpics["alpha"] = []ralphloop.StalledTicket{{Identifier: "01"}}
+	installParkedRegistry(t, map[string][]ralphloop.StalledTicket{"alpha": {{Identifier: "01"}}})
 
 	rows := m.rows()
 	betaIdx := -1
@@ -126,7 +149,7 @@ func TestQueueModelEnterOnNonParkedRowUnchanged(t *testing.T) {
 // TestQueueModelParkedEpicResumesToRunningRendering covers the last "What to
 // build" bullet: once a parked epic resumes (LiveEventIterationStarted or
 // LiveEventTicketReattached — see reduceLiveEvent), its row returns to
-// running/queued rendering and it drops out of m.parkedEpics.
+// running/queued rendering and stops being reported as parked.
 func TestQueueModelParkedEpicResumesToRunningRendering(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: claimed\n\nBody.\n")
@@ -150,8 +173,8 @@ func TestQueueModelParkedEpicResumesToRunningRendering(t *testing.T) {
 	m = updated.(QueueModel)
 	m = deliverQueueCommands(t, m, cmd)
 
-	if _, parked := m.parkedEpics["alpha"]; !parked {
-		t.Fatalf("expected alpha reflected as parked, got %v", m.parkedEpics)
+	if _, parked := r.parkedStalledFor("alpha"); !parked {
+		t.Fatal("expected alpha reflected as parked")
 	}
 	content := ansi.Strip(m.View().Content)
 	if !strings.Contains(content, "parked") {
@@ -164,8 +187,8 @@ func TestQueueModelParkedEpicResumesToRunningRendering(t *testing.T) {
 	m = updated.(QueueModel)
 	m = deliverQueueCommands(t, m, cmd)
 
-	if _, parked := m.parkedEpics["alpha"]; parked {
-		t.Fatalf("expected alpha to drop out of parkedEpics after resuming, got %v", m.parkedEpics)
+	if _, parked := r.parkedStalledFor("alpha"); parked {
+		t.Fatal("expected alpha to stop being reported as parked after resuming")
 	}
 	if !m.runningEpics["alpha"] {
 		t.Fatal("expected alpha reflected as running after resuming")

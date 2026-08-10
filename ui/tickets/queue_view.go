@@ -155,7 +155,8 @@ func (m QueueModel) buildQueueLines() (lines []string, offsets []int, heights []
 		if r.epic.Name != epicName {
 			epicName = r.epic.Name
 			lines = append(lines, "")
-			lines = append(lines, m.epicHeaderLines(r.epic, m.parkedEpics[r.epic.Name])...)
+			parkedStalled, _ := ralphLoopRegistry.parkedStalledFor(r.epic.Name)
+			lines = append(lines, m.epicHeaderLines(r.epic, parkedStalled)...)
 			if err, ok := planErrs[epicName]; ok {
 				lines = append(lines, statusErrorStyle.Render("    "+err.Error()))
 			}
