@@ -86,11 +86,11 @@ func Migrate(scratchRoot string) (MigrationResult, error) {
 				return MigrationResult{}, fmt.Errorf("reading %s: %w", ticketPath, err)
 			}
 
-			oldTicket, err := schema.ParseTicketRaw(string(raw), ticketPath)
+			old, err := schema.ParseTicketRaw(string(raw), ticketPath)
 			if err != nil {
 				return MigrationResult{}, fmt.Errorf("parsing %s: %w", ticketPath, err)
 			}
-			newTicket, notes := migrateTicket(oldTicket, schema.HasLegacyChildren(string(raw)))
+			newTicket, notes := migrateTicket(old)
 
 			files = append(files, migratedTicketFile{
 				path:      ticketPath,
@@ -196,12 +196,13 @@ func migratedStatusOf(s schema.Status) schema.Status {
 	}
 }
 
-// migrateTicket returns t rewritten into the post-refactor shape, plus a
-// note per field it actually changed. A nil notes slice means t already
+// migrateTicket returns old rewritten into the post-refactor shape, plus a
+// note per field it actually changed. A nil notes slice means old already
 // matched the new shape, the signal writeMigration uses to leave the file
-// untouched. hadChildren comes from the raw file rather than from t: the
-// retired field no longer has a home on schema.Ticket, so a rewrite drops it
-// on its own and migration's only remaining job is to notice and report it.
+// untouched. It takes the raw parse rather than the typed ticket because the
+// retired children field no longer has a home on schema.Ticket: a rewrite
+// drops it on its own, and migration's only remaining job is to notice the
+// field was there and report it.
 //
 // Dropping children unconditionally — rather than trying to reconcile it
 // against Parent — is the fix for the malformed-fork-chain gotcha (a fork
@@ -209,11 +210,11 @@ func migratedStatusOf(s schema.Status) schema.Status {
 // the edge every other consumer (Epic.ValidateParentGraph,
 // Epic.UnresolvedBlockers) already treats as authoritative, so discarding
 // children never loses information a correct graph needs.
-func migrateTicket(t schema.Ticket, hadChildren bool) (schema.Ticket, []string) {
-	out := t
+func migrateTicket(old schema.RawTicket) (schema.Ticket, []string) {
+	out := old.Ticket
 	var notes []string
 
-	if hadChildren {
+	if old.HasChildren {
 		notes = append(notes, "children removed")
 	}
 

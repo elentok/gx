@@ -25,31 +25,23 @@ type ticketYAML struct {
 	Compactions           int      `yaml:"compactions,omitempty"`
 	Commitless            bool     `yaml:"commitless,omitempty"`
 	SessionIDs            []string `yaml:"session_ids,omitempty"`
+
+	// Children is the retired field, declared here and nowhere else: the wire
+	// struct is the only place that has to recognize it (yaml.v3 silently
+	// ignores a key with no matching struct field, so a `children:` line would
+	// otherwise parse as if it weren't there at all), while Ticket stays free
+	// of it so nothing downstream can read or write it. Typed as a raw node
+	// rather than []string so presence is what registers, whatever shape the
+	// value has — a scalar or an empty list is the same retired shape as a
+	// populated list. omitempty keeps a zero node out of anything marshaled
+	// back.
+	Children yaml.Node `yaml:"children,omitempty"`
 }
 
-// legacyYAML is the retired half of the on-disk shape: fields Ticket no
-// longer carries, read only so they can be recognized. ticketYAML can't do
-// this job — yaml.v3 silently ignores a key with no matching struct field, so
-// a `children:` line would otherwise parse as if it weren't there at all.
-type legacyYAML struct {
-	Children []string `yaml:"children"`
-}
-
-// HasLegacyChildren reports whether raw's frontmatter still carries the
-// retired `children` field. Two callers, pulling in opposite directions:
-// ParseTicketFromRaw rejects such a file, and `gx tickets migrate` — which
-// parses without that check — uses it to report the field as dropped.
-func HasLegacyChildren(raw string) bool {
-	yamlPart, _, hasFM := splitFrontmatter(raw)
-	if !hasFM {
-		return false
-	}
-	var legacy legacyYAML
-	if err := yaml.Unmarshal([]byte(yamlPart), &legacy); err != nil {
-		return false
-	}
-	return len(legacy.Children) > 0
-}
+// hasChildren reports whether the frontmatter carried a `children:` key at
+// all. An absent key leaves the node at its zero value, the one kind YAML
+// never produces for a value that was actually present.
+func (w ticketYAML) hasChildren() bool { return w.Children.Kind != 0 }
 
 func (w ticketYAML) toTicket() Ticket {
 	t := Ticket{

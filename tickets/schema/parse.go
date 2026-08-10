@@ -27,35 +27,48 @@ func ParseTicket(path string) (Ticket, error) {
 // than ignored, so the pre-contraction shape can't quietly round-trip through
 // a reader that simply doesn't look at it.
 func ParseTicketFromRaw(raw, path string) (Ticket, error) {
-	t, err := ParseTicketRaw(raw, path)
+	r, err := ParseTicketRaw(raw, path)
 	if err != nil {
 		return Ticket{}, err
 	}
-	if HasLegacyChildren(raw) {
+	if r.HasChildren {
 		return Ticket{}, fmt.Errorf("invalid ticket %s: children: retired field, run `gx tickets migrate` (a ticket's children are derived from its forks' parent)", path)
 	}
-	if err := Validate(t); err != nil {
+	if err := Validate(r.Ticket); err != nil {
 		return Ticket{}, fmt.Errorf("invalid ticket %s: %w", path, err)
 	}
-	return t, nil
+	return r.Ticket, nil
 }
 
-// ParseTicketRaw is ParseTicketFromRaw without the trailing Validate call —
-// for a caller (`gx tickets migrate`) that must inspect and repair a ticket
-// exactly as it sits on disk, including a pre-refactor shape (e.g. a missing
-// status:) that would fail Validate before the repair ever runs.
-func ParseTicketRaw(raw, path string) (Ticket, error) {
+// RawTicket is one ticket file as it sits on disk: the typed Ticket plus what
+// the frontmatter carried that Ticket itself no longer has a home for. It
+// exists so the file is decoded exactly once — the loader's rejection of a
+// retired field and migration's report of the same field are two readings of
+// one parse, not two parses that can disagree.
+type RawTicket struct {
+	Ticket Ticket
+	// HasChildren reports the retired `children` key's presence, whatever
+	// value shape it had.
+	HasChildren bool
+}
+
+// ParseTicketRaw is ParseTicketFromRaw without the trailing Validate call and
+// without the retired-field rejection — for a caller (`gx tickets migrate`)
+// that must inspect and repair a ticket exactly as it sits on disk, including
+// a pre-refactor shape (e.g. a missing status:) that would fail Validate
+// before the repair ever runs.
+func ParseTicketRaw(raw, path string) (RawTicket, error) {
 	yamlPart, _, hasFM := splitFrontmatter(raw)
 	if !hasFM {
-		return Ticket{}, fmt.Errorf("ticket %s has no frontmatter block: a \"---\" delimited YAML header is required", path)
+		return RawTicket{}, fmt.Errorf("ticket %s has no frontmatter block: a \"---\" delimited YAML header is required", path)
 	}
 
 	var wire ticketYAML
 	if err := yaml.Unmarshal([]byte(yamlPart), &wire); err != nil {
-		return Ticket{}, fmt.Errorf("parsing frontmatter in %s: %w", path, err)
+		return RawTicket{}, fmt.Errorf("parsing frontmatter in %s: %w", path, err)
 	}
 
-	return wire.toTicket(), nil
+	return RawTicket{Ticket: wire.toTicket(), HasChildren: wire.hasChildren()}, nil
 }
 
 // ParseBody returns raw's markdown body: the content after the frontmatter

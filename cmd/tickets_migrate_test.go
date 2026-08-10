@@ -32,6 +32,9 @@ func TestExecute_TicketsMigrate_Success(t *testing.T) {
 		"03-no-status.md":    "---\nid: \"03\"\ntype: task\n---\nBody.\n",
 		"04-already-new.md":  "---\nid: \"04\"\nstatus: draft\ntype: task\n---\nBody.\n",
 		"05-self-blocked.md": "---\nid: \"05\"\nstatus: open\ntype: task\nparent: \"01\"\nblocked_by: [\"01\", \"02\"]\n---\nBody.\n",
+		// A children value that never parsed as a list of IDs is still the
+		// retired shape, and still has to be stripped and reported.
+		"06-scalar-children.md": "---\nid: \"06\"\nstatus: open\ntype: task\nchildren: 06a\n---\nBody.\n",
 	})
 	alreadyNewPath := filepath.Join(issuesDir, "04-already-new.md")
 	alreadyNewBefore, err := os.ReadFile(alreadyNewPath)
@@ -52,7 +55,8 @@ func TestExecute_TicketsMigrate_Success(t *testing.T) {
 		"02-handed-back.md: status: ready-for-human -> needs-info",
 		"03-no-status.md: status: (missing) -> open",
 		`05-self-blocked.md: blocked_by: removed self-parent entry "01"`,
-		"4 file(s) changed",
+		"06-scalar-children.md: children removed",
+		"5 file(s) changed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("stdout = %q, want it to contain %q", out, want)

@@ -65,8 +65,9 @@ kept as history of what the code did at the time, not as a description of today'
   `true`. Fixed together (splitting them risked shipping (1)'s wider descendant walk while (2)'s
   exclusion still discarded exactly the descendants it exposed): `fullyDone` now derives
   descendants from a `parent`-pointer reverse index (`Epic.childrenIndex`) in addition to the
-  children list; `gx tickets add --parent` backfills the parent's children list as a best-effort,
-  non-authoritative bonus write; the sibling exclusion (now `isForkSibling`) only fires for an
+  children list; `gx tickets add --parent` backfilled the parent's children list as a best-effort,
+  non-authoritative bonus write (the list itself has since been retired, leaving `parent` the only
+  edge); the sibling exclusion (now `isForkSibling`) only fires for an
   *inherited* (ancestor) token, while an unconditional `isSelfOrDescendant` check (self and t's own
   descendants) still applies regardless — narrowing only the sibling half, never the
   self/descendant half, is what stops a ticket from being required to wait on its own not-yet-run

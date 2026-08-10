@@ -95,12 +95,24 @@ func TestParseTicket_RoundTrip(t *testing.T) {
 	}
 }
 
+// The rejection keys off the key being present at all, not off its value
+// parsing as a list of IDs: a scalar or empty value is the same pre-contraction
+// shape, and accepting it would drop the field silently.
 func TestParseTicket_RejectsRetiredChildrenField(t *testing.T) {
-	content := "---\nid: \"04\"\nstatus: open\ntype: task\nchildren: [\"04a\"]\n---\nbody\n"
-	path := writeTemp(t, "04-with-children.md", content)
+	for name, value := range map[string]string{
+		"list":       ` ["04a"]`,
+		"scalar":     ` 04a`,
+		"empty list": ` []`,
+		"null":       ``,
+	} {
+		t.Run(name, func(t *testing.T) {
+			content := "---\nid: \"04\"\nstatus: open\ntype: task\nchildren:" + value + "\n---\nbody\n"
+			path := writeTemp(t, "04-with-children.md", content)
 
-	if _, err := ParseTicket(path); err == nil || !strings.Contains(err.Error(), "children") {
-		t.Fatalf("ParseTicket() error = %v, want one naming the retired children field", err)
+			if _, err := ParseTicket(path); err == nil || !strings.Contains(err.Error(), "children") {
+				t.Fatalf("ParseTicket() error = %v, want one naming the retired children field", err)
+			}
+		})
 	}
 }
 
