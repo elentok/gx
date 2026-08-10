@@ -1,9 +1,16 @@
 # Changelog
 
-## Unreleased
+## v0.27.6 - 2026-08-10
 
-- Added a `draft` ticket status: accepted by the schema, `gx tickets set`, and `gx tickets validate`, rendered as its own state, and never offered to an agent (a draft ticket never enters an epic's frontier).
+- **Breaking:** the `children` frontmatter field is gone. A fork's only structural edge is `parent`, written on the descendant at creation; children are derived from it. A ticket file still carrying `children` is now rejected by the loader rather than silently ignored.
+- **Breaking:** the `needs-triage`, `ready-for-agent`, and `ready-for-human` statuses are gone, and `status` is now required — a ticket without one is an error instead of defaulting to open. `ready-for-human` was schedulable, so the orchestrator could re-claim a ticket that had been handed back to a human; `needs-info` covers that case.
+- Added `gx tickets migrate` to move an existing tracker to the new shape in one pass: it drops `children`, strips the inherited `blocked_by` tokens fork children used to carry, maps the retired statuses, and validates the whole epic (parent graph included) before writing anything.
+- Added a `draft` ticket status: accepted by the schema, `gx tickets set`, and `gx tickets validate`, rendered as its own state, and never offered to an agent (a draft ticket never enters an epic's frontier). `gx tickets add` stamps it on a freshly allocated stub, and `gx tickets set --status open` refuses to promote a ticket whose body is still empty.
+- Added a `waiting-for-children` state for a ticket whose own work is done but whose fork subtree isn't. It is computed on every render, never written to a file, and keeps its epic from counting as complete — previously such a ticket rendered as done, so an epic could report complete with unfinished fork work in it.
+- A run with no runnable work left now parks and waits for a human instead of exiting, and releases its slot in the epic-level concurrency cap while parked. It resumes automatically when the blocking ticket's status clears, or on Enter on the epic's Queue-tab row; the Queue tab shows the stall reason and whether the stalled iteration can be reattached. An epic with no runnable work and nothing a human could clear is still reported as an error.
+- `blocked_by` resolution is now a single predicate: a blocker keeps blocking until its own work is done and every ticket in its fork subtree is likewise finished. Fork children no longer declare a `blocked_by` naming their parent, and code-review tickets get their blockers synthesized at load instead of hand-written.
 - `parent` is now a validated graph edge: an epic never hands out a parent naming a ticket absent from the epic, or one closing a cycle — the loader drops such an edge and flags the ticket, `gx tickets validate` reports it, and `gx tickets set --parent` validates and writes under the epic's allocation lock so two concurrent re-parents can't jointly close a cycle.
+- Fixed fork-parent lookups disagreeing about number padding and case, so a `parent: "4"` naming a `04-…` ticket no longer resolves in some views and not others.
 
 ## v0.27.4 - 2026-08-09
 
