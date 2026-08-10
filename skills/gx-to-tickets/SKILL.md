@@ -156,7 +156,7 @@ error and re-validate until it passes — do not publish a ticket that fails val
 Tickets can also be forked off **mid-flight**, by `gx-implement`, when a ticket outgrows its budget
 while in progress — same template, same publishing mechanics, just triggered from inside a running
 session instead of upfront here. See [gx-local-tracker.md](../gx-local-tracker.md)'s mid-flight
-forking section for the numbering, blocking-edge, and `children`/`parent` mechanics.
+forking section for the numbering, blocking-edge, and `parent` mechanics.
 
 If the breakdown appends a trailing `type: code-review` ticket, run
 `gx tickets ensure-code-review <epic-slug>` instead of publishing it by hand — it's a no-op if the

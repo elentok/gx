@@ -46,14 +46,14 @@ Fields:
   loader rather than read as `open`, so a half-written file can never be handed to an agent.
 - **`blocked_by`** (list of ticket IDs) — tickets that must be `done` before this
   one can start; omit or `[]` when there are none. A bare-number token (`"04"`) is resolved only once
-  every ticket sharing that number — its own children, recursively — is done too (see Frontier
+  every ticket sharing that number — its own descendants, recursively — is done too (see Frontier
   below). A lettered token (`"04a"`) names one specific sibling and resolves the same way, via that
-  sibling's own children. A `type: code-review` ticket carries no `blocked_by` at all; see its own
+  sibling's own descendants. A `type: code-review` ticket carries no `blocked_by` at all; see its own
   frontier rule below.
-- **`children`** (list of ticket IDs) — the ticket(s) this one produced: a mid-flight fork, or (for
-  a `type: code-review` ticket) the fix tickets it opened. `[]` if none.
-- **`parent`** (ticket ID) — the ticket this one was produced from. Omit entirely on a
-  normally-authored ticket.
+- **`parent`** (ticket ID) — the ticket this one was produced from: a mid-flight fork names the
+  ticket it forked off, and a fix ticket opened by a `type: code-review` ticket names that review
+  ticket. This is the only fork edge — it lives on the descendant, and nothing is recorded on the
+  original. Omit entirely on a normally-authored ticket.
 - **`type`** (enum) — one of `task`, `research`, `prototype`, `grilling`, `code-review`. See
   `code-review` below.
 - **`expected_context_window`** (non-negative int) — the estimated tokens the implementation will
@@ -70,8 +70,8 @@ Fields:
 A ticket with `type: code-review` reviews the whole epic once every other ticket in it has landed,
 rather than one specific piece of work — so it carries no `blocked_by` list of its own. Its
 frontier-eligibility rule is different from every other type: it becomes eligible once every *other*
-ticket in the epic is `done`, independent of any `blocked_by`. Fix tickets it opens (if any) are
-recorded as its `children`.
+ticket in the epic is `done`, independent of any `blocked_by`. Fix tickets it opens (if any) name it
+as their `parent`.
 
 The body of the file (everything after the closing `---`) is free-form markdown: title, "What to
 build", acceptance criteria, test seams, and (appended over time) a `## Comments` section for
@@ -94,7 +94,7 @@ conversation history.
 
 The **frontier** is the ticket to work next: the lowest-numbered ticket, across the epic's
 `issues/*.md` files, that is unblocked (every ticket named in its `blocked_by` is `done`, recursively
-through that ticket's own `children`) and unclaimed (its status is one of the open statuses). Scan in
+through that ticket's own descendants — the tickets whose `parent` names it) and unclaimed (its status is one of the open statuses). Scan in
 filename numeric order; the first match wins.
 
 A `type: code-review` ticket is exempt from the `blocked_by` check: it becomes eligible once every
@@ -133,21 +133,19 @@ numbering and blocking conventions:
    same time, and `--slug` (required) writes the stub straight to its final `<id>-<slug>.md`
    filename.
 2. Each new ticket's `blocked_by` includes the original ticket's id.
-3. Each new ticket's `parent` frontmatter names the original, set at creation.
-4. The original ticket's `children` field is set to list the new ticket(s):
-   `gx tickets set <path> --children <new-ticket-ids>`.
-5. The original is closed as `done`, with `commitless: true` if step 5 lands zero commits of the
-   original's own.
+3. Each new ticket's `parent` frontmatter names the original, set at creation. Nothing is recorded
+   on the original: `gx tickets add --parent` writes the only edge that matters.
+4. The original is closed as `done`, with `commitless: true` if it lands zero commits of its own.
 
 Nothing downstream needs editing: a `blocked_by` token naming the original ticket resolves only once
-the original *and every one of its children, recursively* is done (see Frontier above), so a ticket
-already blocked on the pre-fork original stays correctly blocked without its `blocked_by` list ever
-being touched.
+the original *and every one of its descendants, recursively* is done (see Frontier above), so a
+ticket already blocked on the pre-fork original stays correctly blocked without its `blocked_by`
+list ever being touched.
 
 Any not-yet-finished acceptance criteria move off the original ticket onto the new one(s) — don't
 leave a criterion sitting on a ticket that's now closed.
 
-**Once step 4/5 hand off (`children` set, original marked `done`), the original's agent must not
+**Once step 4 hands off (original marked `done`), the original's agent must not
 write to a child ticket's file again for any reason.** Ticket files are shared, unlocked plain
 files, not per-worktree or git-tracked — a later raw write can land after the child's own
 independent iteration has already been claimed and launched, clobbering its `status` back to

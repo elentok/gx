@@ -165,16 +165,15 @@ flowchart LR
     subgraph "Original ticket 04 (claimed)"
     end
     A[commit current thread to green] --> B["gx tickets add --parent 04\n(allocates 04a, 04b, ...)"]
-    B --> C["gx tickets set 04 --children 04a,04b"]
-    C --> D["gx tickets set 04 --status done\n(--commitless true if no diff)"]
+    B --> C["gx tickets set 04 --status done\n(--commitless true if no diff)"]
 ```
 
 Each new ticket's `blocked_by` includes the original's id, and fork-suffix allocation
 (`tickets/allocate.go`) follows: bare number → next letter (`04`→`04a`,`04b`); lettered → next
 number under that letter (`04b`→`04b1`). Nothing needs to "notice" the fork — the next
 `claimNext` scan reloads the epic from disk and sees the new files, and `blocked_by: 04` only
-resolves once **04 and all of its `children`, recursively**, are done — so a ticket blocked on
-the pre-fork original transparently waits for every one of its forked descendants too, while
+resolves once **04 and every ticket whose `parent` chain reaches it, recursively**, are done — so a
+ticket blocked on the pre-fork original transparently waits for every one of its forked descendants too, while
 excluding the forking ticket's own fork-family from that recursive check (so it never deadlocks
 against its own not-yet-created follow-on work).
 
@@ -206,7 +205,7 @@ sequenceDiagram
     Con-->>Rev: approved/rejected/deferred + reason, per finding
     Rev->>Tick: gx-to-tickets (approved findings only)
     Tick-->>Rev: new fix tickets, parent = review ticket
-    Rev->>Rev: gx tickets set review --children ..., --status done --commitless true
+    Rev->>Rev: gx tickets set review --status done --commitless true
 ```
 
 Key points:

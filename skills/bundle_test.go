@@ -6,6 +6,7 @@
 package skills
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -153,6 +154,56 @@ func TestRelativeReferencesResolve(t *testing.T) {
 			}
 		}
 	}
+}
+
+// retiredTrackerTerms are the tracker vocabulary the lifecycle contract
+// removed: the `children` frontmatter field (fork descendants are derived
+// from `parent` alone) and the three statuses the loader no longer accepts.
+// A skill file naming any of them hands an agent an instruction that
+// produces a ticket gx itself rejects, so the bundle bans them outright —
+// including in prose, where a historical mention has to be reworded rather
+// than quoted verbatim.
+var retiredTrackerTerms = []string{
+	"--children",
+	"children:",
+	"needs-triage",
+	"ready-for-agent",
+	"ready-for-human",
+}
+
+func TestBundleDropsRetiredTrackerTerms(t *testing.T) {
+	for _, rel := range bundleMarkdownFiles(t) {
+		raw := readFile(t, rel)
+		for _, term := range retiredTrackerTerms {
+			if strings.Contains(raw, term) {
+				t.Errorf("%s mentions retired tracker term %q", rel, term)
+			}
+		}
+	}
+}
+
+// bundleMarkdownFiles is every markdown file in the bundle directory, not
+// just requiredFiles — a skill that isn't a required runtime file still
+// instructs an agent.
+func bundleMarkdownFiles(t *testing.T) []string {
+	t.Helper()
+	var found []string
+	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() && strings.HasSuffix(path, ".md") {
+			found = append(found, path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walking bundle: %v", err)
+	}
+	if len(found) == 0 {
+		t.Fatal("no markdown files found in bundle")
+	}
+	return found
 }
 
 // representativeTicket exercises the exact shape gx-to-tickets/SKILL.md's

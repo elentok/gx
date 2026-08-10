@@ -19,11 +19,15 @@
   gx-source bug; unstick by clearing the ticket back to `open` for the scheduler to reclaim. Found
   live: `lifecycle-refactor` ticket `05`. See
   `lifecycle-refactor/issues/14-ticket-05-needs-attention-herdr-pane-busy-research.md`.
+Older entries below describe a `children` frontmatter field that no longer exists: fork descendants
+are now derived from `parent` alone (see [gx-local-tracker.md](../gx-local-tracker.md)). They are
+kept as history of what the code did at the time, not as a description of today's schema.
+
 - **The mid-flight-fork placeholder fix above only closed one of three ways a `blocked_by` chain
   could still start early.** Follow-up consult (Opus, read-only) on the same `06b`/`06c` incident
-  found: (1) `fullyDone`'s descendant walk trusted `t.Children`, a field `gx tickets add --parent`
-  never wrote to the parent — a missed/partial `gx tickets set --children` silently dropped a real
-  subtree from the check. (2) The fork-sibling exclusion (then `isSelfOrForkSiblingOrDescendant`,
+  found: (1) `fullyDone`'s descendant walk trusted the then-existing children list, a field
+  `gx tickets add --parent` never wrote to the parent — a missed or partial write of it silently
+  dropped a real subtree from the check. (2) The fork-sibling exclusion (then `isSelfOrForkSiblingOrDescendant`,
   keyed on shared `Parent`) discounted a blocker's own open child as "family" whenever mis-parented
   data (a child's `Parent` written as the fork root instead of its direct parent — the exact shape
   the earlier `01a`/`01b` deadlock entry below documents) made it share the blocked ticket's
@@ -32,8 +36,8 @@
   one resolution (e.g. two `blocked_by` tokens sharing a descendant) could wrongly reuse a stale
   `true`. Fixed together (splitting them risked shipping (1)'s wider descendant walk while (2)'s
   exclusion still discarded exactly the descendants it exposed): `fullyDone` now derives
-  descendants from a `parent`-pointer reverse index (`Epic.childrenIndex`) in addition to
-  `Children`; `gx tickets add --parent` backfills the parent's `children` as a best-effort,
+  descendants from a `parent`-pointer reverse index (`Epic.childrenIndex`) in addition to the
+  children list; `gx tickets add --parent` backfills the parent's children list as a best-effort,
   non-authoritative bonus write; the sibling exclusion (now `isForkSibling`) only fires for an
   *inherited* (ancestor) token, while an unconditional `isSelfOrDescendant` check (self and t's own
   descendants) still applies regardless — narrowing only the sibling half, never the
@@ -76,7 +80,7 @@
   `cmdCheckDetachedLive` (`queue_reattach.go`) only covers the *other* stranded case (a ticket
   left `claimed`/`needs-attention` with a live herdr tab) — an epic that never got claimed at all
   falls through both paths and sits forever, looking "queued" in the UI but never starting. Found
-  live: `tickets-tree` epic, ticket `03b1` (`ready-for-agent`, unblocked) never claimed after
+  live: `tickets-tree` epic, ticket `03b1` (unclaimed and unblocked) never claimed after
   `fork-term` finished and freed a slot, because the attached `gx` process had restarted in
   between. Note: the durable `items` state can't distinguish "checked, Enter never pressed" from
   "checked, was queued, restarted before its turn" — both look identical on disk — so silently
@@ -119,9 +123,9 @@ to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKI
   by dropping the literal parenthetical ("N tickets landed in..."), same commit as this entry.
 - **A ticket blocked_by its own fork-parent can deadlock forever, even though the parent is
   `done`.** When a ticket forks sequentially (X, then Y where Y is `blocked_by: [X]` and
-  `parent: X`), `tickets.Epic.fullyDone`'s recursion into `children` requires every entry in the
-  *root* ticket's `children:` list to be done too. If the root's `children:` was written to list
-  **both** X and Y directly (instead of just X, with Y nested under X's own `children:`), then
+  `parent: X`), `tickets.Epic.fullyDone`'s recursion into the children list requires every entry in
+  the *root* ticket's children list to be done too. If the root's children list was written to list
+  **both** X and Y directly (instead of just X, with Y nested under X's own children list), then
   resolving "is root fully done" pulls in Y — and `isSelfOrForkSibling`'s exclusion (keyed on
   `Parent` equality to the ticket being resolved) doesn't catch this, because Y's `parent` is X,
   not root, so Y doesn't read as X's sibling. Net effect: X can never be considered to unblock
@@ -132,16 +136,16 @@ to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKI
   systemic to whatever produced these tickets, not a one-off typo). Inert copies of the same
   malformed shape (already-`done` chains, so harmless) also exist at `tickets-tree`'s
   `02d`→`02e` and `06`→`06c`. Two-part fix: (1) data — corrected the four live tickets'
-  `children:`/`parent:` to match (each root lists only its direct fork; the intermediate ticket
-  lists the grandchild) via `gx tickets set <path> --children <id>`; (2) source —
+  children/`parent:` links to match (each root listed only its direct fork; the intermediate ticket
+  listed the grandchild); (2) source —
   `tickets/status.go`'s `isSelfOrForkSibling` (renamed `isSelfOrForkSiblingOrDescendant`) now
   also excludes any ticket reached by walking `Parent` hops upward from the candidate to the
   ticket being resolved, not just same-`Parent` siblings, so this shape can't deadlock even if a
-  future fork's `children:`/`parent:` end up mismatched the same way again. Regression test:
+  future fork's children/`parent:` links end up mismatched the same way again. Regression test:
   `TestEpic_UnresolvedBlockers_InheritedTokenNotBlockedByOwnDescendant` in
   `tickets/status_test.go`. Uncommitted as of this diagnosis — see `tickets/status.go` diff.
 - **Code-review-spawned tickets show up in the queue tree but never start.** `gx-code-review` set
-  `children` on the review ticket but never `parent` on the tickets it spawned; both
+  the review ticket's children list but never `parent` on the tickets it spawned; both
   `RunScope.Contains`/`containsChain` (scheduler scope) and the Queue tab's tree nesting walk the
   *child's own* `parent` field, so the new tickets stayed silently out-of-scope until directly
   requested. Fixed in `35c0d2e` (`ralphloop: log scheduler scans; fix review-ticket scoping`),

@@ -91,11 +91,8 @@ If the consultant approved zero findings, skip this step entirely; there's nothi
 - For every ticket `gx-to-tickets` created in step 6, `gx tickets set <new-ticket-path> --parent
   <this-ticket-id>` — this is what makes the new ticket a scheduling/UI child of this one (the
   scheduler's scope resolution and the Queue tab's tree nesting both walk the child's own `parent:`
-  field; setting `children:` on this ticket alone, below, does not create that edge). Do this before
-  the next step, since a running epic's scheduler may pick up the new tickets as soon as they're
-  published.
-- `gx tickets set <path> --children <id1,id2,...>` — the IDs `gx-to-tickets` created in step 6 (omit
-  or pass an empty value if step 6 was skipped).
+  field, the only edge there is; nothing is recorded on this ticket). Do this before the next step,
+  since a running epic's scheduler may pick up the new tickets as soon as they're published.
 - Write the ticket body (append under the existing sections, don't replace them) with three parts:
   - **Raw findings**, per reviewer skill, verbatim from step 4.
   - **Consultant triage**, verbatim from step 5.

@@ -83,13 +83,14 @@ When either trigger fires:
    chain is uncapped — each fork narrows what's left, so it's self-limiting. Move any
    not-yet-finished acceptance criteria off the original ticket onto the new one(s). Do this
    **autonomously** — no pause for user approval; this exists to keep the outer loop unattended.
-4. **Close the original** as done, with `gx tickets set <path> --children 03b,03c` (comma-separated
-   new ticket IDs) and a body note of the token count from the last budget check (e.g.
-   `Tokens used: ~85K`) — so it can be matched against the ticket's `expected_context_window` later.
-   (`actual_context_window` itself is gx-written at cherry-pick time, not by the agent.) If step 1
-   had nothing to commit (design/exploration only, no diff), also pass `--commitless true`:
-   `gx tickets set <path> --children 03b,03c --commitless true`. Without it, ralph-loop's
-   stalled-agent detection flags the forked original `needs-info` instead of leaving it `done`.
+4. **Close the original** as done, with `gx tickets set <path> --status done` and a body note of the
+   token count from the last budget check (e.g. `Tokens used: ~85K`) — so it can be matched against
+   the ticket's `expected_context_window` later. (`actual_context_window` itself is gx-written at
+   cherry-pick time, not by the agent.) Nothing about the new tickets is recorded on the original;
+   their own `parent` is the whole edge. If step 1 had nothing to commit (design/exploration only,
+   no diff), also pass `--commitless true`: `gx tickets set <path> --status done --commitless true`.
+   Without it, ralph-loop's stalled-agent detection flags the forked original `needs-info` instead
+   of leaving it `done`.
 
 ## Comments: fewer, and no numbers in them
 
