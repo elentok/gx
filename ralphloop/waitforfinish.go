@@ -157,11 +157,11 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			}
 		}
 
-		occupancy, ok, occErr := contextOccupancy(d, p.Agent, p.SessionCwd, sessionID)
-		if occErr == nil && ok {
+		occupancy, found, decidable, occErr := smartZoneOccupancy(d, p.Agent, p.SessionCwd, sessionID)
+		if occErr == nil && found {
 			p.sink().ContextOccupancy(p.Ticket, occupancy)
 		}
-		if occErr != nil || !ok || occupancy <= smartZone {
+		if occErr != nil || !decidable || occupancy <= smartZone {
 			continue
 		}
 
@@ -766,6 +766,27 @@ func contextOccupancy(d Deps, agent AgentKind, cwd, sessionID string) (int, bool
 		return 0, false, nil
 	}
 	return d.ReadOccupancy(cwd, sessionID)
+}
+
+// smartZoneOccupancy reads the session's occupancy for one poll tick and
+// reports separately what the tick may display and what it may decide a breach
+// on. The two diverge in the window between a compaction landing and the
+// agent's next turn: the transcript still holds only the pre-compaction
+// figure, which is right to keep showing and wrong to breach on again — doing
+// so interrupts the agent and starts a second /compact on top of the finish-up
+// work the first recovery just asked for. Agents (Codex) and wirings without
+// the staleness-aware reader fall back to the general read, where every found
+// number is decidable.
+func smartZoneOccupancy(d Deps, agent AgentKind, cwd, sessionID string) (occupancy int, found, decidable bool, err error) {
+	if agent == AgentClaude && sessionID != "" && d.ReadOccupancyReading != nil {
+		reading, err := d.ReadOccupancyReading(cwd, sessionID)
+		if err != nil {
+			return 0, false, false, err
+		}
+		return reading.Usage.Occupancy(), reading.Found, reading.Found && !reading.Stale, nil
+	}
+	occupancy, found, err = contextOccupancy(d, agent, cwd, sessionID)
+	return occupancy, found, found, err
 }
 
 // emitContextOccupancy reads cwd/sessionID's current context occupancy and,

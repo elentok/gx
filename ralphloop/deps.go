@@ -104,6 +104,12 @@ type Deps struct {
 	// Code session launched in cwd, or ok=false if its transcript has no
 	// assistant turn yet.
 	ReadOccupancy func(cwd, sessionID string) (occupancy int, ok bool, err error)
+	// ReadOccupancyReading returns the same occupancy plus whether a
+	// compaction boundary has landed since the turn it came from. Only the
+	// smart-zone breach check wants that second answer (see
+	// smartZoneOccupancy); every other consumer reads ReadOccupancy, which
+	// keeps reporting the number regardless.
+	ReadOccupancyReading func(cwd, sessionID string) (transcript.OccupancyReading, error)
 	// ReadCompactions returns how many compaction boundaries the Claude Code
 	// session launched in cwd hit, or ok=false if its transcript can't be
 	// found yet.
@@ -167,6 +173,7 @@ func DefaultDeps() Deps {
 		WorktreeExists:        worktreeExists,
 		InstallDeps:           InstallDependencies,
 		ReadOccupancy:         transcript.LastAssistantOccupancy,
+		ReadOccupancyReading:  transcript.ReadSessionOccupancy,
 		ReadCompactions:       transcript.Compactions,
 		ReadCodexContext:      codexsession.LastContextTokens,
 		ReadCodexRateLimit:    codexsession.LastRateLimit,

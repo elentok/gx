@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/transcript"
 )
 
 func TestWaitForFinish_CodexNativeContextFailureRecoversDespiteStaleOccupancy(t *testing.T) {
@@ -1338,6 +1339,102 @@ func TestRecoverSmartZoneBreach_FinishUpGateGivesUpAfterTimeout(t *testing.T) {
 
 // occupancySink is a minimal EventSink test double that only records
 // ContextOccupancy calls, embedding noopEventSink for the rest.
+// staleReadingDeps wires a Claude Deps whose transcript reports occupancy
+// tokens with the given staleness, plus the minimum needed for waitForFinish
+// to poll: one timing-out tick, then idle.
+func staleReadingDeps(tokens int, stale bool, waits *int) Deps {
+	return Deps{
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			*waits++
+			if *waits == 1 {
+				return herdr.Agent{}, errors.New("timed out waiting for agent status")
+			}
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		ReadOccupancyReading: func(cwd, sessionID string) (transcript.OccupancyReading, error) {
+			return transcript.OccupancyReading{
+				Usage: transcript.Usage{InputTokens: tokens},
+				Found: true,
+				Stale: stale,
+			}, nil
+		},
+		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) { return tokens, true, nil },
+		Sleep:         func(time.Duration) {},
+	}
+}
+
+func TestWaitForFinish_StaleOccupancyAfterCompactionDoesNotRebreach(t *testing.T) {
+	var waits int
+	sink := &occupancySink{}
+	d := staleReadingDeps(200, true, &waits)
+	d.AgentSendKeys = func(string, ...string) error {
+		t.Error("pane interrupted, want the over-budget pre-compaction number treated as unknown for breach purposes")
+		return nil
+	}
+	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+		t.Errorf("prompt %q sent, want no second compaction", opts.Text)
+		return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
+	}
+
+	err := waitForFinish(d, launchAndPromptParams{
+		Label: "iter-19", Agent: AgentClaude, Pane: "pane-1", Ticket: "19",
+		SessionCwd: "/repo/iter-19", SmartZone: 100, Gate: NewGate(), Sink: sink,
+	}, "sess-19")
+	if err != nil {
+		t.Fatalf("waitForFinish: %v", err)
+	}
+	if len(sink.calls) != 1 || sink.calls[0].tokens != 200 {
+		t.Errorf("ContextOccupancy calls = %+v, want the last known 200 still emitted for display", sink.calls)
+	}
+}
+
+func TestWaitForFinish_FreshOccupancyStillBreaches(t *testing.T) {
+	var waits, interruptions int
+	var prompts []string
+	d := staleReadingDeps(200, false, &waits)
+	d.AgentSendKeys = func(string, ...string) error {
+		interruptions++
+		return nil
+	}
+	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+		prompts = append(prompts, opts.Text)
+		return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
+	}
+	d.ReadCompactions = func(cwd, sessionID string) (int, bool, error) { return 0, true, nil }
+	d.AgentRead = func(string, herdr.AgentReadOptions) (string, error) { return "compaction complete", nil }
+
+	err := waitForFinish(d, launchAndPromptParams{
+		Label: "iter-19", Agent: AgentClaude, Pane: "pane-1", Ticket: "19",
+		SessionCwd: "/repo/iter-19", SmartZone: 100, Gate: NewGate(),
+	}, "sess-19")
+	if err != nil {
+		t.Fatalf("waitForFinish: %v", err)
+	}
+	if interruptions != 1 || len(prompts) == 0 || prompts[0] != "/compact" {
+		t.Errorf("interruptions = %d, prompts = %v, want one breach recovery", interruptions, prompts)
+	}
+}
+
+func TestContextOccupancy_UnaffectedByStaleness(t *testing.T) {
+	var waits int
+	d := staleReadingDeps(200, true, &waits)
+	d.ReadOccupancyReading = func(cwd, sessionID string) (transcript.OccupancyReading, error) {
+		t.Error("the general occupancy read reached for the staleness-aware reader, want it left to the smart-zone check")
+		return transcript.OccupancyReading{}, nil
+	}
+
+	occupancy, ok, err := contextOccupancy(d, AgentClaude, "/repo/iter-19", "sess-19")
+	if err != nil || !ok || occupancy != 200 {
+		t.Fatalf("contextOccupancy() = %d, %v, %v; want the stamped/displayed value reported regardless", occupancy, ok, err)
+	}
+
+	sink := &occupancySink{}
+	emitContextOccupancy(d, sink, AgentClaude, "19", "/repo/iter-19", "sess-19")
+	if len(sink.calls) != 1 || sink.calls[0].tokens != 200 {
+		t.Errorf("ContextOccupancy calls = %+v, want the iteration-started emission unaffected", sink.calls)
+	}
+}
+
 type occupancySink struct {
 	noopEventSink
 	mu    sync.Mutex
