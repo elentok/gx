@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
@@ -42,6 +43,39 @@ func TestEpicStatusLineColorsByEpicState(t *testing.T) {
 	icon, _, style = epicStatusLine(icons, clean, nil)
 	if style.Render(icon) != icon {
 		t.Fatalf("in-progress-clean epic: expected the default/no-color treatment, got styled output %q", style.Render(icon))
+	}
+}
+
+// TestEpicStatusLineParkedRendersStallReasonAndReattachability covers 11a5's
+// direct-coverage AC for parked header rendering: the status line renders
+// distinctly from running/queued (icons.Warning, epicStatusParkedStyle) and
+// names each stalled ticket, appending "(reattachable)" only for the ones
+// whose StalledTicket.Reattachable is true — driven off directly constructed
+// StalledTicket values, not ticket disk status, since both stalled tickets
+// here share the same underlying ticket status.
+func TestEpicStatusLineParkedRendersStallReasonAndReattachability(t *testing.T) {
+	icons := ui.Icons(false)
+	epic := tickets.Epic{Tickets: []tickets.Ticket{{Identifier: "01", Status: "claimed"}}}
+
+	stalled := []ralphloop.StalledTicket{
+		{Identifier: "01", Reattachable: true},
+		{Identifier: "02", Reattachable: false},
+	}
+	icon, text, style := epicStatusLine(icons, epic, stalled)
+	if icon != icons.Warning {
+		t.Fatalf("parked epic: icon = %q, want icons.Warning", icon)
+	}
+	if style.Render(icon) != epicStatusParkedStyle.Render(icon) {
+		t.Fatalf("parked epic: status line not rendered in epicStatusParkedStyle")
+	}
+	if !strings.Contains(text, "01 (reattachable)") {
+		t.Fatalf("parked epic: text = %q, want ticket 01 marked reattachable", text)
+	}
+	if strings.Contains(text, "02 (reattachable)") {
+		t.Fatalf("parked epic: text = %q, ticket 02 must not be marked reattachable", text)
+	}
+	if !strings.Contains(text, "02") {
+		t.Fatalf("parked epic: text = %q, want it to still list ticket 02", text)
 	}
 }
 
