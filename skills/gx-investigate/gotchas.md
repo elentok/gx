@@ -23,6 +23,7 @@ to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKI
   gx-source bug; unstick by clearing the ticket back to `open` for the scheduler to reclaim. Found
   live: `lifecycle-refactor` ticket `05`. See
   `lifecycle-refactor/issues/14-ticket-05-needs-attention-herdr-pane-busy-research.md`.
+
 Older entries below describe a `children` frontmatter field that no longer exists: fork descendants
 are now derived from `parent` alone (see [gx-local-tracker.md](../gx-local-tracker.md)). They are
 kept as history of what the code did at the time, not as a description of today's schema.
