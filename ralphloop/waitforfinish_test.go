@@ -597,15 +597,18 @@ func TestCompactSignalUnconfirmed(t *testing.T) {
 
 	t.Run("poll timeout is unconfirmed", func(t *testing.T) {
 		d := Deps{}
-		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", errors.New("timed out waiting for agent status"), confirmedBaseline)
+		unconfirmed, gateHeld := compactSignalUnconfirmed(d, p, "sess-19", errors.New("timed out waiting for agent status"), confirmedBaseline)
 		if !unconfirmed {
 			t.Error("unconfirmed = false, want true: a poll timeout must always fall through")
+		}
+		if gateHeld {
+			t.Error("gateHeld = true, want false: nothing was gated, the pane simply hadn't reported yet")
 		}
 	})
 
 	t.Run("non-timeout error is confirmed (not re-polled here)", func(t *testing.T) {
 		d := Deps{}
-		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", errors.New("boom"), confirmedBaseline)
+		unconfirmed, _ := compactSignalUnconfirmed(d, p, "sess-19", errors.New("boom"), confirmedBaseline)
 		if unconfirmed {
 			t.Error("unconfirmed = true, want false: a genuine non-timeout error is handled by the caller, not waitForCompactionSignal")
 		}
@@ -617,9 +620,12 @@ func TestCompactSignalUnconfirmed(t *testing.T) {
 				return 0, true, nil
 			},
 		}
-		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", nil, confirmedBaseline)
+		unconfirmed, gateHeld := compactSignalUnconfirmed(d, p, "sess-19", nil, confirmedBaseline)
 		if !unconfirmed {
 			t.Error("unconfirmed = false, want true: transcript hasn't advanced past baseline yet")
+		}
+		if !gateHeld {
+			t.Error("gateHeld = false, want true: the pane reported completion and the gate refused it")
 		}
 	})
 
@@ -629,7 +635,7 @@ func TestCompactSignalUnconfirmed(t *testing.T) {
 				return 1, true, nil
 			},
 		}
-		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", nil, confirmedBaseline)
+		unconfirmed, _ := compactSignalUnconfirmed(d, p, "sess-19", nil, confirmedBaseline)
 		if unconfirmed {
 			t.Error("unconfirmed = true, want false: transcript already confirms compaction advanced")
 		}
@@ -637,7 +643,7 @@ func TestCompactSignalUnconfirmed(t *testing.T) {
 
 	t.Run("success on an unsupported agent is confirmed", func(t *testing.T) {
 		d := Deps{}
-		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", nil, compactBoundarySnapshot{state: compactBoundaryUnsupported})
+		unconfirmed, _ := compactSignalUnconfirmed(d, p, "sess-19", nil, compactBoundarySnapshot{state: compactBoundaryUnsupported})
 		if unconfirmed {
 			t.Error("unconfirmed = true, want false: no boundary signal exists for this agent, trust the immediate success")
 		}
@@ -649,9 +655,12 @@ func TestCompactSignalUnconfirmed(t *testing.T) {
 				return 0, false, errors.New("read failed")
 			},
 		}
-		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", nil, confirmedBaseline)
+		unconfirmed, gateHeld := compactSignalUnconfirmed(d, p, "sess-19", nil, confirmedBaseline)
 		if !unconfirmed {
 			t.Error("unconfirmed = false, want true: a read that fails now proves nothing about the compaction")
+		}
+		if !gateHeld {
+			t.Error("gateHeld = false, want true: an unreadable transcript refuses the pane's report just as a stale count does")
 		}
 	})
 
@@ -661,7 +670,7 @@ func TestCompactSignalUnconfirmed(t *testing.T) {
 				return 3, true, nil
 			},
 		}
-		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", nil, compactBoundarySnapshot{state: compactBoundaryUnavailable})
+		unconfirmed, _ := compactSignalUnconfirmed(d, p, "sess-19", nil, compactBoundarySnapshot{state: compactBoundaryUnavailable})
 		if !unconfirmed {
 			t.Error("unconfirmed = false, want true: with no baseline read, no later count can prove the compaction advanced")
 		}
@@ -829,6 +838,148 @@ func TestRecoverSmartZoneBreach_GateReleasesOnceBoundaryAdvances(t *testing.T) {
 	}
 	if len(sleeps) != 2 {
 		t.Errorf("gated sleeps = %d, want 2 (the two ticks the transcript held the gate)", len(sleeps))
+	}
+}
+
+// compactCompletionEvents collects the run-log event types scratchDir's epic
+// recorded, so a completion-route test can assert on the event it wants by
+// absence as much as by presence — the whole point of keeping the gated and
+// the timeout route on separate names.
+func compactCompletionEvents(t *testing.T, scratchDir string) map[string]bool {
+	t.Helper()
+	events, ok, err := readEvents(scratchDir, "epic")
+	if err != nil || !ok {
+		t.Fatalf("readEvents() ok=%v err=%v", ok, err)
+	}
+	seen := map[string]bool{}
+	for _, e := range events {
+		seen[e.Type] = true
+	}
+	return seen
+}
+
+// TestRecoverSmartZoneBreach_GatedCompletionLogsItsOwnEvent covers the middle
+// state: the pane claimed completion immediately, the gate held it, and the
+// boundary landed a few ticks later. Nothing about that wait expired, so it
+// must log the gated event rather than borrowing the timeout one.
+func TestRecoverSmartZoneBreach_GatedCompletionLogsItsOwnEvent(t *testing.T) {
+	scratchDir := t.TempDir()
+	var waits int
+	compactionCount := 0
+	d := Deps{
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			waits++
+			if waits == 3 {
+				compactionCount = 1
+			}
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
+			return compactionCount, true, nil
+		},
+		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+			return "compaction complete", nil
+		},
+		Sleep: func(time.Duration) {},
+	}
+
+	if _, err := recoverSmartZoneBreach(d, gatedBreachParams(scratchDir), "sess-19", "smart-zone breach", 100); err != nil {
+		t.Fatalf("recoverSmartZoneBreach: %v", err)
+	}
+
+	seen := compactCompletionEvents(t, scratchDir)
+	if !seen[eventSmartZoneGateReleased] {
+		t.Errorf("missing %s event for a gated-then-confirmed completion", eventSmartZoneGateReleased)
+	}
+	if seen[eventSmartZoneWaitExpired] {
+		t.Errorf("%s logged for a gated completion, want it reserved for the genuine timeout route", eventSmartZoneWaitExpired)
+	}
+}
+
+// TestRecoverSmartZoneBreach_TimeoutCompletionKeepsTheExpiredEvent is the
+// other direction: a pane wait that really did run past the compact timeout
+// keeps the expired event and must not pick up the gated one.
+func TestRecoverSmartZoneBreach_TimeoutCompletionKeepsTheExpiredEvent(t *testing.T) {
+	scratchDir := t.TempDir()
+	var waits int
+	compactionCount := 0
+	d := Deps{
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			if opts.Text == "/compact" {
+				return herdr.Agent{}, errors.New("timed out waiting for agent status")
+			}
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
+		},
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			waits++
+			if waits == 11 {
+				compactionCount = 1
+			}
+			return herdr.Agent{}, errors.New("timed out waiting for agent status")
+		},
+		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
+			return compactionCount, true, nil
+		},
+		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+			return "compaction complete", nil
+		},
+		Sleep: func(time.Duration) {},
+	}
+
+	if _, err := recoverSmartZoneBreach(d, gatedBreachParams(scratchDir), "sess-19", "smart-zone breach", 100); err != nil {
+		t.Fatalf("recoverSmartZoneBreach: %v", err)
+	}
+
+	seen := compactCompletionEvents(t, scratchDir)
+	if !seen[eventSmartZoneWaitExpired] {
+		t.Errorf("missing %s event for a timeout-then-confirmed completion", eventSmartZoneWaitExpired)
+	}
+	if seen[eventSmartZoneGateReleased] {
+		t.Errorf("%s logged for a timeout completion, want it reserved for a gate that actually held", eventSmartZoneGateReleased)
+	}
+}
+
+// TestRecoverSmartZoneBreach_PaneConfirmedCompletionLogsNeitherEvent covers
+// the ordinary state: the pane reported completion and the transcript already
+// agreed on the first read. Neither route was taken, so neither event belongs
+// in the run log.
+func TestRecoverSmartZoneBreach_PaneConfirmedCompletionLogsNeitherEvent(t *testing.T) {
+	scratchDir := t.TempDir()
+	var reads int
+	d := Deps{
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
+			reads++
+			if reads == 1 {
+				return 0, true, nil
+			}
+			return 1, true, nil
+		},
+		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+			return "compaction complete", nil
+		},
+		Sleep: func(time.Duration) {},
+	}
+
+	recovered, err := recoverSmartZoneBreach(d, gatedBreachParams(scratchDir), "sess-19", "smart-zone breach", 100)
+	if err != nil {
+		t.Fatalf("recoverSmartZoneBreach: %v", err)
+	}
+	if !recovered {
+		t.Fatal("recoverSmartZoneBreach returned recovered=false, want true: the pane and the transcript both confirmed")
+	}
+
+	seen := compactCompletionEvents(t, scratchDir)
+	if seen[eventSmartZoneWaitExpired] || seen[eventSmartZoneGateReleased] {
+		t.Errorf("events = %v, want neither completion-route event for a pane-confirmed compaction", seen)
 	}
 }
 

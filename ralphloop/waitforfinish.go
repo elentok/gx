@@ -332,9 +332,9 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 		Until:     compactStates,
 		TimeoutMs: smartZonePollMs,
 	})
-	expired := false
-	if compactSignalUnconfirmed(d, p, sessionID, err, baseline.snapshot) {
-		agent, expired, err = waitForCompactionSignal(d, p, sessionID, compactStates, smartZonePollMs, baseline)
+	completion := compactPaneConfirmed
+	if unconfirmed, gateHeld := compactSignalUnconfirmed(d, p, sessionID, err, baseline.snapshot); unconfirmed {
+		agent, completion, err = waitForCompactionSignal(d, p, sessionID, compactStates, smartZonePollMs, baseline, gateHeld)
 	}
 	// "blocked" is Codex's compact-confirmation state, and Codex is exactly the
 	// agent with no compaction-boundary signal, so with the gate in place this
@@ -353,7 +353,7 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 				TimeoutMs: smartZonePollMs,
 			})
 			if err != nil && isPollTimeout(err) {
-				_, expired, err = waitForCompactionSignal(d, p, sessionID, plainFinishStates, smartZonePollMs, baseline)
+				_, completion, err = waitForCompactionSignal(d, p, sessionID, plainFinishStates, smartZonePollMs, baseline, false)
 			}
 		}
 	}
@@ -365,8 +365,11 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 		}
 		return false, nil
 	}
-	if expired {
+	switch completion {
+	case compactTimeoutConfirmed:
 		p.logAgentEvent(eventSmartZoneWaitExpired, sessionID, fmt.Sprintf("compact wait for %s expired but the transcript confirmed compaction completed", p.Label))
+	case compactGateConfirmed:
+		p.logAgentEvent(eventSmartZoneGateReleased, sessionID, fmt.Sprintf("the pane reported %s finished compacting before the transcript did; the gate held until the boundary landed", p.Label))
 	}
 
 	if err := confirmCompactSubmittedWithRetry(d, p.Pane); err != nil {
@@ -505,20 +508,44 @@ func (b *stickyBaseline) advancedPast(d Deps, p launchAndPromptParams, sessionID
 	return b.snapshot.advancedPast(d, p, sessionID)
 }
 
+// compactCompletion records which of the three routes a confirmed compaction
+// arrived by. The routes are kept apart because run-log.jsonl is the primary
+// diagnostic instrument for this class of bug, and "the pane claimed to be
+// idle mid-compaction" and "compaction genuinely took more than five minutes"
+// call for opposite fixes.
+type compactCompletion int
+
+const (
+	// compactPaneConfirmed: the pane reported completion and, where a boundary
+	// signal exists at all, the transcript already agreed. The ordinary route,
+	// worth no event of its own.
+	compactPaneConfirmed compactCompletion = iota
+	// compactGateConfirmed: the pane reported completion early, the gate
+	// refused it, and the boundary landed within the compact timeout.
+	compactGateConfirmed
+	// compactTimeoutConfirmed: the pane-status wait kept timing out past
+	// smartZoneCompactTimeoutMs and only the transcript ever confirmed.
+	compactTimeoutConfirmed
+)
+
 // compactSignalUnconfirmed reports whether the immediate "/compact"
 // AgentPrompt result (err) needs a fallthrough to waitForCompactionSignal
 // rather than being trusted as-is: either the prompt's own wait timed out, or
 // the gate is engaged and the transcript hasn't recorded a new compaction
 // boundary yet — a premature idle/done report, not proof the compact actually
-// finished.
-func compactSignalUnconfirmed(d Deps, p launchAndPromptParams, sessionID string, err error, baseline compactBoundarySnapshot) bool {
+// finished. gateHeld distinguishes those two reasons, so a completion reached
+// later can still name the route it came by.
+func compactSignalUnconfirmed(d Deps, p launchAndPromptParams, sessionID string, err error, baseline compactBoundarySnapshot) (unconfirmed, gateHeld bool) {
 	if err != nil {
-		return isPollTimeout(err)
+		return isPollTimeout(err), false
 	}
 	if !baseline.gates() {
-		return false
+		return false, false
 	}
-	return !baseline.advancedPast(d, p, sessionID)
+	if baseline.advancedPast(d, p, sessionID) {
+		return false, false
+	}
+	return true, true
 }
 
 // waitForCompactionSignal polls Pane in smartZonePollMs ticks for one of
@@ -534,12 +561,18 @@ func compactSignalUnconfirmed(d Deps, p launchAndPromptParams, sessionID string,
 // go idle mid-compaction, and trusting that report is what let the finish-up
 // prompt land as queued input and cancel the compaction outright. A pane-status
 // wait that keeps timing out past smartZoneCompactTimeoutMs is conversely still
-// reported as success (transcriptConfirmed=true) once the count advances, since
-// a herdr observation gap is not a stuck compaction. A transcript that can't be
-// read at all right now proves nothing either way, so it holds the gate closed
-// and consumes the extended bound like any other unconfirmed tick. The first
-// tick here is also the one chance a baseline that was unreadable at submission
-// time gets to be adopted — see stickyBaseline.
+// reported as success once the count advances, since a herdr observation gap is
+// not a stuck compaction. A transcript that can't be read at all right now
+// proves nothing either way, so it holds the gate closed and consumes the
+// extended bound like any other unconfirmed tick. The first tick here is also
+// the one chance a baseline that was unreadable at submission time gets to be
+// adopted — see stickyBaseline.
+//
+// gateHeld carries in whether the caller's own first check was already refused
+// by the gate, and the returned compactCompletion names the route taken. A gate
+// that held at any point wins over the timeout route: the pane having lied
+// about being idle is the more specific finding, and the one an investigator
+// reading the run log needs to see.
 //
 // Only once smartZoneCompactExtendedTimeoutMs of accumulated time elapses with
 // neither signal showing completion does this give up: with the pane's own
@@ -550,8 +583,8 @@ func compactSignalUnconfirmed(d Deps, p launchAndPromptParams, sessionID string,
 func waitForCompactionSignal(
 	d Deps, p launchAndPromptParams, sessionID string,
 	until []string, startElapsedMs int,
-	baseline *stickyBaseline,
-) (agent herdr.Agent, transcriptConfirmed bool, err error) {
+	baseline *stickyBaseline, gateHeld bool,
+) (agent herdr.Agent, completion compactCompletion, err error) {
 	elapsedMs := startElapsedMs
 	for {
 		baseline.upgradeOnce(d, p, sessionID)
@@ -561,12 +594,16 @@ func waitForCompactionSignal(
 			TimeoutMs: smartZonePollMs,
 		})
 		if err != nil && !isPollTimeout(err) {
-			return agent, false, err
+			return agent, compactPaneConfirmed, err
 		}
 		if err == nil {
 			if !baseline.gates() || baseline.advancedPast(d, p, sessionID) {
-				return agent, false, nil
+				if gateHeld {
+					return agent, compactGateConfirmed, nil
+				}
+				return agent, compactPaneConfirmed, nil
 			}
+			gateHeld = true
 			// This wait returned immediately (that premature idle report is the
 			// whole reason the gate exists), so it consumed none of the poll
 			// interval the timeout branch below consumes inside AgentWait
@@ -578,16 +615,19 @@ func waitForCompactionSignal(
 		elapsedMs += smartZonePollMs
 
 		if err != nil && elapsedMs >= smartZoneCompactTimeoutMs && baseline.advancedPast(d, p, sessionID) {
-			return agent, true, nil
+			if gateHeld {
+				return agent, compactGateConfirmed, nil
+			}
+			return agent, compactTimeoutConfirmed, nil
 		}
 
 		if elapsedMs >= smartZoneCompactExtendedTimeoutMs {
 			if err == nil {
-				return agent, false, fmt.Errorf(
+				return agent, compactPaneConfirmed, fmt.Errorf(
 					"compacting %s: the pane kept reporting completion but the transcript recorded no compaction boundary: %w",
 					p.Label, errCompactNeverConfirmed)
 			}
-			return agent, false, err
+			return agent, compactPaneConfirmed, err
 		}
 	}
 }

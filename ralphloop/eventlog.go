@@ -30,6 +30,14 @@ const (
 	// compact, not a failure, and deliberately distinct from
 	// eventSmartZoneRecoveryFailed so it isn't misread as one.
 	eventSmartZoneWaitExpired = "smart-zone-wait-expired"
+	// eventSmartZoneGateReleased marks the other route to a confirmed
+	// compaction: the pane reported completion straight away, the
+	// compaction-boundary gate refused to believe it, and the boundary landed
+	// a few poll ticks later. Nothing expired there, so it deliberately does
+	// not share eventSmartZoneWaitExpired's name — telling "Claude Code
+	// reported idle mid-compaction" apart from "compaction genuinely took more
+	// than five minutes" is exactly what run-log.jsonl is read for.
+	eventSmartZoneGateReleased = "smart-zone-gate-released"
 	eventPausedRateLimit      = "paused-rate-limit"
 	eventResumed              = "resumed"
 	eventNeedsInfo            = "needs-info"
