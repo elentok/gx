@@ -1091,11 +1091,13 @@ func TestRecoverSmartZoneBreach_UnsupportedFailsOpenButUnavailableDoesNot(t *tes
 
 // TestWaitForFinish_AbsorbsGatedGiveUpAndKeepsPolling verifies the call site:
 // a gated give-up is a failed recovery, not a failed iteration, so
-// waitForFinish swallows that one error and returns to polling. Any other
-// error around the breach path still aborts the iteration.
+// waitForFinish swallows that one error and returns to polling — and takes the
+// finish once the slow compaction it gave up on finally writes its boundary.
+// Any other error around the breach path still aborts the iteration.
 func TestWaitForFinish_AbsorbsGatedGiveUpAndKeepsPolling(t *testing.T) {
 	var prompts []string
 	var waits int
+	boundaries := 0
 	d := Deps{
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
 			// The compact-completion polls are the ones waiting on "blocked"
@@ -1108,6 +1110,9 @@ func TestWaitForFinish_AbsorbsGatedGiveUpAndKeepsPolling(t *testing.T) {
 			if waits == 1 {
 				return herdr.Agent{}, errors.New("timed out waiting for agent status")
 			}
+			// The compaction lands for real once recovery has already given up
+			// on it, which is what makes the pane's idle report a genuine finish.
+			boundaries = 1
 			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 		},
 		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
@@ -1116,7 +1121,7 @@ func TestWaitForFinish_AbsorbsGatedGiveUpAndKeepsPolling(t *testing.T) {
 		},
 		AgentSendKeys:   func(string, ...string) error { return nil },
 		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
-		ReadCompactions: func(cwd, sessionID string) (int, bool, error) { return 0, true, nil },
+		ReadCompactions: func(cwd, sessionID string) (int, bool, error) { return boundaries, true, nil },
 		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
 			return "compaction complete", nil
 		},
@@ -1225,6 +1230,54 @@ func TestWaitForFinish_EscalatesAfterTwoConsecutiveGatedGiveUps(t *testing.T) {
 	}
 }
 
+// TestWaitForFinish_GatedGiveUpDeniesAPaneIdleToEveryPollKind covers the pane
+// shape a gated give-up is actually produced by: one that reports idle to the
+// compact-completion poll *and* to the ordinary finish poll while the
+// compaction is still running. Trusting the finish poll there closes the ticket
+// and abandons the worktree mid-compaction, and it also puts the give-up bound
+// out of reach — the loop leaves by the finish path before a second give-up can
+// ever be counted.
+func TestWaitForFinish_GatedGiveUpDeniesAPaneIdleToEveryPollKind(t *testing.T) {
+	var prompts []string
+	compacted := false
+	d := Deps{
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			if compacted || slices.Contains(opts.Until, "blocked") {
+				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+			}
+			return herdr.Agent{}, errors.New("timed out waiting for agent status")
+		},
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			prompts = append(prompts, opts.Text)
+			if opts.Text == "/compact" {
+				compacted = true
+			}
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentSendKeys:   func(string, ...string) error { return nil },
+		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
+		ReadCompactions: func(cwd, sessionID string) (int, bool, error) { return 0, true, nil },
+		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+			return "compaction complete", nil
+		},
+		Sleep: func(time.Duration) {},
+	}
+
+	err := waitForFinish(d, boundGiveUpParams(), "sess-19")
+	if !errors.Is(err, errCompactRecoveryExhausted) {
+		t.Fatalf("waitForFinish error = %v, want one wrapping errCompactRecoveryExhausted, not a successful finish", err)
+	}
+	if !errors.Is(err, errCompactNeverConfirmed) {
+		t.Errorf("waitForFinish error = %v, want the underlying gated give-up preserved", err)
+	}
+	if got := countPrompts(prompts, "/compact"); got != 1 {
+		t.Errorf("/compact prompts = %d, want 1: an idle pane never reaches a second breach, so the finish poll itself must carry the count", got)
+	}
+	if len(prompts) != 1 {
+		t.Errorf("prompts = %v, want /compact only: no finish-up prompt may go out while the compaction is unconfirmed", prompts)
+	}
+}
+
 // TestWaitForFinish_SuccessfulRecoveryResetsTheGiveUpCounter pins the bound to
 // *consecutive* give-ups. A lifetime tally would escalate a healthy long
 // iteration on two unrelated give-ups it had already recovered from.
@@ -1235,10 +1288,16 @@ func TestWaitForFinish_SuccessfulRecoveryResetsTheGiveUpCounter(t *testing.T) {
 	settled := false
 	d := Deps{
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			if slices.Contains(opts.Until, "blocked") || settled {
+			if slices.Contains(opts.Until, "blocked") {
 				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 			}
-			return herdr.Agent{}, errors.New("timed out waiting for agent status")
+			if !settled {
+				return herdr.Agent{}, errors.New("timed out waiting for agent status")
+			}
+			// The third compaction lands only once recovery has given up on it,
+			// so the finish the pane then reports is corroborated.
+			boundaries = 2
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 		},
 		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
 			prompts = append(prompts, opts.Text)
@@ -1574,7 +1633,7 @@ func TestWaitForFinish_StaleOccupancyAfterCompactionDoesNotRebreach(t *testing.T
 }
 
 func TestWaitForFinish_FreshOccupancyStillBreaches(t *testing.T) {
-	var waits, interruptions int
+	var waits, interruptions, boundaries int
 	var prompts []string
 	d := staleReadingDeps(200, false, &waits)
 	d.AgentSendKeys = func(string, ...string) error {
@@ -1583,9 +1642,14 @@ func TestWaitForFinish_FreshOccupancyStillBreaches(t *testing.T) {
 	}
 	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
 		prompts = append(prompts, opts.Text)
+		if opts.Text == "/compact" {
+			// The recovery this breach starts completes normally; the breach
+			// itself is what this test is about.
+			boundaries++
+		}
 		return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
 	}
-	d.ReadCompactions = func(cwd, sessionID string) (int, bool, error) { return 0, true, nil }
+	d.ReadCompactions = func(cwd, sessionID string) (int, bool, error) { return boundaries, true, nil }
 	d.AgentRead = func(string, herdr.AgentReadOptions) (string, error) { return "compaction complete", nil }
 
 	err := waitForFinish(d, launchAndPromptParams{

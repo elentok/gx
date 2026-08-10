@@ -44,6 +44,13 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 
 	elapsedMs := 0
 	gatedGiveUps := 0
+	// pending is the compaction-boundary snapshot taken just before the
+	// "/compact" of the most recent gated give-up, kept alive until some later
+	// read proves a boundary landed. While it is unresolved the pane's own
+	// "finished" report proves nothing: the shape that produces a gated give-up
+	// in the first place is a pane reporting idle throughout a running
+	// compaction, and that same pane answers the ordinary finish poll idle too.
+	var pending *compactBoundarySnapshot
 	for {
 		pollMs := smartZonePollMs
 		if p.FinishTimeoutMs > 0 {
@@ -126,8 +133,31 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 				elapsedMs = 0
 				continue
 			}
-			p.logLifecycleEvent(p.FinishEvent, sessionID)
-			return nil
+			if pending == nil || !pending.unresolved(d, p, sessionID) {
+				p.logLifecycleEvent(p.FinishEvent, sessionID)
+				return nil
+			}
+			// The last recovery gave up gated and the transcript still records no
+			// boundary, so this "finished" is that same uncorroborated claim
+			// arriving on the other poll kind — not a finish. Returning here would
+			// close the ticket and abandon the worktree/tab mid-compaction, the
+			// orphaning the gate exists to prevent. Give the transcript one more
+			// poll interval (the compaction may simply be slow), then count a
+			// still-silent one as another gated give-up, which is what keeps
+			// maxConsecutiveGatedGiveUps reachable against a pane that answers
+			// every poll kind idle. Re-prompting instead would type into a pane
+			// that may still be compacting.
+			d.Sleep(smartZonePollMs * time.Millisecond)
+			elapsedMs += smartZonePollMs
+			if !pending.unresolved(d, p, sessionID) {
+				p.logLifecycleEvent(p.FinishEvent, sessionID)
+				return nil
+			}
+			gatedGiveUps++
+			if gatedGiveUps >= maxConsecutiveGatedGiveUps {
+				return gatedGiveUpsExhausted(p.Label, gatedGiveUps, errCompactNeverConfirmed)
+			}
+			continue
 		}
 		if !isPollTimeout(err) {
 			return fmt.Errorf("waiting for agent to finish: %w", err)
@@ -174,13 +204,18 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 		// corroborated) is a failed recovery, not a failed iteration: the agent
 		// is still alive and may well compact on its own, so keep polling and
 		// let the next breach try again. Every other error still aborts.
+		// Snapshotted here rather than read back out of recoverSmartZoneBreach:
+		// the gate's predicate is "count greater than the count at submission
+		// time", so the snapshot only means anything if it is taken before
+		// "/compact" goes out.
+		baseline := readCompactBoundaries(d, p.Agent, p.SessionCwd, sessionID)
 		recovered, err := recoverSmartZoneBreach(d, p, sessionID, reason, smartZone)
 		switch {
 		case errors.Is(err, errCompactNeverConfirmed):
 			gatedGiveUps++
+			pending = &baseline
 			if gatedGiveUps >= maxConsecutiveGatedGiveUps {
-				return fmt.Errorf("%s: %w after %d consecutive attempts: %w",
-					p.Label, errCompactRecoveryExhausted, gatedGiveUps, err)
+				return gatedGiveUpsExhausted(p.Label, gatedGiveUps, err)
 			}
 		case err != nil:
 			return err
@@ -191,6 +226,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			// the counter for precisely the failures that prove nothing about
 			// whether compaction is progressing.
 			gatedGiveUps = 0
+			pending = nil
 		}
 		elapsedMs = 0
 	}
@@ -258,6 +294,15 @@ const maxConsecutiveGatedGiveUps = 2
 // reading the ticket needs to know the agent's own /compact never completed,
 // not merely that some recovery failed.
 var errCompactRecoveryExhausted = errors.New("smart-zone compaction recovery exhausted")
+
+// gatedGiveUpsExhausted builds the escalation error for an iteration that hit
+// maxConsecutiveGatedGiveUps, wrapping cause so the operator reading the
+// needs-attention ticket still sees that it was the agent's own /compact that
+// never completed.
+func gatedGiveUpsExhausted(label string, giveUps int, cause error) error {
+	return fmt.Errorf("%s: %w after %d consecutive attempts: %w",
+		label, errCompactRecoveryExhausted, giveUps, cause)
+}
 
 // smartZoneCompactSubmitPollMs is the tick size for confirmCompactSubmitted's
 // retry loop; smartZoneCompactSubmitTimeoutMs is its total budget. herdr's
@@ -492,6 +537,14 @@ func readCompactBoundaries(d Deps, agent AgentKind, cwd, sessionID string) compa
 // corroboration before it can end the compaction wait.
 func (s compactBoundarySnapshot) gates() bool {
 	return s.state != compactBoundaryUnsupported
+}
+
+// unresolved reports whether a compaction submitted at s still has nothing in
+// the transcript to show for it. An agent with no boundary signal at all is
+// never unresolved: there is no evidence to wait for, so nothing to withhold
+// trust for.
+func (s compactBoundarySnapshot) unresolved(d Deps, p launchAndPromptParams, sessionID string) bool {
+	return s.gates() && !s.advancedPast(d, p, sessionID)
 }
 
 // advancedPast reports whether a fresh read proves a compaction boundary

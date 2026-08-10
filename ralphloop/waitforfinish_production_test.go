@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -429,6 +430,162 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 	}
 	if seen[eventSmartZoneWaitExpired] {
 		t.Errorf("%s logged for a gated completion, want it reserved for the pane-timeout route", eventSmartZoneWaitExpired)
+	}
+}
+
+// TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms is the sibling
+// scenario to the recovery test above, differing in one variable: virtual time
+// never advances, so ClaudeCompact's compaction never reaches its deadline and
+// never writes a boundary. Both of the pane's poll kinds consult the same
+// Status() — under WithPrematureIdlePane that is "idle" throughout — which is
+// the production shape that made the pane-status finish path fire while
+// "/compact" was still running: the iteration was declared finished, the ticket
+// closed needs-info with no commit, and the worktree abandoned mid-compaction.
+// The run must instead end at errCompactRecoveryExhausted, which loop.go
+// persists as needs-attention for an operator.
+func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
+	const pane = "pane-1"
+	const smartZone = 100
+	cwd := "/repo/iter-08"
+	sessionID := "sess-08"
+
+	t.Setenv("HOME", t.TempDir())
+
+	s := herdrfake.NewState(t)
+
+	var mu sync.Mutex
+	compact := herdrfake.NewClaudeCompact(t, cwd, sessionID, func() time.Duration {
+		// Frozen: this scenario's compaction never completes, so no poll of
+		// either kind may ever move the clock past CompactDurationMs.
+		return 0
+	}, smartZone, herdrfake.WithPrematureIdlePane())
+
+	var compactCalls, finishUpCalls, ctrlCCalls, enterCalls int
+	var compactStarted bool
+
+	s.Register("agent", "prompt", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		target, text := argv[2], argv[3]
+		switch {
+		case text == "/compact":
+			mu.Lock()
+			compactCalls++
+			compactStarted = true
+			mu.Unlock()
+			if err := compact.StartCompact(); err != nil {
+				return nil, herdrfake.Identities{}, err
+			}
+			status, err := compact.Status()
+			if err != nil {
+				return nil, herdrfake.Identities{}, err
+			}
+			return agentResult(target, status)
+		case strings.Contains(text, "please finish up quickly"):
+			mu.Lock()
+			finishUpCalls++
+			mu.Unlock()
+			if err := compact.AcceptFinishUp(); err != nil {
+				return nil, herdrfake.Identities{}, err
+			}
+			return agentResult(target, "working")
+		}
+		return agentResult(target, "working")
+	})
+
+	s.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		target := argv[2]
+		until := parseUntil(argv[3:])
+		mu.Lock()
+		started := compactStarted
+		mu.Unlock()
+		// Before "/compact" the agent is mid-turn, so every poll times out —
+		// that's the tick the smart-zone breach is detected on. Afterwards both
+		// poll kinds get the same answer the real pane gave: idle.
+		if !started {
+			return nil, herdrfake.Identities{}, fmt.Errorf("timed out waiting for agent status")
+		}
+		status, err := compact.Status()
+		if err != nil {
+			return nil, herdrfake.Identities{}, err
+		}
+		if len(until) == 0 || slices.Contains(until, status) {
+			return agentResult(target, status)
+		}
+		return nil, herdrfake.Identities{}, fmt.Errorf("timed out waiting for agent status")
+	})
+
+	s.Register("agent", "send-keys", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		target := argv[2]
+		for _, k := range argv[3:] {
+			mu.Lock()
+			switch k {
+			case "ctrl+c":
+				ctrlCCalls++
+			case "enter":
+				enterCalls++
+			}
+			mu.Unlock()
+			if err := compact.SendKey(k); err != nil {
+				return nil, herdrfake.Identities{}, err
+			}
+		}
+		return agentResult(target, "working")
+	})
+
+	s.Register("agent", "read", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		return "", herdrfake.Identities{}, nil
+	})
+
+	herdrfake.StartState(t, s)
+
+	scratchDir := t.TempDir()
+	deps := testDeps()
+	deps.Sleep = func(time.Duration) {}
+	deps.Now = func() time.Time { return time.Unix(0, 0) }
+
+	err := waitForFinish(deps, launchAndPromptParams{
+		Label:      "iter-08",
+		Agent:      AgentClaude,
+		Pane:       pane,
+		SessionCwd: cwd,
+		SmartZone:  smartZone,
+		Gate:       NewGate(),
+		Ticket:     "08",
+		ScratchDir: scratchDir,
+		EpicName:   "epic",
+	}, sessionID)
+	if !errors.Is(err, errCompactRecoveryExhausted) {
+		t.Fatalf("waitForFinish error = %v, want one wrapping errCompactRecoveryExhausted: an idle pane whose transcript never records a boundary is not a finish", err)
+	}
+	if !errors.Is(err, errCompactNeverConfirmed) {
+		t.Errorf("waitForFinish error = %v, want the underlying gated give-up preserved for the operator", err)
+	}
+
+	if compactCalls != 1 {
+		t.Errorf("compact prompts = %d, want exactly 1", compactCalls)
+	}
+	if finishUpCalls != 0 {
+		t.Errorf("finish-up prompts = %d, want 0 (it would land as input to a still-running compaction)", finishUpCalls)
+	}
+	if ctrlCCalls != 1 {
+		t.Errorf("ctrl+c sends = %d, want exactly 1", ctrlCCalls)
+	}
+	if enterCalls != 0 {
+		t.Errorf("enter nudges = %d, want 0 (a stray Enter cancels an in-progress compaction)", enterCalls)
+	}
+
+	events, ok, err := readEvents(scratchDir, "epic")
+	if err != nil || !ok {
+		t.Fatalf("readEvents() ok=%v err=%v", ok, err)
+	}
+	seen := map[string]bool{}
+	for _, e := range events {
+		seen[e.Type] = true
+	}
+	if !seen[eventSmartZoneRecoveryFailed] {
+		t.Errorf("missing %s event for a compaction that never confirmed", eventSmartZoneRecoveryFailed)
+	}
+	if seen[eventResumed] {
+		t.Error("resumed event emitted, want none: nothing recovered")
 	}
 }
 
