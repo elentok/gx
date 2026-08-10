@@ -33,15 +33,11 @@ func TestFrontier_PartiallyBlockedIsExcluded(t *testing.T) {
 	assertNumbers(t, got, []int{3})
 }
 
-func TestFrontier_ClaimedAndDoneFamilyExcluded(t *testing.T) {
+func TestFrontier_ClaimedAndDoneExcluded(t *testing.T) {
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
 		{Number: 1, Status: "claimed"},
 		{Number: 2, Status: "done"},
-		{Number: 3, Status: "resolved"},
-		{Number: 4, Status: "wontfix"},
-		{Number: 5, Status: "closed"},
 		{Number: 6, Status: "done", Commitless: true},
-		{Number: 7, Status: "implemented"},
 		{Number: 8, Status: "needs-info"},
 		{Number: 9, Status: "open"},
 	}}

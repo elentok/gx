@@ -74,17 +74,18 @@ func (t Ticket) DisplayNumber() string {
 	return strconv.Itoa(t.Number)
 }
 
+// doneStatuses is a single-entry set on purpose. It once accepted a wider
+// "done family" (resolved/wontfix/closed/implemented); the contracted status
+// enum (schema.Status) has exactly one spelling per state, and the loader
+// rejects every other value, so those aliases were both unreachable and a
+// second, disagreeing status vocabulary sitting next to the canonical one.
 var doneStatuses = map[string]bool{
-	"done":        true,
-	"resolved":    true,
-	"wontfix":     true,
-	"closed":      true,
-	"implemented": true,
+	"done": true,
 }
 
-// IsDone reports whether the ticket's raw Status collapses into the "done"
-// family. Used for epic open/total counts; the full five-state rendered
-// status (open/claimed/blocked/needs-info/done) is a later concern.
+// IsDone reports whether the ticket's raw Status is done. Used for epic
+// open/total counts; note that a done ticket whose fork subtree is unfinished
+// still renders as StatusWaitingForChildren (see Epic.RenderedStatus).
 func (t Ticket) IsDone() bool {
 	return doneStatuses[strings.ToLower(strings.TrimSpace(t.Status))]
 }

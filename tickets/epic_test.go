@@ -12,7 +12,7 @@ func TestEpic_AllDone(t *testing.T) {
 		want    bool
 	}{
 		{"zero tickets", nil, false},
-		{"all done", []Ticket{{Number: 1, Status: "done"}, {Number: 2, Status: "resolved"}}, true},
+		{"all done", []Ticket{{Number: 1, Status: "done"}, {Number: 2, Status: "done"}}, true},
 		{"one open", []Ticket{{Number: 1, Status: "done"}, {Number: 2, Status: "open"}}, false},
 	}
 

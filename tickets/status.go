@@ -146,9 +146,10 @@ func (e Epic) effectiveBlockedBy(t Ticket) []string {
 // Membership comes from Parent alone; Children is never read (an
 // agent-maintained list a mid-flight fork can forget to update, whereas
 // Parent is the field `gx tickets add --parent` reliably writes on every
-// fork). The recursion carries no cycle guard: ticket 01's Epic-construction
-// validation rejects a cyclic parent graph before it ever reaches here, so
-// every walk down Parent reverse-edges is guaranteed to terminate.
+// fork). The recursion carries no cycle guard: Epic construction quarantines
+// every cyclic or dangling Parent edge (see quarantineInvalidParents) before
+// one can reach here, so every walk down Parent reverse-edges is guaranteed
+// to terminate.
 func (e Epic) Blocking(t Ticket) bool {
 	return e.blocking(t, e.forkChildren())
 }

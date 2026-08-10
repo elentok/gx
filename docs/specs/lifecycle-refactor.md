@@ -180,9 +180,12 @@ Dependencies.
   schema validation has no epic context and therefore cannot check it; the check is that `parent`
   names an existing ticket in the epic that is not in the writing ticket's own fork subtree, which
   requires the whole graph. It is enforced in two places:
-  - **At load.** `Epic` construction validates the complete parent graph and fails rather than
-    exposing a cyclic or dangling one. This is what lets the resolver be unguarded recursion: a
-    hand-edited or externally written file can't reach it.
+  - **At load.** `Epic` construction validates the complete parent graph and never exposes a cyclic
+    or dangling one. This is what lets the resolver be unguarded recursion: a hand-edited or
+    externally written file can't reach it. *(As shipped: the loader quarantines each invalid edge —
+    drops that ticket's `parent`, records the reason, renders it as an error — rather than failing
+    the whole load, so one bad edge can't make the rest of the tracker unreadable. The invariant the
+    resolver depends on is identical either way.)*
   - **At write, under the existing lock.** `gx tickets set --parent` acquires the epic's allocation
     lock (the same one `add` already uses to allocate ids), re-loads the epic inside it, validates
     the resulting graph, and writes — all under the lock. Without this, two concurrent re-parents
@@ -319,7 +322,7 @@ No new seams. Three existing ones carry almost everything:
 - **`tickets.Epic` as an in-memory value** — `tickets/status_test.go`. The whole resolution model,
   fork subtree membership, waiting-for-children, code-review expansion, the frontier, and the
   parent-graph validation that `Epic` construction now performs (a cyclic or dangling `parent`
-  fails to load rather than reaching the resolver). This is
+  never reaches the resolver). This is
   the highest seam available for the core change: pure, no filesystem, and it's where all eight
   recorded bugs already have regression tests. Every one of those tests is rewritten against the new
   predicate, and the ones covering carve-out behavior that no longer exists are deleted with a note

@@ -3,7 +3,7 @@ package tickets
 import "testing"
 
 func TestTicket_IsDone(t *testing.T) {
-	doneValues := []string{"done", "resolved", "wontfix", "closed", "Done", "RESOLVED"}
+	doneValues := []string{"done", "Done", "DONE", " done "}
 	for _, v := range doneValues {
 		ticket := Ticket{Status: v}
 		if !ticket.IsDone() {
@@ -11,7 +11,12 @@ func TestTicket_IsDone(t *testing.T) {
 		}
 	}
 
-	notDoneValues := []string{"", "open", "claimed", "needs-info", "ready-for-agent", "blocked", "bogus"}
+	// The retired "done family" aliases are not done, and not anything else
+	// either: the contracted enum has exactly one spelling per state.
+	notDoneValues := []string{
+		"", "open", "claimed", "needs-info", "needs-attention", "draft", "blocked", "bogus",
+		"resolved", "wontfix", "closed", "implemented",
+	}
 	for _, v := range notDoneValues {
 		ticket := Ticket{Status: v}
 		if ticket.IsDone() {

@@ -21,10 +21,14 @@ eight documented bugs become unrepresentable rather than fixed.
 
 Acyclicity is an invariant of an `Epic`, not of a ticket: the check is "`parent` names an existing
 ticket in this epic that is not in my own fork subtree", which no single-ticket validation can see.
-It is enforced at `Epic` construction, which fails rather than exposing a cyclic or dangling graph
-to the unguarded recursion, and again on `gx tickets set --parent`, which re-loads and validates
-under the epic's existing allocation lock so that two concurrent re-parents cannot each validate
-against a stale snapshot and jointly close a cycle.
+It is enforced at `Epic` construction, which never exposes a cyclic or dangling graph to the
+unguarded recursion: the loader quarantines each invalid edge instead of failing the whole load —
+the offending ticket's `parent` is dropped, the reason is recorded on it, and it renders as an error
+so a single bad edge can't make the rest of the tracker unreadable. It is enforced again on `gx
+tickets set --parent`, which rejects rather than quarantines, and re-loads and validates under the
+epic's existing allocation lock so that two concurrent re-parents cannot each validate against a
+stale snapshot and jointly close a cycle. `gx tickets migrate` validates the same way and refuses to
+write a tracker whose parent graph wouldn't survive it.
 
 ## Consequences
 

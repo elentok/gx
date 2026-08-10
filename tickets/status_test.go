@@ -16,9 +16,11 @@ func TestEpic_RenderedStatus_BaseStates(t *testing.T) {
 		{"needs-attention", StatusNeedsAttention},
 		{"needs-triage", StatusError},
 		{"done", StatusDone},
-		{"resolved", StatusDone},
-		{"wontfix", StatusDone},
-		{"closed", StatusDone},
+		{"draft", StatusDraft},
+		{"resolved", StatusError},
+		{"wontfix", StatusError},
+		{"closed", StatusError},
+		{"implemented", StatusError},
 		{"CLAIMED", StatusClaimed},
 		{"bogus-value", StatusError},
 	}
@@ -126,7 +128,7 @@ func TestEpic_UnresolvedBlockers(t *testing.T) {
 func TestEpic_UnresolvedBlockers_NoneWhenAllResolved(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
 		{Number: 1, BlockedBy: []string{"2"}},
-		{Number: 2, Status: "resolved"},
+		{Number: 2, Status: "done"},
 	}}
 	got := epic.UnresolvedBlockers(epic.Tickets[0])
 	if got != nil {

@@ -269,7 +269,8 @@ func checkBodyBeforeOpen(path string) error {
 // scheduler's own claim-time blocker check (ralphloop's claimNext), which is
 // how a mid-flight-fork placeholder can be born already-done with an
 // unverified blocker (see gx-investigate/gotchas.md and
-// tickets/status.go's FullyDone doc comment). Only enforced for tickets
+// tickets/status.go's Epic.Blocking / Epic.UnresolvedBlockers doc
+// comments). Only enforced for tickets
 // living under the tracker's <epic>/issues/<file>.md layout — anything else
 // (ad-hoc files) is left unchecked, since there's no epic to resolve
 // blockers against.
