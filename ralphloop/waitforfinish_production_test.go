@@ -78,7 +78,11 @@ func writeOccupancyTranscript(t *testing.T, cwd, sessionID string, inputTokens i
 // send-keys, read) going out via the real herdr client functions to a fake
 // `herdr` executable reached through PATH (testutil/herdrfake), backed by a
 // deterministic State whose virtual clock is advanced explicitly instead of
-// sleeping three real minutes.
+// sleeping three real minutes. The pane's immediate idle report is corroborated
+// by a compaction boundary appended to the transcript as "/compact" is
+// submitted — a compaction that genuinely completed inside the three virtual
+// minutes already advanced before waitForFinish is called — since an idle
+// report the transcript never backs up is now held by the completion gate.
 func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 	const pane = "pane-1"
 	const smartZone = 100
@@ -103,7 +107,11 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 			promptOrder = append(promptOrder, "/compact")
 			// The submit call observes the compaction starting; by the time
 			// anything queries status again, the (virtual) compaction has
-			// finished, so the completion wait finds it done.
+			// finished, so the completion wait finds it done — and the
+			// transcript corroborates that idle report with a real compaction
+			// boundary, which is what the completion gate requires before the
+			// finish-up prompt may be sent.
+			appendCompactBoundaryLine(t, cwd, sessionID)
 			respond = "working"
 			status = "idle"
 		case strings.Contains(text, "please finish up quickly"):

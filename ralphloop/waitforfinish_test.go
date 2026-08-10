@@ -593,10 +593,11 @@ func TestRecoverSmartZoneBreach_ImmediateSuccessTrustedWhenAlreadyAdvanced(t *te
 
 func TestCompactSignalUnconfirmed(t *testing.T) {
 	p := launchAndPromptParams{Agent: AgentClaude, SessionCwd: "/repo/iter-19"}
+	confirmedBaseline := compactBoundarySnapshot{state: compactBoundaryConfirmed}
 
 	t.Run("poll timeout is unconfirmed", func(t *testing.T) {
 		d := Deps{}
-		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", errors.New("timed out waiting for agent status"), 0, true)
+		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", errors.New("timed out waiting for agent status"), confirmedBaseline)
 		if !unconfirmed {
 			t.Error("unconfirmed = false, want true: a poll timeout must always fall through")
 		}
@@ -604,7 +605,7 @@ func TestCompactSignalUnconfirmed(t *testing.T) {
 
 	t.Run("non-timeout error is confirmed (not re-polled here)", func(t *testing.T) {
 		d := Deps{}
-		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", errors.New("boom"), 0, true)
+		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", errors.New("boom"), confirmedBaseline)
 		if unconfirmed {
 			t.Error("unconfirmed = true, want false: a genuine non-timeout error is handled by the caller, not waitForCompactionSignal")
 		}
@@ -616,7 +617,7 @@ func TestCompactSignalUnconfirmed(t *testing.T) {
 				return 0, true, nil
 			},
 		}
-		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", nil, 0, true)
+		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", nil, confirmedBaseline)
 		if !unconfirmed {
 			t.Error("unconfirmed = false, want true: transcript hasn't advanced past baseline yet")
 		}
@@ -628,31 +629,365 @@ func TestCompactSignalUnconfirmed(t *testing.T) {
 				return 1, true, nil
 			},
 		}
-		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", nil, 0, true)
+		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", nil, confirmedBaseline)
 		if unconfirmed {
 			t.Error("unconfirmed = true, want false: transcript already confirms compaction advanced")
 		}
 	})
 
-	t.Run("success with no baseline is confirmed", func(t *testing.T) {
+	t.Run("success on an unsupported agent is confirmed", func(t *testing.T) {
 		d := Deps{}
-		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", nil, 0, false)
+		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", nil, compactBoundarySnapshot{state: compactBoundaryUnsupported})
 		if unconfirmed {
-			t.Error("unconfirmed = true, want false: no baseline to check against, trust the immediate success")
+			t.Error("unconfirmed = true, want false: no boundary signal exists for this agent, trust the immediate success")
 		}
 	})
 
-	t.Run("success with re-fetch error is confirmed (trusts immediate success)", func(t *testing.T) {
+	t.Run("success with a re-fetch error is unconfirmed", func(t *testing.T) {
 		d := Deps{
 			ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 				return 0, false, errors.New("read failed")
 			},
 		}
-		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", nil, 0, true)
-		if unconfirmed {
-			t.Error("unconfirmed = true, want false: a re-fetch error must not force a fallthrough")
+		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", nil, confirmedBaseline)
+		if !unconfirmed {
+			t.Error("unconfirmed = false, want true: a read that fails now proves nothing about the compaction")
 		}
 	})
+
+	t.Run("success on an unavailable baseline is unconfirmed", func(t *testing.T) {
+		d := Deps{
+			ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
+				return 3, true, nil
+			},
+		}
+		unconfirmed := compactSignalUnconfirmed(d, p, "sess-19", nil, compactBoundarySnapshot{state: compactBoundaryUnavailable})
+		if !unconfirmed {
+			t.Error("unconfirmed = false, want true: with no baseline read, no later count can prove the compaction advanced")
+		}
+	})
+}
+
+func TestReadCompactBoundaries_ClassifiesEachState(t *testing.T) {
+	reads := func(count int, ok bool, err error) func(string, string) (int, bool, error) {
+		return func(string, string) (int, bool, error) { return count, ok, err }
+	}
+	cases := []struct {
+		name      string
+		agent     AgentKind
+		sessionID string
+		read      func(string, string) (int, bool, error)
+		want      compactBoundarySnapshot
+	}{
+		{
+			name:  "Codex has no boundary signal",
+			agent: AgentCodex, sessionID: "sess-19", read: reads(4, true, nil),
+			want: compactBoundarySnapshot{state: compactBoundaryUnsupported},
+		},
+		{
+			name:  "nil read dependency is unsupported",
+			agent: AgentClaude, sessionID: "sess-19", read: nil,
+			want: compactBoundarySnapshot{state: compactBoundaryUnsupported},
+		},
+		{
+			name:  "empty session id is unavailable, not unsupported",
+			agent: AgentClaude, sessionID: "", read: reads(4, true, nil),
+			want: compactBoundarySnapshot{state: compactBoundaryUnavailable},
+		},
+		{
+			name:  "read error is unavailable",
+			agent: AgentClaude, sessionID: "sess-19", read: reads(0, false, errors.New("read failed")),
+			want: compactBoundarySnapshot{state: compactBoundaryUnavailable},
+		},
+		{
+			name:  "transcript that does not exist yet is unavailable",
+			agent: AgentClaude, sessionID: "sess-19", read: reads(0, false, nil),
+			want: compactBoundarySnapshot{state: compactBoundaryUnavailable},
+		},
+		{
+			name:  "a read count is confirmed",
+			agent: AgentClaude, sessionID: "sess-19", read: reads(4, true, nil),
+			want: compactBoundarySnapshot{state: compactBoundaryConfirmed, count: 4},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := readCompactBoundaries(Deps{ReadCompactions: tc.read}, tc.agent, "/repo/iter-19", tc.sessionID)
+			if got != tc.want {
+				t.Errorf("readCompactBoundaries() = %+v, want %+v", got, tc.want)
+			}
+		})
+	}
+}
+
+// gatedBreachParams is the launchAndPromptParams shape the compaction-gate
+// tests below share: a Claude iteration whose events land in scratchDir.
+func gatedBreachParams(scratchDir string) launchAndPromptParams {
+	return launchAndPromptParams{
+		Label:      "iter-19",
+		Agent:      AgentClaude,
+		Pane:       "pane-1",
+		Ticket:     "19",
+		SessionCwd: "/repo/iter-19",
+		ScratchDir: scratchDir,
+		EpicName:   "epic",
+	}
+}
+
+// TestRecoverSmartZoneBreach_GateHoldsWhileBoundaryStaysAtBaseline verifies
+// the live incident from research ticket 15: a pane that reports idle the
+// instant "/compact" is typed, over and over, while the transcript's
+// compaction-boundary count never moves. The finish-up prompt must never go
+// out — sending it there is what cancelled the compaction — and the give-up
+// must be paced by real poll intervals rather than spinning through the
+// extended bound instantly.
+func TestRecoverSmartZoneBreach_GateHoldsWhileBoundaryStaysAtBaseline(t *testing.T) {
+	scratchDir := t.TempDir()
+	var prompts []string
+	var sleeps []time.Duration
+	d := Deps{
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			prompts = append(prompts, opts.Text)
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
+			return 0, true, nil
+		},
+		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+			return "compaction complete", nil
+		},
+		Sleep: func(d time.Duration) { sleeps = append(sleeps, d) },
+	}
+
+	recovered, err := recoverSmartZoneBreach(d, gatedBreachParams(scratchDir), "sess-19", "smart-zone breach", 100)
+	if !errors.Is(err, errCompactNeverConfirmed) {
+		t.Fatalf("recoverSmartZoneBreach error = %v, want one wrapping errCompactNeverConfirmed", err)
+	}
+	if recovered {
+		t.Error("recoverSmartZoneBreach returned recovered=true, want false: the transcript never confirmed the compaction")
+	}
+	if len(prompts) != 1 || prompts[0] != "/compact" {
+		t.Errorf("prompts = %v, want [/compact] only: the finish-up prompt cancels an in-progress compaction", prompts)
+	}
+	// recoverSmartZoneBreach hands the wait its first tick already spent, so
+	// the gated loop pays for every remaining tick up to the extended bound.
+	wantSleeps := smartZoneCompactExtendedTimeoutMs/smartZonePollMs - 1
+	if len(sleeps) != wantSleeps {
+		t.Errorf("gated sleeps = %d, want %d (one poll interval per gated tick)", len(sleeps), wantSleeps)
+	}
+	for i, s := range sleeps {
+		if s != smartZonePollMs*time.Millisecond {
+			t.Fatalf("sleep %d = %s, want %s", i, s, smartZonePollMs*time.Millisecond)
+		}
+	}
+}
+
+// TestRecoverSmartZoneBreach_GateReleasesOnceBoundaryAdvances is the other
+// half: the same premature-idle pane, but with a compaction that genuinely
+// lands part-way through. Recovery must resume the moment the boundary count
+// moves and send the finish-up prompt then, not before and not never.
+func TestRecoverSmartZoneBreach_GateReleasesOnceBoundaryAdvances(t *testing.T) {
+	scratchDir := t.TempDir()
+	var prompts []string
+	var sleeps []time.Duration
+	var waits int
+	compactionCount := 0
+	d := Deps{
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			prompts = append(prompts, opts.Text)
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			waits++
+			if waits == 3 {
+				compactionCount = 1
+			}
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
+			return compactionCount, true, nil
+		},
+		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+			return "compaction complete", nil
+		},
+		Sleep: func(d time.Duration) { sleeps = append(sleeps, d) },
+	}
+
+	recovered, err := recoverSmartZoneBreach(d, gatedBreachParams(scratchDir), "sess-19", "smart-zone breach", 100)
+	if err != nil {
+		t.Fatalf("recoverSmartZoneBreach: %v", err)
+	}
+	if !recovered {
+		t.Fatal("recoverSmartZoneBreach returned recovered=false, want true once the boundary count advances")
+	}
+	if len(prompts) != 2 || prompts[0] != "/compact" {
+		t.Errorf("prompts = %v, want [/compact, finish-up]", prompts)
+	}
+	if len(sleeps) != 2 {
+		t.Errorf("gated sleeps = %d, want 2 (the two ticks the transcript held the gate)", len(sleeps))
+	}
+}
+
+// TestRecoverSmartZoneBreach_TimeoutPathIsNotDoublePaced pins the pacing
+// asymmetry: a pane wait that times out has already consumed its poll interval
+// inside AgentWait, so the gate must not sleep for it too. Sleeping on both
+// branches would double every tick and stretch the extended bound to twenty
+// minutes of wall clock.
+func TestRecoverSmartZoneBreach_TimeoutPathIsNotDoublePaced(t *testing.T) {
+	scratchDir := t.TempDir()
+	var sleeps []time.Duration
+	var waits int
+	d := Deps{
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			return herdr.Agent{}, errors.New("timed out waiting for agent status")
+		},
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			waits++
+			return herdr.Agent{}, errors.New("timed out waiting for agent status")
+		},
+		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
+			return 0, true, nil
+		},
+		Sleep: func(d time.Duration) { sleeps = append(sleeps, d) },
+	}
+
+	recovered, err := recoverSmartZoneBreach(d, gatedBreachParams(scratchDir), "sess-19", "smart-zone breach", 100)
+	if err != nil {
+		t.Fatalf("recoverSmartZoneBreach: %v", err)
+	}
+	if recovered {
+		t.Fatal("recoverSmartZoneBreach returned recovered=true, want false: neither signal ever confirmed completion")
+	}
+	if len(sleeps) != 0 {
+		t.Errorf("sleeps = %v, want none: the pane wait itself consumed each tick", sleeps)
+	}
+	wantWaits := smartZoneCompactExtendedTimeoutMs/smartZonePollMs - 1
+	if waits != wantWaits {
+		t.Errorf("AgentWait calls = %d, want %d (the extended bound reached in ten minutes of ticks, not twenty)", waits, wantWaits)
+	}
+}
+
+// TestRecoverSmartZoneBreach_UnsupportedFailsOpenButUnavailableDoesNot covers
+// the two states that fail open versus closed on the same underlying
+// (0, false, nil) read: a build with no ReadCompactions dependency has no
+// boundary signal at all and must behave exactly as it did before the gate,
+// while a Claude session whose id isn't known yet is merely unavailable and
+// must not be trusted on the pane's word.
+func TestRecoverSmartZoneBreach_UnsupportedFailsOpenButUnavailableDoesNot(t *testing.T) {
+	newDeps := func(prompts *[]string, readCompactions func(string, string) (int, bool, error)) Deps {
+		return Deps{
+			AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+				*prompts = append(*prompts, opts.Text)
+				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+			},
+			AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+			},
+			ReadCompactions: readCompactions,
+			AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+				return "compaction complete", nil
+			},
+			Sleep: func(time.Duration) {},
+		}
+	}
+
+	t.Run("no boundary signal at all trusts the idle pane", func(t *testing.T) {
+		var prompts []string
+		recovered, err := recoverSmartZoneBreach(newDeps(&prompts, nil), gatedBreachParams(t.TempDir()), "sess-19", "smart-zone breach", 100)
+		if err != nil {
+			t.Fatalf("recoverSmartZoneBreach: %v", err)
+		}
+		if !recovered || len(prompts) != 2 {
+			t.Errorf("recovered = %v, prompts = %v; want the pre-gate behavior: recovered with a finish-up prompt", recovered, prompts)
+		}
+	})
+
+	t.Run("unidentified session holds the gate closed", func(t *testing.T) {
+		var prompts []string
+		d := newDeps(&prompts, func(string, string) (int, bool, error) { return 0, true, nil })
+		recovered, err := recoverSmartZoneBreach(d, gatedBreachParams(t.TempDir()), "", "smart-zone breach", 100)
+		if !errors.Is(err, errCompactNeverConfirmed) {
+			t.Fatalf("recoverSmartZoneBreach error = %v, want one wrapping errCompactNeverConfirmed", err)
+		}
+		if recovered || len(prompts) != 1 {
+			t.Errorf("recovered = %v, prompts = %v; want no finish-up prompt: an empty session id is unavailable, not unsupported", recovered, prompts)
+		}
+	})
+}
+
+// TestWaitForFinish_AbsorbsGatedGiveUpAndKeepsPolling verifies the call site:
+// a gated give-up is a failed recovery, not a failed iteration, so
+// waitForFinish swallows that one error and returns to polling. Any other
+// error around the breach path still aborts the iteration.
+func TestWaitForFinish_AbsorbsGatedGiveUpAndKeepsPolling(t *testing.T) {
+	var prompts []string
+	var waits int
+	d := Deps{
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			// The compact-completion polls are the ones waiting on "blocked"
+			// too (see compactStates): those report the premature idle the gate
+			// exists to distrust.
+			if slices.Contains(opts.Until, "blocked") {
+				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+			}
+			waits++
+			if waits == 1 {
+				return herdr.Agent{}, errors.New("timed out waiting for agent status")
+			}
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			prompts = append(prompts, opts.Text)
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentSendKeys:   func(string, ...string) error { return nil },
+		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
+		ReadCompactions: func(cwd, sessionID string) (int, bool, error) { return 0, true, nil },
+		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+			return "compaction complete", nil
+		},
+		Sleep: func(time.Duration) {},
+	}
+
+	err := waitForFinish(d, launchAndPromptParams{
+		Label: "iter-19", Agent: AgentClaude, Pane: "pane-1", Ticket: "19",
+		SessionCwd: "/repo/iter-19", SmartZone: 100, Gate: NewGate(),
+	}, "sess-19")
+	if err != nil {
+		t.Fatalf("waitForFinish: %v, want the gated give-up absorbed", err)
+	}
+	if len(prompts) != 1 || prompts[0] != "/compact" {
+		t.Errorf("prompts = %v, want [/compact] only: no finish-up prompt may be sent on a gated give-up", prompts)
+	}
+}
+
+func TestWaitForFinish_PropagatesNonGatedRecoveryErrors(t *testing.T) {
+	var waits int
+	d := Deps{
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			waits++
+			if waits == 1 {
+				return herdr.Agent{}, errors.New("timed out waiting for agent status")
+			}
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentSendKeys:   func(string, ...string) error { return errors.New("pane is gone") },
+		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
+		ReadCompactions: func(cwd, sessionID string) (int, bool, error) { return 0, true, nil },
+		Sleep:           func(time.Duration) {},
+	}
+
+	err := waitForFinish(d, launchAndPromptParams{
+		Label: "iter-19", Agent: AgentClaude, Pane: "pane-1", Ticket: "19",
+		SessionCwd: "/repo/iter-19", SmartZone: 100, Gate: NewGate(),
+	}, "sess-19")
+	if err == nil || !strings.Contains(err.Error(), "pane is gone") {
+		t.Fatalf("waitForFinish error = %v, want the transport failure propagated, not absorbed", err)
+	}
 }
 
 func TestConfirmCompactSubmitted(t *testing.T) {
