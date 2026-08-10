@@ -356,7 +356,7 @@ func TestRun_NeedsAttentionWithoutLiveTab_SchedulesOtherTicketsThenParks(t *test
 	if len(*prompts) != 1 {
 		t.Errorf("prompts = %v, want ticket 02 run before the park", *prompts)
 	}
-	if len(sink.parkedStalled) != 1 || len(sink.parkedStalled[0]) != 1 || sink.parkedStalled[0][0] != "01" {
+	if len(sink.parkedStalled) != 1 || len(sink.parkedStalled[0]) != 1 || sink.parkedStalled[0][0].Identifier != "01" {
 		t.Errorf("EpicParked calls = %v, want one naming ticket 01", sink.parkedStalled)
 	}
 	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "02-open.md"))

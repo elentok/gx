@@ -43,6 +43,16 @@ const (
 	PauseNeedsAttention PauseKind = "needs-attention"
 )
 
+// StalledTicket names one human-clearable ticket a parked epic is waiting
+// on. Reattachable reports whether its prior iteration still has a live,
+// owned herdr tab/agent (see resumeReattachable) — the epic-parked half of
+// distinguishing a park a human clears by editing status alone from one a
+// live run can also self-heal from once cleared.
+type StalledTicket struct {
+	Identifier   string
+	Reattachable bool
+}
+
 // EventSink receives every orchestrator-lifecycle event a `gx ralph-loop`
 // invocation produces, so the headless CLI and the TUI (tickets 03-06) can
 // each render the same underlying event stream their own way instead of the
@@ -158,7 +168,7 @@ type EventSink interface {
 	// tickets (identifiers, in file order). Unlike EpicComplete this is not
 	// the end of the run: the run keeps polling and carries on by itself once
 	// a status clears.
-	EpicParked(epicName string, stalled []string)
+	EpicParked(epicName string, stalled []StalledTicket)
 	// EpicComplete reports that every ticket in epicName is done, with
 	// completed tickets landed by this Run call, after elapsedSeconds of
 	// total wall-clock run time.
@@ -193,7 +203,7 @@ func (noopEventSink) TicketCleanupFinished(identifier string)                   
 func (noopEventSink) TicketRecovering(identifier string)                              {}
 func (noopEventSink) TicketRecovered(identifier, epicName, branch, landedSHA string)  {}
 func (noopEventSink) TicketUnrecoverable(identifier, epicName string)                 {}
-func (noopEventSink) EpicParked(epicName string, stalled []string)                    {}
+func (noopEventSink) EpicParked(epicName string, stalled []StalledTicket)             {}
 func (noopEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {}
 
 // textEventSink implements EventSink by rendering each event as the same
@@ -303,8 +313,12 @@ func (s *textEventSink) TicketUnrecoverable(identifier, epicName string) {
 	s.printf("ticket %s: done but commits missing from %s and no iteration branch left to recover them; marked needs-attention\n", identifier, epicName)
 }
 
-func (s *textEventSink) EpicParked(epicName string, stalled []string) {
-	s.printf("ralph-loop %q parked: nothing runnable left; waiting on %s\n", epicName, strings.Join(stalled, ", "))
+func (s *textEventSink) EpicParked(epicName string, stalled []StalledTicket) {
+	identifiers := make([]string, len(stalled))
+	for i, t := range stalled {
+		identifiers[i] = t.Identifier
+	}
+	s.printf("ralph-loop %q parked: nothing runnable left; waiting on %s\n", epicName, strings.Join(identifiers, ", "))
 }
 
 func (s *textEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {

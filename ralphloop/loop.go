@@ -484,13 +484,30 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 				return fmt.Errorf("epic %q is deadlocked: no runnable tickets left, none done, and none a human could clear; check for a dependency cycle or a bad status", opts.EpicName)
 			}
 			if !parked {
-				sink.EpicParked(opts.EpicName, stalled)
+				stalledForSink := make([]StalledTicket, len(stalled))
+				for i, t := range stalled {
+					stalledForSink[i] = StalledTicket{
+						Identifier:   t.Identifier,
+						Reattachable: everLaunched[t.Identifier] && resumeReattachable(d, workspaceID, opts.EpicName, agent, wtDir, t),
+					}
+				}
+				sink.EpicParked(opts.EpicName, stalledForSink)
 				parked = true
 			}
 			// No timeout: the notification has already fired, and the park
 			// ends when a human clears one of the stalled tickets, which the
-			// next pass picks up off disk.
-			d.Sleep(parkPollInterval)
+			// next pass picks up off disk. gate.WakeParked() lets an operator
+			// cut the wait short cosmetically without touching this call's
+			// signature/duration, which several tests key off exactly.
+			sleepDone := make(chan struct{})
+			go func() {
+				d.Sleep(parkPollInterval)
+				close(sleepDone)
+			}()
+			select {
+			case <-sleepDone:
+			case <-gate.ParkWake():
+			}
 			parkPolls++
 			if d.maxParkPolls > 0 && parkPolls >= d.maxParkPolls {
 				break
@@ -631,14 +648,13 @@ func isHumanClearable(e tickets.Epic, t tickets.Ticket) bool {
 	return strings.EqualFold(strings.TrimSpace(t.Status), draftStatus)
 }
 
-// stalledTickets lists the identifiers of every in-scope, human-clearable
-// ticket in e, in file order — what a park notification names as the thing
-// waiting on a person.
-func stalledTickets(e tickets.Epic, scope RunScope) []string {
-	var stalled []string
+// stalledTickets lists every in-scope, human-clearable ticket in e, in file
+// order — what a park notification names as the thing waiting on a person.
+func stalledTickets(e tickets.Epic, scope RunScope) []tickets.Ticket {
+	var stalled []tickets.Ticket
 	for _, t := range e.Tickets {
 		if scope.Contains(t, e) && isHumanClearable(e, t) {
-			stalled = append(stalled, t.Identifier)
+			stalled = append(stalled, t)
 		}
 	}
 	return stalled

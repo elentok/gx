@@ -71,7 +71,7 @@ func TestRun_StalledTicket_ParksInsteadOfExiting(t *testing.T) {
 	if *sleeps == 0 {
 		t.Errorf("run never parked (no park poll), want it to park on the needs-info ticket")
 	}
-	if len(sink.parkedStalled) != 1 || len(sink.parkedStalled[0]) != 1 || sink.parkedStalled[0][0] != "01" {
+	if len(sink.parkedStalled) != 1 || len(sink.parkedStalled[0]) != 1 || sink.parkedStalled[0][0].Identifier != "01" {
 		t.Errorf("EpicParked calls = %v, want one naming ticket 01", sink.parkedStalled)
 	}
 	if len(*prompts) != 1 {
@@ -101,7 +101,7 @@ func TestRun_DraftOnlyEpic_Parks(t *testing.T) {
 	if *sleeps == 0 {
 		t.Errorf("run never parked (no park poll), want it to park on the draft ticket")
 	}
-	if len(sink.parkedStalled) != 1 || len(sink.parkedStalled[0]) != 1 || sink.parkedStalled[0][0] != "01" {
+	if len(sink.parkedStalled) != 1 || len(sink.parkedStalled[0]) != 1 || sink.parkedStalled[0][0].Identifier != "01" {
 		t.Errorf("EpicParked calls = %v, want one naming ticket 01", sink.parkedStalled)
 	}
 	if len(*prompts) != 1 {
@@ -165,7 +165,7 @@ func TestRun_StalledIteration_RegistryClearedAndRelaunched(t *testing.T) {
 	if got.Status != schema.StatusDone {
 		t.Errorf("final Status = %q, want done", got.Status)
 	}
-	if len(sink.parkedStalled) != 1 || len(sink.parkedStalled[0]) != 1 || sink.parkedStalled[0][0] != "01" {
+	if len(sink.parkedStalled) != 1 || len(sink.parkedStalled[0]) != 1 || sink.parkedStalled[0][0].Identifier != "01" {
 		t.Errorf("EpicParked calls = %v, want one naming ticket 01", sink.parkedStalled)
 	}
 }
@@ -248,7 +248,7 @@ func TestRun_ClearedNeedsAttentionWithLiveIteration_ReattachesInsteadOfDoubleLau
 	if len(*removed) != 1 {
 		t.Errorf("removed worktree branches = %v, want exactly one removal", *removed)
 	}
-	if len(sink.parkedStalled) != 1 || len(sink.parkedStalled[0]) != 1 || sink.parkedStalled[0][0] != "01" {
+	if len(sink.parkedStalled) != 1 || len(sink.parkedStalled[0]) != 1 || sink.parkedStalled[0][0].Identifier != "01" {
 		t.Errorf("EpicParked calls = %v, want one naming ticket 01", sink.parkedStalled)
 	}
 }
@@ -270,5 +270,41 @@ func TestRun_NothingRunnableAndNothingClearable_Deadlocks(t *testing.T) {
 	}
 	if len(sink.parkedStalled) != 0 {
 		t.Errorf("EpicParked calls = %v, want none for a deadlocked epic", sink.parkedStalled)
+	}
+}
+
+// TestGate_WakeParked_ShortensParkWait proves the cosmetic-wake mechanism
+// loop.go's park branch relies on: WakeParked cuts a park wait short instead
+// of it running out a long parkPollInterval-equivalent wait. The background
+// timer goroutine deliberately outlives this test (see loop.go's park
+// branch, which accepts the same leak in production) rather than racing a
+// t.Fatalf call against the wake from another goroutine.
+func TestGate_WakeParked_ShortensParkWait(t *testing.T) {
+	gate := NewGate()
+	waiting := make(chan struct{})
+	woke := make(chan struct{})
+
+	go func() {
+		sleepDone := make(chan struct{})
+		go func() {
+			time.Sleep(time.Hour)
+			close(sleepDone)
+		}()
+		parkWake := gate.ParkWake()
+		close(waiting)
+		select {
+		case <-sleepDone:
+		case <-parkWake:
+		}
+		close(woke)
+	}()
+
+	<-waiting
+	gate.WakeParked()
+
+	select {
+	case <-woke:
+	case <-time.After(5 * time.Second):
+		t.Fatal("WakeParked() did not interrupt an in-progress park wait")
 	}
 }

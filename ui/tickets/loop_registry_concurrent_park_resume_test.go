@@ -79,7 +79,6 @@ func fakeParkResumeDeps() ralphloop.Deps {
 		InstallDeps:          func(path string) (string, error) { return "", nil },
 		AgentSendKeys:        func(target string, keys ...string) error { return nil },
 		ReadOccupancy:        func(cwd, sessionID string) (int, bool, error) { return 0, false, nil },
-		ResumeSignaled:       func(path string) (bool, error) { return true, nil },
 		Sleep:                func(time.Duration) {},
 		Now:                  time.Now,
 	}

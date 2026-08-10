@@ -30,7 +30,7 @@ type recordingSink struct {
 	// parkedStalled records the stalled-ticket list of every EpicParked
 	// call, so a test can assert both how many times a run parked and what
 	// it named as blocking each park.
-	parkedStalled [][]string
+	parkedStalled [][]StalledTicket
 	// ticketNeedsInfoCalls records every TicketNeedsInfo call's
 	// (identifier, epicName) pair, for asserting both the count and the
 	// identity a needs-info transition reports.
@@ -106,7 +106,7 @@ func (s *recordingSink) TicketRecovered(identifier, epicName, branch, landedSHA 
 func (s *recordingSink) TicketUnrecoverable(identifier, epicName string) {
 	s.record("TicketUnrecoverable")
 }
-func (s *recordingSink) EpicParked(epicName string, stalled []string) {
+func (s *recordingSink) EpicParked(epicName string, stalled []StalledTicket) {
 	s.mu.Lock()
 	s.parkedStalled = append(s.parkedStalled, stalled)
 	s.mu.Unlock()

@@ -93,9 +93,13 @@ func (s *slackEventSink) TicketNeedsInfo(identifier, epicName string) {
 	s.send(slackStyle.ticketNeedsInfoText(identifier, epicName), notifyKindTicketNeedsInfo)
 }
 
-func (s *slackEventSink) EpicParked(epicName string, stalled []string) {
+func (s *slackEventSink) EpicParked(epicName string, stalled []StalledTicket) {
 	s.EventSink.EpicParked(epicName, stalled)
-	s.send(slackStyle.epicParkedText(epicName, stalled), notifyKindEpicParked)
+	identifiers := make([]string, len(stalled))
+	for i, t := range stalled {
+		identifiers[i] = t.Identifier
+	}
+	s.send(slackStyle.epicParkedText(epicName, identifiers), notifyKindEpicParked)
 }
 
 func (s *slackEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {

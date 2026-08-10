@@ -115,9 +115,13 @@ func (s *telegramEventSink) TicketNeedsInfo(identifier, epicName string) {
 	s.send(telegramStyle.ticketNeedsInfoText(identifier, epicName), notifyKindTicketNeedsInfo)
 }
 
-func (s *telegramEventSink) EpicParked(epicName string, stalled []string) {
+func (s *telegramEventSink) EpicParked(epicName string, stalled []StalledTicket) {
 	s.EventSink.EpicParked(epicName, stalled)
-	s.send(telegramStyle.epicParkedText(epicName, stalled), notifyKindEpicParked)
+	identifiers := make([]string, len(stalled))
+	for i, t := range stalled {
+		identifiers[i] = t.Identifier
+	}
+	s.send(telegramStyle.epicParkedText(epicName, identifiers), notifyKindEpicParked)
 }
 
 func (s *telegramEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {

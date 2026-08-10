@@ -70,7 +70,7 @@ type LiveEvent struct {
 	ElapsedSeconds int
 	// Stalled (EpicParked only) names the human-clearable tickets the parked
 	// run is waiting on.
-	Stalled []string
+	Stalled []StalledTicket
 }
 
 // ChannelEventSink implements EventSink by forwarding every call as a
@@ -170,7 +170,7 @@ func (s *ChannelEventSink) TicketUnrecoverable(identifier, epicName string) {
 	s.emit(LiveEvent{Kind: LiveEventTicketUnrecoverable, Identifier: identifier, EpicName: epicName})
 }
 
-func (s *ChannelEventSink) EpicParked(epicName string, stalled []string) {
+func (s *ChannelEventSink) EpicParked(epicName string, stalled []StalledTicket) {
 	s.emit(LiveEvent{Kind: LiveEventEpicParked, EpicName: epicName, Stalled: stalled})
 }
 
