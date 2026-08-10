@@ -141,6 +141,60 @@ func TestLoad_DanglingParentIsNeverExposed(t *testing.T) {
 	}
 }
 
+func TestForkParents_ResolvesTokenRegardlessOfPadding(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{
+		ticketWithParent(4, "04", ""),
+		ticketWithParent(4, "04a", "4"),
+		ticketWithParent(4, "04b", "04"),
+		ticketWithParent(4, "04a1", "04A"),
+	}}
+	parents := epic.ForkParents()
+
+	for _, tc := range []struct {
+		child string
+		want  string
+	}{
+		{child: "04a", want: "04"},
+		{child: "04b", want: "04"},
+		{child: "04a1", want: "04a"},
+	} {
+		child := epic.Tickets[indexOfIdentifier(t, epic, tc.child)]
+		parent, ok := parents.Of(child)
+		if !ok {
+			t.Fatalf("ForkParents().Of(%s) reported no parent, want %s", tc.child, tc.want)
+		}
+		if parent.Identifier != tc.want {
+			t.Errorf("ForkParents().Of(%s) = %s, want %s", tc.child, parent.Identifier, tc.want)
+		}
+	}
+}
+
+func TestForkParents_AbsentForRootAndUnknownToken(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{
+		ticketWithParent(1, "01", ""),
+		ticketWithParent(2, "02", "09"),
+	}}
+	parents := epic.ForkParents()
+
+	if _, ok := parents.Of(epic.Tickets[0]); ok {
+		t.Error("ForkParents().Of(01) reported a parent for a ticket with no parent token")
+	}
+	if _, ok := parents.Of(epic.Tickets[1]); ok {
+		t.Error("ForkParents().Of(02) reported a parent for a token naming no sibling")
+	}
+}
+
+func indexOfIdentifier(t *testing.T, epic Epic, identifier string) int {
+	t.Helper()
+	for i, ticket := range epic.Tickets {
+		if ticket.Identifier == identifier {
+			return i
+		}
+	}
+	t.Fatalf("no ticket %s in fixture", identifier)
+	return -1
+}
+
 func TestQuarantineInvalidParents_BreaksCycle(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
 		ticketWithParent(1, "01", "02"),

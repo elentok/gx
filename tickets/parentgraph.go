@@ -5,6 +5,36 @@ import (
 	"fmt"
 )
 
+// ForkParents is an epic's canonical fork-parent lookup: the one way to walk
+// from a ticket to the ticket its `parent` names. Building it once and reusing
+// it is what keeps a caller that resolves many tickets (the tickets UI's
+// auto-queueing of forks) from rescanning the epic per ticket.
+//
+// Resolution goes through the same sibling-key index every other parent and
+// blocked-by resolver uses (see byNumberAndSuffix), so a token's zero-padding
+// and letter case never change which ticket it finds — only its spelling.
+type ForkParents struct {
+	bySibling map[string]Ticket
+}
+
+// ForkParents builds e's fork-parent lookup.
+func (e Epic) ForkParents() ForkParents {
+	return ForkParents{bySibling: e.byNumberAndSuffix()}
+}
+
+// Of returns the ticket t's Parent names, or ok=false when t has no parent or
+// its token names no ticket in the epic. A loaded epic never carries the
+// latter — quarantineInvalidParents drops dangling edges — so it only shows up
+// for hand-built Epic values.
+func (p ForkParents) Of(t Ticket) (parent Ticket, ok bool) {
+	if t.Parent == nil {
+		return Ticket{}, false
+	}
+	num, letters := splitBlockedByToken(*t.Parent)
+	parent, ok = p.bySibling[siblingKey(num, letters)]
+	return parent, ok
+}
+
 // ValidateParentGraph checks every Parent edge in e at once: each Parent must
 // name a ticket that exists in the epic, and following Parent hops from any
 // ticket must terminate rather than loop back onto a ticket already on the
@@ -57,19 +87,18 @@ func (e *Epic) quarantineInvalidParents() {
 // closes on a different one, so quarantining the reported set breaks the cycle
 // outright rather than leaving a shorter one behind.
 func (e Epic) invalidParentEdges() map[string]error {
-	index := e.byNumberAndSuffix()
+	parents := e.ForkParents()
 	bad := map[string]error{}
 	for _, start := range e.Tickets {
 		walked := map[string]bool{ticketKey(start): true}
 		current := start
 		for current.Parent != nil {
-			num, letters := splitBlockedByToken(*current.Parent)
-			key := siblingKey(num, letters)
-			parent, ok := index[key]
+			parent, ok := parents.Of(current)
 			if !ok {
 				bad[ticketKey(current)] = fmt.Errorf("ticket %s: parent %q names no ticket in this epic", current.DisplayNumber(), *current.Parent)
 				break
 			}
+			key := ticketKey(parent)
 			if walked[key] {
 				bad[ticketKey(current)] = fmt.Errorf("ticket %s: parent %q closes a cycle in the parent graph", current.DisplayNumber(), *current.Parent)
 				break

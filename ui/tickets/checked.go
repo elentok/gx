@@ -223,11 +223,12 @@ func applyForkedChildren(oldEpics, newEpics []tickets.Epic, isMember func(string
 
 	var childPaths []string
 	for _, epic := range newEpics {
+		parents := epic.ForkParents()
 		for _, nt := range epic.Tickets {
-			if nt.Parent == nil || oldPaths[nt.Path] {
+			if oldPaths[nt.Path] {
 				continue
 			}
-			parent, ok := findTicketByIdentifier(epic, *nt.Parent)
+			parent, ok := parents.Of(nt)
 			if !ok || !oldPaths[parent.Path] || !isMember(parent.Path) {
 				continue
 			}
@@ -235,17 +236,6 @@ func applyForkedChildren(oldEpics, newEpics []tickets.Epic, isMember func(string
 		}
 	}
 	return setMember(childPaths, true)
-}
-
-// findTicketByIdentifier looks up a ticket within epic by its Identifier
-// (e.g. "06a"), used to resolve a newly-observed fork ID to its ticket.Path.
-func findTicketByIdentifier(epic tickets.Epic, identifier string) (tickets.Ticket, bool) {
-	for _, t := range epic.Tickets {
-		if t.Identifier == identifier {
-			return t, true
-		}
-	}
-	return tickets.Ticket{}, false
 }
 
 // epicChecked reports whether every non-done ticket in epic is currently

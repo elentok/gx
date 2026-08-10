@@ -361,6 +361,47 @@ func TestModel_MidRunForkAutoChecksNewChild(t *testing.T) {
 	}
 }
 
+// A hand-written `parent` token may skip the zero padding the CLI always
+// writes; it resolves the same way everywhere else in the tracker, so it must
+// auto-check here too.
+func TestModel_MidRunForkWithUnpaddedParentTokenAutoChecksNewChild(t *testing.T) {
+	root := t.TempDir()
+	writeFrontmatterTicket(t, root, "my-epic", "01-first-ticket.md", "01", "claimed", "")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	ticket := m.epics[0].Tickets[0]
+
+	updated, _ = m.Update(spacePress())
+	m = updated.(Model)
+	if !m.isChecked(ticket.Path) {
+		t.Fatalf("expected ticket checked before simulating the fork")
+	}
+
+	writeFrontmatterTicket(t, root, "my-epic", "01a-first-ticket-cont.md", "01a", "open", "1")
+
+	m = deliverLoad(t, m)
+
+	var child tickets.Ticket
+	found := false
+	for _, tk := range m.epics[0].Tickets {
+		if tk.Identifier == "01a" {
+			child, found = tk, true
+		}
+	}
+	if !found {
+		t.Fatalf("expected forked child ticket 01a to be loaded")
+	}
+	if !m.isChecked(child.Path) {
+		t.Fatalf("expected forked child with an unpadded parent token auto-checked")
+	}
+}
+
 func TestModel_ForkOnUncheckedTicketDoesNotAutoCheckChild(t *testing.T) {
 	root := t.TempDir()
 	writeFrontmatterTicket(t, root, "my-epic", "01-first-ticket.md", "01", "claimed", "")
