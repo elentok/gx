@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.27.7 - 2026-08-10
+
+- Fixed smart-zone recovery cancelling the very compaction it asked for. gx interrupted the agent, sent `/compact`, and then sent the finish-up prompt as soon as the pane reported idle — but Claude Code reports idle while it is still compacting, and the queued prompt text cancelled the compaction. The context never shrank, so the next poll saw the same over-budget number and did the whole thing again. The finish-up prompt is now withheld until a compaction boundary in the agent's transcript proves the compaction actually completed. Codex, which has no such signal, is unaffected and behaves exactly as before.
+- A compaction that is never confirmed no longer retries forever: after two consecutive unconfirmed recoveries in one iteration gx stops touching the pane and routes the ticket to `needs-attention` with the reason recorded, rather than falling back to sending the finish-up prompt anyway.
+- Fixed a spurious second smart-zone breach immediately after a successful compaction. Occupancy stays at its pre-compaction value until the agent next speaks, and gx was breaching on that stale number and interrupting the finish-up work it had just asked for. The breach check now declines to fire on an occupancy reading known to predate the newest compaction, while `gx agent` and the TUI keep showing the last known number and landed tickets keep recording their actual context window.
+- The run log now distinguishes the three ways a compaction wait can end — the pane confirmed it, the transcript gate released it, or the wait expired — instead of labelling the gated route as a timeout.
+
 ## v0.27.6 - 2026-08-10
 
 - **Breaking:** the `children` frontmatter field is gone. A fork's only structural edge is `parent`, written on the descendant at creation; children are derived from it. A ticket file still carrying `children` is now rejected by the loader rather than silently ignored.
