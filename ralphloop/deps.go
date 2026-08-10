@@ -114,6 +114,12 @@ type Deps struct {
 	// session launched in cwd hit, or ok=false if its transcript can't be
 	// found yet.
 	ReadCompactions func(cwd, sessionID string) (count int, ok bool, err error)
+	// ReadCompactionsAfter returns how many of those boundaries were written
+	// strictly after since. The compact-completion gate needs this whenever it
+	// has no trustworthy pre-"/compact" count to compare against: a total count
+	// read after the boundary landed already includes it, so no comparison
+	// against it can prove the compaction happened (see stickyBaseline).
+	ReadCompactionsAfter func(cwd, sessionID string, since time.Time) (count int, ok bool, err error)
 	// ReadCodexContext returns the latest context-token count for the Codex
 	// session launched in cwd, or ok=false until its local session data is
 	// complete enough to identify that worktree and session.
@@ -175,6 +181,7 @@ func DefaultDeps() Deps {
 		ReadOccupancy:         transcript.LastAssistantOccupancy,
 		ReadOccupancyReading:  transcript.ReadSessionOccupancy,
 		ReadCompactions:       transcript.Compactions,
+		ReadCompactionsAfter:  transcript.CompactionsAfter,
 		ReadCodexContext:      codexsession.LastContextTokens,
 		ReadCodexRateLimit:    codexsession.LastRateLimit,
 		ReadPaneRecent:        defaultReadPaneRecent,

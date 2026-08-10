@@ -342,10 +342,34 @@ func CountCompactions(lines []Line) int {
 	return n
 }
 
+// CountCompactionsAfter counts the compaction-boundary markers in lines that
+// were written strictly after since. It answers "has a compaction landed since
+// I asked for one" for a caller that has no trustworthy count from before the
+// ask — a question a total count can't answer, because a count read after the
+// boundary already includes it and is indistinguishable from one read before.
+func CountCompactionsAfter(lines []Line, since time.Time) int {
+	n := 0
+	for _, l := range lines {
+		if l.IsCompactBoundary() && l.Timestamp.After(since) {
+			n++
+		}
+	}
+	return n
+}
+
 // Compactions is a convenience wrapper combining Path, ReadAll, and
 // CountCompactions: it returns how many compaction boundaries the session
 // launched in cwd hit, or ok=false if its transcript can't be found yet.
 func Compactions(cwd, sessionID string) (count int, ok bool, err error) {
+	return compactions(cwd, sessionID, func(lines []Line) int { return CountCompactions(lines) })
+}
+
+// CompactionsAfter is CountCompactionsAfter's equivalent of Compactions.
+func CompactionsAfter(cwd, sessionID string, since time.Time) (count int, ok bool, err error) {
+	return compactions(cwd, sessionID, func(lines []Line) int { return CountCompactionsAfter(lines, since) })
+}
+
+func compactions(cwd, sessionID string, count func([]Line) int) (int, bool, error) {
 	path, err := Path(cwd, sessionID)
 	if err != nil {
 		return 0, false, err
@@ -354,5 +378,5 @@ func Compactions(cwd, sessionID string) (count int, ok bool, err error) {
 	if err != nil || !ok {
 		return 0, ok, err
 	}
-	return CountCompactions(lines), true, nil
+	return count(lines), true, nil
 }

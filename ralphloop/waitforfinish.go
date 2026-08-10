@@ -362,7 +362,7 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 	p.sink().SmartZoneCompactStarted(p.Ticket)
 	p.logAgentEvent(eventPausedSmartZone, sessionID, reason)
 
-	baseline := &stickyBaseline{snapshot: readCompactBoundaries(d, p.Agent, p.SessionCwd, sessionID)}
+	baseline := newStickyBaseline(d, p, sessionID)
 
 	compactStates := append(append([]string{}, plainFinishStates...), "blocked")
 	agent, err := d.AgentPrompt(herdr.AgentPromptOptions{
@@ -373,7 +373,7 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 		TimeoutMs: smartZonePollMs,
 	})
 	completion := compactPaneConfirmed
-	if unconfirmed, gateHeld := compactSignalUnconfirmed(d, p, sessionID, err, baseline.snapshot); unconfirmed {
+	if unconfirmed, gateHeld := compactSignalUnconfirmed(d, p, sessionID, err, baseline); unconfirmed {
 		agent, completion, err = waitForCompactionSignal(d, p, sessionID, compactStates, smartZonePollMs, baseline, gateHeld)
 	}
 	// "blocked" is Codex's compact-confirmation state, and Codex is exactly the
@@ -505,38 +505,40 @@ func (s compactBoundarySnapshot) advancedPast(d Deps, p launchAndPromptParams, s
 	return now.state == compactBoundaryConfirmed && now.count > s.count
 }
 
-// stickyBaseline carries the compaction-boundary snapshot taken just before
-// "/compact" was submitted, plus the single retry the gate allows itself when
-// that first read came back unavailable. Without the retry, one transient
-// transcript read failure disables the gate for the whole recovery and
-// behavior silently reverts to the premature-finish-up bug the gate exists to
-// prevent.
+// stickyBaseline carries what the compact-completion gate knows from before
+// "/compact" was submitted: the boundary snapshot taken then, and the instant
+// it was taken. It is never rebased mid-recovery. The gate's count predicate is
+// "count is greater than baseline", so a baseline adopted after the compaction
+// boundary has already landed is permanently greater than or equal to the
+// count and the gate can never open again — re-reading a count to stand in for
+// an unreadable baseline converts a transient read failure into a deadlock,
+// reporting a genuinely successful compaction as a give-up and driving the
+// ticket to needs-attention.
 //
-// The retry is taken on the first gated tick and never repeated. The baseline
-// must approximate the boundary count at submission time, because the gate's
-// predicate is "count is greater than baseline": a baseline adopted after the
-// compaction boundary has already landed is permanently greater than or equal
-// to the count, so the gate can never open again. Re-reading on every tick
-// would therefore convert a transient read failure into a deadlock, reporting
-// a genuinely successful compaction as a give-up and driving the ticket to
-// needs-attention.
+// An unavailable baseline therefore doesn't get a substitute count at all; it
+// switches predicates instead, to "a boundary was written after since" (see
+// boundaryLandedSince), which needs no pre-submission count to compare
+// against. That reads an auto-compaction landing in the gap between the
+// baseline read and submission as ours, which is the right call anyway: the
+// context did get compacted, and the alternative — waiting for a second
+// boundary that will never come — is the deadlock this type exists to rule
+// out.
 type stickyBaseline struct {
 	snapshot compactBoundarySnapshot
-	// upgraded records that the one retry has been spent, whether or not it
-	// produced a usable count.
-	upgraded bool
+	since    time.Time
 }
 
-// upgradeOnce retries an unavailable baseline read, at most once and only
-// while the recovery is still on its first gated tick. See stickyBaseline for
-// why a later retry is a deadlock rather than a second chance.
-func (b *stickyBaseline) upgradeOnce(d Deps, p launchAndPromptParams, sessionID string) {
-	if b.upgraded || b.snapshot.state != compactBoundaryUnavailable {
-		return
+// newStickyBaseline snapshots the boundary count and stamps since. Both must
+// happen before "/compact" is submitted, so that any boundary this recovery
+// causes is strictly newer than both.
+func newStickyBaseline(d Deps, p launchAndPromptParams, sessionID string) *stickyBaseline {
+	now := time.Now()
+	if d.Now != nil {
+		now = d.Now()
 	}
-	b.upgraded = true
-	if fresh := readCompactBoundaries(d, p.Agent, p.SessionCwd, sessionID); fresh.state == compactBoundaryConfirmed {
-		b.snapshot = fresh
+	return &stickyBaseline{
+		snapshot: readCompactBoundaries(d, p.Agent, p.SessionCwd, sessionID),
+		since:    now,
 	}
 }
 
@@ -544,8 +546,29 @@ func (b *stickyBaseline) gates() bool {
 	return b.snapshot.gates()
 }
 
+// advancedPast reports whether the transcript now proves this recovery's
+// compaction landed.
 func (b *stickyBaseline) advancedPast(d Deps, p launchAndPromptParams, sessionID string) bool {
-	return b.snapshot.advancedPast(d, p, sessionID)
+	switch b.snapshot.state {
+	case compactBoundaryConfirmed:
+		return b.snapshot.advancedPast(d, p, sessionID)
+	case compactBoundaryUnavailable:
+		return b.boundaryLandedSince(d, p, sessionID)
+	}
+	return false
+}
+
+// boundaryLandedSince is the unavailable baseline's predicate. An agent with no
+// boundary signal is excluded here as it is in readCompactBoundaries: its
+// completion is decided by failing the gate open, never by this read. A read
+// that fails proves nothing and holds the gate closed, like every other
+// unconfirmed observation.
+func (b *stickyBaseline) boundaryLandedSince(d Deps, p launchAndPromptParams, sessionID string) bool {
+	if p.Agent == AgentCodex || d.ReadCompactionsAfter == nil || sessionID == "" {
+		return false
+	}
+	count, ok, err := d.ReadCompactionsAfter(p.SessionCwd, sessionID, b.since)
+	return err == nil && ok && count > 0
 }
 
 // compactCompletion records which of the three routes a confirmed compaction
@@ -575,7 +598,7 @@ const (
 // boundary yet — a premature idle/done report, not proof the compact actually
 // finished. gateHeld distinguishes those two reasons, so a completion reached
 // later can still name the route it came by.
-func compactSignalUnconfirmed(d Deps, p launchAndPromptParams, sessionID string, err error, baseline compactBoundarySnapshot) (unconfirmed, gateHeld bool) {
+func compactSignalUnconfirmed(d Deps, p launchAndPromptParams, sessionID string, err error, baseline *stickyBaseline) (unconfirmed, gateHeld bool) {
 	if err != nil {
 		return isPollTimeout(err), false
 	}
@@ -604,9 +627,8 @@ func compactSignalUnconfirmed(d Deps, p launchAndPromptParams, sessionID string,
 // reported as success once the count advances, since a herdr observation gap is
 // not a stuck compaction. A transcript that can't be read at all right now
 // proves nothing either way, so it holds the gate closed and consumes the
-// extended bound like any other unconfirmed tick. The first tick here is also
-// the one chance a baseline that was unreadable at submission time gets to be
-// adopted — see stickyBaseline.
+// extended bound like any other unconfirmed tick. The baseline itself is fixed
+// for the whole recovery and never re-read here — see stickyBaseline.
 //
 // gateHeld carries in whether the caller's own first check was already refused
 // by the gate, and the returned compactCompletion names the route taken. A gate
@@ -627,7 +649,6 @@ func waitForCompactionSignal(
 ) (agent herdr.Agent, completion compactCompletion, err error) {
 	elapsedMs := startElapsedMs
 	for {
-		baseline.upgradeOnce(d, p, sessionID)
 		agent, err = d.AgentWait(herdr.AgentWaitOptions{
 			Target:    p.Pane,
 			Until:     until,

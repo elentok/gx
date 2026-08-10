@@ -237,6 +237,63 @@ func TestCountCompactions_NoCompactionLines_Zero(t *testing.T) {
 	}
 }
 
+func TestCountCompactionsAfter_CountsOnlyNewerBoundaries(t *testing.T) {
+	path := writeTranscript(t,
+		`{"type":"system","subtype":"compact_boundary","timestamp":"2026-01-01T00:00:01.000Z","compactMetadata":{"trigger":"auto"}}`,
+		`{"type":"assistant","timestamp":"2026-01-01T00:00:02.000Z","message":{"usage":{"input_tokens":1}}}`,
+		`{"type":"system","subtype":"compact_boundary","timestamp":"2026-01-01T00:00:03.000Z","compactMetadata":{"trigger":"manual"}}`,
+	)
+
+	lines, ok, err := ReadAll(path)
+	if err != nil || !ok {
+		t.Fatalf("ReadAll() = (ok %v, err %v), want (true, nil)", ok, err)
+	}
+
+	since := time.Date(2026, 1, 1, 0, 0, 2, 0, time.UTC)
+	if got := CountCompactionsAfter(lines, since); got != 1 {
+		t.Errorf("CountCompactionsAfter(since 00:00:02) = %d, want 1", got)
+	}
+	if got := CountCompactionsAfter(lines, time.Date(2026, 1, 1, 0, 0, 3, 0, time.UTC)); got != 0 {
+		t.Errorf("CountCompactionsAfter(since 00:00:03) = %d, want 0: a boundary at since is not after it", got)
+	}
+	if got := CountCompactionsAfter(lines, time.Time{}); got != 2 {
+		t.Errorf("CountCompactionsAfter(zero time) = %d, want 2", got)
+	}
+}
+
+func TestCompactionsAfter_ReadsThroughPath(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	cwd := "/repo/worktree"
+	slugDir := filepath.Join(dir, ".claude", "projects", Slugify(cwd))
+	if err := os.MkdirAll(slugDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	content := strings.Join([]string{
+		`{"type":"system","subtype":"compact_boundary","timestamp":"2026-01-01T00:00:00.000Z","compactMetadata":{"trigger":"auto"}}`,
+		`{"type":"system","subtype":"compact_boundary","timestamp":"2026-01-01T00:00:05.000Z","compactMetadata":{"trigger":"manual"}}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(filepath.Join(slugDir, "sess-1.jsonl"), []byte(content), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	count, ok, err := CompactionsAfter(cwd, "sess-1", time.Date(2026, 1, 1, 0, 0, 1, 0, time.UTC))
+	if err != nil || !ok {
+		t.Fatalf("CompactionsAfter() = (ok %v, err %v), want (true, nil)", ok, err)
+	}
+	if count != 1 {
+		t.Errorf("CompactionsAfter() = %d, want 1", count)
+	}
+
+	count, ok, err = CompactionsAfter("/repo/worktree", "missing-session", time.Time{})
+	if err != nil {
+		t.Fatalf("CompactionsAfter() error = %v, want nil for a missing file", err)
+	}
+	if ok || count != 0 {
+		t.Errorf("CompactionsAfter() = (%d, %v), want (0, false) for a missing file", count, ok)
+	}
+}
+
 func TestCompactions_ReadsThroughPath(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
