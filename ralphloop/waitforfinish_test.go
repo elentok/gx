@@ -1142,6 +1142,173 @@ func TestWaitForFinish_PropagatesNonGatedRecoveryErrors(t *testing.T) {
 	}
 }
 
+// boundGiveUpParams is the iteration shape the give-up-bound tests share: a
+// Claude iteration whose occupancy stays over the smart zone, so every poll
+// tick that times out drives one full recovery attempt.
+func boundGiveUpParams() launchAndPromptParams {
+	return launchAndPromptParams{
+		Label: "iter-19", Agent: AgentClaude, Pane: "pane-1", Ticket: "19",
+		SessionCwd: "/repo/iter-19", SmartZone: 100, Gate: NewGate(),
+	}
+}
+
+// countPrompts reports how many of prompts were the given text.
+func countPrompts(prompts []string, text string) int {
+	n := 0
+	for _, p := range prompts {
+		if p == text {
+			n++
+		}
+	}
+	return n
+}
+
+// TestWaitForFinish_EscalatesAfterTwoConsecutiveGatedGiveUps covers the cycle a
+// bounded absorb exists to break: a compaction that never writes a boundary
+// makes recovery give up gated, the poll loop resets its elapsed counter, the
+// still-high occupancy breaches again, and nothing ever ends the iteration.
+// After the bound the loop must escalate rather than try a third time — and
+// must never fall back to the finish-up prompt, which is the compaction
+// cancellation the gate exists to prevent.
+func TestWaitForFinish_EscalatesAfterTwoConsecutiveGatedGiveUps(t *testing.T) {
+	var prompts []string
+	d := Deps{
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			if slices.Contains(opts.Until, "blocked") {
+				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+			}
+			return herdr.Agent{}, errors.New("timed out waiting for agent status")
+		},
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			prompts = append(prompts, opts.Text)
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentSendKeys:   func(string, ...string) error { return nil },
+		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
+		ReadCompactions: func(cwd, sessionID string) (int, bool, error) { return 0, true, nil },
+		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+			return "compaction complete", nil
+		},
+		Sleep: func(time.Duration) {},
+	}
+
+	err := waitForFinish(d, boundGiveUpParams(), "sess-19")
+	if !errors.Is(err, errCompactRecoveryExhausted) {
+		t.Fatalf("waitForFinish error = %v, want one wrapping errCompactRecoveryExhausted", err)
+	}
+	if !errors.Is(err, errCompactNeverConfirmed) {
+		t.Errorf("waitForFinish error = %v, want the underlying gated give-up preserved", err)
+	}
+	if got := countPrompts(prompts, "/compact"); got != maxConsecutiveGatedGiveUps {
+		t.Errorf("/compact prompts = %d, want %d: the bound stops the loop instead of breaching again", got, maxConsecutiveGatedGiveUps)
+	}
+	if len(prompts) != maxConsecutiveGatedGiveUps {
+		t.Errorf("prompts = %v, want /compact only: the finish-up prompt is never a post-bound fallback", prompts)
+	}
+}
+
+// TestWaitForFinish_SuccessfulRecoveryResetsTheGiveUpCounter pins the bound to
+// *consecutive* give-ups. A lifetime tally would escalate a healthy long
+// iteration on two unrelated give-ups it had already recovered from.
+func TestWaitForFinish_SuccessfulRecoveryResetsTheGiveUpCounter(t *testing.T) {
+	var prompts []string
+	attempt := 0
+	boundaries := 0
+	settled := false
+	d := Deps{
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			if slices.Contains(opts.Until, "blocked") || settled {
+				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+			}
+			return herdr.Agent{}, errors.New("timed out waiting for agent status")
+		},
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			prompts = append(prompts, opts.Text)
+			if opts.Text == "/compact" {
+				attempt++
+				switch attempt {
+				case 2:
+					boundaries++
+				case 3:
+					// The agent wraps up on its own after the third breach, so
+					// the run must reach a normal finish rather than escalating.
+					settled = true
+				}
+			}
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentSendKeys:   func(string, ...string) error { return nil },
+		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
+		ReadCompactions: func(cwd, sessionID string) (int, bool, error) { return boundaries, true, nil },
+		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+			return "compaction complete", nil
+		},
+		Sleep: func(time.Duration) {},
+	}
+
+	if err := waitForFinish(d, boundGiveUpParams(), "sess-19"); err != nil {
+		t.Fatalf("waitForFinish: %v, want no escalation: the successful second recovery reset the counter", err)
+	}
+	if got := countPrompts(prompts, "/compact"); got != 3 {
+		t.Errorf("/compact prompts = %d, want 3", got)
+	}
+	if len(prompts) != 4 {
+		t.Errorf("prompts = %v, want one finish-up prompt from the successful recovery only", prompts)
+	}
+}
+
+// TestWaitForFinish_NonGatedRecoveryFailureNeitherCountsNorResets covers the
+// discrimination the reset is easy to get backwards on: recoverSmartZoneBreach
+// reports a failed submit confirmation as (false, nil), so a reset keyed on a
+// nil error would clear the counter for exactly the failures that say nothing
+// about whether compaction is progressing.
+func TestWaitForFinish_NonGatedRecoveryFailureNeitherCountsNorResets(t *testing.T) {
+	var prompts []string
+	attempt := 0
+	boundaries := 0
+	d := Deps{
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			if slices.Contains(opts.Until, "blocked") {
+				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+			}
+			return herdr.Agent{}, errors.New("timed out waiting for agent status")
+		},
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			prompts = append(prompts, opts.Text)
+			if opts.Text == "/compact" {
+				attempt++
+				if attempt == 2 {
+					boundaries++
+				}
+			}
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentSendKeys:   func(string, ...string) error { return nil },
+		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
+		ReadCompactions: func(cwd, sessionID string) (int, bool, error) { return boundaries, true, nil },
+		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+			// The middle attempt compacts for real but its submission never
+			// renders, so recovery abandons it before the finish-up prompt.
+			if attempt == 2 {
+				return "earlier output\n/compact", nil
+			}
+			return "compaction complete", nil
+		},
+		Sleep: func(time.Duration) {},
+	}
+
+	err := waitForFinish(d, boundGiveUpParams(), "sess-19")
+	if !errors.Is(err, errCompactRecoveryExhausted) {
+		t.Fatalf("waitForFinish error = %v, want escalation: the middle failure was not a recovery and must not reset the counter", err)
+	}
+	if got := countPrompts(prompts, "/compact"); got != 3 {
+		t.Errorf("/compact prompts = %d, want 3 (two gated give-ups either side of one non-gated failure)", got)
+	}
+	if len(prompts) != 3 {
+		t.Errorf("prompts = %v, want /compact only: no finish-up prompt on any of the three attempts", prompts)
+	}
+}
+
 func TestConfirmCompactSubmitted(t *testing.T) {
 	t.Run("trailing /compact line reports not yet submitted", func(t *testing.T) {
 		d := Deps{

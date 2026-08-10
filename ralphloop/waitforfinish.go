@@ -43,6 +43,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 	}
 
 	elapsedMs := 0
+	gatedGiveUps := 0
 	for {
 		pollMs := smartZonePollMs
 		if p.FinishTimeoutMs > 0 {
@@ -173,9 +174,23 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 		// corroborated) is a failed recovery, not a failed iteration: the agent
 		// is still alive and may well compact on its own, so keep polling and
 		// let the next breach try again. Every other error still aborts.
-		if _, err := recoverSmartZoneBreach(d, p, sessionID, reason, smartZone); err != nil &&
-			!errors.Is(err, errCompactNeverConfirmed) {
+		recovered, err := recoverSmartZoneBreach(d, p, sessionID, reason, smartZone)
+		switch {
+		case errors.Is(err, errCompactNeverConfirmed):
+			gatedGiveUps++
+			if gatedGiveUps >= maxConsecutiveGatedGiveUps {
+				return fmt.Errorf("%s: %w after %d consecutive attempts: %w",
+					p.Label, errCompactRecoveryExhausted, gatedGiveUps, err)
+			}
+		case err != nil:
 			return err
+		case recovered:
+			// Only the bool says a recovery actually completed. The non-gated
+			// failure branch returns (false, nil), reporting itself through the
+			// sink instead of the error, so resetting on a nil error would clear
+			// the counter for precisely the failures that prove nothing about
+			// whether compaction is progressing.
+			gatedGiveUps = 0
 		}
 		elapsedMs = 0
 	}
@@ -218,6 +233,25 @@ const smartZoneCompactExtendedTimeoutMs = 600_000
 // outside. waitForFinish absorbs this one and keeps polling; every other error
 // still aborts the iteration.
 var errCompactNeverConfirmed = errors.New("compaction never confirmed by the transcript")
+
+// maxConsecutiveGatedGiveUps bounds how many gated give-ups one iteration may
+// absorb before waitForFinish stops retrying and escalates with
+// errCompactRecoveryExhausted. Absorbing them without a bound never
+// terminates: recovery gives up at the extended bound, the poll loop resets
+// its elapsed counter, occupancy is still over the smart zone, and the whole
+// cycle repeats forever with the finish-up prompt — the one thing that would
+// end the iteration — never sent. The bound deliberately does not fall back to
+// sending that prompt: doing so would reintroduce the compaction cancellation
+// the gate exists to prevent, merely rate-limited. A stuck agent an operator
+// can see beats an agent quietly destroying its own compactions.
+//
+// The count is per-iteration and consecutive: any successful recovery resets
+// it, so give-ups an hour apart in a long healthy iteration never escalate.
+const maxConsecutiveGatedGiveUps = 2
+
+// errCompactRecoveryExhausted marks an iteration abandoned because compaction
+// recovery kept giving up gated. It needs an operator, not another retry.
+var errCompactRecoveryExhausted = errors.New("smart-zone compaction recovery exhausted")
 
 // smartZoneCompactSubmitPollMs is the tick size for confirmCompactSubmitted's
 // retry loop; smartZoneCompactSubmitTimeoutMs is its total budget. herdr's
