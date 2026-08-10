@@ -75,7 +75,7 @@ type QueueModel struct {
 	// from running/queued (see epicHeaderLines, queueRunState).
 	parkedEpics  map[string][]ralphloop.StalledTicket
 	runningAgent ralphloop.AgentKind
-	paused                 bool
+	paused       bool
 	// foreignAttachPID is the pid of a different process currently holding
 	// the per-repo attach lock (ticket 05), refreshed alongside the epics
 	// reload (cmdLoadQueue) since checking it shells out to `ps`. Zero when

@@ -20,11 +20,11 @@ type epicRun struct {
 	// scope is written once, by RunOptions.OnScopeResolved shortly after the
 	// run starts (see cmdStartImplement) — until then it's the zero RunScope,
 	// on which Add is a documented no-op.
-	scope       ralphloop.RunScope
-	state       RunState
-	finalError  string
-	tickets     map[string]RunTicketSnapshot
-	startedAt   time.Time
+	scope      ralphloop.RunScope
+	state      RunState
+	finalError string
+	tickets    map[string]RunTicketSnapshot
+	startedAt  time.Time
 	// pendingNotifyCloses queues reattach-scan notification ids to close,
 	// populated by reduceLiveEvent (running in the event-drain goroutine,
 	// which has no way to send a tea.Cmd itself) and drained into an actual
@@ -43,6 +43,11 @@ type epicRun struct {
 	// parkedStalled is the human-clearable ticket list from the most recent
 	// LiveEventEpicParked, valid only while state == RunStateParked.
 	parkedStalled []ralphloop.StalledTicket
+	// permitReserved marks the concurrency slot tryStart took on this run's
+	// behalf as still unclaimed: the run's first Acquire consumes it instead of
+	// competing for a fresh slot, and finish gives it back if the run ended
+	// without ever acquiring.
+	permitReserved bool
 }
 
 type RunState string
@@ -113,11 +118,17 @@ type loopRegistry struct {
 	// or capacity), for the caller to surface instead of the generic
 	// "already running" message. Cleared at the start of every tryStart.
 	attachErr error
-	// activeCount/permitCond back Acquire/Release (ralphloop.Permit): the
-	// real cap enforcement point now that a parked run can hold a runs[]
-	// entry forever (ticket 08) without counting toward maxConcurrent.
+	// activeCount/permitCond back Acquire/Release (ralphloop.Permit) and count
+	// slots tryStart has reserved but whose run has not acquired yet, so a
+	// parked run can hold a runs[] entry forever (ticket 08) without counting
+	// toward maxConcurrent while a just-started one still does.
 	activeCount int
 	permitCond  *sync.Cond
+	// permitErr records the most recent mismatched Release (see release), which
+	// would otherwise be invisible: the release is refused rather than allowed
+	// to drive activeCount negative and inflate the cap for the rest of the
+	// process's life.
+	permitErr error
 }
 
 func newLoopRegistry(maxConcurrent int) *loopRegistry {
@@ -134,8 +145,21 @@ func newLoopRegistry(maxConcurrent int) *loopRegistry {
 // Acquire blocks until fewer than maxConcurrent epics currently hold a
 // permit, then takes one. Implements ralphloop.Permit for RunOptions.Permit.
 func (r *loopRegistry) Acquire() {
+	r.acquireFor("")
+}
+
+// acquireFor takes epicName's slot: the one tryStart already reserved for it
+// if that reservation is still unclaimed (so a started run never queues behind
+// the very cap it was admitted under), otherwise a fresh slot, blocking until
+// one frees. An epicName with no reservation — including "" — always takes the
+// blocking path.
+func (r *loopRegistry) acquireFor(epicName string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if run := r.runs[epicName]; run != nil && run.permitReserved {
+		run.permitReserved = false
+		return
+	}
 	for r.activeCount >= r.maxConcurrent {
 		r.permitCond.Wait()
 	}
@@ -145,11 +169,49 @@ func (r *loopRegistry) Acquire() {
 // Release frees one permit this process previously acquired via Acquire,
 // waking any run currently blocked waiting for a slot.
 func (r *loopRegistry) Release() {
+	if err := r.release(); err != nil {
+		r.mu.Lock()
+		r.permitErr = err
+		r.mu.Unlock()
+	}
+}
+
+// release is Release's reportable form: it refuses a release that has no
+// matching acquire instead of decrementing past zero.
+func (r *loopRegistry) release() error {
 	r.mu.Lock()
+	if r.activeCount <= 0 {
+		r.mu.Unlock()
+		return fmt.Errorf("release of a concurrency permit that was never acquired")
+	}
 	r.activeCount--
 	r.mu.Unlock()
 	r.permitCond.Broadcast()
+	return nil
 }
+
+// permitError reports the most recent mismatched Release, or nil if every
+// release so far had a matching acquire.
+func (r *loopRegistry) permitError() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.permitErr
+}
+
+// permitFor is the ralphloop.Permit to hand epicName's run: its first Acquire
+// claims the slot tryStart reserved at start time, later ones (after a park
+// released it) queue like any other.
+func (r *loopRegistry) permitFor(epicName string) ralphloop.Permit {
+	return runPermit{registry: r, epicName: epicName}
+}
+
+type runPermit struct {
+	registry *loopRegistry
+	epicName string
+}
+
+func (p runPermit) Acquire() { p.registry.acquireFor(p.epicName) }
+func (p runPermit) Release() { p.registry.Release() }
 
 var ralphLoopRegistry = newLoopRegistry(ui.Settings{}.MaxConcurrentEpics())
 
@@ -187,6 +249,13 @@ func (r *loopRegistry) tryStart(epicName string, done, total int, scratchDir ...
 	if _, exists := r.runs[epicName]; exists {
 		return nil, false
 	}
+	// Reserve the slot here, under the same lock that records the run: the run
+	// goroutine only reaches its own Acquire seconds later, after worktree and
+	// reconcile work, and until then a poll tick that saw free capacity would
+	// keep draining the pending list into runs that just block.
+	if r.activeCount >= r.maxConcurrent {
+		return nil, false
+	}
 
 	dir := ""
 	if len(scratchDir) > 0 {
@@ -215,8 +284,9 @@ func (r *loopRegistry) tryStart(epicName string, done, total int, scratchDir ...
 		drainDone: make(chan struct{}),
 		done:      done, total: total, sink: sink, gate: ralphloop.NewGate(),
 		state: RunStateRunning, tickets: map[string]RunTicketSnapshot{},
-		startedAt: time.Now(), holdsAttach: holdsAttach,
+		startedAt: time.Now(), holdsAttach: holdsAttach, permitReserved: true,
 	}
+	r.activeCount++
 	r.runs[epicName] = run
 	r.snapshots[epicName] = run
 	go func() {
@@ -514,6 +584,11 @@ func (r *loopRegistry) finish(epicName string, err error) {
 			run.finalError = err.Error()
 		}
 		run.sink = nil
+		if run.permitReserved {
+			run.permitReserved = false
+			r.activeCount--
+			r.permitCond.Broadcast()
+		}
 		if run.holdsAttach {
 			r.attachCount--
 			if r.attachCount <= 0 {

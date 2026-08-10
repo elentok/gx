@@ -375,7 +375,85 @@ func TestParkedEpicDoesNotCountTowardCap(t *testing.T) {
 	}
 
 	if _, ok := r.tryStart("epic-other", 0, 1); !ok {
-		t.Fatal("tryStart for a different epic: want ok, tryStart no longer cap-gates")
+		t.Fatal("tryStart for a different epic once the parked one freed the slot: want ok")
+	}
+}
+
+func TestTryStartBeyondCapIsRefusedSynchronously(t *testing.T) {
+	r := newLoopRegistry(1)
+
+	if _, ok := r.tryStart("epic-a", 0, 1); !ok {
+		t.Fatal("tryStart epic-a into a free slot: want ok")
+	}
+	if slots := r.availableSlots(); slots != 0 {
+		t.Fatalf("availableSlots after a start reserved the only slot = %d, want 0", slots)
+	}
+	if _, ok := r.tryStart("epic-b", 0, 1); ok {
+		t.Fatal("tryStart epic-b past the cap, before epic-a's run acquired: want !ok")
+	}
+	if r.isRunningEpic("epic-b") {
+		t.Fatal("a refused tryStart recorded a run anyway")
+	}
+}
+
+func TestStartedRunAcquiresTheSlotReservedForIt(t *testing.T) {
+	r := newLoopRegistry(1)
+	if _, ok := r.tryStart("epic-a", 0, 1); !ok {
+		t.Fatal("tryStart epic-a: want ok")
+	}
+
+	acquired := make(chan struct{})
+	go func() {
+		r.permitFor("epic-a").Acquire()
+		close(acquired)
+	}()
+	select {
+	case <-acquired:
+	case <-time.After(time.Second):
+		t.Fatal("a started run's Acquire: want it to claim its reserved slot without blocking")
+	}
+	if slots := r.availableSlots(); slots != 0 {
+		t.Fatalf("availableSlots after the reserved slot was claimed = %d, want 0 (no double counting)", slots)
+	}
+
+	r.permitFor("epic-a").Release()
+	if slots := r.availableSlots(); slots != 1 {
+		t.Fatalf("availableSlots after the run released its slot = %d, want 1", slots)
+	}
+}
+
+func TestFinishReturnsAnUnclaimedReservation(t *testing.T) {
+	r := newLoopRegistry(1)
+	if _, ok := r.tryStart("epic-a", 0, 1); !ok {
+		t.Fatal("tryStart epic-a: want ok")
+	}
+
+	r.finish("epic-a", nil) // the run ended before ever reaching its Acquire
+
+	if slots := r.availableSlots(); slots != 1 {
+		t.Fatalf("availableSlots after finishing a never-acquired run = %d, want 1", slots)
+	}
+	if _, ok := r.tryStart("epic-b", 0, 1); !ok {
+		t.Fatal("tryStart epic-b into the freed slot: want ok")
+	}
+}
+
+func TestMismatchedReleaseIsReportedAndCannotInflateTheCap(t *testing.T) {
+	r := newLoopRegistry(1)
+
+	r.Release()
+
+	if err := r.permitError(); err == nil {
+		t.Fatal("permitError after releasing a permit that was never acquired: want an error")
+	}
+	if slots := r.availableSlots(); slots != 1 {
+		t.Fatalf("availableSlots after a mismatched release = %d, want the configured cap 1", slots)
+	}
+	if _, ok := r.tryStart("epic-a", 0, 1); !ok {
+		t.Fatal("tryStart epic-a: want ok")
+	}
+	if _, ok := r.tryStart("epic-b", 0, 1); ok {
+		t.Fatal("tryStart epic-b: want !ok, a mismatched release must not have widened the cap")
 	}
 }
 

@@ -299,8 +299,8 @@ func (s *unblockingSink) TicketClaimed(ticket tickets.Ticket) {
 // the epic's own completed_at, since the epic as a whole isn't done.
 func TestRun_EpicWithWaitingForChildrenTicket_DoesNotReportComplete(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-parent.md":   "---\nid: \"01\"\nstatus: done\ntype: task\n---\n# Parent\n",
-		"01a-child.md":   "---\nid: \"01a\"\nstatus: open\ntype: task\nparent: \"01\"\n---\n# Child A\n",
+		"01-parent.md":    "---\nid: \"01\"\nstatus: done\ntype: task\n---\n# Parent\n",
+		"01a-child.md":    "---\nid: \"01a\"\nstatus: open\ntype: task\nparent: \"01\"\n---\n# Child A\n",
 		"02-unrelated.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Unrelated\n",
 	})
 	d, _, _ := fakeDeps()
