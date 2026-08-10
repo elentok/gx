@@ -138,8 +138,10 @@ fixed set of user-facing states, each with its own icon:
   of the above; still selectable, and its raw markdown body still renders in the preview panel if
   the file itself is readable.
 
-Within an epic, tickets group in this order: unblocked (open/claimed) → blocked → needs-info/
-needs-attention → done → error, ticket number ascending within each group.
+Within an epic, tickets are listed in **plan order** — ticket number ascending, with lettered fork
+siblings tie-breaking on display number so an original sorts before its replacements. Status does
+**not** group or reorder them: a ticket never jumps out of its place once it finishes, so the list
+reads as the epic's intended order of execution.
 
 **Stalled** — a run-level state: an epic with no runnable work left, waiting on a human to clear a
 **human-clearable** ticket. A stalled epic parks rather than exiting, and releases its slot in the
