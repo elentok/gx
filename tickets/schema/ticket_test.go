@@ -14,7 +14,7 @@ func TestStatus_DraftIsValid(t *testing.T) {
 func validTicket() Ticket {
 	return Ticket{
 		ID:                    "04b",
-		Status:                StatusReadyForAgent,
+		Status:                StatusOpen,
 		BlockedBy:             []TicketID{"01", "03"},
 		Type:                  TypeTask,
 		ExpectedContextWindow: 20000,
@@ -77,19 +77,21 @@ func TestTicketID_Valid(t *testing.T) {
 
 func TestStatus_Valid(t *testing.T) {
 	canonical := []Status{
-		StatusOpen, StatusNeedsTriage, StatusReadyForAgent, StatusReadyForHuman,
-		StatusClaimed, StatusNeedsInfo, StatusNeedsAttention, StatusDone,
+		StatusDraft, StatusOpen, StatusClaimed,
+		StatusNeedsInfo, StatusNeedsAttention, StatusDone,
 	}
-	if len(canonical) != 8 {
-		t.Fatalf("expected exactly 8 canonical statuses, got %d", len(canonical))
+	if len(canonical) != 6 {
+		t.Fatalf("expected exactly 6 canonical statuses, got %d", len(canonical))
 	}
 	for _, s := range canonical {
 		if !s.Valid() {
 			t.Errorf("Status(%q).Valid() = false, want true", s)
 		}
 	}
-	if Status("error").Valid() {
-		t.Errorf(`Status("error").Valid() = true, want false`)
+	for _, s := range []Status{"error", "", "needs-triage", "ready-for-agent", "ready-for-human"} {
+		if s.Valid() {
+			t.Errorf("Status(%q).Valid() = true, want false", s)
+		}
 	}
 }
 

@@ -163,7 +163,7 @@ func TestRelativeReferencesResolve(t *testing.T) {
 // disagree about what a valid ticket looks like.
 const representativeTicket = `---
 id: "01"
-status: ready-for-agent
+status: open
 blocked_by: []
 split: []
 type: task

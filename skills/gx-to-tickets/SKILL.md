@@ -167,7 +167,7 @@ running it only if the user has explicitly asked for a second code-review ticket
 
 ---
 
-id: "&lt;NN&gt;" status: ready-for-agent blocked_by: [] children: [] type: task
+id: "&lt;NN&gt;" status: open blocked_by: [] type: task
 expected_context_window: 20000
 ---
 
@@ -195,8 +195,7 @@ implementation list.
 ### Frontmatter fields
 
 See [gx-local-tracker.md](../gx-local-tracker.md) for the full field reference. New tickets are
-published as `ready-for-agent` unless instructed otherwise, with `blocked_by: []` when nothing gates
-them.
+published as `open` unless instructed otherwise, with `blocked_by: []` when nothing gates them.
 
 Avoid specific file paths or code snippets in the body — they go stale fast. Exception: if a
 prototype produced a snippet that encodes a decision more precisely than prose can (state machine,

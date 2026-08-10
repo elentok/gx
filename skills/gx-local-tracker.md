@@ -30,9 +30,8 @@ Every ticket file opens with a `---`-delimited YAML frontmatter block:
 ```yaml
 ---
 id: "04"
-status: ready-for-agent
+status: open
 blocked_by: ["01", "02"]
-children: []
 type: task
 expected_context_window: 20000
 ---
@@ -42,10 +41,9 @@ Fields:
 
 - **`id`** (string, required) — the ticket identifier, matching the filename prefix, e.g. `"04"` or
   `"04b"`. Fixed at creation.
-- **`status`** (enum) — one of `open`, `needs-triage`, `ready-for-agent`, `ready-for-human`,
-  `claimed`, `needs-info`, `needs-attention`, `done`. A missing `status:` is treated as
-  `open`. `open`, `needs-triage`, `ready-for-agent`, and `ready-for-human` are all unclaimed — none
-  of them distinguish who is meant to pick the ticket up.
+- **`status`** (enum, required) — one of `draft`, `open`, `claimed`, `needs-info`,
+  `needs-attention`, `done`. There is no default: a ticket with no `status:` is rejected by the
+  loader rather than read as `open`, so a half-written file can never be handed to an agent.
 - **`blocked_by`** (list of ticket IDs) — tickets that must be `done` before this
   one can start; omit or `[]` when there are none. A bare-number token (`"04"`) is resolved only once
   every ticket sharing that number — its own children, recursively — is done too (see Frontier

@@ -75,9 +75,9 @@ func TestQueueModel_AutoRefreshesDataFromDiskWithoutManualReload(t *testing.T) {
 
 func TestQueueModel_ForkInsertsChildrenAfterOriginalPosition(t *testing.T) {
 	root := t.TempDir()
-	writeFrontmatterTicket(t, root, "alpha", "01-x.md", "01", "claimed", nil, "")
-	writeFrontmatterTicket(t, root, "alpha", "02-y.md", "02", "open", nil, "")
-	writeFrontmatterTicket(t, root, "alpha", "03-z.md", "03", "open", nil, "")
+	writeFrontmatterTicket(t, root, "alpha", "01-x.md", "01", "claimed", "")
+	writeFrontmatterTicket(t, root, "alpha", "02-y.md", "02", "open", "")
+	writeFrontmatterTicket(t, root, "alpha", "03-z.md", "03", "open", "")
 
 	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
 	xPath := ticketPath(root, "alpha", "01-x.md")
@@ -96,10 +96,11 @@ func TestQueueModel_ForkInsertsChildrenAfterOriginalPosition(t *testing.T) {
 		t.Fatalf("expected initial queue order X,Y,Z, got %s", got)
 	}
 
-	// Simulate ticket 01 forking mid-run into 01a/01b.
-	writeFrontmatterTicket(t, root, "alpha", "01-x.md", "01", "claimed", []string{"01a", "01b"}, "")
-	writeFrontmatterTicket(t, root, "alpha", "01a-x-cont.md", "01a", "open", nil, "01")
-	writeFrontmatterTicket(t, root, "alpha", "01b-x-cont2.md", "01b", "open", nil, "01")
+	// Simulate ticket 01 forking mid-run into 01a/01b. Only the forks are
+	// written: 01 never records them, which is exactly the case the old
+	// children-diffing auto-queue missed.
+	writeFrontmatterTicket(t, root, "alpha", "01a-x-cont.md", "01a", "open", "01")
+	writeFrontmatterTicket(t, root, "alpha", "01b-x-cont2.md", "01b", "open", "01")
 
 	_, cmd := m.Update(autoRefreshMsg{})
 	m = deliverAutoRefreshReload(t, m, cmd)
@@ -107,6 +108,11 @@ func TestQueueModel_ForkInsertsChildrenAfterOriginalPosition(t *testing.T) {
 	order = identifiersInOrder(t, m)
 	if got := strings.Join(order, ","); got != "01,01a,01b,02,03" {
 		t.Fatalf("expected forked children inserted right after 01 (01,01a,01b,02,03), got %s", got)
+	}
+	for _, filename := range []string{"01a-x-cont.md", "01b-x-cont2.md"} {
+		if !m.queueStore.IsChecked(ticketPath(root, "alpha", filename)) {
+			t.Errorf("expected fork %s auto-queued from its parent edge alone", filename)
+		}
 	}
 }
 

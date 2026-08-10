@@ -175,14 +175,13 @@ func (m Model) handleCheckAddConfirmed(msg checkAddConfirmedMsg) (tea.Model, tea
 }
 
 // autoCheckForkedChildren compares oldEpics (this Model's epics before a
-// reload) against newEpics (the reload's result): for every checked ticket
-// whose Children field gained new entries since oldEpics — a mid-flight
-// fork, per implement/SKILL.md's convention — the newly-appeared sibling(s)
-// join the Tickets tab's independent checked set automatically, no
-// confirmation modal (ticket 06), unlike toggleTicketChecked's
-// blocked-ticket confirmation. A ticket that isn't itself checked forking is
-// a no-op: only a fork of already-checked work needs its continuation
-// auto-added.
+// reload) against newEpics (the reload's result): every ticket that appeared
+// since oldEpics whose `parent` names a checked ticket — a mid-flight fork,
+// per implement/SKILL.md's convention — joins the Tickets tab's independent
+// checked set automatically, no confirmation modal (ticket 06), unlike
+// toggleTicketChecked's blocked-ticket confirmation. A fork of an unchecked
+// ticket is a no-op: only a fork of already-checked work needs its
+// continuation auto-added.
 func autoCheckForkedChildren(oldEpics, newEpics []tickets.Epic, store *QueueStore) error {
 	if store == nil {
 		return nil
@@ -192,8 +191,8 @@ func autoCheckForkedChildren(oldEpics, newEpics []tickets.Epic, store *QueueStor
 
 // autoQueueForkedChildren mirrors autoCheckForkedChildren for the Queue
 // tab's own membership concept (Items) instead of the Tickets tab's
-// independent checked set: a ticket already queued whose Children field
-// gains new entries has its new sibling(s) queued automatically.
+// independent checked set: a fork of an already-queued ticket is queued
+// automatically.
 func autoQueueForkedChildren(oldEpics, newEpics []tickets.Epic, store *QueueStore) error {
 	if store == nil {
 		return nil
@@ -205,46 +204,37 @@ func autoQueueForkedChildren(oldEpics, newEpics []tickets.Epic, store *QueueStor
 // and autoQueueForkedChildren: isMember/setMember let each caller apply it
 // to its own independent membership set (see QueueStore's decoupled
 // checked/queued API).
+//
+// The fork is detected from the new ticket's own `parent` rather than from
+// any list kept on the parent, so a fork still gets picked up when the tool
+// that created it never told the parent about it. Both endpoints are
+// required to have moved the right way: the child must be newly appeared and
+// its parent must already have been loaded before. That second condition is
+// what keeps the first reload of a session — where every ticket looks new —
+// from mass-adding every fork in the tracker to a membership set the user
+// only ever added the parents to.
 func applyForkedChildren(oldEpics, newEpics []tickets.Epic, isMember func(string) bool, setMember func([]string, bool) error) error {
-	oldByPath := make(map[string]tickets.Ticket)
+	oldPaths := make(map[string]bool)
 	for _, epic := range oldEpics {
 		for _, t := range epic.Tickets {
-			oldByPath[t.Path] = t
+			oldPaths[t.Path] = true
 		}
 	}
 
 	var childPaths []string
 	for _, epic := range newEpics {
 		for _, nt := range epic.Tickets {
-			old, ok := oldByPath[nt.Path]
-			if !ok || !isMember(old.Path) {
+			if nt.Parent == nil || oldPaths[nt.Path] {
 				continue
 			}
-			for _, childID := range newForkEntries(old.Children, nt.Children) {
-				if child, ok := findTicketByIdentifier(epic, childID); ok {
-					childPaths = append(childPaths, child.Path)
-				}
+			parent, ok := findTicketByIdentifier(epic, *nt.Parent)
+			if !ok || !oldPaths[parent.Path] || !isMember(parent.Path) {
+				continue
 			}
+			childPaths = append(childPaths, nt.Path)
 		}
 	}
 	return setMember(childPaths, true)
-}
-
-// newForkEntries returns the entries present in newChildren but not
-// oldChildren, i.e. the sibling IDs a ticket's Children field gained since
-// it was last seen.
-func newForkEntries(oldChildren, newChildren []string) []string {
-	seen := make(map[string]bool, len(oldChildren))
-	for _, id := range oldChildren {
-		seen[id] = true
-	}
-	var added []string
-	for _, id := range newChildren {
-		if !seen[id] {
-			added = append(added, id)
-		}
-	}
-	return added
 }
 
 // findTicketByIdentifier looks up a ticket within epic by its Identifier

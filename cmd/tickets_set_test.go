@@ -21,8 +21,16 @@ func TestTicketsSchemaText_HasTicketAndEpicSections(t *testing.T) {
 	if !strings.Contains(ticketsSchemaText, "completed_at") {
 		t.Error("schema text missing completed_at")
 	}
-	if !strings.Contains(ticketsSchemaText, "children") || !strings.Contains(ticketsSchemaText, "parent") {
-		t.Error("schema text missing children/parent")
+	if !strings.Contains(ticketsSchemaText, "parent") {
+		t.Error("schema text missing parent")
+	}
+	if strings.Contains(ticketsSchemaText, "children") {
+		t.Error("schema text still describes the retired children field")
+	}
+	for _, retired := range []string{"needs-triage", "ready-for-agent", "ready-for-human"} {
+		if strings.Contains(ticketsSchemaText, retired) {
+			t.Errorf("schema text still lists retired status %q", retired)
+		}
 	}
 	if !strings.Contains(ticketsSchemaText, "code-review") {
 		t.Error("schema text missing code-review type")
@@ -60,7 +68,7 @@ func TestExecute_TicketsSet_MultiFieldSuccess(t *testing.T) {
 	}
 }
 
-func TestExecute_TicketsSet_ParentChildren(t *testing.T) {
+func TestExecute_TicketsSet_Parent(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
 	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
@@ -68,12 +76,12 @@ func TestExecute_TicketsSet_ParentChildren(t *testing.T) {
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
 
-	err := execute([]string{"tickets", "set", path, "--parent=04", "--children=04c,04d"}, d)
+	err := execute([]string{"tickets", "set", path, "--parent=04"}, d)
 	if err != nil {
 		t.Fatalf("execute tickets set: %v", err)
 	}
-	if !strings.Contains(stdout.String(), "parent=04") || !strings.Contains(stdout.String(), "children=04c,04d") {
-		t.Errorf("stdout = %q, want it to list parent/children", stdout.String())
+	if !strings.Contains(stdout.String(), "parent=04") {
+		t.Errorf("stdout = %q, want it to list parent", stdout.String())
 	}
 
 	raw, err := os.ReadFile(path)
@@ -82,9 +90,6 @@ func TestExecute_TicketsSet_ParentChildren(t *testing.T) {
 	}
 	if !strings.Contains(string(raw), "parent: \"04\"") {
 		t.Errorf("ticket file = %q, want parent: \"04\"", string(raw))
-	}
-	if !strings.Contains(string(raw), "children:") {
-		t.Errorf("ticket file = %q, want children written", string(raw))
 	}
 }
 

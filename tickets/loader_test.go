@@ -177,10 +177,10 @@ func TestLoad_IgnoresNonTicketFilesInIssuesDir(t *testing.T) {
 	}
 }
 
-func TestLoad_SurfacesChildrenAndParent(t *testing.T) {
+func TestLoad_SurfacesParent(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "epic", "issues", "03-original.md"),
-		"---\nid: \"03\"\nstatus: done\ntype: task\nchildren: [\"03a\", \"03b\"]\n---\n")
+		"---\nid: \"03\"\nstatus: done\ntype: task\n---\n")
 	writeFile(t, filepath.Join(dir, "epic", "issues", "03a-first-half.md"),
 		"---\nid: \"03a\"\nstatus: open\ntype: task\nparent: \"03\"\n---\n")
 
@@ -197,11 +197,7 @@ func TestLoad_SurfacesChildrenAndParent(t *testing.T) {
 		byIdentifier[tk.Identifier] = tk
 	}
 
-	original := byIdentifier["03"]
-	if !reflect.DeepEqual(original.Children, []string{"03a", "03b"}) {
-		t.Errorf("original.Children = %v, want [03a 03b]", original.Children)
-	}
-	if original.Parent != nil {
+	if original := byIdentifier["03"]; original.Parent != nil {
 		t.Errorf("original.Parent = %v, want nil", original.Parent)
 	}
 
@@ -209,8 +205,37 @@ func TestLoad_SurfacesChildrenAndParent(t *testing.T) {
 	if child.Parent == nil || *child.Parent != "03" {
 		t.Errorf("child.Parent = %v, want \"03\"", child.Parent)
 	}
-	if child.Children != nil {
-		t.Errorf("child.Children = %v, want nil", child.Children)
+}
+
+// TestLoad_RejectsPreContractionShape pins that the loader surfaces a
+// pre-migration ticket as a read error rather than quietly ignoring the parts
+// it no longer understands — the point of the contraction is that the old
+// shape can't come back through a compatibility path.
+func TestLoad_RejectsPreContractionShape(t *testing.T) {
+	cases := map[string]string{
+		"01-children.md":    "---\nid: \"01\"\nstatus: open\ntype: task\nchildren: [\"01a\"]\n---\n",
+		"02-no-status.md":   "---\nid: \"02\"\ntype: task\n---\n",
+		"03-dead-status.md": "---\nid: \"03\"\nstatus: ready-for-human\ntype: task\n---\n",
+	}
+	dir := t.TempDir()
+	for name, content := range cases {
+		writeFile(t, filepath.Join(dir, "epic", "issues", name), content)
+	}
+
+	epics, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(epics) != 1 || len(epics[0].Tickets) != len(cases) {
+		t.Fatalf("expected 1 epic with %d tickets, got %+v", len(cases), epics)
+	}
+	for _, tk := range epics[0].Tickets {
+		if tk.ReadErr == "" {
+			t.Errorf("ticket %s loaded cleanly, want a read error", tk.Identifier)
+		}
+		if got := epics[0].RenderedStatus(tk); got != StatusError {
+			t.Errorf("ticket %s rendered status = %v, want error", tk.Identifier, got.Word())
+		}
 	}
 }
 

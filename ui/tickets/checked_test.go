@@ -15,9 +15,9 @@ import (
 )
 
 // writeFrontmatterTicket writes a ticket file with real frontmatter fields
-// (id/status/children/parent), unlike writeTicket's LegacyTicketToFrontmatter
-// conversion which doesn't carry children/parent.
-func writeFrontmatterTicket(t *testing.T, root, epic, filename, id, status string, children []string, parent string) {
+// (id/status/parent), unlike writeTicket's LegacyTicketToFrontmatter
+// conversion which doesn't carry parent.
+func writeFrontmatterTicket(t *testing.T, root, epic, filename, id, status, parent string) {
 	t.Helper()
 	path := filepath.Join(root, ".scratch", epic, "issues", filename)
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
@@ -25,9 +25,6 @@ func writeFrontmatterTicket(t *testing.T, root, epic, filename, id, status strin
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "---\nid: %q\nstatus: %s\ntype: task\n", id, status)
-	if len(children) > 0 {
-		fmt.Fprintf(&b, "children: [\"%s\"]\n", strings.Join(children, "\", \""))
-	}
 	if parent != "" {
 		fmt.Fprintf(&b, "parent: %q\n", parent)
 	}
@@ -322,7 +319,7 @@ func TestModel_CancelingBlockedModalLeavesCheckedSetUnchanged(t *testing.T) {
 
 func TestModel_MidRunForkAutoChecksNewChild(t *testing.T) {
 	root := t.TempDir()
-	writeFrontmatterTicket(t, root, "my-epic", "01-first-ticket.md", "01", "claimed", nil, "")
+	writeFrontmatterTicket(t, root, "my-epic", "01-first-ticket.md", "01", "claimed", "")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -339,11 +336,10 @@ func TestModel_MidRunForkAutoChecksNewChild(t *testing.T) {
 		t.Fatalf("expected ticket checked before simulating the fork")
 	}
 
-	// Simulate a mid-run fork: the parent's `children` frontmatter gains an
-	// entry and the new child ticket appears on disk, exactly as
-	// implement/SKILL.md's fork convention writes it.
-	writeFrontmatterTicket(t, root, "my-epic", "01-first-ticket.md", "01", "claimed", []string{"01a"}, "")
-	writeFrontmatterTicket(t, root, "my-epic", "01a-first-ticket-cont.md", "01a", "open", nil, "01")
+	// Simulate a mid-run fork: the new child ticket appears on disk carrying
+	// `parent: "01"`, and the parent is left exactly as it was — the fork is
+	// recognized from the child's own edge, with nothing to backfill.
+	writeFrontmatterTicket(t, root, "my-epic", "01a-first-ticket-cont.md", "01a", "open", "01")
 
 	m = deliverLoad(t, m)
 
@@ -367,15 +363,14 @@ func TestModel_MidRunForkAutoChecksNewChild(t *testing.T) {
 
 func TestModel_ForkOnUncheckedTicketDoesNotAutoCheckChild(t *testing.T) {
 	root := t.TempDir()
-	writeFrontmatterTicket(t, root, "my-epic", "01-first-ticket.md", "01", "claimed", nil, "")
+	writeFrontmatterTicket(t, root, "my-epic", "01-first-ticket.md", "01", "claimed", "")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	writeFrontmatterTicket(t, root, "my-epic", "01-first-ticket.md", "01", "claimed", []string{"01a"}, "")
-	writeFrontmatterTicket(t, root, "my-epic", "01a-first-ticket-cont.md", "01a", "open", nil, "01")
+	writeFrontmatterTicket(t, root, "my-epic", "01a-first-ticket-cont.md", "01a", "open", "01")
 
 	m = deliverLoad(t, m)
 

@@ -34,15 +34,11 @@ const (
 )
 
 // openStatuses covers raw Status: values meaning "unclaimed, nothing external
-// blocks picking it up": a missing Status:, needs-triage (nobody has
-// evaluated it yet), and the ready-for-agent/ready-for-human triage labels
-// (see .ai's triage-labels skill), which don't distinguish who picks it up.
+// blocks picking it up". A missing Status: is deliberately absent: status is
+// required now, so an empty value falls through to StatusError rather than
+// rendering — and scheduling — as open.
 var openStatuses = map[string]bool{
-	"":                true,
-	"open":            true,
-	"needs-triage":    true,
-	"ready-for-agent": true,
-	"ready-for-human": true,
+	"open": true,
 }
 
 var claimedStatuses = map[string]bool{"claimed": true}

@@ -10,7 +10,7 @@ import (
 
 func TestFrontier_MixedStatuses(t *testing.T) {
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
-		{Number: 3, Status: ""},
+		{Number: 3, Status: "draft"},
 		{Number: 1, Status: "open"},
 		{Number: 2, Status: "claimed"},
 		{Number: 4, Status: "done"},
@@ -18,7 +18,7 @@ func TestFrontier_MixedStatuses(t *testing.T) {
 	}}
 
 	got := Frontier(epic)
-	want := []int{1, 3}
+	want := []int{1}
 	assertNumbers(t, got, want)
 }
 
@@ -77,9 +77,12 @@ func TestFrontier_BlockerChain(t *testing.T) {
 	assertNumbers(t, Frontier(epic), []int{3})
 }
 
-func TestFrontier_NoStatusLineIsOpenDefault(t *testing.T) {
+// TestFrontier_NoStatusIsNotSchedulable pins the contraction's central
+// safety property: status is required, so a ticket with none is an error
+// rather than an open ticket an agent can be handed.
+func TestFrontier_NoStatusIsNotSchedulable(t *testing.T) {
 	epic := tickets.Epic{Tickets: []tickets.Ticket{{Number: 1}}}
-	assertNumbers(t, Frontier(epic), []int{1})
+	assertNumbers(t, Frontier(epic), nil)
 }
 
 func TestFrontier_EmptyEpic(t *testing.T) {

@@ -111,13 +111,13 @@ without pull). Rendered purple with `󰜮`.
 
 ## Ticket States (Tickets View)
 
-**RenderedStatus** — the tickets tab's collapse of a ticket's raw `Status:` value (plus the
-tracker's triage-label vocabulary) into a small, fixed set of user-facing states, each with its own
-icon:
+**RenderedStatus** — the tickets tab's collapse of a ticket's raw `Status:` value into a small,
+fixed set of user-facing states, each with its own icon:
 
 - **Draft** — raw `Status: draft`; the ticket exists but isn't ready to be worked. The state a
   freshly allocated stub is born in; never schedulable.
-- **Open** — unclaimed and ready for whoever picks it up next. Covers a missing `Status:`.
+- **Open** — raw `Status: open`: unclaimed, nothing blocks picking it up. `status` is required,
+  so a ticket without one renders as **Error** rather than defaulting to open.
 - **Claimed** — raw `Status: claimed`.
 - **Blocked** — an overlay, not a raw status: applied whenever an open or claimed ticket has a
   blocker that is still **blocking** (see Ticket Dependencies). Needs-info, needs-attention, and

@@ -22,11 +22,17 @@ func ParseTicket(path string) (Ticket, error) {
 
 // ParseTicketFromRaw is ParseTicket's logic over an already-read file, for
 // callers (e.g. tickets.Load) that need to derive both the typed Ticket and
-// the raw body (via ParseBody) from one read.
+// the raw body (via ParseBody) from one read. It accepts only the
+// post-migration shape: a retired `children` field is rejected here rather
+// than ignored, so the pre-contraction shape can't quietly round-trip through
+// a reader that simply doesn't look at it.
 func ParseTicketFromRaw(raw, path string) (Ticket, error) {
 	t, err := ParseTicketRaw(raw, path)
 	if err != nil {
 		return Ticket{}, err
+	}
+	if HasLegacyChildren(raw) {
+		return Ticket{}, fmt.Errorf("invalid ticket %s: children: retired field, run `gx tickets migrate` (a ticket's children are derived from its forks' parent)", path)
 	}
 	if err := Validate(t); err != nil {
 		return Ticket{}, fmt.Errorf("invalid ticket %s: %w", path, err)

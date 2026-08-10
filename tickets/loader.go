@@ -88,7 +88,6 @@ func loadEpic(scratchDir, name string) Epic {
 
 		ticket.Type = string(parsed.Type)
 		ticket.BlockedBy = idsToStrings(parsed.BlockedBy)
-		ticket.Children = idsToStrings(parsed.Children)
 		ticket.Parent = idToStringPtr(parsed.Parent)
 		ticket.Status = string(parsed.Status)
 		ticket.Body = schema.ParseBody(string(raw))

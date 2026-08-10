@@ -20,12 +20,10 @@ import (
 const ticketsSchemaText = `Ticket frontmatter fields:
 
 Settable fields:
-  status (enum, --status): draft, open, claimed, ready-for-agent, ready-for-human,
-    needs-triage, needs-info, needs-attention, done. draft is parked work: it never
-    enters an epic's frontier, so no agent is ever handed it.
+  status (enum, --status): draft, open, claimed, needs-info, needs-attention, done.
+    Required on every ticket. draft is parked work: it never enters an epic's
+    frontier, so no agent is ever handed it.
   blocked_by (comma-separated ticket IDs, --blocked-by): e.g. 01,03
-  children (comma-separated ticket IDs, --children): tickets this one produced (a
-    mid-flight fork, or the fix tickets a code-review ticket opened)
   parent (ticket ID, --parent): the ticket this one was produced from. Must name an
     existing ticket in the same epic, and may not point into this ticket's own fork
     subtree (that would make the fork graph cyclic) — both are rejected.
@@ -33,8 +31,8 @@ Settable fields:
   expected_context_window (non-negative int, --expected-context-window)
   commitless (bool, --commitless): true/false. Set true when you intentionally finish an
     iteration with no commit (e.g. exploration concluded no code change was warranted) —
-    pair it with a status that doesn't leave the ticket claimed (done, ready-for-human,
-    needs-triage), or it's still treated as an unresolved iteration.
+    pair it with a status that doesn't leave the ticket claimed (done, needs-info),
+    or it's still treated as an unresolved iteration.
 
 Read-only fields (gx-managed, not settable via ` + "`set`" + `):
   id — ticket identity, fixed at creation
@@ -54,7 +52,6 @@ func newTicketsSetCmd() *cobra.Command {
 	var (
 		status                string
 		blockedBy             string
-		children              string
 		parent                string
 		ticketType            string
 		expectedContextWindow string
@@ -73,7 +70,6 @@ func newTicketsSetCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&status, "status", "", "set the status field")
 	cmd.Flags().StringVar(&blockedBy, "blocked-by", "", "set blocked_by (comma-separated ticket IDs)")
-	cmd.Flags().StringVar(&children, "children", "", "set children (comma-separated ticket IDs)")
 	cmd.Flags().StringVar(&parent, "parent", "", "set parent")
 	cmd.Flags().StringVar(&ticketType, "type", "", "set the type field")
 	cmd.Flags().StringVar(&expectedContextWindow, "expected-context-window", "", "set expected_context_window")
@@ -96,7 +92,6 @@ type ticketSetField struct {
 var ticketSetFields = []ticketSetField{
 	{"status", "status", func(t *schema.Ticket, v string) { t.Status = schema.Status(v) }},
 	{"blocked-by", "blocked_by", func(t *schema.Ticket, v string) { t.BlockedBy = parseCSVIDs(v) }},
-	{"children", "children", func(t *schema.Ticket, v string) { t.Children = parseCSVIDs(v) }},
 	{"parent", "parent", func(t *schema.Ticket, v string) { t.Parent = parseIDPtr(v) }},
 	{"type", "type", func(t *schema.Ticket, v string) { t.Type = schema.TicketType(v) }},
 	{"expected-context-window", "expected_context_window", func(t *schema.Ticket, v string) {

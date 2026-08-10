@@ -17,7 +17,6 @@ type ticketYAML struct {
 	ID                    string   `yaml:"id"`
 	Status                string   `yaml:"status"`
 	BlockedBy             []string `yaml:"blocked_by,omitempty"`
-	Children              []string `yaml:"children,omitempty"`
 	Parent                string   `yaml:"parent,omitempty"`
 	Type                  string   `yaml:"type"`
 	ExpectedContextWindow int      `yaml:"expected_context_window,omitempty"`
@@ -28,12 +27,35 @@ type ticketYAML struct {
 	SessionIDs            []string `yaml:"session_ids,omitempty"`
 }
 
+// legacyYAML is the retired half of the on-disk shape: fields Ticket no
+// longer carries, read only so they can be recognized. ticketYAML can't do
+// this job — yaml.v3 silently ignores a key with no matching struct field, so
+// a `children:` line would otherwise parse as if it weren't there at all.
+type legacyYAML struct {
+	Children []string `yaml:"children"`
+}
+
+// HasLegacyChildren reports whether raw's frontmatter still carries the
+// retired `children` field. Two callers, pulling in opposite directions:
+// ParseTicketFromRaw rejects such a file, and `gx tickets migrate` — which
+// parses without that check — uses it to report the field as dropped.
+func HasLegacyChildren(raw string) bool {
+	yamlPart, _, hasFM := splitFrontmatter(raw)
+	if !hasFM {
+		return false
+	}
+	var legacy legacyYAML
+	if err := yaml.Unmarshal([]byte(yamlPart), &legacy); err != nil {
+		return false
+	}
+	return len(legacy.Children) > 0
+}
+
 func (w ticketYAML) toTicket() Ticket {
 	t := Ticket{
 		ID:                    TicketID(w.ID),
 		Status:                Status(w.Status),
 		BlockedBy:             stringsToIDs(w.BlockedBy),
-		Children:              stringsToIDs(w.Children),
 		Type:                  TicketType(w.Type),
 		ExpectedContextWindow: w.ExpectedContextWindow,
 		ActualContextWindow:   w.ActualContextWindow,
@@ -54,7 +76,6 @@ func ticketToYAML(t Ticket) ticketYAML {
 		ID:                    string(t.ID),
 		Status:                string(t.Status),
 		BlockedBy:             idsToStrings(t.BlockedBy),
-		Children:              idsToStrings(t.Children),
 		Type:                  string(t.Type),
 		ExpectedContextWindow: t.ExpectedContextWindow,
 		ActualContextWindow:   t.ActualContextWindow,

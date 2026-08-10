@@ -7,14 +7,14 @@ func TestEpic_RenderedStatus_BaseStates(t *testing.T) {
 		status string
 		want   RenderedStatus
 	}{
-		{"", StatusOpen},
+		{"", StatusError},
 		{"open", StatusOpen},
-		{"ready-for-agent", StatusOpen},
-		{"ready-for-human", StatusOpen},
+		{"ready-for-agent", StatusError},
+		{"ready-for-human", StatusError},
 		{"claimed", StatusClaimed},
 		{"needs-info", StatusNeedsInfo},
 		{"needs-attention", StatusNeedsAttention},
-		{"needs-triage", StatusOpen},
+		{"needs-triage", StatusError},
 		{"done", StatusDone},
 		{"resolved", StatusDone},
 		{"wontfix", StatusDone},
@@ -42,7 +42,7 @@ func TestEpic_RenderedStatus_ReadErrIsError(t *testing.T) {
 
 func TestEpic_RenderedStatus_BlockedOverlaysOpenAndClaimed(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
-		{Number: 1, Status: "", BlockedBy: []string{"2"}},
+		{Number: 1, Status: "open", BlockedBy: []string{"2"}},
 		{Number: 2, Status: "open"},
 	}}
 	got := epic.RenderedStatus(epic.Tickets[0])

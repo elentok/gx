@@ -90,7 +90,7 @@ func Migrate(scratchRoot string) (MigrationResult, error) {
 			if err != nil {
 				return MigrationResult{}, fmt.Errorf("parsing %s: %w", ticketPath, err)
 			}
-			newTicket, notes := migrateTicket(oldTicket)
+			newTicket, notes := migrateTicket(oldTicket, schema.HasLegacyChildren(string(raw)))
 
 			files = append(files, migratedTicketFile{
 				path:      ticketPath,
@@ -162,6 +162,15 @@ func writeMigration(files []migratedTicketFile) (MigrationResult, error) {
 	return result, nil
 }
 
+// The three retired status values, named here rather than in schema: they are
+// no longer members of the status enum, and migration is the only code left
+// that has to recognize them at all.
+const (
+	legacyStatusNeedsTriage   schema.Status = "needs-triage"
+	legacyStatusReadyForAgent schema.Status = "ready-for-agent"
+	legacyStatusReadyForHuman schema.Status = "ready-for-human"
+)
+
 // migratedStatusOf maps the three status values the lifecycle-refactor
 // contraction retires onto their replacements, and stamps "open" onto a
 // ticket that omits status: entirely (today, a missing status: silently
@@ -173,11 +182,11 @@ func migratedStatusOf(s schema.Status) schema.Status {
 	switch s {
 	case "":
 		return schema.StatusOpen
-	case schema.StatusReadyForAgent:
+	case legacyStatusReadyForAgent:
 		return schema.StatusOpen
-	case schema.StatusNeedsTriage:
+	case legacyStatusNeedsTriage:
 		return schema.StatusDraft
-	case schema.StatusReadyForHuman:
+	case legacyStatusReadyForHuman:
 		// "Handed back to a human" is exactly what needs-info now covers;
 		// mapping to open would let the orchestrator re-claim a ticket that
 		// was deliberately handed back.
@@ -190,21 +199,22 @@ func migratedStatusOf(s schema.Status) schema.Status {
 // migrateTicket returns t rewritten into the post-refactor shape, plus a
 // note per field it actually changed. A nil notes slice means t already
 // matched the new shape, the signal writeMigration uses to leave the file
-// untouched.
+// untouched. hadChildren comes from the raw file rather than from t: the
+// retired field no longer has a home on schema.Ticket, so a rewrite drops it
+// on its own and migration's only remaining job is to notice and report it.
 //
-// Dropping Children unconditionally — rather than trying to reconcile it
+// Dropping children unconditionally — rather than trying to reconcile it
 // against Parent — is the fix for the malformed-fork-chain gotcha (a fork
 // root listing both its direct fork and that fork's own child): Parent is
 // the edge every other consumer (Epic.ValidateParentGraph,
 // Epic.UnresolvedBlockers) already treats as authoritative, so discarding
-// Children never loses information a correct graph needs.
-func migrateTicket(t schema.Ticket) (schema.Ticket, []string) {
+// children never loses information a correct graph needs.
+func migrateTicket(t schema.Ticket, hadChildren bool) (schema.Ticket, []string) {
 	out := t
 	var notes []string
 
-	if len(out.Children) > 0 {
+	if hadChildren {
 		notes = append(notes, "children removed")
-		out.Children = nil
 	}
 
 	if out.Parent != nil && len(out.BlockedBy) > 0 {

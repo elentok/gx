@@ -33,7 +33,9 @@ func (id TicketID) Valid() bool {
 
 // Status is the ticket lifecycle enum. Unlike the legacy bold-line format,
 // there is deliberately no "error" member: an invalid raw string is a
-// Validate failure, not a status value.
+// Validate failure, not a status value. The empty string is not a member
+// either — status is required, which is what keeps a hand-authored file with
+// no status: and no body from reading as open and becoming schedulable.
 type Status string
 
 const (
@@ -42,9 +44,6 @@ const (
 	// tickets.StatusDraft).
 	StatusDraft          Status = "draft"
 	StatusOpen           Status = "open"
-	StatusNeedsTriage    Status = "needs-triage"
-	StatusReadyForAgent  Status = "ready-for-agent"
-	StatusReadyForHuman  Status = "ready-for-human"
 	StatusClaimed        Status = "claimed"
 	StatusNeedsInfo      Status = "needs-info"
 	StatusNeedsAttention Status = "needs-attention"
@@ -54,9 +53,6 @@ const (
 var validStatuses = map[Status]bool{
 	StatusDraft:          true,
 	StatusOpen:           true,
-	StatusNeedsTriage:    true,
-	StatusReadyForAgent:  true,
-	StatusReadyForHuman:  true,
 	StatusClaimed:        true,
 	StatusNeedsInfo:      true,
 	StatusNeedsAttention: true,
@@ -100,10 +96,11 @@ type Ticket struct {
 	ID        TicketID
 	Status    Status
 	BlockedBy []TicketID
-	// Children/Parent record the "this ticket produced other tickets"
-	// relationship: a mid-flight budget split, or a code-review ticket
-	// recording which fix tickets it opened.
-	Children              []TicketID
+	// Parent records the "this ticket was produced from another" relationship:
+	// a mid-flight budget split, or a fix ticket a code-review ticket opened.
+	// It is the only direction the edge is stored in — the reverse (a ticket's
+	// children) is derived by scanning an epic for tickets pointing at it, so
+	// there is no second copy for a fork to forget to update.
 	Parent                *TicketID
 	Type                  TicketType
 	ExpectedContextWindow int

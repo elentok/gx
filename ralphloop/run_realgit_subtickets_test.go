@@ -37,27 +37,6 @@ func fullTicketIDFromImplementPrompt(text string) (id string, ok bool) {
 	return base[:idx], true
 }
 
-// addChildrenToTicket inserts a "children: [...]" frontmatter line into the
-// ticket file at path, leaving every other frontmatter field (notably
-// status:, which the loop may have already rewritten to "claimed" by the
-// time a mid-run split happens) and the body untouched.
-func addChildrenToTicket(path string, childIDs []string) error {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	parts := strings.SplitN(string(raw), "---\n", 3)
-	if len(parts) != 3 {
-		return fmt.Errorf("malformed ticket frontmatter in %s", path)
-	}
-	quoted := make([]string, len(childIDs))
-	for i, id := range childIDs {
-		quoted[i] = fmt.Sprintf("%q", id)
-	}
-	newFrontmatter := parts[1] + "children: [" + strings.Join(quoted, ", ") + "]\n"
-	return os.WriteFile(path, []byte("---\n"+newFrontmatter+"---\n"+parts[2]), 0644)
-}
-
 // writeChildTicket writes a fresh open child ticket file (filename
 // "{id}-child.md") under issuesDir, with parent recorded as parentID - the
 // fake agent's stand-in for a real implement skill turn that decides to split
@@ -247,8 +226,7 @@ func assertSubticketRunCompleted(t *testing.T, repoDir, epicName, scratchDir str
 // TestRun_ProductionRealGit_TicketCreatesSubtickets drives a single regular
 // task ticket (01) whose implement turn splits mid-run: right after landing
 // its own commit, the fake agent writes two lettered child ticket files
-// (01a, 01b, parent: "01") into the epic's issues directory and records
-// Children on 01 itself - mirroring a real gx-implement turn that decides the
+// (01a, 01b, parent: "01") into the epic's issues directory - mirroring a real gx-implement turn that decides the
 // work is bigger than one iteration and splits it. Nothing in the run request
 // names 01a/01b upfront (RunOptions.TicketIDs is unset, i.e. whole-epic
 // scope): Run must discover them from disk on its next frontier scan, start
@@ -261,7 +239,6 @@ func TestRun_ProductionRealGit_TicketCreatesSubtickets(t *testing.T) {
 		"01-parent.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Parent\n",
 	})
 	issuesDir := filepath.Join(scratchDir, epicName, "issues")
-	parentPath := filepath.Join(issuesDir, "01-parent.md")
 
 	t.Setenv("HOME", t.TempDir())
 
@@ -275,9 +252,6 @@ func TestRun_ProductionRealGit_TicketCreatesSubtickets(t *testing.T) {
 				if err := writeChildTicket(issuesDir, childID, "01"); err != nil {
 					t.Errorf("writeChildTicket(%s): %v", childID, err)
 				}
-			}
-			if err := addChildrenToTicket(parentPath, []string{"01a", "01b"}); err != nil {
-				t.Errorf("addChildrenToTicket: %v", err)
 			}
 		})
 	}
@@ -337,7 +311,6 @@ func TestRun_ProductionRealGit_CodeReviewTicketCreatesSubtickets(t *testing.T) {
 		"02-review.md":    "---\nid: \"02\"\nstatus: open\ntype: code-review\n---\n# Review\n",
 	})
 	issuesDir := filepath.Join(scratchDir, epicName, "issues")
-	reviewPath := filepath.Join(issuesDir, "02-review.md")
 
 	t.Setenv("HOME", t.TempDir())
 
@@ -351,9 +324,6 @@ func TestRun_ProductionRealGit_CodeReviewTicketCreatesSubtickets(t *testing.T) {
 				if err := writeChildTicket(issuesDir, childID, "02"); err != nil {
 					t.Errorf("writeChildTicket(%s): %v", childID, err)
 				}
-			}
-			if err := addChildrenToTicket(reviewPath, []string{"02a", "02b"}); err != nil {
-				t.Errorf("addChildrenToTicket: %v", err)
 			}
 		})
 	}

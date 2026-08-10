@@ -26,16 +26,13 @@ type Ticket struct {
 	// number family (Epic.UnresolvedBlockers); a lettered token names one
 	// specific sibling.
 	BlockedBy []string
-	// Children holds the IDs of the tickets this one was forked into
-	// (mid-flight fork, see .ai's to-tickets skill); Parent is the reverse
-	// edge, the ID of the ticket this one was forked off from
-	// (schema.Ticket.Parent). At most one of a ticket's Children/Parent is
-	// meaningfully populated in practice, but both are carried since
-	// schema.Ticket allows either.
-	Children []string
-	Parent   *string
-	Status   string // raw Status: value; "" means missing (valid open/unclaimed default)
-	Body     string // raw markdown after the leading metadata lines, unmodified
+	// Parent is the ID of the ticket this one was forked off from
+	// (schema.Ticket.Parent) — the only stored direction of the fork edge.
+	// A ticket's children are derived by scanning its epic for tickets
+	// pointing back at it (Epic.forkChildren).
+	Parent *string
+	Status string // raw Status: value; "" only for a ticket that failed to load (see ReadErr)
+	Body   string // raw markdown after the leading metadata lines, unmodified
 
 	// ActualContextWindow and ElapsedTime are the landing-time metrics
 	// ralphloop/report_metrics.go's writeLandedMetrics stamps into a done

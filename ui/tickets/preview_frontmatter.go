@@ -63,7 +63,6 @@ func ticketFrontmatterFields(t tickets.Ticket, status tickets.RenderedStatus) []
 	add("status", status.Word())
 	add("type", t.Type)
 	add("blocked_by", strings.Join(t.BlockedBy, ", "))
-	add("children", strings.Join(t.Children, ", "))
 	if t.Parent != nil {
 		add("parent", *t.Parent)
 	}

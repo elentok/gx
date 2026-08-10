@@ -35,7 +35,7 @@ func TestExecute_CleanupScan_EpicsJSON(t *testing.T) {
 	// epic-done-unmerged-review-pending: all tickets done except the
 	// code-review ticket; branch has an unmerged commit.
 	writeCleanupScanTicket(t, dir, "epic-done-unmerged-review-pending", "01-work.md", "01", "done", "task")
-	writeCleanupScanTicket(t, dir, "epic-done-unmerged-review-pending", "02-review.md", "02", "ready-for-agent", "code-review")
+	writeCleanupScanTicket(t, dir, "epic-done-unmerged-review-pending", "02-review.md", "02", "open", "code-review")
 	// Stage and commit only unmerged.txt (not "git add ." / CommitAll) so the
 	// untracked .scratch ticket fixtures never get swept into the commit —
 	// committing them would delete them from disk on the checkout back to

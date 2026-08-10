@@ -67,7 +67,7 @@ func TestRunTicketsEnsureCodeReview_NoopWhenCodeReviewTicketExists(t *testing.T)
 		t.Fatalf("mkdir issues: %v", err)
 	}
 	writeTicket(t, filepath.Join(issuesDir, "01-do-thing.md"), "01", "done", "task")
-	writeTicket(t, filepath.Join(issuesDir, "02-review.md"), "02", "ready-for-agent", "code-review")
+	writeTicket(t, filepath.Join(issuesDir, "02-review.md"), "02", "open", "code-review")
 
 	var stdout bytes.Buffer
 	if err := runTicketsEnsureCodeReview(epicPath, &stdout); err != nil {
@@ -109,8 +109,8 @@ func TestRunTicketsEnsureCodeReview_CreatesValidStubWhenNoneExists(t *testing.T)
 	if ticket.Type != schema.TypeCodeReview {
 		t.Errorf("stub ticket type = %q, want %q", ticket.Type, schema.TypeCodeReview)
 	}
-	if ticket.Status != schema.StatusReadyForAgent {
-		t.Errorf("stub ticket status = %q, want %q", ticket.Status, schema.StatusReadyForAgent)
+	if ticket.Status != schema.StatusOpen {
+		t.Errorf("stub ticket status = %q, want %q", ticket.Status, schema.StatusOpen)
 	}
 	if ticket.ID != "04" {
 		t.Errorf("stub ticket id = %q, want next sequential id 04", ticket.ID)

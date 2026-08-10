@@ -19,7 +19,7 @@ func writeTemp(t *testing.T, name, content string) string {
 
 const newFormatFixture = `---
 id: "04b"
-status: ready-for-agent
+status: open
 blocked_by: ["01", "03"]
 type: task
 expected_context_window: 20000
@@ -41,7 +41,7 @@ func TestParseTicket_NewFormat(t *testing.T) {
 
 	want := Ticket{
 		ID:                    "04b",
-		Status:                StatusReadyForAgent,
+		Status:                StatusOpen,
 		BlockedBy:             []TicketID{"01", "03"},
 		Type:                  TypeTask,
 		ExpectedContextWindow: 20000,
@@ -95,7 +95,24 @@ func TestParseTicket_RoundTrip(t *testing.T) {
 	}
 }
 
-func TestParseTicket_RoundTrip_ParentChildren(t *testing.T) {
+func TestParseTicket_RejectsRetiredChildrenField(t *testing.T) {
+	content := "---\nid: \"04\"\nstatus: open\ntype: task\nchildren: [\"04a\"]\n---\nbody\n"
+	path := writeTemp(t, "04-with-children.md", content)
+
+	if _, err := ParseTicket(path); err == nil || !strings.Contains(err.Error(), "children") {
+		t.Fatalf("ParseTicket() error = %v, want one naming the retired children field", err)
+	}
+}
+
+func TestParseTicket_RejectsMissingStatus(t *testing.T) {
+	path := writeTemp(t, "04-no-status.md", "---\nid: \"04\"\ntype: task\n---\nbody\n")
+
+	if _, err := ParseTicket(path); err == nil || !strings.Contains(err.Error(), "status") {
+		t.Fatalf("ParseTicket() error = %v, want one naming the missing status", err)
+	}
+}
+
+func TestParseTicket_RoundTrip_Parent(t *testing.T) {
 	orig := Ticket{
 		ID:     "04b",
 		Status: StatusClaimed,
@@ -103,7 +120,6 @@ func TestParseTicket_RoundTrip_ParentChildren(t *testing.T) {
 	}
 	parent := TicketID("04")
 	orig.Parent = &parent
-	orig.Children = []TicketID{"04c", "04d"}
 
 	marshaled, err := MarshalTicket(orig, "body\n")
 	if err != nil {
@@ -186,7 +202,7 @@ func TestParseTicket_RoundTrip_SessionIDs(t *testing.T) {
 func TestParseTicket_MalformedFrontmatterYAML(t *testing.T) {
 	content := `---
 id: "04b"
-status: ready-for-agent
+status: open
 blocked_by: [01, 03
 ---
 body
