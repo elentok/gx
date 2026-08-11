@@ -31,23 +31,22 @@ var liveOwnedStatuses = map[schema.Status]bool{
 var allStatusMenuOrder = []schema.Status{
 	schema.StatusOpen,
 	schema.StatusClaimed,
-	schema.StatusNeedsInfo,
-	schema.StatusNeedsAttention,
+	schema.StatusNeedsAnswer,
+	schema.StatusNeedsRepair,
 	schema.StatusDraft,
 	schema.StatusDone,
 }
 
 // statusMenuLabels renders each schema.Status's menu label. Kept separate
-// from the enum's on-disk spelling so a future rename (e.g. the
-// needs-answer/needs-repair migration this ticket is deliberately not gated
-// on) only has to touch this table.
+// from the enum's on-disk spelling so a future rename only has to touch this
+// table.
 var statusMenuLabels = map[schema.Status]string{
-	schema.StatusOpen:           "open",
-	schema.StatusClaimed:        "claimed",
-	schema.StatusNeedsInfo:      "needs-info",
-	schema.StatusNeedsAttention: "needs-attention",
-	schema.StatusDraft:          "draft",
-	schema.StatusDone:           "done",
+	schema.StatusOpen:        "open",
+	schema.StatusClaimed:     "claimed",
+	schema.StatusNeedsAnswer: "needs-answer",
+	schema.StatusNeedsRepair: "needs-repair",
+	schema.StatusDraft:       "draft",
+	schema.StatusDone:        "done",
 }
 
 // newStatusMenu builds the status menu for ticket: every status but ticket's
