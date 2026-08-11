@@ -57,95 +57,11 @@ func waitForSlackRequests(get func() []slackRequest, want int) []slackRequest {
 	return get()
 }
 
-func TestSlackEventSink_EpicStarted_SendsOneMessageAndForwards(t *testing.T) {
-	server, getRequests := fakeSlackServer(t, http.StatusOK)
-	inner := &recordingSink{}
-	sink := newSlackEventSink(inner, server.URL, "", "")
-
-	sink.EpicStarted("epic", 0, 3)
-
-	if got := inner.snapshot(); len(got) != 1 || got[0] != "EpicStarted" {
-		t.Errorf("inner events = %v, want [EpicStarted]", got)
-	}
-
-	reqs := waitForSlackRequests(getRequests, 1)
-	if len(reqs) != 1 {
-		t.Fatalf("requests = %v, want exactly 1", reqs)
-	}
-	want := slackStyle.epicStartedText("epic", EpicCounts{})
-	if reqs[0].Text != want {
-		t.Errorf("text = %q, want %q", reqs[0].Text, want)
-	}
-}
-
-func TestSlackEventSink_IterationFinished_SendsOneMessageAndForwards(t *testing.T) {
-	server, getRequests := fakeSlackServer(t, http.StatusOK)
-	inner := &recordingSink{}
-	sink := newSlackEventSink(inner, server.URL, "", "")
-
-	stats := IterationStats{ElapsedSeconds: 42, PeakContextTokens: 1234, InProgress: 2, Completed: 3, Total: 5}
-	sink.IterationFinished(tickets.Ticket{Identifier: "04", Title: "Slack decorator"}, "epic", stats)
-
-	if got := inner.snapshot(); len(got) != 1 || got[0] != "IterationFinished" {
-		t.Errorf("inner events = %v, want [IterationFinished]", got)
-	}
-
-	reqs := waitForSlackRequests(getRequests, 1)
-	if len(reqs) != 1 {
-		t.Fatalf("requests = %v, want exactly 1", reqs)
-	}
-	want := slackStyle.iterationFinishedText(tickets.Ticket{Identifier: "04", Title: "Slack decorator"}, "epic", stats)
-	if reqs[0].Text != want {
-		t.Errorf("text = %q, want %q", reqs[0].Text, want)
-	}
-}
-
-func TestSlackEventSink_IterationPaused_SendsOneMessageAndForwards(t *testing.T) {
-	server, getRequests := fakeSlackServer(t, http.StatusOK)
-	inner := &recordingSink{}
-	sink := newSlackEventSink(inner, server.URL, "", "")
-
-	sink.IterationPaused("04", "iter-04", PauseNeedsRepair, "agent blocked on permission prompt")
-
-	if got := inner.snapshot(); len(got) != 1 || got[0] != "IterationPaused" {
-		t.Errorf("inner events = %v, want [IterationPaused]", got)
-	}
-
-	reqs := waitForSlackRequests(getRequests, 1)
-	if len(reqs) != 1 {
-		t.Fatalf("requests = %v, want exactly 1", reqs)
-	}
-	want := slackStyle.iterationPausedText("iter-04", PauseNeedsRepair, "agent blocked on permission prompt")
-	if reqs[0].Text != want {
-		t.Errorf("text = %q, want %q", reqs[0].Text, want)
-	}
-}
-
-func TestSlackEventSink_TicketNeedsHuman_SendsOneMessageAndForwards(t *testing.T) {
-	server, getRequests := fakeSlackServer(t, http.StatusOK)
-	inner := &recordingSink{}
-	sink := newSlackEventSink(inner, server.URL, "", "")
-
-	sink.TicketNeedsHuman("04", "epic", "needs-answer", "no commits landed")
-
-	if got := inner.snapshot(); len(got) != 1 || got[0] != "TicketNeedsHuman" {
-		t.Errorf("inner events = %v, want [TicketNeedsHuman]", got)
-	}
-
-	reqs := waitForSlackRequests(getRequests, 1)
-	if len(reqs) != 1 {
-		t.Fatalf("requests = %v, want exactly 1", reqs)
-	}
-	want := slackStyle.ticketNeedsHumanText("04", "epic", "needs-answer", "no commits landed", EpicCounts{})
-	if reqs[0].Text != want {
-		t.Errorf("text = %q, want %q", reqs[0].Text, want)
-	}
-	if paused := slackStyle.iterationPausedText("epic/04", PauseNeedsRepair, "stuck"); reqs[0].Text == paused {
-		t.Errorf("needs-answer text matched iteration-paused text: %q", reqs[0].Text)
-	}
-}
-
-func TestSlackEventSink_EpicComplete_SendsOneMessageAndForwards(t *testing.T) {
+// TestSlackEventSink_EpicComplete_PostsSlackWireFormat exercises the real
+// slackTransport (POST body shape) end-to-end through a real event; the
+// membership/park-cardinality/message-content behavior is exercised
+// transport-agnostically in chat_eventsink_test.go.
+func TestSlackEventSink_EpicComplete_PostsSlackWireFormat(t *testing.T) {
 	server, getRequests := fakeSlackServer(t, http.StatusOK)
 	inner := &recordingSink{}
 	sink := newSlackEventSink(inner, server.URL, "", "")
@@ -189,20 +105,22 @@ func TestSlackEventSink_CountsLine_AppearsOnlyOnFourMessageKinds(t *testing.T) {
 		t.Fatalf("requests = %v, want exactly 6", reqs)
 	}
 
-	// sends run in their own goroutine (see slackEventSink.send), so requests
+	// sends run in their own goroutine (see chatEventSink.send), so requests
 	// can arrive out of call order; match each by a marker unique to its
-	// message instead of assuming positional order.
+	// message instead of assuming positional order. Emoji markers pick out
+	// EpicStarted/EpicParked/EpicComplete, which otherwise share the same
+	// "[gx] epic" identity line.
 	cases := []struct {
 		label      string
 		marker     string
 		wantCounts bool
 	}{
-		{"EpicStarted", "epic started:", true},
+		{"EpicStarted", "\U0001f680", true},
 		{"IterationFinished", "epic/01", true},
 		{"TicketNeedsHuman", "epic/02", true},
-		{"IterationPaused", "iter-03 paused", false},
-		{"EpicParked", "epic parked:", false},
-		{"EpicComplete", "epic complete:", true},
+		{"IterationPaused", "iter-03:", false},
+		{"EpicParked", "\U0001f17f", false},
+		{"EpicComplete", "\U0001f389", true},
 	}
 	for _, tt := range cases {
 		var matched *slackRequest
@@ -220,52 +138,6 @@ func TestSlackEventSink_CountsLine_AppearsOnlyOnFourMessageKinds(t *testing.T) {
 		if got != tt.wantCounts {
 			t.Errorf("%s text = %q, contains a counts line = %v, want %v", tt.label, matched.Text, got, tt.wantCounts)
 		}
-	}
-}
-
-func TestSlackEventSink_OtherMethods_ForwardWithoutSendingAnyRequest(t *testing.T) {
-	server, getRequests := fakeSlackServer(t, http.StatusOK)
-	inner := &recordingSink{}
-	sink := newSlackEventSink(inner, server.URL, "", "")
-
-	sink.TicketReverted("01")
-	sink.TicketReattached("01", "iter-01", "/repo", "sess-1")
-	sink.TicketClaimed(tickets.Ticket{Identifier: "01"})
-	sink.IterationStarted(tickets.Ticket{Identifier: "01"}, "iter-01", "/repo", "sess-1")
-	sink.IterationResumed("01", "iter-01", PauseRateLimit)
-	sink.TranscriptLine("iter-01", "some line")
-	sink.ContextOccupancy("01", 100)
-	sink.CherryPickStarted("01")
-	sink.ConflictResolutionStarted("01")
-	sink.SmartZoneCompactStarted("01")
-	sink.SmartZoneFinishingUp("01")
-	sink.SmartZoneRecovered("01")
-	sink.TicketCleanupFinished("01")
-	sink.TicketRecovering("01")
-	sink.TicketRecovered("01", "epic", "branch", "sha")
-	sink.TicketUnrecoverable("01", "epic")
-
-	want := []string{
-		"TicketReverted", "TicketReattached",
-		"TicketClaimed", "IterationStarted", "IterationResumed",
-		"TranscriptLine", "ContextOccupancy", "CherryPickStarted", "ConflictResolutionStarted",
-		"SmartZoneCompactStarted", "SmartZoneFinishingUp", "SmartZoneRecovered",
-		"TicketCleanupFinished", "TicketRecovering", "TicketRecovered", "TicketUnrecoverable",
-	}
-	if got := inner.snapshot(); len(got) != len(want) {
-		t.Fatalf("inner events = %v, want %v", got, want)
-	} else {
-		for i, w := range want {
-			if got[i] != w {
-				t.Errorf("inner events[%d] = %q, want %q", i, got[i], w)
-			}
-		}
-	}
-
-	// Give any (unwanted) async send a moment to have fired before asserting none did.
-	time.Sleep(50 * time.Millisecond)
-	if reqs := getRequests(); len(reqs) != 0 {
-		t.Errorf("requests = %v, want none", reqs)
 	}
 }
 
@@ -359,7 +231,7 @@ func TestSlackEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 	server, _ := fakeSlackServer(t, http.StatusOK)
 	sink := newSlackEventSink(&recordingSink{}, server.URL, dir, "epic")
 
-	sink.IterationPaused("01", "iter-01", PauseNeedsRepair, "permission required")
+	sink.EpicComplete("epic", 1, 0)
 
 	var events []Event
 	deadline := time.Now().Add(2 * time.Second)
@@ -370,8 +242,8 @@ func TestSlackEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if len(events) != 1 || events[0].Type != eventNotificationSent || events[0].Channel != "slack" || events[0].NotifyKind != notifyKindIterationPaused {
-		t.Fatalf("run-log events = %#v, want one notification-sent/slack/iteration-paused", events)
+	if len(events) != 1 || events[0].Type != eventNotificationSent || events[0].Channel != "slack" || events[0].NotifyKind != notifyKindEpicComplete {
+		t.Fatalf("run-log events = %#v, want one notification-sent/slack/epic-complete", events)
 	}
 }
 
@@ -380,7 +252,7 @@ func TestSlackEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 	server, _ := fakeSlackServer(t, http.StatusInternalServerError)
 	sink := newSlackEventSink(&recordingSink{}, server.URL, dir, "epic")
 
-	sink.IterationPaused("01", "iter-01", PauseNeedsRepair, "permission required")
+	sink.EpicComplete("epic", 1, 0)
 
 	var events []Event
 	// 4s headroom: sendNotification retries once after notificationRetryBackoff
@@ -408,7 +280,7 @@ func TestSlackEventSink_LogsNotificationFailedToRunLog_RedactsWebhookSecret(t *t
 	server.Close()
 	sink := newSlackEventSink(&recordingSink{}, server.URL+"/services/"+secretPath, dir, "epic")
 
-	sink.IterationPaused("01", "iter-01", PauseNeedsRepair, "permission required")
+	sink.EpicComplete("epic", 1, 0)
 
 	var events []Event
 	// 4s headroom: sendNotification retries once after notificationRetryBackoff

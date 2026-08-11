@@ -76,6 +76,89 @@ func escapeSlackMrkdwn(s string) string {
 	return s
 }
 
+// message is the one shared constructor every chat-member event's text goes
+// through (see chatEventSink): an emoji and bold headline (escaped here, so
+// callers pass it raw), a blank line, an optional counts line, an optional
+// detail line, and identity last. counts/detail/identity arrive pre-escaped
+// — callers control exactly what those carry, in particular keeping the
+// iteration label (permitted in detail) out of identity, which names only
+// the epic or epic-and-ticket a person needs to attribute the message to at
+// a glance.
+func (s mrkdwnStyle) message(emoji, headline, counts, detail, identity string) string {
+	lines := []string{fmt.Sprintf("%s *%s*", emoji, s.escape(headline)), ""}
+	if counts != "" {
+		lines = append(lines, counts)
+	}
+	if detail != "" {
+		lines = append(lines, detail)
+	}
+	lines = append(lines, identity)
+	return strings.Join(lines, "\n")
+}
+
+// identityLine renders the trailing "who this is about" line: the gx tag
+// plus the epic name alone, or the epic and a ticket identifier — never an
+// iteration label, so parallel epics stay attributable at a glance.
+func (s mrkdwnStyle) identityLine(epicName, ticketIdentifier string) string {
+	ref := epicName
+	if ticketIdentifier != "" {
+		ref = fmt.Sprintf("%s/%s", epicName, ticketIdentifier)
+	}
+	return fmt.Sprintf("%s %s", s.gxPrefix, s.escape(ref))
+}
+
+// epicStartedText renders the "epic started" notification — the single
+// message every epic that leaves the queue emits exactly once, folding what
+// used to be separate no-tickets/already-complete notifications: a fresh
+// start reads as a plain counts line, while total 0 or done == total tell
+// the same story the old separate events used to. counts is the full
+// done/in-progress/parked/blocked/ready/total breakdown — the "queue counts
+// line" — since an epic-level message is the one place a run-wide picture
+// is useful rather than noise (see iterationFinishedText):
+//
+//	🚀 *epic started*
+//
+//	{counts line}
+//	[gx] {epic}
+func (s mrkdwnStyle) epicStartedText(epicName string, counts EpicCounts) string {
+	return s.message("\U0001f680", "epic started", RenderCountsLine(counts), "", s.identityLine(epicName, ""))
+}
+
+// iterationStartedText renders the "iteration started" notification:
+//
+//	▶️ *{title}*
+//
+//	[gx] {epic}/{ticket}
+func (s mrkdwnStyle) iterationStartedText(ticket tickets.Ticket, epicName string) string {
+	return s.message("▶️", ticket.Title, "", "", s.identityLine(epicName, ticket.Identifier))
+}
+
+// iterationPausedText renders the "paused" notification. Only reached for a
+// non-park pause (PauseRateLimit — see chatEventSink.IterationPaused), which
+// clears on its own, so there's a single emoji rather than the
+// pause-kind-dependent choice a park's IterationPaused used to need before
+// TicketNeedsHuman became the one chat-visible message for every park:
+//
+//	⏸ *paused*
+//
+//	{label}: {reason}
+//	[gx] {epic}/{ticket}
+func (s mrkdwnStyle) iterationPausedText(label, reason, epicName, ticketIdentifier string) string {
+	detail := s.escape(fmt.Sprintf("%s: %s", label, reason))
+	return s.message("⏸", "paused", "", detail, s.identityLine(epicName, ticketIdentifier))
+}
+
+// iterationResumedText renders the "resumed" notification, the counterpart
+// to iterationPausedText — also only reached for a non-park pause kind:
+//
+//	▶️ *resumed*
+//
+//	{label}
+//	[gx] {epic}/{ticket}
+func (s mrkdwnStyle) iterationResumedText(label, epicName, ticketIdentifier string) string {
+	return s.message("▶️", "resumed", "", s.escape(label), s.identityLine(epicName, ticketIdentifier))
+}
+
 // iterationFinishedText renders the "done" notification:
 //
 //	✅ *{title}*
@@ -89,71 +172,49 @@ func escapeSlackMrkdwn(s string) string {
 // not the epic's full parked/blocked/ready breakdown, which belongs to the
 // epic-level messages alone (see epicStartedText/epicCompleteText).
 func (s mrkdwnStyle) iterationFinishedText(ticket tickets.Ticket, epicName string, stats IterationStats) string {
-	ref := s.escape(fmt.Sprintf("%s/%s", epicName, ticket.Identifier))
 	line := RenderCountsLine(EpicCounts{Done: stats.Completed, InProgress: stats.InProgress, Total: stats.Total})
-	return fmt.Sprintf(
-		"✅ *%s*\n\n%s · %s · %s\n%s %s",
-		s.escape(ticket.Title), formatDuration(stats.ElapsedSeconds), formatTokens(stats.PeakContextTokens),
-		line, s.gxPrefix, ref,
+	counts := fmt.Sprintf(
+		"%s · %s · %s",
+		formatDuration(stats.ElapsedSeconds), formatTokens(stats.PeakContextTokens), line,
 	)
-}
-
-// iterationPausedText renders the "paused" notification. It leads with 🛑
-// for a needs-repair pause (an operator must act) and ⏸ for anything
-// else (rate-limit today; it clears on its own):
-//
-//	🛑 *{label} paused*
-//
-//	{reason}
-func (s mrkdwnStyle) iterationPausedText(label string, kind PauseKind, reason string) string {
-	emoji := "⏸"
-	if kind == PauseNeedsRepair {
-		emoji = "\U0001f6d1"
-	}
-	return fmt.Sprintf("%s *%s paused*\n\n%s", emoji, s.escape(label), s.escape(reason))
+	return s.message("✅", ticket.Title, counts, "", s.identityLine(epicName, ticket.Identifier))
 }
 
 // ticketNeedsHumanText renders the "a machine parked this ticket for a
-// person" notification, for either status: unlike iterationPausedText's
-// "still in progress, will resume/clear on its own", this means the
-// iteration is stuck and won't proceed without a human looking at it.
+// person" notification, for either status — the one chat-visible message
+// for every park (see chatEventSink's park-cardinality handling).
 // needs-answer means no commit landed and the agent never declared the
 // zero-commit finish intentional via `gx tickets set --iteration-status
 // finished --commitless true`; needs-repair means a fault (operator
 // intervention, an iteration error, a dead-on-arrival reconciliation)
 // parked it instead.
 //
-//	🆘 *{epic}/{ticket} needs answer*      (needs-answer)
-//	🛑 *{epic}/{ticket} needs repair*      (needs-repair)
+//	🆘 *needs answer*      (needs-answer)
+//	🛑 *needs repair*      (needs-repair)
 //
 //	{reason}
 //	{counts line}
+//	[gx] {epic}/{ticket}
 func (s mrkdwnStyle) ticketNeedsHumanText(identifier, epicName, status, reason string, counts EpicCounts) string {
-	ref := s.escape(fmt.Sprintf("%s/%s", epicName, identifier))
-	emoji, label := "\U0001f198", "needs answer"
+	emoji, headline := "\U0001f198", "needs answer"
 	if status != "needs-answer" {
-		emoji, label = "\U0001f6d1", "needs repair"
+		emoji, headline = "\U0001f6d1", "needs repair"
 	}
-	return fmt.Sprintf("%s *%s %s*\n\n%s\n%s", emoji, ref, label, s.escape(reason), RenderCountsLine(counts))
+	detail := fmt.Sprintf("%s\n%s", s.escape(reason), RenderCountsLine(counts))
+	return s.message(emoji, headline, "", detail, s.identityLine(epicName, identifier))
 }
 
-// epicStartedText renders the "epic started" notification — the single
-// message every epic that leaves the queue emits exactly once, folding what
-// used to be separate no-tickets/already-complete notifications: a fresh
-// start reads as a plain counts line, while total 0 or done == total tell
-// the same story the old separate events used to. counts is the full
-// done/in-progress/parked/blocked/ready/total breakdown — the "queue counts
-// line" — since an epic-level message is the one place a run-wide picture
-// is useful rather than noise (see iterationFinishedText):
+// epicParkedText renders the "epic parked" notification — the run is still
+// alive (unlike epicCompleteText) with every pane recoverable, waiting on a
+// person to clear one of the named tickets:
 //
-//	🚀 *epic started: {epicName}*
+//	🅿️ *epic parked*
 //
-//	{counts line}
-func (s mrkdwnStyle) epicStartedText(epicName string, counts EpicCounts) string {
-	return fmt.Sprintf(
-		"\U0001f680 *epic started: %s*\n\n%s",
-		s.escape(epicName), RenderCountsLine(counts),
-	)
+//	Nothing runnable left; waiting on {stalled}
+//	[gx] {epic}
+func (s mrkdwnStyle) epicParkedText(epicName string, stalled []string) string {
+	detail := s.escape("Nothing runnable left; waiting on " + strings.Join(stalled, ", "))
+	return s.message("\U0001f17f️", "epic parked", "", detail, s.identityLine(epicName, ""))
 }
 
 // epicCompleteText renders the "epic complete" notification. counts is the
@@ -161,38 +222,24 @@ func (s mrkdwnStyle) epicStartedText(epicName string, counts EpicCounts) string 
 // own landed-ticket tally, a distinct number from counts.Done (the epic's
 // total done count, which may include tickets a prior run landed):
 //
-//	🎉 *epic complete: {epicName}*
+//	🎉 *epic complete*
 //
 //	{counts line}
 //	{completed} ticket(s) landed in {elapsed}
+//	[gx] {epic}
 func (s mrkdwnStyle) epicCompleteText(epicName string, counts EpicCounts, completed int, elapsedSeconds int) string {
-	return fmt.Sprintf(
-		"\U0001f389 *epic complete: %s*\n\n%s\n%d ticket(s) landed in %s",
-		s.escape(epicName), RenderCountsLine(counts), completed, formatDuration(elapsedSeconds),
-	)
-}
-
-// epicParkedText renders the "epic parked" notification — the run is still
-// alive (unlike epicCompleteText) with every pane recoverable, waiting on a
-// person to clear one of the named tickets:
-//
-//	🅿️ *epic parked: {epicName}*
-//
-//	Nothing runnable left; waiting on {stalled}
-func (s mrkdwnStyle) epicParkedText(epicName string, stalled []string) string {
-	return fmt.Sprintf(
-		"\U0001f17f️ *epic parked: %s*\n\n%s",
-		s.escape(epicName), s.escape("Nothing runnable left; waiting on "+strings.Join(stalled, ", ")),
-	)
+	detail := fmt.Sprintf("%d ticket(s) landed in %s", completed, formatDuration(elapsedSeconds))
+	return s.message("\U0001f389", "epic complete", RenderCountsLine(counts), detail, s.identityLine(epicName, ""))
 }
 
 // testMessageText renders the fixed message `gx config test-notifications`
 // sends to confirm a configured service is actually reachable:
 //
-//	[gx] 🔔 *test notification*
+//	🔔 *test notification*
 //
 //	If you can see this, notifications are working.
+//	[gx]
 func (s mrkdwnStyle) testMessageText() string {
 	body := s.escape("If you can see this, notifications are working.")
-	return fmt.Sprintf("%s \U0001f514 *test notification*\n\n%s", s.gxPrefix, body)
+	return s.message("\U0001f514", "test notification", "", body, s.gxPrefix)
 }

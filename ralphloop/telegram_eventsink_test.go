@@ -8,8 +8,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/elentok/gx/tickets"
 )
 
 // telegramRequest captures one decoded call to the fake Telegram API's
@@ -62,101 +60,11 @@ func waitForRequests(get func() []telegramRequest, want int) []telegramRequest {
 	return get()
 }
 
-func TestTelegramEventSink_EpicStarted_SendsOneMessageAndForwards(t *testing.T) {
-	server, getRequests := fakeTelegramServer(t, http.StatusOK)
-	inner := &recordingSink{}
-	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
-
-	sink.EpicStarted("epic", 0, 3)
-
-	if got := inner.snapshot(); len(got) != 1 || got[0] != "EpicStarted" {
-		t.Errorf("inner events = %v, want [EpicStarted]", got)
-	}
-
-	reqs := waitForRequests(getRequests, 1)
-	if len(reqs) != 1 {
-		t.Fatalf("requests = %v, want exactly 1", reqs)
-	}
-	want := telegramStyle.epicStartedText("epic", EpicCounts{})
-	if reqs[0].Text != want {
-		t.Errorf("text = %q, want %q", reqs[0].Text, want)
-	}
-}
-
-func TestTelegramEventSink_IterationFinished_SendsOneMessageAndForwards(t *testing.T) {
-	server, getRequests := fakeTelegramServer(t, http.StatusOK)
-	inner := &recordingSink{}
-	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
-
-	stats := IterationStats{ElapsedSeconds: 42, PeakContextTokens: 1234, InProgress: 2, Completed: 3, Total: 5}
-	sink.IterationFinished(tickets.Ticket{Identifier: "04", Title: "Telegram decorator"}, "epic", stats)
-
-	if got := inner.snapshot(); len(got) != 1 || got[0] != "IterationFinished" {
-		t.Errorf("inner events = %v, want [IterationFinished]", got)
-	}
-
-	reqs := waitForRequests(getRequests, 1)
-	if len(reqs) != 1 {
-		t.Fatalf("requests = %v, want exactly 1", reqs)
-	}
-	if reqs[0].ChatID != "chat-1" {
-		t.Errorf("chat_id = %q, want %q", reqs[0].ChatID, "chat-1")
-	}
-	if reqs[0].ParseMode != "MarkdownV2" {
-		t.Errorf("parse_mode = %q, want %q", reqs[0].ParseMode, "MarkdownV2")
-	}
-	want := telegramStyle.iterationFinishedText(tickets.Ticket{Identifier: "04", Title: "Telegram decorator"}, "epic", stats)
-	if reqs[0].Text != want {
-		t.Errorf("text = %q, want %q", reqs[0].Text, want)
-	}
-}
-
-func TestTelegramEventSink_IterationPaused_SendsOneMessageAndForwards(t *testing.T) {
-	server, getRequests := fakeTelegramServer(t, http.StatusOK)
-	inner := &recordingSink{}
-	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
-
-	sink.IterationPaused("04", "iter-04", PauseNeedsRepair, "agent blocked on permission prompt")
-
-	if got := inner.snapshot(); len(got) != 1 || got[0] != "IterationPaused" {
-		t.Errorf("inner events = %v, want [IterationPaused]", got)
-	}
-
-	reqs := waitForRequests(getRequests, 1)
-	if len(reqs) != 1 {
-		t.Fatalf("requests = %v, want exactly 1", reqs)
-	}
-	want := telegramStyle.iterationPausedText("iter-04", PauseNeedsRepair, "agent blocked on permission prompt")
-	if reqs[0].Text != want {
-		t.Errorf("text = %q, want %q", reqs[0].Text, want)
-	}
-}
-
-func TestTelegramEventSink_TicketNeedsHuman_SendsOneMessageAndForwards(t *testing.T) {
-	server, getRequests := fakeTelegramServer(t, http.StatusOK)
-	inner := &recordingSink{}
-	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
-
-	sink.TicketNeedsHuman("04", "epic", "needs-answer", "no commits landed")
-
-	if got := inner.snapshot(); len(got) != 1 || got[0] != "TicketNeedsHuman" {
-		t.Errorf("inner events = %v, want [TicketNeedsHuman]", got)
-	}
-
-	reqs := waitForRequests(getRequests, 1)
-	if len(reqs) != 1 {
-		t.Fatalf("requests = %v, want exactly 1", reqs)
-	}
-	want := telegramStyle.ticketNeedsHumanText("04", "epic", "needs-answer", "no commits landed", EpicCounts{})
-	if reqs[0].Text != want {
-		t.Errorf("text = %q, want %q", reqs[0].Text, want)
-	}
-	if paused := telegramStyle.iterationPausedText("epic/04", PauseNeedsRepair, "stuck"); reqs[0].Text == paused {
-		t.Errorf("needs-answer text matched iteration-paused text: %q", reqs[0].Text)
-	}
-}
-
-func TestTelegramEventSink_EpicComplete_SendsOneMessageAndForwards(t *testing.T) {
+// TestTelegramEventSink_EpicComplete_PostsTelegramWireFormat exercises the
+// real telegramTransport (chat_id/parse_mode/body shape) end-to-end through
+// a real event; the membership/park-cardinality/message-content behavior is
+// exercised transport-agnostically in chat_eventsink_test.go.
+func TestTelegramEventSink_EpicComplete_PostsTelegramWireFormat(t *testing.T) {
 	server, getRequests := fakeTelegramServer(t, http.StatusOK)
 	inner := &recordingSink{}
 	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
@@ -171,55 +79,15 @@ func TestTelegramEventSink_EpicComplete_SendsOneMessageAndForwards(t *testing.T)
 	if len(reqs) != 1 {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
+	if reqs[0].ChatID != "chat-1" {
+		t.Errorf("chat_id = %q, want %q", reqs[0].ChatID, "chat-1")
+	}
+	if reqs[0].ParseMode != "MarkdownV2" {
+		t.Errorf("parse_mode = %q, want %q", reqs[0].ParseMode, "MarkdownV2")
+	}
 	want := telegramStyle.epicCompleteText("epic", EpicCounts{}, 5, 300)
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
-	}
-}
-
-func TestTelegramEventSink_OtherMethods_ForwardWithoutSendingAnyRequest(t *testing.T) {
-	server, getRequests := fakeTelegramServer(t, http.StatusOK)
-	inner := &recordingSink{}
-	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
-
-	sink.TicketReverted("01")
-	sink.TicketReattached("01", "iter-01", "/repo", "sess-1")
-	sink.TicketClaimed(tickets.Ticket{Identifier: "01"})
-	sink.IterationStarted(tickets.Ticket{Identifier: "01"}, "iter-01", "/repo", "sess-1")
-	sink.IterationResumed("01", "iter-01", PauseRateLimit)
-	sink.TranscriptLine("iter-01", "some line")
-	sink.ContextOccupancy("01", 100)
-	sink.CherryPickStarted("01")
-	sink.ConflictResolutionStarted("01")
-	sink.SmartZoneCompactStarted("01")
-	sink.SmartZoneFinishingUp("01")
-	sink.SmartZoneRecovered("01")
-	sink.TicketCleanupFinished("01")
-	sink.TicketRecovering("01")
-	sink.TicketRecovered("01", "epic", "branch", "sha")
-	sink.TicketUnrecoverable("01", "epic")
-
-	want := []string{
-		"TicketReverted", "TicketReattached",
-		"TicketClaimed", "IterationStarted", "IterationResumed",
-		"TranscriptLine", "ContextOccupancy", "CherryPickStarted", "ConflictResolutionStarted",
-		"SmartZoneCompactStarted", "SmartZoneFinishingUp", "SmartZoneRecovered",
-		"TicketCleanupFinished", "TicketRecovering", "TicketRecovered", "TicketUnrecoverable",
-	}
-	if got := inner.snapshot(); len(got) != len(want) {
-		t.Fatalf("inner events = %v, want %v", got, want)
-	} else {
-		for i, w := range want {
-			if got[i] != w {
-				t.Errorf("inner events[%d] = %q, want %q", i, got[i], w)
-			}
-		}
-	}
-
-	// Give any (unwanted) async send a moment to have fired before asserting none did.
-	time.Sleep(50 * time.Millisecond)
-	if reqs := getRequests(); len(reqs) != 0 {
-		t.Errorf("requests = %v, want none", reqs)
 	}
 }
 

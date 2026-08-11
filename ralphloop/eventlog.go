@@ -63,8 +63,10 @@ const (
 // "notification-sent"/"notification-failed" itself).
 const (
 	notifyKindEpicStarted       = "epic-started"
+	notifyKindIterationStarted  = "iteration-started"
 	notifyKindIterationFinished = "iteration-finished"
 	notifyKindIterationPaused   = "iteration-paused"
+	notifyKindIterationResumed  = "iteration-resumed"
 	notifyKindEpicComplete      = "epic-complete"
 	notifyKindEpicParked        = "epic-parked"
 	notifyKindTicketNeedsHuman  = "ticket-needs-human"
@@ -202,8 +204,8 @@ func LogNotificationsConfigured(scratchDir, epicName string, telegram, slack boo
 }
 
 // logNotificationSent/logNotificationFailed record one Telegram/Slack
-// delivery attempt from inside telegramEventSink/slackEventSink's send,
-// tagged with the channel and the live event that triggered it. Errors are
+// delivery attempt from inside chatEventSink's send, tagged with the
+// channel and the live event that triggered it. Errors are
 // swallowed like every other logEvent call site here — a failure to log
 // shouldn't compound the failure it was trying to record.
 func logNotificationSent(scratchDir, epicName, channel, notifyKind string) {
@@ -227,8 +229,8 @@ const notificationRetryBackoff = 1500 * time.Millisecond
 // sendNotification runs sendSync in its own goroutine, bounded by timeout per
 // attempt, so a slow or unreachable notification endpoint never blocks the
 // caller — the shared goroutine + log-outcome wrapper behind
-// slackEventSink.send and telegramEventSink.send, which were identical
-// except for channel and the sendSync call itself. It retries once after
+// chatEventSink.send, generic over channel and the transport's sendSync
+// call. It retries once after
 // notificationRetryBackoff before giving up: a single hung attempt (observed
 // hanging to the full per-attempt deadline) is a real stall, not evidence the
 // endpoint is unreachable, and the outage this guards against was
@@ -263,7 +265,7 @@ func sendNotification(scratchDir, epicName, channel, notifyKind string, timeout 
 }
 
 // sanitizeSendError strips the request URL from a failed send's error before
-// it reaches logger.Debug or run-log.jsonl. telegramEventSink/slackEventSink
+// it reaches logger.Debug or run-log.jsonl. telegramTransport/slackTransport
 // build that URL with the bot token/webhook secret embedded in the path, and
 // (*url.Error).Error() — what http.Client.Do returns on failure — includes
 // the full URL verbatim, so logging it as-is leaks the secret. The
