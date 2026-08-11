@@ -23,6 +23,10 @@ type PauseKind string
 // IterationStats carries the data IterationFinished needs beyond the ticket
 // and epic name: the landed iteration's own metrics plus the epic's live
 // progress counts, grouped into one type rather than five loose ints.
+// Completed and Total describe the epic as a whole — recomputed from the
+// scan loop's already-loaded epic on every landed iteration, not counted up
+// by this Run call — so a resumed or scoped run reports the same numbers a
+// fresh run over the same epic would (see RunScope.DoneCount/TotalCount).
 type IterationStats struct {
 	ElapsedSeconds    int
 	PeakContextTokens int

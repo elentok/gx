@@ -410,6 +410,11 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 
 	completed := 0
 	active := 0
+	// liveDone tracks the epic-wide done count, recomputed from disk on every
+	// landed iteration (see the results loop below) rather than counted up
+	// per-run, so a resumed run reports what's true of the epic even though
+	// this run's own completed count starts back at zero.
+	liveDone := scope.DoneCount(*initial)
 
 	// The epic is genuinely running past this point (not no-tickets, not
 	// already-complete), so the permit is acquired and the single start
@@ -550,6 +555,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			return err
 		} else if landedEpic != nil {
 			liveTotal = scope.TotalCount(*landedEpic)
+			liveDone = scope.DoneCount(*landedEpic)
 			for _, t := range landedEpic.Tickets {
 				if t.Identifier == r.ticket.Identifier {
 					landedTicket = t
@@ -570,7 +576,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			ElapsedSeconds:    landedTicket.ElapsedTime,
 			PeakContextTokens: landedTicket.ActualContextWindow,
 			InProgress:        active,
-			Completed:         completed,
+			Completed:         liveDone,
 			Total:             liveTotal,
 		})
 	}

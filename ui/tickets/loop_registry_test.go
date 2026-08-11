@@ -133,10 +133,11 @@ func TestReduceLiveEventCompletesTicketProgress(t *testing.T) {
 	})
 	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
 		Kind: ralphloop.LiveEventIterationFinished, Identifier: "01",
+		Stats: ralphloop.IterationStats{Completed: 2, Total: 3},
 	})
 
 	snapshot, _ := r.runSnapshot("epic-a")
-	if snapshot.Done != 2 || snapshot.Paused || !snapshot.Tickets["01"].Completed {
+	if snapshot.Done != 2 || snapshot.Total != 3 || snapshot.Paused || !snapshot.Tickets["01"].Completed {
 		t.Fatalf("snapshot after ticket completion = %#v", snapshot)
 	}
 }
@@ -194,8 +195,35 @@ func TestReduceLiveEventCapturesEpicCompletion(t *testing.T) {
 	})
 
 	snapshot, _ := r.runSnapshot("epic-a")
-	if snapshot.State != RunStateCompleted || snapshot.Done != 3 {
+	if snapshot.State != RunStateCompleted {
 		t.Fatalf("snapshot after epic completion = %#v", snapshot)
+	}
+}
+
+// TestReduceLiveEventEpicCompleteDoesNotClobberDiskSyncedDone pins the fix
+// for a resumed run reporting stale counts: EpicComplete's Completed is this
+// run's own landed-ticket count (see EventSink.EpicComplete), a different
+// number from the epic-wide Done a resumed run's IterationFinished events
+// already synced — EpicComplete must not overwrite Done with it.
+func TestReduceLiveEventEpicCompleteDoesNotClobberDiskSyncedDone(t *testing.T) {
+	r := newLoopRegistry(1)
+	r.tryStart("epic-a", 5, 10)
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationStarted, Identifier: "10", Label: "iter-10",
+	})
+	// A resumed run only landed one ticket itself, but the epic's on-disk
+	// state (synced via Stats) already shows all 10 done.
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationFinished, Identifier: "10",
+		Stats: ralphloop.IterationStats{Completed: 10, Total: 10},
+	})
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventEpicComplete, Completed: 1, ElapsedSeconds: 5,
+	})
+
+	snapshot, _ := r.runSnapshot("epic-a")
+	if snapshot.Done != 10 || snapshot.Total != 10 {
+		t.Fatalf("snapshot.Done/Total = %d/%d, want 10/10 (epic-wide, not this run's landed count of 1)", snapshot.Done, snapshot.Total)
 	}
 }
 
@@ -631,7 +659,7 @@ func TestRegistryDrainsRunEventsBeforeFinish(t *testing.T) {
 	}
 	sink.IterationStarted(tickets.Ticket{Identifier: "01"}, "iter-01", "", "")
 	sink.ContextOccupancy("01", 42)
-	sink.IterationFinished(tickets.Ticket{Identifier: "01"}, "epic-a", ralphloop.IterationStats{})
+	sink.IterationFinished(tickets.Ticket{Identifier: "01"}, "epic-a", ralphloop.IterationStats{Completed: 1, Total: 1})
 
 	r.finish("epic-a", nil)
 

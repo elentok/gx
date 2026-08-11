@@ -778,6 +778,42 @@ func TestRun_ScopeWidenedMidRun_TotalGrowsWithIt(t *testing.T) {
 	}
 }
 
+// TestRun_ResumedRun_ReportsEpicWideDoneNotRunLocalCount is a regression
+// test for ticket 26: a resumed run only lands one ticket itself, but
+// IterationStats.Completed must count every done ticket on disk (including
+// ones done before this Run call started), not just the ones this run
+// landed — otherwise a resumed run understates progress ("1/10 done" when
+// six of ten are already done).
+func TestRun_ResumedRun_ReportsEpicWideDoneNotRunLocalCount(t *testing.T) {
+	scratchDir := writeEpic(t, "my-epic", map[string]string{
+		"01-first.md":  "---\nid: \"01\"\nstatus: done\ntype: task\n---\n# First\n",
+		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
+	})
+	d, _, _ := fakeDeps()
+	sink := &recordingSink{}
+
+	err := Run(RunOptions{
+		EpicName:   "my-epic",
+		Skill:      "implement",
+		ScratchDir: scratchDir,
+		RepoDir:    "/fake/repo",
+	}, d, sink)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	stats, ok := sink.iterationStatsByTicket["02"]
+	if !ok {
+		t.Fatalf("no IterationFinished recorded for ticket 02")
+	}
+	if stats.Completed != 2 {
+		t.Errorf("ticket 02 stats.Completed = %d, want 2 (ticket 01 was already done on disk before this run started)", stats.Completed)
+	}
+	if stats.Total != 2 {
+		t.Errorf("ticket 02 stats.Total = %d, want 2", stats.Total)
+	}
+}
+
 // TestRun_NeedsRepairOutsideSubset_DoesNotPauseRun covers ticket 23's
 // requirement: a needs-repair ticket left outside the requested subset
 // must not gate-pause scheduling of the tickets the caller actually asked

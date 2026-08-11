@@ -387,13 +387,22 @@ func (r *loopRegistry) reduceLiveEvent(epicName string, event ralphloop.LiveEven
 			ticket.PauseReason = ""
 			ticket.ContextTokens = 0
 			run.tickets[event.Identifier] = ticket
-			run.done++
+			// Stats.Completed/Total already describe the whole epic, recomputed
+			// from disk (see IterationStats) — read them rather than counting
+			// this run's own landed tickets, so a resumed run's Done/Total match
+			// what a fresh run over the same epic would report.
+			run.done = event.Stats.Completed
+			run.total = event.Stats.Total
 		}
 	case ralphloop.LiveEventEpicParked:
 		run.state = RunStateParked
 		run.parkedStalled = event.Stalled
 	case ralphloop.LiveEventEpicComplete:
-		run.done = event.Completed
+		// Done/Total were already synced to the epic's true state by the last
+		// LiveEventIterationFinished (or seeded correctly at tryStart if the
+		// epic was already complete when this run started) — event.Completed
+		// is this run's own landed-ticket count, a different number (see
+		// EventSink.EpicComplete), not the epic-wide done count.
 		run.state = RunStateCompleted
 		run.pendingToasts = append(run.pendingToasts, notify.NotifyMsg{
 			Kind:    notify.KindSuccess,

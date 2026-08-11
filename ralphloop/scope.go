@@ -166,14 +166,17 @@ func (s RunScope) TotalCount(epic tickets.Epic) int {
 	return total
 }
 
-// DoneCount is how many of the scope's tickets are done.
+// DoneCount is how many of the scope's tickets are done. Uses RenderedStatus,
+// not the raw Status: field, so a done parent still waiting on its fork
+// children (see Epic.RenderedStatus) counts as not-done here too, matching
+// Epic.DoneCount's whole-epic behavior.
 func (s RunScope) DoneCount(epic tickets.Epic) int {
 	if s.wholeEpic {
 		return epic.DoneCount()
 	}
 	done := 0
 	for _, ticket := range epic.Tickets {
-		if s.Contains(ticket, epic) && ticket.IsDone() {
+		if s.Contains(ticket, epic) && epic.RenderedStatus(ticket) == tickets.StatusDone {
 			done++
 		}
 	}

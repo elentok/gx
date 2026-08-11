@@ -65,6 +65,32 @@ func TestRunScope_DoneAndTotalCount_AreScopedNotEpicWide(t *testing.T) {
 	}
 }
 
+// TestRunScope_DoneCount_WaitingForChildrenParentNotDone pins the fix for a
+// scoped RunScope.DoneCount that used to read a ticket's raw Status: (via
+// IsDone) instead of its RenderedStatus, so a scoped run could count a
+// done-but-waiting-on-its-fork-subtree parent as done when the equivalent
+// whole-epic scope (via Epic.DoneCount) would not — the exact "scoped and
+// fresh runs report identical counts" split the ticket calls out.
+func TestRunScope_DoneCount_WaitingForChildrenParentNotDone(t *testing.T) {
+	parent := "01"
+	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
+		{Number: 1, Identifier: "01", Status: "done"},
+		{Number: 1, Identifier: "01a", Status: "open", Parent: &parent},
+		{Number: 2, Identifier: "02", Status: "done"},
+	}}
+
+	scope, err := ResolveRunScope(epic, []string{"01", "01a", "02"})
+	if err != nil {
+		t.Fatalf("ResolveRunScope() error = %v", err)
+	}
+	if got := scope.DoneCount(epic); got != 1 {
+		t.Errorf("DoneCount() = %d, want 1 (01 is waiting on fork child 01a, only 02 is done)", got)
+	}
+	if got, want := scope.DoneCount(epic), epic.DoneCount(); got != want {
+		t.Errorf("scoped DoneCount() = %d, want %d (whole-epic DoneCount, since scope covers every ticket)", got, want)
+	}
+}
+
 func TestRunScope_DoneAndTotalCount_WholeEpicMatchesEpicMethods(t *testing.T) {
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "done"},
