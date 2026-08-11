@@ -312,6 +312,35 @@ func TestClaim_FrontmatterTicket_RoundTripsThroughSchema(t *testing.T) {
 	}
 }
 
+// TestMarkNeedsAnswerWithReasonAndStub_WritesStatusReasonAndStub verifies
+// ticket 14's pane-answered park write: status becomes needs-answer, and the
+// body gains a "## Needs Answer" stub containing reason, which names the
+// iteration label rather than a raw pane id — a label still resolves after a
+// restart or reattach, and a pane id does not.
+func TestMarkNeedsAnswerWithReasonAndStub_WritesStatusReasonAndStub(t *testing.T) {
+	path := writeFrontmatterTicket(t, "claimed")
+	reason := "iter-01 is blocked on a prompt gx did not send; answer it in the pane"
+
+	if err := MarkNeedsAnswerWithReasonAndStub(path, reason); err != nil {
+		t.Fatalf("MarkNeedsAnswerWithReasonAndStub: %v", err)
+	}
+
+	got := mustParse(t, path)
+	if got.Status != schema.StatusNeedsAnswer {
+		t.Errorf("Status = %q, want needs-answer", got.Status)
+	}
+	body := schema.ParseBody(mustRead(t, path))
+	if !strings.Contains(body, "## Needs Answer") {
+		t.Errorf("body missing ## Needs Answer stub:\n%s", body)
+	}
+	if !strings.Contains(body, "iter-01") {
+		t.Errorf("body does not name the iteration label iter-01:\n%s", body)
+	}
+	if !strings.Contains(body, "Body text.") {
+		t.Errorf("body lost its original content:\n%s", body)
+	}
+}
+
 // TestMarkDoneWithMetadata_FrontmatterTicket_WritesActualContextWindow
 // verifies ticket 07's fix for the corruption described in its issue: a
 // frontmatter ticket already carrying actual_context_window/elapsed_time

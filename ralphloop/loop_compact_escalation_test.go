@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
@@ -26,18 +25,38 @@ func stuckCompactionDeps(onBreach func() error) Deps {
 	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
 		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "session-01"}, nil
 	}
+	// nestedCallsPerCycle is how many AgentWait calls waitForCompactionSignal
+	// makes per breach before giving up (ReadCompactions never advancing means
+	// it always runs to smartZoneCompactExtendedTimeoutMs), derived from the
+	// same constants waitForFinish paces by rather than a hardcoded guess.
+	nestedCallsPerCycle := (smartZoneCompactExtendedTimeoutMs - smartZonePollMs) / smartZonePollMs
+	// sinceBreach counts AgentWait calls since the last ctrl+c interrupt. Once
+	// "blocked" joined waitForFinish's main-poll completion states for every
+	// agent kind (ticket 14), the main poll's own bounded wait and the nested
+	// compaction-confirmation wait share the same Until/TimeoutMs shape, so
+	// nothing in opts distinguishes them anymore — call position does instead:
+	// the nestedCallsPerCycle calls right after each ctrl+c are the compaction
+	// wait (and must claim premature idle completion, since ReadCompactions
+	// never corroborates it), everything else is the main poll's own bounded
+	// tick (and must time out, which is what keeps re-driving the breach).
+	// sinceBreach starts outside that window so the very first call — before
+	// any breach has happened — times out too.
+	sinceBreach := nestedCallsPerCycle + 1
 	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		// The launch's own unbounded wait succeeds, and so does every wait on
-		// the compaction's states — that premature idle report is the pane
-		// claiming a completion the transcript never records. The iteration's
-		// own bounded poll ticks time out, which is what keeps driving the
-		// breach handling.
-		if opts.TimeoutMs == 0 || slices.Contains(opts.Until, "blocked") {
+		if opts.TimeoutMs == 0 {
+			// The launch's own unbounded wait.
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		}
+		sinceBreach++
+		if sinceBreach <= nestedCallsPerCycle {
 			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 		}
 		return herdr.Agent{}, errors.New("timed out waiting for agent status")
 	}
-	d.AgentSendKeys = func(string, ...string) error { return onBreach() }
+	d.AgentSendKeys = func(string, ...string) error {
+		sinceBreach = 0
+		return onBreach()
+	}
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) { return 200, true, nil }
 	d.ReadCompactions = func(cwd, sessionID string) (int, bool, error) { return 0, true, nil }
 	d.AgentRead = func(string, herdr.AgentReadOptions) (string, error) { return "compaction complete", nil }

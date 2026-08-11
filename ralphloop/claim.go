@@ -130,6 +130,21 @@ func MarkNeedsAnswer(path string) error {
 	return SetStatus(path, "needs-answer")
 }
 
+// MarkNeedsAnswerWithReasonAndStub writes status: needs-answer into the
+// ticket file and appends reason to the body under a "## Needs Answer"
+// heading, both naming label. This is the pane-answered park (an involuntary
+// prompt the agent didn't choose): the stub distinguishes it from
+// MarkNeedsAnswer's bare write for a ticket-answered zero-commit finish,
+// since the question here exists only in the pane — a person answers it
+// there, and the stub just gives them (and the TUI's auto-scroll) something
+// to find.
+func MarkNeedsAnswerWithReasonAndStub(path, reason string) error {
+	return updateTicketWithBody(path, func(t *schema.Ticket, body *string) {
+		t.Status = schema.StatusNeedsAnswer
+		*body += fmt.Sprintf("\n## Needs Answer\n\n%s\n", reason)
+	})
+}
+
 // MarkNeedsRepairWithReason writes status: needs-repair into the ticket file
 // and appends a "## Needs Repair" section built by schema.FormatNeedsRepairBody
 // (summary/detail split from reason, plus state rendered best-effort), so the

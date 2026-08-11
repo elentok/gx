@@ -316,10 +316,14 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 	s.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
 		target := argv[2]
 		until := parseUntil(argv[3:])
-		if slices.Contains(until, "blocked") {
+		if compact.Active() {
 			// A compact-completion poll (see compactStates in
 			// waitforfinish.go): each dispatch models one smartZonePollMs tick
-			// of the compaction actually running.
+			// of the compaction actually running. Once "blocked" joined every
+			// finish poll's completion states (ticket 14), Until's shape alone
+			// no longer told this apart from the ordinary finish poll below —
+			// compact.Active() does, since only a compaction actually in
+			// flight should advance the virtual clock.
 			mu.Lock()
 			virtualTime += smartZonePollMs * time.Millisecond
 			mu.Unlock()
@@ -660,7 +664,7 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 	var mu sync.Mutex
 	status := "working" // agent starts mid-turn, already over smartZone
 	var compactCalls, ctrlCCalls, enterCalls, compactWaitTicks int
-	var boundaryWritten bool
+	var boundaryWritten, compacting bool
 	var promptOrder []string
 
 	s.Register("agent", "prompt", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
@@ -674,6 +678,7 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 			promptOrder = append(promptOrder, "/compact")
 			// Deliberately does NOT flip status to "idle": the pane never
 			// confirms the compact finishing, so only the transcript can.
+			compacting = true
 			respond = "working"
 		case strings.Contains(text, "please finish up quickly"):
 			promptOrder = append(promptOrder, "finish-up")
@@ -691,15 +696,20 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 		until := parseUntil(argv[3:])
 		mu.Lock()
 		defer mu.Unlock()
-		if slices.Contains(until, "blocked") {
+		if compacting {
 			// A compact-completion poll (see compactStates in
 			// waitforfinish.go): the pane never reports completion, so
 			// every one of these times out. Once enough ticks have passed,
 			// the transcript is updated as a side effect, still without
-			// ever making this call itself succeed.
+			// ever making this call itself succeed. Gated on compacting
+			// rather than Until's shape — once "blocked" joined every finish
+			// poll's completion states (ticket 14), Until alone no longer
+			// told a compact-completion poll apart from the ordinary finish
+			// poll below.
 			compactWaitTicks++
 			if compactWaitTicks >= compactBoundaryConfirmTick && !boundaryWritten {
 				boundaryWritten = true
+				compacting = false
 				mu.Unlock()
 				appendCompactBoundaryLine(t, cwd, sessionID)
 				mu.Lock()

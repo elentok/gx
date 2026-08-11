@@ -269,6 +269,9 @@ func launchAndPrompt(d Deps, p launchAndPromptParams) (string, error) {
 	}
 
 	if err := waitForFinish(d, p, sessionID); err != nil {
+		if errors.Is(err, errBlockedPaneParked) {
+			return sessionID, err
+		}
 		return "", err
 	}
 	return sessionID, nil
@@ -301,6 +304,9 @@ func attachToLiveAgent(d Deps, p launchAndPromptParams) (string, error) {
 		return sessionID, nil
 	}
 	if err := waitForFinish(d, p, sessionID); err != nil {
+		if errors.Is(err, errBlockedPaneParked) {
+			return sessionID, err
+		}
 		return "", err
 	}
 	return sessionID, nil
@@ -308,16 +314,16 @@ func attachToLiveAgent(d Deps, p launchAndPromptParams) (string, error) {
 
 // plainFinishStates are the herdr agent_status values that mean "the agent's
 // turn is over" for every agent kind. waitForFinish appends "blocked" to
-// these for Codex, which needs its own rate-limit/attention-recovery handling
-// rather than being treated as finished.
+// these for every agent kind, which needs its own quota/park handling rather
+// than being treated as finished.
 var plainFinishStates = []string{"idle", "done"}
 
 // alreadyFinished reports whether status (a herdr tab's current agent_status,
 // e.g. from TabList) already matches one of waitForFinish's plain-completion
 // target states. "blocked" is deliberately excluded even though waitForFinish
-// treats it as a Codex finish state too — a pane already sitting blocked at
-// reattach still needs waitForFinish's rate-limit/attention-recovery
-// handling, not a bare skip.
+// treats it as a finish state of its own — a pane already sitting blocked at
+// reattach still needs waitForFinish's dwell-and-park handling, not a bare
+// skip.
 func alreadyFinished(status string) bool {
 	return slices.Contains(plainFinishStates, status)
 }

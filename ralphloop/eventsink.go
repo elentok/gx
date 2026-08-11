@@ -33,13 +33,13 @@ type IterationStats struct {
 
 const (
 	PauseRateLimit PauseKind = "rate-limit"
-	// PauseNeedsRepair marks the operator-intervention pause
-	// waitForAttentionRecovery drives (Codex blocked on a permission/
-	// intervention prompt): mechanically it's paused through the same
-	// Gate as PauseRateLimit, but a renderer (see ticket 04a) treats
-	// it as its own "needs repair" state rather than a generic pause,
-	// since it needs a human at the agent's pane rather than clearing itself
-	// or via `gx ralph-loop resume`.
+	// PauseNeedsRepair marks the fault-side recovery an iteration goroutine's
+	// own error drives (loop.go's r.err handling): the ticket is flagged
+	// needs-repair and dropped out of the frontier for a human to clear, while
+	// the scheduler itself keeps running every other ticket. A renderer (see
+	// ticket 04a) treats it as its own "needs repair" state rather than a
+	// generic pause. A pane blocked on an operator prompt is a different park
+	// entirely (needs-answer, no pause — see parkOnBlockedPane).
 	PauseNeedsRepair PauseKind = "needs-repair"
 )
 

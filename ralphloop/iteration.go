@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"strconv"
@@ -85,13 +86,22 @@ func runIteration(d Deps, p iterationParams) error {
 	prompt := skillPrompt(p.Agent, p.Skill, p.Ticket.Path)
 	launchParams := p.launchAndPromptParams(label, tab.RootPaneID, tab.TabID, prompt, path, eventIterationStarted, eventIterationFinished)
 	sessionID, err := launchAndPrompt(d, launchParams)
-	if err != nil {
+	parked := errors.Is(err, errBlockedPaneParked)
+	if err != nil && !parked {
 		return err
 	}
 	if sessionID != "" {
 		if err := AppendSessionID(p.Ticket.Path, sessionID); err != nil {
 			return fmt.Errorf("appending session id for ticket %s: %w", p.Ticket.Identifier, err)
 		}
+	}
+	if parked {
+		// The park already ended the iteration: the agent is still live in its
+		// pane, so finishIteration's commit-check/cherry-pick/cleanup — which
+		// assumes the agent actually finished — must not run. Only gx's
+		// watcher goes away; the pane, tab, and worktree survive for a person
+		// to answer in the pane.
+		return nil
 	}
 
 	return finishIteration(d, p, path, tab.RootPaneID, tab.TabID, base, branch, sessionID)
@@ -189,6 +199,11 @@ func reattachIteration(d Deps, p iterationParams) error {
 		}
 		launchParams.logLifecycleEvent(launchParams.FinishEvent, agent.AgentSession)
 	} else if err := waitForFinish(d, launchParams, agent.AgentSession); err != nil {
+		if errors.Is(err, errBlockedPaneParked) {
+			// Same as runIteration's park: the iteration ends here, the pane/
+			// tab/worktree survive, and finishIteration must not run.
+			return nil
+		}
 		return fmt.Errorf("waiting for reattached agent %s to finish: %w", label, err)
 	}
 	if strings.EqualFold(strings.TrimSpace(p.Ticket.Status), "needs-repair") {

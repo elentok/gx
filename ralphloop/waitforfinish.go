@@ -8,7 +8,6 @@ import (
 
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/herdr"
-	"github.com/elentok/gx/tickets/schema"
 )
 
 // smartZonePollMs bounds each "wait for the agent to finish" poll tick, so a
@@ -52,6 +51,16 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 	// in the first place is a pane reporting idle throughout a running
 	// compaction, and that same pane answers the ordinary finish poll idle too.
 	var pending *compactBoundarySnapshot
+	// justRecoveredSmartZone guards the poll tick immediately after
+	// recoverSmartZoneBreach returns: its own ctrl+c-interrupt-and-compact
+	// sequence can leave the pane reporting "blocked" as a side effect (a
+	// confirmation dialog it didn't fully clear, an unconfirmed compact) that
+	// looks identical to an operator-raised prompt. Without this, that very
+	// next observation would be mistaken for the thing this function's own
+	// blocked-pane park exists to catch. It only ever covers the one
+	// immediately-following tick, not the recovery call itself — the recovery
+	// call runs synchronously, so there is no poll tick during it to guard.
+	justRecoveredSmartZone := false
 	for {
 		pollMs := smartZonePollMs
 		if p.FinishTimeoutMs > 0 {
@@ -64,30 +73,38 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			}
 		}
 
-		until := append([]string{}, plainFinishStates...)
-		if p.Agent == AgentCodex {
-			until = append(until, "blocked")
-		}
+		until := append(append([]string{}, plainFinishStates...), "blocked")
 		agent, err := d.AgentWait(herdr.AgentWaitOptions{
 			Target:    p.Pane,
 			Until:     until,
 			TimeoutMs: pollMs,
 		})
 		if err == nil {
-			if p.Agent == AgentCodex && agent.AgentStatus == "blocked" {
-				limit, exhausted, limitErr := codexRateLimit(d, p.SessionCwd, sessionID, p.Pane)
-				if limitErr != nil {
-					return fmt.Errorf("detecting %s Codex quota: %w", p.Label, limitErr)
-				}
-				if exhausted {
-					if err := recoverCodexRateLimit(d, p, sessionID, limit); err != nil {
-						return err
-					}
+			if agent.AgentStatus == "blocked" {
+				if justRecoveredSmartZone {
+					justRecoveredSmartZone = false
 					elapsedMs = 0
 					continue
 				}
-				if err := waitForAttentionRecovery(d, p, sessionID); err != nil {
+				if p.Agent == AgentCodex {
+					limit, exhausted, limitErr := codexRateLimit(d, p.SessionCwd, sessionID, p.Pane)
+					if limitErr != nil {
+						return fmt.Errorf("detecting %s Codex quota: %w", p.Label, limitErr)
+					}
+					if exhausted {
+						if err := recoverCodexRateLimit(d, p, sessionID, limit); err != nil {
+							return err
+						}
+						elapsedMs = 0
+						continue
+					}
+				}
+				parked, err := parkOnBlockedPane(d, p, sessionID)
+				if err != nil {
 					return err
+				}
+				if parked {
+					return errBlockedPaneParked
 				}
 				elapsedMs = 0
 				continue
@@ -229,6 +246,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			gatedGiveUps = 0
 			pending = nil
 		}
+		justRecoveredSmartZone = true
 		elapsedMs = 0
 	}
 }
@@ -831,42 +849,51 @@ func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, li
 	return nil
 }
 
-// waitForAttentionRecovery makes a Codex permission/intervention request
-// durable while keeping its pane and worktree available. The scheduler stays
-// paused until the pane returns to idle/done.
-func waitForAttentionRecovery(d Deps, p launchAndPromptParams, sessionID string) error {
-	const reason = "Codex is waiting for operator intervention"
-	state := schema.NeedsRepairState{
-		Label:    p.Label,
-		Branch:   iterBranch(p.EpicName, p.Ticket),
-		Worktree: p.SessionCwd,
-	}
-	if err := MarkNeedsRepairWithReason(p.TicketPath, reason, state); err != nil {
-		return fmt.Errorf("marking ticket needs-repair: %w", err)
-	}
-	p.Gate.pause(p.Label, reason)
-	p.sink().TicketNeedsHuman(p.Ticket, p.EpicName, "needs-repair", reason)
-	p.logAgentEvent(eventNeedsRepair, sessionID, reason)
+// blockedDwellMs is the fixed window waitForFinish waits, once, after first
+// observing a pane blocked, before parkOnBlockedPane's single re-check. A
+// momentary block (the agent clearing its own transient prompt) shouldn't
+// park a healthy iteration, but this is a fixed window, not a settle timer:
+// a pane that leaves and re-enters the blocked state inside it does not
+// restart the wait, and nothing about the pane is observed again until the
+// window ends.
+const blockedDwellMs = 15_000
 
-	for {
-		agent, err := d.AgentWait(herdr.AgentWaitOptions{
-			Target:    p.Pane,
-			Until:     []string{"idle", "done"},
-			TimeoutMs: smartZonePollMs,
-		})
-		if err == nil && agent.AgentStatus != "blocked" {
-			if err := Claim(p.TicketPath); err != nil {
-				return fmt.Errorf("restoring ticket to claimed: %w", err)
-			}
-			p.Gate.ForceResume(p.Label)
-			p.sink().IterationResumed(p.Ticket, p.Label, PauseNeedsRepair)
-			p.logLifecycleEvent(eventResumed, sessionID)
-			return nil
-		}
-		if err != nil && !isPollTimeout(err) {
-			return fmt.Errorf("rechecking blocked agent: %w", err)
-		}
+// errBlockedPaneParked is waitForFinish's sentinel return for a pane parked
+// by parkOnBlockedPane: not a failure, but a signal to its callers
+// (launchAndPrompt, runIteration, reattachIteration) to end the iteration
+// without running the ordinary finish path (commit check, cherry-pick,
+// worktree/tab cleanup) that assumes the agent actually finished — this
+// pane's agent is still live, just waiting on a prompt nobody has answered
+// yet.
+var errBlockedPaneParked = errors.New("iteration parked: pane blocked on an unanswered prompt")
+
+// parkOnBlockedPane waits out blockedDwellMs, then re-reads the pane once via
+// AgentGet (a peek, not another AgentWait) and, only if it is still blocked
+// at that instant, writes the pane-answered park (needs-answer, a reason, and
+// a "## Needs Answer" stub, both naming p.Label — the pane is named by its
+// iteration label, never a raw pane id, since a label still resolves after a
+// restart or reattach and a pane id does not) and reports parked=true. No
+// prompt is ever sent to the pane here: typing into a pane sitting on an
+// operator's own pending dialog would be the destructive interrupt this path
+// exists to avoid, so the only calls made are the sleep and the peek.
+func parkOnBlockedPane(d Deps, p launchAndPromptParams, sessionID string) (parked bool, err error) {
+	d.Sleep(blockedDwellMs * time.Millisecond)
+
+	agent, err := d.AgentGet(p.Pane)
+	if err != nil {
+		return false, fmt.Errorf("rechecking %s for park: %w", p.Label, err)
 	}
+	if agent.AgentStatus != "blocked" {
+		return false, nil
+	}
+
+	reason := fmt.Sprintf("%s is blocked on a prompt gx did not send; answer it in the pane", p.Label)
+	if err := MarkNeedsAnswerWithReasonAndStub(p.TicketPath, reason); err != nil {
+		return false, fmt.Errorf("marking ticket needs-answer: %w", err)
+	}
+	p.logAgentEvent(eventNeedsAnswer, sessionID, reason)
+	p.sink().TicketNeedsHuman(p.Ticket, p.EpicName, "needs-answer", reason)
+	return true, nil
 }
 
 // contextOccupancy reads the selected agent's own local session data. A

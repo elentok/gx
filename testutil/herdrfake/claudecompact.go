@@ -168,6 +168,17 @@ func (c *ClaudeCompact) activeLocked() bool {
 	return c.started && !c.boundaryWritten
 }
 
+// Active reports whether a compaction is currently running (see
+// activeLocked), for a scenario's own "agent wait" handler to tell a
+// compact-completion poll apart from an ordinary finish poll now that both
+// can share the same Until shape (ticket 14 put "blocked" in every finish
+// poll's completion states, not just a compaction's).
+func (c *ClaudeCompact) Active() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.activeLocked()
+}
+
 // Status reports the modeled agent's current status: "working" for the
 // first CompactDurationMs virtual milliseconds after StartCompact, then
 // "idle" from the moment that elapses onward — or, under

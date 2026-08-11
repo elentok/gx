@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -1094,16 +1095,33 @@ func TestRecoverSmartZoneBreach_UnsupportedFailsOpenButUnavailableDoesNot(t *tes
 // waitForFinish swallows that one error and returns to polling — and takes the
 // finish once the slow compaction it gave up on finally writes its boundary.
 // Any other error around the breach path still aborts the iteration.
+// nestedCompactWaitCallsPerCycle is how many AgentWait calls
+// waitForCompactionSignal makes per breach when ReadCompactions never
+// advances (it always runs to smartZoneCompactExtendedTimeoutMs) — the same
+// derivation stuckCompactionDeps (loop_compact_escalation_test.go) uses.
+// Ticket 14 put "blocked" in every finish poll's completion states, not just
+// a compaction's, so a fake's Until shape alone no longer tells the main
+// poll and the nested compact-completion poll apart; call position (via a
+// sinceBreach counter reset on each ctrl+c) does instead.
+func nestedCompactWaitCallsPerCycle() int {
+	return (smartZoneCompactExtendedTimeoutMs - smartZonePollMs) / smartZonePollMs
+}
+
 func TestWaitForFinish_AbsorbsGatedGiveUpAndKeepsPolling(t *testing.T) {
 	var prompts []string
 	var waits int
 	boundaries := 0
+	nestedCallsPerCycle := nestedCompactWaitCallsPerCycle()
+	sinceBreach := nestedCallsPerCycle + 1
 	d := Deps{
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			// The compact-completion polls are the ones waiting on "blocked"
-			// too (see compactStates): those report the premature idle the gate
-			// exists to distrust.
-			if slices.Contains(opts.Until, "blocked") {
+			// The compact-completion polls are the ones right after a ctrl+c
+			// interrupt (see compactStates): those report the premature idle
+			// the gate exists to distrust. Gated on call position rather than
+			// Until's shape, since ticket 14 put "blocked" in every finish
+			// poll's completion states, not just a compaction's.
+			sinceBreach++
+			if sinceBreach <= nestedCallsPerCycle {
 				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 			}
 			waits++
@@ -1119,7 +1137,7 @@ func TestWaitForFinish_AbsorbsGatedGiveUpAndKeepsPolling(t *testing.T) {
 			prompts = append(prompts, opts.Text)
 			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 		},
-		AgentSendKeys:   func(string, ...string) error { return nil },
+		AgentSendKeys:   func(string, ...string) error { sinceBreach = 0; return nil },
 		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) { return boundaries, true, nil },
 		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
@@ -1195,9 +1213,12 @@ func countPrompts(prompts []string, text string) int {
 // cancellation the gate exists to prevent.
 func TestWaitForFinish_EscalatesAfterTwoConsecutiveGatedGiveUps(t *testing.T) {
 	var prompts []string
+	nestedCallsPerCycle := nestedCompactWaitCallsPerCycle()
+	sinceBreach := nestedCallsPerCycle + 1
 	d := Deps{
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			if slices.Contains(opts.Until, "blocked") {
+			sinceBreach++
+			if sinceBreach <= nestedCallsPerCycle {
 				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 			}
 			return herdr.Agent{}, errors.New("timed out waiting for agent status")
@@ -1206,7 +1227,7 @@ func TestWaitForFinish_EscalatesAfterTwoConsecutiveGatedGiveUps(t *testing.T) {
 			prompts = append(prompts, opts.Text)
 			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 		},
-		AgentSendKeys:   func(string, ...string) error { return nil },
+		AgentSendKeys:   func(string, ...string) error { sinceBreach = 0; return nil },
 		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) { return 0, true, nil },
 		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
@@ -1239,10 +1260,15 @@ func TestWaitForFinish_EscalatesAfterTwoConsecutiveGatedGiveUps(t *testing.T) {
 // ever be counted.
 func TestWaitForFinish_GatedGiveUpDeniesAPaneIdleToEveryPollKind(t *testing.T) {
 	var prompts []string
+	// compacted alone (not Until's shape, since ticket 14 put "blocked" in
+	// every finish poll's completion states too) both drives the nested
+	// compact-completion polls idle and, once set, keeps every later poll —
+	// including the ordinary finish poll — reporting idle too, which is the
+	// pane shape this test exists to distrust.
 	compacted := false
 	d := Deps{
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			if compacted || slices.Contains(opts.Until, "blocked") {
+			if compacted {
 				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 			}
 			return herdr.Agent{}, errors.New("timed out waiting for agent status")
@@ -1286,9 +1312,20 @@ func TestWaitForFinish_SuccessfulRecoveryResetsTheGiveUpCounter(t *testing.T) {
 	attempt := 0
 	boundaries := 0
 	settled := false
+	nestedCallsPerCycle := nestedCompactWaitCallsPerCycle()
+	// sinceBreach discriminates the nested compact-completion polls from the
+	// main poll by call position (Until's shape no longer can, since ticket 14
+	// put "blocked" in every finish poll's completion states too): reset on
+	// each ctrl+c, and also forced back outside the nested window the instant
+	// a finish-up prompt goes out, since the second breach below resolves
+	// immediately (boundaries advances synchronously inside the "/compact"
+	// handler) and so consumes zero nested calls of its own.
+	outsideWindow := nestedCallsPerCycle + 1
+	sinceBreach := outsideWindow
 	d := Deps{
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			if slices.Contains(opts.Until, "blocked") {
+			sinceBreach++
+			if sinceBreach <= nestedCallsPerCycle {
 				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 			}
 			if !settled {
@@ -1311,10 +1348,12 @@ func TestWaitForFinish_SuccessfulRecoveryResetsTheGiveUpCounter(t *testing.T) {
 					// the run must reach a normal finish rather than escalating.
 					settled = true
 				}
+			} else {
+				sinceBreach = outsideWindow
 			}
 			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 		},
-		AgentSendKeys:   func(string, ...string) error { return nil },
+		AgentSendKeys:   func(string, ...string) error { sinceBreach = 0; return nil },
 		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) { return boundaries, true, nil },
 		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
@@ -1343,9 +1382,18 @@ func TestWaitForFinish_NonGatedRecoveryFailureNeitherCountsNorResets(t *testing.
 	var prompts []string
 	attempt := 0
 	boundaries := 0
+	nestedCallsPerCycle := nestedCompactWaitCallsPerCycle()
+	// sinceBreach discriminates the nested compact-completion polls from the
+	// main poll by call position (see nestedCompactWaitCallsPerCycle). The
+	// middle attempt below resolves immediately (boundaries advances
+	// synchronously inside the "/compact" handler), consuming zero nested
+	// calls, so it also forces sinceBreach back outside the window itself.
+	outsideWindow := nestedCallsPerCycle + 1
+	sinceBreach := outsideWindow
 	d := Deps{
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			if slices.Contains(opts.Until, "blocked") {
+			sinceBreach++
+			if sinceBreach <= nestedCallsPerCycle {
 				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 			}
 			return herdr.Agent{}, errors.New("timed out waiting for agent status")
@@ -1356,11 +1404,12 @@ func TestWaitForFinish_NonGatedRecoveryFailureNeitherCountsNorResets(t *testing.
 				attempt++
 				if attempt == 2 {
 					boundaries++
+					sinceBreach = outsideWindow
 				}
 			}
 			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 		},
-		AgentSendKeys:   func(string, ...string) error { return nil },
+		AgentSendKeys:   func(string, ...string) error { sinceBreach = 0; return nil },
 		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) { return boundaries, true, nil },
 		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
@@ -1760,56 +1809,217 @@ func TestWaitForFinish_EmitsContextOccupancyOnEachPollTimeout(t *testing.T) {
 	}
 }
 
-func TestWaitForFinish_CodexBlockedMarksNeedsRepairThenRecovers(t *testing.T) {
+// TestWaitForFinish_BlockedPaneDwellsThenParks verifies ticket 14's core
+// gate: a pane found blocked joins the wait's completion list (so AgentWait
+// returns immediately instead of re-looping to a timeout), a single 15s
+// dwell precedes a re-check via AgentGet (a peek, not another AgentWait), and
+// — the pane still being blocked at the end of that window — the iteration
+// ends in a pane-answered park: needs-answer, a reason, and a "## Needs
+// Answer" stub, both naming the iteration label rather than the raw pane id.
+// It also covers the destructive-interrupt regression: no AgentPrompt call
+// is ever made while the pane is blocked, since typing into a pane sitting
+// on an operator's own pending dialog would be exactly that.
+func TestWaitForFinish_BlockedPaneDwellsThenParks(t *testing.T) {
+	for _, agentKind := range []AgentKind{AgentClaude, AgentCodex} {
+		t.Run(string(agentKind), func(t *testing.T) {
+			ticketPath := writeFrontmatterTicket(t, "claimed")
+			scratchDir := t.TempDir()
+			var slept []time.Duration
+			var prompted bool
+			d := Deps{
+				AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+					return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
+				},
+				AgentGet: func(target string) (herdr.Agent, error) {
+					return herdr.Agent{PaneID: target, AgentStatus: "blocked"}, nil
+				},
+				AgentPrompt: func(herdr.AgentPromptOptions) (herdr.Agent, error) {
+					prompted = true
+					return herdr.Agent{}, nil
+				},
+				Sleep: func(d time.Duration) { slept = append(slept, d) },
+			}
+
+			err := waitForFinish(d, launchAndPromptParams{
+				Label: "iter-01", Agent: agentKind, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
+				ScratchDir: scratchDir, EpicName: "epic", Gate: NewGate(),
+			}, "sess-1")
+			if !errors.Is(err, errBlockedPaneParked) {
+				t.Fatalf("waitForFinish() err = %v, want errBlockedPaneParked", err)
+			}
+			if len(slept) != 1 || slept[0] != blockedDwellMs*time.Millisecond {
+				t.Errorf("Sleep calls = %v, want exactly one %v dwell", slept, blockedDwellMs*time.Millisecond)
+			}
+			if prompted {
+				t.Error("AgentPrompt was called while the pane was blocked; must never interrupt a pending operator prompt")
+			}
+
+			raw, err := os.ReadFile(ticketPath)
+			if err != nil {
+				t.Fatalf("ReadFile: %v", err)
+			}
+			ticket, err := schema.ParseTicketFromRaw(string(raw), ticketPath)
+			if err != nil {
+				t.Fatalf("ParseTicketFromRaw: %v", err)
+			}
+			if ticket.Status != schema.StatusNeedsAnswer {
+				t.Errorf("Status = %q, want needs-answer", ticket.Status)
+			}
+			body := schema.ParseBody(string(raw))
+			if !strings.Contains(body, "## Needs Answer") {
+				t.Errorf("body missing ## Needs Answer stub:\n%s", body)
+			}
+			if !strings.Contains(body, "iter-01") {
+				t.Errorf("body does not name the iteration label iter-01:\n%s", body)
+			}
+
+			events, ok, err := readEvents(scratchDir, "epic")
+			if err != nil || !ok || len(events) == 0 {
+				t.Fatalf("readEvents() = %+v, ok=%v, err=%v", events, ok, err)
+			}
+			last := events[len(events)-1]
+			if last.Type != eventNeedsAnswer || !strings.Contains(last.Reason, "iter-01") {
+				t.Errorf("park event = %+v, want type needs-answer with reason naming iter-01", last)
+			}
+		})
+	}
+}
+
+// TestWaitForFinish_BlockedPaneClearsBeforeDwellRecheck_DoesNotPark verifies
+// that the dwell's single re-check, not the initial observation, decides the
+// park: a pane that is no longer blocked by the time the 15s window ends
+// keeps the iteration running instead of parking it.
+func TestWaitForFinish_BlockedPaneClearsBeforeDwellRecheck_DoesNotPark(t *testing.T) {
 	ticketPath := writeFrontmatterTicket(t, "claimed")
-	scratchDir := t.TempDir()
-	gate := NewGate()
 	var waits int
-	var sawNeedsRepair bool
 	d := Deps{
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
 			waits++
-			switch waits {
-			case 1:
+			if waits == 1 {
 				return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
-			case 2:
-				raw, err := os.ReadFile(ticketPath)
-				if err == nil {
-					sawNeedsRepair = strings.Contains(string(raw), "needs-repair")
-				}
-				return herdr.Agent{}, errors.New("timed out waiting for agent status")
-			default:
-				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 			}
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentGet: func(target string) (herdr.Agent, error) {
+			return herdr.Agent{PaneID: target, AgentStatus: "working"}, nil
 		},
 		Sleep: func(time.Duration) {},
 	}
 
-	if err := waitForFinish(d, launchAndPromptParams{
-		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
-		ScratchDir: scratchDir, EpicName: "epic", Gate: gate,
-	}, "codex-session-1"); err != nil {
+	err := waitForFinish(d, launchAndPromptParams{
+		Label: "iter-01", Agent: AgentClaude, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
+		Gate: NewGate(),
+	}, "sess-1")
+	if err != nil {
 		t.Fatalf("waitForFinish: %v", err)
-	}
-	if !sawNeedsRepair {
-		t.Error("ticket was not marked needs-repair while Codex was blocked")
-	}
-	if gate.isPaused() {
-		t.Error("gate remains paused after Codex recovered")
 	}
 	raw, err := os.ReadFile(ticketPath)
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "claimed") {
-		t.Errorf("ticket status = %s, want claimed after recovery", raw)
+	if strings.Contains(string(raw), "needs-answer") {
+		t.Errorf("ticket was parked despite the pane clearing before the dwell recheck:\n%s", raw)
 	}
-	events, ok, err := readEvents(scratchDir, "epic")
-	if err != nil || !ok || len(events) < 2 {
-		t.Fatalf("readEvents() = %+v, ok=%v, err=%v", events, ok, err)
+}
+
+// TestWaitForFinish_BlockedPaneDwellIsFixedWindow_NotASettleTimer verifies
+// the dwell's shape: parkOnBlockedPane sleeps once and re-checks once,
+// rather than polling the pane during the window. A pane that left and
+// re-entered the blocked state inside the window (indistinguishable from
+// this fixture, which never observes anything mid-window) still parks
+// purely off the single end-of-window read — proven here by AgentWait never
+// being asked again once the dwell starts.
+func TestWaitForFinish_BlockedPaneDwellIsFixedWindow_NotASettleTimer(t *testing.T) {
+	ticketPath := writeFrontmatterTicket(t, "claimed")
+	var waits int
+	d := Deps{
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			waits++
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
+		},
+		AgentGet: func(target string) (herdr.Agent, error) {
+			return herdr.Agent{PaneID: target, AgentStatus: "blocked"}, nil
+		},
+		Sleep: func(time.Duration) {},
 	}
-	if events[0].Type != eventNeedsRepair || events[0].Pane != "pane-1" || events[0].Reason == "" {
-		t.Errorf("attention event = %+v, want pane and reason", events[0])
+
+	err := waitForFinish(d, launchAndPromptParams{
+		Label: "iter-01", Agent: AgentClaude, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
+		Gate: NewGate(),
+	}, "sess-1")
+	if !errors.Is(err, errBlockedPaneParked) {
+		t.Fatalf("waitForFinish() err = %v, want errBlockedPaneParked", err)
+	}
+	if waits != 1 {
+		t.Errorf("AgentWait calls = %d, want exactly 1 (dwell must not re-poll the pane)", waits)
+	}
+}
+
+// TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotParked
+// verifies ticket 14's inverse guard: gx's own smart-zone breach recovery
+// (ctrl+c, then /compact) can leave a pane reporting blocked as a side
+// effect, and the very next poll tick observing that must not be mistaken
+// for an operator-raised prompt and parked.
+func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotParked(t *testing.T) {
+	ticketPath := writeFrontmatterTicket(t, "claimed")
+	var waits int
+	var readCompactionsCalls int
+	d := Deps{
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			waits++
+			switch waits {
+			case 1:
+				// Times out, driving the smart-zone breach branch.
+				return herdr.Agent{}, errors.New("timed out waiting for agent status")
+			case 2:
+				// The tick right after recoverSmartZoneBreach returns: blocked
+				// as its own artifact, must be guarded against parking.
+				return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
+			default:
+				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+			}
+		},
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentSendKeys: func(string, ...string) error { return nil },
+		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
+			return 2_000_000, true, nil
+		},
+		AgentGet: func(target string) (herdr.Agent, error) {
+			t.Fatal("AgentGet (the dwell recheck) was called; the inverse guard should have skipped parking without dwelling")
+			return herdr.Agent{}, nil
+		},
+		// The first two reads are the pre-"/compact" baselines (waitForFinish's
+		// own, then recoverSmartZoneBreach's own newStickyBaseline); the third
+		// is the post-"/compact" advancement check, so the compaction reads as
+		// already confirmed and recoverSmartZoneBreach never needs to poll.
+		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
+			readCompactionsCalls++
+			if readCompactionsCalls <= 2 {
+				return 0, true, nil
+			}
+			return 1, true, nil
+		},
+		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
+			return "compaction complete", nil
+		},
+		Sleep: func(time.Duration) {},
+	}
+
+	err := waitForFinish(d, launchAndPromptParams{
+		Label: "iter-01", Agent: AgentClaude, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
+		SmartZone: 1_000_000, Gate: NewGate(),
+	}, "sess-1")
+	if err != nil {
+		t.Fatalf("waitForFinish: %v", err)
+	}
+	raw, err := os.ReadFile(ticketPath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if strings.Contains(string(raw), "needs-answer") {
+		t.Errorf("ticket was parked off a pane blocked by gx's own smart-zone recovery:\n%s", raw)
 	}
 }
 
