@@ -29,11 +29,19 @@ var (
 	// doesn't read as an alarm state.
 	epicStatusProblemStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow)
 
-	// epicStatusParkedStyle colors a parked epic's header status line
-	// distinctly from both the yellow "problem" and default "running" looks,
-	// so parked reads as its own state rather than an alarm or normal
-	// progress (see reduceLiveEvent's RunStateParked).
-	epicStatusParkedStyle = lipgloss.NewStyle().Foreground(ui.ColorMauve)
+	// epicStatusParkedAnswerStyle colors a parked epic's header status line
+	// orange when every ticket a human still needs to act on is waiting on a
+	// question (needs-answer) rather than a fault. This recolours the single
+	// existing parked style into two variants instead of adding a third
+	// visual style alongside it (see ticket 21's "recolour, not a third
+	// style").
+	epicStatusParkedAnswerStyle = lipgloss.NewStyle().Foreground(ui.ColorOrange)
+
+	// epicStatusParkedRepairStyle colors a parked epic's header status line
+	// red once any ticket a human still needs to act on is broken
+	// (needs-repair) — red wins over orange when both kinds are present,
+	// since a fault outranks a question.
+	epicStatusParkedRepairStyle = lipgloss.NewStyle().Foreground(ui.ColorRed)
 )
 
 // epicHeaderLines renders the Queue tab's per-epic header as two lines: a
@@ -59,9 +67,10 @@ func (m QueueModel) epicHeaderLines(epic tickets.Epic, parked []ralphloop.Stalle
 // needs-answer/needs-repair/error-classed ticket, or the default/no-color
 // treatment otherwise.
 func epicStatusLine(icons ui.IconSet, epic tickets.Epic, parked []ralphloop.StalledTicket) (icon, text string, style lipgloss.Style) {
+	if waiting, parkedStyle := parkedWaitingAndStyle(epic, parked); len(waiting) > 0 {
+		return icons.Warning, fmt.Sprintf("%d parked — %s", len(waiting), parkedStallText(waiting)), parkedStyle
+	}
 	switch {
-	case len(parked) > 0:
-		return icons.Warning, "parked — " + parkedStallText(parked), epicStatusParkedStyle
 	case epic.AllDone():
 		text := "took " + formatElapsed(epicElapsedSeconds(epic))
 		if dur, ok := epic.CompletionDuration(); ok {
@@ -73,6 +82,41 @@ func epicStatusLine(icons ui.IconSet, epic tickets.Epic, parked []ralphloop.Stal
 	default:
 		return icons.Dot, fmt.Sprintf("%d of %d done", epic.DoneCount(), epic.TotalCount()), lipgloss.NewStyle()
 	}
+}
+
+// parkedWaitingAndStyle filters parked down to the tickets a human still
+// needs to act on and picks the colour for them: draft tickets are excluded
+// (they're parked for scheduling — see StatusDraft — not waiting on a
+// person, which is what this count is for), and the style is red if any
+// remaining ticket is needs-repair, orange otherwise.
+func parkedWaitingAndStyle(epic tickets.Epic, parked []ralphloop.StalledTicket) (waiting []ralphloop.StalledTicket, style lipgloss.Style) {
+	anyRepair := false
+	for _, s := range parked {
+		status, ok := epicTicketStatus(epic, s.Identifier)
+		if ok && status == tickets.StatusDraft {
+			continue
+		}
+		waiting = append(waiting, s)
+		if status == tickets.StatusNeedsRepair {
+			anyRepair = true
+		}
+	}
+	if anyRepair {
+		return waiting, epicStatusParkedRepairStyle
+	}
+	return waiting, epicStatusParkedAnswerStyle
+}
+
+// epicTicketStatus looks up identifier's rendered status within epic. ok is
+// false when identifier isn't one of the epic's own tickets, in which case
+// the caller treats it as non-draft so it still counts.
+func epicTicketStatus(epic tickets.Epic, identifier string) (status tickets.RenderedStatus, ok bool) {
+	for _, t := range epic.Tickets {
+		if t.Identifier == identifier {
+			return epic.RenderedStatus(t), true
+		}
+	}
+	return 0, false
 }
 
 // parkedStallText renders a parked epic's stall reason for the header status

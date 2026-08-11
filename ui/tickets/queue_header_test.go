@@ -65,8 +65,11 @@ func TestEpicStatusLineParkedRendersStallReasonAndReattachability(t *testing.T) 
 	if icon != icons.Warning {
 		t.Fatalf("parked epic: icon = %q, want icons.Warning", icon)
 	}
-	if style.Render(icon) != epicStatusParkedStyle.Render(icon) {
-		t.Fatalf("parked epic: status line not rendered in epicStatusParkedStyle")
+	if style.Render(icon) != epicStatusParkedAnswerStyle.Render(icon) {
+		t.Fatalf("parked epic: status line not rendered in epicStatusParkedAnswerStyle")
+	}
+	if !strings.Contains(text, "2 parked") {
+		t.Fatalf("parked epic: text = %q, want it to lead with the parked count", text)
 	}
 	if !strings.Contains(text, "01 (reattachable)") {
 		t.Fatalf("parked epic: text = %q, want ticket 01 marked reattachable", text)
@@ -76,6 +79,62 @@ func TestEpicStatusLineParkedRendersStallReasonAndReattachability(t *testing.T) 
 	}
 	if !strings.Contains(text, "02") {
 		t.Fatalf("parked epic: text = %q, want it to still list ticket 02", text)
+	}
+}
+
+// TestEpicStatusLineParkedColorByKind covers ticket 21's colour rule: an
+// epic with only needs-answer parks renders orange, one containing a
+// needs-repair park renders red (red wins even alongside a needs-answer
+// ticket).
+func TestEpicStatusLineParkedColorByKind(t *testing.T) {
+	icons := ui.Icons(false)
+
+	answerOnly := tickets.Epic{Tickets: []tickets.Ticket{
+		{Identifier: "01", Status: "needs-answer"},
+	}}
+	stalled := []ralphloop.StalledTicket{{Identifier: "01"}}
+	icon, _, style := epicStatusLine(icons, answerOnly, stalled)
+	if style.Render(icon) != epicStatusParkedAnswerStyle.Render(icon) {
+		t.Fatalf("needs-answer-only park: expected epicStatusParkedAnswerStyle (orange)")
+	}
+
+	mixed := tickets.Epic{Tickets: []tickets.Ticket{
+		{Identifier: "01", Status: "needs-answer"},
+		{Identifier: "02", Status: "needs-repair"},
+	}}
+	stalled = []ralphloop.StalledTicket{{Identifier: "01"}, {Identifier: "02"}}
+	icon, _, style = epicStatusLine(icons, mixed, stalled)
+	if style.Render(icon) != epicStatusParkedRepairStyle.Render(icon) {
+		t.Fatalf("park containing needs-repair: expected epicStatusParkedRepairStyle (red)")
+	}
+}
+
+// TestEpicStatusLineParkedExcludesDraftFromCount covers ticket 21's draft
+// exclusion: a draft ticket is parked for scheduling purposes only, so it
+// doesn't move the count or the colour.
+func TestEpicStatusLineParkedExcludesDraftFromCount(t *testing.T) {
+	icons := ui.Icons(false)
+
+	epic := tickets.Epic{Tickets: []tickets.Ticket{
+		{Identifier: "01", Status: "needs-answer"},
+		{Identifier: "02", Status: "draft"},
+	}}
+	stalled := []ralphloop.StalledTicket{{Identifier: "01"}, {Identifier: "02"}}
+	_, text, _ := epicStatusLine(icons, epic, stalled)
+	if !strings.Contains(text, "1 parked") {
+		t.Fatalf("expected draft ticket excluded from count: text = %q, want it to say 1 parked", text)
+	}
+	if strings.Contains(text, "02") {
+		t.Fatalf("expected draft ticket excluded from the waiting list: text = %q", text)
+	}
+
+	allDraft := tickets.Epic{Tickets: []tickets.Ticket{
+		{Identifier: "01", Status: "draft"},
+	}}
+	stalled = []ralphloop.StalledTicket{{Identifier: "01"}}
+	icon, _, style := epicStatusLine(icons, allDraft, stalled)
+	if style.Render(icon) == epicStatusParkedAnswerStyle.Render(icon) || style.Render(icon) == epicStatusParkedRepairStyle.Render(icon) {
+		t.Fatalf("expected an all-draft park not to render as parked at all")
 	}
 }
 
