@@ -504,9 +504,14 @@ func (m *QueueModel) syncRunSnapshot(epicName string) tea.Cmd {
 		}
 	}
 	m.live[epicName] = live
+	var reloadCmd tea.Cmd
+	if ralphLoopRegistry.drainPendingReload(epicName) {
+		reloadCmd = m.cmdLoadQueue()
+	}
 	return tea.Batch(
 		closeNotifyCmd(ralphLoopRegistry.drainPendingNotifyCloses(epicName)),
 		toastNotifyCmd(ralphLoopRegistry.drainPendingToasts(epicName)),
+		reloadCmd,
 	)
 }
 

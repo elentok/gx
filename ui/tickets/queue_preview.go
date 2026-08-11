@@ -22,10 +22,10 @@ func (m QueueModel) selectedQueueRow() (queueRow, bool) {
 // currently selected row, via the same renderTicketPreview the Tickets tab
 // uses (preview.go) - so both tabs' previews render identically. Nothing
 // selected falls back to the same placeholder as the Tickets tab.
-func (m QueueModel) queuePreviewContent(width int) string {
+func (m QueueModel) queuePreviewContent(width int) (string, int, bool) {
 	row, ok := m.selectedQueueRow()
 	if !ok {
-		return ui.StyleDim.Render("  no ticket selected")
+		return ui.StyleDim.Render("  no ticket selected"), 0, false
 	}
 	return renderTicketPreview(row.epic, row.ticket, width)
 }

@@ -35,22 +35,31 @@ func newPreviewFocus() previewFocus {
 // Sync resizes the viewport to width x height, refreshes its content via
 // contentFor, and resets scroll position/search matches only when selKey
 // (identifying which row is being previewed) differs from the value passed
-// on the previous call — not on every resize/refresh.
-func (p *previewFocus) Sync(width, height int, selKey string, contentFor func(width int) string) {
+// on the previous call — not on every resize/refresh. contentFor's second
+// and third return values are an optional scroll-target line index (e.g. a
+// parked ticket's park section — see renderTicketPreview): when the
+// selection just changed and a target is reported, the viewport centers on
+// it instead of the usual GotoTop.
+func (p *previewFocus) Sync(width, height int, selKey string, contentFor func(width int) (content string, scrollTarget int, hasScrollTarget bool)) {
 	p.previewVP.SetWidth(width)
 	p.previewVP.SetHeight(height)
 
 	selectionChanged := selKey != p.previewSelKey
 	p.previewSelKey = selKey
 
-	content := contentFor(width)
+	content, target, hasTarget := contentFor(width)
 	if p.previewSearch.HasQuery() {
 		content = highlightPreviewContent(content, p.previewSearch)
 	}
 	p.previewVP.SetContent(content)
 
 	if selectionChanged {
-		p.previewVP.GotoTop()
+		if hasTarget {
+			offset := target - p.previewVP.Height()/2
+			p.previewVP.SetYOffset(max(offset, 0))
+		} else {
+			p.previewVP.GotoTop()
+		}
 		p.previewSearch.SetMatches(nil)
 	}
 }

@@ -235,6 +235,12 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) []string {
 		}
 		line += " " + suffixStyle.Render(suffix)
 	}
+	if status == tickets.StatusNeedsAnswer || status == tickets.StatusNeedsRepair {
+		if reason := parkReason(epic, t, m.icons().Ellipsis); reason != "" {
+			subtextLine := indent + strings.Repeat(" ", lipgloss.Width(triangle)+lipgloss.Width(icon)+1) + blockedBySuffixStyle.Render(reason)
+			return []string{line, subtextLine}
+		}
+	}
 	if status != tickets.StatusDone {
 		return []string{line}
 	}

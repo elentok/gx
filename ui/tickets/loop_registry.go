@@ -36,6 +36,12 @@ type epicRun struct {
 	// tea.Cmd itself, so toasts wait here for the next syncRunSnapshot poll
 	// on the active tab to drain and dispatch them.
 	pendingToasts []notify.NotifyMsg
+	// pendingReload marks that a ticket in this epic just parked and the
+	// queue needs to re-read it from disk before rendering, since the parked
+	// row's subtext comes from the ticket file (see drainPendingReload) —
+	// not from the event payload, so the row is identical before and after a
+	// gx restart.
+	pendingReload bool
 	// holdsAttach marks a run as one of the ones counted toward
 	// loopRegistry.attachCount, so finish only releases the attach lock once
 	// the run that actually incremented it ends.
@@ -346,10 +352,10 @@ func (r *loopRegistry) reduceLiveEvent(epicName string, event ralphloop.LiveEven
 		}
 	case ralphloop.LiveEventTicketNeedsHuman:
 		// Preserves the toast/row-paused behavior the old
-		// LiveEventIterationPaused/PauseNeedsRepair branch gave fault
-		// parks; needs-answer was never consumed here before either, so it
-		// stays a no-op — richer needs-answer rendering is a later ticket's
-		// job (spec section E).
+		// LiveEventIterationPaused/PauseNeedsRepair branch gave fault parks.
+		// Both statuses set pendingReload so the queue re-reads the ticket
+		// from disk and picks up its park-reason subtext (see
+		// drainPendingReload).
 		if event.Status == "needs-repair" {
 			ticket, ok := run.tickets[event.Identifier]
 			if ok {
@@ -363,6 +369,9 @@ func (r *loopRegistry) reduceLiveEvent(epicName string, event ralphloop.LiveEven
 				Kind:    notify.KindWarning,
 				Message: fmt.Sprintf("\U0001f6d1 %s paused: %s", event.Identifier, event.Reason),
 			})
+		}
+		if event.Status == "needs-answer" || event.Status == "needs-repair" {
+			run.pendingReload = true
 		}
 	case ralphloop.LiveEventIterationResumed:
 		for identifier, ticket := range run.tickets {
@@ -449,6 +458,20 @@ func (r *loopRegistry) drainPendingToasts(epicName string) []notify.NotifyMsg {
 	toasts := run.pendingToasts
 	run.pendingToasts = nil
 	return toasts
+}
+
+// drainPendingReload hands back and clears epicName's queued reload flag
+// (see epicRun.pendingReload) so the caller re-reads the epic's tickets from
+// disk exactly once.
+func (r *loopRegistry) drainPendingReload(epicName string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	run := r.snapshots[epicName]
+	if run == nil || !run.pendingReload {
+		return false
+	}
+	run.pendingReload = false
+	return true
 }
 
 func (r *loopRegistry) runSnapshots() []RunSnapshot {

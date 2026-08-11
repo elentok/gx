@@ -338,6 +338,41 @@ func TestDrainPendingToastsOnNeedsRepairPauseOnly(t *testing.T) {
 	}
 }
 
+// TestReduceLiveEventSetsPendingReloadOnBothParkStatuses covers the
+// reducer's half of the disk-not-event-payload requirement: parking a
+// ticket (needs-answer or needs-repair) marks the run for a re-read from
+// disk, drained exactly once by drainPendingReload.
+func TestReduceLiveEventSetsPendingReloadOnBothParkStatuses(t *testing.T) {
+	for _, status := range []string{"needs-answer", "needs-repair"} {
+		t.Run(status, func(t *testing.T) {
+			r := newLoopRegistry(1)
+			r.tryStart("epic-a", 0, 1)
+			r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+				Kind: ralphloop.LiveEventTicketNeedsHuman, Identifier: "01", Status: status, Reason: "because",
+			})
+
+			if !r.drainPendingReload("epic-a") {
+				t.Fatalf("drainPendingReload() = false after %s park, want true", status)
+			}
+			if r.drainPendingReload("epic-a") {
+				t.Fatal("drainPendingReload() a second time = true, want false (drained once)")
+			}
+		})
+	}
+}
+
+func TestDrainPendingReloadFalseForUnknownOrUntouchedEpic(t *testing.T) {
+	r := newLoopRegistry(1)
+	if r.drainPendingReload("no-such-epic") {
+		t.Fatal("drainPendingReload() for unknown epic = true, want false")
+	}
+
+	r.tryStart("epic-a", 0, 1)
+	if r.drainPendingReload("epic-a") {
+		t.Fatal("drainPendingReload() before any park event = true, want false")
+	}
+}
+
 func TestTryStartSameEpicTwiceFails(t *testing.T) {
 	r := newLoopRegistry(2)
 

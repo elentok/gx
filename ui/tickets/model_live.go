@@ -32,9 +32,14 @@ func (m *Model) syncRunSnapshot(epicName string) tea.Cmd {
 		m.implementingEpics = map[string]bool{}
 	}
 	m.implementingEpics[epicName] = snapshot.State == RunStateRunning
+	var reloadCmd tea.Cmd
+	if ralphLoopRegistry.drainPendingReload(epicName) {
+		reloadCmd = m.cmdLoad()
+	}
 	return tea.Batch(
 		closeNotifyCmd(ralphLoopRegistry.drainPendingNotifyCloses(epicName)),
 		toastNotifyCmd(ralphLoopRegistry.drainPendingToasts(epicName)),
+		reloadCmd,
 	)
 }
 
