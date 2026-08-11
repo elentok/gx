@@ -150,6 +150,13 @@ are all done. For a purely linear chain that means top to bottom.
 
 Do NOT close or modify any parent/source ticket this epic was generated from.
 
+An epic is either hand-driven or loop-driven, never both. When the source you're breaking up is a
+wayfinder map, publish the implementation tickets into a **new** epic directory — never into the map
+epic's own `issues/`. A map's tickets are decisions its author resolves by hand, through
+`gx tickets set`; implementation tickets are claimed and closed by ralph-loop, which takes ownership
+of `status` for the whole epic it runs. Putting both kinds in one directory puts two writers on the
+same status field.
+
 Before considering any ticket published, run `gx tickets validate <path>` on it. Fix any reported
 error and re-validate until it passes — do not publish a ticket that fails validation.
 
