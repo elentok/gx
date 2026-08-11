@@ -517,9 +517,8 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			// (out of the frontier, so never reclaimed until a human clears
 			// it) and keep scheduling the rest.
 			reason := r.err.Error()
-			label := iterLabel(opts.EpicName, r.ticket.Identifier)
 			state := schema.NeedsRepairState{
-				Label:    label,
+				Label:    iterLabel(opts.EpicName, r.ticket.Identifier),
 				Branch:   iterBranch(opts.EpicName, r.ticket.Identifier),
 				Worktree: iterationWorktreePath(wtDir, opts.EpicName, r.ticket.Identifier),
 			}
