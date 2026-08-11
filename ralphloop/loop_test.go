@@ -482,11 +482,12 @@ func TestRun_EventSink_TicketNeedsAnswer_OnZeroCommitIteration(t *testing.T) {
 }
 
 // TestRun_HonorsCommitlessFlag_SkipsNeedsAnswer exercises the escape hatch from
-// the zero-commit path above: if the agent itself sets commitless: true
-// (alongside moving status off "claimed") before finishing, that's an
-// intentional zero-commit finish (e.g. exploration concluded no code change
-// was warranted), not a stalled agent — the ticket must not be forced back to
-// needs-answer, and its worktree/tab get cleaned up like a normal completion.
+// the zero-commit path above: if the agent reports iteration_status: finished
+// with commitless: true before finishing, that's an intentional zero-commit
+// finish (e.g. exploration concluded no code change was warranted), not a
+// stalled agent — the ticket must not be forced back to needs-answer, gx
+// itself writes status: done, and its worktree/tab get cleaned up like a
+// normal completion.
 func TestRun_HonorsCommitlessFlag_SkipsNeedsAnswer(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
@@ -498,10 +499,11 @@ func TestRun_HonorsCommitlessFlag_SkipsNeedsAnswer(t *testing.T) {
 		return 0, nil
 	}
 	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
-		// Simulate the agent calling `gx tickets set --status done
-		// --commitless true` on itself before going idle with no commit.
+		// Simulate the agent calling `gx tickets set --iteration-status
+		// finished --commitless true` on itself before going idle with no
+		// commit.
 		if err := updateTicket(ticketPath, func(tk *schema.Ticket) {
-			tk.Status = schema.StatusDone
+			tk.IterationStatus = schema.IterationStatusFinished
 			tk.Commitless = true
 		}); err != nil {
 			t.Fatalf("simulating agent self-report: %v", err)

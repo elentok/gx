@@ -323,6 +323,67 @@ func TestRun_ReattachedCloseUsesLiveSessionInsteadOfStaleRunLog(t *testing.T) {
 	}
 }
 
+// TestRun_ReattachedCommitlessCloseWithNoLiveSession verifies ticket 08: the
+// commitless close (iteration_status: finished + commitless: true + zero
+// commits reaches done with no cherry-pick) applies identically on the
+// reattached path, even when the reattach recovers no live session id of its
+// own (AgentSession == "") — the route ticket 08 calls out as most likely to
+// be missed because it's reached only after a restart.
+func TestRun_ReattachedCommitlessCloseWithNoLiveSession(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\niteration_status: finished\ncommitless: true\ntype: task\n---\n# A\n",
+	})
+	d, _, removed := fakeDeps()
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
+		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID, AgentStatus: "idle"}}, nil
+	}
+	d.AgentGet = func(string) (herdr.Agent, error) {
+		return herdr.Agent{PaneID: "pane-epic-iter-01", WorkspaceID: "ws1", TabID: "tab-epic-iter-01", AgentStatus: "idle", AgentSession: ""}, nil
+	}
+	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
+		return 0, nil
+	}
+	var cherryPickCalls int
+	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
+		cherryPickCalls++
+		return nil
+	}
+
+	var out strings.Builder
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if cherryPickCalls != 0 {
+		t.Errorf("CherryPickRange calls = %d, want 0 for a commitless close", cherryPickCalls)
+	}
+	if len(*removed) != 1 {
+		t.Errorf("removed worktree branches = %v, want the reattached iteration's worktree cleaned up", *removed)
+	}
+
+	got := mustParse(t, filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if got.Status != schema.StatusDone {
+		t.Errorf("Status = %q, want done", got.Status)
+	}
+
+	events, _, err := readEvents(scratchDir, "epic")
+	if err != nil {
+		t.Fatalf("readEvents: %v", err)
+	}
+	foundCommitless := false
+	for _, e := range events {
+		if e.Type == eventCherryPicked {
+			t.Errorf("events = %v, want no cherry-picked event for a commitless close", events)
+		}
+		if e.Type == eventCommitless && e.Ticket == "01" {
+			foundCommitless = true
+		}
+	}
+	if !foundCommitless {
+		t.Errorf("events = %v, want a commitless event for ticket 01", events)
+	}
+}
+
 // TestRun_ReattachedClose_NoPriorSessionInLog_OmitsMetadata verifies the
 // ticket 06a edge case: when the run log has no iteration-started event to
 // recover a session id from, the reattached close still marks the ticket

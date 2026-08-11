@@ -110,7 +110,8 @@ func (s mrkdwnStyle) iterationPausedText(label string, kind PauseKind, reason st
 // iterationPausedText's "still in progress, will resume/clear on its own",
 // this means the iteration is stuck and won't proceed without a human
 // looking at it — no commit landed and the agent never declared the
-// zero-commit finish intentional via `gx tickets set --commitless true`.
+// zero-commit finish intentional via `gx tickets set --iteration-status
+// finished --commitless true`.
 //
 //	🆘 *{epic}/{ticket} needs answer*
 //

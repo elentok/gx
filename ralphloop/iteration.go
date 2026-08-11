@@ -26,10 +26,10 @@ const conflictResolutionTimeoutMs = 30 * 60 * 1000
 // of that: see adoptNeedsAnswerReport. Otherwise, if the agent finishes
 // without landing any commits, the ticket is marked needs-answer instead and
 // the worktree/tab are left in place for inspection — unless the agent
-// itself declared the zero-commit finish intentional (ticket frontmatter's
-// commitless field, set via `gx tickets set --commitless true` alongside a
-// non-claimed status), in which case the worktree/tab are cleaned up
-// normally with no commit landed.
+// itself declared the zero-commit finish intentional via `gx tickets set
+// --iteration-status finished --commitless true`, in which case gx itself
+// writes status: done and the worktree/tab are cleaned up normally with no
+// commit landed.
 func runIteration(d Deps, p iterationParams) error {
 	label := iterLabel(p.FeatureBranch, p.Ticket.Identifier)
 	branch := iterBranch(p.FeatureBranch, p.Ticket.Identifier)
@@ -93,7 +93,18 @@ func reattachIteration(d Deps, p iterationParams) error {
 	// A reattach that stays claimed throughout (the common case) never goes
 	// through Claim, so a stale iteration_status left by a pre-restart report
 	// must be cleared here instead - unconditionally, so it can't survive
-	// into the new attach before finishIteration/waitForFinish run.
+	// into the new attach before finishIteration/waitForFinish run. The
+	// pre-clear value is kept: if the agent turns out to be alreadyFinished
+	// below, there is no further run of it to produce a fresh report, so the
+	// cleared value is this iteration's only report and is restored before
+	// finishIteration reads it - otherwise a genuine finished+commitless
+	// report left by an agent that exited while the loop itself was down
+	// would be wiped by this same clear and wrongly fall to needs-answer.
+	preClear, err := schema.ParseTicket(p.Ticket.Path)
+	if err != nil {
+		return fmt.Errorf("reading ticket %s before clearing iteration_status: %w", p.Ticket.Identifier, err)
+	}
+	priorIterationStatus := preClear.IterationStatus
 	if err := schema.ClearIterationStatus(p.Ticket.Path); err != nil {
 		return fmt.Errorf("clearing iteration_status for reattached ticket %s: %w", p.Ticket.Identifier, err)
 	}
@@ -152,6 +163,13 @@ func reattachIteration(d Deps, p iterationParams) error {
 		if p.Report != nil {
 			p.Report("%s already finished at reattach; skipping wait\n", label)
 		}
+		if priorIterationStatus != "" {
+			if err := schema.UpdateTicket(p.Ticket.Path, func(t *schema.Ticket) {
+				t.IterationStatus = priorIterationStatus
+			}); err != nil {
+				return fmt.Errorf("restoring iteration_status for already-finished reattached ticket %s: %w", p.Ticket.Identifier, err)
+			}
+		}
 		launchParams.logLifecycleEvent(launchParams.FinishEvent, agent.AgentSession)
 	} else if err := waitForFinish(d, launchParams, agent.AgentSession); err != nil {
 		return fmt.Errorf("waiting for reattached agent %s to finish: %w", label, err)
@@ -205,18 +223,25 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 	if ahead == 0 {
 		// Re-read the ticket's current frontmatter rather than trusting
 		// p.Ticket (populated once at claim time, before the agent ran): the
-		// agent may have called `gx tickets set --commitless true` on itself
-		// during this iteration to declare the zero-commit finish
-		// intentional. Only honored alongside a status the agent also moved
-		// off "claimed" — a commitless ticket still sitting at claimed can't
-		// be told apart from one that simply forgot, so it falls through to
-		// the needs-answer path below like any other zero-commit finish.
+		// agent may have called `gx tickets set --iteration-status finished
+		// --commitless true` on itself during this iteration to declare the
+		// zero-commit finish intentional. iteration_status: finished is the
+		// "this was deliberate" signal — not a non-claimed status, which an
+		// agent can no longer write itself (see ticket 11's CLI guard) — so a
+		// commitless ticket that never reported finished falls through to the
+		// needs-answer path below like any other zero-commit finish. This is
+		// the one place gx writes status: done with no cherry-pick, so it does
+		// so itself here rather than trusting the ticket file to already say
+		// done.
 		current, err := schema.ParseTicket(p.Ticket.Path)
 		if err != nil {
 			return fmt.Errorf("reading ticket %s for commitless check: %w", p.Ticket.Path, err)
 		}
-		if current.IsCommitless() && current.Status != schema.StatusClaimed {
+		if current.IsCommitless() && current.IterationStatus == schema.IterationStatusFinished {
 			stampCommitlessMetrics(p, path, sessionID)
+			if err := MarkDone(p.Ticket.Path); err != nil {
+				return fmt.Errorf("marking commitless ticket %s done: %w", p.Ticket.Identifier, err)
+			}
 			p.logTicketEvent(eventCommitless, pane, tab, sessionID, path)
 			return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, tab)
 		}
