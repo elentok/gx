@@ -3,6 +3,7 @@ package ralphloop
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -115,6 +116,124 @@ func TestMarkDoneWithMetadata_SetsStatusAndActualContextWindow(t *testing.T) {
 	}
 	if got.Compactions != 2 {
 		t.Errorf("Compactions = %d, want 2", got.Compactions)
+	}
+}
+
+// TestClaim_DemotesNeedsRepairIntoDatedComments pins the ticket 19 behaviour:
+// claiming a ticket carrying "## Needs Repair" moves that reason into a
+// dated "## Comments" sub-entry and removes the "## Needs Repair" heading.
+func TestClaim_DemotesNeedsRepairIntoDatedComments(t *testing.T) {
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n"+
+		"# Ticket\n\nBody text.\n\n## Needs Repair\n\nsomething broke\n")
+
+	if err := Claim(path); err != nil {
+		t.Fatalf("Claim: %v", err)
+	}
+
+	body := schema.ParseBody(mustRead(t, path))
+	if strings.Contains(body, "\n## Needs Repair\n") {
+		t.Errorf("body = %q, want ## Needs Repair heading removed", body)
+	}
+	if !strings.Contains(body, "## Comments") {
+		t.Errorf("body = %q, want ## Comments heading present", body)
+	}
+	if !strings.Contains(body, "something broke") {
+		t.Errorf("body = %q, want the retired reason preserved", body)
+	}
+	datePattern := regexp.MustCompile(`\*\*\d{4}-\d{2}-\d{2}\*\* — retired from`)
+	if !datePattern.MatchString(body) {
+		t.Errorf("body = %q, want a dated retirement line", body)
+	}
+}
+
+// TestClaim_RepeatedClaimsDoNotStackDuplicateComments pins the fix for the
+// live stacking bug: claiming a ticket that has already been demoted once
+// (no "## Needs Repair" section left to demote) must not append a second
+// entry.
+func TestClaim_RepeatedClaimsDoNotStackDuplicateComments(t *testing.T) {
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n"+
+		"# Ticket\n\nBody text.\n\n## Needs Repair\n\nfirst failure\n")
+
+	if err := Claim(path); err != nil {
+		t.Fatalf("first Claim: %v", err)
+	}
+	afterFirst := schema.ParseBody(mustRead(t, path))
+
+	if err := Claim(path); err != nil {
+		t.Fatalf("second Claim: %v", err)
+	}
+	afterSecond := schema.ParseBody(mustRead(t, path))
+
+	if afterFirst != afterSecond {
+		t.Errorf("second Claim changed the body:\nfirst:  %q\nsecond: %q", afterFirst, afterSecond)
+	}
+	if n := strings.Count(afterSecond, "## Comments"); n != 1 {
+		t.Errorf("## Comments appears %d times, want exactly 1", n)
+	}
+}
+
+// TestClaim_AppendsSecondDemotionAlongsideFirst pins the "repeated" case
+// this ticket actually cares about: a ticket parked, unparked, reclaimed,
+// and parked again a second time must accumulate two dated entries under
+// one "## Comments" heading, not two "## Comments" headings.
+func TestClaim_AppendsSecondDemotionAlongsideFirst(t *testing.T) {
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n"+
+		"# Ticket\n\nBody text.\n\n## Needs Repair\n\nfirst failure\n")
+
+	if err := Claim(path); err != nil {
+		t.Fatalf("first Claim: %v", err)
+	}
+	if err := MarkNeedsRepairWithReason(path, "second failure"); err != nil {
+		t.Fatalf("MarkNeedsRepairWithReason: %v", err)
+	}
+	if err := Claim(path); err != nil {
+		t.Fatalf("second Claim: %v", err)
+	}
+
+	body := schema.ParseBody(mustRead(t, path))
+	if n := strings.Count(body, "## Comments"); n != 1 {
+		t.Errorf("## Comments appears %d times, want exactly 1", n)
+	}
+	if !strings.Contains(body, "first failure") || !strings.Contains(body, "second failure") {
+		t.Errorf("body = %q, want both retired reasons present", body)
+	}
+}
+
+// TestClaim_UnparkedButUnclaimedKeepsNeedsRepairVisible pins that setting a
+// parked ticket's status directly to open (the unpark gesture) does not by
+// itself retire "## Needs Repair" — only Claim does. A person who unparks a
+// ticket should still see what they were told, right up until it's claimed.
+func TestClaim_UnparkedButUnclaimedKeepsNeedsRepairVisible(t *testing.T) {
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n"+
+		"# Ticket\n\nBody text.\n\n## Needs Repair\n\nsomething broke\n")
+
+	if err := SetStatus(path, "open"); err != nil {
+		t.Fatalf("SetStatus: %v", err)
+	}
+
+	body := schema.ParseBody(mustRead(t, path))
+	if !strings.Contains(body, "## Needs Repair") {
+		t.Errorf("body = %q, want ## Needs Repair still present after unpark", body)
+	}
+}
+
+// TestReattach_ClearIterationStatusDoesNotRetireNeedsRepair pins the ticket
+// 19 behaviour change: the ordinary reattach path (a still-claimed ticket
+// resumed via schema.ClearIterationStatus, see reattachIteration) does not
+// go through Claim, so it must not retire "## Needs Repair" — only an
+// actual claim does. A ticket can reattach several times within one claim;
+// retiring here would fire repeatedly instead of exactly once at claim.
+func TestReattach_ClearIterationStatusDoesNotRetireNeedsRepair(t *testing.T) {
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\niteration_status: working\ntype: task\n---\n"+
+		"# Ticket\n\nBody text.\n\n## Needs Repair\n\nsomething broke\n")
+
+	if err := schema.ClearIterationStatus(path); err != nil {
+		t.Fatalf("ClearIterationStatus: %v", err)
+	}
+
+	body := schema.ParseBody(mustRead(t, path))
+	if !strings.Contains(body, "\n## Needs Repair\n") {
+		t.Errorf("body = %q, want ## Needs Repair still present after reattach", body)
 	}
 }
 
