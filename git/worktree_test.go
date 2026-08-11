@@ -107,6 +107,41 @@ func TestAddWorktree(t *testing.T) {
 	}
 }
 
+func TestAddWorktreeOnBranch(t *testing.T) {
+	t.Parallel()
+	repoDir := tempBareRepoLight(t)
+	repo, _ := git.FindRepo(repoDir)
+
+	// Simulate a park: a branch created by an earlier AddWorktree survives
+	// after its worktree is removed.
+	firstPath := filepath.Join(repoDir, "feature")
+	if err := git.AddWorktree(*repo, "feature", firstPath, "main"); err != nil {
+		t.Fatalf("AddWorktree: %v", err)
+	}
+	if err := git.RemoveWorktree(*repo, firstPath, false); err != nil {
+		t.Fatalf("RemoveWorktree: %v", err)
+	}
+
+	resumedPath := filepath.Join(repoDir, "feature-resumed")
+	if err := git.AddWorktreeOnBranch(*repo, "feature", resumedPath); err != nil {
+		t.Fatalf("AddWorktreeOnBranch: %v", err)
+	}
+
+	wts, err := git.ListWorktrees(*repo)
+	if err != nil {
+		t.Fatalf("ListWorktrees: %v", err)
+	}
+	if len(wts) != 1 {
+		t.Fatalf("got %d worktrees after AddWorktreeOnBranch, want 1", len(wts))
+	}
+	if wts[0].Branch != "feature" {
+		t.Errorf("Branch = %q, want %q", wts[0].Branch, "feature")
+	}
+	if wts[0].Path != resumedPath {
+		t.Errorf("Path = %q, want %q", wts[0].Path, resumedPath)
+	}
+}
+
 func TestAddWorktree_standardRepo_underDotWorktrees(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempRepo(t)

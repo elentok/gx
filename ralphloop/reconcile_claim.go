@@ -70,7 +70,7 @@ func reconcileOrphanedClaim(d Deps, rp reconcileParams, featureBranch string, t 
 			}
 
 			tabID := tabIDForLabel(tabs, label)
-			if err := finishCleanup(d, rp.WorktreeLock, paths.RepoDir, paths.FeatureWorktree, path, branch, tabID); err != nil {
+			if err := finishCleanup(d, rp.WorktreeLock, paths.RepoDir, paths.FeatureWorktree, path, branch, tabID, true); err != nil {
 				return fmt.Errorf("cleaning up orphaned claim %s: %w", t.Identifier, err)
 			}
 

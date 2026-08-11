@@ -94,6 +94,18 @@ func AddWorktree(repo Repo, newName, newPath, fromRef string) error {
 	return err
 }
 
+// AddWorktreeOnBranch creates a linked worktree at newPath attached to the
+// existing local branch branch (no -b, no new branch created) — the
+// resume-after-park counterpart to AddWorktree's always-fresh-branch
+// behavior, for reattaching to an iteration branch a prior park left intact.
+func AddWorktreeOnBranch(repo Repo, branch, newPath string) error {
+	if err := excludeWorktreeDir(repo); err != nil {
+		return err
+	}
+	_, _, err := run(repo.Root, []string{"worktree", "add", newPath, branch})
+	return err
+}
+
 // worktreeExcludeEntry computes the .git/info/exclude entry for repo's
 // linked-worktree directory. It returns ok == false for bare repos, where
 // linked worktrees live outside Root and need no exclusion, and for repos

@@ -99,7 +99,7 @@ func finishStaleCleanup(d Deps, rp reconcileParams, featureBranch string, t tick
 	path := iterationWorktreePath(paths.WorktreeDir, featureBranch, t.Identifier)
 	tabID := tabIDForLabel(tabs, label)
 
-	return finishCleanup(d, rp.WorktreeLock, paths.RepoDir, paths.FeatureWorktree, path, branch, tabID)
+	return finishCleanup(d, rp.WorktreeLock, paths.RepoDir, paths.FeatureWorktree, path, branch, tabID, true)
 }
 
 // tabIDForLabel finds the tab id of the live tab named label, or "" if none

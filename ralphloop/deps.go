@@ -42,9 +42,12 @@ type Deps struct {
 	// are created in (see git.Repo.LinkedWorktreeDir).
 	WorktreeDir func(repoDir string) (string, error)
 	// AddWorktree creates a plain git worktree at path on a new branch,
-	// starting at base (a ref or commit hash; "" for the repo's HEAD). A
-	// no-op if path already exists, so a resumed Run can call it again for a
-	// worktree a prior invocation already created.
+	// starting at base (a ref or commit hash; "" for the repo's HEAD) — or,
+	// if branch already exists, attaches the worktree to that branch instead
+	// (base is then ignored), for a resume that reattaches to the iteration
+	// branch a prior park left intact. A no-op if path already exists, so a
+	// resumed Run can call it again for a worktree a prior invocation already
+	// created.
 	AddWorktree func(repoDir, path, branch, base string) error
 	// RemoveWorktree removes the git worktree checked out at path.
 	RemoveWorktree func(repoDir, path string, force bool) error
@@ -416,7 +419,11 @@ func worktreeDir(repoDir string) (string, error) {
 	return repo.LinkedWorktreeDir(), nil
 }
 
-// addWorktree implements Deps.AddWorktree against the real git package.
+// addWorktree implements Deps.AddWorktree against the real git package. When
+// branch already exists — a resumed iteration reattaching to the branch a
+// prior park left intact — it attaches the worktree to that branch instead
+// of trying (and failing) to create it fresh, so a resume doesn't collide
+// with its own pre-park iteration branch.
 func addWorktree(repoDir, path, branch, base string) error {
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -426,6 +433,9 @@ func addWorktree(repoDir, path, branch, base string) error {
 		// Already checked out, e.g. this Run is reconciling after a crash and
 		// a prior invocation already created it.
 		return nil
+	}
+	if git.IsLocalBranch(repo.Root, branch) {
+		return git.AddWorktreeOnBranch(*repo, branch, path)
 	}
 	return git.AddWorktree(*repo, branch, path, base)
 }

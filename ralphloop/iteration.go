@@ -35,9 +35,26 @@ func runIteration(d Deps, p iterationParams) error {
 	branch := iterBranch(p.FeatureBranch, p.Ticket.Identifier)
 	path := iterationWorktreePath(p.WorktreeDir, p.FeatureBranch, p.Ticket.Identifier)
 
-	base, err := d.RevParse(p.FeatureWorktree, p.FeatureBranch)
-	if err != nil {
-		return fmt.Errorf("resolving %s tip: %w", p.FeatureBranch, err)
+	// A branch surviving under this name means a prior park dropped this
+	// ticket's worktree/tab but kept its branch, per finishIteration's
+	// needs-answer adoption cleanup. Landing that resumed iteration's commits
+	// — both the ones from before the park and whatever it adds after —
+	// needs the merge base of the two branches, not the feature tip: basing
+	// off today's tip would silently drop the pre-park commits, since the
+	// feature branch has very likely advanced past the point this branch
+	// forked from.
+	var base string
+	var err error
+	if branchExists(d, p.FeatureWorktree, branch) {
+		base, err = d.MergeBase(p.FeatureWorktree, branch, p.FeatureBranch)
+		if err != nil {
+			return fmt.Errorf("resolving %s's original base: %w", branch, err)
+		}
+	} else {
+		base, err = d.RevParse(p.FeatureWorktree, p.FeatureBranch)
+		if err != nil {
+			return fmt.Errorf("resolving %s tip: %w", p.FeatureBranch, err)
+		}
 	}
 
 	p.WorktreeLock.Lock()
@@ -200,7 +217,11 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 		return err
 	}
 	if adopted {
-		return nil
+		// The branch is what makes a later resume able to land both sides of
+		// the answer boundary in one pick (see runIteration's branch-reuse
+		// base computation); only the worktree/tab/permit are redundant while
+		// the ticket waits on an answer.
+		return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, tab, false)
 	}
 
 	ahead, err := d.CommitsAhead(path, base, branch)
@@ -243,7 +264,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 				return fmt.Errorf("marking commitless ticket %s done: %w", p.Ticket.Identifier, err)
 			}
 			p.logTicketEvent(eventCommitless, pane, tab, sessionID, path)
-			return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, tab)
+			return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, tab, true)
 		}
 
 		// The agent finished without landing any commits: leave the worktree/
@@ -267,7 +288,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 		return fmt.Errorf("marking ticket done: %w", err)
 	}
 
-	return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, tab)
+	return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, tab, true)
 }
 
 // adoptNeedsAnswerReport honours an agent's `iteration_status: needs-answer`
@@ -423,14 +444,17 @@ func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane, ta
 	return landedSHA, nil
 }
 
-// finishCleanup removes an iteration's now-redundant worktree, tab, and
-// branch. Each check is independent since callers run this against state left
-// in different shapes: a normal completion (worktree/tab/branch all just
-// created and definitely present), or a done ticket's leftover state found on
-// startup after a crash (any subset of the three may have survived — see
-// classifyDoneTicket's doneStaleCleanup). tabID is "" if no live tab was
-// found for this iteration.
-func finishCleanup(d Deps, worktreeLock *sync.Mutex, repoDir, featureWorktree, path, branch, tabID string) error {
+// finishCleanup removes an iteration's now-redundant worktree and tab, and —
+// when removeBranch is true — its branch too. removeBranch is false for a
+// parked (needs-answer) iteration: the branch is what a later resume
+// reattaches to, so it must outlive the worktree/tab/permit that park drops
+// (see finishIteration's adopted-report path). Each check is independent
+// since callers run this against state left in different shapes: a normal
+// completion (worktree/tab/branch all just created and definitely present),
+// or a done ticket's leftover state found on startup after a crash (any
+// subset may have survived — see classifyDoneTicket's doneStaleCleanup).
+// tabID is "" if no live tab was found for this iteration.
+func finishCleanup(d Deps, worktreeLock *sync.Mutex, repoDir, featureWorktree, path, branch, tabID string, removeBranch bool) error {
 	hasWorktree, err := d.WorktreeExists(path)
 	if err != nil {
 		return fmt.Errorf("checking iteration worktree: %w", err)
@@ -450,7 +474,7 @@ func finishCleanup(d Deps, worktreeLock *sync.Mutex, repoDir, featureWorktree, p
 		}
 	}
 
-	if branchExists(d, featureWorktree, branch) {
+	if removeBranch && branchExists(d, featureWorktree, branch) {
 		if err := d.DeleteBranch(repoDir, branch); err != nil {
 			return fmt.Errorf("deleting iteration branch %s: %w", branch, err)
 		}

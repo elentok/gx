@@ -725,6 +725,152 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 	}
 }
 
+// TestRun_ProductionRealGit_ParkThenResumeReusesBranch pins ticket 13: an
+// iteration that parks with a needs-answer report keeps its branch across
+// the park (only its worktree/tab are dropped), and a resume that reattaches
+// to that surviving branch lands both the pre-park and post-resume commits
+// together, in order, in a single cherry-pick — never two, and never
+// silently dropping the pre-park commit by basing off the feature branch's
+// (by-then-advanced) tip instead of the merge base.
+func TestRun_ProductionRealGit_ParkThenResumeReusesBranch(t *testing.T) {
+	const epicName = "epic"
+	repoDir := testutil.TempRepo(t)
+	wtDir := testWorktreeDir(t, repoDir)
+	featurePath := filepath.Join(wtDir, epicName)
+
+	scratchDir := writeEpic(t, epicName, map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+	})
+	ticketPath := filepath.Join(scratchDir, epicName, "issues", "01-a.md")
+	iterationPath := iterationWorktreePath(wtDir, epicName, "01")
+	branch := iterBranch(epicName, "01")
+
+	t.Setenv("HOME", t.TempDir())
+
+	var mu sync.Mutex
+	phase := "pre-park"
+
+	handler := func(argv []string) ([]byte, int) {
+		if len(argv) < 2 {
+			return herdrfake.CommandError(fmt.Sprintf("command too short: %v", argv))
+		}
+		switch argv[0] + " " + argv[1] {
+		case "workspace list":
+			return herdrfake.Result(map[string]any{"workspaces": []any{}})
+		case "workspace create":
+			return herdrfake.Result(map[string]any{"workspace": map[string]any{"workspace_id": "ws1"}})
+		case "tab create":
+			label := realGitFlagValue(argv, "--label")
+			return herdrfake.Result(map[string]any{
+				"tab":       map[string]any{"tab_id": "tab-" + label, "label": label, "workspace_id": realGitFlagValue(argv, "--workspace")},
+				"root_pane": map[string]any{"pane_id": "pane-" + label},
+			})
+		case "tab close":
+			return []byte(`{"result":null}`), 0
+		case "tab list":
+			return herdrfake.Result(map[string]any{"tabs": []any{}})
+		case "agent start":
+			pane := realGitFlagValue(argv, "--pane")
+			return agentJSON(pane, "idle", "sess-"+pane)
+		case "agent prompt":
+			pane, text := argv[2], argv[3]
+			if _, ok := ticketIDFromImplementPrompt(text); ok {
+				mu.Lock()
+				cur := phase
+				mu.Unlock()
+				if cur == "pre-park" {
+					if err := commitIterationWork(iterationPath, "pre"); err != nil {
+						return herdrfake.CommandError(err.Error())
+					}
+					if err := updateTicket(ticketPath, func(tk *schema.Ticket) {
+						tk.IterationStatus = schema.IterationStatusNeedsAnswer
+					}); err != nil {
+						return herdrfake.CommandError(err.Error())
+					}
+				} else {
+					if err := commitIterationWork(iterationPath, "post"); err != nil {
+						return herdrfake.CommandError(err.Error())
+					}
+				}
+			}
+			return agentJSON(pane, "idle", "sess-"+pane)
+		case "agent wait":
+			return agentJSON(argv[2], "idle", "sess-"+argv[2])
+		case "agent send-keys":
+			return agentJSON(argv[2], "idle", "sess-"+argv[2])
+		case "agent read":
+			return []byte(""), 0
+		default:
+			return herdrfake.CommandError("unimplemented command: " + argv[0] + " " + argv[1])
+		}
+	}
+	herdrfake.Start(t, handler)
+
+	deps := testDeps()
+	deps.Sleep = func(time.Duration) {}
+	deps.VerifySkill = func(AgentKind, string) error { return nil }
+	cherryPickCalls := 0
+	realCherryPickRange := deps.CherryPickRange
+	deps.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
+		cherryPickCalls++
+		return realCherryPickRange(dir, fromExclusive, toInclusive)
+	}
+
+	runUntilParked(t, RunOptions{EpicName: epicName, Skill: "implement", ScratchDir: scratchDir, RepoDir: repoDir}, deps, &recordingSink{})
+
+	raw, err := os.ReadFile(ticketPath)
+	if err != nil {
+		t.Fatalf("ReadFile ticket after park: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: needs-answer") {
+		t.Fatalf("ticket after park = %s, want needs-answer", raw)
+	}
+	if _, err := os.Stat(iterationPath); !os.IsNotExist(err) {
+		t.Errorf("iteration worktree %s still exists after park, want removed", iterationPath)
+	}
+	if _, err := git.RevParse(featurePath, branch); err != nil {
+		t.Errorf("iteration branch %s missing after park, want it to survive for the resume: %v", branch, err)
+	}
+	if cherryPickCalls != 0 {
+		t.Errorf("cherry-pick calls after park = %d, want 0 (an adopted needs-answer report must not land anything)", cherryPickCalls)
+	}
+
+	// Simulate a human answering the question and gx picking the ticket back
+	// up: cleared back to open (Claim, run by the next scheduler pass, clears
+	// iteration_status the same way a fresh claim always does).
+	if err := SetStatus(ticketPath, "open"); err != nil {
+		t.Fatalf("SetStatus open: %v", err)
+	}
+	mu.Lock()
+	phase = "post-resume"
+	mu.Unlock()
+
+	var out bytes.Buffer
+	if err := Run(RunOptions{EpicName: epicName, Skill: "implement", ScratchDir: scratchDir, RepoDir: repoDir}, deps, NewTextEventSink(&out)); err != nil {
+		t.Fatalf("Run() (resume) error = %v", err)
+	}
+
+	raw, err = os.ReadFile(ticketPath)
+	if err != nil {
+		t.Fatalf("ReadFile ticket after resume: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: done") {
+		t.Errorf("ticket after resume = %s, want done", raw)
+	}
+
+	for _, name := range []string{"pre.txt", "post.txt"} {
+		if _, err := os.Stat(filepath.Join(featurePath, name)); err != nil {
+			t.Errorf("landed feature branch missing %s (both pre-park and post-resume commits must land together): %v", name, err)
+		}
+	}
+	if _, err := git.RevParse(featurePath, branch); err == nil {
+		t.Errorf("iteration branch %s still exists after landing, want deleted", branch)
+	}
+	if cherryPickCalls != 1 {
+		t.Errorf("total cherry-pick calls = %d, want exactly 1 (both commits landed in a single pick)", cherryPickCalls)
+	}
+}
+
 func TestRun_ProductionRealGit_CodexCompactsThenCompletes(t *testing.T) {
 	const (
 		epicName  = "epic"

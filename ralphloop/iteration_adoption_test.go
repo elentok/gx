@@ -34,7 +34,11 @@ func reportIterationStatus(t *testing.T, path, target, value string) func(herdr.
 // 07's ordering invariant: a needs-answer report is honoured before commit
 // counting, landing, or cleanup, so an agent that committed green work and
 // then stopped to ask never has that work cherry-picked and marked done while
-// the question is unanswered.
+// the question is unanswered. It also pins ticket 13's park cleanup: the
+// worktree/tab are dropped (the park may last a weekend, and there's no
+// reason to hold them open across it), but the iteration branch itself
+// survives — DeleteBranch must never be called — since a resume reattaches
+// to it to land both sides of the answer boundary in one pick.
 func TestRun_NeedsAnswerReport_ParksWithoutCherryPickEvenWithCommits(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
@@ -47,6 +51,11 @@ func TestRun_NeedsAnswerReport_ParksWithoutCherryPickEvenWithCommits(t *testing.
 		cherryPickCalled = true
 		return nil
 	}
+	branchDeleted := false
+	d.DeleteBranch = func(repoDir, branch string) error {
+		branchDeleted = true
+		return nil
+	}
 	// The default fakeDeps CommitsAhead returns 1: commits are present, which
 	// is exactly the case that must not be landed once needs-answer has been
 	// reported.
@@ -57,8 +66,12 @@ func TestRun_NeedsAnswerReport_ParksWithoutCherryPickEvenWithCommits(t *testing.
 	if cherryPickCalled {
 		t.Errorf("CherryPickRange called, want no cherry-pick for an adopted needs-answer report")
 	}
-	if len(*removed) != 0 {
-		t.Errorf("removed worktree branches = %v, want the parked iteration's worktree left in place", *removed)
+	wantRemoved := []string{"ralph-loop/epic-item-01"}
+	if len(*removed) != 1 || (*removed)[0] != wantRemoved[0] {
+		t.Errorf("removed worktree branches = %v, want %v (worktree/tab dropped across the park)", *removed, wantRemoved)
+	}
+	if branchDeleted {
+		t.Errorf("DeleteBranch called, want the iteration branch to survive the park for a later resume")
 	}
 
 	raw, err := os.ReadFile(path)
