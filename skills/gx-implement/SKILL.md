@@ -95,6 +95,14 @@ When either trigger fires:
    Without it, ralph-loop's stalled-agent detection flags the forked original `needs-repair` instead
    of leaving it `done`.
 
+## When only a person can answer
+
+Follow [gx-local-tracker.md](../gx-local-tracker.md)'s announce-and-stop rule: never call an
+interactive prompt. Commit whatever is green first, then write the `## Needs Answer` and
+`## Handoff` sections, report `--iteration-status needs-answer`, and exit. This is not a fork —
+the same ticket resumes once a person answers, and the resuming agent retires both sections into
+`## Comments` before continuing.
+
 ## Comments: fewer, and no numbers in them
 
 A comment quoting a measured value duplicates it, and duplicates drift - stale figures ship.

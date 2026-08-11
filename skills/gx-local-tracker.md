@@ -151,6 +151,35 @@ forked off. A `done` ticket whose fork subtree still has unfinished work renders
 complete. That state is derived from the graph, never written, so closing a ticket that forked is
 always a plain `--status done`; the children carry the rest.
 
+## Announce-and-stop
+
+An agent running under the loop **never calls an interactive prompt.** Interactive tools block the
+pane and write nothing to disk, and on-disk ticket status is gx's only observation channel, so a
+question asked that way is invisible by construction.
+
+When an agent needs something only a person can supply, it follows this rule instead:
+
+1. **Commit what is green.** Work already done is not discarded while the question waits.
+2. Write a **`## Needs Answer`** section: the question, the options weighed, and what the agent would
+   do with each answer, opening with a one-line summary. A person should be able to answer in one
+   pass without reading the diff.
+3. Write a **`## Handoff`** section: what is done, what is left, which files were touched, and which
+   skills the next agent should invoke, referencing by path. This is what makes the discarded context
+   recoverable.
+4. Report `--iteration-status needs-answer`.
+5. **Exit**, releasing the worktree, tab, and concurrency permit.
+
+This is **not a fork**. No child ticket is created; the same ticket resumes later. The resuming agent
+**retires both sections into `## Comments`** and must not re-ask the same question without new
+information, answering once has to be enough.
+
+Answering is one edit: a person appends under `## Needs Answer` and sets `status: open`. There is no
+dedicated command for it.
+
+Scope is **voluntary** asks only — a question the agent itself decides it needs answered. An
+involuntary interactive prompt gx catches from outside (herdr reporting the pane as `blocked`) is the
+orchestrator gate's problem, not the agent's, and follows a different path.
+
 ## Mid-flight forking
 
 A ticket can be forked while work is in progress, when it turns out to be larger than its budget or
