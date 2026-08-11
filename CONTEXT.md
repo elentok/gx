@@ -121,15 +121,17 @@ fixed set of user-facing states, each with its own icon:
   so a ticket without one renders as **Error** rather than defaulting to open.
 - **Claimed** — raw `Status: claimed`.
 - **Blocked** — an overlay, not a raw status: applied whenever an open or claimed ticket has a
-  blocker that is still **blocking** (see Ticket Dependencies). Needs-info, needs-attention, and
+  blocker that is still **blocking** (see Ticket Dependencies). Needs-answer, needs-repair, and
   done tickets keep their own state regardless of `blocked_by`.
-- **Needs-info** — raw `Status: needs-info`; the *work* is stalled on a fact or decision only a
-  human has. Agent-authored. Says nothing about whether an iteration survives.
-- **Needs-attention** — raw `Status: needs-attention`; the *machinery* is stalled — a live pane
-  wants a keypress, a launch failed, or reconciliation found unrecoverable state.
-  Orchestrator-authored. Also says nothing about whether an iteration survives: of its three
-  producers, only the operator-attention gate leaves one. _Avoid_: treating it as "a pane is
-  alive" — see Reattach.
+- **Needs-answer** — raw `Status: needs-answer`; a person is being asked for something — an answer
+  or a decision — and nothing is broken. Written either by an agent that stops to ask, or by gx's
+  own interactive-prompt gate when a pane blocks on an involuntary prompt. Says nothing about
+  whether an iteration survives; that's **Reattach**'s question. _Avoid_: Needs-info (retired
+  name, see ADR 0018).
+- **Needs-repair** — raw `Status: needs-repair`; gx hit a fault it can't resolve on its own and a
+  person must investigate. Never agent-authored. Also says nothing about whether an iteration
+  survives: of its several producers, only the operator-attention gate leaves one. _Avoid_:
+  Needs-attention (retired name, see ADR 0018), treating it as "a pane is alive" — see Reattach.
 - **Done** — the ticket's own work is complete. Says nothing about its fork subtree.
 - **Waiting-for-children** — an overlay on Done, not a raw status: the ticket's own `Status:` is
   done, but its fork subtree isn't. Derived from the graph on every render, never written to a file.
@@ -143,23 +145,51 @@ siblings tie-breaking on display number so an original sorts before its replacem
 **not** group or reorder them: a ticket never jumps out of its place once it finishes, so the list
 reads as the epic's intended order of execution.
 
-**Stalled** — a run-level state: an epic with no runnable work left, waiting on a human to clear a
-**human-clearable** ticket. A stalled epic parks rather than exiting, and releases its slot in the
-epic-level concurrency cap. _Avoid_: Paused (that's the operator-driven whole-queue toggle),
-Settled.
+**Parked** — a ticket's state (`needs-answer`, `needs-repair`, or `draft`; `isParked`) and, derived
+from it, a run-level state: an epic with no runnable work left but at least one parked ticket keeps
+scheduling everything else, then parks indefinitely and notifies, releasing its slot in the
+epic-level concurrency cap, rather than exiting. Per ADR 0020, **stall** names the opposite thing —
+the invisible failure this design exists to eliminate — and must not be used for the deliberate,
+visible state described here. _Avoid_: Stalled, Human-clearable (retired names, see ADR 0020),
+Paused (that's the operator-driven whole-queue toggle), Settled (removed from the vocabulary
+entirely — see ADR 0017).
 
-**Human-clearable** — a ticket whose status a human can change to make the run progress:
-needs-info, needs-attention, or draft. Draft counts because an epic still being authored is waiting
-on a person, not broken.
+**Unpark** — clearing a parked ticket back to the frontier: a person (or, for a pane-blocked park,
+gx itself once the pane leaves `blocked`) writes `status: open`. Not `resume` — the pause `Gate`
+already owns that verb — and not `clear` — the Queue tab's clear-checked/-complete keymaps already
+own that verb, and mean deleting tickets from the queue.
 
-**Deadlocked** — a run-level state: an epic with no runnable work and nothing human-clearable
-either — a genuine dependency error, reported as a failure rather than parked on.
+**Deadlocked** — a run-level state: an epic with no runnable work and nothing parked either — a
+genuine dependency error, reported as a failure rather than parked on.
 
 **Reattach** — reconnecting a run to an iteration that is still live and owned. Run at startup for
 tickets found `claimed`, and again when a parked run resumes. Its result, not the ticket's status,
-decides how a stall resumes: reattached → `claimed`, the same iteration continues; not reattached →
+decides how a park resumes: reattached → `claimed`, the same iteration continues; not reattached →
 `open`, a fresh iteration is launched. A surviving herdr pane is *not* the same thing — a pane
 outlives its goroutine. _Avoid_: "has a pane".
+
+**`status` / `iteration_status`** — a ticket's status splits across two fields with different
+owners. **`status`** is gx-owned and is the sole scheduling authority (the six `RenderedStatus`
+values above). **`iteration_status`** is agent-owned and reports on the current claim alone
+(`working` / `needs-answer` / `finished`, or absent — gx clears it on every claim and reattach, so
+a report is never readable outside the claim that produced it). Not to be confused with **herdr's
+`agent_status`** (`idle`/`done`/`blocked`, on the pane payload, `herdr/agent.go`) — the two names
+collided during design specifically because both describe "what is the agent up to," which is why
+`iteration_status` was picked instead of the more obvious `agent_status`: it names what the field
+describes (the current iteration's state) rather than who wrote it, and can't be confused with
+herdr's field in the one file that holds both. See ADR 0019.
+
+**Adopt** — the verb for gx accepting an `iteration_status` report and acting on it: seeing
+`needs-answer` and writing `status: needs-answer`, or seeing `finished` and entering the landing
+path (only writing `status: done` if landing succeeds). Not "promote", which already names two
+unrelated things in this repo (`draft` → `open`, and an epic entering `MaxConcurrentEpics`'s
+auto-promotion queue). An agent's report can start a landing; it can never conclude one — the
+commit count and the cherry-pick are what conclude it. See ADR 0019.
+
+**Park reason** — the first non-empty line after a parked ticket's `## Needs Answer` or `## Needs
+Repair` heading, with markdown markers stripped and ellipsised for display. What the Queue row
+shows as subtext for a parked ticket, read fresh from disk on every render rather than cached, so
+the row can't go stale between a park and a restart.
 
 ## Ticket Forking
 
@@ -404,10 +434,10 @@ property of the writer, not of the epic.
 **Reattach / Reattach signal** — per-ticket detection that a specific ticket's session is still
 alive, checked via `ralphloop.ScanForReattachable`. A special case of Attach: it only fires when the
 Queue is Detached (`attachLockHeld` false) and at least one ticket is left `claimed`/
-`needs-attention`, and only proceeds after the user confirms the "Found a detached live queue…
+`needs-repair`, and only proceeds after the user confirms the "Found a detached live queue…
 Reattach?" prompt (`handleDetachedLiveDetected`) — there is no silent auto-reattach.
 
-**Live** — the Queue (or a specific ticket) has at least one `claimed`/`needs-attention` ticket with
+**Live** — the Queue (or a specific ticket) has at least one `claimed`/`needs-repair` ticket with
 a still-alive session, as found by a Reattach signal scan (`cmdCheckDetachedLive`'s `alive` count).
 
 **Replace queue** (`r`) / **Add to queue** (`a`) — the two queueing actions from the Tickets tab.

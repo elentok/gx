@@ -1,5 +1,13 @@
 # A run stalled on a human parks and releases its concurrency slot
 
+> Superseded in part by ADR [0018](0018-needs-answer-vs-needs-repair.md), which re-cuts
+> `needs-info`/`needs-attention` into `needs-answer`/`needs-repair` on a new axis; this ADR's
+> parking, reattach-decides-resume, and concurrency-permit decisions are untouched.
+
+> Superseded in part by ADR [0020](0020-parked-not-stalled.md), which renames this ADR's
+> "stalled"/"stall" vocabulary to "parked", reserving "stall" for the invisible-progress failure
+> mode alone; the decision here is unchanged.
+
 An iteration ending `needs-info` or `needs-attention` used to end the run: both counted as settled,
 so `AllSettled` went true and the loop exited — and if nothing else was in flight, `needs-attention`
 returned a hard error (`"epic %q paused with no running iterations left"`). That made the obvious
