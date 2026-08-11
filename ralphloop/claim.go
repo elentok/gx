@@ -22,7 +22,7 @@ func Claim(path string) error {
 	return updateTicketWithBody(path, func(t *schema.Ticket, body *string) {
 		t.Status = schema.StatusClaimed
 		t.IterationStatus = ""
-		*body = demoteNeedsRepairSection(*body, time.Now())
+		*body = demoteSection(*body, "## Needs Repair", time.Now())
 	})
 }
 
@@ -75,18 +75,19 @@ func joinBodySections(preamble string, sections []bodySection) string {
 	return strings.Join(parts, "\n")
 }
 
-// demoteNeedsRepairSection moves body's "## Needs Repair" section (if any)
-// into a dated sub-entry appended under "## Comments" — creating that
-// heading if it doesn't exist yet — and removes the "## Needs Repair"
-// heading itself. Replacing rather than appending a fresh "## Needs Repair"
-// on top is what fixes the live stacking bug: a body with no such section is
-// returned unchanged, so a second claim in a row is a no-op here.
-func demoteNeedsRepairSection(body string, now time.Time) string {
+// demoteSection moves body's heading section (if any) into a dated
+// sub-entry appended under "## Comments" — creating that heading if it
+// doesn't exist yet — and removes heading itself. Replacing rather than
+// appending a fresh copy of heading on top is what fixes the live stacking
+// bug: a body with no such section is returned unchanged, so retiring the
+// same section twice in a row (e.g. two claims, or a claim after an
+// automatic unpark already retired it) is a no-op here.
+func demoteSection(body, heading string, now time.Time) string {
 	preamble, sections := splitBodySections(body)
 
 	idx := -1
 	for i, s := range sections {
-		if s.heading == "## Needs Repair" {
+		if s.heading == heading {
 			idx = i
 			break
 		}
@@ -96,7 +97,7 @@ func demoteNeedsRepairSection(body string, now time.Time) string {
 	}
 
 	reason := strings.TrimSpace(sections[idx].content)
-	entry := fmt.Sprintf("**%s** — retired from `## Needs Repair`:\n\n%s\n", now.Format("2006-01-02"), reason)
+	entry := fmt.Sprintf("**%s** — retired from `%s`:\n\n%s\n", now.Format("2006-01-02"), heading, reason)
 	sections = append(sections[:idx], sections[idx+1:]...)
 
 	commentsIdx := -1

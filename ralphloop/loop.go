@@ -460,6 +460,15 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		if err != nil {
 			return err
 		}
+		// unparkAnswered runs on every pass through this loop — the initial
+		// entry, each completed iteration, and (via the select below) every
+		// park-poll tick even while siblings are still running — reusing the
+		// epic load just above rather than scanning again on its own. See
+		// unparkAnswered's doc for why a live, unblocked pane is what makes
+		// this safe with no ownership check.
+		if err := unparkAnswered(d, workspaceID, opts.EpicName, wtDir, agent, scope, *epic, d.Now()); err != nil {
+			return err
+		}
 		if scope.AllDone(*epic) && active == 0 {
 			if allDone(*epic) {
 				if err := tickets.StampEpicCompleted(scratchDir, opts.EpicName, d.Now()); err != nil {
@@ -521,7 +530,28 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		}
 		parked = false
 
-		r := <-results
+		// With a sibling still running (active > 0, we're past the branch
+		// above), a plain receive would block until that sibling finishes even
+		// if some other ticket is already sitting needs-answer with its pane
+		// answered — the ticket-15 gap. Selecting the same park-timer seam the
+		// idle branch above already polls on catches that case: each tick
+		// loops back to the top, where the epic reload and unparkAnswered
+		// pick it up. Gated on hasLiveParkedTicket rather than "something is
+		// parked" at all: a needs-answer ticket with no live pane can only be
+		// cleared by a person editing the file (already caught by the next
+		// ordinary reload), and polling for it here would race an
+		// always-ready park-timer fake against the sibling's results send,
+		// starving it out forever.
+		var r outcome
+		if hasLiveParkedTicket(d, workspaceID, opts.EpicName, wtDir, agent, scope, *epic) {
+			select {
+			case r = <-results:
+			case <-d.ParkTimer(parkPollInterval):
+				continue
+			}
+		} else {
+			r = <-results
+		}
 		active--
 		if r.err != nil {
 			// A single iteration erroring out (a herdr/git hiccup, an
