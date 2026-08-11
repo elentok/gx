@@ -80,14 +80,21 @@ func escapeSlackMrkdwn(s string) string {
 //
 //	✅ *{title}*
 //
-//	{elapsed} · {tokens} · {done}/{total} done
+//	{elapsed} · {tokens} · {counts line}
 //	[gx] {epic}/{ticket}
+//
+// The counts line here carries only done/in-progress/total (see
+// EpicCounts.ParkedIdentifiers, Blocked, Ready, which IterationStats never
+// populates): a ticket-landed message reports what this landing changed,
+// not the epic's full parked/blocked/ready breakdown, which belongs to the
+// epic-level messages alone (see epicStartedText/epicCompleteText).
 func (s mrkdwnStyle) iterationFinishedText(ticket tickets.Ticket, epicName string, stats IterationStats) string {
 	ref := s.escape(fmt.Sprintf("%s/%s", epicName, ticket.Identifier))
+	line := RenderCountsLine(EpicCounts{Done: stats.Completed, InProgress: stats.InProgress, Total: stats.Total})
 	return fmt.Sprintf(
-		"✅ *%s*\n\n%s · %s · %d/%d done\n%s %s",
+		"✅ *%s*\n\n%s · %s · %s\n%s %s",
 		s.escape(ticket.Title), formatDuration(stats.ElapsedSeconds), formatTokens(stats.PeakContextTokens),
-		stats.Completed, stats.Total, s.gxPrefix, ref,
+		line, s.gxPrefix, ref,
 	)
 }
 
@@ -120,40 +127,48 @@ func (s mrkdwnStyle) iterationPausedText(label string, kind PauseKind, reason st
 //	🛑 *{epic}/{ticket} needs repair*      (needs-repair)
 //
 //	{reason}
-func (s mrkdwnStyle) ticketNeedsHumanText(identifier, epicName, status, reason string) string {
+//	{counts line}
+func (s mrkdwnStyle) ticketNeedsHumanText(identifier, epicName, status, reason string, counts EpicCounts) string {
 	ref := s.escape(fmt.Sprintf("%s/%s", epicName, identifier))
 	emoji, label := "\U0001f198", "needs answer"
 	if status != "needs-answer" {
 		emoji, label = "\U0001f6d1", "needs repair"
 	}
-	return fmt.Sprintf("%s *%s %s*\n\n%s", emoji, ref, label, s.escape(reason))
+	return fmt.Sprintf("%s *%s %s*\n\n%s\n%s", emoji, ref, label, s.escape(reason), RenderCountsLine(counts))
 }
 
 // epicStartedText renders the "epic started" notification — the single
 // message every epic that leaves the queue emits exactly once, folding what
 // used to be separate no-tickets/already-complete notifications: a fresh
 // start reads as a plain counts line, while total 0 or done == total tell
-// the same story the old separate events used to:
+// the same story the old separate events used to. counts is the full
+// done/in-progress/parked/blocked/ready/total breakdown — the "queue counts
+// line" — since an epic-level message is the one place a run-wide picture
+// is useful rather than noise (see iterationFinishedText):
 //
 //	🚀 *epic started: {epicName}*
 //
-//	{done}/{total} done
-func (s mrkdwnStyle) epicStartedText(epicName string, done, total int) string {
+//	{counts line}
+func (s mrkdwnStyle) epicStartedText(epicName string, counts EpicCounts) string {
 	return fmt.Sprintf(
-		"\U0001f680 *epic started: %s*\n\n%d/%d done",
-		s.escape(epicName), done, total,
+		"\U0001f680 *epic started: %s*\n\n%s",
+		s.escape(epicName), RenderCountsLine(counts),
 	)
 }
 
-// epicCompleteText renders the "epic complete" notification:
+// epicCompleteText renders the "epic complete" notification. counts is the
+// full queue counts line, same as epicStartedText; completed is this run's
+// own landed-ticket tally, a distinct number from counts.Done (the epic's
+// total done count, which may include tickets a prior run landed):
 //
 //	🎉 *epic complete: {epicName}*
 //
-//	{completed} tickets landed in {elapsed}
-func (s mrkdwnStyle) epicCompleteText(epicName string, completed int, elapsedSeconds int) string {
+//	{counts line}
+//	{completed} ticket(s) landed in {elapsed}
+func (s mrkdwnStyle) epicCompleteText(epicName string, counts EpicCounts, completed int, elapsedSeconds int) string {
 	return fmt.Sprintf(
-		"\U0001f389 *epic complete: %s*\n\n%d tickets landed in %s",
-		s.escape(epicName), completed, formatDuration(elapsedSeconds),
+		"\U0001f389 *epic complete: %s*\n\n%s\n%d ticket(s) landed in %s",
+		s.escape(epicName), RenderCountsLine(counts), completed, formatDuration(elapsedSeconds),
 	)
 }
 

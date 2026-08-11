@@ -72,7 +72,7 @@ func TestSlackEventSink_EpicStarted_SendsOneMessageAndForwards(t *testing.T) {
 	if len(reqs) != 1 {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
-	want := slackStyle.epicStartedText("epic", 0, 3)
+	want := slackStyle.epicStartedText("epic", EpicCounts{})
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}
@@ -136,7 +136,7 @@ func TestSlackEventSink_TicketNeedsHuman_SendsOneMessageAndForwards(t *testing.T
 	if len(reqs) != 1 {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
-	want := slackStyle.ticketNeedsHumanText("04", "epic", "needs-answer", "no commits landed")
+	want := slackStyle.ticketNeedsHumanText("04", "epic", "needs-answer", "no commits landed", EpicCounts{})
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}
@@ -160,9 +160,66 @@ func TestSlackEventSink_EpicComplete_SendsOneMessageAndForwards(t *testing.T) {
 	if len(reqs) != 1 {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
-	want := slackStyle.epicCompleteText("epic", 5, 300)
+	want := slackStyle.epicCompleteText("epic", EpicCounts{}, 5, 300)
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
+	}
+}
+
+// TestSlackEventSink_CountsLine_AppearsOnlyOnFourMessageKinds pins ticket
+// 27's placement rule: a counts line rides on epic started, ticket landed,
+// ticket parked, and epic complete — the messages where counts materially
+// moved — and on neither IterationPaused nor EpicParked, which chat also
+// sends text for but where the counts haven't changed since the prior
+// message.
+func TestSlackEventSink_CountsLine_AppearsOnlyOnFourMessageKinds(t *testing.T) {
+	server, getRequests := fakeSlackServer(t, http.StatusOK)
+	inner := &recordingSink{}
+	sink := newSlackEventSink(inner, server.URL, "", "")
+
+	sink.EpicStarted("epic", 0, 3)
+	sink.IterationFinished(tickets.Ticket{Identifier: "01"}, "epic", IterationStats{Completed: 1, Total: 3})
+	sink.TicketNeedsHuman("02", "epic", "needs-answer", "no commits landed")
+	sink.IterationPaused("03", "iter-03", PauseRateLimit, "rate limit hit")
+	sink.EpicParked("epic", []StalledTicket{{Identifier: "03"}})
+	sink.EpicComplete("epic", 1, 300)
+
+	reqs := waitForSlackRequests(getRequests, 6)
+	if len(reqs) != 6 {
+		t.Fatalf("requests = %v, want exactly 6", reqs)
+	}
+
+	// sends run in their own goroutine (see slackEventSink.send), so requests
+	// can arrive out of call order; match each by a marker unique to its
+	// message instead of assuming positional order.
+	cases := []struct {
+		label      string
+		marker     string
+		wantCounts bool
+	}{
+		{"EpicStarted", "epic started:", true},
+		{"IterationFinished", "epic/01", true},
+		{"TicketNeedsHuman", "epic/02", true},
+		{"IterationPaused", "iter-03 paused", false},
+		{"EpicParked", "epic parked:", false},
+		{"EpicComplete", "epic complete:", true},
+	}
+	for _, tt := range cases {
+		var matched *slackRequest
+		for i := range reqs {
+			if strings.Contains(reqs[i].Text, tt.marker) {
+				matched = &reqs[i]
+				break
+			}
+		}
+		if matched == nil {
+			t.Errorf("%s: no request matched marker %q among %v", tt.label, tt.marker, reqs)
+			continue
+		}
+		got := strings.Contains(matched.Text, "done ·") || strings.Contains(matched.Text, "done\n")
+		if got != tt.wantCounts {
+			t.Errorf("%s text = %q, contains a counts line = %v, want %v", tt.label, matched.Text, got, tt.wantCounts)
+		}
 	}
 }
 

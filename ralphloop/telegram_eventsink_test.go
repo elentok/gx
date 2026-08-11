@@ -77,7 +77,7 @@ func TestTelegramEventSink_EpicStarted_SendsOneMessageAndForwards(t *testing.T) 
 	if len(reqs) != 1 {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
-	want := telegramStyle.epicStartedText("epic", 0, 3)
+	want := telegramStyle.epicStartedText("epic", EpicCounts{})
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}
@@ -147,7 +147,7 @@ func TestTelegramEventSink_TicketNeedsHuman_SendsOneMessageAndForwards(t *testin
 	if len(reqs) != 1 {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
-	want := telegramStyle.ticketNeedsHumanText("04", "epic", "needs-answer", "no commits landed")
+	want := telegramStyle.ticketNeedsHumanText("04", "epic", "needs-answer", "no commits landed", EpicCounts{})
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}
@@ -171,7 +171,7 @@ func TestTelegramEventSink_EpicComplete_SendsOneMessageAndForwards(t *testing.T)
 	if len(reqs) != 1 {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
-	want := telegramStyle.epicCompleteText("epic", 5, 300)
+	want := telegramStyle.epicCompleteText("epic", EpicCounts{}, 5, 300)
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}

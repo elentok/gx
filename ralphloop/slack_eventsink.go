@@ -80,7 +80,7 @@ func sendSlackMessageRaw(webhookURL, text string) error {
 
 func (s *slackEventSink) EpicStarted(epicName string, done, total int) {
 	s.EventSink.EpicStarted(epicName, done, total)
-	s.send(slackStyle.epicStartedText(epicName, done, total), notifyKindEpicStarted)
+	s.send(slackStyle.epicStartedText(epicName, loadEpicCounts(s.scratchDir, epicName)), notifyKindEpicStarted)
 }
 
 func (s *slackEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
@@ -95,7 +95,8 @@ func (s *slackEventSink) IterationPaused(identifier, label string, kind PauseKin
 
 func (s *slackEventSink) TicketNeedsHuman(identifier, epicName, status, reason string) {
 	s.EventSink.TicketNeedsHuman(identifier, epicName, status, reason)
-	s.send(slackStyle.ticketNeedsHumanText(identifier, epicName, status, reason), notifyKindTicketNeedsHuman)
+	counts := loadEpicCounts(s.scratchDir, epicName)
+	s.send(slackStyle.ticketNeedsHumanText(identifier, epicName, status, reason, counts), notifyKindTicketNeedsHuman)
 }
 
 func (s *slackEventSink) EpicParked(epicName string, stalled []StalledTicket) {
@@ -109,7 +110,8 @@ func (s *slackEventSink) EpicParked(epicName string, stalled []StalledTicket) {
 
 func (s *slackEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {
 	s.EventSink.EpicComplete(epicName, completed, elapsedSeconds)
-	s.send(slackStyle.epicCompleteText(epicName, completed, elapsedSeconds), notifyKindEpicComplete)
+	counts := loadEpicCounts(s.scratchDir, epicName)
+	s.send(slackStyle.epicCompleteText(epicName, counts, completed, elapsedSeconds), notifyKindEpicComplete)
 }
 
 // send POSTs {"text": text} to the Slack workflow webhook in its own

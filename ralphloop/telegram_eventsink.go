@@ -102,7 +102,7 @@ func sendTelegramRaw(botToken, chatID, apiBaseURL, text string) error {
 
 func (s *telegramEventSink) EpicStarted(epicName string, done, total int) {
 	s.EventSink.EpicStarted(epicName, done, total)
-	s.send(telegramStyle.epicStartedText(epicName, done, total), notifyKindEpicStarted)
+	s.send(telegramStyle.epicStartedText(epicName, loadEpicCounts(s.scratchDir, epicName)), notifyKindEpicStarted)
 }
 
 func (s *telegramEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
@@ -117,7 +117,8 @@ func (s *telegramEventSink) IterationPaused(identifier, label string, kind Pause
 
 func (s *telegramEventSink) TicketNeedsHuman(identifier, epicName, status, reason string) {
 	s.EventSink.TicketNeedsHuman(identifier, epicName, status, reason)
-	s.send(telegramStyle.ticketNeedsHumanText(identifier, epicName, status, reason), notifyKindTicketNeedsHuman)
+	counts := loadEpicCounts(s.scratchDir, epicName)
+	s.send(telegramStyle.ticketNeedsHumanText(identifier, epicName, status, reason, counts), notifyKindTicketNeedsHuman)
 }
 
 func (s *telegramEventSink) EpicParked(epicName string, stalled []StalledTicket) {
@@ -131,7 +132,8 @@ func (s *telegramEventSink) EpicParked(epicName string, stalled []StalledTicket)
 
 func (s *telegramEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {
 	s.EventSink.EpicComplete(epicName, completed, elapsedSeconds)
-	s.send(telegramStyle.epicCompleteText(epicName, completed, elapsedSeconds), notifyKindEpicComplete)
+	counts := loadEpicCounts(s.scratchDir, epicName)
+	s.send(telegramStyle.epicCompleteText(epicName, counts, completed, elapsedSeconds), notifyKindEpicComplete)
 }
 
 // send POSTs text to the Telegram Bot API's sendMessage endpoint in its own
