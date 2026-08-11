@@ -20,13 +20,16 @@ const conflictResolutionTimeoutMs = 30 * 60 * 1000
 
 // runIteration drives one ticket through the full iteration lifecycle:
 // create its worktree, launch and prompt the agent, wait for it to finish,
-// cherry-pick its commits onto the feature branch, mark the ticket done, and
-// remove the iteration worktree. If the agent finishes without landing any
-// commits, the ticket is marked needs-answer instead and the worktree/tab are
-// left in place for inspection — unless the agent itself declared the
-// zero-commit finish intentional (ticket frontmatter's commitless field, set
-// via `gx tickets set --commitless true` alongside a non-claimed status), in
-// which case the worktree/tab are cleaned up normally with no commit landed.
+// adopt any iteration_status report the agent left, cherry-pick its commits
+// onto the feature branch, mark the ticket done, and remove the iteration
+// worktree. An `iteration_status: needs-answer` report is adopted before any
+// of that: see adoptNeedsAnswerReport. Otherwise, if the agent finishes
+// without landing any commits, the ticket is marked needs-answer instead and
+// the worktree/tab are left in place for inspection — unless the agent
+// itself declared the zero-commit finish intentional (ticket frontmatter's
+// commitless field, set via `gx tickets set --commitless true` alongside a
+// non-claimed status), in which case the worktree/tab are cleaned up
+// normally with no commit landed.
 func runIteration(d Deps, p iterationParams) error {
 	label := iterLabel(p.FeatureBranch, p.Ticket.Identifier)
 	branch := iterBranch(p.FeatureBranch, p.Ticket.Identifier)
@@ -171,8 +174,17 @@ func reattachIteration(d Deps, p iterationParams) error {
 // finishIteration lands a finished iteration's commits (or marks it
 // needs-answer if it produced none), then removes its worktree/tab on success.
 // Fresh and reattached iterations both carry their native session and pane
-// identity through this shared completion path.
+// identity through this shared completion path. A needs-answer report is
+// adopted before any of that: see adoptNeedsAnswerReport.
 func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, sessionID string) error {
+	adopted, err := adoptNeedsAnswerReport(p, path, pane, tab, sessionID)
+	if err != nil {
+		return err
+	}
+	if adopted {
+		return nil
+	}
+
 	ahead, err := d.CommitsAhead(path, base, branch)
 	if err != nil || ahead == 0 {
 		// waitForFinish's own debounce (confirmFinished) already guards against
@@ -231,6 +243,34 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 	}
 
 	return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, tab)
+}
+
+// adoptNeedsAnswerReport honours an agent's `iteration_status: needs-answer`
+// report before finishIteration counts commits, lands them, cleans up, or
+// announces the iteration finished (ADR 0019's adoption-precedes-landing
+// invariant): without this ordering, an agent that commits what is green and
+// then stops to ask has its partial work cherry-picked and marked done while
+// the question is still unanswered. Unlike the zero-commit fault path below,
+// it never runs zero-commit fault detection and never sets commitless — a
+// ticket that stops to ask fully expects to commit after it resumes, so zero
+// commits at this point is legal. It reads the ticket fresh rather than
+// trusting p.Ticket (populated once at claim time) because the report is
+// written by the agent during the iteration this call is completing.
+func adoptNeedsAnswerReport(p iterationParams, path, pane, tab, sessionID string) (adopted bool, err error) {
+	current, err := schema.ParseTicket(p.Ticket.Path)
+	if err != nil {
+		return false, fmt.Errorf("reading ticket %s for iteration-status adoption: %w", p.Ticket.Path, err)
+	}
+	if current.IterationStatus != schema.IterationStatusNeedsAnswer {
+		return false, nil
+	}
+
+	if err := MarkNeedsAnswer(p.Ticket.Path); err != nil {
+		return false, fmt.Errorf("adopting needs-answer report: %w", err)
+	}
+	p.logTicketEvent(eventNeedsAnswer, pane, tab, sessionID, path)
+	p.Sink.TicketNeedsAnswer(p.Ticket.Identifier, p.FeatureBranch)
+	return true, nil
 }
 
 // markDoneStampingCloseMetadata marks p.Ticket done, stamping the closing
