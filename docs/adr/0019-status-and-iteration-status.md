@@ -1,9 +1,12 @@
 # The ticket's status splits into a gx-owned `status` and an agent-owned `iteration_status`
 
+> Superseded in part by ADR [0023](0023-status-ownership-by-writer.md), which replaces this ADR's
+> Consequences rules on what `gx tickets set --status` accepts and on `--force`.
+
 ADR [0018](0018-needs-answer-vs-needs-repair.md) re-cut the two human-clearable statuses; this one
 decides which field holds what, and who may write it.
 
-Ticket 03 of the `stall-visibility` map established *that* the single `status` field splits in two:
+Ticket 03 of the `no-silent-stalls-map` wayfinder map established *that* the single `status` field splits in two:
 `status` becomes gx-owned and is written only after the cherry-pick lands, so `done` ⇒ landed by
 construction, closing the done-before-landed race; the second field gives gx an on-disk "the agent is
 finished / stuck" signal instead of inferring one from the herdr pane. It deliberately did not decide
@@ -28,7 +31,7 @@ outside the claim that produced it.
 enters its landing path and — only if that path succeeds — writes `status: done`. Nothing in the
 scheduler ever branches on both fields at once.
 
-The verb is **adopt**, not "promote". Ticket 04 of the `stall-visibility` map found "promote"
+The verb is **adopt**, not "promote". Ticket 04 of the `no-silent-stalls-map` wayfinder map found "promote"
 already carrying two unrelated meanings in this repo — `draft` → `open` (`CONTEXT.md`, and the
 tracker contract's "Promoting it is a deliberate, separate step") and a queued epic entering
 `MaxConcurrentEpics`'s auto-promotion queue — so this ADR's sense was renamed rather than becoming a

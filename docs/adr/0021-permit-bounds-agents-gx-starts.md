@@ -1,5 +1,10 @@
 # `MaxConcurrentEpics` bounds the agents gx *starts*, not the agents that are running
 
+> Consequences superseded in part by `docs/specs/no-silent-stalls.md` §D, which parks by ending the
+> iteration: the permit then releases through the existing `active == 0` path, so `TryAcquire` and
+> the try-first re-acquire below are not built. The decision above — that a park may release a slot
+> while a live agent remains in its pane — is unchanged and is what licenses that release.
+
 When an iteration parks because its agent is blocked on an interactive prompt in its pane, gx
 **releases the epic's concurrency permit**, and on recovery re-acquires it **try-first: if no slot is
 free, it logs the fact and proceeds over-subscribed by one** rather than blocking. That reframes what
