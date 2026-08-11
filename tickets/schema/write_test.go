@@ -48,6 +48,33 @@ func TestUpdateTicket_AppendsToSessionIDsWithoutOverwriting(t *testing.T) {
 	}
 }
 
+func TestClearIterationStatus_ClearsFieldLeavesStatusUntouched(t *testing.T) {
+	path := writeTemp(t, "04b-ticket.md", "---\nid: \"04b\"\nstatus: claimed\ntype: task\niteration_status: finished\n---\nBody.\n")
+
+	if err := ClearIterationStatus(path); err != nil {
+		t.Fatalf("ClearIterationStatus: %v", err)
+	}
+
+	got, err := ParseTicket(path)
+	if err != nil {
+		t.Fatalf("ParseTicket: %v", err)
+	}
+	if got.IterationStatus != "" {
+		t.Errorf("IterationStatus = %q, want empty", got.IterationStatus)
+	}
+	if got.Status != StatusClaimed {
+		t.Errorf("Status = %q, want unchanged %q", got.Status, StatusClaimed)
+	}
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading back: %v", err)
+	}
+	if strings.Contains(string(raw), "iteration_status") {
+		t.Errorf("ticket file = %q, want no iteration_status key", string(raw))
+	}
+}
+
 func TestUpdateTicket_ValidationFailureWritesNothing(t *testing.T) {
 	original := "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n"
 	path := writeTemp(t, "04b-ticket.md", original)

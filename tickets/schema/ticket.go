@@ -99,6 +99,36 @@ func (t TicketType) Valid() bool {
 	return validTypes[t]
 }
 
+// IterationStatus is the per-claim self-report an agent leaves on a ticket
+// mid-iteration (see the no-silent-stalls epic). The empty string is a valid
+// member: it means no agent has reported this claim yet, not an error — so
+// unlike Status, IterationStatus.Valid() accepts "" alongside the three named
+// values. Enum enforcement for this field is write-conditional (see
+// ticket.go's package-level notes and the schema.Validate doc comment): it
+// belongs to the CLI write path that sets the field, not to Validate, so a
+// hand-authored or future-written file carrying an unrecognized value still
+// loads without error.
+type IterationStatus string
+
+const (
+	IterationStatusWorking     IterationStatus = "working"
+	IterationStatusNeedsAnswer IterationStatus = "needs-answer"
+	IterationStatusFinished    IterationStatus = "finished"
+)
+
+var validIterationStatuses = map[IterationStatus]bool{
+	"":                         true,
+	IterationStatusWorking:     true,
+	IterationStatusNeedsAnswer: true,
+	IterationStatusFinished:    true,
+}
+
+// Valid reports whether s is one of the three named values or the empty
+// "absent" value.
+func (s IterationStatus) Valid() bool {
+	return validIterationStatuses[s]
+}
+
 // Ticket is the in-memory, typed frontmatter of one ticket file's YAML
 // header (see .scratch/ticket-frontmatter/spec.md's Schema section). No
 // file I/O or YAML (de)serialization here — that's a later ticket in this
@@ -134,6 +164,10 @@ type Ticket struct {
 	// directly — research/grilling/code-review tickets are commitless by
 	// type, without needing the flag set explicitly.
 	Commitless bool
+	// IterationStatus is the agent's latest self-reported claim state (see
+	// the IterationStatus type doc). Never checked by Validate: the enum rule
+	// is enforced only by the CLI write path that sets it.
+	IterationStatus IterationStatus
 }
 
 // IsCommitless reports whether t is exempt from landed-commit verification:

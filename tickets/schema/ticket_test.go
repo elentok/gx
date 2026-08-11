@@ -95,9 +95,30 @@ func TestStatus_Valid(t *testing.T) {
 	}
 }
 
+func TestIterationStatus_Valid(t *testing.T) {
+	for _, s := range []IterationStatus{"", IterationStatusWorking, IterationStatusNeedsAnswer, IterationStatusFinished} {
+		if !s.Valid() {
+			t.Errorf("IterationStatus(%q).Valid() = false, want true", s)
+		}
+	}
+	for _, s := range []IterationStatus{"bogus", "Working", "needs-info"} {
+		if s.Valid() {
+			t.Errorf("IterationStatus(%q).Valid() = true, want false", s)
+		}
+	}
+}
+
 func TestValidate_Valid(t *testing.T) {
 	if err := Validate(validTicket()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidate_DoesNotRejectUnrecognizedIterationStatus(t *testing.T) {
+	tk := validTicket()
+	tk.IterationStatus = "bogus"
+	if err := Validate(tk); err != nil {
+		t.Fatalf("unexpected error: %v, want no rejection (enum enforcement is write-conditional)", err)
 	}
 }
 

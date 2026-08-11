@@ -211,6 +211,65 @@ func TestParseTicket_RoundTrip_SessionIDs(t *testing.T) {
 	}
 }
 
+func TestParseTicket_IterationStatusRoundTrip(t *testing.T) {
+	for _, status := range []IterationStatus{IterationStatusWorking, IterationStatusNeedsAnswer, IterationStatusFinished} {
+		t.Run(string(status), func(t *testing.T) {
+			content := "---\nid: \"04b\"\nstatus: claimed\ntype: task\niteration_status: " + string(status) + "\n---\nbody\n"
+			path := writeTemp(t, "04b-iteration-status.md", content)
+
+			got, err := ParseTicket(path)
+			if err != nil {
+				t.Fatalf("ParseTicket: %v", err)
+			}
+			if got.IterationStatus != status {
+				t.Fatalf("IterationStatus = %q, want %q", got.IterationStatus, status)
+			}
+
+			marshaled, err := MarshalTicket(got, "body\n")
+			if err != nil {
+				t.Fatalf("MarshalTicket: %v", err)
+			}
+			if !strings.Contains(string(marshaled), "iteration_status: "+string(status)) {
+				t.Errorf("marshaled ticket = %q, want iteration_status: %s written back", string(marshaled), status)
+			}
+		})
+	}
+}
+
+func TestParseTicket_AbsentIterationStatusLoadsEmpty(t *testing.T) {
+	content := "---\nid: \"04b\"\nstatus: claimed\ntype: task\n---\nbody\n"
+	path := writeTemp(t, "04b-no-iteration-status.md", content)
+
+	got, err := ParseTicket(path)
+	if err != nil {
+		t.Fatalf("ParseTicket: %v", err)
+	}
+	if got.IterationStatus != "" {
+		t.Fatalf("IterationStatus = %q, want empty", got.IterationStatus)
+	}
+
+	marshaled, err := MarshalTicket(got, "body\n")
+	if err != nil {
+		t.Fatalf("MarshalTicket: %v", err)
+	}
+	if strings.Contains(string(marshaled), "iteration_status") {
+		t.Errorf("marshaled ticket = %q, want no iteration_status key", string(marshaled))
+	}
+}
+
+func TestParseTicket_UnrecognizedIterationStatusLoadsWithoutError(t *testing.T) {
+	content := "---\nid: \"04b\"\nstatus: claimed\ntype: task\niteration_status: bogus\n---\nbody\n"
+	path := writeTemp(t, "04b-bogus-iteration-status.md", content)
+
+	got, err := ParseTicket(path)
+	if err != nil {
+		t.Fatalf("ParseTicket: %v, want no error (enum enforcement is write-conditional)", err)
+	}
+	if got.IterationStatus != "bogus" {
+		t.Fatalf("IterationStatus = %q, want %q", got.IterationStatus, "bogus")
+	}
+}
+
 func TestParseTicket_MalformedFrontmatterYAML(t *testing.T) {
 	content := `---
 id: "04b"

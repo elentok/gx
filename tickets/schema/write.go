@@ -37,6 +37,15 @@ func UpdateTicket(path string, mutate func(*Ticket)) error {
 	return writeFileAtomic(path, out)
 }
 
+// ClearIterationStatus removes path's iteration_status, leaving Status and
+// everything else untouched. This is the primitive ralph-loop's reattach
+// wiring calls once a fresh agent session picks a ticket back up.
+func ClearIterationStatus(path string) error {
+	return UpdateTicket(path, func(t *Ticket) {
+		t.IterationStatus = ""
+	})
+}
+
 // writeFileAtomic replaces path's content via a same-directory temp file
 // plus rename, so a concurrent reader never observes a torn/truncated write
 // from an in-place os.WriteFile. Duplicated from ralphloop's writeFileAtomic

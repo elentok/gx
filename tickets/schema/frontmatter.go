@@ -25,6 +25,7 @@ type ticketYAML struct {
 	Compactions           int      `yaml:"compactions,omitempty"`
 	Commitless            bool     `yaml:"commitless,omitempty"`
 	SessionIDs            []string `yaml:"session_ids,omitempty"`
+	IterationStatus       string   `yaml:"iteration_status,omitempty"`
 
 	// Children is the retired field, declared here and nowhere else: the wire
 	// struct is the only place that has to recognize it (yaml.v3 silently
@@ -55,6 +56,7 @@ func (w ticketYAML) toTicket() Ticket {
 		Compactions:           w.Compactions,
 		Commitless:            w.Commitless,
 		SessionIDs:            copyStrings(w.SessionIDs),
+		IterationStatus:       IterationStatus(w.IterationStatus),
 	}
 	if w.Parent != "" {
 		id := TicketID(w.Parent)
@@ -75,6 +77,7 @@ func ticketToYAML(t Ticket) ticketYAML {
 		Compactions:           t.Compactions,
 		Commitless:            t.Commitless,
 		SessionIDs:            copyStrings(t.SessionIDs),
+		IterationStatus:       string(t.IterationStatus),
 	}
 	if t.Parent != nil {
 		w.Parent = string(*t.Parent)
