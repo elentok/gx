@@ -104,10 +104,32 @@ func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
 	if base != StatusOpen && base != StatusClaimed {
 		return base
 	}
-	if len(e.UnresolvedBlockers(t)) > 0 {
+	if len(e.UnresolvedBlockers(t)) > 0 || !e.parentDone(t) {
 		return StatusBlocked
 	}
 	return base
+}
+
+// parentDone reports whether t's Parent ticket (see Ticket.Parent) has
+// landed its own work — Parent's raw Status alone, via IsDone, never its
+// fork subtree. This is the implicit edge every fork child carries on its
+// parent: recursing into the subtree here (as Blocking does for explicit
+// Blocked by: tokens) would deadlock every fork, since a parent isn't done-
+// with-subtree-resolved until its children are, and the children can't start
+// until it is. A ticket with no Parent is trivially "done" by this measure —
+// it has nothing to wait on. A parent in needs-answer or needs-repair, like
+// any non-done status, holds the child; a commitless-done parent still has
+// Status: done (see ticket 08), so it releases the child same as any other.
+func (e Epic) parentDone(t Ticket) bool {
+	if t.Parent == nil {
+		return true
+	}
+	num, letters := splitBlockedByToken(*t.Parent)
+	parent, ok := e.byNumberAndSuffix()[siblingKey(num, letters)]
+	if !ok {
+		return false
+	}
+	return parent.IsDone()
 }
 
 // effectiveBlockedBy returns t's Blocked by: tokens for scheduling: for

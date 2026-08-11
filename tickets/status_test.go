@@ -511,6 +511,81 @@ func TestEpic_RenderedStatus_CodeReviewTicketsDontBlockEachOther(t *testing.T) {
 	}
 }
 
+// TestEpic_RenderedStatus_ForkChildBlockedOnParentsOwnDone covers the
+// implicit parent-done edge (ticket 10): an open fork child is schedulable
+// once its parent's own Status: is done, and blocked while the parent is
+// still claimed — the deadlock-regression pair that demonstrates the edge
+// exists without ever recursing into the parent's own fork subtree.
+func TestEpic_RenderedStatus_ForkChildBlockedOnParentsOwnDone(t *testing.T) {
+	parent := "01"
+	doneEpic := Epic{Tickets: []Ticket{
+		{Number: 1, Identifier: "01", Status: "done"},
+		{Number: 1, Identifier: "01a", Status: "open", Parent: &parent},
+	}}
+	if got := doneEpic.RenderedStatus(doneEpic.Tickets[1]); got != StatusOpen {
+		t.Errorf("RenderedStatus(01a) = %v, want StatusOpen once parent 01 is done", got)
+	}
+
+	claimedEpic := Epic{Tickets: []Ticket{
+		{Number: 1, Identifier: "01", Status: "claimed"},
+		{Number: 1, Identifier: "01a", Status: "open", Parent: &parent},
+	}}
+	if got := claimedEpic.RenderedStatus(claimedEpic.Tickets[1]); got != StatusBlocked {
+		t.Errorf("RenderedStatus(01a) = %v, want StatusBlocked while parent 01 is still claimed", got)
+	}
+}
+
+// TestEpic_RenderedStatus_ForkChildHeldByParentParkState covers a parent
+// stuck in either park status: a broken or question-blocked parent must not
+// silently seed a child iteration.
+func TestEpic_RenderedStatus_ForkChildHeldByParentParkState(t *testing.T) {
+	parent := "01"
+	for _, parkStatus := range []string{"needs-answer", "needs-repair"} {
+		epic := Epic{Tickets: []Ticket{
+			{Number: 1, Identifier: "01", Status: parkStatus},
+			{Number: 1, Identifier: "01a", Status: "open", Parent: &parent},
+		}}
+		if got := epic.RenderedStatus(epic.Tickets[1]); got != StatusBlocked {
+			t.Errorf("RenderedStatus(01a) = %v, want StatusBlocked while parent 01 is %s", got, parkStatus)
+		}
+	}
+}
+
+// TestEpic_RenderedStatus_ForkChildReleasedByCommitlessDoneParent ties this
+// ticket to 08: a commitless close still leaves Status: done on the parent,
+// so it releases the child same as any other done parent.
+func TestEpic_RenderedStatus_ForkChildReleasedByCommitlessDoneParent(t *testing.T) {
+	parent := "01"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, Identifier: "01", Status: "done", Commitless: true},
+		{Number: 1, Identifier: "01a", Status: "open", Parent: &parent},
+	}}
+	if got := epic.RenderedStatus(epic.Tickets[1]); got != StatusOpen {
+		t.Errorf("RenderedStatus(01a) = %v, want StatusOpen: commitless-done parent still releases its child", got)
+	}
+}
+
+// TestEpic_RenderedStatus_ForkChildParentEdgeIsNonRecursive covers the
+// "non-recursive on the parent's own status" property directly: 01 is done
+// and its own further-forked grandchild 01a is still open (making
+// e.Blocking(01) true), but 01b — a sibling fork child whose Parent points
+// at 01 itself — only checks 01's own Status:, not 01's whole subtree, so it
+// is schedulable regardless of 01a.
+func TestEpic_RenderedStatus_ForkChildParentEdgeIsNonRecursive(t *testing.T) {
+	root := "01"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, Identifier: "01", Status: "done"},
+		{Number: 1, Identifier: "01a", Status: "open", Parent: &root},
+		{Number: 1, Identifier: "01b", Status: "open", Parent: &root},
+	}}
+	if !epic.Blocking(epic.Tickets[0]) {
+		t.Fatalf("Blocking(01) = false, want true: fork child 01a isn't done")
+	}
+	if got := epic.RenderedStatus(epic.Tickets[2]); got != StatusOpen {
+		t.Errorf("RenderedStatus(01b) = %v, want StatusOpen: the parent edge checks 01's own status only, not its subtree", got)
+	}
+}
+
 func TestEpic_UnresolvedBlockers_CodeReviewExpansionNotWrittenToTicket(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
 		{Number: 9, Identifier: "09", Type: typeCodeReview, Status: "open"},
