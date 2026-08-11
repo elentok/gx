@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/spf13/cobra"
@@ -56,7 +57,7 @@ distinct from any ticket's own frontmatter. Both fields are gx-managed, not sett
   completed_at (RFC3339 timestamp) — when the epic's last ticket landed
 `
 
-func newTicketsSetCmd() *cobra.Command {
+func newTicketsSetCmd(d deps) *cobra.Command {
 	var (
 		status                string
 		blockedBy             string
@@ -73,7 +74,7 @@ func newTicketsSetCmd() *cobra.Command {
 		Short: "validated, sparse frontmatter writes to a ticket file",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runTicketsSet(c, args[0], c.OutOrStdout(), c.ErrOrStderr())
+			return runTicketsSet(c, args[0], c.OutOrStdout(), c.ErrOrStderr(), d.getwd)
 		},
 	}
 
@@ -144,11 +145,14 @@ func parseCSVIDs(value string) []schema.TicketID {
 // runTicketsSet applies every flag actually passed on c to path's ticket via
 // schema.UpdateTicket, then prints a summary of just the fields changed this
 // call. Flags never passed leave their Ticket field exactly as parsed.
-func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer) error {
+func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd func() (string, error)) error {
 	if c.Flags().Changed("status") {
 		status, _ := c.Flags().GetString("status")
 		if schema.Status(status) == schema.StatusNeedsAnswer || schema.Status(status) == schema.StatusNeedsRepair {
 			return fmt.Errorf("%s: --status %s is machine-written only; gx parks a ticket that way itself, it is not settable via `tickets set`", path, status)
+		}
+		if err := checkAgentStatusGuard(path, schema.Status(status), getwd); err != nil {
+			return err
 		}
 		if schema.Status(status) == schema.StatusDone {
 			force, _ := c.Flags().GetBool("force")
@@ -202,6 +206,42 @@ func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer) error {
 
 	fmt.Fprintf(w, "%s: updated (%s)\n", path, strings.Join(changed, ", "))
 	return nil
+}
+
+// checkAgentStatusGuard is the landing-decision guard rail: it refuses a
+// --status write from an iteration agent's own worktree unless it's the one
+// promotion mid-flight forking depends on, draft -> open. The guard is keyed
+// off the caller's git branch rather than a flag or env var — see
+// .scratch/no-silent-stalls/issues/11-cli-status-guard.md for why branch is
+// the accident-resistant signal here. It is a guard rail, not a boundary: an
+// agent that changes directory out of its worktree evades it as easily as it
+// could alias a flag away, and that's fine — the failure mode being defended
+// against is a stale instruction, not an adversary. getwd failing, or the
+// branch not matching "ralph-loop/*", both mean no guard: unrecognised is
+// never treated as a false refusal, so hand-driven epics keep working
+// exactly as they do today.
+func checkAgentStatusGuard(path string, newStatus schema.Status, getwd func() (string, error)) error {
+	cwd, err := getwd()
+	if err != nil {
+		return nil
+	}
+
+	branch, err := git.CurrentBranch(cwd)
+	if err != nil || !strings.HasPrefix(branch, "ralph-loop/") {
+		return nil
+	}
+
+	if newStatus == schema.StatusOpen {
+		current, err := schema.ParseTicket(path)
+		if err == nil && current.Status == schema.StatusDraft {
+			return nil
+		}
+	}
+
+	return fmt.Errorf(
+		"%s: --status %s refused from a ralph-loop/* branch (%s); an iteration agent may only promote a draft ticket to open, landing status is gx's to set",
+		path, newStatus, branch,
+	)
 }
 
 // lockEpicForTicket loads the epic owning path under the epic's allocation

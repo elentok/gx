@@ -31,7 +31,7 @@ func selectTicketRow(t *testing.T, m Model) Model {
 
 func TestModel_ChangeStatusKeyOpensMenuWithoutLiveLoop(t *testing.T) {
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: needs-info\n\nBody.\n")
+	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: needs-answer\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -46,13 +46,13 @@ func TestModel_ChangeStatusKeyOpensMenuWithoutLiveLoop(t *testing.T) {
 		t.Fatalf("expected status menu open after 's'")
 	}
 	got := menuValues(m.statusMenu)
-	want := []string{"open", "claimed", "needs-attention", "draft", "done"}
+	want := []string{"open", "claimed", "needs-repair", "draft", "done"}
 	assertSameSet(t, got, want)
 }
 
 func TestModel_ChangeStatusKeyMenuExcludesGxOwnedStatusesWhileEpicIsLive(t *testing.T) {
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: needs-info\n\nBody.\n")
+	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: needs-answer\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -76,7 +76,7 @@ func TestModel_ChangeStatusKeyMenuExcludesGxOwnedStatusesWhileEpicIsLive(t *test
 		t.Fatalf("expected status menu open after 's'")
 	}
 	got := menuValues(m.statusMenu)
-	want := []string{"open", "needs-attention", "draft"}
+	want := []string{"open", "needs-repair", "draft"}
 	assertSameSet(t, got, want)
 	for _, v := range got {
 		if v == "claimed" || v == "done" {
@@ -87,7 +87,7 @@ func TestModel_ChangeStatusKeyMenuExcludesGxOwnedStatusesWhileEpicIsLive(t *test
 
 func TestModel_ChangeStatusKeyUnparksTicketBackToOpen(t *testing.T) {
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: needs-info\n\nBody.\n")
+	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: needs-answer\n\nBody.\n")
 	path := ticketPath(root, "my-epic", "01-first-ticket.md")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
@@ -132,7 +132,7 @@ func TestModel_ChangeStatusKeyUnparksTicketBackToOpen(t *testing.T) {
 
 func TestModel_ChangeStatusKeyDismissibleWithoutWriting(t *testing.T) {
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: needs-info\n\nBody.\n")
+	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: needs-answer\n\nBody.\n")
 	path := ticketPath(root, "my-epic", "01-first-ticket.md")
 	before, err := os.ReadFile(path)
 	if err != nil {

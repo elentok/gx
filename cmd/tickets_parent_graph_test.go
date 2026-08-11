@@ -118,7 +118,7 @@ func TestExecute_TicketsSet_AcceptsDraftStatus(t *testing.T) {
 	path := filepath.Join(dir, "01-first.md")
 	writeTicketFile(t, path, "---\nid: \"01\"\nstatus: open\ntype: task\n---\nBody.\n")
 
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
+	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
 	if err := execute([]string{"tickets", "set", path, "--status=draft"}, d); err != nil {
 		t.Fatalf("execute tickets set --status=draft: %v", err)
 	}

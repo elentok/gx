@@ -6,7 +6,31 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/testutil"
 )
+
+// nonAgentGetwd returns a getwd fake pointed at a plain (non-git) tempdir, so
+// git.CurrentBranch fails and checkAgentStatusGuard treats the caller as an
+// unrecognised branch — i.e. not an iteration agent. Existing tests use it to
+// keep exercising hand-driven-caller behavior unaffected by the guard.
+func nonAgentGetwd(t *testing.T) func() (string, error) {
+	t.Helper()
+	dir := t.TempDir()
+	return func() (string, error) { return dir, nil }
+}
+
+// agentGetwd returns a getwd fake pointed at a real git repo checked out on
+// branch, so git.CurrentBranch resolves to it for checkAgentStatusGuard.
+func agentGetwd(t *testing.T, branch string) func() (string, error) {
+	t.Helper()
+	dir := testutil.TempRepo(t)
+	if err := git.CreateBranch(git.Repo{Root: dir}, branch); err != nil {
+		t.Fatalf("create branch %s: %v", branch, err)
+	}
+	return func() (string, error) { return dir, nil }
+}
 
 func TestTicketsSchemaText_HasTicketAndEpicSections(t *testing.T) {
 	if !strings.Contains(ticketsSchemaText, "Ticket frontmatter fields:") {
@@ -46,7 +70,7 @@ func TestExecute_TicketsSet_MultiFieldSuccess(t *testing.T) {
 	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
 
 	err := execute([]string{"tickets", "set", path, "--status=claimed", "--blocked-by=01,03"}, d)
 	if err != nil {
@@ -151,7 +175,7 @@ func TestExecute_TicketsSet_ValidationFailureWritesNothing(t *testing.T) {
 	writeTicketFile(t, path, original)
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
 
 	err := execute([]string{"tickets", "set", path, "--status=bogus-status"}, d)
 	if err == nil {
@@ -176,7 +200,7 @@ func TestExecute_TicketsSet_Commitless(t *testing.T) {
 	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
 
 	err := execute([]string{"tickets", "set", path, "--status=done", "--commitless=true"}, d)
 	if err != nil {
@@ -204,7 +228,7 @@ func TestExecute_TicketsSet_StatusDoneRefusedWithUnresolvedBlocker(t *testing.T)
 	writeTicketFile(t, targetPath, "---\nid: \"02\"\nstatus: claimed\nblocked_by: [\"01\"]\ntype: task\n---\nBody.\n")
 
 	var stdout, stderr bytes.Buffer
-	d := deps{stdout: &stdout, stderr: &stderr}
+	d := deps{stdout: &stdout, stderr: &stderr, getwd: nonAgentGetwd(t)}
 
 	err := execute([]string{"tickets", "set", targetPath, "--status=done"}, d)
 	if err == nil {
@@ -235,7 +259,7 @@ func TestExecute_TicketsSet_StatusDoneForcedWithUnresolvedBlockerWarns(t *testin
 	writeTicketFile(t, targetPath, "---\nid: \"02\"\nstatus: claimed\nblocked_by: [\"01\"]\ntype: task\n---\nBody.\n")
 
 	var stdout, stderr bytes.Buffer
-	d := deps{stdout: &stdout, stderr: &stderr}
+	d := deps{stdout: &stdout, stderr: &stderr, getwd: nonAgentGetwd(t)}
 
 	err := execute([]string{"tickets", "set", targetPath, "--status=done", "--force"}, d)
 	if err != nil {
@@ -260,7 +284,7 @@ func TestExecute_TicketsSet_StatusDoneUnaffectedByBlockerOutsideIssuesLayout(t *
 	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\nblocked_by: [\"01\"]\ntype: task\n---\nBody.\n")
 
 	var stdout, stderr bytes.Buffer
-	d := deps{stdout: &stdout, stderr: &stderr}
+	d := deps{stdout: &stdout, stderr: &stderr, getwd: nonAgentGetwd(t)}
 
 	err := execute([]string{"tickets", "set", path, "--status=done"}, d)
 	if err != nil {
@@ -274,7 +298,7 @@ func TestExecute_TicketsSet_StatusOpenRefusedWithEmptyBody(t *testing.T) {
 	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: draft\ntype: task\n---\n")
 
 	var stdout, stderr bytes.Buffer
-	d := deps{stdout: &stdout, stderr: &stderr}
+	d := deps{stdout: &stdout, stderr: &stderr, getwd: nonAgentGetwd(t)}
 
 	err := execute([]string{"tickets", "set", path, "--status=open"}, d)
 	if err == nil {
@@ -299,7 +323,7 @@ func TestExecute_TicketsSet_StatusOpenAcceptedWithBody(t *testing.T) {
 	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: draft\ntype: task\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
 
 	err := execute([]string{"tickets", "set", path, "--status=open"}, d)
 	if err != nil {
@@ -321,7 +345,7 @@ func TestExecute_TicketsSet_NeedsRepairToOpenAccepted(t *testing.T) {
 	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: needs-repair\ntype: task\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
 
 	err := execute([]string{"tickets", "set", path, "--status=open"}, d)
 	if err != nil {
@@ -517,5 +541,116 @@ func TestExecute_TicketsSet_ClearingListField(t *testing.T) {
 	}
 	if strings.Contains(string(raw), "blocked_by") {
 		t.Errorf("ticket file = %q, want blocked_by cleared entirely (omitempty)", string(raw))
+	}
+}
+
+func TestExecute_TicketsSet_AgentBranch_NonPromotionStatusRefused(t *testing.T) {
+	for _, status := range []string{"claimed", "done", "draft"} {
+		t.Run(status, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "04b-ticket.md")
+			writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
+
+			var stdout, stderr bytes.Buffer
+			d := deps{stdout: &stdout, stderr: &stderr, getwd: agentGetwd(t, "ralph-loop/widget-item-04b")}
+
+			err := execute([]string{"tickets", "set", path, "--status=" + status}, d)
+			if err == nil {
+				t.Fatalf("expected --status=%s to be refused on a ralph-loop/* branch, got nil", status)
+			}
+			if !strings.Contains(err.Error(), "ralph-loop/") {
+				t.Errorf("error = %q, want it to name the ralph-loop/* branch", err.Error())
+			}
+			if !strings.Contains(err.Error(), status) {
+				t.Errorf("error = %q, want it to name the refused status %q", err.Error(), status)
+			}
+
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("reading ticket back: %v", err)
+			}
+			if !strings.Contains(string(raw), "status: open") {
+				t.Errorf("ticket file changed despite refused write: %q", string(raw))
+			}
+		})
+	}
+}
+
+func TestExecute_TicketsSet_AgentBranch_DraftToOpenAccepted(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "04b-ticket.md")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: draft\ntype: task\n---\nBody.\n")
+
+	var stdout bytes.Buffer
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: agentGetwd(t, "ralph-loop/widget-item-04b")}
+
+	err := execute([]string{"tickets", "set", path, "--status=open"}, d)
+	if err != nil {
+		t.Fatalf("execute tickets set: %v, want draft -> open accepted on a ralph-loop/* branch", err)
+	}
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading ticket back: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: open") {
+		t.Errorf("ticket file = %q, want status: open", string(raw))
+	}
+}
+
+func TestExecute_TicketsSet_AgentBranch_AlreadyOpenToOpenRefused(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "04b-ticket.md")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
+
+	var stdout, stderr bytes.Buffer
+	d := deps{stdout: &stdout, stderr: &stderr, getwd: agentGetwd(t, "ralph-loop/widget-item-04b")}
+
+	err := execute([]string{"tickets", "set", path, "--status=open"}, d)
+	if err == nil {
+		t.Fatal("expected --status=open on an already-open ticket to be refused (not a draft promotion), got nil")
+	}
+}
+
+func TestExecute_TicketsSet_AgentBranch_NeedsAnswerAndNeedsRepairRefused(t *testing.T) {
+	for _, status := range []string{"needs-answer", "needs-repair"} {
+		t.Run(status, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "04b-ticket.md")
+			writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
+
+			var stdout, stderr bytes.Buffer
+			d := deps{stdout: &stdout, stderr: &stderr, getwd: agentGetwd(t, "ralph-loop/widget-item-04b")}
+
+			err := execute([]string{"tickets", "set", path, "--status=" + status}, d)
+			if err == nil {
+				t.Fatalf("expected --status=%s to be refused, got nil", status)
+			}
+		})
+	}
+}
+
+func TestExecute_TicketsSet_UnrecognisedBranch_StatusAccepted(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "04b-ticket.md")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
+
+	var stdout bytes.Buffer
+	// "main" isn't a ralph-loop/* branch, so a hand-driven caller working on
+	// it must never be caught by the guard, even for a status the guard would
+	// otherwise refuse for an iteration agent.
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: agentGetwd(t, "widget-hand-driven")}
+
+	err := execute([]string{"tickets", "set", path, "--status=claimed"}, d)
+	if err != nil {
+		t.Fatalf("execute tickets set: %v, want an unrecognised branch to never be refused", err)
+	}
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading ticket back: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: claimed") {
+		t.Errorf("ticket file = %q, want status: claimed", string(raw))
 	}
 }
