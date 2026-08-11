@@ -394,6 +394,13 @@ running (attached by process %d)"`.
 **Epic run** — the per-epic ralph-loop execution (`loopRegistry.runs[epicName]`). Several can run
 concurrently inside whichever process holds the attachment, up to the concurrency slot cap.
 
+**Hand-driven epic** / **Loop-driven epic** — the two kinds of epic `.scratch/` holds, distinguished
+by who writes `status`, not by file format or by anything on disk. In a hand-driven epic (a
+wayfinder map, or any epic a person works directly) the person is the sole writer and
+`gx tickets set` is their channel. In a loop-driven epic gx owns `status` in-process. The two share
+one format, one validator, and one CLI; nothing marks which is which, because ownership is a
+property of the writer, not of the epic.
+
 **Reattach / Reattach signal** — per-ticket detection that a specific ticket's session is still
 alive, checked via `ralphloop.ScanForReattachable`. A special case of Attach: it only fires when the
 Queue is Detached (`attachLockHeld` false) and at least one ticket is left `claimed`/
@@ -411,3 +418,25 @@ discard). It is blocked process-wide ("Can't replace a live queue") while any ep
 regardless of which epic the checked tickets belong to. Add widens an already-running epic's frozen
 scope (`ralphloop.RunScope.Add`) with the checked tickets under that epic, after a confirmation
 naming the count — it requires the epic under the cursor to already have a live run.
+
+## Notification Surfaces
+
+The three places a run event can surface. They are distinct destinations, not levels of the same
+thing: an event may reach any combination of them.
+
+**TUI** — Queue tab state, driven by `reduceLiveEvent`. Everything gx knows shows up here.
+
+**Toast** — transient in-TUI feedback (`ui/notify`). Only meaningful while someone is looking at the
+screen.
+
+**Chat** — the outbound Slack/Telegram surface (the wrapper sinks). Deliberately a small, fixed
+subset of run events, for a person away from the terminal. The word **push** is retired for this
+sense: it collided with `git push` and with mobile push notifications, and `notify` was already
+taken by the toast package.
+
+**Counts line** — the line of state tallies a chat message may carry, in place of a fraction:
+`8 done · 2 in progress · 1 parked: 07 · 10 total`. A **ticket counts line** tallies the ticket
+states within one epic (`done · in progress · parked · blocked · ready · total`); a **queue counts
+line** tallies the epic states across the Queue (`done · in progress · parked · failed · total`).
+Zero clauses are suppressed except `done` and `total`, which always render. Counts are always
+**epic-truth** — recomputed from disk over the whole epic — never scoped to one run's own progress.
