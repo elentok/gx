@@ -16,6 +16,10 @@ authoritative.
   from anywhere inside the repo. Every `<root>` below refers to this resolved path, not a literal
   `.scratch/`.
 - One feature/epic per directory: `<root>/<epic-slug>/`
+- **List the epics with `gx tickets epics`** — prints one bare epic slug per line, alphabetically,
+  with `.archive` and other dot-prefixed directories already excluded, so it never needs filtering.
+  Use it instead of listing `<root>` yourself. The slugs compose with the resolved root:
+  `<root>/$(gx tickets epics | head -1)/issues/`.
 - A spec or plan, if one exists, is `<root>/<epic-slug>/spec.md`
 - Tickets are one file per ticket at `<root>/<epic-slug>/issues/<NN>-<slug>.md`, numbered from
   `01` — never a single combined tickets file
