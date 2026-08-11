@@ -467,7 +467,7 @@ func TestExecute_TicketsSet_IterationStatusFinishedWithStatusDoneAccepted(t *tes
 	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: task\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
 
 	err := execute([]string{"tickets", "set", path, "--iteration-status=finished", "--status=done"}, d)
 	if err != nil {
