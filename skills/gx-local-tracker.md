@@ -180,6 +180,30 @@ Scope is **voluntary** asks only — a question the agent itself decides it need
 involuntary interactive prompt gx catches from outside (herdr reporting the pane as `blocked`) is the
 orchestrator gate's problem, not the agent's, and follows a different path.
 
+## The `## Needs Repair` section
+
+When gx itself — not an agent — hits a fault it can't resolve (a crashed iteration, an operator
+intervention gx observed from outside, commits that vanished before landing), it parks the ticket
+`needs-repair` and appends a `## Needs Repair` section, in this shape:
+
+1. A **summary line**, guaranteed one line by a helper that splits the fault's reason at its first
+   newline. Every fault path passes its error through unmodified rather than each deciding for itself
+   how to summarise it, so the guarantee holds regardless of which one wrote it.
+2. **Optional detail** — the remainder of the reason, when there was more than one line.
+3. A **best-effort state block**: iteration label, branch, and worktree, whichever gx could still
+   determine. A field it can't determine is **omitted, never filled with a placeholder** — a state
+   block that says "unknown" three times would look like information where there is none.
+
+**No `## Handoff` section.** A handoff describes an agent's own work in progress; a fault write has no
+live agent to author one. Writing a synthetic one would produce a section that reads as if an agent
+wrote it, when nothing did.
+
+Both park sections — this one and `## Needs Answer` above — carry a required one-line reason, so the
+Queue can say *why* a ticket is parked without anyone opening the file. That requirement is
+**write-conditional**: it is enforced by the write path that sets the status, never by the loader.
+Enforcing it at load time would reject a hand-authored ticket that never wrote the section, making the
+loader fail on a file it merely observes rather than one it produced.
+
 ## Mid-flight forking
 
 A ticket can be forked while work is in progress, when it turns out to be larger than its budget or

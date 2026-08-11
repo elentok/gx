@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // smartZonePollMs bounds each "wait for the agent to finish" poll tick, so a
@@ -835,7 +836,12 @@ func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, li
 // paused until the pane returns to idle/done.
 func waitForAttentionRecovery(d Deps, p launchAndPromptParams, sessionID string) error {
 	const reason = "Codex is waiting for operator intervention"
-	if err := MarkNeedsRepairWithReason(p.TicketPath, reason); err != nil {
+	state := schema.NeedsRepairState{
+		Label:    p.Label,
+		Branch:   iterBranch(p.EpicName, p.Ticket),
+		Worktree: p.SessionCwd,
+	}
+	if err := MarkNeedsRepairWithReason(p.TicketPath, reason, state); err != nil {
 		return fmt.Errorf("marking ticket needs-repair: %w", err)
 	}
 	p.Gate.pause(p.Label, reason)

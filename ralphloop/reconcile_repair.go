@@ -5,6 +5,7 @@ import (
 
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // repairRecoverableTicket re-lands a doneRecoverable ticket's commits: a
@@ -120,8 +121,14 @@ func tabIDForLabel(tabs []herdr.Tab, label string) string {
 // than silently reverting the ticket to open (which would re-run it from
 // scratch without a human ever knowing the first run's result vanished).
 func markDoneTicketUnrecoverable(paths reconcilePaths, featureBranch string, t tickets.Ticket) error {
-	reason := fmt.Sprintf("done but commits missing from %s and iteration branch %s no longer exists to recover them", featureBranch, iterBranch(featureBranch, t.Identifier))
-	if err := MarkNeedsRepairWithReason(t.Path, reason); err != nil {
+	branch := iterBranch(featureBranch, t.Identifier)
+	reason := fmt.Sprintf("done but commits missing from %s and iteration branch %s no longer exists to recover them", featureBranch, branch)
+	state := schema.NeedsRepairState{
+		Label:    iterLabel(featureBranch, t.Identifier),
+		Branch:   branch,
+		Worktree: iterationWorktreePath(paths.WorktreeDir, featureBranch, t.Identifier),
+	}
+	if err := MarkNeedsRepairWithReason(t.Path, reason, state); err != nil {
 		return fmt.Errorf("marking ticket needs-repair: %w", err)
 	}
 	if err := logEvent(paths.ScratchDir, featureBranch, Event{Type: eventNeedsRepair, Ticket: t.Identifier, Reason: reason}); err != nil {

@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // defaultScratchDir is the ticket tracker directory used when
@@ -517,7 +518,12 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			// it) and keep scheduling the rest.
 			reason := r.err.Error()
 			label := iterLabel(opts.EpicName, r.ticket.Identifier)
-			if markErr := MarkNeedsRepairWithReason(r.ticket.Path, reason); markErr != nil {
+			state := schema.NeedsRepairState{
+				Label:    label,
+				Branch:   iterBranch(opts.EpicName, r.ticket.Identifier),
+				Worktree: iterationWorktreePath(wtDir, opts.EpicName, r.ticket.Identifier),
+			}
+			if markErr := MarkNeedsRepairWithReason(r.ticket.Path, reason, state); markErr != nil {
 				reason = fmt.Sprintf("%s (also failed marking needs-repair: %v)", reason, markErr)
 			}
 			delete(launched, r.ticket.Identifier)
