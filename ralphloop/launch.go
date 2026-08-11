@@ -79,6 +79,7 @@ func (p iterationParams) launchAndPromptParams(label, pane, tab, prompt, session
 		Sink:        p.Sink,
 		Ticket:      p.Ticket.Identifier,
 		TicketPath:  p.Ticket.Path,
+		TicketData:  p.Ticket,
 		ScratchDir:  p.ScratchDir,
 		EpicName:    p.FeatureBranch,
 		StartEvent:  startEvent,
@@ -159,6 +160,10 @@ type launchAndPromptParams struct {
 	TicketPath string
 	ScratchDir string
 	EpicName   string
+	// TicketData is the full ticket IterationStarted reports, so a consumer
+	// rendering a chat message has the ticket's own fields (title, etc.)
+	// without re-reading TicketPath itself.
+	TicketData tickets.Ticket
 	// StartEvent/FinishEvent are the run-log event types logged when the
 	// agent starts/finishes; "" skips logging that transition.
 	StartEvent  string
@@ -259,7 +264,7 @@ func launchAndPrompt(d Deps, p launchAndPromptParams) (string, error) {
 	}
 	p.logLifecycleEvent(p.StartEvent, sessionID)
 	if p.StartEvent != "" {
-		p.sink().IterationStarted(p.Ticket, p.Label, p.SessionCwd, sessionID)
+		p.sink().IterationStarted(p.TicketData, p.Label, p.SessionCwd, sessionID)
 		emitContextOccupancy(d, p.sink(), p.Agent, p.Ticket, p.SessionCwd, sessionID)
 	}
 
@@ -287,7 +292,7 @@ func attachToLiveAgent(d Deps, p launchAndPromptParams) (string, error) {
 
 	p.logLifecycleEvent(p.StartEvent, sessionID)
 	if p.StartEvent != "" {
-		p.sink().IterationStarted(p.Ticket, p.Label, p.SessionCwd, sessionID)
+		p.sink().IterationStarted(p.TicketData, p.Label, p.SessionCwd, sessionID)
 		emitContextOccupancy(d, p.sink(), p.Agent, p.Ticket, p.SessionCwd, sessionID)
 	}
 

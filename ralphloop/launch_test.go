@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/tickets"
 )
 
 // TestLaunchAndPrompt_IterationStartedCarriesCwdAndSessionIDPlusImmediateOccupancy
@@ -19,8 +20,8 @@ func TestLaunchAndPrompt_IterationStartedCarriesCwdAndSessionIDPlusImmediateOccu
 	occSink := &occupancySink{}
 	sink := &recordingSinkWithArgs{
 		occupancySink: occSink,
-		onIterationStarted: func(identifier, label, cwd, sessionID string) {
-			started.identifier, started.label, started.cwd, started.sessionID = identifier, label, cwd, sessionID
+		onIterationStarted: func(ticket tickets.Ticket, label, cwd, sessionID string) {
+			started.identifier, started.label, started.cwd, started.sessionID = ticket.Identifier, label, cwd, sessionID
 		},
 	}
 
@@ -47,6 +48,7 @@ func TestLaunchAndPrompt_IterationStartedCarriesCwdAndSessionIDPlusImmediateOccu
 		Prompt:     "go",
 		SessionCwd: "/repo/iter-01",
 		Ticket:     "01",
+		TicketData: tickets.Ticket{Identifier: "01"},
 		StartEvent: "iteration-started",
 		Sink:       sink,
 	})
@@ -73,7 +75,7 @@ func TestLaunchAndPrompt_CodexAdoptsSessionIDFromInitialPrompt(t *testing.T) {
 	var observedSessionID string
 	sink := &recordingSinkWithArgs{
 		occupancySink: &occupancySink{},
-		onIterationStarted: func(_, _, _, sessionID string) {
+		onIterationStarted: func(_ tickets.Ticket, _, _, sessionID string) {
 			startedSessionID = sessionID
 		},
 	}
@@ -218,11 +220,11 @@ func TestLaunchAndPrompt_AgentNameTakenByUnrelatedWorktree_StillFails(t *testing
 // need both start-time signals asserted together.
 type recordingSinkWithArgs struct {
 	*occupancySink
-	onIterationStarted func(identifier, label, cwd, sessionID string)
+	onIterationStarted func(ticket tickets.Ticket, label, cwd, sessionID string)
 }
 
-func (s *recordingSinkWithArgs) IterationStarted(identifier, label, cwd, sessionID string) {
+func (s *recordingSinkWithArgs) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string) {
 	if s.onIterationStarted != nil {
-		s.onIterationStarted(identifier, label, cwd, sessionID)
+		s.onIterationStarted(ticket, label, cwd, sessionID)
 	}
 }

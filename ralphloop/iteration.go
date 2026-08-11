@@ -196,7 +196,7 @@ func reattachIteration(d Deps, p iterationParams) error {
 			return fmt.Errorf("restoring ticket to claimed: %w", err)
 		}
 		p.Gate.ForceResume(label)
-		p.Sink.IterationResumed(label, PauseNeedsRepair)
+		p.Sink.IterationResumed(p.Ticket.Identifier, label, PauseNeedsRepair)
 		if p.Report != nil {
 			p.Report("resumed %s after restart recheck\n", label)
 		}

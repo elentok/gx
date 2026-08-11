@@ -1712,12 +1712,12 @@ type quotaResumeEvent struct {
 	kind       PauseKind
 }
 
-func (s *quotaEventSink) IterationPaused(identifier string, kind PauseKind, reason string) {
-	s.paused = append(s.paused, quotaPauseEvent{identifier: identifier, kind: kind, reason: reason})
+func (s *quotaEventSink) IterationPaused(identifier, label string, kind PauseKind, reason string) {
+	s.paused = append(s.paused, quotaPauseEvent{identifier: label, kind: kind, reason: reason})
 }
 
-func (s *quotaEventSink) IterationResumed(identifier string, kind PauseKind) {
-	s.resumed = append(s.resumed, quotaResumeEvent{identifier: identifier, kind: kind})
+func (s *quotaEventSink) IterationResumed(identifier, label string, kind PauseKind) {
+	s.resumed = append(s.resumed, quotaResumeEvent{identifier: label, kind: kind})
 }
 
 func (s *occupancySink) ContextOccupancy(identifier string, tokens int) {

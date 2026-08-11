@@ -105,8 +105,8 @@ func (s *telegramEventSink) IterationFinished(ticket tickets.Ticket, epicName st
 	s.send(telegramStyle.iterationFinishedText(ticket, epicName, stats), notifyKindIterationFinished)
 }
 
-func (s *telegramEventSink) IterationPaused(label string, kind PauseKind, reason string) {
-	s.EventSink.IterationPaused(label, kind, reason)
+func (s *telegramEventSink) IterationPaused(identifier, label string, kind PauseKind, reason string) {
+	s.EventSink.IterationPaused(identifier, label, kind, reason)
 	s.send(telegramStyle.iterationPausedText(label, kind, reason), notifyKindIterationPaused)
 }
 

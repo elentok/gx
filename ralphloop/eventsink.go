@@ -95,16 +95,19 @@ type EventSink interface {
 	// fresh iteration.
 	TicketClaimed(ticket tickets.Ticket)
 	// IterationStarted reports that label's agent has launched and been sent
-	// its initial prompt. identifier is the ticket's Identifier (see
-	// TicketReverted). cwd/sessionID let a consumer resolve the session's
-	// transcript itself (transcript.Path) to compute elapsed time from its
-	// first line's timestamp, rather than stamping "now" client-side.
-	IterationStarted(identifier string, label string, cwd string, sessionID string)
-	// IterationPaused reports that label paused for reason, of the given
-	// kind.
-	IterationPaused(label string, kind PauseKind, reason string)
-	// IterationResumed reports that label resumed from a kind pause.
-	IterationResumed(label string, kind PauseKind)
+	// its initial prompt, for ticket. cwd/sessionID let a consumer resolve
+	// the session's transcript itself (transcript.Path) to compute elapsed
+	// time from its first line's timestamp, rather than stamping "now"
+	// client-side.
+	IterationStarted(ticket tickets.Ticket, label string, cwd string, sessionID string)
+	// IterationPaused reports that identifier's iteration label paused for
+	// reason, of the given kind. identifier is the ticket's Identifier (see
+	// TicketReverted) — label alone is barred from a message's identity line,
+	// so without it this event can't be attributed to a ticket.
+	IterationPaused(identifier string, label string, kind PauseKind, reason string)
+	// IterationResumed reports that identifier's iteration label resumed from
+	// a kind pause.
+	IterationResumed(identifier string, label string, kind PauseKind)
 	// IterationFinished reports that ticket's iteration landed its commits on
 	// epicName, along with stats about the landed iteration and the epic's
 	// live progress.
@@ -186,9 +189,9 @@ func (noopEventSink) TicketReverted(identifier string)                          
 func (noopEventSink) TicketReattached(identifier, label, cwd, sessionID string)    {}
 func (noopEventSink) TicketNeedsHuman(identifier, epicName, status, reason string) {}
 func (noopEventSink) TicketClaimed(ticket tickets.Ticket)                          {}
-func (noopEventSink) IterationStarted(identifier, label, cwd, sessionID string)    {}
-func (noopEventSink) IterationPaused(label string, kind PauseKind, reason string)  {}
-func (noopEventSink) IterationResumed(label string, kind PauseKind)                {}
+func (noopEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string) {}
+func (noopEventSink) IterationPaused(identifier, label string, kind PauseKind, reason string) {}
+func (noopEventSink) IterationResumed(identifier, label string, kind PauseKind)    {}
 func (noopEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
 }
 func (noopEventSink) TranscriptLine(label, line string)                               {}
@@ -253,9 +256,9 @@ func (s *textEventSink) TicketNeedsHuman(identifier, epicName, status, reason st
 
 func (s *textEventSink) TicketClaimed(ticket tickets.Ticket) {}
 
-func (s *textEventSink) IterationStarted(identifier, label, cwd, sessionID string) {}
+func (s *textEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string) {}
 
-func (s *textEventSink) IterationPaused(label string, kind PauseKind, reason string) {
+func (s *textEventSink) IterationPaused(identifier, label string, kind PauseKind, reason string) {
 	switch kind {
 	case PauseRateLimit:
 		s.printf("paused %s: %s; waiting for automatic reset\n", label, reason)
@@ -266,7 +269,7 @@ func (s *textEventSink) IterationPaused(label string, kind PauseKind, reason str
 	}
 }
 
-func (s *textEventSink) IterationResumed(label string, kind PauseKind) {
+func (s *textEventSink) IterationResumed(identifier string, label string, kind PauseKind) {
 	switch kind {
 	case PauseRateLimit:
 		s.printf("resumed %s after rate-limit reset\n", label)

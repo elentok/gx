@@ -629,7 +629,7 @@ func TestRegistryDrainsRunEventsBeforeFinish(t *testing.T) {
 	if !ok {
 		t.Fatal("tryStart epic-a: want ok")
 	}
-	sink.IterationStarted("01", "iter-01", "", "")
+	sink.IterationStarted(tickets.Ticket{Identifier: "01"}, "iter-01", "", "")
 	sink.ContextOccupancy("01", 42)
 	sink.IterationFinished(tickets.Ticket{Identifier: "01"}, "epic-a", ralphloop.IterationStats{})
 
@@ -648,8 +648,8 @@ func TestRegistryDrainsEpicsIndependently(t *testing.T) {
 	r := newLoopRegistry(2)
 	sinkA, _ := r.tryStart("epic-a", 0, 1)
 	sinkB, _ := r.tryStart("epic-b", 0, 1)
-	sinkA.IterationStarted("01", "iter-a", "", "")
-	sinkB.IterationStarted("01", "iter-b", "", "")
+	sinkA.IterationStarted(tickets.Ticket{Identifier: "01"}, "iter-a", "", "")
+	sinkB.IterationStarted(tickets.Ticket{Identifier: "01"}, "iter-b", "", "")
 	sinkA.ContextOccupancy("01", 11)
 	sinkB.ContextOccupancy("01", 22)
 

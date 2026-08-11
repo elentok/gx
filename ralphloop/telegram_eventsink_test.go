@@ -95,7 +95,7 @@ func TestTelegramEventSink_IterationPaused_SendsOneMessageAndForwards(t *testing
 	inner := &recordingSink{}
 	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
 
-	sink.IterationPaused("iter-04", PauseNeedsRepair, "agent blocked on permission prompt")
+	sink.IterationPaused("04", "iter-04", PauseNeedsRepair, "agent blocked on permission prompt")
 
 	if got := inner.snapshot(); len(got) != 1 || got[0] != "IterationPaused" {
 		t.Errorf("inner events = %v, want [IterationPaused]", got)
@@ -166,8 +166,8 @@ func TestTelegramEventSink_OtherMethods_ForwardWithoutSendingAnyRequest(t *testi
 	sink.TicketReverted("01")
 	sink.TicketReattached("01", "iter-01", "/repo", "sess-1")
 	sink.TicketClaimed(tickets.Ticket{Identifier: "01"})
-	sink.IterationStarted("01", "iter-01", "/repo", "sess-1")
-	sink.IterationResumed("iter-01", PauseRateLimit)
+	sink.IterationStarted(tickets.Ticket{Identifier: "01"}, "iter-01", "/repo", "sess-1")
+	sink.IterationResumed("01", "iter-01", PauseRateLimit)
 	sink.TranscriptLine("iter-01", "some line")
 	sink.ContextOccupancy("01", 100)
 	sink.CherryPickStarted("01")

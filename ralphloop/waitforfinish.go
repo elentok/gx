@@ -778,11 +778,11 @@ func recoverClaudeRateLimit(d Deps, p launchAndPromptParams, sessionID, token st
 		reason = fmt.Sprintf("rate limit detected, resets %s", token)
 	}
 	p.Gate.pause(p.Label, reason)
-	p.sink().IterationPaused(p.Label, PauseRateLimit, reason)
+	p.sink().IterationPaused(p.Ticket, p.Label, PauseRateLimit, reason)
 	p.logAgentEvent(eventPausedRateLimit, sessionID, reason)
 	waitForClaudeRateLimitReset(d, p.Gate, p.Label, p.Pane, token)
 	p.Gate.ForceResume(p.Label)
-	p.sink().IterationResumed(p.Label, PauseRateLimit)
+	p.sink().IterationResumed(p.Ticket, p.Label, PauseRateLimit)
 	p.logLifecycleEvent(eventResumed, sessionID)
 
 	if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
@@ -802,11 +802,11 @@ func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, li
 		reason += fmt.Sprintf(", resets %s", limit.ResetAt.UTC().Format(time.RFC3339))
 	}
 	p.Gate.pause(p.Label, reason)
-	p.sink().IterationPaused(p.Label, PauseRateLimit, reason)
+	p.sink().IterationPaused(p.Ticket, p.Label, PauseRateLimit, reason)
 	p.logAgentEvent(eventPausedRateLimit, sessionID, reason)
 	waitForCodexRateLimitReset(d, p.SessionCwd, sessionID, limit)
 	p.Gate.ForceResume(p.Label)
-	p.sink().IterationResumed(p.Label, PauseRateLimit)
+	p.sink().IterationResumed(p.Ticket, p.Label, PauseRateLimit)
 	p.logLifecycleEvent(eventResumed, sessionID)
 
 	agent, err := d.AgentWait(herdr.AgentWaitOptions{
@@ -859,7 +859,7 @@ func waitForAttentionRecovery(d Deps, p launchAndPromptParams, sessionID string)
 				return fmt.Errorf("restoring ticket to claimed: %w", err)
 			}
 			p.Gate.ForceResume(p.Label)
-			p.sink().IterationResumed(p.Label, PauseNeedsRepair)
+			p.sink().IterationResumed(p.Ticket, p.Label, PauseNeedsRepair)
 			p.logLifecycleEvent(eventResumed, sessionID)
 			return nil
 		}

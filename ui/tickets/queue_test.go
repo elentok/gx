@@ -1170,7 +1170,7 @@ func TestQueueModelPersistsRunningThenDoneStatusThroughStore(t *testing.T) {
 	}
 
 	ticket := m.epics[0].Tickets[0]
-	sink.IterationStarted(ticket.Identifier, "iter-01", "", "")
+	sink.IterationStarted(ticket, "iter-01", "", "")
 	sink.IterationFinished(ticket, "alpha", ralphloop.IterationStats{})
 	close(release)
 	waitForEpicToFinish(t, "alpha")

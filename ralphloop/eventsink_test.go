@@ -66,13 +66,15 @@ func (s *recordingSink) TicketNeedsHuman(identifier, epicName, status, reason st
 	s.record("TicketNeedsHuman")
 }
 func (s *recordingSink) TicketClaimed(ticket tickets.Ticket) { s.record("TicketClaimed") }
-func (s *recordingSink) IterationStarted(identifier, label, cwd, sessionID string) {
+func (s *recordingSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string) {
 	s.record("IterationStarted")
 }
-func (s *recordingSink) IterationPaused(label string, kind PauseKind, reason string) {
+func (s *recordingSink) IterationPaused(identifier, label string, kind PauseKind, reason string) {
 	s.record("IterationPaused")
 }
-func (s *recordingSink) IterationResumed(label string, kind PauseKind) { s.record("IterationResumed") }
+func (s *recordingSink) IterationResumed(identifier, label string, kind PauseKind) {
+	s.record("IterationResumed")
+}
 func (s *recordingSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
 	s.mu.Lock()
 	s.lastIterationStats = stats
@@ -190,8 +192,8 @@ func TestNewTextEventSink_RendersSameTextAsBeforeTheEventSinkRefactor(t *testing
 	sink.TicketReverted("01")
 	sink.TicketReattached("01", "iter-01", "/repo/iter-01", "sess-1")
 	sink.TicketNeedsHuman("01", "epic", "needs-repair", "no live iteration found")
-	sink.IterationPaused("iter-01", PauseRateLimit, "rate limit detected")
-	sink.IterationResumed("iter-01", PauseRateLimit)
+	sink.IterationPaused("01", "iter-01", PauseRateLimit, "rate limit detected")
+	sink.IterationResumed("01", "iter-01", PauseRateLimit)
 	sink.SmartZoneCompactStarted("01")
 	sink.SmartZoneFinishingUp("01")
 	sink.SmartZoneRecovered("01")
@@ -203,7 +205,7 @@ func TestNewTextEventSink_RendersSameTextAsBeforeTheEventSinkRefactor(t *testing
 
 	// These no-op in the headless CLI: no line should be printed for them.
 	sink.TicketClaimed(tickets.Ticket{Number: 1})
-	sink.IterationStarted("01", "iter-01", "/repo/iter-01", "sess-1")
+	sink.IterationStarted(tickets.Ticket{Identifier: "01"}, "iter-01", "/repo/iter-01", "sess-1")
 	sink.ContextOccupancy("01", 12345)
 	sink.TranscriptLine("iter-01", "some transcript text")
 

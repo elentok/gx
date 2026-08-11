@@ -130,16 +130,16 @@ func (s *ChannelEventSink) TicketClaimed(ticket tickets.Ticket) {
 	s.emit(LiveEvent{Kind: LiveEventTicketClaimed, Identifier: ticket.Identifier, Ticket: ticket})
 }
 
-func (s *ChannelEventSink) IterationStarted(identifier, label, cwd, sessionID string) {
-	s.emit(LiveEvent{Kind: LiveEventIterationStarted, Identifier: identifier, Label: label, Cwd: cwd, SessionID: sessionID})
+func (s *ChannelEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string) {
+	s.emit(LiveEvent{Kind: LiveEventIterationStarted, Identifier: ticket.Identifier, Ticket: ticket, Label: label, Cwd: cwd, SessionID: sessionID})
 }
 
-func (s *ChannelEventSink) IterationPaused(label string, kind PauseKind, reason string) {
-	s.emit(LiveEvent{Kind: LiveEventIterationPaused, Label: label, PauseKind: kind, Reason: reason})
+func (s *ChannelEventSink) IterationPaused(identifier, label string, kind PauseKind, reason string) {
+	s.emit(LiveEvent{Kind: LiveEventIterationPaused, Identifier: identifier, Label: label, PauseKind: kind, Reason: reason})
 }
 
-func (s *ChannelEventSink) IterationResumed(label string, kind PauseKind) {
-	s.emit(LiveEvent{Kind: LiveEventIterationResumed, Label: label, PauseKind: kind})
+func (s *ChannelEventSink) IterationResumed(identifier, label string, kind PauseKind) {
+	s.emit(LiveEvent{Kind: LiveEventIterationResumed, Identifier: identifier, Label: label, PauseKind: kind})
 }
 
 func (s *ChannelEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
