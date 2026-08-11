@@ -8,22 +8,35 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ui"
 )
 
 func runDoctor(args []string, d deps) error {
 	var fix bool
 	var pause bool
-	for _, arg := range args {
-		switch arg {
+	var blockedFormTarget string
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
 		case "--fix":
 			fix = true
 		case "--pause":
 			pause = true
+		case "--check-blocked-form":
+			i++
+			if i >= len(args) {
+				return fmt.Errorf("--check-blocked-form requires a pane target")
+			}
+			blockedFormTarget = args[i]
 		default:
-			return fmt.Errorf("unknown doctor flag %q", arg)
+			return fmt.Errorf("unknown doctor flag %q", args[i])
 		}
 	}
+
+	if blockedFormTarget != "" {
+		return runDoctorBlockedFormCheck(blockedFormTarget, d)
+	}
+
 	getenv := d.getenv
 	if getenv == nil {
 		getenv = os.Getenv
@@ -102,6 +115,45 @@ func runDoctor(args []string, d deps) error {
 		pauseDoctor(d.stdout, stdin)
 	}
 
+	return nil
+}
+
+// runDoctorBlockedFormCheck is gx doctor's interactive regression check for
+// the orchestrator gate (ralphloop.parkOnBlockedPane): it asks the operator
+// to drive target into a live blocked form by hand, then asserts herdr's own
+// pane monitor still recognizes it via the "live_blocked_form" rule the gate
+// depends on. See docs/runbooks/blocked-form-regression-check.md for the
+// full procedure and what to do on failure. It only runs when
+// --check-blocked-form is passed explicitly, so it never fires (or fails) in
+// a headless `gx doctor` invocation.
+func runDoctorBlockedFormCheck(target string, d deps) error {
+	stdin := d.stdin
+	if stdin == nil {
+		stdin = os.Stdin
+	}
+	explainAgent := d.explainAgent
+	if explainAgent == nil {
+		explainAgent = herdr.AgentExplain
+	}
+
+	fmt.Fprintln(d.stdout, "Interactive check: blocked-form detection")
+	fmt.Fprintf(d.stdout, "In pane %q, drive the agent into a form the orchestrator gate must\n", target)
+	fmt.Fprintln(d.stdout, "recognize as blocked (see docs/runbooks/blocked-form-regression-check.md).")
+	fmt.Fprint(d.stdout, "Once the prompt is showing, press Enter...")
+	_, _ = bufio.NewReader(stdin).ReadString('\n')
+
+	result, err := explainAgent(target)
+	if err != nil {
+		return fmt.Errorf("explaining %s: %w", target, err)
+	}
+
+	if result.State != "blocked" || result.MatchedRuleID != "live_blocked_form" {
+		fmt.Fprintf(d.stdout, "FAIL: herdr matched rule %q (state %q); want \"live_blocked_form\" (state \"blocked\").\n", result.MatchedRuleID, result.State)
+		fmt.Fprintln(d.stdout, "See docs/runbooks/blocked-form-regression-check.md for what to do next.")
+		return fmt.Errorf("blocked-form check failed: matched rule %q, not live_blocked_form", result.MatchedRuleID)
+	}
+
+	fmt.Fprintln(d.stdout, "PASS: herdr matched live_blocked_form.")
 	return nil
 }
 

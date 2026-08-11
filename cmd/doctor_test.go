@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -188,6 +189,64 @@ func TestDoctor_Fix_AppliesWhenConfirmed(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "Fixed") {
 		t.Errorf("expected 'Fixed' in output, got: %q", stdout.String())
+	}
+}
+
+func TestDoctor_CheckBlockedForm_Pass(t *testing.T) {
+	var stdout bytes.Buffer
+	var gotTarget string
+	d := deps{
+		stdin:  strings.NewReader("\n"),
+		stdout: &stdout,
+		stderr: bytes.NewBuffer(nil),
+		explainAgent: func(target string) (herdr.AgentExplainResult, error) {
+			gotTarget = target
+			return herdr.AgentExplainResult{State: "blocked", MatchedRuleID: "live_blocked_form"}, nil
+		},
+	}
+
+	if err := execute([]string{"doctor", "--check-blocked-form", "iter-01"}, d); err != nil {
+		t.Fatalf("doctor --check-blocked-form: %v", err)
+	}
+	if gotTarget != "iter-01" {
+		t.Errorf("explainAgent target = %q, want %q", gotTarget, "iter-01")
+	}
+	if !strings.Contains(stdout.String(), "PASS: herdr matched live_blocked_form.") {
+		t.Errorf("expected PASS message, got: %q", stdout.String())
+	}
+}
+
+func TestDoctor_CheckBlockedForm_FailsOnWrongRule(t *testing.T) {
+	var stdout bytes.Buffer
+	d := deps{
+		stdin:  strings.NewReader("\n"),
+		stdout: &stdout,
+		stderr: bytes.NewBuffer(nil),
+		explainAgent: func(target string) (herdr.AgentExplainResult, error) {
+			return herdr.AgentExplainResult{State: "idle", MatchedRuleID: "live_prompt_box"}, nil
+		},
+	}
+
+	err := execute([]string{"doctor", "--check-blocked-form", "iter-01"}, d)
+	if err == nil {
+		t.Fatal("expected error for mismatched rule")
+	}
+	if !strings.Contains(stdout.String(), "FAIL:") {
+		t.Errorf("expected FAIL message, got: %q", stdout.String())
+	}
+}
+
+func TestDoctor_CheckBlockedForm_RequiresTarget(t *testing.T) {
+	d := deps{
+		getwd: func() (string, error) { return "", errors.New("should not be called") },
+	}
+
+	err := execute([]string{"doctor", "--check-blocked-form"}, d)
+	if err == nil {
+		t.Fatal("expected error for missing target")
+	}
+	if !strings.Contains(err.Error(), "--check-blocked-form requires a pane target") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

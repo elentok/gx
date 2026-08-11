@@ -876,6 +876,12 @@ var errBlockedPaneParked = errors.New("iteration parked: pane blocked on an unan
 // prompt is ever sent to the pane here: typing into a pane sitting on an
 // operator's own pending dialog would be the destructive interrupt this path
 // exists to avoid, so the only calls made are the sleep and the peek.
+//
+// This whole gate rests on herdr's pane monitor still recognizing a blocked
+// Claude form as `agent_status: blocked` — that recognition lives outside
+// this repo and can silently regress on a Claude Code or herdr upgrade. See
+// docs/runbooks/blocked-form-regression-check.md for the (necessarily
+// interactive, via `gx doctor --check-blocked-form`) way to check it.
 func parkOnBlockedPane(d Deps, p launchAndPromptParams, sessionID string) (parked bool, err error) {
 	d.Sleep(blockedDwellMs * time.Millisecond)
 

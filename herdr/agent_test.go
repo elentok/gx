@@ -172,6 +172,34 @@ func TestAgentGet_BuildsArgsAndParsesLiveSession(t *testing.T) {
 	}
 }
 
+func TestAgentExplain_ParsesMatchedRuleFromBareJSON(t *testing.T) {
+	var gotArgs []string
+	withFakeCommand(t, func(args ...string) ([]byte, error) {
+		gotArgs = args
+		return []byte(`{"agent":"claude","state":"blocked","matched_rule":{"id":"live_blocked_form","priority":980,"region":"after_last_horizontal_rule","state":"blocked"}}`), nil
+	})
+
+	result, err := AgentExplain("iter-01")
+	if err != nil {
+		t.Fatalf("AgentExplain() error = %v", err)
+	}
+	if result.State != "blocked" || result.MatchedRuleID != "live_blocked_form" {
+		t.Errorf("AgentExplain() = %+v, want state=blocked matched_rule.id=live_blocked_form", result)
+	}
+	if got := strings.Join(gotArgs, " "); got != "agent explain iter-01 --format json" {
+		t.Errorf("args = %q, want %q", got, "agent explain iter-01 --format json")
+	}
+}
+
+func TestAgentExplain_CommandError_Propagates(t *testing.T) {
+	withFakeCommand(t, func(args ...string) ([]byte, error) {
+		return []byte("boom"), errors.New("exit 1")
+	})
+	if _, err := AgentExplain("iter-01"); err == nil {
+		t.Fatal("AgentExplain() error = nil, want error")
+	}
+}
+
 func TestAgentWait_CommandError_Propagates(t *testing.T) {
 	withFakeCommand(t, func(args ...string) ([]byte, error) {
 		return []byte("boom"), errors.New("exit 1")

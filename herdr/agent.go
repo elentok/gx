@@ -1,6 +1,10 @@
 package herdr
 
-import "strconv"
+import (
+	"encoding/json"
+	"fmt"
+	"strconv"
+)
 
 // Agent describes a herdr agent pane, as returned by AgentPrompt.
 type Agent struct {
@@ -124,6 +128,40 @@ func runAgentJSON(args []string) (Agent, error) {
 		agent.AgentSession = result.Agent.AgentSession.Value
 	}
 	return agent, nil
+}
+
+// AgentExplainResult is herdr's own diagnosis of a pane's current state:
+// which detection rule its pane monitor matched and the state that rule
+// assigns.
+type AgentExplainResult struct {
+	State         string
+	MatchedRuleID string
+}
+
+// AgentExplain reports which detection rule herdr's pane monitor matched for
+// target's current state, via `herdr agent explain`. Unlike the other agent
+// subcommands, explain's JSON is the bare diagnostic object rather than the
+// {"result": ...} envelope runJSON expects, so it parses the response
+// directly instead of going through runJSON.
+func AgentExplain(target string) (AgentExplainResult, error) {
+	out, err := run("agent", "explain", target, "--format", "json")
+	if err != nil {
+		return AgentExplainResult{}, err
+	}
+	var resp struct {
+		State       string `json:"state"`
+		MatchedRule *struct {
+			ID string `json:"id"`
+		} `json:"matched_rule"`
+	}
+	if err := json.Unmarshal(out, &resp); err != nil {
+		return AgentExplainResult{}, fmt.Errorf("parsing herdr agent explain output: %w", err)
+	}
+	result := AgentExplainResult{State: resp.State}
+	if resp.MatchedRule != nil {
+		result.MatchedRuleID = resp.MatchedRule.ID
+	}
+	return result, nil
 }
 
 // AgentSendKeys sends key presses to an agent via `herdr agent send-keys`.

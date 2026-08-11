@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/transcript"
 
@@ -46,6 +47,7 @@ type deps struct {
 	readCodexContext     func(cwd, sessionID string) (tokens int, ok bool, err error)
 	skillsAgentRoots     func() ([]string, error)
 	skillsManifestPath   func() (string, error)
+	explainAgent         func(target string) (herdr.AgentExplainResult, error)
 }
 
 func defaultDeps() deps {
@@ -75,6 +77,7 @@ func defaultDeps() deps {
 		readCodexContext:     codexsession.LastContextTokens,
 		skillsAgentRoots:     defaultSkillsAgentRoots,
 		skillsManifestPath:   defaultSkillsManifestPath,
+		explainAgent:         herdr.AgentExplain,
 	}
 }
 

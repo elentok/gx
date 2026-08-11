@@ -402,7 +402,7 @@ func newRunCmd(d deps) *cobra.Command {
 
 func newDoctorCmd(d deps) *cobra.Command {
 	return &cobra.Command{
-		Use:   "doctor [--fix] [--pause]",
+		Use:   "doctor [--fix] [--pause] [--check-blocked-form <target>]",
 		Short: "check the repo for common configuration issues",
 		// runDoctor does its own flag parsing.
 		DisableFlagParsing: true,
