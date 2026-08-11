@@ -55,6 +55,23 @@ func TestClaim_RewritesStatus(t *testing.T) {
 	}
 }
 
+func TestClaim_ClearsIterationStatus(t *testing.T) {
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\niteration_status: finished\ntype: task\n---\n# Ticket\n\nBody.\n")
+	if err := Claim(path); err != nil {
+		t.Fatalf("Claim: %v", err)
+	}
+	ticket := mustParse(t, path)
+	if ticket.IterationStatus != "" {
+		t.Errorf("IterationStatus = %q, want cleared", ticket.IterationStatus)
+	}
+	if ticket.Status != schema.StatusClaimed {
+		t.Errorf("Status = %q, want %q", ticket.Status, schema.StatusClaimed)
+	}
+	if strings.Contains(mustRead(t, path), "iteration_status") {
+		t.Errorf("ticket file = %q, want iteration_status omitted entirely", mustRead(t, path))
+	}
+}
+
 func TestClaim_PreservesOtherFrontmatterFieldsAndBody(t *testing.T) {
 	original := "---\nid: \"01\"\nstatus: open\nblocked_by: [\"02\", \"03\"]\ntype: task\n---\n" +
 		"# Ticket\n\n- [ ] some criterion\n- [ ] another **bold** criterion\n\nTrailing prose with `code`.\n"

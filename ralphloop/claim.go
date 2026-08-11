@@ -8,9 +8,14 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// Claim writes status: claimed into the ticket file at path.
+// Claim writes status: claimed into the ticket file at path, clearing any
+// iteration_status left over from a prior claim of this ticket — a stale
+// self-report must not survive into a fresh claim.
 func Claim(path string) error {
-	return SetStatus(path, "claimed")
+	return updateTicket(path, func(t *schema.Ticket) {
+		t.Status = schema.StatusClaimed
+		t.IterationStatus = ""
+	})
 }
 
 // MarkDone writes status: done into the ticket file at path.

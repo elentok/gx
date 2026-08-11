@@ -350,6 +350,154 @@ func TestExecute_TicketsValidate_AcceptsBodylessDraft(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsSet_IterationStatusWorkingAccepted(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "04b-ticket.md")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: task\n---\nBody.\n")
+
+	var stdout bytes.Buffer
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+
+	err := execute([]string{"tickets", "set", path, "--iteration-status=working"}, d)
+	if err != nil {
+		t.Fatalf("execute tickets set: %v", err)
+	}
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading ticket back: %v", err)
+	}
+	if !strings.Contains(string(raw), "iteration_status: working") {
+		t.Errorf("ticket file = %q, want iteration_status: working written", string(raw))
+	}
+}
+
+func TestExecute_TicketsSet_IterationStatusInvalidRejected(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "04b-ticket.md")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: task\n---\nBody.\n")
+
+	var stdout bytes.Buffer
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+
+	err := execute([]string{"tickets", "set", path, "--iteration-status=bogus"}, d)
+	if err == nil {
+		t.Fatal("expected a validation error, got nil")
+	}
+	if !strings.Contains(err.Error(), "iteration-status") {
+		t.Errorf("error = %q, want it to mention --iteration-status", err.Error())
+	}
+}
+
+func TestExecute_TicketsSet_IterationStatusFinishedBareRejected(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "04b-ticket.md")
+	original := "---\nid: \"04b\"\nstatus: claimed\ntype: task\n---\nBody.\n"
+	writeTicketFile(t, path, original)
+
+	var stdout bytes.Buffer
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+
+	err := execute([]string{"tickets", "set", path, "--iteration-status=finished"}, d)
+	if err == nil {
+		t.Fatal("expected an error, got nil")
+	}
+	if !strings.Contains(err.Error(), "--commitless=true") || !strings.Contains(err.Error(), "--status=done") {
+		t.Errorf("error = %q, want it to mention --commitless=true and --status=done", err.Error())
+	}
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading ticket back: %v", err)
+	}
+	if string(raw) != original {
+		t.Errorf("ticket file changed on validation failure: got %q, want unchanged %q", string(raw), original)
+	}
+}
+
+func TestExecute_TicketsSet_IterationStatusFinishedWithCommitlessAccepted(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "04b-ticket.md")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: task\n---\nBody.\n")
+
+	var stdout bytes.Buffer
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+
+	err := execute([]string{"tickets", "set", path, "--iteration-status=finished", "--commitless=true"}, d)
+	if err != nil {
+		t.Fatalf("execute tickets set: %v", err)
+	}
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading ticket back: %v", err)
+	}
+	if !strings.Contains(string(raw), "iteration_status: finished") {
+		t.Errorf("ticket file = %q, want iteration_status: finished written", string(raw))
+	}
+}
+
+func TestExecute_TicketsSet_IterationStatusFinishedWithStatusDoneAccepted(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "04b-ticket.md")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: task\n---\nBody.\n")
+
+	var stdout bytes.Buffer
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+
+	err := execute([]string{"tickets", "set", path, "--iteration-status=finished", "--status=done"}, d)
+	if err != nil {
+		t.Fatalf("execute tickets set: %v", err)
+	}
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading ticket back: %v", err)
+	}
+	if !strings.Contains(string(raw), "iteration_status: finished") {
+		t.Errorf("ticket file = %q, want iteration_status: finished written", string(raw))
+	}
+	if !strings.Contains(string(raw), "status: done") {
+		t.Errorf("ticket file = %q, want status: done written", string(raw))
+	}
+}
+
+func TestExecute_TicketsSet_IterationStatusFinishedAlreadyCommitlessOnDiskAccepted(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "04b-ticket.md")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ncommitless: true\ntype: task\n---\nBody.\n")
+
+	var stdout bytes.Buffer
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+
+	err := execute([]string{"tickets", "set", path, "--iteration-status=finished"}, d)
+	if err != nil {
+		t.Fatalf("execute tickets set: %v, want already-commitless-on-disk to satisfy the guard", err)
+	}
+}
+
+func TestExecute_TicketsSet_IterationStatusNeedsAnswerBareAccepted(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "04b-ticket.md")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: task\n---\nBody.\n")
+
+	var stdout bytes.Buffer
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+
+	err := execute([]string{"tickets", "set", path, "--iteration-status=needs-answer"}, d)
+	if err != nil {
+		t.Fatalf("execute tickets set: %v, want needs-answer to never trip the finished-only guard", err)
+	}
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading ticket back: %v", err)
+	}
+	if !strings.Contains(string(raw), "iteration_status: needs-answer") {
+		t.Errorf("ticket file = %q, want iteration_status: needs-answer written", string(raw))
+	}
+}
+
 func TestExecute_TicketsSet_ClearingListField(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")

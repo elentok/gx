@@ -87,6 +87,14 @@ func reattachIteration(d Deps, p iterationParams) error {
 	branch := iterBranch(p.FeatureBranch, p.Ticket.Identifier)
 	path := iterationWorktreePath(p.WorktreeDir, p.FeatureBranch, p.Ticket.Identifier)
 
+	// A reattach that stays claimed throughout (the common case) never goes
+	// through Claim, so a stale iteration_status left by a pre-restart report
+	// must be cleared here instead - unconditionally, so it can't survive
+	// into the new attach before finishIteration/waitForFinish run.
+	if err := schema.ClearIterationStatus(p.Ticket.Path); err != nil {
+		return fmt.Errorf("clearing iteration_status for reattached ticket %s: %w", p.Ticket.Identifier, err)
+	}
+
 	tabs, err := d.TabList(p.WorkspaceID)
 	if err != nil {
 		return fmt.Errorf("finding live tab for reattached iteration %s: %w", label, err)

@@ -141,6 +141,49 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 // cherry-pick without ever polling AgentWait — a pane already sitting idle
 // with no further status transition coming would otherwise wait out every
 // poll timeout forever.
+// TestRun_ReattachClearsStaleIterationStatusBeforeFinish verifies 02b: a
+// ticket that stays claimed throughout a reattach (the common case, never
+// routing through Claim) still must not carry a pre-restart iteration_status
+// report into the new attach. TabList is the first Deps call
+// reattachIteration makes after computing the ticket's iteration paths, so
+// hooking it to snapshot the ticket's on-disk iteration_status proves the
+// clear ran before finishIteration/waitForFinish, not just by the time Run
+// returns.
+func TestRun_ReattachClearsStaleIterationStatusBeforeFinish(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\niteration_status: finished\ntype: task\n---\n# A\n",
+	})
+	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
+
+	d, _, _ := fakeDeps()
+	var iterationStatusAtTabList string
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
+		ticket, err := schema.ParseTicket(ticketPath)
+		if err != nil {
+			t.Fatalf("schema.ParseTicket at TabList: %v", err)
+		}
+		iterationStatusAtTabList = string(ticket.IterationStatus)
+		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
+	}
+
+	var out strings.Builder
+	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if iterationStatusAtTabList != "" {
+		t.Errorf("iteration_status at TabList time = %q, want already cleared before the live-tab lookup", iterationStatusAtTabList)
+	}
+
+	ticket, err := schema.ParseTicket(ticketPath)
+	if err != nil {
+		t.Fatalf("schema.ParseTicket: %v", err)
+	}
+	if ticket.IterationStatus != "" {
+		t.Errorf("final IterationStatus = %q, want cleared", ticket.IterationStatus)
+	}
+}
+
 func TestRun_RestartWithClaimedTicketAlreadyIdle_SkipsWaitAndCherryPicks(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",

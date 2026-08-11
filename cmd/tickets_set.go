@@ -36,6 +36,12 @@ Settable fields:
     pair it with a status that doesn't leave the ticket claimed (done),
     or it's still treated as an unresolved iteration.
 
+Agent-only settable fields:
+  iteration_status (enum, --iteration-status): working, needs-answer, finished. The
+    agent's own self-report for the current claim, distinct from status. Setting
+    finished requires either --commitless=true (in this call or already on disk) or
+    --status=done in the same call — a bare finished report with neither is rejected.
+
 Read-only fields (gx-managed, not settable via ` + "`set`" + `):
   id — ticket identity, fixed at creation
   actual_context_window — stamped by ralphloop at land time
@@ -58,6 +64,7 @@ func newTicketsSetCmd() *cobra.Command {
 		ticketType            string
 		expectedContextWindow string
 		commitless            string
+		iterationStatus       string
 		force                 bool
 	)
 
@@ -76,6 +83,7 @@ func newTicketsSetCmd() *cobra.Command {
 	cmd.Flags().StringVar(&ticketType, "type", "", "set the type field")
 	cmd.Flags().StringVar(&expectedContextWindow, "expected-context-window", "", "set expected_context_window")
 	cmd.Flags().StringVar(&commitless, "commitless", "", "set commitless (true/false)")
+	cmd.Flags().StringVar(&iterationStatus, "iteration-status", "", "set the iteration_status field (working, needs-answer, finished)")
 	cmd.Flags().BoolVar(&force, "force", false, "allow --status done despite unresolved blocked_by")
 
 	return cmd
@@ -104,6 +112,7 @@ var ticketSetFields = []ticketSetField{
 		b, _ := strconv.ParseBool(v)
 		t.Commitless = b
 	}},
+	{"iteration-status", "iteration_status", func(t *schema.Ticket, v string) { t.IterationStatus = schema.IterationStatus(v) }},
 }
 
 // parseIDPtr returns nil for an empty value (clearing the field), or a
@@ -151,6 +160,12 @@ func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer) error {
 			if err := checkBodyBeforeOpen(path); err != nil {
 				return err
 			}
+		}
+	}
+
+	if c.Flags().Changed("iteration-status") {
+		if err := checkIterationStatusFinishedGuard(c, path); err != nil {
+			return err
 		}
 	}
 
@@ -247,6 +262,47 @@ func lockEpicForParentWrite(path, parentID string) (unlock func(), err error) {
 		return nil, fmt.Errorf("%s: rejecting --parent %s: %w", path, parentID, err)
 	}
 	return unlock, nil
+}
+
+// checkIterationStatusFinishedGuard validates --iteration-status's value and,
+// for finished, enforces the zero-commit guard: cmd has no git access to
+// actually count commits (that plumbing is ralphloop's, tickets 07/08), so a
+// finished report is only accepted alongside --commitless=true (this call or
+// already on disk) or --status=done in the same call - the CLI-visible proxy
+// for "the caller already confirmed landing happened". needs-answer is
+// deliberately exempt: a zero-commit needs-answer stop is not commitless.
+func checkIterationStatusFinishedGuard(c *cobra.Command, path string) error {
+	v, _ := c.Flags().GetString("iteration-status")
+	if !schema.IterationStatus(v).Valid() {
+		return fmt.Errorf("%s: --iteration-status %s is invalid; want working, needs-answer, or finished", path, v)
+	}
+	if schema.IterationStatus(v) != schema.IterationStatusFinished {
+		return nil
+	}
+
+	commitless := false
+	if c.Flags().Changed("commitless") {
+		cv, _ := c.Flags().GetString("commitless")
+		commitless, _ = strconv.ParseBool(cv)
+	} else {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		t, err := schema.ParseTicketFromRaw(string(raw), path)
+		if err != nil {
+			return fmt.Errorf("reading ticket %s: %w", path, err)
+		}
+		commitless = t.Commitless
+	}
+
+	status, _ := c.Flags().GetString("status")
+	landing := c.Flags().Changed("status") && schema.Status(status) == schema.StatusDone
+
+	if !commitless && !landing {
+		return fmt.Errorf("%s: --iteration-status finished needs --commitless=true or --status=done in the same call; a finished report with neither commits nor commitless is rejected", path)
+	}
+	return nil
 }
 
 // checkBodyBeforeOpen refuses a --status open write for a ticket whose body
