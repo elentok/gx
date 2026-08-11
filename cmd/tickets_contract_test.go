@@ -39,6 +39,16 @@ func TestExecute_TicketsValidate_RejectsPreContractionShape(t *testing.T) {
 			want: "ready-for-human",
 		},
 		{
+			name: "needs-info status",
+			raw:  "---\nid: \"04\"\nstatus: needs-info\ntype: task\n---\nBody.\n",
+			want: "needs-answer",
+		},
+		{
+			name: "needs-attention status",
+			raw:  "---\nid: \"04\"\nstatus: needs-attention\ntype: task\n---\nBody.\n",
+			want: "needs-repair",
+		},
+		{
 			name: "missing status",
 			raw:  "---\nid: \"04\"\ntype: task\n---\nBody.\n",
 			want: "status",
@@ -64,7 +74,7 @@ func TestExecute_TicketsValidate_RejectsPreContractionShape(t *testing.T) {
 
 func TestExecute_TicketsValidate_AcceptsPostMigrationShape(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "04a-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04a\"\nstatus: needs-info\ntype: task\nparent: \"04\"\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04a\"\nstatus: needs-answer\ntype: task\nparent: \"04\"\n---\nBody.\n")
 
 	var stdout, stderr bytes.Buffer
 	if err := execute([]string{"tickets", "validate", path}, deps{stdout: &stdout, stderr: &stderr}); err != nil {

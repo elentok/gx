@@ -248,9 +248,9 @@ func TestReconcile_ClaimedWithLiveTab_TicketReattachedCarriesLiveSessionIdentity
 	}
 }
 
-func TestReconcile_NeedsAttentionWithLiveTab_ReturnsReattached(t *testing.T) {
+func TestReconcile_NeedsRepairWithLiveTab_ReturnsReattached(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: needs-attention\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n# A\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -266,7 +266,7 @@ func TestReconcile_NeedsAttentionWithLiveTab_ReturnsReattached(t *testing.T) {
 		t.Fatalf("reconcile() error = %v", err)
 	}
 	if len(reattached) != 1 || reattached[0].Number != 1 {
-		t.Fatalf("reattached = %v, want needs-attention ticket 01", reattached)
+		t.Fatalf("reattached = %v, want needs-repair ticket 01", reattached)
 	}
 }
 
@@ -310,11 +310,11 @@ func TestReconcile_ClaimedWithLiveTabOutsideScope_NotReattached(t *testing.T) {
 	}
 }
 
-// TestReconcile_NeedsAttentionOutsideScope_NotReattached is the
-// needs-attention counterpart of the claimed case above.
-func TestReconcile_NeedsAttentionOutsideScope_NotReattached(t *testing.T) {
+// TestReconcile_NeedsRepairOutsideScope_NotReattached is the
+// needs-repair counterpart of the claimed case above.
+func TestReconcile_NeedsRepairOutsideScope_NotReattached(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: needs-attention\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n# A\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -333,17 +333,17 @@ func TestReconcile_NeedsAttentionOutsideScope_NotReattached(t *testing.T) {
 		t.Fatalf("reconcile() error = %v", err)
 	}
 	if len(reattached) != 0 {
-		t.Fatalf("reattached = %v, want none (needs-attention ticket 01 is outside the scope)", reattached)
+		t.Fatalf("reattached = %v, want none (needs-repair ticket 01 is outside the scope)", reattached)
 	}
 }
 
-// TestRun_NeedsAttentionWithoutLiveTab_SchedulesOtherTicketsThenParks covers
-// parking as a last resort: a needs-attention ticket with no live iteration
+// TestRun_NeedsRepairWithoutLiveTab_SchedulesOtherTicketsThenParks covers
+// parking as a last resort: a needs-repair ticket with no live iteration
 // left to reattach to is human-clearable, so it must not hold up the open
 // ticket next to it — that one runs first, and only then does the run park.
-func TestRun_NeedsAttentionWithoutLiveTab_SchedulesOtherTicketsThenParks(t *testing.T) {
+func TestRun_NeedsRepairWithoutLiveTab_SchedulesOtherTicketsThenParks(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-attention.md": "---\nid: \"01\"\nstatus: needs-attention\ntype: task\n---\n# Attention\n",
+		"01-attention.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n# Attention\n",
 		"02-open.md":      "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Open\n",
 	})
 	d, prompts, _ := fakeDeps()
@@ -367,9 +367,9 @@ func TestRun_NeedsAttentionWithoutLiveTab_SchedulesOtherTicketsThenParks(t *test
 	}
 }
 
-func TestRun_RestartedNeedsAttentionRecoversThenResumesScheduling(t *testing.T) {
+func TestRun_RestartedNeedsRepairRecoversThenResumesScheduling(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-attention.md": "---\nid: \"01\"\nstatus: needs-attention\ntype: task\n---\n# Attention\n",
+		"01-attention.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n# Attention\n",
 		"02-open.md":      "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Open\n",
 	})
 	d, prompts, _ := fakeDeps()

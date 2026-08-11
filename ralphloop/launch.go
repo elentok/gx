@@ -89,7 +89,7 @@ func (p iterationParams) launchAndPromptParams(label, pane, tab, prompt, session
 // logTicketEvent appends eventType to p's run-log with p's ticket number
 // plus the given pane/tab/session/cwd — the shared shape behind every event
 // this package logs outside launchAndPrompt's own generic start/finish pair
-// (needs-info, cherry-picked, conflict-hit, conflict-resolved,
+// (needs-answer, cherry-picked, conflict-hit, conflict-resolved,
 // deps-installed).
 func (p iterationParams) logTicketEvent(eventType, pane, tab, agentSession, cwd string) {
 	p.logTicketEventReason(eventType, pane, tab, agentSession, cwd, "")
@@ -228,7 +228,7 @@ func launchAndPrompt(d Deps, p launchAndPromptParams) (string, error) {
 		// braces against any other path that still produces a double-launch,
 		// e.g. a second `gx ralph-loop` process racing the same ticket).
 		// Attach to the live pane instead of hard-failing the whole ticket
-		// to needs-attention.
+		// to needs-repair.
 		return attachToLiveAgent(d, p)
 	}
 

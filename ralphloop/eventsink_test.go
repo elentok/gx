@@ -31,10 +31,10 @@ type recordingSink struct {
 	// call, so a test can assert both how many times a run parked and what
 	// it named as blocking each park.
 	parkedStalled [][]StalledTicket
-	// ticketNeedsInfoCalls records every TicketNeedsInfo call's
+	// ticketNeedsAnswerCalls records every TicketNeedsAnswer call's
 	// (identifier, epicName) pair, for asserting both the count and the
-	// identity a needs-info transition reports.
-	ticketNeedsInfoCalls [][2]string
+	// identity a needs-answer transition reports.
+	ticketNeedsAnswerCalls [][2]string
 }
 
 func (s *recordingSink) record(name string) {
@@ -59,14 +59,14 @@ func (s *recordingSink) TicketReverted(identifier string) { s.record("TicketReve
 func (s *recordingSink) TicketReattached(identifier, label, cwd, sessionID string) {
 	s.record("TicketReattached")
 }
-func (s *recordingSink) TicketStillNeedsAttention(identifier string) {
-	s.record("TicketStillNeedsAttention")
+func (s *recordingSink) TicketStillNeedsRepair(identifier string) {
+	s.record("TicketStillNeedsRepair")
 }
-func (s *recordingSink) TicketNeedsInfo(identifier, epicName string) {
+func (s *recordingSink) TicketNeedsAnswer(identifier, epicName string) {
 	s.mu.Lock()
-	s.ticketNeedsInfoCalls = append(s.ticketNeedsInfoCalls, [2]string{identifier, epicName})
+	s.ticketNeedsAnswerCalls = append(s.ticketNeedsAnswerCalls, [2]string{identifier, epicName})
 	s.mu.Unlock()
-	s.record("TicketNeedsInfo")
+	s.record("TicketNeedsAnswer")
 }
 func (s *recordingSink) TicketClaimed(ticket tickets.Ticket) { s.record("TicketClaimed") }
 func (s *recordingSink) IterationStarted(identifier, label, cwd, sessionID string) {
@@ -192,7 +192,7 @@ func TestNewTextEventSink_RendersSameTextAsBeforeTheEventSinkRefactor(t *testing
 	sink.AlreadyComplete("epic", 2, 2)
 	sink.TicketReverted("01")
 	sink.TicketReattached("01", "iter-01", "/repo/iter-01", "sess-1")
-	sink.TicketStillNeedsAttention("01")
+	sink.TicketStillNeedsRepair("01")
 	sink.IterationPaused("iter-01", PauseRateLimit, "rate limit detected")
 	sink.IterationResumed("iter-01", PauseRateLimit)
 	sink.SmartZoneCompactStarted("01")
@@ -215,7 +215,7 @@ func TestNewTextEventSink_RendersSameTextAsBeforeTheEventSinkRefactor(t *testing
 		"epic \"epic\" is already complete (2/2 done)\n" +
 		"ticket 01: no live iteration found on restart; reverted to open\n" +
 		"ticket 01: reattaching to live iteration iter-01\n" +
-		"ticket 01 still needs attention; no live iteration found\n" +
+		"ticket 01 still needs repair; no live iteration found\n" +
 		"paused iter-01: rate limit detected; waiting for automatic reset\n" +
 		"resumed iter-01 after rate-limit reset\n" +
 		"ticket 01: context budget exceeded; compacting...\n" +
@@ -223,7 +223,7 @@ func TestNewTextEventSink_RendersSameTextAsBeforeTheEventSinkRefactor(t *testing
 		"ticket 01 \"First\" landed on epic\n" +
 		"ticket 01: done and commits landed, but leftover iteration state was never cleaned up; finished the interrupted cleanup\n" +
 		"ticket 01: done but commits were missing from epic; auto re-cherry-picked from iteration branch ralph-loop/iter-01 and restored (deadbeef)\n" +
-		"ticket 01: done but commits missing from epic and no iteration branch left to recover them; marked needs-attention\n" +
+		"ticket 01: done but commits missing from epic and no iteration branch left to recover them; marked needs-repair\n" +
 		"ralph-loop \"epic\" complete: 1 ticket(s) landed on epic\n"
 
 	if out.String() != want {

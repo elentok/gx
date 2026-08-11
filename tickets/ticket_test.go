@@ -14,7 +14,7 @@ func TestTicket_IsDone(t *testing.T) {
 	// The retired "done family" aliases are not done, and not anything else
 	// either: the contracted enum has exactly one spelling per state.
 	notDoneValues := []string{
-		"", "open", "claimed", "needs-info", "needs-attention", "draft", "blocked", "bogus",
+		"", "open", "claimed", "needs-answer", "needs-repair", "draft", "blocked", "bogus",
 		"resolved", "wontfix", "closed", "implemented",
 	}
 	for _, v := range notDoneValues {

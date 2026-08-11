@@ -42,21 +42,32 @@ const (
 	// StatusDraft is written down but deliberately not offered to anyone: it
 	// never enters an epic's frontier and never renders as open (see
 	// tickets.StatusDraft).
-	StatusDraft          Status = "draft"
-	StatusOpen           Status = "open"
-	StatusClaimed        Status = "claimed"
-	StatusNeedsInfo      Status = "needs-info"
-	StatusNeedsAttention Status = "needs-attention"
-	StatusDone           Status = "done"
+	StatusDraft       Status = "draft"
+	StatusOpen        Status = "open"
+	StatusClaimed     Status = "claimed"
+	StatusNeedsAnswer Status = "needs-answer"
+	StatusNeedsRepair Status = "needs-repair"
+	StatusDone        Status = "done"
 )
 
 var validStatuses = map[Status]bool{
-	StatusDraft:          true,
-	StatusOpen:           true,
-	StatusClaimed:        true,
-	StatusNeedsInfo:      true,
-	StatusNeedsAttention: true,
-	StatusDone:           true,
+	StatusDraft:       true,
+	StatusOpen:        true,
+	StatusClaimed:     true,
+	StatusNeedsAnswer: true,
+	StatusNeedsRepair: true,
+	StatusDone:        true,
+}
+
+// retiredStatusReplacements names every status spelling this clean cut
+// retired, mapped to the replacement Validate should point a caller at. It
+// exists so a hand-authored file still carrying the old spelling is rejected
+// with an actionable error instead of the generic "invalid status" every
+// other never-valid value gets — the loader must never silently read
+// "needs-info"/"needs-attention" as their new equivalents.
+var retiredStatusReplacements = map[Status]Status{
+	"needs-info":      StatusNeedsAnswer,
+	"needs-attention": StatusNeedsRepair,
 }
 
 // Valid reports whether s is one of the canonical status values.
@@ -117,7 +128,7 @@ type Ticket struct {
 	// for this ticket (e.g. the agent decided no code change was warranted,
 	// or a mid-flight split closed it with no work of its own) rather than a
 	// stalled/crashed agent. ralph-loop's finishIteration checks it before
-	// marking a zero-commit ticket needs-info, and startup reconciliation's
+	// marking a zero-commit ticket needs-answer, and startup reconciliation's
 	// classifyDoneTicket skips its landed-commit verification for a done
 	// ticket with this set. Prefer IsCommitless over reading this field
 	// directly — research/grilling/code-review tickets are commitless by
@@ -150,7 +161,11 @@ func Validate(t Ticket) error {
 		errs = append(errs, fmt.Errorf("id: invalid ticket ID %q", t.ID))
 	}
 	if !t.Status.Valid() {
-		errs = append(errs, fmt.Errorf("status: invalid status %q", t.Status))
+		if replacement, retired := retiredStatusReplacements[t.Status]; retired {
+			errs = append(errs, fmt.Errorf("status: %q was renamed to %q, run `gx tickets migrate`", t.Status, replacement))
+		} else {
+			errs = append(errs, fmt.Errorf("status: invalid status %q", t.Status))
+		}
 	}
 	if !t.Type.Valid() {
 		errs = append(errs, fmt.Errorf("type: invalid type %q", t.Type))

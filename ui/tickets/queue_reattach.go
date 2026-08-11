@@ -14,17 +14,17 @@ import (
 
 // queueDetachedLiveMsg carries cmdCheckDetachedLive's result: this process is
 // Detached (attachLockHeld is false) but epicNames still have total claimed/
-// needs-attention tickets, alive of which have a confirmed-live herdr tab.
+// needs-repair tickets, alive of which have a confirmed-live herdr tab.
 type queueDetachedLiveMsg struct {
 	epicNames    []string
 	total, alive int
 }
 
 // cmdCheckDetachedLive detects a Detached+Live queue: tickets left claimed/
-// needs-attention by a gx process that exited without releasing the attach
+// needs-repair by a gx process that exited without releasing the attach
 // lock, some of which still have a live herdr pane. Returns nil (no dialog)
 // whenever this process or a foreign process already holds the attach lock,
-// or when nothing is claimed/needs-attention, or when the live-tab scan finds
+// or when nothing is claimed/needs-repair, or when the live-tab scan finds
 // nothing actually alive.
 func cmdCheckDetachedLive(worktreeRoot string) tea.Cmd {
 	return func() tea.Msg {
@@ -40,7 +40,7 @@ func cmdCheckDetachedLive(worktreeRoot string) tea.Cmd {
 		for _, epic := range epics {
 			for _, t := range epic.Tickets {
 				status := strings.ToLower(strings.TrimSpace(t.Status))
-				if status == "claimed" || status == "needs-attention" {
+				if status == "claimed" || status == "needs-repair" {
 					total++
 				}
 			}
@@ -83,7 +83,7 @@ func cmdConfirmDetachedLive(epicNames []string) tea.Cmd {
 // planForFullEpic builds a dynamic whole-epic plan (independent of the
 // checked set) for resuming a Detached+Live epic: every ticket in epic,
 // dynamic so startAvailableEpics launches with an empty RunOptions.TicketIDs
-// and reconcile naturally picks up whatever's still claimed/needs-attention.
+// and reconcile naturally picks up whatever's still claimed/needs-repair.
 func planForFullEpic(epic tickets.Epic) checkedEpicPlan {
 	ticketIDs := make([]string, 0, len(epic.Tickets))
 	done := 0
@@ -135,7 +135,7 @@ func (m QueueModel) handleDetachedLiveConfirmed(msg detachedLiveConfirmedMsg) (t
 
 // queueStrandedPendingMsg names epics that were checked/queued in
 // queue-state.json (durable Items) before this gx process started, have no
-// live registry run and no claimed/needs-attention ticket (that combination
+// live registry run and no claimed/needs-repair ticket (that combination
 // belongs to queueDetachedLiveMsg's confirmation instead), and so silently
 // fell out of MaxConcurrentEpics's auto-promotion queue — see
 // requeueMaybeStrandedEpics's doc comment for why this can't be resolved
@@ -164,7 +164,7 @@ func (m QueueModel) cmdCheckStrandedPending() tea.Cmd {
 
 // requeueMaybeStrandedEpics finds every epic with at least one checked,
 // not-yet-done ticket that isn't already running or pending, and has no
-// claimed/needs-attention ticket of its own (that shape is
+// claimed/needs-repair ticket of its own (that shape is
 // queueDetachedLiveMsg's — a live herdr pane may still be driving it, so it
 // gets an explicit "reattach?" instead of silently folding in here).
 //
@@ -189,7 +189,7 @@ func requeueMaybeStrandedEpics(epics []tickets.Epic, checked map[string]bool, pe
 			continue
 		}
 		if epicHasInFlightTicket(epic) {
-			continue // claimed/needs-attention — queueDetachedLiveMsg owns this case
+			continue // claimed/needs-repair — queueDetachedLiveMsg owns this case
 		}
 		hasChecked, allDone := false, true
 		for _, ticket := range epic.Tickets {
@@ -210,12 +210,12 @@ func requeueMaybeStrandedEpics(epics []tickets.Epic, checked map[string]bool, pe
 }
 
 // epicHasInFlightTicket reports whether epic has any ticket a live herdr
-// session might still be driving (claimed or needs-attention) — the same
+// session might still be driving (claimed or needs-repair) — the same
 // condition cmdCheckDetachedLive scans for.
 func epicHasInFlightTicket(epic tickets.Epic) bool {
 	for _, ticket := range epic.Tickets {
 		switch epic.RenderedStatus(ticket) {
-		case tickets.StatusClaimed, tickets.StatusNeedsAttention:
+		case tickets.StatusClaimed, tickets.StatusNeedsRepair:
 			return true
 		}
 	}

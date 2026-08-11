@@ -177,12 +177,12 @@ func TestClassifyDoneTicket_LiveTabCountsAsLeftover(t *testing.T) {
 // reconcile() entrypoint (not just classifyDoneTicket in isolation): a done
 // ticket whose landed commit went missing is reported, but reconcile doesn't
 // touch its status or the reattached list — repair is a later ticket's job.
-// TestReconcile_DoneTicketUnrecoverable_MarkedNeedsAttention exercises ticket
+// TestReconcile_DoneTicketUnrecoverable_MarkedNeedsRepair exercises ticket
 // 03: a done ticket classified doneUnrecoverable (its landed commit missing
 // from the feature branch, no iteration branch left to recover it from) must
 // not be silently reverted to open or left marked done — it's flagged
-// needs-attention for a human to inspect, with a reason and a logged event.
-func TestReconcile_DoneTicketUnrecoverable_MarkedNeedsAttention(t *testing.T) {
+// needs-repair for a human to inspect, with a reason and a logged event.
+func TestReconcile_DoneTicketUnrecoverable_MarkedNeedsRepair(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
 	})
@@ -212,8 +212,8 @@ func TestReconcile_DoneTicketUnrecoverable_MarkedNeedsAttention(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: needs-attention") {
-		t.Errorf("ticket not marked needs-attention:\n%s", raw)
+	if !strings.Contains(string(raw), "status: needs-repair") {
+		t.Errorf("ticket not marked needs-repair:\n%s", raw)
 	}
 
 	reports := strings.Split(out.String(), "\n")
@@ -236,14 +236,14 @@ func TestReconcile_DoneTicketUnrecoverable_MarkedNeedsAttention(t *testing.T) {
 	}
 	var attentionEvent *Event
 	for i := range events {
-		if events[i].Type == eventNeedsAttention && events[i].Ticket == "03" {
+		if events[i].Type == eventNeedsRepair && events[i].Ticket == "03" {
 			attentionEvent = &events[i]
 		}
 	}
 	if attentionEvent == nil {
-		t.Fatalf("events = %v, want a needs-attention event for ticket 3", events)
+		t.Fatalf("events = %v, want a needs-repair event for ticket 3", events)
 	}
 	if attentionEvent.Reason == "" {
-		t.Errorf("needs-attention event has no reason")
+		t.Errorf("needs-repair event has no reason")
 	}
 }

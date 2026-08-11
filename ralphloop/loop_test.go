@@ -421,7 +421,7 @@ func TestRun_FreshIteration_OmitsCompactionsWhenUnavailable(t *testing.T) {
 	}
 }
 
-func TestRun_LogsNeedsInfoEvent_OnZeroCommitIteration(t *testing.T) {
+func TestRun_LogsNeedsAnswerEvent_OnZeroCommitIteration(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -434,31 +434,31 @@ func TestRun_LogsNeedsInfoEvent_OnZeroCommitIteration(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	// The needs-info ticket is the epic's only one, so the run parks on it.
+	// The needs-answer ticket is the epic's only one, so the run parks on it.
 	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out))
 
 	events, ok, err := readEvents(scratchDir, "epic")
 	if err != nil || !ok {
 		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
 	}
-	var needsInfo *Event
+	var needsAnswer *Event
 	for i, ev := range events {
-		if ev.Type == eventNeedsInfo && ev.Ticket == "01" {
-			needsInfo = &events[i]
+		if ev.Type == eventNeedsAnswer && ev.Ticket == "01" {
+			needsAnswer = &events[i]
 		}
 		if ev.Type == eventCherryPicked {
 			t.Errorf("events = %+v, want no cherry-picked event for a zero-commit iteration", events)
 		}
 	}
-	if needsInfo == nil {
-		t.Fatalf("events = %+v, want a needs-info event for ticket 1", events)
+	if needsAnswer == nil {
+		t.Fatalf("events = %+v, want a needs-answer event for ticket 1", events)
 	}
-	if needsInfo.AgentSession == "" {
-		t.Errorf("needs-info event = %+v, want a non-empty AgentSession (the agent_session that produced zero commits)", needsInfo)
+	if needsAnswer.AgentSession == "" {
+		t.Errorf("needs-answer event = %+v, want a non-empty AgentSession (the agent_session that produced zero commits)", needsAnswer)
 	}
 }
 
-func TestRun_EventSink_TicketNeedsInfo_OnZeroCommitIteration(t *testing.T) {
+func TestRun_EventSink_TicketNeedsAnswer_OnZeroCommitIteration(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -473,21 +473,21 @@ func TestRun_EventSink_TicketNeedsInfo_OnZeroCommitIteration(t *testing.T) {
 	sink := &recordingSink{}
 	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
 
-	if len(sink.ticketNeedsInfoCalls) != 1 {
-		t.Fatalf("TicketNeedsInfo calls = %v, want exactly 1", sink.ticketNeedsInfoCalls)
+	if len(sink.ticketNeedsAnswerCalls) != 1 {
+		t.Fatalf("TicketNeedsAnswer calls = %v, want exactly 1", sink.ticketNeedsAnswerCalls)
 	}
-	if got := sink.ticketNeedsInfoCalls[0]; got[0] != "01" || got[1] != "epic" {
-		t.Errorf("TicketNeedsInfo call = %v, want [01 epic]", got)
+	if got := sink.ticketNeedsAnswerCalls[0]; got[0] != "01" || got[1] != "epic" {
+		t.Errorf("TicketNeedsAnswer call = %v, want [01 epic]", got)
 	}
 }
 
-// TestRun_HonorsCommitlessFlag_SkipsNeedsInfo exercises the escape hatch from
+// TestRun_HonorsCommitlessFlag_SkipsNeedsAnswer exercises the escape hatch from
 // the zero-commit path above: if the agent itself sets commitless: true
 // (alongside moving status off "claimed") before finishing, that's an
 // intentional zero-commit finish (e.g. exploration concluded no code change
 // was warranted), not a stalled agent — the ticket must not be forced back to
-// needs-info, and its worktree/tab get cleaned up like a normal completion.
-func TestRun_HonorsCommitlessFlag_SkipsNeedsInfo(t *testing.T) {
+// needs-answer, and its worktree/tab get cleaned up like a normal completion.
+func TestRun_HonorsCommitlessFlag_SkipsNeedsAnswer(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -523,8 +523,8 @@ func TestRun_HonorsCommitlessFlag_SkipsNeedsInfo(t *testing.T) {
 		if ev.Type == eventCommitless && ev.Ticket == "01" {
 			commitless = &events[i]
 		}
-		if ev.Type == eventNeedsInfo {
-			t.Errorf("events = %+v, want no needs-info event for a declared-commitless iteration", events)
+		if ev.Type == eventNeedsAnswer {
+			t.Errorf("events = %+v, want no needs-answer event for a declared-commitless iteration", events)
 		}
 	}
 	if commitless == nil {
@@ -544,7 +544,7 @@ func TestRun_HonorsCommitlessFlag_SkipsNeedsInfo(t *testing.T) {
 	}
 }
 
-func TestRun_InstallDepsFailure_MarksNeedsAttentionWithoutLaunchingAgentOrAbortingRun(t *testing.T) {
+func TestRun_InstallDepsFailure_MarksNeedsRepairWithoutLaunchingAgentOrAbortingRun(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -554,7 +554,7 @@ func TestRun_InstallDepsFailure_MarksNeedsAttentionWithoutLaunchingAgentOrAborti
 	}
 
 	var out bytes.Buffer
-	// A failed iteration marks needs-attention rather than aborting the run,
+	// A failed iteration marks needs-repair rather than aborting the run,
 	// which leaves the epic parked on its only ticket.
 	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out))
 
@@ -566,8 +566,8 @@ func TestRun_InstallDepsFailure_MarksNeedsAttentionWithoutLaunchingAgentOrAborti
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: needs-attention") {
-		t.Errorf("ticket file = %q, want Status: needs-attention after the install failure", raw)
+	if !strings.Contains(string(raw), "status: needs-repair") {
+		t.Errorf("ticket file = %q, want Status: needs-repair after the install failure", raw)
 	}
 }
 
@@ -603,16 +603,16 @@ func TestRun_NoEpicFound_NoOpSummary(t *testing.T) {
 	}
 }
 
-// TestAllDone_NeedsAttentionIsNotComplete covers ticket 08's central
-// inversion: a needs-attention ticket used to count as terminal and end the
+// TestAllDone_NeedsRepairIsNotComplete covers ticket 08's central
+// inversion: a needs-repair ticket used to count as terminal and end the
 // run, and now must not — the run parks on it instead.
-func TestAllDone_NeedsAttentionIsNotComplete(t *testing.T) {
+func TestAllDone_NeedsRepairIsNotComplete(t *testing.T) {
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
 		{Number: 1, Status: "done"},
-		{Number: 2, Status: "needs-attention"},
+		{Number: 2, Status: "needs-repair"},
 	}}
 	if allDone(epic) {
-		t.Errorf("allDone() = true, want false while ticket 2 needs attention")
+		t.Errorf("allDone() = true, want false while ticket 2 needs repair")
 	}
 }
 
@@ -776,13 +776,13 @@ func TestRun_ScopeWidenedMidRun_TotalGrowsWithIt(t *testing.T) {
 	}
 }
 
-// TestRun_NeedsAttentionOutsideSubset_DoesNotPauseRun covers ticket 23's
-// requirement: a needs-attention ticket left outside the requested subset
+// TestRun_NeedsRepairOutsideSubset_DoesNotPauseRun covers ticket 23's
+// requirement: a needs-repair ticket left outside the requested subset
 // must not gate-pause scheduling of the tickets the caller actually asked
 // for.
-func TestRun_NeedsAttentionOutsideSubset_DoesNotPauseRun(t *testing.T) {
+func TestRun_NeedsRepairOutsideSubset_DoesNotPauseRun(t *testing.T) {
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md":  "---\nid: \"01\"\nstatus: needs-attention\ntype: task\n---\n# First\n",
+		"01-first.md":  "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n# First\n",
 		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
 	})
 	d, prompts, _ := fakeDeps()
@@ -796,7 +796,7 @@ func TestRun_NeedsAttentionOutsideSubset_DoesNotPauseRun(t *testing.T) {
 		TicketIDs:  []string{"02"},
 	}, d, NewTextEventSink(&out))
 	if err != nil {
-		t.Fatalf("Run() error = %v, want the unselected needs-attention ticket 01 to not block scheduling ticket 02", err)
+		t.Fatalf("Run() error = %v, want the unselected needs-repair ticket 01 to not block scheduling ticket 02", err)
 	}
 
 	wantPrompt := "/implement " + filepath.Join(scratchDir, "my-epic", "issues", "02-second.md")
@@ -813,13 +813,13 @@ func TestRun_NeedsAttentionOutsideSubset_DoesNotPauseRun(t *testing.T) {
 	}
 }
 
-// TestRun_NeedsAttentionInsideSubset_RunsTheRestThenParks covers the flip
-// side of the above: a needs-attention ticket the caller did select no longer
+// TestRun_NeedsRepairInsideSubset_RunsTheRestThenParks covers the flip
+// side of the above: a needs-repair ticket the caller did select no longer
 // stops the run outright. It's human-clearable, so the rest of the subset is
 // scheduled first and the run only parks once nothing else is runnable.
-func TestRun_NeedsAttentionInsideSubset_RunsTheRestThenParks(t *testing.T) {
+func TestRun_NeedsRepairInsideSubset_RunsTheRestThenParks(t *testing.T) {
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md":  "---\nid: \"01\"\nstatus: needs-attention\ntype: task\n---\n# First\n",
+		"01-first.md":  "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n# First\n",
 		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
 	})
 	d, prompts, _ := fakeDeps()

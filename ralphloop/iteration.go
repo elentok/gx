@@ -22,7 +22,7 @@ const conflictResolutionTimeoutMs = 30 * 60 * 1000
 // create its worktree, launch and prompt the agent, wait for it to finish,
 // cherry-pick its commits onto the feature branch, mark the ticket done, and
 // remove the iteration worktree. If the agent finishes without landing any
-// commits, the ticket is marked needs-info instead and the worktree/tab are
+// commits, the ticket is marked needs-answer instead and the worktree/tab are
 // left in place for inspection — unless the agent itself declared the
 // zero-commit finish intentional (ticket frontmatter's commitless field, set
 // via `gx tickets set --commitless true` alongside a non-claimed status), in
@@ -145,12 +145,12 @@ func reattachIteration(d Deps, p iterationParams) error {
 	} else if err := waitForFinish(d, launchParams, agent.AgentSession); err != nil {
 		return fmt.Errorf("waiting for reattached agent %s to finish: %w", label, err)
 	}
-	if strings.EqualFold(strings.TrimSpace(p.Ticket.Status), "needs-attention") {
+	if strings.EqualFold(strings.TrimSpace(p.Ticket.Status), "needs-repair") {
 		if err := Claim(p.Ticket.Path); err != nil {
 			return fmt.Errorf("restoring ticket to claimed: %w", err)
 		}
 		p.Gate.ForceResume(label)
-		p.Sink.IterationResumed(label, PauseNeedsAttention)
+		p.Sink.IterationResumed(label, PauseNeedsRepair)
 		if p.Report != nil {
 			p.Report("resumed %s after restart recheck\n", label)
 		}
@@ -161,7 +161,7 @@ func reattachIteration(d Deps, p iterationParams) error {
 }
 
 // finishIteration lands a finished iteration's commits (or marks it
-// needs-info if it produced none), then removes its worktree/tab on success.
+// needs-answer if it produced none), then removes its worktree/tab on success.
 // Fresh and reattached iterations both carry their native session and pane
 // identity through this shared completion path.
 func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, sessionID string) error {
@@ -190,7 +190,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 		// intentional. Only honored alongside a status the agent also moved
 		// off "claimed" — a commitless ticket still sitting at claimed can't
 		// be told apart from one that simply forgot, so it falls through to
-		// the needs-info path below like any other zero-commit finish.
+		// the needs-answer path below like any other zero-commit finish.
 		current, err := schema.ParseTicket(p.Ticket.Path)
 		if err != nil {
 			return fmt.Errorf("reading ticket %s for commitless check: %w", p.Ticket.Path, err)
@@ -204,11 +204,11 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 		// The agent finished without landing any commits: leave the worktree/
 		// tab in place for inspection instead of silently marking done or
 		// retrying, and let the scheduler move on to other unblocked tickets.
-		if err := MarkNeedsInfo(p.Ticket.Path); err != nil {
-			return fmt.Errorf("marking ticket needs-info: %w", err)
+		if err := MarkNeedsAnswer(p.Ticket.Path); err != nil {
+			return fmt.Errorf("marking ticket needs-answer: %w", err)
 		}
-		p.logTicketEvent(eventNeedsInfo, pane, tab, sessionID, path)
-		p.Sink.TicketNeedsInfo(p.Ticket.Identifier, p.FeatureBranch)
+		p.logTicketEvent(eventNeedsAnswer, pane, tab, sessionID, path)
+		p.Sink.TicketNeedsAnswer(p.Ticket.Identifier, p.FeatureBranch)
 		return nil
 	}
 

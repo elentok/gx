@@ -115,17 +115,17 @@ func tabIDForLabel(tabs []herdr.Tab, label string) string {
 // markDoneTicketUnrecoverable flags a doneUnrecoverable ticket for a human to
 // inspect: its commits never landed on featureBranch and no iteration branch
 // survived to recover them from, so — unlike doneRecoverable — there's
-// nothing here to auto-repair. It reuses the same needs-attention
+// nothing here to auto-repair. It reuses the same needs-repair
 // status/event machinery as Codex's own operator-intervention path rather
 // than silently reverting the ticket to open (which would re-run it from
 // scratch without a human ever knowing the first run's result vanished).
 func markDoneTicketUnrecoverable(paths reconcilePaths, featureBranch string, t tickets.Ticket) error {
 	reason := fmt.Sprintf("done but commits missing from %s and iteration branch %s no longer exists to recover them", featureBranch, iterBranch(featureBranch, t.Identifier))
-	if err := MarkNeedsAttentionWithReason(t.Path, reason); err != nil {
-		return fmt.Errorf("marking ticket needs-attention: %w", err)
+	if err := MarkNeedsRepairWithReason(t.Path, reason); err != nil {
+		return fmt.Errorf("marking ticket needs-repair: %w", err)
 	}
-	if err := logEvent(paths.ScratchDir, featureBranch, Event{Type: eventNeedsAttention, Ticket: t.Identifier, Reason: reason}); err != nil {
-		return fmt.Errorf("logging needs-attention event: %w", err)
+	if err := logEvent(paths.ScratchDir, featureBranch, Event{Type: eventNeedsRepair, Ticket: t.Identifier, Reason: reason}); err != nil {
+		return fmt.Errorf("logging needs-repair event: %w", err)
 	}
 	return nil
 }

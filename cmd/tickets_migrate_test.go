@@ -35,6 +35,9 @@ func TestExecute_TicketsMigrate_Success(t *testing.T) {
 		// A children value that never parsed as a list of IDs is still the
 		// retired shape, and still has to be stripped and reported.
 		"06-scalar-children.md": "---\nid: \"06\"\nstatus: open\ntype: task\nchildren: 06a\n---\nBody.\n",
+		// The no-silent-stalls rename's own legacy park spellings.
+		"07-legacy-needs-info.md":      "---\nid: \"07\"\nstatus: needs-info\ntype: task\n---\nBody.\n",
+		"08-legacy-needs-attention.md": "---\nid: \"08\"\nstatus: needs-attention\ntype: task\n---\nBody.\n",
 	})
 	alreadyNewPath := filepath.Join(issuesDir, "04-already-new.md")
 	alreadyNewBefore, err := os.ReadFile(alreadyNewPath)
@@ -52,11 +55,13 @@ func TestExecute_TicketsMigrate_Success(t *testing.T) {
 	out := stdout.String()
 	for _, want := range []string{
 		"01-root.md: children removed",
-		"02-handed-back.md: status: ready-for-human -> needs-info",
+		"02-handed-back.md: status: ready-for-human -> needs-answer",
 		"03-no-status.md: status: (missing) -> open",
 		`05-self-blocked.md: blocked_by: removed self-parent entry "01"`,
 		"06-scalar-children.md: children removed",
-		"5 file(s) changed",
+		"07-legacy-needs-info.md: status: needs-info -> needs-answer",
+		"08-legacy-needs-attention.md: status: needs-attention -> needs-repair",
+		"7 file(s) changed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("stdout = %q, want it to contain %q", out, want)
@@ -98,6 +103,7 @@ func TestExecute_TicketsMigrate_Success(t *testing.T) {
 	for name := range map[string]string{
 		"01-root.md": "", "01a-fork.md": "", "01b-grandchild.md": "", "02-handed-back.md": "",
 		"03-no-status.md": "", "04-already-new.md": "", "05-self-blocked.md": "",
+		"07-legacy-needs-info.md": "", "08-legacy-needs-attention.md": "",
 	} {
 		var validateOut bytes.Buffer
 		vd := deps{stdout: &validateOut, stderr: bytes.NewBuffer(nil)}

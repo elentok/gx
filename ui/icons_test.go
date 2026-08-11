@@ -11,8 +11,8 @@ func TestIcons_TicketNerdFontCodepoints(t *testing.T) {
 	}{
 		{"TicketOpen", icons.TicketOpen, '\uf10c'},
 		{"TicketClaimed", icons.TicketClaimed, '\uf042'},
-		{"TicketNeedsInfo", icons.TicketNeedsInfo, '\uf059'},
-		{"TicketNeedsAttention", icons.TicketNeedsAttention, '\uf071'},
+		{"TicketNeedsAnswer", icons.TicketNeedsAnswer, '\uf059'},
+		{"TicketNeedsRepair", icons.TicketNeedsRepair, '\uf071'},
 		{"TicketBlocked", icons.TicketBlocked, '\uf28e'},
 		{"TicketDone", icons.TicketDone, '\uf00c'},
 		{"TicketError", icons.TicketError, '\uf057'},

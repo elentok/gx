@@ -18,19 +18,19 @@ func MarkDone(path string) error {
 	return SetStatus(path, "done")
 }
 
-// MarkNeedsInfo writes status: needs-info into the ticket file at path.
-func MarkNeedsInfo(path string) error {
-	return SetStatus(path, "needs-info")
+// MarkNeedsAnswer writes status: needs-answer into the ticket file at path.
+func MarkNeedsAnswer(path string) error {
+	return SetStatus(path, "needs-answer")
 }
 
-// MarkNeedsAttentionWithReason writes status: needs-attention into the
+// MarkNeedsRepairWithReason writes status: needs-repair into the
 // ticket file and appends reason to the ticket's body under a "## Needs
-// Attention" heading, so the full failure is readable by opening the ticket
+// Repair" heading, so the full failure is readable by opening the ticket
 // file even when the live UI's status subtext truncates it.
-func MarkNeedsAttentionWithReason(path, reason string) error {
+func MarkNeedsRepairWithReason(path, reason string) error {
 	return updateTicketWithBody(path, func(t *schema.Ticket, body *string) {
-		t.Status = schema.StatusNeedsAttention
-		*body += fmt.Sprintf("\n## Needs Attention\n\n%s\n", reason)
+		t.Status = schema.StatusNeedsRepair
+		*body += fmt.Sprintf("\n## Needs Repair\n\n%s\n", reason)
 	})
 }
 

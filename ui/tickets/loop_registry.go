@@ -30,7 +30,7 @@ type epicRun struct {
 	// which has no way to send a tea.Cmd itself) and drained into an actual
 	// notify.Close cmd by the next syncRunSnapshot poll on the active tab.
 	pendingNotifyCloses []string
-	// pendingToasts queues in-app toasts (epic-complete, needs-attention
+	// pendingToasts queues in-app toasts (epic-complete, needs-repair
 	// pause) the same way pendingNotifyCloses queues closes: reduceLiveEvent
 	// runs in the event-drain goroutine, which has no way to dispatch a
 	// tea.Cmd itself, so toasts wait here for the next syncRunSnapshot poll
@@ -338,7 +338,7 @@ func (r *loopRegistry) reduceLiveEvent(epicName string, event ralphloop.LiveEven
 			run.tickets[identifier] = ticket
 			break
 		}
-		if event.PauseKind == ralphloop.PauseNeedsAttention {
+		if event.PauseKind == ralphloop.PauseNeedsRepair {
 			run.pendingToasts = append(run.pendingToasts, notify.NotifyMsg{
 				Kind:    notify.KindWarning,
 				Message: fmt.Sprintf("\U0001f6d1 %s paused: %s", event.Label, event.Reason),

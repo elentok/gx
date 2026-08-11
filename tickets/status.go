@@ -14,8 +14,8 @@ const (
 	StatusOpen RenderedStatus = iota
 	StatusClaimed
 	StatusBlocked
-	StatusNeedsInfo
-	StatusNeedsAttention
+	StatusNeedsAnswer
+	StatusNeedsRepair
 	StatusDone
 	StatusError
 	// StatusDraft is a ticket its author has explicitly parked: written down,
@@ -44,14 +44,14 @@ var openStatuses = map[string]bool{
 
 var claimedStatuses = map[string]bool{"claimed": true}
 
-// needsInfoStatuses covers raw values meaning work is stalled on someone
+// needsAnswerStatuses covers raw values meaning work is stalled on someone
 // providing more information before it can proceed.
-var needsInfoStatuses = map[string]bool{
-	"needs-info": true,
+var needsAnswerStatuses = map[string]bool{
+	"needs-answer": true,
 }
 
-var needsAttentionStatuses = map[string]bool{
-	"needs-attention": true,
+var needsRepairStatuses = map[string]bool{
+	"needs-repair": true,
 }
 
 // draftStatuses covers raw values meaning the ticket is parked by its author
@@ -79,10 +79,10 @@ func (t Ticket) baseStatus() RenderedStatus {
 		return StatusDone
 	case claimedStatuses[status]:
 		return StatusClaimed
-	case needsInfoStatuses[status]:
-		return StatusNeedsInfo
-	case needsAttentionStatuses[status]:
-		return StatusNeedsAttention
+	case needsAnswerStatuses[status]:
+		return StatusNeedsAnswer
+	case needsRepairStatuses[status]:
+		return StatusNeedsRepair
 	case openStatuses[status]:
 		return StatusOpen
 	default:
@@ -92,7 +92,7 @@ func (t Ticket) baseStatus() RenderedStatus {
 
 // RenderedStatus computes t's rendered status within e: t's base status,
 // overlaid with "blocked" when t has an unresolved Blocked by: and its base
-// status is open or claimed (needs-info and done tickets keep their own
+// status is open or claimed (needs-answer and done tickets keep their own
 // state regardless of Blocked by:). A type: code-review ticket's Blocked by:
 // is synthesized rather than read from its file (see effectiveBlockedBy),
 // but is otherwise resolved the same way as every other ticket's.
@@ -298,10 +298,10 @@ func (s RenderedStatus) Word() string {
 		return "claimed"
 	case StatusBlocked:
 		return "blocked"
-	case StatusNeedsInfo:
-		return "needs-info"
-	case StatusNeedsAttention:
-		return "needs-attention"
+	case StatusNeedsAnswer:
+		return "needs-answer"
+	case StatusNeedsRepair:
+		return "needs-repair"
 	case StatusDone:
 		return "done"
 	case StatusDraft:

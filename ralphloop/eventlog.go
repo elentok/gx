@@ -38,12 +38,12 @@ const (
 	// reported idle mid-compaction" apart from "compaction genuinely took more
 	// than five minutes" is exactly what run-log.jsonl is read for.
 	eventSmartZoneGateReleased = "smart-zone-gate-released"
-	eventPausedRateLimit      = "paused-rate-limit"
-	eventResumed              = "resumed"
-	eventNeedsInfo            = "needs-info"
-	eventCommitless           = "commitless"
-	eventNeedsAttention       = "needs-attention"
-	eventDepsInstalled        = "deps-installed"
+	eventPausedRateLimit       = "paused-rate-limit"
+	eventResumed               = "resumed"
+	eventNeedsAnswer           = "needs-answer"
+	eventCommitless            = "commitless"
+	eventNeedsRepair           = "needs-repair"
+	eventDepsInstalled         = "deps-installed"
 	// eventSchedulerScan marks one claimNext pass: every ticket the epic
 	// currently has, and why the scheduler did or didn't claim it. Added to
 	// debug tickets that appear queued (e.g. a code-review ticket's freshly
@@ -66,7 +66,7 @@ const (
 	notifyKindIterationPaused   = "iteration-paused"
 	notifyKindEpicComplete      = "epic-complete"
 	notifyKindEpicParked        = "epic-parked"
-	notifyKindTicketNeedsInfo   = "ticket-needs-info"
+	notifyKindTicketNeedsAnswer = "ticket-needs-answer"
 )
 
 // ScanDecision records one ticket's scheduling disposition for a single
@@ -85,7 +85,7 @@ type ScanDecision struct {
 	// or maxParallel was already reached elsewhere in this Run call),
 	// "out-of-scope" (RunScope.Contains is false — e.g. a code-review
 	// ticket's child missing its own parent: back-edge), "blocked", or
-	// "settled" (already done/needs-info/needs-attention).
+	// "settled" (already done/needs-answer/needs-repair).
 	Decision string `json:"decision"`
 	// Reason elaborates Decision — e.g. UnresolvedBlockers's tokens for
 	// "blocked". Empty when Decision is self-explanatory.

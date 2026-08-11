@@ -63,8 +63,8 @@ func TestSlackStyleIterationFinishedText_NoEscaping(t *testing.T) {
 	}
 }
 
-func TestTelegramStyleIterationPausedText_NeedsAttentionUsesStopEmoji(t *testing.T) {
-	got := telegramStyle.iterationPausedText("iter-04", PauseNeedsAttention, "agent blocked on permission prompt")
+func TestTelegramStyleIterationPausedText_NeedsRepairUsesStopEmoji(t *testing.T) {
+	got := telegramStyle.iterationPausedText("iter-04", PauseNeedsRepair, "agent blocked on permission prompt")
 	want := "\U0001f6d1 *iter\\-04 paused*\n\nagent blocked on permission prompt"
 	if got != want {
 		t.Errorf("text = %q, want %q", got, want)
@@ -79,20 +79,20 @@ func TestTelegramStyleIterationPausedText_RateLimitUsesPauseEmoji(t *testing.T) 
 	}
 }
 
-func TestTelegramStyleTicketNeedsInfoText_DistinctFromIterationPausedText(t *testing.T) {
-	got := telegramStyle.ticketNeedsInfoText("04", "ui-tree-migration")
-	want := "\U0001f198 *ui\\-tree\\-migration/04 needs info*\n\nNo commits landed; marked needs\\-info\\."
+func TestTelegramStyleTicketNeedsAnswerText_DistinctFromIterationPausedText(t *testing.T) {
+	got := telegramStyle.ticketNeedsAnswerText("04", "ui-tree-migration")
+	want := "\U0001f198 *ui\\-tree\\-migration/04 needs answer*\n\nNo commits landed; marked needs\\-answer\\."
 	if got != want {
 		t.Errorf("text = %q, want %q", got, want)
 	}
-	if paused := telegramStyle.iterationPausedText("ui-tree-migration/04", PauseNeedsAttention, "stuck"); got == paused {
-		t.Errorf("ticketNeedsInfoText matched iterationPausedText: %q", got)
+	if paused := telegramStyle.iterationPausedText("ui-tree-migration/04", PauseNeedsRepair, "stuck"); got == paused {
+		t.Errorf("ticketNeedsAnswerText matched iterationPausedText: %q", got)
 	}
 }
 
-func TestSlackStyleTicketNeedsInfoText_NoEscaping(t *testing.T) {
-	got := slackStyle.ticketNeedsInfoText("04", "ui-tree-migration")
-	want := "\U0001f198 *ui-tree-migration/04 needs info*\n\nNo commits landed; marked needs-info."
+func TestSlackStyleTicketNeedsAnswerText_NoEscaping(t *testing.T) {
+	got := slackStyle.ticketNeedsAnswerText("04", "ui-tree-migration")
+	want := "\U0001f198 *ui-tree-migration/04 needs answer*\n\nNo commits landed; marked needs-answer."
 	if got != want {
 		t.Errorf("text = %q, want %q", got, want)
 	}

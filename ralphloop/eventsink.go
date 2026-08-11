@@ -12,7 +12,7 @@ import (
 // PauseKind distinguishes why an iteration paused, since rendering (the
 // headless text sink today, a future TUI tomorrow) says something different
 // for each: a rate-limit pause clears itself on a timer, while a
-// needs-attention pause needs a human at the agent's pane. A smart-zone
+// needs-repair pause needs a human at the agent's pane. A smart-zone
 // breach is deliberately not a PauseKind: recoverSmartZoneBreach never calls
 // Gate.pause (the scheduler keeps running other tickets throughout), so it
 // reports through SmartZoneCompactStarted/SmartZoneFinishingUp/
@@ -33,14 +33,14 @@ type IterationStats struct {
 
 const (
 	PauseRateLimit PauseKind = "rate-limit"
-	// PauseNeedsAttention marks the operator-intervention pause
+	// PauseNeedsRepair marks the operator-intervention pause
 	// waitForAttentionRecovery drives (Codex blocked on a permission/
 	// intervention prompt): mechanically it's paused through the same
 	// Gate as PauseRateLimit, but a renderer (see ticket 04a) treats
-	// it as its own "needs attention" state rather than a generic pause,
+	// it as its own "needs repair" state rather than a generic pause,
 	// since it needs a human at the agent's pane rather than clearing itself
 	// or via `gx ralph-loop resume`.
-	PauseNeedsAttention PauseKind = "needs-attention"
+	PauseNeedsRepair PauseKind = "needs-repair"
 )
 
 // StalledTicket names one human-clearable ticket a parked epic is waiting
@@ -64,7 +64,7 @@ type EventSink interface {
 	// immediately without doing anything else.
 	NoTicketsFound(epicName string)
 	// AlreadyComplete reports that every one of epicName's tickets was
-	// already done/needs-info before Run did anything.
+	// already done/needs-answer before Run did anything.
 	AlreadyComplete(epicName string, done, total int)
 
 	// TicketReverted reports that a ticket left `Status: claimed` by a prior
@@ -74,22 +74,22 @@ type EventSink interface {
 	// (see UnresolvedBlockers) render distinctly.
 	TicketReverted(identifier string)
 	// TicketReattached reports that a ticket left `Status: claimed` or
-	// `Status: needs-attention` by a prior invocation still has a live
+	// `Status: needs-repair` by a prior invocation still has a live
 	// iteration, being resumed under label. cwd/sessionID (best-effort,
 	// recovered from the run log's last iteration-started event; empty if
 	// none found) let a consumer resolve the session's transcript itself, so
 	// elapsed time survives a reattach instead of resetting to zero.
 	TicketReattached(identifier string, label string, cwd string, sessionID string)
-	// TicketStillNeedsAttention reports that a needs-attention ticket has no
-	// live iteration to reattach to — it stays needs-attention for a human to
+	// TicketStillNeedsRepair reports that a needs-repair ticket has no
+	// live iteration to reattach to — it stays needs-repair for a human to
 	// inspect, unlike a claimed ticket in the same spot (see TicketReverted).
-	TicketStillNeedsAttention(identifier string)
-	// TicketNeedsInfo reports that identifier on epicName was marked
-	// needs-info: its iteration finished with no commit and never declared
-	// itself commitless (MarkNeedsInfo, called from finishIteration) — the
+	TicketStillNeedsRepair(identifier string)
+	// TicketNeedsAnswer reports that identifier on epicName was marked
+	// needs-answer: its iteration finished with no commit and never declared
+	// itself commitless (MarkNeedsAnswer, called from finishIteration) — the
 	// agent got stuck rather than merely paused, so this fires distinct from
 	// IterationPaused.
-	TicketNeedsInfo(identifier, epicName string)
+	TicketNeedsAnswer(identifier, epicName string)
 
 	// TicketClaimed reports that ticket was claimed off the frontier for a
 	// fresh iteration.
@@ -160,7 +160,7 @@ type EventSink interface {
 	TicketRecovered(identifier, epicName, branch, landedSHA string)
 	// TicketUnrecoverable reports that a done ticket's commits are missing
 	// from epicName and no iteration branch survived to recover them from —
-	// flagged needs-attention for a human to inspect.
+	// flagged needs-repair for a human to inspect.
 	TicketUnrecoverable(identifier, epicName string)
 
 	// EpicParked reports that epicName has no runnable work left and is
@@ -184,8 +184,8 @@ func (noopEventSink) NoTicketsFound(epicName string)                            
 func (noopEventSink) AlreadyComplete(epicName string, done, total int)            {}
 func (noopEventSink) TicketReverted(identifier string)                            {}
 func (noopEventSink) TicketReattached(identifier, label, cwd, sessionID string)   {}
-func (noopEventSink) TicketStillNeedsAttention(identifier string)                 {}
-func (noopEventSink) TicketNeedsInfo(identifier, epicName string)                 {}
+func (noopEventSink) TicketStillNeedsRepair(identifier string)                    {}
+func (noopEventSink) TicketNeedsAnswer(identifier, epicName string)               {}
 func (noopEventSink) TicketClaimed(ticket tickets.Ticket)                         {}
 func (noopEventSink) IterationStarted(identifier, label, cwd, sessionID string)   {}
 func (noopEventSink) IterationPaused(label string, kind PauseKind, reason string) {}
@@ -243,12 +243,12 @@ func (s *textEventSink) TicketReattached(identifier, label, cwd, sessionID strin
 	s.printf("ticket %s: reattaching to live iteration %s\n", identifier, label)
 }
 
-func (s *textEventSink) TicketStillNeedsAttention(identifier string) {
-	s.printf("ticket %s still needs attention; no live iteration found\n", identifier)
+func (s *textEventSink) TicketStillNeedsRepair(identifier string) {
+	s.printf("ticket %s still needs repair; no live iteration found\n", identifier)
 }
 
-func (s *textEventSink) TicketNeedsInfo(identifier, epicName string) {
-	s.printf("ticket %s: no commits landed; marked needs-info\n", identifier)
+func (s *textEventSink) TicketNeedsAnswer(identifier, epicName string) {
+	s.printf("ticket %s: no commits landed; marked needs-answer\n", identifier)
 }
 
 func (s *textEventSink) TicketClaimed(ticket tickets.Ticket) {}
@@ -259,7 +259,7 @@ func (s *textEventSink) IterationPaused(label string, kind PauseKind, reason str
 	switch kind {
 	case PauseRateLimit:
 		s.printf("paused %s: %s; waiting for automatic reset\n", label, reason)
-	case PauseNeedsAttention:
+	case PauseNeedsRepair:
 		s.printf("paused %s: %s\n", label, reason)
 	default:
 		s.printf("paused %s: %s; run `gx ralph-loop resume` to continue\n", label, reason)
@@ -270,7 +270,7 @@ func (s *textEventSink) IterationResumed(label string, kind PauseKind) {
 	switch kind {
 	case PauseRateLimit:
 		s.printf("resumed %s after rate-limit reset\n", label)
-	case PauseNeedsAttention:
+	case PauseNeedsRepair:
 		s.printf("resumed %s after operator intervention\n", label)
 	default:
 		s.printf("resumed %s\n", label)
@@ -310,7 +310,7 @@ func (s *textEventSink) TicketRecovered(identifier, epicName, branch, landedSHA 
 }
 
 func (s *textEventSink) TicketUnrecoverable(identifier, epicName string) {
-	s.printf("ticket %s: done but commits missing from %s and no iteration branch left to recover them; marked needs-attention\n", identifier, epicName)
+	s.printf("ticket %s: done but commits missing from %s and no iteration branch left to recover them; marked needs-repair\n", identifier, epicName)
 }
 
 func (s *textEventSink) EpicParked(epicName string, stalled []StalledTicket) {

@@ -78,7 +78,7 @@ func TestReduceLiveEventCapturesProgressContextAndPause(t *testing.T) {
 	})
 	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
 		Kind: ralphloop.LiveEventIterationPaused, Label: "iter-01",
-		PauseKind: ralphloop.PauseNeedsAttention, Reason: "permission required",
+		PauseKind: ralphloop.PauseNeedsRepair, Reason: "permission required",
 	})
 
 	snapshot, ok := r.runSnapshot("epic-a")
@@ -89,7 +89,7 @@ func TestReduceLiveEventCapturesProgressContextAndPause(t *testing.T) {
 		t.Fatalf("run snapshot = %#v", snapshot)
 	}
 	ticket := snapshot.Tickets["01"]
-	if !ticket.Paused || ticket.PauseKind != ralphloop.PauseNeedsAttention || ticket.PauseReason != "permission required" || ticket.ContextTokens != 42_000 {
+	if !ticket.Paused || ticket.PauseKind != ralphloop.PauseNeedsRepair || ticket.PauseReason != "permission required" || ticket.ContextTokens != 42_000 {
 		t.Fatalf("ticket snapshot = %#v", ticket)
 	}
 }
@@ -286,7 +286,7 @@ func TestDrainPendingToastsOnEpicComplete(t *testing.T) {
 	}
 }
 
-func TestDrainPendingToastsOnNeedsAttentionPauseOnly(t *testing.T) {
+func TestDrainPendingToastsOnNeedsRepairPauseOnly(t *testing.T) {
 	r := newLoopRegistry(1)
 	r.tryStart("epic-a", 0, 2)
 	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
@@ -294,16 +294,16 @@ func TestDrainPendingToastsOnNeedsAttentionPauseOnly(t *testing.T) {
 		PauseKind: ralphloop.PauseRateLimit, Reason: "rate limited",
 	})
 	if toasts := r.drainPendingToasts("epic-a"); len(toasts) != 0 {
-		t.Fatalf("drainPendingToasts() after rate-limit pause = %#v, want empty (needs-attention only)", toasts)
+		t.Fatalf("drainPendingToasts() after rate-limit pause = %#v, want empty (needs-repair only)", toasts)
 	}
 
 	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
 		Kind: ralphloop.LiveEventIterationPaused, Label: "iter-01",
-		PauseKind: ralphloop.PauseNeedsAttention, Reason: "permission required",
+		PauseKind: ralphloop.PauseNeedsRepair, Reason: "permission required",
 	})
 	toasts := r.drainPendingToasts("epic-a")
 	if len(toasts) != 1 || toasts[0].Kind != notify.KindWarning {
-		t.Fatalf("drainPendingToasts() after needs-attention pause = %#v, want one warning toast", toasts)
+		t.Fatalf("drainPendingToasts() after needs-repair pause = %#v, want one warning toast", toasts)
 	}
 	if !strings.Contains(toasts[0].Message, "iter-01") || !strings.Contains(toasts[0].Message, "permission required") {
 		t.Fatalf("toast message = %q, want label and reason", toasts[0].Message)

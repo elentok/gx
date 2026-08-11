@@ -440,9 +440,9 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 // Status() — under WithPrematureIdlePane that is "idle" throughout — which is
 // the production shape that made the pane-status finish path fire while
 // "/compact" was still running: the iteration was declared finished, the ticket
-// closed needs-info with no commit, and the worktree abandoned mid-compaction.
+// closed needs-answer with no commit, and the worktree abandoned mid-compaction.
 // The run must instead end at errCompactRecoveryExhausted, which loop.go
-// persists as needs-attention for an operator.
+// persists as needs-repair for an operator.
 func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
 	const pane = "pane-1"
 	const smartZone = 100

@@ -43,7 +43,7 @@ func TestLogEvent_AppendsOneJSONLinePerCall(t *testing.T) {
 func TestLogEvent_FillsInTimeWhenZero(t *testing.T) {
 	dir := t.TempDir()
 	before := time.Now()
-	if err := logEvent(dir, "epic", Event{Type: eventNeedsInfo, Ticket: "02"}); err != nil {
+	if err := logEvent(dir, "epic", Event{Type: eventNeedsAnswer, Ticket: "02"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 	events, ok, err := readEvents(dir, "epic")
@@ -59,10 +59,10 @@ func TestLogEvent_FillsInTimeWhenZero(t *testing.T) {
 }
 
 func TestLogEvent_EmptyScratchDirOrEpicName_NoOp(t *testing.T) {
-	if err := logEvent("", "epic", Event{Type: eventNeedsInfo}); err != nil {
+	if err := logEvent("", "epic", Event{Type: eventNeedsAnswer}); err != nil {
 		t.Errorf("logEvent(scratchDir=\"\") error = %v, want nil no-op", err)
 	}
-	if err := logEvent(t.TempDir(), "", Event{Type: eventNeedsInfo}); err != nil {
+	if err := logEvent(t.TempDir(), "", Event{Type: eventNeedsAnswer}); err != nil {
 		t.Errorf("logEvent(epicName=\"\") error = %v, want nil no-op", err)
 	}
 }
@@ -105,7 +105,7 @@ func TestLastIterationSession_ReturnsMostRecentMatchingTicket(t *testing.T) {
 	events := []Event{
 		{Type: eventIterationStarted, Ticket: "01", Agent: AgentClaude, AgentSession: "sess-1a", Cwd: "/cwd-1a"},
 		{Type: eventIterationFinished, Ticket: "01"},
-		{Type: eventNeedsInfo, Ticket: "01"},
+		{Type: eventNeedsAnswer, Ticket: "01"},
 		{Type: eventIterationStarted, Ticket: "01", Agent: AgentClaude, AgentSession: "sess-1b", Cwd: "/cwd-1b"},
 		{Type: eventIterationStarted, Ticket: "02", Agent: AgentClaude, AgentSession: "sess-2", Cwd: "/cwd-2"},
 	}

@@ -62,11 +62,11 @@ func ticketPath(scratchDir, epicName, file string) string {
 }
 
 // TestRun_StalledTicket_ParksInsteadOfExiting covers ticket 08's core AC: a
-// run whose only remaining ticket is needs-info neither exits nor errors — it
+// run whose only remaining ticket is needs-answer neither exits nor errors — it
 // parks, notifies, and carries on once the status clears.
 func TestRun_StalledTicket_ParksInsteadOfExiting(t *testing.T) {
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-info\ntype: task\n---\n# Stuck\n",
+		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: task\n---\n# Stuck\n",
 	})
 	d, prompts, _ := fakeDeps()
 	// The park has no timeout: only the scripted clearing hand ends it.
@@ -80,7 +80,7 @@ func TestRun_StalledTicket_ParksInsteadOfExiting(t *testing.T) {
 	}
 
 	if *polls == 0 {
-		t.Errorf("run never parked (no park poll), want it to park on the needs-info ticket")
+		t.Errorf("run never parked (no park poll), want it to park on the needs-answer ticket")
 	}
 	if len(sink.parkedStalled) != 1 || len(sink.parkedStalled[0]) != 1 || sink.parkedStalled[0][0].Identifier != "01" {
 		t.Errorf("EpicParked calls = %v, want one naming ticket 01", sink.parkedStalled)
@@ -91,7 +91,7 @@ func TestRun_StalledTicket_ParksInsteadOfExiting(t *testing.T) {
 }
 
 // TestRun_DraftOnlyEpic_Parks covers the other human-clearable status:
-// draft. Unlike needs-info/needs-attention, isHumanClearable matches it off
+// draft. Unlike needs-answer/needs-repair, isParked matches it off
 // the raw frontmatter Status: rather than RenderedStatus, so this proves a
 // draft ticket parks rather than deadlocking.
 func TestRun_DraftOnlyEpic_Parks(t *testing.T) {
@@ -177,14 +177,14 @@ func TestRun_StalledIteration_RegistryClearedAndRelaunched(t *testing.T) {
 	}
 }
 
-// TestRun_ClearedNeedsAttentionWithLiveIteration_ReattachesInsteadOfDoubleLaunching
+// TestRun_ClearedNeedsRepairWithLiveIteration_ReattachesInsteadOfDoubleLaunching
 // covers ticket 09's core claim: iteration ownership decides resume, not the
 // ticket's status. Ticket 01's first launch errors out (a git hiccup) before
-// ever prompting, needs-attention with no goroutine left — but its herdr tab
+// ever prompting, needs-repair with no goroutine left — but its herdr tab
 // is scripted to still be live once a human clears it back to open, so the
 // run must reattach rather than assume "open" means "never launched" and
 // double-launch a second iteration.
-func TestRun_ClearedNeedsAttentionWithLiveIteration_ReattachesInsteadOfDoubleLaunching(t *testing.T) {
+func TestRun_ClearedNeedsRepairWithLiveIteration_ReattachesInsteadOfDoubleLaunching(t *testing.T) {
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -285,7 +285,7 @@ func TestRun_NothingRunnableAndNothingClearable_Deadlocks(t *testing.T) {
 // it stays blocked in the park select rather than leaking work.
 func TestRun_StaysParked_NeverReportsEpicComplete(t *testing.T) {
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-info\ntype: task\n---\n# Stuck\n",
+		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: task\n---\n# Stuck\n",
 	})
 	d, _, _ := fakeDeps()
 	polled := make(chan struct{})
@@ -306,13 +306,13 @@ func TestRun_StaysParked_NeverReportsEpicComplete(t *testing.T) {
 	select {
 	case <-polled:
 	case err := <-done:
-		t.Fatalf("Run() returned %v before parking, want it to park on the needs-info ticket", err)
+		t.Fatalf("Run() returned %v before parking, want it to park on the needs-answer ticket", err)
 	case <-time.After(5 * time.Second):
 		t.Fatal("run never parked")
 	}
 	select {
 	case err := <-done:
-		t.Fatalf("Run() returned %v while its only ticket was still needs-info, want it to stay parked", err)
+		t.Fatalf("Run() returned %v while its only ticket was still needs-answer, want it to stay parked", err)
 	case <-time.After(100 * time.Millisecond):
 	}
 

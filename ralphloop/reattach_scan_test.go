@@ -45,9 +45,9 @@ func TestScanForReattachable_ClaimedWithLiveTab_ProducesSignal(t *testing.T) {
 	}
 }
 
-func TestScanForReattachable_NeedsAttentionWithLiveTab_ProducesSignal(t *testing.T) {
+func TestScanForReattachable_NeedsRepairWithLiveTab_ProducesSignal(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: needs-attention\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n# A\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -117,7 +117,7 @@ func TestScanForReattachable_NoWorkspace_ProducesNothingAndSkipsTabList(t *testi
 	}
 }
 
-func TestScanForReattachable_NoClaimedOrNeedsAttentionTickets_ProducesNothing(t *testing.T) {
+func TestScanForReattachable_NoClaimedOrNeedsRepairTickets_ProducesNothing(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 		"02-a.md": "---\nid: \"02\"\nstatus: done\ntype: task\n---\n# B\n",
@@ -142,7 +142,7 @@ func TestScanForReattachable_NoClaimedOrNeedsAttentionTickets_ProducesNothing(t 
 		t.Fatalf("signals = %+v, want none", signals)
 	}
 	if findWorkspaceCalled {
-		t.Fatal("findWorkspace should not be called for an epic with no claimed/needs-attention tickets")
+		t.Fatal("findWorkspace should not be called for an epic with no claimed/needs-repair tickets")
 	}
 }
 

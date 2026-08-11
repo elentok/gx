@@ -58,14 +58,14 @@ func TestCmdCheckDetachedLive_DetachedButNothingClaimed_ReturnsNil(t *testing.T)
 	root := t.TempDir()
 	writeTicket(t, root, "epic", "01-first.md", "Status: open\n\nBody.\n")
 	withFakeReattachHerdr(t, func(label string) (string, error) {
-		t.Fatal("findWorkspace should not be called when there are no claimed/needs-attention tickets")
+		t.Fatal("findWorkspace should not be called when there are no claimed/needs-repair tickets")
 		return "", nil
 	}, func(workspaceID string) ([]herdr.Tab, error) {
 		return nil, nil
 	})
 
 	if msg := cmdCheckDetachedLive(root)(); msg != nil {
-		t.Fatalf("cmdCheckDetachedLive() = %#v, want nil when nothing is claimed/needs-attention", msg)
+		t.Fatalf("cmdCheckDetachedLive() = %#v, want nil when nothing is claimed/needs-repair", msg)
 	}
 }
 
@@ -140,7 +140,7 @@ func TestHandleDetachedLiveConfirmed_QueuesDynamicPlanAndDefaultsAgent(t *testin
 }
 
 func TestCmdCheckStrandedPending_CheckedEpicWithNoRunOrClaim_ReturnsMsg(t *testing.T) {
-	// No claimed/needs-attention ticket, and an empty registry (as a freshly
+	// No claimed/needs-repair ticket, and an empty registry (as a freshly
 	// started gx process would have): this epic was checked/queued but never
 	// got its turn before the process that queued it exited. Simulates the
 	// exact "tickets-tree" scenario — a checked epic with only ready-for-agent

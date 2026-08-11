@@ -84,7 +84,7 @@ func TestSlackEventSink_IterationPaused_SendsOneMessageAndForwards(t *testing.T)
 	inner := &recordingSink{}
 	sink := newSlackEventSink(inner, server.URL, "", "")
 
-	sink.IterationPaused("iter-04", PauseNeedsAttention, "agent blocked on permission prompt")
+	sink.IterationPaused("iter-04", PauseNeedsRepair, "agent blocked on permission prompt")
 
 	if got := inner.snapshot(); len(got) != 1 || got[0] != "IterationPaused" {
 		t.Errorf("inner events = %v, want [IterationPaused]", got)
@@ -94,33 +94,33 @@ func TestSlackEventSink_IterationPaused_SendsOneMessageAndForwards(t *testing.T)
 	if len(reqs) != 1 {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
-	want := slackStyle.iterationPausedText("iter-04", PauseNeedsAttention, "agent blocked on permission prompt")
+	want := slackStyle.iterationPausedText("iter-04", PauseNeedsRepair, "agent blocked on permission prompt")
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}
 }
 
-func TestSlackEventSink_TicketNeedsInfo_SendsOneMessageAndForwards(t *testing.T) {
+func TestSlackEventSink_TicketNeedsAnswer_SendsOneMessageAndForwards(t *testing.T) {
 	server, getRequests := fakeSlackServer(t, http.StatusOK)
 	inner := &recordingSink{}
 	sink := newSlackEventSink(inner, server.URL, "", "")
 
-	sink.TicketNeedsInfo("04", "epic")
+	sink.TicketNeedsAnswer("04", "epic")
 
-	if got := inner.snapshot(); len(got) != 1 || got[0] != "TicketNeedsInfo" {
-		t.Errorf("inner events = %v, want [TicketNeedsInfo]", got)
+	if got := inner.snapshot(); len(got) != 1 || got[0] != "TicketNeedsAnswer" {
+		t.Errorf("inner events = %v, want [TicketNeedsAnswer]", got)
 	}
 
 	reqs := waitForSlackRequests(getRequests, 1)
 	if len(reqs) != 1 {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
-	want := slackStyle.ticketNeedsInfoText("04", "epic")
+	want := slackStyle.ticketNeedsAnswerText("04", "epic")
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}
-	if paused := slackStyle.iterationPausedText("epic/04", PauseNeedsAttention, "stuck"); reqs[0].Text == paused {
-		t.Errorf("needs-info text matched iteration-paused text: %q", reqs[0].Text)
+	if paused := slackStyle.iterationPausedText("epic/04", PauseNeedsRepair, "stuck"); reqs[0].Text == paused {
+		t.Errorf("needs-answer text matched iteration-paused text: %q", reqs[0].Text)
 	}
 }
 
@@ -154,7 +154,7 @@ func TestSlackEventSink_OtherMethods_ForwardWithoutSendingAnyRequest(t *testing.
 	sink.AlreadyComplete("epic", 1, 2)
 	sink.TicketReverted("01")
 	sink.TicketReattached("01", "iter-01", "/repo", "sess-1")
-	sink.TicketStillNeedsAttention("01")
+	sink.TicketStillNeedsRepair("01")
 	sink.TicketClaimed(tickets.Ticket{Identifier: "01"})
 	sink.IterationStarted("01", "iter-01", "/repo", "sess-1")
 	sink.IterationResumed("iter-01", PauseRateLimit)
@@ -172,7 +172,7 @@ func TestSlackEventSink_OtherMethods_ForwardWithoutSendingAnyRequest(t *testing.
 
 	want := []string{
 		"NoTicketsFound", "AlreadyComplete", "TicketReverted", "TicketReattached",
-		"TicketStillNeedsAttention", "TicketClaimed", "IterationStarted", "IterationResumed",
+		"TicketStillNeedsRepair", "TicketClaimed", "IterationStarted", "IterationResumed",
 		"TranscriptLine", "ContextOccupancy", "CherryPickStarted", "ConflictResolutionStarted",
 		"SmartZoneCompactStarted", "SmartZoneFinishingUp", "SmartZoneRecovered",
 		"TicketCleanupFinished", "TicketRecovering", "TicketRecovered", "TicketUnrecoverable",
@@ -284,7 +284,7 @@ func TestSlackEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 	server, _ := fakeSlackServer(t, http.StatusOK)
 	sink := newSlackEventSink(&recordingSink{}, server.URL, dir, "epic")
 
-	sink.IterationPaused("iter-01", PauseNeedsAttention, "permission required")
+	sink.IterationPaused("iter-01", PauseNeedsRepair, "permission required")
 
 	var events []Event
 	deadline := time.Now().Add(2 * time.Second)
@@ -305,7 +305,7 @@ func TestSlackEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 	server, _ := fakeSlackServer(t, http.StatusInternalServerError)
 	sink := newSlackEventSink(&recordingSink{}, server.URL, dir, "epic")
 
-	sink.IterationPaused("iter-01", PauseNeedsAttention, "permission required")
+	sink.IterationPaused("iter-01", PauseNeedsRepair, "permission required")
 
 	var events []Event
 	// 4s headroom: sendNotification retries once after notificationRetryBackoff
@@ -333,7 +333,7 @@ func TestSlackEventSink_LogsNotificationFailedToRunLog_RedactsWebhookSecret(t *t
 	server.Close()
 	sink := newSlackEventSink(&recordingSink{}, server.URL+"/services/"+secretPath, dir, "epic")
 
-	sink.IterationPaused("iter-01", PauseNeedsAttention, "permission required")
+	sink.IterationPaused("iter-01", PauseNeedsRepair, "permission required")
 
 	var events []Event
 	// 4s headroom: sendNotification retries once after notificationRetryBackoff

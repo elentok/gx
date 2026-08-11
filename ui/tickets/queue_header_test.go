@@ -29,7 +29,7 @@ func TestEpicStatusLineColorsByEpicState(t *testing.T) {
 
 	problem := tickets.Epic{Tickets: []tickets.Ticket{
 		{Identifier: "01", Status: "done"},
-		{Identifier: "02", Status: "needs-info"},
+		{Identifier: "02", Status: "needs-answer"},
 	}}
 	icon, _, style = epicStatusLine(icons, problem, nil)
 	if style.Render(icon) != epicStatusProblemStyle.Render(icon) {

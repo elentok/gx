@@ -162,22 +162,24 @@ func writeMigration(files []migratedTicketFile) (MigrationResult, error) {
 	return result, nil
 }
 
-// The three retired status values, named here rather than in schema: they are
-// no longer members of the status enum, and migration is the only code left
+// The retired status values, named here rather than in schema: they are no
+// longer members of the status enum, and migration is the only code left
 // that has to recognize them at all.
 const (
-	legacyStatusNeedsTriage   schema.Status = "needs-triage"
-	legacyStatusReadyForAgent schema.Status = "ready-for-agent"
-	legacyStatusReadyForHuman schema.Status = "ready-for-human"
+	legacyStatusNeedsTriage    schema.Status = "needs-triage"
+	legacyStatusReadyForAgent  schema.Status = "ready-for-agent"
+	legacyStatusReadyForHuman  schema.Status = "ready-for-human"
+	legacyStatusNeedsInfo      schema.Status = "needs-info"
+	legacyStatusNeedsAttention schema.Status = "needs-attention"
 )
 
-// migratedStatusOf maps the three status values the lifecycle-refactor
-// contraction retires onto their replacements, and stamps "open" onto a
-// ticket that omits status: entirely (today, a missing status: silently
-// reads as open — see tickets.openStatuses — which is also a way around
-// draft for a hand-authored empty file; requiring status: explicit is what
-// makes the coming contraction safe). Every other status passes through
-// unchanged.
+// migratedStatusOf maps the status values the lifecycle-refactor and
+// no-silent-stalls contractions retire onto their replacements, and stamps
+// "open" onto a ticket that omits status: entirely (today, a missing
+// status: silently reads as open — see tickets.openStatuses — which is
+// also a way around draft for a hand-authored empty file; requiring
+// status: explicit is what makes the coming contraction safe). Every other
+// status passes through unchanged.
 func migratedStatusOf(s schema.Status) schema.Status {
 	switch s {
 	case "":
@@ -187,10 +189,14 @@ func migratedStatusOf(s schema.Status) schema.Status {
 	case legacyStatusNeedsTriage:
 		return schema.StatusDraft
 	case legacyStatusReadyForHuman:
-		// "Handed back to a human" is exactly what needs-info now covers;
+		// "Handed back to a human" is exactly what needs-answer now covers;
 		// mapping to open would let the orchestrator re-claim a ticket that
 		// was deliberately handed back.
-		return schema.StatusNeedsInfo
+		return schema.StatusNeedsAnswer
+	case legacyStatusNeedsInfo:
+		return schema.StatusNeedsAnswer
+	case legacyStatusNeedsAttention:
+		return schema.StatusNeedsRepair
 	default:
 		return s
 	}

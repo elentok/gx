@@ -208,7 +208,7 @@ func TestRun_ClaudeDoesNotRunCodexLaunchPreflight(t *testing.T) {
 	}
 }
 
-func TestRun_CodexLaunchFailureAfterClaimNeedsAttention(t *testing.T) {
+func TestRun_CodexLaunchFailureAfterClaimNeedsRepair(t *testing.T) {
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 	})
@@ -218,7 +218,7 @@ func TestRun_CodexLaunchFailureAfterClaimNeedsAttention(t *testing.T) {
 		return herdr.Agent{}, errors.New("Herdr rejected Codex integration")
 	}
 	var out bytes.Buffer
-	// The failed launch leaves the epic's only ticket needs-attention, so the
+	// The failed launch leaves the epic's only ticket needs-repair, so the
 	// run parks on it rather than returning.
 	runUntilParked(t, RunOptions{
 		EpicName: "my-epic", Agent: AgentCodex, Skill: "implement",
@@ -230,17 +230,17 @@ func TestRun_CodexLaunchFailureAfterClaimNeedsAttention(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile(%q): %v", ticketPath, err)
 	}
-	for _, unwanted := range []string{"status: done", "status: needs-info"} {
+	for _, unwanted := range []string{"status: done", "status: needs-answer"} {
 		if strings.Contains(string(contents), unwanted) {
 			t.Errorf("ticket after launch failure =\n%s\nmust not contain %q", contents, unwanted)
 		}
 	}
-	if !strings.Contains(string(contents), "status: needs-attention") ||
+	if !strings.Contains(string(contents), "status: needs-repair") ||
 		!strings.Contains(string(contents), "launching codex: Herdr rejected Codex integration") {
-		t.Errorf("ticket after launch failure =\n%s\nwant durable needs-attention status and launch reason", contents)
+		t.Errorf("ticket after launch failure =\n%s\nwant durable needs-repair status and launch reason", contents)
 	}
 
-	if strings.Contains(out.String(), "finished ticket") || strings.Contains(out.String(), "needs-info") {
+	if strings.Contains(out.String(), "finished ticket") || strings.Contains(out.String(), "needs-answer") {
 		t.Errorf("launch failure output = %q, must not report successful/generic completion", out.String())
 	}
 }

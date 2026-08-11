@@ -20,7 +20,7 @@ type ReattachSignal struct {
 }
 
 // ScanForReattachable reports a ReattachSignal for every claimed or
-// needs-attention ticket, across epics, whose epic still has a live herdr
+// needs-repair ticket, across epics, whose epic still has a live herdr
 // tab for that ticket's iteration — the lightweight half of reconcile's
 // per-ticket live-tab check, factored out so a restart-recovery scan can run
 // it across every epic without invoking reconcile's own claim/reattach
@@ -42,7 +42,7 @@ func ScanForReattachable(
 		)
 		for _, t := range epic.Tickets {
 			status := strings.ToLower(strings.TrimSpace(t.Status))
-			if status != "claimed" && status != "needs-attention" {
+			if status != "claimed" && status != "needs-repair" {
 				continue
 			}
 			if !checked {

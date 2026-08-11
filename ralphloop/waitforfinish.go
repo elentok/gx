@@ -22,7 +22,7 @@ const smartZonePollMs = 30_000
 // end-of-turn signal, so an agent that briefly stops producing output mid-turn
 // (e.g. between its last tool call and a commit) can look finished for an
 // instant. Without this debounce the loop would declare the iteration done,
-// mark it needs-info (no commits yet), and abandon the worktree/tab while the
+// mark it needs-answer (no commits yet), and abandon the worktree/tab while the
 // agent went on to actually finish and commit — orphaning real, landed work.
 const (
 	finishDebounceMs = 3_000
@@ -34,7 +34,7 @@ const (
 // that times out rather than settling. A breach interrupts the pane
 // (Ctrl-C, not killed), then auto-recovers via recoverSmartZoneBreach
 // (compact + finish-up re-prompt) and falls back into normal polling —
-// unlike rate-limit/needs-attention pauses, this never blocks the
+// unlike rate-limit/needs-repair pauses, this never blocks the
 // scheduler via Gate.pause.
 func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 	smartZone := p.SmartZone
@@ -289,7 +289,7 @@ const maxConsecutiveGatedGiveUps = 2
 // recovery kept giving up gated. It needs an operator, not another retry, which
 // is why it leaves waitForFinish as an error: that routes it through Run's
 // per-result handling (see loop.go), which persists the ticket
-// needs-attention with this error's text as the reason. Both this message and
+// needs-repair with this error's text as the reason. Both this message and
 // the errCompactNeverConfirmed it wraps are load-bearing there — the operator
 // reading the ticket needs to know the agent's own /compact never completed,
 // not merely that some recovery failed.
@@ -297,7 +297,7 @@ var errCompactRecoveryExhausted = errors.New("smart-zone compaction recovery exh
 
 // gatedGiveUpsExhausted builds the escalation error for an iteration that hit
 // maxConsecutiveGatedGiveUps, wrapping cause so the operator reading the
-// needs-attention ticket still sees that it was the agent's own /compact that
+// needs-repair ticket still sees that it was the agent's own /compact that
 // never completed.
 func gatedGiveUpsExhausted(label string, giveUps int, cause error) error {
 	return fmt.Errorf("%s: %w after %d consecutive attempts: %w",
@@ -566,7 +566,7 @@ func (s compactBoundarySnapshot) advancedPast(d Deps, p launchAndPromptParams, s
 // count and the gate can never open again — re-reading a count to stand in for
 // an unreadable baseline converts a transient read failure into a deadlock,
 // reporting a genuinely successful compaction as a give-up and driving the
-// ticket to needs-attention.
+// ticket to needs-repair.
 //
 // An unavailable baseline therefore doesn't get a substitute count at all; it
 // switches predicates instead, to "a boundary was written after since" (see
@@ -835,12 +835,12 @@ func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, li
 // paused until the pane returns to idle/done.
 func waitForAttentionRecovery(d Deps, p launchAndPromptParams, sessionID string) error {
 	const reason = "Codex is waiting for operator intervention"
-	if err := MarkNeedsAttentionWithReason(p.TicketPath, reason); err != nil {
-		return fmt.Errorf("marking ticket needs-attention: %w", err)
+	if err := MarkNeedsRepairWithReason(p.TicketPath, reason); err != nil {
+		return fmt.Errorf("marking ticket needs-repair: %w", err)
 	}
 	p.Gate.pause(p.Label, reason)
-	p.sink().IterationPaused(p.Label, PauseNeedsAttention, reason)
-	p.logAgentEvent(eventNeedsAttention, sessionID, reason)
+	p.sink().IterationPaused(p.Label, PauseNeedsRepair, reason)
+	p.logAgentEvent(eventNeedsRepair, sessionID, reason)
 
 	for {
 		agent, err := d.AgentWait(herdr.AgentWaitOptions{
@@ -853,7 +853,7 @@ func waitForAttentionRecovery(d Deps, p launchAndPromptParams, sessionID string)
 				return fmt.Errorf("restoring ticket to claimed: %w", err)
 			}
 			p.Gate.ForceResume(p.Label)
-			p.sink().IterationResumed(p.Label, PauseNeedsAttention)
+			p.sink().IterationResumed(p.Label, PauseNeedsRepair)
 			p.logLifecycleEvent(eventResumed, sessionID)
 			return nil
 		}
@@ -1027,10 +1027,10 @@ func recoverCodexContextExhaustion(d Deps, p launchAndPromptParams, sessionID st
 // to process either) leaves the pane sitting idle post-interrupt with no
 // further evidence of what happened — waitForFinish would then read that as
 // a plain finish, and finishIteration would mark it done (if a stray commit
-// happened to land) or generic needs-info (if not), losing the exhaustion
+// happened to land) or generic needs-answer (if not), losing the exhaustion
 // reason entirely. Returning an error here instead routes through the same
 // path every other iteration-level failure takes (see Run's per-result
-// handling in loop.go), which marks the ticket needs-attention with this
+// handling in loop.go), which marks the ticket needs-repair with this
 // specific reason and leaves its worktree/tab for inspection.
 func recoverOrFailCodexContextExhaustion(d Deps, p launchAndPromptParams, sessionID, evidence string, smartZone int) error {
 	reason := fmt.Sprintf("Codex context exhaustion detected: %s", evidence)

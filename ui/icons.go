@@ -44,12 +44,12 @@ type IconSet struct {
 	CheckboxChecked   string
 	CheckboxUnchecked string
 
-	TicketDraft          string
-	TicketOpen           string
-	TicketClaimed        string
-	TicketBlocked        string
-	TicketNeedsInfo      string
-	TicketNeedsAttention string
+	TicketDraft       string
+	TicketOpen        string
+	TicketClaimed     string
+	TicketBlocked     string
+	TicketNeedsAnswer string
+	TicketNeedsRepair string
 	// TicketWaitingForChildren marks a ticket whose own Status: is done but
 	// whose fork subtree (see tickets.Epic.Blocking) still has live work —
 	// a computed overlay, distinct from TicketDone (see tickets.RenderedStatus).
@@ -103,8 +103,8 @@ func Icons(useNerdFont bool) IconSet {
 			TicketOpen:               "o",
 			TicketClaimed:            "@",
 			TicketBlocked:            "x",
-			TicketNeedsInfo:          "?",
-			TicketNeedsAttention:     "!",
+			TicketNeedsAnswer:        "?",
+			TicketNeedsRepair:        "!",
 			TicketWaitingForChildren: "w",
 			TicketDone:               "d",
 			TicketError:              "!!",
@@ -149,8 +149,8 @@ func Icons(useNerdFont bool) IconSet {
 		TicketOpen:               "",
 		TicketClaimed:            "",
 		TicketBlocked:            "",
-		TicketNeedsInfo:          "",
-		TicketNeedsAttention:     "",
+		TicketNeedsAnswer:        "",
+		TicketNeedsRepair:        "",
 		TicketWaitingForChildren: "⏳",
 		TicketDone:               "",
 		TicketError:              "",

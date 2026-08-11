@@ -315,17 +315,17 @@ func TestExecute_TicketsSet_StatusOpenAcceptedWithBody(t *testing.T) {
 	}
 }
 
-func TestExecute_TicketsSet_NeedsAttentionToOpenAccepted(t *testing.T) {
+func TestExecute_TicketsSet_NeedsRepairToOpenAccepted(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: needs-attention\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: needs-repair\ntype: task\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
 
 	err := execute([]string{"tickets", "set", path, "--status=open"}, d)
 	if err != nil {
-		t.Fatalf("execute tickets set: %v, want needs-attention -> open to be accepted", err)
+		t.Fatalf("execute tickets set: %v, want needs-repair -> open to be accepted", err)
 	}
 
 	raw, err := os.ReadFile(path)

@@ -161,7 +161,7 @@ func TestNewModel_TicketsInPlanOrderWithinEpic(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-done-ticket.md", "Status: done\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "02-open-ticket.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "my-epic", "03-needs-info-ticket.md", "Status: needs-info\n\nBody.\n")
+	writeTicket(t, root, "my-epic", "03-needs-answer-ticket.md", "Status: needs-answer\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "04-blocked-ticket.md", "Status: open\nBlocked by: 02\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
@@ -170,7 +170,7 @@ func TestNewModel_TicketsInPlanOrderWithinEpic(t *testing.T) {
 	m = updated.(Model)
 
 	content := m.View().Content
-	wantOrder := []string{"Done ticket", "Open ticket", "Needs info ticket", "Blocked ticket"}
+	wantOrder := []string{"Done ticket", "Open ticket", "Needs answer ticket", "Blocked ticket"}
 	lastIdx := -1
 	for _, title := range wantOrder {
 		idx := strings.Index(content, title)
@@ -200,10 +200,10 @@ func TestNewModel_BlockedTicketShowsUnresolvedBlockerSuffix(t *testing.T) {
 	}
 }
 
-func TestNewModel_NeedsInfoTicketShowsUnresolvedBlockerSuffix(t *testing.T) {
+func TestNewModel_NeedsAnswerTicketShowsUnresolvedBlockerSuffix(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-blocker-ticket.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "my-epic", "02-needs-info-ticket.md", "Status: needs-info\nBlocked by: 01\n\nBody.\n")
+	writeTicket(t, root, "my-epic", "02-needs-answer-ticket.md", "Status: needs-answer\nBlocked by: 01\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -212,7 +212,7 @@ func TestNewModel_NeedsInfoTicketShowsUnresolvedBlockerSuffix(t *testing.T) {
 
 	content := m.View().Content
 	if !strings.Contains(content, "(blocked by 01)") {
-		t.Fatalf("expected blocked-by suffix on needs-info ticket, got:\n%s", content)
+		t.Fatalf("expected blocked-by suffix on needs-answer ticket, got:\n%s", content)
 	}
 }
 

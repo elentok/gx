@@ -146,7 +146,7 @@ func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) 
 // each breach fires its own Ctrl-C -> /compact -> finish-up cycle, and the
 // scheduler's Gate is never paused by either one, matching the "no retry
 // cap" and "Gate.isPaused() stays false throughout" requirements that
-// distinguish this recovery path from rate-limit/needs-attention pauses.
+// distinguish this recovery path from rate-limit/needs-repair pauses.
 func TestRun_SmartZoneBreach_RepeatsWithNoRetryCap(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",

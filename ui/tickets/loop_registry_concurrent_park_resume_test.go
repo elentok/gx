@@ -14,7 +14,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 )
 
-// writeParkResumeEpic builds a fixture epic with a single needs-info ticket
+// writeParkResumeEpic builds a fixture epic with a single needs-answer ticket
 // at <scratchDir>/<epicName>/issues/01-stuck.md, so ralphloop.Run parks on it
 // immediately — mirroring ralphloop's own unexported writeEpic test helper
 // (ralphloop/loop_test.go), which can't be imported from this package.
@@ -26,7 +26,7 @@ func writeParkResumeEpic(t *testing.T, epicName string) (scratchDir, ticketPath 
 		t.Fatalf("MkdirAll: %v", err)
 	}
 	ticketPath = filepath.Join(issuesDir, "01-stuck.md")
-	content := "---\nid: \"01\"\nstatus: needs-info\ntype: task\n---\n# Stuck\n"
+	content := "---\nid: \"01\"\nstatus: needs-answer\ntype: task\n---\n# Stuck\n"
 	if err := os.WriteFile(ticketPath, []byte(content), 0644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
@@ -166,7 +166,7 @@ func drainChannelEventSink(sink *ralphloop.ChannelEventSink) {
 // seam: ralphloop.Run plus the real loopRegistry together, proving the cap
 // only holds because Run actually acquires a permit before claiming, not
 // just because the registry-level unit tests say Acquire/Release behave.
-// Two epics, each starting on a parked (needs-info) ticket, resume
+// Two epics, each starting on a parked (needs-answer) ticket, resume
 // concurrently against a cap of one; the test proves the second epic's
 // second Acquire() call — the one guarding its real claimed-ticket work, as
 // opposed to the harmless nothing-claimable pass every park poll also
@@ -201,7 +201,7 @@ func TestConcurrentParkResume_TwoEpicsAgainstCapOfOne(t *testing.T) {
 	// epic2AcquireStarted/-Done track only epic two's *second* Acquire call —
 	// the one guarding its real claimed-ticket work — via acquireCount; its
 	// first Acquire (the nothing-claimable pass while its ticket is still
-	// needs-info) is uninteresting and may complete at any time.
+	// needs-answer) is uninteresting and may complete at any time.
 	var epic2AcquireCount atomic.Int32
 	epic2SecondAcquireStarted := make(chan struct{})
 	epic2SecondAcquireDone := make(chan struct{})

@@ -20,7 +20,9 @@ import (
 const ticketsSchemaText = `Ticket frontmatter fields:
 
 Settable fields:
-  status (enum, --status): draft, open, claimed, needs-info, needs-attention, done.
+  status (enum, --status): draft, open, claimed, done. needs-answer and needs-repair are
+    machine-written only and not settable here — gx marks a ticket that way itself when
+    it parks.
     Required on every ticket. draft is parked work: it never enters an epic's
     frontier, so no agent is ever handed it.
   blocked_by (comma-separated ticket IDs, --blocked-by): e.g. 01,03
@@ -31,7 +33,7 @@ Settable fields:
   expected_context_window (non-negative int, --expected-context-window)
   commitless (bool, --commitless): true/false. Set true when you intentionally finish an
     iteration with no commit (e.g. exploration concluded no code change was warranted) —
-    pair it with a status that doesn't leave the ticket claimed (done, needs-info),
+    pair it with a status that doesn't leave the ticket claimed (done),
     or it's still treated as an unresolved iteration.
 
 Read-only fields (gx-managed, not settable via ` + "`set`" + `):
@@ -136,6 +138,9 @@ func parseCSVIDs(value string) []schema.TicketID {
 func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer) error {
 	if c.Flags().Changed("status") {
 		status, _ := c.Flags().GetString("status")
+		if schema.Status(status) == schema.StatusNeedsAnswer || schema.Status(status) == schema.StatusNeedsRepair {
+			return fmt.Errorf("%s: --status %s is machine-written only; gx parks a ticket that way itself, it is not settable via `tickets set`", path, status)
+		}
 		if schema.Status(status) == schema.StatusDone {
 			force, _ := c.Flags().GetBool("force")
 			if err := checkBlockersBeforeDone(path, force, stderr); err != nil {

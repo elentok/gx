@@ -36,11 +36,11 @@ func TestDefaultCollapsedEpics_HonorsExplicitFalseOverAllDoneDefault(t *testing.
 // TestSortedTicketIndexes_PlanOrderIgnoresStatus mirrors
 // TestSortedTickets_PlanOrderIgnoresStatus (flat_test.go) for the sidebar's
 // own sort function: it orders purely by ticket number, not rendered-status
-// group, so a done/needs-attention ticket stays in its plan-order slot
+// group, so a done/needs-repair ticket stays in its plan-order slot
 // instead of jumping to the bottom.
 func TestSortedTicketIndexes_PlanOrderIgnoresStatus(t *testing.T) {
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
-		{Number: 4, Identifier: "04", Status: "needs-attention"},
+		{Number: 4, Identifier: "04", Status: "needs-repair"},
 		{Number: 1, Identifier: "01", Status: "done"},
 		{Number: 3, Identifier: "03", Status: "open"},
 		{Number: 2, Identifier: "02", Status: "done", Commitless: true},

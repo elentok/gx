@@ -7,7 +7,7 @@ import (
 
 // resumeReattachable reports whether t's iteration still has a live, owned
 // herdr tab/agent in workspaceID — the same live-ownership test reconcile's
-// startup reattach applies to a claimed/needs-attention ticket (see
+// startup reattach applies to a claimed/needs-repair ticket (see
 // reconcile's reattach closure), reused here so a cleared ticket the
 // scheduler is about to reclaim is judged by iteration ownership, not by its
 // now-ambiguous "open" status: an "open" ticket the scheduler last saw

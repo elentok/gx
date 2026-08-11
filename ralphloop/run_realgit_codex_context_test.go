@@ -217,7 +217,7 @@ func TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp(t *testing.T
 	wantEventOrder := []string{eventPausedSmartZone, eventResumed, eventIterationFinished, eventCherryPicked}
 	var gotEventOrder []string
 	for _, event := range events {
-		if event.Type == eventNeedsInfo || event.Type == eventNeedsAttention || event.Type == eventSmartZoneRecoveryFailed {
+		if event.Type == eventNeedsAnswer || event.Type == eventNeedsRepair || event.Type == eventSmartZoneRecoveryFailed {
 			t.Errorf("unexpected recovery residue event: %+v", event)
 		}
 		if slices.Contains(wantEventOrder, event.Type) {
@@ -430,8 +430,8 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T
 	if !strings.Contains(string(rawTicket), "status: done") {
 		t.Errorf("completed ticket = %s, want done", rawTicket)
 	}
-	if strings.Contains(string(rawTicket), "status: needs-info") || strings.Contains(string(rawTicket), "status: needs-attention") {
-		t.Errorf("completed ticket = %s, want neither needs-info nor needs-attention", rawTicket)
+	if strings.Contains(string(rawTicket), "status: needs-answer") || strings.Contains(string(rawTicket), "status: needs-repair") {
+		t.Errorf("completed ticket = %s, want neither needs-answer nor needs-repair", rawTicket)
 	}
 
 	events, ok, err := readEvents(scratchDir, epicName)
@@ -443,7 +443,7 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T
 	var gotEventOrder []string
 	for _, event := range events {
 		switch event.Type {
-		case eventNeedsInfo, eventNeedsAttention, eventSmartZoneRecoveryFailed:
+		case eventNeedsAnswer, eventNeedsRepair, eventSmartZoneRecoveryFailed:
 			t.Errorf("unexpected recovery residue event: %+v", event)
 		case eventPausedSmartZone:
 			pausedReason = event.Reason
@@ -467,8 +467,8 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T
 // exercises ticket 31's unsuccessful-recovery path: the same native
 // exhaustion banner is classified and the pane is interrupted, but the
 // /compact prompt itself never lands. That must turn into a durable,
-// actionable needs-attention failure — not a false "done" (no commit ever
-// lands) and not a generic zero-commit needs-info that would lose the
+// actionable needs-repair failure — not a false "done" (no commit ever
+// lands) and not a generic zero-commit needs-answer that would lose the
 // exhaustion reason — and it must leave the iteration's worktree/branch/tab
 // in place for a human to inspect.
 func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *testing.T) {
@@ -562,8 +562,8 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC) }
-	sink := &needsAttentionSink{}
-	// The failed recovery leaves the epic's only ticket needs-attention, so
+	sink := &needsRepairSink{}
+	// The failed recovery leaves the epic's only ticket needs-repair, so
 	// the run parks on it.
 	runUntilParked(t, RunOptions{
 		EpicName: epicName, Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir,
@@ -583,32 +583,32 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 	sink.mu.Lock()
 	paused, kind, reason := sink.paused, sink.kind, sink.reason
 	sink.mu.Unlock()
-	if !paused || kind != PauseNeedsAttention {
-		t.Fatalf("IterationPaused = (paused:%v kind:%q), want (true, %q)", paused, kind, PauseNeedsAttention)
+	if !paused || kind != PauseNeedsRepair {
+		t.Fatalf("IterationPaused = (paused:%v kind:%q), want (true, %q)", paused, kind, PauseNeedsRepair)
 	}
 	if !strings.Contains(reason, "recovery failed") || !strings.Contains(reason, evidence) {
-		t.Errorf("needs-attention reason = %q, want it to name the failed recovery and its evidence", reason)
+		t.Errorf("needs-repair reason = %q, want it to name the failed recovery and its evidence", reason)
 	}
 
 	rawTicket, err := os.ReadFile(ticketPath)
 	if err != nil {
 		t.Fatalf("ReadFile ticket: %v", err)
 	}
-	if !strings.Contains(string(rawTicket), "status: needs-attention") {
-		t.Errorf("ticket = %s, want needs-attention", rawTicket)
+	if !strings.Contains(string(rawTicket), "status: needs-repair") {
+		t.Errorf("ticket = %s, want needs-repair", rawTicket)
 	}
-	if strings.Contains(string(rawTicket), "status: done") || strings.Contains(string(rawTicket), "status: needs-info") {
-		t.Errorf("ticket = %s, want neither done nor needs-info (would drop the exhaustion reason)", rawTicket)
+	if strings.Contains(string(rawTicket), "status: done") || strings.Contains(string(rawTicket), "status: needs-answer") {
+		t.Errorf("ticket = %s, want neither done nor needs-answer (would drop the exhaustion reason)", rawTicket)
 	}
-	if !strings.Contains(string(rawTicket), "## Needs Attention") || !strings.Contains(string(rawTicket), evidence) {
-		t.Errorf("ticket = %s, want a durable Needs Attention note naming the exhaustion evidence", rawTicket)
+	if !strings.Contains(string(rawTicket), "## Needs Repair") || !strings.Contains(string(rawTicket), evidence) {
+		t.Errorf("ticket = %s, want a durable Needs Repair note naming the exhaustion evidence", rawTicket)
 	}
 
 	events, ok, err := readEvents(scratchDir, epicName)
 	if err != nil || !ok {
 		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
 	}
-	var sawPaused, sawRecoveryFailed, sawFinished, sawCherryPicked, sawNeedsInfo bool
+	var sawPaused, sawRecoveryFailed, sawFinished, sawCherryPicked, sawNeedsAnswer bool
 	for _, event := range events {
 		switch event.Type {
 		case eventPausedSmartZone:
@@ -622,8 +622,8 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 			sawFinished = true
 		case eventCherryPicked:
 			sawCherryPicked = true
-		case eventNeedsInfo:
-			sawNeedsInfo = true
+		case eventNeedsAnswer:
+			sawNeedsAnswer = true
 		case eventResumed:
 			t.Error("unexpected resumed event: recovery never succeeded")
 		}
@@ -634,8 +634,8 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 	if sawFinished || sawCherryPicked {
 		t.Error("iteration must not appear finished/cherry-picked: no commit ever landed")
 	}
-	if sawNeedsInfo {
-		t.Error("must not fall back to generic needs-info: that would lose the exhaustion reason")
+	if sawNeedsAnswer {
+		t.Error("must not fall back to generic needs-answer: that would lose the exhaustion reason")
 	}
 
 	path := iterationWorktreePath(wtDir, epicName, "01")
@@ -652,9 +652,9 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 	}
 }
 
-// needsAttentionSink records the single IterationPaused call ticket 31's
+// needsRepairSink records the single IterationPaused call ticket 31's
 // failed-recovery scenario is expected to make.
-type needsAttentionSink struct {
+type needsRepairSink struct {
 	noopEventSink
 	mu     sync.Mutex
 	paused bool
@@ -662,7 +662,7 @@ type needsAttentionSink struct {
 	reason string
 }
 
-func (s *needsAttentionSink) IterationPaused(label string, kind PauseKind, reason string) {
+func (s *needsRepairSink) IterationPaused(label string, kind PauseKind, reason string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.paused = true

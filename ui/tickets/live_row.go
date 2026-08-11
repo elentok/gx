@@ -136,7 +136,7 @@ func appendBlockedBySuffix(line, suffix string) string {
 // paused. ok is false if live has neither (the zero value, which shouldn't
 // reach here since callers only look live up on a present map entry, but
 // keeps this function total). base is the bare icon/spinner+title; suffix is
-// the phase/label text (running) or pause reason (paused/needs-attention),
+// the phase/label text (running) or pause reason (paused/needs-repair),
 // returned separately so the caller can place it where it needs to. prefix is
 // the caller's own leading-column indent (e.g. the Tickets tab's checkbox
 // column vs. the Queue tab's bare indent), so a live row's indent matches its
@@ -145,8 +145,8 @@ func renderLiveTicketRow(icons ui.IconSet, sp spinner.Model, t tickets.Ticket, l
 	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
 
 	switch {
-	case live.paused && live.pauseKind == ralphloop.PauseNeedsAttention:
-		base = prefix + statusNeedsAttentionStyle.Render(icons.TicketNeedsAttention) + " " + title
+	case live.paused && live.pauseKind == ralphloop.PauseNeedsRepair:
+		base = prefix + statusNeedsRepairStyle.Render(icons.TicketNeedsRepair) + " " + title
 		return base, live.reason, true
 
 	case live.paused:

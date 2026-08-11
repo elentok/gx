@@ -221,15 +221,15 @@ func TestRun_ReattachedCodexSessionIdentityFailureStopsSafely(t *testing.T) {
 			}
 
 			// The failed reattach leaves the epic's only ticket
-			// needs-attention, so the run parks on it.
+			// needs-repair, so the run parks on it.
 			runUntilParked(t, RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&strings.Builder{}))
 
 			raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
 			if err != nil {
 				t.Fatalf("ReadFile: %v", err)
 			}
-			if !strings.Contains(string(raw), "status: needs-attention") || !strings.Contains(string(raw), tc.wantErr) {
-				t.Errorf("ticket after failed reattach:\n%s\nwant needs-attention with %q", raw, tc.wantErr)
+			if !strings.Contains(string(raw), "status: needs-repair") || !strings.Contains(string(raw), tc.wantErr) {
+				t.Errorf("ticket after failed reattach:\n%s\nwant needs-repair with %q", raw, tc.wantErr)
 			}
 			if starts != 0 || len(*prompts) != 0 || len(*removed) != 0 {
 				t.Errorf("side effects: starts=%d prompts=%v removed=%v, want none", starts, *prompts, *removed)

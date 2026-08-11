@@ -111,17 +111,17 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 	for _, t := range epic.Tickets {
 		if !rp.Scope.Contains(t, epic) {
 			// Belongs to a different (or not yet requested) run — leave its
-			// claim/needs-attention state exactly as found rather than
+			// claim/needs-repair state exactly as found rather than
 			// reattaching, reverting, or reporting on it here.
 			continue
 		}
 		status := strings.ToLower(strings.TrimSpace(t.Status))
-		if status == "needs-attention" {
+		if status == "needs-repair" {
 			if live[iterationKey(epic.Name, iterLabel(epic.Name, t.Identifier))] {
 				reattach(t)
 				reattached = append(reattached, t)
 			} else {
-				sink.TicketStillNeedsAttention(t.Identifier)
+				sink.TicketStillNeedsRepair(t.Identifier)
 			}
 			continue
 		}
@@ -158,7 +158,7 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 	for _, t := range epic.Tickets {
 		if !rp.Scope.Contains(t, epic) {
 			// Belongs to a different (or not yet requested) run — same
-			// out-of-scope skip as the claim/needs-attention loop above, so a
+			// out-of-scope skip as the claim/needs-repair loop above, so a
 			// scoped run never rewrites a done ticket's status outside what it
 			// was asked to touch.
 			continue

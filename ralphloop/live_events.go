@@ -12,8 +12,8 @@ const (
 	LiveEventAlreadyComplete
 	LiveEventTicketReverted
 	LiveEventTicketReattached
-	LiveEventTicketStillNeedsAttention
-	LiveEventTicketNeedsInfo
+	LiveEventTicketStillNeedsRepair
+	LiveEventTicketNeedsAnswer
 	LiveEventTicketClaimed
 	LiveEventIterationStarted
 	LiveEventIterationPaused
@@ -122,12 +122,12 @@ func (s *ChannelEventSink) TicketReattached(identifier, label, cwd, sessionID st
 	s.emit(LiveEvent{Kind: LiveEventTicketReattached, Identifier: identifier, Label: label, Cwd: cwd, SessionID: sessionID})
 }
 
-func (s *ChannelEventSink) TicketStillNeedsAttention(identifier string) {
-	s.emit(LiveEvent{Kind: LiveEventTicketStillNeedsAttention, Identifier: identifier})
+func (s *ChannelEventSink) TicketStillNeedsRepair(identifier string) {
+	s.emit(LiveEvent{Kind: LiveEventTicketStillNeedsRepair, Identifier: identifier})
 }
 
-func (s *ChannelEventSink) TicketNeedsInfo(identifier, epicName string) {
-	s.emit(LiveEvent{Kind: LiveEventTicketNeedsInfo, Identifier: identifier, EpicName: epicName})
+func (s *ChannelEventSink) TicketNeedsAnswer(identifier, epicName string) {
+	s.emit(LiveEvent{Kind: LiveEventTicketNeedsAnswer, Identifier: identifier, EpicName: epicName})
 }
 
 func (s *ChannelEventSink) TicketClaimed(ticket tickets.Ticket) {

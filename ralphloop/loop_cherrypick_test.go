@@ -281,7 +281,7 @@ func TestRun_UnfinishedConflict_IsAbortedBeforeNextTicketLands(t *testing.T) {
 		active = false
 		return nil
 	}
-	// Ticket 01's conflict leaves it needs-attention, so this run ends parked
+	// Ticket 01's conflict leaves it needs-repair, so this run ends parked
 	// on it rather than exiting; ticket 02 still has to land first.
 	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo", MaxParallel: 1}, d, noopEventSink{})
 
@@ -297,7 +297,7 @@ func TestRun_UnfinishedConflict_IsAbortedBeforeNextTicketLands(t *testing.T) {
 	}
 }
 
-func TestRun_CherryPickConflict_ResolutionNeverFinishes_MarksNeedsAttentionWithoutAbortingRun(t *testing.T) {
+func TestRun_CherryPickConflict_ResolutionNeverFinishes_MarksNeedsRepairWithoutAbortingRun(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -318,7 +318,7 @@ func TestRun_CherryPickConflict_ResolutionNeverFinishes_MarksNeedsAttentionWitho
 		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 	}
 	var out bytes.Buffer
-	// A stuck conflict resolution marks the ticket needs-attention rather than
+	// A stuck conflict resolution marks the ticket needs-repair rather than
 	// aborting the run, which leaves the epic parked on it.
 	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out))
 
@@ -326,8 +326,8 @@ func TestRun_CherryPickConflict_ResolutionNeverFinishes_MarksNeedsAttentionWitho
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: needs-attention") {
-		t.Errorf("ticket file = %q, want Status: needs-attention after the stuck conflict resolution", raw)
+	if !strings.Contains(string(raw), "status: needs-repair") {
+		t.Errorf("ticket file = %q, want Status: needs-repair after the stuck conflict resolution", raw)
 	}
 }
 
@@ -338,7 +338,7 @@ type fakeConflictErr struct{}
 
 func (e *fakeConflictErr) Error() string { return "cherry-pick conflict" }
 
-func TestRun_ZeroCommitIteration_MarksNeedsInfoAndLeavesWorktree(t *testing.T) {
+func TestRun_ZeroCommitIteration_MarksNeedsAnswerAndLeavesWorktree(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -348,7 +348,7 @@ func TestRun_ZeroCommitIteration_MarksNeedsInfoAndLeavesWorktree(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	// The zero-commit iteration leaves its ticket needs-info, so the epic's
+	// The zero-commit iteration leaves its ticket needs-answer, so the epic's
 	// only ticket is one a human must clear: the run parks on it.
 	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out))
 
@@ -360,8 +360,8 @@ func TestRun_ZeroCommitIteration_MarksNeedsInfoAndLeavesWorktree(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: needs-info") {
-		t.Errorf("ticket not marked needs-info after zero-commit iteration:\n%s", raw)
+	if !strings.Contains(string(raw), "status: needs-answer") {
+		t.Errorf("ticket not marked needs-answer after zero-commit iteration:\n%s", raw)
 	}
 	if strings.Contains(string(raw), "status: done") {
 		t.Errorf("ticket must not be marked done after a zero-commit iteration:\n%s", raw)
@@ -382,7 +382,7 @@ func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	// Ticket 01 ends needs-info, so the run parks on it once 02 has landed.
+	// Ticket 01 ends needs-answer, so the run parks on it once 02 has landed.
 	runUntilParked(t, RunOptions{
 		EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
 		MaxParallel: 1,
@@ -396,8 +396,8 @@ func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw01), "status: needs-info") {
-		t.Errorf("ticket 01 not marked needs-info:\n%s", raw01)
+	if !strings.Contains(string(raw01), "status: needs-answer") {
+		t.Errorf("ticket 01 not marked needs-answer:\n%s", raw01)
 	}
 
 	raw02, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "02-b.md"))
@@ -413,7 +413,7 @@ func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {
 // incident: herdr reported the agent idle for one poll, then it went back to
 // work and committed shortly after. waitForFinish's confirmFinished recheck
 // (loop.go) should catch that the first idle signal didn't hold and keep
-// waiting instead of the loop marking the ticket needs-info and abandoning a
+// waiting instead of the loop marking the ticket needs-answer and abandoning a
 // worktree that was about to land a commit.
 func TestRun_TransientIdleBlip_DoesNotOrphanCommit(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
@@ -450,21 +450,21 @@ func TestRun_TransientIdleBlip_DoesNotOrphanCommit(t *testing.T) {
 	if !strings.Contains(string(raw), "status: done") {
 		t.Errorf("ticket not marked done despite the agent finishing after the transient blip:\n%s", raw)
 	}
-	if strings.Contains(string(raw), "status: needs-info") {
-		t.Errorf("ticket wrongly marked needs-info from a transient idle blip:\n%s", raw)
+	if strings.Contains(string(raw), "status: needs-answer") {
+		t.Errorf("ticket wrongly marked needs-answer from a transient idle blip:\n%s", raw)
 	}
 	if len(*removed) != 1 {
 		t.Errorf("removed worktree branches = %v, want the iteration's worktree removed", *removed)
 	}
 }
 
-// TestRun_CommitLandsDuringNeedsInfoRecheck_MarksDoneNotNeedsInfo covers
+// TestRun_CommitLandsDuringNeedsAnswerRecheck_MarksDoneNotNeedsAnswer covers
 // finishIteration's own recheck (loop.go): even after waitForFinish's
 // confirmFinished settles on "finished", a commit can still land in the
 // window before CommitsAhead is checked (e.g. a reattached iteration, which
 // skips waitForFinish's debounce). The recheck should catch it instead of
-// orphaning the ticket as needs-info.
-func TestRun_CommitLandsDuringNeedsInfoRecheck_MarksDoneNotNeedsInfo(t *testing.T) {
+// orphaning the ticket as needs-answer.
+func TestRun_CommitLandsDuringNeedsAnswerRecheck_MarksDoneNotNeedsAnswer(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -490,8 +490,8 @@ func TestRun_CommitLandsDuringNeedsInfoRecheck_MarksDoneNotNeedsInfo(t *testing.
 	if !strings.Contains(string(raw), "status: done") {
 		t.Errorf("ticket not marked done after commit landed on recheck:\n%s", raw)
 	}
-	if strings.Contains(string(raw), "status: needs-info") {
-		t.Errorf("ticket wrongly marked needs-info despite commit landing on recheck:\n%s", raw)
+	if strings.Contains(string(raw), "status: needs-answer") {
+		t.Errorf("ticket wrongly marked needs-answer despite commit landing on recheck:\n%s", raw)
 	}
 	if len(*removed) != 1 {
 		t.Errorf("removed worktree branches = %v, want the iteration's worktree removed", *removed)

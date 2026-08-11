@@ -14,7 +14,7 @@ func TestFrontier_MixedStatuses(t *testing.T) {
 		{Number: 1, Status: "open"},
 		{Number: 2, Status: "claimed"},
 		{Number: 4, Status: "done"},
-		{Number: 5, Status: "needs-info"},
+		{Number: 5, Status: "needs-answer"},
 	}}
 
 	got := Frontier(epic)
@@ -38,7 +38,7 @@ func TestFrontier_ClaimedAndDoneExcluded(t *testing.T) {
 		{Number: 1, Status: "claimed"},
 		{Number: 2, Status: "done"},
 		{Number: 6, Status: "done", Commitless: true},
-		{Number: 8, Status: "needs-info"},
+		{Number: 8, Status: "needs-answer"},
 		{Number: 9, Status: "open"},
 	}}
 

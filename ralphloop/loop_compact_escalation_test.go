@@ -26,7 +26,7 @@ func stuckCompactionDeps(onBreach func() error) Deps {
 	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
 		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "session-01"}, nil
 	}
-	d.AgentWait =func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
 		// The launch's own unbounded wait succeeds, and so does every wait on
 		// the compaction's states — that premature idle report is the pane
 		// claiming a completion the transcript never records. The iteration's
@@ -55,13 +55,13 @@ func readTicket(t *testing.T, scratchDir, epicName, filename string) string {
 	return string(raw)
 }
 
-// TestRun_UnconfirmedCompactionEscalation_PersistsNeedsAttention asserts the
+// TestRun_UnconfirmedCompactionEscalation_PersistsNeedsRepair asserts the
 // half of the escalation a waitForFinish unit test structurally cannot: that
 // the error it returns is carried by Run's per-result handling all the way to
-// the ticket file, as needs-attention with a reason an operator can act on.
+// the ticket file, as needs-repair with a reason an operator can act on.
 // Without this the escalation would only end the iteration, and a stuck agent
 // would look like a run that quietly stopped.
-func TestRun_UnconfirmedCompactionEscalation_PersistsNeedsAttention(t *testing.T) {
+func TestRun_UnconfirmedCompactionEscalation_PersistsNeedsRepair(t *testing.T) {
 	const epicName = "my-epic"
 	scratchDir := writeEpic(t, epicName, map[string]string{
 		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
@@ -69,7 +69,7 @@ func TestRun_UnconfirmedCompactionEscalation_PersistsNeedsAttention(t *testing.T
 	d := stuckCompactionDeps(func() error { return nil })
 
 	var out bytes.Buffer
-	// The escalated iteration leaves the epic's only ticket needs-attention, so
+	// The escalated iteration leaves the epic's only ticket needs-repair, so
 	// the run parks on it rather than returning.
 	runUntilParked(t, RunOptions{
 		EpicName: epicName, Skill: "implement", ScratchDir: scratchDir,
@@ -77,10 +77,10 @@ func TestRun_UnconfirmedCompactionEscalation_PersistsNeedsAttention(t *testing.T
 	}, d, NewTextEventSink(&out))
 
 	contents := readTicket(t, scratchDir, epicName, "01-first.md")
-	if !strings.Contains(contents, "status: needs-attention") {
-		t.Errorf("ticket after escalation =\n%s\nwant status: needs-attention", contents)
+	if !strings.Contains(contents, "status: needs-repair") {
+		t.Errorf("ticket after escalation =\n%s\nwant status: needs-repair", contents)
 	}
-	for _, unwanted := range []string{"status: done", "status: needs-info"} {
+	for _, unwanted := range []string{"status: done", "status: needs-answer"} {
 		if strings.Contains(contents, unwanted) {
 			t.Errorf("ticket after escalation =\n%s\nmust not contain %q", contents, unwanted)
 		}
@@ -91,11 +91,11 @@ func TestRun_UnconfirmedCompactionEscalation_PersistsNeedsAttention(t *testing.T
 	}
 }
 
-// TestRun_OrdinaryIterationError_KeepsItsOwnNeedsAttentionReason pins the
+// TestRun_OrdinaryIterationError_KeepsItsOwnNeedsRepairReason pins the
 // discrimination: the escalation reason is specific to a compaction that never
 // confirmed, so an unrelated failure at the same point in the loop must not
 // acquire it.
-func TestRun_OrdinaryIterationError_KeepsItsOwnNeedsAttentionReason(t *testing.T) {
+func TestRun_OrdinaryIterationError_KeepsItsOwnNeedsRepairReason(t *testing.T) {
 	const epicName = "my-epic"
 	scratchDir := writeEpic(t, epicName, map[string]string{
 		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
@@ -109,9 +109,9 @@ func TestRun_OrdinaryIterationError_KeepsItsOwnNeedsAttentionReason(t *testing.T
 	}, d, NewTextEventSink(&out))
 
 	contents := readTicket(t, scratchDir, epicName, "01-first.md")
-	if !strings.Contains(contents, "status: needs-attention") ||
+	if !strings.Contains(contents, "status: needs-repair") ||
 		!strings.Contains(contents, "herdr pane vanished") {
-		t.Errorf("ticket after ordinary failure =\n%s\nwant needs-attention carrying the failure's own reason", contents)
+		t.Errorf("ticket after ordinary failure =\n%s\nwant needs-repair carrying the failure's own reason", contents)
 	}
 	if strings.Contains(contents, errCompactRecoveryExhausted.Error()) ||
 		strings.Contains(contents, errCompactNeverConfirmed.Error()) {

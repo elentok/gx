@@ -95,7 +95,7 @@ func TestTelegramEventSink_IterationPaused_SendsOneMessageAndForwards(t *testing
 	inner := &recordingSink{}
 	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
 
-	sink.IterationPaused("iter-04", PauseNeedsAttention, "agent blocked on permission prompt")
+	sink.IterationPaused("iter-04", PauseNeedsRepair, "agent blocked on permission prompt")
 
 	if got := inner.snapshot(); len(got) != 1 || got[0] != "IterationPaused" {
 		t.Errorf("inner events = %v, want [IterationPaused]", got)
@@ -105,33 +105,33 @@ func TestTelegramEventSink_IterationPaused_SendsOneMessageAndForwards(t *testing
 	if len(reqs) != 1 {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
-	want := telegramStyle.iterationPausedText("iter-04", PauseNeedsAttention, "agent blocked on permission prompt")
+	want := telegramStyle.iterationPausedText("iter-04", PauseNeedsRepair, "agent blocked on permission prompt")
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}
 }
 
-func TestTelegramEventSink_TicketNeedsInfo_SendsOneMessageAndForwards(t *testing.T) {
+func TestTelegramEventSink_TicketNeedsAnswer_SendsOneMessageAndForwards(t *testing.T) {
 	server, getRequests := fakeTelegramServer(t, http.StatusOK)
 	inner := &recordingSink{}
 	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
 
-	sink.TicketNeedsInfo("04", "epic")
+	sink.TicketNeedsAnswer("04", "epic")
 
-	if got := inner.snapshot(); len(got) != 1 || got[0] != "TicketNeedsInfo" {
-		t.Errorf("inner events = %v, want [TicketNeedsInfo]", got)
+	if got := inner.snapshot(); len(got) != 1 || got[0] != "TicketNeedsAnswer" {
+		t.Errorf("inner events = %v, want [TicketNeedsAnswer]", got)
 	}
 
 	reqs := waitForRequests(getRequests, 1)
 	if len(reqs) != 1 {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
-	want := telegramStyle.ticketNeedsInfoText("04", "epic")
+	want := telegramStyle.ticketNeedsAnswerText("04", "epic")
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}
-	if paused := telegramStyle.iterationPausedText("epic/04", PauseNeedsAttention, "stuck"); reqs[0].Text == paused {
-		t.Errorf("needs-info text matched iteration-paused text: %q", reqs[0].Text)
+	if paused := telegramStyle.iterationPausedText("epic/04", PauseNeedsRepair, "stuck"); reqs[0].Text == paused {
+		t.Errorf("needs-answer text matched iteration-paused text: %q", reqs[0].Text)
 	}
 }
 
@@ -165,7 +165,7 @@ func TestTelegramEventSink_OtherMethods_ForwardWithoutSendingAnyRequest(t *testi
 	sink.AlreadyComplete("epic", 1, 2)
 	sink.TicketReverted("01")
 	sink.TicketReattached("01", "iter-01", "/repo", "sess-1")
-	sink.TicketStillNeedsAttention("01")
+	sink.TicketStillNeedsRepair("01")
 	sink.TicketClaimed(tickets.Ticket{Identifier: "01"})
 	sink.IterationStarted("01", "iter-01", "/repo", "sess-1")
 	sink.IterationResumed("iter-01", PauseRateLimit)
@@ -183,7 +183,7 @@ func TestTelegramEventSink_OtherMethods_ForwardWithoutSendingAnyRequest(t *testi
 
 	want := []string{
 		"NoTicketsFound", "AlreadyComplete", "TicketReverted", "TicketReattached",
-		"TicketStillNeedsAttention", "TicketClaimed", "IterationStarted", "IterationResumed",
+		"TicketStillNeedsRepair", "TicketClaimed", "IterationStarted", "IterationResumed",
 		"TranscriptLine", "ContextOccupancy", "CherryPickStarted", "ConflictResolutionStarted",
 		"SmartZoneCompactStarted", "SmartZoneFinishingUp", "SmartZoneRecovered",
 		"TicketCleanupFinished", "TicketRecovering", "TicketRecovered", "TicketUnrecoverable",

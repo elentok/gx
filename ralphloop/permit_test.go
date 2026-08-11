@@ -33,7 +33,7 @@ func (p *fakePermit) Release() {
 // setup without duplicating its full assertion set).
 func TestRun_NilPermit_BehavesUnrestricted(t *testing.T) {
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-info\ntype: task\n---\n# Stuck\n",
+		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: task\n---\n# Stuck\n",
 	})
 	d, prompts, _ := fakeDeps()
 	parkTimer, polls := clearOnPark(t, ticketPath(scratchDir, "my-epic", "01-stuck.md"), "open")
@@ -44,7 +44,7 @@ func TestRun_NilPermit_BehavesUnrestricted(t *testing.T) {
 		t.Fatalf("Run() error = %v, want nil (no Permit set, unrestricted behavior)", err)
 	}
 	if *polls == 0 {
-		t.Errorf("run never parked (no park poll), want it to park on the needs-info ticket")
+		t.Errorf("run never parked (no park poll), want it to park on the needs-answer ticket")
 	}
 	if len(*prompts) != 1 {
 		t.Errorf("prompts = %v, want the cleared ticket claimed and run once", *prompts)
@@ -58,7 +58,7 @@ func TestRun_NilPermit_BehavesUnrestricted(t *testing.T) {
 // nothing runnable and parks, once again after a human clears the ticket.
 func TestRun_Permit_AcquiredOnClaimReleasedOnPark(t *testing.T) {
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-info\ntype: task\n---\n# Stuck\n",
+		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: task\n---\n# Stuck\n",
 	})
 	d, prompts, _ := fakeDeps()
 	parkTimer, polls := clearOnPark(t, ticketPath(scratchDir, "my-epic", "01-stuck.md"), "open")

@@ -13,8 +13,8 @@ func TestChannelEventSink_ForwardsCallsAsLiveEvents(t *testing.T) {
 
 	s.TicketClaimed(tickets.Ticket{Identifier: "04a", Number: 4})
 	s.IterationStarted("04a", "iter-04a", "/repo/iter-04a", "sess-1")
-	s.IterationPaused("iter-04a", PauseNeedsAttention, "Codex is waiting for operator intervention")
-	s.IterationResumed("iter-04a", PauseNeedsAttention)
+	s.IterationPaused("iter-04a", PauseNeedsRepair, "Codex is waiting for operator intervention")
+	s.IterationResumed("iter-04a", PauseNeedsRepair)
 	s.IterationFinished(tickets.Ticket{Identifier: "04a"}, "my-epic", IterationStats{})
 	s.TicketReattached("04a", "iter-04a", "/repo/iter-04a", "sess-1")
 	s.ContextOccupancy("04a", 12345)
@@ -31,8 +31,8 @@ func TestChannelEventSink_ForwardsCallsAsLiveEvents(t *testing.T) {
 	}{
 		{kind: LiveEventTicketClaimed, identifier: "04a"},
 		{kind: LiveEventIterationStarted, identifier: "04a", label: "iter-04a", cwd: "/repo/iter-04a", sessionID: "sess-1"},
-		{kind: LiveEventIterationPaused, label: "iter-04a", pauseKind: PauseNeedsAttention, reason: "Codex is waiting for operator intervention"},
-		{kind: LiveEventIterationResumed, label: "iter-04a", pauseKind: PauseNeedsAttention},
+		{kind: LiveEventIterationPaused, label: "iter-04a", pauseKind: PauseNeedsRepair, reason: "Codex is waiting for operator intervention"},
+		{kind: LiveEventIterationResumed, label: "iter-04a", pauseKind: PauseNeedsRepair},
 		{kind: LiveEventIterationFinished, identifier: "04a"},
 		{kind: LiveEventTicketReattached, identifier: "04a", label: "iter-04a", cwd: "/repo/iter-04a", sessionID: "sess-1"},
 		{kind: LiveEventContextOccupancy, identifier: "04a", tokens: 12345},

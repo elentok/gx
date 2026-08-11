@@ -23,7 +23,7 @@ import (
 // being marked done (see
 // TestClassifyDoneTicket_RealRepo_TrailerScopedToEpic_NoCrossEpicFalsePositive,
 // a real prior incident in the other direction) — so it flags every one of
-// them doneUnrecoverable/needs-attention, and that's the intended, safe
+// them doneUnrecoverable/needs-repair, and that's the intended, safe
 // default. Downstream tickets blocked on them then flip open->blocked, the
 // frontier empties out, and Run fails with "has no unblocked tickets left
 // but isn't all done" — surprising, but not a bug in classification itself.
@@ -60,13 +60,13 @@ func TestClassifyDoneTicket_IterationStartedButNeverLanded_StillUnrecoverable(t 
 	}
 }
 
-// TestReconcile_DoneTicketWithNoProvenance_FlaggedNeedsAttentionNotSilently
+// TestReconcile_DoneTicketWithNoProvenance_FlaggedNeedsRepairNotSilently
 // exercises the full reconcile() entrypoint for the exact shape reported
 // live: a done ticket with no run-log history at all (ralph-loop has never
 // run against this scratch dir). It documents the intended behavior — this
 // is reported, not silently trusted or silently corrupted — with the
 // specific reason a human needs to see to know what to check.
-func TestReconcile_DoneTicketWithNoProvenance_FlaggedNeedsAttentionNotSilently(t *testing.T) {
+func TestReconcile_DoneTicketWithNoProvenance_FlaggedNeedsRepairNotSilently(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
 	})
@@ -89,8 +89,8 @@ func TestReconcile_DoneTicketWithNoProvenance_FlaggedNeedsAttentionNotSilently(t
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: needs-attention") {
-		t.Errorf("ticket not flagged needs-attention for a human to check:\n%s", raw)
+	if !strings.Contains(string(raw), "status: needs-repair") {
+		t.Errorf("ticket not flagged needs-repair for a human to check:\n%s", raw)
 	}
 	if !strings.Contains(out.String(), "ticket 03") {
 		t.Errorf("reports = %q, want an unrecoverable-mismatch report naming ticket 03", out.String())
@@ -99,9 +99,9 @@ func TestReconcile_DoneTicketWithNoProvenance_FlaggedNeedsAttentionNotSilently(t
 
 // TestReconcile_CommitlessDoneTicket_NotFlaggedUnrecoverable is the
 // commitless counterpart to TestReconcile_DoneTicketWithNoProvenance_
-// FlaggedNeedsAttentionNotSilently above: a done ticket with commitless: true
+// FlaggedNeedsRepairNotSilently above: a done ticket with commitless: true
 // has no landed commit by design, so classifyDoneTicket's verification must
-// be skipped for it entirely rather than flagging it needs-attention for
+// be skipped for it entirely rather than flagging it needs-repair for
 // having no provenance.
 func TestReconcile_CommitlessDoneTicket_NotFlaggedUnrecoverable(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
@@ -126,8 +126,8 @@ func TestReconcile_CommitlessDoneTicket_NotFlaggedUnrecoverable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if strings.Contains(string(raw), "status: needs-attention") {
-		t.Errorf("commitless done ticket was flagged needs-attention, want its no-commit verification skipped entirely:\n%s", raw)
+	if strings.Contains(string(raw), "status: needs-repair") {
+		t.Errorf("commitless done ticket was flagged needs-repair, want its no-commit verification skipped entirely:\n%s", raw)
 	}
 	if !strings.Contains(string(raw), "status: done") {
 		t.Errorf("commitless done ticket's status changed unexpectedly:\n%s", raw)
@@ -168,8 +168,8 @@ func TestReconcile_ResearchGrillingCodeReviewDoneTickets_NotFlaggedUnrecoverable
 		if err != nil {
 			t.Fatalf("ReadFile %s: %v", name, err)
 		}
-		if strings.Contains(string(raw), "status: needs-attention") {
-			t.Errorf("%s flagged needs-attention, want its no-commit verification skipped by type:\n%s", name, raw)
+		if strings.Contains(string(raw), "status: needs-repair") {
+			t.Errorf("%s flagged needs-repair, want its no-commit verification skipped by type:\n%s", name, raw)
 		}
 		if !strings.Contains(string(raw), "status: done") {
 			t.Errorf("%s status changed unexpectedly:\n%s", name, raw)
@@ -206,8 +206,8 @@ func TestReconcile_PrototypeDoneTicket_StillFlaggedUnrecoverable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: needs-attention") {
-		t.Errorf("prototype ticket not flagged needs-attention, want unchanged crash-recovery behavior:\n%s", raw)
+	if !strings.Contains(string(raw), "status: needs-repair") {
+		t.Errorf("prototype ticket not flagged needs-repair, want unchanged crash-recovery behavior:\n%s", raw)
 	}
 }
 
@@ -215,8 +215,8 @@ func TestReconcile_PrototypeDoneTicket_StillFlaggedUnrecoverable(t *testing.T) {
 // live: a queue run scoped to a handful of tickets (e.g. via the Queue UI's
 // checked selection) still swept every done ticket in the whole epic for
 // landed-commit verification, flagging unrelated done tickets the run never
-// touched needs-attention. Scope now gates this loop the same way it already
-// gated claim/needs-attention reattachment above.
+// touched needs-repair. Scope now gates this loop the same way it already
+// gated claim/needs-repair reattachment above.
 func TestReconcile_OutOfScopeDoneTicket_NotVerified(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: done\ntype: task\n---\n# A\n",
@@ -248,13 +248,13 @@ func TestReconcile_OutOfScopeDoneTicket_NotVerified(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if strings.Contains(string(raw), "status: needs-attention") {
-		t.Errorf("out-of-scope done ticket 01 was verified and flagged needs-attention, want it left untouched:\n%s", raw)
+	if strings.Contains(string(raw), "status: needs-repair") {
+		t.Errorf("out-of-scope done ticket 01 was verified and flagged needs-repair, want it left untouched:\n%s", raw)
 	}
 }
 
 // TestClassifyDoneTicket_BackfilledCherryPickEvent_RecognizedAsLanded is the
-// recovery path for a ticket flagged needs-attention per the test above,
+// recovery path for a ticket flagged needs-repair per the test above,
 // once a human/auditing agent has confirmed its commit really is on the
 // feature branch: append a cherry-picked event recording that SHA to the run
 // log, exactly as landCherryPick does for a normal iteration. No new
@@ -312,7 +312,7 @@ func TestRun_BackfilledProvenance_UnblocksDependentsAndCompletesEpic(t *testing.
 	}
 
 	var firstRun bytes.Buffer
-	// Ticket 02 is flagged needs-attention, which blocks ticket 03 and leaves
+	// Ticket 02 is flagged needs-repair, which blocks ticket 03 and leaves
 	// nothing runnable: the run parks on the flag rather than trusting the
 	// unproven done, and waits for the backfill below.
 	runUntilParked(t, RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&firstRun))
@@ -321,13 +321,13 @@ func TestRun_BackfilledProvenance_UnblocksDependentsAndCompletesEpic(t *testing.
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: needs-attention") {
-		t.Fatalf("ticket 02 not flagged needs-attention before backfill:\n%s", raw)
+	if !strings.Contains(string(raw), "status: needs-repair") {
+		t.Fatalf("ticket 02 not flagged needs-repair before backfill:\n%s", raw)
 	}
 
 	// Recovery: a human/auditing agent confirms ticket 02's work is really on
 	// the feature branch and backfills the run log accordingly. Also revert
-	// the needs-attention flag back to done — reconcile only reports
+	// the needs-repair flag back to done — reconcile only reports
 	// mismatches, repairing the ticket file itself is this recovery step's
 	// job (mirrors gx tickets set --status done).
 	if err := SetStatus(filepath.Join(scratchDir, "my-epic", "issues", "02-b.md"), "done"); err != nil {

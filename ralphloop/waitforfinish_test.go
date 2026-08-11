@@ -323,8 +323,8 @@ func TestWaitForFinish_CodexContextBreachRecoversThroughBlockedCompactConfirmati
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if strings.Contains(string(raw), "needs-attention") {
-		t.Errorf("ticket status = %s, compact confirmation must not become needs-attention", raw)
+	if strings.Contains(string(raw), "needs-repair") {
+		t.Errorf("ticket status = %s, compact confirmation must not become needs-repair", raw)
 	}
 	if gate.isPaused() {
 		t.Error("gate.isPaused() = true, want smart-zone recovery to never pause the Gate")
@@ -1760,12 +1760,12 @@ func TestWaitForFinish_EmitsContextOccupancyOnEachPollTimeout(t *testing.T) {
 	}
 }
 
-func TestWaitForFinish_CodexBlockedMarksNeedsAttentionThenRecovers(t *testing.T) {
+func TestWaitForFinish_CodexBlockedMarksNeedsRepairThenRecovers(t *testing.T) {
 	ticketPath := writeFrontmatterTicket(t, "claimed")
 	scratchDir := t.TempDir()
 	gate := NewGate()
 	var waits int
-	var sawNeedsAttention bool
+	var sawNeedsRepair bool
 	d := Deps{
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
 			waits++
@@ -1775,7 +1775,7 @@ func TestWaitForFinish_CodexBlockedMarksNeedsAttentionThenRecovers(t *testing.T)
 			case 2:
 				raw, err := os.ReadFile(ticketPath)
 				if err == nil {
-					sawNeedsAttention = strings.Contains(string(raw), "needs-attention")
+					sawNeedsRepair = strings.Contains(string(raw), "needs-repair")
 				}
 				return herdr.Agent{}, errors.New("timed out waiting for agent status")
 			default:
@@ -1791,8 +1791,8 @@ func TestWaitForFinish_CodexBlockedMarksNeedsAttentionThenRecovers(t *testing.T)
 	}, "codex-session-1"); err != nil {
 		t.Fatalf("waitForFinish: %v", err)
 	}
-	if !sawNeedsAttention {
-		t.Error("ticket was not marked needs-attention while Codex was blocked")
+	if !sawNeedsRepair {
+		t.Error("ticket was not marked needs-repair while Codex was blocked")
 	}
 	if gate.isPaused() {
 		t.Error("gate remains paused after Codex recovered")
@@ -1808,12 +1808,12 @@ func TestWaitForFinish_CodexBlockedMarksNeedsAttentionThenRecovers(t *testing.T)
 	if err != nil || !ok || len(events) < 2 {
 		t.Fatalf("readEvents() = %+v, ok=%v, err=%v", events, ok, err)
 	}
-	if events[0].Type != eventNeedsAttention || events[0].Pane != "pane-1" || events[0].Reason == "" {
+	if events[0].Type != eventNeedsRepair || events[0].Pane != "pane-1" || events[0].Reason == "" {
 		t.Errorf("attention event = %+v, want pane and reason", events[0])
 	}
 }
 
-func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsAttention(t *testing.T) {
+func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsRepair(t *testing.T) {
 	for _, quota := range []string{"primary", "secondary"} {
 		t.Run(quota, func(t *testing.T) {
 			ticketPath := writeFrontmatterTicket(t, "claimed")
@@ -1882,8 +1882,8 @@ func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsAttention(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ReadFile: %v", err)
 			}
-			if !strings.Contains(string(raw), "claimed") || strings.Contains(string(raw), "needs-attention") {
-				t.Errorf("ticket status = %s, want claimed without needs-attention", raw)
+			if !strings.Contains(string(raw), "claimed") || strings.Contains(string(raw), "needs-repair") {
+				t.Errorf("ticket status = %s, want claimed without needs-repair", raw)
 			}
 		})
 	}
@@ -1994,12 +1994,12 @@ func TestWaitForFinish_CodexQuotaDetectionErrorPreservesClaimedTicket(t *testing
 	if readErr != nil {
 		t.Fatalf("ReadFile: %v", readErr)
 	}
-	if !strings.Contains(string(raw), "claimed") || strings.Contains(string(raw), "needs-attention") {
-		t.Errorf("ticket status = %s, want claimed without needs-attention", raw)
+	if !strings.Contains(string(raw), "claimed") || strings.Contains(string(raw), "needs-repair") {
+		t.Errorf("ticket status = %s, want claimed without needs-repair", raw)
 	}
 }
 
-func TestWaitForFinish_CodexPaneQuotaDoesNotBecomeNeedsAttention(t *testing.T) {
+func TestWaitForFinish_CodexPaneQuotaDoesNotBecomeNeedsRepair(t *testing.T) {
 	ticketPath := writeFrontmatterTicket(t, "claimed")
 	gate := NewGate()
 	sink := &quotaEventSink{}
@@ -2038,8 +2038,8 @@ func TestWaitForFinish_CodexPaneQuotaDoesNotBecomeNeedsAttention(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "claimed") || strings.Contains(string(raw), "needs-attention") {
-		t.Errorf("ticket status = %s, want claimed without needs-attention", raw)
+	if !strings.Contains(string(raw), "claimed") || strings.Contains(string(raw), "needs-repair") {
+		t.Errorf("ticket status = %s, want claimed without needs-repair", raw)
 	}
 }
 
@@ -2065,8 +2065,8 @@ func TestWaitForFinish_CodexPaneReadErrorPreservesClaimedTicket(t *testing.T) {
 	if readErr != nil {
 		t.Fatalf("ReadFile: %v", readErr)
 	}
-	if !strings.Contains(string(raw), "claimed") || strings.Contains(string(raw), "needs-attention") {
-		t.Errorf("ticket status = %s, want claimed without needs-attention", raw)
+	if !strings.Contains(string(raw), "claimed") || strings.Contains(string(raw), "needs-repair") {
+		t.Errorf("ticket status = %s, want claimed without needs-repair", raw)
 	}
 }
 

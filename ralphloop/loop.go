@@ -420,7 +420,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	if err != nil {
 		return err
 	}
-	// A ticket found needs-attention at startup deliberately does not pause
+	// A ticket found needs-repair at startup deliberately does not pause
 	// the gate: it's human-clearable, so the run schedules every other
 	// runnable ticket first and only parks on it once nothing is runnable.
 	if len(reattached) > 0 {
@@ -512,16 +512,16 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			// unexpected agent-wait failure, ...) shouldn't take down the
 			// whole epic's run — that leaves every other in-flight ticket's
 			// live-event stream dead too, with no way to recover short of
-			// restarting the loop. Flag just this ticket needs-attention
+			// restarting the loop. Flag just this ticket needs-repair
 			// (out of the frontier, so never reclaimed until a human clears
 			// it) and keep scheduling the rest.
 			reason := r.err.Error()
 			label := iterLabel(opts.EpicName, r.ticket.Identifier)
-			if markErr := MarkNeedsAttentionWithReason(r.ticket.Path, reason); markErr != nil {
-				reason = fmt.Sprintf("%s (also failed marking needs-attention: %v)", reason, markErr)
+			if markErr := MarkNeedsRepairWithReason(r.ticket.Path, reason); markErr != nil {
+				reason = fmt.Sprintf("%s (also failed marking needs-repair: %v)", reason, markErr)
 			}
 			delete(launched, r.ticket.Identifier)
-			sink.IterationPaused(label, PauseNeedsAttention, reason)
+			sink.IterationPaused(label, PauseNeedsRepair, reason)
 			continue
 		}
 
@@ -538,11 +538,11 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			for _, t := range landedEpic.Tickets {
 				if t.Identifier == r.ticket.Identifier {
 					landedTicket = t
-					// An iteration that ended stalled (needs-info, most
+					// An iteration that ended stalled (needs-answer, most
 					// commonly) is no longer launched, so a human clearing
 					// its status puts it back in the frontier for this run
 					// instead of only for the next one.
-					if isHumanClearable(*landedEpic, t) {
+					if isParked(*landedEpic, t) {
 						delete(launched, t.Identifier)
 					}
 					break
@@ -585,7 +585,7 @@ func scanDecisions(epic tickets.Epic, scope RunScope, frontier []tickets.Ticket,
 			d.Decision = "out-of-scope"
 		case status == tickets.StatusDone:
 			d.Decision = "done"
-		case isHumanClearable(epic, t):
+		case isParked(epic, t):
 			d.Decision = "stalled"
 		case inFrontier[t.Path]:
 			d.Decision = "frontier"
@@ -601,7 +601,7 @@ func scanDecisions(epic tickets.Epic, scope RunScope, frontier []tickets.Ticket,
 }
 
 // allDone reports whether every ticket in e is done — the run's one exit
-// condition. A stalled ticket (see isHumanClearable) is deliberately not an
+// condition. A stalled ticket (see isParked) is deliberately not an
 // exit condition: the run parks on it instead, so the agent's question is
 // still answerable in its own pane.
 func allDone(e tickets.Epic) bool {
@@ -616,16 +616,16 @@ func allDone(e tickets.Epic) bool {
 	return true
 }
 
-// isHumanClearable reports whether t is stalled on a person rather than on
-// the run: needs-info (an iteration finished with no commits to land),
-// needs-attention (operator intervention, or a done ticket reconciliation
+// isParked reports whether t is stalled on a person rather than on
+// the run: needs-answer (an iteration finished with no commits to land),
+// needs-repair (operator intervention, or a done ticket reconciliation
 // found unrecoverable — see markDoneTicketUnrecoverable), or draft (a stub
 // nobody has filled in yet). None of these ever appear in the frontier, so a
 // run with only these left has nothing to schedule — but a person can clear
 // any of them, which is what separates parking from a deadlock.
-func isHumanClearable(e tickets.Epic, t tickets.Ticket) bool {
+func isParked(e tickets.Epic, t tickets.Ticket) bool {
 	switch e.RenderedStatus(t) {
-	case tickets.StatusNeedsInfo, tickets.StatusNeedsAttention, tickets.StatusDraft:
+	case tickets.StatusNeedsAnswer, tickets.StatusNeedsRepair, tickets.StatusDraft:
 		return true
 	}
 	return false
@@ -636,7 +636,7 @@ func isHumanClearable(e tickets.Epic, t tickets.Ticket) bool {
 func stalledTickets(e tickets.Epic, scope RunScope) []tickets.Ticket {
 	var stalled []tickets.Ticket
 	for _, t := range e.Tickets {
-		if scope.Contains(t, e) && isHumanClearable(e, t) {
+		if scope.Contains(t, e) && isParked(e, t) {
 			stalled = append(stalled, t)
 		}
 	}

@@ -23,7 +23,7 @@ var (
 	epicStatusDoneStyle = lipgloss.NewStyle().Foreground(ui.ColorGreen)
 
 	// epicStatusProblemStyle colors an epic header's status line yellow when
-	// any of its tickets is needs-info/needs-attention/error-classed.
+	// any of its tickets is needs-answer/needs-repair/error-classed.
 	// "In progress, clean" deliberately falls through to the default/no-color
 	// treatment instead (ticket 02's same open=no-color choice), so it
 	// doesn't read as an alarm state.
@@ -56,7 +56,7 @@ func (m QueueModel) epicHeaderLines(epic tickets.Epic, parked []ralphloop.Stalle
 
 // epicStatusLine picks an epic header's status-line icon, text, and color:
 // green "took <elapsed>" once every ticket is done, yellow flagging any
-// needs-info/needs-attention/error-classed ticket, or the default/no-color
+// needs-answer/needs-repair/error-classed ticket, or the default/no-color
 // treatment otherwise.
 func epicStatusLine(icons ui.IconSet, epic tickets.Epic, parked []ralphloop.StalledTicket) (icon, text string, style lipgloss.Style) {
 	switch {
@@ -105,11 +105,11 @@ func epicElapsedSeconds(epic tickets.Epic) int {
 }
 
 // epicHasProblem reports whether any of the epic's tickets renders as
-// needs-info/needs-attention/error — the header status line's yellow trigger.
+// needs-answer/needs-repair/error — the header status line's yellow trigger.
 func epicHasProblem(epic tickets.Epic) bool {
 	for _, t := range epic.Tickets {
 		switch epic.RenderedStatus(t) {
-		case tickets.StatusNeedsInfo, tickets.StatusNeedsAttention, tickets.StatusError:
+		case tickets.StatusNeedsAnswer, tickets.StatusNeedsRepair, tickets.StatusError:
 			return true
 		}
 	}

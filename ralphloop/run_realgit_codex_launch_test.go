@@ -150,7 +150,7 @@ func TestRun_ProductionRealGit_MissingSkillFailsBeforeClaim(t *testing.T) {
 	assertNoLaunchTrace(t, repoDir, epicName, scratchDir, "01-first.md", &out)
 }
 
-// TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsAttention drives
+// TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsRepair drives
 // the remaining half of ticket 32's "later failures leave deliberate durable
 // state" acceptance criterion: a real git worktree/branch and a real
 // herdrfake.State-backed workspace/tab are created for ticket "01" exactly as
@@ -162,11 +162,11 @@ func TestRun_ProductionRealGit_MissingSkillFailsBeforeClaim(t *testing.T) {
 // before the ticket is ever claimed), this failure lands after
 // AddWorktree/InstallDeps/TabCreate have already run for real, so the
 // durable state they left — worktree, branch, tab — must survive, and the
-// ticket must land on status: needs-attention (not needs-info/done/claimed),
+// ticket must land on status: needs-repair (not needs-answer/done/claimed),
 // matching loop_agent_test.go's
-// TestRun_CodexLaunchFailureAfterClaimNeedsAttention but through real git +
+// TestRun_CodexLaunchFailureAfterClaimNeedsRepair but through real git +
 // herdrfake.State instead of stubbed Deps functions.
-func TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsAttention(t *testing.T) {
+func TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsRepair(t *testing.T) {
 	const epicName = "epic"
 	repoDir := testutil.TempRepo(t)
 	wtDir := testWorktreeDir(t, repoDir)
@@ -209,7 +209,7 @@ func TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsAttention(t *tes
 	deps.Sleep = func(time.Duration) {}
 
 	var out bytes.Buffer
-	// The failed launch leaves the epic's only ticket needs-attention, so the
+	// The failed launch leaves the epic's only ticket needs-repair, so the
 	// run parks on it.
 	runUntilParked(t, RunOptions{
 		EpicName: epicName, Agent: AgentCodex, Skill: "implement",
@@ -237,15 +237,15 @@ func TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsAttention(t *tes
 	if err != nil {
 		t.Fatalf("ReadFile ticket: %v", err)
 	}
-	for _, unwanted := range []string{"status: done", "status: needs-info", "status: claimed"} {
+	for _, unwanted := range []string{"status: done", "status: needs-answer", "status: claimed"} {
 		if strings.Contains(string(raw), unwanted) {
 			t.Errorf("ticket after launch failure = %s, must not contain %q", raw, unwanted)
 		}
 	}
-	if !strings.Contains(string(raw), "status: needs-attention") ||
+	if !strings.Contains(string(raw), "status: needs-repair") ||
 		!strings.Contains(string(raw), "launching codex") ||
 		!strings.Contains(string(raw), "Herdr rejected Codex integration") {
-		t.Errorf("ticket after launch failure = %s, want durable needs-attention status and launch reason", raw)
+		t.Errorf("ticket after launch failure = %s, want durable needs-repair status and launch reason", raw)
 	}
 
 	events, ok, err := readEvents(scratchDir, epicName)
@@ -255,13 +255,13 @@ func TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsAttention(t *tes
 	if ok {
 		for _, event := range events {
 			switch event.Type {
-			case eventIterationStarted, eventIterationFinished, eventCherryPicked, eventNeedsInfo:
+			case eventIterationStarted, eventIterationFinished, eventCherryPicked, eventNeedsAnswer:
 				t.Errorf("unexpected success/finish-family event after launch failure: %+v", event)
 			}
 		}
 	}
 
-	if strings.Contains(out.String(), "finished ticket") || strings.Contains(out.String(), "needs-info") {
+	if strings.Contains(out.String(), "finished ticket") || strings.Contains(out.String(), "needs-answer") {
 		t.Errorf("launch failure output = %q, must not report successful/generic completion", out.String())
 	}
 }
@@ -606,7 +606,7 @@ func TestRun_ProductionRealGit_CodexRestartReattachesAndLandsOnce(t *testing.T) 
 		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
 	}
 	for _, event := range events {
-		if event.Type == eventNeedsInfo || event.Type == eventNeedsAttention || event.Type == eventSmartZoneRecoveryFailed || event.Type == eventPausedSmartZone {
+		if event.Type == eventNeedsAnswer || event.Type == eventNeedsRepair || event.Type == eventSmartZoneRecoveryFailed || event.Type == eventPausedSmartZone {
 			t.Errorf("unexpected recovery/failure residue event (this scenario is restart/reattach only): %+v", event)
 		}
 	}

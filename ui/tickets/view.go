@@ -19,11 +19,11 @@ var (
 	// statusDraftStyle reads as parked, not idle: a draft is outstanding work
 	// nobody can pick up, so it sits between open's default foreground and
 	// done's near-invisible dim.
-	statusDraftStyle          = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
-	statusClaimedStyle        = lipgloss.NewStyle().Foreground(ui.ColorOrange)
-	statusBlockedStyle        = lipgloss.NewStyle().Foreground(ui.ColorRed)
-	statusNeedsInfoStyle      = lipgloss.NewStyle().Foreground(ui.ColorYellow)
-	statusNeedsAttentionStyle = lipgloss.NewStyle().Foreground(ui.ColorRed)
+	statusDraftStyle       = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
+	statusClaimedStyle     = lipgloss.NewStyle().Foreground(ui.ColorOrange)
+	statusBlockedStyle     = lipgloss.NewStyle().Foreground(ui.ColorRed)
+	statusNeedsAnswerStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow)
+	statusNeedsRepairStyle = lipgloss.NewStyle().Foreground(ui.ColorRed)
 	// statusWaitingForChildrenStyle uses the same color family as claimed —
 	// this ticket's own work is finished, but the epic still has live work
 	// underneath it, so it reads as active rather than settled/dim like done.
@@ -263,10 +263,10 @@ func statusIconAndStyle(icons ui.IconSet, status tickets.RenderedStatus) (string
 		return icons.TicketClaimed, statusClaimedStyle
 	case tickets.StatusBlocked:
 		return icons.TicketBlocked, statusBlockedStyle
-	case tickets.StatusNeedsInfo:
-		return icons.TicketNeedsInfo, statusNeedsInfoStyle
-	case tickets.StatusNeedsAttention:
-		return icons.TicketNeedsAttention, statusNeedsAttentionStyle
+	case tickets.StatusNeedsAnswer:
+		return icons.TicketNeedsAnswer, statusNeedsAnswerStyle
+	case tickets.StatusNeedsRepair:
+		return icons.TicketNeedsRepair, statusNeedsRepairStyle
 	case tickets.StatusWaitingForChildren:
 		return icons.TicketWaitingForChildren, statusWaitingForChildrenStyle
 	case tickets.StatusDone:
@@ -277,10 +277,10 @@ func statusIconAndStyle(icons ui.IconSet, status tickets.RenderedStatus) (string
 }
 
 // blockedBySuffix renders the "(blocked by NN[, NN...])" suffix for a
-// blocked/needs-info ticket, filtered to still-unresolved blockers. Empty
+// blocked/needs-answer ticket, filtered to still-unresolved blockers. Empty
 // for any other status or once every blocker has resolved.
 func blockedBySuffix(epic tickets.Epic, t tickets.Ticket, status tickets.RenderedStatus) string {
-	if status != tickets.StatusBlocked && status != tickets.StatusNeedsInfo {
+	if status != tickets.StatusBlocked && status != tickets.StatusNeedsAnswer {
 		return ""
 	}
 	unresolved := epic.UnresolvedBlockers(t)

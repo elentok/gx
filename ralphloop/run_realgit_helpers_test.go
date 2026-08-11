@@ -266,7 +266,7 @@ func writeFakeExecutable(t *testing.T, name, body string) string {
 // assertNoLaunchTrace asserts the outcomes ticket 32 requires of every
 // launch-environment failure that's caught before a ticket is claimed:
 // repository (no feature worktree ever created), tracker (ticket left open,
-// never claimed, so no done/needs-info/needs-attention residue), and
+// never claimed, so no done/needs-answer/needs-repair residue), and
 // diagnostic-trace (no run-log.jsonl at all — logEvent is never reached this
 // early) outcomes. A failure this early also never opens a Herdr tab, since
 // FindOrCreateWorkspace/AddWorktree/TabCreate all run strictly after these
@@ -288,7 +288,7 @@ func assertNoLaunchTrace(t *testing.T, repoDir, epicName, scratchDir, ticketFile
 	if !strings.Contains(string(raw), "status: open") {
 		t.Errorf("ticket after launch failure = %s, want status to remain open (never claimed)", raw)
 	}
-	for _, unwanted := range []string{"status: done", "status: needs-info", "status: needs-attention"} {
+	for _, unwanted := range []string{"status: done", "status: needs-answer", "status: needs-repair"} {
 		if strings.Contains(string(raw), unwanted) {
 			t.Errorf("ticket after launch failure = %s, must not contain %q", raw, unwanted)
 		}
@@ -298,7 +298,7 @@ func assertNoLaunchTrace(t *testing.T, repoDir, epicName, scratchDir, ticketFile
 		t.Errorf("readEvents = ok:%v err:%v, want no run-log written for a failure caught before claim", ok, readErr)
 	}
 
-	if strings.Contains(out.String(), "finished ticket") || strings.Contains(out.String(), "needs-info") {
+	if strings.Contains(out.String(), "finished ticket") || strings.Contains(out.String(), "needs-answer") {
 		t.Errorf("launch failure output = %q, must not report successful/generic completion", out.String())
 	}
 }

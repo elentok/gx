@@ -124,7 +124,7 @@ func TestLaunchAndPrompt_CodexAdoptsSessionIDFromInitialPrompt(t *testing.T) {
 // defense (fix 2, on top of claimNext's own launched-set de-dup in
 // loop.go): if AgentStart fails with agent_name_taken and the reported
 // candidate's cwd is this iteration's own SessionCwd, launchAndPrompt must
-// not hard-fail the ticket to needs-attention — it attaches to the live
+// not hard-fail the ticket to needs-repair — it attaches to the live
 // pane (via AgentGet) and waits it out, without sending a second, redundant
 // initial prompt.
 func TestLaunchAndPrompt_AgentNameTakenByOwnWorktree_AttachesInsteadOfFailing(t *testing.T) {
