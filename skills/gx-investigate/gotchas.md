@@ -15,14 +15,14 @@ to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKI
   belongs to the *second* `/compact`. Not fixed. See
   `lifecycle-refactor/issues/15-smart-zone-compact-cancelled-by-finishup-prompt-research.md`.
 
-- **`agent_pane_busy` on `herdr agent start` puts a ticket into `needs-attention` with no
+- **`agent_pane_busy` on `herdr agent start` puts a ticket into `needs-repair` with no
   `iteration-started` logged at all.** `--pane` is herdr's own `RootPaneID` from `tab create`, not
   allocated/pooled by gx (`ralphloop/iteration.go:56-66` → `herdr/tab.go:30-52` →
   `launch.go:76,220-225`); two tickets launching concurrently under `MaxParallel` can race inside
   herdr's own pane allocator (external binary, no gx-side mutex around the herdr CLI calls). Not a
   gx-source bug; unstick by clearing the ticket back to `open` for the scheduler to reclaim. Found
-  live: `lifecycle-refactor` ticket `05`. See
-  `lifecycle-refactor/issues/14-ticket-05-needs-attention-herdr-pane-busy-research.md`.
+  live: `lifecycle-refactor` ticket `05`. See the `lifecycle-refactor` epic's ticket-05
+  herdr-pane-busy research ticket (filed under the status's retired name).
 
 Older entries below describe a `children` frontmatter field that no longer exists: fork descendants
 are now derived from `parent` alone (see [gx-local-tracker.md](../gx-local-tracker.md)). They are
@@ -108,7 +108,7 @@ kept as history of what the code did at the time, not as a description of today'
   new process's `pendingEpics` starts empty — `queue-state.json`'s `items` still durably marks
   the epic's tickets `"pending"`, but nothing reconstructs `pendingEpics` from that on load.
   `cmdCheckDetachedLive` (`queue_reattach.go`) only covers the *other* stranded case (a ticket
-  left `claimed`/`needs-attention` with a live herdr tab) — an epic that never got claimed at all
+  left `claimed`/`needs-repair` with a live herdr tab) — an epic that never got claimed at all
   falls through both paths and sits forever, looking "queued" in the UI but never starting. Found
   live: `tickets-tree` epic, ticket `03b1` (unclaimed and unblocked) never claimed after
   `fork-term` finished and freed a slot, because the attached `gx` process had restarted in
@@ -195,10 +195,10 @@ kept as history of what the code did at the time, not as a description of today'
   `open`; the next `scheduler-scan` sees it unclaimed and re-launches a second iteration under the
   *same* deterministic herdr agent name, which collides with the still-alive original
   (`agent_name_taken`). `ralphloop/loop.go`'s `r.err != nil` path (~line 402) treats the failed
-  launch as non-fatal: marks that ticket `needs-attention` and fires `IterationPaused`
+  launch as non-fatal: marks that ticket `needs-repair` and fires `IterationPaused`
   (`"{label} paused"` notification quoting the herdr error) but keeps scheduling. Harmless when
   the original iteration finishes normally afterward (its `done` write overwrites the spurious
-  `needs-attention`), but the underlying race — two unsynchronized writers (ralph-loop's
+  `needs-repair`), but the underlying race — two unsynchronized writers (ralph-loop's
   `Claim()`/`SetStatus()` vs. an agent's raw file `Write`) sharing one ticket file with no locking
   — is real and not yet fixed. Diagnosed via bugs-03 iter-06b/2026-08-08 run-log.jsonl (lines
   56–69); no fix ticket filed yet.
@@ -209,5 +209,5 @@ kept as history of what the code did at the time, not as a description of today'
   keyed only on `Parent` equality, not on which token is being resolved, so it also swallows a
   direct sibling dependency (`02c` declaring `blocked_by: [02b]`): `02b`'s real status is never
   checked, `02c` reads as immediately unblocked. No scheduler-side race — `ralphloop.claimNext`
-  reloads fresh per claim. Diagnosed via `tickets-tree` epic, ticket `02c`'s `needs-info`; see
+  reloads fresh per claim. Diagnosed via `tickets-tree` epic, ticket `02c`'s `needs-answer`; see
   `tickets-tree/issues/08-blocked-by-split-sibling-not-enforced-research.md` (not fixed yet).

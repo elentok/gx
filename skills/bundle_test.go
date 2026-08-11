@@ -156,19 +156,32 @@ func TestRelativeReferencesResolve(t *testing.T) {
 	}
 }
 
-// retiredTrackerTerms are the tracker vocabulary the lifecycle contract
-// removed: the `children` frontmatter field (fork descendants are derived
-// from `parent` alone) and the three statuses the loader no longer accepts.
-// A skill file naming any of them hands an agent an instruction that
-// produces a ticket gx itself rejects, so the bundle bans them outright —
-// including in prose, where a historical mention has to be reworded rather
-// than quoted verbatim.
+// retiredTrackerTerms are the tracker vocabulary the lifecycle contract and
+// the needs-answer/needs-repair rename removed: the `children` frontmatter
+// field (fork descendants are derived from `parent` alone), the statuses the
+// loader no longer accepts, and `isHumanClearable`'s old name (now
+// `isParked`). A skill file naming any of them hands an agent an instruction
+// that produces a ticket gx itself rejects, so the bundle bans them
+// outright — including in prose, where a historical mention has to be
+// reworded rather than quoted verbatim.
+//
+// "agent_status:" is the narrowed form of the field-name ban: a bare
+// substring ban on "agent_status" would break the docs whose job is to
+// describe herdr's own pane-status field of that name. Requiring the
+// trailing colon catches the frontmatter-style mistake (`agent_status:` as a
+// YAML key) while leaving `` `agent_status` `` in prose and quoted JSON
+// payloads (`"agent_status": "blocked"`, where the colon follows a quote,
+// not the bare word) writable.
 var retiredTrackerTerms = []string{
 	"--children",
 	"children:",
 	"needs-triage",
 	"ready-for-agent",
 	"ready-for-human",
+	"needs-info",
+	"needs-attention",
+	"isHumanClearable",
+	"agent_status:",
 }
 
 func TestBundleDropsRetiredTrackerTerms(t *testing.T) {

@@ -43,7 +43,7 @@ bare-repo checkout with linked worktrees keeps one shared root at the bare repo'
 - **`<root>/<epic-slug>/run-log.jsonl`** — the append-only scheduler/iteration event log
   (`ralphloop/eventlog.go`). One JSON line per event: `iteration-started`/`-finished`,
   `cherry-picked`, `conflict-hit`/`-resolved`, `paused-smart-zone`, `paused-rate-limit`,
-  `needs-info`, `needs-attention`, `commitless`, `deps-installed`, and **`scheduler-scan`** — one
+  `needs-answer`, `needs-repair`, `commitless`, `deps-installed`, and **`scheduler-scan`** — one
   entry per `claimNext` pass, listing every ticket's disposition that pass (`claimed`, `frontier`,
   `out-of-scope`, `blocked` + reason, `settled`, `unclaimed`). This is usually the fastest way to
   see *why* the scheduler picked or skipped a ticket, especially for "it's in the tree but never

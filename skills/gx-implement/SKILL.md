@@ -92,7 +92,7 @@ When either trigger fires:
    cherry-pick time, not by the agent.) Nothing about the new tickets is recorded on the original;
    their own `parent` is the whole edge. If step 1 had nothing to commit (design/exploration only,
    no diff), also pass `--commitless true`: `gx tickets set <path> --status done --commitless true`.
-   Without it, ralph-loop's stalled-agent detection flags the forked original `needs-info` instead
+   Without it, ralph-loop's stalled-agent detection flags the forked original `needs-repair` instead
    of leaving it `done`.
 
 ## Comments: fewer, and no numbers in them
@@ -121,7 +121,7 @@ exists, or the ticket only needed a fork with no code changes of its own — do 
 claimed`. Set a terminal status plus `commitless: true` in one call, e.g.
 `gx tickets set <path> --status done --commitless true`, explaining why in the ticket body. Without
 `commitless: true`, ralph-loop treats a zero-commit finish as a stalled agent and flags the ticket
-`needs-info` for a human to check.
+`needs-repair` for a human to check.
 
 Commit your work to the current branch. Start every commit subject with
 `{epic}/{ticket id}: `, substituting the `.scratch/<epic>/` directory name (not the branch name,

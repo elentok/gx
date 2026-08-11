@@ -45,8 +45,8 @@ Fields:
 
 - **`id`** (string, required) — the ticket identifier, matching the filename prefix, e.g. `"04"` or
   `"04b"`. Fixed at creation.
-- **`status`** (enum, required) — exactly one of `draft`, `open`, `claimed`, `needs-info`,
-  `needs-attention`, `done`. There is no default: a ticket with no `status:` is rejected by the
+- **`status`** (enum, required) — exactly one of `draft`, `open`, `claimed`, `needs-answer`,
+  `needs-repair`, `done`. There is no default: a ticket with no `status:` is rejected by the
   loader rather than read as `open`, so a half-written file can never be handed to an agent. Only
   `open` is schedulable — `draft` is work its author parked deliberately, neither offered to an agent
   nor counted as finished. The UI also shows `blocked` and `waiting-for-children`, but those are
@@ -119,7 +119,7 @@ The **frontier** is the ticket to work next: the lowest-numbered ticket, across 
 `issues/*.md` files, whose status is `open` and every one of whose `blocked_by` tokens has resolved
 (see the field reference above — a token resolves only once the ticket it names *and* that ticket's
 whole fork subtree are done). `open` is the only schedulable status: `draft`, `claimed`,
-`needs-info`, `needs-attention`, and `done` are all skipped. Scan in filename numeric order; the
+`needs-answer`, `needs-repair`, and `done` are all skipped. Scan in filename numeric order; the
 first match wins.
 
 A `type: code-review` ticket is exempt from the `blocked_by` check: it becomes eligible once every
@@ -137,9 +137,9 @@ When a ticket's work lands, set a terminal status: `gx tickets set <path> --stat
 closed by a mid-flight fork rather than by landing its own work (see below) is also `done`, with
 `commitless: true` since it never had commits of its own. Other terminal outcomes:
 
-- **`needs-info`** — work is stalled on information only a human can supply. Leave a note in the
+- **`needs-answer`** — work is stalled on information only a human can supply. Leave a note in the
   ticket body explaining what's missing.
-- **`needs-attention`** — something needs human judgment before work can continue (e.g. a design
+- **`needs-repair`** — something needs human judgment before work can continue (e.g. a design
   question, a conflict with another ticket).
 
 A ticket finished with zero commits must also set `commitless: true` in the same `set` call, or it

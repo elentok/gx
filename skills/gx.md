@@ -30,7 +30,7 @@ Linear, ...) selected by a separate setup step. gx's bundle drops both assumptio
   red/green loop runs unattended under ralph-loop without stalling on a question nobody's there to
   answer. A ticket authored before this convention existed may still proceed, but only when a
   minimal seam is unambiguous from its acceptance criteria; anything requiring real judgment stops
-  the ticket at `needs-info` instead of guessing.
+  the ticket at `needs-answer` instead of guessing.
 - **Context occupancy is inspected through gx, not by hand.** Upstream `implement` tails the raw
   session transcript JSONL and sums token fields to check context occupancy — a Claude-only,
   format-coupled trick. `gx-implement` calls `gx agent context-window` instead, which works
