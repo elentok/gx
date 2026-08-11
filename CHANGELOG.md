@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.27.8 - 2026-08-11
+
+- Fixed `.scratch` landing under `.git/.scratch` instead of the repo root when run from a linked worktree of a regular (non-bare) repo. Repo-root resolution used `git rev-parse --git-dir`, which for a linked worktree points at `.git/worktrees/<name>` rather than `.git`, so the worktree was misclassified as belonging to a bare repo and its root resolved to the `.git` directory itself. It now uses `git rev-parse --git-common-dir`, which resolves to the shared `.git` dir regardless of which worktree it's run from.
+
 ## v0.27.7 - 2026-08-10
 
 - Fixed smart-zone recovery cancelling the very compaction it asked for. gx interrupted the agent, sent `/compact`, and then sent the finish-up prompt as soon as the pane reported idle — but Claude Code reports idle while it is still compacting, and the queued prompt text cancelled the compaction. The context never shrank, so the next poll saw the same over-budget number and did the whole thing again. The finish-up prompt is now withheld until a compaction boundary in the agent's transcript proves the compaction actually completed. Codex, which has no such signal, is unaffected and behaves exactly as before.

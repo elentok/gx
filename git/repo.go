@@ -59,7 +59,7 @@ func IdentifyDir(dir string) (*DirInfo, error) {
 	isInsideWorktree := runAllowFail(dir, []string{"rev-parse", "--is-inside-work-tree"}) == "true"
 
 	if isInsideWorktree {
-		return identifyWorktree(dir, gitDir)
+		return identifyWorktree(dir)
 	}
 
 	// Bare repo: gitDir "." means the current dir is the git dir itself.
@@ -86,41 +86,44 @@ func IdentifyDir(dir string) (*DirInfo, error) {
 	}, nil
 }
 
-func identifyWorktree(dir, gitDir string) (*DirInfo, error) {
+func identifyWorktree(dir string) (*DirInfo, error) {
 	topLevel := runAllowFail(dir, []string{"rev-parse", "--show-toplevel"})
 	if topLevel == "" {
 		return nil, fmt.Errorf("inside worktree at %q but --show-toplevel failed", dir)
 	}
 
-	gitDirName := filepath.Base(gitDir)
+	// --git-common-dir (unlike --git-dir) resolves to the shared .git dir
+	// even from inside a linked worktree, where --git-dir instead points at
+	// .git/worktrees/<name>. Using --git-dir here would misclassify a linked
+	// worktree of a regular repo as belonging to a bare repo.
+	commonDir := runAllowFail(dir, []string{"rev-parse", "--git-common-dir"})
+	if commonDir == "" {
+		return nil, fmt.Errorf("cannot resolve git common dir for %q", dir)
+	}
+	if !filepath.IsAbs(commonDir) {
+		commonDir = filepath.Join(dir, commonDir)
+	}
+	commonDir = filepath.Clean(commonDir)
 
-	if gitDirName == ".git" {
+	if filepath.Base(commonDir) == ".git" {
 		// Regular (non-bare) repository. Linked worktrees live under
 		// <Root>/.worktrees/ instead of directly under Root, so they don't
 		// clutter the primary checkout's own file listing.
-		worktreeDir := filepath.Join(topLevel, ".worktrees")
-		return &DirInfo{
-			Repo:           Repo{Root: topLevel, WorktreeDir: worktreeDir, IsBare: false, MainBranch: detectMainBranch(topLevel)},
-			IsRepoRoot:     topLevel == dir,
+		root := filepath.Dir(commonDir)
+		worktreeDir := filepath.Join(root, ".worktrees")
+		info := &DirInfo{
+			Repo:           Repo{Root: root, WorktreeDir: worktreeDir, IsBare: false, MainBranch: detectMainBranch(root)},
+			IsRepoRoot:     root == dir,
 			IsWorktreeRoot: topLevel == dir,
-		}, nil
-	}
-
-	// Linked worktree inside a bare repo - find the bare repo root one level up
-	worktreeRoot := topLevel
-	parentDir := filepath.Dir(worktreeRoot)
-	parentGitDir := runAllowFail(parentDir, []string{"rev-parse", "--git-dir"})
-	if parentGitDir == "" {
-		return nil, fmt.Errorf("cannot find bare repo root for worktree %q", worktreeRoot)
-	}
-
-	repoRoot := parentDir
-	if parentGitDir != "." {
-		if !filepath.IsAbs(parentGitDir) {
-			parentGitDir = filepath.Join(parentDir, parentGitDir)
 		}
-		repoRoot = parentGitDir
+		if topLevel != root {
+			info.WorktreeRoot = topLevel
+		}
+		return info, nil
 	}
+
+	// Linked worktree inside a bare repo - commonDir is the bare repo root itself.
+	repoRoot := commonDir
 
 	// For the .bare trick, worktrees live in the parent directory alongside .bare/.
 	worktreeDir := repoRoot
@@ -130,9 +133,9 @@ func identifyWorktree(dir, gitDir string) (*DirInfo, error) {
 
 	return &DirInfo{
 		Repo:           Repo{Root: repoRoot, WorktreeDir: worktreeDir, IsBare: true, MainBranch: detectMainBranch(repoRoot)},
-		WorktreeRoot:   worktreeRoot,
+		WorktreeRoot:   topLevel,
 		IsRepoRoot:     repoRoot == dir,
-		IsWorktreeRoot: worktreeRoot == dir,
+		IsWorktreeRoot: topLevel == dir,
 	}, nil
 }
 

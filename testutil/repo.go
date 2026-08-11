@@ -129,6 +129,19 @@ func TempBareRepoWithWorktrees(t *testing.T, names ...string) string {
 	return repoDir
 }
 
+// TempRepoWithLinkedWorktree creates a regular (non-bare) git repo with a
+// linked worktree under <repo>/.worktrees/<name>, matching the layout gx
+// creates for linked worktrees of a regular repo. Returns the repo root and
+// the worktree directory.
+func TempRepoWithLinkedWorktree(t *testing.T, name string) (repoDir, wtDir string) {
+	t.Helper()
+	repoDir = TempRepo(t)
+	wtDir = filepath.Join(repoDir, ".worktrees", name)
+	mustGit(t, repoDir, "worktree", "add", "-b", name, wtDir)
+	configUser(t, wtDir)
+	return repoDir, wtDir
+}
+
 // TempDotBareRepoWithWorktrees creates a .bare-style repo layout:
 //
 //	outer/
