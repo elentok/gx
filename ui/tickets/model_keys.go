@@ -33,6 +33,7 @@ const (
 	bindingTicketsSelectFirst    keys.BindingID = "select-first"
 	bindingTicketsSelectLast     keys.BindingID = "select-last"
 	bindingTicketsPreviewBottom  keys.BindingID = "preview-bottom"
+	bindingTicketsChangeStatus   keys.BindingID = "change-status"
 )
 
 // newTicketsManager builds the key manager for the sidebar's focus: plain
@@ -72,6 +73,7 @@ func newTicketsManager() keys.Manager {
 		{ID: bindingTicketsSelectFirst, Seq: []string{"g", "g"}, Categories: []string{"Navigation"}, Title: "first row"},
 		{ID: bindingTicketsSelectLast, Seq: []string{"G"}, Categories: []string{"Navigation"}, Title: "last row"},
 		{ID: bindingTicketsPreviewBottom, Seq: []string{"b"}, Categories: []string{"Navigation"}, Title: "preview bottom"},
+		{ID: bindingTicketsChangeStatus, Seq: []string{"s"}, Categories: []string{"Navigation"}, Title: "change status"},
 	})
 }
 
@@ -153,6 +155,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.selectLastRow()
 	case bindingTicketsPreviewBottom:
 		m.previewVP.GotoBottom()
+	case bindingTicketsChangeStatus:
+		return m.handleChangeStatusKey()
 	}
 	return m, nil
 }

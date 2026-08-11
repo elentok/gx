@@ -129,6 +129,12 @@ type Model struct {
 	implementingEpics      map[string]bool
 	implementSpinner       spinner.Model
 
+	// statusMenuOpen/statusMenu back the "s"-triggered change-status menu (see
+	// status_menu.go): built fresh from the selected row and the live loop
+	// registry each time "s" opens it.
+	statusMenuOpen bool
+	statusMenu     components.MenuState
+
 	// Live state is projected from registry snapshots and scoped by epic before
 	// ticket identity so concurrent epics cannot collide.
 	live            map[string]map[string]liveTicketState
@@ -183,7 +189,9 @@ func (m Model) InputFocused() bool {
 // ModalOpen reports whether one of the tab's launch dialogs is open, so the app
 // shell (see ui/app's modalOpener duck-type) blocks tab-switch keys and
 // routes them here instead while it's up.
-func (m Model) ModalOpen() bool { return m.help.IsOpen || m.implementAgentMenuOpen || m.confirm.IsOpen }
+func (m Model) ModalOpen() bool {
+	return m.help.IsOpen || m.implementAgentMenuOpen || m.statusMenuOpen || m.confirm.IsOpen
+}
 
 func (m Model) Init() tea.Cmd {
 	return m.cmdLoad()
@@ -253,13 +261,16 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.implementAgentMenuOpen {
 			return m.handleImplementAgentMenuKey(msg)
 		}
+		if m.statusMenuOpen {
+			return m.handleStatusMenuKey(msg)
+		}
 		if m.confirm.IsOpen {
 			return m.handleConfirmUpdate(msg)
 		}
 		return m.handleKey(msg)
 
 	case tea.MouseClickMsg:
-		if m.implementAgentMenuOpen {
+		if m.implementAgentMenuOpen || m.statusMenuOpen {
 			return m, nil
 		}
 		if m.confirm.IsOpen {
@@ -290,6 +301,8 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleImplementSpinnerTick(msg)
 	case reattachSignalsMsg:
 		return m.handleReattachSignals(msg)
+	case statusChangedMsg:
+		return m.handleStatusChanged()
 	}
 	return m, nil
 }
@@ -525,6 +538,8 @@ func (m Model) View() tea.View {
 	content := m.normalView()
 	if m.implementAgentMenuOpen {
 		content = ui.OverlayCenter(content, m.implementAgentMenuView(), m.width, m.height)
+	} else if m.statusMenuOpen {
+		content = ui.OverlayCenter(content, m.statusMenuView(), m.width, m.height)
 	} else if m.confirm.IsOpen {
 		content = ui.OverlayCenter(content, m.confirm.View(m.width), m.width, m.height)
 	}
