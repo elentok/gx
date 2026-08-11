@@ -182,12 +182,37 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		skill = defaultWorkerSkill
 	}
 
+	// permitHeld/acquirePermit/releasePermit track this Run's concurrency
+	// slot against opts.Permit: acquired before EpicStarted fires (an epic
+	// waiting for a slot hasn't started, so announcing at entry would report
+	// a start that hasn't happened and could sit unfulfilled behind a busy
+	// queue), released by the time Run returns. The defer is what makes
+	// release safe under every return path (deadlock error, mid-loop error,
+	// StampEpicCompleted failure, normal completion, or the no-tickets/
+	// already-complete early returns below) without duplicating a release
+	// call at each one.
+	permitHeld := false
+	acquirePermit := func() {
+		if opts.Permit != nil && !permitHeld {
+			opts.Permit.Acquire()
+			permitHeld = true
+		}
+	}
+	releasePermit := func() {
+		if opts.Permit != nil && permitHeld {
+			opts.Permit.Release()
+			permitHeld = false
+		}
+	}
+	defer releasePermit()
+
 	initial, err := loadNamedEpic(scratchDir, opts.EpicName)
 	if err != nil {
 		return err
 	}
 	if initial == nil || len(initial.Tickets) == 0 {
-		sink.NoTicketsFound(opts.EpicName)
+		acquirePermit()
+		sink.EpicStarted(opts.EpicName, 0, 0)
 		return nil
 	}
 	scope, err := ResolveRunScope(*initial, opts.TicketIDs)
@@ -204,7 +229,8 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 				return fmt.Errorf("stamping epic %q completed_at: %w", opts.EpicName, err)
 			}
 		}
-		sink.AlreadyComplete(opts.EpicName, scope.DoneCount(*initial), total)
+		acquirePermit()
+		sink.EpicStarted(opts.EpicName, scope.DoneCount(*initial), total)
 		return nil
 	}
 	if agent == AgentCodex && d.PreflightAgent != nil {
@@ -277,27 +303,6 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	if gate == nil {
 		gate = NewGate()
 	}
-
-	// permitHeld/acquirePermit/releasePermit track this Run's concurrency
-	// slot against opts.Permit: acquired before any claim while active==0,
-	// released by the time Run returns. The defer is what makes that safe
-	// under every return path (deadlock error, mid-loop error,
-	// StampEpicCompleted failure, normal completion) without duplicating a
-	// release call at each one.
-	permitHeld := false
-	acquirePermit := func() {
-		if opts.Permit != nil && !permitHeld {
-			opts.Permit.Acquire()
-			permitHeld = true
-		}
-	}
-	releasePermit := func() {
-		if opts.Permit != nil && permitHeld {
-			opts.Permit.Release()
-			permitHeld = false
-		}
-	}
-	defer releasePermit()
 
 	type outcome struct {
 		ticket tickets.Ticket
@@ -406,6 +411,14 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	completed := 0
 	active := 0
 
+	// The epic is genuinely running past this point (not no-tickets, not
+	// already-complete), so the permit is acquired and the single start
+	// message fires now — after Acquire() returns, never before — rather
+	// than deferring it to whichever later acquirePermit() call happens to
+	// run first.
+	acquirePermit()
+	sink.EpicStarted(opts.EpicName, scope.DoneCount(*initial), total)
+
 	reattached, err := reconcile(d, reconcileParams{
 		WorkspaceID:  workspaceID,
 		Paths:        reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: featurePath, WorktreeDir: wtDir, RepoDir: opts.RepoDir},
@@ -424,9 +437,6 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	// A ticket found needs-repair at startup deliberately does not pause
 	// the gate: it's human-clearable, so the run schedules every other
 	// runnable ticket first and only parks on it once nothing is runnable.
-	if len(reattached) > 0 {
-		acquirePermit()
-	}
 	for _, ticket := range reattached {
 		launch(ticket, true)
 		active++

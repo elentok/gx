@@ -78,6 +78,11 @@ func sendSlackMessageRaw(webhookURL, text string) error {
 	return s.sendSync(ctx, text)
 }
 
+func (s *slackEventSink) EpicStarted(epicName string, done, total int) {
+	s.EventSink.EpicStarted(epicName, done, total)
+	s.send(slackStyle.epicStartedText(epicName, done, total), notifyKindEpicStarted)
+}
+
 func (s *slackEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
 	s.EventSink.IterationFinished(ticket, epicName, stats)
 	s.send(slackStyle.iterationFinishedText(ticket, epicName, stats), notifyKindIterationFinished)

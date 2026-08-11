@@ -57,6 +57,27 @@ func waitForSlackRequests(get func() []slackRequest, want int) []slackRequest {
 	return get()
 }
 
+func TestSlackEventSink_EpicStarted_SendsOneMessageAndForwards(t *testing.T) {
+	server, getRequests := fakeSlackServer(t, http.StatusOK)
+	inner := &recordingSink{}
+	sink := newSlackEventSink(inner, server.URL, "", "")
+
+	sink.EpicStarted("epic", 0, 3)
+
+	if got := inner.snapshot(); len(got) != 1 || got[0] != "EpicStarted" {
+		t.Errorf("inner events = %v, want [EpicStarted]", got)
+	}
+
+	reqs := waitForSlackRequests(getRequests, 1)
+	if len(reqs) != 1 {
+		t.Fatalf("requests = %v, want exactly 1", reqs)
+	}
+	want := slackStyle.epicStartedText("epic", 0, 3)
+	if reqs[0].Text != want {
+		t.Errorf("text = %q, want %q", reqs[0].Text, want)
+	}
+}
+
 func TestSlackEventSink_IterationFinished_SendsOneMessageAndForwards(t *testing.T) {
 	server, getRequests := fakeSlackServer(t, http.StatusOK)
 	inner := &recordingSink{}
@@ -150,8 +171,6 @@ func TestSlackEventSink_OtherMethods_ForwardWithoutSendingAnyRequest(t *testing.
 	inner := &recordingSink{}
 	sink := newSlackEventSink(inner, server.URL, "", "")
 
-	sink.NoTicketsFound("epic")
-	sink.AlreadyComplete("epic", 1, 2)
 	sink.TicketReverted("01")
 	sink.TicketReattached("01", "iter-01", "/repo", "sess-1")
 	sink.TicketClaimed(tickets.Ticket{Identifier: "01"})
@@ -170,7 +189,7 @@ func TestSlackEventSink_OtherMethods_ForwardWithoutSendingAnyRequest(t *testing.
 	sink.TicketUnrecoverable("01", "epic")
 
 	want := []string{
-		"NoTicketsFound", "AlreadyComplete", "TicketReverted", "TicketReattached",
+		"TicketReverted", "TicketReattached",
 		"TicketClaimed", "IterationStarted", "IterationResumed",
 		"TranscriptLine", "ContextOccupancy", "CherryPickStarted", "ConflictResolutionStarted",
 		"SmartZoneCompactStarted", "SmartZoneFinishingUp", "SmartZoneRecovered",

@@ -62,6 +62,27 @@ func waitForRequests(get func() []telegramRequest, want int) []telegramRequest {
 	return get()
 }
 
+func TestTelegramEventSink_EpicStarted_SendsOneMessageAndForwards(t *testing.T) {
+	server, getRequests := fakeTelegramServer(t, http.StatusOK)
+	inner := &recordingSink{}
+	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
+
+	sink.EpicStarted("epic", 0, 3)
+
+	if got := inner.snapshot(); len(got) != 1 || got[0] != "EpicStarted" {
+		t.Errorf("inner events = %v, want [EpicStarted]", got)
+	}
+
+	reqs := waitForRequests(getRequests, 1)
+	if len(reqs) != 1 {
+		t.Fatalf("requests = %v, want exactly 1", reqs)
+	}
+	want := telegramStyle.epicStartedText("epic", 0, 3)
+	if reqs[0].Text != want {
+		t.Errorf("text = %q, want %q", reqs[0].Text, want)
+	}
+}
+
 func TestTelegramEventSink_IterationFinished_SendsOneMessageAndForwards(t *testing.T) {
 	server, getRequests := fakeTelegramServer(t, http.StatusOK)
 	inner := &recordingSink{}
@@ -161,8 +182,6 @@ func TestTelegramEventSink_OtherMethods_ForwardWithoutSendingAnyRequest(t *testi
 	inner := &recordingSink{}
 	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
 
-	sink.NoTicketsFound("epic")
-	sink.AlreadyComplete("epic", 1, 2)
 	sink.TicketReverted("01")
 	sink.TicketReattached("01", "iter-01", "/repo", "sess-1")
 	sink.TicketClaimed(tickets.Ticket{Identifier: "01"})
@@ -181,7 +200,7 @@ func TestTelegramEventSink_OtherMethods_ForwardWithoutSendingAnyRequest(t *testi
 	sink.TicketUnrecoverable("01", "epic")
 
 	want := []string{
-		"NoTicketsFound", "AlreadyComplete", "TicketReverted", "TicketReattached",
+		"TicketReverted", "TicketReattached",
 		"TicketClaimed", "IterationStarted", "IterationResumed",
 		"TranscriptLine", "ContextOccupancy", "CherryPickStarted", "ConflictResolutionStarted",
 		"SmartZoneCompactStarted", "SmartZoneFinishingUp", "SmartZoneRecovered",

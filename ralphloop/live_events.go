@@ -8,8 +8,7 @@ import "github.com/elentok/gx/tickets"
 type LiveEventKind int
 
 const (
-	LiveEventNoTicketsFound LiveEventKind = iota
-	LiveEventAlreadyComplete
+	LiveEventEpicStarted LiveEventKind = iota
 	LiveEventTicketReverted
 	LiveEventTicketReattached
 	LiveEventTicketNeedsHuman
@@ -106,12 +105,8 @@ func (s *ChannelEventSink) emit(ev LiveEvent) {
 	s.events <- ev
 }
 
-func (s *ChannelEventSink) NoTicketsFound(epicName string) {
-	s.emit(LiveEvent{Kind: LiveEventNoTicketsFound, EpicName: epicName})
-}
-
-func (s *ChannelEventSink) AlreadyComplete(epicName string, done, total int) {
-	s.emit(LiveEvent{Kind: LiveEventAlreadyComplete, EpicName: epicName, Done: done, Total: total})
+func (s *ChannelEventSink) EpicStarted(epicName string, done, total int) {
+	s.emit(LiveEvent{Kind: LiveEventEpicStarted, EpicName: epicName, Done: done, Total: total})
 }
 
 func (s *ChannelEventSink) TicketReverted(identifier string) {

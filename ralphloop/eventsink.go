@@ -60,12 +60,16 @@ type StalledTicket struct {
 // to call concurrently: each running iteration reports through the same
 // sink from its own goroutine.
 type EventSink interface {
-	// NoTicketsFound reports that epicName has no tickets at all; Run exits
-	// immediately without doing anything else.
-	NoTicketsFound(epicName string)
-	// AlreadyComplete reports that every one of epicName's tickets was
-	// already done/needs-answer before Run did anything.
-	AlreadyComplete(epicName string, done, total int)
+	// EpicStarted reports that epicName has begun running: fired exactly
+	// once per epic that leaves the queue, after the concurrency permit is
+	// acquired (not at Run's entry, so a queued epic waiting for a slot
+	// never announces a start it hasn't reached yet). This folds what used
+	// to be two separate events — no tickets at all, and every ticket
+	// already done — into the same single start message (done/total cover
+	// both: total 0 for no tickets, done == total for already complete), so
+	// every epic that leaves the queue emits exactly one start message and
+	// a missing one is itself meaningful.
+	EpicStarted(epicName string, done, total int)
 
 	// TicketReverted reports that a ticket left `Status: claimed` by a prior
 	// crashed/killed invocation had no live iteration to reattach to, and was
@@ -183,8 +187,7 @@ type EventSink interface {
 // tests exercising pause/resume plumbing) without wiring up a real sink.
 type noopEventSink struct{}
 
-func (noopEventSink) NoTicketsFound(epicName string)                               {}
-func (noopEventSink) AlreadyComplete(epicName string, done, total int)             {}
+func (noopEventSink) EpicStarted(epicName string, done, total int)                 {}
 func (noopEventSink) TicketReverted(identifier string)                             {}
 func (noopEventSink) TicketReattached(identifier, label, cwd, sessionID string)    {}
 func (noopEventSink) TicketNeedsHuman(identifier, epicName, status, reason string) {}
@@ -229,12 +232,15 @@ func (s *textEventSink) printf(format string, args ...any) {
 	fmt.Fprintf(s.out, format, args...)
 }
 
-func (s *textEventSink) NoTicketsFound(epicName string) {
-	s.printf("no tickets found for epic %q; nothing to do\n", epicName)
-}
-
-func (s *textEventSink) AlreadyComplete(epicName string, done, total int) {
-	s.printf("epic %q is already complete (%d/%d done)\n", epicName, done, total)
+func (s *textEventSink) EpicStarted(epicName string, done, total int) {
+	switch {
+	case total == 0:
+		s.printf("no tickets found for epic %q; nothing to do\n", epicName)
+	case done == total:
+		s.printf("epic %q is already complete (%d/%d done)\n", epicName, done, total)
+	default:
+		s.printf("epic %q started (%d/%d done)\n", epicName, done, total)
+	}
 }
 
 func (s *textEventSink) TicketReverted(identifier string) {

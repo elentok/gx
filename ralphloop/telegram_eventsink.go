@@ -100,6 +100,11 @@ func sendTelegramRaw(botToken, chatID, apiBaseURL, text string) error {
 	return s.sendSync(ctx, text)
 }
 
+func (s *telegramEventSink) EpicStarted(epicName string, done, total int) {
+	s.EventSink.EpicStarted(epicName, done, total)
+	s.send(telegramStyle.epicStartedText(epicName, done, total), notifyKindEpicStarted)
+}
+
 func (s *telegramEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
 	s.EventSink.IterationFinished(ticket, epicName, stats)
 	s.send(telegramStyle.iterationFinishedText(ticket, epicName, stats), notifyKindIterationFinished)

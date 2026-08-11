@@ -51,11 +51,8 @@ func (s *recordingSink) snapshot() []string {
 	return out
 }
 
-func (s *recordingSink) NoTicketsFound(epicName string) { s.record("NoTicketsFound") }
-func (s *recordingSink) AlreadyComplete(epicName string, done, total int) {
-	s.record("AlreadyComplete")
-}
-func (s *recordingSink) TicketReverted(identifier string) { s.record("TicketReverted") }
+func (s *recordingSink) EpicStarted(epicName string, done, total int) { s.record("EpicStarted") }
+func (s *recordingSink) TicketReverted(identifier string)             { s.record("TicketReverted") }
 func (s *recordingSink) TicketReattached(identifier, label, cwd, sessionID string) {
 	s.record("TicketReattached")
 }
@@ -138,7 +135,7 @@ func TestRun_EventSink_EmitsLifecycleSequenceForASingleTicket(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	want := []string{"TicketClaimed", "IterationStarted", "CherryPickStarted", "IterationFinished", "EpicComplete"}
+	want := []string{"EpicStarted", "TicketClaimed", "IterationStarted", "CherryPickStarted", "IterationFinished", "EpicComplete"}
 	got := sink.snapshot()
 	if len(got) != len(want) {
 		t.Fatalf("events = %v, want %v", got, want)
@@ -174,8 +171,28 @@ func TestRun_EventSink_NoTicketsFound(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	if got := sink.snapshot(); len(got) != 1 || got[0] != "NoTicketsFound" {
-		t.Errorf("events = %v, want [NoTicketsFound]", got)
+	if got := sink.snapshot(); len(got) != 1 || got[0] != "EpicStarted" {
+		t.Errorf("events = %v, want [EpicStarted]", got)
+	}
+}
+
+// TestRun_EventSink_AlreadyCompleteEpic_EmitsExactlyOneEpicStarted pins the
+// other half of the fold: an epic whose every ticket is already done
+// produces the same single EpicStarted event as a fresh run or an empty
+// epic, not a separate "already complete" event.
+func TestRun_EventSink_AlreadyCompleteEpic_EmitsExactlyOneEpicStarted(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: done\ntype: task\n---\n# A\n",
+	})
+	d, _, _ := fakeDeps()
+
+	sink := &recordingSink{}
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if got := sink.snapshot(); len(got) != 1 || got[0] != "EpicStarted" {
+		t.Errorf("events = %v, want [EpicStarted]", got)
 	}
 }
 
@@ -187,8 +204,8 @@ func TestNewTextEventSink_RendersSameTextAsBeforeTheEventSinkRefactor(t *testing
 	var out bytes.Buffer
 	sink := NewTextEventSink(&out)
 
-	sink.NoTicketsFound("epic")
-	sink.AlreadyComplete("epic", 2, 2)
+	sink.EpicStarted("epic", 0, 0)
+	sink.EpicStarted("epic", 2, 2)
 	sink.TicketReverted("01")
 	sink.TicketReattached("01", "iter-01", "/repo/iter-01", "sess-1")
 	sink.TicketNeedsHuman("01", "epic", "needs-repair", "no live iteration found")

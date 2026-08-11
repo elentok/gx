@@ -164,6 +164,48 @@ func TestRun_Permit_BlocksClaimUntilAcquireReturns(t *testing.T) {
 	}
 }
 
+// TestRun_EpicStarted_FiresAfterPermitAcquireReturns proves EpicStarted
+// waits for a slow Permit.Acquire to return before firing: an epic waiting
+// for a slot hasn't started yet, so the start message must not report a
+// start that hasn't happened.
+func TestRun_EpicStarted_FiresAfterPermitAcquireReturns(t *testing.T) {
+	scratchDir := writeEpic(t, "my-epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+	})
+	d, _, _ := fakeDeps()
+
+	unblock := make(chan struct{})
+	permit := &fakePermit{
+		acquire: func() { <-unblock },
+	}
+
+	sink := &recordingSink{}
+	runErr := make(chan error, 1)
+	go func() {
+		runErr <- Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo", Permit: permit}, d, sink)
+	}()
+
+	// Give Run a moment to reach and block on Acquire before releasing it.
+	time.Sleep(50 * time.Millisecond)
+	if got := sink.snapshot(); len(got) != 0 {
+		t.Errorf("events = %v, want none while still blocked on Permit.Acquire", got)
+	}
+	close(unblock)
+
+	select {
+	case err := <-runErr:
+		if err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for Run to finish after unblocking Acquire")
+	}
+
+	if got := sink.snapshot(); len(got) == 0 || got[0] != "EpicStarted" {
+		t.Errorf("events = %v, want EpicStarted first", got)
+	}
+}
+
 // TestRun_Permit_AcquiredBeforeReattachLaunch confirms Acquire is called
 // before the reattach-launch block runs, not just before a fresh claim: a
 // ticket that reconciles as already-running (a live tab found by TabList)

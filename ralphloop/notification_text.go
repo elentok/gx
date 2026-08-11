@@ -129,6 +129,22 @@ func (s mrkdwnStyle) ticketNeedsHumanText(identifier, epicName, status, reason s
 	return fmt.Sprintf("%s *%s %s*\n\n%s", emoji, ref, label, s.escape(reason))
 }
 
+// epicStartedText renders the "epic started" notification — the single
+// message every epic that leaves the queue emits exactly once, folding what
+// used to be separate no-tickets/already-complete notifications: a fresh
+// start reads as a plain counts line, while total 0 or done == total tell
+// the same story the old separate events used to:
+//
+//	🚀 *epic started: {epicName}*
+//
+//	{done}/{total} done
+func (s mrkdwnStyle) epicStartedText(epicName string, done, total int) string {
+	return fmt.Sprintf(
+		"\U0001f680 *epic started: %s*\n\n%d/%d done",
+		s.escape(epicName), done, total,
+	)
+}
+
 // epicCompleteText renders the "epic complete" notification:
 //
 //	🎉 *epic complete: {epicName}*

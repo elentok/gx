@@ -62,6 +62,7 @@ const (
 // notification-failed line — distinct from the Type field (which is always
 // "notification-sent"/"notification-failed" itself).
 const (
+	notifyKindEpicStarted       = "epic-started"
 	notifyKindIterationFinished = "iteration-finished"
 	notifyKindIterationPaused   = "iteration-paused"
 	notifyKindEpicComplete      = "epic-complete"
