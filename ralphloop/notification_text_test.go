@@ -79,19 +79,27 @@ func TestTelegramStyleIterationPausedText_RateLimitUsesPauseEmoji(t *testing.T) 
 	}
 }
 
-func TestTelegramStyleTicketNeedsAnswerText_DistinctFromIterationPausedText(t *testing.T) {
-	got := telegramStyle.ticketNeedsAnswerText("04", "ui-tree-migration")
+func TestTelegramStyleTicketNeedsHumanText_DistinctFromIterationPausedText(t *testing.T) {
+	got := telegramStyle.ticketNeedsHumanText("04", "ui-tree-migration", "needs-answer", "No commits landed; marked needs-answer.")
 	want := "\U0001f198 *ui\\-tree\\-migration/04 needs answer*\n\nNo commits landed; marked needs\\-answer\\."
 	if got != want {
 		t.Errorf("text = %q, want %q", got, want)
 	}
 	if paused := telegramStyle.iterationPausedText("ui-tree-migration/04", PauseNeedsRepair, "stuck"); got == paused {
-		t.Errorf("ticketNeedsAnswerText matched iterationPausedText: %q", got)
+		t.Errorf("ticketNeedsHumanText matched iterationPausedText: %q", got)
 	}
 }
 
-func TestSlackStyleTicketNeedsAnswerText_NoEscaping(t *testing.T) {
-	got := slackStyle.ticketNeedsAnswerText("04", "ui-tree-migration")
+func TestTelegramStyleTicketNeedsHumanText_NeedsRepairUsesDifferentLabel(t *testing.T) {
+	got := telegramStyle.ticketNeedsHumanText("04", "ui-tree-migration", "needs-repair", "Codex is waiting for operator intervention")
+	want := "\U0001f6d1 *ui\\-tree\\-migration/04 needs repair*\n\nCodex is waiting for operator intervention"
+	if got != want {
+		t.Errorf("text = %q, want %q", got, want)
+	}
+}
+
+func TestSlackStyleTicketNeedsHumanText_NoEscaping(t *testing.T) {
+	got := slackStyle.ticketNeedsHumanText("04", "ui-tree-migration", "needs-answer", "No commits landed; marked needs-answer.")
 	want := "\U0001f198 *ui-tree-migration/04 needs answer*\n\nNo commits landed; marked needs-answer."
 	if got != want {
 		t.Errorf("text = %q, want %q", got, want)

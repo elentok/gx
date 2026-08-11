@@ -31,10 +31,10 @@ type recordingSink struct {
 	// call, so a test can assert both how many times a run parked and what
 	// it named as blocking each park.
 	parkedStalled [][]StalledTicket
-	// ticketNeedsAnswerCalls records every TicketNeedsAnswer call's
-	// (identifier, epicName) pair, for asserting both the count and the
-	// identity a needs-answer transition reports.
-	ticketNeedsAnswerCalls [][2]string
+	// ticketNeedsHumanCalls records every TicketNeedsHuman call's
+	// (identifier, epicName, status, reason) tuple, for asserting both the
+	// count and the identity/status a parking-write transition reports.
+	ticketNeedsHumanCalls [][4]string
 }
 
 func (s *recordingSink) record(name string) {
@@ -59,14 +59,11 @@ func (s *recordingSink) TicketReverted(identifier string) { s.record("TicketReve
 func (s *recordingSink) TicketReattached(identifier, label, cwd, sessionID string) {
 	s.record("TicketReattached")
 }
-func (s *recordingSink) TicketStillNeedsRepair(identifier string) {
-	s.record("TicketStillNeedsRepair")
-}
-func (s *recordingSink) TicketNeedsAnswer(identifier, epicName string) {
+func (s *recordingSink) TicketNeedsHuman(identifier, epicName, status, reason string) {
 	s.mu.Lock()
-	s.ticketNeedsAnswerCalls = append(s.ticketNeedsAnswerCalls, [2]string{identifier, epicName})
+	s.ticketNeedsHumanCalls = append(s.ticketNeedsHumanCalls, [4]string{identifier, epicName, status, reason})
 	s.mu.Unlock()
-	s.record("TicketNeedsAnswer")
+	s.record("TicketNeedsHuman")
 }
 func (s *recordingSink) TicketClaimed(ticket tickets.Ticket) { s.record("TicketClaimed") }
 func (s *recordingSink) IterationStarted(identifier, label, cwd, sessionID string) {
@@ -192,7 +189,7 @@ func TestNewTextEventSink_RendersSameTextAsBeforeTheEventSinkRefactor(t *testing
 	sink.AlreadyComplete("epic", 2, 2)
 	sink.TicketReverted("01")
 	sink.TicketReattached("01", "iter-01", "/repo/iter-01", "sess-1")
-	sink.TicketStillNeedsRepair("01")
+	sink.TicketNeedsHuman("01", "epic", "needs-repair", "no live iteration found")
 	sink.IterationPaused("iter-01", PauseRateLimit, "rate limit detected")
 	sink.IterationResumed("iter-01", PauseRateLimit)
 	sink.SmartZoneCompactStarted("01")

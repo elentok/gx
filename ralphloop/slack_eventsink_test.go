@@ -100,22 +100,22 @@ func TestSlackEventSink_IterationPaused_SendsOneMessageAndForwards(t *testing.T)
 	}
 }
 
-func TestSlackEventSink_TicketNeedsAnswer_SendsOneMessageAndForwards(t *testing.T) {
+func TestSlackEventSink_TicketNeedsHuman_SendsOneMessageAndForwards(t *testing.T) {
 	server, getRequests := fakeSlackServer(t, http.StatusOK)
 	inner := &recordingSink{}
 	sink := newSlackEventSink(inner, server.URL, "", "")
 
-	sink.TicketNeedsAnswer("04", "epic")
+	sink.TicketNeedsHuman("04", "epic", "needs-answer", "no commits landed")
 
-	if got := inner.snapshot(); len(got) != 1 || got[0] != "TicketNeedsAnswer" {
-		t.Errorf("inner events = %v, want [TicketNeedsAnswer]", got)
+	if got := inner.snapshot(); len(got) != 1 || got[0] != "TicketNeedsHuman" {
+		t.Errorf("inner events = %v, want [TicketNeedsHuman]", got)
 	}
 
 	reqs := waitForSlackRequests(getRequests, 1)
 	if len(reqs) != 1 {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
-	want := slackStyle.ticketNeedsAnswerText("04", "epic")
+	want := slackStyle.ticketNeedsHumanText("04", "epic", "needs-answer", "no commits landed")
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}
@@ -154,7 +154,6 @@ func TestSlackEventSink_OtherMethods_ForwardWithoutSendingAnyRequest(t *testing.
 	sink.AlreadyComplete("epic", 1, 2)
 	sink.TicketReverted("01")
 	sink.TicketReattached("01", "iter-01", "/repo", "sess-1")
-	sink.TicketStillNeedsRepair("01")
 	sink.TicketClaimed(tickets.Ticket{Identifier: "01"})
 	sink.IterationStarted("01", "iter-01", "/repo", "sess-1")
 	sink.IterationResumed("iter-01", PauseRateLimit)
@@ -172,7 +171,7 @@ func TestSlackEventSink_OtherMethods_ForwardWithoutSendingAnyRequest(t *testing.
 
 	want := []string{
 		"NoTicketsFound", "AlreadyComplete", "TicketReverted", "TicketReattached",
-		"TicketStillNeedsRepair", "TicketClaimed", "IterationStarted", "IterationResumed",
+		"TicketClaimed", "IterationStarted", "IterationResumed",
 		"TranscriptLine", "ContextOccupancy", "CherryPickStarted", "ConflictResolutionStarted",
 		"SmartZoneCompactStarted", "SmartZoneFinishingUp", "SmartZoneRecovered",
 		"TicketCleanupFinished", "TicketRecovering", "TicketRecovered", "TicketUnrecoverable",

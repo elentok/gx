@@ -12,8 +12,7 @@ const (
 	LiveEventAlreadyComplete
 	LiveEventTicketReverted
 	LiveEventTicketReattached
-	LiveEventTicketStillNeedsRepair
-	LiveEventTicketNeedsAnswer
+	LiveEventTicketNeedsHuman
 	LiveEventTicketClaimed
 	LiveEventIterationStarted
 	LiveEventIterationPaused
@@ -46,6 +45,7 @@ type LiveEvent struct {
 	Identifier string
 	Label      string
 	Reason     string
+	Status     string
 	PauseKind  PauseKind
 	Line       string
 	Ticket     tickets.Ticket
@@ -122,12 +122,8 @@ func (s *ChannelEventSink) TicketReattached(identifier, label, cwd, sessionID st
 	s.emit(LiveEvent{Kind: LiveEventTicketReattached, Identifier: identifier, Label: label, Cwd: cwd, SessionID: sessionID})
 }
 
-func (s *ChannelEventSink) TicketStillNeedsRepair(identifier string) {
-	s.emit(LiveEvent{Kind: LiveEventTicketStillNeedsRepair, Identifier: identifier})
-}
-
-func (s *ChannelEventSink) TicketNeedsAnswer(identifier, epicName string) {
-	s.emit(LiveEvent{Kind: LiveEventTicketNeedsAnswer, Identifier: identifier, EpicName: epicName})
+func (s *ChannelEventSink) TicketNeedsHuman(identifier, epicName, status, reason string) {
+	s.emit(LiveEvent{Kind: LiveEventTicketNeedsHuman, Identifier: identifier, EpicName: epicName, Status: status, Reason: reason})
 }
 
 func (s *ChannelEventSink) TicketClaimed(ticket tickets.Ticket) {

@@ -120,7 +120,7 @@ func tabIDForLabel(tabs []herdr.Tab, label string) string {
 // status/event machinery as Codex's own operator-intervention path rather
 // than silently reverting the ticket to open (which would re-run it from
 // scratch without a human ever knowing the first run's result vanished).
-func markDoneTicketUnrecoverable(paths reconcilePaths, featureBranch string, t tickets.Ticket) error {
+func markDoneTicketUnrecoverable(paths reconcilePaths, featureBranch string, t tickets.Ticket) (string, error) {
 	branch := iterBranch(featureBranch, t.Identifier)
 	reason := fmt.Sprintf("done but commits missing from %s and iteration branch %s no longer exists to recover them", featureBranch, branch)
 	state := schema.NeedsRepairState{
@@ -129,10 +129,10 @@ func markDoneTicketUnrecoverable(paths reconcilePaths, featureBranch string, t t
 		Worktree: iterationWorktreePath(paths.WorktreeDir, featureBranch, t.Identifier),
 	}
 	if err := MarkNeedsRepairWithReason(t.Path, reason, state); err != nil {
-		return fmt.Errorf("marking ticket needs-repair: %w", err)
+		return "", fmt.Errorf("marking ticket needs-repair: %w", err)
 	}
 	if err := logEvent(paths.ScratchDir, featureBranch, Event{Type: eventNeedsRepair, Ticket: t.Identifier, Reason: reason}); err != nil {
-		return fmt.Errorf("logging needs-repair event: %w", err)
+		return "", fmt.Errorf("logging needs-repair event: %w", err)
 	}
-	return nil
+	return reason, nil
 }

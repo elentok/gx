@@ -121,7 +121,7 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 				reattach(t)
 				reattached = append(reattached, t)
 			} else {
-				sink.TicketStillNeedsRepair(t.Identifier)
+				sink.TicketNeedsHuman(t.Identifier, epic.Name, "needs-repair", "no live iteration found")
 			}
 			continue
 		}
@@ -186,10 +186,12 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 				return nil, fmt.Errorf("repairing done ticket %s: %w", t.Identifier, err)
 			}
 		case doneUnrecoverable:
-			if err := markDoneTicketUnrecoverable(paths, epic.Name, t); err != nil {
+			reason, err := markDoneTicketUnrecoverable(paths, epic.Name, t)
+			if err != nil {
 				return nil, fmt.Errorf("flagging unrecoverable done ticket %s: %w", t.Identifier, err)
 			}
 			sink.TicketUnrecoverable(t.Identifier, epic.Name)
+			sink.TicketNeedsHuman(t.Identifier, epic.Name, "needs-repair", reason)
 		}
 	}
 

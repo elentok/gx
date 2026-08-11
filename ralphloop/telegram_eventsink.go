@@ -110,9 +110,9 @@ func (s *telegramEventSink) IterationPaused(label string, kind PauseKind, reason
 	s.send(telegramStyle.iterationPausedText(label, kind, reason), notifyKindIterationPaused)
 }
 
-func (s *telegramEventSink) TicketNeedsAnswer(identifier, epicName string) {
-	s.EventSink.TicketNeedsAnswer(identifier, epicName)
-	s.send(telegramStyle.ticketNeedsAnswerText(identifier, epicName), notifyKindTicketNeedsAnswer)
+func (s *telegramEventSink) TicketNeedsHuman(identifier, epicName, status, reason string) {
+	s.EventSink.TicketNeedsHuman(identifier, epicName, status, reason)
+	s.send(telegramStyle.ticketNeedsHumanText(identifier, epicName, status, reason), notifyKindTicketNeedsHuman)
 }
 
 func (s *telegramEventSink) EpicParked(epicName string, stalled []StalledTicket) {

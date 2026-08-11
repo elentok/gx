@@ -66,7 +66,7 @@ const (
 	notifyKindIterationPaused   = "iteration-paused"
 	notifyKindEpicComplete      = "epic-complete"
 	notifyKindEpicParked        = "epic-parked"
-	notifyKindTicketNeedsAnswer = "ticket-needs-answer"
+	notifyKindTicketNeedsHuman  = "ticket-needs-human"
 )
 
 // ScanDecision records one ticket's scheduling disposition for a single

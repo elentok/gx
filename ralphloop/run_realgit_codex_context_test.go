@@ -581,10 +581,10 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 	}
 
 	sink.mu.Lock()
-	paused, kind, reason := sink.paused, sink.kind, sink.reason
+	paused, status, reason := sink.paused, sink.status, sink.reason
 	sink.mu.Unlock()
-	if !paused || kind != PauseNeedsRepair {
-		t.Fatalf("IterationPaused = (paused:%v kind:%q), want (true, %q)", paused, kind, PauseNeedsRepair)
+	if !paused || status != "needs-repair" {
+		t.Fatalf("TicketNeedsHuman = (paused:%v status:%q), want (true, %q)", paused, status, "needs-repair")
 	}
 	if !strings.Contains(reason, "recovery failed") || !strings.Contains(reason, evidence) {
 		t.Errorf("needs-repair reason = %q, want it to name the failed recovery and its evidence", reason)
@@ -652,20 +652,20 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 	}
 }
 
-// needsRepairSink records the single IterationPaused call ticket 31's
+// needsRepairSink records the single TicketNeedsHuman call ticket 31's
 // failed-recovery scenario is expected to make.
 type needsRepairSink struct {
 	noopEventSink
 	mu     sync.Mutex
 	paused bool
-	kind   PauseKind
+	status string
 	reason string
 }
 
-func (s *needsRepairSink) IterationPaused(label string, kind PauseKind, reason string) {
+func (s *needsRepairSink) TicketNeedsHuman(identifier, epicName, status, reason string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.paused = true
-	s.kind = kind
+	s.status = status
 	s.reason = reason
 }

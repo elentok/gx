@@ -88,9 +88,9 @@ func (s *slackEventSink) IterationPaused(label string, kind PauseKind, reason st
 	s.send(slackStyle.iterationPausedText(label, kind, reason), notifyKindIterationPaused)
 }
 
-func (s *slackEventSink) TicketNeedsAnswer(identifier, epicName string) {
-	s.EventSink.TicketNeedsAnswer(identifier, epicName)
-	s.send(slackStyle.ticketNeedsAnswerText(identifier, epicName), notifyKindTicketNeedsAnswer)
+func (s *slackEventSink) TicketNeedsHuman(identifier, epicName, status, reason string) {
+	s.EventSink.TicketNeedsHuman(identifier, epicName, status, reason)
+	s.send(slackStyle.ticketNeedsHumanText(identifier, epicName, status, reason), notifyKindTicketNeedsHuman)
 }
 
 func (s *slackEventSink) EpicParked(epicName string, stalled []StalledTicket) {

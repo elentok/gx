@@ -527,7 +527,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 				reason = fmt.Sprintf("%s (also failed marking needs-repair: %v)", reason, markErr)
 			}
 			delete(launched, r.ticket.Identifier)
-			sink.IterationPaused(label, PauseNeedsRepair, reason)
+			sink.TicketNeedsHuman(r.ticket.Identifier, opts.EpicName, "needs-repair", reason)
 			continue
 		}
 

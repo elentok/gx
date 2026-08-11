@@ -845,7 +845,7 @@ func waitForAttentionRecovery(d Deps, p launchAndPromptParams, sessionID string)
 		return fmt.Errorf("marking ticket needs-repair: %w", err)
 	}
 	p.Gate.pause(p.Label, reason)
-	p.sink().IterationPaused(p.Label, PauseNeedsRepair, reason)
+	p.sink().TicketNeedsHuman(p.Ticket, p.EpicName, "needs-repair", reason)
 	p.logAgentEvent(eventNeedsRepair, sessionID, reason)
 
 	for {

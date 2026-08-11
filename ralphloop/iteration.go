@@ -274,7 +274,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 			return fmt.Errorf("marking ticket needs-answer: %w", err)
 		}
 		p.logTicketEvent(eventNeedsAnswer, pane, tab, sessionID, path)
-		p.Sink.TicketNeedsAnswer(p.Ticket.Identifier, p.FeatureBranch)
+		p.Sink.TicketNeedsHuman(p.Ticket.Identifier, p.FeatureBranch, "needs-answer", "no commits landed")
 		return nil
 	}
 
@@ -315,7 +315,7 @@ func adoptNeedsAnswerReport(p iterationParams, path, pane, tab, sessionID string
 		return false, fmt.Errorf("adopting needs-answer report: %w", err)
 	}
 	p.logTicketEvent(eventNeedsAnswer, pane, tab, sessionID, path)
-	p.Sink.TicketNeedsAnswer(p.Ticket.Identifier, p.FeatureBranch)
+	p.Sink.TicketNeedsHuman(p.Ticket.Identifier, p.FeatureBranch, "needs-answer", "agent reported needs-answer via iteration_status")
 	return true, nil
 }
 

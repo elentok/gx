@@ -344,6 +344,26 @@ func (r *loopRegistry) reduceLiveEvent(epicName string, event ralphloop.LiveEven
 				Message: fmt.Sprintf("\U0001f6d1 %s paused: %s", event.Label, event.Reason),
 			})
 		}
+	case ralphloop.LiveEventTicketNeedsHuman:
+		// Preserves the toast/row-paused behavior the old
+		// LiveEventIterationPaused/PauseNeedsRepair branch gave fault
+		// parks; needs-answer was never consumed here before either, so it
+		// stays a no-op — richer needs-answer rendering is a later ticket's
+		// job (spec section E).
+		if event.Status == "needs-repair" {
+			ticket, ok := run.tickets[event.Identifier]
+			if ok {
+				ticket.Running = false
+				ticket.Paused = true
+				ticket.PauseKind = ralphloop.PauseNeedsRepair
+				ticket.PauseReason = event.Reason
+				run.tickets[event.Identifier] = ticket
+			}
+			run.pendingToasts = append(run.pendingToasts, notify.NotifyMsg{
+				Kind:    notify.KindWarning,
+				Message: fmt.Sprintf("\U0001f6d1 %s paused: %s", event.Identifier, event.Reason),
+			})
+		}
 	case ralphloop.LiveEventIterationResumed:
 		for identifier, ticket := range run.tickets {
 			if ticket.Label != event.Label {

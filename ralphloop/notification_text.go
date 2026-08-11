@@ -106,20 +106,27 @@ func (s mrkdwnStyle) iterationPausedText(label string, kind PauseKind, reason st
 	return fmt.Sprintf("%s *%s paused*\n\n%s", emoji, s.escape(label), s.escape(reason))
 }
 
-// ticketNeedsAnswerText renders the "needs-answer" notification: unlike
-// iterationPausedText's "still in progress, will resume/clear on its own",
-// this means the iteration is stuck and won't proceed without a human
-// looking at it — no commit landed and the agent never declared the
+// ticketNeedsHumanText renders the "a machine parked this ticket for a
+// person" notification, for either status: unlike iterationPausedText's
+// "still in progress, will resume/clear on its own", this means the
+// iteration is stuck and won't proceed without a human looking at it.
+// needs-answer means no commit landed and the agent never declared the
 // zero-commit finish intentional via `gx tickets set --iteration-status
-// finished --commitless true`.
+// finished --commitless true`; needs-repair means a fault (operator
+// intervention, an iteration error, a dead-on-arrival reconciliation)
+// parked it instead.
 //
-//	🆘 *{epic}/{ticket} needs answer*
+//	🆘 *{epic}/{ticket} needs answer*      (needs-answer)
+//	🛑 *{epic}/{ticket} needs repair*      (needs-repair)
 //
-//	No commits landed; marked needs-answer.
-func (s mrkdwnStyle) ticketNeedsAnswerText(identifier, epicName string) string {
+//	{reason}
+func (s mrkdwnStyle) ticketNeedsHumanText(identifier, epicName, status, reason string) string {
 	ref := s.escape(fmt.Sprintf("%s/%s", epicName, identifier))
-	body := s.escape("No commits landed; marked needs-answer.")
-	return fmt.Sprintf("\U0001f198 *%s needs answer*\n\n%s", ref, body)
+	emoji, label := "\U0001f198", "needs answer"
+	if status != "needs-answer" {
+		emoji, label = "\U0001f6d1", "needs repair"
+	}
+	return fmt.Sprintf("%s *%s %s*\n\n%s", emoji, ref, label, s.escape(reason))
 }
 
 // epicCompleteText renders the "epic complete" notification:

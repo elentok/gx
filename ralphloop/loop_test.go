@@ -473,11 +473,11 @@ func TestRun_EventSink_TicketNeedsAnswer_OnZeroCommitIteration(t *testing.T) {
 	sink := &recordingSink{}
 	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
 
-	if len(sink.ticketNeedsAnswerCalls) != 1 {
-		t.Fatalf("TicketNeedsAnswer calls = %v, want exactly 1", sink.ticketNeedsAnswerCalls)
+	if len(sink.ticketNeedsHumanCalls) != 1 {
+		t.Fatalf("TicketNeedsHuman calls = %v, want exactly 1", sink.ticketNeedsHumanCalls)
 	}
-	if got := sink.ticketNeedsAnswerCalls[0]; got[0] != "01" || got[1] != "epic" {
-		t.Errorf("TicketNeedsAnswer call = %v, want [01 epic]", got)
+	if got := sink.ticketNeedsHumanCalls[0]; got[0] != "01" || got[1] != "epic" || got[2] != "needs-answer" {
+		t.Errorf("TicketNeedsHuman call = %v, want [01 epic needs-answer ...]", got)
 	}
 }
 

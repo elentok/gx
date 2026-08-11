@@ -80,16 +80,16 @@ type EventSink interface {
 	// none found) let a consumer resolve the session's transcript itself, so
 	// elapsed time survives a reattach instead of resetting to zero.
 	TicketReattached(identifier string, label string, cwd string, sessionID string)
-	// TicketStillNeedsRepair reports that a needs-repair ticket has no
-	// live iteration to reattach to — it stays needs-repair for a human to
-	// inspect, unlike a claimed ticket in the same spot (see TicketReverted).
-	TicketStillNeedsRepair(identifier string)
-	// TicketNeedsAnswer reports that identifier on epicName was marked
-	// needs-answer: its iteration finished with no commit and never declared
-	// itself commitless (MarkNeedsAnswer, called from finishIteration) — the
-	// agent got stuck rather than merely paused, so this fires distinct from
-	// IterationPaused.
-	TicketNeedsAnswer(identifier, epicName string)
+	// TicketNeedsHuman reports that a machine parked identifier on epicName
+	// for a person, fired at gx's parking write itself (the gate's write, the
+	// adoption path's write, and each fault-side write) so coverage is total
+	// rather than incidental. status is a plain string ("needs-answer" /
+	// "needs-repair", matching schema.StatusNeedsAnswer/StatusNeedsRepair's
+	// raw values) — ask-versus-fault is a rendering choice a consumer makes
+	// from status, not a plumbing fork into separate events the way
+	// TicketNeedsAnswer/TicketStillNeedsRepair/the park-flavored
+	// IterationPaused used to be.
+	TicketNeedsHuman(identifier, epicName, status, reason string)
 
 	// TicketClaimed reports that ticket was claimed off the frontier for a
 	// fresh iteration.
@@ -180,16 +180,15 @@ type EventSink interface {
 // tests exercising pause/resume plumbing) without wiring up a real sink.
 type noopEventSink struct{}
 
-func (noopEventSink) NoTicketsFound(epicName string)                              {}
-func (noopEventSink) AlreadyComplete(epicName string, done, total int)            {}
-func (noopEventSink) TicketReverted(identifier string)                            {}
-func (noopEventSink) TicketReattached(identifier, label, cwd, sessionID string)   {}
-func (noopEventSink) TicketStillNeedsRepair(identifier string)                    {}
-func (noopEventSink) TicketNeedsAnswer(identifier, epicName string)               {}
-func (noopEventSink) TicketClaimed(ticket tickets.Ticket)                         {}
-func (noopEventSink) IterationStarted(identifier, label, cwd, sessionID string)   {}
-func (noopEventSink) IterationPaused(label string, kind PauseKind, reason string) {}
-func (noopEventSink) IterationResumed(label string, kind PauseKind)               {}
+func (noopEventSink) NoTicketsFound(epicName string)                               {}
+func (noopEventSink) AlreadyComplete(epicName string, done, total int)             {}
+func (noopEventSink) TicketReverted(identifier string)                             {}
+func (noopEventSink) TicketReattached(identifier, label, cwd, sessionID string)    {}
+func (noopEventSink) TicketNeedsHuman(identifier, epicName, status, reason string) {}
+func (noopEventSink) TicketClaimed(ticket tickets.Ticket)                          {}
+func (noopEventSink) IterationStarted(identifier, label, cwd, sessionID string)    {}
+func (noopEventSink) IterationPaused(label string, kind PauseKind, reason string)  {}
+func (noopEventSink) IterationResumed(label string, kind PauseKind)                {}
 func (noopEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
 }
 func (noopEventSink) TranscriptLine(label, line string)                               {}
@@ -243,12 +242,13 @@ func (s *textEventSink) TicketReattached(identifier, label, cwd, sessionID strin
 	s.printf("ticket %s: reattaching to live iteration %s\n", identifier, label)
 }
 
-func (s *textEventSink) TicketStillNeedsRepair(identifier string) {
-	s.printf("ticket %s still needs repair; no live iteration found\n", identifier)
-}
-
-func (s *textEventSink) TicketNeedsAnswer(identifier, epicName string) {
-	s.printf("ticket %s: no commits landed; marked needs-answer\n", identifier)
+func (s *textEventSink) TicketNeedsHuman(identifier, epicName, status, reason string) {
+	switch status {
+	case "needs-answer":
+		s.printf("ticket %s: no commits landed; marked needs-answer\n", identifier)
+	default:
+		s.printf("ticket %s still needs repair; %s\n", identifier, reason)
+	}
 }
 
 func (s *textEventSink) TicketClaimed(ticket tickets.Ticket) {}
