@@ -1,7 +1,6 @@
 package ralphloop
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -100,16 +99,16 @@ exit 1
 			deps := testDeps()
 			deps.Sleep = func(time.Duration) {}
 
-			var out bytes.Buffer
+			sink := newRecordingEventSink()
 			err := Run(RunOptions{
 				EpicName: epicName, Agent: AgentCodex, Skill: "implement",
 				ScratchDir: scratchDir, RepoDir: repoDir,
-			}, deps, NewTextEventSink(&out))
+			}, deps, sink)
 			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
 				t.Fatalf("Run() error = %v, want containing %q", err, tc.wantErr)
 			}
 
-			assertNoLaunchTrace(t, repoDir, epicName, scratchDir, "01-first.md", &out)
+			assertNoLaunchTrace(t, repoDir, epicName, scratchDir, "01-first.md", sink)
 
 			// Tab outcome for the one case that actually reaches Herdr: exactly
 			// the "agent start --help" probe, no tab/workspace command.
@@ -138,16 +137,16 @@ func TestRun_ProductionRealGit_MissingSkillFailsBeforeClaim(t *testing.T) {
 	deps := testDeps()
 	deps.Sleep = func(time.Duration) {}
 
-	var out bytes.Buffer
+	sink := newRecordingEventSink()
 	err := Run(RunOptions{
 		EpicName: epicName, Skill: "implement", ScratchDir: scratchDir, RepoDir: repoDir,
-	}, deps, NewTextEventSink(&out))
+	}, deps, sink)
 	wantErr := fmt.Sprintf(`skill "implement" not found at %s`, filepath.Join(home, ".claude", "skills", "implement", "SKILL.md"))
 	if err == nil || !strings.Contains(err.Error(), wantErr) {
 		t.Fatalf("Run() error = %v, want containing %q", err, wantErr)
 	}
 
-	assertNoLaunchTrace(t, repoDir, epicName, scratchDir, "01-first.md", &out)
+	assertNoLaunchTrace(t, repoDir, epicName, scratchDir, "01-first.md", sink)
 }
 
 // TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsRepair drives
@@ -208,13 +207,13 @@ func TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsRepair(t *testin
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	deps.Sleep = func(time.Duration) {}
 
-	var out bytes.Buffer
+	sink := newRecordingEventSink()
 	// The failed launch leaves the epic's only ticket needs-repair, so the
 	// run parks on it.
 	runUntilParked(t, RunOptions{
 		EpicName: epicName, Agent: AgentCodex, Skill: "implement",
 		ScratchDir: scratchDir, RepoDir: repoDir,
-	}, deps, NewTextEventSink(&out))
+	}, deps, sink)
 
 	if agentStartCalls != 1 {
 		t.Errorf("agent start calls = %d, want exactly 1", agentStartCalls)
@@ -261,8 +260,9 @@ func TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsRepair(t *testin
 		}
 	}
 
-	if strings.Contains(out.String(), "finished ticket") || strings.Contains(out.String(), "needs-answer") {
-		t.Errorf("launch failure output = %q, must not report successful/generic completion", out.String())
+	if hasEvent(sink, LiveEventIterationFinished, func(LiveEvent) bool { return true }) ||
+		hasEvent(sink, LiveEventTicketNeedsHuman, func(ev LiveEvent) bool { return ev.Status == "needs-answer" }) {
+		t.Errorf("events = %+v, must not report successful/generic completion", sink.Events())
 	}
 }
 

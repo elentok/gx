@@ -1,7 +1,6 @@
 package ralphloop
 
 import (
-	"bytes"
 	"sync"
 	"testing"
 
@@ -9,8 +8,7 @@ import (
 )
 
 // recordingSink implements EventSink by appending each call's method name to
-// a slice, for asserting the exact event sequence a Run call produces
-// (rather than only the text a textEventSink renders from it).
+// a slice, for asserting the exact event sequence a Run call produces.
 type recordingSink struct {
 	mu                     sync.Mutex
 	calls                  []string
@@ -196,56 +194,5 @@ func TestRun_EventSink_AlreadyCompleteEpic_EmitsExactlyOneEpicStarted(t *testing
 
 	if got := sink.snapshot(); len(got) != 1 || got[0] != "EpicStarted" {
 		t.Errorf("events = %v, want [EpicStarted]", got)
-	}
-}
-
-// TestNewTextEventSink_RendersSameTextAsBeforeTheEventSinkRefactor pins the
-// headless CLI's rendered output for a representative slice of events, so a
-// future change to textEventSink can't silently break gx ralph-loop's
-// stdout output for a piped/CI run.
-func TestNewTextEventSink_RendersSameTextAsBeforeTheEventSinkRefactor(t *testing.T) {
-	var out bytes.Buffer
-	sink := NewTextEventSink(&out)
-
-	sink.EpicStarted("epic", 0, 0)
-	sink.EpicStarted("epic", 2, 2)
-	sink.TicketReverted("01")
-	sink.TicketReattached("01", "iter-01", "/repo/iter-01", "sess-1")
-	sink.TicketNeedsHuman("01", "epic", "needs-repair", "no live iteration found")
-	sink.IterationPaused("01", "iter-01", PauseRateLimit, "rate limit detected")
-	sink.IterationResumed("01", "iter-01", PauseRateLimit)
-	sink.SmartZoneCompactStarted("01")
-	sink.SmartZoneFinishingUp("01")
-	sink.SmartZoneRecovered("01")
-	sink.IterationFinished(tickets.Ticket{Number: 1, Identifier: "01", Title: "First"}, "epic", IterationStats{})
-	sink.TicketCleanupFinished("01")
-	sink.TicketRecovered("01", "epic", "ralph-loop/iter-01", "deadbeef")
-	sink.TicketUnrecoverable("01", "epic")
-	sink.EpicComplete("epic", 1, 0)
-
-	// These no-op in the headless CLI: no line should be printed for them.
-	sink.TicketClaimed(tickets.Ticket{Number: 1})
-	sink.IterationStarted(tickets.Ticket{Identifier: "01"}, "iter-01", "/repo/iter-01", "sess-1")
-	sink.ContextOccupancy("01", 12345)
-	sink.TranscriptLine("iter-01", "some transcript text")
-
-	want := "" +
-		"no tickets found for epic \"epic\"; nothing to do\n" +
-		"epic \"epic\" is already complete (2/2 done)\n" +
-		"ticket 01: no live iteration found on restart; reverted to open\n" +
-		"ticket 01: reattaching to live iteration iter-01\n" +
-		"ticket 01 still needs repair; no live iteration found\n" +
-		"paused iter-01: rate limit detected; waiting for automatic reset\n" +
-		"resumed iter-01 after rate-limit reset\n" +
-		"ticket 01: context budget exceeded; compacting...\n" +
-		"ticket 01: compacted; telling the agent to finish up...\n" +
-		"ticket 01 \"First\" landed on epic\n" +
-		"ticket 01: done and commits landed, but leftover iteration state was never cleaned up; finished the interrupted cleanup\n" +
-		"ticket 01: done but commits were missing from epic; auto re-cherry-picked from iteration branch ralph-loop/iter-01 and restored (deadbeef)\n" +
-		"ticket 01: done but commits missing from epic and no iteration branch left to recover them; marked needs-repair\n" +
-		"ralph-loop \"epic\" complete: 1 ticket(s) landed on epic\n"
-
-	if out.String() != want {
-		t.Errorf("rendered text =\n%s\nwant\n%s", out.String(), want)
 	}
 }

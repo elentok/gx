@@ -1,7 +1,6 @@
 package ralphloop
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -302,7 +301,7 @@ func writeFakeExecutable(t *testing.T, name, body string) string {
 // checks in Run (see loop.go) — verified structurally by the same feature-
 // worktree assertion rather than separately, since no tab can exist without
 // the workspace/worktree that would have to precede it.
-func assertNoLaunchTrace(t *testing.T, repoDir, epicName, scratchDir, ticketFilename string, out *bytes.Buffer) {
+func assertNoLaunchTrace(t *testing.T, repoDir, epicName, scratchDir, ticketFilename string, sink *recordingEventSink) {
 	t.Helper()
 
 	if _, err := os.Stat(filepath.Join(testWorktreeDir(t, repoDir), epicName)); !os.IsNotExist(err) {
@@ -327,7 +326,8 @@ func assertNoLaunchTrace(t *testing.T, repoDir, epicName, scratchDir, ticketFile
 		t.Errorf("readEvents = ok:%v err:%v, want no run-log written for a failure caught before claim", ok, readErr)
 	}
 
-	if strings.Contains(out.String(), "finished ticket") || strings.Contains(out.String(), "needs-answer") {
-		t.Errorf("launch failure output = %q, must not report successful/generic completion", out.String())
+	if hasEvent(sink, LiveEventIterationFinished, func(LiveEvent) bool { return true }) ||
+		hasEvent(sink, LiveEventTicketNeedsHuman, func(ev LiveEvent) bool { return ev.Status == "needs-answer" }) {
+		t.Errorf("launch failure events = %+v, must not report successful/generic completion", sink.Events())
 	}
 }

@@ -2,7 +2,6 @@ package ralphloop
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -54,7 +53,7 @@ func TestReconcile_ClaimedWithNoLiveTab_RevertsToOpen(t *testing.T) {
 		return "deadbeef", nil
 	}
 
-	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(io.Discard)), epics[0])
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{}), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -95,7 +94,7 @@ func TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_RecoversInstead(t *tes
 	// branch as existing with commits ahead of base — simulating the
 	// finished-but-uncherry-picked branch left behind.
 
-	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(io.Discard)), epics[0])
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{}), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -171,7 +170,7 @@ func TestReconcile_ClaimedWithLiveTab_ReturnsReattached(t *testing.T) {
 		return []herdr.Tab{{Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
 	}
 
-	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(io.Discard)), epics[0])
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{}), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -261,7 +260,7 @@ func TestReconcile_NeedsRepairWithLiveTab_ReturnsReattached(t *testing.T) {
 		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
 	}
 
-	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(io.Discard)), epics[0])
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{}), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -289,7 +288,7 @@ func TestReconcile_ClaimedWithLiveTabOutsideScope_NotReattached(t *testing.T) {
 		return []herdr.Tab{{Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
 	}
 
-	rp := testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(io.Discard))
+	rp := testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{})
 	// A scope that requested only ticket 99 — ticket 01 is outside it.
 	rp.Scope = RunScope{data: &scopeData{ticketIDs: map[string]struct{}{"99": {}}}}
 
@@ -325,7 +324,7 @@ func TestReconcile_NeedsRepairOutsideScope_NotReattached(t *testing.T) {
 		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
 	}
 
-	rp := testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(io.Discard))
+	rp := testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{})
 	rp.Scope = RunScope{data: &scopeData{ticketIDs: map[string]struct{}{"99": {}}}}
 
 	reattached, err := reconcile(d, rp, epics[0])
@@ -388,7 +387,7 @@ func TestRun_RestartedNeedsRepairRecoversThenResumesScheduling(t *testing.T) {
 		return 1, nil
 	}
 
-	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&strings.Builder{})); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 	if len(*prompts) != 1 || !strings.HasSuffix((*prompts)[0], "02-open.md") {
@@ -430,7 +429,7 @@ func TestReconcile_OpenAndDoneTicketsIgnored(t *testing.T) {
 		return nil, nil
 	}
 
-	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(io.Discard)), epics[0])
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{}), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}

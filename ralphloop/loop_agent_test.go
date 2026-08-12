@@ -1,7 +1,6 @@
 package ralphloop
 
 import (
-	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
@@ -109,11 +108,10 @@ func TestRun_CodexLaunchPreflight(t *testing.T) {
 				return findOrCreateWorkspace(label, cwd)
 			}
 
-			var out bytes.Buffer
 			err := Run(RunOptions{
 				EpicName: "my-epic", Agent: AgentCodex, Skill: "implement",
 				ScratchDir: scratchDir, RepoDir: "/fake/repo",
-			}, d, NewTextEventSink(&out))
+			}, d, noopEventSink{})
 			if tc.wantErr == "" {
 				if err != nil {
 					t.Fatalf("Run() error = %v", err)
@@ -162,10 +160,9 @@ func TestRun_MissingSkill_FailsBeforeClaimingAnyTicket(t *testing.T) {
 		return findOrCreateWorkspace(label, cwd)
 	}
 
-	var out bytes.Buffer
 	err := Run(RunOptions{
 		EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
-	}, d, NewTextEventSink(&out))
+	}, d, noopEventSink{})
 	if err == nil || !strings.Contains(err.Error(), `skill "implement" not found`) {
 		t.Fatalf("Run() error = %v, want missing-skill error", err)
 	}
@@ -197,10 +194,9 @@ func TestRun_ClaudeDoesNotRunCodexLaunchPreflight(t *testing.T) {
 		return errors.New("Codex preflight should not run")
 	}
 
-	var out bytes.Buffer
 	if err := Run(RunOptions{
 		EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
-	}, d, NewTextEventSink(&out)); err != nil {
+	}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 	if preflightCalls != 0 {
@@ -217,13 +213,13 @@ func TestRun_CodexLaunchFailureAfterClaimNeedsRepair(t *testing.T) {
 	d.AgentStart = func(herdr.AgentStartOptions) (herdr.Agent, error) {
 		return herdr.Agent{}, errors.New("Herdr rejected Codex integration")
 	}
-	var out bytes.Buffer
+	sink := newRecordingEventSink()
 	// The failed launch leaves the epic's only ticket needs-repair, so the
 	// run parks on it rather than returning.
 	runUntilParked(t, RunOptions{
 		EpicName: "my-epic", Agent: AgentCodex, Skill: "implement",
 		ScratchDir: scratchDir, RepoDir: "/fake/repo",
-	}, d, NewTextEventSink(&out))
+	}, d, sink)
 
 	ticketPath := filepath.Join(scratchDir, "my-epic", "issues", "01-first.md")
 	contents, err := os.ReadFile(ticketPath)
@@ -240,8 +236,9 @@ func TestRun_CodexLaunchFailureAfterClaimNeedsRepair(t *testing.T) {
 		t.Errorf("ticket after launch failure =\n%s\nwant durable needs-repair status and launch reason", contents)
 	}
 
-	if strings.Contains(out.String(), "finished ticket") || strings.Contains(out.String(), "needs-answer") {
-		t.Errorf("launch failure output = %q, must not report successful/generic completion", out.String())
+	if hasEvent(sink, LiveEventIterationFinished, func(LiveEvent) bool { return true }) ||
+		hasEvent(sink, LiveEventTicketNeedsHuman, func(ev LiveEvent) bool { return ev.Status == "needs-answer" }) {
+		t.Errorf("events = %+v, must not report successful/generic completion", sink.Events())
 	}
 }
 
@@ -251,8 +248,7 @@ func TestRun_SkillFlag_OverridesPromptSkill(t *testing.T) {
 	})
 	d, prompts, _ := fakeDeps()
 
-	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "my-epic", Skill: "tdd", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+	if err := Run(RunOptions{EpicName: "my-epic", Skill: "tdd", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -294,8 +290,7 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 				return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle"}, nil
 			}
 
-			var out bytes.Buffer
-			err := Run(RunOptions{EpicName: "my-epic", Agent: tc.agent, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out))
+			err := Run(RunOptions{EpicName: "my-epic", Agent: tc.agent, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
 			if err != nil {
 				t.Fatalf("Run() error = %v", err)
 			}
@@ -329,8 +324,7 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 }
 
 func TestRun_InvalidAgent_ReturnsError(t *testing.T) {
-	var out bytes.Buffer
-	err := Run(RunOptions{Agent: "other"}, Deps{}, NewTextEventSink(&out))
+	err := Run(RunOptions{Agent: "other"}, Deps{}, noopEventSink{})
 	if err == nil || !strings.Contains(err.Error(), "must be claude or codex") {
 		t.Fatalf("Run() error = %v, want invalid-agent error", err)
 	}
@@ -344,11 +338,10 @@ func TestRun_MaxParallelOne_RunsSerially(t *testing.T) {
 	})
 	d, prompts, _ := fakeDeps()
 
-	var out bytes.Buffer
 	err := Run(RunOptions{
 		EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
 		MaxParallel: 1,
-	}, d, NewTextEventSink(&out))
+	}, d, noopEventSink{})
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
@@ -374,13 +367,12 @@ func TestRun_MaxParallelTwo_RunsExactlyTwoConcurrentlyAndBackfills(t *testing.T)
 	wait, started, release := gatedAgentWait(d.AgentWait)
 	d.AgentWait = wait
 
-	var out bytes.Buffer
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- Run(RunOptions{
 			EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
 			MaxParallel: 2,
-		}, d, NewTextEventSink(&out))
+		}, d, noopEventSink{})
 	}()
 
 	pane1 := <-started
@@ -417,13 +409,12 @@ func TestRun_PauseLetsInFlightFinishAndResumesScheduling(t *testing.T) {
 	d.Sleep = func(time.Duration) { time.Sleep(time.Millisecond) }
 	gate := NewGate()
 
-	var out bytes.Buffer
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- Run(RunOptions{
 			EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
 			MaxParallel: 1, Gate: gate,
-		}, d, NewTextEventSink(&out))
+		}, d, noopEventSink{})
 	}()
 
 	first := <-started

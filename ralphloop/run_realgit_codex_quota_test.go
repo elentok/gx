@@ -1,7 +1,6 @@
 package ralphloop
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -211,10 +210,9 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 		}
 	}
 
-	var out bytes.Buffer
 	if err := Run(RunOptions{
 		EpicName: epicName, Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: repoDir,
-	}, deps, NewTextEventSink(&out)); err != nil {
+	}, deps, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 

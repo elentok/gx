@@ -1,7 +1,6 @@
 package ralphloop
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -263,8 +262,7 @@ func TestRun_ProductionRealGit_TicketCreatesSubtickets(t *testing.T) {
 	deps.Sleep = func(time.Duration) {}
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 
-	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: epicName, Skill: "implement", ScratchDir: scratchDir, RepoDir: repoDir}, deps, NewTextEventSink(&out)); err != nil {
+	if err := Run(RunOptions{EpicName: epicName, Skill: "implement", ScratchDir: scratchDir, RepoDir: repoDir}, deps, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -335,8 +333,7 @@ func TestRun_ProductionRealGit_CodeReviewTicketCreatesSubtickets(t *testing.T) {
 	deps.Sleep = func(time.Duration) {}
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 
-	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: epicName, Skill: "implement", ScratchDir: scratchDir, RepoDir: repoDir}, deps, NewTextEventSink(&out)); err != nil {
+	if err := Run(RunOptions{EpicName: epicName, Skill: "implement", ScratchDir: scratchDir, RepoDir: repoDir}, deps, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 

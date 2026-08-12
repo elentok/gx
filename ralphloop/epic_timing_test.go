@@ -1,7 +1,6 @@
 package ralphloop
 
 import (
-	"bytes"
 	"testing"
 	"time"
 
@@ -38,8 +37,7 @@ func TestRun_StampsEpicStartedAndCompletedAt(t *testing.T) {
 	fixedNow := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	d.Now = func() time.Time { return fixedNow }
 
-	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -64,15 +62,13 @@ func TestRun_ReRunOnAlreadyCompleteEpic_DoesNotOverwriteTimestamps(t *testing.T)
 	firstRun := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	d.Now = func() time.Time { return firstRun }
 
-	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() (first) error = %v", err)
 	}
 
 	secondRun := firstRun.Add(24 * time.Hour)
 	d.Now = func() time.Time { return secondRun }
-	out.Reset()
-	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() (second) error = %v", err)
 	}
 
@@ -96,14 +92,13 @@ func TestRun_TicketSubset_LeavesCompletedAtUnset(t *testing.T) {
 	})
 	d, _, _ := fakeDeps()
 
-	var out bytes.Buffer
 	if err := Run(RunOptions{
 		EpicName:   "my-epic",
 		Skill:      "implement",
 		ScratchDir: scratchDir,
 		RepoDir:    "/fake/repo",
 		TicketIDs:  []string{"01"},
-	}, d, NewTextEventSink(&out)); err != nil {
+	}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 

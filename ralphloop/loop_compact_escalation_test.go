@@ -1,7 +1,6 @@
 package ralphloop
 
 import (
-	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
@@ -87,13 +86,12 @@ func TestRun_UnconfirmedCompactionEscalation_PersistsNeedsRepair(t *testing.T) {
 	})
 	d := stuckCompactionDeps(func() error { return nil })
 
-	var out bytes.Buffer
 	// The escalated iteration leaves the epic's only ticket needs-repair, so
 	// the run parks on it rather than returning.
 	runUntilParked(t, RunOptions{
 		EpicName: epicName, Skill: "implement", ScratchDir: scratchDir,
 		RepoDir: "/fake/repo", SmartZone: 100,
-	}, d, NewTextEventSink(&out))
+	}, d, noopEventSink{})
 
 	contents := readTicket(t, scratchDir, epicName, "01-first.md")
 	if !strings.Contains(contents, "status: needs-repair") {
@@ -121,11 +119,10 @@ func TestRun_OrdinaryIterationError_KeepsItsOwnNeedsRepairReason(t *testing.T) {
 	})
 	d := stuckCompactionDeps(func() error { return errors.New("herdr pane vanished") })
 
-	var out bytes.Buffer
 	runUntilParked(t, RunOptions{
 		EpicName: epicName, Skill: "implement", ScratchDir: scratchDir,
 		RepoDir: "/fake/repo", SmartZone: 100,
-	}, d, NewTextEventSink(&out))
+	}, d, noopEventSink{})
 
 	contents := readTicket(t, scratchDir, epicName, "01-first.md")
 	if !strings.Contains(contents, "status: needs-repair") ||

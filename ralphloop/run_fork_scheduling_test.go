@@ -1,7 +1,6 @@
 package ralphloop
 
 import (
-	"bytes"
 	"os"
 	"path/filepath"
 	"slices"
@@ -79,7 +78,7 @@ func TestRun_ForkChain_ClaimsInDependencyOrder(t *testing.T) {
 		return origPrompt(opts)
 	}
 
-	sink := &claimOrderSink{EventSink: NewTextEventSink(&bytes.Buffer{})}
+	sink := &claimOrderSink{EventSink: noopEventSink{}}
 
 	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink); err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -119,7 +118,7 @@ func TestRun_ForkParallelChildren_BothClaimedAfterParentHandsOff(t *testing.T) {
 		return origPrompt(opts)
 	}
 
-	sink := &claimOrderSink{EventSink: NewTextEventSink(&bytes.Buffer{})}
+	sink := &claimOrderSink{EventSink: noopEventSink{}}
 
 	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink); err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -162,7 +161,7 @@ func TestRun_DependentOfForkedTicket_WaitsForWholeSubtree(t *testing.T) {
 		return origPrompt(opts)
 	}
 
-	sink := &claimOrderSink{EventSink: NewTextEventSink(&bytes.Buffer{})}
+	sink := &claimOrderSink{EventSink: noopEventSink{}}
 
 	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink); err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -229,7 +228,7 @@ func TestRun_BlockedBySpecificForkSibling_WaitsForExactlyThatSibling(t *testing.
 		return origPrompt(opts)
 	}
 
-	sink := &claimOrderSink{EventSink: NewTextEventSink(&bytes.Buffer{})}
+	sink := &claimOrderSink{EventSink: noopEventSink{}}
 	sink.EventSink = &unblockingSink{
 		EventSink: sink.EventSink,
 		onClaim: func(identifier string) {
@@ -305,14 +304,13 @@ func TestRun_EpicWithWaitingForChildrenTicket_DoesNotReportComplete(t *testing.T
 	})
 	d, _, _ := fakeDeps()
 
-	var out bytes.Buffer
 	if err := Run(RunOptions{
 		EpicName:   "epic",
 		Skill:      "implement",
 		ScratchDir: scratchDir,
 		RepoDir:    "/fake/repo",
 		TicketIDs:  []string{"02"},
-	}, d, NewTextEventSink(&out)); err != nil {
+	}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 

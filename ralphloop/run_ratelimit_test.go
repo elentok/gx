@@ -1,7 +1,6 @@
 package ralphloop
 
 import (
-	"bytes"
 	"os"
 	"path/filepath"
 	"slices"
@@ -88,13 +87,13 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 		return fakeNow
 	}
 
-	var out bytes.Buffer
+	sink := newRecordingEventSink()
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- Run(RunOptions{
 			EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
 			MaxParallel: 2,
-		}, d, NewTextEventSink(&out))
+		}, d, sink)
 	}()
 
 	// epic-iter-01 and epic-iter-02 both claimed and started (2 slots); either order.
@@ -160,10 +159,10 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 		t.Errorf("prompts = %v, want a \"continue\" re-prompt sent to epic-iter-01 after the rate-limit reset", *prompts)
 	}
 
-	if !strings.Contains(out.String(), "paused epic-iter-01") {
-		t.Errorf("output = %q, want a paused report mentioning epic-iter-01", out.String())
+	if !hasEvent(sink, LiveEventIterationPaused, func(ev LiveEvent) bool { return ev.Label == "epic-iter-01" }) {
+		t.Errorf("events = %+v, want a paused event for epic-iter-01", sink.Events())
 	}
-	if !strings.Contains(out.String(), "resumed epic-iter-01") {
-		t.Errorf("output = %q, want a resumed report mentioning epic-iter-01", out.String())
+	if !hasEvent(sink, LiveEventIterationResumed, func(ev LiveEvent) bool { return ev.Label == "epic-iter-01" }) {
+		t.Errorf("events = %+v, want a resumed event for epic-iter-01", sink.Events())
 	}
 }

@@ -1,7 +1,6 @@
 package ralphloop
 
 import (
-	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
@@ -66,13 +65,13 @@ func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) 
 
 	d.Sleep = func(time.Duration) {}
 
-	var out bytes.Buffer
+	sink := newRecordingEventSink()
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- Run(RunOptions{
 			EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
 			MaxParallel: 2,
-		}, d, NewTextEventSink(&out))
+		}, d, sink)
 	}()
 
 	keys := <-sendKeysCh
@@ -133,11 +132,11 @@ func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) 
 		t.Errorf("removed worktree branches = %v, want all 3 iterations removed", *removed)
 	}
 
-	if !strings.Contains(out.String(), "ticket 01: context budget exceeded; compacting...") {
-		t.Errorf("output = %q, want a compacting report for ticket 01", out.String())
+	if !hasEvent(sink, LiveEventSmartZoneCompactStarted, func(ev LiveEvent) bool { return ev.Identifier == "01" }) {
+		t.Errorf("events = %+v, want a compact-started event for ticket 01", sink.Events())
 	}
-	if !strings.Contains(out.String(), "ticket 01: compacted; telling the agent to finish up...") {
-		t.Errorf("output = %q, want a finish-up report for ticket 01", out.String())
+	if !hasEvent(sink, LiveEventSmartZoneFinishingUp, func(ev LiveEvent) bool { return ev.Identifier == "01" }) {
+		t.Errorf("events = %+v, want a finishing-up event for ticket 01", sink.Events())
 	}
 }
 
@@ -194,13 +193,12 @@ func TestRun_SmartZoneBreach_RepeatsWithNoRetryCap(t *testing.T) {
 	gate := NewGate()
 	d.Sleep = func(time.Duration) {}
 
-	var out bytes.Buffer
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- Run(RunOptions{
 			EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
 			MaxParallel: 1, Gate: gate,
-		}, d, NewTextEventSink(&out))
+		}, d, noopEventSink{})
 	}()
 
 	for i := range 2 {

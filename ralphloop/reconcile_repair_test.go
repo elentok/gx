@@ -1,9 +1,7 @@
 package ralphloop
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -42,8 +40,8 @@ func TestReconcile_DoneTicketRecoverable_AutoRecherryPicksAndReports(t *testing.
 		return nil
 	}
 
-	var out bytes.Buffer
-	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(&out)), epics[0])
+	sink := newRecordingEventSink()
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, sink), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -54,15 +52,8 @@ func TestReconcile_DoneTicketRecoverable_AutoRecherryPicksAndReports(t *testing.
 		t.Fatalf("CherryPickRange calls = %v, want exactly one re-cherry-pick", picked)
 	}
 
-	reports := strings.Split(out.String(), "\n")
-	found := false
-	for _, r := range reports {
-		if strings.Contains(r, "ticket 03") && strings.Contains(r, "restored") {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("reports = %v, want a report line naming ticket 03 as restored", reports)
+	if !hasEvent(sink, LiveEventTicketRecovered, func(ev LiveEvent) bool { return ev.Identifier == "03" }) {
+		t.Errorf("events = %+v, want a recovered event naming ticket 03 as restored", sink.Events())
 	}
 
 	events, _, err := readEvents(scratchDir, "epic")
@@ -165,7 +156,7 @@ func TestReconcile_DoneTicketRecoverable_ConflictGoesThroughResolutionPath(t *te
 		return origAgentPrompt(opts)
 	}
 
-	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(io.Discard)), epics[0])
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{}), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -211,7 +202,7 @@ func TestReconcile_DoneTicketRecoverable_CleansUpLeftoverWorktreeAndTab(t *testi
 		return nil
 	}
 
-	_, err = reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees", RepoDir: "/fake/repo"}, NewTextEventSink(io.Discard)), epics[0])
+	_, err = reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees", RepoDir: "/fake/repo"}, noopEventSink{}), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -267,8 +258,8 @@ func TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup(t *testing.T) 
 		return nil
 	}
 
-	var out bytes.Buffer
-	_, err = reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees", RepoDir: "/fake/repo"}, NewTextEventSink(&out)), epics[0])
+	sink := newRecordingEventSink()
+	_, err = reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees", RepoDir: "/fake/repo"}, sink), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -291,15 +282,8 @@ func TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup(t *testing.T) 
 		t.Errorf("ticket status changed unexpectedly:\n%s", raw)
 	}
 
-	reports := strings.Split(out.String(), "\n")
-	found := false
-	for _, r := range reports {
-		if strings.Contains(r, "ticket 03") && strings.Contains(r, "finished the interrupted cleanup") {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("reports = %v, want a report line for the finished cleanup", reports)
+	if !hasEvent(sink, LiveEventTicketCleanupFinished, func(ev LiveEvent) bool { return ev.Identifier == "03" }) {
+		t.Errorf("events = %+v, want a cleanup-finished event for ticket 03", sink.Events())
 	}
 }
 
@@ -338,8 +322,8 @@ func TestReconcile_DoneTicketFullyClean_NoOp(t *testing.T) {
 		return nil
 	}
 
-	var out bytes.Buffer
-	_, err = reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees", RepoDir: "/fake/repo"}, NewTextEventSink(&out)), epics[0])
+	sink := newRecordingEventSink()
+	_, err = reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees", RepoDir: "/fake/repo"}, sink), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -347,7 +331,7 @@ func TestReconcile_DoneTicketFullyClean_NoOp(t *testing.T) {
 	if cleanupCalled {
 		t.Error("a fully-clean done ticket must not trigger any worktree/tab/branch cleanup call")
 	}
-	if out.Len() != 0 {
-		t.Errorf("output = %q, want no spurious log lines for a fully-clean done ticket", out.String())
+	if len(sink.Events()) != 0 {
+		t.Errorf("events = %+v, want no spurious events for a fully-clean done ticket", sink.Events())
 	}
 }

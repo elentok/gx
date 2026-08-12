@@ -268,7 +268,6 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 	d.Sleep = func(time.Duration) {}
 	d.Now = func() time.Time { return time.Unix(0, 0) }
 
-	var out bytes.Buffer
 	p := iterationParams{
 		WorkspaceID:     "ws-1",
 		FeatureWorktree: dir,
@@ -278,7 +277,7 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 		ScratchDir:      scratchDir,
 		SmartZone:       1_000_000,
 		Gate:            NewGate(),
-		Sink:            NewTextEventSink(&out),
+		Sink:            noopEventSink{},
 	}
 
 	picked, gotResolutionSessionID, err := cherryPickWithConflictResolution(d, p, base, iterTip, iterationSessionID, "iter-pane", "iter-tab")
@@ -432,7 +431,6 @@ func TestResolveCherryPickConflict_TabStillPresentAfterClose_LogsWarningNotError
 		return []herdr.Tab{{TabID: closedTabID, WorkspaceID: workspaceID}}, nil
 	}
 
-	var out bytes.Buffer
 	p := iterationParams{
 		WorkspaceID:     "ws-1",
 		FeatureWorktree: t.TempDir(),
@@ -441,7 +439,7 @@ func TestResolveCherryPickConflict_TabStillPresentAfterClose_LogsWarningNotError
 		Ticket:          tickets.Ticket{Identifier: "03"},
 		SmartZone:       1_000_000,
 		Gate:            NewGate(),
-		Sink:            NewTextEventSink(&out),
+		Sink:            noopEventSink{},
 	}
 
 	var logBuf bytes.Buffer

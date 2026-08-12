@@ -1,7 +1,6 @@
 package ralphloop
 
 import (
-	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
@@ -192,8 +191,8 @@ func TestRun_LinearChain_RunsTicketsInOrderAndLandsAll(t *testing.T) {
 	})
 	d, prompts, removed := fakeDeps()
 
-	var out bytes.Buffer
-	err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out))
+	sink := newRecordingEventSink()
+	err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
@@ -221,8 +220,8 @@ func TestRun_LinearChain_RunsTicketsInOrderAndLandsAll(t *testing.T) {
 		}
 	}
 
-	if !strings.Contains(out.String(), "complete: 2 ticket(s)") {
-		t.Errorf("summary output = %q, want a completion summary mentioning 2 tickets", out.String())
+	if !hasEvent(sink, LiveEventEpicComplete, func(ev LiveEvent) bool { return ev.Completed == 2 }) {
+		t.Errorf("events = %+v, want an EpicComplete event reporting 2 completed tickets", sink.Events())
 	}
 }
 
@@ -240,8 +239,7 @@ func TestRun_IterationCompletion_DeletesIterationBranch(t *testing.T) {
 		return nil
 	}
 
-	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -259,8 +257,7 @@ func TestRun_LogsLifecycleEvents_LinearChain(t *testing.T) {
 		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-" + opts.Pane}, nil
 	}
 
-	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -323,14 +320,13 @@ func TestRun_SchedulerScan_LogsOutOfScopeTicket(t *testing.T) {
 	})
 	d, _, _ := fakeDeps()
 
-	var out bytes.Buffer
 	if err := Run(RunOptions{
 		EpicName:   "my-epic",
 		Skill:      "implement",
 		ScratchDir: scratchDir,
 		RepoDir:    "/fake/repo",
 		TicketIDs:  []string{"01"},
-	}, d, NewTextEventSink(&out)); err != nil {
+	}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -377,8 +373,7 @@ func TestRun_FreshIteration_StampsCompactionsOnDone(t *testing.T) {
 		return 3, true, nil
 	}
 
-	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -407,8 +402,7 @@ func TestRun_FreshIteration_OmitsCompactionsWhenUnavailable(t *testing.T) {
 		return 12345, true, nil
 	}
 
-	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -433,9 +427,8 @@ func TestRun_LogsNeedsAnswerEvent_OnZeroCommitIteration(t *testing.T) {
 		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-" + opts.Pane}, nil
 	}
 
-	var out bytes.Buffer
 	// The needs-answer ticket is the epic's only one, so the run parks on it.
-	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out))
+	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
 
 	events, ok, err := readEvents(scratchDir, "epic")
 	if err != nil || !ok {
@@ -511,8 +504,7 @@ func TestRun_HonorsCommitlessFlag_SkipsNeedsAnswer(t *testing.T) {
 		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-" + opts.Pane}, nil
 	}
 
-	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -555,10 +547,9 @@ func TestRun_InstallDepsFailure_MarksNeedsRepairWithoutLaunchingAgentOrAbortingR
 		return "npm ci", errors.New("npm ci: exit status 1")
 	}
 
-	var out bytes.Buffer
 	// A failed iteration marks needs-repair rather than aborting the run,
 	// which leaves the epic parked on its only ticket.
-	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out))
+	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
 
 	if len(*prompts) != 0 {
 		t.Errorf("prompts = %v, want no agent launched after a failed dependency install", *prompts)
@@ -579,16 +570,16 @@ func TestRun_ZeroOpenTickets_NoOpSummary(t *testing.T) {
 	})
 	d, prompts, removed := fakeDeps()
 
-	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+	sink := newRecordingEventSink()
+	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
 	if len(*prompts) != 0 || len(*removed) != 0 {
 		t.Fatalf("expected no iterations to run, got prompts=%v removed=%v", *prompts, *removed)
 	}
-	if !strings.Contains(out.String(), "already complete") {
-		t.Errorf("summary output = %q, want a no-op/already-complete message", out.String())
+	if !hasEvent(sink, LiveEventEpicStarted, func(ev LiveEvent) bool { return ev.Total > 0 && ev.Done == ev.Total }) {
+		t.Errorf("events = %+v, want an EpicStarted event reporting the epic already complete", sink.Events())
 	}
 }
 
@@ -596,12 +587,12 @@ func TestRun_NoEpicFound_NoOpSummary(t *testing.T) {
 	scratchDir := t.TempDir()
 	d, _, _ := fakeDeps()
 
-	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "missing-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+	sink := newRecordingEventSink()
+	if err := Run(RunOptions{EpicName: "missing-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
-	if !strings.Contains(out.String(), "nothing to do") {
-		t.Errorf("summary output = %q, want a nothing-to-do message", out.String())
+	if !hasEvent(sink, LiveEventEpicStarted, func(ev LiveEvent) bool { return ev.Total == 0 }) {
+		t.Errorf("events = %+v, want an EpicStarted event reporting nothing to do", sink.Events())
 	}
 }
 
@@ -666,14 +657,13 @@ func TestRun_TicketSubset_CompletesWithoutTouchingTicketsOutsideSubset(t *testin
 	})
 	d, prompts, _ := fakeDeps()
 
-	var out bytes.Buffer
 	err := Run(RunOptions{
 		EpicName:   "my-epic",
 		Skill:      "implement",
 		ScratchDir: scratchDir,
 		RepoDir:    "/fake/repo",
 		TicketIDs:  []string{"01", "02"},
-	}, d, NewTextEventSink(&out))
+	}, d, noopEventSink{})
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
@@ -825,14 +815,13 @@ func TestRun_NeedsRepairOutsideSubset_DoesNotPauseRun(t *testing.T) {
 	})
 	d, prompts, _ := fakeDeps()
 
-	var out bytes.Buffer
 	err := Run(RunOptions{
 		EpicName:   "my-epic",
 		Skill:      "implement",
 		ScratchDir: scratchDir,
 		RepoDir:    "/fake/repo",
 		TicketIDs:  []string{"02"},
-	}, d, NewTextEventSink(&out))
+	}, d, noopEventSink{})
 	if err != nil {
 		t.Fatalf("Run() error = %v, want the unselected needs-repair ticket 01 to not block scheduling ticket 02", err)
 	}
@@ -934,10 +923,9 @@ func TestRun_ClaimNext_IgnoresExternalRevertOfAlreadyLaunchedTicket(t *testing.T
 		return nil
 	}
 
-	var out bytes.Buffer
 	runErr := make(chan error, 1)
 	go func() {
-		runErr <- Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out))
+		runErr <- Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
 	}()
 
 	select {
@@ -1016,14 +1004,13 @@ func TestRun_SelectingBlockedTicketThenEditingBlockersRunsCorrectMultiWave(t *te
 	}
 
 	d, prompts, _ := fakeDeps()
-	var out bytes.Buffer
 	if err := Run(RunOptions{
 		EpicName:   "my-epic",
 		Skill:      "implement",
 		ScratchDir: scratchDir,
 		RepoDir:    "/fake/repo",
 		TicketIDs:  requested,
-	}, d, NewTextEventSink(&out)); err != nil {
+	}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 

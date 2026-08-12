@@ -1,7 +1,6 @@
 package ralphloop
 
 import (
-	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
@@ -132,8 +131,7 @@ func TestRun_CherryPickConflict_ResolvesInFeatureWorktreeThenCompletes(t *testin
 		return origRemoveWorktree(repoDir, path, force)
 	}
 
-	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -317,10 +315,9 @@ func TestRun_CherryPickConflict_ResolutionNeverFinishes_MarksNeedsRepairWithoutA
 		}
 		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 	}
-	var out bytes.Buffer
 	// A stuck conflict resolution marks the ticket needs-repair rather than
 	// aborting the run, which leaves the epic parked on it.
-	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out))
+	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
 
 	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
 	if err != nil {
@@ -347,10 +344,9 @@ func TestRun_ZeroCommitIteration_MarksNeedsAnswerAndLeavesWorktree(t *testing.T)
 		return 0, nil
 	}
 
-	var out bytes.Buffer
 	// The zero-commit iteration leaves its ticket needs-answer, so the epic's
 	// only ticket is one a human must clear: the run parks on it.
-	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out))
+	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
 
 	if len(*removed) != 0 {
 		t.Errorf("removed worktree branches = %v, want the zero-commit iteration's worktree left in place", *removed)
@@ -381,12 +377,11 @@ func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {
 		return 1, nil
 	}
 
-	var out bytes.Buffer
 	// Ticket 01 ends needs-answer, so the run parks on it once 02 has landed.
 	runUntilParked(t, RunOptions{
 		EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
 		MaxParallel: 1,
-	}, d, NewTextEventSink(&out))
+	}, d, noopEventSink{})
 
 	if len(*removed) != 1 || (*removed)[0] != "ralph-loop/epic-item-02" {
 		t.Errorf("removed worktree branches = %v, want only iter-02 removed", *removed)
@@ -434,8 +429,7 @@ func TestRun_TransientIdleBlip_DoesNotOrphanCommit(t *testing.T) {
 		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 	}
 
-	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -478,8 +472,7 @@ func TestRun_CommitLandsDuringNeedsAnswerRecheck_MarksDoneNotNeedsAnswer(t *test
 		return 1, nil
 	}
 
-	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 

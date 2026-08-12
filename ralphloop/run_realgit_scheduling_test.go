@@ -1,7 +1,6 @@
 package ralphloop
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -154,8 +153,7 @@ func TestRun_ProductionRealGit_AThenBAndCConcurrently(t *testing.T) {
 	deps.Sleep = func(time.Duration) {}
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 
-	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: epicName, Skill: "implement", ScratchDir: scratchDir, RepoDir: repoDir}, deps, NewTextEventSink(&out)); err != nil {
+	if err := Run(RunOptions{EpicName: epicName, Skill: "implement", ScratchDir: scratchDir, RepoDir: repoDir}, deps, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -487,8 +485,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 		t.Fatalf("RevParse base: %v", err)
 	}
 
-	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: epicName, Skill: "implement", ScratchDir: scratchDir, RepoDir: repoDir, SmartZone: smartZone}, deps, NewTextEventSink(&out)); err != nil {
+	if err := Run(RunOptions{EpicName: epicName, Skill: "implement", ScratchDir: scratchDir, RepoDir: repoDir, SmartZone: smartZone}, deps, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -845,8 +842,7 @@ func TestRun_ProductionRealGit_ParkThenResumeReusesBranch(t *testing.T) {
 	phase = "post-resume"
 	mu.Unlock()
 
-	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: epicName, Skill: "implement", ScratchDir: scratchDir, RepoDir: repoDir}, deps, NewTextEventSink(&out)); err != nil {
+	if err := Run(RunOptions{EpicName: epicName, Skill: "implement", ScratchDir: scratchDir, RepoDir: repoDir}, deps, noopEventSink{}); err != nil {
 		t.Fatalf("Run() (resume) error = %v", err)
 	}
 

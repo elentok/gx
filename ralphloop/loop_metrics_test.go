@@ -1,7 +1,6 @@
 package ralphloop
 
 import (
-	"bytes"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -33,8 +32,7 @@ func TestRun_FreshIteration_StampsContextWindowOnDone(t *testing.T) {
 		return 12345, true, nil
 	}
 
-	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -67,8 +65,7 @@ func TestRun_FreshIteration_FrontmatterTicket_EndsWithValidFrontmatter(t *testin
 		return 12345, true, nil
 	}
 
-	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -105,8 +102,7 @@ func TestRun_FreshIteration_OmitsContextWindowWhenOccupancyUnavailable(t *testin
 		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-fresh-01"}, nil
 	}
 
-	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -151,7 +147,7 @@ func TestLandCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmatt
 		Ticket:          tickets.Ticket{Identifier: "01", Path: ticketPath},
 		ScratchDir:      scratchDir,
 		FeatureLock:     &sync.Mutex{},
-		Sink:            NewTextEventSink(&bytes.Buffer{}),
+		Sink:            noopEventSink{},
 	}
 
 	if _, err := landCherryPick(d, p, "base", "branch", sessionID, "pane", "tab"); err != nil {
@@ -210,7 +206,7 @@ func TestLandCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 		Ticket:          tickets.Ticket{Identifier: "01", Path: ticketPath},
 		ScratchDir:      scratchDir,
 		FeatureLock:     &sync.Mutex{},
-		Sink:            NewTextEventSink(&bytes.Buffer{}),
+		Sink:            noopEventSink{},
 	}
 
 	if _, err := landCherryPick(d, p, "base", "branch", sessionID, "pane", "tab"); err != nil {
@@ -365,8 +361,7 @@ func TestRun_LogsDepsInstalledEventWithCommand(t *testing.T) {
 		return "npm ci", nil
 	}
 
-	var out bytes.Buffer
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&out)); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 

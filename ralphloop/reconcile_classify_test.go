@@ -1,7 +1,6 @@
 package ralphloop
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -199,8 +198,8 @@ func TestReconcile_DoneTicketUnrecoverable_MarkedNeedsRepair(t *testing.T) {
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
 
-	var out bytes.Buffer
-	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(&out)), epics[0])
+	sink := newRecordingEventSink()
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, sink), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
@@ -216,15 +215,8 @@ func TestReconcile_DoneTicketUnrecoverable_MarkedNeedsRepair(t *testing.T) {
 		t.Errorf("ticket not marked needs-repair:\n%s", raw)
 	}
 
-	reports := strings.Split(out.String(), "\n")
-	found := false
-	for _, r := range reports {
-		if strings.Contains(r, "ticket 03") && strings.Contains(r, "no iteration branch left") {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("reports = %v, want an unrecoverable-mismatch report for ticket 03", reports)
+	if !hasEvent(sink, LiveEventTicketUnrecoverable, func(ev LiveEvent) bool { return ev.Identifier == "03" }) {
+		t.Errorf("events = %+v, want an unrecoverable-mismatch event for ticket 03", sink.Events())
 	}
 
 	events, ok, err := readEvents(scratchDir, "epic")

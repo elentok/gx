@@ -1,7 +1,6 @@
 package ralphloop
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -80,8 +79,8 @@ func TestReconcile_DoneTicketWithNoProvenance_FlaggedNeedsRepairNotSilently(t *t
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
 
-	var out bytes.Buffer
-	if _, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(&out)), epics[0]); err != nil {
+	sink := newRecordingEventSink()
+	if _, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, sink), epics[0]); err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
 
@@ -92,8 +91,8 @@ func TestReconcile_DoneTicketWithNoProvenance_FlaggedNeedsRepairNotSilently(t *t
 	if !strings.Contains(string(raw), "status: needs-repair") {
 		t.Errorf("ticket not flagged needs-repair for a human to check:\n%s", raw)
 	}
-	if !strings.Contains(out.String(), "ticket 03") {
-		t.Errorf("reports = %q, want an unrecoverable-mismatch report naming ticket 03", out.String())
+	if !hasEvent(sink, LiveEventTicketUnrecoverable, func(ev LiveEvent) bool { return ev.Identifier == "03" }) {
+		t.Errorf("events = %+v, want an unrecoverable-mismatch event naming ticket 03", sink.Events())
 	}
 }
 
@@ -117,8 +116,7 @@ func TestReconcile_CommitlessDoneTicket_NotFlaggedUnrecoverable(t *testing.T) {
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
 
-	var out bytes.Buffer
-	if _, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(&out)), epics[0]); err != nil {
+	if _, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{}), epics[0]); err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
 
@@ -158,8 +156,7 @@ func TestReconcile_ResearchGrillingCodeReviewDoneTickets_NotFlaggedUnrecoverable
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
 
-	var out bytes.Buffer
-	if _, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(&out)), epics[0]); err != nil {
+	if _, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{}), epics[0]); err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
 
@@ -197,8 +194,7 @@ func TestReconcile_PrototypeDoneTicket_StillFlaggedUnrecoverable(t *testing.T) {
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
 
-	var out bytes.Buffer
-	if _, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(&out)), epics[0]); err != nil {
+	if _, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{}), epics[0]); err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}
 
@@ -238,7 +234,7 @@ func TestReconcile_OutOfScopeDoneTicket_NotVerified(t *testing.T) {
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
 
-	params := testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, NewTextEventSink(&bytes.Buffer{}))
+	params := testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{})
 	params.Scope = scope
 	if _, err := reconcile(d, params, epic); err != nil {
 		t.Fatalf("reconcile() error = %v", err)
@@ -311,11 +307,10 @@ func TestRun_BackfilledProvenance_UnblocksDependentsAndCompletesEpic(t *testing.
 		return "deadbeef", nil
 	}
 
-	var firstRun bytes.Buffer
 	// Ticket 02 is flagged needs-repair, which blocks ticket 03 and leaves
 	// nothing runnable: the run parks on the flag rather than trusting the
 	// unproven done, and waits for the backfill below.
-	runUntilParked(t, RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&firstRun))
+	runUntilParked(t, RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
 
 	raw, err := os.ReadFile(filepath.Join(scratchDir, "my-epic", "issues", "02-b.md"))
 	if err != nil {
@@ -337,8 +332,7 @@ func TestRun_BackfilledProvenance_UnblocksDependentsAndCompletesEpic(t *testing.
 		t.Fatalf("logEvent: %v", err)
 	}
 
-	var secondRun bytes.Buffer
-	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, NewTextEventSink(&secondRun)); err != nil {
+	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() (after backfill) error = %v, want the epic to unblock and finish", err)
 	}
 
