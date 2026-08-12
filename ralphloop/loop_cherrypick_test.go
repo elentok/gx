@@ -493,6 +493,103 @@ func TestRun_ConflictResolution_CorroboratesSequencerBeforeClosingTab(t *testing
 	}
 }
 
+// TestRun_RestartMidResolution_ReattachesLiveResolverWithoutReforking covers
+// the run-level counterpart of conflict-lifecycle/02a's guard: a restart
+// finds the cherry-pick sequencer already mid-conflict (from before the
+// crash) with the conflict-resolution agent that was forked for it still
+// live in its own tab. The fresh iteration launched for this ticket must
+// reattach to that live resolver instead of aborting the stale sequencer
+// state and forking a second one under the same conflict-labeled tab.
+func TestRun_RestartMidResolution_ReattachesLiveResolverWithoutReforking(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md":                    "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01a-conflict-resolution.md": "---\nid: \"01a\"\nstatus: claimed\ntype: conflict-resolution\nparent: \"01\"\n---\n# Conflict resolution for 01\n",
+	})
+	d, _, _ := fakeDeps()
+
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
+		return []herdr.Tab{{TabID: "tab-conflict-01", Label: "conflict-01", WorkspaceID: workspaceID}}, nil
+	}
+
+	// The sequencer already owns a conflict from before the crash — no
+	// CherryPickRange call for this ticket ever produces it. The first check
+	// (inside cherryPickWithConflictResolution, before the live resolver is
+	// found) sees it in progress; the second (inside reattachLiveConflictResolver,
+	// after the reattached resolver finishes) sees it resolved.
+	var cpChecks int32
+	d.CherryPickInProgress = func(dir string) (bool, error) {
+		return atomic.AddInt32(&cpChecks, 1) == 1, nil
+	}
+
+	var picks, aborts int32
+	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
+		atomic.AddInt32(&picks, 1)
+		return nil
+	}
+	d.AbortCherryPick = func(dir string) error {
+		atomic.AddInt32(&aborts, 1)
+		return nil
+	}
+
+	var mu sync.Mutex
+	var conflictTabCreates int
+	origTabCreate := d.TabCreate
+	d.TabCreate = func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error) {
+		if strings.HasPrefix(opts.Label, "conflict-") {
+			mu.Lock()
+			conflictTabCreates++
+			mu.Unlock()
+		}
+		return origTabCreate(opts)
+	}
+
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if atomic.LoadInt32(&aborts) != 0 {
+		t.Errorf("AbortCherryPick calls = %d, want 0 (must reattach the live resolver, not abort its sequencer state)", aborts)
+	}
+	if conflictTabCreates != 0 {
+		t.Errorf("conflict-labeled TabCreate calls = %d, want 0 (must reuse the live resolver's tab, not fork a second one)", conflictTabCreates)
+	}
+	if atomic.LoadInt32(&picks) != 0 {
+		t.Errorf("CherryPickRange calls = %d, want 0 for this ticket (the sequencer was already mid-conflict)", picks)
+	}
+
+	issuesDir := filepath.Join(scratchDir, "epic", "issues")
+	entries, err := os.ReadDir(issuesDir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	var conflictChildren int
+	for _, e := range entries {
+		raw, err := os.ReadFile(filepath.Join(issuesDir, e.Name()))
+		if err != nil {
+			t.Fatalf("ReadFile: %v", err)
+		}
+		if strings.Contains(string(raw), "type: conflict-resolution") {
+			conflictChildren++
+		}
+	}
+	if conflictChildren != 1 {
+		t.Errorf("conflict-resolution child ticket files = %d, want exactly 1 (no second fork)", conflictChildren)
+	}
+
+	childRaw := findConflictResolutionChild(t, scratchDir, "epic")
+	if !strings.Contains(childRaw, "status: done") {
+		t.Errorf("conflict-resolution child ticket = %q, want status: done once the reattached resolver finished", childRaw)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: done") {
+		t.Errorf("parent ticket = %q, want status: done", raw)
+	}
+}
+
 // fakeConflictErr stands in for the *git.RunError CherryPickRange returns on
 // a real conflict; only its presence (not its type) matters to the loop,
 // which distinguishes conflicts from other errors via CherryPickInProgress.
