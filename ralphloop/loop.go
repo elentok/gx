@@ -156,6 +156,13 @@ type outcome struct {
 	// sink.IterationFinished wait for the worker's own landResults outcome
 	// once the land actually finishes. Never set on a landResults outcome.
 	built bool
+	// parkedOnChild is true when this outcome is a landResults outcome whose
+	// cherry-pick hit errConflictResolutionUnresolved: the ticket was parked
+	// needs-repair on a conflict-resolution child, not landed — it stays
+	// claimed on disk. err is nil on this path (parking already handled the
+	// failure), so without this flag the results loop can't tell it apart
+	// from a real completed land. Never set on a results (build) outcome.
+	parkedOnChild bool
 }
 
 // Run drives every unblocked ticket in the named epic to completion, up to
@@ -674,6 +681,18 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			// this same ticket's landResults outcome once the land actually
 			// finishes.
 			landing++
+			continue
+		}
+
+		if r.parkedOnChild {
+			// landOne already parked a conflict-resolution child
+			// needs-repair; the parent ticket's on-disk status is still
+			// claimed, not done, so this is not a completed land — no
+			// completed++/sink.IterationFinished. Drop it from launched so a
+			// later run's reconcile can pick the orphaned claim back up
+			// (see isParked's doc: "claimed" itself is never parked, so
+			// nothing else would remove it here).
+			delete(launched, r.ticket.Identifier)
 			continue
 		}
 

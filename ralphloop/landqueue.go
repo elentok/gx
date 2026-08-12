@@ -183,7 +183,7 @@ func landOne(d Deps, lp landQueueParams, job landJob) outcome {
 			// the parent iteration ticket stays claimed, and its worktree/
 			// tab/branch survive for a later orphaned-claim reconcile to
 			// retry — not a failure of this land itself.
-			return outcome{ticket: job.ticket}
+			return outcome{ticket: job.ticket, parkedOnChild: true}
 		}
 		return outcome{ticket: job.ticket, err: err}
 	}

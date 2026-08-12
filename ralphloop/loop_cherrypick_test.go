@@ -405,7 +405,8 @@ func TestRun_ConflictResolution_PrematureTabClose_SequencerStillConflicted_Parks
 		return true, nil
 	}
 
-	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
+	sink := &recordingSink{}
+	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
 
 	childRaw := findConflictResolutionChild(t, scratchDir, "epic")
 	if !strings.Contains(childRaw, "status: needs-repair") {
@@ -418,6 +419,16 @@ func TestRun_ConflictResolution_PrematureTabClose_SequencerStillConflicted_Parks
 	}
 	if strings.Contains(string(parentRaw), "status: needs-repair") {
 		t.Errorf("parent iteration ticket = %q, want it left alone (not needs-repair) — the failure belongs to the conflict-resolution child", parentRaw)
+	}
+
+	// The parent is parked on its conflict-resolution child, not landed: its
+	// on-disk status is still claimed (checked above via the absence of
+	// needs-repair), so Run must not report it as a completed iteration —
+	// see landOne's parkedOnChild outcome and the results loop's handling of
+	// it in loop.go.
+	got := sink.snapshot()
+	if slices.Contains(got, "IterationFinished") {
+		t.Errorf("events = %v, want no IterationFinished for a ticket parked on its conflict-resolution child, not landed", got)
 	}
 }
 
