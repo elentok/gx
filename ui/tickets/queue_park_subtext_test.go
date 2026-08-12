@@ -133,6 +133,9 @@ func TestQueueModel_SelectingParkedRowScrollsPreviewToParkSection(t *testing.T) 
 	m = updated.(QueueModel)
 	m = deliverQueueCommands(t, m, cmd)
 
+	m.View() // populate m.queueTree.Entries()
+	m = selectFirstQueueTicketRow(t, m)
+
 	if m.previewVP.YOffset() == 0 {
 		t.Fatal("expected preview viewport to scroll past the top toward the park section")
 	}

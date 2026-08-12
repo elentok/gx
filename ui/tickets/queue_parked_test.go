@@ -99,6 +99,9 @@ func TestQueueModelEnterOnParkedRowResumesEvenWhenCheckedAndLaunchable(t *testin
 
 	wake := r.gateFor("alpha").ParkWake()
 
+	m.View() // populate m.queueTree.Entries()
+	m = selectFirstQueueTicketRow(t, m)
+
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(QueueModel)
 
@@ -129,17 +132,17 @@ func TestQueueModelEnterOnNonParkedRowUnchanged(t *testing.T) {
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 	installParkedRegistry(t, map[string][]ralphloop.StalledTicket{"alpha": {{Identifier: "01"}}})
 
-	rows := m.rows()
+	m.View() // populate m.queueTree.Entries() (queue_view.go's View())
 	betaIdx := -1
-	for i, r := range rows {
-		if r.epic.Name == "beta" {
+	for i, e := range m.queueTree.Entries() {
+		if e.Value.kind == nodeQueueTicket && e.Value.ticket.epic.Name == "beta" {
 			betaIdx = i
 		}
 	}
 	if betaIdx == -1 {
-		t.Fatalf("expected a beta row among %+v", rows)
+		t.Fatalf("expected a beta row among %+v", m.queueTree.Entries())
 	}
-	m.selected = betaIdx
+	m.queueTree.SetSelectedIndex(betaIdx)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(QueueModel)
