@@ -499,12 +499,25 @@ var depsMarkers = []struct {
 // its working directory. No marker matching is a silent no-op (command ""),
 // since not every worktree is a package-managed project.
 func InstallDependencies(path string) (command string, err error) {
+	return installDependenciesWith(path, exec.LookPath)
+}
+
+// installDependenciesWith is InstallDependencies with the package-manager
+// executable's lookup injected, so tests can point it at a fake binary's
+// exact path instead of prepending to the real PATH env var with t.Setenv
+// (which would block InstallDependencies subtests from running under
+// t.Parallel()).
+func installDependenciesWith(path string, lookPath func(string) (string, error)) (command string, err error) {
 	for _, dm := range depsMarkers {
 		if _, statErr := os.Stat(filepath.Join(path, dm.marker)); statErr != nil {
 			continue
 		}
 		command = strings.Join(dm.command, " ")
-		cmd := exec.Command(dm.command[0], dm.command[1:]...)
+		bin, lookErr := lookPath(dm.command[0])
+		if lookErr != nil {
+			return command, fmt.Errorf("looking up %q: %w", dm.command[0], lookErr)
+		}
+		cmd := exec.Command(bin, dm.command[1:]...)
 		cmd.Dir = path
 		out, runErr := cmd.CombinedOutput()
 		if runErr != nil {

@@ -16,6 +16,27 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
+// setHomeEnv points $HOME at dir for the rest of the test, restored on
+// cleanup via a manual os.Setenv/os.Unsetenv pair rather than t.Setenv, which
+// panics once a test has called t.Parallel(). Production code in this
+// package (transcript.Path and friends) still resolves $HOME directly, so
+// this remains a process-wide mutation — a test using it must stay
+// non-parallel with any other test that also touches $HOME.
+func setHomeEnv(t *testing.T, dir string) {
+	t.Helper()
+	prev, had := os.LookupEnv("HOME")
+	if err := os.Setenv("HOME", dir); err != nil {
+		t.Fatalf("Setenv HOME: %v", err)
+	}
+	t.Cleanup(func() {
+		if had {
+			os.Setenv("HOME", prev)
+		} else {
+			os.Unsetenv("HOME")
+		}
+	})
+}
+
 // TestRun_FreshIteration_StampsContextWindowOnDone verifies ticket 06: a
 // ticket marked done from a fresh (non-reattached) iteration, whose context
 // occupancy is known this run, gets it written into its frontmatter's
@@ -123,7 +144,7 @@ func TestRun_FreshIteration_OmitsContextWindowWhenOccupancyUnavailable(t *testin
 // frontmatter fields.
 func TestLandCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmatter(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHomeEnv(t, home)
 
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
@@ -176,7 +197,7 @@ func TestLandCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmatt
 // commit's message via a single Deps.AppendTrailers call.
 func TestLandCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHomeEnv(t, home)
 
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
@@ -251,7 +272,7 @@ func TestLandCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 // stats are captured while ticket 01 is still genuinely in progress.
 func TestRun_IterationFinishedAndEpicComplete_ReceiveRealMetrics(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHomeEnv(t, home)
 
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
@@ -387,7 +408,7 @@ func TestRun_LogsDepsInstalledEventWithCommand(t *testing.T) {
 // does for a committed finish, and stamps them into the ticket's frontmatter.
 func TestStampCommitlessMetrics_FreshSession_WritesActualContextWindowAndElapsedTime(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHomeEnv(t, home)
 
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: done\ntype: code-review\ncommitless: true\n---\n# A\n",
@@ -433,7 +454,7 @@ func TestStampCommitlessMetrics_FreshSession_WritesActualContextWindowAndElapsed
 // leaves actual_context_window/elapsed_time at 0 rather than erroring.
 func TestStampCommitlessMetrics_NoDiscoverableSession_LeavesFieldsZeroWithoutError(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHomeEnv(t, home)
 
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: done\ntype: code-review\ncommitless: true\n---\n# A\n",

@@ -67,7 +67,7 @@ func parseUntil(args []string) []string {
 
 // writeOccupancyTranscript writes a minimal single-assistant-turn Claude Code
 // transcript at the real path transcript.Path resolves for cwd/sessionID
-// (under $HOME, which the caller must have redirected via t.Setenv), reading
+// (under $HOME, which the caller must have redirected via setHomeEnv), reading
 // back occupancy inputTokens.
 func writeOccupancyTranscript(t *testing.T, cwd, sessionID string, inputTokens int) {
 	t.Helper()
@@ -176,7 +176,7 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 
 	herdrfake.StartState(t, s)
 
-	t.Setenv("HOME", t.TempDir())
+	setHomeEnv(t, t.TempDir())
 	writeOccupancyTranscript(t, cwd, sessionID, smartZone+100)
 
 	// Models the whole scenario's ~3 real minutes of compaction without
@@ -278,7 +278,7 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 	cwd := "/repo/iter-07"
 	sessionID := "sess-07"
 
-	t.Setenv("HOME", t.TempDir())
+	setHomeEnv(t, t.TempDir())
 
 	s := herdrfake.NewState(t)
 
@@ -469,7 +469,7 @@ func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
 	cwd := "/repo/iter-08"
 	sessionID := "sess-08"
 
-	t.Setenv("HOME", t.TempDir())
+	setHomeEnv(t, t.TempDir())
 
 	s := herdrfake.NewState(t)
 
@@ -761,7 +761,7 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 
 	herdrfake.StartState(t, s)
 
-	t.Setenv("HOME", t.TempDir())
+	setHomeEnv(t, t.TempDir())
 	writeOccupancyTranscript(t, cwd, sessionID, smartZone+100)
 
 	// Models the whole scenario's ~8 real minutes of compaction without

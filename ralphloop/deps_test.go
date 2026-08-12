@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,11 +15,13 @@ import (
 )
 
 // stubBin writes an executable script named name into a fresh directory and
-// prepends that directory to PATH for the duration of the test, so
-// InstallDependencies's exec.Command calls resolve to it instead of the real
-// package manager. The script appends its own invocation ("name arg1 arg2 ...")
+// returns a lookPath function (see installDependenciesWith) resolving name to
+// that script, so InstallDependencies's exec.Command calls resolve to it
+// instead of the real package manager, without mutating the process-wide
+// PATH env var (t.Setenv, which would block this test from running under
+// t.Parallel()). The script appends its own invocation ("name arg1 arg2 ...")
 // as one line to logPath, and exits with exitCode.
-func stubBin(t *testing.T, name string, logPath string, exitCode int) {
+func stubBin(t *testing.T, name string, logPath string, exitCode int) func(string) (string, error) {
 	t.Helper()
 	dir := t.TempDir()
 	script := "#!/bin/sh\necho \"$0 $*\" >> " + logPath + "\nexit " + strconv.Itoa(exitCode) + "\n"
@@ -26,7 +29,12 @@ func stubBin(t *testing.T, name string, logPath string, exitCode int) {
 	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
 		t.Fatalf("WriteFile stub: %v", err)
 	}
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	return func(lookup string) (string, error) {
+		if lookup != name {
+			return "", fmt.Errorf("stubBin: unexpected lookup %q, want %q", lookup, name)
+		}
+		return scriptPath, nil
+	}
 }
 
 func TestVerifySkillWith(t *testing.T) {
@@ -143,16 +151,17 @@ func TestInstallDependencies_EachMarker_RunsExpectedCommand(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.marker, func(t *testing.T) {
+			t.Parallel()
 			dir := t.TempDir()
 			if err := os.WriteFile(filepath.Join(dir, c.marker), []byte(""), 0644); err != nil {
 				t.Fatalf("WriteFile %s: %v", c.marker, err)
 			}
 			logPath := filepath.Join(t.TempDir(), "invocations.log")
-			stubBin(t, c.wantBin, logPath, 0)
+			lookPath := stubBin(t, c.wantBin, logPath, 0)
 
-			command, err := InstallDependencies(dir)
+			command, err := installDependenciesWith(dir, lookPath)
 			if err != nil {
-				t.Fatalf("InstallDependencies() error = %v", err)
+				t.Fatalf("installDependenciesWith() error = %v", err)
 			}
 			if command != c.wantCommand {
 				t.Errorf("command = %q, want %q", command, c.wantCommand)
@@ -177,11 +186,11 @@ func TestInstallDependencies_MarkerPrecedence_NpmWinsOverPnpm(t *testing.T) {
 		}
 	}
 	logPath := filepath.Join(t.TempDir(), "invocations.log")
-	stubBin(t, "npm", logPath, 0)
+	lookPath := stubBin(t, "npm", logPath, 0)
 
-	command, err := InstallDependencies(dir)
+	command, err := installDependenciesWith(dir, lookPath)
 	if err != nil {
-		t.Fatalf("InstallDependencies() error = %v", err)
+		t.Fatalf("installDependenciesWith() error = %v", err)
 	}
 	if command != "npm ci" {
 		t.Errorf("command = %q, want npm ci to win when both markers are present", command)
@@ -194,11 +203,11 @@ func TestInstallDependencies_CommandFails_ReturnsError(t *testing.T) {
 		t.Fatalf("WriteFile package-lock.json: %v", err)
 	}
 	logPath := filepath.Join(t.TempDir(), "invocations.log")
-	stubBin(t, "npm", logPath, 1)
+	lookPath := stubBin(t, "npm", logPath, 1)
 
-	command, err := InstallDependencies(dir)
+	command, err := installDependenciesWith(dir, lookPath)
 	if err == nil {
-		t.Fatal("InstallDependencies() error = nil, want failure surfaced")
+		t.Fatal("installDependenciesWith() error = nil, want failure surfaced")
 	}
 	if command != "npm ci" {
 		t.Errorf("command = %q, want npm ci returned alongside the error", command)
