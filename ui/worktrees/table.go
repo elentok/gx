@@ -32,13 +32,11 @@ func sortedWorktrees(wts []git.Worktree, mainBranch string) []git.Worktree {
 	return out
 }
 
-// tableStyles holds the styles configured in newTable so our custom renderer
+// tableStyles holds the styles applied to every table so our custom renderer
 // can use them without needing access to the unexported table.Model.styles field.
-var tableStyles table.Styles
-
-func newTable() table.Model {
-	t := table.New(table.WithFocused(true))
-
+// Computed once at init (not per-newTable call) since concurrent tests
+// constructing tables in parallel would otherwise race on a shared var.
+var tableStyles = func() table.Styles {
 	s := table.DefaultStyles()
 	s.Header = s.Header.
 		BorderStyle(lipgloss.NormalBorder()).
@@ -46,9 +44,12 @@ func newTable() table.Model {
 		BorderBottom(true).
 		Bold(true)
 	s.Selected = ui.StyleRowHighlight
-	t.SetStyles(s)
-	tableStyles = s
+	return s
+}()
 
+func newTable() table.Model {
+	t := table.New(table.WithFocused(true))
+	t.SetStyles(tableStyles)
 	return t
 }
 

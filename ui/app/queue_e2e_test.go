@@ -16,6 +16,7 @@ import (
 )
 
 func TestTicketsConfirmOpensQueueWithSharedSelection(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	issuesDir := filepath.Join(repoDir, ".scratch", "my-epic", "issues")
 	if err := os.MkdirAll(issuesDir, 0o755); err != nil {

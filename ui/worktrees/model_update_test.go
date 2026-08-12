@@ -31,6 +31,7 @@ func newUpdateTestModel(t *testing.T) Model {
 }
 
 func TestInputFocused_TrueInRenameMode(t *testing.T) {
+	t.Parallel()
 	m := newUpdateTestModel(t)
 	m.mode = modeRename
 	if !m.InputFocused() {
@@ -39,6 +40,7 @@ func TestInputFocused_TrueInRenameMode(t *testing.T) {
 }
 
 func TestInputFocused_TrueInCloneMode(t *testing.T) {
+	t.Parallel()
 	m := newUpdateTestModel(t)
 	m.mode = modeClone
 	if !m.InputFocused() {
@@ -47,6 +49,7 @@ func TestInputFocused_TrueInCloneMode(t *testing.T) {
 }
 
 func TestInputFocused_TrueInNewMode(t *testing.T) {
+	t.Parallel()
 	m := newUpdateTestModel(t)
 	m.mode = modeNew
 	if !m.InputFocused() {
@@ -55,6 +58,7 @@ func TestInputFocused_TrueInNewMode(t *testing.T) {
 }
 
 func TestInputFocused_TrueInSearchMode(t *testing.T) {
+	t.Parallel()
 	m := newUpdateTestModel(t)
 	m.mode = modeSearch
 	if !m.InputFocused() {
@@ -63,6 +67,7 @@ func TestInputFocused_TrueInSearchMode(t *testing.T) {
 }
 
 func TestInputFocused_FalseInNormalMode(t *testing.T) {
+	t.Parallel()
 	m := newUpdateTestModel(t)
 	m.mode = modeNormal
 	if m.InputFocused() {
@@ -71,6 +76,7 @@ func TestInputFocused_FalseInNormalMode(t *testing.T) {
 }
 
 func TestUpdate_RenameResultMsg_Error(t *testing.T) {
+	t.Parallel()
 	m := newUpdateTestModel(t)
 	updated, _ := m.Update(renameResultMsg{err: errTest})
 	next := updated.(Model)
@@ -80,6 +86,7 @@ func TestUpdate_RenameResultMsg_Error(t *testing.T) {
 }
 
 func TestUpdate_CloneResultMsg_Error(t *testing.T) {
+	t.Parallel()
 	m := newUpdateTestModel(t)
 	updated, _ := m.Update(cloneResultMsg{err: errTest})
 	next := updated.(Model)
@@ -89,6 +96,7 @@ func TestUpdate_CloneResultMsg_Error(t *testing.T) {
 }
 
 func TestUpdate_NewResultMsg_Error(t *testing.T) {
+	t.Parallel()
 	m := newUpdateTestModel(t)
 	updated, _ := m.Update(newResultMsg{err: errTest})
 	next := updated.(Model)
@@ -98,6 +106,7 @@ func TestUpdate_NewResultMsg_Error(t *testing.T) {
 }
 
 func TestUpdate_WindowSizeMsg(t *testing.T) {
+	t.Parallel()
 	m := newUpdateTestModel(t)
 	updated, cmd := m.Update(tea.WindowSizeMsg{Width: 200, Height: 50})
 	if cmd != nil {

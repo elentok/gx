@@ -59,6 +59,7 @@ func tabClickX(t *testing.T, m Model, id nav.TabID) int {
 }
 
 func TestClickTabLabelSwitchesActiveTab(t *testing.T) {
+	t.Parallel()
 	m := newAppForMouseTest(t)
 	x := tabClickX(t, m, nav.TabLog)
 
@@ -71,6 +72,7 @@ func TestClickTabLabelSwitchesActiveTab(t *testing.T) {
 }
 
 func TestClickOutsideTabBarFallsThroughToActivePage(t *testing.T) {
+	t.Parallel()
 	m := newAppForMouseTest(t)
 	stub := &mouseRecorderStub{}
 	live := m.livePageByTab[nav.TabWorktrees]

@@ -12,6 +12,7 @@ import (
 // worktree the user launched from (activeWorktreePath) on every
 // worktreesLoadedMsg, discarding whatever the user had selected.
 func TestWorktreesLoadedMsg_PreservesSelectionAcrossReload(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a", "feature-b")
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -43,6 +44,7 @@ func TestWorktreesLoadedMsg_PreservesSelectionAcrossReload(t *testing.T) {
 // First load has no prior selection, so it should fall back to the worktree
 // the user launched from.
 func TestWorktreesLoadedMsg_FirstLoadSelectsActiveWorktree(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {

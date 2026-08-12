@@ -9,6 +9,7 @@ import (
 )
 
 func TestCmdOpenURL_NonNil(t *testing.T) {
+	t.Parallel()
 	cmd := cmdOpenURL("https://example.com")
 	if cmd == nil {
 		t.Fatal("expected non-nil cmd from cmdOpenURL")
@@ -16,6 +17,7 @@ func TestCmdOpenURL_NonNil(t *testing.T) {
 }
 
 func TestCmdRebasePreflight_ReturnsMsg(t *testing.T) {
+	t.Parallel()
 	repo := git.Repo{MainBranch: "main"}
 	wt := git.Worktree{Name: "feature", Branch: "feature"}
 	cmd := cmdRebasePreflight(repo, wt)
@@ -29,6 +31,7 @@ func TestCmdRebasePreflight_ReturnsMsg(t *testing.T) {
 }
 
 func TestCmdRebase_NoStash(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	wt := git.Worktree{Name: "main", Path: repoDir}
 	repo := git.Repo{MainBranch: "main"}
@@ -43,6 +46,7 @@ func TestCmdRebase_NoStash(t *testing.T) {
 }
 
 func TestCmdRebase_WithStash(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	wt := git.Worktree{Name: "main", Path: repoDir}
 	repo := git.Repo{MainBranch: "main"}
@@ -57,6 +61,7 @@ func TestCmdRebase_WithStash(t *testing.T) {
 }
 
 func TestCmdRebaseRef_ExecutesAndReturnsMsg(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	wt := git.Worktree{Name: "main", Path: repoDir}
 	cmd := cmdRebaseRef(wt, "HEAD", "initial log")
@@ -70,6 +75,7 @@ func TestCmdRebaseRef_ExecutesAndReturnsMsg(t *testing.T) {
 }
 
 func TestCmdStashPop_ExecutesAndReturnsMsg(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	cmd := cmdStashPop(repoDir, "rebase", "")
 	if cmd == nil {
@@ -82,6 +88,7 @@ func TestCmdStashPop_ExecutesAndReturnsMsg(t *testing.T) {
 }
 
 func TestForcePushPrompt_ContainsBranch(t *testing.T) {
+	t.Parallel()
 	wt := git.Worktree{Branch: "feature/my-branch"}
 	prompt := forcePushPrompt(wt)
 	if !strings.Contains(prompt, "feature/my-branch") {
@@ -90,6 +97,7 @@ func TestForcePushPrompt_ContainsBranch(t *testing.T) {
 }
 
 func TestPromptableJobOutputTitle_Default(t *testing.T) {
+	t.Parallel()
 	title := promptableJobOutputTitle(99)
 	if title == "" {
 		t.Fatal("expected non-empty default title from promptableJobOutputTitle")
@@ -97,6 +105,7 @@ func TestPromptableJobOutputTitle_Default(t *testing.T) {
 }
 
 func TestPromptableJobArgs_PushAndForcePush(t *testing.T) {
+	t.Parallel()
 	repo := git.Repo{MainBranch: "main"}
 	wt := git.Worktree{Name: "feature", Branch: "feature"}
 
@@ -117,6 +126,7 @@ func TestPromptableJobArgs_PushAndForcePush(t *testing.T) {
 }
 
 func TestPromptableJobLabel_AllKinds(t *testing.T) {
+	t.Parallel()
 	wt := git.Worktree{Name: "feature"}
 	labels := []string{
 		promptableJobLabel(promptableJobPushFetch, wt),
@@ -132,6 +142,7 @@ func TestPromptableJobLabel_AllKinds(t *testing.T) {
 }
 
 func TestPromptableJobOutputTitle_KnownKinds(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		kind promptableJobKind
 		want string

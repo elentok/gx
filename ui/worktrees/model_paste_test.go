@@ -9,6 +9,7 @@ import (
 )
 
 func TestPasteMsgUpdatesNewWorktreeInput(t *testing.T) {
+	t.Parallel()
 	m := Model{}.enterNewMode()
 
 	updated, _ := m.Update(tea.PasteMsg{Content: "feature-pasted"})
@@ -20,6 +21,7 @@ func TestPasteMsgUpdatesNewWorktreeInput(t *testing.T) {
 }
 
 func TestPasteMsgUpdatesRenameInput(t *testing.T) {
+	t.Parallel()
 	m := Model{
 		worktrees: []git.Worktree{{Name: "feature-a"}},
 	}
@@ -34,6 +36,7 @@ func TestPasteMsgUpdatesRenameInput(t *testing.T) {
 }
 
 func TestPasteMsgUpdatesSearchQuery(t *testing.T) {
+	t.Parallel()
 	m := Model{
 		worktrees: []git.Worktree{
 			{Name: "feature-a", Branch: "feature-a"},

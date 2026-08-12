@@ -12,6 +12,7 @@ import (
 )
 
 func TestSplitHeight_StackedLayout(t *testing.T) {
+	t.Parallel()
 	m := Model{width: 80, height: 30} // width <= 100 → stacked
 	m.worktrees = make([]git.Worktree, 5)
 	tableH, previewH := m.splitHeight(30)
@@ -27,6 +28,7 @@ func TestSplitHeight_StackedLayout(t *testing.T) {
 }
 
 func TestSplitHeight_NonStackedLayout(t *testing.T) {
+	t.Parallel()
 	m := Model{width: 200, height: 40} // width > 100 → side-by-side
 	tableH, previewH := m.splitHeight(40)
 	if tableH != 40 || previewH != 40 {
@@ -35,6 +37,7 @@ func TestSplitHeight_NonStackedLayout(t *testing.T) {
 }
 
 func TestContentHeight_MinFour(t *testing.T) {
+	t.Parallel()
 	m := Model{height: 2}
 	if h := m.contentHeight(); h != 4 {
 		t.Errorf("expected min contentHeight=4, got %d", h)
@@ -42,6 +45,7 @@ func TestContentHeight_MinFour(t *testing.T) {
 }
 
 func TestContentHeight_Normal(t *testing.T) {
+	t.Parallel()
 	m := Model{height: 30}
 	if h := m.contentHeight(); h != 29 {
 		t.Errorf("expected contentHeight=29 (30-1 helpLine), got %d", h)
@@ -52,6 +56,7 @@ func TestContentHeight_Normal(t *testing.T) {
 // If worktrees is non-empty when previewContent is subsequently called,
 // m.worktrees[m.table.Cursor()] panics with index out of range [-1].
 func TestWindowSizeMsgWithNegativeTableCursorDoesNotPanic(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {

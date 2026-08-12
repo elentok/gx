@@ -8,6 +8,7 @@ import (
 )
 
 func TestDirtyStateFromChanges(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		changes []git.Change
@@ -45,6 +46,7 @@ func TestDirtyStateFromChanges(t *testing.T) {
 }
 
 func TestWorktreeCellBranchSuffix(t *testing.T) {
+	t.Parallel()
 	ic := icons(false)
 	icNerd := icons(true)
 
@@ -95,6 +97,7 @@ func TestWorktreeCellBranchSuffix(t *testing.T) {
 }
 
 func TestDirtyCellSymbols(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		dirty dirtyState
@@ -117,6 +120,7 @@ func TestDirtyCellSymbols(t *testing.T) {
 }
 
 func TestDirtyAndStatusCellSelectedKeepContent(t *testing.T) {
+	t.Parallel()
 	if got := dirtyCell(dirtyState{hasModified: true, hasUntracked: true}, icons(false), true); !strings.Contains(got, "M?") {
 		t.Fatalf("dirtyCell(selected) = %q, want symbol %q", got, "M?")
 	}
@@ -126,6 +130,7 @@ func TestDirtyAndStatusCellSelectedKeepContent(t *testing.T) {
 }
 
 func TestStatusCellNerdFontReplacesAheadBehind(t *testing.T) {
+	t.Parallel()
 	s := git.SyncStatus{Name: git.StatusDiverged, Ahead: 2, Behind: 1}
 	got := statusCell(s, icons(true), false, true)
 	if !strings.Contains(got, "") || !strings.Contains(got, "") {

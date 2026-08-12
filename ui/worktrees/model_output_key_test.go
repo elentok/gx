@@ -14,6 +14,7 @@ import (
 )
 
 func TestGGJumpsToTop(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a", "feature-b")
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -52,6 +53,7 @@ func TestGGJumpsToTop(t *testing.T) {
 }
 
 func TestGOOpensLogsMode(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -79,6 +81,7 @@ func TestGOOpensLogsMode(t *testing.T) {
 }
 
 func TestGShowsChordHint(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -111,6 +114,7 @@ func TestGShowsChordHint(t *testing.T) {
 }
 
 func TestLTriggersLazygitLogCommand(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -132,6 +136,7 @@ func TestLTriggersLazygitLogCommand(t *testing.T) {
 }
 
 func TestGLIsNotHandledByWorktreesView(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -158,6 +163,7 @@ func TestGLIsNotHandledByWorktreesView(t *testing.T) {
 }
 
 func TestEnterNavigatesToLogWhenNavigationEnabled(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -185,6 +191,7 @@ func TestEnterNavigatesToLogWhenNavigationEnabled(t *testing.T) {
 }
 
 func TestOEntersTerminalMenuMode(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {

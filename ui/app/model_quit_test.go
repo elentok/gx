@@ -60,6 +60,7 @@ func newAppWithQuitGuard(t *testing.T, canQuit bool) Model {
 }
 
 func TestBackWithLoopRunningShowsConfirmInsteadOfQuitting(t *testing.T) {
+	t.Parallel()
 	m := newAppWithQuitGuard(t, false)
 
 	updated, cmd := m.Update(nav.Back()())
@@ -78,6 +79,7 @@ func TestBackWithLoopRunningShowsConfirmInsteadOfQuitting(t *testing.T) {
 }
 
 func TestQuitConfirmCancelReturnsToAppWithLoopUnaffected(t *testing.T) {
+	t.Parallel()
 	m := newAppWithQuitGuard(t, false)
 
 	updated, _ := m.Update(nav.Back()())
@@ -106,6 +108,7 @@ func TestQuitConfirmCancelReturnsToAppWithLoopUnaffected(t *testing.T) {
 }
 
 func TestQuitConfirmAcceptQuits(t *testing.T) {
+	t.Parallel()
 	m := newAppWithQuitGuard(t, false)
 
 	updated, _ := m.Update(nav.Back()())
@@ -129,6 +132,7 @@ func TestQuitConfirmAcceptQuits(t *testing.T) {
 }
 
 func TestClickQuitConfirmYesQuits(t *testing.T) {
+	t.Parallel()
 	m := newAppWithQuitGuard(t, false)
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
@@ -155,6 +159,7 @@ func TestClickQuitConfirmYesQuits(t *testing.T) {
 }
 
 func TestClickQuitConfirmNoCancels(t *testing.T) {
+	t.Parallel()
 	m := newAppWithQuitGuard(t, false)
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
@@ -182,6 +187,7 @@ func TestClickQuitConfirmNoCancels(t *testing.T) {
 }
 
 func TestForceQuitWithLoopRunningShowsConfirmInsteadOfQuitting(t *testing.T) {
+	t.Parallel()
 	m := newAppWithQuitGuard(t, false)
 
 	updated, cmd := m.Update(nav.ForceQuit()())
@@ -200,6 +206,7 @@ func TestForceQuitWithLoopRunningShowsConfirmInsteadOfQuitting(t *testing.T) {
 }
 
 func TestForceQuitWithNoLoopRunningQuitsImmediately(t *testing.T) {
+	t.Parallel()
 	m := newAppWithQuitGuard(t, true)
 
 	updated, cmd := m.Update(nav.ForceQuit()())
@@ -217,6 +224,7 @@ func TestForceQuitWithNoLoopRunningQuitsImmediately(t *testing.T) {
 }
 
 func TestBackWithNoLoopRunningQuitsImmediately(t *testing.T) {
+	t.Parallel()
 	m := newAppWithQuitGuard(t, true)
 
 	updated, cmd := m.Update(nav.Back()())

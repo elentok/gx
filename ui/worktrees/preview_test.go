@@ -10,6 +10,7 @@ import (
 func boolPtr(v bool) *bool { return &v }
 
 func TestRenderPreviewContent_IncludesBehindSection(t *testing.T) {
+	t.Parallel()
 	wt := &git.Worktree{Name: "feature-a"}
 	ahead := []git.Commit{{Hash: "abc1234", Subject: "ahead commit"}}
 	behind := []git.Commit{{Hash: "def5678", Subject: "behind commit"}}
@@ -27,6 +28,7 @@ func TestRenderPreviewContent_IncludesBehindSection(t *testing.T) {
 }
 
 func TestRenderPreviewContent_NoUpstream(t *testing.T) {
+	t.Parallel()
 	wt := &git.Worktree{Name: "feature-a"}
 	out := renderPreviewContent(wt, "", git.Commit{}, nil, nil, nil, false, nil, "", false)
 	if !strings.Contains(out, "no remote tracking branch") {
@@ -41,6 +43,7 @@ func TestRenderPreviewContent_NoUpstream(t *testing.T) {
 }
 
 func TestRenderPreviewContent_UsesNerdFontIcons(t *testing.T) {
+	t.Parallel()
 	wt := &git.Worktree{Name: "feature-a"}
 	out := renderPreviewContent(wt, "origin/feature-a", git.Commit{}, nil, nil, nil, false, nil, "", true)
 	if !strings.Contains(out, "󰙅 Worktree") {
@@ -52,6 +55,7 @@ func TestRenderPreviewContent_UsesNerdFontIcons(t *testing.T) {
 }
 
 func TestRenderPreviewContent_RebasedOnMain(t *testing.T) {
+	t.Parallel()
 	wt := &git.Worktree{Name: "feature-a", Branch: "feature-a"}
 	out := renderPreviewContent(wt, "origin/feature-a", git.Commit{}, nil, nil, boolPtr(true), false, nil, "", false)
 	if !strings.Contains(out, "rebased on main") {
@@ -60,6 +64,7 @@ func TestRenderPreviewContent_RebasedOnMain(t *testing.T) {
 }
 
 func TestRenderPreviewContent_NeedsRebase(t *testing.T) {
+	t.Parallel()
 	wt := &git.Worktree{Name: "feature-a", Branch: "feature-a"}
 	out := renderPreviewContent(wt, "origin/feature-a", git.Commit{}, nil, nil, boolPtr(false), false, nil, "", false)
 	if !strings.Contains(out, "needs rebase on main") {
@@ -68,6 +73,7 @@ func TestRenderPreviewContent_NeedsRebase(t *testing.T) {
 }
 
 func TestRenderPreviewContent_MainBranchHidesSection(t *testing.T) {
+	t.Parallel()
 	wt := &git.Worktree{Name: "main", Branch: "main"}
 	out := renderPreviewContent(wt, "origin/main", git.Commit{}, nil, nil, nil, true, nil, "", false)
 	if strings.Contains(out, "Base") {
@@ -76,6 +82,7 @@ func TestRenderPreviewContent_MainBranchHidesSection(t *testing.T) {
 }
 
 func TestRenderPreviewContent_SpinnerInTitle(t *testing.T) {
+	t.Parallel()
 	wt := &git.Worktree{Name: "feature-a"}
 	out := renderPreviewContent(wt, "", git.Commit{}, nil, nil, nil, false, nil, "⣾", false)
 	if !strings.Contains(out, "⣾") {

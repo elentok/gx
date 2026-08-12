@@ -77,6 +77,7 @@ func keySpecial(code rune) tea.KeyPressMsg {
 // ── delete ────────────────────────────────────────────────────────────────────
 
 func TestDeleteConfirmationAppearsAndCancels(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	_, tm := startTUI(t, repoDir)
 
@@ -93,6 +94,7 @@ func TestDeleteConfirmationAppearsAndCancels(t *testing.T) {
 }
 
 func TestDeleteWorktree(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a", "feature-b")
 	repo, tm := startTUI(t, repoDir)
 
@@ -114,6 +116,7 @@ func TestDeleteWorktree(t *testing.T) {
 }
 
 func TestDeleteWorktree_SpinnerClearsAfterDeletion(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a", "feature-b")
 	_, tm := startTUI(t, repoDir)
 
@@ -134,6 +137,7 @@ func TestDeleteWorktree_SpinnerClearsAfterDeletion(t *testing.T) {
 }
 
 func TestDeleteCancelWithN(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	repo, tm := startTUI(t, repoDir)
 
@@ -158,6 +162,7 @@ func TestDeleteCancelWithN(t *testing.T) {
 // ── clone ─────────────────────────────────────────────────────────────────────
 
 func TestCloneInputAppearsAndCancels(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	_, tm := startTUI(t, repoDir)
 
@@ -172,6 +177,7 @@ func TestCloneInputAppearsAndCancels(t *testing.T) {
 }
 
 func TestCloneWorktree(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	_, tm := startTUI(t, repoDir)
 
@@ -213,6 +219,7 @@ func TestCloneWorktree(t *testing.T) {
 // ── new ───────────────────────────────────────────────────────────────────────
 
 func TestNewInputAppearsAndCancels(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	_, tm := startTUI(t, repoDir)
 
@@ -226,6 +233,7 @@ func TestNewInputAppearsAndCancels(t *testing.T) {
 }
 
 func TestNewWorktree(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	repo, tm := startTUI(t, repoDir)
 
@@ -255,6 +263,7 @@ func TestNewWorktree(t *testing.T) {
 // ── yank / paste ──────────────────────────────────────────────────────────────
 
 func TestYankModalAppearsAndCancels(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	_, tm := startTUI(t, repoDir)
 
@@ -269,6 +278,7 @@ func TestYankModalAppearsAndCancels(t *testing.T) {
 }
 
 func TestYankAndPaste(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a", "feature-b")
 
 	// Add an untracked file to feature-a before starting the TUI
@@ -303,6 +313,7 @@ func TestYankAndPaste(t *testing.T) {
 // ── push ──────────────────────────────────────────────────────────────────────
 
 func TestPushWorktree(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	wtDir := filepath.Join(repoDir, "feature-a")
 
@@ -326,6 +337,7 @@ func TestPushWorktree(t *testing.T) {
 }
 
 func TestPushRejectedShowsForcePushPrompt(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	wtDir := filepath.Join(repoDir, "feature-a")
 
@@ -354,6 +366,7 @@ func TestPushRejectedShowsForcePushPrompt(t *testing.T) {
 }
 
 func TestPushRejectedForcePushConfirmed(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	wtDir := filepath.Join(repoDir, "feature-a")
 
@@ -383,6 +396,7 @@ func TestPushRejectedForcePushConfirmed(t *testing.T) {
 // ── pull ──────────────────────────────────────────────────────────────────────
 
 func TestPullMainRefreshesBaseStatus(t *testing.T) {
+	t.Parallel()
 	// Regression: after pulling main the base-status column for feature branches
 	// must update. Before the fix, pullResultMsg only refreshed base statuses
 	// when the selected branch matched MainBranch — verify the happy path.
@@ -405,6 +419,7 @@ func TestPullMainRefreshesBaseStatus(t *testing.T) {
 }
 
 func TestStashPullMainRefreshesBaseStatus(t *testing.T) {
+	t.Parallel()
 	// Regression: the stash-pull path (dirty worktree → stash → pull → pop)
 	// was not refreshing base statuses after completing. stashPopResultMsg only
 	// ran cmdLoadBaseStatus for "rebase" ops, not "pull". Verify the fix.
@@ -439,6 +454,7 @@ func TestStashPullMainRefreshesBaseStatus(t *testing.T) {
 // ── rename ────────────────────────────────────────────────────────────────────
 
 func TestRenameWorktree_DotBareRepo(t *testing.T) {
+	t.Parallel()
 	// Regression test: in a .bare-style repo the new worktree path was built
 	// using repo.Root (.bare/) instead of repo.LinkedWorktreeDir() (outer/),
 	// causing the rename target to land inside .bare/<new-name>.
@@ -474,6 +490,7 @@ func TestRenameWorktree_DotBareRepo(t *testing.T) {
 }
 
 func TestRenameInputAppearsAndCancels(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	_, tm := startTUI(t, repoDir)
 
@@ -489,6 +506,7 @@ func TestRenameInputAppearsAndCancels(t *testing.T) {
 }
 
 func TestRenameWorktree(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	repo, tm := startTUI(t, repoDir)
 
@@ -523,6 +541,7 @@ func TestRenameWorktree(t *testing.T) {
 // ── search ────────────────────────────────────────────────────────────────────
 
 func TestSearchModeAppearsAndCancels(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a", "feature-b")
 	_, tm := startTUI(t, repoDir)
 
@@ -537,6 +556,7 @@ func TestSearchModeAppearsAndCancels(t *testing.T) {
 }
 
 func TestSearchHighlightsAndJumps(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a", "fix-b", "feature-c")
 	_, tm := startTUI(t, repoDir)
 
@@ -557,6 +577,7 @@ func TestSearchHighlightsAndJumps(t *testing.T) {
 }
 
 func TestSearchCyclesMatches(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a", "feature-b", "fix-c")
 	_, tm := startTUI(t, repoDir)
 

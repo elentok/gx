@@ -11,6 +11,7 @@ import (
 )
 
 func TestGNChordOpensNotifyHistory(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -33,6 +34,7 @@ func TestGNChordOpensNotifyHistory(t *testing.T) {
 }
 
 func TestGNChordDoesNotOpenNotifyHistoryWhenModalOpen(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -78,6 +80,7 @@ type fakeTickMsg struct{}
 type fakeTickCmdMsg struct{}
 
 func TestNotifyHistoryOpenFallsThroughNonKeyMouseMessages(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -120,6 +123,7 @@ func TestNotifyHistoryOpenFallsThroughNonKeyMouseMessages(t *testing.T) {
 }
 
 func TestNotifyHistoryOpenStillUpdatesWindowSize(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -151,6 +155,7 @@ func TestNotifyHistoryOpenStillUpdatesWindowSize(t *testing.T) {
 }
 
 func TestNotifyHistoryOpenStillInterceptsMouse(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -187,6 +192,7 @@ func TestNotifyHistoryOpenStillInterceptsMouse(t *testing.T) {
 }
 
 func TestNotifyHistoryEscClosesModal(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {

@@ -12,6 +12,7 @@ import (
 )
 
 func TestStatusBarViewShowsOnlyHelpPromptByDefault(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -33,6 +34,7 @@ func TestStatusBarViewShowsOnlyHelpPromptByDefault(t *testing.T) {
 }
 
 func TestQuestionMarkOpensHelpOverlay(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {

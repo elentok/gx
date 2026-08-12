@@ -15,6 +15,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
+// TestQueueStoreLoadsOnceBeforeInitialPage cannot run in parallel: it
+// monkeypatches the package-level loadQueueStore var, which every other
+// test's New() call reads.
 func TestQueueStoreLoadsOnceBeforeInitialPage(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
@@ -50,6 +53,7 @@ func (s *inputFocusedStub) InputFocused() bool                  { return true }
 // the query rather than being intercepted by the shell's digit-based
 // tab-jump mnemonics (handleShellChordKey) before it ever reaches the tab.
 func TestTicketsSearchDigitTypesIntoQueryNotTabSwitch(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -96,6 +100,7 @@ func (s *lifecycleSpy) OnPageDeactivated() tea.Cmd {
 }
 
 func TestSwitchFiresDeactivateOnOldPage(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -120,6 +125,7 @@ func TestSwitchFiresDeactivateOnOldPage(t *testing.T) {
 }
 
 func TestLogEnterRendersCommitDetailThroughAppShell(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepoWithThreeCommits(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -171,6 +177,7 @@ func runAppCmd(m Model, cmd tea.Cmd) Model {
 }
 
 func TestOpenFiresDeactivateOnOutgoingPage(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -195,6 +202,7 @@ func TestOpenFiresDeactivateOnOutgoingPage(t *testing.T) {
 }
 
 func TestBackFiresDeactivateOnPoppedAndActivateOnRevealed(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -234,6 +242,7 @@ func TestBackFiresDeactivateOnPoppedAndActivateOnRevealed(t *testing.T) {
 }
 
 func TestSwitchMsgChangesTabWithoutHistory(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -259,6 +268,7 @@ func TestSwitchMsgChangesTabWithoutHistory(t *testing.T) {
 }
 
 func TestShellChordDirectTabSwitchClearsHistory(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -289,6 +299,7 @@ func TestShellChordDirectTabSwitchClearsHistory(t *testing.T) {
 }
 
 func TestShellChordSwitchesRelativeTabs(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -321,6 +332,7 @@ func TestShellChordSwitchesRelativeTabs(t *testing.T) {
 }
 
 func TestNumberKeysSwitchTabsGlobally(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -379,6 +391,7 @@ func TestNumberKeysSwitchTabsGlobally(t *testing.T) {
 }
 
 func TestGTMnemonicSwitchesToTicketsTab(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -400,6 +413,7 @@ func TestGTMnemonicSwitchesToTicketsTab(t *testing.T) {
 }
 
 func TestGQMnemonicSwitchesToQueueTab(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -421,6 +435,7 @@ func TestGQMnemonicSwitchesToQueueTab(t *testing.T) {
 }
 
 func TestGPMnemonicSwitchesToPRsTab(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -442,6 +457,7 @@ func TestGPMnemonicSwitchesToPRsTab(t *testing.T) {
 }
 
 func TestNumberKeysDoNotSwitchTabsWhenInputFocused(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -466,6 +482,7 @@ func TestNumberKeysDoNotSwitchTabsWhenInputFocused(t *testing.T) {
 }
 
 func TestSwitchToUninitializedTabRunsInit(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -495,6 +512,7 @@ func TestSwitchToUninitializedTabRunsInit(t *testing.T) {
 }
 
 func TestOpenStashAndBackRestoresTab(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -532,6 +550,7 @@ func TestOpenStashAndBackRestoresTab(t *testing.T) {
 }
 
 func TestOpenStatusAndBackRestoresLogTab(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -566,6 +585,7 @@ func TestOpenStatusAndBackRestoresLogTab(t *testing.T) {
 }
 
 func TestSwitchAlwaysClearsStack(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -595,12 +615,14 @@ func TestSwitchAlwaysClearsStack(t *testing.T) {
 }
 
 func TestStashTabIsFirstClass(t *testing.T) {
+	t.Parallel()
 	if got := navstate.ResolveTabID(nav.TabStash); got != nav.TabStash {
 		t.Fatalf("expected stash to map to itself, got %q", got)
 	}
 }
 
 func TestInitialStashRouteUsesStashTab(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -627,12 +649,14 @@ func TestInitialStashRouteUsesStashTab(t *testing.T) {
 }
 
 func TestPRsTabIsFirstClass(t *testing.T) {
+	t.Parallel()
 	if got := navstate.ResolveTabID(nav.TabPRs); got != nav.TabPRs {
 		t.Fatalf("expected prs to map to itself, got %q", got)
 	}
 }
 
 func TestInitialPRsRouteUsesPRsTab(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -659,12 +683,14 @@ func TestInitialPRsRouteUsesPRsTab(t *testing.T) {
 }
 
 func TestTicketsTabIsFirstClass(t *testing.T) {
+	t.Parallel()
 	if got := navstate.ResolveTabID(nav.TabTickets); got != nav.TabTickets {
 		t.Fatalf("expected tickets to map to itself, got %q", got)
 	}
 }
 
 func TestInitialTicketsRouteUsesTicketsTab(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -691,6 +717,7 @@ func TestInitialTicketsRouteUsesTicketsTab(t *testing.T) {
 }
 
 func TestSwitchToStashTabRestoresTab(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -720,6 +747,7 @@ func TestSwitchToStashTabRestoresTab(t *testing.T) {
 }
 
 func TestSwitchFromLogToStatusCarriesWorktree(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -740,6 +768,7 @@ func TestSwitchFromLogToStatusCarriesWorktree(t *testing.T) {
 }
 
 func TestSwitchFromStatusToLogCarriesWorktree(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -759,6 +788,7 @@ func TestSwitchFromStatusToLogCarriesWorktree(t *testing.T) {
 }
 
 func TestBackWithEmptyHistoryQuits(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -783,6 +813,7 @@ func TestBackWithEmptyHistoryQuits(t *testing.T) {
 }
 
 func TestViewAppendsTabs(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -805,6 +836,7 @@ func TestViewAppendsTabs(t *testing.T) {
 }
 
 func TestGChordOverlayIncludesAppAndChildHints(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -831,6 +863,7 @@ func TestGChordOverlayIncludesAppAndChildHints(t *testing.T) {
 }
 
 func TestChordNotTriggeredWhileHelpFilterFocused(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -860,6 +893,7 @@ func TestChordNotTriggeredWhileHelpFilterFocused(t *testing.T) {
 }
 
 func TestViewMergesTabsIntoFooterLine(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -884,6 +918,7 @@ func TestViewMergesTabsIntoFooterLine(t *testing.T) {
 }
 
 func TestTabsUseBadgeCapsInFooter(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -905,6 +940,7 @@ func TestTabsUseBadgeCapsInFooter(t *testing.T) {
 }
 
 func TestViewMatchesScreenHeight(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -926,6 +962,7 @@ func TestViewMatchesScreenHeight(t *testing.T) {
 }
 
 func TestInjectTabsIntoFooterUsesEllipsisForRightTruncation(t *testing.T) {
+	t.Parallel()
 	width := 32
 	tabs := "worktrees log status"
 	right := "· 󰉸 context: 1 · filetree · ? help"
@@ -944,6 +981,7 @@ func TestInjectTabsIntoFooterUsesEllipsisForRightTruncation(t *testing.T) {
 }
 
 func TestInjectTabsIntoFooterIgnoresRightLineLeadingPadding(t *testing.T) {
+	t.Parallel()
 	width := 90
 	tabs := " worktrees   log   status "
 	right := strings.Repeat(" ", 120) + "· 󰉸 context: 1 · filetree · ? help"
@@ -962,6 +1000,7 @@ func TestInjectTabsIntoFooterIgnoresRightLineLeadingPadding(t *testing.T) {
 }
 
 func TestInjectTabsIntoFooterPreservesRightHintTailWithStatusPrefix(t *testing.T) {
+	t.Parallel()
 	width := 90
 	tabs := " worktrees   log   status "
 	right := "staged README.md" + strings.Repeat(" ", 20) + "· 󰉸 context: 1 · filetree · ? help"
@@ -993,6 +1032,7 @@ func (s *autoReloadSpy) AutoReload() tea.Cmd {
 }
 
 func TestGate_BareSwitch_FreshTab_NoAutoReload(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -1021,6 +1061,7 @@ func TestGate_BareSwitch_FreshTab_NoAutoReload(t *testing.T) {
 }
 
 func TestGate_BareSwitch_StaleTab_OneAutoReload(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -1055,6 +1096,7 @@ func TestGate_BareSwitch_StaleTab_OneAutoReload(t *testing.T) {
 }
 
 func TestGate_FocusSubject_ForcesReloadWhenFresh(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -1083,6 +1125,7 @@ func TestGate_FocusSubject_ForcesReloadWhenFresh(t *testing.T) {
 }
 
 func TestGate_ReconstructPath_NoDoubleReload(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -1134,6 +1177,7 @@ func pressKey(m Model, key rune) Model {
 }
 
 func TestStashTabReachableVia4(t *testing.T) {
+	t.Parallel()
 	m, _ := newAppModel(t)
 	m = pressKey(m, '4')
 	if m.navState.ActiveTab() != nav.TabStash {
@@ -1142,6 +1186,7 @@ func TestStashTabReachableVia4(t *testing.T) {
 }
 
 func TestStashTabReachableViaGS(t *testing.T) {
+	t.Parallel()
 	m, _ := newAppModel(t)
 	m = pressKey(m, 'g')
 	m = pressKey(m, 'S')
@@ -1151,6 +1196,7 @@ func TestStashTabReachableViaGS(t *testing.T) {
 }
 
 func TestStashTabOpensInSplitState(t *testing.T) {
+	t.Parallel()
 	m, repoDir := newAppModel(t)
 	updated, _ := m.Update(nav.Switch(nav.ViewState{Tab: nav.TabStash, WorktreeRoot: repoDir})())
 	m = updated.(Model)
@@ -1169,6 +1215,7 @@ func TestStashTabOpensInSplitState(t *testing.T) {
 }
 
 func TestGCDoesNotSwitchToCommitTab(t *testing.T) {
+	t.Parallel()
 	m, _ := newAppModel(t)
 	before := m.navState.ActiveTab()
 	m = pressKey(m, 'g')
@@ -1215,6 +1262,7 @@ func (c *reloadCounterModel) AutoReload() tea.Cmd {
 // epoch-based tab-reload feature: log → status → log with no repo mutations
 // must not trigger a git re-fetch on the real log model.
 func TestE2E_LogStatusLog_NoReloadWhenFresh(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -1247,6 +1295,7 @@ func TestE2E_LogStatusLog_NoReloadWhenFresh(t *testing.T) {
 // TestE2E_StatusCommit_LogReloadsOnSwitch verifies that after a commit in status
 // emits nav.RepoMutated, the log tab auto-reloads exactly once when activated.
 func TestE2E_StatusCommit_LogReloadsOnSwitch(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -1287,6 +1336,7 @@ func TestE2E_StatusCommit_LogReloadsOnSwitch(t *testing.T) {
 // the page from scratch (losing cached rows). The page model must survive a
 // log → status → log round-trip.
 func TestE2E_LogReportsRefThenSwitchReusesPage(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -1344,6 +1394,7 @@ func (s *modalKeyRecorder) View() tea.View  { return tea.NewView("stub") }
 func (s *modalKeyRecorder) ModalOpen() bool { return true }
 
 func TestNumberKeysDoNotSwitchTabsWhenModalOpen(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -1368,6 +1419,7 @@ func TestNumberKeysDoNotSwitchTabsWhenModalOpen(t *testing.T) {
 }
 
 func TestGChordDoesNotSwitchTabsWhenModalOpen(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -1402,6 +1454,7 @@ func TestGChordDoesNotSwitchTabsWhenModalOpen(t *testing.T) {
 // TestRealPullModalBlocksTabSwitch verifies the full stack: a real status model
 // with its pull modal open must block number-key tab switching at the app shell level.
 func TestRealPullModalBlocksTabSwitch(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -1454,6 +1507,7 @@ func TestRealPullModalBlocksTabSwitch(t *testing.T) {
 // TestNavSwitchMsgIsBlockedWhenModalOpen verifies that a nav.Switch message is
 // also blocked when a modal is open (belt-and-suspenders guard on the message path).
 func TestNavSwitchMsgIsBlockedWhenModalOpen(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -1479,6 +1533,7 @@ func TestNavSwitchMsgIsBlockedWhenModalOpen(t *testing.T) {
 }
 
 func TestRealPullStashConfirmBlocksTabSwitch(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -1525,6 +1580,7 @@ func TestRealPullStashConfirmBlocksTabSwitch(t *testing.T) {
 // ANY key showed "close the modal first", making the modal impossible to interact with.
 // Non-tab-switch keys (y, n, enter, esc) must reach the child model even when ModalOpen=true.
 func TestModalReceivesNonTabSwitchKeysWhenModalOpen(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -1562,6 +1618,7 @@ func TestModalReceivesNonTabSwitchKeysWhenModalOpen(t *testing.T) {
 // not reload. A page reporting NeedsInitialLoad must trigger an AutoReload when
 // re-activated.
 func TestE2E_InterruptedInitialLoad_ReloadsOnReturn(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
@@ -1596,6 +1653,7 @@ func TestE2E_InterruptedInitialLoad_ReloadsOnReturn(t *testing.T) {
 // tickets package) — absent that, tabSpecs must render the plain label even
 // though a Queue tab exists and is reachable.
 func TestQueueTabLabelPlainWhenUnattached(t *testing.T) {
+	t.Parallel()
 	if ticketsui.SelfAttached() {
 		t.Fatal("SelfAttached() = true at test start, want false (no lock acquired)")
 	}
