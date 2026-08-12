@@ -187,12 +187,12 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 			return verifySkillWith(agent, skill, userHomeDirFor(overrides.Home), os.Stat)
 		},
 		AgentGet: herdr.AgentGet,
-		VerifyCodexSession: func(cwd, sessionID string) (bool, error) {
-			if overrides.CodexHome == "" {
-				return codexsession.VerifyIdentity(cwd, sessionID)
-			}
-			return codexsession.VerifyIdentityIn(overrides.CodexHome, cwd, sessionID)
-		},
+		VerifyCodexSession: codexHomeFn(overrides.CodexHome,
+			codexsession.VerifyIdentity,
+			func(cwd, sessionID string) (bool, error) {
+				return codexsession.VerifyIdentityIn(overrides.CodexHome, cwd, sessionID)
+			},
+		),
 		FindOrCreateWorkspace: herdr.EnsureWorkspace,
 		FindWorkspace:         herdr.FindWorkspace,
 		WorktreeDir:           worktreeDir,
@@ -260,18 +260,18 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 			}
 			return transcript.CountCompactionsAfter(lines, since), true, nil
 		},
-		ReadCodexContext: func(cwd, sessionID string) (int, bool, error) {
-			if overrides.CodexHome == "" {
-				return codexsession.LastContextTokens(cwd, sessionID)
-			}
-			return codexsession.LastContextTokensIn(overrides.CodexHome, cwd, sessionID)
-		},
-		ReadCodexRateLimit: func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
-			if overrides.CodexHome == "" {
-				return codexsession.LastRateLimit(cwd, sessionID)
-			}
-			return codexsession.LastRateLimitIn(overrides.CodexHome, cwd, sessionID)
-		},
+		ReadCodexContext: codexHomeFn(overrides.CodexHome,
+			codexsession.LastContextTokens,
+			func(cwd, sessionID string) (int, bool, error) {
+				return codexsession.LastContextTokensIn(overrides.CodexHome, cwd, sessionID)
+			},
+		),
+		ReadCodexRateLimit: codexHomeFn(overrides.CodexHome,
+			codexsession.LastRateLimit,
+			func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
+				return codexsession.LastRateLimitIn(overrides.CodexHome, cwd, sessionID)
+			},
+		),
 		ReadPaneRecent: defaultReadPaneRecent,
 		Sleep:          time.Sleep,
 		Now:            time.Now,
@@ -288,6 +288,18 @@ func transcriptPath(home, cwd, sessionID string) (string, error) {
 		return transcript.PathIn(home, cwd, sessionID), nil
 	}
 	return transcript.Path(cwd, sessionID)
+}
+
+// codexHomeFn returns real when codexHome is empty (codexsession's own
+// CODEX_HOME/UserHomeDir resolution) or override otherwise (codexHome pinned
+// explicitly), mirroring transcriptPath's home-resolution branch for
+// VerifyCodexSession/ReadCodexContext/ReadCodexRateLimit's CodexHome
+// override, each of which pairs a differently-shaped real/In function.
+func codexHomeFn[F any](codexHome string, real, override F) F {
+	if codexHome == "" {
+		return real
+	}
+	return override
 }
 
 // lookPathFor returns exec.LookPath when pathEnv is empty (real process
