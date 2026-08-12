@@ -40,7 +40,7 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 		"03-backfill.md": "---\nid: \"03\"\nstatus: open\ntype: task\n---\n# Backfill\n",
 	})
 
-	t.Setenv("HOME", t.TempDir())
+	home := t.TempDir()
 
 	var mu sync.Mutex
 	status := map[string]string{}  // pane -> agent_status
@@ -192,7 +192,7 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 
 	var rateLimitMu sync.Mutex
 	rateLimitCalls := 0
-	deps := testDeps()
+	deps := testDepsWithOverrides(DepsOverrides{Home: home})
 	deps.Sleep = func(time.Duration) {}
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	deps.PreflightAgent = func(AgentKind) error { return nil }
@@ -348,9 +348,8 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 		"03-backfill.md": "---\nid: \"03\"\nstatus: open\ntype: task\n---\n# Backfill\n",
 	})
 
-	t.Setenv("HOME", t.TempDir())
+	home := t.TempDir()
 	codexHome := t.TempDir()
-	t.Setenv("CODEX_HOME", codexHome)
 
 	dir01 := iterationWorktreePath(wtDir, epicName, "01")
 	dir02 := iterationWorktreePath(wtDir, epicName, "02")
@@ -546,7 +545,7 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 
 	var rateLimitMu sync.Mutex
 	rateLimitCalls := 0
-	deps := testDeps()
+	deps := testDepsWithOverrides(DepsOverrides{Home: home, CodexHome: codexHome})
 	deps.Sleep = func(time.Duration) {}
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	deps.PreflightAgent = func(AgentKind) error { return nil }
@@ -557,7 +556,7 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 			// its synthetic rollout file, which never reports an exhausted
 			// quota (zero rate_limits) — its recovery path is smart-zone
 			// context, not quota.
-			return codexsession.LastRateLimit(cwd, sessionID)
+			return codexsession.LastRateLimitIn(codexHome, cwd, sessionID)
 		}
 
 		rateLimitMu.Lock()
@@ -605,10 +604,10 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 	// Acceptance criterion: the context ticket's session rollout and Herdr
 	// identity match the real iteration cwd, verified through the same
 	// production reader reattachment uses.
-	if ok, err := codexsession.VerifyIdentity(dir01, contextSessionID); err != nil || !ok {
+	if ok, err := codexsession.VerifyIdentityIn(codexHome, dir01, contextSessionID); err != nil || !ok {
 		t.Errorf("VerifyIdentity(%s, %s) = %v, %v; want the rollout's cwd to match the real iteration worktree", dir01, contextSessionID, ok, err)
 	}
-	stats, ok, err := codexsession.ReadStats(dir01, contextSessionID)
+	stats, ok, err := codexsession.ReadStatsIn(codexHome, dir01, contextSessionID)
 	if err != nil || !ok || stats.PeakContext != initialContextTokens || stats.TotalTokens != finalTotalTokens {
 		t.Errorf("ReadStats = %+v, %v, %v; want peak context %d and final total %d", stats, ok, err, initialContextTokens, finalTotalTokens)
 	}

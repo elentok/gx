@@ -44,6 +44,38 @@ func testDeps() Deps {
 	return d
 }
 
+// testDepsWithOverrides is testDeps with DepsOverrides applied, for tests
+// that need to isolate HOME/CODEX_HOME/PATH without mutating process env via
+// t.Setenv.
+func testDepsWithOverrides(overrides DepsOverrides) Deps {
+	d := DefaultDepsWithOverrides(overrides)
+	d.ParkTimer = readyTimer
+	return d
+}
+
+// setProcessEnv points the real process env var key at value for the rest of
+// the test, restored on cleanup via a manual os.Setenv/os.Unsetenv pair
+// rather than t.Setenv (which panics once a test has called t.Parallel()).
+// Only for tests driving herdrfake helpers (RegisterCodexRollout,
+// NewClaudeCompact) that read real process env directly and have no
+// DepsOverrides-style seam of their own — everything else should use
+// testDepsWithOverrides instead. A test using this must stay non-parallel
+// with any other test that also touches the same env var.
+func setProcessEnv(t *testing.T, key, value string) {
+	t.Helper()
+	prev, had := os.LookupEnv(key)
+	if err := os.Setenv(key, value); err != nil {
+		t.Fatalf("Setenv %s: %v", key, err)
+	}
+	t.Cleanup(func() {
+		if had {
+			os.Setenv(key, prev)
+		} else {
+			os.Unsetenv(key)
+		}
+	})
+}
+
 // runUntilParked runs Run in the background, returns once it has parked —
 // the honest end of a test whose epic finishes on a human-clearable ticket
 // nobody clears — then cancels it and waits for Run to actually return

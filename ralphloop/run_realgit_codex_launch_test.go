@@ -79,16 +79,21 @@ exit 1
 			scratchDir := writeEpic(t, epicName, map[string]string{
 				"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 			})
-			t.Setenv("HOME", t.TempDir())
-			t.Setenv("PATH", pathExcluding("codex", "herdr"))
-
+			home := t.TempDir()
+			pathEnv := pathExcluding("codex", "herdr")
 			if tc.codexScript != "" {
 				codexDir := writeFakeExecutable(t, "codex", tc.codexScript)
-				t.Setenv("PATH", codexDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+				pathEnv = codexDir + string(os.PathListSeparator) + pathExcluding("codex", "herdr")
 			}
 
 			herdrCalls := 0
 			if tc.withHerdrFake {
+				// herdrfake.Start prepends its fake herdr's bin dir to the real
+				// process PATH via its own t.Setenv (outside this ticket's
+				// scope to change) — recover that bin dir from the PATH delta
+				// so it can be folded into pathEnv, which is what deps below
+				// actually resolves lookups against.
+				origPath := os.Getenv("PATH")
 				herdrfake.Start(t, func(argv []string) ([]byte, int) {
 					herdrCalls++
 					if len(argv) == 3 && argv[0] == "agent" && argv[1] == "start" && argv[2] == "--help" {
@@ -96,9 +101,11 @@ exit 1
 					}
 					return herdrfake.CommandError("unexpected herdr command in launch-preflight test: " + strings.Join(argv, " "))
 				})
+				herdrDir := strings.TrimSuffix(os.Getenv("PATH"), string(os.PathListSeparator)+origPath)
+				pathEnv = herdrDir + string(os.PathListSeparator) + pathEnv
 			}
 
-			deps := testDeps()
+			deps := testDepsWithOverrides(DepsOverrides{Home: home, Path: pathEnv})
 			deps.Sleep = func(time.Duration) {}
 
 			sink := newRecordingEventSink()
@@ -135,9 +142,8 @@ func TestRun_ProductionRealGit_MissingSkillFailsBeforeClaim(t *testing.T) {
 		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 	})
 	home := t.TempDir()
-	t.Setenv("HOME", home)
 
-	deps := testDeps()
+	deps := testDepsWithOverrides(DepsOverrides{Home: home})
 	deps.Sleep = func(time.Duration) {}
 
 	sink := newRecordingEventSink()
@@ -176,7 +182,7 @@ func TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsRepair(t *testin
 	scratchDir := writeEpic(t, epicName, map[string]string{
 		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 	})
-	t.Setenv("HOME", t.TempDir())
+	home := t.TempDir()
 
 	s := herdrfake.NewState(t)
 	s.Register("workspace", "list", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
@@ -206,7 +212,7 @@ func TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsRepair(t *testin
 	})
 	herdrfake.StartState(t, s)
 
-	deps := testDeps()
+	deps := testDepsWithOverrides(DepsOverrides{Home: home})
 	deps.PreflightAgent = func(AgentKind) error { return nil }
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	deps.Sleep = func(time.Duration) {}
@@ -294,8 +300,15 @@ func TestRun_ProductionRealGit_CodexRestartReattachesAndLandsOnce(t *testing.T) 
 	})
 
 	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("CODEX_HOME", "")
+	codexHome := filepath.Join(home, ".codex")
+	// writeLandedMetrics (report_metrics.go) reads sessionID's Codex stats
+	// through codexsession.ReadStats directly, with no DepsOverrides hook of
+	// its own (it's also used by the standalone `gx ralph-loop report`
+	// command, which always wants real env) — so this test keeps real HOME/
+	// CODEX_HOME pointed at the fixture too, alongside the DepsOverrides
+	// below that cover everything Run() itself reads.
+	setProcessEnv(t, "HOME", home)
+	setProcessEnv(t, "CODEX_HOME", codexHome)
 	cwd := iterationWorktreePath(wtDir, epicName, "01")
 	sessionPath := filepath.Join(home, ".codex", "sessions", "2026", "08", "04", "rollout-"+sessionID+".jsonl")
 	if err := os.MkdirAll(filepath.Dir(sessionPath), 0755); err != nil {
@@ -430,7 +443,7 @@ func TestRun_ProductionRealGit_CodexRestartReattachesAndLandsOnce(t *testing.T) 
 		contextReads = append(contextReads, struct{ cwd, sessionID string }{cwd, sid})
 	}
 
-	d1 := testDeps()
+	d1 := testDepsWithOverrides(DepsOverrides{Home: home, CodexHome: codexHome})
 	d1.PreflightAgent = func(AgentKind) error { return nil }
 	d1.VerifySkill = func(AgentKind, string) error { return nil }
 	d1.Sleep = func(time.Duration) {}
@@ -498,7 +511,7 @@ func TestRun_ProductionRealGit_CodexRestartReattachesAndLandsOnce(t *testing.T) 
 		t.Fatalf("phase after invocation 1 freeze = %q, want implementing", phase)
 	}
 
-	d2 := testDeps()
+	d2 := testDepsWithOverrides(DepsOverrides{Home: home, CodexHome: codexHome})
 	d2.PreflightAgent = func(AgentKind) error { return nil }
 	d2.VerifySkill = func(AgentKind, string) error { return nil }
 	d2.Sleep = func(time.Duration) {}

@@ -43,7 +43,7 @@ func TestRun_ProductionRealGit_AThenBAndCConcurrently(t *testing.T) {
 		"03-c.md": "---\nid: \"03\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# C\n",
 	})
 
-	t.Setenv("HOME", t.TempDir())
+	home := t.TempDir()
 
 	var mu sync.Mutex
 	status := map[string]string{}  // pane -> agent_status
@@ -150,7 +150,7 @@ func TestRun_ProductionRealGit_AThenBAndCConcurrently(t *testing.T) {
 
 	herdrfake.Start(t, handler)
 
-	deps := testDeps()
+	deps := testDepsWithOverrides(DepsOverrides{Home: home})
 	deps.Sleep = func(time.Duration) {}
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 
@@ -256,7 +256,12 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 		"06-f.md": "---\nid: \"06\"\nstatus: open\ntype: task\nblocked_by: [\"04\", \"05\"]\n---\n# F\n",
 	})
 
-	t.Setenv("HOME", t.TempDir())
+	// NewClaudeCompact below always writes its transcript via the real $HOME
+	// (transcript.Path has no override hook), so this test keeps $HOME itself
+	// pointed at the fixture via setHomeEnv rather than DepsOverrides.Home —
+	// that way deps' default HOME resolution and NewClaudeCompact's agree on
+	// the same directory.
+	setHomeEnv(t, t.TempDir())
 	const smartZone = 100
 	var mu sync.Mutex
 	var virtualTime time.Duration
@@ -265,7 +270,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 		if id == "03" {
 			continue
 		}
-		writeFakeTranscript(t, iterationWorktreePath(wtDir, epicName, id), "sess-"+iterLabel(epicName, id), transcriptStart,
+		writeFakeTranscript(t, "", iterationWorktreePath(wtDir, epicName, id), "sess-"+iterLabel(epicName, id), transcriptStart,
 			[3]any{"claude-sonnet-5", contract.tokens - 200, 0},
 			[3]any{"claude-sonnet-5", contract.tokens - 100, 100},
 		)
@@ -745,7 +750,7 @@ func TestRun_ProductionRealGit_ParkThenResumeReusesBranch(t *testing.T) {
 	iterationPath := iterationWorktreePath(wtDir, epicName, "01")
 	branch := iterBranch(epicName, "01")
 
-	t.Setenv("HOME", t.TempDir())
+	home := t.TempDir()
 
 	var mu sync.Mutex
 	phase := "pre-park"
@@ -806,7 +811,7 @@ func TestRun_ProductionRealGit_ParkThenResumeReusesBranch(t *testing.T) {
 	}
 	herdrfake.Start(t, handler)
 
-	deps := testDeps()
+	deps := testDepsWithOverrides(DepsOverrides{Home: home})
 	deps.Sleep = func(time.Duration) {}
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	cherryPickCalls := 0
@@ -884,8 +889,7 @@ func TestRun_ProductionRealGit_CodexCompactsThenCompletes(t *testing.T) {
 	})
 
 	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("CODEX_HOME", "")
+	codexHome := filepath.Join(home, ".codex")
 	cwd := iterationWorktreePath(wtDir, epicName, "01")
 	sessionPath := filepath.Join(home, ".codex", "sessions", "2026", "08", "04", "rollout-"+sessionID+".jsonl")
 	if err := os.MkdirAll(filepath.Dir(sessionPath), 0755); err != nil {
@@ -1031,7 +1035,7 @@ func TestRun_ProductionRealGit_CodexCompactsThenCompletes(t *testing.T) {
 	})
 	herdrfake.StartState(t, s)
 
-	deps := testDeps()
+	deps := testDepsWithOverrides(DepsOverrides{Home: home, CodexHome: codexHome})
 	deps.PreflightAgent = func(AgentKind) error { return nil }
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	deps.Sleep = func(time.Duration) {}

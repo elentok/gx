@@ -154,7 +154,7 @@ func TestLandCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmatt
 	sessionID := "sess-land-01"
 	cwd := iterationWorktreePath("/fake/worktrees", "epic", "01")
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	writeFakeTranscript(t, cwd, sessionID, start,
+	writeFakeTranscript(t, "", cwd, sessionID, start,
 		[3]any{"claude-sonnet-5", 1000, 0},
 		[3]any{"claude-sonnet-5", 2000, 5000},
 	)
@@ -207,7 +207,7 @@ func TestLandCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 	sessionID := "sess-land-01"
 	cwd := iterationWorktreePath("/fake/worktrees", "epic", "01")
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	writeFakeTranscript(t, cwd, sessionID, start,
+	writeFakeTranscript(t, "", cwd, sessionID, start,
 		[3]any{"claude-sonnet-5", 1000, 0},
 		[3]any{"claude-sonnet-5", 2000, 5000},
 	)
@@ -292,11 +292,11 @@ func TestRun_IterationFinishedAndEpicComplete_ReceiveRealMetrics(t *testing.T) {
 	}
 
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	writeFakeTranscript(t, iterationWorktreePath("/fake/worktrees", "epic", "01"), "sess-pane-"+iterLabel("epic", "01"), start,
+	writeFakeTranscript(t, "", iterationWorktreePath("/fake/worktrees", "epic", "01"), "sess-pane-"+iterLabel("epic", "01"), start,
 		[3]any{"claude-sonnet-5", 1000, 0},
 		[3]any{"claude-sonnet-5", 2000, 5000},
 	)
-	writeFakeTranscript(t, iterationWorktreePath("/fake/worktrees", "epic", "02"), "sess-pane-"+iterLabel("epic", "02"), start.Add(20*time.Second),
+	writeFakeTranscript(t, "", iterationWorktreePath("/fake/worktrees", "epic", "02"), "sess-pane-"+iterLabel("epic", "02"), start.Add(20*time.Second),
 		[3]any{"claude-sonnet-5", 3000, 0},
 		[3]any{"claude-sonnet-5", 4000, 9000},
 	)
@@ -418,7 +418,7 @@ func TestStampCommitlessMetrics_FreshSession_WritesActualContextWindowAndElapsed
 	sessionID := "sess-commitless-01"
 	cwd := iterationWorktreePath("/fake/worktrees", "epic", "01")
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	writeFakeTranscript(t, cwd, sessionID, start,
+	writeFakeTranscript(t, "", cwd, sessionID, start,
 		[3]any{"claude-sonnet-5", 1000, 0},
 		[3]any{"claude-sonnet-5", 2000, 5000},
 	)

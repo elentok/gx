@@ -20,14 +20,22 @@ import (
 const resolvedSharedContent = "shared resolved for D\n"
 
 // writeFakeTranscript writes a session transcript under a fake
-// ~/.claude/projects/<slug>/<sessionID>.jsonl (HOME must already be set via
-// t.Setenv by the caller), with one assistant line per (model, inputTokens,
-// cacheReadTokens) entry, one second apart starting at start.
-func writeFakeTranscript(t *testing.T, cwd, sessionID string, start time.Time, turns ...[3]any) {
+// ~/.claude/projects/<slug>/<sessionID>.jsonl (home, when non-empty, overrides
+// the resolved home directory via transcript.PathIn instead of the real
+// $HOME; "" keeps the current-process $HOME behavior via transcript.Path),
+// with one assistant line per (model, inputTokens, cacheReadTokens) entry,
+// one second apart starting at start.
+func writeFakeTranscript(t *testing.T, home, cwd, sessionID string, start time.Time, turns ...[3]any) {
 	t.Helper()
-	path, err := transcript.Path(cwd, sessionID)
-	if err != nil {
-		t.Fatalf("transcript.Path: %v", err)
+	var path string
+	if home != "" {
+		path = transcript.PathIn(home, cwd, sessionID)
+	} else {
+		var err error
+		path, err = transcript.Path(cwd, sessionID)
+		if err != nil {
+			t.Fatalf("transcript.Path: %v", err)
+		}
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)

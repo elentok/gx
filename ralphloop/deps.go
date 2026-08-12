@@ -186,8 +186,13 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		VerifySkill: func(agent AgentKind, skill string) error {
 			return verifySkillWith(agent, skill, userHomeDirFor(overrides.Home), os.Stat)
 		},
-		AgentGet:              herdr.AgentGet,
-		VerifyCodexSession:    codexsession.VerifyIdentity,
+		AgentGet: herdr.AgentGet,
+		VerifyCodexSession: func(cwd, sessionID string) (bool, error) {
+			if overrides.CodexHome == "" {
+				return codexsession.VerifyIdentity(cwd, sessionID)
+			}
+			return codexsession.VerifyIdentityIn(overrides.CodexHome, cwd, sessionID)
+		},
 		FindOrCreateWorkspace: herdr.EnsureWorkspace,
 		FindWorkspace:         herdr.FindWorkspace,
 		WorktreeDir:           worktreeDir,

@@ -30,14 +30,20 @@ type Stats struct {
 // cumulative token usage for sessionID launched in cwd. Missing, partial, and
 // malformed session data return ok=false.
 func ReadStats(cwd, sessionID string) (stats Stats, ok bool, err error) {
-	if cwd == "" || sessionID == "" {
-		return Stats{}, false, nil
-	}
-
 	home, err := codexHome()
 	if err != nil {
 		return Stats{}, false, err
 	}
+	return ReadStatsIn(home, cwd, sessionID)
+}
+
+// ReadStatsIn is ReadStats with an explicit Codex home directory — see
+// LastContextTokensIn.
+func ReadStatsIn(home, cwd, sessionID string) (stats Stats, ok bool, err error) {
+	if cwd == "" || sessionID == "" {
+		return Stats{}, false, nil
+	}
+
 	err = walkSessionFiles(home, sessionID, func(path string) error {
 		value, valid, readErr := readStats(path, cwd, sessionID)
 		if readErr != nil {
@@ -96,12 +102,18 @@ func LastContextTokensIn(home, cwd, sessionID string) (tokens int, ok bool, err 
 // launched in cwd. Token events are not required because a live session may
 // not have produced its first response yet.
 func VerifyIdentity(cwd, sessionID string) (ok bool, err error) {
-	if cwd == "" || sessionID == "" {
-		return false, nil
-	}
 	home, err := codexHome()
 	if err != nil {
 		return false, err
+	}
+	return VerifyIdentityIn(home, cwd, sessionID)
+}
+
+// VerifyIdentityIn is VerifyIdentity with an explicit Codex home directory —
+// see LastContextTokensIn.
+func VerifyIdentityIn(home, cwd, sessionID string) (ok bool, err error) {
+	if cwd == "" || sessionID == "" {
+		return false, nil
 	}
 	err = walkSessionFiles(home, sessionID, func(path string) error {
 		matching, readErr := readIdentity(path, cwd, sessionID)

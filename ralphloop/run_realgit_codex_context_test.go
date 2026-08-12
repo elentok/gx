@@ -43,9 +43,14 @@ func TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp(t *testing.T
 		"01-context.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Context recovery\n",
 	})
 
-	t.Setenv("HOME", t.TempDir())
+	// RegisterCodexRollout below reads CODEX_HOME from the real process env
+	// directly (no override hook of its own), so this test keeps HOME/
+	// CODEX_HOME pointed at fixtures via setProcessEnv rather than
+	// DepsOverrides — that way deps' default resolution and the rollout
+	// writer agree on the same directory.
+	setProcessEnv(t, "HOME", t.TempDir())
 	codexHome := t.TempDir()
-	t.Setenv("CODEX_HOME", codexHome)
+	setProcessEnv(t, "CODEX_HOME", codexHome)
 
 	cwd := iterationWorktreePath(wtDir, epicName, "01")
 
@@ -261,7 +266,7 @@ func TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp(t *testing.T
 // fresh high-occupancy rollout event (see
 // TestRun_ProductionRealGit_CodexCompactsThenCompletes for the occupancy-driven
 // counterpart).
-func codexNativeContextFixture(t *testing.T) (repoDir, scratchDir, ticketPath, cwd string) {
+func codexNativeContextFixture(t *testing.T) (repoDir, scratchDir, ticketPath, cwd, home, codexHome string) {
 	t.Helper()
 	const epicName = "epic"
 	const smartZone = 150000
@@ -273,9 +278,8 @@ func codexNativeContextFixture(t *testing.T) (repoDir, scratchDir, ticketPath, c
 		"01-native.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Native context recovery\n",
 	})
 
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("CODEX_HOME", "")
+	home = t.TempDir()
+	codexHome = filepath.Join(home, ".codex")
 	cwd = iterationWorktreePath(wtDir, epicName, "01")
 	sessionPath := filepath.Join(home, ".codex", "sessions", "2026", "08", "04", "rollout-"+sessionID+".jsonl")
 	if err := os.MkdirAll(filepath.Dir(sessionPath), 0755); err != nil {
@@ -290,7 +294,7 @@ func codexNativeContextFixture(t *testing.T) (repoDir, scratchDir, ticketPath, c
 		t.Fatalf("WriteFile Codex session: %v", err)
 	}
 	ticketPath = filepath.Join(scratchDir, epicName, "issues", "01-native.md")
-	return repoDir, scratchDir, ticketPath, cwd
+	return repoDir, scratchDir, ticketPath, cwd, home, codexHome
 }
 
 // TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers exercises
@@ -305,7 +309,7 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T
 		sessionID = "codex-session-31"
 		evidence  = "stream disconnected before completion: your input exceeds the context window of this model"
 	)
-	repoDir, scratchDir, ticketPath, cwd := codexNativeContextFixture(t)
+	repoDir, scratchDir, ticketPath, cwd, home, codexHome := codexNativeContextFixture(t)
 
 	s := herdrfake.NewState(t)
 	phase := "starting"
@@ -396,7 +400,7 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T
 	})
 	herdrfake.StartState(t, s)
 
-	deps := testDeps()
+	deps := testDepsWithOverrides(DepsOverrides{Home: home, CodexHome: codexHome})
 	deps.PreflightAgent = func(AgentKind) error { return nil }
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	deps.Sleep = func(time.Duration) {}
@@ -486,7 +490,7 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 		// literal Contains checks.
 		evidence = "stream disconnected before completion: your input exceeds the context window of this model"
 	)
-	repoDir, scratchDir, ticketPath, _ := codexNativeContextFixture(t)
+	repoDir, scratchDir, ticketPath, _, home, codexHome := codexNativeContextFixture(t)
 	wtDir := testWorktreeDir(t, repoDir)
 
 	s := herdrfake.NewState(t)
@@ -560,7 +564,7 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 	})
 	herdrfake.StartState(t, s)
 
-	deps := testDeps()
+	deps := testDepsWithOverrides(DepsOverrides{Home: home, CodexHome: codexHome})
 	deps.PreflightAgent = func(AgentKind) error { return nil }
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	deps.Sleep = func(time.Duration) {}
