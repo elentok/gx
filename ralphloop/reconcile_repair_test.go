@@ -168,6 +168,84 @@ func TestReconcile_DoneTicketRecoverable_ConflictGoesThroughResolutionPath(t *te
 	}
 }
 
+// TestReconcile_DoneTicketRecoverable_ReattachesLiveConflictResolverWithoutReforking
+// covers the doneRecoverable repair path's counterpart to conflict-lifecycle/
+// 02a's guard: the repair's re-cherry-pick finds the sequencer already
+// mid-conflict (from before the crash) with the conflict-resolution agent
+// that was forked for it still live in its own tab. It must reattach to
+// that live resolver instead of aborting the stale sequencer state and
+// forking a second one under the same conflict-labeled tab. Unlike the
+// genuine-new-conflict precedent above (no live resolver, TabList nil),
+// this exercises reattachLiveConflictResolver, which never calls
+// AgentPrompt, so the in-progress flag flips via an AgentWait hook instead.
+func TestReconcile_DoneTicketRecoverable_ReattachesLiveConflictResolverWithoutReforking(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"03-c.md":                    "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
+		"03a-conflict-resolution.md": "---\nid: \"03a\"\nstatus: claimed\ntype: conflict-resolution\nparent: \"03\"\n---\n# Conflict resolution for 03\n",
+	})
+	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
+		t.Fatalf("logEvent: %v", err)
+	}
+	epics, err := tickets.Load(scratchDir)
+	if err != nil {
+		t.Fatalf("tickets.Load: %v", err)
+	}
+
+	d, _, _ := fakeDeps()
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
+		return []herdr.Tab{{TabID: "tab-conflict-03", Label: "conflict-03", WorkspaceID: workspaceID}}, nil
+	}
+	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil } // landed SHA missing
+
+	// The sequencer already owns a conflict from before the crash. The
+	// AgentWait hook (fired once reattachLiveConflictResolver waits out the
+	// reattached resolver) flips it to resolved, mirroring what
+	// AgentPrompt does for a fresh fork in the genuine-conflict precedent.
+	inProgress := true
+	d.CherryPickInProgress = func(dir string) (bool, error) { return inProgress, nil }
+	origAgentWait := d.AgentWait
+	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+		if opts.Target == "pane-conflict-03" {
+			inProgress = false
+		}
+		return origAgentWait(opts)
+	}
+
+	var aborted bool
+	d.AbortCherryPick = func(dir string) error {
+		aborted = true
+		return nil
+	}
+	var conflictTabCreates int
+	origTabCreate := d.TabCreate
+	d.TabCreate = func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error) {
+		if strings.HasPrefix(opts.Label, "conflict-") {
+			conflictTabCreates++
+		}
+		return origTabCreate(opts)
+	}
+
+	_, err = reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{}), epics[0])
+	if err != nil {
+		t.Fatalf("reconcile() error = %v", err)
+	}
+
+	if aborted {
+		t.Error("AbortCherryPick called, want the live conflict-resolution resolver reattached instead")
+	}
+	if conflictTabCreates != 0 {
+		t.Errorf("conflict-labeled TabCreate calls = %d, want 0 (must reuse the live resolver's tab, not fork a second one)", conflictTabCreates)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "03-c.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: done") {
+		t.Errorf("ticket = %q, want status: done", raw)
+	}
+}
+
 // TestReconcile_DoneTicketRecoverable_CleansUpLeftoverWorktreeAndTab verifies
 // that once a doneRecoverable ticket's commits are repaired, its leftover
 // iteration worktree/tab (if the crash left any behind) are removed/closed —
