@@ -222,13 +222,8 @@ func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd fun
 // never treated as a false refusal, so hand-driven epics keep working
 // exactly as they do today.
 func checkAgentStatusGuard(path string, newStatus schema.Status, getwd func() (string, error)) error {
-	cwd, err := getwd()
-	if err != nil {
-		return nil
-	}
-
-	branch, err := git.CurrentBranch(cwd)
-	if err != nil || !strings.HasPrefix(branch, "ralph-loop/") {
+	branch, ok := isRalphLoopBranch(getwd)
+	if !ok {
 		return nil
 	}
 
@@ -320,6 +315,25 @@ func checkIterationStatusFinishedGuard(c *cobra.Command, path string) error {
 		return fmt.Errorf("%s: --iteration-status %s is invalid; want working, needs-answer, or finished", path, v)
 	}
 	return nil
+}
+
+// isRalphLoopBranch is the shared branch-detection logic behind
+// checkAgentStatusGuard: getwd being nil or failing, or the branch not
+// matching "ralph-loop/*", all mean "not on a guarded branch" rather than a
+// false positive.
+func isRalphLoopBranch(getwd func() (string, error)) (branch string, ok bool) {
+	if getwd == nil {
+		return "", false
+	}
+	cwd, err := getwd()
+	if err != nil {
+		return "", false
+	}
+	branch, err = git.CurrentBranch(cwd)
+	if err != nil || !strings.HasPrefix(branch, "ralph-loop/") {
+		return "", false
+	}
+	return branch, true
 }
 
 // checkBodyBeforeOpen refuses a --status open write for a ticket whose body
