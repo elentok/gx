@@ -50,6 +50,8 @@ func (m QueueModel) View() tea.View {
 			m.implementAgentMenu,
 		)
 		content = ui.OverlayCenter(content, menu, m.width, m.height)
+	} else if m.actionsMenu.IsOpen {
+		content = ui.OverlayCenter(content, m.actionsMenu.View(), m.width, m.height)
 	} else if m.confirm.IsOpen {
 		content = ui.OverlayCenter(content, m.confirm.View(m.width), m.width, m.height)
 	}
@@ -227,7 +229,18 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) []string {
 		style = ui.StyleDim
 	}
 
-	line := indent + triangle + style.Render(icon) + " " + titleStyle.Render(title)
+	line := indent + triangle + style.Render(icon)
+	badgeWidth := 0
+	if ticketHasSuggestedActions(status) {
+		badgeStyle := suggestedActionBadgeStyle
+		if searchDim {
+			badgeStyle = ui.StyleDim
+		}
+		badge := m.icons().SuggestedAction
+		badgeWidth = lipgloss.Width(badge) + 1
+		line += " " + badgeStyle.Render(badge)
+	}
+	line += " " + titleStyle.Render(title)
 	if suffix := blockedBySuffix(epic, t, status); suffix != "" {
 		suffixStyle := blockedBySuffixStyle
 		if searchDim {
@@ -237,7 +250,7 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) []string {
 	}
 	if status == tickets.StatusNeedsAnswer || status == tickets.StatusNeedsRepair {
 		if reason := parkReason(epic, t, m.icons().Ellipsis); reason != "" {
-			subtextLine := indent + strings.Repeat(" ", lipgloss.Width(triangle)+lipgloss.Width(icon)+1) + blockedBySuffixStyle.Render(reason)
+			subtextLine := indent + strings.Repeat(" ", lipgloss.Width(triangle)+lipgloss.Width(icon)+1+badgeWidth) + blockedBySuffixStyle.Render(reason)
 			return []string{line, subtextLine}
 		}
 	}

@@ -10,30 +10,31 @@ import (
 )
 
 const (
-	bindingTicketsHelp           keys.BindingID = "help"
-	bindingTicketsBack           keys.BindingID = "back"
-	bindingTicketsDown           keys.BindingID = "down"
-	bindingTicketsUp             keys.BindingID = "up"
-	bindingTicketsPageDown       keys.BindingID = "page-down"
-	bindingTicketsPageUp         keys.BindingID = "page-up"
-	bindingTicketsCollapse       keys.BindingID = "collapse"
-	bindingTicketsExpand         keys.BindingID = "expand"
-	bindingTicketsToggle         keys.BindingID = "toggle"
-	bindingTicketsResume         keys.BindingID = "resume"
-	bindingTicketsRefresh        keys.BindingID = "refresh"
-	bindingTicketsEditInPlace    keys.BindingID = "edit"
-	bindingTicketsEditHSplit     keys.BindingID = "edit-hsplit"
-	bindingTicketsEditVSplit     keys.BindingID = "edit-vsplit"
-	bindingTicketsEditTab        keys.BindingID = "edit-tab"
-	bindingTicketsCancelChord    keys.BindingID = "cancel-chord"
-	bindingTicketsReplaceQueue   keys.BindingID = "replace-queue"
-	bindingTicketsAddToQueue     keys.BindingID = "add-to-queue"
-	bindingTicketsToggleCheck    keys.BindingID = "toggle-check"
-	bindingTicketsToggleHideDone keys.BindingID = "toggle-hide-done"
-	bindingTicketsSelectFirst    keys.BindingID = "select-first"
-	bindingTicketsSelectLast     keys.BindingID = "select-last"
-	bindingTicketsPreviewBottom  keys.BindingID = "preview-bottom"
-	bindingTicketsChangeStatus   keys.BindingID = "change-status"
+	bindingTicketsHelp             keys.BindingID = "help"
+	bindingTicketsBack             keys.BindingID = "back"
+	bindingTicketsDown             keys.BindingID = "down"
+	bindingTicketsUp               keys.BindingID = "up"
+	bindingTicketsPageDown         keys.BindingID = "page-down"
+	bindingTicketsPageUp           keys.BindingID = "page-up"
+	bindingTicketsCollapse         keys.BindingID = "collapse"
+	bindingTicketsExpand           keys.BindingID = "expand"
+	bindingTicketsToggle           keys.BindingID = "toggle"
+	bindingTicketsResume           keys.BindingID = "resume"
+	bindingTicketsRefresh          keys.BindingID = "refresh"
+	bindingTicketsEditInPlace      keys.BindingID = "edit"
+	bindingTicketsEditHSplit       keys.BindingID = "edit-hsplit"
+	bindingTicketsEditVSplit       keys.BindingID = "edit-vsplit"
+	bindingTicketsEditTab          keys.BindingID = "edit-tab"
+	bindingTicketsCancelChord      keys.BindingID = "cancel-chord"
+	bindingTicketsReplaceQueue     keys.BindingID = "replace-queue"
+	bindingTicketsAddToQueue       keys.BindingID = "add-to-queue"
+	bindingTicketsToggleCheck      keys.BindingID = "toggle-check"
+	bindingTicketsToggleHideDone   keys.BindingID = "toggle-hide-done"
+	bindingTicketsSelectFirst      keys.BindingID = "select-first"
+	bindingTicketsSelectLast       keys.BindingID = "select-last"
+	bindingTicketsPreviewBottom    keys.BindingID = "preview-bottom"
+	bindingTicketsChangeStatus     keys.BindingID = "change-status"
+	bindingTicketsSuggestedActions keys.BindingID = "suggested-actions"
 )
 
 // newTicketsManager builds the key manager for the sidebar's focus: plain
@@ -74,6 +75,7 @@ func newTicketsManager() keys.Manager {
 		{ID: bindingTicketsSelectLast, Seq: []string{"G"}, Categories: []string{"Navigation"}, Title: "last row"},
 		{ID: bindingTicketsPreviewBottom, Seq: []string{"b"}, Categories: []string{"Navigation"}, Title: "preview bottom"},
 		{ID: bindingTicketsChangeStatus, Seq: []string{"s"}, Categories: []string{"Navigation"}, Title: "change status"},
+		{ID: bindingTicketsSuggestedActions, Seq: []string{"m"}, Categories: []string{"Navigation"}, Title: "suggested actions"},
 	})
 }
 
@@ -157,6 +159,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.previewVP.GotoBottom()
 	case bindingTicketsChangeStatus:
 		return m.handleChangeStatusKey()
+	case bindingTicketsSuggestedActions:
+		return m.handleSuggestedActionsKey()
 	}
 	return m, nil
 }

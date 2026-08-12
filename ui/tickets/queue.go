@@ -67,10 +67,15 @@ type QueueModel struct {
 
 	implementAgentMenuOpen bool
 	implementAgentMenu     components.MenuState
-	pendingEpics           []checkedEpicPlan
-	runningEpics           map[string]bool
-	runningAgent           ralphloop.AgentKind
-	paused                 bool
+	// actionsMenu backs the "m"-triggered suggested-actions menu (see
+	// queue_actions_menu.go), mirroring the Tickets tab's own
+	// Model.actionsMenu — a deliberate, narrow exception to this tab's
+	// otherwise read-only selection (ticket 08).
+	actionsMenu  actionsMenuModel
+	pendingEpics []checkedEpicPlan
+	runningEpics map[string]bool
+	runningAgent ralphloop.AgentKind
+	paused       bool
 	// foreignAttachPID is the pid of a different process currently holding
 	// the per-repo attach lock (ticket 05), refreshed alongside the epics
 	// reload (cmdLoadQueue) since checking it shells out to `ps`. Zero when
@@ -295,6 +300,9 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.confirm.IsOpen {
 			return m.handleQueueConfirmUpdate(msg)
 		}
+		if m.actionsMenu.IsOpen {
+			return m.handleQueueActionsMenuKey(msg)
+		}
 		if m.focus == focusPreview {
 			return m.handleQueuePreviewKey(msg)
 		}
@@ -310,6 +318,9 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m.handleQueueKey(msg)
 	case tea.MouseClickMsg:
+		if m.actionsMenu.IsOpen {
+			return m, nil
+		}
 		if m.confirm.IsOpen {
 			return m.handleQueueConfirmMouseUpdate(msg)
 		}
@@ -324,6 +335,8 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleStrandedPendingDetected(msg)
 	case strandedPendingConfirmedMsg:
 		return m.handleStrandedPendingConfirmed(msg)
+	case queueActionAppliedMsg:
+		return m, m.cmdLoadQueue()
 	}
 	return m, nil
 }
@@ -738,6 +751,8 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	case "x":
 		return m.handleQueueDeleteKey()
+	case "m":
+		return m.handleQueueSuggestedActionsKey()
 	case "enter":
 		// A parked row's "enter" wins over every other meaning below: it
 		// resumes that epic (cosmetic wake via Gate.WakeParked, not reattach)

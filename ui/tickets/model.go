@@ -135,6 +135,11 @@ type Model struct {
 	statusMenuOpen bool
 	statusMenu     components.MenuState
 
+	// actionsMenu backs the "m"-triggered suggested-actions menu (see
+	// actions_menu.go/suggested_actions.go): built fresh from the selected
+	// row's rendered status each time "m" opens it.
+	actionsMenu actionsMenuModel
+
 	// Live state is projected from registry snapshots and scoped by epic before
 	// ticket identity so concurrent epics cannot collide.
 	live            map[string]map[string]liveTicketState
@@ -190,7 +195,7 @@ func (m Model) InputFocused() bool {
 // shell (see ui/app's modalOpener duck-type) blocks tab-switch keys and
 // routes them here instead while it's up.
 func (m Model) ModalOpen() bool {
-	return m.help.IsOpen || m.implementAgentMenuOpen || m.statusMenuOpen || m.confirm.IsOpen
+	return m.help.IsOpen || m.implementAgentMenuOpen || m.statusMenuOpen || m.actionsMenu.IsOpen || m.confirm.IsOpen
 }
 
 func (m Model) Init() tea.Cmd {
@@ -264,13 +269,16 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.statusMenuOpen {
 			return m.handleStatusMenuKey(msg)
 		}
+		if m.actionsMenu.IsOpen {
+			return m.handleActionsMenuKey(msg)
+		}
 		if m.confirm.IsOpen {
 			return m.handleConfirmUpdate(msg)
 		}
 		return m.handleKey(msg)
 
 	case tea.MouseClickMsg:
-		if m.implementAgentMenuOpen || m.statusMenuOpen {
+		if m.implementAgentMenuOpen || m.statusMenuOpen || m.actionsMenu.IsOpen {
 			return m, nil
 		}
 		if m.confirm.IsOpen {
@@ -540,6 +548,8 @@ func (m Model) View() tea.View {
 		content = ui.OverlayCenter(content, m.implementAgentMenuView(), m.width, m.height)
 	} else if m.statusMenuOpen {
 		content = ui.OverlayCenter(content, m.statusMenuView(), m.width, m.height)
+	} else if m.actionsMenu.IsOpen {
+		content = ui.OverlayCenter(content, m.actionsMenu.View(), m.width, m.height)
 	} else if m.confirm.IsOpen {
 		content = ui.OverlayCenter(content, m.confirm.View(m.width), m.width, m.height)
 	}

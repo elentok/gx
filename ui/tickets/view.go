@@ -43,6 +43,11 @@ var (
 
 	blockedBySuffixStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtleLight).Italic(true)
 
+	// suggestedActionBadgeStyle renders the "m"-menu badge (ticketHasSuggestedActions)
+	// distinct from every status color so it reads as an affordance, not a
+	// status signal.
+	suggestedActionBadgeStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true)
+
 	sectionHeaderStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
 
 	// checkedGlyphStyle/uncheckedGlyphStyle render the execution queue's
@@ -208,7 +213,15 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 		style = ui.StyleDim
 	}
 
-	line := indent + triangle + m.checkboxGlyph(m.isChecked(t.Path)) + " " + style.Render(icon) + " " + titleStyle.Render(title)
+	line := indent + triangle + m.checkboxGlyph(m.isChecked(t.Path)) + " " + style.Render(icon)
+	if ticketHasSuggestedActions(status) {
+		badgeStyle := suggestedActionBadgeStyle
+		if searchDim {
+			badgeStyle = ui.StyleDim
+		}
+		line += " " + badgeStyle.Render(m.icons().SuggestedAction)
+	}
+	line += " " + titleStyle.Render(title)
 	if suffix := blockedBySuffix(epic, t, status); suffix != "" {
 		suffixStyle := blockedBySuffixStyle
 		if searchDim {

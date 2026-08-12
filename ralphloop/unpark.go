@@ -38,7 +38,7 @@ func unparkAnswered(d Deps, workspaceID, epicName, worktreeDir string, agentKind
 		if !live || agent.AgentStatus == "blocked" {
 			continue
 		}
-		if err := unparkTicket(t.Path, now); err != nil {
+		if err := UnparkTicket(t.Path, now); err != nil {
 			return fmt.Errorf("unparking answered ticket %s: %w", t.Identifier, err)
 		}
 	}
@@ -69,10 +69,14 @@ func hasLiveParkedTicket(d Deps, workspaceID, epicName, worktreeDir string, agen
 	return false
 }
 
-// unparkTicket reopens the needs-answer ticket at path and demotes its
+// UnparkTicket reopens the needs-answer ticket at path and demotes its
 // "## Needs Answer" stub into a dated "## Comments" entry — the automatic
 // counterpart of a person hand-editing status: open (see unparkAnswered).
-func unparkTicket(path string, now time.Time) error {
+// Exported so a person can trigger the same write explicitly (e.g. the
+// tickets/queue tabs' "m" suggested-actions menu) for a park whose pane
+// unparkAnswered can't safely auto-clear on its own (an announce-and-stop
+// park's live-but-idle pane looks identical to an answered gate park).
+func UnparkTicket(path string, now time.Time) error {
 	return updateTicketWithBody(path, func(t *schema.Ticket, body *string) {
 		t.Status = schema.StatusOpen
 		*body = demoteSection(*body, "## Needs Answer", now)

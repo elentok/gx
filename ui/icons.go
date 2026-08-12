@@ -61,6 +61,11 @@ type IconSet struct {
 	// TicketBlocked's ticket-graph "blocked by" state — see ui/tickets'
 	// statusIconAndStyle vs. ralph-loop's live row rendering.
 	TicketPaused string
+
+	// SuggestedAction badges a ticket row that has a "m"-menu suggested action
+	// available (ui/tickets' ticketHasSuggestedActions), e.g. a needs-answer
+	// ticket's "Resume (I answered)".
+	SuggestedAction string
 }
 
 func Icons(useNerdFont bool) IconSet {
@@ -109,6 +114,8 @@ func Icons(useNerdFont bool) IconSet {
 			TicketDone:               "d",
 			TicketError:              "!!",
 			TicketPaused:             "P",
+
+			SuggestedAction: "*",
 		}
 	}
 	return IconSet{
@@ -155,5 +162,7 @@ func Icons(useNerdFont bool) IconSet {
 		TicketDone:               "",
 		TicketError:              "",
 		TicketPaused:             "",
+
+		SuggestedAction: "",
 	}
 }
