@@ -8,6 +8,7 @@ import (
 )
 
 func TestDetectRateLimit_MatchesKnownMessageVariants(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name      string
 		text      string
@@ -32,6 +33,7 @@ func TestDetectRateLimit_MatchesKnownMessageVariants(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			token, matched := detectRateLimit(tc.text)
 			if !matched {
 				t.Fatalf("detectRateLimit(%q) matched = false, want true", tc.text)
@@ -44,6 +46,7 @@ func TestDetectRateLimit_MatchesKnownMessageVariants(t *testing.T) {
 }
 
 func TestDetectRateLimit_DoesNotMatchIncidentalMentions(t *testing.T) {
+	t.Parallel()
 	cases := []string{
 		"",
 		"Added a rate limit of 100 requests per minute",
@@ -59,6 +62,7 @@ func TestDetectRateLimit_DoesNotMatchIncidentalMentions(t *testing.T) {
 }
 
 func TestDetectCodexRateLimit_ClassifiesKnownMessages(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 8, 4, 9, 0, 0, 0, time.UTC)
 	cases := []struct {
 		name      string
@@ -83,6 +87,7 @@ func TestDetectCodexRateLimit_ClassifiesKnownMessages(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			limit, matched := detectCodexRateLimit(tc.text, now)
 			if !matched {
 				t.Fatalf("detectCodexRateLimit(%q) matched = false, want true", tc.text)
@@ -98,6 +103,7 @@ func TestDetectCodexRateLimit_ClassifiesKnownMessages(t *testing.T) {
 }
 
 func TestDetectCodexRateLimit_RejectsBlockedAndIncidentalText(t *testing.T) {
+	t.Parallel()
 	for _, text := range []string{
 		"",
 		"blocked: waiting for your permission to run this command",
@@ -112,6 +118,7 @@ func TestDetectCodexRateLimit_RejectsBlockedAndIncidentalText(t *testing.T) {
 }
 
 func TestSecondsUntilReset_ParsesClockTimeRollingToNextDayIfPassed(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 8, 1, 9, 0, 0, 0, time.UTC)
 
 	cases := []struct {
@@ -126,6 +133,7 @@ func TestSecondsUntilReset_ParsesClockTimeRollingToNextDayIfPassed(t *testing.T)
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got, ok := secondsUntilReset(tc.token, now)
 			if !ok {
 				t.Fatalf("secondsUntilReset(%q) ok = false, want true", tc.token)
@@ -138,6 +146,7 @@ func TestSecondsUntilReset_ParsesClockTimeRollingToNextDayIfPassed(t *testing.T)
 }
 
 func TestSecondsUntilReset_UnparseableToken_ReturnsNotOK(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 8, 1, 9, 0, 0, 0, time.UTC)
 
 	for _, token := range []string{"", "not a time", "midnight"} {
@@ -148,6 +157,7 @@ func TestSecondsUntilReset_UnparseableToken_ReturnsNotOK(t *testing.T) {
 }
 
 func TestWaitForClaudeRateLimitReset_ParseableToken_ReturnsOnceDeadlinePasses(t *testing.T) {
+	t.Parallel()
 	g := NewGate()
 	g.pause("t1", "rate limit detected, resets 3pm")
 
@@ -170,6 +180,7 @@ func TestWaitForClaudeRateLimitReset_ParseableToken_ReturnsOnceDeadlinePasses(t 
 }
 
 func TestWaitForClaudeRateLimitReset_UnparseableToken_PollsUntilMessageClears(t *testing.T) {
+	t.Parallel()
 	g := NewGate()
 	g.pause("t1", "rate limit detected")
 
@@ -198,6 +209,7 @@ func TestWaitForClaudeRateLimitReset_UnparseableToken_PollsUntilMessageClears(t 
 }
 
 func TestWaitForClaudeRateLimitReset_ForceResumed_ReturnsImmediately(t *testing.T) {
+	t.Parallel()
 	g := NewGate()
 	g.pause("t1", "rate limit detected")
 	g.ForceResume("t1")
@@ -211,6 +223,7 @@ func TestWaitForClaudeRateLimitReset_ForceResumed_ReturnsImmediately(t *testing.
 }
 
 func TestWaitForCodexRateLimitReset_MissingResetPollsUntilQuotaClears(t *testing.T) {
+	t.Parallel()
 	d := Deps{}
 	var sleeps []time.Duration
 	checks := 0
@@ -228,6 +241,7 @@ func TestWaitForCodexRateLimitReset_MissingResetPollsUntilQuotaClears(t *testing
 }
 
 func TestWaitForCodexRateLimitReset_MissingResetAt_NeverClears_BoundedThenReturns(t *testing.T) {
+	t.Parallel()
 	d := Deps{}
 	checks := 0
 	d.Sleep = func(time.Duration) {}
@@ -254,6 +268,7 @@ func TestWaitForCodexRateLimitReset_MissingResetAt_NeverClears_BoundedThenReturn
 }
 
 func TestWaitForCodexRateLimitReset_SleepsPastResetThenReobserves(t *testing.T) {
+	t.Parallel()
 	base := time.Date(2026, 8, 1, 9, 0, 0, 0, time.UTC)
 	d := Deps{Now: func() time.Time { return base }}
 	var sleeps []time.Duration
@@ -277,6 +292,7 @@ func TestWaitForCodexRateLimitReset_SleepsPastResetThenReobserves(t *testing.T) 
 }
 
 func TestWaitForCodexRateLimitReset_StaleResetAt_NoWaitAndBoundedRepolls(t *testing.T) {
+	t.Parallel()
 	base := time.Date(2026, 8, 1, 9, 0, 0, 0, time.UTC)
 	d := Deps{Now: func() time.Time { return base }}
 	var sleeps []time.Duration
@@ -304,6 +320,7 @@ func TestWaitForCodexRateLimitReset_StaleResetAt_NoWaitAndBoundedRepolls(t *test
 }
 
 func TestWaitForCodexRateLimitReset_ClearedRightAfterDeadline_ReturnsWithoutRepolling(t *testing.T) {
+	t.Parallel()
 	base := time.Date(2026, 8, 1, 9, 0, 0, 0, time.UTC)
 	d := Deps{Now: func() time.Time { return base }}
 	var sleeps []time.Duration

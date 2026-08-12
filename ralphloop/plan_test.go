@@ -24,6 +24,7 @@ func waveIDs(waves [][]tickets.Ticket) [][]string {
 }
 
 func TestPlanWaves_CapsEachWaveAtMaxParallel(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "open"},
 		{Number: 2, Identifier: "02", Status: "open", BlockedBy: []string{"01"}},
@@ -52,6 +53,7 @@ func TestPlanWaves_CapsEachWaveAtMaxParallel(t *testing.T) {
 }
 
 func TestPlanWaves_MatchesScopeFrontierForFirstWave(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "open"},
 		{Number: 2, Identifier: "02", Status: "open", BlockedBy: []string{"01"}},
@@ -71,6 +73,7 @@ func TestPlanWaves_MatchesScopeFrontierForFirstWave(t *testing.T) {
 }
 
 func TestPlanWaves_BlockerOutsideScopeThatIsNotDoneNeverRuns(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "open"},
 		{Number: 2, Identifier: "02", Status: "open", BlockedBy: []string{"01"}},
@@ -92,6 +95,7 @@ func TestPlanWaves_BlockerOutsideScopeThatIsNotDoneNeverRuns(t *testing.T) {
 }
 
 func TestPlanWaves_BlockerOutsideScopeThatIsDoneRunsImmediately(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "done"},
 		{Number: 2, Identifier: "02", Status: "open", BlockedBy: []string{"01"}},
@@ -111,6 +115,7 @@ func TestPlanWaves_BlockerOutsideScopeThatIsDoneRunsImmediately(t *testing.T) {
 }
 
 func TestPlanWaves_CycleAmongScopeTicketsReportsActionableError(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "open", BlockedBy: []string{"02"}},
 		{Number: 2, Identifier: "02", Status: "open", BlockedBy: []string{"01"}},
@@ -132,6 +137,7 @@ func TestPlanWaves_CycleAmongScopeTicketsReportsActionableError(t *testing.T) {
 }
 
 func TestPlanWaves_AlreadyDoneScopeTicketNeverBlocks(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "done"},
 		{Number: 2, Identifier: "02", Status: "open", BlockedBy: []string{"01"}},

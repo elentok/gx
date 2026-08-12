@@ -14,6 +14,7 @@ import (
 // extra immediate ContextOccupancy read/emit must fire right away, rather
 // than waiting up to smartZonePollMs for the first poll tick to report it.
 func TestLaunchAndPrompt_IterationStartedCarriesCwdAndSessionIDPlusImmediateOccupancy(t *testing.T) {
+	t.Parallel()
 	var started struct {
 		identifier, label, cwd, sessionID string
 	}
@@ -71,6 +72,7 @@ func TestLaunchAndPrompt_IterationStartedCarriesCwdAndSessionIDPlusImmediateOccu
 // launchAndPrompt must adopt the AgentPrompt result rather than carrying the
 // empty AgentStart session through monitoring, logging, and landing.
 func TestLaunchAndPrompt_CodexAdoptsSessionIDFromInitialPrompt(t *testing.T) {
+	t.Parallel()
 	var startedSessionID string
 	var observedSessionID string
 	sink := &recordingSinkWithArgs{
@@ -130,6 +132,7 @@ func TestLaunchAndPrompt_CodexAdoptsSessionIDFromInitialPrompt(t *testing.T) {
 // pane (via AgentGet) and waits it out, without sending a second, redundant
 // initial prompt.
 func TestLaunchAndPrompt_AgentNameTakenByOwnWorktree_AttachesInsteadOfFailing(t *testing.T) {
+	t.Parallel()
 	var promptCalls int
 	var waitTargets []string
 	sink := &recordingSinkWithArgs{occupancySink: &occupancySink{}}
@@ -190,6 +193,7 @@ func TestLaunchAndPrompt_AgentNameTakenByOwnWorktree_AttachesInsteadOfFailing(t 
 // running launch — it must still hard-fail rather than silently attaching to
 // someone else's pane.
 func TestLaunchAndPrompt_AgentNameTakenByUnrelatedWorktree_StillFails(t *testing.T) {
+	t.Parallel()
 	d := Deps{
 		AgentStart: func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
 			return herdr.Agent{}, &herdr.AgentNameTakenError{

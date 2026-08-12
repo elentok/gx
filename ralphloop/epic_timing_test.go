@@ -29,6 +29,7 @@ func loadEpicByName(t *testing.T, scratchDir, name string) tickets.Epic {
 // moment the first ticket is claimed, and completed_at once the last ticket
 // (and thus the whole epic, not just this run's scope) finishes.
 func TestRun_StampsEpicStartedAndCompletedAt(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# Second\n",
@@ -55,6 +56,7 @@ func TestRun_StampsEpicStartedAndCompletedAt(t *testing.T) {
 // epic that already finished must leave its already-stamped started_at and
 // completed_at untouched, even though the second run's clock has moved on.
 func TestRun_ReRunOnAlreadyCompleteEpic_DoesNotOverwriteTimestamps(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 	})
@@ -86,6 +88,7 @@ func TestRun_ReRunOnAlreadyCompleteEpic_DoesNotOverwriteTimestamps(t *testing.T)
 // (RunOptions.TicketIDs) that finishes its subset while other epic tickets
 // remain open must not stamp completed_at — the epic itself isn't done.
 func TestRun_TicketSubset_LeavesCompletedAtUnset(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",

@@ -80,6 +80,7 @@ func readTicket(t *testing.T, scratchDir, epicName, filename string) string {
 // Without this the escalation would only end the iteration, and a stuck agent
 // would look like a run that quietly stopped.
 func TestRun_UnconfirmedCompactionEscalation_PersistsNeedsRepair(t *testing.T) {
+	t.Parallel()
 	const epicName = "my-epic"
 	scratchDir := writeEpic(t, epicName, map[string]string{
 		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
@@ -113,6 +114,7 @@ func TestRun_UnconfirmedCompactionEscalation_PersistsNeedsRepair(t *testing.T) {
 // confirmed, so an unrelated failure at the same point in the loop must not
 // acquire it.
 func TestRun_OrdinaryIterationError_KeepsItsOwnNeedsRepairReason(t *testing.T) {
+	t.Parallel()
 	const epicName = "my-epic"
 	scratchDir := writeEpic(t, epicName, map[string]string{
 		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",

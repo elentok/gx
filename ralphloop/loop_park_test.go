@@ -66,6 +66,7 @@ func ticketPath(scratchDir, epicName, file string) string {
 // run whose only remaining ticket is needs-answer neither exits nor errors — it
 // parks, notifies, and carries on once the status clears.
 func TestRun_StalledTicket_ParksInsteadOfExiting(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: task\n---\n# Stuck\n",
 	})
@@ -96,6 +97,7 @@ func TestRun_StalledTicket_ParksInsteadOfExiting(t *testing.T) {
 // the raw frontmatter Status: rather than RenderedStatus, so this proves a
 // draft ticket parks rather than deadlocking.
 func TestRun_DraftOnlyEpic_Parks(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-stub.md": "---\nid: \"01\"\nstatus: draft\ntype: task\n---\n# Stub\n",
 	})
@@ -130,6 +132,7 @@ func TestRun_DraftOnlyEpic_Parks(t *testing.T) {
 // very first, still-stalled pass, so a counter would tell the two apart on the
 // wrong call.
 func TestRun_StalledIteration_RegistryClearedAndRelaunched(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -186,6 +189,7 @@ func TestRun_StalledIteration_RegistryClearedAndRelaunched(t *testing.T) {
 // run must reattach rather than assume "open" means "never launched" and
 // double-launch a second iteration.
 func TestRun_ClearedNeedsRepairWithLiveIteration_ReattachesInsteadOfDoubleLaunching(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -262,6 +266,7 @@ func TestRun_ClearedNeedsRepairWithLiveIteration_ReattachesInsteadOfDoubleLaunch
 // corruption signal: a blocker naming a ticket that will never resolve has no
 // human-clearable ticket to park on, so it must still error.
 func TestRun_NothingRunnableAndNothingClearable_Deadlocks(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-cycle-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\nblocked_by: [\"02\"]\n---\n# A\n",
 		"02-cycle-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# B\n",
@@ -285,6 +290,7 @@ func TestRun_NothingRunnableAndNothingClearable_Deadlocks(t *testing.T) {
 // forever by design — its timer never fires and nobody clears the ticket — so
 // it stays blocked in the park select rather than leaking work.
 func TestRun_StaysParked_NeverReportsEpicComplete(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: task\n---\n# Stuck\n",
 	})
@@ -337,6 +343,7 @@ func TestRun_StaysParked_NeverReportsEpicComplete(t *testing.T) {
 // loop.go's park branch relies on: WakeParked cuts a park wait short instead
 // of it running out a long parkPollInterval-equivalent wait.
 func TestGate_WakeParked_ShortensParkWait(t *testing.T) {
+	t.Parallel()
 	gate := NewGate()
 	waiting := make(chan struct{})
 	woke := make(chan struct{})

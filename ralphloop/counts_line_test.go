@@ -6,6 +6,7 @@ import "testing"
 // spec calls out by name: fresh, resumed, already done, empty, and
 // mid-run park.
 func TestRenderCountsLine_DocumentedShapes(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		counts EpicCounts
@@ -39,6 +40,7 @@ func TestRenderCountsLine_DocumentedShapes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := RenderCountsLine(tt.counts); got != tt.want {
 				t.Errorf("RenderCountsLine() = %q, want %q", got, tt.want)
 			}
@@ -49,6 +51,7 @@ func TestRenderCountsLine_DocumentedShapes(t *testing.T) {
 // TestRenderCountsLine_ZeroSuppression pins that every bucket but done/total
 // disappears at zero, and that done/total render even when both are zero.
 func TestRenderCountsLine_ZeroSuppression(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		counts EpicCounts
@@ -67,6 +70,7 @@ func TestRenderCountsLine_ZeroSuppression(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := RenderCountsLine(tt.counts); got != tt.want {
 				t.Errorf("RenderCountsLine() = %q, want %q", got, tt.want)
 			}
@@ -78,6 +82,7 @@ func TestRenderCountsLine_ZeroSuppression(t *testing.T) {
 // identifiers list inline in full, and a sixth collapses the rest into an
 // overflow marker rather than growing the line unbounded.
 func TestRenderCountsLine_ParkedIdentifierCap(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		identifiers []string
@@ -96,6 +101,7 @@ func TestRenderCountsLine_ParkedIdentifierCap(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			counts := EpicCounts{ParkedIdentifiers: tt.identifiers}
 			if got := RenderCountsLine(counts); got != tt.want {
 				t.Errorf("RenderCountsLine() = %q, want %q", got, tt.want)

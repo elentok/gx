@@ -53,6 +53,7 @@ func newFakeChatSink(inner EventSink) (*chatEventSink, *fakeChatTransport) {
 }
 
 func TestChatEventSink_ChatMembers_EachSendExactlyOneMessage(t *testing.T) {
+	t.Parallel()
 	ticket := tickets.Ticket{Identifier: "04", Title: "Some ticket"}
 	stats := IterationStats{ElapsedSeconds: 10, PeakContextTokens: 100, Completed: 1, Total: 2}
 
@@ -72,6 +73,7 @@ func TestChatEventSink_ChatMembers_EachSendExactlyOneMessage(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
 			sink, transport := newFakeChatSink(&recordingSink{})
 			c.fire(sink)
 			if got := waitForSentCount(transport, 1); len(got) != 1 {
@@ -82,6 +84,7 @@ func TestChatEventSink_ChatMembers_EachSendExactlyOneMessage(t *testing.T) {
 }
 
 func TestChatEventSink_NonMembers_SendNoMessage(t *testing.T) {
+	t.Parallel()
 	sink, transport := newFakeChatSink(&recordingSink{})
 
 	sink.TicketReverted("01")
@@ -107,6 +110,7 @@ func TestChatEventSink_NonMembers_SendNoMessage(t *testing.T) {
 }
 
 func TestChatEventSink_EveryEvent_ForwardsToInner(t *testing.T) {
+	t.Parallel()
 	inner := &recordingSink{}
 	sink, _ := newFakeChatSink(inner)
 
@@ -139,6 +143,7 @@ func TestChatEventSink_EveryEvent_ForwardsToInner(t *testing.T) {
 // TicketNeedsHuman on the underlying ticket, but only TicketNeedsHuman may
 // reach chat — otherwise a single park would read as two messages.
 func TestChatEventSink_Park_ProducesExactlyOneChatMessage(t *testing.T) {
+	t.Parallel()
 	sink, transport := newFakeChatSink(&recordingSink{})
 
 	sink.IterationPaused("04", "iter-04", PauseNeedsRepair, "agent blocked on permission prompt")
@@ -155,6 +160,7 @@ func TestChatEventSink_Park_ProducesExactlyOneChatMessage(t *testing.T) {
 }
 
 func TestChatEventSink_IterationPausedResumed_NeedsRepairKindNeverReachesChat(t *testing.T) {
+	t.Parallel()
 	sink, transport := newFakeChatSink(&recordingSink{})
 
 	sink.IterationPaused("04", "iter-04", PauseNeedsRepair, "blocked")
@@ -167,6 +173,7 @@ func TestChatEventSink_IterationPausedResumed_NeedsRepairKindNeverReachesChat(t 
 }
 
 func TestChatEventSink_IterationPausedResumed_RateLimitKindReachesChat(t *testing.T) {
+	t.Parallel()
 	sink, transport := newFakeChatSink(&recordingSink{})
 
 	sink.IterationPaused("04", "iter-04", PauseRateLimit, "rate limited")

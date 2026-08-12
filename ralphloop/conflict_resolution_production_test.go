@@ -235,6 +235,8 @@ func gitSubject(t *testing.T, dir, ref string) string {
 // "/gx-resolving-merge-conflicts" agent through a process-boundary fake herdr
 // executable (testutil/herdrfake) instead of a mocked Deps field.
 func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
+	// not parallel-safe: herdrfake.StartState calls t.Setenv for the helper
+	// socket path and PATH.
 	dir := testutil.TempRepo(t)
 	base, err := git.RevParse(dir, "HEAD")
 	if err != nil {
@@ -374,6 +376,7 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 }
 
 func TestConflictResolverHandlePrompt_WrongCwd_FailsImmediately(t *testing.T) {
+	t.Parallel()
 	expected := t.TempDir()
 	wrong := t.TempDir()
 	resolver := newConflictResolver(t, expected, "sess", "resolved\n")
@@ -389,6 +392,7 @@ func TestConflictResolverHandlePrompt_WrongCwd_FailsImmediately(t *testing.T) {
 }
 
 func TestConflictResolverHandlePrompt_NoCherryPickInProgress_FailsImmediately(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempRepo(t) // clean repo, nothing in progress
 	resolver := newConflictResolver(t, dir, "sess", "resolved\n")
 	resolver.paneCwd["pane-x"] = dir
@@ -403,6 +407,7 @@ func TestConflictResolverHandlePrompt_NoCherryPickInProgress_FailsImmediately(t 
 }
 
 func TestConflictResolverHandlePrompt_UnexpectedPrompt_FailsImmediately(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempRepo(t)
 	resolver := newConflictResolver(t, dir, "sess", "resolved\n")
 	resolver.paneCwd["pane-x"] = dir
@@ -421,6 +426,7 @@ func TestConflictResolverHandlePrompt_UnexpectedPrompt_FailsImmediately(t *testi
 // (via a follow-up tab-list check) and log a warning, not fail the overall
 // operation.
 func TestResolveCherryPickConflict_TabStillPresentAfterClose_LogsWarningNotError(t *testing.T) {
+	t.Parallel()
 	d, _, _ := fakeDeps()
 	var closedTabID string
 	d.TabClose = func(tabID string) error {

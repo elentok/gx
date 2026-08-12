@@ -67,6 +67,7 @@ func missingVerdicts(iface reflect.Type, verdicts map[string]bool) []string {
 }
 
 func TestChatMembershipVerdicts_CoversEveryEventSinkMethod(t *testing.T) {
+	t.Parallel()
 	iface := reflect.TypeFor[EventSink]()
 
 	if missing := missingVerdicts(iface, chatMembershipVerdicts); len(missing) > 0 {
@@ -85,6 +86,7 @@ func TestChatMembershipVerdicts_CoversEveryEventSinkMethod(t *testing.T) {
 // mode the contract test above exists to catch: a fixture interface with one
 // method the verdict map was never updated for.
 func TestChatMembershipVerdicts_FailsOnUnmappedMethod(t *testing.T) {
+	t.Parallel()
 	type fixtureWithUnmappedMethod interface {
 		EventSink
 		BrandNewLiveEvent(identifier string)

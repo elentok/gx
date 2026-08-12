@@ -7,6 +7,7 @@ import (
 )
 
 func TestEpicFailureReporter_EpicFailed_SendsOneMessagePerTarget(t *testing.T) {
+	t.Parallel()
 	r := NewEpicFailureReporter(t.TempDir())
 	transport := &fakeChatTransport{}
 	r.targets = append(r.targets, epicFailureTarget{style: slackStyle, transport: transport})
@@ -23,6 +24,7 @@ func TestEpicFailureReporter_EpicFailed_SendsOneMessagePerTarget(t *testing.T) {
 }
 
 func TestEpicFailureReporter_EpicFailed_NilErrSendsNothing(t *testing.T) {
+	t.Parallel()
 	r := NewEpicFailureReporter(t.TempDir())
 	transport := &fakeChatTransport{}
 	r.targets = append(r.targets, epicFailureTarget{style: slackStyle, transport: transport})

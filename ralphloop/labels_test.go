@@ -12,6 +12,7 @@ import (
 // two epics that both happen to reach iteration number "04" would resolve to
 // the exact same on-disk directory.
 func TestIterationWorktreePath_ScopedByEpicName(t *testing.T) {
+	t.Parallel()
 	pathA := iterationWorktreePath("/fake/worktrees", "epic-a", "04")
 	pathB := iterationWorktreePath("/fake/worktrees", "epic-b", "04")
 	if pathA == pathB {
@@ -23,6 +24,7 @@ func TestIterationWorktreePath_ScopedByEpicName(t *testing.T) {
 // key: two epics using the same iteration label must not produce the same
 // key, or reconcile could mistake one epic's live tab for another's.
 func TestIterationKey_ScopedByEpicName(t *testing.T) {
+	t.Parallel()
 	keyA := iterationKey("epic-a", iterLabel("epic-a", "04"))
 	keyB := iterationKey("epic-b", iterLabel("epic-b", "04"))
 	if keyA == keyB {
@@ -36,6 +38,7 @@ func TestIterationKey_ScopedByEpicName(t *testing.T) {
 // what's actually shown to the user (herdr tab/pane names), unlike
 // iterationKey which is only an internal map key.
 func TestIterLabel_ScopedByEpicName(t *testing.T) {
+	t.Parallel()
 	labelA := iterLabel("epic-a", "06")
 	labelB := iterLabel("epic-b", "06")
 	if labelA == labelB {
@@ -49,6 +52,7 @@ func TestIterLabel_ScopedByEpicName(t *testing.T) {
 // directories rather than the second epic silently reusing (or corrupting)
 // the first's.
 func TestRun_TwoEpicsSameIterationNumber_DontCollideOnWorktreePath(t *testing.T) {
+	t.Parallel()
 	var mu sync.Mutex
 	var addedPaths []string
 

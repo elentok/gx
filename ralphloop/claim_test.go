@@ -47,6 +47,7 @@ func mustParse(t *testing.T, path string) schema.Ticket {
 }
 
 func TestClaim_RewritesStatus(t *testing.T) {
+	t.Parallel()
 	path := writeFrontmatterTicket(t, "open")
 	if err := Claim(path); err != nil {
 		t.Fatalf("Claim: %v", err)
@@ -57,6 +58,7 @@ func TestClaim_RewritesStatus(t *testing.T) {
 }
 
 func TestClaim_ClearsIterationStatus(t *testing.T) {
+	t.Parallel()
 	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\niteration_status: finished\ntype: task\n---\n# Ticket\n\nBody.\n")
 	if err := Claim(path); err != nil {
 		t.Fatalf("Claim: %v", err)
@@ -74,6 +76,7 @@ func TestClaim_ClearsIterationStatus(t *testing.T) {
 }
 
 func TestClaim_PreservesOtherFrontmatterFieldsAndBody(t *testing.T) {
+	t.Parallel()
 	original := "---\nid: \"01\"\nstatus: open\nblocked_by: [\"02\", \"03\"]\ntype: task\n---\n" +
 		"# Ticket\n\n- [ ] some criterion\n- [ ] another **bold** criterion\n\nTrailing prose with `code`.\n"
 	path := writeTicket(t, original)
@@ -93,6 +96,7 @@ func TestClaim_PreservesOtherFrontmatterFieldsAndBody(t *testing.T) {
 }
 
 func TestMarkDone_RewritesStatus(t *testing.T) {
+	t.Parallel()
 	path := writeFrontmatterTicket(t, "claimed")
 	if err := MarkDone(path); err != nil {
 		t.Fatalf("MarkDone: %v", err)
@@ -103,6 +107,7 @@ func TestMarkDone_RewritesStatus(t *testing.T) {
 }
 
 func TestMarkDoneWithMetadata_SetsStatusAndActualContextWindow(t *testing.T) {
+	t.Parallel()
 	path := writeFrontmatterTicket(t, "claimed")
 	if err := MarkDoneWithMetadata(path, 42000, 2, "sess-123"); err != nil {
 		t.Fatalf("MarkDoneWithMetadata: %v", err)
@@ -123,6 +128,7 @@ func TestMarkDoneWithMetadata_SetsStatusAndActualContextWindow(t *testing.T) {
 // claiming a ticket carrying "## Needs Repair" moves that reason into a
 // dated "## Comments" sub-entry and removes the "## Needs Repair" heading.
 func TestClaim_DemotesNeedsRepairIntoDatedComments(t *testing.T) {
+	t.Parallel()
 	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n"+
 		"# Ticket\n\nBody text.\n\n## Needs Repair\n\nsomething broke\n")
 
@@ -151,6 +157,7 @@ func TestClaim_DemotesNeedsRepairIntoDatedComments(t *testing.T) {
 // (no "## Needs Repair" section left to demote) must not append a second
 // entry.
 func TestClaim_RepeatedClaimsDoNotStackDuplicateComments(t *testing.T) {
+	t.Parallel()
 	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n"+
 		"# Ticket\n\nBody text.\n\n## Needs Repair\n\nfirst failure\n")
 
@@ -177,6 +184,7 @@ func TestClaim_RepeatedClaimsDoNotStackDuplicateComments(t *testing.T) {
 // and parked again a second time must accumulate two dated entries under
 // one "## Comments" heading, not two "## Comments" headings.
 func TestClaim_AppendsSecondDemotionAlongsideFirst(t *testing.T) {
+	t.Parallel()
 	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n"+
 		"# Ticket\n\nBody text.\n\n## Needs Repair\n\nfirst failure\n")
 
@@ -204,6 +212,7 @@ func TestClaim_AppendsSecondDemotionAlongsideFirst(t *testing.T) {
 // itself retire "## Needs Repair" — only Claim does. A person who unparks a
 // ticket should still see what they were told, right up until it's claimed.
 func TestClaim_UnparkedButUnclaimedKeepsNeedsRepairVisible(t *testing.T) {
+	t.Parallel()
 	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n"+
 		"# Ticket\n\nBody text.\n\n## Needs Repair\n\nsomething broke\n")
 
@@ -224,6 +233,7 @@ func TestClaim_UnparkedButUnclaimedKeepsNeedsRepairVisible(t *testing.T) {
 // actual claim does. A ticket can reattach several times within one claim;
 // retiring here would fire repeatedly instead of exactly once at claim.
 func TestReattach_ClearIterationStatusDoesNotRetireNeedsRepair(t *testing.T) {
+	t.Parallel()
 	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\niteration_status: working\ntype: task\n---\n"+
 		"# Ticket\n\nBody text.\n\n## Needs Repair\n\nsomething broke\n")
 
@@ -238,6 +248,7 @@ func TestReattach_ClearIterationStatusDoesNotRetireNeedsRepair(t *testing.T) {
 }
 
 func TestAppendSessionID_AppendsWithoutOverwriting(t *testing.T) {
+	t.Parallel()
 	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\ntype: task\nsession_ids: [\"sess-1\"]\n---\n# Ticket\n\nBody.\n")
 
 	if err := AppendSessionID(path, "sess-2"); err != nil {
@@ -252,6 +263,7 @@ func TestAppendSessionID_AppendsWithoutOverwriting(t *testing.T) {
 }
 
 func TestAppendSessionID_FirstEntryOnUnsetField(t *testing.T) {
+	t.Parallel()
 	path := writeFrontmatterTicket(t, "claimed")
 
 	if err := AppendSessionID(path, "sess-1"); err != nil {
@@ -265,6 +277,7 @@ func TestAppendSessionID_FirstEntryOnUnsetField(t *testing.T) {
 }
 
 func TestClaimThenMarkDone_UpdatesStatus(t *testing.T) {
+	t.Parallel()
 	path := writeFrontmatterTicket(t, "open")
 
 	if err := Claim(path); err != nil {
@@ -283,6 +296,7 @@ func TestClaimThenMarkDone_UpdatesStatus(t *testing.T) {
 }
 
 func TestClaim_MissingFileReturnsError(t *testing.T) {
+	t.Parallel()
 	if err := Claim(filepath.Join(t.TempDir(), "does-not-exist.md")); err == nil {
 		t.Error("Claim(missing file) = nil error, want error")
 	}
@@ -294,6 +308,7 @@ func TestClaim_MissingFileReturnsError(t *testing.T) {
 // YAML block stays valid (rather than gaining a stray capitalized "Status:"
 // line that no longer matches the "status" key).
 func TestClaim_FrontmatterTicket_RoundTripsThroughSchema(t *testing.T) {
+	t.Parallel()
 	path := writeTicket(t, "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Ticket\n\nBody.\n")
 	if err := Claim(path); err != nil {
 		t.Fatalf("Claim: %v", err)
@@ -318,6 +333,7 @@ func TestClaim_FrontmatterTicket_RoundTripsThroughSchema(t *testing.T) {
 // iteration label rather than a raw pane id — a label still resolves after a
 // restart or reattach, and a pane id does not.
 func TestMarkNeedsAnswerWithReasonAndStub_WritesStatusReasonAndStub(t *testing.T) {
+	t.Parallel()
 	path := writeFrontmatterTicket(t, "claimed")
 	reason := "iter-01 is blocked on a prompt gx did not send; answer it in the pane"
 
@@ -349,6 +365,7 @@ func TestMarkNeedsAnswerWithReasonAndStub_WritesStatusReasonAndStub(t *testing.T
 // actual_context_window updated in place — not spliced as stray Context
 // window:/Session: lines inside the YAML block.
 func TestMarkDoneWithMetadata_FrontmatterTicket_WritesActualContextWindow(t *testing.T) {
+	t.Parallel()
 	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\ntype: task\nactual_context_window: 500\nelapsed_time: 10\n---\n# Ticket\n\nBody.\n")
 	if err := MarkDoneWithMetadata(path, 42000, 0, "sess-123"); err != nil {
 		t.Fatalf("MarkDoneWithMetadata: %v", err)
@@ -381,6 +398,7 @@ func TestMarkDoneWithMetadata_FrontmatterTicket_WritesActualContextWindow(t *tes
 // TestClaimThenMarkDone_RoundTripsThroughParseTicket, but for a
 // frontmatter-format ticket.
 func TestClaimThenMarkDone_FrontmatterTicket_RoundTripsThroughSchema(t *testing.T) {
+	t.Parallel()
 	path := writeTicket(t, "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Ticket\n\nBody.\n")
 
 	if err := Claim(path); err != nil {
@@ -411,6 +429,7 @@ func TestClaimThenMarkDone_FrontmatterTicket_RoundTripsThroughSchema(t *testing.
 // no longer a valid ticket at all, so Claim must return an error rather than
 // silently line-splicing a Status: line into it.
 func TestClaim_NoFrontmatterReturnsError(t *testing.T) {
+	t.Parallel()
 	path := writeTicket(t, "# Ticket\n\nJust a body, no frontmatter.\n")
 	if err := Claim(path); err == nil {
 		t.Error("Claim(file with no frontmatter) = nil error, want error")
@@ -425,6 +444,7 @@ func TestClaim_NoFrontmatterReturnsError(t *testing.T) {
 // or partial file; SetStatus must instead write via a temp file plus
 // rename so every read sees a complete, valid ticket.
 func TestSetStatus_ConcurrentWritesAndReads_NeverExposesATornFile(t *testing.T) {
+	t.Parallel()
 	path := writeFrontmatterTicket(t, "open")
 
 	var wg sync.WaitGroup

@@ -15,6 +15,7 @@ import (
 )
 
 func TestLogEvent_AppendsOneJSONLinePerCall(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	if err := logEvent(dir, "epic", Event{Type: eventIterationStarted, Ticket: "01", Pane: "pane-1", Tab: "tab-1", AgentSession: "sess-1"}); err != nil {
@@ -41,6 +42,7 @@ func TestLogEvent_AppendsOneJSONLinePerCall(t *testing.T) {
 }
 
 func TestLogEvent_FillsInTimeWhenZero(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	before := time.Now()
 	if err := logEvent(dir, "epic", Event{Type: eventNeedsAnswer, Ticket: "02"}); err != nil {
@@ -59,6 +61,7 @@ func TestLogEvent_FillsInTimeWhenZero(t *testing.T) {
 }
 
 func TestLogEvent_EmptyScratchDirOrEpicName_NoOp(t *testing.T) {
+	t.Parallel()
 	if err := logEvent("", "epic", Event{Type: eventNeedsAnswer}); err != nil {
 		t.Errorf("logEvent(scratchDir=\"\") error = %v, want nil no-op", err)
 	}
@@ -68,6 +71,7 @@ func TestLogEvent_EmptyScratchDirOrEpicName_NoOp(t *testing.T) {
 }
 
 func TestReadEvents_NoLogYet_OkFalse(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	events, ok, err := readEvents(dir, "epic")
 	if err != nil {
@@ -82,6 +86,7 @@ func TestReadEvents_NoLogYet_OkFalse(t *testing.T) {
 }
 
 func TestReadEvents_SkipsMalformedTrailingLine(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := runLogPath(dir, "epic")
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
@@ -102,6 +107,7 @@ func TestReadEvents_SkipsMalformedTrailingLine(t *testing.T) {
 }
 
 func TestLastIterationSession_ReturnsMostRecentMatchingTicket(t *testing.T) {
+	t.Parallel()
 	events := []Event{
 		{Type: eventIterationStarted, Ticket: "01", Agent: AgentClaude, AgentSession: "sess-1a", Cwd: "/cwd-1a"},
 		{Type: eventIterationFinished, Ticket: "01"},
@@ -120,6 +126,7 @@ func TestLastIterationSession_ReturnsMostRecentMatchingTicket(t *testing.T) {
 }
 
 func TestLastIterationSession_DefaultsAgentForHistoricalLogs(t *testing.T) {
+	t.Parallel()
 	events := []Event{
 		{Type: eventIterationStarted, Ticket: "01", AgentSession: "sess-1"},
 	}
@@ -133,6 +140,7 @@ func TestLastIterationSession_DefaultsAgentForHistoricalLogs(t *testing.T) {
 }
 
 func TestLastIterationSession_NoMatch_OkFalse(t *testing.T) {
+	t.Parallel()
 	events := []Event{
 		{Type: eventIterationStarted, Ticket: "02", AgentSession: "sess-2"},
 		{Type: eventIterationStarted, Ticket: "01", AgentSession: ""},
@@ -144,6 +152,7 @@ func TestLastIterationSession_NoMatch_OkFalse(t *testing.T) {
 }
 
 func TestLogEvent_ConcurrentAppends_NeverInterleave(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	var wg sync.WaitGroup
 	for i := range 20 {
@@ -165,6 +174,7 @@ func TestLogEvent_ConcurrentAppends_NeverInterleave(t *testing.T) {
 }
 
 func TestSanitizeSendError_StripsURLFromURLError(t *testing.T) {
+	t.Parallel()
 	underlying := errors.New("connection refused")
 	err := &url.Error{Op: "Post", URL: "https://api.telegram.org/botsecret-token-abc/sendMessage", Err: underlying}
 
@@ -179,6 +189,7 @@ func TestSanitizeSendError_StripsURLFromURLError(t *testing.T) {
 }
 
 func TestSanitizeSendError_LeavesNonURLErrorsUnchanged(t *testing.T) {
+	t.Parallel()
 	err := fmt.Errorf("send failed with status %d", 500)
 
 	if got := sanitizeSendError(err); got != err {
@@ -187,6 +198,7 @@ func TestSanitizeSendError_LeavesNonURLErrorsUnchanged(t *testing.T) {
 }
 
 func TestLogNotificationsConfigured_RecordsBooleansForBothChannels(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	if err := LogNotificationsConfigured(dir, "epic", true, false); err != nil {
 		t.Fatalf("LogNotificationsConfigured: %v", err)
@@ -209,6 +221,7 @@ func TestLogNotificationsConfigured_RecordsBooleansForBothChannels(t *testing.T)
 }
 
 func TestLogNotificationSentAndFailed_RecordChannelAndTriggeringKind(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	logNotificationSent(dir, "epic", "telegram", notifyKindEpicComplete)
 	logNotificationFailed(dir, "epic", "slack", notifyKindIterationPaused, "post failed: 500")
@@ -227,6 +240,7 @@ func TestLogNotificationSentAndFailed_RecordChannelAndTriggeringKind(t *testing.
 }
 
 func TestSendNotification_FailsOnceThenSucceeds_LogsOneSentAndNoFailed(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	var attempts atomic.Int32
 	sendSync := func(ctx context.Context) error {
@@ -256,6 +270,7 @@ func TestSendNotification_FailsOnceThenSucceeds_LogsOneSentAndNoFailed(t *testin
 }
 
 func TestSendNotification_FailsEveryAttempt_LogsOneFailed(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	var attempts atomic.Int32
 	sendSync := func(ctx context.Context) error {

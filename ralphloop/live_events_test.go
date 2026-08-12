@@ -9,6 +9,7 @@ import (
 var _ EventSink = (*ChannelEventSink)(nil)
 
 func TestChannelEventSink_ForwardsCallsAsLiveEvents(t *testing.T) {
+	t.Parallel()
 	s := NewChannelEventSink()
 
 	s.TicketClaimed(tickets.Ticket{Identifier: "04a", Number: 4})

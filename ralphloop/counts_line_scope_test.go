@@ -8,6 +8,7 @@ import "testing"
 // waiting-for-children overlay (ticket 26) landing in Blocked rather than
 // Done.
 func TestRunScope_Counts_BucketsEveryStatus(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "done"},
 		{Number: 2, Identifier: "02", Status: "claimed"},

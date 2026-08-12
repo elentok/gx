@@ -234,6 +234,7 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 }
 
 func TestRun_LinearChain_RunsTicketsInOrderAndLandsAll(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# Second\n",
@@ -278,6 +279,7 @@ func TestRun_LinearChain_RunsTicketsInOrderAndLandsAll(t *testing.T) {
 // AC that the normal same-run success path deletes a landed iteration's
 // now-redundant branch — something it never did before this ticket.
 func TestRun_IterationCompletion_DeletesIterationBranch(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 	})
@@ -298,6 +300,7 @@ func TestRun_IterationCompletion_DeletesIterationBranch(t *testing.T) {
 }
 
 func TestRun_LogsLifecycleEvents_LinearChain(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 	})
@@ -363,6 +366,7 @@ func TestRun_LogsLifecycleEvents_LinearChain(t *testing.T) {
 // what lets that be told apart from "still blocked" or "already claimed
 // elsewhere".
 func TestRun_SchedulerScan_LogsOutOfScopeTicket(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
@@ -408,6 +412,7 @@ func TestRun_SchedulerScan_LogsOutOfScopeTicket(t *testing.T) {
 // compaction boundaries gets that count written into its frontmatter's
 // compactions field alongside status: done.
 func TestRun_FreshIteration_StampsCompactionsOnDone(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -440,6 +445,7 @@ func TestRun_FreshIteration_StampsCompactionsOnDone(t *testing.T) {
 // default fake behavior in fakeDeps, which leaves it nil) still marks the
 // ticket done, without writing a wrong/placeholder compactions count.
 func TestRun_FreshIteration_OmitsCompactionsWhenUnavailable(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -465,6 +471,7 @@ func TestRun_FreshIteration_OmitsCompactionsWhenUnavailable(t *testing.T) {
 }
 
 func TestRun_LogsNeedsAnswerEvent_OnZeroCommitIteration(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -501,6 +508,7 @@ func TestRun_LogsNeedsAnswerEvent_OnZeroCommitIteration(t *testing.T) {
 }
 
 func TestRun_EventSink_TicketNeedsAnswer_OnZeroCommitIteration(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -531,6 +539,7 @@ func TestRun_EventSink_TicketNeedsAnswer_OnZeroCommitIteration(t *testing.T) {
 // itself writes status: done, and its worktree/tab get cleaned up like a
 // normal completion.
 func TestRun_HonorsCommitlessFlag_SkipsNeedsAnswer(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -588,6 +597,7 @@ func TestRun_HonorsCommitlessFlag_SkipsNeedsAnswer(t *testing.T) {
 }
 
 func TestRun_InstallDepsFailure_MarksNeedsRepairWithoutLaunchingAgentOrAbortingRun(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -614,6 +624,7 @@ func TestRun_InstallDepsFailure_MarksNeedsRepairWithoutLaunchingAgentOrAbortingR
 }
 
 func TestRun_ZeroOpenTickets_NoOpSummary(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md": "---\nid: \"01\"\nstatus: done\ntype: task\n---\n# First\n",
 	})
@@ -633,6 +644,7 @@ func TestRun_ZeroOpenTickets_NoOpSummary(t *testing.T) {
 }
 
 func TestRun_NoEpicFound_NoOpSummary(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	d, _, _ := fakeDeps()
 
@@ -649,6 +661,7 @@ func TestRun_NoEpicFound_NoOpSummary(t *testing.T) {
 // inversion: a needs-repair ticket used to count as terminal and end the
 // run, and now must not — the run parks on it instead.
 func TestAllDone_NeedsRepairIsNotComplete(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
 		{Number: 1, Status: "done"},
 		{Number: 2, Status: "needs-repair"},
@@ -659,6 +672,7 @@ func TestAllDone_NeedsRepairIsNotComplete(t *testing.T) {
 }
 
 func TestAllDone_OpenTicketIsNotComplete(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
 		{Number: 1, Status: "done"},
 		{Number: 2, Status: "open"},
@@ -669,6 +683,7 @@ func TestAllDone_OpenTicketIsNotComplete(t *testing.T) {
 }
 
 func TestAllDone_EveryTicketDone(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
 		{Number: 1, Status: "done"},
 		{Number: 2, Status: "done"},
@@ -684,6 +699,7 @@ func TestAllDone_EveryTicketDone(t *testing.T) {
 // (and StampEpicCompleted) would report an epic complete with unfinished
 // forked work still inside it.
 func TestAllDone_WaitingForChildrenNotDone(t *testing.T) {
+	t.Parallel()
 	parent := "1"
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "done"},
@@ -699,6 +715,7 @@ func TestAllDone_WaitingForChildrenNotDone(t *testing.T) {
 // larger epic runs and lands only those tickets, and Run exits once they're
 // done even though a third, unblocked epic ticket is left open.
 func TestRun_TicketSubset_CompletesWithoutTouchingTicketsOutsideSubset(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
@@ -760,6 +777,7 @@ func TestRun_TicketSubset_CompletesWithoutTouchingTicketsOutsideSubset(t *testin
 // the time ticket 01's IterationFinished fires, Total must already reflect
 // both tickets even though only one has landed.
 func TestRun_ScopeWidenedMidRun_TotalGrowsWithIt(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
@@ -824,6 +842,7 @@ func TestRun_ScopeWidenedMidRun_TotalGrowsWithIt(t *testing.T) {
 // landed — otherwise a resumed run understates progress ("1/10 done" when
 // six of ten are already done).
 func TestRun_ResumedRun_ReportsEpicWideDoneNotRunLocalCount(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md":  "---\nid: \"01\"\nstatus: done\ntype: task\n---\n# First\n",
 		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
@@ -858,6 +877,7 @@ func TestRun_ResumedRun_ReportsEpicWideDoneNotRunLocalCount(t *testing.T) {
 // must not gate-pause scheduling of the tickets the caller actually asked
 // for.
 func TestRun_NeedsRepairOutsideSubset_DoesNotPauseRun(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md":  "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n# First\n",
 		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
@@ -894,6 +914,7 @@ func TestRun_NeedsRepairOutsideSubset_DoesNotPauseRun(t *testing.T) {
 // stops the run outright. It's human-clearable, so the rest of the subset is
 // scheduled first and the run only parks once nothing else is runnable.
 func TestRun_NeedsRepairInsideSubset_RunsTheRestThenParks(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md":  "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n# First\n",
 		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
@@ -928,6 +949,7 @@ func TestRun_NeedsRepairInsideSubset_RunsTheRestThenParks(t *testing.T) {
 // a scheduling slot and triggering exactly the scan that must not reclaim
 // 01.
 func TestRun_ClaimNext_IgnoresExternalRevertOfAlreadyLaunchedTicket(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
@@ -1009,6 +1031,7 @@ func TestRun_ClaimNext_IgnoresExternalRevertOfAlreadyLaunchedTicket(t *testing.T
 // reverted, both must agree on the resulting two-wave shape, and 03 — never
 // selected — must stay untouched throughout.
 func TestRun_SelectingBlockedTicketThenEditingBlockersRunsCorrectMultiWave(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# Second\n",

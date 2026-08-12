@@ -8,6 +8,7 @@ import (
 )
 
 func TestPauseGate_NotPausedInitially(t *testing.T) {
+	t.Parallel()
 	g := NewGate()
 	if g.isPaused() {
 		t.Error("isPaused() = true for a fresh gate, want false")
@@ -15,6 +16,7 @@ func TestPauseGate_NotPausedInitially(t *testing.T) {
 }
 
 func TestPauseGate_PauseMarksPausedAndRecordsReason(t *testing.T) {
+	t.Parallel()
 	g := NewGate()
 	g.pause("iter-01", "context occupancy breach")
 
@@ -27,6 +29,7 @@ func TestPauseGate_PauseMarksPausedAndRecordsReason(t *testing.T) {
 }
 
 func TestPauseGate_MultiplePausedIterations_AllStayPausedUntilForceResumeClearsLast(t *testing.T) {
+	t.Parallel()
 	g := NewGate()
 	g.pause("iter-01", "breach one")
 	g.pause("iter-02", "breach two")
@@ -74,6 +77,7 @@ func TestPauseGate_MultiplePausedIterations_AllStayPausedUntilForceResumeClearsL
 }
 
 func TestPauseGate_ForceResume_WakesWaiterImmediately(t *testing.T) {
+	t.Parallel()
 	g := NewGate()
 	g.pause("iter-01", "breach")
 
@@ -105,6 +109,7 @@ func TestPauseGate_ForceResume_WakesWaiterImmediately(t *testing.T) {
 }
 
 func TestPauseGate_ForceResume_UnknownLabelReturnsFalse(t *testing.T) {
+	t.Parallel()
 	g := NewGate()
 	g.pause("iter-01", "breach")
 
@@ -124,6 +129,7 @@ func TestPauseGate_ForceResume_UnknownLabelReturnsFalse(t *testing.T) {
 // pause that no longer exists, polling forever for a resume signal that
 // already happened.
 func TestPauseGate_ForceResumeBeforePause_WaitForResumeReturnsImmediately(t *testing.T) {
+	t.Parallel()
 	g := NewGate()
 	g.pause("iter-01", "breach")
 

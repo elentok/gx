@@ -40,6 +40,7 @@ func reportIterationStatus(t *testing.T, path, target, value string) func(herdr.
 // survives — DeleteBranch must never be called — since a resume reattaches
 // to it to land both sides of the answer boundary in one pick.
 func TestRun_NeedsAnswerReport_ParksWithoutCherryPickEvenWithCommits(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -95,6 +96,7 @@ func TestRun_NeedsAnswerReport_ParksWithoutCherryPickEvenWithCommits(t *testing.
 // report with nothing landed takes the ordinary zero-commit path instead of
 // gx trusting the report into done.
 func TestRun_FinishedReport_ZeroCommits_DoesNotReachDone(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})

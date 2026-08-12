@@ -33,6 +33,7 @@ func stubBin(t *testing.T, name string, logPath string, exitCode int) string {
 }
 
 func TestVerifySkillWith(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name     string
 		agent    AgentKind
@@ -77,6 +78,7 @@ func TestVerifySkillWith(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			var statPath string
 			err := verifySkillWith(tc.agent, tc.skill,
 				func() (string, error) { return "home", tc.homeErr },
@@ -105,6 +107,7 @@ func TestVerifySkillWith(t *testing.T) {
 }
 
 func TestInstallDependencies_NoMarker_SkipsSilently(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	command, err := InstallDependencies(dir)
@@ -117,6 +120,7 @@ func TestInstallDependencies_NoMarker_SkipsSilently(t *testing.T) {
 }
 
 func TestInstallDependencies_GoModOnly_SkipsSilently(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example\n"), 0644); err != nil {
 		t.Fatalf("WriteFile go.mod: %v", err)
@@ -132,6 +136,7 @@ func TestInstallDependencies_GoModOnly_SkipsSilently(t *testing.T) {
 }
 
 func TestInstallDependencies_EachMarker_RunsExpectedCommand(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		marker      string
 		wantCommand string
@@ -174,6 +179,7 @@ func TestInstallDependencies_EachMarker_RunsExpectedCommand(t *testing.T) {
 }
 
 func TestInstallDependencies_MarkerPrecedence_NpmWinsOverPnpm(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	for _, marker := range []string{"package-lock.json", "pnpm-lock.yaml"} {
 		if err := os.WriteFile(filepath.Join(dir, marker), []byte(""), 0644); err != nil {
@@ -193,6 +199,7 @@ func TestInstallDependencies_MarkerPrecedence_NpmWinsOverPnpm(t *testing.T) {
 }
 
 func TestInstallDependencies_CommandFails_ReturnsError(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "package-lock.json"), []byte(""), 0644); err != nil {
 		t.Fatalf("WriteFile package-lock.json: %v", err)
@@ -210,6 +217,7 @@ func TestInstallDependencies_CommandFails_ReturnsError(t *testing.T) {
 }
 
 func TestLookPathIn_ResolvesAgainstExplicitPathInsteadOfProcessEnv(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	binPath := filepath.Join(dir, "mybin")
 	if err := os.WriteFile(binPath, []byte("#!/bin/sh\n"), 0755); err != nil {
@@ -231,6 +239,7 @@ func TestLookPathIn_ResolvesAgainstExplicitPathInsteadOfProcessEnv(t *testing.T)
 }
 
 func TestInstallDependenciesWith_UsesExplicitPathInsteadOfProcessEnv(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "package-lock.json"), []byte(""), 0644); err != nil {
 		t.Fatalf("WriteFile package-lock.json: %v", err)
@@ -257,6 +266,7 @@ func TestInstallDependenciesWith_UsesExplicitPathInsteadOfProcessEnv(t *testing.
 }
 
 func TestDefaultDepsWithOverrides_HomeOverridesVerifySkillLookup(t *testing.T) {
+	t.Parallel()
 	overrideHome := t.TempDir()
 	skillPath := filepath.Join(overrideHome, ".claude", "skills", "implement", "SKILL.md")
 	if err := os.MkdirAll(filepath.Dir(skillPath), 0755); err != nil {
@@ -276,6 +286,7 @@ func TestDefaultDepsWithOverrides_HomeOverridesVerifySkillLookup(t *testing.T) {
 }
 
 func TestDefaultDepsWithOverrides_PathOverridesPreflightLookup(t *testing.T) {
+	t.Parallel()
 	binDir := t.TempDir()
 	script := "#!/bin/sh\necho logged in\nexit 0\n"
 	if err := os.WriteFile(filepath.Join(binDir, "codex"), []byte(script), 0755); err != nil {
@@ -290,6 +301,7 @@ func TestDefaultDepsWithOverrides_PathOverridesPreflightLookup(t *testing.T) {
 }
 
 func TestDefaultDepsWithOverrides_CodexHomeOverridesContextAndRateLimitReads(t *testing.T) {
+	t.Parallel()
 	codexHome := t.TempDir()
 	path := filepath.Join(codexHome, "sessions", "2026", "08", "01", "rollout-2026-08-01T10-00-00-session-1.jsonl")
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
@@ -321,6 +333,7 @@ func TestDefaultDepsWithOverrides_CodexHomeOverridesContextAndRateLimitReads(t *
 }
 
 func TestDefaultDepsWithOverrides_HomeOverridesOccupancyAndCompactionReads(t *testing.T) {
+	t.Parallel()
 	overrideHome := t.TempDir()
 	path := transcript.PathIn(overrideHome, "/repo/iter-01", "session-1")
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
@@ -378,6 +391,7 @@ func stepNow(steps ...time.Duration) func() time.Time {
 }
 
 func TestPromptWithNudge_SucceedsWithoutTimeout_NeverNudges(t *testing.T) {
+	t.Parallel()
 	var promptCalls, sendKeysCalls, waitCalls int
 	prompt := func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
 		promptCalls++
@@ -413,6 +427,7 @@ func TestPromptWithNudge_SucceedsWithoutTimeout_NeverNudges(t *testing.T) {
 }
 
 func TestPromptWithNudge_TimesOutThenNudgeSucceeds(t *testing.T) {
+	t.Parallel()
 	var sendKeysTarget string
 	var sendKeysKeys []string
 	var waitOpts herdr.AgentWaitOptions
@@ -451,6 +466,7 @@ func TestPromptWithNudge_TimesOutThenNudgeSucceeds(t *testing.T) {
 }
 
 func TestPromptWithNudge_ExhaustsNudges_ReturnsTimeoutError(t *testing.T) {
+	t.Parallel()
 	var promptCalls, sendKeysCalls, waitCalls int
 	prompt := func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
 		promptCalls++
@@ -483,6 +499,7 @@ func TestPromptWithNudge_ExhaustsNudges_ReturnsTimeoutError(t *testing.T) {
 }
 
 func TestPromptWithNudge_FastCompletionBeforeWorking_ReturnsSuccessImmediately(t *testing.T) {
+	t.Parallel()
 	var promptCalls, sendKeysCalls, waitCalls int
 	prompt := func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
 		promptCalls++
@@ -519,6 +536,7 @@ func TestPromptWithNudge_FastCompletionBeforeWorking_ReturnsSuccessImmediately(t
 }
 
 func TestPromptWithNudge_StartConfirmed_WaitsForCompletionWithCallersTimeout(t *testing.T) {
+	t.Parallel()
 	var promptCalls int
 	var completionWaitOpts herdr.AgentWaitOptions
 	var completionWaitCalls int
@@ -567,6 +585,7 @@ func TestPromptWithNudge_StartConfirmed_WaitsForCompletionWithCallersTimeout(t *
 }
 
 func TestPromptWithNudge_SendKeysFails_ReturnsErrorImmediately(t *testing.T) {
+	t.Parallel()
 	sendKeysErr := errors.New("pane not found")
 	var waitCalls int
 
@@ -596,6 +615,7 @@ func TestPromptWithNudge_SendKeysFails_ReturnsErrorImmediately(t *testing.T) {
 }
 
 func TestPromptWithNudge_SlowStart_CompletionGetsRemainingBudget(t *testing.T) {
+	t.Parallel()
 	promptAttempts := 0
 	prompt := func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
 		promptAttempts++
@@ -647,6 +667,7 @@ func TestPromptWithNudge_SlowStart_CompletionGetsRemainingBudget(t *testing.T) {
 }
 
 func TestPromptWithNudge_CompletionDeadlineAlreadyExpired_ReturnsTimeoutWithoutWaiting(t *testing.T) {
+	t.Parallel()
 	prompt := func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
 		return herdr.Agent{AgentStatus: "working"}, nil
 	}
@@ -678,6 +699,7 @@ func TestPromptWithNudge_CompletionDeadlineAlreadyExpired_ReturnsTimeoutWithoutW
 }
 
 func TestPromptWithNudge_ZeroTimeout_BoundedStartThenUnlimitedCompletion(t *testing.T) {
+	t.Parallel()
 	prompt := func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
 		if opts.TimeoutMs != promptNudgeGraceMs {
 			t.Errorf("prompt TimeoutMs = %d, want the bounded grace window %d even with no caller deadline", opts.TimeoutMs, promptNudgeGraceMs)

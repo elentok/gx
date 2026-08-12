@@ -32,6 +32,7 @@ func (p *fakePermit) Release() {
 // unrestricted behavior (mirrors TestRun_StalledTicket_ParksInsteadOfExiting's
 // setup without duplicating its full assertion set).
 func TestRun_NilPermit_BehavesUnrestricted(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: task\n---\n# Stuck\n",
 	})
@@ -57,6 +58,7 @@ func TestRun_NilPermit_BehavesUnrestricted(t *testing.T) {
 // Acquire at least twice — once before the initial claim attempt finds
 // nothing runnable and parks, once again after a human clears the ticket.
 func TestRun_Permit_AcquiredOnClaimReleasedOnPark(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: task\n---\n# Stuck\n",
 	})
@@ -117,6 +119,7 @@ func TestRun_Permit_AcquiredOnClaimReleasedOnPark(t *testing.T) {
 // a slow Permit.Acquire rather than claiming anyway: AgentPrompt must never
 // fire before the fake's Acquire call returns.
 func TestRun_Permit_BlocksClaimUntilAcquireReturns(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -169,6 +172,7 @@ func TestRun_Permit_BlocksClaimUntilAcquireReturns(t *testing.T) {
 // for a slot hasn't started yet, so the start message must not report a
 // start that hasn't happened.
 func TestRun_EpicStarted_FiresAfterPermitAcquireReturns(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -211,6 +215,7 @@ func TestRun_EpicStarted_FiresAfterPermitAcquireReturns(t *testing.T) {
 // ticket that reconciles as already-running (a live tab found by TabList)
 // must not be launched until the permit is held.
 func TestRun_Permit_AcquiredBeforeReattachLaunch(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})

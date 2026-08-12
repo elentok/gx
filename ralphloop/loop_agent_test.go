@@ -13,6 +13,7 @@ import (
 )
 
 func TestRun_CodexLaunchPreflight(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name           string
 		executables    map[string]string
@@ -69,6 +70,7 @@ func TestRun_CodexLaunchPreflight(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			scratchDir := writeEpic(t, "my-epic", map[string]string{
 				"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 			})
@@ -141,6 +143,7 @@ func TestRun_CodexLaunchPreflight(t *testing.T) {
 }
 
 func TestRun_MissingSkill_FailsBeforeClaimingAnyTicket(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 	})
@@ -184,6 +187,7 @@ func TestRun_MissingSkill_FailsBeforeClaimingAnyTicket(t *testing.T) {
 }
 
 func TestRun_ClaudeDoesNotRunCodexLaunchPreflight(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 	})
@@ -205,6 +209,7 @@ func TestRun_ClaudeDoesNotRunCodexLaunchPreflight(t *testing.T) {
 }
 
 func TestRun_CodexLaunchFailureAfterClaimNeedsRepair(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 	})
@@ -243,6 +248,7 @@ func TestRun_CodexLaunchFailureAfterClaimNeedsRepair(t *testing.T) {
 }
 
 func TestRun_SkillFlag_OverridesPromptSkill(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 	})
@@ -258,6 +264,7 @@ func TestRun_SkillFlag_OverridesPromptSkill(t *testing.T) {
 }
 
 func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name       string
 		agent      AgentKind
@@ -280,6 +287,7 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			scratchDir := writeEpic(t, "my-epic", map[string]string{
 				"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
 			})
@@ -324,6 +332,7 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 }
 
 func TestRun_InvalidAgent_ReturnsError(t *testing.T) {
+	t.Parallel()
 	err := Run(RunOptions{Agent: "other"}, Deps{}, noopEventSink{})
 	if err == nil || !strings.Contains(err.Error(), "must be claude or codex") {
 		t.Fatalf("Run() error = %v, want invalid-agent error", err)
@@ -331,6 +340,7 @@ func TestRun_InvalidAgent_ReturnsError(t *testing.T) {
 }
 
 func TestRun_MaxParallelOne_RunsSerially(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
@@ -358,6 +368,7 @@ func TestRun_MaxParallelOne_RunsSerially(t *testing.T) {
 }
 
 func TestRun_MaxParallelTwo_RunsExactlyTwoConcurrentlyAndBackfills(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
@@ -399,6 +410,7 @@ func TestRun_MaxParallelTwo_RunsExactlyTwoConcurrentlyAndBackfills(t *testing.T)
 }
 
 func TestRun_PauseLetsInFlightFinishAndResumesScheduling(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",

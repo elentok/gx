@@ -17,6 +17,7 @@ import (
 // building while ticket 01's land is still blocked in CherryPickRange if
 // ticket 01's active slot was released at hand-off, not at land completion.
 func TestRun_QueuedBehindLandingBuild_ReleasesActiveSlotForNextTicket(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
@@ -76,6 +77,7 @@ func TestRun_QueuedBehindLandingBuild_ReleasesActiveSlotForNextTicket(t *testing
 // finishing their builds around the same time must never have their
 // CherryPickRange calls overlap.
 func TestRun_TwoLands_NeverRunConcurrently(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
@@ -104,6 +106,7 @@ func TestRun_TwoLands_NeverRunConcurrently(t *testing.T) {
 // "deadlocked" — Run must instead keep waiting for the land to actually
 // finish before exiting.
 func TestRun_ExitsOnlyAfterLastTicketsLandCompletes(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})

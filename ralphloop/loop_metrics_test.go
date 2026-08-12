@@ -42,6 +42,7 @@ func setHomeEnv(t *testing.T, dir string) {
 // occupancy is known this run, gets it written into its frontmatter's
 // actual_context_window field alongside status: done.
 func TestRun_FreshIteration_StampsContextWindowOnDone(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -75,6 +76,7 @@ func TestRun_FreshIteration_StampsContextWindowOnDone(t *testing.T) {
 // the closing occupancy — rather than a corrupted YAML block from the old
 // line-splicing writer.
 func TestRun_FreshIteration_FrontmatterTicket_EndsWithValidFrontmatter(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -115,6 +117,7 @@ func TestRun_FreshIteration_FrontmatterTicket_EndsWithValidFrontmatter(t *testin
 // default fake behavior in fakeDeps) still marks the ticket done, without
 // writing a wrong/placeholder actual_context_window.
 func TestRun_FreshIteration_OmitsContextWindowWhenOccupancyUnavailable(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -143,6 +146,7 @@ func TestRun_FreshIteration_OmitsContextWindowWhenOccupancyUnavailable(t *testin
 // duration into the landed ticket's actual_context_window/elapsed_time
 // frontmatter fields.
 func TestLandCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmatter(t *testing.T) {
+	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var.
 	home := t.TempDir()
 	setHomeEnv(t, home)
 
@@ -196,6 +200,7 @@ func TestLandCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmatt
 // writeLandedMetrics wrote to the ticket's frontmatter, all in the landed
 // commit's message via a single Deps.AppendTrailers call.
 func TestLandCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
+	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var.
 	home := t.TempDir()
 	setHomeEnv(t, home)
 
@@ -271,6 +276,7 @@ func TestLandCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 // ticket 02's own IterationFinished has already been recorded, so ticket 02's
 // stats are captured while ticket 01 is still genuinely in progress.
 func TestRun_IterationFinishedAndEpicComplete_ReceiveRealMetrics(t *testing.T) {
+	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var.
 	home := t.TempDir()
 	setHomeEnv(t, home)
 
@@ -372,6 +378,7 @@ func TestRun_IterationFinishedAndEpicComplete_ReceiveRealMetrics(t *testing.T) {
 }
 
 func TestRun_LogsDepsInstalledEventWithCommand(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -407,6 +414,7 @@ func TestRun_LogsDepsInstalledEventWithCommand(t *testing.T) {
 // finishing session's stats, the same way landCherryPick's writeLandedMetrics
 // does for a committed finish, and stamps them into the ticket's frontmatter.
 func TestStampCommitlessMetrics_FreshSession_WritesActualContextWindowAndElapsedTime(t *testing.T) {
+	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var.
 	home := t.TempDir()
 	setHomeEnv(t, home)
 
@@ -453,6 +461,7 @@ func TestStampCommitlessMetrics_FreshSession_WritesActualContextWindowAndElapsed
 // (no sessionID and no prior iteration-started event to backfill from)
 // leaves actual_context_window/elapsed_time at 0 rather than erroring.
 func TestStampCommitlessMetrics_NoDiscoverableSession_LeavesFieldsZeroWithoutError(t *testing.T) {
+	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var.
 	home := t.TempDir()
 	setHomeEnv(t, home)
 
