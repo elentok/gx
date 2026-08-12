@@ -185,6 +185,35 @@ func TestRun_CherryPickConflict_ResolvesInFeatureWorktreeThenCompletes(t *testin
 	if conflictResolved.AgentSession == "" || conflictResolved.AgentSession == conflictHit.AgentSession {
 		t.Errorf("conflict-resolved event = %+v, want a non-empty AgentSession distinct from conflict-hit's %q (the resolution agent's own session)", conflictResolved, conflictHit.AgentSession)
 	}
+
+	issuesDir := filepath.Join(scratchDir, "epic", "issues")
+	entries, err := os.ReadDir(issuesDir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	var childRaw string
+	for _, e := range entries {
+		if e.Name() == "01-a.md" {
+			continue
+		}
+		raw, err := os.ReadFile(filepath.Join(issuesDir, e.Name()))
+		if err != nil {
+			t.Fatalf("ReadFile: %v", err)
+		}
+		if strings.Contains(string(raw), "type: conflict-resolution") {
+			childRaw = string(raw)
+			break
+		}
+	}
+	if childRaw == "" {
+		t.Fatalf("issues dir = %v, want a forked type: conflict-resolution child ticket for 01", entries)
+	}
+	if !strings.Contains(childRaw, "parent: \"01\"") && !strings.Contains(childRaw, "parent: 01") {
+		t.Errorf("conflict-resolution child ticket missing parent: 01:\n%s", childRaw)
+	}
+	if !strings.Contains(childRaw, "status: done") {
+		t.Errorf("conflict-resolution child ticket not marked done after successful resolution:\n%s", childRaw)
+	}
 }
 
 func TestRun_AlreadyAppliedIteration_CompletesWithoutCherryPickOrResolver(t *testing.T) {

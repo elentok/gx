@@ -79,19 +79,26 @@ func (s Status) Valid() bool {
 type TicketType string
 
 const (
-	TypeResearch   TicketType = "research"
-	TypeGrilling   TicketType = "grilling"
-	TypePrototype  TicketType = "prototype"
-	TypeTask       TicketType = "task"
-	TypeCodeReview TicketType = "code-review"
+	TypeResearch           TicketType = "research"
+	TypeGrilling           TicketType = "grilling"
+	TypePrototype          TicketType = "prototype"
+	TypeTask               TicketType = "task"
+	TypeCodeReview         TicketType = "code-review"
+	// TypeConflictResolution is system-generated only: gx forks one as a
+	// child of a landing ticket when its cherry-pick hits a conflict (see
+	// ralphloop's cherryPickWithConflictResolution). Never authored by a
+	// person, and never allocated via a plain `gx tickets add` without
+	// `--parent`.
+	TypeConflictResolution TicketType = "conflict-resolution"
 )
 
 var validTypes = map[TicketType]bool{
-	TypeResearch:   true,
-	TypeGrilling:   true,
-	TypePrototype:  true,
-	TypeTask:       true,
-	TypeCodeReview: true,
+	TypeResearch:           true,
+	TypeGrilling:           true,
+	TypePrototype:          true,
+	TypeTask:               true,
+	TypeCodeReview:         true,
+	TypeConflictResolution: true,
 }
 
 // Valid reports whether t is one of the canonical type values.
@@ -177,11 +184,14 @@ type Ticket struct {
 // epic rather than landing code of its own — none of the three lands a
 // commit on the feature branch even when finished correctly, so requiring
 // one would misclassify every one of them as a stalled/crashed agent.
+// TypeConflictResolution resolves its conflict directly inside the landing
+// ticket's own cherry-pick sequence rather than a branch/commit of its own,
+// so the same landed-commit verification doesn't apply to it either.
 // TypePrototype is deliberately excluded: a prototype can legitimately land
 // a real spike/scaffold commit as its actual output, so it stays on the
 // crash-recovery path like TypeTask unless explicitly flagged.
 func (t Ticket) IsCommitless() bool {
-	return t.Commitless || t.Type == TypeResearch || t.Type == TypeGrilling || t.Type == TypeCodeReview
+	return t.Commitless || t.Type == TypeResearch || t.Type == TypeGrilling || t.Type == TypeCodeReview || t.Type == TypeConflictResolution
 }
 
 // Validate checks a populated Ticket for well-formedness: a valid id, a

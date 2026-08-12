@@ -592,11 +592,20 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 	return true, resolutionSessionID, nil
 }
 
-// resolveCherryPickConflict launches a fresh pane in the feature worktree and
-// drives a "/gx-resolving-merge-conflicts" agent to completion in it, returning
-// its agent session id. The iteration's own worktree/tab are untouched
-// while this runs.
+// resolveCherryPickConflict forks p.Ticket into a claimed conflict-resolution
+// child ticket (see forkConflictResolutionTicket), then launches a fresh pane
+// in the feature worktree and drives a "/gx-resolving-merge-conflicts" agent
+// to completion in it, returning its agent session id. The iteration's own
+// worktree/tab are untouched while this runs. The child ticket is marked done
+// once the resolution agent finishes successfully; on failure it is left
+// claimed, which — per ADR 0016's parent/fork protocol — keeps the landing
+// ticket from ever rendering done while the resolution is unfinished.
 func resolveCherryPickConflict(d Deps, p iterationParams) (sessionID string, resultErr error) {
+	childPath, err := forkConflictResolutionTicket(p)
+	if err != nil {
+		return "", fmt.Errorf("forking conflict-resolution ticket: %w", err)
+	}
+
 	label := conflictLabel(p.Ticket.Identifier)
 
 	tab, err := d.TabCreate(herdr.TabCreateOptions{
@@ -639,6 +648,10 @@ func resolveCherryPickConflict(d Deps, p iterationParams) (sessionID string, res
 	sessionID, err = launchAndPrompt(d, launchParams)
 	if err != nil {
 		return "", fmt.Errorf("conflict-resolution agent %s did not finish (possibly stuck): %w", label, err)
+	}
+
+	if err := MarkDone(childPath); err != nil {
+		return "", fmt.Errorf("marking conflict-resolution ticket %s done: %w", childPath, err)
 	}
 
 	return sessionID, nil

@@ -431,12 +431,18 @@ func TestResolveCherryPickConflict_TabStillPresentAfterClose_LogsWarningNotError
 		return []herdr.Tab{{TabID: closedTabID, WorkspaceID: workspaceID}}, nil
 	}
 
+	scratchDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(scratchDir, "main", "issues"), 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
 	p := iterationParams{
 		WorkspaceID:     "ws-1",
 		FeatureWorktree: t.TempDir(),
 		FeatureBranch:   "main",
 		Agent:           AgentClaude,
 		Ticket:          tickets.Ticket{Identifier: "03"},
+		ScratchDir:      scratchDir,
 		SmartZone:       1_000_000,
 		Gate:            NewGate(),
 		Sink:            noopEventSink{},
