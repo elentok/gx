@@ -14,14 +14,30 @@ import (
 
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/transcript"
+	"go.uber.org/goleak"
 )
 
 // TestMain re-enters the test binary as the fake herdr helper when launched
 // under herdrfake's coordinator (see herdrfake.RunHelperProcess), so this
 // package's tests can put a hermetic fake `herdr` executable first in PATH.
+// goleak.VerifyTestMain fails the specific leaking test at leak time (stack
+// trace and all) instead of letting a stuck goroutine surface as an
+// unrelated multi-minute package hang.
+//
+// The three ignores below are pre-existing leaks, not false positives:
+// tests built on runUntilParked (loop_test.go) and its production-scenario
+// siblings intentionally return once Run has parked without ever stopping
+// it, so its land-queue worker and iteration goroutines are still alive at
+// TestMain teardown. Run has no cancellation path a test can drive today;
+// wiring one is tracked separately (test-suite-perf/02) rather than done
+// here, so this ticket lands with goleak catching every *other* leak.
 func TestMain(m *testing.M) {
 	herdrfake.RunHelperProcess()
-	os.Exit(m.Run())
+	goleak.VerifyTestMain(m,
+		goleak.IgnoreTopFunction("github.com/elentok/gx/ralphloop.Run"),
+		goleak.IgnoreTopFunction("github.com/elentok/gx/ralphloop.runLandQueue"),
+		goleak.IgnoreAnyFunction("github.com/elentok/gx/ralphloop.Run.func5.1"),
+	)
 }
 
 // agentResult builds the {"agent": {...}} envelope herdr's runAgentJSON
