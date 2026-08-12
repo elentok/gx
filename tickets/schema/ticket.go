@@ -79,11 +79,11 @@ func (s Status) Valid() bool {
 type TicketType string
 
 const (
-	TypeResearch           TicketType = "research"
-	TypeGrilling           TicketType = "grilling"
-	TypePrototype          TicketType = "prototype"
-	TypeTask               TicketType = "task"
-	TypeCodeReview         TicketType = "code-review"
+	TypeResearch   TicketType = "research"
+	TypeGrilling   TicketType = "grilling"
+	TypePrototype  TicketType = "prototype"
+	TypeTask       TicketType = "task"
+	TypeCodeReview TicketType = "code-review"
 	// TypeConflictResolution is system-generated only: gx forks one as a
 	// child of a landing ticket when its cherry-pick hits a conflict (see
 	// ralphloop's cherryPickWithConflictResolution). Never authored by a
