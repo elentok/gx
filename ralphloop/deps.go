@@ -292,9 +292,16 @@ func verifySkillWith(
 // promptNudgeGraceMs bounds each of promptWithNudge's submit/re-wait attempts.
 // promptMaxNudges caps how many bare-Enter nudges it sends before giving up
 // and returning the underlying poll-timeout error.
+//
+// 4_000 was too tight for a cold-started agent to reach "working" under
+// concurrent load — observed live as a hard failure quoting the literal
+// `--timeout 4000` this constant produces, even with plenty of budget left
+// on the caller's own overall deadline (budgetMs caps every individual
+// attempt to this constant regardless of that deadline). Raised to give
+// cold starts headroom under contention.
 const (
-	promptNudgeGraceMs = 4_000
-	promptMaxNudges    = 2
+	promptNudgeGraceMs = 45_000
+	promptMaxNudges    = 3
 )
 
 // promptWithNudge wraps herdr's AgentPrompt/AgentSendKeys/AgentWait to submit
