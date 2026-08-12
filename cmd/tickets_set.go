@@ -39,9 +39,10 @@ Settable fields:
 
 Agent-only settable fields:
   iteration_status (enum, --iteration-status): working, needs-answer, finished. The
-    agent's own self-report for the current claim, distinct from status. Setting
-    finished requires either --commitless=true (in this call or already on disk) or
-    --status=done in the same call — a bare finished report with neither is rejected.
+    agent's own self-report for the current claim, distinct from status. This report
+    can only start a landing, never conclude one — gx's own commit count and
+    cherry-pick decide whether the ticket actually lands. Never pair finished with
+    --status=done: landing status is gx's alone to write.
 
 Read-only fields (gx-managed, not settable via ` + "`set`" + `):
   id — ticket identity, fixed at creation
@@ -304,43 +305,19 @@ func lockEpicForParentWrite(path, parentID string) (unlock func(), err error) {
 	return unlock, nil
 }
 
-// checkIterationStatusFinishedGuard validates --iteration-status's value and,
-// for finished, enforces the zero-commit guard: cmd has no git access to
-// actually count commits (that plumbing is ralphloop's, tickets 07/08), so a
-// finished report is only accepted alongside --commitless=true (this call or
-// already on disk) or --status=done in the same call - the CLI-visible proxy
-// for "the caller already confirmed landing happened". needs-answer is
-// deliberately exempt: a zero-commit needs-answer stop is not commitless.
+// checkIterationStatusFinishedGuard validates --iteration-status's value.
+// Per no-silent-stalls Story 26/27, an agent's finished report can only start
+// a landing, never conclude one — the zero-commit fault check belongs solely
+// to ralphloop's own landing path, which has real git access to count
+// commits (tickets 07/08), not to a CLI-visible proxy flag. Earlier this
+// guard demanded --status=done alongside a non-commitless finished report,
+// but checkAgentStatusGuard refuses that same --status write from a
+// ralph-loop/* branch, leaving no call an iteration agent could legally make;
+// see .scratch/conflict-lifecycle/issues/06-status-guard-contradiction-research.md.
 func checkIterationStatusFinishedGuard(c *cobra.Command, path string) error {
 	v, _ := c.Flags().GetString("iteration-status")
 	if !schema.IterationStatus(v).Valid() {
 		return fmt.Errorf("%s: --iteration-status %s is invalid; want working, needs-answer, or finished", path, v)
-	}
-	if schema.IterationStatus(v) != schema.IterationStatusFinished {
-		return nil
-	}
-
-	commitless := false
-	if c.Flags().Changed("commitless") {
-		cv, _ := c.Flags().GetString("commitless")
-		commitless, _ = strconv.ParseBool(cv)
-	} else {
-		raw, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		t, err := schema.ParseTicketFromRaw(string(raw), path)
-		if err != nil {
-			return fmt.Errorf("reading ticket %s: %w", path, err)
-		}
-		commitless = t.Commitless
-	}
-
-	status, _ := c.Flags().GetString("status")
-	landing := c.Flags().Changed("status") && schema.Status(status) == schema.StatusDone
-
-	if !commitless && !landing {
-		return fmt.Errorf("%s: --iteration-status finished needs --commitless=true or --status=done in the same call; a finished report with neither commits nor commitless is rejected", path)
 	}
 	return nil
 }

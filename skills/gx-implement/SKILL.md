@@ -82,18 +82,21 @@ When either trigger fires:
    `<id>-<slug>.md` (`--slug` is required, so there's no separate rename step to remember), and
    writes the child's `parent`, which is the only edge a fork produces: give the new ticket no
    `blocked_by` naming the original, and record nothing about it on the original. The stub lands
-   `draft`; fill in its body, then `gx tickets set <new-path> --status open` to hand it over. This
-   chain is uncapped — each fork narrows what's left, so it's self-limiting. Move any
-   not-yet-finished acceptance criteria off the original ticket onto the new one(s). Do this
-   **autonomously** — no pause for user approval; this exists to keep the outer loop unattended.
-4. **Close the original** as done, with `gx tickets set <path> --status done` and a body note of the
-   token count from the last budget check (e.g. `Tokens used: ~85K`) — so it can be matched against
-   the ticket's `expected_context_window` later. (`actual_context_window` itself is gx-written at
-   cherry-pick time, not by the agent.) Nothing about the new tickets is recorded on the original;
-   their own `parent` is the whole edge. If step 1 had nothing to commit (design/exploration only,
-   no diff), also pass `--commitless true`: `gx tickets set <path> --status done --commitless true`.
-   Without it, ralph-loop's stalled-agent detection flags the forked original `needs-repair` instead
-   of leaving it `done`.
+   `draft`; fill in its body, then `gx tickets set <new-path> --status open` to hand it over — this
+   is the one `--status` write an iteration agent ever makes, since a fresh fork must be handed
+   over and nothing else can do it. This chain is uncapped — each fork narrows what's left, so it's
+   self-limiting. Move any not-yet-finished acceptance criteria off the original ticket onto the new
+   one(s). Do this **autonomously** — no pause for user approval; this exists to keep the outer loop
+   unattended.
+4. **Close the original**, with `gx tickets set <path> --iteration-status finished` and a body note
+   of the token count from the last budget check (e.g. `Tokens used: ~85K`) — so it can be matched
+   against the ticket's `expected_context_window` later. (`actual_context_window` itself is
+   gx-written at cherry-pick time, not by the agent; so is landing `status: done` — the report can
+   only start a landing, never conclude one, gx's own commit count decides that.) Nothing about the
+   new tickets is recorded on the original; their own `parent` is the whole edge. If step 1 had
+   nothing to commit (design/exploration only, no diff), also pass `--commitless true`:
+   `gx tickets set <path> --iteration-status finished --commitless true`. Without it, ralph-loop's
+   stalled-agent detection flags the forked original `needs-repair` instead of adopting it as done.
 
 ## When only a person can answer
 
@@ -119,17 +122,20 @@ Use [gx-tdd](../gx-tdd/SKILL.md) where possible, at pre-agreed seams.
 
 Run typechecking regularly, single test files regularly, and the full test suite once at the end.
 
-Once starting, run `gx tickets set <path> --status claimed`.
+Claiming already writes `status: claimed` for you — never write it yourself.
 
-Once done, run `gx tickets set <path> --status done`. Code review runs separately, batched across
-the epic, not per-ticket — do not invoke it from here.
+Once done, run `gx tickets set <path> --iteration-status finished`. This report can only *start* a
+landing, never conclude one: gx adopts it and decides `status: done` itself from its own commit
+count and cherry-pick outcome — never write `--status done` yourself, even paired with
+`--iteration-status finished`; landing status is gx's alone to set (the one exception is the
+draft→open fork handover in step 3 above). Code review runs separately, batched across the epic,
+not per-ticket — do not invoke it from here.
 
 If you conclude this ticket needs **no commit** — e.g. exploration shows the behavior already
-exists, or the ticket only needed a fork with no code changes of its own — do not leave `Status:
-claimed`. Set a terminal status plus `commitless: true` in one call, e.g.
-`gx tickets set <path> --status done --commitless true`, explaining why in the ticket body. Without
-`commitless: true`, ralph-loop treats a zero-commit finish as a stalled agent and flags the ticket
-`needs-repair` for a human to check.
+exists, or the ticket only needed a fork with no code changes of its own — report finished plus
+`commitless: true` in one call: `gx tickets set <path> --iteration-status finished --commitless
+true`, explaining why in the ticket body. Without `commitless: true`, ralph-loop treats a
+zero-commit finish as a stalled agent and flags the ticket `needs-repair` for a human to check.
 
 Commit your work to the current branch. Start every commit subject with
 `{epic}/{ticket id}: `, substituting the `.scratch/<epic>/` directory name (not the branch name,

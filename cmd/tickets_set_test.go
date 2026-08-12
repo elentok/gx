@@ -413,29 +413,25 @@ func TestExecute_TicketsSet_IterationStatusInvalidRejected(t *testing.T) {
 	}
 }
 
-func TestExecute_TicketsSet_IterationStatusFinishedBareRejected(t *testing.T) {
+func TestExecute_TicketsSet_IterationStatusFinishedBareAccepted(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	original := "---\nid: \"04b\"\nstatus: claimed\ntype: task\n---\nBody.\n"
-	writeTicketFile(t, path, original)
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: task\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
 
 	err := execute([]string{"tickets", "set", path, "--iteration-status=finished"}, d)
-	if err == nil {
-		t.Fatal("expected an error, got nil")
-	}
-	if !strings.Contains(err.Error(), "--commitless=true") || !strings.Contains(err.Error(), "--status=done") {
-		t.Errorf("error = %q, want it to mention --commitless=true and --status=done", err.Error())
+	if err != nil {
+		t.Fatalf("execute tickets set: %v, want a bare finished report accepted — the zero-commit check belongs to ralphloop's landing path, not this CLI guard", err)
 	}
 
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("reading ticket back: %v", err)
 	}
-	if string(raw) != original {
-		t.Errorf("ticket file changed on validation failure: got %q, want unchanged %q", string(raw), original)
+	if !strings.Contains(string(raw), "iteration_status: finished") {
+		t.Errorf("ticket file = %q, want iteration_status: finished written", string(raw))
 	}
 }
 

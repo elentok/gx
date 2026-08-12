@@ -131,11 +131,25 @@ Before starting work on a frontier ticket, claim it: `gx tickets set <path> --st
 must happen before any implementation work, not after — an unattended run that crashes mid-ticket
 should leave the ticket visibly claimed, not silently open, so a restart doesn't double-pick it.
 
+Under ralph-loop, gx itself writes `status: claimed` at claim time (`ralphloop.Claim`), before the
+agent's prompt is even sent — an iteration agent never calls `--status claimed` itself, and the CLI
+refuses the attempt from a `ralph-loop/*` branch. This section describes the mechanic for a
+hand-driven epic, where a person or script claims a ticket directly.
+
 ## Resolution
 
 When a ticket's work lands, set a terminal status: `gx tickets set <path> --status done`. A ticket
 closed by a mid-flight fork rather than by landing its own work (see below) is also `done`, with
-`commitless: true` since it never had commits of its own. Other terminal outcomes:
+`commitless: true` since it never had commits of its own.
+
+Under ralph-loop, landing `status: done` is gx's alone to write — an iteration agent reports
+`gx tickets set <path> --iteration-status finished [--commitless true]` instead, and gx adopts that
+report into `status: done` only after checking its own commit count and cherry-pick outcome; the
+report can start a landing, never conclude one. The CLI refuses `--status done` from a
+`ralph-loop/*` branch outright, even paired with `--iteration-status finished`. As with claiming,
+this section's plain `--status done` describes a hand-driven epic.
+
+Other terminal outcomes:
 
 - **`needs-answer`** — work is stalled on information only a human can supply. Leave a note in the
   ticket body explaining what's missing.
