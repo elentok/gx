@@ -414,6 +414,94 @@ func TestRun_RestartedNeedsRepairRecoversThenResumesScheduling(t *testing.T) {
 	}
 }
 
+// TestReconcile_ConflictResolutionChildWithLiveParentTab_StaysClaimed
+// exercises conflict-lifecycle/02a's guard: a claimed conflict-resolution
+// child ticket has no iter-NN tab of its own (see conflictLabel's doc), so
+// reconcile must check liveness under its parent's conflictLabel instead of
+// falling through to the generic iterLabel check, which would always read
+// "not live" for this ticket type and wrongly revert a still-running
+// resolver's child record to open out from under it.
+func TestReconcile_ConflictResolutionChildWithLiveParentTab_StaysClaimed(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md":                  "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01a-conflict-resolution.md": "---\nid: \"01a\"\nstatus: claimed\ntype: conflict-resolution\nparent: \"01\"\n---\n# Conflict resolution for 01\n",
+	})
+	epics, err := tickets.Load(scratchDir)
+	if err != nil {
+		t.Fatalf("tickets.Load: %v", err)
+	}
+
+	d, _, _ := fakeDeps()
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
+		return []herdr.Tab{{TabID: "tab-conflict-01", Label: "conflict-01", WorkspaceID: workspaceID}}, nil
+	}
+	// Neither the parent's iter-01 tab nor its own iteration branch survived
+	// (only the conflict-resolution resolver's pane is live), so the parent
+	// ticket's own claim reverts to open — irrelevant to what this test
+	// checks, but kept realistic rather than asserted on.
+	d.RevParse = func(dir, ref string) (string, error) {
+		return "", fmt.Errorf("unknown revision")
+	}
+
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{}), epics[0])
+	if err != nil {
+		t.Fatalf("reconcile() error = %v", err)
+	}
+	if len(reattached) != 0 {
+		t.Fatalf("reattached = %v, want none (conflict-resolution children are never reattached directly)", reattached)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01a-conflict-resolution.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: claimed") {
+		t.Errorf("conflict-resolution child reverted despite its live parent-keyed tab:\n%s", raw)
+	}
+}
+
+// TestReconcile_ConflictResolutionChildWithNoLiveParentTab_RevertsToOpen is
+// the regression guard on the fallback path: without a live parent-keyed
+// tab, a claimed conflict-resolution child must still revert to open exactly
+// like any other orphaned claim.
+func TestReconcile_ConflictResolutionChildWithNoLiveParentTab_RevertsToOpen(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md":                  "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01a-conflict-resolution.md": "---\nid: \"01a\"\nstatus: claimed\ntype: conflict-resolution\nparent: \"01\"\n---\n# Conflict resolution for 01\n",
+	})
+	epics, err := tickets.Load(scratchDir)
+	if err != nil {
+		t.Fatalf("tickets.Load: %v", err)
+	}
+
+	d, _, _ := fakeDeps()
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
+		return nil, nil // no live tabs at all
+	}
+	// A conflict-resolution child never has its own iteration branch (see
+	// conflictLabel's doc), so its orphaned-claim check must fall straight to
+	// the plain revert-to-open rather than the recover-unlanded-commits path.
+	d.RevParse = func(dir, ref string) (string, error) {
+		return "", fmt.Errorf("unknown revision")
+	}
+
+	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{}), epics[0])
+	if err != nil {
+		t.Fatalf("reconcile() error = %v", err)
+	}
+	if len(reattached) != 0 {
+		t.Fatalf("reattached = %v, want none", reattached)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01a-conflict-resolution.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: open") {
+		t.Errorf("conflict-resolution child not reverted to open without a live parent-keyed tab:\n%s", raw)
+	}
+}
+
 func TestReconcile_OpenAndDoneTicketsIgnored(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
