@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -297,10 +298,12 @@ func TestRun_StaysParked_NeverReportsEpicComplete(t *testing.T) {
 		return never
 	}
 	sink := &recordingSink{}
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
 
 	done := make(chan error, 1)
 	go func() {
-		done <- Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
+		done <- Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo", Ctx: ctx}, d, sink)
 	}()
 
 	select {
@@ -320,6 +323,13 @@ func TestRun_StaysParked_NeverReportsEpicComplete(t *testing.T) {
 		if call == "EpicComplete" {
 			t.Fatalf("sink calls = %v, want no EpicComplete for a still-parked epic", sink.snapshot())
 		}
+	}
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Run() did not stop after cancellation")
 	}
 }
 

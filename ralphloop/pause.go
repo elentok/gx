@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"context"
 	"maps"
 	"sync"
 	"time"
@@ -90,8 +91,9 @@ func (g *Gate) snapshot() map[string]string {
 
 // waitForResume blocks the calling iteration until ForceResume clears the
 // last paused label, releasing every iteration paused at that moment
-// together on the shared wake channel.
-func (g *Gate) waitForResume() {
+// together on the shared wake channel — or until ctx is done, letting Run's
+// own shutdown path unblock a run parked here without waiting on an operator.
+func (g *Gate) waitForResume(ctx context.Context) {
 	g.mu.Lock()
 	if len(g.reasons) == 0 {
 		// Nothing is paused: a ForceResume already landed between the
@@ -103,7 +105,10 @@ func (g *Gate) waitForResume() {
 	myWake := g.wake
 	g.mu.Unlock()
 
-	<-myWake
+	select {
+	case <-myWake:
+	case <-ctx.Done():
+	}
 }
 
 // ForceResume clears label's own pause without disturbing any other

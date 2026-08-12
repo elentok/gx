@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -132,6 +133,15 @@ type RunOptions struct {
 	// Permit, if set, gates how many epics may hold an active concurrency
 	// slot at once — nil means no cap, today's unrestricted behavior.
 	Permit Permit
+	// Ctx, if set, lets a caller request Run stop early: once canceled, Run
+	// stops claiming new tickets and returns as soon as every
+	// already-launched iteration and the land-queue worker have actually
+	// finished — so no goroutine survives the call, without the caller
+	// having to know Run's internals to wait on. Unset means
+	// context.Background(), i.e. Run only stops when the epic is done or
+	// deadlocked, unchanged from before this field existed. A canceled Ctx
+	// makes Run return ctx.Err() rather than nil.
+	Ctx context.Context
 }
 
 // Permit gates how many epics may hold an active concurrency slot at once —
@@ -175,6 +185,10 @@ type outcome struct {
 // the epic reaches a done-family status, or immediately if the epic has none
 // to run.
 func Run(opts RunOptions, d Deps, sink EventSink) error {
+	ctx := opts.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	agent := opts.Agent
 	if agent == "" {
 		agent = AgentClaude
@@ -558,20 +572,33 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			}
 			break
 		}
+		// A canceled ctx with nothing left in flight is the shutdown path's
+		// own exit: nothing more to drain, so stop here rather than fall
+		// through to claiming (guarded below) or parking (which would just
+		// block again on the very thing being canceled).
+		if ctx.Err() != nil && active == 0 && landing == 0 {
+			break
+		}
 
 		if active == 0 {
 			acquirePermit()
 		}
-		for active < maxParallel {
-			ticket, reattach, ok, err := claimNext()
-			if err != nil {
-				return err
+		// Once canceled, stop recruiting new work — but every iteration and
+		// land already in flight keeps running to completion below, so their
+		// goroutines are drained rather than orphaned on a channel nobody
+		// reads anymore.
+		if ctx.Err() == nil {
+			for active < maxParallel {
+				ticket, reattach, ok, err := claimNext()
+				if err != nil {
+					return err
+				}
+				if !ok {
+					break
+				}
+				launch(ticket, reattach)
+				active++
 			}
-			if !ok {
-				break
-			}
-			launch(ticket, reattach)
-			active++
 		}
 
 		if active == 0 && landing == 0 {
@@ -579,9 +606,10 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			if gate.isPaused() {
 				// Nothing is left running to lift the pause from the inside,
 				// so block until an in-process ForceResume (e.g. the TUI)
-				// clears it rather than returning: an exiting run takes its
-				// panes' recoverability with it.
-				gate.waitForResume()
+				// clears it, or ctx is canceled — an exiting run takes its
+				// panes' recoverability with it, but a canceled ctx is the
+				// caller explicitly asking to stop anyway.
+				gate.waitForResume(ctx)
 				continue
 			}
 			stalled := stalledTickets(*epic, scope)
@@ -602,10 +630,12 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			// No timeout: the notification has already fired, and the park
 			// ends when a human clears one of the stalled tickets, which the
 			// next pass picks up off disk. gate.WakeParked() lets an operator
-			// cut the wait short cosmetically.
+			// cut the wait short cosmetically; ctx.Done() lets a caller stop
+			// the run outright.
 			select {
 			case <-d.ParkTimer(parkPollInterval):
 			case <-gate.ParkWake():
+			case <-ctx.Done():
 			}
 			continue
 		}
@@ -730,6 +760,13 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			Completed:         liveDone,
 			Total:             liveTotal,
 		})
+	}
+
+	// A canceled ctx broke the loop above before the epic was actually
+	// done — report the caller's own cancellation rather than a misleading
+	// EpicComplete.
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	sink.EpicComplete(opts.EpicName, completed, int(d.Now().Sub(runStart).Seconds()))

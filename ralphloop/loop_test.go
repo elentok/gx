@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -43,14 +44,20 @@ func testDeps() Deps {
 	return d
 }
 
-// runUntilParked runs Run in the background and returns once it has parked —
+// runUntilParked runs Run in the background, returns once it has parked —
 // the honest end of a test whose epic finishes on a human-clearable ticket
-// nobody clears. The run stays blocked in its park select (the timer it is
-// handed never fires), so it neither spins nor reports a terminal event, and
-// the close of the park signal orders everything Run wrote before parking
-// ahead of the caller's assertions.
+// nobody clears — then cancels it and waits for Run to actually return
+// before handing control back to the caller, so no goroutine of Run's
+// (including the land-queue worker) survives the test. The run stays
+// blocked in its park select (the timer it is handed never fires) until
+// that cancellation, so it neither spins nor reports a terminal event
+// while parked, and the close of the park signal orders everything Run
+// wrote before parking ahead of the caller's assertions.
 func runUntilParked(t *testing.T, opts RunOptions, d Deps, sink EventSink) {
 	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	opts.Ctx = ctx
 	parked := make(chan struct{})
 	never := make(chan time.Time)
 	var once sync.Once
@@ -68,6 +75,16 @@ func runUntilParked(t *testing.T, opts RunOptions, d Deps, sink EventSink) {
 		t.Fatalf("Run() returned %v, want it to park on a ticket only a human can clear", err)
 	case <-time.After(30 * time.Second):
 		t.Fatal("Run() never parked")
+	}
+
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil && !errors.Is(err, context.Canceled) {
+			t.Fatalf("Run() returned %v after cancel, want nil or context.Canceled", err)
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("Run() never returned after cancel")
 	}
 }
 

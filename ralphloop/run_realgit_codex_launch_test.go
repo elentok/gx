@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -453,25 +454,33 @@ func TestRun_ProductionRealGit_CodexRestartReattachesAndLandsOnce(t *testing.T) 
 	realWait1 := d1.AgentWait
 	waitCalls1 := 0
 	freeze := make(chan struct{})
-	block := make(chan struct{})
+	ctx1, cancel1 := context.WithCancel(context.Background())
+	t.Cleanup(cancel1)
 	d1.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
 		waitCalls1++
 		if waitCalls1 == 1 {
 			return realWait1(opts)
 		}
 		close(freeze)
-		<-block
-		return herdr.Agent{}, nil
+		<-ctx1.Done()
+		return herdr.Agent{}, ctx1.Err()
 	}
 
-	// Launched fire-and-forget: it leaks harmlessly once frozen, holds no
-	// locks, and never touches *testing.T again after the freeze point.
+	done1 := make(chan error, 1)
 	go func() {
-		_ = Run(RunOptions{
+		done1 <- Run(RunOptions{
 			EpicName: epicName, Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir,
-			RepoDir: repoDir, SmartZone: smartZone,
+			RepoDir: repoDir, SmartZone: smartZone, Ctx: ctx1,
 		}, d1, noopEventSink{})
 	}()
+	t.Cleanup(func() {
+		cancel1()
+		select {
+		case <-done1:
+		case <-time.After(30 * time.Second):
+			t.Error("Run() invocation 1 did not stop after cancellation")
+		}
+	})
 
 	<-freeze
 

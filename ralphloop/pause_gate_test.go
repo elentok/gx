@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -37,7 +38,7 @@ func TestPauseGate_MultiplePausedIterations_AllStayPausedUntilForceResumeClearsL
 	var wg sync.WaitGroup
 	for range 2 {
 		wg.Go(func() {
-			g.waitForResume()
+			g.waitForResume(context.Background())
 		})
 	}
 
@@ -78,7 +79,7 @@ func TestPauseGate_ForceResume_WakesWaiterImmediately(t *testing.T) {
 
 	returned := make(chan struct{})
 	go func() {
-		g.waitForResume()
+		g.waitForResume(context.Background())
 		close(returned)
 	}()
 
@@ -132,7 +133,7 @@ func TestPauseGate_ForceResumeBeforePause_WaitForResumeReturnsImmediately(t *tes
 
 	returned := make(chan struct{})
 	go func() {
-		g.waitForResume()
+		g.waitForResume(context.Background())
 		close(returned)
 	}()
 
