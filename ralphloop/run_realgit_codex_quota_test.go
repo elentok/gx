@@ -29,6 +29,7 @@ import (
 // tickets driven by the Codex agent so quota detection is exercised for
 // real via Deps.ReadCodexRateLimit.
 func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
+	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const epicName = "epic"
 	repoDir := testutil.TempRepo(t)
 	wtDir := testWorktreeDir(t, repoDir)
@@ -334,6 +335,7 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 // goes through the actual codexsession reader; 02 and 03 reuse the quota
 // test's generic pane bookkeeping.
 func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testing.T) {
+	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const (
 		epicName  = "epic"
 		smartZone = 150000

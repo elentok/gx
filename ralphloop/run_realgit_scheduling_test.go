@@ -32,6 +32,7 @@ import (
 // the scenario's fake-agent evidence that B's iteration commit is created
 // before C's, even though B and C are scheduled and run concurrently.
 func TestRun_ProductionRealGit_AThenBAndCConcurrently(t *testing.T) {
+	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const epicName = "epic"
 	repoDir := testutil.TempRepo(t)
 	wtDir := testWorktreeDir(t, repoDir)
@@ -223,6 +224,7 @@ func TestRun_ProductionRealGit_AThenBAndCConcurrently(t *testing.T) {
 // left to the scheduler alone: it only becomes frontier once both D and E are
 // done, so no extra fake-agent blocking is needed to prove F starts last.
 func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
+	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const epicName = "epic"
 	repoDir := testutil.TempRepo(t)
 	wtDir := testWorktreeDir(t, repoDir)
@@ -730,6 +732,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 // silently dropping the pre-park commit by basing off the feature branch's
 // (by-then-advanced) tip instead of the merge base.
 func TestRun_ProductionRealGit_ParkThenResumeReusesBranch(t *testing.T) {
+	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const epicName = "epic"
 	repoDir := testutil.TempRepo(t)
 	wtDir := testWorktreeDir(t, repoDir)
@@ -868,6 +871,7 @@ func TestRun_ProductionRealGit_ParkThenResumeReusesBranch(t *testing.T) {
 }
 
 func TestRun_ProductionRealGit_CodexCompactsThenCompletes(t *testing.T) {
+	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const (
 		epicName  = "epic"
 		smartZone = 150000

@@ -72,6 +72,7 @@ exit 1
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			realGitTimeoutWatchdog(t, realGitTestTimeout)
 			const epicName = "epic"
 			repoDir := testutil.TempRepo(t)
 			scratchDir := writeEpic(t, epicName, map[string]string{
@@ -126,6 +127,7 @@ exit 1
 // function, asserting the same shared launch-failure outcomes plus the
 // skill's own specific, actionable reason.
 func TestRun_ProductionRealGit_MissingSkillFailsBeforeClaim(t *testing.T) {
+	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const epicName = "epic"
 	repoDir := testutil.TempRepo(t)
 	scratchDir := writeEpic(t, epicName, map[string]string{
@@ -166,6 +168,7 @@ func TestRun_ProductionRealGit_MissingSkillFailsBeforeClaim(t *testing.T) {
 // TestRun_CodexLaunchFailureAfterClaimNeedsRepair but through real git +
 // herdrfake.State instead of stubbed Deps functions.
 func TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsRepair(t *testing.T) {
+	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const epicName = "epic"
 	repoDir := testutil.TempRepo(t)
 	wtDir := testWorktreeDir(t, repoDir)
@@ -277,6 +280,7 @@ func TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsRepair(t *testin
 // polling the same session rather than launching or prompting a fresh one,
 // and lands it to completion exactly once.
 func TestRun_ProductionRealGit_CodexRestartReattachesAndLandsOnce(t *testing.T) {
+	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const (
 		epicName  = "epic"
 		smartZone = 150000

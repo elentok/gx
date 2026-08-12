@@ -32,6 +32,7 @@ import (
 // AddWorktree, so the commit is guaranteed to exist before any wait/finish
 // polling begins.
 func TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp(t *testing.T) {
+	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const (
 		epicName  = "epic"
 		smartZone = 150000
@@ -297,6 +298,7 @@ func codexNativeContextFixture(t *testing.T) (repoDir, scratchDir, ticketPath, c
 // /compact, finish-up) fires off the native-exhaustion banner, the agent
 // finishes and commits, and the ticket lands normally.
 func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T) {
+	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const (
 		epicName  = "epic"
 		smartZone = 150000
@@ -472,6 +474,7 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T
 // exhaustion reason — and it must leave the iteration's worktree/branch/tab
 // in place for a human to inspect.
 func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *testing.T) {
+	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const (
 		epicName  = "epic"
 		smartZone = 150000
