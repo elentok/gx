@@ -294,25 +294,28 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 		return nil
 	}
 
-	landedSHA, err := landCherryPick(d, p, base, branch, sessionID, pane, tab)
-	if err != nil {
-		if errors.Is(err, errConflictResolutionUnresolved) {
-			// Already parked needs-repair on the conflict-resolution child
-			// ticket (see errConflictResolutionUnresolved's doc comment); the
-			// parent iteration ticket stays claimed, and its worktree/tab/
-			// branch survive for a later orphaned-claim reconcile to retry,
-			// same as any other unresolved landCherryPick failure.
-			return nil
-		}
-		return err
+	// Landing itself (cherry-pick, conflict resolution, mark-done, cleanup) is
+	// deferred to the land-queue worker rather than run inline here: that's
+	// what lets this build's active slot free up immediately instead of
+	// holding it through up to 30 minutes of conflict resolution (see
+	// landqueue.go). iteration_status: finished is gx's own signal that this
+	// build has commits ready to land (see MarkBuiltAwaitingLand's doc for how
+	// this stays discriminable from an agent's own commitless self-report);
+	// Status stays claimed. builtAwaitingLandError carries everything the
+	// worker needs that only exists as live-process state — pane/tab/
+	// sessionID/path aren't available once this build goroutine returns.
+	if err := MarkBuiltAwaitingLand(p.Ticket.Path); err != nil {
+		return fmt.Errorf("marking ticket %s built awaiting land: %w", p.Ticket.Identifier, err)
 	}
-	p.logTicketEventSHA(eventCherryPicked, pane, tab, sessionID, path, "", landedSHA)
-
-	if err := markDoneStampingCloseMetadata(d, p, path, sessionID); err != nil {
-		return fmt.Errorf("marking ticket done: %w", err)
-	}
-
-	return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, tab, true)
+	return &builtAwaitingLandError{job: landJob{
+		ticket:    p.Ticket,
+		base:      base,
+		branch:    branch,
+		sessionID: sessionID,
+		pane:      pane,
+		tab:       tab,
+		path:      path,
+	}}
 }
 
 // adoptNeedsAnswerReport honours an agent's `iteration_status: needs-answer`
@@ -413,21 +416,17 @@ func stampCommitlessMetrics(p iterationParams, cwd, sessionID string) {
 // landCherryPick cherry-picks base..branch onto the feature branch (resolving
 // conflicts via cherryPickWithConflictResolution if any arise), then resolves
 // the SHA it landed at — the shared core of both a normal iteration's
-// completion (finishIteration) and a startup repair's re-cherry-pick
-// (repairRecoverableTicket). p.FeatureLock is held for the duration since
-// this mutates the shared feature worktree's working directory; the landed
-// SHA is resolved before releasing it, before another iteration's cherry-pick
-// can advance the tip past this one's — otherwise the recorded SHA could
-// belong to a different ticket entirely. Before resolving the SHA, it writes
-// the landing iteration's session metrics (actual_context_window,
-// elapsed_time) into the ticket's frontmatter via writeLandedMetrics, then
-// stamps ticketTrailerKey and — when those metrics were available — the same
-// values onto tokensTrailerKey/elapsedTrailerKey, all in a single amend
+// completion (the land-queue worker) and a startup repair's re-cherry-pick
+// (repairRecoverableTicket). Callers serialize landings themselves (the
+// land-queue worker is a single goroutine; reconcile runs single-threaded at
+// startup before it starts), so this function needs no lock of its own.
+// Before resolving the SHA, it writes the landing iteration's session
+// metrics (actual_context_window, elapsed_time) into the ticket's
+// frontmatter via writeLandedMetrics, then stamps ticketTrailerKey and —
+// when those metrics were available — the same values onto
+// tokensTrailerKey/elapsedTrailerKey, all in a single amend
 // (Deps.AppendTrailers) rather than one amend per trailer.
 func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane, tab string) (string, error) {
-	p.FeatureLock.Lock()
-	defer p.FeatureLock.Unlock()
-
 	picked, resolutionSessionID, err := cherryPickWithConflictResolution(d, p, base, branch, sessionID, pane, tab)
 	if err != nil {
 		return "", err
@@ -583,9 +582,9 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 	if !inProgress {
 		return false, "", fmt.Errorf("cherry-picking onto %s: %w", p.FeatureBranch, pickErr)
 	}
-	// This call now owns the active sequencer state. Always clean it before
-	// FeatureLock is released on failure, otherwise later tickets can mistake
-	// this ticket's CHERRY_PICK_HEAD for their own conflict.
+	// This call now owns the active sequencer state. Always clean it up on
+	// failure, otherwise the next landing serialized behind this one could
+	// mistake this ticket's CHERRY_PICK_HEAD for its own conflict.
 	defer func() {
 		if resultErr == nil {
 			return

@@ -30,11 +30,6 @@ type iterationParams struct {
 	// FeatureBranch, not a separate field — Run names the feature branch
 	// after the epic, so the two are always the same value.
 	ScratchDir string
-	// FeatureLock serializes the only step that mutates the shared feature
-	// worktree's working directory (cherry-picking a finished iteration's
-	// commits onto it), so concurrently-running iterations never do so at
-	// the same time.
-	FeatureLock *sync.Mutex
 	// WorktreeLock serializes every `git worktree add`/`git worktree remove`
 	// against RepoDir: git's own worktree administrative files (.git/
 	// worktrees/<name>/) aren't safe under concurrent add/remove calls on the

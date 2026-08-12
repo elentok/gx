@@ -126,6 +126,19 @@ func MarkDone(path string) error {
 	return SetStatus(path, "done")
 }
 
+// MarkBuiltAwaitingLand writes iteration_status: finished into the ticket
+// file at path, leaving Status: claimed untouched — gx's own signal that a
+// build finished with commits ready to land, queued behind the land-queue
+// worker rather than landed inline. This widens IterationStatusFinished's
+// meaning beyond an agent's own commitless self-report (see
+// schema.IterationStatus's doc); RenderedStatus keys only off Status, so a
+// claimed ticket bearing this never leaks into the frontier while it waits.
+func MarkBuiltAwaitingLand(path string) error {
+	return updateTicket(path, func(t *schema.Ticket) {
+		t.IterationStatus = schema.IterationStatusFinished
+	})
+}
+
 // MarkNeedsAnswer writes status: needs-answer into the ticket file at path.
 func MarkNeedsAnswer(path string) error {
 	return SetStatus(path, "needs-answer")

@@ -49,6 +49,18 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 	waitCounts := map[string]int{} // pane -> number of "agent wait" calls seen so far
 	tab02Closed := make(chan struct{})
 	var tab02ClosedOnce sync.Once
+	// pane01QuotaDetected closes the instant ticket 01's first
+	// ReadCodexRateLimit call fires (below), i.e. right before
+	// recoverCodexRateLimit calls Gate.pause for label 01. Ticket 02's own
+	// commit (below) waits on it: without this, 02 (a same-wave, no-op
+	// build) can finish and free its active slot before 01 ever registers
+	// its pause — both are otherwise near-instant under the fake herdr and
+	// deps.Sleep no-op below — letting ticket 03 slip past
+	// Gate.claimIfRunning's "any label paused blocks every new claim"
+	// contract this test exists to check, purely on goroutine-scheduling
+	// luck rather than on an actual gate violation.
+	pane01QuotaDetected := make(chan struct{})
+	var pane01QuotaDetectedOnce sync.Once
 
 	pane01 := "pane-" + iterLabel(epicName, "01")
 	dir01 := iterationWorktreePath(wtDir, epicName, "01")
@@ -113,6 +125,11 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 					status[pane] = "working"
 					mu.Unlock()
 					return agentJSON(pane, "working", sess)
+				}
+				if id == "02" {
+					// See pane01QuotaDetected's doc: 02 must not free its
+					// slot until 01 has already registered its quota pause.
+					<-pane01QuotaDetected
 				}
 				dir := iterationWorktreePath(wtDir, epicName, id)
 				if err := commitIterationWork(dir, id); err != nil {
@@ -187,7 +204,11 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 
 		switch call {
 		case 1:
-			// Initial detection, triggers recoverCodexRateLimit.
+			// Initial detection, triggers recoverCodexRateLimit. See
+			// pane01QuotaDetected's doc: closing it here, before returning
+			// (recoverCodexRateLimit's very next line pauses the gate),
+			// gives 01's pause a deterministic head start over 02's commit.
+			pane01QuotaDetectedOnce.Do(func() { close(pane01QuotaDetected) })
 			return codexsession.RateLimit{Quota: "usage"}, true, nil
 		case 2:
 			// The core "slot free while paused" assertion: wait until 02's

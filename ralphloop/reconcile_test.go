@@ -13,9 +13,8 @@ import (
 )
 
 // testReconcileParams builds a reconcileParams for tests that don't exercise
-// the doneRecoverable repair path, wiring just enough (a fresh FeatureLock,
-// no gate needed since repair never pauses in these fixtures) for reconcile
-// to run.
+// the doneRecoverable repair path, wiring just enough (no gate needed since
+// repair never pauses in these fixtures) for reconcile to run.
 func testReconcileParams(workspaceID string, paths reconcilePaths, sink EventSink) reconcileParams {
 	return reconcileParams{
 		WorkspaceID:  workspaceID,
@@ -23,7 +22,6 @@ func testReconcileParams(workspaceID string, paths reconcilePaths, sink EventSin
 		Agent:        AgentClaude,
 		SmartZone:    defaultSmartZone,
 		Gate:         NewGate(),
-		FeatureLock:  &sync.Mutex{},
 		WorktreeLock: &sync.Mutex{},
 		Sink:         sink,
 		Scope:        RunScope{wholeEpic: true},
@@ -423,7 +421,7 @@ func TestRun_RestartedNeedsRepairRecoversThenResumesScheduling(t *testing.T) {
 // resolver's child record to open out from under it.
 func TestReconcile_ConflictResolutionChildWithLiveParentTab_StaysClaimed(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md":                  "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md":                    "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 		"01a-conflict-resolution.md": "---\nid: \"01a\"\nstatus: claimed\ntype: conflict-resolution\nparent: \"01\"\n---\n# Conflict resolution for 01\n",
 	})
 	epics, err := tickets.Load(scratchDir)
@@ -466,7 +464,7 @@ func TestReconcile_ConflictResolutionChildWithLiveParentTab_StaysClaimed(t *test
 // like any other orphaned claim.
 func TestReconcile_ConflictResolutionChildWithNoLiveParentTab_RevertsToOpen(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md":                  "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md":                    "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 		"01a-conflict-resolution.md": "---\nid: \"01a\"\nstatus: claimed\ntype: conflict-resolution\nparent: \"01\"\n---\n# Conflict resolution for 01\n",
 	})
 	epics, err := tickets.Load(scratchDir)

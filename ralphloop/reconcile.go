@@ -38,7 +38,6 @@ type reconcileParams struct {
 	Skill       string
 	SmartZone   int
 	Gate        *Gate
-	FeatureLock *sync.Mutex
 	// WorktreeLock is the same Run-scoped lock as iterationParams.WorktreeLock
 	// (see its doc), threaded through so startup repairs that add/remove a
 	// worktree serialize against any concurrently-launched iteration's own

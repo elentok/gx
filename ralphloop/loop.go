@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -142,6 +143,21 @@ type Permit interface {
 	Release()
 }
 
+// outcome is one iteration's or one land's result, sent on results (a build
+// goroutine) or landResults (the land-queue worker) respectively.
+type outcome struct {
+	ticket tickets.Ticket
+	err    error
+	// built is true when this outcome is a build that finished with commits
+	// ready to land (ahead > 0): iteration_status: finished is already
+	// written and the job is already queued in landJobs (see launch), so the
+	// results-handling loop only needs to release this build's active slot
+	// and hand the ticket to the land queue — completed++/
+	// sink.IterationFinished wait for the worker's own landResults outcome
+	// once the land actually finishes. Never set on a landResults outcome.
+	built bool
+}
+
 // Run drives every unblocked ticket in the named epic to completion, up to
 // MaxParallel running concurrently, each in its own iteration worktree:
 // create the iteration worktree, launch the selected agent, send its initial
@@ -261,17 +277,16 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 
 	// scheduleMu guards reading the frontier and claiming a ticket, so two
 	// concurrently-running iterations never race each other onto the same
-	// ticket. featureMu guards the one operation that mutates the shared
-	// feature worktree's working directory (the cherry-pick landing a
-	// finished iteration's commits), so concurrent iterations never cherry-
-	// pick into it at the same time. worktreeMu guards every `git worktree
-	// add`/`git worktree remove` against RepoDir, since git's own worktree
-	// administrative files aren't safe under concurrent add/remove on the
-	// same repo. sink is safe for concurrent use on its own (see EventSink),
-	// since a paused iteration reports its pause/resume from its own
-	// goroutine.
+	// ticket, and also guards the land-queue worker's own eligibility scan
+	// and landJobs map (see landQueue.go) — the same shape of operation.
+	// worktreeMu guards every `git worktree add`/`git worktree remove`
+	// against RepoDir, since git's own worktree administrative files aren't
+	// safe under concurrent add/remove on the same repo. sink is safe for
+	// concurrent use on its own (see EventSink), since a paused iteration
+	// reports its pause/resume from its own goroutine. The land-queue
+	// worker's single-goroutine-ness is what now serializes cherry-pick
+	// landings onto the feature worktree — no lock needed for that anymore.
 	var scheduleMu sync.Mutex
-	var featureMu sync.Mutex
 	var worktreeMu sync.Mutex
 
 	// launched tracks every ticket identifier this Run call currently has
@@ -304,11 +319,31 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		gate = NewGate()
 	}
 
-	type outcome struct {
-		ticket tickets.Ticket
-		err    error
-	}
 	results := make(chan outcome)
+	landResults := make(chan outcome)
+
+	// landJobs holds the live-process handoff data (see landJob's doc) for
+	// every ticket a build goroutine has finished but the land-queue worker
+	// hasn't yet landed, keyed by ticket identifier. Written by launch's
+	// goroutine before it sends a built:true outcome, read and deleted by the
+	// land-queue worker once it starts landing that ticket. landJobsMu guards
+	// it since the two run concurrently.
+	landJobs := make(map[string]landJob)
+	var landJobsMu sync.Mutex
+
+	// landWake nudges the land-queue worker to rescan immediately after a
+	// fresh job is queued, rather than only on its own idle poll — a buffered
+	// size-1 channel so a wake that arrives while the worker is already
+	// mid-pass isn't lost, just coalesced into the next one.
+	landWake := make(chan struct{}, 1)
+	wakeLandQueue := func() {
+		select {
+		case landWake <- struct{}{}:
+		default:
+		}
+	}
+	landQueueDone := make(chan struct{})
+	defer close(landQueueDone)
 
 	// claimNext claims and returns the next frontier ticket, or ok=false if
 	// none is available right now (every remaining ticket is blocked,
@@ -392,7 +427,6 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 				Skill:           skill,
 				Ticket:          ticket,
 				ScratchDir:      scratchDir,
-				FeatureLock:     &featureMu,
 				WorktreeLock:    &worktreeMu,
 				SmartZone:       smartZone,
 				Gate:            gate,
@@ -404,12 +438,30 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			} else {
 				err = runIteration(d, params)
 			}
+			var built *builtAwaitingLandError
+			if errors.As(err, &built) {
+				landJobsMu.Lock()
+				landJobs[ticket.Identifier] = built.job
+				landJobsMu.Unlock()
+				wakeLandQueue()
+				results <- outcome{ticket: ticket, built: true}
+				return
+			}
 			results <- outcome{ticket: ticket, err: err}
 		}()
 	}
 
 	completed := 0
 	active := 0
+	// landing tracks builds that finished (ahead > 0, iteration_status:
+	// finished written) but haven't yet landed — queued in landJobs, waiting
+	// on the land-queue worker. Incremented when a results outcome arrives
+	// with built == true, decremented when the worker reports that ticket's
+	// landing over landResults. Both the exit condition and the idle/
+	// deadlock branch below gate on active == 0 && landing == 0: a ticket
+	// queued behind an unlanded land is neither done nor a stall a human
+	// needs to clear.
+	landing := 0
 	// liveDone tracks the epic-wide done count, recomputed from disk on every
 	// landed iteration (see the results loop below) rather than counted up
 	// per-run, so a resumed run reports what's true of the epic even though
@@ -431,7 +483,6 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		Skill:        skill,
 		SmartZone:    smartZone,
 		Gate:         gate,
-		FeatureLock:  &featureMu,
 		WorktreeLock: &worktreeMu,
 		Sink:         sink,
 		Scope:        scope,
@@ -448,6 +499,29 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		launched[ticket.Identifier] = true
 		everLaunched[ticket.Identifier] = true
 	}
+
+	// The land-queue worker is the sole serializer of cherry-pick landings
+	// for this Run call — replacing featureMu — and runs as a single
+	// goroutine decoupled from the build goroutines above, so a build's
+	// active slot never waits on a land (including up to 30 minutes of
+	// conflict resolution). It requires no persisted state of its own: the
+	// in-memory landJobs map (pane/tab/sessionID/path) is what survives the
+	// build-goroutine-to-worker handoff, and is also the sole source of
+	// landing eligibility (see runLandQueue).
+	go runLandQueue(d, landQueueParams{
+		WorkspaceID:     workspaceID,
+		RepoDir:         opts.RepoDir,
+		WorktreeDir:     wtDir,
+		FeatureWorktree: featurePath,
+		FeatureBranch:   opts.EpicName,
+		Agent:           agent,
+		Skill:           skill,
+		ScratchDir:      scratchDir,
+		WorktreeLock:    &worktreeMu,
+		SmartZone:       smartZone,
+		Gate:            gate,
+		Sink:            sink,
+	}, landJobs, &landJobsMu, landWake, landQueueDone, landResults)
 
 	// parked records that the run has already announced this park, so the
 	// poll loop below notifies once per park rather than once per tick. It
@@ -469,7 +543,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		if err := unparkAnswered(d, workspaceID, opts.EpicName, wtDir, agent, scope, *epic, d.Now()); err != nil {
 			return err
 		}
-		if scope.AllDone(*epic) && active == 0 {
+		if scope.AllDone(*epic) && active == 0 && landing == 0 {
 			if allDone(*epic) {
 				if err := tickets.StampEpicCompleted(scratchDir, opts.EpicName, d.Now()); err != nil {
 					return fmt.Errorf("stamping epic %q completed_at: %w", opts.EpicName, err)
@@ -493,7 +567,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			active++
 		}
 
-		if active == 0 {
+		if active == 0 && landing == 0 {
 			releasePermit()
 			if gate.isPaused() {
 				// Nothing is left running to lift the pause from the inside,
@@ -542,21 +616,37 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		// ordinary reload), and polling for it here would race an
 		// always-ready park-timer fake against the sibling's results send,
 		// starving it out forever.
+		// The select below always includes landResults alongside results —
+		// harmless even when landing == 0, since nothing sends on it until
+		// the worker has a job — so a land finishing never has to wait for a
+		// sibling build's own results send.
 		var r outcome
-		if hasLiveParkedTicket(d, workspaceID, opts.EpicName, wtDir, agent, scope, *epic) {
+		var fromLand bool
+		if active > 0 && hasLiveParkedTicket(d, workspaceID, opts.EpicName, wtDir, agent, scope, *epic) {
 			select {
 			case r = <-results:
+			case r = <-landResults:
+				fromLand = true
 			case <-d.ParkTimer(parkPollInterval):
 				continue
 			}
 		} else {
-			r = <-results
+			select {
+			case r = <-results:
+			case r = <-landResults:
+				fromLand = true
+			}
 		}
-		active--
+		if fromLand {
+			landing--
+		} else {
+			active--
+		}
 		if r.err != nil {
-			// A single iteration erroring out (a herdr/git hiccup, an
-			// unexpected agent-wait failure, ...) shouldn't take down the
-			// whole epic's run — that leaves every other in-flight ticket's
+			// A single iteration (or land) erroring out (a herdr/git hiccup,
+			// an unexpected agent-wait failure, a cherry-pick conflict that
+			// couldn't be resolved, ...) shouldn't take down the whole
+			// epic's run — that leaves every other in-flight ticket's
 			// live-event stream dead too, with no way to recover short of
 			// restarting the loop. Flag just this ticket needs-repair
 			// (out of the frontier, so never reclaimed until a human clears
@@ -572,6 +662,18 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			}
 			delete(launched, r.ticket.Identifier)
 			sink.TicketNeedsHuman(r.ticket.Identifier, opts.EpicName, "needs-repair", reason)
+			continue
+		}
+
+		if r.built {
+			// This build finished with commits ready to land; its job is
+			// already queued in landJobs and the worker already woken (see
+			// launch). The ticket stays in launched/everLaunched — it's
+			// still this run's, just queued behind landing, not available
+			// for reclaim — and completed++/sink.IterationFinished wait for
+			// this same ticket's landResults outcome once the land actually
+			// finishes.
+			landing++
 			continue
 		}
 

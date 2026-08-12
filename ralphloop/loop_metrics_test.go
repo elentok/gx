@@ -146,7 +146,6 @@ func TestLandCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmatt
 		Agent:           AgentClaude,
 		Ticket:          tickets.Ticket{Identifier: "01", Path: ticketPath},
 		ScratchDir:      scratchDir,
-		FeatureLock:     &sync.Mutex{},
 		Sink:            noopEventSink{},
 	}
 
@@ -205,7 +204,6 @@ func TestLandCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 		Agent:           AgentClaude,
 		Ticket:          tickets.Ticket{Identifier: "01", Path: ticketPath},
 		ScratchDir:      scratchDir,
-		FeatureLock:     &sync.Mutex{},
 		Sink:            noopEventSink{},
 	}
 

@@ -46,12 +46,14 @@ sequenceDiagram
     participant Scheduler as claimNext
     participant Iter as Iteration (goroutine)
     participant Herdr as herdr tab/agent
+    participant LandQ as Land-queue worker
     participant Feature as feature worktree/branch
 
     User->>Queue: check tickets, add to queue, start
     Queue->>Run: tryStart -> ralphloop.Run(epic, scope)
     Run->>Reconcile: reconcile(scope) [once, before scheduling]
     Reconcile-->>Run: reattach list, repaired tickets
+    Run->>LandQ: start (single goroutine, one per Run call)
     loop until parked or done, & idle
         Run->>Scheduler: claimNext (frontier scan)
         Scheduler->>Scheduler: Claim() -> status: claimed
@@ -59,16 +61,20 @@ sequenceDiagram
         Iter->>Herdr: AddWorktree, TabCreate, AgentStart
         Herdr->>Herdr: run /gx-implement <ticket>
         Herdr-->>Iter: idle (commits ahead of base)
-        Iter->>Feature: landCherryPick (under FeatureLock)
-        Iter->>Iter: mark ticket done, stamp trailers
-        Iter->>Iter: finishCleanup (rm worktree/branch, close tab)
+        Iter->>Iter: MarkBuiltAwaitingLand (iteration_status: finished; status stays claimed)
+        Iter-->>Run: builtAwaitingLandError{job} -> active slot freed
+        Run->>LandQ: queue job (pane/tab/sessionID, in-memory only), wake
     end
+    LandQ->>LandQ: pick lowest-numbered claimed+finished ticket (rescanned from disk each pass)
+    LandQ->>Feature: landCherryPick (single-goroutine serialized, no lock)
+    LandQ->>LandQ: mark ticket done, stamp trailers, finishCleanup
+    LandQ-->>Run: landResults outcome -> completed++, IterationFinished
     Run-->>Queue: EpicComplete (every ticket done) or EpicParked (waiting on a person)
     Queue-->>User: Queue tab updates, notification fires
 ```
 
-**Claim → launch → land, per ticket** (`ralphloop/loop.go`, `claim.go`, `launch.go`,
-`iteration.go`):
+**Claim → build → hand off → land, per ticket** (`ralphloop/loop.go`, `claim.go`, `launch.go`,
+`iteration.go`, `landqueue.go`):
 
 1. `claimNext` reloads the epic from disk, computes `scope.Frontier(epic)` (open, unblocked,
    in-scope tickets sorted by number), and claims the first one not already tracked in-memory.
@@ -82,17 +88,29 @@ sequenceDiagram
    needs-repair pauses, and smart-zone breaches along the way (§6).
 3. `finishIteration`: zero commits + `Commitless: true` → treat as an intentional zero-diff
    finish (e.g. fork-and-close, or a code-review ticket); zero commits otherwise → mark
-   `needs-answer`, leave the worktree for a human. Commits present → cherry-pick onto the
-   feature branch (§4 for conflicts), stamp `Ralph-Loop-Ticket`/`-Tokens`/`-Elapsed` trailers,
-   mark `done`, clean up the iteration worktree/branch/tab.
-4. The epic run's own loop keeps re-scanning while there is runnable or parked work in scope. Once
-   nothing in scope is runnable, a parked ticket keeps the epic waiting on a person (`EpicParked`,
-   no timeout) instead of exiting; nothing runnable *and* nothing parked is a deadlock error. If the
-   *whole* epic (not just this run's scope) is done, `EpicComplete` fires and `epic.yaml` gets a
-   `completed_at` stamp.
+   `needs-answer`, leave the worktree for a human. Commits present → write `iteration_status:
+   finished` (`MarkBuiltAwaitingLand`; `status:` stays `claimed`) and return a
+   `builtAwaitingLandError` carrying the pane/tab/sessionID/worktree-path landing will need — the
+   build goroutine's active slot is released right there, before any cherry-pick or conflict
+   resolution runs.
+4. The land-queue worker (`landqueue.go`, one goroutine per `Run` call, replacing the old
+   `FeatureLock` mutex) recomputes eligibility from ticket files on disk every pass — no persisted
+   queue state — and lands the lowest-numbered eligible ticket using the in-memory job data a build
+   goroutine handed off. Landing itself (cherry-pick, conflict resolution if any, §4) can take up to
+   30 minutes without holding any other ticket's build slot, since it's decoupled from `active`
+   entirely; `Run` instead tracks it via a separate `landing` counter.
+5. The epic run's own loop keeps re-scanning while there is runnable or parked work in scope, or a
+   land still outstanding (`active == 0 && landing == 0` gates both the exit condition and the
+   idle/deadlock check — a ticket queued behind an unlanded build is neither done nor a stall a
+   human needs to clear). Once nothing in scope is runnable, a parked ticket keeps the epic waiting
+   on a person (`EpicParked`, no timeout) instead of exiting; nothing runnable *and* nothing parked
+   is a deadlock error. If the *whole* epic (not just this run's scope) is done, `EpicComplete`
+   fires and `epic.yaml` gets a `completed_at` stamp.
 
-One epic → one feature worktree/branch. One ticket-iteration → its own worktree, branch, herdr
-tab, and agent session. Up to `MaxParallel` iterations run concurrently under one epic run.
+One epic → one feature worktree/branch, and one land-queue worker serializing every landing onto
+it. One ticket-iteration → its own worktree, branch, herdr tab, and agent session. Up to
+`MaxParallel` iterations *build* concurrently under one epic run; landing itself is always
+one-at-a-time, but no longer ties up a build slot while it runs.
 
 ## 3. Reconciliation (crash recovery)
 
@@ -129,12 +147,17 @@ to `needs-repair` for a human instead, so a first attempt is never silently disc
 
 ## 4. Landing and conflict resolution
 
-Landing = cherry-picking `base..iteration-branch` onto the shared feature worktree, under a
-`FeatureLock` so only one ticket touches it at a time.
+Landing = cherry-picking `base..iteration-branch` onto the shared feature worktree. The land-queue
+worker (`landqueue.go`) is the sole serializer: one goroutine per `Run` call, so only one ticket
+ever touches the feature worktree at a time — no lock needed, since there's only ever one
+goroutine calling `landCherryPick`. This replaces the old `FeatureLock` mutex, which used to be
+held by the *build* goroutine for the whole landing duration; now a build hands its job off (see
+§2 step 3) and moves on the moment it's queued, so a slow land (including the up-to-30-minute
+conflict-resolution path below) never blocks another ticket's build slot.
 
 ```mermaid
 flowchart TD
-    A[FeatureLock acquired] --> B[clear stale cherry-pick state if any]
+    A[worker picks lowest-numbered\nclaimed + iteration_status:finished ticket] --> B[clear stale cherry-pick state if any]
     B --> C{patch already applied?}
     C -->|yes, no-op| G[picked = true]
     C -->|no| D[CherryPickRange]
@@ -142,13 +165,22 @@ flowchart TD
     E -->|yes| G
     E -->|no, conflict| F[open tab in FEATURE worktree,\nrun gx-resolving-merge-conflicts agent\n30 min timeout]
     F --> G
-    G --> H[stamp trailers, release lock]
+    G --> H[stamp trailers, mark done, finishCleanup]
+    H --> I[landResults outcome -> Run: completed++, IterationFinished]
 ```
 
 Conflict resolution runs a *separate* agent session in the feature worktree itself (where the
 conflict markers actually are, not the iteration worktree) — same launch/wait machinery as a
 normal iteration, but capped at 30 minutes so a hung resolution surfaces as an actionable error
-instead of stalling the whole epic.
+instead of stalling the whole epic. Since the worker is single-goroutine, this 30 minutes only
+delays *other queued lands* — every other ticket's build keeps running unaffected.
+
+Eligibility (which ticket the worker picks next) is recomputed from ticket files on disk every
+pass — `status: claimed` + `iteration_status: finished` + no unresolved `blocked_by`, tie-broken by
+lowest ticket number — with no separate queue state persisted anywhere. Only the pane/tab/
+sessionID/iteration-worktree-path a land actually needs (live-process state, not derivable from
+disk) survives in an in-memory `landJobs` map between a build handing a job off and the worker
+picking it up.
 
 ## 5. Ticket forking and code review
 
@@ -327,7 +359,7 @@ found, the same pattern used for live-session reattach.
 |---|---|
 | Core loop, claiming, launching | `ralphloop/loop.go`, `claim.go`, `launch.go`, `iteration.go`, `schedule.go`, `scope.go` |
 | Reconciliation | `ralphloop/reconcile.go`, `reconcile_claim.go`, `reconcile_classify.go`, `reconcile_repair.go` |
-| Landing / conflicts | `ralphloop/landed.go`, `iteration.go` (`cherryPickWithConflictResolution`) |
+| Landing / conflicts | `ralphloop/landqueue.go` (land-queue worker, `landJob`, `builtAwaitingLandError`), `landed.go`, `iteration.go` (`landCherryPick`, `cherryPickWithConflictResolution`) |
 | Pause / rate limit | `ralphloop/pause.go`, `ratelimit.go`, `waitforfinish.go` |
 | Notifications | `ralphloop/notify.go`, `notification_text.go`, `telegram_eventsink.go` |
 | Wave preview | `ralphloop/plan.go` |

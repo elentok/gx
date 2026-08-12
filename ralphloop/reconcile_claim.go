@@ -46,7 +46,6 @@ func reconcileOrphanedClaim(d Deps, rp reconcileParams, featureBranch string, t 
 				Skill:           rp.Skill,
 				Ticket:          t,
 				ScratchDir:      paths.ScratchDir,
-				FeatureLock:     rp.FeatureLock,
 				WorktreeLock:    rp.WorktreeLock,
 				SmartZone:       rp.SmartZone,
 				Gate:            rp.Gate,
