@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.28.1 - 2026-08-12
+
+- Fixed the smart-zone finish-up prompt naming the wrong skill (`` `implement` `` instead of `` `gx-implement` ``).
+- The `gx-code-review` skill was missing from `//go:embed` in `skills/bundle.go`, so it was never installed by `gx skills install` despite being present in the repo's `skills/` directory. Also fixed its `SKILL.md` frontmatter, whose `description` used an unquoted multi-line plain scalar containing a colon (`` `type: `` `), making the YAML invalid. Added a test that checks every directory under `skills/` is embedded, so a skill going un-embedded fails the build instead of shipping silently.
+
 ## v0.28.0 - 2026-08-12
 
 - **Breaking:** the `needs-info` and `needs-attention` statuses are gone, replaced by `needs-answer` (person must supply input) and `needs-repair` (gx hit a fault). Agents report `iteration_status: needs-answer` and exit instead of calling interactive prompts; `status: done` is written by gx only after work lands or is validated commitless by construction.

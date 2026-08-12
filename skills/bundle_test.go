@@ -33,6 +33,7 @@ var requiredFiles = []string{
 	"gx-investigate/gotchas.md",
 	"gx-cleanup/SKILL.md",
 	"gx-merge/SKILL.md",
+	"gx-code-review/SKILL.md",
 }
 
 func TestBundleRequiredFilesPresent(t *testing.T) {
@@ -62,6 +63,35 @@ func TestEmbeddedBundleContainsRequiredFiles(t *testing.T) {
 		if got[i] != want[i] {
 			t.Errorf("BundleFiles() = %v, want %v", got, want)
 			break
+		}
+	}
+}
+
+// TestEmbeddedBundleIncludesEverySkillDir guards bundle.go's //go:embed
+// directive directly against the skills/ directory on disk, rather than
+// against requiredFiles (a hand-maintained list that can itself go stale -
+// exactly what let gx-code-review ship installable on disk but absent from
+// Bundle, since //go:embed silently omits any path not named in the
+// directive).
+func TestEmbeddedBundleIncludesEverySkillDir(t *testing.T) {
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatalf("reading skills/: %v", err)
+	}
+	got, err := BundleFiles()
+	if err != nil {
+		t.Fatalf("BundleFiles: %v", err)
+	}
+	embedded := make(map[string]bool)
+	for _, f := range got {
+		embedded[strings.SplitN(f, "/", 2)[0]] = true
+	}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		if !embedded[e.Name()] {
+			t.Errorf("skill directory %q exists on disk but isn't embedded in Bundle; add it to bundle.go's //go:embed directive", e.Name())
 		}
 	}
 }
@@ -114,6 +144,7 @@ var wantInvocationPolicy = map[string]bool{
 	"gx-investigate":               false,
 	"gx-cleanup":                   true,
 	"gx-merge":                     true,
+	"gx-code-review":               true,
 }
 
 func TestSkillMetadataAndInvocationPolicy(t *testing.T) {

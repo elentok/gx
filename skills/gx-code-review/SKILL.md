@@ -1,6 +1,6 @@
 ---
 name: gx-code-review
-description:
+description: >-
   Run a configurable, unattended review pass over an epic once every other ticket in it is done —
   code quality plus spec conformance — triage the joined findings with a higher-tier consultant, and
   turn what survives into new tickets. Invoked by gx-implement when the claimed ticket has `type:

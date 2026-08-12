@@ -441,7 +441,7 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 	finishText := fmt.Sprintf(
 		"I stopped you because you exceeded %d tokens in the context window, I compacted the "+
 			"conversation, please finish up quickly, if needed follow the instructions in the "+
-			"`implement` skill and create follow up tickets",
+			"`gx-implement` skill and create follow up tickets",
 		smartZone,
 	)
 	if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
