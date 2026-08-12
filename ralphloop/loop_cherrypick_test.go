@@ -357,6 +357,142 @@ func TestRun_CherryPickConflict_ResolutionNeverFinishes_MarksNeedsRepairWithoutA
 	}
 }
 
+// findConflictResolutionChild scans scratchDir/epicName/issues for the one
+// forked "type: conflict-resolution" ticket, returning its raw file content.
+func findConflictResolutionChild(t *testing.T, scratchDir, epicName string) string {
+	t.Helper()
+	issuesDir := filepath.Join(scratchDir, epicName, "issues")
+	entries, err := os.ReadDir(issuesDir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	for _, e := range entries {
+		raw, err := os.ReadFile(filepath.Join(issuesDir, e.Name()))
+		if err != nil {
+			t.Fatalf("ReadFile: %v", err)
+		}
+		if strings.Contains(string(raw), "type: conflict-resolution") {
+			return string(raw)
+		}
+	}
+	t.Fatalf("issues dir = %v, want a forked type: conflict-resolution child ticket", entries)
+	return ""
+}
+
+// TestRun_ConflictResolution_PrematureTabClose_SequencerStillConflicted_ParksOnChildNotParent
+// reproduces the 2.1.228 incident's first sub-case: herdr reports the
+// conflict-resolution agent's pane idle (a premature "done" signal — the
+// agent hadn't actually finished), but the git sequencer is still genuinely
+// conflicted. resolveCherryPickConflict must catch this via its own
+// CherryPickInProgress corroboration rather than trusting herdr, and must
+// park needs-repair on the conflict-resolution child ticket it forked —
+// never on the parent iteration ticket, so a person sees exactly which
+// conflict resolution needs attention instead of a generic iteration fault.
+func TestRun_ConflictResolution_PrematureTabClose_SequencerStillConflicted_ParksOnChildNotParent(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+	})
+	d, _, _ := fakeDeps()
+
+	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
+		return &fakeConflictErr{}
+	}
+	// herdr's own AgentWait fake (from fakeDeps) reports the conflict-
+	// resolution pane idle immediately — the premature "done" signal — while
+	// this always reports the sequencer still conflicted, standing in for
+	// the git ground truth herdr's signal disagreed with.
+	d.CherryPickInProgress = func(dir string) (bool, error) {
+		return true, nil
+	}
+
+	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
+
+	childRaw := findConflictResolutionChild(t, scratchDir, "epic")
+	if !strings.Contains(childRaw, "status: needs-repair") {
+		t.Errorf("conflict-resolution child ticket = %q, want status: needs-repair after a premature done signal with the sequencer still conflicted", childRaw)
+	}
+
+	parentRaw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if strings.Contains(string(parentRaw), "status: needs-repair") {
+		t.Errorf("parent iteration ticket = %q, want it left alone (not needs-repair) — the failure belongs to the conflict-resolution child", parentRaw)
+	}
+}
+
+// TestRun_ConflictResolution_CorroboratesSequencerBeforeClosingTab covers the
+// ordering half of the 2.1.228 fix directly: resolveCherryPickConflict must
+// check the git sequencer before trusting herdr's tab-closed signal, not
+// after. It scripts TabClose to fail the test if it fires before
+// CherryPickInProgress has already been consulted for the conflict pane's
+// resolution — the reverse of today's bug, where the tab closed (and the
+// child ticket was marked done) before any sequencer check ran at all.
+func TestRun_ConflictResolution_CorroboratesSequencerBeforeClosingTab(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+	})
+	d, _, _ := fakeDeps()
+
+	inProgress := false
+	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
+		inProgress = true
+		return &fakeConflictErr{}
+	}
+
+	var mu sync.Mutex
+	var conflictPaneTab string
+	origTabCreate := d.TabCreate
+	d.TabCreate = func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error) {
+		created, err := origTabCreate(opts)
+		if strings.HasPrefix(opts.Label, "conflict-") {
+			mu.Lock()
+			conflictPaneTab = created.Tab.TabID
+			mu.Unlock()
+		}
+		return created, err
+	}
+
+	origAgentPrompt := d.AgentPrompt
+	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+		if opts.Text == "/gx-resolving-merge-conflicts" {
+			mu.Lock()
+			inProgress = false
+			mu.Unlock()
+		}
+		return origAgentPrompt(opts)
+	}
+
+	var sequencerCheckedBeforeClose bool
+	d.CherryPickInProgress = func(dir string) (bool, error) {
+		mu.Lock()
+		sequencerCheckedBeforeClose = true
+		cur := inProgress
+		mu.Unlock()
+		return cur, nil
+	}
+	origTabClose := d.TabClose
+	d.TabClose = func(tabID string) error {
+		mu.Lock()
+		isConflictTab := conflictPaneTab != "" && tabID == conflictPaneTab
+		checked := sequencerCheckedBeforeClose
+		mu.Unlock()
+		if isConflictTab && !checked {
+			t.Errorf("conflict-resolution tab %s closed before the sequencer was corroborated", tabID)
+		}
+		return origTabClose(tabID)
+	}
+
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	childRaw := findConflictResolutionChild(t, scratchDir, "epic")
+	if !strings.Contains(childRaw, "status: done") {
+		t.Errorf("conflict-resolution child ticket = %q, want status: done once the sequencer corroborated the resolution", childRaw)
+	}
+}
+
 // fakeConflictErr stands in for the *git.RunError CherryPickRange returns on
 // a real conflict; only its presence (not its type) matters to the loop,
 // which distinguishes conflicts from other errors via CherryPickInProgress.

@@ -295,6 +295,14 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 
 	landedSHA, err := landCherryPick(d, p, base, branch, sessionID, pane, tab)
 	if err != nil {
+		if errors.Is(err, errConflictResolutionUnresolved) {
+			// Already parked needs-repair on the conflict-resolution child
+			// ticket (see errConflictResolutionUnresolved's doc comment); the
+			// parent iteration ticket stays claimed, and its worktree/tab/
+			// branch survive for a later orphaned-claim reconcile to retry,
+			// same as any other unresolved landCherryPick failure.
+			return nil
+		}
 		return err
 	}
 	p.logTicketEventSHA(eventCherryPicked, pane, tab, sessionID, path, "", landedSHA)
@@ -577,31 +585,44 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 	p.logTicketEvent(eventConflictHit, pane, tab, sessionID, p.FeatureWorktree)
 	p.Sink.ConflictResolutionStarted(p.Ticket.Identifier)
 
+	// resolveCherryPickConflict itself corroborates against the sequencer
+	// before returning success (see its doc comment), so a nil error here
+	// already means the cherry-pick sequence is genuinely clear.
 	resolutionSessionID, err = resolveCherryPickConflict(d, p)
 	if err != nil {
 		return false, "", err
 	}
 
-	inProgress, err = d.CherryPickInProgress(p.FeatureWorktree)
-	if err != nil {
-		return false, "", fmt.Errorf("checking cherry-pick state onto %s after resolution: %w", p.FeatureBranch, err)
-	}
-	if inProgress {
-		return false, "", fmt.Errorf("cherry-pick onto %s still in progress after conflict-resolution agent finished", p.FeatureBranch)
-	}
 	return true, resolutionSessionID, nil
 }
+
+// errConflictResolutionUnresolved is resolveCherryPickConflict's sentinel for
+// a conflict-resolution failure caught by its own sequencer corroboration
+// (as opposed to a plain launch/wait error, e.g. a stuck agent, which is
+// reported the normal way). The failure is already recorded — needs-repair —
+// on the conflict-resolution child ticket by the time this is returned, so
+// finishIteration must swallow it rather than let it fall into the generic
+// per-iteration error path, which would wrongly also mark the parent
+// iteration ticket needs-repair (see ticket conflict-lifecycle/03: failures
+// here belong to the child, not the parent).
+var errConflictResolutionUnresolved = errors.New("conflict-resolution child ticket needs repair")
 
 // resolveCherryPickConflict forks p.Ticket into a claimed conflict-resolution
 // child ticket (see forkConflictResolutionTicket), then launches a fresh pane
 // in the feature worktree and drives a "/gx-resolving-merge-conflicts" agent
 // to completion in it, returning its agent session id. The iteration's own
-// worktree/tab are untouched while this runs. The child ticket is marked done
-// once the resolution agent finishes successfully; on failure it is left
-// claimed, which — per ADR 0016's parent/fork protocol — keeps the landing
-// ticket from ever rendering done while the resolution is unfinished.
+// worktree/tab are untouched while this runs. herdr's tab-closed/idle signal
+// is not trusted on its own — see the 2.1.228 incident, where herdr
+// misdetected the pane as idle while the agent was still working — so once
+// launchAndPrompt reports the agent done, the child is only marked done after
+// corroborating against the git sequencer itself (the ground truth for
+// whether the resolution actually finished). A sequencer that's still
+// conflicted at that point means the "done" signal was premature; the child
+// ticket is marked needs-repair instead of done, and this returns
+// errConflictResolutionUnresolved so the failure isn't also blamed on the
+// parent iteration ticket.
 func resolveCherryPickConflict(d Deps, p iterationParams) (sessionID string, resultErr error) {
-	childPath, err := forkConflictResolutionTicket(p)
+	childPath, childID, err := forkConflictResolutionTicket(p)
 	if err != nil {
 		return "", fmt.Errorf("forking conflict-resolution ticket: %w", err)
 	}
@@ -650,9 +671,40 @@ func resolveCherryPickConflict(d Deps, p iterationParams) (sessionID string, res
 		return "", fmt.Errorf("conflict-resolution agent %s did not finish (possibly stuck): %w", label, err)
 	}
 
+	// launchAndPrompt reports the agent done — corroborate against the git
+	// sequencer itself before trusting that as "the resolution actually
+	// finished" (see errConflictResolutionUnresolved's doc comment).
+	inProgress, cpErr := d.CherryPickInProgress(p.FeatureWorktree)
+	if cpErr != nil {
+		reason := fmt.Sprintf("checking cherry-pick state after conflict-resolution agent %s reported done: %v", label, cpErr)
+		return "", parkConflictResolutionChildNeedsRepair(p, childPath, childID, label, reason)
+	}
+	if inProgress {
+		reason := fmt.Sprintf("conflict-resolution agent %s reported done, but the cherry-pick sequencer is still conflicted onto %s", label, p.FeatureBranch)
+		return "", parkConflictResolutionChildNeedsRepair(p, childPath, childID, label, reason)
+	}
+
 	if err := MarkDone(childPath); err != nil {
 		return "", fmt.Errorf("marking conflict-resolution ticket %s done: %w", childPath, err)
 	}
 
 	return sessionID, nil
+}
+
+// parkConflictResolutionChildNeedsRepair marks the conflict-resolution child
+// ticket (not the parent iteration ticket — see errConflictResolutionUnresolved)
+// needs-repair with reason, reports it, and returns the sentinel error that
+// tells finishIteration to swallow this failure rather than also blaming the
+// parent.
+func parkConflictResolutionChildNeedsRepair(p iterationParams, childPath, childID, label, reason string) error {
+	state := schema.NeedsRepairState{
+		Label:    label,
+		Branch:   p.FeatureBranch,
+		Worktree: p.FeatureWorktree,
+	}
+	if markErr := MarkNeedsRepairWithReason(childPath, reason, state); markErr != nil {
+		return fmt.Errorf("%s (also failed marking conflict-resolution ticket %s needs-repair: %v)", reason, childPath, markErr)
+	}
+	p.Sink.TicketNeedsHuman(childID, p.FeatureBranch, "needs-repair", reason)
+	return errConflictResolutionUnresolved
 }

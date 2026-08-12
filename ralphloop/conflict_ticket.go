@@ -14,18 +14,18 @@ import (
 // conflict used to launch under. The parent ticket cannot reach done while this
 // child is unfinished — Epic.Blocking already walks parent edges generically,
 // so no new blocking mechanism is needed (see ADR 0016).
-func forkConflictResolutionTicket(p iterationParams) (childPath string, err error) {
+func forkConflictResolutionTicket(p iterationParams) (childPath, childID string, err error) {
 	epicPath := filepath.Join(p.ScratchDir, p.FeatureBranch)
 	epic, unlock, err := tickets.LoadLockedEpic(epicPath)
 	if err != nil {
-		return "", fmt.Errorf("loading epic %s to fork conflict-resolution ticket: %w", epicPath, err)
+		return "", "", fmt.Errorf("loading epic %s to fork conflict-resolution ticket: %w", epicPath, err)
 	}
 	defer unlock()
 
 	parentID := schema.TicketID(p.Ticket.Identifier)
 	id, err := tickets.NextTicketID(*epic, p.Ticket.Identifier)
 	if err != nil {
-		return "", fmt.Errorf("allocating conflict-resolution ticket id: %w", err)
+		return "", "", fmt.Errorf("allocating conflict-resolution ticket id: %w", err)
 	}
 
 	stubPath := filepath.Join(epicPath, "issues", fmt.Sprintf("%s-conflict-resolution.md", id))
@@ -42,21 +42,21 @@ func forkConflictResolutionTicket(p iterationParams) (childPath string, err erro
 
 	out, err := schema.MarshalTicket(stub, body)
 	if err != nil {
-		return "", fmt.Errorf("marshaling conflict-resolution ticket %s: %w", id, err)
+		return "", "", fmt.Errorf("marshaling conflict-resolution ticket %s: %w", id, err)
 	}
 	if err := os.MkdirAll(filepath.Dir(stubPath), 0755); err != nil {
-		return "", fmt.Errorf("creating issues dir for conflict-resolution ticket %s: %w", id, err)
+		return "", "", fmt.Errorf("creating issues dir for conflict-resolution ticket %s: %w", id, err)
 	}
 	if err := os.WriteFile(stubPath, out, 0644); err != nil {
-		return "", fmt.Errorf("writing conflict-resolution ticket %s: %w", stubPath, err)
+		return "", "", fmt.Errorf("writing conflict-resolution ticket %s: %w", stubPath, err)
 	}
 	if _, err := schema.ParseTicket(stubPath); err != nil {
-		return "", fmt.Errorf("conflict-resolution ticket %s failed validation: %w", stubPath, err)
+		return "", "", fmt.Errorf("conflict-resolution ticket %s failed validation: %w", stubPath, err)
 	}
 
 	if err := Claim(stubPath); err != nil {
-		return "", fmt.Errorf("claiming conflict-resolution ticket %s: %w", stubPath, err)
+		return "", "", fmt.Errorf("claiming conflict-resolution ticket %s: %w", stubPath, err)
 	}
 
-	return stubPath, nil
+	return stubPath, id, nil
 }
