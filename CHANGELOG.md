@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.28.0 - 2026-08-12
+
+- **Breaking:** the `needs-info` and `needs-attention` statuses are gone, replaced by `needs-answer` (person must supply input) and `needs-repair` (gx hit a fault). Agents report `iteration_status: needs-answer` and exit instead of calling interactive prompts; `status: done` is written by gx only after work lands or is validated commitless by construction.
+- Iteration agents can now announce-and-stop: commit what is green, write `## Needs Answer` and `## Handoff` sections explaining the question and state, set `--iteration-status needs-answer`, and exit. gx preserves the branch for resume and releases the worktree and permit; the next agent retires the sections and resumes on the same branch.
+- The orchestrator now detects blocked panes (involuntary permission prompts, etc.) within ~15 seconds, parks the ticket as `needs-answer` with the question in the pane, ends the iteration (releasing the permit), and auto-unparks when the pane resumes working — without gx sending any keystrokes at a pane holding a blocking prompt.
+- Queue tab parked rows now show the park reason as ellipsised subtext; selecting a parked row auto-scrolls the preview to the park section (highlighted orange for `needs-answer`, red for `needs-repair`). Per-epic header counts parked tickets. The Tickets tab status menu allows changing a ticket's status directly, unparking with a single gesture instead of a text edit.
+- Chat notifications now carry epic-truth counts (identical across resumed runs) in a fixed-order counts line (`done · in progress · parked · blocked · ready · total`) instead of run-local fractions, and one message fires per parking write. `EpicStarted` and `EpicFailed` events are new; `NoTicketsFound`/`AlreadyComplete` fold into `EpicStarted` so every epic leaving the queue emits exactly one start message.
+- Fork children now implicitly block on their parent's own `status: done`, non-recursive — work lands before descendants start. A parent in a park state holds its child until the parent is unparked; a committed-but-unlanded parent also holds children until the cherry-pick lands.
+- `gx tickets set --status` now refuses `--status done`/`needs-answer`/`needs-repair` from iteration agents (detected by the `ralph-loop/*` branch), preventing agents from writing status that only gx can verify. The CLI's settable statuses are `draft`, `open`, `claimed`, `done`; park states are machine-written only.
+- Removed the `gx ralph-loop` CLI (was never user-facing) along with the dead `textEventSink`/`ralphloop.Report` types and doc comments claiming an invoke path that doesn't exist. Ralph-loop is now driven by the TUI's loop registry only.
+
 ## v0.27.8 - 2026-08-11
 
 - Fixed `.scratch` landing under `.git/.scratch` instead of the repo root when run from a linked worktree of a regular (non-bare) repo. Repo-root resolution used `git rev-parse --git-dir`, which for a linked worktree points at `.git/worktrees/<name>` rather than `.git`, so the worktree was misclassified as belonging to a bare repo and its root resolved to the `.git` directory itself. It now uses `git rev-parse --git-common-dir`, which resolves to the shared `.git` dir regardless of which worktree it's run from.
