@@ -207,7 +207,8 @@ func newTicketsCmd(d deps) *cobra.Command {
 			return runTicketsRoot(cwd, c.OutOrStdout())
 		},
 	})
-	cmd.AddCommand(&cobra.Command{
+	var mapsOnly bool
+	epicsCmd := &cobra.Command{
 		Use:   "epics",
 		Short: "print bare epic slugs under the current repo's .scratch root",
 		Args:  cobra.NoArgs,
@@ -216,9 +217,11 @@ func newTicketsCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runTicketsEpics(cwd, c.OutOrStdout())
+			return runTicketsEpics(cwd, c.OutOrStdout(), mapsOnly)
 		},
-	})
+	}
+	epicsCmd.Flags().BoolVar(&mapsOnly, "maps", false, "only print epics with a wayfinder map.md")
+	cmd.AddCommand(epicsCmd)
 	cmd.AddCommand(&cobra.Command{
 		Use:   "ensure-code-review <epic>",
 		Short: "no-op if the epic has a code-review ticket, else stamp out a stub",

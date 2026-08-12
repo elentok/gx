@@ -14,7 +14,9 @@ import (
 // `.archive` and other dot-prefixed directories excluded by tickets.Load —
 // bare slugs only, no path-building, so it composes with `gx tickets root`
 // in shell tooling like `cd $(gx tickets root)/$(gx tickets epics | fzf)`.
-func runTicketsEpics(cwd string, w io.Writer) error {
+// When mapsOnly is set, only epics with a wayfinder map.md (Epic.IsMap) are
+// printed.
+func runTicketsEpics(cwd string, w io.Writer, mapsOnly bool) error {
 	repo, err := git.FindRepo(cwd)
 	if err != nil {
 		return fmt.Errorf("not inside a git repo: %w", err)
@@ -26,6 +28,9 @@ func runTicketsEpics(cwd string, w io.Writer) error {
 	}
 
 	for _, epic := range epics {
+		if mapsOnly && !epic.IsMap {
+			continue
+		}
 		fmt.Fprintln(w, epic.Name)
 	}
 	return nil

@@ -37,6 +37,32 @@ func TestExecute_TicketsEpics_ListsBareSlugsSortedExcludingArchive(t *testing.T)
 	}
 }
 
+func TestExecute_TicketsEpics_MapsFlagFiltersToWayfinderMapEpics(t *testing.T) {
+	dir := testutil.TempRepo(t)
+	scratchDir := filepath.Join(dir, ".scratch")
+	for _, name := range []string{"zebra-epic", "alpha-epic"} {
+		if err := os.MkdirAll(filepath.Join(scratchDir, name), 0755); err != nil {
+			t.Fatalf("mkdir %s: %v", name, err)
+		}
+	}
+	testutil.WriteFile(t, dir, ".scratch/alpha-epic/map.md", "# alpha map")
+
+	var stdout bytes.Buffer
+	d := deps{
+		stdout: &stdout,
+		stderr: bytes.NewBuffer(nil),
+		getwd:  func() (string, error) { return dir, nil },
+	}
+
+	if err := execute([]string{"tickets", "epics", "--maps"}, d); err != nil {
+		t.Fatalf("execute tickets epics --maps: %v", err)
+	}
+	want := "alpha-epic\n"
+	if stdout.String() != want {
+		t.Errorf("stdout = %q, want %q", stdout.String(), want)
+	}
+}
+
 func TestExecute_TicketsEpics_EmptyScratchExitsZeroWithNoOutput(t *testing.T) {
 	dir := testutil.TempRepo(t)
 
