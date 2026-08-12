@@ -4,6 +4,14 @@ Running list of previously-diagnosed gx/ralph-loop bugs, newest first. Append on
 to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKILL.md) gets fixed
 — don't re-explain what the linked commit/ticket already documents.
 
+- **`conflict-lifecycle/02` forked 4 times (`02a`→`02a1`→`02a2`→`02a3`) despite `gx-to-tickets`
+  already having the rules to catch it.** The ticket named 3 independent variants (SKILL.md's
+  "variant fan-out" rule, N>couple should split) whose tests landed across 4 different files each
+  needing its own precedent read (SKILL.md's "explore/implement split," currently gated on
+  "touches test/e2e coverage" as a whole-ticket judgment rather than a file-count trigger) —
+  neither rule fired. Not fixed; diagnosis + suggested SKILL.md trigger tightening in
+  `conflict-lifecycle/issues/07-ticket-02-fanout-splits-research.md`.
+
 - **A smart-zone `/compact` gets cancelled by gx's own finish-up prompt when herdr reports the pane
   idle/done during compaction.** `waitForCompactionSignal` (`ralphloop/waitforfinish.go`) returns
   success on *any* non-error `AgentWait`, consulting the transcript's compaction-boundary count only

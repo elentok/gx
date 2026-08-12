@@ -32,6 +32,16 @@ lines can still blow the budget once you add:
   (e.g. three distinct row badges, or a list-view change plus a separate preview-pane change). Each
   variant typically needs its own wiring and its own test assertion — treat N independent variants
   the same as threading a large file N times, and split by variant group if N is more than a couple.
+  This is not optional when the variants also land in different test files (see next bullet) — that
+  conjunction, not variant count alone, is what blows a budget: `conflict-lifecycle/02` named 3
+  variants sharing one root cause and forked 4 times before landing, because the variant count alone
+  didn't trigger a split.
+- **Test-file fan-out.** Count how many *distinct existing test files* the ticket's Test Seams will
+  need new cases in. Each file usually means its own read of existing fixtures/conventions before a
+  new case can be written — 3+ files is the same cost shape as the explore/implement split below,
+  even if the ticket reads as "mostly implementation" rather than "mostly tests." Don't let a single
+  `expected_context_window` number smooth over this; split by file group (or route through
+  explore/implement, below) once a ticket's Test Seams section names 3+ files.
 
 Separate "the capability doesn't exist yet" from "something consumes a capability that now exists"
 into different tickets — a plumbing/infra ticket vs. a feature-on-top ticket. This applies whenever
@@ -90,10 +100,12 @@ once no caller remains, in a ticket blocked by every migrate batch. When even th
 green alone, keep the sequence but let them share an integration branch that all block a final
 integrate-and-verify ticket — green is promised only there.
 
-**Explore/implement split for foreseeably-wide test/e2e changes.** If a ticket touches test or e2e
-coverage and it's foreseeable in advance that implementing it requires reading a lot of files first
-(e.g. surveying an existing test suite's conventions, fixtures, and helpers across many files before
-writing new cases), split it into two tickets instead of one, blocked in sequence:
+**Explore/implement split for foreseeably-wide test/e2e changes.** Trigger this whenever a ticket's
+Test Seams will land in 3+ distinct existing test files (test-file fan-out, above) — not only when
+the ticket reads as "mostly test work" as a whole. It's foreseeable in advance that implementing it
+requires reading a lot of files first (e.g. surveying an existing test suite's conventions,
+fixtures, and helpers across many files before writing new cases); split it into two tickets
+instead of one, blocked in sequence:
 
 1. **Explore**: read the necessary files and write the findings — conventions, fixtures, helpers,
    the concrete approach — into this ticket's own body (its answer/notes), with no implementation.
