@@ -83,6 +83,38 @@ func TestRunClaudeStatusline_MissingResetsAtDegradesSilently(t *testing.T) {
 	}
 }
 
+func TestRunClaudeStatusline_RemoteControlActive(t *testing.T) {
+	out := &strings.Builder{}
+	d := deps{
+		stdin:  strings.NewReader(`{"model":{"display_name":"Claude"},"remote":{"session_id":"abc123"}}`),
+		stdout: out,
+		getwd:  func() (string, error) { return t.TempDir(), nil },
+	}
+
+	if err := runClaudeStatusline(d, true, false); err != nil {
+		t.Fatalf("runClaudeStatusline returned error: %v", err)
+	}
+	if !strings.Contains(out.String(), "📡") {
+		t.Fatalf("expected remote control indicator, got %q", out.String())
+	}
+}
+
+func TestRunClaudeStatusline_RemoteControlInactive(t *testing.T) {
+	out := &strings.Builder{}
+	d := deps{
+		stdin:  strings.NewReader(`{"model":{"display_name":"Claude"}}`),
+		stdout: out,
+		getwd:  func() (string, error) { return t.TempDir(), nil },
+	}
+
+	if err := runClaudeStatusline(d, true, false); err != nil {
+		t.Fatalf("runClaudeStatusline returned error: %v", err)
+	}
+	if strings.Contains(out.String(), "📡") {
+		t.Fatalf("expected no remote control indicator, got %q", out.String())
+	}
+}
+
 func TestRunClaudeStatusline_TokensBelowThreshold(t *testing.T) {
 	out := &strings.Builder{}
 	d := deps{
@@ -202,8 +234,8 @@ func TestRunClaudeStatusline_Demo(t *testing.T) {
 	}
 
 	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
-	if len(lines) != 3 {
-		t.Fatalf("expected 3 lines, got %d: %q", len(lines), out.String())
+	if len(lines) != 4 {
+		t.Fatalf("expected 4 lines, got %d: %q", len(lines), out.String())
 	}
 	for _, line := range lines {
 		for _, want := range []string{"TheModel", "12% of 5h", "34% of weekly"} {
@@ -211,6 +243,12 @@ func TestRunClaudeStatusline_Demo(t *testing.T) {
 				t.Fatalf("line missing %q: %q", want, line)
 			}
 		}
+	}
+	if strings.Contains(lines[0], "📡") || strings.Contains(lines[1], "📡") || strings.Contains(lines[2], "📡") {
+		t.Fatalf("did not expect remote control indicator on non-remote demo lines: %q", out.String())
+	}
+	if !strings.Contains(lines[3], "📡") {
+		t.Fatalf("expected remote control indicator on last demo line: %q", lines[3])
 	}
 	for _, want := range []string{"50k", "85k", "120k", "10%", "30%", "60%", "🙂", "🤔", "🥵", "resets "} {
 		if !strings.Contains(out.String(), want) {

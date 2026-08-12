@@ -25,6 +25,7 @@ var (
 	claudePlainStyle    = lipgloss.NewStyle().Foreground(ui.ColorText)
 	claudeWorktreeStyle = lipgloss.NewStyle().Foreground(ui.ColorMauve)
 	claudeBranchStyle   = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
+	claudeRemoteStyle   = lipgloss.NewStyle().Foreground(ui.ColorGreen)
 
 	claudeSeparator    = claudeFaintStyle.Render("·")
 	claudeLeftBracket  = claudeFaintStyle.Render("[")
@@ -58,6 +59,9 @@ type statusLineData struct {
 	Model struct {
 		DisplayName json.RawMessage `json:"display_name"`
 	} `json:"model"`
+	Remote *struct {
+		SessionID json.RawMessage `json:"session_id"`
+	} `json:"remote"`
 }
 
 // runClaudeStatusline reads a Claude Code statusLine-hook JSON payload from
@@ -74,12 +78,14 @@ func runClaudeStatusline(d deps, silent, demo bool) error {
 		for _, row := range []struct {
 			tokens  float64
 			percent int
+			remote  bool
 		}{
-			{50000, 10},
-			{85000, 30},
-			{120000, 60},
+			{50000, 10, false},
+			{85000, 30, false},
+			{120000, 60, false},
+			{50000, 10, true},
 		} {
-			fmt.Fprintln(d.stdout, statusLineFromValues("TheModel", row.tokens, float64(row.percent), 12, 34, fiveHourResetsAt, weekResetsAt, worktreeSeg))
+			fmt.Fprintln(d.stdout, statusLineFromValues("TheModel", row.tokens, float64(row.percent), 12, 34, fiveHourResetsAt, weekResetsAt, worktreeSeg, row.remote))
 		}
 		return nil
 	}
@@ -105,9 +111,20 @@ func runClaudeStatusline(d deps, silent, demo bool) error {
 	weekText := parseNumberField(payload.RateLimits.SevenDay.UsedPercentage, "weekly", true, true)
 	fiveResetText := parseResetTimeField(payload.RateLimits.FiveHour.ResetsAt)
 	weekResetText := parseResetTimeField(payload.RateLimits.SevenDay.ResetsAt)
+	remoteSeg := remoteControlSegment(payload.Remote != nil)
 
-	fmt.Fprintln(d.stdout, statusLineFromParts(rawTokens, modelText, tokensText, ctxText, fiveText, weekText, fiveResetText, weekResetText, worktreeSeg))
+	fmt.Fprintln(d.stdout, statusLineFromParts(rawTokens, modelText, tokensText, ctxText, fiveText, weekText, fiveResetText, weekResetText, worktreeSeg, remoteSeg))
 	return nil
+}
+
+// remoteControlSegment renders a short indicator when Claude Code's Remote
+// Control is active for this session. The statusLine hook payload includes a
+// top-level "remote" object only while a Remote Control session is attached.
+func remoteControlSegment(active bool) string {
+	if !active {
+		return ""
+	}
+	return claudeRemoteStyle.Render("📡")
 }
 
 func errorField(raw json.RawMessage, name string, silent bool) statusField {
@@ -213,7 +230,7 @@ func parseNumber(raw json.RawMessage) (float64, bool) {
 	return parsed, true
 }
 
-func statusLineFromValues(model string, tokens, contextPercent, fiveHourPercent, weekPercent float64, fiveHourResetsAt, weekResetsAt time.Time, worktreeSeg string) string {
+func statusLineFromValues(model string, tokens, contextPercent, fiveHourPercent, weekPercent float64, fiveHourResetsAt, weekResetsAt time.Time, worktreeSeg string, remote bool) string {
 	return statusLineFromParts(
 		tokens,
 		statusField{text: model},
@@ -224,10 +241,11 @@ func statusLineFromValues(model string, tokens, contextPercent, fiveHourPercent,
 		formatResetTime(fiveHourResetsAt),
 		formatResetTime(weekResetsAt),
 		worktreeSeg,
+		remoteControlSegment(remote),
 	)
 }
 
-func statusLineFromParts(rawTokens float64, model, tokens, ctx, five, week statusField, fiveReset, weekReset, worktreeSeg string) string {
+func statusLineFromParts(rawTokens float64, model, tokens, ctx, five, week statusField, fiveReset, weekReset, worktreeSeg, remoteSeg string) string {
 	parts := make([]string, 0, 4)
 	if model.text != "" {
 		parts = append(parts, styledValue(model, claudeModelStyle))
@@ -266,6 +284,9 @@ func statusLineFromParts(rawTokens float64, model, tokens, ctx, five, week statu
 	}
 	if worktreeSeg != "" {
 		parts = append(parts, worktreeSeg)
+	}
+	if remoteSeg != "" {
+		parts = append(parts, remoteSeg)
 	}
 	return strings.Join(parts, " "+claudeSeparator+" ")
 }
