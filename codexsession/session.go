@@ -34,7 +34,11 @@ func ReadStats(cwd, sessionID string) (stats Stats, ok bool, err error) {
 		return Stats{}, false, nil
 	}
 
-	err = walkSessionFiles(sessionID, func(path string) error {
+	home, err := codexHome()
+	if err != nil {
+		return Stats{}, false, err
+	}
+	err = walkSessionFiles(home, sessionID, func(path string) error {
 		value, valid, readErr := readStats(path, cwd, sessionID)
 		if readErr != nil {
 			return readErr
@@ -55,12 +59,24 @@ func ReadStats(cwd, sessionID string) (stats Stats, ok bool, err error) {
 // so a same-named rollout from another worktree cannot pause this iteration.
 // Missing, partial, and malformed session files return ok=false.
 func LastContextTokens(cwd, sessionID string) (tokens int, ok bool, err error) {
+	home, err := codexHome()
+	if err != nil {
+		return 0, false, err
+	}
+	return LastContextTokensIn(home, cwd, sessionID)
+}
+
+// LastContextTokensIn is LastContextTokens with an explicit Codex home
+// directory in place of codexHome()'s CODEX_HOME/UserHomeDir resolution — the
+// seam Deps.ReadCodexContext uses when a per-run home override is set, so a
+// caller can point this at a fixture home without mutating process env.
+func LastContextTokensIn(home, cwd, sessionID string) (tokens int, ok bool, err error) {
 	if cwd == "" || sessionID == "" {
 		return 0, false, nil
 	}
 
 	var found bool
-	err = walkSessionFiles(sessionID, func(path string) error {
+	err = walkSessionFiles(home, sessionID, func(path string) error {
 		value, valid, readErr := readContextTokens(path, cwd, sessionID)
 		if readErr != nil {
 			return readErr
@@ -83,7 +99,11 @@ func VerifyIdentity(cwd, sessionID string) (ok bool, err error) {
 	if cwd == "" || sessionID == "" {
 		return false, nil
 	}
-	err = walkSessionFiles(sessionID, func(path string) error {
+	home, err := codexHome()
+	if err != nil {
+		return false, err
+	}
+	err = walkSessionFiles(home, sessionID, func(path string) error {
 		matching, readErr := readIdentity(path, cwd, sessionID)
 		if readErr != nil {
 			return readErr
@@ -101,11 +121,21 @@ func VerifyIdentity(cwd, sessionID string) (ok bool, err error) {
 // sessionID launched in cwd. Missing, partial, malformed, and non-exhausted
 // session data return ok=false.
 func LastRateLimit(cwd, sessionID string) (limit RateLimit, ok bool, err error) {
+	home, err := codexHome()
+	if err != nil {
+		return RateLimit{}, false, err
+	}
+	return LastRateLimitIn(home, cwd, sessionID)
+}
+
+// LastRateLimitIn is LastRateLimit with an explicit Codex home directory —
+// see LastContextTokensIn.
+func LastRateLimitIn(home, cwd, sessionID string) (limit RateLimit, ok bool, err error) {
 	if cwd == "" || sessionID == "" {
 		return RateLimit{}, false, nil
 	}
 
-	err = walkSessionFiles(sessionID, func(path string) error {
+	err = walkSessionFiles(home, sessionID, func(path string) error {
 		value, valid, readErr := readRateLimit(path, cwd, sessionID)
 		if readErr != nil {
 			return readErr
@@ -132,13 +162,9 @@ func codexHome() (string, error) {
 	return filepath.Join(home, ".codex"), nil
 }
 
-func walkSessionFiles(sessionID string, visit func(path string) error) error {
-	home, err := codexHome()
-	if err != nil {
-		return err
-	}
+func walkSessionFiles(home, sessionID string, visit func(path string) error) error {
 	sessionsDir := filepath.Join(home, "sessions")
-	err = filepath.WalkDir(sessionsDir, func(path string, entry fs.DirEntry, walkErr error) error {
+	err := filepath.WalkDir(sessionsDir, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}

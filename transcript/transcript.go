@@ -48,7 +48,15 @@ func Path(cwd, sessionID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".claude", "projects", Slugify(cwd), sessionID+".jsonl"), nil
+	return PathIn(home, cwd, sessionID), nil
+}
+
+// PathIn is Path with an explicit home directory in place of
+// os.UserHomeDir() — the seam Deps.ReadOccupancy/ReadCompactions/etc. use
+// when a per-run home override is set, and that a test's own fixture-writing
+// helper can call directly instead of relying on process HOME.
+func PathIn(home, cwd, sessionID string) string {
+	return filepath.Join(home, ".claude", "projects", Slugify(cwd), sessionID+".jsonl")
 }
 
 // transcriptLine is the subset of a transcript JSONL line this package

@@ -151,9 +151,41 @@ type Deps struct {
 
 // DefaultDeps wires Deps to the real herdr, git, and transcript packages.
 func DefaultDeps() Deps {
+	return DefaultDepsWithOverrides(DepsOverrides{})
+}
+
+// DepsOverrides substitutes the home directory(ies) and PATH the in-process
+// reads below resolve against, in place of the process's real HOME/
+// CODEX_HOME/PATH. Those reads — codexsession.codexHome, transcript.Path,
+// verifySkill's os.UserHomeDir, and preflightAgent/InstallDependencies's
+// exec.LookPath — happen inside this Go process rather than a spawned
+// subprocess, so exec.Cmd.Env can't influence them; the only prior way to
+// steer them per-test was t.Setenv, which mutates process env and so can't
+// be used safely across parallel tests. A zero field keeps that field's real
+// env resolution exactly as before.
+type DepsOverrides struct {
+	// Home, when non-empty, overrides os.UserHomeDir() for verifySkill's
+	// skill-file lookup and transcript.Path's transcript-file lookup.
+	Home string
+	// CodexHome, when non-empty, overrides codexsession's CODEX_HOME/
+	// UserHomeDir resolution directly (the resolved ~/.codex-equivalent
+	// directory, not $HOME) for Deps.ReadCodexContext/ReadCodexRateLimit.
+	CodexHome string
+	// Path, when non-empty, overrides os.Getenv("PATH") for codex/herdr/
+	// package-manager executable lookups (PreflightAgent, InstallDeps).
+	Path string
+}
+
+// DefaultDepsWithOverrides is DefaultDeps with overrides applied to the
+// in-process env reads described on DepsOverrides.
+func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 	return Deps{
-		PreflightAgent:        preflightAgent,
-		VerifySkill:           verifySkill,
+		PreflightAgent: func(agent AgentKind) error {
+			return preflightAgentWith(agent, lookPathFor(overrides.Path), commandOutput)
+		},
+		VerifySkill: func(agent AgentKind, skill string) error {
+			return verifySkillWith(agent, skill, userHomeDirFor(overrides.Home), os.Stat)
+		},
 		AgentGet:              herdr.AgentGet,
 		VerifyCodexSession:    codexsession.VerifyIdentity,
 		FindOrCreateWorkspace: herdr.EnsureWorkspace,
@@ -180,28 +212,121 @@ func DefaultDeps() Deps {
 		PatchesApplied:        git.PatchesApplied,
 		AppendTrailers:        git.AppendTrailers,
 		WorktreeExists:        worktreeExists,
-		InstallDeps:           InstallDependencies,
-		ReadOccupancy:         transcript.LastAssistantOccupancy,
-		ReadOccupancyReading:  transcript.ReadSessionOccupancy,
-		ReadCompactions:       transcript.Compactions,
-		ReadCompactionsAfter:  transcript.CompactionsAfter,
-		ReadCodexContext:      codexsession.LastContextTokens,
-		ReadCodexRateLimit:    codexsession.LastRateLimit,
-		ReadPaneRecent:        defaultReadPaneRecent,
-		Sleep:                 time.Sleep,
-		Now:                   time.Now,
-		ParkTimer:             time.After,
+		InstallDeps: func(path string) (string, error) {
+			return installDependenciesWith(path, overrides.Path)
+		},
+		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
+			path, err := transcriptPath(overrides.Home, cwd, sessionID)
+			if err != nil {
+				return 0, false, err
+			}
+			usage, ok, err := transcript.LastAssistantUsage(path)
+			if err != nil || !ok {
+				return 0, ok, err
+			}
+			return usage.Occupancy(), true, nil
+		},
+		ReadOccupancyReading: func(cwd, sessionID string) (transcript.OccupancyReading, error) {
+			path, err := transcriptPath(overrides.Home, cwd, sessionID)
+			if err != nil {
+				return transcript.OccupancyReading{}, err
+			}
+			return transcript.ReadOccupancy(path)
+		},
+		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
+			path, err := transcriptPath(overrides.Home, cwd, sessionID)
+			if err != nil {
+				return 0, false, err
+			}
+			lines, ok, err := transcript.ReadAll(path)
+			if err != nil || !ok {
+				return 0, ok, err
+			}
+			return transcript.CountCompactions(lines), true, nil
+		},
+		ReadCompactionsAfter: func(cwd, sessionID string, since time.Time) (int, bool, error) {
+			path, err := transcriptPath(overrides.Home, cwd, sessionID)
+			if err != nil {
+				return 0, false, err
+			}
+			lines, ok, err := transcript.ReadAll(path)
+			if err != nil || !ok {
+				return 0, ok, err
+			}
+			return transcript.CountCompactionsAfter(lines, since), true, nil
+		},
+		ReadCodexContext: func(cwd, sessionID string) (int, bool, error) {
+			if overrides.CodexHome == "" {
+				return codexsession.LastContextTokens(cwd, sessionID)
+			}
+			return codexsession.LastContextTokensIn(overrides.CodexHome, cwd, sessionID)
+		},
+		ReadCodexRateLimit: func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
+			if overrides.CodexHome == "" {
+				return codexsession.LastRateLimit(cwd, sessionID)
+			}
+			return codexsession.LastRateLimitIn(overrides.CodexHome, cwd, sessionID)
+		},
+		ReadPaneRecent: defaultReadPaneRecent,
+		Sleep:          time.Sleep,
+		Now:            time.Now,
+		ParkTimer:      time.After,
 	}
 }
 
-func preflightAgent(agent AgentKind) error {
-	return preflightAgentWith(
-		agent,
-		exec.LookPath,
-		func(name string, args ...string) ([]byte, error) {
-			return exec.Command(name, args...).CombinedOutput()
-		},
-	)
+// transcriptPath resolves cwd/sessionID's transcript file path — home when
+// set, real os.UserHomeDir() otherwise (transcript.Path's own behavior) — so
+// ReadOccupancy/ReadOccupancyReading/ReadCompactions/ReadCompactionsAfter
+// share one home-resolution branch instead of repeating it four times.
+func transcriptPath(home, cwd, sessionID string) (string, error) {
+	if home != "" {
+		return transcript.PathIn(home, cwd, sessionID), nil
+	}
+	return transcript.Path(cwd, sessionID)
+}
+
+// lookPathFor returns exec.LookPath when pathEnv is empty (real process
+// PATH), or a lookup against the explicit pathEnv string otherwise.
+func lookPathFor(pathEnv string) func(string) (string, error) {
+	if pathEnv == "" {
+		return exec.LookPath
+	}
+	return func(file string) (string, error) { return lookPathIn(file, pathEnv) }
+}
+
+// userHomeDirFor returns os.UserHomeDir when home is empty (real process
+// HOME), or a constant home otherwise.
+func userHomeDirFor(home string) func() (string, error) {
+	if home == "" {
+		return os.UserHomeDir
+	}
+	return func() (string, error) { return home, nil }
+}
+
+// lookPathIn resolves file against the PATH-style list pathEnv, the same
+// resolution exec.LookPath performs against the process's real PATH — used
+// so preflightAgentWith and InstallDependencies can be pointed at an
+// explicit PATH string per call instead of exec.LookPath's process-PATH
+// read, which no per-test override can reach without mutating process env.
+func lookPathIn(file, pathEnv string) (string, error) {
+	for _, dir := range filepath.SplitList(pathEnv) {
+		if dir == "" {
+			continue
+		}
+		candidate := filepath.Join(dir, file)
+		info, err := os.Stat(candidate)
+		if err != nil || info.IsDir() {
+			continue
+		}
+		if info.Mode()&0111 != 0 {
+			return candidate, nil
+		}
+	}
+	return "", &exec.Error{Name: file, Err: exec.ErrNotFound}
+}
+
+func commandOutput(name string, args ...string) ([]byte, error) {
+	return exec.Command(name, args...).CombinedOutput()
 }
 
 func preflightAgentWith(
@@ -257,11 +382,6 @@ func preflightAgentWith(
 func isCodexUnauthenticated(output string) bool {
 	lower := strings.ToLower(output)
 	return strings.Contains(lower, "not logged in") || strings.Contains(lower, "not authenticated")
-}
-
-// verifySkill implements Deps.VerifySkill against the real filesystem.
-func verifySkill(agent AgentKind, skill string) error {
-	return verifySkillWith(agent, skill, os.UserHomeDir, os.Stat)
 }
 
 // verifySkillWith confirms skill is installed where agent resolves its
@@ -499,25 +619,28 @@ var depsMarkers = []struct {
 // its working directory. No marker matching is a silent no-op (command ""),
 // since not every worktree is a package-managed project.
 func InstallDependencies(path string) (command string, err error) {
-	return installDependenciesWith(path, exec.LookPath)
+	return installDependenciesWith(path, "")
 }
 
-// installDependenciesWith is InstallDependencies with the package-manager
-// executable's lookup injected, so tests can point it at a fake binary's
-// exact path instead of prepending to the real PATH env var with t.Setenv
-// (which would block InstallDependencies subtests from running under
-// t.Parallel()).
-func installDependenciesWith(path string, lookPath func(string) (string, error)) (command string, err error) {
+// installDependenciesWith is InstallDependencies with an explicit PATH
+// string in place of exec.Command's implicit process-PATH lookup — the seam
+// Deps.InstallDeps uses when a per-run PATH override is set. pathEnv == ""
+// keeps the real process-PATH lookup exec.Command performs on its own.
+func installDependenciesWith(path, pathEnv string) (command string, err error) {
 	for _, dm := range depsMarkers {
 		if _, statErr := os.Stat(filepath.Join(path, dm.marker)); statErr != nil {
 			continue
 		}
 		command = strings.Join(dm.command, " ")
-		bin, lookErr := lookPath(dm.command[0])
-		if lookErr != nil {
-			return command, fmt.Errorf("looking up %q: %w", dm.command[0], lookErr)
+		name := dm.command[0]
+		if pathEnv != "" {
+			resolved, lookErr := lookPathIn(name, pathEnv)
+			if lookErr != nil {
+				return command, fmt.Errorf("running %q in %s: %w", command, path, lookErr)
+			}
+			name = resolved
 		}
-		cmd := exec.Command(bin, dm.command[1:]...)
+		cmd := exec.Command(name, dm.command[1:]...)
 		cmd.Dir = path
 		out, runErr := cmd.CombinedOutput()
 		if runErr != nil {

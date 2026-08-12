@@ -36,6 +36,15 @@ func TestPath_JoinsHomeSlugAndSessionID(t *testing.T) {
 	}
 }
 
+func TestPathIn_UsesExplicitHomeInsteadOfProcessEnv(t *testing.T) {
+	// Deliberately never t.Setenv HOME here — PathIn must not need it.
+	got := PathIn("/home/fake", "/repo/worktree", "session-123")
+	want := filepath.Join("/home/fake", ".claude", "projects", "-repo-worktree", "session-123.jsonl")
+	if got != want {
+		t.Errorf("PathIn() = %q, want %q", got, want)
+	}
+}
+
 func writeTranscript(t *testing.T, lines ...string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "session.jsonl")

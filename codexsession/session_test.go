@@ -283,3 +283,49 @@ func TestLastContextTokens_MissingCodexHomeDirFailsSafe(t *testing.T) {
 		t.Errorf("LastContextTokens() = (%d, %t), want (0, false)", got, ok)
 	}
 }
+
+func TestLastContextTokensIn_UsesExplicitHomeInsteadOfProcessEnv(t *testing.T) {
+	// Deliberately never t.Setenv HOME/CODEX_HOME here — LastContextTokensIn
+	// must not need them.
+	codexHome := t.TempDir()
+	path := filepath.Join(codexHome, "sessions", "2026", "08", "01", "rollout-2026-08-01T10-00-00-session-1.jsonl")
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	contents := `{"type":"session_meta","payload":{"id":"session-1","cwd":"/repo/iter-01"}}
+{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":151000}}}}
+`
+	if err := os.WriteFile(path, []byte(contents), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	got, ok, err := LastContextTokensIn(codexHome, "/repo/iter-01", "session-1")
+	if err != nil {
+		t.Fatalf("LastContextTokensIn: %v", err)
+	}
+	if !ok || got != 151000 {
+		t.Errorf("LastContextTokensIn() = (%d, %t), want (151000, true)", got, ok)
+	}
+}
+
+func TestLastRateLimitIn_UsesExplicitHomeInsteadOfProcessEnv(t *testing.T) {
+	codexHome := t.TempDir()
+	path := filepath.Join(codexHome, "sessions", "2026", "08", "01", "rollout-2026-08-01T10-00-00-session-1.jsonl")
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	contents := `{"type":"session_meta","payload":{"id":"session-1","cwd":"/repo/iter-01"}}
+{"type":"event_msg","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":100,"resets_at":1786170140}}}}
+`
+	if err := os.WriteFile(path, []byte(contents), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	limit, ok, err := LastRateLimitIn(codexHome, "/repo/iter-01", "session-1")
+	if err != nil {
+		t.Fatalf("LastRateLimitIn: %v", err)
+	}
+	if !ok || limit.Quota != "primary" {
+		t.Errorf("LastRateLimitIn() = (%+v, %t), want exhausted primary, ok=true", limit, ok)
+	}
+}
