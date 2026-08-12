@@ -1,0 +1,72 @@
+package ralphloop
+
+import "context"
+
+// EpicFailureNotifier is called by the loop registry once a run has
+// returned an error, after the run's own EventSink has been closed and
+// drained. It is a separate, exported interface (rather than a call
+// straight into EventSink) for two reasons: its lifetime must outlive the
+// run-scoped sink the drain just tore down, and callers outside this
+// package (ui/tickets' loop registry) need to supply a test double without
+// reaching into ralphloop's unexported chatTransport.
+type EpicFailureNotifier interface {
+	EpicFailed(epicName string, err error)
+}
+
+// EpicFailureReporter is the EpicFailureNotifier the loop registry uses in
+// production: it holds its own chat transports (constructed once, at run
+// start, from the same config the run's chatEventSink decoration used) so
+// that its EpicFailed call — made after that decoration's sink has already
+// closed and drained — still reaches chat instead of being emitted into a
+// closed sink and dropped.
+type EpicFailureReporter struct {
+	scratchDir string
+	targets    []epicFailureTarget
+}
+
+type epicFailureTarget struct {
+	style     mrkdwnStyle
+	transport chatTransport
+}
+
+// NewEpicFailureReporter returns a reporter with no configured targets;
+// call AddTelegram/AddSlack for each channel the run's own chat decoration
+// was configured with.
+func NewEpicFailureReporter(scratchDir string) *EpicFailureReporter {
+	return &EpicFailureReporter{scratchDir: scratchDir}
+}
+
+// AddTelegram configures the reporter to also send via the Telegram Bot
+// API, mirroring NewTelegramEventSink's transport.
+func (r *EpicFailureReporter) AddTelegram(botToken, chatID string) {
+	r.targets = append(r.targets, epicFailureTarget{
+		style:     telegramStyle,
+		transport: newTelegramTransport(botToken, chatID, telegramAPIBaseURL),
+	})
+}
+
+// AddSlack configures the reporter to also send via a Slack webhook,
+// mirroring NewSlackEventSink's transport.
+func (r *EpicFailureReporter) AddSlack(webhookURL string) {
+	r.targets = append(r.targets, epicFailureTarget{
+		style:     slackStyle,
+		transport: newSlackTransport(webhookURL),
+	})
+}
+
+// EpicFailed sends the "epic failed" message to every configured target,
+// same fire-and-forget/retry-once/run-log semantics as chatEventSink.send.
+// counts is loaded fresh here rather than carried over from a live event,
+// since the run that would have carried one has already ended.
+func (r *EpicFailureReporter) EpicFailed(epicName string, err error) {
+	if err == nil {
+		return
+	}
+	counts := loadEpicCounts(r.scratchDir, epicName)
+	for _, target := range r.targets {
+		text := target.style.epicFailedText(epicName, counts, err.Error())
+		sendNotification(r.scratchDir, epicName, target.transport.name(), notifyKindEpicFailed, target.transport.timeout(), func(ctx context.Context) error {
+			return target.transport.sendSync(ctx, text)
+		})
+	}
+}

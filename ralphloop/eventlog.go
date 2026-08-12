@@ -70,6 +70,7 @@ const (
 	notifyKindEpicComplete      = "epic-complete"
 	notifyKindEpicParked        = "epic-parked"
 	notifyKindTicketNeedsHuman  = "ticket-needs-human"
+	notifyKindEpicFailed        = "epic-failed"
 )
 
 // ScanDecision records one ticket's scheduling disposition for a single

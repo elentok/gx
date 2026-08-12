@@ -424,6 +424,17 @@ func cmdStartImplement(
 			}
 			return implementFailedMsg{err: fmt.Errorf("a ralph-loop is already running")}
 		}
+		scratchDir := scratchDirFor(worktreeRoot)
+		if notifications.Telegram.BotToken != "" || notifications.Slack.WebhookURL != "" {
+			reporter := ralphloop.NewEpicFailureReporter(scratchDir)
+			if notifications.Telegram.BotToken != "" {
+				reporter.AddTelegram(notifications.Telegram.BotToken, notifications.Telegram.ChatID)
+			}
+			if notifications.Slack.WebhookURL != "" {
+				reporter.AddSlack(notifications.Slack.WebhookURL)
+			}
+			ralphLoopRegistry.setFailureNotifier(epicName, reporter)
+		}
 		opts, err := buildImplementRunOptionsForTickets(worktreeRoot, epicName, agent, maxParallel, ticketIDs, skill)
 		if err != nil {
 			ralphLoopRegistry.finish(epicName, err)

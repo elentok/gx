@@ -169,6 +169,12 @@ func (s *ChannelEventSink) EpicComplete(epicName string, completed int, elapsedS
 	s.emit(LiveEvent{Kind: LiveEventEpicComplete, EpicName: epicName, Completed: completed, ElapsedSeconds: elapsedSeconds})
 }
 
+// EpicFailed is a no-op here: the registry records a run's failure after
+// this sink has already been closed and drained (see loop_registry.go's
+// finish), so there is no live channel left to emit onto by the time this
+// would ever be called.
+func (s *ChannelEventSink) EpicFailed(epicName string, err error) {}
+
 func (s *ChannelEventSink) CherryPickStarted(identifier string) {
 	s.emit(LiveEvent{Kind: LiveEventCherryPickStarted, Identifier: identifier})
 }

@@ -2,6 +2,7 @@ package tickets
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -157,6 +158,101 @@ func TestFinishPreservesCompletionAndFailureSnapshots(t *testing.T) {
 	failed, ok := r.runSnapshot("epic-b")
 	if !ok || failed.State != RunStateFailed || failed.FinalError != "agent failed" {
 		t.Fatalf("failed snapshot = %#v, %v", failed, ok)
+	}
+}
+
+// fakeFailureNotifier records every EpicFailed call, and (for
+// TestFinish_EpicFailed_FiresAfterSinkDrain) lets the test observe registry
+// state from inside the callback — while the callback runs, finish has not
+// yet re-acquired the lock to delete the run, so the drained snapshot is
+// still readable.
+type fakeFailureNotifier struct {
+	mu     sync.Mutex
+	calls  []string
+	onCall func()
+}
+
+func (f *fakeFailureNotifier) EpicFailed(epicName string, err error) {
+	f.mu.Lock()
+	f.calls = append(f.calls, fmt.Sprintf("%s:%v", epicName, err))
+	f.mu.Unlock()
+	if f.onCall != nil {
+		f.onCall()
+	}
+}
+
+func (f *fakeFailureNotifier) snapshot() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]string, len(f.calls))
+	copy(out, f.calls)
+	return out
+}
+
+// TestFinish_EpicFailed_FiresAfterSinkDrain is the ordering test ticket 25
+// requires: a run that returns an error produces exactly one failure
+// message, and it is emitted only once the sink's queued events have all
+// been drained (reduceLiveEvent applied) — not concurrently with the drain,
+// and not before it.
+func TestFinish_EpicFailed_FiresAfterSinkDrain(t *testing.T) {
+	r := newLoopRegistry(1)
+	sink, ok := r.tryStart("epic-a", 0, 1)
+	if !ok {
+		t.Fatal("tryStart failed")
+	}
+	notifier := &fakeFailureNotifier{}
+	r.setFailureNotifier("epic-a", notifier)
+
+	sink.IterationStarted(tickets.Ticket{Identifier: "01"}, "iter-01", "", "")
+
+	notifier.onCall = func() {
+		snap, ok := r.runSnapshot("epic-a")
+		if !ok || snap.Tickets["01"].Label != "iter-01" {
+			t.Errorf("notifier fired before the drain applied its event: snapshot = %#v, ok=%v", snap, ok)
+		}
+	}
+
+	r.finish("epic-a", errors.New("agent failed"))
+
+	if got := notifier.snapshot(); len(got) != 1 || got[0] != "epic-a:agent failed" {
+		t.Fatalf("notifier calls = %v, want exactly one epic-a:agent failed", got)
+	}
+}
+
+// TestFinish_EpicFailed_NotDroppedAfterSinkAlreadyClosed is the
+// dropped-message regression the ticket calls out: the failure reporter's
+// whole reason to exist is that a message fired through the run's own
+// (already-closed) sink would be silently dropped. This asserts the
+// registry's own send path — through the notifier, not the sink — still
+// produces the message even though run.sink has already been torn down by
+// the time finish's caller could ever reach it again.
+func TestFinish_EpicFailed_NotDroppedAfterSinkAlreadyClosed(t *testing.T) {
+	r := newLoopRegistry(1)
+	if _, ok := r.tryStart("epic-a", 0, 1); !ok {
+		t.Fatal("tryStart failed")
+	}
+	notifier := &fakeFailureNotifier{}
+	r.setFailureNotifier("epic-a", notifier)
+
+	r.finish("epic-a", errors.New("boom"))
+
+	if got := notifier.snapshot(); len(got) != 1 || got[0] != "epic-a:boom" {
+		t.Fatalf("notifier calls = %v, want exactly one epic-a:boom despite the sink already being drained/closed", got)
+	}
+}
+
+func TestFinish_NoError_DoesNotNotify(t *testing.T) {
+	r := newLoopRegistry(1)
+	if _, ok := r.tryStart("epic-a", 0, 1); !ok {
+		t.Fatal("tryStart failed")
+	}
+	notifier := &fakeFailureNotifier{}
+	r.setFailureNotifier("epic-a", notifier)
+
+	r.finish("epic-a", nil)
+
+	if got := notifier.snapshot(); len(got) != 0 {
+		t.Fatalf("notifier calls = %v, want none for a successful finish", got)
 	}
 }
 

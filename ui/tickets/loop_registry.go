@@ -23,8 +23,14 @@ type epicRun struct {
 	scope      ralphloop.RunScope
 	state      RunState
 	finalError string
-	tickets    map[string]RunTicketSnapshot
-	startedAt  time.Time
+	// failureNotifier is set once, by cmdStartImplement right after
+	// tryStart, and used only by finish, after the drain below completes:
+	// it must stay live across the sink close/drain since the run has
+	// already returned by the time finish runs, so sink itself is nil by
+	// then (see ralphloop.EpicFailureReporter / EventSink.EpicFailed).
+	failureNotifier ralphloop.EpicFailureNotifier
+	tickets         map[string]RunTicketSnapshot
+	startedAt       time.Time
 	// pendingNotifyCloses queues reattach-scan notification ids to close,
 	// populated by reduceLiveEvent (running in the event-drain goroutine,
 	// which has no way to send a tea.Cmd itself) and drained into an actual
@@ -576,6 +582,17 @@ func (r *loopRegistry) setScope(epicName string, scope ralphloop.RunScope) {
 	}
 }
 
+// setFailureNotifier records the reporter finish will call, after the
+// drain, if the run ends in error. Called once by cmdStartImplement right
+// after tryStart, mirroring setScope.
+func (r *loopRegistry) setFailureNotifier(epicName string, notifier ralphloop.EpicFailureNotifier) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if run := r.runs[epicName]; run != nil {
+		run.failureNotifier = notifier
+	}
+}
+
 // scopeFor returns epicName's live RunScope, for "add to queue" (ticket 10)
 // to widen via RunScope.Add. ok is false once the epic is no longer running.
 func (r *loopRegistry) scopeFor(epicName string) (ralphloop.RunScope, bool) {
@@ -654,6 +671,13 @@ func (r *loopRegistry) finish(epicName string, err error) {
 	if run != nil && run.sink != nil {
 		run.sink.Close()
 		<-run.drainDone
+	}
+	if run != nil && err != nil && run.failureNotifier != nil {
+		// Fired after the drain completes, from a reporter that was
+		// constructed independently of the sink just closed above — the
+		// one way to still reach chat once the run has already returned
+		// (see ralphloop.EventSink.EpicFailed's doc comment).
+		run.failureNotifier.EpicFailed(epicName, err)
 	}
 
 	r.mu.Lock()

@@ -184,6 +184,19 @@ type EventSink interface {
 	// completed tickets landed by this Run call, after elapsedSeconds of
 	// total wall-clock run time.
 	EpicComplete(epicName string, completed int, elapsedSeconds int)
+
+	// EpicFailed reports that epicName's Run call returned err. Unlike every
+	// other event here, this one is not fired from inside the run: by the
+	// time the loop registry records a run's failure the run has already
+	// returned and its sink has been closed and drained, so there is no
+	// live run-scoped emitter left to call this through. The registry's
+	// EpicFailureReporter (see epic_failure_reporter.go) is the one path
+	// that calls it — a chat message emitted straight to the transport
+	// after the drain, not through this interface — which is why
+	// EpicFailed exists on EventSink at all: purely so the contract test in
+	// eventsink_contract_test.go can record its chat membership, not
+	// because any EventSink implementation dispatches it.
+	EpicFailed(epicName string, err error)
 }
 
 // noopEventSink implements EventSink with every method a no-op, used
@@ -214,6 +227,7 @@ func (noopEventSink) TicketRecovered(identifier, epicName, branch, landedSHA str
 func (noopEventSink) TicketUnrecoverable(identifier, epicName string)                 {}
 func (noopEventSink) EpicParked(epicName string, stalled []StalledTicket)             {}
 func (noopEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {}
+func (noopEventSink) EpicFailed(epicName string, err error)                           {}
 
 // textEventSink implements EventSink by rendering each event as the same
 // text line(s) `gx ralph-loop` has always printed for it, for the headless
@@ -337,3 +351,8 @@ func (s *textEventSink) EpicParked(epicName string, stalled []StalledTicket) {
 func (s *textEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {
 	s.printf("ralph-loop %q complete: %d ticket(s) landed on %s\n", epicName, completed, epicName)
 }
+
+// EpicFailed is a no-op here: the headless CLI path already prints Run's
+// returned error itself at the call site, and this sink's copy would never
+// be reached anyway (see the interface doc comment on EpicFailed).
+func (s *textEventSink) EpicFailed(epicName string, err error) {}

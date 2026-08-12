@@ -232,6 +232,21 @@ func (s mrkdwnStyle) epicCompleteText(epicName string, counts EpicCounts, comple
 	return s.message("\U0001f389", "epic complete", RenderCountsLine(counts), detail, s.identityLine(epicName, ""))
 }
 
+// epicFailedText renders the "epic failed" notification — the second of the
+// two epic-level messages a failed run produces (epicStartedText is the
+// first), emitted by EpicFailureReporter after the run's own sink has
+// already closed and drained (see epic_failure_reporter.go), so counts is
+// loaded fresh rather than carried over from a live event:
+//
+//	🔥 *epic failed*
+//
+//	{counts line}
+//	{err}
+//	[gx] {epic}
+func (s mrkdwnStyle) epicFailedText(epicName string, counts EpicCounts, errMsg string) string {
+	return s.message("\U0001f525", "epic failed", RenderCountsLine(counts), s.escape(errMsg), s.identityLine(epicName, ""))
+}
+
 // testMessageText renders the fixed message `gx config test-notifications`
 // sends to confirm a configured service is actually reachable:
 //
