@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/notify"
 )
@@ -362,7 +363,7 @@ func (r *loopRegistry) reduceLiveEvent(epicName string, event ralphloop.LiveEven
 		// Both statuses set pendingReload so the queue re-reads the ticket
 		// from disk and picks up its park-reason subtext (see
 		// drainPendingReload).
-		if event.Status == "needs-repair" {
+		if event.Status == string(schema.StatusNeedsRepair) {
 			ticket, ok := run.tickets[event.Identifier]
 			if ok {
 				ticket.Running = false
@@ -376,7 +377,7 @@ func (r *loopRegistry) reduceLiveEvent(epicName string, event ralphloop.LiveEven
 				Message: fmt.Sprintf("\U0001f6d1 %s paused: %s", event.Identifier, event.Reason),
 			})
 		}
-		if event.Status == "needs-answer" || event.Status == "needs-repair" {
+		if event.Status == string(schema.StatusNeedsAnswer) || event.Status == string(schema.StatusNeedsRepair) {
 			run.pendingReload = true
 		}
 	case ralphloop.LiveEventIterationResumed:

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -14,9 +15,37 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil/herdrfake"
+	"github.com/elentok/gx/transcript"
 )
 
 const resolvedSharedContent = "shared resolved for D\n"
+
+// writeFakeTranscript writes a session transcript under a fake
+// ~/.claude/projects/<slug>/<sessionID>.jsonl (HOME must already be set via
+// t.Setenv by the caller), with one assistant line per (model, inputTokens,
+// cacheReadTokens) entry, one second apart starting at start.
+func writeFakeTranscript(t *testing.T, cwd, sessionID string, start time.Time, turns ...[3]any) {
+	t.Helper()
+	path, err := transcript.Path(cwd, sessionID)
+	if err != nil {
+		t.Fatalf("transcript.Path: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	var lines []string
+	for i, turn := range turns {
+		ts := start.Add(time.Duration(i) * time.Second).UTC().Format(time.RFC3339Nano)
+		model := turn[0].(string)
+		input := turn[1].(int)
+		cacheRead := turn[2].(int)
+		lines = append(lines, `{"type":"assistant","timestamp":"`+ts+`","message":{"model":"`+model+`","usage":{"input_tokens":`+strconv.Itoa(input)+`,"cache_read_input_tokens":`+strconv.Itoa(cacheRead)+`,"output_tokens":10}}}`)
+	}
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+}
 
 // ticketIDFromImplementPrompt extracts a ticket identifier ("01", "02", ...)
 // from a "/implement <ticket-path>" (Claude) or "$implement <ticket-path>"
