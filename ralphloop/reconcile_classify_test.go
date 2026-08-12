@@ -20,6 +20,7 @@ func classifyDoneTicketFixture() (Deps, tickets.Ticket) {
 }
 
 func TestClassifyDoneTicket_CommitLandedNoLeftover_OK(t *testing.T) {
+	t.Parallel()
 	d, ticket := classifyDoneTicketFixture()
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return true, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
@@ -36,6 +37,7 @@ func TestClassifyDoneTicket_CommitLandedNoLeftover_OK(t *testing.T) {
 }
 
 func TestClassifyDoneTicket_CommitLandedButBranchLeftover_StaleCleanup(t *testing.T) {
+	t.Parallel()
 	d, ticket := classifyDoneTicketFixture()
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return true, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "deadbeef", nil } // iteration branch still exists
@@ -52,6 +54,7 @@ func TestClassifyDoneTicket_CommitLandedButBranchLeftover_StaleCleanup(t *testin
 }
 
 func TestClassifyDoneTicket_CommitMissingBranchStillHasIt_Recoverable(t *testing.T) {
+	t.Parallel()
 	d, ticket := classifyDoneTicketFixture()
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "deadbeef", nil }
@@ -68,6 +71,7 @@ func TestClassifyDoneTicket_CommitMissingBranchStillHasIt_Recoverable(t *testing
 }
 
 func TestClassifyDoneTicket_CommitMissingNoBranch_Unrecoverable(t *testing.T) {
+	t.Parallel()
 	d, ticket := classifyDoneTicketFixture()
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
@@ -84,6 +88,7 @@ func TestClassifyDoneTicket_CommitMissingNoBranch_Unrecoverable(t *testing.T) {
 }
 
 func TestClassifyDoneTicket_NoRecordedEvent_TreatedAsMissing(t *testing.T) {
+	t.Parallel()
 	d, ticket := classifyDoneTicketFixture()
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) {
 		t.Fatal("IsAncestor should not be called with no recorded SHA to check")
@@ -106,6 +111,7 @@ func TestClassifyDoneTicket_NoRecordedEvent_TreatedAsMissing(t *testing.T) {
 // (e.g. 04 -> 04a/04b), so iterLabel/iterBranch must key off Identifier, not
 // Number, or lettered siblings would collide on the same worktree/branch.
 func TestIterLabelIterBranch_DistinctForLetteredSiblingsSharingNumber(t *testing.T) {
+	t.Parallel()
 	a, b := tickets.Ticket{Number: 4, Identifier: "04a"}, tickets.Ticket{Number: 4, Identifier: "04b"}
 	if iterLabel("epic", a.Identifier) == iterLabel("epic", b.Identifier) {
 		t.Errorf("iterLabel(%q) == iterLabel(%q) = %q, want distinct labels for siblings sharing Number 4", a.Identifier, b.Identifier, iterLabel("epic", a.Identifier))
@@ -124,6 +130,7 @@ func TestIterLabelIterBranch_DistinctForLetteredSiblingsSharingNumber(t *testing
 // lookup were still keyed by Number, 04b would inherit 04a's landed SHA and
 // misreport doneOK instead of doneUnrecoverable.
 func TestClassifyDoneTicket_LetteredSiblingsShareNumber_NotCrossAttributed(t *testing.T) {
+	t.Parallel()
 	d, _, _ := fakeDeps()
 	d.WorktreeExists = func(path string) (bool, error) { return false, nil }
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) {
@@ -157,6 +164,7 @@ func TestClassifyDoneTicket_LetteredSiblingsShareNumber_NotCrossAttributed(t *te
 }
 
 func TestClassifyDoneTicket_LiveTabCountsAsLeftover(t *testing.T) {
+	t.Parallel()
 	d, ticket := classifyDoneTicketFixture()
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return true, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
@@ -182,6 +190,7 @@ func TestClassifyDoneTicket_LiveTabCountsAsLeftover(t *testing.T) {
 // not be silently reverted to open or left marked done — it's flagged
 // needs-repair for a human to inspect, with a reason and a logged event.
 func TestReconcile_DoneTicketUnrecoverable_MarkedNeedsRepair(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
 	})

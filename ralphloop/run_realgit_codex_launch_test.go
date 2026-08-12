@@ -38,6 +38,10 @@ exit 1
 // asserts ticket 32's shared launch-failure outcomes via assertNoLaunchTrace
 // on top of its own distinct, actionable error message.
 func TestRun_ProductionRealGit_CodexLaunchPreflightFailures(t *testing.T) {
+	// not parallel-safe: the "incompatible herdr integration" case's subtest
+	// calls herdrfake.Start, which calls t.Setenv — and Setenv panics if the
+	// parent test has called t.Parallel, so this outer test must stay
+	// sequential too.
 	for _, tc := range []struct {
 		name          string
 		codexScript   string // "" leaves `codex` absent from PATH entirely
@@ -135,6 +139,7 @@ exit 1
 // function, asserting the same shared launch-failure outcomes plus the
 // skill's own specific, actionable reason.
 func TestRun_ProductionRealGit_MissingSkillFailsBeforeClaim(t *testing.T) {
+	t.Parallel()
 	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const epicName = "epic"
 	repoDir := testutil.TempRepo(t)
@@ -175,6 +180,8 @@ func TestRun_ProductionRealGit_MissingSkillFailsBeforeClaim(t *testing.T) {
 // TestRun_CodexLaunchFailureAfterClaimNeedsRepair but through real git +
 // herdrfake.State instead of stubbed Deps functions.
 func TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsRepair(t *testing.T) {
+	// not parallel-safe: herdrfake.StartState calls t.Setenv for the helper
+	// socket path and PATH.
 	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const epicName = "epic"
 	repoDir := testutil.TempRepo(t)
@@ -287,6 +294,9 @@ func TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsRepair(t *testin
 // polling the same session rather than launching or prompting a fresh one,
 // and lands it to completion exactly once.
 func TestRun_ProductionRealGit_CodexRestartReattachesAndLandsOnce(t *testing.T) {
+	// not parallel-safe: setProcessEnv mutates the process-wide $HOME/
+	// $CODEX_HOME env vars, and herdrfake.StartState calls t.Setenv for the
+	// helper socket path and PATH.
 	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const (
 		epicName  = "epic"

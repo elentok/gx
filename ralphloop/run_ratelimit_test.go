@@ -20,6 +20,7 @@ import (
 // auto-detecting the reset, re-prompting epic-iter-01's agent to continue, and
 // resuming normal scheduling.
 func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",

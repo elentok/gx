@@ -95,6 +95,7 @@ func (f *fakeTimeoutReporter) finish() {
 // Run() never returning) is failed fast, with a message identifying it by
 // name, well before any package-level timeout would fire.
 func TestRealGitTimeoutWatchdog_FiresOnHang(t *testing.T) {
+	t.Parallel()
 	fake := newFakeTimeoutReporter("TestFakeHungRealGitTest")
 	realGitTimeoutWatchdog(fake, 20*time.Millisecond)
 
@@ -112,6 +113,7 @@ func TestRealGitTimeoutWatchdog_FiresOnHang(t *testing.T) {
 // stays silent for a test that finishes before the bound, so it can't flake
 // a healthy test.
 func TestRealGitTimeoutWatchdog_NoFireWhenFinishedInTime(t *testing.T) {
+	t.Parallel()
 	fake := newFakeTimeoutReporter("TestFakeHealthyRealGitTest")
 	realGitTimeoutWatchdog(fake, 200*time.Millisecond)
 	fake.finish()

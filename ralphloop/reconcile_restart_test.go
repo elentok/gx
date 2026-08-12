@@ -19,6 +19,7 @@ import (
 // workspace, is reverted to open and then picked up and run fresh by normal
 // scheduling.
 func TestRun_RestartWithClaimedTicketButNoLiveTab_RerunsFromScratch(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})
@@ -71,6 +72,7 @@ func TestRun_RestartWithClaimedTicketButNoLiveTab_RerunsFromScratch(t *testing.T
 // still alive is reattached (no fresh worktree create, no initial prompt
 // replayed) and driven through to completion.
 func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})
@@ -145,6 +147,7 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 // to that live resolver instead of aborting the stale sequencer state and
 // forking a second one under the same conflict-labeled tab.
 func TestRun_RestartWithNeedsRepairTicketAndLiveResolver_ReattachesWithoutReforking(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md":                    "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n# A\n",
 		"01a-conflict-resolution.md": "---\nid: \"01a\"\nstatus: claimed\ntype: conflict-resolution\nparent: \"01\"\n---\n# Conflict resolution for 01\n",
@@ -238,6 +241,7 @@ func TestRun_RestartWithNeedsRepairTicketAndLiveResolver_ReattachesWithoutRefork
 // clear ran before finishIteration/waitForFinish, not just by the time Run
 // returns.
 func TestRun_ReattachClearsStaleIterationStatusBeforeFinish(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\niteration_status: finished\ntype: task\n---\n# A\n",
 	})
@@ -272,6 +276,7 @@ func TestRun_ReattachClearsStaleIterationStatusBeforeFinish(t *testing.T) {
 }
 
 func TestRun_RestartWithClaimedTicketAlreadyIdle_SkipsWaitAndCherryPicks(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})
@@ -324,6 +329,7 @@ func TestRun_RestartWithClaimedTicketAlreadyIdle_SkipsWaitAndCherryPicks(t *test
 }
 
 func TestRun_ReattachedCodexSessionIdentityFailureStopsSafely(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name     string
 		agent    herdr.Agent
@@ -334,6 +340,7 @@ func TestRun_ReattachedCodexSessionIdentityFailureStopsSafely(t *testing.T) {
 		{name: "mismatched rollout", agent: herdr.Agent{PaneID: "pane-epic-iter-01", WorkspaceID: "ws1", TabID: "tab-epic-iter-01", AgentStatus: "working", AgentSession: "wrong-session"}, wantErr: "does not match rollout metadata"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			scratchDir := writeEpic(t, "epic", map[string]string{
 				"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 			})
@@ -368,6 +375,7 @@ func TestRun_ReattachedCodexSessionIdentityFailureStopsSafely(t *testing.T) {
 }
 
 func TestRun_ReattachedCloseUsesLiveSessionInsteadOfStaleRunLog(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})
@@ -415,6 +423,7 @@ func TestRun_ReattachedCloseUsesLiveSessionInsteadOfStaleRunLog(t *testing.T) {
 // own (AgentSession == "") — the route ticket 08 calls out as most likely to
 // be missed because it's reached only after a restart.
 func TestRun_ReattachedCommitlessCloseWithNoLiveSession(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\niteration_status: finished\ncommitless: true\ntype: task\n---\n# A\n",
 	})
@@ -473,6 +482,7 @@ func TestRun_ReattachedCommitlessCloseWithNoLiveSession(t *testing.T) {
 // recover a session id from, the reattached close still marks the ticket
 // done, without writing a wrong/placeholder actual_context_window.
 func TestRun_ReattachedClose_NoPriorSessionInLog_OmitsMetadata(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})

@@ -28,6 +28,7 @@ func wholeScope(t *testing.T, epic tickets.Epic) RunScope {
 // Comments" — the write unparkAnswered makes on its own, independent of the
 // scan loop around it.
 func TestUnparkAnswered_LivePaneUnblocked_ReopensAndDemotesStub(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: task\n---\n# A\n\n## Needs Answer\n\nmy-epic-iter-01 is blocked on a prompt gx did not send; answer it in the pane\n",
 	})
@@ -71,6 +72,7 @@ func TestUnparkAnswered_LivePaneUnblocked_ReopensAndDemotesStub(t *testing.T) {
 // answer in the file. The live-pane predicate is the only thing telling this
 // apart from the gate-park case above.
 func TestUnparkAnswered_DeadPane_LeftForHuman(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: task\n---\n# A\n\n## Needs Answer\n\nunanswered\n",
 	})
@@ -103,6 +105,7 @@ func TestUnparkAnswered_DeadPane_LeftForHuman(t *testing.T) {
 // predicate's other half: a pane that is still live but still reporting
 // blocked hasn't actually been answered yet, so it must be left parked too.
 func TestUnparkAnswered_LiveButStillBlocked_LeftParked(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: task\n---\n# A\n\n## Needs Answer\n\nstill waiting\n",
 	})
@@ -144,6 +147,11 @@ func TestUnparkAnswered_LiveButStillBlocked_LeftParked(t *testing.T) {
 // only happen if the scheduler noticed ticket 01's answer on its own, not by
 // coincidentally waiting for ticket 02 anyway.
 func TestRun_AnsweredParkWithSiblingRunning_UnparksWithoutWaitingForSibling(t *testing.T) {
+	// not parallel-safe: asserts len(*removed) immediately after observing
+	// ticket 01's "status: done" write, with no synchronization between that
+	// write and the worktree-removal step it's racing — under the CPU
+	// contention of running alongside many other parallel tests, the removal
+	// can lag behind and flake the assertion.
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",

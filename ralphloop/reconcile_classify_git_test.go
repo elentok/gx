@@ -34,6 +34,7 @@ func realGitDeps() Deps {
 // behind. Verifies the real git.IsAncestor/git.RevParse wiring, not just the
 // classifier's own branching logic.
 func TestClassifyDoneTicket_RealRepo_CommitLandedAndCleanedUp_OK(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempRepo(t)
 	base, err := git.RevParse(dir, "HEAD")
 	if err != nil {
@@ -76,6 +77,7 @@ func TestClassifyDoneTicket_RealRepo_CommitLandedAndCleanedUp_OK(t *testing.T) {
 // matching a crash before that step), but the iteration branch itself is
 // still around to recover it from.
 func TestClassifyDoneTicket_RealRepo_NeverCherryPicked_Recoverable(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempRepo(t)
 	base, err := git.RevParse(dir, "HEAD")
 	if err != nil {
@@ -111,6 +113,7 @@ func TestClassifyDoneTicket_RealRepo_NeverCherryPicked_Recoverable(t *testing.T)
 // doneStaleCleanup instead — landed, just needs its leftover branch cleaned
 // up.
 func TestClassifyDoneTicket_RealRepo_RebasedAfterLanding_OK(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempRepo(t)
 	base, err := git.RevParse(dir, "HEAD")
 	if err != nil {
@@ -170,6 +173,7 @@ func TestClassifyDoneTicket_RealRepo_RebasedAfterLanding_OK(t *testing.T) {
 // letting classifyDoneTicket still recognize this as landed instead of
 // flagging a genuinely-done ticket doneUnrecoverable.
 func TestClassifyDoneTicket_RealRepo_RebasedWithConflictResolution_OK(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempRepo(t)
 	base, err := git.RevParse(dir, "HEAD")
 	if err != nil {
@@ -251,6 +255,7 @@ func TestClassifyDoneTicket_RealRepo_RebasedWithConflictResolution_OK(t *testing
 // matched an unrelated older epic's same-numbered ticket, misclassified this
 // one doneOK, and its worktree/branch were deleted without ever landing).
 func TestClassifyDoneTicket_RealRepo_TrailerScopedToEpic_NoCrossEpicFalsePositive(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempRepo(t)
 
 	// An unrelated, older epic's own ticket "05" landed here long ago,

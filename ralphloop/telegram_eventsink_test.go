@@ -65,6 +65,7 @@ func waitForRequests(get func() []telegramRequest, want int) []telegramRequest {
 // a real event; the membership/park-cardinality/message-content behavior is
 // exercised transport-agnostically in chat_eventsink_test.go.
 func TestTelegramEventSink_EpicComplete_PostsTelegramWireFormat(t *testing.T) {
+	t.Parallel()
 	server, getRequests := fakeTelegramServer(t, http.StatusOK)
 	inner := &recordingSink{}
 	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
@@ -92,6 +93,7 @@ func TestTelegramEventSink_EpicComplete_PostsTelegramWireFormat(t *testing.T) {
 }
 
 func TestTelegramEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
+	t.Parallel()
 	server, getRequests := fakeTelegramServer(t, http.StatusInternalServerError)
 	inner := &recordingSink{}
 	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
@@ -106,6 +108,7 @@ func TestTelegramEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
 }
 
 func TestTelegramEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
+	t.Parallel()
 	inner := &recordingSink{}
 	// A closed server's URL is unreachable but still well-formed, which is
 	// what a broken/unreachable Telegram API looks like to the client.
@@ -125,6 +128,7 @@ func TestTelegramEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
 }
 
 func TestSendTelegramTestMessage_SendsSynchronouslyAndReturnsNilOnSuccess(t *testing.T) {
+	t.Parallel()
 	server, getRequests := fakeTelegramServer(t, http.StatusOK)
 
 	err := sendTelegramTestMessage("tok", "chat-1", server.URL)
@@ -146,6 +150,7 @@ func TestSendTelegramTestMessage_SendsSynchronouslyAndReturnsNilOnSuccess(t *tes
 }
 
 func TestSendTelegramTestMessage_ReturnsErrorOnFailingServer(t *testing.T) {
+	t.Parallel()
 	server, _ := fakeTelegramServer(t, http.StatusInternalServerError)
 
 	if err := sendTelegramTestMessage("tok", "chat-1", server.URL); err == nil {
@@ -154,6 +159,7 @@ func TestSendTelegramTestMessage_ReturnsErrorOnFailingServer(t *testing.T) {
 }
 
 func TestSendTelegramMessage_SendsGivenTextEscaped(t *testing.T) {
+	t.Parallel()
 	server, getRequests := fakeTelegramServer(t, http.StatusOK)
 
 	err := sendTelegramMessage("tok", "chat-1", server.URL, "hello-world!")
@@ -172,6 +178,7 @@ func TestSendTelegramMessage_SendsGivenTextEscaped(t *testing.T) {
 }
 
 func TestSendTelegramMessage_ReturnsErrorOnFailingServer(t *testing.T) {
+	t.Parallel()
 	server, _ := fakeTelegramServer(t, http.StatusInternalServerError)
 
 	if err := sendTelegramMessage("tok", "chat-1", server.URL, "hello"); err == nil {
@@ -180,6 +187,7 @@ func TestSendTelegramMessage_ReturnsErrorOnFailingServer(t *testing.T) {
 }
 
 func TestTelegramEventSink_LogsNotificationSentToRunLog(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	server, _ := fakeTelegramServer(t, http.StatusOK)
 	sink := newTelegramEventSink(&recordingSink{}, "tok", "chat-1", server.URL, dir, "epic")
@@ -201,6 +209,7 @@ func TestTelegramEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 }
 
 func TestTelegramEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	server, _ := fakeTelegramServer(t, http.StatusInternalServerError)
 	sink := newTelegramEventSink(&recordingSink{}, "tok", "chat-1", server.URL, dir, "epic")
@@ -224,6 +233,7 @@ func TestTelegramEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 }
 
 func TestTelegramEventSink_LogsNotificationFailedToRunLog_RedactsBotToken(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	const secretToken = "super-secret-bot-token-123"
 	// A closed server's URL is unreachable but well-formed, so http.Client.Do

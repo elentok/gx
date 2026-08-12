@@ -41,6 +41,7 @@ import (
 // land) — it must stay doneUnrecoverable regardless of what else is in the
 // log.
 func TestClassifyDoneTicket_IterationStartedButNeverLanded_StillUnrecoverable(t *testing.T) {
+	t.Parallel()
 	d, ticket := classifyDoneTicketFixture()
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
@@ -66,6 +67,7 @@ func TestClassifyDoneTicket_IterationStartedButNeverLanded_StillUnrecoverable(t 
 // is reported, not silently trusted or silently corrupted — with the
 // specific reason a human needs to see to know what to check.
 func TestReconcile_DoneTicketWithNoProvenance_FlaggedNeedsRepairNotSilently(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
 	})
@@ -103,6 +105,7 @@ func TestReconcile_DoneTicketWithNoProvenance_FlaggedNeedsRepairNotSilently(t *t
 // be skipped for it entirely rather than flagging it needs-repair for
 // having no provenance.
 func TestReconcile_CommitlessDoneTicket_NotFlaggedUnrecoverable(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\ncommitless: true\n---\n# C\n",
 	})
@@ -141,6 +144,7 @@ func TestReconcile_CommitlessDoneTicket_NotFlaggedUnrecoverable(t *testing.T) {
 // schema.Ticket.IsCommitless treats them as commitless by type — no
 // per-ticket commitless: true needed.
 func TestReconcile_ResearchGrillingCodeReviewDoneTickets_NotFlaggedUnrecoverable(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-r.md": "---\nid: \"01\"\nstatus: done\ntype: research\n---\n# R\n",
 		"02-g.md": "---\nid: \"02\"\nstatus: done\ntype: grilling\n---\n# G\n",
@@ -181,6 +185,7 @@ func TestReconcile_ResearchGrillingCodeReviewDoneTickets_NotFlaggedUnrecoverable
 // it must stay on the crash-recovery path unless explicitly flagged
 // commitless: true, same as a plain task ticket.
 func TestReconcile_PrototypeDoneTicket_StillFlaggedUnrecoverable(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"04-p.md": "---\nid: \"04\"\nstatus: done\ntype: prototype\n---\n# P\n",
 	})
@@ -214,6 +219,7 @@ func TestReconcile_PrototypeDoneTicket_StillFlaggedUnrecoverable(t *testing.T) {
 // touched needs-repair. Scope now gates this loop the same way it already
 // gated claim/needs-repair reattachment above.
 func TestReconcile_OutOfScopeDoneTicket_NotVerified(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: done\ntype: task\n---\n# A\n",
 		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
@@ -257,6 +263,7 @@ func TestReconcile_OutOfScopeDoneTicket_NotVerified(t *testing.T) {
 // persistence format needed — this is the same evidence classifyDoneTicket
 // already trusts.
 func TestClassifyDoneTicket_BackfilledCherryPickEvent_RecognizedAsLanded(t *testing.T) {
+	t.Parallel()
 	d, ticket := classifyDoneTicketFixture()
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) {
 		return ancestor == "confirmed-landed-sha", nil
@@ -287,6 +294,7 @@ func TestClassifyDoneTicket_BackfilledCherryPickEvent_RecognizedAsLanded(t *test
 // supported way out of the exact stuck state from the field report, not a
 // hand-edit of ticket frontmatter.
 func TestRun_BackfilledProvenance_UnblocksDependentsAndCompletesEpic(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"02-b.md": "---\nid: \"02\"\nstatus: done\ntype: task\n---\n# B\n",
 		"03-d.md": "---\nid: \"03\"\nstatus: open\ntype: task\nblocked_by: [\"02\"]\n---\n# D\n",

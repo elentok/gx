@@ -16,6 +16,7 @@ import (
 )
 
 func TestWaitForFinish_CodexNativeContextFailureRecoversDespiteStaleOccupancy(t *testing.T) {
+	t.Parallel()
 	const failure = "■ stream disconnected before completion: Your input exceeds the context window of this model. Please adjust your input and try again."
 	scratchDir := t.TempDir()
 	var waits, paneReads, interruptions int
@@ -79,6 +80,7 @@ func TestWaitForFinish_CodexNativeContextFailureRecoversDespiteStaleOccupancy(t 
 }
 
 func TestWaitForFinish_CodexNativeContextFailureDetectedWhenSettled(t *testing.T) {
+	t.Parallel()
 	var paneReads, interruptions int
 	d := Deps{
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
@@ -120,6 +122,7 @@ func TestWaitForFinish_CodexNativeContextFailureDetectedWhenSettled(t *testing.T
 }
 
 func TestWaitForFinish_CodexNativeContextFailureRecoveryFailureIsDurable(t *testing.T) {
+	t.Parallel()
 	const failure = "■ Codex ran out of room in the model's context window."
 	var paneReads, interruptions int
 	d := Deps{
@@ -162,6 +165,7 @@ func TestWaitForFinish_CodexNativeContextFailureRecoveryFailureIsDurable(t *test
 }
 
 func TestWaitForFinish_CodexNativeContextFailureFailsDurablyWithoutFreshTokenEvent(t *testing.T) {
+	t.Parallel()
 	// No ReadCodexContext dependency at all: the classification and its
 	// recovery-failure path must not depend on a fresh high-token record
 	// existing to fire — the native exhaustion text is itself the evidence.
@@ -198,12 +202,14 @@ func TestWaitForFinish_CodexNativeContextFailureFailsDurablyWithoutFreshTokenEve
 }
 
 func TestWaitForFinish_CodexContextDiscussionDoesNotTriggerRecovery(t *testing.T) {
+	t.Parallel()
 	for _, text := range []string{
 		"Error: request failed with status 500",
 		`I am adding detection for "Your input exceeds the context window of this model."`,
 		"The response included context_length_exceeded, which we should classify.",
 	} {
 		t.Run(text, func(t *testing.T) {
+			t.Parallel()
 			var paneReads, interruptions int
 			d := Deps{
 				AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
@@ -244,6 +250,7 @@ func TestWaitForFinish_CodexContextDiscussionDoesNotTriggerRecovery(t *testing.T
 }
 
 func TestWaitForFinish_CodexContextBreachRecoversThroughBlockedCompactConfirmation(t *testing.T) {
+	t.Parallel()
 	ticketPath := writeFrontmatterTicket(t, "claimed")
 	gate := NewGate()
 	var waits int
@@ -339,6 +346,7 @@ func TestWaitForFinish_CodexContextBreachRecoversThroughBlockedCompactConfirmati
 // boundary count rises above its pre-compact baseline, recovery must treat
 // that as success (and finish up) instead of reporting a failure.
 func TestRecoverSmartZoneBreach_TranscriptConfirmsLateCompaction(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	var waits, prompts int
 	var compactionCount int
@@ -423,6 +431,7 @@ func TestRecoverSmartZoneBreach_TranscriptConfirmsLateCompaction(t *testing.T) {
 // wait must eventually give up (at smartZoneCompactExtendedTimeoutMs) and
 // report a genuine failure, not poll forever.
 func TestRecoverSmartZoneBreach_GenuineStuckCompactFailsAfterExtendedWait(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	var prompts int
 	d := Deps{
@@ -483,6 +492,7 @@ func TestRecoverSmartZoneBreach_GenuineStuckCompactFailsAfterExtendedWait(t *tes
 // through to waitForCompactionSignal instead of sending the finish-up
 // prompt right away.
 func TestRecoverSmartZoneBreach_PrematureIdleFallsThroughToTranscriptCheck(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	var prompts []string
 	var waits int
@@ -542,6 +552,7 @@ func TestRecoverSmartZoneBreach_PrematureIdleFallsThroughToTranscriptCheck(t *te
 // success comes back, that's a genuine completion and recovery proceeds
 // straight to the finish-up prompt with no extra polling.
 func TestRecoverSmartZoneBreach_ImmediateSuccessTrustedWhenAlreadyAdvanced(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	var prompts []string
 	var waits int
@@ -594,10 +605,12 @@ func TestRecoverSmartZoneBreach_ImmediateSuccessTrustedWhenAlreadyAdvanced(t *te
 }
 
 func TestCompactSignalUnconfirmed(t *testing.T) {
+	t.Parallel()
 	p := launchAndPromptParams{Agent: AgentClaude, SessionCwd: "/repo/iter-19"}
 	confirmedBaseline := &stickyBaseline{snapshot: compactBoundarySnapshot{state: compactBoundaryConfirmed}}
 
 	t.Run("poll timeout is unconfirmed", func(t *testing.T) {
+		t.Parallel()
 		d := Deps{}
 		unconfirmed, gateHeld := compactSignalUnconfirmed(d, p, "sess-19", errors.New("timed out waiting for agent status"), confirmedBaseline)
 		if !unconfirmed {
@@ -609,6 +622,7 @@ func TestCompactSignalUnconfirmed(t *testing.T) {
 	})
 
 	t.Run("non-timeout error is confirmed (not re-polled here)", func(t *testing.T) {
+		t.Parallel()
 		d := Deps{}
 		unconfirmed, _ := compactSignalUnconfirmed(d, p, "sess-19", errors.New("boom"), confirmedBaseline)
 		if unconfirmed {
@@ -617,6 +631,7 @@ func TestCompactSignalUnconfirmed(t *testing.T) {
 	})
 
 	t.Run("success with baseline not yet advanced is unconfirmed", func(t *testing.T) {
+		t.Parallel()
 		d := Deps{
 			ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 				return 0, true, nil
@@ -632,6 +647,7 @@ func TestCompactSignalUnconfirmed(t *testing.T) {
 	})
 
 	t.Run("success with baseline already advanced is confirmed", func(t *testing.T) {
+		t.Parallel()
 		d := Deps{
 			ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 				return 1, true, nil
@@ -644,6 +660,7 @@ func TestCompactSignalUnconfirmed(t *testing.T) {
 	})
 
 	t.Run("success on an unsupported agent is confirmed", func(t *testing.T) {
+		t.Parallel()
 		d := Deps{}
 		unconfirmed, _ := compactSignalUnconfirmed(d, p, "sess-19", nil, &stickyBaseline{snapshot: compactBoundarySnapshot{state: compactBoundaryUnsupported}})
 		if unconfirmed {
@@ -652,6 +669,7 @@ func TestCompactSignalUnconfirmed(t *testing.T) {
 	})
 
 	t.Run("success with a re-fetch error is unconfirmed", func(t *testing.T) {
+		t.Parallel()
 		d := Deps{
 			ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 				return 0, false, errors.New("read failed")
@@ -667,6 +685,7 @@ func TestCompactSignalUnconfirmed(t *testing.T) {
 	})
 
 	t.Run("success on an unavailable baseline with no boundary since submission is unconfirmed", func(t *testing.T) {
+		t.Parallel()
 		d := Deps{
 			ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 				return 3, true, nil
@@ -682,6 +701,7 @@ func TestCompactSignalUnconfirmed(t *testing.T) {
 	})
 
 	t.Run("success on an unavailable baseline with a boundary since submission is confirmed", func(t *testing.T) {
+		t.Parallel()
 		d := Deps{
 			ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 				return 3, true, nil
@@ -698,6 +718,7 @@ func TestCompactSignalUnconfirmed(t *testing.T) {
 }
 
 func TestReadCompactBoundaries_ClassifiesEachState(t *testing.T) {
+	t.Parallel()
 	reads := func(count int, ok bool, err error) func(string, string) (int, bool, error) {
 		return func(string, string) (int, bool, error) { return count, ok, err }
 	}
@@ -742,6 +763,7 @@ func TestReadCompactBoundaries_ClassifiesEachState(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got := readCompactBoundaries(Deps{ReadCompactions: tc.read}, tc.agent, "/repo/iter-19", tc.sessionID)
 			if got != tc.want {
 				t.Errorf("readCompactBoundaries() = %+v, want %+v", got, tc.want)
@@ -772,6 +794,7 @@ func gatedBreachParams(scratchDir string) launchAndPromptParams {
 // must be paced by real poll intervals rather than spinning through the
 // extended bound instantly.
 func TestRecoverSmartZoneBreach_GateHoldsWhileBoundaryStaysAtBaseline(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	var prompts []string
 	var sleeps []time.Duration
@@ -820,6 +843,7 @@ func TestRecoverSmartZoneBreach_GateHoldsWhileBoundaryStaysAtBaseline(t *testing
 // lands part-way through. Recovery must resume the moment the boundary count
 // moves and send the finish-up prompt then, not before and not never.
 func TestRecoverSmartZoneBreach_GateReleasesOnceBoundaryAdvances(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	var prompts []string
 	var sleeps []time.Duration
@@ -883,6 +907,7 @@ func compactCompletionEvents(t *testing.T, scratchDir string) map[string]bool {
 // boundary landed a few ticks later. Nothing about that wait expired, so it
 // must log the gated event rather than borrowing the timeout one.
 func TestRecoverSmartZoneBreach_GatedCompletionLogsItsOwnEvent(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	var waits int
 	compactionCount := 0
@@ -923,6 +948,7 @@ func TestRecoverSmartZoneBreach_GatedCompletionLogsItsOwnEvent(t *testing.T) {
 // other direction: a pane wait that really did run past the compact timeout
 // keeps the expired event and must not pick up the gated one.
 func TestRecoverSmartZoneBreach_TimeoutCompletionKeepsTheExpiredEvent(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	var waits int
 	compactionCount := 0
@@ -967,6 +993,7 @@ func TestRecoverSmartZoneBreach_TimeoutCompletionKeepsTheExpiredEvent(t *testing
 // agreed on the first read. Neither route was taken, so neither event belongs
 // in the run log.
 func TestRecoverSmartZoneBreach_PaneConfirmedCompletionLogsNeitherEvent(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	var reads int
 	d := Deps{
@@ -1009,6 +1036,7 @@ func TestRecoverSmartZoneBreach_PaneConfirmedCompletionLogsNeitherEvent(t *testi
 // branches would double every tick and stretch the extended bound to twenty
 // minutes of wall clock.
 func TestRecoverSmartZoneBreach_TimeoutPathIsNotDoublePaced(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	var sleeps []time.Duration
 	var waits int
@@ -1049,6 +1077,7 @@ func TestRecoverSmartZoneBreach_TimeoutPathIsNotDoublePaced(t *testing.T) {
 // while a Claude session whose id isn't known yet is merely unavailable and
 // must not be trusted on the pane's word.
 func TestRecoverSmartZoneBreach_UnsupportedFailsOpenButUnavailableDoesNot(t *testing.T) {
+	t.Parallel()
 	newDeps := func(prompts *[]string, readCompactions func(string, string) (int, bool, error)) Deps {
 		return Deps{
 			AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
@@ -1067,6 +1096,7 @@ func TestRecoverSmartZoneBreach_UnsupportedFailsOpenButUnavailableDoesNot(t *tes
 	}
 
 	t.Run("no boundary signal at all trusts the idle pane", func(t *testing.T) {
+		t.Parallel()
 		var prompts []string
 		recovered, err := recoverSmartZoneBreach(newDeps(&prompts, nil), gatedBreachParams(t.TempDir()), "sess-19", "smart-zone breach", 100)
 		if err != nil {
@@ -1078,6 +1108,7 @@ func TestRecoverSmartZoneBreach_UnsupportedFailsOpenButUnavailableDoesNot(t *tes
 	})
 
 	t.Run("unidentified session holds the gate closed", func(t *testing.T) {
+		t.Parallel()
 		var prompts []string
 		d := newDeps(&prompts, func(string, string) (int, bool, error) { return 0, true, nil })
 		recovered, err := recoverSmartZoneBreach(d, gatedBreachParams(t.TempDir()), "", "smart-zone breach", 100)
@@ -1108,6 +1139,7 @@ func nestedCompactWaitCallsPerCycle() int {
 }
 
 func TestWaitForFinish_AbsorbsGatedGiveUpAndKeepsPolling(t *testing.T) {
+	t.Parallel()
 	var prompts []string
 	var waits int
 	boundaries := 0
@@ -1159,6 +1191,7 @@ func TestWaitForFinish_AbsorbsGatedGiveUpAndKeepsPolling(t *testing.T) {
 }
 
 func TestWaitForFinish_PropagatesNonGatedRecoveryErrors(t *testing.T) {
+	t.Parallel()
 	var waits int
 	d := Deps{
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
@@ -1212,6 +1245,7 @@ func countPrompts(prompts []string, text string) int {
 // must never fall back to the finish-up prompt, which is the compaction
 // cancellation the gate exists to prevent.
 func TestWaitForFinish_EscalatesAfterTwoConsecutiveGatedGiveUps(t *testing.T) {
+	t.Parallel()
 	var prompts []string
 	nestedCallsPerCycle := nestedCompactWaitCallsPerCycle()
 	sinceBreach := nestedCallsPerCycle + 1
@@ -1259,6 +1293,7 @@ func TestWaitForFinish_EscalatesAfterTwoConsecutiveGatedGiveUps(t *testing.T) {
 // out of reach — the loop leaves by the finish path before a second give-up can
 // ever be counted.
 func TestWaitForFinish_GatedGiveUpDeniesAPaneIdleToEveryPollKind(t *testing.T) {
+	t.Parallel()
 	var prompts []string
 	// compacted alone (not Until's shape, since ticket 14 put "blocked" in
 	// every finish poll's completion states too) both drives the nested
@@ -1308,6 +1343,7 @@ func TestWaitForFinish_GatedGiveUpDeniesAPaneIdleToEveryPollKind(t *testing.T) {
 // *consecutive* give-ups. A lifetime tally would escalate a healthy long
 // iteration on two unrelated give-ups it had already recovered from.
 func TestWaitForFinish_SuccessfulRecoveryResetsTheGiveUpCounter(t *testing.T) {
+	t.Parallel()
 	var prompts []string
 	attempt := 0
 	boundaries := 0
@@ -1379,6 +1415,7 @@ func TestWaitForFinish_SuccessfulRecoveryResetsTheGiveUpCounter(t *testing.T) {
 // nil error would clear the counter for exactly the failures that say nothing
 // about whether compaction is progressing.
 func TestWaitForFinish_NonGatedRecoveryFailureNeitherCountsNorResets(t *testing.T) {
+	t.Parallel()
 	var prompts []string
 	attempt := 0
 	boundaries := 0
@@ -1436,7 +1473,9 @@ func TestWaitForFinish_NonGatedRecoveryFailureNeitherCountsNorResets(t *testing.
 }
 
 func TestConfirmCompactSubmitted(t *testing.T) {
+	t.Parallel()
 	t.Run("trailing /compact line reports not yet submitted", func(t *testing.T) {
+		t.Parallel()
 		d := Deps{
 			AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
 				return "some earlier output\n/compact", nil
@@ -1452,6 +1491,7 @@ func TestConfirmCompactSubmitted(t *testing.T) {
 	})
 
 	t.Run("rendered output past /compact reports submitted", func(t *testing.T) {
+		t.Parallel()
 		d := Deps{
 			AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
 				return "/compact\nCompacting conversation...\nworking", nil
@@ -1472,6 +1512,7 @@ func TestConfirmCompactSubmitted(t *testing.T) {
 // AgentRead results should drive exactly one Sleep call per retry, each of
 // smartZoneCompactSubmitPollMs, with no AgentWait call at all.
 func TestConfirmCompactSubmittedWithRetry_PacesWithSleep(t *testing.T) {
+	t.Parallel()
 	var reads int
 	var sleeps []time.Duration
 	d := Deps{
@@ -1511,6 +1552,7 @@ func TestConfirmCompactSubmittedWithRetry_PacesWithSleep(t *testing.T) {
 // must not let the finish-up prompt go out on top of it. The finish-up
 // prompt must wait until confirmCompactSubmitted confirms.
 func TestRecoverSmartZoneBreach_FinishUpGatedOnCompactSubmitConfirmation(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	var prompts []string
 	var sentKeys [][]string
@@ -1570,6 +1612,7 @@ func TestRecoverSmartZoneBreach_FinishUpGatedOnCompactSubmitConfirmation(t *test
 // loop gives up after smartZoneCompactSubmitTimeoutMs without ever nudging or
 // resubmitting, and no finish-up prompt is sent.
 func TestRecoverSmartZoneBreach_FinishUpGateGivesUpAfterTimeout(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	var prompts []string
 	var sentKeys [][]string
@@ -1657,6 +1700,7 @@ func staleReadingDeps(tokens int, stale bool, waits *int) Deps {
 }
 
 func TestWaitForFinish_StaleOccupancyAfterCompactionDoesNotRebreach(t *testing.T) {
+	t.Parallel()
 	var waits int
 	sink := &occupancySink{}
 	d := staleReadingDeps(200, true, &waits)
@@ -1682,6 +1726,7 @@ func TestWaitForFinish_StaleOccupancyAfterCompactionDoesNotRebreach(t *testing.T
 }
 
 func TestWaitForFinish_FreshOccupancyStillBreaches(t *testing.T) {
+	t.Parallel()
 	var waits, interruptions, boundaries int
 	var prompts []string
 	d := staleReadingDeps(200, false, &waits)
@@ -1714,6 +1759,7 @@ func TestWaitForFinish_FreshOccupancyStillBreaches(t *testing.T) {
 }
 
 func TestContextOccupancy_UnaffectedByStaleness(t *testing.T) {
+	t.Parallel()
 	var waits int
 	d := staleReadingDeps(200, true, &waits)
 	d.ReadOccupancyReading = func(cwd, sessionID string) (transcript.OccupancyReading, error) {
@@ -1776,6 +1822,7 @@ func (s *occupancySink) ContextOccupancy(identifier string, tokens int) {
 }
 
 func TestWaitForFinish_EmitsContextOccupancyOnEachPollTimeout(t *testing.T) {
+	t.Parallel()
 	var waits int
 	sink := &occupancySink{}
 	d := Deps{
@@ -1820,8 +1867,10 @@ func TestWaitForFinish_EmitsContextOccupancyOnEachPollTimeout(t *testing.T) {
 // is ever made while the pane is blocked, since typing into a pane sitting
 // on an operator's own pending dialog would be exactly that.
 func TestWaitForFinish_BlockedPaneDwellsThenParks(t *testing.T) {
+	t.Parallel()
 	for _, agentKind := range []AgentKind{AgentClaude, AgentCodex} {
 		t.Run(string(agentKind), func(t *testing.T) {
+			t.Parallel()
 			ticketPath := writeFrontmatterTicket(t, "claimed")
 			scratchDir := t.TempDir()
 			var slept []time.Duration
@@ -1890,6 +1939,7 @@ func TestWaitForFinish_BlockedPaneDwellsThenParks(t *testing.T) {
 // park: a pane that is no longer blocked by the time the 15s window ends
 // keeps the iteration running instead of parking it.
 func TestWaitForFinish_BlockedPaneClearsBeforeDwellRecheck_DoesNotPark(t *testing.T) {
+	t.Parallel()
 	ticketPath := writeFrontmatterTicket(t, "claimed")
 	var waits int
 	d := Deps{
@@ -1930,6 +1980,7 @@ func TestWaitForFinish_BlockedPaneClearsBeforeDwellRecheck_DoesNotPark(t *testin
 // purely off the single end-of-window read — proven here by AgentWait never
 // being asked again once the dwell starts.
 func TestWaitForFinish_BlockedPaneDwellIsFixedWindow_NotASettleTimer(t *testing.T) {
+	t.Parallel()
 	ticketPath := writeFrontmatterTicket(t, "claimed")
 	var waits int
 	d := Deps{
@@ -1961,6 +2012,7 @@ func TestWaitForFinish_BlockedPaneDwellIsFixedWindow_NotASettleTimer(t *testing.
 // effect, and the very next poll tick observing that must not be mistaken
 // for an operator-raised prompt and parked.
 func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotParked(t *testing.T) {
+	t.Parallel()
 	ticketPath := writeFrontmatterTicket(t, "claimed")
 	var waits int
 	var readCompactionsCalls int
@@ -2024,8 +2076,10 @@ func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotParked(t 
 }
 
 func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsRepair(t *testing.T) {
+	t.Parallel()
 	for _, quota := range []string{"primary", "secondary"} {
 		t.Run(quota, func(t *testing.T) {
+			t.Parallel()
 			ticketPath := writeFrontmatterTicket(t, "claimed")
 			gate := NewGate()
 			sink := &quotaEventSink{}
@@ -2100,6 +2154,7 @@ func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsRepair(t *testing.T) {
 }
 
 func TestCodexRateLimit_UsesPaneOnlyWhenStructuredQuotaCannotIdentifyBlock(t *testing.T) {
+	t.Parallel()
 	structuredErr := errors.New("rollout unreadable")
 	paneErr := errors.New("pane unreadable")
 	cases := []struct {
@@ -2159,6 +2214,7 @@ func TestCodexRateLimit_UsesPaneOnlyWhenStructuredQuotaCannotIdentifyBlock(t *te
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			paneReads := 0
 			d := Deps{
 				ReadCodexRateLimit: tc.structured,
@@ -2184,6 +2240,7 @@ func TestCodexRateLimit_UsesPaneOnlyWhenStructuredQuotaCannotIdentifyBlock(t *te
 }
 
 func TestWaitForFinish_CodexQuotaDetectionErrorPreservesClaimedTicket(t *testing.T) {
+	t.Parallel()
 	ticketPath := writeFrontmatterTicket(t, "claimed")
 	d := Deps{
 		AgentWait: func(herdr.AgentWaitOptions) (herdr.Agent, error) {
@@ -2210,6 +2267,7 @@ func TestWaitForFinish_CodexQuotaDetectionErrorPreservesClaimedTicket(t *testing
 }
 
 func TestWaitForFinish_CodexPaneQuotaDoesNotBecomeNeedsRepair(t *testing.T) {
+	t.Parallel()
 	ticketPath := writeFrontmatterTicket(t, "claimed")
 	gate := NewGate()
 	sink := &quotaEventSink{}
@@ -2254,6 +2312,7 @@ func TestWaitForFinish_CodexPaneQuotaDoesNotBecomeNeedsRepair(t *testing.T) {
 }
 
 func TestWaitForFinish_CodexPaneReadErrorPreservesClaimedTicket(t *testing.T) {
+	t.Parallel()
 	ticketPath := writeFrontmatterTicket(t, "claimed")
 	d := Deps{
 		AgentWait: func(herdr.AgentWaitOptions) (herdr.Agent, error) {
@@ -2281,6 +2340,7 @@ func TestWaitForFinish_CodexPaneReadErrorPreservesClaimedTicket(t *testing.T) {
 }
 
 func TestWaitForFinish_CodexIgnoresClaudeTerminalRateLimitText(t *testing.T) {
+	t.Parallel()
 	var waits, prompts int
 	d := Deps{
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
@@ -2347,6 +2407,7 @@ func noBoundarySinceSubmission(string, string, time.Time) (int, bool, error) { r
 // against, the gate switches to "was a boundary written after submission" and
 // still refuses the pane's premature idle report until one is.
 func TestRecoverSmartZoneBreach_UnavailableBaselineConfirmsOnABoundaryAfterSubmission(t *testing.T) {
+	t.Parallel()
 	var prompts []string
 	var sleeps, waits int
 	landed := 0
@@ -2387,6 +2448,7 @@ func TestRecoverSmartZoneBreach_UnavailableBaselineConfirmsOnABoundaryAfterSubmi
 // could only ever report "not advanced" here, turning a successful compaction
 // into ten minutes of waiting and a gated give-up.
 func TestRecoverSmartZoneBreach_FastCompactionUnderAnUnavailableBaselineIsConfirmed(t *testing.T) {
+	t.Parallel()
 	var prompts []string
 	var sleeps, waits int
 	d := stickyBaselineDeps(&prompts, &sleeps,
@@ -2423,6 +2485,7 @@ func TestRecoverSmartZoneBreach_FastCompactionUnderAnUnavailableBaselineIsConfir
 // reported as a give-up. With no boundary landing after submission here, the
 // recovery must give up on the extended bound — never on that stale comparison.
 func TestRecoverSmartZoneBreach_UnavailableBaselineNeverRebasesOnALaterCount(t *testing.T) {
+	t.Parallel()
 	var prompts []string
 	var sleeps, reads int
 	d := stickyBaselineDeps(&prompts, &sleeps,
@@ -2456,6 +2519,7 @@ func TestRecoverSmartZoneBreach_UnavailableBaselineNeverRebasesOnALaterCount(t *
 // problem must surface as an ordinary gated give-up, paced by the extended
 // bound.
 func TestRecoverSmartZoneBreach_UnavailableReadsInLoopHoldGateClosed(t *testing.T) {
+	t.Parallel()
 	var prompts []string
 	var sleeps, reads int
 	d := stickyBaselineDeps(&prompts, &sleeps,
@@ -2495,9 +2559,11 @@ func TestRecoverSmartZoneBreach_UnavailableReadsInLoopHoldGateClosed(t *testing.
 // holds the gate closed; a Codex session has no boundary signal at all and
 // still fails open, never routed through the closed-gate policy.
 func TestRecoverSmartZoneBreach_MissingTranscriptVersusUnsupportedAgent(t *testing.T) {
+	t.Parallel()
 	missing := func(string, string) (int, bool, error) { return 0, false, nil }
 
 	t.Run("Claude transcript not written yet holds the gate closed", func(t *testing.T) {
+		t.Parallel()
 		var prompts []string
 		var sleeps int
 		d := stickyBaselineDeps(&prompts, &sleeps, missing, noBoundarySinceSubmission, nil)
@@ -2511,6 +2577,7 @@ func TestRecoverSmartZoneBreach_MissingTranscriptVersusUnsupportedAgent(t *testi
 	})
 
 	t.Run("Codex has no boundary signal and fails open", func(t *testing.T) {
+		t.Parallel()
 		var prompts []string
 		var sleeps, waits int
 		d := stickyBaselineDeps(&prompts, &sleeps, missing, noBoundarySinceSubmission, func() { waits++ })

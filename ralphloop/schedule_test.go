@@ -9,6 +9,7 @@ import (
 )
 
 func TestFrontier_MixedStatuses(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
 		{Number: 3, Status: "draft"},
 		{Number: 1, Status: "open"},
@@ -23,6 +24,7 @@ func TestFrontier_MixedStatuses(t *testing.T) {
 }
 
 func TestFrontier_PartiallyBlockedIsExcluded(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
 		{Number: 1, BlockedBy: []string{"2", "3"}},
 		{Number: 2, Status: "done"},
@@ -34,6 +36,7 @@ func TestFrontier_PartiallyBlockedIsExcluded(t *testing.T) {
 }
 
 func TestFrontier_ClaimedAndDoneExcluded(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
 		{Number: 1, Status: "claimed"},
 		{Number: 2, Status: "done"},
@@ -47,6 +50,7 @@ func TestFrontier_ClaimedAndDoneExcluded(t *testing.T) {
 }
 
 func TestFrontier_OrderedByTicketNumber(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
 		{Number: 5, Status: "open"},
 		{Number: 1, Status: "open"},
@@ -58,6 +62,7 @@ func TestFrontier_OrderedByTicketNumber(t *testing.T) {
 }
 
 func TestFrontier_BlockerChain(t *testing.T) {
+	t.Parallel()
 	// 1 <- 2 <- 3: only 1 is unblocked until each link resolves in turn.
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
 		{Number: 1, Status: "open"},
@@ -77,11 +82,13 @@ func TestFrontier_BlockerChain(t *testing.T) {
 // safety property: status is required, so a ticket with none is an error
 // rather than an open ticket an agent can be handed.
 func TestFrontier_NoStatusIsNotSchedulable(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Tickets: []tickets.Ticket{{Number: 1}}}
 	assertNumbers(t, Frontier(epic), nil)
 }
 
 func TestFrontier_EmptyEpic(t *testing.T) {
+	t.Parallel()
 	got := Frontier(tickets.Epic{})
 	if len(got) != 0 {
 		t.Errorf("Frontier(empty epic) = %v, want empty", got)
@@ -93,6 +100,7 @@ func TestFrontier_EmptyEpic(t *testing.T) {
 // literals, per the ticket's "fully unit-testable against fixture ticket
 // directories" requirement.
 func TestFrontier_AgainstFixtureEpicDirectory(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	issuesDir := filepath.Join(scratchDir, "my-epic", "issues")
 	if err := os.MkdirAll(issuesDir, 0755); err != nil {
@@ -129,6 +137,7 @@ func TestFrontier_AgainstFixtureEpicDirectory(t *testing.T) {
 }
 
 func TestFrontier_DraftIsExcluded(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
 		{Number: 1, Status: "draft"},
 		{Number: 2, Status: "open"},
@@ -138,6 +147,7 @@ func TestFrontier_DraftIsExcluded(t *testing.T) {
 }
 
 func TestFrontier_TicketBlockedOnDraftStaysBlocked(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
 		{Number: 1, Status: "draft"},
 		{Number: 2, Status: "open", BlockedBy: []string{"1"}},

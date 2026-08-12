@@ -126,6 +126,7 @@ func (s *recordingSink) SmartZoneFinishingUp(identifier string) { s.record("Smar
 func (s *recordingSink) SmartZoneRecovered(identifier string)   { s.record("SmartZoneRecovered") }
 
 func TestRun_EventSink_EmitsLifecycleSequenceForASingleTicket(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})
@@ -149,6 +150,7 @@ func TestRun_EventSink_EmitsLifecycleSequenceForASingleTicket(t *testing.T) {
 }
 
 func TestRecordingSink_CapturesIterationFinishedStatsAndEpicCompleteElapsedSeconds(t *testing.T) {
+	t.Parallel()
 	sink := &recordingSink{}
 
 	stats := IterationStats{ElapsedSeconds: 42, PeakContextTokens: 12345, InProgress: 2, Completed: 3, Total: 5}
@@ -164,6 +166,7 @@ func TestRecordingSink_CapturesIterationFinishedStatsAndEpicCompleteElapsedSecon
 }
 
 func TestRun_EventSink_NoTicketsFound(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	d, _, _ := fakeDeps()
 
@@ -182,6 +185,7 @@ func TestRun_EventSink_NoTicketsFound(t *testing.T) {
 // produces the same single EpicStarted event as a fresh run or an empty
 // epic, not a separate "already complete" event.
 func TestRun_EventSink_AlreadyCompleteEpic_EmitsExactlyOneEpicStarted(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: done\ntype: task\n---\n# A\n",
 	})

@@ -17,6 +17,7 @@ import (
 // gets re-cherry-picked automatically, with a cherry-picked event logged and
 // a report line naming what was restored.
 func TestReconcile_DoneTicketRecoverable_AutoRecherryPicksAndReports(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
 	})
@@ -79,6 +80,7 @@ func TestReconcile_DoneTicketRecoverable_AutoRecherryPicksAndReports(t *testing.
 // ticket's commits were being re-landed. TicketRecovering must fire first so
 // a renderer has something to attach the cherry-pick phase to.
 func TestReconcile_DoneTicketRecoverable_ReportsRecoveringBeforeCherryPick(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
 	})
@@ -125,6 +127,7 @@ func TestReconcile_DoneTicketRecoverable_ReportsRecoveringBeforeCherryPick(t *te
 // feature worktree) a normal iteration's first cherry-pick uses, rather than
 // a separate repair-specific conflict handler.
 func TestReconcile_DoneTicketRecoverable_ConflictGoesThroughResolutionPath(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
 	})
@@ -179,6 +182,7 @@ func TestReconcile_DoneTicketRecoverable_ConflictGoesThroughResolutionPath(t *te
 // this exercises reattachLiveConflictResolver, which never calls
 // AgentPrompt, so the in-progress flag flips via an AgentWait hook instead.
 func TestReconcile_DoneTicketRecoverable_ReattachesLiveConflictResolverWithoutReforking(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"03-c.md":                    "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
 		"03a-conflict-resolution.md": "---\nid: \"03a\"\nstatus: claimed\ntype: conflict-resolution\nparent: \"03\"\n---\n# Conflict resolution for 03\n",
@@ -251,6 +255,7 @@ func TestReconcile_DoneTicketRecoverable_ReattachesLiveConflictResolverWithoutRe
 // iteration worktree/tab (if the crash left any behind) are removed/closed —
 // branch deletion is left to a later ticket.
 func TestReconcile_DoneTicketRecoverable_CleansUpLeftoverWorktreeAndTab(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
 	})
@@ -300,6 +305,7 @@ func TestReconcile_DoneTicketRecoverable_CleansUpLeftoverWorktreeAndTab(t *testi
 // startup — worktree removed, tab closed, and its now-redundant branch
 // deleted.
 func TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
 	})
@@ -369,6 +375,7 @@ func TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup(t *testing.T) 
 // landed and nothing left behind (doneOK) is untouched: no worktree/tab/
 // branch cleanup calls, no spurious report lines.
 func TestReconcile_DoneTicketFullyClean_NoOp(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
 	})

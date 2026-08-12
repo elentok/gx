@@ -20,6 +20,7 @@ import (
 // call. Ends in an ordinary landing with the reattached worktree/tab/branch
 // cleaned up exactly once.
 func TestRun_ReattachedSmartZoneBreach_AutoRecoversThenLands(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})
@@ -81,6 +82,7 @@ func TestRun_ReattachedSmartZoneBreach_AutoRecoversThenLands(t *testing.T) {
 // gate around the reset, then re-prompts and lands normally — the same
 // recovery waitForFinish performs for a fresh iteration.
 func TestRun_ReattachedCodexQuota_StructuredRecoveryThenLands(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})
@@ -136,6 +138,7 @@ func TestRun_ReattachedCodexQuota_StructuredRecoveryThenLands(t *testing.T) {
 // back to reading the pane's recent output to detect the quota message, and
 // recovers the same way.
 func TestRun_ReattachedCodexQuota_PaneTextFallbackRecoversThenLands(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})

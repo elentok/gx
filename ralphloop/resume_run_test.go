@@ -20,6 +20,7 @@ import (
 // iterations keep running and backfilling — and the loop then correctly
 // completes the epic once iter-01 re-enters its wait step and finishes.
 func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
@@ -147,6 +148,7 @@ func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) 
 // cap" and "Gate.isPaused() stays false throughout" requirements that
 // distinguish this recovery path from rate-limit/needs-repair pauses.
 func TestRun_SmartZoneBreach_RepeatsWithNoRetryCap(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 	})

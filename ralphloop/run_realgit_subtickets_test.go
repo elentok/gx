@@ -231,6 +231,8 @@ func assertSubticketRunCompleted(t *testing.T, repoDir, epicName, scratchDir str
 // scope): Run must discover them from disk on its next frontier scan, start
 // them, and only then consider the epic done.
 func TestRun_ProductionRealGit_TicketCreatesSubtickets(t *testing.T) {
+	// not parallel-safe: herdrfake.Start calls t.Setenv for the helper socket
+	// path and PATH.
 	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const epicName = "epic"
 	repoDir := testutil.TempRepo(t)
@@ -302,6 +304,8 @@ func TestRun_ProductionRealGit_TicketCreatesSubtickets(t *testing.T) {
 // the epic done, proving the code-review frontier rule and the mid-run split
 // discovery compose correctly.
 func TestRun_ProductionRealGit_CodeReviewTicketCreatesSubtickets(t *testing.T) {
+	// not parallel-safe: herdrfake.Start calls t.Setenv for the helper socket
+	// path and PATH.
 	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const epicName = "epic"
 	repoDir := testutil.TempRepo(t)

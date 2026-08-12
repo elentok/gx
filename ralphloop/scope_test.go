@@ -9,6 +9,7 @@ import (
 )
 
 func TestResolveRunScope_ValidSubsetOwnsMembership(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01"},
 		{Number: 2, Identifier: "02"},
@@ -31,6 +32,7 @@ func TestResolveRunScope_ValidSubsetOwnsMembership(t *testing.T) {
 }
 
 func TestResolveRunScope_RejectsUnknownIdentifier(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01"},
 	}}
@@ -47,6 +49,7 @@ func TestResolveRunScope_RejectsUnknownIdentifier(t *testing.T) {
 }
 
 func TestRunScope_DoneAndTotalCount_AreScopedNotEpicWide(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "done"},
 		{Number: 2, Identifier: "02", Status: "open"},
@@ -72,6 +75,7 @@ func TestRunScope_DoneAndTotalCount_AreScopedNotEpicWide(t *testing.T) {
 // whole-epic scope (via Epic.DoneCount) would not — the exact "scoped and
 // fresh runs report identical counts" split the ticket calls out.
 func TestRunScope_DoneCount_WaitingForChildrenParentNotDone(t *testing.T) {
+	t.Parallel()
 	parent := "01"
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "done"},
@@ -92,6 +96,7 @@ func TestRunScope_DoneCount_WaitingForChildrenParentNotDone(t *testing.T) {
 }
 
 func TestRunScope_DoneAndTotalCount_WholeEpicMatchesEpicMethods(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "done"},
 		{Number: 2, Identifier: "02", Status: "open"},
@@ -110,6 +115,7 @@ func TestRunScope_DoneAndTotalCount_WholeEpicMatchesEpicMethods(t *testing.T) {
 }
 
 func TestResolveRunScope_RejectsDuplicateIdentifier(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01"},
 	}}
@@ -126,6 +132,7 @@ func TestResolveRunScope_RejectsDuplicateIdentifier(t *testing.T) {
 }
 
 func TestRunScope_AllDoneForCompletedSubset(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "done"},
 		{Number: 2, Identifier: "02", Status: "done"},
@@ -145,6 +152,7 @@ func TestRunScope_AllDoneForCompletedSubset(t *testing.T) {
 // at scope level: needs-answer used to count as terminal and let a subset run
 // exit, and now must leave the run parked instead.
 func TestRunScope_AllDone_NeedsAnswerSubsetIsNotDone(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "done"},
 		{Number: 2, Identifier: "02", Status: "needs-answer"},
@@ -160,6 +168,7 @@ func TestRunScope_AllDone_NeedsAnswerSubsetIsNotDone(t *testing.T) {
 }
 
 func TestRunScope_FrontierHonorsUnresolvedEpicDependency(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "open"},
 		{Number: 2, Identifier: "02", Status: "open", BlockedBy: []string{"01"}},
@@ -175,6 +184,7 @@ func TestRunScope_FrontierHonorsUnresolvedEpicDependency(t *testing.T) {
 }
 
 func TestRunScope_FrontierIncludesOnlySelectedTickets(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "open"},
 		{Number: 2, Identifier: "02", Status: "open"},
@@ -195,6 +205,7 @@ func TestRunScope_FrontierIncludesOnlySelectedTickets(t *testing.T) {
 }
 
 func TestRunScope_ContainsWalksParentChain(t *testing.T) {
+	t.Parallel()
 	original := "03"
 	child := "03b"
 	grandchild := "03b2"
@@ -222,6 +233,7 @@ func TestRunScope_ContainsWalksParentChain(t *testing.T) {
 }
 
 func TestRunScope_AllDone_DescendantTicketsDontTripSanityCheck(t *testing.T) {
+	t.Parallel()
 	original := "01"
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "done"},
@@ -239,6 +251,7 @@ func TestRunScope_AllDone_DescendantTicketsDontTripSanityCheck(t *testing.T) {
 }
 
 func TestRunScope_AddMakesTicketImmediatelyClaimable(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "open"},
 		{Number: 2, Identifier: "02", Status: "open"},
@@ -263,6 +276,7 @@ func TestRunScope_AddMakesTicketImmediatelyClaimable(t *testing.T) {
 }
 
 func TestRunScope_AddOnDynamicScopeIsNoop(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "open"},
 	}}
@@ -279,6 +293,7 @@ func TestRunScope_AddOnDynamicScopeIsNoop(t *testing.T) {
 }
 
 func TestRunScope_AddIsRaceFreeAgainstConcurrentReads(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "open"},
 		{Number: 2, Identifier: "02", Status: "open"},
@@ -310,6 +325,7 @@ func TestRunScope_AddIsRaceFreeAgainstConcurrentReads(t *testing.T) {
 }
 
 func TestRunScope_UnsetRequestPreservesWholeEpicBehavior(t *testing.T) {
+	t.Parallel()
 	initial := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "done"},
 	}}

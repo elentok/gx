@@ -50,6 +50,7 @@ func indexOf(order []string, id string) int {
 // gated purely by Parent — see ticket 03/05) and the scheduler agree on the
 // same chain those predicate-level tests already verified in isolation.
 func TestRun_ForkChain_ClaimsInDependencyOrder(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-parent.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Parent\n",
 	})
@@ -96,6 +97,7 @@ func TestRun_ForkChain_ClaimsInDependencyOrder(t *testing.T) {
 // once 01 hands off, in either relative order, since nothing orders them
 // against each other.
 func TestRun_ForkParallelChildren_BothClaimedAfterParentHandsOff(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-parent.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Parent\n",
 	})
@@ -140,6 +142,7 @@ func TestRun_ForkParallelChildren_BothClaimedAfterParentHandsOff(t *testing.T) {
 // fork subtree must also finish before Epic.Blocking(01) clears, so 02 must
 // not be claimed until 01a lands too, not merely once 01 itself does.
 func TestRun_DependentOfForkedTicket_WaitsForWholeSubtree(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-parent.md":    "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Parent\n",
 		"02-dependent.md": "---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# Dependent\n",
@@ -185,6 +188,7 @@ func TestRun_DependentOfForkedTicket_WaitsForWholeSubtree(t *testing.T) {
 // proven here by holding 01b's iteration open (via a blocked AgentPrompt
 // call) until after 02 has already been claimed.
 func TestRun_BlockedBySpecificForkSibling_WaitsForExactlyThatSibling(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-parent.md":    "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Parent\n",
 		"02-dependent.md": "---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01a\"]\n---\n# Dependent\n",
@@ -297,6 +301,7 @@ func (s *unblockingSink) TicketClaimed(ticket tickets.Ticket) {
 // true because of 01a). The requested subset (02) finishing must not stamp
 // the epic's own completed_at, since the epic as a whole isn't done.
 func TestRun_EpicWithWaitingForChildrenTicket_DoesNotReportComplete(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-parent.md":    "---\nid: \"01\"\nstatus: done\ntype: task\n---\n# Parent\n",
 		"01a-child.md":    "---\nid: \"01a\"\nstatus: open\ntype: task\nparent: \"01\"\n---\n# Child A\n",

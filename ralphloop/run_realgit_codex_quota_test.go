@@ -29,6 +29,8 @@ import (
 // tickets driven by the Codex agent so quota detection is exercised for
 // real via Deps.ReadCodexRateLimit.
 func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
+	// not parallel-safe: herdrfake.Start calls t.Setenv for the helper socket
+	// path and PATH.
 	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const epicName = "epic"
 	repoDir := testutil.TempRepo(t)
@@ -335,6 +337,8 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 // goes through the actual codexsession reader; 02 and 03 reuse the quota
 // test's generic pane bookkeeping.
 func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testing.T) {
+	// not parallel-safe: herdrfake.Start calls t.Setenv for the helper socket
+	// path and PATH.
 	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const (
 		epicName  = "epic"

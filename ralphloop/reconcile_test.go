@@ -29,6 +29,7 @@ func testReconcileParams(workspaceID string, paths reconcilePaths, sink EventSin
 }
 
 func TestReconcile_ClaimedWithNoLiveTab_RevertsToOpen(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})
@@ -76,6 +77,7 @@ func TestReconcile_ClaimedWithNoLiveTab_RevertsToOpen(t *testing.T) {
 // that branch orphaned, only for a fresh attempt to collide with it later —
 // so those unlanded commits must be landed here instead.
 func TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_RecoversInstead(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})
@@ -119,6 +121,7 @@ func TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_RecoversInstead(t *tes
 // before CherryPickStarted so a renderer has a live row to update instead of
 // showing nothing while the recovery runs.
 func TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_ReportsRecoveringBeforeCherryPick(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})
@@ -155,6 +158,7 @@ func TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_ReportsRecoveringBefor
 }
 
 func TestReconcile_ClaimedWithLiveTab_ReturnsReattached(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})
@@ -202,6 +206,7 @@ func (s *reattachSink) TicketReattached(identifier, label, cwd, sessionID string
 }
 
 func TestReconcile_ClaimedWithLiveTab_TicketReattachedCarriesLiveSessionIdentity(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})
@@ -246,6 +251,7 @@ func TestReconcile_ClaimedWithLiveTab_TicketReattachedCarriesLiveSessionIdentity
 }
 
 func TestReconcile_NeedsRepairWithLiveTab_ReturnsReattached(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n# A\n",
 	})
@@ -273,6 +279,7 @@ func TestReconcile_NeedsRepairWithLiveTab_ReturnsReattached(t *testing.T) {
 // the scope belongs to a different (or not-yet-started) run and must be
 // left exactly as found rather than reattached.
 func TestReconcile_ClaimedWithLiveTabOutsideScope_NotReattached(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 	})
@@ -310,6 +317,7 @@ func TestReconcile_ClaimedWithLiveTabOutsideScope_NotReattached(t *testing.T) {
 // TestReconcile_NeedsRepairOutsideScope_NotReattached is the
 // needs-repair counterpart of the claimed case above.
 func TestReconcile_NeedsRepairOutsideScope_NotReattached(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n# A\n",
 	})
@@ -339,6 +347,7 @@ func TestReconcile_NeedsRepairOutsideScope_NotReattached(t *testing.T) {
 // left to reattach to is human-clearable, so it must not hold up the open
 // ticket next to it — that one runs first, and only then does the run park.
 func TestRun_NeedsRepairWithoutLiveTab_SchedulesOtherTicketsThenParks(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-attention.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n# Attention\n",
 		"02-open.md":      "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Open\n",
@@ -365,6 +374,7 @@ func TestRun_NeedsRepairWithoutLiveTab_SchedulesOtherTicketsThenParks(t *testing
 }
 
 func TestRun_RestartedNeedsRepairRecoversThenResumesScheduling(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-attention.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n# Attention\n",
 		"02-open.md":      "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Open\n",
@@ -420,6 +430,7 @@ func TestRun_RestartedNeedsRepairRecoversThenResumesScheduling(t *testing.T) {
 // "not live" for this ticket type and wrongly revert a still-running
 // resolver's child record to open out from under it.
 func TestReconcile_ConflictResolutionChildWithLiveParentTab_StaysClaimed(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md":                    "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 		"01a-conflict-resolution.md": "---\nid: \"01a\"\nstatus: claimed\ntype: conflict-resolution\nparent: \"01\"\n---\n# Conflict resolution for 01\n",
@@ -463,6 +474,7 @@ func TestReconcile_ConflictResolutionChildWithLiveParentTab_StaysClaimed(t *test
 // tab, a claimed conflict-resolution child must still revert to open exactly
 // like any other orphaned claim.
 func TestReconcile_ConflictResolutionChildWithNoLiveParentTab_RevertsToOpen(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md":                    "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
 		"01a-conflict-resolution.md": "---\nid: \"01a\"\nstatus: claimed\ntype: conflict-resolution\nparent: \"01\"\n---\n# Conflict resolution for 01\n",
@@ -501,6 +513,7 @@ func TestReconcile_ConflictResolutionChildWithNoLiveParentTab_RevertsToOpen(t *t
 }
 
 func TestReconcile_OpenAndDoneTicketsIgnored(t *testing.T) {
+	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
 		"02-b.md": "---\nid: \"02\"\nstatus: done\ntype: task\n---\n# B\n",

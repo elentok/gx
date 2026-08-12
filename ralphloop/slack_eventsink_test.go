@@ -62,6 +62,7 @@ func waitForSlackRequests(get func() []slackRequest, want int) []slackRequest {
 // membership/park-cardinality/message-content behavior is exercised
 // transport-agnostically in chat_eventsink_test.go.
 func TestSlackEventSink_EpicComplete_PostsSlackWireFormat(t *testing.T) {
+	t.Parallel()
 	server, getRequests := fakeSlackServer(t, http.StatusOK)
 	inner := &recordingSink{}
 	sink := newSlackEventSink(inner, server.URL, "", "")
@@ -89,6 +90,7 @@ func TestSlackEventSink_EpicComplete_PostsSlackWireFormat(t *testing.T) {
 // sends text for but where the counts haven't changed since the prior
 // message.
 func TestSlackEventSink_CountsLine_AppearsOnlyOnFourMessageKinds(t *testing.T) {
+	t.Parallel()
 	server, getRequests := fakeSlackServer(t, http.StatusOK)
 	inner := &recordingSink{}
 	sink := newSlackEventSink(inner, server.URL, "", "")
@@ -142,6 +144,7 @@ func TestSlackEventSink_CountsLine_AppearsOnlyOnFourMessageKinds(t *testing.T) {
 }
 
 func TestSlackEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
+	t.Parallel()
 	server, getRequests := fakeSlackServer(t, http.StatusInternalServerError)
 	inner := &recordingSink{}
 	sink := newSlackEventSink(inner, server.URL, "", "")
@@ -156,6 +159,7 @@ func TestSlackEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
 }
 
 func TestSlackEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
+	t.Parallel()
 	inner := &recordingSink{}
 	// A closed server's URL is unreachable but still well-formed, which is
 	// what a broken/unreachable Slack webhook looks like to the client.
@@ -175,6 +179,7 @@ func TestSlackEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
 }
 
 func TestSendSlackTestMessage_SendsSynchronouslyAndReturnsNilOnSuccess(t *testing.T) {
+	t.Parallel()
 	server, getRequests := fakeSlackServer(t, http.StatusOK)
 
 	err := SendSlackTestMessage(server.URL)
@@ -193,6 +198,7 @@ func TestSendSlackTestMessage_SendsSynchronouslyAndReturnsNilOnSuccess(t *testin
 }
 
 func TestSendSlackTestMessage_ReturnsErrorOnFailingServer(t *testing.T) {
+	t.Parallel()
 	server, _ := fakeSlackServer(t, http.StatusInternalServerError)
 
 	if err := SendSlackTestMessage(server.URL); err == nil {
@@ -201,6 +207,7 @@ func TestSendSlackTestMessage_ReturnsErrorOnFailingServer(t *testing.T) {
 }
 
 func TestSendSlackMessage_SendsGivenTextEscaped(t *testing.T) {
+	t.Parallel()
 	server, getRequests := fakeSlackServer(t, http.StatusOK)
 
 	err := SendSlackMessage(server.URL, "hello <world> & friends")
@@ -219,6 +226,7 @@ func TestSendSlackMessage_SendsGivenTextEscaped(t *testing.T) {
 }
 
 func TestSendSlackMessage_ReturnsErrorOnFailingServer(t *testing.T) {
+	t.Parallel()
 	server, _ := fakeSlackServer(t, http.StatusInternalServerError)
 
 	if err := SendSlackMessage(server.URL, "hello"); err == nil {
@@ -227,6 +235,7 @@ func TestSendSlackMessage_ReturnsErrorOnFailingServer(t *testing.T) {
 }
 
 func TestSlackEventSink_LogsNotificationSentToRunLog(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	server, _ := fakeSlackServer(t, http.StatusOK)
 	sink := newSlackEventSink(&recordingSink{}, server.URL, dir, "epic")
@@ -248,6 +257,7 @@ func TestSlackEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 }
 
 func TestSlackEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	server, _ := fakeSlackServer(t, http.StatusInternalServerError)
 	sink := newSlackEventSink(&recordingSink{}, server.URL, dir, "epic")
@@ -271,6 +281,7 @@ func TestSlackEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 }
 
 func TestSlackEventSink_LogsNotificationFailedToRunLog_RedactsWebhookSecret(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	const secretPath = "T00/B00/super-secret-webhook-token"
 	// A closed server's URL is unreachable but well-formed, so http.Client.Do
