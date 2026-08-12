@@ -16,6 +16,7 @@ func writeTicketFile(t *testing.T, path, content string) {
 }
 
 func TestExecute_TicketsValidate_OldFormatMissingFrontmatterFails(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "01-a-ticket.md")
 	writeTicketFile(t, path, "Status: open\n\nBody.\n")
@@ -33,6 +34,7 @@ func TestExecute_TicketsValidate_OldFormatMissingFrontmatterFails(t *testing.T) 
 }
 
 func TestExecute_TicketsValidate_ValidNewFormat(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
 	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
@@ -49,6 +51,7 @@ func TestExecute_TicketsValidate_ValidNewFormat(t *testing.T) {
 }
 
 func TestExecute_TicketsValidate_InvalidTicketExitsNonZero(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
 	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: bogus-status\ntype: task\n---\nBody.\n")
@@ -66,6 +69,7 @@ func TestExecute_TicketsValidate_InvalidTicketExitsNonZero(t *testing.T) {
 }
 
 func TestExecute_TicketsValidate_MissingFileExitsNonZero(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
 

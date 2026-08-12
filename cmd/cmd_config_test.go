@@ -16,6 +16,7 @@ import (
 )
 
 func TestExecute_ConfigEdit_RequiresEditor(t *testing.T) {
+	t.Parallel()
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
@@ -35,6 +36,7 @@ func TestExecute_ConfigEdit_RequiresEditor(t *testing.T) {
 }
 
 func TestExecute_ConfigEdit_RunsEditor(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	var gotEditor, gotPath string
 	d := deps{
@@ -68,6 +70,7 @@ func TestExecute_ConfigEdit_RunsEditor(t *testing.T) {
 }
 
 func TestExecute_ConfigDefaults_PrintsJSON(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	d := deps{
 		stdout: &stdout,
@@ -90,6 +93,7 @@ func TestExecute_ConfigDefaults_PrintsJSON(t *testing.T) {
 }
 
 func TestSettingsFromConfigIncludesExecutionQueueLimits(t *testing.T) {
+	t.Parallel()
 	cfg := config.Default()
 	cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic = 3
 	cfg.ExecutionQueue.MaxConcurrentEpics = 4
@@ -104,6 +108,7 @@ func TestSettingsFromConfigIncludesExecutionQueueLimits(t *testing.T) {
 }
 
 func TestExecute_ConfigShow_PrintsJSON(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	d := deps{
 		stdout: &stdout,
@@ -126,6 +131,7 @@ func TestExecute_ConfigShow_PrintsJSON(t *testing.T) {
 }
 
 func TestExecute_ConfigShow_PropagatesError(t *testing.T) {
+	t.Parallel()
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
@@ -140,6 +146,7 @@ func TestExecute_ConfigShow_PropagatesError(t *testing.T) {
 }
 
 func TestExecute_ConfigTestNotifications_NoneConfiguredPrintsNoticeAndSucceeds(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	d := deps{
 		stdout: &stdout,
@@ -157,6 +164,7 @@ func TestExecute_ConfigTestNotifications_NoneConfiguredPrintsNoticeAndSucceeds(t
 }
 
 func TestExecute_ConfigTestNotifications_SlackConfiguredSendsAndReportsSuccess(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -181,6 +189,7 @@ func TestExecute_ConfigTestNotifications_SlackConfiguredSendsAndReportsSuccess(t
 }
 
 func TestExecute_ConfigTestNotifications_SlackFailureReportsErrorAndPropagates(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
@@ -206,6 +215,7 @@ func TestExecute_ConfigTestNotifications_SlackFailureReportsErrorAndPropagates(t
 }
 
 func TestExecute_ConfigTestNotifications_PropagatesLoadConfigError(t *testing.T) {
+	t.Parallel()
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
@@ -220,6 +230,7 @@ func TestExecute_ConfigTestNotifications_PropagatesLoadConfigError(t *testing.T)
 }
 
 func TestExecute_Notify_NoneConfiguredPrintsNoticeAndSucceeds(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	d := deps{
 		stdout: &stdout,
@@ -237,6 +248,7 @@ func TestExecute_Notify_NoneConfiguredPrintsNoticeAndSucceeds(t *testing.T) {
 }
 
 func TestExecute_Notify_SlackConfiguredSendsAndReportsSuccess(t *testing.T) {
+	t.Parallel()
 	var gotBody string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
@@ -267,6 +279,7 @@ func TestExecute_Notify_SlackConfiguredSendsAndReportsSuccess(t *testing.T) {
 }
 
 func TestExecute_Notify_SlackFailurePropagatesErrorWithoutDoubleReporting(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
@@ -297,6 +310,7 @@ func TestExecute_Notify_SlackFailurePropagatesErrorWithoutDoubleReporting(t *tes
 }
 
 func TestExecute_Notify_PropagatesLoadConfigError(t *testing.T) {
+	t.Parallel()
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
@@ -311,6 +325,7 @@ func TestExecute_Notify_PropagatesLoadConfigError(t *testing.T) {
 }
 
 func TestExecute_Notify_RequiresMessageArg(t *testing.T) {
+	t.Parallel()
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
@@ -321,6 +336,7 @@ func TestExecute_Notify_RequiresMessageArg(t *testing.T) {
 }
 
 func TestRelativeDate_Zero(t *testing.T) {
+	t.Parallel()
 	got := relativeDate(time.Time{})
 	if got != "unknown time" {
 		t.Fatalf("relativeDate(zero) = %q, want %q", got, "unknown time")
@@ -328,6 +344,7 @@ func TestRelativeDate_Zero(t *testing.T) {
 }
 
 func TestRelativeDate_NonZero(t *testing.T) {
+	t.Parallel()
 	got := relativeDate(time.Now().Add(-time.Hour))
 	if got == "" || got == "unknown time" {
 		t.Fatalf("relativeDate(now-1h) = %q, expected a non-empty relative string", got)
@@ -335,6 +352,7 @@ func TestRelativeDate_NonZero(t *testing.T) {
 }
 
 func TestRunEditorCommand_Success(t *testing.T) {
+	t.Parallel()
 	path := t.TempDir() + "/file.txt"
 	err := runEditorCommand("touch", path, bytes.NewBuffer(nil), bytes.NewBuffer(nil), bytes.NewBuffer(nil))
 	if err != nil {
@@ -346,6 +364,7 @@ func TestRunEditorCommand_Success(t *testing.T) {
 }
 
 func TestRunEditorCommand_Failure(t *testing.T) {
+	t.Parallel()
 	err := runEditorCommand("false", "/irrelevant", bytes.NewBuffer(nil), bytes.NewBuffer(nil), bytes.NewBuffer(nil))
 	if err == nil {
 		t.Fatal("expected error from false command")
@@ -353,6 +372,7 @@ func TestRunEditorCommand_Failure(t *testing.T) {
 }
 
 func TestRunEditorCommand_MultiWordEditor(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	// Verify a multi-word $EDITOR (e.g. "code --wait") gets split correctly.
 	err := runEditorCommand("echo hello", "/dev/null", bytes.NewBuffer(nil), &stdout, bytes.NewBuffer(nil))

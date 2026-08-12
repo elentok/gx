@@ -26,6 +26,7 @@ func agentTestDeps(stdout *bytes.Buffer, env map[string]string) deps {
 }
 
 func TestExecute_AgentContextWindow_ClaudeSessionDetected(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	d := agentTestDeps(&stdout, map[string]string{"CLAUDE_CODE_SESSION_ID": "sess-1"})
 	d.readClaudeOccupancy = func(cwd, sessionID string) (int, bool, error) {
@@ -44,6 +45,7 @@ func TestExecute_AgentContextWindow_ClaudeSessionDetected(t *testing.T) {
 }
 
 func TestExecute_AgentContextWindow_CodexSessionDetected(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	d := agentTestDeps(&stdout, map[string]string{"CODEX_THREAD_ID": "thread-1"})
 	d.verifyCodexSession = func(cwd, sessionID string) (bool, error) {
@@ -62,6 +64,7 @@ func TestExecute_AgentContextWindow_CodexSessionDetected(t *testing.T) {
 }
 
 func TestExecute_AgentContextWindow_NeitherProviderFails(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	d := agentTestDeps(&stdout, map[string]string{})
 
@@ -75,6 +78,7 @@ func TestExecute_AgentContextWindow_NeitherProviderFails(t *testing.T) {
 }
 
 func TestExecute_AgentContextWindow_BothProvidersAmbiguous(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	d := agentTestDeps(&stdout, map[string]string{
 		"CLAUDE_CODE_SESSION_ID": "sess-1",
@@ -91,6 +95,7 @@ func TestExecute_AgentContextWindow_BothProvidersAmbiguous(t *testing.T) {
 }
 
 func TestExecute_AgentContextWindow_IdentityMismatchFails(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	d := agentTestDeps(&stdout, map[string]string{"CLAUDE_CODE_SESSION_ID": "sess-1"})
 	d.readClaudeOccupancy = func(cwd, sessionID string) (int, bool, error) {
@@ -107,6 +112,7 @@ func TestExecute_AgentContextWindow_IdentityMismatchFails(t *testing.T) {
 }
 
 func TestExecute_AgentContextWindow_CodexIdentityMismatchFails(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	d := agentTestDeps(&stdout, map[string]string{"CODEX_THREAD_ID": "thread-1"})
 	d.verifyCodexSession = func(cwd, sessionID string) (bool, error) {
@@ -123,6 +129,7 @@ func TestExecute_AgentContextWindow_CodexIdentityMismatchFails(t *testing.T) {
 }
 
 func TestExecute_AgentContextWindow_ExplicitOverridesSkipEnv(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	// Env vars point at a different session than the explicit override, to
 	// prove the override wins rather than falling back to auto-detection.
@@ -149,6 +156,7 @@ func TestExecute_AgentContextWindow_ExplicitOverridesSkipEnv(t *testing.T) {
 }
 
 func TestExecute_AgentContextWindow_SessionWithoutAgentFails(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	d := agentTestDeps(&stdout, map[string]string{})
 
@@ -162,6 +170,7 @@ func TestExecute_AgentContextWindow_SessionWithoutAgentFails(t *testing.T) {
 }
 
 func TestExecute_AgentContextWindow_InvalidAgentFails(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	d := agentTestDeps(&stdout, map[string]string{})
 

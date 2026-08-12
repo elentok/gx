@@ -8,6 +8,7 @@ import (
 )
 
 func TestRunWithSpinner_NonTTYRunsFunction(t *testing.T) {
+	t.Parallel()
 	var called bool
 	err := runWithSpinner(bytes.NewBuffer(nil), bytes.NewBuffer(nil), "working", func() error {
 		called = true
@@ -22,6 +23,7 @@ func TestRunWithSpinner_NonTTYRunsFunction(t *testing.T) {
 }
 
 func TestRunWithSpinner_NonTTYPropagatesError(t *testing.T) {
+	t.Parallel()
 	want := errors.New("boom")
 	err := runWithSpinner(bytes.NewBuffer(nil), bytes.NewBuffer(nil), "working", func() error {
 		return want
@@ -32,12 +34,14 @@ func TestRunWithSpinner_NonTTYPropagatesError(t *testing.T) {
 }
 
 func TestIsTerminalWriter_Buffer(t *testing.T) {
+	t.Parallel()
 	if isTerminalWriter(bytes.NewBuffer(nil)) {
 		t.Fatal("bytes.Buffer should not be a terminal writer")
 	}
 }
 
 func TestIsTerminalWriter_Stderr(t *testing.T) {
+	t.Parallel()
 	// os.Stderr is an *os.File but may not be a TTY in CI — just verify it doesn't panic.
 	_ = isTerminalWriter(os.Stderr)
 }

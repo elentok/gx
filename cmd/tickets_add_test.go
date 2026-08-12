@@ -12,6 +12,7 @@ import (
 )
 
 func TestRunTicketsAdd_FlatSibling(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	epicPath := filepath.Join(scratchDir, "widget-epic")
 	issuesDir := filepath.Join(epicPath, "issues")
@@ -42,6 +43,7 @@ func TestRunTicketsAdd_FlatSibling(t *testing.T) {
 }
 
 func TestRunTicketsAdd_WritesStatusDraft(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	epicPath := filepath.Join(scratchDir, "widget-epic")
 	issuesDir := filepath.Join(epicPath, "issues")
@@ -65,6 +67,7 @@ func TestRunTicketsAdd_WritesStatusDraft(t *testing.T) {
 }
 
 func TestRunTicketsAdd_EmptySlugFails(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	epicPath := filepath.Join(scratchDir, "widget-epic")
 	issuesDir := filepath.Join(epicPath, "issues")
@@ -87,6 +90,7 @@ func TestRunTicketsAdd_EmptySlugFails(t *testing.T) {
 }
 
 func TestRunTicketsAdd_LetteredChild(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	epicPath := filepath.Join(scratchDir, "widget-epic")
 	issuesDir := filepath.Join(epicPath, "issues")
@@ -115,6 +119,7 @@ func TestRunTicketsAdd_LetteredChild(t *testing.T) {
 }
 
 func TestRunTicketsAdd_WritesParentFrontmatter(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	epicPath := filepath.Join(scratchDir, "widget-epic")
 	issuesDir := filepath.Join(epicPath, "issues")
@@ -143,6 +148,7 @@ func TestRunTicketsAdd_WritesParentFrontmatter(t *testing.T) {
 // file and leaves the parent byte-identical, so there is no backfill left to
 // go missing.
 func TestRunTicketsAdd_LeavesParentUntouched(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	epicPath := filepath.Join(scratchDir, "widget-epic")
 	issuesDir := filepath.Join(epicPath, "issues")
@@ -172,6 +178,7 @@ func TestRunTicketsAdd_LeavesParentUntouched(t *testing.T) {
 }
 
 func TestRunTicketsAdd_NumericLevelPastLetteredParent(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	epicPath := filepath.Join(scratchDir, "widget-epic")
 	issuesDir := filepath.Join(epicPath, "issues")
@@ -200,6 +207,7 @@ func TestRunTicketsAdd_NumericLevelPastLetteredParent(t *testing.T) {
 }
 
 func TestRunTicketsAdd_LetteredNumericParentAllocatesNextSibling(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	epicPath := filepath.Join(scratchDir, "widget-epic")
 	issuesDir := filepath.Join(epicPath, "issues")
@@ -219,6 +227,7 @@ func TestRunTicketsAdd_LetteredNumericParentAllocatesNextSibling(t *testing.T) {
 }
 
 func TestRunTicketsAdd_ConcurrentCallsAllocateDistinctIDs(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	epicPath := filepath.Join(scratchDir, "widget-epic")
 	issuesDir := filepath.Join(epicPath, "issues")

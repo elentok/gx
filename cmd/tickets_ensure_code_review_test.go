@@ -12,6 +12,7 @@ import (
 )
 
 func TestResolveEpicArg_BareNameAndFullPathResolveToSameEpic(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	epicDir := filepath.Join(repoDir, ".scratch", "widget-epic")
 	testutil.Mkdir(t, epicDir)
@@ -28,6 +29,7 @@ func TestResolveEpicArg_BareNameAndFullPathResolveToSameEpic(t *testing.T) {
 }
 
 func TestResolveEpicArg_UnknownBareNameReturnedUnchanged(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 
 	resolved := resolveEpicArg("no-such-epic", repoDir)
@@ -38,6 +40,7 @@ func TestResolveEpicArg_UnknownBareNameReturnedUnchanged(t *testing.T) {
 }
 
 func TestCompleteEpicNames_ListsEpicsExcludingDotDirectories(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	testutil.Mkdir(t, filepath.Join(repoDir, ".scratch", "bugs-05"))
 	testutil.Mkdir(t, filepath.Join(repoDir, ".scratch", "widget-epic"))
@@ -60,6 +63,7 @@ func TestCompleteEpicNames_ListsEpicsExcludingDotDirectories(t *testing.T) {
 }
 
 func TestRunTicketsEnsureCodeReview_NoopWhenCodeReviewTicketExists(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	epicPath := filepath.Join(scratchDir, "widget-epic")
 	issuesDir := filepath.Join(epicPath, "issues")
@@ -87,6 +91,7 @@ func TestRunTicketsEnsureCodeReview_NoopWhenCodeReviewTicketExists(t *testing.T)
 }
 
 func TestRunTicketsEnsureCodeReview_CreatesValidStubWhenNoneExists(t *testing.T) {
+	t.Parallel()
 	scratchDir := t.TempDir()
 	epicPath := filepath.Join(scratchDir, "widget-epic")
 	issuesDir := filepath.Join(epicPath, "issues")

@@ -41,6 +41,7 @@ type deps struct {
 	initConfig           func() (string, error)
 	loadConfig           func() (config.Config, error)
 	getenv               func(string) string
+	userHomeDir          func() (string, error)
 	runEditor            func(editor, path string, in io.Reader, out, err io.Writer) error
 	readClaudeOccupancy  func(cwd, sessionID string) (occupancy int, ok bool, err error)
 	verifyCodexSession   func(cwd, sessionID string) (ok bool, err error)
@@ -71,6 +72,7 @@ func defaultDeps() deps {
 		initConfig:           config.Init,
 		loadConfig:           config.Load,
 		getenv:               os.Getenv,
+		userHomeDir:          os.UserHomeDir,
 		runEditor:            runEditorCommand,
 		readClaudeOccupancy:  transcript.LastAssistantOccupancy,
 		verifyCodexSession:   codexsession.VerifyIdentity,

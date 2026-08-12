@@ -12,9 +12,11 @@ import (
 )
 
 func TestWarnOnScratchFoldFailure(t *testing.T) {
+	t.Parallel()
 	noConfirm := func(string) (bool, error) { return true, nil }
 
 	t.Run("fold succeeds: no warning", func(t *testing.T) {
+		t.Parallel()
 		repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 		strayEpic := filepath.Join(repoDir, "feature-a", ".scratch", "bugs-01")
 		testutil.Mkdir(t, strayEpic)
@@ -30,6 +32,7 @@ func TestWarnOnScratchFoldFailure(t *testing.T) {
 	})
 
 	t.Run("fold fails: warning written", func(t *testing.T) {
+		t.Parallel()
 		repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 
 		strayEpic := filepath.Join(repoDir, "feature-a", ".scratch", "bugs-01")
@@ -51,6 +54,7 @@ func TestWarnOnScratchFoldFailure(t *testing.T) {
 	})
 
 	t.Run("getwd resolves outside a git repo: no-op", func(t *testing.T) {
+		t.Parallel()
 		dir := t.TempDir()
 		getwd := func() (string, error) { return dir, nil }
 		var w bytes.Buffer
@@ -63,6 +67,7 @@ func TestWarnOnScratchFoldFailure(t *testing.T) {
 }
 
 func TestResolveScratchCollisionPromptsAndMerges(t *testing.T) {
+	t.Parallel()
 	var shownPrompt string
 	confirmFn := func(prompt string) (bool, error) {
 		shownPrompt = prompt
@@ -83,6 +88,7 @@ func TestResolveScratchCollisionPromptsAndMerges(t *testing.T) {
 }
 
 func TestResolveScratchCollisionPromptsAndAutoRenames(t *testing.T) {
+	t.Parallel()
 	confirmFn := func(string) (bool, error) { return false, nil }
 
 	action := tickets.FoldAction{EpicSlug: "bugs-01", WorktreeName: "feature-a"}
@@ -96,6 +102,7 @@ func TestResolveScratchCollisionPromptsAndAutoRenames(t *testing.T) {
 }
 
 func TestResolveScratchCollisionPropagatesConfirmError(t *testing.T) {
+	t.Parallel()
 	wantErr := errors.New("boom")
 	confirmFn := func(string) (bool, error) { return false, wantErr }
 

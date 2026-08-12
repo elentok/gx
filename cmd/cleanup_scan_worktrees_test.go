@@ -81,6 +81,7 @@ func requireEpic(t *testing.T, epics []tickets.Epic, epicName string) {
 }
 
 func TestScanWorktrees_RealRepo_CurrentPatternIterationBranch_LandedAndDone(t *testing.T) {
+	t.Parallel()
 	byBranch, epics := realDevRepoScanWithEpics(t)
 	requireEpic(t, epics, "bugs-01")
 	scan := requireBranch(t, byBranch, "ralph-loop/bugs-01-item-04")
@@ -100,6 +101,7 @@ func TestScanWorktrees_RealRepo_CurrentPatternIterationBranch_LandedAndDone(t *t
 }
 
 func TestScanWorktrees_RealRepo_LegacyPatternIterationBranch_LandedAndDone(t *testing.T) {
+	t.Parallel()
 	byBranch, epics := realDevRepoScanWithEpics(t)
 	requireEpic(t, epics, "gx-tickets-set-retrofit")
 	scan := requireBranch(t, byBranch, "ralph-loop/gx-tickets-set-retrofit/iter-01")
@@ -119,6 +121,7 @@ func TestScanWorktrees_RealRepo_LegacyPatternIterationBranch_LandedAndDone(t *te
 }
 
 func TestScanWorktrees_RealRepo_FeatureBranch(t *testing.T) {
+	t.Parallel()
 	byBranch, epics := realDevRepoScanWithEpics(t)
 	requireEpic(t, epics, "gx-cleanup")
 	scan := requireBranch(t, byBranch, "gx-cleanup")
@@ -132,6 +135,7 @@ func TestScanWorktrees_RealRepo_FeatureBranch(t *testing.T) {
 }
 
 func TestScanWorktrees_RealRepo_OtherBranch(t *testing.T) {
+	t.Parallel()
 	byBranch := realDevRepoScan(t)
 	// "wip" matches no epic under .scratch and no ralph-loop/ iteration
 	// naming - a real orphan/other branch from this repo's own history.
@@ -147,6 +151,7 @@ func TestScanWorktrees_RealRepo_OtherBranch(t *testing.T) {
 // test runs, ticket 01's commit landed on it moments ago, so it's a real
 // worktree with a genuinely recent commit - not a synthesized one.
 func TestScanWorktrees_RealRepo_ActiveWorkNeverRecommended(t *testing.T) {
+	t.Parallel()
 	byBranch := realDevRepoScan(t)
 	scan := requireBranch(t, byBranch, "ralph-loop/gx-cleanup-item-02")
 

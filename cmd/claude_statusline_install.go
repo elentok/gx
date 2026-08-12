@@ -18,7 +18,7 @@ const claudeStatusLineCommand = "gx claude statusline"
 // "statusLine" entry to run claudeStatusLineCommand, preserving every other
 // top-level key already in that file.
 func installClaudeStatusline(d deps) error {
-	home, err := os.UserHomeDir()
+	home, err := d.userHomeDir()
 	if err != nil {
 		return fmt.Errorf("resolve home directory: %w", err)
 	}

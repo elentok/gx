@@ -13,6 +13,7 @@ import (
 )
 
 func TestRunStashify_NoArgs(t *testing.T) {
+	t.Parallel()
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
@@ -25,6 +26,7 @@ func TestRunStashify_NoArgs(t *testing.T) {
 }
 
 func TestRunStashify_NoChanges_RunsCommand(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	var stdout bytes.Buffer
 	d := deps{
@@ -45,6 +47,7 @@ func TestRunStashify_NoChanges_RunsCommand(t *testing.T) {
 }
 
 func TestRunStashify_WithChanges_StashesRunsUnstashes(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 
 	// Modify a tracked file to create a stashable change.
@@ -89,6 +92,7 @@ func TestRunStashify_WithChanges_StashesRunsUnstashes(t *testing.T) {
 }
 
 func TestRunStashify_WithChanges_CommandFails_UserConfirmsPop(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	// Modify a tracked file so git stash actually stashes it.
 	testutil.WriteFile(t, repoDir, "README.md", "modified for confirm test")
@@ -128,6 +132,7 @@ func TestRunStashify_WithChanges_CommandFails_UserConfirmsPop(t *testing.T) {
 }
 
 func TestRunStashify_WithChanges_CommandFails_UserDeclinesPop(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	// Modify a tracked file so git stash actually stashes it.
 	testutil.WriteFile(t, repoDir, "README.md", "modified for decline test")
@@ -167,6 +172,7 @@ func TestRunStashify_WithChanges_CommandFails_UserDeclinesPop(t *testing.T) {
 }
 
 func TestRunStashify_GetWdError(t *testing.T) {
+	t.Parallel()
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),

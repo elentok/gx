@@ -46,6 +46,7 @@ func decodeMergeResult(t *testing.T, stdout *bytes.Buffer) MergeResult {
 }
 
 func TestRunMerge_CleanFastForward(t *testing.T) {
+	t.Parallel()
 	repoDir, mainDir := mergeTestRepo(t, map[string]string{"feature": "feature"})
 	commitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
 
@@ -69,6 +70,7 @@ func TestRunMerge_CleanFastForward(t *testing.T) {
 }
 
 func TestRunMerge_Diverged(t *testing.T) {
+	t.Parallel()
 	repoDir, mainDir := mergeTestRepo(t, map[string]string{"feature": "feature"})
 	commitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
 	commitFile(t, mainDir, "main-only.txt", "diverge")
@@ -94,6 +96,7 @@ func TestRunMerge_Diverged(t *testing.T) {
 }
 
 func TestRunMerge_ResolvesWorktreeDirNameToRealBranch(t *testing.T) {
+	t.Parallel()
 	// A nested branch name checked out under a shorter worktree dir name,
 	// mirroring ralph-loop's iteration branches.
 	repoDir, mainDir := mergeTestRepo(t, map[string]string{"item-01": "ralph-loop/epic-item-01"})
@@ -111,6 +114,7 @@ func TestRunMerge_ResolvesWorktreeDirNameToRealBranch(t *testing.T) {
 }
 
 func TestRunMerge_NoMatchingWorktreeTreatsArgAsLiteralBranch(t *testing.T) {
+	t.Parallel()
 	_, mainDir := mergeTestRepo(t, map[string]string{})
 	// A branch that exists but has no linked worktree of its own.
 	testutil.MustGitExported(t, mainDir, "branch", "literal-branch")
@@ -130,6 +134,7 @@ func TestRunMerge_NoMatchingWorktreeTreatsArgAsLiteralBranch(t *testing.T) {
 }
 
 func TestRunMerge_TextOutput(t *testing.T) {
+	t.Parallel()
 	repoDir, mainDir := mergeTestRepo(t, map[string]string{"feature": "feature"})
 	commitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
 

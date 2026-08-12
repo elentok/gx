@@ -9,10 +9,10 @@ import (
 )
 
 func TestInstallClaudeStatusline_MissingFileWritesCanonical(t *testing.T) {
+	t.Parallel()
 	home := t.TempDir()
-	t.Setenv("HOME", home)
 	out := &strings.Builder{}
-	d := deps{stdout: out}
+	d := deps{stdout: out, userHomeDir: func() (string, error) { return home, nil }}
 
 	if err := installClaudeStatusline(d); err != nil {
 		t.Fatalf("installClaudeStatusline: %v", err)
@@ -45,8 +45,8 @@ func TestInstallClaudeStatusline_MissingFileWritesCanonical(t *testing.T) {
 }
 
 func TestInstallClaudeStatusline_PreservesOtherSettings(t *testing.T) {
+	t.Parallel()
 	home := t.TempDir()
-	t.Setenv("HOME", home)
 	settingsDir := filepath.Join(home, ".claude")
 	if err := os.MkdirAll(settingsDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
@@ -57,7 +57,7 @@ func TestInstallClaudeStatusline_PreservesOtherSettings(t *testing.T) {
 		t.Fatalf("write existing settings: %v", err)
 	}
 
-	d := deps{stdout: &strings.Builder{}}
+	d := deps{stdout: &strings.Builder{}, userHomeDir: func() (string, error) { return home, nil }}
 	if err := installClaudeStatusline(d); err != nil {
 		t.Fatalf("installClaudeStatusline: %v", err)
 	}
@@ -80,9 +80,9 @@ func TestInstallClaudeStatusline_PreservesOtherSettings(t *testing.T) {
 }
 
 func TestInstallClaudeStatusline_IdempotentAcrossRuns(t *testing.T) {
+	t.Parallel()
 	home := t.TempDir()
-	t.Setenv("HOME", home)
-	d := deps{stdout: &strings.Builder{}}
+	d := deps{stdout: &strings.Builder{}, userHomeDir: func() (string, error) { return home, nil }}
 
 	if err := installClaudeStatusline(d); err != nil {
 		t.Fatalf("installClaudeStatusline (1st run): %v", err)

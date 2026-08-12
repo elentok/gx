@@ -8,6 +8,7 @@ import (
 )
 
 func TestRunRun_NoArgs(t *testing.T) {
+	t.Parallel()
 	d := deps{
 		stdin:  bytes.NewBuffer(nil),
 		stdout: bytes.NewBuffer(nil),
@@ -20,6 +21,7 @@ func TestRunRun_NoArgs(t *testing.T) {
 }
 
 func TestRunRun_Success(t *testing.T) {
+	t.Parallel()
 	d := deps{
 		stdin:  bytes.NewBuffer(nil),
 		stdout: bytes.NewBuffer(nil),
@@ -31,6 +33,7 @@ func TestRunRun_Success(t *testing.T) {
 }
 
 func TestRunRun_Failure_MapsToExitError(t *testing.T) {
+	t.Parallel()
 	d := deps{
 		// Newline so the keep-open wait unblocks instead of hanging.
 		stdin:  strings.NewReader("\n"),
@@ -48,6 +51,7 @@ func TestRunRun_Failure_MapsToExitError(t *testing.T) {
 }
 
 func TestRunRun_ArgsReachChildVerbatim(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	d := deps{
 		stdin:  bytes.NewBuffer(nil),
@@ -65,6 +69,7 @@ func TestRunRun_ArgsReachChildVerbatim(t *testing.T) {
 }
 
 func TestRunCmd_DisableFlagParsing_PassesFlags(t *testing.T) {
+	t.Parallel()
 	// Drive through the cobra seam so the `run` subcommand's DisableFlagParsing
 	// is exercised: a flag-like token after the program reaches the child.
 	var stdout bytes.Buffer

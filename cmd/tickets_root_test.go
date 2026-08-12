@@ -10,6 +10,7 @@ import (
 )
 
 func TestExecute_TicketsRoot_StandardRepo(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempRepo(t)
 
 	var stdout bytes.Buffer
@@ -29,6 +30,7 @@ func TestExecute_TicketsRoot_StandardRepo(t *testing.T) {
 }
 
 func TestExecute_TicketsRoot_NotAGitRepo(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	var stdout, stderr bytes.Buffer

@@ -27,6 +27,7 @@ func ticketFrontmatter(id, extra string) string {
 }
 
 func TestExecute_TicketsSet_ParentAcceptedForExistingTicket(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writeEpicTicket(t, dir, "e", "01-first.md", ticketFrontmatter("01", ""))
 	path := writeEpicTicket(t, dir, "e", "01a-fork.md", ticketFrontmatter("01a", ""))
@@ -46,6 +47,7 @@ func TestExecute_TicketsSet_ParentAcceptedForExistingTicket(t *testing.T) {
 }
 
 func TestExecute_TicketsSet_ParentRejectedWhenAbsentFromEpic(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := writeEpicTicket(t, dir, "e", "01-first.md", ticketFrontmatter("01", ""))
 	before, err := os.ReadFile(path)
@@ -65,6 +67,7 @@ func TestExecute_TicketsSet_ParentRejectedWhenAbsentFromEpic(t *testing.T) {
 }
 
 func TestExecute_TicketsSet_ParentRejectedWhenItWouldCloseACycle(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := writeEpicTicket(t, dir, "e", "01-first.md", ticketFrontmatter("01", ""))
 	writeEpicTicket(t, dir, "e", "01a-fork.md", ticketFrontmatter("01a", "parent: \"01\"\n"))
@@ -85,6 +88,7 @@ func TestExecute_TicketsSet_ParentRejectedWhenItWouldCloseACycle(t *testing.T) {
 }
 
 func TestExecute_TicketsValidate_ReportsInvalidParentEdge(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := writeEpicTicket(t, dir, "e", "01-first.md", ticketFrontmatter("01", "parent: \"09\"\n"))
 
@@ -99,6 +103,7 @@ func TestExecute_TicketsValidate_ReportsInvalidParentEdge(t *testing.T) {
 }
 
 func TestExecute_TicketsValidate_AcceptsDraftStatus(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "01-first.md")
 	writeTicketFile(t, path, "---\nid: \"01\"\nstatus: draft\ntype: task\n---\nBody.\n")
@@ -114,6 +119,7 @@ func TestExecute_TicketsValidate_AcceptsDraftStatus(t *testing.T) {
 }
 
 func TestExecute_TicketsSet_AcceptsDraftStatus(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "01-first.md")
 	writeTicketFile(t, path, "---\nid: \"01\"\nstatus: open\ntype: task\n---\nBody.\n")

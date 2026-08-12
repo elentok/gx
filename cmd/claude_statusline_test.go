@@ -12,6 +12,7 @@ import (
 )
 
 func TestRunClaudeStatusline_ValidInput(t *testing.T) {
+	t.Parallel()
 	out := &strings.Builder{}
 	d := deps{
 		stdin:  strings.NewReader(`{"context_window":{"total_input_tokens":1234,"used_percentage":51.2},"rate_limits":{"five_hour":{"used_percentage":11.4},"seven_day":{"used_percentage":72.8}},"model":{"display_name":"Claude Sonnet"}}`),
@@ -32,6 +33,7 @@ func TestRunClaudeStatusline_ValidInput(t *testing.T) {
 }
 
 func TestRunClaudeStatusline_RateLimitResets(t *testing.T) {
+	t.Parallel()
 	fiveHourReset := time.Now().Add(30 * time.Minute)
 	weekReset := time.Now().AddDate(0, 0, 3)
 
@@ -61,6 +63,7 @@ func TestRunClaudeStatusline_RateLimitResets(t *testing.T) {
 }
 
 func TestRunClaudeStatusline_MissingResetsAtDegradesSilently(t *testing.T) {
+	t.Parallel()
 	out := &strings.Builder{}
 	d := deps{
 		stdin:  strings.NewReader(`{"rate_limits":{"five_hour":{"used_percentage":11},"seven_day":{"used_percentage":72}},"model":{"display_name":"Claude"}}`),
@@ -116,6 +119,7 @@ func TestRunClaudeStatusline_RemoteControlInactive(t *testing.T) {
 }
 
 func TestRunClaudeStatusline_TokensBelowThreshold(t *testing.T) {
+	t.Parallel()
 	out := &strings.Builder{}
 	d := deps{
 		stdin:  strings.NewReader(`{"context_window":{"total_input_tokens":999,"used_percentage":1},"rate_limits":{"five_hour":{"used_percentage":2},"seven_day":{"used_percentage":3}},"model":{"display_name":"Claude"}}`),
@@ -132,6 +136,7 @@ func TestRunClaudeStatusline_TokensBelowThreshold(t *testing.T) {
 }
 
 func TestRunClaudeStatusline_InvalidFields(t *testing.T) {
+	t.Parallel()
 	out := &strings.Builder{}
 	d := deps{
 		stdin:  strings.NewReader(`{"context_window":{"total_input_tokens":"NaN?","used_percentage":"oops"},"rate_limits":{"five_hour":{},"seven_day":{"used_percentage":88}},"model":{"display_name":9}}`),
@@ -160,6 +165,7 @@ func TestRunClaudeStatusline_InvalidFields(t *testing.T) {
 }
 
 func TestRunClaudeStatusline_RejectsNonFiniteNumbers(t *testing.T) {
+	t.Parallel()
 	out := &strings.Builder{}
 	d := deps{
 		stdin:  strings.NewReader(`{"context_window":{"total_input_tokens":"NaN","used_percentage":"Infinity"},"rate_limits":{"five_hour":{"used_percentage":10},"seven_day":{"used_percentage":20}},"model":{"display_name":"Claude"}}`),
@@ -183,6 +189,7 @@ func TestRunClaudeStatusline_RejectsNonFiniteNumbers(t *testing.T) {
 }
 
 func TestRunClaudeStatusline_SilentSkipsInvalid(t *testing.T) {
+	t.Parallel()
 	out := &strings.Builder{}
 	d := deps{
 		stdin:  strings.NewReader(`{"context_window":{"total_input_tokens":"bad"},"rate_limits":{"five_hour":{"used_percentage":10}},"model":{"display_name":"Claude"}}`),
@@ -206,6 +213,7 @@ func TestRunClaudeStatusline_SilentSkipsInvalid(t *testing.T) {
 }
 
 func TestRunClaudeStatusline_MalformedJSON(t *testing.T) {
+	t.Parallel()
 	out := &strings.Builder{}
 	d := deps{
 		stdin:  strings.NewReader(`{"model":`),
@@ -222,6 +230,7 @@ func TestRunClaudeStatusline_MalformedJSON(t *testing.T) {
 }
 
 func TestRunClaudeStatusline_Demo(t *testing.T) {
+	t.Parallel()
 	out := &strings.Builder{}
 	d := deps{
 		stdin:  strings.NewReader(`{"model":"ignored"}`),
@@ -258,6 +267,7 @@ func TestRunClaudeStatusline_Demo(t *testing.T) {
 }
 
 func TestTokenColorThresholds(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name   string
 		tokens float64
@@ -273,6 +283,7 @@ func TestTokenColorThresholds(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			if got := tokenColor(tc.tokens); got != tc.want {
 				t.Fatalf("expected %v, got %v", tc.want, got)
 			}
@@ -281,6 +292,7 @@ func TestTokenColorThresholds(t *testing.T) {
 }
 
 func TestContextProgressValue_RendersBar(t *testing.T) {
+	t.Parallel()
 	got := contextProgressValue(50, 1000)
 	if !strings.Contains(got, "■") && !strings.Contains(got, "·") {
 		t.Fatalf("expected a rendered progress bar, got %q", got)
@@ -291,6 +303,7 @@ func TestContextProgressValue_RendersBar(t *testing.T) {
 }
 
 func TestCurrentWorktreeSegment_PresentWhenBranchMatchesWorktree(t *testing.T) {
+	t.Parallel()
 	outer := testutil.TempDotBareRepoWithWorktrees(t, "feature-a")
 	d := deps{getwd: func() (string, error) { return filepath.Join(outer, "feature-a"), nil }}
 
@@ -304,6 +317,7 @@ func TestCurrentWorktreeSegment_PresentWhenBranchMatchesWorktree(t *testing.T) {
 }
 
 func TestCurrentWorktreeSegment_PresentWithBranchWhenDiffers(t *testing.T) {
+	t.Parallel()
 	outer := testutil.TempDotBareRepoWithWorktrees(t, "feature-b")
 	wtDir := filepath.Join(outer, "feature-b")
 	testutil.MustGitExported(t, wtDir, "checkout", "-b", "other-branch")
@@ -320,6 +334,7 @@ func TestCurrentWorktreeSegment_PresentWithBranchWhenDiffers(t *testing.T) {
 }
 
 func TestCurrentWorktreeSegment_OmittedOutsideGit(t *testing.T) {
+	t.Parallel()
 	d := deps{getwd: func() (string, error) { return t.TempDir(), nil }}
 
 	if got := currentWorktreeSegment(d); got != "" {
@@ -328,6 +343,7 @@ func TestCurrentWorktreeSegment_OmittedOutsideGit(t *testing.T) {
 }
 
 func TestCurrentWorktreeSegment_TruncatesLongNames(t *testing.T) {
+	t.Parallel()
 	longName := "a-worktree-name-that-is-far-too-long-to-fit"
 	outer := testutil.TempDotBareRepoWithWorktrees(t, longName)
 	d := deps{getwd: func() (string, error) { return filepath.Join(outer, longName), nil }}
@@ -342,6 +358,7 @@ func TestCurrentWorktreeSegment_TruncatesLongNames(t *testing.T) {
 }
 
 func TestRunClaudeStatusline_IncludesWorktreeSegment(t *testing.T) {
+	t.Parallel()
 	outer := testutil.TempDotBareRepoWithWorktrees(t, "feature-c")
 	out := &strings.Builder{}
 	d := deps{

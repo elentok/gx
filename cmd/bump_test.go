@@ -28,6 +28,7 @@ func tagRepo(t *testing.T, dir, tag string) {
 // --- parseVersion ---
 
 func TestParseVersion_Valid(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		tag                 string
 		major, minor, patch int
@@ -51,6 +52,7 @@ func TestParseVersion_Valid(t *testing.T) {
 }
 
 func TestParseVersion_Invalid(t *testing.T) {
+	t.Parallel()
 	for _, tag := range []string{"v1.2", "v1", "vx.y.z", "v1.2.x", ""} {
 		_, _, _, err := git.ParseVersion(tag)
 		if err == nil {
@@ -62,6 +64,7 @@ func TestParseVersion_Invalid(t *testing.T) {
 // --- pickBump ---
 
 func TestPickBump_EnterSelectsPatch(t *testing.T) {
+	t.Parallel()
 	got, err := pickBump("v1.2.3", 1, 2, 3, strings.NewReader("\r"), bytes.NewBuffer(nil))
 	if err != nil {
 		t.Fatalf("pickBump: %v", err)
@@ -72,6 +75,7 @@ func TestPickBump_EnterSelectsPatch(t *testing.T) {
 }
 
 func TestPickBump_DownThenEnterSelectsMinor(t *testing.T) {
+	t.Parallel()
 	got, err := pickBump("v1.2.3", 1, 2, 3, strings.NewReader("j\r"), bytes.NewBuffer(nil))
 	if err != nil {
 		t.Fatalf("pickBump: %v", err)
@@ -82,6 +86,7 @@ func TestPickBump_DownThenEnterSelectsMinor(t *testing.T) {
 }
 
 func TestPickBump_CursorClampsAtBottom(t *testing.T) {
+	t.Parallel()
 	// Verify that pressing j past the last option does not wrap and still
 	// selects the last option (major) on enter. The picker has 3 options
 	// (patch=0, minor=1, major=2), so pressing j three times (one more than
@@ -107,6 +112,7 @@ func TestPickBump_CursorClampsAtBottom(t *testing.T) {
 }
 
 func TestPickBump_QCancels(t *testing.T) {
+	t.Parallel()
 	got, err := pickBump("v1.2.3", 1, 2, 3, strings.NewReader("q"), bytes.NewBuffer(nil))
 	if err != nil {
 		t.Fatalf("pickBump: %v", err)
@@ -117,6 +123,7 @@ func TestPickBump_QCancels(t *testing.T) {
 }
 
 func TestPickBump_EscCancels(t *testing.T) {
+	t.Parallel()
 	got, err := pickBump("v1.2.3", 1, 2, 3, strings.NewReader("\x1b"), bytes.NewBuffer(nil))
 	if err != nil {
 		t.Fatalf("pickBump: %v", err)
@@ -129,6 +136,7 @@ func TestPickBump_EscCancels(t *testing.T) {
 // --- runBump with explicit args ---
 
 func TestRunBump_PatchExplicit(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempRepo(t)
 	tagRepo(t, dir, "v1.2.3")
 
@@ -151,6 +159,7 @@ func TestRunBump_PatchExplicit(t *testing.T) {
 }
 
 func TestRunBump_MinorExplicit(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempRepo(t)
 	tagRepo(t, dir, "v1.2.3")
 
@@ -173,6 +182,7 @@ func TestRunBump_MinorExplicit(t *testing.T) {
 }
 
 func TestRunBump_MajorExplicit(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempRepo(t)
 	tagRepo(t, dir, "v1.2.3")
 
@@ -195,6 +205,7 @@ func TestRunBump_MajorExplicit(t *testing.T) {
 }
 
 func TestRunBump_NoExistingTag_DefaultsToV0(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempRepo(t)
 
 	var stdout bytes.Buffer
@@ -216,6 +227,7 @@ func TestRunBump_NoExistingTag_DefaultsToV0(t *testing.T) {
 }
 
 func TestRunBump_CreatesAnnotatedTag(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempRepo(t)
 	tagRepo(t, dir, "v1.0.0")
 
@@ -251,6 +263,7 @@ func TestRunBump_CreatesAnnotatedTag(t *testing.T) {
 }
 
 func TestRunBump_SkipsPushWhenDeclined(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempRepo(t)
 	tagRepo(t, dir, "v1.0.0")
 
@@ -275,6 +288,7 @@ func TestRunBump_SkipsPushWhenDeclined(t *testing.T) {
 }
 
 func TestRunBump_InteractivePicker(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempRepo(t)
 	tagRepo(t, dir, "v2.0.0")
 
@@ -297,6 +311,7 @@ func TestRunBump_InteractivePicker(t *testing.T) {
 }
 
 func TestRunBump_InteractivePicker_Cancel(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempRepo(t)
 	tagRepo(t, dir, "v1.0.0")
 

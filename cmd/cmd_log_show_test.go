@@ -10,6 +10,7 @@ import (
 )
 
 func TestExecute_LogDispatchesToRunLog(t *testing.T) {
+	t.Parallel()
 	var got LogOptions
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
@@ -32,6 +33,7 @@ func TestExecute_LogDispatchesToRunLog(t *testing.T) {
 }
 
 func TestExecute_RunLog_DispatchesWithRef(t *testing.T) {
+	t.Parallel()
 	var got LogOptions
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
@@ -50,6 +52,7 @@ func TestExecute_RunLog_DispatchesWithRef(t *testing.T) {
 }
 
 func TestExecute_LogFileFlag(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name    string
 		args    []string
@@ -62,6 +65,7 @@ func TestExecute_LogFileFlag(t *testing.T) {
 		{name: "ref-before-flag", args: []string{"log", "abc123", "-f", "foo.txt"}, wantRef: "abc123"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			repoDir := testutil.TempRepo(t)
 			var got LogOptions
 			d := deps{
@@ -87,6 +91,7 @@ func TestExecute_LogFileFlag(t *testing.T) {
 }
 
 func TestExecute_LogFileResolvesFromSubdir(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	subDir := filepath.Join(repoDir, "sub")
 	if err := os.MkdirAll(subDir, 0o755); err != nil {
@@ -111,6 +116,7 @@ func TestExecute_LogFileResolvesFromSubdir(t *testing.T) {
 }
 
 func TestExecute_LogFileRejectsEscape(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
@@ -128,6 +134,7 @@ func TestExecute_LogFileRejectsEscape(t *testing.T) {
 }
 
 func TestExecute_RunShow_DispatchesWithRef(t *testing.T) {
+	t.Parallel()
 	var got string
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
@@ -146,6 +153,7 @@ func TestExecute_RunShow_DispatchesWithRef(t *testing.T) {
 }
 
 func TestExecute_RunShow_NoRef(t *testing.T) {
+	t.Parallel()
 	var got string
 	d := deps{
 		stdout: bytes.NewBuffer(nil),

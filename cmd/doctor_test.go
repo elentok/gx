@@ -45,6 +45,7 @@ func setupDotBareForCmd(t *testing.T) (outerDir string) {
 }
 
 func TestDoctor_NoIssues(t *testing.T) {
+	t.Parallel()
 	outerDir := setupDotBareForCmd(t)
 
 	var stdout bytes.Buffer
@@ -63,6 +64,7 @@ func TestDoctor_NoIssues(t *testing.T) {
 }
 
 func TestDoctor_PrintsRuntimeTerminalInfo(t *testing.T) {
+	t.Parallel()
 	outerDir := setupDotBareForCmd(t)
 
 	var stdout bytes.Buffer
@@ -100,6 +102,7 @@ func TestDoctor_PrintsRuntimeTerminalInfo(t *testing.T) {
 }
 
 func TestDoctor_PauseWaitsForEnter(t *testing.T) {
+	t.Parallel()
 	outerDir := setupDotBareForCmd(t)
 
 	var stdout bytes.Buffer
@@ -119,6 +122,7 @@ func TestDoctor_PauseWaitsForEnter(t *testing.T) {
 }
 
 func TestDoctor_UnknownFlag(t *testing.T) {
+	t.Parallel()
 	d := deps{
 		getwd: func() (string, error) { return "", errors.New("should not be called") },
 	}
@@ -133,6 +137,7 @@ func TestDoctor_UnknownFlag(t *testing.T) {
 }
 
 func TestDoctor_ReportsIssue(t *testing.T) {
+	t.Parallel()
 	outerDir := setupDotBareForCmd(t)
 
 	// Corrupt the outer .git file.
@@ -161,6 +166,7 @@ func TestDoctor_ReportsIssue(t *testing.T) {
 }
 
 func TestDoctor_Fix_AppliesWhenConfirmed(t *testing.T) {
+	t.Parallel()
 	outerDir := setupDotBareForCmd(t)
 
 	gitFile := filepath.Join(outerDir, ".git")
@@ -193,6 +199,7 @@ func TestDoctor_Fix_AppliesWhenConfirmed(t *testing.T) {
 }
 
 func TestDoctor_CheckBlockedForm_Pass(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	var gotTarget string
 	d := deps{
@@ -217,6 +224,7 @@ func TestDoctor_CheckBlockedForm_Pass(t *testing.T) {
 }
 
 func TestDoctor_CheckBlockedForm_FailsOnWrongRule(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	d := deps{
 		stdin:  strings.NewReader("\n"),
@@ -237,6 +245,7 @@ func TestDoctor_CheckBlockedForm_FailsOnWrongRule(t *testing.T) {
 }
 
 func TestDoctor_CheckBlockedForm_RequiresTarget(t *testing.T) {
+	t.Parallel()
 	d := deps{
 		getwd: func() (string, error) { return "", errors.New("should not be called") },
 	}
@@ -251,6 +260,7 @@ func TestDoctor_CheckBlockedForm_RequiresTarget(t *testing.T) {
 }
 
 func TestDoctor_Fix_SkipsWhenDeclined(t *testing.T) {
+	t.Parallel()
 	outerDir := setupDotBareForCmd(t)
 
 	gitFile := filepath.Join(outerDir, ".git")

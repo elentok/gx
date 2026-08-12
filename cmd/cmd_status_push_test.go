@@ -13,8 +13,10 @@ import (
 )
 
 func TestExecute_RunsPush(t *testing.T) {
+	t.Parallel()
 	for _, name := range []string{"push", "ps"} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			d := deps{
 				stdout: bytes.NewBuffer(nil),
 				stderr: bytes.NewBuffer(nil),
@@ -30,8 +32,10 @@ func TestExecute_RunsPush(t *testing.T) {
 }
 
 func TestExecute_RunsStatus(t *testing.T) {
+	t.Parallel()
 	for _, name := range []string{"status", "s"} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			called := 0
 			d := deps{
 				stdout: bytes.NewBuffer(nil),
@@ -53,6 +57,7 @@ func TestExecute_RunsStatus(t *testing.T) {
 }
 
 func TestExecute_RunsStatusWithPath(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name string
 		args []string
@@ -62,6 +67,7 @@ func TestExecute_RunsStatusWithPath(t *testing.T) {
 		{name: "alias", args: []string{"s", "/tmp/file.txt"}, want: "/tmp/file.txt"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			var got string
 			d := deps{
 				stdout: bytes.NewBuffer(nil),
@@ -83,6 +89,7 @@ func TestExecute_RunsStatusWithPath(t *testing.T) {
 }
 
 func TestResolveStatusTargetPath(t *testing.T) {
+	t.Parallel()
 	root := "/repo"
 	cwd := "/repo/sub"
 
@@ -105,6 +112,7 @@ func TestResolveStatusTargetPath(t *testing.T) {
 }
 
 func TestResolveStatusTargetPathRejectsOutsideWorktree(t *testing.T) {
+	t.Parallel()
 	_, err := resolveStatusTargetPath("/repo", "/repo", "../other.txt")
 	if err == nil {
 		t.Fatal("expected error for path outside worktree")
@@ -112,6 +120,7 @@ func TestResolveStatusTargetPathRejectsOutsideWorktree(t *testing.T) {
 }
 
 func TestExecute_PushAllowedInRegularRepo(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
@@ -132,6 +141,7 @@ func TestExecute_PushAllowedInRegularRepo(t *testing.T) {
 }
 
 func TestExecute_PushRejectedInBareRepo(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepo(t)
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
@@ -152,6 +162,7 @@ func TestExecute_PushRejectedInBareRepo(t *testing.T) {
 }
 
 func TestExecute_PushConfirmsBeforeCheckingDivergence(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	remote := t.TempDir() + "/remote.git"
 	testutil.MustGitExported(t, ".", "clone", "--bare", repoDir, remote)
@@ -187,6 +198,7 @@ func TestExecute_PushConfirmsBeforeCheckingDivergence(t *testing.T) {
 }
 
 func TestRunGitInteractive_Success(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	err := runGitInteractive(repoDir, bytes.NewBuffer(nil), bytes.NewBuffer(nil), bytes.NewBuffer(nil), "status")
 	if err != nil {
@@ -195,6 +207,7 @@ func TestRunGitInteractive_Success(t *testing.T) {
 }
 
 func TestRunGitInteractive_Failure(t *testing.T) {
+	t.Parallel()
 	err := runGitInteractive(t.TempDir(), bytes.NewBuffer(nil), bytes.NewBuffer(nil), bytes.NewBuffer(nil), "status")
 	if err == nil {
 		t.Fatal("expected error for non-repo dir")
@@ -202,6 +215,7 @@ func TestRunGitInteractive_Failure(t *testing.T) {
 }
 
 func TestExecute_PushConfirmedNoRemote(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	d := deps{
 		stdin:  bytes.NewBuffer(nil),
@@ -223,6 +237,7 @@ func TestExecute_PushConfirmedNoRemote(t *testing.T) {
 }
 
 func TestExecute_PushConfirmError(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	wantErr := errors.New("confirm failed")
 	d := deps{
@@ -241,6 +256,7 @@ func TestExecute_PushConfirmError(t *testing.T) {
 }
 
 func TestResolveStatusTargetPath_ExactRoot(t *testing.T) {
+	t.Parallel()
 	_, err := resolveStatusTargetPath("/repo", "/repo", "/repo")
 	if err == nil {
 		t.Fatal("expected error for exact root target")

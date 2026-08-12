@@ -75,6 +75,7 @@ func agentRootsOf(t *testing.T, d deps) (claude, codex string) {
 }
 
 func TestExecute_SkillsInstall_CopiesBundleIntoBothAgentRoots(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	d := fakeSkillsDeps(t, &stdout)
 	claudeRoot, codexRoot := agentRootsOf(t, d)
@@ -101,6 +102,7 @@ func TestExecute_SkillsInstall_CopiesBundleIntoBothAgentRoots(t *testing.T) {
 }
 
 func TestExecute_SkillsInstall_ReinstallReportsSkipped(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	d := fakeSkillsDeps(t, &stdout)
 
@@ -123,6 +125,7 @@ func TestExecute_SkillsInstall_ReinstallReportsSkipped(t *testing.T) {
 }
 
 func TestExecute_SkillsInstall_ConflictedPathBlocksInstallAndReportsConflict(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	d := fakeSkillsDeps(t, &stdout)
 	claudeRoot, _ := agentRootsOf(t, d)
@@ -152,6 +155,7 @@ func TestExecute_SkillsInstall_ConflictedPathBlocksInstallAndReportsConflict(t *
 }
 
 func TestExecute_SkillsInstall_ForceOverridesConflict(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	d := fakeSkillsDeps(t, &stdout)
 	claudeRoot, _ := agentRootsOf(t, d)
@@ -177,6 +181,7 @@ func TestExecute_SkillsInstall_ForceOverridesConflict(t *testing.T) {
 }
 
 func TestExecute_SkillsUninstall_NotInstalledPrintsMessageAndSucceeds(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	d := fakeSkillsDeps(t, &stdout)
 
@@ -189,6 +194,7 @@ func TestExecute_SkillsUninstall_NotInstalledPrintsMessageAndSucceeds(t *testing
 }
 
 func TestExecute_SkillsUninstall_RemovesInstalledBundle(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	d := fakeSkillsDeps(t, &stdout)
 	claudeRoot, codexRoot := agentRootsOf(t, d)
@@ -220,6 +226,7 @@ func TestExecute_SkillsUninstall_RemovesInstalledBundle(t *testing.T) {
 }
 
 func TestExecute_SkillsUninstall_PreservesLocallyModifiedFileAsConflicted(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	d := fakeSkillsDeps(t, &stdout)
 	claudeRoot, _ := agentRootsOf(t, d)
@@ -249,6 +256,7 @@ func TestExecute_SkillsUninstall_PreservesLocallyModifiedFileAsConflicted(t *tes
 }
 
 func TestExecute_SkillsInstallDev_SymlinksCurrentCheckoutIntoBothAgentRoots(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	repo := testutil.TempRepo(t)
 	bundleDir := writeDevBundle(t, repo)
@@ -278,6 +286,7 @@ func TestExecute_SkillsInstallDev_SymlinksCurrentCheckoutIntoBothAgentRoots(t *t
 }
 
 func TestExecute_SkillsInstallDev_ResolvesGitRootFromNestedWorkingDirectory(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	repo := testutil.TempRepo(t)
 	bundleDir := writeDevBundle(t, repo)
@@ -301,6 +310,7 @@ func TestExecute_SkillsInstallDev_ResolvesGitRootFromNestedWorkingDirectory(t *t
 }
 
 func TestExecute_SkillsInstallDev_ResolvesLinkedWorktreeRootNotBareRoot(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	bareRepo := testutil.TempBareRepoWithWorktrees(t, "feature")
 	wtDir := filepath.Join(bareRepo, "feature")
@@ -323,6 +333,7 @@ func TestExecute_SkillsInstallDev_ResolvesLinkedWorktreeRootNotBareRoot(t *testi
 }
 
 func TestExecute_SkillsInstallDev_ReinstallFromSameCheckoutIsIdempotent(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	repo := testutil.TempRepo(t)
 	writeDevBundle(t, repo)
@@ -347,6 +358,7 @@ func TestExecute_SkillsInstallDev_ReinstallFromSameCheckoutIsIdempotent(t *testi
 }
 
 func TestExecute_SkillsInstallDev_DifferentCheckoutDetectsChangedLinkTargetInsteadOfRetargeting(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	repoA := testutil.TempRepo(t)
 	bundleDirA := writeDevBundle(t, repoA)
@@ -382,6 +394,7 @@ func TestExecute_SkillsInstallDev_DifferentCheckoutDetectsChangedLinkTargetInste
 }
 
 func TestExecute_SkillsInstall_SwitchingBetweenProdAndDevRequiresForce(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	repo := testutil.TempRepo(t)
 	writeDevBundle(t, repo)
@@ -402,6 +415,7 @@ func TestExecute_SkillsInstall_SwitchingBetweenProdAndDevRequiresForce(t *testin
 }
 
 func TestExecute_SkillsInstallDev_RefusesCheckoutMissingBundle(t *testing.T) {
+	t.Parallel()
 	var stdout bytes.Buffer
 	repo := testutil.TempRepo(t) // no skills/ directory written
 	d := fakeSkillsDevDeps(t, &stdout, repo)

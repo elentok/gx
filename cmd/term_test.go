@@ -11,6 +11,7 @@ import (
 )
 
 func TestResolveSplitType(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		flags   termFlags
@@ -27,6 +28,7 @@ func TestResolveSplitType(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := resolveSplitType(tt.flags)
 			if tt.wantErr {
 				if err == nil {
@@ -87,6 +89,7 @@ func envFunc(m map[string]string) func(string) string {
 }
 
 func TestRunTerm_SplitWrapsExplicitCommand(t *testing.T) {
+	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
 	l, e := withSeams(t)
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
@@ -119,6 +122,7 @@ func TestRunTerm_SplitWrapsExplicitCommand(t *testing.T) {
 }
 
 func TestRunTerm_NoCommandLaunchesShellBare(t *testing.T) {
+	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
 	l, _ := withSeams(t)
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
@@ -146,6 +150,7 @@ func TestRunTerm_NoCommandLaunchesShellBare(t *testing.T) {
 }
 
 func TestRunTerm_ShellFallsBackToSh(t *testing.T) {
+	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
 	l, _ := withSeams(t)
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
@@ -162,6 +167,7 @@ func TestRunTerm_ShellFallsBackToSh(t *testing.T) {
 }
 
 func TestRunTerm_CwdOverride(t *testing.T) {
+	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
 	l, _ := withSeams(t)
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
@@ -178,6 +184,7 @@ func TestRunTerm_CwdOverride(t *testing.T) {
 }
 
 func TestRunTerm_CwdDefaultsToGetwd(t *testing.T) {
+	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
 	l, _ := withSeams(t)
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
@@ -194,6 +201,7 @@ func TestRunTerm_CwdDefaultsToGetwd(t *testing.T) {
 }
 
 func TestRunTerm_HereRunsInPlace(t *testing.T) {
+	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
 	l, e := withSeams(t)
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
@@ -221,6 +229,7 @@ func TestRunTerm_HereRunsInPlace(t *testing.T) {
 }
 
 func TestRunTerm_PlainTerminalFallsBackInPlaceSilently(t *testing.T) {
+	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
 	l, e := withSeams(t)
 	var stderr bytes.Buffer
 	d := deps{
@@ -244,6 +253,7 @@ func TestRunTerm_PlainTerminalFallsBackInPlaceSilently(t *testing.T) {
 }
 
 func TestRunTerm_KittyWithoutRemotePrintsHint(t *testing.T) {
+	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
 	l, e := withSeams(t)
 	var stderr bytes.Buffer
 	d := deps{
@@ -267,6 +277,7 @@ func TestRunTerm_KittyWithoutRemotePrintsHint(t *testing.T) {
 }
 
 func TestRunTerm_KittyRemoteUsesSplit(t *testing.T) {
+	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
 	l, _ := withSeams(t)
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
@@ -286,6 +297,7 @@ func TestRunTerm_KittyRemoteUsesSplit(t *testing.T) {
 }
 
 func TestRunTerm_DashTerminator(t *testing.T) {
+	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
 	l, _ := withSeams(t)
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
@@ -304,6 +316,7 @@ func TestRunTerm_DashTerminator(t *testing.T) {
 }
 
 func TestRunTerm_ConflictingDirectionsError(t *testing.T) {
+	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),

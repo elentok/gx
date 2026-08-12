@@ -13,6 +13,7 @@ import (
 // would have already rewritten, so anything still carrying the old shape is a
 // hand-authored file rather than a tracker the migration missed.
 func TestExecute_TicketsValidate_RejectsPreContractionShape(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		raw  string
@@ -57,6 +58,7 @@ func TestExecute_TicketsValidate_RejectsPreContractionShape(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			path := filepath.Join(t.TempDir(), "04-ticket.md")
 			writeTicketFile(t, path, tc.raw)
 
@@ -73,6 +75,7 @@ func TestExecute_TicketsValidate_RejectsPreContractionShape(t *testing.T) {
 }
 
 func TestExecute_TicketsValidate_AcceptsPostMigrationShape(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "04a-ticket.md")
 	writeTicketFile(t, path, "---\nid: \"04a\"\nstatus: needs-answer\ntype: task\nparent: \"04\"\n---\nBody.\n")
 
@@ -85,6 +88,7 @@ func TestExecute_TicketsValidate_AcceptsPostMigrationShape(t *testing.T) {
 // TestExecute_TicketsSet_NoChildrenFlag pins that `set` no longer offers a way
 // to write the retired field back onto a ticket the loader would then reject.
 func TestExecute_TicketsSet_NoChildrenFlag(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "04b-ticket.md")
 	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
 

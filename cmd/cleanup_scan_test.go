@@ -23,6 +23,7 @@ func writeCleanupScanTicket(t *testing.T, dir, epic, filename, id, status, ticke
 }
 
 func TestExecute_CleanupScan_EpicsJSON(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempRepo(t)
 
 	// epic-done-merged-review-done: all tickets done, branch merged (no
@@ -93,6 +94,7 @@ func TestExecute_CleanupScan_EpicsJSON(t *testing.T) {
 }
 
 func TestExecute_CleanupScan_HousekeepingReportsTrackedFilesAndMissingGitignore(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempRepo(t)
 	testutil.Mkdir(t, filepath.Join(dir, ".scratch", "stray-epic"))
 	testutil.WriteFile(t, dir, ".scratch/stray-epic/leaked.txt", "oops, this got committed")
@@ -127,6 +129,7 @@ func TestExecute_CleanupScan_HousekeepingReportsTrackedFilesAndMissingGitignore(
 }
 
 func TestExecute_CleanupScan_HousekeepingSkippedAtBareRootWithNoWorktree(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempBareRepo(t)
 
 	var stdout bytes.Buffer
@@ -151,6 +154,7 @@ func TestExecute_CleanupScan_HousekeepingSkippedAtBareRootWithNoWorktree(t *test
 }
 
 func TestExecute_CleanupScan_NotAGitRepo(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	var stdout, stderr bytes.Buffer

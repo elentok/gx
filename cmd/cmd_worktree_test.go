@@ -10,6 +10,7 @@ import (
 )
 
 func TestExecute_ListWorktrees(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a", "feature-b")
 	var stdout bytes.Buffer
 	d := deps{
@@ -32,6 +33,7 @@ func TestExecute_ListWorktrees(t *testing.T) {
 }
 
 func TestExecute_WorktreeAbsPath(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	var stdout bytes.Buffer
 	d := deps{
@@ -52,6 +54,7 @@ func TestExecute_WorktreeAbsPath(t *testing.T) {
 }
 
 func TestExecute_ListWorktrees_FromInsideWorktree(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a", "feature-b")
 	wtDir := repoDir + "/feature-a"
 	var stdout bytes.Buffer
@@ -73,6 +76,7 @@ func TestExecute_ListWorktrees_FromInsideWorktree(t *testing.T) {
 }
 
 func TestExecute_WorktreeAbsPath_FromInsideWorktree(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a", "feature-b")
 	wtDir := repoDir + "/feature-a"
 	var stdout bytes.Buffer
@@ -94,6 +98,7 @@ func TestExecute_WorktreeAbsPath_FromInsideWorktree(t *testing.T) {
 }
 
 func TestExecute_WorktreeAbsPath_NotFound(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
@@ -111,6 +116,7 @@ func TestExecute_WorktreeAbsPath_NotFound(t *testing.T) {
 }
 
 func TestExecute_WorktreeAbsPath_MissingArg(t *testing.T) {
+	t.Parallel()
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
@@ -123,6 +129,7 @@ func TestExecute_WorktreeAbsPath_MissingArg(t *testing.T) {
 }
 
 func TestExecute_WtClone_NoArgs(t *testing.T) {
+	t.Parallel()
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
@@ -134,6 +141,7 @@ func TestExecute_WtClone_NoArgs(t *testing.T) {
 }
 
 func TestExecute_WtClone_TooManyArgs(t *testing.T) {
+	t.Parallel()
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
@@ -145,6 +153,7 @@ func TestExecute_WtClone_TooManyArgs(t *testing.T) {
 }
 
 func TestExecute_WtClone_GetWdError(t *testing.T) {
+	t.Parallel()
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),

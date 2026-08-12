@@ -21,6 +21,7 @@ func writeMigrateFixtureEpic(t *testing.T, root, epicName string, files map[stri
 }
 
 func TestExecute_TicketsMigrate_Success(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	issuesDir := writeMigrateFixtureEpic(t, root, "widget-epic", map[string]string{
 		// Malformed fork chain: 01 lists both its direct fork (01a) and its
@@ -146,6 +147,7 @@ func TestExecute_TicketsMigrate_Success(t *testing.T) {
 }
 
 func TestExecute_TicketsMigrate_InvalidResultWritesNothing(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	issuesDir := writeMigrateFixtureEpic(t, root, "cyclic-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\nparent: \"02\"\n---\nBody.\n",

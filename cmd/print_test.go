@@ -7,6 +7,7 @@ import (
 )
 
 func TestPrintBadge_NonTerminal(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	printBadge(&buf, false, "nerd text", "plain text")
 	got := buf.String()
@@ -16,6 +17,7 @@ func TestPrintBadge_NonTerminal(t *testing.T) {
 }
 
 func TestPrintBadge_NonTerminal_Nerd(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	printBadge(&buf, true, "nerd text", "plain text")
 	got := buf.String()
@@ -25,6 +27,7 @@ func TestPrintBadge_NonTerminal_Nerd(t *testing.T) {
 }
 
 func TestPrintSuccess_NonTerminal(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	printSuccess(&buf, "it worked")
 	got := buf.String()
@@ -37,6 +40,7 @@ func TestPrintSuccess_NonTerminal(t *testing.T) {
 }
 
 func TestPrintError_NonTerminal(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	printError(&buf, "it failed")
 	got := buf.String()

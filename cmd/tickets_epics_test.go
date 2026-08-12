@@ -11,6 +11,7 @@ import (
 )
 
 func TestExecute_TicketsEpics_ListsBareSlugsSortedExcludingArchive(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempRepo(t)
 	scratchDir := filepath.Join(dir, ".scratch")
 	for _, name := range []string{"zebra-epic", "alpha-epic", ".archive"} {
@@ -64,6 +65,7 @@ func TestExecute_TicketsEpics_MapsFlagFiltersToWayfinderMapEpics(t *testing.T) {
 }
 
 func TestExecute_TicketsEpics_EmptyScratchExitsZeroWithNoOutput(t *testing.T) {
+	t.Parallel()
 	dir := testutil.TempRepo(t)
 
 	var stdout bytes.Buffer
@@ -82,6 +84,7 @@ func TestExecute_TicketsEpics_EmptyScratchExitsZeroWithNoOutput(t *testing.T) {
 }
 
 func TestExecute_TicketsEpics_NotAGitRepo(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	var stdout, stderr bytes.Buffer

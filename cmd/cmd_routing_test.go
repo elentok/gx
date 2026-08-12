@@ -9,6 +9,7 @@ import (
 )
 
 func TestExecute_PRsDispatchesToRunPRs(t *testing.T) {
+	t.Parallel()
 	called := 0
 	var gotAllRepos bool
 	d := deps{
@@ -33,6 +34,7 @@ func TestExecute_PRsDispatchesToRunPRs(t *testing.T) {
 }
 
 func TestExecute_PRsAllFlagDispatchesAllRepos(t *testing.T) {
+	t.Parallel()
 	called := 0
 	var gotAllRepos bool
 	d := deps{
@@ -57,6 +59,7 @@ func TestExecute_PRsAllFlagDispatchesAllRepos(t *testing.T) {
 }
 
 func TestExecute_TicketsDispatchesToRunTickets(t *testing.T) {
+	t.Parallel()
 	called := 0
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
@@ -76,6 +79,7 @@ func TestExecute_TicketsDispatchesToRunTickets(t *testing.T) {
 }
 
 func TestExecute_TicketsAliasTk(t *testing.T) {
+	t.Parallel()
 	called := 0
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
@@ -95,6 +99,7 @@ func TestExecute_TicketsAliasTk(t *testing.T) {
 }
 
 func TestExecute_DefaultRunsStatus(t *testing.T) {
+	t.Parallel()
 	called := 0
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
@@ -115,6 +120,7 @@ func TestExecute_DefaultRunsStatus(t *testing.T) {
 }
 
 func TestExecute_DefaultFromBareRootRunsWorktrees(t *testing.T) {
+	t.Parallel()
 	bareRoot := testutil.TempBareRepo(t)
 
 	statusCalled, worktreesCalled := 0, 0
@@ -141,8 +147,10 @@ func TestExecute_DefaultFromBareRootRunsWorktrees(t *testing.T) {
 }
 
 func TestExecute_WorktreesAliases(t *testing.T) {
+	t.Parallel()
 	for _, args := range [][]string{{"worktrees"}, {"wt"}} {
 		t.Run(args[0], func(t *testing.T) {
+			t.Parallel()
 			called := 0
 			d := deps{
 				stdout: bytes.NewBuffer(nil),
@@ -163,6 +171,7 @@ func TestExecute_WorktreesAliases(t *testing.T) {
 }
 
 func TestExecute_UnknownCommand(t *testing.T) {
+	t.Parallel()
 	d := deps{
 		stdout:       bytes.NewBuffer(nil),
 		stderr:       bytes.NewBuffer(nil),
@@ -178,8 +187,10 @@ func TestExecute_UnknownCommand(t *testing.T) {
 }
 
 func TestExecute_Version(t *testing.T) {
+	t.Parallel()
 	for _, args := range [][]string{{"version"}, {"--version"}, {"-v"}} {
 		t.Run(args[0], func(t *testing.T) {
+			t.Parallel()
 			var stdout bytes.Buffer
 			d := deps{
 				stdout: &stdout,
@@ -193,8 +204,10 @@ func TestExecute_Version(t *testing.T) {
 }
 
 func TestExecute_Help(t *testing.T) {
+	t.Parallel()
 	for _, args := range [][]string{{"-h"}, {"--help"}, {"help"}} {
 		t.Run(args[0], func(t *testing.T) {
+			t.Parallel()
 			var stdout bytes.Buffer
 			d := deps{
 				stdout: &stdout,
@@ -211,6 +224,7 @@ func TestExecute_Help(t *testing.T) {
 }
 
 func TestExecute_StatusWithTooManyArgs(t *testing.T) {
+	t.Parallel()
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
@@ -222,6 +236,7 @@ func TestExecute_StatusWithTooManyArgs(t *testing.T) {
 }
 
 func TestExecute_LogWithTooManyArgs(t *testing.T) {
+	t.Parallel()
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
@@ -233,6 +248,7 @@ func TestExecute_LogWithTooManyArgs(t *testing.T) {
 }
 
 func TestExecute_ShowWithTooManyArgs(t *testing.T) {
+	t.Parallel()
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
@@ -244,6 +260,7 @@ func TestExecute_ShowWithTooManyArgs(t *testing.T) {
 }
 
 func TestExecute_StashifyNoArgs(t *testing.T) {
+	t.Parallel()
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
@@ -256,6 +273,7 @@ func TestExecute_StashifyNoArgs(t *testing.T) {
 }
 
 func TestExecute_WtUnknownSubcommand(t *testing.T) {
+	t.Parallel()
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
