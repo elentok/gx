@@ -20,7 +20,10 @@ authoritative.
   with `.archive` and other dot-prefixed directories already excluded, so it never needs filtering.
   Use it instead of listing `<root>` yourself. The slugs compose with the resolved root:
   `<root>/$(gx tickets epics | head -1)/issues/`.
-- A spec or plan, if one exists, is `<root>/<epic-slug>/spec.md`
+- A spec or plan, if one exists, is `<root>/<epic-slug>/spec.md`. A `wayfinder` map's body (the
+  Destination/Notes/Decisions-so-far/Not-yet-specified/Out-of-scope doc — see the `wayfinder` skill)
+  is `<root>/<epic-slug>/map.md` instead — same directory shape, distinct filename so a map is
+  never mistaken for an ordinary spec.
 - Tickets are one file per ticket at `<root>/<epic-slug>/issues/<NN>-<slug>.md`, numbered from
   `01` — never a single combined tickets file
 - A ticket **identifier** is the filename's numeric prefix, optionally followed by one lowercase

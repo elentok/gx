@@ -1,7 +1,7 @@
 # No silent stalls
 
 > Follow-on epic to `lifecycle-refactor`. Written from the wayfinder map at
-> `.scratch/no-silent-stalls-map/spec.md`, whose 15 decision tickets are all closed. Almost every
+> `.scratch/no-silent-stalls-map/map.md`, whose 15 decision tickets are all closed. Almost every
 > decision below is recorded in one of those tickets or in ADRs 0018–0023; this spec states the
 > shape, not the reasoning, and cites the ticket that holds the reasoning.
 >
