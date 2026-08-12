@@ -43,24 +43,11 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 	}
 
 	elapsedMs := 0
-	gatedGiveUps := 0
-	// pending is the compaction-boundary snapshot taken just before the
-	// "/compact" of the most recent gated give-up, kept alive until some later
-	// read proves a boundary landed. While it is unresolved the pane's own
-	// "finished" report proves nothing: the shape that produces a gated give-up
-	// in the first place is a pane reporting idle throughout a running
-	// compaction, and that same pane answers the ordinary finish poll idle too.
-	var pending *compactBoundarySnapshot
-	// justRecoveredSmartZone guards the poll tick immediately after
-	// recoverSmartZoneBreach returns: its own ctrl+c-interrupt-and-compact
-	// sequence can leave the pane reporting "blocked" as a side effect (a
-	// confirmation dialog it didn't fully clear, an unconfirmed compact) that
-	// looks identical to an operator-raised prompt. Without this, that very
-	// next observation would be mistaken for the thing this function's own
-	// blocked-pane park exists to catch. It only ever covers the one
-	// immediately-following tick, not the recovery call itself — the recovery
-	// call runs synchronously, so there is no poll tick during it to guard.
-	justRecoveredSmartZone := false
+	// recovery holds the smart-zone-breach-and-recovery sub-state (gated
+	// give-up bookkeeping and the post-recovery blocked-pane guard) apart from
+	// the blocked-pane / rate-limit / gated-give-up branches below — see its
+	// own doc comment.
+	recovery := newSmartZoneRecovery(smartZone)
 	for {
 		pollMs := smartZonePollMs
 		if p.FinishTimeoutMs > 0 {
@@ -81,8 +68,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 		})
 		if err == nil {
 			if agent.AgentStatus == "blocked" {
-				if justRecoveredSmartZone {
-					justRecoveredSmartZone = false
+				if recovery.consumeJustRecovered() {
 					elapsedMs = 0
 					continue
 				}
@@ -151,7 +137,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 				elapsedMs = 0
 				continue
 			}
-			if pending == nil || !pending.unresolved(d, p, sessionID) {
+			if !recovery.pendingUnresolved(d, p, sessionID) {
 				p.logLifecycleEvent(p.FinishEvent, sessionID)
 				return nil
 			}
@@ -167,13 +153,12 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			// that may still be compacting.
 			d.Sleep(smartZonePollMs * time.Millisecond)
 			elapsedMs += smartZonePollMs
-			if !pending.unresolved(d, p, sessionID) {
+			if !recovery.pendingUnresolved(d, p, sessionID) {
 				p.logLifecycleEvent(p.FinishEvent, sessionID)
 				return nil
 			}
-			gatedGiveUps++
-			if gatedGiveUps >= maxConsecutiveGatedGiveUps {
-				return gatedGiveUpsExhausted(p.Label, gatedGiveUps, errCompactNeverConfirmed)
+			if recovery.recordGatedGiveUp() {
+				return gatedGiveUpsExhausted(p.Label, recovery.gatedGiveUps, errCompactNeverConfirmed)
 			}
 			continue
 		}
@@ -206,48 +191,17 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			}
 		}
 
-		occupancy, found, decidable, occErr := smartZoneOccupancy(d, p.Agent, p.SessionCwd, sessionID)
-		if occErr == nil && found {
-			p.sink().ContextOccupancy(p.Ticket, occupancy)
-		}
-		if occErr != nil || !decidable || occupancy <= smartZone {
-			continue
-		}
-
-		if err := d.AgentSendKeys(p.Pane, "ctrl+c"); err != nil {
-			return fmt.Errorf("interrupting %s after smart-zone breach: %w", p.Label, err)
-		}
-		reason := fmt.Sprintf("context occupancy %d exceeds --smart-zone %d", occupancy, smartZone)
 		// A gated give-up (the pane claimed completion the transcript never
 		// corroborated) is a failed recovery, not a failed iteration: the agent
 		// is still alive and may well compact on its own, so keep polling and
 		// let the next breach try again. Every other error still aborts.
-		// Snapshotted here rather than read back out of recoverSmartZoneBreach:
-		// the gate's predicate is "count greater than the count at submission
-		// time", so the snapshot only means anything if it is taken before
-		// "/compact" goes out.
-		baseline := readCompactBoundaries(d, p.Agent, p.SessionCwd, sessionID)
-		recovered, err := recoverSmartZoneBreach(d, p, sessionID, reason, smartZone)
-		switch {
-		case errors.Is(err, errCompactNeverConfirmed):
-			gatedGiveUps++
-			pending = &baseline
-			if gatedGiveUps >= maxConsecutiveGatedGiveUps {
-				return gatedGiveUpsExhausted(p.Label, gatedGiveUps, err)
-			}
-		case err != nil:
+		breached, err := recovery.checkAndRecover(d, p, sessionID)
+		if err != nil {
 			return err
-		case recovered:
-			// Only the bool says a recovery actually completed. The non-gated
-			// failure branch returns (false, nil), reporting itself through the
-			// sink instead of the error, so resetting on a nil error would clear
-			// the counter for precisely the failures that prove nothing about
-			// whether compaction is progressing.
-			gatedGiveUps = 0
-			pending = nil
 		}
-		justRecoveredSmartZone = true
-		elapsedMs = 0
+		if breached {
+			elapsedMs = 0
+		}
 	}
 }
 
