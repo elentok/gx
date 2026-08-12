@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -530,11 +531,30 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 	// before recording its outcome. Never let the next ticket inherit or
 	// resolve that operation as its own: its iteration branch is durable, so
 	// aborting here is lossless and lets reconciliation retry it explicitly.
+	//
+	// The one exception is a conflict-resolution agent that survived the
+	// crash: its pane is still live in a tab labeled conflictLabel(p.Ticket.
+	// Identifier) and still owns this exact sequencer state. Aborting under
+	// it would discard its staged edits, and re-cherry-picking would hit the
+	// same conflict again and fork a second child ticket onto a TabCreate
+	// call sharing that same label — two live tabs on one label, the
+	// corruption this guard exists to prevent. Reattach to it instead.
 	inProgress, err := d.CherryPickInProgress(p.FeatureWorktree)
 	if err != nil {
 		return false, "", fmt.Errorf("checking for stale cherry-pick onto %s: %w", p.FeatureBranch, err)
 	}
 	if inProgress {
+		liveTab, found, err := findLiveConflictResolutionTab(d, p)
+		if err != nil {
+			return false, "", err
+		}
+		if found {
+			resolutionSessionID, err := reattachLiveConflictResolver(d, p, liveTab)
+			if err != nil {
+				return false, "", err
+			}
+			return true, resolutionSessionID, nil
+		}
 		if err := d.AbortCherryPick(p.FeatureWorktree); err != nil {
 			return false, "", fmt.Errorf("aborting stale cherry-pick onto %s: %w", p.FeatureBranch, err)
 		}
@@ -606,6 +626,105 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 // iteration ticket needs-repair (see ticket conflict-lifecycle/03: failures
 // here belong to the child, not the parent).
 var errConflictResolutionUnresolved = errors.New("conflict-resolution child ticket needs repair")
+
+// findLiveConflictResolutionTab reports whether a tab labeled
+// conflictLabel(p.Ticket.Identifier) is currently live in p.WorkspaceID —
+// evidence that a conflict-resolution agent forked for this exact cherry-pick
+// survived a crash/restart and still owns the sequencer state
+// cherryPickWithConflictResolution is about to inspect.
+func findLiveConflictResolutionTab(d Deps, p iterationParams) (tab herdr.Tab, found bool, err error) {
+	label := conflictLabel(p.Ticket.Identifier)
+	tabs, err := d.TabList(p.WorkspaceID)
+	if err != nil {
+		return herdr.Tab{}, false, fmt.Errorf("listing tabs to check for a live conflict-resolution resolver for %s: %w", p.Ticket.Identifier, err)
+	}
+	for _, t := range tabs {
+		if t.Label == label {
+			return t, true, nil
+		}
+	}
+	return herdr.Tab{}, false, nil
+}
+
+// findConflictResolutionChildTicket locates the still-claimed
+// conflict-resolution ticket forkConflictResolutionTicket created for
+// p.Ticket — the durable record reattachLiveConflictResolver marks done once
+// the live resolver it reattached to finishes.
+func findConflictResolutionChildTicket(p iterationParams) (string, error) {
+	epics, err := tickets.Load(p.ScratchDir)
+	if err != nil {
+		return "", fmt.Errorf("loading epics to find conflict-resolution child for %s: %w", p.Ticket.Identifier, err)
+	}
+	for _, epic := range epics {
+		if epic.Name != p.FeatureBranch {
+			continue
+		}
+		for _, t := range epic.Tickets {
+			if t.Type != string(schema.TypeConflictResolution) {
+				continue
+			}
+			if t.Parent == nil || *t.Parent != p.Ticket.Identifier {
+				continue
+			}
+			if strings.EqualFold(strings.TrimSpace(t.Status), string(schema.StatusClaimed)) {
+				return t.Path, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("no claimed conflict-resolution child ticket found for %s", p.Ticket.Identifier)
+}
+
+// reattachLiveConflictResolver waits out a conflict-resolution agent that
+// survived a restart in liveTab, instead of aborting the cherry-pick
+// sequencer state it still owns and forking a second resolver under the same
+// tab label (see cherryPickWithConflictResolution's call site). It mirrors
+// resolveCherryPickConflict's success path — locate the claimed child ticket,
+// wait for its agent, mark it done, close its tab — but never creates a tab
+// or child ticket of its own, since both already exist from before the
+// crash.
+func reattachLiveConflictResolver(d Deps, p iterationParams, liveTab herdr.Tab) (sessionID string, resultErr error) {
+	label := conflictLabel(p.Ticket.Identifier)
+
+	childPath, err := findConflictResolutionChildTicket(p)
+	if err != nil {
+		return "", err
+	}
+
+	agent, err := d.AgentGet(label)
+	if err != nil {
+		return "", fmt.Errorf("reading live agent state for conflict-resolution tab %s: %w", label, err)
+	}
+	if agent.PaneID == "" || agent.TabID != liveTab.TabID || agent.WorkspaceID != p.WorkspaceID {
+		return "", fmt.Errorf("live agent state for conflict-resolution tab %s does not match workspace %s and tab %s", label, p.WorkspaceID, liveTab.TabID)
+	}
+	sessionID = agent.AgentSession
+
+	launchParams := p.launchAndPromptParams(label, agent.PaneID, liveTab.TabID, "", p.FeatureWorktree, "", "")
+	launchParams.FinishTimeoutMs = conflictResolutionTimeoutMs
+	if !alreadyFinished(agent.AgentStatus) {
+		if err := waitForFinish(d, launchParams, sessionID); err != nil {
+			return "", fmt.Errorf("waiting for reattached conflict-resolution agent %s to finish: %w", label, err)
+		}
+	}
+
+	inProgress, err := d.CherryPickInProgress(p.FeatureWorktree)
+	if err != nil {
+		return "", fmt.Errorf("checking cherry-pick state onto %s after reattached resolution: %w", p.FeatureBranch, err)
+	}
+	if inProgress {
+		return "", fmt.Errorf("cherry-pick onto %s still in progress after reattached conflict-resolution agent %s finished", p.FeatureBranch, label)
+	}
+
+	if err := d.TabClose(liveTab.TabID); err != nil {
+		return "", fmt.Errorf("closing reattached conflict-resolution tab: %w", err)
+	}
+
+	if err := MarkDone(childPath); err != nil {
+		return "", fmt.Errorf("marking conflict-resolution ticket %s done: %w", childPath, err)
+	}
+
+	return sessionID, nil
+}
 
 // resolveCherryPickConflict forks p.Ticket into a claimed conflict-resolution
 // child ticket (see forkConflictResolutionTicket), then launches a fresh pane

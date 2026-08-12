@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // reconcilePaths bundles the run-scoped filesystem locations reconcile needs
@@ -126,6 +127,24 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 			continue
 		}
 		if status != "claimed" {
+			continue
+		}
+		if t.Type == string(schema.TypeConflictResolution) {
+			// A conflict-resolution child ticket never has its own iterLabel
+			// tab (see conflictLabel's doc) — it's keyed off the parent's
+			// identifier instead, since resolveCherryPickConflict launches its
+			// pane inline inside the parent's own landCherryPick call. Check
+			// liveness there rather than falling through to the generic
+			// iterLabel check below, which would always read "not live" for
+			// this ticket type and send a still-running resolver's child
+			// record through reconcileOrphanedClaim to be wrongly reverted to
+			// open out from under it.
+			if t.Parent != nil && live[iterationKey(epic.Name, conflictLabel(*t.Parent))] {
+				continue
+			}
+			if err := reconcileOrphanedClaim(d, rp, epic.Name, t, tabs); err != nil {
+				return nil, fmt.Errorf("reconciling orphaned claim %s: %w", t.Identifier, err)
+			}
 			continue
 		}
 		if !live[iterationKey(epic.Name, iterLabel(epic.Name, t.Identifier))] {
