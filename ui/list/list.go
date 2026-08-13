@@ -182,6 +182,9 @@ type LineHeight func(i int) int
 // included even if it alone exceeds budget (so an over-tall final item is
 // still reachable, just clipped).
 func maxLineOffset(total int, lineHeight LineHeight, lineBudget int) int {
+	if lineBudget <= 0 {
+		return total
+	}
 	used, i, first := 0, total, true
 	for i > 0 {
 		h := lineHeight(i - 1)
@@ -244,7 +247,7 @@ func (m *Model) VisibleRangeLines(total int, lineHeight LineHeight, lineBudget i
 func (m *Model) EnsureSelectionVisibleLines(total int, lineHeight LineHeight, lineBudget int) {
 	if m.selected < m.scrollOffset {
 		m.scrollOffset = m.selected
-	} else {
+	} else if lineBudget > 0 {
 		used := 0
 		for i := m.scrollOffset; i <= m.selected; i++ {
 			used += lineHeight(i)

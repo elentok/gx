@@ -482,6 +482,108 @@ func TestNewModel_NoExtraBindingsUnaffected(t *testing.T) {
 	}
 }
 
+func TestRenderLines_MultiLineBody_RendersContiguousLines(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{
+		{ID: "a", Body: []string{"reason line 1", "reason line 2"}},
+		{ID: "b"},
+	})
+	label := func(e Entry[int]) string { return e.ID }
+	lines := m.RenderLines(6, RenderOpts[int]{AccentColor: color.White, Label: label})
+
+	if got := ansi.Strip(lines[0]); !strings.Contains(got, "a") {
+		t.Fatalf("lines[0] = %q, want entry a's primary line", got)
+	}
+	if got := ansi.Strip(lines[1]); !strings.Contains(got, "reason line 1") {
+		t.Fatalf("lines[1] = %q, want first body line", got)
+	}
+	if got := ansi.Strip(lines[2]); !strings.Contains(got, "reason line 2") {
+		t.Fatalf("lines[2] = %q, want second body line", got)
+	}
+	if got := ansi.Strip(lines[3]); !strings.Contains(got, "b") {
+		t.Fatalf("lines[3] = %q, want entry b right after a's body, got", got)
+	}
+}
+
+func TestRenderLines_MultiLineBody_SelectionHighlightsAllLines(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{{ID: "sel", Body: []string{"extra"}}})
+	label := func(e Entry[int]) string { return e.ID }
+	lines := m.RenderLines(4, RenderOpts[int]{AccentColor: ui.ColorBlue, Active: true, Label: label})
+
+	if len(lines) < 2 {
+		t.Fatalf("expected at least 2 rendered lines, got %d", len(lines))
+	}
+	if lines[0] == ansi.Strip(lines[0]) {
+		t.Fatal("expected ANSI selection styling on entry's primary line")
+	}
+	if lines[1] == ansi.Strip(lines[1]) {
+		t.Fatal("expected ANSI selection styling on entry's body line too")
+	}
+}
+
+// TestVisibleEntries_MixedHeights_ScrollMathUsesPhysicalLines covers the
+// ticket's "scroll/paging math correctness for mixed single/multi-line
+// trees" seam: a scrolled-past multi-line entry must free up exactly as many
+// screen lines as it occupies, not 1.
+func TestVisibleEntries_MixedHeights_ScrollMathUsesPhysicalLines(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{
+		{ID: "a", Body: []string{"a2", "a3"}}, // 3 physical lines
+		{ID: "b"},
+		{ID: "c"},
+	})
+	m.SetVisibleHeight(2)
+	m.ScrollViewport(3) // scroll past all 3 of a's lines
+
+	label := func(e Entry[int]) string { return e.ID }
+	lines := m.RenderLines(4, RenderOpts[int]{AccentColor: color.White, Label: label})
+	if got := ansi.Strip(lines[0]); !strings.Contains(got, "b") {
+		t.Fatalf("lines[0] = %q, want entry b (a's 3 lines scrolled past)", got)
+	}
+	if got := ansi.Strip(lines[1]); !strings.Contains(got, "c") {
+		t.Fatalf("lines[1] = %q, want entry c", got)
+	}
+}
+
+func TestAppendScrollbar_LineBasedFits_ShowsWhenBodyOverflowsViewport(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{
+		{ID: "a", Body: []string{"a2", "a3", "a4"}}, // 4 physical lines
+		{ID: "b"},
+	})
+	label := func(e Entry[int]) string { return e.ID }
+	// height=5 -> innerH=3; total physical lines=5 > innerH=3, so despite
+	// only 2 entries (which would fit an entry-count-based check), the
+	// line-based total must still trigger the scrollbar.
+	lines := m.RenderLines(5, RenderOpts[int]{AccentColor: color.White, Width: 20, Label: label})
+
+	found := false
+	for _, line := range lines {
+		if strings.ContainsAny(ansi.Strip(line), "┃│") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected scrollbar glyph when physical lines overflow the viewport, got lines=%v", lines)
+	}
+}
+
+func TestAppendScrollbar_LineBasedFits_HiddenWhenBodyFitsViewport(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{{ID: "a", Body: []string{"a2"}}}) // 2 physical lines
+	label := func(e Entry[int]) string { return e.ID }
+	// height=4 -> innerH=2, exactly matching the entry's 2 physical lines.
+	lines := m.RenderLines(4, RenderOpts[int]{AccentColor: color.White, Width: 20, Label: label})
+
+	for _, line := range lines {
+		if strings.ContainsAny(ansi.Strip(line), "┃│") {
+			t.Fatalf("expected no scrollbar glyph when content fits, got lines=%v", lines)
+		}
+	}
+}
+
 func TestRenderLines_DepthIndentsRows(t *testing.T) {
 	m := NewModel[int]()
 	m.SetEntries([]Entry[int]{

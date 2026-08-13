@@ -27,6 +27,18 @@ type Entry[T any] struct {
 	// Leaves is every leaf value nested under this entry, collected recursively.
 	// Set by BuildEntriesFromPaths; BuildEntriesFromValues leaves it nil.
 	Leaves []T
+	// Body holds extra physical lines rendered below the entry's primary
+	// line (e.g. wrapped reason text). Nil/empty (the default) means a
+	// single-line entry, preserving existing behavior for every consumer
+	// that never sets it. Body is the only source of truth ui/tree uses for
+	// both scroll/paging math and rendering, so the two can't drift apart.
+	Body []string
+}
+
+// lineCount is how many physical lines the entry occupies (its primary line
+// plus every Body line).
+func (e Entry[T]) lineCount() int {
+	return 1 + len(e.Body)
 }
 
 // Model owns tree list state (selection/scroll/search), reusing the same
@@ -141,7 +153,17 @@ func (m Model[T]) SelectedIndex() int {
 
 func (m *Model[T]) SetSelectedIndex(index int) {
 	m.list.SetSelected(index, len(m.entries))
-	m.list.EnsureSelectionVisible(len(m.entries), m.visibleH)
+	m.list.EnsureSelectionVisibleLines(len(m.entries), m.entryLineHeight, m.visibleH)
+}
+
+// entryLineHeight is m.entries' list.LineHeight: it reports how many
+// physical lines entry i occupies (see Entry.Body), defaulting to 1 for an
+// out-of-range index.
+func (m Model[T]) entryLineHeight(i int) int {
+	if i < 0 || i >= len(m.entries) {
+		return 1
+	}
+	return m.entries[i].lineCount()
 }
 
 // ScrollOffset returns the current scroll offset of the list.
@@ -157,12 +179,18 @@ func (m *Model[T]) SetVisibleHeight(h int) {
 // ScrollViewport scrolls the viewport by delta rows without moving the
 // selection (e.g. a mouse wheel pans the list independently of the cursor).
 func (m *Model[T]) ScrollViewport(delta int) {
-	m.list.ScrollOffsetOnly(delta, len(m.entries), m.visibleH)
+	m.list.ScrollOffsetOnlyLines(delta, len(m.entries), m.entryLineHeight, m.visibleH)
 }
 
-// ScrollPage moves selection and viewport together by delta (vim-style ctrl+d/u).
+// ScrollPage moves selection and viewport together by delta (vim-style
+// ctrl+d/u): delta's sign is direction, its magnitude is the line budget to
+// page by (callers pass ±list.DefaultScroll).
 func (m *Model[T]) ScrollPage(delta int) {
-	m.list.ScrollPage(delta, len(m.entries), m.visibleH)
+	dir, lineBudget := 1, delta
+	if delta < 0 {
+		dir, lineBudget = -1, -delta
+	}
+	m.list.ScrollPageLines(dir, len(m.entries), m.entryLineHeight, lineBudget)
 }
 
 func (m Model[T]) selectedEntry() (Entry[T], bool) {
@@ -276,11 +304,11 @@ func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd, Result) {
 		if match != nil {
 			switch match.ID {
 			case BindingMoveDown:
-				m.list.Navigate(+1, len(m.entries), m.visibleH)
+				m.list.NavigateLines(+1, len(m.entries), m.entryLineHeight, m.visibleH)
 				m.SkipUnselectable(+1)
 				return m, nil, Result{Handled: true, SelectionChanged: m.list.Selected() != prevSelected}
 			case BindingMoveUp:
-				m.list.Navigate(-1, len(m.entries), m.visibleH)
+				m.list.NavigateLines(-1, len(m.entries), m.entryLineHeight, m.visibleH)
 				m.SkipUnselectable(-1)
 				return m, nil, Result{Handled: true, SelectionChanged: m.list.Selected() != prevSelected}
 			case BindingCollapse:

@@ -350,6 +350,25 @@ func TestEnsureSelectionVisibleLines_UniformHeight_MatchesEnsureSelectionVisible
 	}
 }
 
+// TestEnsureSelectionVisibleLines_ZeroLineBudget_MatchesEnsureSelectionVisible
+// covers a caller that renders/selects before ever calling SetVisibleHeight
+// (several existing unit tests do exactly this) - lineBudget=0 must stay a
+// no-op on the offset, just like visibleH=0 does on EnsureSelectionVisible,
+// instead of scrolling the first row out of view.
+func TestEnsureSelectionVisibleLines_ZeroLineBudget_MatchesEnsureSelectionVisible(t *testing.T) {
+	m1 := &list.Model{}
+	m1.SetSelected(1, 2)
+	m1.EnsureSelectionVisible(2, 0)
+
+	m2 := &list.Model{}
+	m2.SetSelected(1, 2)
+	m2.EnsureSelectionVisibleLines(2, uniformHeight, 0)
+
+	if m1.Offset() != m2.Offset() {
+		t.Errorf("EnsureSelectionVisibleLines(uniform, lineBudget=0) offset = %d, want %d", m2.Offset(), m1.Offset())
+	}
+}
+
 func TestNavigateLines_UniformHeight_MatchesNavigate(t *testing.T) {
 	m1 := &list.Model{}
 	m1.Navigate(7, 20, 5)

@@ -39,8 +39,11 @@ func (m Model[T]) RenderLines(height int, opts RenderOpts[T]) []string {
 		lines = append(lines, opts.EmptyLine)
 	} else {
 		for _, row := range entries {
-			lines = append(lines, m.renderEntry(row.index, row.entry, opts, row.index == m.SelectedIndex()))
+			lines = append(lines, m.renderEntryLines(row.index, row.entry, opts, row.index == m.SelectedIndex())...)
 		}
+	}
+	if len(lines) > innerH {
+		lines = lines[:innerH]
 	}
 	for len(lines) < innerH {
 		lines = append(lines, "")
@@ -56,7 +59,7 @@ func (m Model[T]) RenderLines(height int, opts RenderOpts[T]) []string {
 // scrolling. Rows are padded to opts.Width-2 when a width is set, or to the
 // widest row otherwise (e.g. when called from RequiredWidth).
 func (m Model[T]) appendScrollbar(lines []string, height int, opts RenderOpts[T]) []string {
-	bar := ui.RenderScrollbar(height, len(m.entries), height, m.ScrollOffset())
+	bar := ui.RenderScrollbar(height, m.totalLines(), height, m.offsetLines())
 	var barLines []string
 	if bar != "" {
 		barLines = strings.Split(bar, "\n")
@@ -102,19 +105,36 @@ func (m Model[T]) visibleEntries(innerH int) []visibleEntry[T] {
 	if total == 0 || innerH <= 0 {
 		return nil
 	}
-	offset := m.ScrollOffset()
-	end := offset + innerH
-	if end > total {
-		end = total
-	}
-	rows := make([]visibleEntry[T], 0, maxInt(0, end-offset))
-	for i := offset; i < end; i++ {
+	start, end := m.list.VisibleRangeLines(total, m.entryLineHeight, innerH)
+	rows := make([]visibleEntry[T], 0, maxInt(0, end-start))
+	for i := start; i < end; i++ {
 		rows = append(rows, visibleEntry[T]{index: i, entry: m.entries[i]})
 	}
 	return rows
 }
 
-func (m Model[T]) renderEntry(index int, entry Entry[T], opts RenderOpts[T], selected bool) string {
+// totalLines is the tree's full content height in physical lines, used by
+// appendScrollbar to keep the thumb proportional once entries have
+// different heights.
+func (m Model[T]) totalLines() int {
+	total := 0
+	for i := range m.entries {
+		total += m.entryLineHeight(i)
+	}
+	return total
+}
+
+// offsetLines is the physical-line position of the current scroll offset:
+// the summed line height of every entry above it.
+func (m Model[T]) offsetLines() int {
+	offset := 0
+	for i := 0; i < m.ScrollOffset() && i < len(m.entries); i++ {
+		offset += m.entryLineHeight(i)
+	}
+	return offset
+}
+
+func (m Model[T]) renderEntryLines(index int, entry Entry[T], opts RenderOpts[T], selected bool) []string {
 	mark := " "
 	if selected {
 		mark = lipgloss.NewStyle().Foreground(opts.AccentColor).Render("▌")
@@ -128,6 +148,8 @@ func (m Model[T]) renderEntry(index int, entry Entry[T], opts RenderOpts[T], sel
 	if faint {
 		colorStyle = colorStyle.Faint(true)
 	}
+
+	indent := strings.Repeat("  ", entry.Depth)
 
 	meta := ""
 	if opts.MetaText != nil {
@@ -143,7 +165,17 @@ func (m Model[T]) renderEntry(index int, entry Entry[T], opts RenderOpts[T], sel
 	if strings.TrimSpace(meta) == "" {
 		sep = ""
 	}
-	line := mark + strings.Repeat("  ", entry.Depth) + meta + sep + name
+	lines := make([]string, 0, entry.lineCount())
+	lines = append(lines, m.styleEntryLine(mark+indent+meta+sep+name, selected, faint, opts))
+	for _, body := range entry.Body {
+		lines = append(lines, m.styleEntryLine(mark+indent+colorStyle.Render(body), selected, faint, opts))
+	}
+	return lines
+}
+
+// styleEntryLine applies the selection/width styling shared by an entry's
+// primary line and its Body continuation lines.
+func (m Model[T]) styleEntryLine(line string, selected, faint bool, opts RenderOpts[T]) string {
 	if selected && !faint {
 		line = lipgloss.NewStyle().Bold(true).Render(line)
 	}
