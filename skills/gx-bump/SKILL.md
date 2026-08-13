@@ -39,7 +39,7 @@ Otherwise, detect the project's test command, in this order, and run the first t
 1. A `Makefile` with a `test` target - run `make test`.
 2. A `package.json` with a `"test"` script - run `npm test` (or the project's package manager
    equivalent).
-3. Neither applies - run `go test ./... -timeout=2m`.
+3. A discernible Go module (e.g. a `go.mod` file) - run `go test ./... -timeout=2m`.
 4. None of the above apply - ask the user for the command to run.
 
 If the test suite fails, stop the whole flow immediately. Nothing after this step runs.
