@@ -2,13 +2,14 @@ package ralphloop
 
 import (
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func TestEpicFailureReporter_EpicFailed_SendsOneMessagePerTarget(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
 	r := NewEpicFailureReporter(t.TempDir())
+	r.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 	transport := &fakeChatTransport{}
 	r.targets = append(r.targets, epicFailureTarget{style: slackStyle, transport: transport})
 
@@ -24,8 +25,8 @@ func TestEpicFailureReporter_EpicFailed_SendsOneMessagePerTarget(t *testing.T) {
 }
 
 func TestEpicFailureReporter_EpicFailed_NilErrSendsNothing(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
 	r := NewEpicFailureReporter(t.TempDir())
+	r.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 	transport := &fakeChatTransport{}
 	r.targets = append(r.targets, epicFailureTarget{style: slackStyle, transport: transport})
 
@@ -37,8 +38,8 @@ func TestEpicFailureReporter_EpicFailed_NilErrSendsNothing(t *testing.T) {
 }
 
 func TestEpicFailureReporter_EpicFailed_GlobalBreakerTrips_SuppressesFurtherSends(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
 	r := NewEpicFailureReporter(t.TempDir())
+	r.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 	transport := &fakeChatTransport{}
 	r.targets = append(r.targets, epicFailureTarget{style: slackStyle, transport: transport})
 

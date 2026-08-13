@@ -27,6 +27,13 @@ type EpicFailureNotifier interface {
 type EpicFailureReporter struct {
 	scratchDir string
 	targets    []epicFailureTarget
+
+	// gateStatePath overrides NotificationGate's real per-user state-file
+	// path (see notificationStateFilePath) with a test-only fixed path,
+	// mirroring chatEventSink.gateStatePath - so tests never touch the real
+	// ~/.local/state/gx/notifications-state.json. Empty (the production
+	// default from NewEpicFailureReporter) means "use the real path".
+	gateStatePath string
 }
 
 type epicFailureTarget struct {
@@ -59,6 +66,16 @@ func (r *EpicFailureReporter) AddSlack(webhookURL string) {
 	})
 }
 
+// gate runs source through NotificationGate (or, under test, an injected
+// fixed state-file path — see gateStatePath), mirroring
+// chatEventSink.gate.
+func (r *EpicFailureReporter) gate(transport, source string) (GateResult, error) {
+	if r.gateStatePath != "" {
+		return notificationGateAt(r.gateStatePath, transport, notifyKindEpicFailed, source, time.Now(), true, nil)
+	}
+	return NotificationGate(transport, notifyKindEpicFailed, source, time.Now(), true, nil)
+}
+
 // EpicFailed sends the "epic failed" message to every configured target,
 // same fire-and-forget/retry-once/run-log semantics as chatEventSink.send.
 // counts is loaded fresh here rather than carried over from a live event,
@@ -73,7 +90,7 @@ func (r *EpicFailureReporter) EpicFailed(epicName string, err error) {
 	counts := loadEpicCounts(r.scratchDir, epicName)
 	source := "epic:" + epicName
 	for _, target := range r.targets {
-		result, gateErr := NotificationGate(target.transport.name(), notifyKindEpicFailed, source, time.Now(), true, nil)
+		result, gateErr := r.gate(target.transport.name(), source)
 		if gateErr != nil {
 			logger.Debug("%s: notification gate: %v\n", target.transport.name(), gateErr)
 			continue
