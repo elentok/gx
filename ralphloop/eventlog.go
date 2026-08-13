@@ -48,11 +48,11 @@ const (
 	eventBackgroundTaskGateReleased = "background-task-gate-released"
 	eventBackgroundTaskGateExpired  = "background-task-gate-expired"
 	eventPausedRateLimit            = "paused-rate-limit"
-	eventResumed               = "resumed"
-	eventNeedsAnswer           = "needs-answer"
-	eventCommitless            = "commitless"
-	eventNeedsRepair           = "needs-repair"
-	eventDepsInstalled         = "deps-installed"
+	eventResumed                    = "resumed"
+	eventNeedsAnswer                = "needs-answer"
+	eventCommitless                 = "commitless"
+	eventNeedsRepair                = "needs-repair"
+	eventDepsInstalled              = "deps-installed"
 	// eventSchedulerScan marks one claimNext pass: every ticket the epic
 	// currently has, and why the scheduler did or didn't claim it. Added to
 	// debug tickets that appear queued (e.g. a code-review ticket's freshly
