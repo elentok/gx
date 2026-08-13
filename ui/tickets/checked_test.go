@@ -71,6 +71,32 @@ func TestModel_SpaceTogglesCheckedOnTicketRow(t *testing.T) {
 	}
 }
 
+// TestModel_SpaceOnSectionRowIsNoOp covers 03's "root rows are not checkable"
+// acceptance criterion: now that nodeSection rows are cursor-reachable
+// (ticket 03a), index 0 (the "Open epics" section header) is real but
+// selectedRow reports ok=false for it, so handleToggleCheck's existing
+// ok-gate makes space a no-op — no new gating code needed.
+func TestModel_SpaceOnSectionRowIsNoOp(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	if _, ok := m.selectedRow(); ok {
+		t.Fatalf("expected initial selection on section row to report ok=false")
+	}
+
+	before := len(m.checked)
+	updated, _ = m.Update(spacePress())
+	m = updated.(Model)
+	if len(m.checked) != before {
+		t.Fatalf("expected space on section row to be a no-op, checked count changed from %d to %d", before, len(m.checked))
+	}
+}
+
 func TestModel_SpaceOnEpicRowChecksAllTickets(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

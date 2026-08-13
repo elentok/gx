@@ -173,43 +173,42 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if s := msg.String(); s == "k" || s == "up" {
 			dir = -1
 		}
-		m.skipSectionHeader(dir)
+		m.skipUnselectableRow(dir)
 	}
 	if !result.Handled {
 		if match, consumed := m.sidebarTree.Keys().Process(msg); consumed && match != nil {
 			switch match.ID {
 			case tree.BindingPageDown:
 				m.sidebarTree.ScrollPage(list.DefaultScroll)
-				m.skipSectionHeader(1)
+				m.skipUnselectableRow(1)
 			case tree.BindingPageUp:
 				m.sidebarTree.ScrollPage(-list.DefaultScroll)
-				m.skipSectionHeader(-1)
+				m.skipUnselectableRow(-1)
 			}
 		}
 	}
 	return m, cmd
 }
 
-// skipSectionHeader nudges the sidebar selection off a section-header entry
-// in dir's direction (+1 down, -1 up) — section headers are real tree.Entry
-// rows (needed so BuildEntriesFromValues can size the section's child count)
-// but were never cursor-reachable in the pre-migration sidebarLines, so
-// tree.Model's own navigation needs this nudge to preserve that. If dir's
-// direction runs off the end of the entries while still on a header (e.g.
-// paging up lands back on entry 0, the open-epics header, with nowhere
-// further up to go), it retries the opposite direction — a header must never
-// end up selected, even at a list boundary.
-func (m *Model) skipSectionHeader(dir int) {
-	idx := skipSectionHeaderDir(m.sidebarTree.Entries(), m.sidebarTree.SelectedIndex(), dir)
+// skipUnselectableRow nudges the sidebar selection off an unselectable entry
+// (the blank separator row, or an empty-section placeholder) in dir's
+// direction (+1 down, -1 up) — those rows are real tree.Entry rows (needed so
+// BuildEntriesFromValues can size the section's child count) but must never
+// hold the cursor. If dir's direction runs off the end of the entries while
+// still on an unselectable row (e.g. paging up lands back on entry 0 with
+// nowhere further up to go), it retries the opposite direction — an
+// unselectable row must never end up selected, even at a list boundary.
+func (m *Model) skipUnselectableRow(dir int) {
+	idx := skipUnselectableRowDir(m.sidebarTree.Entries(), m.sidebarTree.SelectedIndex(), dir)
 	if entries := m.sidebarTree.Entries(); idx >= 0 && idx < len(entries) && isUnselectableSidebarRow(entries[idx].Value.kind) {
-		idx = skipSectionHeaderDir(entries, idx, -dir)
+		idx = skipUnselectableRowDir(entries, idx, -dir)
 	}
 	if idx != m.sidebarTree.SelectedIndex() {
 		m.sidebarTree.SetSelectedIndex(idx)
 	}
 }
 
-func skipSectionHeaderDir(entries []tree.Entry[sidebarNode], idx, dir int) int {
+func skipUnselectableRowDir(entries []tree.Entry[sidebarNode], idx, dir int) int {
 	for idx >= 0 && idx < len(entries) && isUnselectableSidebarRow(entries[idx].Value.kind) {
 		next := idx + dir
 		if next < 0 || next >= len(entries) {
@@ -221,10 +220,12 @@ func skipSectionHeaderDir(entries []tree.Entry[sidebarNode], idx, dir int) int {
 }
 
 // isUnselectableSidebarRow reports whether kind is a sidebar row that must
-// never end up as the cursor's selection: section headers, the blank
-// separator between the two sections, and an empty-section placeholder.
+// never end up as the cursor's selection: the blank separator between the
+// two sections, and an empty-section placeholder. Section headers (nodeSection)
+// are real, cursor-reachable rows — collapsing/expanding a section is a
+// selectable action like any epic or ticket row.
 func isUnselectableSidebarRow(kind sidebarNodeKind) bool {
-	return kind == nodeSection || kind == nodeBlank || kind == nodeEmpty
+	return kind == nodeBlank || kind == nodeEmpty
 }
 
 // selectFirstRow/selectLastRow implement "gg"/"G": jump the sidebar
@@ -234,7 +235,7 @@ func (m *Model) selectFirstRow() {
 		return
 	}
 	m.sidebarTree.SetSelectedIndex(0)
-	m.skipSectionHeader(1)
+	m.skipUnselectableRow(1)
 }
 
 func (m *Model) selectLastRow() {
@@ -243,7 +244,7 @@ func (m *Model) selectLastRow() {
 		return
 	}
 	m.sidebarTree.SetSelectedIndex(n - 1)
-	m.skipSectionHeader(-1)
+	m.skipUnselectableRow(-1)
 }
 
 // toggleHideDone flips the "tc" hide-complete filter and rebuilds the
@@ -258,8 +259,9 @@ func (m *Model) toggleHideDone() {
 }
 
 // selectedRow returns the row currently under the selection, if any. A
-// nodeSection selection reports false (rowFromEntry) — kept off in practice
-// by skipSectionHeader. A Model built without going through clampSelected
+// nodeSection selection reports false (rowFromEntry) — section rows are
+// cursor-reachable but have no row representation (not checkable, no
+// epic/ticket to preview). A Model built without going through clampSelected
 // (e.g. a test constructing Model{epics: ...} directly, never routing it
 // through a WindowSizeMsg/epicsLoadedMsg) has an empty sidebarTree — that's
 // not "nothing selected", it's "entries were never built", so it falls back

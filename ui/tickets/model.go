@@ -225,7 +225,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refreshQueueSnapshot()
 		m.loaded = true
 		m.epics = msg.epics
-		m.sidebarTree.SetCollapsedIDs(defaultCollapsedEpics(msg.epics, m.sidebarTree.CollapsedIDs()))
+		m.sidebarTree.SetCollapsedIDs(defaultCollapsedSidebar(msg.epics, m.sidebarTree.CollapsedIDs()))
 		if m.search.HasQuery() {
 			m.recomputeSearchMatches()
 		}
@@ -313,13 +313,13 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 // clampSelected rebuilds the sidebar tree's entries from the current
 // epics/hideDone/collapse state, e.g. after a collapse hides the rows below
 // the selection — SetEntries re-clamps selection to the new entry count.
-// Section headers are real tree.Entry rows but were never cursor-reachable
-// pre-migration, so every rebuild (including the very first, off of
-// tree.NewModel's zero-value selection at index 0) nudges off one if the
-// rebuilt entries left the selection sitting on one.
+// The blank separator row and an empty-section placeholder are real
+// tree.Entry rows but must never hold the cursor, so every rebuild (including
+// the very first, off of tree.NewModel's zero-value selection at index 0)
+// nudges off one if the rebuilt entries left the selection sitting on one.
 func (m *Model) clampSelected() {
 	m.sidebarTree.SetEntries(m.buildSidebarEntries())
-	m.skipSectionHeader(1)
+	m.skipUnselectableRow(1)
 }
 
 // sidebarViewportHeight is the sidebar body's visible line count, matching
@@ -386,7 +386,7 @@ func (m Model) handleSidebarMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cm
 	}
 	m.focus = focusSidebar
 	m.sidebarTree.SetSelectedIndex(idx)
-	m.skipSectionHeader(1)
+	m.skipUnselectableRow(1)
 	return m, nil
 }
 

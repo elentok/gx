@@ -130,10 +130,7 @@ func (m Model) buildSidebarEntries() []tree.Entry[sidebarNode] {
 	idFn := func(n sidebarNode) string {
 		switch n.kind {
 		case nodeSection:
-			if n.section == sectionOpen {
-				return "section:open"
-			}
-			return "section:closed"
+			return sidebarSectionID(n.section)
 		case nodeBlank:
 			return "blank-separator"
 		case nodeEmpty:
@@ -225,9 +222,9 @@ type row struct {
 func (r row) isEpic() bool { return r.ticketIdx < 0 }
 
 // rowFromEntry adapts one sidebar tree.Entry into row's flat shape. A
-// nodeSection entry has no row representation — section headers were never
-// cursor-reachable pre-migration (see skipSectionHeader) — so it reports ok
-// = false.
+// nodeSection entry has no row representation — a section header is
+// cursor-reachable but isn't an epic or ticket, so there's nothing to check
+// or preview — so it reports ok = false.
 func rowFromEntry(e tree.Entry[sidebarNode]) (row, bool) {
 	switch e.Value.kind {
 	case nodeEpic:
@@ -290,24 +287,38 @@ func (m Model) isCollapsed(epic tickets.Epic) bool {
 	return m.sidebarTree.CollapsedIDs()[epic.Path]
 }
 
-// defaultCollapsedEpics computes the per-epic collapse state for epics,
-// preserving any entry already present in existing (e.g. a user's manual
-// toggle) and only filling in a default for epic paths not yet in existing:
-// an epic where every ticket is done starts collapsed; every other epic
-// (including a zero-ticket epic) starts expanded.
-func defaultCollapsedEpics(epics []tickets.Epic, existing map[string]bool) map[string]bool {
-	collapsed := make(map[string]bool, len(epics))
+// sidebarSectionID is the tree.Entry ID for a section's nodeSection root row
+// — the single source of truth idFn and defaultCollapsedSidebar both share
+// for "section:open"/"section:closed".
+func sidebarSectionID(section sidebarSection) string {
+	if section == sectionOpen {
+		return "section:open"
+	}
+	return "section:closed"
+}
+
+// defaultCollapsedSidebar computes the sidebar's collapse state: each epic's
+// own entry preserves whatever is already in existing (e.g. a user's manual
+// per-epic toggle) with no default of its own — collapsing on "all tickets
+// done" moved to the Closed section as a whole, not each epic individually.
+// The Closed section root defaults to collapsed when absent from existing;
+// the Open section root is left out of the map entirely, since tree.Model
+// treats an absent ID as expanded by default.
+func defaultCollapsedSidebar(epics []tickets.Epic, existing map[string]bool) map[string]bool {
+	collapsed := make(map[string]bool, len(epics)+1)
 	for _, epic := range epics {
 		if v, ok := existing[epic.Path]; ok {
 			// Preserve the entry itself, not just its value, so an explicit
 			// false (manually expanded) survives into the next reload's
 			// existing map instead of vanishing back to "unseen".
 			collapsed[epic.Path] = v
-			continue
 		}
-		if epic.AllDone() {
-			collapsed[epic.Path] = true
-		}
+	}
+	closedID := sidebarSectionID(sectionClosed)
+	if v, ok := existing[closedID]; ok {
+		collapsed[closedID] = v
+	} else {
+		collapsed[closedID] = true
 	}
 	return collapsed
 }
