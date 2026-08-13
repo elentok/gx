@@ -87,6 +87,7 @@ func notificationGateAt(path, transport, eventType, source string, now time.Time
 
 func applyGate(state *NotificationState, transport, eventType, source string, now time.Time, recordSend bool, parkTicket ParkFunc) (GateResult, error) {
 	ts := state.Transports[transport]
+	defer func() { state.Transports[transport] = ts }()
 
 	if ts.Muted {
 		return GateResult{Decision: GloballyMuted}, nil
@@ -105,7 +106,6 @@ func applyGate(state *NotificationState, transport, eventType, source string, no
 		var err error
 		alreadyMuted, err = ticketAlreadyMuted(source, eventType)
 		if err != nil {
-			state.Transports[transport] = ts
 			return GateResult{}, err
 		}
 	}
@@ -116,7 +116,6 @@ func applyGate(state *NotificationState, transport, eventType, source string, no
 	case !ticketless && countMatchingInWindow(ts.Events, now, perSourceWindow, eventType, source) >= perSourceThreshold:
 		edge, err := muteSource(source, eventType, now, parkTicket, "storm mute: per-source threshold crossed")
 		if err != nil {
-			state.Transports[transport] = ts
 			return GateResult{}, err
 		}
 		result.Decision = PerSourceMuted
@@ -134,7 +133,6 @@ func applyGate(state *NotificationState, transport, eventType, source string, no
 				continue
 			}
 			if _, err := muteSource(sc.Source, eventType, now, parkTicket, "storm mute: global-trip attribution"); err != nil {
-				state.Transports[transport] = ts
 				return GateResult{}, err
 			}
 		}
@@ -148,7 +146,6 @@ func applyGate(state *NotificationState, transport, eventType, source string, no
 		result.EdgeTriggered = true
 	}
 
-	state.Transports[transport] = ts
 	return result, nil
 }
 

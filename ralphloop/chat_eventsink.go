@@ -173,21 +173,35 @@ func (s *chatEventSink) drainQueue() []batchedMessage {
 }
 
 // flush renders every queued message as one send (see renderBatch) and
-// hands it to sendRaw. A tick with an empty queue sends nothing.
+// hands it to sendRaw — the one gate call per flush that records this batch
+// against the send series (see gate's recordSend), so the global budget
+// tracks actual wire sends rather than the events that were coalesced into
+// them. A gate error fails open (send proceeds), matching send's own
+// fail-open policy. A tick with an empty queue sends nothing and never
+// calls the gate.
 func (s *chatEventSink) flush() {
 	items := s.drainQueue()
 	if len(items) == 0 {
 		return
 	}
+	result, err := s.gate(notifyKindBatch, epicSource(s.epicName), true)
+	if err != nil {
+		logger.Debug("%s: notification gate: %v\n", s.transport.name(), err)
+		s.sendRaw(renderBatch(items), notifyKindBatch)
+		return
+	}
+	if result.Decision == GloballyMuted {
+		return
+	}
 	s.sendRaw(renderBatch(items), notifyKindBatch)
 }
 
-// closeFlush is flush's close-time variant: if the transport is already
-// globally muted, the queued messages are dropped rather than sent, and one
-// notification-suppressed run-log line names the event kinds that were
-// dropped — so the outcome stays recoverable from the log even though chat
-// never got it. Otherwise it sends synchronously (bounded by the
-// transport's own timeout, no retry) rather than through sendRaw's
+// closeFlush is flush's close-time variant: if the gate reports the
+// transport is now globally muted, the queued messages are dropped rather
+// than sent, and one notification-suppressed run-log line names the event
+// kinds that were dropped — so the outcome stays recoverable from the log
+// even though chat never got it. Otherwise it sends synchronously (bounded
+// by the transport's own timeout, no retry) rather than through sendRaw's
 // fire-and-forget goroutine, since the process may exit right after Close
 // returns.
 func (s *chatEventSink) closeFlush() {
@@ -195,32 +209,17 @@ func (s *chatEventSink) closeFlush() {
 	if len(items) == 0 {
 		return
 	}
-	if s.transportGloballyMuted() {
+	result, err := s.gate(notifyKindBatch, epicSource(s.epicName), true)
+	if err != nil {
+		logger.Debug("%s: notification gate: %v\n", s.transport.name(), err)
+		s.sendSync(renderBatch(items), notifyKindBatch)
+		return
+	}
+	if result.Decision == GloballyMuted {
 		logNotificationSuppressed(s.scratchDir, s.epicName, s.transport.name(), strings.Join(distinctKinds(items), ","))
 		return
 	}
 	s.sendSync(renderBatch(items), notifyKindBatch)
-}
-
-// transportGloballyMuted reports whether the transport is already
-// globally muted, read directly from NotificationState (or, under test, the
-// injected gateStatePath) rather than through the gate — a close-time flush
-// has no single (eventType, source) to gate on, and this check must not
-// itself record an event/send series entry. A read error fails open (no
-// suppression), matching the gate's own fail-open policy elsewhere in this
-// file.
-func (s *chatEventSink) transportGloballyMuted() bool {
-	var state NotificationState
-	var err error
-	if s.gateStatePath != "" {
-		state, err = loadNotificationStateAt(s.gateStatePath)
-	} else {
-		state, err = LoadNotificationState()
-	}
-	if err != nil {
-		return false
-	}
-	return state.Transports[s.transport.name()].Muted
 }
 
 // renderBatch joins every queued message into one send, separator lines
@@ -284,13 +283,16 @@ func (s *chatEventSink) parkTicket(source, reason string) error {
 
 // gate runs source through NotificationGate (or, under test, an injected
 // fixed state-file path — see gateStatePath), recording this call in the
-// persisted event/send series and applying the budget/per-source-mute/
-// global-mute rules.
-func (s *chatEventSink) gate(eventType, source string) (GateResult, error) {
+// persisted event series and applying the budget/per-source-mute/
+// global-mute rules. recordSend additionally records a send-series entry —
+// callers pass true only at the point a batch actually goes out on the wire
+// (see flush/closeFlush), never at enqueue time (see send), so the global
+// budget tracks actual sends rather than raw event volume.
+func (s *chatEventSink) gate(eventType, source string, recordSend bool) (GateResult, error) {
 	if s.gateStatePath != "" {
-		return notificationGateAt(s.gateStatePath, s.transport.name(), eventType, source, time.Now(), true, s.parkTicket)
+		return notificationGateAt(s.gateStatePath, s.transport.name(), eventType, source, time.Now(), recordSend, s.parkTicket)
 	}
-	return NotificationGate(s.transport.name(), eventType, source, time.Now(), true, s.parkTicket)
+	return NotificationGate(s.transport.name(), eventType, source, time.Now(), recordSend, s.parkTicket)
 }
 
 func (s *chatEventSink) EpicStarted(epicName string, done, total int) {
@@ -358,7 +360,7 @@ func (s *chatEventSink) EpicComplete(epicName string, completed int, elapsedSeco
 // delivery on its own bookkeeping succeeding, so text is still queued as if
 // the gate weren't there.
 func (s *chatEventSink) send(text, notifyKind, source, ticketIdentifier string) {
-	result, err := s.gate(notifyKind, source)
+	result, err := s.gate(notifyKind, source, false)
 	if err != nil {
 		logger.Debug("%s: notification gate: %v\n", s.transport.name(), err)
 		s.enqueue(text, notifyKind)

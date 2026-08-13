@@ -433,3 +433,35 @@ func TestChatEventSink_Close_GloballyMuted_SuppressesFlushAndLogsRunLogLine(t *t
 		t.Errorf("suppressed reason = %q, want it to name %q", suppressed[0].Reason, notifyKindEpicStarted)
 	}
 }
+
+// TestChatEventSink_BurstOfEventsCoalescedIntoOneFlush_CountsOneSendAgainstBudget
+// pins ticket 12's gate-at-flush-time seam: a burst of events well over
+// globalThreshold, all enqueued before a single flush, counts as exactly one
+// send-series entry (not one per event) and does not trip the global
+// breaker — only sustained flush volume can.
+func TestChatEventSink_BurstOfEventsCoalescedIntoOneFlush_CountsOneSendAgainstBudget(t *testing.T) {
+	t.Parallel()
+	sink, transport := newFakeChatSink(t, &recordingSink{})
+
+	for i := range globalThreshold + 5 {
+		sink.EpicStarted(fmt.Sprintf("epic-%d", i), 0, 3)
+	}
+	sink.flush()
+
+	got := waitForSentCount(transport, 1)
+	if len(got) != 1 {
+		t.Fatalf("sent = %v, want exactly 1 batched message for one flush", got)
+	}
+
+	state, err := loadNotificationStateAt(sink.gateStatePath)
+	if err != nil {
+		t.Fatalf("loadNotificationStateAt: %v", err)
+	}
+	ts := state.Transports["fake"]
+	if len(ts.Sends) != 1 {
+		t.Fatalf("Sends = %v, want exactly 1 entry for one flush covering %d events", ts.Sends, globalThreshold+5)
+	}
+	if ts.Muted {
+		t.Errorf("transport muted after a single flush, want the burst of events not to trip the global breaker")
+	}
+}
