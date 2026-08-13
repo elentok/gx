@@ -10,6 +10,8 @@ disable-model-invocation: true
 
 Implement a ticket from gx's local markdown tracker (see [gx-local-tracker.md](../gx-local-tracker.md)).
 
+Use DRY, KISS & YAGNI principles.
+
 If given a directory of tickets rather than a single ticket, work the **frontier**: the
 lowest-numbered ticket that is unblocked (every ticket in its `blocked_by` is `done`) and unclaimed.
 Implement exactly that one ticket, then stop — do not continue on to the next ticket in the same
@@ -76,8 +78,8 @@ When either trigger fires:
 2. **Commit.**
 3. **Create the follow-up ticket(s)**, following [gx-local-tracker.md](../gx-local-tracker.md)'s
    mid-flight-fork numbering and `parent` conventions, and gx-to-tickets' estimation method.
-   Allocate each new ticket's ID with `gx tickets add <epic> --parent <original-id>
-   --slug <descriptive-slug>` — it atomically picks the next free ID (safe against another
+   Allocate each new ticket's ID with `gx tickets add <epic> --parent <original-id> --slug <descriptive-slug>`
+   — it atomically picks the next free ID (safe against another
    parallel iteration doing the same fork at the same time), writes the stub straight to
    `<id>-<slug>.md` (`--slug` is required, so there's no separate rename step to remember), and
    writes the child's `parent`, which is the only edge a fork produces: give the new ticket no
@@ -124,7 +126,7 @@ Run typechecking regularly, single test files regularly, and the full test suite
 
 Claiming already writes `status: claimed` for you — never write it yourself.
 
-Once done, run `gx tickets set <path> --iteration-status finished`. This report can only *start* a
+Once done, run `gx tickets set <path> --iteration-status finished`. This report can only _start_ a
 landing, never conclude one: gx adopts it and decides `status: done` itself from its own commit
 count and cherry-pick outcome — never write `--status done` yourself, even paired with
 `--iteration-status finished`; landing status is gx's alone to set (the one exception is the
