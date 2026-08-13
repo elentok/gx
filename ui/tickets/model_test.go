@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
@@ -59,12 +60,87 @@ func TestBuildImplementRunOptionsUsesSelectedAgent(t *testing.T) {
 func TestBuildImplementRunOptionsUsesConfiguredTicketConcurrency(t *testing.T) {
 	t.Parallel()
 	root := testutil.TempRepo(t)
-	opts, err := buildImplementRunOptionsForTickets(root, "my-epic", ralphloop.AgentCodex, 5, nil, "gx-implement")
+	opts, err := buildImplementRunOptionsForTickets(root, "my-epic", ralphloop.AgentCodex, 5, nil, "gx-implement", config.AgentsConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if opts.MaxParallel != 5 {
 		t.Fatalf("MaxParallel = %d, want 5", opts.MaxParallel)
+	}
+}
+
+func TestBuildImplementRunOptionsForTicketsPassesResolvedAgentsConfig(t *testing.T) {
+	t.Parallel()
+	root := testutil.TempRepo(t)
+	agents := config.AgentsConfig{Claude: config.AgentConfig{Model: "opus", Effort: "high"}}
+	opts, err := buildImplementRunOptionsForTickets(root, "my-epic", ralphloop.AgentClaude, 1, nil, "gx-implement", agents)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opts.Agents != agents {
+		t.Fatalf("Agents = %+v, want %+v", opts.Agents, agents)
+	}
+}
+
+func TestAgentConfigSuffixFormatsModelAndEffort(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		ac   config.AgentConfig
+		want string
+	}{
+		{"both set", config.AgentConfig{Model: "sonnet", Effort: "medium"}, " (sonnet, medium)"},
+		{"only model", config.AgentConfig{Model: "sonnet"}, " (sonnet)"},
+		{"only effort", config.AgentConfig{Effort: "medium"}, " (medium)"},
+		{"both empty", config.AgentConfig{}, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := agentConfigSuffix(tc.ac); got != tc.want {
+				t.Fatalf("agentConfigSuffix(%+v) = %q, want %q", tc.ac, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestOpenImplementConfirmNamesModelAndEffort(t *testing.T) {
+	t.Parallel()
+	root := testutil.TempRepo(t)
+	m := NewModel(root, ui.Settings{Agents: config.AgentsConfig{
+		Claude: config.AgentConfig{Model: "sonnet", Effort: "medium"},
+	}}, keys.New(nil))
+	m = deliverLoad(t, m)
+	m.epics = []tickets.Epic{{Name: "x"}}
+	m.selected = 0
+
+	updated, _ := m.openImplementConfirm(ralphloop.AgentClaude)
+	m = updated.(Model)
+
+	if !strings.Contains(m.confirm.View(80), `Start implementing epic "x" with Claude (sonnet, medium)?`) {
+		t.Fatalf("confirm view missing expected prompt:\n%s", m.confirm.View(80))
+	}
+}
+
+func TestOpenImplementConfirmDropsParensWhenBothEmpty(t *testing.T) {
+	t.Parallel()
+	root := testutil.TempRepo(t)
+	// A fully-populated Settings.Agents whose Claude entry deliberately has
+	// both fields empty (the inherit-from-agent-CLI case) — distinct from
+	// ui.Settings{}'s zero value, which AgentConfig defaults instead (see
+	// TestAgentConfigDefaultsOnZeroValueSettings).
+	m := NewModel(root, ui.Settings{Agents: config.AgentsConfig{
+		Codex: config.AgentConfig{Model: "gpt-5.6-sol", Effort: "medium"},
+	}}, keys.New(nil))
+	m = deliverLoad(t, m)
+	m.epics = []tickets.Epic{{Name: "x"}}
+	m.selected = 0
+
+	updated, _ := m.openImplementConfirm(ralphloop.AgentClaude)
+	m = updated.(Model)
+
+	if !strings.Contains(m.confirm.View(80), `Start implementing epic "x" with Claude?`) {
+		t.Fatalf("confirm view should have no parenthetical:\n%s", m.confirm.View(80))
 	}
 }
 

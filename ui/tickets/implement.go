@@ -259,11 +259,30 @@ func (m Model) openImplementConfirm(agent ralphloop.AgentKind) (tea.Model, tea.C
 		return m, nil
 	}
 	epic := m.epics[r.epicIdx]
+	ac := m.settings.AgentConfig(agent)
 	m.confirm = m.confirm.Open(confirm.Options{
-		Prompt:    fmt.Sprintf("Start implementing epic %q with %s?", epic.Name, agentDisplayName(agent)),
+		Prompt:    fmt.Sprintf("Start implementing epic %q with %s%s?", epic.Name, agentDisplayName(agent), agentConfigSuffix(ac)),
 		AcceptCmd: m.cmdStartImplement(epic.Name, agent, epic.DoneCount(), epic.TotalCount()),
 	})
 	return m, nil
+}
+
+// agentConfigSuffix renders ac's model/effort for the launch-confirmation
+// prompt (see openImplementConfirm): "Claude (sonnet, medium)?". Either or
+// both fields may be empty (the inherit-from-agent-CLI case) — when both are
+// empty, no parenthetical is rendered at all rather than empty parens; a
+// single empty value shows only the populated one.
+func agentConfigSuffix(ac config.AgentConfig) string {
+	switch {
+	case ac.Model != "" && ac.Effort != "":
+		return fmt.Sprintf(" (%s, %s)", ac.Model, ac.Effort)
+	case ac.Model != "":
+		return fmt.Sprintf(" (%s)", ac.Model)
+	case ac.Effort != "":
+		return fmt.Sprintf(" (%s)", ac.Effort)
+	default:
+		return ""
+	}
 }
 
 func (m Model) implementAgentMenuView() string {
@@ -403,6 +422,7 @@ func (m Model) cmdStartImplement(epicName string, agent ralphloop.AgentKind, don
 	return cmdStartImplement(
 		m.worktreeRoot, epicName, agent, done, total,
 		m.settings.MaxConcurrentTicketsPerEpic(), nil, m.settings.Notifications, m.settings.ImplementSkill(),
+		m.settings.ResolvedAgents(),
 	)
 }
 
@@ -415,6 +435,7 @@ func cmdStartImplement(
 	ticketIDs []string,
 	notifications config.NotificationsConfig,
 	skill string,
+	agents config.AgentsConfig,
 ) tea.Cmd {
 	return func() tea.Msg {
 		sink, ok := ralphLoopRegistry.tryStart(epicName, done, total, scratchDirFor(worktreeRoot))
@@ -435,7 +456,7 @@ func cmdStartImplement(
 			}
 			ralphLoopRegistry.setFailureNotifier(epicName, reporter)
 		}
-		opts, err := buildImplementRunOptionsForTickets(worktreeRoot, epicName, agent, maxParallel, ticketIDs, skill)
+		opts, err := buildImplementRunOptionsForTickets(worktreeRoot, epicName, agent, maxParallel, ticketIDs, skill, agents)
 		if err != nil {
 			ralphLoopRegistry.finish(epicName, err)
 			return implementFailedMsg{err: err}
@@ -477,6 +498,7 @@ func buildImplementRunOptions(worktreeRoot, epicName string, agent ralphloop.Age
 	return buildImplementRunOptionsForTickets(
 		worktreeRoot, epicName, agent,
 		settings.MaxConcurrentTicketsPerEpic(), nil, settings.ImplementSkill(),
+		settings.ResolvedAgents(),
 	)
 }
 
@@ -486,6 +508,7 @@ func buildImplementRunOptionsForTickets(
 	maxParallel int,
 	ticketIDs []string,
 	skill string,
+	agents config.AgentsConfig,
 ) (ralphloop.RunOptions, error) {
 	repo, err := git.FindRepo(worktreeRoot)
 	if err != nil {
@@ -494,6 +517,7 @@ func buildImplementRunOptionsForTickets(
 	return ralphloop.RunOptions{
 		EpicName:    epicName,
 		Agent:       agent,
+		Agents:      agents,
 		Skill:       skill,
 		RepoDir:     repo.Root,
 		ScratchDir:  repo.ScratchRoot(),
