@@ -185,7 +185,30 @@ func reattachIteration(d Deps, p iterationParams) error {
 	// StartEvent remains empty because reattachment must not imply a fresh
 	// launch; all later events use the recovered native session identity.
 	launchParams := p.launchAndPromptParams(label, agent.PaneID, tabID, "", path, "", eventIterationFinished)
+	finished := false
 	if alreadyFinished(agent.AgentStatus) {
+		// An idle pane at reattach gets the same debounce and background-task
+		// gate a live finish gets in waitForFinish (confirmFinished /
+		// waitForBackgroundTasks): without them, a genuine mid-turn pause or a
+		// still-outstanding backgrounded shell command reads as finished,
+		// landing a partial commit set and tearing down the worktree under a
+		// still-working agent - which is how both real park/reopen/reattach
+		// incidents actually looped, since this short-circuit used to skip
+		// waitForFinish (and its gate) entirely.
+		confirmed, err := confirmFinished(d, agent.PaneID, plainFinishStates)
+		if err != nil {
+			return fmt.Errorf("confirming %s already finished at reattach: %w", label, err)
+		}
+		if confirmed {
+			sessionID := resolveReattachSessionID(p, agent.AgentSession, preClear.SessionIDs)
+			elapsedMs := 0
+			if err := waitForBackgroundTasks(d, launchParams, sessionID, &elapsedMs); err != nil {
+				return err
+			}
+			finished = true
+		}
+	}
+	if finished {
 		// An agent that finished while the loop was down has no future state
 		// transition for AgentWait to observe.
 		if p.Report != nil {
@@ -220,6 +243,33 @@ func reattachIteration(d Deps, p iterationParams) error {
 	}
 
 	return finishIteration(d, p, path, agent.PaneID, tabID, base, branch, agent.AgentSession)
+}
+
+// resolveReattachSessionID recovers a session id for
+// reattachIteration's already-finished background-task gate check: Claude's
+// AgentSession is empty at reattach until the live agent produces one, so
+// this falls back through the same chain established for a reattached
+// close's metadata (backfillDoneMetadata) - the ticket's own most recently
+// recorded session (priorSessionIDs, read before this reattach could have
+// appended one of its own), then the run log's last iteration-started event.
+// Returns "" if none of those resolve, which waitForBackgroundTasks treats
+// as no session to gate on rather than an error.
+func resolveReattachSessionID(p iterationParams, agentSession string, priorSessionIDs []string) string {
+	if agentSession != "" {
+		return agentSession
+	}
+	if n := len(priorSessionIDs); n > 0 {
+		return priorSessionIDs[n-1]
+	}
+	events, ok, err := readEvents(p.ScratchDir, p.FeatureBranch)
+	if err != nil || !ok {
+		return ""
+	}
+	sessionID, _, _, ok := lastIterationSession(events, p.Ticket.Identifier)
+	if !ok {
+		return ""
+	}
+	return sessionID
 }
 
 // finishIteration lands a finished iteration's commits (or marks it

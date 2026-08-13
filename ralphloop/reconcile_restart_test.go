@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,9 +9,11 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/transcript"
 )
 
 // TestRun_RestartWithClaimedTicketButNoLiveTab_RevertsAndRerunsFromScratch
@@ -298,8 +301,8 @@ func TestRun_RestartWithClaimedTicketAlreadyIdle_SkipsWaitAndCherryPicks(t *test
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	if agentWaitCalls != 0 {
-		t.Errorf("AgentWait calls = %d, want 0 for a pane already idle at reattach", agentWaitCalls)
+	if agentWaitCalls != 1 {
+		t.Errorf("AgentWait calls = %d, want 1 (confirmFinished's debounce re-check) for a pane already idle at reattach, not waitForFinish's full poll loop", agentWaitCalls)
 	}
 	if len(*removed) != 1 {
 		t.Errorf("removed worktree branches = %v, want the reattached iteration's worktree removed on completion", *removed)
@@ -501,5 +504,186 @@ func TestRun_ReattachedClose_NoPriorSessionInLog_OmitsMetadata(t *testing.T) {
 	}
 	if got.ActualContextWindow != 0 {
 		t.Errorf("ActualContextWindow = %d, want 0 (no prior session to backfill from)", got.ActualContextWindow)
+	}
+}
+
+// idleReattachDeps returns fakeDeps() wired for a reattach whose live pane
+// already reports idle at AgentGet time, the alreadyFinished short-circuit's
+// entry condition. AgentWait always answers idle too, so once the gate lets
+// the short-circuit through, nothing loops back into waitForFinish's full
+// poll.
+func idleReattachDeps(t *testing.T, agentSession string) (Deps, *[]string) {
+	t.Helper()
+	d, _, removed := fakeDeps()
+	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
+		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID, AgentStatus: "idle"}}, nil
+	}
+	d.AgentGet = func(string) (herdr.Agent, error) {
+		return herdr.Agent{PaneID: "pane-epic-iter-01", WorkspaceID: "ws1", TabID: "tab-epic-iter-01", AgentStatus: "idle", AgentSession: agentSession}, nil
+	}
+	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+	}
+	return d, removed
+}
+
+// TestRun_ReattachAlreadyIdle_BackgroundTaskOutstanding_HoldsShortCircuit
+// covers ticket 04's core fix: the alreadyFinished short-circuit must consult
+// the same background-task gate confirmFinished/waitForBackgroundTasks apply
+// in waitForFinish, not skip it - this is the mechanism both real incidents
+// looped through (false park -> reopen -> reattach -> immediate re-finish).
+func TestRun_ReattachAlreadyIdle_BackgroundTaskOutstanding_HoldsShortCircuit(t *testing.T) {
+	t.Parallel()
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+	})
+	d, removed := idleReattachDeps(t, "session-epic-iter-01")
+	var reads int
+	d.ReadBackgroundTasks = func(cwd, sessionID string) (transcript.BackgroundTaskReading, error) {
+		reads++
+		status := transcript.BackgroundTaskOutstandingFresh
+		if reads >= 2 {
+			status = transcript.BackgroundTaskResolved
+		}
+		return transcript.BackgroundTaskReading{
+			Markers: []transcript.BackgroundTaskMarker{{TaskID: "task-1", Status: status}},
+		}, nil
+	}
+	d.Sleep = func(time.Duration) {}
+
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if reads < 2 {
+		t.Errorf("ReadBackgroundTasks calls = %d, want at least 2: the gate must be consulted and held until the marker resolves", reads)
+	}
+	if len(*removed) != 1 {
+		t.Errorf("removed worktree branches = %v, want the reattached iteration's worktree cleaned up once the gate releases", *removed)
+	}
+
+	events, _, err := readEvents(scratchDir, "epic")
+	if err != nil {
+		t.Fatalf("readEvents: %v", err)
+	}
+	var held bool
+	for _, e := range events {
+		if e.Type == eventBackgroundTaskGateHeld {
+			held = true
+		}
+	}
+	if !held {
+		t.Errorf("events = %v, want a background-task-gate-held event for the reattach short-circuit", events)
+	}
+}
+
+// TestRun_ReattachAlreadyIdle_NoBackgroundTask_DebouncesBeforeShortCircuit
+// covers the bonus fix: even with no background task involved at all, the
+// short-circuit must debounce a just-observed idle pane before trusting it -
+// a genuine mid-turn pause (agent still working, nothing backgrounded) must
+// not be misread as finished. Here the debounce re-check itself catches the
+// agent still working, so the short-circuit is not taken and control falls
+// through to waitForFinish's normal poll loop instead.
+func TestRun_ReattachAlreadyIdle_NoBackgroundTask_DebouncesBeforeShortCircuit(t *testing.T) {
+	t.Parallel()
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+	})
+	d, removed := idleReattachDeps(t, "session-epic-iter-01")
+	var waitCalls int
+	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+		waitCalls++
+		if waitCalls == 1 {
+			// confirmFinished's debounce re-check: the agent is still working,
+			// so the just-observed idle at AgentGet time was a transient blip.
+			return herdr.Agent{}, errors.New("timed out waiting for agent status")
+		}
+		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+	}
+	d.Sleep = func(time.Duration) {}
+
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if waitCalls < 2 {
+		t.Errorf("AgentWait calls = %d, want at least 2: debounce re-check plus waitForFinish's own poll after the short-circuit is declined", waitCalls)
+	}
+	if len(*removed) != 1 {
+		t.Errorf("removed worktree branches = %v, want the reattached iteration's worktree cleaned up once it genuinely finishes", *removed)
+	}
+
+	got := mustParse(t, filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
+	if got.Status != schema.StatusDone {
+		t.Errorf("Status = %q, want done", got.Status)
+	}
+}
+
+// TestRun_ReattachAlreadyIdle_EmptySession_FallsBackToTicketSessionIDs
+// covers ticket 04's session-id recovery: when AgentGet's live AgentSession
+// is empty (the Claude case at reattach), the background-task gate must
+// still be consulted using a session id recovered from the ticket's own
+// session_ids frontmatter, not skipped for want of a session.
+func TestRun_ReattachAlreadyIdle_EmptySession_FallsBackToTicketSessionIDs(t *testing.T) {
+	t.Parallel()
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\nsession_ids:\n    - \"sess-older\"\n    - \"sess-prior\"\n---\n# A\n",
+	})
+	d, removed := idleReattachDeps(t, "")
+	var gotSessionID string
+	d.ReadBackgroundTasks = func(cwd, sessionID string) (transcript.BackgroundTaskReading, error) {
+		gotSessionID = sessionID
+		return transcript.BackgroundTaskReading{}, nil
+	}
+	d.Sleep = func(time.Duration) {}
+
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if gotSessionID != "sess-prior" {
+		t.Errorf("session id consulted by the gate = %q, want the ticket's most recent recorded session_ids entry %q", gotSessionID, "sess-prior")
+	}
+	if len(*removed) != 1 {
+		t.Errorf("removed worktree branches = %v, want the reattached iteration's worktree cleaned up", *removed)
+	}
+}
+
+// TestRun_ReattachAlreadyIdle_EmptySessionAndNoSessionIDs_FallsBackToRunLog
+// covers the last link in ticket 04's session-id recovery chain: with both
+// AgentGet's AgentSession and the ticket's session_ids empty, the gate falls
+// back to the run log's last iteration-started event for this ticket.
+func TestRun_ReattachAlreadyIdle_EmptySessionAndNoSessionIDs_FallsBackToRunLog(t *testing.T) {
+	t.Parallel()
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+	})
+	if err := logEvent(scratchDir, "epic", Event{
+		Type:         eventIterationStarted,
+		Ticket:       "01",
+		Agent:        AgentClaude,
+		AgentSession: "sess-from-log",
+		Cwd:          "/fake/worktrees/epic-item-01",
+	}); err != nil {
+		t.Fatalf("logEvent: %v", err)
+	}
+
+	d, removed := idleReattachDeps(t, "")
+	var gotSessionID string
+	d.ReadBackgroundTasks = func(cwd, sessionID string) (transcript.BackgroundTaskReading, error) {
+		gotSessionID = sessionID
+		return transcript.BackgroundTaskReading{}, nil
+	}
+	d.Sleep = func(time.Duration) {}
+
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if gotSessionID != "sess-from-log" {
+		t.Errorf("session id consulted by the gate = %q, want the run log's last iteration-started session %q", gotSessionID, "sess-from-log")
+	}
+	if len(*removed) != 1 {
+		t.Errorf("removed worktree branches = %v, want the reattached iteration's worktree cleaned up", *removed)
 	}
 }
