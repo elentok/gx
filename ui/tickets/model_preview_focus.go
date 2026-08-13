@@ -111,29 +111,6 @@ func highlightPreviewLine(line, query string, current bool) string {
 	return prefix.String() + style.Render(matched.String()) + suffix.String()
 }
 
-// focusPreviewOrExpand implements "l"/"enter": on a leaf ticket row, or on
-// an epic/parent-ticket row that's already expanded, it hands focus to the
-// preview panel to scroll/search its body. On a collapsed epic row or a
-// collapsed ticket row with children (ticket 09) it instead reports false
-// so the caller falls back to expanding it — the first enter/l on a
-// collapsed row expands it, and only a second press (now that it's
-// expanded) moves focus to the preview.
-func (m *Model) focusPreviewOrExpand() bool {
-	r, ok := m.selectedRow()
-	if !ok {
-		return false
-	}
-	if r.isEpic() {
-		if m.isCollapsed(m.epics[r.epicIdx]) {
-			return false
-		}
-	} else if r.hasChildren && !r.expanded {
-		return false
-	}
-	m.focus = focusPreview
-	return true
-}
-
 // handlePreviewKey processes key input while the preview panel has focus:
 // its own search overlay, "h"/"left"/"esc" handing focus back to the
 // sidebar, "b" jumping straight to the bottom (overriding the viewport's own

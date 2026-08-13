@@ -270,7 +270,7 @@ func TestQueueModelDoneParentWithOpenForkChildStaysVisible(t *testing.T) {
 
 // TestQueueModelLOnLeafRowFocusesPreview covers ticket 12: "l"/"right"/"enter"
 // on a leaf row (no children) hands focus straight to the preview panel,
-// mirroring Tickets' focusPreviewOrExpand.
+// mirroring the Tickets tab's own focus-or-expand dispatch.
 func TestQueueModelLOnLeafRowFocusesPreview(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

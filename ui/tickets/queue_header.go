@@ -44,24 +44,6 @@ var (
 	epicStatusParkedRepairStyle = lipgloss.NewStyle().Foreground(ui.ColorRed)
 )
 
-// epicHeaderLines renders the Queue tab's per-epic header as two lines: a
-// status line (an icon + status text, colored per epicStatusLine) and a
-// context-window line (avg/max token usage plus a compact count across the
-// epic's tickets). Both lines carry the same 2-char indent as the list rows
-// beneath them (ticket 03) rather than the header widening to the list's old
-// 4-char indent.
-func (m QueueModel) epicHeaderLines(epic tickets.Epic, parked []ralphloop.StalledTicket) []string {
-	icon, text, style := epicStatusLine(m.icons(), epic, parked)
-	statusLine := "  " + epicHeaderStyle.Render(epic.Name) + " " + style.Render(icon+" "+text)
-
-	avg, maximum, compacts := epicContextMetrics(epic)
-	contextLine := "  " + metricsLineStyle.Render(fmt.Sprintf(
-		"Context window: avg %s, max %s (%d compacts)",
-		formatTokenCount(avg), formatTokenCount(maximum), compacts,
-	))
-	return []string{statusLine, contextLine}
-}
-
 // epicStatusLine picks an epic header's status-line icon, text, and color:
 // green "took <elapsed>" once every ticket is done, yellow flagging any
 // needs-answer/needs-repair/error-classed ticket, or the default/no-color

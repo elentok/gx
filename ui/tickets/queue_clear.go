@@ -64,7 +64,7 @@ func cmdConfirmQueueClear(paths []string) tea.Cmd {
 
 // handleQueueClearConfirmed applies queueClearConfirmedMsg: every path is
 // unchecked, causing any epic left with no checked tickets to drop out of
-// rowsAndPlanErrors' output with no further bookkeeping (see its doc
+// buildQueueEntries' output with no further bookkeeping (see its doc
 // comment).
 func (m QueueModel) handleQueueClearConfirmed(msg queueClearConfirmedMsg) (tea.Model, tea.Cmd) {
 	if err := m.clearCheckedPaths(msg.paths); err != nil {
@@ -78,7 +78,7 @@ func (m *QueueModel) clearCheckedPaths(paths []string) error {
 	if len(paths) == 0 {
 		return nil
 	}
-	// Also drop each path from m.candidates: rowsAndPlanErrors only ever grows
+	// Also drop each path from m.candidates: buildQueueEntries only ever grows
 	// candidates from m.checked (so a row a user unchecked via the Tickets tab
 	// stays visible for re-toggling), which would otherwise leave a cleared
 	// ticket's row (and its epic, if it was the last one) rendered forever.

@@ -85,8 +85,8 @@ type QueueModel struct {
 	// ForeignAttachPID.
 	foreignAttachPID int
 
-	// search backs "/"-triggered filtering over rows(), mirroring the Tickets
-	// tab's own m.search (see ui/tickets/search.go).
+	// search backs "/"-triggered filtering over buildQueueEntries, mirroring
+	// the Tickets tab's own m.search (see ui/tickets/search.go).
 	search search.Model
 
 	// confirm backs the "C"/"c" clear keymaps and the "x" cascade-delete keymap
@@ -94,8 +94,8 @@ type QueueModel struct {
 	// so this is the only modal this tab opens outside the agent-picker menu.
 	confirm confirm.Model
 
-	// hideComplete backs the "tc" chord (ticket 09): when true, rows()/
-	// rowsAndPlanErrors() omit StatusDone tickets from the rendered row list,
+	// hideComplete backs the "tc" chord (ticket 09): when true,
+	// buildQueueEntries omits StatusDone tickets from the rendered row list,
 	// independent of the "c"/"C" clear keymaps (which mutate the queue store,
 	// not visibility) and independent of epicWaves' plan validation, which
 	// must keep considering hidden-but-still-queued tickets.

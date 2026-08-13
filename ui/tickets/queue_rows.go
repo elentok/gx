@@ -21,58 +21,13 @@ type queueRow struct {
 	parentPath  string
 }
 
-func (m QueueModel) rows() []queueRow {
-	rows, _ := m.rowsAndPlanErrors()
-	return rows
-}
-
-// rowsAndPlanErrors lists every candidate ticket per epic in plan order —
-// ticket-number order (sortedTicketIndexes), which follows each ticket's
-// blocked_by chain, so the topmost open ticket in an epic is always the next
-// one ralph-loop would actually claim — rather than batching them into
-// synchronized "parallel"/"then" waves (ticket 25: that grouping read as a
-// hard concurrency contract the runner didn't actually enforce). A plan
-// validation still runs per epic via the same canonical planner
-// (ralphloop.PlanWaves over a ralphloop.RunScope) the runner itself claims
-// tickets from, so a dependency cycle or a blocker outside the selection that
-// will never resolve is still caught — surfaced by name in planErrs for
-// queueLines to render as an actionable error instead of a misleading plan.
-func (m QueueModel) rowsAndPlanErrors() ([]queueRow, map[string]error) {
-	candidates := m.candidates
-	if candidates == nil {
-		// Before queueEpicsLoadedMsg arrives, m.candidates hasn't been
-		// initialized yet, but bubbletea can still call View (and thus this)
-		// on the initial render. Fall back to a scratch map rather than
-		// writing into the nil m.candidates.
-		candidates = make(map[string]bool, len(m.checked))
-	}
-	for path := range m.checked {
-		candidates[path] = true
-	}
-	var out []queueRow
-	planErrs := make(map[string]error)
-	for _, epic := range m.epics {
-		waves, err := epicWaves(epic, candidates, m.settings.MaxConcurrentTicketsPerEpic())
-		if err != nil {
-			planErrs[epic.Name] = err
-		}
-		ordered := epicRowOrder(epic, waves, candidates)
-		if m.hideComplete {
-			ordered = filterDoneTickets(epic, ordered)
-		}
-		out = append(out, queueRowsForEpic(epic, ordered, m.queueTree.CollapsedIDs())...)
-	}
-	return out, planErrs
-}
-
 // queueNodeKind distinguishes the six row kinds the Queue tab's tree can
 // hold: a per-epic blank separator, its status/context-window header lines,
 // an optional plan-error line, a ticket, and a ticket's optional park-reason
 // subtext. tree.Model[T] has no notion of a heterogeneous node — this sum
 // type plus buildQueueEntries' idFn/childrenFn is what makes one
 // tree.Model[queueNode] stand in for buildQueueLines' former hand-spliced
-// header/blank/error strings interleaved with queueRowsForEpic's ticket
-// rows.
+// header/blank/error strings interleaved with the ticket rows.
 type queueNodeKind int
 
 const (
@@ -98,10 +53,9 @@ type queueNode struct {
 // separator, its status/context-window header lines, an optional plan-error
 // line, and its own candidate tickets nested by Parent/Children — mirroring
 // buildSidebarEntries (model_data.go) one level down. Reuses
-// epicWaves/epicRowOrder/filterDoneTickets/nearestVisibleQueueAncestor
-// unchanged (rowsAndPlanErrors' own data-prep); only the final step —
-// wrapping ordered tickets into queueNode tree entries instead of []queueRow
-// via queueRowsForEpic — is new. Called on every
+// epicWaves/epicRowOrder/filterDoneTickets/nearestVisibleQueueAncestor to
+// compute each epic's plan-ordered candidate tickets, then wraps them into
+// queueNode tree entries. Called on every
 // queueEpicsLoadedMsg/hideComplete toggle/collapse mutation via
 // clampSelected.
 func (m QueueModel) buildQueueEntries() []tree.Entry[queueNode] {
@@ -207,7 +161,7 @@ func (m QueueModel) buildQueueEntries() []tree.Entry[queueNode] {
 }
 
 // filterDoneTickets drops a done ticket from ordered before nesting
-// (queueRowsForEpic) rather than after, so a done parent doesn't strand its
+// (buildQueueEntries) rather than after, so a done parent doesn't strand its
 // children — nearestVisibleQueueAncestor reattaches them to the nearest
 // surviving ancestor instead of losing them.
 func filterDoneTickets(epic tickets.Epic, ordered []tickets.Ticket) []tickets.Ticket {
@@ -219,57 +173,6 @@ func filterDoneTickets(epic tickets.Epic, ordered []tickets.Ticket) []tickets.Ti
 		filtered = append(filtered, t)
 	}
 	return filtered
-}
-
-// queueRowsForEpic nests ordered (epicRowOrder's flattened plan-order ticket
-// list) under each ticket's Parent (ticket 03) via ui/tree's pure
-// entry-builder (ticket 02), mirroring the Tickets tab's ticketRows (ticket
-// 09) one level down. ordered is also the definition of "visible" here: a
-// ticket's parent counts as a nesting target only if it's also present in
-// ordered (still checked/planned, and not hideComplete-filtered), preserving
-// ordered's own plan order among roots and among each parent's children.
-func queueRowsForEpic(epic tickets.Epic, ordered []tickets.Ticket, collapsed map[string]bool) []queueRow {
-	visible := make(map[string]bool, len(ordered))
-	for _, t := range ordered {
-		visible[t.Path] = true
-	}
-
-	byIdentifier := make(map[string]tickets.Ticket, len(epic.Tickets))
-	for _, t := range epic.Tickets {
-		if t.Identifier != "" {
-			byIdentifier[t.Identifier] = t
-		}
-	}
-
-	parentOf := make(map[string]string, len(ordered))
-	childrenOf := make(map[string][]tickets.Ticket, len(ordered))
-	var roots []tickets.Ticket
-	for _, t := range ordered {
-		parentPath := nearestVisibleQueueAncestor(t, visible, byIdentifier)
-		parentOf[t.Path] = parentPath
-		if parentPath == "" {
-			roots = append(roots, t)
-		} else {
-			childrenOf[parentPath] = append(childrenOf[parentPath], t)
-		}
-	}
-
-	idFn := func(t tickets.Ticket) string { return t.Path }
-	childrenFn := func(t tickets.Ticket) []tickets.Ticket { return childrenOf[t.Path] }
-	entries := tree.BuildEntriesFromValues(roots, idFn, childrenFn, collapsed)
-
-	rows := make([]queueRow, len(entries))
-	for i, e := range entries {
-		rows[i] = queueRow{
-			epic:        epic,
-			ticket:      e.Value,
-			depth:       e.Depth,
-			hasChildren: e.HasChildren,
-			expanded:    e.Expanded,
-			parentPath:  parentOf[e.Value.Path],
-		}
-	}
-	return rows
 }
 
 // nearestVisibleQueueAncestor walks t's Parent chain (ticket 03's schema
@@ -320,7 +223,7 @@ func epicRowOrder(epic tickets.Epic, waves [][]tickets.Ticket, candidates map[st
 
 // epicWaves resolves candidates (the checked-ticket paths within epic) into a
 // ralphloop.RunScope and hands off to ralphloop.PlanWaves, the same planner
-// Run uses to claim tickets — see rowsAndPlanErrors.
+// Run uses to claim tickets — see buildQueueEntries.
 func epicWaves(epic tickets.Epic, candidates map[string]bool, maxParallel int) ([][]tickets.Ticket, error) {
 	var ids []string
 	for _, idx := range sortedTicketIndexes(epic) {

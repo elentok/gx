@@ -62,12 +62,6 @@ func (m *QueueModel) jumpToCurrentQueueMatch() {
 	}
 }
 
-// queueSearchMatch reports whether the row at idx is a search match, and
-// whether it's the match currently under the search cursor (n/N target).
-func (m QueueModel) queueSearchMatch(idx int) (matched, current bool) {
-	return m.queueTree.SearchMatch(idx)
-}
-
 func (m QueueModel) searchOverlayWidth() int {
 	max := m.width * 80 / 100
 	if search.DESIRED_WIDTH < max {

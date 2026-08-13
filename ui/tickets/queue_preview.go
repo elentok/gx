@@ -67,9 +67,9 @@ func (m *QueueModel) syncQueuePreviewViewport() {
 	m.previewFocus.Sync(contentW, ht, m.queuePreviewSelectionKey(), m.queuePreviewContent)
 }
 
-// queueFocusPreviewOrExpand mirrors Tickets' focusPreviewOrExpand
-// (model_preview_focus.go) one level down for the Queue tab's uniform
-// queueRow (no separate epic-row case, unlike Tickets): on a leaf row, or a
+// queueFocusPreviewOrExpand is the Queue tab's counterpart to the Tickets
+// tab's own focus-or-expand dispatch, one level down for the Queue tab's
+// uniform queueRow (no separate epic-row case, unlike Tickets): on a leaf row, or a
 // row with children that's already expanded, it hands focus to the preview
 // panel. On a collapsed row with children it reports false so the caller
 // falls back to expanding it instead — the first "l"/"enter" on a collapsed
