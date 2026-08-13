@@ -7,12 +7,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/menu"
 
 	humanize "github.com/dustin/go-humanize"
@@ -369,11 +371,54 @@ func runConfigTestNotifications(d deps) error {
 	return nil
 }
 
-// runNotify sends text to every notification service configured in
+// notifyTransports is the ordered set of transport names --enable/--disable/
+// --status operate on, matching ralphloop.NotificationState's keys and
+// SendMessage's sent-to strings.
+var notifyTransports = []string{"telegram", "slack"}
+
+func isKnownNotifyTransport(name string) bool {
+	return slices.Contains(notifyTransports, name)
+}
+
+// runNotify dispatches `gx notify` to whichever of its mutually exclusive
+// modes was requested: send a message, flip a transport's manual mute, or
+// report status. Args holds at most one positional message (Args:
+// cobra.MaximumNArgs(1)).
+func runNotify(args []string, enable, disable string, status bool, d deps) error {
+	hasMessage := len(args) == 1
+	controlFlags := 0
+	if enable != "" {
+		controlFlags++
+	}
+	if disable != "" {
+		controlFlags++
+	}
+	if status {
+		controlFlags++
+	}
+
+	switch {
+	case hasMessage && controlFlags > 0:
+		return fmt.Errorf("a message and --enable/--disable/--status are mutually exclusive")
+	case controlFlags > 1:
+		return fmt.Errorf("--enable, --disable, and --status are mutually exclusive")
+	case enable != "":
+		return runNotifySetMute(enable, false, d)
+	case disable != "":
+		return runNotifySetMute(disable, true, d)
+	case status:
+		return runNotifyStatus(d)
+	case hasMessage:
+		return sendNotify(args[0], d)
+	default:
+		return fmt.Errorf("notify requires a message or one of --enable/--disable/--status")
+	}
+}
+
+// sendNotify sends text to every notification service configured in
 // ~/.config/gx/config.json (Telegram and/or Slack), no-op'ing per-service
-// when unconfigured — same as `gx config test-notifications`. It reports
-// which service(s) it sent to.
-func runNotify(text string, d deps) error {
+// when unconfigured, and reports which service(s) it sent to.
+func sendNotify(text string, d deps) error {
 	cfg, err := d.loadConfig()
 	if err != nil {
 		return err
@@ -388,6 +433,88 @@ func runNotify(text string, d deps) error {
 	}
 	fmt.Fprintf(d.stdout, "sent to: %s\n", strings.Join(sent, ", "))
 	return err
+}
+
+// runNotifySetMute flips transport's manual mute in the notification state
+// file (ticket 02's module) and reports the new state. This is the same
+// manual path a planned quiet period would use.
+func runNotifySetMute(transport string, muted bool, d deps) error {
+	if !isKnownNotifyTransport(transport) {
+		return fmt.Errorf("unknown transport %q (expected telegram or slack)", transport)
+	}
+
+	err := ralphloop.UpdateNotificationState(func(state *ralphloop.NotificationState) {
+		ts := state.Transports[transport]
+		ts.Muted = muted
+		if muted {
+			ts.Reason = "manual-disable"
+			ts.TrippedAt = time.Now()
+		} else {
+			ts.Reason = ""
+			ts.TrippedAt = time.Time{}
+		}
+		state.Transports[transport] = ts
+	})
+	if err != nil {
+		return err
+	}
+
+	if muted {
+		fmt.Fprintf(d.stdout, "%s: muted\n", transport)
+	} else {
+		fmt.Fprintf(d.stdout, "%s: active\n", transport)
+	}
+	return nil
+}
+
+// runNotifyStatus reports every transport's mute state plus every ticket
+// under the current repo's tracker root carrying a non-empty Mutes.
+func runNotifyStatus(d deps) error {
+	state, err := ralphloop.LoadNotificationState()
+	if err != nil {
+		return err
+	}
+	for _, transport := range notifyTransports {
+		ts := state.Transports[transport]
+		if ts.Muted {
+			fmt.Fprintf(d.stdout, "%s: muted (%s)\n", transport, ts.Reason)
+		} else {
+			fmt.Fprintf(d.stdout, "%s: active\n", transport)
+		}
+	}
+
+	cwd, err := d.getwd()
+	if err != nil {
+		return err
+	}
+	info, err := git.IdentifyDir(cwd)
+	if err != nil {
+		return fmt.Errorf("not inside a git repo: %w", err)
+	}
+	epics, err := tickets.Load(info.Repo.ScratchRoot())
+	if err != nil {
+		return err
+	}
+
+	var muted []string
+	for _, epic := range epics {
+		for _, t := range epic.Tickets {
+			for _, m := range t.Mutes {
+				muted = append(muted, fmt.Sprintf("%s/%s: %s (tripped %s)",
+					epic.Name, t.DisplayNumber(), m.EventType, m.TrippedAt.Format(time.RFC3339)))
+			}
+		}
+	}
+
+	if len(muted) == 0 {
+		fmt.Fprintf(d.stdout, "\nno tickets with active mutes\n")
+		return nil
+	}
+	fmt.Fprintf(d.stdout, "\nmuted tickets:\n")
+	for _, line := range muted {
+		fmt.Fprintf(d.stdout, "  %s\n", line)
+	}
+	return nil
 }
 
 func runEditorCommand(editor, path string, in io.Reader, out, errOut io.Writer) error {

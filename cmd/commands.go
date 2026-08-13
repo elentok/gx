@@ -416,14 +416,21 @@ func newDoctorCmd(d deps) *cobra.Command {
 }
 
 func newNotifyCmd(d deps) *cobra.Command {
-	return &cobra.Command{
-		Use:   "notify <message>",
+	var enable, disable string
+	var status bool
+
+	cmd := &cobra.Command{
+		Use:   "notify [message]",
 		Short: "send a message via configured Telegram/Slack notifications",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return runNotify(args[0], d)
+			return runNotify(args, enable, disable, status, d)
 		},
 	}
+	cmd.Flags().StringVar(&enable, "enable", "", "clear the manual mute for a transport (telegram/slack)")
+	cmd.Flags().StringVar(&disable, "disable", "", "trip the manual mute for a transport (telegram/slack)")
+	cmd.Flags().BoolVar(&status, "status", false, "report per-transport mute state and muted tickets")
+	return cmd
 }
 
 func newVersionCmd(d deps) *cobra.Command {
