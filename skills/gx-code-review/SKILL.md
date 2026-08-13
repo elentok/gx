@@ -38,8 +38,8 @@ stop and fix the ticket's frontmatter before doing anything else.
   fixed point, `git diff <fixed-point>...HEAD` for the diff, `git log <fixed-point>..HEAD --oneline`
   for the commit list. Fail here — not inside a subagent — if the merge-base can't be resolved or the
   diff is empty.
-- The epic's spec is the first of these that exists: `<epic-dir>/spec.md`, then
-  `docs/specs/<epic-slug>.md` from the repo root. When neither does, the epic's ticket bodies are the
+- The epic's spec is the first of these that exists: `docs/specs/<epic-slug>.md` from the repo root,
+  then `<epic-dir>/spec.md` (legacy location). When neither does, the epic's ticket bodies are the
   spec: every `<epic-dir>/issues/*.md` except this code-review ticket, read in full. Either way the
   spec resolves — the Spec axis always runs.
 
@@ -67,8 +67,8 @@ read/git access to the worktree, so it runs the diff itself.
 
 **Spec subagent** (exactly one, whatever the configured skill list holds) also gets:
 
-- The path of the spec resolved in step 2 — `spec.md`, or the list of ticket file paths that stand in
-  for it.
+- The path of the spec resolved in step 2 — `docs/specs/<epic-slug>.md` (or the legacy `spec.md`), or
+  the list of ticket file paths that stand in for it.
 - The brief: "Report: (a) requirements the spec asked for that are missing or partial; (b) behaviour
   in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where
   the implementation looks wrong. Quote the spec line — or the ticket path and line — for each
