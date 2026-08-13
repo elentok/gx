@@ -368,13 +368,16 @@ func newConfigCmd(d deps) *cobra.Command {
 }
 
 func newBumpCmd(d deps) *cobra.Command {
-	return &cobra.Command{
+	var yes bool
+	cmd := &cobra.Command{
 		Use:   "bump [major|minor|patch]",
 		Short: "create a version tag and optionally push",
 		RunE: func(_ *cobra.Command, args []string) error {
-			return runBump(args, d)
+			return runBump(args, d, yes)
 		},
 	}
+	cmd.Flags().BoolVar(&yes, "yes", false, "push commits and tag to origin without prompting")
+	return cmd
 }
 
 func newStashifyCmd(d deps) *cobra.Command {

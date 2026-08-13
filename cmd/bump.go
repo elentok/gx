@@ -13,7 +13,9 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-func runBump(args []string, d deps) error {
+func runBump(args []string, d deps, yes ...bool) error {
+	skipConfirm := len(yes) > 0 && yes[0]
+
 	cwd, err := d.getwd()
 	if err != nil {
 		return err
@@ -59,9 +61,12 @@ func runBump(args []string, d deps) error {
 	}
 	fmt.Fprintf(d.stdout, "Created annotated tag %s\n\n", newTag)
 
-	confirmed, err := d.confirmForce("Push commits and tag to origin?")
-	if err != nil {
-		return err
+	confirmed := skipConfirm
+	if !skipConfirm {
+		confirmed, err = d.confirmForce("Push commits and tag to origin?")
+		if err != nil {
+			return err
+		}
 	}
 	if confirmed {
 		if err := git.PushOrigin(cwd); err != nil {

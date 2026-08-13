@@ -287,6 +287,34 @@ func TestRunBump_SkipsPushWhenDeclined(t *testing.T) {
 	}
 }
 
+func TestRunBump_Yes_SkipsConfirmAndPushes(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	tagRepo(t, dir, "v1.0.0")
+	remote := t.TempDir() + "/remote.git"
+	testutil.MustGitExported(t, ".", "clone", "--bare", dir, remote)
+	testutil.MustGitExported(t, dir, "remote", "add", "origin", remote)
+
+	var stdout bytes.Buffer
+	d := deps{
+		stdin:  strings.NewReader(""),
+		stdout: &stdout,
+		stderr: bytes.NewBuffer(nil),
+		getwd:  func() (string, error) { return dir, nil },
+		confirmForce: func(string) (bool, error) {
+			t.Fatal("confirmForce should not be called when yes is true")
+			return false, nil
+		},
+	}
+
+	if err := runBump([]string{"patch"}, d, true); err != nil {
+		t.Fatalf("runBump: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "Pushed.") {
+		t.Errorf("expected 'Pushed.' in output, got: %q", stdout.String())
+	}
+}
+
 func TestRunBump_InteractivePicker(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)
