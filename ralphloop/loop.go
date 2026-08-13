@@ -621,7 +621,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 				for i, t := range stalled {
 					stalledForSink[i] = StalledTicket{
 						Identifier:   t.Identifier,
-						Reattachable: everLaunched[t.Identifier] && resumeReattachable(d, workspaceID, opts.EpicName, agent, wtDir, t),
+						Reattachable: everLaunched[t.Identifier] && clearableParkedTicket(d, workspaceID, opts.EpicName, wtDir, agent, *epic, t),
 					}
 				}
 				sink.EpicParked(opts.EpicName, stalledForSink)

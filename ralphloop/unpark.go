@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/elentok/gx/tickets"
@@ -34,8 +35,7 @@ func unparkAnswered(d Deps, workspaceID, epicName, worktreeDir string, agentKind
 		if epic.RenderedStatus(t) != tickets.StatusNeedsAnswer {
 			continue
 		}
-		agent, live := liveAgent(d, workspaceID, epicName, agentKind, worktreeDir, t)
-		if !live || agent.AgentStatus == "blocked" {
+		if !clearableParkedTicket(d, workspaceID, epicName, worktreeDir, agentKind, epic, t) {
 			continue
 		}
 		if err := UnparkTicket(t.Path, now); err != nil {
@@ -62,11 +62,100 @@ func hasLiveParkedTicket(d Deps, workspaceID, epicName, worktreeDir string, agen
 		if epic.RenderedStatus(t) != tickets.StatusNeedsAnswer {
 			continue
 		}
-		if _, live := liveAgent(d, workspaceID, epicName, agentKind, worktreeDir, t); live {
+		agent, live := liveAgent(d, workspaceID, epicName, agentKind, worktreeDir, t)
+		if !live {
+			continue
+		}
+		// A still-blocked pane could leave the blocked state on its own before
+		// the next poll — the only way that gets noticed is this same poll
+		// loop reaching unparkAnswered again — so it's worth continuing to
+		// poll for regardless of what clearableParkedTicket says right now.
+		// A live-and-unblocked ticket clearableParkedTicket still calls not
+		// clearable (a zero-commit park with nothing landed yet) has no
+		// pending state change a poll could catch: it only clears once a
+		// person edits the file, which the ordinary per-iteration epic reload
+		// already picks up, same as an announce-and-stop park's dead pane.
+		if agent.AgentStatus == "blocked" || clearableParkedTicket(d, workspaceID, epicName, worktreeDir, agentKind, epic, t) {
 			return true
 		}
 	}
 	return false
+}
+
+// clearableParkedTicket reports whether t, parked at epic.RenderedStatus(t),
+// is ready for gx to clear on its own — reopening a needs-answer ticket via
+// unparkAnswered, or counting it "reattachable" in an EpicParked
+// notification. Branches on RenderedStatus rather than t's raw Status: the
+// three call sites reach status two different ways today, and a raw-Status
+// predicate would route a ticket down the wrong branch whenever they
+// diverge.
+//
+// A needs-answer ticket's clearability depends on which of ralph-loop's
+// three needs-answer producers parked it (see schema.ParkKind's doc). A
+// missing park_kind (any ticket parked before that field existed) defaults
+// to ParkKindZeroCommit, the conservative choice: unlike a gate park or a
+// self-report, a zero-commit finish never told anyone whether picking the
+// pane back up is actually safe. blocked-pane and self-reported parks still
+// own a pane an operator answers directly, so a live, unblocked pane is the
+// whole signal, same as before park_kind existed. A zero-commit park's pane
+// is left alive only for inspection — its agent already declared itself
+// done with nothing to land — so liveness alone would auto-reattach a
+// finished agent with no new instructions; CommitsAhead is what tells the
+// zero-commit case apart, since it's the same check finishIteration itself
+// uses to decide whether an iteration produced anything. The CommitsAhead
+// call is gated behind park_kind == zero-commit && live so the common case
+// (blocked-pane/self-reported) never pays for it, and a CommitsAhead
+// failure degrades to "not clearable" rather than propagating as an error —
+// a git hiccup here must not kill the whole run.
+//
+// needs-repair and draft parks never carry park_kind (only a needs-answer
+// park does) and are unaffected by any of this: they stay the same
+// liveness-only rule ralph-loop has always applied to them.
+func clearableParkedTicket(d Deps, workspaceID, epicName, worktreeDir string, agentKind AgentKind, epic tickets.Epic, t tickets.Ticket) bool {
+	switch epic.RenderedStatus(t) {
+	case tickets.StatusNeedsAnswer:
+		agent, live := liveAgent(d, workspaceID, epicName, agentKind, worktreeDir, t)
+		if !live || agent.AgentStatus == "blocked" {
+			return false
+		}
+		kind := t.ParkKind
+		if kind == "" {
+			kind = schema.ParkKindZeroCommit
+		}
+		if kind == schema.ParkKindZeroCommit {
+			return parkedTicketHasNewCommits(d, worktreeDir, epicName, t)
+		}
+		return true
+	case tickets.StatusNeedsRepair, tickets.StatusDraft:
+		_, live := liveAgent(d, workspaceID, epicName, agentKind, worktreeDir, t)
+		return live
+	default:
+		return false
+	}
+}
+
+// parkedTicketHasNewCommits reports whether t's iteration branch holds any
+// commits ahead of its original base — the same zero-commit test
+// finishIteration itself runs, re-derived here since a zero-commit park
+// records neither the base it was measured against nor the count itself.
+// Any failure (the branch is gone, the merge-base can't resolve, git
+// itself errors) degrades to false rather than propagating: a transient git
+// hiccup must never turn into "not clearable" becoming a run-ending error.
+func parkedTicketHasNewCommits(d Deps, worktreeDir, epicName string, t tickets.Ticket) bool {
+	featureWorktree := filepath.Join(worktreeDir, epicName)
+	branch := iterBranch(epicName, t.Identifier)
+	if !branchExists(d, featureWorktree, branch) {
+		return false
+	}
+	base, err := d.MergeBase(featureWorktree, branch, epicName)
+	if err != nil {
+		return false
+	}
+	ahead, err := d.CommitsAhead(featureWorktree, base, branch)
+	if err != nil {
+		return false
+	}
+	return ahead > 0
 }
 
 // UnparkTicket reopens the needs-answer ticket at path and demotes its

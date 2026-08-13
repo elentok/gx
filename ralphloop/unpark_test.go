@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"errors"
 	"os"
 	"strings"
 	"sync"
@@ -10,6 +11,89 @@ import (
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
+
+// TestClearableParkedTicket covers the shared predicate's full matrix: park
+// kind (including a missing park_kind, which must default to
+// zero-commit — the conservative choice for tickets parked before that field
+// existed) x rendered status x pane liveness x whether the iteration branch
+// has new commits.
+func TestClearableParkedTicket(t *testing.T) {
+	t.Parallel()
+
+	live := func(d *Deps) {
+		d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
+			return []herdr.Tab{{TabID: "tab-my-epic-iter-01", Label: "my-epic-iter-01", WorkspaceID: workspaceID}}, nil
+		}
+		d.AgentGet = func(target string) (herdr.Agent, error) {
+			return herdr.Agent{PaneID: "pane-" + target, WorkspaceID: "ws1", TabID: "tab-" + target, AgentStatus: "idle"}, nil
+		}
+	}
+	blocked := func(d *Deps) {
+		live(d)
+		d.AgentGet = func(target string) (herdr.Agent, error) {
+			return herdr.Agent{PaneID: "pane-" + target, WorkspaceID: "ws1", TabID: "tab-" + target, AgentStatus: "blocked"}, nil
+		}
+	}
+	dead := func(d *Deps) {
+		d.TabList = func(workspaceID string) ([]herdr.Tab, error) { return nil, nil }
+	}
+	noCommits := func(d *Deps) {
+		d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) { return 0, nil }
+	}
+	commitsErr := func(d *Deps) {
+		d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) { return 0, errors.New("fake CommitsAhead failure") }
+	}
+
+	tests := []struct {
+		name      string
+		status    string
+		parkKind  string
+		setupDeps func(*Deps)
+		want      bool
+	}{
+		{"blocked-pane live unblocked clearable", "needs-answer", "blocked-pane", live, true},
+		{"blocked-pane live still blocked not clearable", "needs-answer", "blocked-pane", blocked, false},
+		{"blocked-pane dead pane not clearable", "needs-answer", "blocked-pane", dead, false},
+		{"self-reported live unblocked clearable", "needs-answer", "self-reported", live, true},
+		{"self-reported dead pane not clearable", "needs-answer", "self-reported", dead, false},
+		{"zero-commit live with new commits clearable", "needs-answer", "zero-commit", live, true},
+		{"zero-commit live with no new commits not clearable", "needs-answer", "zero-commit", func(d *Deps) { live(d); noCommits(d) }, false},
+		{"zero-commit dead pane not clearable", "needs-answer", "zero-commit", dead, false},
+		{"zero-commit CommitsAhead failure degrades to not clearable", "needs-answer", "zero-commit", func(d *Deps) { live(d); commitsErr(d) }, false},
+		{"missing park_kind defaults to zero-commit, live with commits clearable", "needs-answer", "", live, true},
+		{"missing park_kind defaults to zero-commit, live with no commits not clearable", "needs-answer", "", func(d *Deps) { live(d); noCommits(d) }, false},
+		{"needs-repair ignores park_kind, live is enough", "needs-repair", "", live, true},
+		{"needs-repair ignores park_kind, dead pane not clearable", "needs-repair", "", dead, false},
+		{"draft ignores park_kind, live is enough", "draft", "", live, true},
+		{"draft ignores park_kind, dead pane not clearable", "draft", "", dead, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			parkKindLine := ""
+			if tt.parkKind != "" {
+				parkKindLine = "park_kind: " + tt.parkKind + "\n"
+			}
+			scratchDir := writeEpic(t, "my-epic", map[string]string{
+				"01-a.md": "---\nid: \"01\"\nstatus: " + tt.status + "\ntype: task\n" + parkKindLine + "---\n# A\n",
+			})
+			d, _, _ := fakeDeps()
+			tt.setupDeps(&d)
+
+			epic, err := loadNamedEpic(scratchDir, "my-epic")
+			if err != nil {
+				t.Fatalf("loadNamedEpic: %v", err)
+			}
+			ticket := epic.Tickets[0]
+
+			got := clearableParkedTicket(d, "ws1", "my-epic", "/fake/worktrees", AgentClaude, *epic, ticket)
+			if got != tt.want {
+				t.Errorf("clearableParkedTicket() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 
 // wholeScope resolves epic's whole-epic RunScope, for tests that call
 // unparkAnswered directly rather than through Run.

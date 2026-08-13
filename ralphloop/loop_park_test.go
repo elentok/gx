@@ -339,6 +339,37 @@ func TestRun_StaysParked_NeverReportsEpicComplete(t *testing.T) {
 	}
 }
 
+// TestRun_EpicParked_ZeroCommitParkReportsNotReattachable covers the third
+// of the ticket's three call sites: EpicParked's Reattachable flag (surfaced
+// in Telegram notifications) must not claim a zero-commit park is
+// reattachable when gx will never auto-reattach it. Before this predicate
+// existed, Reattachable was liveness-only, so a live-but-idle zero-commit
+// park (nothing landed) would have wrongly reported true — the exact
+// mismatch this ticket closes between the notification and unparkAnswered's
+// own refusal to clear the same ticket.
+func TestRun_EpicParked_ZeroCommitParkReportsNotReattachable(t *testing.T) {
+	t.Parallel()
+	scratchDir := writeEpic(t, "my-epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+	})
+	d, _, _ := fakeDeps()
+	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) { return 0, nil }
+	sink := &recordingSink{}
+
+	runUntilParked(t, RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
+
+	if len(sink.parkedStalled) == 0 {
+		t.Fatalf("EpicParked calls = %v, want at least one", sink.parkedStalled)
+	}
+	last := sink.parkedStalled[len(sink.parkedStalled)-1]
+	if len(last) != 1 || last[0].Identifier != "01" {
+		t.Fatalf("EpicParked stalled = %v, want exactly ticket 01", last)
+	}
+	if last[0].Reattachable {
+		t.Errorf("zero-commit ticket 01 Reattachable = true, want false (live pane but no new commits)")
+	}
+}
+
 // TestGate_WakeParked_ShortensParkWait proves the cosmetic-wake mechanism
 // loop.go's park branch relies on: WakeParked cuts a park wait short instead
 // of it running out a long parkPollInterval-equivalent wait.

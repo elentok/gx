@@ -6,6 +6,8 @@ package tickets
 import (
 	"strconv"
 	"strings"
+
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // Ticket is one parsed `<epic>/issues/NN-<slug>.md` file. Number, Title, and
@@ -48,6 +50,11 @@ type Ticket struct {
 	// Commitless mirrors schema.Ticket.Commitless: true means a zero-commit
 	// iteration finish is intentional for this ticket, not a stalled agent.
 	Commitless bool
+
+	// ParkKind mirrors schema.Ticket.ParkKind: which of ralph-loop's
+	// needs-answer producers parked this ticket, empty for a ticket parked
+	// before that field existed (or never parked).
+	ParkKind schema.ParkKind
 
 	// ReadErr is set when the loader found the file (its name matched
 	// "NN-<slug>.md") but couldn't read its contents (I/O error). Non-empty

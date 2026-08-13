@@ -12,16 +12,22 @@ import (
 
 // Claim writes status: claimed into the ticket file at path, clearing any
 // iteration_status left over from a prior claim of this ticket — a stale
-// self-report must not survive into a fresh claim. It also demotes any
-// "## Needs Repair" section into a dated "## Comments" sub-entry: per the
-// retirement principle (only a person reads a fault section, so gx — not
-// the next agent — retires it), and claim is the moment a ticket starts a
-// new life. Doing this here rather than at reattach means a ticket that
-// reattaches several times within one claim never re-fires the demotion.
+// self-report must not survive into a fresh claim. It also clears park_kind:
+// Claim is the single choke point every reopen path funnels through (auto
+// unpark, a hand-edited status flip back to open, the queue tab's
+// suggested-actions menu), so clearing it only in UnparkTicket would miss
+// the hand-edited path and leave a stale park_kind for a future park to
+// misread. It also demotes any "## Needs Repair" section into a dated "##
+// Comments" sub-entry: per the retirement principle (only a person reads a
+// fault section, so gx — not the next agent — retires it), and claim is the
+// moment a ticket starts a new life. Doing this here rather than at reattach
+// means a ticket that reattaches several times within one claim never
+// re-fires the demotion.
 func Claim(path string) error {
 	return updateTicketWithBody(path, func(t *schema.Ticket, body *string) {
 		t.Status = schema.StatusClaimed
 		t.IterationStatus = ""
+		t.ParkKind = ""
 		*body = demoteSection(*body, "## Needs Repair", time.Now())
 	})
 }

@@ -75,6 +75,21 @@ func TestClaim_ClearsIterationStatus(t *testing.T) {
 	}
 }
 
+func TestClaim_ClearsParkKind(t *testing.T) {
+	t.Parallel()
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-answer\npark_kind: zero-commit\ntype: task\n---\n# Ticket\n\nBody.\n")
+	if err := Claim(path); err != nil {
+		t.Fatalf("Claim: %v", err)
+	}
+	ticket := mustParse(t, path)
+	if ticket.ParkKind != "" {
+		t.Errorf("ParkKind = %q, want cleared", ticket.ParkKind)
+	}
+	if strings.Contains(mustRead(t, path), "park_kind") {
+		t.Errorf("ticket file = %q, want park_kind omitted entirely", mustRead(t, path))
+	}
+}
+
 func TestClaim_PreservesOtherFrontmatterFieldsAndBody(t *testing.T) {
 	t.Parallel()
 	original := "---\nid: \"01\"\nstatus: open\nblocked_by: [\"02\", \"03\"]\ntype: task\n---\n" +
