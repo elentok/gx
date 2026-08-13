@@ -530,10 +530,13 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	// queued behind an unlanded land is neither done nor a stall a human
 	// needs to clear.
 	landing := 0
-	// liveDone tracks the epic-wide done count, recomputed from disk on every
-	// landed iteration (see the results loop below) rather than counted up
-	// per-run, so a resumed run reports what's true of the epic even though
-	// this run's own completed count starts back at zero.
+	// liveDone tracks the epic-wide done count: seeded from disk once here so
+	// a resumed run reports what's true of the epic even though this run's
+	// own completed count starts back at zero, then incremented by exactly
+	// one per landed outcome this loop drains below (never re-derived from a
+	// live disk rescan — two near-simultaneous landings can both already be
+	// "done" on disk by the time either outcome is dequeued, which made a
+	// rescan double-count instead of reporting 1, then 2).
 	liveDone := scope.DoneCount(*initial)
 
 	// The epic is genuinely running past this point (not no-tickets, not
@@ -783,11 +786,11 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		// than threading a return value up through runIteration/finishIteration.
 		landedTicket := r.ticket
 		liveTotal := total
+		liveDone++
 		if landedEpic, err := loadNamedEpic(scratchDir, opts.EpicName); err != nil {
 			return err
 		} else if landedEpic != nil {
 			liveTotal = scope.TotalCount(*landedEpic)
-			liveDone = scope.DoneCount(*landedEpic)
 			for _, t := range landedEpic.Tickets {
 				if t.Identifier == r.ticket.Identifier {
 					landedTicket = t

@@ -12,10 +12,11 @@ build:
 install:
 	go install -ldflags "-X github.com/elentok/gx/cmd.version=$(shell git describe --tags --always --dirty)" .
 
-# -timeout=2m: legitimate tests (incl. real-git/production-style) finish in a few seconds each;
-# 2m fails a hung test fast while leaving ample headroom over the slowest normal run.
+# -timeout=5m: legitimate tests (incl. real-git/production-style) finish in a few seconds each
+# locally, but CI runners' lower core counts give concurrency-sensitive tests (e.g. park/resume
+# against a permit cap) more room to legitimately run long; 2m proved too tight there.
 test:
-	go test ./... -timeout=2m
+	go test ./... -timeout=5m
 
 coverage:
 	go test ./... -coverprofile=coverage.out

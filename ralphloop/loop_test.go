@@ -813,9 +813,6 @@ func TestRun_ScopeWidenedMidRun_TotalGrowsWithIt(t *testing.T) {
 	if !ok {
 		t.Fatalf("no IterationFinished recorded for ticket 01")
 	}
-	if firstStats.Completed != 1 {
-		t.Errorf("ticket 01 stats.Completed = %d, want 1", firstStats.Completed)
-	}
 	if firstStats.Total != 2 {
 		t.Errorf("ticket 01 stats.Total = %d, want 2 (mid-run Add must grow Total before it lands)", firstStats.Total)
 	}
@@ -827,11 +824,23 @@ func TestRun_ScopeWidenedMidRun_TotalGrowsWithIt(t *testing.T) {
 	if !ok {
 		t.Fatalf("no IterationFinished recorded for ticket 02")
 	}
-	if secondStats.Completed != 2 {
-		t.Errorf("ticket 02 stats.Completed = %d, want 2", secondStats.Completed)
-	}
 	if secondStats.Total != 2 {
 		t.Errorf("ticket 02 stats.Total = %d, want 2", secondStats.Total)
+	}
+	if secondStats.Completed > secondStats.Total {
+		t.Errorf("ticket 02 stats: Completed %d > Total %d", secondStats.Completed, secondStats.Total)
+	}
+
+	// The scheduler never promised which of the two concurrently-eligible
+	// tickets' IterationFinished fires first once 02 is widened into scope
+	// mid-run (both become runnable near-simultaneously) — only that,
+	// together, they land Completed={1,2} exactly once each. Asserting a
+	// fixed ticket-to-Completed mapping made this test an intermittent CI
+	// flake whenever 02 happened to finish first.
+	gotCompleted := []int{firstStats.Completed, secondStats.Completed}
+	sort.Ints(gotCompleted)
+	if !(gotCompleted[0] == 1 && gotCompleted[1] == 2) {
+		t.Errorf("Completed counts across tickets 01/02 = %v, want {1,2} in some order", gotCompleted)
 	}
 }
 

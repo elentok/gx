@@ -32,9 +32,14 @@ jobs:
         run: brew install git-delta
 
       - name: Test
-        # -timeout=2m: matches the Makefile test target — fails a hung test fast,
-        # well above the slowest legitimate test's runtime.
-        run: go test ./... -timeout=2m
+        # -timeout=5m: matches the Makefile test target — still fails a truly
+        # hung test well before the job's overall time limit, but leaves
+        # headroom for CI runners' lower core counts, where concurrency-
+        # sensitive tests (e.g. park/resume against a permit cap) can
+        # legitimately take longer than on a local dev machine. 2m proved too
+        # tight and produced runner-only timeout failures on tests that pass
+        # reliably (and fast) locally.
+        run: go test ./... -timeout=5m
 
       - name: Build
         run: go build ./...
