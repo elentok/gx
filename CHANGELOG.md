@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.28.4 - 2026-08-13
+
+- Fixed Investigate badge appearing on irrelevant ticket statuses
+- Fixed EpicFailureReporter leaking queue-state.json into dev machine during tests, isolated test state
+- Fixed default sonnet model config
+- Fixed stuck prompt submissions not retyping/retrying and live pane leaks on launch failure
+
 ## v0.28.3 - 2026-08-13
 
 - Added a `gx-bump` skill that orchestrates a full release: resolves the bump type, runs tests, drafts and reviews the changelog entry, commits, and tags/pushes via `gx bump --yes`.
