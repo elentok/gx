@@ -56,6 +56,10 @@ type Ticket struct {
 	// before that field existed (or never parked).
 	ParkKind schema.ParkKind
 
+	// Mutes mirrors schema.Ticket.Mutes: notification event types that have
+	// tripped a throttle for this ticket, oldest first.
+	Mutes []schema.MuteRecord
+
 	// ReadErr is set when the loader found the file (its name matched
 	// "NN-<slug>.md") but couldn't read its contents (I/O error). Non-empty
 	// means Type/BlockedBy/Status/Body are all zero-valued - there was no

@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"time"
 )
 
 // TicketID is a validated ticket identifier, e.g. "04", "06b", or "06b1":
@@ -207,6 +208,19 @@ type Ticket struct {
 	// the ParkKind type doc). Never checked by Validate, same as
 	// IterationStatus.
 	ParkKind ParkKind
+	// Mutes records notification event types that have tripped a throttle for
+	// this ticket, oldest first. Machine-written only, same posture as
+	// SessionIDs — no `gx tickets set --mutes` flag. EventType's shape is
+	// write-conditional (enforced by whatever later writes it), never checked
+	// by Validate, same as IterationStatus.
+	Mutes []MuteRecord
+}
+
+// MuteRecord is one tripped notification throttle: the event type that
+// tripped it and when.
+type MuteRecord struct {
+	EventType string    `yaml:"event_type"`
+	TrippedAt time.Time `yaml:"tripped_at"`
 }
 
 // IsCommitless reports whether t is exempt from landed-commit verification:

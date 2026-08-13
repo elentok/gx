@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func writeTemp(t *testing.T, name, content string) string {
@@ -208,6 +209,37 @@ func TestParseTicket_RoundTrip_SessionIDs(t *testing.T) {
 	}
 	if !reflect.DeepEqual(orig, got) {
 		t.Fatalf("round trip mismatch: original %+v, got %+v", orig, got)
+	}
+}
+
+func TestParseTicket_RoundTrip_Mutes(t *testing.T) {
+	orig := Ticket{
+		ID:     "04b",
+		Status: StatusClaimed,
+		Type:   TypeTask,
+		Mutes: []MuteRecord{
+			{EventType: "iteration-stalled", TrippedAt: time.Date(2026, 8, 13, 10, 0, 0, 0, time.UTC)},
+			{EventType: "needs-answer", TrippedAt: time.Date(2026, 8, 13, 11, 30, 0, 0, time.UTC)},
+		},
+	}
+
+	marshaled, err := MarshalTicket(orig, "body\n")
+	if err != nil {
+		t.Fatalf("MarshalTicket: %v", err)
+	}
+
+	path := writeTemp(t, "04b-mutes.md", string(marshaled))
+	got, err := ParseTicket(path)
+	if err != nil {
+		t.Fatalf("re-parse: %v", err)
+	}
+	if len(got.Mutes) != len(orig.Mutes) {
+		t.Fatalf("Mutes = %+v, want %+v", got.Mutes, orig.Mutes)
+	}
+	for i, want := range orig.Mutes {
+		if got.Mutes[i].EventType != want.EventType || !got.Mutes[i].TrippedAt.Equal(want.TrippedAt) {
+			t.Errorf("Mutes[%d] = %+v, want %+v", i, got.Mutes[i], want)
+		}
 	}
 }
 

@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/tickets/schema"
 )
 
 func writeFile(t *testing.T, path, content string) {
@@ -77,6 +79,25 @@ func TestLoad_DiscoversEpicsAndTickets(t *testing.T) {
 	}
 	if byNumber[2].Title != "Second ticket" {
 		t.Errorf("ticket 2 Title = %q, want %q", byNumber[2].Title, "Second ticket")
+	}
+}
+
+func TestLoad_MirrorsMutes(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "my-epic", "issues", "01-ticket.md"),
+		"---\nid: \"01\"\nstatus: open\ntype: task\nmutes:\n  - event_type: iteration-stalled\n    tripped_at: 2026-08-13T10:00:00Z\n---\nBody.\n")
+
+	epics, err := Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got := epics[0].Tickets[0].Mutes
+	want := []schema.MuteRecord{
+		{EventType: "iteration-stalled", TrippedAt: time.Date(2026, 8, 13, 10, 0, 0, 0, time.UTC)},
+	}
+	if len(got) != len(want) || got[0].EventType != want[0].EventType || !got[0].TrippedAt.Equal(want[0].TrippedAt) {
+		t.Errorf("Mutes = %+v, want %+v", got, want)
 	}
 }
 

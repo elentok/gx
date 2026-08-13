@@ -48,6 +48,8 @@ Read-only fields (gx-managed, not settable via ` + "`set`" + `):
   id — ticket identity, fixed at creation
   actual_context_window — stamped by ralphloop at land time
   elapsed_time — stamped by ralphloop at land time
+  mutes — notification throttles tripped for this ticket (event type + timestamp),
+    machine-written only
 
 Epic frontmatter fields:
 

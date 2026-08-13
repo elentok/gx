@@ -14,19 +14,20 @@ import (
 // from the typed in-memory representation (TicketID, Status, etc.) without
 // yaml struct tags leaking into schema's public API.
 type ticketYAML struct {
-	ID                    string   `yaml:"id"`
-	Status                string   `yaml:"status"`
-	BlockedBy             []string `yaml:"blocked_by,omitempty"`
-	Parent                string   `yaml:"parent,omitempty"`
-	Type                  string   `yaml:"type"`
-	ExpectedContextWindow int      `yaml:"expected_context_window,omitempty"`
-	ActualContextWindow   int      `yaml:"actual_context_window,omitempty"`
-	ElapsedTime           int      `yaml:"elapsed_time,omitempty"`
-	Compactions           int      `yaml:"compactions,omitempty"`
-	Commitless            bool     `yaml:"commitless,omitempty"`
-	SessionIDs            []string `yaml:"session_ids,omitempty"`
-	IterationStatus       string   `yaml:"iteration_status,omitempty"`
-	ParkKind              string   `yaml:"park_kind,omitempty"`
+	ID                    string       `yaml:"id"`
+	Status                string       `yaml:"status"`
+	BlockedBy             []string     `yaml:"blocked_by,omitempty"`
+	Parent                string       `yaml:"parent,omitempty"`
+	Type                  string       `yaml:"type"`
+	ExpectedContextWindow int          `yaml:"expected_context_window,omitempty"`
+	ActualContextWindow   int          `yaml:"actual_context_window,omitempty"`
+	ElapsedTime           int          `yaml:"elapsed_time,omitempty"`
+	Compactions           int          `yaml:"compactions,omitempty"`
+	Commitless            bool         `yaml:"commitless,omitempty"`
+	SessionIDs            []string     `yaml:"session_ids,omitempty"`
+	IterationStatus       string       `yaml:"iteration_status,omitempty"`
+	ParkKind              string       `yaml:"park_kind,omitempty"`
+	Mutes                 []MuteRecord `yaml:"mutes,omitempty"`
 
 	// Children is the retired field, declared here and nowhere else: the wire
 	// struct is the only place that has to recognize it (yaml.v3 silently
@@ -59,6 +60,7 @@ func (w ticketYAML) toTicket() Ticket {
 		SessionIDs:            copyStrings(w.SessionIDs),
 		IterationStatus:       IterationStatus(w.IterationStatus),
 		ParkKind:              ParkKind(w.ParkKind),
+		Mutes:                 copyMutes(w.Mutes),
 	}
 	if w.Parent != "" {
 		id := TicketID(w.Parent)
@@ -81,6 +83,7 @@ func ticketToYAML(t Ticket) ticketYAML {
 		SessionIDs:            copyStrings(t.SessionIDs),
 		IterationStatus:       string(t.IterationStatus),
 		ParkKind:              string(t.ParkKind),
+		Mutes:                 copyMutes(t.Mutes),
 	}
 	if t.Parent != nil {
 		w.Parent = string(*t.Parent)
@@ -108,6 +111,18 @@ func copyStrings(vals []string) []string {
 		return nil
 	}
 	out := make([]string, len(vals))
+	copy(out, vals)
+	return out
+}
+
+// copyMutes returns a defensive copy of vals, or nil for an empty/nil slice —
+// matching copyStrings's nil-when-empty convention so an unset mutes field
+// round-trips through Ticket without becoming a non-nil empty slice.
+func copyMutes(vals []MuteRecord) []MuteRecord {
+	if len(vals) == 0 {
+		return nil
+	}
+	out := make([]MuteRecord, len(vals))
 	copy(out, vals)
 	return out
 }
