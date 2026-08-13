@@ -7,15 +7,24 @@ import (
 	"github.com/elentok/gx/ui/nav"
 )
 
-// selectedQueueRow returns the queue row at m.selected, mirroring
-// Model.selectedRow for the Tickets tab's sidebar. false means the queue is
-// empty (nothing checked yet, or every checked ticket already cleared).
+// selectedQueueRow returns the queue row under m.queueTree's current
+// selection, mirroring Model.selectedRow for the Tickets tab's sidebar.
+// false means nothing is selected — the queue is empty (nothing checked
+// yet, or every checked ticket already cleared), or the selected entry is a
+// header/separator/error row, a deliberate minor behavior change from the
+// old rows()-only selection (05's "Real gap" section): those rows are left
+// selectable but read as "nothing selected" to the preview.
 func (m QueueModel) selectedQueueRow() (queueRow, bool) {
-	rows := m.rows()
-	if m.selected < 0 || m.selected >= len(rows) {
+	entries := m.queueTree.Entries()
+	idx := m.queueTree.SelectedIndex()
+	if idx < 0 || idx >= len(entries) {
 		return queueRow{}, false
 	}
-	return rows[m.selected], true
+	entry := entries[idx]
+	if entry.Value.kind != nodeQueueTicket {
+		return queueRow{}, false
+	}
+	return entry.Value.ticket, true
 }
 
 // queuePreviewContent builds the Queue tab's preview pane body for the

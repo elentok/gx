@@ -21,8 +21,9 @@ func (m QueueModel) ModalOpen() bool {
 }
 
 // recomputeQueueSearchMatches rebuilds the match set against the current
-// rows() order: case-insensitive substring over each ticket's title,
-// mirroring the Tickets tab's recomputeSearchMatches (search.go).
+// m.queueTree.Entries() order: case-insensitive substring over each ticket
+// entry's title, mirroring the Tickets tab's recomputeSearchMatches
+// (search.go). Header/separator/error entries never match.
 func (m *QueueModel) recomputeQueueSearchMatches() {
 	q := strings.ToLower(strings.TrimSpace(m.search.Query()))
 	if q == "" {
@@ -30,10 +31,12 @@ func (m *QueueModel) recomputeQueueSearchMatches() {
 		return
 	}
 
-	rows := m.rows()
 	matches := make([]search.Match, 0)
-	for i, r := range rows {
-		if strings.Contains(strings.ToLower(r.ticket.Title), q) {
+	for i, e := range m.queueTree.Entries() {
+		if e.Value.kind != nodeQueueTicket {
+			continue
+		}
+		if strings.Contains(strings.ToLower(e.Value.ticket.ticket.Title), q) {
 			matches = append(matches, search.Match{DataIndex: i})
 		}
 	}
@@ -47,21 +50,15 @@ func (m *QueueModel) jumpToCurrentQueueMatch() {
 	if !ok {
 		return
 	}
-	rows := m.rows()
-	if match.DataIndex >= 0 && match.DataIndex < len(rows) {
-		m.selected = match.DataIndex
-		m.ensureQueueVisible()
+	if match.DataIndex >= 0 && match.DataIndex < len(m.queueTree.Entries()) {
+		m.queueTree.SetSelectedIndex(match.DataIndex)
 	}
 }
 
 // queueSearchMatch reports whether the row at idx is a search match, and
 // whether it's the match currently under the search cursor (n/N target).
 func (m QueueModel) queueSearchMatch(idx int) (matched, current bool) {
-	pos, ok := m.search.MatchPosByDataIndex(idx)
-	if !ok {
-		return false, false
-	}
-	return true, pos == m.search.Cursor()
+	return m.queueTree.SearchMatch(idx)
 }
 
 func (m QueueModel) searchOverlayWidth() int {

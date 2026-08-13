@@ -23,11 +23,11 @@ const (
 // mirroring the Tickets tab's Model.cmdEditSelectedFile — the Queue tab only
 // ever selects tickets (no epic rows), so there's no map.md case to handle.
 func (m QueueModel) cmdEditSelectedFile(splitType terminalrun.SplitType) tea.Cmd {
-	rows := m.rows()
-	if m.selected < 0 || m.selected >= len(rows) {
+	row, ok := m.selectedQueueRow()
+	if !ok {
 		return notify.Warning("nothing selected")
 	}
-	return editTicketFile(m.worktreeRoot, m.settings, rows[m.selected].ticket.Path, splitType)
+	return editTicketFile(m.worktreeRoot, m.settings, row.ticket.Path, splitType)
 }
 
 func (m QueueModel) handleEditFileFinished(msg editFileFinishedMsg) (QueueModel, tea.Cmd) {

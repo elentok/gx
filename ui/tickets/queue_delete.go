@@ -34,11 +34,10 @@ type cascadeDeleteConfirmedMsg struct {
 // full cascade (tickets.Epic.CascadeDelete) and opens a confirmation modal
 // listing it before anything is removed.
 func (m QueueModel) handleQueueDeleteKey() (tea.Model, tea.Cmd) {
-	rows := m.rows()
-	if m.selected < 0 || m.selected >= len(rows) {
+	row, ok := m.selectedQueueRow()
+	if !ok {
 		return m, nil
 	}
-	row := rows[m.selected]
 	toDelete, toClear := row.epic.CascadeDelete(row.ticket)
 
 	items := make([]string, 0, len(toDelete)+len(toClear))

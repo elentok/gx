@@ -54,11 +54,10 @@ func (m Model) yankTicketFilePath() tea.Cmd {
 // Model.yankTicketSummary ("yy") — every queue row already carries its own
 // ticket (queueRow), so there's no epic-row case to guard against.
 func (m QueueModel) yankQueueTicketSummary() tea.Cmd {
-	rows := m.rows()
-	if m.selected < 0 || m.selected >= len(rows) {
+	r, ok := m.selectedQueueRow()
+	if !ok {
 		return notify.Warning("no ticket selected")
 	}
-	r := rows[m.selected]
 	text := formatTicketSummary(r.epic.Name, r.ticket)
 	if err := ticketsClipboardWrite(text); err != nil {
 		return notify.Error("clipboard copy failed: " + err.Error())
@@ -69,11 +68,11 @@ func (m QueueModel) yankQueueTicketSummary() tea.Cmd {
 // yankQueueTicketFilePath is the Queue tab's counterpart to
 // Model.yankTicketFilePath ("yf").
 func (m QueueModel) yankQueueTicketFilePath() tea.Cmd {
-	rows := m.rows()
-	if m.selected < 0 || m.selected >= len(rows) {
+	r, ok := m.selectedQueueRow()
+	if !ok {
 		return notify.Warning("no ticket selected")
 	}
-	path := rows[m.selected].ticket.Path
+	path := r.ticket.Path
 	if err := ticketsClipboardWrite(path); err != nil {
 		return notify.Error("clipboard copy failed: " + err.Error())
 	}

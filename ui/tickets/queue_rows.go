@@ -65,21 +65,23 @@ func (m QueueModel) rowsAndPlanErrors() ([]queueRow, map[string]error) {
 	return out, planErrs
 }
 
-// queueNodeKind distinguishes the five row kinds the Queue tab's tree can
+// queueNodeKind distinguishes the six row kinds the Queue tab's tree can
 // hold: a per-epic blank separator, its status/context-window header lines,
-// an optional plan-error line, and a ticket. tree.Model[T] has no notion of a
-// heterogeneous node — this sum type plus buildQueueEntries' idFn/childrenFn
-// is what makes one tree.Model[queueNode] stand in for buildQueueLines'
-// former hand-spliced header/blank/error strings interleaved with
-// queueRowsForEpic's ticket rows.
+// an optional plan-error line, a ticket, and a ticket's optional park-reason
+// subtext. tree.Model[T] has no notion of a heterogeneous node — this sum
+// type plus buildQueueEntries' idFn/childrenFn is what makes one
+// tree.Model[queueNode] stand in for buildQueueLines' former hand-spliced
+// header/blank/error strings interleaved with queueRowsForEpic's ticket
+// rows.
 type queueNodeKind int
 
 const (
-	nodeEpicSeparator queueNodeKind = iota // blank line before every epic
-	nodeEpicStatus                         // epic name + status icon/text (epicStatusLine)
-	nodeEpicContext                        // context-window metrics line
-	nodeEpicError                          // present only when planErrs[epic.Name] != nil
-	nodeQueueTicket                        // wraps a queueRow
+	nodeEpicSeparator     queueNodeKind = iota // blank line before every epic
+	nodeEpicStatus                             // epic name + status icon/text (epicStatusLine)
+	nodeEpicContext                            // context-window metrics line
+	nodeEpicError                              // present only when planErrs[epic.Name] != nil
+	nodeQueueTicket                            // wraps a queueRow
+	nodeQueueTicketReason                      // park-reason subtext, sibling right after its nodeQueueTicket (queueTicketReasonLine)
 )
 
 // queueNode is ui/tree.Model[queueNode]'s value type. err is set only for
@@ -142,11 +144,15 @@ func (m QueueModel) buildQueueEntries() []tree.Entry[queueNode] {
 			}
 		}
 		for _, t := range ordered {
-			node := queueNode{kind: nodeQueueTicket, epic: epic, ticket: queueRow{epic: epic, ticket: t}}
+			row := queueRow{epic: epic, ticket: t}
+			siblings := []queueNode{{kind: nodeQueueTicket, epic: epic, ticket: row}}
+			if parkReason(epic, t, m.icons().Ellipsis) != "" {
+				siblings = append(siblings, queueNode{kind: nodeQueueTicketReason, epic: epic, ticket: row})
+			}
 			if parentPath := nearestVisibleQueueAncestor(t, visible, byIdentifier); parentPath != "" {
-				childrenOf[parentPath] = append(childrenOf[parentPath], node)
+				childrenOf[parentPath] = append(childrenOf[parentPath], siblings...)
 			} else {
-				roots = append(roots, node)
+				roots = append(roots, siblings...)
 			}
 		}
 	}
@@ -161,6 +167,8 @@ func (m QueueModel) buildQueueEntries() []tree.Entry[queueNode] {
 			return "epic:" + n.epic.Name + ":context"
 		case nodeEpicError:
 			return "epic:" + n.epic.Name + ":err"
+		case nodeQueueTicketReason:
+			return n.ticket.ticket.Path + ":reason"
 		default:
 			return n.ticket.ticket.Path
 		}

@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/tree"
 )
 
 func (m QueueModel) View() tea.View {
@@ -22,13 +23,11 @@ func (m QueueModel) View() tea.View {
 	if !m.ready {
 		return ui.NewMainView("\n  Initializing…")
 	}
-	viewportH := m.queueViewportHeight()
 	sidebarW, previewW := splitPanelWidth(m.width)
 	sidebarH, previewH := splitPanelHeight(m.width, m.contentHeight())
-	lines := ui.AppendScrollbar(m.queueVisibleLines(viewportH), sidebarW-2, len(m.queueLines()), viewportH, m.scrollOffset)
 
 	queueView := ui.RenderPanel(ui.PanelOptionsFor(
-		sidebarW, sidebarH, m.queueHeaderTitle(), "", lines, m.focus == focusSidebar, ui.ColorBlue, nil, true,
+		sidebarW, sidebarH, m.queueHeaderTitle(), "", m.queueBody(sidebarW-2), m.focus == focusSidebar, ui.ColorBlue, nil, true,
 	))
 	previewView := ui.RenderPanel(ui.PanelOptionsFor(
 		previewW, previewH, "Preview", m.previewMatchStatus(), m.previewLines(), m.focus == focusPreview, ui.ColorBlue, nil, false,
@@ -75,15 +74,6 @@ func (m QueueModel) View() tea.View {
 	return ui.NewMainView(content)
 }
 
-// queueVisibleLines windows queueLines() to a single viewportH-line scroll
-// position at m.scrollOffset, mirroring Model.sidebarVisibleLines.
-func (m QueueModel) queueVisibleLines(viewportH int) []string {
-	lines := m.queueLines()
-	start := min(m.scrollOffset, len(lines))
-	end := min(start+viewportH, len(lines))
-	return lines[start:end]
-}
-
 func (m QueueModel) completedExecutionProgress() (done, total int) {
 	for _, epic := range m.epics {
 		for _, ticket := range epic.Tickets {
@@ -120,81 +110,93 @@ func (m QueueModel) checkedProgress() (int, int) {
 	return done, total
 }
 
-func (m QueueModel) queueLines() []string {
-	lines, _, _ := m.buildQueueLines()
-	return lines
-}
-
-// queueLineForSelected returns the selected row's line index and physical
-// height within queueLines()'s output, mirroring Model.sidebarLineForSelected
-// — needed since a row is one or two physical lines depending on its
-// live/done status (renderQueueTicketRow).
-func (m QueueModel) queueLineForSelected() (line, height int, ok bool) {
-	_, offsets, heights := m.buildQueueLines()
-	if m.selected < 0 || m.selected >= len(offsets) {
-		return 0, 0, false
-	}
-	return offsets[m.selected], heights[m.selected], true
-}
-
-// buildQueueLines renders every candidate ticket, grouped by epic and
-// ordered in plan order (rowsAndPlanErrors), as the same single-line status
-// rows the Tickets tab renders for its own tickets (renderQueueTicketRow) — no
-// "parallel"/"then" wave grouping (ticket 25). offsets/heights are aligned to
-// rowsAndPlanErrors' row order so selection/scroll math can find any row's
-// position in lines without re-deriving the rendering.
-func (m QueueModel) buildQueueLines() (lines []string, offsets []int, heights []int) {
+// queueBody renders the Queue tab's panel body: the run-state banner
+// (queueHeaderBodyLines, queue_header.go) as fixed lines, followed by
+// m.queueTree's own windowed rendering — mirroring the Tickets tab's
+// sidebarBody split between its own pre-load short-circuit and
+// sidebarTree.RenderLines.
+func (m QueueModel) queueBody(width int) []string {
 	if !m.loaded {
-		return []string{ui.StyleDim.Render("  loading…")}, nil, nil
+		return []string{ui.StyleDim.Render("  loading…")}
 	}
 
+	var lines []string
 	for _, line := range m.queueHeaderBodyLines() {
 		lines = append(lines, "  "+ui.StyleHint.Render(line))
 	}
 
-	rows, planErrs := m.rowsAndPlanErrors()
-	if len(rows) == 0 {
-		lines = append(lines, ui.StyleMuted.Render("  no tickets checked — check tickets in the Tickets tab to build a plan"))
-		return lines, nil, nil
-	}
-
-	epicName := ""
-	for i, r := range rows {
-		if r.epic.Name != epicName {
-			epicName = r.epic.Name
-			lines = append(lines, "")
-			parkedStalled, _ := ralphLoopRegistry.parkedStalledFor(r.epic.Name)
-			lines = append(lines, m.epicHeaderLines(r.epic, parkedStalled)...)
-			if err, ok := planErrs[epicName]; ok {
-				lines = append(lines, statusErrorStyle.Render("    "+err.Error()))
-			}
-		}
-		offsets = append(offsets, len(lines))
-		rowLines := m.renderQueueTicketRow(r, i)
-		if i == m.selected {
-			for li, line := range rowLines {
-				rowLines[li] = ui.RenderRowHighlight(line)
-			}
-		}
-		lines = append(lines, rowLines...)
-		heights = append(heights, len(rowLines))
-	}
-	return lines, offsets, heights
+	treeH := m.queueViewportHeight() - len(lines)
+	lines = append(lines, m.queueTree.RenderLines(treeH+2, m.queueRenderOpts(width))...)
+	return lines
 }
 
-// renderQueueTicketRow renders one physical line for every ticket — the same
+// queueRenderOpts builds the tree.RenderOpts m.queueTree.RenderLines renders
+// through: every physical row (blank separator, epic status/context/error
+// header, ticket) is a real tree.Entry, dispatched on entry.Value.kind by
+// Label alone — mirroring the Tickets-tab sidebar's sidebarRenderOpts one
+// level down. Unlike the sidebar, header/separator rows are left selectable
+// (05's explicit recommendation) — no skip-non-actionable-rows wrapper.
+func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
+	entries := m.queueTree.Entries()
+	idxByID := make(map[string]int, len(entries))
+	for i, e := range entries {
+		idxByID[e.ID] = i
+	}
+
+	return tree.RenderOpts[queueNode]{
+		AccentColor: ui.ColorBlue,
+		Active:      m.focus == focusSidebar,
+		Width:       width,
+		EmptyLine:   ui.StyleMuted.Render("  no tickets checked — check tickets in the Tickets tab to build a plan"),
+		Label: func(entry tree.Entry[queueNode]) string {
+			switch entry.Value.kind {
+			case nodeEpicSeparator:
+				return ""
+			case nodeEpicStatus:
+				parkedStalled, _ := ralphLoopRegistry.parkedStalledFor(entry.Value.epic.Name)
+				icon, text, style := epicStatusLine(m.icons(), entry.Value.epic, parkedStalled)
+				return "  " + epicHeaderStyle.Render(entry.Value.epic.Name) + " " + style.Render(icon+" "+text)
+			case nodeEpicContext:
+				avg, maximum, compacts := epicContextMetrics(entry.Value.epic)
+				return "  " + metricsLineStyle.Render(fmt.Sprintf(
+					"Context window: avg %s, max %s (%d compacts)",
+					formatTokenCount(avg), formatTokenCount(maximum), compacts,
+				))
+			case nodeEpicError:
+				return statusErrorStyle.Render("    " + entry.Value.err.Error())
+			case nodeQueueTicketReason:
+				line, _ := m.queueTicketReasonLine(entry.Value.ticket)
+				return line
+			default: // nodeQueueTicket
+				return m.renderQueueTicketRow(entry.Value.ticket, idxByID[entry.ID])
+			}
+		},
+	}
+}
+
+// renderQueueTicketRow renders one row's text content for the same
 // single-line status presentation as the Tickets tab's renderTicketRow
 // (view.go), so the Queue tab shows identical per-ticket status (ticket 25).
-// r.depth indents a nested ticket (Parent/Children, ticket 03) two extra
-// spaces per level, matching ui/tree's own indent unit and the Tickets tab's
-// renderTicketRow (ticket 09/10). The triangle column is reserved at a fixed
-// width whether or not this row has children (a childless row shows a blank
-// in its place), so every row at a given depth lines its icon up in the same
-// column; only the triangle itself reflects r.expanded.
-func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) []string {
+// Nesting under a parent ticket (r.depth>0) is handled by
+// m.queueTree.RenderLines itself via each Entry's own Depth — but every
+// ticket entry sits at the tree's root alongside the epic header rows (not
+// nested under them), so this still carries the same literal "  " base
+// indent those header rows carry, keeping ticket and header text aligned at
+// depth 0 the way buildQueueLines' old "  "+repeat("  ", r.depth) formula
+// did in one combined computation. r.hasChildren/r.expanded still drive the
+// row's own fold triangle since that's row content, not tree indentation —
+// the triangle column is reserved at a fixed width whether or not this row
+// has children, matching the Tickets tab's renderTicketRow (ticket 09/10).
+// Search-match highlighting is likewise left to RenderLines' own generic
+// overlay — rowIdx is only used to dim a non-matching row while a query is
+// active. A needs-answer/needs-repair ticket's park-reason subtext renders
+// as its own sibling nodeQueueTicketReason entry (queueTicketReasonLine)
+// rather than a second physical line here, since RenderLines is one Entry
+// per line.
+func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 	epic, t := r.epic, r.ticket
 	status := epic.RenderedStatus(t)
-	indent := "  " + strings.Repeat("  ", r.depth)
+	indent := "  "
 
 	triangle := strings.Repeat(" ", triangleColumnWidth(m.icons())) + " "
 	if r.hasChildren {
@@ -209,14 +211,14 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) []string {
 		if live, ok := m.live[epic.Name][t.Identifier]; ok {
 			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live, indent+triangle); ok {
 				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens, 0)
-				return []string{appendRowMetrics(base, joinNonEmpty(" ", suffix, metrics), metricsLineStyle)}
+				return appendRowMetrics(base, joinNonEmpty(" ", suffix, metrics), metricsLineStyle)
 			}
 		}
 	}
 
 	icon, style := statusIconAndStyle(m.icons(), status)
 
-	matched, current := m.queueSearchMatch(rowIdx)
+	matched, _ := m.queueTree.SearchMatch(rowIdx)
 	searchDim := m.search.HasQuery() && !matched
 
 	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
@@ -224,9 +226,7 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) []string {
 		title += " (commitless)"
 	}
 	titleStyle := lipgloss.NewStyle()
-	if matched {
-		title = search.Highlight(title, m.search.Query(), current)
-	} else if status == tickets.StatusDone {
+	if status == tickets.StatusDone {
 		titleStyle = statusDoneStyle
 	} else if searchDim {
 		titleStyle = ui.StyleDim
@@ -236,15 +236,12 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) []string {
 	}
 
 	line := indent + triangle + style.Render(icon)
-	badgeWidth := 0
 	if ticketHasSuggestedActions(status, t) {
 		badgeStyle := suggestedActionBadgeStyle
 		if searchDim {
 			badgeStyle = ui.StyleDim
 		}
-		badge := m.icons().SuggestedAction
-		badgeWidth = lipgloss.Width(badge) + 1
-		line += " " + badgeStyle.Render(badge)
+		line += " " + badgeStyle.Render(m.icons().SuggestedAction)
 	}
 	line += " " + titleStyle.Render(title)
 	if suffix := blockedBySuffix(epic, t, status); suffix != "" {
@@ -254,17 +251,41 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) []string {
 		}
 		line += " " + suffixStyle.Render(suffix)
 	}
-	if status == tickets.StatusNeedsAnswer || status == tickets.StatusNeedsRepair {
-		if reason := parkReason(epic, t, m.icons().Ellipsis); reason != "" {
-			subtextLine := indent + strings.Repeat(" ", lipgloss.Width(triangle)+lipgloss.Width(icon)+1+badgeWidth) + blockedBySuffixStyle.Render(reason)
-			return []string{line, subtextLine}
-		}
-	}
 	if status != tickets.StatusDone {
-		return []string{line}
+		return line
 	}
 	metrics := formatMetricsLine(t.ElapsedTime, t.ActualContextWindow, t.ActualCost)
-	return []string{appendRowMetrics(line, metrics, style)}
+	if searchDim {
+		return appendRowMetrics(line, metrics, ui.StyleDim)
+	}
+	return appendRowMetrics(line, metrics, style)
+}
+
+// queueTicketReasonLine renders the park-reason subtext for a needs-answer/
+// needs-repair ticket as its own line (nodeQueueTicketReason, a sibling
+// entry immediately following the ticket's own nodeQueueTicket row —
+// buildQueueEntries), indented to align under the title the same way the
+// pre-tree.Model buildQueueLines' two-physical-line row used to (triangle +
+// icon + badge width, mirroring renderQueueTicketRow's own column layout).
+// ok reports false (empty line) when r's ticket isn't currently parked.
+func (m QueueModel) queueTicketReasonLine(r queueRow) (line string, ok bool) {
+	epic, t := r.epic, r.ticket
+	status := epic.RenderedStatus(t)
+	reason := parkReason(epic, t, m.icons().Ellipsis)
+	if reason == "" {
+		return "", false
+	}
+
+	triangleWidth := triangleColumnWidth(m.icons()) + 1
+	icon, _ := statusIconAndStyle(m.icons(), status)
+	badgeWidth := 0
+	if ticketHasSuggestedActions(status, t) {
+		badgeWidth = lipgloss.Width(m.icons().SuggestedAction) + 1
+	}
+
+	indent := "  "
+	prefix := indent + strings.Repeat(" ", triangleWidth+lipgloss.Width(icon)+1+badgeWidth)
+	return prefix + blockedBySuffixStyle.Render(reason), true
 }
 
 func (m QueueModel) icons() ui.IconSet {

@@ -215,7 +215,7 @@ func TestQueueModelListRowsIndentMatchesHeaderIndent(t *testing.T) {
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
 	var headerLine, rowLine string
-	for _, line := range m.queueLines() {
+	for _, line := range m.queueBody(80) {
 		plain := ansi.Strip(line)
 		if strings.Contains(plain, "alpha") && headerLine == "" {
 			headerLine = plain
@@ -225,7 +225,7 @@ func TestQueueModelListRowsIndentMatchesHeaderIndent(t *testing.T) {
 		}
 	}
 	if headerLine == "" || rowLine == "" {
-		t.Fatalf("expected both an epic header line and a ticket row line:\n%v", m.queueLines())
+		t.Fatalf("expected both an epic header line and a ticket row line:\n%v", m.queueBody(80))
 	}
 	headerIndent := len(headerLine) - len(strings.TrimLeft(headerLine, " "))
 	rowIndent := len(rowLine) - len(strings.TrimLeft(rowLine, " "))

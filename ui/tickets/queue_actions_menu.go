@@ -13,11 +13,10 @@ import (
 // none. The Queue tab is otherwise read-only for selection (ticket 08); this
 // is a deliberate, narrow exception for this one action.
 func (m QueueModel) handleQueueSuggestedActionsKey() (tea.Model, tea.Cmd) {
-	rows := m.rows()
-	if m.selected < 0 || m.selected >= len(rows) {
+	r, ok := m.selectedQueueRow()
+	if !ok {
 		return m, notify.Info("select a ticket to see its suggested actions")
 	}
-	r := rows[m.selected]
 	items := suggestedActionItems(r.epic.RenderedStatus(r.ticket), r.ticket)
 	if len(items) == 0 {
 		return m, notify.Info("no suggested actions for this ticket")

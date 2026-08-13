@@ -43,7 +43,7 @@ func TestQueueModel_ParkedRowSubtextComesFromDiskNotEventPayload(t *testing.T) {
 	m = updated.(QueueModel)
 	m = deliverQueueCommands(t, m, cmd)
 
-	lines, _, _ := m.buildQueueLines()
+	lines := m.queueBody(80)
 	rowText := ansi.Strip(strings.Join(lines, "\n"))
 	if !strings.Contains(rowText, "On-disk reason, not the event payload.") {
 		t.Fatalf("expected row subtext sourced from disk:\n%s", rowText)
@@ -64,7 +64,7 @@ func TestQueueModel_DraftRowUnaffectedByParkRendering(t *testing.T) {
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
-	lines, _, _ := m.buildQueueLines()
+	lines := m.queueBody(80)
 	rowText := ansi.Strip(strings.Join(lines, "\n"))
 	if strings.Contains(rowText, "Leftover text that must not surface.") {
 		t.Fatalf("expected draft row to omit park subtext:\n%s", rowText)

@@ -200,7 +200,7 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.ready = true
 		m.help, _ = m.help.Update(msg)
-		m.queueTree.SetVisibleHeight(m.queueViewportHeight())
+		m.queueTree.SetVisibleHeight(m.queueViewportHeight() - len(m.queueHeaderBodyLines()))
 		return m, nil
 	case queueEpicsLoadedMsg:
 		if err := autoQueueForkedChildren(m.epics, msg.epics, m.queueStore); err != nil {
@@ -751,9 +751,9 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		// A parked row's "enter" wins over every other meaning below: it
 		// resumes that epic (cosmetic wake via Gate.WakeParked, not reattach)
 		// rather than launching the checked queue or toggling focus.
-		if rows := m.rows(); m.selected >= 0 && m.selected < len(rows) {
-			if _, parked := ralphLoopRegistry.parkedStalledFor(rows[m.selected].epic.Name); parked {
-				ralphLoopRegistry.resumeParked(rows[m.selected].epic.Name)
+		if row, ok := m.selectedQueueRow(); ok {
+			if _, parked := ralphLoopRegistry.parkedStalledFor(row.epic.Name); parked {
+				ralphLoopRegistry.resumeParked(row.epic.Name)
 				return m, nil
 			}
 		}
