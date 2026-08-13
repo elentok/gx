@@ -121,10 +121,11 @@ func TestQueueModel_ForkInsertsChildrenAfterOriginalPosition(t *testing.T) {
 
 func identifiersInOrder(t *testing.T, m QueueModel) []string {
 	t.Helper()
-	rows := m.rows()
-	out := make([]string, len(rows))
-	for i, r := range rows {
-		out[i] = r.ticket.Identifier
+	var out []string
+	for _, e := range m.queueTree.Entries() {
+		if e.Value.kind == nodeQueueTicket {
+			out = append(out, e.Value.ticket.ticket.Identifier)
+		}
 	}
 	return out
 }

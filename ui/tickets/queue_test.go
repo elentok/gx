@@ -22,6 +22,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/tree"
 )
 
 func TestQueueModelRendersFlatDependencyOrderedEpicPlan(t *testing.T) {
@@ -124,17 +125,17 @@ func TestQueueModelNestsChildrenUnderParentAndCollapsesWithHL(t *testing.T) {
 	}
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
-	rows := m.rows()
+	rows := queueTicketEntries(m)
 	if len(rows) != 3 {
 		t.Fatalf("expected 3 rows, got %d: %+v", len(rows), rows)
 	}
-	if rows[0].ticket.Identifier != "01" || rows[0].depth != 0 || !rows[0].hasChildren || !rows[0].expanded {
+	if rows[0].Value.ticket.ticket.Identifier != "01" || rows[0].Depth != 0 || !rows[0].HasChildren || !rows[0].Expanded {
 		t.Fatalf("expected parent 01 at depth 0 with children, got %+v", rows[0])
 	}
-	if rows[1].ticket.Identifier != "02" || rows[1].depth != 1 {
+	if rows[1].Value.ticket.ticket.Identifier != "02" || rows[1].Depth != 1 {
 		t.Fatalf("expected child 02 nested at depth 1 right after its parent, got %+v", rows[1])
 	}
-	if rows[2].ticket.Identifier != "03" || rows[2].depth != 0 {
+	if rows[2].Value.ticket.ticket.Identifier != "03" || rows[2].Depth != 0 {
 		t.Fatalf("expected unrelated ticket 03 at depth 0, got %+v", rows[2])
 	}
 
@@ -147,8 +148,8 @@ func TestQueueModelNestsChildrenUnderParentAndCollapsesWithHL(t *testing.T) {
 	m = selectFirstQueueTicketRow(t, m)
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	m = updated.(QueueModel)
-	rows = m.rows()
-	if len(rows) != 2 || rows[0].ticket.Identifier != "01" || rows[1].ticket.Identifier != "03" {
+	rows = queueTicketEntries(m)
+	if len(rows) != 2 || rows[0].Value.ticket.ticket.Identifier != "01" || rows[1].Value.ticket.ticket.Identifier != "03" {
 		t.Fatalf("expected only 01 and 03 after collapsing 01's children, got %+v", rows)
 	}
 	if strings.Contains(m.View().Content, "Child") {
@@ -157,9 +158,113 @@ func TestQueueModelNestsChildrenUnderParentAndCollapsesWithHL(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	m = updated.(QueueModel)
-	rows = m.rows()
+	rows = queueTicketEntries(m)
 	if len(rows) != 3 {
 		t.Fatalf("expected \"l\" to re-expand and restore all 3 rows, got %d: %+v", len(rows), rows)
+	}
+}
+
+// queueTicketEntries filters m.queueTree.Entries() down to nodeQueueTicket
+// rows, dropping the per-epic separator/status/context/error/park-reason
+// entries buildQueueEntries interleaves — the tree's own Depth/HasChildren/
+// Expanded on each Entry (not queueRow's mirrored fields, which only exist to
+// drive the fold-glyph render) is the nesting truth these tests assert
+// against, per ticket 19's live-render-path rewrite.
+func queueTicketEntries(m QueueModel) []tree.Entry[queueNode] {
+	var out []tree.Entry[queueNode]
+	for _, e := range m.queueTree.Entries() {
+		if e.Value.kind == nodeQueueTicket {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// TestQueueModelNestsChildrenAtArbitraryDepthAndRespectsCollapse ports
+// queue_rows_test.go's TestQueueRowsForEpic_NestsChildrenAtArbitraryDepthAndRespectsCollapse
+// (ticket 19): a ticket (01) with a child (02) that itself has a child (03)
+// nests two levels deep via m.queueTree.Entries(), leaving an unrelated
+// ticket (04) at the top level, and collapsing the grandparent via "h" hides
+// both descendants while leaving 04 visible.
+func TestQueueModelNestsChildrenAtArbitraryDepthAndRespectsCollapse(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeFrontmatterTicket(t, root, "alpha", "01-a.md", "01", "open", "")
+	writeFrontmatterTicket(t, root, "alpha", "02-b.md", "02", "open", "01")
+	writeFrontmatterTicket(t, root, "alpha", "03-c.md", "03", "open", "02")
+	writeFrontmatterTicket(t, root, "alpha", "04-d.md", "04", "open", "")
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "01-a.md"): true,
+		ticketPath(root, "alpha", "02-b.md"): true,
+		ticketPath(root, "alpha", "03-c.md"): true,
+		ticketPath(root, "alpha", "04-d.md"): true,
+	}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+
+	rows := queueTicketEntries(m)
+	wantIDs := []string{"01", "02", "03", "04"}
+	wantDepths := []int{0, 1, 2, 0}
+	if len(rows) != len(wantIDs) {
+		t.Fatalf("got %d rows, want %d: %+v", len(rows), len(wantIDs), rows)
+	}
+	for i, r := range rows {
+		if r.Value.ticket.ticket.Identifier != wantIDs[i] {
+			t.Fatalf("row %d ticket = %q, want %q", i, r.Value.ticket.ticket.Identifier, wantIDs[i])
+		}
+		if r.Depth != wantDepths[i] {
+			t.Fatalf("row %d (%s) depth = %d, want %d", i, wantIDs[i], r.Depth, wantDepths[i])
+		}
+	}
+	if !rows[0].HasChildren || !rows[0].Expanded {
+		t.Fatalf("expected ticket 01 to report hasChildren+expanded, got %+v", rows[0])
+	}
+
+	m = selectFirstQueueTicketRow(t, m)
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
+	m = updated.(QueueModel)
+	rows = queueTicketEntries(m)
+	wantAfterCollapse := []string{"01", "04"}
+	if len(rows) != len(wantAfterCollapse) {
+		t.Fatalf("expected %d rows after collapsing 01, got %d: %+v", len(wantAfterCollapse), len(rows), rows)
+	}
+	for i, want := range wantAfterCollapse {
+		if rows[i].Value.ticket.ticket.Identifier != want {
+			t.Fatalf("row %d after collapse = %q, want %q", i, rows[i].Value.ticket.ticket.Identifier, want)
+		}
+	}
+	if rows[0].Expanded {
+		t.Fatalf("expected collapsed ticket 01 to report expanded=false")
+	}
+}
+
+// TestQueueModelDoneParentWithOpenForkChildStaysVisible ports
+// queue_rows_test.go's TestQueueRowsForEpic_DoneParentWithOpenForkChildStaysVisible
+// (ticket 19): a done parent whose fork child (Parent: ticket 03) is still
+// open must not be dropped by hideComplete's filterDoneTickets — the child
+// stays nested under its still-live parent in m.queueTree.Entries() instead
+// of being reattached to the top level.
+func TestQueueModelDoneParentWithOpenForkChildStaysVisible(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeFrontmatterTicket(t, root, "alpha", "01-a.md", "01", "done", "")
+	writeFrontmatterTicket(t, root, "alpha", "02-b.md", "02", "open", "01")
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "01-a.md"): true,
+		ticketPath(root, "alpha", "02-b.md"): true,
+	}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+	m = updated.(QueueModel)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+	m = updated.(QueueModel)
+
+	rows := queueTicketEntries(m)
+	if len(rows) != 2 || rows[0].Value.ticket.ticket.Identifier != "01" || rows[1].Value.ticket.ticket.Identifier != "02" {
+		t.Fatalf("expected 01 (waiting-for-children) and nested 02, got %+v", rows)
+	}
+	if rows[1].Depth != 1 {
+		t.Fatalf("expected ticket 02 nested under 01 at depth 1, got depth=%d", rows[1].Depth)
 	}
 }
 
