@@ -514,6 +514,121 @@ func TestLoadSlackNotificationsMissingUsesDefaults(t *testing.T) {
 	}
 }
 
+func TestDefaultAgentsConfig(t *testing.T) {
+	cfg := DefaultAgentsConfig()
+	if cfg.Claude.Model != "sonnet" || cfg.Claude.Effort != "medium" {
+		t.Fatalf("Claude = %+v, want sonnet/medium", cfg.Claude)
+	}
+	if cfg.Codex.Model != "gpt-5.6-sol" || cfg.Codex.Effort != "medium" {
+		t.Fatalf("Codex = %+v, want gpt-5.6-sol/medium", cfg.Codex)
+	}
+}
+
+func TestLoadAgentsConfigDefaultsWhenBlockAbsent(t *testing.T) {
+	tmp := t.TempDir()
+	prev := userConfigDirFn
+	userConfigDirFn = func() (string, error) { return tmp, nil }
+	t.Cleanup(func() { userConfigDirFn = prev })
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Agents.Claude.Model != "sonnet" || cfg.Agents.Claude.Effort != "medium" {
+		t.Fatalf("Agents.Claude = %+v, want sonnet/medium", cfg.Agents.Claude)
+	}
+	if cfg.Agents.Codex.Model != "gpt-5.6-sol" || cfg.Agents.Codex.Effort != "medium" {
+		t.Fatalf("Agents.Codex = %+v, want gpt-5.6-sol/medium", cfg.Agents.Codex)
+	}
+}
+
+func TestLoadAgentsConfigPartialFillsMissingKeysFromDefaults(t *testing.T) {
+	tmp := t.TempDir()
+	prev := userConfigDirFn
+	userConfigDirFn = func() (string, error) { return tmp, nil }
+	t.Cleanup(func() { userConfigDirFn = prev })
+
+	dir := filepath.Join(tmp, "gx")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	path := filepath.Join(dir, "config.json")
+	body := `{"agents":{"claude":{"model":"opus"}}}`
+	if err := os.WriteFile(path, []byte(body), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Agents.Claude.Model != "opus" {
+		t.Fatalf("Agents.Claude.Model = %q, want opus", cfg.Agents.Claude.Model)
+	}
+	if cfg.Agents.Claude.Effort != "medium" {
+		t.Fatalf("Agents.Claude.Effort = %q, want default medium", cfg.Agents.Claude.Effort)
+	}
+	if cfg.Agents.Codex.Model != "gpt-5.6-sol" || cfg.Agents.Codex.Effort != "medium" {
+		t.Fatalf("Agents.Codex = %+v, want untouched defaults", cfg.Agents.Codex)
+	}
+}
+
+func TestLoadAgentsConfigExplicitEmptyStringMeansInherit(t *testing.T) {
+	tmp := t.TempDir()
+	prev := userConfigDirFn
+	userConfigDirFn = func() (string, error) { return tmp, nil }
+	t.Cleanup(func() { userConfigDirFn = prev })
+
+	dir := filepath.Join(tmp, "gx")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	path := filepath.Join(dir, "config.json")
+	body := `{"agents":{"claude":{"model":"","effort":""}}}`
+	if err := os.WriteFile(path, []byte(body), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Agents.Claude.Model != "" {
+		t.Fatalf("Agents.Claude.Model = %q, want empty (inherit)", cfg.Agents.Claude.Model)
+	}
+	if cfg.Agents.Claude.Effort != "" {
+		t.Fatalf("Agents.Claude.Effort = %q, want empty (inherit)", cfg.Agents.Claude.Effort)
+	}
+}
+
+func TestLoadAgentsConfigTrimsWhitespace(t *testing.T) {
+	tmp := t.TempDir()
+	prev := userConfigDirFn
+	userConfigDirFn = func() (string, error) { return tmp, nil }
+	t.Cleanup(func() { userConfigDirFn = prev })
+
+	dir := filepath.Join(tmp, "gx")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	path := filepath.Join(dir, "config.json")
+	body := `{"agents":{"codex":{"model":"  gpt-5.6-sol  ","effort":" high "}}}`
+	if err := os.WriteFile(path, []byte(body), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Agents.Codex.Model != "gpt-5.6-sol" {
+		t.Fatalf("Agents.Codex.Model = %q, want trimmed gpt-5.6-sol", cfg.Agents.Codex.Model)
+	}
+	if cfg.Agents.Codex.Effort != "high" {
+		t.Fatalf("Agents.Codex.Effort = %q, want trimmed high", cfg.Agents.Codex.Effort)
+	}
+}
+
 func TestInitFailsIfConfigExists(t *testing.T) {
 	tmp := t.TempDir()
 	prev := userConfigDirFn

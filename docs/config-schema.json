@@ -187,6 +187,55 @@
         "implement": "gx-implement",
         "code-review": ["thermo-nuclear-code-quality-review"]
       }
+    },
+    "agents": {
+      "type": "object",
+      "description": "Model and effort level each coding agent runs under. For each field: an absent key uses gx's built-in default; an explicit empty string (\"\") means \"inherit\" — gx passes no flag for that knob, leaving the agent CLI's own configuration in charge. Values are passed through as-is (trimmed of surrounding whitespace) and are never validated against a model/effort allowlist.",
+      "additionalProperties": false,
+      "properties": {
+        "claude": {
+          "type": "object",
+          "description": "Model/effort for the claude agent. Default: model=sonnet, effort=medium.",
+          "additionalProperties": false,
+          "properties": {
+            "model": {
+              "type": "string",
+              "description": "Model passed to the claude CLI. Empty string means inherit the CLI's own setting. Default: sonnet."
+            },
+            "effort": {
+              "type": "string",
+              "description": "Effort level passed to the claude CLI. Empty string means inherit the CLI's own setting. Default: medium."
+            }
+          },
+          "default": {
+            "model": "sonnet",
+            "effort": "medium"
+          }
+        },
+        "codex": {
+          "type": "object",
+          "description": "Model/effort for the codex agent. Default: model=gpt-5.6-sol, effort=medium.",
+          "additionalProperties": false,
+          "properties": {
+            "model": {
+              "type": "string",
+              "description": "Model passed to the codex CLI. Empty string means inherit the CLI's own setting. Default: gpt-5.6-sol."
+            },
+            "effort": {
+              "type": "string",
+              "description": "Effort level passed to the codex CLI. Empty string means inherit the CLI's own setting. Default: medium."
+            }
+          },
+          "default": {
+            "model": "gpt-5.6-sol",
+            "effort": "medium"
+          }
+        }
+      },
+      "default": {
+        "claude": { "model": "sonnet", "effort": "medium" },
+        "codex": { "model": "gpt-5.6-sol", "effort": "medium" }
+      }
     }
   }
 }

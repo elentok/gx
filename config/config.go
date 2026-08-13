@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // UserConfigDir hardcodes ~/.config as gx's config base directory on every
@@ -47,6 +48,7 @@ type Config struct {
 	ExecutionQueue        ExecutionQueueConfig `json:"execution-queue"`
 	Notifications         NotificationsConfig  `json:"notifications"`
 	Skills                SkillsConfig         `json:"skills"`
+	Agents                AgentsConfig         `json:"agents"`
 }
 
 // Default returns the default configuration.
@@ -60,6 +62,7 @@ func Default() Config {
 		ExecutionQueue:        DefaultExecutionQueueConfig(),
 		Notifications:         DefaultNotificationsConfig(),
 		Skills:                DefaultSkillsConfig(),
+		Agents:                DefaultAgentsConfig(),
 	}
 }
 
@@ -112,6 +115,16 @@ func Load() (Config, error) {
 			Implement  *string  `json:"implement"`
 			CodeReview []string `json:"code-review"`
 		} `json:"skills"`
+		Agents *struct {
+			Claude *struct {
+				Model  *string `json:"model"`
+				Effort *string `json:"effort"`
+			} `json:"claude"`
+			Codex *struct {
+				Model  *string `json:"model"`
+				Effort *string `json:"effort"`
+			} `json:"codex"`
+		} `json:"agents"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return cfg, fmt.Errorf("parse config %s: %w", path, err)
@@ -171,8 +184,29 @@ func Load() (Config, error) {
 			cfg.Skills.CodeReview = raw.Skills.CodeReview
 		}
 	}
+	if raw.Agents != nil {
+		if raw.Agents.Claude != nil {
+			applyAgentConfig(&cfg.Agents.Claude, raw.Agents.Claude.Model, raw.Agents.Claude.Effort)
+		}
+		if raw.Agents.Codex != nil {
+			applyAgentConfig(&cfg.Agents.Codex, raw.Agents.Codex.Model, raw.Agents.Codex.Effort)
+		}
+	}
 
 	return cfg, nil
+}
+
+// applyAgentConfig overlays explicitly-set model/effort values onto an
+// AgentConfig, trimming whitespace and leaving unset keys at the built-in
+// default. A trimmed-empty value survives as empty (meaning "inherit"),
+// distinct from an absent key (meaning "use the default").
+func applyAgentConfig(cfg *AgentConfig, model, effort *string) {
+	if model != nil {
+		cfg.Model = strings.TrimSpace(*model)
+	}
+	if effort != nil {
+		cfg.Effort = strings.TrimSpace(*effort)
+	}
 }
 
 func clampStageDiffContext(n int) int {

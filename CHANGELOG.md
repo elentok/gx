@@ -2,6 +2,7 @@
 
 ## v0.28.2 - 2026-08-13
 
+- **Behavior change on upgrade:** added an `agents` config block (`agents.claude`/`agents.codex`, each with `model` and `effort`). Iterations now run under gx's own built-in defaults (claude sonnet/medium, codex gpt-5.6-sol/medium) instead of inheriting whatever `~/.claude/settings.json` or `~/.codex/config.toml` already say. Set a field to `""` to opt back into the agent CLI's own setting; omit it to keep gx's default.
 - Added a suggested-actions menu for `needs-answer` tickets in the Tickets tab.
 - Added `--maps` flag to `gx tickets epics`; `gx-local-tracker` now writes wayfinder maps to `map.md`.
 - The claude statusline now shows a remote-control indicator.
