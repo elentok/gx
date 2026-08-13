@@ -208,7 +208,7 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.ready = true
 		m.help, _ = m.help.Update(msg)
-		m.queueTree.SetVisibleHeight(m.queueViewportHeight() - len(m.queueHeaderBodyLines()))
+		m.queueTree.SetVisibleHeight(m.queueViewportHeight() - queueHeaderReservedLines)
 		return m, nil
 	case queueEpicsLoadedMsg:
 		if err := autoQueueForkedChildren(m.epics, msg.epics, m.queueStore); err != nil {
@@ -396,7 +396,7 @@ func (m QueueModel) handleQueueMouseClick(msg tea.MouseClickMsg) (tea.Model, tea
 	if m.previewFocus.clickToFocus(mouse, m.width, m.contentHeight()) {
 		return m, nil
 	}
-	bodyLine := mouse.Y - 1 - len(m.queueHeaderBodyLines())
+	bodyLine := mouse.Y - 1 - queueHeaderReservedLines
 	m.queueTree.SelectAtBodyLine(bodyLine)
 	return m, nil
 }

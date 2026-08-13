@@ -568,8 +568,13 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 		if got, want := m.queueHeaderTitle(), "Queue"; got != want {
 			t.Fatalf("title = %q, want %q", got, want)
 		}
-		if lines := m.queueHeaderBodyLines(); len(lines) != 0 {
-			t.Fatalf("body lines = %v, want none", lines)
+		lines := m.queueHeaderBodyLines()
+		if len(lines) != queueHeaderReservedLines {
+			t.Fatalf("body lines = %v, want %d line(s)", lines, queueHeaderReservedLines)
+		}
+		got := ansi.Strip(lines[0])
+		if !strings.Contains(got, "Idle") || !strings.Contains(got, "enter") || !strings.Contains(got, "start") {
+			t.Fatalf("body line = %q, want idle copy with the enter hint", got)
 		}
 	})
 
@@ -580,8 +585,9 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 		if !strings.HasPrefix(got, "Queue · 0 of 1 done · ") || !strings.HasSuffix(got, " implementing...") {
 			t.Fatalf("title = %q, want \"Queue · 0 of 1 done · <spinner> implementing...\"", got)
 		}
-		if lines := m.queueHeaderBodyLines(); len(lines) != 0 {
-			t.Fatalf("body lines = %v, want none while running", lines)
+		want := []string{""}
+		if lines := m.queueHeaderBodyLines(); !slices.Equal(lines, want) {
+			t.Fatalf("body lines = %v, want %v while running (reserved slot stays blank)", lines, want)
 		}
 	})
 
@@ -601,8 +607,9 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 	t.Run("paused with nothing in flight", func(t *testing.T) {
 		m := base
 		m.paused = true
-		if lines := m.queueHeaderBodyLines(); len(lines) != 0 {
-			t.Fatalf("body lines = %v, want none when runningEpics is empty", lines)
+		want := []string{""}
+		if lines := m.queueHeaderBodyLines(); !slices.Equal(lines, want) {
+			t.Fatalf("body lines = %v, want %v when runningEpics is empty", lines, want)
 		}
 	})
 
@@ -613,8 +620,26 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 		if got, want := m.queueHeaderTitle(), "Queue"; got != want {
 			t.Fatalf("title = %q, want %q", got, want)
 		}
-		if lines := m.queueHeaderBodyLines(); len(lines) != 0 {
-			t.Fatalf("body lines = %v, want none for an idle queue", lines)
+		lines := m.queueHeaderBodyLines()
+		if len(lines) != queueHeaderReservedLines {
+			t.Fatalf("body lines = %v, want %d line(s)", lines, queueHeaderReservedLines)
+		}
+		got := ansi.Strip(lines[0])
+		if !strings.Contains(got, "Idle") {
+			t.Fatalf("body line = %q, want idle copy for an idle queue", got)
+		}
+	})
+
+	t.Run("idle with nothing selected", func(t *testing.T) {
+		emptyRoot := t.TempDir()
+		m := loadQueueModel(t, NewQueueModel(emptyRoot, ui.Settings{}, map[string]bool{}, keys.Manager{}))
+		lines := m.queueHeaderBodyLines()
+		if len(lines) != queueHeaderReservedLines {
+			t.Fatalf("body lines = %v, want %d line(s)", lines, queueHeaderReservedLines)
+		}
+		want := "No selected tickets — go to the Tickets tab first"
+		if got := ansi.Strip(lines[0]); got != want {
+			t.Fatalf("body line = %q, want %q", got, want)
 		}
 	})
 
@@ -1873,6 +1898,45 @@ func TestQueueModelMouseClickSelectsRowOnly(t *testing.T) {
 	m = updated.(QueueModel)
 	if m.queueTree.SelectedIndex() != ticketRows[2] {
 		t.Fatalf("expected out-of-bounds click to leave selection at row %d, got %d", ticketRows[2], m.queueTree.SelectedIndex())
+	}
+}
+
+// TestQueueMouseClickRowMappingStaysCorrectAcrossBannerTransition covers
+// ticket 21: the run-state banner's slot is now a constant height
+// (queueHeaderReservedLines), so mouse.Y's mapping to a tree row must stay
+// correct across a banner-appear/disappear transition even with no
+// intervening resize — the bug the reserved slot fixes.
+func TestQueueMouseClickRowMappingStaysCorrectAcrossBannerTransition(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "01-first.md"):  true,
+		ticketPath(root, "alpha", "02-second.md"): true,
+	}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+
+	var ticketRows []int
+	for i, e := range m.queueTree.Entries() {
+		if e.Value.kind == nodeQueueTicket {
+			ticketRows = append(ticketRows, i)
+		}
+	}
+	if len(ticketRows) != 2 {
+		t.Fatalf("expected 2 ticket rows, got %d: %v", len(ticketRows), ticketRows)
+	}
+	rowY := 1 + queueHeaderReservedLines + ticketRows[1]
+
+	// Idle -> running with no WindowSizeMsg in between: the reserved slot's
+	// height (and thus SetVisibleHeight/the mouse-click offset) must not
+	// change.
+	m.runningEpics = map[string]bool{"alpha": true}
+
+	updated, _ := m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, Y: rowY})
+	m = updated.(QueueModel)
+	if m.queueTree.SelectedIndex() != ticketRows[1] {
+		t.Fatalf("expected click to select row %d after banner transition, got %d", ticketRows[1], m.queueTree.SelectedIndex())
 	}
 }
 

@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -67,8 +68,9 @@ func TestQueueRunStateAndTitleReflectParkedEpics(t *testing.T) {
 	if strings.Contains(title, "02") {
 		t.Fatalf("queueHeaderTitle() = %q, want it not to name beta's ticket 02", title)
 	}
-	if m.queueHeaderBodyLines() != nil {
-		t.Fatalf("queueHeaderBodyLines() = %v, want nil for parked (title already carries the detail)", m.queueHeaderBodyLines())
+	want := []string{""}
+	if lines := m.queueHeaderBodyLines(); !slices.Equal(lines, want) {
+		t.Fatalf("queueHeaderBodyLines() = %v, want %v for parked (title already carries the detail)", lines, want)
 	}
 }
 

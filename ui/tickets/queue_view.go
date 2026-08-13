@@ -130,6 +130,13 @@ func (m QueueModel) queueBody(width int) []string {
 
 	var lines []string
 	for _, line := range m.queueHeaderBodyLines() {
+		if strings.Contains(line, "\x1b") {
+			// Already carries its own ANSI styling (e.g. a rendered key hint
+			// via ui.StatusWithHints) — wrapping it in StyleHint again would
+			// bleed one color's reset codes into the other's spans.
+			lines = append(lines, "  "+line)
+			continue
+		}
 		lines = append(lines, "  "+ui.StyleHint.Render(line))
 	}
 

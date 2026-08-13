@@ -5,12 +5,23 @@ import (
 	"sort"
 	"strings"
 
+	"charm.land/bubbles/v2/key"
 	"charm.land/lipgloss/v2"
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 )
+
+// queueHeaderReservedLines is the constant height reserved for the Queue
+// tab's run-state banner slot (queueHeaderBodyLines), whether or not a
+// banner is actually active — the maximum line count any queueRunStateKind
+// can emit. Keeping this a fixed constant, rather than deriving it from
+// len(queueHeaderBodyLines()), is the point of ticket 21: m.queueTree's
+// SetVisibleHeight only runs from the window-resize handler, so a banner
+// that changed the body's line count mid-session (no resize in between)
+// used to desync the tree's scroll/paging math.
+const queueHeaderReservedLines = 1
 
 var (
 	// epicHeaderStyle highlights the Queue tab's per-epic header name in the
@@ -262,6 +273,13 @@ func (m QueueModel) queueHeaderTitle() string {
 	}
 }
 
+// queueHeaderBodyLines always returns exactly queueHeaderReservedLines
+// lines — the reserved banner slot's constant height — so m.queueTree's
+// SetVisibleHeight never goes stale when the active run state changes
+// without an intervening resize. Most non-idle states leave the slot blank
+// (mirroring the pre-ticket-21 nil body); only queueRunIdle fills it with
+// contextual copy, since that's the state a person is actually looking at
+// the Queue tab wondering what to do next.
 func (m QueueModel) queueHeaderBodyLines() []string {
 	switch m.queueRunState() {
 	case queueRunCompleted:
@@ -274,14 +292,26 @@ func (m QueueModel) queueHeaderBodyLines() []string {
 		if len(m.runningEpics) > 0 {
 			return []string{"Queue paused — in-flight iterations will finish"}
 		}
-		return nil
+		return []string{""}
 	case queueRunParked:
 		// The title (queueHeaderTitle) already names the parked epic/ticket;
 		// no separate body line needed.
-		return nil
-	default:
-		return nil
+		return []string{""}
+	case queueRunRunning:
+		return []string{""}
+	default: // queueRunIdle
+		return []string{m.queueIdleBodyLine()}
 	}
+}
+
+// queueIdleBodyLine picks the reserved slot's idle copy: a call to action
+// when there's a checked plan to run, or a pointer back to the Tickets tab
+// when nothing is checked at all.
+func (m QueueModel) queueIdleBodyLine() string {
+	if len(m.checkedEpicPlans()) == 0 {
+		return "No selected tickets — go to the Tickets tab first"
+	}
+	return ui.StatusWithHints("Idle — press enter to start", key.NewBinding(key.WithHelp("enter", "start")))
 }
 
 func (m QueueModel) completedContextMetrics() (total, average, maximum int) {
