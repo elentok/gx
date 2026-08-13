@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.28.5 - 2026-08-14
+
+- Fixed a flaky e2e test (`TestIdleWhileWorking_AgentStatusNeverReportsWorking`) that could fail under load when herdr transiently returned `agent_pane_busy`; `Workspace.AgentStart` in `testutil/herdrctl/herdrctl.go` now retries up to 5 times with a 200ms backoff on that error, matching the tolerance already used by `PrependPath` for the same class of race.
+
 ## v0.28.4 - 2026-08-13
 
 - Fixed Investigate badge appearing on irrelevant ticket statuses
