@@ -94,14 +94,41 @@ func NewWorkspace(t *testing.T, cwd string, env ...string) *Workspace {
 // PrependPath puts dir at the very front of the root pane's shell PATH, for
 // e.g. making a fake agent binary (testutil/agentfake) resolve ahead of a
 // real one before calling AgentStart. herdr's `workspace create --env`
-// alone isn't enough for this: the pane's interactive shell (fish, in this
-// environment) re-derives PATH from its own config on startup and can
-// reorder an inherited entry behind its own configured dirs, so this uses
-// fish's own `fish_add_path --prepend --move` instead of relying on the
-// process's initial environment.
+// alone isn't enough for this: the pane's interactive shell re-derives PATH
+// from its own config on startup and can reorder an inherited entry behind
+// its own configured dirs. The pane's shell varies by environment (fish
+// locally, bash on GitHub's macOS runners), so this detects it via `herdr
+// pane process-info` and sends shell-appropriate syntax.
 func (w *Workspace) PrependPath(dir string) {
 	w.t.Helper()
-	w.Run("fish_add_path", "--prepend", "--move", dir)
+	if w.shellName() == "fish" {
+		w.Run("fish_add_path", "--prepend", "--move", dir)
+		return
+	}
+	w.Run("export", "PATH="+dir+":$PATH")
+}
+
+// shellName returns the root pane's foreground shell process name (e.g.
+// "fish", "bash", "zsh"), read via `herdr pane process-info`.
+func (w *Workspace) shellName() string {
+	w.t.Helper()
+	out := run(w.t, "pane", "process-info", "--pane", w.RootPaneID)
+	var resp struct {
+		Result struct {
+			ProcessInfo struct {
+				ForegroundProcesses []struct {
+					Name string `json:"name"`
+				} `json:"foreground_processes"`
+			} `json:"process_info"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(out, &resp); err != nil {
+		w.t.Fatalf("herdrctl: parse process-info response: %v\nraw: %s", err, out)
+	}
+	if len(resp.Result.ProcessInfo.ForegroundProcesses) == 0 {
+		w.t.Fatalf("herdrctl: process-info returned no foreground processes\nraw: %s", out)
+	}
+	return resp.Result.ProcessInfo.ForegroundProcesses[0].Name
 }
 
 // Run launches command in the workspace's root pane (types it and presses
