@@ -465,6 +465,42 @@ func TestPromptWithNudge_TimesOutThenNudgeSucceeds(t *testing.T) {
 	}
 }
 
+func TestPromptWithNudge_AgentPromptStalled_NudgeSucceeds(t *testing.T) {
+	t.Parallel()
+	stalledErr := errors.New(`$ herdr agent prompt w27:p7 ...
+
+exit status 1
+
+{"error":{"code":"agent_prompt_stalled","message":"agent prompt produced no observed state change within 5000 ms; status is idle and state_change_seq remained 946"}}`)
+	var sendKeysCalls int
+	prompt := func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+		return herdr.Agent{}, stalledErr
+	}
+	sendKeys := func(target string, keys ...string) error {
+		sendKeysCalls++
+		return nil
+	}
+	wait := func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+		return herdr.Agent{AgentStatus: "working"}, nil
+	}
+
+	agent, err := promptWithNudge(prompt, sendKeys, wait, fixedNow())(herdr.AgentPromptOptions{
+		Target: "pane-1",
+		Text:   "hello",
+		Wait:   true,
+		Until:  []string{"working"},
+	})
+	if err != nil {
+		t.Fatalf("promptWithNudge() error = %v, want nudge to recover from agent_prompt_stalled", err)
+	}
+	if agent.AgentStatus != "working" {
+		t.Errorf("agent.AgentStatus = %q, want %q", agent.AgentStatus, "working")
+	}
+	if sendKeysCalls != 1 {
+		t.Errorf("sendKeysCalls = %d, want 1 (nudge should fire for agent_prompt_stalled)", sendKeysCalls)
+	}
+}
+
 func TestPromptWithNudge_ExhaustsNudges_ReturnsTimeoutError(t *testing.T) {
 	t.Parallel()
 	var promptCalls, sendKeysCalls, waitCalls int

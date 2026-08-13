@@ -1120,10 +1120,17 @@ func recoverOrFailCodexContextExhaustion(d Deps, p launchAndPromptParams, sessio
 	return nil
 }
 
-// isPollTimeout reports whether err looks like AgentWait's own
-// timeout-elapsed failure (herdr's "timed out waiting for agent status"),
-// as opposed to a genuine failure that should abort the loop instead of
-// looping back for another poll tick.
+// isPollTimeout reports whether err looks like a transient herdr wait
+// failure worth nudging and retrying rather than aborting the loop: either
+// AgentWait's own timeout-elapsed failure ("timed out waiting for agent
+// status"), or herdr's agent_prompt_stalled error (the pane went idle with
+// no observed state change within herdr's own internal stall window).
 func isPollTimeout(err error) bool {
-	return err != nil && strings.Contains(strings.ToLower(err.Error()), "timed out")
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "timed out") ||
+		strings.Contains(msg, "agent_prompt_stalled") ||
+		strings.Contains(msg, "no observed state change")
 }

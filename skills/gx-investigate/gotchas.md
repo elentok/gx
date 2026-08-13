@@ -4,6 +4,19 @@ Running list of previously-diagnosed gx/ralph-loop bugs, newest first. Append on
 to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKILL.md) gets fixed
 — don't re-explain what the linked commit/ticket already documents.
 
+- **A `herdr agent prompt agent_prompt_stalled` error leaves a ticket `needs-repair` with no
+  `iteration-started` ever logged, and the retry code that exists doesn't cover it.**
+  `iteration-started` is logged only after `AgentPrompt` succeeds (`ralphloop/launch.go:242-263`);
+  a failed prompt-send returns before that line ever runs. There's a nudge-retry
+  (`promptWithNudge`, `ralphloop/deps.go:457-568`) but it only fires when the error text contains
+  "timed out" (`isPollTimeout`, `ralphloop/waitforfinish.go:1127-1129`) — herdr's stalled-prompt
+  message ("produced no observed state change within 5000 ms") doesn't match, so it's one-shot.
+  Lands in the same generic `r.err != nil` catch-all as `agent_pane_busy` below
+  (`ralphloop/loop.go:691-711`); clear the ticket back to `open` to reclaim, same as that entry —
+  but reclaim leaks a second herdr tab (`TabCreate` has no collision detection) since the failed
+  launch never cleaned up its own pane. Fixed by widening `isPollTimeout` to also match
+  `agent_prompt_stalled`/"no observed state change" (`ralphloop/waitforfinish.go:1127-1136`); the
+  pane/tab-leak-on-reclaim part is still open. See `model-config/issues/04a1-*.md`.
 - **`type: code-review` tickets always stall on `needs-answer` (`park_kind: zero-commit`)
   under ralph-loop.** `gx-implement/SKILL.md` told the agent to "follow the gx-code-review
   skill instead," which the agent read as invoking the Skill tool — but `gx-code-review` sets
