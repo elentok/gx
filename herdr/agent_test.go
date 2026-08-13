@@ -14,7 +14,8 @@ func TestAgentPrompt_ParsesAgentSession(t *testing.T) {
 			"type":"agent_prompted",
 			"agent":{
 				"pane_id":"wE:p1","workspace_id":"wE","tab_id":"wE:t9","agent_status":"idle",
-				"agent_session":{"source":"herdr:claude","agent":"claude","kind":"id","value":"f6be0343-85c1-4a50-8911-927380626a6b"}
+				"agent_session":{"source":"herdr:claude","agent":"claude","kind":"id","value":"f6be0343-85c1-4a50-8911-927380626a6b"},
+				"state_change_seq":946
 			}
 		}}`), nil
 	})
@@ -29,11 +30,12 @@ func TestAgentPrompt_ParsesAgentSession(t *testing.T) {
 		t.Fatalf("AgentPrompt() error = %v", err)
 	}
 	want := Agent{
-		PaneID:       "wE:p1",
-		WorkspaceID:  "wE",
-		TabID:        "wE:t9",
-		AgentStatus:  "idle",
-		AgentSession: "f6be0343-85c1-4a50-8911-927380626a6b",
+		PaneID:         "wE:p1",
+		WorkspaceID:    "wE",
+		TabID:          "wE:t9",
+		AgentStatus:    "idle",
+		AgentSession:   "f6be0343-85c1-4a50-8911-927380626a6b",
+		StateChangeSeq: 946,
 	}
 	if agent != want {
 		t.Fatalf("AgentPrompt() = %+v, want %+v", agent, want)
@@ -155,7 +157,8 @@ func TestAgentGet_BuildsArgsAndParsesLiveSession(t *testing.T) {
 			"type":"agent_info",
 			"agent":{
 				"pane_id":"wE:p1","workspace_id":"wE","tab_id":"wE:t9","agent_status":"working",
-				"agent_session":{"source":"herdr:codex","agent":"codex","kind":"id","value":"session-1"}
+				"agent_session":{"source":"herdr:codex","agent":"codex","kind":"id","value":"session-1"},
+				"state_change_seq":12
 			}
 		}}`), nil
 	})
@@ -164,8 +167,8 @@ func TestAgentGet_BuildsArgsAndParsesLiveSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AgentGet() error = %v", err)
 	}
-	if agent.PaneID != "wE:p1" || agent.TabID != "wE:t9" || agent.WorkspaceID != "wE" || agent.AgentStatus != "working" || agent.AgentSession != "session-1" {
-		t.Errorf("AgentGet() = %+v, want live pane/tab/workspace/status/session attribution", agent)
+	if agent.PaneID != "wE:p1" || agent.TabID != "wE:t9" || agent.WorkspaceID != "wE" || agent.AgentStatus != "working" || agent.AgentSession != "session-1" || agent.StateChangeSeq != 12 {
+		t.Errorf("AgentGet() = %+v, want live pane/tab/workspace/status/session/state_change_seq attribution", agent)
 	}
 	if got := strings.Join(gotArgs, " "); got != "agent get iter-01" {
 		t.Errorf("args = %q, want %q", got, "agent get iter-01")

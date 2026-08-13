@@ -13,6 +13,11 @@ type Agent struct {
 	TabID        string
 	AgentStatus  string
 	AgentSession string // agent_session.value: the underlying agent's session id (for Claude, its Claude Code session UUID)
+	// StateChangeSeq is herdr's per-pane counter that only advances when the
+	// pane's observed state actually changes, distinguishing "idle because it
+	// genuinely finished a turn" from "idle because it never processed
+	// anything since it was created".
+	StateChangeSeq int
 }
 
 // AgentPromptOptions are the arguments/flags for AgentPrompt.
@@ -113,16 +118,18 @@ func runAgentJSON(args []string) (Agent, error) {
 			AgentSession *struct {
 				Value string `json:"value"`
 			} `json:"agent_session"`
+			StateChangeSeq int `json:"state_change_seq"`
 		} `json:"agent"`
 	}
 	if err := runJSON(args, &result); err != nil {
 		return Agent{}, err
 	}
 	agent := Agent{
-		PaneID:      result.Agent.PaneID,
-		WorkspaceID: result.Agent.WorkspaceID,
-		TabID:       result.Agent.TabID,
-		AgentStatus: result.Agent.AgentStatus,
+		PaneID:         result.Agent.PaneID,
+		WorkspaceID:    result.Agent.WorkspaceID,
+		TabID:          result.Agent.TabID,
+		AgentStatus:    result.Agent.AgentStatus,
+		StateChangeSeq: result.Agent.StateChangeSeq,
 	}
 	if result.Agent.AgentSession != nil {
 		agent.AgentSession = result.Agent.AgentSession.Value
