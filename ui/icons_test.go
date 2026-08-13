@@ -25,3 +25,13 @@ func TestIcons_TicketNerdFontCodepoints(t *testing.T) {
 		}
 	}
 }
+
+func TestIcons_ASCIITriangleDirection(t *testing.T) {
+	icons := Icons(false)
+	if icons.TriangleCollapsed != "▶" {
+		t.Errorf("TriangleCollapsed = %q, want %q", icons.TriangleCollapsed, "▶")
+	}
+	if icons.TriangleExpanded != "▼" {
+		t.Errorf("TriangleExpanded = %q, want %q", icons.TriangleExpanded, "▼")
+	}
+}
