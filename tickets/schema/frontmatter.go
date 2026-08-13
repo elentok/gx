@@ -22,6 +22,7 @@ type ticketYAML struct {
 	ExpectedContextWindow int          `yaml:"expected_context_window,omitempty"`
 	ActualContextWindow   int          `yaml:"actual_context_window,omitempty"`
 	ElapsedTime           int          `yaml:"elapsed_time,omitempty"`
+	ActualCost            float64      `yaml:"actual_cost,omitempty"`
 	Compactions           int          `yaml:"compactions,omitempty"`
 	Commitless            bool         `yaml:"commitless,omitempty"`
 	SessionIDs            []string     `yaml:"session_ids,omitempty"`
@@ -55,6 +56,7 @@ func (w ticketYAML) toTicket() Ticket {
 		ExpectedContextWindow: w.ExpectedContextWindow,
 		ActualContextWindow:   w.ActualContextWindow,
 		ElapsedTime:           w.ElapsedTime,
+		ActualCost:            w.ActualCost,
 		Compactions:           w.Compactions,
 		Commitless:            w.Commitless,
 		SessionIDs:            copyStrings(w.SessionIDs),
@@ -78,6 +80,7 @@ func ticketToYAML(t Ticket) ticketYAML {
 		ExpectedContextWindow: t.ExpectedContextWindow,
 		ActualContextWindow:   t.ActualContextWindow,
 		ElapsedTime:           t.ElapsedTime,
+		ActualCost:            t.ActualCost,
 		Compactions:           t.Compactions,
 		Commitless:            t.Commitless,
 		SessionIDs:            copyStrings(t.SessionIDs),

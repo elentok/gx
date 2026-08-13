@@ -30,6 +30,7 @@ const ticketTrailerKey = "Ralph-Loop-Ticket"
 const (
 	tokensTrailerKey  = "Ralph-Loop-Tokens"
 	elapsedTrailerKey = "Ralph-Loop-Elapsed"
+	costTrailerKey    = "Ralph-Loop-Cost"
 )
 
 // ticketTrailerValue builds ticketTrailerKey's value, scoped to epicName: a
@@ -806,6 +807,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		sink.IterationFinished(landedTicket, opts.EpicName, IterationStats{
 			ElapsedSeconds:    landedTicket.ElapsedTime,
 			PeakContextTokens: landedTicket.ActualContextWindow,
+			Cost:              landedTicket.ActualCost,
 			InProgress:        active,
 			Completed:         liveDone,
 			Total:             liveTotal,

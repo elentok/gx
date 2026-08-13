@@ -43,6 +43,10 @@ type Ticket struct {
 	// nothing to stamp).
 	ActualContextWindow int
 	ElapsedTime         int
+	// ActualCost mirrors schema.Ticket.ActualCost: the USD cost of the
+	// session(s) that landed this ticket. Zero for a ticket that's never run,
+	// or one landed before this field existed.
+	ActualCost float64
 	// Compactions mirrors schema.Ticket.Compactions: how many compaction
 	// boundaries the landing iteration's session crossed.
 	Compactions int

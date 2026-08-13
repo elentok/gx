@@ -94,6 +94,21 @@ func loadEpicCounts(scratchDir, epicName string) EpicCounts {
 	return RunScope{wholeEpic: true}.Counts(*epic)
 }
 
+// loadEpicTotalCost sums ActualCost across every ticket in epicName, the
+// epic-wide counterpart to a single landed ticket's IterationStats.Cost.
+// Same load-fresh, zero-on-failure posture as loadEpicCounts.
+func loadEpicTotalCost(scratchDir, epicName string) float64 {
+	epic, err := loadNamedEpic(scratchDir, epicName)
+	if err != nil || epic == nil {
+		return 0
+	}
+	var total float64
+	for _, t := range epic.Tickets {
+		total += t.ActualCost
+	}
+	return total
+}
+
 // joinParkedIdentifiers lists identifiers inline, capped at
 // parkedIdentifierCap: beyond that, the rest collapse into a single "+N
 // more" marker instead of growing the line without bound.

@@ -33,6 +33,13 @@ func formatTokens(n int) string {
 	return fmt.Sprintf("%dk tok", k)
 }
 
+// formatCost renders cost as "$0.42", the notification-text counterpart to
+// ralphloop's formatCostTrailer (report_metrics.go) and ui/tickets'
+// formatCost.
+func formatCost(cost float64) string {
+	return fmt.Sprintf("$%.2f", cost)
+}
+
 // mrkdwnStyle adapts the shared message templates below to a specific
 // chat platform's markup dialect: Telegram's MarkdownV2 requires
 // backslash-escaping a long list of ASCII punctuation (including the
@@ -163,7 +170,7 @@ func (s mrkdwnStyle) iterationResumedText(label, epicName, ticketIdentifier stri
 //
 //	✅ *{title}*
 //
-//	{elapsed} · {tokens} · {counts line}
+//	{elapsed} · {tokens} · {cost} · {counts line}
 //	[gx] {epic}/{ticket}
 //
 // The counts line here carries only done/in-progress/total (see
@@ -174,8 +181,8 @@ func (s mrkdwnStyle) iterationResumedText(label, epicName, ticketIdentifier stri
 func (s mrkdwnStyle) iterationFinishedText(ticket tickets.Ticket, epicName string, stats IterationStats) string {
 	line := RenderCountsLine(EpicCounts{Done: stats.Completed, InProgress: stats.InProgress, Total: stats.Total})
 	counts := fmt.Sprintf(
-		"%s · %s · %s",
-		formatDuration(stats.ElapsedSeconds), formatTokens(stats.PeakContextTokens), line,
+		"%s · %s · %s · %s",
+		formatDuration(stats.ElapsedSeconds), formatTokens(stats.PeakContextTokens), formatCost(stats.Cost), line,
 	)
 	return s.message("✅", ticket.Title, counts, "", s.identityLine(epicName, ticket.Identifier))
 }
@@ -220,15 +227,17 @@ func (s mrkdwnStyle) epicParkedText(epicName string, stalled []string) string {
 // epicCompleteText renders the "epic complete" notification. counts is the
 // full queue counts line, same as epicStartedText; completed is this run's
 // own landed-ticket tally, a distinct number from counts.Done (the epic's
-// total done count, which may include tickets a prior run landed):
+// total done count, which may include tickets a prior run landed); totalCost
+// is the epic-wide sum of every ticket's ActualCost (see loadEpicTotalCost),
+// not just this run's own landings:
 //
 //	🎉 *epic complete*
 //
 //	{counts line}
-//	{completed} ticket(s) landed in {elapsed}
+//	{completed} ticket(s) landed in {elapsed} · {totalCost}
 //	[gx] {epic}
-func (s mrkdwnStyle) epicCompleteText(epicName string, counts EpicCounts, completed int, elapsedSeconds int) string {
-	detail := fmt.Sprintf("%d ticket(s) landed in %s", completed, formatDuration(elapsedSeconds))
+func (s mrkdwnStyle) epicCompleteText(epicName string, counts EpicCounts, completed int, elapsedSeconds int, totalCost float64) string {
+	detail := fmt.Sprintf("%d ticket(s) landed in %s · %s", completed, formatDuration(elapsedSeconds), formatCost(totalCost))
 	return s.message("\U0001f389", "epic complete", RenderCountsLine(counts), detail, s.identityLine(epicName, ""))
 }
 

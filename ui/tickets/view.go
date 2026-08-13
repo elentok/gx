@@ -185,7 +185,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 	if m.implementingEpics[epic.Name] {
 		if live, ok := m.live[epic.Name][t.Identifier]; ok {
 			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live, indent+triangle+m.checkboxGlyph(m.isChecked(t.Path))+" "); ok {
-				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens)
+				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens, 0)
 				return []string{appendRowMetrics(base, joinNonEmpty(" ", suffix, metrics), metricsLineStyle)}
 			}
 		}
@@ -232,7 +232,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 	if status != tickets.StatusDone {
 		return []string{line}
 	}
-	metrics := formatMetricsLine(t.ElapsedTime, t.ActualContextWindow)
+	metrics := formatMetricsLine(t.ElapsedTime, t.ActualContextWindow, t.ActualCost)
 	if searchDim {
 		return []string{appendRowMetrics(line, metrics, ui.StyleDim)}
 	}

@@ -90,7 +90,7 @@ func TestTelegramEventSink_EpicComplete_PostsTelegramWireFormat(t *testing.T) {
 	if reqs[0].ParseMode != "MarkdownV2" {
 		t.Errorf("parse_mode = %q, want %q", reqs[0].ParseMode, "MarkdownV2")
 	}
-	want := telegramStyle.epicCompleteText("epic", EpicCounts{}, 5, 300)
+	want := telegramStyle.epicCompleteText("epic", EpicCounts{}, 5, 300, 0)
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}

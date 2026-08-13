@@ -183,7 +183,12 @@ type Ticket struct {
 	ExpectedContextWindow int
 	ActualContextWindow   int
 	ElapsedTime           int
-	Compactions           int
+	// ActualCost is the USD cost of the session(s) that landed this ticket,
+	// summed across every assistant turn and priced by each turn's own model
+	// (see ralphloop's turnCost). Zero for tickets landed before this field
+	// existed, or when the transcript's cost couldn't be computed.
+	ActualCost  float64
+	Compactions int
 	// SessionIDs accumulates the native session id of every claude/codex
 	// instance ever launched or reattached for this ticket, oldest first —
 	// distinct from the dropped single-value Session field (see
@@ -271,6 +276,9 @@ func Validate(t Ticket) error {
 	}
 	if t.Compactions < 0 {
 		errs = append(errs, fmt.Errorf("compactions: must be non-negative, got %d", t.Compactions))
+	}
+	if t.ActualCost < 0 {
+		errs = append(errs, fmt.Errorf("actual_cost: must be non-negative, got %g", t.ActualCost))
 	}
 	for _, b := range t.BlockedBy {
 		if b == t.ID {

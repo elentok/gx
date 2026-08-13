@@ -363,7 +363,8 @@ func (s *chatEventSink) EpicParked(epicName string, stalled []StalledTicket) {
 func (s *chatEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {
 	s.EventSink.EpicComplete(epicName, completed, elapsedSeconds)
 	counts := loadEpicCounts(s.scratchDir, epicName)
-	s.send(s.style.epicCompleteText(epicName, counts, completed, elapsedSeconds), notifyKindEpicComplete, epicSource(epicName), "")
+	totalCost := loadEpicTotalCost(s.scratchDir, epicName)
+	s.send(s.style.epicCompleteText(epicName, counts, completed, elapsedSeconds, totalCost), notifyKindEpicComplete, epicSource(epicName), "")
 }
 
 // send runs (eventType, source) through the budget/mute gate before

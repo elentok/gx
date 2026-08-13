@@ -327,7 +327,7 @@ func TestChatEventSink_MultipleDistinctEvents_FlushSendsOneSeparatorJoinedMessag
 	if len(got) != 1 {
 		t.Fatalf("sent = %v, want exactly 1 batched message", got)
 	}
-	want := slackStyle.epicStartedText("epic", EpicCounts{}) + "\n---\n" + slackStyle.epicCompleteText("epic", EpicCounts{}, 1, 10)
+	want := slackStyle.epicStartedText("epic", EpicCounts{}) + "\n---\n" + slackStyle.epicCompleteText("epic", EpicCounts{}, 1, 10, 0)
 	if got[0] != want {
 		t.Errorf("sent[0] = %q, want %q", got[0], want)
 	}

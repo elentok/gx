@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -51,6 +52,11 @@ func turnCost(u transcript.Usage) float64 {
 		float64(u.OutputTokens)/perMTok*p.output +
 		float64(u.CacheReadInputTokens)/perMTok*p.cacheRead +
 		float64(u.CacheCreationInputTokens)/perMTok*p.cacheWrite
+}
+
+// formatCostTrailer renders cost as a USD trailer value, e.g. "$0.42".
+func formatCostTrailer(cost float64) string {
+	return fmt.Sprintf("$%.2f", cost)
 }
 
 // sessionStats are one Claude Code session's aggregate figures, computed
@@ -138,23 +144,23 @@ func readAgentSessionStats(key sessionKey) (sessionStats, error) {
 // read yet: a repair/reattached landing (see reconcile.go) has no fresh
 // session of its own to read, and these metrics are a landing-time
 // convenience, not a precondition for the cherry-pick itself to succeed.
-func writeLandedMetrics(agent AgentKind, cwd, sessionID, ticketPath string) (contextWindow, elapsedSeconds int, ok bool, err error) {
+func writeLandedMetrics(agent AgentKind, cwd, sessionID, ticketPath string) (contextWindow, elapsedSeconds int, cost float64, ok bool, err error) {
 	stats, err := readAgentSessionStats(sessionKey{agent: agent, cwd: cwd, sessionID: sessionID})
 	if err != nil || !stats.ok {
-		return 0, 0, false, nil
+		return 0, 0, 0, false, nil
 	}
 	elapsedSeconds = int(stats.end.Sub(stats.start).Seconds())
-	if err := writeTicketMetrics(ticketPath, stats.peakOccupancy, elapsedSeconds); err != nil {
-		return 0, 0, false, err
+	if err := writeTicketMetrics(ticketPath, stats.peakOccupancy, elapsedSeconds, stats.cost); err != nil {
+		return 0, 0, 0, false, err
 	}
-	return stats.peakOccupancy, elapsedSeconds, true, nil
+	return stats.peakOccupancy, elapsedSeconds, stats.cost, true, nil
 }
 
 // writeTicketMetrics rewrites ticketPath's frontmatter with contextWindow/
-// elapsedSeconds in actual_context_window/elapsed_time, round-tripping
-// through schema's typed parse/marshal so every other field and the
-// markdown body are carried through unchanged.
-func writeTicketMetrics(ticketPath string, contextWindow, elapsedSeconds int) error {
+// elapsedSeconds/cost in actual_context_window/elapsed_time/actual_cost,
+// round-tripping through schema's typed parse/marshal so every other field
+// and the markdown body are carried through unchanged.
+func writeTicketMetrics(ticketPath string, contextWindow, elapsedSeconds int, cost float64) error {
 	raw, err := os.ReadFile(ticketPath)
 	if err != nil {
 		return err
@@ -165,6 +171,7 @@ func writeTicketMetrics(ticketPath string, contextWindow, elapsedSeconds int) er
 	}
 	t.ActualContextWindow = contextWindow
 	t.ElapsedTime = elapsedSeconds
+	t.ActualCost = cost
 
 	out, err := schema.MarshalTicket(t, schema.ParseBody(string(raw)))
 	if err != nil {

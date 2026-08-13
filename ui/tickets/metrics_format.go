@@ -70,10 +70,20 @@ func formatDuration(d time.Duration) string {
 	}
 }
 
-// formatMetricsLine joins elapsed/tokens into a row's line-2 figures, e.g.
-// "12m34s · 45.2k tok".
-func formatMetricsLine(elapsedSeconds, tokens int) string {
-	return formatElapsed(elapsedSeconds) + " · " + formatTokenCount(tokens)
+// formatCost renders a USD cost as "$0.42" for a row's metrics line.
+func formatCost(cost float64) string {
+	return fmt.Sprintf("$%.2f", cost)
+}
+
+// formatMetricsLine joins elapsed/tokens/cost into a row's line-2 figures,
+// e.g. "12m34s · 45.2k tok · $0.42". cost is omitted when zero — a live
+// row's cost isn't known until the iteration lands.
+func formatMetricsLine(elapsedSeconds, tokens int, cost float64) string {
+	line := formatElapsed(elapsedSeconds) + " · " + formatTokenCount(tokens)
+	if cost > 0 {
+		line += " · " + formatCost(cost)
+	}
+	return line
 }
 
 // joinNonEmpty joins a and b with sep, skipping either side if empty — a

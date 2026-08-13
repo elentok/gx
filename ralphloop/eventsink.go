@@ -25,6 +25,7 @@ type PauseKind string
 type IterationStats struct {
 	ElapsedSeconds    int
 	PeakContextTokens int
+	Cost              float64
 	InProgress        int
 	Completed         int
 	Total             int

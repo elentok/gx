@@ -113,10 +113,10 @@ func TestTelegramStyleIterationStartedText_IdentityLineLast(t *testing.T) {
 func TestTelegramStyleIterationFinishedText_EscapesAndFormats(t *testing.T) {
 	t.Parallel()
 	ticket := tickets.Ticket{Identifier: "02", Title: "Migrate ui"}
-	stats := IterationStats{ElapsedSeconds: 332, PeakContextTokens: 39000, Completed: 2, Total: 5}
+	stats := IterationStats{ElapsedSeconds: 332, PeakContextTokens: 39000, Cost: 1.234, Completed: 2, Total: 5}
 
 	got := telegramStyle.iterationFinishedText(ticket, "ui-tree-migration", stats)
-	want := "✅ *Migrate ui*\n\n5m32s · 39k tok · 2 done · 5 total\n\\[gx\\] ui\\-tree\\-migration/02"
+	want := "✅ *Migrate ui*\n\n5m32s · 39k tok · $1.23 · 2 done · 5 total\n\\[gx\\] ui\\-tree\\-migration/02"
 	if got != want {
 		t.Errorf("text = %q, want %q", got, want)
 	}
@@ -125,10 +125,10 @@ func TestTelegramStyleIterationFinishedText_EscapesAndFormats(t *testing.T) {
 func TestSlackStyleIterationFinishedText_NoEscaping(t *testing.T) {
 	t.Parallel()
 	ticket := tickets.Ticket{Identifier: "02", Title: "Migrate ui"}
-	stats := IterationStats{ElapsedSeconds: 332, PeakContextTokens: 39000, Completed: 2, Total: 5}
+	stats := IterationStats{ElapsedSeconds: 332, PeakContextTokens: 39000, Cost: 1.234, Completed: 2, Total: 5}
 
 	got := slackStyle.iterationFinishedText(ticket, "ui-tree-migration", stats)
-	want := "✅ *Migrate ui*\n\n5m32s · 39k tok · 2 done · 5 total\n[gx] ui-tree-migration/02"
+	want := "✅ *Migrate ui*\n\n5m32s · 39k tok · $1.23 · 2 done · 5 total\n[gx] ui-tree-migration/02"
 	if got != want {
 		t.Errorf("text = %q, want %q", got, want)
 	}
@@ -205,8 +205,8 @@ func TestTelegramStyleEpicParkedText(t *testing.T) {
 
 func TestTelegramStyleEpicCompleteText(t *testing.T) {
 	t.Parallel()
-	got := telegramStyle.epicCompleteText("ui-tree-migration", EpicCounts{Done: 8, Total: 10}, 5, 492)
-	want := "\U0001f389 *epic complete*\n\n8 done · 10 total\n5 ticket(s) landed in 8m12s\n\\[gx\\] ui\\-tree\\-migration"
+	got := telegramStyle.epicCompleteText("ui-tree-migration", EpicCounts{Done: 8, Total: 10}, 5, 492, 12.5)
+	want := "\U0001f389 *epic complete*\n\n8 done · 10 total\n5 ticket(s) landed in 8m12s · $12.50\n\\[gx\\] ui\\-tree\\-migration"
 	if got != want {
 		t.Errorf("text = %q, want %q", got, want)
 	}

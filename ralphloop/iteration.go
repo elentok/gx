@@ -524,7 +524,7 @@ func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane, ta
 	}
 
 	iterationCwd := iterationWorktreePath(p.WorktreeDir, p.FeatureBranch, p.Ticket.Identifier)
-	contextWindow, elapsedSeconds, hasMetrics, err := writeLandedMetrics(p.Agent, iterationCwd, sessionID, p.Ticket.Path)
+	contextWindow, elapsedSeconds, cost, hasMetrics, err := writeLandedMetrics(p.Agent, iterationCwd, sessionID, p.Ticket.Path)
 	if err != nil {
 		return "", fmt.Errorf("writing landed metrics for ticket %s: %w", p.Ticket.Identifier, err)
 	}
@@ -534,6 +534,7 @@ func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane, ta
 		trailers = append(trailers,
 			git.Trailer{Key: tokensTrailerKey, Value: strconv.Itoa(contextWindow)},
 			git.Trailer{Key: elapsedTrailerKey, Value: strconv.Itoa(elapsedSeconds) + "s"},
+			git.Trailer{Key: costTrailerKey, Value: formatCostTrailer(cost)},
 		)
 	}
 	if err := d.AppendTrailers(p.FeatureWorktree, trailers...); err != nil {

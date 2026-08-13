@@ -227,7 +227,7 @@ func TestRenderTicketRow_DoneMetricsLineMatchesTitleColor(t *testing.T) {
 	m := newModelForTicketRowTests(epic)
 
 	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)
-	wantSuffix := " " + statusDoneStyle.Italic(true).Render(formatMetricsLine(5, 100))
+	wantSuffix := " " + statusDoneStyle.Italic(true).Render(formatMetricsLine(5, 100, 0))
 	if !strings.HasSuffix(lines[0], wantSuffix) {
 		t.Fatalf("row line = %q, want it to end with %q", lines[0], wantSuffix)
 	}
