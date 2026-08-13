@@ -15,6 +15,7 @@ import (
 // bounds shifts focus to it (mirroring "l"/"enter"), and a subsequent wheel
 // event then scrolls the preview instead of the sidebar.
 func TestModel_ClickInsidePreviewBoundsFocusesItAndRoutesWheel(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\n"+strings.Repeat("Line of body text.\n\n", 100))
 
@@ -55,6 +56,7 @@ func TestModel_ClickInsidePreviewBoundsFocusesItAndRoutesWheel(t *testing.T) {
 // the preview has focus, clicking back inside the sidebar hands focus back to
 // it, so wheel events resume scrolling the sidebar rather than the preview.
 func TestModel_ClickInsideSidebarRestoresFocus(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 

@@ -25,6 +25,7 @@ func withFakeReattachHerdr(t *testing.T, findWorkspace func(string) (string, err
 }
 
 func TestCmdReattachScan_FirstActivation_ScansAndSecondIsNoOp(t *testing.T) {
+	// not parallel-safe: reassigns the package-level reattachFindWorkspace/reattachTabList/reattachScanOnce singletons
 	resetReattachScanOnce()
 	t.Cleanup(resetReattachScanOnce)
 
@@ -66,6 +67,7 @@ func TestCmdReattachScan_FirstActivation_ScansAndSecondIsNoOp(t *testing.T) {
 }
 
 func TestCmdReattachScan_FreshProcess_ReScans(t *testing.T) {
+	// not parallel-safe: reassigns the package-level reattachFindWorkspace/reattachTabList/reattachScanOnce singletons
 	resetReattachScanOnce()
 	t.Cleanup(resetReattachScanOnce)
 
@@ -90,6 +92,7 @@ func TestCmdReattachScan_FreshProcess_ReScans(t *testing.T) {
 }
 
 func TestHandleReattachSignals_NoTicketOrProcessStateMutated(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "epic", "01-first.md", "Status: claimed\n\nBody.\n")
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
@@ -110,6 +113,7 @@ func TestHandleReattachSignals_NoTicketOrProcessStateMutated(t *testing.T) {
 }
 
 func TestHandleReattachSignals_NeverSwitchesToQueueTab(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "epic", "01-first.md", "Status: claimed\n\nBody.\n")
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
@@ -147,6 +151,7 @@ func batchContainsQueueSwitch(cmd tea.Cmd) bool {
 }
 
 func TestHandleReattachSignals_NoSignals_NoOp(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 

@@ -12,6 +12,7 @@ import (
 )
 
 func TestModel_LiveEventsHighlightRunningEpicInFullList(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: claimed\n\nBody.\n")
 
@@ -70,6 +71,7 @@ func findCloseMsg(cmd tea.Cmd, id string) bool {
 }
 
 func TestModel_SyncRunSnapshotClosesReattachNotificationOnTicketReattached(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: claimed\n\nBody.\n")
 
@@ -101,6 +103,7 @@ func TestModel_SyncRunSnapshotClosesReattachNotificationOnTicketReattached(t *te
 }
 
 func TestModel_LiveEventDoesNotLeakAcrossEpicsWithSameTicketIdentifier(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
 	root := t.TempDir()
 	writeTicket(t, root, "running-epic", "01-first-ticket.md", "Status: claimed\n\nBody.\n")
 	writeTicket(t, root, "other-epic", "01-unrelated-ticket.md", "Status: open\n\nBody.\n")
@@ -132,6 +135,7 @@ func TestModel_LiveEventDoesNotLeakAcrossEpicsWithSameTicketIdentifier(t *testin
 }
 
 func TestModel_OnPageActivatedRecoversTwoConcurrentEpicRuns(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
 	root := t.TempDir()
 	writeTicket(t, root, "epic-a", "01-first-ticket.md", "Status: claimed\n\nBody.\n")
 	writeTicket(t, root, "epic-b", "01-first-ticket.md", "Status: claimed\n\nBody.\n")
@@ -193,6 +197,7 @@ func TestModel_OnPageActivatedRecoversTwoConcurrentEpicRuns(t *testing.T) {
 }
 
 func TestModel_LiveEventsScopedPerEpicWithConcurrentSameNumberedTickets(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
 	root := t.TempDir()
 	writeTicket(t, root, "epic-a", "01-first-ticket.md", "Status: claimed\n\nBody.\n")
 	writeTicket(t, root, "epic-b", "01-first-ticket.md", "Status: claimed\n\nBody.\n")

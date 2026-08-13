@@ -12,6 +12,7 @@ import (
 // win over the AllDone-implies-collapsed default, not just fall through as
 // if the epic had never been seen.
 func TestDefaultCollapsedEpics_HonorsExplicitFalseOverAllDoneDefault(t *testing.T) {
+	t.Parallel()
 	epics := []tickets.Epic{
 		{Path: "done-epic", Tickets: []tickets.Ticket{{Number: 1, Status: "done"}}},
 	}
@@ -39,6 +40,7 @@ func TestDefaultCollapsedEpics_HonorsExplicitFalseOverAllDoneDefault(t *testing.
 // group, so a done/needs-repair ticket stays in its plan-order slot
 // instead of jumping to the bottom.
 func TestSortedTicketIndexes_PlanOrderIgnoresStatus(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
 		{Number: 4, Identifier: "04", Status: "needs-repair"},
 		{Number: 1, Identifier: "01", Status: "done"},
@@ -59,6 +61,7 @@ func TestSortedTicketIndexes_PlanOrderIgnoresStatus(t *testing.T) {
 // mirrors TestSortedTickets_LetteredSiblingsFollowOriginalInFilenameOrder
 // (flat_test.go): 04/04a/04b share Number 4 and tie-break on DisplayNumber.
 func TestSortedTicketIndexes_LetteredSiblingsFollowOriginalInFilenameOrder(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
 		{Number: 4, Identifier: "04b", Status: "open"},
 		{Number: 5, Identifier: "05", Status: "open"},
@@ -81,6 +84,7 @@ func TestSortedTicketIndexes_LetteredSiblingsFollowOriginalInFilenameOrder(t *te
 // leaving an unrelated ticket (04) at the top level; collapsing the
 // grandparent hides both descendants while leaving 04 visible.
 func TestModel_TicketRows_NestsChildrenAtArbitraryDepthAndRespectsCollapse(t *testing.T) {
+	t.Parallel()
 	parent01, parent02 := "01", "02"
 	epic := tickets.Epic{Path: "epic", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Path: "01", Status: "open"},

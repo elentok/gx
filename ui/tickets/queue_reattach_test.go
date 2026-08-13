@@ -12,6 +12,7 @@ import (
 )
 
 func TestCmdCheckDetachedLive_DetachedWithLiveClaimedTicket_ReturnsMsg(t *testing.T) {
+	// not parallel-safe: reassigns the package-level reattachFindWorkspace/reattachTabList singletons
 	root := t.TempDir()
 	writeTicket(t, root, "epic", "01-first.md", "Status: claimed\n\nBody.\n")
 	withFakeReattachHerdr(t, func(label string) (string, error) {
@@ -34,6 +35,7 @@ func TestCmdCheckDetachedLive_DetachedWithLiveClaimedTicket_ReturnsMsg(t *testin
 }
 
 func TestCmdCheckDetachedLive_ForeignAttached_ReturnsNil(t *testing.T) {
+	// not parallel-safe: reassigns the package-level processStartTime/reattachFindWorkspace/reattachTabList singletons
 	root := t.TempDir()
 	writeTicket(t, root, "epic", "01-first.md", "Status: claimed\n\nBody.\n")
 	foreignPID := 5252525
@@ -55,6 +57,7 @@ func TestCmdCheckDetachedLive_ForeignAttached_ReturnsNil(t *testing.T) {
 }
 
 func TestCmdCheckDetachedLive_DetachedButNothingClaimed_ReturnsNil(t *testing.T) {
+	// not parallel-safe: reassigns the package-level reattachFindWorkspace/reattachTabList singletons
 	root := t.TempDir()
 	writeTicket(t, root, "epic", "01-first.md", "Status: open\n\nBody.\n")
 	withFakeReattachHerdr(t, func(label string) (string, error) {
@@ -70,6 +73,7 @@ func TestCmdCheckDetachedLive_DetachedButNothingClaimed_ReturnsNil(t *testing.T)
 }
 
 func TestCmdCheckDetachedLive_DetachedButNothingLive_ReturnsNil(t *testing.T) {
+	// not parallel-safe: reassigns the package-level reattachFindWorkspace/reattachTabList singletons
 	root := t.TempDir()
 	writeTicket(t, root, "epic", "01-first.md", "Status: claimed\n\nBody.\n")
 	withFakeReattachHerdr(t, func(label string) (string, error) {
@@ -84,6 +88,7 @@ func TestCmdCheckDetachedLive_DetachedButNothingLive_ReturnsNil(t *testing.T) {
 }
 
 func TestHandleDetachedLiveDetected_OpensConfirm(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "epic", "01-first.md", "Status: claimed\n\nBody.\n")
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, map[string]bool{}, keys.Manager{}))
@@ -96,6 +101,7 @@ func TestHandleDetachedLiveDetected_OpensConfirm(t *testing.T) {
 }
 
 func TestHandleDetachedLiveDetected_DoesNotClobberOpenConfirm(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "epic", "01-first.md", "Status: claimed\n\nBody.\n")
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, map[string]bool{}, keys.Manager{}))
@@ -109,6 +115,7 @@ func TestHandleDetachedLiveDetected_DoesNotClobberOpenConfirm(t *testing.T) {
 }
 
 func TestHandleDetachedLiveConfirmed_QueuesDynamicPlanAndDefaultsAgent(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
 	// Zero available slots so startAvailableEpics (called at the end of
 	// handleDetachedLiveConfirmed) can't immediately drain the plan this test
 	// asserts on back out of m.pendingEpics.
@@ -140,6 +147,7 @@ func TestHandleDetachedLiveConfirmed_QueuesDynamicPlanAndDefaultsAgent(t *testin
 }
 
 func TestCmdCheckStrandedPending_CheckedEpicWithNoRunOrClaim_ReturnsMsg(t *testing.T) {
+	t.Parallel()
 	// No claimed/needs-repair ticket, and an empty registry (as a freshly
 	// started gx process would have): this epic was checked/queued but never
 	// got its turn before the process that queued it exited. Simulates the
@@ -162,6 +170,7 @@ func TestCmdCheckStrandedPending_CheckedEpicWithNoRunOrClaim_ReturnsMsg(t *testi
 }
 
 func TestCmdCheckStrandedPending_ClaimedTicket_ReturnsNil(t *testing.T) {
+	t.Parallel()
 	// A claimed ticket belongs to cmdCheckDetachedLive's explicit
 	// reattach-confirmation flow instead — cmdCheckStrandedPending must steer
 	// clear of it rather than risk double-supervising a still-live herdr
@@ -177,6 +186,7 @@ func TestCmdCheckStrandedPending_ClaimedTicket_ReturnsNil(t *testing.T) {
 }
 
 func TestCmdCheckStrandedPending_FullyDoneEpic_ReturnsNil(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "epic", "01-first.md", "Status: done\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "epic", "01-first.md"): true}
@@ -188,6 +198,7 @@ func TestCmdCheckStrandedPending_FullyDoneEpic_ReturnsNil(t *testing.T) {
 }
 
 func TestCmdCheckStrandedPending_NothingChecked_ReturnsNil(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "epic", "01-first.md", "Status: ready-for-agent\n\nBody.\n")
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, map[string]bool{}, keys.Manager{}))
@@ -198,6 +209,7 @@ func TestCmdCheckStrandedPending_NothingChecked_ReturnsNil(t *testing.T) {
 }
 
 func TestHandleStrandedPendingConfirmed_QueuesCheckedPlanAndDefaultsAgent(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
 	// Zero available slots so startAvailableEpics (called at the end of
 	// handleStrandedPendingConfirmed) can't immediately drain the plan this
 	// test asserts on back out of m.pendingEpics.
@@ -233,6 +245,7 @@ func TestHandleStrandedPendingConfirmed_QueuesCheckedPlanAndDefaultsAgent(t *tes
 }
 
 func TestHandleDetachedLiveConfirmed_DoesNotOverwriteExistingAgent(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
 	previousRegistry := ralphLoopRegistry
 	ralphLoopRegistry = newLoopRegistry(0)
 	t.Cleanup(func() { ralphLoopRegistry = previousRegistry })

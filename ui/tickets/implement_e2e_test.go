@@ -17,6 +17,7 @@ import (
 )
 
 func TestTicketsTUI_ImplementKeyNoopsWithNothingChecked(t *testing.T) {
+	t.Parallel()
 	root := testutil.TempRepo(t)
 	if err := os.MkdirAll(filepath.Join(root, ".scratch", "my-epic", "issues"), 0755); err != nil {
 		t.Fatal(err)
@@ -42,6 +43,7 @@ func TestTicketsTUI_ImplementKeyNoopsWithNothingChecked(t *testing.T) {
 // verified separately at the Model level (implement_test.go), since this
 // isolated harness has no app shell to route it.
 func TestTicketsTUI_ImplementKeyOpensQueueDirectlyWithNoActiveLoop(t *testing.T) {
+	t.Parallel()
 	root := testutil.TempRepo(t)
 	if err := os.MkdirAll(filepath.Join(root, ".scratch", "my-epic", "issues"), 0755); err != nil {
 		t.Fatal(err)

@@ -28,6 +28,7 @@ func loadSingleTicket(t *testing.T, root, epicName, filename, content string) (t
 }
 
 func TestParkReason_NeedsAnswerFirstNonEmptyLineStripped(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	epic, ticket := loadSingleTicket(t, root, "my-epic", "01-first.md",
 		"Status: needs-answer\n\n## Needs Answer\n\n**Which approach?** option A or B\n")
@@ -40,6 +41,7 @@ func TestParkReason_NeedsAnswerFirstNonEmptyLineStripped(t *testing.T) {
 }
 
 func TestParkReason_NeedsRepairFirstNonEmptyLineStripped(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	epic, ticket := loadSingleTicket(t, root, "my-epic", "01-first.md",
 		"Status: needs-repair\n\n## Needs Repair\n\n_build failed_ with exit 1\n")
@@ -57,6 +59,7 @@ func TestParkReason_NeedsRepairFirstNonEmptyLineStripped(t *testing.T) {
 // heading to find, so parkReason returns "" — but the row stays classified
 // as parked by RenderedStatus regardless.
 func TestParkReason_StaleSectionStillGatedParked(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	epic, ticket := loadSingleTicket(t, root, "my-epic", "01-first.md",
 		"Status: needs-answer\n\nNo park section here.\n")
@@ -70,6 +73,7 @@ func TestParkReason_StaleSectionStillGatedParked(t *testing.T) {
 }
 
 func TestParkReason_DraftNotParked(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	epic, ticket := loadSingleTicket(t, root, "my-epic", "01-first.md",
 		"Status: draft\n\n## Needs Answer\n\nSomething.\n")
@@ -80,6 +84,7 @@ func TestParkReason_DraftNotParked(t *testing.T) {
 }
 
 func TestParkReason_OpenStatusIgnoresLeftoverSection(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	epic, ticket := loadSingleTicket(t, root, "my-epic", "01-first.md",
 		"Status: open\n\n## Needs Answer\n\nSomething.\n")
@@ -90,6 +95,7 @@ func TestParkReason_OpenStatusIgnoresLeftoverSection(t *testing.T) {
 }
 
 func TestEllipsize_TruncatesAtRuneCapWithIcon(t *testing.T) {
+	t.Parallel()
 	long := ""
 	for range 100 {
 		long += "x"

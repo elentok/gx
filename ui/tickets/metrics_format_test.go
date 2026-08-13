@@ -6,6 +6,7 @@ import (
 )
 
 func TestFormatTokenCount(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		tokens int
 		want   string
@@ -26,6 +27,7 @@ func TestFormatTokenCount(t *testing.T) {
 }
 
 func TestFormatElapsed(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		seconds int
 		want    string
@@ -45,6 +47,7 @@ func TestFormatElapsed(t *testing.T) {
 }
 
 func TestFormatDuration(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		d    time.Duration
 		want string

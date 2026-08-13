@@ -13,6 +13,7 @@ import (
 )
 
 func TestModel_SidebarScrollbarAppearsOnlyWhenListOverflows(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
 
@@ -41,6 +42,7 @@ func TestModel_SidebarScrollbarAppearsOnlyWhenListOverflows(t *testing.T) {
 }
 
 func TestModel_MouseWheelScrollsSidebarWithoutMovingSelection(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	for i := 1; i <= 60; i++ {
 		writeTicket(t, root, "epic", fmt.Sprintf("%02d-ticket.md", i), "Status: open\n\nBody.\n")
@@ -67,6 +69,7 @@ func TestModel_MouseWheelScrollsSidebarWithoutMovingSelection(t *testing.T) {
 // TestModel_CtrlDCtrlUPagesSidebar mirrors the Queue tab's ctrl+d/ctrl+u
 // paging test — both tabs must page by list.DefaultScroll rows.
 func TestModel_CtrlDCtrlUPagesSidebar(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	for i := 1; i <= 40; i++ {
 		writeTicket(t, root, "epic", fmt.Sprintf("%02d-ticket.md", i), "Status: open\n\nBody.\n")
@@ -102,6 +105,7 @@ func TestModel_CtrlDCtrlUPagesSidebar(t *testing.T) {
 }
 
 func TestQueueModel_ScrollbarAppearsOnlyWhenListOverflows(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "epic", "01-only-ticket.md"): true}

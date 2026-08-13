@@ -25,6 +25,7 @@ import (
 )
 
 func TestQueueModelRendersFlatDependencyOrderedEpicPlan(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-foundation.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-dependent.md", "Status: open\nBlocked by: 01\n\nBody.\n")
@@ -66,6 +67,7 @@ func TestQueueModelRendersFlatDependencyOrderedEpicPlan(t *testing.T) {
 // dependents via ralphloop.PlanWaves), not plain ticket-number order — even
 // when the blocker has a higher ticket number than its dependent.
 func TestQueueModelOrdersRowsByDependencyNotTicketNumber(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "20-dependent.md", "Status: open\nBlocked by: 50\n\nBody.\n")
 	writeTicket(t, root, "alpha", "50-blocker.md", "Status: open\n\nBody.\n")
@@ -109,6 +111,7 @@ func TestQueueModelOrdersRowsByDependencyNotTicketNumber(t *testing.T) {
 // 03) render nested underneath it in the Queue tab, and "h"/"l" collapse and
 // re-expand that nesting.
 func TestQueueModelNestsChildrenUnderParentAndCollapsesWithHL(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-parent.md", "Status: open\n\nBody.\n")
 	writeRawQueueTicket(t, root, "alpha", "02-child.md", "---\nid: \"02\"\nstatus: open\ntype: task\nparent: \"01\"\n---\n\nBody.\n")
@@ -163,6 +166,7 @@ func TestQueueModelNestsChildrenUnderParentAndCollapsesWithHL(t *testing.T) {
 // on a leaf row (no children) hands focus straight to the preview panel,
 // mirroring Tickets' focusPreviewOrExpand.
 func TestQueueModelLOnLeafRowFocusesPreview(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-solo.md", "Status: open\n\nBody.\n")
 
@@ -190,6 +194,7 @@ func TestQueueModelLOnLeafRowFocusesPreview(t *testing.T) {
 // TestQueueModelEnterStillLaunchesCheckedQueueWhenActionable for the
 // opposite, launch-wins case).
 func TestQueueModelEnterOnExpandedParentFocusesPreview(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-parent.md", "Status: open\n\nBody.\n")
 	writeRawQueueTicket(t, root, "alpha", "02-child.md", "---\nid: \"02\"\nstatus: open\ntype: task\nparent: \"01\"\n---\n\nBody.\n")
@@ -219,6 +224,7 @@ func TestQueueModelEnterOnExpandedParentFocusesPreview(t *testing.T) {
 // handlePreviewKey — each key tested from a fresh preview-focused model so one
 // doesn't mask another's regression.
 func TestQueueModelHLeftEscReturnFocusFromPreview(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-solo.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-solo.md"): true}
@@ -253,6 +259,7 @@ func TestQueueModelHLeftEscReturnFocusFromPreview(t *testing.T) {
 // over the same keypress on the common case of a leaf row with a runnable
 // plan checked.
 func TestQueueModelEnterStillLaunchesCheckedQueueWhenActionable(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-solo.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-solo.md"): true}
@@ -272,6 +279,7 @@ func TestQueueModelEnterStillLaunchesCheckedQueueWhenActionable(t *testing.T) {
 }
 
 func TestQueueModelNeverShowsATicketRunnableWhenOutOfScopeBlockerIsUnmet(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-foundation.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-dependent.md", "Status: open\nBlocked by: 01\n\nBody.\n")
@@ -297,6 +305,7 @@ func TestQueueModelNeverShowsATicketRunnableWhenOutOfScopeBlockerIsUnmet(t *test
 }
 
 func TestQueueModelSurfacesActionableErrorForDependencyCycle(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\nBlocked by: 02\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-second.md", "Status: open\nBlocked by: 01\n\nBody.\n")
@@ -321,6 +330,7 @@ func TestQueueModelSurfacesActionableErrorForDependencyCycle(t *testing.T) {
 // must show up in the Queue tab's list/count instead of staying frozen to
 // m.executionTickets' kickoff snapshot.
 func TestQueueModelPollSyncsExecutionTicketsToWidenedRunScope(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: claimed\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
@@ -375,6 +385,7 @@ func TestQueueModelPollSyncsExecutionTicketsToWidenedRunScope(t *testing.T) {
 }
 
 func TestQueueModelBannerWhileRunningAggregatesCheckedEpics(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-done.md", "Status: done\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-running.md", "Status: claimed\n\nBody.\n")
@@ -400,6 +411,7 @@ func TestQueueModelBannerWhileRunningAggregatesCheckedEpics(t *testing.T) {
 }
 
 func TestQueueModelBannerWhenCompletedAggregatesLandedTicketMetrics(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: claimed\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-second.md", "Status: claimed\n\nBody.\n")
@@ -438,6 +450,7 @@ func TestQueueModelBannerWhenCompletedAggregatesLandedTicketMetrics(t *testing.T
 // title always encodes run state, and the body carries at most one
 // state-specific line — one assertion per state.
 func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
@@ -540,6 +553,7 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 // read-only for selection, so its rows must not render a checkbox glyph
 // (checking/selecting only happens in the Tickets tab).
 func TestQueueModelRowsRenderWithNoCheckbox(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	name := "01-first.md"
 	writeTicket(t, root, "alpha", name, "Status: open\n\nBody.\n")
@@ -557,6 +571,7 @@ func TestQueueModelRowsRenderWithNoCheckbox(t *testing.T) {
 // pressing it opens a confirmation, and only accepting it clears every
 // queued ticket.
 func TestQueueModelClearAllRequiresConfirmation(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "beta", "01-first.md", "Status: open\n\nBody.\n")
@@ -586,6 +601,7 @@ func TestQueueModelClearAllRequiresConfirmation(t *testing.T) {
 // keymap: only done tickets (and epics left with nothing visible) are
 // cleared, after confirmation.
 func TestQueueModelClearCompleteRequiresConfirmation(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-open.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-done.md", "Status: open\n\nBody.\n")
@@ -628,6 +644,7 @@ func TestQueueModelClearCompleteRequiresConfirmation(t *testing.T) {
 // affecting epicWaves' plan validation (which must keep treating the hidden
 // ticket as queued), and toggling "tc" again restores it.
 func TestQueueModelHideCompleteToggleHidesDoneTicketsButKeepsPlanValidation(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-second.md", "Status: open\nBlocked by: 01\n\nBody.\n")
@@ -678,6 +695,7 @@ func TestQueueModelHideCompleteToggleHidesDoneTicketsButKeepsPlanValidation(t *t
 // behavior, and plain "c"/"C" (with no preceding "t") still open their clear
 // confirmations unaffected.
 func TestQueueModelTChordDoesNotCollideWithClearKeymaps(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-done.md", "Status: open\n\nBody.\n")
 	writeRawQueueTicket(t, root, "alpha", "01-done.md", "---\nid: \"01\"\nstatus: done\ntype: task\n---\n\nBody.\n")
@@ -726,6 +744,7 @@ func TestQueueModelTChordDoesNotCollideWithClearKeymaps(t *testing.T) {
 }
 
 func TestQueueModelIncludesSelectionsAddedAfterLoad(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	name := "01-later.md"
 	writeTicket(t, root, "alpha", name, "Status: open\n\nBody.\n")
@@ -740,6 +759,7 @@ func TestQueueModelIncludesSelectionsAddedAfterLoad(t *testing.T) {
 }
 
 func TestQueueModelEnterChoosesAgentAndStartsOneEpicSubset(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry/runRalphLoop singletons
 	root := testutil.TempRepo(t)
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
@@ -813,6 +833,7 @@ func TestQueueModelEnterChoosesAgentAndStartsOneEpicSubset(t *testing.T) {
 }
 
 func TestQueueModelEnterStartsFullEligibleSelectionDynamic(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry/runRalphLoop singletons
 	root := testutil.TempRepo(t)
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
@@ -873,6 +894,7 @@ func TestQueueModelEnterStartsFullEligibleSelectionDynamic(t *testing.T) {
 }
 
 func TestQueueModelSchedulesCheckedEpicsInCheckOrderAndBackfillsAtCap(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry/runRalphLoop singletons
 	root := testutil.TempRepo(t)
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "beta", "01-first.md", "Status: open\n\nBody.\n")
@@ -971,6 +993,7 @@ func TestQueueModelSchedulesCheckedEpicsInCheckOrderAndBackfillsAtCap(t *testing
 }
 
 func TestQueueModelReactivationRecoversTwoConcurrentEpicsFromRegistry(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: claimed\n\nBody.\n")
 	writeTicket(t, root, "beta", "01-first.md", "Status: claimed\n\nBody.\n")
@@ -1011,6 +1034,7 @@ func TestQueueModelReactivationRecoversTwoConcurrentEpicsFromRegistry(t *testing
 }
 
 func TestQueueModelReactivationBackfillsPendingEpicAfterMissedCompletion(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry/runRalphLoop singletons
 	root := testutil.TempRepo(t)
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "beta", "01-first.md", "Status: open\n\nBody.\n")
@@ -1124,6 +1148,7 @@ func loadQueueModel(t *testing.T, m QueueModel) QueueModel {
 }
 
 func TestQueueModelPersistsRunningThenDoneStatusThroughStore(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry/runRalphLoop singletons
 	root := testutil.TempRepo(t)
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	path := ticketPath(root, "alpha", "01-first.md")
@@ -1184,6 +1209,7 @@ func TestQueueModelPersistsRunningThenDoneStatusThroughStore(t *testing.T) {
 }
 
 func TestQueueModelPersistsErroredStatusOnFailure(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry/runRalphLoop singletons
 	root := testutil.TempRepo(t)
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	path := ticketPath(root, "alpha", "01-first.md")
@@ -1238,6 +1264,7 @@ func TestQueueModelPersistsErroredStatusOnFailure(t *testing.T) {
 }
 
 func TestQueueModelPauseDoesNotRewriteRunningStatus(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry/runRalphLoop singletons
 	root := testutil.TempRepo(t)
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	path := ticketPath(root, "alpha", "01-first.md")
@@ -1289,6 +1316,7 @@ func TestQueueModelPauseDoesNotRewriteRunningStatus(t *testing.T) {
 }
 
 func TestQueueModelMidRunSelectionChangeDoesNotRewriteProgressTotals(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry/runRalphLoop singletons
 	root := testutil.TempRepo(t)
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
@@ -1353,6 +1381,7 @@ func TestQueueModelMidRunSelectionChangeDoesNotRewriteProgressTotals(t *testing.
 // (as a prior process session would have left it) must be fully reflected in
 // a freshly constructed QueueModel with no prior Tickets-tab visit.
 func TestQueueModelRestoresAllStatusesAsInitialTab(t *testing.T) {
+	t.Parallel()
 	root := testutil.TempRepo(t)
 	writeTicket(t, root, "alpha", "01-pending.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-running.md", "Status: open\n\nBody.\n")
@@ -1400,6 +1429,7 @@ func TestQueueModelRestoresAllStatusesAsInitialTab(t *testing.T) {
 // tabs read the same QueueStore, so a Tickets-first-then-Queue construction
 // and a Queue-first-then-Tickets construction must agree.
 func TestTicketsAndQueueMatchAfterRestartRegardlessOfNavigationOrder(t *testing.T) {
+	t.Parallel()
 	root := testutil.TempRepo(t)
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	queuedPath := ticketPath(root, "alpha", "01-first.md")
@@ -1444,6 +1474,7 @@ func TestTicketsAndQueueMatchAfterRestartRegardlessOfNavigationOrder(t *testing.
 // Tickets tab renders (view.go's renderTicketRow), not just a bare checkbox
 // and title.
 func TestQueueModelShowsSameStatusAsTicketsTab(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-foundation.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-dependent.md", "Status: open\nBlocked by: 01\n\nBody.\n")
@@ -1466,6 +1497,7 @@ func TestQueueModelShowsSameStatusAsTicketsTab(t *testing.T) {
 }
 
 func TestRenderQueueTicketRow_CommitlessSuffix(t *testing.T) {
+	t.Parallel()
 	var m QueueModel
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 		{Identifier: "01", Title: "Open ticket", Status: "open", Commitless: true},
@@ -1483,6 +1515,7 @@ func TestRenderQueueTicketRow_CommitlessSuffix(t *testing.T) {
 // line up whether or not each one has children, since the triangle column is
 // reserved at a fixed width for every row.
 func TestRenderQueueTicketRow_IconColumnAlignsRegardlessOfChildren(t *testing.T) {
+	t.Parallel()
 	var m QueueModel
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 		{Identifier: "01", Title: "Parent ticket", Status: "open"},
@@ -1513,6 +1546,7 @@ func leadingWhitespace(s string) string {
 // caller must not add its own on top or a running row ends up indented 4
 // spaces instead of 2.
 func TestRenderQueueTicketRow_LiveRowIndentMatchesNormalRow(t *testing.T) {
+	t.Parallel()
 	var m QueueModel
 	m.runningEpics = map[string]bool{"epic": true}
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
@@ -1534,6 +1568,7 @@ func TestRenderQueueTicketRow_LiveRowIndentMatchesNormalRow(t *testing.T) {
 }
 
 func TestRenderQueueTicketRow_DoneMetricsLineMatchesTitleColor(t *testing.T) {
+	t.Parallel()
 	var m QueueModel
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 		{Identifier: "01", Title: "Done ticket", Status: "done", ElapsedTime: 5, ActualContextWindow: 100},
@@ -1552,6 +1587,7 @@ func TestRenderQueueTicketRow_DoneMetricsLineMatchesTitleColor(t *testing.T) {
 // scroll offset at all, so content past the panel's height was simply
 // unreachable.
 func TestQueueModelScrollsWithKeysAndMouse(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	for i := 1; i <= 40; i++ {
 		writeTicket(t, root, "alpha", fmt.Sprintf("%02d-ticket.md", i), "Status: open\n\nBody.\n")
@@ -1613,6 +1649,7 @@ func TestQueueModelScrollsWithKeysAndMouse(t *testing.T) {
 // with no preview at all, now shows the same shared preview pane
 // (renderTicketPreview) as the Tickets tab for whichever row is selected.
 func TestQueueModelShowsPreviewPaneForSelectedTicket(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\nType: task\n\nDistinctive queue-preview body.\n")
 
@@ -1635,6 +1672,7 @@ func TestQueueModelShowsPreviewPaneForSelectedTicket(t *testing.T) {
 // in the Queue tab must select it (like arrowing there) and do nothing else
 // — no confirm modal, no other side effect.
 func TestQueueModelMouseClickSelectsRowOnly(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
@@ -1685,6 +1723,7 @@ func TestQueueModelMouseClickSelectsRowOnly(t *testing.T) {
 // mirroring the Tickets tab's TestModel_ClickInsidePreviewBoundsFocusesItAndRoutesWheel
 // (mouse_focus_test.go) via the shared previewFocus.clickToFocus helper.
 func TestQueueModelClickInsidePreviewBoundsFocusesIt(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
@@ -1710,6 +1749,7 @@ func TestQueueModelClickInsidePreviewBoundsFocusesIt(t *testing.T) {
 // scrolling ("b" jumps straight there since the Queue tab has no
 // focus-toggle of its own yet, ticket 12).
 func TestQueueModelPreviewScrollsPastTruncationPoint(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-ticket.md", "Status: open\n\nTOPMARKERXYZ\n\n"+strings.Repeat("Filler line of body text.\n\n", 80)+"BOTTOMMARKERXYZ\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-ticket.md"): true}
@@ -1737,6 +1777,7 @@ func TestQueueModelPreviewScrollsPastTruncationPoint(t *testing.T) {
 // "G"/"gg" bindings on the Queue tab, mirroring the Tickets tab's own
 // TestModel_GAndGGJumpSidebarSelectionToLastAndFirstRow (preview_test.go).
 func TestQueueModelGAndGGJumpSelectionToLastAndFirstRow(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
@@ -1780,6 +1821,7 @@ func writeRawQueueTicket(t *testing.T, root, epic, name, content string) {
 }
 
 func TestQueueSearch_SlashEntersInputMode(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
@@ -1795,6 +1837,7 @@ func TestQueueSearch_SlashEntersInputMode(t *testing.T) {
 }
 
 func TestQueueSearch_TypedCharactersFilterAndHighlight(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
@@ -1827,6 +1870,7 @@ func TestQueueSearch_TypedCharactersFilterAndHighlight(t *testing.T) {
 }
 
 func TestQueueSearch_EscExitsSearchMode(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
@@ -1850,6 +1894,7 @@ func TestQueueSearch_EscExitsSearchMode(t *testing.T) {
 }
 
 func TestQueueSearch_EnterExitsInputButKeepsResults(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
@@ -1877,6 +1922,7 @@ func TestQueueSearch_EnterExitsInputButKeepsResults(t *testing.T) {
 // input is active, digit keys must type into the query rather than falling
 // through to any of handleQueueKey's own bindings.
 func TestQueueSearch_DigitsTypeIntoQueryNotBoundKeys(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
@@ -1897,6 +1943,7 @@ func TestQueueSearch_DigitsTypeIntoQueryNotBoundKeys(t *testing.T) {
 }
 
 func TestQueueEditChordLaunchesEditorOnSelectedTicket(t *testing.T) {
+	// not parallel-safe: t.Setenv (EDITOR) is process-wide
 	t.Setenv("EDITOR", "true")
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
@@ -1937,6 +1984,7 @@ func TestQueueEditChordLaunchesEditorOnSelectedTicket(t *testing.T) {
 }
 
 func TestQueueEditChordCancelsOnEsc(t *testing.T) {
+	// not parallel-safe: t.Setenv (EDITOR) is process-wide
 	t.Setenv("EDITOR", "true")
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")

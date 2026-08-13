@@ -11,6 +11,7 @@ import (
 )
 
 func TestSearch_SlashEntersInputMode(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 
@@ -28,6 +29,7 @@ func TestSearch_SlashEntersInputMode(t *testing.T) {
 }
 
 func TestSearch_MatchesTitleAndStatusWordWithoutHidingRows(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
@@ -57,6 +59,7 @@ func TestSearch_MatchesTitleAndStatusWordWithoutHidingRows(t *testing.T) {
 }
 
 func TestSearch_NonMatchesAreDimmed(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
@@ -84,6 +87,7 @@ func TestSearch_NonMatchesAreDimmed(t *testing.T) {
 }
 
 func TestSearch_EnterDismissesInputButKeepsMatches(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 
@@ -110,6 +114,7 @@ func TestSearch_EnterDismissesInputButKeepsMatches(t *testing.T) {
 }
 
 func TestSearch_EscFullyClears(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 
@@ -133,6 +138,7 @@ func TestSearch_EscFullyClears(t *testing.T) {
 }
 
 func TestSearch_MatchesTicketInsideCollapsedClosedEpic(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "closed-epic", "01-hidden-gem.md", "Status: done\n\nBody.\n")
 	writeTicket(t, root, "open-epic", "01-other.md", "Status: open\n\nBody.\n")
@@ -175,6 +181,7 @@ func TestSearch_MatchesTicketInsideCollapsedClosedEpic(t *testing.T) {
 }
 
 func TestSearch_NoMatchLeavesCollapseStateUnchanged(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "closed-epic", "01-hidden-gem.md", "Status: done\n\nBody.\n")
 	writeTicket(t, root, "open-epic", "01-other.md", "Status: open\n\nBody.\n")
@@ -200,6 +207,7 @@ func TestSearch_NoMatchLeavesCollapseStateUnchanged(t *testing.T) {
 }
 
 func TestSearch_NAndShiftNCycleMatches(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-open-a.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "02-open-b.md", "Status: open\n\nBody.\n")

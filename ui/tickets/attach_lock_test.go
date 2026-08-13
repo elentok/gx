@@ -34,6 +34,7 @@ func readAttachLockFile(t *testing.T, scratchDir string) attachLockInfo {
 }
 
 func TestAcquireAttachLockWhenUnattachedSucceeds(t *testing.T) {
+	// not parallel-safe: reassigns the package-level processStartTime singleton
 	dir := t.TempDir()
 	withFakeProcessStartTime(t, map[int]string{os.Getpid(): "self-start-1"})
 
@@ -49,6 +50,7 @@ func TestAcquireAttachLockWhenUnattachedSucceeds(t *testing.T) {
 }
 
 func TestAcquireAttachLockForeignLiveBlocks(t *testing.T) {
+	// not parallel-safe: reassigns the package-level processStartTime singleton
 	dir := t.TempDir()
 	foreignPID := 424242
 	withFakeProcessStartTime(t, map[int]string{
@@ -76,6 +78,7 @@ func TestAcquireAttachLockForeignLiveBlocks(t *testing.T) {
 }
 
 func TestAcquireAttachLockReclaimsDeadPid(t *testing.T) {
+	// not parallel-safe: reassigns the package-level processStartTime singleton
 	dir := t.TempDir()
 	deadPID := 424243
 	withFakeProcessStartTime(t, map[int]string{
@@ -100,6 +103,7 @@ func TestAcquireAttachLockReclaimsDeadPid(t *testing.T) {
 }
 
 func TestAcquireAttachLockReclaimsMismatchedStartTime(t *testing.T) {
+	// not parallel-safe: reassigns the package-level processStartTime singleton
 	dir := t.TempDir()
 	reusedPID := 424244
 	withFakeProcessStartTime(t, map[int]string{
@@ -135,6 +139,7 @@ func writeAttachLockFile(t *testing.T, dir string, info attachLockInfo) {
 }
 
 func TestTryStartAcquiresAttachLockOnceAcrossEpics(t *testing.T) {
+	// not parallel-safe: reassigns the package-level processStartTime singleton
 	dir := t.TempDir()
 	withFakeProcessStartTime(t, map[int]string{os.Getpid(): "self-start-1"})
 
@@ -157,6 +162,7 @@ func TestTryStartAcquiresAttachLockOnceAcrossEpics(t *testing.T) {
 }
 
 func TestTryStartFailsAndLeavesRegistryUntouchedWhenForeignAttached(t *testing.T) {
+	// not parallel-safe: reassigns the package-level processStartTime singleton
 	dir := t.TempDir()
 	foreignPID := 424245
 	withFakeProcessStartTime(t, map[int]string{
@@ -185,6 +191,7 @@ func TestTryStartFailsAndLeavesRegistryUntouchedWhenForeignAttached(t *testing.T
 }
 
 func TestSelfAttachedReflectsThisProcessOnly(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry/processStartTime singletons
 	dir := t.TempDir()
 	withFakeProcessStartTime(t, map[int]string{os.Getpid(): "self-start-1"})
 
@@ -209,6 +216,7 @@ func TestSelfAttachedReflectsThisProcessOnly(t *testing.T) {
 }
 
 func TestForeignAttachPIDReportsLiveForeignHolderOnly(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry/processStartTime singletons
 	dir := t.TempDir()
 	foreignPID := 424246
 	withFakeProcessStartTime(t, map[int]string{
@@ -242,6 +250,7 @@ func TestForeignAttachPIDReportsLiveForeignHolderOnly(t *testing.T) {
 }
 
 func TestFinishReleasesAttachLockOnlyWhenLastRunEnds(t *testing.T) {
+	// not parallel-safe: reassigns the package-level processStartTime singleton
 	dir := t.TempDir()
 	withFakeProcessStartTime(t, map[int]string{os.Getpid(): "self-start-1"})
 

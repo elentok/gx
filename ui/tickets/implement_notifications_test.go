@@ -43,6 +43,7 @@ func startAndCaptureSink(t *testing.T, notifications config.NotificationsConfig)
 }
 
 func TestCmdStartImplementWrapsSinkInTelegramDecoratorWhenBotTokenConfigured(t *testing.T) {
+	// not parallel-safe: startAndCaptureSink reassigns the package-level runRalphLoop/ralphLoopRegistry singletons
 	notifications := config.NotificationsConfig{Telegram: config.TelegramConfig{BotToken: "tok", ChatID: "42"}}
 	sink := startAndCaptureSink(t, notifications)
 
@@ -52,6 +53,7 @@ func TestCmdStartImplementWrapsSinkInTelegramDecoratorWhenBotTokenConfigured(t *
 }
 
 func TestCmdStartImplementWrapsSinkInSlackDecoratorWhenWebhookURLConfigured(t *testing.T) {
+	// not parallel-safe: startAndCaptureSink reassigns the package-level runRalphLoop/ralphLoopRegistry singletons
 	notifications := config.NotificationsConfig{Slack: config.SlackConfig{WebhookURL: "https://hooks.example.com/x"}}
 	sink := startAndCaptureSink(t, notifications)
 
@@ -61,6 +63,7 @@ func TestCmdStartImplementWrapsSinkInSlackDecoratorWhenWebhookURLConfigured(t *t
 }
 
 func TestCmdStartImplementUsesRealSinkDirectlyWhenNoNotificationsConfigured(t *testing.T) {
+	// not parallel-safe: startAndCaptureSink reassigns the package-level runRalphLoop/ralphLoopRegistry singletons
 	sink := startAndCaptureSink(t, config.NotificationsConfig{})
 
 	if _, ok := sink.(*ralphloop.ChannelEventSink); !ok {

@@ -41,6 +41,7 @@ func installParkedRegistry(t *testing.T, parked map[string][]ralphloop.StalledTi
 // queueRunState's doc comment), and the title names the lowest epic name's
 // lowest ticket identifier deterministically.
 func TestQueueRunStateAndTitleReflectParkedEpics(t *testing.T) {
+	// not parallel-safe: installParkedRegistry reassigns the package-level ralphLoopRegistry singleton
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "beta", "01-first.md", "Status: open\n\nBody.\n")
@@ -77,6 +78,7 @@ func TestQueueRunStateAndTitleReflectParkedEpics(t *testing.T) {
 // implement-agent menu, even though its ticket is checked and would
 // otherwise be launchable.
 func TestQueueModelEnterOnParkedRowResumesEvenWhenCheckedAndLaunchable(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
@@ -116,6 +118,7 @@ func TestQueueModelEnterOnParkedRowResumesEvenWhenCheckedAndLaunchable(t *testin
 // implement-agent menu for the selected (non-parked) row instead of the
 // parked check swallowing it.
 func TestQueueModelEnterOnNonParkedRowUnchanged(t *testing.T) {
+	// not parallel-safe: installParkedRegistry reassigns the package-level ralphLoopRegistry singleton
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "beta", "01-first.md", "Status: open\n\nBody.\n")
@@ -151,6 +154,7 @@ func TestQueueModelEnterOnNonParkedRowUnchanged(t *testing.T) {
 // LiveEventTicketReattached — see reduceLiveEvent), its row returns to
 // running/queued rendering and stops being reported as parked.
 func TestQueueModelParkedEpicResumesToRunningRendering(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: claimed\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}

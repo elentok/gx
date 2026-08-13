@@ -39,6 +39,7 @@ func spacePress() tea.KeyPressMsg {
 }
 
 func TestModel_SpaceTogglesCheckedOnTicketRow(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 
@@ -71,6 +72,7 @@ func TestModel_SpaceTogglesCheckedOnTicketRow(t *testing.T) {
 }
 
 func TestModel_SpaceOnEpicRowChecksAllTickets(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
@@ -104,6 +106,7 @@ func TestModel_SpaceOnEpicRowChecksAllTickets(t *testing.T) {
 }
 
 func TestModel_SpaceToggleOnDoneTicketIsNoOp(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
@@ -134,6 +137,7 @@ func TestModel_SpaceToggleOnDoneTicketIsNoOp(t *testing.T) {
 }
 
 func TestModel_SpaceOnEpicRowChecksOnlyNonDoneTickets(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
@@ -160,6 +164,7 @@ func TestModel_SpaceOnEpicRowChecksOnlyNonDoneTickets(t *testing.T) {
 }
 
 func TestModel_CheckingBlockedTicketOpensConfirmModal(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\nBlocked by: 01\n\nBody.\n")
@@ -204,6 +209,7 @@ func TestModel_CheckingBlockedTicketOpensConfirmModal(t *testing.T) {
 }
 
 func TestModel_CheckingTicketWithAlreadyCheckedBlockersSkipsConfirm(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\nBlocked by: 01\n\nBody.\n")
@@ -241,6 +247,7 @@ func TestModel_CheckingTicketWithAlreadyCheckedBlockersSkipsConfirm(t *testing.T
 }
 
 func TestModel_ConfirmingBlockedModalChecksTicketAndBlockers(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\nBlocked by: 01\n\nBody.\n")
@@ -282,6 +289,7 @@ func TestModel_ConfirmingBlockedModalChecksTicketAndBlockers(t *testing.T) {
 }
 
 func TestModel_CancelingBlockedModalLeavesCheckedSetUnchanged(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\nBlocked by: 01\n\nBody.\n")
@@ -318,6 +326,7 @@ func TestModel_CancelingBlockedModalLeavesCheckedSetUnchanged(t *testing.T) {
 }
 
 func TestModel_MidRunForkAutoChecksNewChild(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeFrontmatterTicket(t, root, "my-epic", "01-first-ticket.md", "01", "claimed", "")
 
@@ -365,6 +374,7 @@ func TestModel_MidRunForkAutoChecksNewChild(t *testing.T) {
 // writes; it resolves the same way everywhere else in the tracker, so it must
 // auto-check here too.
 func TestModel_MidRunForkWithUnpaddedParentTokenAutoChecksNewChild(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeFrontmatterTicket(t, root, "my-epic", "01-first-ticket.md", "01", "claimed", "")
 
@@ -403,6 +413,7 @@ func TestModel_MidRunForkWithUnpaddedParentTokenAutoChecksNewChild(t *testing.T)
 }
 
 func TestModel_ForkOnUncheckedTicketDoesNotAutoCheckChild(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeFrontmatterTicket(t, root, "my-epic", "01-first-ticket.md", "01", "claimed", "")
 
@@ -431,6 +442,7 @@ func TestModel_ForkOnUncheckedTicketDoesNotAutoCheckChild(t *testing.T) {
 }
 
 func TestModel_CheckedRowsRenderDistinctMarker(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 
@@ -456,6 +468,7 @@ func TestModel_CheckedRowsRenderDistinctMarker(t *testing.T) {
 }
 
 func TestModel_CachedModelsRenderSelectionFromSharedQueueStore(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 	store := loadQueueStoreAt(t.TempDir() + "/queue.json")
@@ -485,6 +498,7 @@ func TestModel_CachedModelsRenderSelectionFromSharedQueueStore(t *testing.T) {
 }
 
 func TestModel_BlockedConfirmationFailureKeepsPriorQueue(t *testing.T) {
+	t.Parallel()
 	store := loadQueueStoreAt(t.TempDir() + "/queue.json")
 	if err := store.SetTicketChecked([]string{"keep"}, true); err != nil {
 		t.Fatal(err)

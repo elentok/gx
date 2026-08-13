@@ -18,6 +18,7 @@ import (
 // deliberately disagree, so a row showing the on-disk text (not
 // event.Reason) proves drainPendingReload's re-read wins.
 func TestQueueModel_ParkedRowSubtextComesFromDiskNotEventPayload(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md",
 		"Status: needs-answer\n\n## Needs Answer\n\nOn-disk reason, not the event payload.\n")
@@ -56,6 +57,7 @@ func TestQueueModel_ParkedRowSubtextComesFromDiskNotEventPayload(t *testing.T) {
 // a draft-status ticket's row must stay visually unchanged by this ticket's
 // work, even when it happens to carry a leftover "## Needs Answer" heading.
 func TestQueueModel_DraftRowUnaffectedByParkRendering(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md",
 		"Status: draft\n\n## Needs Answer\n\nLeftover text that must not surface.\n")
@@ -73,6 +75,7 @@ func TestQueueModel_DraftRowUnaffectedByParkRendering(t *testing.T) {
 // the preview's severity coloring: needs-answer highlights orange,
 // needs-repair red - distinct from each other and from the row-icon colors.
 func TestHighlightParkSection_NeedsAnswerAndNeedsRepairUseDistinctColors(t *testing.T) {
+	t.Parallel()
 	rendered := "intro\n" + needsAnswerHeading + "\nsome reason\n"
 	out, target, ok := highlightParkSection(rendered, tickets.StatusNeedsAnswer)
 	if !ok || target != 1 {
@@ -102,6 +105,7 @@ func TestHighlightParkSection_NeedsAnswerAndNeedsRepairUseDistinctColors(t *test
 // shared preview viewport so the park section heading is within view rather
 // than left at the top.
 func TestQueueModel_SelectingParkedRowScrollsPreviewToParkSection(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
 	root := t.TempDir()
 	var padding strings.Builder
 	for range 80 {

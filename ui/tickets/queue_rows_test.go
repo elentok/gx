@@ -16,6 +16,7 @@ import (
 // plan-order given in ordered (mirroring epicRowOrder's blockers-before-
 // dependents output) is preserved among sibling rows.
 func TestQueueRowsForEpic_NestsChildrenAtArbitraryDepthAndRespectsCollapse(t *testing.T) {
+	t.Parallel()
 	parent01, parent02 := "01", "02"
 	epic := tickets.Epic{Path: "epic", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Path: "01", Status: "open"},
@@ -68,6 +69,7 @@ func TestQueueRowsForEpic_NestsChildrenAtArbitraryDepthAndRespectsCollapse(t *te
 // old done-family collapse, the child stays nested under its still-live
 // parent instead of being reattached to the top level.
 func TestQueueRowsForEpic_DoneParentWithOpenForkChildStaysVisible(t *testing.T) {
+	t.Parallel()
 	parent01 := "01"
 	epic := tickets.Epic{Path: "epic", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Path: "01", Status: "done"},

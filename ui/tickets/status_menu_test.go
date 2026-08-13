@@ -30,6 +30,7 @@ func selectTicketRow(t *testing.T, m Model) Model {
 }
 
 func TestModel_ChangeStatusKeyOpensMenuWithoutLiveLoop(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: needs-answer\n\nBody.\n")
 
@@ -51,6 +52,7 @@ func TestModel_ChangeStatusKeyOpensMenuWithoutLiveLoop(t *testing.T) {
 }
 
 func TestModel_ChangeStatusKeyMenuExcludesGxOwnedStatusesWhileEpicIsLive(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: needs-answer\n\nBody.\n")
 
@@ -86,6 +88,7 @@ func TestModel_ChangeStatusKeyMenuExcludesGxOwnedStatusesWhileEpicIsLive(t *test
 }
 
 func TestModel_ChangeStatusKeyUnparksTicketBackToOpen(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: needs-answer\n\nBody.\n")
 	path := ticketPath(root, "my-epic", "01-first-ticket.md")
@@ -131,6 +134,7 @@ func TestModel_ChangeStatusKeyUnparksTicketBackToOpen(t *testing.T) {
 }
 
 func TestModel_ChangeStatusKeyDismissibleWithoutWriting(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: needs-answer\n\nBody.\n")
 	path := ticketPath(root, "my-epic", "01-first-ticket.md")

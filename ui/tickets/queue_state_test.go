@@ -14,6 +14,7 @@ import (
 )
 
 func TestQueueStoreRoundTripAndSnapshotIsolation(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "queue.json")
 	store := loadQueueStoreAt(path)
 	for i, status := range []queueItemStatus{queueStatusPending, queueStatusRunning, queueStatusDone, queueStatusErrored} {
@@ -40,6 +41,7 @@ func TestQueueStoreRoundTripAndSnapshotIsolation(t *testing.T) {
 }
 
 func TestQueueStoreConcurrentSnapshots(t *testing.T) {
+	t.Parallel()
 	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
 	if err := store.Check("ticket"); err != nil {
 		t.Fatal(err)
@@ -58,6 +60,7 @@ func TestQueueStoreConcurrentSnapshots(t *testing.T) {
 }
 
 func TestQueueStoreFailedWriteDoesNotPublishMutation(t *testing.T) {
+	t.Parallel()
 	path := t.TempDir()
 	store := loadQueueStoreAt(path)
 	if err := store.Check("ticket"); err == nil {
@@ -69,6 +72,7 @@ func TestQueueStoreFailedWriteDoesNotPublishMutation(t *testing.T) {
 }
 
 func TestQueueStoreSetCheckedPreservesUnrelatedEntries(t *testing.T) {
+	t.Parallel()
 	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
 	if err := store.Check("keep"); err != nil {
 		t.Fatal(err)
@@ -102,6 +106,7 @@ func TestQueueStoreSetCheckedPreservesUnrelatedEntries(t *testing.T) {
 }
 
 func TestQueueStoreSetCheckedFailedWritePublishesNothing(t *testing.T) {
+	t.Parallel()
 	store := loadQueueStoreAt(t.TempDir())
 	if err := store.SetChecked([]string{"ticket", "blocker"}, true); err == nil {
 		t.Fatal("expected write failure")
@@ -112,6 +117,7 @@ func TestQueueStoreSetCheckedFailedWritePublishesNothing(t *testing.T) {
 }
 
 func TestQueueStoreIncompleteStateFallsBackWhole(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "queue.json")
 	if err := os.WriteFile(path, []byte(`{"items":{"ticket":"running"}}`), 0644); err != nil {
 		t.Fatal(err)
@@ -126,6 +132,7 @@ func TestQueueStoreIncompleteStateFallsBackWhole(t *testing.T) {
 // membership, and SetQueued/EnqueueAndClearChecked never touch the
 // independent checked set except where clearedPaths says to.
 func TestQueueStoreTicketCheckedIsIndependentOfQueued(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "queue.json")
 	store := loadQueueStoreAt(path)
 
@@ -155,6 +162,7 @@ func TestQueueStoreTicketCheckedIsIndependentOfQueued(t *testing.T) {
 // membership wholesale and clears exactly clearedPaths from the checked set,
 // leaving any other checked entry untouched.
 func TestQueueStoreEnqueueAndClearChecked(t *testing.T) {
+	t.Parallel()
 	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
 	if err := store.SetTicketChecked([]string{"a", "b", "keep-checked"}, true); err != nil {
 		t.Fatal(err)
@@ -183,6 +191,7 @@ func TestQueueStoreEnqueueAndClearChecked(t *testing.T) {
 // key) has every one of its Items entries treated as both checked and
 // queued on first load, since the old format never distinguished the two.
 func TestQueueStoreMigratesLegacyItemsIntoIndependentCheckedSet(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "queue.json")
 	legacy := `{"items":{"a":"pending","b":"done"},"check_order":{"a":1,"b":2}}`
 	if err := os.WriteFile(path, []byte(legacy), 0644); err != nil {
@@ -251,6 +260,7 @@ func withQueueStateDir(t *testing.T) string {
 // "space" persists to the independent Tickets-tab checked set, not to queue
 // membership/status (that's "i"'s job — see implement_test.go).
 func TestModel_CheckingTicketPersistsToCheckedSet(t *testing.T) {
+	// not parallel-safe: reassigns the package-level queueStateDirFn singleton
 	withQueueStateDir(t)
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
@@ -276,6 +286,7 @@ func TestModel_CheckingTicketPersistsToCheckedSet(t *testing.T) {
 }
 
 func TestModel_UncheckingTicketRemovesFromCheckedSet(t *testing.T) {
+	// not parallel-safe: reassigns the package-level queueStateDirFn singleton
 	withQueueStateDir(t)
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
@@ -303,6 +314,7 @@ func TestModel_UncheckingTicketRemovesFromCheckedSet(t *testing.T) {
 // decoupling: the independent checked set and queue membership/status are
 // two separate persisted concepts, and both survive a restart independently.
 func TestModel_RestoresCheckedSetAndQueueStatusOnStartup(t *testing.T) {
+	// not parallel-safe: reassigns the package-level queueStateDirFn singleton
 	withQueueStateDir(t)
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")

@@ -16,6 +16,7 @@ import (
 )
 
 func TestTicketProgressSpinnerFillsAndDrainsAtDocumentedCodepoints(t *testing.T) {
+	t.Parallel()
 	want := []string{
 		"\U000F0A9E", "\U000F0A9F", "\U000F0AA0", "\U000F0AA1",
 		"\U000F0AA2", "\U000F0AA3", "\U000F0AA4", "\U000F0AA5",
@@ -33,6 +34,7 @@ func TestTicketProgressSpinnerFillsAndDrainsAtDocumentedCodepoints(t *testing.T)
 }
 
 func TestImplementAgentMenuDefaultsToClaude(t *testing.T) {
+	t.Parallel()
 	menu := newImplementAgentMenu()
 	if menu.Cursor != 0 {
 		t.Fatalf("cursor = %d, want 0", menu.Cursor)
@@ -43,6 +45,7 @@ func TestImplementAgentMenuDefaultsToClaude(t *testing.T) {
 }
 
 func TestBuildImplementRunOptionsUsesSelectedAgent(t *testing.T) {
+	t.Parallel()
 	root := testutil.TempRepo(t)
 	opts, err := buildImplementRunOptions(root, "my-epic", ralphloop.AgentCodex)
 	if err != nil {
@@ -54,6 +57,7 @@ func TestBuildImplementRunOptionsUsesSelectedAgent(t *testing.T) {
 }
 
 func TestBuildImplementRunOptionsUsesConfiguredTicketConcurrency(t *testing.T) {
+	t.Parallel()
 	root := testutil.TempRepo(t)
 	opts, err := buildImplementRunOptionsForTickets(root, "my-epic", ralphloop.AgentCodex, 5, nil, "gx-implement")
 	if err != nil {
@@ -65,6 +69,7 @@ func TestBuildImplementRunOptionsUsesConfiguredTicketConcurrency(t *testing.T) {
 }
 
 func TestNewModel_RendersEmptyStateWithNoScratchDir(t *testing.T) {
+	t.Parallel()
 	m := NewModel(t.TempDir(), ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -93,6 +98,7 @@ func deliverLoad(t *testing.T, m Model) Model {
 }
 
 func TestNewModel_RendersEpicsAndTicketsFromDisk(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
@@ -112,6 +118,7 @@ func TestNewModel_RendersEpicsAndTicketsFromDisk(t *testing.T) {
 }
 
 func TestNewModel_RendersAlphabeticallySuffixedTicketNumber(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "10a-split-ticket.md", "Status: open\n\nBody.\n")
 
@@ -126,6 +133,7 @@ func TestNewModel_RendersAlphabeticallySuffixedTicketNumber(t *testing.T) {
 }
 
 func TestModel_StackedLayoutSplitsAvailableHeightEvenly(t *testing.T) {
+	t.Parallel()
 	m := Model{width: 80, height: 30}
 	sidebarH, previewH := m.splitHeight(m.contentHeight())
 	if sidebarH+previewH != 28 { // 30 minus the footer line minus the seam row
@@ -137,6 +145,7 @@ func TestModel_StackedLayoutSplitsAvailableHeightEvenly(t *testing.T) {
 }
 
 func TestNewModel_ZeroEpicScratchDirRendersSameEmptyStateAsNoScratchDir(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".scratch"), 0755); err != nil {
 		t.Fatal(err)
@@ -158,6 +167,7 @@ func TestNewModel_ZeroEpicScratchDirRendersSameEmptyStateAsNoScratchDir(t *testi
 // ascending) so a ticket never jumps position once it's done, regardless of
 // status — see sortedTicketIndexes.
 func TestNewModel_TicketsInPlanOrderWithinEpic(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-done-ticket.md", "Status: done\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "02-open-ticket.md", "Status: open\n\nBody.\n")
@@ -185,6 +195,7 @@ func TestNewModel_TicketsInPlanOrderWithinEpic(t *testing.T) {
 }
 
 func TestNewModel_BlockedTicketShowsUnresolvedBlockerSuffix(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-blocker-ticket.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "02-blocked-ticket.md", "Status: open\nBlocked by: 01\n\nBody.\n")
@@ -201,6 +212,7 @@ func TestNewModel_BlockedTicketShowsUnresolvedBlockerSuffix(t *testing.T) {
 }
 
 func TestNewModel_NeedsAnswerTicketShowsUnresolvedBlockerSuffix(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-blocker-ticket.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "02-needs-answer-ticket.md", "Status: needs-answer\nBlocked by: 01\n\nBody.\n")
@@ -217,6 +229,7 @@ func TestNewModel_NeedsAnswerTicketShowsUnresolvedBlockerSuffix(t *testing.T) {
 }
 
 func TestNewModel_ResolvedBlockerDropsSuffixAndRegroups(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-blocker-ticket.md", "Status: done\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "02-formerly-blocked-ticket.md", "Status: open\nBlocked by: 01\n\nBody.\n")
@@ -233,6 +246,7 @@ func TestNewModel_ResolvedBlockerDropsSuffixAndRegroups(t *testing.T) {
 }
 
 func TestNewModel_UnrecognizedStatusRendersAsError(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-bogus-status-ticket.md", "Status: bogus-value\n\nBody.\n")
 
@@ -248,6 +262,7 @@ func TestNewModel_UnrecognizedStatusRendersAsError(t *testing.T) {
 }
 
 func TestNewModel_FullyDoneEpicStartsCollapsedAndDimmed(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "done-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
 	writeTicket(t, root, "done-epic", "02-second-ticket.md", "Status: done\n\nBody.\n")
@@ -268,6 +283,7 @@ func TestNewModel_FullyDoneEpicStartsCollapsedAndDimmed(t *testing.T) {
 }
 
 func TestModel_EpicsLoadedMsgPreservesManualCollapseToggle(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
 
@@ -300,6 +316,7 @@ func TestModel_EpicsLoadedMsgPreservesManualCollapseToggle(t *testing.T) {
 }
 
 func TestNewModel_ZeroTicketEpicStartsExpanded(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".scratch", "empty-epic", "issues"), 0755); err != nil {
 		t.Fatal(err)
@@ -318,6 +335,7 @@ func TestNewModel_ZeroTicketEpicStartsExpanded(t *testing.T) {
 }
 
 func TestNewModel_SplitsOpenAndClosedEpicSections(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "done-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
 	writeTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
@@ -344,6 +362,7 @@ func TestNewModel_SplitsOpenAndClosedEpicSections(t *testing.T) {
 }
 
 func TestNewModel_EmptySectionShowsMutedPlaceholder(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
 
@@ -359,6 +378,7 @@ func TestNewModel_EmptySectionShowsMutedPlaceholder(t *testing.T) {
 }
 
 func TestModel_NavigationAndSelectionUnaffectedBySectionHeaders(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "done-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
 	writeTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
@@ -396,6 +416,7 @@ func TestModel_NavigationAndSelectionUnaffectedBySectionHeaders(t *testing.T) {
 // row in the Tickets tab's sidebar must select it (like arrowing there) and
 // do nothing else — no checkbox toggle, no confirm modal.
 func TestModel_MouseClickSelectsSidebarRowOnly(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
@@ -456,6 +477,7 @@ func TestModel_MouseClickSelectsSidebarRowOnly(t *testing.T) {
 // ticket row. Collapsing an epic is "h"/left's job only (see
 // TestModel_HLCollapseAndExpandSelectedEpic).
 func TestModel_EnterOnExpandedEpicFocusesPreview(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 
@@ -483,6 +505,7 @@ func TestModel_EnterOnExpandedEpicFocusesPreview(t *testing.T) {
 // sidebar so the user can see what appeared); only a second enter, now that
 // it's expanded, focuses the preview panel.
 func TestModel_EnterOnCollapsedEpicExpandsThenFocusesPreview(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 
@@ -514,6 +537,7 @@ func TestModel_EnterOnCollapsedEpicExpandsThenFocusesPreview(t *testing.T) {
 }
 
 func TestModel_HLCollapseAndExpandSelectedEpic(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 
@@ -536,6 +560,7 @@ func TestModel_HLCollapseAndExpandSelectedEpic(t *testing.T) {
 }
 
 func TestModel_NavigationSkipsCollapsedEpicTickets(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "epic-a", "01-first-ticket.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "epic-b", "01-second-ticket.md", "Status: open\n\nBody.\n")
@@ -561,6 +586,7 @@ func TestModel_NavigationSkipsCollapsedEpicTickets(t *testing.T) {
 }
 
 func TestModel_NoGlobalCollapseExpandAllBinding(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "epic-a", "01-first-ticket.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "epic-b", "01-second-ticket.md", "Status: open\n\nBody.\n")
@@ -580,6 +606,7 @@ func TestModel_NoGlobalCollapseExpandAllBinding(t *testing.T) {
 }
 
 func TestModel_DimmingTracksAllDoneNotCollapseState(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "done-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
 	writeTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
@@ -610,6 +637,7 @@ func TestModel_DimmingTracksAllDoneNotCollapseState(t *testing.T) {
 }
 
 func TestModel_TCTogglesHideDoneTickets(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
@@ -661,6 +689,7 @@ func TestModel_TCTogglesHideDoneTickets(t *testing.T) {
 }
 
 func TestModel_TCOnFullyDoneEpicHidesAllTicketsButKeepsEpicRow(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "done-epic", "01-only-ticket.md", "Status: done\n\nBody.\n")
 
@@ -688,6 +717,7 @@ func TestModel_TCOnFullyDoneEpicHidesAllTicketsButKeepsEpicRow(t *testing.T) {
 }
 
 func TestModel_UnrelatedTAndCSequencesUnaffectedByHideDoneChord(t *testing.T) {
+	// not parallel-safe: t.Setenv (EDITOR) is process-wide
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
 
@@ -723,6 +753,7 @@ func TestModel_UnrelatedTAndCSequencesUnaffectedByHideDoneChord(t *testing.T) {
 }
 
 func TestModel_RRefreshesDataFromDisk(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 
@@ -855,6 +886,7 @@ func writeMap(t *testing.T, root, epic, content string) {
 }
 
 func TestNewModel_RendersBeforeSizing(t *testing.T) {
+	t.Parallel()
 	m := NewModel("/repo", ui.Settings{}, keys.New(nil))
 	// Never hidden: the tab must render something even before a WindowSizeMsg
 	// arrives (mirrors the "reachable and visually present" acceptance

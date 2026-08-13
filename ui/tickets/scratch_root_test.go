@@ -16,6 +16,7 @@ import (
 // to Repo.ScratchRoot() rather than reconstructing the path itself (ticket
 // queue-preview-focus-and-scratch-root/07).
 func TestModel_ScratchDirDelegatesToRepoScratchRoot(t *testing.T) {
+	t.Parallel()
 	root := testutil.TempRepo(t)
 	sub := filepath.Join(root, "sub")
 	if err := os.Mkdir(sub, 0755); err != nil {
@@ -38,6 +39,7 @@ func TestModel_ScratchDirDelegatesToRepoScratchRoot(t *testing.T) {
 // resolve the same canonical `.scratch` regardless of which linked worktree
 // of a bare-repo checkout they're scoped to.
 func TestScratchRoot_CallSitesAgreeAcrossWorktreesInBareRepo(t *testing.T) {
+	t.Parallel()
 	outer := testutil.TempDotBareRepoWithWorktrees(t, "feature", "other")
 	featureWt := filepath.Join(outer, "feature")
 	otherWt := filepath.Join(outer, "other")

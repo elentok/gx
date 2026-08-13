@@ -9,6 +9,7 @@ import (
 )
 
 func TestModel_EditChordOpensSelectedTicketFile(t *testing.T) {
+	// not parallel-safe: t.Setenv (EDITOR) is process-wide
 	t.Setenv("EDITOR", "true")
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
@@ -32,6 +33,7 @@ func TestModel_EditChordOpensSelectedTicketFile(t *testing.T) {
 }
 
 func TestModel_EditChordSplitVariants(t *testing.T) {
+	// not parallel-safe: t.Setenv (EDITOR) is process-wide
 	t.Setenv("EDITOR", "true")
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
@@ -58,6 +60,7 @@ func TestModel_EditChordSplitVariants(t *testing.T) {
 }
 
 func TestModel_EditChordOnEpicWithMapOpensMapFile(t *testing.T) {
+	// not parallel-safe: t.Setenv (EDITOR) is process-wide
 	t.Setenv("EDITOR", "true")
 	root := t.TempDir()
 	writeMap(t, root, "my-epic", "# My epic\n")
@@ -78,6 +81,7 @@ func TestModel_EditChordOnEpicWithMapOpensMapFile(t *testing.T) {
 }
 
 func TestModel_EditChordOnPlainEpicIsNoOpWithWarning(t *testing.T) {
+	// not parallel-safe: t.Setenv (EDITOR) is process-wide
 	t.Setenv("EDITOR", "true")
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")

@@ -18,6 +18,7 @@ import (
 // current checked selection — while running entries are left exactly as they
 // are, whether or not they're still part of the selection.
 func TestModel_ImplementKeyReplacesPendingSelectionAfterConfirmation(t *testing.T) {
+	t.Parallel()
 	worktreeRoot := t.TempDir()
 	scratch := func(name string) string {
 		return filepath.Join(worktreeRoot, ".scratch", "alpha", "issues", name)
@@ -100,6 +101,7 @@ func TestModel_ImplementKeyReplacesPendingSelectionAfterConfirmation(t *testing.
 // already tickets.StatusDone must not be enqueued — it has nothing left to
 // implement — while the rest of the checked selection still queues normally.
 func TestModel_ImplementKeyExcludesAlreadyDoneTickets(t *testing.T) {
+	t.Parallel()
 	worktreeRoot := t.TempDir()
 	scratch := func(name string) string {
 		return filepath.Join(worktreeRoot, ".scratch", "alpha", "issues", name)
@@ -147,6 +149,7 @@ func TestModel_ImplementKeyExcludesAlreadyDoneTickets(t *testing.T) {
 // "r" — only the cursor's own epic having a live run does. Pressing "r" here
 // opens the confirmation instead of showing "Can't replace a live queue".
 func TestModel_ImplementKeyNotBlockedByUnrelatedRunningEpic(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
 	worktreeRoot := t.TempDir()
 	epic := tickets.Epic{Name: "my-epic", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "open"},
@@ -185,6 +188,7 @@ func TestModel_ImplementKeyNotBlockedByUnrelatedRunningEpic(t *testing.T) {
 // is still blocked when the epic under the cursor itself has a live run,
 // showing "Can't replace a live queue" and never opening the confirmation.
 func TestModel_ImplementKeyBlockedWhenCursorEpicRunning(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
 	worktreeRoot := t.TempDir()
 	scratch := func(name string) string {
 		return filepath.Join(worktreeRoot, ".scratch", "my-epic", "issues", name)
@@ -245,6 +249,7 @@ func TestModel_ImplementKeyBlockedWhenCursorEpicRunning(t *testing.T) {
 // epic under the cursor that has no live run is a no-op with an info
 // notification, and never opens the confirmation modal.
 func TestModel_AddToQueueKeyNotRunningEpic(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "alpha", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Path: "/alpha/01.md", Status: "open"},
 	}}
@@ -269,6 +274,7 @@ func TestModel_AddToQueueKeyNotRunningEpic(t *testing.T) {
 // running epic with nothing checked from it is a no-op with an info
 // notification, and never opens the confirmation modal.
 func TestModel_AddToQueueKeyNothingChecked(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
 	epic := tickets.Epic{Name: "alpha", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Path: "/alpha/01.md", Status: "open"},
 	}}
@@ -302,6 +308,7 @@ func TestModel_AddToQueueKeyNothingChecked(t *testing.T) {
 // against a running epic with checked tickets opens the confirmation naming
 // the checked count, and never widens the scope before it's accepted.
 func TestModel_AddToQueueKeyOpensConfirmationWithCount(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
 	epic := tickets.Epic{Name: "alpha", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Path: "/alpha/01.md", Status: "open"},
 		{Number: 2, Identifier: "02", Path: "/alpha/02.md", Status: "open"},
@@ -342,6 +349,7 @@ func TestModel_AddToQueueKeyOpensConfirmationWithCount(t *testing.T) {
 // accepting "a"'s confirmation widens the targeted epic's live RunScope via
 // ralphloop.RunScope.Add (ticket 09), making the added ticket claimable.
 func TestCmdAddToLiveQueueWidensRunningScope(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
 	epic := tickets.Epic{Name: "alpha", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "open"},
 		{Number: 2, Identifier: "02", Status: "open"},

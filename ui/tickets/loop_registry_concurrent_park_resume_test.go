@@ -174,6 +174,7 @@ func drainChannelEventSink(sink *ralphloop.ChannelEventSink) {
 // first epic holds the permit, and that neither epic ever observes more
 // than one permit held at once.
 func TestConcurrentParkResume_TwoEpicsAgainstCapOfOne(t *testing.T) {
+	t.Parallel()
 	scratch1, ticket1 := writeParkResumeEpic(t, "epic-one")
 	scratch2, ticket2 := writeParkResumeEpic(t, "epic-two")
 

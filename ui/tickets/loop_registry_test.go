@@ -14,6 +14,7 @@ import (
 )
 
 func TestRunSnapshotsAreDeterministicAndIndependent(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(2)
 	r.tryStart("epic-b", 2, 4)
 	r.tryStart("epic-a", 1, 3)
@@ -44,6 +45,7 @@ func TestRunSnapshotsAreDeterministicAndIndependent(t *testing.T) {
 }
 
 func TestLoopRegistryConcurrencyCanBeReconfigured(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(2)
 	r.Acquire()
 	r.Acquire()
@@ -69,6 +71,7 @@ func TestLoopRegistryConcurrencyCanBeReconfigured(t *testing.T) {
 }
 
 func TestReduceLiveEventCapturesProgressContextAndPause(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(1)
 	r.tryStart("epic-a", 1, 3)
 	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
@@ -96,6 +99,7 @@ func TestReduceLiveEventCapturesProgressContextAndPause(t *testing.T) {
 }
 
 func TestReduceLiveEventStampsPerTicketStartedAt(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(1)
 	r.tryStart("epic-a", 0, 2)
 	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
@@ -121,6 +125,7 @@ func TestReduceLiveEventStampsPerTicketStartedAt(t *testing.T) {
 }
 
 func TestReduceLiveEventCompletesTicketProgress(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(1)
 	r.tryStart("epic-a", 1, 3)
 	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
@@ -144,6 +149,7 @@ func TestReduceLiveEventCompletesTicketProgress(t *testing.T) {
 }
 
 func TestFinishPreservesCompletionAndFailureSnapshots(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(2)
 	r.tryStart("epic-a", 1, 1)
 	r.tryStart("epic-b", 0, 1)
@@ -195,6 +201,7 @@ func (f *fakeFailureNotifier) snapshot() []string {
 // been drained (reduceLiveEvent applied) — not concurrently with the drain,
 // and not before it.
 func TestFinish_EpicFailed_FiresAfterSinkDrain(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(1)
 	sink, ok := r.tryStart("epic-a", 0, 1)
 	if !ok {
@@ -227,6 +234,7 @@ func TestFinish_EpicFailed_FiresAfterSinkDrain(t *testing.T) {
 // produces the message even though run.sink has already been torn down by
 // the time finish's caller could ever reach it again.
 func TestFinish_EpicFailed_NotDroppedAfterSinkAlreadyClosed(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(1)
 	if _, ok := r.tryStart("epic-a", 0, 1); !ok {
 		t.Fatal("tryStart failed")
@@ -242,6 +250,7 @@ func TestFinish_EpicFailed_NotDroppedAfterSinkAlreadyClosed(t *testing.T) {
 }
 
 func TestFinish_NoError_DoesNotNotify(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(1)
 	if _, ok := r.tryStart("epic-a", 0, 1); !ok {
 		t.Fatal("tryStart failed")
@@ -257,6 +266,7 @@ func TestFinish_NoError_DoesNotNotify(t *testing.T) {
 }
 
 func TestRunSnapshotsAllowConcurrentReductionAndReads(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(1)
 	r.tryStart("epic-a", 0, 1)
 	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
@@ -284,6 +294,7 @@ func TestRunSnapshotsAllowConcurrentReductionAndReads(t *testing.T) {
 }
 
 func TestReduceLiveEventCapturesEpicCompletion(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(1)
 	r.tryStart("epic-a", 2, 3)
 	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
@@ -302,6 +313,7 @@ func TestReduceLiveEventCapturesEpicCompletion(t *testing.T) {
 // number from the epic-wide Done a resumed run's IterationFinished events
 // already synced — EpicComplete must not overwrite Done with it.
 func TestReduceLiveEventEpicCompleteDoesNotClobberDiskSyncedDone(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(1)
 	r.tryStart("epic-a", 5, 10)
 	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
@@ -324,6 +336,7 @@ func TestReduceLiveEventEpicCompleteDoesNotClobberDiskSyncedDone(t *testing.T) {
 }
 
 func TestDrainPendingNotifyClosesOnTicketReattached(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(1)
 	r.tryStart("epic-a", 0, 2)
 	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
@@ -343,6 +356,7 @@ func TestDrainPendingNotifyClosesOnTicketReattached(t *testing.T) {
 }
 
 func TestDrainPendingNotifyClosesOnIterationResumed(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(1)
 	r.tryStart("epic-a", 0, 2)
 	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
@@ -366,6 +380,7 @@ func TestDrainPendingNotifyClosesOnIterationResumed(t *testing.T) {
 }
 
 func TestDrainPendingNotifyClosesOnlyAffectsResumedTicket(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(1)
 	r.tryStart("epic-a", 0, 2)
 	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
@@ -391,6 +406,7 @@ func TestDrainPendingNotifyClosesOnlyAffectsResumedTicket(t *testing.T) {
 }
 
 func TestDrainPendingToastsOnEpicComplete(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(1)
 	r.tryStart("epic-a", 0, 2)
 	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
@@ -411,6 +427,7 @@ func TestDrainPendingToastsOnEpicComplete(t *testing.T) {
 }
 
 func TestDrainPendingToastsOnNeedsRepairPauseOnly(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(1)
 	r.tryStart("epic-a", 0, 2)
 	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
@@ -439,6 +456,7 @@ func TestDrainPendingToastsOnNeedsRepairPauseOnly(t *testing.T) {
 // ticket (needs-answer or needs-repair) marks the run for a re-read from
 // disk, drained exactly once by drainPendingReload.
 func TestReduceLiveEventSetsPendingReloadOnBothParkStatuses(t *testing.T) {
+	t.Parallel()
 	for _, status := range []string{"needs-answer", "needs-repair"} {
 		t.Run(status, func(t *testing.T) {
 			r := newLoopRegistry(1)
@@ -458,6 +476,7 @@ func TestReduceLiveEventSetsPendingReloadOnBothParkStatuses(t *testing.T) {
 }
 
 func TestDrainPendingReloadFalseForUnknownOrUntouchedEpic(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(1)
 	if r.drainPendingReload("no-such-epic") {
 		t.Fatal("drainPendingReload() for unknown epic = true, want false")
@@ -470,6 +489,7 @@ func TestDrainPendingReloadFalseForUnknownOrUntouchedEpic(t *testing.T) {
 }
 
 func TestTryStartSameEpicTwiceFails(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(2)
 
 	if _, ok := r.tryStart("epic-a", 0, 5); !ok {
@@ -481,6 +501,7 @@ func TestTryStartSameEpicTwiceFails(t *testing.T) {
 }
 
 func TestTryStartDifferentEpicsUpToCapSucceed(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(2)
 
 	if _, ok := r.tryStart("epic-a", 0, 5); !ok {
@@ -495,6 +516,7 @@ func TestTryStartDifferentEpicsUpToCapSucceed(t *testing.T) {
 }
 
 func TestTryStartBeyondCapFailsUntilSlotFrees(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(2)
 
 	r.Acquire()
@@ -521,6 +543,7 @@ func TestTryStartBeyondCapFailsUntilSlotFrees(t *testing.T) {
 }
 
 func TestParkedEpicDoesNotCountTowardCap(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(1)
 
 	r.Acquire()
@@ -539,6 +562,7 @@ func TestParkedEpicDoesNotCountTowardCap(t *testing.T) {
 }
 
 func TestTryStartBeyondCapIsRefusedSynchronously(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(1)
 
 	if _, ok := r.tryStart("epic-a", 0, 1); !ok {
@@ -556,6 +580,7 @@ func TestTryStartBeyondCapIsRefusedSynchronously(t *testing.T) {
 }
 
 func TestStartedRunAcquiresTheSlotReservedForIt(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(1)
 	if _, ok := r.tryStart("epic-a", 0, 1); !ok {
 		t.Fatal("tryStart epic-a: want ok")
@@ -582,6 +607,7 @@ func TestStartedRunAcquiresTheSlotReservedForIt(t *testing.T) {
 }
 
 func TestFinishReturnsAnUnclaimedReservation(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(1)
 	if _, ok := r.tryStart("epic-a", 0, 1); !ok {
 		t.Fatal("tryStart epic-a: want ok")
@@ -598,6 +624,7 @@ func TestFinishReturnsAnUnclaimedReservation(t *testing.T) {
 }
 
 func TestMismatchedReleaseIsReportedAndCannotInflateTheCap(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(1)
 
 	r.Release()
@@ -617,6 +644,7 @@ func TestMismatchedReleaseIsReportedAndCannotInflateTheCap(t *testing.T) {
 }
 
 func TestQueuedEpicStartsWhenRunningEpicParks(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(1)
 
 	r.Acquire()
@@ -642,6 +670,7 @@ func TestQueuedEpicStartsWhenRunningEpicParks(t *testing.T) {
 }
 
 func TestResumingEpicWaitsForPermitWhenCapIsFullThenProceeds(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(1)
 
 	r.Acquire()
@@ -684,6 +713,7 @@ func TestResumingEpicWaitsForPermitWhenCapIsFullThenProceeds(t *testing.T) {
 }
 
 func TestFinishTracksEachEpicsErrorIndependently(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(2)
 
 	if _, ok := r.tryStart("epic-a", 0, 5); !ok {
@@ -709,6 +739,7 @@ func TestFinishTracksEachEpicsErrorIndependently(t *testing.T) {
 }
 
 func TestIsRunningReflectsAnyEpic(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(2)
 
 	if r.isRunning() {
@@ -733,6 +764,7 @@ func TestIsRunningReflectsAnyEpic(t *testing.T) {
 }
 
 func TestIsRunningEpicReflectsThatEpicOnly(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(2)
 	r.tryStart("epic-a", 1, 5)
 	r.tryStart("epic-b", 2, 3)
@@ -756,6 +788,7 @@ func TestIsRunningEpicReflectsThatEpicOnly(t *testing.T) {
 }
 
 func TestPauseStopsAllRunGatesAndNewStartsUntilResume(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(2)
 	if _, ok := r.tryStart("epic-a", 0, 2); !ok {
 		t.Fatal("tryStart epic-a: want ok")
@@ -783,6 +816,7 @@ func TestPauseStopsAllRunGatesAndNewStartsUntilResume(t *testing.T) {
 }
 
 func TestRegistryDrainsRunEventsBeforeFinish(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(1)
 	sink, ok := r.tryStart("epic-a", 0, 1)
 	if !ok {
@@ -804,6 +838,7 @@ func TestRegistryDrainsRunEventsBeforeFinish(t *testing.T) {
 }
 
 func TestRegistryDrainsEpicsIndependently(t *testing.T) {
+	t.Parallel()
 	r := newLoopRegistry(2)
 	sinkA, _ := r.tryStart("epic-a", 0, 1)
 	sinkB, _ := r.tryStart("epic-b", 0, 1)

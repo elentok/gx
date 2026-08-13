@@ -14,6 +14,7 @@ import (
 )
 
 func TestEpicStatusLineColorsByEpicState(t *testing.T) {
+	t.Parallel()
 	icons := ui.Icons(false)
 
 	done := tickets.Epic{Tickets: []tickets.Ticket{
@@ -54,6 +55,7 @@ func TestEpicStatusLineColorsByEpicState(t *testing.T) {
 // StalledTicket values, not ticket disk status, since both stalled tickets
 // here share the same underlying ticket status.
 func TestEpicStatusLineParkedRendersStallReasonAndReattachability(t *testing.T) {
+	t.Parallel()
 	icons := ui.Icons(false)
 	epic := tickets.Epic{Tickets: []tickets.Ticket{{Identifier: "01", Status: "claimed"}}}
 
@@ -87,6 +89,7 @@ func TestEpicStatusLineParkedRendersStallReasonAndReattachability(t *testing.T) 
 // needs-repair park renders red (red wins even alongside a needs-answer
 // ticket).
 func TestEpicStatusLineParkedColorByKind(t *testing.T) {
+	t.Parallel()
 	icons := ui.Icons(false)
 
 	answerOnly := tickets.Epic{Tickets: []tickets.Ticket{
@@ -113,6 +116,7 @@ func TestEpicStatusLineParkedColorByKind(t *testing.T) {
 // exclusion: a draft ticket is parked for scheduling purposes only, so it
 // doesn't move the count or the colour.
 func TestEpicStatusLineParkedExcludesDraftFromCount(t *testing.T) {
+	t.Parallel()
 	icons := ui.Icons(false)
 
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
@@ -139,6 +143,7 @@ func TestEpicStatusLineParkedExcludesDraftFromCount(t *testing.T) {
 }
 
 func TestEpicStatusLinePrefersCompletionTimestampsOverElapsedSum(t *testing.T) {
+	t.Parallel()
 	icons := ui.Icons(false)
 	started := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
 	completed := started.Add(3*time.Hour + 30*time.Minute)
@@ -161,6 +166,7 @@ func TestEpicStatusLinePrefersCompletionTimestampsOverElapsedSum(t *testing.T) {
 }
 
 func TestEpicContextMetricsAveragesMaxAndSumsCompactions(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
 		{Identifier: "01", Status: "done", ActualContextWindow: 12000, Compactions: 2},
 		{Identifier: "02", Status: "done", ActualContextWindow: 8000, Compactions: 1},
@@ -174,6 +180,7 @@ func TestEpicContextMetricsAveragesMaxAndSumsCompactions(t *testing.T) {
 }
 
 func TestQueueModelEpicHeaderRendersStatusAndContextLines(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
@@ -201,6 +208,7 @@ func TestQueueModelEpicHeaderRendersStatusAndContextLines(t *testing.T) {
 // reserved triangle-glyph slot (blank, since this leaf ticket shows no
 // triangle), not the header's bare 2-char indent.
 func TestQueueModelListRowsIndentMatchesHeaderIndent(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}

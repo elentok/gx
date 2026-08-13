@@ -23,6 +23,7 @@ func newModelForTicketRowTests(epic tickets.Epic) Model {
 }
 
 func TestRenderTicketRow_NeverRunIsSingleLine(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{{Identifier: "01", Title: "Open ticket", Status: "open"}}}
 	m := newModelForTicketRowTests(epic)
 
@@ -33,6 +34,7 @@ func TestRenderTicketRow_NeverRunIsSingleLine(t *testing.T) {
 }
 
 func TestRenderTicketRow_DoneHasMetricsLine(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 		{Identifier: "01", Title: "Done ticket", Status: "done", ElapsedTime: 754, ActualContextWindow: 45_200},
 	}}
@@ -48,6 +50,7 @@ func TestRenderTicketRow_DoneHasMetricsLine(t *testing.T) {
 }
 
 func TestRenderTicketRow_LiveHasSuffixAndMetricsLine(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{{Identifier: "01", Title: "Running ticket", Status: "claimed"}}}
 	m := newModelForTicketRowTests(epic)
 	m.implementingEpics = map[string]bool{epic.Name: true}
@@ -77,6 +80,7 @@ func TestRenderTicketRow_LiveHasSuffixAndMetricsLine(t *testing.T) {
 // a hardcoded prefix, so a live row's indent matches its non-live siblings'
 // checkbox column exactly.
 func TestRenderTicketRow_LiveRowIndentNotDoubled(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{{Identifier: "01", Title: "Running ticket", Status: "claimed"}}}
 	m := newModelForTicketRowTests(epic)
 	m.implementingEpics = map[string]bool{epic.Name: true}
@@ -100,6 +104,7 @@ func TestRenderTicketRow_LiveRowIndentNotDoubled(t *testing.T) {
 // mirrored into the live-row path, so a running ticket's row indent matches
 // its non-running siblings' instead of falling back to a bare 2-space prefix.
 func TestRenderTicketRow_LiveRowIndentMatchesNonLiveSibling(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 		{Identifier: "01", Title: "Normal ticket", Status: "open"},
 		{Identifier: "02", Title: "Running ticket", Status: "claimed"},
@@ -119,6 +124,7 @@ func TestRenderTicketRow_LiveRowIndentMatchesNonLiveSibling(t *testing.T) {
 }
 
 func TestRenderTicketRow_PausedHasReasonAndMetricsLine(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{{Identifier: "01", Title: "Paused ticket", Status: "claimed"}}}
 	m := newModelForTicketRowTests(epic)
 	m.implementingEpics = map[string]bool{epic.Name: true}
@@ -144,6 +150,7 @@ func TestRenderTicketRow_PausedHasReasonAndMetricsLine(t *testing.T) {
 }
 
 func TestSidebarLineForSelectedCountsMetricsLines(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 		{Identifier: "01", Title: "Done ticket", Status: "done"},
 		{Identifier: "02", Title: "Open ticket", Status: "open"},
@@ -161,6 +168,7 @@ func TestSidebarLineForSelectedCountsMetricsLines(t *testing.T) {
 }
 
 func TestStatusIconAndStyle_Colors(t *testing.T) {
+	t.Parallel()
 	icons := ui.Icons(false)
 	cases := []struct {
 		status tickets.RenderedStatus
@@ -199,6 +207,7 @@ func TestStatusIconAndStyle_Colors(t *testing.T) {
 }
 
 func TestRenderTicketRow_CommitlessSuffix(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 		{Identifier: "01", Title: "Open ticket", Status: "open", Commitless: true},
 	}}
@@ -211,6 +220,7 @@ func TestRenderTicketRow_CommitlessSuffix(t *testing.T) {
 }
 
 func TestRenderTicketRow_DoneMetricsLineMatchesTitleColor(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 		{Identifier: "01", Title: "Done ticket", Status: "done", ElapsedTime: 5, ActualContextWindow: 100},
 	}}
@@ -224,6 +234,7 @@ func TestRenderTicketRow_DoneMetricsLineMatchesTitleColor(t *testing.T) {
 }
 
 func TestRenderEpicRow_ShowsDurationOnlyWhenBothTimestampsSet(t *testing.T) {
+	t.Parallel()
 	started := time.Now().Add(-(2*time.Hour + 15*time.Minute))
 	completed := time.Now()
 
@@ -245,6 +256,7 @@ func TestRenderEpicRow_ShowsDurationOnlyWhenBothTimestampsSet(t *testing.T) {
 // children, since the triangle column left of the checkbox is reserved at a
 // fixed width for every row (a childless row just shows a blank there).
 func TestRenderTicketRow_IconColumnAlignsRegardlessOfChildren(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 		{Identifier: "01", Title: "Parent ticket", Status: "open"},
 		{Identifier: "02", Title: "Leaf ticket", Status: "open"},
@@ -267,6 +279,7 @@ func TestRenderTicketRow_IconColumnAlignsRegardlessOfChildren(t *testing.T) {
 }
 
 func TestSidebarLinesHighlightsBothLinesOfSelectedTicket(t *testing.T) {
+	t.Parallel()
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 		{Identifier: "01", Title: "Done ticket", Status: "done", ElapsedTime: 5, ActualContextWindow: 100},
 		{Identifier: "02", Title: "Open ticket", Status: "open"},

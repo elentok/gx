@@ -16,6 +16,7 @@ func xPress() tea.KeyPressMsg {
 }
 
 func TestQueueModel_XOpensConfirmModalListingFullCascade(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-root.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-dependent.md", "Status: open\nBlocked by: 01\n\nBody.\n")
@@ -48,6 +49,7 @@ func TestQueueModel_XOpensConfirmModalListingFullCascade(t *testing.T) {
 }
 
 func TestQueueModel_XConfirmedDeletesCascadeAndClearsDoneSurvivor(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-root.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-done-dependent.md", "Status: done\nBlocked by: 01\n\nBody.\n")

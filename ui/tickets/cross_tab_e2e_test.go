@@ -20,6 +20,7 @@ import (
 // (re)activation — neither tab keeps its own event reader or a duplicated
 // live-event map, per ticket 17's snapshot-only migration.
 func TestCrossTabSwitchingDuringTwoLiveRunsStaysConsistent(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
 	root := t.TempDir()
 	writeTicket(t, root, "epic-a", "01-first.md", "Status: claimed\n\nBody.\n")
 	writeTicket(t, root, "epic-b", "01-first.md", "Status: claimed\n\nBody.\n")
@@ -106,6 +107,7 @@ func TestCrossTabSwitchingDuringTwoLiveRunsStaysConsistent(t *testing.T) {
 // pins that the clear-on-queue write is actually observable cross-tab, not
 // just within the Model that performed it.
 func TestCrossTabCheckThenQueueResetsTicketsCheckboxWhileQueueTabKeepsEntries(t *testing.T) {
+	// not parallel-safe: reassigns the package-level queueStateDirFn singleton
 	withQueueStateDir(t)
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first.md", "Status: open\n\nBody.\n")
@@ -160,6 +162,7 @@ func TestCrossTabCheckThenQueueResetsTicketsCheckboxWhileQueueTabKeepsEntries(t 
 // projectLiveTickets (ticket 21), this pins the rendered numbers so a future
 // divergence between the tabs' bookkeeping fails here.
 func TestCrossTabLiveMetricsRenderSameFiguresFromSharedProjection(t *testing.T) {
+	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
 	root := t.TempDir()
 	writeTicket(t, root, "epic-a", "01-first.md", "Status: claimed\n\nBody.\n")
 

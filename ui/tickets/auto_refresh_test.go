@@ -29,6 +29,7 @@ func deliverAutoRefreshReload[M tea.Model](t *testing.T, m M, cmd tea.Cmd) M {
 }
 
 func TestModel_AutoRefreshesDataFromDiskWithoutManualReload(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 
@@ -54,6 +55,7 @@ func TestModel_AutoRefreshesDataFromDiskWithoutManualReload(t *testing.T) {
 }
 
 func TestQueueModel_AutoRefreshesDataFromDiskWithoutManualReload(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
@@ -74,6 +76,7 @@ func TestQueueModel_AutoRefreshesDataFromDiskWithoutManualReload(t *testing.T) {
 }
 
 func TestQueueModel_ForkInsertsChildrenAfterOriginalPosition(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeFrontmatterTicket(t, root, "alpha", "01-x.md", "01", "claimed", "")
 	writeFrontmatterTicket(t, root, "alpha", "02-y.md", "02", "open", "")

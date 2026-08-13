@@ -14,6 +14,7 @@ import (
 )
 
 func TestModel_SelectingTicketShowsFrontmatterAndBodyNoHeader(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Type: task\nStatus: open\n\n## Heading\n\nSome distinctive body prose.\n")
 
@@ -50,6 +51,7 @@ func TestModel_SelectingTicketShowsFrontmatterAndBodyNoHeader(t *testing.T) {
 // "actual_context_window" -> "Context window" (an explicit override, since
 // the default transform would read "Actual context window").
 func TestModel_PreviewFrontmatterUsesPrettifiedFieldLabels(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-blocker.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "02-blocked.md", "Status: open\nBlocked by: 01\n\nBody.\n")
@@ -72,6 +74,7 @@ func TestModel_PreviewFrontmatterUsesPrettifiedFieldLabels(t *testing.T) {
 }
 
 func TestModel_PreviewBlockedBySuffixOmittedOnceResolved(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-blocker-ticket.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "02-blocked-ticket.md", "Status: open\nBlocked by: 01\n\nBody.\n")
@@ -102,6 +105,7 @@ func TestModel_PreviewBlockedBySuffixOmittedOnceResolved(t *testing.T) {
 }
 
 func TestModel_PreviewPlainEpicShowsHeaderOnly(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nDistinctive ticket body.\n")
 
@@ -124,6 +128,7 @@ func TestModel_PreviewPlainEpicShowsHeaderOnly(t *testing.T) {
 }
 
 func TestModel_PreviewMapEpicShowsMapBadgeAndBody(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeMap(t, root, "wayfinder-epic", "# Wayfinder Map\n\nDistinctive map prose.\n")
 
@@ -143,6 +148,7 @@ func TestModel_PreviewMapEpicShowsMapBadgeAndBody(t *testing.T) {
 }
 
 func TestModel_PreviewUnreadableTicketShowsErrorMessage(t *testing.T) {
+	t.Parallel()
 	if os.Geteuid() == 0 {
 		t.Skip("running as root: unreadable-file permissions aren't enforced")
 	}
@@ -171,6 +177,7 @@ func TestModel_PreviewUnreadableTicketShowsErrorMessage(t *testing.T) {
 }
 
 func TestModel_PreviewUnrecognizedStatusShowsReadError(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-weird-ticket.md", "Status: bogus-value\n\nDistinctive body text.\n")
 
@@ -190,6 +197,7 @@ func TestModel_PreviewUnrecognizedStatusShowsReadError(t *testing.T) {
 }
 
 func TestModel_PreviewScrollbarAppearsOnlyWhenBodyOverflows(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "epic", "01-short-ticket.md", "Status: open\n\nShort body.\n")
 	writeTicket(t, root, "epic", "02-long-ticket.md", "Status: open\n\n"+strings.Repeat("Line of body text.\n\n", 100))
@@ -220,6 +228,7 @@ func TestModel_PreviewScrollbarAppearsOnlyWhenBodyOverflows(t *testing.T) {
 // visible row, independent of the preview (which has its own "b" for
 // bottom).
 func TestModel_GAndGGJumpSidebarSelectionToLastAndFirstRow(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "epic", "01-first.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "epic", "02-second.md", "Status: open\n\nBody.\n")
@@ -253,6 +262,7 @@ func TestModel_GAndGGJumpSidebarSelectionToLastAndFirstRow(t *testing.T) {
 // binding: from the sidebar (list) focus it scrolls the preview to its
 // bottom without moving focus off the sidebar.
 func TestModel_BJumpsPreviewToBottomFromListFocus(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "epic", "01-ticket.md", "Status: open\n\nTOPMARKERXYZ\n\n"+strings.Repeat("Filler line of body text.\n\n", 80)+"BOTTOMMARKERXYZ\n")
 
@@ -281,6 +291,7 @@ func TestModel_BJumpsPreviewToBottomFromListFocus(t *testing.T) {
 // binding from preview focus, overriding bubbles/viewport's own default "b"
 // (page up) — see handlePreviewKey.
 func TestModel_BJumpsPreviewToBottomFromPreviewFocus(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "epic", "01-ticket.md", "Status: open\n\nTOPMARKERXYZ\n\n"+strings.Repeat("Filler line of body text.\n\n", 80)+"BOTTOMMARKERXYZ\n")
 
@@ -316,6 +327,7 @@ func TestModel_BJumpsPreviewToBottomFromPreviewFocus(t *testing.T) {
 // wrap it in the search-highlight style, not just leave the plain text
 // untouched.
 func TestModel_PreviewSearchHighlightsMatch(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nSome distinctive body prose.\n")
 
