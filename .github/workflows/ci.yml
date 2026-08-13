@@ -55,8 +55,6 @@ jobs:
           brew install herdr
 
       - name: Start herdr server
-        env:
-          RUST_LOG: debug
         run: |
           nohup herdr server > herdr-server.log 2>&1 &
           disown
@@ -79,13 +77,3 @@ jobs:
         env:
           HERDR_ENV: "1"
         run: go test ./e2e/... -timeout=2m
-
-      - name: Dump herdr logs
-        if: failure()
-        run: |
-          echo "--- herdr-server.log ---"
-          cat herdr-server.log || true
-          echo "--- ~/.config/herdr/herdr.log ---"
-          cat ~/.config/herdr/herdr.log || true
-          echo "--- ~/.config/herdr/herdr-server.log ---"
-          cat ~/.config/herdr/herdr-server.log || true

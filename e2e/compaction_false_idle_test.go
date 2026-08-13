@@ -86,7 +86,6 @@ func TestCompactionFalseIdle_AgentWaitDoesNotSettleBeforeFakeCompactionEnds(t *t
 			elapsed, compactionPause)
 	}
 	if agent.AgentStatus != "done" {
-		explain := ws.AgentExplain("")
-		t.Fatalf("agent status = %q, want done (explain: state=%q rule=%q)", agent.AgentStatus, explain.State, explain.MatchedRuleID)
+		t.Fatalf("agent status = %q, want done", agent.AgentStatus)
 	}
 }

@@ -17,11 +17,32 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/herdr"
 )
+
+var ensureActiveWorkspaceOnce sync.Once
+
+// ensureActiveWorkspace guarantees herdr's server already has an active
+// (focused) workspace before any test workspace is created with
+// --no-focus. herdr's create_workspace_with_launch_env focuses a new
+// workspace whenever the server has never had an active workspace yet,
+// regardless of --no-focus — on a freshly started server (as on CI, unlike
+// a real dev machine's herdr, which already has one from live use) this
+// silently promotes the first test's --no-focus workspace to active,
+// which then makes herdr report its idle-completion as "idle" instead of
+// "done" (busy-pane classification suppresses the notification/done state
+// for the focused tab). A throwaway sentinel workspace, focused once up
+// front, keeps every real test workspace correctly out of focus.
+func ensureActiveWorkspace(t *testing.T) {
+	t.Helper()
+	ensureActiveWorkspaceOnce.Do(func() {
+		run(t, "workspace", "create", "--cwd", os.TempDir(), "--label", "gx-e2e-sentinel", "--focus")
+	})
+}
 
 // RequireHerdr skips the test unless a real herdr daemon is reachable: herdr
 // must be on PATH, and HERDR_ENV=1 must be set (herdr's own gate on its
@@ -53,6 +74,7 @@ type Workspace struct {
 // claude.
 func NewWorkspace(t *testing.T, cwd string, env ...string) *Workspace {
 	t.Helper()
+	ensureActiveWorkspace(t)
 
 	args := []string{"workspace", "create", "--cwd", cwd, "--label", "gx-e2e-" + t.Name(), "--no-focus"}
 	for _, e := range env {
