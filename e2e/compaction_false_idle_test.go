@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -66,7 +67,7 @@ func TestCompactionFalseIdle_AgentWaitDoesNotSettleBeforeFakeCompactionEnds(t *t
 	ws.PrependPath(fakeDir)
 
 	ws.AgentStart(herdr.AgentStartOptions{
-		Name: "compaction-false-idle",
+		Name: "compaction-false-idle-" + strings.ToLower(ws.ID),
 		Kind: "claude",
 		AgentArgs: []string{
 			"--mode=compact",

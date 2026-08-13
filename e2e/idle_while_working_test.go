@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -42,7 +43,7 @@ func TestIdleWhileWorking_AgentStatusNeverReportsWorking(t *testing.T) {
 	ws.PrependPath(fakeDir)
 
 	started := ws.AgentStart(herdr.AgentStartOptions{
-		Name: "idle-while-working",
+		Name: "idle-while-working-" + strings.ToLower(ws.ID),
 		Kind: "claude",
 		AgentArgs: []string{
 			"--mode=slow-working",

@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -263,14 +264,32 @@ func (w *Workspace) Read() string {
 // AgentStart starts an interactive agent (e.g. claude, or a fake standing in
 // for one — see testutil/agentfake) in the workspace's root pane via `herdr
 // agent start`. opts.Pane defaults to the workspace's root pane if unset.
+//
+// Even after PrependPath's own sentinel wait, herdr's "is this pane an
+// available shell" bookkeeping can still occasionally lag behind the shell
+// actually being ready — worse under a loaded test suite (many packages'
+// tests running concurrently) than in isolation. That surfaces here as a
+// transient agent_pane_busy error rather than at PrependPath. Retry a few
+// times with a short backoff before failing the test, the same tolerance
+// PrependPath already applies to the analogous race.
 func (w *Workspace) AgentStart(opts herdr.AgentStartOptions) herdr.Agent {
 	w.t.Helper()
 	if opts.Pane == "" {
 		opts.Pane = w.RootPaneID
 	}
-	agent, err := herdr.AgentStart(opts)
-	if err != nil {
-		w.t.Fatalf("herdrctl: agent start: %v", err)
+
+	const maxAttempts = 5
+	var agent herdr.Agent
+	var err error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		agent, err = herdr.AgentStart(opts)
+		if err == nil {
+			return agent
+		}
+		if !strings.Contains(err.Error(), "agent_pane_busy") || attempt == maxAttempts {
+			w.t.Fatalf("herdrctl: agent start: %v", err)
+		}
+		time.Sleep(200 * time.Millisecond)
 	}
 	return agent
 }
