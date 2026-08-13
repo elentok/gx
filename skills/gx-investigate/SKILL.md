@@ -92,9 +92,20 @@ to gotchas.md yourself. Don't re-explain what the linked commit/ticket already d
 
 This skill only diagnoses; it never edits code.
 
-- If there's an active epic in scope (`<root>/<epic-slug>/`), publish the diagnosis as a
-  `type: research` ticket in that epic, following gx-local-tracker.md's template: what's wrong,
-  the evidence (log lines, ticket IDs), and a suggested fix direction. A follow-up fix ticket can
-  then `blocked_by` it.
-- If there's no epic in scope (a one-off question, nothing under the tracker root), report the
+Where the diagnosis is published depends on what the bug is *about*, not which epic you were
+looking at when you found it:
+
+- **Bug is in the ticket/epic's own deliverable** (something one of its tickets built or should
+  have built) — publish as a `type: research` ticket in that epic (`<root>/<epic-slug>/`),
+  following gx-local-tracker.md's template: what's wrong, the evidence (log lines, ticket IDs),
+  and a suggested fix direction. A follow-up fix ticket can then `blocked_by` it.
+- **Bug is in gx/ralph-loop tooling itself** (scheduler, a skill's own instructions, herdr
+  plumbing) surfaced *while* running some epic, but not part of what that epic's tickets asked
+  for — publish in `<root>/follow-ups/issues/` instead (see the existing tickets there for the
+  pattern), even though you found it investigating a specific epic. Don't clutter that epic's own
+  issue list with a finding about gx itself.
+- **No epic in scope at all** (a one-off question, nothing under the tracker root) — report the
   diagnosis directly instead of publishing anything.
+
+When unsure which of the first two applies, ask: would this bug still exist if the epic you were
+investigating had never been authored? If yes, it's a tooling bug — `follow-ups`, not the epic.

@@ -55,19 +55,22 @@ func writeFakeTranscript(t *testing.T, home, cwd, sessionID string, start time.T
 }
 
 // ticketIDFromImplementPrompt extracts a ticket identifier ("01", "02", ...)
-// from a "/implement <ticket-path>" (Claude) or "$implement <ticket-path>"
-// (Codex, see skillPrompt) prompt's ticket path, or ok=false if text isn't an
-// implement prompt — the fake agent's cue for which iteration worktree to do
-// (simulated) work in.
+// from a "/<skill> <ticket-path>" (Claude) or "$<skill> <ticket-path>"
+// (Codex, see skillPrompt) prompt's ticket path, or ok=false if text isn't a
+// skill-launch prompt — the fake agent's cue for which iteration worktree to
+// do (simulated) work in. The skill name itself isn't checked: production
+// launches type: code-review tickets under "gx-code-review" rather than the
+// run's configured Skill (see runIteration), and the fake only cares which
+// ticket the prompt is for.
 func ticketIDFromImplementPrompt(text string) (id string, ok bool) {
-	base, found := strings.CutPrefix(text, "/implement ")
-	if !found {
-		base, found = strings.CutPrefix(text, "$implement ")
+	if !strings.HasPrefix(text, "/") && !strings.HasPrefix(text, "$") {
+		return "", false
 	}
+	_, path, found := strings.Cut(text, " ")
 	if !found {
 		return "", false
 	}
-	base = filepath.Base(base)
+	base := filepath.Base(path)
 	if len(base) < 2 {
 		return "", false
 	}

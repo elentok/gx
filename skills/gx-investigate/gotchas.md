@@ -4,6 +4,25 @@ Running list of previously-diagnosed gx/ralph-loop bugs, newest first. Append on
 to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKILL.md) gets fixed
 — don't re-explain what the linked commit/ticket already documents.
 
+- **`type: code-review` tickets always stall on `needs-answer` (`park_kind: zero-commit`)
+  under ralph-loop.** `gx-implement/SKILL.md` told the agent to "follow the gx-code-review
+  skill instead," which the agent read as invoking the Skill tool — but `gx-code-review` sets
+  `disable-model-invocation: true`, so the call is refused and the iteration ends with zero
+  commits every time. Fixed at the scheduler, not in-session: `runIteration`
+  (`ralphloop/iteration.go`) now launches a `type: code-review` frontier ticket with
+  `/gx-code-review` directly (`codeReviewSkill` const, `ralphloop/loop.go`) instead of handing
+  off from inside a `gx-implement` session, since the harness starting a session with the
+  command already resolved isn't blocked by `disable-model-invocation` the way an in-session
+  Skill-tool call is. `gx-implement/SKILL.md` keeps a short note for the manual-invocation edge
+  case only. See `follow-ups/issues/02-code-review-skill-invocation-research.md`.
+- **Every ticket in an epic lands in `needs-repair` on first claim, whole epic parks.**
+  `ralphloop/labels.go`'s `iterLabel` (`epicName + "-iter-" + identifier`, no length cap) is used
+  verbatim as the herdr agent name; epic slugs of 25+ chars push double-digit-ticket labels past
+  herdr's 32-char `invalid_agent_name` limit, and herdr's error isn't special-cased the way
+  `agent_name_taken` is, so it falls into the generic non-fatal `needs-repair` path and every
+  ticket fails identically. Found live: `notification-throttle-impl` (27-char slug), tickets `01`,
+  `02`, `09` all rejected on `notification-throttle-impl-iter-01`/`-02`/`-09` (34 chars). Not fixed.
+  See `notification-throttle-impl/issues/11-agent-name-too-long-research.md`.
 - **`conflict-lifecycle/02` forked 4 times (`02a`→`02a1`→`02a2`→`02a3`) despite `gx-to-tickets`
   already having the rules to catch it.** The ticket named 3 independent variants (SKILL.md's
   "variant fan-out" rule, N>couple should split) whose tests landed across 4 different files each

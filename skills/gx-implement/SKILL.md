@@ -17,9 +17,14 @@ lowest-numbered ticket that is unblocked (every ticket in its `blocked_by` is `d
 Implement exactly that one ticket, then stop — do not continue on to the next ticket in the same
 run, even if it's now unblocked.
 
-If the frontier ticket's `type` is `code-review`, stop reading this document and follow the
-[gx-code-review](../gx-code-review/SKILL.md) skill instead — it reviews the epic and opens follow-up
-tickets rather than implementing anything itself.
+Under ralph-loop, a frontier ticket with `type: code-review` never reaches this skill: the
+scheduler launches the iteration with `/gx-code-review` directly instead of `/gx-implement`
+(see `ralphloop.codeReviewSkill`), since [gx-code-review](../gx-code-review/SKILL.md) sets
+`disable-model-invocation: true` and can only be entered via an explicit `/command`, not a
+Skill-tool call from inside a running session. If you're reading this document against a
+`type: code-review` ticket anyway (e.g. invoked by hand), stop — don't implement it and don't
+try to invoke gx-code-review yourself via the Skill tool; ask the user to run
+`/gx-code-review <path>` instead.
 
 Before starting work on the ticket you're about to claim, run `gx tickets validate <path>` on it. If
 it fails, stop and fix the ticket's frontmatter (or hand it back) before doing anything else — do

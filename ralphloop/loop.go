@@ -57,6 +57,15 @@ const defaultSmartZone = 130_000
 // RunOptions.Skill is unset.
 const defaultWorkerSkill = "gx-implement"
 
+// codeReviewSkill is the skill launched directly for type: code-review
+// tickets instead of defaultWorkerSkill/RunOptions.Skill (see
+// runIteration). It's launched as its own fresh /command rather than
+// entered from inside a gx-implement session because gx-code-review sets
+// disable-model-invocation: true, which blocks an in-session Skill-tool
+// hand-off but not the harness starting a session with the command
+// already resolved.
+const codeReviewSkill = "gx-code-review"
+
 // AgentKind identifies the coding agent that drives an iteration.
 type AgentKind string
 

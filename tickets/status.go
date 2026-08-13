@@ -65,6 +65,11 @@ var draftStatuses = map[string]bool{
 // comparison is against the literal rather than the typed constant.
 const typeCodeReview = "code-review"
 
+// IsCodeReview reports whether t's Type is code-review.
+func (t Ticket) IsCodeReview() bool {
+	return t.Type == typeCodeReview
+}
+
 // baseStatus classifies t's raw Status: value alone, before the Blocked by:
 // overlay (see Epic.RenderedStatus) is applied.
 func (t Ticket) baseStatus() RenderedStatus {

@@ -84,7 +84,11 @@ func runIteration(d Deps, p iterationParams) error {
 		return fmt.Errorf("opening iteration tab: %w", err)
 	}
 
-	prompt := skillPrompt(p.Agent, p.Skill, p.Ticket.Path)
+	skill := p.Skill
+	if p.Ticket.IsCodeReview() {
+		skill = codeReviewSkill
+	}
+	prompt := skillPrompt(p.Agent, skill, p.Ticket.Path)
 	launchParams := p.launchAndPromptParams(label, tab.RootPaneID, tab.TabID, prompt, path, eventIterationStarted, eventIterationFinished)
 	sessionID, err := launchAndPrompt(d, launchParams)
 	parked := errors.Is(err, errBlockedPaneParked)

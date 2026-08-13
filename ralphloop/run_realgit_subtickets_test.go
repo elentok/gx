@@ -16,19 +16,22 @@ import (
 )
 
 // fullTicketIDFromImplementPrompt is ticketIDFromImplementPrompt's variant for
-// this file's tests: it returns the implement prompt's full "NN[letters]"
+// this file's tests: it returns the skill-launch prompt's full "NN[letters]"
 // filename prefix (e.g. "01a") rather than just the first two characters, so
 // a parent (e.g. "01") and its lettered children (e.g. "01a"/"01b") - which
-// share those first two characters - are told apart.
+// share those first two characters - are told apart. Like
+// ticketIDFromImplementPrompt, the skill name itself isn't checked: a
+// type: code-review ticket launches under "gx-code-review" rather than the
+// run's configured Skill (see runIteration).
 func fullTicketIDFromImplementPrompt(text string) (id string, ok bool) {
-	base, found := strings.CutPrefix(text, "/implement ")
-	if !found {
-		base, found = strings.CutPrefix(text, "$implement ")
+	if !strings.HasPrefix(text, "/") && !strings.HasPrefix(text, "$") {
+		return "", false
 	}
+	_, path, found := strings.Cut(text, " ")
 	if !found {
 		return "", false
 	}
-	base = filepath.Base(base)
+	base := filepath.Base(path)
 	idx := strings.Index(base, "-")
 	if idx <= 0 {
 		return "", false
