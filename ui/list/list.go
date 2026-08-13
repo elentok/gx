@@ -33,47 +33,23 @@ func (m *Model) Offset() int {
 	return m.scrollOffset
 }
 
+// uniformLineHeight treats every item as occupying exactly one screen line,
+// reducing a *Lines method's line-space arithmetic to the item-space
+// arithmetic its non-Lines sibling below performs directly.
+func uniformLineHeight(int) int {
+	return 1
+}
+
 // Navigate moves the selection by delta (clamped to bounds), then calls
 // EnsureSelectionVisible to keep the selection on screen.
 func (m *Model) Navigate(delta, total, visibleH int) {
-	m.SetSelected(m.selected+delta, total)
-	m.EnsureSelectionVisible(total, visibleH)
+	m.NavigateLines(delta, total, uniformLineHeight, visibleH)
 }
 
 // ScrollViewport scrolls the offset by delta (clamped to [0, max(0,total-visibleH)]),
 // then snaps the selection into the visible range.
 func (m *Model) ScrollViewport(delta, total, visibleH int) {
-	maxOffset := total - visibleH
-	if maxOffset < 0 {
-		maxOffset = 0
-	}
-
-	newOffset := m.scrollOffset + delta
-	if newOffset < 0 {
-		newOffset = 0
-	}
-	if newOffset > maxOffset {
-		newOffset = maxOffset
-	}
-	m.scrollOffset = newOffset
-
-	// Snap selection into visible range
-	if m.selected < newOffset {
-		m.selected = newOffset
-	}
-	if visibleH > 0 && m.selected >= newOffset+visibleH {
-		m.selected = newOffset + visibleH - 1
-	}
-
-	// Clamp selection to [0, total-1]
-	if total > 0 {
-		if m.selected < 0 {
-			m.selected = 0
-		}
-		if m.selected > total-1 {
-			m.selected = total - 1
-		}
-	}
+	m.ScrollViewportLines(delta, total, uniformLineHeight, visibleH)
 }
 
 // ScrollOffsetOnly scrolls the offset by delta (clamped to [0,
@@ -82,58 +58,31 @@ func (m *Model) ScrollViewport(delta, total, visibleH int) {
 // the scroll offset (e.g. a mouse wheel that pans the list without moving
 // the cursor).
 func (m *Model) ScrollOffsetOnly(delta, total, visibleH int) {
-	maxOffset := total - visibleH
-	if maxOffset < 0 {
-		maxOffset = 0
-	}
-
-	newOffset := m.scrollOffset + delta
-	if newOffset < 0 {
-		newOffset = 0
-	}
-	if newOffset > maxOffset {
-		newOffset = maxOffset
-	}
-	m.scrollOffset = newOffset
+	m.ScrollOffsetOnlyLines(delta, total, uniformLineHeight, visibleH)
 }
 
 // EnsureSelectionVisible adjusts the offset minimally to keep the selection
 // on screen (no centering).
 func (m *Model) EnsureSelectionVisible(total, visibleH int) {
-	if m.selected < m.scrollOffset {
-		m.scrollOffset = m.selected
-	}
-	if visibleH > 0 && m.selected >= m.scrollOffset+visibleH {
-		m.scrollOffset = m.selected - visibleH + 1
-	}
-
-	// Clamp offset to [0, max(0, total-visibleH)]
-	maxOffset := total - visibleH
-	if maxOffset < 0 {
-		maxOffset = 0
-	}
-	if m.scrollOffset < 0 {
-		m.scrollOffset = 0
-	}
-	if m.scrollOffset > maxOffset {
-		m.scrollOffset = maxOffset
-	}
+	m.EnsureSelectionVisibleLines(total, uniformLineHeight, visibleH)
 }
 
 // VisibleRange returns the start and end indices of the visible range.
 // Returns (offset, min(offset+visibleH, total)).
 func (m *Model) VisibleRange(total, visibleH int) (start, end int) {
-	start = m.scrollOffset
-	end = m.scrollOffset + visibleH
-	if end > total {
-		end = total
-	}
-	return start, end
+	return m.VisibleRangeLines(total, uniformLineHeight, visibleH)
 }
 
 // ScrollPage moves both the selection and the viewport by delta lines (vim-style
 // ctrl+d/ctrl+u: cursor and viewport move together, staying at the same screen position).
 // No-op if already at the boundary in the direction of delta.
+//
+// This can't delegate to ScrollPageLines directly: that method's lineBudget
+// doubles as both the paging distance and the max-offset line budget, which
+// only coincide when a caller pages by exactly one viewport height. Here
+// delta (paging distance) and visibleH (viewport height, bounding the max
+// offset) are independent, so the item-walk uses delta as its budget while
+// the offset clamp uses visibleH directly, same as the pre-Lines arithmetic.
 func (m *Model) ScrollPage(delta, total, visibleH int) {
 	if total == 0 {
 		return
@@ -145,7 +94,13 @@ func (m *Model) ScrollPage(delta, total, visibleH int) {
 		return
 	}
 
-	newSelected := m.selected + delta
+	dir := 1
+	if delta < 0 {
+		dir = -1
+	}
+	itemDelta := dir * pageItemDelta(m.selected, total, uniformLineHeight, delta*dir, dir)
+
+	newSelected := m.selected + itemDelta
 	if newSelected < 0 {
 		newSelected = 0
 	}
@@ -157,7 +112,7 @@ func (m *Model) ScrollPage(delta, total, visibleH int) {
 	if maxOffset < 0 {
 		maxOffset = 0
 	}
-	newOffset := m.scrollOffset + delta
+	newOffset := m.scrollOffset + itemDelta
 	if newOffset < 0 {
 		newOffset = 0
 	}
