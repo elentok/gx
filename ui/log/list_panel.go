@@ -95,26 +95,31 @@ func (m listPanel) Selected() int { return m.list.Selected() }
 
 // Navigate moves the cursor by delta rows.
 func (m listPanel) Navigate(delta int) listPanel {
-	m.list.Navigate(delta, len(m.rows), m.visibleH())
+	m.list.NavigateLines(delta, len(m.rows), m.rowLineHeight, m.lineBudget())
 	return m
 }
 
 // SetSelected moves the cursor to position i and ensures it's visible.
 func (m listPanel) SetSelected(i int) listPanel {
 	m.list.SetSelected(i, len(m.rows))
-	m.list.EnsureSelectionVisible(len(m.rows), m.visibleH())
+	m.list.EnsureSelectionVisibleLines(len(m.rows), m.rowLineHeight, m.lineBudget())
 	return m
 }
 
-// ScrollPage scrolls by delta pages.
+// ScrollPage scrolls by delta pages: delta's sign is direction, its
+// magnitude is the line budget to page by (callers pass ±list.DefaultScroll).
 func (m listPanel) ScrollPage(delta int) listPanel {
-	m.list.ScrollPage(delta, len(m.rows), m.visibleH())
+	dir, lineBudget := 1, delta
+	if delta < 0 {
+		dir, lineBudget = -1, -delta
+	}
+	m.list.ScrollPageLines(dir, len(m.rows), m.rowLineHeight, lineBudget)
 	return m
 }
 
 // ScrollViewport scrolls the viewport by delta rows without moving selection.
 func (m listPanel) ScrollViewport(delta int) listPanel {
-	m.list.ScrollViewport(delta, len(m.rows), m.visibleH())
+	m.list.ScrollViewportLines(delta, len(m.rows), m.rowLineHeight, m.lineBudget())
 	return m
 }
 
@@ -143,16 +148,22 @@ func (m listPanel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// visibleH returns how many rows fit on screen. Commit rows render as two
-// physical lines, so this is conservative: it assumes every row takes two
-// lines, which slightly under-counts when the single-line pseudo-status row
-// is in view but never overflows the frame.
-func (m listPanel) visibleH() int {
-	h := (m.height - 3) / 2
+// lineBudget returns how many screen lines are available for rows.
+func (m listPanel) lineBudget() int {
+	h := m.height - 3
 	if h < 1 {
 		return 1
 	}
 	return h
+}
+
+// rowLineHeight is m.rows' list.LineHeight: pseudo-status rows render as one
+// physical line, commit rows as two (subject line + metadata line).
+func (m listPanel) rowLineHeight(i int) int {
+	if m.rows[i].kind == rowPseudoStatus {
+		return 1
+	}
+	return 2
 }
 
 // View renders the log list panel frame.
@@ -187,11 +198,14 @@ func (m listPanel) visibleLines() []string {
 	if len(m.rows) == 0 {
 		return []string{ui.StyleMuted.Render("no commits")}
 	}
-	rowBudget := maxInt(1, m.visibleH())
-	start, end := m.list.VisibleRange(len(m.rows), rowBudget)
+	lineBudget := m.lineBudget()
+	start, end := m.list.VisibleRangeLines(len(m.rows), m.rowLineHeight, lineBudget)
 	lines := make([]string, 0, (end-start)*2)
 	for i := start; i < end; i++ {
 		lines = append(lines, m.renderRow(m.rows[i], i == m.list.Selected(), m.width-2)...)
+	}
+	if len(lines) > lineBudget {
+		lines = lines[:lineBudget]
 	}
 	return lines
 }
