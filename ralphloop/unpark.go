@@ -183,3 +183,23 @@ func UnparkTicket(path string, now time.Time) error {
 		*body = demoteSection(*body, "## Needs Answer", now)
 	})
 }
+
+// UnmuteTicket clears the ticket at path's Mutes field and demotes any "##
+// Needs Repair" section into a dated "## Comments" sub-entry, the storm-mute
+// counterpart of UnparkTicket — triggered by a person via the tickets/queue
+// tabs' "m" suggested-actions menu, since a storm mute (unlike a needs-answer
+// park) never auto-clears on its own. If the mute actually parked the ticket
+// (status: needs-repair, written when muteSource's parkTicket callback ran),
+// this also reopens it; a mute that tripped with no parkTicket callback
+// available (see muteSource) never changed status, so there's no park to
+// undo and clearing Mutes is the whole action.
+func UnmuteTicket(path string, now time.Time) error {
+	return updateTicketWithBody(path, func(t *schema.Ticket, body *string) {
+		t.Mutes = nil
+		if t.Status == schema.StatusNeedsRepair {
+			t.Status = schema.StatusOpen
+		}
+		*body = demoteSection(*body, "## Needs Repair", now)
+		*body = appendComment(*body, fmt.Sprintf("**%s** — unmuted via Suggested Actions", now.Format("2006-01-02")))
+	})
+}

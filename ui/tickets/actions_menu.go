@@ -109,7 +109,7 @@ func (m Model) handleSuggestedActionsKey() (tea.Model, tea.Cmd) {
 	}
 	epic := m.epics[r.epicIdx]
 	ticket := epic.Tickets[r.ticketIdx]
-	items := suggestedActionItems(epic.RenderedStatus(ticket))
+	items := suggestedActionItems(epic.RenderedStatus(ticket), ticket)
 	if len(items) == 0 {
 		return m, notify.Info("no suggested actions for this ticket")
 	}

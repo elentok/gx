@@ -237,7 +237,7 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) []string {
 
 	line := indent + triangle + style.Render(icon)
 	badgeWidth := 0
-	if ticketHasSuggestedActions(status) {
+	if ticketHasSuggestedActions(status, t) {
 		badgeStyle := suggestedActionBadgeStyle
 		if searchDim {
 			badgeStyle = ui.StyleDim

@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // TestClearableParkedTicket covers the shared predicate's full matrix: park
@@ -318,6 +319,65 @@ func TestRun_AnsweredParkWithSiblingRunning_UnparksWithoutWaitingForSibling(t *t
 	}
 	if !strings.Contains(string(raw02), "status: done") {
 		t.Errorf("ticket 02 not marked done:\n%s", raw02)
+	}
+}
+
+// TestUnmuteTicket_Parked_ClearsMutesDemotesReopens covers a mute that
+// actually parked its ticket (status: needs-repair, written by muteSource's
+// parkTicket callback): UnmuteTicket clears Mutes, demotes the "## Needs
+// Repair" section into "## Comments", reopens the ticket, and appends its
+// own unmute audit note.
+func TestUnmuteTicket_Parked_ClearsMutesDemotesReopens(t *testing.T) {
+	t.Parallel()
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: task\nmutes:\n    - event_type: notification-storm\n      tripped_at: 2026-01-01T00:00:00Z\n---\n# A\n\n## Needs Repair\n\nnotification storm tripped a mute\n")
+
+	if err := UnmuteTicket(path, time.Now()); err != nil {
+		t.Fatalf("UnmuteTicket: %v", err)
+	}
+
+	ticket := mustParse(t, path)
+	if ticket.Status != schema.StatusOpen {
+		t.Errorf("Status = %q, want %q", ticket.Status, schema.StatusOpen)
+	}
+	if len(ticket.Mutes) != 0 {
+		t.Errorf("Mutes = %v, want empty", ticket.Mutes)
+	}
+
+	raw := mustRead(t, path)
+	if strings.Contains(raw, "\n## Needs Repair\n") {
+		t.Errorf("Needs Repair section not demoted:\n%s", raw)
+	}
+	if !strings.Contains(raw, "## Comments") || !strings.Contains(raw, "retired from `## Needs Repair`") {
+		t.Errorf("Needs Repair not retired into Comments:\n%s", raw)
+	}
+	if !strings.Contains(raw, "unmuted via Suggested Actions") {
+		t.Errorf("unmute audit note missing:\n%s", raw)
+	}
+}
+
+// TestUnmuteTicket_Unparked_ClearsMutesLeavesStatus covers a mute that
+// tripped with no parkTicket callback available (see muteSource) — the
+// ticket's status was never touched, so there's no park to undo: clearing
+// Mutes (plus the audit note) is the whole action.
+func TestUnmuteTicket_Unparked_ClearsMutesLeavesStatus(t *testing.T) {
+	t.Parallel()
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: open\ntype: task\nmutes:\n    - event_type: notification-storm\n      tripped_at: 2026-01-01T00:00:00Z\n---\n# A\n\nBody text.\n")
+
+	if err := UnmuteTicket(path, time.Now()); err != nil {
+		t.Fatalf("UnmuteTicket: %v", err)
+	}
+
+	ticket := mustParse(t, path)
+	if ticket.Status != schema.StatusOpen {
+		t.Errorf("Status = %q, want unchanged %q", ticket.Status, schema.StatusOpen)
+	}
+	if len(ticket.Mutes) != 0 {
+		t.Errorf("Mutes = %v, want empty", ticket.Mutes)
+	}
+
+	raw := mustRead(t, path)
+	if !strings.Contains(raw, "unmuted via Suggested Actions") {
+		t.Errorf("unmute audit note missing:\n%s", raw)
 	}
 }
 

@@ -105,26 +105,35 @@ func demoteSection(body, heading string, now time.Time) string {
 	reason := strings.TrimSpace(sections[idx].content)
 	entry := fmt.Sprintf("**%s** — retired from `%s`:\n\n%s\n", now.Format("2006-01-02"), heading, reason)
 	sections = append(sections[:idx], sections[idx+1:]...)
-
-	commentsIdx := -1
-	for i, s := range sections {
-		if s.heading == "## Comments" {
-			commentsIdx = i
-			break
-		}
-	}
-	if commentsIdx == -1 {
-		sections = append(sections, bodySection{heading: "## Comments", content: "\n" + entry})
-	} else {
-		existing := strings.TrimRight(sections[commentsIdx].content, "\n")
-		if strings.TrimSpace(existing) == "" {
-			sections[commentsIdx].content = "\n" + entry
-		} else {
-			sections[commentsIdx].content = existing + "\n\n" + entry
-		}
-	}
+	sections = appendCommentsEntry(sections, entry)
 
 	return joinBodySections(preamble, sections)
+}
+
+// appendComment appends entry as a dated sub-entry under body's "## Comments"
+// heading, creating the heading if it doesn't exist yet.
+func appendComment(body, entry string) string {
+	preamble, sections := splitBodySections(body)
+	sections = appendCommentsEntry(sections, entry)
+	return joinBodySections(preamble, sections)
+}
+
+// appendCommentsEntry appends entry under sections' "## Comments" heading,
+// creating that heading if it doesn't exist yet — the shared write demoteSection
+// and appendComment both funnel through.
+func appendCommentsEntry(sections []bodySection, entry string) []bodySection {
+	for i, s := range sections {
+		if s.heading == "## Comments" {
+			existing := strings.TrimRight(s.content, "\n")
+			if strings.TrimSpace(existing) == "" {
+				sections[i].content = "\n" + entry
+			} else {
+				sections[i].content = existing + "\n\n" + entry
+			}
+			return sections
+		}
+	}
+	return append(sections, bodySection{heading: "## Comments", content: "\n" + entry})
 }
 
 // MarkDone writes status: done into the ticket file at path.

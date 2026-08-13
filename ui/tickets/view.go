@@ -214,7 +214,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 	}
 
 	line := indent + triangle + m.checkboxGlyph(m.isChecked(t.Path)) + " " + style.Render(icon)
-	if ticketHasSuggestedActions(status) {
+	if ticketHasSuggestedActions(status, t) {
 		badgeStyle := suggestedActionBadgeStyle
 		if searchDim {
 			badgeStyle = ui.StyleDim

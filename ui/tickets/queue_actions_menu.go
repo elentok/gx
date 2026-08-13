@@ -18,7 +18,7 @@ func (m QueueModel) handleQueueSuggestedActionsKey() (tea.Model, tea.Cmd) {
 		return m, notify.Info("select a ticket to see its suggested actions")
 	}
 	r := rows[m.selected]
-	items := suggestedActionItems(r.epic.RenderedStatus(r.ticket))
+	items := suggestedActionItems(r.epic.RenderedStatus(r.ticket), r.ticket)
 	if len(items) == 0 {
 		return m, notify.Info("no suggested actions for this ticket")
 	}

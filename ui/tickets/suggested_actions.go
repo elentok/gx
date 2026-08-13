@@ -33,25 +33,38 @@ const actionInvestigate = "investigate"
 // investigateSkill is the skill cmdLaunchInvestigate's prompt invokes.
 const investigateSkill = "gx-investigate"
 
-// suggestedActionItems returns status's suggested-action menu items.
-// resume-answered only applies to needs-answer; investigate applies to any
-// status signaling a problem — everything except open/claimed (still
-// healthy, unclaimed or in-progress work) and done (finished successfully).
-func suggestedActionItems(status tickets.RenderedStatus) []components.MenuItem {
-	items := []components.MenuItem{}
+// actionUnmuteReopen is offered on any ticket carrying a non-empty Mutes
+// field, independent of status — a mute that tripped with no parkTicket
+// callback (see ralphloop.muteSource) never moves the ticket to
+// needs-repair, so gating on status alone would leave that mute invisible
+// and unclearable from the Tickets tab.
+const actionUnmuteReopen = "unmute-reopen"
+
+// suggestedActionItems returns ticket's suggested-action menu items, empty
+// when none apply, given its rendered status. resume-answered only applies
+// to needs-answer; investigate applies to any status signaling a problem —
+// everything except open/claimed (still healthy, unclaimed or in-progress
+// work) and done (finished successfully). handleSuggestedActionsKey/
+// handleQueueSuggestedActionsKey toast "no suggested actions" rather than
+// opening an empty menu.
+func suggestedActionItems(status tickets.RenderedStatus, ticket tickets.Ticket) []components.MenuItem {
+	var items []components.MenuItem
 	if status == tickets.StatusNeedsAnswer {
 		items = append(items, components.MenuItem{Label: "Resume (I answered)", Value: actionResumeAnswered})
 	}
 	if status != tickets.StatusOpen && status != tickets.StatusClaimed && status != tickets.StatusDone {
 		items = append(items, components.MenuItem{Label: "Investigate", Value: actionInvestigate})
 	}
+	if len(ticket.Mutes) > 0 {
+		items = append(items, components.MenuItem{Label: "Unmute & Reopen", Value: actionUnmuteReopen})
+	}
 	return items
 }
 
-// ticketHasSuggestedActions reports whether status's row should carry the "m"
-// suggested-actions badge (ui.IconSet.SuggestedAction).
-func ticketHasSuggestedActions(status tickets.RenderedStatus) bool {
-	return len(suggestedActionItems(status)) > 0
+// ticketHasSuggestedActions reports whether ticket's row should carry the
+// "m" suggested-actions badge (ui.IconSet.SuggestedAction).
+func ticketHasSuggestedActions(status tickets.RenderedStatus, ticket tickets.Ticket) bool {
+	return len(suggestedActionItems(status, ticket)) > 0
 }
 
 // applySuggestedAction performs action's write against the ticket at path.
@@ -59,6 +72,8 @@ func applySuggestedAction(path, action string, now time.Time) error {
 	switch action {
 	case actionResumeAnswered:
 		return ralphloop.UnparkTicket(path, now)
+	case actionUnmuteReopen:
+		return ralphloop.UnmuteTicket(path, now)
 	}
 	return nil
 }
