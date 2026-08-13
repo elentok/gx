@@ -420,19 +420,20 @@ func newDoctorCmd(d deps) *cobra.Command {
 
 func newNotifyCmd(d deps) *cobra.Command {
 	var enable, disable string
-	var status bool
+	var status, testBatch bool
 
 	cmd := &cobra.Command{
 		Use:   "notify [message]",
 		Short: "send a message via configured Telegram/Slack notifications",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return runNotify(args, enable, disable, status, d)
+			return runNotify(args, enable, disable, status, testBatch, d)
 		},
 	}
 	cmd.Flags().StringVar(&enable, "enable", "", "clear the manual mute for a transport (telegram/slack)")
 	cmd.Flags().StringVar(&disable, "disable", "", "trip the manual mute for a transport (telegram/slack)")
 	cmd.Flags().BoolVar(&status, "status", false, "report per-transport mute state and muted tickets")
+	cmd.Flags().BoolVar(&testBatch, "test-batch", false, "send a fixed 2-message batch through the same join a real flush uses, to reproduce/verify the batch-separator escaping bug live")
 	return cmd
 }
 

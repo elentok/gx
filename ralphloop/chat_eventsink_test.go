@@ -199,7 +199,7 @@ func TestChatEventSink_IterationPausedResumed_RateLimitKindReachesChat(t *testin
 	}
 	pausedText := slackStyle.iterationPausedText("iter-04", "rate limited", "epic", "04")
 	resumedText := slackStyle.iterationResumedText("iter-04", "epic", "04")
-	want := pausedText + "\n---\n" + resumedText
+	want := pausedText + "\n\n---\n\n" + resumedText
 	if got[0] != want {
 		t.Errorf("sent[0] = %q, want %q", got[0], want)
 	}
@@ -262,7 +262,7 @@ func TestChatEventSink_RepeatedEvent_TripsPerSourceMuteAndParksTicket(t *testing
 	}
 	normalText := slackStyle.iterationPausedText("iter-04", "rate limited", epicName, "04")
 	wantMuted := slackStyle.mutedText(epicName, "04")
-	want := fmt.Sprintf("%s ×4", normalText) + "\n---\n" + wantMuted
+	want := fmt.Sprintf("%s ×4", normalText) + "\n\n---\n\n" + wantMuted
 	if got[0] != want {
 		t.Errorf("sent[0] = %q, want %q", got[0], want)
 	}
@@ -327,7 +327,7 @@ func TestChatEventSink_MultipleDistinctEvents_FlushSendsOneSeparatorJoinedMessag
 	if len(got) != 1 {
 		t.Fatalf("sent = %v, want exactly 1 batched message", got)
 	}
-	want := slackStyle.epicStartedText("epic", EpicCounts{}) + "\n---\n" + slackStyle.epicCompleteText("epic", EpicCounts{}, 1, 10, 0)
+	want := slackStyle.epicStartedText("epic", EpicCounts{}) + "\n\n---\n\n" + slackStyle.epicCompleteText("epic", EpicCounts{}, 1, 10, 0)
 	if got[0] != want {
 		t.Errorf("sent[0] = %q, want %q", got[0], want)
 	}

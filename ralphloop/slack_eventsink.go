@@ -77,6 +77,19 @@ func SendSlackTestMessage(webhookURL string) error {
 	return sendSlackMessageRaw(webhookURL, slackStyle.testMessageText())
 }
 
+// SendSlackTestBatch is Slack's counterpart to SendTelegramTestBatch: sends
+// two fixed test messages through the same renderBatch join a real flush
+// uses. Slack's mrkdwn dialect doesn't treat "-" as reserved, so this is
+// expected to succeed even while the Telegram counterpart 400s — included for
+// symmetry/smoke-testing the batch plumbing, not because Slack has the bug.
+func SendSlackTestBatch(webhookURL string) error {
+	items := []batchedMessage{
+		{text: slackStyle.testMessageText(), kind: "test"},
+		{text: slackStyle.testMessageText(), kind: "test"},
+	}
+	return sendSlackMessageRaw(webhookURL, renderBatch(slackStyle, items))
+}
+
 // SendSlackMessage synchronously posts arbitrary text to the Slack webhook
 // and returns any error instead of swallowing it, for callers like `gx
 // notify` that need to report success/failure directly — unlike the

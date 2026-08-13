@@ -63,6 +63,42 @@ func sendMessage(cfg config.NotificationsConfig, text, telegramBaseURL string) (
 	return sent, joined
 }
 
+// SendTestBatch sends a fixed 2-message test batch to every notification
+// service configured in cfg, through the exact same renderBatch join a real
+// flush uses (see SendTelegramTestBatch/SendSlackTestBatch) — `gx notify
+// --test-batch`'s entry point for reproducing/verifying the batch-separator
+// escaping bug against the real APIs, no-op'ing per-service when that
+// service's credentials are absent, same shape as SendMessage.
+func SendTestBatch(cfg config.NotificationsConfig) ([]string, error) {
+	var sent []string
+	var errs []error
+
+	if cfg.Telegram.BotToken != "" {
+		if err := SendTelegramTestBatch(cfg.Telegram.BotToken, cfg.Telegram.ChatID); err != nil {
+			errs = append(errs, fmt.Errorf("telegram: %w", err))
+		} else {
+			sent = append(sent, "telegram")
+		}
+	}
+
+	if cfg.Slack.WebhookURL != "" {
+		if err := SendSlackTestBatch(cfg.Slack.WebhookURL); err != nil {
+			errs = append(errs, fmt.Errorf("slack: %w", err))
+		} else {
+			sent = append(sent, "slack")
+		}
+	}
+
+	if len(errs) == 0 {
+		return sent, nil
+	}
+	joined := errs[0]
+	for _, err := range errs[1:] {
+		joined = fmt.Errorf("%w; %w", joined, err)
+	}
+	return sent, joined
+}
+
 // gateCLISend runs transport's send through the notification gate with
 // source "cli" — there's no ticket to park a trip against, so parkTicket is
 // nil. A trip still writes its bookkeeping; the caller just skips sending.

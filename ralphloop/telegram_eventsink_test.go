@@ -165,6 +165,72 @@ func waitForRunLogEvent(t *testing.T, dir, epicName string) []Event {
 	return nil
 }
 
+// unescapedTelegramMarkdownV2Char scans text for a reserved MarkdownV2
+// character that isn't backslash-escaped, returning it (and its index) or
+// ("", -1) if text is fully escaped. "*" is exempted: every message builder
+// in notification_text.go deliberately emits it unescaped as the bold
+// headline delimiter, so a literal "*" is valid syntax, not stray data.
+func unescapedTelegramMarkdownV2Char(text string) (string, int) {
+	runes := []rune(text)
+	for i := 0; i < len(runes); i++ {
+		if runes[i] == '\\' {
+			i++ // skip the escaped char
+			continue
+		}
+		if runes[i] == '*' {
+			continue
+		}
+		if strings.ContainsRune(telegramMarkdownV2SpecialChars, runes[i]) {
+			return string(runes[i]), i
+		}
+	}
+	return "", -1
+}
+
+// TestRenderBatch_TelegramStyle_MultipleItems_SeparatorIsEscaped guards
+// against the batch-separator MarkdownV2 bug directly: renderBatch's own
+// "\n---\n" join must not introduce an unescaped reserved character, since
+// nothing downstream of it (sendRaw/sendSync) escapes the joined text again
+// — chat_eventsink.go's existing separator test only ever exercised
+// slackStyle, whose dialect doesn't reserve "-", so it never caught this.
+func TestRenderBatch_TelegramStyle_MultipleItems_SeparatorIsEscaped(t *testing.T) {
+	t.Parallel()
+	items := []batchedMessage{
+		{text: telegramStyle.testMessageText(), kind: "a"},
+		{text: telegramStyle.testMessageText(), kind: "b"},
+	}
+	got := renderBatch(telegramStyle, items)
+	if ch, idx := unescapedTelegramMarkdownV2Char(got); idx != -1 {
+		t.Errorf("renderBatch produced unescaped %q at index %d in %q", ch, idx, got)
+	}
+}
+
+// TestSendTelegramTestBatch_PostsRenderBatchOutputAsIs pins the `gx notify
+// --test-batch` entry point to renderBatch's exact output — the live
+// reproduction path a person runs against the real Bot API, mirrored here
+// against a fake server as documentation and to catch a future regression
+// where the batch send stops matching what a real flush() does.
+func TestSendTelegramTestBatch_PostsRenderBatchOutputAsIs(t *testing.T) {
+	t.Parallel()
+	server, getRequests := fakeTelegramServer(t, http.StatusOK)
+
+	if err := sendTelegramTestBatch("tok", "chat-1", server.URL); err != nil {
+		t.Fatalf("sendTelegramTestBatch: %v", err)
+	}
+
+	reqs := getRequests()
+	if len(reqs) != 1 {
+		t.Fatalf("requests = %v, want exactly 1", reqs)
+	}
+	want := renderBatch(telegramStyle, []batchedMessage{
+		{text: telegramStyle.testMessageText(), kind: "test"},
+		{text: telegramStyle.testMessageText(), kind: "test"},
+	})
+	if reqs[0].Text != want {
+		t.Errorf("text = %q, want %q", reqs[0].Text, want)
+	}
+}
+
 func TestSendTelegramTestMessage_SendsSynchronouslyAndReturnsNilOnSuccess(t *testing.T) {
 	t.Parallel()
 	server, getRequests := fakeTelegramServer(t, http.StatusOK)

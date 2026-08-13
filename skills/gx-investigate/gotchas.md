@@ -4,6 +4,15 @@ Running list of previously-diagnosed gx/ralph-loop bugs, newest first. Append on
 to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKILL.md) gets fixed
 — don't re-explain what the linked commit/ticket already documents.
 
+- **Telegram batch notifications silently drop whenever ≥2 messages coalesce into one flush.**
+  `renderBatch` (`ralphloop/chat_eventsink.go:244-253`) joins each already-escaped queued
+  message with a raw `"\n---\n"` separator — `-` is a reserved MarkdownV2 char
+  (`telegramMarkdownV2SpecialChars`), so any batch with 2+ distinct messages 400s on send;
+  single-message batches (no separator) go through fine, so the drop is intermittent, not total.
+  Same failure shape as the `epicCompleteText` `(s)` gotcha below, in the newer batch-join path.
+  Found live: `tickets-tree`'s 2026-08-13 re-run, 19/26 telegram `notify_kind: batch` sends
+  400'd; the 7 that succeeded matched exactly the 7 notifications the user reported receiving.
+  Not fixed. See `follow-ups/issues/06-batch-notification-separator-unescaped-markdownv2.md`.
 - **Nudge-retry exhaustion on the initial `herdr agent wait --until working` launch step leaves a
   ticket `needs-repair` with a live, never-prompted pane leaked.** `promptWithNudge`
   (`ralphloop/deps.go:483-568`) only resends bare Enter, never the actual prompt text, across its

@@ -203,13 +203,13 @@ func (s *chatEventSink) flush() {
 	result, err := s.gate(notifyKindBatch, epicSource(s.epicName), true)
 	if err != nil {
 		logger.Debug("%s: notification gate: %v\n", s.transport.name(), err)
-		s.sendRaw(renderBatch(items), notifyKindBatch)
+		s.sendRaw(renderBatch(s.style, items), notifyKindBatch)
 		return
 	}
 	if result.Decision == GloballyMuted {
 		return
 	}
-	s.sendRaw(renderBatch(items), notifyKindBatch)
+	s.sendRaw(renderBatch(s.style, items), notifyKindBatch)
 }
 
 // closeFlush is flush's close-time variant: if the gate reports the
@@ -228,20 +228,31 @@ func (s *chatEventSink) closeFlush() {
 	result, err := s.gate(notifyKindBatch, epicSource(s.epicName), true)
 	if err != nil {
 		logger.Debug("%s: notification gate: %v\n", s.transport.name(), err)
-		s.sendSync(renderBatch(items), notifyKindBatch)
+		s.sendSync(renderBatch(s.style, items), notifyKindBatch)
 		return
 	}
 	if result.Decision == GloballyMuted {
 		logNotificationSuppressed(s.scratchDir, s.epicName, s.transport.name(), strings.Join(distinctKinds(items), ","))
 		return
 	}
-	s.sendSync(renderBatch(items), notifyKindBatch)
+	s.sendSync(renderBatch(s.style, items), notifyKindBatch)
 }
+
+// batchSeparatorRaw is the literal divider renderBatch places between
+// originally-distinct messages, before style-specific escaping. Every
+// individual message's text arrives already escaped (see enqueue) — this is
+// the one piece of the joined output renderBatch itself introduces, so it
+// must go through style.escape the same as any other literal, or a dialect
+// that reserves one of its characters (Telegram's MarkdownV2 reserves "-")
+// rejects the whole send.
+const batchSeparatorRaw = "---"
 
 // renderBatch joins every queued message into one send, separator lines
 // between originally-distinct messages, applying each message's ×N dedup
-// suffix.
-func renderBatch(items []batchedMessage) string {
+// suffix. style escapes the separator for the target dialect — item text is
+// already escaped by the time it's queued (see enqueue), but the separator
+// is renderBatch's own literal, so it needs the same treatment.
+func renderBatch(style mrkdwnStyle, items []batchedMessage) string {
 	lines := make([]string, len(items))
 	for i, it := range items {
 		lines[i] = it.text
@@ -249,7 +260,8 @@ func renderBatch(items []batchedMessage) string {
 			lines[i] = fmt.Sprintf("%s ×%d", it.text, it.count)
 		}
 	}
-	return strings.Join(lines, "\n---\n")
+	separator := fmt.Sprintf("\n\n%s\n\n", style.escape(batchSeparatorRaw))
+	return strings.Join(lines, separator)
 }
 
 // distinctKinds returns items' notifyKinds in first-seen order, deduped —

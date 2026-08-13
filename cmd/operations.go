@@ -384,7 +384,7 @@ func isKnownNotifyTransport(name string) bool {
 // modes was requested: send a message, flip a transport's manual mute, or
 // report status. Args holds at most one positional message (Args:
 // cobra.MaximumNArgs(1)).
-func runNotify(args []string, enable, disable string, status bool, d deps) error {
+func runNotify(args []string, enable, disable string, status, testBatch bool, d deps) error {
 	hasMessage := len(args) == 1
 	controlFlags := 0
 	if enable != "" {
@@ -396,22 +396,27 @@ func runNotify(args []string, enable, disable string, status bool, d deps) error
 	if status {
 		controlFlags++
 	}
+	if testBatch {
+		controlFlags++
+	}
 
 	switch {
 	case hasMessage && controlFlags > 0:
-		return fmt.Errorf("a message and --enable/--disable/--status are mutually exclusive")
+		return fmt.Errorf("a message and --enable/--disable/--status/--test-batch are mutually exclusive")
 	case controlFlags > 1:
-		return fmt.Errorf("--enable, --disable, and --status are mutually exclusive")
+		return fmt.Errorf("--enable, --disable, --status, and --test-batch are mutually exclusive")
 	case enable != "":
 		return runNotifySetMute(enable, false, d)
 	case disable != "":
 		return runNotifySetMute(disable, true, d)
 	case status:
 		return runNotifyStatus(d)
+	case testBatch:
+		return sendTestBatch(d)
 	case hasMessage:
 		return sendNotify(args[0], d)
 	default:
-		return fmt.Errorf("notify requires a message or one of --enable/--disable/--status")
+		return fmt.Errorf("notify requires a message or one of --enable/--disable/--status/--test-batch")
 	}
 }
 
@@ -432,6 +437,28 @@ func sendNotify(text string, d deps) error {
 		return err
 	}
 	fmt.Fprintf(d.stdout, "sent to: %s\n", strings.Join(sent, ", "))
+	return err
+}
+
+// sendTestBatch sends a fixed 2-message batch to every notification service
+// configured in ~/.config/gx/config.json, through the exact same renderBatch
+// join a real flush uses — reproduces (pre-fix) or verifies (post-fix) the
+// batch-separator MarkdownV2 escaping bug against the real APIs, rather than
+// only in a unit test.
+func sendTestBatch(d deps) error {
+	cfg, err := d.loadConfig()
+	if err != nil {
+		return err
+	}
+
+	sent, err := ralphloop.SendTestBatch(cfg.Notifications)
+	if len(sent) == 0 {
+		if err == nil {
+			fmt.Fprintf(d.stdout, "no notification service configured (see `gx config edit`)\n")
+		}
+		return err
+	}
+	fmt.Fprintf(d.stdout, "sent test batch to: %s\n", strings.Join(sent, ", "))
 	return err
 }
 

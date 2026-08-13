@@ -105,6 +105,23 @@ func sendTelegramTestMessage(botToken, chatID, apiBaseURL string) error {
 	return sendTelegramRaw(botToken, chatID, apiBaseURL, telegramStyle.testMessageText())
 }
 
+// SendTelegramTestBatch synchronously sends two fixed test messages through
+// the exact same batch-join path a real flush uses (renderBatch,
+// chat_eventsink.go), for callers like `gx notify --test-batch` that need to
+// reproduce/verify the batch-separator MarkdownV2 escaping bug live against
+// the real Bot API instead of only in a unit test.
+func SendTelegramTestBatch(botToken, chatID string) error {
+	return sendTelegramTestBatch(botToken, chatID, telegramAPIBaseURL)
+}
+
+func sendTelegramTestBatch(botToken, chatID, apiBaseURL string) error {
+	items := []batchedMessage{
+		{text: telegramStyle.testMessageText(), kind: "test"},
+		{text: telegramStyle.testMessageText(), kind: "test"},
+	}
+	return sendTelegramRaw(botToken, chatID, apiBaseURL, renderBatch(telegramStyle, items))
+}
+
 // SendTelegramMessage synchronously sends arbitrary text via the Telegram Bot
 // API and returns any error instead of swallowing it, for callers like `gx
 // notify` that need to report success/failure directly — unlike the
