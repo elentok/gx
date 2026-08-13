@@ -658,6 +658,14 @@ const bindingQueueSelectFirst keys.BindingID = "select-first"
 // Tickets tab's bindingTicketsHelp.
 const bindingQueueHelp keys.BindingID = "help"
 
+// bindingQueueYankSummary/bindingQueueYankFilePath are the Queue tab's
+// "yy"/"yf" chords, mirroring the Tickets tab's bindingTicketsYankSummary/
+// bindingTicketsYankFilePath (model_keys.go).
+const (
+	bindingQueueYankSummary  keys.BindingID = "yank-summary"
+	bindingQueueYankFilePath keys.BindingID = "yank-file-path"
+)
+
 func newQueueKeysManager() keys.Manager {
 	return keys.New([]keys.Binding{
 		{ID: bindingQueueHelp, Seq: []string{"?"}, Categories: []string{"Other"}, Title: "help"},
@@ -668,6 +676,10 @@ func newQueueKeysManager() keys.Manager {
 		{ID: bindingQueueEditTab, Seq: []string{"e", "t"}, Categories: []string{"Navigation"}, Title: "edit file (tab)"},
 		{ID: bindingQueueCancelChord, Seq: []string{"e", "esc"}, Categories: []string{}, Title: ""},
 		{ID: bindingQueueSelectFirst, Seq: []string{"g", "g"}, Categories: []string{"Navigation"}, Title: "first row"},
+		// y-prefix chords
+		{ID: bindingQueueYankSummary, Seq: []string{"y", "y"}, Categories: []string{"Yank"}, Title: "yank epic - ticket"},
+		{ID: bindingQueueYankFilePath, Seq: []string{"y", "f"}, Categories: []string{"Yank"}, Title: "yank file path"},
+		{ID: bindingQueueCancelChord, Seq: []string{"y", "esc"}, Categories: []string{}, Title: ""},
 	})
 }
 
@@ -699,6 +711,10 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case bindingQueueSelectFirst:
 			m.selectFirstRow()
+		case bindingQueueYankSummary:
+			return m, m.yankQueueTicketSummary()
+		case bindingQueueYankFilePath:
+			return m, m.yankQueueTicketFilePath()
 		}
 		return m, nil
 	}

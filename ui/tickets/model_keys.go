@@ -35,6 +35,8 @@ const (
 	bindingTicketsPreviewBottom    keys.BindingID = "preview-bottom"
 	bindingTicketsChangeStatus     keys.BindingID = "change-status"
 	bindingTicketsSuggestedActions keys.BindingID = "suggested-actions"
+	bindingTicketsYankSummary      keys.BindingID = "yank-summary"
+	bindingTicketsYankFilePath     keys.BindingID = "yank-file-path"
 )
 
 // newTicketsManager builds the key manager for the sidebar's focus: plain
@@ -76,6 +78,10 @@ func newTicketsManager() keys.Manager {
 		{ID: bindingTicketsPreviewBottom, Seq: []string{"b"}, Categories: []string{"Navigation"}, Title: "preview bottom"},
 		{ID: bindingTicketsChangeStatus, Seq: []string{"s"}, Categories: []string{"Navigation"}, Title: "change status"},
 		{ID: bindingTicketsSuggestedActions, Seq: []string{"m"}, Categories: []string{"Navigation"}, Title: "suggested actions"},
+		// y-prefix chords
+		{ID: bindingTicketsYankSummary, Seq: []string{"y", "y"}, Categories: []string{"Yank"}, Title: "yank epic - ticket"},
+		{ID: bindingTicketsYankFilePath, Seq: []string{"y", "f"}, Categories: []string{"Yank"}, Title: "yank file path"},
+		{ID: bindingTicketsCancelChord, Seq: []string{"y", "esc"}, Categories: []string{}, Title: ""},
 	})
 }
 
@@ -161,6 +167,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handleChangeStatusKey()
 	case bindingTicketsSuggestedActions:
 		return m.handleSuggestedActionsKey()
+	case bindingTicketsYankSummary:
+		return m, m.yankTicketSummary()
+	case bindingTicketsYankFilePath:
+		return m, m.yankTicketFilePath()
 	}
 	return m, nil
 }

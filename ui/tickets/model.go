@@ -563,6 +563,12 @@ func (m Model) View() tea.View {
 		y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
 		content = ui.OverlayBottomCenter(content, overlay, m.width, y)
 	}
+	if prefix := m.keys.Prefix(); len(prefix) > 0 {
+		hints := ui.ChordBindingsFromHints(m.keys.ChordHints())
+		if len(hints) > 0 {
+			content = ui.OverlayBottomRight(content, ui.RenderChordOverlay(prefix[0], hints), m.width, m.height)
+		}
+	}
 	return ui.NewMainView(content)
 }
 
