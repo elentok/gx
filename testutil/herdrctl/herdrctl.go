@@ -13,6 +13,7 @@ package herdrctl
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
@@ -99,13 +100,33 @@ func NewWorkspace(t *testing.T, cwd string, env ...string) *Workspace {
 // its own configured dirs. The pane's shell varies by environment (fish
 // locally, bash on GitHub's macOS runners), so this detects it via `herdr
 // pane process-info` and sends shell-appropriate syntax.
+//
+// It then runs a uniquely-tagged `echo` and waits for that echo's own
+// output, rather than returning as soon as the PATH command is sent: on a
+// loaded CI runner, herdr's own bookkeeping of "is this pane an available
+// shell" lags slightly behind the shell actually finishing the prior
+// command, and an AgentStart issued immediately after can race that lag
+// (agent_pane_busy, or a stale idle/done read later on). Waiting for our
+// own echo to come back proves the shell has fully round-tripped the PATH
+// command before anything else touches the pane.
 func (w *Workspace) PrependPath(dir string) {
 	w.t.Helper()
 	if w.shellName() == "fish" {
 		w.Run("fish_add_path", "--prepend", "--move", dir)
-		return
+	} else {
+		w.Run("export", "PATH="+dir+":$PATH")
 	}
-	w.Run("export", "PATH="+dir+":$PATH")
+
+	// Split the sentinel across two quoted printf args: `pane run` types the
+	// command verbatim (visible in the pane before it even executes), so a
+	// sentinel passed whole to `echo` would match on the typed input, not
+	// its output. Split like this, the full sentinel is contiguous only in
+	// printf's concatenated *output* — never in the input line, where the
+	// quotes and space keep the two halves apart.
+	sentinel := fmt.Sprintf("herdrctl-prependpath-ready-%s-%d", w.RootPaneID, time.Now().UnixNano())
+	half := len(sentinel) / 2
+	w.Run("printf", "'%s%s'", "'"+sentinel[:half]+"'", "'"+sentinel[half:]+"'")
+	w.WaitForText(sentinel, 10*time.Second)
 }
 
 // shellName returns the root pane's foreground shell process name (e.g.
