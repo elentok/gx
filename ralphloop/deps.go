@@ -123,6 +123,12 @@ type Deps struct {
 	// read after the boundary landed already includes it, so no comparison
 	// against it can prove the compaction happened (see stickyBaseline).
 	ReadCompactionsAfter func(cwd, sessionID string, since time.Time) (count int, ok bool, err error)
+	// ReadBackgroundTasks returns the Claude Code session's outstanding
+	// backgrounded-shell-command markers, used to gate confirmFinished against
+	// a pane that looks idle while a background task it started is still
+	// running (see waitForBackgroundTasks). Codex has no equivalent transcript
+	// signal, so callers only ever invoke this for AgentClaude.
+	ReadBackgroundTasks func(cwd, sessionID string) (transcript.BackgroundTaskReading, error)
 	// ReadCodexContext returns the latest context-token count for the Codex
 	// session launched in cwd, or ok=false until its local session data is
 	// complete enough to identify that worktree and session.
@@ -259,6 +265,13 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 				return 0, ok, err
 			}
 			return transcript.CountCompactionsAfter(lines, since), true, nil
+		},
+		ReadBackgroundTasks: func(cwd, sessionID string) (transcript.BackgroundTaskReading, error) {
+			path, err := transcriptPath(overrides.Home, cwd, sessionID)
+			if err != nil {
+				return transcript.BackgroundTaskReading{}, err
+			}
+			return transcript.ReadBackgroundTasks(path, backgroundTaskAgedOutCap, time.Now())
 		},
 		ReadCodexContext: codexHomeFn(overrides.CodexHome,
 			codexsession.LastContextTokens,

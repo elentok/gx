@@ -38,7 +38,16 @@ const (
 	// reported idle mid-compaction" apart from "compaction genuinely took more
 	// than five minutes" is exactly what run-log.jsonl is read for.
 	eventSmartZoneGateReleased = "smart-zone-gate-released"
-	eventPausedRateLimit       = "paused-rate-limit"
+	// eventBackgroundTaskGateHeld/Released/Expired mark waitForBackgroundTasks
+	// holding confirmFinished's conclusion open for one outstanding-fresh
+	// backgrounded-shell-command marker: Held once when first observed
+	// outstanding (never once per poll tick), Released once its
+	// task-notification lands, Expired once it ages out past
+	// backgroundTaskAgedOutCap and the gate stops holding on it instead.
+	eventBackgroundTaskGateHeld     = "background-task-gate-held"
+	eventBackgroundTaskGateReleased = "background-task-gate-released"
+	eventBackgroundTaskGateExpired  = "background-task-gate-expired"
+	eventPausedRateLimit            = "paused-rate-limit"
 	eventResumed               = "resumed"
 	eventNeedsAnswer           = "needs-answer"
 	eventCommitless            = "commitless"

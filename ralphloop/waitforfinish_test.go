@@ -2598,3 +2598,199 @@ func TestRecoverSmartZoneBreach_MissingTranscriptVersusUnsupportedAgent(t *testi
 		}
 	})
 }
+
+// idleBackgroundTaskDeps is the base Deps for waitForBackgroundTasks tests: a
+// pane that reports idle on every AgentWait (including confirmFinished's own
+// re-check), so readBackgroundTasks is the only thing that can hold
+// waitForFinish's conclusion open.
+func idleBackgroundTaskDeps(readBackgroundTasks func(cwd, sessionID string) (transcript.BackgroundTaskReading, error), sleeps *int) Deps {
+	return Deps{
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		ReadBackgroundTasks: readBackgroundTasks,
+		Sleep:               func(time.Duration) { *sleeps++ },
+	}
+}
+
+func backgroundTaskGateParams(scratchDir string) launchAndPromptParams {
+	return launchAndPromptParams{
+		Label: "iter-30", Agent: AgentClaude, Pane: "pane-1", Ticket: "30",
+		SessionCwd: "/repo/iter-30", Gate: NewGate(),
+		ScratchDir: scratchDir, EpicName: "epic",
+	}
+}
+
+// TestWaitForFinish_BackgroundTaskGateHoldsUntilResolved covers the core gate
+// contract: a pane that debounce-confirms idle while its transcript still
+// shows an outstanding-fresh background task must not be reported finished
+// until that task resolves.
+func TestWaitForFinish_BackgroundTaskGateHoldsUntilResolved(t *testing.T) {
+	t.Parallel()
+	scratchDir := t.TempDir()
+	var sleeps, reads int
+	readBackgroundTasks := func(string, string) (transcript.BackgroundTaskReading, error) {
+		reads++
+		status := transcript.BackgroundTaskOutstandingFresh
+		if reads >= 3 {
+			status = transcript.BackgroundTaskResolved
+		}
+		return transcript.BackgroundTaskReading{
+			Markers: []transcript.BackgroundTaskMarker{{TaskID: "task-1", Status: status}},
+		}, nil
+	}
+	d := idleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
+
+	if err := waitForFinish(d, backgroundTaskGateParams(scratchDir), "sess-30"); err != nil {
+		t.Fatalf("waitForFinish: %v", err)
+	}
+	if reads != 3 {
+		t.Errorf("ReadBackgroundTasks calls = %d, want 3 (held, held, resolved)", reads)
+	}
+	// One sleep from confirmFinished's own debounce, plus two more pacing the
+	// gate's re-reads while the marker stayed outstanding-fresh.
+	if sleeps != 3 {
+		t.Errorf("Sleep calls = %d, want 3: the gate must pace re-reads at smartZonePollMs, not spin", sleeps)
+	}
+
+	events, ok, err := readEvents(scratchDir, "epic")
+	if err != nil || !ok {
+		t.Fatalf("readEvents() ok=%v err=%v", ok, err)
+	}
+	var held, released int
+	for _, ev := range events {
+		switch ev.Type {
+		case eventBackgroundTaskGateHeld:
+			held++
+			if !strings.Contains(ev.Reason, "task-1") {
+				t.Errorf("gate-held reason = %q, want it to name the task id", ev.Reason)
+			}
+		case eventBackgroundTaskGateReleased:
+			released++
+		}
+	}
+	if held != 1 {
+		t.Errorf("gate-held events = %d, want exactly 1 (once per task id, not once per poll tick)", held)
+	}
+	if released != 1 {
+		t.Errorf("gate-released events = %d, want exactly 1", released)
+	}
+}
+
+// TestWaitForFinish_BackgroundTaskAgesOutAndFallsThrough covers the ~2h cap:
+// once a held marker reads outstanding-aged-out, the gate stops holding on
+// it and waitForFinish falls through to a plain finish, logging gate-expired
+// (never gate-released) for that marker.
+func TestWaitForFinish_BackgroundTaskAgesOutAndFallsThrough(t *testing.T) {
+	t.Parallel()
+	scratchDir := t.TempDir()
+	var sleeps, reads int
+	readBackgroundTasks := func(string, string) (transcript.BackgroundTaskReading, error) {
+		reads++
+		status := transcript.BackgroundTaskOutstandingFresh
+		if reads >= 2 {
+			status = transcript.BackgroundTaskOutstandingAgedOut
+		}
+		return transcript.BackgroundTaskReading{
+			Markers: []transcript.BackgroundTaskMarker{{TaskID: "task-1", Status: status}},
+		}, nil
+	}
+	d := idleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
+
+	if err := waitForFinish(d, backgroundTaskGateParams(scratchDir), "sess-30"); err != nil {
+		t.Fatalf("waitForFinish: %v, want the aged-out marker to fall through to a plain finish", err)
+	}
+
+	events, ok, err := readEvents(scratchDir, "epic")
+	if err != nil || !ok {
+		t.Fatalf("readEvents() ok=%v err=%v", ok, err)
+	}
+	var expired, released int
+	for _, ev := range events {
+		switch ev.Type {
+		case eventBackgroundTaskGateExpired:
+			expired++
+		case eventBackgroundTaskGateReleased:
+			released++
+		}
+	}
+	if expired != 1 {
+		t.Errorf("gate-expired events = %d, want exactly 1", expired)
+	}
+	if released != 0 {
+		t.Errorf("gate-released events = %d, want 0: this marker aged out, it never resolved", released)
+	}
+}
+
+// TestWaitForFinish_BackgroundTaskUnreadableAndUnsupportedNeverHoldGate covers
+// the fail-open requirement: neither a transcript that failed to parse nor an
+// agent with no transcript at all (Codex, via ReadBackgroundTasks == nil at
+// the call site) is evidence, so waitForFinish must conclude on the first
+// debounce-confirmed idle exactly as it would with no reader wired at all.
+func TestWaitForFinish_BackgroundTaskUnreadableAndUnsupportedNeverHoldGate(t *testing.T) {
+	t.Parallel()
+
+	t.Run("unreadable transcript fails open", func(t *testing.T) {
+		t.Parallel()
+		scratchDir := t.TempDir()
+		var sleeps int
+		readBackgroundTasks := func(string, string) (transcript.BackgroundTaskReading, error) {
+			return transcript.BackgroundTaskReading{FileStatus: transcript.BackgroundTaskUnreadable}, nil
+		}
+		d := idleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
+
+		if err := waitForFinish(d, backgroundTaskGateParams(scratchDir), "sess-30"); err != nil {
+			t.Fatalf("waitForFinish: %v", err)
+		}
+		if sleeps != 1 {
+			t.Errorf("Sleep calls = %d, want exactly 1 (confirmFinished's debounce only)", sleeps)
+		}
+	})
+
+	t.Run("unsupported (Codex) agent never even calls the reader", func(t *testing.T) {
+		t.Parallel()
+		scratchDir := t.TempDir()
+		var sleeps, reads int
+		readBackgroundTasks := func(string, string) (transcript.BackgroundTaskReading, error) {
+			reads++
+			return transcript.BackgroundTaskReading{FileStatus: transcript.BackgroundTaskUnsupported}, nil
+		}
+		d := idleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
+		p := backgroundTaskGateParams(scratchDir)
+		p.Agent = AgentCodex
+
+		if err := waitForFinish(d, p, "sess-30"); err != nil {
+			t.Fatalf("waitForFinish: %v", err)
+		}
+		if reads != 0 {
+			t.Errorf("ReadBackgroundTasks calls = %d, want 0: waitForBackgroundTasks must not call it for Codex", reads)
+		}
+		if sleeps != 1 {
+			t.Errorf("Sleep calls = %d, want exactly 1 (confirmFinished's debounce only)", sleeps)
+		}
+	})
+}
+
+// TestWaitForFinish_BackgroundTaskGateAccumulatesAgainstFinishTimeoutMs covers
+// the elapsed-time contract: time spent holding the gate must accumulate
+// against a caller-set FinishTimeoutMs (never reset), so a bound shorter than
+// the ~2h aged-out cap still fires while the gate is held.
+func TestWaitForFinish_BackgroundTaskGateAccumulatesAgainstFinishTimeoutMs(t *testing.T) {
+	t.Parallel()
+	scratchDir := t.TempDir()
+	var sleeps int
+	readBackgroundTasks := func(string, string) (transcript.BackgroundTaskReading, error) {
+		return transcript.BackgroundTaskReading{
+			Markers: []transcript.BackgroundTaskMarker{{TaskID: "task-1", Status: transcript.BackgroundTaskOutstandingFresh}},
+		}, nil
+	}
+	d := idleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
+
+	p := backgroundTaskGateParams(scratchDir)
+	p.FinishTimeoutMs = smartZonePollMs / 2
+
+	err := waitForFinish(d, p, "sess-30")
+	if err == nil || !strings.Contains(err.Error(), "timed out after") {
+		t.Fatalf("waitForFinish error = %v, want a FinishTimeoutMs timeout while the gate held", err)
+	}
+}

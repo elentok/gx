@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/transcript"
 )
 
 // smartZonePollMs bounds each "wait for the agent to finish" poll tick, so a
@@ -139,6 +140,9 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 				continue
 			}
 			if !recovery.pendingUnresolved(d, p, sessionID) {
+				if err := waitForBackgroundTasks(d, p, sessionID, &elapsedMs); err != nil {
+					return err
+				}
 				p.logLifecycleEvent(p.FinishEvent, sessionID)
 				return nil
 			}
@@ -155,6 +159,9 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			d.Sleep(smartZonePollMs * time.Millisecond)
 			elapsedMs += smartZonePollMs
 			if !recovery.pendingUnresolved(d, p, sessionID) {
+				if err := waitForBackgroundTasks(d, p, sessionID, &elapsedMs); err != nil {
+					return err
+				}
 				p.logLifecycleEvent(p.FinishEvent, sessionID)
 				return nil
 			}
@@ -739,6 +746,81 @@ func confirmFinished(d Deps, pane string, until []string) (bool, error) {
 		return false, nil
 	}
 	return false, err
+}
+
+// backgroundTaskAgedOutCap bounds how long waitForBackgroundTasks trusts an
+// outstanding backgrounded-shell-command marker as evidence the pane isn't
+// really finished. Past this, ReadBackgroundTasks itself reclassifies the
+// marker outstanding-aged-out, and the gate stops holding on it — the
+// background job is assumed abandoned or unresolvable rather than waited on
+// forever.
+const backgroundTaskAgedOutCap = 2 * time.Hour
+
+// waitForBackgroundTasks gates confirmFinished's conclusion on any
+// outstanding-fresh backgrounded-shell-command marker in the Claude
+// transcript: a pane that looks idle/done while a background task it started
+// is still running is not actually finished, even though herdr's own status
+// (and the finishDebounceMs re-check already applied by the caller) agree it
+// looks so. Mirrors how compactBoundarySnapshot/stickyBaseline gate a
+// premature idle report during smart-zone recovery — an unreadable/
+// unsupported read (Codex, or any read failure) is never evidence, so it
+// fails open with no markers to hold on.
+//
+// elapsedMs is the caller's own running total (see waitForFinish), threaded
+// through by pointer so time spent holding here counts against a caller-set
+// FinishTimeoutMs instead of resetting it, and it paces re-reads at
+// smartZonePollMs instead of spinning — same reasoning as
+// waitForCompactionSignal's own pacing.
+func waitForBackgroundTasks(d Deps, p launchAndPromptParams, sessionID string, elapsedMs *int) error {
+	if p.Agent != AgentClaude || d.ReadBackgroundTasks == nil || sessionID == "" {
+		return nil
+	}
+
+	held := map[string]bool{}
+	for {
+		reading, err := d.ReadBackgroundTasks(p.SessionCwd, sessionID)
+		if err != nil {
+			return nil
+		}
+
+		outstanding := false
+		for _, m := range reading.Markers {
+			switch m.Status {
+			case transcript.BackgroundTaskOutstandingFresh:
+				outstanding = true
+				if !held[m.TaskID] {
+					held[m.TaskID] = true
+					p.logAgentEvent(eventBackgroundTaskGateHeld, sessionID, fmt.Sprintf("background task %s", m.TaskID))
+				}
+			case transcript.BackgroundTaskResolved:
+				if held[m.TaskID] {
+					delete(held, m.TaskID)
+					p.logAgentEvent(eventBackgroundTaskGateReleased, sessionID, fmt.Sprintf("background task %s", m.TaskID))
+				}
+			case transcript.BackgroundTaskOutstandingAgedOut:
+				if held[m.TaskID] {
+					delete(held, m.TaskID)
+					p.logAgentEvent(eventBackgroundTaskGateExpired, sessionID, fmt.Sprintf("background task %s", m.TaskID))
+				}
+			}
+		}
+		if !outstanding {
+			return nil
+		}
+
+		pollMs := smartZonePollMs
+		if p.FinishTimeoutMs > 0 {
+			remaining := p.FinishTimeoutMs - *elapsedMs
+			if remaining <= 0 {
+				return fmt.Errorf("waiting for agent to finish: timed out after %dms", p.FinishTimeoutMs)
+			}
+			if remaining < pollMs {
+				pollMs = remaining
+			}
+		}
+		d.Sleep(time.Duration(pollMs) * time.Millisecond)
+		*elapsedMs += pollMs
+	}
 }
 
 // recoverClaudeRateLimit pauses label for display, waits out the rate limit
