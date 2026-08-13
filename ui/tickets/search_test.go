@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/search"
@@ -266,6 +267,48 @@ func TestSearch_NoMatchLeavesCollapseStateUnchanged(t *testing.T) {
 	}
 	if !m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
 		t.Fatalf("expected non-matching search to leave collapse state unchanged")
+	}
+}
+
+// TestSearch_SidebarHighlightsMatchExactlyOnce guards against ui/tree's
+// generic highlighting stacking on top of an inline search.Highlight call in
+// renderTicketRow (ticket 18): search.Highlight is a plain byte-substring
+// wrapper, not idempotent, so applying it twice nests broken ANSI escapes
+// around the match instead of highlighting it once cleanly.
+func TestSearch_SidebarHighlightsMatchExactlyOnce(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	m.search.Start("first ticket")
+	m.recomputeSearchMatches()
+	if m.search.MatchesCount() != 1 {
+		t.Fatalf("expected exactly one match, got %d", m.search.MatchesCount())
+	}
+
+	lines := m.sidebarBody(20, 80)
+	var matchLine string
+	for _, l := range lines {
+		if strings.Contains(ansi.Strip(l), "First ticket") {
+			matchLine = l
+			break
+		}
+	}
+	if matchLine == "" {
+		t.Fatalf("expected a sidebar line containing the matched title, got:\n%#v", lines)
+	}
+
+	wrapped := ui.StyleActiveSearchResult.Render("First ticket")
+	if strings.Count(matchLine, wrapped) != 1 {
+		t.Fatalf("expected the match highlighted exactly once, got:\n%q", matchLine)
+	}
+	if !strings.Contains(ansi.Strip(matchLine), "First ticket") {
+		t.Fatalf("expected plain title still present after stripping ANSI, got:\n%s", ansi.Strip(matchLine))
 	}
 }
 

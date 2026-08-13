@@ -8,7 +8,6 @@ import (
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -178,7 +177,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 
 	icon, style := statusIconAndStyle(m.icons(), status)
 
-	matched, current := m.searchMatch(rowIdx)
+	matched, _ := m.searchMatch(rowIdx)
 	searchDim := m.search.HasQuery() && !matched
 	doneDim := status == tickets.StatusDone
 
@@ -187,12 +186,12 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 		title += " (commitless)"
 	}
 	titleStyle := lipgloss.NewStyle()
-	if matched {
-		title = search.Highlight(title, m.search.Query(), current)
-	} else if doneDim {
-		titleStyle = statusDoneStyle
-	} else if searchDim {
-		titleStyle = ui.StyleDim
+	if !matched {
+		if doneDim {
+			titleStyle = statusDoneStyle
+		} else if searchDim {
+			titleStyle = ui.StyleDim
+		}
 	}
 	if searchDim {
 		style = ui.StyleDim
