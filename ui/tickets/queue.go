@@ -127,6 +127,14 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 	sp.Spinner = TicketProgressSpinner
 	km := newQueueKeysManager()
 	queueTree := tree.NewModel[queueNode]()
+	queueTree.SetIsSelectable(func(n queueNode) bool {
+		switch n.kind {
+		case nodeEpicSeparator, nodeEpicStatus, nodeEpicContext, nodeEpicError, nodeQueueTicketReason:
+			return false
+		default:
+			return true
+		}
+	})
 	return QueueModel{
 		executionTickets:   map[string]bool{},
 		runTicketIDs:       map[string][]string{},
@@ -798,8 +806,10 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			switch match.ID {
 			case tree.BindingPageDown:
 				m.queueTree.ScrollPage(list.DefaultScroll)
+				m.queueTree.SkipUnselectable(1)
 			case tree.BindingPageUp:
 				m.queueTree.ScrollPage(-list.DefaultScroll)
+				m.queueTree.SkipUnselectable(-1)
 			}
 		}
 	}
@@ -949,6 +959,7 @@ func (m *QueueModel) selectFirstRow() {
 		return
 	}
 	m.queueTree.SetSelectedIndex(0)
+	m.queueTree.SkipUnselectable(1)
 }
 
 func (m *QueueModel) selectLastRow() {
@@ -957,6 +968,7 @@ func (m *QueueModel) selectLastRow() {
 		return
 	}
 	m.queueTree.SetSelectedIndex(n - 1)
+	m.queueTree.SkipUnselectable(-1)
 }
 
 // clampSelected rebuilds the queue tree's entries from the current
@@ -964,6 +976,7 @@ func (m *QueueModel) selectLastRow() {
 // new entry count.
 func (m *QueueModel) clampSelected() {
 	m.queueTree.SetEntries(m.buildQueueEntries())
+	m.queueTree.SkipUnselectable(1)
 }
 
 // queueViewportHeight is the queue panel's visible body line count, matching

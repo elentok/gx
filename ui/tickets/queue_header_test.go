@@ -228,7 +228,14 @@ func TestQueueModelListRowsIndentMatchesHeaderIndent(t *testing.T) {
 		t.Fatalf("expected both an epic header line and a ticket row line:\n%v", m.queueBody(80))
 	}
 	headerIndent := len(headerLine) - len(strings.TrimLeft(headerLine, " "))
-	rowIndent := len(rowLine) - len(strings.TrimLeft(rowLine, " "))
+	// rowLine's first rune is the selection mark column (a space when
+	// unselected, "▌" when this row holds the cursor — the ticket row is
+	// selected by default now that filler rows are excluded from selection,
+	// see ticket 17), which strings.TrimLeft's space-only trim can't skip past
+	// on its own.
+	rowRunes := []rune(rowLine)
+	rowRest := string(rowRunes[1:])
+	rowIndent := 1 + len(rowRest) - len(strings.TrimLeft(rowRest, " "))
 	triangleColumn := triangleColumnWidth(m.icons()) + 1
 	if headerIndent != 2 || rowIndent != headerIndent+triangleColumn {
 		t.Fatalf("got headerIndent=%d rowIndent=%d, want headerIndent=2 rowIndent=%d", headerIndent, rowIndent, 2+triangleColumn)

@@ -811,15 +811,16 @@ func TestQueueModelTChordDoesNotCollideWithClearKeymaps(t *testing.T) {
 	checked := map[string]bool{done: true, open: true}
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
-	if m.queueTree.SelectedIndex() != 0 {
-		t.Fatalf("expected initial selection at row 0, got %d", m.queueTree.SelectedIndex())
+	start := firstSelectableQueueIndex(t, m)
+	if m.queueTree.SelectedIndex() != start {
+		t.Fatalf("expected initial selection at the first selectable row (%d), got %d", start, m.queueTree.SelectedIndex())
 	}
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updated.(QueueModel)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(QueueModel)
-	if m.queueTree.SelectedIndex() != 1 {
-		t.Fatalf("expected \"t\",\"j\" to still move the selection down, got %d", m.queueTree.SelectedIndex())
+	if want := start + 1; m.queueTree.SelectedIndex() != want {
+		t.Fatalf("expected \"t\",\"j\" to still move the selection down, got %d, want %d", m.queueTree.SelectedIndex(), want)
 	}
 	if m.hideComplete {
 		t.Fatal("expected \"t\" followed by an unrelated key not to toggle hideComplete")
@@ -1258,6 +1259,22 @@ func loadQueueModel(t *testing.T, m QueueModel) QueueModel {
 // precede it. Several tests assumed SetSelectedIndex(0)/SelectedIndex()==0
 // landed on the first ticket row before buildQueueEntries started emitting
 // those headers.
+// firstSelectableQueueIndex returns the index of the first row the
+// selectability policy set in NewQueueModel considers selectable — the
+// per-epic separator/status/context header rows never do, so tests that
+// assert the cursor landed "at the top" must compare against this instead of
+// a hardcoded 0.
+func firstSelectableQueueIndex(t *testing.T, m QueueModel) int {
+	t.Helper()
+	for i, e := range m.queueTree.Entries() {
+		if e.Value.kind == nodeQueueTicket {
+			return i
+		}
+	}
+	t.Fatalf("expected at least one selectable row, found none")
+	return -1
+}
+
 func selectFirstQueueTicketRow(t *testing.T, m QueueModel) QueueModel {
 	t.Helper()
 	for i, e := range m.queueTree.Entries() {
@@ -1755,8 +1772,8 @@ func TestQueueModelScrollsWithKeysAndMouse(t *testing.T) {
 		updated, _ = m.Update(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 		m = updated.(QueueModel)
 	}
-	if m.queueTree.SelectedIndex() != 0 {
-		t.Fatalf("expected ctrl+u to page the selection back to the top, got %d", m.queueTree.SelectedIndex())
+	if want := firstSelectableQueueIndex(t, m); m.queueTree.SelectedIndex() != want {
+		t.Fatalf("expected ctrl+u to page the selection back to the top (%d), got %d", want, m.queueTree.SelectedIndex())
 	}
 	if m.queueTree.ScrollOffset() >= afterPageDown {
 		t.Fatalf("expected ctrl+u to scroll the viewport back up from %d, got %d", afterPageDown, m.queueTree.ScrollOffset())
@@ -1812,8 +1829,8 @@ func TestQueueModelMouseClickSelectsRowOnly(t *testing.T) {
 		ticketPath(root, "alpha", "03-third.md"):  true,
 	}
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
-	if m.queueTree.SelectedIndex() != 0 {
-		t.Fatalf("expected initial selection at row 0, got %d", m.queueTree.SelectedIndex())
+	if want := firstSelectableQueueIndex(t, m); m.queueTree.SelectedIndex() != want {
+		t.Fatalf("expected initial selection at the first selectable row (%d), got %d", want, m.queueTree.SelectedIndex())
 	}
 
 	// Ticket rows sit at whatever entry index the tree gave them, after the
@@ -1946,8 +1963,130 @@ func TestQueueModelGAndGGJumpSelectionToLastAndFirstRow(t *testing.T) {
 	m = updated.(QueueModel)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	m = updated.(QueueModel)
-	if m.queueTree.SelectedIndex() != 0 {
-		t.Fatalf("expected 'gg' to select the first row (0), got %d", m.queueTree.SelectedIndex())
+	if want := firstSelectableQueueIndex(t, m); m.queueTree.SelectedIndex() != want {
+		t.Fatalf("expected 'gg' to select the first selectable row (%d), got %d", want, m.queueTree.SelectedIndex())
+	}
+}
+
+// TestQueueModelCursorSkipsFillerRowsBetweenEpics covers ticket 17: moving
+// down off the last ticket row of one epic must land directly on the next
+// epic's first ticket row, skipping that epic's own
+// separator/status/context header rows (nodeEpicSeparator/nodeEpicStatus/
+// nodeEpicContext) entirely rather than stopping the cursor on one of them.
+func TestQueueModelCursorSkipsFillerRowsBetweenEpics(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "beta", "01-second.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "01-first.md"): true,
+		ticketPath(root, "beta", "01-second.md"): true,
+	}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+
+	var alphaTicket, betaTicket int
+	for i, e := range m.queueTree.Entries() {
+		if e.Value.kind != nodeQueueTicket {
+			continue
+		}
+		if e.Value.epic.Name == "alpha" {
+			alphaTicket = i
+		} else {
+			betaTicket = i
+		}
+	}
+	if betaTicket <= alphaTicket+1 {
+		t.Fatalf("expected beta's filler header rows between the two ticket rows, got alpha=%d beta=%d", alphaTicket, betaTicket)
+	}
+	m.queueTree.SetSelectedIndex(alphaTicket)
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(QueueModel)
+	if m.queueTree.SelectedIndex() != betaTicket {
+		t.Fatalf("expected 'j' off alpha's ticket to land on beta's ticket (%d), got %d", betaTicket, m.queueTree.SelectedIndex())
+	}
+}
+
+// TestQueueModelPageDownLandsOnSelectableRow covers ticket 17's paging
+// requirement: ctrl+d moves the selection by list.DefaultScroll rows without
+// any skip of its own (queue.go's BindingPageDown case), so a page that
+// would land squarely on a filler row must be nudged onto the nearest ticket
+// row instead.
+func TestQueueModelPageDownLandsOnSelectableRow(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	for i := 1; i <= 5; i++ {
+		writeTicket(t, root, "alpha", fmt.Sprintf("%02d-ticket.md", i), "Status: open\n\nBody.\n")
+	}
+	writeTicket(t, root, "beta", "01-ticket.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{}
+	for i := 1; i <= 5; i++ {
+		checked[ticketPath(root, "alpha", fmt.Sprintf("%02d-ticket.md", i))] = true
+	}
+	checked[ticketPath(root, "beta", "01-ticket.md")] = true
+
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(QueueModel)
+
+	start := firstSelectableQueueIndex(t, m)
+	// alpha contributes 3 header rows + 5 ticket rows; a 7-row page from
+	// alpha's first ticket (list.DefaultScroll) lands on beta's header block
+	// (start+7), not a ticket row — the case this test pins.
+	entries := m.queueTree.Entries()
+	if landing := start + 7; landing >= len(entries) || entries[landing].Value.kind == nodeQueueTicket {
+		t.Fatalf("test setup expected ctrl+d's raw landing index (%d) to be a filler row, got %+v", landing, entries)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
+	m = updated.(QueueModel)
+	entries = m.queueTree.Entries()
+	sel := m.queueTree.SelectedIndex()
+	if sel < 0 || sel >= len(entries) || entries[sel].Value.kind != nodeQueueTicket {
+		t.Fatalf("expected ctrl+d to land the selection on a ticket row, got index %d (%+v)", sel, entries)
+	}
+}
+
+// TestQueueModelClampSelectedSkipsFillerRowAfterRebuild covers ticket 17's
+// rebuild requirement: clampSelected's SetEntries re-clamps selection by
+// entry count alone, which can leave the cursor sitting on a header row that
+// shifted into the previously-selected index once an epic's tickets are
+// filtered out from under it (e.g. the "tc" hide-completed toggle) —
+// clampSelected must nudge off that row rather than leaving it there.
+func TestQueueModelClampSelectedSkipsFillerRowAfterRebuild(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-done.md", "Status: open\n\nBody.\n")
+	writeRawQueueTicket(t, root, "alpha", "01-done.md", "---\nid: \"01\"\nstatus: done\ntype: task\n---\n\nBody.\n")
+	writeTicket(t, root, "alpha", "02-open.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "beta", "01-open.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "01-done.md"): true,
+		ticketPath(root, "alpha", "02-open.md"): true,
+		ticketPath(root, "beta", "01-open.md"):  true,
+	}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+
+	var openTicketIdx int
+	for i, e := range m.queueTree.Entries() {
+		if e.Value.kind == nodeQueueTicket && e.Value.epic.Name == "alpha" && e.Value.ticket.ticket.Identifier == "02" {
+			openTicketIdx = i
+		}
+	}
+	m.queueTree.SetSelectedIndex(openTicketIdx)
+
+	// Toggling hideComplete removes alpha's done ticket (but not its still-open
+	// sibling, so alpha's header rows stay) and rebuilds via clampSelected;
+	// the removed row shifts beta's header block one slot earlier, landing
+	// squarely where alpha's open ticket used to sit only if we'd left the
+	// selection unclamped — assert it actually lands on a ticket row.
+	m.hideComplete = true
+	m.clampSelected()
+
+	entries := m.queueTree.Entries()
+	sel := m.queueTree.SelectedIndex()
+	if sel < 0 || sel >= len(entries) || entries[sel].Value.kind != nodeQueueTicket {
+		t.Fatalf("expected rebuild to leave the selection on a ticket row, got index %d (%+v)", sel, entries)
 	}
 }
 

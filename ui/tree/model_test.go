@@ -97,6 +97,24 @@ func TestSkipUnselectable_BoundaryRetriesOppositeDirection(t *testing.T) {
 	}
 }
 
+// TestSetSelectedIndex_IgnoresSelectabilityPolicy pins SetSelectedIndex as
+// the direct-set path (used by search-jump and click resolution, ticket 17)
+// that a selectability policy must never silently relocate — unlike
+// SkipUnselectable, it is not skip-aware.
+func TestSetSelectedIndex_IgnoresSelectabilityPolicy(t *testing.T) {
+	m := NewModel[int]()
+	m.SetIsSelectable(func(v int) bool { return v != 0 })
+	m.SetEntries([]Entry[int]{
+		{ID: "blank", Value: 0},
+		{ID: "a", Value: 1},
+	})
+
+	m.SetSelectedIndex(0)
+	if m.SelectedIndex() != 0 {
+		t.Fatalf("selected=%d want=0 (SetSelectedIndex must not skip the excluded row)", m.SelectedIndex())
+	}
+}
+
 func TestModelUpdate_ExpandCollapse(t *testing.T) {
 	m := NewModel[int]()
 	m.SetEntries([]Entry[int]{

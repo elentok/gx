@@ -142,8 +142,9 @@ func (m QueueModel) queueBody(width int) []string {
 // through: every physical row (blank separator, epic status/context/error
 // header, ticket) is a real tree.Entry, dispatched on entry.Value.kind by
 // Label alone — mirroring the Tickets-tab sidebar's sidebarRenderOpts one
-// level down. Unlike the sidebar, header/separator rows are left selectable
-// (05's explicit recommendation) — no skip-non-actionable-rows wrapper.
+// level down. Header/separator/reason rows are excluded from selection via
+// SetIsSelectable/SkipUnselectable (ticket 17), mirroring the sidebar's own
+// nodeBlank/nodeEmpty treatment.
 func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 	entries := m.queueTree.Entries()
 	idxByID := make(map[string]int, len(entries))
