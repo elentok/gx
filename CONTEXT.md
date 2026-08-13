@@ -154,10 +154,23 @@ visible state described here. _Avoid_: Stalled, Human-clearable (retired names, 
 Paused (that's the operator-driven whole-queue toggle), Settled (removed from the vocabulary
 entirely — see ADR 0017).
 
-**Unpark** — clearing a parked ticket back to the frontier: a person (or, for a pane-blocked park,
-gx itself once the pane leaves `blocked`) writes `status: open`. Not `resume` — the pause `Gate`
-already owns that verb — and not `clear` — the Queue tab's clear-checked/-complete keymaps already
-own that verb, and mean deleting tickets from the queue.
+**Unpark** — clearing a parked ticket back to the frontier: a person (or, for a `blocked-pane` or
+`self-reported` park, gx itself once the pane is live and unblocked) writes `status: open`. A
+`zero-commit` park never auto-unparks on liveness alone — it requires a person to look at the
+ticket and flip its status by hand, or new commits to appear on its branch while the pane is live.
+Not `resume` — the pause `Gate` already owns that verb — and not `clear` — the Queue tab's
+clear-checked/-complete keymaps already own that verb, and mean deleting tickets from the queue.
+
+**Park kind** (`park_kind` frontmatter field, `needs-answer` parks only) — which of three things
+caused a `needs-answer` park: `blocked-pane` (a genuinely blocked interactive prompt — pane stays
+live), `self-reported` (the agent itself asked a real question via `iteration_status:
+needs-answer` — its pane/worktree/tab is already released by this point, unlike the other two),
+or `zero-commit` (gx's own uncertain guess: no commits, no self-report, pane left alive for
+inspection). A ticket parked before this field existed carries no `park_kind` and is treated as
+`zero-commit` — the conservative default. Not written for `needs-repair`/`draft` parks, which keep
+their own liveness-only unpark rule untouched. _Avoid_: "gate park", "announce-and-stop park"
+(retired informal names — collided with the already-established `Gate` type and its `.gates()`
+verb).
 
 **Deadlocked** — a run-level state: an epic with no runnable work and nothing parked either — a
 genuine dependency error, reported as a failure rather than parked on.
@@ -167,6 +180,15 @@ tickets found `claimed`, and again when a parked run resumes. Its result, not th
 decides how a park resumes: reattached → `claimed`, the same iteration continues; not reattached →
 `open`, a fresh iteration is launched. A surviving herdr pane is *not* the same thing — a pane
 outlives its goroutine. _Avoid_: "has a pane".
+
+**Background task** — a shell command a Claude agent moved off its own foreground turn (recorded as
+a `backgroundTaskId` in the session transcript), resolved later by a `task-notification` matched on
+task id. "Outstanding" while unresolved, "resolved" once a matching notification is seen (its
+reported status — success, failure, killed — doesn't matter, only that one exists), "aged out" once
+it's stayed outstanding past a generous cap without resolving. Turn-level, inside one still-live
+iteration — distinct from the pane-level Reattach/Live terms above, which describe the iteration as
+a whole. A subagent's (sidechain) background task is never a signal about its parent iteration.
+Claude-only; Codex iterations have no equivalent signal.
 
 **`status` / `iteration_status`** — a ticket's status splits across two fields with different
 owners. **`status`** is gx-owned and is the sole scheduling authority (the six `RenderedStatus`
