@@ -113,6 +113,12 @@ type Result struct {
 	OpenSelected        bool
 	SearchQueryChanged  bool
 	SearchCursorChanged bool
+	// ExpandNoop reports that the pressed key was expand/toggle and the
+	// target entry already had HasChildren && Expanded — nothing left to
+	// expand. A consumer that redirects focus elsewhere on a repeated
+	// expand/toggle press (e.g. ui/tickets moving focus to its preview pane)
+	// reacts to this instead of re-matching the raw key string.
+	ExpandNoop bool
 }
 
 // NewModel constructs a tree Model. extra bindings are appended to the base
@@ -328,6 +334,14 @@ func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd, Result) {
 				m.list.NavigateLines(-1, len(m.entries), m.entryLineHeight, m.visibleH)
 				m.SkipUnselectable(-1)
 				return m, nil, Result{Handled: true, SelectionChanged: m.list.Selected() != prevSelected}
+			case BindingPageDown:
+				m.ScrollPage(list.DefaultScroll)
+				m.SkipUnselectable(+1)
+				return m, nil, Result{Handled: true, SelectionChanged: m.list.Selected() != prevSelected}
+			case BindingPageUp:
+				m.ScrollPage(-list.DefaultScroll)
+				m.SkipUnselectable(-1)
+				return m, nil, Result{Handled: true, SelectionChanged: m.list.Selected() != prevSelected}
 			case BindingCollapse:
 				if collapseSelected(m.entries, m.collapsed, m.list.Selected()) {
 					return m, nil, Result{Handled: true, RebuildRequested: true}
@@ -345,17 +359,20 @@ func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd, Result) {
 				if !entry.HasChildren {
 					return m, nil, Result{Handled: true, OpenSelected: true}
 				}
-				if expandSelected(m.entries, m.collapsed, m.list.Selected()) {
-					return m, nil, Result{Handled: true, RebuildRequested: true}
+				if entry.Expanded {
+					if idx, ok := firstChildIndex(m.entries, m.list.Selected()); ok && idx != m.list.Selected() {
+						m.list.SetSelected(idx, len(m.entries))
+						return m, nil, Result{Handled: true, SelectionChanged: true, ExpandNoop: true}
+					}
+					return m, nil, Result{Handled: true, ExpandNoop: true}
 				}
-				if idx, ok := firstChildIndex(m.entries, m.list.Selected()); ok && idx != m.list.Selected() {
-					m.list.SetSelected(idx, len(m.entries))
-					return m, nil, Result{Handled: true, SelectionChanged: true}
-				}
-				return m, nil, Result{Handled: true}
+				expandSelected(m.entries, m.collapsed, m.list.Selected())
+				return m, nil, Result{Handled: true, RebuildRequested: true}
 			case BindingToggle:
+				entry, ok := m.selectedEntry()
+				noop := ok && entry.HasChildren && entry.Expanded
 				if toggleOnEnter(m.entries, m.collapsed, m.list.Selected()) {
-					return m, nil, Result{Handled: true, RebuildRequested: true}
+					return m, nil, Result{Handled: true, RebuildRequested: true, ExpandNoop: noop}
 				}
 				return m, nil, Result{Handled: true, OpenSelected: true}
 			default:

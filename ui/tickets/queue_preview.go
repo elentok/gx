@@ -67,26 +67,6 @@ func (m *QueueModel) syncQueuePreviewViewport() {
 	m.previewFocus.Sync(contentW, ht, m.queuePreviewSelectionKey(), m.queuePreviewContent)
 }
 
-// queueFocusPreviewOrExpand is the Queue tab's counterpart to the Tickets
-// tab's own focus-or-expand dispatch, one level down for the Queue tab's
-// uniform queueRow (no separate epic-row case, unlike Tickets): on a leaf row, or a
-// row with children that's already expanded, it hands focus to the preview
-// panel. On a collapsed row with children it reports false so the caller
-// falls back to expanding it instead — the first "l"/"enter" on a collapsed
-// row expands it, and only a second press (now expanded) moves focus to the
-// preview.
-func (m *QueueModel) queueFocusPreviewOrExpand() bool {
-	r, ok := m.selectedQueueRow()
-	if !ok {
-		return false
-	}
-	if r.hasChildren && !r.expanded {
-		return false
-	}
-	m.focus = focusPreview
-	return true
-}
-
 // handleQueuePreviewKey processes key input while the Queue tab's preview
 // panel has focus, mirroring Model.handlePreviewKey (model_preview_focus.go):
 // its own search overlay, "h"/"left"/"esc" handing focus back to the list,

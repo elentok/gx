@@ -4,10 +4,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/ui/keys"
-	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/terminalrun"
-	"github.com/elentok/gx/ui/tree"
 )
 
 const (
@@ -67,16 +65,16 @@ func newTicketsManager() keys.Manager {
 // handleKey processes sidebar-focused key input via two separate
 // keys.Manager instances, tried in a fixed order, never re-Process-ing the
 // same manager for the same keystroke: m.keys' "extra" bindings first, then
-// m.sidebarTree's own nav bindings. ui/tree's own doc comment ("see
+// m.sidebarTree's own nav bindings via m.sidebarTree.Update (which now
+// handles paging directly, see ui/tree/model.go's BindingPageDown/
+// BindingPageUp cases — ticket 31). ui/tree's own doc comment ("see
 // ui/status/filetree_keys.go") suggests calling m.sidebarTree.Update first
 // and falling back to m.sidebarTree.Keys().Process on a miss — that pattern
 // is safe only for single-key bindings; for multi-key chords the second
 // Process call sees a reset prefix and can wrongly re-arm a pending chord
 // instead of surfacing the completed match. Trying m.keys first side-steps
 // that entirely since neither manager's Process is ever called twice for the
-// same keystroke (the ctrl+d/ctrl+u fallback below is the one exception,
-// safe because those are single-key bindings on m.sidebarTree's own
-// manager).
+// same keystroke.
 func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.focus == focusPreview {
 		return m.handlePreviewKey(msg)
@@ -143,21 +141,18 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Expand-on-already-expanded: tree.Model's own Update no-ops "l"/"right"/
-	// "enter" on a row that's HasChildren && already Expanded (nothing left
-	// to expand) — the pre-migration behavior was for a second press there to
-	// hand focus to the preview instead, so that's special-cased here, ahead
-	// of m.sidebarTree.Update, rather than inside it.
-	if s := msg.String(); s == "l" || s == "right" || s == "enter" {
-		entries := m.sidebarTree.Entries()
-		idx := m.sidebarTree.SelectedIndex()
-		if idx >= 0 && idx < len(entries) && entries[idx].HasChildren && entries[idx].Expanded {
-			m.focus = focusPreview
-			return m, nil
-		}
-	}
-
+	// Expand-on-already-expanded: tree.Model's own Update reports ExpandNoop
+	// on a row that's HasChildren && already Expanded (nothing left to
+	// expand) — the pre-migration behavior was for a second press there to
+	// hand focus to the preview instead, so that mutation is discarded
+	// (next is dropped rather than assigned back) and focus redirected
+	// instead. A leaf row never sets ExpandNoop; it falls through to the
+	// tree's own OpenSelected below, same as always.
 	next, cmd, result := m.sidebarTree.Update(msg)
+	if result.ExpandNoop {
+		m.focus = focusPreview
+		return m, cmd
+	}
 	m.sidebarTree = next
 	if result.RebuildRequested {
 		m.clampSelected()
@@ -171,18 +166,6 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// BindingMoveDown/BindingMoveUp already self-skip non-selectable rows
 	// inside tree.Model.Update (see SetIsSelectable/SkipUnselectable) — no
 	// extra nudge needed here for j/k/up/down.
-	if !result.Handled {
-		if match, consumed := m.sidebarTree.Keys().Process(msg); consumed && match != nil {
-			switch match.ID {
-			case tree.BindingPageDown:
-				m.sidebarTree.ScrollPage(list.DefaultScroll)
-				m.sidebarTree.SkipUnselectable(1)
-			case tree.BindingPageUp:
-				m.sidebarTree.ScrollPage(-list.DefaultScroll)
-				m.sidebarTree.SkipUnselectable(-1)
-			}
-		}
-	}
 	return m, cmd
 }
 

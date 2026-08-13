@@ -15,7 +15,6 @@ import (
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
-	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/search"
@@ -110,8 +109,9 @@ type QueueModel struct {
 	// with the Tickets tab (see preview_focus.go) — ticket 11 gave the Queue
 	// tab real scroll/search instead of the old truncate-only preview, and
 	// ticket 12 wires its promoted focus field up to "l"/"right"/"enter" and
-	// "h"/"left"/"esc" (see queueFocusPreviewOrExpand/handleQueuePreviewKey in
-	// queue_preview.go), mirroring the Tickets tab's own focus-toggle.
+	// "h"/"left"/"esc" (see the ExpandNoop/OpenSelected handling in
+	// handleQueueKey and handleQueuePreviewKey in queue_preview.go),
+	// mirroring the Tickets tab's own focus-toggle.
 	previewFocus
 }
 
@@ -774,20 +774,20 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// "l"/"right"/"enter": queueFocusPreviewOrExpand (queue_preview.go)
-	// already implements the preview-vs-expand interception — on a leaf row,
-	// or a row with children that's already expanded, it hands focus to the
-	// preview panel; on a collapsed row with children it reports false so
-	// the press falls through to m.queueTree.Update below, which expands it
-	// via tree's own BindingExpand/BindingToggle. Mirrors 02e1's two-manager
-	// ordering for the Tickets-tab sidebar.
-	if s := msg.String(); s == "l" || s == "right" || s == "enter" {
-		if m.queueFocusPreviewOrExpand() {
-			return m, nil
-		}
-	}
-
+	// Expand-on-already-expanded: tree.Model's own Update reports ExpandNoop
+	// on a row that's HasChildren && already Expanded (nothing left to
+	// expand); that mutation is discarded (next is dropped rather than
+	// assigned back) and focus redirected to the preview pane instead. A
+	// leaf row never sets ExpandNoop — it falls through to the tree's own
+	// OpenSelected below, which the Queue tab also sends to the preview
+	// pane, so leaves land on the same focus-preview outcome as an
+	// already-expanded row (the Queue tab's own choice, unlike the sidebar's
+	// leaves-are-a-no-op behavior).
 	next, cmd, result := m.queueTree.Update(msg)
+	if result.ExpandNoop {
+		m.focus = focusPreview
+		return m, cmd
+	}
 	m.queueTree = next
 	if result.RebuildRequested {
 		m.clampSelected()
@@ -797,18 +797,6 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if result.OpenSelected {
 		m.focus = focusPreview
-	}
-	if !result.Handled {
-		if match, consumed := m.queueTree.Keys().Process(msg); consumed && match != nil {
-			switch match.ID {
-			case tree.BindingPageDown:
-				m.queueTree.ScrollPage(list.DefaultScroll)
-				m.queueTree.SkipUnselectable(1)
-			case tree.BindingPageUp:
-				m.queueTree.ScrollPage(-list.DefaultScroll)
-				m.queueTree.SkipUnselectable(-1)
-			}
-		}
 	}
 	return m, cmd
 }

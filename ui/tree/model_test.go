@@ -210,6 +210,125 @@ func TestModelUpdate_LeftOnNestedExpandedNodeCollapsesBeforeParent(t *testing.T)
 	}
 }
 
+// TestModelUpdate_PageDownPageUp exercises the BindingPageDown/BindingPageUp
+// dispatch added to Update's own switch (ticket 31) — previously these fell
+// through to `default` unhandled, and every embedder re-ran
+// Keys().Process(msg) by hand to call ScrollPage + SkipUnselectable itself.
+func TestModelUpdate_PageDownPageUp(t *testing.T) {
+	m := NewModel[int]()
+	entries := make([]Entry[int], 20)
+	for i := range entries {
+		entries[i] = Entry[int]{ID: string(rune('a' + i)), Value: i}
+	}
+	m.SetEntries(entries)
+	m.SetVisibleHeight(5)
+
+	next, _, result := m.Update(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl, Text: "ctrl+d"})
+	if !result.Handled {
+		t.Fatal("expected ctrl+d to be handled")
+	}
+	if next.ScrollOffset() == 0 {
+		t.Fatal("expected ctrl+d to scroll the viewport down")
+	}
+
+	next2, _, result := next.Update(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl, Text: "ctrl+u"})
+	if !result.Handled {
+		t.Fatal("expected ctrl+u to be handled")
+	}
+	if next2.ScrollOffset() != 0 {
+		t.Fatalf("expected ctrl+u to scroll back to top, offset=%d", next2.ScrollOffset())
+	}
+}
+
+// TestModelUpdate_PageDownSkipsUnselectableRows pins SkipUnselectable being
+// applied after paging, matching what the deleted ui/tickets call-site
+// blocks did by hand.
+func TestModelUpdate_PageDownSkipsUnselectableRows(t *testing.T) {
+	m := NewModel[int]()
+	m.SetIsSelectable(func(v int) bool { return v != 0 })
+	entries := make([]Entry[int], 20)
+	for i := range entries {
+		entries[i] = Entry[int]{ID: string(rune('a' + i)), Value: i}
+	}
+	entries[7].Value = 0 // decorative row landed on by paging
+	m.SetEntries(entries)
+	m.SetVisibleHeight(5)
+	m.SetSelectedIndex(6)
+
+	next, _, result := m.Update(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl, Text: "ctrl+d"})
+	if !result.Handled {
+		t.Fatal("expected ctrl+d to be handled")
+	}
+	if next.SelectedIndex() == 7 {
+		t.Fatal("expected the non-selectable row to be skipped after paging")
+	}
+}
+
+// TestModelUpdate_ExpandNoop covers the structural ExpandNoop signal (ticket
+// 31): expand/toggle on an entry that already has HasChildren && Expanded
+// reports it, while a collapsed entry or a fresh expand does not.
+func TestModelUpdate_ExpandNoop(t *testing.T) {
+	t.Run("right on already-expanded entry reports ExpandNoop", func(t *testing.T) {
+		m := NewModel[int]()
+		m.SetEntries([]Entry[int]{
+			{ID: "parent", HasChildren: true, Expanded: true},
+			{ID: "a", ParentID: "parent", Value: 1, Depth: 1},
+		})
+		m.SetSelectedIndex(0)
+
+		_, _, result := m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+		if !result.ExpandNoop {
+			t.Fatal("expected ExpandNoop=true for right on an already-expanded entry")
+		}
+	})
+
+	t.Run("enter on already-expanded entry reports ExpandNoop", func(t *testing.T) {
+		m := NewModel[int]()
+		m.SetEntries([]Entry[int]{
+			{ID: "parent", HasChildren: true, Expanded: true},
+			{ID: "a", ParentID: "parent", Value: 1, Depth: 1},
+		})
+		m.SetSelectedIndex(0)
+
+		_, _, result := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+		if !result.ExpandNoop {
+			t.Fatal("expected ExpandNoop=true for enter on an already-expanded entry")
+		}
+	})
+
+	t.Run("right on a collapsed entry does not report ExpandNoop", func(t *testing.T) {
+		m := NewModel[int]()
+		m.SetEntries([]Entry[int]{
+			{ID: "parent", HasChildren: true, Expanded: false},
+		})
+		m.SetSelectedIndex(0)
+
+		_, _, result := m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+		if result.ExpandNoop {
+			t.Fatal("expected ExpandNoop=false for right on a collapsed entry")
+		}
+		if !result.RebuildRequested {
+			t.Fatal("expected the fresh expand to still request a rebuild")
+		}
+	})
+
+	t.Run("right on a leaf does not report ExpandNoop", func(t *testing.T) {
+		m := NewModel[int]()
+		m.SetEntries([]Entry[int]{
+			{ID: "a", Value: 1},
+		})
+		m.SetSelectedIndex(0)
+
+		_, _, result := m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+		if result.ExpandNoop {
+			t.Fatal("expected ExpandNoop=false for right on a leaf")
+		}
+		if !result.OpenSelected {
+			t.Fatal("expected OpenSelected for right on a leaf")
+		}
+	})
+}
+
 func TestModelAccessors(t *testing.T) {
 	m := NewModel[int]()
 	entries := []Entry[int]{
