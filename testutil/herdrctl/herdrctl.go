@@ -30,18 +30,48 @@ var ensureActiveWorkspaceOnce sync.Once
 // (focused) workspace before any test workspace is created with
 // --no-focus. herdr's create_workspace_with_launch_env focuses a new
 // workspace whenever the server has never had an active workspace yet,
-// regardless of --no-focus — on a freshly started server (as on CI, unlike
-// a real dev machine's herdr, which already has one from live use) this
+// regardless of --no-focus — on a freshly started server (as on CI) this
 // silently promotes the first test's --no-focus workspace to active,
 // which then makes herdr report its idle-completion as "idle" instead of
 // "done" (busy-pane classification suppresses the notification/done state
-// for the focused tab). A throwaway sentinel workspace, focused once up
-// front, keeps every real test workspace correctly out of focus.
+// for the focused tab).
+//
+// A real dev machine's herdr almost always already has an active workspace
+// from live use, so the guard is only needed on a truly fresh server: this
+// checks first and only creates (and focuses) a throwaway sentinel
+// workspace when nothing is focused yet, so running these tests locally
+// never steals focus from whatever the developer is actually working on.
 func ensureActiveWorkspace(t *testing.T) {
 	t.Helper()
 	ensureActiveWorkspaceOnce.Do(func() {
+		if hasActiveWorkspace(t) {
+			return
+		}
 		run(t, "workspace", "create", "--cwd", os.TempDir(), "--label", "gx-e2e-sentinel", "--focus")
 	})
+}
+
+// hasActiveWorkspace reports whether herdr's server already has a focused
+// workspace, via `herdr workspace list`.
+func hasActiveWorkspace(t *testing.T) bool {
+	t.Helper()
+	out := run(t, "workspace", "list")
+	var resp struct {
+		Result struct {
+			Workspaces []struct {
+				Focused bool `json:"focused"`
+			} `json:"workspaces"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(out, &resp); err != nil {
+		t.Fatalf("herdrctl: parse workspace list response: %v\nraw: %s", err, out)
+	}
+	for _, ws := range resp.Result.Workspaces {
+		if ws.Focused {
+			return true
+		}
+	}
+	return false
 }
 
 // RequireHerdr skips the test unless a real herdr daemon is reachable: herdr

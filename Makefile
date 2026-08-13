@@ -1,4 +1,4 @@
-.PHONY: build install test test-docker-ubuntu run demos demo-seed
+.PHONY: build install test e2e test-docker-ubuntu run demos demo-seed
 
 GO_VERSION := 1.25.0
 
@@ -17,6 +17,11 @@ install:
 # against a permit cap) more room to legitimately run long; 2m proved too tight there.
 test:
 	go test ./... -timeout=5m
+
+# e2e runs the herdr e2e suite against a real, already-running herdr daemon
+# (herdr must be on PATH). Tests skip themselves if either isn't available.
+e2e:
+	HERDR_ENV=1 go test ./e2e/... -timeout=2m
 
 coverage:
 	go test ./... -coverprofile=coverage.out
