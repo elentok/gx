@@ -139,22 +139,28 @@ func MarkBuiltAwaitingLand(path string) error {
 	})
 }
 
-// MarkNeedsAnswer writes status: needs-answer into the ticket file at path.
-func MarkNeedsAnswer(path string) error {
-	return SetStatus(path, "needs-answer")
+// MarkNeedsAnswer writes status: needs-answer into the ticket file at path,
+// stamping parkKind so a later reader can tell which of the three producers
+// parked it.
+func MarkNeedsAnswer(path string, parkKind schema.ParkKind) error {
+	return updateTicket(path, func(t *schema.Ticket) {
+		t.Status = schema.StatusNeedsAnswer
+		t.ParkKind = parkKind
+	})
 }
 
 // MarkNeedsAnswerWithReasonAndStub writes status: needs-answer into the
-// ticket file and appends reason to the body under a "## Needs Answer"
-// heading, both naming label. This is the pane-answered park (an involuntary
-// prompt the agent didn't choose): the stub distinguishes it from
-// MarkNeedsAnswer's bare write for a ticket-answered zero-commit finish,
-// since the question here exists only in the pane — a person answers it
-// there, and the stub just gives them (and the TUI's auto-scroll) something
-// to find.
-func MarkNeedsAnswerWithReasonAndStub(path, reason string) error {
+// ticket file, stamps parkKind, and appends reason to the body under a
+// "## Needs Answer" heading, both naming label. This is the pane-answered
+// park (an involuntary prompt the agent didn't choose): the stub distinguishes
+// it from MarkNeedsAnswer's bare write for a ticket-answered zero-commit
+// finish, since the question here exists only in the pane — a person answers
+// it there, and the stub just gives them (and the TUI's auto-scroll)
+// something to find.
+func MarkNeedsAnswerWithReasonAndStub(path, reason string, parkKind schema.ParkKind) error {
 	return updateTicketWithBody(path, func(t *schema.Ticket, body *string) {
 		t.Status = schema.StatusNeedsAnswer
+		t.ParkKind = parkKind
 		*body += fmt.Sprintf("\n## Needs Answer\n\n%s\n", reason)
 	})
 }

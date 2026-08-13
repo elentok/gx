@@ -286,7 +286,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 		// The agent finished without landing any commits: leave the worktree/
 		// tab in place for inspection instead of silently marking done or
 		// retrying, and let the scheduler move on to other unblocked tickets.
-		if err := MarkNeedsAnswer(p.Ticket.Path); err != nil {
+		if err := MarkNeedsAnswer(p.Ticket.Path, schema.ParkKindZeroCommit); err != nil {
 			return fmt.Errorf("marking ticket needs-answer: %w", err)
 		}
 		p.logTicketEvent(eventNeedsAnswer, pane, tab, sessionID, path)
@@ -338,7 +338,7 @@ func adoptNeedsAnswerReport(p iterationParams, path, pane, tab, sessionID string
 		return false, nil
 	}
 
-	if err := MarkNeedsAnswer(p.Ticket.Path); err != nil {
+	if err := MarkNeedsAnswer(p.Ticket.Path, schema.ParkKindSelfReported); err != nil {
 		return false, fmt.Errorf("adopting needs-answer report: %w", err)
 	}
 	p.logTicketEvent(eventNeedsAnswer, pane, tab, sessionID, path)

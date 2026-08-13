@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // smartZonePollMs bounds each "wait for the agent to finish" poll tick, so a
@@ -848,7 +849,7 @@ func parkOnBlockedPane(d Deps, p launchAndPromptParams, sessionID string) (parke
 	}
 
 	reason := fmt.Sprintf("%s is blocked on a prompt gx did not send; answer it in the pane", p.Label)
-	if err := MarkNeedsAnswerWithReasonAndStub(p.TicketPath, reason); err != nil {
+	if err := MarkNeedsAnswerWithReasonAndStub(p.TicketPath, reason, schema.ParkKindBlockedPane); err != nil {
 		return false, fmt.Errorf("marking ticket needs-answer: %w", err)
 	}
 	p.logAgentEvent(eventNeedsAnswer, sessionID, reason)

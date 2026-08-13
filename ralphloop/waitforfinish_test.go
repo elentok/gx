@@ -1914,6 +1914,9 @@ func TestWaitForFinish_BlockedPaneDwellsThenParks(t *testing.T) {
 			if ticket.Status != schema.StatusNeedsAnswer {
 				t.Errorf("Status = %q, want needs-answer", ticket.Status)
 			}
+			if ticket.ParkKind != schema.ParkKindBlockedPane {
+				t.Errorf("ParkKind = %q, want blocked-pane", ticket.ParkKind)
+			}
 			body := schema.ParseBody(string(raw))
 			if !strings.Contains(body, "## Needs Answer") {
 				t.Errorf("body missing ## Needs Answer stub:\n%s", body)

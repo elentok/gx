@@ -644,6 +644,9 @@ func TestRun_ZeroCommitIteration_MarksNeedsAnswerAndLeavesWorktree(t *testing.T)
 	if strings.Contains(string(raw), "status: done") {
 		t.Errorf("ticket must not be marked done after a zero-commit iteration:\n%s", raw)
 	}
+	if !strings.Contains(string(raw), "park_kind: zero-commit") {
+		t.Errorf("ticket not stamped park_kind: zero-commit after zero-commit iteration:\n%s", raw)
+	}
 }
 
 func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {

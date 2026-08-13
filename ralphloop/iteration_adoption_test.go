@@ -88,6 +88,9 @@ func TestRun_NeedsAnswerReport_ParksWithoutCherryPickEvenWithCommits(t *testing.
 	if strings.Contains(string(raw), "commitless: true") {
 		t.Errorf("needs-answer adoption must not set commitless:\n%s", raw)
 	}
+	if !strings.Contains(string(raw), "park_kind: self-reported") {
+		t.Errorf("ticket not stamped park_kind: self-reported after adopted needs-answer report:\n%s", raw)
+	}
 }
 
 // TestRun_FinishedReport_ZeroCommits_DoesNotReachDone pins the other half of

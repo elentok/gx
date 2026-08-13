@@ -136,6 +136,34 @@ func (s IterationStatus) Valid() bool {
 	return validIterationStatuses[s]
 }
 
+// ParkKind records which of ralph-loop's three needs-answer producers parked
+// a ticket: ParkKindBlockedPane (a genuinely blocked interactive prompt, pane
+// left live), ParkKindSelfReported (the agent's own iteration_status:
+// needs-answer report, pane/worktree/tab already released), or
+// ParkKindZeroCommit (finishIteration's zero-commit fallback, pane left alive
+// for inspection). Like IterationStatus, the empty string is valid: it means
+// no park has stamped this ticket, not an error.
+type ParkKind string
+
+const (
+	ParkKindBlockedPane  ParkKind = "blocked-pane"
+	ParkKindSelfReported ParkKind = "self-reported"
+	ParkKindZeroCommit   ParkKind = "zero-commit"
+)
+
+var validParkKinds = map[ParkKind]bool{
+	"":                   true,
+	ParkKindBlockedPane:  true,
+	ParkKindSelfReported: true,
+	ParkKindZeroCommit:   true,
+}
+
+// Valid reports whether k is one of the three named values or the empty
+// "absent" value.
+func (k ParkKind) Valid() bool {
+	return validParkKinds[k]
+}
+
 // Ticket is the in-memory, typed frontmatter of one ticket file's YAML
 // header (see .scratch/ticket-frontmatter/spec.md's Schema section). No
 // file I/O or YAML (de)serialization here — that's a later ticket in this
@@ -175,6 +203,10 @@ type Ticket struct {
 	// the IterationStatus type doc). Never checked by Validate: the enum rule
 	// is enforced only by the CLI write path that sets it.
 	IterationStatus IterationStatus
+	// ParkKind records which needs-answer producer parked this ticket (see
+	// the ParkKind type doc). Never checked by Validate, same as
+	// IterationStatus.
+	ParkKind ParkKind
 }
 
 // IsCommitless reports whether t is exempt from landed-commit verification:

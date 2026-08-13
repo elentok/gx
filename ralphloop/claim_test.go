@@ -337,13 +337,16 @@ func TestMarkNeedsAnswerWithReasonAndStub_WritesStatusReasonAndStub(t *testing.T
 	path := writeFrontmatterTicket(t, "claimed")
 	reason := "iter-01 is blocked on a prompt gx did not send; answer it in the pane"
 
-	if err := MarkNeedsAnswerWithReasonAndStub(path, reason); err != nil {
+	if err := MarkNeedsAnswerWithReasonAndStub(path, reason, schema.ParkKindBlockedPane); err != nil {
 		t.Fatalf("MarkNeedsAnswerWithReasonAndStub: %v", err)
 	}
 
 	got := mustParse(t, path)
 	if got.Status != schema.StatusNeedsAnswer {
 		t.Errorf("Status = %q, want needs-answer", got.Status)
+	}
+	if got.ParkKind != schema.ParkKindBlockedPane {
+		t.Errorf("ParkKind = %q, want blocked-pane", got.ParkKind)
 	}
 	body := schema.ParseBody(mustRead(t, path))
 	if !strings.Contains(body, "## Needs Answer") {
