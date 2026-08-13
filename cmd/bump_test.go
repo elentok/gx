@@ -149,7 +149,7 @@ func TestRunBump_PatchExplicit(t *testing.T) {
 		confirmForce: func(string) (bool, error) { return false, nil },
 	}
 
-	if err := runBump([]string{"patch"}, d); err != nil {
+	if err := runBump([]string{"patch"}, d, false); err != nil {
 		t.Fatalf("runBump: %v", err)
 	}
 	out := stdout.String()
@@ -172,7 +172,7 @@ func TestRunBump_MinorExplicit(t *testing.T) {
 		confirmForce: func(string) (bool, error) { return false, nil },
 	}
 
-	if err := runBump([]string{"minor"}, d); err != nil {
+	if err := runBump([]string{"minor"}, d, false); err != nil {
 		t.Fatalf("runBump: %v", err)
 	}
 	out := stdout.String()
@@ -195,7 +195,7 @@ func TestRunBump_MajorExplicit(t *testing.T) {
 		confirmForce: func(string) (bool, error) { return false, nil },
 	}
 
-	if err := runBump([]string{"major"}, d); err != nil {
+	if err := runBump([]string{"major"}, d, false); err != nil {
 		t.Fatalf("runBump: %v", err)
 	}
 	out := stdout.String()
@@ -217,7 +217,7 @@ func TestRunBump_NoExistingTag_DefaultsToV0(t *testing.T) {
 		confirmForce: func(string) (bool, error) { return false, nil },
 	}
 
-	if err := runBump([]string{"patch"}, d); err != nil {
+	if err := runBump([]string{"patch"}, d, false); err != nil {
 		t.Fatalf("runBump: %v", err)
 	}
 	out := stdout.String()
@@ -239,7 +239,7 @@ func TestRunBump_CreatesAnnotatedTag(t *testing.T) {
 		confirmForce: func(string) (bool, error) { return false, nil },
 	}
 
-	if err := runBump([]string{"patch"}, d); err != nil {
+	if err := runBump([]string{"patch"}, d, false); err != nil {
 		t.Fatalf("runBump: %v", err)
 	}
 
@@ -276,7 +276,7 @@ func TestRunBump_SkipsPushWhenDeclined(t *testing.T) {
 		confirmForce: func(string) (bool, error) { return false, nil },
 	}
 
-	if err := runBump([]string{"patch"}, d); err != nil {
+	if err := runBump([]string{"patch"}, d, false); err != nil {
 		t.Fatalf("runBump: %v", err)
 	}
 	if strings.Contains(stdout.String(), "Pushed") {
@@ -330,7 +330,7 @@ func TestRunBump_InteractivePicker(t *testing.T) {
 		confirmForce: func(string) (bool, error) { return false, nil },
 	}
 
-	if err := runBump(nil, d); err != nil {
+	if err := runBump(nil, d, false); err != nil {
 		t.Fatalf("runBump: %v", err)
 	}
 	if !strings.Contains(stdout.String(), "v2.1.0") {
@@ -352,7 +352,7 @@ func TestRunBump_InteractivePicker_Cancel(t *testing.T) {
 		confirmForce: func(string) (bool, error) { return false, nil },
 	}
 
-	if err := runBump(nil, d); err != nil {
+	if err := runBump(nil, d, false); err != nil {
 		t.Fatalf("runBump: %v", err)
 	}
 	// Cancelled — no tag should be created, nothing pushed.

@@ -13,8 +13,8 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-func runBump(args []string, d deps, yes ...bool) error {
-	skipConfirm := len(yes) > 0 && yes[0]
+func runBump(args []string, d deps, yes bool) error {
+	skipConfirm := yes
 
 	cwd, err := d.getwd()
 	if err != nil {
