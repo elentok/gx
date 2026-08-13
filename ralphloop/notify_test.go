@@ -20,7 +20,7 @@ func TestSendMessage_NoneConfigured_NoOpsAndReturnsNoSent(t *testing.T) {
 }
 
 func TestSendMessage_BothConfigured_SendsToBothAndReportsBoth(t *testing.T) {
-	t.Parallel()
+	t.Setenv("HOME", t.TempDir())
 	telegramServer, getTelegramRequests := fakeTelegramServer(t, http.StatusOK)
 	slackServer, getSlackRequests := fakeSlackServer(t, http.StatusOK)
 
@@ -55,7 +55,7 @@ func TestSendMessage_BothConfigured_SendsToBothAndReportsBoth(t *testing.T) {
 }
 
 func TestSendMessage_TelegramOnlyConfigured_SendsOnlyTelegram(t *testing.T) {
-	t.Parallel()
+	t.Setenv("HOME", t.TempDir())
 	telegramServer, getTelegramRequests := fakeTelegramServer(t, http.StatusOK)
 	cfg := config.NotificationsConfig{
 		Telegram: config.TelegramConfig{BotToken: "tok", ChatID: "chat-1"},
@@ -74,7 +74,7 @@ func TestSendMessage_TelegramOnlyConfigured_SendsOnlyTelegram(t *testing.T) {
 }
 
 func TestSendMessage_SlackFailure_ReturnsErrorMentioningSlack(t *testing.T) {
-	t.Parallel()
+	t.Setenv("HOME", t.TempDir())
 	server, _ := fakeSlackServer(t, http.StatusInternalServerError)
 	cfg := config.NotificationsConfig{Slack: config.SlackConfig{WebhookURL: server.URL}}
 
@@ -91,7 +91,7 @@ func TestSendMessage_SlackFailure_ReturnsErrorMentioningSlack(t *testing.T) {
 }
 
 func TestSendMessage_TelegramFailsSlackSucceeds_ReportsSlackAndErrorsOnTelegram(t *testing.T) {
-	t.Parallel()
+	t.Setenv("HOME", t.TempDir())
 	failingTelegram, _ := fakeTelegramServer(t, http.StatusInternalServerError)
 	slackServer, _ := fakeSlackServer(t, http.StatusOK)
 	cfg := config.NotificationsConfig{
@@ -108,5 +108,24 @@ func TestSendMessage_TelegramFailsSlackSucceeds_ReportsSlackAndErrorsOnTelegram(
 	}
 	if len(sent) != 1 || sent[0] != "slack" {
 		t.Fatalf("sent = %v, want [slack] despite telegram failure", sent)
+	}
+}
+
+func TestSendMessage_GlobalBreakerTrips_SuppressesFurtherSends(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	telegramServer, getTelegramRequests := fakeTelegramServer(t, http.StatusOK)
+	cfg := config.NotificationsConfig{
+		Telegram: config.TelegramConfig{BotToken: "tok", ChatID: "chat-1"},
+	}
+
+	for range globalThreshold + 5 {
+		if _, err := sendMessage(cfg, "hi", telegramServer.URL); err != nil {
+			t.Fatalf("sendMessage: %v", err)
+		}
+	}
+
+	want := globalThreshold - 1
+	if reqs := getTelegramRequests(); len(reqs) != want {
+		t.Fatalf("telegram requests = %d, want exactly %d (breaker trips before the send that crosses the threshold)", len(reqs), want)
 	}
 }

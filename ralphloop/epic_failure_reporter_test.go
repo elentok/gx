@@ -7,7 +7,7 @@ import (
 )
 
 func TestEpicFailureReporter_EpicFailed_SendsOneMessagePerTarget(t *testing.T) {
-	t.Parallel()
+	t.Setenv("HOME", t.TempDir())
 	r := NewEpicFailureReporter(t.TempDir())
 	transport := &fakeChatTransport{}
 	r.targets = append(r.targets, epicFailureTarget{style: slackStyle, transport: transport})
@@ -24,7 +24,7 @@ func TestEpicFailureReporter_EpicFailed_SendsOneMessagePerTarget(t *testing.T) {
 }
 
 func TestEpicFailureReporter_EpicFailed_NilErrSendsNothing(t *testing.T) {
-	t.Parallel()
+	t.Setenv("HOME", t.TempDir())
 	r := NewEpicFailureReporter(t.TempDir())
 	transport := &fakeChatTransport{}
 	r.targets = append(r.targets, epicFailureTarget{style: slackStyle, transport: transport})
@@ -33,5 +33,22 @@ func TestEpicFailureReporter_EpicFailed_NilErrSendsNothing(t *testing.T) {
 
 	if got := transport.snapshot(); len(got) != 0 {
 		t.Fatalf("sent = %v, want none for a nil error", got)
+	}
+}
+
+func TestEpicFailureReporter_EpicFailed_GlobalBreakerTrips_SuppressesFurtherSends(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	r := NewEpicFailureReporter(t.TempDir())
+	transport := &fakeChatTransport{}
+	r.targets = append(r.targets, epicFailureTarget{style: slackStyle, transport: transport})
+
+	for range globalThreshold + 5 {
+		r.EpicFailed("my-epic", errors.New("boom"))
+	}
+
+	want := globalThreshold - 1
+	got := waitForSentCount(transport, want)
+	if len(got) != want {
+		t.Fatalf("sent = %d messages, want exactly %d (breaker trips before the send that crosses the threshold)", len(got), want)
 	}
 }

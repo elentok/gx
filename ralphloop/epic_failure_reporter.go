@@ -1,6 +1,11 @@
 package ralphloop
 
-import "context"
+import (
+	"context"
+	"time"
+
+	"github.com/elentok/gx/logger"
+)
 
 // EpicFailureNotifier is called by the loop registry once a run has
 // returned an error, after the run's own EventSink has been closed and
@@ -57,13 +62,26 @@ func (r *EpicFailureReporter) AddSlack(webhookURL string) {
 // EpicFailed sends the "epic failed" message to every configured target,
 // same fire-and-forget/retry-once/run-log semantics as chatEventSink.send.
 // counts is loaded fresh here rather than carried over from a live event,
-// since the run that would have carried one has already ended.
+// since the run that would have carried one has already ended. Each target
+// is gated (source "epic:<name>", no parkTicket — there's no ticket to park
+// this send against) before it sends; a gate trip still writes its
+// bookkeeping but suppresses the send itself.
 func (r *EpicFailureReporter) EpicFailed(epicName string, err error) {
 	if err == nil {
 		return
 	}
 	counts := loadEpicCounts(r.scratchDir, epicName)
+	source := "epic:" + epicName
 	for _, target := range r.targets {
+		result, gateErr := NotificationGate(target.transport.name(), notifyKindEpicFailed, source, time.Now(), true, nil)
+		if gateErr != nil {
+			logger.Debug("%s: notification gate: %v\n", target.transport.name(), gateErr)
+			continue
+		}
+		if result.Decision != Allowed {
+			continue
+		}
+
 		text := target.style.epicFailedText(epicName, counts, err.Error())
 		sendNotification(r.scratchDir, epicName, target.transport.name(), notifyKindEpicFailed, target.transport.timeout(), func(ctx context.Context) error {
 			return target.transport.sendSync(ctx, text)

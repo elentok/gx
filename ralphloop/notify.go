@@ -2,9 +2,14 @@ package ralphloop
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/elentok/gx/config"
 )
+
+// notifyKindCLI tags gate/run-log bookkeeping for gx notify's synchronous
+// send path — the only kind of event this path ever produces.
+const notifyKindCLI = "cli-notify"
 
 // SendMessage sends text to every notification service configured in cfg
 // (Telegram and/or Slack), no-op'ing per-service when that service's
@@ -23,18 +28,28 @@ func sendMessage(cfg config.NotificationsConfig, text, telegramBaseURL string) (
 	var errs []error
 
 	if cfg.Telegram.BotToken != "" {
-		if err := sendTelegramMessage(cfg.Telegram.BotToken, cfg.Telegram.ChatID, telegramBaseURL, text); err != nil {
+		allowed, err := gateCLISend("telegram")
+		if err != nil {
 			errs = append(errs, fmt.Errorf("telegram: %w", err))
-		} else {
-			sent = append(sent, "telegram")
+		} else if allowed {
+			if err := sendTelegramMessage(cfg.Telegram.BotToken, cfg.Telegram.ChatID, telegramBaseURL, text); err != nil {
+				errs = append(errs, fmt.Errorf("telegram: %w", err))
+			} else {
+				sent = append(sent, "telegram")
+			}
 		}
 	}
 
 	if cfg.Slack.WebhookURL != "" {
-		if err := SendSlackMessage(cfg.Slack.WebhookURL, text); err != nil {
+		allowed, err := gateCLISend("slack")
+		if err != nil {
 			errs = append(errs, fmt.Errorf("slack: %w", err))
-		} else {
-			sent = append(sent, "slack")
+		} else if allowed {
+			if err := SendSlackMessage(cfg.Slack.WebhookURL, text); err != nil {
+				errs = append(errs, fmt.Errorf("slack: %w", err))
+			} else {
+				sent = append(sent, "slack")
+			}
 		}
 	}
 
@@ -46,4 +61,15 @@ func sendMessage(cfg config.NotificationsConfig, text, telegramBaseURL string) (
 		joined = fmt.Errorf("%w; %w", joined, err)
 	}
 	return sent, joined
+}
+
+// gateCLISend runs transport's send through the notification gate with
+// source "cli" — there's no ticket to park a trip against, so parkTicket is
+// nil. A trip still writes its bookkeeping; the caller just skips sending.
+func gateCLISend(transport string) (bool, error) {
+	result, err := NotificationGate(transport, notifyKindCLI, "cli", time.Now(), true, nil)
+	if err != nil {
+		return false, err
+	}
+	return result.Decision == Allowed, nil
 }
