@@ -50,7 +50,9 @@ jobs:
           go-version-file: go.mod
 
       - name: Install herdr
-        run: brew install herdr
+        run: |
+          brew update
+          brew install herdr
 
       - name: Start herdr server
         run: |
