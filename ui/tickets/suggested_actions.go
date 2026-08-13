@@ -22,9 +22,9 @@ import (
 const actionResumeAnswered = "resume-answered"
 
 // actionInvestigate opens a new herdr tab and launches a fresh
-// gx-investigate session for the ticket (see cmdLaunchInvestigate). Unlike
-// actionResumeAnswered it applies to every ticket regardless of status, so
-// applySuggestedAction never handles it — dispatch happens in
+// gx-investigate session for the ticket (see cmdLaunchInvestigate), for any
+// status signaling a problem (see suggestedActionItems). applySuggestedAction
+// never handles it — dispatch happens in
 // handleActionsMenuKey/handleQueueActionsMenuKey, which have the epic name
 // and ticket identifier the herdr launch needs and applySuggestedAction's
 // path-only signature doesn't carry.
@@ -42,17 +42,21 @@ const actionUnmuteReopen = "unmute-reopen"
 
 // suggestedActionItems returns ticket's suggested-action menu items, empty
 // when none apply, given its rendered status. resume-answered only applies
-// to needs-answer; investigate applies to any status signaling a problem —
-// everything except open/claimed (still healthy, unclaimed or in-progress
-// work) and done (finished successfully). handleSuggestedActionsKey/
-// handleQueueSuggestedActionsKey toast "no suggested actions" rather than
-// opening an empty menu.
+// to needs-answer; investigate is whitelisted to the statuses that signal an
+// actual problem (needs-answer, needs-repair, error) rather than excluding
+// the healthy ones — Open/Claimed/Done are healthy, but so are Blocked
+// (waiting on a dependency), Draft (not yet offered to an agent) and
+// WaitingForChildren (own work already done), none of which have a live or
+// stalled session worth investigating. Whitelisting also fails closed for
+// any status added to the enum later, instead of showing the badge by
+// default. handleSuggestedActionsKey/handleQueueSuggestedActionsKey toast
+// "no suggested actions" rather than opening an empty menu.
 func suggestedActionItems(status tickets.RenderedStatus, ticket tickets.Ticket) []components.MenuItem {
 	var items []components.MenuItem
 	if status == tickets.StatusNeedsAnswer {
 		items = append(items, components.MenuItem{Label: "Resume (I answered)", Value: actionResumeAnswered})
 	}
-	if status != tickets.StatusOpen && status != tickets.StatusClaimed && status != tickets.StatusDone {
+	if status == tickets.StatusNeedsAnswer || status == tickets.StatusNeedsRepair || status == tickets.StatusError {
 		items = append(items, components.MenuItem{Label: "Investigate", Value: actionInvestigate})
 	}
 	if len(ticket.Mutes) > 0 {

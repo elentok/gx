@@ -15,6 +15,33 @@ func TestSuggestedActionItems_NeedsAnswer_NoMutes_ResumeAndInvestigate(t *testin
 	}
 }
 
+func TestSuggestedActionItems_NeedsRepairOrError_IncludesInvestigate(t *testing.T) {
+	t.Parallel()
+	for _, status := range []tickets.RenderedStatus{tickets.StatusNeedsRepair, tickets.StatusError} {
+		items := suggestedActionItems(status, tickets.Ticket{})
+		if len(items) != 1 || items[0].Value != actionInvestigate {
+			t.Errorf("status %v: items = %v, want just %q", status, items, actionInvestigate)
+		}
+	}
+}
+
+func TestSuggestedActionItems_HealthyStatuses_NoInvestigate(t *testing.T) {
+	t.Parallel()
+	for _, status := range []tickets.RenderedStatus{
+		tickets.StatusOpen,
+		tickets.StatusClaimed,
+		tickets.StatusDone,
+		tickets.StatusBlocked,
+		tickets.StatusDraft,
+		tickets.StatusWaitingForChildren,
+	} {
+		items := suggestedActionItems(status, tickets.Ticket{})
+		if len(items) != 0 {
+			t.Errorf("status %v: items = %v, want none", status, items)
+		}
+	}
+}
+
 func TestSuggestedActionItems_MutedTicket_AnyStatus_IncludesUnmute(t *testing.T) {
 	t.Parallel()
 	muted := tickets.Ticket{Mutes: []schema.MuteRecord{{EventType: "notification-storm"}}}
