@@ -32,7 +32,21 @@ func UserCacheDir() (string, error) {
 	return filepath.Join(home, ".cache"), nil
 }
 
+// UserStateDir hardcodes ~/.local/state as gx's runtime-state base directory
+// on every platform, mirroring UserConfigDir/UserCacheDir's deliberate
+// bypass of per-OS/XDG resolution. Runtime state (queue-state.json,
+// notifications-state.json) lives here rather than under UserConfigDir,
+// which is reserved for user-edited config (config.json).
+func UserStateDir() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".local", "state"), nil
+}
+
 var userConfigDirFn = UserConfigDir
+var userStateDirFn = UserStateDir
 
 const SchemaURL = "https://raw.githubusercontent.com/elentok/gx/main/docs/config-schema.json"
 

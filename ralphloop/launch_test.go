@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -216,6 +217,40 @@ func TestLaunchAndPrompt_AgentNameTakenByUnrelatedWorktree_StillFails(t *testing
 		Ticket:     "01",
 	}); err == nil {
 		t.Fatal("launchAndPrompt() error = nil, want a hard failure for an unrelated agent_name_taken collision")
+	}
+}
+
+// TestLaunchAndPrompt_StuckSubmission_PropagatesAsErrStuckSubmission is a
+// regression test for the fix-spinner/04 incident: when the initial prompt
+// never reaches the pane at all (AgentPrompt's promptWithNudge wrapper
+// exhausts its retypes and returns errStuckSubmission), launchAndPrompt's
+// "sending initial prompt" wrap must still be unwrappable back to
+// errStuckSubmission via errors.Is, so runIteration's caller-side retry
+// logic can tell it apart from an ordinary launch failure.
+func TestLaunchAndPrompt_StuckSubmission_PropagatesAsErrStuckSubmission(t *testing.T) {
+	t.Parallel()
+	d := Deps{
+		AgentStart: func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+			return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle"}, nil
+		},
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			return herdr.Agent{}, errStuckSubmission
+		},
+	}
+
+	_, err := launchAndPrompt(d, launchAndPromptParams{
+		Label:      "iter-04",
+		Agent:      AgentClaude,
+		Pane:       "pane-4",
+		Prompt:     "go",
+		SessionCwd: "/repo/iter-04",
+		Ticket:     "04",
+	})
+	if !errors.Is(err, errStuckSubmission) {
+		t.Fatalf("launchAndPrompt() error = %v, want it to wrap errStuckSubmission", err)
 	}
 }
 

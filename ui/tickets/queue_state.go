@@ -26,13 +26,13 @@ const (
 	queueStatusErrored queueItemStatus = "errored"
 )
 
-// queueStateDirFn resolves the same base directory config.FilePath uses,
-// overridden in tests (see TestMain) so the package's test suite never
-// touches the real machine's config dir.
-var queueStateDirFn = config.UserConfigDir
+// queueStateDirFn resolves gx's runtime-state base directory, overridden in
+// tests (see TestMain) so the package's test suite never touches the real
+// machine's state dir.
+var queueStateDirFn = config.UserStateDir
 
 // queueStateFilePath returns the on-disk path for the persisted queue state,
-// mirroring config.FilePath's ~/.config/gx/ layout.
+// under config.UserStateDir's ~/.local/state/gx/ layout.
 func queueStateFilePath() (string, error) {
 	base, err := queueStateDirFn()
 	if err != nil {

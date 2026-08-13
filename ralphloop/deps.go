@@ -209,7 +209,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		TabClose:              herdr.TabClose,
 		TabList:               herdr.TabList,
 		AgentStart:            herdr.AgentStart,
-		AgentPrompt:           promptWithNudge(herdr.AgentPrompt, herdr.AgentSendKeys, herdr.AgentWait, time.Now),
+		AgentPrompt:           promptWithNudge(herdr.AgentPrompt, herdr.AgentSendKeys, herdr.AgentWait, herdr.AgentRead, time.Now),
 		AgentWait:             herdr.AgentWait,
 		AgentSendKeys:         herdr.AgentSendKeys,
 		AgentRead:             herdr.AgentRead,
@@ -441,7 +441,10 @@ func verifySkillWith(
 
 // promptNudgeGraceMs bounds each of promptWithNudge's submit/re-wait attempts.
 // promptMaxNudges caps how many bare-Enter nudges it sends before giving up
-// and returning the underlying poll-timeout error.
+// and returning the underlying poll-timeout error. promptMaxRetypes caps how
+// many times it falls back to resubmitting opts.Text in full (see
+// errStuckSubmission's doc comment) before giving up early instead of
+// spending the rest of promptMaxNudges on nudges that can't help either.
 //
 // 4_000 was too tight for a cold-started agent to reach "working" under
 // concurrent load — observed live as a hard failure quoting the literal
@@ -452,21 +455,38 @@ func verifySkillWith(
 const (
 	promptNudgeGraceMs = 45_000
 	promptMaxNudges    = 3
+	promptMaxRetypes   = 2
 )
 
-// promptWithNudge wraps herdr's AgentPrompt/AgentSendKeys/AgentWait to submit
-// opts.Text exactly once while working around a submission that never
-// actually gets typed into the pane (observed in production: the text only
-// appears once something else, like an operator's own keypress, nudges
-// herdr's terminal-state detection).
+// errStuckSubmission is promptWithNudge's sentinel for a pane that shows no
+// change at all across promptMaxRetypes full resubmissions of opts.Text —
+// distinct from the underlying poll-timeout error so a caller (runIteration)
+// can tell "the agent is slow to start, a bare nudge might still land" apart
+// from "this pane genuinely never received anything and retyping the same
+// text into it again won't help either," and retry against a fresh pane
+// instead.
+var errStuckSubmission = errors.New("submission never reached the pane")
+
+// promptWithNudge wraps herdr's AgentPrompt/AgentSendKeys/AgentWait/AgentRead
+// to submit opts.Text while working around a submission that never actually
+// gets typed into the pane (observed in production: the text only appears
+// once something else, like an operator's own keypress, nudges herdr's
+// terminal-state detection).
 //
 // It first detects *start*, not completion: it submits with a short grace
 // timeout, waiting for either "working" or any of the caller's own Until
 // states (a completion so fast it's observed before "working" ever is). If
-// neither is observed in that window, it sends a bare Enter keypress and
-// re-waits for the same start states, retrying up to promptMaxNudges times
-// before returning the underlying poll-timeout error — the prompt itself is
-// never resubmitted, only nudged.
+// neither is observed in that window, it reads the pane's current text and
+// compares it against the snapshot taken before the previous attempt: if the
+// pane changed at all (the common case — the text landed but wasn't
+// submitted), it sends a bare Enter keypress and re-waits, same as before. If
+// the pane shows no change whatsoever (the text never reached it in the
+// first place, so Enter alone has nothing to submit), it resubmits opts.Text
+// in full instead — up to promptMaxRetypes times — rather than nudging blind.
+// Retrying either way is capped by promptMaxNudges total attempts, and an
+// unchanged pane that's already exhausted promptMaxRetypes retypes gives up
+// immediately with errStuckSubmission rather than spending its remaining
+// nudge budget on Enter keypresses that can't do anything either.
 //
 // Once "working" is observed, start/nudge handling is done: this enters a
 // completion phase that only waits (never nudges or resubmits) for one of
@@ -484,6 +504,7 @@ func promptWithNudge(
 	prompt func(herdr.AgentPromptOptions) (herdr.Agent, error),
 	sendKeys func(target string, keys ...string) error,
 	wait func(herdr.AgentWaitOptions) (herdr.Agent, error),
+	read func(target string, opts herdr.AgentReadOptions) (string, error),
 	now func() time.Time,
 ) func(herdr.AgentPromptOptions) (herdr.Agent, error) {
 	return func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
@@ -527,12 +548,36 @@ func promptWithNudge(
 		submit.Until = startUntil
 		submit.TimeoutMs = graceMs
 
+		// snapshot is best-effort: a read error is treated the same as "the
+		// pane changed" (unchanged stays false below), since there's no
+		// evidence to declare it stuck — falling back to the older,
+		// safer bare-Enter-nudge behavior rather than resubmitting blind.
+		snapshot, _ := read(opts.Target, herdr.AgentReadOptions{Source: "recent-unwrapped"})
+
 		agent, err := prompt(submit)
+		retypes := 0
 		for attempt := 0; isPollTimeout(err) && attempt < promptMaxNudges; attempt++ {
 			graceMs, ok := budgetMs()
 			if !ok {
 				break
 			}
+
+			after, readErr := read(opts.Target, herdr.AgentReadOptions{Source: "recent-unwrapped"})
+			unchanged := readErr == nil && after == snapshot
+			snapshot = after
+
+			if unchanged {
+				if retypes >= promptMaxRetypes {
+					return herdr.Agent{}, fmt.Errorf("%w after %d retries: %w", errStuckSubmission, retypes, err)
+				}
+				retypes++
+				resubmit := opts
+				resubmit.Until = startUntil
+				resubmit.TimeoutMs = graceMs
+				agent, err = prompt(resubmit)
+				continue
+			}
+
 			if nudgeErr := sendKeys(opts.Target, "enter"); nudgeErr != nil {
 				return herdr.Agent{}, fmt.Errorf("nudging stuck submission: %w", nudgeErr)
 			}

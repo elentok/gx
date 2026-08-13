@@ -65,7 +65,7 @@ const (
 // source is counted toward both series but can never itself be
 // per-source-muted.
 func NotificationGate(transport, eventType, source string, now time.Time, recordSend bool, parkTicket ParkFunc) (GateResult, error) {
-	path, err := notificationStateFilePath()
+	path, err := notificationStateFilePathFn()
 	if err != nil {
 		return GateResult{}, err
 	}

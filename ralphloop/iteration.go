@@ -20,6 +20,14 @@ import (
 // distinct, actionable error instead of hanging the whole loop forever.
 const conflictResolutionTimeoutMs = 30 * 60 * 1000
 
+// maxLaunchAttempts bounds how many fresh panes runIteration will try when a
+// launch keeps failing with errStuckSubmission (the initial prompt never
+// reaching the pane at all) — a genuinely bad pane rather than a slow agent,
+// so a clean retry against a new one often just works. Other launch failures
+// (agent_name_taken, agent_pane_busy, ...) are not retried this way; they
+// fall straight through to the existing needs-repair path.
+const maxLaunchAttempts = 2
+
 // runIteration drives one ticket through the full iteration lifecycle:
 // create its worktree, launch and prompt the agent, wait for it to finish,
 // adopt any iteration_status report the agent left, cherry-pick its commits
@@ -75,24 +83,46 @@ func runIteration(d Deps, p iterationParams) error {
 	}
 	p.logTicketEventReason(eventDepsInstalled, "", "", "", path, command)
 
-	tab, err := d.TabCreate(herdr.TabCreateOptions{
-		WorkspaceID: p.WorkspaceID,
-		Cwd:         path,
-		Label:       label,
-	})
-	if err != nil {
-		return fmt.Errorf("opening iteration tab: %w", err)
-	}
-
 	skill := p.Skill
 	if p.Ticket.IsCodeReview() {
 		skill = codeReviewSkill
 	}
 	prompt := skillPrompt(p.Agent, skill, p.Ticket.Path)
-	launchParams := p.launchAndPromptParams(label, tab.RootPaneID, tab.TabID, prompt, path, eventIterationStarted, eventIterationFinished)
-	sessionID, err := launchAndPrompt(d, launchParams)
+
+	var tab herdr.CreatedTab
+	var sessionID string
+	for attempt := 1; ; attempt++ {
+		tab, err = d.TabCreate(herdr.TabCreateOptions{
+			WorkspaceID: p.WorkspaceID,
+			Cwd:         path,
+			Label:       label,
+		})
+		if err != nil {
+			return fmt.Errorf("opening iteration tab: %w", err)
+		}
+
+		launchParams := p.launchAndPromptParams(label, tab.RootPaneID, tab.TabID, prompt, path, eventIterationStarted, eventIterationFinished)
+		sessionID, err = launchAndPrompt(d, launchParams)
+		if !errors.Is(err, errStuckSubmission) || attempt >= maxLaunchAttempts {
+			break
+		}
+		// The pane never received its initial prompt at all (see
+		// errStuckSubmission's doc comment) — close it and retry against a
+		// fresh one instead of leaving an orphaned, never-prompted pane
+		// behind for a problem a clean retry can often solve on its own.
+		if closeErr := d.TabClose(tab.TabID); closeErr != nil {
+			log.Printf("closing stuck-submission tab %s for retry: %v", tab.TabID, closeErr)
+		}
+	}
 	parked := errors.Is(err, errBlockedPaneParked)
 	if err != nil && !parked {
+		if errors.Is(err, errStuckSubmission) {
+			// The retry budget is exhausted too — don't leave this last
+			// unprompted pane leaked behind a needs-repair ticket either.
+			if closeErr := d.TabClose(tab.TabID); closeErr != nil {
+				log.Printf("closing stuck-submission tab %s: %v", tab.TabID, closeErr)
+			}
+		}
 		return err
 	}
 	if sessionID != "" {

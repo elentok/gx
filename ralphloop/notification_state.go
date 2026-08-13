@@ -79,11 +79,17 @@ func emptyNotificationState() NotificationState {
 	return NotificationState{Transports: map[string]TransportState{}}
 }
 
-// notificationStateFilePath returns notifications-state.json's path,
-// mirroring queue-state.json's ~/.config/gx/ layout (queueStateFilePath)
-// rather than introducing a new state-directory convention.
+// notificationStateFilePathFn resolves notifications-state.json's real
+// on-disk path, overridden by TestMain (see waitforfinish_production_test.go)
+// so this package's whole test suite never touches the real machine's state
+// file even if an individual test forgets its own gateStatePath override.
+var notificationStateFilePathFn = notificationStateFilePath
+
+// notificationStateFilePath returns notifications-state.json's path, under
+// config.UserStateDir's ~/.local/state/gx/ layout (mirroring
+// queue-state.json's queueStateFilePath).
 func notificationStateFilePath() (string, error) {
-	base, err := config.UserConfigDir()
+	base, err := config.UserStateDir()
 	if err != nil {
 		return "", err
 	}

@@ -4,6 +4,20 @@ Running list of previously-diagnosed gx/ralph-loop bugs, newest first. Append on
 to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKILL.md) gets fixed
 — don't re-explain what the linked commit/ticket already documents.
 
+- **Nudge-retry exhaustion on the initial `herdr agent wait --until working` launch step leaves a
+  ticket `needs-repair` with a live, never-prompted pane leaked.** `promptWithNudge`
+  (`ralphloop/deps.go:483-568`) only resends bare Enter, never the actual prompt text, across its
+  3 nudges (`promptMaxNudges`, `deps.go:454`, 45s each, `deps.go:453`); if the agent never
+  reaches `working` before all 3 exhaust, no prompt content was ever delivered, and the created
+  pane/tab is left alive with an empty prompt box — `loop.go`'s generic `r.err != nil` catch-all
+  (`ralphloop/loop.go:732-752`) marks the ticket `needs-repair` with no `iteration-started`
+  logged and no cleanup of the orphaned pane. Found live: `fix-spinner/04`, pane `w2A:p5`
+  confirmed idle at Claude Code's fresh welcome screen ~2min after launch. Fixed:
+  `promptWithNudge` now diffs a pane-text snapshot per attempt and retypes the full prompt (capped
+  by `promptMaxRetypes`) instead of nudging when nothing changed, returning `errStuckSubmission`
+  once retypes are exhausted; `runIteration` retries once against a fresh pane on that error and
+  closes whichever pane it finally gives up on. See
+  `follow-ups/issues/05-launch-nudge-exhaustion-leaks-live-pane-research.md`.
 - **Reclaiming an already-live pane via `reattachIteration` logs no `iteration-started`, so the
   Queue spinner and the epic's "N parked" count both go stale.** `resumeReattachable`
   (`ralphloop/loop.go:409-411`) routes a reclaim of a ticket with a still-live tab/pane through

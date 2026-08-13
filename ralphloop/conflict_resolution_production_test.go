@@ -337,7 +337,10 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 			verbs = append(verbs, e.Argv[0]+" "+e.Argv[1])
 		}
 	}
-	wantPrefix := []string{"tab create", "agent start", "agent wait", "agent prompt"}
+	// promptWithNudge now reads the pane once (a baseline snapshot for its
+	// unchanged-vs-changed diff) before submitting the initial prompt — see
+	// the fix-spinner/04 stuck-submission fix in deps.go.
+	wantPrefix := []string{"tab create", "agent start", "agent wait", "agent read", "agent prompt"}
 	if len(verbs) < len(wantPrefix) {
 		t.Fatalf("traced commands = %v, want at least %v", verbs, wantPrefix)
 	}
