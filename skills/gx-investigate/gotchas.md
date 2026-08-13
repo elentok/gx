@@ -4,6 +4,19 @@ Running list of previously-diagnosed gx/ralph-loop bugs, newest first. Append on
 to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKILL.md) gets fixed
 — don't re-explain what the linked commit/ticket already documents.
 
+- **Reclaiming an already-live pane via `reattachIteration` logs no `iteration-started`, so the
+  Queue spinner and the epic's "N parked" count both go stale.** `resumeReattachable`
+  (`ralphloop/loop.go:409-411`) routes a reclaim of a ticket with a still-live tab/pane through
+  `reattachIteration`, which deliberately sets `StartEvent=""` (`ralphloop/iteration.go:189-191`);
+  that gates off both the run-log event and `sink().IterationStarted`
+  (`launch.go:260-262,291-293`). The UI spinner (`ui/tickets/live_row.go`) and the epic-parked
+  count (`ui/tickets/loop_registry.go:322-379,413-415`) both only update on
+  `IterationStarted`/`TicketReattached`/`IterationPaused` events, never recomputing from ticket
+  status directly — so a ticket can sit `claimed` with `gx` genuinely still polling it (confirmed
+  live via the `herdr agent wait` process) while the UI shows no spinner and the epic title stays
+  stuck at a stale parked count. Found live: `model-config/04a`, same stalled pane as the entry
+  below, retried 3x. Not fixed. See
+  `follow-ups/issues/04-reattach-reclaim-skips-sink-events.md`.
 - **`attachToLiveAgent` treats a permanently-stalled idle pane as "already finished," parking a
   second ticket zero-commit with no real work attempted.** A ticket that already leaked a pane/tab
   from a failed launch (the `04a1` gotcha below) can, on reclaim, collide (`agent_name_taken`) with
