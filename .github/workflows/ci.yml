@@ -55,6 +55,8 @@ jobs:
           brew install herdr
 
       - name: Start herdr server
+        env:
+          RUST_LOG: debug
         run: |
           nohup herdr server > herdr-server.log 2>&1 &
           disown
