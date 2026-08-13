@@ -294,6 +294,8 @@ func TestRunBump_Yes_SkipsConfirmAndPushes(t *testing.T) {
 	remote := t.TempDir() + "/remote.git"
 	testutil.MustGitExported(t, ".", "clone", "--bare", dir, remote)
 	testutil.MustGitExported(t, dir, "remote", "add", "origin", remote)
+	testutil.MustGitExported(t, dir, "fetch", "origin")
+	testutil.SetBranchUpstream(t, dir, "main", "origin/main")
 
 	var stdout bytes.Buffer
 	d := deps{
