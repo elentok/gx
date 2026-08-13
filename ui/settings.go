@@ -52,7 +52,18 @@ func (s Settings) ImplementSkill() string {
 // populated — which config.Load always produces, since its own defaults are
 // non-zero — each kind's AgentConfig is returned exactly as given, including
 // a deliberately empty Model or Effort (the "inherit the agent CLI's own
-// setting" case; see config.AgentConfig).
+// setting" case; see config.AgentConfig). This correctly preserves a
+// per-kind inherit choice (e.g. Claude explicitly emptied while Codex is
+// left at its real values — see config.TestLoadAgentsConfigExplicitEmptyStringMeansInherit)
+// because s.Agents as a whole stays non-zero whenever any field anywhere
+// still holds a real value.
+//
+// Known limitation: a Settings where the user has deliberately emptied
+// every field of *both* kinds (the "inherit everywhere" opt-out) is
+// bit-for-bit identical to a Settings that was never loaded at all — there
+// is no way to tell those two apart from s.Agents' value alone. This
+// accessor resolves that one ambiguous case in favor of the
+// never-loaded/defensive reading (built-in defaults), the same as before.
 func (s Settings) AgentConfig(agent ralphloop.AgentKind) config.AgentConfig {
 	agents := s.Agents
 	if agents == (config.AgentsConfig{}) {
