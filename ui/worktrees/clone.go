@@ -128,8 +128,12 @@ func copyDir(src, dst string) error {
 	})
 }
 
+// copyFile copies src to dst via a temp file plus rename, rather than writing
+// dst in place, so a concurrent reader (e.g. a test's WaitFor poll, or a user
+// watching the new worktree) can never observe dst partially written.
 func copyFile(src, dst string) error {
-	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+	dir := filepath.Dir(dst)
+	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
 	r, err := os.Open(src)
@@ -138,12 +142,20 @@ func copyFile(src, dst string) error {
 	}
 	defer r.Close()
 
-	w, err := os.Create(dst)
+	tmp, err := os.CreateTemp(dir, filepath.Base(dst)+".tmp-*")
 	if err != nil {
 		return err
 	}
-	defer w.Close()
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath) // no-op once the rename below succeeds
 
-	_, err = io.Copy(w, r)
-	return err
+	if _, err := io.Copy(tmp, r); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+
+	return os.Rename(tmpPath, dst)
 }

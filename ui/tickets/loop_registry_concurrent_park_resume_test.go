@@ -174,7 +174,11 @@ func drainChannelEventSink(sink *ralphloop.ChannelEventSink) {
 // first epic holds the permit, and that neither epic ever observes more
 // than one permit held at once.
 func TestConcurrentParkResume_TwoEpicsAgainstCapOfOne(t *testing.T) {
-	t.Parallel()
+	// not parallel-safe: a real ralphloop.Run + registry integration test with
+	// no timeout of its own beyond the package's 2m cap; under the scheduling
+	// pressure of the rest of this package's now-parallel tests (many of which
+	// leak tryStart's sink-drain goroutine — a pre-existing, separate issue)
+	// it has been observed missing that cap outright.
 	scratch1, ticket1 := writeParkResumeEpic(t, "epic-one")
 	scratch2, ticket2 := writeParkResumeEpic(t, "epic-two")
 
