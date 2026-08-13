@@ -98,9 +98,10 @@ func TestTelegramEventSink_EpicComplete_PostsTelegramWireFormat(t *testing.T) {
 
 func TestTelegramEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
 	t.Parallel()
+	dir := t.TempDir()
 	server, getRequests := fakeTelegramServer(t, http.StatusInternalServerError)
 	inner := &recordingSink{}
-	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
+	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, dir, "epic")
 	defer sink.Close()
 	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
@@ -112,16 +113,20 @@ func TestTelegramEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
 	}
 
 	waitForRequests(getRequests, 1)
+	// Drain the retry-and-log goroutine sendNotification spawns (it sleeps
+	// notificationRetryBackoff then retries) so it doesn't outlive the test.
+	waitForRunLogEvent(t, dir, "epic")
 }
 
 func TestTelegramEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
 	t.Parallel()
+	dir := t.TempDir()
 	inner := &recordingSink{}
 	// A closed server's URL is unreachable but still well-formed, which is
 	// what a broken/unreachable Telegram API looks like to the client.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	server.Close()
-	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
+	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, dir, "epic")
 	defer sink.Close()
 	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
@@ -135,6 +140,29 @@ func TestTelegramEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
 	if got := inner.snapshot(); len(got) != 1 || got[0] != "EpicComplete" {
 		t.Errorf("inner events = %v, want [EpicComplete]", got)
 	}
+	// Drain the retry-and-log goroutine sendNotification spawns (it sleeps
+	// notificationRetryBackoff then retries) so it doesn't outlive the test.
+	waitForRunLogEvent(t, dir, "epic")
+}
+
+// waitForRunLogEvent polls run-log.jsonl until sendNotification's background
+// goroutine has logged its failure outcome, so callers can be sure that
+// goroutine — including its notificationRetryBackoff sleep and second
+// attempt (each bounded by the transport's timeout) — has exited before the
+// test returns.
+func waitForRunLogEvent(t *testing.T, dir, epicName string) []Event {
+	t.Helper()
+	var events []Event
+	deadline := time.Now().Add(15 * time.Second)
+	for time.Now().Before(deadline) {
+		events, _, _ = readEvents(dir, epicName)
+		if len(events) > 0 && events[0].Type == eventNotificationFailed {
+			return events
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for a notification-failed run-log event in %s", dir)
+	return nil
 }
 
 func TestSendTelegramTestMessage_SendsSynchronouslyAndReturnsNilOnSuccess(t *testing.T) {

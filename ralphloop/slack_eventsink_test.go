@@ -154,9 +154,10 @@ func TestSlackEventSink_CountsLine_AppearsOnlyOnFourMessageKinds(t *testing.T) {
 
 func TestSlackEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
 	t.Parallel()
+	dir := t.TempDir()
 	server, getRequests := fakeSlackServer(t, http.StatusInternalServerError)
 	inner := &recordingSink{}
-	sink := newSlackEventSink(inner, server.URL, "", "")
+	sink := newSlackEventSink(inner, server.URL, dir, "epic")
 	defer sink.Close()
 	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
@@ -168,16 +169,20 @@ func TestSlackEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
 	}
 
 	waitForSlackRequests(getRequests, 1)
+	// Drain the retry-and-log goroutine sendNotification spawns (it sleeps
+	// notificationRetryBackoff then retries) so it doesn't outlive the test.
+	waitForRunLogEvent(t, dir, "epic")
 }
 
 func TestSlackEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
 	t.Parallel()
+	dir := t.TempDir()
 	inner := &recordingSink{}
 	// A closed server's URL is unreachable but still well-formed, which is
 	// what a broken/unreachable Slack webhook looks like to the client.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	server.Close()
-	sink := newSlackEventSink(inner, server.URL, "", "")
+	sink := newSlackEventSink(inner, server.URL, dir, "epic")
 	defer sink.Close()
 	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
@@ -191,6 +196,9 @@ func TestSlackEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
 	if got := inner.snapshot(); len(got) != 1 || got[0] != "EpicComplete" {
 		t.Errorf("inner events = %v, want [EpicComplete]", got)
 	}
+	// Drain the retry-and-log goroutine sendNotification spawns (it sleeps
+	// notificationRetryBackoff then retries) so it doesn't outlive the test.
+	waitForRunLogEvent(t, dir, "epic")
 }
 
 func TestSendSlackTestMessage_SendsSynchronouslyAndReturnsNilOnSuccess(t *testing.T) {
