@@ -75,7 +75,10 @@ bare-repo checkout with linked worktrees keeps one shared root at the bare repo'
    `queue-state.json` for drift.
 5. If the symptom is inside one agent session (hung, wrong edit, crashed), pull that iteration's
    transcript via the `Cwd`/`AgentSession` on its `iteration-started` event.
-6. Once you have a concrete hypothesis, verify it against the source it actually lives in
+6. Before concluding a symptom is a live bug, rule out a notification mute: check
+   `~/.config/gx/notifications-state.json` and the affected ticket's own `Mutes` frontmatter field.
+   A muted event can look identical to a stuck ticket or a scheduler that silently skipped it.
+7. Once you have a concrete hypothesis, verify it against the source it actually lives in
    (`ralphloop/loop.go`, `scope.go`, `schedule.go`, `tickets/status.go`) — this file is a map, not
    a substitute for reading the code the bug is in.
 
@@ -101,9 +104,19 @@ looking at when you found it:
   and a suggested fix direction. A follow-up fix ticket can then `blocked_by` it.
 - **Bug is in gx/ralph-loop tooling itself** (scheduler, a skill's own instructions, herdr
   plumbing) surfaced *while* running some epic, but not part of what that epic's tickets asked
-  for — publish in `<root>/follow-ups/issues/` instead (see the existing tickets there for the
-  pattern), even though you found it investigating a specific epic. Don't clutter that epic's own
-  issue list with a finding about gx itself.
+  for — publish in `<root>/follow-ups/issues/` instead, even though you found it investigating a
+  specific epic. Don't clutter that epic's own issue list with a finding about gx itself.
+  - If `<root>/follow-ups/` doesn't exist yet, create the directory (no `epic.yaml` needed until a
+    loop actually runs against it).
+  - File it as `type: research, status: draft` — `draft` because it's a diagnosis handed off for a
+    person to plan, not schedulable work; `research` matches `gx-implement`'s commitless-by-type
+    handling for a diagnosis-only ticket.
+  - Follow `follow-ups`'s established ticket shape (see e.g. `follow-ups/issues/01-*.md`): a
+    `## Context` section naming the epic/investigation this came from, followed by the diagnosis
+    itself — what's wrong, the evidence (log lines, ticket IDs), and a suggested fix direction. A
+    follow-up fix ticket can then `blocked_by` it.
+  - This is scoped to diagnosis tickets filed by this skill only — other "file into whatever epic
+    is active" call sites (code-review fix tickets, spec-review follow-ups) are untouched.
 - **No epic in scope at all** (a one-off question, nothing under the tracker root) — report the
   diagnosis directly instead of publishing anything.
 
