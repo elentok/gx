@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.28.2 - 2026-08-13
+
+- Added a suggested-actions menu for `needs-answer` tickets in the Tickets tab.
+- Added `--maps` flag to `gx tickets epics`; `gx-local-tracker` now writes wayfinder maps to `map.md`.
+- The claude statusline now shows a remote-control indicator.
+- Reworked git conflict handling around a tracked conflict lifecycle: reconcile and cherry-pick now recognize live conflicts, sequencer state is corroborated before trusting cached branch status, and parked-on-child land outcomes are distinguished from other errors.
+- Landing now goes through a dedicated land-queue worker instead of a `featureMu` lock; `gx-implement` no longer routes landing status through agents.
+- Tightened `gx-to-tickets` variant/test-file fan-out split triggers.
+- Parallelized and hardened the test suite (goleak, per-test timeouts, env-injection seams, `t.Parallel()` across `ralphloop`, `cmd`, and `ui`) to cut CI time and flakiness.
+
 ## v0.28.1 - 2026-08-12
 
 - Fixed the smart-zone finish-up prompt naming the wrong skill (`` `implement` `` instead of `` `gx-implement` ``).
