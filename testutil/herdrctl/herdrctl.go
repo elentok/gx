@@ -274,6 +274,21 @@ func (w *Workspace) AgentWait(opts herdr.AgentWaitOptions) herdr.Agent {
 	return agent
 }
 
+// AgentGet reads an agent's current status without waiting for a transition
+// or submitting a prompt, via `herdr agent get`. target defaults to the
+// workspace's root pane if empty.
+func (w *Workspace) AgentGet(target string) herdr.Agent {
+	w.t.Helper()
+	if target == "" {
+		target = w.RootPaneID
+	}
+	agent, err := herdr.AgentGet(target)
+	if err != nil {
+		w.t.Fatalf("herdrctl: agent get: %v", err)
+	}
+	return agent
+}
+
 // AgentExplain reports which detection rule herdr's pane monitor matched for
 // target's current state, via `herdr agent explain`. target defaults to the
 // workspace's root pane if empty.
