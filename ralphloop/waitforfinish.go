@@ -909,10 +909,19 @@ var errBlockedPaneParked = errors.New("iteration parked: pane blocked on an unan
 // at that instant, writes the pane-answered park (needs-answer, a reason, and
 // a "## Needs Answer" stub, both naming p.Label — the pane is named by its
 // iteration label, never a raw pane id, since a label still resolves after a
-// restart or reattach and a pane id does not) and reports parked=true. No
-// prompt is ever sent to the pane here: typing into a pane sitting on an
-// operator's own pending dialog would be the destructive interrupt this path
-// exists to avoid, so the only calls made are the sleep and the peek.
+// restart or reattach and a pane id does not) and reports parked=true.
+//
+// Ordinarily no prompt is ever sent to the pane here: typing into a pane
+// sitting on an operator's own pending dialog would be the destructive
+// interrupt this path exists to avoid. But a pane whose state_change_seq
+// hasn't moved since this iteration's own launch (see noActivitySinceLaunch)
+// never got that dialog in the first place — there's nothing to clobber — so
+// that case gets one resend attempt before falling through to the same park.
+// A successful resend re-enters waitForFinish's ordinary poll loop instead of
+// parking, mirroring attachToLiveAgent's stalled-since-launch precedent
+// (launch.go); a failed resend falls back to parking as before rather than
+// propagating the error, since an agent-side prompt failure here is a race,
+// not a defect in gx's own bookkeeping.
 //
 // This whole gate rests on herdr's pane monitor still recognizing a blocked
 // Claude form as `agent_status: blocked` — that recognition lives outside
@@ -928,6 +937,17 @@ func parkOnBlockedPane(d Deps, p launchAndPromptParams, sessionID string) (parke
 	}
 	if agent.AgentStatus != "blocked" {
 		return false, nil
+	}
+
+	if noActivitySinceLaunch(p.ScratchDir, p.EpicName, sessionID, agent.StateChangeSeq) {
+		if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
+			Target: p.Pane,
+			Text:   p.Prompt,
+			Wait:   true,
+			Until:  []string{"working"},
+		}); err == nil {
+			return false, nil
+		}
 	}
 
 	reason := fmt.Sprintf("%s is blocked on a prompt gx did not send; answer it in the pane", p.Label)

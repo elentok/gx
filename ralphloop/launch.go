@@ -368,16 +368,28 @@ func attachToLiveAgent(d Deps, p launchAndPromptParams) (string, error) {
 // session, or no matching event all fall through to false — the safe,
 // backward-compatible default of trusting alreadyFinished as before.
 func stalledSinceLaunch(p launchAndPromptParams, live herdr.Agent) bool {
-	if live.AgentSession == "" {
+	return noActivitySinceLaunch(p.ScratchDir, p.EpicName, live.AgentSession, live.StateChangeSeq)
+}
+
+// noActivitySinceLaunch reports whether a pane's current state_change_seq
+// still matches the baseline stamped on its own iteration-started event (see
+// logAgentStartEvent), found in the epic's run log by matching agentSession.
+// Shared by stalledSinceLaunch (attachToLiveAgent's collided-reattach guard)
+// and parkOnBlockedPane's resend-before-park guard — both need the same
+// "has this pane done anything since this iteration launched it" check. A
+// missing log, an untracked session, or no matching event all fall through
+// to false — the safe default of trusting the caller's existing behavior.
+func noActivitySinceLaunch(scratchDir, epicName, agentSession string, currentSeq int) bool {
+	if agentSession == "" {
 		return false
 	}
-	events, ok, err := readEvents(p.ScratchDir, p.EpicName)
+	events, ok, err := readEvents(scratchDir, epicName)
 	if !ok || err != nil {
 		return false
 	}
 	for _, ev := range events {
-		if ev.Type == eventIterationStarted && ev.AgentSession == live.AgentSession {
-			return live.StateChangeSeq == ev.StateChangeSeq
+		if ev.Type == eventIterationStarted && ev.AgentSession == agentSession {
+			return currentSeq == ev.StateChangeSeq
 		}
 	}
 	return false
