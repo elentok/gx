@@ -43,3 +43,42 @@ jobs:
 
       - name: Build
         run: go build ./...
+
+  herdr-e2e:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Install herdr
+        run: |
+          brew update
+          brew install herdr
+
+      - name: Start herdr server
+        run: |
+          nohup herdr server > herdr-server.log 2>&1 &
+          disown
+          for i in $(seq 1 30); do
+            herdr status server --json >/dev/null 2>&1 && exit 0
+            sleep 1
+          done
+          echo "herdr server did not become ready in time" >&2
+          cat herdr-server.log >&2
+          exit 1
+
+      - name: Update herdr agent detection manifests
+        # A freshly-installed server may not have fetched the remote
+        # detection manifests yet (see agentfake's working-title glyph,
+        # only matched by claude.toml's osc_title_working rule) — refresh
+        # synchronously instead of racing the background fetch.
+        run: herdr server update-agent-manifests
+
+      - name: Test
+        env:
+          HERDR_ENV: "1"
+        run: go test ./e2e/... -timeout=2m

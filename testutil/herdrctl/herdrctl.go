@@ -13,14 +13,36 @@ package herdrctl
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/herdr"
 )
+
+var ensureActiveWorkspaceOnce sync.Once
+
+// ensureActiveWorkspace guarantees herdr's server already has an active
+// (focused) workspace before any test workspace is created with
+// --no-focus. herdr's create_workspace_with_launch_env focuses a new
+// workspace whenever the server has never had an active workspace yet,
+// regardless of --no-focus — on a freshly started server (as on CI, unlike
+// a real dev machine's herdr, which already has one from live use) this
+// silently promotes the first test's --no-focus workspace to active,
+// which then makes herdr report its idle-completion as "idle" instead of
+// "done" (busy-pane classification suppresses the notification/done state
+// for the focused tab). A throwaway sentinel workspace, focused once up
+// front, keeps every real test workspace correctly out of focus.
+func ensureActiveWorkspace(t *testing.T) {
+	t.Helper()
+	ensureActiveWorkspaceOnce.Do(func() {
+		run(t, "workspace", "create", "--cwd", os.TempDir(), "--label", "gx-e2e-sentinel", "--focus")
+	})
+}
 
 // RequireHerdr skips the test unless a real herdr daemon is reachable: herdr
 // must be on PATH, and HERDR_ENV=1 must be set (herdr's own gate on its
@@ -52,6 +74,7 @@ type Workspace struct {
 // claude.
 func NewWorkspace(t *testing.T, cwd string, env ...string) *Workspace {
 	t.Helper()
+	ensureActiveWorkspace(t)
 
 	args := []string{"workspace", "create", "--cwd", cwd, "--label", "gx-e2e-" + t.Name(), "--no-focus"}
 	for _, e := range env {
@@ -94,14 +117,61 @@ func NewWorkspace(t *testing.T, cwd string, env ...string) *Workspace {
 // PrependPath puts dir at the very front of the root pane's shell PATH, for
 // e.g. making a fake agent binary (testutil/agentfake) resolve ahead of a
 // real one before calling AgentStart. herdr's `workspace create --env`
-// alone isn't enough for this: the pane's interactive shell (fish, in this
-// environment) re-derives PATH from its own config on startup and can
-// reorder an inherited entry behind its own configured dirs, so this uses
-// fish's own `fish_add_path --prepend --move` instead of relying on the
-// process's initial environment.
+// alone isn't enough for this: the pane's interactive shell re-derives PATH
+// from its own config on startup and can reorder an inherited entry behind
+// its own configured dirs. The pane's shell varies by environment (fish
+// locally, bash on GitHub's macOS runners), so this detects it via `herdr
+// pane process-info` and sends shell-appropriate syntax.
+//
+// It then runs a uniquely-tagged `echo` and waits for that echo's own
+// output, rather than returning as soon as the PATH command is sent: on a
+// loaded CI runner, herdr's own bookkeeping of "is this pane an available
+// shell" lags slightly behind the shell actually finishing the prior
+// command, and an AgentStart issued immediately after can race that lag
+// (agent_pane_busy, or a stale idle/done read later on). Waiting for our
+// own echo to come back proves the shell has fully round-tripped the PATH
+// command before anything else touches the pane.
 func (w *Workspace) PrependPath(dir string) {
 	w.t.Helper()
-	w.Run("fish_add_path", "--prepend", "--move", dir)
+	if w.shellName() == "fish" {
+		w.Run("fish_add_path", "--prepend", "--move", dir)
+	} else {
+		w.Run("export", "PATH="+dir+":$PATH")
+	}
+
+	// Split the sentinel across two quoted printf args: `pane run` types the
+	// command verbatim (visible in the pane before it even executes), so a
+	// sentinel passed whole to `echo` would match on the typed input, not
+	// its output. Split like this, the full sentinel is contiguous only in
+	// printf's concatenated *output* — never in the input line, where the
+	// quotes and space keep the two halves apart.
+	sentinel := fmt.Sprintf("herdrctl-prependpath-ready-%s-%d", w.RootPaneID, time.Now().UnixNano())
+	half := len(sentinel) / 2
+	w.Run("printf", "'%s%s'", "'"+sentinel[:half]+"'", "'"+sentinel[half:]+"'")
+	w.WaitForText(sentinel, 10*time.Second)
+}
+
+// shellName returns the root pane's foreground shell process name (e.g.
+// "fish", "bash", "zsh"), read via `herdr pane process-info`.
+func (w *Workspace) shellName() string {
+	w.t.Helper()
+	out := run(w.t, "pane", "process-info", "--pane", w.RootPaneID)
+	var resp struct {
+		Result struct {
+			ProcessInfo struct {
+				ForegroundProcesses []struct {
+					Name string `json:"name"`
+				} `json:"foreground_processes"`
+			} `json:"process_info"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(out, &resp); err != nil {
+		w.t.Fatalf("herdrctl: parse process-info response: %v\nraw: %s", err, out)
+	}
+	if len(resp.Result.ProcessInfo.ForegroundProcesses) == 0 {
+		w.t.Fatalf("herdrctl: process-info returned no foreground processes\nraw: %s", out)
+	}
+	return resp.Result.ProcessInfo.ForegroundProcesses[0].Name
 }
 
 // Run launches command in the workspace's root pane (types it and presses
