@@ -18,6 +18,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/herdr"
 )
 
 // RequireHerdr skips the test unless a real herdr daemon is reachable: herdr
@@ -44,11 +46,18 @@ type Workspace struct {
 // NewWorkspace creates a fresh herdr workspace rooted at cwd, labeled after
 // the test, and registers cleanup: the workspace is closed if the test
 // passed, and left open (with its IDs logged) if the test failed, so a
-// failure can be inspected live.
-func NewWorkspace(t *testing.T, cwd string) *Workspace {
+// failure can be inspected live. env entries (each "KEY=VALUE") are set on
+// the launched process, e.g. to prepend a fake-agent binary's directory onto
+// PATH so `herdr agent start --kind claude` finds it instead of a real
+// claude.
+func NewWorkspace(t *testing.T, cwd string, env ...string) *Workspace {
 	t.Helper()
 
-	out := run(t, "workspace", "create", "--cwd", cwd, "--label", "gx-e2e-"+t.Name(), "--no-focus")
+	args := []string{"workspace", "create", "--cwd", cwd, "--label", "gx-e2e-" + t.Name(), "--no-focus"}
+	for _, e := range env {
+		args = append(args, "--env", e)
+	}
+	out := run(t, args...)
 	var resp struct {
 		Result struct {
 			RootPane struct {
@@ -80,6 +89,19 @@ func NewWorkspace(t *testing.T, cwd string) *Workspace {
 	})
 
 	return w
+}
+
+// PrependPath puts dir at the very front of the root pane's shell PATH, for
+// e.g. making a fake agent binary (testutil/agentfake) resolve ahead of a
+// real one before calling AgentStart. herdr's `workspace create --env`
+// alone isn't enough for this: the pane's interactive shell (fish, in this
+// environment) re-derives PATH from its own config on startup and can
+// reorder an inherited entry behind its own configured dirs, so this uses
+// fish's own `fish_add_path --prepend --move` instead of relying on the
+// process's initial environment.
+func (w *Workspace) PrependPath(dir string) {
+	w.t.Helper()
+	w.Run("fish_add_path", "--prepend", "--move", dir)
 }
 
 // Run launches command in the workspace's root pane (types it and presses
@@ -136,6 +158,65 @@ func (w *Workspace) waitOutput(flag, value string, timeout time.Duration) {
 func (w *Workspace) Read() string {
 	w.t.Helper()
 	return string(run(w.t, "pane", "read", w.RootPaneID, "--source", "visible"))
+}
+
+// AgentStart starts an interactive agent (e.g. claude, or a fake standing in
+// for one — see testutil/agentfake) in the workspace's root pane via `herdr
+// agent start`. opts.Pane defaults to the workspace's root pane if unset.
+func (w *Workspace) AgentStart(opts herdr.AgentStartOptions) herdr.Agent {
+	w.t.Helper()
+	if opts.Pane == "" {
+		opts.Pane = w.RootPaneID
+	}
+	agent, err := herdr.AgentStart(opts)
+	if err != nil {
+		w.t.Fatalf("herdrctl: agent start: %v", err)
+	}
+	return agent
+}
+
+// AgentPrompt submits a prompt to an agent via `herdr agent prompt`.
+// opts.Target defaults to the workspace's root pane if unset.
+func (w *Workspace) AgentPrompt(opts herdr.AgentPromptOptions) herdr.Agent {
+	w.t.Helper()
+	if opts.Target == "" {
+		opts.Target = w.RootPaneID
+	}
+	agent, err := herdr.AgentPrompt(opts)
+	if err != nil {
+		w.t.Fatalf("herdrctl: agent prompt: %v", err)
+	}
+	return agent
+}
+
+// AgentWait blocks until an agent reaches one of the requested states via
+// `herdr agent wait`. opts.Target defaults to the workspace's root pane if
+// unset.
+func (w *Workspace) AgentWait(opts herdr.AgentWaitOptions) herdr.Agent {
+	w.t.Helper()
+	if opts.Target == "" {
+		opts.Target = w.RootPaneID
+	}
+	agent, err := herdr.AgentWait(opts)
+	if err != nil {
+		w.t.Fatalf("herdrctl: agent wait: %v", err)
+	}
+	return agent
+}
+
+// AgentExplain reports which detection rule herdr's pane monitor matched for
+// target's current state, via `herdr agent explain`. target defaults to the
+// workspace's root pane if empty.
+func (w *Workspace) AgentExplain(target string) herdr.AgentExplainResult {
+	w.t.Helper()
+	if target == "" {
+		target = w.RootPaneID
+	}
+	result, err := herdr.AgentExplain(target)
+	if err != nil {
+		w.t.Fatalf("herdrctl: agent explain: %v", err)
+	}
+	return result
 }
 
 func run(t *testing.T, args ...string) []byte {
