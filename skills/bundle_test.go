@@ -34,6 +34,7 @@ var requiredFiles = []string{
 	"gx-cleanup/SKILL.md",
 	"gx-merge/SKILL.md",
 	"gx-code-review/SKILL.md",
+	"gx-changelog/SKILL.md",
 }
 
 func TestBundleRequiredFilesPresent(t *testing.T) {
@@ -145,6 +146,7 @@ var wantInvocationPolicy = map[string]bool{
 	"gx-cleanup":                   true,
 	"gx-merge":                     true,
 	"gx-code-review":               true,
+	"gx-changelog":                 true,
 }
 
 func TestSkillMetadataAndInvocationPolicy(t *testing.T) {
