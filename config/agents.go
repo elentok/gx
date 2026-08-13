@@ -1,7 +1,7 @@
 package config
 
 const (
-	defaultClaudeModel  = "sonnet"
+	defaultClaudeModel  = "claude-sonnet-5"
 	defaultClaudeEffort = "medium"
 	defaultCodexModel   = "gpt-5.6-sol"
 	defaultCodexEffort  = "medium"

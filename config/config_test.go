@@ -516,8 +516,8 @@ func TestLoadSlackNotificationsMissingUsesDefaults(t *testing.T) {
 
 func TestDefaultAgentsConfig(t *testing.T) {
 	cfg := DefaultAgentsConfig()
-	if cfg.Claude.Model != "sonnet" || cfg.Claude.Effort != "medium" {
-		t.Fatalf("Claude = %+v, want sonnet/medium", cfg.Claude)
+	if cfg.Claude.Model != "claude-sonnet-5" || cfg.Claude.Effort != "medium" {
+		t.Fatalf("Claude = %+v, want claude-sonnet-5/medium", cfg.Claude)
 	}
 	if cfg.Codex.Model != "gpt-5.6-sol" || cfg.Codex.Effort != "medium" {
 		t.Fatalf("Codex = %+v, want gpt-5.6-sol/medium", cfg.Codex)
@@ -534,8 +534,8 @@ func TestLoadAgentsConfigDefaultsWhenBlockAbsent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.Agents.Claude.Model != "sonnet" || cfg.Agents.Claude.Effort != "medium" {
-		t.Fatalf("Agents.Claude = %+v, want sonnet/medium", cfg.Agents.Claude)
+	if cfg.Agents.Claude.Model != "claude-sonnet-5" || cfg.Agents.Claude.Effort != "medium" {
+		t.Fatalf("Agents.Claude = %+v, want claude-sonnet-5/medium", cfg.Agents.Claude)
 	}
 	if cfg.Agents.Codex.Model != "gpt-5.6-sol" || cfg.Agents.Codex.Effort != "medium" {
 		t.Fatalf("Agents.Codex = %+v, want gpt-5.6-sol/medium", cfg.Agents.Codex)
