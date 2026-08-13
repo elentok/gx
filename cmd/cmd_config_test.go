@@ -248,7 +248,7 @@ func TestExecute_Notify_NoneConfiguredPrintsNoticeAndSucceeds(t *testing.T) {
 }
 
 func TestExecute_Notify_SlackConfiguredSendsAndReportsSuccess(t *testing.T) {
-	t.Parallel()
+	t.Setenv("HOME", t.TempDir())
 	var gotBody string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
@@ -279,7 +279,7 @@ func TestExecute_Notify_SlackConfiguredSendsAndReportsSuccess(t *testing.T) {
 }
 
 func TestExecute_Notify_SlackFailurePropagatesErrorWithoutDoubleReporting(t *testing.T) {
-	t.Parallel()
+	t.Setenv("HOME", t.TempDir())
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))

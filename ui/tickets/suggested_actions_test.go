@@ -7,11 +7,11 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-func TestSuggestedActionItems_NeedsAnswer_NoMutes_OnlyResume(t *testing.T) {
+func TestSuggestedActionItems_NeedsAnswer_NoMutes_ResumeAndInvestigate(t *testing.T) {
 	t.Parallel()
 	items := suggestedActionItems(tickets.StatusNeedsAnswer, tickets.Ticket{})
-	if len(items) != 1 || items[0].Value != actionResumeAnswered {
-		t.Errorf("items = %v, want only %q", items, actionResumeAnswered)
+	if len(items) != 2 || items[0].Value != actionResumeAnswered || items[1].Value != actionInvestigate {
+		t.Errorf("items = %v, want %q then %q", items, actionResumeAnswered, actionInvestigate)
 	}
 }
 
