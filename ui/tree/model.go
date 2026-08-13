@@ -156,6 +156,23 @@ func (m *Model[T]) SetSelectedIndex(index int) {
 	m.list.EnsureSelectionVisibleLines(len(m.entries), m.entryLineHeight, m.visibleH)
 }
 
+// SelectAtBodyLine resolves bodyLine — a tree-body-relative line (0 = the
+// first rendered body line at the current ScrollOffset), as reported by a
+// consumer's mouse click after it has already subtracted its own panel
+// origin/header height — to the entry occupying that physical line, using
+// ticket 26's line-aware list.ItemAtLine so mixed single-/multi-line entries
+// resolve correctly. A click on a multi-line entry's body line resolves to
+// that entry, not its successor. No-op if bodyLine falls past the last
+// rendered line (never clamps onto the last entry) or lands on a row
+// SetIsSelectable excludes.
+func (m *Model[T]) SelectAtBodyLine(bodyLine int) {
+	idx := list.ItemAtLine(m.list.Offset(), len(m.entries), m.entryLineHeight, bodyLine)
+	if idx < 0 || !m.isEntrySelectable(idx) {
+		return
+	}
+	m.SetSelectedIndex(idx)
+}
+
 // entryLineHeight is m.entries' list.LineHeight: it reports how many
 // physical lines entry i occupies (see Entry.Body), defaulting to 1 for an
 // out-of-range index.

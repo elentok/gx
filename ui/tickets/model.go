@@ -380,16 +380,8 @@ func (m Model) handleSidebarMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cm
 		}
 	}
 	bodyLine := mouse.Y - 1
-	if bodyLine < 0 {
-		return m, nil
-	}
-	idx := m.sidebarTree.ScrollOffset() + bodyLine
-	if idx < 0 || idx >= len(m.sidebarTree.Entries()) {
-		return m, nil
-	}
 	m.focus = focusSidebar
-	m.sidebarTree.SetSelectedIndex(idx)
-	m.sidebarTree.SkipUnselectable(1)
+	m.sidebarTree.SelectAtBodyLine(bodyLine)
 	return m, nil
 }
 

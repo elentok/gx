@@ -397,10 +397,7 @@ func (m QueueModel) handleQueueMouseClick(msg tea.MouseClickMsg) (tea.Model, tea
 		return m, nil
 	}
 	bodyLine := mouse.Y - 1 - len(m.queueHeaderBodyLines())
-	if bodyLine < 0 {
-		return m, nil
-	}
-	m.queueTree.SetSelectedIndex(m.queueTree.ScrollOffset() + bodyLine)
+	m.queueTree.SelectAtBodyLine(bodyLine)
 	return m, nil
 }
 

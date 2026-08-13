@@ -522,6 +522,67 @@ func TestRenderLines_MultiLineBody_SelectionHighlightsAllLines(t *testing.T) {
 	}
 }
 
+// TestSelectAtBodyLine_MixedHeights_ResolvesCorrectEntry covers ticket 28's
+// core seam: a click's tree-body-relative line resolves to the entry
+// physically occupying it, including a click on a multi-line entry's second
+// line, which must select that entry rather than its successor.
+func TestSelectAtBodyLine_MixedHeights_ResolvesCorrectEntry(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{
+		{ID: "a", Body: []string{"a2", "a3"}}, // lines 0-2
+		{ID: "b"},                             // line 3
+		{ID: "c"},                             // line 4
+	})
+
+	m.SelectAtBodyLine(1) // a's second physical line
+	if m.SelectedIndex() != 0 {
+		t.Fatalf("selected=%d want=0 (click on a's body line selects a)", m.SelectedIndex())
+	}
+
+	m.SelectAtBodyLine(3) // b's line
+	if m.SelectedIndex() != 1 {
+		t.Fatalf("selected=%d want=1 (click on b's line selects b)", m.SelectedIndex())
+	}
+
+	m.SelectAtBodyLine(4) // c's line
+	if m.SelectedIndex() != 2 {
+		t.Fatalf("selected=%d want=2 (click on c's line selects c)", m.SelectedIndex())
+	}
+}
+
+// TestSelectAtBodyLine_PastLastRenderedLine_NoOps pins the out-of-content
+// case as a designed no-op rather than the incidental clamp the pre-ticket-28
+// hand-rolled math produced via list.SetSelected's clamping.
+func TestSelectAtBodyLine_PastLastRenderedLine_NoOps(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{{ID: "a"}, {ID: "b"}})
+	m.SetSelectedIndex(0)
+
+	m.SelectAtBodyLine(5) // past the last rendered line
+	if m.SelectedIndex() != 0 {
+		t.Fatalf("selected=%d want=0 (click past last line must no-op, not clamp)", m.SelectedIndex())
+	}
+}
+
+// TestSelectAtBodyLine_RespectsIsSelectable covers the SetIsSelectable
+// integration: a click landing on a row the consumer marked unselectable
+// must not change the selection.
+func TestSelectAtBodyLine_RespectsIsSelectable(t *testing.T) {
+	m := NewModel[int]()
+	m.SetIsSelectable(func(v int) bool { return v != 0 })
+	m.SetEntries([]Entry[int]{
+		{ID: "a", Value: 1},
+		{ID: "blank", Value: 0},
+		{ID: "b", Value: 2},
+	})
+	m.SetSelectedIndex(0)
+
+	m.SelectAtBodyLine(1) // the unselectable blank row
+	if m.SelectedIndex() != 0 {
+		t.Fatalf("selected=%d want=0 (click on unselectable row must not change selection)", m.SelectedIndex())
+	}
+}
+
 // TestVisibleEntries_MixedHeights_ScrollMathUsesPhysicalLines covers the
 // ticket's "scroll/paging math correctness for mixed single/multi-line
 // trees" seam: a scrolled-past multi-line entry must free up exactly as many
