@@ -46,6 +46,34 @@ func TestIterLabel_ScopedByEpicName(t *testing.T) {
 	}
 }
 
+// TestIterLabel_LongEpicName_StaysWithinHerdrCap guards the herdr agent-name
+// budget directly: a long epic name plus "-iter-" plus the identifier must
+// never exceed herdr's 32-char "invalid_agent_name" limit, and must still
+// leave the identifier intact (that's what a caller actually looks up).
+func TestIterLabel_LongEpicName_StaysWithinHerdrCap(t *testing.T) {
+	t.Parallel()
+	label := iterLabel("notification-throttle-impl", "01")
+	if len(label) > maxIterLabelLen {
+		t.Fatalf("iterLabel(long name, 01) = %q (%d chars), want <= %d", label, len(label), maxIterLabelLen)
+	}
+	if !strings.HasSuffix(label, "-iter-01") {
+		t.Fatalf("iterLabel(long name, 01) = %q, want suffix %q preserved", label, "-iter-01")
+	}
+}
+
+// TestIterLabel_LongEpicName_StaysDistinctAcrossEpics guards against the
+// truncation itself introducing the same collision iterLabel already
+// protects against for short names: two long epic names sharing a common
+// prefix must still truncate to different labels.
+func TestIterLabel_LongEpicName_StaysDistinctAcrossEpics(t *testing.T) {
+	t.Parallel()
+	labelA := iterLabel("notification-throttle-impl-alpha", "01")
+	labelB := iterLabel("notification-throttle-impl-beta", "01")
+	if labelA == labelB {
+		t.Fatalf("iterLabel(alpha, 01) = iterLabel(beta, 01) = %q, want distinct labels", labelA)
+	}
+}
+
 // TestRun_TwoEpicsSameIterationNumber_DontCollideOnWorktreePath exercises
 // ticket 01's regression scenario end to end: two separate epics that both
 // reach an iteration numbered "04" must land on distinct worktree

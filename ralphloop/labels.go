@@ -1,6 +1,10 @@
 package ralphloop
 
-import "path/filepath"
+import (
+	"crypto/sha1"
+	"fmt"
+	"path/filepath"
+)
 
 // iterLabel/iterBranch/conflictLabel key off a ticket's Identifier (the
 // filename's full "NN[letter]" prefix), not its Number, so that lettered
@@ -11,8 +15,25 @@ import "path/filepath"
 // iterItemName, because this label is what's actually shown to the user
 // (herdr tab/pane names): two epics that each happen to reach iteration "06"
 // would otherwise be indistinguishable wherever the label surfaces.
+//
+// herdr's agent name cap is 32 chars; a long epicName plus "-iter-" plus the
+// identifier can exceed that ("invalid_agent_name", every ticket in the epic
+// then fails to launch). When the full label doesn't fit, epicName is
+// truncated and given a short content hash suffix — deterministic (every
+// call site recomputes the same label independently, e.g. reconcile.go
+// matching live herdr tabs) and collision-resistant (two epic names that
+// happen to share a long prefix truncate to different labels).
+const maxIterLabelLen = 32
+
 func iterLabel(epicName, identifier string) string {
-	return epicName + "-iter-" + identifier
+	suffix := "-iter-" + identifier
+	budget := maxIterLabelLen - len(suffix)
+	name := epicName
+	if len(name) > budget {
+		hashSuffix := fmt.Sprintf("-%x", sha1.Sum([]byte(epicName)))[:7]
+		name = epicName[:budget-len(hashSuffix)] + hashSuffix
+	}
+	return name + suffix
 }
 
 // iterItemName scopes an iteration by epicName as a single flat path/branch
