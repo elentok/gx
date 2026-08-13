@@ -254,6 +254,133 @@ func TestLaunchAndPrompt_StuckSubmission_PropagatesAsErrStuckSubmission(t *testi
 	}
 }
 
+// TestLaunchAndPrompt_AttachToLiveAgent_StalledSinceLaunchSendsPrompt covers
+// ticket 03: a collided reattach onto a pane that reports idle but never
+// advanced past its own launch-time state_change_seq baseline (its first
+// prompt-send stalled) must send/nudge a prompt instead of short-circuiting
+// to "already finished".
+func TestLaunchAndPrompt_AttachToLiveAgent_StalledSinceLaunchSendsPrompt(t *testing.T) {
+	t.Parallel()
+	scratchDir := t.TempDir()
+	epicName := "fix-spinner"
+
+	if err := logEvent(scratchDir, epicName, Event{
+		Type:           eventIterationStarted,
+		Ticket:         "03",
+		AgentSession:   "sess-live",
+		StateChangeSeq: 946,
+	}); err != nil {
+		t.Fatalf("logEvent: %v", err)
+	}
+
+	var promptCalls int
+	sink := &recordingSinkWithArgs{occupancySink: &occupancySink{}}
+
+	d := Deps{
+		AgentStart: func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+			return herdr.Agent{}, &herdr.AgentNameTakenError{
+				Message:      "agent name iter-01 is already used; candidates: cwd=/repo/iter-01 status=Idle",
+				CandidateCwd: "/repo/iter-01",
+			}
+		},
+		AgentGet: func(target string) (herdr.Agent, error) {
+			return herdr.Agent{PaneID: "live-pane", AgentStatus: "idle", AgentSession: "sess-live", StateChangeSeq: 946}, nil
+		},
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			promptCalls++
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "working", AgentSession: "sess-live"}, nil
+		},
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		Sleep: func(time.Duration) {},
+	}
+
+	sessionID, err := launchAndPrompt(d, launchAndPromptParams{
+		Label:      "iter-01",
+		Agent:      AgentClaude,
+		Pane:       "fresh-pane",
+		Prompt:     "go",
+		SessionCwd: "/repo/iter-01",
+		Ticket:     "03",
+		ScratchDir: scratchDir,
+		EpicName:   epicName,
+		StartEvent: eventIterationStarted,
+		Sink:       sink,
+	})
+	if err != nil {
+		t.Fatalf("launchAndPrompt: %v", err)
+	}
+	if sessionID != "sess-live" {
+		t.Errorf("sessionID = %q, want sess-live", sessionID)
+	}
+	if promptCalls != 1 {
+		t.Errorf("AgentPrompt calls = %d, want 1 (stalled-since-launch pane must be prompted)", promptCalls)
+	}
+}
+
+// TestLaunchAndPrompt_AttachToLiveAgent_GenuinelyFinishedStaysFinished covers
+// the flip side of ticket 03: a collided reattach onto a pane whose
+// state_change_seq has advanced past its launch-time baseline and reports
+// idle genuinely finished a turn — it must keep parking as "already
+// finished", unchanged from today, with no extra prompt sent.
+func TestLaunchAndPrompt_AttachToLiveAgent_GenuinelyFinishedStaysFinished(t *testing.T) {
+	t.Parallel()
+	scratchDir := t.TempDir()
+	epicName := "fix-spinner"
+
+	if err := logEvent(scratchDir, epicName, Event{
+		Type:           eventIterationStarted,
+		Ticket:         "03",
+		AgentSession:   "sess-live",
+		StateChangeSeq: 946,
+	}); err != nil {
+		t.Fatalf("logEvent: %v", err)
+	}
+
+	var promptCalls int
+	sink := &recordingSinkWithArgs{occupancySink: &occupancySink{}}
+
+	d := Deps{
+		AgentStart: func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+			return herdr.Agent{}, &herdr.AgentNameTakenError{
+				Message:      "agent name iter-01 is already used; candidates: cwd=/repo/iter-01 status=Idle",
+				CandidateCwd: "/repo/iter-01",
+			}
+		},
+		AgentGet: func(target string) (herdr.Agent, error) {
+			return herdr.Agent{PaneID: "live-pane", AgentStatus: "idle", AgentSession: "sess-live", StateChangeSeq: 950}, nil
+		},
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			promptCalls++
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "working", AgentSession: "sess-live"}, nil
+		},
+		Sleep: func(time.Duration) {},
+	}
+
+	sessionID, err := launchAndPrompt(d, launchAndPromptParams{
+		Label:      "iter-01",
+		Agent:      AgentClaude,
+		Pane:       "fresh-pane",
+		Prompt:     "go",
+		SessionCwd: "/repo/iter-01",
+		Ticket:     "03",
+		ScratchDir: scratchDir,
+		EpicName:   epicName,
+		StartEvent: eventIterationStarted,
+		Sink:       sink,
+	})
+	if err != nil {
+		t.Fatalf("launchAndPrompt: %v", err)
+	}
+	if sessionID != "sess-live" {
+		t.Errorf("sessionID = %q, want sess-live", sessionID)
+	}
+	if promptCalls != 0 {
+		t.Errorf("AgentPrompt calls = %d, want 0 (genuinely finished pane must not be re-prompted)", promptCalls)
+	}
+}
+
 // recordingSinkWithArgs embeds occupancySink (itself embedding
 // noopEventSink) and additionally hooks IterationStarted, for tests that
 // need both start-time signals asserted together.

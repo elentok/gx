@@ -180,6 +180,14 @@ type Event struct {
 	// that was sent (or attempted), so counter/content bugs are diagnosable
 	// from run-log.jsonl alone without reproducing the send.
 	Body string `json:"body,omitempty"`
+	// StateChangeSeq (iteration-started only, and only when the agent was
+	// actually launched here rather than attached to) is herdr's
+	// state_change_seq at the moment AgentStart returned — the launch-time
+	// baseline a later collided reattach (attachToLiveAgent) compares its own
+	// live reading against to tell "idle because it genuinely finished a
+	// turn" from "idle because it never left this launch state" (see
+	// stalledSinceLaunch).
+	StateChangeSeq int `json:"state_change_seq,omitempty"`
 }
 
 // eventLogMu serializes appends across every goroutine in the process (each

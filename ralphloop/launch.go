@@ -198,6 +198,26 @@ func (p launchAndPromptParams) logAgentEvent(eventType, agentSession, reason str
 	})
 }
 
+// logAgentStartEvent is logLifecycleEvent for the launch-time start event
+// only, additionally recording seq (see Event.StateChangeSeq) so a later
+// collided reattach can look up this launch's baseline by AgentSession — see
+// stalledSinceLaunch.
+func (p launchAndPromptParams) logAgentStartEvent(eventType, agentSession string, seq int) {
+	if eventType == "" {
+		return
+	}
+	_ = logEvent(p.ScratchDir, p.EpicName, Event{
+		Type:           eventType,
+		Ticket:         p.Ticket,
+		Agent:          p.Agent,
+		Pane:           p.Pane,
+		Tab:            p.Tab,
+		AgentSession:   agentSession,
+		Cwd:            p.SessionCwd,
+		StateChangeSeq: seq,
+	})
+}
+
 func (p launchAndPromptParams) report(format string, args ...any) {
 	if p.Report == nil {
 		return
@@ -268,7 +288,7 @@ func launchAndPrompt(d Deps, p launchAndPromptParams) (string, error) {
 	if promptedAgent.AgentSession != "" {
 		sessionID = promptedAgent.AgentSession
 	}
-	p.logLifecycleEvent(p.StartEvent, sessionID)
+	p.logAgentStartEvent(p.StartEvent, sessionID, startedAgent.StateChangeSeq)
 	if p.StartEvent != "" {
 		p.sink().IterationStarted(p.TicketData, p.Label, p.SessionCwd, sessionID)
 		emitContextOccupancy(d, p.sink(), p.Agent, p.Ticket, p.SessionCwd, sessionID)
@@ -291,6 +311,15 @@ func launchAndPrompt(d Deps, p launchAndPromptParams) (string, error) {
 // there — mirroring reattachIteration's own already-running handling, but
 // staying inside launchAndPrompt so its caller doesn't need to special-case
 // this path.
+//
+// An idle-looking pane isn't always a finished one: if the collision
+// happened because this pane's very first prompt-send stalled right after
+// launch, its status reads idle without ever having done any work. Before
+// trusting alreadyFinished, stalledSinceLaunch checks the pane's
+// state_change_seq against the baseline recorded when it was originally
+// started (see logAgentStartEvent) — if it hasn't moved, this is that
+// stalled-since-launch case, and the fix is to send the prompt now instead
+// of parking the ticket as already finished.
 func attachToLiveAgent(d Deps, p launchAndPromptParams) (string, error) {
 	live, err := d.AgentGet(p.Label)
 	if err != nil {
@@ -305,9 +334,23 @@ func attachToLiveAgent(d Deps, p launchAndPromptParams) (string, error) {
 		emitContextOccupancy(d, p.sink(), p.Agent, p.Ticket, p.SessionCwd, sessionID)
 	}
 
-	if alreadyFinished(live.AgentStatus) {
+	if alreadyFinished(live.AgentStatus) && !stalledSinceLaunch(p, live) {
 		p.logLifecycleEvent(p.FinishEvent, sessionID)
 		return sessionID, nil
+	}
+	if alreadyFinished(live.AgentStatus) {
+		promptedAgent, err := d.AgentPrompt(herdr.AgentPromptOptions{
+			Target: p.Pane,
+			Text:   p.Prompt,
+			Wait:   true,
+			Until:  []string{"working"},
+		})
+		if err != nil {
+			return "", fmt.Errorf("sending initial prompt to stalled reattached pane: %w", err)
+		}
+		if promptedAgent.AgentSession != "" {
+			sessionID = promptedAgent.AgentSession
+		}
 	}
 	if err := waitForFinish(d, p, sessionID); err != nil {
 		if errors.Is(err, errBlockedPaneParked) {
@@ -316,6 +359,28 @@ func attachToLiveAgent(d Deps, p launchAndPromptParams) (string, error) {
 		return "", err
 	}
 	return sessionID, nil
+}
+
+// stalledSinceLaunch reports whether live's pane never advanced past the
+// state_change_seq baseline recorded when it was originally started (see
+// logAgentStartEvent), by looking that launch's iteration-started event up
+// in the epic's run log by AgentSession. A missing log, an untracked
+// session, or no matching event all fall through to false — the safe,
+// backward-compatible default of trusting alreadyFinished as before.
+func stalledSinceLaunch(p launchAndPromptParams, live herdr.Agent) bool {
+	if live.AgentSession == "" {
+		return false
+	}
+	events, ok, err := readEvents(p.ScratchDir, p.EpicName)
+	if !ok || err != nil {
+		return false
+	}
+	for _, ev := range events {
+		if ev.Type == eventIterationStarted && ev.AgentSession == live.AgentSession {
+			return live.StateChangeSeq == ev.StateChangeSeq
+		}
+	}
+	return false
 }
 
 // plainFinishStates are the herdr agent_status values that mean "the agent's
