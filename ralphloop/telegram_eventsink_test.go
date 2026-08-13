@@ -71,6 +71,7 @@ func TestTelegramEventSink_EpicComplete_PostsTelegramWireFormat(t *testing.T) {
 	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
 
 	sink.EpicComplete("epic", 5, 300)
+	sink.flush()
 
 	if got := inner.snapshot(); len(got) != 1 || got[0] != "EpicComplete" {
 		t.Errorf("inner events = %v, want [EpicComplete]", got)
@@ -100,6 +101,7 @@ func TestTelegramEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
 
 	start := time.Now()
 	sink.EpicComplete("epic", 1, 0)
+	sink.flush()
 	if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
 		t.Errorf("EpicComplete blocked for %s, want near-instant return", elapsed)
 	}
@@ -118,6 +120,7 @@ func TestTelegramEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
 
 	start := time.Now()
 	sink.EpicComplete("epic", 1, 0)
+	sink.flush()
 	if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
 		t.Errorf("EpicComplete blocked for %s, want near-instant return", elapsed)
 	}
@@ -193,6 +196,7 @@ func TestTelegramEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 	sink := newTelegramEventSink(&recordingSink{}, "tok", "chat-1", server.URL, dir, "epic")
 
 	sink.EpicComplete("epic", 1, 0)
+	sink.flush()
 
 	var events []Event
 	deadline := time.Now().Add(2 * time.Second)
@@ -203,8 +207,8 @@ func TestTelegramEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if len(events) != 1 || events[0].Type != eventNotificationSent || events[0].Channel != "telegram" || events[0].NotifyKind != notifyKindEpicComplete {
-		t.Fatalf("run-log events = %#v, want one notification-sent/telegram/epic-complete", events)
+	if len(events) != 1 || events[0].Type != eventNotificationSent || events[0].Channel != "telegram" || events[0].NotifyKind != notifyKindBatch {
+		t.Fatalf("run-log events = %#v, want one notification-sent/telegram/batch", events)
 	}
 }
 
@@ -215,6 +219,7 @@ func TestTelegramEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 	sink := newTelegramEventSink(&recordingSink{}, "tok", "chat-1", server.URL, dir, "epic")
 
 	sink.EpicComplete("epic", 1, 0)
+	sink.flush()
 
 	var events []Event
 	// 4s headroom: sendNotification retries once after notificationRetryBackoff
@@ -244,6 +249,7 @@ func TestTelegramEventSink_LogsNotificationFailedToRunLog_RedactsBotToken(t *tes
 	sink := newTelegramEventSink(&recordingSink{}, secretToken, "chat-1", server.URL, dir, "epic")
 
 	sink.EpicComplete("epic", 1, 0)
+	sink.flush()
 
 	var events []Event
 	// 4s headroom: sendNotification retries once after notificationRetryBackoff

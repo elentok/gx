@@ -471,14 +471,29 @@ func cmdStartImplement(
 			notifications.Telegram.BotToken != "", notifications.Slack.WebhookURL != "",
 		)
 		var runSink ralphloop.EventSink = sink
+		var chatClosers []func()
 		if notifications.Telegram.BotToken != "" {
-			runSink = ralphloop.NewTelegramEventSink(runSink, notifications.Telegram.BotToken, notifications.Telegram.ChatID, opts.ScratchDir, epicName)
+			tg := ralphloop.NewTelegramEventSink(runSink, notifications.Telegram.BotToken, notifications.Telegram.ChatID, opts.ScratchDir, epicName)
+			runSink = tg
+			if c, ok := tg.(interface{ Close() }); ok {
+				chatClosers = append(chatClosers, c.Close)
+			}
 		}
 		if notifications.Slack.WebhookURL != "" {
-			runSink = ralphloop.NewSlackEventSink(runSink, notifications.Slack.WebhookURL, opts.ScratchDir, epicName)
+			sl := ralphloop.NewSlackEventSink(runSink, notifications.Slack.WebhookURL, opts.ScratchDir, epicName)
+			runSink = sl
+			if c, ok := sl.(interface{ Close() }); ok {
+				chatClosers = append(chatClosers, c.Close)
+			}
 		}
 		go func() {
 			err := runRalphLoop(opts, ralphloop.DefaultDeps(), runSink)
+			// Flush each chat sink's queued batch (bounded by the transport
+			// timeout) before the run is reported finished, so a run ending
+			// mid-window doesn't drop its last batch.
+			for _, closeChat := range chatClosers {
+				closeChat()
+			}
 			ralphLoopRegistry.finish(epicName, err)
 		}()
 		return implementStartedMsg{epicName: epicName}

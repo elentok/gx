@@ -87,7 +87,9 @@ func NewTelegramEventSink(inner EventSink, botToken, chatID, scratchDir, epicNam
 }
 
 func newTelegramEventSink(inner EventSink, botToken, chatID, apiBaseURL, scratchDir, epicName string) *chatEventSink {
-	return newChatEventSink(inner, telegramStyle, newTelegramTransport(botToken, chatID, apiBaseURL), scratchDir, epicName)
+	s := newChatEventSink(inner, telegramStyle, newTelegramTransport(botToken, chatID, apiBaseURL), scratchDir, epicName)
+	s.startFlushLoop(batchFlushInterval)
+	return s
 }
 
 // SendTelegramTestMessage synchronously sends a fixed test notification via

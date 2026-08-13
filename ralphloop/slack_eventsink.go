@@ -64,7 +64,9 @@ func NewSlackEventSink(inner EventSink, webhookURL, scratchDir, epicName string)
 }
 
 func newSlackEventSink(inner EventSink, webhookURL, scratchDir, epicName string) *chatEventSink {
-	return newChatEventSink(inner, slackStyle, newSlackTransport(webhookURL), scratchDir, epicName)
+	s := newChatEventSink(inner, slackStyle, newSlackTransport(webhookURL), scratchDir, epicName)
+	s.startFlushLoop(batchFlushInterval)
+	return s
 }
 
 // SendSlackTestMessage synchronously sends a fixed test notification to the

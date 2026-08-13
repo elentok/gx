@@ -2,13 +2,23 @@ package ralphloop
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/elentok/gx/logger"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
+
+// batchFlushInterval is how often a production chatEventSink's queue flushes
+// — a fixed periodic tick, deliberately not modeled on the waitForFinish
+// idle-debounce pattern that caused the incident this throttling exists to
+// prevent (a debounce never fires while events keep arriving; a storm is
+// exactly when they do).
+const batchFlushInterval = 6 * time.Second
 
 // chatTransport abstracts the wire format and destination a chatEventSink
 // posts its rendered text to — Slack's {"text": ...} webhook body, or
@@ -48,12 +58,42 @@ type chatEventSink struct {
 	// Empty (the production default from newChatEventSink) means "use the
 	// real path".
 	gateStatePath string
+
+	// mu guards queue against concurrent enqueue (multiple running iterations
+	// report through the same sink) and against a flush racing an enqueue.
+	mu    sync.Mutex
+	queue []batchedMessage
+
+	// flushTicker/flushDone back the periodic flush loop (see
+	// startFlushLoop/stopFlushLoop); both are nil until startFlushLoop runs,
+	// which production sinks do at construction (see newSlackEventSink/
+	// newTelegramEventSink) and tests do explicitly, if at all, to exercise
+	// the periodic-tick behavior — most tests drive flush()/Close() directly
+	// instead.
+	flushTicker *time.Ticker
+	flushDone   chan struct{}
+	closeOnce   sync.Once
+}
+
+// batchedMessage is one distinct rendered text waiting in the queue for the
+// next flush, with count tracking how many times an identical text was
+// enqueued within the current window (see chatEventSink.enqueue) — the
+// dedup ×N collapse. kind is the notifyKind that produced it, kept so a
+// suppressed close-time flush can name what it dropped (see closeFlush).
+type batchedMessage struct {
+	text  string
+	kind  string
+	count int
 }
 
 // newChatEventSink wires inner to transport via style. Every chat-member
 // event's rendered text passes through the budget/mute gate (see send) and,
-// if allowed, is sent through transport and logged (success or failure) to
-// scratchDir/epicName's run-log.jsonl.
+// if allowed, is queued rather than sent immediately — a periodic flush
+// (see flush) renders every queued message as one send. newChatEventSink
+// itself does not start the flush loop (see startFlushLoop); production
+// callers (newSlackEventSink/newTelegramEventSink) do, so a bare
+// newChatEventSink is inert until flush()/Close() is driven explicitly —
+// the shape tests rely on.
 func newChatEventSink(inner EventSink, style mrkdwnStyle, transport chatTransport, scratchDir, epicName string) *chatEventSink {
 	return &chatEventSink{
 		EventSink:  inner,
@@ -62,6 +102,154 @@ func newChatEventSink(inner EventSink, style mrkdwnStyle, transport chatTranspor
 		scratchDir: scratchDir,
 		epicName:   epicName,
 	}
+}
+
+// startFlushLoop begins flushing the queue every interval until Close stops
+// it. Called once by production sinks at construction; a test that wants to
+// exercise the periodic tick itself (rather than driving flush()/Close()
+// directly) calls it with a short interval.
+func (s *chatEventSink) startFlushLoop(interval time.Duration) {
+	s.flushDone = make(chan struct{})
+	ticker := time.NewTicker(interval)
+	s.flushTicker = ticker
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				s.flush()
+			case <-s.flushDone:
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+}
+
+// stopFlushLoop stops the periodic flush loop, if one was started. Safe to
+// call more than once (Close does) and safe to call when startFlushLoop was
+// never called at all.
+func (s *chatEventSink) stopFlushLoop() {
+	s.closeOnce.Do(func() {
+		if s.flushDone != nil {
+			close(s.flushDone)
+		}
+	})
+}
+
+// Close stops the periodic flush loop (if running) and flushes any queued
+// messages synchronously, bounded by the transport's timeout — so a run
+// ending mid flush-window doesn't drop its last batch. If the transport is
+// already globally muted, the flush is suppressed rather than sent (see
+// closeFlush).
+func (s *chatEventSink) Close() {
+	s.stopFlushLoop()
+	s.closeFlush()
+}
+
+// enqueue adds text to the queue, collapsing it into an existing entry (and
+// bumping its count) if an identical text is already queued this window —
+// the dedup ×N behavior. kind is recorded so a suppressed close-time flush
+// can name what it dropped.
+func (s *chatEventSink) enqueue(text, kind string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.queue {
+		if s.queue[i].text == text {
+			s.queue[i].count++
+			return
+		}
+	}
+	s.queue = append(s.queue, batchedMessage{text: text, kind: kind, count: 1})
+}
+
+// drainQueue empties the queue and returns what it held, so flush/closeFlush
+// can render or suppress it outside the lock.
+func (s *chatEventSink) drainQueue() []batchedMessage {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	items := s.queue
+	s.queue = nil
+	return items
+}
+
+// flush renders every queued message as one send (see renderBatch) and
+// hands it to sendRaw. A tick with an empty queue sends nothing.
+func (s *chatEventSink) flush() {
+	items := s.drainQueue()
+	if len(items) == 0 {
+		return
+	}
+	s.sendRaw(renderBatch(items), notifyKindBatch)
+}
+
+// closeFlush is flush's close-time variant: if the transport is already
+// globally muted, the queued messages are dropped rather than sent, and one
+// notification-suppressed run-log line names the event kinds that were
+// dropped — so the outcome stays recoverable from the log even though chat
+// never got it. Otherwise it sends synchronously (bounded by the
+// transport's own timeout, no retry) rather than through sendRaw's
+// fire-and-forget goroutine, since the process may exit right after Close
+// returns.
+func (s *chatEventSink) closeFlush() {
+	items := s.drainQueue()
+	if len(items) == 0 {
+		return
+	}
+	if s.transportGloballyMuted() {
+		logNotificationSuppressed(s.scratchDir, s.epicName, s.transport.name(), strings.Join(distinctKinds(items), ","))
+		return
+	}
+	s.sendSync(renderBatch(items), notifyKindBatch)
+}
+
+// transportGloballyMuted reports whether the transport is already
+// globally muted, read directly from NotificationState (or, under test, the
+// injected gateStatePath) rather than through the gate — a close-time flush
+// has no single (eventType, source) to gate on, and this check must not
+// itself record an event/send series entry. A read error fails open (no
+// suppression), matching the gate's own fail-open policy elsewhere in this
+// file.
+func (s *chatEventSink) transportGloballyMuted() bool {
+	var state NotificationState
+	var err error
+	if s.gateStatePath != "" {
+		state, err = loadNotificationStateAt(s.gateStatePath)
+	} else {
+		state, err = LoadNotificationState()
+	}
+	if err != nil {
+		return false
+	}
+	return state.Transports[s.transport.name()].Muted
+}
+
+// renderBatch joins every queued message into one send, separator lines
+// between originally-distinct messages, applying each message's ×N dedup
+// suffix.
+func renderBatch(items []batchedMessage) string {
+	lines := make([]string, len(items))
+	for i, it := range items {
+		lines[i] = it.text
+		if it.count > 1 {
+			lines[i] = fmt.Sprintf("%s ×%d", it.text, it.count)
+		}
+	}
+	return strings.Join(lines, "\n---\n")
+}
+
+// distinctKinds returns items' notifyKinds in first-seen order, deduped —
+// what a suppressed close-time flush names in its run-log line.
+func distinctKinds(items []batchedMessage) []string {
+	seen := map[string]bool{}
+	kinds := make([]string, 0, len(items))
+	for _, it := range items {
+		if seen[it.kind] {
+			continue
+		}
+		seen[it.kind] = true
+		kinds = append(kinds, it.kind)
+	}
+	return kinds
 }
 
 // epicSource is the ticket-less NotificationGate source for an epic-level
@@ -161,31 +349,32 @@ func (s *chatEventSink) EpicComplete(epicName string, completed int, elapsedSeco
 }
 
 // send runs (eventType, source) through the budget/mute gate before
-// sending: allowed sends text as before; a trip suppresses text and, if
-// this call is the edge-triggered one, sends the "muting this"/"globally
-// muted" notice instead — through the same transport, so the operator is
-// told the storm was throttled rather than just going silent. A gate error
-// (e.g. source's ticket file not found/parseable) fails open: the gate
-// exists to bound a runaway storm, not to gate delivery on its own
-// bookkeeping succeeding, so text still sends as if the gate weren't there.
+// queueing: allowed enqueues text as before (see flush); a trip suppresses
+// text and, if this call is the edge-triggered one, enqueues the "muting
+// this"/"globally muted" notice instead — through the same transport, so
+// the operator is told the storm was throttled rather than just going
+// silent. A gate error (e.g. source's ticket file not found/parseable)
+// fails open: the gate exists to bound a runaway storm, not to gate
+// delivery on its own bookkeeping succeeding, so text is still queued as if
+// the gate weren't there.
 func (s *chatEventSink) send(text, notifyKind, source, ticketIdentifier string) {
 	result, err := s.gate(notifyKind, source)
 	if err != nil {
 		logger.Debug("%s: notification gate: %v\n", s.transport.name(), err)
-		s.sendRaw(text, notifyKind)
+		s.enqueue(text, notifyKind)
 		return
 	}
 
 	switch result.Decision {
 	case Allowed:
-		s.sendRaw(text, notifyKind)
+		s.enqueue(text, notifyKind)
 	case PerSourceMuted:
 		if result.EdgeTriggered {
-			s.sendRaw(s.style.mutedText(s.epicName, ticketIdentifier), notifyKindMuted)
+			s.enqueue(s.style.mutedText(s.epicName, ticketIdentifier), notifyKindMuted)
 		}
 	case GloballyMuted:
 		if result.EdgeTriggered {
-			s.sendRaw(s.style.globallyMutedText(s.transport.name()), notifyKindGloballyMuted)
+			s.enqueue(s.style.globallyMutedText(s.transport.name()), notifyKindGloballyMuted)
 		}
 	}
 }
@@ -199,4 +388,21 @@ func (s *chatEventSink) sendRaw(text, notifyKind string) {
 	sendNotification(s.scratchDir, s.epicName, s.transport.name(), notifyKind, s.transport.timeout(), func(ctx context.Context) error {
 		return s.transport.sendSync(ctx, text)
 	})
+}
+
+// sendSync sends text through the transport in the caller's own goroutine,
+// bounded by a single transport.timeout() attempt with no retry — closeFlush's
+// send, since a fire-and-forget goroutine (sendRaw) could still be in
+// flight, or never scheduled, by the time the process exits right after
+// Close returns.
+func (s *chatEventSink) sendSync(text, notifyKind string) {
+	ctx, cancel := context.WithTimeout(context.Background(), s.transport.timeout())
+	defer cancel()
+	if err := s.transport.sendSync(ctx, text); err != nil {
+		err = sanitizeSendError(err)
+		logger.Debug("%s: %v\n", s.transport.name(), err)
+		logNotificationFailed(s.scratchDir, s.epicName, s.transport.name(), notifyKind, err.Error())
+		return
+	}
+	logNotificationSent(s.scratchDir, s.epicName, s.transport.name(), notifyKind)
 }

@@ -65,6 +65,12 @@ const (
 	eventNotificationsConfigured = "notifications-configured"
 	eventNotificationSent        = "notification-sent"
 	eventNotificationFailed      = "notification-failed"
+	// eventNotificationSuppressed marks a close-time batch flush (see
+	// chatEventSink.closeFlush) that was dropped rather than sent because the
+	// transport was already globally muted — the one case a queued batch
+	// never reaches chat at all, so the run-log line is what keeps the
+	// outcome recoverable.
+	eventNotificationSuppressed = "notification-suppressed"
 )
 
 // notifyKind* tag which live event triggered a notification-sent/
@@ -86,6 +92,11 @@ const (
 	// mute, which is itself suppressed rather than sent.
 	notifyKindMuted         = "muted"
 	notifyKindGloballyMuted = "globally-muted"
+	// notifyKindBatch tags a chatEventSink batch-queue flush (see
+	// chatEventSink.flush/closeFlush) — one send covering every message
+	// queued since the last flush, as opposed to notifyKind* tagging a single
+	// live event under the pre-batch immediate-send model.
+	notifyKindBatch = "batch"
 )
 
 // ScanDecision records one ticket's scheduling disposition for a single
@@ -233,6 +244,16 @@ func logNotificationSent(scratchDir, epicName, channel, notifyKind string) {
 func logNotificationFailed(scratchDir, epicName, channel, notifyKind, reason string) {
 	_ = logEvent(scratchDir, epicName, Event{
 		Type: eventNotificationFailed, Channel: channel, NotifyKind: notifyKind, Reason: reason,
+	})
+}
+
+// logNotificationSuppressed records a close-time batch flush (see
+// chatEventSink.closeFlush) that was dropped rather than sent because the
+// transport was already globally muted — reason names the queued event
+// kinds so the outcome stays recoverable from the run log alone.
+func logNotificationSuppressed(scratchDir, epicName, channel, reason string) {
+	_ = logEvent(scratchDir, epicName, Event{
+		Type: eventNotificationSuppressed, Channel: channel, NotifyKind: notifyKindBatch, Reason: reason,
 	})
 }
 

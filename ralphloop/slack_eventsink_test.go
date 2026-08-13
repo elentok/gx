@@ -68,6 +68,7 @@ func TestSlackEventSink_EpicComplete_PostsSlackWireFormat(t *testing.T) {
 	sink := newSlackEventSink(inner, server.URL, "", "")
 
 	sink.EpicComplete("epic", 5, 300)
+	sink.flush()
 
 	if got := inner.snapshot(); len(got) != 1 || got[0] != "EpicComplete" {
 		t.Errorf("inner events = %v, want [EpicComplete]", got)
@@ -101,17 +102,18 @@ func TestSlackEventSink_CountsLine_AppearsOnlyOnFourMessageKinds(t *testing.T) {
 	sink.IterationPaused("03", "iter-03", PauseRateLimit, "rate limit hit")
 	sink.EpicParked("epic", []StalledTicket{{Identifier: "03"}})
 	sink.EpicComplete("epic", 1, 300)
+	sink.flush()
 
-	reqs := waitForSlackRequests(getRequests, 6)
-	if len(reqs) != 6 {
-		t.Fatalf("requests = %v, want exactly 6", reqs)
+	reqs := waitForSlackRequests(getRequests, 1)
+	if len(reqs) != 1 {
+		t.Fatalf("requests = %v, want exactly 1 batched request", reqs)
 	}
 
-	// sends run in their own goroutine (see chatEventSink.send), so requests
-	// can arrive out of call order; match each by a marker unique to its
-	// message instead of assuming positional order. Emoji markers pick out
-	// EpicStarted/EpicParked/EpicComplete, which otherwise share the same
-	// "[gx] epic" identity line.
+	// all six messages land in one flush, separator-joined (see renderBatch);
+	// match each by a marker unique to its message instead of assuming
+	// positional order. Emoji markers pick out EpicStarted/EpicParked/
+	// EpicComplete, which otherwise share the same "[gx] epic" identity line.
+	segments := strings.Split(reqs[0].Text, "\n---\n")
 	cases := []struct {
 		label      string
 		marker     string
@@ -125,20 +127,22 @@ func TestSlackEventSink_CountsLine_AppearsOnlyOnFourMessageKinds(t *testing.T) {
 		{"EpicComplete", "\U0001f389", true},
 	}
 	for _, tt := range cases {
-		var matched *slackRequest
-		for i := range reqs {
-			if strings.Contains(reqs[i].Text, tt.marker) {
-				matched = &reqs[i]
+		var matched string
+		found := false
+		for _, seg := range segments {
+			if strings.Contains(seg, tt.marker) {
+				matched = seg
+				found = true
 				break
 			}
 		}
-		if matched == nil {
-			t.Errorf("%s: no request matched marker %q among %v", tt.label, tt.marker, reqs)
+		if !found {
+			t.Errorf("%s: no segment matched marker %q among %v", tt.label, tt.marker, segments)
 			continue
 		}
-		got := strings.Contains(matched.Text, "done ·") || strings.Contains(matched.Text, "done\n")
+		got := strings.Contains(matched, "done ·") || strings.Contains(matched, "done\n")
 		if got != tt.wantCounts {
-			t.Errorf("%s text = %q, contains a counts line = %v, want %v", tt.label, matched.Text, got, tt.wantCounts)
+			t.Errorf("%s segment = %q, contains a counts line = %v, want %v", tt.label, matched, got, tt.wantCounts)
 		}
 	}
 }
@@ -151,6 +155,7 @@ func TestSlackEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
 
 	start := time.Now()
 	sink.EpicComplete("epic", 1, 0)
+	sink.flush()
 	if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
 		t.Errorf("EpicComplete blocked for %s, want near-instant return", elapsed)
 	}
@@ -169,6 +174,7 @@ func TestSlackEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
 
 	start := time.Now()
 	sink.EpicComplete("epic", 1, 0)
+	sink.flush()
 	if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
 		t.Errorf("EpicComplete blocked for %s, want near-instant return", elapsed)
 	}
@@ -241,6 +247,7 @@ func TestSlackEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 	sink := newSlackEventSink(&recordingSink{}, server.URL, dir, "epic")
 
 	sink.EpicComplete("epic", 1, 0)
+	sink.flush()
 
 	var events []Event
 	deadline := time.Now().Add(2 * time.Second)
@@ -251,8 +258,8 @@ func TestSlackEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if len(events) != 1 || events[0].Type != eventNotificationSent || events[0].Channel != "slack" || events[0].NotifyKind != notifyKindEpicComplete {
-		t.Fatalf("run-log events = %#v, want one notification-sent/slack/epic-complete", events)
+	if len(events) != 1 || events[0].Type != eventNotificationSent || events[0].Channel != "slack" || events[0].NotifyKind != notifyKindBatch {
+		t.Fatalf("run-log events = %#v, want one notification-sent/slack/batch", events)
 	}
 }
 
@@ -263,6 +270,7 @@ func TestSlackEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 	sink := newSlackEventSink(&recordingSink{}, server.URL, dir, "epic")
 
 	sink.EpicComplete("epic", 1, 0)
+	sink.flush()
 
 	var events []Event
 	// 4s headroom: sendNotification retries once after notificationRetryBackoff
@@ -292,6 +300,7 @@ func TestSlackEventSink_LogsNotificationFailedToRunLog_RedactsWebhookSecret(t *t
 	sink := newSlackEventSink(&recordingSink{}, server.URL+"/services/"+secretPath, dir, "epic")
 
 	sink.EpicComplete("epic", 1, 0)
+	sink.flush()
 
 	var events []Event
 	// 4s headroom: sendNotification retries once after notificationRetryBackoff

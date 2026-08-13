@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -86,6 +87,7 @@ func TestChatEventSink_ChatMembers_EachSendExactlyOneMessage(t *testing.T) {
 			t.Parallel()
 			sink, transport := newFakeChatSink(t, &recordingSink{})
 			c.fire(sink)
+			sink.flush()
 			if got := waitForSentCount(transport, 1); len(got) != 1 {
 				t.Fatalf("sent = %v, want exactly 1 message", got)
 			}
@@ -158,6 +160,7 @@ func TestChatEventSink_Park_ProducesExactlyOneChatMessage(t *testing.T) {
 
 	sink.IterationPaused("04", "iter-04", PauseNeedsRepair, "agent blocked on permission prompt")
 	sink.TicketNeedsHuman("04", "epic", "needs-repair", "agent blocked on permission prompt")
+	sink.flush()
 
 	got := waitForSentCount(transport, 1)
 	if len(got) != 1 {
@@ -188,9 +191,17 @@ func TestChatEventSink_IterationPausedResumed_RateLimitKindReachesChat(t *testin
 
 	sink.IterationPaused("04", "iter-04", PauseRateLimit, "rate limited")
 	sink.IterationResumed("04", "iter-04", PauseRateLimit)
+	sink.flush()
 
-	if got := waitForSentCount(transport, 2); len(got) != 2 {
-		t.Fatalf("sent = %v, want exactly 2 messages", got)
+	got := waitForSentCount(transport, 1)
+	if len(got) != 1 {
+		t.Fatalf("sent = %v, want exactly 1 batched message joining both", got)
+	}
+	pausedText := slackStyle.iterationPausedText("iter-04", "rate limited", "epic", "04")
+	resumedText := slackStyle.iterationResumedText("iter-04", "epic", "04")
+	want := pausedText + "\n---\n" + resumedText
+	if got[0] != want {
+		t.Errorf("sent[0] = %q, want %q", got[0], want)
 	}
 }
 
@@ -243,20 +254,17 @@ func TestChatEventSink_RepeatedEvent_TripsPerSourceMuteAndParksTicket(t *testing
 	for range 5 {
 		sink.IterationPaused("04", "iter-04", PauseRateLimit, "rate limited")
 	}
+	sink.flush()
 
-	got := waitForSentCount(transport, 5)
-	if len(got) != 5 {
-		t.Fatalf("sent = %v, want 4 normal sends plus 1 muting notice", got)
+	got := waitForSentCount(transport, 1)
+	if len(got) != 1 {
+		t.Fatalf("sent = %v, want 1 batched message (4 deduped normal sends plus 1 muting notice)", got)
 	}
 	normalText := slackStyle.iterationPausedText("iter-04", "rate limited", epicName, "04")
-	for i := range 4 {
-		if got[i] != normalText {
-			t.Errorf("sent[%d] = %q, want %q", i, got[i], normalText)
-		}
-	}
 	wantMuted := slackStyle.mutedText(epicName, "04")
-	if got[4] != wantMuted {
-		t.Errorf("sent[4] = %q, want muting notice %q", got[4], wantMuted)
+	want := fmt.Sprintf("%s ×4", normalText) + "\n---\n" + wantMuted
+	if got[0] != want {
+		t.Errorf("sent[0] = %q, want %q", got[0], want)
 	}
 
 	ticket, err := schema.ParseTicket(ticketPath)
@@ -292,15 +300,136 @@ func TestChatEventSink_NonTrippingSequence_SendsNormallyThroughGate(t *testing.T
 	for range 3 {
 		sink.IterationPaused("07", "iter-07", PauseRateLimit, "rate limited")
 	}
+	sink.flush()
 
-	got := waitForSentCount(transport, 3)
-	if len(got) != 3 {
-		t.Fatalf("sent = %v, want exactly 3 messages (no trip below threshold)", got)
+	got := waitForSentCount(transport, 1)
+	if len(got) != 1 {
+		t.Fatalf("sent = %v, want exactly 1 batched message deduped ×3 (no trip below threshold)", got)
 	}
-	want := slackStyle.iterationPausedText("iter-07", "rate limited", epicName, "07")
-	for i, g := range got {
-		if g != want {
-			t.Errorf("sent[%d] = %q, want %q", i, g, want)
+	want := fmt.Sprintf("%s ×3", slackStyle.iterationPausedText("iter-07", "rate limited", epicName, "07"))
+	if got[0] != want {
+		t.Errorf("sent[0] = %q, want %q", got[0], want)
+	}
+}
+
+// TestChatEventSink_MultipleDistinctEvents_FlushSendsOneSeparatorJoinedMessage
+// pins ticket 06's batch-shape seam: several distinct queued messages render
+// as one send, joined by a separator line.
+func TestChatEventSink_MultipleDistinctEvents_FlushSendsOneSeparatorJoinedMessage(t *testing.T) {
+	t.Parallel()
+	sink, transport := newFakeChatSink(t, &recordingSink{})
+
+	sink.EpicStarted("epic", 0, 3)
+	sink.EpicComplete("epic", 1, 10)
+	sink.flush()
+
+	got := waitForSentCount(transport, 1)
+	if len(got) != 1 {
+		t.Fatalf("sent = %v, want exactly 1 batched message", got)
+	}
+	want := slackStyle.epicStartedText("epic", EpicCounts{}) + "\n---\n" + slackStyle.epicCompleteText("epic", EpicCounts{}, 1, 10)
+	if got[0] != want {
+		t.Errorf("sent[0] = %q, want %q", got[0], want)
+	}
+}
+
+// TestChatEventSink_IdenticalMessages_FlushCollapsesToSingleLineWithCount
+// pins ticket 06's dedup seam directly against enqueue/renderBatch, apart
+// from the gate-storm scenario the RepeatedEvent test also covers.
+func TestChatEventSink_IdenticalMessages_FlushCollapsesToSingleLineWithCount(t *testing.T) {
+	t.Parallel()
+	sink, transport := newFakeChatSink(t, &recordingSink{})
+
+	sink.EpicStarted("epic", 0, 3)
+	sink.EpicStarted("epic", 0, 3)
+	sink.EpicStarted("epic", 0, 3)
+	sink.flush()
+
+	got := waitForSentCount(transport, 1)
+	if len(got) != 1 {
+		t.Fatalf("sent = %v, want exactly 1 batched message", got)
+	}
+	want := fmt.Sprintf("%s ×3", slackStyle.epicStartedText("epic", EpicCounts{}))
+	if got[0] != want {
+		t.Errorf("sent[0] = %q, want %q", got[0], want)
+	}
+}
+
+// TestChatEventSink_EmptyQueue_FlushSendsNothing pins ticket 06's empty-tick
+// seam: a flush with nothing queued sends nothing.
+func TestChatEventSink_EmptyQueue_FlushSendsNothing(t *testing.T) {
+	t.Parallel()
+	sink, transport := newFakeChatSink(t, &recordingSink{})
+
+	sink.flush()
+
+	time.Sleep(50 * time.Millisecond)
+	if got := transport.snapshot(); len(got) != 0 {
+		t.Errorf("sent = %v, want none for an empty flush", got)
+	}
+}
+
+// TestChatEventSink_Close_FlushesQueuedMessageSynchronously pins ticket 06's
+// flush-on-close seam: Close sends the queue's one message before returning,
+// with no need to poll like the async sendRaw path.
+func TestChatEventSink_Close_FlushesQueuedMessageSynchronously(t *testing.T) {
+	t.Parallel()
+	sink, transport := newFakeChatSink(t, &recordingSink{})
+
+	sink.EpicStarted("epic", 0, 3)
+	sink.Close()
+
+	got := transport.snapshot()
+	if len(got) != 1 {
+		t.Fatalf("sent = %v, want exactly 1 message from Close's synchronous flush", got)
+	}
+}
+
+// TestChatEventSink_Close_GloballyMuted_SuppressesFlushAndLogsRunLogLine
+// pins ticket 06's suppressed-close-time-flush seam: a close-time flush
+// against an already globally-muted transport sends nothing, and appends
+// exactly one notification-suppressed run-log line naming the queued kinds.
+func TestChatEventSink_Close_GloballyMuted_SuppressesFlushAndLogsRunLogLine(t *testing.T) {
+	t.Parallel()
+	scratchDir := t.TempDir()
+	epicName := "epic"
+	sink, transport := newFakeChatSink(t, &recordingSink{})
+	sink.scratchDir = scratchDir
+	sink.epicName = epicName
+
+	// Enqueue while the transport is still unmuted — a gate call against an
+	// already-muted transport would suppress at gate time (see send) and
+	// never reach the queue, which is a different code path than the one
+	// this test targets: a close-time flush finding the transport muted
+	// after the item was already queued.
+	sink.EpicStarted("epic", 0, 3)
+
+	if err := updateNotificationStateAt(sink.gateStatePath, func(state *NotificationState) {
+		state.Transports["fake"] = TransportState{Muted: true, Reason: "auto-trip"}
+	}); err != nil {
+		t.Fatalf("updateNotificationStateAt: %v", err)
+	}
+
+	sink.Close()
+
+	if got := transport.snapshot(); len(got) != 0 {
+		t.Errorf("sent = %v, want none — transport is globally muted", got)
+	}
+
+	events, ok, err := readEvents(scratchDir, epicName)
+	if err != nil || !ok {
+		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+	}
+	var suppressed []Event
+	for _, ev := range events {
+		if ev.Type == eventNotificationSuppressed {
+			suppressed = append(suppressed, ev)
 		}
+	}
+	if len(suppressed) != 1 {
+		t.Fatalf("suppressed run-log lines = %v, want exactly 1", suppressed)
+	}
+	if !strings.Contains(suppressed[0].Reason, notifyKindEpicStarted) {
+		t.Errorf("suppressed reason = %q, want it to name %q", suppressed[0].Reason, notifyKindEpicStarted)
 	}
 }
