@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -66,6 +67,7 @@ func TestSlackEventSink_EpicComplete_PostsSlackWireFormat(t *testing.T) {
 	server, getRequests := fakeSlackServer(t, http.StatusOK)
 	inner := &recordingSink{}
 	sink := newSlackEventSink(inner, server.URL, "", "")
+	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
 	sink.EpicComplete("epic", 5, 300)
 	sink.flush()
@@ -95,6 +97,7 @@ func TestSlackEventSink_CountsLine_AppearsOnlyOnFourMessageKinds(t *testing.T) {
 	server, getRequests := fakeSlackServer(t, http.StatusOK)
 	inner := &recordingSink{}
 	sink := newSlackEventSink(inner, server.URL, "", "")
+	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
 	sink.EpicStarted("epic", 0, 3)
 	sink.IterationFinished(tickets.Ticket{Identifier: "01"}, "epic", IterationStats{Completed: 1, Total: 3})
@@ -152,6 +155,7 @@ func TestSlackEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
 	server, getRequests := fakeSlackServer(t, http.StatusInternalServerError)
 	inner := &recordingSink{}
 	sink := newSlackEventSink(inner, server.URL, "", "")
+	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
 	start := time.Now()
 	sink.EpicComplete("epic", 1, 0)
@@ -171,6 +175,7 @@ func TestSlackEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	server.Close()
 	sink := newSlackEventSink(inner, server.URL, "", "")
+	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
 	start := time.Now()
 	sink.EpicComplete("epic", 1, 0)
@@ -245,6 +250,7 @@ func TestSlackEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 	dir := t.TempDir()
 	server, _ := fakeSlackServer(t, http.StatusOK)
 	sink := newSlackEventSink(&recordingSink{}, server.URL, dir, "epic")
+	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
 	sink.EpicComplete("epic", 1, 0)
 	sink.flush()
@@ -268,6 +274,7 @@ func TestSlackEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 	dir := t.TempDir()
 	server, _ := fakeSlackServer(t, http.StatusInternalServerError)
 	sink := newSlackEventSink(&recordingSink{}, server.URL, dir, "epic")
+	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
 	sink.EpicComplete("epic", 1, 0)
 	sink.flush()
@@ -298,6 +305,7 @@ func TestSlackEventSink_LogsNotificationFailedToRunLog_RedactsWebhookSecret(t *t
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	server.Close()
 	sink := newSlackEventSink(&recordingSink{}, server.URL+"/services/"+secretPath, dir, "epic")
+	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
 	sink.EpicComplete("epic", 1, 0)
 	sink.flush()

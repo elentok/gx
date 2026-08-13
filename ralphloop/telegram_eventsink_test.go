@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -69,6 +70,7 @@ func TestTelegramEventSink_EpicComplete_PostsTelegramWireFormat(t *testing.T) {
 	server, getRequests := fakeTelegramServer(t, http.StatusOK)
 	inner := &recordingSink{}
 	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
+	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
 	sink.EpicComplete("epic", 5, 300)
 	sink.flush()
@@ -98,6 +100,7 @@ func TestTelegramEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
 	server, getRequests := fakeTelegramServer(t, http.StatusInternalServerError)
 	inner := &recordingSink{}
 	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
+	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
 	start := time.Now()
 	sink.EpicComplete("epic", 1, 0)
@@ -117,6 +120,7 @@ func TestTelegramEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	server.Close()
 	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, "", "")
+	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
 	start := time.Now()
 	sink.EpicComplete("epic", 1, 0)
@@ -194,6 +198,7 @@ func TestTelegramEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 	dir := t.TempDir()
 	server, _ := fakeTelegramServer(t, http.StatusOK)
 	sink := newTelegramEventSink(&recordingSink{}, "tok", "chat-1", server.URL, dir, "epic")
+	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
 	sink.EpicComplete("epic", 1, 0)
 	sink.flush()
@@ -217,6 +222,7 @@ func TestTelegramEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 	dir := t.TempDir()
 	server, _ := fakeTelegramServer(t, http.StatusInternalServerError)
 	sink := newTelegramEventSink(&recordingSink{}, "tok", "chat-1", server.URL, dir, "epic")
+	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
 	sink.EpicComplete("epic", 1, 0)
 	sink.flush()
@@ -247,6 +253,7 @@ func TestTelegramEventSink_LogsNotificationFailedToRunLog_RedactsBotToken(t *tes
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	server.Close()
 	sink := newTelegramEventSink(&recordingSink{}, secretToken, "chat-1", server.URL, dir, "epic")
+	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
 	sink.EpicComplete("epic", 1, 0)
 	sink.flush()
