@@ -35,9 +35,14 @@ type reconcileParams struct {
 	WorkspaceID string
 	Paths       reconcilePaths
 	Agent       AgentKind
-	Skill       string
-	SmartZone   int
-	Gate        *Gate
+	// Model and Effort are the resolved per-agent config a repaired/
+	// recovered iteration's agent process starts under (see
+	// RunOptions.Agents); empty omits that one flag from the launch argv.
+	Model     string
+	Effort    string
+	Skill     string
+	SmartZone int
+	Gate      *Gate
 	// WorktreeLock is the same Run-scoped lock as iterationParams.WorktreeLock
 	// (see its doc), threaded through so startup repairs that add/remove a
 	// worktree serialize against any concurrently-launched iteration's own

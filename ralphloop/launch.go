@@ -23,8 +23,13 @@ type iterationParams struct {
 	FeatureWorktree string
 	FeatureBranch   string
 	Agent           AgentKind
-	Skill           string
-	Ticket          tickets.Ticket
+	// Model and Effort are the resolved per-agent config the launched agent
+	// process starts under (see RunOptions.Agents); empty omits that one
+	// flag from the launch argv.
+	Model  string
+	Effort string
+	Skill  string
+	Ticket tickets.Ticket
 	// ScratchDir locates this run's run-log.jsonl (see eventlog.go);
 	// logEvent no-ops if it's empty. The epic name half of that path is
 	// FeatureBranch, not a separate field — Run names the feature branch
@@ -65,6 +70,8 @@ func (p iterationParams) launchAndPromptParams(label, pane, tab, prompt, session
 	return launchAndPromptParams{
 		Label:       label,
 		Agent:       p.Agent,
+		Model:       p.Model,
+		Effort:      p.Effort,
 		Pane:        pane,
 		Tab:         tab,
 		Prompt:      prompt,
@@ -117,8 +124,12 @@ func (p iterationParams) logTicketEventSHA(eventType, pane, tab, agentSession, c
 
 // launchAndPromptParams are the per-call inputs to launchAndPrompt.
 type launchAndPromptParams struct {
-	Label  string // agent name/tab label, used in error messages
-	Agent  AgentKind
+	Label string // agent name/tab label, used in error messages
+	Agent AgentKind
+	// Model and Effort are the resolved per-agent config the launched agent
+	// process starts under; empty omits that one flag from the launch argv.
+	Model  string
+	Effort string
 	Pane   string // pane id to launch the agent in and send the prompt to
 	Tab    string // tab id owning Pane, recorded on logged events
 	Prompt string // initial skill prompt text
@@ -214,7 +225,7 @@ func launchAndPrompt(d Deps, p launchAndPromptParams) (string, error) {
 		Name:      p.Label,
 		Kind:      string(p.Agent),
 		Pane:      p.Pane,
-		AgentArgs: agentArgs(p.Agent, p.ScratchDir, p.EpicName),
+		AgentArgs: agentArgs(p.Agent, p.ScratchDir, p.EpicName, p.Model, p.Effort),
 	})
 	if err != nil {
 		var nameTaken *herdr.AgentNameTakenError

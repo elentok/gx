@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/herdr"
 )
 
@@ -268,6 +269,7 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		agent      AgentKind
+		agents     config.AgentsConfig
 		wantKind   string
 		wantArgs   []string
 		wantPrefix string
@@ -285,6 +287,28 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 			wantArgs:   []string{"--sandbox", "workspace-write", "--ask-for-approval", "on-request"},
 			wantPrefix: "$implement ",
 		},
+		{
+			name:  "claude with model and effort",
+			agent: AgentClaude,
+			agents: config.AgentsConfig{
+				Claude: config.AgentConfig{Model: "sonnet", Effort: "medium"},
+			},
+			wantKind:   "claude",
+			wantArgs:   []string{"--permission-mode", "auto", "--model", "sonnet", "--effort", "medium"},
+			wantPrefix: "/implement ",
+		},
+		{
+			name:  "codex with model and effort",
+			agent: AgentCodex,
+			agents: config.AgentsConfig{
+				Codex: config.AgentConfig{Model: "gpt-5.6-sol", Effort: "medium"},
+			},
+			wantKind: "codex",
+			wantArgs: []string{
+				"--sandbox", "workspace-write", "--ask-for-approval", "on-request",
+			},
+			wantPrefix: "$implement ",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -298,7 +322,7 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 				return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle"}, nil
 			}
 
-			err := Run(RunOptions{EpicName: "my-epic", Agent: tc.agent, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
+			err := Run(RunOptions{EpicName: "my-epic", Agent: tc.agent, Agents: tc.agents, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
 			if err != nil {
 				t.Fatalf("Run() error = %v", err)
 			}
@@ -313,6 +337,16 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 				if !slices.Contains(start.AgentArgs, wantScratch) {
 					t.Errorf("AgentStart AgentArgs = %v, want epic scratch directory %q", start.AgentArgs, wantScratch)
 				}
+				codexCfg := tc.agents.Codex
+				if codexCfg.Model != "" && !slices.Contains(start.AgentArgs, "--model") {
+					t.Errorf("AgentStart AgentArgs = %v, want --model flag", start.AgentArgs)
+				}
+				if codexCfg.Effort != "" {
+					want := `model_reasoning_effort="` + codexCfg.Effort + `"`
+					if !slices.Contains(start.AgentArgs, want) {
+						t.Errorf("AgentStart AgentArgs = %v, want %q", start.AgentArgs, want)
+					}
+				}
 			}
 			wantPrompt := tc.wantPrefix + filepath.Join(scratchDir, "my-epic", "issues", "01-first.md")
 			if len(*prompts) != 1 || (*prompts)[0] != wantPrompt {
@@ -326,6 +360,94 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 				if event.Agent != AgentKind(tc.wantKind) {
 					t.Errorf("event %q agent = %q, want %q", event.Type, event.Agent, tc.wantKind)
 				}
+			}
+		})
+	}
+}
+
+func TestAgentArgs_ModelAndEffort(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name   string
+		agent  AgentKind
+		model  string
+		effort string
+		want   []string
+	}{
+		{
+			name:  "claude both empty unchanged",
+			agent: AgentClaude,
+			want:  []string{"--permission-mode", "auto"},
+		},
+		{
+			name:   "claude both set",
+			agent:  AgentClaude,
+			model:  "sonnet",
+			effort: "medium",
+			want:   []string{"--permission-mode", "auto", "--model", "sonnet", "--effort", "medium"},
+		},
+		{
+			name:  "claude model only",
+			agent: AgentClaude,
+			model: "sonnet",
+			want:  []string{"--permission-mode", "auto", "--model", "sonnet"},
+		},
+		{
+			name:   "claude effort only",
+			agent:  AgentClaude,
+			effort: "medium",
+			want:   []string{"--permission-mode", "auto", "--effort", "medium"},
+		},
+		{
+			name:  "codex both empty unchanged",
+			agent: AgentCodex,
+			want: []string{
+				"--sandbox", "workspace-write",
+				"--ask-for-approval", "on-request",
+				"--add-dir", filepath.Join("scratch", "epic"),
+			},
+		},
+		{
+			name:   "codex both set",
+			agent:  AgentCodex,
+			model:  "gpt-5.6-sol",
+			effort: "medium",
+			want: []string{
+				"--sandbox", "workspace-write",
+				"--ask-for-approval", "on-request",
+				"--add-dir", filepath.Join("scratch", "epic"),
+				"--model", "gpt-5.6-sol",
+				"-c", `model_reasoning_effort="medium"`,
+			},
+		},
+		{
+			name:  "codex model only",
+			agent: AgentCodex,
+			model: "gpt-5.6-sol",
+			want: []string{
+				"--sandbox", "workspace-write",
+				"--ask-for-approval", "on-request",
+				"--add-dir", filepath.Join("scratch", "epic"),
+				"--model", "gpt-5.6-sol",
+			},
+		},
+		{
+			name:   "codex effort only",
+			agent:  AgentCodex,
+			effort: "medium",
+			want: []string{
+				"--sandbox", "workspace-write",
+				"--ask-for-approval", "on-request",
+				"--add-dir", filepath.Join("scratch", "epic"),
+				"-c", `model_reasoning_effort="medium"`,
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := agentArgs(tc.agent, "scratch", "epic", tc.model, tc.effort)
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("agentArgs() = %v, want %v", got, tc.want)
 			}
 		})
 	}

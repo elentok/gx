@@ -54,12 +54,17 @@ type landQueueParams struct {
 	FeatureWorktree string
 	FeatureBranch   string
 	Agent           AgentKind
-	Skill           string
-	ScratchDir      string
-	WorktreeLock    *sync.Mutex
-	SmartZone       int
-	Gate            *Gate
-	Sink            EventSink
+	// Model and Effort are the resolved per-agent config a landed
+	// conflict-resolution agent starts under (see RunOptions.Agents); empty
+	// omits that one flag from the launch argv.
+	Model        string
+	Effort       string
+	Skill        string
+	ScratchDir   string
+	WorktreeLock *sync.Mutex
+	SmartZone    int
+	Gate         *Gate
+	Sink         EventSink
 }
 
 // iterationParamsFor rebuilds the iterationParams landCherryPick/
@@ -74,6 +79,8 @@ func (lp landQueueParams) iterationParamsFor(job landJob) iterationParams {
 		FeatureWorktree: lp.FeatureWorktree,
 		FeatureBranch:   lp.FeatureBranch,
 		Agent:           lp.Agent,
+		Model:           lp.Model,
+		Effort:          lp.Effort,
 		Skill:           lp.Skill,
 		Ticket:          job.ticket,
 		ScratchDir:      lp.ScratchDir,

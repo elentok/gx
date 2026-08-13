@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -100,26 +101,59 @@ func skillPrompt(agent AgentKind, skill, ticketPath string) string {
 	return fmt.Sprintf("%s%s %s", prefix, skill, ticketPath)
 }
 
-func agentArgs(agent AgentKind, scratchDir, epicName string) []string {
+func agentArgs(agent AgentKind, scratchDir, epicName, model, effort string) []string {
 	if agent == AgentCodex {
-		return []string{
+		args := []string{
 			"--sandbox", "workspace-write",
 			"--ask-for-approval", "on-request",
 			"--add-dir", filepath.Join(scratchDir, epicName),
 		}
+		if model != "" {
+			args = append(args, "--model", model)
+		}
+		if effort != "" {
+			// Codex has no dedicated effort flag; -c is the only route it
+			// offers, and gx deliberately does not manage a codex profile
+			// file to get one.
+			args = append(args, "-c", fmt.Sprintf("model_reasoning_effort=%q", effort))
+		}
+		return args
 	}
-	return []string{"--permission-mode", "auto"}
+	args := []string{"--permission-mode", "auto"}
+	if model != "" {
+		args = append(args, "--model", model)
+	}
+	if effort != "" {
+		args = append(args, "--effort", effort)
+	}
+	return args
+}
+
+// resolvedAgentConfig picks agents' Claude or Codex sub-config for agent —
+// the single AgentConfig relevant to this Run call, since RunOptions.Agent is
+// fixed for the whole run.
+func resolvedAgentConfig(agents config.AgentsConfig, agent AgentKind) config.AgentConfig {
+	if agent == AgentCodex {
+		return agents.Codex
+	}
+	return agents.Claude
 }
 
 // RunOptions configures a single `gx ralph-loop {epic-name}` invocation.
 type RunOptions struct {
-	EpicName    string
-	Agent       AgentKind // defaults to AgentClaude
-	Skill       string    // skill each iteration invokes; defaults to defaultWorkerSkill ("gx-implement") when unset
-	ScratchDir  string    // defaults to ".scratch"
-	RepoDir     string    // repo root passed as the herdr workspace/worktree cwd
-	MaxParallel int       // defaults to defaultMaxParallel; how many iterations run concurrently
-	SmartZone   int       // defaults to defaultSmartZone; context-token ceiling before pausing an iteration
+	EpicName string
+	Agent    AgentKind // defaults to AgentClaude
+	// Agents carries the resolved per-agent model/effort config an iteration
+	// launches under (see resolvedAgentConfig) — the caller supplies it
+	// (e.g. from config.Load), ralphloop never loads config itself. The zero
+	// value (both fields empty for both agents) reproduces today's launch
+	// argv unchanged.
+	Agents      config.AgentsConfig
+	Skill       string // skill each iteration invokes; defaults to defaultWorkerSkill ("gx-implement") when unset
+	ScratchDir  string // defaults to ".scratch"
+	RepoDir     string // repo root passed as the herdr workspace/worktree cwd
+	MaxParallel int    // defaults to defaultMaxParallel; how many iterations run concurrently
+	SmartZone   int    // defaults to defaultSmartZone; context-token ceiling before pausing an iteration
 	// TicketIDs, if set, restricts scheduling to just these ticket
 	// identifiers (see tickets.Ticket.DisplayNumber) within the epic — Run
 	// exits once every one of them is done, independent of any other open
@@ -205,6 +239,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	if err := ValidateAgentKind(agent); err != nil {
 		return err
 	}
+	agentConfig := resolvedAgentConfig(opts.Agents, agent)
 	runStart := d.Now()
 
 	scratchDir := opts.ScratchDir
@@ -454,6 +489,8 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 				FeatureWorktree: featurePath,
 				FeatureBranch:   opts.EpicName,
 				Agent:           agent,
+				Model:           agentConfig.Model,
+				Effort:          agentConfig.Effort,
 				Skill:           skill,
 				Ticket:          ticket,
 				ScratchDir:      scratchDir,
@@ -510,6 +547,8 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		WorkspaceID:  workspaceID,
 		Paths:        reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: featurePath, WorktreeDir: wtDir, RepoDir: opts.RepoDir},
 		Agent:        agent,
+		Model:        agentConfig.Model,
+		Effort:       agentConfig.Effort,
 		Skill:        skill,
 		SmartZone:    smartZone,
 		Gate:         gate,
@@ -545,6 +584,8 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		FeatureWorktree: featurePath,
 		FeatureBranch:   opts.EpicName,
 		Agent:           agent,
+		Model:           agentConfig.Model,
+		Effort:          agentConfig.Effort,
 		Skill:           skill,
 		ScratchDir:      scratchDir,
 		WorktreeLock:    &worktreeMu,
