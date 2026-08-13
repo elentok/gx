@@ -23,7 +23,7 @@ func (m QueueModel) handleQueueSuggestedActionsKey() (tea.Model, tea.Cmd) {
 		return m, notify.Info("no suggested actions for this ticket")
 	}
 	prompt := fmt.Sprintf("Suggested actions for %q:", r.ticket.Title)
-	m.actionsMenu = m.actionsMenu.Open(r.ticket.Path, prompt, items)
+	m.actionsMenu = m.actionsMenu.Open(r.ticket.Path, r.epic.Name, r.ticket.DisplayNumber(), prompt, items)
 	return m, nil
 }
 
@@ -37,6 +37,9 @@ func (m QueueModel) handleQueueActionsMenuKey(msg tea.KeyPressMsg) (tea.Model, t
 	m.actionsMenu = next
 	if !result.Done || !result.Accepted {
 		return m, nil
+	}
+	if result.Action == actionInvestigate {
+		return m, cmdLaunchInvestigate(m.worktreeRoot, result.EpicName, result.TicketID)
 	}
 	return m, cmdApplySuggestedAction(result.Path, result.Action, func() tea.Msg { return queueActionAppliedMsg{} })
 }

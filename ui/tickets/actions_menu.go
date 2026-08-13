@@ -18,16 +18,22 @@ import (
 type actionsMenuModel struct {
 	IsOpen bool
 
-	state components.MenuState
-	path  string
-	title string
+	state    components.MenuState
+	path     string
+	epicName string
+	ticketID string
+	title    string
 }
 
-// Open opens the menu for the ticket at path, titled for its prompt line.
-func (m actionsMenuModel) Open(path, title string, items []components.MenuItem) actionsMenuModel {
+// Open opens the menu for ticketID (part of epicName) at path, titled for
+// its prompt line. epicName/ticketID are only consumed by actions that need
+// more than a filesystem path — e.g. actionInvestigate's herdr launch.
+func (m actionsMenuModel) Open(path, epicName, ticketID, title string, items []components.MenuItem) actionsMenuModel {
 	m.IsOpen = true
 	m.state = components.MenuState{Items: items, Cursor: 0}
 	m.path = path
+	m.epicName = epicName
+	m.ticketID = ticketID
 	m.title = title
 	return m
 }
@@ -38,6 +44,8 @@ type actionsMenuResult struct {
 	Done     bool // the menu was cancelled or accepted this event
 	Accepted bool
 	Path     string
+	EpicName string
+	TicketID string
 	Action   string
 }
 
@@ -57,7 +65,7 @@ func (m actionsMenuModel) Update(msg tea.KeyPressMsg) (actionsMenuModel, actions
 		return m, actionsMenuResult{Done: true}, true
 	}
 	action := m.state.Items[m.state.Cursor].Value
-	return m, actionsMenuResult{Done: true, Accepted: true, Path: m.path, Action: action}, true
+	return m, actionsMenuResult{Done: true, Accepted: true, Path: m.path, EpicName: m.epicName, TicketID: m.ticketID, Action: action}, true
 }
 
 // View renders the menu modal.
@@ -106,7 +114,7 @@ func (m Model) handleSuggestedActionsKey() (tea.Model, tea.Cmd) {
 		return m, notify.Info("no suggested actions for this ticket")
 	}
 	prompt := fmt.Sprintf("Suggested actions for %q:", ticket.Title)
-	m.actionsMenu = m.actionsMenu.Open(ticket.Path, prompt, items)
+	m.actionsMenu = m.actionsMenu.Open(ticket.Path, epic.Name, ticket.DisplayNumber(), prompt, items)
 	return m, nil
 }
 
@@ -119,6 +127,9 @@ func (m Model) handleActionsMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	m.actionsMenu = next
 	if !result.Done || !result.Accepted {
 		return m, nil
+	}
+	if result.Action == actionInvestigate {
+		return m, cmdLaunchInvestigate(m.worktreeRoot, result.EpicName, result.TicketID)
 	}
 	return m, cmdApplySuggestedAction(result.Path, result.Action, func() tea.Msg { return statusChangedMsg{} })
 }
