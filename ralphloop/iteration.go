@@ -268,12 +268,12 @@ func reattachIteration(d Deps, p iterationParams) error {
 		if err := Claim(p.Ticket.Path); err != nil {
 			return fmt.Errorf("restoring ticket to claimed: %w", err)
 		}
-		p.Gate.ForceResume(label)
 		p.Sink.IterationResumed(p.Ticket.Identifier, label, PauseNeedsRepair)
 		if p.Report != nil {
 			p.Report("resumed %s after restart recheck\n", label)
 		}
 		launchParams.logLifecycleEvent(eventResumed, agent.AgentSession)
+		p.Gate.ForceResume(label)
 	}
 
 	return finishIteration(d, p, path, agent.PaneID, tabID, base, branch, agent.AgentSession)

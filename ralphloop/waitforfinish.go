@@ -836,9 +836,9 @@ func recoverClaudeRateLimit(d Deps, p launchAndPromptParams, sessionID, token st
 	p.sink().IterationPaused(p.Ticket, p.Label, PauseRateLimit, reason)
 	p.logAgentEvent(eventPausedRateLimit, sessionID, reason)
 	waitForClaudeRateLimitReset(d, p.Gate, p.Label, p.Pane, token)
-	p.Gate.ForceResume(p.Label)
 	p.sink().IterationResumed(p.Ticket, p.Label, PauseRateLimit)
 	p.logLifecycleEvent(eventResumed, sessionID)
+	p.Gate.ForceResume(p.Label)
 
 	if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
 		Target: p.Pane,
@@ -860,9 +860,9 @@ func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, li
 	p.sink().IterationPaused(p.Ticket, p.Label, PauseRateLimit, reason)
 	p.logAgentEvent(eventPausedRateLimit, sessionID, reason)
 	waitForCodexRateLimitReset(d, p.SessionCwd, sessionID, limit)
-	p.Gate.ForceResume(p.Label)
 	p.sink().IterationResumed(p.Ticket, p.Label, PauseRateLimit)
 	p.logLifecycleEvent(eventResumed, sessionID)
+	p.Gate.ForceResume(p.Label)
 
 	agent, err := d.AgentWait(herdr.AgentWaitOptions{
 		Target: p.Pane,

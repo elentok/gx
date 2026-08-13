@@ -52,18 +52,6 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 	waitCounts := map[string]int{} // pane -> number of "agent wait" calls seen so far
 	tab02Closed := make(chan struct{})
 	var tab02ClosedOnce sync.Once
-	// pane01QuotaDetected closes the instant ticket 01's first
-	// ReadCodexRateLimit call fires (below), i.e. right before
-	// recoverCodexRateLimit calls Gate.pause for label 01. Ticket 02's own
-	// commit (below) waits on it: without this, 02 (a same-wave, no-op
-	// build) can finish and free its active slot before 01 ever registers
-	// its pause — both are otherwise near-instant under the fake herdr and
-	// deps.Sleep no-op below — letting ticket 03 slip past
-	// Gate.claimIfRunning's "any label paused blocks every new claim"
-	// contract this test exists to check, purely on goroutine-scheduling
-	// luck rather than on an actual gate violation.
-	pane01QuotaDetected := make(chan struct{})
-	var pane01QuotaDetectedOnce sync.Once
 
 	pane01 := "pane-" + iterLabel(epicName, "01")
 	dir01 := iterationWorktreePath(wtDir, epicName, "01")
@@ -130,9 +118,15 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 					return agentJSON(pane, "working", sess)
 				}
 				if id == "02" {
-					// See pane01QuotaDetected's doc: 02 must not free its
-					// slot until 01 has already registered its quota pause.
-					<-pane01QuotaDetected
+					// 02 must not free its slot until 01 has already
+					// registered its quota pause (a run-log paused-rate-limit
+					// event for ticket 01) — otherwise 02 (a same-wave, no-op
+					// build) can finish first, letting ticket 03 slip past
+					// Gate.claimIfRunning's "any label paused blocks every new
+					// claim" contract this test exists to check, purely on
+					// goroutine-scheduling luck rather than on an actual gate
+					// violation.
+					waitForPausedRateLimitEvent(t, scratchDir, epicName, "01")
 				}
 				dir := iterationWorktreePath(wtDir, epicName, id)
 				if err := commitIterationWork(dir, id); err != nil {
@@ -207,11 +201,7 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 
 		switch call {
 		case 1:
-			// Initial detection, triggers recoverCodexRateLimit. See
-			// pane01QuotaDetected's doc: closing it here, before returning
-			// (recoverCodexRateLimit's very next line pauses the gate),
-			// gives 01's pause a deterministic head start over 02's commit.
-			pane01QuotaDetectedOnce.Do(func() { close(pane01QuotaDetected) })
+			// Initial detection, triggers recoverCodexRateLimit.
 			return codexsession.RateLimit{Quota: "usage"}, true, nil
 		case 2:
 			// The core "slot free while paused" assertion: wait until 02's
@@ -318,6 +308,29 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 		t.Errorf("event order = paused-rate-limit(01):%d resumed(01):%d iteration-started(03):%d iteration-finished(03):%d, want strictly increasing",
 			pausedIdx, resumedIdx, started03Idx, finished03Idx)
 	}
+}
+
+// waitForPausedRateLimitEvent polls the run log until a paused-rate-limit
+// event for the given ticket has been appended, i.e. until
+// recoverCodexRateLimit/recoverClaudeRateLimit's p.Gate.pause call for that
+// ticket has already happened-before the poll returns. Used in place of a
+// bespoke test-only channel so waiters observe the same signal the
+// production code and its other assertions already rely on.
+func waitForPausedRateLimitEvent(t *testing.T, scratchDir, epicName, ticketID string) {
+	t.Helper()
+	deadline := time.Now().Add(15 * time.Second)
+	for time.Now().Before(deadline) {
+		events, ok, err := readEvents(scratchDir, epicName)
+		if err == nil && ok {
+			for _, event := range events {
+				if event.Type == eventPausedRateLimit && event.Ticket == ticketID {
+					return
+				}
+			}
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for a paused-rate-limit run-log event for ticket %s in %s", ticketID, scratchDir)
 }
 
 // TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve drives
@@ -499,6 +512,14 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 		case "agent wait":
 			pane := argv[2]
 			if pane == pane01 {
+				// 01's context-breach recovery must not race ahead of 02's
+				// quota pause: without this, 01 can compact and land (freeing
+				// its slot) before 02 ever registers its pause, letting
+				// ticket 03 slip past Gate.claimIfRunning's "any label paused
+				// blocks every new claim" contract this test exists to
+				// check, purely on goroutine-scheduling luck rather than on
+				// an actual gate violation.
+				waitForPausedRateLimitEvent(t, scratchDir, epicName, "02")
 				return contextWaitResponse(pane, &contextPhase, rolloutPath, &contextLine, contextSessionID,
 					compactedContextTokens, compactedTotalTokens, finalContextTokens, finalTotalTokens)
 			}
