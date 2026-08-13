@@ -70,3 +70,47 @@ func TestCmdStartImplementUsesRealSinkDirectlyWhenNoNotificationsConfigured(t *t
 		t.Fatalf("expected the real sink unwrapped, got %T", sink)
 	}
 }
+
+// TestCmdStartImplementChatSinksSatisfyChatEventSinkForShutdown pins ticket
+// 13: the sink cmdStartImplement wires into runRalphLoop must be assertable
+// against ralphloop.ChatEventSink so the shutdown goroutine's chatClosers
+// cast (the interface{ Close() } this ticket replaced) keeps finding it —
+// regardless of which decorator, or which order, wraps the run's base sink.
+// Close() must also run without panicking (with nothing queued there's
+// nothing to send over the network), the same call the shutdown goroutine
+// makes for real.
+func TestCmdStartImplementChatSinksSatisfyChatEventSinkForShutdown(t *testing.T) {
+	// not parallel-safe: startAndCaptureSink reassigns the package-level runRalphLoop/ralphLoopRegistry singletons
+	cases := []struct {
+		name          string
+		notifications config.NotificationsConfig
+	}{
+		{
+			name:          "telegram only",
+			notifications: config.NotificationsConfig{Telegram: config.TelegramConfig{BotToken: "tok", ChatID: "42"}},
+		},
+		{
+			name:          "slack only",
+			notifications: config.NotificationsConfig{Slack: config.SlackConfig{WebhookURL: "https://hooks.example.com/x"}},
+		},
+		{
+			name: "telegram and slack",
+			notifications: config.NotificationsConfig{
+				Telegram: config.TelegramConfig{BotToken: "tok", ChatID: "42"},
+				Slack:    config.SlackConfig{WebhookURL: "https://hooks.example.com/x"},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			sink := startAndCaptureSink(t, tc.notifications)
+
+			closer, ok := sink.(ralphloop.ChatEventSink)
+			if !ok {
+				t.Fatalf("expected sink to satisfy ralphloop.ChatEventSink, got %T", sink)
+			}
+			closer.Close()
+		})
+	}
+}

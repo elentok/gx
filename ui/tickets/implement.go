@@ -475,14 +475,14 @@ func cmdStartImplement(
 		if notifications.Telegram.BotToken != "" {
 			tg := ralphloop.NewTelegramEventSink(runSink, notifications.Telegram.BotToken, notifications.Telegram.ChatID, opts.ScratchDir, epicName)
 			runSink = tg
-			if c, ok := tg.(interface{ Close() }); ok {
+			if c, ok := tg.(ralphloop.ChatEventSink); ok {
 				chatClosers = append(chatClosers, c.Close)
 			}
 		}
 		if notifications.Slack.WebhookURL != "" {
 			sl := ralphloop.NewSlackEventSink(runSink, notifications.Slack.WebhookURL, opts.ScratchDir, epicName)
 			runSink = sl
-			if c, ok := sl.(interface{ Close() }); ok {
+			if c, ok := sl.(ralphloop.ChatEventSink); ok {
 				chatClosers = append(chatClosers, c.Close)
 			}
 		}

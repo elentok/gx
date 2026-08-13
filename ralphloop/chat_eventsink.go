@@ -46,6 +46,22 @@ type chatTransport interface {
 // chat message), IterationFinished, TicketNeedsHuman, EpicParked, and
 // EpicComplete. Every other event is a pure pass-through to the embedded
 // EventSink.
+// ChatEventSink is the interface NewTelegramEventSink/NewSlackEventSink's
+// return value actually satisfies (both are declared to return the plainer
+// EventSink so callers not wired to chat can ignore it) — a named interface
+// a caller like ui/tickets/implement.go can assert against to close the
+// sink's flush loop on shutdown, instead of an anonymous method-set cast
+// that would silently no-op if the concrete type ever stopped implementing
+// it.
+type ChatEventSink interface {
+	EventSink
+	// Close stops the periodic flush loop and flushes any queued messages
+	// synchronously (bounded by the transport's timeout) before returning.
+	Close()
+}
+
+var _ ChatEventSink = (*chatEventSink)(nil)
+
 type chatEventSink struct {
 	EventSink
 	style      mrkdwnStyle
