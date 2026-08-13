@@ -39,7 +39,7 @@ func TestSearch_MatchesTitleAndStatusWordWithoutHidingRows(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	beforeRows := len(m.visibleRows())
+	beforeRows := len(visibleRows(m))
 
 	m.search.Start("done")
 	m.recomputeSearchMatches()
@@ -48,8 +48,8 @@ func TestSearch_MatchesTitleAndStatusWordWithoutHidingRows(t *testing.T) {
 		t.Fatalf("expected exactly one match for status word %q, got %d", "done", m.search.MatchesCount())
 	}
 	// Both tickets' rows must still be present — highlight-in-place, not filtering.
-	if len(m.visibleRows()) != beforeRows {
-		t.Fatalf("expected row count unchanged while searching, got %d want %d", len(m.visibleRows()), beforeRows)
+	if len(visibleRows(m)) != beforeRows {
+		t.Fatalf("expected row count unchanged while searching, got %d want %d", len(visibleRows(m)), beforeRows)
 	}
 
 	content := m.View().Content
@@ -170,13 +170,13 @@ func TestSearch_MatchesTicketInsideCollapsedClosedEpic(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected a match at position 0")
 	}
-	rows := m.visibleRows()
-	if match.DataIndex < 0 || match.DataIndex >= len(rows) {
-		t.Fatalf("match DataIndex %d out of range of %d visible rows", match.DataIndex, len(rows))
+	entries := m.sidebarTree.Entries()
+	if match.DataIndex < 0 || match.DataIndex >= len(entries) {
+		t.Fatalf("match DataIndex %d out of range of %d sidebar entries", match.DataIndex, len(entries))
 	}
-	r := rows[match.DataIndex]
-	if r.isEpic() || m.epics[r.epicIdx].Tickets[r.ticketIdx].Title != "Hidden gem" {
-		t.Fatalf("expected match to point at the hidden-gem ticket row, got row %+v", r)
+	r, ok := rowFromEntry(entries[match.DataIndex])
+	if !ok || r.isEpic() || m.epics[r.epicIdx].Tickets[r.ticketIdx].Title != "Hidden gem" {
+		t.Fatalf("expected match to point at the hidden-gem ticket row, got row %+v ok=%v", r, ok)
 	}
 }
 
@@ -225,18 +225,18 @@ func TestSearch_NAndShiftNCycleMatches(t *testing.T) {
 	m.search.DismissAndKeepResults()
 	m.search.SetCursor(0)
 	if match, ok := m.search.Match(0); ok {
-		m.selected = match.DataIndex
+		m.sidebarTree.SetSelectedIndex(match.DataIndex)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	m = updated.(Model)
-	if match, ok := m.search.Match(1); !ok || m.selected != match.DataIndex {
+	if match, ok := m.search.Match(1); !ok || m.sidebarTree.SelectedIndex() != match.DataIndex {
 		t.Fatalf("expected n to move selection to next match")
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'N', Text: "N", ShiftedCode: 'N', Mod: tea.ModShift})
 	m = updated.(Model)
-	if match, ok := m.search.Match(0); !ok || m.selected != match.DataIndex {
+	if match, ok := m.search.Match(0); !ok || m.sidebarTree.SelectedIndex() != match.DataIndex {
 		t.Fatalf("expected shift+n to move selection back to previous match")
 	}
 }

@@ -112,7 +112,8 @@ func TestOpenImplementConfirmNamesModelAndEffort(t *testing.T) {
 	}}, keys.New(nil))
 	m = deliverLoad(t, m)
 	m.epics = []tickets.Epic{{Name: "x"}}
-	m.selected = 0
+	m.sidebarTree.SetEntries(m.buildSidebarEntries())
+	m.sidebarTree.SetSelectedIndex(1) // entries[0] is the open-section header
 
 	updated, _ := m.openImplementConfirm(ralphloop.AgentClaude)
 	m = updated.(Model)
@@ -134,7 +135,8 @@ func TestOpenImplementConfirmDropsParensWhenBothEmpty(t *testing.T) {
 	}}, keys.New(nil))
 	m = deliverLoad(t, m)
 	m.epics = []tickets.Epic{{Name: "x"}}
-	m.selected = 0
+	m.sidebarTree.SetEntries(m.buildSidebarEntries())
+	m.sidebarTree.SetSelectedIndex(1) // entries[0] is the open-section header
 
 	updated, _ := m.openImplementConfirm(ralphloop.AgentClaude)
 	m = updated.(Model)
@@ -369,7 +371,7 @@ func TestModel_EpicsLoadedMsgPreservesManualCollapseToggle(t *testing.T) {
 	m = updated.(Model)
 
 	// Manually collapse open-epic, which defaults to expanded.
-	m.setCollapsed(indexOfEpic(t, m, "open-epic"), true)
+	setCollapsedEpic(&m, indexOfEpic(t, m, "open-epic"), true)
 	if !m.isCollapsed(findEpic(t, m, "open-epic")) {
 		t.Fatalf("expected open-epic collapsed after manual toggle")
 	}
@@ -405,8 +407,8 @@ func TestNewModel_ZeroTicketEpicStartsExpanded(t *testing.T) {
 
 	// A zero-ticket epic must not start dimmed/collapsed (only fully-done
 	// epics with >=1 ticket do).
-	if len(m.collapsedEpics) != 0 {
-		t.Fatalf("expected zero-ticket epic to start expanded, collapsedEpics=%v", m.collapsedEpics)
+	if collapsedEpics := m.sidebarTree.CollapsedIDs(); len(collapsedEpics) != 0 {
+		t.Fatalf("expected zero-ticket epic to start expanded, collapsedEpics=%v", collapsedEpics)
 	}
 }
 
@@ -502,26 +504,26 @@ func TestModel_MouseClickSelectsSidebarRowOnly(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// Navigate to the second ticket row (epic header, then its two tickets)
-	// so we can read the line its click needs to land on.
+	// Navigate to the second ticket row (section header, epic header, then
+	// its two tickets) so we can read the line its click needs to land on.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
-	if m.selected != 2 {
-		t.Fatalf("expected selection at row 2 after two downs, got %d", m.selected)
+	if m.sidebarTree.SelectedIndex() != 3 {
+		t.Fatalf("expected selection at entry 3 after two downs, got %d", m.sidebarTree.SelectedIndex())
 	}
-	line, _, ok := m.sidebarLineForSelected()
-	if !ok {
-		t.Fatalf("expected a line for the selected row")
-	}
+	line := selectedSidebarLine(t, m)
 	checkedBefore := len(m.checked)
 
-	m.selected = 0
+	// Entry 1 (the epic) is the sidebar's first real row — entry 0 is the
+	// section header, never cursor-reachable — so it's the reset baseline
+	// below.
+	m.sidebarTree.SetSelectedIndex(1)
 	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, X: 0, Y: line + 1})
 	m = updated.(Model)
-	if m.selected != 2 {
-		t.Fatalf("expected click to select row 2, got %d", m.selected)
+	if m.sidebarTree.SelectedIndex() != 3 {
+		t.Fatalf("expected click to select entry 3, got %d", m.sidebarTree.SelectedIndex())
 	}
 	if m.confirm.IsOpen {
 		t.Fatalf("expected click-to-select to not open the confirm modal")
@@ -532,18 +534,18 @@ func TestModel_MouseClickSelectsSidebarRowOnly(t *testing.T) {
 
 	// A click landing on the preview panel (past the sidebar's width) is a no-op.
 	sidebarW, _ := m.splitWidth()
-	m.selected = 0
+	m.sidebarTree.SetSelectedIndex(1)
 	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, X: sidebarW, Y: line + 1})
 	m = updated.(Model)
-	if m.selected != 0 {
-		t.Fatalf("expected click on the preview panel to leave selection at row 0, got %d", m.selected)
+	if m.sidebarTree.SelectedIndex() != 1 {
+		t.Fatalf("expected click on the preview panel to leave selection at entry 1, got %d", m.sidebarTree.SelectedIndex())
 	}
 
 	// A non-left click must not move the selection either.
 	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseRight, X: 0, Y: line + 1})
 	m = updated.(Model)
-	if m.selected != 0 {
-		t.Fatalf("expected non-left click to leave selection at row 0, got %d", m.selected)
+	if m.sidebarTree.SelectedIndex() != 1 {
+		t.Fatalf("expected non-left click to leave selection at entry 1, got %d", m.sidebarTree.SelectedIndex())
 	}
 }
 
@@ -699,14 +701,14 @@ func TestModel_DimmingTracksAllDoneNotCollapseState(t *testing.T) {
 
 	// done-epic starts collapsed by default: expand it and confirm it's
 	// still dimmed (dimming tracks AllDone(), not the collapse toggle).
-	m.setCollapsed(indexOfEpic(t, m, "done-epic"), false)
+	setCollapsedEpic(&m, indexOfEpic(t, m, "done-epic"), false)
 	if !strings.Contains(m.renderEpicRow(doneEpic), dimPrefix) {
 		t.Fatalf("expected done-epic to stay dimmed after manual expand, got: %q", m.renderEpicRow(doneEpic))
 	}
 
 	// open-epic starts expanded: collapse it and confirm it does NOT
 	// become dimmed just because it's collapsed.
-	m.setCollapsed(indexOfEpic(t, m, "open-epic"), true)
+	setCollapsedEpic(&m, indexOfEpic(t, m, "open-epic"), true)
 	if strings.Contains(m.renderEpicRow(openEpic), dimPrefix) {
 		t.Fatalf("expected open-epic to stay undimmed after manual collapse, got: %q", m.renderEpicRow(openEpic))
 	}
@@ -726,7 +728,7 @@ func TestModel_TCTogglesHideDoneTickets(t *testing.T) {
 	if !strings.Contains(m.View().Content, "First ticket") {
 		t.Fatalf("expected done ticket visible before 'tc', got:\n%s", m.View().Content)
 	}
-	if got := len(m.visibleRows()); got != 3 {
+	if got := len(visibleRows(m)); got != 3 {
 		t.Fatalf("expected 3 visible rows (epic + 2 tickets) before 'tc', got %d", got)
 	}
 
@@ -741,7 +743,7 @@ func TestModel_TCTogglesHideDoneTickets(t *testing.T) {
 	if !strings.Contains(m.View().Content, "Second ticket") {
 		t.Fatalf("expected open ticket still visible after 'tc', got:\n%s", m.View().Content)
 	}
-	if got := len(m.visibleRows()); got != 2 {
+	if got := len(visibleRows(m)); got != 2 {
 		t.Fatalf("expected 2 visible rows (epic + open ticket) after 'tc', got %d", got)
 	}
 	// Epic header counts read epic.Tickets directly, so the filter must not
@@ -759,7 +761,7 @@ func TestModel_TCTogglesHideDoneTickets(t *testing.T) {
 	if !strings.Contains(m.View().Content, "First ticket") {
 		t.Fatalf("expected done ticket visible again after second 'tc', got:\n%s", m.View().Content)
 	}
-	if got := len(m.visibleRows()); got != 3 {
+	if got := len(visibleRows(m)); got != 3 {
 		t.Fatalf("expected 3 visible rows again after second 'tc', got %d", got)
 	}
 }
@@ -776,14 +778,14 @@ func TestModel_TCOnFullyDoneEpicHidesAllTicketsButKeepsEpicRow(t *testing.T) {
 
 	// done-epic starts collapsed by default (AllDone); expand it so its
 	// ticket row would normally be visible.
-	m.setCollapsed(indexOfEpic(t, m, "done-epic"), false)
+	setCollapsedEpic(&m, indexOfEpic(t, m, "done-epic"), false)
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
 	m = updated.(Model)
 
-	rows := m.visibleRows()
+	rows := visibleRows(m)
 	if len(rows) != 1 || !rows[0].isEpic() {
 		t.Fatalf("expected only the epic row visible for a fully-done epic under 'tc', got %+v", rows)
 	}
@@ -891,6 +893,66 @@ func indexOfEpic(t *testing.T, m Model, name string) int {
 	}
 	t.Fatalf("epic %q not found", name)
 	return -1
+}
+
+// setCollapsedEpic mirrors the old m.setCollapsed(epicIdx, collapsed): mutate
+// a copy of the sidebar tree's collapsed-ID map keyed by the epic's Path,
+// write it back, then clampSelected to rebuild entries so a caller's
+// subsequent Entries()/selectedRow() call sees the change.
+func setCollapsedEpic(m *Model, epicIdx int, collapsed bool) {
+	ids := m.sidebarTree.CollapsedIDs()
+	ids[m.epics[epicIdx].Path] = collapsed
+	m.sidebarTree.SetCollapsedIDs(ids)
+	m.clampSelected()
+}
+
+// selectedSidebarLine mirrors sidebarLines()' (view.go) header/placeholder
+// line counting to find which physical line the currently selected entry
+// renders on — the test-only replacement for the deleted
+// sidebarLineForSelected, now that every row is exactly 1 physical line.
+func selectedSidebarLine(t *testing.T, m Model) int {
+	t.Helper()
+	idxs := make([]int, len(m.epics))
+	for i := range m.epics {
+		idxs[i] = i
+	}
+	openIdxs, closedIdxs := splitEpicIndexesBySection(m.epics, idxs)
+	selectedIdx := m.sidebarTree.SelectedIndex()
+
+	line := 0
+	for i, e := range m.sidebarTree.Entries() {
+		if i == selectedIdx {
+			return line
+		}
+		switch e.Value.kind {
+		case nodeSection:
+			n := len(openIdxs)
+			if e.Value.section == sectionClosed {
+				n = len(closedIdxs)
+				line++ // blank line preceding the closed section header
+			}
+			line++
+			if n == 0 {
+				line++ // muted "no ... epics" placeholder
+			}
+		case nodeEpic, nodeTicket:
+			line++
+		}
+	}
+	t.Fatalf("selected index %d not found among sidebar entries", selectedIdx)
+	return -1
+}
+
+// visibleRows mirrors the old m.visibleRows(): every cursor-reachable sidebar
+// row (epics + tickets), section-header entries excluded.
+func visibleRows(m Model) []row {
+	var rows []row
+	for _, e := range m.sidebarTree.Entries() {
+		if r, ok := rowFromEntry(e); ok {
+			rows = append(rows, r)
+		}
+	}
+	return rows
 }
 
 func writeTicket(t *testing.T, root, epic, filename, content string) {

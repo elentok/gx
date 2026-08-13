@@ -92,9 +92,24 @@ func TestModel_TicketRows_NestsChildrenAtArbitraryDepthAndRespectsCollapse(t *te
 		{Number: 3, Identifier: "03", Path: "03", Status: "open", Parent: &parent02},
 		{Number: 4, Identifier: "04", Path: "04", Status: "open"},
 	}}
-	m := Model{}
+	m := Model{epics: []tickets.Epic{epic}}
 
-	rows := m.ticketRows(0, epic)
+	ticketRows := func() []row {
+		var rows []row
+		for _, e := range m.buildSidebarEntries() {
+			if e.Value.kind != nodeTicket || e.Value.epicIdx != 0 {
+				continue
+			}
+			r, ok := rowFromEntry(e)
+			if !ok {
+				continue
+			}
+			rows = append(rows, r)
+		}
+		return rows
+	}
+
+	rows := ticketRows()
 	wantIDs := []string{"01", "02", "03", "04"}
 	wantDepths := []int{0, 1, 2, 0}
 	if len(rows) != len(wantIDs) {
@@ -112,8 +127,8 @@ func TestModel_TicketRows_NestsChildrenAtArbitraryDepthAndRespectsCollapse(t *te
 		t.Fatalf("expected ticket 01 to report hasChildren+expanded, got %+v", rows[0])
 	}
 
-	m.collapsedTickets = map[string]bool{"01": true}
-	rows = m.ticketRows(0, epic)
+	m.sidebarTree.SetCollapsedIDs(map[string]bool{"01": true})
+	rows = ticketRows()
 	wantAfterCollapse := []string{"01", "04"}
 	if len(rows) != len(wantAfterCollapse) {
 		t.Fatalf("expected %d rows after collapsing 01, got %d: %+v", len(wantAfterCollapse), len(rows), rows)

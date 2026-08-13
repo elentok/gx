@@ -241,20 +241,18 @@ func TestModel_GAndGGJumpSidebarSelectionToLastAndFirstRow(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	m = updated.(Model)
-	last := len(m.visibleRows()) - 1
-	if last <= 0 {
-		t.Fatalf("expected more than one visible row in test setup, got %d", last+1)
-	}
-	if m.selected != last {
-		t.Fatalf("expected 'G' to select the last row (%d), got %d", last, m.selected)
+	r, ok := m.selectedRow()
+	if !ok || r.isEpic() || m.epics[r.epicIdx].Tickets[r.ticketIdx].Identifier != "03" {
+		t.Fatalf("expected 'G' to select the last ticket row, got row=%+v ok=%v", r, ok)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	m = updated.(Model)
-	if m.selected != 0 {
-		t.Fatalf("expected 'gg' to select the first row (0), got %d", m.selected)
+	r, ok = m.selectedRow()
+	if !ok || !r.isEpic() {
+		t.Fatalf("expected 'gg' to select the first row (epic), got row=%+v ok=%v", r, ok)
 	}
 }
 

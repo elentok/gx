@@ -44,8 +44,8 @@ func TestModel_ClickInsidePreviewBoundsFocusesItAndRoutesWheel(t *testing.T) {
 	updated, _ = m.Update(tea.MouseWheelMsg{X: px + 1, Y: py + 1, Button: tea.MouseWheelDown})
 	m = updated.(Model)
 
-	if m.scrollOffset != 0 {
-		t.Fatalf("expected sidebar scroll offset to stay at 0, got %d", m.scrollOffset)
+	if m.sidebarTree.ScrollOffset() != 0 {
+		t.Fatalf("expected sidebar scroll offset to stay at 0, got %d", m.sidebarTree.ScrollOffset())
 	}
 	if m.previewVP.YOffset() == initialOffset {
 		t.Fatalf("expected preview viewport to scroll on wheel event while focused, offset stayed at %d", initialOffset)
@@ -67,10 +67,7 @@ func TestModel_ClickInsideSidebarRestoresFocus(t *testing.T) {
 
 	m.focus = focusPreview
 
-	line, _, ok := m.sidebarLineForSelected()
-	if !ok {
-		t.Fatal("expected a selected sidebar row to click on")
-	}
+	line := selectedSidebarLine(t, m)
 	updated, _ = m.Update(tea.MouseClickMsg{X: 1, Y: line + 1, Button: tea.MouseLeft})
 	m = updated.(Model)
 

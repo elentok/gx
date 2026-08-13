@@ -18,7 +18,7 @@ func newModelForTicketRowTests(epic tickets.Epic) Model {
 	m := NewModel("", ui.Settings{}, keys.New(nil))
 	m.loaded = true
 	m.epics = []tickets.Epic{epic}
-	m.collapsedEpics = map[string]bool{}
+	m.sidebarTree.SetEntries(m.buildSidebarEntries())
 	return m
 }
 
@@ -149,24 +149,6 @@ func TestRenderTicketRow_PausedHasReasonAndMetricsLine(t *testing.T) {
 	}
 }
 
-func TestSidebarLineForSelectedCountsMetricsLines(t *testing.T) {
-	t.Parallel()
-	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
-		{Identifier: "01", Title: "Done ticket", Status: "done"},
-		{Identifier: "02", Title: "Open ticket", Status: "open"},
-	}}
-	m := newModelForTicketRowTests(epic)
-	m.selected = 2 // epic row, single-line done row, then open row
-
-	line, height, ok := m.sidebarLineForSelected()
-	if !ok {
-		t.Fatal("sidebarLineForSelected() ok = false")
-	}
-	if line != 3 || height != 1 {
-		t.Fatalf("sidebarLineForSelected() = (%d, %d), want (3, 1)", line, height)
-	}
-}
-
 func TestStatusIconAndStyle_Colors(t *testing.T) {
 	t.Parallel()
 	icons := ui.Icons(false)
@@ -285,7 +267,8 @@ func TestSidebarLinesHighlightsBothLinesOfSelectedTicket(t *testing.T) {
 		{Identifier: "02", Title: "Open ticket", Status: "open"},
 	}}
 	m := newModelForTicketRowTests(epic)
-	m.selected = 1 // epic is row 0; done ticket is row 1
+	// Entries: section header (0), epic (1), done ticket (2), open ticket (3).
+	m.sidebarTree.SetSelectedIndex(2)
 
 	lines := m.sidebarLines()
 	want := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)
