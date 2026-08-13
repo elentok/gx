@@ -381,6 +381,90 @@ func TestLaunchAndPrompt_AttachToLiveAgent_GenuinelyFinishedStaysFinished(t *tes
 	}
 }
 
+// TestNoActivitySinceLaunch covers ticket 07: a matching eventIterationStarted
+// with a zero/unset StateChangeSeq (as written by attachToLiveAgent's own
+// collision-path logLifecycleEvent call, which never stamps a seq) is never
+// treated as a real launch-time baseline — the scan must keep looking past it
+// rather than short-circuit on it.
+func TestNoActivitySinceLaunch(t *testing.T) {
+	t.Parallel()
+
+	t.Run("zero-seq match is not a real baseline", func(t *testing.T) {
+		t.Parallel()
+		scratchDir := t.TempDir()
+		epicName := "fix-spinner"
+		if err := logEvent(scratchDir, epicName, Event{
+			Type:         eventIterationStarted,
+			AgentSession: "sess-live",
+		}); err != nil {
+			t.Fatalf("logEvent: %v", err)
+		}
+
+		if got := noActivitySinceLaunch(scratchDir, epicName, "sess-live", 0); got {
+			t.Errorf("noActivitySinceLaunch() = true, want false (zero-seq event must not be treated as a real baseline)")
+		}
+	})
+
+	t.Run("no matching event falls through to false", func(t *testing.T) {
+		t.Parallel()
+		scratchDir := t.TempDir()
+		epicName := "fix-spinner"
+		if err := logEvent(scratchDir, epicName, Event{
+			Type:         eventIterationStarted,
+			AgentSession: "sess-other",
+		}); err != nil {
+			t.Fatalf("logEvent: %v", err)
+		}
+
+		if got := noActivitySinceLaunch(scratchDir, epicName, "sess-live", 946); got {
+			t.Errorf("noActivitySinceLaunch() = true, want false (no matching event)")
+		}
+	})
+
+	t.Run("genuine non-zero baseline still matches", func(t *testing.T) {
+		t.Parallel()
+		scratchDir := t.TempDir()
+		epicName := "fix-spinner"
+		if err := logEvent(scratchDir, epicName, Event{
+			Type:           eventIterationStarted,
+			AgentSession:   "sess-live",
+			StateChangeSeq: 946,
+		}); err != nil {
+			t.Fatalf("logEvent: %v", err)
+		}
+
+		if got := noActivitySinceLaunch(scratchDir, epicName, "sess-live", 946); !got {
+			t.Errorf("noActivitySinceLaunch() = false, want true (current seq matches genuine baseline)")
+		}
+		if got := noActivitySinceLaunch(scratchDir, epicName, "sess-live", 950); got {
+			t.Errorf("noActivitySinceLaunch() = true, want false (current seq has moved past genuine baseline)")
+		}
+	})
+
+	t.Run("skips zero-seq event to find a later genuine baseline", func(t *testing.T) {
+		t.Parallel()
+		scratchDir := t.TempDir()
+		epicName := "fix-spinner"
+		if err := logEvent(scratchDir, epicName, Event{
+			Type:         eventIterationStarted,
+			AgentSession: "sess-live",
+		}); err != nil {
+			t.Fatalf("logEvent: %v", err)
+		}
+		if err := logEvent(scratchDir, epicName, Event{
+			Type:           eventIterationStarted,
+			AgentSession:   "sess-live",
+			StateChangeSeq: 946,
+		}); err != nil {
+			t.Fatalf("logEvent: %v", err)
+		}
+
+		if got := noActivitySinceLaunch(scratchDir, epicName, "sess-live", 946); !got {
+			t.Errorf("noActivitySinceLaunch() = false, want true (must skip the zero-seq event and match the later genuine baseline)")
+		}
+	})
+}
+
 // recordingSinkWithArgs embeds occupancySink (itself embedding
 // noopEventSink) and additionally hooks IterationStarted, for tests that
 // need both start-time signals asserted together.

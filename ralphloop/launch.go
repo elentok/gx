@@ -339,12 +339,7 @@ func attachToLiveAgent(d Deps, p launchAndPromptParams) (string, error) {
 		return sessionID, nil
 	}
 	if alreadyFinished(live.AgentStatus) {
-		promptedAgent, err := d.AgentPrompt(herdr.AgentPromptOptions{
-			Target: p.Pane,
-			Text:   p.Prompt,
-			Wait:   true,
-			Until:  []string{"working"},
-		})
+		promptedAgent, err := resendPrompt(d, p)
 		if err != nil {
 			return "", fmt.Errorf("sending initial prompt to stalled reattached pane: %w", err)
 		}
@@ -359,6 +354,19 @@ func attachToLiveAgent(d Deps, p launchAndPromptParams) (string, error) {
 		return "", err
 	}
 	return sessionID, nil
+}
+
+// resendPrompt re-sends p.Prompt to p.Pane and waits for the pane to reach
+// "working" — the shared resend used by both attachToLiveAgent's
+// stalled-since-launch branch and parkOnBlockedPane's resend-before-park
+// gate, so future changes to resend semantics land once, not twice.
+func resendPrompt(d Deps, p launchAndPromptParams) (herdr.Agent, error) {
+	return d.AgentPrompt(herdr.AgentPromptOptions{
+		Target: p.Pane,
+		Text:   p.Prompt,
+		Wait:   true,
+		Until:  []string{"working"},
+	})
 }
 
 // stalledSinceLaunch reports whether live's pane never advanced past the
@@ -388,7 +396,7 @@ func noActivitySinceLaunch(scratchDir, epicName, agentSession string, currentSeq
 		return false
 	}
 	for _, ev := range events {
-		if ev.Type == eventIterationStarted && ev.AgentSession == agentSession {
+		if ev.Type == eventIterationStarted && ev.AgentSession == agentSession && ev.StateChangeSeq != 0 {
 			return currentSeq == ev.StateChangeSeq
 		}
 	}

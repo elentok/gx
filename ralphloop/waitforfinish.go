@@ -940,12 +940,7 @@ func parkOnBlockedPane(d Deps, p launchAndPromptParams, sessionID string) (parke
 	}
 
 	if noActivitySinceLaunch(p.ScratchDir, p.EpicName, sessionID, agent.StateChangeSeq) {
-		if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
-			Target: p.Pane,
-			Text:   p.Prompt,
-			Wait:   true,
-			Until:  []string{"working"},
-		}); err == nil {
+		if _, err := resendPrompt(d, p); err == nil {
 			return false, nil
 		}
 	}
