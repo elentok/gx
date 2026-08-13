@@ -173,9 +173,6 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 				))
 			case nodeEpicError:
 				return statusErrorStyle.Render("    " + entry.Value.err.Error())
-			case nodeQueueTicketReason:
-				line, _ := m.queueTicketReasonLine(entry.Value.ticket)
-				return line
 			default: // nodeQueueTicket
 				return m.renderQueueTicketRow(entry.Value.ticket, idxByID[entry.ID])
 			}
@@ -198,10 +195,9 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 // has children, matching the Tickets tab's renderTicketRow (ticket 09/10).
 // Search-match highlighting is likewise left to RenderLines' own generic
 // overlay — rowIdx is only used to dim a non-matching row while a query is
-// active. A needs-answer/needs-repair ticket's park-reason subtext renders
-// as its own sibling nodeQueueTicketReason entry (queueTicketReasonLine)
-// rather than a second physical line here, since RenderLines is one Entry
-// per line.
+// active. A needs-answer/needs-repair ticket's park-reason subtext is a
+// second physical line on this same entry (queueTicketReasonLine, set as
+// Entry.Body in buildQueueEntries) rather than rendered here.
 func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 	epic, t := r.epic, r.ticket
 	status := epic.RenderedStatus(t)
@@ -271,12 +267,12 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 }
 
 // queueTicketReasonLine renders the park-reason subtext for a needs-answer/
-// needs-repair ticket as its own line (nodeQueueTicketReason, a sibling
-// entry immediately following the ticket's own nodeQueueTicket row —
-// buildQueueEntries), indented to align under the title the same way the
-// pre-tree.Model buildQueueLines' two-physical-line row used to (triangle +
-// icon + badge width, mirroring renderQueueTicketRow's own column layout).
-// ok reports false (empty line) when r's ticket isn't currently parked.
+// needs-repair ticket as a second physical line on its own nodeQueueTicket
+// entry (set as Entry.Body in buildQueueEntries), indented to align under the
+// title the same way the pre-tree.Model buildQueueLines' two-physical-line
+// row used to (triangle + icon + badge width, mirroring renderQueueTicketRow's
+// own column layout). ok reports false (empty line) when r's ticket isn't
+// currently parked.
 func (m QueueModel) queueTicketReasonLine(r queueRow) (line string, ok bool) {
 	epic, t := r.epic, r.ticket
 	status := epic.RenderedStatus(t)

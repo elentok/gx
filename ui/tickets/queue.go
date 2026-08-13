@@ -129,7 +129,7 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 	queueTree := tree.NewModel[queueNode]()
 	queueTree.SetIsSelectable(func(n queueNode) bool {
 		switch n.kind {
-		case nodeEpicSeparator, nodeEpicStatus, nodeEpicContext, nodeEpicError, nodeQueueTicketReason:
+		case nodeEpicSeparator, nodeEpicStatus, nodeEpicContext, nodeEpicError:
 			return false
 		default:
 			return true

@@ -165,8 +165,8 @@ func TestQueueModelNestsChildrenUnderParentAndCollapsesWithHL(t *testing.T) {
 }
 
 // queueTicketEntries filters m.queueTree.Entries() down to nodeQueueTicket
-// rows, dropping the per-epic separator/status/context/error/park-reason
-// entries buildQueueEntries interleaves — the tree's own Depth/HasChildren/
+// rows, dropping the per-epic separator/status/context/error entries
+// buildQueueEntries interleaves — the tree's own Depth/HasChildren/
 // Expanded on each Entry (not queueRow's mirrored fields, which only exist to
 // drive the fold-glyph render) is the nesting truth these tests assert
 // against, per ticket 19's live-render-path rewrite.

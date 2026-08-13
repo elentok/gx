@@ -21,22 +21,23 @@ type queueRow struct {
 	parentPath  string
 }
 
-// queueNodeKind distinguishes the six row kinds the Queue tab's tree can
+// queueNodeKind distinguishes the five row kinds the Queue tab's tree can
 // hold: a per-epic blank separator, its status/context-window header lines,
-// an optional plan-error line, a ticket, and a ticket's optional park-reason
-// subtext. tree.Model[T] has no notion of a heterogeneous node — this sum
-// type plus buildQueueEntries' idFn/childrenFn is what makes one
-// tree.Model[queueNode] stand in for buildQueueLines' former hand-spliced
-// header/blank/error strings interleaved with the ticket rows.
+// an optional plan-error line, and a ticket. tree.Model[T] has no notion of a
+// heterogeneous node — this sum type plus buildQueueEntries' idFn/childrenFn
+// is what makes one tree.Model[queueNode] stand in for buildQueueLines'
+// former hand-spliced header/blank/error strings interleaved with the ticket
+// rows. A ticket's park-reason subtext is not a node of its own — it's a
+// second physical line on the ticket's own entry (queueTicketReasonLine, set
+// as Entry.Body in buildQueueEntries).
 type queueNodeKind int
 
 const (
-	nodeEpicSeparator     queueNodeKind = iota // blank line before every epic
-	nodeEpicStatus                             // epic name + status icon/text (epicStatusLine)
-	nodeEpicContext                            // context-window metrics line
-	nodeEpicError                              // present only when planErrs[epic.Name] != nil
-	nodeQueueTicket                            // wraps a queueRow
-	nodeQueueTicketReason                      // park-reason subtext, sibling right after its nodeQueueTicket (queueTicketReasonLine)
+	nodeEpicSeparator queueNodeKind = iota // blank line before every epic
+	nodeEpicStatus                         // epic name + status icon/text (epicStatusLine)
+	nodeEpicContext                        // context-window metrics line
+	nodeEpicError                          // present only when planErrs[epic.Name] != nil
+	nodeQueueTicket                        // wraps a queueRow
 )
 
 // queueNode is ui/tree.Model[queueNode]'s value type. err is set only for
@@ -99,14 +100,11 @@ func (m QueueModel) buildQueueEntries() []tree.Entry[queueNode] {
 		}
 		for _, t := range ordered {
 			row := queueRow{epic: epic, ticket: t}
-			siblings := []queueNode{{kind: nodeQueueTicket, epic: epic, ticket: row}}
-			if parkReason(epic, t, m.icons().Ellipsis) != "" {
-				siblings = append(siblings, queueNode{kind: nodeQueueTicketReason, epic: epic, ticket: row})
-			}
+			node := queueNode{kind: nodeQueueTicket, epic: epic, ticket: row}
 			if parentPath := nearestVisibleQueueAncestor(t, visible, byIdentifier); parentPath != "" {
-				childrenOf[parentPath] = append(childrenOf[parentPath], siblings...)
+				childrenOf[parentPath] = append(childrenOf[parentPath], node)
 			} else {
-				roots = append(roots, siblings...)
+				roots = append(roots, node)
 			}
 		}
 	}
@@ -144,8 +142,6 @@ func (m QueueModel) buildQueueEntries() []tree.Entry[queueNode] {
 			return "epic:" + n.epic.Name + ":context"
 		case nodeEpicError:
 			return "epic:" + n.epic.Name + ":err"
-		case nodeQueueTicketReason:
-			return n.ticket.ticket.Path + ":reason"
 		default:
 			return n.ticket.ticket.Path
 		}
@@ -157,7 +153,16 @@ func (m QueueModel) buildQueueEntries() []tree.Entry[queueNode] {
 		return childrenOf[n.ticket.ticket.Path]
 	}
 
-	return tree.BuildEntriesFromValues(roots, idFn, childrenFn, m.queueTree.CollapsedIDs())
+	entries := tree.BuildEntriesFromValues(roots, idFn, childrenFn, m.queueTree.CollapsedIDs())
+	for i := range entries {
+		if entries[i].Value.kind != nodeQueueTicket {
+			continue
+		}
+		if line, ok := m.queueTicketReasonLine(entries[i].Value.ticket); ok {
+			entries[i].Body = []string{line}
+		}
+	}
+	return entries
 }
 
 // filterDoneTickets drops a done ticket from ordered before nesting
