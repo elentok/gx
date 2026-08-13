@@ -205,6 +205,7 @@ func reattachIteration(d Deps, p iterationParams) error {
 			return fmt.Errorf("live Codex session %s for reattached iteration %s does not match rollout metadata for cwd %s", agent.AgentSession, label, path)
 		}
 	}
+	p.Sink.TicketReattached(p.Ticket.Identifier, label, path, agent.AgentSession)
 	if agent.AgentSession != "" {
 		if err := AppendSessionID(p.Ticket.Path, agent.AgentSession); err != nil {
 			return fmt.Errorf("appending session id for reattached ticket %s: %w", p.Ticket.Identifier, err)

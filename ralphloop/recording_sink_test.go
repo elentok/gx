@@ -33,6 +33,10 @@ type recordingSink struct {
 	// (identifier, epicName, status, reason) tuple, for asserting both the
 	// count and the identity/status a parking-write transition reports.
 	ticketNeedsHumanCalls [][4]string
+	// reattachedCalls records every TicketReattached call's
+	// (identifier, label, cwd, sessionID) tuple, for asserting the live
+	// session identity a reattach reports.
+	reattachedCalls [][4]string
 }
 
 func (s *recordingSink) record(name string) {
@@ -52,6 +56,9 @@ func (s *recordingSink) snapshot() []string {
 func (s *recordingSink) EpicStarted(epicName string, done, total int) { s.record("EpicStarted") }
 func (s *recordingSink) TicketReverted(identifier string)             { s.record("TicketReverted") }
 func (s *recordingSink) TicketReattached(identifier, label, cwd, sessionID string) {
+	s.mu.Lock()
+	s.reattachedCalls = append(s.reattachedCalls, [4]string{identifier, label, cwd, sessionID})
+	s.mu.Unlock()
 	s.record("TicketReattached")
 }
 func (s *recordingSink) TicketNeedsHuman(identifier, epicName, status, reason string) {
