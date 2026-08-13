@@ -82,14 +82,14 @@ func TestQueueModelOrdersRowsByDependencyNotTicketNumber(t *testing.T) {
 		ticketPath(root, "alpha", "10-unrelated.md"): true,
 	}
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
-	rows := m.rows()
+	rows := queueTicketEntries(m)
 	if len(rows) != 4 {
 		t.Fatalf("expected 4 rows, got %d: %+v", len(rows), rows)
 	}
 
 	indexOf := func(id string) int {
 		for i, r := range rows {
-			if r.ticket.Identifier == id {
+			if r.Value.ticket.ticket.Identifier == id {
 				return i
 			}
 		}
@@ -319,7 +319,7 @@ func TestQueueModelEnterOnExpandedParentFocusesPreview(t *testing.T) {
 	if m.focus != focusPreview {
 		t.Fatalf("expected enter on already-expanded parent row to focus preview, got focus=%v", m.focus)
 	}
-	rows := m.rows()
+	rows := queueTicketEntries(m)
 	if len(rows) != 2 {
 		t.Fatalf("expected parent to stay expanded (2 rows) after enter, got %d: %+v", len(rows), rows)
 	}
@@ -763,8 +763,8 @@ func TestQueueModelHideCompleteToggleHidesDoneTicketsButKeepsPlanValidation(t *t
 	if content := m.View().Content; !strings.Contains(content, "First") {
 		t.Fatalf("expected done ticket visible by default:\n%s", content)
 	}
-	if len(m.rows()) != 2 {
-		t.Fatalf("expected both tickets in rows() by default, got %d", len(m.rows()))
+	if len(queueTicketEntries(m)) != 2 {
+		t.Fatalf("expected both tickets in Entries() by default, got %d", len(queueTicketEntries(m)))
 	}
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
@@ -772,9 +772,9 @@ func TestQueueModelHideCompleteToggleHidesDoneTicketsButKeepsPlanValidation(t *t
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
 	m = updated.(QueueModel)
 
-	rows := m.rows()
-	if len(rows) != 1 || rows[0].ticket.Path != second {
-		t.Fatalf("expected only the non-done ticket in rows() after tc, got %+v", rows)
+	rows := queueTicketEntries(m)
+	if len(rows) != 1 || rows[0].Value.ticket.ticket.Path != second {
+		t.Fatalf("expected only the non-done ticket in Entries() after tc, got %+v", rows)
 	}
 	content := m.View().Content
 	if strings.Contains(content, "First") {
@@ -791,8 +791,8 @@ func TestQueueModelHideCompleteToggleHidesDoneTicketsButKeepsPlanValidation(t *t
 	m = updated.(QueueModel)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
 	m = updated.(QueueModel)
-	if len(m.rows()) != 2 {
-		t.Fatalf("expected tc toggled again to restore both tickets, got %d", len(m.rows()))
+	if len(queueTicketEntries(m)) != 2 {
+		t.Fatalf("expected tc toggled again to restore both tickets, got %d", len(queueTicketEntries(m)))
 	}
 }
 
@@ -2000,18 +2000,19 @@ func TestQueueSearch_TypedCharactersFilterAndHighlight(t *testing.T) {
 	}
 
 	dimPrefix := strings.SplitN(ui.StyleDim.Render("PROBE"), "PROBE", 2)[0]
-	rows := m.rows()
 	var ticketRows []int
+	var ticketValues []queueNode
 	for i, e := range m.queueTree.Entries() {
 		if e.Value.kind == nodeQueueTicket {
 			ticketRows = append(ticketRows, i)
+			ticketValues = append(ticketValues, e.Value)
 		}
 	}
 	if len(ticketRows) != 2 {
 		t.Fatalf("expected 2 ticket rows, got %d: %v", len(ticketRows), ticketRows)
 	}
-	matchedLine := m.renderQueueTicketRow(rows[0], ticketRows[0])
-	nonMatchedLine := m.renderQueueTicketRow(rows[1], ticketRows[1])
+	matchedLine := m.renderQueueTicketRow(ticketValues[0].ticket, ticketRows[0])
+	nonMatchedLine := m.renderQueueTicketRow(ticketValues[1].ticket, ticketRows[1])
 	if strings.Contains(matchedLine, dimPrefix) {
 		t.Fatalf("expected matching row undimmed, got: %q", matchedLine)
 	}
