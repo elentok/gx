@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -69,13 +70,17 @@ func hasLiveParkedTicket(d Deps, workspaceID, epicName, worktreeDir string, agen
 		// A still-blocked pane could leave the blocked state on its own before
 		// the next poll — the only way that gets noticed is this same poll
 		// loop reaching unparkAnswered again — so it's worth continuing to
-		// poll for regardless of what clearableParkedTicket says right now.
-		// A live-and-unblocked ticket clearableParkedTicket still calls not
+		// poll for regardless of what clearableNeedsAnswer says right now.
+		// A live-and-unblocked ticket clearableNeedsAnswer still calls not
 		// clearable (a zero-commit park with nothing landed yet) has no
 		// pending state change a poll could catch: it only clears once a
 		// person edits the file, which the ordinary per-iteration epic reload
 		// already picks up, same as an announce-and-stop park's dead pane.
-		if agent.AgentStatus == "blocked" || clearableParkedTicket(d, workspaceID, epicName, worktreeDir, agentKind, epic, t) {
+		//
+		// agent/live were just looked up above for this same ticket — reused
+		// here via clearableNeedsAnswer rather than re-derived through
+		// clearableParkedTicket, which would look the pane up a second time.
+		if agent.AgentStatus == "blocked" || clearableNeedsAnswer(d, worktreeDir, epicName, t, agent, live) {
 			return true
 		}
 	}
@@ -89,49 +94,56 @@ func hasLiveParkedTicket(d Deps, workspaceID, epicName, worktreeDir string, agen
 // three call sites reach status two different ways today, and a raw-Status
 // predicate would route a ticket down the wrong branch whenever they
 // diverge.
-//
-// A needs-answer ticket's clearability depends on which of ralph-loop's
-// three needs-answer producers parked it (see schema.ParkKind's doc). A
-// missing park_kind (any ticket parked before that field existed) defaults
-// to ParkKindZeroCommit, the conservative choice: unlike a gate park or a
-// self-report, a zero-commit finish never told anyone whether picking the
-// pane back up is actually safe. blocked-pane and self-reported parks still
-// own a pane an operator answers directly, so a live, unblocked pane is the
-// whole signal, same as before park_kind existed. A zero-commit park's pane
-// is left alive only for inspection — its agent already declared itself
-// done with nothing to land — so liveness alone would auto-reattach a
-// finished agent with no new instructions; CommitsAhead is what tells the
-// zero-commit case apart, since it's the same check finishIteration itself
-// uses to decide whether an iteration produced anything. The CommitsAhead
-// call is gated behind park_kind == zero-commit && live so the common case
-// (blocked-pane/self-reported) never pays for it, and a CommitsAhead
-// failure degrades to "not clearable" rather than propagating as an error —
-// a git hiccup here must not kill the whole run.
-//
-// needs-repair and draft parks never carry park_kind (only a needs-answer
-// park does) and are unaffected by any of this: they stay the same
-// liveness-only rule ralph-loop has always applied to them.
 func clearableParkedTicket(d Deps, workspaceID, epicName, worktreeDir string, agentKind AgentKind, epic tickets.Epic, t tickets.Ticket) bool {
 	switch epic.RenderedStatus(t) {
 	case tickets.StatusNeedsAnswer:
 		agent, live := liveAgent(d, workspaceID, epicName, agentKind, worktreeDir, t)
-		if !live || agent.AgentStatus == "blocked" {
-			return false
-		}
-		kind := t.ParkKind
-		if kind == "" {
-			kind = schema.ParkKindZeroCommit
-		}
-		if kind == schema.ParkKindZeroCommit {
-			return parkedTicketHasNewCommits(d, worktreeDir, epicName, t)
-		}
-		return true
+		return clearableNeedsAnswer(d, worktreeDir, epicName, t, agent, live)
 	case tickets.StatusNeedsRepair, tickets.StatusDraft:
+		// These statuses never carry park_kind (only a needs-answer park
+		// does) and stay on the same liveness-only rule ralph-loop has
+		// always applied to them.
 		_, live := liveAgent(d, workspaceID, epicName, agentKind, worktreeDir, t)
 		return live
 	default:
 		return false
 	}
+}
+
+// clearableNeedsAnswer is clearableParkedTicket's StatusNeedsAnswer branch,
+// split out so a caller that has already looked up t's live-agent status
+// (hasLiveParkedTicket, deciding whether to keep polling the same ticket) can
+// reuse that lookup instead of paying for a second pane lookup here.
+//
+// Clearability depends on which of ralph-loop's three needs-answer producers
+// parked t (see schema.ParkKind's doc). A missing park_kind (any ticket
+// parked before that field existed) defaults to ParkKindZeroCommit, the
+// conservative choice: unlike a gate park or a self-report, a zero-commit
+// finish never told anyone whether picking the pane back up is actually
+// safe. blocked-pane and self-reported parks still own a pane an operator
+// answers directly, so a live, unblocked pane is the whole signal, same as
+// before park_kind existed. A zero-commit park's pane is left alive only for
+// inspection — its agent already declared itself done with nothing to land —
+// so liveness alone would auto-reattach a finished agent with no new
+// instructions; CommitsAhead is what tells the zero-commit case apart, since
+// it's the same check finishIteration itself uses to decide whether an
+// iteration produced anything. The CommitsAhead call is gated behind
+// park_kind == zero-commit && live so the common case (blocked-pane/
+// self-reported) never pays for it, and a CommitsAhead failure degrades to
+// "not clearable" rather than propagating as an error — a git hiccup here
+// must not kill the whole run.
+func clearableNeedsAnswer(d Deps, worktreeDir, epicName string, t tickets.Ticket, agent herdr.Agent, live bool) bool {
+	if !live || agent.AgentStatus == "blocked" {
+		return false
+	}
+	kind := t.ParkKind
+	if kind == "" {
+		kind = schema.ParkKindZeroCommit
+	}
+	if kind == schema.ParkKindZeroCommit {
+		return parkedTicketHasNewCommits(d, worktreeDir, epicName, t)
+	}
+	return true
 }
 
 // parkedTicketHasNewCommits reports whether t's iteration branch holds any
