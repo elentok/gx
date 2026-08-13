@@ -247,6 +247,30 @@ func (s mrkdwnStyle) epicFailedText(epicName string, counts EpicCounts, errMsg s
 	return s.message("\U0001f525", "epic failed", RenderCountsLine(counts), s.escape(errMsg), s.identityLine(epicName, ""))
 }
 
+// mutedText renders the gate's edge-triggered per-source mute notice — the
+// one message sent on the allowed→muted transition for a ticket's storm
+// (see chatEventSink.send):
+//
+//	🔇 *muting this*
+//
+//	[gx] {epic}/{ticket}
+func (s mrkdwnStyle) mutedText(epicName, ticketIdentifier string) string {
+	return s.message("\U0001f507", "muting this", "", "", s.identityLine(epicName, ticketIdentifier))
+}
+
+// globallyMutedText renders the gate's edge-triggered global-mute notice —
+// the final message sent on transport before every further send on it is
+// suppressed until `gx notify --enable`:
+//
+//	🚫 *globally muted*
+//
+//	re-enable with `gx notify --enable {transport}`
+//	[gx]
+func (s mrkdwnStyle) globallyMutedText(transport string) string {
+	detail := s.escape(fmt.Sprintf("re-enable with `gx notify --enable %s`", transport))
+	return s.message("\U0001f6ab", "globally muted", "", detail, s.gxPrefix)
+}
+
 // testMessageText renders the fixed message `gx config test-notifications`
 // sends to confirm a configured service is actually reachable:
 //

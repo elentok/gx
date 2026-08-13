@@ -2,11 +2,15 @@ package ralphloop
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // fakeChatTransport records every text it's asked to send, in memory, so
@@ -46,9 +50,15 @@ func waitForSentCount(f *fakeChatTransport, want int) []string {
 	return f.snapshot()
 }
 
-func newFakeChatSink(inner EventSink) (*chatEventSink, *fakeChatTransport) {
+// newFakeChatSink builds a chatEventSink whose gate reads/writes a
+// per-test temp state file (see chatEventSink.gateStatePath) instead of the
+// real ~/.config/gx/notifications-state.json, so exercising send from a
+// test never touches real user state.
+func newFakeChatSink(t *testing.T, inner EventSink) (*chatEventSink, *fakeChatTransport) {
+	t.Helper()
 	transport := &fakeChatTransport{}
 	sink := newChatEventSink(inner, slackStyle, transport, "", "epic")
+	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 	return sink, transport
 }
 
@@ -74,7 +84,7 @@ func TestChatEventSink_ChatMembers_EachSendExactlyOneMessage(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			sink, transport := newFakeChatSink(&recordingSink{})
+			sink, transport := newFakeChatSink(t, &recordingSink{})
 			c.fire(sink)
 			if got := waitForSentCount(transport, 1); len(got) != 1 {
 				t.Fatalf("sent = %v, want exactly 1 message", got)
@@ -85,7 +95,7 @@ func TestChatEventSink_ChatMembers_EachSendExactlyOneMessage(t *testing.T) {
 
 func TestChatEventSink_NonMembers_SendNoMessage(t *testing.T) {
 	t.Parallel()
-	sink, transport := newFakeChatSink(&recordingSink{})
+	sink, transport := newFakeChatSink(t, &recordingSink{})
 
 	sink.TicketReverted("01")
 	sink.TicketReattached("01", "iter-01", "/repo", "sess-1")
@@ -112,7 +122,7 @@ func TestChatEventSink_NonMembers_SendNoMessage(t *testing.T) {
 func TestChatEventSink_EveryEvent_ForwardsToInner(t *testing.T) {
 	t.Parallel()
 	inner := &recordingSink{}
-	sink, _ := newFakeChatSink(inner)
+	sink, _ := newFakeChatSink(t, inner)
 
 	sink.EpicStarted("epic", 0, 3)
 	sink.IterationStarted(tickets.Ticket{Identifier: "01"}, "iter-01", "/repo", "sess-1")
@@ -144,7 +154,7 @@ func TestChatEventSink_EveryEvent_ForwardsToInner(t *testing.T) {
 // reach chat — otherwise a single park would read as two messages.
 func TestChatEventSink_Park_ProducesExactlyOneChatMessage(t *testing.T) {
 	t.Parallel()
-	sink, transport := newFakeChatSink(&recordingSink{})
+	sink, transport := newFakeChatSink(t, &recordingSink{})
 
 	sink.IterationPaused("04", "iter-04", PauseNeedsRepair, "agent blocked on permission prompt")
 	sink.TicketNeedsHuman("04", "epic", "needs-repair", "agent blocked on permission prompt")
@@ -161,7 +171,7 @@ func TestChatEventSink_Park_ProducesExactlyOneChatMessage(t *testing.T) {
 
 func TestChatEventSink_IterationPausedResumed_NeedsRepairKindNeverReachesChat(t *testing.T) {
 	t.Parallel()
-	sink, transport := newFakeChatSink(&recordingSink{})
+	sink, transport := newFakeChatSink(t, &recordingSink{})
 
 	sink.IterationPaused("04", "iter-04", PauseNeedsRepair, "blocked")
 	sink.IterationResumed("04", "iter-04", PauseNeedsRepair)
@@ -174,12 +184,123 @@ func TestChatEventSink_IterationPausedResumed_NeedsRepairKindNeverReachesChat(t 
 
 func TestChatEventSink_IterationPausedResumed_RateLimitKindReachesChat(t *testing.T) {
 	t.Parallel()
-	sink, transport := newFakeChatSink(&recordingSink{})
+	sink, transport := newFakeChatSink(t, &recordingSink{})
 
 	sink.IterationPaused("04", "iter-04", PauseRateLimit, "rate limited")
 	sink.IterationResumed("04", "iter-04", PauseRateLimit)
 
 	if got := waitForSentCount(transport, 2); len(got) != 2 {
 		t.Fatalf("sent = %v, want exactly 2 messages", got)
+	}
+}
+
+// writeChatGateTicket writes a real ticket fixture at
+// scratchDir/epicName/issues/<identifier>-ticket.md — the layout
+// chatEventSink.resolveTicketPath expects — so the gate can parse and mute
+// it for real instead of failing open on a missing file.
+func writeChatGateTicket(t *testing.T, scratchDir, epicName, identifier string) string {
+	t.Helper()
+	issuesDir := filepath.Join(scratchDir, epicName, "issues")
+	if err := os.MkdirAll(issuesDir, 0755); err != nil {
+		t.Fatalf("mkdir issues dir: %v", err)
+	}
+	marshaled, err := schema.MarshalTicket(schema.Ticket{
+		ID:     schema.TicketID(identifier),
+		Status: schema.StatusClaimed,
+		Type:   schema.TypeTask,
+	}, "body\n")
+	if err != nil {
+		t.Fatalf("MarshalTicket: %v", err)
+	}
+	path := filepath.Join(issuesDir, identifier+"-ticket.md")
+	if err := os.WriteFile(path, marshaled, 0644); err != nil {
+		t.Fatalf("write ticket: %v", err)
+	}
+	return path
+}
+
+func newGateChatSink(t *testing.T, scratchDir, epicName string) (*chatEventSink, *fakeChatTransport) {
+	t.Helper()
+	transport := &fakeChatTransport{}
+	sink := newChatEventSink(&recordingSink{}, slackStyle, transport, scratchDir, epicName)
+	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
+	return sink, transport
+}
+
+// TestChatEventSink_RepeatedEvent_TripsPerSourceMuteAndParksTicket covers
+// two of ticket 04's test seams at once: the end-to-end trip (5 identical
+// events within 60s mutes the source and sends exactly one "muting this"
+// notice) and the loop-registry parkTicket wiring (the trip resolves the
+// ticket's real path and reaches MarkNeedsRepairWithReason with a
+// storm-mute reason).
+func TestChatEventSink_RepeatedEvent_TripsPerSourceMuteAndParksTicket(t *testing.T) {
+	t.Parallel()
+	scratchDir := t.TempDir()
+	epicName := "epic"
+	ticketPath := writeChatGateTicket(t, scratchDir, epicName, "04")
+	sink, transport := newGateChatSink(t, scratchDir, epicName)
+
+	for range 5 {
+		sink.IterationPaused("04", "iter-04", PauseRateLimit, "rate limited")
+	}
+
+	got := waitForSentCount(transport, 5)
+	if len(got) != 5 {
+		t.Fatalf("sent = %v, want 4 normal sends plus 1 muting notice", got)
+	}
+	normalText := slackStyle.iterationPausedText("iter-04", "rate limited", epicName, "04")
+	for i := range 4 {
+		if got[i] != normalText {
+			t.Errorf("sent[%d] = %q, want %q", i, got[i], normalText)
+		}
+	}
+	wantMuted := slackStyle.mutedText(epicName, "04")
+	if got[4] != wantMuted {
+		t.Errorf("sent[4] = %q, want muting notice %q", got[4], wantMuted)
+	}
+
+	ticket, err := schema.ParseTicket(ticketPath)
+	if err != nil {
+		t.Fatalf("ParseTicket: %v", err)
+	}
+	if ticket.Status != schema.StatusNeedsRepair {
+		t.Fatalf("ticket.Status = %q, want %q", ticket.Status, schema.StatusNeedsRepair)
+	}
+	if len(ticket.Mutes) != 1 || ticket.Mutes[0].EventType != notifyKindIterationPaused {
+		t.Fatalf("ticket.Mutes = %+v, want one %s mute", ticket.Mutes, notifyKindIterationPaused)
+	}
+
+	raw, err := os.ReadFile(ticketPath)
+	if err != nil {
+		t.Fatalf("read ticket file: %v", err)
+	}
+	if !strings.Contains(string(raw), "storm mute") {
+		t.Errorf("ticket body = %q, want it to name the storm-mute reason", raw)
+	}
+}
+
+// TestChatEventSink_NonTrippingSequence_SendsNormallyThroughGate is the
+// third seam: a sequence under the per-source threshold passes through the
+// gate and sends every message normally.
+func TestChatEventSink_NonTrippingSequence_SendsNormallyThroughGate(t *testing.T) {
+	t.Parallel()
+	scratchDir := t.TempDir()
+	epicName := "epic"
+	writeChatGateTicket(t, scratchDir, epicName, "07")
+	sink, transport := newGateChatSink(t, scratchDir, epicName)
+
+	for range 3 {
+		sink.IterationPaused("07", "iter-07", PauseRateLimit, "rate limited")
+	}
+
+	got := waitForSentCount(transport, 3)
+	if len(got) != 3 {
+		t.Fatalf("sent = %v, want exactly 3 messages (no trip below threshold)", got)
+	}
+	want := slackStyle.iterationPausedText("iter-07", "rate limited", epicName, "07")
+	for i, g := range got {
+		if g != want {
+			t.Errorf("sent[%d] = %q, want %q", i, g, want)
+		}
 	}
 }

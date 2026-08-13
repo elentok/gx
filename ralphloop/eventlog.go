@@ -80,6 +80,12 @@ const (
 	notifyKindEpicParked        = "epic-parked"
 	notifyKindTicketNeedsHuman  = "ticket-needs-human"
 	notifyKindEpicFailed        = "epic-failed"
+	// notifyKindMuted/notifyKindGloballyMuted tag the gate's own
+	// edge-triggered "muting this"/"globally muted" notice (see
+	// chatEventSink.send) — distinct from the live event that tripped the
+	// mute, which is itself suppressed rather than sent.
+	notifyKindMuted         = "muted"
+	notifyKindGloballyMuted = "globally-muted"
 )
 
 // ScanDecision records one ticket's scheduling disposition for a single
