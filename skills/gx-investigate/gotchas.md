@@ -4,6 +4,17 @@ Running list of previously-diagnosed gx/ralph-loop bugs, newest first. Append on
 to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKILL.md) gets fixed
 — don't re-explain what the linked commit/ticket already documents.
 
+- **`attachToLiveAgent` treats a permanently-stalled idle pane as "already finished," parking a
+  second ticket zero-commit with no real work attempted.** A ticket that already leaked a pane/tab
+  from a failed launch (the `04a1` gotcha below) can, on reclaim, collide (`agent_name_taken`) with
+  that same leaked agent name; `attachToLiveAgent` (`ralphloop/launch.go:283-301`) reattaches to it
+  and, since its status is `idle`, logs `iteration-started`/`-finished` back-to-back with no
+  `AgentPrompt`/`waitForFinish` ever run — `promptWithNudge`'s stall-retry never gets a chance.
+  `finishIteration` then parks the ticket `needs-answer`/`park_kind: zero-commit` against the
+  *new*, unused tab, while the actually-stalled agent sits untouched in the *old* leaked one — two
+  live tabs end up under one label. Found live: `model-config/04a`, session id on the ticket
+  matched the *original* `04a1` stall session (`state_change_seq` unchanged since). Not fixed. See
+  `follow-ups/issues/03-attach-to-live-agent-treats-stalled-idle-as-finished.md`.
 - **A `herdr agent prompt agent_prompt_stalled` error leaves a ticket `needs-repair` with no
   `iteration-started` ever logged, and the retry code that exists doesn't cover it.**
   `iteration-started` is logged only after `AgentPrompt` succeeds (`ralphloop/launch.go:242-263`);
