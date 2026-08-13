@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.28.3 - 2026-08-13
+
+- Added a `gx-bump` skill that orchestrates a full release: resolves the bump type, runs tests, drafts and reviews the changelog entry, commits, and tags/pushes via `gx bump --yes`.
+- Added `--yes` flag to `gx bump` for non-interactive, scriptable pushes.
+- Added a `gx-changelog` skill for drafting `CHANGELOG.md` entries via a cheap sub-agent commit summary followed by review.
+- Added a chat notification throttle: per-source mute after 5 identical events within 60s, a global mute around 20 sends/min per transport, and batched delivery for chat-member events (flushes every ~6s, collapses repeats into `×N`), with new `UnmuteTicket`/`Unmute-Reopen` suggested actions to recover.
+- Added `gx notify --enable/--disable/--status` to control the notification throttle from the CLI.
+- Added `yy`/`yf` yank chords (copy epic id+title / file path) and an Investigate suggested action for any problem-status ticket.
+- Fixed the Tickets/Queue tabs' chord overlay not appearing while a multi-key chord (e.g. `gg`/`ee`/`tc`) is in progress.
+- Fixed `herdr` agent names for long epic names exceeding its 32-character limit, avoiding `invalid_agent_name` errors by hashing the overflow into the label.
+- Fixed `type: code-review` ticket launches to invoke `/gx-code-review` directly instead of going through the blocked Skill-tool path.
+- Fixed several park/reopen races: reattach now gates on debounce and background-task completion, parked-ticket evaluation is shared and consistent across call sites, and `herdr`'s `agent_prompt_stalled` is retried like a poll timeout.
+
 ## v0.28.2 - 2026-08-13
 
 - **Behavior change on upgrade:** added an `agents` config block (`agents.claude`/`agents.codex`, each with `model` and `effort`). Iterations now run under gx's own built-in defaults (claude sonnet/medium, codex gpt-5.6-sol/medium) instead of inheriting whatever `~/.claude/settings.json` or `~/.codex/config.toml` already say. Set a field to `""` to opt back into the agent CLI's own setting; omit it to keep gx's default.
