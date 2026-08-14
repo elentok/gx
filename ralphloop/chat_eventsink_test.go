@@ -26,11 +26,11 @@ type fakeChatTransport struct {
 func (f *fakeChatTransport) name() string           { return "fake" }
 func (f *fakeChatTransport) timeout() time.Duration { return time.Second }
 
-func (f *fakeChatTransport) sendSync(_ context.Context, text chatmarkup.Text) error {
+func (f *fakeChatTransport) sendSync(_ context.Context, text chatmarkup.Text) (sendResult, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.sent = append(f.sent, text.String())
-	return nil
+	return sendResult{StatusCode: 200}, nil
 }
 
 func (f *fakeChatTransport) snapshot() []string {

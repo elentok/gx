@@ -44,38 +44,51 @@ func newTelegramTransport(botToken, chatID, apiBaseURL string) *telegramTranspor
 func (t *telegramTransport) name() string           { return "telegram" }
 func (t *telegramTransport) timeout() time.Duration { return telegramSendTimeout }
 
+// telegramErrorResponse is the Telegram Bot API's JSON error body shape —
+// description names why a non-2xx response happened (e.g. a MarkdownV2-parse
+// rejection vs. an invalid chat_id), which sendSync surfaces via
+// sendResult.Description.
+type telegramErrorResponse struct {
+	Description string `json:"description"`
+}
+
 // sendSync POSTs text to the Telegram Bot API's sendMessage endpoint and
 // waits for the response, returning any failure (marshal error, network
-// error, non-2xx response) instead of swallowing it. text is expected to
+// error, non-2xx response) instead of swallowing it, alongside a sendResult
+// carrying the status code and — on a non-2xx response whose body parses as
+// JSON with a description field — that field's value. text is expected to
 // already be MarkdownV2-escaped (see notification_text.go); parse_mode tells
 // Telegram to render its "*bold*" markers instead of showing them literally.
-func (t *telegramTransport) sendSync(ctx context.Context, text chatmarkup.Text) error {
+func (t *telegramTransport) sendSync(ctx context.Context, text chatmarkup.Text) (sendResult, error) {
 	payload, err := json.Marshal(map[string]string{
 		"chat_id":    t.chatID,
 		"text":       text.String(),
 		"parse_mode": "MarkdownV2",
 	})
 	if err != nil {
-		return fmt.Errorf("marshal message: %w", err)
+		return sendResult{}, fmt.Errorf("marshal message: %w", err)
 	}
 
 	endpoint := fmt.Sprintf("%s/bot%s/sendMessage", t.apiBaseURL, url.PathEscape(t.botToken))
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
 	if err != nil {
-		return fmt.Errorf("build request: %w", err)
+		return sendResult{}, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := t.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("send: %w", err)
+		return sendResult{}, fmt.Errorf("send: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("send failed with status %d", resp.StatusCode)
+		var body telegramErrorResponse
+		_ = json.NewDecoder(resp.Body).Decode(&body)
+		return sendResult{StatusCode: resp.StatusCode, Description: body.Description},
+			fmt.Errorf("send failed with status %d", resp.StatusCode)
 	}
-	return nil
+	return sendResult{StatusCode: resp.StatusCode}, nil
 }
 
 // NewTelegramEventSink returns an EventSink that wraps inner and additionally
@@ -144,5 +157,6 @@ func sendTelegramRaw(botToken, chatID, apiBaseURL string, text chatmarkup.Text) 
 	t := newTelegramTransport(botToken, chatID, apiBaseURL)
 	ctx, cancel := context.WithTimeout(context.Background(), telegramSendTimeout)
 	defer cancel()
-	return t.sendSync(ctx, text)
+	_, err := t.sendSync(ctx, text)
+	return err
 }

@@ -248,6 +248,27 @@ func TestSendSlackMessage_SendsGivenTextEscaped(t *testing.T) {
 	}
 }
 
+// TestSlackTransport_SendSync_ResultCarriesStatusCode pins ticket 04a's
+// transport seam for Slack: the webhook response body carries no field
+// comparable to Telegram's description (see slackTransport.sendSync's doc
+// comment), so only the status code is asserted here.
+func TestSlackTransport_SendSync_ResultCarriesStatusCode(t *testing.T) {
+	t.Parallel()
+	server, _ := fakeSlackServer(t, http.StatusInternalServerError)
+
+	transport := newSlackTransport(server.URL)
+	result, err := transport.sendSync(t.Context(), slackStyle.testMessageText())
+	if err == nil {
+		t.Fatal("sendSync: want error for a 500 response")
+	}
+	if result.StatusCode != http.StatusInternalServerError {
+		t.Errorf("result.StatusCode = %d, want %d", result.StatusCode, http.StatusInternalServerError)
+	}
+	if result.Description != "" {
+		t.Errorf("result.Description = %q, want empty — Slack's webhook body carries no comparable field", result.Description)
+	}
+}
+
 func TestSendSlackMessage_ReturnsErrorOnFailingServer(t *testing.T) {
 	t.Parallel()
 	server, _ := fakeSlackServer(t, http.StatusInternalServerError)

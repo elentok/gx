@@ -287,6 +287,48 @@ func TestSendTelegramMessage_SendsGivenTextEscaped(t *testing.T) {
 	}
 }
 
+// TestTelegramTransport_SendSync_NonOKResponse_ResultCarriesStatusAndDescription
+// pins ticket 04a's transport seam: a 400 response whose body carries a
+// description field surfaces both the status code and that description in
+// the returned sendResult, not just a generic error.
+func TestTelegramTransport_SendSync_NonOKResponse_ResultCarriesStatusAndDescription(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"ok":false,"error_code":400,"description":"Bad Request: can't parse entities"}`))
+	}))
+	t.Cleanup(server.Close)
+
+	transport := newTelegramTransport("tok", "chat-1", server.URL)
+	result, err := transport.sendSync(t.Context(), telegramStyle.testMessageText())
+	if err == nil {
+		t.Fatal("sendSync: want error for a 400 response")
+	}
+	if result.StatusCode != http.StatusBadRequest {
+		t.Errorf("result.StatusCode = %d, want %d", result.StatusCode, http.StatusBadRequest)
+	}
+	if result.Description != "Bad Request: can't parse entities" {
+		t.Errorf("result.Description = %q, want the response body's description field", result.Description)
+	}
+}
+
+// TestTelegramTransport_SendSync_OKResponse_ResultCarriesStatus pins the
+// success path: a 2xx response returns a nil error and a sendResult carrying
+// that status code.
+func TestTelegramTransport_SendSync_OKResponse_ResultCarriesStatus(t *testing.T) {
+	t.Parallel()
+	server, _ := fakeTelegramServer(t, http.StatusOK)
+
+	transport := newTelegramTransport("tok", "chat-1", server.URL)
+	result, err := transport.sendSync(t.Context(), telegramStyle.testMessageText())
+	if err != nil {
+		t.Fatalf("sendSync: %v", err)
+	}
+	if result.StatusCode != http.StatusOK {
+		t.Errorf("result.StatusCode = %d, want %d", result.StatusCode, http.StatusOK)
+	}
+}
+
 func TestSendTelegramMessage_ReturnsErrorOnFailingServer(t *testing.T) {
 	t.Parallel()
 	server, _ := fakeTelegramServer(t, http.StatusInternalServerError)

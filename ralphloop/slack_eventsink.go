@@ -32,28 +32,34 @@ func newSlackTransport(webhookURL string) *slackTransport {
 func (t *slackTransport) name() string           { return "slack" }
 func (t *slackTransport) timeout() time.Duration { return slackSendTimeout }
 
-func (t *slackTransport) sendSync(ctx context.Context, text chatmarkup.Text) error {
+// sendSync POSTs text to the Slack webhook and returns a sendResult carrying
+// the status code alongside any failure. Slack's webhook error body is a
+// plain-text reason (e.g. "invalid_payload"), not a JSON object with a field
+// comparable to Telegram's description — so, unlike telegramTransport,
+// sendResult.Description is always left empty here; the status code is the
+// only structured signal this transport's response actually provides.
+func (t *slackTransport) sendSync(ctx context.Context, text chatmarkup.Text) (sendResult, error) {
 	payload, err := json.Marshal(map[string]string{"text": text.String()})
 	if err != nil {
-		return fmt.Errorf("marshal message: %w", err)
+		return sendResult{}, fmt.Errorf("marshal message: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, t.webhookURL, bytes.NewReader(payload))
 	if err != nil {
-		return fmt.Errorf("build request: %w", err)
+		return sendResult{}, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := t.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("send: %w", err)
+		return sendResult{}, fmt.Errorf("send: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("send failed with status %d", resp.StatusCode)
+		return sendResult{StatusCode: resp.StatusCode}, fmt.Errorf("send failed with status %d", resp.StatusCode)
 	}
-	return nil
+	return sendResult{StatusCode: resp.StatusCode}, nil
 }
 
 // NewSlackEventSink returns an EventSink that wraps inner and additionally
@@ -105,5 +111,6 @@ func sendSlackMessageRaw(webhookURL string, text chatmarkup.Text) error {
 	t := newSlackTransport(webhookURL)
 	ctx, cancel := context.WithTimeout(context.Background(), slackSendTimeout)
 	defer cancel()
-	return t.sendSync(ctx, text)
+	_, err := t.sendSync(ctx, text)
+	return err
 }

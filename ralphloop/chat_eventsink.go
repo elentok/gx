@@ -29,7 +29,20 @@ const batchFlushInterval = 6 * time.Second
 type chatTransport interface {
 	name() string
 	timeout() time.Duration
-	sendSync(ctx context.Context, text chatmarkup.Text) error
+	sendSync(ctx context.Context, text chatmarkup.Text) (sendResult, error)
+}
+
+// sendResult carries a chatTransport.sendSync response's status beyond a bare
+// error — the HTTP status code, plus (Telegram only, see telegramTransport's
+// sendSync) the response body's description field, which names why a 400
+// happened (e.g. a MarkdownV2-parse rejection vs. an invalid chat_id).
+// Slack's webhook response body doesn't carry a comparable field, so
+// slackTransport.sendSync leaves Description empty. Threading this up
+// through sendRaw/eventlog.go's retry loop is a follow-up ticket — for now
+// callers here discard it and keep using the plain error.
+type sendResult struct {
+	StatusCode  int
+	Description string
 }
 
 // chatEventSink decorates another EventSink with one chat notification per
@@ -420,7 +433,8 @@ func (s *chatEventSink) send(text chatmarkup.Text, notifyKind, source, ticketIde
 // live event that triggered it).
 func (s *chatEventSink) sendRaw(text chatmarkup.Text, notifyKind string) {
 	sendNotification(s.scratchDir, s.epicName, s.transport.name(), notifyKind, text.String(), s.transport.timeout(), func(ctx context.Context) error {
-		return s.transport.sendSync(ctx, text)
+		_, err := s.transport.sendSync(ctx, text)
+		return err
 	}, func(reason string) {
 		s.EventSink.NotificationFailed(s.transport.name(), reason)
 	})
@@ -434,7 +448,7 @@ func (s *chatEventSink) sendRaw(text chatmarkup.Text, notifyKind string) {
 func (s *chatEventSink) sendSync(text chatmarkup.Text, notifyKind string) {
 	ctx, cancel := context.WithTimeout(context.Background(), s.transport.timeout())
 	defer cancel()
-	if err := s.transport.sendSync(ctx, text); err != nil {
+	if _, err := s.transport.sendSync(ctx, text); err != nil {
 		err = sanitizeSendError(err)
 		logger.Debug("%s: %v\n", s.transport.name(), err)
 		logNotificationFailed(s.scratchDir, s.epicName, s.transport.name(), notifyKind, err.Error(), text.String())
