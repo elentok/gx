@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.28.6 - 2026-08-14
+
+- Made chat notification sending resilient: sealed markdown AST validation, per-send status reporting, automatic requeueing of failed sends, plain-text fallback on markdown parse errors, Slack 429 retry handling, and Telegram retry_after support. Send failures now surface in the TUI.
+- Improved ticket preview: show ticket ID and expected context window, suppress "(commitless)" for research/code-review tickets, show metrics for non-done tickets, self-clearing/persistent reattach notifications, wrap long frontmatter lines to pane width.
+- Polished Queue tab: collapse long blocked-by lists to a count, show non-candidate ancestors as dimmed rows, dedup empty-state messaging, simplify row dim-style precedence.
+- Auto-queue tickets added to an already-queued epic.
+- Switched ticket filtering to an allowlist of commitless-by-design types.
+- Fixed ralph-stats scratch root resolution to use the gx tickets root.
+- Logged notification bodies to run-log.jsonl; fixed cost-decimal escaping in Telegram notifications.
+
 ## v0.28.5 - 2026-08-14
 
 - Fixed a flaky e2e test (`TestIdleWhileWorking_AgentStatusNeverReportsWorking`) that could fail under load when herdr transiently returned `agent_pane_busy`; `Workspace.AgentStart` in `testutil/herdrctl/herdrctl.go` now retries up to 5 times with a 200ms backoff on that error, matching the tolerance already used by `PrependPath` for the same class of race.
