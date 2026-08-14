@@ -333,3 +333,155 @@ func TestSendWithRetry_FirstAttemptFailsSecondSucceedsDegraded_ReturnsDegradedRe
 		t.Errorf("result.StatusCode = %d, want 200", result.StatusCode)
 	}
 }
+
+func TestSendWithRetry_NonRetryable4xx_MakesOnlyOneAttempt(t *testing.T) {
+	t.Parallel()
+	for _, code := range []int{400, 401, 403, 404} {
+		t.Run(fmt.Sprintf("%d", code), func(t *testing.T) {
+			t.Parallel()
+			var attempts atomic.Int32
+			sendSync := func(ctx context.Context) (sendResult, error) {
+				attempts.Add(1)
+				return sendResult{StatusCode: code}, fmt.Errorf("send failed with status %d", code)
+			}
+
+			start := time.Now()
+			_, err := sendWithRetry(context.Background(), time.Second, sendSync)
+			elapsed := time.Since(start)
+
+			if err == nil {
+				t.Fatalf("err = nil, want failure")
+			}
+			if got := attempts.Load(); got != 1 {
+				t.Errorf("attempts = %d, want 1 (no retry for status %d)", got, code)
+			}
+			if elapsed >= notificationRetryBackoff {
+				t.Errorf("elapsed = %v, want well under notificationRetryBackoff (no backoff sleep)", elapsed)
+			}
+		})
+	}
+}
+
+func TestSendWithRetry_429WithRetryAfterUnderCap_HonorsRetryAfterAsDelay(t *testing.T) {
+	t.Parallel()
+	retryAfter := 1
+	var attempts atomic.Int32
+	var secondAttemptAt time.Time
+	firstAttemptAt := time.Now()
+	sendSync := func(ctx context.Context) (sendResult, error) {
+		if attempts.Add(1) == 1 {
+			return sendResult{StatusCode: 429, RetryAfter: &retryAfter}, errors.New("rate limited")
+		}
+		secondAttemptAt = time.Now()
+		return sendResult{StatusCode: 200}, nil
+	}
+
+	result, err := sendWithRetry(context.Background(), time.Second, sendSync)
+	if err != nil {
+		t.Fatalf("err = %v, want nil", err)
+	}
+	if result.StatusCode != 200 {
+		t.Errorf("result.StatusCode = %d, want 200", result.StatusCode)
+	}
+	if got := attempts.Load(); got != 2 {
+		t.Fatalf("attempts = %d, want 2", got)
+	}
+	delay := secondAttemptAt.Sub(firstAttemptAt)
+	if delay < time.Duration(retryAfter)*time.Second {
+		t.Errorf("delay = %v, want at least retry_after (%ds)", delay, retryAfter)
+	}
+	if delay >= notificationRetryBackoff {
+		t.Errorf("delay = %v, want under the fixed notificationRetryBackoff (%v) — retry_after should have been honored instead", delay, notificationRetryBackoff)
+	}
+}
+
+func TestSendWithRetry_429AboveCapOrUnparseable_SkipsRetry(t *testing.T) {
+	t.Parallel()
+	aboveCap := 31
+	tests := []struct {
+		name   string
+		result sendResult
+	}{
+		{"above cap", sendResult{StatusCode: 429, RetryAfter: &aboveCap}},
+		{"unparseable/absent", sendResult{StatusCode: 429, RetryAfter: nil}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var attempts atomic.Int32
+			sendSync := func(ctx context.Context) (sendResult, error) {
+				attempts.Add(1)
+				return tt.result, errors.New("rate limited")
+			}
+
+			_, err := sendWithRetry(context.Background(), time.Second, sendSync)
+			if err == nil {
+				t.Fatalf("err = nil, want failure")
+			}
+			if got := attempts.Load(); got != 1 {
+				t.Errorf("attempts = %d, want 1 (retry skipped)", got)
+			}
+		})
+	}
+}
+
+func TestSendWithRetry_OtherRetryableFailures_KeepFixedBackoffRetryOnce(t *testing.T) {
+	t.Parallel()
+	statusCodes := []int{0, 408, 429, 500, 503}
+	for _, code := range statusCodes {
+		t.Run(fmt.Sprintf("%d", code), func(t *testing.T) {
+			t.Parallel()
+			var attempts atomic.Int32
+			sendSync := func(ctx context.Context) (sendResult, error) {
+				if attempts.Add(1) == 1 {
+					// 429 with no retry_after would otherwise skip the retry
+					// (see TestSendWithRetry_429AboveCapOrUnparseable_SkipsRetry) — this
+					// asserts every *other* retryable failure keeps the fixed backoff.
+					if code == 429 {
+						return sendResult{}, errors.New("transient failure")
+					}
+					return sendResult{StatusCode: code}, errors.New("transient failure")
+				}
+				return sendResult{StatusCode: 200}, nil
+			}
+
+			result, err := sendWithRetry(context.Background(), time.Second, sendSync)
+			if err != nil {
+				t.Fatalf("err = %v, want nil", err)
+			}
+			if result.StatusCode != 200 {
+				t.Errorf("result.StatusCode = %d, want 200", result.StatusCode)
+			}
+			if got := attempts.Load(); got != 2 {
+				t.Errorf("attempts = %d, want 2 (fixed-backoff retry-once unchanged)", got)
+			}
+		})
+	}
+}
+
+func TestSendWithRetry_DeadlineShorterThanRetryAfter_SkipsRetry(t *testing.T) {
+	t.Parallel()
+	retryAfter := 5
+	var attempts atomic.Int32
+	sendSync := func(ctx context.Context) (sendResult, error) {
+		attempts.Add(1)
+		return sendResult{StatusCode: 429, RetryAfter: &retryAfter}, errors.New("rate limited")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	_, err := sendWithRetry(ctx, 50*time.Millisecond, sendSync)
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatalf("err = nil, want failure")
+	}
+	if got := attempts.Load(); got != 1 {
+		t.Errorf("attempts = %d, want 1 (retry skipped: retry_after exceeds remaining deadline)", got)
+	}
+	if elapsed >= time.Duration(retryAfter)*time.Second {
+		t.Errorf("elapsed = %v, want well under retry_after (%ds) — should not have waited it out", elapsed, retryAfter)
+	}
+}

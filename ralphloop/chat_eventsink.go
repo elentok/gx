@@ -42,11 +42,16 @@ type chatTransport interface {
 // always false for slackTransport, which has no such fallback. On a
 // degraded success, Description carries the original MarkdownV2-rejection
 // description (rather than being left empty, as it is on any other success)
-// so callers can report why the downgrade happened.
+// so callers can report why the downgrade happened. RetryAfter carries a 429
+// response's retry_after (seconds), if Telegram's body included one — nil
+// when absent or when the transport doesn't support it (slackTransport never
+// sets it), which sendWithRetry treats as "not honorable" rather than "retry
+// immediately" (see eventlog.go's retryDelay).
 type sendResult struct {
 	StatusCode  int
 	Description string
 	Degraded    bool
+	RetryAfter  *int
 }
 
 // chatEventSink decorates another EventSink with one chat notification per

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -292,6 +293,51 @@ func logNotificationSuppressed(scratchDir, epicName, channel, reason string) {
 // shorter) without materially adding to worst-case caller-visible latency.
 const notificationRetryBackoff = 1500 * time.Millisecond
 
+// maxHonoredRetryAfter caps how long sendWithRetry will honor a Telegram
+// 429's retry_after as the retry delay. A long sleep happens inside a
+// fire-and-forget goroutine (chatEventSink.sendRaw), so a wait past this
+// cap would deliver badly out-of-order relative to the 6s periodic flush
+// cycle (batchFlushInterval) — better to drop the retry than let that
+// happen, so above the cap sendWithRetry skips the retry entirely rather
+// than clamping to the cap.
+const maxHonoredRetryAfter = 30 * time.Second
+
+// nonRetryableStatusCodes are 4xx failures a retry cannot fix — the request
+// itself is wrong (bad token/chat_id/payload), so a second identical attempt
+// would just waste notificationRetryBackoff on a guaranteed-identical
+// failure. 429 (rate limit) and 408 (request timeout) are deliberately
+// excluded: both describe a transient condition a retry can resolve, and
+// treating them as non-retryable would turn a recoverable failure into a
+// dropped notification.
+var nonRetryableStatusCodes = map[int]bool{
+	400: true,
+	401: true,
+	403: true,
+	404: true,
+}
+
+// retryDelay decides whether a failed attempt should be retried and, if so,
+// after how long. A 429 honors the response's retry_after (capped at
+// maxHonoredRetryAfter); every other retryable failure (network error,
+// timeout, 5xx, 408 — anything not in nonRetryableStatusCodes) keeps the
+// existing fixed notificationRetryBackoff.
+func retryDelay(result sendResult) (time.Duration, bool) {
+	if nonRetryableStatusCodes[result.StatusCode] {
+		return 0, false
+	}
+	if result.StatusCode != http.StatusTooManyRequests {
+		return notificationRetryBackoff, true
+	}
+	if result.RetryAfter == nil {
+		return 0, false
+	}
+	delay := time.Duration(*result.RetryAfter) * time.Second
+	if delay > maxHonoredRetryAfter {
+		return 0, false
+	}
+	return delay, true
+}
+
 // sendNotification runs sendNotificationSync in its own goroutine, unbounded
 // by any caller-supplied context (context.Background()), so a slow or
 // unreachable notification endpoint never blocks the caller. This is
@@ -352,16 +398,22 @@ func sendNotificationSync(ctx context.Context, scratchDir, epicName, channel, no
 	return result, nil
 }
 
-// sendWithRetry runs sendSync once, retrying after notificationRetryBackoff
-// if the first attempt fails, and returns whichever attempt's sendResult/error
-// is last — the one that succeeded, or the second attempt's failure if both
-// did. ctx bounds both the per-attempt timeout (each attempt gets a child
-// context.WithTimeout derived from ctx, so a cancelled/expired ctx cuts an
-// in-progress attempt short too) and the backoff wait itself, so a cancelled
-// ctx fails fast rather than sleeping out the full notificationRetryBackoff
-// first. Extracted from sendNotificationSync so the "first attempt fails,
-// second succeeds degraded" carry-through is directly testable without
-// racing a background goroutine and polling run-log.jsonl.
+// sendWithRetry runs sendSync once, retrying after a delay decided by
+// retryDelay if the first attempt fails and is retryable, and returns
+// whichever attempt's sendResult/error is last — the one that succeeded, or
+// the last failure if none did. A non-retryable failure (retryDelay's second
+// return is false — a deterministic 4xx, or a 429 whose retry_after is
+// absent/unparseable/above maxHonoredRetryAfter) returns the first attempt's
+// result immediately, with no second attempt and no wait. ctx bounds both
+// the per-attempt timeout (each attempt gets a child context.WithTimeout
+// derived from ctx, so a cancelled/expired ctx cuts an in-progress attempt
+// short too) and the backoff wait itself, so a cancelled ctx fails fast
+// rather than sleeping out the full delay first; if ctx carries a deadline
+// (03a's shutdown budget) shorter than the decided delay, the retry is
+// skipped the same way rather than waiting past that deadline. Extracted
+// from sendNotificationSync so the "first attempt fails, second succeeds
+// degraded" carry-through is directly testable without racing a background
+// goroutine and polling run-log.jsonl.
 func sendWithRetry(ctx context.Context, timeout time.Duration, sendSync func(ctx context.Context) (sendResult, error)) (sendResult, error) {
 	attempt := func() (sendResult, error) {
 		attemptCtx, cancel := context.WithTimeout(ctx, timeout)
@@ -370,15 +422,22 @@ func sendWithRetry(ctx context.Context, timeout time.Duration, sendSync func(ctx
 	}
 
 	result, err := attempt()
-	if err != nil {
-		select {
-		case <-ctx.Done():
-			return result, ctx.Err()
-		case <-time.After(notificationRetryBackoff):
-		}
-		result, err = attempt()
+	if err == nil {
+		return result, err
 	}
-	return result, err
+	delay, retryable := retryDelay(result)
+	if !retryable {
+		return result, err
+	}
+	if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) < delay {
+		return result, err
+	}
+	select {
+	case <-ctx.Done():
+		return result, ctx.Err()
+	case <-time.After(delay):
+	}
+	return attempt()
 }
 
 // sanitizeSendError strips the request URL from a failed send's error before

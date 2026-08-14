@@ -48,9 +48,13 @@ func (t *telegramTransport) timeout() time.Duration { return telegramSendTimeout
 // telegramErrorResponse is the Telegram Bot API's JSON error body shape —
 // description names why a non-2xx response happened (e.g. a MarkdownV2-parse
 // rejection vs. an invalid chat_id), which sendSync surfaces via
-// sendResult.Description.
+// sendResult.Description. Parameters.RetryAfter is only populated on a 429
+// (rate-limit) response, and surfaces via sendResult.RetryAfter.
 type telegramErrorResponse struct {
 	Description string `json:"description"`
+	Parameters  struct {
+		RetryAfter *int `json:"retry_after"`
+	} `json:"parameters"`
 }
 
 // telegramMarkdownParseFailureMarker is the substring Telegram's Bot API
@@ -137,7 +141,7 @@ func (t *telegramTransport) post(ctx context.Context, text, parseMode string) (s
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		var errBody telegramErrorResponse
 		_ = json.NewDecoder(resp.Body).Decode(&errBody)
-		return sendResult{StatusCode: resp.StatusCode, Description: errBody.Description},
+		return sendResult{StatusCode: resp.StatusCode, Description: errBody.Description, RetryAfter: errBody.Parameters.RetryAfter},
 			fmt.Errorf("send failed with status %d", resp.StatusCode)
 	}
 	return sendResult{StatusCode: resp.StatusCode}, nil
