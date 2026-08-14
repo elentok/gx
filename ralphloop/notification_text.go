@@ -180,10 +180,10 @@ func (s mrkdwnStyle) iterationResumedText(label, epicName, ticketIdentifier stri
 // epic-level messages alone (see epicStartedText/epicCompleteText).
 func (s mrkdwnStyle) iterationFinishedText(ticket tickets.Ticket, epicName string, stats IterationStats) string {
 	line := RenderCountsLine(EpicCounts{Done: stats.Completed, InProgress: stats.InProgress, Total: stats.Total})
-	counts := fmt.Sprintf(
+	counts := s.escape(fmt.Sprintf(
 		"%s · %s · %s · %s",
 		formatDuration(stats.ElapsedSeconds), formatTokens(stats.PeakContextTokens), formatCost(stats.Cost), line,
-	)
+	))
 	return s.message("✅", ticket.Title, counts, "", s.identityLine(epicName, ticket.Identifier))
 }
 
@@ -237,7 +237,7 @@ func (s mrkdwnStyle) epicParkedText(epicName string, stalled []string) string {
 //	{completed} ticket(s) landed in {elapsed} · {totalCost}
 //	[gx] {epic}
 func (s mrkdwnStyle) epicCompleteText(epicName string, counts EpicCounts, completed int, elapsedSeconds int, totalCost float64) string {
-	detail := fmt.Sprintf("%d ticket(s) landed in %s · %s", completed, formatDuration(elapsedSeconds), formatCost(totalCost))
+	detail := s.escape(fmt.Sprintf("%d ticket(s) landed in %s · %s", completed, formatDuration(elapsedSeconds), formatCost(totalCost)))
 	return s.message("\U0001f389", "epic complete", RenderCountsLine(counts), detail, s.identityLine(epicName, ""))
 }
 

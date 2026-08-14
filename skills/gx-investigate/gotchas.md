@@ -4,6 +4,16 @@ Running list of previously-diagnosed gx/ralph-loop bugs, newest first. Append on
 to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKILL.md) gets fixed
 — don't re-explain what the linked commit/ticket already documents.
 
+- **Telegram ticket-completion notifications silently drop almost every time (unescaped `.` in
+  cost).** `formatCost` (`ralphloop/notification_text.go`) renders `"$1.23"` and
+  `iterationFinishedText` splices it unescaped into the counts line `message()` sends — `.` is a
+  reserved MarkdownV2 char, so any non-integer cost 400s the whole send; since almost every real
+  iteration has a fractional cost, `✅` ticket-done messages drop nearly always. Explains a report
+  of "got epic-start and every iteration-started, never a single completion" (those carry no
+  cost, so they go through fine). Fixed by escaping the assembled counts/detail strings in
+  `iterationFinishedText`/`epicCompleteText`; regression covered by
+  `ralphloop/full_epic_notifications_e2e_test.go`. See
+  `follow-ups/issues/07-iteration-finished-cost-decimal-unescaped-markdownv2.md`.
 - **Telegram batch notifications silently drop whenever ≥2 messages coalesce into one flush.**
   `renderBatch` (`ralphloop/chat_eventsink.go:244-253`) joins each already-escaped queued
   message with a raw `"\n---\n"` separator — `-` is a reserved MarkdownV2 char
