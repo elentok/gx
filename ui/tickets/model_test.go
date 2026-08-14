@@ -492,10 +492,9 @@ func TestNewModel_SplitsOpenAndClosedEpicSections(t *testing.T) {
 
 // TestNewModel_SectionHeadersMatchTreeRowShape covers ticket 02's redesign:
 // section headers drop the old "── … ──" border in favor of the same
-// expand-glyph-led shape epic/ticket rows use, "Closed epics" gains the
-// shared "done" icon (TicketDone) as a state signal while "Open epics" gets
-// none (open is this app's default, no-signal state elsewhere), and the
-// blank spacer row that used to sit between the two sections is gone.
+// expand-glyph-led shape epic/ticket rows use, with no state icon on either
+// header — "Closed epics" matches "Open epics" — and the blank spacer row
+// that used to sit between the two sections is gone.
 func TestNewModel_SectionHeadersMatchTreeRowShape(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -527,13 +526,8 @@ func TestNewModel_SectionHeadersMatchTreeRowShape(t *testing.T) {
 	if !strings.Contains(closedPrefix, icons.TriangleExpanded) {
 		t.Fatalf("expected 'Closed epics' row to lead with the expand glyph, got: %q", closedPrefix)
 	}
-	if !strings.Contains(closedPrefix, icons.TicketDone) {
-		t.Fatalf("expected 'Closed epics' row to show the done icon, got: %q", closedPrefix)
-	}
-	// The done icon keeps the same statusDoneStyle a closed ticket row's icon
-	// uses, rather than being swallowed into sectionHeaderStyle's uniform gray.
-	if !strings.Contains(rawContent, statusDoneStyle.Render(icons.TicketDone)) {
-		t.Fatalf("expected 'Closed epics' done icon to render with statusDoneStyle, got:\n%s", rawContent)
+	if strings.Contains(closedPrefix, icons.TicketDone) {
+		t.Fatalf("expected 'Closed epics' row to show no icon, got: %q", closedPrefix)
 	}
 
 	lines := strings.Split(content, "\n")
