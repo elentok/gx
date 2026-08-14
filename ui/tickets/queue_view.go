@@ -163,7 +163,9 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 		AccentColor: ui.ColorBlue,
 		Active:      m.focus == focusSidebar,
 		Width:       width,
-		EmptyLine:   ui.StyleMuted.Render("  no tickets checked — check tickets in the Tickets tab to build a plan"),
+		// EmptyLine is blank: the header banner's queueIdleBodyLine (queue_header.go)
+		// already covers the empty-selection case with "No selected tickets...".
+		EmptyLine: "",
 		Label: func(entry tree.Entry[queueNode]) string {
 			switch entry.Value.kind {
 			case nodeEpicSeparator:

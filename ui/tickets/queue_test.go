@@ -654,6 +654,12 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 		if !strings.Contains(got, "Idle") || !strings.Contains(got, "enter") || !strings.Contains(got, "start") {
 			t.Fatalf("body line = %q, want idle copy with the enter hint", got)
 		}
+		if strings.Contains(got, "·") {
+			t.Fatalf("body line = %q, want no redundant \"· enter start\" hint suffix", got)
+		}
+		if want := epicStatusParkedAnswerStyle.Render(got); lines[0] != want {
+			t.Fatalf("body line = %q, want orange-styled %q", lines[0], want)
+		}
 	})
 
 	t.Run("running", func(t *testing.T) {
@@ -718,6 +724,14 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 		want := "No selected tickets — go to the Tickets tab first"
 		if got := ansi.Strip(lines[0]); got != want {
 			t.Fatalf("body line = %q, want %q", got, want)
+		}
+		if wantStyled := epicStatusParkedAnswerStyle.Render(want); lines[0] != wantStyled {
+			t.Fatalf("body line = %q, want orange-styled %q", lines[0], wantStyled)
+		}
+
+		emptyLine := m.queueRenderOpts(80).EmptyLine
+		if emptyLine != "" {
+			t.Fatalf("tree EmptyLine = %q, want empty (header banner already covers no-selection case)", emptyLine)
 		}
 	})
 

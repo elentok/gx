@@ -5,7 +5,6 @@ import (
 	"sort"
 	"strings"
 
-	"charm.land/bubbles/v2/key"
 	"charm.land/lipgloss/v2"
 
 	"github.com/elentok/gx/ralphloop"
@@ -309,9 +308,9 @@ func (m QueueModel) queueHeaderBodyLines() []string {
 // when nothing is checked at all.
 func (m QueueModel) queueIdleBodyLine() string {
 	if len(m.checkedEpicPlans()) == 0 {
-		return "No selected tickets — go to the Tickets tab first"
+		return epicStatusParkedAnswerStyle.Render("No selected tickets — go to the Tickets tab first")
 	}
-	return ui.StatusWithHints("Idle — press enter to start", key.NewBinding(key.WithHelp("enter", "start")))
+	return epicStatusParkedAnswerStyle.Render("Idle — press enter to start")
 }
 
 func (m QueueModel) completedContextMetrics() (total, average, maximum int) {
