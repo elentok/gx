@@ -81,7 +81,7 @@ func TestSlackEventSink_EpicComplete_PostsSlackWireFormat(t *testing.T) {
 	if len(reqs) != 1 {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
-	want := slackStyle.epicCompleteText("epic", EpicCounts{}, 5, 300, 0)
+	want := slackStyle.epicCompleteText("epic", EpicCounts{}, 5, 300, 0).String()
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}
@@ -214,7 +214,7 @@ func TestSendSlackTestMessage_SendsSynchronouslyAndReturnsNilOnSuccess(t *testin
 	if len(reqs) != 1 {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
-	want := slackStyle.testMessageText()
+	want := slackStyle.testMessageText().String()
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}

@@ -5,6 +5,7 @@ import (
 	"math"
 	"strings"
 
+	"github.com/elentok/gx/chatmarkup"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -40,21 +41,23 @@ func formatCost(cost float64) string {
 	return fmt.Sprintf("$%.2f", cost)
 }
 
-// mrkdwnStyle adapts the shared message templates below to a specific
-// chat platform's markup dialect: Telegram's MarkdownV2 requires
-// backslash-escaping a long list of ASCII punctuation (including the
-// hyphens epic/ticket names commonly contain), while Slack's mrkdwn needs
-// none of that. gxPrefix carries the platform-appropriate spelling of the
-// literal "[gx]" tag, since Telegram's escaper would otherwise need to
-// escape the brackets there too.
+// mrkdwnStyle adapts the shared message templates below to a specific chat
+// platform's markup dialect, pairing chatStyle (chatmarkup's own dialect
+// value, which every *Text function routes its raw fragments through) with
+// escape, still needed directly by renderBatch's batch-separator literal
+// (see chat_eventsink.go — 01c threads that through chatmarkup too).
+// gxPrefix is the raw literal "[gx]" tag for both platforms; it's no longer
+// pre-escaped, since it now flows through the same chatmarkup.Style.Message
+// boundary escape as every other fragment.
 type mrkdwnStyle struct {
-	escape   func(string) string
-	gxPrefix string
+	chatStyle chatmarkup.Style
+	escape    func(string) string
+	gxPrefix  string
 }
 
-var telegramStyle = mrkdwnStyle{escape: escapeTelegramMarkdownV2, gxPrefix: `\[gx\]`}
+var telegramStyle = mrkdwnStyle{chatStyle: chatmarkup.Telegram, escape: escapeTelegramMarkdownV2, gxPrefix: "[gx]"}
 
-var slackStyle = mrkdwnStyle{escape: escapeSlackMrkdwn, gxPrefix: "[gx]"}
+var slackStyle = mrkdwnStyle{chatStyle: chatmarkup.Slack, escape: escapeSlackMrkdwn, gxPrefix: "[gx]"}
 
 // telegramMarkdownV2SpecialChars are the ASCII punctuation characters
 // Telegram's MarkdownV2 parser treats as syntax; every occurrence outside
@@ -83,35 +86,17 @@ func escapeSlackMrkdwn(s string) string {
 	return s
 }
 
-// message is the one shared constructor every chat-member event's text goes
-// through (see chatEventSink): an emoji and bold headline (escaped here, so
-// callers pass it raw), a blank line, an optional counts line, an optional
-// detail line, and identity last. counts/detail/identity arrive pre-escaped
-// — callers control exactly what those carry, in particular keeping the
-// iteration label (permitted in detail) out of identity, which names only
-// the epic or epic-and-ticket a person needs to attribute the message to at
-// a glance.
-func (s mrkdwnStyle) message(emoji, headline, counts, detail, identity string) string {
-	lines := []string{fmt.Sprintf("%s *%s*", emoji, s.escape(headline)), ""}
-	if counts != "" {
-		lines = append(lines, counts)
-	}
-	if detail != "" {
-		lines = append(lines, detail)
-	}
-	lines = append(lines, identity)
-	return strings.Join(lines, "\n")
-}
-
 // identityLine renders the trailing "who this is about" line: the gx tag
 // plus the epic name alone, or the epic and a ticket identifier — never an
-// iteration label, so parallel epics stay attributable at a glance.
+// iteration label, so parallel epics stay attributable at a glance. The
+// result is raw, unescaped text: every *Text function hands it to
+// chatStyle.Message as the identity fragment, which escapes it there.
 func (s mrkdwnStyle) identityLine(epicName, ticketIdentifier string) string {
 	ref := epicName
 	if ticketIdentifier != "" {
 		ref = fmt.Sprintf("%s/%s", epicName, ticketIdentifier)
 	}
-	return fmt.Sprintf("%s %s", s.gxPrefix, s.escape(ref))
+	return fmt.Sprintf("%s %s", s.gxPrefix, ref)
 }
 
 // epicStartedText renders the "epic started" notification — the single
@@ -127,8 +112,8 @@ func (s mrkdwnStyle) identityLine(epicName, ticketIdentifier string) string {
 //
 //	{counts line}
 //	[gx] {epic}
-func (s mrkdwnStyle) epicStartedText(epicName string, counts EpicCounts) string {
-	return s.message("\U0001f680", "epic started", RenderCountsLine(counts), "", s.identityLine(epicName, ""))
+func (s mrkdwnStyle) epicStartedText(epicName string, counts EpicCounts) chatmarkup.Text {
+	return s.chatStyle.Message("\U0001f680", "epic started", RenderCountsLine(counts), "", s.identityLine(epicName, ""))
 }
 
 // iterationStartedText renders the "iteration started" notification:
@@ -136,8 +121,8 @@ func (s mrkdwnStyle) epicStartedText(epicName string, counts EpicCounts) string 
 //	▶️ *{title}*
 //
 //	[gx] {epic}/{ticket}
-func (s mrkdwnStyle) iterationStartedText(ticket tickets.Ticket, epicName string) string {
-	return s.message("▶️", ticket.Title, "", "", s.identityLine(epicName, ticket.Identifier))
+func (s mrkdwnStyle) iterationStartedText(ticket tickets.Ticket, epicName string) chatmarkup.Text {
+	return s.chatStyle.Message("▶️", ticket.Title, "", "", s.identityLine(epicName, ticket.Identifier))
 }
 
 // iterationPausedText renders the "paused" notification. Only reached for a
@@ -150,9 +135,9 @@ func (s mrkdwnStyle) iterationStartedText(ticket tickets.Ticket, epicName string
 //
 //	{label}: {reason}
 //	[gx] {epic}/{ticket}
-func (s mrkdwnStyle) iterationPausedText(label, reason, epicName, ticketIdentifier string) string {
-	detail := s.escape(fmt.Sprintf("%s: %s", label, reason))
-	return s.message("⏸", "paused", "", detail, s.identityLine(epicName, ticketIdentifier))
+func (s mrkdwnStyle) iterationPausedText(label, reason, epicName, ticketIdentifier string) chatmarkup.Text {
+	detail := fmt.Sprintf("%s: %s", label, reason)
+	return s.chatStyle.Message("⏸", "paused", "", detail, s.identityLine(epicName, ticketIdentifier))
 }
 
 // iterationResumedText renders the "resumed" notification, the counterpart
@@ -162,8 +147,8 @@ func (s mrkdwnStyle) iterationPausedText(label, reason, epicName, ticketIdentifi
 //
 //	{label}
 //	[gx] {epic}/{ticket}
-func (s mrkdwnStyle) iterationResumedText(label, epicName, ticketIdentifier string) string {
-	return s.message("▶️", "resumed", "", s.escape(label), s.identityLine(epicName, ticketIdentifier))
+func (s mrkdwnStyle) iterationResumedText(label, epicName, ticketIdentifier string) chatmarkup.Text {
+	return s.chatStyle.Message("▶️", "resumed", "", label, s.identityLine(epicName, ticketIdentifier))
 }
 
 // iterationFinishedText renders the "done" notification:
@@ -178,13 +163,13 @@ func (s mrkdwnStyle) iterationResumedText(label, epicName, ticketIdentifier stri
 // populates): a ticket-landed message reports what this landing changed,
 // not the epic's full parked/blocked/ready breakdown, which belongs to the
 // epic-level messages alone (see epicStartedText/epicCompleteText).
-func (s mrkdwnStyle) iterationFinishedText(ticket tickets.Ticket, epicName string, stats IterationStats) string {
+func (s mrkdwnStyle) iterationFinishedText(ticket tickets.Ticket, epicName string, stats IterationStats) chatmarkup.Text {
 	line := RenderCountsLine(EpicCounts{Done: stats.Completed, InProgress: stats.InProgress, Total: stats.Total})
-	counts := s.escape(fmt.Sprintf(
+	counts := fmt.Sprintf(
 		"%s · %s · %s · %s",
 		formatDuration(stats.ElapsedSeconds), formatTokens(stats.PeakContextTokens), formatCost(stats.Cost), line,
-	))
-	return s.message("✅", ticket.Title, counts, "", s.identityLine(epicName, ticket.Identifier))
+	)
+	return s.chatStyle.Message("✅", ticket.Title, counts, "", s.identityLine(epicName, ticket.Identifier))
 }
 
 // ticketNeedsHumanText renders the "a machine parked this ticket for a
@@ -202,13 +187,13 @@ func (s mrkdwnStyle) iterationFinishedText(ticket tickets.Ticket, epicName strin
 //	{reason}
 //	{counts line}
 //	[gx] {epic}/{ticket}
-func (s mrkdwnStyle) ticketNeedsHumanText(identifier, epicName, status, reason string, counts EpicCounts) string {
+func (s mrkdwnStyle) ticketNeedsHumanText(identifier, epicName, status, reason string, counts EpicCounts) chatmarkup.Text {
 	emoji, headline := "\U0001f198", "needs answer"
 	if status != "needs-answer" {
 		emoji, headline = "\U0001f6d1", "needs repair"
 	}
-	detail := fmt.Sprintf("%s\n%s", s.escape(reason), RenderCountsLine(counts))
-	return s.message(emoji, headline, "", detail, s.identityLine(epicName, identifier))
+	detail := fmt.Sprintf("%s\n%s", reason, RenderCountsLine(counts))
+	return s.chatStyle.Message(emoji, headline, "", detail, s.identityLine(epicName, identifier))
 }
 
 // epicParkedText renders the "epic parked" notification — the run is still
@@ -219,9 +204,9 @@ func (s mrkdwnStyle) ticketNeedsHumanText(identifier, epicName, status, reason s
 //
 //	Nothing runnable left; waiting on {stalled}
 //	[gx] {epic}
-func (s mrkdwnStyle) epicParkedText(epicName string, stalled []string) string {
-	detail := s.escape("Nothing runnable left; waiting on " + strings.Join(stalled, ", "))
-	return s.message("\U0001f17f️", "epic parked", "", detail, s.identityLine(epicName, ""))
+func (s mrkdwnStyle) epicParkedText(epicName string, stalled []string) chatmarkup.Text {
+	detail := "Nothing runnable left; waiting on " + strings.Join(stalled, ", ")
+	return s.chatStyle.Message("\U0001f17f️", "epic parked", "", detail, s.identityLine(epicName, ""))
 }
 
 // epicCompleteText renders the "epic complete" notification. counts is the
@@ -236,9 +221,9 @@ func (s mrkdwnStyle) epicParkedText(epicName string, stalled []string) string {
 //	{counts line}
 //	{completed} ticket(s) landed in {elapsed} · {totalCost}
 //	[gx] {epic}
-func (s mrkdwnStyle) epicCompleteText(epicName string, counts EpicCounts, completed int, elapsedSeconds int, totalCost float64) string {
-	detail := s.escape(fmt.Sprintf("%d ticket(s) landed in %s · %s", completed, formatDuration(elapsedSeconds), formatCost(totalCost)))
-	return s.message("\U0001f389", "epic complete", RenderCountsLine(counts), detail, s.identityLine(epicName, ""))
+func (s mrkdwnStyle) epicCompleteText(epicName string, counts EpicCounts, completed int, elapsedSeconds int, totalCost float64) chatmarkup.Text {
+	detail := fmt.Sprintf("%d ticket(s) landed in %s · %s", completed, formatDuration(elapsedSeconds), formatCost(totalCost))
+	return s.chatStyle.Message("\U0001f389", "epic complete", RenderCountsLine(counts), detail, s.identityLine(epicName, ""))
 }
 
 // epicFailedText renders the "epic failed" notification — the second of the
@@ -252,8 +237,8 @@ func (s mrkdwnStyle) epicCompleteText(epicName string, counts EpicCounts, comple
 //	{counts line}
 //	{err}
 //	[gx] {epic}
-func (s mrkdwnStyle) epicFailedText(epicName string, counts EpicCounts, errMsg string) string {
-	return s.message("\U0001f525", "epic failed", RenderCountsLine(counts), s.escape(errMsg), s.identityLine(epicName, ""))
+func (s mrkdwnStyle) epicFailedText(epicName string, counts EpicCounts, errMsg string) chatmarkup.Text {
+	return s.chatStyle.Message("\U0001f525", "epic failed", RenderCountsLine(counts), errMsg, s.identityLine(epicName, ""))
 }
 
 // mutedText renders the gate's edge-triggered per-source mute notice — the
@@ -263,8 +248,8 @@ func (s mrkdwnStyle) epicFailedText(epicName string, counts EpicCounts, errMsg s
 //	🔇 *muting this*
 //
 //	[gx] {epic}/{ticket}
-func (s mrkdwnStyle) mutedText(epicName, ticketIdentifier string) string {
-	return s.message("\U0001f507", "muting this", "", "", s.identityLine(epicName, ticketIdentifier))
+func (s mrkdwnStyle) mutedText(epicName, ticketIdentifier string) chatmarkup.Text {
+	return s.chatStyle.Message("\U0001f507", "muting this", "", "", s.identityLine(epicName, ticketIdentifier))
 }
 
 // globallyMutedText renders the gate's edge-triggered global-mute notice —
@@ -275,9 +260,9 @@ func (s mrkdwnStyle) mutedText(epicName, ticketIdentifier string) string {
 //
 //	re-enable with `gx notify --enable {transport}`
 //	[gx]
-func (s mrkdwnStyle) globallyMutedText(transport string) string {
-	detail := s.escape(fmt.Sprintf("re-enable with `gx notify --enable %s`", transport))
-	return s.message("\U0001f6ab", "globally muted", "", detail, s.gxPrefix)
+func (s mrkdwnStyle) globallyMutedText(transport string) chatmarkup.Text {
+	detail := fmt.Sprintf("re-enable with `gx notify --enable %s`", transport)
+	return s.chatStyle.Message("\U0001f6ab", "globally muted", "", detail, s.gxPrefix)
 }
 
 // testMessageText renders the fixed message `gx config test-notifications`
@@ -287,7 +272,7 @@ func (s mrkdwnStyle) globallyMutedText(transport string) string {
 //
 //	If you can see this, notifications are working.
 //	[gx]
-func (s mrkdwnStyle) testMessageText() string {
-	body := s.escape("If you can see this, notifications are working.")
-	return s.message("\U0001f514", "test notification", "", body, s.gxPrefix)
+func (s mrkdwnStyle) testMessageText() chatmarkup.Text {
+	body := "If you can see this, notifications are working."
+	return s.chatStyle.Message("\U0001f514", "test notification", "", body, s.gxPrefix)
 }

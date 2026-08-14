@@ -102,7 +102,7 @@ func SendTelegramTestMessage(botToken, chatID string) error {
 }
 
 func sendTelegramTestMessage(botToken, chatID, apiBaseURL string) error {
-	return sendTelegramRaw(botToken, chatID, apiBaseURL, telegramStyle.testMessageText())
+	return sendTelegramRaw(botToken, chatID, apiBaseURL, telegramStyle.testMessageText().String())
 }
 
 // SendTelegramTestBatch synchronously sends two fixed test messages through
@@ -116,8 +116,8 @@ func SendTelegramTestBatch(botToken, chatID string) error {
 
 func sendTelegramTestBatch(botToken, chatID, apiBaseURL string) error {
 	items := []batchedMessage{
-		{text: telegramStyle.testMessageText(), kind: "test"},
-		{text: telegramStyle.testMessageText(), kind: "test"},
+		{text: telegramStyle.testMessageText().String(), kind: "test"},
+		{text: telegramStyle.testMessageText().String(), kind: "test"},
 	}
 	return sendTelegramRaw(botToken, chatID, apiBaseURL, renderBatch(telegramStyle, items))
 }

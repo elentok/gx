@@ -74,7 +74,7 @@ func newSlackEventSink(inner EventSink, webhookURL, scratchDir, epicName string)
 // like `gx config test-notifications` that need to report success/failure
 // directly — unlike the EventSink decorator's fire-and-forget send.
 func SendSlackTestMessage(webhookURL string) error {
-	return sendSlackMessageRaw(webhookURL, slackStyle.testMessageText())
+	return sendSlackMessageRaw(webhookURL, slackStyle.testMessageText().String())
 }
 
 // SendSlackTestBatch is Slack's counterpart to SendTelegramTestBatch: sends
@@ -84,8 +84,8 @@ func SendSlackTestMessage(webhookURL string) error {
 // symmetry/smoke-testing the batch plumbing, not because Slack has the bug.
 func SendSlackTestBatch(webhookURL string) error {
 	items := []batchedMessage{
-		{text: slackStyle.testMessageText(), kind: "test"},
-		{text: slackStyle.testMessageText(), kind: "test"},
+		{text: slackStyle.testMessageText().String(), kind: "test"},
+		{text: slackStyle.testMessageText().String(), kind: "test"},
 	}
 	return sendSlackMessageRaw(webhookURL, renderBatch(slackStyle, items))
 }

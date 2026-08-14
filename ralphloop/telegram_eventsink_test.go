@@ -90,7 +90,7 @@ func TestTelegramEventSink_EpicComplete_PostsTelegramWireFormat(t *testing.T) {
 	if reqs[0].ParseMode != "MarkdownV2" {
 		t.Errorf("parse_mode = %q, want %q", reqs[0].ParseMode, "MarkdownV2")
 	}
-	want := telegramStyle.epicCompleteText("epic", EpicCounts{}, 5, 300, 0)
+	want := telegramStyle.epicCompleteText("epic", EpicCounts{}, 5, 300, 0).String()
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}
@@ -196,8 +196,8 @@ func unescapedTelegramMarkdownV2Char(text string) (string, int) {
 func TestRenderBatch_TelegramStyle_MultipleItems_SeparatorIsEscaped(t *testing.T) {
 	t.Parallel()
 	items := []batchedMessage{
-		{text: telegramStyle.testMessageText(), kind: "a"},
-		{text: telegramStyle.testMessageText(), kind: "b"},
+		{text: telegramStyle.testMessageText().String(), kind: "a"},
+		{text: telegramStyle.testMessageText().String(), kind: "b"},
 	}
 	got := renderBatch(telegramStyle, items)
 	if ch, idx := unescapedTelegramMarkdownV2Char(got); idx != -1 {
@@ -223,8 +223,8 @@ func TestSendTelegramTestBatch_PostsRenderBatchOutputAsIs(t *testing.T) {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
 	want := renderBatch(telegramStyle, []batchedMessage{
-		{text: telegramStyle.testMessageText(), kind: "test"},
-		{text: telegramStyle.testMessageText(), kind: "test"},
+		{text: telegramStyle.testMessageText().String(), kind: "test"},
+		{text: telegramStyle.testMessageText().String(), kind: "test"},
 	})
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
@@ -244,7 +244,7 @@ func TestSendTelegramTestMessage_SendsSynchronouslyAndReturnsNilOnSuccess(t *tes
 	if len(reqs) != 1 {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
-	want := telegramStyle.testMessageText()
+	want := telegramStyle.testMessageText().String()
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}

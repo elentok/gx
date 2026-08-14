@@ -325,12 +325,12 @@ func (s *chatEventSink) gate(eventType, source string, recordSend bool) (GateRes
 
 func (s *chatEventSink) EpicStarted(epicName string, done, total int) {
 	s.EventSink.EpicStarted(epicName, done, total)
-	s.send(s.style.epicStartedText(epicName, loadEpicCounts(s.scratchDir, epicName)), notifyKindEpicStarted, epicSource(epicName), "")
+	s.send(s.style.epicStartedText(epicName, loadEpicCounts(s.scratchDir, epicName)).String(), notifyKindEpicStarted, epicSource(epicName), "")
 }
 
 func (s *chatEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string) {
 	s.EventSink.IterationStarted(ticket, label, cwd, sessionID)
-	s.send(s.style.iterationStartedText(ticket, s.epicName), notifyKindIterationStarted, ticket.Path, ticket.Identifier)
+	s.send(s.style.iterationStartedText(ticket, s.epicName).String(), notifyKindIterationStarted, ticket.Path, ticket.Identifier)
 }
 
 func (s *chatEventSink) IterationPaused(identifier, label string, kind PauseKind, reason string) {
@@ -341,7 +341,7 @@ func (s *chatEventSink) IterationPaused(identifier, label string, kind PauseKind
 		// pause itself stays TUI-only (see "park cardinality").
 		return
 	}
-	s.send(s.style.iterationPausedText(label, reason, s.epicName, identifier), notifyKindIterationPaused, s.resolveTicketPath(identifier), identifier)
+	s.send(s.style.iterationPausedText(label, reason, s.epicName, identifier).String(), notifyKindIterationPaused, s.resolveTicketPath(identifier), identifier)
 }
 
 func (s *chatEventSink) IterationResumed(identifier, label string, kind PauseKind) {
@@ -349,18 +349,18 @@ func (s *chatEventSink) IterationResumed(identifier, label string, kind PauseKin
 	if kind == PauseNeedsRepair {
 		return
 	}
-	s.send(s.style.iterationResumedText(label, s.epicName, identifier), notifyKindIterationResumed, s.resolveTicketPath(identifier), identifier)
+	s.send(s.style.iterationResumedText(label, s.epicName, identifier).String(), notifyKindIterationResumed, s.resolveTicketPath(identifier), identifier)
 }
 
 func (s *chatEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
 	s.EventSink.IterationFinished(ticket, epicName, stats)
-	s.send(s.style.iterationFinishedText(ticket, epicName, stats), notifyKindIterationFinished, ticket.Path, ticket.Identifier)
+	s.send(s.style.iterationFinishedText(ticket, epicName, stats).String(), notifyKindIterationFinished, ticket.Path, ticket.Identifier)
 }
 
 func (s *chatEventSink) TicketNeedsHuman(identifier, epicName, status, reason string) {
 	s.EventSink.TicketNeedsHuman(identifier, epicName, status, reason)
 	counts := loadEpicCounts(s.scratchDir, epicName)
-	s.send(s.style.ticketNeedsHumanText(identifier, epicName, status, reason, counts), notifyKindTicketNeedsHuman, s.resolveTicketPath(identifier), identifier)
+	s.send(s.style.ticketNeedsHumanText(identifier, epicName, status, reason, counts).String(), notifyKindTicketNeedsHuman, s.resolveTicketPath(identifier), identifier)
 }
 
 func (s *chatEventSink) EpicParked(epicName string, stalled []StalledTicket) {
@@ -369,14 +369,14 @@ func (s *chatEventSink) EpicParked(epicName string, stalled []StalledTicket) {
 	for i, t := range stalled {
 		identifiers[i] = t.Identifier
 	}
-	s.send(s.style.epicParkedText(epicName, identifiers), notifyKindEpicParked, epicSource(epicName), "")
+	s.send(s.style.epicParkedText(epicName, identifiers).String(), notifyKindEpicParked, epicSource(epicName), "")
 }
 
 func (s *chatEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {
 	s.EventSink.EpicComplete(epicName, completed, elapsedSeconds)
 	counts := loadEpicCounts(s.scratchDir, epicName)
 	totalCost := loadEpicTotalCost(s.scratchDir, epicName)
-	s.send(s.style.epicCompleteText(epicName, counts, completed, elapsedSeconds, totalCost), notifyKindEpicComplete, epicSource(epicName), "")
+	s.send(s.style.epicCompleteText(epicName, counts, completed, elapsedSeconds, totalCost).String(), notifyKindEpicComplete, epicSource(epicName), "")
 }
 
 // send runs (eventType, source) through the budget/mute gate before
@@ -401,11 +401,11 @@ func (s *chatEventSink) send(text, notifyKind, source, ticketIdentifier string) 
 		s.enqueue(text, notifyKind)
 	case PerSourceMuted:
 		if result.EdgeTriggered {
-			s.enqueue(s.style.mutedText(s.epicName, ticketIdentifier), notifyKindMuted)
+			s.enqueue(s.style.mutedText(s.epicName, ticketIdentifier).String(), notifyKindMuted)
 		}
 	case GloballyMuted:
 		if result.EdgeTriggered {
-			s.enqueue(s.style.globallyMutedText(s.transport.name()), notifyKindGloballyMuted)
+			s.enqueue(s.style.globallyMutedText(s.transport.name()).String(), notifyKindGloballyMuted)
 		}
 	}
 }
