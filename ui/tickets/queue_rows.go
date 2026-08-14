@@ -1,6 +1,8 @@
 package tickets
 
 import (
+	"slices"
+
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/tree"
@@ -19,6 +21,11 @@ type queueRow struct {
 	hasChildren bool
 	expanded    bool
 	parentPath  string
+	// actionable is false for a row injected by attachQueueAncestors to keep
+	// a scheduling candidate nested under its real parent chain (ticket 08):
+	// the ticket itself isn't a candidate, so renderQueueTicketRow dims it to
+	// tell it apart from rows the user can actually act on.
+	actionable bool
 }
 
 // queueNodeKind distinguishes the five row kinds the Queue tab's tree can
@@ -54,7 +61,7 @@ type queueNode struct {
 // separator, its status/context-window header lines, an optional plan-error
 // line, and its own candidate tickets nested by Parent/Children — mirroring
 // buildSidebarEntries (model_data.go) one level down. Reuses
-// epicWaves/epicRowOrder/filterDoneTickets/nearestVisibleQueueAncestor to
+// epicWaves/epicRowOrder/filterDoneTickets/attachQueueAncestors to
 // compute each epic's plan-ordered candidate tickets, then wraps them into
 // queueNode tree entries. Called on every
 // queueEpicsLoadedMsg/hideComplete toggle/collapse mutation via
@@ -98,10 +105,12 @@ func (m QueueModel) buildQueueEntries() []tree.Entry[queueNode] {
 				byIdentifier[t.Identifier] = t
 			}
 		}
+		injected := map[string]bool{}
 		for _, t := range ordered {
-			row := queueRow{epic: epic, ticket: t}
+			row := queueRow{epic: epic, ticket: t, actionable: true}
 			node := queueNode{kind: nodeQueueTicket, epic: epic, ticket: row}
-			if parentPath := nearestVisibleQueueAncestor(t, visible, byIdentifier); parentPath != "" {
+			parentPath := attachQueueAncestors(t, epic, visible, injected, byIdentifier, childrenOf, &roots)
+			if parentPath != "" {
 				childrenOf[parentPath] = append(childrenOf[parentPath], node)
 			} else {
 				roots = append(roots, node)
@@ -180,27 +189,61 @@ func filterDoneTickets(epic tickets.Epic, ordered []tickets.Ticket) []tickets.Ti
 	return filtered
 }
 
-// nearestVisibleQueueAncestor walks t's Parent chain (ticket 03's schema
-// field) up to the first ancestor present in visible, mirroring the Tickets
-// tab's nearestVisibleAncestor (ticket 09, model_data.go) — keyed by
-// Ticket.Path/Identifier rather than an epic.Tickets index since queueRow
-// doesn't carry one. Returns "" once the chain runs out, hits a Parent token
-// with no matching ticket in the epic, or would loop (guarded via seen).
-func nearestVisibleQueueAncestor(t tickets.Ticket, visible map[string]bool, byIdentifier map[string]tickets.Ticket) string {
+// attachQueueAncestors walks t's Parent chain (ticket 03's schema field)
+// looking for the nearest ancestor already in visible, mirroring the Tickets
+// tab's nearestVisibleAncestor (ticket 09, model_data.go) one level down —
+// keyed by Ticket.Path/Identifier rather than an epic.Tickets index since
+// queueRow doesn't carry one. Unlike a plain lookup, any ancestor found along
+// the way that ISN'T a scheduling candidate gets injected into roots/
+// childrenOf as a dimmed (actionable: false) row of its own instead of being
+// skipped (ticket 08) — otherwise t would get promoted to root and the
+// parent-child connection the tree exists to show would be lost. injected
+// dedupes across tickets sharing the same non-candidate ancestor within an
+// epic, and visible is extended in place so a later call sees an ancestor
+// this call just injected as already visible. Returns "" once the chain runs
+// out, hits a Parent token with no matching ticket in the epic, or would loop
+// (guarded via seen) — same fallback as before: t is promoted to root.
+func attachQueueAncestors(t tickets.Ticket, epic tickets.Epic, visible map[string]bool, injected map[string]bool, byIdentifier map[string]tickets.Ticket, childrenOf map[string][]queueNode, roots *[]queueNode) string {
 	seen := map[string]bool{t.Path: true}
+	var chain []tickets.Ticket // non-candidate ancestors to inject, nearest first
 	cur := t
+	attachPoint := ""
 	for cur.Parent != nil {
 		parent, ok := byIdentifier[*cur.Parent]
 		if !ok || seen[parent.Path] {
-			return ""
+			break
 		}
 		if visible[parent.Path] {
-			return parent.Path
+			attachPoint = parent.Path
+			break
 		}
+		chain = append(chain, parent)
 		seen[parent.Path] = true
 		cur = parent
 	}
-	return ""
+
+	// Inject farthest-first so each new dimmed row's own parent is already
+	// attached (either an existing visible ancestor or an injected one from
+	// an earlier iteration of this same loop) before it's linked in.
+	parentPath := attachPoint
+	for _, ancestor := range slices.Backward(chain) {
+		if !injected[ancestor.Path] {
+			node := queueNode{
+				kind:   nodeQueueTicket,
+				epic:   epic,
+				ticket: queueRow{epic: epic, ticket: ancestor, actionable: false},
+			}
+			if parentPath != "" {
+				childrenOf[parentPath] = append(childrenOf[parentPath], node)
+			} else {
+				*roots = append(*roots, node)
+			}
+			injected[ancestor.Path] = true
+			visible[ancestor.Path] = true
+		}
+		parentPath = ancestor.Path
+	}
+	return parentPath
 }
 
 // epicRowOrder flattens waves (blockers before dependents, ties in ticket

@@ -232,19 +232,26 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 
 	matched, _ := m.queueTree.SearchMatch(rowIdx)
 	searchDim := m.search.HasQuery() && !matched
+	// nonCandidateDim marks a row injected by attachQueueAncestors (ticket
+	// 08) to keep a candidate nested under its real parent chain — it reuses
+	// statusDoneStyle's permanent grey rather than ui.StyleDim's transient
+	// search-fade, since this row isn't actionable regardless of search state.
+	nonCandidateDim := !r.actionable
 
 	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
 	if t.ShowsCommitlessSuffix() {
 		title += " (commitless)"
 	}
 	titleStyle := lipgloss.NewStyle()
-	if status == tickets.StatusDone {
+	if status == tickets.StatusDone || nonCandidateDim {
 		titleStyle = statusDoneStyle
 	} else if searchDim {
 		titleStyle = ui.StyleDim
 	}
 	if searchDim {
 		style = ui.StyleDim
+	} else if nonCandidateDim {
+		style = statusDoneStyle
 	}
 
 	line := indent + triangle + style.Render(icon)
@@ -252,6 +259,8 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 		badgeStyle := suggestedActionBadgeStyle
 		if searchDim {
 			badgeStyle = ui.StyleDim
+		} else if nonCandidateDim {
+			badgeStyle = statusDoneStyle
 		}
 		line += " " + badgeStyle.Render(m.icons().SuggestedAction)
 	}
@@ -260,6 +269,8 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 		suffixStyle := blockedBySuffixStyle
 		if searchDim {
 			suffixStyle = ui.StyleDim
+		} else if nonCandidateDim {
+			suffixStyle = statusDoneStyle
 		}
 		line += " " + suffixStyle.Render(suffix)
 	}
@@ -269,6 +280,9 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 	metrics := formatMetricsLine(t.ElapsedTime, t.ActualContextWindow, t.ActualCost)
 	if searchDim {
 		return appendRowMetrics(line, metrics, ui.StyleDim)
+	}
+	if nonCandidateDim {
+		return appendRowMetrics(line, metrics, statusDoneStyle)
 	}
 	return appendRowMetrics(line, metrics, style)
 }

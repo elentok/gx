@@ -237,6 +237,84 @@ func TestQueueModelNestsChildrenAtArbitraryDepthAndRespectsCollapse(t *testing.T
 	}
 }
 
+// TestQueueModelInjectsNonCandidateAncestorDimmedInsteadOfPromotingToRoot
+// covers ticket 08: when a checked ticket's real parent isn't itself a
+// scheduling candidate (unchecked), the tree stays connected by injecting
+// that parent as a dimmed, non-actionable row rather than promoting the
+// checked ticket to the top level.
+func TestQueueModelInjectsNonCandidateAncestorDimmedInsteadOfPromotingToRoot(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeFrontmatterTicket(t, root, "alpha", "01-a.md", "01", "open", "")
+	writeFrontmatterTicket(t, root, "alpha", "02-b.md", "02", "open", "01")
+	writeFrontmatterTicket(t, root, "alpha", "03-c.md", "03", "open", "")
+	checked := map[string]bool{
+		// 01 (the parent) is deliberately left unchecked: not a scheduling
+		// candidate on its own.
+		ticketPath(root, "alpha", "02-b.md"): true,
+		ticketPath(root, "alpha", "03-c.md"): true,
+	}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+
+	rows := queueTicketEntries(m)
+	if len(rows) != 3 {
+		t.Fatalf("expected 3 rows (injected 01 + checked 02/03), got %d: %+v", len(rows), rows)
+	}
+	if rows[0].Value.ticket.ticket.Identifier != "01" || rows[0].Depth != 0 {
+		t.Fatalf("expected injected ancestor 01 at depth 0, got %+v", rows[0])
+	}
+	if rows[0].Value.ticket.actionable {
+		t.Fatalf("expected injected ancestor 01 to be marked non-actionable, got %+v", rows[0].Value.ticket)
+	}
+	if rows[1].Value.ticket.ticket.Identifier != "02" || rows[1].Depth != 1 {
+		t.Fatalf("expected checked ticket 02 nested under injected 01 at depth 1, got %+v", rows[1])
+	}
+	if !rows[1].Value.ticket.actionable {
+		t.Fatalf("expected checked ticket 02 to stay marked actionable, got %+v", rows[1].Value.ticket)
+	}
+	if rows[2].Value.ticket.ticket.Identifier != "03" || rows[2].Depth != 0 {
+		t.Fatalf("expected unrelated checked ticket 03 at depth 0, got %+v", rows[2])
+	}
+
+	content := m.View().Content
+	plain := ansi.Strip(content)
+	if !strings.Contains(plain, "01") {
+		t.Fatalf("expected injected ancestor 01's row to render:\n%s", plain)
+	}
+}
+
+// TestQueueModelSharedNonCandidateAncestorInjectedOnce covers the dedup path
+// of attachQueueAncestors: two checked tickets sharing the same non-candidate
+// parent must only inject that parent once, with both children nested under
+// the single injected row.
+func TestQueueModelSharedNonCandidateAncestorInjectedOnce(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeFrontmatterTicket(t, root, "alpha", "01-a.md", "01", "open", "")
+	writeFrontmatterTicket(t, root, "alpha", "02-b.md", "02", "open", "01")
+	writeFrontmatterTicket(t, root, "alpha", "03-c.md", "03", "open", "01")
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "02-b.md"): true,
+		ticketPath(root, "alpha", "03-c.md"): true,
+	}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+
+	rows := queueTicketEntries(m)
+	wantIDs := []string{"01", "02", "03"}
+	wantDepths := []int{0, 1, 1}
+	if len(rows) != len(wantIDs) {
+		t.Fatalf("expected a single injected 01 with both 02 and 03 nested under it, got %d rows: %+v", len(rows), rows)
+	}
+	for i, want := range wantIDs {
+		if rows[i].Value.ticket.ticket.Identifier != want {
+			t.Fatalf("row %d = %q, want %q: %+v", i, rows[i].Value.ticket.ticket.Identifier, want, rows)
+		}
+		if rows[i].Depth != wantDepths[i] {
+			t.Fatalf("row %d (%s) depth = %d, want %d", i, want, rows[i].Depth, wantDepths[i])
+		}
+	}
+}
+
 // TestQueueModelDoneParentWithOpenForkChildStaysVisible ports
 // queue_rows_test.go's TestQueueRowsForEpic_DoneParentWithOpenForkChildStaysVisible
 // (ticket 19): a done parent whose fork child (Parent: ticket 03) is still
