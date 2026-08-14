@@ -13,6 +13,12 @@ declaring the tickets that **block** it — published to gx's local markdown tra
 [gx-local-tracker.md](../gx-local-tracker.md) for the full layout, frontmatter, and CLI contract;
 this skill only covers how to break work up and what to put in each ticket.
 
+ralph-loop runs the published epic unattended, ticket by ticket, with no session-length limit — it
+will happily churn through however many tickets the epic has, overnight if needed. The only budget
+that matters is **context window per ticket**, never wall-clock time for the epic as a whole: split
+a ticket because its implementation won't fit one fresh context window, not because the epic "would
+take a while" to get through.
+
 Estimate the amount of tokens that will be needed for the implementation of each ticket; if a ticket
 will need more than 70K tokens, split it.
 
