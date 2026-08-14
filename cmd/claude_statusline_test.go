@@ -32,6 +32,17 @@ func TestRunClaudeStatusline_ValidInput(t *testing.T) {
 	}
 }
 
+// expectedResetLabel mirrors formatResetTime's same-day-vs-weekday choice so
+// the test doesn't assume "same day" and go flaky when a reset time computed
+// as now+30m happens to cross local midnight.
+func expectedResetLabel(t time.Time) string {
+	now := time.Now()
+	if t.Year() == now.Year() && t.YearDay() == now.YearDay() {
+		return t.Format("15:04")
+	}
+	return t.Format("Mon 15:04")
+}
+
 func TestRunClaudeStatusline_RateLimitResets(t *testing.T) {
 	t.Parallel()
 	fiveHourReset := time.Now().Add(30 * time.Minute)
@@ -53,8 +64,8 @@ func TestRunClaudeStatusline_RateLimitResets(t *testing.T) {
 
 	got := out.String()
 	for _, want := range []string{
-		"resets " + fiveHourReset.Format("15:04"),
-		"resets " + weekReset.Format("Mon 15:04"),
+		"resets " + expectedResetLabel(fiveHourReset),
+		"resets " + expectedResetLabel(weekReset),
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("output missing %q: %q", want, got)

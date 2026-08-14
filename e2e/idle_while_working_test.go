@@ -18,7 +18,10 @@ import (
 // time (confirmed hands-on against real herdr 0.8.0 with a fake agent
 // visibly busy for 20s: agent_status read "idle" at every one-second sample
 // until the title reverted). `agent wait --until working` genuinely times
-// out rather than ever firing.
+// out rather than ever firing. The bug is racy rather than deterministic
+// (occasional runs observe a correct "working" sample), so treat an
+// occasional failure here as the bug's own flakiness, not a fixed-and-should-
+// -flip signal — only flip once "working" reproduces consistently.
 //
 // This is the inverse failure mode from the compaction false-idle scenario
 // (e2e/compaction_false_idle_test.go: turn reported settled too early).
@@ -57,7 +60,9 @@ func TestIdleWhileWorking_AgentStatusNeverReportsWorking(t *testing.T) {
 	}
 
 	// Sample mid-window: still busy, status should (bug notwithstanding)
-	// still read "idle", not "working".
+	// still read "idle", not "working". (Verified across repeated runs with
+	// the PrependPath fix in place: this still reproduces most of the time,
+	// with an occasional "working" — the underlying bug is racy, not fixed.)
 	time.Sleep(workingDuration / 2)
 	mid := ws.AgentGet("")
 	if mid.AgentStatus != "idle" {

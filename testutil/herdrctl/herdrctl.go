@@ -165,7 +165,12 @@ func NewWorkspace(t *testing.T, cwd string, env ...string) *Workspace {
 func (w *Workspace) PrependPath(dir string) {
 	w.t.Helper()
 	if w.shellName() == "fish" {
-		w.Run("fish_add_path", "--prepend", "--move", dir)
+		// set -gx PATH directly rather than fish_add_path: fish_add_path only
+		// edits fish_user_paths, and its resync into $PATH can land behind an
+		// entry (e.g. ~/.local/bin) that config.fish put in $PATH directly —
+		// which silently let a real `claude` on PATH win over the fake one
+		// this exists to shadow.
+		w.Run("set", "-gx", "PATH", dir, "$PATH")
 	} else {
 		w.Run("export", "PATH="+dir+":$PATH")
 	}
