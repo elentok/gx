@@ -16,36 +16,9 @@ import (
 	"github.com/elentok/gx/testutil/herdrfake"
 )
 
-// isValidTelegramMarkdownV2 reports whether text would be accepted by a real
-// Telegram sendMessage call with parse_mode=MarkdownV2: every occurrence of
-// a reserved char (telegramMarkdownV2SpecialChars) must be backslash-escaped.
-// A bare "*" is treated as a deliberate bold marker (this package only ever
-// emits matched *headline* pairs, never a lone literal one) rather than
-// something that needs escaping — everything else reserved must be escaped.
-// This is deliberately the same rule production code is supposed to
-// maintain (see escapeTelegramMarkdownV2), reimplemented independently here
-// so the fake server below can catch a call site that forgot to escape,
-// rather than trusting the code under test to grade its own homework.
-func isValidTelegramMarkdownV2(text string) bool {
-	runes := []rune(text)
-	for i := 0; i < len(runes); i++ {
-		r := runes[i]
-		if r == '\\' {
-			i++ // an escaped char (or a trailing lone backslash, itself invalid)
-			if i >= len(runes) {
-				return false
-			}
-			continue
-		}
-		if r == '*' {
-			continue
-		}
-		if strings.ContainsRune(telegramMarkdownV2SpecialChars, r) {
-			return false
-		}
-	}
-	return true
-}
+// isValidTelegramMarkdownV2 lives in markdown_validity_test.go, with its own
+// independently-written special-character list — importable from both this
+// e2e test and notification_markdownv2_validity_test.go's fast unit tests.
 
 // fakeValidatingTelegramServer starts an httptest.Server standing in for the
 // Telegram Bot API that, like the real API, rejects (400) any sendMessage
