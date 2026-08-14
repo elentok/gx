@@ -508,7 +508,8 @@ func TestNewModel_SectionHeadersMatchTreeRowShape(t *testing.T) {
 	m = updated.(Model)
 	setCollapsedSection(&m, sectionClosed, false)
 
-	content := ansi.Strip(m.View().Content)
+	rawContent := m.View().Content
+	content := ansi.Strip(rawContent)
 	if strings.Contains(content, "──") {
 		t.Fatalf("expected the decorative border to be gone, got:\n%s", content)
 	}
@@ -528,6 +529,11 @@ func TestNewModel_SectionHeadersMatchTreeRowShape(t *testing.T) {
 	}
 	if !strings.Contains(closedPrefix, icons.TicketDone) {
 		t.Fatalf("expected 'Closed epics' row to show the done icon, got: %q", closedPrefix)
+	}
+	// The done icon keeps the same statusDoneStyle a closed ticket row's icon
+	// uses, rather than being swallowed into sectionHeaderStyle's uniform gray.
+	if !strings.Contains(rawContent, statusDoneStyle.Render(icons.TicketDone)) {
+		t.Fatalf("expected 'Closed epics' done icon to render with statusDoneStyle, got:\n%s", rawContent)
 	}
 
 	lines := strings.Split(content, "\n")

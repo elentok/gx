@@ -100,9 +100,14 @@ func (m Model) sidebarRenderOpts(width int) tree.RenderOpts[sidebarNode] {
 				icon := ""
 				if entry.Value.section == sectionClosed {
 					label, n = "Closed epics", len(closedIdxs)
-					icon = m.icons().TicketDone + " "
+					icon = statusDoneStyle.Render(m.icons().TicketDone) + " "
 				}
-				return sectionHeaderStyle.Render(fmt.Sprintf("%s %s%s (%d)", glyph, icon, label, n))
+				// Only the label+count segment is dimmed via sectionHeaderStyle —
+				// the glyph and done icon keep the same styling (unstyled glyph,
+				// statusDoneStyle icon) an epic/ticket row uses, so "Closed
+				// epics"'s done icon isn't a washed-out double of the one on a
+				// closed ticket one row below it.
+				return fmt.Sprintf("%s %s%s", glyph, icon, sectionHeaderStyle.Render(fmt.Sprintf("%s (%d)", label, n)))
 			case nodeEmpty:
 				label := "open epics"
 				if entry.Value.section == sectionClosed {
