@@ -19,6 +19,7 @@ var frontmatterLabelStyle = ui.StyleMuted
 // entirely (both the actual and expected variants read the same in the
 // preview, since only one is ever populated on a given ticket).
 var frontmatterLabelOverrides = map[string]string{
+	"id":                    "ID",
 	"actual_context_window": "Context window",
 }
 
@@ -60,6 +61,7 @@ func ticketFrontmatterFields(t tickets.Ticket, status tickets.RenderedStatus) []
 		fields = append(fields, frontmatterField{key: key, value: value})
 	}
 
+	add("id", t.Identifier)
 	add("status", status.Word())
 	add("type", t.Type)
 	add("blocked_by", strings.Join(t.BlockedBy, ", "))
@@ -68,6 +70,8 @@ func ticketFrontmatterFields(t tickets.Ticket, status tickets.RenderedStatus) []
 	}
 	if t.ActualContextWindow > 0 {
 		add("actual_context_window", formatTokenCount(t.ActualContextWindow))
+	} else if t.ExpectedContextWindow > 0 {
+		add("actual_context_window", "Expected: "+formatTokenCount(t.ExpectedContextWindow))
 	}
 	if t.ElapsedTime > 0 {
 		add("elapsed_time", formatElapsed(t.ElapsedTime))

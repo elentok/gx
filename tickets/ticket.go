@@ -42,7 +42,11 @@ type Ticket struct {
 	// landed before metrics existed (report.go's readSessionStats found
 	// nothing to stamp).
 	ActualContextWindow int
-	ElapsedTime         int
+	// ExpectedContextWindow mirrors schema.Ticket.ExpectedContextWindow: the
+	// ticket author's pre-landing estimate, shown in the preview only until
+	// ActualContextWindow is populated (see ui/tickets/preview_frontmatter.go).
+	ExpectedContextWindow int
+	ElapsedTime           int
 	// ActualCost mirrors schema.Ticket.ActualCost: the USD cost of the
 	// session(s) that landed this ticket. Zero for a ticket that's never run,
 	// or one landed before this field existed.

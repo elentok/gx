@@ -92,6 +92,7 @@ func loadEpic(scratchDir, name string) Epic {
 		ticket.Status = string(parsed.Status)
 		ticket.Body = schema.ParseBody(string(raw))
 		ticket.ActualContextWindow = parsed.ActualContextWindow
+		ticket.ExpectedContextWindow = parsed.ExpectedContextWindow
 		ticket.ElapsedTime = parsed.ElapsedTime
 		ticket.ActualCost = parsed.ActualCost
 		ticket.Compactions = parsed.Compactions
