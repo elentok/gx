@@ -240,39 +240,47 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 	// search-fade, since this row isn't actionable regardless of search state.
 	nonCandidateDim := !r.actionable
 
+	// dimStyle/dimmed resolve searchDim vs nonCandidateDim once, with
+	// searchDim taking precedence when both apply, and are then reused for
+	// every row element (icon, title, badge, suffix, metrics) so a row can't
+	// render a mismatched blend of the two dim styles (ticket 13).
+	dimStyle := lipgloss.NewStyle()
+	dimmed := false
+	switch {
+	case searchDim:
+		dimStyle, dimmed = ui.StyleDim, true
+	case nonCandidateDim:
+		dimStyle, dimmed = statusDoneStyle, true
+	}
+
 	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
 	if t.ShowsCommitlessSuffix() {
 		title += " (commitless)"
 	}
 	titleStyle := lipgloss.NewStyle()
-	if status == tickets.StatusDone || nonCandidateDim {
+	switch {
+	case status == tickets.StatusDone:
 		titleStyle = statusDoneStyle
-	} else if searchDim {
-		titleStyle = ui.StyleDim
+	case dimmed:
+		titleStyle = dimStyle
 	}
-	if searchDim {
-		style = ui.StyleDim
-	} else if nonCandidateDim {
-		style = statusDoneStyle
+	if dimmed {
+		style = dimStyle
 	}
 
 	line := indent + triangle + style.Render(icon)
 	if ticketHasSuggestedActions(status, t) {
 		badgeStyle := suggestedActionBadgeStyle
-		if searchDim {
-			badgeStyle = ui.StyleDim
-		} else if nonCandidateDim {
-			badgeStyle = statusDoneStyle
+		if dimmed {
+			badgeStyle = dimStyle
 		}
 		line += " " + badgeStyle.Render(m.icons().SuggestedAction)
 	}
 	line += " " + titleStyle.Render(title)
 	if suffix := blockedBySuffix(epic, t, status); suffix != "" {
 		suffixStyle := blockedBySuffixStyle
-		if searchDim {
-			suffixStyle = ui.StyleDim
-		} else if nonCandidateDim {
-			suffixStyle = statusDoneStyle
+		if dimmed {
+			suffixStyle = dimStyle
 		}
 		line += " " + suffixStyle.Render(suffix)
 	}
@@ -280,11 +288,8 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 		return line
 	}
 	metrics := formatMetricsLine(t.ElapsedTime, t.ActualContextWindow, t.ActualCost)
-	if searchDim {
-		return appendRowMetrics(line, metrics, ui.StyleDim)
-	}
-	if nonCandidateDim {
-		return appendRowMetrics(line, metrics, statusDoneStyle)
+	if dimmed {
+		return appendRowMetrics(line, metrics, dimStyle)
 	}
 	return appendRowMetrics(line, metrics, style)
 }

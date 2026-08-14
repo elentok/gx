@@ -1874,6 +1874,35 @@ func TestRenderQueueTicketRow_NonDoneWithZeroMetricsOmitsLine(t *testing.T) {
 	}
 }
 
+// TestRenderQueueTicketRow_SearchDimWinsOverNonCandidateDim covers ticket 13:
+// a row that's both an injected non-candidate ancestor (ticket 08) and
+// search-dimmed (an active query it doesn't match) must render its icon,
+// title, badge, and suffix all in the same dim style — previously the title
+// resolved nonCandidateDim first while the other elements resolved searchDim
+// first, producing a two-tone row.
+func TestRenderQueueTicketRow_SearchDimWinsOverNonCandidateDim(t *testing.T) {
+	t.Parallel()
+	var m QueueModel
+	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
+		{Identifier: "01", Title: "Ancestor ticket", Status: "open"},
+	}}
+	m.search.Start("no-match")
+	m.queueTree.Search().SetPassiveResults("no-match", nil)
+
+	row := queueRow{epic: epic, ticket: epic.Tickets[0], actionable: false}
+	line := m.renderQueueTicketRow(row, 0)
+	stripped := ansi.Strip(line)
+
+	title := epic.Tickets[0].DisplayNumber() + " " + epic.Tickets[0].Title
+	wantTitle := ui.StyleDim.Render(title)
+	if !strings.Contains(line, wantTitle) {
+		t.Fatalf("row line = %q, want title rendered in ui.StyleDim (matching icon/badge/suffix), got literal stripped text %q", line, stripped)
+	}
+	if strings.Contains(line, statusDoneStyle.Render(title)) {
+		t.Fatalf("row line = %q, title still rendered in statusDoneStyle instead of ui.StyleDim", line)
+	}
+}
+
 // TestQueueModelScrollsWithKeysAndMouse covers ticket 25's third request: the
 // Queue tab must scroll (keyboard, including ctrl+d/ctrl+u, and mouse wheel)
 // once its content overflows the visible viewport — previously it had no
