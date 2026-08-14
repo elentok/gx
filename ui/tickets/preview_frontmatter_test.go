@@ -1,8 +1,10 @@
 package tickets
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -57,5 +59,43 @@ func TestTicketFrontmatterFields_ActualContextWindowReplacesExpectedOnceLanded(t
 	}
 	if contextWindow != "19.8k tok" {
 		t.Fatalf("expected actual context window to replace the expected one, got %q", contextWindow)
+	}
+}
+
+// TestRenderFrontmatterBlock_WrapsLongValueToWidth covers ticket 06 (bugs-07):
+// a frontmatter value long enough to overflow the pane (e.g. a blocked_by
+// list with many entries) must wrap within width instead of producing one
+// long line.
+func TestRenderFrontmatterBlock_WrapsLongValueToWidth(t *testing.T) {
+	t.Parallel()
+	tk := tickets.Ticket{
+		Type:      "task",
+		BlockedBy: []string{"01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"},
+	}
+
+	const width = 30
+	out := renderFrontmatterBlock(tk, tickets.StatusOpen, width)
+
+	for _, line := range strings.Split(out, "\n") {
+		if w := ansi.StringWidth(ansi.Strip(line)); w > width {
+			t.Fatalf("expected every line within width %d, got line of width %d:\n%q\nfull output:\n%s", width, w, line, out)
+		}
+	}
+	if !strings.Contains(ansi.Strip(out), "12") {
+		t.Fatalf("expected wrapped output to still contain the full blocked_by list, got:\n%s", ansi.Strip(out))
+	}
+}
+
+// TestRenderFrontmatterBlock_NoRegressionForShortValues covers this ticket's
+// second acceptance criterion: short field values render as a single line,
+// unchanged by the added wrapping.
+func TestRenderFrontmatterBlock_NoRegressionForShortValues(t *testing.T) {
+	t.Parallel()
+	tk := tickets.Ticket{Type: "task"}
+
+	out := renderFrontmatterBlock(tk, tickets.StatusOpen, 80)
+	lines := strings.Split(out, "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 short frontmatter lines (status, type), got %d:\n%s", len(lines), out)
 	}
 }

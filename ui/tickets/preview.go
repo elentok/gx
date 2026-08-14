@@ -98,7 +98,7 @@ func renderTicketPreview(epic tickets.Epic, t tickets.Ticket, width int) (string
 	status := epic.RenderedStatus(t)
 
 	var b strings.Builder
-	b.WriteString(renderFrontmatterBlock(t, status))
+	b.WriteString(renderFrontmatterBlock(t, status, width))
 	b.WriteString("\n")
 	b.WriteString(previewRuleStyle.Render(strings.Repeat("─", max(width, 0))))
 	b.WriteString("\n")

@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 )
@@ -88,11 +89,14 @@ func ticketFrontmatterFields(t tickets.Ticket, status tickets.RenderedStatus) []
 // renderFrontmatterBlock renders a ticket's frontmatter as prettified
 // "Label: value" lines, one per field - the preview's replacement for its
 // old synthesized header+meta lines (see renderTicketPreview's doc comment).
-func renderFrontmatterBlock(t tickets.Ticket, status tickets.RenderedStatus) string {
+// Each line is word-wrapped to width so a long value (e.g. a blocked_by list
+// with many entries) wraps within the pane instead of overflowing it.
+func renderFrontmatterBlock(t tickets.Ticket, status tickets.RenderedStatus, width int) string {
 	fields := ticketFrontmatterFields(t, status)
 	lines := make([]string, len(fields))
 	for i, f := range fields {
-		lines[i] = "  " + frontmatterLabelStyle.Render(prettifyFieldName(f.key)+":") + " " + f.value
+		line := "  " + frontmatterLabelStyle.Render(prettifyFieldName(f.key)+":") + " " + f.value
+		lines[i] = ansi.Wordwrap(line, max(width, 1), "")
 	}
 	return strings.Join(lines, "\n")
 }
