@@ -49,6 +49,45 @@ func TestRenderTicketRow_DoneHasMetricsLine(t *testing.T) {
 	}
 }
 
+// TestRenderTicketRow_NonDoneWithMetricsShowsLine covers ticket 03: a
+// non-done ticket (e.g. parked needs-answer/needs-repair) can already carry
+// non-zero elapsed_time/actual_context_window from a prior run, and that
+// data must not be hidden just because the ticket isn't done.
+func TestRenderTicketRow_NonDoneWithMetricsShowsLine(t *testing.T) {
+	t.Parallel()
+	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
+		{Identifier: "01", Title: "Parked ticket", Status: "needs-answer", ElapsedTime: 754, ActualContextWindow: 45_200},
+	}}
+	m := newModelForTicketRowTests(epic)
+
+	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)
+	if len(lines) != 1 {
+		t.Fatalf("renderTicketRow() returned %d lines, want 1: %#v", len(lines), lines)
+	}
+	if !strings.Contains(lines[0], "12m34s") || !strings.Contains(lines[0], "45.2k tok") {
+		t.Fatalf("row line = %q, want elapsed time and tokens", lines[0])
+	}
+}
+
+// TestRenderTicketRow_NonDoneWithZeroMetricsOmitsLine covers ticket 03: a
+// non-done ticket with no recorded elapsed_time/actual_context_window yet
+// still shows nothing to display.
+func TestRenderTicketRow_NonDoneWithZeroMetricsOmitsLine(t *testing.T) {
+	t.Parallel()
+	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
+		{Identifier: "01", Title: "Parked ticket", Status: "needs-repair"},
+	}}
+	m := newModelForTicketRowTests(epic)
+
+	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)
+	if len(lines) != 1 {
+		t.Fatalf("renderTicketRow() returned %d lines, want 1: %#v", len(lines), lines)
+	}
+	if strings.Contains(lines[0], "tok") {
+		t.Fatalf("row line = %q, want no metrics suffix", lines[0])
+	}
+}
+
 func TestRenderTicketRow_LiveHasSuffixAndMetricsLine(t *testing.T) {
 	t.Parallel()
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{{Identifier: "01", Title: "Running ticket", Status: "claimed"}}}

@@ -213,7 +213,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 		}
 		line += " " + suffixStyle.Render(suffix)
 	}
-	if status != tickets.StatusDone {
+	if status != tickets.StatusDone && t.ElapsedTime <= 0 && t.ActualContextWindow <= 0 {
 		return []string{line}
 	}
 	metrics := formatMetricsLine(t.ElapsedTime, t.ActualContextWindow, t.ActualCost)

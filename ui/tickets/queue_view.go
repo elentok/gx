@@ -263,7 +263,7 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 		}
 		line += " " + suffixStyle.Render(suffix)
 	}
-	if status != tickets.StatusDone {
+	if status != tickets.StatusDone && t.ElapsedTime <= 0 && t.ActualContextWindow <= 0 {
 		return line
 	}
 	metrics := formatMetricsLine(t.ElapsedTime, t.ActualContextWindow, t.ActualCost)

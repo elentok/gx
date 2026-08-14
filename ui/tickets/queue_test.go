@@ -1750,6 +1750,38 @@ func TestRenderQueueTicketRow_DoneMetricsLineMatchesTitleColor(t *testing.T) {
 	}
 }
 
+// TestRenderQueueTicketRow_NonDoneWithMetricsShowsLine covers ticket 03: a
+// parked (needs-answer/needs-repair/claimed) ticket that already carries
+// non-zero elapsed_time/actual_context_window must show it, not just done
+// tickets.
+func TestRenderQueueTicketRow_NonDoneWithMetricsShowsLine(t *testing.T) {
+	t.Parallel()
+	var m QueueModel
+	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
+		{Identifier: "01", Title: "Parked ticket", Status: "needs-answer", ElapsedTime: 5, ActualContextWindow: 100},
+	}}
+
+	line := m.renderQueueTicketRow(queueRow{epic: epic, ticket: epic.Tickets[0]}, 0)
+	if !strings.Contains(line, formatMetricsLine(5, 100, 0)) {
+		t.Fatalf("row line = %q, want it to contain metrics %q", line, formatMetricsLine(5, 100, 0))
+	}
+}
+
+// TestRenderQueueTicketRow_NonDoneWithZeroMetricsOmitsLine covers ticket 03:
+// a non-done ticket with nothing recorded yet still omits the metrics line.
+func TestRenderQueueTicketRow_NonDoneWithZeroMetricsOmitsLine(t *testing.T) {
+	t.Parallel()
+	var m QueueModel
+	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
+		{Identifier: "01", Title: "Parked ticket", Status: "needs-repair"},
+	}}
+
+	line := m.renderQueueTicketRow(queueRow{epic: epic, ticket: epic.Tickets[0]}, 0)
+	if strings.Contains(line, "tok") {
+		t.Fatalf("row line = %q, want no metrics suffix", line)
+	}
+}
+
 // TestQueueModelScrollsWithKeysAndMouse covers ticket 25's third request: the
 // Queue tab must scroll (keyboard, including ctrl+d/ctrl+u, and mouse wheel)
 // once its content overflows the visible viewport — previously it had no
