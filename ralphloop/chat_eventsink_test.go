@@ -603,3 +603,140 @@ func TestChatEventSink_BurstOfEventsCoalescedIntoOneFlush_CountsOneSendAgainstBu
 		t.Errorf("transport muted after a single flush, want the burst of events not to trip the global breaker")
 	}
 }
+
+// TestChatEventSink_Flush_FailedSend_RequeuesItems covers ticket 03b's first
+// seam: a flush whose send ultimately fails (after sendNotificationSync's own
+// retry) must put its items back on the queue, marked requeued, rather than
+// lose them.
+func TestChatEventSink_Flush_FailedSend_RequeuesItems(t *testing.T) {
+	sink, transport := newFakeChatSink(t, &recordingSink{})
+	transport.sendSyncFunc = func(ctx context.Context, text chatmarkup.Text) (sendResult, error) {
+		return sendResult{}, errors.New("boom")
+	}
+
+	sink.EpicComplete("epic", 1, 1)
+	sink.flush()
+	sink.inFlight.Wait()
+
+	sink.mu.Lock()
+	queue := append([]batchedMessage(nil), sink.queue...)
+	sink.mu.Unlock()
+	if len(queue) != 1 {
+		t.Fatalf("queue after failed flush = %v, want exactly 1 requeued item", queue)
+	}
+	if !queue[0].requeued {
+		t.Errorf("requeued item not marked requeued")
+	}
+}
+
+// TestChatEventSink_Requeue_MergesWithNewlyQueuedDuplicate covers ticket
+// 03b's merge seam: an identical text that arrived (was enqueued fresh)
+// while the failed batch was being requeued must end up as one merged entry
+// with a combined count, not two separate ×N groups.
+func TestChatEventSink_Requeue_MergesWithNewlyQueuedDuplicate(t *testing.T) {
+	sink, _ := newFakeChatSink(t, &recordingSink{})
+	textA := slackStyle.chatStyle.Escape("a")
+	textB := slackStyle.chatStyle.Escape("b")
+	sink.queue = []batchedMessage{{text: textB, kind: "k", count: 1}}
+
+	sink.requeue([]batchedMessage{
+		{text: textA, kind: "k", count: 2},
+		{text: textB, kind: "k", count: 1},
+	})
+
+	if len(sink.queue) != 2 {
+		t.Fatalf("queue = %v, want 2 entries (a prepended, b merged)", sink.queue)
+	}
+	if sink.queue[0].text != textA || !sink.queue[0].requeued || sink.queue[0].count != 2 {
+		t.Errorf("queue[0] = %+v, want prepended requeued textA with count 2", sink.queue[0])
+	}
+	if sink.queue[1].text != textB || sink.queue[1].requeued || sink.queue[1].count != 2 {
+		t.Errorf("queue[1] = %+v, want merged textB with count 2, not marked requeued", sink.queue[1])
+	}
+}
+
+// TestChatEventSink_Requeue_CapsSize covers ticket 03b's cap seam: repeated
+// failures past maxRequeueSize leave the queue bounded, not growing
+// unboundedly.
+func TestChatEventSink_Requeue_CapsSize(t *testing.T) {
+	sink, _ := newFakeChatSink(t, &recordingSink{})
+
+	items := make([]batchedMessage, maxRequeueSize+10)
+	for i := range items {
+		items[i] = batchedMessage{text: slackStyle.chatStyle.Escape(fmt.Sprintf("msg-%d", i)), kind: "k", count: 1}
+	}
+	sink.requeue(items)
+
+	if len(sink.queue) != maxRequeueSize {
+		t.Fatalf("queue len = %d, want capped at maxRequeueSize (%d)", len(sink.queue), maxRequeueSize)
+	}
+}
+
+// TestChatEventSink_RequeueRetryCycle_DoesNotDoubleChargeGateBudget covers
+// ticket 03b's gate-budget seam: a requeue-and-retry cycle must not record a
+// second recordSend=true gate call for the same logical batch, or a
+// sustained outage could trip the global-mute breaker purely from retrying.
+func TestChatEventSink_RequeueRetryCycle_DoesNotDoubleChargeGateBudget(t *testing.T) {
+	sink, transport := newFakeChatSink(t, &recordingSink{})
+	transport.sendSyncFunc = func(ctx context.Context, text chatmarkup.Text) (sendResult, error) {
+		return sendResult{}, errors.New("boom")
+	}
+
+	sink.EpicComplete("epic", 1, 1)
+	sink.flush()
+	sink.inFlight.Wait()
+
+	sink.flush() // retry cycle: drains the requeued (all-requeued) batch
+	sink.inFlight.Wait()
+
+	state, err := loadNotificationStateAt(sink.gateStatePath)
+	if err != nil {
+		t.Fatalf("loadNotificationStateAt: %v", err)
+	}
+	if got := len(state.Transports["fake"].Sends); got != 1 {
+		t.Errorf("gate Sends = %d, want exactly 1 (retry cycle must not re-charge)", got)
+	}
+}
+
+// TestChatEventSink_Requeue_SkippedAfterClose_LogsSuppression covers ticket
+// 03b's closed-flag guard seam: a requeue attempted after Close has started
+// shutting the sink down is skipped and logged via a suppression-style
+// run-log line instead of silently dropped into a queue nobody will ever
+// flush again.
+func TestChatEventSink_Requeue_SkippedAfterClose_LogsSuppression(t *testing.T) {
+	scratchDir := t.TempDir()
+	epicName := "epic"
+	sink, _ := newFakeChatSink(t, &recordingSink{})
+	sink.scratchDir = scratchDir
+	sink.epicName = epicName
+
+	sink.mu.Lock()
+	sink.closed = true
+	sink.mu.Unlock()
+
+	sink.requeue([]batchedMessage{{text: slackStyle.chatStyle.Escape("a"), kind: notifyKindEpicComplete, count: 1}})
+
+	sink.mu.Lock()
+	queueLen := len(sink.queue)
+	sink.mu.Unlock()
+	if queueLen != 0 {
+		t.Errorf("queue after closed requeue = %d entries, want 0 (should be skipped, not queued)", queueLen)
+	}
+
+	events, ok, err := readEvents(scratchDir, epicName)
+	if err != nil || !ok {
+		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+	}
+	var suppressed []Event
+	for _, ev := range events {
+		if ev.Type == eventNotificationSuppressed {
+			suppressed = append(suppressed, ev)
+		}
+	}
+	if len(suppressed) != 1 {
+		t.Fatalf("suppressed run-log lines = %v, want exactly 1", suppressed)
+	}
+	if !strings.Contains(suppressed[0].Reason, notifyKindEpicComplete) {
+		t.Errorf("suppressed reason = %q, want it to name %q", suppressed[0].Reason, notifyKindEpicComplete)
+	}
+}

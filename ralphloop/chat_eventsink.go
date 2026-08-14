@@ -107,10 +107,12 @@ type chatEventSink struct {
 	// in production and every test but the one exercising that race.
 	flushMidpointHook func()
 
-	// mu guards queue against concurrent enqueue (multiple running iterations
-	// report through the same sink) and against a flush racing an enqueue.
-	mu    sync.Mutex
-	queue []batchedMessage
+	// mu guards queue and closed against concurrent enqueue (multiple running
+	// iterations report through the same sink) and against a flush or
+	// requeue racing an enqueue.
+	mu     sync.Mutex
+	queue  []batchedMessage
+	closed bool
 
 	// flushTicker/flushDone/flushLoopExited back the periodic flush loop (see
 	// startFlushLoop/stopFlushLoop); all three are nil until startFlushLoop
@@ -146,6 +148,13 @@ type batchedMessage struct {
 	text  chatmarkup.Text
 	kind  string
 	count int
+	// requeued marks an entry that came back from a failed flush send (see
+	// chatEventSink.requeue) rather than a fresh enqueue — flush uses it to
+	// decide whether a retry attempt needs a new gate recordSend charge (see
+	// flush's recordSend comment). Merging a requeued entry with a freshly
+	// enqueued one clears the flag (see requeue): the merged entry now
+	// carries new, never-charged content, so it should be charged again.
+	requeued bool
 }
 
 // newChatEventSink wires inner to transport via style. Every chat-member
@@ -224,6 +233,9 @@ func (s *chatEventSink) stopFlushLoop() {
 // shutdownTotalBudget's doc comment).
 func (s *chatEventSink) Close() {
 	deadline := time.Now().Add(shutdownTotalBudget)
+	s.mu.Lock()
+	s.closed = true
+	s.mu.Unlock()
 	s.stopFlushLoop()
 	s.cancelInFlight(deadline)
 	s.closeFlush(deadline)
@@ -299,6 +311,14 @@ func (s *chatEventSink) drainQueue() []batchedMessage {
 // them. A gate error fails open (send proceeds), matching send's own
 // fail-open policy. A tick with an empty queue sends nothing and never
 // calls the gate.
+//
+// recordSend is false when every drained item is a requeue (see requeue) of
+// a batch that already recorded a send on its first attempt — a retry cycle
+// during a sustained outage must not keep charging the budget for the same
+// logical batch, or it could trip the global-mute breaker purely from
+// retrying (see the ticket this guards). Any item that isn't a requeue (a
+// fresh arrival, or one merged with a requeue — see requeue) still charges
+// normally.
 func (s *chatEventSink) flush() {
 	items := s.drainQueue()
 	if len(items) == 0 {
@@ -307,16 +327,27 @@ func (s *chatEventSink) flush() {
 	if s.flushMidpointHook != nil {
 		s.flushMidpointHook()
 	}
-	result, err := s.gate(notifyKindBatch, epicSource(s.epicName), true)
+	result, err := s.gate(notifyKindBatch, epicSource(s.epicName), !allRequeued(items))
 	if err != nil {
 		logger.Debug("%s: notification gate: %v\n", s.transport.name(), err)
-		s.sendRaw(renderBatch(s.style, items), notifyKindBatch)
+		s.sendRaw(items, renderBatch(s.style, items), notifyKindBatch)
 		return
 	}
 	if result.Decision == GloballyMuted {
 		return
 	}
-	s.sendRaw(renderBatch(s.style, items), notifyKindBatch)
+	s.sendRaw(items, renderBatch(s.style, items), notifyKindBatch)
+}
+
+// allRequeued reports whether every item in a drained batch came back from a
+// failed prior flush (see requeue) rather than a fresh enqueue.
+func allRequeued(items []batchedMessage) bool {
+	for _, it := range items {
+		if !it.requeued {
+			return false
+		}
+	}
+	return true
 }
 
 // closeFlush is flush's close-time variant: if the gate reports the
@@ -537,13 +568,70 @@ func (s *chatEventSink) send(text chatmarkup.Text, notifyKind, source, ticketIde
 // cancelInFlight). inFlight is incremented synchronously here, before the
 // goroutine launches — incrementing from inside the goroutine would race
 // Close's inFlight.Wait if the goroutine hasn't been scheduled yet by the
-// time Close samples the count.
-func (s *chatEventSink) sendRaw(text chatmarkup.Text, notifyKind string) {
+// time Close samples the count. items is the batch text was rendered from
+// (see flush) — on a genuine failure (err != nil; a Degraded-but-delivered
+// result is not a failure) it's handed to requeue so the next flush gets
+// another chance at it instead of losing it.
+func (s *chatEventSink) sendRaw(items []batchedMessage, text chatmarkup.Text, notifyKind string) {
 	s.inFlight.Go(func() {
-		sendNotificationSync(s.sendCtx, s.scratchDir, s.epicName, s.transport.name(), notifyKind, text.String(), s.transport.timeout(), func(ctx context.Context) (sendResult, error) {
+		_, err := sendNotificationSync(s.sendCtx, s.scratchDir, s.epicName, s.transport.name(), notifyKind, text.String(), s.transport.timeout(), func(ctx context.Context) (sendResult, error) {
 			return s.transport.sendSync(ctx, text)
 		}, func(reason string) {
 			s.EventSink.NotificationFailed(s.transport.name(), reason)
 		})
+		if err != nil {
+			s.requeue(items)
+		}
 	})
+}
+
+// maxRequeueSize bounds the queue after a requeue (see requeue) so a
+// sustained outage can't grow it unboundedly: past this many distinct
+// entries, the oldest are evicted first (they sit at the front after
+// requeue's prepend) to make room for what just failed.
+const maxRequeueSize = 50
+
+// requeue puts a failed flush's items back at the front of the queue —
+// prepended, since they're older than anything queued since the batch was
+// drained, and merged into any identical text already queued rather than
+// appended as a duplicate (see enqueue's same dedup rule). Every requeued
+// entry is marked requeued so flush knows not to re-charge the notification
+// gate's send budget for a batch it already charged once (see flush); an
+// entry that merges with a fresh (non-requeued) one loses that mark, since
+// it now carries new content flush hasn't charged for yet.
+//
+// If s.closed (Close has started shutting the sink down), the requeue is
+// skipped and logged via logNotificationSuppressed instead — nothing will
+// ever flush this queue again, so silently requeuing here would just lose
+// the batch invisibly. 03a's cancel-and-consolidate shutdown redesign makes
+// this a rare path in practice, not the primary loss-prevention mechanism.
+func (s *chatEventSink) requeue(items []batchedMessage) {
+	if len(items) == 0 {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		logNotificationSuppressed(s.scratchDir, s.epicName, s.transport.name(), strings.Join(distinctKinds(items), ","))
+		return
+	}
+	var unmatched []batchedMessage
+	for _, item := range items {
+		item.requeued = true
+		merged := false
+		for i := range s.queue {
+			if s.queue[i].text == item.text {
+				s.queue[i].count += item.count
+				merged = true
+				break
+			}
+		}
+		if !merged {
+			unmatched = append(unmatched, item)
+		}
+	}
+	s.queue = append(unmatched, s.queue...)
+	if len(s.queue) > maxRequeueSize {
+		s.queue = s.queue[len(s.queue)-maxRequeueSize:]
+	}
 }
