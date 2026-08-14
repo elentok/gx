@@ -93,20 +93,43 @@ type chatEventSink struct {
 	// real path".
 	gateStatePath string
 
+	// flushMidpointHook, if non-nil, runs synchronously inside flush() right
+	// after drainQueue but before the gate/sendRaw call that hands the
+	// drained items off — a test-only seam for deterministically landing
+	// Close() inside the exact window stopFlushLoop's wait-for-actual-exit
+	// exists to close: a flush that has already taken items off the queue
+	// but not yet reached sendRaw, and so not yet incremented inFlight. Nil
+	// in production and every test but the one exercising that race.
+	flushMidpointHook func()
+
 	// mu guards queue against concurrent enqueue (multiple running iterations
 	// report through the same sink) and against a flush racing an enqueue.
 	mu    sync.Mutex
 	queue []batchedMessage
 
-	// flushTicker/flushDone back the periodic flush loop (see
-	// startFlushLoop/stopFlushLoop); both are nil until startFlushLoop runs,
-	// which production sinks do at construction (see newSlackEventSink/
-	// newTelegramEventSink) and tests do explicitly, if at all, to exercise
-	// the periodic-tick behavior — most tests drive flush()/Close() directly
-	// instead.
-	flushTicker *time.Ticker
-	flushDone   chan struct{}
-	closeOnce   sync.Once
+	// flushTicker/flushDone/flushLoopExited back the periodic flush loop (see
+	// startFlushLoop/stopFlushLoop); all three are nil until startFlushLoop
+	// runs, which production sinks do at construction (see
+	// newSlackEventSink/newTelegramEventSink) and tests do explicitly, if at
+	// all, to exercise the periodic-tick behavior — most tests drive
+	// flush()/Close() directly instead. flushLoopExited is closed by the loop
+	// goroutine itself right before it returns, so stopFlushLoop can wait for
+	// the goroutine to actually be gone rather than just signaling it to stop
+	// — see stopFlushLoop's race note.
+	flushTicker     *time.Ticker
+	flushDone       chan struct{}
+	flushLoopExited chan struct{}
+	closeOnce       sync.Once
+
+	// sendCtx/sendCancel bound every sendRaw-launched goroutine; Close cancels
+	// sendCtx so an in-flight retry/backoff fails fast instead of being
+	// waited out (see sendRaw, Close). inFlight tracks those goroutines —
+	// incremented synchronously in sendRaw before the goroutine launches, so
+	// Close can wait for them to actually finish (quickly, once cancelled)
+	// rather than just for the cancellation signal to have been sent.
+	sendCtx    context.Context
+	sendCancel context.CancelFunc
+	inFlight   sync.WaitGroup
 }
 
 // batchedMessage is one distinct rendered text waiting in the queue for the
@@ -129,12 +152,15 @@ type batchedMessage struct {
 // newChatEventSink is inert until flush()/Close() is driven explicitly —
 // the shape tests rely on.
 func newChatEventSink(inner EventSink, style mrkdwnStyle, transport chatTransport, scratchDir, epicName string) *chatEventSink {
+	sendCtx, sendCancel := context.WithCancel(context.Background())
 	return &chatEventSink{
 		EventSink:  inner,
 		style:      style,
 		transport:  transport,
 		scratchDir: scratchDir,
 		epicName:   epicName,
+		sendCtx:    sendCtx,
+		sendCancel: sendCancel,
 	}
 }
 
@@ -144,9 +170,11 @@ func newChatEventSink(inner EventSink, style mrkdwnStyle, transport chatTranspor
 // directly) calls it with a short interval.
 func (s *chatEventSink) startFlushLoop(interval time.Duration) {
 	s.flushDone = make(chan struct{})
+	s.flushLoopExited = make(chan struct{})
 	ticker := time.NewTicker(interval)
 	s.flushTicker = ticker
 	go func() {
+		defer close(s.flushLoopExited)
 		for {
 			select {
 			case <-ticker.C:
@@ -159,25 +187,78 @@ func (s *chatEventSink) startFlushLoop(interval time.Duration) {
 	}()
 }
 
-// stopFlushLoop stops the periodic flush loop, if one was started. Safe to
-// call more than once (Close does) and safe to call when startFlushLoop was
-// never called at all.
+// stopFlushLoop stops the periodic flush loop, if one was started, and waits
+// for its goroutine to actually exit before returning — not just for the
+// done channel to close. This matters because flush() (called synchronously
+// from inside that goroutine on every tick) is what increments the in-flight
+// send counter (via sendRaw); if stopFlushLoop returned as soon as the done
+// signal was sent, a tick that fired concurrently with Close() could still
+// be inside flush(), on its way to sendRaw, at the moment Close() samples the
+// in-flight count — making that message invisible and lost regardless of the
+// cancel-and-collect logic below. Waiting for flushLoopExited guarantees any
+// such in-progress flush() has already returned (and so already incremented
+// inFlight, if it had anything to send) before Close moves on. Safe to call
+// more than once (Close does) and safe to call when startFlushLoop was never
+// called at all.
 func (s *chatEventSink) stopFlushLoop() {
 	s.closeOnce.Do(func() {
 		if s.flushDone != nil {
 			close(s.flushDone)
+			<-s.flushLoopExited
 		}
 	})
 }
 
-// Close stops the periodic flush loop (if running) and flushes any queued
-// messages synchronously, bounded by the transport's timeout — so a run
-// ending mid flush-window doesn't drop its last batch. If the transport is
-// already globally muted, the flush is suppressed rather than sent (see
-// closeFlush).
+// Close stops the periodic flush loop (if running), cancels any in-flight
+// sendRaw send rather than waiting for it to finish naturally, then flushes
+// the queue — now including anything that in-flight cancellation surfaced —
+// synchronously through the same retrying send logic as the normal async
+// path. The whole sequence (cancel-and-collect plus the final send) is
+// bounded by shutdownTotalBudget so Close never blocks indefinitely; a
+// failure after that budget is accepted, bounded message loss (see
+// shutdownTotalBudget's doc comment).
 func (s *chatEventSink) Close() {
+	deadline := time.Now().Add(shutdownTotalBudget)
 	s.stopFlushLoop()
-	s.closeFlush()
+	s.cancelInFlight(deadline)
+	s.closeFlush(deadline)
+}
+
+// shutdownTotalBudget bounds Close's whole shutdown sequence — the
+// cancel-and-collect phase (cancelling any in-flight sendRaw and waiting for
+// it to actually stop) plus closeFlush's own consolidated send. In practice
+// cancel-and-collect resolves in under ~1s (a cancelled sendWithRetry attempt
+// fails fast); the final send inherits whatever budget that phase didn't use,
+// up to its own worst case of ~11.5s (a 5s transport attempt, then
+// notificationRetryBackoff, then a second 5s attempt) — the ceiling doesn't
+// stack on top of the ~12-13s total. A shutdown-time failure after this
+// budget is exhausted is accepted, bounded message loss: full cross-process
+// durability (surviving the gx process itself exiting) is out of scope for
+// this epic (see follow-ups/08). Declared as a var, not a const, so
+// TestChatEventSink_Close_TotalShutdownDeadline_ReturnsWithinBound can
+// temporarily shrink it rather than actually waiting out ~12.5s.
+var shutdownTotalBudget = 12500 * time.Millisecond
+
+// cancelInFlight cancels sendCtx (cutting short any sendRaw attempt currently
+// sleeping in a retry backoff or blocked on the transport) and waits for
+// every sendRaw goroutine tracked by inFlight to actually return, bounded by
+// deadline so a sendSync implementation that ignores context cancellation
+// can't block Close forever. A cancelled attempt's own failure path
+// (sendNotificationSync's onFailed) still runs before the goroutine
+// returns, so by the time this call returns, every attempt that was in
+// flight when Close was called has already reported its outcome.
+func (s *chatEventSink) cancelInFlight(deadline time.Time) {
+	s.sendCancel()
+
+	done := make(chan struct{})
+	go func() {
+		s.inFlight.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Until(deadline)):
+	}
 }
 
 // enqueue adds text to the queue, collapsing it into an existing entry (and
@@ -218,6 +299,9 @@ func (s *chatEventSink) flush() {
 	if len(items) == 0 {
 		return
 	}
+	if s.flushMidpointHook != nil {
+		s.flushMidpointHook()
+	}
 	result, err := s.gate(notifyKindBatch, epicSource(s.epicName), true)
 	if err != nil {
 		logger.Debug("%s: notification gate: %v\n", s.transport.name(), err)
@@ -234,11 +318,12 @@ func (s *chatEventSink) flush() {
 // transport is now globally muted, the queued messages are dropped rather
 // than sent, and one notification-suppressed run-log line names the event
 // kinds that were dropped — so the outcome stays recoverable from the log
-// even though chat never got it. Otherwise it sends synchronously (bounded
-// by the transport's own timeout, no retry) rather than through sendRaw's
-// fire-and-forget goroutine, since the process may exit right after Close
-// returns.
-func (s *chatEventSink) closeFlush() {
+// even though chat never got it. Otherwise it sends synchronously, through
+// the same retrying sendNotificationSync logic as the normal async path
+// (unlike the old single-attempt-only close-time send), bounded by deadline
+// rather than sendRaw's fire-and-forget goroutine, since the process may
+// exit right after Close returns.
+func (s *chatEventSink) closeFlush(deadline time.Time) {
 	items := s.drainQueue()
 	if len(items) == 0 {
 		return
@@ -246,14 +331,26 @@ func (s *chatEventSink) closeFlush() {
 	result, err := s.gate(notifyKindBatch, epicSource(s.epicName), true)
 	if err != nil {
 		logger.Debug("%s: notification gate: %v\n", s.transport.name(), err)
-		s.sendSync(renderBatch(s.style, items), notifyKindBatch)
+		s.sendFinal(renderBatch(s.style, items), notifyKindBatch, deadline)
 		return
 	}
 	if result.Decision == GloballyMuted {
 		logNotificationSuppressed(s.scratchDir, s.epicName, s.transport.name(), strings.Join(distinctKinds(items), ","))
 		return
 	}
-	s.sendSync(renderBatch(s.style, items), notifyKindBatch)
+	s.sendFinal(renderBatch(s.style, items), notifyKindBatch, deadline)
+}
+
+// sendFinal runs sendNotificationSync synchronously, bounded by deadline —
+// closeFlush's consolidated shutdown-time send.
+func (s *chatEventSink) sendFinal(text chatmarkup.Text, notifyKind string, deadline time.Time) {
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
+	defer cancel()
+	sendNotificationSync(ctx, s.scratchDir, s.epicName, s.transport.name(), notifyKind, text.String(), s.transport.timeout(), func(ctx context.Context) (sendResult, error) {
+		return s.transport.sendSync(ctx, text)
+	}, func(reason string) {
+		s.EventSink.NotificationFailed(s.transport.name(), reason)
+	})
 }
 
 // batchSeparatorRaw is the literal divider renderBatch places between
@@ -430,44 +527,18 @@ func (s *chatEventSink) send(text chatmarkup.Text, notifyKind, source, ticketIde
 	}
 }
 
-// sendRaw hands text off to sendNotification (see eventlog.go), which runs
-// transport.sendSync in its own goroutine bounded by transport.timeout() so
-// a slow or unreachable endpoint never blocks the caller, retrying once and
-// logging the final outcome to run-log.jsonl tagged with notifyKind (the
-// live event that triggered it).
+// sendRaw runs sendNotificationSync in its own goroutine, bounded by
+// s.sendCtx so Close can cancel it rather than wait it out (see Close,
+// cancelInFlight). inFlight is incremented synchronously here, before the
+// goroutine launches — incrementing from inside the goroutine would race
+// Close's inFlight.Wait if the goroutine hasn't been scheduled yet by the
+// time Close samples the count.
 func (s *chatEventSink) sendRaw(text chatmarkup.Text, notifyKind string) {
-	sendNotification(s.scratchDir, s.epicName, s.transport.name(), notifyKind, text.String(), s.transport.timeout(), func(ctx context.Context) (sendResult, error) {
-		return s.transport.sendSync(ctx, text)
-	}, func(reason string) {
-		s.EventSink.NotificationFailed(s.transport.name(), reason)
+	s.inFlight.Go(func() {
+		sendNotificationSync(s.sendCtx, s.scratchDir, s.epicName, s.transport.name(), notifyKind, text.String(), s.transport.timeout(), func(ctx context.Context) (sendResult, error) {
+			return s.transport.sendSync(ctx, text)
+		}, func(reason string) {
+			s.EventSink.NotificationFailed(s.transport.name(), reason)
+		})
 	})
-}
-
-// sendSync sends text through the transport in the caller's own goroutine,
-// bounded by a single transport.timeout() attempt with no retry — closeFlush's
-// send, since a fire-and-forget goroutine (sendRaw) could still be in
-// flight, or never scheduled, by the time the process exits right after
-// Close returns.
-func (s *chatEventSink) sendSync(text chatmarkup.Text, notifyKind string) {
-	ctx, cancel := context.WithTimeout(context.Background(), s.transport.timeout())
-	defer cancel()
-	result, err := s.transport.sendSync(ctx, text)
-	if err != nil {
-		err = sanitizeSendError(err)
-		logger.Debug("%s: %v\n", s.transport.name(), err)
-		logNotificationFailed(s.scratchDir, s.epicName, s.transport.name(), notifyKind, err.Error(), text.String())
-		s.EventSink.NotificationFailed(s.transport.name(), err.Error())
-		return
-	}
-	if result.Degraded {
-		logNotificationDegraded(s.scratchDir, s.epicName, s.transport.name(), notifyKind, text.String())
-		// The message was delivered — this isn't a failure — but reusing
-		// NotificationFailed (rather than adding a dedicated EventSink method
-		// just for this label) is the only route telegramTransport's caller
-		// has to a TUI toast; degradedReason's wording keeps that
-		// deliberate stretch legible to whoever reads the toast.
-		s.EventSink.NotificationFailed(s.transport.name(), degradedReason(result.Description))
-		return
-	}
-	logNotificationSent(s.scratchDir, s.epicName, s.transport.name(), notifyKind, text.String())
 }

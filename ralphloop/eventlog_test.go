@@ -322,7 +322,7 @@ func TestSendWithRetry_FirstAttemptFailsSecondSucceedsDegraded_ReturnsDegradedRe
 		return sendResult{StatusCode: 200, Degraded: true}, nil
 	}
 
-	result, err := sendWithRetry(time.Second, sendSync)
+	result, err := sendWithRetry(context.Background(), time.Second, sendSync)
 	if err != nil {
 		t.Fatalf("err = %v, want nil", err)
 	}

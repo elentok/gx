@@ -2,11 +2,13 @@ package ralphloop
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -17,20 +19,37 @@ import (
 
 // fakeChatTransport records every text it's asked to send, in memory, so
 // chatEventSink's membership and park-cardinality behavior can be tested
-// without a real HTTP round trip.
+// without a real HTTP round trip. sendSyncFunc, if set, overrides the
+// default always-succeeds-immediately behavior — used by the shutdown-redesign
+// tests to simulate a hung/failing send that respects ctx cancellation, the
+// same way a real HTTP transport would.
 type fakeChatTransport struct {
-	mu   sync.Mutex
-	sent []string
+	mu              sync.Mutex
+	sent            []string
+	sendSyncFunc    func(ctx context.Context, text chatmarkup.Text) (sendResult, error)
+	timeoutOverride time.Duration
 }
 
-func (f *fakeChatTransport) name() string           { return "fake" }
-func (f *fakeChatTransport) timeout() time.Duration { return time.Second }
+func (f *fakeChatTransport) name() string { return "fake" }
+func (f *fakeChatTransport) timeout() time.Duration {
+	if f.timeoutOverride != 0 {
+		return f.timeoutOverride
+	}
+	return time.Second
+}
 
-func (f *fakeChatTransport) sendSync(_ context.Context, text chatmarkup.Text) (sendResult, error) {
+func (f *fakeChatTransport) sendSync(ctx context.Context, text chatmarkup.Text) (sendResult, error) {
+	if f.sendSyncFunc != nil {
+		return f.sendSyncFunc(ctx, text)
+	}
+	f.recordSent(text.String())
+	return sendResult{StatusCode: 200}, nil
+}
+
+func (f *fakeChatTransport) recordSent(text string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.sent = append(f.sent, text.String())
-	return sendResult{StatusCode: 200}, nil
+	f.sent = append(f.sent, text)
 }
 
 func (f *fakeChatTransport) snapshot() []string {
@@ -62,6 +81,124 @@ func newFakeChatSink(t *testing.T, inner EventSink) (*chatEventSink, *fakeChatTr
 	sink := newChatEventSink(inner, slackStyle, transport, "", "epic")
 	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 	return sink, transport
+}
+
+// TestChatEventSink_Close_CancelsInFlightSendPromptlyInsteadOfWaitingOutBackoff
+// covers the ticket's first required seam: an in-flight sendRaw stuck
+// sleeping in sendWithRetry's backoff when Close is called must be cancelled
+// promptly, not waited out.
+func TestChatEventSink_Close_CancelsInFlightSendPromptlyInsteadOfWaitingOutBackoff(t *testing.T) {
+	sink, transport := newFakeChatSink(t, &recordingSink{})
+	transport.timeoutOverride = 5 * time.Second
+	transport.sendSyncFunc = func(ctx context.Context, text chatmarkup.Text) (sendResult, error) {
+		<-ctx.Done()
+		return sendResult{}, ctx.Err()
+	}
+
+	sink.EpicComplete("epic", 1, 1)
+	sink.flush()
+
+	start := time.Now()
+	sink.Close()
+	elapsed := time.Since(start)
+
+	if elapsed >= notificationRetryBackoff {
+		t.Fatalf("Close took %v, want well under notificationRetryBackoff (%v) — in-flight send was waited out, not cancelled", elapsed, notificationRetryBackoff)
+	}
+}
+
+// TestChatEventSink_CloseFlush_ConsolidatedSend_RetriesOnceLikeNormalPath
+// covers the ticket's third required seam: closeFlush's consolidated send
+// must retry like the normal async path, not make a single attempt.
+func TestChatEventSink_CloseFlush_ConsolidatedSend_RetriesOnceLikeNormalPath(t *testing.T) {
+	sink, transport := newFakeChatSink(t, &recordingSink{})
+	var attempts atomic.Int32
+	transport.sendSyncFunc = func(ctx context.Context, text chatmarkup.Text) (sendResult, error) {
+		if attempts.Add(1) == 1 {
+			return sendResult{}, errors.New("first attempt fails")
+		}
+		transport.recordSent(text.String())
+		return sendResult{StatusCode: 200}, nil
+	}
+
+	sink.EpicComplete("epic", 1, 1)
+	sink.Close()
+
+	if got := attempts.Load(); got != 2 {
+		t.Fatalf("attempts = %d, want exactly 2 (retry-once)", got)
+	}
+	if got := transport.snapshot(); len(got) != 1 {
+		t.Fatalf("sent = %v, want exactly 1 message", got)
+	}
+}
+
+// TestChatEventSink_Close_WaitsForInProgressFlush_BeforeCancellingInFlight
+// covers the ticket's second required seam: a flush that has drained the
+// queue but not yet reached sendRaw (so inFlight hasn't been incremented
+// yet) when Close is called must not lose its message. This uses
+// flushMidpointHook to pause a real ticker-driven flush at exactly that
+// point; it would fail against a naive stopFlushLoop that only closes
+// flushDone without waiting for the tick's flush() to actually return.
+func TestChatEventSink_Close_WaitsForInProgressFlush_BeforeCancellingInFlight(t *testing.T) {
+	sink, transport := newFakeChatSink(t, &recordingSink{})
+
+	hookEntered := make(chan struct{})
+	release := make(chan struct{})
+	sink.flushMidpointHook = func() {
+		close(hookEntered)
+		<-release
+	}
+
+	sink.startFlushLoop(5 * time.Millisecond)
+	sink.EpicComplete("epic", 1, 1)
+
+	<-hookEntered
+
+	closeDone := make(chan struct{})
+	go func() {
+		sink.Close()
+		close(closeDone)
+	}()
+
+	select {
+	case <-closeDone:
+		t.Fatalf("Close returned before the in-progress flush was released")
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(release)
+	<-closeDone
+
+	if got := transport.snapshot(); len(got) != 1 {
+		t.Fatalf("sent = %v, want exactly 1 message, in-progress flush was lost", got)
+	}
+}
+
+// TestChatEventSink_Close_TotalShutdownDeadline_ReturnsWithinBound covers
+// the ticket's fourth required seam: Close must return within
+// shutdownTotalBudget even when sends would otherwise hang indefinitely.
+// Not parallel: it mutates the package-level shutdownTotalBudget var.
+func TestChatEventSink_Close_TotalShutdownDeadline_ReturnsWithinBound(t *testing.T) {
+	original := shutdownTotalBudget
+	shutdownTotalBudget = 200 * time.Millisecond
+	defer func() { shutdownTotalBudget = original }()
+
+	sink, transport := newFakeChatSink(t, &recordingSink{})
+	transport.timeoutOverride = time.Minute
+	transport.sendSyncFunc = func(ctx context.Context, text chatmarkup.Text) (sendResult, error) {
+		<-ctx.Done()
+		return sendResult{}, ctx.Err()
+	}
+
+	sink.EpicComplete("epic", 1, 1)
+	sink.flush()
+
+	start := time.Now()
+	sink.Close()
+	elapsed := time.Since(start)
+
+	if elapsed > shutdownTotalBudget+500*time.Millisecond {
+		t.Fatalf("Close took %v, want within shutdownTotalBudget (%v) plus slack", elapsed, shutdownTotalBudget)
+	}
 }
 
 func TestChatEventSink_ChatMembers_EachSendExactlyOneMessage(t *testing.T) {

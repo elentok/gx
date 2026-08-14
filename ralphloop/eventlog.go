@@ -292,71 +292,90 @@ func logNotificationSuppressed(scratchDir, epicName, channel, reason string) {
 // shorter) without materially adding to worst-case caller-visible latency.
 const notificationRetryBackoff = 1500 * time.Millisecond
 
-// sendNotification runs sendSync in its own goroutine, bounded by timeout per
-// attempt, so a slow or unreachable notification endpoint never blocks the
-// caller — the shared goroutine + log-outcome wrapper behind
-// chatEventSink.send, generic over channel and the transport's sendSync
-// call. It retries once after
-// notificationRetryBackoff before giving up: a single hung attempt (observed
-// hanging to the full per-attempt deadline) is a real stall, not evidence the
-// endpoint is unreachable, and the outage this guards against was
-// intermittent rather than sustained. Only the final outcome is logged —
-// intermediate attempt failures are not — so run-log.jsonl gets one line per
-// notification, not one per attempt. Any failure is logged via gx's logger
-// and otherwise swallowed, but the final outcome is also durably recorded to
-// run-log.jsonl via logNotificationSent/logNotificationFailed, tagged with
-// channel and notifyKind (the live event that triggered it). onFailed, if
-// non-nil, is called with the sanitized error after both attempts fail —
-// chatEventSink.sendRaw uses it to also surface the failure as a
-// LiveEventNotificationFailed on its embedded EventSink, for a TUI toast;
-// epicFailureReporter's own call passes nil, since by the time it sends the
-// run's sink has already closed and drained (see EventSink.EpicFailed). A
-// send that succeeds only via telegramTransport.sendSync's plain-text
-// fallback (result.Degraded) is logged via logNotificationDegraded instead
-// of logNotificationSent, and also routed through onFailed (with
-// degradedReason's wording) so the downgrade still reaches the TUI toast —
-// the message was delivered, so this is a deliberate reuse of the "failed"
-// reporting channel for a "succeeded, but degraded" outcome, not a bug.
+// sendNotification runs sendNotificationSync in its own goroutine, unbounded
+// by any caller-supplied context (context.Background()), so a slow or
+// unreachable notification endpoint never blocks the caller. This is
+// epicFailureReporter's path — by the time it sends, the run's own sink has
+// already closed and drained (see EventSink.EpicFailed), so there is no
+// shutdown-ordering concern to cancel against; chatEventSink.sendRaw instead
+// calls sendNotificationSync directly with its own cancellable context, so
+// Close() can cut an in-flight attempt short (see chat_eventsink.go).
 func sendNotification(scratchDir, epicName, channel, notifyKind, body string, timeout time.Duration, sendSync func(ctx context.Context) (sendResult, error), onFailed func(reason string)) {
-	go func() {
-		result, err := sendWithRetry(timeout, sendSync)
+	go sendNotificationSync(context.Background(), scratchDir, epicName, channel, notifyKind, body, timeout, sendSync, onFailed)
+}
 
-		if err != nil {
-			err = sanitizeSendError(err)
-			logger.Debug("%s: %v\n", channel, err)
-			logNotificationFailed(scratchDir, epicName, channel, notifyKind, err.Error(), body)
-			if onFailed != nil {
-				onFailed(err.Error())
-			}
-			return
+// sendNotificationSync blocks until sendSync succeeds or both attempts
+// (initial + one retry after notificationRetryBackoff) fail, then records the
+// final outcome — the attempt/backoff/retry/log logic extracted out of
+// sendNotification's goroutine so a caller that needs to block (closeFlush's
+// consolidated shutdown-time send) or cancel (chatEventSink.Close cutting an
+// in-flight sendRaw short) can drive it directly instead of going through a
+// fire-and-forget goroutine. ctx bounds the whole call, including the backoff
+// wait between attempts (see sendWithRetry) — a caller that cancels ctx gets
+// a fast failure instead of waiting out the full attempt+backoff+retry
+// budget. Only the final outcome is logged — intermediate attempt failures
+// are not — so run-log.jsonl gets one line per notification, not one per
+// attempt. Any failure is logged via gx's logger and otherwise swallowed, but
+// the final outcome is also durably recorded to run-log.jsonl via
+// logNotificationSent/logNotificationFailed, tagged with channel and
+// notifyKind (the live event that triggered it). onFailed, if non-nil, is
+// called with the sanitized error once both attempts fail (or the call is
+// cancelled) — chatEventSink.sendRaw uses it to also surface the failure as a
+// LiveEventNotificationFailed on its embedded EventSink, for a TUI toast;
+// epicFailureReporter's own call passes nil. A send that succeeds only via
+// telegramTransport.sendSync's plain-text fallback (result.Degraded) is
+// logged via logNotificationDegraded instead of logNotificationSent, and
+// also routed through onFailed (with degradedReason's wording) so the
+// downgrade still reaches the TUI toast — the message was delivered, so this
+// is a deliberate reuse of the "failed" reporting channel for a "succeeded,
+// but degraded" outcome, not a bug.
+func sendNotificationSync(ctx context.Context, scratchDir, epicName, channel, notifyKind, body string, timeout time.Duration, sendSync func(ctx context.Context) (sendResult, error), onFailed func(reason string)) (sendResult, error) {
+	result, err := sendWithRetry(ctx, timeout, sendSync)
+
+	if err != nil {
+		err = sanitizeSendError(err)
+		logger.Debug("%s: %v\n", channel, err)
+		logNotificationFailed(scratchDir, epicName, channel, notifyKind, err.Error(), body)
+		if onFailed != nil {
+			onFailed(err.Error())
 		}
-		if result.Degraded {
-			logNotificationDegraded(scratchDir, epicName, channel, notifyKind, body)
-			if onFailed != nil {
-				onFailed(degradedReason(result.Description))
-			}
-			return
+		return result, err
+	}
+	if result.Degraded {
+		logNotificationDegraded(scratchDir, epicName, channel, notifyKind, body)
+		if onFailed != nil {
+			onFailed(degradedReason(result.Description))
 		}
-		logNotificationSent(scratchDir, epicName, channel, notifyKind, body)
-	}()
+		return result, nil
+	}
+	logNotificationSent(scratchDir, epicName, channel, notifyKind, body)
+	return result, nil
 }
 
 // sendWithRetry runs sendSync once, retrying after notificationRetryBackoff
 // if the first attempt fails, and returns whichever attempt's sendResult/error
 // is last — the one that succeeded, or the second attempt's failure if both
-// did. Extracted from sendNotification's goroutine so the "first attempt
-// fails, second succeeds degraded" carry-through is directly testable without
+// did. ctx bounds both the per-attempt timeout (each attempt gets a child
+// context.WithTimeout derived from ctx, so a cancelled/expired ctx cuts an
+// in-progress attempt short too) and the backoff wait itself, so a cancelled
+// ctx fails fast rather than sleeping out the full notificationRetryBackoff
+// first. Extracted from sendNotificationSync so the "first attempt fails,
+// second succeeds degraded" carry-through is directly testable without
 // racing a background goroutine and polling run-log.jsonl.
-func sendWithRetry(timeout time.Duration, sendSync func(ctx context.Context) (sendResult, error)) (sendResult, error) {
+func sendWithRetry(ctx context.Context, timeout time.Duration, sendSync func(ctx context.Context) (sendResult, error)) (sendResult, error) {
 	attempt := func() (sendResult, error) {
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		attemptCtx, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()
-		return sendSync(ctx)
+		return sendSync(attemptCtx)
 	}
 
 	result, err := attempt()
 	if err != nil {
-		time.Sleep(notificationRetryBackoff)
+		select {
+		case <-ctx.Done():
+			return result, ctx.Err()
+		case <-time.After(notificationRetryBackoff):
+		}
 		result, err = attempt()
 	}
 	return result, err
