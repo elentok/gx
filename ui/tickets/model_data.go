@@ -27,7 +27,6 @@ const (
 	nodeSection sidebarNodeKind = iota
 	nodeEpic
 	nodeTicket
-	nodeBlank // a blank separator row between the two section roots — always present, never selectable
 	nodeEmpty // "no open/closed epics" placeholder, child of a nodeSection with zero epics
 )
 
@@ -123,7 +122,6 @@ func (m Model) buildSidebarEntries() []tree.Entry[sidebarNode] {
 
 	roots := []sidebarNode{
 		{kind: nodeSection, section: sectionOpen, ticketIdx: -1},
-		{kind: nodeBlank, ticketIdx: -1},
 		{kind: nodeSection, section: sectionClosed, ticketIdx: -1},
 	}
 
@@ -131,8 +129,6 @@ func (m Model) buildSidebarEntries() []tree.Entry[sidebarNode] {
 		switch n.kind {
 		case nodeSection:
 			return sidebarSectionID(n.section)
-		case nodeBlank:
-			return "blank-separator"
 		case nodeEmpty:
 			if n.section == sectionOpen {
 				return "section:open:empty"
@@ -160,7 +156,7 @@ func (m Model) buildSidebarEntries() []tree.Entry[sidebarNode] {
 				children[i] = sidebarNode{kind: nodeEpic, epicIdx: epicIdx, ticketIdx: -1}
 			}
 			return children
-		case nodeBlank, nodeEmpty:
+		case nodeEmpty:
 			return nil
 		case nodeEpic:
 			roots := epicTree(n.epicIdx).roots

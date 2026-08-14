@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/testutil"
@@ -487,6 +488,80 @@ func TestNewModel_SplitsOpenAndClosedEpicSections(t *testing.T) {
 	if !(openHeaderIdx < openIdx && openIdx < closedHeaderIdx && closedHeaderIdx < closedIdx) {
 		t.Fatalf("expected order [open header, open-epic, closed header, done-epic], got:\n%s", content)
 	}
+}
+
+// TestNewModel_SectionHeadersMatchTreeRowShape covers ticket 02's redesign:
+// section headers drop the old "── … ──" border in favor of the same
+// expand-glyph-led shape epic/ticket rows use, "Closed epics" gains the
+// shared "done" icon (TicketDone) as a state signal while "Open epics" gets
+// none (open is this app's default, no-signal state elsewhere), and the
+// blank spacer row that used to sit between the two sections is gone.
+func TestNewModel_SectionHeadersMatchTreeRowShape(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTicket(t, root, "done-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
+	writeTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+	setCollapsedSection(&m, sectionClosed, false)
+
+	content := ansi.Strip(m.View().Content)
+	if strings.Contains(content, "──") {
+		t.Fatalf("expected the decorative border to be gone, got:\n%s", content)
+	}
+
+	icons := m.icons()
+	openPrefix := prefixBefore(t, content, "Open epics (1)")
+	if !strings.Contains(openPrefix, icons.TriangleExpanded) {
+		t.Fatalf("expected 'Open epics' row to lead with the expand glyph, got: %q", openPrefix)
+	}
+	if strings.Contains(openPrefix, icons.TicketDone) {
+		t.Fatalf("expected 'Open epics' row to show no icon, got: %q", openPrefix)
+	}
+
+	closedPrefix := prefixBefore(t, content, "Closed epics (1)")
+	if !strings.Contains(closedPrefix, icons.TriangleExpanded) {
+		t.Fatalf("expected 'Closed epics' row to lead with the expand glyph, got: %q", closedPrefix)
+	}
+	if !strings.Contains(closedPrefix, icons.TicketDone) {
+		t.Fatalf("expected 'Closed epics' row to show the done icon, got: %q", closedPrefix)
+	}
+
+	lines := strings.Split(content, "\n")
+	closedHeaderLine := -1
+	for i, line := range lines {
+		if strings.Contains(line, "Closed epics (1)") {
+			closedHeaderLine = i
+			break
+		}
+	}
+	if closedHeaderLine <= 0 {
+		t.Fatalf("expected to find the 'Closed epics' header past line 0, got:\n%s", content)
+	}
+	if strings.TrimSpace(lines[closedHeaderLine-1]) == "" {
+		t.Fatalf("expected no blank spacer row directly above the 'Closed epics' header, got:\n%s", content)
+	}
+}
+
+// prefixBefore returns the portion of the single line in content containing
+// needle that precedes it — i.e. the row's own glyph/icon column, excluding
+// whatever the split-pane preview happens to render on the same physical
+// line. Fails the test if needle isn't found on exactly one line.
+func prefixBefore(t *testing.T, content, needle string) string {
+	t.Helper()
+	var found []string
+	for _, line := range strings.Split(content, "\n") {
+		if strings.Contains(line, needle) {
+			found = append(found, line[:strings.Index(line, needle)])
+		}
+	}
+	if len(found) != 1 {
+		t.Fatalf("expected exactly one line containing %q, got %d:\n%s", needle, len(found), content)
+	}
+	return found[0]
 }
 
 func TestNewModel_EmptySectionShowsMutedPlaceholder(t *testing.T) {
@@ -999,9 +1074,9 @@ func setCollapsedSection(m *Model, section sidebarSection, collapsed bool) {
 }
 
 // selectedSidebarLine returns which physical line the currently selected
-// entry renders on. Every sidebar row (including the blank separator and
-// empty-section placeholder) is now a real tree.Entry, so this is exactly
-// the selected entry's index — no more header/placeholder line-counting.
+// entry renders on. Every sidebar row (including an empty-section
+// placeholder) is now a real tree.Entry, so this is exactly the selected
+// entry's index — no more header/placeholder line-counting.
 func selectedSidebarLine(t *testing.T, m Model) int {
 	t.Helper()
 	return m.sidebarTree.SelectedIndex()

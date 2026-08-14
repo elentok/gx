@@ -151,7 +151,7 @@ func (m QueueModel) queueBody(width int) []string {
 // Label alone — mirroring the Tickets-tab sidebar's sidebarRenderOpts one
 // level down. Header/separator/reason rows are excluded from selection via
 // SetIsSelectable/SkipUnselectable (ticket 17), mirroring the sidebar's own
-// nodeBlank/nodeEmpty treatment.
+// nodeEmpty treatment.
 func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 	entries := m.queueTree.Entries()
 	idxByID := make(map[string]int, len(entries))

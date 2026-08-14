@@ -61,12 +61,16 @@ var (
 )
 
 // sidebarRenderOpts builds the tree.RenderOpts m.sidebarTree.RenderLines
-// renders through: every physical row (section header, blank separator,
-// empty-section placeholder, epic, ticket) is a real tree.Entry, dispatched
-// on entry.Value.kind by Label alone (Icon/MetaText/RowColor/Faint stay
-// nil — ticket 01's "Row rendering" spec). --all mode behaves the same as
-// single-worktree: it just interleaves every worktree's epics into this one
-// grouping, each epic row labeled with its worktree (renderEpicRow).
+// renders through: every physical row (section header, empty-section
+// placeholder, epic, ticket) is a real tree.Entry, dispatched on
+// entry.Value.kind by Label alone (Icon/MetaText/RowColor/Faint stay
+// nil — ticket 01's "Row rendering" spec). A section header (ticket 02)
+// renders with the same expand-glyph-led shape as an epic/ticket row, minus
+// the checkbox slot — no separate Icon/glyph-column plumbing, since epic and
+// ticket rows bake their own glyph into the Label string too. --all mode
+// behaves the same as single-worktree: it just interleaves every worktree's
+// epics into this one grouping, each epic row labeled with its worktree
+// (renderEpicRow).
 func (m Model) sidebarRenderOpts(width int) tree.RenderOpts[sidebarNode] {
 	idxs := make([]int, len(m.epics))
 	for i := range m.epics {
@@ -88,19 +92,23 @@ func (m Model) sidebarRenderOpts(width int) tree.RenderOpts[sidebarNode] {
 		Label: func(entry tree.Entry[sidebarNode]) string {
 			switch entry.Value.kind {
 			case nodeSection:
+				glyph := m.icons().TriangleExpanded
+				if m.sidebarTree.CollapsedIDs()[entry.ID] {
+					glyph = m.icons().TriangleCollapsed
+				}
 				label, n := "Open epics", len(openIdxs)
+				icon := ""
 				if entry.Value.section == sectionClosed {
 					label, n = "Closed epics", len(closedIdxs)
+					icon = m.icons().TicketDone + " "
 				}
-				return sectionHeaderStyle.Render(fmt.Sprintf("── %s (%d) ──", label, n))
+				return sectionHeaderStyle.Render(fmt.Sprintf("%s %s%s (%d)", glyph, icon, label, n))
 			case nodeEmpty:
 				label := "open epics"
 				if entry.Value.section == sectionClosed {
 					label = "closed epics"
 				}
 				return ui.StyleMuted.Render("no " + label)
-			case nodeBlank:
-				return ""
 			case nodeEpic:
 				r, _ := rowFromEntry(entry)
 				return m.renderEpicRow(m.epics[r.epicIdx])

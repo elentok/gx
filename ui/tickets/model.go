@@ -160,7 +160,7 @@ func NewModelWithStore(worktreeRoot string, settings ui.Settings, extraKeys keys
 	km := newTicketsManager()
 	sidebarTree := tree.NewModel[sidebarNode]()
 	sidebarTree.SetIsSelectable(func(n sidebarNode) bool {
-		return n.kind != nodeBlank && n.kind != nodeEmpty
+		return n.kind != nodeEmpty
 	})
 	return Model{
 		worktreeRoot:       worktreeRoot,
@@ -325,10 +325,10 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 // clampSelected rebuilds the sidebar tree's entries from the current
 // epics/hideDone/collapse state, e.g. after a collapse hides the rows below
 // the selection — SetEntries re-clamps selection to the new entry count.
-// The blank separator row and an empty-section placeholder are real
-// tree.Entry rows but must never hold the cursor, so every rebuild (including
-// the very first, off of tree.NewModel's zero-value selection at index 0)
-// nudges off one if the rebuilt entries left the selection sitting on one.
+// An empty-section placeholder is a real tree.Entry row but must never hold
+// the cursor, so every rebuild (including the very first, off of
+// tree.NewModel's zero-value selection at index 0) nudges off one if the
+// rebuilt entries left the selection sitting on one.
 func (m *Model) clampSelected() {
 	m.sidebarTree.SetEntries(m.buildSidebarEntries())
 	m.sidebarTree.SkipUnselectable(1)
@@ -344,8 +344,8 @@ func (m Model) sidebarViewportHeight() int {
 
 // sidebarBody renders the sidebar panel's body lines. m.sidebarTree.Entries()
 // is only ever empty before the first epicsLoadedMsg arrives (the root list
-// is 3 fixed entries — 2 sections + 1 blank — regardless of len(m.epics),
-// once clampSelected has run at least once), so RenderOpts.EmptyLine covers
+// is 2 fixed section entries regardless of len(m.epics), once clampSelected
+// has run at least once), so RenderOpts.EmptyLine covers
 // the pre-load "loading…" state on its own. It cannot reproduce the
 // zero-epics-after-load "no .scratch/ directory found" message though — that
 // would otherwise render as two real, empty section headers plus their
