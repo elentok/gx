@@ -64,6 +64,12 @@ func collapseSelected[T any](entries []Entry[T], collapsed map[string]bool, sele
 	return true
 }
 
+// expandSelected records an explicit, durable "user expanded this" entry
+// (collapsed[id] = false) rather than deleting the map key — a deleted key is
+// indistinguishable from an ID nobody has ever touched, which is invisible
+// for a node that defaults to expanded but silently re-collapses a node
+// whose caller-declared default is collapsed (see ApplyDefaults) on the next
+// rebuild.
 func expandSelected[T any](entries []Entry[T], collapsed map[string]bool, selected int) bool {
 	if selected < 0 || selected >= len(entries) {
 		return false
@@ -72,7 +78,7 @@ func expandSelected[T any](entries []Entry[T], collapsed map[string]bool, select
 	if !entry.HasChildren || entry.Expanded {
 		return false
 	}
-	delete(collapsed, entry.ID)
+	collapsed[entry.ID] = false
 	return true
 }
 
@@ -84,10 +90,6 @@ func toggleOnEnter[T any](entries []Entry[T], collapsed map[string]bool, selecte
 	if !entry.HasChildren {
 		return false
 	}
-	if entry.Expanded {
-		collapsed[entry.ID] = true
-	} else {
-		delete(collapsed, entry.ID)
-	}
+	collapsed[entry.ID] = entry.Expanded
 	return true
 }

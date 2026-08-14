@@ -297,30 +297,17 @@ func sidebarSectionID(section sidebarSection) string {
 	return "section:closed"
 }
 
-// defaultCollapsedSidebar computes the sidebar's collapse state: each epic's
-// own entry preserves whatever is already in existing (e.g. a user's manual
-// per-epic toggle) with no default of its own — collapsing on "all tickets
-// done" moved to the Closed section as a whole, not each epic individually.
-// The Closed section root defaults to collapsed when absent from existing;
-// the Open section root is left out of the map entirely, since tree.Model
-// treats an absent ID as expanded by default.
-func defaultCollapsedSidebar(epics []tickets.Epic, existing map[string]bool) map[string]bool {
-	collapsed := make(map[string]bool, len(epics)+1)
-	for _, epic := range epics {
-		if v, ok := existing[epic.Path]; ok {
-			// Preserve the entry itself, not just its value, so an explicit
-			// false (manually expanded) survives into the next reload's
-			// existing map instead of vanishing back to "unseen".
-			collapsed[epic.Path] = v
-		}
-	}
-	closedID := sidebarSectionID(sectionClosed)
-	if v, ok := existing[closedID]; ok {
-		collapsed[closedID] = v
-	} else {
-		collapsed[closedID] = true
-	}
-	return collapsed
+// defaultCollapsedSidebar applies the sidebar's one default-collapsed
+// policy — "Closed epics" starts collapsed, everything else (individual
+// epics, the Open section) starts expanded — via tree.ApplyDefaults: an ID
+// the user has ever explicitly toggled (an epic, or the Closed section
+// itself) keeps that choice across reload no matter how many times epics
+// data is rebuilt, since expand/collapse ops record an explicit true/false
+// rather than deleting the map entry.
+func defaultCollapsedSidebar(existing map[string]bool) map[string]bool {
+	return tree.ApplyDefaults(existing, map[string]bool{
+		sidebarSectionID(sectionClosed): true,
+	})
 }
 
 // sortedTicketIndexes orders epic.Tickets' indexes in plan order — ticket

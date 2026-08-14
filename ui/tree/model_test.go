@@ -417,6 +417,65 @@ func TestModelNodeOperations(t *testing.T) {
 	})
 }
 
+// TestExpandSelected_SurvivesDefaultReapplication covers ticket 01's root
+// cause: expanding a node whose ID is declared collapsed-by-default must
+// leave a durable record so ApplyDefaults never re-collapses it, no matter
+// how many times it's called on rebuilt state.
+func TestExpandSelected_SurvivesDefaultReapplication(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{
+		{ID: "closed-section", HasChildren: true, Expanded: false},
+	})
+	m.SetCollapsedIDs(map[string]bool{"closed-section": true})
+	m.SetSelectedIndex(0)
+
+	if !m.ExpandSelected() {
+		t.Fatal("expected ExpandSelected=true on collapsed node")
+	}
+
+	defaults := map[string]bool{"closed-section": true}
+	got := ApplyDefaults(m.CollapsedIDs(), defaults)
+	if got["closed-section"] {
+		t.Fatal("expected explicit expand to survive one default reapplication")
+	}
+
+	got = ApplyDefaults(got, defaults)
+	if got["closed-section"] {
+		t.Fatal("expected explicit expand to survive a second default reapplication")
+	}
+}
+
+// TestApplyDefaults covers ApplyDefaults' three-way composition: untouched
+// IDs take their declared default, touched IDs (in either direction) keep
+// their explicit choice, and IDs with no declared default pass through.
+func TestApplyDefaults(t *testing.T) {
+	existing := map[string]bool{
+		"touched-collapsed": true,
+		"touched-expanded":  false,
+		"no-default":        true,
+	}
+	defaults := map[string]bool{
+		"untouched-collapsed": true,
+		"touched-collapsed":   false, // default disagrees; existing wins
+		"touched-expanded":    true,  // default disagrees; existing wins
+	}
+
+	got := ApplyDefaults(existing, defaults)
+
+	if !got["untouched-collapsed"] {
+		t.Error("expected untouched id to take its declared default")
+	}
+	if !got["touched-collapsed"] {
+		t.Error("expected explicit collapse to survive despite disagreeing default")
+	}
+	if got["touched-expanded"] {
+		t.Error("expected explicit expand to survive despite disagreeing default")
+	}
+	if !got["no-default"] {
+		t.Error("expected id with no declared default to pass through unchanged")
+	}
+}
+
 func TestModelUpdate_SearchStartAndQueryMsg(t *testing.T) {
 	m := NewModel[int]()
 

@@ -235,7 +235,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refreshQueueSnapshot()
 		m.loaded = true
 		m.epics = msg.epics
-		m.sidebarTree.SetCollapsedIDs(defaultCollapsedSidebar(msg.epics, m.sidebarTree.CollapsedIDs()))
+		m.sidebarTree.SetCollapsedIDs(defaultCollapsedSidebar(m.sidebarTree.CollapsedIDs()))
 		if m.search.HasQuery() {
 			m.recomputeSearchMatches()
 		}

@@ -235,6 +235,26 @@ func (m *Model[T]) SetCollapsedIDs(ids map[string]bool) {
 	maps.Copy(m.collapsed, ids)
 }
 
+// ApplyDefaults layers defaults on top of existing collapse state: an ID
+// absent from existing (never explicitly expanded or collapsed by the user)
+// takes its declared default; an ID already present in existing — however it
+// got there, expand/collapse ops always write an explicit true/false rather
+// than deleting the key — keeps that choice regardless of what defaults
+// says; an ID with no declared default passes through unchanged. Callers
+// with an inverted default (collapsed until the user opens it) call this on
+// every rebuild instead of hand-rolling their own "was it ever touched"
+// tracking.
+func ApplyDefaults(existing map[string]bool, defaults map[string]bool) map[string]bool {
+	out := make(map[string]bool, len(existing)+len(defaults))
+	maps.Copy(out, existing)
+	for id, def := range defaults {
+		if _, ok := existing[id]; !ok {
+			out[id] = def
+		}
+	}
+	return out
+}
+
 func (m *Model[T]) Search() *search.Model {
 	return &m.search
 }

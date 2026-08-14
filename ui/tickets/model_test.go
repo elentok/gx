@@ -400,6 +400,44 @@ func TestModel_EpicsLoadedMsgPreservesManualCollapseToggle(t *testing.T) {
 	}
 }
 
+// TestModel_ExpandedClosedSectionSurvivesRepeatedRefresh is ticket 01's
+// regression: expanding "Closed epics" used to snap shut again on the very
+// next auto-refresh poll, because expanding deleted the collapse-map entry
+// instead of recording an explicit choice, so the section's collapsed-by-
+// default policy re-asserted itself. Assert it survives more than one tick.
+func TestModel_ExpandedClosedSectionSurvivesRepeatedRefresh(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTicket(t, root, "done-epic", "01-only-ticket.md", "Status: done\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	if !m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
+		t.Fatalf("expected Closed section to start collapsed")
+	}
+
+	setCollapsedSection(&m, sectionClosed, false)
+	if m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
+		t.Fatalf("expected Closed section expanded after manual toggle")
+	}
+
+	for i := range 3 {
+		msg := m.cmdLoad()()
+		updated, _ = m.Update(msg)
+		m = updated.(Model)
+
+		if m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
+			t.Fatalf("refresh %d: expected Closed section to stay expanded, got collapsed", i+1)
+		}
+		if !strings.Contains(m.View().Content, "Only ticket") {
+			t.Fatalf("refresh %d: expected Closed section's ticket visible, got:\n%s", i+1, m.View().Content)
+		}
+	}
+}
+
 func TestNewModel_ZeroTicketEpicStartsExpanded(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
