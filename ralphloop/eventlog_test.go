@@ -243,11 +243,11 @@ func TestSendNotification_FailsOnceThenSucceeds_LogsOneSentAndNoFailed(t *testin
 	t.Parallel()
 	dir := t.TempDir()
 	var attempts atomic.Int32
-	sendSync := func(ctx context.Context) error {
+	sendSync := func(ctx context.Context) (sendResult, error) {
 		if attempts.Add(1) == 1 {
-			return errors.New("transient failure")
+			return sendResult{}, errors.New("transient failure")
 		}
-		return nil
+		return sendResult{}, nil
 	}
 
 	var onFailedCalls atomic.Int32
@@ -277,9 +277,9 @@ func TestSendNotification_FailsEveryAttempt_LogsOneFailedAndCallsOnFailed(t *tes
 	t.Parallel()
 	dir := t.TempDir()
 	var attempts atomic.Int32
-	sendSync := func(ctx context.Context) error {
+	sendSync := func(ctx context.Context) (sendResult, error) {
 		attempts.Add(1)
-		return errors.New("permanent failure")
+		return sendResult{}, errors.New("permanent failure")
 	}
 
 	var onFailedReason string
@@ -309,5 +309,27 @@ func TestSendNotification_FailsEveryAttempt_LogsOneFailedAndCallsOnFailed(t *tes
 	}
 	if onFailedReason != "permanent failure" {
 		t.Errorf("onFailed reason = %q, want %q", onFailedReason, "permanent failure")
+	}
+}
+
+func TestSendWithRetry_FirstAttemptFailsSecondSucceedsDegraded_ReturnsDegradedResult(t *testing.T) {
+	t.Parallel()
+	var attempts atomic.Int32
+	sendSync := func(ctx context.Context) (sendResult, error) {
+		if attempts.Add(1) == 1 {
+			return sendResult{Degraded: false}, errors.New("markdown rejected")
+		}
+		return sendResult{StatusCode: 200, Degraded: true}, nil
+	}
+
+	result, err := sendWithRetry(time.Second, sendSync)
+	if err != nil {
+		t.Fatalf("err = %v, want nil", err)
+	}
+	if !result.Degraded {
+		t.Errorf("result.Degraded = false, want true (naive first-attempt-only implementations would report false here)")
+	}
+	if result.StatusCode != 200 {
+		t.Errorf("result.StatusCode = %d, want 200", result.StatusCode)
 	}
 }

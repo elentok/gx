@@ -37,12 +37,14 @@ type chatTransport interface {
 // sendSync) the response body's description field, which names why a 400
 // happened (e.g. a MarkdownV2-parse rejection vs. an invalid chat_id).
 // Slack's webhook response body doesn't carry a comparable field, so
-// slackTransport.sendSync leaves Description empty. Threading this up
-// through sendRaw/eventlog.go's retry loop is a follow-up ticket — for now
-// callers here discard it and keep using the plain error.
+// slackTransport.sendSync leaves Description empty. Degraded marks a send
+// that succeeded only via telegramTransport.sendSync's plain-text fallback
+// (a follow-up ticket) — false for every transport until that fallback
+// exists to set it.
 type sendResult struct {
 	StatusCode  int
 	Description string
+	Degraded    bool
 }
 
 // chatEventSink decorates another EventSink with one chat notification per
@@ -432,9 +434,8 @@ func (s *chatEventSink) send(text chatmarkup.Text, notifyKind, source, ticketIde
 // logging the final outcome to run-log.jsonl tagged with notifyKind (the
 // live event that triggered it).
 func (s *chatEventSink) sendRaw(text chatmarkup.Text, notifyKind string) {
-	sendNotification(s.scratchDir, s.epicName, s.transport.name(), notifyKind, text.String(), s.transport.timeout(), func(ctx context.Context) error {
-		_, err := s.transport.sendSync(ctx, text)
-		return err
+	sendNotification(s.scratchDir, s.epicName, s.transport.name(), notifyKind, text.String(), s.transport.timeout(), func(ctx context.Context) (sendResult, error) {
+		return s.transport.sendSync(ctx, text)
 	}, func(reason string) {
 		s.EventSink.NotificationFailed(s.transport.name(), reason)
 	})

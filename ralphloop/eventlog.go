@@ -286,19 +286,9 @@ const notificationRetryBackoff = 1500 * time.Millisecond
 // LiveEventNotificationFailed on its embedded EventSink, for a TUI toast;
 // epicFailureReporter's own call passes nil, since by the time it sends the
 // run's sink has already closed and drained (see EventSink.EpicFailed).
-func sendNotification(scratchDir, epicName, channel, notifyKind, body string, timeout time.Duration, sendSync func(ctx context.Context) error, onFailed func(reason string)) {
+func sendNotification(scratchDir, epicName, channel, notifyKind, body string, timeout time.Duration, sendSync func(ctx context.Context) (sendResult, error), onFailed func(reason string)) {
 	go func() {
-		attempt := func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			defer cancel()
-			return sendSync(ctx)
-		}
-
-		err := attempt()
-		if err != nil {
-			time.Sleep(notificationRetryBackoff)
-			err = attempt()
-		}
+		_, err := sendWithRetry(timeout, sendSync)
 
 		if err != nil {
 			err = sanitizeSendError(err)
@@ -311,6 +301,27 @@ func sendNotification(scratchDir, epicName, channel, notifyKind, body string, ti
 		}
 		logNotificationSent(scratchDir, epicName, channel, notifyKind, body)
 	}()
+}
+
+// sendWithRetry runs sendSync once, retrying after notificationRetryBackoff
+// if the first attempt fails, and returns whichever attempt's sendResult/error
+// is last — the one that succeeded, or the second attempt's failure if both
+// did. Extracted from sendNotification's goroutine so the "first attempt
+// fails, second succeeds degraded" carry-through is directly testable without
+// racing a background goroutine and polling run-log.jsonl.
+func sendWithRetry(timeout time.Duration, sendSync func(ctx context.Context) (sendResult, error)) (sendResult, error) {
+	attempt := func() (sendResult, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		return sendSync(ctx)
+	}
+
+	result, err := attempt()
+	if err != nil {
+		time.Sleep(notificationRetryBackoff)
+		result, err = attempt()
+	}
+	return result, err
 }
 
 // sanitizeSendError strips the request URL from a failed send's error before
