@@ -329,7 +329,7 @@ func retryDelay(result sendResult) (time.Duration, bool) {
 		return notificationRetryBackoff, true
 	}
 	if result.RetryAfter == nil {
-		return 0, false
+		return notificationRetryBackoff, true
 	}
 	delay := time.Duration(*result.RetryAfter) * time.Second
 	if delay > maxHonoredRetryAfter {

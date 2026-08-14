@@ -395,33 +395,21 @@ func TestSendWithRetry_429WithRetryAfterUnderCap_HonorsRetryAfterAsDelay(t *test
 	}
 }
 
-func TestSendWithRetry_429AboveCapOrUnparseable_SkipsRetry(t *testing.T) {
+func TestSendWithRetry_429AboveCap_SkipsRetry(t *testing.T) {
 	t.Parallel()
 	aboveCap := 31
-	tests := []struct {
-		name   string
-		result sendResult
-	}{
-		{"above cap", sendResult{StatusCode: 429, RetryAfter: &aboveCap}},
-		{"unparseable/absent", sendResult{StatusCode: 429, RetryAfter: nil}},
+	var attempts atomic.Int32
+	sendSync := func(ctx context.Context) (sendResult, error) {
+		attempts.Add(1)
+		return sendResult{StatusCode: 429, RetryAfter: &aboveCap}, errors.New("rate limited")
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			var attempts atomic.Int32
-			sendSync := func(ctx context.Context) (sendResult, error) {
-				attempts.Add(1)
-				return tt.result, errors.New("rate limited")
-			}
 
-			_, err := sendWithRetry(context.Background(), time.Second, sendSync)
-			if err == nil {
-				t.Fatalf("err = nil, want failure")
-			}
-			if got := attempts.Load(); got != 1 {
-				t.Errorf("attempts = %d, want 1 (retry skipped)", got)
-			}
-		})
+	_, err := sendWithRetry(context.Background(), time.Second, sendSync)
+	if err == nil {
+		t.Fatalf("err = nil, want failure")
+	}
+	if got := attempts.Load(); got != 1 {
+		t.Errorf("attempts = %d, want 1 (retry skipped)", got)
 	}
 }
 
@@ -434,12 +422,6 @@ func TestSendWithRetry_OtherRetryableFailures_KeepFixedBackoffRetryOnce(t *testi
 			var attempts atomic.Int32
 			sendSync := func(ctx context.Context) (sendResult, error) {
 				if attempts.Add(1) == 1 {
-					// 429 with no retry_after would otherwise skip the retry
-					// (see TestSendWithRetry_429AboveCapOrUnparseable_SkipsRetry) — this
-					// asserts every *other* retryable failure keeps the fixed backoff.
-					if code == 429 {
-						return sendResult{}, errors.New("transient failure")
-					}
 					return sendResult{StatusCode: code}, errors.New("transient failure")
 				}
 				return sendResult{StatusCode: 200}, nil
