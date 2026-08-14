@@ -3,6 +3,8 @@ package tickets
 import (
 	"strconv"
 	"strings"
+
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // RenderedStatus is the tickets tab's collapse of the tracker's raw Status:/
@@ -60,26 +62,36 @@ var draftStatuses = map[string]bool{
 	"draft": true,
 }
 
-// typeCodeReview and typeResearch mirror schema.TypeCodeReview's and
-// schema.TypeResearch's on-disk values. tickets.Ticket carries Type as a
-// plain string (it predates the schema package), so the comparison is
-// against the literal rather than the typed constant.
-const (
-	typeCodeReview = "code-review"
-	typeResearch   = "research"
-)
+// typeCodeReview mirrors schema.TypeCodeReview's on-disk value.
+// tickets.Ticket carries Type as a plain string (it predates the schema
+// package), so the comparison is against the literal rather than the typed
+// constant.
+const typeCodeReview = "code-review"
 
 // IsCodeReview reports whether t's Type is code-review.
 func (t Ticket) IsCodeReview() bool {
 	return t.Type == typeCodeReview
 }
 
+// commitlessByDesignTypes lists the ticket types schema.Ticket.IsCommitless
+// treats as commitless regardless of the Commitless flag. It's an allowlist
+// (rather than excluding known-noisy types) so a new commitless-by-design
+// type added to schema shows up here too instead of silently getting the
+// wrong default.
+var commitlessByDesignTypes = map[string]bool{
+	string(schema.TypeResearch):           true,
+	string(schema.TypeGrilling):           true,
+	string(schema.TypeCodeReview):         true,
+	string(schema.TypeConflictResolution): true,
+}
+
 // ShowsCommitlessSuffix reports whether t's UI row should append
-// " (commitless)". research and code-review tickets are commitless by
-// design (schema.Ticket.IsCommitless), so the suffix would be noise there;
-// it's only informative for types where a missing commit is unexpected.
+// " (commitless)". Types that are commitless by design
+// (schema.Ticket.IsCommitless) are excluded since the suffix would be noise
+// there; it's only informative for types where a missing commit is
+// unexpected.
 func (t Ticket) ShowsCommitlessSuffix() bool {
-	return t.Commitless && t.Type != typeCodeReview && t.Type != typeResearch
+	return t.Commitless && !commitlessByDesignTypes[t.Type]
 }
 
 // baseStatus classifies t's raw Status: value alone, before the Blocked by:
