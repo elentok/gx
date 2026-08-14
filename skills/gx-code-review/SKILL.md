@@ -120,5 +120,8 @@ If the consultant approved zero findings, skip this step entirely; there's nothi
   - **Raw findings**, per axis and reviewer skill, verbatim from step 4.
   - **Consultant triage**, verbatim from step 5.
   - **Final disposition** of each finding: which ticket it became, or why it was rejected/deferred.
-- `gx tickets set <path> --status done --commitless true` — this skill never commits code of its own,
-  so `commitless: true` is always correct here, not just the no-findings case.
+- `gx tickets set <path> --iteration-status finished --commitless true` — this skill never commits
+  code of its own, so `commitless: true` is always correct here, not just the no-findings case.
+  `--status done` will be refused on a `ralph-loop/*` branch (landing status is gx's alone to set);
+  `iteration_status: finished` is the self-report ralph-loop's landing logic actually watches for on
+  a claimed ticket, so set it even though `--status done` isn't yours to set directly.
