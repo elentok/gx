@@ -227,21 +227,3 @@ func TestTelegramStyle_OverflowParkedIdentifiersEscapesPlus(t *testing.T) {
 		}
 	})
 }
-
-func TestEscapeTelegramMarkdownV2_EscapesSpecialChars(t *testing.T) {
-	t.Parallel()
-	got := escapeTelegramMarkdownV2("a.b-c_d*e[f]g(h)~i`j>k#l+m=n|o{p}q!r\\s")
-	want := "a\\.b\\-c\\_d\\*e\\[f\\]g\\(h\\)\\~i\\`j\\>k\\#l\\+m\\=n\\|o\\{p\\}q\\!r\\\\s"
-	if got != want {
-		t.Errorf("escapeTelegramMarkdownV2 = %q, want %q", got, want)
-	}
-}
-
-func TestEscapeSlackMrkdwn_EscapesAmpLtGt(t *testing.T) {
-	t.Parallel()
-	got := escapeSlackMrkdwn("a&b<c>d")
-	want := "a&amp;b&lt;c&gt;d"
-	if got != want {
-		t.Errorf("escapeSlackMrkdwn = %q, want %q", got, want)
-	}
-}

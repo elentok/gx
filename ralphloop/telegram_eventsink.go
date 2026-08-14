@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/elentok/gx/chatmarkup"
 )
 
 const (
@@ -47,10 +49,10 @@ func (t *telegramTransport) timeout() time.Duration { return telegramSendTimeout
 // error, non-2xx response) instead of swallowing it. text is expected to
 // already be MarkdownV2-escaped (see notification_text.go); parse_mode tells
 // Telegram to render its "*bold*" markers instead of showing them literally.
-func (t *telegramTransport) sendSync(ctx context.Context, text string) error {
+func (t *telegramTransport) sendSync(ctx context.Context, text chatmarkup.Text) error {
 	payload, err := json.Marshal(map[string]string{
 		"chat_id":    t.chatID,
-		"text":       text,
+		"text":       text.String(),
 		"parse_mode": "MarkdownV2",
 	})
 	if err != nil {
@@ -102,7 +104,7 @@ func SendTelegramTestMessage(botToken, chatID string) error {
 }
 
 func sendTelegramTestMessage(botToken, chatID, apiBaseURL string) error {
-	return sendTelegramRaw(botToken, chatID, apiBaseURL, telegramStyle.testMessageText().String())
+	return sendTelegramRaw(botToken, chatID, apiBaseURL, telegramStyle.testMessageText())
 }
 
 // SendTelegramTestBatch synchronously sends two fixed test messages through
@@ -116,8 +118,8 @@ func SendTelegramTestBatch(botToken, chatID string) error {
 
 func sendTelegramTestBatch(botToken, chatID, apiBaseURL string) error {
 	items := []batchedMessage{
-		{text: telegramStyle.testMessageText().String(), kind: "test"},
-		{text: telegramStyle.testMessageText().String(), kind: "test"},
+		{text: telegramStyle.testMessageText(), kind: "test"},
+		{text: telegramStyle.testMessageText(), kind: "test"},
 	}
 	return sendTelegramRaw(botToken, chatID, apiBaseURL, renderBatch(telegramStyle, items))
 }
@@ -132,13 +134,13 @@ func SendTelegramMessage(botToken, chatID, text string) error {
 }
 
 func sendTelegramMessage(botToken, chatID, apiBaseURL, text string) error {
-	return sendTelegramRaw(botToken, chatID, apiBaseURL, telegramStyle.escape(text))
+	return sendTelegramRaw(botToken, chatID, apiBaseURL, telegramStyle.chatStyle.Escape(text))
 }
 
 // sendTelegramRaw POSTs text to the Telegram Bot API as-is, without any
 // further escaping — callers are responsible for pre-escaping MarkdownV2
 // text (see notification_text.go).
-func sendTelegramRaw(botToken, chatID, apiBaseURL, text string) error {
+func sendTelegramRaw(botToken, chatID, apiBaseURL string, text chatmarkup.Text) error {
 	t := newTelegramTransport(botToken, chatID, apiBaseURL)
 	ctx, cancel := context.WithTimeout(context.Background(), telegramSendTimeout)
 	defer cancel()

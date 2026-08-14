@@ -242,7 +242,7 @@ func TestSendSlackMessage_SendsGivenTextEscaped(t *testing.T) {
 	if len(reqs) != 1 {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
-	want := slackStyle.escape("hello <world> & friends")
+	want := slackStyle.chatStyle.Escape("hello <world> & friends").String()
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}

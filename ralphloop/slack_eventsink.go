@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/elentok/gx/chatmarkup"
 )
 
 // slackSendTimeout bounds a single send attempt (both http.Client.Timeout
@@ -30,8 +32,8 @@ func newSlackTransport(webhookURL string) *slackTransport {
 func (t *slackTransport) name() string           { return "slack" }
 func (t *slackTransport) timeout() time.Duration { return slackSendTimeout }
 
-func (t *slackTransport) sendSync(ctx context.Context, text string) error {
-	payload, err := json.Marshal(map[string]string{"text": text})
+func (t *slackTransport) sendSync(ctx context.Context, text chatmarkup.Text) error {
+	payload, err := json.Marshal(map[string]string{"text": text.String()})
 	if err != nil {
 		return fmt.Errorf("marshal message: %w", err)
 	}
@@ -74,7 +76,7 @@ func newSlackEventSink(inner EventSink, webhookURL, scratchDir, epicName string)
 // like `gx config test-notifications` that need to report success/failure
 // directly — unlike the EventSink decorator's fire-and-forget send.
 func SendSlackTestMessage(webhookURL string) error {
-	return sendSlackMessageRaw(webhookURL, slackStyle.testMessageText().String())
+	return sendSlackMessageRaw(webhookURL, slackStyle.testMessageText())
 }
 
 // SendSlackTestBatch is Slack's counterpart to SendTelegramTestBatch: sends
@@ -84,8 +86,8 @@ func SendSlackTestMessage(webhookURL string) error {
 // symmetry/smoke-testing the batch plumbing, not because Slack has the bug.
 func SendSlackTestBatch(webhookURL string) error {
 	items := []batchedMessage{
-		{text: slackStyle.testMessageText().String(), kind: "test"},
-		{text: slackStyle.testMessageText().String(), kind: "test"},
+		{text: slackStyle.testMessageText(), kind: "test"},
+		{text: slackStyle.testMessageText(), kind: "test"},
 	}
 	return sendSlackMessageRaw(webhookURL, renderBatch(slackStyle, items))
 }
@@ -96,10 +98,10 @@ func SendSlackTestBatch(webhookURL string) error {
 // EventSink decorator's fire-and-forget send. text is escaped for Slack's
 // mrkdwn dialect here, so callers pass plain text.
 func SendSlackMessage(webhookURL, text string) error {
-	return sendSlackMessageRaw(webhookURL, slackStyle.escape(text))
+	return sendSlackMessageRaw(webhookURL, slackStyle.chatStyle.Escape(text))
 }
 
-func sendSlackMessageRaw(webhookURL, text string) error {
+func sendSlackMessageRaw(webhookURL string, text chatmarkup.Text) error {
 	t := newSlackTransport(webhookURL)
 	ctx, cancel := context.WithTimeout(context.Background(), slackSendTimeout)
 	defer cancel()

@@ -170,6 +170,12 @@ func waitForRunLogEvent(t *testing.T, dir, epicName string) []Event {
 // ("", -1) if text is fully escaped. "*" is exempted: every message builder
 // in notification_text.go deliberately emits it unescaped as the bold
 // headline delimiter, so a literal "*" is valid syntax, not stray data.
+// telegramMarkdownV2SpecialChars mirrors chatmarkup.Telegram's reserved
+// character set for these tests' own escaping assertions, now that
+// notification_text.go no longer declares this itself (chatmarkup.Style
+// owns escaping — see chatmarkup/styles.go).
+const telegramMarkdownV2SpecialChars = "_*[]()~`>#+-=|{}.!\\"
+
 func unescapedTelegramMarkdownV2Char(text string) (string, int) {
 	runes := []rune(text)
 	for i := 0; i < len(runes); i++ {
@@ -196,11 +202,11 @@ func unescapedTelegramMarkdownV2Char(text string) (string, int) {
 func TestRenderBatch_TelegramStyle_MultipleItems_SeparatorIsEscaped(t *testing.T) {
 	t.Parallel()
 	items := []batchedMessage{
-		{text: telegramStyle.testMessageText().String(), kind: "a"},
-		{text: telegramStyle.testMessageText().String(), kind: "b"},
+		{text: telegramStyle.testMessageText(), kind: "a"},
+		{text: telegramStyle.testMessageText(), kind: "b"},
 	}
 	got := renderBatch(telegramStyle, items)
-	if ch, idx := unescapedTelegramMarkdownV2Char(got); idx != -1 {
+	if ch, idx := unescapedTelegramMarkdownV2Char(got.String()); idx != -1 {
 		t.Errorf("renderBatch produced unescaped %q at index %d in %q", ch, idx, got)
 	}
 }
@@ -223,10 +229,10 @@ func TestSendTelegramTestBatch_PostsRenderBatchOutputAsIs(t *testing.T) {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
 	want := renderBatch(telegramStyle, []batchedMessage{
-		{text: telegramStyle.testMessageText().String(), kind: "test"},
-		{text: telegramStyle.testMessageText().String(), kind: "test"},
+		{text: telegramStyle.testMessageText(), kind: "test"},
+		{text: telegramStyle.testMessageText(), kind: "test"},
 	})
-	if reqs[0].Text != want {
+	if reqs[0].Text != want.String() {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}
 }
@@ -275,7 +281,7 @@ func TestSendTelegramMessage_SendsGivenTextEscaped(t *testing.T) {
 	if len(reqs) != 1 {
 		t.Fatalf("requests = %v, want exactly 1", reqs)
 	}
-	want := telegramStyle.escape("hello-world!")
+	want := telegramStyle.chatStyle.Escape("hello-world!").String()
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}

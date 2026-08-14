@@ -42,49 +42,20 @@ func formatCost(cost float64) string {
 }
 
 // mrkdwnStyle adapts the shared message templates below to a specific chat
-// platform's markup dialect, pairing chatStyle (chatmarkup's own dialect
-// value, which every *Text function routes its raw fragments through) with
-// escape, still needed directly by renderBatch's batch-separator literal
-// (see chat_eventsink.go — 01c threads that through chatmarkup too).
-// gxPrefix is the raw literal "[gx]" tag for both platforms; it's no longer
-// pre-escaped, since it now flows through the same chatmarkup.Style.Message
-// boundary escape as every other fragment.
+// platform's markup dialect via chatStyle (chatmarkup's own dialect value,
+// which every *Text function and renderBatch's batch separator routes its
+// raw fragments through — see chat_eventsink.go). gxPrefix is the raw
+// literal "[gx]" tag for both platforms; it's no longer pre-escaped, since it
+// now flows through the same chatmarkup.Style.Message boundary escape as
+// every other fragment.
 type mrkdwnStyle struct {
 	chatStyle chatmarkup.Style
-	escape    func(string) string
 	gxPrefix  string
 }
 
-var telegramStyle = mrkdwnStyle{chatStyle: chatmarkup.Telegram, escape: escapeTelegramMarkdownV2, gxPrefix: "[gx]"}
+var telegramStyle = mrkdwnStyle{chatStyle: chatmarkup.Telegram, gxPrefix: "[gx]"}
 
-var slackStyle = mrkdwnStyle{chatStyle: chatmarkup.Slack, escape: escapeSlackMrkdwn, gxPrefix: "[gx]"}
-
-// telegramMarkdownV2SpecialChars are the ASCII punctuation characters
-// Telegram's MarkdownV2 parser treats as syntax; every occurrence outside
-// deliberate formatting markers (the literal "*" this package wraps titles
-// in) must be backslash-escaped or the API rejects the message.
-const telegramMarkdownV2SpecialChars = "_*[]()~`>#+-=|{}.!\\"
-
-func escapeTelegramMarkdownV2(s string) string {
-	var b strings.Builder
-	for _, r := range s {
-		if strings.ContainsRune(telegramMarkdownV2SpecialChars, r) {
-			b.WriteByte('\\')
-		}
-		b.WriteRune(r)
-	}
-	return b.String()
-}
-
-// escapeSlackMrkdwn escapes the three characters Slack's mrkdwn requires
-// escaped as HTML entities; everything else (including "*" and "-") is
-// passed through unchanged.
-func escapeSlackMrkdwn(s string) string {
-	s = strings.ReplaceAll(s, "&", "&amp;")
-	s = strings.ReplaceAll(s, "<", "&lt;")
-	s = strings.ReplaceAll(s, ">", "&gt;")
-	return s
-}
+var slackStyle = mrkdwnStyle{chatStyle: chatmarkup.Slack, gxPrefix: "[gx]"}
 
 // identityLine renders the trailing "who this is about" line: the gx tag
 // plus the epic name alone, or the epic and a ticket identifier — never an

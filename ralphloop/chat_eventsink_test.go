@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/chatmarkup"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -25,10 +26,10 @@ type fakeChatTransport struct {
 func (f *fakeChatTransport) name() string           { return "fake" }
 func (f *fakeChatTransport) timeout() time.Duration { return time.Second }
 
-func (f *fakeChatTransport) sendSync(_ context.Context, text string) error {
+func (f *fakeChatTransport) sendSync(_ context.Context, text chatmarkup.Text) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.sent = append(f.sent, text)
+	f.sent = append(f.sent, text.String())
 	return nil
 }
 

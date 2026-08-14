@@ -41,7 +41,7 @@ func TestSendMessage_BothConfigured_SendsToBothAndReportsBoth(t *testing.T) {
 	if len(telegramReqs) != 1 {
 		t.Fatalf("telegram requests = %v, want exactly 1", telegramReqs)
 	}
-	if want := telegramStyle.escape("hello"); telegramReqs[0].Text != want {
+	if want := telegramStyle.chatStyle.Escape("hello").String(); telegramReqs[0].Text != want {
 		t.Errorf("telegram text = %q, want %q", telegramReqs[0].Text, want)
 	}
 
@@ -49,7 +49,7 @@ func TestSendMessage_BothConfigured_SendsToBothAndReportsBoth(t *testing.T) {
 	if len(slackReqs) != 1 {
 		t.Fatalf("slack requests = %v, want exactly 1", slackReqs)
 	}
-	if want := slackStyle.escape("hello"); slackReqs[0].Text != want {
+	if want := slackStyle.chatStyle.Escape("hello").String(); slackReqs[0].Text != want {
 		t.Errorf("slack text = %q, want %q", slackReqs[0].Text, want)
 	}
 }

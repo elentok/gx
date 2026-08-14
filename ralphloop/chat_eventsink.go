@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/chatmarkup"
 	"github.com/elentok/gx/logger"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -28,7 +29,7 @@ const batchFlushInterval = 6 * time.Second
 type chatTransport interface {
 	name() string
 	timeout() time.Duration
-	sendSync(ctx context.Context, text string) error
+	sendSync(ctx context.Context, text chatmarkup.Text) error
 }
 
 // chatEventSink decorates another EventSink with one chat notification per
@@ -97,7 +98,7 @@ type chatEventSink struct {
 // dedup ×N collapse. kind is the notifyKind that produced it, kept so a
 // suppressed close-time flush can name what it dropped (see closeFlush).
 type batchedMessage struct {
-	text  string
+	text  chatmarkup.Text
 	kind  string
 	count int
 }
@@ -166,7 +167,7 @@ func (s *chatEventSink) Close() {
 // bumping its count) if an identical text is already queued this window —
 // the dedup ×N behavior. kind is recorded so a suppressed close-time flush
 // can name what it dropped.
-func (s *chatEventSink) enqueue(text, kind string) {
+func (s *chatEventSink) enqueue(text chatmarkup.Text, kind string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i := range s.queue {
@@ -249,19 +250,21 @@ const batchSeparatorRaw = "---"
 
 // renderBatch joins every queued message into one send, separator lines
 // between originally-distinct messages, applying each message's ×N dedup
-// suffix. style escapes the separator for the target dialect — item text is
-// already escaped by the time it's queued (see enqueue), but the separator
-// is renderBatch's own literal, so it needs the same treatment.
-func renderBatch(style mrkdwnStyle, items []batchedMessage) string {
-	lines := make([]string, len(items))
+// suffix through chatmarkup.Text.WithSuffix. style escapes the separator for
+// the target dialect — item text is already safe by the time it's queued
+// (see enqueue), but the separator is renderBatch's own literal, so it needs
+// the same treatment; chatmarkup.Join only accepts already-safe Text values,
+// so the separator physically cannot reach the wire unescaped.
+func renderBatch(style mrkdwnStyle, items []batchedMessage) chatmarkup.Text {
+	texts := make([]chatmarkup.Text, len(items))
 	for i, it := range items {
-		lines[i] = it.text
+		texts[i] = it.text
 		if it.count > 1 {
-			lines[i] = fmt.Sprintf("%s ×%d", it.text, it.count)
+			texts[i] = it.text.WithSuffix(fmt.Sprintf(" ×%d", it.count), style.chatStyle)
 		}
 	}
-	separator := fmt.Sprintf("\n\n%s\n\n", style.escape(batchSeparatorRaw))
-	return strings.Join(lines, separator)
+	separator := style.chatStyle.Escape("\n\n" + batchSeparatorRaw + "\n\n")
+	return chatmarkup.Join(separator, texts)
 }
 
 // distinctKinds returns items' notifyKinds in first-seen order, deduped —
@@ -325,12 +328,12 @@ func (s *chatEventSink) gate(eventType, source string, recordSend bool) (GateRes
 
 func (s *chatEventSink) EpicStarted(epicName string, done, total int) {
 	s.EventSink.EpicStarted(epicName, done, total)
-	s.send(s.style.epicStartedText(epicName, loadEpicCounts(s.scratchDir, epicName)).String(), notifyKindEpicStarted, epicSource(epicName), "")
+	s.send(s.style.epicStartedText(epicName, loadEpicCounts(s.scratchDir, epicName)), notifyKindEpicStarted, epicSource(epicName), "")
 }
 
 func (s *chatEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string) {
 	s.EventSink.IterationStarted(ticket, label, cwd, sessionID)
-	s.send(s.style.iterationStartedText(ticket, s.epicName).String(), notifyKindIterationStarted, ticket.Path, ticket.Identifier)
+	s.send(s.style.iterationStartedText(ticket, s.epicName), notifyKindIterationStarted, ticket.Path, ticket.Identifier)
 }
 
 func (s *chatEventSink) IterationPaused(identifier, label string, kind PauseKind, reason string) {
@@ -341,7 +344,7 @@ func (s *chatEventSink) IterationPaused(identifier, label string, kind PauseKind
 		// pause itself stays TUI-only (see "park cardinality").
 		return
 	}
-	s.send(s.style.iterationPausedText(label, reason, s.epicName, identifier).String(), notifyKindIterationPaused, s.resolveTicketPath(identifier), identifier)
+	s.send(s.style.iterationPausedText(label, reason, s.epicName, identifier), notifyKindIterationPaused, s.resolveTicketPath(identifier), identifier)
 }
 
 func (s *chatEventSink) IterationResumed(identifier, label string, kind PauseKind) {
@@ -349,18 +352,18 @@ func (s *chatEventSink) IterationResumed(identifier, label string, kind PauseKin
 	if kind == PauseNeedsRepair {
 		return
 	}
-	s.send(s.style.iterationResumedText(label, s.epicName, identifier).String(), notifyKindIterationResumed, s.resolveTicketPath(identifier), identifier)
+	s.send(s.style.iterationResumedText(label, s.epicName, identifier), notifyKindIterationResumed, s.resolveTicketPath(identifier), identifier)
 }
 
 func (s *chatEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
 	s.EventSink.IterationFinished(ticket, epicName, stats)
-	s.send(s.style.iterationFinishedText(ticket, epicName, stats).String(), notifyKindIterationFinished, ticket.Path, ticket.Identifier)
+	s.send(s.style.iterationFinishedText(ticket, epicName, stats), notifyKindIterationFinished, ticket.Path, ticket.Identifier)
 }
 
 func (s *chatEventSink) TicketNeedsHuman(identifier, epicName, status, reason string) {
 	s.EventSink.TicketNeedsHuman(identifier, epicName, status, reason)
 	counts := loadEpicCounts(s.scratchDir, epicName)
-	s.send(s.style.ticketNeedsHumanText(identifier, epicName, status, reason, counts).String(), notifyKindTicketNeedsHuman, s.resolveTicketPath(identifier), identifier)
+	s.send(s.style.ticketNeedsHumanText(identifier, epicName, status, reason, counts), notifyKindTicketNeedsHuman, s.resolveTicketPath(identifier), identifier)
 }
 
 func (s *chatEventSink) EpicParked(epicName string, stalled []StalledTicket) {
@@ -369,14 +372,14 @@ func (s *chatEventSink) EpicParked(epicName string, stalled []StalledTicket) {
 	for i, t := range stalled {
 		identifiers[i] = t.Identifier
 	}
-	s.send(s.style.epicParkedText(epicName, identifiers).String(), notifyKindEpicParked, epicSource(epicName), "")
+	s.send(s.style.epicParkedText(epicName, identifiers), notifyKindEpicParked, epicSource(epicName), "")
 }
 
 func (s *chatEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {
 	s.EventSink.EpicComplete(epicName, completed, elapsedSeconds)
 	counts := loadEpicCounts(s.scratchDir, epicName)
 	totalCost := loadEpicTotalCost(s.scratchDir, epicName)
-	s.send(s.style.epicCompleteText(epicName, counts, completed, elapsedSeconds, totalCost).String(), notifyKindEpicComplete, epicSource(epicName), "")
+	s.send(s.style.epicCompleteText(epicName, counts, completed, elapsedSeconds, totalCost), notifyKindEpicComplete, epicSource(epicName), "")
 }
 
 // send runs (eventType, source) through the budget/mute gate before
@@ -388,7 +391,7 @@ func (s *chatEventSink) EpicComplete(epicName string, completed int, elapsedSeco
 // fails open: the gate exists to bound a runaway storm, not to gate
 // delivery on its own bookkeeping succeeding, so text is still queued as if
 // the gate weren't there.
-func (s *chatEventSink) send(text, notifyKind, source, ticketIdentifier string) {
+func (s *chatEventSink) send(text chatmarkup.Text, notifyKind, source, ticketIdentifier string) {
 	result, err := s.gate(notifyKind, source, false)
 	if err != nil {
 		logger.Debug("%s: notification gate: %v\n", s.transport.name(), err)
@@ -401,11 +404,11 @@ func (s *chatEventSink) send(text, notifyKind, source, ticketIdentifier string) 
 		s.enqueue(text, notifyKind)
 	case PerSourceMuted:
 		if result.EdgeTriggered {
-			s.enqueue(s.style.mutedText(s.epicName, ticketIdentifier).String(), notifyKindMuted)
+			s.enqueue(s.style.mutedText(s.epicName, ticketIdentifier), notifyKindMuted)
 		}
 	case GloballyMuted:
 		if result.EdgeTriggered {
-			s.enqueue(s.style.globallyMutedText(s.transport.name()).String(), notifyKindGloballyMuted)
+			s.enqueue(s.style.globallyMutedText(s.transport.name()), notifyKindGloballyMuted)
 		}
 	}
 }
@@ -415,8 +418,8 @@ func (s *chatEventSink) send(text, notifyKind, source, ticketIdentifier string) 
 // a slow or unreachable endpoint never blocks the caller, retrying once and
 // logging the final outcome to run-log.jsonl tagged with notifyKind (the
 // live event that triggered it).
-func (s *chatEventSink) sendRaw(text, notifyKind string) {
-	sendNotification(s.scratchDir, s.epicName, s.transport.name(), notifyKind, text, s.transport.timeout(), func(ctx context.Context) error {
+func (s *chatEventSink) sendRaw(text chatmarkup.Text, notifyKind string) {
+	sendNotification(s.scratchDir, s.epicName, s.transport.name(), notifyKind, text.String(), s.transport.timeout(), func(ctx context.Context) error {
 		return s.transport.sendSync(ctx, text)
 	}, func(reason string) {
 		s.EventSink.NotificationFailed(s.transport.name(), reason)
@@ -428,15 +431,15 @@ func (s *chatEventSink) sendRaw(text, notifyKind string) {
 // send, since a fire-and-forget goroutine (sendRaw) could still be in
 // flight, or never scheduled, by the time the process exits right after
 // Close returns.
-func (s *chatEventSink) sendSync(text, notifyKind string) {
+func (s *chatEventSink) sendSync(text chatmarkup.Text, notifyKind string) {
 	ctx, cancel := context.WithTimeout(context.Background(), s.transport.timeout())
 	defer cancel()
 	if err := s.transport.sendSync(ctx, text); err != nil {
 		err = sanitizeSendError(err)
 		logger.Debug("%s: %v\n", s.transport.name(), err)
-		logNotificationFailed(s.scratchDir, s.epicName, s.transport.name(), notifyKind, err.Error(), text)
+		logNotificationFailed(s.scratchDir, s.epicName, s.transport.name(), notifyKind, err.Error(), text.String())
 		s.EventSink.NotificationFailed(s.transport.name(), err.Error())
 		return
 	}
-	logNotificationSent(s.scratchDir, s.epicName, s.transport.name(), notifyKind, text)
+	logNotificationSent(s.scratchDir, s.epicName, s.transport.name(), notifyKind, text.String())
 }
