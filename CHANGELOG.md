@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.28.7 - 2026-08-14
+
+- Restyled sidebar section headers (e.g. Closed epics) to match the tree row shape, and removed the done-icon from the Closed epics header
+
 ## v0.28.6 - 2026-08-14
 
 - Made chat notification sending resilient: sealed markdown AST validation, per-send status reporting, automatic requeueing of failed sends, plain-text fallback on markdown parse errors, Slack 429 retry handling, and Telegram retry_after support. Send failures now surface in the TUI.
