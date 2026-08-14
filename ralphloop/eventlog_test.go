@@ -223,18 +223,18 @@ func TestLogNotificationsConfigured_RecordsBooleansForBothChannels(t *testing.T)
 func TestLogNotificationSentAndFailed_RecordChannelAndTriggeringKind(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	logNotificationSent(dir, "epic", "telegram", notifyKindEpicComplete)
-	logNotificationFailed(dir, "epic", "slack", notifyKindIterationPaused, "post failed: 500")
+	logNotificationSent(dir, "epic", "telegram", notifyKindEpicComplete, "epic complete!")
+	logNotificationFailed(dir, "epic", "slack", notifyKindIterationPaused, "post failed: 500", "iteration paused")
 
 	events, ok, err := readEvents(dir, "epic")
 	if err != nil || !ok || len(events) != 2 {
 		t.Fatalf("readEvents: events=%#v ok=%v err=%v", events, ok, err)
 	}
 	sent, failed := events[0], events[1]
-	if sent.Type != eventNotificationSent || sent.Channel != "telegram" || sent.NotifyKind != notifyKindEpicComplete {
+	if sent.Type != eventNotificationSent || sent.Channel != "telegram" || sent.NotifyKind != notifyKindEpicComplete || sent.Body != "epic complete!" {
 		t.Errorf("sent event = %#v", sent)
 	}
-	if failed.Type != eventNotificationFailed || failed.Channel != "slack" || failed.NotifyKind != notifyKindIterationPaused || failed.Reason != "post failed: 500" {
+	if failed.Type != eventNotificationFailed || failed.Channel != "slack" || failed.NotifyKind != notifyKindIterationPaused || failed.Reason != "post failed: 500" || failed.Body != "iteration paused" {
 		t.Errorf("failed event = %#v", failed)
 	}
 }
@@ -251,7 +251,7 @@ func TestSendNotification_FailsOnceThenSucceeds_LogsOneSentAndNoFailed(t *testin
 	}
 
 	var onFailedCalls atomic.Int32
-	sendNotification(dir, "epic", "slack", notifyKindEpicComplete, time.Second, sendSync, func(string) { onFailedCalls.Add(1) })
+	sendNotification(dir, "epic", "slack", notifyKindEpicComplete, "epic complete!", time.Second, sendSync, func(string) { onFailedCalls.Add(1) })
 
 	var events []Event
 	deadline := time.Now().Add(4 * time.Second)
@@ -262,8 +262,8 @@ func TestSendNotification_FailsOnceThenSucceeds_LogsOneSentAndNoFailed(t *testin
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if len(events) != 1 || events[0].Type != eventNotificationSent {
-		t.Fatalf("run-log events = %#v, want exactly one notification-sent", events)
+	if len(events) != 1 || events[0].Type != eventNotificationSent || events[0].Body != "epic complete!" {
+		t.Fatalf("run-log events = %#v, want exactly one notification-sent with body", events)
 	}
 	if got := attempts.Load(); got != 2 {
 		t.Errorf("attempts = %d, want 2", got)
@@ -284,7 +284,7 @@ func TestSendNotification_FailsEveryAttempt_LogsOneFailedAndCallsOnFailed(t *tes
 
 	var onFailedReason string
 	var onFailedCalls atomic.Int32
-	sendNotification(dir, "epic", "slack", notifyKindEpicComplete, time.Second, sendSync, func(reason string) {
+	sendNotification(dir, "epic", "slack", notifyKindEpicComplete, "epic complete!", time.Second, sendSync, func(reason string) {
 		onFailedReason = reason
 		onFailedCalls.Add(1)
 	})
@@ -298,8 +298,8 @@ func TestSendNotification_FailsEveryAttempt_LogsOneFailedAndCallsOnFailed(t *tes
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if len(events) != 1 || events[0].Type != eventNotificationFailed {
-		t.Fatalf("run-log events = %#v, want exactly one notification-failed", events)
+	if len(events) != 1 || events[0].Type != eventNotificationFailed || events[0].Body != "epic complete!" {
+		t.Fatalf("run-log events = %#v, want exactly one notification-failed with body", events)
 	}
 	if got := attempts.Load(); got != 2 {
 		t.Errorf("attempts = %d, want 2", got)

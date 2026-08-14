@@ -416,7 +416,7 @@ func (s *chatEventSink) send(text, notifyKind, source, ticketIdentifier string) 
 // logging the final outcome to run-log.jsonl tagged with notifyKind (the
 // live event that triggered it).
 func (s *chatEventSink) sendRaw(text, notifyKind string) {
-	sendNotification(s.scratchDir, s.epicName, s.transport.name(), notifyKind, s.transport.timeout(), func(ctx context.Context) error {
+	sendNotification(s.scratchDir, s.epicName, s.transport.name(), notifyKind, text, s.transport.timeout(), func(ctx context.Context) error {
 		return s.transport.sendSync(ctx, text)
 	}, func(reason string) {
 		s.EventSink.NotificationFailed(s.transport.name(), reason)
@@ -434,9 +434,9 @@ func (s *chatEventSink) sendSync(text, notifyKind string) {
 	if err := s.transport.sendSync(ctx, text); err != nil {
 		err = sanitizeSendError(err)
 		logger.Debug("%s: %v\n", s.transport.name(), err)
-		logNotificationFailed(s.scratchDir, s.epicName, s.transport.name(), notifyKind, err.Error())
+		logNotificationFailed(s.scratchDir, s.epicName, s.transport.name(), notifyKind, err.Error(), text)
 		s.EventSink.NotificationFailed(s.transport.name(), err.Error())
 		return
 	}
-	logNotificationSent(s.scratchDir, s.epicName, s.transport.name(), notifyKind)
+	logNotificationSent(s.scratchDir, s.epicName, s.transport.name(), notifyKind, text)
 }

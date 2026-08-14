@@ -167,6 +167,10 @@ type Event struct {
 	// NotifyKind (notification-sent/notification-failed only) is the live
 	// event that triggered the send attempt — see notifyKind* consts.
 	NotifyKind string `json:"notify_kind,omitempty"`
+	// Body (notification-sent/notification-failed only) is the message text
+	// that was sent (or attempted), so counter/content bugs are diagnosable
+	// from run-log.jsonl alone without reproducing the send.
+	Body string `json:"body,omitempty"`
 }
 
 // eventLogMu serializes appends across every goroutine in the process (each
@@ -235,15 +239,15 @@ func LogNotificationsConfigured(scratchDir, epicName string, telegram, slack boo
 // channel and the live event that triggered it. Errors are
 // swallowed like every other logEvent call site here — a failure to log
 // shouldn't compound the failure it was trying to record.
-func logNotificationSent(scratchDir, epicName, channel, notifyKind string) {
+func logNotificationSent(scratchDir, epicName, channel, notifyKind, body string) {
 	_ = logEvent(scratchDir, epicName, Event{
-		Type: eventNotificationSent, Channel: channel, NotifyKind: notifyKind,
+		Type: eventNotificationSent, Channel: channel, NotifyKind: notifyKind, Body: body,
 	})
 }
 
-func logNotificationFailed(scratchDir, epicName, channel, notifyKind, reason string) {
+func logNotificationFailed(scratchDir, epicName, channel, notifyKind, reason, body string) {
 	_ = logEvent(scratchDir, epicName, Event{
-		Type: eventNotificationFailed, Channel: channel, NotifyKind: notifyKind, Reason: reason,
+		Type: eventNotificationFailed, Channel: channel, NotifyKind: notifyKind, Reason: reason, Body: body,
 	})
 }
 
@@ -282,7 +286,7 @@ const notificationRetryBackoff = 1500 * time.Millisecond
 // LiveEventNotificationFailed on its embedded EventSink, for a TUI toast;
 // epicFailureReporter's own call passes nil, since by the time it sends the
 // run's sink has already closed and drained (see EventSink.EpicFailed).
-func sendNotification(scratchDir, epicName, channel, notifyKind string, timeout time.Duration, sendSync func(ctx context.Context) error, onFailed func(reason string)) {
+func sendNotification(scratchDir, epicName, channel, notifyKind, body string, timeout time.Duration, sendSync func(ctx context.Context) error, onFailed func(reason string)) {
 	go func() {
 		attempt := func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -299,13 +303,13 @@ func sendNotification(scratchDir, epicName, channel, notifyKind string, timeout 
 		if err != nil {
 			err = sanitizeSendError(err)
 			logger.Debug("%s: %v\n", channel, err)
-			logNotificationFailed(scratchDir, epicName, channel, notifyKind, err.Error())
+			logNotificationFailed(scratchDir, epicName, channel, notifyKind, err.Error(), body)
 			if onFailed != nil {
 				onFailed(err.Error())
 			}
 			return
 		}
-		logNotificationSent(scratchDir, epicName, channel, notifyKind)
+		logNotificationSent(scratchDir, epicName, channel, notifyKind, body)
 	}()
 }
 
