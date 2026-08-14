@@ -12,6 +12,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
@@ -137,6 +138,12 @@ type Model struct {
 	// ticket identity so concurrent epics cannot collide.
 	live            map[string]map[string]liveTicketState
 	labelIdentifier map[string]map[string]string
+
+	// reattachPending is every "recoverable session detected" notification
+	// currently open (see handleReattachSignals), rechecked by
+	// cmdReattachRescan/handleReattachRescan on each OnPageActivated so it
+	// clears once the session it points at is no longer live.
+	reattachPending []ralphloop.ReattachSignal
 }
 
 // NewModel creates a new tickets tab model scoped to worktreeRoot's own
@@ -307,6 +314,8 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleImplementSpinnerTick(msg)
 	case reattachSignalsMsg:
 		return m.handleReattachSignals(msg)
+	case reattachRescanMsg:
+		return m.handleReattachRescan(msg)
 	case statusChangedMsg:
 		return m.handleStatusChanged()
 	}

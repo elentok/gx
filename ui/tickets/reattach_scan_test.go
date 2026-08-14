@@ -151,25 +151,22 @@ func batchContainsQueueSwitch(cmd tea.Cmd) bool {
 	return ok && vs.Tab == nav.TabQueue
 }
 
-// TestHandleReattachSignals_NotificationSelfClears verifies the notification
-// opened for a signaled ticket is a self-expiring (ttl) notification, not a
-// KindProgress one requiring an explicit Close — so it clears on its own once
-// the scan that found it completes, without needing a loopRegistry run to
-// exist to emit the closing live event (loop_registry.go's reduceLiveEvent
-// bails when r.snapshots[epicName] is nil, which is exactly the
-// fresh-process state this covers; see notify/model.go's handleNotifyMsg,
-// which only sets expiresAt — and so only self-clears — for non-KindProgress
-// notifications).
-func TestHandleReattachSignals_NotificationSelfClears(t *testing.T) {
+// TestHandleReattachSignals_NotificationPersistsUntilRescanClears verifies
+// (ticket 12) that the "recoverable session detected" notification stays up
+// across multiple rescans that still find the session live, and only clears
+// once a rescan no longer reports it — not merely that its Kind differs from
+// KindProgress (that was ticket 04's over-corrected fix: a fixed 5s TTL that
+// could expire before anyone looked at the screen).
+func TestHandleReattachSignals_NotificationPersistsUntilRescanClears(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "epic", "01-first.md", "Status: claimed\n\nBody.\n")
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
 
-	_, cmd := m.handleReattachSignals(reattachSignalsMsg{signals: []ralphloop.ReattachSignal{
-		{EpicName: "epic", Ticket: m.epics[0].Tickets[0]},
-	}})
+	signal := ralphloop.ReattachSignal{EpicName: "epic", Ticket: m.epics[0].Tickets[0]}
+	updated, cmd := m.handleReattachSignals(reattachSignalsMsg{signals: []ralphloop.ReattachSignal{signal}})
+	m = updated.(Model)
 	if cmd == nil {
 		t.Fatal("handleReattachSignals: want a notify cmd when a signal is found")
 	}
@@ -179,8 +176,59 @@ func TestHandleReattachSignals_NotificationSelfClears(t *testing.T) {
 	if !ok {
 		t.Fatalf("handleReattachSignals: want a NotifyMsg for %q among returned cmds", id)
 	}
-	if n.Kind == notify.KindProgress {
-		t.Fatalf("handleReattachSignals: notification for %q is KindProgress, want a self-expiring kind so it doesn't require an explicit Close to clear", id)
+	if n.Kind != notify.KindProgress {
+		t.Fatalf("handleReattachSignals: notification for %q kind = %v, want KindProgress (explicit-close, no fixed TTL)", id, n.Kind)
+	}
+
+	// A rescan that still finds the session live must not close it — across
+	// several ticks/renders, not just once.
+	for i := range 3 {
+		updated, rescanCmd := m.handleReattachRescan(reattachRescanMsg{signals: []ralphloop.ReattachSignal{signal}})
+		m = updated.(Model)
+		if findCloseMsg(rescanCmd, id) {
+			t.Fatalf("handleReattachRescan (still live, iteration %d): notification %q closed, want it to remain", i, id)
+		}
+	}
+	if len(m.reattachPending) != 1 {
+		t.Fatalf("reattachPending = %d entries, want 1 while still live", len(m.reattachPending))
+	}
+
+	// A rescan that no longer finds the session clears it.
+	updated, rescanCmd := m.handleReattachRescan(reattachRescanMsg{})
+	m = updated.(Model)
+	if rescanCmd == nil {
+		t.Fatal("handleReattachRescan: want a close cmd once the session is no longer found")
+	}
+	if !findCloseMsg(rescanCmd, id) {
+		t.Fatalf("handleReattachRescan: want a CloseMsg for %q once the scan no longer finds it", id)
+	}
+	if len(m.reattachPending) != 0 {
+		t.Fatalf("reattachPending = %d entries, want 0 after the clearing scan", len(m.reattachPending))
+	}
+}
+
+// TestCmdReattachRescan_NoPending_NoOp verifies cmdReattachRescan skips the
+// scan entirely (nil cmd) when nothing is currently pending, so
+// OnPageActivated doesn't shell out to herdr on every tab focus once
+// notifications have already cleared.
+func TestCmdReattachRescan_NoPending_NoOp(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+
+	calls := 0
+	withFakeReattachHerdr(t, func(label string) (string, error) {
+		calls++
+		return "ws1", nil
+	}, func(workspaceID string) ([]herdr.Tab, error) {
+		return nil, nil
+	})
+
+	if cmd := m.cmdReattachRescan(); cmd != nil {
+		t.Fatal("cmdReattachRescan: want nil cmd when reattachPending is empty")
+	}
+	if calls != 0 {
+		t.Fatalf("findWorkspace calls = %d, want 0 (no pending notifications to rescan)", calls)
 	}
 }
 

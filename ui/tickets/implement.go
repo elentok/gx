@@ -408,12 +408,15 @@ func (m Model) handleImplementSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.C
 // every running epic's live state deterministically — including a completion
 // it missed, or an epic it never even saw start — without opening an event
 // reader of its own or depending on messages that arrived while another tab
-// was active.
+// was active. It also fires cmdReattachScan (once-per-process detection) and
+// cmdReattachRescan (repeatable clearing, see reattach_scan.go) so a
+// still-open "recoverable session detected" notification gets rechecked
+// every time the tab regains focus.
 func (m Model) OnPageActivated() tea.Cmd {
 	syncCmd := func() tea.Msg {
 		return implementSyncMsg{runningEpics: ralphLoopRegistry.runningEpicNames()}
 	}
-	return tea.Batch(syncCmd, m.cmdReattachScan())
+	return tea.Batch(syncCmd, m.cmdReattachScan(), m.cmdReattachRescan())
 }
 
 // cmdStartImplement launches the producer while the registry owns the sole
