@@ -88,7 +88,7 @@ func (r *EpicFailureReporter) EpicFailed(epicName string, err error) {
 		return
 	}
 	counts := loadEpicCounts(r.scratchDir, epicName)
-	source := "epic:" + epicName
+	source := epicSource(epicName)
 	for _, target := range r.targets {
 		result, gateErr := r.gate(target.transport.name(), source)
 		if gateErr != nil {

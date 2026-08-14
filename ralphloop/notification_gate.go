@@ -152,7 +152,7 @@ func applyGate(state *NotificationState, transport, eventType, source string, no
 // isTicketlessSource reports whether source is one of the sentinel values
 // used when there's no ticket to write a mute onto ("cli", "epic:<name>").
 func isTicketlessSource(source string) bool {
-	return source == "cli" || strings.HasPrefix(source, "epic:")
+	return source == "cli" || strings.HasPrefix(source, epicSourcePrefix)
 }
 
 // ticketAlreadyMuted reports whether source's ticket already carries a

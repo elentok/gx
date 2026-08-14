@@ -432,11 +432,16 @@ func distinctKinds(items []batchedMessage) []string {
 	return kinds
 }
 
+// epicSourcePrefix is the ticket-less NotificationGate source sentinel for
+// epic-level events (no single ticket to attribute or mute it to) — shared
+// by epicSource, EpicFailureReporter, and isTicketlessSource so the format
+// can't desync across call sites.
+const epicSourcePrefix = "epic:"
+
 // epicSource is the ticket-less NotificationGate source for an epic-level
-// event (no single ticket to attribute or mute it to) — mirrors
-// EpicFailureReporter's "epic:<name>" sentinel (see isTicketlessSource).
+// event (no single ticket to attribute or mute it to).
 func epicSource(epicName string) string {
-	return "epic:" + epicName
+	return epicSourcePrefix + epicName
 }
 
 // resolveTicketPath finds identifier's ticket file under
