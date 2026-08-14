@@ -119,6 +119,67 @@ func TestQueueModel_ForkInsertsChildrenAfterOriginalPosition(t *testing.T) {
 	}
 }
 
+func TestQueueModel_NewTicketInFullyCheckedEpicAutoQueued(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeFrontmatterTicket(t, root, "alpha", "01-x.md", "01", "claimed", "")
+	writeFrontmatterTicket(t, root, "alpha", "02-y.md", "02", "open", "")
+
+	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
+	xPath := ticketPath(root, "alpha", "01-x.md")
+	yPath := ticketPath(root, "alpha", "02-y.md")
+	for _, path := range []string{xPath, yPath} {
+		if err := store.Check(path); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	m := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, keys.Manager{}, store))
+
+	// A new, unrelated ticket (no `parent` edge) appears in the same epic —
+	// e.g. added by hand or another tool, not a mid-run fork.
+	writeFrontmatterTicket(t, root, "alpha", "03-z.md", "03", "open", "")
+
+	_, cmd := m.Update(autoRefreshMsg{})
+	m = deliverAutoRefreshReload(t, m, cmd)
+
+	zPath := ticketPath(root, "alpha", "03-z.md")
+	if !m.queueStore.IsChecked(zPath) {
+		t.Errorf("expected new sibling ticket auto-queued since its epic was already fully checked")
+	}
+
+	order := identifiersInOrder(t, m)
+	if got := strings.Join(order, ","); got != "01,02,03" {
+		t.Fatalf("expected new sibling ticket to appear in the tree (01,02,03), got %s", got)
+	}
+}
+
+func TestQueueModel_NewTicketInPartiallyCheckedEpicNotAutoQueued(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeFrontmatterTicket(t, root, "alpha", "01-x.md", "01", "claimed", "")
+	writeFrontmatterTicket(t, root, "alpha", "02-y.md", "02", "open", "")
+
+	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
+	xPath := ticketPath(root, "alpha", "01-x.md")
+	if err := store.Check(xPath); err != nil {
+		t.Fatal(err)
+	}
+	// 02-y.md is deliberately left unchecked: the epic isn't fully queued.
+
+	m := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, keys.Manager{}, store))
+
+	writeFrontmatterTicket(t, root, "alpha", "03-z.md", "03", "open", "")
+
+	_, cmd := m.Update(autoRefreshMsg{})
+	m = deliverAutoRefreshReload(t, m, cmd)
+
+	zPath := ticketPath(root, "alpha", "03-z.md")
+	if m.queueStore.IsChecked(zPath) {
+		t.Errorf("expected new sibling ticket left unqueued since its epic wasn't fully checked")
+	}
+}
+
 func identifiersInOrder(t *testing.T, m QueueModel) []string {
 	t.Helper()
 	var out []string

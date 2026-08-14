@@ -214,6 +214,9 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if err := autoQueueForkedChildren(m.epics, msg.epics, m.queueStore); err != nil {
 			return m, notify.Error("save queue: " + err.Error())
 		}
+		if err := autoQueueNewEpicSiblings(m.epics, msg.epics, m.queueStore); err != nil {
+			return m, notify.Error("save queue: " + err.Error())
+		}
 		if m.queueStore != nil {
 			snapshot := m.queueStore.Snapshot()
 			m.checked = snapshot.Checked
