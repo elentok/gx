@@ -113,10 +113,10 @@ func (m Model) drainMenuView() string {
 	)
 }
 
-// drainReplaceConfirmedMsg carries the "D" confirmation acceptance:
-// worktreeRoot/epicName/agent are captured at confirm-open time (mirroring
-// replaceQueueConfirmedMsg) since the drain and eventual replace+launch must
-// run against the live Model, not the value m.confirm.Open closed over.
+// drainReplaceConfirmedMsg carries the drain-choice menu's accepted
+// selection: worktreeRoot/epicName/agent are captured when the menu is
+// opened/accepted (mirroring implementAgentMenu) and threaded through so the
+// drain and eventual replace+launch run against the live Model.
 type drainReplaceConfirmedMsg struct {
 	worktreeRoot string
 	epicName     string
