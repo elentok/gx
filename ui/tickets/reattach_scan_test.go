@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/notify"
 )
 
 // withFakeReattachHerdr swaps reattachFindWorkspace/reattachTabList for the
@@ -148,6 +149,61 @@ func batchContainsQueueSwitch(cmd tea.Cmd) bool {
 	}
 	vs, ok := nav.IsSwitch(msg)
 	return ok && vs.Tab == nav.TabQueue
+}
+
+// TestHandleReattachSignals_NotificationSelfClears verifies the notification
+// opened for a signaled ticket is a self-expiring (ttl) notification, not a
+// KindProgress one requiring an explicit Close — so it clears on its own once
+// the scan that found it completes, without needing a loopRegistry run to
+// exist to emit the closing live event (loop_registry.go's reduceLiveEvent
+// bails when r.snapshots[epicName] is nil, which is exactly the
+// fresh-process state this covers; see notify/model.go's handleNotifyMsg,
+// which only sets expiresAt — and so only self-clears — for non-KindProgress
+// notifications).
+func TestHandleReattachSignals_NotificationSelfClears(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTicket(t, root, "epic", "01-first.md", "Status: claimed\n\nBody.\n")
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+
+	_, cmd := m.handleReattachSignals(reattachSignalsMsg{signals: []ralphloop.ReattachSignal{
+		{EpicName: "epic", Ticket: m.epics[0].Tickets[0]},
+	}})
+	if cmd == nil {
+		t.Fatal("handleReattachSignals: want a notify cmd when a signal is found")
+	}
+
+	id := reattachNotifyID("epic", m.epics[0].Tickets[0].Identifier)
+	n, ok := findNotifyMsg(cmd, id)
+	if !ok {
+		t.Fatalf("handleReattachSignals: want a NotifyMsg for %q among returned cmds", id)
+	}
+	if n.Kind == notify.KindProgress {
+		t.Fatalf("handleReattachSignals: notification for %q is KindProgress, want a self-expiring kind so it doesn't require an explicit Close to clear", id)
+	}
+}
+
+// findNotifyMsg recursively unwraps a (possibly batched) tea.Cmd looking for
+// a notify.NotifyMsg with the given id.
+func findNotifyMsg(cmd tea.Cmd, id string) (notify.NotifyMsg, bool) {
+	if cmd == nil {
+		return notify.NotifyMsg{}, false
+	}
+	msg := cmd()
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		for _, c := range batch {
+			if n, ok := findNotifyMsg(c, id); ok {
+				return n, true
+			}
+		}
+		return notify.NotifyMsg{}, false
+	}
+	n, ok := msg.(notify.NotifyMsg)
+	if ok && n.ID == id {
+		return n, true
+	}
+	return notify.NotifyMsg{}, false
 }
 
 func TestHandleReattachSignals_NoSignals_NoOp(t *testing.T) {

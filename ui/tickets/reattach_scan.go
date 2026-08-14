@@ -64,11 +64,18 @@ func (m Model) cmdReattachScan() tea.Cmd {
 }
 
 // handleReattachSignals surfaces each detect-only ReattachSignal as a
-// persistent progress-style (spinner) notification, keyed so a ticket
-// already signaled doesn't duplicate. This is detect-only: no ticket state is
-// touched and nothing is auto-resumed or auto-navigated to, matching
-// ScanForReattachable's own contract — resuming happens only via the Queue
-// tab's Detached+Live confirmation (queue_reattach.go).
+// self-expiring (ttl, see notify/model.go) notification, keyed so a ticket
+// already signaled doesn't duplicate. It's deliberately not a KindProgress
+// (spinner) notification requiring an explicit Close: that tied clearing to
+// loopRegistry.reduceLiveEvent, which never fires for an epic with no active
+// run (e.g. right after a fresh-process rescan), leaving the notification
+// stuck forever. The ttl clears it on its own regardless of whether a run
+// ever starts; reduceLiveEvent's Close (still keyed the same way, see
+// reattachNotifyID) just clears it early when a run is active. This is
+// detect-only: no ticket state is touched and nothing is auto-resumed or
+// auto-navigated to, matching ScanForReattachable's own contract — resuming
+// happens only via the Queue tab's Detached+Live confirmation
+// (queue_reattach.go).
 func (m Model) handleReattachSignals(msg reattachSignalsMsg) (tea.Model, tea.Cmd) {
 	if len(msg.signals) == 0 {
 		return m, nil
@@ -76,18 +83,19 @@ func (m Model) handleReattachSignals(msg reattachSignalsMsg) (tea.Model, tea.Cmd
 	cmds := make([]tea.Cmd, 0, len(msg.signals))
 	for _, s := range msg.signals {
 		id := reattachNotifyID(s.EpicName, s.Ticket.Identifier)
-		cmds = append(cmds, notify.Progress(id, fmt.Sprintf(
-			"epic %q ticket %s: recoverable session detected", s.EpicName, s.Ticket.Identifier,
-		)))
+		message := fmt.Sprintf("epic %q ticket %s: recoverable session detected", s.EpicName, s.Ticket.Identifier)
+		cmds = append(cmds, func() tea.Msg {
+			return notify.NotifyMsg{ID: id, Kind: notify.KindInfo, Message: message}
+		})
 	}
 	return m, tea.Batch(cmds...)
 }
 
-// reattachNotifyID is the notify.Progress/notify.Close id for a signaled
-// ticket's "recoverable session detected" notification — shared by
+// reattachNotifyID is the notification id for a signaled ticket's
+// "recoverable session detected" notification — shared by
 // handleReattachSignals (which opens it) and loopRegistry.reduceLiveEvent
-// (which closes it once that ticket's session is actually reattached or
-// resumed), so the two ends can never drift out of sync.
+// (which closes it early once that ticket's session is actually reattached
+// or resumed), so the two ends can never drift out of sync.
 func reattachNotifyID(epicName, identifier string) string {
 	return "reattach-scan-" + epicName + "-" + identifier
 }
