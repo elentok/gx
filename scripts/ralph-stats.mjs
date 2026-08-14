@@ -6,12 +6,14 @@
 //
 // Usage: node scripts/ralph-stats.mjs [scratchDir...] [--since=YYYY-MM-DD] [--until=YYYY-MM-DD] [--daily]
 // Accepts any number of scratch dirs (one per project) and aggregates across
-// all of them. Defaults to .bare/.scratch relative to the gx bare repo.
+// all of them. Defaults to the current gx checkout's scratch root (`gx
+// tickets root`), so this works from any checkout/worktree.
 // --since/--until filter events by local calendar day (inclusive).
 // --daily breaks the two metrics down per calendar day; with no --since it
 // defaults to the past 7 days (today and the 6 days before it).
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 
 const rawArgs = process.argv.slice(2);
@@ -24,9 +26,16 @@ for (const arg of rawArgs) {
   else scratchDirArgs.push(arg);
 }
 
-const scratchDirs = scratchDirArgs.length > 0
-  ? scratchDirArgs
-  : [join(process.env.HOME, "dev/gx/.bare/.scratch")];
+function resolveScratchRoot() {
+  try {
+    return execFileSync("gx", ["tickets", "root"], { encoding: "utf8" }).trim();
+  } catch (err) {
+    console.error(`failed to resolve scratch root via 'gx tickets root': ${err.message}`);
+    process.exit(1);
+  }
+}
+
+const scratchDirs = scratchDirArgs.length > 0 ? scratchDirArgs : [resolveScratchRoot()];
 
 // local YYYY-MM-DD, matching how a person reads "today"/"this week" on this machine
 function dayKey(isoTime) {
