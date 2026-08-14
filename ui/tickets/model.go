@@ -134,6 +134,17 @@ type Model struct {
 	// row's rendered status each time "m" opens it.
 	actionsMenu actionsMenuModel
 
+	// drainMenuOpen/drainMenu back the "D" drain-choice menu (see
+	// drain_replace.go): drainMenuEpic/drainMenuAgent are captured at
+	// open-time, mirroring drainReplaceConfirmedMsg's own capture-at-open-time
+	// rationale, since the eventual drain (and possible replace+launch) must
+	// run against whichever epic/agent were live when the menu opened, not
+	// whatever the cursor points at by the time a choice is made.
+	drainMenuOpen  bool
+	drainMenu      components.MenuState
+	drainMenuEpic  string
+	drainMenuAgent ralphloop.AgentKind
+
 	// Live state is projected from registry snapshots and scoped by epic before
 	// ticket identity so concurrent epics cannot collide.
 	live            map[string]map[string]liveTicketState
@@ -200,7 +211,7 @@ func (m Model) InputFocused() bool {
 // shell (see ui/app's modalOpener duck-type) blocks tab-switch keys and
 // routes them here instead while it's up.
 func (m Model) ModalOpen() bool {
-	return m.help.IsOpen || m.implementAgentMenuOpen || m.statusMenuOpen || m.actionsMenu.IsOpen || m.confirm.IsOpen
+	return m.help.IsOpen || m.implementAgentMenuOpen || m.statusMenuOpen || m.actionsMenu.IsOpen || m.drainMenuOpen || m.confirm.IsOpen
 }
 
 func (m Model) Init() tea.Cmd {
@@ -283,13 +294,16 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.actionsMenu.IsOpen {
 			return m.handleActionsMenuKey(msg)
 		}
+		if m.drainMenuOpen {
+			return m.handleDrainMenuKey(msg)
+		}
 		if m.confirm.IsOpen {
 			return m.handleConfirmUpdate(msg)
 		}
 		return m.handleKey(msg)
 
 	case tea.MouseClickMsg:
-		if m.implementAgentMenuOpen || m.statusMenuOpen || m.actionsMenu.IsOpen {
+		if m.implementAgentMenuOpen || m.statusMenuOpen || m.actionsMenu.IsOpen || m.drainMenuOpen {
 			return m, nil
 		}
 		if m.confirm.IsOpen {
@@ -439,6 +453,8 @@ func (m Model) View() tea.View {
 		content = ui.OverlayCenter(content, m.statusMenuView(), m.width, m.height)
 	} else if m.actionsMenu.IsOpen {
 		content = ui.OverlayCenter(content, m.actionsMenu.View(), m.width, m.height)
+	} else if m.drainMenuOpen {
+		content = ui.OverlayCenter(content, m.drainMenuView(), m.width, m.height)
 	} else if m.confirm.IsOpen {
 		content = ui.OverlayCenter(content, m.confirm.View(m.width), m.width, m.height)
 	}

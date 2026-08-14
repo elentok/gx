@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
@@ -36,9 +38,10 @@ func TestModel_DrainReplaceKeyBlockedWhenCursorEpicNotRunning(t *testing.T) {
 	}
 }
 
-// TestModel_DrainReplaceKeyBlockedWhenNothingChecked covers 02a's "D" guard:
-// a live epic with nothing checked has no execution plan to replace with.
-func TestModel_DrainReplaceKeyBlockedWhenNothingChecked(t *testing.T) {
+// TestModel_DrainReplaceKeyOpensMenuWithOnlyDrainOnlyWhenNothingChecked
+// covers the drain-choice menu's omission rule: a live epic with nothing
+// checked opens the menu, but "Drain and replace..." isn't in it at all.
+func TestModel_DrainReplaceKeyOpensMenuWithOnlyDrainOnlyWhenNothingChecked(t *testing.T) {
 	epic := tickets.Epic{Name: "alpha", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Path: "/alpha/01.md", Status: "open"},
 	}}
@@ -55,23 +58,25 @@ func TestModel_DrainReplaceKeyBlockedWhenNothingChecked(t *testing.T) {
 
 	updated, cmd := m.handleDrainReplaceKey()
 	m = updated.(Model)
-	if cmd == nil {
-		t.Fatal("expected a notify command, got nil")
+	if cmd != nil {
+		t.Fatalf("expected no cmd when opening the menu, got %#v", cmd)
 	}
-	msg := cmd()
-	notifyMsg, ok := msg.(notify.NotifyMsg)
-	if !ok || !strings.Contains(notifyMsg.Message, "check at least one ticket") {
-		t.Fatalf("cmd() = %#v, want a \"check at least one ticket\" notification", msg)
+	if !m.drainMenuOpen {
+		t.Fatal("expected the drain menu to open")
+	}
+	if len(m.drainMenu.Items) != 1 || m.drainMenu.Items[0].Value != drainMenuValueDrainOnly {
+		t.Fatalf("menu items = %#v, want only \"Drain only\"", m.drainMenu.Items)
 	}
 	if m.confirm.IsOpen {
-		t.Fatal("expected no confirmation with nothing checked")
+		t.Fatal("expected no confirmation prompt; the menu replaces it")
 	}
 }
 
-// TestModel_DrainReplaceKeyOpensConfirmationNamingEpic covers 02a's "D"
-// happy path: a live epic with a checked selection opens the confirmation,
-// naming the epic, without touching the registry or the queue yet.
-func TestModel_DrainReplaceKeyOpensConfirmationNamingEpic(t *testing.T) {
+// TestModel_DrainReplaceKeyOpensMenuNamingEpicWithBothItemsWhenChecked
+// covers the drain-choice menu's happy path: a live epic with a checked
+// selection opens the menu naming the epic in its header, offering both
+// items, without touching the registry or the queue yet.
+func TestModel_DrainReplaceKeyOpensMenuNamingEpicWithBothItemsWhenChecked(t *testing.T) {
 	epic := tickets.Epic{Name: "alpha", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Path: "/alpha/01.md", Status: "open"},
 	}}
@@ -90,13 +95,78 @@ func TestModel_DrainReplaceKeyOpensConfirmationNamingEpic(t *testing.T) {
 	updated, cmd := m.handleDrainReplaceKey()
 	m = updated.(Model)
 	if cmd != nil {
-		t.Fatal("expected no cmd until the confirmation is accepted")
+		t.Fatalf("expected no cmd when opening the menu, got %#v", cmd)
 	}
-	if !m.confirm.IsOpen {
-		t.Fatal("expected the confirmation modal to open")
+	if !m.drainMenuOpen {
+		t.Fatal("expected the drain menu to open")
 	}
-	if !strings.Contains(m.confirm.View(80), `"alpha"`) {
-		t.Fatalf("confirm view = %q, want it to name the epic", m.confirm.View(80))
+	if len(m.drainMenu.Items) != 2 {
+		t.Fatalf("menu items = %#v, want both \"Drain only\" and \"Drain and replace...\"", m.drainMenu.Items)
+	}
+	if !strings.Contains(m.drainMenuView(), `"alpha"`) {
+		t.Fatalf("drain menu view = %q, want it to name the epic", m.drainMenuView())
+	}
+}
+
+// TestModel_DrainMenuEscCancelsWithoutDraining covers esc/q's cancel
+// behavior on the open menu: nothing is drained, nothing about the queue
+// changes.
+func TestModel_DrainMenuEscCancelsWithoutDraining(t *testing.T) {
+	r := newLoopRegistry(1)
+	r.tryStart("alpha", 0, 1)
+	previous := ralphLoopRegistry
+	ralphLoopRegistry = r
+	t.Cleanup(func() {
+		r.finish("alpha", nil)
+		ralphLoopRegistry = previous
+	})
+
+	m := Model{drainMenuOpen: true, drainMenuEpic: "alpha", drainMenu: newDrainMenu(true)}
+
+	updated, cmd := m.handleDrainMenuKey(tea.KeyPressMsg{Code: 'q', Text: "q"})
+	m = updated.(Model)
+	if cmd != nil {
+		t.Fatalf("expected no cmd from cancelling, got %#v", cmd)
+	}
+	if m.drainMenuOpen {
+		t.Fatal("expected the drain menu to close")
+	}
+	gate := r.gateFor("alpha")
+	if gate.IsDraining() {
+		t.Fatal("expected cancelling the menu not to drain anything")
+	}
+}
+
+// TestModel_DrainMenuSelectDrainOnlyDrainsWithoutReplacing covers the
+// "Drain only" item: it drains the epic's Gate and does nothing else —
+// no queue replace, no launch.
+func TestModel_DrainMenuSelectDrainOnlyDrainsWithoutReplacing(t *testing.T) {
+	r := newLoopRegistry(1)
+	r.tryStart("alpha", 0, 1)
+	previous := ralphLoopRegistry
+	ralphLoopRegistry = r
+	t.Cleanup(func() {
+		r.finish("alpha", nil)
+		ralphLoopRegistry = previous
+	})
+
+	m := Model{drainMenuOpen: true, drainMenuEpic: "alpha", drainMenu: newDrainMenu(true)}
+
+	updated, cmd := m.handleDrainMenuKey(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	if m.drainMenuOpen {
+		t.Fatal("expected the drain menu to close")
+	}
+	if cmd == nil {
+		t.Fatal("expected a drain cmd")
+	}
+	msg := cmd()
+	if _, ok := msg.(notify.NotifyMsg); !ok {
+		t.Fatalf("cmd() = %#v, want a notify message", msg)
+	}
+	gate := r.gateFor("alpha")
+	if !gate.IsDraining() {
+		t.Fatal("expected \"Drain only\" to drain alpha's gate")
 	}
 }
 
@@ -201,10 +271,13 @@ func TestModel_DrainReplacePollFlowLaunchesReplacementWithCapturedAgent(t *testi
 	updated, cmd := m.handleDrainReplaceKey()
 	m = updated.(Model)
 	if cmd != nil {
-		t.Fatal("expected no cmd until the confirmation is accepted")
+		t.Fatal("expected no cmd until a menu item is chosen")
 	}
-	if !m.confirm.IsOpen {
-		t.Fatal("expected confirmation modal to open")
+	if !m.drainMenuOpen {
+		t.Fatal("expected the drain menu to open")
+	}
+	if len(m.drainMenu.Items) != 2 || m.drainMenu.Items[1].Value != drainMenuValueReplace {
+		t.Fatalf("menu items = %#v, want \"Drain and replace...\" as the second item", m.drainMenu.Items)
 	}
 
 	agent, ok := ralphLoopRegistry.agentFor("alpha")
@@ -212,7 +285,16 @@ func TestModel_DrainReplacePollFlowLaunchesReplacementWithCapturedAgent(t *testi
 		t.Fatal("expected alpha's driving agent still captured while it's live")
 	}
 
-	confirmedMsg := cmdConfirmDrainReplace(m.worktreeRoot, "alpha", agent)().(drainReplaceConfirmedMsg)
+	m.drainMenu.Cursor = 1
+	updated, cmd = m.handleDrainMenuKey(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	if m.drainMenuOpen {
+		t.Fatal("expected the drain menu to close")
+	}
+	if cmd == nil {
+		t.Fatal("expected the drain-replace cmd to be armed")
+	}
+	confirmedMsg := cmd().(drainReplaceConfirmedMsg)
 	updated, cmd = m.handleDrainReplaceConfirmed(confirmedMsg)
 	m = updated.(Model)
 	if cmd == nil {

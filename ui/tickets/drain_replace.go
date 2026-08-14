@@ -7,16 +7,25 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/ui/confirm"
+	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/notify"
 )
 
-// handleDrainReplaceKey applies the "D" ("drain & replace queue") combo: the
-// epic under the cursor must have a live run — draining a queue with nothing
-// live to drain is what "r" (handleReplaceQueueKey) already does — and the
-// agent is captured now, while the run is still confirmed live, since
-// agentFor stops returning ok=true the moment the run actually finishes (see
-// epicRun.agent's doc comment in loop_registry.go).
+const (
+	drainMenuValueDrainOnly = "drain-only"
+	drainMenuValueReplace   = "replace"
+)
+
+// handleDrainReplaceKey applies the "D" ("drain") combo: the epic under the
+// cursor must have a live run — draining a queue with nothing live to drain
+// is what "r" (handleReplaceQueueKey) already does — and the agent is
+// captured now, while the run is still confirmed live, since agentFor stops
+// returning ok=true the moment the run actually finishes (see epicRun.agent's
+// doc comment in loop_registry.go). It opens a menu rather than draining
+// outright, since "drain only" and "drain and replace the queue" are both
+// reachable from here and the menu's header explains what draining does
+// before either is chosen.
 func (m Model) handleDrainReplaceKey() (tea.Model, tea.Cmd) {
 	r, ok := m.selectedRow()
 	if !ok {
@@ -26,18 +35,82 @@ func (m Model) handleDrainReplaceKey() (tea.Model, tea.Cmd) {
 	if !ralphLoopRegistry.isRunningEpic(epic.Name) {
 		return m, notify.Info(fmt.Sprintf("epic %q isn't running", epic.Name))
 	}
-	if len(m.checked) == 0 {
-		return m, notify.Info("check at least one ticket to build an execution plan")
-	}
 	agent, ok := ralphLoopRegistry.agentFor(epic.Name)
 	if !ok {
 		return m, notify.Info(fmt.Sprintf("epic %q isn't running", epic.Name))
 	}
-	m.confirm = m.confirm.Open(confirm.Options{
-		Prompt:    fmt.Sprintf("Drain epic %q, then replace the queue with the checked selection?", epic.Name),
-		AcceptCmd: cmdConfirmDrainReplace(m.worktreeRoot, epic.Name, agent),
-	})
+	m.drainMenuEpic = epic.Name
+	m.drainMenuAgent = agent
+	m.drainMenu = newDrainMenu(len(m.checked) > 0)
+	m.drainMenuOpen = true
 	return m, nil
+}
+
+// newDrainMenu builds the "D" menu's items: "Drain and replace..." is
+// omitted entirely (not merely disabled) when nothing is checked, so the
+// menu itself explains why it's missing.
+func newDrainMenu(offerReplace bool) components.MenuState {
+	items := []components.MenuItem{
+		{Label: "Drain only", Value: drainMenuValueDrainOnly},
+	}
+	if offerReplace {
+		items = append(items, components.MenuItem{
+			Label: "Drain and replace queue with checked selection",
+			Value: drainMenuValueReplace,
+		})
+	}
+	return components.MenuState{Items: items}
+}
+
+// handleDrainMenuKey drives the open drain menu: esc/q cancels without
+// draining anything, and enter commits whichever item is under the cursor —
+// "drain only" just drains, "drain and replace..." reuses the existing
+// drain-then-replace flow unchanged (cmdConfirmDrainReplace/
+// handleDrainReplaceConfirmed/handleDrainReplacePoll/launchDrainedReplace).
+func (m Model) handleDrainMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	next, decided, accepted, handled := components.UpdateMenu(msg, m.drainMenu)
+	if !handled {
+		return m, nil
+	}
+	m.drainMenu = next
+	if !decided {
+		return m, nil
+	}
+	m.drainMenuOpen = false
+	if !accepted {
+		return m, nil
+	}
+	if m.drainMenu.Items[m.drainMenu.Cursor].Value == drainMenuValueReplace {
+		return m, cmdConfirmDrainReplace(m.worktreeRoot, m.drainMenuEpic, m.drainMenuAgent)
+	}
+	return m, cmdDrainOnly(m.drainMenuEpic)
+}
+
+// cmdDrainOnly drains epicName's Gate with no follow-up queue replace or
+// launch — the "Drain only" menu item.
+func cmdDrainOnly(epicName string) tea.Cmd {
+	return func() tea.Msg {
+		ralphLoopRegistry.drain(epicName)
+		return notify.Info(fmt.Sprintf("epic %q draining", epicName))()
+	}
+}
+
+func (m Model) drainMenuView() string {
+	prompt := fmt.Sprintf(
+		"Draining %q stops admitting new claims, lets the current run finish naturally instead of killing it.",
+		m.drainMenuEpic,
+	)
+	return components.RenderMenuModal(
+		"Drain Epic",
+		prompt,
+		m.drainMenu,
+		"",
+		ui.ColorBorder,
+		ui.ColorBlue,
+		ui.ColorSubtle,
+		ui.ColorText,
+		56,
+	)
 }
 
 // drainReplaceConfirmedMsg carries the "D" confirmation acceptance:
