@@ -276,8 +276,13 @@ const notificationRetryBackoff = 1500 * time.Millisecond
 // notification, not one per attempt. Any failure is logged via gx's logger
 // and otherwise swallowed, but the final outcome is also durably recorded to
 // run-log.jsonl via logNotificationSent/logNotificationFailed, tagged with
-// channel and notifyKind (the live event that triggered it).
-func sendNotification(scratchDir, epicName, channel, notifyKind string, timeout time.Duration, sendSync func(ctx context.Context) error) {
+// channel and notifyKind (the live event that triggered it). onFailed, if
+// non-nil, is called with the sanitized error after both attempts fail —
+// chatEventSink.sendRaw uses it to also surface the failure as a
+// LiveEventNotificationFailed on its embedded EventSink, for a TUI toast;
+// epicFailureReporter's own call passes nil, since by the time it sends the
+// run's sink has already closed and drained (see EventSink.EpicFailed).
+func sendNotification(scratchDir, epicName, channel, notifyKind string, timeout time.Duration, sendSync func(ctx context.Context) error, onFailed func(reason string)) {
 	go func() {
 		attempt := func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -295,6 +300,9 @@ func sendNotification(scratchDir, epicName, channel, notifyKind string, timeout 
 			err = sanitizeSendError(err)
 			logger.Debug("%s: %v\n", channel, err)
 			logNotificationFailed(scratchDir, epicName, channel, notifyKind, err.Error())
+			if onFailed != nil {
+				onFailed(err.Error())
+			}
 			return
 		}
 		logNotificationSent(scratchDir, epicName, channel, notifyKind)

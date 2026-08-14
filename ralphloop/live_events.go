@@ -30,6 +30,7 @@ const (
 	LiveEventSmartZoneFinishingUp
 	LiveEventSmartZoneRecovered
 	LiveEventContextOccupancy
+	LiveEventNotificationFailed
 )
 
 // LiveEvent captures one EventSink call for asynchronous delivery over a
@@ -70,6 +71,9 @@ type LiveEvent struct {
 	// Stalled (EpicParked only) names the human-clearable tickets the parked
 	// run is waiting on.
 	Stalled []StalledTicket
+	// Channel (NotificationFailed only) is which chat transport the failed
+	// send used ("telegram"/"slack"); Reason carries the sanitized error.
+	Channel string
 }
 
 // ChannelEventSink implements EventSink by forwarding every call as a
@@ -197,4 +201,8 @@ func (s *ChannelEventSink) SmartZoneRecovered(identifier string) {
 
 func (s *ChannelEventSink) ContextOccupancy(identifier string, tokens int) {
 	s.emit(LiveEvent{Kind: LiveEventContextOccupancy, Identifier: identifier, Tokens: tokens})
+}
+
+func (s *ChannelEventSink) NotificationFailed(channel, reason string) {
+	s.emit(LiveEvent{Kind: LiveEventNotificationFailed, Channel: channel, Reason: reason})
 }

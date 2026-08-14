@@ -49,6 +49,11 @@ var chatMembershipVerdicts = map[string]bool{
 	"TicketRecovering":          false,
 	"TicketRecovered":           false,
 	"TicketUnrecoverable":       false,
+	// NotificationFailed is TUI-only by construction, not by omission: it
+	// only ever fires from chatEventSink calling it on its own embedded
+	// EventSink when a chat send itself just failed, so treating it as a
+	// chat member would risk looping a broken send back through chat.
+	"NotificationFailed": false,
 }
 
 // missingVerdicts reports every method on iface that verdicts has no entry

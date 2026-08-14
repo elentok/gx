@@ -250,7 +250,8 @@ func TestSendNotification_FailsOnceThenSucceeds_LogsOneSentAndNoFailed(t *testin
 		return nil
 	}
 
-	sendNotification(dir, "epic", "slack", notifyKindEpicComplete, time.Second, sendSync)
+	var onFailedCalls atomic.Int32
+	sendNotification(dir, "epic", "slack", notifyKindEpicComplete, time.Second, sendSync, func(string) { onFailedCalls.Add(1) })
 
 	var events []Event
 	deadline := time.Now().Add(4 * time.Second)
@@ -267,9 +268,12 @@ func TestSendNotification_FailsOnceThenSucceeds_LogsOneSentAndNoFailed(t *testin
 	if got := attempts.Load(); got != 2 {
 		t.Errorf("attempts = %d, want 2", got)
 	}
+	if got := onFailedCalls.Load(); got != 0 {
+		t.Errorf("onFailed calls = %d, want 0 (send eventually succeeded)", got)
+	}
 }
 
-func TestSendNotification_FailsEveryAttempt_LogsOneFailed(t *testing.T) {
+func TestSendNotification_FailsEveryAttempt_LogsOneFailedAndCallsOnFailed(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	var attempts atomic.Int32
@@ -278,7 +282,12 @@ func TestSendNotification_FailsEveryAttempt_LogsOneFailed(t *testing.T) {
 		return errors.New("permanent failure")
 	}
 
-	sendNotification(dir, "epic", "slack", notifyKindEpicComplete, time.Second, sendSync)
+	var onFailedReason string
+	var onFailedCalls atomic.Int32
+	sendNotification(dir, "epic", "slack", notifyKindEpicComplete, time.Second, sendSync, func(reason string) {
+		onFailedReason = reason
+		onFailedCalls.Add(1)
+	})
 
 	var events []Event
 	deadline := time.Now().Add(4 * time.Second)
@@ -294,5 +303,11 @@ func TestSendNotification_FailsEveryAttempt_LogsOneFailed(t *testing.T) {
 	}
 	if got := attempts.Load(); got != 2 {
 		t.Errorf("attempts = %d, want 2", got)
+	}
+	if got := onFailedCalls.Load(); got != 1 {
+		t.Errorf("onFailed calls = %d, want exactly 1", got)
+	}
+	if onFailedReason != "permanent failure" {
+		t.Errorf("onFailed reason = %q, want %q", onFailedReason, "permanent failure")
 	}
 }

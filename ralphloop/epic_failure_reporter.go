@@ -102,6 +102,6 @@ func (r *EpicFailureReporter) EpicFailed(epicName string, err error) {
 		text := target.style.epicFailedText(epicName, counts, err.Error())
 		sendNotification(r.scratchDir, epicName, target.transport.name(), notifyKindEpicFailed, target.transport.timeout(), func(ctx context.Context) error {
 			return target.transport.sendSync(ctx, text)
-		})
+		}, nil)
 	}
 }

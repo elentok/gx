@@ -115,6 +115,9 @@ func (s *recordingSink) EpicComplete(epicName string, completed int, elapsedSeco
 func (s *recordingSink) EpicFailed(epicName string, err error) {
 	s.record("EpicFailed")
 }
+func (s *recordingSink) NotificationFailed(channel, reason string) {
+	s.record("NotificationFailed")
+}
 func (s *recordingSink) CherryPickStarted(identifier string) { s.record("CherryPickStarted") }
 func (s *recordingSink) ConflictResolutionStarted(identifier string) {
 	s.record("ConflictResolutionStarted")

@@ -413,6 +413,11 @@ func (r *loopRegistry) reduceLiveEvent(epicName string, event ralphloop.LiveEven
 	case ralphloop.LiveEventEpicParked:
 		run.state = RunStateParked
 		run.parkedStalled = event.Stalled
+	case ralphloop.LiveEventNotificationFailed:
+		run.pendingToasts = append(run.pendingToasts, notify.NotifyMsg{
+			Kind:    notify.KindWarning,
+			Message: fmt.Sprintf("%s notification failed: %s", event.Channel, event.Reason),
+		})
 	case ralphloop.LiveEventEpicComplete:
 		// Done/Total were already synced to the epic's true state by the last
 		// LiveEventIterationFinished (or seeded correctly at tryStart if the

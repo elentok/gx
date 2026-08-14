@@ -193,6 +193,16 @@ type EventSink interface {
 	// eventsink_contract_test.go can record its chat membership, not
 	// because any EventSink implementation dispatches it.
 	EpicFailed(epicName string, err error)
+
+	// NotificationFailed reports that a chat notification send to channel
+	// ("telegram"/"slack") ultimately failed (after chatEventSink's own
+	// retry) — reason is the sanitized error text also written to
+	// run-log.jsonl's notification-failed entry. TUI-only, never itself
+	// re-dispatched to chat (that would risk looping a broken send back
+	// through the very transport that just failed): only chatEventSink
+	// calls this, on its own embedded EventSink, when its own send fails —
+	// never something ralphloop's scheduling logic reports.
+	NotificationFailed(channel, reason string)
 }
 
 // noopEventSink implements EventSink with every method a no-op, used
@@ -224,3 +234,4 @@ func (noopEventSink) TicketUnrecoverable(identifier, epicName string)           
 func (noopEventSink) EpicParked(epicName string, stalled []StalledTicket)             {}
 func (noopEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {}
 func (noopEventSink) EpicFailed(epicName string, err error)                           {}
+func (noopEventSink) NotificationFailed(channel, reason string)                       {}

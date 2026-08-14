@@ -136,3 +136,5 @@ func (s *recordingEventSink) EpicComplete(epicName string, completed int, elapse
 // registry calls it, this sink has already been closed and drained (see
 // EventSink's doc comment on EpicFailed).
 func (s *recordingEventSink) EpicFailed(epicName string, err error) {}
+
+func (s *recordingEventSink) NotificationFailed(channel, reason string) {}

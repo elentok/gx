@@ -319,7 +319,8 @@ func TestTelegramEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	server, _ := fakeTelegramServer(t, http.StatusInternalServerError)
-	sink := newTelegramEventSink(&recordingSink{}, "tok", "chat-1", server.URL, dir, "epic")
+	inner := &recordingSink{}
+	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, dir, "epic")
 	defer sink.Close()
 	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
@@ -339,6 +340,14 @@ func TestTelegramEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 	}
 	if len(events) != 1 || events[0].Type != eventNotificationFailed || events[0].Channel != "telegram" || events[0].Reason == "" {
 		t.Fatalf("run-log events = %#v, want one notification-failed/telegram with a non-empty reason", events)
+	}
+
+	// The failed send must also reach the embedded EventSink as a
+	// NotificationFailed call, not just run-log.jsonl — that's what lets a
+	// live TUI turn a Telegram 400 into an in-app toast (see
+	// ui/tickets/loop_registry.go's LiveEventNotificationFailed case).
+	if calls := inner.snapshot(); len(calls) != 2 || calls[0] != "EpicComplete" || calls[1] != "NotificationFailed" {
+		t.Errorf("inner events = %v, want [EpicComplete NotificationFailed]", calls)
 	}
 }
 

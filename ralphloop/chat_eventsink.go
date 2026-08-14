@@ -418,6 +418,8 @@ func (s *chatEventSink) send(text, notifyKind, source, ticketIdentifier string) 
 func (s *chatEventSink) sendRaw(text, notifyKind string) {
 	sendNotification(s.scratchDir, s.epicName, s.transport.name(), notifyKind, s.transport.timeout(), func(ctx context.Context) error {
 		return s.transport.sendSync(ctx, text)
+	}, func(reason string) {
+		s.EventSink.NotificationFailed(s.transport.name(), reason)
 	})
 }
 
@@ -433,6 +435,7 @@ func (s *chatEventSink) sendSync(text, notifyKind string) {
 		err = sanitizeSendError(err)
 		logger.Debug("%s: %v\n", s.transport.name(), err)
 		logNotificationFailed(s.scratchDir, s.epicName, s.transport.name(), notifyKind, err.Error())
+		s.EventSink.NotificationFailed(s.transport.name(), err.Error())
 		return
 	}
 	logNotificationSent(s.scratchDir, s.epicName, s.transport.name(), notifyKind)
