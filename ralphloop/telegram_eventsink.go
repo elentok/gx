@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/elentok/gx/chatmarkup"
@@ -52,19 +53,70 @@ type telegramErrorResponse struct {
 	Description string `json:"description"`
 }
 
+// telegramMarkdownParseFailureMarker is the substring Telegram's Bot API
+// puts in a 400 response's description specifically when parse_mode
+// rejected the text (e.g. "Bad Request: can't parse entities: character '-'
+// is reserved..."), as opposed to an unrelated 400 cause like an invalid
+// chat_id ("Bad Request: chat not found") — sendSync's plain-text fallback
+// must trigger only on this specific cause, never on every 400.
+const telegramMarkdownParseFailureMarker = "can't parse entities"
+
+func isMarkdownV2ParseFailure(description string) bool {
+	return strings.Contains(strings.ToLower(description), telegramMarkdownParseFailureMarker)
+}
+
 // sendSync POSTs text to the Telegram Bot API's sendMessage endpoint and
 // waits for the response, returning any failure (marshal error, network
 // error, non-2xx response) instead of swallowing it, alongside a sendResult
 // carrying the status code and — on a non-2xx response whose body parses as
 // JSON with a description field — that field's value. text is expected to
-// already be MarkdownV2-escaped (see notification_text.go); parse_mode tells
-// Telegram to render its "*bold*" markers instead of showing them literally.
+// already be MarkdownV2-escaped (see notification_text.go).
+//
+// If the first attempt 400s specifically because parse_mode rejected text
+// (isMarkdownV2ParseFailure), this is a last-resort safety net on top of
+// chatmarkup's compiler-enforced escaping (an edge case the escaper missed,
+// or a future regression in that package): sendSync retries once more with
+// parse_mode omitted, converting text back to unmarked plain text via
+// chatmarkup.Telegram.Plain first. telegramTransport is Telegram-specific by
+// construction, so it reaches for the package-level chatmarkup.Telegram
+// style directly rather than taking one in from the caller. Plain() reading
+// an already-sealed Text back out to a plain string is a sanctioned way to
+// read the value (same as .String()) — Text's sealing controls
+// *construction*, not reads — not a boundary violation despite handing the
+// API a bare string instead of a Text. A successful fallback send reports
+// Degraded: true so callers can log/surface it as a downgrade rather than an
+// ordinary send.
 func (t *telegramTransport) sendSync(ctx context.Context, text chatmarkup.Text) (sendResult, error) {
-	payload, err := json.Marshal(map[string]string{
-		"chat_id":    t.chatID,
-		"text":       text.String(),
-		"parse_mode": "MarkdownV2",
-	})
+	result, err := t.post(ctx, text.String(), "MarkdownV2")
+	if err == nil {
+		return result, nil
+	}
+	if !isMarkdownV2ParseFailure(result.Description) {
+		return result, err
+	}
+
+	fallback, fallbackErr := t.post(ctx, chatmarkup.Telegram.Plain(text), "")
+	if fallbackErr != nil {
+		return fallback, fallbackErr
+	}
+	fallback.Degraded = true
+	fallback.Description = result.Description
+	return fallback, nil
+}
+
+// post is the single POST-and-decode call sendSync makes for each attempt
+// (the original MarkdownV2 send, and the plain-text fallback). parseMode
+// empty omits the field entirely rather than sending it as "" — Telegram
+// treats a present-but-empty parse_mode as if it were still MarkdownV2.
+func (t *telegramTransport) post(ctx context.Context, text, parseMode string) (sendResult, error) {
+	body := map[string]string{
+		"chat_id": t.chatID,
+		"text":    text,
+	}
+	if parseMode != "" {
+		body["parse_mode"] = parseMode
+	}
+	payload, err := json.Marshal(body)
 	if err != nil {
 		return sendResult{}, fmt.Errorf("marshal message: %w", err)
 	}
@@ -83,9 +135,9 @@ func (t *telegramTransport) sendSync(ctx context.Context, text chatmarkup.Text) 
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		var body telegramErrorResponse
-		_ = json.NewDecoder(resp.Body).Decode(&body)
-		return sendResult{StatusCode: resp.StatusCode, Description: body.Description},
+		var errBody telegramErrorResponse
+		_ = json.NewDecoder(resp.Body).Decode(&errBody)
+		return sendResult{StatusCode: resp.StatusCode, Description: errBody.Description},
 			fmt.Errorf("send failed with status %d", resp.StatusCode)
 	}
 	return sendResult{StatusCode: resp.StatusCode}, nil

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -65,6 +66,13 @@ const (
 	eventNotificationsConfigured = "notifications-configured"
 	eventNotificationSent        = "notification-sent"
 	eventNotificationFailed      = "notification-failed"
+	// eventNotificationDegraded marks a send that only succeeded via
+	// telegramTransport.sendSync's plain-text fallback (a MarkdownV2 parse
+	// rejection on the first attempt) — deliberately distinct from
+	// eventNotificationSent so a formatting downgrade, which signals the
+	// chatmarkup escaper has a hole worth investigating, doesn't blend into
+	// the ordinary-send count.
+	eventNotificationDegraded = "notification-degraded"
 	// eventNotificationSuppressed marks a close-time batch flush (see
 	// chatEventSink.closeFlush) that was dropped rather than sent because the
 	// transport was already globally muted — the one case a queued batch
@@ -251,6 +259,23 @@ func logNotificationFailed(scratchDir, epicName, channel, notifyKind, reason, bo
 	})
 }
 
+// logNotificationDegraded records a send that only succeeded via
+// telegramTransport.sendSync's plain-text fallback — see
+// eventNotificationDegraded.
+func logNotificationDegraded(scratchDir, epicName, channel, notifyKind, body string) {
+	_ = logEvent(scratchDir, epicName, Event{
+		Type: eventNotificationDegraded, Channel: channel, NotifyKind: notifyKind, Body: body,
+	})
+}
+
+// degradedReason formats a degraded sendResult's original-failure
+// description as an EventSink.NotificationFailed reason, for the TUI toast
+// pipeline — reused rather than adding a dedicated EventSink method just for
+// this label (see chatEventSink.sendSync/sendRaw's call sites).
+func degradedReason(description string) string {
+	return fmt.Sprintf("degraded to plain text: %s", description)
+}
+
 // logNotificationSuppressed records a close-time batch flush (see
 // chatEventSink.closeFlush) that was dropped rather than sent because the
 // transport was already globally muted — reason names the queued event
@@ -285,10 +310,16 @@ const notificationRetryBackoff = 1500 * time.Millisecond
 // chatEventSink.sendRaw uses it to also surface the failure as a
 // LiveEventNotificationFailed on its embedded EventSink, for a TUI toast;
 // epicFailureReporter's own call passes nil, since by the time it sends the
-// run's sink has already closed and drained (see EventSink.EpicFailed).
+// run's sink has already closed and drained (see EventSink.EpicFailed). A
+// send that succeeds only via telegramTransport.sendSync's plain-text
+// fallback (result.Degraded) is logged via logNotificationDegraded instead
+// of logNotificationSent, and also routed through onFailed (with
+// degradedReason's wording) so the downgrade still reaches the TUI toast —
+// the message was delivered, so this is a deliberate reuse of the "failed"
+// reporting channel for a "succeeded, but degraded" outcome, not a bug.
 func sendNotification(scratchDir, epicName, channel, notifyKind, body string, timeout time.Duration, sendSync func(ctx context.Context) (sendResult, error), onFailed func(reason string)) {
 	go func() {
-		_, err := sendWithRetry(timeout, sendSync)
+		result, err := sendWithRetry(timeout, sendSync)
 
 		if err != nil {
 			err = sanitizeSendError(err)
@@ -296,6 +327,13 @@ func sendNotification(scratchDir, epicName, channel, notifyKind, body string, ti
 			logNotificationFailed(scratchDir, epicName, channel, notifyKind, err.Error(), body)
 			if onFailed != nil {
 				onFailed(err.Error())
+			}
+			return
+		}
+		if result.Degraded {
+			logNotificationDegraded(scratchDir, epicName, channel, notifyKind, body)
+			if onFailed != nil {
+				onFailed(degradedReason(result.Description))
 			}
 			return
 		}

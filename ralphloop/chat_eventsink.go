@@ -38,9 +38,11 @@ type chatTransport interface {
 // happened (e.g. a MarkdownV2-parse rejection vs. an invalid chat_id).
 // Slack's webhook response body doesn't carry a comparable field, so
 // slackTransport.sendSync leaves Description empty. Degraded marks a send
-// that succeeded only via telegramTransport.sendSync's plain-text fallback
-// (a follow-up ticket) — false for every transport until that fallback
-// exists to set it.
+// that succeeded only via telegramTransport.sendSync's plain-text fallback —
+// always false for slackTransport, which has no such fallback. On a
+// degraded success, Description carries the original MarkdownV2-rejection
+// description (rather than being left empty, as it is on any other success)
+// so callers can report why the downgrade happened.
 type sendResult struct {
 	StatusCode  int
 	Description string
@@ -449,11 +451,22 @@ func (s *chatEventSink) sendRaw(text chatmarkup.Text, notifyKind string) {
 func (s *chatEventSink) sendSync(text chatmarkup.Text, notifyKind string) {
 	ctx, cancel := context.WithTimeout(context.Background(), s.transport.timeout())
 	defer cancel()
-	if _, err := s.transport.sendSync(ctx, text); err != nil {
+	result, err := s.transport.sendSync(ctx, text)
+	if err != nil {
 		err = sanitizeSendError(err)
 		logger.Debug("%s: %v\n", s.transport.name(), err)
 		logNotificationFailed(s.scratchDir, s.epicName, s.transport.name(), notifyKind, err.Error(), text.String())
 		s.EventSink.NotificationFailed(s.transport.name(), err.Error())
+		return
+	}
+	if result.Degraded {
+		logNotificationDegraded(s.scratchDir, s.epicName, s.transport.name(), notifyKind, text.String())
+		// The message was delivered — this isn't a failure — but reusing
+		// NotificationFailed (rather than adding a dedicated EventSink method
+		// just for this label) is the only route telegramTransport's caller
+		// has to a TUI toast; degradedReason's wording keeps that
+		// deliberate stretch legible to whoever reads the toast.
+		s.EventSink.NotificationFailed(s.transport.name(), degradedReason(result.Description))
 		return
 	}
 	logNotificationSent(s.scratchDir, s.epicName, s.transport.name(), notifyKind, text.String())

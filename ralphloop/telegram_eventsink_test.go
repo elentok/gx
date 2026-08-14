@@ -338,6 +338,144 @@ func TestSendTelegramMessage_ReturnsErrorOnFailingServer(t *testing.T) {
 	}
 }
 
+// fakeTelegramMarkdownRejectingServer 400s with a MarkdownV2-parse
+// description whenever parse_mode is set, and 200s once it's omitted —
+// standing in for a real MarkdownV2 parse rejection that a plain-text retry
+// resolves.
+func fakeTelegramMarkdownRejectingServer(t *testing.T) (*httptest.Server, func() []telegramRequest) {
+	t.Helper()
+	var mu sync.Mutex
+	var requests []telegramRequest
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req telegramRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("failed to decode request body: %v", err)
+		}
+		mu.Lock()
+		requests = append(requests, req)
+		mu.Unlock()
+		if req.ParseMode != "" {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"ok":false,"error_code":400,"description":"Bad Request: can't parse entities: character '-' is reserved"}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	return server, func() []telegramRequest {
+		mu.Lock()
+		defer mu.Unlock()
+		out := make([]telegramRequest, len(requests))
+		copy(out, requests)
+		return out
+	}
+}
+
+// TestTelegramTransport_SendSync_MarkdownParseRejection_RetriesPlainAndSucceeds
+// pins ticket 05's safety net: a 400 whose description names a MarkdownV2
+// parse failure triggers exactly one plain-text (no parse_mode) retry, which
+// succeeds and reports Degraded.
+func TestTelegramTransport_SendSync_MarkdownParseRejection_RetriesPlainAndSucceeds(t *testing.T) {
+	t.Parallel()
+	server, getRequests := fakeTelegramMarkdownRejectingServer(t)
+
+	transport := newTelegramTransport("tok", "chat-1", server.URL)
+	text := telegramStyle.chatStyle.Escape("hello - world")
+	result, err := transport.sendSync(t.Context(), text)
+	if err != nil {
+		t.Fatalf("sendSync: %v", err)
+	}
+	if !result.Degraded {
+		t.Errorf("result.Degraded = false, want true")
+	}
+	if result.StatusCode != http.StatusOK {
+		t.Errorf("result.StatusCode = %d, want %d", result.StatusCode, http.StatusOK)
+	}
+
+	reqs := getRequests()
+	if len(reqs) != 2 {
+		t.Fatalf("requests = %v, want exactly 2 (markdown attempt + plain fallback)", reqs)
+	}
+	if reqs[0].ParseMode != "MarkdownV2" {
+		t.Errorf("first request parse_mode = %q, want MarkdownV2", reqs[0].ParseMode)
+	}
+	if reqs[1].ParseMode != "" {
+		t.Errorf("fallback request parse_mode = %q, want empty", reqs[1].ParseMode)
+	}
+	if reqs[1].Text != "hello - world" {
+		t.Errorf("fallback request text = %q, want unescaped plain text", reqs[1].Text)
+	}
+}
+
+// TestTelegramTransport_SendSync_UnrelatedBadRequest_NoFallback pins the
+// negative case: a 400 for a reason other than a MarkdownV2 parse failure
+// (e.g. an invalid chat_id) must not trigger the plain-text fallback.
+func TestTelegramTransport_SendSync_UnrelatedBadRequest_NoFallback(t *testing.T) {
+	t.Parallel()
+	var requestCount int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"ok":false,"error_code":400,"description":"Bad Request: chat not found"}`))
+	}))
+	t.Cleanup(server.Close)
+
+	transport := newTelegramTransport("tok", "chat-1", server.URL)
+	result, err := transport.sendSync(t.Context(), telegramStyle.testMessageText())
+	if err == nil {
+		t.Fatal("sendSync: want error, got nil")
+	}
+	if result.Degraded {
+		t.Errorf("result.Degraded = true, want false")
+	}
+	if requestCount != 1 {
+		t.Errorf("requestCount = %d, want exactly 1 (no fallback attempt)", requestCount)
+	}
+}
+
+// TestTelegramEventSink_MarkdownParseRejection_LogsDegradedAndTogglesToast
+// covers the ticket-05 end-to-end path: a successful fallback send logs a
+// distinct notification-degraded run-log line (not notification-sent) and
+// still reaches NotificationFailed for the TUI toast pipeline.
+func TestTelegramEventSink_MarkdownParseRejection_LogsDegradedAndTogglesToast(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	server, _ := fakeTelegramMarkdownRejectingServer(t)
+	inner := &recordingSink{}
+	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, dir, "epic")
+	defer sink.Close()
+	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
+
+	sink.EpicComplete("epic", 1, 0)
+	sink.flush()
+
+	var events []Event
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		events, _, _ = readEvents(dir, "epic")
+		if len(events) > 0 {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if len(events) != 1 || events[0].Type != eventNotificationDegraded || events[0].Channel != "telegram" {
+		t.Fatalf("run-log events = %#v, want one notification-degraded/telegram", events)
+	}
+
+	deadline = time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if calls := inner.snapshot(); len(calls) == 2 {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if calls := inner.snapshot(); len(calls) != 2 || calls[0] != "EpicComplete" || calls[1] != "NotificationFailed" {
+		t.Errorf("inner events = %v, want [EpicComplete NotificationFailed]", calls)
+	}
+}
+
 func TestTelegramEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
