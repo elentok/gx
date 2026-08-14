@@ -234,7 +234,7 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 	searchDim := m.search.HasQuery() && !matched
 
 	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
-	if t.Commitless {
+	if t.ShowsCommitlessSuffix() {
 		title += " (commitless)"
 	}
 	titleStyle := lipgloss.NewStyle()

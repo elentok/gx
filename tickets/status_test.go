@@ -34,6 +34,28 @@ func TestEpic_RenderedStatus_BaseStates(t *testing.T) {
 	}
 }
 
+func TestTicket_ShowsCommitlessSuffix(t *testing.T) {
+	cases := []struct {
+		name       string
+		ticketType string
+		commitless bool
+		want       bool
+	}{
+		{"task, commitless", "task", true, true},
+		{"task, not commitless", "task", false, false},
+		{"research, commitless", "research", true, false},
+		{"code-review, commitless", "code-review", true, false},
+	}
+
+	for _, c := range cases {
+		ticket := Ticket{Type: c.ticketType, Commitless: c.commitless}
+		got := ticket.ShowsCommitlessSuffix()
+		if got != c.want {
+			t.Errorf("ShowsCommitlessSuffix(Type: %q, Commitless: %v) = %v, want %v", c.ticketType, c.commitless, got, c.want)
+		}
+	}
+}
+
 func TestEpic_RenderedStatus_ReadErrIsError(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{{Number: 1, Status: "open", ReadErr: "permission denied"}}}
 	got := epic.RenderedStatus(epic.Tickets[0])

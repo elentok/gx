@@ -182,7 +182,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 	doneDim := status == tickets.StatusDone
 
 	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
-	if t.Commitless {
+	if t.ShowsCommitlessSuffix() {
 		title += " (commitless)"
 	}
 	titleStyle := lipgloss.NewStyle()

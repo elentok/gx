@@ -60,14 +60,26 @@ var draftStatuses = map[string]bool{
 	"draft": true,
 }
 
-// typeCodeReview mirrors schema.TypeCodeReview's on-disk value. tickets.Ticket
-// carries Type as a plain string (it predates the schema package), so the
-// comparison is against the literal rather than the typed constant.
-const typeCodeReview = "code-review"
+// typeCodeReview and typeResearch mirror schema.TypeCodeReview's and
+// schema.TypeResearch's on-disk values. tickets.Ticket carries Type as a
+// plain string (it predates the schema package), so the comparison is
+// against the literal rather than the typed constant.
+const (
+	typeCodeReview = "code-review"
+	typeResearch   = "research"
+)
 
 // IsCodeReview reports whether t's Type is code-review.
 func (t Ticket) IsCodeReview() bool {
 	return t.Type == typeCodeReview
+}
+
+// ShowsCommitlessSuffix reports whether t's UI row should append
+// " (commitless)". research and code-review tickets are commitless by
+// design (schema.Ticket.IsCommitless), so the suffix would be noise there;
+// it's only informative for types where a missing commit is unexpected.
+func (t Ticket) ShowsCommitlessSuffix() bool {
+	return t.Commitless && t.Type != typeCodeReview && t.Type != typeResearch
 }
 
 // baseStatus classifies t's raw Status: value alone, before the Blocked by:
