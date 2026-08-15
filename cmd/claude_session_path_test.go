@@ -59,14 +59,18 @@ func TestRunClaudeSessionPath_MultipleMatchesPrintsAllAndErrors(t *testing.T) {
 	p2 := writeSessionFixture(t, home, "-Users-david-dev-proj2", "dup-id", []string{`{"type":"user"}`})
 
 	out := &strings.Builder{}
-	d := deps{stdout: out, userHomeDir: func() (string, error) { return home, nil }}
+	errOut := &strings.Builder{}
+	d := deps{stdout: out, stderr: errOut, userHomeDir: func() (string, error) { return home, nil }}
 
 	err := runClaudeSessionPath(d, "dup-id", "")
 	if err == nil {
 		t.Fatal("expected an error for multiple matching transcripts, got nil")
 	}
-	if !strings.Contains(out.String(), p1) || !strings.Contains(out.String(), p2) {
-		t.Fatalf("expected both matches printed, got %q", out.String())
+	if out.String() != "" {
+		t.Fatalf("expected stdout to be empty, got %q", out.String())
+	}
+	if !strings.Contains(errOut.String(), p1) || !strings.Contains(errOut.String(), p2) {
+		t.Fatalf("expected both matches printed to stderr, got %q", errOut.String())
 	}
 }
 

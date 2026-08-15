@@ -17,7 +17,12 @@ func newClaudeSessionPathCmd(d deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "session-path <session-id>",
 		Short: "locate a Claude Code transcript file by session id",
-		Args:  cobra.ExactArgs(1),
+		Long: `Locate a Claude Code transcript file by session id.
+
+If more than one transcript matches the session id, all candidate paths are
+printed to stderr and the command exits non-zero; nothing is printed to
+stdout in that case.`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			return runClaudeSessionPath(d, args[0], grepPattern)
 		},
@@ -45,7 +50,7 @@ func runClaudeSessionPath(d deps, sessionID, grepPattern string) error {
 	}
 	if len(matches) > 1 {
 		for _, m := range matches {
-			fmt.Fprintln(d.stdout, m)
+			fmt.Fprintln(d.stderr, m)
 		}
 		return fmt.Errorf("session %s matched %d transcripts, expected exactly one", sessionID, len(matches))
 	}
