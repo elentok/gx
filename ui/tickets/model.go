@@ -353,12 +353,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleSidebarMouseClick(msg)
 
 	case tea.MouseWheelMsg:
-		if m.focus == focusPreview {
-			var cmd tea.Cmd
-			m.previewVP, cmd = m.previewVP.Update(msg)
-			return m, cmd
-		}
-		return m.handleSidebarMouseWheel(msg)
+		return m.handleMouseWheel(msg)
 
 	case implementStartedMsg:
 		return m.handleImplementStarted(msg)
@@ -465,6 +460,26 @@ func (m Model) handleSidebarMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cm
 	m.focus = focusSidebar
 	m.sidebarTree.SelectAtBodyLine(bodyLine)
 	return m, nil
+}
+
+// handleMouseWheel routes a wheel event to whichever of the sidebar/preview
+// panels the cursor is over (ui.HoverHitTest), independent of which pane
+// currently holds keyboard focus. A cursor position outside both panels'
+// rects is a no-op rather than falling back to the focused pane.
+func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
+	mouse := msg.Mouse()
+	sx, sy, sw, sh := m.sidebarRect()
+	px, py, pw, ph := m.previewRect()
+	idx, ok := ui.HoverHitTest(mouse.X, mouse.Y, ui.Rect{X: sx, Y: sy, W: sw, H: sh}, ui.Rect{X: px, Y: py, W: pw, H: ph})
+	if !ok {
+		return m, nil
+	}
+	if idx == 0 {
+		return m.handleSidebarMouseWheel(msg)
+	}
+	var cmd tea.Cmd
+	m.previewVP, cmd = m.previewVP.Update(msg)
+	return m, cmd
 }
 
 // handleSidebarMouseWheel scrolls the sidebar viewport without moving
@@ -641,6 +656,15 @@ func splitPanelHeight(width, total int) (sidebarH, previewH int) {
 // wheel routing) stays in sync with what's actually rendered.
 func (m Model) previewRect() (x, y, w, h int) {
 	return previewRect(m.width, m.contentHeight())
+}
+
+// sidebarRect returns the sidebar panel's absolute on-screen bounds,
+// mirroring previewRect's layout math so wheel hit-testing stays in sync
+// with what's actually rendered.
+func (m Model) sidebarRect() (x, y, w, h int) {
+	sidebarW, _ := m.splitWidth()
+	sidebarH, _ := m.splitHeight(m.contentHeight())
+	return 0, 0, sidebarW, sidebarH
 }
 
 func (m Model) contentHeight() int {
