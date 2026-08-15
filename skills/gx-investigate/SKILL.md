@@ -45,16 +45,21 @@ bare-repo checkout with linked worktrees keeps one shared root at the bare repo'
   `cherry-picked`, `conflict-hit`/`-resolved`, `paused-smart-zone`, `paused-rate-limit`,
   `needs-answer`, `needs-repair`, `commitless`, `deps-installed`, and **`scheduler-scan`** — one
   entry per `claimNext` pass, listing every ticket's disposition that pass (`claimed`, `frontier`,
-  `out-of-scope`, `blocked` + reason, `settled`, `unclaimed`). This is usually the fastest way to
-  see *why* the scheduler picked or skipped a ticket, especially for "it's in the tree but never
-  starts" reports.
+  `out-of-scope`, `blocked` + reason, `settled`, `unclaimed`). Query it with
+  `gx tickets filter-run-log <epic> --ticket <id> [--event <type>]` (both filters optional,
+  `--event` repeatable) rather than hand-rolling a `python3`/`jq` filter. This is usually the
+  fastest way to see *why* the scheduler picked or skipped a ticket, especially for "it's in the
+  tree but never starts" reports.
 - **`~/.config/gx/queue-state.json`** — the Queue tab's own UI bookkeeping (which tickets are
   checked, their display order). A cache that can drift from the tickets it describes — never the
   source of truth for ticket status.
 - **`~/.config/gx/config.json`** — effective gx config (`gx config show` prints it resolved).
 - **Agent session transcript** — `~/.claude/projects/<slugified-cwd>/<session-id>.jsonl`, keyed by
-  the `Cwd`/`AgentSession` recorded on that ticket's `iteration-started` event. Use it to see what
-  the agent actually did inside one iteration.
+  the `Cwd`/`AgentSession` recorded on that ticket's `iteration-started` event. Locate it with
+  `gx claude session-path <session-id> [--grep <pattern>]` instead of a manual `fd` search — it
+  scans every project directory for you, so you don't need to slugify the cwd by hand; `--grep`
+  prints only the transcript's matching lines instead of the path. Use it to see what the agent
+  actually did inside one iteration.
 - **`herdr`** (pane/session driver) is an external binary gx shells out to — its own pane/session
   state isn't a file in this repo and isn't readable through gx. If the symptom is at the
   tmux-pane level (hung pane, wrong agent launched), you're debugging herdr's process, not gx's
@@ -66,15 +71,17 @@ bare-repo checkout with linked worktrees keeps one shared root at the bare repo'
 ## Where to start
 
 1. Run `gx tickets root` to get `<root>`, then identify the epic: `<root>/<epic-slug>/`.
-2. Read `run-log.jsonl`, filtered to the ticket(s) in question. The most recent `scheduler-scan`
-   entry's `scan` list gives every ticket's decision and reason as of that pass.
+2. Run `gx tickets filter-run-log <epic> --ticket <id>`, filtered to the ticket(s) in question. The
+   most recent `scheduler-scan` entry's `scan` list gives every ticket's decision and reason as of
+   that pass.
 3. Read the affected ticket's frontmatter directly and check it against gx-local-tracker.md's
    field reference — most "queued but stuck" reports are a frontmatter field (`parent`,
    `blocked_by`, `status`) not doing what the UI implies, not a scheduler logic bug.
 4. If the discrepancy is between the Queue tab and the tickets themselves, check
    `queue-state.json` for drift.
 5. If the symptom is inside one agent session (hung, wrong edit, crashed), pull that iteration's
-   transcript via the `Cwd`/`AgentSession` on its `iteration-started` event.
+   transcript via `gx claude session-path <session-id>`, using the `Cwd`/`AgentSession` on its
+   `iteration-started` event to get the session id.
 6. Before concluding a symptom is a live bug, rule out a notification mute: check
    `~/.config/gx/notifications-state.json` and the affected ticket's own `Mutes` frontmatter field.
    A muted event can look identical to a stuck ticket or a scheduler that silently skipped it.
