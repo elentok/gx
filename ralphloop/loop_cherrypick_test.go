@@ -626,9 +626,10 @@ func TestRun_ZeroCommitIteration_MarksNeedsAnswerAndLeavesWorktree(t *testing.T)
 		return 0, nil
 	}
 
+	sink := &recordingSink{}
 	// The zero-commit iteration leaves its ticket needs-answer, so the epic's
 	// only ticket is one a human must clear: the run parks on it.
-	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
+	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
 
 	if len(*removed) != 0 {
 		t.Errorf("removed worktree branches = %v, want the zero-commit iteration's worktree left in place", *removed)
@@ -646,6 +647,18 @@ func TestRun_ZeroCommitIteration_MarksNeedsAnswerAndLeavesWorktree(t *testing.T)
 	}
 	if !strings.Contains(string(raw), "park_kind: zero-commit") {
 		t.Errorf("ticket not stamped park_kind: zero-commit after zero-commit iteration:\n%s", raw)
+	}
+
+	// A parked ticket already gets its own notification via
+	// TicketNeedsHuman; it must not also fire IterationFinished (the
+	// spurious "done" notification) or count toward completed — see
+	// loop.go's parked early-continue in the results-handling loop.
+	got := sink.snapshot()
+	if !slices.Contains(got, "TicketNeedsHuman") {
+		t.Errorf("events = %v, want TicketNeedsHuman for the parked ticket", got)
+	}
+	if slices.Contains(got, "IterationFinished") {
+		t.Errorf("events = %v, want no IterationFinished for a parked (zero-commit) ticket", got)
 	}
 }
 

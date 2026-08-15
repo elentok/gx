@@ -828,7 +828,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		// than threading a return value up through runIteration/finishIteration.
 		landedTicket := r.ticket
 		liveTotal := total
-		liveDone++
+		parked := false
 		if landedEpic, err := loadNamedEpic(scratchDir, opts.EpicName); err != nil {
 			return err
 		} else if landedEpic != nil {
@@ -841,6 +841,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 					// its status puts it back in the frontier for this run
 					// instead of only for the next one.
 					if isParked(*landedEpic, t) {
+						parked = true
 						delete(launched, t.Identifier)
 					}
 					break
@@ -848,6 +849,17 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			}
 		}
 
+		if parked {
+			// A parked outcome (needs-answer/needs-repair, no commits) already
+			// got its own notification via sink.TicketNeedsHuman (fired from
+			// iteration.go/waitforfinish.go) — it never landed, so it must not
+			// also count toward completed or emit a contradictory "done"
+			// sink.IterationFinished, mirroring the r.parkedOnChild early-exit
+			// above.
+			continue
+		}
+
+		liveDone++
 		completed++
 		sink.IterationFinished(landedTicket, opts.EpicName, IterationStats{
 			ElapsedSeconds:    landedTicket.ElapsedTime,
