@@ -483,7 +483,7 @@ func TestQueueModelNeverShowsATicketRunnableWhenOutOfScopeBlockerIsUnmet(t *test
 	if !strings.Contains(content, "Dependent") {
 		t.Fatalf("expected the checked ticket to remain visible for toggling:\n%s", content)
 	}
-	if !strings.Contains(content, "no unblocked tickets") {
+	if !strings.Contains(content, "no unblocked tickets left") {
 		t.Fatalf("expected an actionable plan error instead of a misleading wave:\n%s", content)
 	}
 }
@@ -501,7 +501,7 @@ func TestQueueModelSurfacesActionableErrorForDependencyCycle(t *testing.T) {
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 	content := m.View().Content
 
-	if !strings.Contains(content, "no unblocked tickets") {
+	if !strings.Contains(content, "no unblocked tickets left") {
 		t.Fatalf("expected an actionable cycle error:\n%s", content)
 	}
 	if !strings.Contains(content, "First") || !strings.Contains(content, "Second") {

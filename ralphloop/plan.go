@@ -50,7 +50,7 @@ func PlanWaves(epic tickets.Epic, scope RunScope, maxParallel int) ([][]tickets.
 			}
 		}
 		if len(ready) == 0 {
-			return nil, stuckPlanError(epic.Name, blocked)
+			return nil, &StuckPlanError{EpicName: epic.Name, Blocked: blocked}
 		}
 		sort.Slice(ready, func(i, j int) bool { return ready[i].Number < ready[j].Number })
 
@@ -71,13 +71,29 @@ func PlanWaves(epic tickets.Epic, scope RunScope, maxParallel int) ([][]tickets.
 	return waves, nil
 }
 
-func stuckPlanError(epicName string, blocked []tickets.Ticket) error {
-	ids := make([]string, 0, len(blocked))
-	for _, t := range blocked {
+// StuckPlanError reports that PlanWaves found scope tickets that will never
+// become ready — a dependency cycle or a blocker outside the scope that will
+// never resolve. EpicName and Blocked are exposed so callers (e.g. the Queue
+// tab) can render their own short, non-alarming message instead of Error()'s
+// full sentence, which is tuned for logs/CLI output.
+type StuckPlanError struct {
+	EpicName string
+	Blocked  []tickets.Ticket
+}
+
+// BlockedIDs returns the display numbers of the tickets that never became
+// ready, sorted by ticket number.
+func (e *StuckPlanError) BlockedIDs() []string {
+	ids := make([]string, 0, len(e.Blocked))
+	for _, t := range e.Blocked {
 		ids = append(ids, t.DisplayNumber())
 	}
-	return fmt.Errorf(
+	return ids
+}
+
+func (e *StuckPlanError) Error() string {
+	return fmt.Sprintf(
 		"epic %q has no unblocked tickets left in the selected scope but isn't all done; "+
-			"check for a dependency cycle or a blocker outside the scope among: %v", epicName, ids,
+			"check for a dependency cycle or a blocker outside the scope among: %v", e.EpicName, e.BlockedIDs(),
 	)
 }

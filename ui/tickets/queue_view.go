@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/search"
@@ -181,6 +182,12 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 					formatTokenCount(avg), formatTokenCount(maximum), compacts,
 				))
 			case nodeEpicError:
+				if stuck, ok := entry.Value.err.(*ralphloop.StuckPlanError); ok {
+					return "    " + metricsLineStyle.Render(
+						"no unblocked tickets left: "+strings.Join(stuck.BlockedIDs(), ", ")+
+							" still waiting on a dependency cycle or a blocker outside the selection",
+					)
+				}
 				return statusErrorStyle.Render("    " + entry.Value.err.Error())
 			default: // nodeQueueTicket
 				return m.renderQueueTicketRow(entry.Value.ticket, idxByID[entry.ID])
