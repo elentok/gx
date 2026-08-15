@@ -525,6 +525,75 @@ func TestQuestionMarkOpensHelpOverlay(t *testing.T) {
 	}
 }
 
+func TestMouseWheelScrollsPRList(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 12})
+
+	openPRs := make([]git.PR, 15)
+	for i := range openPRs {
+		openPRs[i] = git.PR{Number: i + 1, Title: "Open PR", UpdatedAt: time.Now()}
+	}
+	m = loadPRs(m, openPRs, true, nil, nil)
+
+	if m.scrollOffset != 0 {
+		t.Fatalf("expected initial scrollOffset 0, got %d", m.scrollOffset)
+	}
+
+	m = sendModel(m, tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	if m.scrollOffset != ui.WheelScrollLines {
+		t.Fatalf("expected scrollOffset %d after wheel-down, got %d", ui.WheelScrollLines, m.scrollOffset)
+	}
+
+	lines, _ := m.combinedContent()
+	maxOffset := len(lines) - m.viewportH()
+	for range len(lines) {
+		m = sendModel(m, tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	}
+	if m.scrollOffset != maxOffset {
+		t.Fatalf("expected scrollOffset clamped to %d at the bottom, got %d", maxOffset, m.scrollOffset)
+	}
+
+	m = sendModel(m, tea.MouseWheelMsg{Button: tea.MouseWheelUp})
+	if m.scrollOffset != maxOffset-ui.WheelScrollLines {
+		t.Fatalf("expected scrollOffset %d after wheel-up, got %d", maxOffset-ui.WheelScrollLines, m.scrollOffset)
+	}
+
+	for range len(lines) {
+		m = sendModel(m, tea.MouseWheelMsg{Button: tea.MouseWheelUp})
+	}
+	if m.scrollOffset != 0 {
+		t.Fatalf("expected scrollOffset clamped to 0 at the top, got %d", m.scrollOffset)
+	}
+}
+
+func TestMouseWheelWithHelpOpenScrollsHelpNotList(t *testing.T) {
+	extraBindings := make([]keys.Binding, 0, 40)
+	for range 40 {
+		extraBindings = append(extraBindings, keys.Binding{Seq: []string{"x"}, Categories: []string{"Extra"}, Title: "extra binding"})
+	}
+	m := NewModel("/repo", ui.Settings{}, keys.New(extraBindings))
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 8})
+
+	openPRs := make([]git.PR, 15)
+	for i := range openPRs {
+		openPRs[i] = git.PR{Number: i + 1, Title: "Open PR", UpdatedAt: time.Now()}
+	}
+	m = loadPRs(m, openPRs, true, nil, nil)
+	m = sendModel(m, tea.KeyPressMsg{Code: '?', Text: "?"})
+	if !m.help.IsOpen {
+		t.Fatal("expected help open after ?")
+	}
+
+	scrollOffsetBefore := m.scrollOffset
+	m = sendModel(m, tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	if m.scrollOffset != scrollOffsetBefore {
+		t.Fatalf("expected PR list scrollOffset unchanged while help open, got %d, want %d", m.scrollOffset, scrollOffsetBefore)
+	}
+	if m.help.Viewport.YOffset() == 0 {
+		t.Fatal("expected wheel-down to scroll the help modal while it's open")
+	}
+}
+
 func TestCKeyOnOpenPROpensCommentsPopupAndFetches(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
