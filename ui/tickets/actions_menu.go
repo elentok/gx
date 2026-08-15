@@ -107,7 +107,7 @@ func (m Model) handleSuggestedActionsKey() (tea.Model, tea.Cmd) {
 	if !ok || r.isEpic() {
 		return m, notify.Info("select a ticket to see its suggested actions")
 	}
-	epic := m.epics[r.epicIdx]
+	epic := m.epicAt(r)
 	ticket := epic.Tickets[r.ticketIdx]
 	items := suggestedActionItems(epic.RenderedStatus(ticket), ticket)
 	if len(items) == 0 {

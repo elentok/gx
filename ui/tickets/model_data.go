@@ -40,12 +40,16 @@ const (
 )
 
 // sidebarNode is ui/tree.Model[sidebarNode]'s value type. ticketIdx is -1 for
-// nodeSection/nodeEpic.
+// nodeSection/nodeEpic. archived marks a node sourced from m.archivedEpics
+// rather than m.epics — always false until ticket 04's Archived section
+// starts populating entries from it; carried through to row (rowFromEntry)
+// so epicAt(row) knows which slice to resolve against.
 type sidebarNode struct {
 	kind      sidebarNodeKind
 	section   sidebarSection
 	epicIdx   int
 	ticketIdx int
+	archived  bool
 }
 
 // epicTicketTree is one epic's ticketRows-equivalent shape: which tickets are
@@ -179,18 +183,26 @@ func (m Model) buildSidebarEntries() []tree.Entry[sidebarNode] {
 }
 
 type epicsLoadedMsg struct {
-	epics []tickets.Epic
-	err   error
+	epics             []tickets.Epic
+	err               error
+	archivedEpicCount int
 }
 
 // cmdLoad reads the tab's `.scratch/` directory in the background. A missing
 // directory is not an error (tickets.Load reports it as zero epics), so it
-// renders the same empty state as an absent `.scratch/`.
+// renders the same empty state as an absent `.scratch/`. It also computes
+// the cheap archive count (tickets.CountArchivedEpics — a flat directory
+// listing, no ticket parsing) so the Archived section's up-front count stays
+// current on both manual refresh and the auto-refresh timer, even though
+// ticket 04's lazy load is what actually populates m.archivedEpics. A count
+// error is treated as zero rather than surfaced alongside msg.err, since a
+// missing/unreadable ".archive" just means "nothing archived to show".
 func (m Model) cmdLoad() tea.Cmd {
 	scratchDir := m.scratchDir()
 	return func() tea.Msg {
 		epics, err := tickets.Load(scratchDir)
-		return epicsLoadedMsg{epics: epics, err: err}
+		archivedEpicCount, _ := tickets.CountArchivedEpics(scratchDir)
+		return epicsLoadedMsg{epics: epics, err: err, archivedEpicCount: archivedEpicCount}
 	}
 }
 
@@ -213,6 +225,9 @@ type row struct {
 	depth       int
 	hasChildren bool
 	expanded    bool
+	// archived mirrors sidebarNode.archived — which of m.epics/m.archivedEpics
+	// epicIdx indexes into. Read via epicAt(row) rather than directly.
+	archived bool
 }
 
 func (r row) isEpic() bool { return r.ticketIdx < 0 }
@@ -224,7 +239,7 @@ func (r row) isEpic() bool { return r.ticketIdx < 0 }
 func rowFromEntry(e tree.Entry[sidebarNode]) (row, bool) {
 	switch e.Value.kind {
 	case nodeEpic:
-		return row{epicIdx: e.Value.epicIdx, ticketIdx: -1}, true
+		return row{epicIdx: e.Value.epicIdx, ticketIdx: -1, archived: e.Value.archived}, true
 	case nodeTicket:
 		return row{
 			epicIdx:     e.Value.epicIdx,
@@ -232,10 +247,22 @@ func rowFromEntry(e tree.Entry[sidebarNode]) (row, bool) {
 			depth:       e.Depth - 2, // section, epic ancestors
 			hasChildren: e.HasChildren,
 			expanded:    e.Expanded,
+			archived:    e.Value.archived,
 		}, true
 	default:
 		return row{}, false
 	}
+}
+
+// epicAt resolves r's epic against m.epics or m.archivedEpics depending on
+// which one r.archived says it was sourced from — the single accessor every
+// row-carrying call site uses instead of indexing m.epics directly, so a
+// row sourced from the (ticket 04) Archived section resolves correctly too.
+func (m Model) epicAt(r row) tickets.Epic {
+	if r.archived {
+		return m.archivedEpics[r.epicIdx]
+	}
+	return m.epics[r.epicIdx]
 }
 
 // nearestVisibleAncestor walks idx's Parent chain (ticket 03's schema field)

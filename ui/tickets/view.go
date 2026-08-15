@@ -109,10 +109,10 @@ func (m Model) sidebarRenderOpts(width int) tree.RenderOpts[sidebarNode] {
 				return ui.StyleMuted.Render("no " + label)
 			case nodeEpic:
 				r, _ := rowFromEntry(entry)
-				return m.renderEpicRow(m.epics[r.epicIdx])
+				return m.renderEpicRow(m.epicAt(r))
 			default: // nodeTicket
 				r, _ := rowFromEntry(entry)
-				return m.renderTicketRow(m.epics[r.epicIdx], r, idxByID[entry.ID])[0]
+				return m.renderTicketRow(m.epicAt(r), r, idxByID[entry.ID])[0]
 			}
 		},
 	}

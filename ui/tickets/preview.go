@@ -76,10 +76,10 @@ func (m Model) previewContent(width int) (string, int, bool) {
 		return ui.StyleDim.Render("  no ticket selected"), 0, false
 	}
 	if r.isEpic() {
-		return previewEpicContent(m.epics[r.epicIdx], width), 0, false
+		return previewEpicContent(m.epicAt(r), width), 0, false
 	}
 
-	epic := m.epics[r.epicIdx]
+	epic := m.epicAt(r)
 	t := epic.Tickets[r.ticketIdx]
 	return renderTicketPreview(epic, t, width)
 }

@@ -58,7 +58,7 @@ func (m Model) selectedEditTarget() (path string, ok bool, warning string) {
 	if !ok {
 		return "", false, "nothing selected"
 	}
-	epic := m.epics[r.epicIdx]
+	epic := m.epicAt(r)
 	if r.isEpic() {
 		if !epic.IsMap {
 			return "", false, "epic has no map.md to edit"

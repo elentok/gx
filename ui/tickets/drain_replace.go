@@ -31,7 +31,7 @@ func (m Model) handleDrainReplaceKey() (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	epic := m.epics[r.epicIdx]
+	epic := m.epicAt(r)
 	if !ralphLoopRegistry.isRunningEpic(epic.Name) {
 		return m, notify.Info(fmt.Sprintf("epic %q isn't running", epic.Name))
 	}

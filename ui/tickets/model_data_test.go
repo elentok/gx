@@ -161,3 +161,35 @@ func TestModel_TicketRows_NestsChildrenAtArbitraryDepthAndRespectsCollapse(t *te
 		t.Fatalf("expected collapsed ticket 01 to report expanded=false")
 	}
 }
+
+// TestModel_EpicAt_ResolvesActiveRowAgainstEpics covers ticket 03's accessor
+// for the common case: a row with archived=false (the default, matching
+// every row buildSidebarEntries produces today) resolves against m.epics.
+func TestModel_EpicAt_ResolvesActiveRowAgainstEpics(t *testing.T) {
+	t.Parallel()
+	m := Model{epics: []tickets.Epic{{Name: "active-epic"}}}
+
+	got := m.epicAt(row{epicIdx: 0})
+
+	if got.Name != "active-epic" {
+		t.Fatalf("epicAt() = %+v, want epic named active-epic", got)
+	}
+}
+
+// TestModel_EpicAt_ResolvesArchivedRowAgainstArchivedEpics covers the other
+// half: a row with archived=true resolves against m.archivedEpics instead of
+// m.epics, even when both slices are populated and share the same index —
+// the origin flag, not epicIdx alone, decides which slice wins.
+func TestModel_EpicAt_ResolvesArchivedRowAgainstArchivedEpics(t *testing.T) {
+	t.Parallel()
+	m := Model{
+		epics:         []tickets.Epic{{Name: "active-epic"}},
+		archivedEpics: []tickets.Epic{{Name: "archived-epic"}},
+	}
+
+	got := m.epicAt(row{epicIdx: 0, archived: true})
+
+	if got.Name != "archived-epic" {
+		t.Fatalf("epicAt() = %+v, want epic named archived-epic", got)
+	}
+}

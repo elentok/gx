@@ -64,6 +64,14 @@ type Model struct {
 
 	loaded bool
 	epics  []tickets.Epic
+	// archivedEpics holds the Archived section's tickets.Epic data (ticket
+	// 04's lazy load populates it) — deliberately separate from m.epics so
+	// epicsLoadedMsg's wholesale replacement of m.epics on every load/
+	// auto-refresh tick never wipes it. archivedEpicCount is the cheap
+	// up-front count (see cmdLoad) that arrives on every load regardless of
+	// whether archivedEpics itself has been populated yet.
+	archivedEpics     []tickets.Epic
+	archivedEpicCount int
 	// autoRefreshStarted guards cmdAutoRefresh's self-perpetuating poll loop
 	// (auto_refresh.go) against being started more than once per Model
 	// instance — every epicsLoadedMsg, including ones the loop itself
@@ -246,6 +254,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refreshQueueSnapshot()
 		m.loaded = true
 		m.epics = msg.epics
+		m.archivedEpicCount = msg.archivedEpicCount
 		m.sidebarTree.SetCollapsedIDs(defaultCollapsedSidebar(m.sidebarTree.CollapsedIDs()))
 		if m.search.HasQuery() {
 			m.recomputeSearchMatches()
@@ -370,9 +379,12 @@ func (m Model) sidebarViewportHeight() int {
 // zero-epics-after-load "no .scratch/ directory found" message though — that
 // would otherwise render as two real, empty section headers plus their
 // nodeEmpty placeholders, a different visual — so that state keeps its own
-// short-circuit ahead of the RenderLines call.
+// short-circuit ahead of the RenderLines call. That short-circuit only
+// applies when there's truly nothing to show: a non-zero archivedEpicCount
+// means the Archived section (ticket 04) still has something to render, so
+// an empty active `.scratch/` alone must not suppress the whole tree.
 func (m Model) sidebarBody(sidebarViewportH, width int) []string {
-	if m.loaded && len(m.epics) == 0 {
+	if m.loaded && len(m.epics) == 0 && m.archivedEpicCount == 0 {
 		return []string{ui.StyleMuted.Render("  no .scratch/ directory found")}
 	}
 	// RenderLines' own height param is an outer-panel height, from which it

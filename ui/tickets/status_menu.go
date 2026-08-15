@@ -76,7 +76,7 @@ func (m Model) handleChangeStatusKey() (tea.Model, tea.Cmd) {
 	if !ok || r.isEpic() {
 		return m, notify.Info("select a ticket to change its status")
 	}
-	epic := m.epics[r.epicIdx]
+	epic := m.epicAt(r)
 	ticket := epic.Tickets[r.ticketIdx]
 	live := ralphLoopRegistry.isRunningEpic(epic.Name)
 	menu := newStatusMenu(ticket, live)
@@ -125,7 +125,7 @@ func (m Model) applyStatusChange(status schema.Status) (tea.Model, tea.Cmd) {
 	if !ok || r.isEpic() {
 		return m, nil
 	}
-	epic := m.epics[r.epicIdx]
+	epic := m.epicAt(r)
 	ticket := epic.Tickets[r.ticketIdx]
 
 	if status == schema.StatusOpen {
@@ -186,7 +186,7 @@ func (m Model) handleStatusChanged() (tea.Model, tea.Cmd) {
 func (m Model) statusMenuView() string {
 	prompt := "Choose a status:"
 	if r, ok := m.selectedRow(); ok && !r.isEpic() {
-		ticket := m.epics[r.epicIdx].Tickets[r.ticketIdx]
+		ticket := m.epicAt(r).Tickets[r.ticketIdx]
 		prompt = fmt.Sprintf("Choose a status for %q:", ticket.Title)
 	}
 	return components.RenderMenuModal(

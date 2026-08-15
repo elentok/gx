@@ -27,7 +27,7 @@ func (m Model) yankTicketSummary() tea.Cmd {
 	if !ok || r.isEpic() {
 		return notify.Warning("no ticket selected")
 	}
-	epic := m.epics[r.epicIdx]
+	epic := m.epicAt(r)
 	text := formatTicketSummary(epic.Name, epic.Tickets[r.ticketIdx])
 	if err := ticketsClipboardWrite(text); err != nil {
 		return notify.Error("clipboard copy failed: " + err.Error())
@@ -42,7 +42,7 @@ func (m Model) yankTicketFilePath() tea.Cmd {
 	if !ok || r.isEpic() {
 		return notify.Warning("no ticket selected")
 	}
-	epic := m.epics[r.epicIdx]
+	epic := m.epicAt(r)
 	path := epic.Tickets[r.ticketIdx].Path
 	if err := ticketsClipboardWrite(path); err != nil {
 		return notify.Error("clipboard copy failed: " + err.Error())

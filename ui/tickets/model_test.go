@@ -241,6 +241,61 @@ func TestNewModel_ZeroEpicScratchDirRendersSameEmptyStateAsNoScratchDir(t *testi
 	}
 }
 
+// TestModel_ArchivedEpicCountSuppressesEmptyState covers ticket 03's guard:
+// a non-zero archivedEpicCount means the Archived section still has
+// something to render, so an empty active .scratch/ alone must not render
+// the "no .scratch/ directory found" short-circuit.
+func TestModel_ArchivedEpicCountSuppressesEmptyState(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".scratch"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	m.archivedEpicCount = 1
+
+	body := strings.Join(m.sidebarBody(20, 80), "\n")
+	if strings.Contains(body, "no .scratch/ directory found") {
+		t.Fatalf("expected archivedEpicCount>0 to suppress empty state, got:\n%s", body)
+	}
+}
+
+// TestModel_CmdLoad_CarriesArchivedEpicCountAndRefreshesIt covers ticket
+// 03's plumbing: cmdLoad computes the cheap archive count via
+// tickets.CountArchivedEpics so it arrives on epicsLoadedMsg both on initial
+// load and again after a subsequent "R" refresh, without m.archivedEpics
+// itself ever being populated (that's ticket 04's lazy load).
+func TestModel_CmdLoad_CarriesArchivedEpicCountAndRefreshesIt(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-open-ticket.md", "Status: open\n\nBody.\n")
+	archiveDir := filepath.Join(root, ".scratch", ".archive", "old-epic")
+	if err := os.MkdirAll(archiveDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	if m.archivedEpicCount != 1 {
+		t.Fatalf("archivedEpicCount after initial load = %d, want 1", m.archivedEpicCount)
+	}
+
+	secondArchiveDir := filepath.Join(root, ".scratch", ".archive", "another-old-epic")
+	if err := os.MkdirAll(secondArchiveDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'R', Text: "R"})
+	m = updated.(Model)
+	m = deliverCmd(t, m, cmd)
+
+	if m.archivedEpicCount != 2 {
+		t.Fatalf("archivedEpicCount after refresh = %d, want 2", m.archivedEpicCount)
+	}
+}
+
 // TestNewModel_TicketsInPlanOrderWithinEpic guards against re-grouping
 // tickets by rendered status: they render in plan order (ticket number
 // ascending) so a ticket never jumps position once it's done, regardless of

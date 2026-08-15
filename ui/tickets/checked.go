@@ -67,12 +67,12 @@ func (m Model) handleToggleCheck() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if r.isEpic() {
-		if err := m.toggleEpicChecked(r.epicIdx); err != nil {
+		if err := m.toggleEpicChecked(r); err != nil {
 			return m, notify.Error("save queue: " + err.Error())
 		}
 		return m, nil
 	}
-	return m.toggleTicketChecked(r.epicIdx, r.ticketIdx)
+	return m.toggleTicketChecked(r)
 }
 
 // eligibleEpicTickets returns epic's tickets that aren't StatusDone — a done
@@ -107,13 +107,13 @@ func epicFullyMember(epic tickets.Epic, isMember func(string) bool) bool {
 	return true
 }
 
-// toggleEpicChecked checks every non-done ticket in the epic at epicIdx if
-// any is currently unchecked, otherwise unchecks them all — standard
-// "select all" checkbox-group behavior, except a StatusDone ticket is never
-// added to the checked set (it has nothing left to queue). A zero-ticket or
-// all-done epic is a no-op either way.
-func (m *Model) toggleEpicChecked(epicIdx int) error {
-	epic := m.epics[epicIdx]
+// toggleEpicChecked checks every non-done ticket in r's epic if any is
+// currently unchecked, otherwise unchecks them all — standard "select all"
+// checkbox-group behavior, except a StatusDone ticket is never added to the
+// checked set (it has nothing left to queue). A zero-ticket or all-done epic
+// is a no-op either way.
+func (m *Model) toggleEpicChecked(r row) error {
+	epic := m.epicAt(r)
 	eligible := eligibleEpicTickets(epic)
 	if len(eligible) == 0 {
 		return nil
@@ -125,18 +125,17 @@ func (m *Model) toggleEpicChecked(epicIdx int) error {
 	return m.setPathsChecked(paths, !epicFullyMember(epic, m.isChecked))
 }
 
-// toggleTicketChecked toggles the ticket at (epicIdx, ticketIdx). Unchecking
-// is always immediate. Checking a StatusDone ticket is a no-op — it has
-// nothing left to queue. Checking a ticket with unresolved blockers
-// (Epic.BlockingTickets) instead opens a confirmation modal rather than
-// checking it outright — accepting adds the ticket plus its blockers
-// (checkAddConfirmedMsg), canceling leaves the checked set unchanged. A
-// blocker already in the checked set needs no confirmation, since adding it
-// again is a no-op — only blockers that would actually change the checked
-// set gate the prompt.
-func (m Model) toggleTicketChecked(epicIdx, ticketIdx int) (tea.Model, tea.Cmd) {
-	epic := m.epics[epicIdx]
-	t := epic.Tickets[ticketIdx]
+// toggleTicketChecked toggles r's ticket. Unchecking is always immediate.
+// Checking a StatusDone ticket is a no-op — it has nothing left to queue.
+// Checking a ticket with unresolved blockers (Epic.BlockingTickets) instead
+// opens a confirmation modal rather than checking it outright — accepting
+// adds the ticket plus its blockers (checkAddConfirmedMsg), canceling leaves
+// the checked set unchanged. A blocker already in the checked set needs no
+// confirmation, since adding it again is a no-op — only blockers that would
+// actually change the checked set gate the prompt.
+func (m Model) toggleTicketChecked(r row) (tea.Model, tea.Cmd) {
+	epic := m.epicAt(r)
+	t := epic.Tickets[r.ticketIdx]
 	if m.isChecked(t.Path) {
 		if err := m.setPathsChecked([]string{t.Path}, false); err != nil {
 			return m, notify.Error("save queue: " + err.Error())

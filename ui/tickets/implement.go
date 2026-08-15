@@ -78,7 +78,7 @@ func newImplementAgentMenu() components.MenuState {
 // handleReplaceQueueConfirmed and switches to the Queue tab.
 func (m Model) handleReplaceQueueKey() (tea.Model, tea.Cmd) {
 	if r, ok := m.selectedRow(); ok {
-		epic := m.epics[r.epicIdx]
+		epic := m.epicAt(r)
 		if ralphLoopRegistry.isRunningEpic(epic.Name) {
 			return m, notify.Info("Can't replace a live queue")
 		}
@@ -129,7 +129,7 @@ func (m Model) handleAddToQueueKey() (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	epic := m.epics[r.epicIdx]
+	epic := m.epicAt(r)
 	if !ralphLoopRegistry.isRunningEpic(epic.Name) {
 		return m, notify.Info(fmt.Sprintf("epic %q isn't running", epic.Name))
 	}
@@ -258,7 +258,7 @@ func (m Model) openImplementConfirm(agent ralphloop.AgentKind) (tea.Model, tea.C
 	if !ok || !r.isEpic() {
 		return m, nil
 	}
-	epic := m.epics[r.epicIdx]
+	epic := m.epicAt(r)
 	ac := m.settings.AgentConfig(agent)
 	m.confirm = m.confirm.Open(confirm.Options{
 		Prompt:    fmt.Sprintf("Start implementing epic %q with %s%s?", epic.Name, agentDisplayName(agent), agentConfigSuffix(ac)),
@@ -288,7 +288,7 @@ func agentConfigSuffix(ac config.AgentConfig) string {
 func (m Model) implementAgentMenuView() string {
 	prompt := "Choose the agent for this ralph-loop:"
 	if r, ok := m.selectedRow(); ok && r.isEpic() {
-		prompt = fmt.Sprintf("Choose the agent for epic %q:", m.epics[r.epicIdx].Name)
+		prompt = fmt.Sprintf("Choose the agent for epic %q:", m.epicAt(r).Name)
 	}
 	return renderImplementAgentMenu(prompt, m.implementAgentMenu)
 }
