@@ -4,19 +4,24 @@ Running list of previously-diagnosed gx/ralph-loop bugs, newest first. Append on
 to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKILL.md) gets fixed
 — don't re-explain what the linked commit/ticket already documents.
 
-- **A blocking `TaskOutput` retrieval never resolves the background-task gate, stalling a ticket
-  `claimed` ("implementing...") until the 2h aged-out cap.** `transcript.ReadBackgroundTasks`
-  (`transcript/background_task.go`) only recognized resolution via a `task-notification`-origin
-  transcript line carrying `<task-id>`. An agent that instead calls the `TaskOutput` tool to block
-  on the same task id gets its result inline as `toolUseResult: {retrieval_status, task:
-  {task_id, ...}}` — a different shape that produces no `task-notification` line at all, so the
-  marker reads `outstanding-fresh` forever even though the agent plainly saw the result, kept
-  working, and finished for real. Found live: `idle-cost/01` — commit landed, worktree clean, pane
-  idle, but `run-log.jsonl` shows only `background-task-gate-held`, no release, ever. Distinct
-  failure mode from the entry below (that one resolves too eagerly; this one never resolves at
-  all) in the same new gate. Fixed same session: `ReadBackgroundTasks` now also matches
-  `toolUseResult.retrieval_status`/`toolUseResult.task.task_id`. See
-  `follow-ups/issues/12-taskoutput-retrieval-never-resolves-background-task-gate.md`.
+- **A blocking `TaskOutput`/`TaskStop` retrieval never resolves the background-task gate, stalling
+  a ticket `claimed` ("implementing...") until the 2h aged-out cap.**
+  `transcript.ReadBackgroundTasks` (`transcript/background_task.go`) only recognized resolution
+  via a `task-notification`-origin transcript line carrying `<task-id>`. An agent that instead
+  calls `TaskOutput` to block on the same task id gets its result inline as `toolUseResult:
+  {retrieval_status, task: {task_id, ...}}` (nested); one that calls `TaskStop` to kill it outright
+  gets `toolUseResult: {task_id, message, ...}` (flat) — two more shapes, neither producing a
+  `task-notification` line, so the marker reads `outstanding-fresh` forever even though the agent
+  plainly saw the result (or killed the task itself) and finished for real. Found live: `idle-
+  cost/01` (`TaskOutput` shape — commit landed, worktree clean, pane idle, `run-log.jsonl` shows
+  only `background-task-gate-held`, no release) and `idle-cost/09` (`TaskStop` shape, same
+  symptom, found right after the `TaskOutput` fix landed — proof there wasn't just one gap).
+  Distinct failure mode from the entry below (that one resolves too eagerly; this one never
+  resolves at all) in the same new gate. Fixed same session, in two passes:
+  `ReadBackgroundTasks` now matches all three shapes. See
+  `follow-ups/issues/12-taskoutput-retrieval-never-resolves-background-task-gate.md`. If a fourth
+  stuck ticket turns up, check for yet another `toolUseResult` shape before assuming this is fully
+  closed — nothing so far has enumerated every way an agent can learn a background task ended.
 - **`background-task-gate-released` is treated as full-turn completion, parking the ticket
   `needs-answer`/zero-commit even though the agent kept working afterward.**
   `waitForBackgroundTasks` (`ralphloop/waitforfinish.go:774-824`) only tracks whether one specific

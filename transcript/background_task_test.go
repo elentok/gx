@@ -27,6 +27,14 @@ func taskOutputLine(taskID, timestamp string) string {
 	return `{"isSidechain":false,"timestamp":"` + timestamp + `","message":{"content":[{"tool_use_id":"tool-out","type":"tool_result","content":"` + content + `"}]},"toolUseResult":{"retrieval_status":"success","task":{"task_id":"` + taskID + `","status":"completed"}}}`
 }
 
+// taskStopLine mirrors the tool_result a TaskStop call gets: a flat
+// toolUseResult.task_id, no retrieval_status/nested task and no
+// task-notification entry of its own either.
+func taskStopLine(taskID, timestamp string) string {
+	content := `{\"message\":\"Successfully stopped task: ` + taskID + `\",\"task_id\":\"` + taskID + `\"}`
+	return `{"isSidechain":false,"timestamp":"` + timestamp + `","message":{"content":[{"tool_use_id":"tool-stop","type":"tool_result","content":"` + content + `"}]},"toolUseResult":{"message":"Successfully stopped task: ` + taskID + `","task_id":"` + taskID + `"}}`
+}
+
 const capDuration = 2 * time.Hour
 
 var readAt = mustParseTime("2026-08-12T18:00:00.000000000Z")
@@ -81,6 +89,21 @@ func TestReadBackgroundTasks_ResolvedViaBlockingTaskOutputRetrieval(t *testing.T
 	}
 	if len(reading.Markers) != 1 || reading.Markers[0].Status != BackgroundTaskResolved {
 		t.Errorf("Markers = %+v, want one resolved marker: a blocking TaskOutput retrieval resolves the marker even with no task-notification entry", reading.Markers)
+	}
+}
+
+func TestReadBackgroundTasks_ResolvedViaTaskStop(t *testing.T) {
+	path := writeTranscript(t,
+		startMarkerLine("task-1", "tool-1", "2026-08-12T15:00:00.000000000Z"),
+		taskStopLine("task-1", "2026-08-12T15:05:00.000000000Z"),
+	)
+
+	reading, err := ReadBackgroundTasks(path, capDuration, readAt)
+	if err != nil {
+		t.Fatalf("ReadBackgroundTasks() error = %v", err)
+	}
+	if len(reading.Markers) != 1 || reading.Markers[0].Status != BackgroundTaskResolved {
+		t.Errorf("Markers = %+v, want one resolved marker: killing the task via TaskStop resolves the marker even with no task-notification entry", reading.Markers)
 	}
 }
 

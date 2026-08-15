@@ -71,8 +71,13 @@ type backgroundTaskLine struct {
 	} `json:"message"`
 	ToolUseResult struct {
 		BackgroundTaskID string `json:"backgroundTaskId"`
-		RetrievalStatus  string `json:"retrieval_status"`
-		Task             struct {
+		// TaskID is the flat task id a TaskStop tool_result reports at the
+		// top level of toolUseResult.
+		TaskID          string `json:"task_id"`
+		RetrievalStatus string `json:"retrieval_status"`
+		// Task.TaskID is the nested task id a TaskOutput tool_result reports
+		// instead — a distinct shape from TaskStop's flat TaskID above.
+		Task struct {
 			TaskID string `json:"task_id"`
 		} `json:"task"`
 	} `json:"toolUseResult"`
@@ -91,13 +96,15 @@ var (
 
 // ReadBackgroundTasks scans the transcript at path for non-sidechain
 // backgrounded-shell-command start markers (a tool_result carrying
-// backgroundTaskId) and, for each, whether it was later resolved — either by
-// a passive task-notification transcript entry, or by a TaskOutput tool call
-// blocking on the same task id and returning its result inline (which never
-// produces a task-notification entry of its own). Sidechain-scoped markers
-// (isSidechain: true) are excluded entirely — a subagent's background task
-// belongs to the subagent's lifetime, never the parent iteration's. Either
-// resolution whose task id never had a matching start marker is ignored.
+// backgroundTaskId) and, for each, whether it was later resolved — by a
+// passive task-notification transcript entry, by a TaskOutput tool call
+// blocking on the same task id and returning its result inline, or by a
+// TaskStop tool call killing it outright. Only the first of these produces a
+// task-notification entry of its own; the other two are tool_results the
+// agent sees directly. Sidechain-scoped markers (isSidechain: true) are
+// excluded entirely — a subagent's background task belongs to the
+// subagent's lifetime, never the parent iteration's. Any resolution whose
+// task id never had a matching start marker is ignored.
 //
 // now is compared against each marker's own timestamp to decide
 // outstanding-fresh vs outstanding-aged-out against cap — passed explicitly
@@ -181,6 +188,16 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 			// so a marker only ever retrieved this way would otherwise never
 			// resolve and hold the gate until the aged-out cap.
 			if m, ok := markers[entry.ToolUseResult.Task.TaskID]; ok {
+				m.resolved = true
+			}
+
+		case entry.ToolUseResult.TaskID != "":
+			// A TaskStop tool call kills the backgrounded task outright — a
+			// third resolution shape, distinct from both a passive
+			// notification and a TaskOutput retrieval: once explicitly
+			// stopped, nothing is outstanding for the gate to keep waiting
+			// on, regardless of what the killed command was doing.
+			if m, ok := markers[entry.ToolUseResult.TaskID]; ok {
 				m.resolved = true
 			}
 		}
