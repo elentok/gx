@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tree"
 )
 
 // selectArchivedTicketRow expands the Archived section then its single
@@ -144,5 +145,34 @@ func TestModel_ReadOnlyKeysStillWorkOnArchivedRow(t *testing.T) {
 	}
 	if !strings.Contains(m.View().Content, "old-epic") {
 		t.Fatalf("expected archived epic still rendered after read-only keys, got:\n%s", m.View().Content)
+	}
+}
+
+// TestModel_ExpandArchivedSectionZeroCountDoesNotEngageLazyLoad covers 06a's
+// first fix via the real key-handling path (handleKey), not by setting state
+// directly: expanding the Archived header when the up-front count is 0 must
+// render the shared empty placeholder without ever issuing a
+// tickets.LoadArchived command or moving archivedLazy out of LazyIdle.
+func TestModel_ExpandArchivedSectionZeroCountDoesNotEngageLazyLoad(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-open-ticket.md", "Status: open\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	m.sidebarTree.SetSelectedIndex(archivedSectionHeaderIndex(t, m))
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+	m = updated.(Model)
+	if cmd != nil {
+		t.Fatal("expected no command when expanding a zero-count Archived section")
+	}
+	if m.archivedLazy.State() != tree.LazyIdle {
+		t.Fatalf("archivedLazy.State() = %v, want LazyIdle after expanding a zero-count section", m.archivedLazy.State())
+	}
+	if !strings.Contains(m.View().Content, "no archived epics") {
+		t.Fatalf("expected empty-archive placeholder, got:\n%s", m.View().Content)
 	}
 }

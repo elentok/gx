@@ -33,6 +33,18 @@ const (
 	bindingTicketsYankFilePath     keys.BindingID = "yank-file-path"
 )
 
+// archivedBlockedBindings lists every mutating binding archivedReadOnlyGuard
+// must block on an archived row. A future mutating binding needs an entry
+// here to be guarded — nothing else enforces that.
+var archivedBlockedBindings = map[keys.BindingID]bool{
+	bindingTicketsReplaceQueue:     true,
+	bindingTicketsAddToQueue:       true,
+	bindingTicketsDrainReplace:     true,
+	bindingTicketsToggleCheck:      true,
+	bindingTicketsChangeStatus:     true,
+	bindingTicketsSuggestedActions: true,
+}
+
 // newTicketsManager builds the key manager for the sidebar's "extra"
 // bindings — everything beyond ui/tree's own base nav (j/k/h/l/enter/ctrl+d/
 // ctrl+u, see ui/tree/model_keys.go), which m.sidebarTree's own manager
@@ -102,6 +114,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if match == nil {
 			return m, nil // chord in progress
 		}
+		if archivedBlockedBindings[match.ID] {
+			if cmd, blocked := m.archivedReadOnlyGuard(); blocked {
+				return m, cmd
+			}
+		}
 		switch match.ID {
 		case bindingTicketsHelp:
 			m.keys.Reset()
@@ -119,24 +136,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case bindingTicketsCancelChord:
 			return m, nil
 		case bindingTicketsReplaceQueue:
-			if cmd, blocked := m.archivedReadOnlyGuard(); blocked {
-				return m, cmd
-			}
 			return m.handleReplaceQueueKey()
 		case bindingTicketsAddToQueue:
-			if cmd, blocked := m.archivedReadOnlyGuard(); blocked {
-				return m, cmd
-			}
 			return m.handleAddToQueueKey()
 		case bindingTicketsDrainReplace:
-			if cmd, blocked := m.archivedReadOnlyGuard(); blocked {
-				return m, cmd
-			}
 			return m.handleDrainReplaceKey()
 		case bindingTicketsToggleCheck:
-			if cmd, blocked := m.archivedReadOnlyGuard(); blocked {
-				return m, cmd
-			}
 			return m.handleToggleCheck()
 		case bindingTicketsToggleHideDone:
 			m.toggleHideDone()
@@ -147,14 +152,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case bindingTicketsPreviewBottom:
 			m.previewVP.GotoBottom()
 		case bindingTicketsChangeStatus:
-			if cmd, blocked := m.archivedReadOnlyGuard(); blocked {
-				return m, cmd
-			}
 			return m.handleChangeStatusKey()
 		case bindingTicketsSuggestedActions:
-			if cmd, blocked := m.archivedReadOnlyGuard(); blocked {
-				return m, cmd
-			}
 			return m.handleSuggestedActionsKey()
 		case bindingTicketsYankSummary:
 			return m, m.yankTicketSummary()
@@ -198,7 +197,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 			m.explicitCollapsed[selectedID] = m.sidebarTree.CollapsedIDs()[selectedID]
 		}
-		if selectedID == sidebarSectionID(sectionArchived) && !m.sidebarTree.CollapsedIDs()[selectedID] {
+		if selectedID == sidebarSectionID(sectionArchived) && !m.sidebarTree.CollapsedIDs()[selectedID] && m.archivedEpicCount > 0 {
 			if expandCmd := m.archivedLazy.Expand(); expandCmd != nil {
 				cmd = tea.Batch(cmd, expandCmd)
 			}
