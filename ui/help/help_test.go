@@ -145,6 +145,44 @@ func TestHelpFilterNoMatches(t *testing.T) {
 	}
 }
 
+func TestHelpMouseWheelScrollsContentLikeKeyboard(t *testing.T) {
+	bindings := make([]keys.Binding, 0, 40)
+	for range 40 {
+		bindings = append(bindings, keys.Binding{Seq: []string{"j"}, Title: "binding"})
+	}
+	m := NewModel([]KeySection{{Title: "Navigation", Bindings: bindings}})
+	m.Open(120, 20)
+	if m.Viewport.YOffset() != 0 {
+		t.Fatalf("expected initial YOffset=0, got %d", m.Viewport.YOffset())
+	}
+
+	wheelDown, _ := m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	keyDown, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	if wheelDown.Viewport.YOffset() == 0 {
+		t.Error("expected mouse-wheel-down to scroll content, YOffset still 0")
+	}
+	if keyDown.Viewport.YOffset() == 0 {
+		t.Error("expected keyboard-down to scroll content, YOffset still 0")
+	}
+
+	// Scroll to the bottom via wheel and confirm it clamps like GotoBottom does.
+	scrolled := m
+	for range 60 {
+		scrolled, _ = scrolled.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	}
+	bottom := m
+	bottom.Viewport.GotoBottom()
+	if scrolled.Viewport.YOffset() != bottom.Viewport.YOffset() {
+		t.Errorf("wheel-scrolled-to-bottom YOffset=%d, want clamped to %d",
+			scrolled.Viewport.YOffset(), bottom.Viewport.YOffset())
+	}
+
+	scrolled, _ = scrolled.Update(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
+	if scrolled.Viewport.YOffset() >= bottom.Viewport.YOffset() {
+		t.Error("expected mouse-wheel-up to scroll content back up")
+	}
+}
+
 func TestHelpWindowSizeMsg(t *testing.T) {
 	m := NewModel(nil)
 	m.Open(120, 40)

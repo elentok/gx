@@ -58,6 +58,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		m, cmd = m.handleKey(msg)
 		return m, cmd
+
+	case tea.MouseWheelMsg:
+		m.Viewport, cmd = m.Viewport.Update(msg)
+		return m, cmd
 	}
 	return m, nil
 }
