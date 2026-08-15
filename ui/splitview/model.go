@@ -116,27 +116,93 @@ func (m Model) SetDetailFocused(focused bool) Model {
 	return m
 }
 
-// HandleMouseClick focuses whichever panel a left click lands in, hit-testing
-// against DetailOrigin/DetailSize (detail) and ListSize (list). Only applies
-// in split mode - collapsed shows just the list, and fullscreen already
-// shows only the focused panel, so there's nothing for a click to switch. A
-// click outside both panels' bounds is a no-op.
+// HandleMouseClick focuses whichever panel a left click lands in, via
+// hoverTarget. Only applies in split mode - collapsed shows just the list,
+// and fullscreen already shows only the focused panel, so there's nothing
+// for a click to switch. A click outside both panels' bounds is a no-op.
 func (m Model) HandleMouseClick(msg tea.MouseClickMsg) Model {
 	mouse := msg.Mouse()
 	if mouse.Button != tea.MouseLeft || m.vis != visModeSplit {
 		return m
 	}
-	if col, row, visible := m.DetailOrigin(); visible {
-		dw, dh := m.DetailSize()
-		if mouse.X >= col && mouse.X < col+dw && mouse.Y >= row && mouse.Y < row+dh {
-			return m.SetDetailFocused(true)
-		}
-	}
-	lw, lh := m.ListSize()
-	if mouse.X >= 0 && mouse.X < lw && mouse.Y >= 0 && mouse.Y < lh {
-		return m.SetDetailFocused(false)
+	if target, ok := m.hoverTarget(mouse.X, mouse.Y); ok {
+		return m.SetDetailFocused(target == focusDetail)
 	}
 	return m
+}
+
+// HoverSide identifies which panel a cursor position falls over.
+type HoverSide int
+
+const (
+	// HoverNone means the cursor matches neither panel: the seam between
+	// them, or outside both panels' bounds. Callers should treat this as a
+	// no-op rather than falling back to either panel.
+	HoverNone HoverSide = iota
+	HoverList
+	HoverDetail
+)
+
+// HoverSideAt reports which panel (if either) a mouse-wheel event's cursor
+// position falls over, across all three display modes: in the normal split
+// layout it routes strictly by position against the list and detail rects;
+// when only one panel is visible (single-pane fullscreen, or collapsed),
+// any in-bounds cursor routes to that one visible panel, since there's no
+// other candidate to disambiguate against.
+func (m Model) HoverSideAt(x, y int) HoverSide {
+	target, ok := m.hoverTarget(x, y)
+	if !ok {
+		return HoverNone
+	}
+	if target == focusDetail {
+		return HoverDetail
+	}
+	return HoverList
+}
+
+// hoverTarget hit-tests (x, y) against whichever of the list/detail panels
+// are currently visible, generalizing HandleMouseClick's original
+// split-only hit-test across all three display modes. Detail is checked
+// before list, matching the original click handler's precedence.
+func (m Model) hoverTarget(x, y int) (focusTarget, bool) {
+	var rects []ui.Rect
+	var targets []focusTarget
+	if r, ok := m.detailRect(); ok {
+		rects = append(rects, r)
+		targets = append(targets, focusDetail)
+	}
+	if r, ok := m.listRect(); ok {
+		rects = append(rects, r)
+		targets = append(targets, focusList)
+	}
+	idx, ok := ui.HoverHitTest(x, y, rects...)
+	if !ok {
+		return 0, false
+	}
+	return targets[idx], true
+}
+
+// listRect returns the list panel's rect (relative to the split view's own
+// top-left) in the current display mode, or ok=false if the list isn't
+// currently visible.
+func (m Model) listRect() (r ui.Rect, ok bool) {
+	if m.vis == visModeFullscreen && m.focus == focusDetail {
+		return ui.Rect{}, false
+	}
+	w, h := m.ListSize()
+	return ui.Rect{X: 0, Y: 0, W: w, H: h}, true
+}
+
+// detailRect returns the detail panel's rect (relative to the split view's
+// own top-left) in the current display mode, or ok=false if the detail
+// panel isn't currently visible.
+func (m Model) detailRect() (r ui.Rect, ok bool) {
+	col, row, visible := m.DetailOrigin()
+	if !visible {
+		return ui.Rect{}, false
+	}
+	w, h := m.DetailSize()
+	return ui.Rect{X: col, Y: row, W: w, H: h}, true
 }
 
 // HasChord reports whether the split view is waiting for the second key of a

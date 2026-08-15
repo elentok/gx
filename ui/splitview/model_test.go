@@ -409,6 +409,75 @@ func TestHandleMouseClickIgnoresNonLeftButton(t *testing.T) {
 	}
 }
 
+// --- HoverSideAt ---
+
+func TestHoverSideAtSplitRoutesByPosition(t *testing.T) {
+	t.Parallel()
+	m := newTestModel(200, 50)
+	m.vis = visModeSplit
+	if got := m.HoverSideAt(0, 0); got != HoverList {
+		t.Fatalf("expected HoverList inside list bounds, got %v", got)
+	}
+	col, row, visible := m.DetailOrigin()
+	if !visible {
+		t.Fatal("expected detail visible in split")
+	}
+	if got := m.HoverSideAt(col+1, row); got != HoverDetail {
+		t.Fatalf("expected HoverDetail inside detail bounds, got %v", got)
+	}
+}
+
+func TestHoverSideAtSplitSeamMatchesNeither(t *testing.T) {
+	t.Parallel()
+	m := newTestModel(200, 50)
+	m.vis = visModeSplit
+	col, _, visible := m.DetailOrigin()
+	if !visible {
+		t.Fatal("expected detail visible in split")
+	}
+	if got := m.HoverSideAt(col-1, 0); got != HoverNone {
+		t.Fatalf("expected HoverNone in the seam, got %v", got)
+	}
+}
+
+func TestHoverSideAtCollapsedRoutesToList(t *testing.T) {
+	t.Parallel()
+	m := newTestModel(200, 50)
+	m.vis = visModeCollapsed
+	if got := m.HoverSideAt(100, 25); got != HoverList {
+		t.Fatalf("expected HoverList while collapsed, got %v", got)
+	}
+}
+
+func TestHoverSideAtFullscreenListRoutesToList(t *testing.T) {
+	t.Parallel()
+	m := newTestModel(200, 50)
+	m.vis = visModeFullscreen
+	m.focus = focusList
+	if got := m.HoverSideAt(100, 25); got != HoverList {
+		t.Fatalf("expected HoverList in list-fullscreen, got %v", got)
+	}
+}
+
+func TestHoverSideAtFullscreenDetailRoutesToDetail(t *testing.T) {
+	t.Parallel()
+	m := newTestModel(200, 50)
+	m.vis = visModeFullscreen
+	m.focus = focusDetail
+	if got := m.HoverSideAt(100, 25); got != HoverDetail {
+		t.Fatalf("expected HoverDetail in detail-fullscreen, got %v", got)
+	}
+}
+
+func TestHoverSideAtOutsideBoundsMatchesNeither(t *testing.T) {
+	t.Parallel()
+	m := newTestModel(200, 50)
+	m.vis = visModeSplit
+	if got := m.HoverSideAt(1000, 1000); got != HoverNone {
+		t.Fatalf("expected HoverNone outside bounds, got %v", got)
+	}
+}
+
 // --- Auto-orientation threshold ---
 
 func TestAutoOrientationHorizontalAtWidth99(t *testing.T) {
