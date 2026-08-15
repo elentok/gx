@@ -66,10 +66,10 @@ func runClaudeSessionPath(d deps, sessionID, grepPattern string) error {
 	return nil
 }
 
-// grepFileLines returns path's lines matching pattern, case-insensitively —
-// the same -i regex semantics claudehistory.GrepTranscripts' rg invocation
-// uses for the interactive grep page, so a --grep search here behaves like
-// the one a caller already knows from `gx claude history`.
+// grepFileLines returns path's lines matching pattern as a case-insensitive
+// Go regexp (RE2 syntax) match, independent of claudehistory.GrepTranscripts'
+// rg-based (Rust regex) matching — the two are close for simple patterns but
+// not a byte-for-byte semantic match.
 func grepFileLines(path, pattern string) ([]string, error) {
 	re, err := regexp.Compile("(?i)" + pattern)
 	if err != nil {
