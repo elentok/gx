@@ -12,6 +12,14 @@ to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKI
   completed anyway" in the same notification batch. Diagnosed via `blf`'s `power-improvements`
   ticket `05`, `run-log.jsonl` batch at `2026-08-14T22:41:45+03:00`; not yet fixed. See
   `follow-ups/issues/09-parked-outcome-still-fires-iteration-finished.md`.
+- **Draining a paused epic run hangs silently — indistinguishable from a drain still waiting on a
+  long in-flight ticket.** `Gate.Drain()` doesn't wake a run parked in `waitForResume`, so a drain
+  requested against a paused epic never completes: the run still shows `running`, no
+  `DrainComplete` notification ever fires, and drain-then-replace never launches — no error or log
+  line marks the difference from an in-flight ticket the drain is legitimately still waiting on.
+  Recovery: resume the epic and it exits immediately. Not fixed as of this entry — see ticket `01`
+  of `drain-queue-fixes`; drop this entry once `01` lands. See
+  `drain-queue-fixes/issues/01-*.md`.
 - **Telegram ticket-completion notifications silently drop almost every time (unescaped `.` in
   cost).** `formatCost` (`ralphloop/notification_text.go`) renders `"$1.23"` and
   `iterationFinishedText` splices it unescaped into the counts line `message()` sends — `.` is a

@@ -17,7 +17,7 @@ property of the event rather than a guess about the reader's intent.
 
 - **Membership.** Chat: `EpicStarted`, `IterationStarted`, `IterationPaused`, `IterationResumed`,
   `IterationFinished`, `TicketNeedsHuman` (ticket 05's single parking event), `EpicParked`,
-  `EpicComplete`, `EpicFailed`. Everything else on `EventSink` is TUI-only.
+  `EpicComplete`, `EpicFailed`, `DrainComplete`. Everything else on `EventSink` is TUI-only.
   `TicketUnrecoverable` reaches chat *through* `TicketNeedsHuman` — it is a parking write like any
   other — rather than as a member of its own, which keeps "every park is one event from one site"
   literally true.
@@ -36,8 +36,8 @@ property of the event rather than a guess about the reader's intent.
   tally shape was chosen over a fraction because the queue's denominator moves — an epic can be
   added mid-run — and a fraction would read as a progress bar that goes backwards.
 - **A counts line appears only where the counts materially moved**: epic started, ticket landed,
-  ticket parked, epic complete. Not on ticket started, paused, or resumed, where it would repeat the
-  previous message with one ticket shifted.
+  ticket parked, epic complete, drain complete. Not on ticket started, paused, or resumed, where it
+  would repeat the previous message with one ticket shifted.
 - **One `chatEventSink`** parameterized by an `mrkdwnStyle` and a transport replaces the two
   near-identical decorators, so an event can no longer land in Slack and not Telegram. A
   reflection-driven contract test enumerates every `EventSink` method against an explicit chat

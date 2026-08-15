@@ -111,7 +111,7 @@ existing `follow-ups` backlog epic instead of the epic under investigation.
   - **Batch queue**: wraps only the async chat-event path (`chatEventSink`) — the internal
     lifecycle events enumerated in `chat_eventsink.go`'s doc comment (`EpicStarted`,
     `IterationStarted`, `IterationPaused`/`Resumed` for non-park kinds, `IterationFinished`,
-    `TicketNeedsHuman`, `EpicParked`, `EpicComplete`). `gx notify` and `EpicFailureReporter` do not
+    `TicketNeedsHuman`, `EpicParked`, `EpicComplete`, `DrainComplete`). `gx notify` and `EpicFailureReporter` do not
     go through the batch queue — both already send exactly one message per call, and per the map,
     `gx notify` is a deliberate one-off action that shouldn't wait on a flush tick. The queue flushes
     synchronously on sink close / TUI shutdown (bounded by the transport timeout), not just on the
