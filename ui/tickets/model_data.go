@@ -2,6 +2,7 @@ package tickets
 
 import (
 	"sort"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -311,7 +312,7 @@ func (m Model) isCollapsed(epic tickets.Epic) bool {
 }
 
 // sidebarSectionID is the tree.Entry ID for a section's nodeSection root row
-// — the single source of truth idFn and defaultCollapsedSidebar both share
+// — the single source of truth idFn and closedEpicDefaults both share
 // for "section:open"/"section:closed".
 func sidebarSectionID(section sidebarSection) string {
 	if section == sectionOpen {
@@ -320,17 +321,85 @@ func sidebarSectionID(section sidebarSection) string {
 	return "section:closed"
 }
 
-// defaultCollapsedSidebar applies the sidebar's one default-collapsed
-// policy — "Closed epics" starts collapsed, everything else (individual
-// epics, the Open section) starts expanded — via tree.ApplyDefaults: an ID
-// the user has ever explicitly toggled (an epic, or the Closed section
-// itself) keeps that choice across reload no matter how many times epics
-// data is rebuilt, since expand/collapse ops record an explicit true/false
-// rather than deleting the map entry.
-func defaultCollapsedSidebar(existing map[string]bool) map[string]bool {
-	return tree.ApplyDefaults(existing, map[string]bool{
-		sidebarSectionID(sectionClosed): true,
-	})
+// closedEpicDefaults is the sidebar's declared-default collapse policy: the
+// "Closed epics" section starts collapsed, and every closed epic's own row
+// (splitEpicIndexesBySection's AllDone rule) starts collapsed too — so
+// expanding the section doesn't dump every closed epic's full ticket list
+// on screen at once. An open epic gets no entry (defaults to expanded).
+// Declared fresh from epics every call — never mutated or persisted — so an
+// epic that reopens (a ticket moves back off done) simply stops appearing
+// here on the very next call, with nothing to un-seed.
+func closedEpicDefaults(epics []tickets.Epic) map[string]bool {
+	defaults := map[string]bool{sidebarSectionID(sectionClosed): true}
+	for _, epic := range epics {
+		if epic.AllDone() {
+			defaults[epic.Path] = true
+		}
+	}
+	return defaults
+}
+
+// searchExpandOverrides is the transient half of the sidebar's collapse
+// layering: every epic containing a query match (recomputeSearchMatches'
+// own matching rule, duplicated here as a pure function so
+// deriveCollapsedSidebar can call it without a *Model) reports its own path
+// and containing section as wanting to render expanded. Declared fresh from
+// epics/query every call — nil once query is empty, so it carries no state
+// of its own between searches.
+func searchExpandOverrides(epics []tickets.Epic, query string) map[string]bool {
+	q := strings.ToLower(strings.TrimSpace(query))
+	if q == "" {
+		return nil
+	}
+	var overrides map[string]bool
+	for _, epic := range epics {
+		matched := false
+		for _, t := range epic.Tickets {
+			text := strings.ToLower(t.Title + " " + epic.RenderedStatus(t).Word())
+			if strings.Contains(text, q) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			continue
+		}
+		if overrides == nil {
+			overrides = map[string]bool{}
+		}
+		overrides[epic.Path] = false
+		section := sectionOpen
+		if epic.AllDone() {
+			section = sectionClosed
+		}
+		overrides[sidebarSectionID(section)] = false
+	}
+	return overrides
+}
+
+// deriveCollapsedSidebar computes the sidebar's effective/derived collapse
+// map fresh every call, from three layers: explicit (the user's own
+// recorded expand/collapse/toggle choices — the only durable map, owned by
+// Model.explicitCollapsed, never written to by this function or its
+// callers) as the base; closedEpicDefaults layered under it via
+// tree.ApplyDefaults (an ID absent from explicit takes its declared
+// default; an ID already in explicit — however it got there — keeps that
+// choice); then searchExpandOverrides layered on top, but only for IDs
+// explicit hasn't touched, so a user's explicit toggle always wins over
+// both the declared default and the transient search override, in either
+// direction. The result is safe to hand straight to
+// sidebarTree.SetCollapsedIDs — it must never be read back into explicit,
+// or a default/override would calcify into a permanent choice the way the
+// old read-back-and-write-back defaultCollapsedSidebar did.
+func deriveCollapsedSidebar(explicit map[string]bool, epics []tickets.Epic, query string) map[string]bool {
+	effective := tree.ApplyDefaults(explicit, closedEpicDefaults(epics))
+	for id := range searchExpandOverrides(epics, query) {
+		if _, ok := explicit[id]; ok {
+			continue
+		}
+		effective[id] = false
+	}
+	return effective
 }
 
 // sortedTicketIndexes orders epic.Tickets' indexes in plan order — ticket

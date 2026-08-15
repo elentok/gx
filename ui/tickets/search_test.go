@@ -155,9 +155,9 @@ func TestSearch_MatchesTicketInsideCollapsedClosedEpic(t *testing.T) {
 	if !closedEpic.AllDone() {
 		t.Fatalf("expected closed-epic to be all-done in this fixture")
 	}
-	// Per-epic collapse defaults moved to the Closed section as a whole (03a)
-	// — the epic itself starts expanded, but nested inside the collapsed
-	// Closed section root it stays unreachable until the section expands.
+	// The epic itself also defaults to collapsed (ticket 02), but that's
+	// moot here since it's nested inside the collapsed Closed section root
+	// and stays unreachable until the section expands regardless.
 	if !m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
 		t.Fatalf("expected Closed section to start collapsed by default")
 	}
@@ -186,7 +186,13 @@ func TestSearch_MatchesTicketInsideCollapsedClosedEpic(t *testing.T) {
 	}
 }
 
-func TestSearch_MatchExpandsBothManuallyCollapsedEpicAndClosedSection(t *testing.T) {
+// TestSearch_MatchExpandsClosedSectionButNotManuallyCollapsedEpic covers
+// ticket 02's requirement that a user's explicit collapse beats the search
+// override in either direction: the Closed section itself has no explicit
+// entry here, so search's transient override still expands it, but the
+// epic the user explicitly collapsed stays collapsed and its ticket stays
+// out of the rendered (and thus matchable) sidebar entries.
+func TestSearch_MatchExpandsClosedSectionButNotManuallyCollapsedEpic(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "closed-epic", "01-hidden-gem.md", "Status: done\n\nBody.\n")
 	writeTicket(t, root, "open-epic", "01-other.md", "Status: open\n\nBody.\n")
@@ -205,10 +211,10 @@ func TestSearch_MatchExpandsBothManuallyCollapsedEpicAndClosedSection(t *testing
 	if closedEpicIdx == -1 {
 		t.Fatalf("expected a closed epic in this fixture")
 	}
-	// The epic starts expanded by default (03a moved collapse defaults to the
-	// section); collapse it individually here so both it and its containing
-	// Closed section root are collapsed at once, matching the ticket's
-	// "closed, collapsed epic" scenario.
+	// The epic already defaults to collapsed once the Closed section is
+	// expanded (ticket 02); collapse it explicitly here so the assertions
+	// below exercise the explicit-beats-search-override path, not just the
+	// declared default.
 	setCollapsedEpic(&m, closedEpicIdx, true)
 	if !m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
 		t.Fatalf("expected Closed section to start collapsed by default")
@@ -220,27 +226,14 @@ func TestSearch_MatchExpandsBothManuallyCollapsedEpicAndClosedSection(t *testing
 	m.search.Start("hidden gem")
 	m.recomputeSearchMatches()
 
-	if m.search.MatchesCount() != 1 {
-		t.Fatalf("expected one match for ticket inside doubly-collapsed epic, got %d", m.search.MatchesCount())
+	if m.search.MatchesCount() != 0 {
+		t.Fatalf("expected no visible matches for a ticket inside a manually-collapsed epic, got %d", m.search.MatchesCount())
 	}
 	if m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
 		t.Fatalf("expected Closed section to auto-expand")
 	}
-	if m.sidebarTree.CollapsedIDs()[m.epics[closedEpicIdx].Path] {
-		t.Fatalf("expected the matching epic to auto-expand")
-	}
-
-	match, ok := m.search.Match(0)
-	if !ok {
-		t.Fatalf("expected a match at position 0")
-	}
-	entries := m.sidebarTree.Entries()
-	if match.DataIndex < 0 || match.DataIndex >= len(entries) {
-		t.Fatalf("match DataIndex %d out of range of %d sidebar entries", match.DataIndex, len(entries))
-	}
-	r, ok := rowFromEntry(entries[match.DataIndex])
-	if !ok || r.isEpic() || m.epics[r.epicIdx].Tickets[r.ticketIdx].Title != "Hidden gem" {
-		t.Fatalf("expected match to point at the hidden-gem ticket row, got row %+v ok=%v", r, ok)
+	if !m.sidebarTree.CollapsedIDs()[m.epics[closedEpicIdx].Path] {
+		t.Fatalf("expected the manually-collapsed epic to stay collapsed despite the search match")
 	}
 }
 

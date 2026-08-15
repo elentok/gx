@@ -83,6 +83,16 @@ type Model struct {
 	// replacing the former m.selected/m.scrollOffset/m.collapsedEpics/
 	// m.collapsedTickets fields.
 	sidebarTree tree.Model[sidebarNode]
+	// explicitCollapsed is the sidebar's durable collapse state (ticket 02
+	// collapse-state layering): only ever written to by the user's own
+	// expand/collapse/toggle keypresses (see handleSidebarTreeKey), never by
+	// a declared default or the transient search-match override. Every
+	// rebuild re-derives m.sidebarTree's actual collapse map fresh from this
+	// plus epics/search state (deriveCollapsedSidebar, via
+	// refreshSidebarCollapse) — this map itself is never overwritten by that
+	// derived result, so a default or override can never calcify into a
+	// permanent entry.
+	explicitCollapsed map[string]bool
 	// hideDone is the "tc" chord's toggle (ticket 08): when set, done tickets
 	// are excluded from buildSidebarEntries()/sidebarBody() navigation and
 	// rendering. Epic done/total header counts read epic.Tickets directly
@@ -199,6 +209,7 @@ func NewModelWithStore(worktreeRoot string, settings ui.Settings, extraKeys keys
 		checkOrder:         snapshot.TicketCheckOrder,
 		queueStatus:        snapshot.Status,
 		queueStore:         store,
+		explicitCollapsed:  map[string]bool{},
 	}
 }
 
@@ -255,7 +266,6 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loaded = true
 		m.epics = msg.epics
 		m.archivedEpicCount = msg.archivedEpicCount
-		m.sidebarTree.SetCollapsedIDs(defaultCollapsedSidebar(m.sidebarTree.CollapsedIDs()))
 		if m.search.HasQuery() {
 			m.recomputeSearchMatches()
 		}
@@ -359,8 +369,20 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 // tree.NewModel's zero-value selection at index 0) nudges off one if the
 // rebuilt entries left the selection sitting on one.
 func (m *Model) clampSelected() {
+	m.refreshSidebarCollapse()
 	m.sidebarTree.SetEntries(m.buildSidebarEntries())
 	m.sidebarTree.SkipUnselectable(1)
+}
+
+// refreshSidebarCollapse re-derives m.sidebarTree's collapse map fresh from
+// m.explicitCollapsed/m.epics/m.search's query (deriveCollapsedSidebar) and
+// hands it to m.sidebarTree — every rebuild path funnels through here (or
+// through recomputeSearchMatches, which does the same) so the sidebar's
+// three collapse-state read sites (buildSidebarEntries, the section-header
+// glyph, isCollapsed/renderEpicRow) always read through the one map that
+// was actually handed to the tree.
+func (m *Model) refreshSidebarCollapse() {
+	m.sidebarTree.SetCollapsedIDs(deriveCollapsedSidebar(m.explicitCollapsed, m.epics, m.search.Query()))
 }
 
 // sidebarViewportHeight is the sidebar body's visible line count, matching

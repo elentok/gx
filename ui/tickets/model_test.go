@@ -444,13 +444,13 @@ func TestModel_EpicsLoadedMsgPreservesManualCollapseToggle(t *testing.T) {
 	if !m.isCollapsed(findEpic(t, m, "open-epic")) {
 		t.Fatalf("expected manually-collapsed open-epic to stay collapsed after epicsLoadedMsg")
 	}
-	// Individual epics no longer get an automatic default-collapse: the new
-	// fully-done epic itself stays expanded...
-	if m.isCollapsed(findEpic(t, m, "new-done-epic")) {
-		t.Fatalf("expected new fully-done epic itself to stay expanded (no per-epic default)")
+	// A newly-closed epic now gets its own collapsed default (ticket 02),
+	// on top of the Closed section itself also starting collapsed.
+	if !m.isCollapsed(findEpic(t, m, "new-done-epic")) {
+		t.Fatalf("expected new fully-done epic to default to collapsed")
 	}
-	// ...but its ticket is still hidden, because the Closed section itself
-	// starts collapsed.
+	// ...and its ticket is hidden either way, because the Closed section
+	// itself starts collapsed.
 	if strings.Contains(m.View().Content, "First ticket") {
 		t.Fatalf("expected new-done-epic's ticket hidden by the default-collapsed Closed section, got:\n%s", m.View().Content)
 	}
@@ -479,6 +479,10 @@ func TestModel_ExpandedClosedSectionSurvivesRepeatedRefresh(t *testing.T) {
 	if m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
 		t.Fatalf("expected Closed section expanded after manual toggle")
 	}
+	// done-epic itself still defaults to collapsed once the section is
+	// expanded (ticket 02) — expand it explicitly too, since this test is
+	// about the section toggle's durability, not the per-epic default.
+	setCollapsedEpic(&m, indexOfEpic(t, m, "done-epic"), false)
 
 	for i := range 3 {
 		msg := m.cmdLoad()()
@@ -1107,14 +1111,16 @@ func indexOfEpic(t *testing.T, m Model, name string) int {
 	return -1
 }
 
-// setCollapsedEpic mirrors the old m.setCollapsed(epicIdx, collapsed): mutate
-// a copy of the sidebar tree's collapsed-ID map keyed by the epic's Path,
-// write it back, then clampSelected to rebuild entries so a caller's
+// setCollapsedEpic mirrors a user's explicit toggle keypress: write directly
+// into m.explicitCollapsed (never m.sidebarTree's own map, which
+// clampSelected/refreshSidebarCollapse now overwrites from explicit state on
+// every rebuild), then clampSelected to rebuild entries so a caller's
 // subsequent Entries()/selectedRow() call sees the change.
 func setCollapsedEpic(m *Model, epicIdx int, collapsed bool) {
-	ids := m.sidebarTree.CollapsedIDs()
-	ids[m.epics[epicIdx].Path] = collapsed
-	m.sidebarTree.SetCollapsedIDs(ids)
+	if m.explicitCollapsed == nil {
+		m.explicitCollapsed = map[string]bool{}
+	}
+	m.explicitCollapsed[m.epics[epicIdx].Path] = collapsed
 	m.clampSelected()
 }
 
@@ -1122,9 +1128,10 @@ func setCollapsedEpic(m *Model, epicIdx int, collapsed bool) {
 // (e.g. expanding the Closed section, which now starts collapsed by
 // default, so a test can see its epics/tickets).
 func setCollapsedSection(m *Model, section sidebarSection, collapsed bool) {
-	ids := m.sidebarTree.CollapsedIDs()
-	ids[sidebarSectionID(section)] = collapsed
-	m.sidebarTree.SetCollapsedIDs(ids)
+	if m.explicitCollapsed == nil {
+		m.explicitCollapsed = map[string]bool{}
+	}
+	m.explicitCollapsed[sidebarSectionID(section)] = collapsed
 	m.clampSelected()
 }
 

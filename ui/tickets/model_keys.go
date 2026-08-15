@@ -152,6 +152,16 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// (next is dropped rather than assigned back) and focus redirected
 	// instead. A leaf row never sets ExpandNoop; it falls through to the
 	// tree's own OpenSelected below, same as always.
+	// selectedID is captured before tree.Model.Update runs a collapse/expand/
+	// toggle binding directly against its own internal collapsed map (see
+	// ui/tree/ops.go) — the only way ui/tickets learns which single entry
+	// just changed, short of duplicating that binding logic here.
+	selectedID := ""
+	if entries := m.sidebarTree.Entries(); len(entries) > 0 {
+		if idx := m.sidebarTree.SelectedIndex(); idx >= 0 && idx < len(entries) {
+			selectedID = entries[idx].ID
+		}
+	}
 	next, cmd, result := m.sidebarTree.Update(msg)
 	if result.ExpandNoop {
 		m.focus = focusPreview
@@ -159,6 +169,16 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	m.sidebarTree = next
 	if result.RebuildRequested {
+		// Record only selectedID's own resulting value into the durable
+		// explicit map — never the whole CollapsedIDs() map, which would
+		// reintroduce the read-back-and-write-back loop (ticket 02) that
+		// made every declared default/search override permanent.
+		if selectedID != "" {
+			if m.explicitCollapsed == nil {
+				m.explicitCollapsed = map[string]bool{}
+			}
+			m.explicitCollapsed[selectedID] = m.sidebarTree.CollapsedIDs()[selectedID]
+		}
 		m.clampSelected()
 		if m.search.HasQuery() {
 			m.recomputeSearchMatches()

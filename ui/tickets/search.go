@@ -15,7 +15,7 @@ type ticketRef struct {
 
 // recomputeSearchMatches matches against the underlying epic/ticket data
 // directly (m.epics), not m.sidebarTree.Entries(), so a match inside a
-// collapsed epic or a collapsed Closed section (see defaultCollapsedSidebar)
+// collapsed epic or a collapsed Closed section (see deriveCollapsedSidebar)
 // is still found: case-insensitive substring over each ticket's title
 // concatenated with its rendered status word. Any epic containing a match is
 // auto-expanded first, along with its containing section (via
@@ -32,6 +32,11 @@ func (m *Model) recomputeSearchMatches() {
 		// SearchMatch, so the query has to land there too, not just on the
 		// matches — SetPassiveResults sets both in one call.
 		m.sidebarTree.Search().SetPassiveResults("", nil)
+		// Re-derive collapse state now (rather than waiting for the next
+		// unrelated rebuild) so ending a search drops its transient
+		// auto-expand override immediately, per ticket 02.
+		m.refreshSidebarCollapse()
+		m.sidebarTree.SetEntries(m.buildSidebarEntries())
 		return
 	}
 
@@ -48,22 +53,20 @@ func (m *Model) recomputeSearchMatches() {
 	if len(matchedRefs) == 0 {
 		m.search.SetMatches(nil)
 		m.sidebarTree.Search().SetPassiveResults("", nil)
+		m.refreshSidebarCollapse()
+		m.sidebarTree.SetEntries(m.buildSidebarEntries())
 		return
 	}
 
 	wanted := make(map[ticketRef]bool, len(matchedRefs))
-	collapsed := m.sidebarTree.CollapsedIDs()
 	for _, ref := range matchedRefs {
 		wanted[ref] = true
-		epic := m.epics[ref.epicIdx]
-		collapsed[epic.Path] = false
-		section := sectionOpen
-		if epic.AllDone() {
-			section = sectionClosed
-		}
-		collapsed[sidebarSectionID(section)] = false
 	}
-	m.sidebarTree.SetCollapsedIDs(collapsed)
+	// deriveCollapsedSidebar (via refreshSidebarCollapse) computes the same
+	// per-epic/section auto-expand this loop used to write directly into
+	// m.sidebarTree's collapsed map — but transiently, off m.search.Query()
+	// (already set by the caller), never touching m.explicitCollapsed.
+	m.refreshSidebarCollapse()
 	m.sidebarTree.SetEntries(m.buildSidebarEntries())
 
 	matches := make([]search.Match, 0, len(matchedRefs))
