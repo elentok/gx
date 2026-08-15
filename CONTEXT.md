@@ -423,6 +423,17 @@ auto-reload only in that it flashes a "refreshed" notification; like auto-reload
 position and expand/collapse state. It is also the escape hatch for changes made _outside_ gx
 (external terminal git commands), which do not bump the repo epoch.
 
+**Scratch watch** — the Tickets and Queue tabs' event-driven notice that `.scratch` changed. It
+exists because `.scratch` is written by processes the repo epoch cannot see: another gx, a
+ralph-loop running in a sibling worktree, or a hand edit. It is explicitly **best-effort**: it may
+miss changes, and it may fail to start at all. Active only while its own tab is active.
+
+**Scratch poll** — the slow periodic reload of `.scratch` that runs alongside the scratch watch.
+Unlike the watch it is a guarantee, not an optimization: it is what makes "the tab eventually shows
+what is on disk" true even when no event ever arrives (see ADR 0025). Also active only while its own
+tab is active; both watch and poll are started when the tab is activated and are allowed to stop
+when it is deactivated.
+
 ## Queue and Attach Lifecycle (Queue Tab)
 
 **Queue** — the single, per-repo collection of checked/queued tickets across all epics
