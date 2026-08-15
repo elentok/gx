@@ -429,7 +429,9 @@ func TestConflictResolverHandlePrompt_UnexpectedPrompt_FailsImmediately(t *testi
 // (via a follow-up tab-list check) and log a warning, not fail the overall
 // operation.
 func TestResolveCherryPickConflict_TabStillPresentAfterClose_LogsWarningNotError(t *testing.T) {
-	t.Parallel()
+	// Not t.Parallel(): this test mutates the shared global "log" output
+	// (log.SetOutput) to capture the warning, which races against any other
+	// concurrently-running test's log calls.
 	d, _, _ := fakeDeps()
 	var closedTabID string
 	d.TabClose = func(tabID string) error {
