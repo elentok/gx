@@ -437,7 +437,10 @@ func (r *loopRegistry) reduceLiveEvent(epicName string, event ralphloop.LiveEven
 			Message: fmt.Sprintf("\U0001f389 epic %q complete (%s)", epicName, formatElapsed(event.ElapsedSeconds)),
 		})
 	case ralphloop.LiveEventDrainComplete:
-		run.done = event.Completed
+		// Done/Total were already synced to the epic's true state by the last
+		// LiveEventIterationFinished — event.Completed is this run's own
+		// landed-ticket count, a different number (see EventSink.EpicComplete),
+		// not the epic-wide done count.
 		run.state = RunStateCompleted
 		run.pendingToasts = append(run.pendingToasts, notify.NotifyMsg{
 			Kind:    notify.KindWarning,

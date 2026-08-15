@@ -428,8 +428,11 @@ func TestDrainPendingToastsOnEpicComplete(t *testing.T) {
 
 func TestReduceLiveEventDrainComplete(t *testing.T) {
 	t.Parallel()
+	// Resumed/subset run: the epic's true done count (8) already differs
+	// from what this run call itself will land (Completed: 1) before the
+	// drain even fires — mirrors LiveEventEpicComplete's exclusion.
 	r := newLoopRegistry(1)
-	r.tryStart("epic-a", 0, 2)
+	r.tryStart("epic-a", 8, 10)
 	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
 		Kind: ralphloop.LiveEventDrainComplete, EpicName: "epic-a", Completed: 1, ElapsedSeconds: 90,
 	})
@@ -441,8 +444,8 @@ func TestReduceLiveEventDrainComplete(t *testing.T) {
 	if snap.State != RunStateCompleted {
 		t.Errorf("run.State = %v, want RunStateCompleted", snap.State)
 	}
-	if snap.Done != 1 {
-		t.Errorf("run.Done = %d, want 1", snap.Done)
+	if snap.Done != 8 {
+		t.Errorf("run.Done = %d, want 8 (unchanged by drain-complete's own tally)", snap.Done)
 	}
 
 	toasts := r.drainPendingToasts("epic-a")
