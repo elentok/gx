@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 )
@@ -57,6 +58,22 @@ func Path(cwd, sessionID string) (string, error) {
 // helper can call directly instead of relying on process HOME.
 func PathIn(home, cwd, sessionID string) string {
 	return filepath.Join(home, ".claude", "projects", Slugify(cwd), sessionID+".jsonl")
+}
+
+// FindByID searches every project directory under home/.claude/projects for
+// a transcript named <sessionID>.jsonl, for a caller that knows a session id
+// but not the cwd it was slugified from (Path/PathIn's precondition). It
+// returns every match, sorted, rather than the first one found: session ids
+// are unique in practice, so more than one match is an anomaly a caller
+// should surface, not silently resolve by picking one. A nil slice with a
+// nil error means no transcript matched.
+func FindByID(home, sessionID string) ([]string, error) {
+	matches, err := filepath.Glob(filepath.Join(home, ".claude", "projects", "*", sessionID+".jsonl"))
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(matches)
+	return matches, nil
 }
 
 // transcriptLine is the subset of a transcript JSONL line this package

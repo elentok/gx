@@ -13,6 +13,7 @@ func newClaudeCmd(d deps) *cobra.Command {
 	}
 	cmd.AddCommand(newClaudeStatuslineCmd(d))
 	cmd.AddCommand(newClaudeHistoryCmd(d))
+	cmd.AddCommand(newClaudeSessionPathCmd(d))
 	return cmd
 }
 
