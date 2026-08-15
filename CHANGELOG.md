@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.28.10 - 2026-08-15
+
+- Mouse wheel now scrolls whatever pane is under the cursor, hover-based, no click/focus needed first — wired across Tickets, Queue, Log, Stash, Worktrees, PRs tabs, the help modal, commit-info/PR-comments popups, and output viewports.
+- Fixed spurious "done" notification firing alongside the correct park notification when a ralph-loop ticket parks (needs-answer/needs-repair) instead of completing.
+
 ## v0.28.9 - 2026-08-15
 
 - Fixed a flaky ralphloop test (`TestResolveCherryPickConflict_TabStillPresentAfterClose_LogsWarningNotError`) by removing `t.Parallel()`, since it mutates the shared global `log` package output via `log.SetOutput` and was racing other concurrently-running parallel tests
