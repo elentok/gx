@@ -151,6 +151,9 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		m.commitDetail = updated.(commitui.Model)
 		return m, detailCmd
 
+	case tea.MouseWheelMsg:
+		return m.handleMouseWheel(msg)
+
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}

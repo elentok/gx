@@ -86,6 +86,12 @@ func (m listPanel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// ScrollViewport scrolls the viewport by delta rows without moving selection.
+func (m listPanel) ScrollViewport(delta int) listPanel {
+	m.list.ScrollViewport(delta, len(m.entries), m.visibleH())
+	return m
+}
+
 func (m listPanel) visibleH() int {
 	h := m.height - 3 // frame is height-1, minus top+bottom borders
 	if h < 1 {
