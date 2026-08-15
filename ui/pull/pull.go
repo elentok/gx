@@ -132,6 +132,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, Result) {
 		return m.handleKey(msg)
 
 	case spinner.TickMsg:
+		if m.phase != phaseChecking && m.phase != phaseStashing && m.phase != phasePulling && m.phase != phaseStashPopping {
+			return m, nil, Result{}
+		}
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd, Result{}

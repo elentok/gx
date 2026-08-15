@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
@@ -110,6 +111,29 @@ func TestRunnerDoneError_Fails(t *testing.T) {
 	next, _, _ := m.Update(runnerDoneMsg{phase: phaseFetching, err: fakeErr("network error")})
 	if next.phase != phaseFailed {
 		t.Fatalf("expected phaseFailed, got %d", next.phase)
+	}
+}
+
+// spinner.TickMsg rearms only while a network command is running.
+func TestSpinnerTick_RearmsWhileRunning(t *testing.T) {
+	for _, phase := range []phase{phaseFetching, phaseRebasing, phasePushing, phaseTagPushing, phaseForcePushing} {
+		m := newModelWithLog()
+		m.phase = phase
+		_, cmd, _ := m.Update(spinner.TickMsg{})
+		if cmd == nil {
+			t.Errorf("phase %v: expected rearm command while running", phase)
+		}
+	}
+}
+
+func TestSpinnerTick_NoRearmWhileWaitingOnUser(t *testing.T) {
+	for _, phase := range []phase{phaseConfirm, phaseDiverged, phaseForceConfirm, phasePRPrompt, phaseAbortConfirm, phaseFailed} {
+		m := newModelWithLog()
+		m.phase = phase
+		_, cmd, _ := m.Update(spinner.TickMsg{})
+		if cmd != nil {
+			t.Errorf("phase %v: expected no rearm command", phase)
+		}
 	}
 }
 

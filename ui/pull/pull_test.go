@@ -443,7 +443,20 @@ func TestUpdate_SpinnerTick(t *testing.T) {
 	if result.Done {
 		t.Fatal("spinner tick should not emit done")
 	}
-	_ = cmd
+	if cmd == nil {
+		t.Fatal("expected spinner to rearm while pulling")
+	}
+}
+
+func TestUpdate_SpinnerTick_NoRearmWhileWaitingOnUser(t *testing.T) {
+	for _, phase := range []phase{phaseStashConfirm, phasePopStashConfirm, phaseFailed} {
+		m := openedModel()
+		m.phase = phase
+		_, cmd, _ := m.Update(spinner.TickMsg{})
+		if cmd != nil {
+			t.Errorf("phase %v: expected no rearm command, got one", phase)
+		}
+	}
 }
 
 func TestUpdate_PollMsg_NilRunner(t *testing.T) {

@@ -187,6 +187,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, Result) {
 		return m.handleKey(msg)
 
 	case spinner.TickMsg:
+		switch m.phase {
+		case phaseFetching, phaseRebasing, phasePushing, phaseTagPushing, phaseForcePushing:
+		default:
+			return m, nil, Result{}
+		}
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd, Result{}
