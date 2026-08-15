@@ -1966,6 +1966,116 @@ func TestQueueModelScrollsWithKeysAndMouse(t *testing.T) {
 	}
 }
 
+// queueModelForHoverScroll builds a QueueModel with 40 tickets (so the tree
+// overflows a short window) and a long preview body for the first ticket (so
+// the preview overflows too), at a window small enough that both panes have
+// something to scroll. Non-stacked layout (width > 100) puts the tree at
+// x in [0, sidebarW) and the preview at x in [sidebarW+1, width), both
+// spanning y in [0, contentHeight) — see previewRect/queueTreeRect.
+func queueModelForHoverScroll(t *testing.T) QueueModel {
+	t.Helper()
+	root := t.TempDir()
+	var longBody strings.Builder
+	for i := 1; i <= 100; i++ {
+		fmt.Fprintf(&longBody, "Line %d of a long body.\n", i)
+	}
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\n"+longBody.String())
+	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+	for i := 2; i <= 40; i++ {
+		filename := fmt.Sprintf("%02d-ticket.md", i)
+		writeTicket(t, root, "alpha", filename, "Status: open\n\nBody.\n")
+		checked[ticketPath(root, "alpha", filename)] = true
+	}
+
+	m := NewQueueModel(root, ui.Settings{}, checked, keys.Manager{})
+	msg := m.Init()()
+	updated, _ := m.Update(msg)
+	m = updated.(QueueModel)
+	updated, _ = m.Update(tea.WindowSizeMsg{Width: 220, Height: 20})
+	m = updated.(QueueModel)
+	m = selectFirstQueueTicketRow(t, m)
+
+	if m.queueTree.ScrollOffset() != 0 || m.previewVP.YOffset() != 0 {
+		t.Fatalf("expected both panes to start unscrolled, got tree=%d preview=%d", m.queueTree.ScrollOffset(), m.previewVP.YOffset())
+	}
+	return m
+}
+
+// TestQueueModelHoverScrollFollowsCursorNotFocus covers ticket 03: the Queue
+// tab's tree/preview wheel routing follows the cursor's hover position, not
+// m.focus — mirroring the Tickets tab's sidebar/preview pair and ui/commit's
+// diff/filetree pair (ticket 01's HoverHitTest helper).
+func TestQueueModelHoverScrollFollowsCursorNotFocus(t *testing.T) {
+	t.Parallel()
+
+	t.Run("focus pinned to preview, hover over tree scrolls tree", func(t *testing.T) {
+		t.Parallel()
+		m := queueModelForHoverScroll(t)
+		m.focus = focusPreview
+
+		updated, _ := m.Update(tea.MouseWheelMsg{X: 1, Y: 1, Button: tea.MouseWheelDown})
+		m = updated.(QueueModel)
+
+		if m.queueTree.ScrollOffset() == 0 {
+			t.Fatalf("expected hovering the tree to scroll it")
+		}
+		if m.previewVP.YOffset() != 0 {
+			t.Fatalf("expected the preview's scroll offset to stay unchanged, got %d", m.previewVP.YOffset())
+		}
+		if m.focus != focusPreview {
+			t.Fatalf("expected focus to stay on the preview, got %v", m.focus)
+		}
+	})
+
+	t.Run("focus pinned to tree, hover over preview scrolls preview", func(t *testing.T) {
+		t.Parallel()
+		m := queueModelForHoverScroll(t)
+		m.focus = focusSidebar
+
+		px, _, _, _ := previewRect(m.width, m.contentHeight())
+		updated, _ := m.Update(tea.MouseWheelMsg{X: px + 1, Y: 1, Button: tea.MouseWheelDown})
+		m = updated.(QueueModel)
+
+		if m.previewVP.YOffset() == 0 {
+			t.Fatalf("expected hovering the preview to scroll it")
+		}
+		if m.queueTree.ScrollOffset() != 0 {
+			t.Fatalf("expected the tree's scroll offset to stay unchanged, got %d", m.queueTree.ScrollOffset())
+		}
+		if m.focus != focusSidebar {
+			t.Fatalf("expected focus to stay on the tree, got %v", m.focus)
+		}
+	})
+}
+
+// TestQueueModelHoverScrollNoOpsWithNoOverflow covers ticket 03's acceptance
+// criterion that a pane with nothing to scroll no-ops the wheel rather than
+// falling back to the focused pane.
+func TestQueueModelHoverScrollNoOpsWithNoOverflow(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+	m = selectFirstQueueTicketRow(t, m)
+
+	treeBefore := m.queueTree.ScrollOffset()
+	previewBefore := m.previewVP.YOffset()
+
+	px, _, _, _ := previewRect(m.width, m.contentHeight())
+	updated, _ := m.Update(tea.MouseWheelMsg{X: px + 1, Y: 1, Button: tea.MouseWheelDown})
+	m = updated.(QueueModel)
+	updated, _ = m.Update(tea.MouseWheelMsg{X: 1, Y: 1, Button: tea.MouseWheelDown})
+	m = updated.(QueueModel)
+
+	if m.queueTree.ScrollOffset() != treeBefore {
+		t.Fatalf("expected tree scroll offset unchanged, got %d want %d", m.queueTree.ScrollOffset(), treeBefore)
+	}
+	if m.previewVP.YOffset() != previewBefore {
+		t.Fatalf("expected preview scroll offset unchanged, got %d want %d", m.previewVP.YOffset(), previewBefore)
+	}
+}
+
 // TestQueueModelShowsPreviewPaneForSelectedTicket covers ticket 15's core
 // acceptance criterion: the Queue tab, previously a single full-width list
 // with no preview at all, now shows the same shared preview pane

@@ -373,20 +373,43 @@ func (m QueueModel) handleQueueSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.
 	return m, cmd
 }
 
-// handleQueueMouseWheel scrolls the queue viewport without moving selection,
-// mirroring ui/log's handleMouseWheel.
+// handleQueueMouseWheel scrolls whichever of the tree/preview panes the
+// cursor is over, routed by ui.HoverHitTest rather than m.focus — so
+// scrolling never needs a prior click/keyboard focus change, mirroring
+// ui/commit's handleMouseWheel. Selection is left untouched either way.
 func (m QueueModel) handleQueueMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 	dir, ok := ui.WheelDirection(msg)
 	if !ok {
 		return m, nil
 	}
-	if m.focus == focusPreview {
+	mouse := msg.Mouse()
+	idx, ok := ui.HoverHitTest(mouse.X, mouse.Y, m.queueTreeRect(), m.queuePreviewRect())
+	if !ok {
+		return m, nil
+	}
+	if idx == 1 {
 		var cmd tea.Cmd
 		m.previewVP, cmd = m.previewVP.Update(msg)
 		return m, cmd
 	}
 	m.queueTree.ScrollViewport(dir * ui.WheelScrollLines)
 	return m, nil
+}
+
+// queueTreeRect returns the queue tree panel's absolute on-screen bounds,
+// mirroring previewRect's layout math (same splitPanelWidth/splitPanelHeight
+// call) for the Queue tab's own panel pair.
+func (m QueueModel) queueTreeRect() ui.Rect {
+	sidebarW, _ := splitPanelWidth(m.width)
+	sidebarH, _ := splitPanelHeight(m.width, m.contentHeight())
+	return ui.Rect{X: 0, Y: 0, W: sidebarW, H: sidebarH}
+}
+
+// queuePreviewRect wraps the shared previewRect in a ui.Rect for
+// HoverHitTest.
+func (m QueueModel) queuePreviewRect() ui.Rect {
+	x, y, w, h := previewRect(m.width, m.contentHeight())
+	return ui.Rect{X: x, Y: y, W: w, H: h}
 }
 
 // contentHeight returns the content height below the tab bar, mirroring
