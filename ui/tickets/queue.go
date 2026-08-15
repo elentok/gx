@@ -66,6 +66,19 @@ type QueueModel struct {
 	// (tree.Model[queueNode], see queue_rows.go's buildQueueEntries).
 	queueTree tree.Model[queueNode]
 
+	// entriesCache memoizes buildQueueEntries' output across renders. It's a
+	// pointer so the cache survives QueueModel being copied by value on every
+	// Update: buildQueueEntries only depends on m.epics/m.checked/
+	// m.hideComplete/collapsed-IDs (see queueEntriesCache), everything else
+	// live (running-epic elapsed time, spinner frame, parked/stalled state)
+	// is read straight from the model by queueRenderOpts' Label callback at
+	// draw time, not baked into the cached entries — so reusing a cached
+	// tree when none of those four inputs changed is safe even mid-run.
+	// Cuts the CPU cost of cmdAutoRefresh's 2s poll (auto_refresh.go)
+	// rebuilding the full tree from scratch every render even when nothing
+	// on disk changed.
+	entriesCache *queueEntriesCache
+
 	implementAgentMenuOpen bool
 	implementAgentMenu     components.MenuState
 	// actionsMenu backs the "m"-triggered suggested-actions menu (see
@@ -153,6 +166,7 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 		search:             search.NewModel(),
 		keys:               km,
 		queueTree:          queueTree,
+		entriesCache:       &queueEntriesCache{},
 		help:               help.NewModel(help.BuildSections(km, *queueTree.Keys(), extraKeys)),
 		previewFocus:       newPreviewFocus(),
 	}

@@ -92,7 +92,7 @@ type statusData struct {
 }
 
 func DefaultSettings() ui.Settings {
-	return ui.Settings{UseNerdFontIcons: true, ImageDiffs: true, Terminal: ui.TerminalPlain, DiffContextLines: 1}
+	return ui.Settings{UseNerdFontIcons: true, ImageDiffs: true, Terminal: ui.TerminalPlain, DiffContextLines: 1, RenderHeartbeat: true}
 }
 
 type flashTickMsg struct{}

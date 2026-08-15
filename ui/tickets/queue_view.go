@@ -28,9 +28,12 @@ func (m QueueModel) View() tea.View {
 		// m.checked is a map shared with the Tickets tab (and, with a
 		// queueStore, refreshed from its snapshot just above) — either can add
 		// a ticket to it between Update calls with no queueEpicsLoadedMsg/
-		// clampSelected in between, so the tree must be rebuilt on every render
-		// rather than only on the events clampSelected's own doc comment lists.
-		m.queueTree.SetEntries(m.buildQueueEntries())
+		// clampSelected in between, so this must be re-evaluated on every
+		// render rather than only on the events clampSelected's own doc
+		// comment lists. buildQueueEntriesCached (queue_rows.go) reuses the
+		// previous tree when m.checked (among its other inputs) actually
+		// didn't change, rather than always rebuilding from scratch.
+		m.queueTree.SetEntries(m.buildQueueEntriesCached())
 	}
 	sidebarW, previewW := splitPanelWidth(m.width)
 	sidebarH, previewH := splitPanelHeight(m.width, m.contentHeight())

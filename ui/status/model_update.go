@@ -14,10 +14,14 @@ import (
 )
 
 func (m Model) Init() tea.Cmd {
-	if m.settings.EnableNavigation {
-		return tea.Batch(renderTickCmd(), statusStartupLoadCmd())
+	var heartbeatCmd tea.Cmd
+	if m.settings.RenderHeartbeat {
+		heartbeatCmd = renderTickCmd()
 	}
-	return tea.Batch(renderTickCmd(), m.cmdLoadBranchSync())
+	if m.settings.EnableNavigation {
+		return tea.Batch(heartbeatCmd, statusStartupLoadCmd())
+	}
+	return tea.Batch(heartbeatCmd, m.cmdLoadBranchSync())
 }
 
 func renderTickCmd() tea.Cmd {

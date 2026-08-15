@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"reflect"
 	"slices"
 
 	"github.com/elentok/gx/ralphloop"
@@ -54,6 +55,50 @@ type queueNode struct {
 	epic   tickets.Epic
 	err    error
 	ticket queueRow
+}
+
+// queueEntriesCache memoizes buildQueueEntries' output (see QueueModel.
+// entriesCache) against the four inputs that actually change its structure.
+// Anything read live at draw time instead (running-epic elapsed seconds,
+// spinner frame, parked/stalled state — queueRenderOpts' Label callback) is
+// excluded on purpose: it doesn't affect which entries exist, only how a
+// cached entry's row text renders, so it can't go stale from reusing this
+// cache.
+type queueEntriesCache struct {
+	epics        []tickets.Epic
+	checked      map[string]bool
+	hideComplete bool
+	collapsed    map[string]bool
+	entries      []tree.Entry[queueNode]
+}
+
+// buildQueueEntriesCached returns buildQueueEntries' result, reusing the
+// previous build when none of its inputs changed since the last render.
+// Queue is polled every 2s by cmdAutoRefresh (auto_refresh.go) whether or
+// not anything on disk actually changed, and View() (queue_view.go) must
+// call this on every single render regardless — so without this cache an
+// idle Queue tab left open still redoes the full tree rebuild (icons,
+// labels, per-ticket wave/order computation) forever.
+func (m QueueModel) buildQueueEntriesCached() []tree.Entry[queueNode] {
+	if m.entriesCache == nil {
+		return m.buildQueueEntries()
+	}
+	collapsed := m.queueTree.CollapsedIDs()
+	c := m.entriesCache
+	if c.entries != nil &&
+		c.hideComplete == m.hideComplete &&
+		reflect.DeepEqual(c.epics, m.epics) &&
+		reflect.DeepEqual(c.checked, m.checked) &&
+		reflect.DeepEqual(c.collapsed, collapsed) {
+		return c.entries
+	}
+	entries := m.buildQueueEntries()
+	c.epics = m.epics
+	c.checked = m.checked
+	c.hideComplete = m.hideComplete
+	c.collapsed = collapsed
+	c.entries = entries
+	return entries
 }
 
 // buildQueueEntries flattens m.epics into the Queue tab's full tree.Entry

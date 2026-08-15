@@ -12,6 +12,13 @@ type Settings struct {
 	InputModalBottom config.InputModalBottom
 	Terminal         Terminal
 	EnableNavigation bool
+	// RenderHeartbeat keeps ui/status's 1s renderTickCmd loop running. It
+	// exists solely so teatest's WaitFor (which polls rendered output) keeps
+	// observing progress in tests — see docs/retro/0001-notifications.md.
+	// Real interactive sessions leave this false: an unconditional 1Hz
+	// re-render forever was burning CPU on an idle status tab left open for
+	// hours (see ui/status/model_update.go).
+	RenderHeartbeat bool
 	DiffContextLines int               // used by the status diff view
 	NameAliases      map[string]string // used by the worktrees view
 	LogConfig        config.LogConfig
