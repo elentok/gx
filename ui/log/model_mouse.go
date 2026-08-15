@@ -3,8 +3,6 @@ package log
 import (
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/commit"
 	"github.com/elentok/gx/ui/splitview"
 )
 
@@ -20,9 +18,8 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
-	if m.help.IsOpen {
-		var cmd tea.Cmd
-		m.help, cmd = m.help.Update(msg)
+	if next, cmd, handled := m.help.Forward(msg); handled {
+		m.help = next
 		return m, cmd
 	}
 	if m.amendConfirm.IsOpen {
@@ -31,25 +28,7 @@ func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 	if m.commitInfoOpen {
 		return m.handleCommitInfoWheel(msg)
 	}
-	mouse := msg.Mouse()
-	switch m.split.HoverSideAt(mouse.X, mouse.Y) {
-	case splitview.HoverDetail:
-		col, row, visible := m.split.DetailOrigin()
-		if !visible {
-			return m, nil
-		}
-		translated := tea.MouseWheelMsg{X: mouse.X - col, Y: mouse.Y - row, Button: mouse.Button, Mod: mouse.Mod}
-		updated, cmd := m.commitDetail.Update(translated)
-		m.commitDetail = updated.(commit.Model)
-		return m, cmd
-	case splitview.HoverList:
-		dir, ok := ui.WheelDirection(msg)
-		if !ok {
-			return m, nil
-		}
-		m.listPanel = m.listPanel.ScrollViewport(dir * ui.WheelScrollLines)
-		return m, nil
-	default:
-		return m, nil
-	}
+	var cmd tea.Cmd
+	m.commitDetail, m.listPanel, cmd = splitview.RouteWheel(m.split, m.commitDetail, m.listPanel, msg)
+	return m, cmd
 }

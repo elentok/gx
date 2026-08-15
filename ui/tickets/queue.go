@@ -309,9 +309,8 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case spinner.TickMsg:
 		return m.handleQueueSpinnerTick(msg)
 	case tea.MouseWheelMsg:
-		if m.help.IsOpen {
-			var cmd tea.Cmd
-			m.help, cmd = m.help.Update(msg)
+		if next, cmd, handled := m.help.Forward(msg); handled {
+			m.help = next
 			return m, cmd
 		}
 		return m.handleQueueMouseWheel(msg)

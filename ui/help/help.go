@@ -45,6 +45,19 @@ func (m Model) InputFocused() bool {
 	return m.IsOpen && m.filter.InputFocused()
 }
 
+// Forward routes msg to the help modal when it's open, so callers can put
+// this ahead of their own remaining guard conditions instead of hand-copying
+// an "if IsOpen { ... }" block at every embedding site. ok reports whether
+// the modal was open (and thus handled the event); when false, m is
+// returned unchanged and the caller should fall through to its own logic.
+func (m Model) Forward(msg tea.Msg) (next Model, cmd tea.Cmd, ok bool) {
+	if !m.IsOpen {
+		return m, nil, false
+	}
+	next, cmd = m.Update(msg)
+	return next, cmd, true
+}
+
 // This makes HelpModel compatible with tea.Model
 func (m Model) Init() tea.Cmd { return nil }
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {

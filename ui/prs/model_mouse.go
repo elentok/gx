@@ -16,9 +16,8 @@ func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if m.help.IsOpen {
-		var cmd tea.Cmd
-		m.help, cmd = m.help.Update(msg)
+	if next, cmd, handled := m.help.Forward(msg); handled {
+		m.help = next
 		return m, cmd
 	}
 

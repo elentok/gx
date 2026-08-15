@@ -11,9 +11,8 @@ import (
 // hit-test. A hit on neither (a seam, a border) or a pane with nothing to
 // scroll no-ops.
 func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
-	if m.mode == modeHelp {
-		var cmd tea.Cmd
-		m.helpModel, cmd = m.helpModel.Update(msg)
+	if next, cmd, handled := m.helpModel.Forward(msg); handled {
+		m.helpModel = next
 		return m, cmd
 	}
 	if m.mode == modeLogs {

@@ -7,9 +7,8 @@ import (
 )
 
 func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
-	if m.help.IsOpen {
-		var cmd tea.Cmd
-		m.help, cmd = m.help.Update(msg)
+	if next, cmd, handled := m.help.Forward(msg); handled {
+		m.help = next
 		return m, cmd
 	}
 	if m.amendConfirm.IsOpen || m.diffModel.Search().IsActive() || m.fileTreeModel.Search().IsActive() {

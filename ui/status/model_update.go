@@ -197,9 +197,8 @@ func (m Model) handleBranchSyncLoaded(msg branchSyncLoadedMsg) (Model, tea.Cmd) 
 }
 
 func (m Model) handleMouseWheelMsg(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
-	if m.help.IsOpen {
-		var cmd tea.Cmd
-		m.help, cmd = m.help.Update(msg)
+	if next, cmd, handled := m.help.Forward(msg); handled {
+		m.help = next
 		return m, cmd
 	}
 	if m.output.IsOpen {
