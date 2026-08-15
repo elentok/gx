@@ -71,6 +71,10 @@ type backgroundTaskLine struct {
 	} `json:"message"`
 	ToolUseResult struct {
 		BackgroundTaskID string `json:"backgroundTaskId"`
+		RetrievalStatus  string `json:"retrieval_status"`
+		Task             struct {
+			TaskID string `json:"task_id"`
+		} `json:"task"`
 	} `json:"toolUseResult"`
 }
 
@@ -87,12 +91,13 @@ var (
 
 // ReadBackgroundTasks scans the transcript at path for non-sidechain
 // backgrounded-shell-command start markers (a tool_result carrying
-// backgroundTaskId) and, for each, whether a later task-notification
-// resolving the same task id has landed. Sidechain-scoped markers
+// backgroundTaskId) and, for each, whether it was later resolved — either by
+// a passive task-notification transcript entry, or by a TaskOutput tool call
+// blocking on the same task id and returning its result inline (which never
+// produces a task-notification entry of its own). Sidechain-scoped markers
 // (isSidechain: true) are excluded entirely — a subagent's background task
-// belongs to the subagent's lifetime, never the parent iteration's. A
-// task-notification whose task id never had a matching start marker is
-// ignored.
+// belongs to the subagent's lifetime, never the parent iteration's. Either
+// resolution whose task id never had a matching start marker is ignored.
 //
 // now is compared against each marker's own timestamp to decide
 // outstanding-fresh vs outstanding-aged-out against cap — passed explicitly
@@ -166,6 +171,16 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 				}
 			}
 			if m, ok := markers[taskID]; ok {
+				m.resolved = true
+			}
+
+		case entry.ToolUseResult.RetrievalStatus != "" && entry.ToolUseResult.Task.TaskID != "":
+			// A TaskOutput tool call blocks on the backgrounded task and
+			// returns its result inline, instead of the task's completion
+			// ever landing as a passive task-notification transcript entry —
+			// so a marker only ever retrieved this way would otherwise never
+			// resolve and hold the gate until the aged-out cap.
+			if m, ok := markers[entry.ToolUseResult.Task.TaskID]; ok {
 				m.resolved = true
 			}
 		}

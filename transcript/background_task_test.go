@@ -19,6 +19,14 @@ func notificationLine(taskID, toolUseID, status, timestamp string) string {
 	return `{"isSidechain":false,"timestamp":"` + timestamp + `","origin":{"kind":"task-notification"},"message":{"content":"` + content + `"}}`
 }
 
+// taskOutputLine mirrors the tool_result a blocking TaskOutput call gets:
+// this never carries origin.kind == "task-notification" (no passive
+// notification is ever queued once the tool retrieves the result directly).
+func taskOutputLine(taskID, timestamp string) string {
+	content := "<retrieval_status>success</retrieval_status>\\n\\n<task_id>" + taskID + "</task_id>\\n\\n<status>completed</status>"
+	return `{"isSidechain":false,"timestamp":"` + timestamp + `","message":{"content":[{"tool_use_id":"tool-out","type":"tool_result","content":"` + content + `"}]},"toolUseResult":{"retrieval_status":"success","task":{"task_id":"` + taskID + `","status":"completed"}}}`
+}
+
 const capDuration = 2 * time.Hour
 
 var readAt = mustParseTime("2026-08-12T18:00:00.000000000Z")
@@ -58,6 +66,21 @@ func TestReadBackgroundTasks_Resolved_NonCompletedStatusStillResolves(t *testing
 	}
 	if len(reading.Markers) != 1 || reading.Markers[0].Status != BackgroundTaskResolved {
 		t.Errorf("Markers = %+v, want one resolved marker (a failed/killed notification still resolves)", reading.Markers)
+	}
+}
+
+func TestReadBackgroundTasks_ResolvedViaBlockingTaskOutputRetrieval(t *testing.T) {
+	path := writeTranscript(t,
+		startMarkerLine("task-1", "tool-1", "2026-08-12T15:00:00.000000000Z"),
+		taskOutputLine("task-1", "2026-08-12T15:05:00.000000000Z"),
+	)
+
+	reading, err := ReadBackgroundTasks(path, capDuration, readAt)
+	if err != nil {
+		t.Fatalf("ReadBackgroundTasks() error = %v", err)
+	}
+	if len(reading.Markers) != 1 || reading.Markers[0].Status != BackgroundTaskResolved {
+		t.Errorf("Markers = %+v, want one resolved marker: a blocking TaskOutput retrieval resolves the marker even with no task-notification entry", reading.Markers)
 	}
 }
 
