@@ -106,7 +106,7 @@ func (m *Model) cmdOpenComments() tea.Cmd {
 		return nil
 	}
 	pr := m.prs[sel]
-	m.comments.open(m.width)
+	m.comments.open(m.width, m.height)
 
 	worktreeRoot := m.worktreeRoot
 	repo := pr.Repo

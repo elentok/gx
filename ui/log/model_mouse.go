@@ -27,6 +27,9 @@ func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 	if m.amendConfirm.IsOpen {
 		return m, nil
 	}
+	if m.commitInfoOpen {
+		return m.handleCommitInfoWheel(msg)
+	}
 	if m.split.IsSplit() && m.split.IsDetailFocused() {
 		col, row, visible := m.split.DetailOrigin()
 		if !visible {

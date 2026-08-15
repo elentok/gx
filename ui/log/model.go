@@ -78,6 +78,7 @@ type Model struct {
 
 	commitInfoOpen    bool
 	commitInfoDetails git.CommitDetails
+	commitInfoScroll  int
 
 	pendingFocusSubject string
 	pendingFocusRef     string

@@ -1,6 +1,7 @@
 package prs
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -669,6 +670,43 @@ func TestCommentsPopupDismissesViaEscQEnter(t *testing.T) {
 				t.Fatalf("expected popup closed after %q", key)
 			}
 		})
+	}
+}
+
+func TestCommentsPopupScrollsViaKeyboardAndWheel(t *testing.T) {
+	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
+	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = loadPRs(m, []git.PR{
+		{Number: 12, Title: "Add widget", Repo: "acme/widgets", UpdatedAt: time.Now()},
+	}, true, nil, nil)
+	m = sendModel(m, tea.KeyPressMsg{Code: 'c', Text: "c"})
+
+	comments := make([]git.PRComment, 20)
+	for i := range comments {
+		comments[i] = git.PRComment{Author: "alice", Body: fmt.Sprintf("comment %d", i), CreatedAt: time.Now()}
+	}
+	m = sendModel(m, commentsLoadedMsg{comments: comments})
+	if m.comments.scrollOffset != 0 {
+		t.Fatalf("expected fresh popup scrolled to top, got %d", m.comments.scrollOffset)
+	}
+
+	m = sendModel(m, tea.KeyPressMsg{Code: 'j', Text: "j"})
+	if m.comments.scrollOffset != 1 {
+		t.Fatalf("expected j to scroll popup down by 1, got %d", m.comments.scrollOffset)
+	}
+
+	scrollOffsetBefore := m.scrollOffset
+	m = sendModel(m, tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	if m.comments.scrollOffset != 1+ui.WheelScrollLines {
+		t.Fatalf("expected wheel-down to scroll popup by %d, got %d", ui.WheelScrollLines, m.comments.scrollOffset)
+	}
+	if m.scrollOffset != scrollOffsetBefore {
+		t.Fatalf("expected PR list scrollOffset unchanged while comments popup open, got %d, want %d", m.scrollOffset, scrollOffsetBefore)
+	}
+
+	m = sendModel(m, tea.KeyPressMsg{Code: 'k', Text: "k"})
+	if m.comments.scrollOffset != ui.WheelScrollLines {
+		t.Fatalf("expected k to scroll popup up by 1, got %d", m.comments.scrollOffset)
 	}
 }
 

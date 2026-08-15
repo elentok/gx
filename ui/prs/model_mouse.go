@@ -12,6 +12,7 @@ import (
 // the tab's only wheel target besides the modal.
 func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 	if m.comments.isOpen {
+		m.comments.handleWheel(msg)
 		return m, nil
 	}
 

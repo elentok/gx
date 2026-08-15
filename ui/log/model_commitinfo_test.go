@@ -103,6 +103,46 @@ func TestHandleCommitInfoKey_OtherKeyStaysOpen(t *testing.T) {
 	}
 }
 
+func TestHandleCommitInfoKey_ScrollsBodyWithLongCommit(t *testing.T) {
+	m := newTestModel()
+	m.width, m.height = 80, 24
+	m.commitInfoOpen = true
+	body := strings.Repeat("line\n", 40)
+	m.commitInfoDetails = git.CommitDetails{FullHash: "abc123", Hash: "abc123", Subject: "subject", Body: body}
+
+	next, _ := m.handleCommitInfoKey(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	updated := next.(Model)
+	if updated.commitInfoScroll != 1 {
+		t.Fatalf("expected j to scroll popup down by 1, got %d", updated.commitInfoScroll)
+	}
+
+	next, _ = updated.handleCommitInfoKey(tea.KeyPressMsg{Code: 'k', Text: "k"})
+	updated = next.(Model)
+	if updated.commitInfoScroll != 0 {
+		t.Fatalf("expected k to scroll popup back up to 0, got %d", updated.commitInfoScroll)
+	}
+}
+
+func TestHandleCommitInfoWheel_ScrollsPopupNotListBehind(t *testing.T) {
+	m := newTestModel()
+	m.width, m.height = 80, 24
+	m.commitInfoOpen = true
+	body := strings.Repeat("line\n", 40)
+	m.commitInfoDetails = git.CommitDetails{FullHash: "abc123", Hash: "abc123", Subject: "subject", Body: body}
+	m.listPanel = m.listPanel.WithRows(commitRows(30))
+	prevListOffset := m.listPanel.list.Offset()
+
+	next, _ := m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	updated := next.(Model)
+
+	if updated.commitInfoScroll != ui.WheelScrollLines {
+		t.Fatalf("expected wheel-down to scroll popup by %d, got %d", ui.WheelScrollLines, updated.commitInfoScroll)
+	}
+	if updated.listPanel.list.Offset() != prevListOffset {
+		t.Fatalf("expected log list offset unchanged while commit-info popup open, got %d want %d", updated.listPanel.list.Offset(), prevListOffset)
+	}
+}
+
 func TestRenderCommitInfoPopup_HasBorder(t *testing.T) {
 	m := newTestModel()
 	m.width, m.height = 80, 30
