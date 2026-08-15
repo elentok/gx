@@ -652,6 +652,14 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		// DrainComplete's doc comment) — an operator away from the terminal
 		// needs to know the difference.
 		if gate.isDraining() && active == 0 && landing == 0 {
+			// Check ctx.Err() before emitting DrainComplete: if cancellation
+			// landed between the ctx.Err() check above and this one, break
+			// without the emit so the ctx.Err() check after the loop reports
+			// the caller's own cancellation instead of a drained notification
+			// for a run the registry then records as failed.
+			if ctx.Err() != nil {
+				break
+			}
 			sink.DrainComplete(opts.EpicName, completed, int(d.Now().Sub(runStart).Seconds()))
 			break
 		}

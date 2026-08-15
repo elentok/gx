@@ -55,11 +55,28 @@ func (g *Gate) pause(label, reason string) {
 // it. Once every currently in-flight iteration finishes (or immediately, if
 // none are in flight), Run's own active==0 check ends the run through the
 // same code path natural completion takes; isDraining is what that check
-// consults.
+// consults. It also closes wake and parkWake (mirroring ForceResume and
+// WakeParked's lock/close/replace shape), so a run currently parked in
+// waitForResume — nothing in flight, an operator away from the terminal —
+// wakes immediately and re-evaluates isDraining instead of hanging until a
+// ForceResume that Drain doesn't expect to come.
 func (g *Gate) Drain() {
 	g.mu.Lock()
-	defer g.mu.Unlock()
+	if g.draining {
+		// Already draining: wake/parkWake were already closed and replaced
+		// by the first Drain call, so closing them again would panic.
+		g.mu.Unlock()
+		return
+	}
 	g.draining = true
+	wake := g.wake
+	g.wake = make(chan struct{})
+	parkWake := g.parkWake
+	g.parkWake = make(chan struct{})
+	g.mu.Unlock()
+
+	close(wake)
+	close(parkWake)
 }
 
 // isDraining reports whether Drain has been called on this Gate.

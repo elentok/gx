@@ -893,6 +893,57 @@ func TestRun_Drain_ZeroInFlight_EndsImmediately(t *testing.T) {
 	}
 }
 
+// TestRun_Drain_WakesRunParkedInWaitForResume is a regression test for
+// ticket 01: draining a run that's paused-and-idle (an iteration paused,
+// nothing in flight, blocked in Gate.waitForResume) must end the run on its
+// own rather than hang until a ForceResume that Drain never expects to
+// come — the exact operator-walks-away scenario drain exists to serve.
+func TestRun_Drain_WakesRunParkedInWaitForResume(t *testing.T) {
+	scratchDir := writeEpic(t, "my-epic", map[string]string{
+		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
+	})
+	d, prompts, _ := fakeDeps()
+
+	gate := NewGate()
+	gate.pause("some-other-iteration", "context occupancy breach")
+
+	sink := &recordingSink{}
+	done := make(chan error, 1)
+	go func() {
+		done <- Run(RunOptions{
+			EpicName:   "my-epic",
+			Skill:      "implement",
+			ScratchDir: scratchDir,
+			RepoDir:    "/fake/repo",
+			Gate:       gate,
+		}, d, sink)
+	}()
+
+	// Give Run a moment to reach waitForResume before draining, so this
+	// actually exercises Drain waking a parked waiter rather than racing
+	// ahead of it.
+	time.Sleep(50 * time.Millisecond)
+	gate.Drain()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Run() never returned after Drain(): the run stayed parked in waitForResume")
+	}
+
+	if len(*prompts) != 0 {
+		t.Fatalf("prompts = %v, want none: the paused label was never resumed so nothing should ever claim", *prompts)
+	}
+
+	calls := sink.snapshot()
+	if n := countCalls(calls, "DrainComplete"); n != 1 {
+		t.Errorf("DrainComplete calls = %d, want exactly 1", n)
+	}
+}
+
 // TestRun_ScopeWidenedMidRun_TotalGrowsWithIt is a regression test for the
 // notification total-count bug: total was captured once from the pre-run
 // scope snapshot, so a ticket added to a running epic's scope mid-run (via
