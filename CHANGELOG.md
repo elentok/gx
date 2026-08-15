@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.28.9 - 2026-08-15
+
+- Fixed a flaky ralphloop test (`TestResolveCherryPickConflict_TabStillPresentAfterClose_LogsWarningNotError`) by removing `t.Parallel()`, since it mutates the shared global `log` package output via `log.SetOutput` and was racing other concurrently-running parallel tests
+- Added `gx tickets filter-run-log` and `gx claude session-path` CLI commands to support investigation workflows
+- Added an Archived epics section to the tickets sidebar, with lazy-loading and guarded mutating keybindings
+- Fixed idle Status/Queue tabs burning CPU indefinitely
+- Fixed background-task tracking: transcript now recognizes `TaskStop` kills and blocking `TaskOutput` retrievals as resolving background tasks; ralphloop rechecks pane idle state after background-task gate release
+
 ## v0.28.8 - 2026-08-15
 
 - Added terminal drain for ralphloop runs: stops accepting new work and ends after the in-flight iteration completes, with a drain-then-replace combo keybinding ("D") and interactive drain-choice menu, a distinct end-of-drain notification separate from EpicComplete, and suppression of trailing EpicComplete chat/toast notifications after a drain
