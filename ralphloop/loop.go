@@ -603,6 +603,12 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	// resets the moment anything is running again, so a run that resumes and
 	// later parks on a different ticket announces that park too.
 	parked := false
+	// drained records that this run ended via the DrainComplete branch below,
+	// so the final sink.EpicComplete call after the loop can skip its
+	// human-facing chat/toast — DrainComplete already told the operator the
+	// run ended, and a trailing "epic complete" is simply false with tickets
+	// still open (see the drained guard on that call).
+	drained := false
 
 	for {
 		epic, err := loadNamedEpic(scratchDir, opts.EpicName)
@@ -661,6 +667,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 				break
 			}
 			sink.DrainComplete(opts.EpicName, completed, int(d.Now().Sub(runStart).Seconds()))
+			drained = true
 			break
 		}
 
@@ -854,7 +861,12 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		return err
 	}
 
-	sink.EpicComplete(opts.EpicName, completed, int(d.Now().Sub(runStart).Seconds()))
+	// A drained run already announced its end via DrainComplete above — a
+	// trailing EpicComplete here would be a second, contradictory chat/toast
+	// (see the drained field's doc comment), so skip it for that path.
+	if !drained {
+		sink.EpicComplete(opts.EpicName, completed, int(d.Now().Sub(runStart).Seconds()))
+	}
 	return nil
 }
 

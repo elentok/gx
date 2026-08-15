@@ -770,9 +770,11 @@ func TestRun_TicketSubset_CompletesWithoutTouchingTicketsOutsideSubset(t *testin
 // covers ticket 01a's core seam: draining a running epic must let every
 // already-in-flight ticket finish its full normal lifecycle, must never
 // claim a still-open ticket once draining starts, and must end the run
-// (Run returns nil, EpicComplete fires) once the last in-flight ticket
+// (Run returns nil, DrainComplete fires) once the last in-flight ticket
 // lands — even though ticket 03 is left open, so the ordinary
-// scope.AllSettled exit would never fire on its own.
+// scope.AllSettled exit would never fire on its own. Ticket 02 suppresses
+// the trailing EpicComplete a drained run used to also emit, so DrainComplete
+// is both the only and the last sink call here.
 func TestRun_Drain_WithInFlightTickets_FinishesInFlightThenEndsWithoutNewClaims(t *testing.T) {
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
@@ -827,11 +829,14 @@ func TestRun_Drain_WithInFlightTickets_FinishesInFlightThenEndsWithoutNewClaims(
 	}
 
 	calls := sink.snapshot()
-	if calls[len(calls)-1] != "EpicComplete" {
-		t.Fatalf("last sink call = %q, want EpicComplete (the same code point natural completion reaches)", calls[len(calls)-1])
+	if calls[len(calls)-1] != "DrainComplete" {
+		t.Fatalf("last sink call = %q, want DrainComplete", calls[len(calls)-1])
 	}
 	if n := countCalls(calls, "DrainComplete"); n != 1 {
 		t.Errorf("DrainComplete calls = %d, want exactly 1 (ticket 01b)", n)
+	}
+	if n := countCalls(calls, "EpicComplete"); n != 0 {
+		t.Errorf("EpicComplete calls = %d, want 0: a drained run must not also emit EpicComplete (ticket 02)", n)
 	}
 }
 
@@ -885,11 +890,14 @@ func TestRun_Drain_ZeroInFlight_EndsImmediately(t *testing.T) {
 	}
 
 	calls := sink.snapshot()
-	if len(calls) == 0 || calls[len(calls)-1] != "EpicComplete" {
-		t.Fatalf("sink calls = %v, want the run to end via EpicComplete immediately", calls)
+	if len(calls) == 0 || calls[len(calls)-1] != "DrainComplete" {
+		t.Fatalf("sink calls = %v, want the run to end via DrainComplete immediately", calls)
 	}
 	if n := countCalls(calls, "DrainComplete"); n != 1 {
 		t.Errorf("DrainComplete calls = %d, want exactly 1 (ticket 01b, immediate-drain case)", n)
+	}
+	if n := countCalls(calls, "EpicComplete"); n != 0 {
+		t.Errorf("EpicComplete calls = %d, want 0: a drained run must not also emit EpicComplete (ticket 02)", n)
 	}
 }
 
