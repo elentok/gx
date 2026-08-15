@@ -5,6 +5,7 @@ import (
 
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/commit"
+	"github.com/elentok/gx/ui/splitview"
 )
 
 // handleMouseClick focuses whichever split panel a click landed in (see
@@ -30,21 +31,25 @@ func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 	if m.commitInfoOpen {
 		return m.handleCommitInfoWheel(msg)
 	}
-	if m.split.IsSplit() && m.split.IsDetailFocused() {
+	mouse := msg.Mouse()
+	switch m.split.HoverSideAt(mouse.X, mouse.Y) {
+	case splitview.HoverDetail:
 		col, row, visible := m.split.DetailOrigin()
 		if !visible {
 			return m, nil
 		}
-		mouse := msg.Mouse()
 		translated := tea.MouseWheelMsg{X: mouse.X - col, Y: mouse.Y - row, Button: mouse.Button, Mod: mouse.Mod}
 		updated, cmd := m.commitDetail.Update(translated)
 		m.commitDetail = updated.(commit.Model)
 		return m, cmd
-	}
-	dir, ok := ui.WheelDirection(msg)
-	if !ok {
+	case splitview.HoverList:
+		dir, ok := ui.WheelDirection(msg)
+		if !ok {
+			return m, nil
+		}
+		m.listPanel = m.listPanel.ScrollViewport(dir * ui.WheelScrollLines)
+		return m, nil
+	default:
 		return m, nil
 	}
-	m.listPanel = m.listPanel.ScrollViewport(dir * ui.WheelScrollLines)
-	return m, nil
 }

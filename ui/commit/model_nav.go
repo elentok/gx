@@ -22,3 +22,17 @@ func (m Model) IsFileTreeFocused() bool {
 func (m Model) IsHeaderFocused() bool {
 	return m.focusHeader
 }
+
+// DiffScrollOffset returns the diff viewport's current vertical scroll
+// offset, for callers (e.g. hover-routing tests) that need to observe
+// whether a wheel event reached the diff pane.
+func (m Model) DiffScrollOffset() int {
+	return m.diffModel.Viewport().YOffset()
+}
+
+// FileTreeScrollOffset returns the file tree's current vertical scroll
+// offset, for callers (e.g. hover-routing tests) that need to observe
+// whether a wheel event reached the file tree.
+func (m Model) FileTreeScrollOffset() int {
+	return m.fileTreeModel.ScrollOffset()
+}
