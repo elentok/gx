@@ -677,6 +677,25 @@ const (
 	bindingQueueYankFilePath keys.BindingID = "yank-file-path"
 )
 
+// bindingQueueSelectLast, bindingQueuePreviewBottom, bindingQueueReload,
+// bindingQueuePauseResume, bindingQueueClearChecked,
+// bindingQueueClearDoneChecked, bindingQueueDelete, and
+// bindingQueueSuggestedActions were previously handled by a raw
+// msg.String() switch with no keys.Manager entry, so they never appeared in
+// the "?" help modal (help.BuildSections only sees this tab's own km, the
+// tree's bindings, and the app-wide extraKeys). Registering them here fixes
+// that; behavior is unchanged.
+const (
+	bindingQueueSelectLast       keys.BindingID = "select-last"
+	bindingQueuePreviewBottom    keys.BindingID = "preview-bottom"
+	bindingQueueReload           keys.BindingID = "reload"
+	bindingQueuePauseResume      keys.BindingID = "pause-resume"
+	bindingQueueClearChecked     keys.BindingID = "clear-checked"
+	bindingQueueClearDoneChecked keys.BindingID = "clear-done-checked"
+	bindingQueueDelete           keys.BindingID = "delete"
+	bindingQueueSuggestedActions keys.BindingID = "suggested-actions"
+)
+
 func newQueueKeysManager() keys.Manager {
 	return keys.New([]keys.Binding{
 		{ID: bindingQueueHelp, Seq: []string{"?"}, Categories: []string{"Other"}, Title: "help"},
@@ -691,6 +710,14 @@ func newQueueKeysManager() keys.Manager {
 		{ID: bindingQueueYankSummary, Seq: []string{"y", "y"}, Categories: []string{"Yank"}, Title: "yank epic - ticket"},
 		{ID: bindingQueueYankFilePath, Seq: []string{"y", "f"}, Categories: []string{"Yank"}, Title: "yank file path"},
 		{ID: bindingQueueCancelChord, Seq: []string{"y", "esc"}, Categories: []string{}, Title: ""},
+		{ID: bindingQueueSelectLast, Seq: []string{"G"}, Categories: []string{"Navigation"}, Title: "last row"},
+		{ID: bindingQueuePreviewBottom, Seq: []string{"b"}, Categories: []string{"Navigation"}, Title: "preview bottom"},
+		{ID: bindingQueueReload, Seq: []string{"R"}, Categories: []string{"Other"}, Title: "reload queue"},
+		{ID: bindingQueuePauseResume, Seq: []string{"p"}, Categories: []string{"Other"}, Title: "pause/resume queue"},
+		{ID: bindingQueueClearChecked, Seq: []string{"C"}, Categories: []string{"Other"}, Title: "clear checked"},
+		{ID: bindingQueueClearDoneChecked, Seq: []string{"c"}, Categories: []string{"Other"}, Title: "clear completed checked"},
+		{ID: bindingQueueDelete, Seq: []string{"x"}, Categories: []string{"Other"}, Title: "delete"},
+		{ID: bindingQueueSuggestedActions, Seq: []string{"m"}, Categories: []string{"Other"}, Title: "suggested actions"},
 	})
 }
 
@@ -726,49 +753,45 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, m.yankQueueTicketSummary()
 		case bindingQueueYankFilePath:
 			return m, m.yankQueueTicketFilePath()
+		case bindingQueueSelectLast:
+			m.selectLastRow()
+		case bindingQueuePreviewBottom:
+			m.previewVP.GotoBottom()
+		case bindingQueueReload:
+			return m, m.cmdLoadQueue()
+		case bindingQueuePauseResume:
+			if m.paused {
+				ralphLoopRegistry.resume()
+				m.paused = false
+				return m, tea.Batch(notify.Success("queue resumed"), m.startAvailableEpics())
+			}
+			ralphLoopRegistry.pause()
+			m.paused = true
+			return m, notify.Info("queue paused")
+		case bindingQueueClearChecked:
+			if paths := m.checkedPaths(); len(paths) > 0 {
+				m.confirm = m.confirm.Open(confirm.Options{
+					Prompt:    fmt.Sprintf("Clear all %d queued ticket(s)?", len(paths)),
+					AcceptCmd: cmdConfirmQueueClear(paths),
+				})
+			}
+		case bindingQueueClearDoneChecked:
+			if paths := m.doneCheckedPaths(); len(paths) > 0 {
+				m.confirm = m.confirm.Open(confirm.Options{
+					Prompt:    fmt.Sprintf("Clear %d completed ticket(s) from the queue?", len(paths)),
+					AcceptCmd: cmdConfirmQueueClear(paths),
+				})
+			}
+		case bindingQueueDelete:
+			return m.handleQueueDeleteKey()
+		case bindingQueueSuggestedActions:
+			return m.handleQueueSuggestedActionsKey()
 		}
 		return m, nil
 	}
 	switch msg.String() {
 	case "q", "esc":
 		return m, nav.Back()
-	case "G":
-		m.selectLastRow()
-		return m, nil
-	case "b":
-		m.previewVP.GotoBottom()
-		return m, nil
-	case "R":
-		return m, m.cmdLoadQueue()
-	case "p":
-		if m.paused {
-			ralphLoopRegistry.resume()
-			m.paused = false
-			return m, tea.Batch(notify.Success("queue resumed"), m.startAvailableEpics())
-		}
-		ralphLoopRegistry.pause()
-		m.paused = true
-		return m, notify.Info("queue paused")
-	case "C":
-		if paths := m.checkedPaths(); len(paths) > 0 {
-			m.confirm = m.confirm.Open(confirm.Options{
-				Prompt:    fmt.Sprintf("Clear all %d queued ticket(s)?", len(paths)),
-				AcceptCmd: cmdConfirmQueueClear(paths),
-			})
-		}
-		return m, nil
-	case "c":
-		if paths := m.doneCheckedPaths(); len(paths) > 0 {
-			m.confirm = m.confirm.Open(confirm.Options{
-				Prompt:    fmt.Sprintf("Clear %d completed ticket(s) from the queue?", len(paths)),
-				AcceptCmd: cmdConfirmQueueClear(paths),
-			})
-		}
-		return m, nil
-	case "x":
-		return m.handleQueueDeleteKey()
-	case "m":
-		return m.handleQueueSuggestedActionsKey()
 	case "enter":
 		// A parked row's "enter" wins over every other meaning below: it
 		// resumes that epic (cosmetic wake via Gate.WakeParked, not reattach)
