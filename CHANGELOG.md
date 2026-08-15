@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.28.8 - 2026-08-15
+
+- Added terminal drain for ralphloop runs: stops accepting new work and ends after the in-flight iteration completes, with a drain-then-replace combo keybinding ("D") and interactive drain-choice menu, a distinct end-of-drain notification separate from EpicComplete, and suppression of trailing EpicComplete chat/toast notifications after a drain
+- Fixed drain edge cases: runs parked in waitForResume now wake on drain(), and DrainComplete no longer clobbers run.done state
+- Fixed spinner/Queue display staleness on mid-run ticket reclaim: fires TicketReattached to resync reattached agents, exposes herdr's state_change_seq for accurate state tracking, guards attachToLiveAgent with seq-versioning, resends prompts on never-started panes, and hardens noActivitySinceLaunch against zero-seq baselines
+
 ## v0.28.7 - 2026-08-14
 
 - Restyled sidebar section headers (e.g. Closed epics) to match the tree row shape, and removed the done-icon from the Closed epics header
