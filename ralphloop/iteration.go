@@ -297,7 +297,7 @@ func resolveReattachSessionID(p iterationParams, agentSession string, priorSessi
 	if n := len(priorSessionIDs); n > 0 {
 		return priorSessionIDs[n-1]
 	}
-	events, ok, err := readEvents(p.ScratchDir, p.FeatureBranch)
+	events, ok, err := ReadEvents(p.ScratchDir, p.FeatureBranch)
 	if err != nil || !ok {
 		return ""
 	}
@@ -458,7 +458,7 @@ func markDoneStampingCloseMetadata(d Deps, p iterationParams, cwd, sessionID str
 // no prior session can be found, or its occupancy can't be read — these
 // fields are a best-effort convenience, not required for a ticket to close.
 func backfillDoneMetadata(d Deps, p iterationParams) error {
-	events, ok, err := readEvents(p.ScratchDir, p.FeatureBranch)
+	events, ok, err := ReadEvents(p.ScratchDir, p.FeatureBranch)
 	if err != nil || !ok {
 		return MarkDone(p.Ticket.Path)
 	}
@@ -488,7 +488,7 @@ func stampCommitlessMetrics(p iterationParams, cwd, sessionID string) {
 		writeLandedMetrics(p.Agent, cwd, sessionID, p.Ticket.Path)
 		return
 	}
-	events, ok, err := readEvents(p.ScratchDir, p.FeatureBranch)
+	events, ok, err := ReadEvents(p.ScratchDir, p.FeatureBranch)
 	if err != nil || !ok {
 		return
 	}

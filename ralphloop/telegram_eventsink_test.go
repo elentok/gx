@@ -189,7 +189,7 @@ func waitForRunLogEvent(t *testing.T, dir, epicName string) []Event {
 	var events []Event
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
-		events, _, _ = readEvents(dir, epicName)
+		events, _, _ = ReadEvents(dir, epicName)
 		if len(events) > 0 && events[0].Type == eventNotificationFailed {
 			return events
 		}
@@ -488,7 +488,7 @@ func TestTelegramEventSink_MarkdownParseRejection_LogsDegradedAndTogglesToast(t 
 	var events []Event
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		events, _, _ = readEvents(dir, "epic")
+		events, _, _ = ReadEvents(dir, "epic")
 		if len(events) > 0 {
 			break
 		}
@@ -524,7 +524,7 @@ func TestTelegramEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 	var events []Event
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		events, _, _ = readEvents(dir, "epic")
+		events, _, _ = ReadEvents(dir, "epic")
 		if len(events) > 0 {
 			break
 		}
@@ -552,7 +552,7 @@ func TestTelegramEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 	// (1.5s) before logging notification-failed.
 	deadline := time.Now().Add(4 * time.Second)
 	for time.Now().Before(deadline) {
-		events, _, _ = readEvents(dir, "epic")
+		events, _, _ = ReadEvents(dir, "epic")
 		if len(events) > 0 {
 			break
 		}
@@ -592,7 +592,7 @@ func TestTelegramEventSink_LogsNotificationFailedToRunLog_RedactsBotToken(t *tes
 	// (1.5s) before logging notification-failed.
 	deadline := time.Now().Add(4 * time.Second)
 	for time.Now().Before(deadline) {
-		events, _, _ = readEvents(dir, "epic")
+		events, _, _ = ReadEvents(dir, "epic")
 		if len(events) > 0 {
 			break
 		}

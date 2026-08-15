@@ -391,7 +391,7 @@ func noActivitySinceLaunch(scratchDir, epicName, agentSession string, currentSeq
 	if agentSession == "" {
 		return false
 	}
-	events, ok, err := readEvents(scratchDir, epicName)
+	events, ok, err := ReadEvents(scratchDir, epicName)
 	if !ok || err != nil {
 		return false
 	}

@@ -48,9 +48,9 @@ func TestLogEvent_FillsInTimeWhenZero(t *testing.T) {
 	if err := logEvent(dir, "epic", Event{Type: eventNeedsAnswer, Ticket: "02"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
-	events, ok, err := readEvents(dir, "epic")
+	events, ok, err := ReadEvents(dir, "epic")
 	if err != nil || !ok {
-		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	if len(events) != 1 {
 		t.Fatalf("got %d events, want 1", len(events))
@@ -73,9 +73,9 @@ func TestLogEvent_EmptyScratchDirOrEpicName_NoOp(t *testing.T) {
 func TestReadEvents_NoLogYet_OkFalse(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	events, ok, err := readEvents(dir, "epic")
+	events, ok, err := ReadEvents(dir, "epic")
 	if err != nil {
-		t.Fatalf("readEvents: %v", err)
+		t.Fatalf("ReadEvents: %v", err)
 	}
 	if ok {
 		t.Error("ok = true, want false when run-log.jsonl doesn't exist yet")
@@ -97,9 +97,9 @@ func TestReadEvents_SkipsMalformedTrailingLine(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	events, ok, err := readEvents(dir, "epic")
+	events, ok, err := ReadEvents(dir, "epic")
 	if err != nil || !ok {
-		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	if len(events) != 1 || events[0].Type != eventIterationStarted {
 		t.Errorf("events = %+v, want only the well-formed first line", events)
@@ -164,9 +164,9 @@ func TestLogEvent_ConcurrentAppends_NeverInterleave(t *testing.T) {
 	}
 	wg.Wait()
 
-	events, ok, err := readEvents(dir, "epic")
+	events, ok, err := ReadEvents(dir, "epic")
 	if err != nil || !ok {
-		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	if len(events) != 20 {
 		t.Errorf("got %d events, want 20 (no interleaved/corrupted lines)", len(events))
@@ -204,9 +204,9 @@ func TestLogNotificationsConfigured_RecordsBooleansForBothChannels(t *testing.T)
 		t.Fatalf("LogNotificationsConfigured: %v", err)
 	}
 
-	events, ok, err := readEvents(dir, "epic")
+	events, ok, err := ReadEvents(dir, "epic")
 	if err != nil || !ok || len(events) != 1 {
-		t.Fatalf("readEvents: events=%#v ok=%v err=%v", events, ok, err)
+		t.Fatalf("ReadEvents: events=%#v ok=%v err=%v", events, ok, err)
 	}
 	ev := events[0]
 	if ev.Type != eventNotificationsConfigured {
@@ -226,9 +226,9 @@ func TestLogNotificationSentAndFailed_RecordChannelAndTriggeringKind(t *testing.
 	logNotificationSent(dir, "epic", "telegram", notifyKindEpicComplete, "epic complete!")
 	logNotificationFailed(dir, "epic", "slack", notifyKindIterationPaused, "post failed: 500", "iteration paused")
 
-	events, ok, err := readEvents(dir, "epic")
+	events, ok, err := ReadEvents(dir, "epic")
 	if err != nil || !ok || len(events) != 2 {
-		t.Fatalf("readEvents: events=%#v ok=%v err=%v", events, ok, err)
+		t.Fatalf("ReadEvents: events=%#v ok=%v err=%v", events, ok, err)
 	}
 	sent, failed := events[0], events[1]
 	if sent.Type != eventNotificationSent || sent.Channel != "telegram" || sent.NotifyKind != notifyKindEpicComplete || sent.Body != "epic complete!" {
@@ -256,7 +256,7 @@ func TestSendNotification_FailsOnceThenSucceeds_LogsOneSentAndNoFailed(t *testin
 	var events []Event
 	deadline := time.Now().Add(4 * time.Second)
 	for time.Now().Before(deadline) {
-		events, _, _ = readEvents(dir, "epic")
+		events, _, _ = ReadEvents(dir, "epic")
 		if len(events) > 0 {
 			break
 		}
@@ -292,7 +292,7 @@ func TestSendNotification_FailsEveryAttempt_LogsOneFailedAndCallsOnFailed(t *tes
 	var events []Event
 	deadline := time.Now().Add(4 * time.Second)
 	for time.Now().Before(deadline) {
-		events, _, _ = readEvents(dir, "epic")
+		events, _, _ = ReadEvents(dir, "epic")
 		if len(events) > 0 {
 			break
 		}

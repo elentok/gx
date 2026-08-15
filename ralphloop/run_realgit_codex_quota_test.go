@@ -283,9 +283,9 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 		t.Errorf("feature branch gone: %v", err)
 	}
 
-	events, ok, err := readEvents(scratchDir, epicName)
+	events, ok, err := ReadEvents(scratchDir, epicName)
 	if err != nil || !ok {
-		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	pausedIdx, resumedIdx, started03Idx, finished03Idx := -1, -1, -1, -1
 	for i, event := range events {
@@ -320,7 +320,7 @@ func waitForPausedRateLimitEvent(t *testing.T, scratchDir, epicName, ticketID st
 	t.Helper()
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
-		events, ok, err := readEvents(scratchDir, epicName)
+		events, ok, err := ReadEvents(scratchDir, epicName)
 		if err == nil && ok {
 			for _, event := range events {
 				if event.Type == eventPausedRateLimit && event.Ticket == ticketID {
@@ -704,9 +704,9 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 		t.Errorf("feature branch gone: %v", err)
 	}
 
-	events, ok, err := readEvents(scratchDir, epicName)
+	events, ok, err := ReadEvents(scratchDir, epicName)
 	if err != nil || !ok {
-		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	pausedSmartZone01, resumed01, finished01 := -1, -1, -1
 	pausedRateLimit02, resumed02 := -1, -1

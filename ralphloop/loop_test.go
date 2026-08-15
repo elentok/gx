@@ -313,9 +313,9 @@ func TestRun_LogsLifecycleEvents_LinearChain(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	rawEvents, ok, err := readEvents(scratchDir, "my-epic")
+	rawEvents, ok, err := ReadEvents(scratchDir, "my-epic")
 	if err != nil || !ok {
-		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	// scheduler-scan events are logged on every claimNext pass, interleaved
 	// with (and racing) the async iteration lifecycle below; this test is
@@ -383,9 +383,9 @@ func TestRun_SchedulerScan_LogsOutOfScopeTicket(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	events, ok, err := readEvents(scratchDir, "my-epic")
+	events, ok, err := ReadEvents(scratchDir, "my-epic")
 	if err != nil || !ok {
-		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 
 	var found bool
@@ -486,9 +486,9 @@ func TestRun_LogsNeedsAnswerEvent_OnZeroCommitIteration(t *testing.T) {
 	// The needs-answer ticket is the epic's only one, so the run parks on it.
 	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
 
-	events, ok, err := readEvents(scratchDir, "epic")
+	events, ok, err := ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
-		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	var needsAnswer *Event
 	for i, ev := range events {
@@ -566,9 +566,9 @@ func TestRun_HonorsCommitlessFlag_SkipsNeedsAnswer(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	events, ok, err := readEvents(scratchDir, "epic")
+	events, ok, err := ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
-		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	var commitless *Event
 	for i, ev := range events {

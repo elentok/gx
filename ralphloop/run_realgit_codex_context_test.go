@@ -219,9 +219,9 @@ func TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp(t *testing.T
 		t.Errorf("completed Codex ticket unexpectedly persisted compactions: %s", raw)
 	}
 
-	events, ok, err := readEvents(scratchDir, epicName)
+	events, ok, err := ReadEvents(scratchDir, epicName)
 	if err != nil || !ok {
-		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	wantEventOrder := []string{eventPausedSmartZone, eventResumed, eventIterationFinished, eventCherryPicked}
 	var gotEventOrder []string
@@ -445,9 +445,9 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T
 		t.Errorf("completed ticket = %s, want neither needs-answer nor needs-repair", rawTicket)
 	}
 
-	events, ok, err := readEvents(scratchDir, epicName)
+	events, ok, err := ReadEvents(scratchDir, epicName)
 	if err != nil || !ok {
-		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	var pausedReason string
 	wantEventOrder := []string{eventPausedSmartZone, eventResumed, eventIterationFinished, eventCherryPicked}
@@ -618,9 +618,9 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 		t.Errorf("ticket = %s, want a durable Needs Repair note naming the exhaustion evidence", rawTicket)
 	}
 
-	events, ok, err := readEvents(scratchDir, epicName)
+	events, ok, err := ReadEvents(scratchDir, epicName)
 	if err != nil || !ok {
-		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	var sawPaused, sawRecoveryFailed, sawFinished, sawCherryPicked, sawNeedsAnswer bool
 	for _, event := range events {

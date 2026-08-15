@@ -333,8 +333,8 @@ func assertNoLaunchTrace(t *testing.T, repoDir, epicName, scratchDir, ticketFile
 		}
 	}
 
-	if _, ok, readErr := readEvents(scratchDir, epicName); readErr != nil || ok {
-		t.Errorf("readEvents = ok:%v err:%v, want no run-log written for a failure caught before claim", ok, readErr)
+	if _, ok, readErr := ReadEvents(scratchDir, epicName); readErr != nil || ok {
+		t.Errorf("ReadEvents = ok:%v err:%v, want no run-log written for a failure caught before claim", ok, readErr)
 	}
 
 	if hasEvent(sink, LiveEventIterationFinished, func(LiveEvent) bool { return true }) ||

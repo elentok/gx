@@ -617,9 +617,9 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 		}
 	}
 
-	events, ok, err := readEvents(scratchDir, epicName)
+	events, ok, err := ReadEvents(scratchDir, epicName)
 	if err != nil || !ok {
-		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	eventCounts := map[string]int{}
 	eventPositions := map[string]int{}
@@ -1086,9 +1086,9 @@ func TestRun_ProductionRealGit_CodexCompactsThenCompletes(t *testing.T) {
 		t.Errorf("closed tabs = %d, want exactly one", closedTabs)
 	}
 
-	events, ok, err := readEvents(scratchDir, epicName)
+	events, ok, err := ReadEvents(scratchDir, epicName)
 	if err != nil || !ok {
-		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	wantEventOrder := []string{eventPausedSmartZone, eventResumed, eventIterationFinished, eventCherryPicked}
 	var gotEventOrder []string

@@ -391,9 +391,9 @@ func TestRun_LogsDepsInstalledEventWithCommand(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	events, ok, err := readEvents(scratchDir, "epic")
+	events, ok, err := ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
-		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	var found *Event
 	for i, ev := range events {

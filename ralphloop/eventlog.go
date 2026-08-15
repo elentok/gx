@@ -486,18 +486,11 @@ func lastIterationSession(events []Event, identifier string) (agentSession, cwd 
 	return "", "", "", false
 }
 
-// readEvents reads and parses every line of epicName's run-log.jsonl under
+// ReadEvents reads and parses every line of epicName's run-log.jsonl under
 // scratchDir, skipping malformed lines rather than failing the whole read
 // (a run-log written by a process killed mid-write may have a torn final
 // line). ok is false if the log doesn't exist yet.
-// ReadEvents is readEvents exported for callers outside the ralphloop package
-// (e.g. `gx tickets filter-run-log`), so a run-log.jsonl reader never
-// hand-rolls a second decoding of the same file.
 func ReadEvents(scratchDir, epicName string) (events []Event, ok bool, err error) {
-	return readEvents(scratchDir, epicName)
-}
-
-func readEvents(scratchDir, epicName string) (events []Event, ok bool, err error) {
 	raw, err := os.ReadFile(runLogPath(scratchDir, epicName))
 	if err != nil {
 		if os.IsNotExist(err) {

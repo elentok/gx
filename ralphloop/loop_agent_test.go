@@ -352,9 +352,9 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 			if len(*prompts) != 1 || (*prompts)[0] != wantPrompt {
 				t.Errorf("prompts = %v, want %q", *prompts, wantPrompt)
 			}
-			events, ok, readErr := readEvents(scratchDir, "my-epic")
+			events, ok, readErr := ReadEvents(scratchDir, "my-epic")
 			if readErr != nil || !ok || len(events) == 0 {
-				t.Fatalf("readEvents: events=%+v ok=%v err=%v", events, ok, readErr)
+				t.Fatalf("ReadEvents: events=%+v ok=%v err=%v", events, ok, readErr)
 			}
 			for _, event := range events {
 				if event.Agent != AgentKind(tc.wantKind) {

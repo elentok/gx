@@ -123,9 +123,9 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 		t.Errorf("SessionIDs = %v, want %v (reattach appends the live agent's session)", ticket.SessionIDs, want)
 	}
 
-	events, _, err := readEvents(scratchDir, "epic")
+	events, _, err := ReadEvents(scratchDir, "epic")
 	if err != nil {
-		t.Fatalf("readEvents: %v", err)
+		t.Fatalf("ReadEvents: %v", err)
 	}
 	foundFinish := false
 	for _, event := range events {
@@ -316,9 +316,9 @@ func TestRun_RestartWithClaimedTicketAlreadyIdle_SkipsWaitAndCherryPicks(t *test
 		t.Errorf("reattached ticket not marked done:\n%s", raw)
 	}
 
-	events, _, err := readEvents(scratchDir, "epic")
+	events, _, err := ReadEvents(scratchDir, "epic")
 	if err != nil {
-		t.Fatalf("readEvents: %v", err)
+		t.Fatalf("ReadEvents: %v", err)
 	}
 	foundFinish := false
 	for _, e := range events {
@@ -462,9 +462,9 @@ func TestRun_ReattachedCommitlessCloseWithNoLiveSession(t *testing.T) {
 		t.Errorf("Status = %q, want done", got.Status)
 	}
 
-	events, _, err := readEvents(scratchDir, "epic")
+	events, _, err := ReadEvents(scratchDir, "epic")
 	if err != nil {
-		t.Fatalf("readEvents: %v", err)
+		t.Fatalf("ReadEvents: %v", err)
 	}
 	foundCommitless := false
 	for _, e := range events {
@@ -562,9 +562,9 @@ func TestRun_ReattachAlreadyIdle_BackgroundTaskOutstanding_HoldsShortCircuit(t *
 		t.Errorf("removed worktree branches = %v, want the reattached iteration's worktree cleaned up once the gate releases", *removed)
 	}
 
-	events, _, err := readEvents(scratchDir, "epic")
+	events, _, err := ReadEvents(scratchDir, "epic")
 	if err != nil {
-		t.Fatalf("readEvents: %v", err)
+		t.Fatalf("ReadEvents: %v", err)
 	}
 	var held bool
 	for _, e := range events {

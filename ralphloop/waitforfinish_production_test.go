@@ -210,9 +210,9 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 		t.Errorf("VirtualTime() = %s, want >= 3m (scenario must advance virtual time, not sleep)", got)
 	}
 
-	events, ok, err := readEvents(scratchDir, "epic")
+	events, ok, err := ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
-		t.Fatalf("readEvents() ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}
 	var sawResumed, sawFailed bool
 	for _, e := range events {
@@ -423,9 +423,9 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 		t.Errorf("VirtualTime() = %s, want >= %s (the compact polls must advance the clock far enough for the boundary to land)", got, want)
 	}
 
-	events, ok, err := readEvents(scratchDir, "epic")
+	events, ok, err := ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
-		t.Fatalf("readEvents() ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}
 	seen := map[string]bool{}
 	for _, e := range events {
@@ -587,9 +587,9 @@ func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
 		t.Errorf("enter nudges = %d, want 0 (a stray Enter cancels an in-progress compaction)", enterCalls)
 	}
 
-	events, ok, err := readEvents(scratchDir, "epic")
+	events, ok, err := ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
-		t.Fatalf("readEvents() ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}
 	seen := map[string]bool{}
 	for _, e := range events {
@@ -804,9 +804,9 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 		t.Fatal("test bug: compact boundary line was never written")
 	}
 
-	events, ok, err := readEvents(scratchDir, "epic")
+	events, ok, err := ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
-		t.Fatalf("readEvents() ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}
 	var sawResumed, sawFailed, sawWaitExpired bool
 	for _, e := range events {

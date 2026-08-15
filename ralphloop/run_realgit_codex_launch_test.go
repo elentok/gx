@@ -264,9 +264,9 @@ func TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsRepair(t *testin
 		t.Errorf("ticket after launch failure = %s, want durable needs-repair status and launch reason", raw)
 	}
 
-	events, ok, err := readEvents(scratchDir, epicName)
+	events, ok, err := ReadEvents(scratchDir, epicName)
 	if err != nil {
-		t.Fatalf("readEvents: %v", err)
+		t.Fatalf("ReadEvents: %v", err)
 	}
 	if ok {
 		for _, event := range events {
@@ -637,9 +637,9 @@ func TestRun_ProductionRealGit_CodexRestartReattachesAndLandsOnce(t *testing.T) 
 		t.Errorf("closed tabs = %d, want exactly one", closedTabs)
 	}
 
-	events, ok, err := readEvents(scratchDir, epicName)
+	events, ok, err := ReadEvents(scratchDir, epicName)
 	if err != nil || !ok {
-		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	for _, event := range events {
 		if event.Type == eventNeedsAnswer || event.Type == eventNeedsRepair || event.Type == eventSmartZoneRecoveryFailed || event.Type == eventPausedSmartZone {

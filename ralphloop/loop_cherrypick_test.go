@@ -162,9 +162,9 @@ func TestRun_CherryPickConflict_ResolvesInFeatureWorktreeThenCompletes(t *testin
 		t.Errorf("ticket not marked done after conflict resolution:\n%s", raw)
 	}
 
-	events, ok, err := readEvents(scratchDir, "epic")
+	events, ok, err := ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
-		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	var gotTypes []string
 	var conflictHit, conflictResolved *Event

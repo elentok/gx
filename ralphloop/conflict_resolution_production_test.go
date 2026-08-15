@@ -313,9 +313,9 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 		t.Errorf("landed commit subject = %q, want original cherry-picked subject %q preserved", gotSubject, wantSubject)
 	}
 
-	events, ok, err := readEvents(scratchDir, "main")
+	events, ok, err := ReadEvents(scratchDir, "main")
 	if err != nil || !ok {
-		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	var conflictHit *Event
 	for i, e := range events {

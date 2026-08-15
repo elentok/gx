@@ -406,9 +406,9 @@ func TestRun_RestartedNeedsRepairRecoversThenResumesScheduling(t *testing.T) {
 	if !sawClaimed {
 		t.Error("recovered ticket was not restored to claimed before completion")
 	}
-	events, _, err := readEvents(scratchDir, "epic")
+	events, _, err := ReadEvents(scratchDir, "epic")
 	if err != nil {
-		t.Fatalf("readEvents: %v", err)
+		t.Fatalf("ReadEvents: %v", err)
 	}
 	foundResumed := false
 	for _, event := range events {

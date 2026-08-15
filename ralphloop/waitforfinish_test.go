@@ -70,9 +70,9 @@ func TestWaitForFinish_CodexNativeContextFailureRecoversDespiteStaleOccupancy(t 
 	if len(prompts) != 2 || prompts[0] != "/compact" {
 		t.Errorf("prompts = %v, want compact then finish-up", prompts)
 	}
-	events, ok, err := readEvents(scratchDir, "epic")
+	events, ok, err := ReadEvents(scratchDir, "epic")
 	if err != nil || !ok || len(events) == 0 {
-		t.Fatalf("readEvents() = %+v, ok=%v, err=%v", events, ok, err)
+		t.Fatalf("ReadEvents() = %+v, ok=%v, err=%v", events, ok, err)
 	}
 	if events[0].Type != eventPausedSmartZone || !strings.Contains(events[0].Reason, "input exceeds the context window") {
 		t.Errorf("recovery event = %+v, want native failure evidence", events[0])
@@ -399,9 +399,9 @@ func TestRecoverSmartZoneBreach_TranscriptConfirmsLateCompaction(t *testing.T) {
 		t.Errorf("prompts sent = %d, want 2 (/compact, then finish-up)", prompts)
 	}
 
-	events, ok, err := readEvents(scratchDir, "epic")
+	events, ok, err := ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
-		t.Fatalf("readEvents() ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}
 	var sawFailed, sawExpired, sawResumed bool
 	for _, e := range events {
@@ -469,9 +469,9 @@ func TestRecoverSmartZoneBreach_GenuineStuckCompactFailsAfterExtendedWait(t *tes
 		t.Errorf("prompts sent = %d, want 1 (/compact only, no finish-up after failure)", prompts)
 	}
 
-	events, ok, err := readEvents(scratchDir, "epic")
+	events, ok, err := ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
-		t.Fatalf("readEvents() ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}
 	var sawFailed bool
 	for _, e := range events {
@@ -891,9 +891,9 @@ func TestRecoverSmartZoneBreach_GateReleasesOnceBoundaryAdvances(t *testing.T) {
 // the timeout route on separate names.
 func compactCompletionEvents(t *testing.T, scratchDir string) map[string]bool {
 	t.Helper()
-	events, ok, err := readEvents(scratchDir, "epic")
+	events, ok, err := ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
-		t.Fatalf("readEvents() ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}
 	seen := map[string]bool{}
 	for _, e := range events {
@@ -1658,9 +1658,9 @@ func TestRecoverSmartZoneBreach_FinishUpGateGivesUpAfterTimeout(t *testing.T) {
 		t.Errorf("AgentSendKeys calls = %v, want none: the gate must never nudge or resubmit", sentKeys)
 	}
 
-	events, ok, err := readEvents(scratchDir, "epic")
+	events, ok, err := ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
-		t.Fatalf("readEvents() ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}
 	var sawFailed bool
 	for _, e := range events {
@@ -1925,9 +1925,9 @@ func TestWaitForFinish_BlockedPaneDwellsThenParks(t *testing.T) {
 				t.Errorf("body does not name the iteration label iter-01:\n%s", body)
 			}
 
-			events, ok, err := readEvents(scratchDir, "epic")
+			events, ok, err := ReadEvents(scratchDir, "epic")
 			if err != nil || !ok || len(events) == 0 {
-				t.Fatalf("readEvents() = %+v, ok=%v, err=%v", events, ok, err)
+				t.Fatalf("ReadEvents() = %+v, ok=%v, err=%v", events, ok, err)
 			}
 			last := events[len(events)-1]
 			if last.Type != eventNeedsAnswer || !strings.Contains(last.Reason, "iter-01") {
@@ -2765,9 +2765,9 @@ func TestWaitForFinish_BackgroundTaskGateHoldsUntilResolved(t *testing.T) {
 		t.Errorf("Sleep calls = %d, want 4: the gate must pace re-reads at smartZonePollMs, not spin, and recheck idle once it releases", sleeps)
 	}
 
-	events, ok, err := readEvents(scratchDir, "epic")
+	events, ok, err := ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
-		t.Fatalf("readEvents() ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}
 	var held, released int
 	for _, ev := range events {
@@ -2813,9 +2813,9 @@ func TestWaitForFinish_BackgroundTaskAgesOutAndFallsThrough(t *testing.T) {
 		t.Fatalf("waitForFinish: %v, want the aged-out marker to fall through to a plain finish", err)
 	}
 
-	events, ok, err := readEvents(scratchDir, "epic")
+	events, ok, err := ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
-		t.Fatalf("readEvents() ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}
 	var expired, released int
 	for _, ev := range events {
@@ -2881,9 +2881,9 @@ func TestWaitForFinish_BackgroundTaskGateReleaseRechecksIdle(t *testing.T) {
 		t.Errorf("AgentWait calls = %d, want at least 4: the gate-release recheck finding the pane busy must send waitForFinish back around its outer poll loop", waits)
 	}
 
-	events, ok, err := readEvents(scratchDir, "epic")
+	events, ok, err := ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
-		t.Fatalf("readEvents() ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}
 	var held, released int
 	for _, ev := range events {

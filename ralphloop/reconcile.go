@@ -86,7 +86,7 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 		liveTabs[key] = tab
 	}
 
-	events, _, err := readEvents(paths.ScratchDir, epic.Name)
+	events, _, err := ReadEvents(paths.ScratchDir, epic.Name)
 	if err != nil {
 		return nil, fmt.Errorf("reading run log for done-ticket verification: %w", err)
 	}

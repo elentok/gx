@@ -228,12 +228,12 @@ func TestReconcile_DoneTicketUnrecoverable_MarkedNeedsRepair(t *testing.T) {
 		t.Errorf("events = %+v, want an unrecoverable-mismatch event for ticket 03", sink.Events())
 	}
 
-	events, ok, err := readEvents(scratchDir, "epic")
+	events, ok, err := ReadEvents(scratchDir, "epic")
 	if err != nil {
-		t.Fatalf("readEvents: %v", err)
+		t.Fatalf("ReadEvents: %v", err)
 	}
 	if !ok {
-		t.Fatalf("readEvents: run log not found")
+		t.Fatalf("ReadEvents: run log not found")
 	}
 	var attentionEvent *Event
 	for i := range events {

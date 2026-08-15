@@ -554,9 +554,9 @@ func TestChatEventSink_Close_GloballyMuted_SuppressesFlushAndLogsRunLogLine(t *t
 		t.Errorf("sent = %v, want none — transport is globally muted", got)
 	}
 
-	events, ok, err := readEvents(scratchDir, epicName)
+	events, ok, err := ReadEvents(scratchDir, epicName)
 	if err != nil || !ok {
-		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	var suppressed []Event
 	for _, ev := range events {
@@ -723,9 +723,9 @@ func TestChatEventSink_Requeue_SkippedAfterClose_LogsSuppression(t *testing.T) {
 		t.Errorf("queue after closed requeue = %d entries, want 0 (should be skipped, not queued)", queueLen)
 	}
 
-	events, ok, err := readEvents(scratchDir, epicName)
+	events, ok, err := ReadEvents(scratchDir, epicName)
 	if err != nil || !ok {
-		t.Fatalf("readEvents: ok=%v err=%v", ok, err)
+		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	var suppressed []Event
 	for _, ev := range events {

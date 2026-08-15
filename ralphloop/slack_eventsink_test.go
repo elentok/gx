@@ -321,7 +321,7 @@ func TestSlackEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 	var events []Event
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		events, _, _ = readEvents(dir, "epic")
+		events, _, _ = ReadEvents(dir, "epic")
 		if len(events) > 0 {
 			break
 		}
@@ -348,7 +348,7 @@ func TestSlackEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 	// (1.5s) before logging notification-failed.
 	deadline := time.Now().Add(4 * time.Second)
 	for time.Now().Before(deadline) {
-		events, _, _ = readEvents(dir, "epic")
+		events, _, _ = ReadEvents(dir, "epic")
 		if len(events) > 0 {
 			break
 		}
@@ -380,7 +380,7 @@ func TestSlackEventSink_LogsNotificationFailedToRunLog_RedactsWebhookSecret(t *t
 	// (1.5s) before logging notification-failed.
 	deadline := time.Now().Add(4 * time.Second)
 	for time.Now().Before(deadline) {
-		events, _, _ = readEvents(dir, "epic")
+		events, _, _ = ReadEvents(dir, "epic")
 		if len(events) > 0 {
 			break
 		}

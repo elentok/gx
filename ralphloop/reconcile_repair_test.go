@@ -57,9 +57,9 @@ func TestReconcile_DoneTicketRecoverable_AutoRecherryPicksAndReports(t *testing.
 		t.Errorf("events = %+v, want a recovered event naming ticket 03 as restored", sink.Events())
 	}
 
-	events, _, err := readEvents(scratchDir, "epic")
+	events, _, err := ReadEvents(scratchDir, "epic")
 	if err != nil {
-		t.Fatalf("readEvents: %v", err)
+		t.Fatalf("ReadEvents: %v", err)
 	}
 	sawRepairCherryPick := false
 	for _, ev := range events {

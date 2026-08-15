@@ -204,12 +204,12 @@ func TestRun_FullEpicRealGit_TelegramNotifications_AllValidMarkdownV2(t *testing
 		}
 	}
 
-	events, ok, err := readEvents(scratchDir, epicName)
+	events, ok, err := ReadEvents(scratchDir, epicName)
 	if err != nil {
-		t.Fatalf("readEvents: %v", err)
+		t.Fatalf("ReadEvents: %v", err)
 	}
 	if !ok {
-		t.Fatalf("readEvents ok = false, want run-log.jsonl to exist")
+		t.Fatalf("ReadEvents ok = false, want run-log.jsonl to exist")
 	}
 	for _, ev := range events {
 		if ev.Type == eventNotificationFailed {
