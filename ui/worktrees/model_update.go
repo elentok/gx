@@ -60,6 +60,9 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 			return m.handleConfirmMouseUpdate(msg)
 		}
 
+	case tea.MouseWheelMsg:
+		return m.handleMouseWheel(msg)
+
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
 			if m.settings.EnableNavigation {
@@ -468,14 +471,9 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	cmds = append(cmds, tableCmd)
 
 	if m.table.Cursor() != prevCursor && len(m.worktrees) > 0 {
-		m.table.SetRows(m.buildRows())
-		m.previewLoading = true
-		m.viewport.SetContent(m.previewContent())
-		var spinnerCmd tea.Cmd
-		if !m.spinnerActive {
-			spinnerCmd = m.spinner.Tick
-		}
-		cmds = append(cmds, cmdLoadPreviewData(m.repo, m.worktrees[m.table.Cursor()]), spinnerCmd)
+		var cursorCmd tea.Cmd
+		m, cursorCmd = m.refreshAfterCursorMove()
+		cmds = append(cmds, cursorCmd)
 	}
 
 	var vpCmd tea.Cmd
@@ -483,4 +481,18 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	cmds = append(cmds, vpCmd)
 
 	return m, tea.Batch(cmds...)
+}
+
+// refreshAfterCursorMove re-renders the table and preview and kicks off a
+// reload of the newly-selected worktree's preview data, shared by every path
+// that moves the table cursor (keyboard, mouse wheel).
+func (m Model) refreshAfterCursorMove() (Model, tea.Cmd) {
+	m.table.SetRows(m.buildRows())
+	m.previewLoading = true
+	m.viewport.SetContent(m.previewContent())
+	var spinnerCmd tea.Cmd
+	if !m.spinnerActive {
+		spinnerCmd = m.spinner.Tick
+	}
+	return m, tea.Batch(cmdLoadPreviewData(m.repo, m.worktrees[m.table.Cursor()]), spinnerCmd)
 }

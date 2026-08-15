@@ -2,6 +2,7 @@ package worktrees
 
 import (
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui"
 )
 
 // seamWidth is the 1-cell gap reserved between the table and details panels;
@@ -44,6 +45,23 @@ func (m Model) splitHeight(total int) (tableH, previewH int) {
 
 func (m Model) useStackedLayout() bool {
 	return m.width <= 100
+}
+
+// tableRect and previewRect give the on-screen bounds of the two panes, for
+// routing a mouse-wheel event to whichever the cursor is over.
+func (m Model) tableRect() ui.Rect {
+	tableW, _ := m.splitWidth()
+	tableH, _ := m.splitHeight(m.contentHeight())
+	return ui.Rect{X: 0, Y: 0, W: tableW, H: tableH}
+}
+
+func (m Model) previewRect() ui.Rect {
+	tableW, previewW := m.splitWidth()
+	tableH, previewH := m.splitHeight(m.contentHeight())
+	if m.useStackedLayout() {
+		return ui.Rect{X: 0, Y: tableH + m.seamWidth(), W: tableW, H: previewH}
+	}
+	return ui.Rect{X: tableW + m.seamWidth(), Y: 0, W: previewW, H: tableH}
 }
 
 func (m Model) helpLineCount() int {
