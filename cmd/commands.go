@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"path/filepath"
 	"strings"
 
@@ -9,6 +10,38 @@ import (
 
 	"github.com/spf13/cobra"
 )
+
+// newEpicScopedCmd builds a cobra command that takes a single epic argument:
+// cwd resolution, resolveEpicArg, and shell-completion via completeEpicNames
+// are wired once here so epic-scoped subcommands (ensure-code-review, add,
+// filter-run-log, ...) don't each hand-roll the same boilerplate. run
+// receives the resolved epic path, the raw args (for any extra positional
+// args beyond the epic), and the command's output writer.
+func newEpicScopedCmd(d deps, use, short string, run func(epicPath string, args []string, out io.Writer) error) *cobra.Command {
+	return &cobra.Command{
+		Use:   use,
+		Short: short,
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			cwd, err := d.getwd()
+			if err != nil {
+				return err
+			}
+			return run(resolveEpicArg(args[0], cwd), args, c.OutOrStdout())
+		},
+		ValidArgsFunction: func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+			cwd, err := d.getwd()
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveError
+			}
+			names, err := completeEpicNames(cwd)
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveError
+			}
+			return names, cobra.ShellCompDirectiveNoFileComp
+		},
+	}
+}
 
 func newWorktreesCmd(d deps) *cobra.Command {
 	cmd := &cobra.Command{
@@ -222,29 +255,11 @@ func newTicketsCmd(d deps) *cobra.Command {
 	}
 	epicsCmd.Flags().BoolVar(&mapsOnly, "maps", false, "only print epics with a wayfinder map.md")
 	cmd.AddCommand(epicsCmd)
-	cmd.AddCommand(&cobra.Command{
-		Use:   "ensure-code-review <epic>",
-		Short: "no-op if the epic has a code-review ticket, else stamp out a stub",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(c *cobra.Command, args []string) error {
-			cwd, err := d.getwd()
-			if err != nil {
-				return err
-			}
-			return runTicketsEnsureCodeReview(resolveEpicArg(args[0], cwd), c.OutOrStdout())
-		},
-		ValidArgsFunction: func(c *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			cwd, err := d.getwd()
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveError
-			}
-			names, err := completeEpicNames(cwd)
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveError
-			}
-			return names, cobra.ShellCompDirectiveNoFileComp
-		},
-	})
+	cmd.AddCommand(newEpicScopedCmd(d, "ensure-code-review <epic>",
+		"no-op if the epic has a code-review ticket, else stamp out a stub",
+		func(epicPath string, _ []string, out io.Writer) error {
+			return runTicketsEnsureCodeReview(epicPath, out)
+		}))
 	cmd.AddCommand(&cobra.Command{
 		Use:   "schema",
 		Short: "print the ticket frontmatter schema (settable and read-only fields)",
@@ -255,57 +270,21 @@ func newTicketsCmd(d deps) *cobra.Command {
 		},
 	})
 	var addParent, addSlug string
-	addCmd := &cobra.Command{
-		Use:   "add <epic>",
-		Short: "atomically allocate the next ticket ID and stamp out a stub file",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(c *cobra.Command, args []string) error {
-			cwd, err := d.getwd()
-			if err != nil {
-				return err
-			}
-			return runTicketsAdd(resolveEpicArg(args[0], cwd), addParent, addSlug, c.OutOrStdout())
-		},
-		ValidArgsFunction: func(c *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			cwd, err := d.getwd()
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveError
-			}
-			names, err := completeEpicNames(cwd)
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveError
-			}
-			return names, cobra.ShellCompDirectiveNoFileComp
-		},
-	}
+	addCmd := newEpicScopedCmd(d, "add <epic>",
+		"atomically allocate the next ticket ID and stamp out a stub file",
+		func(epicPath string, _ []string, out io.Writer) error {
+			return runTicketsAdd(epicPath, addParent, addSlug, out)
+		})
 	addCmd.Flags().StringVar(&addParent, "parent", "", "allocate a lettered child of this ticket ID (or, if parent is itself lettered, one numeric level past it)")
 	addCmd.Flags().StringVar(&addSlug, "slug", "", "descriptive filename slug, e.g. \"wire-tree-model-selection\" (required; stub lands at <id>-<slug>.md)")
 	cmd.AddCommand(addCmd)
 	var filterTicket string
 	var filterEvents []string
-	filterRunLogCmd := &cobra.Command{
-		Use:   "filter-run-log <epic>",
-		Short: "print an epic's run-log.jsonl events, filtered by ticket/event type",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(c *cobra.Command, args []string) error {
-			cwd, err := d.getwd()
-			if err != nil {
-				return err
-			}
-			return runTicketsFilterRunLog(resolveEpicArg(args[0], cwd), filterTicket, filterEvents, c.OutOrStdout())
-		},
-		ValidArgsFunction: func(c *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			cwd, err := d.getwd()
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveError
-			}
-			names, err := completeEpicNames(cwd)
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveError
-			}
-			return names, cobra.ShellCompDirectiveNoFileComp
-		},
-	}
+	filterRunLogCmd := newEpicScopedCmd(d, "filter-run-log <epic>",
+		"print an epic's run-log.jsonl events, filtered by ticket/event type",
+		func(epicPath string, _ []string, out io.Writer) error {
+			return runTicketsFilterRunLog(epicPath, filterTicket, filterEvents, out)
+		})
 	filterRunLogCmd.Flags().StringVar(&filterTicket, "ticket", "", "only events for this ticket id")
 	filterRunLogCmd.Flags().StringArrayVar(&filterEvents, "event", nil, "only events of this type (repeatable)")
 	cmd.AddCommand(filterRunLogCmd)
