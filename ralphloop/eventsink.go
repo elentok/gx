@@ -179,6 +179,19 @@ type EventSink interface {
 	// EpicComplete reports that every ticket in epicName is done, with
 	// completed tickets landed by this Run call, after elapsedSeconds of
 	// total wall-clock run time.
+	//
+	// Notification-only invariant: every current implementer (chatEventSink,
+	// ChannelEventSink, noopEventSink) only notifies — sends a chat message or
+	// forwards a LiveEvent — and never itself persists ticket/epic state to
+	// disk or elsewhere. Run's drain-exit path (see the drained guard in
+	// loop.go) relies on this: it skips this call wholesale for a drained run
+	// rather than only suppressing its chat/toast half, on the assumption
+	// there's no other, non-notification behavior to lose. See
+	// TestEpicComplete_ChatSinkIsNotificationOnly in
+	// eventsink_contract_test.go, which pins this for chatEventSink (the one
+	// implementer with enough behavior to plausibly grow a state mutation). A
+	// future implementer that persists state here would need Run's drain path
+	// updated to call it separately from the chat/toast half.
 	EpicComplete(epicName string, completed int, elapsedSeconds int)
 	// DrainComplete reports that epicName's run ended specifically because it
 	// was draining (see Gate.Drain) — whether that end was immediate

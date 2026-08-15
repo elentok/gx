@@ -441,6 +441,14 @@ func (r *loopRegistry) reduceLiveEvent(epicName string, event ralphloop.LiveEven
 		// LiveEventIterationFinished — event.Completed is this run's own
 		// landed-ticket count, a different number (see EventSink.EpicComplete),
 		// not the epic-wide done count.
+		//
+		// run.state = RunStateCompleted duplicates the LiveEventEpicComplete
+		// case above rather than falling through to it, because a drained run
+		// never gets a LiveEventEpicComplete at all — Run's drain-exit path
+		// skips that call outright (see EventSink.EpicComplete's
+		// notification-only doc comment). If EpicComplete's reducer case above
+		// ever grows behavior beyond the state set + toast, this case needs
+		// the same addition.
 		run.state = RunStateCompleted
 		run.pendingToasts = append(run.pendingToasts, notify.NotifyMsg{
 			Kind:    notify.KindWarning,
