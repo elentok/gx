@@ -28,16 +28,19 @@ const (
 	nodeSection sidebarNodeKind = iota
 	nodeEpic
 	nodeTicket
-	nodeEmpty // "no open/closed epics" placeholder, child of a nodeSection with zero epics
+	nodeEmpty     // "no open/closed/archived epics" placeholder, child of a nodeSection with zero epics
+	nodeLoading   // "loading…" placeholder, child of the Archived section while its lazy load is in flight
+	nodeLoadError // inline error placeholder, child of the Archived section after a failed lazy load
 )
 
-// sidebarSection is which of the two section-header roots a sidebarNode
+// sidebarSection is which of the three section-header roots a sidebarNode
 // belongs under.
 type sidebarSection int
 
 const (
 	sectionOpen sidebarSection = iota
 	sectionClosed
+	sectionArchived
 )
 
 // sidebarNode is ui/tree.Model[sidebarNode]'s value type. ticketIdx is -1 for
@@ -63,12 +66,14 @@ type epicTicketTree struct {
 	childrenOf map[int][]int
 }
 
-// buildEpicTicketTree computes epicIdx's visible-ticket parent/child shape:
+// buildEpicTicketTree computes epic's visible-ticket parent/child shape:
 // sortedTicketIndexes' plan order, filtered by hideDone, then nested via each
 // ticket's nearest visible ancestor (a hideDone-filtered parent reattaches
-// its children one level further up instead of stranding them).
-func (m Model) buildEpicTicketTree(epicIdx int) epicTicketTree {
-	epic := m.epics[epicIdx]
+// its children one level further up instead of stranding them). Takes the
+// Epic value directly (rather than an index into m.epics) so it works
+// equally for m.archivedEpics — indices in that slice mean nothing against
+// m.epics.
+func (m Model) buildEpicTicketTree(epic tickets.Epic) epicTicketTree {
 	sorted := sortedTicketIndexes(epic)
 
 	visible := make(map[int]bool, len(sorted))
@@ -115,12 +120,18 @@ func (m Model) buildSidebarEntries() []tree.Entry[sidebarNode] {
 	}
 	openIdxs, closedIdxs := splitEpicIndexesBySection(m.epics, idxs)
 
-	epicTrees := make(map[int]epicTicketTree, len(m.epics))
-	epicTree := func(epicIdx int) epicTicketTree {
-		t, ok := epicTrees[epicIdx]
+	epicTreesOpen := make(map[int]epicTicketTree, len(m.epics))
+	epicTreesArchived := make(map[int]epicTicketTree, len(m.archivedEpics))
+	epicTree := func(archived bool, epicIdx int) epicTicketTree {
+		cache := epicTreesOpen
+		epics := m.epics
+		if archived {
+			cache, epics = epicTreesArchived, m.archivedEpics
+		}
+		t, ok := cache[epicIdx]
 		if !ok {
-			t = m.buildEpicTicketTree(epicIdx)
-			epicTrees[epicIdx] = t
+			t = m.buildEpicTicketTree(epics[epicIdx])
+			cache[epicIdx] = t
 		}
 		return t
 	}
@@ -128,6 +139,7 @@ func (m Model) buildSidebarEntries() []tree.Entry[sidebarNode] {
 	roots := []sidebarNode{
 		{kind: nodeSection, section: sectionOpen, ticketIdx: -1},
 		{kind: nodeSection, section: sectionClosed, ticketIdx: -1},
+		{kind: nodeSection, section: sectionArchived, ticketIdx: -1},
 	}
 
 	idFn := func(n sidebarNode) string {
@@ -135,20 +147,24 @@ func (m Model) buildSidebarEntries() []tree.Entry[sidebarNode] {
 		case nodeSection:
 			return sidebarSectionID(n.section)
 		case nodeEmpty:
-			if n.section == sectionOpen {
-				return "section:open:empty"
-			}
-			return "section:closed:empty"
+			return sidebarSectionID(n.section) + ":empty"
+		case nodeLoading:
+			return sidebarSectionID(n.section) + ":loading"
+		case nodeLoadError:
+			return sidebarSectionID(n.section) + ":error"
 		case nodeEpic:
-			return m.epics[n.epicIdx].Path
+			return m.epicAt(row{epicIdx: n.epicIdx, archived: n.archived}).Path
 		default:
-			return m.epics[n.epicIdx].Tickets[n.ticketIdx].Path
+			return m.epicAt(row{epicIdx: n.epicIdx, archived: n.archived}).Tickets[n.ticketIdx].Path
 		}
 	}
 
 	childrenFn := func(n sidebarNode) []sidebarNode {
 		switch n.kind {
 		case nodeSection:
+			if n.section == sectionArchived {
+				return m.archivedSectionChildren()
+			}
 			order := openIdxs
 			if n.section == sectionClosed {
 				order = closedIdxs
@@ -161,26 +177,50 @@ func (m Model) buildSidebarEntries() []tree.Entry[sidebarNode] {
 				children[i] = sidebarNode{kind: nodeEpic, epicIdx: epicIdx, ticketIdx: -1}
 			}
 			return children
-		case nodeEmpty:
+		case nodeEmpty, nodeLoading, nodeLoadError:
 			return nil
 		case nodeEpic:
-			roots := epicTree(n.epicIdx).roots
+			roots := epicTree(n.archived, n.epicIdx).roots
 			children := make([]sidebarNode, len(roots))
 			for i, idx := range roots {
-				children[i] = sidebarNode{kind: nodeTicket, epicIdx: n.epicIdx, ticketIdx: idx}
+				children[i] = sidebarNode{kind: nodeTicket, epicIdx: n.epicIdx, ticketIdx: idx, archived: n.archived}
 			}
 			return children
 		default:
-			kids := epicTree(n.epicIdx).childrenOf[n.ticketIdx]
+			kids := epicTree(n.archived, n.epicIdx).childrenOf[n.ticketIdx]
 			children := make([]sidebarNode, len(kids))
 			for i, idx := range kids {
-				children[i] = sidebarNode{kind: nodeTicket, epicIdx: n.epicIdx, ticketIdx: idx}
+				children[i] = sidebarNode{kind: nodeTicket, epicIdx: n.epicIdx, ticketIdx: idx, archived: n.archived}
 			}
 			return children
 		}
 	}
 
 	return tree.BuildEntriesFromValues(roots, idFn, childrenFn, m.sidebarTree.CollapsedIDs())
+}
+
+// archivedSectionChildren computes the Archived section header's synthetic
+// children: the shared nodeEmpty placeholder when the up-front count is
+// zero (so an empty archive renders identically to an empty Open/Closed
+// section, never as a bare non-expandable row), otherwise a loading/error
+// placeholder or the real archived-epic rows depending on m.archivedLazy's
+// current state.
+func (m Model) archivedSectionChildren() []sidebarNode {
+	if m.archivedEpicCount == 0 {
+		return []sidebarNode{{kind: nodeEmpty, section: sectionArchived, ticketIdx: -1}}
+	}
+	switch m.archivedLazy.State() {
+	case tree.LazyLoaded:
+		children := make([]sidebarNode, len(m.archivedEpics))
+		for i := range m.archivedEpics {
+			children[i] = sidebarNode{kind: nodeEpic, epicIdx: i, ticketIdx: -1, archived: true}
+		}
+		return children
+	case tree.LazyFailed:
+		return []sidebarNode{{kind: nodeLoadError, section: sectionArchived, ticketIdx: -1}}
+	default:
+		return []sidebarNode{{kind: nodeLoading, section: sectionArchived, ticketIdx: -1}}
+	}
 }
 
 type epicsLoadedMsg struct {
@@ -313,12 +353,16 @@ func (m Model) isCollapsed(epic tickets.Epic) bool {
 
 // sidebarSectionID is the tree.Entry ID for a section's nodeSection root row
 // — the single source of truth idFn and closedEpicDefaults both share
-// for "section:open"/"section:closed".
+// for "section:open"/"section:closed"/"section:archived".
 func sidebarSectionID(section sidebarSection) string {
-	if section == sectionOpen {
+	switch section {
+	case sectionOpen:
 		return "section:open"
+	case sectionClosed:
+		return "section:closed"
+	default:
+		return "section:archived"
 	}
-	return "section:closed"
 }
 
 // closedEpicDefaults is the sidebar's declared-default collapse policy: the
@@ -329,12 +373,18 @@ func sidebarSectionID(section sidebarSection) string {
 // Declared fresh from epics every call — never mutated or persisted — so an
 // epic that reopens (a ticket moves back off done) simply stops appearing
 // here on the very next call, with nothing to un-seed.
-func closedEpicDefaults(epics []tickets.Epic) map[string]bool {
-	defaults := map[string]bool{sidebarSectionID(sectionClosed): true}
+func closedEpicDefaults(epics []tickets.Epic, archivedEpics []tickets.Epic) map[string]bool {
+	defaults := map[string]bool{
+		sidebarSectionID(sectionClosed):   true,
+		sidebarSectionID(sectionArchived): true,
+	}
 	for _, epic := range epics {
 		if epic.AllDone() {
 			defaults[epic.Path] = true
 		}
+	}
+	for _, epic := range archivedEpics {
+		defaults[epic.Path] = true
 	}
 	return defaults
 }
@@ -391,8 +441,8 @@ func searchExpandOverrides(epics []tickets.Epic, query string) map[string]bool {
 // sidebarTree.SetCollapsedIDs — it must never be read back into explicit,
 // or a default/override would calcify into a permanent choice the way the
 // old read-back-and-write-back defaultCollapsedSidebar did.
-func deriveCollapsedSidebar(explicit map[string]bool, epics []tickets.Epic, query string) map[string]bool {
-	effective := tree.ApplyDefaults(explicit, closedEpicDefaults(epics))
+func deriveCollapsedSidebar(explicit map[string]bool, epics []tickets.Epic, archivedEpics []tickets.Epic, query string) map[string]bool {
+	effective := tree.ApplyDefaults(explicit, closedEpicDefaults(epics, archivedEpics))
 	for id := range searchExpandOverrides(epics, query) {
 		if _, ok := explicit[id]; ok {
 			continue

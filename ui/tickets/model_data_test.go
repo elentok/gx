@@ -17,7 +17,7 @@ func TestDeriveCollapsedSidebar_ClosedEpicDefaultsCollapsedOpenEpicDoesNot(t *te
 		{Path: "open-epic", Tickets: []tickets.Ticket{{Status: "open"}}},
 	}
 
-	got := deriveCollapsedSidebar(nil, epics, "")
+	got := deriveCollapsedSidebar(nil, epics, nil, "")
 
 	if !got["closed-epic"] {
 		t.Fatalf("expected closed epic to default to collapsed, got %v", got["closed-epic"])
@@ -35,10 +35,10 @@ func TestDeriveCollapsedSidebar_ReopenedEpicLosesCollapsedDefault(t *testing.T) 
 	closed := []tickets.Epic{{Path: "epic", Tickets: []tickets.Ticket{{Status: "done"}}}}
 	reopened := []tickets.Epic{{Path: "epic", Tickets: []tickets.Ticket{{Status: "open"}}}}
 
-	if got := deriveCollapsedSidebar(nil, closed, ""); !got["epic"] {
+	if got := deriveCollapsedSidebar(nil, closed, nil, ""); !got["epic"] {
 		t.Fatalf("expected closed epic to default to collapsed, got %v", got["epic"])
 	}
-	if got := deriveCollapsedSidebar(nil, reopened, ""); got["epic"] {
+	if got := deriveCollapsedSidebar(nil, reopened, nil, ""); got["epic"] {
 		t.Fatalf("expected reopened epic to lose its collapsed default, got collapsed=%v", got["epic"])
 	}
 }
@@ -50,12 +50,12 @@ func TestDeriveCollapsedSidebar_ExplicitToggleBeatsClosedDefault(t *testing.T) {
 	t.Parallel()
 	epics := []tickets.Epic{{Path: "epic", Tickets: []tickets.Ticket{{Status: "done"}}}}
 
-	expanded := deriveCollapsedSidebar(map[string]bool{"epic": false}, epics, "")
+	expanded := deriveCollapsedSidebar(map[string]bool{"epic": false}, epics, nil, "")
 	if expanded["epic"] {
 		t.Fatalf("expected explicit expand to beat closed-epic default, got collapsed=%v", expanded["epic"])
 	}
 
-	collapsed := deriveCollapsedSidebar(map[string]bool{"epic": true}, epics, "")
+	collapsed := deriveCollapsedSidebar(map[string]bool{"epic": true}, epics, nil, "")
 	if !collapsed["epic"] {
 		t.Fatalf("expected explicit collapse to be honored, got collapsed=%v", collapsed["epic"])
 	}
@@ -70,7 +70,7 @@ func TestDeriveCollapsedSidebar_SearchOverrideIsTransient(t *testing.T) {
 	epics := []tickets.Epic{{Path: "closed-epic", Tickets: []tickets.Ticket{{Title: "widget", Status: "done"}}}}
 	explicit := map[string]bool{}
 
-	matched := deriveCollapsedSidebar(explicit, epics, "widget")
+	matched := deriveCollapsedSidebar(explicit, epics, nil, "widget")
 	if matched["closed-epic"] {
 		t.Fatalf("expected search match to expand closed epic, got collapsed=%v", matched["closed-epic"])
 	}
@@ -78,12 +78,12 @@ func TestDeriveCollapsedSidebar_SearchOverrideIsTransient(t *testing.T) {
 		t.Fatalf("expected search override to leave no trace in the explicit map, got %v", explicit)
 	}
 
-	noQuery := deriveCollapsedSidebar(explicit, epics, "")
+	noQuery := deriveCollapsedSidebar(explicit, epics, nil, "")
 	if !noQuery["closed-epic"] {
 		t.Fatalf("expected closed-epic default to reassert once search ends, got collapsed=%v", noQuery["closed-epic"])
 	}
 
-	noMatch := deriveCollapsedSidebar(explicit, epics, "gadget")
+	noMatch := deriveCollapsedSidebar(explicit, epics, nil, "gadget")
 	if !noMatch["closed-epic"] {
 		t.Fatalf("expected closed-epic default to reassert once it no longer matches, got collapsed=%v", noMatch["closed-epic"])
 	}

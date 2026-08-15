@@ -179,6 +179,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 			m.explicitCollapsed[selectedID] = m.sidebarTree.CollapsedIDs()[selectedID]
 		}
+		if selectedID == sidebarSectionID(sectionArchived) && !m.sidebarTree.CollapsedIDs()[selectedID] {
+			if expandCmd := m.archivedLazy.Expand(); expandCmd != nil {
+				cmd = tea.Batch(cmd, expandCmd)
+			}
+		}
 		m.clampSelected()
 		if m.search.HasQuery() {
 			m.recomputeSearchMatches()

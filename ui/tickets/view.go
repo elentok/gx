@@ -97,16 +97,26 @@ func (m Model) sidebarRenderOpts(width int) tree.RenderOpts[sidebarNode] {
 					glyph = m.icons().TriangleCollapsed
 				}
 				label, n := "Open epics", len(openIdxs)
-				if entry.Value.section == sectionClosed {
+				switch entry.Value.section {
+				case sectionClosed:
 					label, n = "Closed epics", len(closedIdxs)
+				case sectionArchived:
+					label, n = "Archived epics", m.archivedEpicCount
 				}
 				return fmt.Sprintf("%s %s", glyph, sectionHeaderStyle.Render(fmt.Sprintf("%s (%d)", label, n)))
 			case nodeEmpty:
 				label := "open epics"
-				if entry.Value.section == sectionClosed {
+				switch entry.Value.section {
+				case sectionClosed:
 					label = "closed epics"
+				case sectionArchived:
+					label = "archived epics"
 				}
 				return ui.StyleMuted.Render("no " + label)
+			case nodeLoading:
+				return ui.StyleDim.Render("loading…")
+			case nodeLoadError:
+				return statusErrorStyle.Render("failed to load: " + m.archivedLazy.Err().Error())
 			case nodeEpic:
 				r, _ := rowFromEntry(entry)
 				return m.renderEpicRow(m.epicAt(r))

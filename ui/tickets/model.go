@@ -72,6 +72,12 @@ type Model struct {
 	// whether archivedEpics itself has been populated yet.
 	archivedEpics     []tickets.Epic
 	archivedEpicCount int
+	// archivedLazy drives the Archived section's on-expand load (ticket 04):
+	// Expand() returns the load command the first time the section is
+	// expanded, Deliver feeds the result back in, and SetCount (called on
+	// every epicsLoadedMsg) auto-invalidates the cache if the archive's count
+	// changed since it was loaded.
+	archivedLazy tree.LazySection[tickets.Epic]
 	// autoRefreshStarted guards cmdAutoRefresh's self-perpetuating poll loop
 	// (auto_refresh.go) against being started more than once per Model
 	// instance — every epicsLoadedMsg, including ones the loop itself
@@ -189,7 +195,11 @@ func NewModelWithStore(worktreeRoot string, settings ui.Settings, extraKeys keys
 	km := newTicketsManager()
 	sidebarTree := tree.NewModel[sidebarNode]()
 	sidebarTree.SetIsSelectable(func(n sidebarNode) bool {
-		return n.kind != nodeEmpty
+		return n.kind != nodeEmpty && n.kind != nodeLoading && n.kind != nodeLoadError
+	})
+	scratchDir := scratchDirFor(worktreeRoot)
+	archivedLazy := tree.NewLazySection(0, func() ([]tickets.Epic, error) {
+		return tickets.LoadArchived(scratchDir)
 	})
 	return Model{
 		worktreeRoot:       worktreeRoot,
@@ -210,6 +220,7 @@ func NewModelWithStore(worktreeRoot string, settings ui.Settings, extraKeys keys
 		queueStatus:        snapshot.Status,
 		queueStore:         store,
 		explicitCollapsed:  map[string]bool{},
+		archivedLazy:       archivedLazy,
 	}
 }
 
@@ -266,6 +277,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loaded = true
 		m.epics = msg.epics
 		m.archivedEpicCount = msg.archivedEpicCount
+		m.archivedLazy.SetCount(msg.archivedEpicCount)
 		if m.search.HasQuery() {
 			m.recomputeSearchMatches()
 		}
@@ -282,6 +294,13 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case autoRefreshMsg:
 		return m, tea.Batch(m.cmdLoad(), cmdAutoRefresh())
+
+	case tree.LazyResultMsg[tickets.Epic]:
+		if m.archivedLazy.Deliver(msg) {
+			m.archivedEpics = m.archivedLazy.Rows()
+			m.clampSelected()
+		}
+		return m, nil
 
 	case editFileFinishedMsg:
 		return m.handleEditFileFinished(msg)
@@ -382,7 +401,7 @@ func (m *Model) clampSelected() {
 // glyph, isCollapsed/renderEpicRow) always read through the one map that
 // was actually handed to the tree.
 func (m *Model) refreshSidebarCollapse() {
-	m.sidebarTree.SetCollapsedIDs(deriveCollapsedSidebar(m.explicitCollapsed, m.epics, m.search.Query()))
+	m.sidebarTree.SetCollapsedIDs(deriveCollapsedSidebar(m.explicitCollapsed, m.epics, m.archivedEpics, m.search.Query()))
 }
 
 // sidebarViewportHeight is the sidebar body's visible line count, matching
