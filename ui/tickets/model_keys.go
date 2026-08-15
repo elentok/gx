@@ -5,6 +5,7 @@ import (
 
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/terminalrun"
 )
 
@@ -118,12 +119,24 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case bindingTicketsCancelChord:
 			return m, nil
 		case bindingTicketsReplaceQueue:
+			if cmd, blocked := m.archivedReadOnlyGuard(); blocked {
+				return m, cmd
+			}
 			return m.handleReplaceQueueKey()
 		case bindingTicketsAddToQueue:
+			if cmd, blocked := m.archivedReadOnlyGuard(); blocked {
+				return m, cmd
+			}
 			return m.handleAddToQueueKey()
 		case bindingTicketsDrainReplace:
+			if cmd, blocked := m.archivedReadOnlyGuard(); blocked {
+				return m, cmd
+			}
 			return m.handleDrainReplaceKey()
 		case bindingTicketsToggleCheck:
+			if cmd, blocked := m.archivedReadOnlyGuard(); blocked {
+				return m, cmd
+			}
 			return m.handleToggleCheck()
 		case bindingTicketsToggleHideDone:
 			m.toggleHideDone()
@@ -134,8 +147,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case bindingTicketsPreviewBottom:
 			m.previewVP.GotoBottom()
 		case bindingTicketsChangeStatus:
+			if cmd, blocked := m.archivedReadOnlyGuard(); blocked {
+				return m, cmd
+			}
 			return m.handleChangeStatusKey()
 		case bindingTicketsSuggestedActions:
+			if cmd, blocked := m.archivedReadOnlyGuard(); blocked {
+				return m, cmd
+			}
 			return m.handleSuggestedActionsKey()
 		case bindingTicketsYankSummary:
 			return m, m.yankTicketSummary()
@@ -196,6 +215,20 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// inside tree.Model.Update (see SetIsSelectable/SkipUnselectable) — no
 	// extra nudge needed here for j/k/up/down.
 	return m, cmd
+}
+
+// archivedReadOnlyGuard is the mutating keybindings' shared no-op check:
+// tickets/epics sourced from the (ticket 04) Archived section live outside
+// the active tracker as a plain filesystem move under .scratch/.archive/, so
+// status changes, queue actions, toggle-check, and suggested-actions must not
+// write to or navigate away from them. blocked reports whether the caller
+// should stop and return cmd unchanged instead of running its handler.
+func (m Model) archivedReadOnlyGuard() (cmd tea.Cmd, blocked bool) {
+	r, ok := m.selectedRow()
+	if !ok || !r.archived {
+		return nil, false
+	}
+	return notify.Info("read-only: this ticket is archived"), true
 }
 
 // selectFirstRow/selectLastRow implement "gg"/"G": jump the sidebar
