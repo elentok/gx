@@ -4,6 +4,14 @@ Running list of previously-diagnosed gx/ralph-loop bugs, newest first. Append on
 to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKILL.md) gets fixed
 — don't re-explain what the linked commit/ticket already documents.
 
+- **A parked (needs-answer/needs-repair, no commits) outcome also fires a spurious "done"
+  notification with `0s · 0 tok · $0.00`.** `ralphloop/loop.go`'s main scheduling loop (~line
+  759-817) only early-exits on `r.built`/`r.parkedOnChild`; a plain park falls through to
+  `completed++`/`sink.IterationFinished` anyway, alongside the correct `TicketNeedsHuman` message
+  fired earlier in `iteration.go`/`waitforfinish.go`. Reads as "ticket X needed an answer, then
+  completed anyway" in the same notification batch. Diagnosed via `blf`'s `power-improvements`
+  ticket `05`, `run-log.jsonl` batch at `2026-08-14T22:41:45+03:00`; not yet fixed. See
+  `follow-ups/issues/09-parked-outcome-still-fires-iteration-finished.md`.
 - **Telegram ticket-completion notifications silently drop almost every time (unescaped `.` in
   cost).** `formatCost` (`ralphloop/notification_text.go`) renders `"$1.23"` and
   `iterationFinishedText` splices it unescaped into the counts line `message()` sends — `.` is a
