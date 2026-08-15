@@ -353,6 +353,11 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleSidebarMouseClick(msg)
 
 	case tea.MouseWheelMsg:
+		if m.help.IsOpen {
+			var cmd tea.Cmd
+			m.help, cmd = m.help.Update(msg)
+			return m, cmd
+		}
 		return m.handleMouseWheel(msg)
 
 	case implementStartedMsg:

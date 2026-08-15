@@ -2627,6 +2627,40 @@ func TestMouseWheelScrollsStagedDiffViewport(t *testing.T) {
 	}
 }
 
+func TestMouseWheelWhileHelpOpenScrollsHelpNotDiff(t *testing.T) {
+	t.Parallel()
+	repo := testutil.TempRepo(t)
+	before := make([]string, 0, 80)
+	after := make([]string, 0, 80)
+	for i := 1; i <= 80; i++ {
+		before = append(before, fmt.Sprintf("old-%03d", i))
+		after = append(after, fmt.Sprintf("new-%03d", i))
+	}
+	testutil.WriteFile(t, repo, "scroll.txt", strings.Join(before, "\n")+"\n")
+	testutil.MustGitExported(t, repo, "add", "scroll.txt")
+	testutil.MustGitExported(t, repo, "commit", "-m", "baseline")
+	testutil.WriteFile(t, repo, "scroll.txt", strings.Join(after, "\n")+"\n")
+
+	m := newTestModelDefault(repo)
+	m.ready = true
+	m.width = 70
+	m.height = 20
+	m.syncDiffViewports()
+	m.focus = focusDiff
+	m.help.Open(m.width, m.height)
+
+	beforeDiffOffset := m.diffarea.Unstaged.Viewport().YOffset()
+	beforeHelpOffset := m.help.Viewport.YOffset()
+	updated, _ := m.Update(tea.MouseWheelMsg{X: 30, Y: 6, Button: tea.MouseWheelDown})
+	m = updated.(Model)
+	if m.diffarea.Unstaged.Viewport().YOffset() != beforeDiffOffset {
+		t.Fatalf("expected unstaged viewport not to scroll while help is open, before=%d after=%d", beforeDiffOffset, m.diffarea.Unstaged.Viewport().YOffset())
+	}
+	if m.help.Viewport.YOffset() <= beforeHelpOffset {
+		t.Fatalf("expected help viewport to scroll on wheel while open, before=%d after=%d", beforeHelpOffset, m.help.Viewport.YOffset())
+	}
+}
+
 func TestWToggleSoftWrap(t *testing.T) {
 	t.Parallel()
 	repo := testutil.TempRepo(t)

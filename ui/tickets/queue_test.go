@@ -2076,6 +2076,44 @@ func TestQueueModelHoverScrollNoOpsWithNoOverflow(t *testing.T) {
 	}
 }
 
+// TestQueueModelMouseWheelWhileHelpOpenScrollsHelpNotQueue covers the missing
+// help.IsOpen guard on the top-level tea.MouseWheelMsg case: while the help
+// modal is open, wheel events must scroll it instead of reaching the queue
+// tree behind it.
+func TestQueueModelMouseWheelWhileHelpOpenScrollsHelpNotQueue(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	for i := 1; i <= 40; i++ {
+		writeTicket(t, root, "alpha", fmt.Sprintf("%02d-ticket.md", i), "Status: open\n\nBody.\n")
+	}
+	checked := map[string]bool{}
+	for i := 1; i <= 40; i++ {
+		checked[ticketPath(root, "alpha", fmt.Sprintf("%02d-ticket.md", i))] = true
+	}
+
+	m := NewQueueModel(root, ui.Settings{}, checked, keys.Manager{})
+	msg := m.Init()()
+	updated, _ := m.Update(msg)
+	m = updated.(QueueModel)
+	updated, _ = m.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+	m = updated.(QueueModel)
+
+	m.help.Open(m.width, m.height)
+
+	prevQueueOffset := m.queueTree.ScrollOffset()
+	prevHelpOffset := m.help.Viewport.YOffset()
+
+	updated, _ = m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	m = updated.(QueueModel)
+
+	if m.queueTree.ScrollOffset() != prevQueueOffset {
+		t.Fatalf("expected queue tree not to scroll while help is open, before=%d after=%d", prevQueueOffset, m.queueTree.ScrollOffset())
+	}
+	if m.help.Viewport.YOffset() <= prevHelpOffset {
+		t.Fatalf("expected help viewport to scroll on wheel while open, before=%d after=%d", prevHelpOffset, m.help.Viewport.YOffset())
+	}
+}
+
 // TestQueueModelShowsPreviewPaneForSelectedTicket covers ticket 15's core
 // acceptance criterion: the Queue tab, previously a single full-width list
 // with no preview at all, now shows the same shared preview pane

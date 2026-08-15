@@ -183,3 +183,46 @@ func TestModel_WheelOverPaneWithNoOverflowIsNoop(t *testing.T) {
 		t.Fatalf("expected preview scroll offset to stay at %d, got %d", previewOffsetBefore, m.previewVP.YOffset())
 	}
 }
+
+// TestModel_MouseWheelWhileHelpOpenScrollsHelpNotPreview covers the missing
+// help.IsOpen guard on the top-level tea.MouseWheelMsg case: while the help
+// modal is open, wheel events must scroll it instead of reaching the
+// sidebar/preview panes behind it.
+func TestModel_MouseWheelWhileHelpOpenScrollsHelpNotPreview(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\n"+strings.Repeat("Line of body text.\n\n", 100))
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+	m = updated.(Model)
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+
+	px, py, _, _ := m.previewRect()
+	updated, _ = m.Update(tea.MouseClickMsg{X: px + 1, Y: py + 1, Button: tea.MouseLeft})
+	m = updated.(Model)
+
+	m.help.Open(m.width, m.height)
+
+	prevPreviewOffset := m.previewVP.YOffset()
+	prevSidebarOffset := m.sidebarTree.ScrollOffset()
+	prevHelpOffset := m.help.Viewport.YOffset()
+
+	updated, _ = m.Update(tea.MouseWheelMsg{X: px + 1, Y: py + 1, Button: tea.MouseWheelDown})
+	m = updated.(Model)
+
+	if m.previewVP.YOffset() != prevPreviewOffset {
+		t.Fatalf("expected preview not to scroll while help is open, before=%d after=%d", prevPreviewOffset, m.previewVP.YOffset())
+	}
+	if m.sidebarTree.ScrollOffset() != prevSidebarOffset {
+		t.Fatalf("expected sidebar not to scroll while help is open, before=%d after=%d", prevSidebarOffset, m.sidebarTree.ScrollOffset())
+	}
+	if m.help.Viewport.YOffset() <= prevHelpOffset {
+		t.Fatalf("expected help viewport to scroll on wheel while open, before=%d after=%d", prevHelpOffset, m.help.Viewport.YOffset())
+	}
+}

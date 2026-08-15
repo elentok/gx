@@ -197,6 +197,11 @@ func (m Model) handleBranchSyncLoaded(msg branchSyncLoadedMsg) (Model, tea.Cmd) 
 }
 
 func (m Model) handleMouseWheelMsg(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
+	if m.help.IsOpen {
+		var cmd tea.Cmd
+		m.help, cmd = m.help.Update(msg)
+		return m, cmd
+	}
 	if m.handleMouseWheel(msg) {
 		m.overlay.MarkDirty()
 		return m, nil

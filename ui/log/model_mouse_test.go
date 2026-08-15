@@ -78,3 +78,29 @@ func TestWheelStillScrollsListWhenDetailNotFocused(t *testing.T) {
 		t.Fatal("expected the log list to still scroll on wheel events when the detail pane isn't focused")
 	}
 }
+
+// TestMouseWheelWhileHelpOpenScrollsHelpNotList is a regression test for
+// mouse-wheel events being swallowed while the help modal is open instead of
+// scrolling its content.
+func TestMouseWheelWhileHelpOpenScrollsHelpNotList(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.listPanel = m.listPanel.WithRows(commitRows(30))
+
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 64, Height: 20})
+	m = next.(Model)
+	m.help.Open(m.width, m.height)
+
+	prevListOffset := m.listPanel.list.Offset()
+	prevHelpOffset := m.help.Viewport.YOffset()
+
+	next, _ = m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	m = next.(Model)
+
+	if m.listPanel.list.Offset() != prevListOffset {
+		t.Fatalf("expected the log list not to scroll while help is open, before=%d after=%d", prevListOffset, m.listPanel.list.Offset())
+	}
+	if m.help.Viewport.YOffset() <= prevHelpOffset {
+		t.Fatalf("expected help viewport to scroll on wheel while open, before=%d after=%d", prevHelpOffset, m.help.Viewport.YOffset())
+	}
+}

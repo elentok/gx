@@ -19,7 +19,12 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
-	if m.help.IsOpen || m.amendConfirm.IsOpen {
+	if m.help.IsOpen {
+		var cmd tea.Cmd
+		m.help, cmd = m.help.Update(msg)
+		return m, cmd
+	}
+	if m.amendConfirm.IsOpen {
 		return m, nil
 	}
 	if m.split.IsSplit() && m.split.IsDetailFocused() {
