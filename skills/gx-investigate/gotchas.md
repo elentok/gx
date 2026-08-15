@@ -4,6 +4,21 @@ Running list of previously-diagnosed gx/ralph-loop bugs, newest first. Append on
 to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKILL.md) gets fixed
 — don't re-explain what the linked commit/ticket already documents.
 
+- **`background-task-gate-released` is treated as full-turn completion, parking the ticket
+  `needs-answer`/zero-commit even though the agent kept working afterward.**
+  `waitForBackgroundTasks` (`ralphloop/waitforfinish.go:774-824`) only tracks whether one specific
+  backgrounded shell command's own completion notification appeared in the transcript — not pane
+  status. Its callers (`waitforfinish.go:143-166`, `iteration.go:240-243`) log the finish event and
+  fall straight into `finishIteration`'s commit count with no re-check that the pane is still idle;
+  if the agent resumes real work once it sees the background task's result (the normal case), the
+  park fires anyway. Found live: `idle-cost` tickets `03` and `06`, both parked right after a gate
+  release; `03` (manually resumed from the Queue menu) then produced a genuine commit 7 minutes
+  later in the same session/pane. Recovery: resume from the Queue menu, don't clear to `open` — the
+  session is intact, not stalled. `background_task.go`/the gate wiring landed 2026-08-13
+  (`d583e908`, `05489e3e`). Fixed same session: `waitForBackgroundTasks` now re-runs
+  `confirmFinished` once a gate it actually held releases, and both call sites loop again instead
+  of finishing if that recheck finds the pane busy. See
+  `follow-ups/issues/11-background-task-gate-release-skips-pane-recheck.md`.
 - **A parked (needs-answer/needs-repair, no commits) outcome also fires a spurious "done"
   notification with `0s · 0 tok · $0.00`.** `ralphloop/loop.go`'s main scheduling loop (~line
   759-817) only early-exits on `r.built`/`r.parkedOnChild`; a plain park falls through to

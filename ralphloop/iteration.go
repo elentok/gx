@@ -237,10 +237,11 @@ func reattachIteration(d Deps, p iterationParams) error {
 		if confirmed {
 			sessionID := resolveReattachSessionID(p, agent.AgentSession, preClear.SessionIDs)
 			elapsedMs := 0
-			if err := waitForBackgroundTasks(d, launchParams, sessionID, &elapsedMs); err != nil {
+			finishedAfterGate, err := waitForBackgroundTasks(d, launchParams, sessionID, plainFinishStates, &elapsedMs)
+			if err != nil {
 				return err
 			}
-			finished = true
+			finished = finishedAfterGate
 		}
 	}
 	if finished {

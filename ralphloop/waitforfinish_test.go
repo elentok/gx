@@ -2758,10 +2758,11 @@ func TestWaitForFinish_BackgroundTaskGateHoldsUntilResolved(t *testing.T) {
 	if reads != 3 {
 		t.Errorf("ReadBackgroundTasks calls = %d, want 3 (held, held, resolved)", reads)
 	}
-	// One sleep from confirmFinished's own debounce, plus two more pacing the
-	// gate's re-reads while the marker stayed outstanding-fresh.
-	if sleeps != 3 {
-		t.Errorf("Sleep calls = %d, want 3: the gate must pace re-reads at smartZonePollMs, not spin", sleeps)
+	// One sleep from confirmFinished's own debounce, two more pacing the
+	// gate's re-reads while the marker stayed outstanding-fresh, plus one more
+	// from the recheck confirmFinished runs once the gate releases.
+	if sleeps != 4 {
+		t.Errorf("Sleep calls = %d, want 4: the gate must pace re-reads at smartZonePollMs, not spin, and recheck idle once it releases", sleeps)
 	}
 
 	events, ok, err := readEvents(scratchDir, "epic")
@@ -2830,6 +2831,71 @@ func TestWaitForFinish_BackgroundTaskAgesOutAndFallsThrough(t *testing.T) {
 	}
 	if released != 0 {
 		t.Errorf("gate-released events = %d, want 0: this marker aged out, it never resolved", released)
+	}
+}
+
+// TestWaitForFinish_BackgroundTaskGateReleaseRechecksIdle covers the false-
+// finish this gate can otherwise produce: a background task resolving only
+// proves that one task's own notification landed, not that the agent's
+// overall turn is over — seeing the result is exactly when it's likely to
+// resume real work. If the pane is back to "working" by the time the gate
+// releases, waitForFinish must not declare the iteration done off the stale
+// idle signal from before the gate started holding; it must keep polling
+// until a later idle genuinely holds up.
+func TestWaitForFinish_BackgroundTaskGateReleaseRechecksIdle(t *testing.T) {
+	t.Parallel()
+	scratchDir := t.TempDir()
+	var sleeps, reads, waits int
+	readBackgroundTasks := func(string, string) (transcript.BackgroundTaskReading, error) {
+		reads++
+		status := transcript.BackgroundTaskOutstandingFresh
+		if reads >= 2 {
+			status = transcript.BackgroundTaskResolved
+		}
+		return transcript.BackgroundTaskReading{
+			Markers: []transcript.BackgroundTaskMarker{{TaskID: "task-1", Status: status}},
+		}, nil
+	}
+	d := Deps{
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			waits++
+			// waits: 1 = outer loop's first AgentWait (idle); 2 = that idle's
+			// own confirmFinished recheck (still idle); 3 = the gate-release
+			// recheck this fix adds (agent resumed work, not idle); 4 = outer
+			// loop's second AgentWait, once the agent is genuinely done; 5 =
+			// that second idle's own confirmFinished recheck (idle; no gate
+			// re-hold since ReadBackgroundTasks already reports resolved).
+			if waits == 3 {
+				return herdr.Agent{}, errors.New("timed out waiting for agent status")
+			}
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		},
+		ReadBackgroundTasks: readBackgroundTasks,
+		Sleep:               func(time.Duration) { sleeps++ },
+	}
+
+	if err := waitForFinish(d, backgroundTaskGateParams(scratchDir), "sess-30"); err != nil {
+		t.Fatalf("waitForFinish: %v", err)
+	}
+	if waits < 4 {
+		t.Errorf("AgentWait calls = %d, want at least 4: the gate-release recheck finding the pane busy must send waitForFinish back around its outer poll loop", waits)
+	}
+
+	events, ok, err := readEvents(scratchDir, "epic")
+	if err != nil || !ok {
+		t.Fatalf("readEvents() ok=%v err=%v", ok, err)
+	}
+	var held, released int
+	for _, ev := range events {
+		switch ev.Type {
+		case eventBackgroundTaskGateHeld:
+			held++
+		case eventBackgroundTaskGateReleased:
+			released++
+		}
+	}
+	if held != 1 || released != 1 {
+		t.Errorf("gate-held/-released events = %d/%d, want exactly 1/1 (only the first outstanding task ever gates)", held, released)
 	}
 }
 

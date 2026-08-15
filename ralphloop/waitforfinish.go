@@ -140,8 +140,16 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 				continue
 			}
 			if !recovery.pendingUnresolved(d, p, sessionID) {
-				if err := waitForBackgroundTasks(d, p, sessionID, &elapsedMs); err != nil {
+				finished, err := waitForBackgroundTasks(d, p, sessionID, until, &elapsedMs)
+				if err != nil {
 					return err
+				}
+				if !finished {
+					// The gate released, but the recheck found the agent back at
+					// work reacting to the background task's result: not a real
+					// finish, same as a transient idle blip above.
+					elapsedMs = 0
+					continue
 				}
 				p.logLifecycleEvent(p.FinishEvent, sessionID)
 				return nil
@@ -159,8 +167,13 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			d.Sleep(smartZonePollMs * time.Millisecond)
 			elapsedMs += smartZonePollMs
 			if !recovery.pendingUnresolved(d, p, sessionID) {
-				if err := waitForBackgroundTasks(d, p, sessionID, &elapsedMs); err != nil {
+				finished, err := waitForBackgroundTasks(d, p, sessionID, until, &elapsedMs)
+				if err != nil {
 					return err
+				}
+				if !finished {
+					elapsedMs = 0
+					continue
 				}
 				p.logLifecycleEvent(p.FinishEvent, sessionID)
 				return nil
@@ -766,21 +779,32 @@ const backgroundTaskAgedOutCap = 2 * time.Hour
 // unsupported read (Codex, or any read failure) is never evidence, so it
 // fails open with no markers to hold on.
 //
+// A held gate's release only proves that one background task's own
+// completion notification landed — not that the agent's overall turn is
+// over; seeing that result is exactly when an agent is likely to resume real
+// work. So once a gate that actually held releases (or ages out), this
+// re-runs confirmFinished before reporting finished=true, the same debounced
+// idle check the caller already trusted once before the gate started
+// holding. The returned bool tells the caller whether the pane is still
+// idle after that recheck; false means treat this like any other transient
+// idle blip and keep polling instead of declaring the iteration done.
+//
 // elapsedMs is the caller's own running total (see waitForFinish), threaded
 // through by pointer so time spent holding here counts against a caller-set
 // FinishTimeoutMs instead of resetting it, and it paces re-reads at
 // smartZonePollMs instead of spinning — same reasoning as
 // waitForCompactionSignal's own pacing.
-func waitForBackgroundTasks(d Deps, p launchAndPromptParams, sessionID string, elapsedMs *int) error {
+func waitForBackgroundTasks(d Deps, p launchAndPromptParams, sessionID string, until []string, elapsedMs *int) (bool, error) {
 	if p.Agent != AgentClaude || d.ReadBackgroundTasks == nil || sessionID == "" {
-		return nil
+		return true, nil
 	}
 
 	held := map[string]bool{}
+	gated := false
 	for {
 		reading, err := d.ReadBackgroundTasks(p.SessionCwd, sessionID)
 		if err != nil {
-			return nil
+			return true, nil
 		}
 
 		outstanding := false
@@ -790,6 +814,7 @@ func waitForBackgroundTasks(d Deps, p launchAndPromptParams, sessionID string, e
 				outstanding = true
 				if !held[m.TaskID] {
 					held[m.TaskID] = true
+					gated = true
 					p.logAgentEvent(eventBackgroundTaskGateHeld, sessionID, fmt.Sprintf("background task %s", m.TaskID))
 				}
 			case transcript.BackgroundTaskResolved:
@@ -805,14 +830,21 @@ func waitForBackgroundTasks(d Deps, p launchAndPromptParams, sessionID string, e
 			}
 		}
 		if !outstanding {
-			return nil
+			if !gated {
+				return true, nil
+			}
+			confirmed, err := confirmFinished(d, p.Pane, until)
+			if err != nil {
+				return false, fmt.Errorf("confirming %s still finished after background task gate: %w", p.Label, err)
+			}
+			return confirmed, nil
 		}
 
 		pollMs := smartZonePollMs
 		if p.FinishTimeoutMs > 0 {
 			remaining := p.FinishTimeoutMs - *elapsedMs
 			if remaining <= 0 {
-				return fmt.Errorf("waiting for agent to finish: timed out after %dms", p.FinishTimeoutMs)
+				return false, fmt.Errorf("waiting for agent to finish: timed out after %dms", p.FinishTimeoutMs)
 			}
 			if remaining < pollMs {
 				pollMs = remaining
