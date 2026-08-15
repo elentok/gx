@@ -2,6 +2,7 @@ package worktrees
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/git"
@@ -131,5 +132,54 @@ func TestMouseWheelWithHelpOpenScrollsHelpNotTableOrPreview(t *testing.T) {
 	}
 	if m.helpModel.Viewport.YOffset() == 0 {
 		t.Fatal("expected wheel-down to scroll the help modal while it's open")
+	}
+}
+
+func longContent(nLines int) string {
+	return strings.TrimRight(strings.Repeat("line\n", nLines), "\n")
+}
+
+func TestMouseWheelWithLogsOpenScrollsLogsNotTableOrPreview(t *testing.T) {
+	t.Parallel()
+	m := newTestModelWithWorktrees(t, 20)
+	m.lastJobLog = longContent(80)
+	m = m.enterLogsMode()
+
+	prevCursor := m.table.Cursor()
+	prevOffset := m.viewport.YOffset()
+	rect := m.tableRect()
+	updated, _ := m.Update(tea.MouseWheelMsg{X: rect.X + 2, Y: rect.Y + 2, Button: tea.MouseWheelDown})
+	m = updated.(Model)
+
+	if m.table.Cursor() != prevCursor {
+		t.Fatalf("expected table cursor unchanged while logs modal is open, before=%d after=%d", prevCursor, m.table.Cursor())
+	}
+	if m.viewport.YOffset() != prevOffset {
+		t.Fatalf("expected details preview scroll unchanged while logs modal is open, before=%d after=%d", prevOffset, m.viewport.YOffset())
+	}
+	if m.logsViewport.YOffset() == 0 {
+		t.Fatal("expected wheel-down to scroll the logs modal while it's open")
+	}
+}
+
+func TestMouseWheelWithErrorOpenScrollsErrorNotTableOrPreview(t *testing.T) {
+	t.Parallel()
+	m := newTestModelWithWorktrees(t, 20)
+	m = m.showError(longContent(80))
+
+	prevCursor := m.table.Cursor()
+	prevOffset := m.viewport.YOffset()
+	rect := m.tableRect()
+	updated, _ := m.Update(tea.MouseWheelMsg{X: rect.X + 2, Y: rect.Y + 2, Button: tea.MouseWheelDown})
+	m = updated.(Model)
+
+	if m.table.Cursor() != prevCursor {
+		t.Fatalf("expected table cursor unchanged while error modal is open, before=%d after=%d", prevCursor, m.table.Cursor())
+	}
+	if m.viewport.YOffset() != prevOffset {
+		t.Fatalf("expected details preview scroll unchanged while error modal is open, before=%d after=%d", prevOffset, m.viewport.YOffset())
+	}
+	if m.errorViewport.YOffset() == 0 {
+		t.Fatal("expected wheel-down to scroll the error modal while it's open")
 	}
 }

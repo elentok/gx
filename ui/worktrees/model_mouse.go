@@ -6,14 +6,24 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// handleMouseWheel routes a wheel event to whichever region the cursor is
-// over: the help modal while it's open, otherwise the table or the details
-// preview, by hover hit-test. A hit on neither (a seam, a border) or a pane
-// with nothing to scroll no-ops.
+// handleMouseWheel routes a wheel event to whichever modal is open (help,
+// logs, error), or otherwise to the table or the details preview by hover
+// hit-test. A hit on neither (a seam, a border) or a pane with nothing to
+// scroll no-ops.
 func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 	if m.mode == modeHelp {
 		var cmd tea.Cmd
 		m.helpModel, cmd = m.helpModel.Update(msg)
+		return m, cmd
+	}
+	if m.mode == modeLogs {
+		var cmd tea.Cmd
+		m.logsViewport, cmd = m.logsViewport.Update(msg)
+		return m, cmd
+	}
+	if m.mode == modeError {
+		var cmd tea.Cmd
+		m.errorViewport, cmd = m.errorViewport.Update(msg)
 		return m, cmd
 	}
 

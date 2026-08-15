@@ -202,6 +202,11 @@ func (m Model) handleMouseWheelMsg(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
 		m.help, cmd = m.help.Update(msg)
 		return m, cmd
 	}
+	if m.output.IsOpen {
+		var cmd tea.Cmd
+		m.output, cmd = m.output.Update(msg)
+		return m, cmd
+	}
 	if m.handleMouseWheel(msg) {
 		m.overlay.MarkDirty()
 		return m, nil

@@ -48,13 +48,16 @@ func (m *Model) Open(containerWidth, containerHeight int) {
 // Update handles all messages while the modal is open.
 // Returns the updated model and any command. The modal closes on esc/enter/q.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
-	kp, ok := msg.(tea.KeyPressMsg)
-	if !ok {
-		return m, nil
-	}
-	switch kp.String() {
-	case "esc", "enter", "q":
-		m.IsOpen = false
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "esc", "enter", "q":
+			m.IsOpen = false
+			return m, nil
+		}
+	case tea.MouseWheelMsg:
+		// fall through to forward to the viewport
+	default:
 		return m, nil
 	}
 	var cmd tea.Cmd

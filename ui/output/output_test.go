@@ -1,6 +1,7 @@
 package output
 
 import (
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -51,6 +52,27 @@ func TestOutputUpdate_CloseKeys(t *testing.T) {
 		if next.IsOpen {
 			t.Errorf("key %v: expected IsOpen=false after close key", msg)
 		}
+	}
+}
+
+func TestOutputUpdate_MouseWheelScrolls(t *testing.T) {
+	content := strings.TrimRight(strings.Repeat("line\n", 60), "\n")
+
+	m := New()
+	m.Set("title", content)
+	m.Open(100, 40)
+
+	next, _ := m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	if next.vp.YOffset() == 0 {
+		t.Fatal("expected wheel-down to scroll the viewport")
+	}
+
+	next, _ = next.Update(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
+	next, _ = next.Update(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
+	next, _ = next.Update(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
+	next, _ = next.Update(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
+	if next.vp.YOffset() != 0 {
+		t.Errorf("expected wheel-up to clamp at top, got YOffset=%d", next.vp.YOffset())
 	}
 }
 
