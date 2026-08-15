@@ -24,15 +24,22 @@ const QueuePauseLabel = "queue"
 // every iteration paused at the time wakes together the moment ForceResume
 // clears the last of them.
 type Gate struct {
-	mu       sync.Mutex
-	reasons  map[string]string // iteration label -> pause reason
-	wake     chan struct{}
-	parkWake chan struct{}
-	draining bool
+	mu         sync.Mutex
+	reasons    map[string]string // iteration label -> pause reason
+	wake       chan struct{}
+	parkWake   chan struct{}
+	draining   bool
+	parked     chan struct{}
+	parkedOnce sync.Once
 }
 
 func NewGate() *Gate {
-	return &Gate{reasons: map[string]string{}, wake: make(chan struct{}), parkWake: make(chan struct{})}
+	return &Gate{
+		reasons:  map[string]string{},
+		wake:     make(chan struct{}),
+		parkWake: make(chan struct{}),
+		parked:   make(chan struct{}),
+	}
 }
 
 // Pause stops this Gate from admitting new claims while allowing work that
@@ -150,10 +157,19 @@ func (g *Gate) waitForResume(ctx context.Context) {
 	myWake := g.wake
 	g.mu.Unlock()
 
+	g.parkedOnce.Do(func() { close(g.parked) })
+
 	select {
 	case <-myWake:
 	case <-ctx.Done():
 	}
+}
+
+// Parked returns a channel closed the first time a caller actually blocks in
+// waitForResume, letting a test observe that a run's goroutine has parked
+// there instead of racing it with a fixed sleep before calling Drain.
+func (g *Gate) Parked() <-chan struct{} {
+	return g.parked
 }
 
 // ForceResume clears label's own pause without disturbing any other

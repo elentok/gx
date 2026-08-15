@@ -115,14 +115,14 @@ func TestSlackEventSink_DrainComplete_PostsSlackWireFormat(t *testing.T) {
 	}
 }
 
-// TestSlackEventSink_CountsLine_AppearsOnlyOnFourMessageKinds pins ticket
+// TestSlackEventSink_CountsLine_AppearsOnEpicAndTicketMilestones pins ticket
 // 27's placement rule: a counts line rides on epic started, ticket landed,
 // ticket parked, and epic complete — the messages where counts materially
 // moved — and on neither IterationPaused nor EpicParked, which chat also
 // sends text for but where the counts haven't changed since the prior
 // message. DrainComplete is a fifth counts-line kind added later; it's
 // covered by its own test above rather than folded into this one.
-func TestSlackEventSink_CountsLine_AppearsOnlyOnFourMessageKinds(t *testing.T) {
+func TestSlackEventSink_CountsLine_AppearsOnEpicAndTicketMilestones(t *testing.T) {
 	t.Parallel()
 	server, getRequests := fakeSlackServer(t, http.StatusOK)
 	inner := &recordingSink{}

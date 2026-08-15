@@ -927,10 +927,14 @@ func TestRun_Drain_WakesRunParkedInWaitForResume(t *testing.T) {
 		}, d, sink)
 	}()
 
-	// Give Run a moment to reach waitForResume before draining, so this
-	// actually exercises Drain waking a parked waiter rather than racing
-	// ahead of it.
-	time.Sleep(50 * time.Millisecond)
+	// Wait for the run's goroutine to actually park in waitForResume before
+	// draining, so this exercises Drain waking a parked waiter rather than
+	// racing ahead of it and firing before there's anything parked to wake.
+	select {
+	case <-gate.Parked():
+	case <-time.After(2 * time.Second):
+		t.Fatal("Run() never reached waitForResume")
+	}
 	gate.Drain()
 
 	select {
