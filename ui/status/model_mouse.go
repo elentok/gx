@@ -1,6 +1,7 @@
 package status
 
 import (
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/status/diffarea"
 
@@ -35,12 +36,12 @@ func (m Model) searchActive() bool {
 
 func (m *Model) scrollDiffByMouse(x, y, dir int) bool {
 	mainH := m.height - 1
-	if mainH < 1 || y < 0 || y >= mainH || x < 0 || x >= m.width {
+	if mainH < 1 {
 		return false
 	}
 
 	diffX, diffY, diffW, diffH, ok := m.diffRect(mainH)
-	if !ok || x < diffX || x >= diffX+diffW || y < diffY || y >= diffY+diffH {
+	if !ok || !(ui.Rect{X: diffX, Y: diffY, W: diffW, H: diffH}).Contains(x, y) {
 		return false
 	}
 
@@ -54,11 +55,11 @@ func (m *Model) scrollDiffByMouse(x, y, dir int) bool {
 
 func (m *Model) scrollFiletreeByMouse(x, y, dir int) bool {
 	mainH := m.height - 1
-	if mainH < 1 || y < 0 || y >= mainH || x < 0 || x >= m.width {
+	if mainH < 1 {
 		return false
 	}
 	filetreeX, filetreeY, filetreeW, filetreeH := m.filetreeRect(mainH)
-	if x < filetreeX || x >= filetreeX+filetreeW || y < filetreeY || y >= filetreeY+filetreeH {
+	if !(ui.Rect{X: filetreeX, Y: filetreeY, W: filetreeW, H: filetreeH}).Contains(x, y) {
 		return false
 	}
 	m.fileTreeModel.SetVisibleHeight(m.filetreeInnerHeight(filetreeH))

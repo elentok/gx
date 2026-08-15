@@ -1,6 +1,8 @@
 package commit
 
 import (
+	"github.com/elentok/gx/ui"
+
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -18,37 +20,35 @@ func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 	default:
 		return m, nil
 	}
-	if m.mouseOverDiff(mouse.X, mouse.Y) {
+	idx, ok := ui.HoverHitTest(mouse.X, mouse.Y, m.diffRect(), m.filetreeRect())
+	if !ok {
+		return m, nil
+	}
+	if idx == 0 {
 		m.diffModel.ScrollViewport(dir * 3)
-	} else if m.mouseOverFiletree(mouse.X, mouse.Y) {
+	} else {
 		m.fileTreeModel.SetVisibleHeight(m.filesInnerHeight())
 		m.fileTreeModel.ScrollViewport(dir * 3)
 	}
 	return m, nil
 }
 
-func (m Model) mouseOverDiff(x, y int) bool {
+func (m Model) diffRect() ui.Rect {
 	bodyH, contentH := m.layoutHeights()
-	if y < bodyH || y >= bodyH+contentH {
-		return false
-	}
 	if m.width < 90 {
-		filesH, _ := m.narrowPaneHeights(contentH)
-		return y >= bodyH+filesH
+		filesH, diffH := m.narrowPaneHeights(contentH)
+		return ui.Rect{X: 0, Y: bodyH + filesH, W: m.width, H: diffH}
 	}
 	leftW := m.filesPaneWidth(contentH)
-	return x >= leftW
+	return ui.Rect{X: leftW, Y: bodyH, W: m.width - leftW, H: contentH}
 }
 
-func (m Model) mouseOverFiletree(x, y int) bool {
+func (m Model) filetreeRect() ui.Rect {
 	bodyH, contentH := m.layoutHeights()
-	if y < bodyH || y >= bodyH+contentH {
-		return false
-	}
 	if m.width < 90 {
 		filesH, _ := m.narrowPaneHeights(contentH)
-		return y < bodyH+filesH
+		return ui.Rect{X: 0, Y: bodyH, W: m.width, H: filesH}
 	}
 	leftW := m.filesPaneWidth(contentH)
-	return x < leftW
+	return ui.Rect{X: 0, Y: bodyH, W: leftW, H: contentH}
 }
