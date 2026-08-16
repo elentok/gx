@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
@@ -240,4 +241,126 @@ func TestQueueModelListRowsIndentMatchesHeaderIndent(t *testing.T) {
 	if headerIndent != 2 || rowIndent != headerIndent+triangleColumn {
 		t.Fatalf("got headerIndent=%d rowIndent=%d, want headerIndent=2 rowIndent=%d", headerIndent, rowIndent, 2+triangleColumn)
 	}
+}
+
+// setCostAggTotals directly mutates the package-level costAgg singleton
+// (mirroring cost_aggregator_test.go's own seam) so a test can drive
+// queueHeaderCostSuffix/the per-epic append without a real poller tick.
+// Restores zero values on cleanup so later tests (including t.Parallel()
+// ones, which only run once every non-parallel test in the package has
+// finished) see a clean LiveSpend()/LiveSpendByEpic()/UnpricedRunningCount().
+func setCostAggTotals(t *testing.T, total float64, perEpic map[string]float64, unpriced int) {
+	t.Helper()
+	costAgg.mu.Lock()
+	costAgg.total = total
+	costAgg.perEpic = perEpic
+	costAgg.unpriced = unpriced
+	costAgg.mu.Unlock()
+	t.Cleanup(func() {
+		costAgg.mu.Lock()
+		costAgg.total = 0
+		costAgg.perEpic = map[string]float64{}
+		costAgg.unpriced = 0
+		costAgg.mu.Unlock()
+	})
+}
+
+// TestQueueHeaderCostSuffixFormatsAndColors covers ticket 10's title-line
+// live-total: the bare-"$X"-vs-"$X of $Y" format split on whether a soft
+// limit is configured, the three color bands against the soft limit, and the
+// unpriced-Codex-run note appearing only when the count is nonzero.
+// Not t.Parallel(): it drives the shared costAgg singleton directly, the same
+// seam cost_aggregator_test.go's non-parallel tests use.
+func TestQueueHeaderCostSuffixFormatsAndColors(t *testing.T) {
+	root := t.TempDir()
+	budgetOff := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, map[string]bool{}, keys.Manager{}))
+	withBudget := loadQueueModel(t, NewQueueModel(root, ui.Settings{Budget: config.BudgetConfig{SoftLimit: 100}}, map[string]bool{}, keys.Manager{}))
+
+	setCostAggTotals(t, 42.3, map[string]float64{}, 0)
+	if got, want := budgetOff.queueHeaderCostSuffix(), "$42.30"; got != want {
+		t.Fatalf("budget disabled: queueHeaderCostSuffix() = %q, want bare %q", got, want)
+	}
+
+	setCostAggTotals(t, 50, map[string]float64{}, 0)
+	if got, want := withBudget.queueHeaderCostSuffix(), "$50.00 of $100.00"; got != want {
+		t.Fatalf("below 80%% of soft limit: = %q, want default-styled %q", got, want)
+	}
+
+	setCostAggTotals(t, 85, map[string]float64{}, 0)
+	if got, want := withBudget.queueHeaderCostSuffix(), epicStatusProblemStyle.Render("$85.00 of $100.00"); got != want {
+		t.Fatalf("80%%-to-limit: = %q, want warning-styled %q", got, want)
+	}
+
+	setCostAggTotals(t, 120, map[string]float64{}, 0)
+	if got, want := withBudget.queueHeaderCostSuffix(), epicStatusParkedRepairStyle.Render("$120.00 of $100.00"); got != want {
+		t.Fatalf("at/above soft limit: = %q, want alarm-styled %q", got, want)
+	}
+
+	setCostAggTotals(t, 50, map[string]float64{}, 1)
+	if got, want := withBudget.queueHeaderCostSuffix(), "$50.00 of $100.00 (+1 unpriced Codex run)"; got != want {
+		t.Fatalf("unpriced=1: = %q, want %q", got, want)
+	}
+
+	setCostAggTotals(t, 50, map[string]float64{}, 2)
+	if got, want := withBudget.queueHeaderCostSuffix(), "$50.00 of $100.00 (+2 unpriced Codex runs)"; got != want {
+		t.Fatalf("unpriced=2: = %q, want %q", got, want)
+	}
+
+	setCostAggTotals(t, 0, map[string]float64{}, 0)
+	if got, want := budgetOff.queueHeaderCostSuffix(), "$0.00"; got != want {
+		t.Fatalf("unpriced=0: queueHeaderCostSuffix() = %q, want %q (no note appended)", got, want)
+	}
+}
+
+// TestQueueEpicHeaderAppendsUnstyledRunningCost covers ticket 10's per-epic
+// total: appended to the epic's own header status text with the existing
+// " · " metrics-line separator, always unstyled even though this epic's
+// status line itself renders in its problem color (yellow) — the configured
+// limits are session-wide, so coloring one epic's slice against them would
+// misleadingly suggest that epic alone is over budget.
+func TestQueueEpicHeaderAppendsUnstyledRunningCost(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: needs-repair\n\nBody.\n")
+	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+
+	setCostAggTotals(t, 12.5, map[string]float64{"alpha": 12.5}, 0)
+
+	headerLine := epicHeaderLine(t, m, "alpha")
+	if !strings.Contains(headerLine, " · $12.50") {
+		t.Fatalf("epic header line missing unstyled per-epic cost suffix \" · $12.50\": %q", headerLine)
+	}
+}
+
+// TestQueueEpicHeaderOmitsCostForNonRunningEpic covers ticket 10's "no
+// live-cost data" case: an epic absent from LiveSpendByEpic (never observed
+// running this Attach session) gets nothing appended.
+func TestQueueEpicHeaderOmitsCostForNonRunningEpic(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+
+	setCostAggTotals(t, 0, map[string]float64{}, 0)
+
+	headerLine := epicHeaderLine(t, m, "alpha")
+	if strings.Contains(headerLine, "$") {
+		t.Fatalf("expected no per-epic cost text for an epic absent from LiveSpendByEpic: %q", headerLine)
+	}
+}
+
+// epicHeaderLine returns m.queueBody's plain-text epic header line naming
+// epicName (the line rendered by queue_view.go's nodeEpicStatus case), for
+// tests that need to inspect just that line rather than the whole panel
+// (which also carries queueHeaderTitle's own live-total suffix).
+func epicHeaderLine(t *testing.T, m QueueModel, epicName string) string {
+	t.Helper()
+	for _, line := range m.queueBody(80) {
+		plain := ansi.Strip(line)
+		if strings.Contains(plain, epicName) {
+			return plain
+		}
+	}
+	t.Fatalf("no epic header line found naming %q", epicName)
+	return ""
 }

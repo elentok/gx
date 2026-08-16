@@ -643,7 +643,7 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 
 	t.Run("not started", func(t *testing.T) {
 		m := base
-		if got, want := m.queueHeaderTitle(), "Queue"; got != want {
+		if got, want := m.queueHeaderTitle(), "Queue · $0.00"; got != want {
 			t.Fatalf("title = %q, want %q", got, want)
 		}
 		lines := m.queueHeaderBodyLines()
@@ -666,8 +666,8 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 		m := base
 		m.runningEpics = map[string]bool{"alpha": true}
 		got := m.queueHeaderTitle()
-		if !strings.HasPrefix(got, "Queue · 0 of 1 done · ") || !strings.HasSuffix(got, " implementing...") {
-			t.Fatalf("title = %q, want \"Queue · 0 of 1 done · <spinner> implementing...\"", got)
+		if !strings.HasPrefix(got, "Queue · 0 of 1 done · ") || !strings.HasSuffix(got, " implementing... · $0.00") {
+			t.Fatalf("title = %q, want \"Queue · 0 of 1 done · <spinner> implementing... · $0.00\"", got)
 		}
 		want := []string{""}
 		if lines := m.queueHeaderBodyLines(); !slices.Equal(lines, want) {
@@ -679,7 +679,7 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 		m := base
 		m.paused = true
 		m.runningEpics = map[string]bool{"alpha": true}
-		if got, want := m.queueHeaderTitle(), "Queue · paused (0 of 1 done)"; got != want {
+		if got, want := m.queueHeaderTitle(), "Queue · paused (0 of 1 done) · $0.00"; got != want {
 			t.Fatalf("title = %q, want %q", got, want)
 		}
 		want := []string{"Queue paused — in-flight iterations will finish"}
@@ -701,7 +701,7 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 		m := base
 		m.paused = true
 		m.executionTickets = map[string]bool{}
-		if got, want := m.queueHeaderTitle(), "Queue"; got != want {
+		if got, want := m.queueHeaderTitle(), "Queue · $0.00"; got != want {
 			t.Fatalf("title = %q, want %q", got, want)
 		}
 		lines := m.queueHeaderBodyLines()
@@ -746,7 +746,7 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 	t.Run("no foreign attach uses normal state", func(t *testing.T) {
 		m := base
 		m.foreignAttachPID = 0
-		if got, want := m.queueHeaderTitle(), "Queue"; got != want {
+		if got, want := m.queueHeaderTitle(), "Queue · $0.00"; got != want {
 			t.Fatalf("title = %q, want %q", got, want)
 		}
 	})
@@ -762,7 +762,7 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 		m.executionCompletedAt = completedAt
 		m.executionTickets = map[string]bool{"alpha/01": true}
 
-		if got, want := m.queueHeaderTitle(), "Queue · done, took 1h03m"; got != want {
+		if got, want := m.queueHeaderTitle(), "Queue · done, took 1h03m · $0.00"; got != want {
 			t.Fatalf("title = %q, want %q", got, want)
 		}
 		want := []string{"context windows: total 12.0k tok, avg 12.0k tok, max 12.0k tok"}

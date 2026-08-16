@@ -163,6 +163,9 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 	for i, e := range entries {
 		idxByID[e.ID] = i
 	}
+	// liveByEpic backs ticket 10's per-epic cost append below — fetched once
+	// per render rather than once per row.
+	liveByEpic := LiveSpendByEpic()
 
 	return tree.RenderOpts[queueNode]{
 		AccentColor: ui.ColorBlue,
@@ -178,7 +181,18 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 			case nodeEpicStatus:
 				parkedStalled, _ := ralphLoopRegistry.parkedStalledFor(entry.Value.epic.Name)
 				icon, text, style := epicStatusLine(m.icons(), entry.Value.epic, parkedStalled)
-				return " " + epicHeaderStyle.Render(entry.Value.epic.Name) + " " + style.Render(icon+" "+text)
+				line := " " + epicHeaderStyle.Render(entry.Value.epic.Name) + " " + style.Render(icon+" "+text)
+				// Ticket 10: the epic's own running total, appended unstyled
+				// regardless of the status line's color — the configured limits
+				// are session-wide, so coloring one epic's slice against them
+				// would misleadingly suggest that epic alone is over budget.
+				// Only present for a currently-running epic (LiveSpendByEpic is
+				// scoped to the running set); an idle/completed epic gets nothing
+				// appended.
+				if cost, ok := liveByEpic[entry.Value.epic.Name]; ok {
+					line += " · " + formatCost(cost)
+				}
+				return line
 			case nodeEpicContext:
 				avg, maximum, compacts := epicContextMetrics(entry.Value.epic)
 				return " " + metricsLineStyle.Render(fmt.Sprintf(

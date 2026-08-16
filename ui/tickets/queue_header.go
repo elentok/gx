@@ -251,6 +251,13 @@ func (m QueueModel) queueHeaderTitle() string {
 	if m.foreignAttachPID != 0 {
 		return fmt.Sprintf("Queue · attached to gx pid %d", m.foreignAttachPID)
 	}
+	return m.queueRunStateTitle() + " · " + m.queueHeaderCostSuffix()
+}
+
+// queueRunStateTitle is queueHeaderTitle's run-state text, before ticket 10's
+// live-cost suffix is appended — split out so the suffix logic doesn't have
+// to be repeated in every switch case.
+func (m QueueModel) queueRunStateTitle() string {
 	switch m.queueRunState() {
 	case queueRunCompleted:
 		elapsed := int(m.executionCompletedAt.Sub(m.executionStartedAt).Seconds())
@@ -269,6 +276,52 @@ func (m QueueModel) queueHeaderTitle() string {
 		return fmt.Sprintf("Queue · %d of %d done · %s implementing...", done, total, glyph)
 	default:
 		return "Queue"
+	}
+}
+
+// queueHeaderCostSuffix renders ticket 10's live-total segment appended to
+// the title line in every local run state: "$X of $Y" colored against the
+// configured soft limit when one is set (config.BudgetConfig.SoftLimit != 0),
+// bare unstyled "$X" when the budget is off. A nonzero UnpricedRunningCount
+// (a live Codex iteration, which has no cost source) appends a short note so
+// the operator knows the total doesn't cover everything currently spending.
+func (m QueueModel) queueHeaderCostSuffix() string {
+	total := LiveSpend()
+	soft := m.settings.Budget.SoftLimit
+	text := formatCost(total)
+	style := lipgloss.NewStyle()
+	if soft > 0 {
+		text = fmt.Sprintf("%s of %s", formatCost(total), formatCost(soft))
+		style = budgetTotalStyle(total, soft)
+	}
+	if n := UnpricedRunningCount(); n > 0 {
+		run := "run"
+		if n != 1 {
+			run = "runs"
+		}
+		text += fmt.Sprintf(" (+%d unpriced Codex %s)", n, run)
+	}
+	return style.Render(text)
+}
+
+// budgetTotalStyle picks the live-total's color against softLimit: the
+// default/no-color treatment below 80% of it, epicStatusProblemStyle's
+// warning yellow from 80% up to it, and epicStatusParkedRepairStyle's alarm
+// red at or above it — reusing the same colors already used for epic-header
+// warning states (ticket 10) rather than duplicating them. Unstyled entirely
+// when softLimit is 0 (budget disabled) — callers should check that first,
+// but this also degrades to unstyled if called with 0 directly.
+func budgetTotalStyle(total, softLimit float64) lipgloss.Style {
+	if softLimit <= 0 {
+		return lipgloss.NewStyle()
+	}
+	switch {
+	case total >= softLimit:
+		return epicStatusParkedRepairStyle
+	case total >= 0.8*softLimit:
+		return epicStatusProblemStyle
+	default:
+		return lipgloss.NewStyle()
 	}
 }
 
