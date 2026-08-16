@@ -57,6 +57,12 @@ type costAggregator struct {
 	baselines       map[string]float64
 	transcriptCache map[transcriptCacheKey]transcriptCacheEntry
 
+	// budgetHighWaterMark is the highest configured threshold already
+	// notified for, reset alongside baselines/total at every attach
+	// zero-to-one/one-to-zero transition so reattach re-arms it (see ticket
+	// 05's reattach-reset requirement).
+	budgetHighWaterMark float64
+
 	// tickInterval is a field, not a hardcoded const in the ticker call, so
 	// tests can inject a short interval instead of waiting out a real 30s.
 	tickInterval time.Duration
@@ -110,6 +116,7 @@ func (a *costAggregator) start() {
 	a.consecutiveMisses = 0
 	a.baselines = map[string]float64{}
 	a.transcriptCache = map[transcriptCacheKey]transcriptCacheEntry{}
+	a.budgetHighWaterMark = 0
 	a.stopCh = make(chan struct{})
 	a.doneCh = make(chan struct{})
 	interval := a.tickInterval
@@ -158,6 +165,7 @@ func (a *costAggregator) stop() {
 	a.consecutiveMisses = 0
 	a.baselines = map[string]float64{}
 	a.transcriptCache = map[transcriptCacheKey]transcriptCacheEntry{}
+	a.budgetHighWaterMark = 0
 	a.mu.Unlock()
 }
 
@@ -256,6 +264,8 @@ func (a *costAggregator) tick() {
 		a.consecutiveMisses = 0
 	}
 	a.mu.Unlock()
+
+	a.checkBudgetThresholds(sum)
 }
 
 // transcriptCost returns cwd/sessionID's Claude transcript cost, reusing the

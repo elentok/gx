@@ -276,6 +276,17 @@ func SetBudgetConfig(cfg config.BudgetConfig) {
 	budgetConfig = cfg
 }
 
+// notificationsConfig is process-wide and write-once like budgetConfig
+// above — budget notifications sum across every running epic, so they use
+// this shared config rather than any one epic's own chat wiring.
+var notificationsConfig config.NotificationsConfig
+
+// SetNotificationsConfig stores cfg for budget notifications to send
+// through, same call site and lifecycle as SetBudgetConfig.
+func SetNotificationsConfig(cfg config.NotificationsConfig) {
+	notificationsConfig = cfg
+}
+
 var runRalphLoop = ralphloop.Run
 
 // tryStart claims an epic slot and starts the stream drain before returning
