@@ -32,16 +32,12 @@ func withBudgetHardLimit(t *testing.T, hardLimit float64, thresholds []float64) 
 	previous := budgetConfig
 	SetBudgetConfig(config.BudgetConfig{HardLimit: hardLimit, NotificationThresholds: thresholds})
 	costAgg.mu.Lock()
-	costAgg.hardLimitTripped = false
-	costAgg.hardLimitOverride = false
-	costAgg.hardLimitOverridePoint = 0
+	costAgg.hardLimitLatch.reset()
 	costAgg.mu.Unlock()
 	t.Cleanup(func() {
 		SetBudgetConfig(previous)
 		costAgg.mu.Lock()
-		costAgg.hardLimitTripped = false
-		costAgg.hardLimitOverride = false
-		costAgg.hardLimitOverridePoint = 0
+		costAgg.hardLimitLatch.reset()
 		costAgg.mu.Unlock()
 	})
 }
@@ -210,9 +206,7 @@ func TestCheckBudgetHardLimit_IndependentFromSoftLimitAndManualPause(t *testing.
 	t.Cleanup(func() { SetBudgetConfig(previous) })
 	resetSoftLimitState(t)
 	costAgg.mu.Lock()
-	costAgg.hardLimitTripped = false
-	costAgg.hardLimitOverride = false
-	costAgg.hardLimitOverridePoint = 0
+	costAgg.hardLimitLatch.reset()
 	costAgg.mu.Unlock()
 	captureBudgetNotifications(t)
 	captureStoppedIterations(t)

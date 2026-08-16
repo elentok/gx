@@ -140,16 +140,13 @@ type loopRegistry struct {
 	maxConcurrent int
 	runs          map[string]*epicRun
 	snapshots     map[string]*epicRun
-	paused        bool
-	// softLimitPaused is the budget soft-limit pause, independent of paused
-	// (the operator's own manual pause) — see pauseSoftLimit/resumeSoftLimit.
-	softLimitPaused bool
-	// hardLimitPaused is the budget hard-limit pause, independent of both
-	// paused and softLimitPaused — see pauseHardLimit/resumeHardLimit. Set
-	// the moment a hard-limit kill sequence starts (ticket 08), so new
-	// starts are refused during and after the kill, not just once it
-	// finishes.
-	hardLimitPaused bool
+	// pauseReasons holds one entry per active pause, keyed by pause label
+	// (ralphloop.QueuePauseLabel/BudgetPauseLabel/BudgetHardPauseLabel) —
+	// the manual pause and the budget soft/hard-limit pauses are each
+	// independent of the others (pausing/resuming one never touches
+	// another's entry), and the run is paused for tryStart's purposes iff
+	// this map is non-empty (see anyPausedLocked).
+	pauseReasons map[string]bool
 	// Errors survive run removal so every observer sees the failure until an
 	// explicit acknowledgement clears it.
 	lastErr map[string]error
@@ -183,6 +180,7 @@ func newLoopRegistry(maxConcurrent int) *loopRegistry {
 		runs:          map[string]*epicRun{},
 		snapshots:     map[string]*epicRun{},
 		lastErr:       map[string]error{},
+		pauseReasons:  map[string]bool{},
 	}
 	r.permitCond = sync.NewCond(&r.mu)
 	return r
@@ -311,7 +309,7 @@ func (r *loopRegistry) tryStart(epicName string, done, total int, scratchDir ...
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.attachErr = nil
-	if r.paused || r.softLimitPaused || r.hardLimitPaused {
+	if r.anyPausedLocked() {
 		return nil, false
 	}
 	if _, exists := r.runs[epicName]; exists {
@@ -524,7 +522,7 @@ func (r *loopRegistry) runSnapshot(epicName string) (RunSnapshot, bool) {
 	if run == nil {
 		return RunSnapshot{}, false
 	}
-	return copyRunSnapshot(epicName, run, r.paused), true
+	return copyRunSnapshot(epicName, run, r.pauseReasons[ralphloop.QueuePauseLabel]), true
 }
 
 // drainPendingNotifyCloses hands back and clears epicName's queued
@@ -581,7 +579,7 @@ func (r *loopRegistry) runSnapshots() []RunSnapshot {
 	sort.Strings(names)
 	snapshots := make([]RunSnapshot, len(names))
 	for i, name := range names {
-		snapshots[i] = copyRunSnapshot(name, r.snapshots[name], r.paused)
+		snapshots[i] = copyRunSnapshot(name, r.snapshots[name], r.pauseReasons[ralphloop.QueuePauseLabel])
 	}
 	return snapshots
 }
@@ -734,87 +732,86 @@ func (r *loopRegistry) scopeFor(epicName string) (ralphloop.RunScope, bool) {
 	return run.scope, true
 }
 
-func (r *loopRegistry) pause() {
+// setPauseReason arms or clears label's entry in pauseReasons and pushes the
+// matching gate change to every live run, the shared body behind
+// pause/resume, pauseSoftLimit/resumeSoftLimit, and
+// pauseHardLimit/resumeHardLimit — each pair independent of the others
+// because each owns its own label (see pauseReasons's doc comment).
+func (r *loopRegistry) setPauseReason(label, reason string, active bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.paused = true
-	for _, run := range r.runs {
-		run.gate.Pause(ralphloop.QueuePauseLabel, "queue paused")
+	if active {
+		r.pauseReasons[label] = true
+	} else {
+		delete(r.pauseReasons, label)
 	}
+	for _, run := range r.runs {
+		if active {
+			run.gate.Pause(label, reason)
+		} else {
+			run.gate.ForceResume(label)
+		}
+	}
+}
+
+// isPausedFor reports whether label's pause is currently active.
+func (r *loopRegistry) isPausedFor(label string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.pauseReasons[label]
+}
+
+// anyPausedLocked reports whether any pause reason is active. Callers must
+// already hold r.mu — see tryStart/availableSlots.
+func (r *loopRegistry) anyPausedLocked() bool {
+	return len(r.pauseReasons) > 0
+}
+
+func (r *loopRegistry) pause() {
+	r.setPauseReason(ralphloop.QueuePauseLabel, "queue paused", true)
 }
 
 func (r *loopRegistry) resume() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.paused = false
-	for _, run := range r.runs {
-		run.gate.ForceResume(ralphloop.QueuePauseLabel)
-	}
+	r.setPauseReason(ralphloop.QueuePauseLabel, "", false)
 }
 
 func (r *loopRegistry) isPaused() bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.paused
+	return r.isPausedFor(ralphloop.QueuePauseLabel)
 }
 
 // pauseSoftLimit is called when the cost aggregator observes live spend
 // crossing the configured soft limit — independent of the operator's own
-// manual pause() (see softLimitPaused's doc comment).
+// manual pause() (see pauseReasons's doc comment).
 func (r *loopRegistry) pauseSoftLimit() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.softLimitPaused = true
-	for _, run := range r.runs {
-		run.gate.Pause(ralphloop.BudgetPauseLabel, "soft limit reached")
-	}
+	r.setPauseReason(ralphloop.BudgetPauseLabel, "soft limit reached", true)
 }
 
 // resumeSoftLimit is called only by the accepted-override path (see
 // costAggregator.overrideSoftLimit).
 func (r *loopRegistry) resumeSoftLimit() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.softLimitPaused = false
-	for _, run := range r.runs {
-		run.gate.ForceResume(ralphloop.BudgetPauseLabel)
-	}
+	r.setPauseReason(ralphloop.BudgetPauseLabel, "", false)
 }
 
 func (r *loopRegistry) isSoftLimitPaused() bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.softLimitPaused
+	return r.isPausedFor(ralphloop.BudgetPauseLabel)
 }
 
 // pauseHardLimit is called the moment the cost aggregator observes live
 // spend crossing the configured hard limit, before the kill sequence starts
-// (see hardLimitPaused's doc comment) — independent of both the manual
-// pause() and pauseSoftLimit.
+// (see pauseReasons's doc comment) — independent of both the manual pause()
+// and pauseSoftLimit.
 func (r *loopRegistry) pauseHardLimit() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.hardLimitPaused = true
-	for _, run := range r.runs {
-		run.gate.Pause(ralphloop.BudgetHardPauseLabel, "hard limit reached")
-	}
+	r.setPauseReason(ralphloop.BudgetHardPauseLabel, "hard limit reached", true)
 }
 
 // resumeHardLimit is called only by the accepted-override path (see
 // costAggregator.overrideHardLimit).
 func (r *loopRegistry) resumeHardLimit() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.hardLimitPaused = false
-	for _, run := range r.runs {
-		run.gate.ForceResume(ralphloop.BudgetHardPauseLabel)
-	}
+	r.setPauseReason(ralphloop.BudgetHardPauseLabel, "", false)
 }
 
 func (r *loopRegistry) isHardLimitPaused() bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.hardLimitPaused
+	return r.isPausedFor(ralphloop.BudgetHardPauseLabel)
 }
 
 // holdsAttach reports whether this process currently holds the per-repo
@@ -944,7 +941,7 @@ func (r *loopRegistry) isRunning() bool {
 func (r *loopRegistry) availableSlots() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.paused || r.softLimitPaused || r.hardLimitPaused {
+	if r.anyPausedLocked() {
 		return 0
 	}
 	return max(r.maxConcurrent-r.activeCount, 0)

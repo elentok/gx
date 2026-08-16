@@ -27,15 +27,11 @@ func withBudgetSoftLimit(t *testing.T, softLimit float64, thresholds []float64) 
 func resetSoftLimitState(t *testing.T) {
 	t.Helper()
 	costAgg.mu.Lock()
-	costAgg.softLimitTripped = false
-	costAgg.softLimitOverride = false
-	costAgg.softLimitOverridePoint = 0
+	costAgg.softLimitLatch.reset()
 	costAgg.mu.Unlock()
 	t.Cleanup(func() {
 		costAgg.mu.Lock()
-		costAgg.softLimitTripped = false
-		costAgg.softLimitOverride = false
-		costAgg.softLimitOverridePoint = 0
+		costAgg.softLimitLatch.reset()
 		costAgg.mu.Unlock()
 	})
 }
@@ -228,24 +224,6 @@ func TestCheckBudgetSoftLimit_OverrideRearms(t *testing.T) {
 				t.Fatalf("sent after climbing past the re-arm point = %v, want exactly 2", sent())
 			}
 		})
-	}
-}
-
-func TestSoftLimitRearmPoint(t *testing.T) {
-	// Default-config case: the only threshold equals the soft limit, i.e. no
-	// threshold sits strictly above the override point, so the +10% fallback
-	// applies.
-	if got, want := softLimitRearmPoint(20.0, 20.0, []float64{5, 10, 15, 20}), 22.0; got != want {
-		t.Fatalf("softLimitRearmPoint(default config) = %v, want %v", got, want)
-	}
-	// Empty thresholds: same +10% fallback.
-	if got, want := softLimitRearmPoint(20.0, 20.0, nil), 22.0; got != want {
-		t.Fatalf("softLimitRearmPoint(empty thresholds) = %v, want %v", got, want)
-	}
-	// A threshold strictly above the override point, but still under the
-	// +10% arm, wins (min of the two).
-	if got, want := softLimitRearmPoint(10.0, 20.0, []float64{5, 11, 15, 20}), 11.0; got != want {
-		t.Fatalf("softLimitRearmPoint(threshold above, under +10%% arm) = %v, want %v", got, want)
 	}
 }
 

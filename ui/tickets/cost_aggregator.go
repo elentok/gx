@@ -63,23 +63,14 @@ type costAggregator struct {
 	// 05's reattach-reset requirement).
 	budgetHighWaterMark float64
 
-	// softLimitTripped is latched: true from the moment the soft limit is
+	// softLimitLatch is latched: tripped from the moment the soft limit is
 	// crossed until an accepted override (or reattach) clears it — never
 	// self-clears on a poll tick alone (see checkBudgetSoftLimit).
-	softLimitTripped bool
-	// softLimitOverride is true while an accepted override is suppressing
-	// re-trip, until spend climbs past the computed re-arm point.
-	softLimitOverride bool
-	// softLimitOverridePoint is the total at the moment the override was
-	// accepted, the base the re-arm point is computed from.
-	softLimitOverridePoint float64
-
-	// hardLimitTripped/hardLimitOverride/hardLimitOverridePoint mirror the
-	// soft-limit fields above, for the hard-limit kill (ticket 08) — a
-	// separate latch so an override of one limit never affects the other.
-	hardLimitTripped       bool
-	hardLimitOverride      bool
-	hardLimitOverridePoint float64
+	softLimitLatch budgetLimitLatch
+	// hardLimitLatch mirrors softLimitLatch for the hard-limit kill (ticket
+	// 08) — a separate latch so an override of one limit never affects the
+	// other.
+	hardLimitLatch budgetLimitLatch
 
 	// tickInterval is a field, not a hardcoded const in the ticker call, so
 	// tests can inject a short interval instead of waiting out a real 30s.
@@ -148,12 +139,8 @@ func (a *costAggregator) start() {
 	a.baselines = map[string]float64{}
 	a.transcriptCache = map[transcriptCacheKey]transcriptCacheEntry{}
 	a.budgetHighWaterMark = 0
-	a.softLimitTripped = false
-	a.softLimitOverride = false
-	a.softLimitOverridePoint = 0
-	a.hardLimitTripped = false
-	a.hardLimitOverride = false
-	a.hardLimitOverridePoint = 0
+	a.softLimitLatch.reset()
+	a.hardLimitLatch.reset()
 	a.stopCh = make(chan struct{})
 	a.doneCh = make(chan struct{})
 	interval := a.tickInterval
@@ -203,12 +190,8 @@ func (a *costAggregator) stop() {
 	a.baselines = map[string]float64{}
 	a.transcriptCache = map[transcriptCacheKey]transcriptCacheEntry{}
 	a.budgetHighWaterMark = 0
-	a.softLimitTripped = false
-	a.softLimitOverride = false
-	a.softLimitOverridePoint = 0
-	a.hardLimitTripped = false
-	a.hardLimitOverride = false
-	a.hardLimitOverridePoint = 0
+	a.softLimitLatch.reset()
+	a.hardLimitLatch.reset()
 	a.mu.Unlock()
 }
 

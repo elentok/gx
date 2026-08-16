@@ -44,6 +44,51 @@ func TestRunSnapshotsAreDeterministicAndIndependent(t *testing.T) {
 	}
 }
 
+func TestLoopRegistryPauseReasons_IndependentAndAnyPaused(t *testing.T) {
+	t.Parallel()
+	r := newLoopRegistry(2)
+
+	if r.isPaused() || r.isSoftLimitPaused() || r.isHardLimitPaused() {
+		t.Fatal("expected no pause reason active initially")
+	}
+
+	r.pauseSoftLimit()
+	if !r.isSoftLimitPaused() {
+		t.Fatal("expected pauseSoftLimit to set the soft-limit reason")
+	}
+	if r.isPaused() || r.isHardLimitPaused() {
+		t.Fatal("expected pauseSoftLimit to leave the other reasons untouched")
+	}
+
+	r.pause()
+	if !r.isPaused() || !r.isSoftLimitPaused() {
+		t.Fatal("expected pause() to add its own reason without clearing the soft-limit one")
+	}
+
+	r.resumeSoftLimit()
+	if r.isSoftLimitPaused() {
+		t.Fatal("expected resumeSoftLimit to clear only the soft-limit reason")
+	}
+	if !r.isPaused() {
+		t.Fatal("expected resumeSoftLimit to leave the manual pause untouched")
+	}
+
+	r.mu.Lock()
+	anyPaused := r.anyPausedLocked()
+	r.mu.Unlock()
+	if !anyPaused {
+		t.Fatal("expected the run to report paused while the manual reason is still active")
+	}
+
+	r.resume()
+	r.mu.Lock()
+	anyPaused = r.anyPausedLocked()
+	r.mu.Unlock()
+	if anyPaused {
+		t.Fatal("expected the run to report unpaused once every reason is cleared")
+	}
+}
+
 func TestLoopRegistryConcurrencyCanBeReconfigured(t *testing.T) {
 	t.Parallel()
 	r := newLoopRegistry(2)

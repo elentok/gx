@@ -39,28 +39,11 @@ func (a *costAggregator) checkBudgetHardLimit(total float64, snapshot []epicCost
 	}
 
 	a.mu.Lock()
-	tripped, overridden, overridePoint := a.hardLimitTripped, a.hardLimitOverride, a.hardLimitOverridePoint
+	fired := a.hardLimitLatch.checkAndTrip(total, limit, budgetConfig.NotificationThresholds)
 	a.mu.Unlock()
-
-	if overridden {
-		rearm := softLimitRearmPoint(overridePoint, limit, budgetConfig.NotificationThresholds)
-		if total <= rearm {
-			return // still suppressed
-		}
-		a.mu.Lock()
-		a.hardLimitOverride = false
-		a.hardLimitTripped = false // re-arm: allow a fresh trip below
-		a.mu.Unlock()
-		tripped = false
-	}
-
-	if tripped || total < limit {
+	if !fired {
 		return
 	}
-
-	a.mu.Lock()
-	a.hardLimitTripped = true
-	a.mu.Unlock()
 
 	// Pause before killing to close the race window where a new
 	// epic/iteration could start during the kill's grace period.
@@ -74,8 +57,7 @@ func (a *costAggregator) checkBudgetHardLimit(total float64, snapshot []epicCost
 // un-pauses new starts — already-stopped iterations are never relaunched.
 func (a *costAggregator) overrideHardLimit() {
 	a.mu.Lock()
-	a.hardLimitOverride = true
-	a.hardLimitOverridePoint = a.total
+	a.hardLimitLatch.override(a.total)
 	a.mu.Unlock()
 	ralphLoopRegistry.resumeHardLimit()
 }
