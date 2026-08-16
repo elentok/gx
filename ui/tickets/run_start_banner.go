@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/subscription"
+	"github.com/elentok/gx/ui"
 )
 
 // codexOnPath reports whether the codex CLI is on PATH: a fresh, uncached
@@ -37,10 +38,23 @@ func availableAgents() []ralphloop.AgentKind {
 func runStartBannerLines(budget config.BudgetConfig, sub config.SubscriptionConfig) []string {
 	var lines []string
 	if line := subscription.BuildLine(subscription.Check(), sub.SuppressExtraUsageWarning); line != nil {
-		lines = append(lines, line.Text)
+		lines = append(lines, styleSubscriptionLine(line))
 	}
 	lines = append(lines, budgetBannerLines(budget)...)
 	return lines
+}
+
+// styleSubscriptionLine renders a subscription safety-check line per its
+// severity: SeverityWarning is unmissable (bold, warning color) since gx has
+// no control over the account setting itself; SeverityInfo is a quieter,
+// muted confirmation/remind-only line.
+func styleSubscriptionLine(line *subscription.Line) string {
+	switch line.Severity {
+	case subscription.SeverityWarning:
+		return ui.StyleWarning.Bold(true).Render(line.Text)
+	default:
+		return ui.StyleMuted.Render(line.Text)
+	}
 }
 
 // budgetBannerLines renders budget's soft/hard limits and notification
@@ -62,7 +76,7 @@ func budgetBannerLines(budget config.BudgetConfig) []string {
 		for i, t := range budget.NotificationThresholds {
 			thresholds[i] = formatCost(t)
 		}
-		lines = append(lines, "Notification thresholds: "+strings.Join(thresholds, ", "))
+		lines = append(lines, "Notification thresholds: "+strings.Join(thresholds, ", ")+" estimated API-equivalent cost")
 	}
 	return lines
 }

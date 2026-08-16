@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/subscription"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
@@ -28,10 +29,30 @@ func TestRunStartBannerLines_RendersSoftHardAndThresholds(t *testing.T) {
 		NotificationThresholds: []float64{2.5, 7.5},
 	})
 	joined := strings.Join(lines, "\n")
-	for _, want := range []string{"Soft budget limit: $5.00", "Hard budget limit: $10.00", "Notification thresholds: $2.50, $7.50"} {
+	for _, want := range []string{
+		"Soft budget limit: $5.00 estimated API-equivalent cost",
+		"Hard budget limit: $10.00 estimated API-equivalent cost",
+		"Notification thresholds: $2.50, $7.50 estimated API-equivalent cost",
+	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("expected banner lines to contain %q, got:\n%s", want, joined)
 		}
+	}
+}
+
+func TestStyleSubscriptionLine_SeverityRendersDistinctly(t *testing.T) {
+	t.Parallel()
+	warning := styleSubscriptionLine(&subscription.Line{Text: "unmissable", Severity: subscription.SeverityWarning})
+	info := styleSubscriptionLine(&subscription.Line{Text: "quiet", Severity: subscription.SeverityInfo})
+
+	if warning != ui.StyleWarning.Bold(true).Render("unmissable") {
+		t.Fatalf("expected SeverityWarning line styled with ui.StyleWarning bold, got %q", warning)
+	}
+	if info != ui.StyleMuted.Render("quiet") {
+		t.Fatalf("expected SeverityInfo line styled with ui.StyleMuted, got %q", info)
+	}
+	if warning == info {
+		t.Fatalf("expected SeverityWarning and SeverityInfo to render with different styling, both rendered %q", warning)
 	}
 }
 
