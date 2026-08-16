@@ -72,6 +72,45 @@ func TestLoadExecutionQueueConfigPreservesUnspecifiedDefault(t *testing.T) {
 	}
 }
 
+func TestLoadSubscriptionConfigDefaultsToUnsuppressed(t *testing.T) {
+	tmp := t.TempDir()
+	prev := userConfigDirFn
+	userConfigDirFn = func() (string, error) { return tmp, nil }
+	t.Cleanup(func() { userConfigDirFn = prev })
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Subscription.SuppressExtraUsageWarning {
+		t.Fatal("SuppressExtraUsageWarning = true, want false by default")
+	}
+}
+
+func TestLoadSubscriptionConfigSuppressWarning(t *testing.T) {
+	tmp := t.TempDir()
+	prev := userConfigDirFn
+	userConfigDirFn = func() (string, error) { return tmp, nil }
+	t.Cleanup(func() { userConfigDirFn = prev })
+
+	dir := filepath.Join(tmp, "gx")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	path := filepath.Join(dir, "config.json")
+	if err := os.WriteFile(path, []byte(`{"subscription":{"suppress-extra-usage-warning":true}}`), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !cfg.Subscription.SuppressExtraUsageWarning {
+		t.Fatal("SuppressExtraUsageWarning = false, want true")
+	}
+}
+
 func TestLoadExecutionQueueConfigClampsLimitsToOne(t *testing.T) {
 	tmp := t.TempDir()
 	prev := userConfigDirFn

@@ -63,6 +63,7 @@ type Config struct {
 	Notifications         NotificationsConfig  `json:"notifications"`
 	Skills                SkillsConfig         `json:"skills"`
 	Agents                AgentsConfig         `json:"agents"`
+	Subscription          SubscriptionConfig   `json:"subscription"`
 }
 
 // Default returns the default configuration.
@@ -77,6 +78,7 @@ func Default() Config {
 		Notifications:         DefaultNotificationsConfig(),
 		Skills:                DefaultSkillsConfig(),
 		Agents:                DefaultAgentsConfig(),
+		Subscription:          DefaultSubscriptionConfig(),
 	}
 }
 
@@ -139,6 +141,9 @@ func Load() (Config, error) {
 				Effort *string `json:"effort"`
 			} `json:"codex"`
 		} `json:"agents"`
+		Subscription *struct {
+			SuppressExtraUsageWarning *bool `json:"suppress-extra-usage-warning"`
+		} `json:"subscription"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return cfg, fmt.Errorf("parse config %s: %w", path, err)
@@ -205,6 +210,9 @@ func Load() (Config, error) {
 		if raw.Agents.Codex != nil {
 			applyAgentConfig(&cfg.Agents.Codex, raw.Agents.Codex.Model, raw.Agents.Codex.Effort)
 		}
+	}
+	if raw.Subscription != nil && raw.Subscription.SuppressExtraUsageWarning != nil {
+		cfg.Subscription.SuppressExtraUsageWarning = *raw.Subscription.SuppressExtraUsageWarning
 	}
 
 	return cfg, nil
