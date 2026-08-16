@@ -13,7 +13,7 @@ import (
 )
 
 // writeHardLimitTicket writes a stub ticket file at the path
-// resolveHardLimitTicketPath's glob expects, so killLiveIterations can
+// ralphloop.ResolveTicketPath's glob expects, so killLiveIterations can
 // resolve a Path for the stop-and-repair seam.
 func writeHardLimitTicket(t *testing.T, scratchDir, epicName, identifier string) {
 	t.Helper()

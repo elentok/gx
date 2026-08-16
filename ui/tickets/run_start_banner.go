@@ -5,10 +5,15 @@ import (
 	"os/exec"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/subscription"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/confirm"
+	"github.com/elentok/gx/ui/notify"
 )
 
 // codexOnPath reports whether the codex CLI is on PATH: a fresh, uncached
@@ -90,4 +95,72 @@ func runStartBannerText(budget config.BudgetConfig, sub config.SubscriptionConfi
 		return ""
 	}
 	return strings.Join(lines, "\n")
+}
+
+// newRunStartAgentMenu is the Queue tab's run-start pick-list, offered only
+// when openRunStartModal finds more than one available agent — a trailing
+// Cancel item alongside Claude/Codex, since this modal (unlike the Tickets
+// tab's dead agent-picker it replaces) has no separate confirm step for
+// picking to fall back on.
+func newRunStartAgentMenu() components.MenuState {
+	return components.MenuState{
+		Items: []components.MenuItem{
+			{Label: "l  Claude", Value: string(ralphloop.AgentClaude)},
+			{Label: "o  Codex", Value: string(ralphloop.AgentCodex)},
+			{Label: "Cancel", Value: "cancel"},
+		},
+		Cursor: 0,
+	}
+}
+
+// openRunStartModal implements ticket 09a's unified run-start modal: a
+// banner (the subscription safety-check line plus configured budget limits)
+// above an action area scoped to whichever agents are actually usable on
+// this machine right now (see availableAgents — Codex's availability is
+// rechecked fresh, uncached, on every open). Exactly one available agent
+// collapses the action area to a plain Yes/No confirmation; more than one
+// opens the pick-an-agent list (plus Cancel), where picking confirms
+// directly; zero is a defensive, currently-unreachable case (Claude has no
+// availability check) that never opens a modal at all.
+func (m QueueModel) openRunStartModal() (tea.Model, tea.Cmd) {
+	agents := availableAgents()
+	banner := runStartBannerText(m.settings.Budget, m.settings.Subscription)
+	switch len(agents) {
+	case 0:
+		return m, notify.Info("no agent is available to run this epic")
+	case 1:
+		prompt := fmt.Sprintf("Start the checked selection with %s?", agentDisplayName(agents[0]))
+		if banner != "" {
+			prompt = banner + "\n\n" + prompt
+		}
+		m.confirm = m.confirm.Open(confirm.Options{
+			Prompt:    prompt,
+			AcceptCmd: cmdConfirmRunStart(agents[0]),
+		})
+		return m, nil
+	default:
+		m.implementAgentMenu = newRunStartAgentMenu()
+		m.implementAgentMenuOpen = true
+		return m, nil
+	}
+}
+
+// runStartConfirmedMsg carries the run-start modal's Yes/No confirmation
+// acceptance: agent is captured when the modal opened (mirroring
+// queueClearConfirmedMsg's same capture-at-open-time approach).
+type runStartConfirmedMsg struct {
+	agent ralphloop.AgentKind
+}
+
+func cmdConfirmRunStart(agent ralphloop.AgentKind) tea.Cmd {
+	return func() tea.Msg {
+		return runStartConfirmedMsg{agent: agent}
+	}
+}
+
+// handleRunStartConfirmed applies runStartConfirmedMsg by launching the
+// checked selection with the confirmed agent, same as picking an agent
+// directly from the pick-list branch.
+func (m QueueModel) handleRunStartConfirmed(msg runStartConfirmedMsg) (tea.Model, tea.Cmd) {
+	return m.startCheckedEpic(msg.agent)
 }

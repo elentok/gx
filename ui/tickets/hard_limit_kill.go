@@ -2,7 +2,6 @@ package tickets
 
 import (
 	"fmt"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -92,7 +91,7 @@ func killLiveIterations(snapshot []epicCostSnapshot) {
 			if !ticket.Running {
 				continue
 			}
-			path := resolveHardLimitTicketPath(epic.ScratchDir, epic.EpicName, identifier)
+			path := ralphloop.ResolveTicketPath(epic.ScratchDir, epic.EpicName, identifier)
 			if path == "" {
 				continue
 			}
@@ -106,15 +105,4 @@ func killLiveIterations(snapshot []epicCostSnapshot) {
 		}
 	}
 	wg.Wait()
-}
-
-// resolveHardLimitTicketPath mirrors chat_eventsink.go's resolveTicketPath,
-// duplicated locally since that method is unexported on ralphloop's
-// chatEventSink and not worth exporting for this one call site.
-func resolveHardLimitTicketPath(scratchDir, epicName, identifier string) string {
-	matches, err := filepath.Glob(filepath.Join(scratchDir, epicName, "issues", identifier+"-*.md"))
-	if err != nil || len(matches) == 0 {
-		return ""
-	}
-	return matches[0]
 }

@@ -451,7 +451,16 @@ func epicSource(epicName string) string {
 // fails open (see gate's doc comment) rather than block the notification on
 // a filesystem lookup.
 func (s *chatEventSink) resolveTicketPath(identifier string) string {
-	matches, err := filepath.Glob(filepath.Join(s.scratchDir, s.epicName, "issues", identifier+"-*.md"))
+	return ResolveTicketPath(s.scratchDir, s.epicName, identifier)
+}
+
+// ResolveTicketPath is the canonical "<id>-<slug>.md" ticket-file lookup
+// under scratchDir/epicName/issues, shared by every caller that needs to go
+// from a bare ticket identifier to its file on disk (chatEventSink and the
+// hard-limit kill path) so the glob pattern only needs to change in one
+// place if the naming convention ever does. Returns "" if no file matches.
+func ResolveTicketPath(scratchDir, epicName, identifier string) string {
+	matches, err := filepath.Glob(filepath.Join(scratchDir, epicName, "issues", identifier+"-*.md"))
 	if err != nil || len(matches) == 0 {
 		return ""
 	}
