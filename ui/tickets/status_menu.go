@@ -91,10 +91,9 @@ func (m Model) handleChangeStatusKey() (tea.Model, tea.Cmd) {
 // handleStatusMenuKey drives the open status menu: navigation/cancel is
 // components.UpdateMenu's generic j/k/enter/esc handling, so accepting an
 // item re-resolves the selected row (rather than trusting a path captured at
-// open time) the same way openImplementConfirm does — nothing can move the
-// sidebar selection while a modal owns key input, so re-deriving it here is
-// exactly as safe as capturing it up front, without a second field to keep
-// in sync.
+// open time) — nothing can move the sidebar selection while a modal owns key
+// input, so re-deriving it here is exactly as safe as capturing it up front,
+// without a second field to keep in sync.
 func (m Model) handleStatusMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	next, decided, accepted, handled := components.UpdateMenu(msg, m.statusMenu)
 	if !handled {

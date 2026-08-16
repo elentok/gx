@@ -128,24 +128,22 @@ type Model struct {
 	// keep reading/writing its fields as m.focus, m.previewVP, etc.
 	previewFocus
 
-	// implementAgentMenu, confirm, implementEpic and implementSpinner back the
-	// "i"-triggered ralph-loop launch (see implement.go): implementEpic is the
-	// name of the epic this tab's own launch (re)started tracking most
-	// recently, "" when none — the process-wide "is anything running" check
-	// goes through ralphLoopRegistry instead, since that must hold even if
-	// this Model gets rebuilt mid-run (e.g. a worktree-context switch).
-	// implementingEpics is the actual set this Model is live-tracking (ticket
-	// 05): with ralphLoopRegistry now allowing more than one epic in flight
+	// confirm, implementEpic and implementSpinner back the "i"-triggered
+	// ralph-loop launch (see implement.go): implementEpic is the name of the
+	// epic this tab's own launch (re)started tracking most recently, "" when
+	// none — the process-wide "is anything running" check goes through
+	// ralphLoopRegistry instead, since that must hold even if this Model gets
+	// rebuilt mid-run (e.g. a worktree-context switch). implementingEpics is
+	// the actual set this Model is live-tracking (ticket 05): with
+	// ralphLoopRegistry now allowing more than one epic in flight
 	// process-wide (ticket 03), a resync (OnPageActivated) can hand this
 	// Model a second epic's event stream alongside its own launch, so
 	// gutter-highlighting/live-row rendering has to check set membership
 	// rather than equality against one name.
-	implementAgentMenuOpen bool
-	implementAgentMenu     components.MenuState
-	confirm                confirm.Model
-	implementEpic          string
-	implementingEpics      map[string]bool
-	implementSpinner       spinner.Model
+	confirm           confirm.Model
+	implementEpic     string
+	implementingEpics map[string]bool
+	implementSpinner  spinner.Model
 
 	// statusMenuOpen/statusMenu back the "s"-triggered change-status menu (see
 	// status_menu.go): built fresh from the selected row and the live loop
@@ -202,25 +200,24 @@ func NewModelWithStore(worktreeRoot string, settings ui.Settings, extraKeys keys
 		return tickets.LoadArchived(scratchDir)
 	})
 	return Model{
-		worktreeRoot:       worktreeRoot,
-		settings:           settings,
-		keys:               km,
-		sidebarTree:        sidebarTree,
-		help:               help.NewModel(help.BuildSections(km, *sidebarTree.Keys(), extraKeys)),
-		search:             search.NewModel(),
-		previewFocus:       newPreviewFocus(),
-		confirm:            confirm.New(),
-		implementAgentMenu: newImplementAgentMenu(),
-		implementingEpics:  map[string]bool{},
-		implementSpinner:   sp,
-		live:               map[string]map[string]liveTicketState{},
-		labelIdentifier:    map[string]map[string]string{},
-		checked:            snapshot.TicketChecked,
-		checkOrder:         snapshot.TicketCheckOrder,
-		queueStatus:        snapshot.Status,
-		queueStore:         store,
-		explicitCollapsed:  map[string]bool{},
-		archivedLazy:       archivedLazy,
+		worktreeRoot:      worktreeRoot,
+		settings:          settings,
+		keys:              km,
+		sidebarTree:       sidebarTree,
+		help:              help.NewModel(help.BuildSections(km, *sidebarTree.Keys(), extraKeys)),
+		search:            search.NewModel(),
+		previewFocus:      newPreviewFocus(),
+		confirm:           confirm.New(),
+		implementingEpics: map[string]bool{},
+		implementSpinner:  sp,
+		live:              map[string]map[string]liveTicketState{},
+		labelIdentifier:   map[string]map[string]string{},
+		checked:           snapshot.TicketChecked,
+		checkOrder:        snapshot.TicketCheckOrder,
+		queueStatus:       snapshot.Status,
+		queueStore:        store,
+		explicitCollapsed: map[string]bool{},
+		archivedLazy:      archivedLazy,
 	}
 }
 
@@ -241,7 +238,7 @@ func (m Model) InputFocused() bool {
 // shell (see ui/app's modalOpener duck-type) blocks tab-switch keys and
 // routes them here instead while it's up.
 func (m Model) ModalOpen() bool {
-	return m.help.IsOpen || m.implementAgentMenuOpen || m.statusMenuOpen || m.actionsMenu.IsOpen || m.drainMenuOpen || m.confirm.IsOpen
+	return m.help.IsOpen || m.statusMenuOpen || m.actionsMenu.IsOpen || m.drainMenuOpen || m.confirm.IsOpen
 }
 
 func (m Model) Init() tea.Cmd {
@@ -323,9 +320,6 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.help, cmd = m.help.Update(msg)
 			return m, cmd
 		}
-		if m.implementAgentMenuOpen {
-			return m.handleImplementAgentMenuKey(msg)
-		}
 		if m.statusMenuOpen {
 			return m.handleStatusMenuKey(msg)
 		}
@@ -341,7 +335,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKey(msg)
 
 	case tea.MouseClickMsg:
-		if m.implementAgentMenuOpen || m.statusMenuOpen || m.actionsMenu.IsOpen || m.drainMenuOpen {
+		if m.statusMenuOpen || m.actionsMenu.IsOpen || m.drainMenuOpen {
 			return m, nil
 		}
 		if m.confirm.IsOpen {
@@ -519,9 +513,7 @@ func (m Model) View() tea.View {
 		return ui.NewMainView("\n  Initializing…")
 	}
 	content := m.normalView()
-	if m.implementAgentMenuOpen {
-		content = ui.OverlayCenter(content, m.implementAgentMenuView(), m.width, m.height)
-	} else if m.statusMenuOpen {
+	if m.statusMenuOpen {
 		content = ui.OverlayCenter(content, m.statusMenuView(), m.width, m.height)
 	} else if m.actionsMenu.IsOpen {
 		content = ui.OverlayCenter(content, m.actionsMenu.View(), m.width, m.height)

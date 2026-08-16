@@ -18,7 +18,7 @@ type Settings struct {
 	// Real interactive sessions leave this false: an unconditional 1Hz
 	// re-render forever was burning CPU on an idle status tab left open for
 	// hours (see ui/status/model_update.go).
-	RenderHeartbeat bool
+	RenderHeartbeat  bool
 	DiffContextLines int               // used by the status diff view
 	NameAliases      map[string]string // used by the worktrees view
 	LogConfig        config.LogConfig
@@ -27,6 +27,7 @@ type Settings struct {
 	Skills           config.SkillsConfig
 	Agents           config.AgentsConfig
 	Budget           config.BudgetConfig
+	Subscription     config.SubscriptionConfig
 }
 
 // MaxConcurrentTicketsPerEpic returns the configured per-epic ticket limit.

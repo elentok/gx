@@ -56,26 +56,15 @@ type implementFailedMsg struct {
 	err error
 }
 
-func newImplementAgentMenu() components.MenuState {
-	return components.MenuState{
-		Items: []components.MenuItem{
-			{Label: "l  Claude", Value: string(ralphloop.AgentClaude)},
-			{Label: "o  Codex", Value: string(ralphloop.AgentCodex)},
-		},
-		Cursor: 0,
-	}
-}
-
 // handleReplaceQueueKey applies bugs-05/03's "r" ("Replace queue") action:
 // "r" is blocked only when the epic under the cursor itself has a live run —
 // a live run on some other epic no longer stops it, mirroring "a"'s
 // per-epic scoping (handleAddToQueueKey) instead of the old process-wide
 // IsLoopRunning() check. With no epic under the cursor there's nothing to
 // scope the guard to, so the check is simply skipped. Once past the guard,
-// "r" opens the same confirmation step "a" already goes through
-// (openImplementConfirm) before touching the queue, naming what's about to
-// happen; accepting it runs replaceQueuedSelection via
-// handleReplaceQueueConfirmed and switches to the Queue tab.
+// "r" opens a confirmation step naming what's about to happen; accepting it
+// runs replaceQueuedSelection via handleReplaceQueueConfirmed and switches to
+// the Queue tab.
 func (m Model) handleReplaceQueueKey() (tea.Model, tea.Cmd) {
 	if r, ok := m.selectedRow(); ok {
 		epic := m.epicAt(r)
@@ -226,71 +215,6 @@ func (m *Model) isTicketDone(path string) bool {
 
 func cmdOpenQueueTab(worktreeRoot string) tea.Cmd {
 	return nav.Switch(nav.ViewState{Tab: nav.TabQueue, WorktreeRoot: worktreeRoot})
-}
-
-func (m Model) handleImplementAgentMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "l":
-		return m.openImplementConfirm(ralphloop.AgentClaude)
-	case "o":
-		return m.openImplementConfirm(ralphloop.AgentCodex)
-	}
-
-	next, decided, accepted, handled := components.UpdateMenu(msg, m.implementAgentMenu)
-	if !handled {
-		return m, nil
-	}
-	m.implementAgentMenu = next
-	if !decided {
-		return m, nil
-	}
-	if !accepted {
-		m.implementAgentMenuOpen = false
-		return m, nil
-	}
-	agent := ralphloop.AgentKind(m.implementAgentMenu.Items[m.implementAgentMenu.Cursor].Value)
-	return m.openImplementConfirm(agent)
-}
-
-func (m Model) openImplementConfirm(agent ralphloop.AgentKind) (tea.Model, tea.Cmd) {
-	m.implementAgentMenuOpen = false
-	r, ok := m.selectedRow()
-	if !ok || !r.isEpic() {
-		return m, nil
-	}
-	epic := m.epicAt(r)
-	ac := m.settings.AgentConfig(agent)
-	m.confirm = m.confirm.Open(confirm.Options{
-		Prompt:    fmt.Sprintf("Start implementing epic %q with %s%s?", epic.Name, agentDisplayName(agent), agentConfigSuffix(ac)),
-		AcceptCmd: m.cmdStartImplement(epic.Name, agent, epic.DoneCount(), epic.TotalCount()),
-	})
-	return m, nil
-}
-
-// agentConfigSuffix renders ac's model/effort for the launch-confirmation
-// prompt (see openImplementConfirm): "Claude (sonnet, medium)?". Either or
-// both fields may be empty (the inherit-from-agent-CLI case) — when both are
-// empty, no parenthetical is rendered at all rather than empty parens; a
-// single empty value shows only the populated one.
-func agentConfigSuffix(ac config.AgentConfig) string {
-	switch {
-	case ac.Model != "" && ac.Effort != "":
-		return fmt.Sprintf(" (%s, %s)", ac.Model, ac.Effort)
-	case ac.Model != "":
-		return fmt.Sprintf(" (%s)", ac.Model)
-	case ac.Effort != "":
-		return fmt.Sprintf(" (%s)", ac.Effort)
-	default:
-		return ""
-	}
-}
-
-func (m Model) implementAgentMenuView() string {
-	prompt := "Choose the agent for this ralph-loop:"
-	if r, ok := m.selectedRow(); ok && r.isEpic() {
-		prompt = fmt.Sprintf("Choose the agent for epic %q:", m.epicAt(r).Name)
-	}
-	return renderImplementAgentMenu(prompt, m.implementAgentMenu)
 }
 
 func renderImplementAgentMenu(prompt string, menu components.MenuState) string {

@@ -56,10 +56,11 @@ func (m QueueModel) View() tea.View {
 
 	if m.implementAgentMenuOpen {
 		plans := m.checkedEpicPlans()
-		menu := renderImplementAgentMenu(
-			fmt.Sprintf("Choose the agent for %d checked epic(s):", len(plans)),
-			m.implementAgentMenu,
-		)
+		prompt := fmt.Sprintf("Choose the agent for %d checked epic(s):", len(plans))
+		if banner := runStartBannerText(m.settings.Budget, m.settings.Subscription); banner != "" {
+			prompt = banner + "\n\n" + prompt
+		}
+		menu := renderImplementAgentMenu(prompt, m.implementAgentMenu)
 		content = ui.OverlayCenter(content, menu, m.width, m.height)
 	} else if m.actionsMenu.IsOpen {
 		content = ui.OverlayCenter(content, m.actionsMenu.View(), m.width, m.height)

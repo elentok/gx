@@ -159,7 +159,7 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 		queueStatus:        map[string]queueItemStatus{},
 		live:               map[string]map[string]liveTicketState{},
 		implementSpinner:   sp,
-		implementAgentMenu: newImplementAgentMenu(),
+		implementAgentMenu: newRunStartAgentMenu(),
 		runningEpics:       map[string]bool{},
 		paused:             ralphLoopRegistry.isPaused(),
 		confirm:            confirm.New(),
@@ -316,6 +316,8 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleQueueMouseWheel(msg)
 	case queueClearConfirmedMsg:
 		return m.handleQueueClearConfirmed(msg)
+	case runStartConfirmedMsg:
+		return m.handleRunStartConfirmed(msg)
 	case editFileFinishedMsg:
 		return m.handleEditFileFinished(msg)
 	case tea.KeyPressMsg:
@@ -835,9 +837,7 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		// the row focus-toggle "l"/"right" also drive (ticket 12), so the two
 		// meanings of "enter" never fight over the same press.
 		if len(m.runningEpics) == 0 && len(m.pendingEpics) == 0 && len(m.checkedEpicPlans()) > 0 {
-			m.implementAgentMenu = newImplementAgentMenu()
-			m.implementAgentMenuOpen = true
-			return m, nil
+			return m.openRunStartModal()
 		}
 	}
 
@@ -888,8 +888,80 @@ func (m QueueModel) handleQueueAgentMenuKey(msg tea.KeyPressMsg) (tea.Model, tea
 		m.implementAgentMenuOpen = false
 		return m, nil
 	}
-	agent := ralphloop.AgentKind(m.implementAgentMenu.Items[m.implementAgentMenu.Cursor].Value)
-	return m.startCheckedEpic(agent)
+	value := m.implementAgentMenu.Items[m.implementAgentMenu.Cursor].Value
+	if value == "cancel" {
+		m.implementAgentMenuOpen = false
+		return m, nil
+	}
+	return m.startCheckedEpic(ralphloop.AgentKind(value))
+}
+
+// newRunStartAgentMenu is the Queue tab's run-start pick-list, offered only
+// when openRunStartModal finds more than one available agent — a trailing
+// Cancel item alongside Claude/Codex, since this modal (unlike the Tickets
+// tab's dead agent-picker it replaces) has no separate confirm step for
+// picking to fall back on.
+func newRunStartAgentMenu() components.MenuState {
+	return components.MenuState{
+		Items: []components.MenuItem{
+			{Label: "l  Claude", Value: string(ralphloop.AgentClaude)},
+			{Label: "o  Codex", Value: string(ralphloop.AgentCodex)},
+			{Label: "Cancel", Value: "cancel"},
+		},
+		Cursor: 0,
+	}
+}
+
+// openRunStartModal implements ticket 09a's unified run-start modal: a
+// banner (the subscription safety-check line plus configured budget limits)
+// above an action area scoped to whichever agents are actually usable on
+// this machine right now (see availableAgents — Codex's availability is
+// rechecked fresh, uncached, on every open). Exactly one available agent
+// collapses the action area to a plain Yes/No confirmation; more than one
+// opens the pick-an-agent list (plus Cancel), where picking confirms
+// directly; zero is a defensive, currently-unreachable case (Claude has no
+// availability check) that never opens a modal at all.
+func (m QueueModel) openRunStartModal() (tea.Model, tea.Cmd) {
+	agents := availableAgents()
+	banner := runStartBannerText(m.settings.Budget, m.settings.Subscription)
+	switch len(agents) {
+	case 0:
+		return m, notify.Info("no agent is available to run this epic")
+	case 1:
+		prompt := fmt.Sprintf("Start the checked selection with %s?", agentDisplayName(agents[0]))
+		if banner != "" {
+			prompt = banner + "\n\n" + prompt
+		}
+		m.confirm = m.confirm.Open(confirm.Options{
+			Prompt:    prompt,
+			AcceptCmd: cmdConfirmRunStart(agents[0]),
+		})
+		return m, nil
+	default:
+		m.implementAgentMenu = newRunStartAgentMenu()
+		m.implementAgentMenuOpen = true
+		return m, nil
+	}
+}
+
+// runStartConfirmedMsg carries the run-start modal's Yes/No confirmation
+// acceptance: agent is captured when the modal opened (mirroring
+// queueClearConfirmedMsg's same capture-at-open-time approach).
+type runStartConfirmedMsg struct {
+	agent ralphloop.AgentKind
+}
+
+func cmdConfirmRunStart(agent ralphloop.AgentKind) tea.Cmd {
+	return func() tea.Msg {
+		return runStartConfirmedMsg{agent: agent}
+	}
+}
+
+// handleRunStartConfirmed applies runStartConfirmedMsg by launching the
+// checked selection with the confirmed agent, same as picking an agent
+// directly from the pick-list branch.
+func (m QueueModel) handleRunStartConfirmed(msg runStartConfirmedMsg) (tea.Model, tea.Cmd) {
+	return m.startCheckedEpic(msg.agent)
 }
 
 func (m QueueModel) startCheckedEpic(agent ralphloop.AgentKind) (tea.Model, tea.Cmd) {
