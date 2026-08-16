@@ -17,6 +17,11 @@ const parkPollInterval = 30 * time.Second
 // QueuePauseLabel identifies the in-process pause controlled by the Queue UI.
 const QueuePauseLabel = "queue"
 
+// BudgetPauseLabel identifies the in-process pause controlled by the
+// soft-limit budget check — a separate label from QueuePauseLabel so a
+// budget pause and a manual pause never clear each other via ForceResume.
+const BudgetPauseLabel = "budget"
+
 // Gate coordinates the smart-zone pause/resume protocol shared by every
 // iteration running under a single `gx ralph-loop` invocation. Any iteration
 // can pause the whole loop (stop new scheduling; block the process in

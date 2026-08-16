@@ -63,6 +63,17 @@ type costAggregator struct {
 	// 05's reattach-reset requirement).
 	budgetHighWaterMark float64
 
+	// softLimitTripped is latched: true from the moment the soft limit is
+	// crossed until an accepted override (or reattach) clears it — never
+	// self-clears on a poll tick alone (see checkBudgetSoftLimit).
+	softLimitTripped bool
+	// softLimitOverride is true while an accepted override is suppressing
+	// re-trip, until spend climbs past the computed re-arm point.
+	softLimitOverride bool
+	// softLimitOverridePoint is the total at the moment the override was
+	// accepted, the base the re-arm point is computed from.
+	softLimitOverridePoint float64
+
 	// tickInterval is a field, not a hardcoded const in the ticker call, so
 	// tests can inject a short interval instead of waiting out a real 30s.
 	tickInterval time.Duration
@@ -103,6 +114,13 @@ func UnpricedRunningCount() int {
 	return costAgg.unpricedRunningCount()
 }
 
+// OverrideSoftLimitPause accepts the operator's confirm-dialog override of an
+// active soft-limit pause, mirroring LiveSpend's package-function wrapper
+// shape over costAgg.
+func OverrideSoftLimitPause() {
+	costAgg.overrideSoftLimit()
+}
+
 func (a *costAggregator) start() {
 	a.mu.Lock()
 	if a.running {
@@ -117,6 +135,9 @@ func (a *costAggregator) start() {
 	a.baselines = map[string]float64{}
 	a.transcriptCache = map[transcriptCacheKey]transcriptCacheEntry{}
 	a.budgetHighWaterMark = 0
+	a.softLimitTripped = false
+	a.softLimitOverride = false
+	a.softLimitOverridePoint = 0
 	a.stopCh = make(chan struct{})
 	a.doneCh = make(chan struct{})
 	interval := a.tickInterval
@@ -166,6 +187,9 @@ func (a *costAggregator) stop() {
 	a.baselines = map[string]float64{}
 	a.transcriptCache = map[transcriptCacheKey]transcriptCacheEntry{}
 	a.budgetHighWaterMark = 0
+	a.softLimitTripped = false
+	a.softLimitOverride = false
+	a.softLimitOverridePoint = 0
 	a.mu.Unlock()
 }
 
@@ -266,6 +290,7 @@ func (a *costAggregator) tick() {
 	a.mu.Unlock()
 
 	a.checkBudgetThresholds(sum)
+	a.checkBudgetSoftLimit(sum)
 }
 
 // transcriptCost returns cwd/sessionID's Claude transcript cost, reusing the

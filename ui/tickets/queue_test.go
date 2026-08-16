@@ -1186,6 +1186,9 @@ func TestQueueModelSchedulesCheckedEpicsInCheckOrderAndBackfillsAtCap(t *testing
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'p', Text: "p"})
 	m = updated.(QueueModel)
+	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	m = updated.(QueueModel)
+	m = deliverQueueCommands(t, m, cmd)
 	close(releases["gamma"])
 	waitForEpicToFinish(t, "gamma")
 	updated, cmd = m.Update(implementPollMsg{epicName: "gamma"})
@@ -1199,7 +1202,9 @@ func TestQueueModelSchedulesCheckedEpicsInCheckOrderAndBackfillsAtCap(t *testing
 
 	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'p', Text: "p"})
 	m = updated.(QueueModel)
-	m = deliverQueueCommands(t, m, cmd)
+	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	m = updated.(QueueModel)
+	m = deliverQueueCommandsWithFollowup(t, m, cmd)
 	select {
 	case name := <-starts:
 		if name != "beta" {
@@ -1348,6 +1353,28 @@ func deliverQueueCommands(t *testing.T, m QueueModel, cmd tea.Cmd) QueueModel {
 	}
 	updated, _ := m.Update(msg)
 	return updated.(QueueModel)
+}
+
+// deliverQueueCommandsWithFollowup is deliverQueueCommands plus one extra
+// level of delivery for the returned cmd, for confirm-dialog flows whose
+// accepted handler itself returns a further cmd (e.g. resume's
+// startAvailableEpics) — bounded to one extra hop rather than recursing
+// generically, since some production cmds (e.g. polling ticks) never
+// terminate and would hang the test if delivered forever.
+func deliverQueueCommandsWithFollowup(t *testing.T, m QueueModel, cmd tea.Cmd) QueueModel {
+	t.Helper()
+	if cmd == nil {
+		return m
+	}
+	msg := cmd()
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		for _, nested := range batch {
+			m = deliverQueueCommandsWithFollowup(t, m, nested)
+		}
+		return m
+	}
+	updated, nextCmd := m.Update(msg)
+	return deliverQueueCommands(t, updated.(QueueModel), nextCmd)
 }
 
 func waitForEpicToFinish(t *testing.T, epicName string) {
@@ -1566,6 +1593,9 @@ func TestQueueModelPauseDoesNotRewriteRunningStatus(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'p', Text: "p"})
 	m = updated.(QueueModel)
+	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	m = updated.(QueueModel)
+	m = deliverQueueCommands(t, m, cmd)
 	if !strings.Contains(m.View().Content, "Queue paused") {
 		t.Fatalf("expected paused banner:\n%s", m.View().Content)
 	}

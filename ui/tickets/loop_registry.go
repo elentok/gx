@@ -141,6 +141,9 @@ type loopRegistry struct {
 	runs          map[string]*epicRun
 	snapshots     map[string]*epicRun
 	paused        bool
+	// softLimitPaused is the budget soft-limit pause, independent of paused
+	// (the operator's own manual pause) — see pauseSoftLimit/resumeSoftLimit.
+	softLimitPaused bool
 	// Errors survive run removal so every observer sees the failure until an
 	// explicit acknowledgement clears it.
 	lastErr map[string]error
@@ -302,7 +305,7 @@ func (r *loopRegistry) tryStart(epicName string, done, total int, scratchDir ...
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.attachErr = nil
-	if r.paused {
+	if r.paused || r.softLimitPaused {
 		return nil, false
 	}
 	if _, exists := r.runs[epicName]; exists {
@@ -749,6 +752,35 @@ func (r *loopRegistry) isPaused() bool {
 	return r.paused
 }
 
+// pauseSoftLimit is called when the cost aggregator observes live spend
+// crossing the configured soft limit — independent of the operator's own
+// manual pause() (see softLimitPaused's doc comment).
+func (r *loopRegistry) pauseSoftLimit() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.softLimitPaused = true
+	for _, run := range r.runs {
+		run.gate.Pause(ralphloop.BudgetPauseLabel, "soft limit reached")
+	}
+}
+
+// resumeSoftLimit is called only by the accepted-override path (see
+// costAggregator.overrideSoftLimit).
+func (r *loopRegistry) resumeSoftLimit() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.softLimitPaused = false
+	for _, run := range r.runs {
+		run.gate.ForceResume(ralphloop.BudgetPauseLabel)
+	}
+}
+
+func (r *loopRegistry) isSoftLimitPaused() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.softLimitPaused
+}
+
 // holdsAttach reports whether this process currently holds the per-repo
 // attach lock (ticket 05), for SelfAttached's tab-label signal.
 func (r *loopRegistry) holdsAttach() bool {
@@ -876,7 +908,7 @@ func (r *loopRegistry) isRunning() bool {
 func (r *loopRegistry) availableSlots() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.paused {
+	if r.paused || r.softLimitPaused {
 		return 0
 	}
 	return max(r.maxConcurrent-r.activeCount, 0)

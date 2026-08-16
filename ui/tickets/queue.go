@@ -316,6 +316,12 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleQueueMouseWheel(msg)
 	case queueClearConfirmedMsg:
 		return m.handleQueueClearConfirmed(msg)
+	case queuePauseConfirmedMsg:
+		return m.handleQueuePauseConfirmed(msg)
+	case queueResumeConfirmedMsg:
+		return m.handleQueueResumeConfirmed(msg)
+	case budgetOverrideConfirmedMsg:
+		return m.handleBudgetOverrideConfirmed(msg)
 	case runStartConfirmedMsg:
 		return m.handleRunStartConfirmed(msg)
 	case editFileFinishedMsg:
@@ -789,14 +795,22 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case bindingQueueReload:
 			return m, m.cmdLoadQueue()
 		case bindingQueuePauseResume:
-			if m.paused {
-				ralphLoopRegistry.resume()
-				m.paused = false
-				return m, tea.Batch(notify.Success("queue resumed"), m.startAvailableEpics())
+			budgetPaused := ralphLoopRegistry.isSoftLimitPaused()
+			var prompt string
+			var acceptCmd tea.Cmd
+			switch {
+			case budgetPaused:
+				prompt = budgetPauseConfirmPrompt(LiveSpend(), m.settings.Budget.SoftLimit)
+				acceptCmd = cmdConfirmBudgetOverride()
+			case m.paused:
+				prompt = "Resume the queue?"
+				acceptCmd = cmdConfirmQueueResume()
+			default:
+				prompt = "Pause the queue?"
+				acceptCmd = cmdConfirmQueuePause()
 			}
-			ralphLoopRegistry.pause()
-			m.paused = true
-			return m, notify.Info("queue paused")
+			m.confirm = m.confirm.Open(confirm.Options{Prompt: prompt, AcceptCmd: acceptCmd})
+			return m, nil
 		case bindingQueueClearChecked:
 			if paths := m.checkedPaths(); len(paths) > 0 {
 				m.confirm = m.confirm.Open(confirm.Options{
