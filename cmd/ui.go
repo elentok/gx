@@ -307,6 +307,7 @@ func settingsFromConfig(cfg config.Config) ui.Settings {
 		Notifications:    cfg.Notifications,
 		Skills:           cfg.Skills,
 		Agents:           cfg.Agents,
+		Budget:           cfg.Budget,
 	}
 }
 

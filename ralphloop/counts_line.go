@@ -109,6 +109,25 @@ func loadEpicTotalCost(scratchDir, epicName string) float64 {
 	return total
 }
 
+// EpicLandedCosts loads epicName's tickets once and returns both its
+// epic-wide landed cost and each ticket's own landed cost keyed by
+// identifier (0 for a ticket that hasn't landed). Same load-fresh,
+// zero-on-failure posture as loadEpicTotalCost — a between-ticks race where
+// the epic dir briefly can't be read reports 0/nil rather than an error, so
+// the live cost aggregator's tick isn't failed by it.
+func EpicLandedCosts(scratchDir, epicName string) (total float64, perTicket map[string]float64, err error) {
+	epic, err := loadNamedEpic(scratchDir, epicName)
+	if err != nil || epic == nil {
+		return 0, nil, nil
+	}
+	perTicket = make(map[string]float64, len(epic.Tickets))
+	for _, t := range epic.Tickets {
+		perTicket[t.Identifier] = t.ActualCost
+		total += t.ActualCost
+	}
+	return total, perTicket, nil
+}
+
 // joinParkedIdentifiers lists identifiers inline, capped at
 // parkedIdentifierCap: beyond that, the rest collapse into a single "+N
 // more" marker instead of growing the line without bound.

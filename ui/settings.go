@@ -26,6 +26,7 @@ type Settings struct {
 	Notifications    config.NotificationsConfig
 	Skills           config.SkillsConfig
 	Agents           config.AgentsConfig
+	Budget           config.BudgetConfig
 }
 
 // MaxConcurrentTicketsPerEpic returns the configured per-epic ticket limit.

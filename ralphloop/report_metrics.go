@@ -116,6 +116,19 @@ func readSessionStats(cwd, sessionID string) (sessionStats, error) {
 	return stats, nil
 }
 
+// SessionCost returns the estimated API-equivalent cost of the Claude Code
+// session launched in cwd with the given id, wrapping readSessionStats for
+// callers outside this package (ui/tickets' live cost aggregator). ok is
+// false (not an error) if the transcript can't be found yet, matching
+// readSessionStats.
+func SessionCost(cwd, sessionID string) (cost float64, ok bool, err error) {
+	stats, err := readSessionStats(cwd, sessionID)
+	if err != nil {
+		return 0, false, err
+	}
+	return stats.cost, stats.ok, nil
+}
+
 func readAgentSessionStats(key sessionKey) (sessionStats, error) {
 	if key.agent != AgentCodex {
 		return readSessionStats(key.cwd, key.sessionID)

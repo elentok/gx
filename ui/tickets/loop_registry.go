@@ -2,10 +2,12 @@ package tickets
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
@@ -68,6 +70,11 @@ type epicRun struct {
 	// competing for a fresh slot, and finish gives it back if the run ended
 	// without ever acquiring.
 	permitReserved bool
+	// scratchDir is this run's repo `.scratch` dir, set unconditionally in
+	// tryStart (even "" when the caller omitted it) — the live cost
+	// aggregator's tick reads it to load the epic's on-disk state without
+	// reaching back into tryStart's local variables.
+	scratchDir string
 }
 
 type RunState string
@@ -258,6 +265,17 @@ func (r *loopRegistry) setMaxConcurrent(maxConcurrent int) {
 	r.permitCond.Broadcast()
 }
 
+// budgetConfig is process-wide and write-once, loaded from config at
+// startup (same call site as ConfigureMaxConcurrentEpics) — there is no
+// hot-reload, matching every other config section in the codebase.
+var budgetConfig config.BudgetConfig
+
+// SetBudgetConfig stores cfg for the registry layer and the Queue tab's
+// model to read via Model.settings.Budget.
+func SetBudgetConfig(cfg config.BudgetConfig) {
+	budgetConfig = cfg
+}
+
 var runRalphLoop = ralphloop.Run
 
 // tryStart claims an epic slot and starts the stream drain before returning
@@ -304,6 +322,7 @@ func (r *loopRegistry) tryStart(epicName string, done, total int, scratchDir ...
 				return nil, false
 			}
 			r.attachScratchDir = dir
+			startCostAggregator()
 		}
 		r.attachCount++
 		holdsAttach = true
@@ -315,6 +334,7 @@ func (r *loopRegistry) tryStart(epicName string, done, total int, scratchDir ...
 		done:           done, total: total, sink: sink, gate: ralphloop.NewGate(),
 		state: RunStateRunning, tickets: map[string]RunTicketSnapshot{},
 		startedAt: time.Now(), holdsAttach: holdsAttach, permitReserved: true,
+		scratchDir: dir,
 	}
 	r.activeCount++
 	r.runs[epicName] = run
@@ -770,7 +790,7 @@ func (r *loopRegistry) finish(epicName string, err error) {
 	}
 
 	r.mu.Lock()
-	defer r.mu.Unlock()
+	stopAggregator := false
 	if run != nil {
 		run.state = RunStateCompleted
 		if err != nil {
@@ -789,6 +809,7 @@ func (r *loopRegistry) finish(epicName string, err error) {
 				releaseAttachLock(r.attachScratchDir)
 				r.attachCount = 0
 				r.attachScratchDir = ""
+				stopAggregator = true
 			}
 		}
 	}
@@ -797,6 +818,14 @@ func (r *loopRegistry) finish(epicName string, err error) {
 		r.lastErr[epicName] = err
 	} else {
 		delete(r.lastErr, epicName)
+	}
+	r.mu.Unlock()
+	// stopCostAggregator blocks on the poller goroutine exiting, which itself
+	// needs r.mu (via runningEpicNames/costSnapshot) to complete an in-flight
+	// tick — must run after r.mu is released above, not under defer, or the
+	// two deadlock.
+	if stopAggregator {
+		stopCostAggregator()
 	}
 }
 
@@ -849,6 +878,36 @@ func (r *loopRegistry) isRunningEpic(epicName string) bool {
 	defer r.mu.Unlock()
 	_, ok := r.runs[epicName]
 	return ok
+}
+
+// epicCostSnapshot is one running epic's state as the live cost aggregator
+// needs it: enough to load the epic's on-disk landed costs and locate each
+// running ticket's live session, without the aggregator holding r.mu across
+// its own (slow, disk-bound) work.
+type epicCostSnapshot struct {
+	EpicName   string
+	ScratchDir string
+	Tickets    map[string]RunTicketSnapshot
+}
+
+// costSnapshot returns a point-in-time copy of every running epic's name,
+// scratchDir, and ticket map, gathered in one locked pass.
+func (r *loopRegistry) costSnapshot() []epicCostSnapshot {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	names := make([]string, 0, len(r.runs))
+	for name := range r.runs {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	snapshots := make([]epicCostSnapshot, len(names))
+	for i, name := range names {
+		run := r.runs[name]
+		tickets := make(map[string]RunTicketSnapshot, len(run.tickets))
+		maps.Copy(tickets, run.tickets)
+		snapshots[i] = epicCostSnapshot{EpicName: name, ScratchDir: run.scratchDir, Tickets: tickets}
+	}
+	return snapshots
 }
 
 // runningEpicNames reports every epic currently mid-run, sorted by name, so a
