@@ -144,6 +144,12 @@ type loopRegistry struct {
 	// softLimitPaused is the budget soft-limit pause, independent of paused
 	// (the operator's own manual pause) — see pauseSoftLimit/resumeSoftLimit.
 	softLimitPaused bool
+	// hardLimitPaused is the budget hard-limit pause, independent of both
+	// paused and softLimitPaused — see pauseHardLimit/resumeHardLimit. Set
+	// the moment a hard-limit kill sequence starts (ticket 08), so new
+	// starts are refused during and after the kill, not just once it
+	// finishes.
+	hardLimitPaused bool
 	// Errors survive run removal so every observer sees the failure until an
 	// explicit acknowledgement clears it.
 	lastErr map[string]error
@@ -305,7 +311,7 @@ func (r *loopRegistry) tryStart(epicName string, done, total int, scratchDir ...
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.attachErr = nil
-	if r.paused || r.softLimitPaused {
+	if r.paused || r.softLimitPaused || r.hardLimitPaused {
 		return nil, false
 	}
 	if _, exists := r.runs[epicName]; exists {
@@ -781,6 +787,36 @@ func (r *loopRegistry) isSoftLimitPaused() bool {
 	return r.softLimitPaused
 }
 
+// pauseHardLimit is called the moment the cost aggregator observes live
+// spend crossing the configured hard limit, before the kill sequence starts
+// (see hardLimitPaused's doc comment) — independent of both the manual
+// pause() and pauseSoftLimit.
+func (r *loopRegistry) pauseHardLimit() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.hardLimitPaused = true
+	for _, run := range r.runs {
+		run.gate.Pause(ralphloop.BudgetHardPauseLabel, "hard limit reached")
+	}
+}
+
+// resumeHardLimit is called only by the accepted-override path (see
+// costAggregator.overrideHardLimit).
+func (r *loopRegistry) resumeHardLimit() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.hardLimitPaused = false
+	for _, run := range r.runs {
+		run.gate.ForceResume(ralphloop.BudgetHardPauseLabel)
+	}
+}
+
+func (r *loopRegistry) isHardLimitPaused() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.hardLimitPaused
+}
+
 // holdsAttach reports whether this process currently holds the per-repo
 // attach lock (ticket 05), for SelfAttached's tab-label signal.
 func (r *loopRegistry) holdsAttach() bool {
@@ -908,7 +944,7 @@ func (r *loopRegistry) isRunning() bool {
 func (r *loopRegistry) availableSlots() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.paused || r.softLimitPaused {
+	if r.paused || r.softLimitPaused || r.hardLimitPaused {
 		return 0
 	}
 	return max(r.maxConcurrent-r.activeCount, 0)

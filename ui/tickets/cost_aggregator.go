@@ -74,6 +74,13 @@ type costAggregator struct {
 	// accepted, the base the re-arm point is computed from.
 	softLimitOverridePoint float64
 
+	// hardLimitTripped/hardLimitOverride/hardLimitOverridePoint mirror the
+	// soft-limit fields above, for the hard-limit kill (ticket 08) — a
+	// separate latch so an override of one limit never affects the other.
+	hardLimitTripped       bool
+	hardLimitOverride      bool
+	hardLimitOverridePoint float64
+
 	// tickInterval is a field, not a hardcoded const in the ticker call, so
 	// tests can inject a short interval instead of waiting out a real 30s.
 	tickInterval time.Duration
@@ -121,6 +128,12 @@ func OverrideSoftLimitPause() {
 	costAgg.overrideSoftLimit()
 }
 
+// OverrideHardLimitPause accepts the operator's confirm-dialog override of an
+// active hard-limit pause, mirroring OverrideSoftLimitPause.
+func OverrideHardLimitPause() {
+	costAgg.overrideHardLimit()
+}
+
 func (a *costAggregator) start() {
 	a.mu.Lock()
 	if a.running {
@@ -138,6 +151,9 @@ func (a *costAggregator) start() {
 	a.softLimitTripped = false
 	a.softLimitOverride = false
 	a.softLimitOverridePoint = 0
+	a.hardLimitTripped = false
+	a.hardLimitOverride = false
+	a.hardLimitOverridePoint = 0
 	a.stopCh = make(chan struct{})
 	a.doneCh = make(chan struct{})
 	interval := a.tickInterval
@@ -190,6 +206,9 @@ func (a *costAggregator) stop() {
 	a.softLimitTripped = false
 	a.softLimitOverride = false
 	a.softLimitOverridePoint = 0
+	a.hardLimitTripped = false
+	a.hardLimitOverride = false
+	a.hardLimitOverridePoint = 0
 	a.mu.Unlock()
 }
 
@@ -291,6 +310,7 @@ func (a *costAggregator) tick() {
 
 	a.checkBudgetThresholds(sum)
 	a.checkBudgetSoftLimit(sum)
+	a.checkBudgetHardLimit(sum, snapshot)
 }
 
 // transcriptCost returns cwd/sessionID's Claude transcript cost, reusing the

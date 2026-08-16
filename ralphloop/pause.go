@@ -22,6 +22,12 @@ const QueuePauseLabel = "queue"
 // budget pause and a manual pause never clear each other via ForceResume.
 const BudgetPauseLabel = "budget"
 
+// BudgetHardPauseLabel identifies the in-process pause controlled by the
+// hard-limit budget kill — a separate label from both QueuePauseLabel and
+// BudgetPauseLabel so a hard-limit pause, a soft-limit pause, and a manual
+// pause never clear each other via ForceResume.
+const BudgetHardPauseLabel = "budget-hard"
+
 // Gate coordinates the smart-zone pause/resume protocol shared by every
 // iteration running under a single `gx ralph-loop` invocation. Any iteration
 // can pause the whole loop (stop new scheduling; block the process in

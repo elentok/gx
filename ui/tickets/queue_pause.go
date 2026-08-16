@@ -38,6 +38,10 @@ func (m QueueModel) handleQueueResumeConfirmed(_ queueResumeConfirmedMsg) (tea.M
 }
 
 func (m QueueModel) handleBudgetOverrideConfirmed(_ budgetOverrideConfirmedMsg) (tea.Model, tea.Cmd) {
-	OverrideSoftLimitPause()
+	if ralphLoopRegistry.isHardLimitPaused() {
+		OverrideHardLimitPause()
+	} else {
+		OverrideSoftLimitPause()
+	}
 	return m, tea.Batch(notify.Success("budget pause overridden"), m.startAvailableEpics())
 }

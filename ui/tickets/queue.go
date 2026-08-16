@@ -795,11 +795,15 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case bindingQueueReload:
 			return m, m.cmdLoadQueue()
 		case bindingQueuePauseResume:
-			budgetPaused := ralphLoopRegistry.isSoftLimitPaused()
+			hardBudgetPaused := ralphLoopRegistry.isHardLimitPaused()
+			softBudgetPaused := ralphLoopRegistry.isSoftLimitPaused()
 			var prompt string
 			var acceptCmd tea.Cmd
 			switch {
-			case budgetPaused:
+			case hardBudgetPaused:
+				prompt = budgetHardPauseConfirmPrompt(LiveSpend(), m.settings.Budget.HardLimit)
+				acceptCmd = cmdConfirmBudgetOverride()
+			case softBudgetPaused:
 				prompt = budgetPauseConfirmPrompt(LiveSpend(), m.settings.Budget.SoftLimit)
 				acceptCmd = cmdConfirmBudgetOverride()
 			case m.paused:
