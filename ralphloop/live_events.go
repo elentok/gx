@@ -60,6 +60,13 @@ type LiveEvent struct {
 	// elapsed time from its first line's timestamp.
 	Cwd       string
 	SessionID string
+	// AgentKind/PaneID/TabID (IterationStarted only) identify which agent and
+	// herdr pane/tab this running iteration is on — the identity a consumer
+	// outside ralphloop (the Queue tab's registry) needs to locate a live
+	// iteration, not just resolve its transcript.
+	AgentKind AgentKind
+	PaneID    string
+	TabID     string
 	// Tokens (ContextOccupancy only) is the session's current context-window
 	// token occupancy.
 	Tokens int
@@ -130,8 +137,8 @@ func (s *ChannelEventSink) TicketClaimed(ticket tickets.Ticket) {
 	s.emit(LiveEvent{Kind: LiveEventTicketClaimed, Identifier: ticket.Identifier, Ticket: ticket})
 }
 
-func (s *ChannelEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string) {
-	s.emit(LiveEvent{Kind: LiveEventIterationStarted, Identifier: ticket.Identifier, Ticket: ticket, Label: label, Cwd: cwd, SessionID: sessionID})
+func (s *ChannelEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string, agent AgentKind, paneID, tabID string) {
+	s.emit(LiveEvent{Kind: LiveEventIterationStarted, Identifier: ticket.Identifier, Ticket: ticket, Label: label, Cwd: cwd, SessionID: sessionID, AgentKind: agent, PaneID: paneID, TabID: tabID})
 }
 
 func (s *ChannelEventSink) IterationPaused(identifier, label string, kind PauseKind, reason string) {

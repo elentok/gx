@@ -64,8 +64,8 @@ func (s *recordingEventSink) TicketClaimed(ticket tickets.Ticket) {
 	s.record(LiveEvent{Kind: LiveEventTicketClaimed, Identifier: ticket.Identifier, Ticket: ticket})
 }
 
-func (s *recordingEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string) {
-	s.record(LiveEvent{Kind: LiveEventIterationStarted, Identifier: ticket.Identifier, Ticket: ticket, Label: label, Cwd: cwd, SessionID: sessionID})
+func (s *recordingEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string, agent AgentKind, paneID, tabID string) {
+	s.record(LiveEvent{Kind: LiveEventIterationStarted, Identifier: ticket.Identifier, Ticket: ticket, Label: label, Cwd: cwd, SessionID: sessionID, AgentKind: agent, PaneID: paneID, TabID: tabID})
 }
 
 func (s *recordingEventSink) IterationPaused(identifier, label string, kind PauseKind, reason string) {

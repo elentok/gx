@@ -89,6 +89,16 @@ type RunTicketSnapshot struct {
 	PauseReason   string
 	ContextTokens int
 	StartedAt     time.Time
+	// SessionID/Cwd/Agent/PaneID/TabID identify the currently-running
+	// iteration's live agent — populated from LiveEventIterationStarted and
+	// cleared once LiveEventIterationFinished lands, so other tickets (live
+	// cost aggregation, the hard-limit stop/repair seam) can locate the
+	// iteration without reaching into ralphloop internals themselves.
+	SessionID string
+	Cwd       string
+	Agent     ralphloop.AgentKind
+	PaneID    string
+	TabID     string
 }
 
 type RunSnapshot struct {
@@ -336,6 +346,11 @@ func (r *loopRegistry) reduceLiveEvent(epicName string, event ralphloop.LiveEven
 			Label:      event.Label,
 			Running:    true,
 			StartedAt:  time.Now(),
+			SessionID:  event.SessionID,
+			Cwd:        event.Cwd,
+			Agent:      event.AgentKind,
+			PaneID:     event.PaneID,
+			TabID:      event.TabID,
 		}
 		if event.Kind == ralphloop.LiveEventTicketReattached {
 			run.pendingNotifyCloses = append(run.pendingNotifyCloses, reattachNotifyID(epicName, event.Identifier))
@@ -409,6 +424,11 @@ func (r *loopRegistry) reduceLiveEvent(epicName string, event ralphloop.LiveEven
 			ticket.PauseKind = ""
 			ticket.PauseReason = ""
 			ticket.ContextTokens = 0
+			ticket.SessionID = ""
+			ticket.Cwd = ""
+			ticket.Agent = ""
+			ticket.PaneID = ""
+			ticket.TabID = ""
 			run.tickets[event.Identifier] = ticket
 			// Stats.Completed/Total already describe the whole epic, recomputed
 			// from disk (see IterationStats) — read them rather than counting

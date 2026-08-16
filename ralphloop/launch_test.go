@@ -473,7 +473,7 @@ type recordingSinkWithArgs struct {
 	onIterationStarted func(ticket tickets.Ticket, label, cwd, sessionID string)
 }
 
-func (s *recordingSinkWithArgs) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string) {
+func (s *recordingSinkWithArgs) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string, agent AgentKind, paneID, tabID string) {
 	if s.onIterationStarted != nil {
 		s.onIterationStarted(ticket, label, cwd, sessionID)
 	}

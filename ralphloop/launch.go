@@ -290,7 +290,7 @@ func launchAndPrompt(d Deps, p launchAndPromptParams) (string, error) {
 	}
 	p.logAgentStartEvent(p.StartEvent, sessionID, startedAgent.StateChangeSeq)
 	if p.StartEvent != "" {
-		p.sink().IterationStarted(p.TicketData, p.Label, p.SessionCwd, sessionID)
+		p.sink().IterationStarted(p.TicketData, p.Label, p.SessionCwd, sessionID, p.Agent, p.Pane, p.Tab)
 		emitContextOccupancy(d, p.sink(), p.Agent, p.Ticket, p.SessionCwd, sessionID)
 	}
 
@@ -330,7 +330,7 @@ func attachToLiveAgent(d Deps, p launchAndPromptParams) (string, error) {
 
 	p.logLifecycleEvent(p.StartEvent, sessionID)
 	if p.StartEvent != "" {
-		p.sink().IterationStarted(p.TicketData, p.Label, p.SessionCwd, sessionID)
+		p.sink().IterationStarted(p.TicketData, p.Label, p.SessionCwd, sessionID, p.Agent, p.Pane, p.Tab)
 		emitContextOccupancy(d, p.sink(), p.Agent, p.Ticket, p.SessionCwd, sessionID)
 	}
 

@@ -68,7 +68,7 @@ func (s *recordingSink) TicketNeedsHuman(identifier, epicName, status, reason st
 	s.record("TicketNeedsHuman")
 }
 func (s *recordingSink) TicketClaimed(ticket tickets.Ticket) { s.record("TicketClaimed") }
-func (s *recordingSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string) {
+func (s *recordingSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string, agent AgentKind, paneID, tabID string) {
 	s.record("IterationStarted")
 }
 func (s *recordingSink) IterationPaused(identifier, label string, kind PauseKind, reason string) {

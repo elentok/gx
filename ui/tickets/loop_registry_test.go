@@ -98,6 +98,43 @@ func TestReduceLiveEventCapturesProgressContextAndPause(t *testing.T) {
 	}
 }
 
+// TestReduceLiveEventCapturesRunningIterationIdentity is ticket 02's test
+// seam: a running iteration's full identity (session id, cwd, agent, pane
+// id, tab id) reaches the registry's per-ticket snapshot from
+// LiveEventIterationStarted, and is cleared once LiveEventIterationFinished
+// lands — the plumbing later cost-aggregation and stop/repair tickets build
+// on.
+func TestReduceLiveEventCapturesRunningIterationIdentity(t *testing.T) {
+	t.Parallel()
+	r := newLoopRegistry(1)
+	r.tryStart("epic-a", 0, 1)
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationStarted, Identifier: "01", Label: "iter-01",
+		SessionID: "sess-1", Cwd: "/repo/iter-01",
+		AgentKind: ralphloop.AgentKind("claude"), PaneID: "pane-1", TabID: "tab-1",
+	})
+
+	running, ok := r.runSnapshot("epic-a")
+	if !ok {
+		t.Fatal("runSnapshot(epic-a): want snapshot")
+	}
+	ticket := running.Tickets["01"]
+	if ticket.SessionID != "sess-1" || ticket.Cwd != "/repo/iter-01" ||
+		ticket.Agent != ralphloop.AgentKind("claude") || ticket.PaneID != "pane-1" || ticket.TabID != "tab-1" {
+		t.Fatalf("running ticket identity = %#v, want full identity", ticket)
+	}
+
+	r.reduceLiveEvent("epic-a", ralphloop.LiveEvent{
+		Kind: ralphloop.LiveEventIterationFinished, Identifier: "01",
+		Stats: ralphloop.IterationStats{Completed: 1, Total: 1},
+	})
+	finished, _ := r.runSnapshot("epic-a")
+	ticket = finished.Tickets["01"]
+	if ticket.SessionID != "" || ticket.Cwd != "" || ticket.Agent != "" || ticket.PaneID != "" || ticket.TabID != "" {
+		t.Fatalf("finished ticket identity = %#v, want cleared", ticket)
+	}
+}
+
 func TestReduceLiveEventStampsPerTicketStartedAt(t *testing.T) {
 	t.Parallel()
 	r := newLoopRegistry(1)
@@ -210,7 +247,7 @@ func TestFinish_EpicFailed_FiresAfterSinkDrain(t *testing.T) {
 	notifier := &fakeFailureNotifier{}
 	r.setFailureNotifier("epic-a", notifier)
 
-	sink.IterationStarted(tickets.Ticket{Identifier: "01"}, "iter-01", "", "")
+	sink.IterationStarted(tickets.Ticket{Identifier: "01"}, "iter-01", "", "", "", "", "")
 
 	notifier.onCall = func() {
 		snap, ok := r.runSnapshot("epic-a")
@@ -856,7 +893,7 @@ func TestRegistryDrainsRunEventsBeforeFinish(t *testing.T) {
 	if !ok {
 		t.Fatal("tryStart epic-a: want ok")
 	}
-	sink.IterationStarted(tickets.Ticket{Identifier: "01"}, "iter-01", "", "")
+	sink.IterationStarted(tickets.Ticket{Identifier: "01"}, "iter-01", "", "", "", "", "")
 	sink.ContextOccupancy("01", 42)
 	sink.IterationFinished(tickets.Ticket{Identifier: "01"}, "epic-a", ralphloop.IterationStats{Completed: 1, Total: 1})
 
@@ -876,8 +913,8 @@ func TestRegistryDrainsEpicsIndependently(t *testing.T) {
 	r := newLoopRegistry(2)
 	sinkA, _ := r.tryStart("epic-a", 0, 1)
 	sinkB, _ := r.tryStart("epic-b", 0, 1)
-	sinkA.IterationStarted(tickets.Ticket{Identifier: "01"}, "iter-a", "", "")
-	sinkB.IterationStarted(tickets.Ticket{Identifier: "01"}, "iter-b", "", "")
+	sinkA.IterationStarted(tickets.Ticket{Identifier: "01"}, "iter-a", "", "", "", "", "")
+	sinkB.IterationStarted(tickets.Ticket{Identifier: "01"}, "iter-b", "", "", "", "", "")
 	sinkA.ContextOccupancy("01", 11)
 	sinkB.ContextOccupancy("01", 22)
 

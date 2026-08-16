@@ -102,8 +102,10 @@ type EventSink interface {
 	// its initial prompt, for ticket. cwd/sessionID let a consumer resolve
 	// the session's transcript itself (transcript.Path) to compute elapsed
 	// time from its first line's timestamp, rather than stamping "now"
-	// client-side.
-	IterationStarted(ticket tickets.Ticket, label string, cwd string, sessionID string)
+	// client-side. agent/paneID/tabID identify which agent kind and herdr
+	// pane/tab this iteration is running on, so a consumer outside ralphloop
+	// (the Queue tab's registry) can locate the live iteration itself.
+	IterationStarted(ticket tickets.Ticket, label string, cwd string, sessionID string, agent AgentKind, paneID string, tabID string)
 	// IterationPaused reports that identifier's iteration label paused for
 	// reason, of the given kind. identifier is the ticket's Identifier (see
 	// TicketReverted) — label alone is barred from a message's identity line,
@@ -236,7 +238,8 @@ func (noopEventSink) TicketReverted(identifier string)                          
 func (noopEventSink) TicketReattached(identifier, label, cwd, sessionID string)               {}
 func (noopEventSink) TicketNeedsHuman(identifier, epicName, status, reason string)            {}
 func (noopEventSink) TicketClaimed(ticket tickets.Ticket)                                     {}
-func (noopEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string)    {}
+func (noopEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string, agent AgentKind, paneID, tabID string) {
+}
 func (noopEventSink) IterationPaused(identifier, label string, kind PauseKind, reason string) {}
 func (noopEventSink) IterationResumed(identifier, label string, kind PauseKind)               {}
 func (noopEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {

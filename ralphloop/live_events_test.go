@@ -13,7 +13,7 @@ func TestChannelEventSink_ForwardsCallsAsLiveEvents(t *testing.T) {
 	s := NewChannelEventSink()
 
 	s.TicketClaimed(tickets.Ticket{Identifier: "04a", Number: 4})
-	s.IterationStarted(tickets.Ticket{Identifier: "04a", Number: 4}, "iter-04a", "/repo/iter-04a", "sess-1")
+	s.IterationStarted(tickets.Ticket{Identifier: "04a", Number: 4}, "iter-04a", "/repo/iter-04a", "sess-1", AgentKind("claude"), "pane-1", "tab-1")
 	s.IterationPaused("04a", "iter-04a", PauseNeedsRepair, "Codex is waiting for operator intervention")
 	s.IterationResumed("04a", "iter-04a", PauseNeedsRepair)
 	s.IterationFinished(tickets.Ticket{Identifier: "04a"}, "my-epic", IterationStats{})
@@ -29,9 +29,12 @@ func TestChannelEventSink_ForwardsCallsAsLiveEvents(t *testing.T) {
 		cwd        string
 		sessionID  string
 		tokens     int
+		agentKind  AgentKind
+		paneID     string
+		tabID      string
 	}{
 		{kind: LiveEventTicketClaimed, identifier: "04a"},
-		{kind: LiveEventIterationStarted, identifier: "04a", label: "iter-04a", cwd: "/repo/iter-04a", sessionID: "sess-1"},
+		{kind: LiveEventIterationStarted, identifier: "04a", label: "iter-04a", cwd: "/repo/iter-04a", sessionID: "sess-1", agentKind: AgentKind("claude"), paneID: "pane-1", tabID: "tab-1"},
 		{kind: LiveEventIterationPaused, identifier: "04a", label: "iter-04a", pauseKind: PauseNeedsRepair, reason: "Codex is waiting for operator intervention"},
 		{kind: LiveEventIterationResumed, identifier: "04a", label: "iter-04a", pauseKind: PauseNeedsRepair},
 		{kind: LiveEventIterationFinished, identifier: "04a"},
@@ -44,7 +47,8 @@ func TestChannelEventSink_ForwardsCallsAsLiveEvents(t *testing.T) {
 		case ev := <-s.Events():
 			if ev.Kind != w.kind || ev.Identifier != w.identifier || ev.Label != w.label ||
 				ev.Reason != w.reason || ev.PauseKind != w.pauseKind ||
-				ev.Cwd != w.cwd || ev.SessionID != w.sessionID || ev.Tokens != w.tokens {
+				ev.Cwd != w.cwd || ev.SessionID != w.sessionID || ev.Tokens != w.tokens ||
+				ev.AgentKind != w.agentKind || ev.PaneID != w.paneID || ev.TabID != w.tabID {
 				t.Errorf("event %d = %+v, want %+v", i, ev, w)
 			}
 		default:
