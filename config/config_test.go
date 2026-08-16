@@ -135,6 +135,128 @@ func TestLoadExecutionQueueConfigClampsLimitsToOne(t *testing.T) {
 	}
 }
 
+func writeBudgetConfig(t *testing.T, tmp string, body string) {
+	t.Helper()
+	dir := filepath.Join(tmp, "gx")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(body), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+}
+
+func TestLoadBudgetConfigDefaultsWhenAbsent(t *testing.T) {
+	tmp := t.TempDir()
+	prev := userConfigDirFn
+	userConfigDirFn = func() (string, error) { return tmp, nil }
+	t.Cleanup(func() { userConfigDirFn = prev })
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Budget.SoftLimit != 20 || cfg.Budget.HardLimit != 30 {
+		t.Fatalf("Budget limits = %+v, want soft=20 hard=30", cfg.Budget)
+	}
+	if want := []float64{5, 10, 15}; !floatSlicesEqual(cfg.Budget.NotificationThresholds, want) {
+		t.Fatalf("Budget.NotificationThresholds = %v, want %v", cfg.Budget.NotificationThresholds, want)
+	}
+}
+
+func TestLoadBudgetConfigZeroDisablesLimitsIndependently(t *testing.T) {
+	tmp := t.TempDir()
+	prev := userConfigDirFn
+	userConfigDirFn = func() (string, error) { return tmp, nil }
+	t.Cleanup(func() { userConfigDirFn = prev })
+
+	writeBudgetConfig(t, tmp, `{"budget":{"soft-limit":0,"hard-limit":30}}`)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Budget.SoftLimit != 0 {
+		t.Fatalf("Budget.SoftLimit = %v, want 0 (disabled)", cfg.Budget.SoftLimit)
+	}
+	if cfg.Budget.HardLimit != 30 {
+		t.Fatalf("Budget.HardLimit = %v, want 30 (unaffected)", cfg.Budget.HardLimit)
+	}
+
+	tmp2 := t.TempDir()
+	userConfigDirFn = func() (string, error) { return tmp2, nil }
+	writeBudgetConfig(t, tmp2, `{"budget":{"soft-limit":20,"hard-limit":0}}`)
+
+	cfg2, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg2.Budget.HardLimit != 0 {
+		t.Fatalf("Budget.HardLimit = %v, want 0 (disabled)", cfg2.Budget.HardLimit)
+	}
+	if cfg2.Budget.SoftLimit != 20 {
+		t.Fatalf("Budget.SoftLimit = %v, want 20 (unaffected)", cfg2.Budget.SoftLimit)
+	}
+}
+
+func TestLoadBudgetConfigSortsAndDedupesThresholds(t *testing.T) {
+	tmp := t.TempDir()
+	prev := userConfigDirFn
+	userConfigDirFn = func() (string, error) { return tmp, nil }
+	t.Cleanup(func() { userConfigDirFn = prev })
+
+	writeBudgetConfig(t, tmp, `{"budget":{"notification-thresholds":[10,5,10,15,5]}}`)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if want := []float64{5, 10, 15}; !floatSlicesEqual(cfg.Budget.NotificationThresholds, want) {
+		t.Fatalf("Budget.NotificationThresholds = %v, want %v", cfg.Budget.NotificationThresholds, want)
+	}
+}
+
+func TestLoadBudgetConfigBumpsHardLimitAtOrBelowSoftLimit(t *testing.T) {
+	tmp := t.TempDir()
+	prev := userConfigDirFn
+	userConfigDirFn = func() (string, error) { return tmp, nil }
+	t.Cleanup(func() { userConfigDirFn = prev })
+
+	writeBudgetConfig(t, tmp, `{"budget":{"soft-limit":20,"hard-limit":20}}`)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Budget.HardLimit != 20 {
+		t.Fatalf("Budget.HardLimit = %v, want 20 (bumped to soft limit)", cfg.Budget.HardLimit)
+	}
+
+	tmp2 := t.TempDir()
+	userConfigDirFn = func() (string, error) { return tmp2, nil }
+	writeBudgetConfig(t, tmp2, `{"budget":{"soft-limit":20,"hard-limit":10}}`)
+
+	cfg2, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg2.Budget.HardLimit != 20 {
+		t.Fatalf("Budget.HardLimit = %v, want 20 (bumped to soft limit)", cfg2.Budget.HardLimit)
+	}
+}
+
+func floatSlicesEqual(a, b []float64) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func TestLoadSkillsConfigDefaultsWhenBlockAbsent(t *testing.T) {
 	tmp := t.TempDir()
 	prev := userConfigDirFn

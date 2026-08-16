@@ -77,6 +77,39 @@
         "max-concurrent-epics": 2
       }
     },
+    "budget": {
+      "type": "object",
+      "description": "Estimated API-equivalent-cost soft/hard limits and notification thresholds, in dollars.",
+      "additionalProperties": false,
+      "properties": {
+        "soft-limit": {
+          "type": "number",
+          "description": "Estimated API-equivalent-cost soft limit in dollars. 0 disables it. Default: 20.",
+          "minimum": 0,
+          "default": 20
+        },
+        "hard-limit": {
+          "type": "number",
+          "description": "Estimated API-equivalent-cost hard limit in dollars. 0 disables it. Bumped up to soft-limit if set at or below a nonzero soft-limit. Default: 30.",
+          "minimum": 0,
+          "default": 30
+        },
+        "notification-thresholds": {
+          "type": "array",
+          "description": "Estimated API-equivalent-cost thresholds in dollars at which a notification fires. Sorted and deduped. Default: [5, 10, 15].",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "default": [5, 10, 15]
+        }
+      },
+      "default": {
+        "soft-limit": 20,
+        "hard-limit": 30,
+        "notification-thresholds": [5, 10, 15]
+      }
+    },
     "log": {
       "type": "object",
       "description": "Log view display settings.",

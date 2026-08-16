@@ -60,6 +60,7 @@ type Config struct {
 	NameAliases           map[string]string    `json:"name-aliases,omitempty"`
 	Log                   LogConfig            `json:"log,omitempty"`
 	ExecutionQueue        ExecutionQueueConfig `json:"execution-queue"`
+	Budget                BudgetConfig         `json:"budget"`
 	Notifications         NotificationsConfig  `json:"notifications"`
 	Skills                SkillsConfig         `json:"skills"`
 	Agents                AgentsConfig         `json:"agents"`
@@ -75,6 +76,7 @@ func Default() Config {
 		InputModalBottom:      DefaultInputModalBottom(),
 		Log:                   DefaultLogConfig(),
 		ExecutionQueue:        DefaultExecutionQueueConfig(),
+		Budget:                DefaultBudgetConfig(),
 		Notifications:         DefaultNotificationsConfig(),
 		Skills:                DefaultSkillsConfig(),
 		Agents:                DefaultAgentsConfig(),
@@ -118,6 +120,11 @@ func Load() (Config, error) {
 			MaxConcurrentTicketsPerEpic *int `json:"max-concurrent-tickets-per-epic"`
 			MaxConcurrentEpics          *int `json:"max-concurrent-epics"`
 		} `json:"execution-queue"`
+		Budget *struct {
+			SoftLimit              *float64  `json:"soft-limit"`
+			HardLimit              *float64  `json:"hard-limit"`
+			NotificationThresholds []float64 `json:"notification-thresholds"`
+		} `json:"budget"`
 		Notifications *struct {
 			Telegram *struct {
 				BotToken *string `json:"bot-token"`
@@ -181,6 +188,18 @@ func Load() (Config, error) {
 		if raw.ExecutionQueue.MaxConcurrentEpics != nil {
 			cfg.ExecutionQueue.MaxConcurrentEpics = clampExecutionQueueLimit(*raw.ExecutionQueue.MaxConcurrentEpics)
 		}
+	}
+	if raw.Budget != nil {
+		if raw.Budget.SoftLimit != nil {
+			cfg.Budget.SoftLimit = *raw.Budget.SoftLimit
+		}
+		if raw.Budget.HardLimit != nil {
+			cfg.Budget.HardLimit = *raw.Budget.HardLimit
+		}
+		if raw.Budget.NotificationThresholds != nil {
+			cfg.Budget.NotificationThresholds = raw.Budget.NotificationThresholds
+		}
+		cfg.Budget = clampBudget(cfg.Budget)
 	}
 	if raw.Notifications != nil && raw.Notifications.Telegram != nil {
 		if raw.Notifications.Telegram.BotToken != nil {

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Added a `budget` config section (soft limit, hard limit, notification thresholds, all in dollars) — ships on by default at $20/$30 with thresholds at $5/$10/$15. To disable, set `budget.soft-limit` and `budget.hard-limit` to `0` in `~/.config/gx/config.json`.
+
 ## v0.28.10 - 2026-08-15
 
 - Mouse wheel now scrolls whatever pane is under the cursor, hover-based, no click/focus needed first — wired across Tickets, Queue, Log, Stash, Worktrees, PRs tabs, the help modal, commit-info/PR-comments popups, and output viewports.

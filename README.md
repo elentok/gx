@@ -256,6 +256,9 @@ Optional config file at `~/.config/gx/config.json` (run `gx config edit` to open
 | `name-aliases`             | object                          | `{}`      | Map of exact worktree full-names to display aliases, applied before the normal dash-segment compression.                                                                                     |
 | `execution-queue.max-concurrent-tickets-per-epic` | integer (≥1) | `2` | Maximum tickets that may run concurrently within one epic. |
 | `execution-queue.max-concurrent-epics` | integer (≥1) | `2` | Maximum epics that may run concurrently in this `gx` process. |
+| `budget.soft-limit`        | dollars (float)                 | `20`      | Estimated API-equivalent-cost soft limit. Set to `0` to disable.                                                                                                                             |
+| `budget.hard-limit`        | dollars (float)                 | `30`      | Estimated API-equivalent-cost hard limit. Set to `0` to disable. Bumped up to `soft-limit` on load if it's set at or below a nonzero `soft-limit`.                                          |
+| `budget.notification-thresholds` | array of dollars (float)  | `[5, 10, 15]` | Estimated API-equivalent-cost thresholds at which a notification fires. Sorted and deduped on load.                                                                                    |
 | `log.important-refs`       | array                           | see below | Rules for highlighting important refs in the log view. Refs matching a rule get a bright colored badge and are sorted to the front; all others get a dim surface badge.                      |
 | `log.hide-refs`            | array of strings                | `[]`      | Regular expressions matched against full ref names. Matching refs are hidden from the log view entirely. Takes priority over `important-refs`.                                               |
 
@@ -290,6 +293,11 @@ Example config:
   "execution-queue": {
     "max-concurrent-tickets-per-epic": 2,
     "max-concurrent-epics": 2
+  },
+  "budget": {
+    "soft-limit": 20,
+    "hard-limit": 30,
+    "notification-thresholds": [5, 10, 15]
   },
   "log": {
     "important-refs": [
