@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.28.14 - 2026-08-17
+
+- Fixed herdr pane-run commands (e.g. status-tab commit) sometimes running in the wrong directory by waiting for the pane's shell to start and apply --cwd before typing commands into a freshly split/created pane
+- Landed epics in the tickets view now show their summed cost alongside "took Xm" (previously only live-running epics showed a cost); the elapsed/tokens/cost metrics line now omits each field independently when zero instead of hiding the whole line
+
 ## v0.28.13 - 2026-08-17
 
 - Added vim mode indicator to claude statusline: shows NORMAL/VISUAL/INSERT/REPLACE with a Nerd Font icon, fixed-width padding, and per-mode coloring; demo mode cycles through all four
