@@ -209,21 +209,35 @@ func launchSplit(worktreeRoot string, terminal ui.Terminal, splitType SplitType,
 		// command in another pane").
 		var paneID string
 		var err error
+		// refocusCmd is appended to the pane's command line so, once the
+		// program exits, the pane hands focus back to the pane/tab that
+		// launched it before self-closing. herdr only restores focus to
+		// *some* neighbor on pane close (observed to depend on pane count,
+		// not a true "previously focused" stack), so relying on that is
+		// unreliable once more than two panes exist in the tab.
+		var refocusCmd string
 		switch splitType {
 		case HSplit:
-			// HSplit (vim :split, stacked) maps to herdr's "down" split.
+			// HSplit (vim :split, stacked) maps to herdr's "down" split, so
+			// the new pane's "up" neighbor is the one that launched it.
 			paneID, err = herdrPaneSplit(worktreeRoot, "down")
+			refocusCmd = "herdr pane focus --current --direction up"
 		case VSplit:
-			// VSplit (vim :vsplit, side-by-side) maps to herdr's "right" split.
+			// VSplit (vim :vsplit, side-by-side) maps to herdr's "right"
+			// split, so the new pane's "left" neighbor launched it.
 			paneID, err = herdrPaneSplit(worktreeRoot, "right")
+			refocusCmd = "herdr pane focus --current --direction left"
 		case Tab:
 			paneID, err = herdrTabCreate(worktreeRoot)
+			if origTab := os.Getenv("HERDR_TAB_ID"); origTab != "" {
+				refocusCmd = "herdr tab focus " + origTab
+			}
 		}
 		if err != nil {
 			return "herdr", err
 		}
 		waitForPaneShell(paneID)
-		err = herdrPaneRun(paneID, program, args)
+		err = herdrPaneRun(paneID, program, args, refocusCmd)
 		return "herdr", err
 	}
 	return "", fmt.Errorf("split not supported for terminal %v", terminal)
@@ -296,7 +310,7 @@ var (
 // old racy behavior rather than hanging forever.
 func waitForPaneShell(paneID string) {
 	for i := 0; i < panePollMaxAttempts; i++ {
-		out, err := runCommand("herdr", "pane", "process-info", paneID)
+		out, err := runCommand("herdr", "pane", "process-info", "--pane", paneID)
 		if err == nil {
 			var resp struct {
 				Result struct {
@@ -314,16 +328,21 @@ func waitForPaneShell(paneID string) {
 }
 
 // herdrPaneRun types program (with args) as a command line into paneID's
-// shell and presses Enter, then appends `; exit` so the pane closes once the
-// command finishes — matching tmux split-window/kitty @ launch, which exec
-// the program directly and close the pane on exit.
-func herdrPaneRun(paneID, program string, args []string) error {
+// shell and presses Enter, then appends refocusCmd (if any, see launchSplit)
+// and `; exit` so the pane hands focus back and closes once the command
+// finishes — matching tmux split-window/kitty @ launch, which exec the
+// program directly and close the pane on exit.
+func herdrPaneRun(paneID, program string, args []string, refocusCmd string) error {
 	tokens := make([]string, 0, len(args)+1)
 	tokens = append(tokens, shellQuote(program))
 	for _, arg := range args {
 		tokens = append(tokens, shellQuote(arg))
 	}
-	cmdLine := strings.Join(tokens, " ") + "; exit"
+	cmdLine := strings.Join(tokens, " ")
+	if refocusCmd != "" {
+		cmdLine += "; " + refocusCmd
+	}
+	cmdLine += "; exit"
 	runArgs := []string{"pane", "run", paneID, cmdLine}
 	out, err := runCommand("herdr", runArgs...)
 	if err != nil {

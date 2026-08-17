@@ -170,12 +170,13 @@ func TestLaunchSplit_ArgVectors(t *testing.T) {
 
 func TestLaunchSplit_HerdrSplitsPaneThenRunsCommand(t *testing.T) {
 	tests := []struct {
-		name          string
-		splitType     SplitType
-		wantDirection string
+		name           string
+		splitType      SplitType
+		wantDirection  string
+		wantRefocusDir string
 	}{
-		{name: "hsplit maps to down", splitType: HSplit, wantDirection: "down"},
-		{name: "vsplit maps to right", splitType: VSplit, wantDirection: "right"},
+		{name: "hsplit maps to down", splitType: HSplit, wantDirection: "down", wantRefocusDir: "up"},
+		{name: "vsplit maps to right", splitType: VSplit, wantDirection: "right", wantRefocusDir: "left"},
 	}
 
 	for _, tt := range tests {
@@ -208,11 +209,11 @@ func TestLaunchSplit_HerdrSplitsPaneThenRunsCommand(t *testing.T) {
 			if !reflect.DeepEqual(calls[0], wantSplit) {
 				t.Errorf("first call = %#v, want %#v", calls[0], wantSplit)
 			}
-			wantProcessInfo := []string{"herdr", "pane", "process-info", "w2:p1C"}
+			wantProcessInfo := []string{"herdr", "pane", "process-info", "--pane", "w2:p1C"}
 			if !reflect.DeepEqual(calls[1], wantProcessInfo) {
 				t.Errorf("second call = %#v, want %#v", calls[1], wantProcessInfo)
 			}
-			wantPaneRun := []string{"herdr", "pane", "run", "w2:p1C", "'gx' 'run' 'lazygit'; exit"}
+			wantPaneRun := []string{"herdr", "pane", "run", "w2:p1C", "'gx' 'run' 'lazygit'; herdr pane focus --current --direction " + tt.wantRefocusDir + "; exit"}
 			if !reflect.DeepEqual(calls[2], wantPaneRun) {
 				t.Errorf("third call = %#v, want %#v", calls[2], wantPaneRun)
 			}
@@ -221,6 +222,8 @@ func TestLaunchSplit_HerdrSplitsPaneThenRunsCommand(t *testing.T) {
 }
 
 func TestLaunchSplit_HerdrTabCreatesTabThenRunsCommand(t *testing.T) {
+	t.Setenv("HERDR_TAB_ID", "w2:t1")
+
 	prev := runCommand
 	var calls [][]string
 	runCommand = func(name string, args ...string) ([]byte, error) {
@@ -249,11 +252,11 @@ func TestLaunchSplit_HerdrTabCreatesTabThenRunsCommand(t *testing.T) {
 	if !reflect.DeepEqual(calls[0], wantTabCreate) {
 		t.Errorf("first call = %#v, want %#v", calls[0], wantTabCreate)
 	}
-	wantProcessInfo := []string{"herdr", "pane", "process-info", "w2:p1D"}
+	wantProcessInfo := []string{"herdr", "pane", "process-info", "--pane", "w2:p1D"}
 	if !reflect.DeepEqual(calls[1], wantProcessInfo) {
 		t.Errorf("second call = %#v, want %#v", calls[1], wantProcessInfo)
 	}
-	wantPaneRun := []string{"herdr", "pane", "run", "w2:p1D", "'gx' 'run' 'lazygit'; exit"}
+	wantPaneRun := []string{"herdr", "pane", "run", "w2:p1D", "'gx' 'run' 'lazygit'; herdr tab focus w2:t1; exit"}
 	if !reflect.DeepEqual(calls[2], wantPaneRun) {
 		t.Errorf("third call = %#v, want %#v", calls[2], wantPaneRun)
 	}
@@ -293,7 +296,7 @@ func TestLaunchSplit_HerdrPaneRunProceedsAfterProcessInfoTimeout(t *testing.T) {
 		t.Fatalf("expected %d herdr calls, got %d: %#v", wantCalls, len(calls), calls)
 	}
 	last := calls[len(calls)-1]
-	wantPaneRun := []string{"herdr", "pane", "run", "w2:p1C", "'gx' 'run' 'lazygit'; exit"}
+	wantPaneRun := []string{"herdr", "pane", "run", "w2:p1C", "'gx' 'run' 'lazygit'; herdr pane focus --current --direction up; exit"}
 	if !reflect.DeepEqual(last, wantPaneRun) {
 		t.Errorf("last call = %#v, want %#v", last, wantPaneRun)
 	}
