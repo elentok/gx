@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.28.13 - 2026-08-17
+
+- Added vim mode indicator to claude statusline: shows NORMAL/VISUAL/INSERT/REPLACE with a Nerd Font icon, fixed-width padding, and per-mode coloring; demo mode cycles through all four
+- Moved 5h/weekly rate limit usage segments to their own second statusline row, decluttering the first line
+
 ## v0.28.12 - 2026-08-17
 
 - Raised default budget notification thresholds from $5/$10/$15 to $50/$100/$150/$200/$250, matching the higher $300/$350 soft/hard limits introduced in v0.28.11.
