@@ -84,15 +84,15 @@
       "properties": {
         "soft-limit": {
           "type": "number",
-          "description": "Estimated API-equivalent-cost soft limit in dollars. 0 disables it. Default: 20.",
+          "description": "Estimated API-equivalent-cost soft limit in dollars. 0 disables it. Default: 300.",
           "minimum": 0,
-          "default": 20
+          "default": 300
         },
         "hard-limit": {
           "type": "number",
-          "description": "Estimated API-equivalent-cost hard limit in dollars. 0 disables it. Bumped up to soft-limit if set at or below a nonzero soft-limit. Default: 30.",
+          "description": "Estimated API-equivalent-cost hard limit in dollars. 0 disables it. Bumped up to soft-limit if set at or below a nonzero soft-limit. Default: 350.",
           "minimum": 0,
-          "default": 30
+          "default": 350
         },
         "notification-thresholds": {
           "type": "array",
@@ -105,8 +105,8 @@
         }
       },
       "default": {
-        "soft-limit": 20,
-        "hard-limit": 30,
+        "soft-limit": 300,
+        "hard-limit": 350,
         "notification-thresholds": [5, 10, 15]
       }
     },

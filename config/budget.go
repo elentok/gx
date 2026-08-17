@@ -3,8 +3,8 @@ package config
 import "sort"
 
 const (
-	defaultBudgetSoftLimit = 20.0
-	defaultBudgetHardLimit = 30.0
+	defaultBudgetSoftLimit = 300.0
+	defaultBudgetHardLimit = 350.0
 )
 
 // BudgetConfig controls estimated API-equivalent-cost soft/hard limits and

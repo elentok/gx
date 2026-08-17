@@ -156,8 +156,8 @@ func TestLoadBudgetConfigDefaultsWhenAbsent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.Budget.SoftLimit != 20 || cfg.Budget.HardLimit != 30 {
-		t.Fatalf("Budget limits = %+v, want soft=20 hard=30", cfg.Budget)
+	if cfg.Budget.SoftLimit != 300 || cfg.Budget.HardLimit != 350 {
+		t.Fatalf("Budget limits = %+v, want soft=300 hard=350", cfg.Budget)
 	}
 	if want := []float64{5, 10, 15}; !floatSlicesEqual(cfg.Budget.NotificationThresholds, want) {
 		t.Fatalf("Budget.NotificationThresholds = %v, want %v", cfg.Budget.NotificationThresholds, want)
