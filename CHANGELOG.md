@@ -1,8 +1,9 @@
 # Changelog
 
-## Unreleased
+## v0.28.11 - 2026-08-17
 
-- Added a `budget` config section (soft limit, hard limit, notification thresholds, all in dollars) — ships on by default at $20/$30 with thresholds at $5/$10/$15. To disable, set `budget.soft-limit` and `budget.hard-limit` to `0` in `~/.config/gx/config.json`.
+- Added a `budget` config section (soft limit, hard limit, notification thresholds, all in dollars) — ships on by default at $300/$350 with thresholds at $5/$10/$15. Soft limit pauses running agents, hard limit kills them; includes a run-start banner with cost estimates, a live cost aggregator shown in the Queue tab header, and budget notifications. To disable, set `budget.soft-limit` and `budget.hard-limit` to `0` in `~/.config/gx/config.json`.
+- Fixed background-task resolution matching a task ID as a substring of another (e.g. `task-1` inside `task-10`), which could stall the background-task gate; now uses a token-boundary scan instead of parsing specific JSON shapes.
 
 ## v0.28.10 - 2026-08-15
 
