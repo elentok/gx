@@ -182,15 +182,20 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 				parkedStalled, _ := ralphLoopRegistry.parkedStalledFor(entry.Value.epic.Name)
 				icon, text, style := epicStatusLine(m.icons(), entry.Value.epic, parkedStalled)
 				line := " " + epicHeaderStyle.Render(entry.Value.epic.Name) + " " + style.Render(icon+" "+text)
-				// Ticket 10: the epic's own running total, appended unstyled
-				// regardless of the status line's color — the configured limits
-				// are session-wide, so coloring one epic's slice against them
-				// would misleadingly suggest that epic alone is over budget.
-				// Only present for a currently-running epic (LiveSpendByEpic is
-				// scoped to the running set); an idle/completed epic gets nothing
-				// appended.
+				// Ticket 10: the epic's own running total, appended dim italic
+				// (metricsLineStyle) regardless of the status line's color — the
+				// configured limits are session-wide, so coloring one epic's
+				// slice against them would misleadingly suggest that epic alone
+				// is over budget. Only present for a currently-running epic
+				// (LiveSpendByEpic is scoped to the running set); a completed
+				// epic instead gets its final summed cost (epicCost) appended
+				// alongside "took Xm", and an idle epic gets nothing.
 				if cost, ok := liveByEpic[entry.Value.epic.Name]; ok {
-					line += " · " + formatCost(cost)
+					line = appendRowMetrics(line, tickets.FormatCost(cost), metricsLineStyle)
+				} else if entry.Value.epic.AllDone() {
+					if cost := epicCost(entry.Value.epic); cost > 0 {
+						line = appendRowMetrics(line, tickets.FormatCost(cost), metricsLineStyle)
+					}
 				}
 				return line
 			case nodeEpicContext:
@@ -309,7 +314,7 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 		}
 		line += " " + suffixStyle.Render(suffix)
 	}
-	if status != tickets.StatusDone && t.ElapsedTime <= 0 && t.ActualContextWindow <= 0 {
+	if t.ElapsedTime <= 0 && t.ActualContextWindow <= 0 && t.ActualCost <= 0 {
 		return line
 	}
 	metrics := formatMetricsLine(t.ElapsedTime, t.ActualContextWindow, t.ActualCost)

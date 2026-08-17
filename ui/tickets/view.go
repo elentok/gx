@@ -141,7 +141,11 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 		line = statusDoneStyle.Render(line)
 	}
 	if dur, ok := epic.CompletionDuration(); ok {
-		line += " took " + formatDuration(dur)
+		text := "took " + formatDuration(dur)
+		if cost := epicCost(epic); cost > 0 {
+			text += " " + tickets.FormatCost(cost)
+		}
+		line = appendRowMetrics(line, text, metricsLineStyle)
 	}
 	if m.implementingEpics[epic.Name] {
 		line += " " + statusClaimedStyle.Render(strings.TrimRight(m.implementSpinner.View(), " ")+" running")
@@ -229,7 +233,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 		}
 		line += " " + suffixStyle.Render(suffix)
 	}
-	if status != tickets.StatusDone && t.ElapsedTime <= 0 && t.ActualContextWindow <= 0 {
+	if t.ElapsedTime <= 0 && t.ActualContextWindow <= 0 && t.ActualCost <= 0 {
 		return []string{line}
 	}
 	metrics := formatMetricsLine(t.ElapsedTime, t.ActualContextWindow, t.ActualCost)

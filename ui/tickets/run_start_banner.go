@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/subscription"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/confirm"
@@ -71,15 +72,15 @@ func budgetBannerLines(budget config.BudgetConfig) []string {
 	}
 	var lines []string
 	if budget.SoftLimit > 0 {
-		lines = append(lines, fmt.Sprintf("Soft budget limit: %s estimated API-equivalent cost", formatCost(budget.SoftLimit)))
+		lines = append(lines, fmt.Sprintf("Soft budget limit: %s estimated API-equivalent cost", tickets.FormatCost(budget.SoftLimit)))
 	}
 	if budget.HardLimit > 0 {
-		lines = append(lines, fmt.Sprintf("Hard budget limit: %s estimated API-equivalent cost", formatCost(budget.HardLimit)))
+		lines = append(lines, fmt.Sprintf("Hard budget limit: %s estimated API-equivalent cost", tickets.FormatCost(budget.HardLimit)))
 	}
 	if len(budget.NotificationThresholds) > 0 {
 		thresholds := make([]string, len(budget.NotificationThresholds))
 		for i, t := range budget.NotificationThresholds {
-			thresholds[i] = formatCost(t)
+			thresholds[i] = tickets.FormatCost(t)
 		}
 		lines = append(lines, "Notification thresholds: "+strings.Join(thresholds, ", ")+" estimated API-equivalent cost")
 	}

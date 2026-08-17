@@ -34,13 +34,6 @@ func formatTokens(n int) string {
 	return fmt.Sprintf("%dk tok", k)
 }
 
-// formatCost renders cost as "$0.42", the notification-text counterpart to
-// ralphloop's formatCostTrailer (report_metrics.go) and ui/tickets'
-// formatCost.
-func formatCost(cost float64) string {
-	return fmt.Sprintf("$%.2f", cost)
-}
-
 // mrkdwnStyle adapts the shared message templates below to a specific chat
 // platform's markup dialect via chatStyle (chatmarkup's own dialect value,
 // which every *Text function and renderBatch's batch separator routes its
@@ -138,7 +131,7 @@ func (s mrkdwnStyle) iterationFinishedText(ticket tickets.Ticket, epicName strin
 	line := RenderCountsLine(EpicCounts{Done: stats.Completed, InProgress: stats.InProgress, Total: stats.Total})
 	counts := fmt.Sprintf(
 		"%s · %s · %s · %s",
-		formatDuration(stats.ElapsedSeconds), formatTokens(stats.PeakContextTokens), formatCost(stats.Cost), line,
+		formatDuration(stats.ElapsedSeconds), formatTokens(stats.PeakContextTokens), tickets.FormatCost(stats.Cost), line,
 	)
 	return s.chatStyle.Message("✅", ticket.Title, counts, "", s.identityLine(epicName, ticket.Identifier))
 }
@@ -193,7 +186,7 @@ func (s mrkdwnStyle) epicParkedText(epicName string, stalled []string) chatmarku
 //	{completed} ticket(s) landed in {elapsed} · {totalCost}
 //	[gx] {epic}
 func (s mrkdwnStyle) epicCompleteText(epicName string, counts EpicCounts, completed int, elapsedSeconds int, totalCost float64) chatmarkup.Text {
-	detail := fmt.Sprintf("%d ticket(s) landed in %s · %s", completed, formatDuration(elapsedSeconds), formatCost(totalCost))
+	detail := fmt.Sprintf("%d ticket(s) landed in %s · %s", completed, formatDuration(elapsedSeconds), tickets.FormatCost(totalCost))
 	return s.chatStyle.Message("\U0001f389", "epic complete", RenderCountsLine(counts), detail, s.identityLine(epicName, ""))
 }
 
@@ -248,7 +241,7 @@ func (s mrkdwnStyle) globallyMutedText(transport string) chatmarkup.Text {
 //	{completed} ticket(s) landed in {elapsed} · {totalCost}
 //	[gx] {epic}
 func (s mrkdwnStyle) drainCompleteText(epicName string, counts EpicCounts, completed int, elapsedSeconds int, totalCost float64) chatmarkup.Text {
-	detail := fmt.Sprintf("%d ticket(s) landed in %s · %s", completed, formatDuration(elapsedSeconds), formatCost(totalCost))
+	detail := fmt.Sprintf("%d ticket(s) landed in %s · %s", completed, formatDuration(elapsedSeconds), tickets.FormatCost(totalCost))
 	return s.chatStyle.Message("\U0001f6d1", "epic drained", RenderCountsLine(counts), detail, s.identityLine(epicName, ""))
 }
 

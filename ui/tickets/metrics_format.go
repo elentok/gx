@@ -2,10 +2,12 @@ package tickets
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"charm.land/lipgloss/v2"
 
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 )
 
@@ -70,20 +72,23 @@ func formatDuration(d time.Duration) string {
 	}
 }
 
-// formatCost renders a USD cost as "$0.42" for a row's metrics line.
-func formatCost(cost float64) string {
-	return fmt.Sprintf("$%.2f", cost)
-}
-
 // formatMetricsLine joins elapsed/tokens/cost into a row's line-2 figures,
-// e.g. "12m34s · 45.2k tok · $0.42". cost is omitted when zero — a live
-// row's cost isn't known until the iteration lands.
+// e.g. "12m34s · 45.2k tok · $0.42". Each figure is omitted independently
+// when zero — a live row's cost isn't known until the iteration lands, and a
+// ticket that only recorded one or two of the three fields (or none at all)
+// shouldn't render a misleading "0s"/"0 tok" for the ones it never landed.
 func formatMetricsLine(elapsedSeconds, tokens int, cost float64) string {
-	line := formatElapsed(elapsedSeconds) + " · " + formatTokenCount(tokens)
-	if cost > 0 {
-		line += " · " + formatCost(cost)
+	var parts []string
+	if elapsedSeconds > 0 {
+		parts = append(parts, formatElapsed(elapsedSeconds))
 	}
-	return line
+	if tokens > 0 {
+		parts = append(parts, formatTokenCount(tokens))
+	}
+	if cost > 0 {
+		parts = append(parts, tickets.FormatCost(cost))
+	}
+	return strings.Join(parts, " · ")
 }
 
 // joinNonEmpty joins a and b with sep, skipping either side if empty — a

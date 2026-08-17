@@ -140,6 +140,17 @@ func epicElapsedSeconds(epic tickets.Epic) int {
 	return total
 }
 
+// epicCost sums the epic's tickets' landed ActualCost, for the "took Xm
+// $X.XX" cost summary appended alongside "took Xm" once the epic is fully
+// done.
+func epicCost(epic tickets.Epic) float64 {
+	total := 0.0
+	for _, t := range epic.Tickets {
+		total += t.ActualCost
+	}
+	return total
+}
+
 // epicHasProblem reports whether any of the epic's tickets renders as
 // needs-answer/needs-repair/error — the header status line's yellow trigger.
 func epicHasProblem(epic tickets.Epic) bool {
@@ -288,10 +299,10 @@ func (m QueueModel) queueRunStateTitle() string {
 func (m QueueModel) queueHeaderCostSuffix() string {
 	total := LiveSpend()
 	soft := m.settings.Budget.SoftLimit
-	text := formatCost(total)
+	text := tickets.FormatCost(total)
 	style := lipgloss.NewStyle()
 	if soft > 0 {
-		text = fmt.Sprintf("%s of %s", formatCost(total), formatCost(soft))
+		text = fmt.Sprintf("%s of %s", tickets.FormatCost(total), tickets.FormatCost(soft))
 		style = budgetTotalStyle(total, soft)
 	}
 	if n := UnpricedRunningCount(); n > 0 {

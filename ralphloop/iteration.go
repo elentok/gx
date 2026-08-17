@@ -536,7 +536,7 @@ func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane, ta
 		trailers = append(trailers,
 			git.Trailer{Key: tokensTrailerKey, Value: strconv.Itoa(contextWindow)},
 			git.Trailer{Key: elapsedTrailerKey, Value: strconv.Itoa(elapsedSeconds) + "s"},
-			git.Trailer{Key: costTrailerKey, Value: formatCostTrailer(cost)},
+			git.Trailer{Key: costTrailerKey, Value: tickets.FormatCost(cost)},
 		)
 	}
 	if err := d.AppendTrailers(p.FeatureWorktree, trailers...); err != nil {

@@ -1,7 +1,6 @@
 package ralphloop
 
 import (
-	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -52,11 +51,6 @@ func turnCost(u transcript.Usage) float64 {
 		float64(u.OutputTokens)/perMTok*p.output +
 		float64(u.CacheReadInputTokens)/perMTok*p.cacheRead +
 		float64(u.CacheCreationInputTokens)/perMTok*p.cacheWrite
-}
-
-// formatCostTrailer renders cost as a USD trailer value, e.g. "$0.42".
-func formatCostTrailer(cost float64) string {
-	return fmt.Sprintf("$%.2f", cost)
 }
 
 // sessionStats are one Claude Code session's aggregate figures, computed

@@ -272,6 +272,81 @@ func TestRenderEpicRow_ShowsDurationOnlyWhenBothTimestampsSet(t *testing.T) {
 	}
 }
 
+// TestRenderEpicRow_AppendsCostSummaryDimItalic covers the epic-row cost
+// summary: "took Xm" gains a " $X.XX" suffix summed across the epic's own
+// tickets' ActualCost, and the whole "took Xm $X.XX" segment renders
+// metricsLineStyle (dim italic) rather than inheriting the row's own
+// done/status color.
+func TestRenderEpicRow_AppendsCostSummaryDimItalic(t *testing.T) {
+	t.Parallel()
+	started := time.Now().Add(-(2*time.Hour + 15*time.Minute))
+	completed := time.Now()
+
+	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
+		{Identifier: "01", Status: "done", ActualCost: 30},
+		{Identifier: "02", Status: "done", ActualCost: 13},
+	}, StartedAt: started, CompletedAt: completed}
+	m := newModelForTicketRowTests(epic)
+
+	line := m.renderEpicRow(epic)
+	wantSuffix := " " + metricsLineStyle.Italic(true).Render("took 2h 15m $43.00")
+	if !strings.HasSuffix(line, wantSuffix) {
+		t.Fatalf("epic row line = %q, want it to end with %q", line, wantSuffix)
+	}
+}
+
+// TestRenderEpicRow_OmitsCostWhenZero covers the case with no landed cost at
+// all: "took Xm" renders with no "$0.00" suffix.
+func TestRenderEpicRow_OmitsCostWhenZero(t *testing.T) {
+	t.Parallel()
+	started := time.Now().Add(-(2*time.Hour + 15*time.Minute))
+	completed := time.Now()
+
+	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{{Identifier: "01", Status: "done"}}, StartedAt: started, CompletedAt: completed}
+	m := newModelForTicketRowTests(epic)
+
+	line := m.renderEpicRow(epic)
+	if strings.Contains(line, "$") {
+		t.Fatalf("epic row line = %q, want no cost suffix when ActualCost is zero", line)
+	}
+}
+
+// TestRenderTicketRow_CostOnlyStillShowsSubtitle covers the per-field
+// omission rule: a ticket with only ActualCost landed (no elapsed/tokens)
+// still shows a subtitle carrying just the cost.
+func TestRenderTicketRow_CostOnlyStillShowsSubtitle(t *testing.T) {
+	t.Parallel()
+	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
+		{Identifier: "01", Title: "Done ticket", Status: "done", ActualCost: 0.42},
+	}}
+	m := newModelForTicketRowTests(epic)
+
+	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)
+	if !strings.Contains(lines[0], "$0.42") {
+		t.Fatalf("row line = %q, want it to contain the cost-only subtitle %q", lines[0], "$0.42")
+	}
+}
+
+// TestRenderTicketRow_DoneWithNoMetricsOmitsSubtitle covers the per-field
+// omission rule applying regardless of ticket status: a done ticket that
+// landed no elapsed/tokens/cost at all shows no subtitle, rather than the
+// former always-shown "0s · 0 tok".
+func TestRenderTicketRow_DoneWithNoMetricsOmitsSubtitle(t *testing.T) {
+	t.Parallel()
+	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
+		{Identifier: "01", Title: "Done ticket", Status: "done"},
+	}}
+	m := newModelForTicketRowTests(epic)
+
+	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)
+	if len(lines) != 1 {
+		t.Fatalf("renderTicketRow() returned %d lines, want 1: %#v", len(lines), lines)
+	}
+	if strings.Contains(lines[0], "s ") || strings.Contains(lines[0], "tok") || strings.Contains(lines[0], "$") {
+		t.Fatalf("row line = %q, want no metrics subtitle", lines[0])
+	}
+}
+
 // TestRenderTicketRow_IconColumnAlignsRegardlessOfChildren covers ticket 10:
 // same-depth siblings' icon columns must line up whether or not each one has
 // children, since the triangle column left of the checkbox is reserved at a

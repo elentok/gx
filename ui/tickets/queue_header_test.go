@@ -313,11 +313,11 @@ func TestQueueHeaderCostSuffixFormatsAndColors(t *testing.T) {
 }
 
 // TestQueueEpicHeaderAppendsUnstyledRunningCost covers ticket 10's per-epic
-// total: appended to the epic's own header status text with the existing
-// " · " metrics-line separator, always unstyled even though this epic's
-// status line itself renders in its problem color (yellow) — the configured
-// limits are session-wide, so coloring one epic's slice against them would
-// misleadingly suggest that epic alone is over budget.
+// total: appended to the epic's own header status text dim italic
+// (metricsLineStyle), regardless of the fact that this epic's status line
+// itself renders in its problem color (yellow) — the configured limits are
+// session-wide, so coloring one epic's slice against them would misleadingly
+// suggest that epic alone is over budget.
 func TestQueueEpicHeaderAppendsUnstyledRunningCost(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: needs-repair\n\nBody.\n")
@@ -327,8 +327,8 @@ func TestQueueEpicHeaderAppendsUnstyledRunningCost(t *testing.T) {
 	setCostAggTotals(t, 12.5, map[string]float64{"alpha": 12.5}, 0)
 
 	headerLine := epicHeaderLine(t, m, "alpha")
-	if !strings.Contains(headerLine, " · $12.50") {
-		t.Fatalf("epic header line missing unstyled per-epic cost suffix \" · $12.50\": %q", headerLine)
+	if !strings.Contains(headerLine, "$12.50") {
+		t.Fatalf("epic header line missing per-epic cost suffix \"$12.50\": %q", headerLine)
 	}
 }
 
@@ -346,6 +346,30 @@ func TestQueueEpicHeaderOmitsCostForNonRunningEpic(t *testing.T) {
 	headerLine := epicHeaderLine(t, m, "alpha")
 	if strings.Contains(headerLine, "$") {
 		t.Fatalf("expected no per-epic cost text for an epic absent from LiveSpendByEpic: %q", headerLine)
+	}
+}
+
+// TestQueueEpicHeaderAppendsSummedCostForCompletedEpic covers the completed-
+// epic cost summary: an AllDone epic with no live cost data gets its final
+// ActualCost total appended alongside "took Xm", summed across its own
+// tickets.
+func TestQueueEpicHeaderAppendsSummedCostForCompletedEpic(t *testing.T) {
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
+	writeRawQueueTicket(t, root, "alpha", "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: task\nelapsed_time: 60\nactual_cost: 30\n---\n\nBody.\n")
+	writeRawQueueTicket(t, root, "alpha", "02-second.md", "---\nid: \"02\"\nstatus: done\ntype: task\nelapsed_time: 60\nactual_cost: 13\n---\n\nBody.\n")
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "01-first.md"): true,
+		ticketPath(root, "alpha", "02-second.md"): true,
+	}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+
+	setCostAggTotals(t, 0, map[string]float64{}, 0)
+
+	headerLine := epicHeaderLine(t, m, "alpha")
+	if !strings.Contains(headerLine, "$43.00") {
+		t.Fatalf("epic header line missing summed cost \"$43.00\" for a completed epic: %q", headerLine)
 	}
 }
 
