@@ -19,6 +19,11 @@ func notificationLine(taskID, toolUseID, status, timestamp string) string {
 	return `{"isSidechain":false,"timestamp":"` + timestamp + `","origin":{"kind":"task-notification"},"message":{"content":"` + content + `"}}`
 }
 
+func sidechainNotificationLine(taskID, toolUseID, status, timestamp string) string {
+	content := "<task-notification>\\n<task-id>" + taskID + "</task-id>\\n<tool-use-id>" + toolUseID + "</tool-use-id>\\n<status>" + status + "</status>\\n</task-notification>"
+	return `{"isSidechain":true,"timestamp":"` + timestamp + `","origin":{"kind":"task-notification"},"message":{"content":"` + content + `"}}`
+}
+
 // taskOutputLine mirrors the tool_result a blocking TaskOutput call gets:
 // this never carries origin.kind == "task-notification" (no passive
 // notification is ever queued once the tool retrieves the result directly).
@@ -33,6 +38,14 @@ func taskOutputLine(taskID, timestamp string) string {
 func taskStopLine(taskID, timestamp string) string {
 	content := `{\"message\":\"Successfully stopped task: ` + taskID + `\",\"task_id\":\"` + taskID + `\"}`
 	return `{"isSidechain":false,"timestamp":"` + timestamp + `","message":{"content":[{"tool_use_id":"tool-stop","type":"tool_result","content":"` + content + `"}]},"toolUseResult":{"message":"Successfully stopped task: ` + taskID + `","task_id":"` + taskID + `"}}`
+}
+
+// queueOperationAttachmentLine mirrors the queue-operation/attachment shape
+// found in the incident that produced this ticket: neither a
+// task-notification, nor a TaskOutput/TaskStop tool_result — the task id
+// only ever shows up embedded in an attachment payload.
+func queueOperationAttachmentLine(taskID, timestamp string) string {
+	return `{"isSidechain":false,"timestamp":"` + timestamp + `","type":"queue-operation","operation":"attachment","attachment":{"taskId":"` + taskID + `","kind":"background-task-result"}}`
 }
 
 const capDuration = 2 * time.Hour
@@ -176,6 +189,36 @@ func TestReadBackgroundTasks_MatchesOnTaskIDEvenWithoutToolUseIDCorroboration(t 
 	}
 	if len(reading.Markers) != 1 || reading.Markers[0].Status != BackgroundTaskResolved {
 		t.Errorf("Markers = %+v, want task-1 resolved by task id alone, no tool-use-id required", reading.Markers)
+	}
+}
+
+func TestReadBackgroundTasks_ResolvedViaQueueOperationAttachment(t *testing.T) {
+	path := writeTranscript(t,
+		startMarkerLine("task-1", "tool-1", "2026-08-12T15:00:00.000000000Z"),
+		queueOperationAttachmentLine("task-1", "2026-08-12T15:05:00.000000000Z"),
+	)
+
+	reading, err := ReadBackgroundTasks(path, capDuration, readAt)
+	if err != nil {
+		t.Fatalf("ReadBackgroundTasks() error = %v", err)
+	}
+	if len(reading.Markers) != 1 || reading.Markers[0].Status != BackgroundTaskResolved {
+		t.Errorf("Markers = %+v, want one resolved marker: an unrecognized queue-operation/attachment shape still resolves by id-substring match", reading.Markers)
+	}
+}
+
+func TestReadBackgroundTasks_SidechainNotificationNeverResolvesParentMarker(t *testing.T) {
+	path := writeTranscript(t,
+		startMarkerLine("task-1", "tool-1", "2026-08-12T17:00:00.000000000Z"),
+		sidechainNotificationLine("task-1", "tool-1", "completed", "2026-08-12T17:05:00.000000000Z"),
+	)
+
+	reading, err := ReadBackgroundTasks(path, capDuration, readAt)
+	if err != nil {
+		t.Fatalf("ReadBackgroundTasks() error = %v", err)
+	}
+	if len(reading.Markers) != 1 || reading.Markers[0].Status != BackgroundTaskOutstandingFresh {
+		t.Errorf("Markers = %+v, want task-1 still outstanding-fresh — a sidechain-owned notification must never resolve the parent iteration's marker, even with a matching task id", reading.Markers)
 	}
 }
 

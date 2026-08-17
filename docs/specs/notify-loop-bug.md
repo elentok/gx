@@ -66,6 +66,16 @@ no equivalent transcript signal, reads as `unsupported`, and fails open exactly 
 existing compaction-boundary gate, so this is a pure addition with no behavior change for Codex
 iterations.
 
+`waitForBackgroundTasks` (the gate this fix adds) is a work-preservation guard against a premature
+park/teardown mid-background-job — it stops `confirmFinished`/`reattachIteration` from concluding
+"finished" while a backgrounded command is still outstanding. It is not, by itself, the fix for the
+notification-storm/reopen-loop bug described above: that storm is independently prevented by Fix 2's
+`park_kind`/`clearableParkedTicket` mechanism (a `zero-commit` park only auto-reopens once new
+commits appear, never on the background-task signal resolving by itself). Without Fix 1, both real
+incidents would still eventually self-heal once the agent's commit lands — Fix 1 just removes the
+stall window in between, by never mis-parking the ticket as needs-answer while the job is still
+running.
+
 **Fix 2 — record which kind of park happened, and stop inferring it from pane liveness.**
 Needs-answer parks record which of three things happened, in a new `park_kind` frontmatter field:
 `blocked-pane` (a genuinely blocked interactive prompt), `self-reported` (the agent deliberately

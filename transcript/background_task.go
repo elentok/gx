@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 )
@@ -55,56 +54,29 @@ type BackgroundTaskReading struct {
 }
 
 // backgroundTaskLine is the subset of a transcript JSONL line
-// ReadBackgroundTasks reads: a tool_result line's backgroundTaskId (the
-// start marker, found in toolUseResult, with the triggering tool_use_id
-// inside message.content) and a task-notification line's origin.kind (whose
-// <task-id>/<tool-use-id> live inside message.content as an XML-ish string,
-// not structured JSON).
+// ReadBackgroundTasks reads to find a start marker: a tool_result line's
+// backgroundTaskId, found in toolUseResult. Resolution isn't matched against
+// any particular field — see ReadBackgroundTasks — so nothing else needs
+// parsing.
 type backgroundTaskLine struct {
-	IsSidechain bool   `json:"isSidechain"`
-	Timestamp   string `json:"timestamp"`
-	Origin      struct {
-		Kind string `json:"kind"`
-	} `json:"origin"`
-	Message struct {
-		Content json.RawMessage `json:"content"`
-	} `json:"message"`
+	IsSidechain   bool   `json:"isSidechain"`
+	Timestamp     string `json:"timestamp"`
 	ToolUseResult struct {
 		BackgroundTaskID string `json:"backgroundTaskId"`
-		// TaskID is the flat task id a TaskStop tool_result reports at the
-		// top level of toolUseResult.
-		TaskID          string `json:"task_id"`
-		RetrievalStatus string `json:"retrieval_status"`
-		// Task.TaskID is the nested task id a TaskOutput tool_result reports
-		// instead — a distinct shape from TaskStop's flat TaskID above.
-		Task struct {
-			TaskID string `json:"task_id"`
-		} `json:"task"`
 	} `json:"toolUseResult"`
 }
 
-// toolResultContentItem is message.content's shape on a start-marker line: a
-// one-element array carrying the tool_use_id the backgroundTaskId resolves.
-type toolResultContentItem struct {
-	ToolUseID string `json:"tool_use_id"`
-}
-
-var (
-	taskIDTagRe    = regexp.MustCompile(`<task-id>(.*?)</task-id>`)
-	toolUseIDTagRe = regexp.MustCompile(`<tool-use-id>(.*?)</tool-use-id>`)
-)
-
 // ReadBackgroundTasks scans the transcript at path for non-sidechain
 // backgrounded-shell-command start markers (a tool_result carrying
-// backgroundTaskId) and, for each, whether it was later resolved — by a
-// passive task-notification transcript entry, by a TaskOutput tool call
-// blocking on the same task id and returning its result inline, or by a
-// TaskStop tool call killing it outright. Only the first of these produces a
-// task-notification entry of its own; the other two are tool_results the
-// agent sees directly. Sidechain-scoped markers (isSidechain: true) are
-// excluded entirely — a subagent's background task belongs to the
-// subagent's lifetime, never the parent iteration's. Any resolution whose
-// task id never had a matching start marker is ignored.
+// backgroundTaskId) and, for each, whether it was later resolved. A marker
+// resolves as soon as its task id string appears anywhere on a later
+// non-sidechain transcript line — regardless of that line's
+// type/origin/JSON nesting — because the CLI necessarily refers to a task by
+// its id wherever it reports on it, whatever shape that report takes.
+// Sidechain-scoped markers (isSidechain: true) are excluded entirely, both
+// as start markers and as resolution lines — a subagent's background task
+// belongs to the subagent's lifetime, never the parent iteration's, so a
+// sidechain line can never resolve a parent marker either.
 //
 // now is compared against each marker's own timestamp to decide
 // outstanding-fresh vs outstanding-aged-out against cap — passed explicitly
@@ -129,7 +101,6 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 	}
 	markers := map[string]*markerState{}
 	var order []string
-	toolUseToTaskID := map[string]string{}
 
 	totalNonBlank := 0
 	parsedOK := 0
@@ -147,12 +118,18 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 		}
 		parsedOK++
 
-		switch {
-		case entry.ToolUseResult.BackgroundTaskID != "":
-			if entry.IsSidechain {
-				continue
+		if entry.IsSidechain {
+			continue
+		}
+
+		for _, taskID := range order {
+			m := markers[taskID]
+			if !m.resolved && strings.Contains(raw, taskID) {
+				m.resolved = true
 			}
-			taskID := entry.ToolUseResult.BackgroundTaskID
+		}
+
+		if taskID := entry.ToolUseResult.BackgroundTaskID; taskID != "" {
 			ts, tsErr := time.Parse(time.RFC3339Nano, entry.Timestamp)
 			if tsErr != nil {
 				continue
@@ -160,45 +137,6 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 			if _, exists := markers[taskID]; !exists {
 				markers[taskID] = &markerState{taskID: taskID, startedAt: ts}
 				order = append(order, taskID)
-			}
-			var items []toolResultContentItem
-			if json.Unmarshal(entry.Message.Content, &items) == nil && len(items) > 0 && items[0].ToolUseID != "" {
-				toolUseToTaskID[items[0].ToolUseID] = taskID
-			}
-
-		case entry.Origin.Kind == "task-notification":
-			var content string
-			if json.Unmarshal(entry.Message.Content, &content) != nil {
-				continue
-			}
-			taskID := firstSubmatch(taskIDTagRe, content)
-			if taskID == "" {
-				if toolUseID := firstSubmatch(toolUseIDTagRe, content); toolUseID != "" {
-					taskID = toolUseToTaskID[toolUseID]
-				}
-			}
-			if m, ok := markers[taskID]; ok {
-				m.resolved = true
-			}
-
-		case entry.ToolUseResult.RetrievalStatus != "" && entry.ToolUseResult.Task.TaskID != "":
-			// A TaskOutput tool call blocks on the backgrounded task and
-			// returns its result inline, instead of the task's completion
-			// ever landing as a passive task-notification transcript entry —
-			// so a marker only ever retrieved this way would otherwise never
-			// resolve and hold the gate until the aged-out cap.
-			if m, ok := markers[entry.ToolUseResult.Task.TaskID]; ok {
-				m.resolved = true
-			}
-
-		case entry.ToolUseResult.TaskID != "":
-			// A TaskStop tool call kills the backgrounded task outright — a
-			// third resolution shape, distinct from both a passive
-			// notification and a TaskOutput retrieval: once explicitly
-			// stopped, nothing is outstanding for the gate to keep waiting
-			// on, regardless of what the killed command was doing.
-			if m, ok := markers[entry.ToolUseResult.TaskID]; ok {
-				m.resolved = true
 			}
 		}
 	}
@@ -226,12 +164,4 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 		})
 	}
 	return reading, nil
-}
-
-func firstSubmatch(re *regexp.Regexp, s string) string {
-	m := re.FindStringSubmatch(s)
-	if m == nil {
-		return ""
-	}
-	return m[1]
 }
