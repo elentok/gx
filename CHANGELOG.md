@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.28.12 - 2026-08-17
+
+- Raised default budget notification thresholds from $5/$10/$15 to $50/$100/$150/$200/$250, matching the higher $300/$350 soft/hard limits introduced in v0.28.11.
+
 ## v0.28.11 - 2026-08-17
 
 - Added a `budget` config section (soft limit, hard limit, notification thresholds, all in dollars) — ships on by default at $300/$350 with thresholds at $5/$10/$15. Soft limit pauses running agents, hard limit kills them; includes a run-start banner with cost estimates, a live cost aggregator shown in the Queue tab header, and budget notifications. To disable, set `budget.soft-limit` and `budget.hard-limit` to `0` in `~/.config/gx/config.json`.
