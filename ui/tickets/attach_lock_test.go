@@ -147,11 +147,13 @@ func TestTryStartAcquiresAttachLockOnceAcrossEpics(t *testing.T) {
 	if _, ok := r.tryStart("epic-a", 0, 1, dir); !ok {
 		t.Fatal("tryStart(epic-a): want success")
 	}
+	t.Cleanup(func() { r.finish("epic-a", nil) })
 	before := readAttachLockFile(t, dir)
 
 	if _, ok := r.tryStart("epic-b", 0, 1, dir); !ok {
 		t.Fatal("tryStart(epic-b): want success")
 	}
+	t.Cleanup(func() { r.finish("epic-b", nil) })
 	after := readAttachLockFile(t, dir)
 	if before != after {
 		t.Fatalf("second tryStart rewrote the lock: before=%#v after=%#v", before, after)
@@ -244,6 +246,7 @@ func TestForeignAttachPIDReportsLiveForeignHolderOnly(t *testing.T) {
 	if _, ok := r.tryStart("epic-a", 0, 1, selfDir); !ok {
 		t.Fatal("tryStart(epic-a): want success")
 	}
+	t.Cleanup(func() { r.finish("epic-a", nil) })
 	if got := ForeignAttachPID(dir); got != 0 {
 		t.Fatalf("ForeignAttachPID() = %d while this process holds its own lock, want 0", got)
 	}
