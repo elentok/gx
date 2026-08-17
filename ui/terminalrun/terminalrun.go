@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui"
@@ -221,6 +222,7 @@ func launchSplit(worktreeRoot string, terminal ui.Terminal, splitType SplitType,
 		if err != nil {
 			return "herdr", err
 		}
+		waitForPaneShell(paneID)
 		err = herdrPaneRun(paneID, program, args)
 		return "herdr", err
 	}
@@ -274,6 +276,41 @@ func herdrTabCreate(worktreeRoot string) (string, error) {
 		return "", fmt.Errorf("herdr tab create returned no pane id: %s", strings.TrimSpace(string(out)))
 	}
 	return resp.Result.RootPane.PaneID, nil
+}
+
+// panePollInterval and panePollMaxAttempts bound how long waitForPaneShell
+// waits for a freshly created pane's shell to start.
+var (
+	panePollInterval    = 25 * time.Millisecond
+	panePollMaxAttempts = 80 // ~2s
+	sleepFunc           = time.Sleep
+)
+
+// waitForPaneShell polls `herdr pane process-info` until paneID reports a
+// shell_pid, i.e. its shell has actually started and applied the --cwd it
+// was spawned with. herdr's tab/pane-create commands return as soon as the
+// pane exists, not once its shell is running, so calling herdrPaneRun right
+// after can type the command before the shell (and its --cwd) is in place —
+// the command then runs in whatever directory the terminal defaulted to
+// instead of worktreeRoot. Giving up after the timeout falls back to the
+// old racy behavior rather than hanging forever.
+func waitForPaneShell(paneID string) {
+	for i := 0; i < panePollMaxAttempts; i++ {
+		out, err := runCommand("herdr", "pane", "process-info", paneID)
+		if err == nil {
+			var resp struct {
+				Result struct {
+					ProcessInfo struct {
+						ShellPid *int `json:"shell_pid"`
+					} `json:"process_info"`
+				} `json:"result"`
+			}
+			if json.Unmarshal(out, &resp) == nil && resp.Result.ProcessInfo.ShellPid != nil {
+				return
+			}
+		}
+		sleepFunc(panePollInterval)
+	}
 }
 
 // herdrPaneRun types program (with args) as a command line into paneID's
