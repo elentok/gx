@@ -785,9 +785,22 @@ func TestRun_Drain_WithInFlightTickets_FinishesInFlightThenEndsWithoutNewClaims(
 
 	gate := NewGate()
 	var drainOnce sync.Once
+	drained := make(chan struct{})
 	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
 		if strings.Contains(opts.Target, iterLabel("my-epic", "01")) {
-			drainOnce.Do(gate.Drain)
+			drainOnce.Do(func() {
+				gate.Drain()
+				close(drained)
+			})
+		} else {
+			// Ticket 02 runs concurrently with 01 (maxParallel defaults to 2)
+			// with no guaranteed order between its own AgentWait call and 01's.
+			// Block here until 01 has drained, so 02's iteration can never
+			// finish (freeing its slot) before the gate closes to new claims —
+			// otherwise this test flakes under scheduling pressure, racing
+			// whether ticket 03 gets claimed into that freed slot before 01's
+			// goroutine gets around to calling AgentWait.
+			<-drained
 		}
 		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 	}
