@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui"
@@ -186,6 +187,9 @@ func TestLaunchSplit_HerdrSplitsPaneThenRunsCommand(t *testing.T) {
 				if len(calls) == 1 {
 					return []byte(`{"result":{"pane":{"pane_id":"w2:p1C"}}}`), nil
 				}
+				if len(calls) == 2 {
+					return []byte(`{"result":{"process_info":{"shell_pid":123}}}`), nil
+				}
 				return nil, nil
 			}
 			defer func() { runCommand = prev }()
@@ -197,16 +201,20 @@ func TestLaunchSplit_HerdrSplitsPaneThenRunsCommand(t *testing.T) {
 			if app != "herdr" {
 				t.Errorf("app = %q, want herdr", app)
 			}
-			if len(calls) != 2 {
-				t.Fatalf("expected 2 herdr calls, got %d: %#v", len(calls), calls)
+			if len(calls) != 3 {
+				t.Fatalf("expected 3 herdr calls, got %d: %#v", len(calls), calls)
 			}
 			wantSplit := []string{"herdr", "pane", "split", "--current", "--direction", tt.wantDirection, "--cwd", "/wt", "--focus"}
 			if !reflect.DeepEqual(calls[0], wantSplit) {
 				t.Errorf("first call = %#v, want %#v", calls[0], wantSplit)
 			}
+			wantProcessInfo := []string{"herdr", "pane", "process-info", "w2:p1C"}
+			if !reflect.DeepEqual(calls[1], wantProcessInfo) {
+				t.Errorf("second call = %#v, want %#v", calls[1], wantProcessInfo)
+			}
 			wantPaneRun := []string{"herdr", "pane", "run", "w2:p1C", "'gx' 'run' 'lazygit'; exit"}
-			if !reflect.DeepEqual(calls[1], wantPaneRun) {
-				t.Errorf("second call = %#v, want %#v", calls[1], wantPaneRun)
+			if !reflect.DeepEqual(calls[2], wantPaneRun) {
+				t.Errorf("third call = %#v, want %#v", calls[2], wantPaneRun)
 			}
 		})
 	}
@@ -220,6 +228,9 @@ func TestLaunchSplit_HerdrTabCreatesTabThenRunsCommand(t *testing.T) {
 		if len(calls) == 1 {
 			return []byte(`{"result":{"root_pane":{"pane_id":"w2:p1D"}}}`), nil
 		}
+		if len(calls) == 2 {
+			return []byte(`{"result":{"process_info":{"shell_pid":123}}}`), nil
+		}
 		return nil, nil
 	}
 	defer func() { runCommand = prev }()
@@ -231,16 +242,60 @@ func TestLaunchSplit_HerdrTabCreatesTabThenRunsCommand(t *testing.T) {
 	if app != "herdr" {
 		t.Errorf("app = %q, want herdr", app)
 	}
-	if len(calls) != 2 {
-		t.Fatalf("expected 2 herdr calls, got %d: %#v", len(calls), calls)
+	if len(calls) != 3 {
+		t.Fatalf("expected 3 herdr calls, got %d: %#v", len(calls), calls)
 	}
 	wantTabCreate := []string{"herdr", "tab", "create", "--cwd", "/wt", "--focus"}
 	if !reflect.DeepEqual(calls[0], wantTabCreate) {
 		t.Errorf("first call = %#v, want %#v", calls[0], wantTabCreate)
 	}
+	wantProcessInfo := []string{"herdr", "pane", "process-info", "w2:p1D"}
+	if !reflect.DeepEqual(calls[1], wantProcessInfo) {
+		t.Errorf("second call = %#v, want %#v", calls[1], wantProcessInfo)
+	}
 	wantPaneRun := []string{"herdr", "pane", "run", "w2:p1D", "'gx' 'run' 'lazygit'; exit"}
-	if !reflect.DeepEqual(calls[1], wantPaneRun) {
-		t.Errorf("second call = %#v, want %#v", calls[1], wantPaneRun)
+	if !reflect.DeepEqual(calls[2], wantPaneRun) {
+		t.Errorf("third call = %#v, want %#v", calls[2], wantPaneRun)
+	}
+}
+
+func TestLaunchSplit_HerdrPaneRunProceedsAfterProcessInfoTimeout(t *testing.T) {
+	prevInterval, prevAttempts, prevSleep := panePollInterval, panePollMaxAttempts, sleepFunc
+	panePollMaxAttempts = 3
+	sleepFunc = func(time.Duration) {}
+	defer func() {
+		panePollInterval, panePollMaxAttempts, sleepFunc = prevInterval, prevAttempts, prevSleep
+	}()
+
+	prev := runCommand
+	var calls [][]string
+	runCommand = func(name string, args ...string) ([]byte, error) {
+		calls = append(calls, append([]string{name}, args...))
+		if len(calls) == 1 {
+			return []byte(`{"result":{"pane":{"pane_id":"w2:p1C"}}}`), nil
+		}
+		// process-info never reports a shell_pid; waitForPaneShell must give
+		// up after panePollMaxAttempts and let herdrPaneRun proceed anyway.
+		return []byte(`{"result":{"process_info":{}}}`), nil
+	}
+	defer func() { runCommand = prev }()
+
+	app, err := launchSplit("/wt", ui.TerminalHerdr, HSplit, "gx", []string{"run", "lazygit"})
+	if err != nil {
+		t.Fatalf("launchSplit() error = %v", err)
+	}
+	if app != "herdr" {
+		t.Errorf("app = %q, want herdr", app)
+	}
+	// 1 split call + panePollMaxAttempts process-info polls + 1 pane run call.
+	wantCalls := 1 + panePollMaxAttempts + 1
+	if len(calls) != wantCalls {
+		t.Fatalf("expected %d herdr calls, got %d: %#v", wantCalls, len(calls), calls)
+	}
+	last := calls[len(calls)-1]
+	wantPaneRun := []string{"herdr", "pane", "run", "w2:p1C", "'gx' 'run' 'lazygit'; exit"}
+	if !reflect.DeepEqual(last, wantPaneRun) {
+		t.Errorf("last call = %#v, want %#v", last, wantPaneRun)
 	}
 }
 
