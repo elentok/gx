@@ -315,17 +315,26 @@ func statusLineFromParts(rawTokens float64, model, tokens, ctx, five, week statu
 		dynamicStyle := lipgloss.NewStyle().Foreground(tokenColor(rawTokens))
 		parts = append(parts, styledValue(tokensSegment, dynamicStyle))
 	}
-
-	usageParts := make([]string, 0, 3)
 	if ctx.text != "" {
-		usageParts = append(usageParts, styledValue(ctx, claudePlainStyle))
+		parts = append(parts, styledValue(ctx, claudePlainStyle))
 	}
+	if worktreeSeg != "" {
+		parts = append(parts, worktreeSeg)
+	}
+	if remoteSeg != "" {
+		parts = append(parts, remoteSeg)
+	}
+	line := strings.Join(parts, " "+claudeSeparator+" ")
+
+	// The 5h/weekly rate limit usage renders on its own second line so it
+	// doesn't crowd out the rest of the status line.
+	limitParts := make([]string, 0, 2)
 	if five.text != "" {
 		text := five.text + " of 5h"
 		if fiveReset != "" {
 			text += " (resets " + fiveReset + ")"
 		}
-		usageParts = append(usageParts, styledValue(
+		limitParts = append(limitParts, styledValue(
 			statusField{text: text, invalid: five.invalid}, claudePlainStyle,
 		))
 	}
@@ -334,20 +343,14 @@ func statusLineFromParts(rawTokens float64, model, tokens, ctx, five, week statu
 		if weekReset != "" {
 			text += " (resets " + weekReset + ")"
 		}
-		usageParts = append(usageParts, styledValue(
+		limitParts = append(limitParts, styledValue(
 			statusField{text: text, invalid: week.invalid}, claudeFaintStyle,
 		))
 	}
-	if len(usageParts) > 0 {
-		parts = append(parts, strings.Join(usageParts, " "+claudeSeparator+" "))
+	if len(limitParts) > 0 {
+		line += "\n" + strings.Join(limitParts, " "+claudeSeparator+" ")
 	}
-	if worktreeSeg != "" {
-		parts = append(parts, worktreeSeg)
-	}
-	if remoteSeg != "" {
-		parts = append(parts, remoteSeg)
-	}
-	return strings.Join(parts, " "+claudeSeparator+" ")
+	return line
 }
 
 func styledValue(value statusField, style lipgloss.Style) string {

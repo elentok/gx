@@ -254,27 +254,34 @@ func TestRunClaudeStatusline_Demo(t *testing.T) {
 		t.Fatalf("runClaudeStatusline returned error: %v", err)
 	}
 
+	// Each demo row now renders as two lines: the main line, then the 5h/weekly
+	// usage line.
 	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
-	if len(lines) != 4 {
-		t.Fatalf("expected 4 lines, got %d: %q", len(lines), out.String())
+	if len(lines) != 8 {
+		t.Fatalf("expected 8 lines (4 rows x 2 lines), got %d: %q", len(lines), out.String())
 	}
-	for _, line := range lines {
-		for _, want := range []string{"TheModel", "12% of 5h", "34% of weekly"} {
-			if !strings.Contains(line, want) {
-				t.Fatalf("line missing %q: %q", want, line)
+	for i := range 4 {
+		mainLine := lines[i*2]
+		usageLine := lines[i*2+1]
+		if !strings.Contains(mainLine, "TheModel") {
+			t.Fatalf("main line %d missing model: %q", i, mainLine)
+		}
+		for _, want := range []string{"12% of 5h", "34% of weekly"} {
+			if !strings.Contains(usageLine, want) {
+				t.Fatalf("usage line %d missing %q: %q", i, want, usageLine)
 			}
 		}
 	}
 	for i, want := range []string{"NORMAL", "VISUAL", "INSERT", "REPLACE"} {
-		if !strings.Contains(lines[i], want) {
-			t.Fatalf("line %d missing vim mode %q: %q", i, want, lines[i])
+		if !strings.Contains(lines[i*2], want) {
+			t.Fatalf("main line %d missing vim mode %q: %q", i, want, lines[i*2])
 		}
 	}
-	if strings.Contains(lines[0], "📡") || strings.Contains(lines[1], "📡") || strings.Contains(lines[2], "📡") {
+	if strings.Contains(lines[0], "📡") || strings.Contains(lines[2], "📡") || strings.Contains(lines[4], "📡") {
 		t.Fatalf("did not expect remote control indicator on non-remote demo lines: %q", out.String())
 	}
-	if !strings.Contains(lines[3], "📡") {
-		t.Fatalf("expected remote control indicator on last demo line: %q", lines[3])
+	if !strings.Contains(lines[6], "📡") {
+		t.Fatalf("expected remote control indicator on last demo row's main line: %q", lines[6])
 	}
 	for _, want := range []string{"50k", "85k", "120k", "10%", "30%", "60%", "🙂", "🤔", "🥵", "resets "} {
 		if !strings.Contains(out.String(), want) {
