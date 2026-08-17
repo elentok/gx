@@ -62,6 +62,9 @@ type statusLineData struct {
 	Remote *struct {
 		SessionID json.RawMessage `json:"session_id"`
 	} `json:"remote"`
+	Vim struct {
+		Mode json.RawMessage `json:"mode"`
+	} `json:"vim"`
 }
 
 // runClaudeStatusline reads a Claude Code statusLine-hook JSON payload from
@@ -79,13 +82,14 @@ func runClaudeStatusline(d deps, silent, demo bool) error {
 			tokens  float64
 			percent int
 			remote  bool
+			vimMode string
 		}{
-			{50000, 10, false},
-			{85000, 30, false},
-			{120000, 60, false},
-			{50000, 10, true},
+			{50000, 10, false, "NORMAL"},
+			{85000, 30, false, "VISUAL"},
+			{120000, 60, false, "INSERT"},
+			{50000, 10, true, "REPLACE"},
 		} {
-			fmt.Fprintln(d.stdout, statusLineFromValues("TheModel", row.tokens, float64(row.percent), 12, 34, fiveHourResetsAt, weekResetsAt, worktreeSeg, row.remote))
+			fmt.Fprintln(d.stdout, statusLineFromValues("TheModel", row.tokens, float64(row.percent), 12, 34, fiveHourResetsAt, weekResetsAt, worktreeSeg, row.remote, row.vimMode))
 		}
 		return nil
 	}
@@ -112,9 +116,56 @@ func runClaudeStatusline(d deps, silent, demo bool) error {
 	fiveResetText := parseResetTimeField(payload.RateLimits.FiveHour.ResetsAt)
 	weekResetText := parseResetTimeField(payload.RateLimits.SevenDay.ResetsAt)
 	remoteSeg := remoteControlSegment(payload.Remote != nil)
+	vimSeg := vimModeSegment(payload.Vim.Mode)
 
-	fmt.Fprintln(d.stdout, statusLineFromParts(rawTokens, modelText, tokensText, ctxText, fiveText, weekText, fiveResetText, weekResetText, worktreeSeg, remoteSeg))
+	fmt.Fprintln(d.stdout, statusLineFromParts(rawTokens, modelText, tokensText, ctxText, fiveText, weekText, fiveResetText, weekResetText, worktreeSeg, remoteSeg, vimSeg))
 	return nil
+}
+
+// claudeVimModeColors maps each Claude Code vim mode to a fixed color so the
+// mode is recognizable at a glance. Unknown modes fall back to a neutral
+// color rather than being hidden, in case Claude Code adds new modes.
+var claudeVimModeColors = map[string]color.Color{
+	"NORMAL":  ui.ColorGray,
+	"VISUAL":  ui.ColorMagenta,
+	"INSERT":  ui.ColorGreen,
+	"REPLACE": ui.ColorOrange,
+}
+
+// vimModeWidth is the length of the longest known vim mode name ("REPLACE").
+// Modes are padded to this width so the status line doesn't jump around as
+// the mode changes.
+const vimModeWidth = 7
+
+// vimModeIcon is the Nerd Font vim glyph (nf-dev-vim) shown ahead of the mode
+// name.
+const vimModeIcon = ""
+
+// vimModeSegment renders the current vim mode (e.g. " NORMAL") when the
+// statusLine payload includes one. Returns "" when absent, matching the
+// hook's behavior of omitting the "vim" object outside of vim editor mode.
+// The segment is joined with the rest of the status line by the same "·"
+// separator used everywhere else, so no separator is added here.
+func vimModeSegment(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+
+	var mode string
+	if err := json.Unmarshal(raw, &mode); err != nil {
+		return ""
+	}
+	mode = strings.ToUpper(strings.TrimSpace(mode))
+	if mode == "" {
+		return ""
+	}
+
+	modeColor, ok := claudeVimModeColors[mode]
+	if !ok {
+		modeColor = ui.ColorSubtle
+	}
+	text := fmt.Sprintf("%s %-*s", vimModeIcon, vimModeWidth, mode)
+	return lipgloss.NewStyle().Foreground(modeColor).Render(text)
 }
 
 // remoteControlSegment renders a short indicator when Claude Code's Remote
@@ -230,7 +281,11 @@ func parseNumber(raw json.RawMessage) (float64, bool) {
 	return parsed, true
 }
 
-func statusLineFromValues(model string, tokens, contextPercent, fiveHourPercent, weekPercent float64, fiveHourResetsAt, weekResetsAt time.Time, worktreeSeg string, remote bool) string {
+func statusLineFromValues(model string, tokens, contextPercent, fiveHourPercent, weekPercent float64, fiveHourResetsAt, weekResetsAt time.Time, worktreeSeg string, remote bool, vimMode string) string {
+	vimSeg := ""
+	if vimMode != "" {
+		vimSeg = vimModeSegment(json.RawMessage(strconv.Quote(vimMode)))
+	}
 	return statusLineFromParts(
 		tokens,
 		statusField{text: model},
@@ -242,11 +297,15 @@ func statusLineFromValues(model string, tokens, contextPercent, fiveHourPercent,
 		formatResetTime(weekResetsAt),
 		worktreeSeg,
 		remoteControlSegment(remote),
+		vimSeg,
 	)
 }
 
-func statusLineFromParts(rawTokens float64, model, tokens, ctx, five, week statusField, fiveReset, weekReset, worktreeSeg, remoteSeg string) string {
-	parts := make([]string, 0, 4)
+func statusLineFromParts(rawTokens float64, model, tokens, ctx, five, week statusField, fiveReset, weekReset, worktreeSeg, remoteSeg, vimSeg string) string {
+	parts := make([]string, 0, 5)
+	if vimSeg != "" {
+		parts = append(parts, vimSeg)
+	}
 	if model.text != "" {
 		parts = append(parts, styledValue(model, claudeModelStyle))
 	}

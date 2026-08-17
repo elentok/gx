@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -264,6 +265,11 @@ func TestRunClaudeStatusline_Demo(t *testing.T) {
 			}
 		}
 	}
+	for i, want := range []string{"NORMAL", "VISUAL", "INSERT", "REPLACE"} {
+		if !strings.Contains(lines[i], want) {
+			t.Fatalf("line %d missing vim mode %q: %q", i, want, lines[i])
+		}
+	}
 	if strings.Contains(lines[0], "📡") || strings.Contains(lines[1], "📡") || strings.Contains(lines[2], "📡") {
 		t.Fatalf("did not expect remote control indicator on non-remote demo lines: %q", out.String())
 	}
@@ -365,6 +371,75 @@ func TestCurrentWorktreeSegment_TruncatesLongNames(t *testing.T) {
 	}
 	if strings.Contains(got, longName) {
 		t.Fatalf("expected the long name to be truncated, got %q", got)
+	}
+}
+
+func TestVimModeSegment(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name    string
+		raw     string
+		want    string
+		wantAbs bool
+	}{
+		{name: "normal", raw: `"NORMAL"`, want: "NORMAL "},
+		{name: "visual", raw: `"VISUAL"`, want: "VISUAL "},
+		{name: "insert", raw: `"INSERT"`, want: "INSERT "},
+		{name: "replace", raw: `"REPLACE"`, want: "REPLACE"},
+		{name: "lowercase normalized", raw: `"normal"`, want: "NORMAL "},
+		{name: "unknown mode still renders", raw: `"SELECT"`, want: "SELECT "},
+		{name: "missing", raw: ``, wantAbs: true},
+		{name: "empty string", raw: `""`, wantAbs: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := vimModeSegment(json.RawMessage(tc.raw))
+			if tc.wantAbs {
+				if got != "" {
+					t.Fatalf("expected empty segment, got %q", got)
+				}
+				return
+			}
+			if !strings.Contains(got, tc.want) || !strings.Contains(got, vimModeIcon) {
+				t.Fatalf("expected segment to contain %q and the vim icon, got %q", tc.want, got)
+			}
+		})
+	}
+}
+
+func TestRunClaudeStatusline_IncludesVimModeSegment(t *testing.T) {
+	t.Parallel()
+	out := &strings.Builder{}
+	d := deps{
+		stdin:  strings.NewReader(`{"model":{"display_name":"Claude"},"vim":{"mode":"INSERT"}}`),
+		stdout: out,
+		getwd:  func() (string, error) { return t.TempDir(), nil },
+	}
+
+	if err := runClaudeStatusline(d, false, false); err != nil {
+		t.Fatalf("runClaudeStatusline returned error: %v", err)
+	}
+	if !strings.Contains(out.String(), "INSERT") {
+		t.Fatalf("expected vim mode segment, got %q", out.String())
+	}
+}
+
+func TestRunClaudeStatusline_OmitsVimModeSegmentWhenAbsent(t *testing.T) {
+	t.Parallel()
+	out := &strings.Builder{}
+	d := deps{
+		stdin:  strings.NewReader(`{"model":{"display_name":"Claude"}}`),
+		stdout: out,
+		getwd:  func() (string, error) { return t.TempDir(), nil },
+	}
+
+	if err := runClaudeStatusline(d, false, false); err != nil {
+		t.Fatalf("runClaudeStatusline returned error: %v", err)
+	}
+	if strings.Contains(out.String(), vimModeIcon) {
+		t.Fatalf("expected no vim mode segment, got %q", out.String())
 	}
 }
 
