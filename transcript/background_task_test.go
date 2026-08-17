@@ -222,6 +222,21 @@ func TestReadBackgroundTasks_SidechainNotificationNeverResolvesParentMarker(t *t
 	}
 }
 
+func TestReadBackgroundTasks_PrefixCollidingLongerIDDoesNotResolveShorterMarker(t *testing.T) {
+	path := writeTranscript(t,
+		startMarkerLine("task-1", "tool-1", "2026-08-12T17:00:00.000000000Z"),
+		notificationLine("task-10", "tool-10", "completed", "2026-08-12T17:05:00.000000000Z"),
+	)
+
+	reading, err := ReadBackgroundTasks(path, capDuration, readAt)
+	if err != nil {
+		t.Fatalf("ReadBackgroundTasks() error = %v", err)
+	}
+	if len(reading.Markers) != 1 || reading.Markers[0].TaskID != "task-1" || reading.Markers[0].Status != BackgroundTaskOutstandingFresh {
+		t.Errorf("Markers = %+v, want task-1 still outstanding-fresh — a later line mentioning only task-10 must not resolve task-1's marker", reading.Markers)
+	}
+}
+
 func TestReadBackgroundTasks_UnreadableFile(t *testing.T) {
 	path := writeTranscript(t, "not json at all", "still not json")
 

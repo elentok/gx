@@ -81,6 +81,35 @@ type backgroundTaskLine struct {
 // now is compared against each marker's own timestamp to decide
 // outstanding-fresh vs outstanding-aged-out against cap — passed explicitly
 // (rather than time.Now()) so callers and tests get a deterministic read.
+// containsTaskIDToken reports whether taskID appears in raw as its own
+// token: the characters immediately flanking every candidate match must not
+// themselves be id-token characters (alphanumeric/_/-), so a shorter id
+// (task-1) doesn't spuriously match inside a longer prefix-colliding one
+// (task-10, task-100).
+func containsTaskIDToken(raw, taskID string) bool {
+	for searchFrom := 0; ; {
+		i := strings.Index(raw[searchFrom:], taskID)
+		if i < 0 {
+			return false
+		}
+		start := searchFrom + i
+		end := start + len(taskID)
+		beforeOK := start == 0 || !isIDTokenChar(raw[start-1])
+		afterOK := end == len(raw) || !isIDTokenChar(raw[end])
+		if beforeOK && afterOK {
+			return true
+		}
+		searchFrom = start + 1
+	}
+}
+
+func isIDTokenChar(b byte) bool {
+	return b == '_' || b == '-' ||
+		(b >= '0' && b <= '9') ||
+		(b >= 'a' && b <= 'z') ||
+		(b >= 'A' && b <= 'Z')
+}
+
 func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (BackgroundTaskReading, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -124,7 +153,7 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 
 		for _, taskID := range order {
 			m := markers[taskID]
-			if !m.resolved && strings.Contains(raw, taskID) {
+			if !m.resolved && containsTaskIDToken(raw, taskID) {
 				m.resolved = true
 			}
 		}
