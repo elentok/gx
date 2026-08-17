@@ -96,18 +96,18 @@
         },
         "notification-thresholds": {
           "type": "array",
-          "description": "Estimated API-equivalent-cost thresholds in dollars at which a notification fires. Sorted and deduped. Default: [5, 10, 15].",
+          "description": "Estimated API-equivalent-cost thresholds in dollars at which a notification fires. Sorted and deduped. Default: [50, 100, 150, 200, 250].",
           "items": {
             "type": "number",
             "minimum": 0
           },
-          "default": [5, 10, 15]
+          "default": [50, 100, 150, 200, 250]
         }
       },
       "default": {
         "soft-limit": 300,
         "hard-limit": 350,
-        "notification-thresholds": [5, 10, 15]
+        "notification-thresholds": [50, 100, 150, 200, 250]
       }
     },
     "log": {

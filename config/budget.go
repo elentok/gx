@@ -20,7 +20,7 @@ func DefaultBudgetConfig() BudgetConfig {
 	return BudgetConfig{
 		SoftLimit:              defaultBudgetSoftLimit,
 		HardLimit:              defaultBudgetHardLimit,
-		NotificationThresholds: []float64{5, 10, 15},
+		NotificationThresholds: []float64{50, 100, 150, 200, 250},
 	}
 }
 
