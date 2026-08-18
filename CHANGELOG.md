@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.28.15 - 2026-08-18
+
+- Fixed herdr split/tab launches hanging ~2s due to a bad `process-info` arg format (now uses `--pane` flag)
+- Fixed herdr splits/tabs losing focus on close by explicitly refocusing the originating pane/tab instead of relying on herdr's unreliable neighbor-focus fallback
+
 ## v0.28.14 - 2026-08-17
 
 - Fixed herdr pane-run commands (e.g. status-tab commit) sometimes running in the wrong directory by waiting for the pane's shell to start and apply --cwd before typing commands into a freshly split/created pane
