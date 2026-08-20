@@ -2078,82 +2078,13 @@ func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotParked(t 
 	}
 }
 
-// TestWaitForFinish_BlockedPaneNoActivitySinceLaunch_ResendsInsteadOfParking
-// covers ticket 05: a pane blocked at the dwell recheck whose
-// state_change_seq still matches its own launch-time baseline never got an
-// operator dialog to clobber, so it gets one prompt resend and, once that
-// succeeds, re-enters the ordinary poll loop instead of parking.
-func TestWaitForFinish_BlockedPaneNoActivitySinceLaunch_ResendsInsteadOfParking(t *testing.T) {
+// TestWaitForFinish_BlockedPane_ParksWithoutResend covers ticket 05: the
+// park-on-blocked resend hatch was unreachable dead code and has been
+// deleted, so a blocked pane always parks with no prompt attempted,
+// whatever its state_change_seq.
+func TestWaitForFinish_BlockedPane_ParksWithoutResend(t *testing.T) {
 	t.Parallel()
 	ticketPath := writeFrontmatterTicket(t, "claimed")
-	scratchDir := t.TempDir()
-
-	if err := logEvent(scratchDir, "epic", Event{
-		Type:           eventIterationStarted,
-		Ticket:         "01",
-		AgentSession:   "sess-1",
-		StateChangeSeq: 100,
-	}); err != nil {
-		t.Fatalf("logEvent: %v", err)
-	}
-
-	var prompted int
-	var waits int
-	d := Deps{
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			waits++
-			if waits == 1 {
-				return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
-			}
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentGet: func(target string) (herdr.Agent, error) {
-			return herdr.Agent{PaneID: target, AgentStatus: "blocked", StateChangeSeq: 100}, nil
-		},
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			prompted++
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
-		},
-		Sleep: func(time.Duration) {},
-	}
-
-	err := waitForFinish(d, launchAndPromptParams{
-		Label: "iter-01", Agent: AgentClaude, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
-		ScratchDir: scratchDir, EpicName: "epic", Gate: NewGate(),
-	}, "sess-1")
-	if err != nil {
-		t.Fatalf("waitForFinish: %v", err)
-	}
-	if prompted != 1 {
-		t.Errorf("AgentPrompt calls = %d, want exactly 1 (resend attempt on a pane with no activity since launch)", prompted)
-	}
-	raw, err := os.ReadFile(ticketPath)
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
-	}
-	if strings.Contains(string(raw), "needs-answer") {
-		t.Errorf("ticket was parked despite a successful resend on a never-started pane:\n%s", raw)
-	}
-}
-
-// TestWaitForFinish_BlockedPaneGenuineActivitySinceLaunch_ParksWithoutResend
-// is the regression guard for the no-clobber guard's real case: a pane whose
-// state_change_seq has moved since launch has genuine prior activity (an
-// operator's own pending dialog may be sitting in it), so it must keep
-// today's park-without-resend behavior unchanged.
-func TestWaitForFinish_BlockedPaneGenuineActivitySinceLaunch_ParksWithoutResend(t *testing.T) {
-	t.Parallel()
-	ticketPath := writeFrontmatterTicket(t, "claimed")
-	scratchDir := t.TempDir()
-
-	if err := logEvent(scratchDir, "epic", Event{
-		Type:           eventIterationStarted,
-		Ticket:         "01",
-		AgentSession:   "sess-1",
-		StateChangeSeq: 100,
-	}); err != nil {
-		t.Fatalf("logEvent: %v", err)
-	}
 
 	var prompted bool
 	d := Deps{
@@ -2161,7 +2092,7 @@ func TestWaitForFinish_BlockedPaneGenuineActivitySinceLaunch_ParksWithoutResend(
 			return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
 		},
 		AgentGet: func(target string) (herdr.Agent, error) {
-			return herdr.Agent{PaneID: target, AgentStatus: "blocked", StateChangeSeq: 107}, nil
+			return herdr.Agent{PaneID: target, AgentStatus: "blocked", StateChangeSeq: 0}, nil
 		},
 		AgentPrompt: func(herdr.AgentPromptOptions) (herdr.Agent, error) {
 			prompted = true
@@ -2172,20 +2103,23 @@ func TestWaitForFinish_BlockedPaneGenuineActivitySinceLaunch_ParksWithoutResend(
 
 	err := waitForFinish(d, launchAndPromptParams{
 		Label: "iter-01", Agent: AgentClaude, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
-		ScratchDir: scratchDir, EpicName: "epic", Gate: NewGate(),
+		Gate: NewGate(),
 	}, "sess-1")
 	if !errors.Is(err, errBlockedPaneParked) {
 		t.Fatalf("waitForFinish() err = %v, want errBlockedPaneParked", err)
 	}
 	if prompted {
-		t.Error("AgentPrompt was called despite genuine prior activity since launch; must not risk clobbering an operator's own dialog")
+		t.Error("AgentPrompt was called; a blocked pane must never be prompted")
 	}
 	raw, err := os.ReadFile(ticketPath)
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
 	if !strings.Contains(string(raw), "needs-answer") {
-		t.Errorf("ticket was not parked despite genuine prior activity since launch:\n%s", raw)
+		t.Errorf("ticket was not parked despite a blocked pane:\n%s", raw)
+	}
+	if !strings.Contains(string(raw), "iter-01") {
+		t.Errorf("park reason does not name the iteration label:\n%s", raw)
 	}
 }
 
