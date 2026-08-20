@@ -23,6 +23,9 @@ herdr upgrade, and periodically otherwise.
 - Whenever the gate's behavior is in question — e.g. a ticket sat "blocked" for a long time without
   parking, or parked when it shouldn't have.
 
+Run the enforcement check (below) at the same times — it's the same triggers, just a different
+regression.
+
 ## What to run
 
 1. Pick or start a live Claude Code pane managed by herdr (e.g. an in-progress ralph-loop
@@ -75,3 +78,74 @@ If this happens:
 4. Until it's fixed upstream, treat the gate as **not trustworthy** for this failure mode — a
    blocked agent may sit unrecognized. Consider running epics with closer manual supervision (e.g.
    watching pane state directly) until a herdr/manifest fix lands and this check passes again.
+
+## The enforcement contract (herdr 0.8.2+)
+
+The check above covers **detection**: whether herdr recognizes a blocked pane at all. herdr 0.8.2
+added a second thing that can regress: **enforcement** — what each command does once a pane is
+blocked. A future herdr release that changes this breaks gx just as silently as a detection
+regression would, and this section is what catches it.
+
+The contract, confirmed against live panes (not fakes, not release notes):
+
+- `agent prompt` refuses outright with `agent_blocked` — no text or Enter reaches the pane.
+- `agent send-keys` is not guarded — key presses still reach a blocked pane.
+- `agent start` fails outright with `agent_not_ready` when the target pane is already blocked at
+  startup.
+
+gx depends on all three. `parkOnBlockedPane` in `ralphloop/waitforfinish.go` relies on `agent
+prompt` being refused so a blocked pane is never silently re-prompted. `launchAndPrompt` in
+`ralphloop/launch.go` classifies `agent_not_ready` (via `herdr.AgentNotReadyError`) instead of
+routing every launch-time block to an opaque needs-repair. Both rely on `agent send-keys` still
+reaching the pane, since that's the only write path gx ever uses against a blocked pane.
+
+**What gx answers automatically.** This is the whole answerable set — everything else parks:
+
+- Codex's `trust_directory` dialog, at `agent start`, with a single `agent send-keys <label>
+  enter` (`recoverAgentNotReady` in `ralphloop/launch.go`). That's it.
+- Everywhere else — a quota-reset dialog, a permission prompt, any rule id gx doesn't recognize —
+  gx parks for a human and names the dialog by its `matched_rule.id` (read via `AgentExplain`).
+  gx never guesses at an answer.
+
+**gx never bypasses the guard.** herdr also exposes `herdr pane run <pane_id> <text>`, which sends
+text straight to the pane runtime with no blocked-state check — a complete bypass of `agent
+prompt`'s guard, available today. gx deliberately has no wrapper for it. Do not add one: the guard
+is telling gx something true (a blocked pane is showing a dialog, not waiting for a prompt), and
+routing around it would reintroduce the exact operator-dialog clobbering the park gate exists to
+prevent. If you're reading this because `pane run` looks like a fix for a stuck path, it isn't —
+the fix is answering the dialog correctly or parking.
+
+**Two live-pane facts to re-check after any herdr or Claude Code/Codex upgrade.** These are the
+facts gx's fakes (`testutil/herdrfake`) encode, and the ones that silently invalidated this epic's
+original premises the last time they were checked:
+
+- A single `ctrl+c` on a working Codex pane leaves it `idle` (`matched_rule.id ==
+  osc_title_idle`), not `blocked` — and it accepts a prompt immediately after. gx's smart-zone
+  `/compact` recovery depends on this: it does not dismiss anything, it just prompts.
+- `trust_directory` is cleared by `enter` alone — a two-option list with `1. Yes, continue`
+  preselected and a `Press enter to continue` footer. If a future Codex build changes the default
+  selection or adds a step, `enter` alone stops being enough and `recoverAgentNotReady` needs a
+  different key sequence.
+
+### How to confirm the enforcement contract on a live pane
+
+Like the detection check above, this is necessarily interactive — there's no headless way to drive
+Codex into a startup trust dialog or a mid-turn interrupt.
+
+1. Start a Codex agent (`herdr agent start`) in a directory Codex has not trusted before (a fresh
+   worktree outside any already-trusted parent, e.g. not under an already-trusted `~/dev/gx`).
+2. Confirm `agent start` fails with `agent_not_ready`, and `herdr agent explain <target> --format
+   json` reports `state: blocked`, `matched_rule.id: trust_directory`.
+3. Clear it: `herdr agent send-keys <target> enter`. Confirm `agent explain` moves the pane to
+   `working`/`idle` and the dialog is gone.
+4. Start a turn that runs long enough to interrupt mid-flight (any tool-using turn). Interrupt with
+   `ctrl+c`.
+5. Confirm `agent explain` reports `state: idle`, `matched_rule.id: osc_title_idle` — not
+   `blocked`.
+6. Confirm a prompt is accepted immediately: `agent prompt <target> "..."` should succeed, not
+   return `agent_blocked`.
+
+If any step diverges from what's described above — a different rule id, a different result code, a
+prompt refused where it should be accepted — treat it the same way as a detection-check failure:
+it's a herdr- or Codex-side change to file upstream, and until it's understood, the corresponding gx
+recovery path (`recoverAgentNotReady`, smart-zone `/compact`) should be treated as not trustworthy.
