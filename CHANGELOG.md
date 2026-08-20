@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.28.16 - 2026-08-20
+
+- Fixed loop iterations being parked as failures when an agent ended its turn by *printing* a tool call as text instead of running it: gx now detects that case and sends one corrective re-prompt before falling back to needs-answer, and honors a self-report (needs-answer or commitless finish) coming from that retry turn as well
+- Added support for herdr 0.8.2's blocked-pane contract: gx classifies the `agent_blocked` envelope as a typed error, auto-dismisses an answerable `trust_directory` dialog during agent launch, and routes every other blocked dialog to needs-repair naming the matched rule id
+- Changed Codex quota-reset recovery to park the ticket for a human when the pane is still blocked on its own dialog, instead of sending a "continue" re-prompt that herdr now rejects outright
+- Classified herdr's new `agent_name_lost` and `agent_not_ready` launch failures as typed errors, with the lost pane named in the launch-failure reason
+- Fixed docs referring to the removed `gx ralph-loop` CLI
+
 ## v0.28.15 - 2026-08-18
 
 - Fixed herdr split/tab launches hanging ~2s due to a bad `process-info` arg format (now uses `--pane` flag)
