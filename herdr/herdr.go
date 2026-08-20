@@ -47,6 +47,32 @@ type AgentBlockedError struct {
 func (e *AgentBlockedError) Error() string { return e.wrapped.Error() }
 func (e *AgentBlockedError) Unwrap() error { return e.wrapped }
 
+// AgentNameLostError is herdr 0.8.2's agent_name_lost failure: the target
+// pane's terminal identity changed between the launch request and the
+// readiness check, so the pane gx asked to start an agent in is no longer
+// the pane herdr resolved. Message is herdr's own description, which names
+// the lost pane.
+type AgentNameLostError struct {
+	Message string
+	wrapped error
+}
+
+func (e *AgentNameLostError) Error() string { return e.wrapped.Error() }
+func (e *AgentNameLostError) Unwrap() error { return e.wrapped }
+
+// AgentNotReadyError is herdr 0.8.2's agent_not_ready failure: `agent start`'s
+// readiness poll returned the target pane's status as "blocked" before the
+// agent ever came up — the process is alive but sitting on a dialog, e.g.
+// Codex raising its trust_directory prompt in an untrusted directory. Message
+// is herdr's own description.
+type AgentNotReadyError struct {
+	Message string
+	wrapped error
+}
+
+func (e *AgentNotReadyError) Error() string { return e.wrapped.Error() }
+func (e *AgentNotReadyError) Unwrap() error { return e.wrapped }
+
 // candidateCwdPattern extracts the first candidate's cwd out of an
 // agent_name_taken error's Message, e.g. "...candidates: terminal_id=...
 // pane_id=... cwd=/path/to/worktree status=Working".
@@ -54,9 +80,10 @@ var candidateCwdPattern = regexp.MustCompile(`\bcwd=(\S+)`)
 
 // run shells out to herdr with args and returns its combined output,
 // wrapping a non-zero exit with the command line and output for context. If
-// the failure is herdr's JSON error envelope with code "agent_name_taken" or
-// "agent_blocked", the returned error is an *AgentNameTakenError or
-// *AgentBlockedError instead.
+// the failure is herdr's JSON error envelope with code "agent_name_taken",
+// "agent_blocked", "agent_name_lost", or "agent_not_ready", the returned
+// error is an *AgentNameTakenError, *AgentBlockedError, *AgentNameLostError,
+// or *AgentNotReadyError instead.
 func run(args ...string) ([]byte, error) {
 	out, err := runCommand(args...)
 	if err != nil {
@@ -77,6 +104,10 @@ func run(args ...string) ([]byte, error) {
 				return nil, &AgentNameTakenError{Message: resp.Error.Message, CandidateCwd: candidateCwd, wrapped: wrapped}
 			case "agent_blocked":
 				return nil, &AgentBlockedError{Message: resp.Error.Message, wrapped: wrapped}
+			case "agent_name_lost":
+				return nil, &AgentNameLostError{Message: resp.Error.Message, wrapped: wrapped}
+			case "agent_not_ready":
+				return nil, &AgentNotReadyError{Message: resp.Error.Message, wrapped: wrapped}
 			}
 		}
 		return nil, wrapped

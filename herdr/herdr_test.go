@@ -149,6 +149,74 @@ func TestRun_OtherCLIError_NotAgentBlocked(t *testing.T) {
 	}
 }
 
+func TestRun_AgentNameLostError_Classified(t *testing.T) {
+	withFakeCommand(t, func(args ...string) ([]byte, error) {
+		return []byte(`{"error":{"code":"agent_name_lost","message":"pane for agent iter-06b changed identity before it became ready"}}`), errors.New("exit 1")
+	})
+	_, err := run("agent", "start", "iter-06b")
+	if err == nil {
+		t.Fatal("run() error = nil, want error")
+	}
+	var lost *AgentNameLostError
+	if !errors.As(err, &lost) {
+		t.Fatalf("run() error = %v, want an *AgentNameLostError", err)
+	}
+	if lost.Message != "pane for agent iter-06b changed identity before it became ready" {
+		t.Errorf("Message = %q, want the envelope's message", lost.Message)
+	}
+	if !strings.Contains(lost.Error(), "iter-06b") {
+		t.Errorf("Error() = %q, want it to mention the command context", lost.Error())
+	}
+}
+
+func TestRun_OtherCLIError_NotAgentNameLost(t *testing.T) {
+	withFakeCommand(t, func(args ...string) ([]byte, error) {
+		return []byte(`{"error":{"code":"pane_not_found","message":"no such pane"}}`), errors.New("exit 1")
+	})
+	_, err := run("agent", "start", "iter-01")
+	if err == nil {
+		t.Fatal("run() error = nil, want error")
+	}
+	var lost *AgentNameLostError
+	if errors.As(err, &lost) {
+		t.Errorf("run() error = %v, want a plain error (not agent_name_lost)", err)
+	}
+}
+
+func TestRun_AgentNotReadyError_Classified(t *testing.T) {
+	withFakeCommand(t, func(args ...string) ([]byte, error) {
+		return []byte(`{"error":{"code":"agent_not_ready","message":"agent iter-06b is blocked during startup and is not ready for prompts"}}`), errors.New("exit 1")
+	})
+	_, err := run("agent", "start", "iter-06b")
+	if err == nil {
+		t.Fatal("run() error = nil, want error")
+	}
+	var notReady *AgentNotReadyError
+	if !errors.As(err, &notReady) {
+		t.Fatalf("run() error = %v, want an *AgentNotReadyError", err)
+	}
+	if notReady.Message != "agent iter-06b is blocked during startup and is not ready for prompts" {
+		t.Errorf("Message = %q, want the envelope's message", notReady.Message)
+	}
+	if !strings.Contains(notReady.Error(), "iter-06b") {
+		t.Errorf("Error() = %q, want it to mention the command context", notReady.Error())
+	}
+}
+
+func TestRun_OtherCLIError_NotAgentNotReady(t *testing.T) {
+	withFakeCommand(t, func(args ...string) ([]byte, error) {
+		return []byte(`{"error":{"code":"pane_not_found","message":"no such pane"}}`), errors.New("exit 1")
+	})
+	_, err := run("agent", "start", "iter-01")
+	if err == nil {
+		t.Fatal("run() error = nil, want error")
+	}
+	var notReady *AgentNotReadyError
+	if errors.As(err, &notReady) {
+		t.Errorf("run() error = %v, want a plain error (not agent_not_ready)", err)
+	}
+}
+
 func TestAppendFlag(t *testing.T) {
 	got := appendFlag([]string{"a"}, "--flag", "")
 	if len(got) != 1 {

@@ -249,25 +249,50 @@ func launchAndPrompt(d Deps, p launchAndPromptParams) (string, error) {
 	})
 	if err != nil {
 		var nameTaken *herdr.AgentNameTakenError
-		if !errors.As(err, &nameTaken) || nameTaken.CandidateCwd == "" || nameTaken.CandidateCwd != p.SessionCwd {
-			return "", fmt.Errorf("launching %s: %w", p.Agent, err)
+		if errors.As(err, &nameTaken) && nameTaken.CandidateCwd != "" && nameTaken.CandidateCwd == p.SessionCwd {
+			// The colliding pane's own cwd is this iteration's own worktree —
+			// almost certainly our own already-launched agent, not an
+			// unrelated name collision (claimNext's launched-set de-dup
+			// registry in loop.go should prevent this within one Run; this
+			// is belt-and-braces against any other path that still produces
+			// a double-launch, e.g. a second `gx ralph-loop` process racing
+			// the same ticket). Attach to the live pane instead of
+			// hard-failing the whole ticket to needs-repair.
+			return attachToLiveAgent(d, p)
 		}
-		// The colliding pane's own cwd is this iteration's own worktree —
-		// almost certainly our own already-launched agent, not an unrelated
-		// name collision (claimNext's launched-set de-dup registry in
-		// loop.go should prevent this within one Run; this is belt-and-
-		// braces against any other path that still produces a double-launch,
-		// e.g. a second `gx ralph-loop` process racing the same ticket).
-		// Attach to the live pane instead of hard-failing the whole ticket
-		// to needs-repair.
-		return attachToLiveAgent(d, p)
+		var nameLost *herdr.AgentNameLostError
+		if errors.As(err, &nameLost) {
+			return "", fmt.Errorf("launching %s: pane %s lost its identity before %s became ready: %w", p.Agent, p.Pane, p.Label, err)
+		}
+		var notReady *herdr.AgentNotReadyError
+		if errors.As(err, &notReady) {
+			return recoverAgentNotReady(d, p)
+		}
+		return "", fmt.Errorf("launching %s: %w", p.Agent, err)
 	}
 
-	if _, err := d.AgentWait(herdr.AgentWaitOptions{
+	return continueLaunch(d, p, startedAgent)
+}
+
+// continueLaunch runs the shared post-AgentStart launch protocol: wait for
+// Pane to reach idle, send Prompt and wait for it to start working, then wait
+// for it to finish. startedAgent is AgentStart's result when it succeeded
+// outright, or the zero value when recoverAgentNotReady is resuming a launch
+// whose AgentStart call itself failed (agent_not_ready) — in that case the
+// idle wait's own Agent result stands in for it.
+func continueLaunch(d Deps, p launchAndPromptParams, startedAgent herdr.Agent) (string, error) {
+	idleAgent, err := d.AgentWait(herdr.AgentWaitOptions{
 		Target: p.Pane,
 		Until:  []string{"idle"},
-	}); err != nil {
+	})
+	if err != nil {
 		return "", fmt.Errorf("waiting for %s to reach idle after launch: %w", p.Agent, err)
+	}
+	if startedAgent.AgentSession == "" {
+		startedAgent.AgentSession = idleAgent.AgentSession
+	}
+	if startedAgent.StateChangeSeq == 0 {
+		startedAgent.StateChangeSeq = idleAgent.StateChangeSeq
 	}
 
 	promptedAgent, err := d.AgentPrompt(herdr.AgentPromptOptions{
@@ -301,6 +326,32 @@ func launchAndPrompt(d Deps, p launchAndPromptParams) (string, error) {
 		return "", err
 	}
 	return sessionID, nil
+}
+
+// recoverAgentNotReady handles AgentStart failing with agent_not_ready: the
+// agent process is alive and its name still resolves, but herdr's readiness
+// poll caught the pane sitting on a dialog before the agent ever came up.
+// Per ticket 01's answerable-set rule, only a trust_directory dialog is
+// dismissed automatically — a two-option list with "1. Yes, continue"
+// preselected and a "Press enter to continue" footer, confirmed live in
+// ticket 01 — after which the ordinary launch protocol resumes. Any other
+// matched rule id means gx did not raise the dialog, so it must not answer
+// it; that routes to needs-repair naming the rule id instead, sending no
+// keys to the pane.
+func recoverAgentNotReady(d Deps, p launchAndPromptParams) (string, error) {
+	ruleID := "unknown"
+	if d.AgentExplain != nil {
+		if explain, err := d.AgentExplain(p.Pane); err == nil && explain.MatchedRuleID != "" {
+			ruleID = explain.MatchedRuleID
+		}
+	}
+	if ruleID != "trust_directory" {
+		return "", fmt.Errorf("launching %s: %s is not ready, blocked on dialog %q gx did not raise", p.Agent, p.Label, ruleID)
+	}
+	if err := d.AgentSendKeys(p.Pane, "enter"); err != nil {
+		return "", fmt.Errorf("dismissing %s's trust_directory dialog: %w", p.Label, err)
+	}
+	return continueLaunch(d, p, herdr.Agent{})
 }
 
 // attachToLiveAgent is launchAndPrompt's fallback once AgentStart reports

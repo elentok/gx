@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -463,6 +464,139 @@ func TestNoActivitySinceLaunch(t *testing.T) {
 			t.Errorf("noActivitySinceLaunch() = false, want true (must skip the zero-seq event and match the later genuine baseline)")
 		}
 	})
+}
+
+// TestLaunchAndPrompt_AgentNameLost_ReportsPaneAndFails covers ticket 06: an
+// AgentStart failing with herdr's agent_name_lost keeps the existing
+// needs-repair outcome (a hard failure, not a park), and the reason names the
+// lost pane rather than just dumping the wrapped envelope.
+func TestLaunchAndPrompt_AgentNameLost_ReportsPaneAndFails(t *testing.T) {
+	t.Parallel()
+	d := Deps{
+		AgentStart: func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+			return herdr.Agent{}, &herdr.AgentNameLostError{
+				Message: "pane for agent iter-06 changed identity before it became ready",
+			}
+		},
+	}
+
+	_, err := launchAndPrompt(d, launchAndPromptParams{
+		Label:      "iter-06",
+		Agent:      AgentClaude,
+		Pane:       "pane-6",
+		Prompt:     "go",
+		SessionCwd: "/repo/iter-06",
+		Ticket:     "06",
+	})
+	if err == nil {
+		t.Fatal("launchAndPrompt() error = nil, want a hard failure for agent_name_lost")
+	}
+	if !strings.Contains(err.Error(), "pane-6") {
+		t.Errorf("error = %q, want it to name the lost pane %q", err.Error(), "pane-6")
+	}
+	if errors.Is(err, errStuckSubmission) || errors.Is(err, errBlockedPaneParked) {
+		t.Errorf("error = %v, want it to be neither errStuckSubmission nor errBlockedPaneParked", err)
+	}
+}
+
+// TestLaunchAndPrompt_AgentNotReady_TrustDirectory_DismissesAndProceeds
+// covers ticket 06's answerable-set rule: an AgentStart failing with
+// agent_not_ready on a trust_directory dialog is dismissed by sending
+// "enter", after which the ordinary launch protocol (wait idle, prompt, wait
+// working, wait finish) proceeds normally.
+func TestLaunchAndPrompt_AgentNotReady_TrustDirectory_DismissesAndProceeds(t *testing.T) {
+	t.Parallel()
+	var sentKeys []string
+	var waitTargets []string
+	sink := &recordingSinkWithArgs{occupancySink: &occupancySink{}}
+
+	d := Deps{
+		AgentStart: func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+			return herdr.Agent{}, &herdr.AgentNotReadyError{
+				Message: "agent iter-06 is blocked during startup and is not ready for prompts",
+			}
+		},
+		AgentExplain: func(target string) (herdr.AgentExplainResult, error) {
+			return herdr.AgentExplainResult{State: "blocked", MatchedRuleID: "trust_directory"}, nil
+		},
+		AgentSendKeys: func(target string, keys ...string) error {
+			sentKeys = append(sentKeys, keys...)
+			return nil
+		},
+		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+			waitTargets = append(waitTargets, opts.Target)
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle", AgentSession: "sess-06"}, nil
+		},
+		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+			return herdr.Agent{PaneID: opts.Target, AgentStatus: "working", AgentSession: "sess-06"}, nil
+		},
+		Sleep: func(time.Duration) {},
+	}
+
+	sessionID, err := launchAndPrompt(d, launchAndPromptParams{
+		Label:      "iter-06",
+		Agent:      AgentClaude,
+		Pane:       "pane-6",
+		Prompt:     "go",
+		SessionCwd: "/repo/iter-06",
+		Ticket:     "06",
+		StartEvent: eventIterationStarted,
+		Sink:       sink,
+	})
+	if err != nil {
+		t.Fatalf("launchAndPrompt: %v", err)
+	}
+	if sessionID != "sess-06" {
+		t.Errorf("sessionID = %q, want sess-06", sessionID)
+	}
+	if len(sentKeys) != 1 || sentKeys[0] != "enter" {
+		t.Errorf("sent keys = %v, want exactly [\"enter\"]", sentKeys)
+	}
+	if len(waitTargets) == 0 || waitTargets[0] != "pane-6" {
+		t.Errorf("AgentWait targets = %v, want the first to be pane-6 (the ordinary launch protocol resuming)", waitTargets)
+	}
+}
+
+// TestLaunchAndPrompt_AgentNotReady_OtherRule_NeedsRepairNoKeys covers the
+// flip side of ticket 06's answerable-set rule: any matched rule id other
+// than trust_directory means gx did not raise the dialog, so it routes to
+// needs-repair naming the rule id and sends no keys to the pane.
+func TestLaunchAndPrompt_AgentNotReady_OtherRule_NeedsRepairNoKeys(t *testing.T) {
+	t.Parallel()
+	var sendKeysCalls int
+
+	d := Deps{
+		AgentStart: func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+			return herdr.Agent{}, &herdr.AgentNotReadyError{
+				Message: "agent iter-06 is blocked during startup and is not ready for prompts",
+			}
+		},
+		AgentExplain: func(target string) (herdr.AgentExplainResult, error) {
+			return herdr.AgentExplainResult{State: "blocked", MatchedRuleID: "codex_approval_prompt"}, nil
+		},
+		AgentSendKeys: func(target string, keys ...string) error {
+			sendKeysCalls++
+			return nil
+		},
+	}
+
+	_, err := launchAndPrompt(d, launchAndPromptParams{
+		Label:      "iter-06",
+		Agent:      AgentClaude,
+		Pane:       "pane-6",
+		Prompt:     "go",
+		SessionCwd: "/repo/iter-06",
+		Ticket:     "06",
+	})
+	if err == nil {
+		t.Fatal("launchAndPrompt() error = nil, want a hard failure for an unanswerable agent_not_ready rule")
+	}
+	if !strings.Contains(err.Error(), "codex_approval_prompt") {
+		t.Errorf("error = %q, want it to name the matched rule id", err.Error())
+	}
+	if sendKeysCalls != 0 {
+		t.Errorf("AgentSendKeys calls = %d, want 0 (gx must not answer a dialog it did not raise)", sendKeysCalls)
+	}
 }
 
 // recordingSinkWithArgs embeds occupancySink (itself embedding
