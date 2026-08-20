@@ -2189,12 +2189,18 @@ func TestWaitForFinish_BlockedPaneGenuineActivitySinceLaunch_ParksWithoutResend(
 	}
 }
 
+// TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsRepair covers a Codex pane
+// still blocked once its quota resets: per ticket 04, that must park for a
+// human (needs-answer), never a hard failure that stalled-agent detection
+// would flag needs-repair, and never a "continue" re-prompt into a pane
+// herdr reports blocked.
 func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsRepair(t *testing.T) {
 	t.Parallel()
 	for _, quota := range []string{"primary", "secondary"} {
 		t.Run(quota, func(t *testing.T) {
 			t.Parallel()
 			ticketPath := writeFrontmatterTicket(t, "claimed")
+			scratchDir := t.TempDir()
 			gate := NewGate()
 			sink := &quotaEventSink{}
 			var waits, prompts, quotaChecks, interruptions int
@@ -2202,10 +2208,7 @@ func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsRepair(t *testing.T) {
 			d := Deps{
 				AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
 					waits++
-					if waits < 3 {
-						return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
-					}
-					return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+					return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
 				},
 				AgentPrompt: func(herdr.AgentPromptOptions) (herdr.Agent, error) {
 					prompts++
@@ -2227,14 +2230,15 @@ func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsRepair(t *testing.T) {
 				Now:   time.Now,
 			}
 
-			if err := waitForFinish(d, launchAndPromptParams{
+			err := waitForFinish(d, launchAndPromptParams{
 				Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
-				Gate: gate, Sink: sink,
-			}, "codex-session-1"); err != nil {
-				t.Fatalf("waitForFinish: %v", err)
+				ScratchDir: scratchDir, EpicName: "epic", Gate: gate, Sink: sink,
+			}, "codex-session-1")
+			if !errors.Is(err, errBlockedPaneParked) {
+				t.Fatalf("waitForFinish() err = %v, want errBlockedPaneParked", err)
 			}
-			if prompts != 1 {
-				t.Errorf("continue prompts = %d, want 1", prompts)
+			if prompts != 0 {
+				t.Errorf("continue prompts = %d, want 0 — a pane herdr reports blocked must never be prompted", prompts)
 			}
 			if interruptions != 0 {
 				t.Errorf("pane interruptions = %d, want 0", interruptions)
@@ -2260,8 +2264,8 @@ func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsRepair(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ReadFile: %v", err)
 			}
-			if !strings.Contains(string(raw), "claimed") || strings.Contains(string(raw), "needs-repair") {
-				t.Errorf("ticket status = %s, want claimed without needs-repair", raw)
+			if !strings.Contains(string(raw), "needs-answer") || strings.Contains(string(raw), "needs-repair") {
+				t.Errorf("ticket status = %s, want needs-answer without needs-repair", raw)
 			}
 		})
 	}

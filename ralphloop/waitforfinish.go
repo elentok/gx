@@ -907,15 +907,33 @@ func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, li
 		return nil
 	}
 
-	if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
-		Target: p.Pane,
-		Text:   "continue",
-		Wait:   true,
-		Until:  []string{"working"},
-	}); err != nil {
-		return fmt.Errorf("re-prompting %s after Codex quota reset: %w", p.Label, err)
+	return parkBlockedAfterCodexQuotaReset(d, p, sessionID)
+}
+
+// parkBlockedAfterCodexQuotaReset handles a Codex pane that comes back
+// blocked once its quota reset: unlike waitForClaudeRateLimitReset's plain
+// "continue" re-prompt, a blocked pane here is sitting on its own dialog, not
+// waiting for the iteration to resume — "continue" is a prompt, not a dialog
+// answer, and gx never raised the dialog in the first place, so it must not
+// be sent. There is also no trust_directory branch to try: the directory was
+// already trusted at launch and gx was asleep for the reset, so the only
+// answerable-dialog case (see ticket 01) can't occur here. This parks for a
+// human instead, naming the unanswered dialog by its matched_rule.id (read
+// via AgentExplain) the same way parkOnBlockedPane does.
+func parkBlockedAfterCodexQuotaReset(d Deps, p launchAndPromptParams, sessionID string) error {
+	ruleID := "unknown"
+	if d.AgentExplain != nil {
+		if explain, err := d.AgentExplain(p.Pane); err == nil && explain.MatchedRuleID != "" {
+			ruleID = explain.MatchedRuleID
+		}
 	}
-	return nil
+	reason := fmt.Sprintf("%s came back blocked on dialog %q after a Codex quota reset; answer it in the pane", p.Label, ruleID)
+	if err := MarkNeedsAnswerWithReasonAndStub(p.TicketPath, reason, schema.ParkKindBlockedPane); err != nil {
+		return fmt.Errorf("marking ticket needs-answer after Codex quota reset: %w", err)
+	}
+	p.logAgentEvent(eventNeedsAnswer, sessionID, reason)
+	p.sink().TicketNeedsHuman(p.Ticket, p.EpicName, "needs-answer", reason)
+	return errBlockedPaneParked
 }
 
 // blockedDwellMs is the fixed window waitForFinish waits, once, after first

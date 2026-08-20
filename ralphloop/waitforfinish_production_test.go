@@ -12,7 +12,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/codexsession"
+	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/testutil/herdrfake"
+	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/transcript"
 	"go.uber.org/goleak"
 )
@@ -925,5 +928,87 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 		if compactionRunning && len(e.Argv) >= 2 && e.Argv[0] == "agent" && e.Argv[1] == "send-keys" {
 			t.Errorf("send-keys dispatched after compaction started: %v", e.Argv)
 		}
+	}
+}
+
+// TestRecoverCodexRateLimit_ProductionBlockedAfterReset_ParksWithoutPrompting
+// exercises ticket 04 through the production Codex-quota harness with
+// ticket 02's agent_blocked rejection turned on: a pane that comes back
+// blocked once its quota resets must park for a human instead of being
+// prompted (which herdr 0.8.2 would hard-reject anyway).
+func TestRecoverCodexRateLimit_ProductionBlockedAfterReset_ParksWithoutPrompting(t *testing.T) {
+	pane := "pane-codex-04"
+	agentID := "agent-codex-04"
+	sessionID := "sess-codex-04"
+	cwd := t.TempDir()
+
+	s := herdrfake.NewState(t)
+	s.Agents[agentID] = &herdrfake.Agent{ID: agentID, PaneID: pane, Name: "codex", Kind: "codex", Status: "blocked", SessionID: sessionID}
+
+	s.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		return map[string]any{"agent": map[string]any{
+			"pane_id": pane, "agent_status": "blocked",
+			"agent_session": map[string]any{"value": sessionID},
+		}}, herdrfake.Identities{PaneID: pane, AgentID: agentID, SessionID: sessionID}, nil
+	})
+	s.Register("agent", "prompt", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		return nil, herdrfake.Identities{PaneID: pane}, herdrfake.AgentBlockedError("codex")
+	})
+
+	herdrfake.StartState(t, s)
+
+	ticketPath := writeFrontmatterTicket(t, "claimed")
+	scratchDir := t.TempDir()
+	deps := testDeps()
+	deps.Sleep = func(time.Duration) {}
+	deps.Now = func() time.Time { return time.Unix(0, 0) }
+	deps.ReadCodexRateLimit = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
+		return codexsession.RateLimit{}, false, nil
+	}
+	// herdr agent explain returns its bare diagnostic JSON, not the
+	// {"result": ...} envelope herdrfake.Result wraps every other command
+	// in, so it can't be modeled through s.Register the way agent wait/prompt
+	// are — fake it directly on Deps instead, same as the lighter-weight
+	// unit test in recover_codex_quota_blocked_test.go.
+	deps.AgentExplain = func(target string) (herdr.AgentExplainResult, error) {
+		return herdr.AgentExplainResult{State: "blocked", MatchedRuleID: "live_blocked_form"}, nil
+	}
+
+	err := recoverCodexRateLimit(deps, launchAndPromptParams{
+		Label: "iter-04", Agent: AgentCodex, Pane: pane, SessionCwd: cwd, Ticket: "04", TicketPath: ticketPath,
+		ScratchDir: scratchDir, EpicName: "epic", Gate: NewGate(),
+	}, sessionID, codexsession.RateLimit{Quota: "usage"})
+	if !errors.Is(err, errBlockedPaneParked) {
+		t.Fatalf("recoverCodexRateLimit() err = %v, want errBlockedPaneParked", err)
+	}
+
+	for _, e := range s.Trace() {
+		if len(e.Argv) >= 2 && e.Argv[0] == "agent" && e.Argv[1] == "prompt" {
+			t.Errorf("agent prompt dispatched while herdr reported the pane blocked: %v", e.Argv)
+		}
+	}
+
+	raw, readErr := os.ReadFile(ticketPath)
+	if readErr != nil {
+		t.Fatalf("ReadFile: %v", readErr)
+	}
+	ticket, parseErr := schema.ParseTicketFromRaw(string(raw), ticketPath)
+	if parseErr != nil {
+		t.Fatalf("ParseTicketFromRaw: %v", parseErr)
+	}
+	if ticket.Status != schema.StatusNeedsAnswer {
+		t.Errorf("Status = %q, want needs-answer", ticket.Status)
+	}
+	if ticket.ParkKind != schema.ParkKindBlockedPane {
+		t.Errorf("ParkKind = %q, want blocked-pane", ticket.ParkKind)
+	}
+
+	events, ok, err := ReadEvents(scratchDir, "epic")
+	if err != nil || !ok || len(events) == 0 {
+		t.Fatalf("ReadEvents() = %+v, ok=%v, err=%v", events, ok, err)
+	}
+	last := events[len(events)-1]
+	if !strings.Contains(last.Reason, "live_blocked_form") {
+		t.Errorf("park reason = %q, want it to name the matched_rule.id live_blocked_form", last.Reason)
 	}
 }

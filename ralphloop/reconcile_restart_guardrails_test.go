@@ -78,9 +78,12 @@ func TestRun_ReattachedSmartZoneBreach_AutoRecoversThenLands(t *testing.T) {
 
 // TestRun_ReattachedCodexQuota_StructuredRecoveryThenLands covers ticket 23's
 // second requirement: a reattached Codex iteration's wait still detects a
-// structured (session-file-backed) quota exhaustion, pauses and resumes the
-// gate around the reset, then re-prompts and lands normally — the same
-// recovery waitForFinish performs for a fresh iteration.
+// structured (session-file-backed) quota exhaustion and pauses/resumes the
+// gate around the reset. Per ticket 04, a pane still blocked once that reset
+// completes must park for a human instead of being re-prompted — herdr
+// 0.8.2 hard-rejects a prompt into a blocked pane, and even without that
+// guard "continue" isn't an answer to whatever dialog the pane is sitting
+// on.
 func TestRun_ReattachedCodexQuota_StructuredRecoveryThenLands(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
@@ -93,10 +96,10 @@ func TestRun_ReattachedCodexQuota_StructuredRecoveryThenLands(t *testing.T) {
 	var waits int
 	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
 		waits++
-		if waits < 3 {
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
-		}
-		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
+	}
+	d.AgentGet = func(target string) (herdr.Agent, error) {
+		return herdr.Agent{PaneID: "pane-" + target, WorkspaceID: "ws1", TabID: "tab-" + target, AgentStatus: "blocked", AgentSession: "session-" + target}, nil
 	}
 	var quotaChecks int
 	d.ReadCodexRateLimit = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
@@ -111,32 +114,52 @@ func TestRun_ReattachedCodexQuota_StructuredRecoveryThenLands(t *testing.T) {
 		prompts = append(prompts, opts.Text)
 		return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
 	}
+	// The pane stays blocked forever in this fake — there is no dialog for a
+	// human to answer here, only a scripted proof that the park happened. The
+	// park poll is the run's only path to noticing an external status change,
+	// so it doubles as that "human" here: on the first poll it reads back the
+	// parked ticket to prove it landed on needs-answer with the reset's
+	// pane never prompted, then marks it done directly, the same way a person
+	// resolving the dialog by hand would let the run settle.
+	path := ticketPath(scratchDir, "epic", "01-a.md")
+	var parkPolls int
+	d.ParkTimer = func(dur time.Duration) <-chan time.Time {
+		parkPolls++
+		if parkPolls == 1 {
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				t.Errorf("ReadFile %s: %v", path, err)
+			} else if !strings.Contains(string(raw), "needs-answer") {
+				t.Errorf("ticket at first park poll = %s, want needs-answer", raw)
+			}
+			if err := SetStatus(path, "done"); err != nil {
+				t.Errorf("SetStatus %s: %v", path, err)
+			}
+		}
+		return readyTimer(dur)
+	}
 
 	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	if len(prompts) != 1 || prompts[0] != "continue" {
-		t.Errorf("prompts = %v, want a single \"continue\" re-prompt after the structured Codex quota reset", prompts)
+	if len(prompts) != 0 {
+		t.Errorf("prompts = %v, want none — a pane herdr reports blocked must never be prompted", prompts)
 	}
-	if len(*removed) != 1 {
-		t.Errorf("removed worktree branches = %v, want the reattached iteration cleaned up exactly once", *removed)
+	if len(*removed) != 0 {
+		t.Errorf("removed worktree branches = %v, want none — the ticket was resolved directly, not through the ordinary landing path", *removed)
 	}
-
-	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
-	}
-	if !strings.Contains(string(raw), "status: done") {
-		t.Errorf("ticket after reattached structured quota recovery = %s, want status: done", raw)
+	if parkPolls == 0 {
+		t.Errorf("run never parked (no park poll), want it to park on the blocked-after-reset ticket")
 	}
 }
 
 // TestRun_ReattachedCodexQuota_PaneTextFallbackRecoversThenLands covers the
 // other half of ticket 23's second requirement: when structured session data
 // can't identify the block, a reattached Codex iteration's wait still falls
-// back to reading the pane's recent output to detect the quota message, and
-// recovers the same way.
+// back to reading the pane's recent output to detect the quota message. Per
+// ticket 04, a pane still blocked once that reset completes must park for a
+// human instead of being re-prompted.
 func TestRun_ReattachedCodexQuota_PaneTextFallbackRecoversThenLands(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
@@ -149,10 +172,10 @@ func TestRun_ReattachedCodexQuota_PaneTextFallbackRecoversThenLands(t *testing.T
 	var waits int
 	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
 		waits++
-		if waits < 3 {
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
-		}
-		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+		return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
+	}
+	d.AgentGet = func(target string) (herdr.Agent, error) {
+		return herdr.Agent{PaneID: "pane-" + target, WorkspaceID: "ws1", TabID: "tab-" + target, AgentStatus: "blocked", AgentSession: "session-" + target}, nil
 	}
 	d.ReadCodexRateLimit = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
 		return codexsession.RateLimit{}, false, nil
@@ -165,23 +188,38 @@ func TestRun_ReattachedCodexQuota_PaneTextFallbackRecoversThenLands(t *testing.T
 		prompts = append(prompts, opts.Text)
 		return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
 	}
+	// Same rationale as the structured-recovery test above: the pane stays
+	// blocked forever here, so the park poll doubles as the "human" that
+	// notices the park and resolves it, after proving it landed correctly.
+	path := ticketPath(scratchDir, "epic", "01-a.md")
+	var parkPolls int
+	d.ParkTimer = func(dur time.Duration) <-chan time.Time {
+		parkPolls++
+		if parkPolls == 1 {
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				t.Errorf("ReadFile %s: %v", path, err)
+			} else if !strings.Contains(string(raw), "needs-answer") {
+				t.Errorf("ticket at first park poll = %s, want needs-answer", raw)
+			}
+			if err := SetStatus(path, "done"); err != nil {
+				t.Errorf("SetStatus %s: %v", path, err)
+			}
+		}
+		return readyTimer(dur)
+	}
 
 	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	if len(prompts) != 1 || prompts[0] != "continue" {
-		t.Errorf("prompts = %v, want a single \"continue\" re-prompt after the pane-text Codex quota reset", prompts)
+	if len(prompts) != 0 {
+		t.Errorf("prompts = %v, want none — a pane herdr reports blocked must never be prompted", prompts)
 	}
-	if len(*removed) != 1 {
-		t.Errorf("removed worktree branches = %v, want the reattached iteration cleaned up exactly once", *removed)
+	if len(*removed) != 0 {
+		t.Errorf("removed worktree branches = %v, want none — the ticket was resolved directly, not through the ordinary landing path", *removed)
 	}
-
-	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
-	}
-	if !strings.Contains(string(raw), "status: done") {
-		t.Errorf("ticket after reattached pane-text quota recovery = %s, want status: done", raw)
+	if parkPolls == 0 {
+		t.Errorf("run never parked (no park poll), want it to park on the blocked-after-reset ticket")
 	}
 }
